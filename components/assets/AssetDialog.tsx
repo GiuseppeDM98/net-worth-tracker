@@ -38,6 +38,7 @@ import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useAuth } from '@/contexts/AuthContext';
+import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { Asset, AssetFormData, AssetType, AssetClass, AssetAllocationTarget, AssetComposition, CouponFrequency, BondDetails, CouponRateTier, AnnouncedInflationRate } from '@/types/assets';
 import { createAsset, updateAsset } from '@/lib/services/assetService';
@@ -375,6 +376,7 @@ const assetClasses: { value: AssetClass; label: string }[] = [
 
 export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
   const { user } = useAuth();
+  const { ownerId } = useActiveAccount();
   const [step, setStep] = useState<1 | 2>(1);
   const isEdit = !!asset;
   const [fetchingPrice, setFetchingPrice] = useState(false);
@@ -509,11 +511,11 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
   }, [open, user]);
 
   const loadAllocationTargets = async () => {
-    if (!user) return;
+    if (!user || !ownerId) return;
 
     try {
       setLoadingTargets(true);
-      const targets = await getTargets(user.uid);
+      const targets = await getTargets(ownerId);
       setAllocationTargets(targets);
     } catch (error) {
       console.error('Error loading allocation targets:', error);
@@ -689,14 +691,14 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
   };
 
   const handleAddSubCategory = async () => {
-    if (!user || !selectedAssetClass || !newSubCategoryName.trim()) {
+    if (!user || !ownerId || !selectedAssetClass || !newSubCategoryName.trim()) {
       toast.error('Inserisci un nome per la sottocategoria');
       return;
     }
 
     try {
       setIsAddingSubCategory(true);
-      await addSubCategory(user.uid, selectedAssetClass, newSubCategoryName.trim());
+      await addSubCategory(ownerId, selectedAssetClass, newSubCategoryName.trim());
       toast.success(`Sottocategoria "${newSubCategoryName}" creata con successo!`);
 
       // Ricarica i targets per ottenere la nuova sottocategoria
@@ -794,7 +796,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
    * 4. If all fail → set price to 0 as indicator for manual update
    */
   const onSubmit = async (data: AssetFormValues) => {
-    if (!user) return;
+    if (!user || !ownerId) return;
 
     if (isSubCategoryEnabled() && !data.subCategory) {
       toast.error('La sottocategoria è obbligatoria per questa classe di asset');
@@ -850,14 +852,14 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         savedAssetId = asset.id;
         toast.success('Asset aggiornato con successo');
       } else {
-        savedAssetId = await createAsset(user.uid, formData);
+        savedAssetId = await createAsset(ownerId, formData);
         toast.success('Asset creato con successo');
       }
 
       // Step 4: Schedule coupon dividends for bonds with configured coupon details
       if (bondDetailsValue) {
         try {
-          await scheduleCouponDividends(bondDetailsValue, data, savedAssetId, user.uid);
+          await scheduleCouponDividends(bondDetailsValue, data, savedAssetId, ownerId);
         } catch (couponError) {
           // Non-critical: asset was saved; coupon generation failed
           console.error('Error generating coupon dividend:', couponError);

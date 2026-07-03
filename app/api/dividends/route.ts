@@ -8,7 +8,7 @@ import { adminDb } from '@/lib/firebase/admin';
 import { DividendFormData } from '@/types/dividend';
 import { Asset } from '@/types/assets';
 import {
-  assertSameUser,
+  assertCanAccessAccount,
   getApiAuthErrorResponse,
   requireFirebaseAuth,
 } from '@/lib/server/apiAuth';
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
     const startDateStr = searchParams.get('startDate');
     const endDateStr = searchParams.get('endDate');
 
-    assertSameUser(decodedToken, userId);
+    await assertCanAccessAccount(decodedToken, userId);
     const authenticatedUserId = userId as string;
 
     let dividends;
@@ -151,7 +151,7 @@ export async function POST(request: NextRequest) {
     }
 
     const userId = body.userId as string;
-    assertSameUser(decodedToken, userId);
+    await assertCanAccessAccount(decodedToken, userId);
 
     const dividendResult = parseOr400(dividendDataSchema, body.dividendData);
     if (!dividendResult.ok) return dividendResult.response;

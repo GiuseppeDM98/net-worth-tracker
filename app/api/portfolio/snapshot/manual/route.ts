@@ -4,7 +4,7 @@ import { Timestamp } from 'firebase-admin/firestore';
 import { updateHallOfFame } from '@/lib/services/hallOfFameService.server';
 import { invalidateDashboardOverviewSummaryServer } from '@/lib/services/dashboardOverviewInvalidation.server';
 import {
-  assertSameUser,
+  assertCanAccessAccount,
   getApiAuthErrorResponse,
   requireFirebaseAuth,
 } from '@/lib/server/apiAuth';
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
     //
     // Manual snapshots require all data upfront (no automatic calculation)
     // Validation order: Basic fields → Numeric fields → Object fields → Ranges
-    assertSameUser(decodedToken, userId);
+    await assertCanAccessAccount(decodedToken, userId);
 
     if (!year || !month) {
       return NextResponse.json(

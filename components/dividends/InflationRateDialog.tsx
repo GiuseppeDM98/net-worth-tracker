@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
+import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { updateAssetBondDetails } from '@/lib/services/assetService';
 import { scheduleNextCoupon } from '@/lib/services/couponScheduling';
@@ -43,6 +44,7 @@ interface InflationRateDialogProps {
 
 export function InflationRateDialog({ open, coupon, asset, onClose, onSaved }: InflationRateDialogProps) {
   const { user } = useAuth();
+  const { ownerId } = useActiveAccount();
   const isDemo = useDemoMode();
   const [rateInput, setRateInput] = useState('');
   const [saving, setSaving] = useState(false);
@@ -76,7 +78,7 @@ export function InflationRateDialog({ open, coupon, asset, onClose, onSaved }: I
   }, [bondDetails, couponDate, rateInput, quantity]);
 
   const handleSave = async () => {
-    if (!asset?.bondDetails || !couponDate || !user || isDemo) return;
+    if (!asset?.bondDetails || !couponDate || !user || !ownerId || isDemo) return;
     const parsed = parseFloat(rateInput.replace(',', '.'));
     if (isNaN(parsed)) {
       toast.error('Inserisci un tasso valido');
@@ -100,7 +102,7 @@ export function InflationRateDialog({ open, coupon, asset, onClose, onSaved }: I
         quantity: asset.quantity,
         currency: asset.currency,
         taxRate: asset.taxRate,
-        userId: user.uid,
+        userId: ownerId,
       });
       toast.success('Cedola aggiornata con il tasso di inflazione');
       await onSaved();

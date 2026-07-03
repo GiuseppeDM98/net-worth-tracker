@@ -24,6 +24,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
+import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { queryKeys } from '@/lib/query/queryKeys';
 import { CostCenter, CostCenterPeriod } from '@/types/costCenters';
@@ -96,6 +97,7 @@ interface CenterRow {
 
 export function CostCentersTab() {
   const { user } = useAuth();
+  const { ownerId } = useActiveAccount();
   const isDemo = useDemoMode();
   const queryClient = useQueryClient();
   const chartColors = useChartColors();
@@ -103,7 +105,7 @@ export function CostCentersTab() {
   // Fetch centers + every center's raw expenses once. Period views are derived in memory,
   // so switching period is instant and needs no refetch.
   const { data, isLoading: loading } = useQuery({
-    queryKey: queryKeys.costCenters.all(user?.uid ?? ''),
+    queryKey: queryKeys.costCenters.all(ownerId ?? ''),
     enabled: !!user,
     queryFn: async () => {
       const userId = user!.uid;
@@ -122,7 +124,7 @@ export function CostCentersTab() {
   const expensesByCenter = useMemo(() => data?.expensesByCenter ?? {}, [data]);
 
   const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: queryKeys.costCenters.all(user?.uid ?? '') });
+    queryClient.invalidateQueries({ queryKey: queryKeys.costCenters.all(ownerId ?? '') });
 
   // --- UI state ---
   const [period, setPeriod] = useState<CostCenterPeriod>('year');
@@ -202,9 +204,9 @@ export function CostCentersTab() {
   };
 
   const handleDelete = async (center: CostCenter) => {
-    if (!user) return;
+    if (!user || !ownerId) return;
     try {
-      await deleteCostCenter(user.uid, center.id);
+      await deleteCostCenter(ownerId, center.id);
       toast.success(`"${center.name}" eliminato`);
       setSelectedCenter(null);
       invalidate();

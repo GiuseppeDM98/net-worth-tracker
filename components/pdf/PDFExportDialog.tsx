@@ -30,6 +30,7 @@ import {
 import { Loader2 } from 'lucide-react';
 import { generatePDF, validatePDFOptions } from '@/lib/utils/pdfGenerator';
 import { useAuth } from '@/contexts/AuthContext';
+import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { toast } from 'sonner';
 import type { SectionSelection, TimeFilter } from '@/types/pdf';
 import type { MonthlySnapshot, Asset, AssetAllocationTarget } from '@/types/assets';
@@ -92,6 +93,7 @@ export function PDFExportDialog({
   allocationTargets,
 }: PDFExportDialogProps) {
   const { user } = useAuth();
+  const { ownerId } = useActiveAccount();
   const [loading, setLoading] = useState(false);
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('total');
   const [validation, setValidation] = useState(validateTimeFilterData(snapshots));
@@ -240,7 +242,7 @@ export function PDFExportDialog({
    * On success: Close dialog and show success toast
    */
   const handleExport = async () => {
-    if (!user) {
+    if (!user || !ownerId) {
       toast.error('Utente non autenticato');
       return;
     }
@@ -267,7 +269,7 @@ export function PDFExportDialog({
 
       // Prepare PDF generation options with filtered data
       const options = {
-        userId: user.uid,
+        userId: ownerId,
         userName: user.displayName || 'Utente',
         sections,
         snapshots: filteredSnapshots,

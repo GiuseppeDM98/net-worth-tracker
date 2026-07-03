@@ -11,7 +11,7 @@ import { computeDividendYieldMetrics } from '@/lib/utils/yieldOnCost';
 import { getUserSnapshotsAdmin } from '@/lib/server/assetAdminRepository';
 import { deriveHoldingStartDates } from '@/lib/utils/snapshotAssetBreakdown';
 import {
-  assertSameUser,
+  assertCanAccessAccount,
   getApiAuthErrorResponse,
   requireFirebaseAuth,
 } from '@/lib/server/apiAuth';
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     const endDateStr = searchParams.get('endDate');
     const assetId = searchParams.get('assetId') || undefined;
 
-    assertSameUser(decodedToken, userId);
+    await assertCanAccessAccount(decodedToken, userId);
     const authenticatedUserId = userId as string;
 
     let startDate: Date | undefined;

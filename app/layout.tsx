@@ -25,6 +25,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { ActiveAccountProvider } from "@/contexts/ActiveAccountContext";
 import { QueryClientProvider } from "@/lib/providers/QueryClientProvider";
 import { Toaster } from "@/components/ui/sonner";
 import { MotionProvider } from "@/components/providers/MotionProvider";
@@ -80,12 +81,14 @@ export default function RootLayout({
         <ThemeProvider>
           <MotionProvider>
             <AuthProvider>
-              <ColorThemeProvider>
-                <QueryClientProvider>
-                  {children}
-                  <Toaster />
-                </QueryClientProvider>
-              </ColorThemeProvider>
+              <ActiveAccountProvider>
+                <ColorThemeProvider>
+                  <QueryClientProvider>
+                    {children}
+                    <Toaster />
+                  </QueryClientProvider>
+                </ColorThemeProvider>
+              </ActiveAccountProvider>
             </AuthProvider>
           </MotionProvider>
         </ThemeProvider>

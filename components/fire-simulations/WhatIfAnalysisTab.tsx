@@ -19,6 +19,7 @@
 import { useEffect, useMemo, useRef, useState, type ElementType } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
+import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import {
   getAllAssets,
   calculateFIRENetWorth,
@@ -277,23 +278,24 @@ function IncomeSourceSelector({
 
 export function WhatIfAnalysisTab() {
   const { user } = useAuth();
+  const { ownerId } = useActiveAccount();
 
   const { data: settings, isLoading: isLoadingSettings } = useQuery<Settings | null>({
-    queryKey: ['settings', user?.uid],
+    queryKey: ['settings', ownerId],
     queryFn: () => getSettings(user!.uid),
     enabled: !!user,
     staleTime: 300000,
   });
 
   const { data: assets, isLoading: isLoadingAssets } = useQuery({
-    queryKey: ['assets', user?.uid],
+    queryKey: ['assets', ownerId],
     queryFn: () => getAllAssets(user!.uid),
     enabled: !!user,
     staleTime: 300000,
   });
 
   const { data: cashflowData, isLoading: isLoadingCashflow } = useQuery({
-    queryKey: ['annualCashflowData', user?.uid],
+    queryKey: ['annualCashflowData', ownerId],
     queryFn: () => getAnnualCashflowData(user!.uid),
     enabled: !!user,
     staleTime: 300000,

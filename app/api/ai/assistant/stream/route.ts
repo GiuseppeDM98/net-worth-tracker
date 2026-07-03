@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  assertSameUser,
+  assertCanAccessAccount,
   getApiAuthErrorResponse,
   requireFirebaseAuth,
 } from '@/lib/server/apiAuth';
@@ -161,7 +161,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = (await request.json()) as AssistantStreamRequest;
-    assertSameUser(decodedToken, body.userId);
+    await assertCanAccessAccount(decodedToken, body.userId);
 
     const rateLimitResult = checkRateLimit(
       `${body.userId}:stream`,

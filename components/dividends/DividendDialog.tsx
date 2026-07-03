@@ -18,6 +18,7 @@ import { useForm, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useAuth } from '@/contexts/AuthContext';
+import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { Dividend, DividendFormData, DividendType } from '@/types/dividend';
 import { Asset } from '@/types/assets';
@@ -92,6 +93,7 @@ const dividendTypeLabels: Record<DividendType, string> = {
 
 export function DividendDialog({ open, onClose, dividend, onSuccess }: DividendDialogProps) {
   const { user } = useAuth();
+  const { ownerId } = useActiveAccount();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loadingAssets, setLoadingAssets] = useState(false);
 
@@ -134,11 +136,11 @@ export function DividendDialog({ open, onClose, dividend, onSuccess }: DividendD
   }, [open, user]);
 
   const loadAssets = async () => {
-    if (!user) return;
+    if (!user || !ownerId) return;
 
     try {
       setLoadingAssets(true);
-      const allAssets = await getAllAssets(user.uid);
+      const allAssets = await getAllAssets(ownerId);
 
       // Filter only assets that can have dividends (stocks, ETFs)
       const dividendAssets = allAssets.filter(
@@ -220,7 +222,7 @@ export function DividendDialog({ open, onClose, dividend, onSuccess }: DividendD
   }, [dividend, reset, open]);
 
   const onSubmit = async (data: DividendFormValues) => {
-    if (!user) {
+    if (!user || !ownerId) {
       toast.error('Devi essere autenticato');
       return;
     }
@@ -257,7 +259,7 @@ export function DividendDialog({ open, onClose, dividend, onSuccess }: DividendD
       // Prepara il body in base al metodo
       const requestBody = dividend
         ? { updates: dividendData } // PUT usa "updates"
-        : { userId: user.uid, dividendData }; // POST usa wrapper
+        : { userId: ownerId, dividendData }; // POST usa wrapper
 
       const response = await authenticatedFetch(endpoint, {
         method,

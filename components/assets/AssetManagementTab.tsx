@@ -23,6 +23,7 @@
 
 import { useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { Asset, MonthlySnapshot } from '@/types/assets';
 import {
@@ -136,10 +137,11 @@ function SortHead({ column, children, className, sortState, onSort }: SortHeadPr
 
 export function AssetManagementTab({ assets, allAssets, loading, onRefresh, snapshots }: AssetManagementTabProps) {
   const { user } = useAuth();
+  const { ownerId } = useActiveAccount();
   const isDemo = useDemoMode();
   const queryClient = useQueryClient();
 
-  const deleteAssetMutation = useDeleteAsset(user?.uid || '');
+  const deleteAssetMutation = useDeleteAsset(ownerId || '');
 
   const [updating, setUpdating] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -160,14 +162,14 @@ export function AssetManagementTab({ assets, allAssets, loading, onRefresh, snap
 
   // Batch update prices for all assets via server-side Yahoo Finance API
   const handleUpdatePrices = async () => {
-    if (!user) return;
+    if (!user || !ownerId) return;
 
     try {
       setUpdating(true);
       const response = await authenticatedFetch('/api/prices/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.uid }),
+        body: JSON.stringify({ userId: ownerId }),
       });
 
       const data = await response.json();
@@ -191,7 +193,7 @@ export function AssetManagementTab({ assets, allAssets, loading, onRefresh, snap
   };
 
   const handleDelete = async (assetId: string) => {
-    if (!user) return;
+    if (!user || !ownerId) return;
     try {
       await deleteAssetMutation.mutateAsync(assetId);
       toast.success('Asset eliminato con successo');
@@ -222,9 +224,9 @@ export function AssetManagementTab({ assets, allAssets, loading, onRefresh, snap
   const handleDialogClose = () => {
     setDialogOpen(false);
     setEditingAsset(null);
-    if (user?.uid) {
-      queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(user.uid) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.overview(user.uid) });
+    if (ownerId) {
+      queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.overview(ownerId) });
     }
   };
 

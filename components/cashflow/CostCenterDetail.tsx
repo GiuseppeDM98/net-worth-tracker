@@ -23,6 +23,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
+import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { queryKeys } from '@/lib/query/queryKeys';
 import { CostCenter, CostCenterPeriod } from '@/types/costCenters';
 import { getExpensesForCostCenter } from '@/lib/services/costCenterService';
@@ -87,12 +88,13 @@ export function CostCenterDetail({
   isDemo = false,
 }: CostCenterDetailProps) {
   const { user } = useAuth();
+  const { ownerId } = useActiveAccount();
   const chartColors = useChartColors();
 
   // Shares the ['cost-centers', userId] prefix invalidated by ExpenseDialog, so the
   // detail stays in sync with expense mutations elsewhere.
   const { data: allExpenses = [], isLoading: loading } = useQuery({
-    queryKey: queryKeys.costCenters.expenses(user?.uid ?? '', costCenter.id),
+    queryKey: queryKeys.costCenters.expenses(ownerId ?? '', costCenter.id),
     enabled: !!user,
     queryFn: async () => {
       const data = await getExpensesForCostCenter(user!.uid, costCenter.id);

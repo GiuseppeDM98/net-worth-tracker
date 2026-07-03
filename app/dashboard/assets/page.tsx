@@ -21,6 +21,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRef, useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useAssets, useDeleteAsset } from '@/lib/hooks/useAssets';
 import { useSnapshots } from '@/lib/hooks/useSnapshots';
 import { useDashboardOverview } from '@/lib/hooks/useDashboardOverview';
@@ -207,12 +208,13 @@ function CashAccountDetailDialog({
 
 export default function AssetsPage() {
   const { user } = useAuth();
+  const { ownerId } = useActiveAccount();
 
-  const { data: assets = [], isLoading: loading, refetch: refetchAssets } = useAssets(user?.uid);
-  const { data: snapshots = [], refetch: refetchSnapshots } = useSnapshots(user?.uid);
-  const { data: overview, isLoading: loadingOverview } = useDashboardOverview(user?.uid);
+  const { data: assets = [], isLoading: loading, refetch: refetchAssets } = useAssets(ownerId);
+  const { data: snapshots = [], refetch: refetchSnapshots } = useSnapshots(ownerId);
+  const { data: overview, isLoading: loadingOverview } = useDashboardOverview(ownerId);
 
-  const deleteAssetMutation = useDeleteAsset(user?.uid || '');
+  const deleteAssetMutation = useDeleteAsset(ownerId || '');
   const queryClient = useQueryClient();
 
   // ─── Cash detail dialog state ─────────────────────────────────────────────────
@@ -300,9 +302,9 @@ export default function AssetsPage() {
     setCashEditOpen(false);
     setSelectedCashAsset(null);
     // Invalidate assets + overview so the card grid, table, and hero block reflect any changes.
-    if (user?.uid) {
-      queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(user.uid) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.overview(user.uid) });
+    if (ownerId) {
+      queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.overview(ownerId) });
     }
   };
 

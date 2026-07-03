@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import {
@@ -318,6 +319,7 @@ function buildTaxBracketSnapshotKey(brackets: CoastFireTaxBracket[]): string {
 
 export function CoastFireTab() {
   const { user } = useAuth();
+  const { ownerId } = useActiveAccount();
   const isDemo = useDemoMode();
   const queryClient = useQueryClient();
   const isMobile = useMediaQuery('(max-width: 767px)');
@@ -332,21 +334,21 @@ export function CoastFireTab() {
   const [isConfigOpen, setIsConfigOpen] = useState(false);
 
   const { data: settings, isLoading: isLoadingSettings } = useQuery<Settings | null>({
-    queryKey: ['settings', user?.uid],
+    queryKey: ['settings', ownerId],
     queryFn: () => getSettings(user!.uid),
     enabled: !!user,
     staleTime: 300000,
   });
 
   const { data: assets, isLoading: isLoadingAssets } = useQuery({
-    queryKey: ['assets', user?.uid],
+    queryKey: ['assets', ownerId],
     queryFn: () => getAllAssets(user!.uid),
     enabled: !!user,
     staleTime: 300000,
   });
 
   const { data: annualExpenses, isLoading: isLoadingAnnualExpenses } = useQuery({
-    queryKey: ['coastFireAnnualExpenses', user?.uid],
+    queryKey: ['coastFireAnnualExpenses', ownerId],
     queryFn: () => getAnnualExpenses(user!.uid),
     enabled: !!user,
     staleTime: 300000,
@@ -468,7 +470,7 @@ export function CoastFireTab() {
       }),
     onSuccess: () => {
       toast.success('Impostazioni Coast FIRE salvate con successo');
-      queryClient.invalidateQueries({ queryKey: ['settings', user?.uid] });
+      queryClient.invalidateQueries({ queryKey: ['settings', ownerId] });
     },
     onError: (error) => {
       console.error('Error saving Coast FIRE settings:', error);

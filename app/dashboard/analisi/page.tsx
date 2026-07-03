@@ -19,6 +19,7 @@
 import { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
+import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useExpenses, useExpenseCategories } from '@/lib/hooks/useExpenses';
 import { getSettings } from '@/lib/services/assetAllocationService';
 import { queryKeys } from '@/lib/query/queryKeys';
@@ -30,12 +31,13 @@ function getErrorMessage(error: unknown): string {
 
 export default function AnalisiPage() {
   const { user } = useAuth();
+  const { ownerId } = useActiveAccount();
   const queryClient = useQueryClient();
 
-  const { data: allExpenses = [], isLoading: expensesLoading } = useExpenses(user?.uid);
+  const { data: allExpenses = [], isLoading: expensesLoading } = useExpenses(ownerId);
   // Categories are loaded so AnalisiTab's sibling components (e.g. ExpenseTrackingTab)
   // share the same RQ cache; we only need the loading flag here.
-  const { isLoading: categoriesLoading } = useExpenseCategories(user?.uid);
+  const { isLoading: categoriesLoading } = useExpenseCategories(ownerId);
 
   const [cashflowHistoryStartYear, setCashflowHistoryStartYear] = useState<number>(
     new Date().getFullYear() - 1
@@ -44,31 +46,31 @@ export default function AnalisiPage() {
   // Load cashflowHistoryStartYear — same pattern as cashflow/page.tsx. Literal copy intentional:
   // avoid a shared hook abstraction for a one-time read used in two places with the same logic.
   useEffect(() => {
-    if (!user) return;
+    if (!user || !ownerId) return;
     const loadSettings = async () => {
       try {
-        const settings = await getSettings(user.uid);
+        const settings = await getSettings(ownerId);
         if (settings?.cashflowHistoryStartYear !== undefined) {
           setCashflowHistoryStartYear(settings.cashflowHistoryStartYear);
         }
       } catch (error) {
         // Non-fatal: trend charts will simply show data from currentYear-1 onward.
         console.error('Failed to load analisi settings, using fallback defaults', {
-          userId: user.uid,
+          userId: ownerId,
           operation: 'loadAnalisiSettings',
           error: getErrorMessage(error),
         });
       }
     };
     void loadSettings();
-  }, [user]);
+  }, [user, ownerId]);
 
   const handleRefresh = async () => {
     await queryClient.invalidateQueries({
-      queryKey: queryKeys.expenses.all(user?.uid || ''),
+      queryKey: queryKeys.expenses.all(ownerId || ''),
     });
     await queryClient.invalidateQueries({
-      queryKey: queryKeys.expenses.categories(user?.uid || ''),
+      queryKey: queryKeys.expenses.categories(ownerId || ''),
     });
   };
 

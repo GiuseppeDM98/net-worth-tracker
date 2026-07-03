@@ -13,9 +13,21 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // Helper function: verifica se i dati hanno il campo userId corretto
-    function hasValidUserId() {
-      return request.resource.data.userId == request.auth.uid;
+    // Helper: l'utente è un membro delegato dell'account di ownerUid.
+    // Legge account-access/{ownerUid}.memberUids. Guardia exists() perché get()
+    // su un documento inesistente ritorna null e l'accesso a .data fallirebbe.
+    function isMemberOf(ownerUid) {
+      return isAuthenticated()
+        && exists(/databases/$(database)/documents/account-access/$(ownerUid))
+        && request.auth.uid in get(/databases/$(database)/documents/account-access/$(ownerUid)).data.memberUids;
+    }
+
+    // Helper: l'utente può agire sull'account di ownerUid — è il proprietario
+    // oppure un membro delegato (account condiviso). Usato al posto di isOwner
+    // su tutte le collezioni di dati (non su profilo/preferenze, che restano
+    // legate al viewer).
+    function canAccess(ownerUid) {
+      return isOwner(ownerUid) || isMemberOf(ownerUid);
     }
 
     // Collezione users - ogni utente può leggere e scrivere solo i propri dati
@@ -24,31 +36,32 @@ service cloud.firestore {
       allow write: if isOwner(userId);
     }
 
-    // Collezione assets - ogni utente può gestire solo i propri asset
+    // Collezione assets - proprietario o membro delegato dell'account
     match /assets/{assetId} {
-      // Lettura: solo se è il proprietario
-      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      // Lettura: proprietario o membro delegato
+      allow read: if canAccess(resource.data.userId);
 
-      // Creazione: solo se autenticato e il userId corrisponde
-      allow create: if isAuthenticated() && hasValidUserId();
+      // Creazione: un membro può creare doc timbrati con lo userId dell'account
+      // a cui ha accesso (non necessariamente il proprio uid)
+      allow create: if canAccess(request.resource.data.userId);
 
-      // Aggiornamento: solo se è il proprietario e non cambia il userId (se presente)
-      allow update: if isOwner(resource.data.userId) &&
+      // Aggiornamento: proprietario/membro e userId immutabile (se presente)
+      allow update: if canAccess(resource.data.userId) &&
                        (!('userId' in request.resource.data) ||
                         request.resource.data.userId == resource.data.userId);
 
-      // Cancellazione: solo se è il proprietario
-      allow delete: if isOwner(resource.data.userId);
+      // Cancellazione: proprietario o membro delegato
+      allow delete: if canAccess(resource.data.userId);
     }
 
     // Collezione monthly-snapshots - snapshot mensili del patrimonio
     match /monthly-snapshots/{snapshotId} {
-      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow create: if isAuthenticated() && hasValidUserId();
-      allow update: if isOwner(resource.data.userId) &&
+      allow read: if canAccess(resource.data.userId);
+      allow create: if canAccess(request.resource.data.userId);
+      allow update: if canAccess(resource.data.userId) &&
                        (!('userId' in request.resource.data) ||
                         request.resource.data.userId == resource.data.userId);
-      allow delete: if isOwner(resource.data.userId);
+      allow delete: if canAccess(resource.data.userId);
     }
 
     // Collezione price-history - storico prezzi (può essere condiviso tra utenti)
@@ -62,116 +75,116 @@ service cloud.firestore {
 
     // Collezione portfolios - se hai portafogli separati
     match /portfolios/{portfolioId} {
-      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow create: if isAuthenticated() && hasValidUserId();
-      allow update: if isOwner(resource.data.userId) &&
+      allow read: if canAccess(resource.data.userId);
+      allow create: if canAccess(request.resource.data.userId);
+      allow update: if canAccess(resource.data.userId) &&
                        (!('userId' in request.resource.data) ||
                         request.resource.data.userId == resource.data.userId);
-      allow delete: if isOwner(resource.data.userId);
+      allow delete: if canAccess(resource.data.userId);
     }
 
     // Collezione assetAllocationTargets - target di allocazione asset
     match /assetAllocationTargets/{targetId} {
-      // Read: use targetId instead of resource.data.userId to allow reading non-existent documents
-      // This is needed during registration when getDoc() is called before the document exists
-      allow read: if isAuthenticated() && targetId == request.auth.uid;
-      allow create: if isAuthenticated() && hasValidUserId();
-      allow update: if isOwner(resource.data.userId) &&
+      // Read: usa targetId (doc id) invece di resource.data.userId per consentire
+      // la lettura di documenti inesistenti (durante la registrazione, getDoc()
+      // viene chiamato prima che il documento esista)
+      allow read: if canAccess(targetId);
+      allow create: if canAccess(request.resource.data.userId);
+      allow update: if canAccess(resource.data.userId) &&
                        (!('userId' in request.resource.data) ||
                         request.resource.data.userId == resource.data.userId);
-      allow delete: if isOwner(resource.data.userId);
+      allow delete: if canAccess(resource.data.userId);
     }
 
     // Collezione expenses - tracciamento spese ed entrate
     match /expenses/{expenseId} {
-      // Lettura: solo se è il proprietario
-      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      // Lettura: proprietario o membro delegato
+      allow read: if canAccess(resource.data.userId);
 
-      // Creazione: solo se autenticato e il userId corrisponde
-      allow create: if isAuthenticated() && hasValidUserId();
+      // Creazione: un membro può creare spese timbrate con lo userId dell'account condiviso
+      allow create: if canAccess(request.resource.data.userId);
 
-      // Aggiornamento: solo se è il proprietario e non cambia il userId (se presente)
+      // Aggiornamento: proprietario/membro e userId immutabile (se presente)
       // Permette update parziali che non includono userId
-      allow update: if isOwner(resource.data.userId) &&
+      allow update: if canAccess(resource.data.userId) &&
                        (!('userId' in request.resource.data) ||
                         request.resource.data.userId == resource.data.userId);
 
-      // Cancellazione: solo se è il proprietario
-      allow delete: if isOwner(resource.data.userId);
+      // Cancellazione: proprietario o membro delegato
+      allow delete: if canAccess(resource.data.userId);
     }
 
     // Collezione expenseCategories - categorie per le spese
     match /expenseCategories/{categoryId} {
-      // Lettura: solo se è il proprietario
-      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      // Lettura: proprietario o membro delegato
+      allow read: if canAccess(resource.data.userId);
 
-      // Creazione: solo se autenticato e il userId corrisponde
-      allow create: if isAuthenticated() && hasValidUserId();
+      // Creazione: un membro può creare categorie sull'account condiviso
+      allow create: if canAccess(request.resource.data.userId);
 
-      // Aggiornamento: solo se è il proprietario e non cambia il userId (se presente)
-      allow update: if isOwner(resource.data.userId) &&
+      // Aggiornamento: proprietario/membro e userId immutabile (se presente)
+      allow update: if canAccess(resource.data.userId) &&
                        (!('userId' in request.resource.data) ||
                         request.resource.data.userId == resource.data.userId);
 
-      // Cancellazione: solo se è il proprietario
-      allow delete: if isOwner(resource.data.userId);
+      // Cancellazione: proprietario o membro delegato
+      allow delete: if canAccess(resource.data.userId);
     }
 
     // Collezione dividends - tracciamento dividendi
     match /dividends/{dividendId} {
-      // Lettura: solo se è il proprietario
-      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      // Lettura: proprietario o membro delegato
+      allow read: if canAccess(resource.data.userId);
 
-      // Creazione: solo se autenticato e il userId corrisponde
-      allow create: if isAuthenticated() && hasValidUserId();
+      // Creazione: un membro può creare dividendi sull'account condiviso
+      allow create: if canAccess(request.resource.data.userId);
 
-      // Aggiornamento: solo se è il proprietario e non cambia il userId (se presente)
-      allow update: if isOwner(resource.data.userId) &&
+      // Aggiornamento: proprietario/membro e userId immutabile (se presente)
+      allow update: if canAccess(resource.data.userId) &&
                        (!('userId' in request.resource.data) ||
                         request.resource.data.userId == resource.data.userId);
 
-      // Cancellazione: solo se è il proprietario
-      allow delete: if isOwner(resource.data.userId);
+      // Cancellazione: proprietario o membro delegato
+      allow delete: if canAccess(resource.data.userId);
     }
 
-    // Collezione hall-of-fame - ranking personali dell'utente
+    // Collezione hall-of-fame - ranking dell'account (doc id = ownerUid)
     match /hall-of-fame/{userId} {
-      // Lettura: solo il proprietario può leggere i propri ranking
-      allow read: if isOwner(userId);
+      // Lettura: proprietario o membro delegato
+      allow read: if canAccess(userId);
 
-      // Scrittura: solo il proprietario può aggiornare i propri ranking
-      // (il document ID è uguale all'userId)
-      allow create, update: if isOwner(userId) &&
+      // Scrittura: proprietario o membro; il campo userId deve coincidere col doc id
+      allow create, update: if canAccess(userId) &&
                                request.resource.data.userId == userId;
 
-      // Cancellazione: solo il proprietario
-      allow delete: if isOwner(userId);
+      // Cancellazione: proprietario o membro delegato
+      allow delete: if canAccess(userId);
     }
 
-    // Collezione goalBasedInvesting - obiettivi di investimento
+    // Collezione goalBasedInvesting - obiettivi di investimento (doc id = ownerUid)
     match /goalBasedInvesting/{userId} {
-      // Read: use userId (doc ID) to allow reading non-existent documents (returns null)
-      allow read: if isOwner(userId);
+      // Read: usa userId (doc id) per consentire la lettura di doc inesistenti (null)
+      allow read: if canAccess(userId);
 
-      // Write: only the owner can create/update/delete their goals
-      allow create, update: if isOwner(userId) &&
+      // Write: proprietario o membro; il campo userId deve coincidere col doc id
+      allow create, update: if canAccess(userId) &&
                                request.resource.data.userId == userId;
 
-      // Delete: only the owner
-      allow delete: if isOwner(userId);
+      // Delete: proprietario o membro delegato
+      allow delete: if canAccess(userId);
     }
 
-    // Collezione budgets - configurazione budget mensili dell'utente
+    // Collezione budgets - configurazione budget (doc id = ownerUid)
     match /budgets/{userId} {
-      // Read: use userId (doc ID) to allow reading non-existent documents (returns null)
-      allow read: if isOwner(userId);
+      // Read: usa userId (doc id) per consentire la lettura di doc inesistenti (null)
+      allow read: if canAccess(userId);
 
-      // Write: only the owner can create/update/delete their budget config
-      allow create, update: if isOwner(userId) &&
+      // Write: proprietario o membro; il campo userId deve coincidere col doc id
+      allow create, update: if canAccess(userId) &&
                                request.resource.data.userId == userId;
 
-      // Delete: only the owner
-      allow delete: if isOwner(userId);
+      // Delete: proprietario o membro delegato
+      allow delete: if canAccess(userId);
     }
 
     // Collezione userPreferences - preferenze UI per utente (tema colori, ecc.)
@@ -183,18 +196,18 @@ service cloud.firestore {
     }
 
     // Collezione performance-cache - cache pre-calcolata dei dati Rendimenti
-    // Document ID == userId; nessun campo userId nel documento (pattern come userPreferences)
+    // Document ID == ownerUid. Un membro delegato legge/ricalcola la cache dell'account condiviso.
     match /performance-cache/{userId} {
-      allow read: if isOwner(userId);
-      allow create, update: if isOwner(userId) &&
+      allow read: if canAccess(userId);
+      allow create, update: if canAccess(userId) &&
                                request.resource.data.userId == userId;
-      allow delete: if isOwner(userId);
+      allow delete: if canAccess(userId);
     }
 
-    // Collezione exposure-cache - cache esposizione portafoglio per utente (ETF holdings, settori, emittenti)
-    // Document ID == userId; Admin SDK write only (client cannot write directly).
+    // Collezione exposure-cache - cache esposizione portafoglio (ETF holdings, settori, emittenti)
+    // Document ID == ownerUid; Admin SDK write only (client cannot write directly).
     match /exposure-cache/{userId} {
-      allow read: if isOwner(userId);
+      allow read: if canAccess(userId);
       allow write: if false;
     }
 
@@ -224,12 +237,23 @@ service cloud.firestore {
 
     // Collezione costCenters - centri di costo per raggruppare spese per oggetto/progetto
     match /costCenters/{costCenterId} {
-      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow create: if isAuthenticated() && hasValidUserId();
-      allow update: if isOwner(resource.data.userId) &&
+      allow read: if canAccess(resource.data.userId);
+      allow create: if canAccess(request.resource.data.userId);
+      allow update: if canAccess(resource.data.userId) &&
                        (!('userId' in request.resource.data) ||
                         request.resource.data.userId == resource.data.userId);
-      allow delete: if isOwner(resource.data.userId);
+      allow delete: if canAccess(resource.data.userId);
+    }
+
+    // Collezione account-access - concessioni di accesso delegato (doc id = ownerUid)
+    // Lettura: il proprietario, o un membro elencato (abilita sia get() delle rules
+    //   sopra sia la query array-contains con cui il viewer scopre gli account condivisi).
+    // Scrittura: solo via Admin SDK (/api/account/members), perché aggiungere un
+    //   membro richiede la risoluzione email->uid lato server.
+    match /account-access/{ownerUid} {
+      allow read: if isOwner(ownerUid) ||
+                     (isAuthenticated() && request.auth.uid in resource.data.memberUids);
+      allow write: if false;
     }
 
     // Blocca tutto il resto per sicurezza

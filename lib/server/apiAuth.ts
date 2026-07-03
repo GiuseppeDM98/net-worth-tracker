@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createHash, timingSafeEqual } from 'crypto';
 import { DecodedIdToken } from 'firebase-admin/auth';
-import { adminAuth } from '@/lib/firebase/admin';
+import { adminAuth, adminDb } from '@/lib/firebase/admin';
+import { ACCOUNT_ACCESS_COLLECTION } from '@/types/account';
 
 class ApiAuthError extends Error {
   status: number;
@@ -60,6 +61,55 @@ export function assertSameUser(
 
   if (decodedToken.uid !== requestedUserId) {
     throw new ApiAuthError(403, 'Authenticated user does not match requested user');
+  }
+}
+
+/**
+ * Enforce that the authenticated user may act on `ownerUserId`'s account —
+ * either because they ARE the owner, or because the owner granted them
+ * delegated access (shared account).
+ *
+ * This is the delegation-aware replacement for `assertSameUser` on any route
+ * whose data is scoped to a data-owner rather than the caller. Membership is
+ * read from `account-access/{ownerUserId}.memberUids`.
+ *
+ * Performance: the self case (caller === owner) returns immediately WITHOUT a
+ * Firestore read, so the common path costs nothing; the read happens only when
+ * a delegate is acting on someone else's account.
+ *
+ * @throws ApiAuthError(400) if ownerUserId is missing
+ * @throws ApiAuthError(403) if the caller is neither the owner nor a member
+ */
+export async function assertCanAccessAccount(
+  decodedToken: DecodedIdToken,
+  ownerUserId: string | null | undefined
+): Promise<void> {
+  if (!ownerUserId) {
+    throw new ApiAuthError(400, 'User ID is required');
+  }
+
+  // Owner acting on their own account: no membership lookup needed.
+  if (decodedToken.uid === ownerUserId) {
+    return;
+  }
+
+  const accessSnap = await adminDb
+    .collection(ACCOUNT_ACCESS_COLLECTION)
+    .doc(ownerUserId)
+    .get();
+
+  const memberUids: unknown = accessSnap.exists
+    ? accessSnap.data()?.memberUids
+    : undefined;
+
+  const isMember =
+    Array.isArray(memberUids) && memberUids.includes(decodedToken.uid);
+
+  if (!isMember) {
+    throw new ApiAuthError(
+      403,
+      'Authenticated user does not have access to requested account'
+    );
   }
 }
 

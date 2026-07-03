@@ -19,6 +19,7 @@ import { useEffect, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
+import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { getAllAssets, calculateTotalValue, calculateLiquidNetWorth } from '@/lib/services/assetService';
 import { getSettings, setSettings, getDefaultTargets, calculateCurrentAllocation } from '@/lib/services/assetAllocationService';
 import {
@@ -64,6 +65,7 @@ export function MonteCarloTab() {
   // ========== State and Data Fetching ==========
 
   const { user } = useAuth();
+  const { ownerId } = useActiveAccount();
   const queryClient = useQueryClient();
   const [results, setResults] = useState<MonteCarloResults | null>(null);
   const [isRunning, setIsRunning] = useState(false);
@@ -110,14 +112,14 @@ export function MonteCarloTab() {
    * React Query Integration: Both queries run in parallel and are cached for 5 minutes.
    */
   const { data: assets, isLoading: isLoadingAssets } = useQuery({
-    queryKey: ['assets', user?.uid],
+    queryKey: ['assets', ownerId],
     queryFn: () => getAllAssets(user!.uid),
     enabled: !!user,
     staleTime: 300000,
   });
 
   const { data: settings, isLoading: isLoadingSettings } = useQuery({
-    queryKey: ['settings', user?.uid],
+    queryKey: ['settings', ownerId],
     queryFn: () => getSettings(user!.uid),
     enabled: !!user,
     staleTime: 300000,
@@ -215,8 +217,8 @@ export function MonteCarloTab() {
 
   const saveMutation = useMutation({
     mutationFn: () => {
-      if (!user) throw new Error('User not authenticated');
-      return setSettings(user.uid, {
+      if (!user || !ownerId) throw new Error('User not authenticated');
+      return setSettings(ownerId, {
         ...settings,
         targets: settings?.targets || getDefaultTargets(),
         monteCarloScenarios: scenarios,
@@ -224,7 +226,7 @@ export function MonteCarloTab() {
     },
     onSuccess: () => {
       toast.success('Parametri scenari salvati');
-      queryClient.invalidateQueries({ queryKey: ['settings', user?.uid] });
+      queryClient.invalidateQueries({ queryKey: ['settings', ownerId] });
     },
     onError: () => toast.error('Errore nel salvataggio dei parametri'),
   });

@@ -13,16 +13,27 @@ const {
   getAssistantThreadDetailMock,
   deleteAssistantThreadMock,
   isAssistantStoreErrorMock,
+  accountAccessDocGetMock,
 } = vi.hoisted(() => ({
   verifyIdTokenMock: vi.fn(),
   getAssistantThreadDetailMock: vi.fn(),
   deleteAssistantThreadMock: vi.fn(),
   isAssistantStoreErrorMock: vi.fn(() => false),
+  accountAccessDocGetMock: vi.fn(),
 }));
 
 vi.mock('@/lib/firebase/admin', () => ({
   adminAuth: {
     verifyIdToken: verifyIdTokenMock,
+  },
+  adminDb: {
+    collection: vi.fn((name: string) => {
+      // Delegated-access lookup performed by assertCanAccessAccount.
+      if (name === 'account-access') {
+        return { doc: vi.fn(() => ({ get: accountAccessDocGetMock })) };
+      }
+      throw new Error(`Unexpected collection: ${name}`);
+    }),
   },
 }));
 
@@ -69,6 +80,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   // Default: valid token for USER_ID; individual tests override with mockRejectedValueOnce/Once
   verifyIdTokenMock.mockResolvedValue({ uid: USER_ID });
+  // Default: no delegated-access grant, so cross-account calls are denied (403).
+  accountAccessDocGetMock.mockResolvedValue({ exists: false, data: () => undefined });
   isAssistantStoreErrorMock.mockReturnValue(false);
   getAssistantThreadDetailMock.mockResolvedValue(mockDetail);
   deleteAssistantThreadMock.mockResolvedValue(undefined);

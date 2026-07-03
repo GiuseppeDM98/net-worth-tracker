@@ -32,6 +32,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import {
   ExpenseCategory,
   ExpenseSubCategory,
@@ -81,6 +82,7 @@ export function CategoryMoveDialog({
   triggerOrigin,
 }: CategoryMoveDialogProps) {
   const { user } = useAuth();
+  const { ownerId } = useActiveAccount();
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [selectedSubCategoryId, setSelectedSubCategoryId] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -194,8 +196,8 @@ export function CategoryMoveDialog({
    * After inline category creation, reload categories and auto-select the new one.
    */
   const handleCategoryCreated = async () => {
-    if (user) {
-      const updatedCategories = await getAllCategories(user.uid);
+    if (user && ownerId) {
+      const updatedCategories = await getAllCategories(ownerId);
       setLocalCategories(updatedCategories);
 
       // Auto-select newest category

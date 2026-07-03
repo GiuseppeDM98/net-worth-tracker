@@ -36,6 +36,7 @@ import { DividendTrackingTab } from '@/components/dividends/DividendTrackingTab'
 import { BudgetTab } from '@/components/cashflow/BudgetTab';
 import { CostCentersTab } from '@/components/cashflow/CostCentersTab';
 import { useAuth } from '@/contexts/AuthContext';
+import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { Dividend } from '@/types/dividend';
 import { Asset } from '@/types/assets';
 import { useExpenses, useExpenseCategories } from '@/lib/hooks/useExpenses';
@@ -72,6 +73,7 @@ function getInitialTab(param: string | null): CashflowTabId {
 
 export default function CashflowPage() {
   const { user } = useAuth();
+  const { ownerId } = useActiveAccount();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -84,9 +86,9 @@ export default function CashflowPage() {
   const [costCentersEnabled, setCostCentersEnabled] = useState<boolean | null>(null);
 
   // React Query hooks for expenses and categories
-  const { data: allExpenses = [], isLoading: expensesLoading } = useExpenses(user?.uid);
-  const { data: categories = [], isLoading: categoriesLoading } = useExpenseCategories(user?.uid);
-  const { data: allAssets = [] } = useAssets(user?.uid);
+  const { data: allExpenses = [], isLoading: expensesLoading } = useExpenses(ownerId);
+  const { data: categories = [], isLoading: categoriesLoading } = useExpenseCategories(ownerId);
+  const { data: allAssets = [] } = useAssets(ownerId);
 
   const assetNameMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -107,17 +109,17 @@ export default function CashflowPage() {
 
   // Load dividends and assets only when their tabs are mounted
   const loadOtherData = async () => {
-    if (!user || otherDataLoaded) return;
+    if (!user || !ownerId || otherDataLoaded) return;
 
     try {
       setOtherDataLoading(true);
 
       // Fetch only dividends and assets (expenses/categories handled by React Query)
       const [dividendsData, assetsData] = await Promise.all([
-        authenticatedFetch(`/api/dividends?userId=${user.uid}`)
+        authenticatedFetch(`/api/dividends?userId=${ownerId}`)
           .then(r => r.json())
           .then(d => d.dividends || []),
-        getAllAssets(user.uid),
+        getAllAssets(ownerId),
       ]);
 
       setDividends(dividendsData);
@@ -126,7 +128,7 @@ export default function CashflowPage() {
       setOtherDataLoaded(true);
     } catch (error) {
       console.error('Failed to load cashflow secondary data', {
-        userId: user.uid,
+        userId: ownerId,
         operation: 'loadOtherData',
         error: getErrorMessage(error),
       });
@@ -138,17 +140,17 @@ export default function CashflowPage() {
 
   useEffect(() => {
     const needsOtherData = mountedTabs.has('dividends');
-    if (user && needsOtherData && !otherDataLoaded) {
+    if (user && ownerId && needsOtherData && !otherDataLoaded) {
       loadOtherData();
     }
-  }, [user, mountedTabs, otherDataLoaded]);
+  }, [user, ownerId, mountedTabs, otherDataLoaded]);
 
   // Load cashflow history start year from user settings (one-time read per session)
   useEffect(() => {
-    if (!user) return;
+    if (!user || !ownerId) return;
     const loadSettings = async () => {
       try {
-        const settings = await getSettings(user.uid);
+        const settings = await getSettings(ownerId);
 
         if (settings?.cashflowHistoryStartYear !== undefined) {
           setCashflowHistoryStartYear(settings.cashflowHistoryStartYear);
@@ -157,7 +159,7 @@ export default function CashflowPage() {
       } catch (error) {
         // Settings bootstrap is non-fatal for the page: keep safe defaults and log explicitly.
         console.error('Failed to load cashflow settings, using fallback defaults', {
-          userId: user.uid,
+          userId: ownerId,
           operation: 'loadCashflowSettings',
           fallbackHistoryStartYear: 2025,
           fallbackCostCentersEnabled: false,
@@ -168,15 +170,15 @@ export default function CashflowPage() {
     };
 
     void loadSettings();
-  }, [user]);
+  }, [user, ownerId]);
 
   const handleRefresh = async () => {
     // Invalidate React Query caches for expenses and categories
     await queryClient.invalidateQueries({
-      queryKey: queryKeys.expenses.all(user?.uid || ''),
+      queryKey: queryKeys.expenses.all(ownerId || ''),
     });
     await queryClient.invalidateQueries({
-      queryKey: queryKeys.expenses.categories(user?.uid || ''),
+      queryKey: queryKeys.expenses.categories(ownerId || ''),
     });
 
     // Force re-fetch of other data (dividends, assets)
@@ -292,7 +294,7 @@ export default function CashflowPage() {
                 categories={categories}
                 loading={loading}
                 historyStartYear={cashflowHistoryStartYear}
-                userId={user?.uid ?? ''}
+                userId={ownerId ?? ''}
               />
             </motion.div>
           </TabsContent>

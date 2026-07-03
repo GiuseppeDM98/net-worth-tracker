@@ -40,6 +40,7 @@ import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useAuth } from '@/contexts/AuthContext';
+import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { useDashboardOverview } from '@/lib/hooks/useDashboardOverview';
 import { useCountUp } from '@/lib/utils/useCountUp';
@@ -420,6 +421,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   const router = useRouter();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { ownerId } = useActiveAccount();
   const isDemo = useDemoMode();
   const prefersReducedMotion = useReducedMotion();
   const conversationEndRef = useRef<HTMLDivElement>(null);
@@ -474,16 +476,16 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   // Dashboard overview — used to source the current net worth for the "patrimonio oggi" scheda.
   // Reuses the React Query cache from Panoramica if the user visited it this session,
   // so in practice this is a cache hit and adds no network latency.
-  const { data: overviewData } = useDashboardOverview(user?.uid);
+  const { data: overviewData } = useDashboardOverview(ownerId);
 
-  const { data: threads = [], isLoading: loadingThreads, error: threadsError } = useAssistantThreads(user?.uid);
+  const { data: threads = [], isLoading: loadingThreads, error: threadsError } = useAssistantThreads(ownerId);
   const { data: threadDetail, isLoading: loadingThreadDetail, error: threadError } = useAssistantThread(
     selectedThreadId,
-    user?.uid
+    ownerId
   );
-  const { data: memory, isLoading: loadingMemory, error: memoryError } = useAssistantMemory(user?.uid);
-  const updateMemoryMutation = useUpdateAssistantMemory(user?.uid ?? '');
-  const deleteThreadMutation = useDeleteAssistantThread(user?.uid ?? '');
+  const { data: memory, isLoading: loadingMemory, error: memoryError } = useAssistantMemory(ownerId);
+  const updateMemoryMutation = useUpdateAssistantMemory(ownerId ?? '');
+  const deleteThreadMutation = useDeleteAssistantThread(ownerId ?? '');
 
   // Effective period for the context scheda: a loaded thread pins its own period;
   // otherwise the live selector drives a preview so the scheda fills in *before* the
@@ -524,7 +526,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
     );
 
   const { data: fetchedContextBundle, isLoading: loadingContextBundle } = useAssistantPeriodContext(
-    shouldFetchContext ? user?.uid : undefined,
+    shouldFetchContext ? ownerId : undefined,
     previewMode,
     previewMonth,
     previewYear,
@@ -708,7 +710,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
     const promptToSend = (promptOverride ?? draft).trim();
     const modeToSend = modeOverride ?? mode;
 
-    if (!user?.uid || !promptToSend || isStreaming) {
+    if (!ownerId || !promptToSend || isStreaming) {
       return;
     }
 
@@ -719,7 +721,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
     const userMessage: AssistantMessage = {
       id: `local-user-${Date.now()}`,
       threadId: selectedThreadId ?? 'pending',
-      userId: user.uid,
+      userId: ownerId,
       role: 'user',
       content: promptToSend,
       createdAt: new Date(),
@@ -750,7 +752,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
       {
         id: assistantMessageId,
         threadId: selectedThreadId ?? 'pending',
-        userId: user.uid,
+        userId: ownerId,
         role: 'assistant',
         content: '',
         createdAt: new Date(),
@@ -766,7 +768,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
         headers: { 'Content-Type': 'application/json' },
         signal: abortController.signal,
         body: JSON.stringify({
-          userId: user.uid,
+          userId: ownerId,
           mode: modeToSend,
           prompt: promptToSend,
           threadId: selectedThreadId,
@@ -859,9 +861,9 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
         }
       }
 
-      if (user.uid) {
+      if (ownerId) {
         await Promise.all([
-          queryClient.invalidateQueries({ queryKey: queryKeys.assistant.threads(user.uid) }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.assistant.threads(ownerId) }),
           resolvedThreadId
             ? queryClient.invalidateQueries({ queryKey: queryKeys.assistant.thread(resolvedThreadId) })
             : Promise.resolve(),
@@ -905,7 +907,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   const handlePreferencesChange = async (
     patch: Partial<NonNullable<typeof memory>['preferences']>
   ) => {
-    if (!user?.uid) return;
+    if (!ownerId) return;
     try {
       await updateMemoryMutation.mutateAsync({ preferences: patch });
     } catch (error) {
@@ -1093,7 +1095,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                   </Sheet>
 
                   {/* Memoria — same right-side sheet on every breakpoint. */}
-                  {user?.uid && (
+                  {ownerId && (
                     <Sheet open={isMemorySheetOpen} onOpenChange={setIsMemorySheetOpen}>
                       <SheetTrigger asChild>
                         <Button
@@ -1116,7 +1118,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
                           <SheetTitle className="text-left text-sm">Memoria</SheetTitle>
                         </SheetHeader>
                         <div className="px-4 py-4">
-                          <AssistantMemoryPanel userId={user.uid} memory={memory} isLoading={loadingMemory} />
+                          <AssistantMemoryPanel userId={ownerId} memory={memory} isLoading={loadingMemory} />
                         </div>
                       </SheetContent>
                     </Sheet>
@@ -1260,8 +1262,8 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
               </div>
 
               {/* Proactive goal-completion banner (A3) — visible in any state. */}
-              {user?.uid && (
-                <AssistantSuggestionsBanner userId={user.uid} memory={memory} disabled={isStreaming} />
+              {ownerId && (
+                <AssistantSuggestionsBanner userId={ownerId} memory={memory} disabled={isStreaming} />
               )}
 
               {/* ── Empty state: shown when no messages exist yet ── */}

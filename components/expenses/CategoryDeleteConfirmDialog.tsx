@@ -36,6 +36,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import {
   ExpenseCategory,
   ExpenseSubCategory,
@@ -85,6 +86,7 @@ export function CategoryDeleteConfirmDialog({
   triggerOrigin,
 }: CategoryDeleteConfirmDialogProps) {
   const { user } = useAuth();
+  const { ownerId } = useActiveAccount();
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [selectedSubCategoryId, setSelectedSubCategoryId] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -216,8 +218,8 @@ export function CategoryDeleteConfirmDialog({
    */
   const handleCategoryCreated = async () => {
     // Reload categories from database to get the newly created one
-    if (user) {
-      const updatedCategories = await getAllCategories(user.uid);
+    if (user && ownerId) {
+      const updatedCategories = await getAllCategories(ownerId);
       setLocalCategories(updatedCategories);
 
       // Auto-select the newly created category (most recent by timestamp)

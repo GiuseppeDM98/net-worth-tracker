@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  assertSameUser,
+  assertCanAccessAccount,
   getApiAuthErrorResponse,
   requireFirebaseAuth,
 } from '@/lib/server/apiAuth';
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     const decodedToken = await requireFirebaseAuth(request);
     const userId = request.nextUrl.searchParams.get('userId');
 
-    assertSameUser(decodedToken, userId);
+    await assertCanAccessAccount(decodedToken, userId);
 
     const threads = await listAssistantThreads(userId as string);
     return NextResponse.json({ threads });
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     const decodedToken = await requireFirebaseAuth(request);
     const body = (await request.json()) as AssistantCreateThreadInput;
 
-    assertSameUser(decodedToken, body.userId);
+    await assertCanAccessAccount(decodedToken, body.userId);
 
     const thread = await createAssistantThread({
       userId: body.userId,

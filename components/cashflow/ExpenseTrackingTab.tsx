@@ -20,6 +20,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
+import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { Expense, ExpenseCategory, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
 import {
@@ -104,6 +105,7 @@ export function ExpenseTrackingTab({
   assetNameMap,
 }: ExpenseTrackingTabProps) {
   const { user } = useAuth();
+  const { ownerId } = useActiveAccount();
   const isDemo = useDemoMode();
   const queryClient = useQueryClient();
   // chartColors removed — CategoryBreakdownList manages its own useChartColors() internally.
@@ -310,12 +312,12 @@ export function ExpenseTrackingTab({
         } else if (expense.linkedCashAssetId) {
           await updateCashAssetBalance(expense.linkedCashAssetId, -expense.amount);
         }
-        if (user && (expense.linkedCashAssetId || expense.transferCashAssetId)) {
-          queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(user.uid) });
+        if (user && ownerId && (expense.linkedCashAssetId || expense.transferCashAssetId)) {
+          queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
         }
         const { deleteExpense } = await import('@/lib/services/expenseService');
         await deleteExpense(expense.id);
-        if (user) queryClient.invalidateQueries({ queryKey: queryKeys.costCenters.all(user.uid) });
+        if (user && ownerId) queryClient.invalidateQueries({ queryKey: queryKeys.costCenters.all(ownerId) });
         toast.success('Voce eliminata con successo');
         await onRefresh();
       } catch (error) {
@@ -358,12 +360,12 @@ export function ExpenseTrackingTab({
           await updateCashAssetBalance(exp.linkedCashAssetId, -exp.amount);
         }
       }
-      if (user && seriesExpenses.some((e) => e.linkedCashAssetId)) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(user.uid) });
+      if (user && ownerId && seriesExpenses.some((e) => e.linkedCashAssetId)) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
       }
       const { deleteRecurringExpenses } = await import('@/lib/services/expenseService');
       await deleteRecurringExpenses(recurringParentId);
-      if (user) queryClient.invalidateQueries({ queryKey: queryKeys.costCenters.all(user.uid) });
+      if (user && ownerId) queryClient.invalidateQueries({ queryKey: queryKeys.costCenters.all(ownerId) });
       toast.success('Tutte le voci ricorrenti sono state eliminate');
       await onRefresh();
     } catch (error) {
@@ -381,12 +383,12 @@ export function ExpenseTrackingTab({
           await updateCashAssetBalance(exp.linkedCashAssetId, -exp.amount);
         }
       }
-      if (user && seriesExpenses.some((e) => e.linkedCashAssetId)) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(user.uid) });
+      if (user && ownerId && seriesExpenses.some((e) => e.linkedCashAssetId)) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
       }
       const { deleteInstallmentExpenses } = await import('@/lib/services/expenseService');
       await deleteInstallmentExpenses(installmentParentId);
-      if (user) queryClient.invalidateQueries({ queryKey: queryKeys.costCenters.all(user.uid) });
+      if (user && ownerId) queryClient.invalidateQueries({ queryKey: queryKeys.costCenters.all(ownerId) });
       toast.success('Tutte le rate sono state eliminate');
       await onRefresh();
     } catch (error) {

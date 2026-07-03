@@ -27,6 +27,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import Link from 'next/link';
 import { getAllAssets } from '@/lib/services/assetService';
 import {
@@ -64,6 +65,7 @@ const ExposureSection = dynamic(
 
 export default function AllocationPage() {
   const { user } = useAuth();
+  const { ownerId } = useActiveAccount();
   const [targets, setTargets] = useState<AssetAllocationTarget | null>(null);
   const [allocation, setAllocation] = useState<AllocationResult | null>(null);
   const [loading, setLoading] = useState(true);
@@ -74,15 +76,15 @@ export default function AllocationPage() {
   const [band, setBand] = useState<RebalanceBand>(DEFAULT_REBALANCE_BAND);
 
   const loadData = useCallback(async () => {
-    if (!user) return;
+    if (!user || !ownerId) return;
 
     // `loading` initializes to true; no synchronous setState here (it would trigger a
     // cascading-render lint error). Every setState below runs after the first await.
     try {
       const [assetsData, settings, goalData] = await Promise.all([
-        getAllAssets(user.uid),
-        getSettings(user.uid),
-        getGoalData(user.uid),
+        getAllAssets(ownerId),
+        getSettings(ownerId),
+        getGoalData(ownerId),
       ]);
 
       // Derive targets from goals when goal-based investing is enabled; otherwise use
@@ -121,7 +123,7 @@ export default function AllocationPage() {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, ownerId]);
 
   useEffect(() => {
     loadData();
@@ -234,7 +236,7 @@ export default function AllocationPage() {
 
             <AllocationBreakdown allocation={bandedAllocation} targets={targets} />
 
-            {user && <ExposureSection userId={user.uid} />}
+            {user && ownerId && <ExposureSection userId={ownerId} />}
           </div>
         </>
       )}

@@ -9,6 +9,7 @@ import {
   periodContentSettle,
 } from '@/lib/utils/motionVariants';
 import { useAuth } from '@/contexts/AuthContext';
+import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { getAllPerformanceData, calculatePerformanceForPeriod, preparePerformanceChartData, getSnapshotsForPeriod, prepareMonthlyReturnsHeatmap, prepareUnderwaterDrawdownData } from '@/lib/services/performanceService';
@@ -253,6 +254,7 @@ function PerformancePeriodSelector({
 
 export default function PerformancePage() {
   const { user } = useAuth();
+  const { ownerId } = useActiveAccount();
   const isDemo = useDemoMode();
   const [isPendingPeriodChange, startPeriodTransition] = useTransition();
   const [performanceData, setPerformanceData] = useState<PerformanceData | null>(null);
@@ -298,10 +300,10 @@ export default function PerformancePage() {
   const isLandscape = useMediaQuery('(min-width: 568px) and (max-height: 500px) and (orientation: landscape)');
 
   useEffect(() => {
-    if (user) {
+    if (user && ownerId) {
       loadPerformanceData();
     }
-  }, [user]);
+  }, [user, ownerId]);
 
   const calculateDialogOrigin = (element: HTMLElement) => {
     const rect = element.getBoundingClientRect();
@@ -336,7 +338,7 @@ export default function PerformancePage() {
    * Cache invalidation: Only on explicit refresh button click or page reload.
    */
   const loadPerformanceData = async () => {
-    if (!user) return;
+    if (!user || !ownerId) return;
 
     try {
       const isInitialLoad = !hasLoadedOnceRef.current;
@@ -349,12 +351,12 @@ export default function PerformancePage() {
       // Fetch snapshots once and cache them in component state.
       // This cache will be reused for all period switches and custom date ranges,
       // eliminating redundant API calls and improving performance by ~85%.
-      const snapshots = await getUserSnapshots(user.uid);
+      const snapshots = await getUserSnapshots(ownerId);
       setCachedSnapshots(snapshots);
 
       // forceRefresh on explicit button click so the cache is bypassed and rewritten
       const isRefresh = hasLoadedOnceRef.current;
-      const data = await getAllPerformanceData(user.uid, isRefresh);
+      const data = await getAllPerformanceData(ownerId, isRefresh);
 
       // Fetch YOC and Current Yield metrics for all periods in parallel
       // Both require server-side calculation due to Firebase Admin SDK usage
@@ -381,7 +383,7 @@ export default function PerformancePage() {
 
         try {
           const params = new URLSearchParams({
-            userId: user.uid,
+            userId: ownerId,
             startDate: metrics.startDate.toISOString(),
             dividendEndDate: metrics.dividendEndDate.toISOString(),
             numberOfMonths: metrics.numberOfMonths.toString(),
@@ -471,12 +473,12 @@ export default function PerformancePage() {
    * @param endDate - Custom period end date
    */
   const handleCustomDateRange = async (startDate: Date, endDate: Date) => {
-    if (!user || !performanceData || cachedSnapshots.length === 0) return;
+    if (!user || !ownerId || !performanceData || cachedSnapshots.length === 0) return;
 
     try {
       // Use cached snapshots instead of fetching again (reuses loadPerformanceData cache)
       const customMetrics = await calculatePerformanceForPeriod(
-        user.uid,
+        ownerId,
         cachedSnapshots,  // Cached snapshots from initial load
         'CUSTOM',
         performanceData.ytd.riskFreeRate,
@@ -490,7 +492,7 @@ export default function PerformancePage() {
       if (!customMetrics.hasInsufficientData) {
         try {
           const params = new URLSearchParams({
-            userId: user.uid,
+            userId: ownerId,
             startDate: customMetrics.startDate.toISOString(),
             dividendEndDate: customMetrics.dividendEndDate.toISOString(),
             numberOfMonths: customMetrics.numberOfMonths.toString(),
@@ -1582,7 +1584,7 @@ export default function PerformancePage() {
       />
 
       {/* AI Analysis Dialog */}
-      {user && metrics && !metrics.hasInsufficientData && (
+      {user && ownerId && metrics && !metrics.hasInsufficientData && (
         <AIAnalysisDialog
           open={showAIAnalysisDialog}
           onOpenChange={(open) => {
@@ -1593,7 +1595,7 @@ export default function PerformancePage() {
           }}
           metrics={metrics}
           timePeriod={selectedPeriod}
-          userId={user.uid}
+          userId={ownerId}
           triggerOrigin={aiDialogOrigin}
         />
       )}

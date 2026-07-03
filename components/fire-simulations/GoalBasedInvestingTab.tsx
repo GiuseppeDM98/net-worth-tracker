@@ -17,6 +17,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
+import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { getSettings } from '@/lib/services/assetAllocationService';
 import { getAllAssets } from '@/lib/services/assetService';
@@ -51,9 +52,10 @@ import { GoalMilestoneTimeline } from '@/components/goals/GoalMilestoneTimeline'
 
 export function GoalBasedInvestingTab() {
   const { user } = useAuth();
+  const { ownerId } = useActiveAccount();
   const isDemo = useDemoMode();
   const queryClient = useQueryClient();
-  const userId = user?.uid;
+  const userId = ownerId;
 
   // Dialog state
   const [goalDialogOpen, setGoalDialogOpen] = useState(false);

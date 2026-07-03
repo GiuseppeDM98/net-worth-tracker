@@ -14,6 +14,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import {
   CostCenter,
   CostCenterFormData,
@@ -63,6 +64,7 @@ export function CostCenterDialog({
   onSuccess,
 }: CostCenterDialogProps) {
   const { user } = useAuth();
+  const { ownerId } = useActiveAccount();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [color, setColor] = useState<string>(COST_CENTER_COLORS[0]);
@@ -89,7 +91,7 @@ export function CostCenterDialog({
   }, [costCenter, open]);
 
   const handleSave = async () => {
-    if (!user || !name.trim()) return;
+    if (!user || !ownerId || !name.trim()) return;
 
     // A non-positive or empty budget input means "no ceiling": persist undefined so
     // the verdict logic skips it.
@@ -111,7 +113,7 @@ export function CostCenterDialog({
         onSuccess({ ...costCenter, ...formData });
         toast.success('Centro di costo aggiornato');
       } else {
-        const created = await createCostCenter(user.uid, formData);
+        const created = await createCostCenter(ownerId, formData);
         onSuccess(created);
         toast.success('Centro di costo creato');
       }
