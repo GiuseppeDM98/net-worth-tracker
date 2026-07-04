@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { invalidateDashboardOverviewSummaryServer } from '@/lib/services/dashboardOverviewInvalidation.server';
-import { getApiAuthErrorResponse, requireFirebaseAuth } from '@/lib/server/apiAuth';
+import {
+  assertCanAccessAccount,
+  getApiAuthErrorResponse,
+  requireFirebaseAuth,
+} from '@/lib/server/apiAuth';
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -30,14 +34,20 @@ export async function POST(request: NextRequest) {
 
     const requestBody =
       typeof body === 'object' && body !== null
-        ? body as { reason?: unknown }
+        ? body as { ownerId?: unknown; reason?: unknown }
         : {};
+
+    // Invalidate the DATA-OWNER's summary, not the caller's: a shared-account
+    // delegate mutating the owner's data must mark the owner's overview stale.
+    const ownerId =
+      typeof requestBody.ownerId === 'string' ? requestBody.ownerId : null;
+    await assertCanAccessAccount(decodedToken, ownerId);
 
     const reason = typeof requestBody.reason === 'string' && requestBody.reason.trim().length > 0
       ? requestBody.reason.trim()
       : 'client_mutation';
 
-    await invalidateDashboardOverviewSummaryServer(decodedToken.uid, reason);
+    await invalidateDashboardOverviewSummaryServer(ownerId as string, reason);
 
     return NextResponse.json({ ok: true });
   } catch (error) {

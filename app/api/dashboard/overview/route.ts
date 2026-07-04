@@ -1,17 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDashboardOverview } from '@/lib/services/dashboardOverviewService';
-import { getApiAuthErrorResponse, requireFirebaseAuth } from '@/lib/server/apiAuth';
+import {
+  assertCanAccessAccount,
+  getApiAuthErrorResponse,
+  requireFirebaseAuth,
+} from '@/lib/server/apiAuth';
 
 /**
  * GET /api/dashboard/overview
+ * Query params: userId (required — the data-owner account)
  *
- * Private overview endpoint for the dashboard landing page.
- * The authenticated Firebase token is the only authoritative user identity.
+ * Private overview endpoint for the dashboard landing page and the Patrimonio
+ * hero cards. Delegation-aware: the caller may request their own overview or,
+ * for a shared account, the owner's — `assertCanAccessAccount` authorizes both.
  */
 export async function GET(request: NextRequest) {
   try {
     const decodedToken = await requireFirebaseAuth(request);
-    const payload = await getDashboardOverview(decodedToken.uid);
+    const userId = request.nextUrl.searchParams.get('userId');
+
+    await assertCanAccessAccount(decodedToken, userId);
+    const payload = await getDashboardOverview(userId as string);
 
     return NextResponse.json(payload);
   } catch (error) {

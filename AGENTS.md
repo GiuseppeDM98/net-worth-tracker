@@ -384,6 +384,7 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - `DashboardOverviewPayload` should stay lean: only KPI, variations, expense stats, chart datasets, flags, and freshness fields actually rendered by Panoramica belong there
 - `dashboardOverviewSummaries/{userId}` is a server-owned materialized summary for warm loads; the client must never read it directly, only the authenticated overview route may do that
 - Overview materialized summaries must have explicit invalidation on overview-relevant mutations plus a short TTL fallback, so stale docs never become a silent source of truth
+- **Both overview endpoints are delegation-aware (owner-scoped, not token-scoped).** Panoramica AND the Patrimonio hero cards read the same `useDashboardOverview(ownerId)`. The read route `GET /api/dashboard/overview?userId=<ownerId>` and the write route `POST /api/dashboard/overview/invalidate` (`{ ownerId, reason }`) both authorize with `assertCanAccessAccount(decodedToken, ownerId)` — they must NOT fall back to `decodedToken.uid`, or a shared-account delegate sees their own (empty) overview and their mutations invalidate the wrong summary. This was the one endpoint pair missed by the original shared-account refactor; keep it aligned with the `?userId=` pattern used by every other data route.
 
 ### Motion and Charts
 - Shared variants live in `lib/utils/motionVariants.ts`

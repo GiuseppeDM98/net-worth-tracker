@@ -12,16 +12,18 @@ import { authenticatedFetch } from '@/lib/utils/authFetch';
  * the primary user action fail after the underlying Firestore write already succeeded.
  */
 export async function invalidateDashboardOverviewSummary(
-  _userId: string,
+  ownerId: string,
   reason: string
 ): Promise<void> {
   try {
+    // Send the data-owner id so the endpoint invalidates the OWNER's summary,
+    // not the caller's — a shared-account delegate mutates the owner's data.
     await authenticatedFetch('/api/dashboard/overview/invalidate', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ reason }),
+      body: JSON.stringify({ ownerId, reason }),
     });
   } catch (error) {
     console.warn('[dashboardOverviewInvalidation] Failed to mark summary stale:', error);
