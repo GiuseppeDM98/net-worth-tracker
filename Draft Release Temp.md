@@ -48,6 +48,7 @@
 - **Hall of Fame in your summary emails** — monthly and yearly summary emails now put the period in historical perspective with a one-line standing under your net worth, e.g. "🏆 È il 4° miglior mese per crescita del patrimonio" (or a calm "📉 Mese in calo" when net worth dropped). The ranking uses the same Hall of Fame logic as the app, and the AI comment can reference it too
 - **Richer year-end email** — the yearly summary email is now a fuller year-in-review: a "Spese per Tipo" breakdown (Fisse / Variabili / Debiti), your Top 10 single expenses, and a new Top 10 income entries of the year — all in the same email you already receive, with the existing AI year-end comment now also reasoning about your fixed-vs-variable spending mix
 - **Cost center detail — breakdown by subcategory with a "net of X" toggle** — opening a cost center now shows a new "Dettaglio per sottocategoria" card that splits the period's spend by subcategory (ranked, with each one's share). Tap any subcategory to exclude it and the card recomputes a "Totale al netto" — so you can answer questions like "for my car, how much did I spend net of fuel?" at a glance. Exclusions are a quick what-if (they reset when you leave) and never affect the center's headline total, budget verdict, or charts, which always reflect your real spend
+- **AI Assistant can now help you categorize spending** — the assistant sees your complete list of expense categories and subcategories (not just the handful used in the period you're analyzing), so you can ask it where to file a new expense or whether it's worth creating a new category, and it will suggest an existing match first instead of guessing blind
 
 ## 🐛 Bug Fixes
 
@@ -193,6 +194,7 @@
 - **Search Cashflow by amount** — the Cashflow search box now also matches transaction amounts, not just notes and category names. Type "76" to find every transaction around that figure (76,45 · 176 · 1276…), or "76,45" for an exact match — the Italian decimal comma is understood
 - **Model-portfolio comparison table sorted by return** — the "Confronto con Portafogli Modello" table on the Rendimenti page is now ordered by annualized TWR, highest first — with your own portfolio ranked in alongside the model portfolios — so you can see at a glance who's ahead
 - **More precise AI Assistant and email answers** — the AI Assistant and the AI comment in your summary emails now share a more detailed set of instructions: Italian financial terms specific to this app (YOC, TWR, bollo, PAC, inflation-linked BTP Italia coupons, cost centers…) are defined explicitly instead of left to guesswork, web search is used only for market/macro context and never to invent reasons for your personal income or expense changes, and answers distinguish clearly between what's stated in your data and what's a reasonable inference
+- **AI Assistant and email AI comments upgraded to a newer, more capable model** — every AI-generated answer and comment in the app (Assistant chat, monthly/quarterly/yearly summary emails, weekly budget email) now runs on Anthropic's latest Sonnet-tier model for improved reasoning quality
 
 ## 🔒 Security
 

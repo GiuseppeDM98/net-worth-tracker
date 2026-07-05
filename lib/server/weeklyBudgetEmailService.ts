@@ -234,8 +234,10 @@ export async function generateWeeklyBudgetComment(data: WeeklyBudgetData): Promi
     const Anthropic = (await import('@anthropic-ai/sdk')).default;
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: 'claude-sonnet-5',
       max_tokens: 200,
+      thinking: { type: 'adaptive' },
+      output_config: { effort: 'high' },
       messages: [{ role: 'user', content: prompt }],
     });
     const text = message.content

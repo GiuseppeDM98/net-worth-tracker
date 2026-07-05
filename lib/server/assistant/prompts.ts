@@ -237,6 +237,18 @@ function formatBundleForPrompt(bundle: AssistantMonthContextBundle): string {
     lines.push('');
   }
 
+  // Full category taxonomy — lets Claude answer "in che categoria segno questa spesa?"
+  // or "ha senso creare una nuova categoria?" against what the user has already
+  // configured, instead of only the top-5 categories actually used this period.
+  if (bundle.expenseCategories.length > 0) {
+    lines.push('--- CATEGORIE DI SPESA CONFIGURATE ---');
+    for (const category of bundle.expenseCategories) {
+      const subLabel = category.subCategories.length > 0 ? ` (sottocategorie: ${category.subCategories.join(', ')})` : '';
+      lines.push(`${category.name} [${category.type}]${subLabel}`);
+    }
+    lines.push('');
+  }
+
   // Data quality notes — instructs Claude on what it can and cannot say
   if (dataQuality.notes.length > 0) {
     lines.push('--- NOTE QUALITÀ DATI ---');
@@ -302,6 +314,9 @@ export const ASSISTANT_SYSTEM_CORE = [
   '- Preferisci: "Il patrimonio è salito di €3.200 (+1,8%), trainato per €2.100 dal versamento mensile e per €1.100 dalla performance di mercato — la componente organica resta modesta questo mese."',
   '- Evita: "Le spese sono aumentate rispetto al mese scorso."',
   "- Preferisci: \"Le uscite sono salite di €340, quasi interamente per la voce Trasporti (+€290) — verifica se è una spesa una tantum o un nuovo livello stabile.\"",
+  '',
+  '# Categorizzazione spese',
+  "Il blocco CATEGORIE DI SPESA CONFIGURATE elenca l'intera tassonomia impostata dall'utente (non solo quelle usate nel periodo). Usalo per rispondere a domande come \"in che categoria segno questa spesa?\" o \"ha senso creare una nuova categoria?\": suggerisci prima una categoria/sottocategoria già esistente se pertinente, e proponi una nuova categoria solo se davvero non c'è una corrispondenza ragionevole.",
   '',
   '# Casi limite',
   "- Periodo ancora in corso (mese/anno corrente, YTD): i dati sono parziali per definizione — evidenzia le tendenze osservate finora, non presentarle come il risultato finale del periodo",

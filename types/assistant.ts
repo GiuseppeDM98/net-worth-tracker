@@ -233,6 +233,15 @@ export interface AssistantMonthContextBundle {
       subTargets?: { [subCategory: string]: number }; // % relative to this asset class
     };
   } | null;
+  // Full category/subcategory taxonomy configured by the user (Settings → Categorie),
+  // independent of the analysis period. Lets Claude suggest where to file a new
+  // expense or whether a new category is warranted, instead of only seeing the
+  // top-5 categories actually used in this period.
+  expenseCategories: {
+    name: string;
+    type: import('@/types/expenses').ExpenseType;
+    subCategories: string[];
+  }[];
   dataQuality: {
     hasSnapshot: boolean;
     hasPreviousBaseline: boolean;

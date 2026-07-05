@@ -595,12 +595,12 @@ async function generateEmailAiComment(
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
 
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: 'claude-sonnet-5',
       max_tokens: 5000,
-      // Same static block for every user's email in this cron run — cached so the
-      // run's many back-to-back calls share one cached prefix instead of paying for
-      // it per user (see buildEmailAiPrompt's doc comment).
-      system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
+      // No cache_control — see anthropicStream.ts for why caching stays off app-wide.
+      system: system,
+      thinking: { type: 'adaptive' },
+      output_config: { effort: 'high' },
       tools: [
         {
           type: 'web_search_20250305',

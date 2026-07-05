@@ -141,14 +141,15 @@ export async function streamAssistantResponse({
     const chatMaxTokens = enableWebSearch ? 5000 : 3000;
     const { system, userContent } = buildPrompt(mode, prompt, contextBundle, month, preferences, memoryItems);
     const stream = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: 'claude-sonnet-5',
       max_tokens: isStructuredAnalysis ? 7000 : chatMaxTokens,
       // Static role/domain/guardrail/format instructions, identical for every user and
-      // every request of this mode — cached so repeat turns don't re-pay for it in full.
-      system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
-      ...(isStructuredAnalysis
-        ? { thinking: { type: 'enabled', budget_tokens: 4000 } }
-        : {}),
+      // every request of this mode. No cache_control: this app's traffic pattern
+      // (sporadic single-user requests) rarely lands two calls within the 5-minute
+      // cache TTL, so caching would pay the 1.25x write premium without recouping it.
+      system: system,
+      thinking: { type: 'adaptive' },
+      output_config: { effort: 'high' },
       ...(enableWebSearch
         ? {
             tools: [

@@ -52,6 +52,7 @@ function makeBundle(overrides?: Partial<AssistantMonthContextBundle>): Assistant
       },
     },
     targetAllocation: null,
+    expenseCategories: [],
     dataQuality: {
       hasSnapshot: true,
       hasPreviousBaseline: false,

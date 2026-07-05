@@ -33,7 +33,7 @@ import { adminDb } from '@/lib/firebase/admin';
 import { getItalyMonthYear, toDate } from '@/lib/utils/dateHelpers';
 import { AssistantMonthContextBundle, AssistantMonthSelectorValue } from '@/types/assistant';
 import { Asset, AssetAllocationSettings, MonthlySnapshot } from '@/types/assets';
-import { Expense } from '@/types/expenses';
+import { Expense, ExpenseCategory } from '@/types/expenses';
 
 const MAX_ALLOCATION_CHANGES = 5;
 
@@ -187,7 +187,35 @@ async function fetchAssets(userId: string): Promise<Asset[]> {
   });
 }
 
+/**
+ * Fetches the user's full expense category taxonomy, independent of the analysis period.
+ */
+async function fetchExpenseCategories(userId: string): Promise<ExpenseCategory[]> {
+  const snap = await adminDb
+    .collection('expenseCategories')
+    .where('userId', '==', userId)
+    .get();
+
+  return snap.docs.map((doc) => {
+    const data = doc.data();
+    return { id: doc.id, ...data, subCategories: data.subCategories || [] } as ExpenseCategory;
+  });
+}
+
 // ─── Shared helpers ──────────────────────────────────────────────────────────
+
+/**
+ * Flattens the user's category taxonomy into the shape the prompt builder needs.
+ */
+function buildCategoryTaxonomy(
+  categories: ExpenseCategory[]
+): AssistantMonthContextBundle['expenseCategories'] {
+  return categories.map((category) => ({
+    name: category.name,
+    type: category.type,
+    subCategories: category.subCategories.map((sub) => sub.name),
+  }));
+}
 
 /**
  * Builds bySubCategoryAllocation from a snapshot's byAsset array and live asset metadata.
@@ -407,11 +435,12 @@ export async function buildAssistantMonthContext(
   const { year: prevYear, month: prevMonth } = getPreviousMonth(year, month);
 
   // Fetch snapshots, transactions, settings, and asset metadata in parallel
-  const [allSnapshots, monthExpenses, settings, assets] = await Promise.all([
+  const [allSnapshots, monthExpenses, settings, assets, categories] = await Promise.all([
     fetchSnapshots(userId),
     fetchExpenses(userId, startDate, endDate),
     fetchSettings(userId),
     fetchAssets(userId),
+    fetchExpenseCategories(userId),
   ]);
 
   const currentSnapshot = findSnapshot(allSnapshots, year, month, includeDummySnapshots);
@@ -486,6 +515,7 @@ export async function buildAssistantMonthContext(
     topIndividualExpenses,
     bySubCategoryAllocation,
     targetAllocation,
+    expenseCategories: buildCategoryTaxonomy(categories),
     dataQuality: {
       hasSnapshot,
       hasPreviousBaseline,
@@ -523,11 +553,12 @@ export async function buildAssistantYearContext(
   // For current year: cap at end of today's month; for completed years: full Dec 31
   const yearEnd = new Date(year, 11, 31, 23, 59, 59);
 
-  const [allSnapshots, yearExpenses, settings, assets] = await Promise.all([
+  const [allSnapshots, yearExpenses, settings, assets, categories] = await Promise.all([
     fetchSnapshots(userId),
     fetchExpenses(userId, yearStart, yearEnd),
     fetchSettings(userId),
     fetchAssets(userId),
+    fetchExpenseCategories(userId),
   ]);
 
   // Baseline = December of previous year
@@ -593,6 +624,7 @@ export async function buildAssistantYearContext(
     topIndividualExpenses,
     bySubCategoryAllocation,
     targetAllocation,
+    expenseCategories: buildCategoryTaxonomy(categories),
     dataQuality: {
       hasSnapshot,
       hasPreviousBaseline,
@@ -637,11 +669,12 @@ export async function buildAssistantQuarterContext(
   // Day 0 of next month = last day of quarter-end month
   const endDate = new Date(year, lastMonthOfQuarter, 0, 23, 59, 59);
 
-  const [allSnapshots, quarterExpenses, settings, assets] = await Promise.all([
+  const [allSnapshots, quarterExpenses, settings, assets, categories] = await Promise.all([
     fetchSnapshots(userId),
     fetchExpenses(userId, startDate, endDate),
     fetchSettings(userId),
     fetchAssets(userId),
+    fetchExpenseCategories(userId),
   ]);
 
   // End snapshot = last day of quarter-end month
@@ -701,6 +734,7 @@ export async function buildAssistantQuarterContext(
     topIndividualExpenses,
     bySubCategoryAllocation,
     targetAllocation,
+    expenseCategories: buildCategoryTaxonomy(categories),
     dataQuality: {
       hasSnapshot,
       hasPreviousBaseline,
@@ -734,11 +768,12 @@ export async function buildAssistantYtdContext(
   // Include up to end of today's month so all tracked transactions are captured
   const ytdEnd = new Date(currentYear, currentMonth, 0, 23, 59, 59);
 
-  const [allSnapshots, ytdExpenses, settings, assets] = await Promise.all([
+  const [allSnapshots, ytdExpenses, settings, assets, categories] = await Promise.all([
     fetchSnapshots(userId),
     fetchExpenses(userId, ytdStart, ytdEnd),
     fetchSettings(userId),
     fetchAssets(userId),
+    fetchExpenseCategories(userId),
   ]);
 
   // Baseline = December of previous year (same as year builder)
@@ -797,6 +832,7 @@ export async function buildAssistantYtdContext(
     topIndividualExpenses,
     bySubCategoryAllocation,
     targetAllocation,
+    expenseCategories: buildCategoryTaxonomy(categories),
     dataQuality: {
       hasSnapshot,
       hasPreviousBaseline,
@@ -833,11 +869,12 @@ export async function buildAssistantHistoryContext(
   const historyStart = new Date(startYear, 0, 1, 0, 0, 0);
   const historyEnd = new Date(currentYear, currentMonth, 0, 23, 59, 59);
 
-  const [allSnapshots, historyExpenses, settings, assets] = await Promise.all([
+  const [allSnapshots, historyExpenses, settings, assets, categories] = await Promise.all([
     fetchSnapshots(userId),
     fetchExpenses(userId, historyStart, historyEnd),
     fetchSettings(userId),
     fetchAssets(userId),
+    fetchExpenseCategories(userId),
   ]);
 
   // Filter to snapshots within the history window
@@ -899,6 +936,7 @@ export async function buildAssistantHistoryContext(
     topIndividualExpenses,
     bySubCategoryAllocation,
     targetAllocation,
+    expenseCategories: buildCategoryTaxonomy(categories),
     dataQuality: {
       hasSnapshot,
       hasPreviousBaseline,
