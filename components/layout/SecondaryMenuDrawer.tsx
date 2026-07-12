@@ -17,12 +17,13 @@ import {
 import { AssistenteBanner } from '@/components/layout/AssistenteBanner';
 import { LogoutDialog } from '@/components/layout/LogoutDialog';
 import { ThemePicker } from '@/components/layout/ThemePicker';
-import { Settings, LogOut, MoreVertical } from 'lucide-react';
+import { Settings, LogOut, MoreVertical, Users, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { drawerContainer, drawerItem } from '@/lib/utils/motionVariants';
 import { useLogout } from '@/lib/hooks/useLogout';
 import { useAuth } from '@/contexts/AuthContext';
-import { getDisplayInfo } from '@/lib/utils/userDisplayUtils';
+import { useActiveAccount } from '@/contexts/ActiveAccountContext';
+import { getAccountLabel, getDisplayInfo } from '@/lib/utils/userDisplayUtils';
 import { analysisNav, planningNav } from '@/lib/constants/navigation';
 
 interface SecondaryMenuDrawerProps {
@@ -45,6 +46,10 @@ function getFocusable(container: HTMLElement): HTMLElement[] {
 export function SecondaryMenuDrawer({ open, onOpenChange }: SecondaryMenuDrawerProps) {
   const pathname = usePathname();
   const { user } = useAuth();
+  // The account switcher lives here too, not only in AppSidebar: in portrait the
+  // sidebar is unreachable (its only trigger sits in the landscape-only header bar),
+  // so this drawer is a delegate's sole way to switch accounts on a phone.
+  const { ownerId, accessibleAccounts, switchAccount, isSharedView } = useActiveAccount();
   const { confirmLogout, setConfirmLogout, handleSignOut } = useLogout(() => onOpenChange(false));
 
   // Ref on the dialog panel — used for focus management and Tab trapping.
@@ -108,6 +113,7 @@ export function SecondaryMenuDrawer({ open, onOpenChange }: SecondaryMenuDrawerP
     pathname === href || pathname.startsWith(href + '/');
 
   const { displayName, initials } = getDisplayInfo(user);
+  const activeAccount = accessibleAccounts.find((a) => a.ownerId === ownerId);
 
   // py-3 (12px × 2) + text-sm line-height (~20px) = 44px — meets WCAG 2.5.5 touch target minimum.
   const navItemCn = (active: boolean) =>
@@ -236,7 +242,16 @@ export function SecondaryMenuDrawer({ open, onOpenChange }: SecondaryMenuDrawerP
                   </Avatar>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{displayName}</p>
-                    <p className="truncate text-xs text-sidebar-foreground/50">{user?.email}</p>
+                    {/* When viewing a shared account, surface WHOSE data is active
+                        instead of the viewer's own email — otherwise the account
+                        being edited is invisible. Same rule as AppSidebar. */}
+                    {isSharedView && activeAccount ? (
+                      <p className="truncate text-xs text-primary">
+                        Vedi: {getAccountLabel(activeAccount)}
+                      </p>
+                    ) : (
+                      <p className="truncate text-xs text-sidebar-foreground/50">{user?.email}</p>
+                    )}
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -248,6 +263,31 @@ export function SecondaryMenuDrawer({ open, onOpenChange }: SecondaryMenuDrawerP
                       </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent side="top" align="end" className="w-52">
+                      {/* Account switcher — only when the viewer can reach >1 account */}
+                      {accessibleAccounts.length > 1 && (
+                        <>
+                          <DropdownMenuLabel className="text-xs font-medium text-muted-foreground">
+                            Account
+                          </DropdownMenuLabel>
+                          <DropdownMenuGroup>
+                            {accessibleAccounts.map((account) => (
+                              <DropdownMenuItem
+                                key={account.ownerId}
+                                onSelect={() => switchAccount(account.ownerId)}
+                              >
+                                <Users className="size-4" />
+                                <span className="flex-1 truncate">
+                                  {getAccountLabel(account)}
+                                </span>
+                                {account.ownerId === ownerId && (
+                                  <Check className="ml-auto size-4 shrink-0 text-primary" />
+                                )}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuGroup>
+                          <DropdownMenuSeparator />
+                        </>
+                      )}
                       <DropdownMenuGroup>
                         <DropdownMenuItem asChild>
                           <Link href="/dashboard/settings" onClick={() => onOpenChange(false)}>

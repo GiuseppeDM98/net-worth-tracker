@@ -35,7 +35,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { cn } from '@/lib/utils';
 import { useLogout } from '@/lib/hooks/useLogout';
 import { isNavItemActive } from '@/lib/utils/navUtils';
-import { getDisplayInfo } from '@/lib/utils/userDisplayUtils';
+import { getAccountLabel, getDisplayInfo } from '@/lib/utils/userDisplayUtils';
 import { primaryNav, analysisNav, planningNav, type NavItem } from '@/lib/constants/navigation';
 import {
   Bot,
@@ -101,12 +101,6 @@ export function AppSidebar() {
   };
 
   const { displayName, initials } = getDisplayInfo(user);
-
-  // Human label for an accessible account: own account and named/emailed shares.
-  const accountLabel = (account: (typeof accessibleAccounts)[number]) =>
-    account.isOwn
-      ? 'Il mio account'
-      : account.displayName || account.email || 'Account condiviso';
   const activeAccount = accessibleAccounts.find((a) => a.ownerId === ownerId);
 
   const showAssistant = process.env.NEXT_PUBLIC_ASSISTANT_AI_ENABLED !== 'false';
@@ -240,7 +234,7 @@ export function AppSidebar() {
                           being edited is invisible. */}
                       {isSharedView && activeAccount ? (
                         <span className="truncate text-xs text-primary">
-                          Vedi: {accountLabel(activeAccount)}
+                          Vedi: {getAccountLabel(activeAccount)}
                         </span>
                       ) : (
                         /* text-sidebar-foreground/50: footer sits on --sidebar, not --background */
@@ -265,7 +259,7 @@ export function AppSidebar() {
                           >
                             <Users className="size-4" />
                             <span className="flex-1 truncate">
-                              {accountLabel(account)}
+                              {getAccountLabel(account)}
                             </span>
                             {account.ownerId === ownerId && (
                               <Check className="ml-auto size-4 shrink-0 text-primary" />

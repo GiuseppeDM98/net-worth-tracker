@@ -33,6 +33,7 @@ import {
   isWeeklyBudgetDayItaly,
   buildWeeklyBudgetData,
   buildWeeklyBudgetEmailHtml,
+  buildCommentContext,
 } from '@/lib/server/weeklyBudgetEmailService';
 
 function expenseDoc(
@@ -170,5 +171,64 @@ describe('buildWeeklyBudgetData', () => {
     expect(html).toContain('Riepilogo settimanale budget');
     expect(html).toContain('Vacanze');
     expect(html).toContain('Budget annuali');
+  });
+
+  it('states in the email that the amounts are month-to-date, not weekly', async () => {
+    mockBudgetDoc = {
+      exists: true,
+      data: () => ({ items: [], overallMonthlyAmount: 2200 }),
+    };
+    mockExpenseDocs = [expenseDoc(-1800, new Date(2026, 5, 10))];
+
+    const data = await buildWeeklyBudgetData('u1', now);
+    const html = buildWeeklyBudgetEmailHtml(data!);
+    expect(html).toContain('dal 1° del mese a oggi');
+    expect(html).toContain('non sono settimanali');
+    // A bare "proiezione €X" was read as a year-end figure — the horizon must be spelled out.
+    expect(html).toContain('proiezione a fine mese');
+  });
+});
+
+describe('buildCommentContext', () => {
+  const now = new Date(2026, 5, 15, 12); // June 15 2026 (30-day month)
+
+  it('declares the monthly horizon of the overall budget and its end-of-month projection', async () => {
+    // Reproduces the production error: the model called the overall projection a
+    // year-end figure because the prompt never said the ceiling was monthly.
+    mockBudgetDoc = {
+      exists: true,
+      data: () => ({ items: [], overallMonthlyAmount: 2200 }),
+    };
+    mockExpenseDocs = [expenseDoc(-1800, new Date(2026, 5, 10))];
+
+    const data = await buildWeeklyBudgetData('u1', now);
+    const context = buildCommentContext(data!);
+
+    expect(context).toContain('tetto MENSILE');
+    expect(context).toContain('proiezione A FINE MESE');
+    expect(context).toContain('dal 1° giugno a oggi');
+    expect(context).toContain('giorno 15 di 30');
+  });
+
+  it('scopes annual budgets to the year and monthly budgets to the month', async () => {
+    mockBudgetDoc = {
+      exists: true,
+      data: () => ({
+        items: [
+          { id: 'a', kind: 'expense', scope: 'category', period: 'annual', categoryId: 'c1', categoryName: 'Vacanze', amount: 2000, order: 0 },
+          { id: 'b', kind: 'expense', scope: 'category', period: 'monthly', categoryId: 'c2', categoryName: 'Tecnologia', amount: 200, order: 1 },
+        ],
+      }),
+    };
+    mockExpenseDocs = [
+      expenseDoc(-500, new Date(2026, 2, 10), 'c1'),
+      expenseDoc(-150, new Date(2026, 5, 10), 'c2'),
+    ];
+
+    const data = await buildWeeklyBudgetData('u1', now);
+    const context = buildCommentContext(data!);
+
+    expect(context).toContain('Vacanze (budget di spesa ANNUALE): 500€ da inizio anno a oggi');
+    expect(context).toContain('Tecnologia (budget di spesa MENSILE): 150€ dal 1° giugno a oggi');
   });
 });

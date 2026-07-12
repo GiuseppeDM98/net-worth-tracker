@@ -211,31 +211,77 @@ export async function buildWeeklyBudgetData(userId: string, now: Date): Promise<
 
 // ─── AI comment ───────────────────────────────────────────────────────────────
 
+const monthNameFormatter = new Intl.DateTimeFormat('it-IT', { month: 'long' });
+
 /**
- * Generates a single Italian sentence highlighting the most notable budget fact
- * this week. Non-blocking: returns null on any failure or when no API key is set.
+ * Builds the budget-status block handed to the model.
+ *
+ * Every line must carry its own time window. The email is sent weekly, but NONE of
+ * its numbers are weekly: monthly budgets and the overall ceiling are month-to-date,
+ * annual budgets are year-to-date, and projections land at end of month. Leaving the
+ * horizon implicit produced a real error in production — the model saw only the
+ * "anno trascorso al N%" hint and reported the overall projection as "a fine anno"
+ * when it is in fact a monthly ceiling projected to month end.
+ *
+ * Pure — exported for testing.
+ */
+export function buildCommentContext(data: WeeklyBudgetData): string {
+  const italy = getItalyDate(data.generatedAt);
+  const monthName = monthNameFormatter.format(italy);
+  const dayOfMonth = italy.getDate();
+  const daysInMonth = new Date(italy.getFullYear(), italy.getMonth() + 1, 0).getDate();
+
+  const header = [
+    `Oggi è il giorno ${dayOfMonth} di ${daysInMonth} del mese di ${monthName} ${italy.getFullYear()}.`,
+    `L'anno è trascorso al ${Math.round(data.yearElapsedPct)}%.`,
+  ].join(' ');
+
+  const lines = [
+    data.overall &&
+      `Budget complessivo (tetto MENSILE su tutte le spese): speso ${Math.round(data.overall.spent)}€ dal 1° ${monthName} a oggi, su un limite di ${Math.round(data.overall.limit)}€ per questo mese (${Math.round(data.overall.ratio * 100)}%). Al ritmo attuale la proiezione A FINE MESE è ${Math.round(data.overall.projected ?? 0)}€.`,
+    ...data.rows.map((row) => {
+      const window =
+        row.period === 'annual' ? 'da inizio anno a oggi' : `dal 1° ${monthName} a oggi`;
+      const horizon = row.period === 'annual' ? 'per quest\'anno' : 'per questo mese';
+      const kind = row.isIncome ? 'obiettivo di entrata' : 'budget di spesa';
+      const projection =
+        row.projected != null && !row.isIncome
+          ? ` Proiezione A FINE MESE: ${Math.round(row.projected)}€.`
+          : '';
+      return `${row.label} (${kind} ${row.period === 'annual' ? 'ANNUALE' : 'MENSILE'}): ${Math.round(row.spent)}€ ${window}, su un limite di ${Math.round(row.limit)}€ ${horizon} (${Math.round(row.ratio * 100)}%).${projection}`;
+    }),
+  ].filter(Boolean);
+
+  return `${header}\n\n${lines.join('\n')}`;
+}
+
+/**
+ * Generates a short Italian comment (2 sentences: the most notable fact + one concrete
+ * action) for the weekly email. Non-blocking: returns null on any failure or when no
+ * API key is set.
  */
 export async function generateWeeklyBudgetComment(data: WeeklyBudgetData): Promise<string | null> {
   if (!process.env.ANTHROPIC_API_KEY) return null;
   try {
-    const lines = [
-      data.overall &&
-        `Complessivo: speso ${Math.round(data.overall.spent)}€ su ${Math.round(data.overall.limit)}€ (proiezione ${Math.round(data.overall.projected ?? 0)}€)`,
-      ...data.rows.map(
-        (r) =>
-          `${r.label} [${r.period === 'annual' ? 'annuale' : 'mensile'}${r.isIncome ? ', entrata' : ''}]: ${Math.round(r.spent)}€ su ${Math.round(r.limit)}€ (${Math.round(r.ratio * 100)}%)`
-      ),
-    ]
-      .filter(Boolean)
-      .join('\n');
+    const prompt = `Sei un assistente finanziario personale italiano. Questo è lo stato dei budget dell'utente:
 
-    const prompt = `Sei un assistente finanziario personale italiano. Stato dei budget dell'utente a fine settimana (anno trascorso al ${Math.round(data.yearElapsedPct)}%):\n\n${lines}\n\nScrivi UNA sola frase in italiano (massimo 25 parole) che evidenzia il fatto più rilevante — un budget vicino o oltre il limite, oppure un buon andamento — usando solo i numeri sopra, senza inventarne altri. Niente elenchi, saluti o premesse.`;
+${buildCommentContext(data)}
+
+REGOLE
+- Usa SOLO i numeri e gli orizzonti temporali indicati sopra: non inventare cifre né ricavarne di nuove.
+- Rispetta l'orizzonte di ogni voce. I budget mensili e il budget complessivo si misurano sul MESE CORRENTE e le loro proiezioni sono A FINE MESE: non definirle mai "a fine anno". Solo i budget annuali riguardano l'anno.
+- Nessun dato qui è settimanale: la mail arriva ogni settimana, ma i numeri no. Non parlare di "questa settimana".
+
+Scrivi esattamente DUE frasi in italiano (massimo 45 parole in totale):
+1. il fatto più rilevante — il budget più critico (vicino o oltre il limite) oppure, se è tutto in ordine, l'andamento positivo più significativo;
+2. una singola azione concreta e specifica che l'utente può fare da qui a fine periodo.
+Niente elenchi, saluti, premesse o titoli.`;
 
     const Anthropic = (await import('@anthropic-ai/sdk')).default;
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-5',
-      max_tokens: 200,
+      max_tokens: 400,
       thinking: { type: 'adaptive' },
       output_config: { effort: 'high' },
       messages: [{ role: 'user', content: prompt }],
@@ -293,8 +339,11 @@ function overspendHtml(expenses: OverspendExpense[]): string {
 function rowHtml(row: WeeklyBudgetRow): string {
   const color = statusColor(row.status);
   const pct = Math.round(row.ratio * 100);
+  // Spell out the horizon: "proiezione €X" alone was read as a year-end figure.
   const projectedNote =
-    row.projected != null && !row.isIncome ? ` · proiezione ${formatEur(row.projected)}` : '';
+    row.projected != null && !row.isIncome
+      ? ` · proiezione a fine mese ${formatEur(row.projected)}`
+      : '';
   const breakdown = row.overspendExpenses?.length ? overspendHtml(row.overspendExpenses) : '';
   return `
     <tr>
@@ -335,9 +384,10 @@ export function buildWeeklyBudgetEmailHtml(data: WeeklyBudgetData): string {
           <p style="margin:0;font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;">Riepilogo settimanale budget</p>
           <p style="margin:6px 0 0;font-size:22px;font-weight:700;color:#0f172a;">${data.onTrackCount} in linea · ${data.atRiskCount} da tenere d'occhio</p>
           <p style="margin:4px 0 0;font-size:12px;color:#94a3b8;">${dateLabel}</p>
+          <p style="margin:10px 0 0;font-size:12px;color:#64748b;line-height:1.5;">Questa mail arriva ogni domenica, ma gli importi non sono settimanali: i budget mensili e il budget complessivo mostrano quanto hai speso <strong style="font-weight:600;">dal 1° del mese a oggi</strong>, i budget annuali <strong style="font-weight:600;">da inizio anno a oggi</strong>.</p>
         </td></tr>
 
-        ${data.aiComment ? `<tr><td style="padding:8px 32px 0;"><p style="margin:0;font-size:13px;color:#334155;line-height:1.6;background:#f8fafc;border-radius:8px;padding:12px 14px;">${data.aiComment}</p></td></tr>` : ''}
+        ${data.aiComment ? `<tr><td style="padding:8px 32px 0;"><p style="margin:0;font-size:13px;color:#334155;line-height:1.6;background:#f8fafc;border-radius:8px;padding:12px 14px;">${escapeHtml(data.aiComment)}</p></td></tr>` : ''}
 
         ${data.overall ? groupHtml('Budget complessivo', 'questo mese', [data.overall]) : ''}
         ${groupHtml('Budget mensili', 'questo mese', monthly)}

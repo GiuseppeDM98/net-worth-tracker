@@ -92,18 +92,25 @@ export function BudgetSettingsCard({
                 className="font-mono tabular-nums"
               />
               {overallMonthlyAmount != null && (
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">
-                    Allocato:{' '}
-                    <span className="font-mono tabular-nums">{cachedFormatCurrencyEUR(validation.allocated)}</span>
-                  </span>
-                  <span className={validation.valid ? 'text-muted-foreground' : 'text-destructive'}>
-                    {validation.valid ? 'Disponibile: ' : 'Eccedenza: '}
-                    <span className="font-mono tabular-nums">
-                      {cachedFormatCurrencyEUR(Math.abs(validation.available))}
+                <>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">
+                      Allocato:{' '}
+                      <span className="font-mono tabular-nums">{cachedFormatCurrencyEUR(validation.allocated)}</span>
                     </span>
-                  </span>
-                </div>
+                    <span className={validation.valid ? 'text-muted-foreground' : 'text-destructive'}>
+                      {validation.valid ? 'Disponibile: ' : 'Eccedenza: '}
+                      <span className="font-mono tabular-nums">
+                        {cachedFormatCurrencyEUR(Math.abs(validation.available))}
+                      </span>
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground/70">
+                    {'"Allocato" è la somma dei budget mensili di spesa che hai già assegnato alle singole categorie; '}
+                    {'"Disponibile" è la parte del tetto complessivo non ancora assegnata a nessuna categoria. '}
+                    {'I budget annuali, le entrate e le sottocategorie non entrano in questo conteggio.'}
+                  </p>
+                </>
               )}
               {!validation.valid && (
                 <p className="text-xs text-destructive">
