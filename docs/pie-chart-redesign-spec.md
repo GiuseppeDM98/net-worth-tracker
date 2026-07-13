@@ -1,8 +1,17 @@
 # Spec — Redesign dei pie chart
 
-**Stato**: approvata, da implementare (Sonnet 5)
+**Stato**: implementata (Sonnet 5), con una correzione post-implementazione — vedi nota sotto
 **Data**: 2026-07-13
 **Origine**: feedback utente — i pie chart sembrano "poco in linea" con la linea visiva dell'app, con troppo spazio libero su desktop. Complimenti per la grafica generale; l'appunto riguarda solo i pie.
+
+**Correzione post-implementazione (2026-07-13)**: il censimento §0 (riga 4) classificava
+`components/goals/GoalAllocationPieChart.tsx` come "Tenere (unico caso giustificato)" senza
+verificarne l'importer. Si è rivelato codice morto — il donut era già stato rimosso dalla UI
+di `GoalBasedInvestingTab` in una sessione precedente (commento nel file: "Pie chart removed —
+values readable from the list directly"), quindi 0 importer. È stato prima polishato per
+errore (commit `polish(goals)`), poi eliminato quando l'utente ha segnalato di non vederlo
+nella pagina Obiettivi e un grep ha confermato zero importer. L'app ora non ha più nessun
+`<Pie>` Recharts. Dettaglio in CLAUDE.md → Current Status → Latest.
 
 ---
 

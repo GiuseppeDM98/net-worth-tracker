@@ -7,7 +7,7 @@ Feedback utente: i pie chart sembrano "poco in linea" con la linea visiva dell'a
 - **Analisi** (`AnalisiTab.tsx`): 5 pie con drill-down, card full-width alte 500px, cerchio ~280px in ~1200px → il colpevole principale del whitespace. Forma sbagliata per 8–12 voci.
 - **Overview** (`OverviewChartsSection.tsx` + `ui/pie-chart.tsx`): 2 pie compatti 160px.
 - **Dividendi** (`DividendTrackingTab.tsx`): 1 pie per-payer, parzialmente ridondante col leaderboard.
-- **Obiettivi** (`GoalAllocationPieChart.tsx`): unico donut giustificato (parte-sul-tutto, poche fette, active-slice + label centrale).
+- **Obiettivi** (`GoalAllocationPieChart.tsx`): unico donut giustificato (parte-sul-tutto, poche fette, active-slice + label centrale). ⚠️ **Censimento errato**: mai verificato l'importer — vedi "Correzione post-implementazione" sotto, il componente è codice morto.
 - **Codice morto**: `CurrentYearTab.tsx` + `TotalHistoryTab.tsx` (0 importer, 11 pie legacy — fusi in `AnalisiTab`), ramo full-size di `ui/pie-chart.tsx` inutilizzato.
 
 ## Decisioni (confermate dall'utente)
@@ -42,3 +42,19 @@ Feedback utente: i pie chart sembrano "poco in linea" con la linea visiva dell'a
 - `CompositionBar`'s Framer Motion `initial={{width:0}}` non richiede più il tracking `revealedCharts`/`animateOnMount` che serviva per Recharts: essendo lo stesso componente montato (stessa posizione JSX), i cambi di tab/dati sui dati Overview non fanno ripartire l'animazione di entrata — semplificazione trovata durante l'implementazione, non prevista esplicitamente dalla spec.
 - `prepareAssetClassDistributionData` (chartService.ts) ora porta anche la chiave `assetClass` grezza su ogni `PieChartData`, usata da `app/dashboard/page.tsx` per il remap via `ASSET_CLASS_CHART_INDEX` invece che per indice posizionale (§4.3 della spec) — `PieChartData.assetClass` è opzionale, non rompe gli altri consumer.
 - `docs/critique-prompts.md`/`docs/audit-prompts.md` non menzionano mai "pie"/"donut" esplicitamente (grep vuoto) — nessuna modifica necessaria lì, contrariamente a quanto la spec §9.4 ipotizzava.
+
+## Correzione post-implementazione — GoalAllocationPieChart era codice morto
+L'utente ha segnalato "in pagina obiettivi non vedo nessun donut" dopo il completamento dei 6
+commit + docs. Verifica: `grep -rn "GoalAllocationPieChart"` in `components/app/lib` → **zero
+importer** oltre al file stesso. `GoalBasedInvestingTab.tsx` riga 6 conferma: "Pie chart
+removed — values readable from the list directly" — il donut era già stato tolto dalla UI in
+una sessione precedente, il file però non era mai stato cancellato. Il censimento §0 della spec
+lo aveva marcato "Tenere" senza controllare gli importer (unico punto del censimento non
+verificato con grep, a differenza di CurrentYearTab/TotalHistoryTab che invece erano stati
+controllati). Risultato: il commit 5 (`polish(goals)`) ha modificato codice morto — innocuo ma
+inutile. Azione: file eliminato (`git rm`), commit 5 di fatto reso nullo da un commit successivo
+di cleanup, documentazione (DESIGN.md/CLAUDE.md/spec) corretta per riflettere che **l'app non ha
+più alcun `<Pie>` Recharts**, non "3 su 4 sostituiti + 1 tenuto".
+**Lezione per il futuro**: quando si marca una superficie "da tenere" durante un censimento,
+verificarne comunque l'importer con grep — la stessa disciplina già applicata al codice
+esplicitamente "da eliminare".
