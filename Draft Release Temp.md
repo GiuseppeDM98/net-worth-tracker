@@ -91,6 +91,8 @@
 - Fixed: the "Confronto con Portafogli Modello" table on the Rendimenti page no longer shows blank values (TWR, total growth, Sharpe, Sortino, Calmar) for the model portfolios when the selected timeframe ends in the current, still-ongoing month. The benchmarks now use their last available month of market data instead of expecting a return for a month that hasn't finished yet
 - Fixed: **the account switcher is now reachable on a phone held upright**. If someone shared their account with you, the switcher only existed in the desktop sidebar — which cannot be opened in portrait — so on a phone you were stuck on whichever account you last selected elsewhere. You'll now find it in the "Altro" menu, under the ⋮ button next to your name (it appears only if you actually have access to more than one account)
 - Fixed: **the AI comment in the weekly budget email no longer mislabels monthly figures as year-end ones**. It could say things like "the overall budget is projected at €3,665 by year end, well over the €2,200 planned" — but the overall budget is a *monthly* ceiling and that projection is for the *end of the month*. The comment now always states the correct horizon, and it's grown into two sentences: the most critical fact, plus one concrete action to take
+- Fixed: sub-category rows in the Analisi drill-down (Spese/Entrate per Categoria) always showed the same fixed indigo shade regardless of your selected color theme — they now correctly shade using the parent category's actual color
+- Fixed: on the Overview page, the "Per Asset Class" composition could show a class in a slightly different color than the same class uses on Allocazione and Storico — colors are now consistent across all three pages
 
 ## 🔧 Improvements
 
@@ -200,6 +202,8 @@
 - **"Approfondimenti" in the Budget tab now says what each number actually means** — the list at the bottom of the card was showing *projections* of where each category is heading by month-end, marked only with a discreet `~`, so it read as money already spent and never added up to your actual expenses. It now sits under an explicit "Proiezione a fine mese" heading that spells this out, and each line shows the projection against its budget. The card also states up front that it only covers the categories you gave a budget to — not all of your spending
 - **The weekly budget email now says which period its numbers cover** — the email arrives every Sunday, but none of its figures are weekly: monthly budgets and the overall budget show what you've spent **since the 1st of the month**, annual budgets **since the start of the year**. A short line under the headline now makes this explicit, and projections are labelled "a fine mese" rather than left open to interpretation
 - **"Allocato" and "Disponibile" are now explained** — in Budget settings, the two figures under your overall monthly budget tell you how much of that ceiling you've already handed out to individual categories, and how much is still unassigned. A short note now spells this out, including what doesn't count toward it (annual budgets, income targets, and subcategories)
+
+- **Pie charts replaced with ranked bar lists** — the pie/donut charts on the Analisi page (spending and income by category, sub-categories, spending by type), the Overview page (asset class and per-asset composition), and the Dividendi tab (per-payer breakdown) have been redesigned as ranked horizontal bar lists. They're easier to scan for "which is biggest, and by how much" and no longer leave large empty gaps on desktop screens
 
 ## 🔒 Security
 
