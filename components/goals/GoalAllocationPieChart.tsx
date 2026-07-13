@@ -10,6 +10,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useReducedMotion } from 'framer-motion';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { GoalProgress } from '@/types/goals';
 import { CardContent } from '@/components/ui/card';
@@ -21,11 +22,34 @@ interface GoalAllocationPieChartProps {
   activeGoalId: string | null;
 }
 
+// Module-level (React Compiler: no components defined inside another component's
+// body) so the Legend content= prop gets a stable reference. Square swatch —
+// DESIGN.md: rounded-[2px] reads as a color key, rounded-full reads as a status dot.
+function GoalLegendContent({ payload }: { payload?: Array<{ value?: string; color?: string }> }) {
+  if (!payload || payload.length === 0) return null;
+  return (
+    <ul className="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-1.5">
+      {payload.map((entry, i) => (
+        <li key={`${entry.value}-${i}`} className="flex items-center gap-1.5">
+          <span
+            className="h-2 w-2 shrink-0 rounded-[2px]"
+            style={{ backgroundColor: entry.color }}
+            aria-hidden="true"
+          />
+          <span className="text-[11px] text-muted-foreground">{entry.value}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function GoalAllocationPieChart({
   progressList,
   unassignedValue,
   activeGoalId,
 }: GoalAllocationPieChartProps) {
+  const reducedMotion = useReducedMotion();
+
   // Read the muted-foreground CSS var after paint so it adapts to theme switches
   const [unassignedColor, setUnassignedColor] = useState('#94a3b8');
 
@@ -85,7 +109,7 @@ export function GoalAllocationPieChart({
             paddingAngle={2}
             dataKey="value"
             animationBegin={0}
-            animationDuration={600}
+            animationDuration={reducedMotion ? 0 : 600}
             animationEasing="ease-out"
           >
             {chartData.map((entry, index) => (
@@ -115,13 +139,10 @@ export function GoalAllocationPieChart({
               border: '1px solid var(--border)',
               color: 'var(--card-foreground)',
             }}
+            itemStyle={{ color: 'var(--card-foreground)' }}
             labelStyle={{ color: 'var(--foreground)' }}
           />
-          <Legend
-            formatter={(value: string) => (
-              <span className="text-sm text-muted-foreground">{value}</span>
-            )}
-          />
+          <Legend content={<GoalLegendContent />} />
           {/* SVG text uses inline style={{ fill }} — Tailwind fill-* classes don't work on <text> */}
           {activeSlice && (
             <>
