@@ -70,9 +70,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {
-  PieChart,
-  Pie,
-  Cell,
   BarChart,
   Bar,
   AreaChart,
@@ -85,6 +82,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
+import { CompositionList, type CompositionListItem } from '@/components/ui/composition-list';
 import {
   ChevronDown,
   Download,
@@ -861,6 +859,18 @@ function PayerListRow({
 
 // --- Charts -----------------------------------------------------------------
 
+// PayerRow is already ranked net-descending (rankPayers) — reuse that order.
+function toPayerCompositionItems(payers: PayerRow[], color: (i: number) => string): CompositionListItem[] {
+  const total = payers.reduce((sum, p) => sum + p.net, 0);
+  return payers.map((p, i) => ({
+    id: p.assetId,
+    name: p.assetTicker,
+    value: p.net,
+    percentage: total > 0 ? (p.net / total) * 100 : 0,
+    color: color(i),
+  }));
+}
+
 function DividendCharts({
   payers,
   yearlySeries,
@@ -877,21 +887,16 @@ function DividendCharts({
   return (
     <div className="space-y-6">
       <div className="grid gap-6 desktop:grid-cols-2">
-        {/* By payer (pie). */}
+        {/* By payer (ranked list) — the leaderboard above already gives the full detail;
+            this panel caps to the top 8 rows so it stays scannable in the 2-col grid. */}
         {payers.length > 0 && (
           <div className="rounded-xl border border-border/60 p-4">
             <h4 className="text-sm font-semibold mb-2">Dividendi per asset</h4>
-            <ResponsiveContainer width="100%" height={260}>
-              <PieChart>
-                <Pie data={payers} dataKey="net" nameKey="assetTicker" cx="50%" cy="45%" outerRadius={72} animationDuration={500}>
-                  {payers.map((_, i) => (
-                    <Cell key={i} fill={color(i)} />
-                  ))}
-                </Pie>
-                <RechartsTooltip formatter={(value, name) => [formatCurrency(value as number), name as string]} contentStyle={TOOLTIP_CONTENT_STYLE} />
-                <Legend iconSize={10} wrapperStyle={{ fontSize: '11px' }} />
-              </PieChart>
-            </ResponsiveContainer>
+            <CompositionList
+              items={toPayerCompositionItems(payers, color)}
+              maxRows={8}
+              ariaLabel="Dividendi per asset"
+            />
           </div>
         )}
 

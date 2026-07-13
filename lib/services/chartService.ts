@@ -55,6 +55,10 @@ export function prepareAssetClassDistributionData(
       value,
       percentage,
       color: getAssetClassColor(assetClass),
+      // Raw class key (e.g. 'equity') — lets callers remap the color via
+      // ASSET_CLASS_CHART_INDEX so the same class matches Allocazione/Storico,
+      // instead of a positional remap that drifts whenever object key order changes.
+      assetClass,
     });
   });
 

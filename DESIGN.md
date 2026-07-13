@@ -627,9 +627,40 @@ A technique for pinning secondary metric content to the bottom of a variable-hei
 - `border-t border-border` provides visual separation; `pt-4` provides breathing room. `mt-auto` creates the push — no explicit `flex-1` spacer element needed.
 - On desktop, pair with the companion card's `h-full` so the sticky footer visually aligns with the companion card's bottom edge.
 
+### CompositionList and CompositionBar (Ranked Comparison and Composition)
+
+Two related primitives replace pie/donut charts everywhere the question is a magnitude
+comparison or a full breakdown, not a simple part-of-whole read:
+
+- **`CompositionList`** (`components/ui/composition-list.tsx`): a `divide-y` list of rows —
+  label + bar + mono value + `%` — for "which items are biggest, by how much" with 6+ items
+  (category breakdowns, per-payer rankings). Bar width is `value / maxValue` (the largest item
+  fills the track), NOT `percentage` — width encodes rank, the trailing `%` encodes share.
+  Using `percentage` as width leaves every bar looking short whenever no single item
+  dominates the total, recreating the empty-card problem this primitive exists to solve.
+- **`CompositionBar`** (`components/ui/composition-bar.tsx`): a single stacked bar (all
+  segments summing to ~100%) plus an optional inline legend — "what does the whole composition
+  look like" in one glance, for a handful of segments (asset classes, allocation categories).
+  `AllocationCompositionBar` is a thin wrapper supplying asset-class-specific segment
+  derivation over this primitive.
+
+**Rule — when a pie/donut is still correct:** only for a genuine part-of-whole question with
+≤5 slices AND some information a flat row wouldn't carry (e.g. an active-slice highlight
+synced to a list selection, or a hand-rolled SVG donut integral to a hero card layout — see
+Animated SVG Donut below). Everywhere else — 6+ items, no extra per-slice interaction — use
+`CompositionList` or `CompositionBar`. This extends the existing Liquidità rule below: a donut
+was replaced by flat rows there for the same reason (chrome reduction, more information with
+less visual noise); pie charts as drill-down or ranking UI carry that same anti-pattern at a
+larger scale (Analisi's 5 pies, Overview's 2 compact pies, Dividendi's per-payer pie all showed
+this — see the 2026-07-13 pie-chart redesign). As of that redesign, **the app has zero
+Recharts `<Pie>` usages left** — the one remaining candidate, Obiettivi's goal-allocation
+donut, turned out to be dead code (`GoalAllocationPieChart.tsx`, 0 importers — the donut had
+already been dropped from `GoalBasedInvestingTab` in an earlier session in favor of the goal
+list, and the file was removed rather than polished once this was discovered).
+
 ### Chart Legend Swatch
 
-The color swatch used in pie chart legend rows. At 8×8px, shape matters: a fully round circle reads as a "dot indicator" (inline traffic-light semantics); a slightly rounded square reads as a "color key."
+The color swatch used in composition bar / chart legend rows. At 8×8px, shape matters: a fully round circle reads as a "dot indicator" (inline traffic-light semantics); a slightly rounded square reads as a "color key."
 
 **Structure (LegendRow):**
 ```tsx
@@ -722,9 +753,9 @@ useEffect(() => {
 - **Don't** use `lg:` (1024px) as a layout breakpoint for wide-screen changes. iPad Mini in landscape is 1024px and receives the mobile treatment by design. Use `desktop:` (1440px) for all layout switches.
 - **Don't** design the desktop version first and then adapt it for mobile. Mobile layout is the base; desktop adds columns, tables, and sidebar — it does not simplify a desktop original.
 - **Don't** use `bg-card` for sub-items nested inside a Card. Sub-tiles inside a card must use `bg-muted` — the card background repeated creates a card-within-card violation even when the inner element has no explicit `<Card>` wrapper.
-- **Don't** use a Recharts `<ResponsiveContainer>` in compact pie chart mode when the width is known. Pass `width` and `height` directly to `<PieChart>` to avoid the "width: -1" warning and prevent layout reflows during animation.
 - **Don't** place count-up animation logic (`useCountUp`, `rAF` loops) in a page-level component. Every frame tick re-renders the entire tree. Animation state belongs in a dedicated leaf component.
 - **Don't** render a ring or donut chart with `strokeLinecap="round"` when the segment can be near 0% or near 100% — the round caps visually overlap the track ring and distort the reading. Use `strokeLinecap="butt"` for data-accurate arcs.
-- **Don't** use `rounded-full` for pie chart legend swatches. At 8×8px, a circle reads as a traffic-light dot (status indicator), not as a color key. `rounded-[2px]` reads as a color sample. The distinction is visually meaningful.
+- **Don't** use `rounded-full` for chart legend swatches (CompositionList/CompositionBar rows). At 8×8px, a circle reads as a traffic-light dot (status indicator), not as a color key. `rounded-[2px]` reads as a color sample. The distinction is visually meaningful.
+- **Don't** reach for a pie/donut chart to compare magnitudes across 6+ items. Pie angles are hard to compare; aligned bar lengths aren't. Use `CompositionList` (ranked rows) for "which items are biggest" or `CompositionBar` (stacked bar) for "what does the whole composition look like" — reserve pie/donut for genuine part-of-whole reads with ≤5 slices and information a flat row can't carry (see CompositionList and CompositionBar above).
 - **Don't** use an animated SVG donut or ring chart when flat `divide-y` rows carry the same information more clearly. Chrome reduction is the primary principle — the animated donut in the Liquid card was replaced by a flat 3-row breakdown precisely because the breakdown communicates more (three separate values, individual percentages) with less visual noise.
 - **Don't** use placeholder bars (e.g. dummy `width: 0` category bars) when no data is available. Omit the block entirely — absence communicates "no data" more cleanly than empty chrome.

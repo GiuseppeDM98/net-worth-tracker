@@ -37,6 +37,7 @@ import { NetWorthSparkline } from '@/components/dashboard/NetWorthSparkline';
 import { useChartColors } from '@/lib/hooks/useChartColors';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
+import { ASSET_CLASS_CHART_INDEX } from '@/lib/utils/allocationUtils';
 import { cn } from '@/lib/utils';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -159,9 +160,12 @@ export default function DashboardPage() {
         {
           id: 'assetClass',
           title: 'Distribuzione per Asset Class',
-          data: (overview?.charts.assetClassData ?? []).map((d, i) => ({
+          // Remap by the shared ASSET_CLASS_CHART_INDEX (not positional index) so a
+          // class renders the same color here as on Allocazione/Storico — a positional
+          // remap drifts whenever object key iteration order changes.
+          data: (overview?.charts.assetClassData ?? []).map((d) => ({
             ...d,
-            color: chartColors[i] ?? d.color,
+            color: chartColors[ASSET_CLASS_CHART_INDEX[d.assetClass ?? ''] ?? 0] ?? d.color,
           })),
         },
         {

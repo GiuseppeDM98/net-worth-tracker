@@ -4,7 +4,7 @@ import { memo, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { PieChart as PieChartComponent } from '@/components/ui/pie-chart';
+import { CompositionBar, type CompositionBarSegment } from '@/components/ui/composition-bar';
 import { EmptyState, ChartEmptyIcon } from '@/components/ui/empty-state';
 import { springLayoutTransition } from '@/lib/utils/motionVariants';
 import { useChartColors } from '@/lib/hooks/useChartColors';
@@ -42,6 +42,14 @@ const LoadingPlaceholder = () => (
   </div>
 );
 
+// CompositionBar's entrance animation is a Framer Motion `initial` on each segment,
+// which only replays on a true unmount — not on tab switches or data refreshes, since
+// the bar stays the same mounted component instance across those. This means (unlike
+// the old Recharts pie) no revealedCharts/animateOnMount tracking is needed here.
+function toSegments(data: PieChartData[]): CompositionBarSegment[] {
+  return data.map((item) => ({ key: item.name, label: item.name, pct: item.percentage, color: item.color }));
+}
+
 const CHART_TABS = [
   { id: 'assetClass', label: 'Asset Class' },
   { id: 'asset',      label: 'Per Asset'   },
@@ -72,9 +80,9 @@ type ChartTabId = typeof CHART_TABS[number]['id'];
  * All 3 charts side-by-side in a 3-col grid. No tabs needed.
  *
  * CHART ANIMATION:
- * Each chart tracks whether it has been rendered before via revealedCharts.
- * animateOnMount is true only on the first render of each chart to avoid
- * replaying Recharts entrance animations on data refreshes or tab switches.
+ * CompositionBar's entrance animation is a Framer Motion `initial` prop, which only
+ * replays on unmount — no explicit revealed-chart tracking is needed (see toSegments
+ * above).
  */
 const OverviewChartsSectionInner = ({
   sections,
@@ -86,10 +94,6 @@ const OverviewChartsSectionInner = ({
 
   // Active tab for the mobile tab-switched view
   const [activeTab, setActiveTab] = useState<ChartTabId>('assetClass');
-
-  // Tracks which charts have completed their first render so we can disable
-  // the entrance animation on subsequent data refreshes or tab switches.
-  const [revealedCharts, setRevealedCharts] = useState<Set<string>>(new Set());
 
   // Controls whether chart SVGs are actually mounted. Delayed until heroSettled
   // + an idle browser window to avoid competing with the count-up animation.
@@ -121,15 +125,6 @@ const OverviewChartsSectionInner = ({
       }
     };
   }, [heroSettled, chartRenderReady, prefersReducedMotion, isMobile]);
-
-  const markRevealed = (id: string) => {
-    setRevealedCharts(prev => {
-      if (prev.has(id)) return prev;
-      const next = new Set(prev);
-      next.add(id);
-      return next;
-    });
-  };
 
   /**
    * Legend row for a single chart slice.
@@ -204,18 +199,13 @@ const OverviewChartsSectionInner = ({
                 className="h-[150px]"
               />
             ) : (
-              <div className="flex items-center gap-5">
-                <div className="flex-shrink-0">
-                  <PieChartComponent
-                    data={activeSection.data}
-                    animateOnMount={!revealedCharts.has(activeSection.id)}
-                    onFirstRender={() => markRevealed(activeSection.id)}
-                    compact
-                    width={150}
-                    height={150}
-                  />
-                </div>
-                <div className="flex-1 flex flex-col gap-[7px] min-w-0">
+              <div>
+                <CompositionBar
+                  segments={toSegments(activeSection.data)}
+                  ariaLabel={activeSection.title}
+                  showLegend={false}
+                />
+                <div className="mt-3 flex flex-col gap-[7px] min-w-0">
                   {activeSection.data
                     .filter(item => item.percentage >= 5)
                     .map((item, i) => (
@@ -263,18 +253,13 @@ const OverviewChartsSectionInner = ({
                   className="h-[160px]"
                 />
               ) : (
-                <div className="flex items-center gap-4">
-                  <div className="flex-shrink-0">
-                    <PieChartComponent
-                      data={section.data}
-                      animateOnMount={!revealedCharts.has(section.id)}
-                      onFirstRender={() => markRevealed(section.id)}
-                      compact
-                      width={160}
-                      height={160}
-                    />
-                  </div>
-                  <div className="flex-1 flex flex-col gap-[7px] min-w-0">
+                <div>
+                  <CompositionBar
+                    segments={toSegments(section.data)}
+                    ariaLabel={section.title}
+                    showLegend={false}
+                  />
+                  <div className="mt-3 flex flex-col gap-[7px] min-w-0">
                     {section.data
                       .filter(item => item.percentage >= 5)
                       .map((item, i) => (

@@ -18,7 +18,7 @@
  * - Click Budget/Risparmi → no action
  * - Back button → return to budget view
  *
- * Used by: CurrentYearTab and TotalHistoryTab cashflow pages
+ * Used by: AnalisiTab
  */
 'use client';
 

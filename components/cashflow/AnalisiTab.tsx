@@ -34,14 +34,6 @@ import { ChevronDown, ChevronLeft, ExternalLink } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
-import {
-  PieChart as RechartsPC,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  Tooltip,
-  Legend,
-} from 'recharts';
 import { formatCurrency } from '@/lib/services/chartService';
 import { getItalyMonth, getItalyYear, toDate } from '@/lib/utils/dateHelpers';
 import { CashflowSankeyChart } from '@/components/cashflow/CashflowSankeyChart';
@@ -50,6 +42,8 @@ import { SavingsRateTrendSection } from '@/components/cashflow/SavingsRateTrendS
 import { CategoryTrendsGrid } from '@/components/cashflow/CategoryTrendsGrid';
 import { AndamentoStoricoSection } from '@/components/cashflow/AndamentoStoricoSection';
 import { AnomalieBlock, AnomaliaItem } from '@/components/cashflow/AnomalieBlock';
+import { CompositionList, CompositionListItem } from '@/components/ui/composition-list';
+import { computeShadeOpacities } from '@/lib/utils/compositionShading';
 import { chartShellSettle, fadeVariants } from '@/lib/utils/motionVariants';
 import { cn } from '@/lib/utils';
 
@@ -59,37 +53,6 @@ interface ChartData {
   percentage: number;
   color: string;
 }
-
-
-const ChartTooltip = ({
-  active,
-  payload,
-  label,
-  formatter,
-}: {
-  active?: boolean;
-  payload?: Array<{ name: string; value: number; color?: string; fill?: string; payload?: { fill?: string } }>;
-  label?: string | number;
-  formatter?: (value: number) => string;
-}) => {
-  if (!active || !payload || !payload.length) return null;
-  const fmt = formatter ?? formatCurrency;
-  return (
-    <div className="rounded-md border border-border bg-popover px-3 py-2 shadow-md text-sm min-w-[140px]">
-      {label !== undefined && (
-        <p className="font-medium text-popover-foreground mb-1">{label}</p>
-      )}
-      {payload.map((entry, index) => {
-        const color = entry.color || entry.fill || entry.payload?.fill || 'var(--popover-foreground)';
-        return (
-          <p key={index} className="tabular-nums" style={{ color }}>
-            {entry.name} : {fmt(entry.value)}
-          </p>
-        );
-      })}
-    </div>
-  );
-};
 
 type DrillDownLevel = 'category' | 'subcategory' | 'expenseList';
 type ChartType = 'expenses' | 'income';
@@ -233,51 +196,6 @@ function getExpensesByType(expenses: Expense[], colors: string[]): ChartData[] {
       color: colors[index % colors.length],
     }))
     .sort((a, b) => b.value - a.value);
-}
-
-// ── LegendItems ──────────────────────────────────────────────────────────────
-// Module-level component so the Legend content= prop gets a stable reference.
-// Clickable items render as <button> for keyboard accessibility (WCAG 2.1.1).
-
-function LegendItems({
-  items,
-  onItemClick,
-  className,
-  maxItems,
-  isMobile,
-}: {
-  items: ChartData[];
-  onItemClick?: (item: ChartData) => void;
-  className?: string;
-  maxItems?: number;
-  isMobile: boolean;
-}) {
-  const filtered = items.filter(item => item.percentage >= 5).sort((a, b) => b.value - a.value);
-  const visible = maxItems ? filtered.slice(0, maxItems) : filtered;
-  const baseClass = isMobile ? 'mt-4 flex flex-wrap gap-3' : 'pl-5';
-  return (
-    <div className={cn(baseClass, className)}>
-      {visible.map((item, index) =>
-        onItemClick ? (
-          <button
-            key={`legend-${index}`}
-            type="button"
-            className="flex items-center gap-2 text-sm text-left"
-            onClick={() => onItemClick(item)}
-            aria-label={`Filtra per ${item.name} (${item.percentage.toFixed(1)}%)`}
-          >
-            <div className="h-3.5 w-3.5 flex-shrink-0 rounded-sm" style={{ backgroundColor: item.color }} />
-            <span className="text-muted-foreground">{item.name} ({item.percentage.toFixed(1)}%)</span>
-          </button>
-        ) : (
-          <div key={`legend-${index}`} className="flex items-center gap-2 text-sm">
-            <div className="h-3.5 w-3.5 flex-shrink-0 rounded-sm" style={{ backgroundColor: item.color }} />
-            <span className="text-muted-foreground">{item.name} ({item.percentage.toFixed(1)}%)</span>
-          </div>
-        )
-      )}
-    </div>
-  );
 }
 
 interface AnalisiTabProps {
@@ -561,18 +479,9 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
 
   // ── Pie/drill-down helpers ─────────────────────────────────────────────
 
-  const deriveSubcategoryColors = (baseColor: string, count: number): string[] => {
-    if (count === 0) return [];
-    return Array.from({ length: count }, (_, i) => {
-      const opacity = 0.4 + (i / Math.max(count - 1, 1)) * 0.6;
-      const hex = baseColor.startsWith('#') ? baseColor : '#6366f1';
-      const r = parseInt(hex.slice(1, 3), 16);
-      const g = parseInt(hex.slice(3, 5), 16);
-      const b = parseInt(hex.slice(5, 7), 16);
-      return `rgba(${r},${g},${b},${opacity.toFixed(2)})`;
-    });
-  };
-
+  // Subcategory rows share the parent category's color and differentiate only via
+  // barOpacity (computeShadeOpacities) — resolved by the caller, not here, so this
+  // stays independent of whatever color format useChartColors() returns (oklch/hex/rgb).
   const getSubcategoriesData = (expenses: Expense[], categoryName: string, chartType: ChartType): ChartData[] => {
     const filtered = expenses.filter(e =>
       e.categoryName === categoryName &&
@@ -584,12 +493,9 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
       const name = e.subCategoryName || 'Altro';
       subcategoryMap.set(name, (subcategoryMap.get(name) || 0) + Math.abs(e.amount));
     });
-    const baseColor = drillDown.selectedCategoryColor || COLORS[0];
-    const colors = deriveSubcategoryColors(baseColor, subcategoryMap.size);
-    let colorIndex = 0;
     const data: ChartData[] = [];
     subcategoryMap.forEach((value, name) => {
-      data.push({ name, value, percentage: total > 0 ? (value / total) * 100 : 0, color: colors[colorIndex++ % colors.length] });
+      data.push({ name, value, percentage: total > 0 ? (value / total) * 100 : 0, color: '' });
     });
     return data.sort((a, b) => b.value - a.value);
   };
@@ -607,12 +513,12 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
     });
   };
 
-  const handleCategoryClick = (data: ChartData, chartType: ChartType) => {
-    setDrillDown({ level: 'subcategory', chartType, selectedCategory: data.name, selectedCategoryColor: data.color, selectedSubCategory: null });
+  const handleCategoryClick = (item: CompositionListItem, chartType: ChartType) => {
+    setDrillDown({ level: 'subcategory', chartType, selectedCategory: item.name, selectedCategoryColor: item.color, selectedSubCategory: null });
   };
 
-  const handleSubcategoryClick = (data: ChartData) => {
-    setDrillDown(prev => ({ ...prev, level: 'expenseList', selectedSubCategory: data.name }));
+  const handleSubcategoryClick = (item: CompositionListItem) => {
+    setDrillDown(prev => ({ ...prev, level: 'expenseList', selectedSubCategory: item.name }));
   };
 
   const handleBack = () => {
@@ -631,8 +537,25 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
 
   const currentFilteredExpenses = drillDown.level === 'expenseList' ? getFilteredExpenses() : [];
 
-  const pieChartHeight = isMobile ? 320 : 500;
-  const pieOuterRadius = isMobile ? 110 : 140;
+  // ChartData → CompositionListItem: name doubles as the stable id (unique per Map
+  // construction above); color arrives pre-resolved from useChartColors().
+  const toCompositionItems = (data: ChartData[]): CompositionListItem[] =>
+    data.map(d => ({ id: d.name, name: d.name, value: d.value, percentage: d.percentage, color: d.color }));
+
+  // Subcategory rows: color = parent category color, opacity ramps via computeShadeOpacities
+  // (format-independent — works whether useChartColors() returns oklch, hex, or rgb).
+  const subcategoryCompositionItems: CompositionListItem[] = (() => {
+    const baseColor = drillDown.selectedCategoryColor || COLORS[0];
+    const opacities = computeShadeOpacities(currentSubcategoriesData.length);
+    return currentSubcategoriesData.map((d, i) => ({
+      id: d.name,
+      name: d.name,
+      value: d.value,
+      percentage: d.percentage,
+      color: baseColor,
+      barOpacity: opacities[i],
+    }));
+  })();
 
   // Show structural skeleton only on initial load (no data yet).
   // Re-fetches while data is present show stale data, not a skeleton — avoids jarring blank flash.
@@ -979,42 +902,18 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
               </CardHeader>
               <CardContent>
                 {drillDown.level === 'category' && expensesByCategoryData.length > 0 && (
-                  <ResponsiveContainer width="100%" height={pieChartHeight}>
-                    <RechartsPC>
-                      <Pie
-                        data={expensesByCategoryData as any}
-                        cx="50%" cy="50%" labelLine={false}
-                        label={!isMobile ? (entry: any) => entry.percentage >= 5 ? `${entry.name}: ${entry.percentage.toFixed(1)}%` : '' : false}
-                        outerRadius={pieOuterRadius} dataKey="value"
-                        onClick={(data: any) => handleCategoryClick(data, 'expenses')} cursor="pointer"
-                        animationBegin={0} animationDuration={600} animationEasing="ease-out"
-                      >
-                        {expensesByCategoryData.map((entry, i) => <Cell key={i} fill={entry.color} style={{ cursor: 'pointer' }} />)}
-                      </Pie>
-                      <Tooltip content={<ChartTooltip />} />
-                      <Legend layout={isMobile ? 'horizontal' : 'vertical'} align={isMobile ? 'center' : 'right'} verticalAlign={isMobile ? 'bottom' : 'middle'}
-                        content={() => <LegendItems items={expensesByCategoryData} onItemClick={e => handleCategoryClick(e, 'expenses')} isMobile={isMobile} maxItems={isMobile ? 3 : undefined} />} />
-                    </RechartsPC>
-                  </ResponsiveContainer>
+                  <CompositionList
+                    items={toCompositionItems(expensesByCategoryData)}
+                    onItemClick={(item) => handleCategoryClick(item, 'expenses')}
+                    ariaLabel={`Spese per categoria — ${periodLabel}`}
+                  />
                 )}
-                {drillDown.level === 'subcategory' && drillDown.chartType === 'expenses' && currentSubcategoriesData.length > 0 && (
-                  <ResponsiveContainer width="100%" height={pieChartHeight}>
-                    <RechartsPC>
-                      <Pie
-                        data={currentSubcategoriesData as any}
-                        cx="50%" cy="50%" labelLine={false}
-                        label={!isMobile ? (entry: any) => entry.percentage >= 5 ? `${entry.name}: ${entry.percentage.toFixed(1)}%` : '' : false}
-                        outerRadius={pieOuterRadius} dataKey="value"
-                        onClick={(data: any) => handleSubcategoryClick(data)} cursor="pointer"
-                        animationBegin={0} animationDuration={600} animationEasing="ease-out"
-                      >
-                        {currentSubcategoriesData.map((entry, i) => <Cell key={i} fill={entry.color} style={{ cursor: 'pointer' }} />)}
-                      </Pie>
-                      <Tooltip content={<ChartTooltip />} />
-                      <Legend layout={isMobile ? 'horizontal' : 'vertical'} align={isMobile ? 'center' : 'right'} verticalAlign={isMobile ? 'bottom' : 'middle'}
-                        content={() => <LegendItems items={currentSubcategoriesData} onItemClick={e => handleSubcategoryClick(e)} isMobile={isMobile} />} />
-                    </RechartsPC>
-                  </ResponsiveContainer>
+                {drillDown.level === 'subcategory' && drillDown.chartType === 'expenses' && subcategoryCompositionItems.length > 0 && (
+                  <CompositionList
+                    items={subcategoryCompositionItems}
+                    onItemClick={handleSubcategoryClick}
+                    ariaLabel={`Sottocategorie di ${drillDown.selectedCategory}`}
+                  />
                 )}
                 {drillDown.level === 'expenseList' && drillDown.chartType === 'expenses' && (
                   <ExpenseList expenses={currentFilteredExpenses} isIncome={false} />
@@ -1028,21 +927,10 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
             <Card className="desktop:col-span-2">
               <CardHeader><CardTitle>Spese per Tipo — {periodLabel}</CardTitle></CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={pieChartHeight}>
-                  <RechartsPC>
-                    <Pie
-                      data={expensesByTypeData as any} cx="50%" cy="50%" labelLine={false}
-                      label={!isMobile ? (entry: any) => entry.percentage >= 5 ? `${entry.name}: ${entry.percentage.toFixed(1)}%` : '' : false}
-                      outerRadius={pieOuterRadius} dataKey="value"
-                      animationBegin={0} animationDuration={600} animationEasing="ease-out"
-                    >
-                      {expensesByTypeData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-                    </Pie>
-                    <Tooltip content={<ChartTooltip />} />
-                    <Legend layout={isMobile ? 'horizontal' : 'vertical'} align={isMobile ? 'center' : 'right'} verticalAlign={isMobile ? 'bottom' : 'middle'}
-                      content={() => <LegendItems items={expensesByTypeData} isMobile={isMobile} />} />
-                  </RechartsPC>
-                </ResponsiveContainer>
+                <CompositionList
+                  items={toCompositionItems(expensesByTypeData)}
+                  ariaLabel={`Spese per tipo — ${periodLabel}`}
+                />
               </CardContent>
             </Card>
           )}
@@ -1071,40 +959,18 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
               </CardHeader>
               <CardContent>
                 {drillDown.level === 'category' && incomeByCategoryData.length > 0 && (
-                  <ResponsiveContainer width="100%" height={pieChartHeight}>
-                    <RechartsPC>
-                      <Pie
-                        data={incomeByCategoryData as any} cx="50%" cy="50%" labelLine={false}
-                        label={!isMobile ? (entry: any) => entry.percentage >= 5 ? `${entry.name}: ${entry.percentage.toFixed(1)}%` : '' : false}
-                        outerRadius={pieOuterRadius} dataKey="value"
-                        onClick={(data: any) => handleCategoryClick(data, 'income')} cursor="pointer"
-                        animationBegin={0} animationDuration={600} animationEasing="ease-out"
-                      >
-                        {incomeByCategoryData.map((entry, i) => <Cell key={i} fill={entry.color} style={{ cursor: 'pointer' }} />)}
-                      </Pie>
-                      <Tooltip content={<ChartTooltip />} />
-                      <Legend layout={isMobile ? 'horizontal' : 'vertical'} align={isMobile ? 'center' : 'right'} verticalAlign={isMobile ? 'bottom' : 'middle'}
-                        content={() => <LegendItems items={incomeByCategoryData} onItemClick={e => handleCategoryClick(e, 'income')} isMobile={isMobile} />} />
-                    </RechartsPC>
-                  </ResponsiveContainer>
+                  <CompositionList
+                    items={toCompositionItems(incomeByCategoryData)}
+                    onItemClick={(item) => handleCategoryClick(item, 'income')}
+                    ariaLabel={`Entrate per categoria — ${periodLabel}`}
+                  />
                 )}
-                {drillDown.level === 'subcategory' && drillDown.chartType === 'income' && currentSubcategoriesData.length > 0 && (
-                  <ResponsiveContainer width="100%" height={pieChartHeight}>
-                    <RechartsPC>
-                      <Pie
-                        data={currentSubcategoriesData as any} cx="50%" cy="50%" labelLine={false}
-                        label={!isMobile ? (entry: any) => entry.percentage >= 5 ? `${entry.name}: ${entry.percentage.toFixed(1)}%` : '' : false}
-                        outerRadius={pieOuterRadius} dataKey="value"
-                        onClick={(data: any) => handleSubcategoryClick(data)} cursor="pointer"
-                        animationBegin={0} animationDuration={600} animationEasing="ease-out"
-                      >
-                        {currentSubcategoriesData.map((entry, i) => <Cell key={i} fill={entry.color} style={{ cursor: 'pointer' }} />)}
-                      </Pie>
-                      <Tooltip content={<ChartTooltip />} />
-                      <Legend layout={isMobile ? 'horizontal' : 'vertical'} align={isMobile ? 'center' : 'right'} verticalAlign={isMobile ? 'bottom' : 'middle'}
-                        content={() => <LegendItems items={currentSubcategoriesData} onItemClick={e => handleSubcategoryClick(e)} isMobile={isMobile} />} />
-                    </RechartsPC>
-                  </ResponsiveContainer>
+                {drillDown.level === 'subcategory' && drillDown.chartType === 'income' && subcategoryCompositionItems.length > 0 && (
+                  <CompositionList
+                    items={subcategoryCompositionItems}
+                    onItemClick={handleSubcategoryClick}
+                    ariaLabel={`Sottocategorie di ${drillDown.selectedCategory}`}
+                  />
                 )}
                 {drillDown.level === 'expenseList' && drillDown.chartType === 'income' && (
                   <ExpenseList expenses={currentFilteredExpenses} isIncome={true} />

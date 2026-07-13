@@ -253,6 +253,8 @@ export interface PieChartData {
   value: number;
   percentage: number;
   color: string;
+  /** Raw asset-class key (e.g. 'equity'), set only by asset-class distribution data. */
+  assetClass?: string;
   [key: string]: any; // Index signature for Recharts compatibility
 }
 
