@@ -21,12 +21,14 @@ import { LayoutGrid } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { ASSET_CLASS_ORDER } from '@/lib/services/assetService';
+import { formatCurrency } from '@/lib/services/chartService';
 import { AllocationResult, AssetAllocationTarget } from '@/types/assets';
 import {
   ASSET_CLASS_LABELS,
   groupSubCategoriesByAssetClass,
   filterSpecificAssets,
   hasSpecificAssetTracking,
+  type AllocatableHolding,
 } from '@/lib/utils/allocationUtils';
 import { useActionColors } from '@/lib/hooks/useActionColors';
 import { AllocationRow } from './AllocationRow';
@@ -34,6 +36,8 @@ import { AllocationRow } from './AllocationRow';
 interface AllocationBreakdownProps {
   allocation: AllocationResult;
   targets: AssetAllocationTarget | null;
+  /** Assets flagged non-rebalanceable — reported at the bottom, never scored against a target. */
+  excludedHoldings: AllocatableHolding[];
 }
 
 const byAssetClassOrder = (a: string, b: string) =>
@@ -59,12 +63,17 @@ function CollapseRegion({ open, children }: { open: boolean; children: ReactNode
   );
 }
 
-export function AllocationBreakdown({ allocation, targets }: AllocationBreakdownProps) {
+export function AllocationBreakdown({
+  allocation,
+  targets,
+  excludedHoldings,
+}: AllocationBreakdownProps) {
   const actionColors = useActionColors();
   const [expandedClasses, setExpandedClasses] = useState<Set<string>>(new Set());
   const [expandedSubs, setExpandedSubs] = useState<Set<string>>(new Set());
 
   const subCategoriesByClass = groupSubCategoriesByAssetClass(allocation.bySubCategory);
+  const excludedTotal = excludedHoldings.reduce((sum, holding) => sum + holding.value, 0);
 
   const toggle = (set: Set<string>, key: string): Set<string> => {
     const next = new Set(set);
@@ -182,6 +191,44 @@ export function AllocationBreakdown({ allocation, targets }: AllocationBreakdown
           );
         })}
       </div>
+
+      {/* Wealth OUTSIDE the allocation (role `excluded` — the home you live in). Deliberately
+          outside the divide-y list above and visually quieter: it carries no target, no chip and no
+          action. It exists here only so the page total reconciles with the Patrimonio one instead of
+          silently disagreeing with it. Note this is NOT the `frozen` role — those assets ARE in the
+          class rows above, because they are part of the allocation; they simply never move. */}
+      {excludedHoldings.length > 0 && (
+        <div className="border-t border-border bg-muted/20">
+          <div className="flex items-baseline justify-between gap-3 px-4 pb-2 pt-3.5">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+              Esclusi dall&apos;allocazione
+            </p>
+            <p className="font-mono text-xs tabular-nums text-muted-foreground">
+              {formatCurrency(excludedTotal)}
+            </p>
+          </div>
+          <p className="px-4 pb-2 text-[11px] text-muted-foreground/70">
+            Nel patrimonio, fuori dai calcoli di questa pagina.
+          </p>
+          <div className="divide-y divide-border/40">
+            {[...excludedHoldings]
+              .sort((a, b) => b.value - a.value)
+              .map((holding) => (
+                <div
+                  key={holding.id}
+                  className="flex items-center justify-between gap-3 px-4 py-2.5"
+                >
+                  <span className="truncate text-xs text-muted-foreground" title={holding.label}>
+                    {holding.label}
+                  </span>
+                  <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
+                    {formatCurrency(holding.value)}
+                  </span>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
     </Card>
   );
 }

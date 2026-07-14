@@ -40,8 +40,9 @@ import * as z from 'zod';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
-import { Asset, AssetFormData, AssetType, AssetClass, AssetAllocationTarget, AssetComposition, CouponFrequency, BondDetails, CouponRateTier, AnnouncedInflationRate } from '@/types/assets';
+import { Asset, AssetFormData, AssetType, AssetClass, AllocationRole, AssetAllocationTarget, AssetComposition, CouponFrequency, BondDetails, CouponRateTier, AnnouncedInflationRate } from '@/types/assets';
 import { createAsset, updateAsset } from '@/lib/services/assetService';
+import { resolveAllocationRole } from '@/lib/utils/allocationUtils';
 import { scheduleNextCoupon, scheduleFinalPremium } from '@/lib/services/couponScheduling';
 import { getTargets, addSubCategory } from '@/lib/services/assetAllocationService';
 import {
@@ -242,6 +243,7 @@ function buildAssetFormDataFromValues(
         ? data.outstandingDebt
         : undefined,
     isPrimaryResidence: data.isPrimaryResidence || false,
+    allocationRole: data.allocationRole ?? 'tradable',
   };
 }
 
@@ -323,6 +325,7 @@ const assetSchema = z.object({
   isComposite: z.boolean().optional(),
   outstandingDebt: z.number().nonnegative('Debt cannot be negative').optional().or(z.nan()),
   isPrimaryResidence: z.boolean().optional(),
+  allocationRole: z.enum(['tradable', 'frozen', 'excluded']).optional(),
   // Bond coupon details (optional, only shown for type=bond + assetClass=bonds)
   bondCouponRate: z.number().min(0).max(100).optional().or(z.nan()),
   bondCouponFrequency: z.enum(['monthly', 'quarterly', 'semiannual', 'annual']).optional(),
@@ -365,6 +368,33 @@ const assetTypes: { value: AssetType; label: string }[] = [
   { value: 'realestate', label: 'Immobile' },
 ];
 
+/**
+ * The three allocation roles, in the order a user should reason about them: the default first, then
+ * the two ways an asset can be untouchable. The descriptions name the calculation each one drives —
+ * without that, three near-identical switches (this, "Asset Liquido", "Casa di Abitazione") are
+ * indistinguishable, which is exactly how the earlier boolean version misled.
+ */
+const ALLOCATION_ROLE_OPTIONS: { value: AllocationRole; label: string; description: string }[] = [
+  {
+    value: 'tradable',
+    label: 'Ribilanciabile',
+    description:
+      'Lo puoi comprare e vendere liberamente. Conta nelle percentuali e compare in Ribilancia, Versa e Preleva. È il caso normale: ETF, azioni, obbligazioni, liquidità.',
+  },
+  {
+    value: 'frozen',
+    label: 'Non negoziabile',
+    description:
+      'È denaro investito a tutti gli effetti, ma non lo puoi muovere: fondo pensione vincolato, private equity. Conta nelle percentuali (così vedi il rischio vero), ma i piani non lo toccano mai e raggiungono il target muovendo gli altri asset.',
+  },
+  {
+    value: 'excluded',
+    label: "Escluso dall'allocazione",
+    description:
+      "Non fa parte del portafoglio investito: la casa in cui vivi. Esce del tutto dalla pagina Allocazione, denominatore incluso — tenercelo dentro terrebbe la classe Immobili fuori target per sempre, contro una vendita che non farai mai.",
+  },
+];
+
 const assetClasses: { value: AssetClass; label: string }[] = [
   { value: 'equity', label: 'Azioni' },
   { value: 'bonds', label: 'Obbligazioni' },
@@ -388,6 +418,9 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
   const [composition, setComposition] = useState<AssetComposition[]>([]);
   const [isComposite, setIsComposite] = useState(false);
   const [hasOutstandingDebt, setHasOutstandingDebt] = useState(false);
+  // True once the user has picked an allocation role by hand — from then on the type/sub-category
+  // driven suggestion stops overriding their choice.
+  const [allocationRoleTouched, setAllocationRoleTouched] = useState(false);
   const [showCostBasis, setShowCostBasis] = useState(false);
   const [showTER, setShowTER] = useState(false);
   const [showBondDetails, setShowBondDetails] = useState(false);
@@ -411,6 +444,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
       isComposite: false,
       outstandingDebt: undefined,
       isPrimaryResidence: false,
+      allocationRole: 'tradable',
     },
   });
 
@@ -435,6 +469,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
   const watchBondIsInflationLinked = useWatch({ control, name: 'bondIsInflationLinked' });
   const watchAverageCost = useWatch({ control, name: 'averageCost' });
   const watchIsPrimaryResidence = useWatch({ control, name: 'isPrimaryResidence' });
+  const watchAllocationRole = useWatch({ control, name: 'allocationRole' });
   const watchStampDutyExempt = useWatch({ control, name: 'stampDutyExempt' });
   // True when the bond qualifies for % of par ↔ EUR conversion:
   // must have ISIN (triggers Borsa Italiana pricing) AND nominalValue > 1.
@@ -484,6 +519,31 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
     }
   }, [selectedAssetClass, selectedSubCategory, selectedType, watchIsLiquid, watchAutoUpdatePrice, setValue]);
 
+  // Suggest an allocation role for the two archetypal untouchable holdings, each getting the role
+  // that actually fits it: a property is `excluded` (it is not an investment), private equity is
+  // `frozen` (it IS an investment, you just cannot move it). This is a FORM default — visible in the
+  // select before saving and one click from changed — never a read-time fallback: no existing
+  // asset's role changes without the user asking. Once they pick a role, we stop steering.
+  useEffect(() => {
+    if (isEdit || allocationRoleTouched) return;
+    const suggested: AllocationRole =
+      selectedAssetClass === 'realestate'
+        ? 'excluded'
+        : selectedSubCategory === 'Private Equity'
+          ? 'frozen'
+          : 'tradable';
+    if (watchAllocationRole !== suggested) {
+      setValue('allocationRole', suggested);
+    }
+  }, [
+    isEdit,
+    allocationRoleTouched,
+    selectedAssetClass,
+    selectedSubCategory,
+    watchAllocationRole,
+    setValue,
+  ]);
+
   // Auto-activate bond detail toggles for new bond assets
   // When type=bond and assetClass=bonds, automatically open the bond details and cost basis sections
   // so the user sees the available fields without needing to manually toggle them.
@@ -529,6 +589,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
     // Without `open` in deps, `asset` stays null between opens and the effect never re-fires.
     if (!open) return;
     setStep(asset ? 2 : 1);
+    setAllocationRoleTouched(false);
 
     if (asset) {
       // Determine default for isLiquid if not set
@@ -576,6 +637,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         isComposite: !!(asset.composition && asset.composition.length > 0),
         outstandingDebt: asset.outstandingDebt || undefined,
         isPrimaryResidence: asset.isPrimaryResidence || false,
+        allocationRole: resolveAllocationRole(asset),
         isin: asset.isin || undefined,
       });
 
@@ -644,6 +706,7 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
         isComposite: false,
         outstandingDebt: undefined,
         isPrimaryResidence: false,
+        allocationRole: 'tradable',
         bondCouponRate: undefined,
         bondCouponFrequency: undefined,
         bondIssueDate: undefined,
@@ -1160,13 +1223,16 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
             </div>
           </div>
 
-          {/* Liquidità */}
+          {/* Liquidità — the three switches below (liquid / non-rebalanceable / primary residence)
+              each steer a DIFFERENT calculation, and the old copy never said which. Their
+              descriptions now name the calculation they touch, and say what they leave alone. */}
           <div className="space-y-2 rounded-lg border p-4">
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <Label htmlFor="isLiquid">Asset Liquido</Label>
                 <p className="text-xs text-muted-foreground">
-                  Indica se questo asset può essere convertito rapidamente in contanti
+                  Si converte rapidamente in contanti. Determina solo la divisione tra patrimonio
+                  liquido e illiquido (Panoramica, FIRE): non tocca il ribilanciamento.
                 </p>
               </div>
               <Switch
@@ -1175,6 +1241,41 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
                 onCheckedChange={(checked) => setValue('isLiquid', checked)}
               />
             </div>
+          </div>
+
+          {/* Ruolo nell'allocazione — tre stati, non due switch sovrapposti. Le due domande
+              ("fa parte del portafoglio investito?" e "lo posso muovere?") sono distinte, e
+              confonderle era ciò che rendeva la vecchia coppia di flag indistinguibile. */}
+          <div className="space-y-3 rounded-lg border p-4">
+            <div className="space-y-0.5">
+              <Label htmlFor="allocationRole">Ruolo nell&apos;allocazione</Label>
+              <p className="text-xs text-muted-foreground">
+                Vale solo per la pagina Allocazione. Ovunque altro (Panoramica, Storico, FIRE)
+                l&apos;asset conta sempre nel patrimonio.
+              </p>
+            </div>
+            <Select
+              value={watchAllocationRole ?? 'tradable'}
+              onValueChange={(value) => {
+                setAllocationRoleTouched(true);
+                setValue('allocationRole', value as AllocationRole);
+              }}
+            >
+              <SelectTrigger id="allocationRole">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ALLOCATION_ROLE_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {ALLOCATION_ROLE_OPTIONS.find((o) => o.value === (watchAllocationRole ?? 'tradable'))
+                ?.description}
+            </p>
           </div>
 
           {/* autoUpdatePrice — hidden for cash/realestate (they don't use market prices) */}
@@ -1366,8 +1467,9 @@ export function AssetDialog({ open, onClose, asset }: AssetDialogProps) {
                 <div className="space-y-0.5">
                   <Label htmlFor="isPrimaryResidence">Casa di Abitazione</Label>
                   <p className="text-xs text-muted-foreground">
-                    Marca questo immobile come casa di abitazione. Il calcolo FIRE può escludere questi immobili
-                    (configurabile nelle impostazioni FIRE).
+                    L&apos;immobile in cui vivi. Determina solo il net worth usato per il calcolo FIRE,
+                    che può escluderlo (lo decidi nelle impostazioni FIRE): non tocca il
+                    ribilanciamento, che dipende dal flag qui sopra.
                   </p>
                 </div>
                 <Switch

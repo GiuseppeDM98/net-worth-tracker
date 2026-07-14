@@ -2250,9 +2250,17 @@ export default function SettingsPage() {
       {/* Unified target card — one card, flat divide-y, sub-categories expandable inline */}
       <Card className="overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b">
-          <p className="text-sm font-semibold">Target per Asset Class</p>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold">Target per Asset Class</p>
+            {/* The denominator these percentages apply to is not the net worth — say so here, or the
+                Allocazione page reads as if it had lost money. */}
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Si applicano al patrimonio ribilanciabile: gli asset marcati &quot;Escludi dal
+              ribilanciamento&quot; non entrano nel calcolo.
+            </p>
+          </div>
           <span
-            className={`text-xs font-semibold font-mono ${isValidTotal ? 'text-green-600' : 'text-red-600'}`}
+            className={`shrink-0 text-xs font-semibold font-mono ${isValidTotal ? 'text-green-600' : 'text-red-600'}`}
           >
             {formatPercentage(total)}
             {cashUseFixedAmount && ' (excl. cash)'}

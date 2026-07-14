@@ -61,6 +61,30 @@ export interface BondDetails {
   announcedInflationRates?: AnnouncedInflationRate[]; // User-announced per-period inflation rates, keyed by coupon date
 }
 
+/**
+ * How the Allocazione page treats an asset. One field, three mutually exclusive states — NOT a
+ * pair of overlapping booleans, which is what an earlier cut had and what made the two ideas below
+ * impossible to tell apart in the UI.
+ *
+ * The two questions are orthogonal, and only three of the four combinations are meaningful:
+ *   "Is this part of my invested portfolio?"  ×  "Can I trade it?"
+ *
+ *  - `tradable`  (default) — yes / yes. ETFs, stocks, bonds, cash.
+ *  - `frozen`    — yes / no. It IS invested wealth and belongs in your asset-class percentages, but
+ *                  you cannot move it: a pension fund locked until retirement, a private-equity
+ *                  commitment. Counted in the DENOMINATOR (so your true equity/bond exposure is
+ *                  right and the plans compensate for it with the assets you CAN move), but never
+ *                  offered as a destination or a source in Ribilancia / Versa / Preleva.
+ *  - `excluded`  — no / no. Not an investment at all: the home you live in. Out of the Allocazione
+ *                  page entirely, denominator included — keeping it in would peg the realestate
+ *                  class permanently off-target against an impossible-to-execute trade.
+ *
+ * Orthogonal to `isLiquid` (liquid vs illiquid net-worth split) and `isPrimaryResidence` (FIRE net
+ * worth). Everywhere outside Allocazione — Panoramica, Storico, snapshots, FIRE, Patrimonio — all
+ * three roles count identically toward net worth.
+ */
+export type AllocationRole = 'tradable' | 'frozen' | 'excluded';
+
 export interface AssetComposition {
   assetClass: AssetClass;
   percentage: number;
@@ -92,6 +116,9 @@ export interface Asset {
   composition?: AssetComposition[]; // For composite assets (e.g., pension funds with mixed allocation: 60% equity, 40% bonds)
   outstandingDebt?: number; // Outstanding mortgage/loan for real estate. Net value calculation: value - outstandingDebt
   isPrimaryResidence?: boolean; // Indicates if this real estate is the primary residence (excluded from FIRE calculations based on user setting)
+  allocationRole?: AllocationRole; // How the Allocazione page treats this asset. See AllocationRole. Absent → legacy excludeFromAllocation, else 'tradable'.
+  /** @deprecated Superseded by `allocationRole`. Read-only legacy fallback: true → 'excluded'. Never write it. */
+  excludeFromAllocation?: boolean;
   isin?: string; // ISIN code for dividend scraping (optional)
   bondDetails?: BondDetails; // Optional bond-specific details for coupon scheduling
   // Start of the CURRENT continuous holding, stamped on (re)purchase — createAsset on ISIN reuse,
@@ -124,6 +151,7 @@ export interface AssetFormData {
   composition?: AssetComposition[];
   outstandingDebt?: number;
   isPrimaryResidence?: boolean;
+  allocationRole?: AllocationRole; // How the Allocazione page treats this asset. See AllocationRole.
   isin?: string; // ISIN code for dividend scraping (optional)
   bondDetails?: BondDetails; // Optional bond-specific details for coupon scheduling
 }

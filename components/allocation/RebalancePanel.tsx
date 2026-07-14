@@ -54,16 +54,29 @@ export function RebalancePanel({ moves }: RebalancePanelProps) {
               </p>
             </div>
 
+            {/* A VENDI capped by frozen wealth prints what you CAN sell, never the raw gap: the gap
+                stays visible as the % → % line on the left, but the euro figure has to be an order
+                you can actually fill. When nothing at all is sellable, say so instead of "−0 €". */}
             <div className="shrink-0 text-right">
-              <p
-                className="font-mono text-lg font-bold tabular-nums leading-none"
-                style={{ color: actionColors[move.action] }}
-              >
-                {isBuy ? '+' : '−'}
-                {formatCurrency(move.amount)}
-              </p>
+              {move.limitedByFrozen && move.amount < 0.5 ? (
+                <p className="text-sm font-medium text-muted-foreground">Non negoziabile</p>
+              ) : (
+                <p
+                  className="font-mono text-lg font-bold tabular-nums leading-none"
+                  style={{ color: actionColors[move.action] }}
+                >
+                  {isBuy ? '+' : '−'}
+                  {formatCurrency(move.amount)}
+                </p>
+              )}
               <p className="mt-1 text-[11px] text-muted-foreground">
-                {isBuy ? 'da aggiungere' : 'da ridurre'}
+                {move.limitedByFrozen
+                  ? move.amount < 0.5
+                    ? 'tutto in asset non negoziabili'
+                    : `max vendibile · gap ${formatCurrency(move.requestedAmount)}`
+                  : isBuy
+                    ? 'da aggiungere'
+                    : 'da ridurre'}
               </p>
             </div>
           </div>

@@ -1,15 +1,16 @@
 /**
- * ActionPlanner — "Cosa faccio" (A4): one block, two answers to the same question.
+ * ActionPlanner — "Cosa faccio" (A4): one block, three answers to the same question.
  *
- * The page used to scatter the two things a user actually does into a prominent card
- * (rebalance plan) and a buried collapsible (contribution planner). They are two answers to
- * one question — "what do I do to get closer to target?" — so they belong together behind a
- * segmented switch:
+ * The page used to scatter the things a user actually does into a prominent card (rebalance plan)
+ * and a buried collapsible (contribution planner). They are answers to ONE question — "what do I do
+ * to get closer to target?" — so they belong together behind a segmented switch:
  *   - Ribilancia → sell the over-allocated, buy the under-allocated (RebalancePanel).
  *   - Versa      → split new cash with no selling (ContributionPanel).
+ *   - Preleva    → take money out, draining what is above target first (WithdrawalPanel).
  *
- * Surfacing "Versa" as a peer tab (not a collapsed card at the page bottom) matters: for an
- * accumulating investor, "where do I put new money" is a primary action. The segmented pill
+ * The three cover a portfolio's whole life: Versa is the accumulation question, Preleva the
+ * decumulation one, Ribilancia the no-net-flow one. Surfacing them as peer tabs (not collapsed
+ * cards at the page bottom) matters: each is a primary action in its phase. The segmented pill
  * follows DESIGN.md "Segmented Pill Control, Variant B" (Framer `layoutId`, spring 400/35).
  *
  * Pure presentation; no data fetching, no mutation (no demo-mode concern).
@@ -20,25 +21,37 @@ import { useId, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { type RebalanceMove } from '@/lib/utils/allocationUtils';
+import { type AllocatableHolding, type RebalanceMove } from '@/lib/utils/allocationUtils';
 import type { AllocationData } from '@/types/assets';
 import { RebalancePanel } from './RebalancePanel';
 import { ContributionPanel } from './ContributionPanel';
+import { WithdrawalPanel } from './WithdrawalPanel';
 
-type Mode = 'rebalance' | 'contribute';
+type Mode = 'rebalance' | 'contribute' | 'withdraw';
 
 const MODES: { key: Mode; label: string }[] = [
   { key: 'rebalance', label: 'Ribilancia' },
   { key: 'contribute', label: 'Versa' },
+  { key: 'withdraw', label: 'Preleva' },
 ];
 
 interface ActionPlannerProps {
   moves: RebalanceMove[];
   byAssetClass: Record<string, AllocationData>;
+  /** MUST already have orphaned sub-targets stripped (`stripOrphanedSubTargets`). */
   bySubCategory: Record<string, AllocationData>;
+  bySpecificAsset: Record<string, AllocationData>;
+  /** Per-instrument rows of the rebalanceable portfolio; Versa and Preleva drill down to these. */
+  holdings: AllocatableHolding[];
 }
 
-export function ActionPlanner({ moves, byAssetClass, bySubCategory }: ActionPlannerProps) {
+export function ActionPlanner({
+  moves,
+  byAssetClass,
+  bySubCategory,
+  bySpecificAsset,
+  holdings,
+}: ActionPlannerProps) {
   const reducedMotion = useReducedMotion();
   const layoutId = useId();
   const [mode, setMode] = useState<Mode>('rebalance');
@@ -85,10 +98,21 @@ export function ActionPlanner({ moves, byAssetClass, bySubCategory }: ActionPlan
         </div>
       </div>
 
-      {mode === 'rebalance' ? (
-        <RebalancePanel moves={moves} />
-      ) : (
-        <ContributionPanel byAssetClass={byAssetClass} bySubCategory={bySubCategory} />
+      {mode === 'rebalance' && <RebalancePanel moves={moves} />}
+      {mode === 'contribute' && (
+        <ContributionPanel
+          byAssetClass={byAssetClass}
+          bySubCategory={bySubCategory}
+          bySpecificAsset={bySpecificAsset}
+          holdings={holdings}
+        />
+      )}
+      {mode === 'withdraw' && (
+        <WithdrawalPanel
+          byAssetClass={byAssetClass}
+          bySubCategory={bySubCategory}
+          holdings={holdings}
+        />
       )}
     </Card>
   );
