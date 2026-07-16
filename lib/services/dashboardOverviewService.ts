@@ -5,12 +5,18 @@ import { Timestamp } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
 import { Asset, AssetAllocationSettings, MonthlySnapshot } from '@/types/assets';
 import { Expense } from '@/types/expenses';
+import { GoalAssetAssignment, GoalBasedInvestingData, InvestmentGoal } from '@/types/goals';
 import {
   DashboardOverviewPayload,
   DashboardOverviewExpenseStats,
   DashboardOverviewTopAsset,
   DashboardOverviewCategoryAmount,
 } from '@/types/dashboardOverview';
+import {
+  computeAllTimeHigh,
+  computeTopMovers,
+  pickFeaturedGoalProgress,
+} from '@/lib/utils/dashboardOverviewUtils';
 import {
   calculateAnnualPortfolioCost,
   calculateAssetValue,
@@ -139,6 +145,25 @@ async function getSettingsForUser(userId: string): Promise<AssetAllocationSettin
   } as AssetAllocationSettings;
 }
 
+async function getGoalDataForUser(userId: string): Promise<GoalBasedInvestingData | null> {
+  const goalDoc = await adminDb.collection('goalBasedInvesting').doc(userId).get();
+
+  if (!goalDoc.exists) {
+    return null;
+  }
+
+  const data = goalDoc.data();
+
+  if (!data) {
+    return null;
+  }
+
+  return {
+    goals: (data.goals ?? []) as InvestmentGoal[],
+    assignments: (data.assignments ?? []) as GoalAssetAssignment[],
+  };
+}
+
 async function getExpensesForMonth(userId: string, year: number, month: number): Promise<Expense[]> {
   const { start, end } = getMonthDateRangeInItaly(year, month);
   const snapshot = await adminDb
@@ -250,7 +275,8 @@ function buildLiveOverviewPayload(
   assets: Asset[],
   snapshots: MonthlySnapshot[],
   settings: AssetAllocationSettings | null,
-  expenseStats: DashboardOverviewExpenseStats | null
+  expenseStats: DashboardOverviewExpenseStats | null,
+  goalData: GoalBasedInvestingData | null
 ): Omit<DashboardOverviewPayload, 'freshness'> {
   const { month: currentMonth, year: currentYear } = getItalyMonthYear();
   const currentMonthSnapshot = snapshots.find(
@@ -281,12 +307,15 @@ function buildLiveOverviewPayload(
 
   let monthlyVariation = null;
   let yearlyVariation = null;
+  // Hoisted out of the block below so computeTopMovers can compare against the
+  // same "previous month" snapshot the monthly variation chip uses.
+  let previousSnapshot: MonthlySnapshot | null = null;
 
   if (snapshots.length > 0) {
     const currentNetWorth = currentMonthSnapshot
       ? currentMonthSnapshot.totalNetWorth
       : totalValue;
-    const previousSnapshot = currentMonthSnapshot
+    previousSnapshot = currentMonthSnapshot
       ? (snapshots.length > 1 ? snapshots[snapshots.length - 2] : null)
       : snapshots[snapshots.length - 1];
 
@@ -295,6 +324,18 @@ function buildLiveOverviewPayload(
       : null;
     yearlyVariation = calculateYearlyChange(currentNetWorth, snapshots);
   }
+
+  const { previousAllTimeHigh, isNewATH } = computeAllTimeHigh(
+    snapshots,
+    currentMonth,
+    currentYear,
+    totalValue
+  );
+  const topMovers = computeTopMovers(assets, previousSnapshot, totalValue);
+  const goalProgress =
+    settings?.goalBasedInvestingEnabled && goalData
+      ? pickFeaturedGoalProgress(goalData.goals, goalData.assignments, assets)
+      : null;
 
   // Top assets for the portfolio list card — active assets sorted by value desc, capped at 15.
   const topAssets: DashboardOverviewTopAsset[] = assets
@@ -384,6 +425,12 @@ function buildLiveOverviewPayload(
         .map((s) => ({ month: s.month, year: s.year, totalNetWorth: s.totalNetWorth })),
       { month: currentMonth, year: currentYear, totalNetWorth: totalValue },
     ],
+    ath: {
+      previousAllTimeHigh,
+      isNewATH,
+    },
+    topMovers,
+    goalProgress,
   };
 }
 
@@ -430,10 +477,11 @@ async function recomputeDashboardOverview(userId: string): Promise<DashboardOver
   const previousMonth = currentMonth === 1 ? 12 : currentMonth - 1;
   const previousYear = currentMonth === 1 ? currentYear - 1 : currentYear;
 
-  const [assets, snapshots, settings] = await Promise.all([
+  const [assets, snapshots, settings, goalData] = await Promise.all([
     getAssetsForUser(userId),
     getSnapshotsForUser(userId),
     getSettingsForUser(userId),
+    getGoalDataForUser(userId),
   ]);
 
   let expenseStats: DashboardOverviewExpenseStats | null = null;
@@ -449,7 +497,13 @@ async function recomputeDashboardOverview(userId: string): Promise<DashboardOver
     console.warn('[dashboardOverviewService] Failed to compute expense stats, falling back to null:', error);
   }
 
-  const payloadWithoutFreshness = buildLiveOverviewPayload(assets, snapshots, settings, expenseStats);
+  const payloadWithoutFreshness = buildLiveOverviewPayload(
+    assets,
+    snapshots,
+    settings,
+    expenseStats,
+    goalData
+  );
   const now = new Date();
 
   const summaryDoc: StoredDashboardOverviewSummary = {

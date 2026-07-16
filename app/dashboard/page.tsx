@@ -21,7 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Camera, Receipt, TrendingDown, TrendingUp } from 'lucide-react';
+import { Camera, Receipt, TrendingDown, TrendingUp, Trophy } from 'lucide-react';
 import { CashflowWidget } from '@/components/cashflow/cashflow-kpi/CashflowWidget';
 import { toast } from 'sonner';
 import { useCreateSnapshot } from '@/lib/hooks/useSnapshots';
@@ -34,10 +34,12 @@ import { getGreeting } from '@/lib/utils/getGreeting';
 import { OverviewAnimatedCurrency } from '@/components/dashboard/OverviewAnimatedCurrency';
 import { OverviewChartsSection } from '@/components/dashboard/OverviewChartsSection';
 import { NetWorthSparkline } from '@/components/dashboard/NetWorthSparkline';
+import { PeriodSelector, SparklinePeriod } from '@/components/dashboard/PeriodSelector';
 import { useChartColors } from '@/lib/hooks/useChartColors';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { ASSET_CLASS_CHART_INDEX } from '@/lib/utils/allocationUtils';
+import { filterSparklineByPeriod } from '@/lib/utils/sparklinePeriod';
 import { cn } from '@/lib/utils';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -128,6 +130,9 @@ export default function DashboardPage() {
   const [heroSettled, setHeroSettled] = useState(false);
   const handleHeroSettled = useCallback(() => setHeroSettled(true), []);
 
+  // Hero sparkline period control — defaults to 1A, matching the previous fixed behaviour.
+  const [sparklinePeriod, setSparklinePeriod] = useState<SparklinePeriod>('1A');
+
   // ─── Derived metrics ──────────────────────────────────────────────────────────
   const totalValue = overview?.metrics.totalValue ?? 0;
 
@@ -146,11 +151,40 @@ export default function DashboardPage() {
     return income / expenses;
   }, [overview]);
 
-  // ─── Sparkline — last 13 points (12 months + baseline) ──────────────────────
-  const sparkline12m = useMemo(() => {
+  // ─── Sparkline — displayed range follows the period pill; a fixed last-13-points
+  // (12 months + baseline) copy is kept separately for the "Ultimi 12 mesi" reassurance
+  // line, which stays anchored to a full year regardless of what period is selected. ──
+  const sparklineDisplay = useMemo(() => {
+    if (!overview?.sparklineData) return [];
+    return filterSparklineByPeriod(overview.sparklineData, sparklinePeriod);
+  }, [overview, sparklinePeriod]);
+
+  const sparkline12mFixed = useMemo(() => {
     if (!overview?.sparklineData) return [];
     return overview.sparklineData.slice(-13);
   }, [overview]);
+
+  // Long-run (12m) context shown only when the monthly chip is negative, so a red
+  // month always has an offsetting figure in the same glance (DESIGN.md deference —
+  // no copy, just another real number, always available whenever the sparkline is).
+  const longRunChangePercent = useMemo(() => {
+    if (sparkline12mFixed.length < 2) return null;
+    const first = sparkline12mFixed[0].totalNetWorth;
+    const last = sparkline12mFixed[sparkline12mFixed.length - 1].totalNetWorth;
+    if (first === 0) return null;
+    return ((last - first) / Math.abs(first)) * 100;
+  }, [sparkline12mFixed]);
+
+  // Overflow guard for the hero number (P1): a 7-8 figure net worth at 44/54px in a
+  // ~346px mobile card can wrap or clip. Step down to a smaller size once the formatted
+  // string gets long, rather than letting the single most important number on the page overflow.
+  const heroValueClass = useMemo(() => {
+    const formattedLength = cachedFormatCurrencyEUR(totalValue).length;
+    return cn(
+      'font-mono font-bold tracking-[-0.03em] tabular-nums',
+      formattedLength > 13 ? 'text-[32px] desktop:text-[40px]' : 'desktop:text-[54px] text-[44px]',
+    );
+  }, [totalValue]);
 
   // ─── Chart sections (stable memoized objects for memo isolation) ──────────────
   // Liquidity chart removed — now shown as the hero donut in the Patrimonio Liquido card.
@@ -362,12 +396,12 @@ export default function DashboardPage() {
                   Patrimonio Totale Lordo
                 </p>
 
-                {/* Animated number */}
+                {/* Animated number — heroValueClass steps down for very long formatted values */}
                 <OverviewAnimatedCurrency
                   value={totalValue}
                   animateOnMount={true}
                   onSettled={handleHeroSettled}
-                  className="desktop:text-[54px] font-mono text-[44px] font-bold tracking-[-0.03em]"
+                  className={heroValueClass}
                 />
 
                 {/* Variation chips */}
@@ -410,24 +444,53 @@ export default function DashboardPage() {
                       {overview.variations.yearly.percentage.toFixed(2)}%) YTD
                     </span>
                   )}
+                  {overview?.ath?.isNewATH && (
+                    <span className="bg-positive/10 text-positive inline-flex items-center gap-2 rounded-[9px] px-[13px] py-[6px] font-mono text-[15px] font-semibold tracking-[-0.01em]">
+                      <Trophy className="h-[13px] w-[13px]" aria-hidden="true" />
+                      Nuovo massimo storico
+                    </span>
+                  )}
                 </div>
 
-                {/* Area sparkline — last 12 months, edge-to-edge via -mx-[22px] */}
-                {sparkline12m.length >= 2 && (
+                {/* Long-run reassurance — only when the monthly chip is negative, so a red
+                    month always has an offsetting figure in the same glance. */}
+                {overview?.variations.monthly &&
+                  overview.variations.monthly.value < 0 &&
+                  longRunChangePercent !== null && (
+                    <p
+                      className={cn(
+                        'mt-1.5 font-mono text-[12px] tabular-nums',
+                        signTextClass(longRunChangePercent),
+                      )}
+                    >
+                      Ultimi 12 mesi: {longRunChangePercent >= 0 ? '+' : ''}
+                      {longRunChangePercent.toFixed(1)}%
+                    </p>
+                  )}
+
+                {/* Sparkline period control */}
+                {(overview?.sparklineData?.length ?? 0) >= 2 && (
+                  <div className="mt-3">
+                    <PeriodSelector value={sparklinePeriod} onChange={setSparklinePeriod} />
+                  </div>
+                )}
+
+                {/* Area sparkline — displayed range follows the period pill, edge-to-edge via -mx-[22px] */}
+                {sparklineDisplay.length >= 2 && (
                   <>
                     <div className="-mx-[22px] mt-3" style={{ height: 68 }}>
                       <NetWorthSparkline
-                        data={sparkline12m}
+                        data={sparklineDisplay}
                         filled={true}
                         color="var(--chart-1)"
                         height={68}
                       />
                     </div>
                     <div className="text-muted-foreground mt-1 mb-3 flex justify-between px-px font-mono text-[10px]">
-                      <span>{cachedFormatCurrencyEUR(sparkline12m[0].totalNetWorth, true)}</span>
+                      <span>{cachedFormatCurrencyEUR(sparklineDisplay[0].totalNetWorth, true)}</span>
                       <span>
                         {cachedFormatCurrencyEUR(
-                          sparkline12m[sparkline12m.length - 1].totalNetWorth,
+                          sparklineDisplay[sparklineDisplay.length - 1].totalNetWorth,
                           true,
                         )}
                       </span>
@@ -435,7 +498,24 @@ export default function DashboardPage() {
                   </>
                 )}
 
-                <p className="text-muted-foreground mt-2.5 text-[11px]">
+                {/* "Guidato da" digest — the 1-2 asset classes that moved the most this month. */}
+                {overview?.topMovers && overview.topMovers.length > 0 && (
+                  <p className="text-muted-foreground mt-0.5 text-[11px] truncate">
+                    Guidato da:{' '}
+                    {overview.topMovers.map((mover, i) => (
+                      <span key={mover.assetClass}>
+                        {i > 0 && ' · '}
+                        {mover.label}{' '}
+                        <span className={cn('font-mono tabular-nums', signTextClass(mover.delta))}>
+                          {mover.delta >= 0 ? '+' : ''}
+                          {cachedFormatCurrencyEUR(mover.delta, true)}
+                        </span>
+                      </span>
+                    ))}
+                  </p>
+                )}
+
+                <p className="text-muted-foreground mt-1 text-[11px]">
                   {(overview?.flags.assetCount ?? 0) === 0
                     ? 'Aggiungi asset per iniziare'
                     : `${overview?.flags.assetCount ?? 0} asset in portafoglio`}
@@ -465,7 +545,7 @@ export default function DashboardPage() {
                           <p className="text-muted-foreground mb-2 text-[10px] font-semibold tracking-[0.1em] uppercase">
                             Costo Annuale Stimato
                           </p>
-                          <p className="font-mono text-[22px] leading-none font-bold tracking-[-0.025em] text-amber-600 tabular-nums dark:text-amber-400">
+                          <p className="text-warning-foreground font-mono text-[22px] leading-none font-bold tracking-[-0.025em] tabular-nums">
                             {cachedFormatCurrencyEUR(annualTotal)}
                           </p>
                           {bothPresent && (
@@ -581,7 +661,7 @@ export default function DashboardPage() {
                       {
                         label: 'Tasse Stimate',
                         value: overview.metrics.estimatedTaxes,
-                        className: 'text-amber-600 dark:text-amber-400',
+                        className: 'text-warning-foreground',
                         prefix: '',
                       },
                       {
@@ -611,17 +691,45 @@ export default function DashboardPage() {
                       </div>
                     ))}
 
-                    {/* Concluding row: Pat. Netto Totale — the card's anchor figure, promoted
-                        to the 16px sub-step so the companion has one dominant value (the other
-                        bold rows are sub-section subtotals, not the bottom line). */}
+                    {/* Concluding row: Pat. Netto Totale. Kept at the same 14px bold tier as
+                        the subtotal rows above it (not promoted past them) — a subtotal
+                        derived from the ones above, not a second dominant total. */}
                     <div className="flex items-center justify-between py-[9px]">
                       <span className="text-foreground text-[14px] font-semibold">
                         Pat. Netto Totale
                       </span>
-                      <span className="text-foreground font-mono text-[16px] font-bold tracking-[-0.01em] tabular-nums">
+                      <span className="text-foreground font-mono text-[14px] font-bold tracking-[-0.01em] tabular-nums">
                         {cachedFormatCurrencyEUR(overview.metrics.netTotal)}
                       </span>
                     </div>
+                  </div>
+                )}
+
+                {/* Featured Goal-Based Investing progress — the single most relevant
+                    in-progress goal, thin category bar reusing the goal's own color. */}
+                {overview?.goalProgress && (
+                  <div className="border-border mt-3 border-t pt-3">
+                    <div className="mb-1.5 flex items-center justify-between gap-2">
+                      <span className="text-muted-foreground min-w-0 truncate text-[10px] font-semibold tracking-[0.1em] uppercase">
+                        Obiettivo · {overview.goalProgress.goalName}
+                      </span>
+                      <span className="text-foreground font-mono text-[12px] font-semibold tabular-nums">
+                        {Math.round(overview.goalProgress.progressPercentage)}%
+                      </span>
+                    </div>
+                    <div className="bg-muted h-[3px] overflow-hidden rounded-full">
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${Math.min(100, overview.goalProgress.progressPercentage)}%`,
+                          background: overview.goalProgress.goalColor,
+                        }}
+                      />
+                    </div>
+                    <p className="text-muted-foreground mt-1.5 font-mono text-[11px] tabular-nums">
+                      {cachedFormatCurrencyEUR(overview.goalProgress.currentValue, true)} di{' '}
+                      {cachedFormatCurrencyEUR(overview.goalProgress.targetAmount, true)}
+                    </p>
                   </div>
                 )}
               </CardContent>
@@ -673,7 +781,7 @@ export default function DashboardPage() {
                   Costo Annuale Stimato
                 </span>
                 <div>
-                  <p className="mt-3 font-mono text-[22px] leading-none font-bold tracking-[-0.025em] text-amber-600 tabular-nums dark:text-amber-400">
+                  <p className="text-warning-foreground mt-3 font-mono text-[22px] leading-none font-bold tracking-[-0.025em] tabular-nums">
                     {cachedFormatCurrencyEUR(annualTotal)}
                   </p>
                   {bothPresent && (

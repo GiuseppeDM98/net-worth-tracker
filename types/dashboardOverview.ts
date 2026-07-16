@@ -33,6 +33,25 @@ export interface DashboardOverviewTopAsset {
   returnPercent: number | null;
 }
 
+// One asset class that moved the portfolio this month, most-significant first
+// (see computeTopMovers in lib/utils/dashboardOverviewUtils.ts).
+export interface DashboardOverviewMover {
+  assetClass: string;
+  label: string;
+  delta: number;
+}
+
+// The single most relevant in-progress Goal-Based Investing goal, surfaced on the
+// companion card footer (see pickFeaturedGoalProgress in lib/utils/dashboardOverviewUtils.ts).
+export interface DashboardOverviewGoalProgress {
+  goalId: string;
+  goalName: string;
+  goalColor: string;
+  currentValue: number;
+  targetAmount: number;
+  progressPercentage: number;
+}
+
 export interface DashboardOverviewExpenseStats {
   currentMonth: {
     income: number;
@@ -102,4 +121,19 @@ export interface DashboardOverviewPayload {
   // Last 3 historical snapshots for the hero sparkline — optional so old cached
   // docs degrade gracefully (no sparkline shown until next recompute).
   sparklineData?: DashboardOverviewSparklinePoint[];
+  // All-time-high check for the "Nuovo massimo storico" chip next to the hero
+  // variation chips. Optional so old cached docs degrade gracefully (no badge
+  // until next recompute). previousAllTimeHigh is null when there's no prior
+  // snapshot to compare against (first-ever snapshot).
+  ath?: {
+    previousAllTimeHigh: number | null;
+    isNewATH: boolean;
+  };
+  // Top 1-2 asset classes that moved the most this month vs the previous
+  // snapshot — the "Guidato da" digest under the hero sparkline. Optional so
+  // old cached docs degrade gracefully (line simply doesn't render).
+  topMovers?: DashboardOverviewMover[];
+  // Single most relevant in-progress goal (Goal-Based Investing), only present
+  // when the user has the feature enabled and at least one goal in progress.
+  goalProgress?: DashboardOverviewGoalProgress | null;
 }

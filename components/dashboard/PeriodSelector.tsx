@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 
-const PERIODS = ['1M', '3M', '6M', 'YTD', '1A', '3A', 'All'] as const;
+const PERIODS = ['3M', '6M', 'YTD', '1A', '3A', 'All'] as const;
 export type SparklinePeriod = typeof PERIODS[number];
 
 interface PeriodSelectorProps {

@@ -39,6 +39,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - Progressive disclosure: methodology section collapsed by default; one-time guide strip for new users; "Avanzato" badge on technical metrics (TWR, IRR, Sharpe, YOC)
 - Animated metric cards: values count up on load and settle more naturally during period changes; staggered entrance cascade per section
 - Dashboard KPI cards (Total Portfolio, Liquid Net Worth, Unrealized Gains, Taxes) animate their values on page load — numbers count up from zero once on mount; each card animates independently so the rest of the page stays stable during the animation
+- Dashboard hero trend chart has a period selector (3M / 6M / YTD / 1Y / 3Y / All), an all-time-high badge when your net worth reaches a new peak, and a "driven by" line showing which asset classes moved the most this month; a featured progress bar for your most relevant active goal appears alongside it when Goal-Based Investing is enabled
 - All major pages (Dashboard, Hall of Fame, History, Performance, Dividends) animate on load with staggered card entrances and smooth expand/collapse transitions; respects system "Reduce Motion" preference
 - All charts animate on load: bars grow up from baseline, lines draw in left to right, area fills expand, ranked composition bars grow to width — covers every page with data visualization (History, Performance, Cashflow, Dividends, FIRE, Monte Carlo, Goals)
 - AI-powered analysis using Claude with Extended Thinking and web search

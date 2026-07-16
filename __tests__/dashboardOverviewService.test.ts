@@ -15,6 +15,7 @@ const {
   snapshotsGetMock,
   settingsDocGetMock,
   expensesGetMock,
+  goalDocGetMock,
 } = vi.hoisted(() => ({
   overviewSummaryDocGetMock: vi.fn(),
   overviewSummaryDocSetMock: vi.fn(),
@@ -22,6 +23,7 @@ const {
   snapshotsGetMock: vi.fn(),
   settingsDocGetMock: vi.fn(),
   expensesGetMock: vi.fn(),
+  goalDocGetMock: vi.fn(),
 }));
 
 vi.mock('@/lib/firebase/admin', () => ({
@@ -64,6 +66,14 @@ vi.mock('@/lib/firebase/admin', () => ({
         };
       }
 
+      if (name === 'goalBasedInvesting') {
+        return {
+          doc: vi.fn(() => ({
+            get: goalDocGetMock,
+          })),
+        };
+      }
+
       if (name === 'expenses') {
         return {
           where: vi.fn(() => ({
@@ -98,6 +108,7 @@ describe('dashboardOverviewService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     overviewSummaryDocSetMock.mockResolvedValue(undefined);
+    goalDocGetMock.mockResolvedValue({ exists: false });
   });
 
   it('returns the materialized summary when it is still fresh', async () => {
@@ -137,9 +148,9 @@ describe('dashboardOverviewService', () => {
         },
         updatedAt: new Date(),
         computedAt: new Date(),
-        // Must match DASHBOARD_OVERVIEW_SOURCE_VERSION (currently 3) for the cache to be
+        // Must match DASHBOARD_OVERVIEW_SOURCE_VERSION (currently 4) for the cache to be
         // considered fresh. Tests that rely on recompute can use an old version number.
-        sourceVersion: 3,
+        sourceVersion: 4,
         invalidatedAt: null,
       }),
     });

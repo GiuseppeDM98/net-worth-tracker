@@ -28,6 +28,7 @@ const {
   overviewSummaryDocGetMock,
   overviewSummaryDocSetMock,
   accountAccessDocGetMock,
+  goalBasedInvestingDocGetMock,
   getQuoteMock,
   getBondPriceByIsinMock,
 } = vi.hoisted(() => ({
@@ -49,6 +50,7 @@ const {
   overviewSummaryDocGetMock: vi.fn(),
   overviewSummaryDocSetMock: vi.fn(),
   accountAccessDocGetMock: vi.fn(),
+  goalBasedInvestingDocGetMock: vi.fn(),
   getQuoteMock: vi.fn(),
   getBondPriceByIsinMock: vi.fn(),
 }));
@@ -98,6 +100,14 @@ vi.mock('@/lib/firebase/admin', () => ({
         return {
           doc: vi.fn(() => ({
             get: assetAllocationTargetsDocGetMock,
+          })),
+        };
+      }
+
+      if (name === 'goalBasedInvesting') {
+        return {
+          doc: vi.fn(() => ({
+            get: goalBasedInvestingDocGetMock,
           })),
         };
       }
@@ -268,6 +278,7 @@ describe('Private API route auth', () => {
     snapshotDocSetMock.mockResolvedValue(undefined);
     overviewSummaryDocGetMock.mockResolvedValue({ exists: false });
     overviewSummaryDocSetMock.mockResolvedValue(undefined);
+    goalBasedInvestingDocGetMock.mockResolvedValue({ exists: false });
     monthlySnapshotsGetMock.mockResolvedValue({
       docs: [],
     });
