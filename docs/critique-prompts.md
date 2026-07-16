@@ -77,7 +77,6 @@ in una volta (craft + polish), con test verdi e tsc pulito.
 File: app/dashboard/assets/page.tsx
 Componenti: components/assets/AssetManagementTab.tsx,
             components/assets/AssetCard.tsx,
-            components/assets/AssetMobileSummary.tsx,
             components/assets/AssetSparkline.tsx,
             components/assets/AssetDialog.tsx,
             components/dashboard/OverviewAnimatedCurrency.tsx,
@@ -92,7 +91,8 @@ La pagina è una singola scroll (nessun tab). Layout:
   assetClass=cash), esclusi dalla tabella principale.
 - AssetManagementTab: tabella ordinabile (Valore, G/P%, Peso%, Nome, Classe),
   group-by-class toggle, sparkline per asset, 2-click delete, AssetDialog 2-step.
-  Mobile: AssetMobileSummary (ultimi 3 mesi).
+  Mobile: niente tabella — grid di AssetCard raggruppate per classe, rese inline
+  nello stesso componente (non un AssetMobileSummary separato).
 Confronta con: Panoramica (stesso hero layout), AllocationBreakdown (flat divide-y rows),
 GoalDetailCard (expand/collapse inline).
 Design language atteso (vedi DESIGN.md): North Star "Effortless Precision" — Linear/Vercel +
@@ -343,16 +343,28 @@ in una volta (craft + polish), con test verdi e tsc pulito.
 File: app/dashboard/allocation/page.tsx
 Componenti: components/allocation/*
 
-Questa pagina (redesign "ripensamento" 2026-06-04) risponde a una sola domanda — "sono
-in linea col target e cosa muovo?" — con: AllocationHero (patrimonio allocato + verdetto
-equilibrio: N classi fuori target + scostamento maggiore), RebalancePlan (lista firmata e
-ordinata delle mosse per classe, empty-state "Tutto in linea"), RebalanceBandControl (soglia
-±2/±5/regola 5·25/custom, di sessione, ri-classifica COMPRA/VENDI/OK in tutta la pagina),
-ContributionAllocator (versamento no-sell ripartito per classe e sottocategoria),
-AllocationBreakdown (una card, accordion inline grid-template-rows su tutti i breakpoint,
-AllocationRow + TargetTick per riga). Colori azione dal tema via useActionColors; pure layer
-in allocationUtils.ts. Bottom: sezione "Esposizione Portfolio" (ExposureSection) lazy-loaded
-con drill-down per azienda / settore / emittente ETF.
+Questa pagina (redesign "ripensamento" 2026-06-04, esteso 2026-07-14 con `AllocationRole` +
+"Preleva") risponde a una sola domanda — "sono in linea col target e cosa muovo?" — con:
+AllocationHero (patrimonio allocato + verdetto equilibrio: N classi fuori target + scostamento
+maggiore, più caption cliccabili separate per la quota "frozen" e la quota "esclusa"),
+ActionPlanner segmented a 3 stati Ribilancia/Versa/Preleva (possiede la Card; i pannelli sono
+bodyless) → RebalancePanel (lista firmata e ordinata delle mosse per classe, empty-state
+"Tutto in linea", sell cap sulla quota tradable) / ContributionPanel (versamento no-sell
+ripartito per classe e sottocategoria) / WithdrawalPanel (prelievo surplus-first, mirror di
+Versa) — Versa e Preleva condividono un unico albero PlanNode col segno invertito, class →
+sottocategoria → strumento, righe rese dal `PlanRow` comune. RebalanceBandControl (soglia
+±2/±5/regola 5·25/custom, di sessione, ri-classifica COMPRA/VENDI/OK in tutta la pagina).
+`Asset.allocationRole` (tradable/frozen/excluded, selezionabile in AssetDialog per qualsiasi
+tipo di asset) è partizionato PRIMA di compareAllocations: un asset frozen (fondo pensione,
+private equity) resta nel denominatore e nelle percentuali ma non compare mai in un piano —
+i piani compensano spostando ciò che è tradable; un asset excluded (la casa di abitazione)
+esce dalla pagina, denominatore incluso — per questo il totale è più piccolo del net worth di
+Panoramica. AllocationBreakdown (una card, accordion inline grid-template-rows su tutti i
+breakpoint, AllocationRow + TargetTick per riga, più un gruppo "Esclusi dall'allocazione");
+findOrphanedTargets + stripOrphanedSubTargets individuano e correggono i target rimasti
+orfani per via di un'esclusione, anche a livello di sotto-categoria. Colori azione dal tema
+via useActionColors; pure layer in allocationUtils.ts. Bottom: sezione "Esposizione Portfolio"
+(ExposureSection) lazy-loaded con drill-down per azienda / settore / emittente ETF.
 Confronta con: Rendimenti (MetricSection flat rows), Patrimonio (sortable table).
 Design language atteso (vedi DESIGN.md): North Star "Effortless Precision" — Linear/Vercel +
 Trade Republic + Apple, sotto la legge Form Follows Function (onestà, deferenza, inevitabilità:

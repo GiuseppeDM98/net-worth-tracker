@@ -242,7 +242,6 @@ Contesto:
 File: app/dashboard/assets/page.tsx
 Componenti: components/assets/AssetManagementTab.tsx,
             components/assets/AssetCard.tsx,
-            components/assets/AssetMobileSummary.tsx,
             components/assets/AssetSparkline.tsx,
             components/assets/AssetDialog.tsx,
             components/dashboard/OverviewAnimatedCurrency.tsx,
@@ -258,8 +257,10 @@ La pagina è una singola scroll — nessun tab. Assi da verificare (minimum — 
   `useChartColors()`
 - CashAccountsSection: `bg-muted/40` (KPI chip variant, no border) — nessun `bg-card`
   (sarebbe card-in-card); grid `grid-cols-2 desktop:grid-cols-4`
-- AssetManagementTab: tabella ordinabile solo `desktop:`, `AssetMobileSummary` solo
-  portrait; delete 2-click con `aria-label` e disarmo visibile; skeleton isomorfo
+- AssetManagementTab: tabella ordinabile solo `desktop:`; sotto `desktop:` niente tabella —
+  grid di `AssetCard` raggruppate per classe (stesso componente della card mobile, reso
+  inline in AssetManagementTab, non un componente `AssetMobileSummary` separato); delete
+  2-click con `aria-label` e disarmo visibile; skeleton isomorfo
 - ARIA: AssetDialog con `DialogDescription`; type picker Step 1 con `role="radio"`
 - Breakpoint: `md:` → `desktop:`; `max-desktop:portrait:pb-20`
 - Altro: pattern anomali o violazioni non elencate sopra
@@ -462,21 +463,33 @@ Componenti: components/allocation/*
 
 Assi da verificare (minimum — segnala anche eventuali altri problemi):
 - Token: `ActionChip` (COMPRA/VENDI/OK) e `TargetTick` — colori azione via `useActionColors`
-  (legge `--chart-*` con clamp lightness oklch), non hardcoded; `AllocationHero` verdetto e
-  `RebalancePlan` mosse — nessun `bg-gray-*`/hex su badge e righe; `ContributionAllocator`
-  ripartizione — token; `RebalanceBandControl` segmented (±2/±5/5·25/custom) — token
+  (legge `--chart-*` con clamp lightness oklch), non hardcoded; `AllocationHero` verdetto,
+  `RebalancePanel`/`ContributionPanel`/`WithdrawalPanel` (righe via `PlanRow` condiviso) —
+  nessun `bg-gray-*`/hex su badge e righe; `RebalanceBandControl` segmented (±2/±5/5·25/custom) — token
+- `ActionPlanner`: segmented a 3 stati Ribilancia/Versa/Preleva — verifica che il terzo stato
+  (Preleva → `WithdrawalPanel`) sia raggiungibile e stilisticamente coerente con gli altri due;
+  `ActionPlanner` possiede la Card, i pannelli sono bodyless (nessun `Card`/`Collapsible` proprio)
+- Ruoli di allocazione: `AssetDialog` espone il 3-way select `AllocationRole` (tradable/frozen/
+  excluded) — verifica select coerente con gli altri form field; `AllocationHero`/
+  `AllocationCompositionBar` mostrano caption cliccabili separate per la quota "frozen"
+  (dentro il totale) e la quota "esclusa" (fuori dal totale) — non un'unica cifra
+  "non ribilanciabili"; nota sotto il target editor in Impostazioni sui ruoli
 - Chart colors: eventuali grafici in ExposureSection via `useChartColors()`; i colori azione
   passano da `useActionColors` (ACTION_CHART_NUMBER COMPRA 3 / VENDI 5 / OK 2)
-- ARIA: `AllocationBreakdown` accordion con `aria-expanded` + contenuto `inert` da chiuso;
-  `RebalanceBandControl` `role="radiogroup"`/segmented; `ActionChip` con `aria-label` descrittivo
+- ARIA: `AllocationBreakdown` accordion con `aria-expanded` + contenuto `inert` da chiuso
+  (incl. il gruppo "Esclusi dall'allocazione"); `RebalanceBandControl` `role="radiogroup"`/
+  segmented; `ActionChip` con `aria-label` descrittivo; segmented Ribilancia/Versa/Preleva
+  con `role="tablist"`/`role="tab"`
 - Breakpoint: AllocationBreakdown accordion (grid-template-rows) e ExposureSection drill-down
-  (azienda/settore/ETF) non overflow su mobile
+  (azienda/settore/ETF) non overflow su mobile; l'albero class → sub-categoria → strumento
+  di `PlanRow` (Versa/Preleva) non degrada su mobile
 - Skeleton: `AllocationPageSkeleton` isomorfo al layout reale (hero → plan → breakdown → exposure)
-- Altro: pattern anomali o violazioni non elencate sopra
+- Altro: pattern anomali o violazioni non elencate sopra — incl. eventuali target orfani non
+  catturati da `findOrphanedTargets`/`stripOrphanedSubTargets`
 
 Contesto:
 - Leggi DESIGN.md (fonte canonica del design system — North Star, Form Follows Function, scala tipografica, Mono Mandate, Zero-Chroma)
-- Leggi AGENTS.md (pattern, convenzioni, gotcha)
+- Leggi AGENTS.md (pattern, convenzioni, gotcha — vedi "Allocation: AllocationRole" + "Allocation: the two action plans")
 - Leggi CLAUDE.md (stato corrente, known issues)
 ```
 
