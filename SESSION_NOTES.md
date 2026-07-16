@@ -1,0 +1,9 @@
+# SESSION_NOTES
+
+## 2026-07-16 — Spec: Registro operazioni asset (trade ledger acquisti/vendite)
+
+**Cosa**: Scritti i file di specifica per il tracciamento esplicito di acquisti/vendite degli asset (`docs/specs/asset-transactions/`: README + 01-data-model-and-rules + 02-derivation-engine + 03-service-and-api + 04-ui + 05-impacts-testing-rollout). Nessun codice prodotto in questa sessione — le spec sono il deliverable, da far implementare in sessioni successive. In coda a ogni file c'è il prompt pronto per la fase corrispondente con modello/effort consigliati (indice nel README: Fase A/B → Opus 4.8 xhigh, Fase C/D → Sonnet 5 high).
+
+**Perché**: Oggi quantity/PMC vengono sovrascritti a mano in AssetDialog senza storico dei movimenti: il rendimento per asset esclude le posizioni vendute ("we don't track the actual realized sell price" in `app/api/dividends/stats/route.ts`), "Contributi" su Rendimenti è risparmio inferito dalle spese e non capitale investito, e non esistono P&L realizzato né IRR per asset. Un ledger di transazioni rende i rendimenti corretti per costruzione.
+
+**Nota**: Decisioni prese con l'utente in sessione (vincolanti per l'implementazione): (1) collegamento cassa opzionale per trade (pattern `updateCashAssetBalancesAtomic`), (2) quantity/PMC derivati dal ledger e read-only per i tipi negoziabili, con tipo "Rettifica" per correzioni/split, (3) v1 calcola P&L realizzato + rendimento per asset inclusi venduti + XIRR per asset + capitale investito reale, (4) migrazione = baseline buy con qty+PMC attuali, retrodatazione solo ≥ baseline. Gotcha critici già individuati e codificati nelle spec: la migrazione NON deve toccare `holdingStartDate` (o YOC scarta tutti i dividendi pre-migrazione) e AssetDialog per asset a ledger non deve più passare da `updateAsset` (che traduce `averageCost` assente in `deleteField()`).
