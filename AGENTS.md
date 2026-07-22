@@ -718,31 +718,15 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
   Define the three objects as module-level `as const` constants — avoids re-creating objects on every render and keeps usage sites clean. Applied in `ConfrontoAnnualeSection.tsx` (TOOLTIP_CONTENT_STYLE / TOOLTIP_LABEL_STYLE), `CostCenterDetail.tsx` (all three). Never use `color: '#111827'` in any of them — invisible in dark mode. The `#111827` bug was found and fixed in `BenchmarkComparisonChart.tsx` `labelStyle` (2026-05-29).
 - **`itemSorter` to order multi-series tooltip rows by value**: a multi-line chart's tooltip lists rows in fixed series order by default, which rarely matches the on-screen vertical stacking of the lines. Pass `itemSorter={(item) => -(item.value as number)}` to sort rows by value descending so the tooltip mirrors which line is highest at the hovered X (the order then shifts naturally where lines cross — that's the intent). Applied in `AndamentoStoricoSection.tsx` (per-category lines).
 
-### `sticky` on `tfoot` inside a div-scroll wrapper
-- **Symptom**: the total/summary footer row overlaps the last visible data rows when a table is inside a scrollable `<div>` — the tfoot appears to float on top of content.
-- **Root cause**: `sticky bottom-0` on `<tfoot>` positions relative to the nearest scroll ancestor. If the scroll container is a `<div>` wrapper (not the `<table>` itself), the tfoot sticks to the bottom of the visible viewport area, overlapping content. CSS `sticky` on table parts only works correctly when the table's own scroll context is the scroll container.
-- **Fix**: remove `sticky bottom-0` from `<tfoot>`. The total appears naturally at the end of the table after scrolling — correct UX for a long scrollable list.
-- Applied in `CashflowSankeyChart.tsx` and `AnalisiTab.tsx` (ExpenseList).
+### `sticky` on table parts inside a div-scroll wrapper
+- `sticky bottom-0` on `<tfoot>` overlaps rows when the scroll container is a `<div>` (not the `<table>`) — remove it; the total appears naturally at the end (`CashflowSankeyChart`, `AnalisiTab` ExpenseList).
+- Sticky `<thead>` with a semi-transparent bg (`bg-muted/50`) shows rows through it on scroll — use a fully opaque token (`bg-card` inside a Card, `bg-background` on a plain page). Never alpha bg on sticky headers.
 
-### Sticky `thead` transparent background causes header/row overlap on scroll
-- **Symptom**: column headers visually merge with table rows when scrolling inside a `max-h-[...] overflow-y-auto` container — header text and cell content overlap.
-- **Root cause**: `bg-muted/50` (50% opacity) on `<thead className="sticky top-0">` is semi-transparent. Inside an overflow scroll wrapper, rows scroll under the sticky header and are visible through the transparent background.
-- **Fix**: use a fully opaque token — `bg-card` for tables inside `<Card>`, `bg-background` for tables on plain page backgrounds. Never use alpha-transparent backgrounds on sticky headers.
-- Applied in `CashflowSankeyChart.tsx` (Sankey transaction table) and `AnalisiTab.tsx` (ExpenseList drill-down).
+### Recharts `<Legend content=>` needs a module-level component
+- `content={() => renderLegendItems(...)}` makes a new ref every render → Legend re-renders/flickers on unrelated state (drill-down, filters). Extract a module-level `LegendItems` and use `content={() => <LegendItems .../>}` (bonus: enables `<button>` legend items, WCAG 2.1.1). (`AnalisiTab`.)
 
-### Recharts `<Legend content=>` must receive a module-level component for stable reference
-- **Symptom**: Recharts Legend re-renders on every state change unrelated to chart data (drill-down navigation, filter changes) — noticeable flicker or unnecessary reconciliation.
-- **Root cause**: `content={() => renderLegendItems(...)}` creates a new function reference every render. Recharts treats a changed `content` reference as a reason to re-render the Legend subtree.
-- **Fix**: extract the legend renderer to a module-level component (e.g. `LegendItems`) and use `content={() => <LegendItems items={...} />}`. The component reference itself is stable; only the props change when data changes.
-- **Bonus**: module-level component enables proper semantic HTML — clickable legend items can be `<button type="button">` instead of `<div onClick>` (WCAG 2.1.1 compliance).
-- Applied in `AnalisiTab.tsx`: `LegendItems` replaces `renderLegendItems`.
-
-### `@nivo/sankey` + `useChartColors()` → react-spring arity crash
-- **Symptom**: `createStringInterpolator2: The arity of each output value must be equal` on page load after making Sankey node colors theme-aware.
-- **Root cause**: `@nivo/sankey` v0.99 uses `@react-spring/web` internally. `useChartColors()` starts with hex values (CHART_COLORS), then after a `requestAnimationFrame` resolves CSS vars returning `oklch(...)` strings (Tailwind v4 format). When `sankeyData` recomputes with oklch values, react-spring tries to interpolate from hex → oklch — doesn't recognize oklch as a color format, parses it as a generic string with different numeric arity → crash.
-- **Workarounds that DO NOT work**: `animate={false}` on ResponsiveSankey (spring objects are initialized regardless); canvas-based oklch→hex normalization (the re-render itself triggers spring updates regardless of color format).
-- **Real fix**: Sankey node colors must remain hardcoded hex. Semantic colors (blue=fixed, violet=variable, amber=debt) are intentional — they must not follow the theme palette.
-- **General rule**: never pass `useChartColors()` values to any Nivo component backed by `@react-spring/web` (Sankey, Network, TreeMap). Only Recharts is safe (no react-spring dependency).
+### @nivo/sankey + useChartColors() → react-spring arity crash
+- `createStringInterpolator2: arity … must be equal` on load: `@nivo/*` (Sankey/Network/TreeMap) use `@react-spring/web`, which can't interpolate hex→oklch (the format `useChartColors()` returns after its rAF). `animate={false}` and canvas hex-normalization DON'T fix it. **Rule**: never pass `useChartColors()` to any Nivo/react-spring component — keep Sankey node colors hardcoded hex (semantic blue/violet/amber are intentional). Only Recharts is react-spring-free.
 
 ### Cashflow Null State vs Genuine Zero
 - `expenseStats === null` (no data) ≠ `expenseStats = 0` (real zero). Render empty state for null; `€0,00` is reserved for confirmed zero
@@ -751,128 +735,64 @@ For pages that aggregate large collections (many snapshots + all expenses) on ev
 - **Anti-pattern**: `progressColor(ratio).replace('bg-green-500', 'text-green-600 dark:text-green-500')` to get a matching text color. Fragile: breaks silently if the source class name changes; Tailwind's JIT scanner treats the derived string as a new class name, which is never statically visible in source — it may or may not appear in the purged output depending on safelist config.
 - **Fix**: extract a dedicated `progressTextColor(ratio, inverted)` that returns text-class strings directly, using the same threshold logic as `progressColor`. The two functions stay in sync and both are statically scannable. Applied in `BudgetTab.tsx`.
 
-### Recharts Sparkline — flat line on large absolute numbers
-- Symptom: 260k → 284k sparkline is a flat horizontal line. Fix: `<YAxis hide domain={['auto', 'auto']} />` — scales Y to data range instead of starting from 0
+### Recharts sizing gotchas
+- Sparkline flat line on large numbers (260k→284k): `<YAxis hide domain={['auto','auto']} />` (scale to data, not 0).
+- `ResponsiveContainer` logs `width(-1)/height(-1)` on every mount before `ResizeObserver` fires (rAF deferral doesn't help). Fixed-size charts: bypass it, pass `width`/`height` directly. Variable size: keep it, the warning is cosmetic (fires once). (`CompositionBar`/`CompositionList` sidestep it — plain divs.)
 
-### Recharts ResponsiveContainer -1 Warning
-- Symptom: `The width(-1) and height(-1) of chart should be greater than 0` fires on mount.
-- Root cause: `ResponsiveContainer` always initialises its state with `{ width: -1, height: -1 }` and logs the warning in the render body before `ResizeObserver` fires its first measurement — on every mount, regardless of parent container size.
-- **rAF workarounds do not work**: deferring mount by one `requestAnimationFrame` only delays the problem. When the component remounts after `rafReady` becomes `true`, `ResponsiveContainer` initialises with -1 again and logs again.
-- **Real fix for fixed-size Recharts containers**: when chart dimensions are known at compile time, bypass `ResponsiveContainer` entirely — pass `width` and `height` props directly to the Recharts chart component. No measurement needed, no warning. (`CompositionBar`/`CompositionList` sidestep this entirely — plain `div`s, no Recharts.)
-- **For variable-size containers**: `ResponsiveContainer` is still necessary. The -1 warning fires once on mount then disappears — cosmetic only.
+### Radix `CollapsibleTrigger` nested-button
+- `<button> cannot be a descendant of <button>` hydration error: the default trigger renders its own `<button>`, so a `Button` child nests. Always use `asChild` AND make the child `<button type="button">` — a `<div>`/`<span>` child is a P1 keyboard-a11y bug (excluded from tab order, no Enter/Space; WCAG 2.1.1). (`ExpenseTrackingTab` Filtri, `AssistantMemoryPanel`.)
 
-### Radix CollapsibleTrigger Nested Button
-- Symptom: `<button> cannot be a descendant of <button>` hydration error in console
-- Cause: `CollapsibleTrigger asChild={false}` (the Radix default) renders its own `<button>` element. If the trigger's children contain any `Button` component (another `<button>`), this creates an invalid nested-button DOM tree.
-- Fix: always use `asChild` on `CollapsibleTrigger` so it clones the first child element as the interactive trigger. **The child must be `<button type="button">`** — never a `<div>` or `<span>`. Non-button elements are excluded from the tab order and do not respond to Enter/Space, breaking keyboard access entirely (WCAG 2.1.1). `disabled` and other props still work correctly via prop merging.
-- **`asChild + <div>` is a P1 keyboard accessibility bug**: a `<div>` child looks correct visually but removes the trigger from keyboard navigation. Applied fix in `ExpenseTrackingTab.tsx` Filtri card.
-- Applied in `AssistantMemoryPanel` — use `<button type="button">` (or a non-button element only if the trigger itself contains no interactive controls and you add `tabIndex={0}` + `onKeyDown` manually).
+### CSS grid / overflow mobile traps
+- Horizontal page scroll on mobile: an implicit-`auto`-track grid expands to its widest child. Add explicit `grid-cols-1` (= `minmax(0,1fr)`, shrinkable) on mobile + `min-w-0` on flex/grid children (they default to `min-width:auto`). Pattern: `grid grid-cols-1 desktop:grid-cols-[minmax(0,1.7fr)_…]` + child `flex min-w-0`. (`AssistantPageClient`.)
+- `overflow-x-hidden` on an ancestor CLIPS descendants' `overflow-x:auto` (new BFC) → tables/code get cut, not scrollable (setting one overflow axis non-`visible` also implies `auto` on the other). Fix the real overflow source (negative margins, auto tracks, missing `min-w-0`); reserve `overflow-x-hidden` for decorative elements with no scrollable descendants.
 
-### CSS Grid Mobile Overflow: `auto` Tracks vs `minmax(0, 1fr)`
-- **Symptom**: on mobile, a page scrolls horizontally — long text in message cards or tables causes the page to expand beyond the viewport.
-- **Root cause**: a `grid` without explicit column definitions uses implicit `auto` tracks. `auto` tracks have `min-width: auto` — they expand to accommodate the widest child, even beyond the viewport. On desktop, `minmax(0, 1.7fr)` prevents this; but the mobile fallback has no constraint.
-- **Fix**: always add `grid-cols-1` explicitly on mobile for single-column grids. `grid-cols-1` = `repeat(1, minmax(0, 1fr))` — the `minmax(0, ...)` forces the column to be allowed to shrink, so long text wraps instead of expanding the layout. Apply `min-w-0` to the direct flex/grid children as well — flex items have `min-width: auto` by default and resist shrinking.
-- **Pattern**: `<div className="grid grid-cols-1 gap-6 desktop:grid-cols-[minmax(0,1.7fr)_...]">` + `<div className="flex min-w-0 flex-col">`.
-- Applied in `AssistantPageClient.tsx` — without this, assistant message cards caused horizontal page scroll on tablet/mobile.
+### JSX comment can't be a sibling in a ternary branch
+- `{/* comment */} <div>` inside a ternary branch = two expressions → `TS1005`/`TS1382` parse errors (pointing far from the comment). Wrap both in a fragment `<>…</>`, move the comment inside the element, or drop it.
 
-### `overflow-x-hidden` on Ancestor Breaks Scroll Containers
-- **Symptom**: adding `overflow-x-hidden` to a wrapper stops the page scrolling horizontally, but content inside is truncated (clipped) rather than scrolling — tables, code blocks, and long text are cut off.
-- **Root cause**: `overflow-x: hidden` creates a new block formatting context and clips ALL overflow from descendants. Any child with `overflow-x: auto` can no longer create a visible scrollbar — the clipping happens at the ancestor before the scroll container has a chance to render. This also applies to `overflow-y: auto` on `<main>`: setting one overflow axis to non-`visible` implicitly sets the other to `auto`, enabling horizontal scroll as a side effect.
-- **Correct fix**: resolve the actual source of overflow (negative margins, `auto` grid tracks, missing `min-w-0`) rather than clamping with `overflow-x-hidden`. Reserve `overflow-x-hidden` only for decorative elements (reveal effects, slide-in panels) that have no scrollable descendants.
-- Applied in `AssistantPageClient.tsx` — `overflow-x-hidden` on the page wrapper was clipping table content and text; the real fix was `grid-cols-1` + `min-w-0` + removing `-mx-4`.
+### `useCountUp` has no `enabled` option
+- Only `startDelay`/`duration`/`once`/`fromPrevious` exist. Always call `useCountUp(value ?? 0, opts)` unconditionally (hook rules) and gate display in JSX (`{value !== null ? cachedFormatCurrencyEUR(animated ?? 0) : '—'}`). `enabled:false` doesn't exist and errors.
 
-### JSX Comment Cannot Be a Sibling in a Ternary Else Branch
-- **Symptom**: TypeScript parse errors like `TS1005: ')' expected` or `TS1382: Unexpected token. Did you mean {'>'}?` immediately after adding a `{/* comment */}` before a JSX element inside a ternary.
-- **Root cause**: a ternary expression requires a single expression for each branch. `{/* comment */} <div ...>` is two expressions — the comment is a JSX expression (`{...}`), and the element is a second one. The parser sees two children and fails.
-- **Fix**: remove the comment, or wrap both in a fragment `<>...</>` if you need the comment. Alternatively, move the comment inside the element itself.
-- This error is subtle because the parse failure points at a closing brace or `>` character far from the actual comment.
+### iOS safe area on sticky composers
+- Sticky `bottom-N` input bars need `style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}` (CSS property, not a Tailwind class) for the home indicator; the `0px` fallback = no extra padding elsewhere. Don't also add BottomNav clearance if the wrapper already uses `bottom-N` (double-counts).
 
-### `useCountUp` Has No `enabled` Option
-- `UseCountUpOptions` interface only has `startDelay`, `duration`, `once`, `fromPrevious`. There is no `enabled` field.
-- **Pattern when conditionally animating**: always call `useCountUp(value ?? 0, opts)` unconditionally (hook rules). Gate the display in JSX: `{value !== null ? cachedFormatCurrencyEUR(animated ?? 0) : '—'}`. The `?? 0` on the animated value handles the `number | null` return type.
-- Do NOT try to skip the animation by passing `enabled: false` — it doesn't exist and TypeScript will error.
+### `useMediaQuery` — mobile re-render trap
+- It initializes with the real `window.matchMedia(query).matches` (not `false`) — the `useState(false)` SSR pattern would cause an extra mount-time re-render (false→true) that fights rAF loops. Safe to read `window` (all callers are post-login `'use client'`). Revert to `useState(false)` only if adding it to a public SSR page.
 
-### iOS Safe Area on Sticky Composers
-- Sticky input bars positioned with `bottom-N` in a scrollable layout need `padding-bottom: env(safe-area-inset-bottom, 0px)` for iOS devices with home indicator. Use the CSS property directly (not Tailwind class) for reliable cross-browser support: `style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}` or via arbitrary value `pb-[env(safe-area-inset-bottom,0px)]`. The fallback `0px` ensures no extra padding on non-notched devices.
-- Do NOT add extra bottom padding to account for BottomNav clearance if the sticky wrapper already uses `bottom-N` — that double-counts. Only the iOS safe area needs a top-up beyond the sticky offset.
+### Heavy renders vs rAF animations
+- Mobile CPU budget is ~3–5× tighter; concurrent mount work (re-renders + Recharts SVG + Framer stagger + rAF) blows the 16ms frame → jank. When a page runs mount-time `useCountUp`, don't simultaneously render heavy off-screen components — start below-fold Recharts collapsed on mobile (`isMobile` in the `useState` initializer).
 
-### useMediaQuery — Mobile Re-render Trap
-- `useMediaQuery` initializes with the real `window.matchMedia(query).matches` value, not `false`
-- The classic `useState(false)` SSR-safe pattern would cause an extra re-render on mobile (false → true) that competes with `requestAnimationFrame` animation loops at mount time
-- Safe to read `window` directly because all callers are `'use client'` components rendered only after login
-- **Only revert to `useState(false)` if adding a hook call to a public SSR page**
+### Dividend "received" metrics: `paymentDate`, not `exDate`
+- YOC/`averageYield` showing before any cash arrived: `getAllDividends` includes upcoming ones, and `exDate >= 12mo ago` passes future-`paymentDate` rows. Filter received metrics by `paymentDate >= twelveMonthsAgo && <= today`; use `exDate` only for "announced future" data. **Timezone gotcha**: `today.setHours(0,0,0,0)` on a CEST server = `…T22:00:00Z` (before UTC midnight), so a `…T00:00:00Z` dividend reads as future and vanishes — always use `setHours(23,59,59,999)` for `paymentDate <=` upper bounds. (`dividendService`, `dividends/stats`, `dividendUseCase`.)
 
-### Heavy Renders vs rAF Animations
-- On mobile, CPU budget is ~3–5x tighter. Multiple concurrent tasks at mount (re-renders, Recharts SVG, Framer Motion stagger, rAF loops) can exceed the 16ms/frame budget and cause visible animation jank
-- When a page uses `useCountUp` for mount-time KPI animations, avoid simultaneously rendering heavy components (Recharts charts, large lists) that aren't immediately visible
-- Pattern: start collapsible/below-fold Recharts components as collapsed on mobile, let users expand — use `isMobile` from `useMediaQuery` in the `useState` initializer for the expanded state
+### JSON date deserialization in API bodies
+- `Date` fields in `request.json()` arrive as ISO strings; `string <=/>= Date` is always `false` (coerces to `NaN`). Wrap `new Date(body.field)` before any date comparison in a route/use case (the silent bug that stopped auto-expense creation for past dividends).
 
-### Dividend TTM Filter: paymentDate not exDate
-- Symptom: YOC (Yield on Cost) and `averageYield` appear even when no dividends have been received yet
-- Cause: `getAllDividends` returns ALL dividends including upcoming ones. Filtering by `exDate >= twelveMonthsAgo` passes dividends with a past ex-date but future paymentDate — meaning cash has not arrived yet
-- Fix: filter TTM dividends by `paymentDate >= twelveMonthsAgo && paymentDate <= today`. The `today` variable is already defined for the `paidDividends` chart filter in the same route — reuse it. Applied in `app/api/dividends/stats/route.ts`
-- Rule: use `exDate` only for "announced future" dividend data (upcoming dividends card). Use `paymentDate` capped at `today` for any "received" metric (YOC, averageYield, charts)
-- **`today` timezone gotcha**: `today.setHours(0, 0, 0, 0)` produces `2026-05-19T22:00:00Z` on a CEST (UTC+2) server — 2 hours *before* midnight UTC. A dividend stored at `2026-05-20T00:00:00Z` (Firestore midnight UTC) then compares as *future* and vanishes from both "received" and "upcoming" lists. Fix: always use `today.setHours(23, 59, 59, 999)` when constructing the upper bound for `paymentDate <=` comparisons — the resulting UTC timestamp is always *after* midnight UTC of the same local day, regardless of server timezone. Applied in `dividendService.ts`, `app/api/dividends/stats/route.ts`, `lib/server/dividendUseCase.ts`.
+### AnimatePresence dialog body collapses to blank
+- `absolute inset-0` on a `motion.div` in `AnimatePresence` needs an explicit-pixel-height parent; a `flex-1` child of a content-height dialog (`max-h-[90vh] flex flex-col`) has none → absolute children go to 0. Use `div.flex-1.overflow-y-auto.min-h-0` as the scroll container, plain padding on the `motion.div` children, move the sticky footer outside `AnimatePresence` as a `shrink-0` sibling (submit via `<form id>`+`<button form=id>`).
 
-### JSON Date Deserialization in API Route Bodies
-- `Date` fields in `request.json()` bodies arrive as ISO strings (`"2024-04-10T..."`), not `Date` objects
-- Comparing a string to a `Date` with `<=` / `>=` always returns `false` in JavaScript — the string coerces to `NaN` via `Number()`
-- **Always wrap**: `const paymentDate = new Date(dividendData.paymentDate)` before any date comparison in a route or use case that receives data from the client
-- Applied in `lib/server/dividendUseCase.ts` — the bug caused automatic expense creation to silently never trigger for past dividends
+### Async tab count: `boolean | null`
+- Init `useState<boolean|null>(null)`, render a `h-10 animate-pulse bg-muted` placeholder while null, mount the real `TabsList` only after settings arrive — avoids a column-count reflow flash.
 
-### AnimatePresence Dialog Body Collapse
-- Symptom: dialog opens but body appears completely blank — no form fields, no cards, just empty white space
-- Cause: `absolute inset-0` on a `motion.div` inside `AnimatePresence` requires the parent to have an **explicit pixel height**. Inside a flex dialog driven by content height (`max-h-[90vh] flex flex-col`), a `flex-1` child has no defined pixel height — absolute children collapse to zero.
-- Fix: use `div.flex-1.overflow-y-auto.min-h-0` as the scrollable container (no `relative`), plain padding classes on the `motion.div` children, and move the sticky footer outside `AnimatePresence` as a `shrink-0` sibling. Connect the submit button with `<form id="expense-form">` + `<button type="submit" form="expense-form">` so it doesn't need to be physically inside the `<form>` tag.
+### Components defined inside render → silent remount
+- `const Foo = () => {…}` inside a render body is a new component TYPE every render → React unmounts/remounts it. Symptoms: `AnimatePresence initial={false}` enter never plays (child already present on the fresh mount); `useEffect([])` fires on every parent state change. Fix: move to module level (state as props) or inline the JSX via an IIFE. Distinct from the React-Compiler "module-level" error — this remounts even without the Compiler. (`page.tsx`: `FiscalSection`/`CashflowCard`/`VariationBlocks` → inline.)
 
-### Async Tab Count: boolean | null Pattern
-- Tab count depends on async settings: init `useState<boolean | null>(null)`. While `null`, render a `h-10 animate-pulse rounded-md bg-muted` placeholder to hold space. Mount real `TabsList` only after settings arrive — avoids a visible column-count reflow flash.
+### All hooks must precede conditional early returns
+- `Rendered more hooks than during the previous render` at the first hook after an `if (loading) return (...)`: the guard skips every hook below it. Move ALL hooks (incl. "derived" `useMemo`s) above any early return; guard undefined data inside the body (`useMemo(() => { if (!overview?.metrics) return []; … }, [overview])`).
 
-### Components Defined Inside Render — Remount Anti-Pattern
-- **Symptom A**: `AnimatePresence initial={false}` enter animation appears instant (never plays). The setup looks correct — the pattern is fine — but it always looks like a fresh mount with no prior state.
-- **Symptom B**: `useEffect` with empty deps `[]` fires on every parent state change (e.g. expanding an unrelated collapsible), not just on true mount.
-- **Root cause**: defining `const Foo = () => {...}` inside another component's render body creates a new function reference on every call. React uses the function reference as the component type key. When the type changes each render, React fully unmounts the old instance and mounts a new one — even if the rendered output looks identical. Result: `AnimatePresence initial={false}` on a freshly-mounted `AnimatePresence` sees its child already present and skips the enter animation; `useEffect([])` fires because it IS a true new mount.
-- **Fix**: never define components inside a render function. Two options: (1) move to module level and pass parent state as explicit props; (2) inline the JSX directly in the return using IIFEs for local variable scoping (`{overview?.expenseStats && (() => { const { income } = ...; return (<div>...); })()} `).
-- **Related AGENTS note**: "React Compiler: components must be at module level" covers the React Compiler-specific error. This pattern causes silent remounting even without the Compiler.
-- Applied in `app/dashboard/page.tsx`: `FiscalSection`, `CashflowCard`, `VariationBlocks` converted to inline JSX; fiscalItems pre-computed via `useMemo` before the loading early return.
+### Recharts `ResponsiveContainer` inside a flex row (sibling legend)
+- `width="100%"` measures the parent, but a flex item without an explicit width resolves to 0 or full before `ResizeObserver` fires → chart squishes the legend or renders `-1`/flat. Wrap the chart in a fixed-size `div` (`style={{width:160,height:160,flexShrink:0}}`); the legend takes `flex-1`. If the chart has an internal `<Legend>` and the parent renders its own, suppress the internal one (two legends = bug).
 
-### All Hooks Must Precede Conditional Early Returns
-- **Symptom**: `Uncaught Error: Rendered more hooks than during the previous render` at the first `useMemo`/`useEffect`/`useState` call placed after an `if (loading) return (...)`.
-- **Rule**: React hooks must be called in the same order on every render. An early return causes renders that hit the guard to skip every hook below it — React detects the count mismatch and throws.
-- **Fix**: move ALL hook calls (including "derived data" `useMemo`s that feel close to their usage) above any `if (...) return` guard. Use optional chaining inside the hook body to handle undefined data: `useMemo(() => { if (!overview?.metrics) return []; ... }, [overview])`.
-- Applied in `app/dashboard/page.tsx`: `fiscalItems` useMemo initially placed after `if (loading) return (...)` — moved to the derived metrics section above it.
+### `getAvailablePercentage(assetId, assignments, excludeGoalId)` double-counting
+- It returns `100 − Σ(other goals)` = the goal's TOTAL cap (free pool + its own existing slice, since its own is excluded). Do NOT add `existingAssignment.percentage` on top (double-counts → a goal exceeds 100%): `maxAllowedPct = available`. For displaying truly-free space call it WITHOUT exclusion; show "Nessuna quota libera" when 0 and the goal already holds a slice. (`AssetAssignmentDialog`.)
 
-### Recharts ResponsiveContainer inside Flex Row with Sibling Legend
-- **Symptom**: the chart takes all available space, squishing the sibling legend column to near-zero width; or the chart reports width/height of `-1` and renders a flat line.
-- **Root cause**: `<ResponsiveContainer width="100%">` measures its parent's width. Inside a `flex` row, the parent is a flex item without an explicit width — the flex algorithm doesn't resolve it before `ResizeObserver` fires, so the container gets zero or the full width.
-- **Fix**: wrap the chart component in a fixed-size `div` (`style={{ width: 160, height: 160, flexShrink: 0 }}`). `ResponsiveContainer` then measures that fixed parent unambiguously. The sibling legend takes the remaining `flex-1` space.
-- **Double-legend corollary**: if the embedded chart has an internal `<Legend>` and the parent renders a second custom legend, suppress the chart's internal one (`compact` prop, or `showLegend={false}`). Two legends is always a bug — one from Recharts SVG, one from the parent JSX.
-- `OverviewChartsSection.tsx`'s asset/asset-class distributions no longer hit this at all since the 2026-07-13 pie-chart redesign — `CompositionBar`/`CompositionList` render plain `div`s, not `ResponsiveContainer`, so there's no flex-row sizing race to work around there. The pattern still applies to any other Recharts component placed next to a sibling legend.
+### Firestore `runTransaction` — all reads before all writes (hidden by mocks)
+- `FirebaseError: … all reads to be executed before all writes` in prod while every test passes: the SDK forbids any `tx.get()` after a `tx.set/update/delete()`; a `get→update` loop violates it on the 2nd doc, and it's invisible when the function is mocked away (581 tests green while every 2-account transfer was broken). **Fix**: two phases — ALL `tx.get()` first, then ALL writes; aggregate deltas per docId before the tx so a ref is never read+written twice (self-transfer nets to 0, skipped). `updateCashAssetBalancesAtomic`. **Test the real thing** against a fake `runTransaction` whose `tx.get` throws once a write happened (`__tests__/updateCashAssetBalancesAtomic.test.ts` is the template) — never a mock of the function itself. **Corollary**: fire success toasts AFTER the reconcile returns, never before (a pre-toast shows false success if the tx throws).
 
-### `getAvailablePercentage` with `excludeGoalId` — double-counting trap
-- `getAvailablePercentage(assetId, assignments, excludeGoalId)` returns `100 - sum(other goals)`, effectively the **total cap** a goal can hold (free pool + its own existing allocation, since its own is excluded from the sum).
-- **Do NOT add `existingAssignment` on top**: `maxAllowedPct = available + existingAssignment.percentage` double-counts. If Giulia has 50% and Isabella has 50%, `available=50` (excludes Isabella) + `existingAssignment=50` = 100% — lets Isabella increase to 100%, putting total at 150%.
-- **Correct**: `maxAllowedPct = available`. The cap is already the right value.
-- **For display** (showing truly free space to the user): use `getAvailablePercentage(assetId, assignments)` with **no exclusion** — returns globally free space. If 0% free and the goal already has an assignment, show "Nessuna quota libera", not "X% disponibile". Applied in `AssetAssignmentDialog.tsx`.
+### MultiSelect inside a Drawer can't scroll on tablet → `forceDrawer`
+- `MultiSelect` renders a nested vaul Drawer only <640px; on tablet it's a Radix Popover, which nested inside a vaul Drawer fights focus-trapping (`Blocked aria-hidden…`) and clips/can't-scroll. Pass `forceDrawer` to always render the bottom-sheet Drawer (also bumps to `max-h-[60vh]`). Use it for any MultiSelect inside another Drawer/Sheet. (`MobileFiltersDrawer`.)
 
-### Firestore `runTransaction` — All Reads Before All Writes (hidden by mocks)
-- **Symptom**: a multi-document transaction throws `FirebaseError: Firestore transactions require all reads to be executed before all writes.` in production — but every unit test passes.
-- **Root cause**: the Firestore client SDK forbids any `tx.get()` after a `tx.update()`/`set()`/`delete()` within the same transaction. A naive `for` loop that does `get → update` per iteration violates this on the 2nd doc. Critically, this is invisible in tests when the function under test is **mocked away** (e.g. `cashBalanceReconciliation.test.ts` mocked `updateCashAssetBalancesAtomic`), so the real transaction body never runs — 581 tests were green while every 2-account transfer was broken.
-- **Fix**: two phases inside `runTransaction` — first loop performs ALL `tx.get()` (collect snapshots), second loop performs ALL `tx.update()`. Also **aggregate deltas per docId before the transaction** so the same ref is never read/written twice (a self-transfer where origin === destination nets to 0 and is skipped). Applied in `updateCashAssetBalancesAtomic` (`assetService.ts`).
-- **Test the real thing**: add an integration test with a fake `runTransaction` whose `tx.get` throws once a write has happened (mirrors the SDK). `__tests__/updateCashAssetBalancesAtomic.test.ts` is the template. Rule: any function whose correctness depends on transaction semantics must be tested against the real implementation, not a mock of itself.
-- **Toast-after-reconcile corollary**: in `ExpenseDialog`, show the success toast AFTER the balance reconcile (`reconcileTransfer*`/`reconcileSingle*`) returns — never before. A toast fired before the (possibly throwing) transaction shows false "success" while balances stay inconsistent.
+### SearchableCombobox — suppress "Add" on exact match
+- Typing an existing option shows both the result AND `+ Aggiungi "…"`. Compute `hasExactMatch = options.some(o => o.label.toLowerCase() === query.trim().toLowerCase())` and render the create-option only `{onCreateOption && !hasExactMatch && …}`. Applies to every `SearchableCombobox` with `onCreateOption`.
 
-### MultiSelect Inside a Drawer — Popover Can't Scroll on Tablet (`forceDrawer`)
-- **Symptom**: opening the category MultiSelect inside the Cashflow filters Drawer works on mobile but on tablet (640–1023px) the option list can't scroll and overflows; console logs `Blocked aria-hidden on an element because its descendant retained focus`.
-- **Root cause**: `MultiSelect` renders its options in a nested vaul **Drawer** only when `screenSize === "mobile"` (<640px); on tablet/desktop it renders a Radix **Popover**. A Popover nested inside a vaul Drawer fights for focus trapping (the aria-hidden warning) and the floating content is clipped/unscrollable.
-- **Fix**: pass `forceDrawer` to render the options as a bottom-sheet Drawer regardless of screen size (the `inDrawer` flag also bumps the list to `max-h-[60vh]`). Use it for any MultiSelect that lives inside another Drawer/Sheet. The filters Drawer only mounts <1440px, so the category selector is always a bottom-sheet there. Applied in `MobileFiltersDrawer.tsx` → `multi-select.tsx`.
-
-### SearchableCombobox — Suppress "Add" Option on Exact Match
-- **Symptom**: typing an existing option name (e.g. "Abbonamenti") shows both the filtered result AND a `+ Aggiungi "Abbonamenti"` create-option, suggesting the user create a duplicate.
-- **Fix**: compute `hasExactMatch = options.some(opt => opt.label.toLowerCase() === searchQuery.trim().toLowerCase())` and render `{onCreateOption && !hasExactMatch && (...)}`. Guard uses `.toLowerCase()` + `.trim()` for robustness.
-- Applies to all `SearchableCombobox` instances with an `onCreateOption` prop (category + subcategory pickers in `ExpenseDialog`, subcategory in `DividendDialog`, etc.). Applied in `components/ui/searchable-combobox.tsx`.
-
-### Recharts Tooltip Header Shows Point Index (0,1,2…) Without an XAxis
-- **Symptom**: a minimal Area/Line chart (e.g. a hero sparkline) with a tooltip shows `0`, `1`, `2`… as the tooltip header instead of the category label (month name), even though each datum has a `label` field.
-- **Root cause**: Recharts derives the tooltip header from the category (X) axis. With no `<XAxis dataKey="…">` rendered, the category axis defaults to the array index, so the header is the point index. A `labelFormatter={(l) => String(l)}` can't fix it because `l` is already the index.
-- **Fix**: render a hidden axis bound to the label field: `<XAxis dataKey="label" hide />`. The tooltip header then reads the real category; the axis stays invisible. Applied in `DividendTrackingTab.tsx` hero sparkline.
+### Recharts tooltip header shows point index (0,1,2…) without an XAxis
+- A minimal Area/Line chart with a tooltip shows `0/1/2` as the header (Recharts reads it from the category axis, which defaults to the array index with no `<XAxis dataKey>`; `labelFormatter` can't fix it — `l` is already the index). Render a hidden axis: `<XAxis dataKey="label" hide />`. (`DividendTrackingTab` hero sparkline.)
