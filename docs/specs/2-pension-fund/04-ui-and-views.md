@@ -26,10 +26,21 @@ Riferimento codice fork: `ciocc/main:components/fire-simulations/PensionTab.tsx`
   `pensionFund` (il branch ha già `AssetComposition`; il commento su `Asset.composition` cita proprio
   i fondi). Righe classe+% che sommano a 100 (validazione esistente). La composizione è usata SOLO
   nel look-through delle card Previdenza (§5) — mai altrove (invariante #3).
-- **`allocationRole`**: alla creazione di un `pensionFund`, default `frozen` (D1). Se il form espone
-  già il selettore di ruolo (dal lavoro allocationRole del branch), pre-selezionare `frozen` per
-  questo tipo con una nota "Capitale bloccato: incluso nel patrimonio, escluso dai piani di
-  ribilanciamento". Se non lo espone, stampare `allocationRole:'frozen'` di default nel submit.
+- **`allocationRole` (già esistente — RIUSARE, non ricreare)**: `AssetDialog` ha già il selettore a
+  tre stati con copy dominio-specifica (righe ~378-395): *Ribilanciabile* (`tradable`) / *Non
+  negoziabile* (`frozen`) / *Escluso dall'allocazione* (`excluded`) — e la descrizione di `frozen`
+  **nomina già "fondo pensione vincolato"**. C'è pure un `useEffect` (righe ~527-534) che **suggerisce**
+  il ruolo come default di form per classe/sotto-categoria (`realestate → excluded`,
+  `Private Equity → frozen`, altrimenti `tradable`), visibile prima del salvataggio e a un click dal
+  cambiarlo, che smette di guidare appena l'utente sceglie a mano (`allocationRoleTouched`) e non è mai
+  un fallback in lettura (non cambia asset esistenti).
+  - **Unica modifica**: aggiungere il ramo `selectedType === 'pensionFund' ? 'frozen'` a quel
+    `useEffect` (e `selectedType` alle deps), così un fondo nuovo nasce **`frozen`** ("Non negoziabile").
+    Nessuna nuova UI, nessuna nuova copy, nessun toggle globale.
+  - **La scelta resta all'utente** (§5): chi preferisce il modello "previdenza fuori dall'allocazione"
+    (quello del fork) cambia il fondo in **`excluded`** con un click, per-fondo. `frozen` e `excluded`
+    sono entrambi supportati dalla macchina `allocationRole`; Storico e base Rendimenti sono type-based
+    e indifferenti alla scelta.
 - **`asset-transactions`**: `pensionFund` è non-ledger → NON entra nel ramo read-only qty/PMC di
   AssetDialog né nel trigger migrazione; resta sul path manuale `updateAsset` (come `realestate`).
 - Link "Vai a Previdenza" dalla card asset in Patrimonio (`AssetCard`/`AssetManagementTab`) per i
