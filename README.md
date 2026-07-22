@@ -221,7 +221,14 @@ npm run start      # Start production server
 npm run lint       # Run ESLint
 npm test           # Run unit tests (single run)
 npm run test:watch # Run tests in watch mode
+
+# Local Firebase Emulator Suite (offline dev/testing — never touches production; requires a JDK)
+npm run emulators      # Start Auth + Firestore emulators (data persists across restarts)
+npm run emulators:seed # Seed a synthetic test account (once) — test@example.com / test1234
+npm run dev:emulator   # Run the app against the local emulators
 ```
+
+See [SETUP.md → Step 6](SETUP.md) for the full local-emulator guide (prerequisites, persistence, reset).
 
 ### Conventions
 

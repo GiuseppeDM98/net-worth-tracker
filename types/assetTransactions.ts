@@ -1,6 +1,14 @@
 import type { AssetType } from './assets';
 
 /**
+ * Firestore collection names for the trade ledger. Kept in this Firebase-free module so the
+ * client service (client SDK reads) and the server use case (Admin SDK writes) resolve them from
+ * a single source. See docs/specs/1-asset-transactions/01-data-model-and-rules.md §2.
+ */
+export const ASSET_TRANSACTIONS_COLLECTION = 'assetTransactions';
+export const ASSET_TRANSACTIONS_META_COLLECTION = 'assetTransactionsMeta';
+
+/**
  * Asset types that are managed through the trade ledger.
  * cash (balance-as-quantity) and realestate (estimated value) are deliberately
  * excluded: their "quantity" is not the result of trading operations.

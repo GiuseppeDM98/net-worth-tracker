@@ -36,6 +36,14 @@ yarn-error.log*
 # Firebase Admin SDK service account keys
 firebase-admin-key.json
 
+# Firebase local emulator (persisted data exports + debug logs)
+/.emulator-data
+firebase-debug.log
+firestore-debug.log
+database-debug.log
+ui-debug.log
+pubsub-debug.log
+
 # vercel
 .vercel
 

@@ -1,5 +1,11 @@
 # 03 — Service Layer, Admin API, Migration, Hooks
 
+> Status: **✅ IMPLEMENTED (Fase B, 2026-07-22).** Firestore rules + zod schemas + `resolveTradePriceEur` +
+> `assetTransactionUseCase` + the 3 Admin routes + idempotent migration + `updateAssetMetadata` +
+> client service/hooks/queryKeys + migration trigger are shipped, with `assetTransactionsRoutes` /
+> `assetTransactionWriteTx` green. See CLAUDE.md → Current Status and AGENTS.md → *Asset Trade
+> Ledger — Service, API, Migration (Fase B)*. Fasi C-D (UI dialogs, Rendimenti metric surfaces) remain.
+
 ## 0. Why writes are Admin-API-only (design decision, keep it)
 
 A trade mutation must atomically: (1) write/update/delete the trade doc, (2) rewrite the derived

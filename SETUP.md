@@ -215,6 +215,57 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 2. Create an account with email/password or Google sign-in
 3. Log in and start adding your assets!
 
+### Step 6 (Optional but recommended): Local testing with the Firebase Emulator Suite
+
+Run the app against **local** Auth + Firestore emulators instead of the cloud project, so
+development and manual testing never touch production data. The emulator also loads
+`firestore.rules`, so you validate rule changes locally before deploying them.
+
+**Prerequisite — a Java runtime (JDK 11+).** The Firestore emulator runs on Java. On Windows:
+
+```powershell
+winget install Microsoft.OpenJDK.21
+# then open a NEW terminal so PATH refreshes, and verify:
+java -version
+```
+
+(macOS: `brew install temurin` · Debian/Ubuntu: `sudo apt install openjdk-21-jre`.)
+
+**Usage — three terminals:**
+
+```bash
+# 1) Start the emulators (Auth :9099, Firestore :8080, UI :4000). First run downloads the jars.
+npm run emulators
+
+# 2) Seed a synthetic test account (only needed once — see persistence note below).
+npm run emulators:seed
+
+# 3) Run the app pointed at the emulators.
+npm run dev:emulator
+```
+
+Then open [http://localhost:3000](http://localhost:3000) and log in with the seeded account:
+
+- **Email:** `test@example.com`  ·  **Password:** `test1234`
+
+Inspect the data live in the Emulator UI at [http://127.0.0.1:4000](http://127.0.0.1:4000).
+
+**What the seed creates** (`scripts/seedEmulator.ts`): the test user plus a representative
+portfolio — 4 ledger assets (ETF / stock / bond / crypto), a cash account, a primary residence,
+allocation settings, a few expense categories + expenses, and two monthly snapshots.
+
+**Data persistence:** `npm run emulators` imports the previous session's data on start and exports
+it on exit (`Ctrl+C`), so you **seed once** and your data survives restarts. To start clean, delete
+the `.emulator-data/` directory (gitignored) and re-seed.
+
+**Notes:**
+- Nothing here touches production: the client SDK is routed to the emulators by
+  `NEXT_PUBLIC_USE_FIREBASE_EMULATOR=true`, and the Admin SDK by `FIRESTORE_EMULATOR_HOST` — both
+  set automatically by the npm scripts. The emulators run offline under the `demo-net-worth`
+  project id (no `firebase login` required).
+- The external integrations (Yahoo Finance, Frankfurter FX, Anthropic, FRED) still call the real
+  services — only Firestore and Auth are emulated.
+
 ---
 
 ## Vercel Deployment
