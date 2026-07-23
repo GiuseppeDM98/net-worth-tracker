@@ -68,6 +68,9 @@ import {
   computeReturnConsistency,
   computeDrawdownStatus,
 } from '@/lib/utils/performanceSummary';
+import { useAssetLedgerMeta, useAssetTransactions } from '@/lib/hooks/useAssetTransactions';
+import { computeInvestedCapital } from '@/lib/utils/assetTransactionUtils';
+import { aggregateRealizedByYear, RealizedGainsRows } from '@/components/performance/RealizedGainsSection';
 
 /**
  * Header action buttons (Periodo Personalizzato / Analizza con AI / Aggiorna).
@@ -282,6 +285,15 @@ export default function PerformancePage() {
   };
 
   const chartColors = useChartColors();
+
+  // Asset trade ledger (Fase D §5): "Capitale investito" + "Plusvalenze realizzate" are gated on
+  // migration having run — degrade to today's page (nothing rendered) while meta is absent, same
+  // as the Patrimonio entry points (Fase C). Trades query only fires once migrated.
+  const { data: ledgerMeta } = useAssetLedgerMeta(ownerId);
+  const isLedgerMigrated = !!ledgerMeta;
+  const { data: ledgerTrades = [] } = useAssetTransactions(ownerId, undefined, {
+    enabled: isLedgerMigrated,
+  });
 
   // Reference benchmark for the hero "vs benchmark" delta — the first model portfolio
   // (Portafoglio 60/40), the same default the comparison section selects. Fetched lazily
@@ -615,6 +627,18 @@ export default function PerformancePage() {
     : null;
   const returnConsistency = useMemo(() => computeReturnConsistency(heatmapData), [heatmapData]);
   const drawdownStatus = useMemo(() => computeDrawdownStatus(underwaterData), [underwaterData]);
+
+  // Capitale investito (Fase D §5): SAME period bounds as the page — never a recalculated window
+  // (Cross-Component Metric Consistency, AGENTS.md).
+  const investedCapital = useMemo(() => {
+    if (!metrics) return null;
+    return computeInvestedCapital(ledgerTrades, metrics.startDate, metrics.endDate);
+  }, [metrics, ledgerTrades]);
+
+  // Plusvalenze realizzate (Fase D §5): all-time, independent of the selected period — a realized
+  // sale belongs to its own fiscal year regardless of which period is currently viewed.
+  const realizedByYear = useMemo(() => aggregateRealizedByYear(ledgerTrades), [ledgerTrades]);
+  const hasRealizedGains = Object.keys(realizedByYear).length > 0;
 
   // Responsive helper function
   const getChartHeight = () => {
@@ -1053,6 +1077,16 @@ export default function PerformancePage() {
             description={`Da ${metrics.startDate.toLocaleDateString('it-IT')} a ${metrics.endDate.toLocaleDateString('it-IT')}`}
             tooltip="Periodo di tempo coperto dall'analisi. La data di inizio è il primo giorno del mese del primo snapshot disponibile. La data di fine è l'ultimo giorno del mese dell'ultimo snapshot disponibile. Gli snapshot automatici vengono creati alla fine di ogni mese (28-31) e includono tutti i cash flow fino a quella data."
           />
+          {isLedgerMigrated && investedCapital && (
+            <MetricCard
+              title="Capitale investito"
+              value={investedCapital.netInvestedEur}
+              format="currency"
+              subtitle={`Acquisti: ${formatCurrency(investedCapital.investedEur)} · Vendite: ${formatCurrency(investedCapital.divestedEur)}`}
+              description="Acquisti meno vendite dal registro operazioni, nel periodo selezionato"
+              tooltip="Capitale investito: acquisti meno vendite registrati nel registro operazioni nel periodo. Contributi netti: risparmio esterno stimato dal tracciamento spese. Misurano cose diverse."
+            />
+          )}
         </MetricSection>
 
         {/* PROVENTI FINANZIARI (conditional): YOC Netto hero + flat rows */}
@@ -1114,6 +1148,19 @@ export default function PerformancePage() {
                   : '\n\nMetrica più accurata per valutare il reddito passivo effettivo rispetto ad altre opportunità (bond, depositi, altri ETF).'
               }`}
             />
+          </MetricSection>
+        )}
+
+        {/* PLUSVALENZE REALIZZATE (Fase D §5, conditional): per-fiscal-year realized P&L from the
+            asset trade ledger, aggregated across every asset's own replay. Hidden entirely when
+            empty (progressive disclosure — no empty shells) and until the ledger has migrated. */}
+        {isLedgerMigrated && hasRealizedGains && (
+          <MetricSection
+            title="Plusvalenze Realizzate"
+            description="Utili e perdite chiuse tramite il registro operazioni, per anno fiscale"
+            sectionIndex={4}
+          >
+            <RealizedGainsRows byYear={realizedByYear} />
           </MetricSection>
         )}
         </CollapsibleContent>

@@ -22,6 +22,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { TrendingUp, ChevronRight, HelpCircle } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils/formatters';
@@ -65,6 +66,8 @@ interface DividendStatsData {
     capitalGainPercentage: number;
     dividendReturnPercentage: number;
     totalReturnPercentage: number;
+    // Ledger-based only (Fase D) — absent for the static-fallback rows.
+    isClosed?: boolean;
   }>;
   dividendGrowthData?: {
     byAsset: Array<{
@@ -507,7 +510,7 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
               Rendimento Totale per Asset
             </CardTitle>
             <p className="text-sm text-muted-foreground mt-1">
-              Plusvalenza non realizzata + dividendi netti del possesso attuale, sul costo d&apos;acquisto
+              Plusvalenza (realizzata per le posizioni chiuse, non realizzata per quelle aperte) + dividendi netti del possesso attuale, sul costo d&apos;acquisto
             </p>
           </CardHeader>
           <CardContent>
@@ -515,7 +518,17 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
               {stats.totalReturnAssets.map((asset) => (
                 <div key={asset.assetId} className="flex items-center gap-4 py-3">
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium truncate">{asset.assetTicker}</p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="font-medium truncate">{asset.assetTicker}</p>
+                      {asset.isClosed && (
+                        <Badge
+                          variant="outline"
+                          className="h-4 shrink-0 border-muted-foreground/30 px-1.5 py-0 text-[10px] font-normal text-muted-foreground"
+                        >
+                          Chiusa
+                        </Badge>
+                      )}
+                    </div>
                     <p className="text-xs text-muted-foreground truncate">{asset.assetName}</p>
                   </div>
                   <div className="hidden sm:flex flex-col items-end w-28">
