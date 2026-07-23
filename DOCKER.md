@@ -1,4 +1,4 @@
-# Docker Deployment Guidea
+# Docker Deployment Guide
 
 This guide covers how to self-host Net Worth Tracker using Docker on any VPS or server. Firebase still handles authentication and the database — Docker just runs the Next.js application layer.
 
