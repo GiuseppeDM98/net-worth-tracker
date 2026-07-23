@@ -1,5 +1,7 @@
 import { adminDb } from '@/lib/firebase/admin';
 import { Asset, MonthlySnapshot } from '@/types/assets';
+import { toDate } from '@/lib/utils/dateHelpers';
+import { ASSET_TRANSACTIONS_COLLECTION, type AssetTransaction } from '@/types/assetTransactions';
 
 /**
  * Fetch all assets for a user using Firebase Admin SDK (server-side only).
@@ -49,5 +51,44 @@ export async function getUserSnapshotsAdmin(userId: string): Promise<MonthlySnap
   } catch (error) {
     console.error('[getUserSnapshotsAdmin] Error fetching snapshots:', error);
     throw new Error('Failed to fetch snapshots');
+  }
+}
+
+/**
+ * Fetch every trade-ledger transaction for a user using the Admin SDK (server-side only).
+ *
+ * Read-only mirror of the Timestamp→Date conversion in assetTransactionUseCase.ts
+ * (docToAssetTransaction) — duplicated rather than imported: that module already imports
+ * getUserAssetsAdmin from this file, so importing back would create a cycle.
+ */
+export async function getAssetTransactionsAdmin(userId: string): Promise<AssetTransaction[]> {
+  try {
+    const querySnapshot = await adminDb
+      .collection(ASSET_TRANSACTIONS_COLLECTION)
+      .where('userId', '==', userId)
+      .get();
+
+    return querySnapshot.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        userId: data.userId,
+        assetId: data.assetId,
+        type: data.type,
+        date: toDate(data.date),
+        quantity: data.quantity,
+        pricePerUnit: data.pricePerUnit,
+        priceEur: data.priceEur,
+        fees: data.fees,
+        linkedCashAssetId: data.linkedCashAssetId,
+        isBaseline: data.isBaseline,
+        note: data.note,
+        createdAt: toDate(data.createdAt),
+        updatedAt: toDate(data.updatedAt),
+      } as AssetTransaction;
+    });
+  } catch (error) {
+    console.error('[getAssetTransactionsAdmin] Error fetching asset transactions:', error);
+    throw new Error('Failed to fetch asset transactions');
   }
 }

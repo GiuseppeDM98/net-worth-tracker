@@ -1,5 +1,12 @@
 # 05 — Downstream Impacts, Testing, Rollout
 
+> Status: **✅ IMPLEMENTED (all phases A→D complete, 2026-07-23)**. The impact table (§1), the
+> regression checklist (§2), and the manual test scripts (§3) were all executed against Fases B/C/D
+> as written — see CLAUDE.md → Current Status and AGENTS.md → *Asset Trade Ledger — Rendimenti &
+> Dividends Surfaces (Fase D)*. Kept as a reference: `docs/specs/README.md` points other specs at
+> this folder's *Binding instructions* and dependency ordering, and `2-pension-fund` cites §2 of
+> `01-data-model-and-rules.md` as a design precedent.
+
 ## 1. Impact table
 
 The load-bearing property: **the asset doc keeps carrying authoritative `quantity`/`averageCost`,
