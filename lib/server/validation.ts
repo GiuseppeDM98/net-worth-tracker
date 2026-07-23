@@ -65,6 +65,71 @@ export const dividendDataSchema = z.object({
 });
 
 /**
+ * Asset trade-ledger schemas (Registro operazioni asset — see
+ * docs/specs/1-asset-transactions/01-data-model-and-rules.md §4).
+ *
+ * These are the HTTP-boundary gate. Semantic checks that need Firestore data (asset exists and is
+ * a ledger type, date >= baselineDate, linked asset is `cash`, no-negative-position replay) live in
+ * the use-case layer, NOT here — see docs/specs/1-asset-transactions/03-service-and-api.md.
+ */
+export const assetTransactionTypeSchema = z.enum(['buy', 'sell', 'adjustment']);
+
+/**
+ * Base object shape, without cross-field refinements. Extracted so the update schema can build on
+ * it with `.partial()`/`.omit()`: those methods live on ZodObject, and adding a `.superRefine()`
+ * turns the schema into a ZodEffects that no longer exposes them.
+ */
+const assetTransactionBaseSchema = z.object({
+  assetId: z.string().min(1),
+  type: assetTransactionTypeSchema,
+  // Dates arrive as ISO strings in JSON; coerce to Date objects.
+  date: z.coerce.date(),
+  quantity: z.number().finite().min(0),
+  pricePerUnit: z.number().finite().min(0),
+  fees: z.number().finite().min(0).optional(),
+  linkedCashAssetId: z.string().min(1).optional(),
+  note: z.string().max(500).optional(),
+});
+
+/** Cross-field rules shared by create and update. `type`/`quantity` may be absent on an update. */
+function refineAssetTransaction(
+  data: { type?: 'buy' | 'sell' | 'adjustment'; quantity?: number; fees?: number; linkedCashAssetId?: string },
+  ctx: z.RefinementCtx
+): void {
+  // buy/sell need a strictly positive quantity; adjustment allows 0 (position-close correction).
+  if (data.type !== undefined && data.type !== 'adjustment' && data.quantity !== undefined && data.quantity <= 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['quantity'],
+      message: 'La quantità deve essere maggiore di zero per acquisti e vendite.',
+    });
+  }
+  // An absolute reset moves no money: fees and a linked cash settlement make no sense on it.
+  if (data.type === 'adjustment' && data.fees !== undefined) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['fees'],
+      message: 'Una rettifica non prevede commissioni.',
+    });
+  }
+  if (data.type === 'adjustment' && data.linkedCashAssetId !== undefined) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['linkedCashAssetId'],
+      message: 'Una rettifica non movimenta liquidità.',
+    });
+  }
+}
+
+export const assetTransactionDataSchema = assetTransactionBaseSchema.superRefine(refineAssetTransaction);
+
+/** PUT payload: every field optional, and a trade can never be moved to another asset. */
+export const assetTransactionUpdateSchema = assetTransactionBaseSchema
+  .omit({ assetId: true })
+  .partial()
+  .superRefine(refineAssetTransaction);
+
+/**
  * Parse helper: runs safeParse and returns either the typed data or a
  * ready-to-return 400 NextResponse with flattened zod error details.
  */

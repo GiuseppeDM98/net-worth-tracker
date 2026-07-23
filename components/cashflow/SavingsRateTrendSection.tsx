@@ -13,10 +13,9 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
 import { useChartColors } from '@/lib/hooks/useChartColors';
 import { Expense } from '@/types/expenses';
-import { cn } from '@/lib/utils';
+import { SegmentedPill } from '@/components/ui/segmented-pill';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   LineChart,
@@ -127,55 +126,15 @@ function SavingsRateLineChart({
 
 // ── Range toggle ──────────────────────────────────────────────────────────────
 // 'all' shows the entire history (default) so the long-term savings trend isn't
-// truncated; 12m/24m give a focused recent window. Reuses the Framer layoutId +
-// spring(400/35) pill pattern shared across the Analisi tab.
+// truncated; 12m/24m give a focused recent window.
 
 type TrendRange = '12m' | '24m' | 'all';
 
-const RANGE_OPTIONS: ReadonlyArray<readonly [TrendRange, string]> = [
-  ['12m', '12m'],
-  ['24m', '24m'],
-  ['all', 'Tutto'],
-] as const;
-
-function RangePillToggle({
-  value,
-  onChange,
-}: {
-  value: TrendRange;
-  onChange: (value: TrendRange) => void;
-}) {
-  return (
-    <div
-      role="tablist"
-      aria-label="Finestra temporale"
-      className="inline-flex items-center gap-1 rounded-full bg-muted p-1"
-    >
-      {RANGE_OPTIONS.map(([key, label]) => (
-        <button
-          key={key}
-          type="button"
-          role="tab"
-          aria-selected={value === key}
-          onClick={() => onChange(key)}
-          className={cn(
-            'relative px-3 py-1 text-xs font-medium rounded-full transition-colors',
-            value !== key && 'text-muted-foreground hover:text-foreground',
-          )}
-        >
-          {value === key && (
-            <motion.span
-              layoutId="savings-range-pill"
-              className="absolute inset-0 rounded-full bg-background shadow-sm"
-              transition={{ type: 'spring', stiffness: 400, damping: 35 }}
-            />
-          )}
-          <span className="relative z-10">{label}</span>
-        </button>
-      ))}
-    </div>
-  );
-}
+const RANGE_OPTIONS: ReadonlyArray<{ value: TrendRange; label: string }> = [
+  { value: '12m', label: '12m' },
+  { value: '24m', label: '24m' },
+  { value: 'all', label: 'Tutto' },
+];
 
 // ── SavingsRateTrendSection ───────────────────────────────────────────────────
 
@@ -305,7 +264,15 @@ export function SavingsRateTrendSection({
           <CardTitle className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
             Andamento Risparmio
           </CardTitle>
-          {!isScoped && <RangePillToggle value={range} onChange={setRange} />}
+          {!isScoped && (
+            <SegmentedPill
+              ariaLabel="Finestra temporale"
+              layoutId="savings-range-pill"
+              value={range}
+              onChange={setRange}
+              options={RANGE_OPTIONS}
+            />
+          )}
         </div>
         <p className="text-xs text-muted-foreground">
           Tasso di risparmio mensile — {subtitle}
@@ -314,7 +281,7 @@ export function SavingsRateTrendSection({
       <CardContent className="pt-0">
         {!hasEnoughData ? (
           <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
-            Registra almeno 3 mesi di entrate per vedere il trend
+            Servono almeno 3 mesi di entrate per il trend
           </div>
         ) : (
           <SavingsRateLineChart data={trendData} colors={chartColors} />

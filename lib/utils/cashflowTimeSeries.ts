@@ -264,6 +264,52 @@ export function buildCategoryTimeSeries(
 }
 
 /**
+ * Average monthly savings rate over the N months trailing (and including) a
+ * reference month — the counterbalancing figure shown when the selected month
+ * is a deficit, mirroring the Panoramica hero's 12-month reassurance line
+ * (see CLAUDE.md "Panoramica: hero critique follow-up").
+ *
+ * Months with no income are skipped (no rate to average), consistent with the
+ * "no data" gap semantics used everywhere else in this module. Returns null
+ * when no month in the window has income data.
+ */
+export function computeTrailingSavingsRateAverage(
+  expenses: Expense[],
+  referenceYear: number,
+  referenceMonth: number,
+  monthsBack = 12,
+): number | null {
+  let year = referenceYear;
+  let month = referenceMonth;
+  const rates: number[] = [];
+
+  for (let i = 0; i < monthsBack; i++) {
+    const monthExpenses = expenses.filter((e) => {
+      const d = toDate(e.date);
+      return getItalyYear(d) === year && getItalyMonth(d) === month;
+    });
+
+    const income = monthExpenses
+      .filter((e) => e.type === 'income')
+      .reduce((s, e) => s + e.amount, 0);
+    const outflow = monthExpenses
+      .filter((e) => isExpenseRecord(e))
+      .reduce((s, e) => s + Math.abs(e.amount), 0);
+
+    if (income > 0) rates.push(((income - outflow) / income) * 100);
+
+    month--;
+    if (month < 1) {
+      month = 12;
+      year--;
+    }
+  }
+
+  if (rates.length === 0) return null;
+  return rates.reduce((s, r) => s + r, 0) / rates.length;
+}
+
+/**
  * The three real spending types, in the canonical order used across the app
  * (structural → discretionary → debt). Mirrors budgetUtils' SECTION_ORDER so the
  * "Uscite per Tipo" chart reads the same direction as the budget sections.

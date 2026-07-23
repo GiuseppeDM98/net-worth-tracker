@@ -24,6 +24,8 @@ import { useExpenses, useExpenseCategories } from '@/lib/hooks/useExpenses';
 import { getSettings } from '@/lib/services/assetAllocationService';
 import { queryKeys } from '@/lib/query/queryKeys';
 import { AnalisiTab } from '@/components/cashflow/AnalisiTab';
+import { PageContainer } from '@/components/layout/PageContainer';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -77,19 +79,12 @@ export default function AnalisiPage() {
   const loading = expensesLoading || categoriesLoading;
 
   return (
-    <div className="space-y-6 max-desktop:portrait:pb-20">
-      {/* Header — standard dashboard page pattern */}
-      <div className="border-b border-border pb-4">
-        <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-          Analisi
-        </p>
-        <h1 className="mt-1 text-2xl font-bold text-foreground sm:text-3xl">
-          Analisi Cashflow
-        </h1>
-        <p className="mt-2 text-muted-foreground">
-          Distribuzione delle spese, pattern e trend nel tempo
-        </p>
-      </div>
+    <PageContainer>
+      <PageHeader
+        label="Analisi"
+        title="Analisi Cashflow"
+        description="Distribuzione delle spese, pattern e trend nel tempo"
+      />
 
       <AnalisiTab
         allExpenses={allExpenses}
@@ -97,6 +92,6 @@ export default function AnalisiPage() {
         onRefresh={handleRefresh}
         historyStartYear={cashflowHistoryStartYear}
       />
-    </div>
+    </PageContainer>
   );
 }

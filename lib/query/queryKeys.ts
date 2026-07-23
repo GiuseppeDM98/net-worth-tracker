@@ -57,6 +57,15 @@ export const queryKeys = {
     exposure: (userId: string) => ['portfolio', 'exposure', userId] as const,
   },
 
+  // Asset trade ledger (Registro operazioni asset).
+  // `all` is a prefix of `byAsset` so invalidating `all` refreshes any open movements list
+  // (the costCenters prefix-invalidation precedent).
+  assetTransactions: {
+    all: (userId: string) => ['asset-transactions', userId] as const,
+    byAsset: (userId: string, assetId: string) => ['asset-transactions', userId, assetId] as const,
+    meta: (userId: string) => ['asset-transactions-meta', userId] as const,
+  },
+
   // Cost centers (list + per-center spend stats derived from expenses).
   // Both keys share the ['cost-centers', userId] prefix so invalidating `all`
   // also refreshes any open detail view via prefix match.

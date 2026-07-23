@@ -6,8 +6,21 @@ let adminApp: App;
 
 // Initialize Firebase Admin SDK
 if (getApps().length === 0) {
+  // Local Emulator Suite: when FIRESTORE_EMULATOR_HOST is set (by the `dev:emulator`/`emulators:seed`
+  // scripts), the Admin SDK auto-routes to the local emulators, so NO real service-account
+  // credentials are needed — initialize with the project id only. Checked first so emulator runs
+  // never touch production even if prod credentials happen to be present in the environment.
+  if (process.env.FIRESTORE_EMULATOR_HOST) {
+    adminApp = initializeApp({
+      projectId:
+        process.env.GCLOUD_PROJECT ||
+        process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||
+        'demo-net-worth',
+    });
+    console.info('[firebase-admin] Using LOCAL emulators (FIRESTORE_EMULATOR_HOST set).');
+  }
   // Try to use service account JSON first (recommended for Vercel)
-  if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY && process.env.FIREBASE_SERVICE_ACCOUNT_KEY.trim().length > 0) {
+  else if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY && process.env.FIREBASE_SERVICE_ACCOUNT_KEY.trim().length > 0) {
     try {
       const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
       adminApp = initializeApp({

@@ -103,8 +103,13 @@ export interface Asset {
   assetClass: AssetClass;
   subCategory?: string;
   currency: string;
+  // DERIVED for LEDGER_ASSET_TYPES (stock/etf/bond/crypto/commodity, see types/assetTransactions.ts):
+  // `quantity` and `averageCost` are recomputed by replaying `assetTransactions` — via
+  // buildDerivedAssetFields in lib/utils/assetTransactionUtils.ts — and rewritten to this doc by the
+  // trade Admin API after every ledger mutation. Do NOT write them directly for ledger types; the
+  // ledger is the source of truth. cash/realestate keep direct editing and have no ledger.
   quantity: number;
-  averageCost?: number;
+  averageCost?: number; // Native-currency PMC (weighted avg of trade prices, fees excluded). Derived for ledger types — see note on `quantity`.
   taxRate?: number; // Tax rate percentage for unrealized gains (e.g., 26 for 26%)
   totalExpenseRatio?: number; // Total Expense Ratio (TER) as a percentage (e.g., 0.20 for 0.20%)
   stampDutyExempt?: boolean; // If true, asset is excluded from stamp duty (imposta di bollo) calculation (e.g. pension funds, real estate)

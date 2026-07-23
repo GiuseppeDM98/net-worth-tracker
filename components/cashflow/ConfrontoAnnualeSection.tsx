@@ -14,7 +14,6 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
 import { useChartColors } from '@/lib/hooks/useChartColors';
 import { type Expense } from '@/types/expenses';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,8 +30,9 @@ import {
 import { formatCurrency, formatCurrencyCompact } from '@/lib/services/chartService';
 import { getItalyMonth, getItalyYear, toDate } from '@/lib/utils/dateHelpers';
 import { MONTH_NAMES } from '@/lib/constants/months';
-import { cn } from '@/lib/utils';
+import { SegmentedPill } from '@/components/ui/segmented-pill';
 import { type PeriodMode } from '@/components/cashflow/AnalisiTab';
+import { cn } from '@/lib/utils';
 
 // ── Shared tooltip style ──────────────────────────────────────────────────────
 // Defined once to avoid duplication across the three sub-charts.
@@ -94,7 +94,7 @@ function MensileBarChart({
           ]}
           contentStyle={TOOLTIP_CONTENT_STYLE}
           labelStyle={TOOLTIP_LABEL_STYLE}
-          cursor={{ fill: 'rgba(128,128,128,0.1)' }}
+          cursor={{ fill: 'var(--muted)', fillOpacity: 0.4 }}
         />
         <Legend
           formatter={(value) => (value === 'current' ? currentYear.toString() : prevYear.toString())}
@@ -167,7 +167,7 @@ function CategoriaBarChart({
           ]}
           contentStyle={TOOLTIP_CONTENT_STYLE}
           labelStyle={TOOLTIP_LABEL_STYLE}
-          cursor={{ fill: 'rgba(128,128,128,0.1)' }}
+          cursor={{ fill: 'var(--muted)', fillOpacity: 0.4 }}
         />
         <Legend
           formatter={(value) => (value === 'current' ? currentYear.toString() : prevYear.toString())}
@@ -225,7 +225,7 @@ function HistoryLineChart({
           formatter={(value) => [formatCurrency(Number(value ?? 0)), 'Spese']}
           contentStyle={TOOLTIP_CONTENT_STYLE}
           labelStyle={TOOLTIP_LABEL_STYLE}
-          cursor={{ fill: 'rgba(128,128,128,0.1)' }}
+          cursor={{ fill: 'var(--muted)', fillOpacity: 0.4 }}
         />
         <Bar
           dataKey="spese"
@@ -425,36 +425,16 @@ export function ConfrontoAnnualeSection({
 
           {/* Toggle visible only in current/year mode — history uses its own single-chart layout */}
           {periodMode !== 'history' && (
-            <div
-              role="tablist"
-              aria-label="Vista confronto"
-              className="inline-flex items-center gap-1 rounded-full bg-muted p-1"
-            >
-              {(['mensile', 'categoria'] as const).map((mode) => (
-                <button
-                  key={mode}
-                  type="button"
-                  role="tab"
-                  aria-selected={viewMode === mode}
-                  onClick={() => setViewMode(mode)}
-                  className={cn(
-                    'relative px-3 py-1 text-xs font-medium rounded-full transition-colors',
-                    viewMode !== mode && 'text-muted-foreground hover:text-foreground',
-                  )}
-                >
-                  {viewMode === mode && (
-                    <motion.span
-                      layoutId="confronto-view-pill"
-                      className="absolute inset-0 rounded-full bg-background shadow-sm"
-                      transition={{ type: 'spring', stiffness: 400, damping: 35 }}
-                    />
-                  )}
-                  <span className="relative z-10">
-                    {mode === 'mensile' ? 'Mensile' : 'Per Categoria'}
-                  </span>
-                </button>
-              ))}
-            </div>
+            <SegmentedPill
+              ariaLabel="Vista confronto"
+              layoutId="confronto-view-pill"
+              value={viewMode}
+              onChange={setViewMode}
+              options={[
+                { value: 'mensile', label: 'Mensile' },
+                { value: 'categoria', label: 'Per Categoria' },
+              ]}
+            />
           )}
         </div>
 
@@ -467,7 +447,9 @@ export function ConfrontoAnnualeSection({
         {/* Placeholder when not enough historical data for a meaningful comparison */}
         {!hasComparisonData && (
           <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
-            Dati insufficienti per il confronto
+            {periodMode === 'history'
+              ? 'Servono almeno 2 anni di dati per il confronto'
+              : 'Servono dati sull’anno precedente per il confronto'}
           </div>
         )}
 

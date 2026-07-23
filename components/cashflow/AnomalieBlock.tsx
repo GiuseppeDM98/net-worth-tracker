@@ -4,8 +4,9 @@
  * Renders only when anomalie.length > 0. Each chip is clickable and
  * navigates to the pie chart drill-down for that category.
  *
- * DESIGN: amber tint background, flat divide-y list on mobile,
- * horizontal chip row on desktop.
+ * DESIGN: filled warning banner via the theme-aware --warning/--warning-foreground/
+ * --warning-border tokens (same set as the low-balance banner in dashboard/layout.tsx)
+ * — NOT raw amber-* Tailwind classes, which stay literal amber regardless of theme.
  *
  * ALGORITHM: anomalies are spending categories whose current-month total
  * exceeds the 6-month rolling average by >25% AND >€50 in absolute terms.
@@ -31,16 +32,16 @@ export function AnomalieBlock({ anomalie, onCategoryClick }: AnomalieBlockProps)
   if (anomalie.length === 0) return null;
 
   return (
-    <div className="rounded-xl border border-amber-200/60 bg-amber-50/40 dark:border-amber-800/40 dark:bg-amber-950/20 px-4 py-3 space-y-3">
+    <div className="rounded-xl border border-warning-border bg-warning px-4 py-3 space-y-3">
       {/* Header + legenda formato */}
       <div className="space-y-0.5">
         <div className="flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
-          <p className="text-xs font-semibold uppercase tracking-widest text-amber-700 dark:text-amber-400">
+          <AlertTriangle className="h-4 w-4 text-warning-foreground shrink-0" />
+          <p className="text-xs font-semibold uppercase tracking-widest text-warning-foreground">
             Da controllare
           </p>
         </div>
-        <p className="text-xs text-amber-600/70 dark:text-amber-400/60 pl-6">
+        <p className="text-xs text-warning-foreground/70 pl-6">
           Spesa superiore alla media degli ultimi 6 mesi · (media → mese selezionato)
         </p>
       </div>
@@ -52,13 +53,13 @@ export function AnomalieBlock({ anomalie, onCategoryClick }: AnomalieBlockProps)
             key={a.category}
             type="button"
             onClick={() => onCategoryClick(a.category)}
-            className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/60 dark:border-amber-700/40 bg-amber-100/60 dark:bg-amber-900/30 px-3 py-1.5 text-sm font-medium text-amber-900 dark:text-amber-200 hover:bg-amber-200/60 dark:hover:bg-amber-800/40 transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-full border border-warning-border bg-warning-foreground/10 px-3 py-1.5 text-sm font-medium text-warning-foreground hover:bg-warning-foreground/15 transition-colors"
           >
             <span className="font-semibold">{a.category}</span>
-            <span className="text-amber-700 dark:text-amber-300 font-mono">
+            <span className="font-mono">
               +{a.deltaPercent.toFixed(0)}%
             </span>
-            <span className="text-xs text-amber-600/80 dark:text-amber-400/80 font-mono">
+            <span className="text-xs text-warning-foreground/80 font-mono">
               ({formatCurrency(a.referenceAverage)} → {formatCurrency(a.currentTotal)})
             </span>
           </button>

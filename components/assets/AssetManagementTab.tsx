@@ -54,11 +54,15 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Plus, RefreshCw, Pencil, Trash2, Info, Calculator, ArrowUpDown, ChevronUp, ChevronDown, ChevronRight, Wallet, LayoutGrid, TrendingUp } from 'lucide-react';
+import { Plus, RefreshCw, Pencil, Trash2, Info, Calculator, ArrowUpDown, ChevronUp, ChevronDown, ChevronRight, Wallet, LayoutGrid, TrendingUp, ArrowLeftRight, ScrollText } from 'lucide-react';
 import { toast } from 'sonner';
 import { AssetDialog } from '@/components/assets/AssetDialog';
 import { AssetCard, type AssetPerformanceData } from '@/components/assets/AssetCard';
 import { TaxCalculatorModal } from '@/components/assets/TaxCalculatorModal';
+import { TransactionDialog } from '@/components/assets/TransactionDialog';
+import { AssetMovementsDialog } from '@/components/assets/AssetMovementsDialog';
+import { useAssetLedgerMeta } from '@/lib/hooks/useAssetTransactions';
+import { isLedgerAssetType } from '@/types/assetTransactions';
 import { getItalyYear, getItalyMonth } from '@/lib/utils/dateHelpers';
 
 // Format a % delta: "+1.2%" / "-3.4%" / "—"
@@ -143,9 +147,19 @@ export function AssetManagementTab({ assets, allAssets, loading, onRefresh, snap
 
   const deleteAssetMutation = useDeleteAsset(ownerId || '');
 
+  // Trade-ledger row actions are shown only once the ledger meta doc exists (migration ran); while
+  // absent the page is exactly today's page (spec 04 §1). Movimenti is read-only (allowed in demo);
+  // Registra operazione is a mutation (disabled in demo, like every other mutating control).
+  const { data: ledgerMeta } = useAssetLedgerMeta(ownerId);
+  const ledgerReady = !!ledgerMeta;
+
   const [updating, setUpdating] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
+  const [transactionDialogOpen, setTransactionDialogOpen] = useState(false);
+  const [tradeAsset, setTradeAsset] = useState<Asset | null>(null);
+  const [movementsOpen, setMovementsOpen] = useState(false);
+  const [movementsAsset, setMovementsAsset] = useState<Asset | null>(null);
   const [taxCalculatorOpen, setTaxCalculatorOpen] = useState(false);
   const [calculatingAsset, setCalculatingAsset] = useState<Asset | null>(null);
   const [sortState, setSortState] = useState<SortState | null>(null);
@@ -220,6 +234,20 @@ export function AssetManagementTab({ assets, allAssets, loading, onRefresh, snap
     setEditingAsset(asset);
     setDialogOpen(true);
   };
+
+  const openTransactionDialog = (asset: Asset) => {
+    setTradeAsset(asset);
+    setTransactionDialogOpen(true);
+  };
+
+  const openMovementsDialog = (asset: Asset) => {
+    setMovementsAsset(asset);
+    setMovementsOpen(true);
+  };
+
+  // Ledger row actions apply only to ledger asset types (stock/etf/bond/crypto/commodity) once
+  // migration has produced the meta doc. Cash/realestate never show them.
+  const showLedgerActions = (asset: Asset) => ledgerReady && isLedgerAssetType(asset.type);
 
   const handleDialogClose = () => {
     setDialogOpen(false);
@@ -546,6 +574,9 @@ export function AssetManagementTab({ assets, allAssets, loading, onRefresh, snap
                                 isDemo={isDemo}
                                 sparklineData={assetSparklineData[asset.id]}
                                 performance={assetPerformanceData[asset.id]}
+                                showLedgerActions={showLedgerActions(asset)}
+                                onRegisterTrade={openTransactionDialog}
+                                onMovements={openMovementsDialog}
                               />
                             ))}
                           </div>
@@ -566,6 +597,9 @@ export function AssetManagementTab({ assets, allAssets, loading, onRefresh, snap
                           isDemo={isDemo}
                           sparklineData={assetSparklineData[asset.id]}
                           performance={assetPerformanceData[asset.id]}
+                          showLedgerActions={showLedgerActions(asset)}
+                          onRegisterTrade={openTransactionDialog}
+                          onMovements={openMovementsDialog}
                         />
                       ))}
                     </div>
@@ -765,6 +799,32 @@ export function AssetManagementTab({ assets, allAssets, loading, onRefresh, snap
                                     <Calculator className="h-4 w-4" />
                                   </Button>
                                 )}
+                                {showLedgerActions(asset) && (
+                                  <>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-8 w-8"
+                                      onClick={() => openTransactionDialog(asset)}
+                                      disabled={isDemo}
+                                      aria-label="Registra operazione"
+                                      title={isDemo ? 'Non disponibile in modalità demo' : undefined}
+                                    >
+                                      <ArrowLeftRight className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-8 w-8"
+                                      onClick={() => openMovementsDialog(asset)}
+                                      aria-label="Movimenti"
+                                    >
+                                      <ScrollText className="h-4 w-4" />
+                                    </Button>
+                                  </>
+                                )}
                                 <Button
                                   type="button"
                                   variant="ghost"
@@ -860,7 +920,34 @@ export function AssetManagementTab({ assets, allAssets, loading, onRefresh, snap
         </CardContent>
       </Card>
 
-      <AssetDialog open={dialogOpen} onClose={handleDialogClose} asset={editingAsset} />
+      <AssetDialog
+        open={dialogOpen}
+        onClose={handleDialogClose}
+        asset={editingAsset}
+        onRegisterTrade={openTransactionDialog}
+      />
+
+      {tradeAsset && (
+        <TransactionDialog
+          open={transactionDialogOpen}
+          onClose={() => {
+            setTransactionDialogOpen(false);
+            setTradeAsset(null);
+          }}
+          asset={tradeAsset}
+        />
+      )}
+
+      {movementsAsset && (
+        <AssetMovementsDialog
+          open={movementsOpen}
+          onClose={() => {
+            setMovementsOpen(false);
+            setMovementsAsset(null);
+          }}
+          asset={movementsAsset}
+        />
+      )}
 
       {calculatingAsset && (
         <TaxCalculatorModal open={taxCalculatorOpen} onClose={handleTaxCalculatorClose} asset={calculatingAsset} />

@@ -8,13 +8,38 @@ import {
 import { adminDb } from '@/lib/firebase/admin';
 import { AssetDividendGrowth, DividendGrowthData, TotalReturnAsset, YieldOnCostAsset } from '@/types/dividend';
 import { computeDividendYieldMetrics } from '@/lib/utils/yieldOnCost';
-import { getUserSnapshotsAdmin } from '@/lib/server/assetAdminRepository';
+import { getUserSnapshotsAdmin, getAssetTransactionsAdmin } from '@/lib/server/assetAdminRepository';
 import { deriveHoldingStartDates } from '@/lib/utils/snapshotAssetBreakdown';
+import {
+  replayTransactions,
+  computeAssetTotalReturn,
+  type LedgerPositionState,
+} from '@/lib/utils/assetTransactionUtils';
+import type { AssetTransaction } from '@/types/assetTransactions';
 import {
   assertCanAccessAccount,
   getApiAuthErrorResponse,
   requireFirebaseAuth,
 } from '@/lib/server/apiAuth';
+
+// Mirror of calculateAssetValue() (lib/services/assetService.ts) for ledger-based total return —
+// assetService.ts imports the client Firebase SDK and cannot be used in this Admin route (same
+// reasoning as resolveAssetValueEur in portfolioExposureService.ts). Ledger asset types
+// (stock/etf/bond/crypto/commodity) never carry outstandingDebt, so that branch is omitted.
+function resolveLedgerAssetValueEur(asset: {
+  quantity: number;
+  currentPrice: number;
+  currentPriceEur?: number;
+  currency?: string;
+}): number {
+  const isGBp = asset.currency === 'GBp';
+  const normalizedPrice = isGBp ? asset.currentPrice / 100 : asset.currentPrice;
+  const priceEur =
+    asset.currency && asset.currency.toUpperCase() !== 'EUR' && asset.currentPriceEur !== undefined
+      ? asset.currentPriceEur
+      : normalizedPrice;
+  return asset.quantity * priceEur;
+}
 
 /**
  * GET /api/dividends/stats
@@ -81,11 +106,24 @@ export async function GET(request: NextRequest) {
       name: doc.data().name || '',
       quantity: doc.data().quantity || 0,
       currentPrice: doc.data().currentPrice || 0,
+      currentPriceEur: doc.data().currentPriceEur as number | undefined,
+      currency: doc.data().currency as string | undefined,
       averageCost: doc.data().averageCost,
       // Prefer the exact start stamped at (re)purchase; fall back to the snapshot-derived value.
       holdingStartDate: doc.data().holdingStartDate?.toDate() ?? holdingStarts.get(doc.id),
     }));
     const assetsMap = new Map(userAssets.map(a => [a.id, a]));
+
+    // Trade-ledger transactions, grouped by asset (Fase D §6): assets WITH ledger entries get a
+    // date-exact total return via replayTransactions; assets without one keep the static fallback
+    // below (only possible for a position opened and never migrated/re-bought).
+    const allTrades = await getAssetTransactionsAdmin(authenticatedUserId);
+    const tradesByAssetId = new Map<string, AssetTransaction[]>();
+    allTrades.forEach(t => {
+      const arr = tradesByAssetId.get(t.assetId) ?? [];
+      arr.push(t);
+      tradesByAssetId.set(t.assetId, arr);
+    });
 
     // Only show upcoming dividends for assets still owned
     const activeUpcomingDividends = upcomingDividends.filter(div => {
@@ -146,15 +184,19 @@ export async function GET(request: NextRequest) {
       dividendsByAsset.set(div.assetId, arr);
     });
 
-    // Compute total return per asset: unrealized capital gain % + dividend return % on cost.
-    // Excludes sold assets (quantity = 0) since we don't track the actual realized sell price,
-    // and assets without averageCost (e.g. cash) since cost basis is required for % calculation.
+    // Compute total return per asset: capital gain % + dividend return % on cost.
     // Dividends are scoped to the CURRENT holding (paymentDate >= holdingStartDate): a rebought
     // asset's prior-holding dividends must not be credited to the new position — the capital-gain
     // term is already current-holding only, so the dividend term must match (consistent with YOC).
+    //
+    // Two paths (Fase D, spec 04 §6):
+    //   - LEDGER-BASED (asset has trade-ledger entries): replayTransactions + computeAssetTotalReturn
+    //     is authoritative — includes CLOSED positions (quantity 0, isClosed: true) and partial
+    //     sells, which the static path below cannot represent (it has no realized-sell price).
+    //   - STATIC fallback (no ledger doc for this asset — never migrated/re-bought): unchanged
+    //     unrealized price-vs-PMC calculation, gated on averageCost > 0 && quantity > 0 && dividends.
     const totalReturnAssets: TotalReturnAsset[] = userAssets
-      .filter(asset => asset.averageCost && asset.averageCost > 0 && asset.quantity > 0)
-      .map(asset => {
+      .map((asset): TotalReturnAsset | null => {
         // Scope to the current holding. holdingStartDate = exact stamp at (re)purchase ?? snapshot-
         // derived; absent for continuously-held assets (then all dividends count, as before).
         const assetDividends = (dividendsByAsset.get(asset.id) ?? []).filter(div =>
@@ -164,10 +206,53 @@ export async function GET(request: NextRequest) {
           (sum, div) => sum + (div.netAmountEur ?? div.netAmount),
           0
         );
+
+        const trades = tradesByAssetId.get(asset.id);
+        if (trades && trades.length > 0) {
+          let state: LedgerPositionState;
+          try {
+            state = replayTransactions(trades);
+          } catch {
+            // A corrupted/invalid stored sequence should not crash the whole stats route — skip it.
+            return null;
+          }
+          if (state.investedEur <= 0) return null; // nothing ever bought (shouldn't happen)
+
+          const currentValueEur = state.quantity > 0 ? resolveLedgerAssetValueEur(asset) : 0;
+          const totalReturn = computeAssetTotalReturn(state, currentValueEur, netDividends);
+          // Capital gain = the price-driven component (realized + unrealized), symmetric with the
+          // static path below where capitalGainPercentage + dividendReturnPercentage = total.
+          const capitalGainAbsolute = totalReturn.realizedPnlEur + totalReturn.unrealizedPnlEur;
+          const capitalGainPercentage = (capitalGainAbsolute / totalReturn.investedEur) * 100;
+          const dividendReturnPercentage = (netDividends / totalReturn.investedEur) * 100;
+
+          return {
+            assetId: asset.id,
+            assetTicker: asset.ticker,
+            assetName: asset.name,
+            quantity: asset.quantity,
+            averageCost: state.averageCostEur ?? asset.averageCost ?? 0,
+            currentPrice: asset.currentPrice,
+            costBasis: state.costBasisEur,
+            currentValue: currentValueEur,
+            netDividends,
+            capitalGainAbsolute,
+            capitalGainPercentage,
+            dividendReturnPercentage,
+            totalReturnPercentage: capitalGainPercentage + dividendReturnPercentage,
+            realizedPnlEur: totalReturn.realizedPnlEur,
+            isClosed: totalReturn.isClosed,
+          };
+        }
+
+        // Static fallback: no ledger doc for this asset (never migrated/re-bought at quantity 0).
+        // Excludes sold assets (quantity = 0) since we don't track the actual realized sell price,
+        // and assets without averageCost (e.g. cash) since cost basis is required for % calculation.
+        if (!asset.averageCost || asset.averageCost <= 0 || asset.quantity <= 0) return null;
         // Dividend-return card: an asset with no dividends in the current holding has no story here.
         if (netDividends <= 0) return null;
 
-        const costBasis = asset.quantity * asset.averageCost!;
+        const costBasis = asset.quantity * asset.averageCost;
         const currentValue = asset.quantity * asset.currentPrice;
         const capitalGainAbsolute = currentValue - costBasis;
         const capitalGainPercentage = (capitalGainAbsolute / costBasis) * 100;

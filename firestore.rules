@@ -245,6 +245,23 @@ service cloud.firestore {
       allow delete: if canAccess(resource.data.userId);
     }
 
+    // Collezione assetTransactions - registro operazioni asset (trade ledger)
+    // Leggibile dal proprietario o da un membro delegato; scrittura SOLO via Admin API
+    // (ogni mutazione riscrive atomicamente i campi derivati dell'asset — vedi
+    // docs/specs/1-asset-transactions). Stessa postura "write:false" di account-access.
+    match /assetTransactions/{transactionId} {
+      allow read: if canAccess(resource.data.userId);
+      allow create, update, delete: if false;
+    }
+
+    // Collezione assetTransactionsMeta - metadati del registro (doc id = ownerUid)
+    // Read con userId (doc id) per consentire la lettura del doc inesistente prima
+    // della migrazione; scrittura solo via Admin API.
+    match /assetTransactionsMeta/{userId} {
+      allow read: if canAccess(userId);
+      allow write: if false;
+    }
+
     // Collezione account-access - concessioni di accesso delegato (doc id = ownerUid)
     // Lettura: il proprietario, o un membro elencato (abilita sia get() delle rules
     //   sopra sia la query array-contains con cui il viewer scopre gli account condivisi).

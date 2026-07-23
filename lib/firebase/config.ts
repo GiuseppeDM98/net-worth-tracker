@@ -1,8 +1,9 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { getAuth, connectAuthEmulator } from 'firebase/auth';
 import {
   getFirestore,
   initializeFirestore,
+  connectFirestoreEmulator,
   memoryLocalCache,
   persistentLocalCache,
   persistentMultipleTabManager,
@@ -48,5 +49,20 @@ function createFirestoreInstance() {
 // Initialize Firebase services
 export const auth = getAuth(app);
 export const db = createFirestoreInstance();
+
+// ── Local Emulator Suite ──────────────────────────────────────────────────────
+// When NEXT_PUBLIC_USE_FIREBASE_EMULATOR=true (set by the `dev:emulator` npm script), route Auth
+// and Firestore to the local emulators instead of the cloud project. This keeps development and
+// manual testing entirely off production data. Ports match firebase.json. The globalThis guard
+// prevents a double-connect on Fast Refresh (connect* throws once the SDK has issued a request).
+if (process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === 'true') {
+  const globalWithFlag = globalThis as typeof globalThis & { __firebaseEmulatorsConnected?: boolean };
+  if (!globalWithFlag.__firebaseEmulatorsConnected) {
+    connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+    connectFirestoreEmulator(db, '127.0.0.1', 8080);
+    globalWithFlag.__firebaseEmulatorsConnected = true;
+    console.info('[firebase] Connected to LOCAL emulators (Auth :9099, Firestore :8080).');
+  }
+}
 
 export default app;

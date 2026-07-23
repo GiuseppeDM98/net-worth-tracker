@@ -387,13 +387,13 @@ describe('Private API route auth', () => {
         },
         updatedAt: new Date(),
         computedAt: new Date(),
-        sourceVersion: 3, // must match DASHBOARD_OVERVIEW_SOURCE_VERSION in dashboardOverviewConstants.ts
+        sourceVersion: 4, // must match DASHBOARD_OVERVIEW_SOURCE_VERSION in dashboardOverviewConstants.ts
         invalidatedAt: null,
       }),
     });
 
     const response = await dashboardOverviewRoute(
-      createJsonRequest('http://localhost/api/dashboard/overview', {
+      createJsonRequest('http://localhost/api/dashboard/overview?userId=user-1', {
         headers: {
           Authorization: 'Bearer valid-token',
         },
@@ -407,7 +407,7 @@ describe('Private API route auth', () => {
       },
       freshness: {
         source: 'materialized_summary',
-        sourceVersion: 3, // must match DASHBOARD_OVERVIEW_SOURCE_VERSION in dashboardOverviewConstants.ts
+        sourceVersion: 4, // must match DASHBOARD_OVERVIEW_SOURCE_VERSION in dashboardOverviewConstants.ts
         stale: false,
       },
     });
@@ -483,7 +483,7 @@ describe('Private API route auth', () => {
     const response = await invalidateDashboardOverviewRoute(
       createJsonRequest('http://localhost/api/dashboard/overview/invalidate', {
         method: 'POST',
-        body: { reason: 'expense_created' },
+        body: { ownerId: 'user-1', reason: 'expense_created' },
         headers: {
           Authorization: 'Bearer valid-token',
         },

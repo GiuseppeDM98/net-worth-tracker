@@ -13,16 +13,16 @@
  * - Chart sub-components are module-level (React Compiler: never nest components).
  * - Colours come exclusively from useChartColors() — no hardcoded hex.
  * - Recharts tooltips are styled via CSS vars, never inline hex.
- * - Pill toggles reuse the Framer layoutId + spring(400/35) pattern of AnalisiTab.
+ * - Pill toggles use the shared SegmentedPill (components/ui/segmented-pill.tsx).
  */
 'use client';
 
 import { useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
 import { useChartColors } from '@/lib/hooks/useChartColors';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { type Expense } from '@/types/expenses';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { SegmentedPill } from '@/components/ui/segmented-pill';
 import {
   ComposedChart,
   LineChart,
@@ -44,7 +44,6 @@ import {
   buildTypeTimeSeries,
   type TimeGranularity,
 } from '@/lib/utils/cashflowTimeSeries';
-import { cn } from '@/lib/utils';
 
 // ── Shared tooltip style ──────────────────────────────────────────────────────
 // Defined once (mirrors ConfrontoAnnualeSection) so all sub-charts stay consistent.
@@ -60,54 +59,6 @@ const TOOLTIP_LABEL_STYLE = { fontWeight: 600, color: 'var(--card-foreground)' }
 
 type CategoryChartType = 'expenses' | 'income';
 type TypeChartView = 'absolute' | 'percent';
-
-// ── PillToggle ────────────────────────────────────────────────────────────────
-// Generic two/three-option segmented control. Module-level for a stable reference.
-
-function PillToggle<T extends string>({
-  options,
-  value,
-  onChange,
-  layoutId,
-  ariaLabel,
-}: {
-  options: ReadonlyArray<readonly [T, string]>;
-  value: T;
-  onChange: (value: T) => void;
-  layoutId: string;
-  ariaLabel: string;
-}) {
-  return (
-    <div
-      role="tablist"
-      aria-label={ariaLabel}
-      className="inline-flex items-center gap-1 rounded-full bg-muted p-1"
-    >
-      {options.map(([key, label]) => (
-        <button
-          key={key}
-          type="button"
-          role="tab"
-          aria-selected={value === key}
-          onClick={() => onChange(key)}
-          className={cn(
-            'relative px-3 py-1 text-xs font-medium rounded-full transition-colors',
-            value !== key && 'text-muted-foreground hover:text-foreground',
-          )}
-        >
-          {value === key && (
-            <motion.span
-              layoutId={layoutId}
-              className="absolute inset-0 rounded-full bg-background shadow-sm"
-              transition={{ type: 'spring', stiffness: 400, damping: 35 }}
-            />
-          )}
-          <span className="relative z-10">{label}</span>
-        </button>
-      ))}
-    </div>
-  );
-}
 
 // ── FlowComposedChart ─────────────────────────────────────────────────────────
 // Chart A: income/expense bars + net-savings line. Module-level (React Compiler).
@@ -146,7 +97,7 @@ function FlowComposedChart({
           ]}
           contentStyle={TOOLTIP_CONTENT_STYLE}
           labelStyle={TOOLTIP_LABEL_STYLE}
-          cursor={{ fill: 'rgba(128,128,128,0.1)' }}
+          cursor={{ fill: 'var(--muted)', fillOpacity: 0.4 }}
         />
         <Legend
           formatter={(value) =>
@@ -386,11 +337,11 @@ export function AndamentoStoricoSection({
             <CardTitle className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
               Entrate, Uscite e Risparmio
             </CardTitle>
-            <PillToggle
+            <SegmentedPill
               options={[
-                ['month', 'Mese'],
-                ['year', 'Anno'],
-              ] as const}
+                { value: 'month', label: 'Mese' },
+                { value: 'year', label: 'Anno' },
+              ]}
               value={granularity}
               onChange={setGranularity}
               layoutId="andamento-granularity-pill"
@@ -415,11 +366,11 @@ export function AndamentoStoricoSection({
             <CardTitle className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
               {categoryType === 'expenses' ? 'Uscite per Categoria' : 'Entrate per Categoria'}
             </CardTitle>
-            <PillToggle
+            <SegmentedPill
               options={[
-                ['expenses', 'Uscite'],
-                ['income', 'Entrate'],
-              ] as const}
+                { value: 'expenses', label: 'Uscite' },
+                { value: 'income', label: 'Entrate' },
+              ]}
               value={categoryType}
               onChange={setCategoryType}
               layoutId="andamento-category-pill"
@@ -451,11 +402,11 @@ export function AndamentoStoricoSection({
             <CardTitle className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
               Uscite per Tipo
             </CardTitle>
-            <PillToggle
+            <SegmentedPill
               options={[
-                ['absolute', '€'],
-                ['percent', '%'],
-              ] as const}
+                { value: 'absolute', label: '€' },
+                { value: 'percent', label: '%' },
+              ]}
               value={typeView}
               onChange={setTypeView}
               layoutId="andamento-type-view-pill"

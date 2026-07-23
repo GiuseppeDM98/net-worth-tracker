@@ -13,6 +13,7 @@ import {
   buildTimeBuckets,
   buildCategoryTimeSeries,
   buildTypeTimeSeries,
+  computeTrailingSavingsRateAverage,
 } from '@/lib/utils/cashflowTimeSeries';
 import type { Expense } from '@/types/expenses';
 
@@ -208,5 +209,43 @@ describe('buildTypeTimeSeries', () => {
     const result = buildTypeTimeSeries([], 'month', 2025);
     expect(result.buckets).toEqual([]);
     expect(result.series).toEqual([]);
+  });
+});
+
+describe('computeTrailingSavingsRateAverage', () => {
+  it('averages the savings rate over months that have income, skipping months without it', () => {
+    const expenses: Expense[] = [
+      makeExpense({ type: 'income', amount: 2000, date: d(2025, 1) }),
+      makeExpense({ type: 'variable', amount: -1000, date: d(2025, 1) }), // 50%
+      // February: no income → excluded from the average, not treated as 0%
+      makeExpense({ type: 'variable', amount: -200, date: d(2025, 2) }),
+      makeExpense({ type: 'income', amount: 1000, date: d(2025, 3) }),
+      makeExpense({ type: 'variable', amount: -700, date: d(2025, 3) }), // 30%
+    ];
+
+    const result = computeTrailingSavingsRateAverage(expenses, 2025, 3, 3);
+
+    expect(result).toBeCloseTo(40, 5); // (50 + 30) / 2
+  });
+
+  it('returns null when no month in the window has income', () => {
+    const expenses: Expense[] = [
+      makeExpense({ type: 'variable', amount: -100, date: d(2025, 1) }),
+    ];
+
+    expect(computeTrailingSavingsRateAverage(expenses, 2025, 1, 3)).toBeNull();
+  });
+
+  it('walks backward across a year boundary', () => {
+    const expenses: Expense[] = [
+      makeExpense({ type: 'income', amount: 1000, date: d(2024, 12) }),
+      makeExpense({ type: 'variable', amount: -600, date: d(2024, 12) }), // 40%
+      makeExpense({ type: 'income', amount: 1000, date: d(2025, 1) }),
+      makeExpense({ type: 'variable', amount: -800, date: d(2025, 1) }), // 20%
+    ];
+
+    const result = computeTrailingSavingsRateAverage(expenses, 2025, 1, 2);
+
+    expect(result).toBeCloseTo(30, 5); // (20 + 40) / 2
   });
 });

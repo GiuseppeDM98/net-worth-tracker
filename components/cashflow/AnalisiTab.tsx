@@ -12,16 +12,20 @@
  *
  * DRILL-DOWN STATE MACHINE:
  * Level 1 (category) → Level 2 (subcategory) → Level 3 (expenseList)
- * Back button returns one level at a time.
- * Drill-down resets on every period change.
+ * Back button returns one level at a time; breadcrumb (DrillBreadcrumb) also
+ * jumps straight to an intermediate level. Drill-down resets on every period
+ * change and is NOT synced to the URL (unlike period, see readPeriodFromSearchParams).
  *
- * TREND SECTION:
- * Collapsible (open=false by default) to reduce initial cognitive load.
- * Contains monthly + yearly trend charts, grouped by type and category.
+ * DETTAGLIO SECTION:
+ * Confronto Annuale, Andamento Storico, Andamento Risparmio and Trend per
+ * Categoria live inside one Collapsible (open=false by default) below the
+ * always-visible KPI trio + Anomalie + Sankey + Spese Maggiori — progressive
+ * disclosure to keep the initial view scannable in ~30 seconds.
  */
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useChartColors } from '@/lib/hooks/useChartColors';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { MONTH_NAMES } from '@/lib/constants/months';
@@ -30,6 +34,7 @@ import { Expense, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
 import { calculateTotalExpenses, calculateTotalIncome } from '@/lib/services/expenseService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronDown, ChevronLeft, ExternalLink } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format } from 'date-fns';
@@ -43,7 +48,10 @@ import { CategoryTrendsGrid } from '@/components/cashflow/CategoryTrendsGrid';
 import { AndamentoStoricoSection } from '@/components/cashflow/AndamentoStoricoSection';
 import { AnomalieBlock, AnomaliaItem } from '@/components/cashflow/AnomalieBlock';
 import { CompositionList, CompositionListItem } from '@/components/ui/composition-list';
+import { SegmentedPill } from '@/components/ui/segmented-pill';
+import { DrillBreadcrumb } from '@/components/ui/drill-breadcrumb';
 import { computeShadeOpacities } from '@/lib/utils/compositionShading';
+import { computeTrailingSavingsRateAverage } from '@/lib/utils/cashflowTimeSeries';
 import { chartShellSettle, fadeVariants } from '@/lib/utils/motionVariants';
 import { cn } from '@/lib/utils';
 
@@ -205,20 +213,76 @@ interface AnalisiTabProps {
   historyStartYear?: number;
 }
 
+// Parses the "period"/"year"/"month" query params into a valid initial period state.
+// Falls back to the "Anno Corrente" default whenever a param is missing or malformed —
+// a bad/stale link degrades to the default view rather than crashing or showing garbage.
+function readPeriodFromSearchParams(
+  searchParams: URLSearchParams,
+  currentYear: number
+): { periodMode: PeriodMode; selectedYear: number | null; selectedMonth: number | null } {
+  const periodParam = searchParams.get('period');
+  const periodMode: PeriodMode =
+    periodParam === 'year' || periodParam === 'history' ? periodParam : 'current';
+
+  const monthParam = searchParams.get('month');
+  const parsedMonth = monthParam ? parseInt(monthParam, 10) : NaN;
+  const selectedMonth = periodMode !== 'history' && parsedMonth >= 1 && parsedMonth <= 12 ? parsedMonth : null;
+
+  if (periodMode === 'current') return { periodMode, selectedYear: currentYear, selectedMonth };
+  if (periodMode === 'history') return { periodMode, selectedYear: null, selectedMonth: null };
+
+  const yearParam = searchParams.get('year');
+  const parsedYear = yearParam ? parseInt(yearParam, 10) : NaN;
+  const selectedYear = Number.isFinite(parsedYear) ? parsedYear : currentYear - 1;
+  return { periodMode, selectedYear, selectedMonth };
+}
+
 export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: AnalisiTabProps) {
   const COLORS = useChartColors();
   const controlClassName = 'transition-colors duration-200 border-border/70 hover:border-primary/40 focus-visible:ring-primary/30 data-[placeholder]:text-muted-foreground';
 
   const currentYear = getItalyYear();
 
-  // Three-state period selector
-  const [periodMode, setPeriodMode] = useState<PeriodMode>('current');
-  const [selectedYear, setSelectedYear] = useState<number | null>(currentYear);
-  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // Three-state period selector — initial value read once from the URL so a
+  // shared/refreshed link reopens on the same period (deep-linkable "monthly
+  // check" for repeat visits). Drill-down state is intentionally NOT synced to
+  // the URL: two independent drill-down machines (this one + the Sankey's) would
+  // need careful joint encoding to round-trip safely, and period is the piece
+  // that actually matters for "come back to the same check next month".
+  const [periodMode, setPeriodMode] = useState<PeriodMode>(
+    () => readPeriodFromSearchParams(searchParams, currentYear).periodMode
+  );
+  const [selectedYear, setSelectedYear] = useState<number | null>(
+    () => readPeriodFromSearchParams(searchParams, currentYear).selectedYear
+  );
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(
+    () => readPeriodFromSearchParams(searchParams, currentYear).selectedMonth
+  );
+
+  // Keep the URL in sync with the period selection — replace (not push) so
+  // filter changes don't spam browser history with back-button stops.
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (periodMode !== 'current') params.set('period', periodMode);
+    if (periodMode === 'year' && selectedYear !== null) params.set('year', String(selectedYear));
+    if (selectedMonth !== null) params.set('month', String(selectedMonth));
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- router/pathname are stable
+  }, [periodMode, selectedYear, selectedMonth]);
 
   // useMediaQuery avoids the manual matchMedia + listener pattern and integrates with the
   // project's standard breakpoint hook (all callers are 'use client' post-login).
   const isMobile = useMediaQuery('(max-width: 639px)');
+
+  // "Dettaglio" zone (Confronto Annuale, Andamento Storico, Savings trend,
+  // Category trends) — collapsed by default, mirrors Rendimenti's "Mostra tutte
+  // le metriche" pattern.
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
 
   // Drill-down state machine
   const [drillDown, setDrillDown] = useState<DrillDownState>({
@@ -354,6 +418,17 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
     [periodFilteredExpenses, COLORS]
   );
 
+  // The single (year, month) this period resolves to — null for "Anno"/"Storico"
+  // views spanning more than one month. Shared by anomaly detection and the
+  // deficit-month reassurance line so both agree on "which month is this".
+  const singleMonthContext = useMemo(() => {
+    if (periodMode === 'current') return { year: getItalyYear(), month: getItalyMonth() };
+    if (periodMode === 'year' && selectedMonth !== null && selectedYear !== null) {
+      return { year: selectedYear, month: selectedMonth };
+    }
+    return null;
+  }, [periodMode, selectedMonth, selectedYear]);
+
   /**
    * Compute spending anomalies for the current month context.
    *
@@ -366,19 +441,9 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
    * Skip categories with fewer than 3 months of history.
    */
   const anomalieData = useMemo<AnomaliaItem[]>(() => {
-    // Determine the anomaly month based on the current period mode
-    let anomalyMonth: number | null = null;
-    let anomalyYear: number | null = null;
-
-    if (periodMode === 'current') {
-      anomalyMonth = getItalyMonth();
-      anomalyYear = getItalyYear();
-    } else if (periodMode === 'year' && selectedMonth !== null && selectedYear !== null) {
-      anomalyMonth = selectedMonth;
-      anomalyYear = selectedYear;
-    } else {
-      return []; // Annual or historical view — no anomaly detection
-    }
+    // Anomaly detection is only meaningful at monthly granularity.
+    if (!singleMonthContext) return [];
+    const { year: anomalyYear, month: anomalyMonth } = singleMonthContext;
 
     // Collect non-income expenses for the anomaly month
     const anomalyExpenses = allExpenses.filter(e => {
@@ -401,8 +466,8 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
     // Build 6-month reference window immediately preceding the anomaly month.
     // We iterate backward from anomalyMonth-1, wrapping across year boundaries.
     const referenceMonths: Array<{ year: number; month: number }> = [];
-    let refYear = anomalyYear!;
-    let refMonth = anomalyMonth! - 1;
+    let refYear = anomalyYear;
+    let refMonth = anomalyMonth - 1;
     for (let i = 0; i < 6; i++) {
       if (refMonth < 1) { refMonth = 12; refYear--; }
       referenceMonths.push({ year: refYear, month: refMonth });
@@ -446,7 +511,17 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
     });
 
     return results.sort((a, b) => b.deltaPercent - a.deltaPercent);
-  }, [allExpenses, periodMode, selectedMonth, selectedYear]);
+  }, [allExpenses, singleMonthContext]);
+
+  // Reassurance figure for a deficit month — the trailing 12-month average savings
+  // rate, so a single bad month reads next to a stabilizing long-run number instead
+  // of standing alone (mirrors Panoramica's 12-month reassurance line, CLAUDE.md
+  // "Panoramica: hero critique follow-up"). Only computed when there's something to
+  // reassure about: a genuine single-month deficit.
+  const trailingSavingsAverage = useMemo(() => {
+    if (!singleMonthContext || netBalance >= 0) return null;
+    return computeTrailingSavingsRateAverage(allExpenses, singleMonthContext.year, singleMonthContext.month, 12);
+  }, [allExpenses, singleMonthContext, netBalance]);
 
   // Ref for scrolling to the distribution section (Sankey + Pie) from anomaly chips
   const distributionRef = useRef<HTMLDivElement>(null);
@@ -594,36 +669,26 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
   }
 
   // ── Drill-down breadcrumb path ─────────────────────────────────────────
-  // Wrapped in <nav> so screen readers announce it as a navigation landmark.
-  // Separator spans are aria-hidden — they're purely visual dividers.
+  // Shared with the Sankey's own drill-down (components/ui/drill-breadcrumb.tsx)
+  // so both give the same clickable-crumb navigation language on this page.
   const drillBreadcrumb = drillDown.level !== 'category' && drillDown.chartType ? (
-    <nav aria-label="Posizione nel drill-down">
-      <div className="flex items-center gap-1 text-sm text-muted-foreground">
-        <button
-          className="hover:text-foreground transition-colors"
-          onClick={resetDrillDown}
-        >
-          {drillDown.chartType === 'expenses' ? 'Spese' : 'Entrate'}
-        </button>
-        {drillDown.selectedCategory && (
-          <>
-            <span className="text-border" aria-hidden="true">/</span>
-            <button
-              className="hover:text-foreground transition-colors"
-              onClick={() => setDrillDown(prev => ({ ...prev, level: 'subcategory', selectedSubCategory: null }))}
-            >
-              {drillDown.selectedCategory}
-            </button>
-          </>
-        )}
-        {drillDown.level === 'expenseList' && drillDown.selectedSubCategory && (
-          <>
-            <span className="text-border" aria-hidden="true">/</span>
-            <span className="text-foreground font-medium">{drillDown.selectedSubCategory}</span>
-          </>
-        )}
-      </div>
-    </nav>
+    <DrillBreadcrumb
+      ariaLabel="Posizione nel drill-down"
+      steps={[
+        { label: drillDown.chartType === 'expenses' ? 'Spese' : 'Entrate', onClick: resetDrillDown },
+        ...(drillDown.selectedCategory
+          ? [{
+              label: drillDown.selectedCategory,
+              onClick: drillDown.level === 'expenseList'
+                ? () => setDrillDown(prev => ({ ...prev, level: 'subcategory', selectedSubCategory: null }))
+                : undefined,
+            }]
+          : []),
+        ...(drillDown.level === 'expenseList' && drillDown.selectedSubCategory
+          ? [{ label: drillDown.selectedSubCategory }]
+          : []),
+      ]}
+    />
   ) : null;
 
   return (
@@ -635,40 +700,18 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
       <div className="flex flex-col gap-3 desktop:flex-row desktop:items-center desktop:justify-between">
         {/* Three-state pill — self-center centers it on the stacked column without
             stretching the picker; desktop:self-auto restores row placement. */}
-        <div
-          role="tablist"
-          aria-label="Periodo di analisi"
-          className="inline-flex items-center gap-1 rounded-full bg-muted p-1 self-center desktop:self-auto"
-        >
-          {([
-            ['current', 'Anno Corrente'],
-            ['year', 'Anno'],
-            ['history', 'Storico'],
-          ] as [PeriodMode, string][]).map(([mode, label]) => (
-            <button
-              key={mode}
-              type="button"
-              role="tab"
-              aria-selected={periodMode === mode}
-              onClick={() => handlePeriodModeChange(mode)}
-              className={cn(
-                'relative px-3 py-1.5 text-sm font-medium rounded-full transition-colors',
-                periodMode === mode
-                  ? 'text-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              {periodMode === mode && (
-                <motion.span
-                  layoutId="analisi-period-pill"
-                  className="absolute inset-0 rounded-full bg-background shadow-sm"
-                  transition={{ type: 'spring', stiffness: 400, damping: 35 }}
-                />
-              )}
-              <span className="relative z-10">{label}</span>
-            </button>
-          ))}
-        </div>
+        <SegmentedPill
+          ariaLabel="Periodo di analisi"
+          layoutId="analisi-period-pill"
+          className="self-center desktop:self-auto"
+          value={periodMode}
+          onChange={handlePeriodModeChange}
+          options={[
+            { value: 'current', label: 'Anno Corrente' },
+            { value: 'year', label: 'Anno' },
+            { value: 'history', label: 'Storico' },
+          ]}
+        />
 
         {/* Month picker — wrapped in AnimatePresence so the exit animation plays
             when switching between period modes (not just on mount). */}
@@ -780,7 +823,7 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
             </p>
           </div>
           <div className="text-right sm:text-left sm:mt-1">
-            <p className="text-2xl desktop:text-4xl font-bold font-mono text-emerald-600 dark:text-emerald-400 tabular-nums">
+            <p className="text-[36px] font-bold font-mono tracking-[-0.03em] leading-none text-positive tabular-nums">
               {formatCurrency(totalIncome)}
             </p>
             <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block">
@@ -798,7 +841,7 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
             </p>
           </div>
           <div className="text-right sm:text-left sm:mt-1">
-            <p className="text-2xl desktop:text-4xl font-bold font-mono text-destructive tabular-nums">
+            <p className="text-[36px] font-bold font-mono tracking-[-0.03em] leading-none text-destructive tabular-nums">
               {formatCurrency(totalExpenses)}
             </p>
             <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block">
@@ -815,7 +858,7 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
               <p className={cn(
                 'text-xs font-medium font-mono sm:hidden',
                 savingsRate >= 20
-                  ? 'text-emerald-600 dark:text-emerald-400'
+                  ? 'text-positive'
                   : savingsRate >= 10
                     ? 'text-amber-600 dark:text-amber-400'
                     : 'text-destructive'
@@ -826,7 +869,7 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
           </div>
           <div className="text-right sm:text-left sm:mt-1">
             <p className={cn(
-              'text-2xl desktop:text-4xl font-bold font-mono tabular-nums',
+              'text-[36px] font-bold font-mono tracking-[-0.03em] leading-none tabular-nums',
               netBalance >= 0 ? 'text-foreground' : 'text-destructive'
             )}>
               {formatCurrency(netBalance)}
@@ -835,12 +878,19 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
               <p className={cn(
                 'text-xs font-medium font-mono mt-0.5 hidden sm:block',
                 savingsRate >= 20
-                  ? 'text-emerald-600 dark:text-emerald-400'
+                  ? 'text-positive'
                   : savingsRate >= 10
                     ? 'text-amber-600 dark:text-amber-400'
                     : 'text-destructive'
               )}>
                 {savingsRate >= 0 ? `${savingsRate.toFixed(1)}% risparmiato` : `${savingsRate.toFixed(1)}% (deficit)`}
+              </p>
+            )}
+            {/* Reassurance line — only for a genuine deficit month, so a bad month
+                isn't the only figure on screen (see trailingSavingsAverage above). */}
+            {trailingSavingsAverage !== null && (
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Media ultimi 12 mesi: {trailingSavingsAverage.toFixed(1)}%
               </p>
             )}
           </div>
@@ -867,20 +917,18 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
           variants={chartShellSettle}
           initial={false}
           animate="settle"
-          className="grid gap-4 sm:gap-6 desktop:grid-cols-2"
+          className="space-y-4 sm:space-y-6"
         >
           {/* Sankey */}
-          <div className="desktop:col-span-2">
-            <CashflowSankeyChart
-              expenses={periodFilteredExpenses}
-              isMobile={isMobile}
-              title={`Flusso Cashflow ${periodLabel}`}
-            />
-          </div>
+          <CashflowSankeyChart
+            expenses={periodFilteredExpenses}
+            isMobile={isMobile}
+            title={`Flusso Cashflow ${periodLabel}`}
+          />
 
           {/* Spese per Categoria drill-down */}
           {(expensesByCategoryData.length > 0 || (drillDown.chartType === 'expenses' && drillDown.level !== 'category')) && (
-            <Card ref={expensesChartRef} className="desktop:col-span-2">
+            <Card ref={expensesChartRef}>
               <CardHeader>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex flex-col gap-1">
@@ -924,7 +972,7 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
 
           {/* Spese per Tipo */}
           {expensesByTypeData.length > 0 && (
-            <Card className="desktop:col-span-2">
+            <Card>
               <CardHeader><CardTitle>Spese per Tipo — {periodLabel}</CardTitle></CardHeader>
               <CardContent>
                 <CompositionList
@@ -937,7 +985,7 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
 
           {/* Entrate per Categoria drill-down */}
           {(incomeByCategoryData.length > 0 || (drillDown.chartType === 'income' && drillDown.level !== 'category')) && (
-            <Card ref={incomeChartRef} className="desktop:col-span-2">
+            <Card ref={incomeChartRef}>
               <CardHeader>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex flex-col gap-1">
@@ -981,43 +1029,70 @@ export function AnalisiTab({ allExpenses, loading, historyStartYear = 2024 }: An
         </motion.div>
       )}
 
-      {/* ── Confronto Annuale ─────────────────────────────────────────── */}
-      {/* Always rendered — shows placeholder when comparison data unavailable */}
-      <ConfrontoAnnualeSection
-        allExpenses={allExpenses}
-        selectedYear={selectedYear}
-        selectedMonth={selectedMonth}
-        periodMode={periodMode}
-        historyStartYear={historyStartYear}
-      />
+      {/* ── Dettaglio ─────────────────────────────────────────────────── */}
+      {/* KPI trio + Anomalie + Sankey + Spese Maggiori above are the 30-second
+          answer; everything below is reference material for whoever wants to go
+          deeper. Collapsed by default (progressive disclosure) — this page used
+          to render 7-9 always-open sections, which is why the impeccable critique
+          (2026-07-21) flagged it as the page's biggest cognitive-load issue. */}
+      <Collapsible open={isDetailOpen} onOpenChange={setIsDetailOpen} className="border-t border-border/60 pt-4">
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className="group flex w-full items-center justify-between gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 rounded-md"
+          >
+            <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+              {isDetailOpen ? 'Nascondi dettaglio' : 'Mostra dettaglio'}
+            </span>
+            <ChevronDown
+              className={cn(
+                'h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none',
+                isDetailOpen && 'rotate-180'
+              )}
+              aria-hidden="true"
+            />
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="overflow-hidden data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 duration-200">
+          <div className="space-y-6 pt-4">
+            {/* Confronto Annuale — always rendered, shows a placeholder when comparison
+                data is unavailable */}
+            <ConfrontoAnnualeSection
+              allExpenses={allExpenses}
+              selectedYear={selectedYear}
+              selectedMonth={selectedMonth}
+              periodMode={periodMode}
+              historyStartYear={historyStartYear}
+            />
 
-      {/* ── Andamento nel Tempo (solo Storico) ───────────────────────────── */}
-      {/* Income/expense/net flow + per-category multi-line trends over the full
-          history. History-only: in Anno Corrente/Anno the YoY section above already
-          covers the period, and the Mese/Anno axis would degenerate to one bucket. */}
-      {periodMode === 'history' && (
-        <AndamentoStoricoSection
-          allExpenses={allExpenses}
-          historyStartYear={historyStartYear}
-        />
-      )}
+            {/* Andamento nel Tempo — history-only: in Anno Corrente/Anno the YoY
+                section above already covers the period, and the Mese/Anno axis would
+                degenerate to one bucket. */}
+            {periodMode === 'history' && (
+              <AndamentoStoricoSection
+                allExpenses={allExpenses}
+                historyStartYear={historyStartYear}
+              />
+            )}
 
-      {/* ── Andamento Risparmio + Trend per Categoria ────────────────── */}
-      {/* Year-scoped whenever a year is selected (Anno Corrente → current year,
-          Anno → the chosen past year), so the windows match the period filter;
-          full history (with the 12m/24m/Tutto toggle) only in "Storico". */}
-      <SavingsRateTrendSection
-        allExpenses={allExpenses}
-        historyStartYear={historyStartYear}
-        scopeYear={selectedYear}
-      />
+            {/* Andamento Risparmio — year-scoped whenever a year is selected (Anno
+                Corrente → current year, Anno → the chosen past year); full history
+                (with the 12m/24m/Tutto toggle) only in "Storico". */}
+            <SavingsRateTrendSection
+              allExpenses={allExpenses}
+              historyStartYear={historyStartYear}
+              scopeYear={selectedYear}
+            />
 
-      <CategoryTrendsGrid
-        allExpenses={allExpenses}
-        historyStartYear={historyStartYear}
-        monthsToShow={12}
-        scopeYear={selectedYear}
-      />
+            <CategoryTrendsGrid
+              allExpenses={allExpenses}
+              historyStartYear={historyStartYear}
+              monthsToShow={12}
+              scopeYear={selectedYear}
+            />
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   );
 }
@@ -1034,7 +1109,7 @@ function ExpenseList({ expenses, isIncome }: { expenses: Expense[]; isIncome: bo
 
   // Sum all amounts — income entries are positive, expense entries are negative.
   const totalAmount = expenses.reduce((sum, e) => sum + e.amount, 0);
-  const amountClass = isIncome ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive';
+  const amountClass = isIncome ? 'text-positive' : 'text-destructive';
 
   return (
     <div className="space-y-4">

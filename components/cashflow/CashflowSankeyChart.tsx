@@ -33,6 +33,7 @@ import { formatCurrency, formatCurrencyForSankey } from '@/lib/services/chartSer
 import { toDate } from '@/lib/utils/dateHelpers';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { DrillBreadcrumb, type DrillBreadcrumbStep } from '@/components/ui/drill-breadcrumb';
 import { ChevronLeft, ExternalLink } from 'lucide-react';
 import { chartReveal, fadeVariants } from '@/lib/utils/motionVariants';
 import { cn } from '@/lib/utils';
@@ -1048,11 +1049,61 @@ export function CashflowSankeyChart({
     return baseTitle;
   };
 
+  // ── Breadcrumb jump handlers ─────────────────────────────────────────────
+  // Reuse the exact same target states handleBack already produces for each
+  // level, so jumping directly to an intermediate crumb is equivalent to
+  // clicking "Indietro" the corresponding number of times.
+
+  const jumpToTypeLevel = () => {
+    setSelectedCategory(prev => (prev?.parentType
+      ? { name: prev.parentType, color: prev.parentTypeColor || prev.color, isIncome: false, mode: 'type' }
+      : null));
+  };
+
+  const jumpToCategoryLevel = () => {
+    setSelectedCategory(prev => (prev ? { ...prev, mode: 'category', selectedSubcategory: undefined } : null));
+  };
+
+  // Build the clickable breadcrumb steps for the current drill-down path. The
+  // last step never has an onClick (it's the current level). Mirrors
+  // getBreadcrumbTitle's path logic but produces separately-clickable segments
+  // instead of one flattened string — lets a user jump straight to an
+  // intermediate level instead of clicking "Indietro" repeatedly (Nielsen
+  // heuristic #6, flagged in the 2026-07-21 impeccable critique).
+  const getBreadcrumbSteps = (): DrillBreadcrumbStep[] => {
+    const baseTitle = title || 'Flusso Cashflow';
+    const root: DrillBreadcrumbStep = { label: baseTitle, onClick: () => setSelectedCategory(null) };
+
+    if (!selectedCategory) return [];
+
+    if (selectedCategory.mode === 'type') {
+      return [root, { label: selectedCategory.name }];
+    }
+
+    if (selectedCategory.mode === 'category') {
+      if (selectedCategory.parentType) {
+        return [root, { label: selectedCategory.parentType, onClick: jumpToTypeLevel }, { label: selectedCategory.name }];
+      }
+      return [root, { label: selectedCategory.name }];
+    }
+
+    // mode === 'transactions'
+    const categoryName = selectedCategory.parentCategory || selectedCategory.name;
+    const categorySteps: DrillBreadcrumbStep[] = selectedCategory.parentType
+      ? [root, { label: selectedCategory.parentType, onClick: jumpToTypeLevel }]
+      : [root];
+
+    if (selectedCategory.selectedSubcategory) {
+      return [...categorySteps, { label: categoryName, onClick: jumpToCategoryLevel }, { label: selectedCategory.selectedSubcategory }];
+    }
+    return [...categorySteps, { label: categoryName }];
+  };
+
   // Empty state: no data to visualize (but allow transactions mode to render table)
   if ((sankeyData.nodes.length === 0 || sankeyData.links.length === 0) &&
       selectedCategory?.mode !== 'transactions') {
     return (
-      <Card className="desktop:col-span-2">
+      <Card>
         <CardHeader>
           <CardTitle>{getBreadcrumbTitle()}</CardTitle>
         </CardHeader>
@@ -1080,7 +1131,7 @@ export function CashflowSankeyChart({
       : 'Vista compatta';
 
   return (
-    <Card className="desktop:col-span-2">
+    <Card>
       <CardHeader>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
@@ -1096,9 +1147,11 @@ export function CashflowSankeyChart({
                   Indietro
                 </Button>
               )}
-              <CardTitle>
-                {getBreadcrumbTitle()}
-              </CardTitle>
+              {selectedCategory ? (
+                <DrillBreadcrumb ariaLabel="Posizione nel flusso" steps={getBreadcrumbSteps()} />
+              ) : (
+                <CardTitle>{getBreadcrumbTitle()}</CardTitle>
+              )}
             </div>
             <p className="text-xs text-muted-foreground">
               {sankeyModeLabel} · {sankeyData.nodes.length} nodi · {sankeyData.links.length} flussi
@@ -1230,7 +1283,7 @@ export function CashflowSankeyChart({
                           {filteredExpenses.map((expense) => {
                             // Use semantic Tailwind tokens instead of hardcoded hex colors.
                             const rowAmountClass = expense.type === 'income'
-                              ? 'text-emerald-600 dark:text-emerald-400'
+                              ? 'text-positive'
                               : 'text-destructive';
                             return (
                               <tr key={expense.id} className="border-b hover:bg-muted/30 transition-colors">
@@ -1267,7 +1320,7 @@ export function CashflowSankeyChart({
                             </td>
                             <td className={cn(
                               'px-4 py-3 text-sm text-right font-semibold font-mono',
-                              listTotal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'
+                              listTotal >= 0 ? 'text-positive' : 'text-destructive'
                             )}>
                               {formatCurrency(listTotal)}
                             </td>
@@ -1282,7 +1335,7 @@ export function CashflowSankeyChart({
                   <div className="space-y-3 desktop:hidden">
                     {filteredExpenses.map((expense) => {
                       const rowAmountClass = expense.type === 'income'
-                        ? 'text-emerald-600 dark:text-emerald-400'
+                        ? 'text-positive'
                         : 'text-destructive';
                       return (
                         <div key={expense.id} className="rounded-md border p-3 bg-card">
@@ -1318,7 +1371,7 @@ export function CashflowSankeyChart({
                       </span>
                       <span className={cn(
                         'text-sm font-semibold font-mono',
-                        listTotal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'
+                        listTotal >= 0 ? 'text-positive' : 'text-destructive'
                       )}>
                         {formatCurrency(listTotal)}
                       </span>

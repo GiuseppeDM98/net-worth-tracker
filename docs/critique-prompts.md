@@ -301,18 +301,27 @@ Componenti: components/cashflow/AnalisiTab.tsx,
 Pure layer: lib/utils/cashflowTimeSeries.ts
 
 Pagina standalone (estratta dal tab "Analisi" di Cashflow). Unifica anno corrente +
-storico in un'unica vista con 3-state period pill (Anno Corrente / Anno / Storico).
-Include: Sankey chart con drill-down breadcrumb, TopExpensesBlock (top 5 spese
-espandibile), AnomalieBlock (anomalie di spesa), ConfrontoAnnualeSection (confronto
-anno corrente vs anno precedente), SavingsRateTrendSection (trend savings rate),
-CategoryTrendsGrid (sparkline per categoria, ultimi 12 mesi). Solo in modalità Storico:
+storico in un'unica vista con 3-state period pill (Anno Corrente / Anno / Storico), ora
+sincronizzato in querystring (`?period=&year=&month=`) per check mensili ripetibili via link.
+Sempre visibili: KPI trio Entrate/Spese/Risparmio (section-hero scale) + AnomalieBlock
+(banner `--warning` token) + Sankey (drill-down con `DrillBreadcrumb` cliccabile a livello
+intermedio, condiviso con AnalisiTab) + TopExpensesBlock (top 5 spese espandibile). Dietro un
+"Dettaglio" Collapsible (default chiuso, progressive disclosure): ConfrontoAnnualeSection
+(confronto anno corrente vs anno precedente), SavingsRateTrendSection (trend savings rate),
+CategoryTrendsGrid (sparkline per categoria, ultimi 12 mesi), e solo in modalità Storico
 AndamentoStoricoSection — Chart A ComposedChart (Entrate/Uscite barre + Risparmio netto
 linea) + Chart B LineChart a linee multiple per categoria (sub-toggle Entrate/Uscite),
 con toggle Mese/Anno condiviso; aggregazione pura in cashflowTimeSeries.ts (asse temporale
-con floor `cashflowHistoryStartYear`). Data fetching autonomo via
-useExpenses / useExpenseCategories — non condivide route lifecycle con Cashflow.
+con floor `cashflowHistoryStartYear`). Tutti i pill (period/view/range/granularity) usano
+`SegmentedPill` condiviso (`components/ui/segmented-pill.tsx`, roving tabindex). Data
+fetching autonomo via useExpenses / useExpenseCategories — non condivide route lifecycle
+con Cashflow.
 Confronta con: Cashflow/Tracciamento (dati condivisi via RQ cache),
 Rendimenti (period selector), Storico (narrative order + collapsible appendice).
+Nota: critique baseline 2026-07-21 = 25/40 (pre-redesign, 2 P1: scala tipografica hero,
+assenza di progressive disclosure). Il redesign (Dettaglio collapsible, SegmentedPill,
+DrillBreadcrumb, token warning/positive) è stato implementato lo stesso giorno —
+rieseguire la critique per misurare il delta.
 Design language atteso (vedi DESIGN.md): North Star "Effortless Precision" — Linear/Vercel +
 Trade Republic + Apple, sotto la legge Form Follows Function (onestà, deferenza, inevitabilità:
 ogni proprietà visiva è conseguenza di una funzione, mai decorazione). Scala hero: page hero
@@ -1061,7 +1070,7 @@ in una volta (craft + polish), con test verdi e tsc pulito.
 Dalla meno redesignata alla più redesignata, per trovare i delta maggiori prima:
 
 1. Cashflow / tab "Dividendi" ← mai redesignato, delta atteso alto
-2. Analisi ← pagina nuova (estratta da Cashflow), mai critiquata formalmente
+2. Analisi ← critiquata 2026-07-21 (25/40), redesign implementato — rieseguire per delta
 3. App Shell e Navigazione ← fondamentale, problemi noti già in layout.tsx
 4. Cross-cutting: Sistema dei Dialog ← usati ovunque, coerenza mai verificata
 5. Impostazioni ← redesign parziale

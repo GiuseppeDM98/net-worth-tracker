@@ -19,10 +19,12 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { useRef, useMemo, useState } from 'react';
+import { useRef, useMemo, useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useAssets, useDeleteAsset } from '@/lib/hooks/useAssets';
+import { useAssetLedgerMeta } from '@/lib/hooks/useAssetTransactions';
+import { migrateAssetLedger } from '@/lib/services/assetTransactionService';
 import { useSnapshots } from '@/lib/hooks/useSnapshots';
 import { useDashboardOverview } from '@/lib/hooks/useDashboardOverview';
 import { useQueryClient } from '@tanstack/react-query';
@@ -216,6 +218,30 @@ export default function AssetsPage() {
 
   const deleteAssetMutation = useDeleteAsset(ownerId || '');
   const queryClient = useQueryClient();
+
+  // ─── Trade-ledger migration trigger (spec 03 §4) ──────────────────────────────
+  // The first time an owner has no ledger meta doc, fire the idempotent one-shot migration. Silent:
+  // no modal, no success toast; on failure it degrades to today's behavior (trade affordances stay
+  // hidden while meta is absent). The useRef guard (keyed by ownerId so switching accounts re-arms)
+  // makes it fire at most once per owner per mount.
+  const { data: ledgerMeta, isLoading: isLedgerMetaLoading } = useAssetLedgerMeta(ownerId);
+  const ledgerMigrationAttemptedRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!ownerId || isLedgerMetaLoading) return;
+    if (ledgerMeta !== null) return; // already migrated (or query not yet resolved)
+    if (ledgerMigrationAttemptedRef.current === ownerId) return;
+    ledgerMigrationAttemptedRef.current = ownerId;
+
+    migrateAssetLedger(ownerId)
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: queryKeys.assetTransactions.meta(ownerId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
+      })
+      .catch((error) => {
+        console.error('[AssetsPage] Ledger migration failed:', error);
+      });
+  }, [ownerId, isLedgerMetaLoading, ledgerMeta, queryClient]);
 
   // ─── Cash detail dialog state ─────────────────────────────────────────────────
   const [cashDetailOpen, setCashDetailOpen] = useState(false);

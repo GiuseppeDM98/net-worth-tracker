@@ -15,7 +15,7 @@ import {
 } from '@/lib/services/assetService';
 import { getAssetClassCssVar } from '@/lib/constants/colors';
 import { formatAssetClassName } from '@/lib/utils/assetUtils';
-import { Pencil, Trash2, Calculator, ChevronDown, Info } from 'lucide-react';
+import { Pencil, Trash2, Calculator, ChevronDown, Info, ArrowLeftRight, ScrollText } from 'lucide-react';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import {
@@ -44,6 +44,10 @@ interface AssetCardProps {
   isDemo?: boolean;
   sparklineData?: { value: number }[];
   performance?: AssetPerformanceData;
+  /** Trade-ledger row actions — shown only for ledger asset types once migration has run (spec 04 §1). */
+  showLedgerActions?: boolean;
+  onRegisterTrade?: (asset: Asset) => void;
+  onMovements?: (asset: Asset) => void;
 }
 
 // Format a % delta for display: "+1.2%" or "-3.4%" or "—".
@@ -73,6 +77,9 @@ export function AssetCard({
   isDemo = false,
   sparklineData,
   performance,
+  showLedgerActions = false,
+  onRegisterTrade,
+  onMovements,
 }: AssetCardProps) {
   const [showDetails, setShowDetails] = useState(false);
   const [isPendingDelete, setIsPendingDelete] = useState(false);
@@ -363,6 +370,35 @@ export function AssetCard({
               {isPendingDelete ? 'Conferma?' : 'Elimina'}
             </Button>
           </div>
+          {/* Trade-ledger actions — Registra operazione (mutation, demo-disabled) + Movimenti (read-only). */}
+          {showLedgerActions && (
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="default"
+                onClick={() => onRegisterTrade?.(asset)}
+                disabled={isDemo}
+                title={isDemo ? 'Non disponibile in modalità demo' : undefined}
+                className="w-full"
+                aria-label="Registra operazione"
+              >
+                <ArrowLeftRight className="h-4 w-4" />
+                Operazione
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="default"
+                onClick={() => onMovements?.(asset)}
+                className="w-full"
+                aria-label="Movimenti"
+              >
+                <ScrollText className="h-4 w-4" />
+                Movimenti
+              </Button>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
