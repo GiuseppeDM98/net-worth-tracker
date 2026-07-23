@@ -510,7 +510,7 @@ export function DividendStats({ startDate, endDate, assetId }: DividendStatsProp
               Rendimento Totale per Asset
             </CardTitle>
             <p className="text-sm text-muted-foreground mt-1">
-              Plusvalenza (realizzata per le posizioni chiuse, non realizzata per quelle aperte) + dividendi netti del possesso attuale, sul costo d&apos;acquisto
+              Plusvalenza (realizzata per le posizioni chiuse, non realizzata per quelle aperte) + dividendi netti del possesso attuale, sul capitale storicamente investito in questa posizione — non solo sul costo di quanto detieni oggi
             </p>
           </CardHeader>
           <CardContent>

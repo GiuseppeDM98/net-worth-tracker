@@ -13,6 +13,7 @@
 ## 🐛 Bug Fixes
 
 - Fixed the "Total Return per Asset" table on Dividends excluding fully-sold investments entirely and describing every gain as "unrealized" — it now uses your real buy/sell history for tracked investments, so fully-sold positions (marked "Chiusa") and partial sells show an accurate, correctly-labeled capital-gain figure instead.
+- Fixed the dividend-return figure on that same table for tracked investments with more than one purchase at a different price — it now credits each dividend against the cost basis that was actually in effect when it was paid, instead of a single average across your whole holding period.
 
 ## 🔧 Improvements
 

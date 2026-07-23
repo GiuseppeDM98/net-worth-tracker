@@ -6,7 +6,7 @@ import {
   getAllDividends
 } from '@/lib/services/dividendService';
 import { adminDb } from '@/lib/firebase/admin';
-import { AssetDividendGrowth, DividendGrowthData, TotalReturnAsset, YieldOnCostAsset } from '@/types/dividend';
+import { AssetDividendGrowth, Dividend, DividendGrowthData, TotalReturnAsset, YieldOnCostAsset } from '@/types/dividend';
 import { computeDividendYieldMetrics } from '@/lib/utils/yieldOnCost';
 import { getUserSnapshotsAdmin, getAssetTransactionsAdmin } from '@/lib/server/assetAdminRepository';
 import { deriveHoldingStartDates } from '@/lib/utils/snapshotAssetBreakdown';
@@ -39,6 +39,27 @@ function resolveLedgerAssetValueEur(asset: {
       ? asset.currentPriceEur
       : normalizedPrice;
   return asset.quantity * priceEur;
+}
+
+/**
+ * Per-payment dividend return %, summing (net ÷ cost-basis-AT-PAYMENT-TIME) for each dividend —
+ * the YOC v3 approach: uses `Dividend.costPerShare` (the historical PMC snapshot at creation time)
+ * so a later purchase never dilutes an earlier payment's yield. `fallbackAverageCost` covers legacy
+ * records without the stamp. Shared by BOTH the ledger and static totalReturnAssets paths below —
+ * `costPerShare` is stamped from `asset.averageCost` at dividend-creation time regardless of asset
+ * type, and for ledger assets that field is kept authoritative by the trade replay, so the exact
+ * same per-payment math applies without any ledger-specific branching.
+ */
+function computeDividendReturnPercentage(
+  assetDividends: Dividend[],
+  fallbackAverageCost: number
+): number {
+  return assetDividends.reduce((sum, div) => {
+    const effectiveCostPerShare = div.costPerShare ?? fallbackAverageCost;
+    const costBasisAtTime = div.quantity * effectiveCostPerShare;
+    if (costBasisAtTime <= 0) return sum;
+    return sum + (div.netAmountEur ?? div.netAmount) / costBasisAtTime * 100;
+  }, 0);
 }
 
 /**
@@ -189,7 +210,8 @@ export async function GET(request: NextRequest) {
     // asset's prior-holding dividends must not be credited to the new position — the capital-gain
     // term is already current-holding only, so the dividend term must match (consistent with YOC).
     //
-    // Two paths (Fase D, spec 04 §6):
+    // Two paths (Fase D, spec 04 §6) SHARE the dividend-return method (computeDividendReturnPercentage,
+    // per-payment historical cost basis) and diverge only on the capital-gain term:
     //   - LEDGER-BASED (asset has trade-ledger entries): replayTransactions + computeAssetTotalReturn
     //     is authoritative — includes CLOSED positions (quantity 0, isClosed: true) and partial
     //     sells, which the static path below cannot represent (it has no realized-sell price).
@@ -224,7 +246,15 @@ export async function GET(request: NextRequest) {
           // static path below where capitalGainPercentage + dividendReturnPercentage = total.
           const capitalGainAbsolute = totalReturn.realizedPnlEur + totalReturn.unrealizedPnlEur;
           const capitalGainPercentage = (capitalGainAbsolute / totalReturn.investedEur) * 100;
-          const dividendReturnPercentage = (netDividends / totalReturn.investedEur) * 100;
+          // Same per-payment method as the static path (see computeDividendReturnPercentage) — NOT
+          // a flat netDividends/investedEur ratio, which would silently lose the anti-dilution
+          // property the static path has always had. Fallback is NATIVE currency (state.averageCost,
+          // not averageCostEur) to match the unit div.costPerShare was stamped in (asset.averageCost
+          // is native — see the helper's doc comment).
+          const dividendReturnPercentage = computeDividendReturnPercentage(
+            assetDividends,
+            state.averageCost ?? asset.averageCost ?? 0
+          );
 
           return {
             assetId: asset.id,
@@ -256,14 +286,7 @@ export async function GET(request: NextRequest) {
         const currentValue = asset.quantity * asset.currentPrice;
         const capitalGainAbsolute = currentValue - costBasis;
         const capitalGainPercentage = (capitalGainAbsolute / costBasis) * 100;
-        // Per-payment historical cost basis (costPerShare snapshot at dividend creation, YOC v3),
-        // fallback to current averageCost for legacy records. Prevents dilution from later buys.
-        const dividendReturnPercentage = assetDividends.reduce((sum, div) => {
-          const effectiveCostPerShare = div.costPerShare ?? asset.averageCost!;
-          const costBasisAtTime = div.quantity * effectiveCostPerShare;
-          if (costBasisAtTime <= 0) return sum;
-          return sum + (div.netAmountEur ?? div.netAmount) / costBasisAtTime * 100;
-        }, 0);
+        const dividendReturnPercentage = computeDividendReturnPercentage(assetDividends, asset.averageCost!);
         return {
           assetId: asset.id,
           assetTicker: asset.ticker,
