@@ -269,6 +269,12 @@ export async function updateAsset(
 
     if (updates.averageCost === undefined) cleanedUpdates.averageCost = deleteField();
     if (updates.taxRate === undefined) cleanedUpdates.taxRate = deleteField();
+    // leverageRatio is user-clearable (empty = no leverage). Only clear it when the caller
+    // actually sends the key undefined (the form always does) — the `in` check protects partial
+    // callers (e.g. a price update) from wiping it. See AssetDialog leverage input.
+    if ('leverageRatio' in updates && updates.leverageRatio === undefined) {
+      cleanedUpdates.leverageRatio = deleteField();
+    }
 
     // Rebuy on the same doc: quantity goes from 0 (sold but kept) back to > 0. Stamp the new
     // holding start so YOC ignores the previous holding's dividends (mirrors the ISIN-reuse path
@@ -327,6 +333,10 @@ export async function updateAssetMetadata(
     });
 
     if (updates.taxRate === undefined) cleanedUpdates.taxRate = deleteField();
+    // leverageRatio is a metadata field for ledger types (etf) — clearable, same rule as updateAsset.
+    if ('leverageRatio' in updates && updates.leverageRatio === undefined) {
+      cleanedUpdates.leverageRatio = deleteField();
+    }
 
     await updateDoc(assetRef, cleanedUpdates);
 

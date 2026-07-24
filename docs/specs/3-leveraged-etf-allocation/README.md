@@ -1,7 +1,10 @@
 # Allocazione a Leva (ETF a leva) — Specification Index
 
-> Status: **SPEC — riprogettata dal fork `Ciocc128`, adattata al branch attuale (allocationRole,
-> CompositionBar/List, planner Preleva) e a post `asset-transactions`** (scritta 2026-07-22).
+> Status: **IMPLEMENTATA (L0→L2, 2026-07-24)** — riprogettata dal fork `Ciocc128`, adattata al
+> branch attuale (allocationRole, CompositionBar/List, planner Preleva) e a post `asset-transactions`
+> (spec scritta 2026-07-22). Vedi CLAUDE.md → Current Status e AGENTS.md → *Allocazione a Leva —
+> Fasi L0/L1/L2*. Il **bug fix D5** è più profondo della prima stesura (`classConst` **e**
+> `classCoeff`) — vedi `02-…engine.md §3b`.
 > Deliverable: supportare portafogli con esposizione nozionale > patrimonio market (ETF a leva /
 > compositi), con dualità market/nozionale in UI, target che sommano a >100% (= leva target), e un
 > motore Versa/Ribilancia/Preleva **instrument-aware** — col bug del solver del fork **risolto**.
@@ -73,12 +76,12 @@ Vedi anche `docs/specs/README.md` → *Decisioni di riconciliazione condivise*.
 
 ## Fasatura
 
-| Fase | Scope | Gate |
-| --- | --- | --- |
-| **L0** | `leverageRatio`, classi `trendFollowing`/`carry` (+ Record widening), `assetExposureUtils.ts` pure + test (spec 01 + spec 02 §1) | `tsc` + `vitest run __tests__/assetExposure.test.ts` |
-| **L1** | `assetAllocationService` base nozionale + target `>=100` + leva derivata; planner instrument-aware **col bug fix** + Preleva; test (spec 02 §2-4) | `tsc` + `compareAllocations`/`leverageAwareAllocationUtils` verdi |
-| **L2** | UI: hero due numeri, CompositionBar, Settings, AssetDialog `leverageRatio`, integrazione ActionPlanner/`PlanRow` (spec 03) | `tsc` + test manuale (incluso il flusso Versa/Ribilancia/Preleva a leva) |
-| **L3** | Impatti, regressione, docs (spec 04) | `tsc` + suite aree |
+| Fase | Scope | Gate | Stato |
+| --- | --- | --- | --- |
+| **L0** | `leverageRatio`, classi `trendFollowing`/`carry` (+ Record widening), `assetExposureUtils.ts` pure + test (spec 01 + spec 02 §1) | `tsc` + `vitest run __tests__/assetExposure.test.ts` | ✅ fatto |
+| **L1** | `assetAllocationService` base nozionale + target `>=100` + leva derivata; planner instrument-aware **col bug fix** + Preleva; test (spec 02 §2-4) | `tsc` + `compareAllocations`/`leverageAwareAllocationUtils` verdi | ✅ fatto (bug fix D5 completo: `classConst`+`classCoeff`) |
+| **L2** | UI: hero due numeri, CompositionBar, Settings, AssetDialog `leverageRatio`, integrazione ActionPlanner/`InstrumentTradeList` (spec 03) | `tsc` + test manuale (incluso il flusso Versa/Ribilancia/Preleva a leva) | ✅ fatto |
+| **L3** | Impatti, regressione, docs (spec 04) | `tsc` + suite aree | ✅ regressione (69 file/1215 test) + docs in questa sessione |
 
 **Modello consigliato**: **Opus 4.8** per L1 (base nozionale + QP + bug fix — correttezza). Sonnet 5
 per L0/L2/L3.

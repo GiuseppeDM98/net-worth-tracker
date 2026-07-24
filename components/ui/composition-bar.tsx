@@ -16,8 +16,12 @@ import { formatPercentage } from '@/lib/services/chartService';
 export interface CompositionBarSegment {
   key: string;
   label: string;
-  /** 0-100; segments are expected to sum to ~100. */
+  /** Segment WIDTH, 0-100; segments are expected to sum to ~100. */
   pct: number;
+  /** Optional label shown in the legend/tooltip INSTEAD of `pct`, when it must differ from the
+   *  width (e.g. leverage-aware allocation: width = notional share, label = leveraged % which sums
+   *  to leverage×100). Defaults to `pct` — unchanged for every existing caller. */
+  displayPct?: number;
   color: string;
 }
 
@@ -46,7 +50,7 @@ export function CompositionBar({ segments, ariaLabel, showLegend = true }: Compo
             key={seg.key}
             className="h-full first:rounded-l-full last:rounded-r-full"
             style={{ backgroundColor: seg.color }}
-            title={`${seg.label} · ${formatPercentage(seg.pct)}`}
+            title={`${seg.label} · ${formatPercentage(seg.displayPct ?? seg.pct)}`}
             initial={reducedMotion ? false : { width: 0 }}
             animate={{ width: `${seg.pct}%` }}
             transition={
@@ -69,7 +73,7 @@ export function CompositionBar({ segments, ariaLabel, showLegend = true }: Compo
               />
               <span className="text-[11px] text-muted-foreground">{seg.label}</span>
               <span className="font-mono text-[11px] tabular-nums text-foreground">
-                {formatPercentage(seg.pct)}
+                {formatPercentage(seg.displayPct ?? seg.pct)}
               </span>
             </li>
           ))}
