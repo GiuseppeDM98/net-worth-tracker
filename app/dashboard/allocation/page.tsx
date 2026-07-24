@@ -39,9 +39,11 @@ import { getAllAssets, calculateAssetValue } from '@/lib/services/assetService';
 import {
   getSettings,
   compareAllocations,
+  deriveTargetLeverageRatio,
   getDefaultTargets,
   buildTargetsFromGoalAllocation,
 } from '@/lib/services/assetAllocationService';
+import type { LeveragePlanInputs } from '@/lib/utils/leverageAwareAllocationUtils';
 import { getGoalData, deriveTargetAllocationFromGoals } from '@/lib/services/goalService';
 import { Asset, AllocationResult, AssetAllocationTarget } from '@/types/assets';
 import { Button } from '@/components/ui/button';
@@ -91,6 +93,9 @@ export default function AllocationPage() {
   // its own `tradable` flag: the frozen ones count in every total and percentage but are never
   // offered as a source or destination, so the plans reach the target by moving the others.
   const [holdings, setHoldings] = useState<AllocatableHolding[]>([]);
+  // The `tradable` assets themselves (not holdings): the trade CANDIDATES for the leverage-aware
+  // planner (frozen/excluded are never candidates). Only used when the portfolio has leverage.
+  const [tradableAssets, setTradableAssets] = useState<Asset[]>([]);
   // The wealth this page deliberately ignores — the home you live in. Not an investment, so not in
   // the denominator. Reported only. Kept as holdings so composite sleeves land in the right class.
   const [excludedHoldings, setExcludedHoldings] = useState<AllocatableHolding[]>([]);
@@ -154,6 +159,7 @@ export default function AllocationPage() {
       setUsingGoalTargets(fromGoals);
       setAllocation(compareAllocations(inAllocation, effectiveTargets));
       setHoldings(buildHoldings(inAllocation, calculateAssetValue));
+      setTradableAssets(tradable);
       setExcludedHoldings(buildHoldings(excluded, calculateAssetValue));
       setAllAssets(assetsData);
     } catch (error) {
@@ -188,6 +194,34 @@ export default function AllocationPage() {
   // frozen pension fund and still have almost nothing you may sell.
   const tradableByClass = useMemo(() => sumTradableByClass(holdings), [holdings]);
   const frozenHoldings = useMemo(() => holdings.filter((h) => !h.tradable), [holdings]);
+
+  // Target leverage = Σtarget / 100 (read-only, derived). Fed to the hero chip and the planner.
+  const targetLeverageRatio = useMemo(() => deriveTargetLeverageRatio(targets), [targets]);
+
+  // The instrument-aware planner inputs — computed only when the portfolio actually has leverage
+  // (otherwise the pro-rata planners are used, unchanged). Candidates = the `tradable` assets; the
+  // notional/market totals come from the leverage-aware AllocationResult (investable base).
+  const leverageInputs = useMemo<LeveragePlanInputs | undefined>(() => {
+    if (!allocation || !allocation.hasLeveragedExposure) return undefined;
+    const currentNotionalByAssetClass: Record<string, number> = {};
+    for (const [assetClass, data] of Object.entries(allocation.byAssetClass)) {
+      currentNotionalByAssetClass[assetClass] = data.currentValue;
+    }
+    const targetPercentageByAssetClass: Record<string, number> = {};
+    if (targets) {
+      for (const [assetClass, target] of Object.entries(targets)) {
+        targetPercentageByAssetClass[assetClass] = target.targetPercentage;
+      }
+    }
+    return {
+      tradableAssets,
+      currentNotionalByAssetClass,
+      currentNotionalTotal: allocation.notionalValue,
+      currentMarketTotal: allocation.marketValue,
+      targetPercentageByAssetClass,
+      targetLeverageRatio,
+    };
+  }, [allocation, targets, tradableAssets, targetLeverageRatio]);
 
   const rebalancePlan = useMemo(
     () =>
@@ -303,7 +337,11 @@ export default function AllocationPage() {
         <>
           {/* DECISION zone: how much / how close to target / what to do. */}
           <AllocationHero
-            totalValue={bandedAllocation.totalValue}
+            marketValue={bandedAllocation.marketValue}
+            notionalValue={bandedAllocation.notionalValue}
+            leverageRatio={bandedAllocation.leverageRatio}
+            hasLeveragedExposure={bandedAllocation.hasLeveragedExposure}
+            targetLeverageRatio={targetLeverageRatio}
             byAssetClass={bandedAllocation.byAssetClass}
             summary={balanceSummary}
             balance={balanceScore}
@@ -354,6 +392,7 @@ export default function AllocationPage() {
             bySubCategory={actionableSubCategories}
             bySpecificAsset={bandedAllocation.bySpecificAsset}
             holdings={holdings}
+            leverage={leverageInputs}
           />
 
           {/* DETAIL zone: quieter reference under a labeled divider (A5 rhythm). */}

@@ -118,9 +118,9 @@ vi.mock('@/lib/firebase/admin', () => {
   return { adminAuth: { verifyIdToken: mocks.verifyIdToken }, adminDb };
 });
 
-import { POST as createRoute } from '@/app/api/1-asset-transactions/route';
-import { PUT as editRoute, DELETE as deleteRoute } from '@/app/api/1-asset-transactions/[transactionId]/route';
-import { POST as migrateRoute } from '@/app/api/1-asset-transactions/migrate/route';
+import { POST as createRoute } from '@/app/api/asset-transactions/route';
+import { PUT as editRoute, DELETE as deleteRoute } from '@/app/api/asset-transactions/[transactionId]/route';
+import { POST as migrateRoute } from '@/app/api/asset-transactions/migrate/route';
 
 function createJsonRequest(
   url: string,
@@ -175,7 +175,7 @@ describe('Asset trade-ledger routes', () => {
 
   it('returns 401 without an Authorization header', async () => {
     const response = await createRoute(
-      createJsonRequest('http://localhost/api/1-asset-transactions', {
+      createJsonRequest('http://localhost/api/asset-transactions', {
         method: 'POST',
         body: { userId: 'user-1', transaction: validTransaction() },
       })
@@ -186,7 +186,7 @@ describe('Asset trade-ledger routes', () => {
 
   it('returns 403 for a non-member acting on another owner’s data', async () => {
     const response = await createRoute(
-      createJsonRequest('http://localhost/api/1-asset-transactions', {
+      createJsonRequest('http://localhost/api/asset-transactions', {
         method: 'POST',
         body: { userId: 'owner-2', transaction: validTransaction() },
         headers: AUTH,
@@ -200,7 +200,7 @@ describe('Asset trade-ledger routes', () => {
     seedLedgerAsset('asset-1', 'user-1');
 
     const response = await createRoute(
-      createJsonRequest('http://localhost/api/1-asset-transactions', {
+      createJsonRequest('http://localhost/api/asset-transactions', {
         method: 'POST',
         body: { userId: 'user-1', transaction: validTransaction() },
         headers: AUTH,
@@ -219,7 +219,7 @@ describe('Asset trade-ledger routes', () => {
     seedLedgerAsset('asset-9', 'owner-9');
 
     const response = await createRoute(
-      createJsonRequest('http://localhost/api/1-asset-transactions', {
+      createJsonRequest('http://localhost/api/asset-transactions', {
         method: 'POST',
         body: { userId: 'owner-9', transaction: validTransaction({ assetId: 'asset-9' }) },
         headers: AUTH,
@@ -235,7 +235,7 @@ describe('Asset trade-ledger routes', () => {
     seedLedgerAsset('asset-1', 'user-1');
 
     const response = await createRoute(
-      createJsonRequest('http://localhost/api/1-asset-transactions', {
+      createJsonRequest('http://localhost/api/asset-transactions', {
         method: 'POST',
         body: { userId: 'user-1', transaction: validTransaction({ quantity: -5 }) },
         headers: AUTH,
@@ -249,7 +249,7 @@ describe('Asset trade-ledger routes', () => {
     seedLedgerAsset('asset-1', 'user-1');
 
     const response = await createRoute(
-      createJsonRequest('http://localhost/api/1-asset-transactions', {
+      createJsonRequest('http://localhost/api/asset-transactions', {
         method: 'POST',
         body: {
           userId: 'user-1',
@@ -278,7 +278,7 @@ describe('Asset trade-ledger routes', () => {
     });
 
     const response = await createRoute(
-      createJsonRequest('http://localhost/api/1-asset-transactions', {
+      createJsonRequest('http://localhost/api/asset-transactions', {
         method: 'POST',
         body: { userId: 'user-1', transaction: validTransaction({ type: 'sell', quantity: 100 }) },
         headers: AUTH,
@@ -295,7 +295,7 @@ describe('Asset trade-ledger routes', () => {
     seedLedgerAsset('asset-1', 'user-1'); // asset exists, but no meta doc
 
     const response = await createRoute(
-      createJsonRequest('http://localhost/api/1-asset-transactions', {
+      createJsonRequest('http://localhost/api/asset-transactions', {
         method: 'POST',
         body: { userId: 'user-1', transaction: validTransaction() },
         headers: AUTH,
@@ -325,7 +325,7 @@ describe('Asset trade-ledger routes', () => {
     });
 
     const response = await editRoute(
-      createJsonRequest('http://localhost/api/1-asset-transactions/baseline-asset-1', {
+      createJsonRequest('http://localhost/api/asset-transactions/baseline-asset-1', {
         method: 'PUT',
         body: { userId: 'user-1', updates: { date: new Date().toISOString() } },
         headers: AUTH,
@@ -354,7 +354,7 @@ describe('Asset trade-ledger routes', () => {
     });
 
     const response = await deleteRoute(
-      createJsonRequest('http://localhost/api/1-asset-transactions/baseline-asset-1?userId=user-1', {
+      createJsonRequest('http://localhost/api/asset-transactions/baseline-asset-1?userId=user-1', {
         method: 'DELETE',
         headers: AUTH,
       }),
@@ -374,7 +374,7 @@ describe('Asset trade-ledger routes', () => {
     ]);
 
     const first = await migrateRoute(
-      createJsonRequest('http://localhost/api/1-asset-transactions/migrate', {
+      createJsonRequest('http://localhost/api/asset-transactions/migrate', {
         method: 'POST',
         body: { userId: 'user-1' },
         headers: AUTH,
@@ -387,7 +387,7 @@ describe('Asset trade-ledger routes', () => {
     expect(store.has(docKey('assetTransactionsMeta', 'user-1'))).toBe(true);
 
     const second = await migrateRoute(
-      createJsonRequest('http://localhost/api/1-asset-transactions/migrate', {
+      createJsonRequest('http://localhost/api/asset-transactions/migrate', {
         method: 'POST',
         body: { userId: 'user-1' },
         headers: AUTH,

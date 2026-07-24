@@ -20,19 +20,27 @@ import { Input } from '@/components/ui/input';
 import { formatCurrency } from '@/lib/services/chartService';
 import { useActionColors } from '@/lib/hooks/useActionColors';
 import { buildWithdrawalPlan, type AllocatableHolding } from '@/lib/utils/allocationUtils';
+import {
+  planInstrumentWithdrawal,
+  type LeveragePlanInputs,
+} from '@/lib/utils/leverageAwareAllocationUtils';
 import { PlanRow, MIN_VISIBLE_AMOUNT } from './PlanRow';
+import { InstrumentTradeList } from './InstrumentTradeList';
 import type { AllocationData } from '@/types/assets';
 
 interface WithdrawalPanelProps {
   byAssetClass: Record<string, AllocationData>;
   bySubCategory: Record<string, AllocationData>;
   holdings: AllocatableHolding[];
+  /** Present only under leverage: raises the cash by selling the real instruments toward target. */
+  leverage?: LeveragePlanInputs;
 }
 
 export function WithdrawalPanel({
   byAssetClass,
   bySubCategory,
   holdings,
+  leverage,
 }: WithdrawalPanelProps) {
   const [amountInput, setAmountInput] = useState('');
   const amount = Number(amountInput) || 0;
@@ -49,6 +57,24 @@ export function WithdrawalPanel({
         (node) => node.amount >= MIN_VISIBLE_AMOUNT
       ),
     [byAssetClass, bySubCategory, holdings, amount]
+  );
+
+  // Under leverage, raise the cash by selling the real instruments toward the notional target
+  // (sells only), instead of the class-level 1x drain.
+  const leverageTrades = useMemo(
+    () =>
+      leverage && amount > 0
+        ? planInstrumentWithdrawal(
+            leverage.tradableAssets,
+            leverage.currentNotionalByAssetClass,
+            leverage.currentNotionalTotal,
+            leverage.currentMarketTotal,
+            leverage.targetPercentageByAssetClass,
+            amount,
+            leverage.targetLeverageRatio
+          ).trades
+        : null,
+    [leverage, amount]
   );
 
   // The plan still returns a full drain when asked for more than exists (Σtake is capped at the
@@ -87,7 +113,17 @@ export function WithdrawalPanel({
         </p>
       )}
 
-      {amount > 0 && plan.length > 0 ? (
+      {amount > 0 && leverageTrades ? (
+        leverageTrades.length > 0 ? (
+          <div className="mt-4">
+            <InstrumentTradeList trades={leverageTrades} />
+          </div>
+        ) : (
+          <p className="mt-4 text-xs text-muted-foreground">
+            Con questo importo nessuna vendita avvicina l&apos;esposizione al target.
+          </p>
+        )
+      ) : amount > 0 && plan.length > 0 ? (
         <div className="mt-4 divide-y divide-border/50 rounded-xl border border-border bg-muted/20">
           {plan.map((node) => (
             <div key={node.key} className="px-3.5 py-3">
@@ -102,9 +138,9 @@ export function WithdrawalPanel({
       )}
 
       <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground/70">
-        Attinge prima da classi e sottocategorie sopra target, così il prelievo ti riavvicina
-        all&apos;obiettivo. Dove non c&apos;è un target, ripartisce in proporzione a quanto detieni. Le
-        tasse sulla plusvalenza non sono considerate. Stima indicativa, non un consiglio finanziario.
+        {leverage
+          ? 'Raccoglie la cifra vendendo gli strumenti reali che detieni (solo vendite), riportando l’esposizione nozionale verso il target. Le tasse sulla plusvalenza non sono considerate. Stima indicativa, non un consiglio finanziario.'
+          : 'Attinge prima da classi e sottocategorie sopra target, così il prelievo ti riavvicina all’obiettivo. Dove non c’è un target, ripartisce in proporzione a quanto detieni. Le tasse sulla plusvalenza non sono considerate. Stima indicativa, non un consiglio finanziario.'}
       </p>
     </div>
   );

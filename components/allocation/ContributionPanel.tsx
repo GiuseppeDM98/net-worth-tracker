@@ -16,7 +16,12 @@
 import { useMemo, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { buildContributionPlan, type AllocatableHolding } from '@/lib/utils/allocationUtils';
+import {
+  planInstrumentContribution,
+  type LeveragePlanInputs,
+} from '@/lib/utils/leverageAwareAllocationUtils';
 import { PlanRow, MIN_VISIBLE_AMOUNT } from './PlanRow';
+import { InstrumentTradeList } from './InstrumentTradeList';
 import type { AllocationData } from '@/types/assets';
 
 interface ContributionPanelProps {
@@ -24,6 +29,8 @@ interface ContributionPanelProps {
   bySubCategory: Record<string, AllocationData>;
   bySpecificAsset: Record<string, AllocationData>;
   holdings: AllocatableHolding[];
+  /** Present only under leverage: splits the contribution across the real (leveraged) instruments. */
+  leverage?: LeveragePlanInputs;
 }
 
 export function ContributionPanel({
@@ -31,6 +38,7 @@ export function ContributionPanel({
   bySubCategory,
   bySpecificAsset,
   holdings,
+  leverage,
 }: ContributionPanelProps) {
   const [amountInput, setAmountInput] = useState('');
   const amount = Number(amountInput) || 0;
@@ -41,6 +49,24 @@ export function ContributionPanel({
         (node) => node.amount >= MIN_VISIBLE_AMOUNT
       ),
     [byAssetClass, bySubCategory, bySpecificAsset, holdings, amount]
+  );
+
+  // Under leverage, spend the new cash on the real held instruments toward the notional target
+  // (buys only), instead of the class-level 1x pro-rata split.
+  const leverageTrades = useMemo(
+    () =>
+      leverage && amount > 0
+        ? planInstrumentContribution(
+            leverage.tradableAssets,
+            leverage.currentNotionalByAssetClass,
+            leverage.currentNotionalTotal,
+            leverage.currentMarketTotal,
+            leverage.targetPercentageByAssetClass,
+            amount,
+            leverage.targetLeverageRatio
+          ).trades
+        : null,
+    [leverage, amount]
   );
 
   return (
@@ -68,7 +94,17 @@ export function ContributionPanel({
         />
       </div>
 
-      {amount > 0 && plan.length > 0 ? (
+      {amount > 0 && leverageTrades ? (
+        leverageTrades.length > 0 ? (
+          <div className="mt-4">
+            <InstrumentTradeList trades={leverageTrades} />
+          </div>
+        ) : (
+          <p className="mt-4 text-xs text-muted-foreground">
+            Con questo importo nessuna operazione avvicina l&apos;esposizione al target.
+          </p>
+        )
+      ) : amount > 0 && plan.length > 0 ? (
         <div className="mt-4 divide-y divide-border/50 rounded-xl border border-border bg-muted/20">
           {plan.map((node) => (
             <div key={node.key} className="px-3.5 py-3">
@@ -84,10 +120,9 @@ export function ContributionPanel({
       )}
 
       <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground/70">
-        Colma prima le classi e sottocategorie sotto target, senza vendere nulla. La % di classe è
-        sul portafoglio, quella di sottocategoria è sulla classe. Sul singolo strumento segue i tuoi
-        asset specifici, se configurati; altrimenti ripartisce in proporzione a quanto detieni. Stima
-        indicativa, non un consiglio finanziario.
+        {leverage
+          ? 'Ripartisce la nuova liquidità sugli strumenti reali che detieni (solo acquisti), verso l’esposizione nozionale target di ogni classe. Stima indicativa, non un consiglio finanziario.'
+          : 'Colma prima le classi e sottocategorie sotto target, senza vendere nulla. La % di classe è sul portafoglio, quella di sottocategoria è sulla classe. Sul singolo strumento segue i tuoi asset specifici, se configurati; altrimenti ripartisce in proporzione a quanto detieni. Stima indicativa, non un consiglio finanziario.'}
       </p>
     </div>
   );

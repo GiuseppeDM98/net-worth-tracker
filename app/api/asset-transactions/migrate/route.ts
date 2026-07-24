@@ -7,7 +7,7 @@ import { migrateAssetLedger } from '@/lib/server/assetTransactionUseCase';
 import { getTradeErrorResponse } from '../errorResponse';
 
 /**
- * POST /api/1-asset-transactions/migrate
+ * POST /api/asset-transactions/migrate
  *
  * Idempotent, per-user ledger migration. Body: { userId }. A delegate may trigger it for the owner
  * (canAccess semantics — the demo user's data is migrated too so the demo UI renders coherently).
@@ -24,6 +24,6 @@ export async function POST(request: NextRequest) {
     const result = await migrateAssetLedger(ownerId as string);
     return NextResponse.json(result);
   } catch (error) {
-    return getTradeErrorResponse(error, 'POST /api/1-asset-transactions/migrate');
+    return getTradeErrorResponse(error, 'POST /api/asset-transactions/migrate');
   }
 }

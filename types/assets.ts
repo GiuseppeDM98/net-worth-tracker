@@ -16,7 +16,11 @@ import type { PensionFundDetails } from './pension';
 // (exhaustive `Record<AssetType, AssetClass>` — tsc catches this one) and deciding whether the type
 // belongs in LEDGER_ASSET_TYPES (types/assetTransactions.ts — tsc does NOT catch that one).
 export type AssetType = 'stock' | 'etf' | 'bond' | 'crypto' | 'commodity' | 'cash' | 'realestate' | 'pensionFund';
-export type AssetClass = 'equity' | 'bonds' | 'crypto' | 'realestate' | 'cash' | 'commodity';
+// trendFollowing (managed futures) and carry are exposure-only classes reached via a leveraged/
+// composite `etf`'s `composition` legs (spec 3-leveraged-etf-allocation/01-data-model.md §2) — no
+// AssetType maps to them directly in TYPE_TO_CLASS.
+export type AssetClass = 'equity' | 'bonds' | 'crypto' | 'realestate' | 'cash' | 'commodity'
+                        | 'trendFollowing' | 'carry';
 
 // Coupon payment frequency for bonds.
 // Determines how many times per year the coupon is paid.
@@ -131,6 +135,12 @@ export interface Asset {
   allocationRole?: AllocationRole; // How the Allocazione page treats this asset. See AllocationRole. Absent → legacy excludeFromAllocation, else 'tradable'.
   /** @deprecated Superseded by `allocationRole`. Read-only legacy fallback: true → 'excluded'. Never write it. */
   excludeFromAllocation?: boolean;
+  // For a leveraged/composite ETF: 2 = 2x, 3 = 3x, 1 or absent = no leverage. Shown in AssetDialog
+  // for type 'etf' only (D4: no dedicated AssetType — the math depends solely on this field plus
+  // `composition`, never on `type`). Multiplies notionalValue in `expandAssetExposure`
+  // (lib/utils/assetExposureUtils.ts); `quantity`/`averageCost`/`pricePerUnit` stay per-quota and
+  // independent of it.
+  leverageRatio?: number;
   isin?: string; // ISIN code for dividend scraping (optional)
   bondDetails?: BondDetails; // Optional bond-specific details for coupon scheduling
   pensionFundDetails?: PensionFundDetails; // Optional fondo pensione details (type 'pensionFund'); see types/pension.ts
@@ -165,6 +175,7 @@ export interface AssetFormData {
   outstandingDebt?: number;
   isPrimaryResidence?: boolean;
   allocationRole?: AllocationRole; // How the Allocazione page treats this asset. See AllocationRole.
+  leverageRatio?: number; // For a leveraged/composite ETF: 2 = 2x, 3 = 3x, 1 or absent = no leverage.
   isin?: string; // ISIN code for dividend scraping (optional)
   bondDetails?: BondDetails; // Optional bond-specific details for coupon scheduling
   pensionFundDetails?: PensionFundDetails; // Optional fondo pensione details (type 'pensionFund'); see types/pension.ts
@@ -310,7 +321,23 @@ export interface AllocationResult {
   bySpecificAsset: {
     [specificAsset: string]: AllocationData; // Key format: "assetClass:subCategory:assetName"
   };
+  // Leverage-aware totals (spec 3-leveraged-etf-allocation). For an unleveraged portfolio
+  // notional === market, so every field below collapses to the pre-leverage number and the
+  // result is byte-identical to before (invariant #1).
+  //
+  // `totalValue` is the NOTIONAL exposure total of the investable base — kept under this name
+  // for backward compatibility (existing readers get notional, == market when unleveraged). Each
+  // class's `currentValue`/`currentPercentage` is likewise a notional figure, so the percentages
+  // sum to `leverageRatio × 100` rather than to 100 under leverage.
   totalValue: number;
+  /** Market total of the investable base (tradable + frozen). Hero "Patrimonio investito". */
+  marketValue: number;
+  /** Notional exposure total of the investable base. Hero "Esposizione nozionale". == totalValue. */
+  notionalValue: number;
+  /** notionalValue / marketValue over the investable base (1 when unleveraged or market = 0). */
+  leverageRatio: number;
+  /** True when leverageRatio exceeds 1 by more than a rounding epsilon — drives the hero split. */
+  hasLeveragedExposure: boolean;
 }
 
 export interface PieChartData {

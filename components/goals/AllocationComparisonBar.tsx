@@ -23,6 +23,8 @@ const ASSET_CLASS_LABELS: Record<AssetClass, string> = {
   realestate: 'Immobili',
   cash: 'Liquidita',
   commodity: 'Materie Prime',
+  trendFollowing: 'Trend Following',
+  carry: 'Carry',
 };
 
 function AllocationBar({
@@ -79,6 +81,15 @@ export function AllocationComparisonBar({
       chartColors[0] && chartColors[1]
         ? `color-mix(in srgb, ${chartColors[0]} 70%, ${chartColors[1]})`
         : '#F97316',
+    // No dedicated chart slot yet (only 5) — blend the other two pairs, mirroring commodity's approach.
+    trendFollowing:
+      chartColors[2] && chartColors[3]
+        ? `color-mix(in srgb, ${chartColors[2]} 70%, ${chartColors[3]})`
+        : '#8B5CF6',
+    carry:
+      chartColors[1] && chartColors[4]
+        ? `color-mix(in srgb, ${chartColors[1]} 70%, ${chartColors[4]})`
+        : '#EC4899',
   };
 
   const hasActual = Object.values(actualAllocation).some((v) => v && v > 0);

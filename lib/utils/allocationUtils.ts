@@ -37,6 +37,8 @@ export const ASSET_CLASS_LABELS: Record<string, string> = {
   realestate: 'Immobili',
   cash: 'Liquidità',
   commodity: 'Materie Prime',
+  trendFollowing: 'Trend Following',
+  carry: 'Carry',
 };
 
 // ---------------------------------------------------------------------------
@@ -99,7 +101,13 @@ export function applyRebalanceBand(
   };
 
   return {
+    // Re-classification only touches `action`; the leverage-aware totals must survive it
+    // untouched (otherwise the hero loses the leverage after the band is applied — the fork bug).
     totalValue: allocation.totalValue,
+    marketValue: allocation.marketValue,
+    notionalValue: allocation.notionalValue,
+    leverageRatio: allocation.leverageRatio,
+    hasLeveragedExposure: allocation.hasLeveragedExposure,
     byAssetClass: mapValues(allocation.byAssetClass),
     bySubCategory: mapValues(allocation.bySubCategory),
     bySpecificAsset: mapValues(allocation.bySpecificAsset),
@@ -216,6 +224,8 @@ export const ASSET_CLASS_CHART_INDEX: Record<string, number> = {
   realestate: 3,
   cash: 4,
   commodity: 5,
+  trendFollowing: 6,
+  carry: 7,
 };
 
 export interface BalanceScore {

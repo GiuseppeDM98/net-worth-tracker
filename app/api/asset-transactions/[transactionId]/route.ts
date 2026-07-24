@@ -11,7 +11,7 @@ import {
 import { getTradeErrorResponse } from '../errorResponse';
 
 /**
- * PUT /api/1-asset-transactions/[transactionId]
+ * PUT /api/asset-transactions/[transactionId]
  *
  * Edit a trade. Body: { userId, updates: Partial<AssetTransactionFormData> }. The whole replay is
  * re-validated, so an edit that makes a LATER sell over-sell is rejected here (422), not silently.
@@ -34,12 +34,12 @@ export async function PUT(
     const result = await updateAssetTransaction(ownerId as string, transactionId, parsed.data);
     return NextResponse.json(result);
   } catch (error) {
-    return getTradeErrorResponse(error, 'PUT /api/1-asset-transactions/[transactionId]');
+    return getTradeErrorResponse(error, 'PUT /api/asset-transactions/[transactionId]');
   }
 }
 
 /**
- * DELETE /api/1-asset-transactions/[transactionId]?userId=...
+ * DELETE /api/asset-transactions/[transactionId]?userId=...
  *
  * Delete a trade (never a baseline). Reverses any linked cash settlement in the same transaction.
  */
@@ -57,6 +57,6 @@ export async function DELETE(
     const result = await deleteAssetTransaction(ownerId as string, transactionId);
     return NextResponse.json(result);
   } catch (error) {
-    return getTradeErrorResponse(error, 'DELETE /api/1-asset-transactions/[transactionId]');
+    return getTradeErrorResponse(error, 'DELETE /api/asset-transactions/[transactionId]');
   }
 }

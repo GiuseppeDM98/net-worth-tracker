@@ -64,24 +64,45 @@ Rif. fork (riportare quasi integralmente: `InstrumentExposure`, `buildInstrument
   la lista trade mostra l'alias (integra con la spec `ticker-display-alias`).
 
 ### 3b. 🔴 BUG FIX (D5) — termine di classe su base market
+> **Nota di implementazione (L1, verificata):** il fix è su **DUE** termini, `classConst` *e*
+> `classCoeff`, non solo `classConst` come indicato nella prima stesura qui sotto. Il residuo di
+> classe del fork era `notionalAfter[c] − targetFraction[c] · notionalTotalAfter`, codificato da
+> `classConst = currentNotional[c] − tf·currentNotionalTotal` **e** da
+> `classCoeff[c][i] = exposurePerEuro[c][i] − tf·instrumentLeverage[i]`: **entrambi** scalano il
+> target sul totale *nozionale* (che rimoltiplica per la leva corrente). Correggere solo
+> `classConst` NON chiude il gap — verificato dal test "class target on the post-trade MARKET
+> base": l'ottimo fisico (ribilanciare una coppia equity 2x+1x a leva 1.2 → nozionale 1200 =
+> 1.2×1000) ha residuo di classe **360, non 0**, con il solo fix di `classConst`, e **0** col fix
+> completo. Vedi AGENTS.md → *Allocazione a Leva — Fase L1*.
+
 Nel `solve` del fork:
 ```ts
-// BUG: usa il totale NOZIONALE come base del target di classe
+// BUG: usa il totale NOZIONALE come base del target di classe, su ENTRAMBI i termini
+classCoeff[assetClass] = instruments.map((inst, i) =>
+  (inst.exposurePerEuro[assetClass] ?? 0) - targetFraction[assetClass] * instrumentLeverage[i]); // ❌
 classConst[assetClass] = (currentNotionalByAssetClass[assetClass] ?? 0)
                        - targetFraction[assetClass] * currentNotionalTotal;   // ❌
 ```
 `targetFraction[c] = target%/100` somma alla **leva** (es. 1.5), ed è % del **market**. Il target
-nozionale di classe deve essere `targetFraction[c] × marketAfterTrade`, non `× currentNotionalTotal`
-(che riscala per la leva *corrente* → sbagliato ogni volta che leva_corrente ≠ leva_target, e
-comunque doppia la leva). **Fix**:
+nozionale di classe deve essere la **costante** `targetFraction[c] × marketAfterTrade` (il market è
+fisso sull'insieme ammissibile perché `Σx = budget` è imposto dalla proiezione), non
+`× currentNotionalTotal` né funzione della leva degli strumenti (che riscala per la leva *corrente*
+→ sbagliato ogni volta che leva_corrente ≠ leva_target). Il residuo corretto è
+`notionalAfter[c] − targetFraction[c] · marketAfterTrade`, cioè
+`classCoeff[c][i] = exposurePerEuro[c][i]` (niente `instrumentLeverage`) e
+`classConst[c] = currentNotional[c] − targetFraction[c] · marketAfterTrade`. **Fix**:
 ```ts
-const marketAfterTrade = currentMarketTotal + budget;   // budget=0 Ribilancia, +amount Versa, −amount Preleva
+const marketAfterTrade = currentMarketTotal + budget;   // budget=0 Ribilancia, +amount Versa, −amount Preleva (PRIMA del loop)
+classCoeff[assetClass] = instruments.map((inst) =>
+  inst.exposurePerEuro[assetClass] ?? 0);                                     // ✅ solo l'esposizione
 classConst[assetClass] = (currentNotionalByAssetClass[assetClass] ?? 0)
-                       - targetFraction[assetClass] * marketAfterTrade;        // ✅
+                       - targetFraction[assetClass] * marketAfterTrade;        // ✅ base market
 ```
-Ora il termine di classe è coerente col termine di leva (che già usa `marketAfterTrade`):
-`Σ_c targetFraction[c] × marketAfterTrade = targetLeverageRatio × marketAfterTrade`. Spostare il
-calcolo di `marketAfterTrade` **prima** del loop dei `classConst`.
+Il termine di **leva** invece MANTIENE `instrumentLeverage` come coefficiente
+(`leverageCoeff[i] = instrumentLeverage[i]`, `leverageConst = currentNotionalTotal −
+targetLeverageRatio · marketAfterTrade`): corretto, perché il nozionale *totale* varia davvero con
+la leva di ogni strumento. Coerenza: `Σ_c targetFraction[c] × marketAfterTrade = targetLeverageRatio
+× marketAfterTrade`.
 
 ### 3c. Nuovo: `planInstrumentWithdrawal` (Preleva a leva)
 Il fork ha solo Versa/Ribilancia; il branch ha anche **Preleva**. Aggiungere:

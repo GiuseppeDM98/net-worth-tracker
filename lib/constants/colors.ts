@@ -8,6 +8,8 @@ export const ASSET_CLASS_COLORS: Record<string, string> = {
   realestate: '#10B981',  // green
   cash: '#6B7280',        // gray
   commodity: '#92400E',   // brown
+  trendFollowing: '#8B5CF6', // violet
+  carry: '#EC4899',       // pink
 };
 
 /**
@@ -41,6 +43,8 @@ export function getAssetClassColor(assetClass: string): string {
  * Recharts components must keep using getAssetClassColor (hex) since they
  * cannot consume CSS variables at render time.
  */
+// trendFollowing/carry have no dedicated slot yet (only 5 --chart-* vars exist) — they fall back
+// to --muted-foreground below like cash, pending an L2/L3 design pass on the 2 new classes.
 const ASSET_CLASS_CSS_VAR: Record<string, string> = {
   equity:     '--chart-1',
   bonds:      '--chart-2',

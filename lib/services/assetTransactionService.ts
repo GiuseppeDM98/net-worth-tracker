@@ -128,7 +128,7 @@ export async function createAssetTransaction(
   ownerId: string,
   data: AssetTransactionFormData
 ): Promise<AssetTransactionMutationResult> {
-  const response = await authenticatedFetch('/api/1-asset-transactions', {
+  const response = await authenticatedFetch('/api/asset-transactions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ userId: ownerId, transaction: data }),
@@ -141,7 +141,7 @@ export async function updateAssetTransaction(
   transactionId: string,
   updates: Partial<AssetTransactionFormData>
 ): Promise<AssetTransactionMutationResult> {
-  const response = await authenticatedFetch(`/api/1-asset-transactions/${transactionId}`, {
+  const response = await authenticatedFetch(`/api/asset-transactions/${transactionId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ userId: ownerId, updates }),
@@ -154,7 +154,7 @@ export async function deleteAssetTransaction(
   transactionId: string
 ): Promise<AssetTransactionMutationResult> {
   const response = await authenticatedFetch(
-    `/api/1-asset-transactions/${transactionId}?userId=${encodeURIComponent(ownerId)}`,
+    `/api/asset-transactions/${transactionId}?userId=${encodeURIComponent(ownerId)}`,
     { method: 'DELETE' }
   );
   return parseWriteResponse(response, "Errore durante l'eliminazione dell'operazione.");
@@ -170,7 +170,7 @@ export async function deleteAllAssetTransactionsForAsset(
   assetId: string
 ): Promise<{ deletedCount: number }> {
   const response = await authenticatedFetch(
-    `/api/1-asset-transactions/by-asset/${assetId}?userId=${encodeURIComponent(ownerId)}`,
+    `/api/asset-transactions/by-asset/${assetId}?userId=${encodeURIComponent(ownerId)}`,
     { method: 'DELETE' }
   );
   return parseWriteResponse(response, "Errore durante la pulizia del registro operazioni.");
@@ -178,7 +178,7 @@ export async function deleteAllAssetTransactionsForAsset(
 
 /** Idempotent ledger migration for the owner. Silent no-op when already migrated. */
 export async function migrateAssetLedger(ownerId: string): Promise<AssetLedgerMigrationResult> {
-  const response = await authenticatedFetch('/api/1-asset-transactions/migrate', {
+  const response = await authenticatedFetch('/api/asset-transactions/migrate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ userId: ownerId }),

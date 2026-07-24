@@ -274,6 +274,11 @@ function buildAssetFormDataFromValues(
       data.totalExpenseRatio && !isNaN(data.totalExpenseRatio) && data.totalExpenseRatio >= 0
         ? data.totalExpenseRatio
         : undefined,
+    // Leverage is an ETF-only concept; a value of exactly 1 means "no leverage" → store undefined.
+    leverageRatio:
+      data.type === 'etf' && data.leverageRatio && !isNaN(data.leverageRatio) && data.leverageRatio > 1
+        ? data.leverageRatio
+        : undefined,
     stampDutyExempt: data.stampDutyExempt || false,
     currentPrice,
     currentPriceEur: fetchedCurrentPriceEur,
@@ -364,7 +369,11 @@ const assetSchema = z.object({
   // where the form value is passed back as an AssetType). 'pensionFund' is accepted here from P0 on;
   // its type card and its dedicated fields land with the pension UI phase (spec 2-pension-fund/04).
   type: z.enum(['stock', 'etf', 'bond', 'crypto', 'commodity', 'cash', 'realestate', 'pensionFund']),
-  assetClass: z.enum(['equity', 'bonds', 'crypto', 'realestate', 'cash', 'commodity']),
+  // Mirrors the AssetClass union in types/assets.ts (tsc catches drift the same way as `type` above).
+  // 'trendFollowing'/'carry' are accepted here from L0 on but have no picker entry yet in the
+  // `assetClasses` composition-leg Select below — that lands with the leverage UI (spec 3-leveraged-
+  // etf-allocation/03, phase L2).
+  assetClass: z.enum(['equity', 'bonds', 'crypto', 'realestate', 'cash', 'commodity', 'trendFollowing', 'carry']),
   subCategory: z.string().optional(),
   currency: z.string().min(1, 'Currency is required'),
   quantity: z.number().min(0, 'La quantità non può essere negativa'),
@@ -372,6 +381,10 @@ const assetSchema = z.object({
   averageCost: z.number().positive('Average cost must be positive').optional().or(z.nan()),
   taxRate: z.number().min(0, 'Tax rate must be at least 0').max(100, 'Tax rate must be at most 100').optional().or(z.nan()),
   totalExpenseRatio: z.number().min(0, 'TER must be at least 0').max(100, 'TER must be at most 100').optional().or(z.nan()),
+  // Leverage multiplier for a leveraged/composite ETF (2 = 2x). Empty/1 = no leverage. Shown for
+  // type 'etf' only (spec 3-leveraged-etf-allocation/03 §4). It is metadata (multiplies notional
+  // exposure), independent of quantity/PMC — so for ledger types it rides updateAssetMetadata.
+  leverageRatio: z.number().min(1, 'La leva deve essere almeno 1').max(10, 'Leva massima 10').optional().or(z.nan()),
   stampDutyExempt: z.boolean().optional(),
   isLiquid: z.boolean().optional(),
   autoUpdatePrice: z.boolean().optional(),
@@ -474,6 +487,8 @@ const assetClasses: { value: AssetClass; label: string }[] = [
   { value: 'realestate', label: 'Immobili' },
   { value: 'cash', label: 'Liquidità' },
   { value: 'commodity', label: 'Materie Prime' },
+  { value: 'trendFollowing', label: 'Trend Following' },
+  { value: 'carry', label: 'Carry' },
 ];
 
 export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDialogProps) {
@@ -589,6 +604,8 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
   const newAsset_showAutoUpdate = selectedType !== 'cash' && selectedType !== 'realestate' && selectedType !== 'pensionFund';
   const newAsset_showCostBasis = selectedType !== 'cash' && selectedType !== 'realestate' && selectedType !== 'pensionFund';
   const newAsset_showTER = selectedType === 'etf' || selectedType === 'stock';
+  // Leva: only ETFs can be leveraged/composite instruments (spec 3-leveraged-etf-allocation/03 §4).
+  const newAsset_showLeverage = selectedType === 'etf';
   const newAsset_showComposition = selectedType === 'etf' || selectedType === 'pensionFund';
 
   // Determine price source based on asset type
@@ -736,6 +753,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
         })(),
         taxRate: asset.taxRate || undefined,
         totalExpenseRatio: asset.totalExpenseRatio || undefined,
+        leverageRatio: asset.leverageRatio || undefined,
         stampDutyExempt: asset.stampDutyExempt || false,
         isLiquid: defaultIsLiquid,
         autoUpdatePrice: asset.autoUpdatePrice !== undefined ? asset.autoUpdatePrice : shouldUpdatePrice(asset.type, asset.subCategory),
@@ -810,6 +828,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
         averageCost: undefined,
         taxRate: undefined,
         totalExpenseRatio: undefined,
+        leverageRatio: undefined,
         stampDutyExempt: false,
         isLiquid: true,
         autoUpdatePrice: true,
@@ -2428,6 +2447,35 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                 </p>
               </div>
             )}
+          </div>
+          )}
+
+          {/* Leva — ETF a leva / compositi. Empty = 1 (nessuna leva). */}
+          {newAsset_showLeverage && (
+          <div className="space-y-2 rounded-lg border p-4">
+            <Label htmlFor="leverageRatio">Leva</Label>
+            <div className="relative max-w-[160px]">
+              <Input
+                id="leverageRatio"
+                type="number"
+                step="0.1"
+                min="1"
+                max="10"
+                placeholder="1"
+                className="pr-7 font-mono tabular-nums"
+                {...register('leverageRatio', { valueAsNumber: true })}
+              />
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 font-mono text-sm text-muted-foreground">
+                ×
+              </span>
+            </div>
+            {errors.leverageRatio && (
+              <p className="text-sm text-red-500">{errors.leverageRatio.message}</p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Solo per ETF a leva (es. 2 = 2×): moltiplica l&apos;esposizione nozionale in
+              Allocazione. Lascia vuoto per un ETF normale.
+            </p>
           </div>
           )}
 
