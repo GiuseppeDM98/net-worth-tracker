@@ -318,7 +318,11 @@ export default function HistoryPage() {
 
   // Memoized — these iterate over every snapshot on every call; snapshots rarely changes
   const netWorthHistory = useMemo(() => prepareNetWorthHistoryData(snapshots), [snapshots]);
-  const assetClassHistory = useMemo(() => prepareAssetClassHistoryData(snapshots), [snapshots]);
+  const pensionAssets = useMemo(() => assets.filter((a) => a.type === 'pensionFund'), [assets]);
+  const assetClassHistory = useMemo(
+    () => prepareAssetClassHistoryData(snapshots, pensionAssets),
+    [snapshots, pensionAssets]
+  );
   const yoyVariationData = useMemo(() => prepareYoYVariationData(snapshots), [snapshots]);
   const savingsVsInvestmentData = useMemo(
     () => prepareSavingsVsInvestmentData(snapshots, expenses),
@@ -471,6 +475,9 @@ export default function HistoryPage() {
     cash: chartColors[4],
     commodity: chartColors[5],
   };
+  // "Previdenza" — a synthetic type-based series (pensionAssets.length check below), so it only
+  // appears when the user has at least one pensionFund asset. Slot 6, past the six real classes.
+  const pensionColor = chartColors[6];
 
   return (
     <PageContainer>
@@ -923,6 +930,9 @@ export default function HistoryPage() {
                             <Line type="monotone" dataKey="realestatePercentage" stroke={acColors.realestate} strokeWidth={2} name="Immobili" dot={{ r: 4 }} animationDuration={800} animationEasing="ease-out" label={false} />
                             <Line type="monotone" dataKey="cashPercentage" stroke={acColors.cash} strokeWidth={2} name="Liquidità" dot={{ r: 4 }} animationDuration={800} animationEasing="ease-out" label={false} />
                             <Line type="monotone" dataKey="commodityPercentage" stroke={acColors.commodity} strokeWidth={2} name="Materie Prime" dot={{ r: 4 }} animationDuration={800} animationEasing="ease-out" label={false} />
+                            {pensionAssets.length > 0 && (
+                              <Line type="monotone" dataKey="pensionPercentage" stroke={pensionColor} strokeWidth={2} name="Previdenza" dot={{ r: 4 }} animationDuration={800} animationEasing="ease-out" label={false} />
+                            )}
                           </LineChart>
                         ) : (
                           <AreaChart data={assetClassHistory} margin={getChartMargins()}>
@@ -937,6 +947,9 @@ export default function HistoryPage() {
                             <Area type="monotone" dataKey="realestate" stroke={acColors.realestate} fill={acColors.realestate} fillOpacity={0.8} name="Immobili" animationDuration={800} animationEasing="ease-out" label={false} />
                             <Area type="monotone" dataKey="cash" stroke={acColors.cash} fill={acColors.cash} fillOpacity={0.8} name="Liquidità" animationDuration={800} animationEasing="ease-out" label={false} />
                             <Area type="monotone" dataKey="commodity" stroke={acColors.commodity} fill={acColors.commodity} fillOpacity={0.8} name="Materie Prime" animationDuration={800} animationEasing="ease-out" label={false} />
+                            {pensionAssets.length > 0 && (
+                              <Area type="monotone" dataKey="pension" stroke={pensionColor} fill={pensionColor} fillOpacity={0.8} name="Previdenza" animationDuration={800} animationEasing="ease-out" label={false} />
+                            )}
                           </AreaChart>
                         )}
                       </ResponsiveContainer>
@@ -944,7 +957,9 @@ export default function HistoryPage() {
                       {/* Mobile inline legend — replaces hidden Recharts legend on narrow screens */}
                       {isMobile && (
                         <div className="flex flex-wrap gap-x-3 gap-y-1.5 mt-3 px-1">
-                          {(Object.entries(acColors) as [string, string][]).map(([key, color]) => {
+                          {(Object.entries(
+                            pensionAssets.length > 0 ? { ...acColors, pension: pensionColor } : acColors
+                          ) as [string, string][]).map(([key, color]) => {
                             const labels: Record<string, string> = {
                               equity: 'Azioni',
                               bonds: 'Obblig.',
@@ -952,6 +967,7 @@ export default function HistoryPage() {
                               realestate: 'Immobili',
                               cash: 'Liquidità',
                               commodity: 'Commodity',
+                              pension: 'Previdenza',
                             };
                             return (
                               <div key={key} className="flex items-center gap-1.5">

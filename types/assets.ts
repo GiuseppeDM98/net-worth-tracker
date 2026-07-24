@@ -269,6 +269,9 @@ export interface AssetAllocationSettings {
   grossAnnualIncome?: number; // RAL — base for the marginal-rate IRPEF benefit estimate
   isFirstEmploymentPost2007?: boolean; // Eligibility for the extra-deducibilità plafond recovery
   firstEmploymentYear?: number; // First calendar year of participation — anchors the plafond 5/20-year windows
+  // When true, FireCalculatorTab subtracts locked pension-fund capital (unlockDate in the future)
+  // from the FIRE-eligible net worth — see lib/utils/pensionFire.ts. Off by default (opt-in, MVP).
+  respectPensionLockInFire?: boolean;
   targets: AssetAllocationTarget;
 }
 

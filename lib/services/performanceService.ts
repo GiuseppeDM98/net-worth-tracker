@@ -20,7 +20,9 @@ import {
 import { getExpensesByDateRange } from './expenseService';
 import { getUserSnapshots } from './snapshotService';
 import { getSettings } from './assetAllocationService';
+import { getAllAssets } from './assetService';
 import { computeDividendYieldMetrics } from '@/lib/utils/yieldOnCost';
+import { toPerformanceBaseSnapshots } from '@/lib/utils/performanceBase';
 
 const PERFORMANCE_CACHE_COLLECTION = 'performance-cache';
 
@@ -1355,11 +1357,19 @@ function buildCacheKey(snapshots: MonthlySnapshot[]): string {
  * @returns Complete performance data for all periods
  */
 export async function getAllPerformanceData(userId: string, forceRefresh = false): Promise<PerformanceData> {
-  // ==== STEP 1: Fetch snapshots and settings in parallel ====
-  const [snapshots, settings] = await Promise.all([
+  // ==== STEP 1: Fetch snapshots, settings, and assets in parallel ====
+  const [rawSnapshots, settings, assets] = await Promise.all([
     getUserSnapshots(userId),
     getSettings(userId),
+    getAllAssets(userId),
   ]);
+
+  // Rendimenti measures the ACTIVELY MANAGED portfolio: a fondo pensione is illiquid,
+  // non-rebalanceable capital fed by contributions rather than market activity, so every metric
+  // below (TWR/Sharpe/volatility/MaxDD/ROI/CAGR) excludes it — see performanceBase.ts. Type-based
+  // (not class-based), per decision D2.
+  const pensionAssetIds = assets.filter((asset) => asset.type === 'pensionFund').map((asset) => asset.id);
+  const snapshots = toPerformanceBaseSnapshots(rawSnapshots, pensionAssetIds);
 
   const riskFreeRate = settings?.riskFreeRate || 2.5;
   const dividendCategoryId = settings?.dividendIncomeCategoryId;
