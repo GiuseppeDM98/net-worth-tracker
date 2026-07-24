@@ -103,6 +103,14 @@ export interface PensionFundDetails {
   isFirstEmploymentPost2007?: boolean;
   /** Date (ISO 'YYYY-MM-DD') from which the capital is accessible — per-fund, drives the FIRE lock-in. */
   unlockDate?: string;
+  /**
+   * Links this fund to one of the account's `AssetAllocationSettings.familyMembers`, so the
+   * Previdenza view can compute the tax deduction against THAT person's RAL/eligibility instead of
+   * mixing every fund in the account into one calculation (the ceiling is per taxpayer). Absent, or
+   * pointing at a member that no longer exists, is treated as "unassigned" — never silently folded
+   * into another member's numbers.
+   */
+  familyMemberId?: string;
   /** Benefit tax rate on the final payout, derived from years enrolled (15% → 9%); cached for FIRE. */
   currentBenefitTaxRate?: number;
   /** Cache of cumulative deducted contributions; source of truth = PensionContribution. */

@@ -301,8 +301,10 @@ export function PensionContributionDialog({ open, onClose, defaultAssetId }: Pen
           </div>
 
           <p className="text-xs text-muted-foreground">
-            Il versamento aumenta subito il valore del fondo. Il rendimento di mercato lo aggiorni a
-            mano dal tuo asset in Patrimonio quando arriva l&apos;estratto conto.
+            Il versamento aumenta subito il valore del fondo. Registra prima tutti i versamenti del
+            mese (TFR, tuo, datore), poi aggiorna «Valore attuale» dal tuo asset in Patrimonio quando
+            arriva l&apos;estratto conto — altrimenti li conti due volte, perché l&apos;estratto conto
+            li include già.
           </p>
         </form>
       )}
