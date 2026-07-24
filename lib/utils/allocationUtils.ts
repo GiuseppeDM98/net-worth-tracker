@@ -101,7 +101,13 @@ export function applyRebalanceBand(
   };
 
   return {
+    // Re-classification only touches `action`; the leverage-aware totals must survive it
+    // untouched (otherwise the hero loses the leverage after the band is applied — the fork bug).
     totalValue: allocation.totalValue,
+    marketValue: allocation.marketValue,
+    notionalValue: allocation.notionalValue,
+    leverageRatio: allocation.leverageRatio,
+    hasLeveragedExposure: allocation.hasLeveragedExposure,
     byAssetClass: mapValues(allocation.byAssetClass),
     bySubCategory: mapValues(allocation.bySubCategory),
     bySpecificAsset: mapValues(allocation.bySpecificAsset),

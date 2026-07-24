@@ -321,7 +321,23 @@ export interface AllocationResult {
   bySpecificAsset: {
     [specificAsset: string]: AllocationData; // Key format: "assetClass:subCategory:assetName"
   };
+  // Leverage-aware totals (spec 3-leveraged-etf-allocation). For an unleveraged portfolio
+  // notional === market, so every field below collapses to the pre-leverage number and the
+  // result is byte-identical to before (invariant #1).
+  //
+  // `totalValue` is the NOTIONAL exposure total of the investable base — kept under this name
+  // for backward compatibility (existing readers get notional, == market when unleveraged). Each
+  // class's `currentValue`/`currentPercentage` is likewise a notional figure, so the percentages
+  // sum to `leverageRatio × 100` rather than to 100 under leverage.
   totalValue: number;
+  /** Market total of the investable base (tradable + frozen). Hero "Patrimonio investito". */
+  marketValue: number;
+  /** Notional exposure total of the investable base. Hero "Esposizione nozionale". == totalValue. */
+  notionalValue: number;
+  /** notionalValue / marketValue over the investable base (1 when unleveraged or market = 0). */
+  leverageRatio: number;
+  /** True when leverageRatio exceeds 1 by more than a rounding epsilon — drives the hero split. */
+  hasLeveragedExposure: boolean;
 }
 
 export interface PieChartData {
