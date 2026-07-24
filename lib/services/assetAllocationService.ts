@@ -85,6 +85,9 @@ export async function getSettings(
       yearlyEmailEnabled: data.yearlyEmailEnabled,
       weeklyBudgetEmailEnabled: data.weeklyBudgetEmailEnabled,
       monthlyEmailRecipients: data.monthlyEmailRecipients,
+      grossAnnualIncome: data.grossAnnualIncome,
+      isFirstEmploymentPost2007: data.isFirstEmploymentPost2007,
+      firstEmploymentYear: data.firstEmploymentYear,
       targets: data.targets as AssetAllocationTarget,
     };
   } catch (error) {
@@ -250,6 +253,15 @@ export async function setSettings(
       if (settings.monthlyEmailRecipients !== undefined) {
         docData.monthlyEmailRecipients = settings.monthlyEmailRecipients;
       }
+      if (settings.grossAnnualIncome !== undefined) {
+        docData.grossAnnualIncome = settings.grossAnnualIncome;
+      }
+      if (settings.isFirstEmploymentPost2007 !== undefined) {
+        docData.isFirstEmploymentPost2007 = settings.isFirstEmploymentPost2007;
+      }
+      if (settings.firstEmploymentYear !== undefined) {
+        docData.firstEmploymentYear = settings.firstEmploymentYear;
+      }
 
       // Use setDoc WITHOUT merge to completely replace targets
       await setDoc(targetRef, docData);
@@ -373,6 +385,15 @@ export async function setSettings(
       }
       if (settings.monthlyEmailRecipients !== undefined) {
         docData.monthlyEmailRecipients = settings.monthlyEmailRecipients;
+      }
+      if (settings.grossAnnualIncome !== undefined) {
+        docData.grossAnnualIncome = settings.grossAnnualIncome;
+      }
+      if (settings.isFirstEmploymentPost2007 !== undefined) {
+        docData.isFirstEmploymentPost2007 = settings.isFirstEmploymentPost2007;
+      }
+      if (settings.firstEmploymentYear !== undefined) {
+        docData.firstEmploymentYear = settings.firstEmploymentYear;
       }
 
       // Use merge: true to preserve existing fields

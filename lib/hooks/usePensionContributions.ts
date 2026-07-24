@@ -7,10 +7,11 @@
  * delegated member records contributions on the shared account's data. The query key varies with the
  * optional `assetId`, so the per-fund and all-funds lists cache independently.
  *
- * Mutations invalidate a TRIPLE: pensionContributions.all + assets.all + dashboard.overview. The
- * usual asset/overview pair becomes a triple because a contribution moves the fund's value — and, for
- * a voluntary one, the source account's balance too — so the asset table and the hero total both go
- * stale (same rule as the trade ledger). Demo mode is gated at the UI (button disable), not here.
+ * Mutations invalidate: pensionContributions.all + assets.all + dashboard.overview + expenses.all. The
+ * usual asset/overview pair grows because a contribution moves the fund's value — and, for a
+ * voluntary one, the source account's balance AND its transfer entry in the cashflow feed — so the
+ * asset table, the hero total, and the expense list all go stale (same rule as the trade ledger).
+ * Demo mode is gated at the UI (button disable), not here.
  */
 
 import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
@@ -42,12 +43,18 @@ export function usePensionContributions(
   });
 }
 
-/** Invalidate the contribution list, the asset table, and the overview hero after a mutation. */
+/**
+ * Invalidate the contribution list, the asset table, the overview hero, and the expense list after a
+ * mutation. `expenses.all` joins the triple from P1 here (P2 is the first UI that surfaces this): a
+ * voluntary contribution creates a `transfer` Expense (spec 03), so Cashflow's transaction feed goes
+ * stale too if it isn't included.
+ */
 function invalidatePensionCaches(queryClient: QueryClient, ownerId: string): void {
   // pensionContributions.all is a prefix of byAsset → this also refreshes any open per-fund list.
   queryClient.invalidateQueries({ queryKey: queryKeys.pensionContributions.all(ownerId) });
   queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
   queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.overview(ownerId) });
+  queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all(ownerId) });
 }
 
 export function useRecordPensionContribution(ownerId: string) {

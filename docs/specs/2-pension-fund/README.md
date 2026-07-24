@@ -1,6 +1,6 @@
 # Fondo Pensione — Specification Index
 
-> Status: **IN CORSO — P0 ✅ implementata (2026-07-24); P1-P3 da fare.** Spec riprogettata dal fork
+> Status: **IN CORSO — P0+P1+P2 ✅ implementate (2026-07-24); P3 da fare (prossima sessione).** Spec riprogettata dal fork
 > `Ciocc128`, adattata al branch attuale e a post `asset-transactions` (scritta 2026-07-22).
 > Deliverable: tracciare il fondo pensione complementare come asset a valutazione manuale, con
 > contributi in collection dedicata, motore fiscale (deducibilità ordinaria + extra-deducibilità),
@@ -98,9 +98,9 @@ Vedi anche `docs/specs/README.md` → *Decisioni di riconciliazione condivise*.
 | Fase | Scope | Gate |
 | --- | --- | --- |
 | **P0** ✅ | Tipi (`types/pension.ts`, `AssetType 'pensionFund'`, `Asset.pensionFundDetails`) + motore fiscale puro + test (spec 01 §1-2 + spec 02) — **fatta 2026-07-24**, 19 test verdi, `tsc` pulito | `tsc` + `vitest run __tests__/pensionDeduction.test.ts` |
-| **P1** | Collection `pensionContributions` + rules + indici + service (effetto valore/transfer + storno) + hooks + rollup puro + test (spec 01 §3-5 + spec 03) | `tsc` + suite contributi + rules/indexes deploy note |
-| **P2** | UI base: AssetDialog `pensionFund` (+ composition), `PensionContributionDialog`, vista `/dashboard/pension` con contributi + recap fiscale (spec 04 §1-4) | `tsc` + script test manuale |
-| **P3** | Integrazioni: Allocazione `frozen` + card look-through, segmento Storico, base Rendimenti, FIRE lock-in (spec 04 §5-8) + docs (spec 05) | `tsc` + suite aree + test manuale |
+| **P1** ✅ | Collection `pensionContributions` + rules + indici + service (effetto valore/transfer + storno) + hooks + rollup puro + test (spec 01 §3-5 + spec 03) — **fatta 2026-07-24**, 33 test verdi, `tsc` pulito | `tsc` + suite contributi + rules/indexes deploy note |
+| **P2** ✅ | UI base: AssetDialog `pensionFund` (+ composition, conversione asset ledger esistente), `PensionContributionDialog`, vista `/dashboard/pension` con contributi + recap fiscale (spec 04 §1-4) — **fatta 2026-07-24**, nessun test automatico nuovo (fase UI), `tsc` pulito, suite pensione P0/P1 52/52 + suite completa 1169 test verdi, 8/8 test manuali verificati su emulatore | `tsc` + script test manuale |
+| **P3** | Integrazioni: Allocazione `frozen` + card look-through, segmento Storico, base Rendimenti, FIRE lock-in (spec 04 §5-8) + docs (spec 05) — **prossima sessione** | `tsc` + suite aree + test manuale |
 
 **Modello consigliato**: **Opus 4.8** per P0 (motore fiscale, correttezza) e P1 (scritture
 atomiche/transfer). Sonnet 5 accettabile per P2/P3.
