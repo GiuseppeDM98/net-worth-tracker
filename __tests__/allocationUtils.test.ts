@@ -154,6 +154,10 @@ describe('bandForTarget', () => {
 describe('applyRebalanceBand', () => {
   const baseResult: AllocationResult = {
     totalValue: 100000,
+    marketValue: 100000,
+    notionalValue: 100000,
+    leverageRatio: 1,
+    hasLeveragedExposure: false,
     byAssetClass: {
       equity: makeAllocationData({ difference: 3, targetPercentage: 60, action: 'OK' }),
       bonds: makeAllocationData({ difference: -3, targetPercentage: 8, action: 'OK' }),
