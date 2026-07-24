@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import Link from 'next/link';
 import { Asset } from '@/types/assets';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -15,7 +16,7 @@ import {
 } from '@/lib/services/assetService';
 import { getAssetClassCssVar } from '@/lib/constants/colors';
 import { formatAssetClassName } from '@/lib/utils/assetUtils';
-import { Pencil, Trash2, Calculator, ChevronDown, Info, ArrowLeftRight, ScrollText } from 'lucide-react';
+import { Pencil, Trash2, Calculator, ChevronDown, Info, ArrowLeftRight, ScrollText, PiggyBank } from 'lucide-react';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import {
@@ -398,6 +399,21 @@ export function AssetCard({
                 Movimenti
               </Button>
             </div>
+          )}
+          {/* Fondo pensione — versamenti/beneficio fiscale live on the dedicated Previdenza view. */}
+          {asset.type === 'pensionFund' && (
+            <Button
+              type="button"
+              variant="outline"
+              size="default"
+              asChild
+              className="w-full"
+            >
+              <Link href="/dashboard/pension" aria-label="Vai a Previdenza">
+                <PiggyBank className="h-4 w-4" />
+                Vai a Previdenza
+              </Link>
+            </Button>
           )}
         </div>
       </CardContent>

@@ -264,6 +264,11 @@ export interface AssetAllocationSettings {
   yearlyEmailEnabled?: boolean; // When true, a summary email is sent on December 31
   weeklyBudgetEmailEnabled?: boolean; // When true, a budget status email is sent every Sunday
   monthlyEmailRecipients?: string[]; // Recipient list shared by all periodic summary emails (monthly/quarterly/semiannual/yearly/weekly-budget)
+  // Fondo pensione tax params (spec 2-pension-fund/04 §4) — feed computePensionTaxRecap in the
+  // Previdenza view. Editable there inline; not part of the FIRE Coast tax params above.
+  grossAnnualIncome?: number; // RAL — base for the marginal-rate IRPEF benefit estimate
+  isFirstEmploymentPost2007?: boolean; // Eligibility for the extra-deducibilità plafond recovery
+  firstEmploymentYear?: number; // First calendar year of participation — anchors the plafond 5/20-year windows
   targets: AssetAllocationTarget;
 }
 

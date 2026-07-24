@@ -160,6 +160,22 @@ export async function deleteAssetTransaction(
   return parseWriteResponse(response, "Errore durante l'eliminazione dell'operazione.");
 }
 
+/**
+ * Delete every trade for one asset, no replay. Only path this exists for: converting a ledger asset
+ * to `pensionFund` in AssetDialog (docs/specs/2-pension-fund/04-ui-and-views.md §1.1) — the asset is
+ * leaving the ledger for good, so there is nothing left to reconcile.
+ */
+export async function deleteAllAssetTransactionsForAsset(
+  ownerId: string,
+  assetId: string
+): Promise<{ deletedCount: number }> {
+  const response = await authenticatedFetch(
+    `/api/1-asset-transactions/by-asset/${assetId}?userId=${encodeURIComponent(ownerId)}`,
+    { method: 'DELETE' }
+  );
+  return parseWriteResponse(response, "Errore durante la pulizia del registro operazioni.");
+}
+
 /** Idempotent ledger migration for the owner. Silent no-op when already migrated. */
 export async function migrateAssetLedger(ownerId: string): Promise<AssetLedgerMigrationResult> {
   const response = await authenticatedFetch('/api/1-asset-transactions/migrate', {

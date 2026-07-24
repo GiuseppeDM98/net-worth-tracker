@@ -8,6 +8,7 @@ import {
   CalendarRange,
   Trophy,
   Flame,
+  PiggyBank,
 } from 'lucide-react';
 
 export type NavItem = {
@@ -35,8 +36,9 @@ export const analysisNav: NavItem[] = [
 // Allocazione is here (not Analisi) because it has action chips — it's a rebalancing
 // tool, not a read-only stat view.
 export const planningNav: NavItem[] = [
-  { name: 'Allocazione',        href: '/dashboard/allocation',       icon: PieChart },
-  { name: 'FIRE e Simulazioni', href: '/dashboard/fire-simulations', icon: Flame    },
+  { name: 'Allocazione',        href: '/dashboard/allocation',       icon: PieChart  },
+  { name: 'FIRE e Simulazioni', href: '/dashboard/fire-simulations', icon: Flame     },
+  { name: 'Previdenza',         href: '/dashboard/pension',          icon: PiggyBank },
 ];
 
 // All secondary hrefs — used by BottomNavigation to determine "Altro" active state.

@@ -22,6 +22,7 @@
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
@@ -54,7 +55,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Plus, RefreshCw, Pencil, Trash2, Info, Calculator, ArrowUpDown, ChevronUp, ChevronDown, ChevronRight, Wallet, LayoutGrid, TrendingUp, ArrowLeftRight, ScrollText } from 'lucide-react';
+import { Plus, RefreshCw, Pencil, Trash2, Info, Calculator, ArrowUpDown, ChevronUp, ChevronDown, ChevronRight, Wallet, LayoutGrid, TrendingUp, ArrowLeftRight, ScrollText, PiggyBank } from 'lucide-react';
 import { toast } from 'sonner';
 import { AssetDialog } from '@/components/assets/AssetDialog';
 import { AssetCard, type AssetPerformanceData } from '@/components/assets/AssetCard';
@@ -824,6 +825,19 @@ export function AssetManagementTab({ assets, allAssets, loading, onRefresh, snap
                                       <ScrollText className="h-4 w-4" />
                                     </Button>
                                   </>
+                                )}
+                                {asset.type === 'pensionFund' && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8"
+                                    asChild
+                                  >
+                                    <Link href="/dashboard/pension" aria-label="Vai a Previdenza">
+                                      <PiggyBank className="h-4 w-4" />
+                                    </Link>
+                                  </Button>
                                 )}
                                 <Button
                                   type="button"
