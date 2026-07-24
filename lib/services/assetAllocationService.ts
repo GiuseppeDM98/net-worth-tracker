@@ -30,6 +30,22 @@ function serializeCoastFirePensions(
   }));
 }
 
+function serializeFamilyMembers(
+  members: AssetAllocationSettings['familyMembers']
+) {
+  if (!members) return members;
+
+  return members.map((member) => ({
+    id: member.id,
+    name: member.name,
+    ...(member.grossAnnualIncome !== undefined ? { grossAnnualIncome: member.grossAnnualIncome } : {}),
+    ...(member.isFirstEmploymentPost2007 !== undefined
+      ? { isFirstEmploymentPost2007: member.isFirstEmploymentPost2007 }
+      : {}),
+    ...(member.firstEmploymentYear !== undefined ? { firstEmploymentYear: member.firstEmploymentYear } : {}),
+  }));
+}
+
 /**
  * Get allocation settings for a user
  *
@@ -85,9 +101,7 @@ export async function getSettings(
       yearlyEmailEnabled: data.yearlyEmailEnabled,
       weeklyBudgetEmailEnabled: data.weeklyBudgetEmailEnabled,
       monthlyEmailRecipients: data.monthlyEmailRecipients,
-      grossAnnualIncome: data.grossAnnualIncome,
-      isFirstEmploymentPost2007: data.isFirstEmploymentPost2007,
-      firstEmploymentYear: data.firstEmploymentYear,
+      familyMembers: data.familyMembers,
       targets: data.targets as AssetAllocationTarget,
     };
   } catch (error) {
@@ -253,14 +267,8 @@ export async function setSettings(
       if (settings.monthlyEmailRecipients !== undefined) {
         docData.monthlyEmailRecipients = settings.monthlyEmailRecipients;
       }
-      if (settings.grossAnnualIncome !== undefined) {
-        docData.grossAnnualIncome = settings.grossAnnualIncome;
-      }
-      if (settings.isFirstEmploymentPost2007 !== undefined) {
-        docData.isFirstEmploymentPost2007 = settings.isFirstEmploymentPost2007;
-      }
-      if (settings.firstEmploymentYear !== undefined) {
-        docData.firstEmploymentYear = settings.firstEmploymentYear;
+      if (settings.familyMembers !== undefined) {
+        docData.familyMembers = serializeFamilyMembers(settings.familyMembers);
       }
 
       // Use setDoc WITHOUT merge to completely replace targets
@@ -386,14 +394,8 @@ export async function setSettings(
       if (settings.monthlyEmailRecipients !== undefined) {
         docData.monthlyEmailRecipients = settings.monthlyEmailRecipients;
       }
-      if (settings.grossAnnualIncome !== undefined) {
-        docData.grossAnnualIncome = settings.grossAnnualIncome;
-      }
-      if (settings.isFirstEmploymentPost2007 !== undefined) {
-        docData.isFirstEmploymentPost2007 = settings.isFirstEmploymentPost2007;
-      }
-      if (settings.firstEmploymentYear !== undefined) {
-        docData.firstEmploymentYear = settings.firstEmploymentYear;
+      if (settings.familyMembers !== undefined) {
+        docData.familyMembers = serializeFamilyMembers(settings.familyMembers);
       }
 
       // Use merge: true to preserve existing fields

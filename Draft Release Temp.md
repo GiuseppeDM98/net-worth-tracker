@@ -18,11 +18,13 @@
 - Added a "Previdenza" band to the Storico asset-class chart, so your pension funds' value is shown on its own instead of being folded into Azioni/Obbligazioni.
 - Performance metrics (TWR, Sharpe, volatility, drawdown, ROI, CAGR) now exclude your pension funds, since they're illiquid capital fed by contributions rather than market activity — "Capitale investito" already excluded them.
 - Added an optional FIRE Calculator setting to treat locked pension capital (before its unlock date) as unavailable for early retirement, while still counting it in your total net worth everywhere else.
+- Added a "Famiglia" section in Settings where you can add family members, each with their own income (RAL) and pension deduction eligibility, and link each pension fund to one of them from its asset details.
 
 ## 🐛 Bug Fixes
 
 - Fixed the "Total Return per Asset" table on Dividends excluding fully-sold investments entirely and describing every gain as "unrealized" — it now uses your real buy/sell history for tracked investments, so fully-sold positions (marked "Chiusa") and partial sells show an accurate, correctly-labeled capital-gain figure instead.
 - Fixed the dividend-return figure on that same table for tracked investments with more than one purchase at a different price — it now credits each dividend against the cost basis that was actually in effect when it was paid, instead of a single average across your whole holding period.
+- Fixed the Previdenza tax-benefit estimate for accounts tracking more than one person's pension fund (e.g. both spouses): contributions from every fund were being summed against a single income, understating the deduction for each person. The tax benefit is now calculated once per family member, using their own income and contributions.
 
 ## 🔧 Improvements
 
@@ -36,6 +38,8 @@
 - When a month ends in deficit, Analisi now also shows your average savings rate over the last 12 months next to it, for context.
 - All period, view, and range toggle controls can now be navigated with the arrow keys, not just the mouse.
 - The spending-anomaly warning banner on Analisi now follows your selected color theme instead of a fixed amber color.
+- Removed two unused fields ("Data di iscrizione", "Prima occupazione dopo il 2007") from the pension fund's own details, now that this information is set once per family member in Settings instead of per fund.
+- The Previdenza page and the "Registra versamento" dialog now explain the correct order for your monthly update: register the month's contributions first, then update the fund's current value from your statement — doing it the other way around double-counts the contributions.
 
 ## 🔒 Security
 

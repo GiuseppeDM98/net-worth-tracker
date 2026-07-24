@@ -48,12 +48,13 @@ import { isLedgerAssetType, type AssetTransactionFormData } from '@/types/assetT
 import { deleteAllAssetTransactionsForAsset } from '@/lib/services/assetTransactionService';
 import { useAssets } from '@/lib/hooks/useAssets';
 import { useAssetLedgerMeta, useCreateAssetTransaction } from '@/lib/hooks/useAssetTransactions';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query/queryKeys';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { resolveAllocationRole } from '@/lib/utils/allocationUtils';
 import { scheduleNextCoupon, scheduleFinalPremium } from '@/lib/services/couponScheduling';
-import { getTargets, addSubCategory } from '@/lib/services/assetAllocationService';
+import { getTargets, addSubCategory, getSettings } from '@/lib/services/assetAllocationService';
+import type { Settings } from '@/types/settings';
 import {
   Dialog,
   DialogContent,
@@ -227,21 +228,18 @@ function buildPensionFundDetailsFromForm(data: AssetFormValues): PensionFundDeta
   if (data.type !== 'pensionFund') return undefined;
 
   const provider = data.pensionProvider?.trim();
-  const hasAnyField =
-    !!provider ||
-    !!data.pensionEnrollmentDate ||
-    !!data.pensionFirstEmploymentDate ||
-    !!data.pensionUnlockDate ||
-    !!data.pensionIsFirstEmploymentPost2007;
+  const familyMemberId =
+    data.pensionFamilyMemberId && data.pensionFamilyMemberId !== '__none__'
+      ? data.pensionFamilyMemberId
+      : undefined;
+  const hasAnyField = !!provider || !!data.pensionUnlockDate || !!familyMemberId;
 
   if (!hasAnyField) return undefined;
 
   return {
     provider: provider || '',
-    ...(data.pensionEnrollmentDate ? { enrollmentDate: data.pensionEnrollmentDate } : {}),
-    ...(data.pensionFirstEmploymentDate ? { firstEmploymentDate: data.pensionFirstEmploymentDate } : {}),
     ...(data.pensionUnlockDate ? { unlockDate: data.pensionUnlockDate } : {}),
-    ...(data.pensionIsFirstEmploymentPost2007 ? { isFirstEmploymentPost2007: true } : {}),
+    ...(familyMemberId ? { familyMemberId } : {}),
   };
 }
 
@@ -404,11 +402,13 @@ const assetSchema = z.object({
   // The announced rates themselves are managed from the Dividendi tab, not this form.
   bondIsInflationLinked: z.boolean().optional(),
   // Fondo pensione details (type 'pensionFund' only) — dates as ISO strings (types/pension.ts).
+  // enrollmentDate/firstEmploymentDate/isFirstEmploymentPost2007 were removed from this form: they
+  // were never read by any calculation (only unlockDate is, for the FIRE lock-in), and now that RAL
+  // and "prima occupazione" live per family member in Settings, keeping a second unused copy here
+  // was actively confusing next to the new "Membro famiglia" field.
   pensionProvider: z.string().optional(),
-  pensionEnrollmentDate: z.string().optional(),
-  pensionFirstEmploymentDate: z.string().optional(),
   pensionUnlockDate: z.string().optional(),
-  pensionIsFirstEmploymentPost2007: z.boolean().optional(),
+  pensionFamilyMemberId: z.string().optional(),
 }).superRefine((data, ctx) => {
   const tickerRequired = data.type !== 'cash' && data.type !== 'realestate' && data.type !== 'pensionFund';
   if (tickerRequired && (!data.ticker || data.ticker.trim().length === 0)) {
@@ -488,6 +488,14 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
   const { data: ledgerMeta } = useAssetLedgerMeta(ownerId);
   const { data: ledgerAllAssets = [] } = useAssets(ownerId);
   const createTradeMutation = useCreateAssetTransaction(ownerId || '');
+  // Family members for the "Membro famiglia" Select on the pensionFund details section — sourced
+  // from Settings (Impostazioni → Preferenze → Famiglia), same queryKey every other settings
+  // consumer uses so a save there is picked up here too.
+  const { data: settings } = useQuery<Settings | null>({
+    queryKey: ['settings', ownerId],
+    queryFn: () => getSettings(ownerId!),
+    enabled: !!ownerId,
+  });
   const ledgerCashAssets = ledgerAllAssets.filter((a) => a.assetClass === 'cash');
   const [fetchingPrice, setFetchingPrice] = useState(false);
   const [allocationTargets, setAllocationTargets] = useState<AssetAllocationTarget | null>(null);
@@ -553,7 +561,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
   const watchAllocationRole = useWatch({ control, name: 'allocationRole' });
   const watchStampDutyExempt = useWatch({ control, name: 'stampDutyExempt' });
   const watchOpeningCashAssetId = useWatch({ control, name: 'openingCashAssetId' });
-  const watchPensionIsFirstEmploymentPost2007 = useWatch({ control, name: 'pensionIsFirstEmploymentPost2007' });
+  const watchPensionFamilyMemberId = useWatch({ control, name: 'pensionFamilyMemberId' });
 
   // Ledger gating (Phase C):
   //  - isLedgerEdit: editing a ledger asset → quantity/PMC are read-only, submit via updateAssetMetadata.
@@ -739,10 +747,8 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
         openingDate: todayIso,
         openingCashAssetId: '__none__',
         pensionProvider: asset.pensionFundDetails?.provider || undefined,
-        pensionEnrollmentDate: asset.pensionFundDetails?.enrollmentDate || undefined,
-        pensionFirstEmploymentDate: asset.pensionFundDetails?.firstEmploymentDate || undefined,
         pensionUnlockDate: asset.pensionFundDetails?.unlockDate || undefined,
-        pensionIsFirstEmploymentPost2007: asset.pensionFundDetails?.isFirstEmploymentPost2007 || false,
+        pensionFamilyMemberId: asset.pensionFundDetails?.familyMemberId || '__none__',
       });
 
       if (asset.composition && asset.composition.length > 0) {
@@ -822,10 +828,8 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
         bondFinalPremiumRate: undefined,
         bondIsInflationLinked: false,
         pensionProvider: undefined,
-        pensionEnrollmentDate: undefined,
-        pensionFirstEmploymentDate: undefined,
         pensionUnlockDate: undefined,
-        pensionIsFirstEmploymentPost2007: false,
+        pensionFamilyMemberId: '__none__',
       });
       replaceTiers([]);
       setComposition([]);
@@ -1584,54 +1588,50 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="pensionEnrollmentDate">Data di iscrizione</Label>
-                  <Input
-                    id="pensionEnrollmentDate"
-                    type="date"
-                    {...register('pensionEnrollmentDate')}
-                  />
-                  <p className="text-xs text-muted-foreground">Definisce l&apos;aliquota di prestazione in uscita.</p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="pensionUnlockDate">Data di sblocco</Label>
-                  <Input
-                    id="pensionUnlockDate"
-                    type="date"
-                    {...register('pensionUnlockDate')}
-                  />
-                  <p className="text-xs text-muted-foreground">Da quando il capitale è accessibile (uso FIRE).</p>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="pensionIsFirstEmploymentPost2007">Prima occupazione dopo il 2007</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Abilita il recupero del plafond di deducibilità inutilizzato (extra-deducibilità).
-                  </p>
-                </div>
-                <Switch
-                  id="pensionIsFirstEmploymentPost2007"
-                  checked={!!watchPensionIsFirstEmploymentPost2007}
-                  onCheckedChange={(checked) => setValue('pensionIsFirstEmploymentPost2007', checked)}
+              <div className="space-y-2">
+                <Label htmlFor="pensionUnlockDate">Data di sblocco</Label>
+                <Input
+                  id="pensionUnlockDate"
+                  type="date"
+                  {...register('pensionUnlockDate')}
                 />
+                <p className="text-xs text-muted-foreground">Da quando il capitale è accessibile (uso FIRE).</p>
               </div>
 
-              {watchPensionIsFirstEmploymentPost2007 && (
-                <div className="space-y-2">
-                  <Label htmlFor="pensionFirstEmploymentDate">Data prima occupazione</Label>
-                  <Input
-                    id="pensionFirstEmploymentDate"
-                    type="date"
-                    {...register('pensionFirstEmploymentDate')}
-                  />
+              <div className="space-y-2">
+                <Label htmlFor="pensionFamilyMemberId">Membro famiglia</Label>
+                {(settings?.familyMembers ?? []).length > 0 ? (
+                  <Select
+                    value={watchPensionFamilyMemberId ?? '__none__'}
+                    onValueChange={(value) => setValue('pensionFamilyMemberId', value)}
+                  >
+                    <SelectTrigger id="pensionFamilyMemberId">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Non assegnato</SelectItem>
+                      <SelectSeparator />
+                      {(settings?.familyMembers ?? []).map((member) => (
+                        <SelectItem key={member.id} value={member.id}>
+                          {member.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
                   <p className="text-xs text-muted-foreground">
-                    Da qui parte la finestra di accumulo del plafond (primi 5 anni).
+                    Nessun membro configurato. Aggiungine uno in{' '}
+                    <Link href="/dashboard/settings" className="text-primary underline hover:no-underline">
+                      Impostazioni → Preferenze → Famiglia
+                    </Link>{' '}
+                    per collegare il beneficio fiscale a questo fondo.
                   </p>
-                </div>
-              )}
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Il beneficio fiscale in Previdenza si calcola per membro — un fondo non assegnato
+                  resta visibile ma senza calcolo.
+                </p>
+              </div>
 
               <p className="text-xs text-muted-foreground border-t border-border/60 pt-3">
                 I versamenti si registrano dalla vista{' '}
