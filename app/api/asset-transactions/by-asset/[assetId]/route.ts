@@ -7,7 +7,7 @@ import { deleteAllAssetTransactionsForAsset } from '@/lib/server/assetTransactio
 import { getTradeErrorResponse } from '../../errorResponse';
 
 /**
- * DELETE /api/1-asset-transactions/by-asset/[assetId]?userId=...
+ * DELETE /api/asset-transactions/by-asset/[assetId]?userId=...
  *
  * Delete EVERY trade for one asset, no replay. Only path this exists for: converting a ledger asset
  * to `pensionFund` in AssetDialog (docs/specs/2-pension-fund/04-ui-and-views.md §1.1, option 1) —
@@ -27,6 +27,6 @@ export async function DELETE(
     const deletedCount = await deleteAllAssetTransactionsForAsset(ownerId as string, assetId);
     return NextResponse.json({ deletedCount });
   } catch (error) {
-    return getTradeErrorResponse(error, 'DELETE /api/1-asset-transactions/by-asset/[assetId]');
+    return getTradeErrorResponse(error, 'DELETE /api/asset-transactions/by-asset/[assetId]');
   }
 }

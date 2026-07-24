@@ -8,7 +8,7 @@ import { createAssetTransaction } from '@/lib/server/assetTransactionUseCase';
 import { getTradeErrorResponse } from './errorResponse';
 
 /**
- * POST /api/1-asset-transactions
+ * POST /api/asset-transactions
  *
  * Create one trade in the asset ledger. Body: { userId, transaction: AssetTransactionFormData }.
  * Writes are Admin-API-only because a trade must atomically rewrite the asset's derived fields from
@@ -31,6 +31,6 @@ export async function POST(request: NextRequest) {
     const result = await createAssetTransaction(ownerId as string, parsed.data);
     return NextResponse.json(result);
   } catch (error) {
-    return getTradeErrorResponse(error, 'POST /api/1-asset-transactions');
+    return getTradeErrorResponse(error, 'POST /api/asset-transactions');
   }
 }
