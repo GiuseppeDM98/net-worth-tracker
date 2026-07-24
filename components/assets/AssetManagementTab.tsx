@@ -271,8 +271,12 @@ export function AssetManagementTab({ assets, allAssets, loading, onRefresh, snap
 
   // An asset has cost basis tracking when averageCost is set and positive.
   // taxRate is NOT required — a user may know their PMC without having set a tax rate.
+  // pensionFund is excluded regardless of a leftover averageCost: a fund converted from a
+  // ledger type (04 §1.1) keeps its old PMC untouched (updateAssetMetadata never clears it),
+  // but a pension fund's exit taxation (15%→9% by years enrolled) is a completely different
+  // regime from this capital-gains calculator — showing it would produce a meaningless number.
   const hasCostBasisTracking = (asset: Asset) => {
-    return !!(asset.averageCost && asset.averageCost > 0);
+    return asset.type !== 'pensionFund' && !!(asset.averageCost && asset.averageCost > 0);
   };
 
   const totalValue = calculateTotalValue(assets);
