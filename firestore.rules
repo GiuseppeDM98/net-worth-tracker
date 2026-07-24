@@ -148,6 +148,26 @@ service cloud.firestore {
       allow delete: if canAccess(resource.data.userId);
     }
 
+    // Collezione pensionContributions - contributi al fondo pensione
+    // Scritta dal client SDK (come dividends): non c'è replay atomico multi-doc,
+    // e l'atomicità conto<->fondo del versamento volontario è già garantita da
+    // updateCashAssetBalancesAtomic dentro reconcileTransferCreate.
+    match /pensionContributions/{contributionId} {
+      // Lettura: proprietario o membro delegato
+      allow read: if canAccess(resource.data.userId);
+
+      // Creazione: un membro può creare contributi sull'account condiviso
+      allow create: if canAccess(request.resource.data.userId);
+
+      // Aggiornamento: proprietario/membro e userId immutabile (se presente)
+      allow update: if canAccess(resource.data.userId) &&
+                       (!('userId' in request.resource.data) ||
+                        request.resource.data.userId == resource.data.userId);
+
+      // Cancellazione: proprietario o membro delegato
+      allow delete: if canAccess(resource.data.userId);
+    }
+
     // Collezione hall-of-fame - ranking dell'account (doc id = ownerUid)
     match /hall-of-fame/{userId} {
       // Lettura: proprietario o membro delegato
