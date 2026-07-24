@@ -108,9 +108,14 @@ const assetClassLabels: Record<AssetClass, string> = {
   realestate: 'Immobili (Real Estate)',
   cash: 'Liquidità (Cash)',
   commodity: 'Materie Prime (Commodity)',
+  // Not yet in the target grid below (assetClasses array) — reachable only via a leveraged/composite
+  // ETF's `composition` legs today. Wiring a settable target for them is L2/L3 (leverage UI) scope.
+  trendFollowing: 'Trend Following',
+  carry: 'Carry',
 };
 
 // Order: Azioni → Obbligazioni → Commodities → Real Estate → Cash → Crypto
+// trendFollowing/carry are deliberately absent here (see assetClassLabels comment above).
 const assetClasses: AssetClass[] = [
   'equity',
   'bonds',

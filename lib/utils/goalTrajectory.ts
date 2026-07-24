@@ -34,6 +34,8 @@ export const GOAL_CLASS_RETURNS: Record<AssetClass, number> = {
   crypto: 12,
   realestate: 4,
   commodity: 3,
+  trendFollowing: 5,
+  carry: 4,
 };
 
 // Used when a goal has no recommended allocation to weight the return.
