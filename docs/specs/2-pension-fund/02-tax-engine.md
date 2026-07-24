@@ -1,5 +1,22 @@
 # 02 — Motore fiscale (puro, testato)
 
+> Status: **✅ IMPLEMENTATA (Fase P0, 2026-07-24).** `lib/utils/pensionDeduction.ts` (§1-5, zero
+> import Firebase, `taxOf` iniettato) + `__tests__/pensionDeduction.test.ts` (§6: tutti i 18 casi
+> della matrice, più un test di invariante `isLedgerAssetType('pensionFund') === false` → 19 verdi;
+> `tsc` pulito). Nella stessa fase è stata implementata anche la **spec 01 §1-2** (`types/pension.ts`,
+> `AssetType 'pensionFund'`, `Asset/AssetFormData.pensionFundDetails`, `TYPE_TO_CLASS`); la spec 01
+> §3-6 (collection, rules, indici, validazione) resta a P1. Vedi CLAUDE.md → Current Status e
+> AGENTS.md → *Fondo Pensione — Tipi + Motore Fiscale (P0)*. Restano P1 (contributi), P2 (UI),
+> P3 (integrazioni).
+>
+> **Caveat d'uso deciso con l'owner (D-P0.2)**: i contributi storici NON vengono tracciati — si parte
+> a registrare da ora. La deduzione ordinaria (§2, path base) è per-anno e resta corretta; il fold
+> dell'extra-deducibilità invece tratta gli anni mancanti come *0 versato*, quindi accrediterebbe il
+> plafond massimo a chi ha davvero versato in passato. Perciò **`isFirstEmploymentPost2007` va tenuto
+> OFF** finché non esiste uno storico. Se in futuro servisse l'extra-deducibilità, la via è un
+> "plafond iniziale" da estratto conto — non il back-fill degli anni — e cambia la firma di
+> `PensionDeductionInput` (§2), quindi va deciso **prima di P1**.
+
 Nuovo modulo **`lib/utils/pensionDeduction.ts`** + test **`__tests__/pensionDeduction.test.ts`**.
 Riferimento fedele: `ciocc/main:lib/utils/pensionDeduction.ts` (già ottimo — riportarlo quasi
 integralmente). Vincoli: **zero import Firebase**, `taxOf` iniettato, tetti come funzione-soglia.

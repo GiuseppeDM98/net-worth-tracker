@@ -1,7 +1,7 @@
 # Fondo Pensione — Specification Index
 
-> Status: **SPEC — riprogettata dal fork `Ciocc128`, adattata al branch attuale e a post
-> `asset-transactions`** (scritta 2026-07-22).
+> Status: **IN CORSO — P0 ✅ implementata (2026-07-24); P1-P3 da fare.** Spec riprogettata dal fork
+> `Ciocc128`, adattata al branch attuale e a post `asset-transactions` (scritta 2026-07-22).
 > Deliverable: tracciare il fondo pensione complementare come asset a valutazione manuale, con
 > contributi in collection dedicata, motore fiscale (deducibilità ordinaria + extra-deducibilità),
 > vista Previdenza dedicata, e integrazione con Allocazione / Storico / Rendimenti / FIRE.
@@ -37,11 +37,23 @@ Vedi anche `docs/specs/README.md` → *Decisioni di riconciliazione condivise*.
    extra-deducibilità come fold pluriennale (accumulo primi 5 anni / drawdown anni 6–25 / scadenza).
    Beneficio IRPEF via `tax(RAL) − tax(RAL − dedotto)`, riusando gli scaglioni Coast FIRE con `taxOf`
    iniettato. Campo **RAL** in Impostazioni.
+   - **D-P0.2 (fissata 2026-07-24)**: i contributi **storici non si tracciano** — si registra da ora
+     in poi. La deduzione ordinaria resta corretta (è per-anno); il fold invece legge gli anni
+     mancanti come *0 versato*, quindi **`isFirstEmploymentPost2007` va tenuto OFF** finché non
+     esiste uno storico, altrimenti il plafond risulta gonfiato. Niente UI di import storico in
+     P1/P2. Un eventuale ripensamento passa da un "plafond iniziale" da estratto conto (cambia la
+     firma di `PensionDeductionInput`) → **da decidere prima di P1**.
 7. **Casa della feature**: **vista dedicata `/dashboard/pension`** in `planningNav`, con link dalla
    card asset in Patrimonio. NON un tab in `fire-simulations`.
 8. **FIRE**: toggle `respectPensionLockInFire` — quando on, il valore dei fondi bloccati
    (`unlockDate` futura) esce dal `currentNetWorth` del calcolo FIRE (resta nel patrimonio totale).
    Coast FIRE terza gamba e withdrawal netto asset-aware = **fuori scope v1** (fase 2).
+9. **D-P0.1 (fissata 2026-07-24) — i fondi già a portafoglio si CONVERTONO, non si ricreano**: chi
+   tracciava già il fondo lo ha come `etf`/`stock` con il valore in `quantity` a prezzo 1, cioè la
+   forma esatta di destinazione. Si cambia il tipo dall'edit di `AssetDialog`; eliminare e ricreare
+   perde lo storico (`MonthlySnapshot.byAsset` è keyed by `assetId`). Attenzione al **BUY baseline
+   orfano** del registro operazioni, che `computeInvestedCapital` conterebbe ancora. Procedura,
+   conseguenze e le due opzioni di fix in `04-ui-and-views.md` §1.1 (scope P2, non opzionale).
 
 ## Glossario
 
@@ -85,7 +97,7 @@ Vedi anche `docs/specs/README.md` → *Decisioni di riconciliazione condivise*.
 
 | Fase | Scope | Gate |
 | --- | --- | --- |
-| **P0** | Tipi (`types/pension.ts`, `AssetType 'pensionFund'`, `Asset.pensionFundDetails`) + motore fiscale puro + test (spec 01 §1-2 + spec 02) | `tsc` + `vitest run __tests__/pensionDeduction.test.ts` |
+| **P0** ✅ | Tipi (`types/pension.ts`, `AssetType 'pensionFund'`, `Asset.pensionFundDetails`) + motore fiscale puro + test (spec 01 §1-2 + spec 02) — **fatta 2026-07-24**, 19 test verdi, `tsc` pulito | `tsc` + `vitest run __tests__/pensionDeduction.test.ts` |
 | **P1** | Collection `pensionContributions` + rules + indici + service (effetto valore/transfer + storno) + hooks + rollup puro + test (spec 01 §3-5 + spec 03) | `tsc` + suite contributi + rules/indexes deploy note |
 | **P2** | UI base: AssetDialog `pensionFund` (+ composition), `PensionContributionDialog`, vista `/dashboard/pension` con contributi + recap fiscale (spec 04 §1-4) | `tsc` + script test manuale |
 | **P3** | Integrazioni: Allocazione `frozen` + card look-through, segmento Storico, base Rendimenti, FIRE lock-in (spec 04 §5-8) + docs (spec 05) | `tsc` + suite aree + test manuale |

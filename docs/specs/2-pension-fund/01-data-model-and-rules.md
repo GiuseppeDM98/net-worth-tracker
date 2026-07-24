@@ -1,5 +1,14 @@
 # 01 — Data Model, AssetType, Collection, Rules, Validation
 
+> Status: **§1-2 ✅ IMPLEMENTATE (Fase P0, 2026-07-24)** — `types/pension.ts`, `AssetType 'pensionFund'`,
+> `Asset`/`AssetFormData.pensionFundDetails`, `TYPE_TO_CLASS['pensionFund'] = 'equity'` (+ lo zod
+> enum di `assetSchema`, che duplica la union), `isLedgerAssetType('pensionFund') === false` coperto
+> da test. **§3-6 (collection `pensionContributions`, rules, indici, validazione) restano a P1.**
+> Vedi CLAUDE.md → Current Status e AGENTS.md → *Fondo Pensione — Tipi + Motore Fiscale (P0)*.
+>
+> Nota per P1: sul punto aperto di §5 (indici compositi vs sort in memoria) la raccomandazione della
+> spec — **no `orderBy`, sort in memoria** — resta quella da seguire salvo decisione contraria.
+
 ## 1. Domain types — new file `types/pension.ts`
 
 Riferimento fedele: `ciocc/main:types/pension.ts`. Riportare integralmente (i commenti TEACHER/WHY
