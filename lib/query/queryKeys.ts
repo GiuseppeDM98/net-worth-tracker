@@ -66,6 +66,14 @@ export const queryKeys = {
     meta: (userId: string) => ['asset-transactions-meta', userId] as const,
   },
 
+  // Fondo pensione — contributions in the dedicated `pensionContributions` collection.
+  // `all` is a prefix of `byAsset` so invalidating `all` also refreshes any per-fund view.
+  pensionContributions: {
+    all: (userId: string) => ['pension-contributions', userId] as const,
+    byAsset: (userId: string, assetId: string) =>
+      ['pension-contributions', userId, assetId] as const,
+  },
+
   // Cost centers (list + per-center spend stats derived from expenses).
   // Both keys share the ['cost-centers', userId] prefix so invalidating `all`
   // also refreshes any open detail view via prefix match.
