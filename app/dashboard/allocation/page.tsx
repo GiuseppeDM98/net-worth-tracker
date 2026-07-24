@@ -43,7 +43,7 @@ import {
   buildTargetsFromGoalAllocation,
 } from '@/lib/services/assetAllocationService';
 import { getGoalData, deriveTargetAllocationFromGoals } from '@/lib/services/goalService';
-import { AllocationResult, AssetAllocationTarget } from '@/types/assets';
+import { Asset, AllocationResult, AssetAllocationTarget } from '@/types/assets';
 import { Button } from '@/components/ui/button';
 import { Settings, Sparkles, LayoutGrid, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
@@ -54,6 +54,7 @@ import { AllocationHero } from '@/components/allocation/AllocationHero';
 import { RebalanceBandControl } from '@/components/allocation/RebalanceBandControl';
 import { ActionPlanner } from '@/components/allocation/ActionPlanner';
 import { AllocationBreakdown } from '@/components/allocation/AllocationBreakdown';
+import { PensionAllocationCards } from '@/components/allocation/PensionAllocationCards';
 import {
   applyRebalanceBand,
   summarizeBalance,
@@ -93,6 +94,11 @@ export default function AllocationPage() {
   // The wealth this page deliberately ignores — the home you live in. Not an investment, so not in
   // the denominator. Reported only. Kept as holdings so composite sleeves land in the right class.
   const [excludedHoldings, setExcludedHoldings] = useState<AllocatableHolding[]>([]);
+  // Full, unfiltered asset list — feeds PensionAllocationCards' "Portafoglio + previdenza" card,
+  // which must include a fund regardless of its allocationRole (even 'excluded', for a user who
+  // opted the fund fully out of Allocazione — the main hero above then does NOT include it, so this
+  // card is the only place that shows the combined picture for that choice).
+  const [allAssets, setAllAssets] = useState<Asset[]>([]);
 
   // Drift tolerance that decides COMPRA/VENDI/OK. Session-only; default matches the
   // server's ±2 p.p. so the first render is identical to the persisted classification.
@@ -149,6 +155,7 @@ export default function AllocationPage() {
       setAllocation(compareAllocations(inAllocation, effectiveTargets));
       setHoldings(buildHoldings(inAllocation, calculateAssetValue));
       setExcludedHoldings(buildHoldings(excluded, calculateAssetValue));
+      setAllAssets(assetsData);
     } catch (error) {
       console.error('Error loading allocation data:', error);
       toast.error('Errore nel caricamento dei dati');
@@ -365,6 +372,8 @@ export default function AllocationPage() {
               targets={targets}
               excludedHoldings={excludedHoldings}
             />
+
+            <PensionAllocationCards assets={allAssets} />
 
             {user && ownerId && <ExposureSection userId={ownerId} />}
           </div>

@@ -22,6 +22,7 @@
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
@@ -54,7 +55,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Plus, RefreshCw, Pencil, Trash2, Info, Calculator, ArrowUpDown, ChevronUp, ChevronDown, ChevronRight, Wallet, LayoutGrid, TrendingUp, ArrowLeftRight, ScrollText } from 'lucide-react';
+import { Plus, RefreshCw, Pencil, Trash2, Info, Calculator, ArrowUpDown, ChevronUp, ChevronDown, ChevronRight, Wallet, LayoutGrid, TrendingUp, ArrowLeftRight, ScrollText, PiggyBank } from 'lucide-react';
 import { toast } from 'sonner';
 import { AssetDialog } from '@/components/assets/AssetDialog';
 import { AssetCard, type AssetPerformanceData } from '@/components/assets/AssetCard';
@@ -270,8 +271,12 @@ export function AssetManagementTab({ assets, allAssets, loading, onRefresh, snap
 
   // An asset has cost basis tracking when averageCost is set and positive.
   // taxRate is NOT required — a user may know their PMC without having set a tax rate.
+  // pensionFund is excluded regardless of a leftover averageCost: a fund converted from a
+  // ledger type (04 §1.1) keeps its old PMC untouched (updateAssetMetadata never clears it),
+  // but a pension fund's exit taxation (15%→9% by years enrolled) is a completely different
+  // regime from this capital-gains calculator — showing it would produce a meaningless number.
   const hasCostBasisTracking = (asset: Asset) => {
-    return !!(asset.averageCost && asset.averageCost > 0);
+    return asset.type !== 'pensionFund' && !!(asset.averageCost && asset.averageCost > 0);
   };
 
   const totalValue = calculateTotalValue(assets);
@@ -824,6 +829,19 @@ export function AssetManagementTab({ assets, allAssets, loading, onRefresh, snap
                                       <ScrollText className="h-4 w-4" />
                                     </Button>
                                   </>
+                                )}
+                                {asset.type === 'pensionFund' && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8"
+                                    asChild
+                                  >
+                                    <Link href="/dashboard/pension" aria-label="Vai a Previdenza">
+                                      <PiggyBank className="h-4 w-4" />
+                                    </Link>
+                                  </Button>
                                 )}
                                 <Button
                                   type="button"

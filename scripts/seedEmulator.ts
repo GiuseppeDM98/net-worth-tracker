@@ -125,6 +125,31 @@ async function seedAssets(): Promise<void> {
       },
     },
     {
+      // A fondo pensione tracked "the old way", BEFORE the pensionFund AssetType existed: an `etf`
+      // whose euro value sits in `quantity` at price 1. This is the exact shape real users have, and
+      // the conversion path of spec 2-pension-fund/04 §1.1 starts from it — a type edit, never a
+      // delete + recreate, because monthly snapshots are keyed by assetId.
+      //
+      // It is deliberately a LEDGER type, so the Fase B migration gives it a baseline BUY. That
+      // orphan baseline is the whole point of the fixture: it survives the conversion, and
+      // `computeInvestedCapital` still sums it (it does not filter by asset type).
+      id: 'seed-pension-legacy',
+      data: {
+        ...assetBase(),
+        ticker: 'FONDOPENSIONE',
+        name: 'Fondo Pensione Aperto (tracciato come ETF)',
+        type: 'etf',
+        assetClass: 'equity',
+        currency: 'EUR',
+        quantity: 12000,
+        averageCost: 1,
+        currentPrice: 1,
+        autoUpdatePrice: false,
+        stampDutyExempt: true,
+        isLiquid: false,
+      },
+    },
+    {
       id: 'seed-cash',
       data: {
         ...assetBase(),
@@ -156,7 +181,7 @@ async function seedAssets(): Promise<void> {
   ];
 
   await Promise.all(assets.map((a) => db.collection('assets').doc(a.id).set(a.data)));
-  console.info(`  ✓ ${assets.length} assets (4 ledger + cash + home)`);
+  console.info(`  ✓ ${assets.length} assets (5 ledger incl. legacy pension fund + cash + home)`);
 }
 
 async function seedSettings(): Promise<void> {
@@ -220,6 +245,7 @@ async function seedSnapshots(): Promise<void> {
     { assetId: 'seed-aapl', ticker: 'AAPL', name: 'Apple Inc.', quantity: 10, price: 175, totalValue: 1750 },
     { assetId: 'seed-btp', ticker: 'BTP', name: 'BTP Valore 2030', quantity: 5, price: 101, totalValue: 505 },
     { assetId: 'seed-btc', ticker: 'BTC', name: 'Bitcoin', quantity: 0.5, price: 55000, totalValue: 27500 },
+    { assetId: 'seed-pension-legacy', ticker: 'FONDOPENSIONE', name: 'Fondo Pensione Aperto (tracciato come ETF)', quantity: 12000, price: 1, totalValue: 12000 },
     { assetId: 'seed-cash', ticker: 'CASH', name: 'Conto Corrente', quantity: 8000, price: 1, totalValue: 8000 },
     { assetId: 'seed-home', ticker: 'CASA', name: 'Abitazione principale', quantity: 1, price: 250000, totalValue: 250000 },
   ];
@@ -240,14 +266,14 @@ async function seedSnapshots(): Promise<void> {
         liquidNetWorth: Math.round((total - illiquid) * s.factor),
         illiquidNetWorth: illiquid,
         byAssetClass: {
-          equity: Math.round(3950 * s.factor),
+          equity: Math.round(15950 * s.factor),
           bonds: Math.round(505 * s.factor),
           crypto: Math.round(27500 * s.factor),
           cash: 8000,
           realestate: illiquid,
         },
         byAsset,
-        assetAllocation: { equity: 3950, bonds: 505, crypto: 27500, cash: 8000, realestate: illiquid },
+        assetAllocation: { equity: 15950, bonds: 505, crypto: 27500, cash: 8000, realestate: illiquid },
         createdAt: new Date(s.year, s.month - 1, 28),
       })
     )
@@ -265,7 +291,9 @@ async function main(): Promise<void> {
   console.info('\n✅ Seed complete.');
   console.info('   Login:  ' + TEST_EMAIL + '  /  ' + TEST_PASSWORD);
   console.info('   Open the app with `npm run dev:emulator`, then log in with the above.');
-  console.info('   Opening /dashboard/assets fires the ledger migration (creates 4 baselines).\n');
+  console.info('   Opening /dashboard/assets fires the ledger migration (creates 5 baselines).');
+  console.info('   `seed-pension-legacy` is a fondo pensione tracked the OLD way (an etf, value in');
+  console.info('   quantity at price 1) — the starting point of the conversion path (spec 04 §1.1).\n');
 }
 
 main()

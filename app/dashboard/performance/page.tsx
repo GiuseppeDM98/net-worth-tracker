@@ -14,6 +14,8 @@ import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { getAllPerformanceData, calculatePerformanceForPeriod, preparePerformanceChartData, getSnapshotsForPeriod, prepareMonthlyReturnsHeatmap, prepareUnderwaterDrawdownData } from '@/lib/services/performanceService';
 import { getUserSnapshots } from '@/lib/services/snapshotService';
+import { getAllAssets } from '@/lib/services/assetService';
+import { toPerformanceBaseSnapshots } from '@/lib/utils/performanceBase';
 import { PerformanceData, PerformanceMetrics, TimePeriod } from '@/types/performance';
 import { MonthlySnapshot } from '@/types/assets';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -363,7 +365,18 @@ export default function PerformancePage() {
       // Fetch snapshots once and cache them in component state.
       // This cache will be reused for all period switches and custom date ranges,
       // eliminating redundant API calls and improving performance by ~85%.
-      const snapshots = await getUserSnapshots(ownerId);
+      const [rawSnapshots, assetsForBase] = await Promise.all([
+        getUserSnapshots(ownerId),
+        getAllAssets(ownerId),
+      ]);
+      // Same portfolio-base exclusion as getAllPerformanceData (performanceBase.ts): the client-side
+      // chart/heatmap/custom-range helpers below all read cachedSnapshots directly, so they need the
+      // pension funds excluded too, or a custom period would silently disagree with the pre-computed
+      // YTD/1Y/3Y/5Y/ALL metrics.
+      const pensionAssetIds = assetsForBase
+        .filter((asset) => asset.type === 'pensionFund')
+        .map((asset) => asset.id);
+      const snapshots = toPerformanceBaseSnapshots(rawSnapshots, pensionAssetIds);
       setCachedSnapshots(snapshots);
 
       // forceRefresh on explicit button click so the cache is bypassed and rewritten

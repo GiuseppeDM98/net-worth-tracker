@@ -34,6 +34,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -41,8 +42,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { Asset, AssetFormData, AssetType, AssetClass, AllocationRole, AssetAllocationTarget, AssetComposition, CouponFrequency, BondDetails, CouponRateTier, AnnouncedInflationRate } from '@/types/assets';
+import type { PensionFundDetails } from '@/types/pension';
 import { createAsset, updateAsset, updateAssetMetadata } from '@/lib/services/assetService';
 import { isLedgerAssetType, type AssetTransactionFormData } from '@/types/assetTransactions';
+import { deleteAllAssetTransactionsForAsset } from '@/lib/services/assetTransactionService';
 import { useAssets } from '@/lib/hooks/useAssets';
 import { useAssetLedgerMeta, useCreateAssetTransaction } from '@/lib/hooks/useAssetTransactions';
 import { useQueryClient } from '@tanstack/react-query';
@@ -70,7 +73,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Calculator, Plus, X, BarChart3, Landmark, Bitcoin, Wallet, Home, Package, TrendingUp, ChevronLeft } from 'lucide-react';
+import { Calculator, Plus, X, BarChart3, Landmark, Bitcoin, Wallet, Home, Package, TrendingUp, ChevronLeft, PiggyBank } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 
 /**
@@ -96,6 +99,11 @@ function shouldUpdatePrice(assetType: string, subCategory?: string): boolean {
 
   // Cash always has price = 1 (no updates needed)
   if (assetType === 'cash') {
+    return false;
+  }
+
+  // Fondo pensione: value is a statement (estratto conto) overwrite, like realestate — no market price.
+  if (assetType === 'pensionFund') {
     return false;
   }
 
@@ -211,6 +219,33 @@ function buildBondDetailsFromForm(
 }
 
 /**
+ * Assembles a PensionFundDetails object from validated form values.
+ * Returns undefined when the type isn't pensionFund or none of the fields were filled in — an empty
+ * block is pointless noise on the asset doc (removeUndefinedDeep-equivalent restraint at the source).
+ */
+function buildPensionFundDetailsFromForm(data: AssetFormValues): PensionFundDetails | undefined {
+  if (data.type !== 'pensionFund') return undefined;
+
+  const provider = data.pensionProvider?.trim();
+  const hasAnyField =
+    !!provider ||
+    !!data.pensionEnrollmentDate ||
+    !!data.pensionFirstEmploymentDate ||
+    !!data.pensionUnlockDate ||
+    !!data.pensionIsFirstEmploymentPost2007;
+
+  if (!hasAnyField) return undefined;
+
+  return {
+    provider: provider || '',
+    ...(data.pensionEnrollmentDate ? { enrollmentDate: data.pensionEnrollmentDate } : {}),
+    ...(data.pensionFirstEmploymentDate ? { firstEmploymentDate: data.pensionFirstEmploymentDate } : {}),
+    ...(data.pensionUnlockDate ? { unlockDate: data.pensionUnlockDate } : {}),
+    ...(data.pensionIsFirstEmploymentPost2007 ? { isFirstEmploymentPost2007: true } : {}),
+  };
+}
+
+/**
  * Builds the AssetFormData payload from resolved form values and price data.
  * averageCost uses the same Borsa Italiana % of par convention as currentPrice:
  * entered as BI price, stored in EUR (e.g. user enters 100 → stored as nominalValue€).
@@ -253,6 +288,7 @@ function buildAssetFormDataFromValues(
         : undefined,
     isPrimaryResidence: data.isPrimaryResidence || false,
     allocationRole: data.allocationRole ?? 'tradable',
+    pensionFundDetails: buildPensionFundDetailsFromForm(data),
   };
 }
 
@@ -300,6 +336,12 @@ const TYPE_TO_CLASS: Record<AssetType, AssetClass> = {
   cash: 'cash',
   realestate: 'realestate',
   commodity: 'commodity',
+  // A fondo pensione has no asset class of its OWN — its real exposure is the internal comparto mix,
+  // which lives in `Asset.composition` (decision D2: no `AssetClass 'pension'`). Every consumer that
+  // matters reads `composition` when present, so this entry is only the fallback for a fund whose
+  // composition has not been filled in yet; 'equity' is the least-wrong default for the typical
+  // (equity-tilted) comparto. The form always prompts for the composition.
+  pensionFund: 'equity',
 };
 
 // Type picker card definitions for step 1 of the create flow
@@ -311,6 +353,7 @@ const TYPE_CARDS: { type: AssetType; label: string; title: string; Icon: React.E
   { type: 'cash', label: 'Liquidità', title: 'Nuova Liquidità', Icon: Wallet, description: 'Conti correnti e conti deposito' },
   { type: 'realestate', label: 'Immobile', title: 'Nuovo Immobile', Icon: Home, description: 'Proprietà immobiliari' },
   { type: 'commodity', label: 'Materia Prima', title: 'Nuova Materia Prima', Icon: Package, description: 'Oro, argento, petrolio, ecc.' },
+  { type: 'pensionFund', label: 'Fondo Pensione', title: 'Nuovo Fondo Pensione', Icon: PiggyBank, description: 'Previdenza complementare, valore da estratto conto' },
 ];
 
 // Zod validation schema for asset form
@@ -319,7 +362,10 @@ const assetSchema = z.object({
   ticker: z.string(),
   name: z.string().min(1, 'Name is required'),
   isin: z.string().regex(/^[A-Z]{2}[A-Z0-9]{9}[0-9]$/, 'Invalid ISIN format (example: IT0003128367)').optional().or(z.literal('')),
-  type: z.enum(['stock', 'etf', 'bond', 'crypto', 'commodity', 'cash', 'realestate']),
+  // Mirrors the AssetType union in types/assets.ts — keep the two in lock-step (tsc catches drift
+  // where the form value is passed back as an AssetType). 'pensionFund' is accepted here from P0 on;
+  // its type card and its dedicated fields land with the pension UI phase (spec 2-pension-fund/04).
+  type: z.enum(['stock', 'etf', 'bond', 'crypto', 'commodity', 'cash', 'realestate', 'pensionFund']),
   assetClass: z.enum(['equity', 'bonds', 'crypto', 'realestate', 'cash', 'commodity']),
   subCategory: z.string().optional(),
   currency: z.string().min(1, 'Currency is required'),
@@ -357,8 +403,14 @@ const assetSchema = z.object({
   // Inflation-linked (BTP Italia Sì): coupon = fixed minimum + announced FOI inflation.
   // The announced rates themselves are managed from the Dividendi tab, not this form.
   bondIsInflationLinked: z.boolean().optional(),
+  // Fondo pensione details (type 'pensionFund' only) — dates as ISO strings (types/pension.ts).
+  pensionProvider: z.string().optional(),
+  pensionEnrollmentDate: z.string().optional(),
+  pensionFirstEmploymentDate: z.string().optional(),
+  pensionUnlockDate: z.string().optional(),
+  pensionIsFirstEmploymentPost2007: z.boolean().optional(),
 }).superRefine((data, ctx) => {
-  const tickerRequired = data.type !== 'cash' && data.type !== 'realestate';
+  const tickerRequired = data.type !== 'cash' && data.type !== 'realestate' && data.type !== 'pensionFund';
   if (tickerRequired && (!data.ticker || data.ticker.trim().length === 0)) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Ticker is required', path: ['ticker'] });
   }
@@ -385,6 +437,7 @@ const assetTypes: { value: AssetType; label: string }[] = [
   { value: 'commodity', label: 'Materia Prima' },
   { value: 'cash', label: 'Liquidità' },
   { value: 'realestate', label: 'Immobile' },
+  { value: 'pensionFund', label: 'Fondo Pensione' },
 ];
 
 /**
@@ -500,6 +553,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
   const watchAllocationRole = useWatch({ control, name: 'allocationRole' });
   const watchStampDutyExempt = useWatch({ control, name: 'stampDutyExempt' });
   const watchOpeningCashAssetId = useWatch({ control, name: 'openingCashAssetId' });
+  const watchPensionIsFirstEmploymentPost2007 = useWatch({ control, name: 'pensionIsFirstEmploymentPost2007' });
 
   // Ledger gating (Phase C):
   //  - isLedgerEdit: editing a ledger asset → quantity/PMC are read-only, submit via updateAssetMetadata.
@@ -521,13 +575,13 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
     (watchBondNominalValue ?? 0) > 1;
 
   // Field visibility based on asset type — applies to both create and edit modes.
-  const newAsset_showTicker = selectedType !== 'cash' && selectedType !== 'realestate';
+  const newAsset_showTicker = selectedType !== 'cash' && selectedType !== 'realestate' && selectedType !== 'pensionFund';
   const newAsset_showISIN = selectedType === 'stock' || selectedType === 'etf' || selectedType === 'bond';
-  const newAsset_quantityLabel = selectedType === 'cash' ? 'Saldo' : selectedType === 'realestate' ? 'Valore stimato' : 'Quantità';
-  const newAsset_showAutoUpdate = selectedType !== 'cash' && selectedType !== 'realestate';
-  const newAsset_showCostBasis = selectedType !== 'cash' && selectedType !== 'realestate';
+  const newAsset_quantityLabel = selectedType === 'cash' ? 'Saldo' : selectedType === 'realestate' ? 'Valore stimato' : selectedType === 'pensionFund' ? 'Valore attuale' : 'Quantità';
+  const newAsset_showAutoUpdate = selectedType !== 'cash' && selectedType !== 'realestate' && selectedType !== 'pensionFund';
+  const newAsset_showCostBasis = selectedType !== 'cash' && selectedType !== 'realestate' && selectedType !== 'pensionFund';
   const newAsset_showTER = selectedType === 'etf' || selectedType === 'stock';
-  const newAsset_showComposition = selectedType === 'etf';
+  const newAsset_showComposition = selectedType === 'etf' || selectedType === 'pensionFund';
 
   // Determine price source based on asset type
   const priceSource = selectedType === 'bond' && selectedAssetClass === 'bonds'
@@ -540,10 +594,12 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
   // - Cash → liquid, no updates (price always 1)
   useEffect(() => {
     if (selectedAssetClass) {
-      // Default for isLiquid: most assets are liquid except real estate and private equity
+      // Default for isLiquid: most assets are liquid except real estate, private equity, and
+      // fondo pensione (locked until retirement — illiquid by nature, spec 04 §1).
       const defaultIsLiquid =
         selectedAssetClass !== 'realestate' &&
-        selectedSubCategory !== 'Private Equity';
+        selectedSubCategory !== 'Private Equity' &&
+        selectedType !== 'pensionFund';
 
       // Default for autoUpdatePrice: use shouldUpdatePrice logic
       const defaultAutoUpdatePrice = shouldUpdatePrice(selectedType, selectedSubCategory);
@@ -569,7 +625,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
     const suggested: AllocationRole =
       selectedAssetClass === 'realestate'
         ? 'excluded'
-        : selectedSubCategory === 'Private Equity'
+        : selectedSubCategory === 'Private Equity' || selectedType === 'pensionFund'
           ? 'frozen'
           : 'tradable';
     if (watchAllocationRole !== suggested) {
@@ -580,6 +636,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
     allocationRoleTouched,
     selectedAssetClass,
     selectedSubCategory,
+    selectedType,
     watchAllocationRole,
     setValue,
   ]);
@@ -635,7 +692,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
       // Determine default for isLiquid if not set
       const defaultIsLiquid = asset.isLiquid !== undefined
         ? asset.isLiquid
-        : (asset.assetClass !== 'realestate' && asset.subCategory !== 'Private Equity');
+        : (asset.assetClass !== 'realestate' && asset.subCategory !== 'Private Equity' && asset.type !== 'pensionFund');
 
       reset({
         ticker: asset.ticker,
@@ -681,6 +738,11 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
         isin: asset.isin || undefined,
         openingDate: todayIso,
         openingCashAssetId: '__none__',
+        pensionProvider: asset.pensionFundDetails?.provider || undefined,
+        pensionEnrollmentDate: asset.pensionFundDetails?.enrollmentDate || undefined,
+        pensionFirstEmploymentDate: asset.pensionFundDetails?.firstEmploymentDate || undefined,
+        pensionUnlockDate: asset.pensionFundDetails?.unlockDate || undefined,
+        pensionIsFirstEmploymentPost2007: asset.pensionFundDetails?.isFirstEmploymentPost2007 || false,
       });
 
       if (asset.composition && asset.composition.length > 0) {
@@ -759,6 +821,11 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
         bondCouponRateSchedule: [],
         bondFinalPremiumRate: undefined,
         bondIsInflationLinked: false,
+        pensionProvider: undefined,
+        pensionEnrollmentDate: undefined,
+        pensionFirstEmploymentDate: undefined,
+        pensionUnlockDate: undefined,
+        pensionIsFirstEmploymentPost2007: false,
       });
       replaceTiers([]);
       setComposition([]);
@@ -992,6 +1059,20 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
         await updateAssetMetadata(asset.id, metadata);
         savedAssetId = asset.id;
         toast.success('Asset aggiornato con successo');
+
+        // Conversion to pensionFund (spec 2-pension-fund/04 §1.1, option 1): the asset leaves the
+        // ledger for good — pensionFund is not a LEDGER_ASSET_TYPE, so its trades would otherwise
+        // sit as an orphan the Rendimenti "Capitale investito" aggregation still sums. Delete them
+        // rather than leave a number that quietly stops matching the page it came from. Best-effort:
+        // a failure here does not roll back the (already successful) type conversion.
+        if (data.type === 'pensionFund' && ownerId) {
+          try {
+            await deleteAllAssetTransactionsForAsset(ownerId, asset.id);
+          } catch (cleanupError) {
+            console.error('Failed to clean up ledger trades after pensionFund conversion:', cleanupError);
+            toast.error('Asset convertito, ma la pulizia del registro operazioni è fallita.');
+          }
+        }
       } else if (asset) {
         // Classic edit (cash / realestate): keep existing price for non-market-priced assets.
         if (!shouldUpdatePrice(data.type, data.subCategory)) {
@@ -1479,6 +1560,86 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                   Il registro operazioni si sta inizializzando: la posizione viene salvata comunque.
                 </p>
               )}
+            </div>
+          )}
+
+          {/* Dettagli Fondo Pensione — only for type pensionFund. Dates feed the tax/plafond engine
+              (lib/utils/pensionDeduction.ts) and the FIRE lock-in (P3); none of it is required to
+              save the asset, so every field stays optional here. */}
+          {selectedType === 'pensionFund' && (
+            <div className="space-y-4 rounded-lg border p-4">
+              <div className="space-y-0.5">
+                <Label>Dettagli Fondo Pensione</Label>
+                <p className="text-xs text-muted-foreground">
+                  Usati per il calcolo del beneficio fiscale e del plafond nella vista Previdenza.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="pensionProvider">Ente / Gestore</Label>
+                <Input
+                  id="pensionProvider"
+                  {...register('pensionProvider')}
+                  placeholder="es. Amundi, Fondo Cometa, PIP Poste Vita"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="pensionEnrollmentDate">Data di iscrizione</Label>
+                  <Input
+                    id="pensionEnrollmentDate"
+                    type="date"
+                    {...register('pensionEnrollmentDate')}
+                  />
+                  <p className="text-xs text-muted-foreground">Definisce l&apos;aliquota di prestazione in uscita.</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pensionUnlockDate">Data di sblocco</Label>
+                  <Input
+                    id="pensionUnlockDate"
+                    type="date"
+                    {...register('pensionUnlockDate')}
+                  />
+                  <p className="text-xs text-muted-foreground">Da quando il capitale è accessibile (uso FIRE).</p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="pensionIsFirstEmploymentPost2007">Prima occupazione dopo il 2007</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Abilita il recupero del plafond di deducibilità inutilizzato (extra-deducibilità).
+                  </p>
+                </div>
+                <Switch
+                  id="pensionIsFirstEmploymentPost2007"
+                  checked={!!watchPensionIsFirstEmploymentPost2007}
+                  onCheckedChange={(checked) => setValue('pensionIsFirstEmploymentPost2007', checked)}
+                />
+              </div>
+
+              {watchPensionIsFirstEmploymentPost2007 && (
+                <div className="space-y-2">
+                  <Label htmlFor="pensionFirstEmploymentDate">Data prima occupazione</Label>
+                  <Input
+                    id="pensionFirstEmploymentDate"
+                    type="date"
+                    {...register('pensionFirstEmploymentDate')}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Da qui parte la finestra di accumulo del plafond (primi 5 anni).
+                  </p>
+                </div>
+              )}
+
+              <p className="text-xs text-muted-foreground border-t border-border/60 pt-3">
+                I versamenti si registrano dalla vista{' '}
+                <Link href="/dashboard/pension" className="text-primary underline hover:no-underline">
+                  Previdenza
+                </Link>
+                , non da qui. Il valore sopra resta il saldo aggiornato manualmente dal tuo estratto conto.
+              </p>
             </div>
           )}
 
@@ -2311,11 +2472,12 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
           )}
 
           {/* color-mix() on --primary so the info box tracks the active theme colour. */}
-          {(selectedType === 'realestate' || selectedSubCategory === 'Private Equity' || shouldUpdatePrice(selectedType, selectedSubCategory)) && (
+          {(selectedType === 'realestate' || selectedType === 'pensionFund' || selectedSubCategory === 'Private Equity' || shouldUpdatePrice(selectedType, selectedSubCategory)) && (
           <div className="rounded-lg bg-[color-mix(in_oklch,var(--primary)_8%,transparent)] border border-[color-mix(in_oklch,var(--primary)_20%,transparent)] p-3">
             <p className="text-sm text-foreground">
               <strong>Nota:</strong>
               {selectedType === 'realestate' && ' Per immobili, il prezzo deve essere aggiornato manualmente.'}
+              {selectedType === 'pensionFund' && " Per i fondi pensione, il valore va aggiornato manualmente quando arriva l'estratto conto: i versamenti registrati da Previdenza si sommano da soli."}
               {selectedSubCategory === 'Private Equity' && ' Per Private Equity, il prezzo deve essere aggiornato manualmente.'}
               {shouldUpdatePrice(selectedType, selectedSubCategory) && ` Puoi inserire un prezzo manuale nel campo apposito, oppure il prezzo verrà recuperato automaticamente da ${priceSource}. In caso di errore nel recupero automatico, potrai sempre impostare il prezzo manualmente.`}
             </p>

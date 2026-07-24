@@ -30,9 +30,11 @@ import {
   calculateFIRENetWorth,
   calculateLiquidFIRENetWorth,
   calculateIlliquidFIRENetWorth,
+  calculateAssetValue,
 } from '@/lib/services/assetService';
 import { getItalyYear } from '@/lib/utils/dateHelpers';
 import { getSettings, setSettings, getDefaultTargets } from '@/lib/services/assetAllocationService';
+import { calculatePensionLockedValue } from '@/lib/utils/pensionFire';
 import {
   getFIREData,
   calculateFIREMetrics,
@@ -123,6 +125,7 @@ export function FireCalculatorTab() {
 
   const [tempWithdrawalRate, setTempWithdrawalRate] = useState<string>('4.0');
   const [includePrimaryResidence, setIncludePrimaryResidence] = useState<boolean>(false);
+  const [respectPensionLockIn, setRespectPensionLockIn] = useState<boolean>(false);
   const [settingsOpen, setSettingsOpen] = useState<boolean>(false);
   const [howItWorksOpen, setHowItWorksOpen] = useState<boolean>(false);
 
@@ -141,9 +144,21 @@ export function FireCalculatorTab() {
   });
 
   const withdrawalRate = settings?.withdrawalRate ?? 4.0;
-  const currentNetWorth = assets ? calculateFIRENetWorth(assets, includePrimaryResidence) : 0;
+  // Locked pension capital (unlockDate in the future) stays in the app's total net worth
+  // everywhere else — it only leaves what THIS calculator treats as spendable now. Subtracted from
+  // both currentNetWorth and illiquidNetWorth (a pension fund is illiquid) so "Anni di spesa totali"
+  // still equals the liquid + illiquid breakdown shown below it.
+  const pensionLockedValue =
+    respectPensionLockIn && assets
+      ? calculatePensionLockedValue(assets, new Date(), calculateAssetValue)
+      : 0;
+  const currentNetWorth = assets
+    ? calculateFIRENetWorth(assets, includePrimaryResidence) - pensionLockedValue
+    : 0;
   const liquidNetWorth = assets ? calculateLiquidFIRENetWorth(assets, includePrimaryResidence) : 0;
-  const illiquidNetWorth = assets ? calculateIlliquidFIRENetWorth(assets, includePrimaryResidence) : 0;
+  const illiquidNetWorth = assets
+    ? Math.max(0, calculateIlliquidFIRENetWorth(assets, includePrimaryResidence) - pensionLockedValue)
+    : 0;
 
   const { data: fireData, isLoading: isLoadingFIRE } = useQuery({
     queryKey: ['fireData', ownerId, currentNetWorth, withdrawalRate, includePrimaryResidence],
@@ -173,7 +188,8 @@ export function FireCalculatorTab() {
       : withdrawalRate;
   const hasUnsavedChanges =
     tempWithdrawalRate !== (settings?.withdrawalRate ?? 4.0).toString() ||
-    includePrimaryResidence !== (settings?.includePrimaryResidenceInFIRE ?? false);
+    includePrimaryResidence !== (settings?.includePrimaryResidenceInFIRE ?? false) ||
+    respectPensionLockIn !== (settings?.respectPensionLockInFire ?? false);
 
   // Decide the panel's initial state ONCE, after the form has settled to match saved settings
   // (hasUnsavedChanges === false ⇒ temp state has been seeded). Collapsed when a withdrawal rate
@@ -249,17 +265,20 @@ export function FireCalculatorTab() {
     if (isLoadingSettings) return;
     setTempWithdrawalRate((settings?.withdrawalRate ?? 4.0).toString());
     setIncludePrimaryResidence(settings?.includePrimaryResidenceInFIRE ?? false);
+    setRespectPensionLockIn(settings?.respectPensionLockInFire ?? false);
   }, [isLoadingSettings, settings]);
 
   const handleResetToSaved = () => {
     setTempWithdrawalRate((settings?.withdrawalRate ?? 4.0).toString());
     setIncludePrimaryResidence(settings?.includePrimaryResidenceInFIRE ?? false);
+    setRespectPensionLockIn(settings?.respectPensionLockInFire ?? false);
   };
 
   const mutation = useMutation({
     mutationFn: (newSettings: {
       withdrawalRate: number;
       includePrimaryResidenceInFIRE?: boolean;
+      respectPensionLockInFire?: boolean;
     }) =>
       setSettings(user!.uid, {
         ...settings,
@@ -287,6 +306,7 @@ export function FireCalculatorTab() {
     mutation.mutate({
       withdrawalRate: newWR,
       includePrimaryResidenceInFIRE: includePrimaryResidence,
+      respectPensionLockInFire: respectPensionLockIn,
     });
   };
 
@@ -410,6 +430,24 @@ export function FireCalculatorTab() {
                   id="includePrimaryResidence"
                   checked={includePrimaryResidence}
                   onCheckedChange={setIncludePrimaryResidence}
+                  className="mt-0.5 shrink-0"
+                />
+              </div>
+
+              <div className="flex items-start justify-between gap-4 rounded-lg border border-border bg-muted/30 p-4">
+                <div className="min-w-0 space-y-0.5">
+                  <Label htmlFor="respectPensionLockIn" className="leading-normal">
+                    Considera il fondo pensione come capitale bloccato fino allo sblocco
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Se attivo, i fondi pensione con data di sblocco futura escono dal patrimonio
+                    FIRE spendibile (restano nel patrimonio totale).
+                  </p>
+                </div>
+                <Switch
+                  id="respectPensionLockIn"
+                  checked={respectPensionLockIn}
+                  onCheckedChange={setRespectPensionLockIn}
                   className="mt-0.5 shrink-0"
                 />
               </div>

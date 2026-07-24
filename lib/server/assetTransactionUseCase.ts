@@ -520,6 +520,39 @@ export async function deleteAssetTransaction(
   return buildResult(plan, commit);
 }
 
+/**
+ * Delete EVERY trade for one asset, no replay — the ledger-orphan fix for converting a ledger asset
+ * (stock/etf/bond/crypto/commodity) to `pensionFund` (docs/specs/2-pension-fund/04-ui-and-views.md
+ * §1.1, option 1). The asset is about to leave the ledger for good: `pensionFund` is not a
+ * LEDGER_ASSET_TYPE, so the caller's metadata write already stopped deriving quantity/PMC from these
+ * trades. Left in place, they would still be summed by ledger consumers keyed on `assetId` alone
+ * (e.g. Rendimenti "Capitale investito") even though the asset itself no longer looks like a ledger
+ * position — a silent, hard-to-diagnose overcount. Batched delete, well under Firestore's 500-op cap
+ * for a single asset's trade history.
+ *
+ * Not exposed for any other use case: a still-ledger asset must never lose its trades this way (use
+ * `deleteAssetTransaction` for a single trade, which re-validates the replay).
+ */
+export async function deleteAllAssetTransactionsForAsset(
+  ownerId: string,
+  assetId: string
+): Promise<number> {
+  const snap = await adminDb
+    .collection(ASSET_TRANSACTIONS_COLLECTION)
+    .where('userId', '==', ownerId)
+    .where('assetId', '==', assetId)
+    .get();
+
+  if (snap.empty) return 0;
+
+  const batch = adminDb.batch();
+  for (const doc of snap.docs) {
+    batch.delete(doc.ref);
+  }
+  await batch.commit();
+  return snap.docs.length;
+}
+
 // ---------------------------------------------------------------------------
 // Migration (idempotent, per-user, server-side — spec 03 §4)
 // ---------------------------------------------------------------------------

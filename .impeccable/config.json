@@ -1,0 +1,41 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "design-system-color",
+        "value": "rgba(128,128,128,0.1)",
+        "createdAt": "2026-07-24T12:14:06.148Z",
+        "reason": "Pre-existing Recharts tooltip cursor fill used across every chart in History (and elsewhere) since before this session; not introduced by the pension-fund P3 work"
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "app/dashboard/history/page.tsx"
+        ],
+        "createdAt": "2026-07-24T12:14:13.677Z",
+        "reason": "False positive: hits a code COMMENT string that documents a border being removed (\"No side-stripe borders: removed border-l-4...\"), not an actual CSS border"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "10px",
+        "createdAt": "2026-07-24T12:14:31.668Z",
+        "reason": "Pre-existing small-caption font size used before this session in FireCalculatorTab/allocation/performance pages; not introduced by the pension-fund P3 work"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "11px",
+        "createdAt": "2026-07-24T12:14:31.745Z",
+        "reason": "Pre-existing small-caption font size (Dettaglio divider label) used before this session; not introduced by the pension-fund P3 work"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#9ca3af",
+        "createdAt": "2026-07-24T12:14:40.718Z",
+        "reason": "Pre-existing 'Altri' bucket gray in prepareAssetDistributionData, predates this session's pension-fund P3 work"
+      }
+    ]
+  }
+}

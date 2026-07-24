@@ -9,6 +9,15 @@
 - Added a live estimated realized-P&L preview when recording a sale, so you see the outcome before confirming.
 - Added "Capitale investito" on Performance: what you actually bought minus sold through the operations register in the selected period, shown next to "Contributi netti" with a popover explaining why the two figures measure different things.
 - Added "Plusvalenze realizzate" on Performance: a per-fiscal-year breakdown of realized gains and losses closed through the operations register.
+- Added a "Fondo Pensione" (pension fund) asset type: a manually-valued holding for your Italian complementary pension, with its own equity/bond mix, enrollment date, and unlock date.
+- Added a dedicated Previdenza page to record pension contributions — TFR, employer, or your own voluntary payment from a linked cash account — with a running total by year and nature, and a one-tap delete that reverses the contribution's effect.
+- Added an estimated annual IRPEF tax-saving summary on the Previdenza page, plus a plafond tracker for the "extra-deducibilità" recovery regime (workers whose first employment started after 2007).
+- Added a "Vai a Previdenza" quick link on your pension fund asset in Patrimonio, and a new "Previdenza" entry in the navigation.
+- Added the ability to convert an investment you already track into a pension fund asset without losing its value or history.
+- Added a "Mostra previdenza complementare" look-through on Allocazione: two read-only cards show your pension fund's own equity/bond mix and the combined portfolio-plus-pension split, without affecting the plans (a pension fund is never bought or sold from there).
+- Added a "Previdenza" band to the Storico asset-class chart, so your pension funds' value is shown on its own instead of being folded into Azioni/Obbligazioni.
+- Performance metrics (TWR, Sharpe, volatility, drawdown, ROI, CAGR) now exclude your pension funds, since they're illiquid capital fed by contributions rather than market activity — "Capitale investito" already excluded them.
+- Added an optional FIRE Calculator setting to treat locked pension capital (before its unlock date) as unavailable for early retirement, while still counting it in your total net worth everywhere else.
 
 ## 🐛 Bug Fixes
 

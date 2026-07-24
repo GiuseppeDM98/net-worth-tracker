@@ -1,3 +1,5 @@
+import type { PensionFundDetails } from './pension';
+
 // AssetType: Granular classification used in UI (stock, ETF, bond, crypto, etc.)
 // AssetClass: Broad financial categories for allocation analysis (equity, bonds, etc.)
 //
@@ -8,7 +10,12 @@
 // - crypto -> crypto
 // - cash -> cash
 // - realestate -> realestate
-export type AssetType = 'stock' | 'etf' | 'bond' | 'crypto' | 'commodity' | 'cash' | 'realestate';
+// - pensionFund -> equity (fallback only; the real mix lives in `composition`) - see TYPE_TO_CLASS
+//
+// WARNING: adding a type here requires updating TYPE_TO_CLASS in components/assets/AssetDialog.tsx
+// (exhaustive `Record<AssetType, AssetClass>` — tsc catches this one) and deciding whether the type
+// belongs in LEDGER_ASSET_TYPES (types/assetTransactions.ts — tsc does NOT catch that one).
+export type AssetType = 'stock' | 'etf' | 'bond' | 'crypto' | 'commodity' | 'cash' | 'realestate' | 'pensionFund';
 export type AssetClass = 'equity' | 'bonds' | 'crypto' | 'realestate' | 'cash' | 'commodity';
 
 // Coupon payment frequency for bonds.
@@ -126,6 +133,7 @@ export interface Asset {
   excludeFromAllocation?: boolean;
   isin?: string; // ISIN code for dividend scraping (optional)
   bondDetails?: BondDetails; // Optional bond-specific details for coupon scheduling
+  pensionFundDetails?: PensionFundDetails; // Optional fondo pensione details (type 'pensionFund'); see types/pension.ts
   // Start of the CURRENT continuous holding, stamped on (re)purchase — createAsset on ISIN reuse,
   // or updateAsset when quantity goes 0 → >0. Lets YOC / Current-Yield ignore dividends from a
   // previous, discontinuous holding of the same instrument. Absent for assets held since before
@@ -159,6 +167,7 @@ export interface AssetFormData {
   allocationRole?: AllocationRole; // How the Allocazione page treats this asset. See AllocationRole.
   isin?: string; // ISIN code for dividend scraping (optional)
   bondDetails?: BondDetails; // Optional bond-specific details for coupon scheduling
+  pensionFundDetails?: PensionFundDetails; // Optional fondo pensione details (type 'pensionFund'); see types/pension.ts
 }
 
 export interface SubCategoryConfig {
@@ -255,6 +264,14 @@ export interface AssetAllocationSettings {
   yearlyEmailEnabled?: boolean; // When true, a summary email is sent on December 31
   weeklyBudgetEmailEnabled?: boolean; // When true, a budget status email is sent every Sunday
   monthlyEmailRecipients?: string[]; // Recipient list shared by all periodic summary emails (monthly/quarterly/semiannual/yearly/weekly-budget)
+  // Fondo pensione tax params (spec 2-pension-fund/04 §4) — feed computePensionTaxRecap in the
+  // Previdenza view. Editable there inline; not part of the FIRE Coast tax params above.
+  grossAnnualIncome?: number; // RAL — base for the marginal-rate IRPEF benefit estimate
+  isFirstEmploymentPost2007?: boolean; // Eligibility for the extra-deducibilità plafond recovery
+  firstEmploymentYear?: number; // First calendar year of participation — anchors the plafond 5/20-year windows
+  // When true, FireCalculatorTab subtracts locked pension-fund capital (unlockDate in the future)
+  // from the FIRE-eligible net worth — see lib/utils/pensionFire.ts. Off by default (opt-in, MVP).
+  respectPensionLockInFire?: boolean;
   targets: AssetAllocationTarget;
 }
 
