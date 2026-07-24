@@ -230,6 +230,22 @@ export interface CoastFireTaxBracket {
   rate: number; // Percentage rate (e.g. 23 for 23%)
 }
 
+/**
+ * A household member the account's pension funds can be attributed to (spec 2-pension-fund
+ * follow-up). The IRPEF pension-deduction ceiling is per TAXPAYER, not per account/household, so an
+ * account tracking more than one person's fondo pensione (e.g. both spouses) needs a per-person RAL
+ * and eligibility, not one shared value. `Asset.pensionFundDetails.familyMemberId` links a fund to
+ * one of these; a fund with no link, or a stale one (member deleted), is treated as unassigned by
+ * the Previdenza view rather than silently mixed into anyone else's calculation.
+ */
+export interface FamilyMember {
+  id: string;
+  name: string;
+  grossAnnualIncome?: number; // RAL — base for the marginal-rate IRPEF benefit estimate
+  isFirstEmploymentPost2007?: boolean; // Eligibility for the extra-deducibilità plafond recovery
+  firstEmploymentYear?: number; // First calendar year of participation — anchors the plafond 5/20-year windows
+}
+
 export interface AssetAllocationSettings {
   userAge?: number;
   riskFreeRate?: number;
@@ -264,11 +280,10 @@ export interface AssetAllocationSettings {
   yearlyEmailEnabled?: boolean; // When true, a summary email is sent on December 31
   weeklyBudgetEmailEnabled?: boolean; // When true, a budget status email is sent every Sunday
   monthlyEmailRecipients?: string[]; // Recipient list shared by all periodic summary emails (monthly/quarterly/semiannual/yearly/weekly-budget)
-  // Fondo pensione tax params (spec 2-pension-fund/04 §4) — feed computePensionTaxRecap in the
-  // Previdenza view. Editable there inline; not part of the FIRE Coast tax params above.
-  grossAnnualIncome?: number; // RAL — base for the marginal-rate IRPEF benefit estimate
-  isFirstEmploymentPost2007?: boolean; // Eligibility for the extra-deducibilità plafond recovery
-  firstEmploymentYear?: number; // First calendar year of participation — anchors the plafond 5/20-year windows
+  // Fondo pensione — household members, one RAL/eligibility per taxpayer (see FamilyMember). Feeds
+  // computePensionTaxRecap in the Previdenza view, once per member with ≥1 linked fund. Editable
+  // from Impostazioni → Preferenze → Famiglia, not part of the FIRE Coast tax params above.
+  familyMembers?: FamilyMember[];
   // When true, FireCalculatorTab subtracts locked pension-fund capital (unlockDate in the future)
   // from the FIRE-eligible net worth — see lib/utils/pensionFire.ts. Off by default (opt-in, MVP).
   respectPensionLockInFire?: boolean;

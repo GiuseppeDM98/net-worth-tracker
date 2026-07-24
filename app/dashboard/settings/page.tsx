@@ -43,7 +43,8 @@ import {
   calculateEquityPercentage,
   validateSpecificAssets,
 } from '@/lib/services/assetAllocationService';
-import { AssetAllocationTarget, AssetClass, SubCategoryTarget as SubCategoryTargetType } from '@/types/assets';
+import { AssetAllocationTarget, AssetClass, SubCategoryTarget as SubCategoryTargetType, FamilyMember } from '@/types/assets';
+import { useQueryClient } from '@tanstack/react-query';
 import { formatPercentage } from '@/lib/services/chartService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -124,6 +125,66 @@ const roundToTwoDecimals = (value: number): number => {
   return Math.round(value * 100) / 100;
 };
 
+// Famiglia — household members a pension fund can be attributed to (Impostazioni → Preferenze).
+// String-typed draft (never fights the user while typing), same shape as CoastFireTab's pension/tax
+// bracket draft editors — plain useState array, no react-hook-form field array anywhere in Settings.
+interface FamilyMemberDraft {
+  id: string;
+  name: string;
+  grossAnnualIncome: string;
+  isFirstEmploymentPost2007: boolean;
+  firstEmploymentYear: string;
+}
+
+// Local id generator — CoastFireTab.tsx has an identical `createLocalId`, not exported; duplicated
+// here rather than introducing a cross-module import for a one-line helper.
+function createFamilyMemberId(): string {
+  return `family-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function toFamilyMemberDrafts(members: FamilyMember[] | undefined): FamilyMemberDraft[] {
+  return (members ?? []).map((member) => ({
+    id: member.id,
+    name: member.name,
+    grossAnnualIncome: member.grossAnnualIncome != null ? String(member.grossAnnualIncome) : '',
+    isFirstEmploymentPost2007: member.isFirstEmploymentPost2007 ?? false,
+    firstEmploymentYear: member.firstEmploymentYear != null ? String(member.firstEmploymentYear) : '',
+  }));
+}
+
+// Drops rows with an empty/whitespace-only name (same cleanup-before-validation precedent as the
+// empty-subcategory-row cleanup in handleSave) — a nameless member can't be attributed to anything.
+function parseFamilyMemberDrafts(drafts: FamilyMemberDraft[]): FamilyMember[] {
+  return drafts
+    .filter((draft) => draft.name.trim() !== '')
+    .map((draft) => {
+      const ral = Number.parseFloat(draft.grossAnnualIncome.replace(',', '.'));
+      const year = Number.parseInt(draft.firstEmploymentYear, 10);
+      return {
+        id: draft.id,
+        name: draft.name.trim(),
+        grossAnnualIncome: Number.isFinite(ral) && ral > 0 ? ral : undefined,
+        isFirstEmploymentPost2007: draft.isFirstEmploymentPost2007,
+        firstEmploymentYear: Number.isInteger(year) ? year : undefined,
+      };
+    });
+}
+
+// Normalized, order-independent snapshot of a FamilyMember[] for the dirty-state comparison —
+// used for BOTH the saved baseline and the live draft state so the two are always comparable.
+function familyMembersSnapshotValue(members: FamilyMember[]) {
+  return [...members]
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map((member) => ({
+      id: member.id,
+      name: member.name,
+      grossAnnualIncome:
+        member.grossAnnualIncome !== undefined ? roundToTwoDecimals(member.grossAnnualIncome) : null,
+      isFirstEmploymentPost2007: member.isFirstEmploymentPost2007 ?? false,
+      firstEmploymentYear: member.firstEmploymentYear ?? null,
+    }));
+}
+
 // Module-level tab definitions drive both the mobile pill and the desktop underline tabs.
 const SETTINGS_TABS: TabDef[] = [
   { value: 'allocazione', label: 'Allocazione', icon: PieChart },
@@ -138,6 +199,7 @@ export default function SettingsPage() {
   const { user } = useAuth();
   const { ownerId } = useActiveAccount();
   const isDemo = useDemoMode();
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [userAge, setUserAge] = useState<number | undefined>(undefined);
@@ -227,6 +289,7 @@ export default function SettingsPage() {
   const { colorTheme, setColorTheme } = useColorTheme();
   const [allocationBaselineKey, setAllocationBaselineKey] = useState('');
   const [generalBaselineKey, setGeneralBaselineKey] = useState('');
+  const [familyMemberDrafts, setFamilyMemberDrafts] = useState<FamilyMemberDraft[]>([]);
   const [dividendBaselineKey, setDividendBaselineKey] = useState('');
   const [deleteDialogOrigin, setDeleteDialogOrigin] = useState<string | undefined>(
     undefined
@@ -402,6 +465,8 @@ export default function SettingsPage() {
         // Load dividend settings
         setDividendIncomeCategoryId(settingsData.dividendIncomeCategoryId || '');
         setDividendIncomeSubCategoryId(settingsData.dividendIncomeSubCategoryId || '');
+        // Load family members (fondo pensione per-taxpayer RAL/eligibility)
+        setFamilyMemberDrafts(toFamilyMemberDrafts(settingsData.familyMembers));
       }
 
       // Load cash fixed amount settings if available
@@ -518,6 +583,7 @@ export default function SettingsPage() {
           yearlyEmailEnabled: settingsData?.yearlyEmailEnabled ?? false,
           weeklyBudgetEmailEnabled: settingsData?.weeklyBudgetEmailEnabled ?? false,
           monthlyEmailRecipients: [...(settingsData?.monthlyEmailRecipients ?? [])].sort(),
+          familyMembers: familyMembersSnapshotValue(settingsData?.familyMembers ?? []),
         })
       );
 
@@ -920,6 +986,29 @@ export default function SettingsPage() {
     );
   };
 
+  // Famiglia — add/update/remove a member row (plain array state, same pattern as
+  // updatePensionRow/removePensionRow in CoastFireTab.tsx).
+  const addFamilyMemberRow = () => {
+    setFamilyMemberDrafts((current) => [
+      ...current,
+      { id: createFamilyMemberId(), name: '', grossAnnualIncome: '', isFirstEmploymentPost2007: false, firstEmploymentYear: '' },
+    ]);
+  };
+
+  const updateFamilyMemberRow = (
+    id: string,
+    field: keyof Omit<FamilyMemberDraft, 'id'>,
+    value: string | boolean
+  ) => {
+    setFamilyMemberDrafts((current) =>
+      current.map((draft) => (draft.id === id ? { ...draft, [field]: value } : draft))
+    );
+  };
+
+  const removeFamilyMemberRow = (id: string) => {
+    setFamilyMemberDrafts((current) => current.filter((draft) => draft.id !== id));
+  };
+
   const handleSave = async () => {
     if (!user || !ownerId) return;
 
@@ -1081,11 +1170,16 @@ export default function SettingsPage() {
         yearlyEmailEnabled,
         weeklyBudgetEmailEnabled,
         monthlyEmailRecipients,
+        familyMembers: parseFamilyMemberDrafts(familyMemberDrafts),
       });
       toast.success('Impostazioni salvate con successo');
       setAllocationBaselineKey(allocationSnapshotKey);
       setGeneralBaselineKey(generalSnapshotKey);
       setDividendBaselineKey(dividendSnapshotKey);
+      // Other consumers (AssetDialog's family-member Select, PensionOverview) read settings via
+      // React Query with a 5-minute staleTime — without this, a just-added member wouldn't be
+      // selectable there until that cache naturally expired.
+      queryClient.invalidateQueries({ queryKey: ['settings', ownerId] });
     } catch (error) {
       console.error('Error saving targets:', error);
       toast.error('Errore nel salvataggio dei target');
@@ -1397,6 +1491,7 @@ export default function SettingsPage() {
         yearlyEmailEnabled,
         weeklyBudgetEmailEnabled,
         monthlyEmailRecipients: [...monthlyEmailRecipients].sort(),
+        familyMembers: familyMembersSnapshotValue(parseFamilyMemberDrafts(familyMemberDrafts)),
       }),
     [
       includePrimaryResidenceInFIRE,
@@ -1416,6 +1511,7 @@ export default function SettingsPage() {
       yearlyEmailEnabled,
       weeklyBudgetEmailEnabled,
       monthlyEmailRecipients,
+      familyMemberDrafts,
     ]
   );
 
@@ -1801,6 +1897,117 @@ export default function SettingsPage() {
                 className={interactiveControlClass}
               />
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Famiglia — household members a fondo pensione can be attributed to. The IRPEF pension
+          deduction ceiling is per taxpayer, not per account: an account tracking more than one
+          person's fund (e.g. both spouses) needs a RAL per person here, not one shared value, or
+          the Previdenza tax recap silently mixes their contributions together. */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-base">Famiglia</CardTitle>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Aggiungi un membro per ogni persona i cui fondi pensione tracci in questo account, con la
+            propria RAL — il beneficio fiscale in Previdenza si calcola una volta per membro, non
+            sommando tutti i fondi insieme. Colleghi un fondo a un membro dalla sua scheda in
+            Patrimonio.
+          </p>
+        </CardHeader>
+        <CardContent className="p-4 sm:p-6">
+          <div className="space-y-3">
+            {familyMemberDrafts.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border bg-muted/20 p-4 text-sm text-muted-foreground">
+                Nessun membro inserito. I fondi pensione restano visibili in Previdenza ma senza
+                calcolo del beneficio fiscale finché non li assegni a un membro.
+              </div>
+            ) : (
+              familyMemberDrafts.map((member) => (
+                <div key={member.id} className="rounded-lg border border-border bg-card p-4">
+                  <div className="mb-3 flex items-start justify-between gap-3">
+                    <div className="flex-1 space-y-2">
+                      <Label htmlFor={`family-name-${member.id}`}>Nome</Label>
+                      <Input
+                        id={`family-name-${member.id}`}
+                        value={member.name}
+                        onChange={(e) => updateFamilyMemberRow(member.id, 'name', e.target.value)}
+                        placeholder="es. Giuseppe"
+                        disabled={isDemo}
+                        className={interactiveControlClass}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeFamilyMemberRow(member.id)}
+                      disabled={isDemo}
+                      aria-label="Rimuovi membro"
+                      className="mt-6 h-10 w-10 shrink-0"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor={`family-ral-${member.id}`}>Reddito annuo lordo (RAL)</Label>
+                      <Input
+                        id={`family-ral-${member.id}`}
+                        type="number"
+                        inputMode="decimal"
+                        value={member.grossAnnualIncome}
+                        onChange={(e) => updateFamilyMemberRow(member.id, 'grossAnnualIncome', e.target.value)}
+                        placeholder="es. 35000"
+                        disabled={isDemo}
+                        className={interactiveControlClass}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor={`family-year-${member.id}`}>Anno prima occupazione</Label>
+                      <Input
+                        id={`family-year-${member.id}`}
+                        type="number"
+                        value={member.firstEmploymentYear}
+                        onChange={(e) => updateFamilyMemberRow(member.id, 'firstEmploymentYear', e.target.value)}
+                        placeholder="es. 2022"
+                        disabled={isDemo || !member.isFirstEmploymentPost2007}
+                        className={interactiveControlClass}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between gap-3 border-t pt-3">
+                    <Label htmlFor={`family-firstjob-${member.id}`} className="text-xs text-muted-foreground">
+                      Prima occupazione dopo il 2007 (abilita il recupero plafond)
+                    </Label>
+                    <Switch
+                      id={`family-firstjob-${member.id}`}
+                      checked={member.isFirstEmploymentPost2007}
+                      onCheckedChange={(checked) => updateFamilyMemberRow(member.id, 'isFirstEmploymentPost2007', checked)}
+                      disabled={isDemo}
+                      className={interactiveControlClass}
+                    />
+                  </div>
+                </div>
+              ))
+            )}
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={addFamilyMemberRow}
+              disabled={isDemo}
+              className="w-full sm:w-auto"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Aggiungi membro
+            </Button>
           </div>
         </CardContent>
       </Card>
