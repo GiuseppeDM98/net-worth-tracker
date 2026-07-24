@@ -300,6 +300,12 @@ const TYPE_TO_CLASS: Record<AssetType, AssetClass> = {
   cash: 'cash',
   realestate: 'realestate',
   commodity: 'commodity',
+  // A fondo pensione has no asset class of its OWN — its real exposure is the internal comparto mix,
+  // which lives in `Asset.composition` (decision D2: no `AssetClass 'pension'`). Every consumer that
+  // matters reads `composition` when present, so this entry is only the fallback for a fund whose
+  // composition has not been filled in yet; 'equity' is the least-wrong default for the typical
+  // (equity-tilted) comparto. The form always prompts for the composition.
+  pensionFund: 'equity',
 };
 
 // Type picker card definitions for step 1 of the create flow
@@ -319,7 +325,10 @@ const assetSchema = z.object({
   ticker: z.string(),
   name: z.string().min(1, 'Name is required'),
   isin: z.string().regex(/^[A-Z]{2}[A-Z0-9]{9}[0-9]$/, 'Invalid ISIN format (example: IT0003128367)').optional().or(z.literal('')),
-  type: z.enum(['stock', 'etf', 'bond', 'crypto', 'commodity', 'cash', 'realestate']),
+  // Mirrors the AssetType union in types/assets.ts — keep the two in lock-step (tsc catches drift
+  // where the form value is passed back as an AssetType). 'pensionFund' is accepted here from P0 on;
+  // its type card and its dedicated fields land with the pension UI phase (spec 2-pension-fund/04).
+  type: z.enum(['stock', 'etf', 'bond', 'crypto', 'commodity', 'cash', 'realestate', 'pensionFund']),
   assetClass: z.enum(['equity', 'bonds', 'crypto', 'realestate', 'cash', 'commodity']),
   subCategory: z.string().optional(),
   currency: z.string().min(1, 'Currency is required'),

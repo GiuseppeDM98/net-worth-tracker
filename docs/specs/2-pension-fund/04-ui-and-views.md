@@ -43,8 +43,43 @@ Riferimento codice fork: `ciocc/main:components/fire-simulations/PensionTab.tsx`
     e indifferenti alla scelta.
 - **`asset-transactions`**: `pensionFund` è non-ledger → NON entra nel ramo read-only qty/PMC di
   AssetDialog né nel trigger migrazione; resta sul path manuale `updateAsset` (come `realestate`).
+  ⚠️ Vale per un fondo creato come tale; per uno **convertito** vedi §1.1 (il branch di submit legge
+  `asset.type`, cioè il tipo PRIMA della modifica).
 - Link "Vai a Previdenza" dalla card asset in Patrimonio (`AssetCard`/`AssetManagementTab`) per i
   fondi → `/dashboard/pension`.
+
+### 1.1 Conversione dei fondi già a portafoglio (scope P2, NON opzionale)
+
+Un utente che tracciava già il fondo prima della feature lo ha quasi certamente modellato come
+**ledger type** (`etf`/`stock`, `assetClass 'equity'`, valore in `quantity`, prezzo 1) — che è già
+la forma esatta prevista dall'invariante #2. La conversione è quindi una **modifica di tipo**, non
+una ricreazione, e la spec deve dirlo esplicitamente perché la strada sbagliata è quella intuitiva.
+
+- **Mai eliminare e ricreare.** `MonthlySnapshot.byAsset` è keyed by `assetId`: un asset nuovo perde
+  Δ Inizio, "Valore per Strumento" e la continuità storica nei grafici. La Select **"Tipo \*"**
+  dell'edit di `AssetDialog` (già esistente, visibile solo in `isEdit`) è la via corretta — basta
+  che `assetTypes` includa `pensionFund`.
+- **Il valore si conserva da solo.** Il branch di submit è
+  `ledgerEditFlow = !!asset && isLedgerAssetType(asset.type)` e legge il tipo **memorizzato**, non
+  quello scelto nel form: l'edit di conversione passa quindi da `updateAssetMetadata`, che include
+  `type` ma **non tocca `quantity`**. Nessun reinserimento del valore. (Da qui in poi l'asset è
+  non-ledger e ogni edit successivo va su `updateAsset`, come dice §1.)
+- **Ledger orfano — è il punto che produce un numero sbagliato, non solo un residuo.** L'asset
+  conserva il BUY baseline scritto dalla migrazione del registro. Le azioni riga spariscono da sole
+  (gate `isLedgerAssetType`), ma `computeInvestedCapital` (Rendimenti) somma **tutti** i trade senza
+  filtrare per tipo asset: il "Capitale investito" continuerebbe a includere il fondo **proprio
+  mentre P3 lo esclude dalla base Rendimenti** → pagina internamente incoerente. Risolvere in P2 con
+  una delle due (decidere in fase, documentare la scelta):
+  1. cancellare i doc `assetTransactions` dell'asset alla conversione (irreversibile, ma il fondo
+     non avrà mai un registro), oppure
+  2. filtrare i trade per `isLedgerAssetType(asset.type)` nei consumer (`computeInvestedCapital`,
+     `aggregateRealizedByYear`, `totalReturnAssets`) — più difensivo, copre anche conversioni future.
+- **Campi da sistemare a mano dopo la conversione** (nessuno ha un default retroattivo, per la regola
+  "nessun ruolo è mai inferito in lettura"): `allocationRole → frozen` (il default `frozen` del
+  `useEffect` vale solo per i fondi NUOVI), `stampDutyExempt → true` (esenzione bollo), più
+  `pensionFundDetails` e `composition`.
+- **Copy**: l'edit di un asset appena convertito deve rendere evidente che i contributi si registrano
+  da `/dashboard/pension` e che il valore attuale resta il saldo da estratto conto.
 
 ## 2. `components/pension/PensionContributionDialog.tsx` (nuovo)
 

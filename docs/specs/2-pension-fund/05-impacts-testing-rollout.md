@@ -11,7 +11,7 @@ creano `Expense` di consumo → cashflow intatto.
 | Superficie | Perché è safe |
 | --- | --- |
 | Cashflow / budget / Analisi / overview / email | i contributi non sono Expense di consumo; il transfer del volontario è net-zero già escluso |
-| `asset-transactions` (registro, migrazione, metriche) | `pensionFund` non è ledger type → nessuna interazione |
+| `asset-transactions` — fondo creato **come** `pensionFund` | non è ledger type → nessuna interazione |
 | Patrimonio (tabella, Δ, G/P), PDF, stamp duty | leggono il valore dell'asset (quantity), invariato |
 | Panoramica net worth | il valore del fondo è nel patrimonio come qualunque asset |
 | YOC / dividendi | il fondo non paga dividendi tracciati; nessun impatto |
@@ -37,6 +37,13 @@ creano `Expense` di consumo → cashflow intatto.
 | `lib/utils/performanceBase.ts` + pagina Rendimenti + `getAllPerformanceData` | base portafoglio esclude fondi | P3 |
 | `lib/utils/pensionFire.ts` + `FireCalculatorTab.tsx` + settings | lock-in FIRE | P3 |
 | `components/fire-simulations/page.tsx` | rimozione eventuale tab Previdenza | P2 |
+| `assetTransactions` dei fondi **convertiti** | cleanup baseline orfano **oppure** filtro per tipo nei consumer (04 §1.1) | P2 |
+
+> ⚠️ **La riga "nessuna interazione" qui sopra vale solo per un fondo creato da zero.** Un fondo
+> **convertito** da `etf`/`stock` conserva il BUY baseline della migrazione del registro: le azioni
+> riga spariscono da sole, ma `computeInvestedCapital` somma tutti i trade senza filtrare per tipo,
+> quindi il "Capitale investito" di Rendimenti includerebbe il fondo mentre P3 lo esclude dalla base.
+> Procedura completa e le due opzioni di fix in `04-ui-and-views.md` §1.1.
 
 ## 2. Checklist di regressione (dopo P1, P2, P3)
 
@@ -57,6 +64,10 @@ creano `Expense` di consumo → cashflow intatto.
 9. **Fiscale**: recap con RAL nota → risparmio = `tax(RAL) − tax(RAL − dedotto)`; plafond coerente
    col fold (confrontare con un calcolo a mano su un profilo prima-occupazione-post-2007).
 10. Shared account: delegato registra/elimina contributi. Demo: viste visibili, mutazioni disabilitate.
+11. **Conversione (04 §1.1)**: convertito un `etf` in `pensionFund`, il valore resta identico, lo
+    storico per-asset non si spezza (Δ Inizio e "Valore per Strumento" continuano dai mesi
+    precedenti), le azioni riga del registro spariscono, e il "Capitale investito" di Rendimenti
+    **non** conta più il fondo.
 
 ## 3. Script di test manuale (fine P2 e P3)
 
@@ -64,6 +75,13 @@ creano `Expense` di consumo → cashflow intatto.
 registra TFR (valore sale) → registra volontario da un conto (conto scende, valore sale, transfer in
 Cashflow net-zero) → registra datoriale → imposta RAL in Settings → verifica recap "Beneficio fiscale"
 e "Plafond" → elimina il volontario (conto ristornato, transfer sparito).
+
+**P2 — conversione di un fondo preesistente** (percorso reale dell'utente, 04 §1.1): apri in modifica
+un fondo oggi modellato come `etf` → cambia "Tipo" in Fondo Pensione → salva. Verifica: valore
+invariato senza reinserirlo; `allocationRole` da portare a `frozen` e `stampDutyExempt` da attivare a
+mano; compila provider/composizione/date; le icone ⇄ e 📋 del registro spariscono dalla riga; in
+Rendimenti il "Capitale investito" non include più il fondo; in Storico la serie dell'asset non si
+interrompe nel mese della conversione.
 
 **P3**: Allocazione — il fondo non è nei piani, card look-through corrette → Storico — banda Previdenza
 → Rendimenti — TWR invariato con/senza fondo → FIRE — toggle lock-in sposta il currentNetWorth.

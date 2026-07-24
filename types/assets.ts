@@ -1,3 +1,5 @@
+import type { PensionFundDetails } from './pension';
+
 // AssetType: Granular classification used in UI (stock, ETF, bond, crypto, etc.)
 // AssetClass: Broad financial categories for allocation analysis (equity, bonds, etc.)
 //
@@ -8,7 +10,12 @@
 // - crypto -> crypto
 // - cash -> cash
 // - realestate -> realestate
-export type AssetType = 'stock' | 'etf' | 'bond' | 'crypto' | 'commodity' | 'cash' | 'realestate';
+// - pensionFund -> equity (fallback only; the real mix lives in `composition`) - see TYPE_TO_CLASS
+//
+// WARNING: adding a type here requires updating TYPE_TO_CLASS in components/assets/AssetDialog.tsx
+// (exhaustive `Record<AssetType, AssetClass>` — tsc catches this one) and deciding whether the type
+// belongs in LEDGER_ASSET_TYPES (types/assetTransactions.ts — tsc does NOT catch that one).
+export type AssetType = 'stock' | 'etf' | 'bond' | 'crypto' | 'commodity' | 'cash' | 'realestate' | 'pensionFund';
 export type AssetClass = 'equity' | 'bonds' | 'crypto' | 'realestate' | 'cash' | 'commodity';
 
 // Coupon payment frequency for bonds.
@@ -126,6 +133,7 @@ export interface Asset {
   excludeFromAllocation?: boolean;
   isin?: string; // ISIN code for dividend scraping (optional)
   bondDetails?: BondDetails; // Optional bond-specific details for coupon scheduling
+  pensionFundDetails?: PensionFundDetails; // Optional fondo pensione details (type 'pensionFund'); see types/pension.ts
   // Start of the CURRENT continuous holding, stamped on (re)purchase — createAsset on ISIN reuse,
   // or updateAsset when quantity goes 0 → >0. Lets YOC / Current-Yield ignore dividends from a
   // previous, discontinuous holding of the same instrument. Absent for assets held since before
@@ -159,6 +167,7 @@ export interface AssetFormData {
   allocationRole?: AllocationRole; // How the Allocazione page treats this asset. See AllocationRole.
   isin?: string; // ISIN code for dividend scraping (optional)
   bondDetails?: BondDetails; // Optional bond-specific details for coupon scheduling
+  pensionFundDetails?: PensionFundDetails; // Optional fondo pensione details (type 'pensionFund'); see types/pension.ts
 }
 
 export interface SubCategoryConfig {
