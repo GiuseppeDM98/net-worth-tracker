@@ -19,6 +19,11 @@
 - Performance metrics (TWR, Sharpe, volatility, drawdown, ROI, CAGR) now exclude your pension funds, since they're illiquid capital fed by contributions rather than market activity — "Capitale investito" already excluded them.
 - Added an optional FIRE Calculator setting to treat locked pension capital (before its unlock date) as unavailable for early retirement, while still counting it in your total net worth everywhere else.
 - Added a "Famiglia" section in Settings where you can add family members, each with their own income (RAL) and pension deduction eligibility, and link each pension fund to one of them from its asset details.
+- Added support for leveraged and composite ETFs: set a "Leva" (leverage) multiplier on an ETF (e.g. 2 for a 2x fund) and the app tracks its notional exposure — the real risk it carries — separately from its market value.
+- Added a dual-number view to the Allocazione hero when you hold leverage: your invested capital ("Patrimonio investito") and your notional exposure ("Esposizione nozionale") side by side, with a current-vs-target leverage indicator.
+- Added leverage-aware allocation targets: your per-class targets can now sum to more than 100% to express a desired leverage, and Settings shows the resulting target leverage (e.g. "Leva target 1,50×").
+- Added leverage-aware Ribilancia / Versa / Preleva plans: when you hold leveraged or composite ETFs, the suggested trades reason over your actual instruments (a €1 buy of a 2x fund moves more than €1 of exposure) instead of assuming plain 1x purchases.
+- Added two new asset classes, "Trend Following" and "Carry", selectable as allocation targets and as composition legs of a composite ETF.
 
 ## 🐛 Bug Fixes
 

@@ -22,6 +22,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { type AllocatableHolding, type RebalanceMove } from '@/lib/utils/allocationUtils';
+import type { LeveragePlanInputs } from '@/lib/utils/leverageAwareAllocationUtils';
 import type { AllocationData } from '@/types/assets';
 import { RebalancePanel } from './RebalancePanel';
 import { ContributionPanel } from './ContributionPanel';
@@ -43,6 +44,9 @@ interface ActionPlannerProps {
   bySpecificAsset: Record<string, AllocationData>;
   /** Per-instrument rows of the rebalanceable portfolio; Versa and Preleva drill down to these. */
   holdings: AllocatableHolding[];
+  /** Present only when the portfolio has leveraged exposure: routes all three modes through the
+   *  instrument-aware engine instead of the class-level pro-rata planners. */
+  leverage?: LeveragePlanInputs;
 }
 
 export function ActionPlanner({
@@ -51,6 +55,7 @@ export function ActionPlanner({
   bySubCategory,
   bySpecificAsset,
   holdings,
+  leverage,
 }: ActionPlannerProps) {
   const reducedMotion = useReducedMotion();
   const layoutId = useId();
@@ -98,13 +103,14 @@ export function ActionPlanner({
         </div>
       </div>
 
-      {mode === 'rebalance' && <RebalancePanel moves={moves} />}
+      {mode === 'rebalance' && <RebalancePanel moves={moves} leverage={leverage} />}
       {mode === 'contribute' && (
         <ContributionPanel
           byAssetClass={byAssetClass}
           bySubCategory={bySubCategory}
           bySpecificAsset={bySpecificAsset}
           holdings={holdings}
+          leverage={leverage}
         />
       )}
       {mode === 'withdraw' && (
@@ -112,6 +118,7 @@ export function ActionPlanner({
           byAssetClass={byAssetClass}
           bySubCategory={bySubCategory}
           holdings={holdings}
+          leverage={leverage}
         />
       )}
     </Card>

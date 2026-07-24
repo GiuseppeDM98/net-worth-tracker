@@ -117,6 +117,22 @@ export interface LeverageAwarePlan {
   resultingLeverageRatio: number;
 }
 
+/**
+ * The current-state inputs the three `planInstrument*` functions all need, bundled so the page can
+ * compute them once (from the leverage-aware `AllocationResult` + the tradable partition) and hand
+ * them to the Ribilancia/Versa/Preleva panels. `tradableAssets` are the trade CANDIDATES (only
+ * `tradable`); the notional/market totals are on the investable base (`tradable + frozen`), so the
+ * frozen exposure enters the solver as a constant and the trades compensate for it (invariant #5).
+ */
+export interface LeveragePlanInputs {
+  tradableAssets: Asset[];
+  currentNotionalByAssetClass: Record<string, number>;
+  currentNotionalTotal: number;
+  currentMarketTotal: number;
+  targetPercentageByAssetClass: Record<string, number>;
+  targetLeverageRatio: number;
+}
+
 function dot(a: number[], b: number[]): number {
   let sum = 0;
   for (let i = 0; i < a.length; i++) sum += a[i] * b[i];

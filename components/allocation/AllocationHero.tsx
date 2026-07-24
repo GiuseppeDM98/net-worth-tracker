@@ -32,7 +32,18 @@ import { BalanceScoreGauge } from './BalanceScoreGauge';
 import type { AllocationData } from '@/types/assets';
 
 interface AllocationHeroProps {
-  totalValue: number;
+  /** Market total of the investable base — "Patrimonio investito". The single hero number when
+   *  there is no leverage (market === notional then). */
+  marketValue: number;
+  /** Notional exposure total — "Esposizione nozionale". Shown as the second number under leverage,
+   *  and it is the denominator the composition bar widths are relative to. */
+  notionalValue: number;
+  /** Current leverage (notional / market). 1 when unleveraged. */
+  leverageRatio: number;
+  /** Whether to show the dual-number, leverage-aware hero. */
+  hasLeveragedExposure: boolean;
+  /** Target leverage (Σtarget / 100), for the chip's "corrente · target" when they differ. */
+  targetLeverageRatio: number;
   byAssetClass: Record<string, AllocationData>;
   summary: BalanceSummary;
   balance: BalanceScore;
@@ -41,6 +52,11 @@ interface AllocationHeroProps {
   excludedHoldings: AllocatableHolding[];
   /** Role `frozen` — INSIDE the total above, but untouchable by the plans. Empty hides the caption. */
   frozenHoldings: AllocatableHolding[];
+}
+
+/** Leverage formatted the Italian way, e.g. 1.5 → "1,50×". */
+function formatLeverage(ratio: number): string {
+  return `${ratio.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}×`;
 }
 
 /** Leaf so the rAF count-up re-renders only this span. */
@@ -109,7 +125,11 @@ function HoldingsCaption({
 }
 
 export function AllocationHero({
-  totalValue,
+  marketValue,
+  notionalValue,
+  leverageRatio,
+  hasLeveragedExposure,
+  targetLeverageRatio,
   byAssetClass,
   summary,
   balance,
@@ -119,20 +139,62 @@ export function AllocationHero({
 }: AllocationHeroProps) {
   const { isBalanced, offTargetCount, largestGap } = summary;
   const actionColors = useActionColors();
+  const leverageDiffersFromTarget = Math.abs(leverageRatio - targetLeverageRatio) > 0.01;
 
   return (
     <div className="grid gap-4 desktop:grid-cols-[2fr_1fr]">
-      {/* Dominant: total allocated wealth + portfolio shape */}
+      {/* Dominant: total allocated wealth + portfolio shape. Without leverage, ONE number (market
+          == notional). With leverage, TWO paired numbers — investito (market) vs esposizione
+          (notional) — stacked on mobile (grid-cols-1) to avoid the ~390px overlap, side-by-side
+          from tablet up, with the leverage chip between them. */}
       <div className="flex flex-col rounded-2xl border border-border bg-card p-[22px]">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-          Patrimonio allocato
-        </p>
-        <p className="mt-2 font-mono text-[44px] font-bold leading-none tracking-[-0.03em] text-foreground desktop:text-[54px]">
-          <HeroValue value={totalValue} />
-        </p>
-        <p className="mt-3 text-[11px] text-muted-foreground">
-          {assetClassCount} {assetClassCount === 1 ? 'classe di asset' : 'classi di asset'} · valori correnti
-        </p>
+        {hasLeveragedExposure ? (
+          <>
+            <div className="grid grid-cols-1 gap-4 tablet:grid-cols-2">
+              <div className="flex flex-col">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                  Patrimonio investito
+                </p>
+                <p className="mt-2 font-mono text-[34px] font-bold leading-none tracking-[-0.03em] text-foreground desktop:text-[40px]">
+                  <HeroValue value={marketValue} />
+                </p>
+              </div>
+              <div className="flex flex-col tablet:border-l tablet:border-border/60 tablet:pl-4">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                  Esposizione nozionale
+                </p>
+                <p className="mt-2 font-mono text-[34px] font-bold leading-none tracking-[-0.03em] text-foreground desktop:text-[40px]">
+                  <HeroValue value={notionalValue} />
+                </p>
+              </div>
+            </div>
+            <div className="mt-3 flex items-center gap-2">
+              <span className="rounded-md bg-muted px-2 py-0.5 font-mono text-xs font-semibold tabular-nums text-foreground">
+                Leva {formatLeverage(leverageRatio)}
+              </span>
+              {leverageDiffersFromTarget && (
+                <span className="text-[11px] text-muted-foreground">
+                  target {formatLeverage(targetLeverageRatio)}
+                </span>
+              )}
+              <span className="ml-auto text-[11px] text-muted-foreground">
+                {assetClassCount} {assetClassCount === 1 ? 'classe' : 'classi'}
+              </span>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+              Patrimonio allocato
+            </p>
+            <p className="mt-2 font-mono text-[44px] font-bold leading-none tracking-[-0.03em] text-foreground desktop:text-[54px]">
+              <HeroValue value={marketValue} />
+            </p>
+            <p className="mt-3 text-[11px] text-muted-foreground">
+              {assetClassCount} {assetClassCount === 1 ? 'classe di asset' : 'classi di asset'} · valori correnti
+            </p>
+          </>
+        )}
 
         {/* Two captions, two OPPOSITE relationships to the number above — hence two lines, not one.
             Frozen wealth is INSIDE the total (it just cannot be moved); excluded wealth is OUTSIDE
@@ -151,7 +213,12 @@ export function AllocationHero({
         />
 
         <div className="mt-auto pt-5">
-          <AllocationCompositionBar byAssetClass={byAssetClass} totalValue={totalValue} />
+          <AllocationCompositionBar
+            byAssetClass={byAssetClass}
+            totalValue={notionalValue}
+            marketValue={marketValue}
+            hasLeveragedExposure={hasLeveragedExposure}
+          />
         </div>
       </div>
 

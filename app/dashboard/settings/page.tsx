@@ -108,14 +108,13 @@ const assetClassLabels: Record<AssetClass, string> = {
   realestate: 'Immobili (Real Estate)',
   cash: 'Liquidità (Cash)',
   commodity: 'Materie Prime (Commodity)',
-  // Not yet in the target grid below (assetClasses array) — reachable only via a leveraged/composite
-  // ETF's `composition` legs today. Wiring a settable target for them is L2/L3 (leverage UI) scope.
   trendFollowing: 'Trend Following',
   carry: 'Carry',
 };
 
-// Order: Azioni → Obbligazioni → Commodities → Real Estate → Cash → Crypto
-// trendFollowing/carry are deliberately absent here (see assetClassLabels comment above).
+// Order: Azioni → Obbligazioni → Commodities → Real Estate → Cash → Crypto → Trend Following → Carry.
+// trendFollowing/carry get a settable target here from L2 on (spec 3-leveraged-etf-allocation/03 §3):
+// alt-beta sleeves whose desired notional exposure can push the total above 100% (= target leverage).
 const assetClasses: AssetClass[] = [
   'equity',
   'bonds',
@@ -123,6 +122,8 @@ const assetClasses: AssetClass[] = [
   'realestate',
   'cash',
   'crypto',
+  'trendFollowing',
+  'carry',
 ];
 
 // Helper function to round to 2 decimal places
@@ -1549,7 +1550,14 @@ export default function SettingsPage() {
   if (loading) return null;
 
   const total = calculateTotal();
-  const isValidTotal = Math.abs(total - 100) < 0.01;
+  // Leverage-aware: the target percentages are desired NOTIONAL exposure over invested capital, so a
+  // total of EXACTLY 100 means "no leverage" and anything ABOVE 100 is a legitimate target leverage
+  // (spec 3-leveraged-etf-allocation/03 §3). Only an under-allocated set (< 100) is invalid.
+  const isValidTotal = total >= 100 - 0.01;
+  // Derived, read-only target leverage = Σtarget / 100 (mirrors deriveTargetLeverageRatio). Shown
+  // when the user has actually set leverage (> 1); the app never stores a manual leverage input.
+  const derivedTargetLeverage = total > 0 ? total / 100 : 1;
+  const hasTargetLeverage = derivedTargetLeverage > 1.005;
 
   return (
     <PageContainer className="space-y-4 sm:space-y-6">
@@ -2332,10 +2340,21 @@ export default function SettingsPage() {
             <p className={`text-4xl font-bold font-mono ${isValidTotal ? 'text-foreground' : 'text-destructive'}`}>
               {formatPercentage(total)}
             </p>
+            {hasTargetLeverage && (
+              <span className="mb-1 rounded-md bg-muted px-2 py-0.5 text-sm font-medium font-mono tabular-nums text-foreground">
+                Leva target {derivedTargetLeverage.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}×
+              </span>
+            )}
             {cashUseFixedAmount && (
               <span className="text-sm text-muted-foreground mb-1">esclusa liquidità fissa</span>
             )}
           </div>
+          {/* A total above 100% is not an error under leverage — the sum IS the target leverage. */}
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            La somma è l&apos;esposizione desiderata sul capitale investito: 100% = nessuna leva, oltre
+            100% = leva target. Per escludere un asset (casa, fondo pensione) usa il suo ruolo in
+            Patrimonio, non un target qui.
+          </p>
           <div className="divide-y border-t mt-4">
             <div className="flex items-center justify-between py-2.5">
               <span className="text-sm text-muted-foreground">Classi con allocazione &gt; 0%</span>
@@ -2343,6 +2362,14 @@ export default function SettingsPage() {
                 {Object.values(assetClassStates).filter((s) => s && s.targetPercentage > 0).length}
               </span>
             </div>
+            {hasTargetLeverage && (
+              <div className="flex items-center justify-between py-2.5">
+                <span className="text-sm text-muted-foreground">Leva target (derivata)</span>
+                <span className="text-sm font-semibold font-mono tabular-nums text-foreground">
+                  {derivedTargetLeverage.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}×
+                </span>
+              </div>
+            )}
             {autoCalculate && userAge !== undefined && riskFreeRate !== undefined && (
               <div className="flex items-center justify-between py-2.5">
                 <span className="text-sm text-muted-foreground">Auto-calc attivo</span>
@@ -2518,7 +2545,8 @@ export default function SettingsPage() {
                       type="number"
                       step="0.01"
                       min="0"
-                      max={isCash && cashUseFixedAmount ? undefined : '100'}
+                      // No max cap: a single class can exceed 100% of invested capital under leverage
+                      // (spec 3-leveraged-etf-allocation/03 §3). The fixed-cash case is a € amount.
                       value={
                         isCash && cashUseFixedAmount
                           ? cashFixedAmount
