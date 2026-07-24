@@ -10,8 +10,9 @@ export const ASSET_TRANSACTIONS_META_COLLECTION = 'assetTransactionsMeta';
 
 /**
  * Asset types that are managed through the trade ledger.
- * cash (balance-as-quantity) and realestate (estimated value) are deliberately
- * excluded: their "quantity" is not the result of trading operations.
+ * cash (balance-as-quantity), realestate (estimated value) and pensionFund (statement value, fed by
+ * `pensionContributions`) are deliberately excluded: their "quantity" is not the result of trading
+ * operations. See docs/specs/2-pension-fund/01-data-model-and-rules.md §2 for the pension case.
  */
 export const LEDGER_ASSET_TYPES = ['stock', 'etf', 'bond', 'crypto', 'commodity'] as const satisfies readonly AssetType[];
 
