@@ -16,7 +16,11 @@ import type { PensionFundDetails } from './pension';
 // (exhaustive `Record<AssetType, AssetClass>` — tsc catches this one) and deciding whether the type
 // belongs in LEDGER_ASSET_TYPES (types/assetTransactions.ts — tsc does NOT catch that one).
 export type AssetType = 'stock' | 'etf' | 'bond' | 'crypto' | 'commodity' | 'cash' | 'realestate' | 'pensionFund';
-export type AssetClass = 'equity' | 'bonds' | 'crypto' | 'realestate' | 'cash' | 'commodity';
+// trendFollowing (managed futures) and carry are exposure-only classes reached via a leveraged/
+// composite `etf`'s `composition` legs (spec 3-leveraged-etf-allocation/01-data-model.md §2) — no
+// AssetType maps to them directly in TYPE_TO_CLASS.
+export type AssetClass = 'equity' | 'bonds' | 'crypto' | 'realestate' | 'cash' | 'commodity'
+                        | 'trendFollowing' | 'carry';
 
 // Coupon payment frequency for bonds.
 // Determines how many times per year the coupon is paid.
@@ -131,6 +135,12 @@ export interface Asset {
   allocationRole?: AllocationRole; // How the Allocazione page treats this asset. See AllocationRole. Absent → legacy excludeFromAllocation, else 'tradable'.
   /** @deprecated Superseded by `allocationRole`. Read-only legacy fallback: true → 'excluded'. Never write it. */
   excludeFromAllocation?: boolean;
+  // For a leveraged/composite ETF: 2 = 2x, 3 = 3x, 1 or absent = no leverage. Shown in AssetDialog
+  // for type 'etf' only (D4: no dedicated AssetType — the math depends solely on this field plus
+  // `composition`, never on `type`). Multiplies notionalValue in `expandAssetExposure`
+  // (lib/utils/assetExposureUtils.ts); `quantity`/`averageCost`/`pricePerUnit` stay per-quota and
+  // independent of it.
+  leverageRatio?: number;
   isin?: string; // ISIN code for dividend scraping (optional)
   bondDetails?: BondDetails; // Optional bond-specific details for coupon scheduling
   pensionFundDetails?: PensionFundDetails; // Optional fondo pensione details (type 'pensionFund'); see types/pension.ts
@@ -165,6 +175,7 @@ export interface AssetFormData {
   outstandingDebt?: number;
   isPrimaryResidence?: boolean;
   allocationRole?: AllocationRole; // How the Allocazione page treats this asset. See AllocationRole.
+  leverageRatio?: number; // For a leveraged/composite ETF: 2 = 2x, 3 = 3x, 1 or absent = no leverage.
   isin?: string; // ISIN code for dividend scraping (optional)
   bondDetails?: BondDetails; // Optional bond-specific details for coupon scheduling
   pensionFundDetails?: PensionFundDetails; // Optional fondo pensione details (type 'pensionFund'); see types/pension.ts

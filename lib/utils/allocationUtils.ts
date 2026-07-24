@@ -37,6 +37,8 @@ export const ASSET_CLASS_LABELS: Record<string, string> = {
   realestate: 'Immobili',
   cash: 'Liquidità',
   commodity: 'Materie Prime',
+  trendFollowing: 'Trend Following',
+  carry: 'Carry',
 };
 
 // ---------------------------------------------------------------------------
@@ -216,6 +218,8 @@ export const ASSET_CLASS_CHART_INDEX: Record<string, number> = {
   realestate: 3,
   cash: 4,
   commodity: 5,
+  trendFollowing: 6,
+  carry: 7,
 };
 
 export interface BalanceScore {

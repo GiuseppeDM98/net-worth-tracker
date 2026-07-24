@@ -24,5 +24,7 @@ export const DEFAULT_SUB_CATEGORIES: Record<AssetClass, string[]> = {
     'Gold',
     'Other Commodities',
   ],
+  trendFollowing: [],
+  carry: [],
 };
 

@@ -364,7 +364,11 @@ const assetSchema = z.object({
   // where the form value is passed back as an AssetType). 'pensionFund' is accepted here from P0 on;
   // its type card and its dedicated fields land with the pension UI phase (spec 2-pension-fund/04).
   type: z.enum(['stock', 'etf', 'bond', 'crypto', 'commodity', 'cash', 'realestate', 'pensionFund']),
-  assetClass: z.enum(['equity', 'bonds', 'crypto', 'realestate', 'cash', 'commodity']),
+  // Mirrors the AssetClass union in types/assets.ts (tsc catches drift the same way as `type` above).
+  // 'trendFollowing'/'carry' are accepted here from L0 on but have no picker entry yet in the
+  // `assetClasses` composition-leg Select below — that lands with the leverage UI (spec 3-leveraged-
+  // etf-allocation/03, phase L2).
+  assetClass: z.enum(['equity', 'bonds', 'crypto', 'realestate', 'cash', 'commodity', 'trendFollowing', 'carry']),
   subCategory: z.string().optional(),
   currency: z.string().min(1, 'Currency is required'),
   quantity: z.number().min(0, 'La quantità non può essere negativa'),
