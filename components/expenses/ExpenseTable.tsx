@@ -59,6 +59,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { getExpenseDate } from '@/lib/utils/expenseHelpers';
+import { isScheduledRow } from '@/lib/utils/tracciamentoSummary';
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const;
 type PageSizeOption = (typeof PAGE_SIZE_OPTIONS)[number];
@@ -70,9 +71,15 @@ interface ExpenseTableProps {
   isDemo?: boolean;
   hasActiveFilters?: boolean;
   categories?: ExpenseCategory[];
+  /**
+   * The page's clock. Rows dated after it are marked «in calendario» and lose the sign
+   * colour on their amount: the list carries scheduled rows (instalments, recurring
+   * occurrences) that the figures above it do not count. Omitted → nothing is marked.
+   */
+  now?: Date;
 }
 
-export function ExpenseTable({ expenses, onEdit, onRefresh, isDemo = false, hasActiveFilters = false, categories = [] }: ExpenseTableProps) {
+export function ExpenseTable({ expenses, onEdit, onRefresh, isDemo = false, hasActiveFilters = false, categories = [], now }: ExpenseTableProps) {
   const { user } = useAuth();
   const { ownerId } = useActiveAccount();
   const queryClient = useQueryClient();
@@ -446,13 +453,20 @@ export function ExpenseTable({ expenses, onEdit, onRefresh, isDemo = false, hasA
 
           {/* ========== Table Body ========== */}
           <TableBody>
-            {paginatedExpenses.map((expense: Expense) => (
+            {paginatedExpenses.map((expense: Expense) => {
+            const scheduled = now ? isScheduledRow(expense, now) : false;
+            return (
             <TableRow key={expense.id}>
               <TableCell className="font-medium text-sm">
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1.5">
                   {formatDate(expense.date)}
                   {expense.isRecurring && (
                     <Calendar className="h-3 w-3 text-muted-foreground" aria-label="Voce ricorrente" />
+                  )}
+                  {scheduled && (
+                    <Badge variant="outline" className="flex-shrink-0 text-[10px] font-normal text-muted-foreground">
+                      In calendario
+                    </Badge>
                   )}
                 </div>
               </TableCell>
@@ -505,11 +519,14 @@ export function ExpenseTable({ expenses, onEdit, onRefresh, isDemo = false, hasA
                 {expense.subCategoryName || '-'}
               </TableCell>
               <TableCell className="text-right font-medium">
+                {/* The sign colour means money gained or lost; a scheduled row is neither yet. */}
                 <div
                   className={`flex items-center justify-end gap-1 ${
-                    expense.type === 'income'
-                      ? 'text-emerald-600 dark:text-emerald-400'
-                      : 'text-destructive'
+                    scheduled
+                      ? 'text-muted-foreground'
+                      : expense.type === 'income'
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : 'text-destructive'
                   }`}
                 >
                   {expense.type === 'income' ? (
@@ -570,7 +587,8 @@ export function ExpenseTable({ expenses, onEdit, onRefresh, isDemo = false, hasA
                 </div>
               </TableCell>
             </TableRow>
-          ))}
+            );
+          })}
         </TableBody>
       </Table>
     </div>

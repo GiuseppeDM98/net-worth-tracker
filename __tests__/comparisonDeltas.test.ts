@@ -372,6 +372,14 @@ describe('resolveComparisonScope', () => {
     expect(resolveComparisonScope('current', null, 8)).toEqual({ kind: 'sameMonths', upToMonth: 8 });
   });
 
+  it('should treat «da inizio anno» exactly like the running year — same months, same rules', () => {
+    // Both windows can only be matched on the months already lived, whatever they span.
+    expect(resolveComparisonScope('ytd', null, 8)).toEqual({ kind: 'sameMonths', upToMonth: 8 });
+    expect(resolveComparisonScope('ytd', 8, 8)).toEqual({ kind: 'singleMonth', month: 8, inProgress: true });
+    // A month the running year has not reached has nothing to compare.
+    expect(resolveComparisonScope('ytd', 11, 8)).toBeNull();
+  });
+
   it('should map a past year without a month to a full-year comparison', () => {
     expect(resolveComparisonScope('year', null, 8)).toEqual({ kind: 'fullYear' });
   });

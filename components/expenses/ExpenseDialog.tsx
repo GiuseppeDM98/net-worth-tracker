@@ -115,7 +115,9 @@ const expenseSchema = z
     type: z.enum(['fixed', 'variable', 'debt', 'income', 'transfer']),
     categoryId: z.string().min(1, "Categoria è obbligatoria"),
     subCategoryId: z.string().optional(),
-    amount: z.number().positive("L'importo deve essere positivo"),
+    // Optional here, required by the superRefine below — an instalment plan states its cost in
+    // its own fields («Importo totale»), and this one is neither read nor saved for it.
+    amount: z.number().positive("L'importo deve essere positivo").optional(),
     currency: z.string().min(1, "Valuta è obbligatoria"),
     date: z.date(),
     notes: z.string().optional(),
@@ -137,7 +139,7 @@ const expenseSchema = z
     (data) => {
       if (data.isInstallment) {
         if (!data.installmentCount || data.installmentCount < 2) return false;
-        if (data.installmentMode === 'auto' && !data.installmentTotalAmount) return false;
+        if (!data.installmentTotalAmount) return false;
         if (
           data.installmentMode === 'manual' &&
           data.installmentAmounts?.length !== data.installmentCount
@@ -148,6 +150,14 @@ const expenseSchema = z
     },
     { message: 'Campi rate incompleti o non validi' }
   )
+  .superRefine((data, ctx) => {
+    // The cost of the thing is declared ONCE. Without an instalment plan that place is this
+    // field; with one it is «Importo totale», and this field is hidden rather than asked for
+    // and ignored (it used to be required and then overwritten by the plan).
+    if (!data.isInstallment && (data.amount === undefined || Number.isNaN(data.amount))) {
+      ctx.addIssue({ code: 'custom', path: ['amount'], message: "L'importo è obbligatorio" });
+    }
+  })
   .superRefine((data, ctx) => {
     // The ceiling depends on the cadence, so it cannot live on the field's own schema, and
     // the message has to name the cadence's own unit — which is why this is a superRefine
@@ -472,26 +482,33 @@ function ExpenseFormBody({
         </div>
       )}
 
-      {/* ---- Importo + Data ---- */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="space-y-2 min-w-0">
-          <Label htmlFor="amount">Importo (euro) *</Label>
-          <Input
-            id="amount"
-            type="number"
-            step="0.01"
-            min="0"
-            placeholder="0,00"
-            {...register('amount', { valueAsNumber: true })}
-            className={errors.amount ? 'border-destructive' : ''}
-          />
-          {selectedType !== 'income' && selectedType !== 'transfer' && (
-            <p className="text-xs text-muted-foreground">Salvato come negativo</p>
-          )}
-          {errors.amount && (
-            <p className="text-sm text-destructive">{errors.amount.message}</p>
-          )}
-        </div>
+      {/* ---- Importo + Data ----
+           With «Acquisto rateale» on, the plan declares the cost («Importo totale») and this
+           field is HIDDEN: it used to be required and then silently overwritten by the plan,
+           so typing 100 here and 600 there saved 600 without a word. The date then takes the
+           whole row. The toggle is creation-only, so an existing instalment row still edits
+           its own amount here. */}
+      <div className={cn('grid grid-cols-1 gap-4', !watchedIsInstallment && 'sm:grid-cols-2')}>
+        {!watchedIsInstallment && (
+          <div className="space-y-2 min-w-0">
+            <Label htmlFor="amount">Importo (euro) *</Label>
+            <Input
+              id="amount"
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="0,00"
+              {...register('amount', { valueAsNumber: true })}
+              className={errors.amount ? 'border-destructive' : ''}
+            />
+            {selectedType !== 'income' && selectedType !== 'transfer' && (
+              <p className="text-xs text-muted-foreground">Salvato come negativo</p>
+            )}
+            {errors.amount && (
+              <p className="text-sm text-destructive">{errors.amount.message}</p>
+            )}
+          </div>
+        )}
 
         <div className="space-y-2 min-w-0">
           <Label htmlFor="date">Data *</Label>
@@ -751,6 +768,9 @@ function ExpenseFormBody({
                       setValue('isRecurring', false);
                       setValue('installmentMode', 'auto');
                       setValue('installmentStartDate', getValues('date'));
+                      // Carry over an amount already typed before the toggle was flipped —
+                      // the field is hidden from here on, so this is its last chance to
+                      // become the plan's total instead of being silently dropped.
                       const currentAmount = getValues('amount');
                       if (currentAmount && currentAmount > 0) {
                         setValue('installmentTotalAmount', currentAmount);
@@ -834,6 +854,20 @@ function ExpenseFormBody({
                   </TabsContent>
 
                   <TabsContent value="manual" className="space-y-4 mt-4">
+                    {/* The total lives here too, not only in «auto»: it is the ONE place that
+                        declares what the purchase costs, and the seed «Genera campi rate»
+                        divides. The per-instalment fields below still win on save. */}
+                    <div className="space-y-2">
+                      <Label htmlFor="installmentTotalAmountManual">Importo totale *</Label>
+                      <Input
+                        id="installmentTotalAmountManual"
+                        type="number"
+                        step="0.01"
+                        min="0.01"
+                        placeholder="333.41"
+                        {...register('installmentTotalAmount', { valueAsNumber: true })}
+                      />
+                    </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="installmentCountManual">Numero di rate *</Label>
@@ -877,7 +911,7 @@ function ExpenseFormBody({
                           size="sm"
                           onClick={() => {
                             const count = getValues('installmentCount') || 2;
-                            const baseAmount = getValues('amount') || 0;
+                            const baseAmount = getValues('installmentTotalAmount') || 0;
                             const perInstallment = Number((baseAmount / count).toFixed(2));
                             setValue(
                               'installmentAmounts',
@@ -1411,7 +1445,9 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
         type: data.type,
         categoryId: data.categoryId,
         subCategoryId: data.subCategoryId,
-        amount: data.amount,
+        // An instalment plan overwrites this per row (createInstallmentExpenses), and its
+        // own field is hidden — 0 is the honest placeholder, never a saved figure.
+        amount: data.amount ?? 0,
         currency: data.currency,
         date: data.date,
         notes: data.notes,
@@ -1474,8 +1510,11 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
         // two accounts, so crossing that boundary needs the cross-shape reconcilers.
         const wasTransfer = expense.type === 'transfer';
         const isTransfer = data.type === 'transfer';
+        // Editing always has an amount: the instalment toggle is creation-only, so the
+        // field is never hidden here.
+        const editedAmount = data.amount ?? 0;
         const newSignedAmount =
-          data.type === 'income' ? Math.abs(data.amount) : -Math.abs(data.amount);
+          data.type === 'income' ? Math.abs(editedAmount) : -Math.abs(editedAmount);
 
         if (wasTransfer && isTransfer) {
           assetUpdated = await reconcileTransferEdit({
@@ -1484,7 +1523,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
             newOriginId: linkedCashAssetId,
             newDestId: transferCashAssetId,
             oldAmount: Math.abs(expense.amount),
-            newAmount: Math.abs(data.amount),
+            newAmount: Math.abs(editedAmount),
           });
         } else if (wasTransfer) {
           assetUpdated = await reconcileTransferToSingleEdit({
@@ -1500,7 +1539,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
             oldSignedAmount: expense.amount,
             newOriginId: linkedCashAssetId,
             newDestId: transferCashAssetId,
-            newAmount: Math.abs(data.amount),
+            newAmount: Math.abs(editedAmount),
           });
         } else {
           assetUpdated = await reconcileSingleEdit({
@@ -1530,7 +1569,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
           const transferUpdated = await reconcileTransferCreate({
             originId: linkedCashAssetId,
             destId: transferCashAssetId,
-            amount: Math.abs(data.amount),
+            amount: Math.abs(expenseData.amount),
           });
           if (transferUpdated) {
             queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
@@ -1560,10 +1599,10 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
             expenseData.recurringCount &&
             expenseData.recurringCount > 0
           ) {
-            firstSignedAmount = -Math.abs(data.amount);
+            firstSignedAmount = -Math.abs(expenseData.amount);
           } else {
             firstSignedAmount =
-              data.type === 'income' ? Math.abs(data.amount) : -Math.abs(data.amount);
+              data.type === 'income' ? Math.abs(expenseData.amount) : -Math.abs(expenseData.amount);
           }
 
           await reconcileSingleCreate({ linkedAssetId: linkedCashAssetId, signedAmount: firstSignedAmount });

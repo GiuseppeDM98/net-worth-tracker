@@ -12,10 +12,13 @@
 import { describe, expect, it } from 'vitest';
 import type { Expense } from '@/types/expenses';
 import type { Period } from '@/lib/utils/period';
+import { endOfMonthBound } from '@/lib/utils/dateHelpers';
 import {
   buildTrailingMonthFlows,
   computePeriodDelta,
+  currentComparisonWindow,
   filterExpensesByPeriod,
+  isScheduledRow,
   previousPeriod,
   rankCategories,
   resolveAnchorMonth,
@@ -25,6 +28,7 @@ import {
   summarizeMovements,
   summarizePeriodCashflow,
   summarizeSavingsHistory,
+  summarizeScheduled,
 } from '@/lib/utils/tracciamentoSummary';
 
 function makeExpense(overrides: Partial<Expense> & { amount: number; date: Date }): Expense {
@@ -105,19 +109,20 @@ describe('filterExpensesByPeriod', () => {
       makeExpense({ amount: -4, date: new Date(2026, 8, 1, 0, 0) }),
     ];
 
-    expect(filterExpensesByPeriod(rows, AUGUST, NOW).map((e) => e.amount)).toEqual([-2, -3]);
+    expect(filterExpensesByPeriod(rows, AUGUST).map((e) => e.amount)).toEqual([-2, -3]);
   });
 
-  it('should stop a year still running at the end of today\'s month — recurring rows are materialised into the future', () => {
+  it('should keep a year still running WHOLE — an instalment due in October is part of «il 2026»', () => {
     const rows = [
       makeExpense({ amount: -1, date: d(2026, 1) }),
       makeExpense({ amount: -2, date: new Date(2026, 7, 31, 23, 30) }),
       makeExpense({ amount: -3, date: d(2026, 9) }),
       makeExpense({ amount: -4, date: d(2026, 12) }),
+      makeExpense({ amount: -5, date: d(2027, 1) }),
     ];
-    expect(filterExpensesByPeriod(rows, { kind: 'year', year: 2026 }, NOW).map((e) => e.amount)).toEqual([-1, -2]);
-    // A closed year keeps all twelve months.
-    expect(filterExpensesByPeriod(rows.map((e) => ({ ...e, date: new Date(2025, e.date.getMonth(), 15, 12) })), { kind: 'year', year: 2025 }, NOW)).toHaveLength(4);
+    expect(filterExpensesByPeriod(rows, { kind: 'year', year: 2026 }).map((e) => e.amount)).toEqual([-1, -2, -3, -4]);
+    // A closed year keeps all twelve months, as it always did.
+    expect(filterExpensesByPeriod(rows.map((e) => ({ ...e, date: new Date(2025, e.date.getMonth(), 15, 12) })), { kind: 'year', year: 2025 })).toHaveLength(5);
   });
 });
 
@@ -174,9 +179,18 @@ describe('resolveAnchorMonth and resolveFlowWindow', () => {
     expect(resolveFlowWindow(AUGUST, NOW)).toEqual({ endYear: 2026, endMonth: 8, count: 6 });
   });
 
-  it('should span the current year up to today and a past year in full', () => {
-    expect(resolveFlowWindow({ kind: 'year', year: 2026 }, NOW)).toEqual({ endYear: 2026, endMonth: 8, count: 8 });
+  it('should span every year in full — the chart of a period draws the whole period', () => {
+    expect(resolveFlowWindow({ kind: 'year', year: 2026 }, NOW)).toEqual({ endYear: 2026, endMonth: 12, count: 12 });
     expect(resolveFlowWindow({ kind: 'year', year: 2024 }, NOW)).toEqual({ endYear: 2024, endMonth: 12, count: 12 });
+    // The savings history keeps its own anchor: today's month, never December.
+    expect(resolveAnchorMonth({ kind: 'year', year: 2026 }, NOW)).toEqual({ year: 2026, month: 8 });
+  });
+
+  it('should mark as scheduled only the months that have not started', () => {
+    const flows = buildTrailingMonthFlows([], 2026, 12, 12, NOW);
+    expect(flows.filter((f) => f.scheduled).map((f) => f.month)).toEqual([9, 10, 11, 12]);
+    // Without a clock nothing is marked: a window entirely in the past needs no mark.
+    expect(buildTrailingMonthFlows([], 2026, 12, 12).some((f) => f.scheduled)).toBe(false);
   });
 
   it('should anchor a custom range on the month of its last day', () => {
@@ -230,6 +244,7 @@ describe('summarizeSavingsHistory', () => {
     expenses: 0,
     net: 0,
     savingsRate,
+    scheduled: false,
   });
 
   it('should average only the measured months and name the best and the worst', () => {
@@ -320,22 +335,131 @@ describe('rankCategories', () => {
 
 describe('summarizeMovements', () => {
   it('should count every row by type and name the largest by absolute amount', () => {
-    const summary = summarizeMovements(AUGUST_ROWS);
+    const summary = summarizeMovements(AUGUST_ROWS, NOW);
 
     expect(summary).toMatchObject({ count: 11, expenseCount: 7, incomeCount: 2, transferCount: 2 });
     expect(summary.largest).toEqual({ label: 'Stipendio', amount: 4200, type: 'income' });
   });
 
   it('should label the largest by its note when there is one', () => {
-    const summary = summarizeMovements([
-      makeExpense({ type: 'fixed', amount: -820, categoryName: 'Casa', notes: 'Rata mutuo ', date: d(2026, 8) }),
-    ]);
+    const summary = summarizeMovements(
+      [makeExpense({ type: 'fixed', amount: -820, categoryName: 'Casa', notes: 'Rata mutuo ', date: d(2026, 8) })],
+      NOW,
+    );
 
     expect(summary.largest).toEqual({ label: 'Rata mutuo', amount: 820, type: 'fixed' });
   });
 
+  it('should count the rows dated after today apart, across every type', () => {
+    const summary = summarizeMovements(
+      [
+        makeExpense({ type: 'variable', amount: -100, date: d(2026, 8, 20) }),
+        makeExpense({ type: 'variable', amount: -203.18, date: d(2026, 9, 28) }),
+        makeExpense({ type: 'variable', amount: -203.18, date: d(2026, 10, 28) }),
+        // A scheduled income is as unspent as a scheduled instalment: the split is by date only.
+        makeExpense({ type: 'income', amount: 500, date: d(2026, 12, 1) }),
+      ],
+      NOW,
+    );
+
+    expect(summary.scheduled).toEqual({ count: 3, total: 906.36 });
+    // The largest is still the largest, scheduled or not — the list holds it either way.
+    expect(summary.largest).toMatchObject({ amount: 500 });
+  });
+
+  it('should report no scheduled rows for a period entirely in the past', () => {
+    expect(summarizeMovements(AUGUST_ROWS, d(2026, 12, 31)).scheduled).toEqual({ count: 0, total: 0 });
+  });
+
   it('should report nothing on an empty list', () => {
-    expect(summarizeMovements([])).toEqual({ count: 0, expenseCount: 0, incomeCount: 0, transferCount: 0, largest: null });
+    expect(summarizeMovements([], NOW)).toEqual({
+      count: 0,
+      expenseCount: 0,
+      incomeCount: 0,
+      transferCount: 0,
+      largest: null,
+      scheduled: { count: 0, total: 0 },
+    });
+  });
+});
+
+describe('currentComparisonWindow', () => {
+  it('should scope a running year to the months the previous year can match', () => {
+    const window = currentComparisonWindow({ kind: 'year', year: 2026 }, NOW);
+    expect(window).toEqual({ kind: 'custom', from: new Date(2026, 0, 1), to: endOfMonthBound(2026, 8) });
+
+    // Both sides of the delta now cover January → August, one year apart.
+    const previous = previousPeriod({ kind: 'year', year: 2026 }, NOW);
+    expect(previous).toEqual({ kind: 'custom', from: new Date(2025, 0, 1), to: new Date(2025, 8, 0) });
+  });
+
+  it('should be the period itself for a month and a closed year, and null for a custom range', () => {
+    expect(currentComparisonWindow(AUGUST, NOW)).toEqual(AUGUST);
+    expect(currentComparisonWindow({ kind: 'year', year: 2024 }, NOW)).toEqual({ kind: 'year', year: 2024 });
+    // Null exactly where previousPeriod is null: nothing to scope against.
+    const custom: Period = { kind: 'custom', from: d(2026, 2), to: d(2026, 5) };
+    expect(currentComparisonWindow(custom, NOW)).toBeNull();
+    expect(previousPeriod(custom, NOW)).toBeNull();
+  });
+});
+
+describe('the ytd period', () => {
+  const YTD: Period = { kind: 'ytd', year: 2026, throughMonth: 8 };
+
+  it('should compare against the same months a year earlier, in the same shape', () => {
+    expect(previousPeriod(YTD, NOW)).toEqual({ kind: 'ytd', year: 2025, throughMonth: 8 });
+    // It already stops at today's month, so it IS its own comparable window.
+    expect(currentComparisonWindow(YTD, NOW)).toEqual(YTD);
+  });
+
+  it('should anchor on its last month and draw exactly its own months', () => {
+    expect(resolveAnchorMonth(YTD, NOW)).toEqual({ year: 2026, month: 8 });
+    expect(resolveFlowWindow(YTD, NOW)).toEqual({ endYear: 2026, endMonth: 8, count: 8 });
+  });
+
+  it('should slice January to the end of its last month, dropping what a whole year would keep', () => {
+    const rows = [
+      makeExpense({ amount: -1, date: d(2026, 1) }),
+      makeExpense({ amount: -2, date: new Date(2026, 7, 31, 23, 30) }),
+      makeExpense({ amount: -3, date: d(2026, 9) }),
+      makeExpense({ amount: -4, date: d(2026, 12) }),
+    ];
+    expect(filterExpensesByPeriod(rows, YTD).map((e) => e.amount)).toEqual([-1, -2]);
+    // The whole year keeps all four — the two periods must differ, that is the point.
+    expect(filterExpensesByPeriod(rows, { kind: 'year', year: 2026 })).toHaveLength(4);
+  });
+
+  it('should have nothing scheduled by construction', () => {
+    const rows = [makeExpense({ amount: -3, date: d(2026, 9) }), makeExpense({ amount: -1, date: d(2026, 1) })];
+    expect(summarizeScheduled(filterExpensesByPeriod(rows, YTD), NOW).count).toBe(0);
+  });
+});
+
+describe('summarizeScheduled', () => {
+  const ROWS = [
+    makeExpense({ type: 'variable', amount: -100, date: d(2026, 8, 20) }),
+    makeExpense({ type: 'variable', amount: -203.18, date: d(2026, 9, 28) }),
+    makeExpense({ type: 'variable', amount: -203.18, date: d(2026, 10, 28) }),
+    makeExpense({ type: 'income', amount: 500, date: d(2026, 12, 1) }),
+    // A transfer is net-zero: counted as a row, never as a flow.
+    makeExpense({ type: 'transfer', amount: 300, date: d(2026, 11, 5) }),
+  ];
+
+  it('should split the period at today, keeping spending and income apart', () => {
+    expect(summarizeScheduled(ROWS, NOW)).toEqual({ count: 4, expenses: 406.36, income: 500, throughMonth: 12 });
+  });
+
+  it('should report an empty slice when nothing is ahead', () => {
+    expect(summarizeScheduled(ROWS, d(2026, 12, 31))).toEqual({ count: 0, expenses: 0, income: 0, throughMonth: null });
+  });
+});
+
+describe('isScheduledRow', () => {
+  it('should call a row scheduled only when it is dated strictly after now', () => {
+    expect(isScheduledRow(makeExpense({ amount: -1, date: d(2026, 9, 28) }), NOW)).toBe(true);
+    expect(isScheduledRow(makeExpense({ amount: -1, date: d(2026, 8, 20) }), NOW)).toBe(false);
+    // Now itself has happened.
+    expect(isScheduledRow(makeExpense({ amount: -1, date: NOW }), NOW)).toBe(false);
   });
 });
 

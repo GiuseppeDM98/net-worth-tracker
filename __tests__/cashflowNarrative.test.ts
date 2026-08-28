@@ -21,7 +21,7 @@ vi.mock('firebase/firestore', () => ({
 
 import type { Period } from '@/lib/utils/period';
 import { narrativeToText, type Narrative } from '@/lib/utils/narrative';
-import type { MonthFlow, PeriodCashflowTotals, SavingsHistory } from '@/lib/utils/tracciamentoSummary';
+import type { MonthFlow, PeriodCashflowTotals, SavingsHistory, ScheduledSlice } from '@/lib/utils/tracciamentoSummary';
 import {
   buildCashflowVerdict,
   describeCategoryShare,
@@ -30,6 +30,8 @@ import {
   describeFlowWindow,
   describeMonthWindow,
   describeMovements,
+  describeScheduledHorizon,
+  scheduledSentence,
   describeMovementsCount,
   describePeriodCashflow,
   describePeriodSubject,
@@ -49,12 +51,40 @@ const AUGUST: Period = { kind: 'month', year: 2026, month: 8 };
 
 const TOTALS: PeriodCashflowTotals = { income: 4850, expenses: 2910, net: 1940, savingsRate: 40, coverageRatio: 1.6667, transferCount: 0 };
 
+/** Nothing scheduled — the default for a period that has already happened. */
+const NOTHING_SCHEDULED: ScheduledSlice = { count: 0, expenses: 0, income: 0, throughMonth: null };
+
 const INPUT: CashflowVerdictInput = {
   period: AUGUST,
   now: NOW,
   totals: TOTALS,
   delta: { income: 3.19, expenses: -6.43 },
+  scheduled: NOTHING_SCHEDULED,
 };
+
+describe('the ytd period in words', () => {
+  const YTD: Period = { kind: 'ytd', year: 2026, throughMonth: 8 };
+
+  it('should name itself «finora», never as the bare year', () => {
+    const subject = describePeriodSubject(YTD, NOW);
+    expect(subject.subject).toBe('Il 2026 finora');
+    expect(subject.inPeriod).toBe('nel 2026 finora');
+    expect(subject.ongoing).toBe(true);
+    // The whole year is a different subject.
+    expect(describePeriodSubject({ kind: 'year', year: 2026 }, NOW).subject).toBe('Il 2026');
+  });
+
+  it('should compare against the same months of the previous year', () => {
+    expect(describeComparisonPhrase(YTD, NOW)).toBe('su gen–ago 2025');
+    expect(describePreviousPeriodLabel(YTD, NOW)).toBe('gen–ago 2025');
+  });
+
+  it('should open the verdict with its own subject', () => {
+    const verdict = buildCashflowVerdict({ ...INPUT, period: YTD });
+    expect(verdict.headline).toBe('Il 2026 finora sta andando bene.');
+    expect(plain(verdict.sentence)).toContain('Nel 2026 finora hai messo da parte');
+  });
+});
 
 describe('describePeriodSubject', () => {
   it('should name the current month as ongoing, with the euphonic "ad"', () => {
@@ -114,6 +144,30 @@ describe('buildCashflowVerdict', () => {
     expect(plain(verdict.sentence)).toBe(
       'Ad agosto hai messo da parte il 40% (1940 €): entrate 4850 €, spese 2910 €, in calo del 6,4% su luglio.',
     );
+  });
+
+  it('should close with what is still in the calendar — the totals include it, so the verdict says it', () => {
+    const both = buildCashflowVerdict({ ...INPUT, scheduled: { count: 3, expenses: 1850, income: 500, throughMonth: 12 } });
+    expect(plain(both.sentence)).toBe(
+      'Ad agosto hai messo da parte il 40% (1940 €): entrate 4850 €, spese 2910 €, in calo del 6,4% su luglio. In calendario ci sono ancora 1850 € di spese e 500 € di entrate da qui a fine mese.',
+    );
+
+    // The verb agrees with the AMOUNT, not with the number of clauses: 406 € is plural.
+    const spendingOnly = buildCashflowVerdict({ ...INPUT, scheduled: { count: 2, expenses: 406, income: 0, throughMonth: 10 } });
+    expect(plain(spendingOnly.sentence)).toContain('In calendario ci sono ancora 406 € di spese da qui a fine mese.');
+
+    // Only a lone «1 €» is singular — and «1 €» is the figure AS PRINTED, so 1,40 € counts.
+    const oneEuro = buildCashflowVerdict({ ...INPUT, scheduled: { count: 1, expenses: 1, income: 0, throughMonth: 9 } });
+    expect(plain(oneEuro.sentence)).toContain("In calendario c'è ancora 1 € di spese da qui a fine mese.");
+    const roundsToOne = buildCashflowVerdict({ ...INPUT, scheduled: { count: 1, expenses: 1.4, income: 0, throughMonth: 9 } });
+    expect(plain(roundsToOne.sentence)).toContain("In calendario c'è ancora 1 € di spese da qui a fine mese.");
+    // One euro of spending BESIDE income is plural again: two amounts, one verb.
+    const oneEuroPlusIncome = buildCashflowVerdict({ ...INPUT, scheduled: { count: 2, expenses: 1, income: 500, throughMonth: 9 } });
+    expect(plain(oneEuroPlusIncome.sentence)).toContain('In calendario ci sono ancora 1 € di spese e 500 € di entrate da qui a fine mese.');
+
+    // A slice with a count but no amounts (transfers only) adds no sentence.
+    const transfersOnly = buildCashflowVerdict({ ...INPUT, scheduled: { count: 1, expenses: 0, income: 0, throughMonth: 9 } });
+    expect(plain(transfersOnly.sentence)).not.toContain('In calendario');
   });
 
   it('should use the past tense for a closed month and a year', () => {
@@ -268,6 +322,7 @@ describe('describeSavingsHistory', () => {
     expenses: 0,
     net: 0,
     savingsRate,
+    scheduled: false,
   });
   const history = (overrides: Partial<SavingsHistory>): SavingsHistory => ({
     months: Array.from({ length: 12 }, (_, i) => flow(2026, i + 1, 30)),
@@ -348,20 +403,48 @@ describe('describeSavingsHistory', () => {
   });
 });
 
+/** No scheduled rows — the default for a period entirely in the past. */
+const NO_SCHEDULED = { count: 0, total: 0 };
+
+describe('describeScheduledHorizon', () => {
+  it('should close on the end of the PERIOD, not on the last scheduled row', () => {
+    expect(describeScheduledHorizon(AUGUST, NOW)).toBe('a fine mese');
+    expect(describeScheduledHorizon({ kind: 'year', year: 2026 }, NOW)).toBe('a fine anno');
+    // Another month, another year: named, so «fine mese» never means the wrong month.
+    expect(describeScheduledHorizon({ kind: 'month', year: 2026, month: 10 }, NOW)).toBe('a fine ottobre');
+    expect(describeScheduledHorizon({ kind: 'year', year: 2027 }, NOW)).toBe('a fine 2027');
+  });
+
+  it('should name the day of a custom range, which ends on no calendar unit', () => {
+    expect(describeScheduledHorizon({ kind: 'custom', from: new Date(2026, 0, 1), to: new Date(2026, 2, 20) }, NOW)).toBe('al 20 marzo');
+  });
+
+  it('should let the sentence stand without a horizon', () => {
+    const noHorizon = scheduledSentence({ count: 1, expenses: 406, income: 0, throughMonth: 10 }, null);
+    expect(plain(noHorizon)).toBe(' In calendario ci sono ancora 406 € di spese.');
+  });
+});
+
 describe('describeMovements', () => {
   it('should count the rows by type and name the largest', () => {
-    const summary = { count: 47, expenseCount: 40, incomeCount: 5, transferCount: 2, largest: { label: 'Stipendio', amount: 4200, type: 'income' as const } };
+    const summary = { count: 47, expenseCount: 40, incomeCount: 5, transferCount: 2, largest: { label: 'Stipendio', amount: 4200, type: 'income' as const }, scheduled: NO_SCHEDULED };
     expect(plain(describeMovements(summary))).toBe('47 movimenti: 40 spese, 5 entrate e 2 trasferimenti; la voce più grande è Stipendio (4200 €).');
   });
 
   it('should drop an empty type and decline the singulars', () => {
-    expect(plain(describeMovements({ count: 2, expenseCount: 1, incomeCount: 1, transferCount: 0, largest: { label: 'Casa', amount: 800, type: 'fixed' as const } }))).toBe(
+    expect(plain(describeMovements({ count: 2, expenseCount: 1, incomeCount: 1, transferCount: 0, largest: { label: 'Casa', amount: 800, type: 'fixed' as const }, scheduled: NO_SCHEDULED }))).toBe(
       '2 movimenti: 1 spesa e 1 entrata; la voce più grande è Casa (800 €).',
     );
-    expect(plain(describeMovements({ count: 1, expenseCount: 0, incomeCount: 0, transferCount: 1, largest: { label: 'Giroconto', amount: 300, type: 'transfer' as const } }))).toBe(
+    expect(plain(describeMovements({ count: 1, expenseCount: 0, incomeCount: 0, transferCount: 1, largest: { label: 'Giroconto', amount: 300, type: 'transfer' as const }, scheduled: NO_SCHEDULED }))).toBe(
       '1 movimento: 1 trasferimento; la voce più grande è Giroconto (300 €).',
     );
-    expect(describeMovements({ count: 0, expenseCount: 0, incomeCount: 0, transferCount: 0, largest: null })).toBeNull();
+    expect(describeMovements({ count: 0, expenseCount: 0, incomeCount: 0, transferCount: 0, largest: null, scheduled: NO_SCHEDULED })).toBeNull();
+  });
+
+  it('should name the scheduled rows — the clause that keeps the list honest against the tiles', () => {
+    expect(
+      plain(describeMovements({ count: 47, expenseCount: 40, incomeCount: 5, transferCount: 2, largest: { label: 'Stipendio', amount: 4200, type: 'income' as const }, scheduled: { count: 2, total: 406 } })),
+    ).toBe('47 movimenti: 40 spese, 5 entrate e 2 trasferimenti, di cui 2 in calendario (406 €); la voce più grande è Stipendio (4200 €).');
   });
 
   it('should size the aside as shown of total when the list is filtered', () => {

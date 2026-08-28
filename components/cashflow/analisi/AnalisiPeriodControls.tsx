@@ -21,13 +21,16 @@ interface AnalisiPeriodControlsProps {
 }
 
 const MODE_OPTIONS = [
+  // «Da inizio anno» stops at today's month; «Anno corrente» is January → December and carries
+  // what is only scheduled. Same words as the Cashflow picker, for the same two windows.
+  { value: 'ytd' as const, label: 'Da inizio anno' },
   { value: 'current' as const, label: 'Anno corrente' },
   { value: 'year' as const, label: 'Anno' },
   { value: 'history' as const, label: 'Storico' },
 ];
 
 /**
- * The page's ONE axis — the three-mode pill (Anno corrente | Anno | Storico) with the month
+ * The page's ONE axis — the four-mode pill (Da inizio anno | Anno corrente | Anno | Storico) with the month
  * picker (and the year picker in «Anno») beside it. Deep-linked as `?period&year&month` by the
  * tab; rendered beside the verdict from `desktop:` and under it below. «Ripristina» clears the
  * month only: the mode and the year are the axis, not a filter.

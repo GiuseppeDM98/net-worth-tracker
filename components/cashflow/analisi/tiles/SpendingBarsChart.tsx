@@ -43,7 +43,7 @@ export function SpendingBarsChart({ points, kind, minHeight = 150, className }: 
   const describe = (point: SpendingPoint): string => {
     const name = kind === 'month' ? `${point.label} ${yearOf(point)}` : point.label;
     const baseline = point.prevYearValue !== null ? `, ${Number(yearOf(point)) - 1}: ${cachedFormatCurrencyEUR(point.prevYearValue, true)}` : '';
-    return `${name}: ${cachedFormatCurrencyEUR(point.value, true)}${baseline}${point.ongoing ? ' (in corso)' : ''}`;
+    return `${name}: ${cachedFormatCurrencyEUR(point.value, true)}${baseline}${point.ongoing ? ' (in corso)' : ''}${point.scheduled ? ' (in calendario)' : ''}`;
   };
 
   // A mouse over a bucket reads its figures (desktop only; the SVG titles serve the rest).
@@ -81,7 +81,9 @@ export function SpendingBarsChart({ points, kind, minHeight = 150, className }: 
                   width={barWidth}
                   height={currentHeight}
                   fill="var(--chart-1)"
-                  fillOpacity={point.ongoing ? 0.55 : 1}
+                  // A month that has not started holds only what is already in the calendar:
+                  // drawn lighter still, and never outlined — it is not the month in progress.
+                  fillOpacity={point.scheduled ? 0.3 : point.ongoing ? 0.55 : 1}
                   stroke={point.ongoing ? 'var(--foreground)' : 'none'}
                   vectorEffect="non-scaling-stroke"
                 />
@@ -95,6 +97,7 @@ export function SpendingBarsChart({ points, kind, minHeight = 150, className }: 
               <span className="text-muted-foreground">{kind === 'month' ? `${yearOf(hovered)} ` : 'Spese '}</span>
               <span className="text-destructive">{cachedFormatCurrencyEUR(hovered.value, true)}</span>
               {hovered.ongoing && <span className="text-muted-foreground"> in corso</span>}
+              {hovered.scheduled && <span className="text-muted-foreground"> in calendario</span>}
             </span>
             {hovered.prevYearValue !== null && (
               <span className="font-mono tabular-nums">
@@ -109,7 +112,7 @@ export function SpendingBarsChart({ points, kind, minHeight = 150, className }: 
         {points.map((point) => (
           <span
             key={point.key}
-            className={cn('truncate text-center font-mono text-[10px] tabular-nums', point.ongoing ? 'font-semibold text-foreground' : 'text-muted-foreground')}
+            className={cn('truncate text-center font-mono text-[10px] tabular-nums', point.ongoing ? 'font-semibold text-foreground' : 'text-muted-foreground', point.scheduled && 'opacity-60')}
           >
             {point.label}
           </span>

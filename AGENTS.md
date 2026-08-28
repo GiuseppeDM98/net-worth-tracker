@@ -334,6 +334,15 @@ Companion documents — do not duplicate their content into this file:
   `buildEntityYearRows` for the Scheda's reading. **Every sentence** comes from `analisiNarrative.ts`
   (`buildAnalisiVerdict`, the `describe*`) or from `cashflowNarrative.ts` (`describePeriodCashflow`,
   `describeCategoryShare`), never from a component.
+- **The axis has FOUR modes** (`Da inizio anno | Anno corrente | Anno | Storico`): `ytd` and `current` are not the
+  same window and must never be treated as one — see the Tracciamento section. `resolvePeriodThroughMonth` is the ONE
+  place that says where a period stops (today's month for `ytd`, a picked month, otherwise nothing), and it feeds both
+  the slice and the monthly chart. `resolvePeriodMonthCount` was deleted with the verdict's «(8 mesi)» clause.
+- **The running year is NOT clipped** (2026-08-28): `periodExpenses` takes the whole calendar year and
+  `resolvePeriodMonthCount` returns 12 for it, so the verdict lost its «(8 mesi)» clause and gained the shared
+  `scheduledSentence` instead; the Periodo aside reads «12 mesi · 4 in calendario». The pacing is untouched — it always
+  computed both sides off `allExpenses` under `sameMonths`, so it stays the one honest comparison. See the Tracciamento
+  section for the rule in full.
 - **«Fuori scala» is an Off-Axis tile**: the anomalies run on ONE month (`resolveSingleMonth`: the picked one, or
   today's for the bare running year); the aside names it, and the verdict's clause names it too unless the period IS
   that month. When no month can be meant (a past year without a month, the history) the tile is ABSENT and Spese
@@ -393,9 +402,39 @@ Companion documents — do not duplicate their content into this file:
   of the anchor month window, named «su gen–ago 2025» — eight months against twelve read as a drop by construction,
   which is what the old tab's `null` avoided); custom range → `null`. With a null predecessor every delta, the «su
   luglio» clause and the «vs luglio» captions disappear. A zero base is `null`, never `0%`, and a delta is judged
-  on the PRINTED figure (`printedDelta`: 0,04% is «invariate»). The same year-to-date rule clips the period slice
-  itself (`filterExpensesByPeriod(…, now)` stops an ongoing year at the end of today's month): recurring series are
-  materialised as future-dated rows, and a verdict on «il 2026» must not count December's mortgage in August.
+  on the PRINTED figure (`printedDelta`: 0,04% is «invariate»).
+- **A period is its WHOLE calendar span, and what has not happened is DECLARED** (2026-08-28, changed from the
+  year-to-date clip that shipped with the redesign). `filterExpensesByPeriod(expenses, period)` takes no clock:
+  «il 2026» is January → December even in August, so a materialised instalment due in October is in the tiles AND in
+  the list. `summarizeScheduled(expenses, now)` carries the part still ahead, and `scheduledSentence` — defined ONCE in
+  `cashflowNarrative.ts` and imported by `analisiNarrative.ts` — closes both verdicts with «In calendario ci sono
+  ancora 1850 € di spese e 500 € di entrate.» **The verb agrees with the AMOUNT, never with the number of clauses**:
+  «1850 €» is plural however few clauses follow it, and only a lone «1 €» takes «c'è» — «1 €» meaning the figure AS
+  PRINTED, so 1,40 € counts (the `articleForPercent` rule, applied to a verb). The sentence CLOSES on how far the
+  figure reaches — «… da qui a fine mese / a fine anno / al 20 marzo» — and that horizon is the **period's** end, not
+  the last scheduled row's: the amount is bounded by the window the reader is looking at, so «361 € entro ottobre»
+  would be a different and smaller claim. Two resolvers, one per period type (`describeScheduledHorizon` for `Period`,
+  `describeAnalisiScheduledHorizon` for `AnalisiPeriod`), both returning null where no end can be named (the history),
+  so the clause is dropped rather than guessed. A row dated after today is `isScheduledRow`: chip «In calendario» in the
+  feed, the table and the detail drawer, and its amount drops the sign colour (the sign tokens mean gained and lost,
+  and it is neither yet). The two month charts draw the months not started at reduced opacity, never outlined — the
+  outline stays the month in progress. **The figures of a running year therefore contain a forecast; that is the
+  owner's decision, and the page says so.**
+- **«Da inizio anno» is a period of its own** (`Period` gained `{ kind: 'ytd'; year; throughMonth }`, and Analisi's
+  `PeriodMode` gained `'ytd'`): January → the end of today's month, the window the whole-year rule above deliberately
+  no longer is. `throughMonth` is STORED, never read off a clock, so `periodToRange` stays pure and the period is a
+  fully-described value; the picker fills it from today. It is a kind and NOT a custom range because it HAS an honest
+  predecessor — the same months a year earlier, `{ kind: 'ytd', year: year − 1, throughMonth }` — and a name of its
+  own («2026 · gen–ago», never the bare year, which is a different period). Its subject is «Nel 2026 finora» on both
+  pages, it has nothing scheduled by construction, and `resolveComparisonScope` treats `'ytd'` exactly like
+  `'current'` (`sameMonths`), so under it the headline and the percentage finally measure the SAME window.
+- **Two windows stay anchored to today, on purpose, and must not be «fixed» to follow the period.**
+  `resolveAnchorMonth` anchors the trailing SAVINGS HISTORY, which is history and must not run into months not lived
+  (`resolveFlowWindow` is the period's own chart and does cover all twelve). `currentComparisonWindow(period, now)`
+  scopes the DELTA's current side to January → the end of today's month, because the previous year has no December to
+  match: twelve against eight is a rise by construction, the mirror of the drop `previousPeriod` already refuses. Both
+  sides then cover gen–ago and `describeComparisonPhrase` names it. Analisi reaches the same place through
+  `resolveComparisonScope` → `sameMonths`, which already computed both sides off `allExpenses`.
 - **The month-end projection** exists only when the period IS the current Italian month (`resolvePeriodCalendar`)
   and extrapolates only what is booked up to today (`splitSpendingAtDate`): a row dated after today is added as it
   is, never scaled by the days left. The Panoramica's CashflowTile applies the SAME split through the payload's
@@ -1202,6 +1241,12 @@ Companion documents — do not duplicate their content into this file:
 - **`pensionFund` is an `AssetType`, never an `AssetClass`, and never a ledger type.** Its value is statement-driven, held
   in `quantity` **at price 1**; `TYPE_TO_CLASS['pensionFund'] = 'equity'` is a fallback for an empty `composition`, so
   any `assetClass`-keyed default effect must exclude the type explicitly.
+- **An instalment plan declares its cost ONCE** (2026-08-28): with «Acquisto rateale» on, the dialog's top «Importo
+  (euro)» is HIDDEN and `amount` is optional in the schema (a `superRefine` requires it only without a plan). It used
+  to be required and then silently overwritten — `createInstallmentExpenses` writes `amount: installmentAmounts[i]`
+  per row — so 100 there and 600 in «Importo totale» saved 600 without a word. «Importo totale» now exists in BOTH
+  modes (it is what «Genera campi rate» divides in `manual`), and the save path reads `expenseData.amount`, never
+  `data.amount`. The toggle is creation-only, so an existing instalment row still edits its own amount normally.
 - **The `AssetType` union is enumerated in TWO places in `AssetDialog.tsx`** — `TYPE_TO_CLASS` and `assetSchema`'s
   `z.enum` (three indirect errors). Update both in one edit.
 - **Two tax mechanisms, only one reads history.** ORDINARY deduction is stateless per year (ceilings via
@@ -1829,6 +1874,15 @@ rules permitting the writes, real `Timestamp` values surviving `removeUndefinedD
 - **`boundingBox()` is viewport-relative, so hovering a chart below the fold does nothing** — `page.mouse.move` past the
   window height lands outside it and the tooltip never opens, which reads exactly like "this chart has no tooltip".
   `scrollIntoViewIfNeeded()` first, then read the box.
+- **A throwaway spec left in `e2e/` is collected by the BROAD projects too.** `desktop`'s `testMatch` catches any
+  `*.spec.ts`, so a verification spec written for its own fixture account runs again under the base account in a full
+  `npx playwright test` and fails there — three red tests that look like a regression and are not. Give a throwaway its
+  OWN config (`playwright.<name>.config.ts` with its own setup project and a narrow `testMatch`), run it with
+  `--config=`, and DELETE it before the full suite (2026-08-28).
+- **The period and axis controls are not buttons.** The Cashflow picker is a `combobox` named
+  «Periodo selezionato: {label}»; `SegmentedPill` renders its options as `tab`; the instalment toggle sits behind the
+  «Impostazioni avanzate» disclosure and must be opened first; the two-step create dialog labels its types with a
+  capital («Spesa Variabile»). Read the failure's page snapshot before guessing a second selector (2026-08-28).
 - **Responsive DOM duplicates make `.first()` a trap** (the DOM-first node is usually the HIDDEN mobile copy) — filter
   with `.filter({ visible: true })`. **A collapsed CSS-grid region is still "visible" to Playwright**: scope through the
   toggle's `aria-controls` id and assert the collapse by measuring height.
@@ -1843,8 +1897,11 @@ rules permitting the writes, real `Timestamp` values surviving `removeUndefinedD
 - **Two `boundingBox()` calls sample two different FRAMES.** While a drawer slides up the second element reads as
   *higher* than the first and a one-column layout looks like two. Read every rect a single assertion compares in ONE
   `evaluate()`. Same rule for anything measured during an animation.
-- **The emulator needs Java ≥ 21** — since 2026-08-27 the system JDK here is Microsoft OpenJDK 21 (`java -version`), so the
-  portable Temurin SETUP.md → Step 6 describes is no longer needed on this machine. Stopping the npm wrapper does **not** kill
+- **The emulator needs Java ≥ 21, and this machine's system JDK is 15** (verified 2026-08-28 — an earlier note here
+  claimed a system OpenJDK 21; it is not there, so CHECK `java -version` instead of trusting either claim). The portable
+  Temurin of SETUP.md → Step 6 is the way: `winget` is NOT on this shell's PATH, so fetch the zip directly
+  (`https://api.adoptium.net/v3/binary/latest/21/ga/windows/x64/jdk/hotspot/normal/eclipse`), expand it into the session
+  scratchpad and export `JAVA_HOME`/`PATH` for the `npm run emulators` process only — no system change, nothing to undo. Stopping the npm wrapper does **not** kill
   the JVM: the ports stay taken and the next start fails with "port taken", naming no stale process. Free them by PID — `netstat -ano | grep LISTENING | grep :8080`, then `taskkill //PID <pid> //F //T`, the same for `next dev` on :3100 — and only AFTER the Hub export.
 - **Ports 8080/9099 answering is not proof that OUR emulators are up.** On 2026-08-27 they were another repo's suite
   (`chronostep-9ab39`, started by hand with `--single_project_mode`): every seed «succeeded» into its `demo-net-worth`
@@ -1882,6 +1939,14 @@ rules permitting the writes, real `Timestamp` values surviving `removeUndefinedD
 - **A green mechanical check that has never been seen red is indistinguishable from one asserting nothing** — and that
   includes the check's own arithmetic: filtering values by magnitude to drop chart-axis ticks also drops a legitimate
   reading of the same magnitude. Break the thing under test on purpose once.
+
+### Per-page blind spots
+
+Moved verbatim from CLAUDE.md's Known Issues on 2026-08-28, when that file reached its 40.000-character budget. These are behaviours that look like bugs and are not — read them before "fixing" one.
+
+- **Assistente**: no Playwright spec (the throwaway specs were deleted); the Cashflow tile is absent for a period without cashflow rows; the savings rate is `netCashFlow / (income + dividends)`; «Patrimonio oggi» prints the GROSS total (the verdict's figure), the old card printed the net; the Conversazione count includes the user's messages; starter rows prefill the composer, follow-up rows submit; the thread sheet keeps its 3 s auto-disarm delete (on request) while the memory rows use `useArmedDelete`; a companion taller than the viewport is reachable only at the end of the scroll (sticky, by design); the «goal reached» tile and the sheet's row are two surfaces of ONE suggestion.
+- **FIRE › Calcolatore**: «FIRE nel {anno}» is the BASE scenario of a deterministic walk on the last full cashflow year (or the running year annualized, said in Base di calcolo) — changed expenses read stale until the year closes; a target reached «today» prints no passive-income clause; the Ventaglio runs only while open, its probability lives in the Traguardo footer; `getFIREData` still runs for runway and history but its `metrics` are ignored; the fan is unavailable without an allocation in the four MC classes; the pension-lock switch is optimistic (a failed save reverts with a toast), disabled in demo; Parametri reopens on every unsaved edit.
+- **Allocazione**: no Playwright spec; Esposizione fetches `/api/portfolio/exposure` on mount (Yahoo on the first visit, then the 24 h cache) and truncates names at 128 px; a class held WITHOUT a target never enters `byAssetClass` (`compareAllocations` iterates the targets), so the score charges it as drift — the Bilanciamento reading names it, the verdict lists only targeted classes; a Ribilancia is «a saldo zero» only when the in-band classes carry no gap; «Modifica target» points to Impostazioni even with goal-derived targets; theoretical specific-asset targets are rows without a tick; `BandToggle` snaps 2 or 5 typed in the custom field back to the preset.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

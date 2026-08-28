@@ -11,6 +11,7 @@ import {
   isCurrentMonth,
   isPrevMonth,
   isCurrentYear,
+  isCurrentYtd,
   parseDateInput,
 } from '@/lib/utils/period';
 
@@ -40,6 +41,8 @@ export interface UsePeriodPickerReturn {
   isCurrentMonthActive: boolean;
   isPrevMonthActive: boolean;
   isCurrentYearActive: boolean;
+  /** This year, January → today's month — distinct from the whole year above. */
+  isCurrentYtdActive: boolean;
   // Handlers
   handlePreset: (period: Period) => void;
   handleRangeSelect: (range: DateRange | undefined) => void;
@@ -181,6 +184,7 @@ export function usePeriodPicker({
     isCurrentMonthActive: isCurrentMonth(value),
     isPrevMonthActive: isPrevMonth(value),
     isCurrentYearActive: isCurrentYear(value),
+    isCurrentYtdActive: isCurrentYtd(value),
     handlePreset,
     handleRangeSelect,
     handleApply,

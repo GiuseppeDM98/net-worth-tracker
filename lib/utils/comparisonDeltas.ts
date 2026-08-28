@@ -49,22 +49,23 @@ export type ComparisonMonthScope =
  * has not happened).
  */
 export function resolveComparisonScope(
-  periodMode: 'current' | 'year' | 'history',
+  periodMode: 'ytd' | 'current' | 'year' | 'history',
   selectedMonth: number | null,
   todayMonth: number,
 ): ComparisonMonthScope | null {
   if (periodMode === 'history') return null;
+  // Both windows on the running year compare the same way: only the months already lived can
+  // be matched against the previous year, whatever the period itself spans.
+  const isRunningYear = periodMode === 'current' || periodMode === 'ytd';
   if (selectedMonth !== null) {
-    if (periodMode === 'current' && selectedMonth > todayMonth) return null;
+    if (isRunningYear && selectedMonth > todayMonth) return null;
     return {
       kind: 'singleMonth',
       month: selectedMonth,
-      inProgress: periodMode === 'current' && selectedMonth === todayMonth,
+      inProgress: isRunningYear && selectedMonth === todayMonth,
     };
   }
-  return periodMode === 'current'
-    ? { kind: 'sameMonths', upToMonth: todayMonth }
-    : { kind: 'fullYear' };
+  return isRunningYear ? { kind: 'sameMonths', upToMonth: todayMonth } : { kind: 'fullYear' };
 }
 
 export type CategoryComparisonStatus = 'ongoing' | 'new' | 'gone';

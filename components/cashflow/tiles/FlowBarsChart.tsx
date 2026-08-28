@@ -35,7 +35,7 @@ export function FlowBarsChart({ flows, highlightKey, minHeight = 150, className 
   const pairWidth = barWidth * 2 + gap;
 
   const label = flows
-    .map((f) => `${f.label}: entrate ${cachedFormatCurrencyEUR(f.income, true)}, spese ${cachedFormatCurrencyEUR(f.expenses, true)}`)
+    .map((f) => `${f.label}: entrate ${cachedFormatCurrencyEUR(f.income, true)}, spese ${cachedFormatCurrencyEUR(f.expenses, true)}${f.scheduled ? ' (in calendario)' : ''}`)
     .join('; ');
 
   // A mouse over a month reads its two figures (desktop only; the SVG titles serve the rest).
@@ -63,17 +63,20 @@ export function FlowBarsChart({ flows, highlightKey, minHeight = 150, className 
             // The month the page is about is outlined, never the others dimmed: a dimmed slot
             // falls under the 3:1 floor for graphical objects on the light card.
             const stroke = flow.key === highlightKey ? 'var(--foreground)' : 'none';
+            // A month that has not started holds only what is already in the calendar: drawn
+            // lighter, so a recurring-only bar is never read as a month that was lived.
+            const opacity = flow.scheduled ? 0.45 : 1;
             return (
               <g key={flow.key}>
-                <title>{`${flow.label}: entrate ${cachedFormatCurrencyEUR(flow.income, true)}, spese ${cachedFormatCurrencyEUR(flow.expenses, true)}`}</title>
-                <rect x={x} y={VIEW_H - incomeHeight} width={barWidth} height={incomeHeight} fill="var(--chart-2)" stroke={stroke} vectorEffect="non-scaling-stroke" />
-                <rect x={x + barWidth + gap} y={VIEW_H - expensesHeight} width={barWidth} height={expensesHeight} fill="var(--chart-1)" stroke={stroke} vectorEffect="non-scaling-stroke" />
+                <title>{`${flow.label}: entrate ${cachedFormatCurrencyEUR(flow.income, true)}, spese ${cachedFormatCurrencyEUR(flow.expenses, true)}${flow.scheduled ? ' (in calendario)' : ''}`}</title>
+                <rect x={x} y={VIEW_H - incomeHeight} width={barWidth} height={incomeHeight} fill="var(--chart-2)" fillOpacity={opacity} stroke={stroke} vectorEffect="non-scaling-stroke" />
+                <rect x={x + barWidth + gap} y={VIEW_H - expensesHeight} width={barWidth} height={expensesHeight} fill="var(--chart-1)" fillOpacity={opacity} stroke={stroke} vectorEffect="non-scaling-stroke" />
               </g>
             );
           })}
         </svg>
         {hovered && hover.index !== null && (
-          <ChartHoverTip x={(hover.index + 0.5) / flows.length} label={`${hovered.label} ${hovered.year}`}>
+          <ChartHoverTip x={(hover.index + 0.5) / flows.length} label={`${hovered.label} ${hovered.year}${hovered.scheduled ? ' · in calendario' : ''}`}>
             <span className="font-mono tabular-nums">
               <span className="text-muted-foreground">Entrate </span>
               <span className="text-positive">{cachedFormatCurrencyEUR(hovered.income, true)}</span>
@@ -89,7 +92,11 @@ export function FlowBarsChart({ flows, highlightKey, minHeight = 150, className 
         {flows.map((flow) => (
           <span
             key={flow.key}
-            className={cn('text-center font-mono text-[10px] tabular-nums', flow.key === highlightKey ? 'font-semibold text-foreground' : 'text-muted-foreground')}
+            className={cn(
+              'text-center font-mono text-[10px] tabular-nums',
+              flow.key === highlightKey ? 'font-semibold text-foreground' : 'text-muted-foreground',
+              flow.scheduled && 'opacity-60',
+            )}
           >
             {flow.label}
           </span>

@@ -19,13 +19,14 @@ vi.mock('firebase/firestore', () => ({
 }));
 
 import { narrativeToText, type Narrative } from '@/lib/utils/narrative';
-import type { PeriodCashflowTotals } from '@/lib/utils/tracciamentoSummary';
+import type { PeriodCashflowTotals, ScheduledSlice } from '@/lib/utils/tracciamentoSummary';
 import type { CategoryDeltaRow, TotalsPacing } from '@/lib/utils/comparisonDeltas';
 import type { SpendingAnomaly } from '@/lib/utils/cashflowComposition';
 import type { AnalisiPeriod, FlowSummary, SpendingPoint, TopExpenses } from '@/lib/utils/analisiSummary';
 import {
   buildAnalisiVerdict,
   describeAnalisiSubject,
+  describeAnalisiScheduledHorizon,
   describeAnomalies,
   describeBaseline,
   describeComparison,
@@ -65,12 +66,15 @@ const ANOMALIES: SpendingAnomaly[] = [
   { key: 'fixed:cat-auto', expenseType: 'fixed', categoryKey: 'cat-auto', categoryLabel: 'Auto', currentTotal: 550, referenceAverage: 420, deltaPercent: 31, absoluteDelta: 130 },
 ];
 
+/** Nothing ahead — the default for a period that has already happened. */
+const NOTHING_SCHEDULED: ScheduledSlice = { count: 0, expenses: 0, income: 0, throughMonth: null };
+
 const INPUT: AnalisiVerdictInput = {
   period: CURRENT,
   today: TODAY,
   historyStartYear: 2024,
   totals: TOTALS,
-  monthCount: 8,
+  scheduled: NOTHING_SCHEDULED,
   pacing: PACING,
   baseline: 'gen–ago 2025',
   topCategory: { label: 'Casa', percentage: 33.3, categoryKey: 'cat-casa', expenseType: 'fixed' },
@@ -113,6 +117,36 @@ describe('describeAnalisiSubject', () => {
   });
 });
 
+describe('describeAnalisiScheduledHorizon', () => {
+  it('should follow the window: the year to December, a month to its own end', () => {
+    expect(describeAnalisiScheduledHorizon(CURRENT, TODAY)).toBe('a fine anno');
+    expect(describeAnalisiScheduledHorizon(PAST_YEAR, TODAY)).toBe(`a fine ${PAST_YEAR.year}`);
+    expect(describeAnalisiScheduledHorizon({ mode: 'current', year: 2026, month: 8 }, TODAY)).toBe('a fine mese');
+    expect(describeAnalisiScheduledHorizon({ mode: 'current', year: 2026, month: 10 }, TODAY)).toBe('a fine ottobre');
+  });
+
+  it('should have no horizon for the history — an end nobody can name is not guessed', () => {
+    expect(describeAnalisiScheduledHorizon(HISTORY, TODAY)).toBeNull();
+  });
+});
+
+describe('the ytd mode in words', () => {
+  const YTD = { mode: 'ytd' as const, year: 2026, month: null };
+
+  it('should say «finora», so it is never read as the whole year', () => {
+    expect(describeAnalisiSubject(YTD, TODAY, 2024).subject).toBe('Nel 2026 finora');
+    expect(describeAnalisiSubject(YTD, TODAY, 2024).inPeriod).toBe('nel 2026 finora');
+    // The whole running year keeps the bare form — the two must not collide.
+    expect(describeAnalisiSubject(CURRENT, TODAY, 2024).subject).toBe('Nel 2026');
+  });
+
+  it('should size its aside by the months it covers, with nothing in the calendar', () => {
+    expect(plain(describePeriodScope(YTD, TODAY, null, 2024))).toBe('8 mesi');
+    // The whole year still says twelve and how many have not started.
+    expect(plain(describePeriodScope(CURRENT, TODAY, null, 2024))).toBe('12 mesi · 4 in calendario');
+  });
+});
+
 describe('describeBaseline', () => {
   it('should name the same months, the whole year or the single month of the comparison year', () => {
     expect(describeBaseline({ kind: 'sameMonths', upToMonth: 8 }, 2025)).toBe('gen–ago 2025');
@@ -143,7 +177,7 @@ describe('buildAnalisiVerdict', () => {
     expect(verdict.headline).toBe("Nel 2026 spendi più dell'anno scorso.");
     expect(verdict.tone).toBe('warning');
     expect(plain(verdict.sentence)).toBe(
-      'Nel 2026 (8 mesi) hai speso 31.200 €, +4,2% su gen–ago 2025; Casa pesa un terzo e Vacanze è la categoria cresciuta di più (+1100 €); ad agosto 2 categorie sono fuori scala: Ristoranti e Auto.',
+      'Nel 2026 hai speso 31.200 €, +4,2% su gen–ago 2025; Casa pesa un terzo e Vacanze è la categoria cresciuta di più (+1100 €); ad agosto 2 categorie sono fuori scala: Ristoranti e Auto.',
     );
     const rise = segmentOf(verdict.sentence, '+4,2%');
     expect(rise).toMatchObject({ mono: true, sign: 'negative' });
@@ -173,19 +207,19 @@ describe('buildAnalisiVerdict', () => {
   });
 
   it('should conjugate a closed year in the past and compare it with the year before', () => {
-    const verdict = buildAnalisiVerdict({ ...INPUT, period: PAST_YEAR, monthCount: 12, baseline: '2024', anomalies: [], anomalyMonth: null });
+    const verdict = buildAnalisiVerdict({ ...INPUT, period: PAST_YEAR, baseline: '2024', anomalies: [], anomalyMonth: null });
     expect(verdict.headline).toBe('Nel 2025 hai speso più del 2024.');
     expect(plain(verdict.sentence)).toBe('Nel 2025 hai speso 31.200 €, +4,2% su 2024; Casa pesa un terzo e Vacanze è la categoria cresciuta di più (+1100 €).');
   });
 
   it('should drop the month count clause for a month and name the anomalies without repeating the month', () => {
-    const verdict = buildAnalisiVerdict({ ...INPUT, period: CURRENT_MONTH, monthCount: 1, baseline: 'agosto 2025', grown: null, shrunk: null });
+    const verdict = buildAnalisiVerdict({ ...INPUT, period: CURRENT_MONTH, baseline: 'agosto 2025', grown: null, shrunk: null });
     expect(verdict.headline).toBe('Ad agosto spendi più di agosto 2025.');
     expect(plain(verdict.sentence)).toBe('Ad agosto hai speso 31.200 €, +4,2% su agosto 2025; Casa pesa un terzo; 2 categorie sono fuori scala: Ristoranti e Auto.');
   });
 
   it('should fall back to the heaviest category when there is nothing to compare', () => {
-    const history = buildAnalisiVerdict({ ...INPUT, period: HISTORY, monthCount: null, pacing: null, baseline: null, grown: null, shrunk: null, anomalies: [], anomalyMonth: null });
+    const history = buildAnalisiVerdict({ ...INPUT, period: HISTORY, pacing: null, baseline: null, grown: null, shrunk: null, anomalies: [], anomalyMonth: null });
     expect(history.headline).toBe('Casa è la voce più pesante.');
     expect(history.tone).toBe('neutral');
     expect(plain(history.sentence)).toBe('Dal 2024 hai speso 31.200 €; Casa pesa un terzo.');
@@ -218,6 +252,11 @@ describe('buildAnalisiVerdict', () => {
     expect(plain(many.sentence)).toContain('; ad agosto 5 categorie sono fuori scala: Ristoranti, Auto, Sport e altre 2.');
   });
 
+  it('should close by naming what the period still has in the calendar', () => {
+    const verdict = buildAnalisiVerdict({ ...INPUT, scheduled: { count: 3, expenses: 1850, income: 500, throughMonth: 12 } });
+    expect(plain(verdict.sentence)).toContain('In calendario ci sono ancora 1850 € di spese e 500 € di entrate da qui a fine anno.');
+  });
+
   it('should drop the pacing clause when the baseline is zero and keep the rest', () => {
     const verdict = buildAnalisiVerdict({
       ...INPUT,
@@ -226,15 +265,15 @@ describe('buildAnalisiVerdict', () => {
     });
     expect(verdict.headline).toBe('Casa è la voce più pesante.');
     // No baseline → no pacing AND no mover: «cresciuta» against nothing would name no window.
-    expect(plain(verdict.sentence)).toBe('Nel 2026 (8 mesi) hai speso 31.200 €; Casa pesa un terzo.');
+    expect(plain(verdict.sentence)).toBe('Nel 2026 hai speso 31.200 €; Casa pesa un terzo.');
   });
 
   it('should refuse a verdict on a month that has not started, naming what is already in the calendar', () => {
-    const december = buildAnalisiVerdict({ ...INPUT, period: { mode: 'current', year: 2026, month: 12 }, monthCount: 1, pacing: null, baseline: null, totals: { ...TOTALS, income: 0, expenses: 800, net: -800, savingsRate: null, coverageRatio: null }, anomalies: [], anomalyMonth: null });
+    const december = buildAnalisiVerdict({ ...INPUT, period: { mode: 'current', year: 2026, month: 12 }, pacing: null, baseline: null, totals: { ...TOTALS, income: 0, expenses: 800, net: -800, savingsRate: null, coverageRatio: null }, anomalies: [], anomalyMonth: null });
     expect(december.headline).toBe('Dicembre non è ancora iniziato.');
     expect(december.tone).toBe('neutral');
     expect(plain(december.sentence)).toBe('Dicembre non è ancora iniziato: 800 € già in calendario.');
-    const empty = buildAnalisiVerdict({ ...INPUT, period: { mode: 'current', year: 2026, month: 12 }, monthCount: 1, pacing: null, baseline: null, totals: { income: 0, expenses: 0, net: 0, savingsRate: null, coverageRatio: null, transferCount: 0 }, topCategory: null, anomalies: [], anomalyMonth: null });
+    const empty = buildAnalisiVerdict({ ...INPUT, period: { mode: 'current', year: 2026, month: 12 }, pacing: null, baseline: null, totals: { income: 0, expenses: 0, net: 0, savingsRate: null, coverageRatio: null, transferCount: 0 }, topCategory: null, anomalies: [], anomalyMonth: null });
     expect(plain(empty.sentence)).toBe('Dicembre non è ancora iniziato: nessuna spesa in calendario.');
   });
 
@@ -252,8 +291,9 @@ describe('buildAnalisiVerdict', () => {
 
 describe('describePeriodScope', () => {
   it('should count the months of a year, the day of the running month, the floor of the history', () => {
-    expect(plain(describePeriodScope(CURRENT, TODAY, null, 2024))).toBe('8 mesi');
-    expect(plain(describePeriodScope({ mode: 'current', year: 2026, month: null }, { year: 2026, month: 1 }, null, 2024))).toBe('1 mese');
+    // A running year covers twelve months and says how many have not started.
+    expect(plain(describePeriodScope(CURRENT, TODAY, null, 2024))).toBe('12 mesi · 4 in calendario');
+    expect(plain(describePeriodScope({ mode: 'current', year: 2026, month: null }, { year: 2026, month: 1 }, null, 2024))).toBe('12 mesi · 11 in calendario');
     expect(plain(describePeriodScope(PAST_YEAR, TODAY, null, 2024))).toBe('12 mesi');
     expect(plain(describePeriodScope(CURRENT_MONTH, TODAY, { dayOfMonth: 25, daysInMonth: 31 }, 2024))).toBe('giorno 25 di 31');
     expect(describePeriodScope(PAST_MONTH, TODAY, null, 2024)).toBeNull();
@@ -270,7 +310,7 @@ describe('describeSpendingChart', () => {
 });
 
 describe('describeSpendingChartFooter', () => {
-  const point = (key: string, label: string, ongoing: boolean, prev: number | null): SpendingPoint => ({ key, label, value: 100, prevYearValue: prev, ongoing });
+  const point = (key: string, label: string, ongoing: boolean, prev: number | null): SpendingPoint => ({ key, label, value: 100, prevYearValue: prev, ongoing, scheduled: false });
 
   it('should explain the half-tone running month and the previous year, or its absence', () => {
     expect(plain(describeSpendingChartFooter([point('2026-07', 'Lug', false, 90), point('2026-08', 'Ago', true, 80)], 'month', 2026, 2024))).toBe('Agosto è in corso: barra a metà tono; il 2025 è disegnato sugli stessi mesi.');

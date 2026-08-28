@@ -14,7 +14,7 @@ import {
   isPeriodOngoing,
   rankTopExpenses,
   resolveCategoryMovers,
-  resolvePeriodMonthCount,
+  resolvePeriodThroughMonth,
   resolveSingleMonth,
   summarizeFlow,
   type AnalisiPeriod,
@@ -71,18 +71,17 @@ describe('resolveSingleMonth', () => {
   });
 });
 
-describe('resolvePeriodMonthCount', () => {
-  it('should count the months lived so far in the running year', () => {
-    expect(resolvePeriodMonthCount(CURRENT, TODAY)).toBe(8);
+describe('resolvePeriodThroughMonth', () => {
+  it('should stop «da inizio anno» at the current month and leave a whole year open', () => {
+    expect(resolvePeriodThroughMonth({ mode: 'ytd', year: 2026, month: null }, TODAY)).toBe(8);
+    // A whole year has no upper month: it runs to December, scheduled rows included.
+    expect(resolvePeriodThroughMonth(CURRENT, TODAY)).toBeNull();
+    expect(resolvePeriodThroughMonth(PAST_YEAR, TODAY)).toBeNull();
   });
 
-  it('should count twelve for a past year and one for a month', () => {
-    expect(resolvePeriodMonthCount(PAST_YEAR, TODAY)).toBe(12);
-    expect(resolvePeriodMonthCount(PAST_MONTH, TODAY)).toBe(1);
-  });
-
-  it('should have no count for the whole history', () => {
-    expect(resolvePeriodMonthCount(HISTORY, TODAY)).toBeNull();
+  it('should let a picked month win over the mode, and have none for the history', () => {
+    expect(resolvePeriodThroughMonth(PAST_MONTH, TODAY)).toBe(PAST_MONTH.month);
+    expect(resolvePeriodThroughMonth(HISTORY, TODAY)).toBeNull();
   });
 });
 

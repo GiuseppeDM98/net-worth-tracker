@@ -23,18 +23,25 @@ export interface CompactExpenseRowProps {
   onSelect: (expense: Expense) => void;
   categoryIcon?: string;
   categoryColor?: string;
+  /** The row is dated after today — listed, not yet happened. */
+  scheduled?: boolean;
 }
 
 /**
  * Flat list row for mobile expense display (Trade Republic divide-y style).
  *
  * Tapping the row opens a detail bottom-sheet managed by the parent.
+ *
+ * A scheduled row (an instalment, a recurring occurrence dated ahead) takes an «In
+ * calendario» chip and drops the sign colour on its amount: the sign tokens mean money
+ * gained and money lost, and neither has happened yet.
  */
 export function CompactExpenseRow({
   expense,
   onSelect,
   categoryIcon,
   categoryColor,
+  scheduled = false,
 }: Readonly<CompactExpenseRowProps>) {
   const isIncome = expense.type === 'income';
   const isTransfer = expense.type === 'transfer';
@@ -93,15 +100,25 @@ export function CompactExpenseRow({
               Ric.
             </Badge>
           )}
+          {scheduled && (
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 flex-shrink-0 text-muted-foreground">
+              In calendario
+            </Badge>
+          )}
         </div>
         <p className="text-[12px] text-muted-foreground truncate mt-0.5">{subtitle}</p>
       </div>
 
-      {/* Amount — the sign tokens for income and spending, muted for a net-zero transfer */}
+      {/* Amount — the sign tokens for income and spending, muted for a net-zero transfer
+          and for anything that has not happened yet */}
       <span
         className={cn(
           'text-[14px] font-bold font-mono tabular-nums flex-shrink-0',
-          isIncome ? 'text-positive' : isTransfer ? 'text-muted-foreground' : 'text-destructive',
+          scheduled || isTransfer
+            ? 'text-muted-foreground'
+            : isIncome
+              ? 'text-positive'
+              : 'text-destructive',
         )}
       >
         {amountLabel}

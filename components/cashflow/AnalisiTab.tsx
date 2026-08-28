@@ -48,7 +48,7 @@ import {
   NO_SUBCATEGORY_KEY,
   NO_SUBCATEGORY_LABEL,
 } from '@/types/expenses';
-import { endOfMonthBound, getItalyDate, getItalyMonth, getItalyMonthYear, getItalyYear, toDate } from '@/lib/utils/dateHelpers';
+import { getItalyDate, getItalyMonth, getItalyMonthYear, getItalyYear, toDate } from '@/lib/utils/dateHelpers';
 import {
   buildExpenseComposition,
   buildIncomeComposition,
@@ -62,13 +62,13 @@ import { getCategoryKey, getSubCategoryKey, getSubCategoryLabel, selectExpensesF
 import { buildCategoryComparison, computeTotalsPacing, resolveComparisonScope } from '@/lib/utils/comparisonDeltas';
 import { buildEntityYearRows, computeEntityRunRate, type EntityScope } from '@/lib/utils/expenseEntityStats';
 import { type EntitySearchTarget } from '@/lib/utils/entitySearch';
-import { summarizePeriodCashflow } from '@/lib/utils/tracciamentoSummary';
+import { summarizePeriodCashflow, summarizeScheduled } from '@/lib/utils/tracciamentoSummary';
 import {
   buildMonthlySpending,
   buildYearlySpending,
   rankTopExpenses,
   resolveCategoryMovers,
-  resolvePeriodMonthCount,
+  resolvePeriodThroughMonth,
   resolveSingleMonth,
   summarizeFlow,
   type AnalisiPeriod,
@@ -214,13 +214,13 @@ function resolveFocusLabels(
 // link degrades to the default view rather than crashing or showing garbage.
 function readPeriodFromSearchParams(searchParams: URLSearchParams, currentYear: number): { periodMode: PeriodMode; selectedYear: number | null; selectedMonth: number | null } {
   const periodParam = searchParams.get('period');
-  const periodMode: PeriodMode = periodParam === 'year' || periodParam === 'history' ? periodParam : 'current';
+  const periodMode: PeriodMode = periodParam === 'year' || periodParam === 'history' || periodParam === 'ytd' ? periodParam : 'current';
 
   const monthParam = searchParams.get('month');
   const parsedMonth = monthParam ? parseInt(monthParam, 10) : NaN;
   const selectedMonth = periodMode !== 'history' && parsedMonth >= 1 && parsedMonth <= 12 ? parsedMonth : null;
 
-  if (periodMode === 'current') return { periodMode, selectedYear: currentYear, selectedMonth };
+  if (periodMode === 'current' || periodMode === 'ytd') return { periodMode, selectedYear: currentYear, selectedMonth };
   if (periodMode === 'history') return { periodMode, selectedYear: null, selectedMonth: null };
 
   const yearParam = searchParams.get('year');
@@ -247,6 +247,8 @@ export function AnalisiTab({ allExpenses, categories, loading, historyStartYear 
 
   // Today in the Italian calendar — the tense, the anomaly month and the running bucket.
   const today = useMemo((): MonthRef => getItalyMonthYear(), []);
+  // The same clock as a Date — what splits the period into happened and scheduled.
+  const nowDate = useMemo(() => getItalyDate(), []);
   const currentYear = today.year;
   const calendar = useMemo(() => {
     const date = getItalyDate();
@@ -335,7 +337,7 @@ export function AnalisiTab({ allExpenses, categories, loading, historyStartYear 
   // study (its Scheda spans every year regardless of the window), not a filter of the period.
   const handlePeriodModeChange = (mode: PeriodMode) => {
     setPeriodMode(mode);
-    if (mode === 'current') {
+    if (mode === 'current' || mode === 'ytd') {
       setSelectedYear(currentYear);
       setSelectedMonth(null);
     } else if (mode === 'history') {
@@ -352,18 +354,25 @@ export function AnalisiTab({ allExpenses, categories, loading, historyStartYear 
     setSelectedMonth(null);
   };
 
-  // The running year stops at the end of today's month (the Tracciamento rule): recurring series
-  // are materialised as future-dated rows, and «nel 2026 (8 mesi)» must not count December's rent.
+  // A year is January → December even while it is running (the Tracciamento rule): recurring
+  // series and instalments are materialised as real future-dated rows, and the page shows
+  // them rather than hiding them. What has not happened yet is never passed off as done —
+  // `scheduled` below carries it, and the verdict closes by naming it.
   const periodExpenses = useMemo(() => {
     if (selectedYear === null) return baseExpenses;
-    const runningYearBound = selectedYear === today.year && selectedMonth === null ? endOfMonthBound(today.year, today.month) : null;
+    // «Da inizio anno» stops at the end of today's month; every other window takes its months whole.
+    const throughMonth = resolvePeriodThroughMonth({ mode: periodMode, year: selectedYear, month: selectedMonth }, today);
     return baseExpenses.filter((e) => {
       const date = toDate(e.date);
       if (getItalyYear(date) !== selectedYear) return false;
-      if (runningYearBound && date > runningYearBound) return false;
+      if (throughMonth !== null && getItalyMonth(date) > throughMonth) return false;
       return selectedMonth === null || getItalyMonth(date) === selectedMonth;
     });
-  }, [baseExpenses, selectedYear, selectedMonth, today]);
+  }, [baseExpenses, periodMode, selectedYear, selectedMonth, today]);
+
+  // The part of the period still ahead. The figures above include it; this is what lets every
+  // sentence say so instead of letting a forecast read as a fact.
+  const scheduled = useMemo(() => summarizeScheduled(periodExpenses, nowDate), [periodExpenses, nowDate]);
 
   // ─── Figures (pure modules) ──────────────────────────────────────────────────
 
@@ -400,9 +409,11 @@ export function AnalisiTab({ allExpenses, categories, loading, historyStartYear 
   const chartKind: 'month' | 'year' = selectedYear === null ? 'year' : 'month';
   const spendingPoints = useMemo(() => {
     if (selectedYear === null) return buildYearlySpending(allExpenses, historyStartYear, monthOf, today);
-    const throughMonth = selectedYear === today.year ? today.month : 12;
+    // The chart draws the period: twelve months for a year, up to today's month for «Da
+    // inizio anno». The months still ahead are marked, never dropped.
+    const throughMonth = resolvePeriodThroughMonth({ mode: periodMode, year: selectedYear, month: null }, today) ?? 12;
     return buildMonthlySpending(allExpenses, selectedYear, throughMonth, historyStartYear, monthOf, today);
-  }, [allExpenses, selectedYear, historyStartYear, today]);
+  }, [allExpenses, periodMode, selectedYear, historyStartYear, today]);
 
   // ─── Words (analisiNarrative / cashflowNarrative) ────────────────────────────
 
@@ -413,7 +424,7 @@ export function AnalisiTab({ allExpenses, categories, loading, historyStartYear 
         today,
         historyStartYear,
         totals,
-        monthCount: resolvePeriodMonthCount(period, today),
+        scheduled,
         pacing,
         baseline,
         topCategory: expenseSlices[0]

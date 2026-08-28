@@ -58,6 +58,28 @@ describe('periodLabel', () => {
 
 // ─── periodToRange ────────────────────────────────────────────────────────────
 
+describe('the ytd kind', () => {
+  it('should span January to the end of throughMonth, without reading a clock', () => {
+    const { from, to } = periodToRange({ kind: 'ytd', year: 2026, throughMonth: 8 });
+    expect(from).toEqual(new Date(2026, 0, 1, 0, 0, 0, 0));
+    // Inclusive upper bound: the last instant of August, not the 1st of September.
+    expect(to.getFullYear()).toBe(2026);
+    expect(to.getMonth()).toBe(7);
+    expect(to.getDate()).toBe(31);
+  });
+
+  it('should name itself by its months, never by the bare year', () => {
+    // «2026» alone is the WHOLE year — a different period, so the label must differ.
+    expect(periodLabel({ kind: 'ytd', year: 2026, throughMonth: 8 })).toBe('2026 · gen–ago');
+    expect(periodLabel({ kind: 'ytd', year: 2026, throughMonth: 1 })).toBe('2026 · gen–gen');
+    expect(periodLabel({ kind: 'year', year: 2026 })).toBe('2026');
+  });
+
+  it('should not be mistaken for the whole current year', () => {
+    expect(isCurrentYear({ kind: 'ytd', year: 2026, throughMonth: 8 })).toBe(false);
+  });
+});
+
 describe('periodToRange', () => {
   it('returns start-of-month to end-of-month for a month period', () => {
     const p: Period = { kind: 'month', year: 2024, month: 3 };

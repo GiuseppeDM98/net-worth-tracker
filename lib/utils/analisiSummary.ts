@@ -19,8 +19,15 @@ import { MONTH_NAMES_SHORT } from '@/lib/utils/period';
 
 // ─── The period ───────────────────────────────────────────────────────────────
 
-/** The three modes of the Analisi axis (the URL's `?period=`). */
-export type PeriodMode = 'current' | 'year' | 'history';
+/**
+ * The four modes of the Analisi axis (the URL's `?period=`).
+ *
+ * `ytd` and `current` are NOT the same window: `current` is the whole calendar year, December
+ * included, and therefore carries what is only scheduled; `ytd` stops at the end of today's
+ * month. Two questions — «come sta andando l'anno?» and «quanto ho fatto finora?» — so two
+ * modes, each saying which it is.
+ */
+export type PeriodMode = 'ytd' | 'current' | 'year' | 'history';
 
 /** The page's period state: `year` is null only in history, `month` only when a month is picked. */
 export interface AnalisiPeriod {
@@ -46,14 +53,8 @@ export type DayResolver = (expense: Expense) => MonthRef & { day: number };
 export function resolveSingleMonth(period: AnalisiPeriod, today: MonthRef): MonthRef | null {
   if (period.mode === 'history' || period.year === null) return null;
   if (period.month !== null) return { year: period.year, month: period.month };
-  return period.mode === 'current' ? { year: today.year, month: today.month } : null;
-}
-
-/** How many months the period covers: 1 for a month, the months lived so far for the running year, 12 for a past year, none for the history. */
-export function resolvePeriodMonthCount(period: AnalisiPeriod, today: MonthRef): number | null {
-  if (period.mode === 'history' || period.year === null) return null;
-  if (period.month !== null) return 1;
-  return period.year === today.year ? today.month : 12;
+  // Both windows on the running year mean today's month; a past year means no month at all.
+  return period.mode === 'current' || period.mode === 'ytd' ? { year: today.year, month: today.month } : null;
 }
 
 /** Whether the period is still running today — the tense of the verdict. */
@@ -61,6 +62,13 @@ export function isPeriodOngoing(period: AnalisiPeriod, today: MonthRef): boolean
   if (period.mode === 'history' || period.year === null) return true;
   if (period.year !== today.year) return false;
   return period.month === null || period.month === today.month;
+}
+
+/** The last month a period covers, or null when it covers the whole year (or no year at all). */
+export function resolvePeriodThroughMonth(period: AnalisiPeriod, today: MonthRef): number | null {
+  if (period.mode === 'history' || period.year === null) return null;
+  if (period.month !== null) return period.month;
+  return period.mode === 'ytd' ? today.month : null;
 }
 
 // ─── Top expenses ─────────────────────────────────────────────────────────────
@@ -147,6 +155,11 @@ export interface SpendingPoint {
   prevYearValue: number | null;
   /** The bucket that contains today — drawn at half tone and outlined. */
   ongoing: boolean;
+  /**
+   * The bucket has not started yet: it holds only what is already in the calendar
+   * (recurring rows, instalments). Never true for the bucket in progress.
+   */
+  scheduled: boolean;
 }
 
 /**
@@ -184,6 +197,7 @@ export function buildMonthlySpending(
       value: current[month - 1],
       prevYearValue: baselineKnown ? previous[month - 1] : null,
       ongoing: year === today.year && month === today.month,
+      scheduled: year > today.year || (year === today.year && month > today.month),
     });
   }
   return points;
@@ -206,7 +220,7 @@ export function buildYearlySpending(expenses: Expense[], historyStartYear: numbe
 
   const points: SpendingPoint[] = [];
   for (let year = firstYear; year <= today.year; year++) {
-    points.push({ key: String(year), label: String(year), value: byYear.get(year) ?? 0, prevYearValue: null, ongoing: year === today.year });
+    points.push({ key: String(year), label: String(year), value: byYear.get(year) ?? 0, prevYearValue: null, ongoing: year === today.year, scheduled: false });
   }
   return points;
 }

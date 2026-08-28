@@ -67,18 +67,63 @@ export function summarizePeriodCashflow(expenses: Expense[]): PeriodCashflowTota
   };
 }
 
-/**
- * The rows inside the period, both ends inclusive (the same slice the toolbar filters). A
- * year still running stops at the end of today's month: recurring series are materialised as
- * future-dated rows, and «il 2026» is January → today, not January → December.
- */
-export function filterExpensesByPeriod(expenses: Expense[], period: Period, now: Date): Expense[] {
-  const range = periodToRange(period);
-  const to = period.kind === 'year' && isYearToDate(period, now) ? endOfMonthBound(period.year, resolveAnchorMonth(period, now).month) : range.to;
+function sliceBetween(expenses: Expense[], from: Date, to: Date): Expense[] {
   return expenses.filter((expense) => {
     const date = getExpenseDate(expense.date);
-    return date >= range.from && date <= to;
+    return date >= from && date <= to;
   });
+}
+
+/**
+ * The rows of the period, both ends inclusive — the calendar's bounds, nothing narrower.
+ * «Il 2026» is January → December even in August: recurring series and instalments are
+ * materialised as real future-dated rows, and the page shows them rather than hiding them.
+ *
+ * What is not spent yet is never passed off as spent: `summarizeScheduled` counts it and
+ * every sentence built on these totals names it («di cui 1.850 € ancora in calendario»),
+ * while the list marks each such row. Two windows that must NOT follow this rule and stay
+ * anchored to today: `previousPeriod` (a comparison needs two comparable windows) and
+ * `resolveAnchorMonth` (the trailing savings history is history, not the period).
+ */
+export function filterExpensesByPeriod(expenses: Expense[], period: Period): Expense[] {
+  const range = periodToRange(period);
+  return sliceBetween(expenses, range.from, range.to);
+}
+
+/** A row the period counts but that has not happened yet — an instalment, a recurring occurrence. */
+export function isScheduledRow(expense: Expense, now: Date): boolean {
+  return getExpenseDate(expense.date) > now;
+}
+
+export interface ScheduledSlice {
+  /** Rows dated after today, across every type. */
+  count: number;
+  /** Spending not yet spent, as a magnitude. */
+  expenses: number;
+  /** Income not yet received. */
+  income: number;
+  /** The last month the period still has ahead of it; null when nothing is scheduled. */
+  throughMonth: number | null;
+}
+
+/**
+ * The part of a period that has not happened yet. The totals above it include this; this is
+ * the number that lets every sentence say so, instead of letting a forecast read as a fact.
+ */
+export function summarizeScheduled(expenses: Expense[], now: Date): ScheduledSlice {
+  let count = 0;
+  let spending = 0;
+  let income = 0;
+  let throughMonth: number | null = null;
+  for (const expense of expenses) {
+    if (!isScheduledRow(expense, now)) continue;
+    count++;
+    if (expense.type === 'income') income += expense.amount;
+    else if (isSpending(expense)) spending += Math.abs(expense.amount);
+    const month = getItalyMonth(getExpenseDate(expense.date));
+    if (throughMonth === null || month > throughMonth) throughMonth = month;
+  }
+  return { count, expenses: spending, income, throughMonth };
 }
 
 /**
@@ -98,9 +143,29 @@ export function splitSpendingAtDate(expenses: Expense[], now: Date): { spentToDa
   return { spentToDate, scheduled };
 }
 
-/** A year period that is still running: its figures stop at today's month. */
+/** A year period that is still running — it reaches past today. */
 export function isYearToDate(period: Period, now: Date): boolean {
   return period.kind === 'year' && period.year === getItalyMonthYear(now).year;
+}
+
+/**
+ * The window of the CURRENT period that `previousPeriod` can honestly be compared with: the
+ * period itself, except for a year still running, where it is January → the end of today's
+ * month. The period's own totals span the whole year; a delta may not, because the previous
+ * year has no months to match December against — twelve against eight is a rise by
+ * construction, the mirror of the drop `previousPeriod` already refuses.
+ *
+ * Null exactly when `previousPeriod` is null: with no predecessor there is nothing to scope.
+ */
+export function currentComparisonWindow(period: Period, now: Date): Period | null {
+  if (period.kind === 'custom') return null;
+  // A ytd period already stops at today's month: it IS its own comparable window.
+  if (period.kind === 'ytd') return period;
+  if (period.kind === 'year' && isYearToDate(period, now)) {
+    const anchor = resolveAnchorMonth(period, now);
+    return { kind: 'custom', from: new Date(period.year, 0, 1), to: endOfMonthBound(period.year, anchor.month) };
+  }
+  return period;
 }
 
 /**
@@ -115,6 +180,9 @@ export function previousPeriod(period: Period, now: Date): Period | null {
       ? { kind: 'month', year: period.year - 1, month: 12 }
       : { kind: 'month', year: period.year, month: period.month - 1 };
   }
+  // Year-to-date against the SAME months a year earlier — same shape, so it keeps its name
+  // and its range rule instead of degrading into an anonymous custom window.
+  if (period.kind === 'ytd') return { kind: 'ytd', year: period.year - 1, throughMonth: period.throughMonth };
   if (period.kind === 'year') {
     if (!isYearToDate(period, now)) return { kind: 'year', year: period.year - 1 };
     const anchor = resolveAnchorMonth(period, now);
@@ -152,10 +220,16 @@ export interface MonthRef {
  * The month every trailing window ends at: the selected month, the last month of the year
  * (today's month for the current year — the future is not data), or the month of a custom
  * range's last day.
+ *
+ * Deliberately still anchored to today for a running year, even though the period itself is
+ * now the whole calendar year: this anchors the trailing SAVINGS HISTORY, which is history
+ * and must not run into months that have not happened. The period's own chart uses
+ * `resolveFlowWindow`, which does cover the whole year.
  */
 export function resolveAnchorMonth(period: Period, now: Date): MonthRef {
   const today = getItalyMonthYear(now);
   if (period.kind === 'month') return { year: period.year, month: period.month };
+  if (period.kind === 'ytd') return { year: period.year, month: period.throughMonth };
   if (period.kind === 'year') {
     return { year: period.year, month: period.year === today.year ? today.month : 12 };
   }
@@ -170,12 +244,16 @@ export interface FlowWindow {
 
 /**
  * The window of the income-vs-spending chart: the trailing months for a month or a custom
- * range, the year's own months (January → anchor) for a year.
+ * range, ALL TWELVE months for a year — the chart of a period must draw the period, and a
+ * year is January → December whether or not it has finished. The months still ahead carry
+ * only what is materialised (recurring rows, instalments) and are drawn as scheduled.
  */
 export function resolveFlowWindow(period: Period, now: Date, trailing = 6): FlowWindow {
+  if (period.kind === 'year') return { endYear: period.year, endMonth: 12, count: 12 };
+  // January → the period's last month; a ytd window has no month ahead of today to mark.
+  if (period.kind === 'ytd') return { endYear: period.year, endMonth: period.throughMonth, count: period.throughMonth };
   const anchor = resolveAnchorMonth(period, now);
-  const count = period.kind === 'year' ? anchor.month : trailing;
-  return { endYear: anchor.year, endMonth: anchor.month, count };
+  return { endYear: anchor.year, endMonth: anchor.month, count: trailing };
 }
 
 export interface MonthFlow extends MonthRef {
@@ -188,6 +266,11 @@ export interface MonthFlow extends MonthRef {
   net: number;
   /** Percent; null when the month had no income. */
   savingsRate: number | null;
+  /**
+   * The month has not started yet: its bars hold only what is already in the calendar.
+   * False for the month in progress — that one is partly real, and `highlightKey` marks it.
+   */
+  scheduled: boolean;
 }
 
 function monthKey(year: number, month: number): string {
@@ -197,8 +280,11 @@ function monthKey(year: number, month: number): string {
 /**
  * A gap-free series of `count` months ending at (endYear, endMonth), oldest first. Rows
  * outside the window are ignored; an empty month is a zero bucket with a null rate.
+ *
+ * `now` marks the months that have not started; omit it and nothing is marked (a window
+ * entirely in the past needs no mark).
  */
-export function buildTrailingMonthFlows(expenses: Expense[], endYear: number, endMonth: number, count: number): MonthFlow[] {
+export function buildTrailingMonthFlows(expenses: Expense[], endYear: number, endMonth: number, count: number, now?: Date): MonthFlow[] {
   // Walk back from the anchor to build the axis, then reverse into chronological order.
   const axis: MonthRef[] = [];
   let year = endYear;
@@ -212,6 +298,11 @@ export function buildTrailingMonthFlows(expenses: Expense[], endYear: number, en
     }
   }
 
+  // A month is scheduled when it starts after today — the month in progress is partly real.
+  const today = now ? getItalyMonthYear(now) : null;
+  const startsAfterToday = (ref: MonthRef) =>
+    today !== null && (ref.year > today.year || (ref.year === today.year && ref.month > today.month));
+
   const byKey = new Map<string, MonthFlow>();
   for (const ref of axis) {
     byKey.set(monthKey(ref.year, ref.month), {
@@ -222,6 +313,7 @@ export function buildTrailingMonthFlows(expenses: Expense[], endYear: number, en
       expenses: 0,
       net: 0,
       savingsRate: null,
+      scheduled: startsAfterToday(ref),
     });
   }
 
@@ -359,17 +451,33 @@ export interface MovementsSummary {
   transferCount: number;
   /** The row with the largest absolute amount, labelled like the feed (note, else category). */
   largest: { label: string; amount: number; type: ExpenseType } | null;
+  /**
+   * The subset dated after today — listed, not yet happened. Counted across every type
+   * (a scheduled income is as unspent as a scheduled instalment); the total is a magnitude,
+   * so it never mixes signs. Zero when the period is entirely in the past.
+   */
+  scheduled: { count: number; total: number };
 }
 
-export function summarizeMovements(expenses: Expense[]): MovementsSummary {
+/**
+ * The inventory of a list of rows. `now` splits it into what has happened and what is only
+ * in the calendar: the register lists both, and the reading must not let them read as one.
+ */
+export function summarizeMovements(expenses: Expense[], now: Date): MovementsSummary {
   let expenseCount = 0;
   let incomeCount = 0;
   let transferCount = 0;
+  let scheduledCount = 0;
+  let scheduledTotal = 0;
   let largest: Expense | null = null;
   for (const expense of expenses) {
     if (expense.type === 'income') incomeCount++;
     else if (expense.type === 'transfer') transferCount++;
     else expenseCount++;
+    if (isScheduledRow(expense, now)) {
+      scheduledCount++;
+      scheduledTotal += Math.abs(expense.amount);
+    }
     if (!largest || Math.abs(expense.amount) > Math.abs(largest.amount)) largest = expense;
   }
   return {
@@ -380,6 +488,7 @@ export function summarizeMovements(expenses: Expense[]): MovementsSummary {
     largest: largest
       ? { label: largest.notes?.trim() || largest.categoryName, amount: Math.abs(largest.amount), type: largest.type }
       : null,
+    scheduled: { count: scheduledCount, total: scheduledTotal },
   };
 }
 

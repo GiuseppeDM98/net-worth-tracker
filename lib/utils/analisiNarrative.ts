@@ -15,7 +15,7 @@
  */
 
 import type { Narrative, NarrativeSegment, PageVerdictModel, VerdictTone } from '@/lib/utils/narrative';
-import type { PeriodCashflowTotals } from '@/lib/utils/tracciamentoSummary';
+import type { PeriodCashflowTotals, ScheduledSlice } from '@/lib/utils/tracciamentoSummary';
 import type { CategoryDeltaRow, ComparisonMonthScope, PacingSide, TotalsPacing } from '@/lib/utils/comparisonDeltas';
 import type { SpendingAnomaly } from '@/lib/utils/cashflowComposition';
 import type { ExpenseType } from '@/types/expenses';
@@ -23,7 +23,7 @@ import type { AnalisiPeriod, CategoryMover, FlowSummary, MonthRef, SpendingPoint
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { formatPercentage } from '@/lib/services/chartService';
 import { articleForPercent, monthWithPrepositionA, ofThePercent } from '@/lib/utils/patrimonioNarrative';
-import { printedDelta } from '@/lib/utils/cashflowNarrative';
+import { printedDelta, scheduledSentence } from '@/lib/utils/cashflowNarrative';
 import { MONTH_NAMES } from '@/lib/constants/months';
 import { MONTH_NAMES_SHORT } from '@/lib/utils/period';
 
@@ -114,9 +114,12 @@ export function describeAnalisiSubject(period: AnalisiPeriod, today: MonthRef, h
     };
   }
   const ongoing = period.year === today.year;
+  // «Nel 2026 finora» — never the bare year, which names all twelve months and carries what
+  // is only scheduled. Same wording as the Cashflow axis, for the same window.
+  const finora = period.mode === 'ytd' ? ' finora' : '';
   return {
-    subject: `Nel ${period.year}`,
-    inPeriod: `nel ${period.year}`,
+    subject: `Nel ${period.year}${finora}`,
+    inPeriod: `nel ${period.year}${finora}`,
     ongoing,
     comparisonOf: ongoing ? "dell'anno scorso" : `del ${period.year - 1}`,
     comparisonPlain: ongoing ? "l'anno scorso" : `il ${period.year - 1}`,
@@ -155,6 +158,21 @@ export function shareInWords(percentage: number): Narrative {
   return percentWithArticle(percentage);
 }
 
+/**
+ * How far the scheduled figure reaches, in Analisi's own period vocabulary — the counterpart
+ * of `describeScheduledHorizon` for the `Period` type. The history has no end to name, so its
+ * clause is dropped rather than guessed.
+ */
+export function describeAnalisiScheduledHorizon(period: AnalisiPeriod, today: MonthRef): string | null {
+  if (period.mode === 'history' || period.year === null) return null;
+  if (period.month !== null) {
+    return period.year === today.year && period.month === today.month ? 'a fine mese' : `a fine ${monthInSentence(period.month)}`;
+  }
+  // «Da inizio anno» stops at today's month; every other year window runs to December.
+  if (period.mode === 'ytd') return 'a fine mese';
+  return period.year === today.year ? 'a fine anno' : `a fine ${period.year}`;
+}
+
 // ─── Verdict ──────────────────────────────────────────────────────────────────
 
 export interface AnalisiVerdictInput {
@@ -162,8 +180,12 @@ export interface AnalisiVerdictInput {
   today: MonthRef;
   historyStartYear: number;
   totals: PeriodCashflowTotals;
-  /** Months the period covers; null for the history. */
-  monthCount: number | null;
+  /**
+   * The part of the period that has not happened yet — instalments and recurring rows dated
+   * ahead. `totals` INCLUDE it, so the verdict closes by naming it: without that sentence a
+   * forecast would read as a fact.
+   */
+  scheduled: ScheduledSlice;
   /** Against the previous year's same window; null when there is none. */
   pacing: TotalsPacing | null;
   /** The baseline in words («gen–ago 2025»), from `describeBaseline`; null with no pacing. */
@@ -241,15 +263,17 @@ export function buildAnalisiVerdict(input: AnalisiVerdictInput): PageVerdictMode
       totals.transferCount > 0
         ? [prose(`Solo ${totals.transferCount} ${pluralize(totals.transferCount, 'trasferimento', 'trasferimenti')} tra i tuoi conti.`)]
         : [prose('Nessun movimento registrato.')];
-    return { headline, tone, sentence };
+    return { headline, tone, sentence: [...sentence, ...(scheduledSentence(input.scheduled, describeAnalisiScheduledHorizon(input.period, input.today)) ?? [])] };
   }
   if (totals.expenses <= 0) {
-    return { headline, tone, sentence: [prose(`${subject.subject} nessuna spesa: entrate `), figure(euro(totals.income)), prose('.')] };
+    const noSpending: Narrative = [prose(`${subject.subject} nessuna spesa: entrate `), figure(euro(totals.income)), prose('.')];
+    return { headline, tone, sentence: [...noSpending, ...(scheduledSentence(input.scheduled, describeAnalisiScheduledHorizon(input.period, input.today)) ?? [])] };
   }
 
-  // Opening: «Nel 2026 (8 mesi) hai speso 31.200 €» — the month count only for a year still short of twelve.
-  const months = input.period.month === null && input.monthCount !== null && input.monthCount < 12 ? ` (${input.monthCount} ${pluralize(input.monthCount, 'mese', 'mesi')})` : '';
-  const sentence: Narrative = [prose(`${subject.subject}${months} hai speso `), figure(euro(totals.expenses))];
+  // Opening: «Nel 2026 hai speso 31.200 €». A period now always covers its whole calendar
+  // span, so there is no shortened month count to print — what has not happened yet is named
+  // by the closing sentence instead.
+  const sentence: Narrative = [prose(`${subject.subject} hai speso `), figure(euro(totals.expenses))];
 
   const pacing = resolveSpendingPacing(input.pacing);
   if (pacing && input.baseline) {
@@ -275,12 +299,16 @@ export function buildAnalisiVerdict(input: AnalisiVerdictInput): PageVerdictMode
   const anomalies = anomaliesClause(input);
   if (anomalies.length > 0) sentence.push(prose('; '), ...anomalies);
   sentence.push(prose('.'));
+  sentence.push(...(scheduledSentence(input.scheduled, describeAnalisiScheduledHorizon(input.period, input.today)) ?? []));
   return { headline, tone, sentence };
 }
 
 // ─── Tile readings ────────────────────────────────────────────────────────────
 
-/** The aside of the Periodo tile: «8 mesi», «giorno 25 di 31», «dal 2024»; null for a closed month. */
+/**
+ * The aside of the Periodo tile: «12 mesi · 4 in calendario» for a year still running,
+ * «12 mesi» for a closed one, «giorno 25 di 31», «dal 2024»; null for a closed month.
+ */
 export function describePeriodScope(
   period: AnalisiPeriod,
   today: MonthRef,
@@ -292,8 +320,14 @@ export function describePeriodScope(
     if (!calendar || period.year !== today.year || period.month !== today.month) return null;
     return [prose('giorno '), figure(String(calendar.dayOfMonth)), prose(' di '), figure(String(calendar.daysInMonth))];
   }
-  const count = period.year === today.year ? today.month : 12;
-  return [figure(String(count)), prose(` ${pluralize(count, 'mese', 'mesi')}`)];
+  // Year-to-date says the months it covers; a whole year says twelve and how many of them
+  // have not started, so «12 mesi» is never read as twelve months lived.
+  if (period.mode === 'ytd') {
+    return [figure(String(today.month)), prose(` ${pluralize(today.month, 'mese', 'mesi')}`)];
+  }
+  const ahead = period.year === today.year ? 12 - today.month : 0;
+  const months: Narrative = [figure('12'), prose(' mesi')];
+  return ahead > 0 ? [...months, prose(' · '), figure(String(ahead)), prose(' in calendario')] : months;
 }
 
 /** The sub-eyebrow of the spending chart: «Spese per mese · 2026 e 2025», «Spese per anno · dal 2024». */
