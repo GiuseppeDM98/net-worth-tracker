@@ -24,7 +24,7 @@ import { getLifecycleStatus, resolveLastActivityDate, splitRecurringVsOneOff } f
 import { summarizeCeiling } from '@/lib/utils/budgetSummary';
 import { projectWindowEndWithScheduled } from '@/lib/utils/spendingProjection';
 import { resolveBudgetCalendar } from '@/lib/utils/budgetUtils';
-import { getItalyDate, getItalyMonth, getItalyYear, toDate } from '@/lib/utils/dateHelpers';
+import { getItalyDate, getItalyMonth, getItalyYear, isItalyDayAfter, toDate } from '@/lib/utils/dateHelpers';
 import { MONTH_NAMES_SHORT } from '@/lib/utils/period';
 
 // ─── Calendar ─────────────────────────────────────────────────────────────────
@@ -68,7 +68,11 @@ export function resolveYearCalendar(now: Date): YearCalendar {
 // ─── Row helpers ──────────────────────────────────────────────────────────────
 
 const cost = (expense: Expense) => Math.abs(expense.amount);
-const isBooked = (expense: Expense, now: Date) => toDate(expense.date) <= now;
+/**
+ * A row already happened, by Italian calendar DAY — the same boundary Tracciamento's
+ * `isScheduledRow` uses, so a spesa recorded today is booked here too whatever hour it carries.
+ */
+const isBooked = (expense: Expense, now: Date) => !isItalyDayAfter(toDate(expense.date), now);
 const monthKey = (year: number, month: number) => `${year}-${String(month).padStart(2, '0')}`;
 
 function sum(rows: Expense[]): number {

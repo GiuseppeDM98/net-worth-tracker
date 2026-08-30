@@ -158,6 +158,44 @@ describe('setSettings — scrittura, ramo con targets (setDoc senza merge)', () 
 
     expect(writtenPayload().pensionReturnStartMonth).toBe('2026-07');
   });
+
+  // Età, risk-free e le due categorie dividendi si possono SVUOTARE dalla UI. Senza la guardia
+  // `'x' in settings` questo ramo le riportava indietro: parte da `...existingData` e con
+  // `!== undefined` un campo svuotato non sovrascriveva nulla (bug corretto il 2026-08-29).
+  it.each([
+    ['userAge', 34],
+    ['riskFreeRate', 3.5],
+    ['dividendIncomeCategoryId', 'cat-1'],
+    ['dividendIncomeSubCategoryId', 'sub-1'],
+  ])('drops %s from the payload when it is cleared', async (field, stored) => {
+    vi.mocked(getDoc).mockResolvedValue({
+      exists: () => true,
+      data: () => ({ [field]: stored }),
+    } as never);
+
+    await setSettings('user-1', {
+      targets: TARGETS,
+      [field]: undefined,
+    } as AssetAllocationSettings);
+
+    expect(writtenPayload()).not.toHaveProperty(field);
+  });
+
+  it.each([
+    ['userAge', 34],
+    ['riskFreeRate', 3.5],
+    ['dividendIncomeCategoryId', 'cat-1'],
+    ['dividendIncomeSubCategoryId', 'sub-1'],
+  ])('leaves an untouched %s alone when the key is absent from the update', async (field, stored) => {
+    vi.mocked(getDoc).mockResolvedValue({
+      exists: () => true,
+      data: () => ({ [field]: stored }),
+    } as never);
+
+    await setSettings('user-1', { targets: TARGETS } as AssetAllocationSettings);
+
+    expect(writtenPayload()[field]).toBe(stored);
+  });
 });
 
 describe('setSettings — scrittura, ramo senza targets (merge: true)', () => {
@@ -200,4 +238,24 @@ describe('setSettings — scrittura, ramo senza targets (merge: true)', () => {
 
     expect(writtenPayload()).not.toHaveProperty('pensionReturnStartMonth');
   });
+
+  // Lo stesso per gli altri quattro campi svuotabili: qui si scrive con merge, quindi omettere
+  // la chiave lascerebbe il valore vecchio — serve un deleteField() esplicito (2026-08-29).
+  it.each(['userAge', 'riskFreeRate', 'dividendIncomeCategoryId', 'dividendIncomeSubCategoryId'])(
+    'uses deleteField to clear %s, since omitting the key would keep it',
+    async (field) => {
+      await setSettings('user-1', { [field]: undefined } as unknown as AssetAllocationSettings);
+
+      expect(writtenPayload()[field]).toBe(DELETE_SENTINEL);
+    }
+  );
+
+  it.each(['userAge', 'riskFreeRate', 'dividendIncomeCategoryId', 'dividendIncomeSubCategoryId'])(
+    'does not touch %s when the key is absent from the update',
+    async (field) => {
+      await setSettings('user-1', { costCentersEnabled: true } as AssetAllocationSettings);
+
+      expect(writtenPayload()).not.toHaveProperty(field);
+    }
+  );
 });

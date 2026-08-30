@@ -33,6 +33,7 @@ import { TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { useActionColors } from '@/lib/hooks/useActionColors';
 import {
   ASSET_CLASS_LABELS,
+  NO_SUBCATEGORY_LABEL,
   assetClassSequenceIndex,
   filterSpecificAssets,
   groupSubCategoriesByAssetClass,
@@ -117,8 +118,16 @@ export function AllocationBreakdown({ allocation, targets, className }: Allocati
               <CollapseRegion open={isClassOpen}>
                 <div className="divide-y divide-border border-t border-border">
                   {Object.entries(subs)
-                    .sort(([a], [b]) => a.localeCompare(b))
+                    // Alphabetical, except the residual sleeve, which closes the list: it is what
+                    // is LEFT of the class, so reading it between two targeted sleeves would put a
+                    // non-verdict in the middle of a column of verdicts.
+                    .sort(([a], [b]) => {
+                      if (a === NO_SUBCATEGORY_LABEL) return 1;
+                      if (b === NO_SUBCATEGORY_LABEL) return -1;
+                      return a.localeCompare(b);
+                    })
                     .map(([subCategory, subData]) => {
+                      const isUntargeted = subCategory === NO_SUBCATEGORY_LABEL;
                       const subKey = `${assetClass}:${subCategory}`;
                       const hasSpecific = hasSpecificAssetTracking(targets, assetClass, subCategory);
                       const isSubOpen = expandedSubs.has(subKey);
@@ -132,6 +141,7 @@ export function AllocationBreakdown({ allocation, targets, className }: Allocati
                             data={subData}
                             actionColor={actionColors[subData.action]}
                             depth={1}
+                            untargeted={isUntargeted}
                             expandable={hasSpecific}
                             expanded={isSubOpen}
                             onToggle={hasSpecific ? () => setExpandedSubs((s) => toggleKey(s, subKey)) : undefined}

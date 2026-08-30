@@ -241,9 +241,10 @@ function anomaliesClause(input: AnalisiVerdictInput): Narrative {
 }
 
 /**
- * The headline + the sentence under it: the total with the months lived, the pacing against
- * the same window of the previous year, the heaviest category's share, the category that
- * moved the most, and the anomalies of the month — each clause only when its input exists.
+ * The headline + the sentence under it: the total, the pacing against the SAME window of the
+ * previous year (the period's own span — see `resolveComparisonScope`), the heaviest category's
+ * share, the category that moved the most, and the anomalies of the month — each clause only
+ * when its input exists.
  */
 export function buildAnalisiVerdict(input: AnalisiVerdictInput): PageVerdictModel {
   const subject = describeAnalisiSubject(input.period, input.today, input.historyStartYear);

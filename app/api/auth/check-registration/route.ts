@@ -14,7 +14,7 @@ import { isRegistrationAllowed } from '@/lib/server/registrationPolicy';
  *
  * Response:
  * - 200: { allowed: true } - Registration is permitted
- * - 403: { allowed: false, message: "..." } - Registration is blocked
+ * - 403: { allowed: false, code: "registration/not-allowed", message: "..." } - Registration is blocked
  * - 400: { error: "..." } - Invalid request
  * - 500: { error: "..." } - Server error
  */
@@ -52,6 +52,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           allowed: false,
+          // A stable code, so the client says the refusal in its own words instead of
+          // printing this message: lib/utils/authNarrative.ts owns the sentence the
+          // reader sees, and it must not drift with a copy edit made here.
+          code: 'registration/not-allowed',
           message: 'Le registrazioni sono attualmente chiuse o la tua email non è autorizzata.',
         },
         { status: 403 }

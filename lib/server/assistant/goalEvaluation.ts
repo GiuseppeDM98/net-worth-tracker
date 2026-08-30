@@ -24,6 +24,7 @@ import {
   AssistantStructuredGoal,
 } from '@/types/assistant';
 import { formatCurrency } from '@/lib/utils/formatters';
+import { ASSET_CLASS_LABELS } from '@/lib/utils/allocationUtils';
 import { getItalyDateIso } from '@/lib/utils/dateHelpers';
 
 interface SuggestionIdFactoryArgs {
@@ -107,7 +108,7 @@ function resolveGoalMetric(
       return {
         value: roundMetric(snapshot.byAssetClass?.[goal.assetClass] ?? 0),
         evaluatedAgainst: 'asset_class_value',
-        label: `Classe ${goal.assetClass}`,
+        label: `Classe ${ASSET_CLASS_LABELS[goal.assetClass] ?? goal.assetClass}`,
       };
 
     case 'asset_class_percentage_target': {
@@ -116,7 +117,7 @@ function resolveGoalMetric(
       return {
         value: roundMetric((value / snapshot.totalNetWorth) * 100),
         evaluatedAgainst: 'asset_class_percentage',
-        label: `Allocazione ${goal.assetClass}`,
+        label: `Allocazione ${ASSET_CLASS_LABELS[goal.assetClass] ?? goal.assetClass}`,
       };
     }
 

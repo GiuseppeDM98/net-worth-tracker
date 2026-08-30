@@ -756,7 +756,13 @@ export function stripOrphanedSubTargets(
 // Withdrawal ("Preleva") — the mirror image of the contribution split
 // ---------------------------------------------------------------------------
 
-/** Label for holdings that carry no sub-category, so every euro of a class lands in some bucket. */
+/**
+ * Label for holdings that carry no sub-category, so every euro of a class lands in some bucket.
+ *
+ * The subcategory is optional (AssetDialog offers «Nessuna»), so this is a real bucket, not an
+ * edge case: the allocation snapshot files unclassified holdings under it, Allocazione states it
+ * as an untargeted row, and both plans treat it as "no opinion" rather than as a 0% target.
+ */
 export const NO_SUBCATEGORY_LABEL = 'Senza sottocategoria';
 
 /**
@@ -955,7 +961,10 @@ function buildWithdrawalHoldingNodes(
  * class's take across it alone would strand every euro sitting in an untargeted sub-category —
  * the per-instrument takes would no longer sum back to the class take. Grouping the class's own
  * holdings guarantees that every euro of the class is in exactly one bucket. A bucket with a
- * configured target is drained toward it; one without gets a neutral target (pro-rata).
+ * configured target is drained toward it; one without gets a neutral target (pro-rata) — and the
+ * residual `NO_SUBCATEGORY_LABEL` bucket counts as "without", even though `bySubCategory` now
+ * carries a 0 target for it: that zero is a display convention ("no target declared"), and
+ * reading it as a real one would drain the unclassified holdings before anything else.
  */
 function buildWithdrawalSubCategoryNodes(
   assetClass: string,
@@ -988,7 +997,9 @@ function buildWithdrawalSubCategoryNodes(
     currentValue: bucket.currentValue,
     capacity: bucket.capacity,
     targetPercentage:
-      bySubCategory[`${assetClass}:${bucket.key}`]?.targetPercentage ??
+      (bucket.key === NO_SUBCATEGORY_LABEL
+        ? undefined
+        : bySubCategory[`${assetClass}:${bucket.key}`]?.targetPercentage) ??
       (bucketTotal > 0 ? (bucket.currentValue / bucketTotal) * 100 : 0),
   }));
 
@@ -1210,6 +1221,9 @@ export function buildContributionPlan(
     // a frozen asset. An unfunded target (nothing behind it at all) stays: buying into it is
     // exactly what a contribution is for.
     const subEntries = Object.entries(subs).filter(([subCategory]) => {
+      // The residual bucket is a statement about what is unclassified, never a destination: new
+      // money goes into a sleeve you chose, not into the absence of one.
+      if (subCategory === NO_SUBCATEGORY_LABEL) return false;
       const bucket = holdings.filter(
         (holding) => holding.assetClass === slice.assetClass && holding.subCategory === subCategory
       );

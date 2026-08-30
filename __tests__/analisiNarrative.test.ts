@@ -254,7 +254,7 @@ describe('buildAnalisiVerdict', () => {
 
   it('should close by naming what the period still has in the calendar', () => {
     const verdict = buildAnalisiVerdict({ ...INPUT, scheduled: { count: 3, expenses: 1850, income: 500, throughMonth: 12 } });
-    expect(plain(verdict.sentence)).toContain('In calendario ci sono ancora 1850 € di spese e 500 € di entrate da qui a fine anno.');
+    expect(plain(verdict.sentence)).toContain('Nel totale ci sono ancora 1850 € di spese e 500 € di entrate già in calendario da qui a fine anno.');
   });
 
   it('should drop the pacing clause when the baseline is zero and keep the rest', () => {

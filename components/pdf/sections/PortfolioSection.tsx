@@ -201,6 +201,8 @@ function getAssetClassShort(assetClass: string): string {
     realestate: 'Immob.',
     commodity: 'Materie P.',
     cash: 'Liquid.',
+    trendFollowing: 'Trend F.',
+    carry: 'Carry',
   };
   return shorts[assetClass] || assetClass;
 }

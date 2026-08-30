@@ -27,5 +27,9 @@ export const DASHBOARD_OVERVIEW_SUMMARY_COLLECTION = 'dashboardOverviewSummaries
 // reason — it feeds both Panoramica's "Asset principali" and Patrimonio's "Rendimento" tile.
 // Bumped from 12→13: topInstrumentMovers[].name now resolves via getAssetDisplayTicker too —
 // it feeds the "Mercato:" digest (Patrimonio) and the verdict's named top mover.
-export const DASHBOARD_OVERVIEW_SOURCE_VERSION = 13;
+// Bumped from 13→14: two payload changes at once. charts.assetClassData[].name carries the
+// Italian label for trendFollowing/carry instead of the raw Firestore key (the Composizione and
+// Classi tiles print that string verbatim), and expensesScheduled now splits by Italian calendar
+// DAY, so a row recorded today counts as spent rather than as scheduled.
+export const DASHBOARD_OVERVIEW_SOURCE_VERSION = 14;
 export const DASHBOARD_OVERVIEW_SUMMARY_TTL_MS = 5 * 60 * 1000;

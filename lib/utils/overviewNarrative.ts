@@ -16,6 +16,7 @@
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { formatPercentage } from '@/lib/services/chartService';
 import { MONTH_NAMES } from '@/lib/constants/months';
+import { atThePercent } from '@/lib/utils/patrimonioNarrative';
 
 import type { Narrative, NarrativeSegment, VerdictTone } from '@/lib/utils/narrative';
 
@@ -270,14 +271,20 @@ export function describeComposition(
     return [prose(`Tutto in ${classNoun(top.assetClass)}.`)];
   }
 
+  // The article follows the figure AS PRINTED (`atThePercent`, the app's one rule): «allo 0,1%»
+  // for a class rounding to zero, «all'8,5%» before a vowel-initial number name. A hard-coded
+  // «al » printed «carry al 0,1%», which is not Italian.
   const lead: Narrative =
     top.percentage > 50
       ? [prose(`Più della metà in ${classNoun(top.assetClass)}`)]
-      : [prose(`${capitalise(classNoun(top.assetClass))} al `), figure(formatPercentage(top.percentage, 1))];
+      : [
+          prose(`${capitalise(classNoun(top.assetClass))} ${atThePercent(top.percentage, 1)}`),
+          figure(formatPercentage(top.percentage, 1)),
+        ];
 
   return [
     ...lead,
-    prose(`; ${classNoun(bottom.assetClass)} al `),
+    prose(`; ${classNoun(bottom.assetClass)} ${atThePercent(bottom.percentage, 1)}`),
     figure(formatPercentage(bottom.percentage, 1)),
     prose('.'),
   ];

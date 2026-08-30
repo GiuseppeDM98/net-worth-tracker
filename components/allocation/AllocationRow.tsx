@@ -17,6 +17,11 @@
  * The "theoretical" variant is for specific-asset TARGETS, whose current value is always 0
  * (they are not linked to real holdings). A 0% column and an empty tick there would read as
  * missing data, so that variant prints the target alone and draws no tick.
+ *
+ * The "untargeted" variant is its mirror — the residual «Senza sottocategoria» sleeve, which has
+ * a real weight and NO target. It prints the share and the value and stops: a target column, a
+ * gap and an action chip would all answer «troppo o troppo poco?», and the honest answer there
+ * is «classificalo», which no chip can say. It exists so the sleeves visibly reach 100%.
  */
 'use client';
 
@@ -41,6 +46,8 @@ interface AllocationRowProps {
   onToggle?: () => void;
   /** Theoretical specific-asset target (current value always 0 → the target alone, no tick). */
   theoretical?: boolean;
+  /** Residual sleeve with no target (→ share and value alone, no chip, no gap, no tick). */
+  untargeted?: boolean;
 }
 
 const DEPTH_PADDING: Record<0 | 1 | 2, string> = {
@@ -67,6 +74,7 @@ export function AllocationRow({
   expanded = false,
   onToggle,
   theoretical = false,
+  untargeted = false,
 }: AllocationRowProps) {
   const isInteractive = expandable && !!onToggle;
   // A class row is the tile's 13px row; everything under it steps down to 12px so depth reads
@@ -101,14 +109,18 @@ export function AllocationRow({
           second one, right-aligned — the tick under both still reads as the row's. */}
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
         <div className="flex min-w-0 flex-1 basis-[140px] items-center gap-2">
-          <span className={cn('truncate font-medium text-foreground', rowText)} title={name}>
+          <span className={cn('truncate font-medium', untargeted ? 'text-muted-foreground' : 'text-foreground', rowText)} title={name}>
             {name}
           </span>
-          <ActionChip action={data.action} color={actionColor} />
+          {!untargeted && <ActionChip action={data.action} color={actionColor} />}
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-2.5">
 
-        {theoretical ? (
+        {untargeted ? (
+          <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">
+            {formatPercentage(data.currentPercentage, 1)} · {cachedFormatCurrencyEUR(data.currentValue, true)} · senza target
+          </span>
+        ) : theoretical ? (
           <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">
             target {formatPercentage(data.targetPercentage, 0)} · {cachedFormatCurrencyEUR(data.targetValue, true)}
           </span>
@@ -144,7 +156,7 @@ export function AllocationRow({
         </div>
       </div>
 
-      {!theoretical && (
+      {!theoretical && !untargeted && (
         <TargetTick className="mt-1" currentPercentage={data.currentPercentage} targetPercentage={data.targetPercentage} />
       )}
     </div>

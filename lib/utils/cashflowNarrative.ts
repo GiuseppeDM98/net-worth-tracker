@@ -186,7 +186,8 @@ export function describeScheduledHorizon(period: Period, now: Date): string | nu
     year === today.year && month === today.month ? 'a fine mese' : `a fine ${monthInSentence(month)}`;
 
   if (period.kind === 'month') return endOfMonthNamed(period.year, period.month);
-  // A ytd window never carries a scheduled row, but if it ever did its end is its last month.
+  // A ytd window runs to the END of today's month (period.ts → periodToRange), so it DOES carry
+  // the rest of this month: its horizon is that month's end.
   if (period.kind === 'ytd') return endOfMonthNamed(period.year, period.throughMonth);
   if (period.kind === 'year') return period.year === today.year ? 'a fine anno' : `a fine ${period.year}`;
   // A custom range ends on a day, not on a calendar unit: name the day.
@@ -194,8 +195,16 @@ export function describeScheduledHorizon(period: Period, now: Date): string | nu
 }
 
 /**
- * "In calendario ci sono ancora 1850 € di spese e 500 € di entrate da qui a fine anno." — the
- * second sentence of the verdict whenever the period reaches past today; null when it does not.
+ * "Nel totale ci sono ancora 1850 € di spese e 500 € di entrate già in calendario da qui a fine
+ * anno." — the second sentence of the verdict whenever the period reaches past today; null when
+ * it does not.
+ *
+ * It opens on «Nel totale» and not on «In calendario» because the amount is INSIDE the figure
+ * the verdict has just printed, not beside it. The bare existential form shipped until
+ * 2026-08-30 and read as an addition — «spese 2910 €. In calendario ci sono ancora 1850 €»
+ * invites the reader to sum to 4760, when 1850 is part of the 2910. Centri di Costo says the
+ * same words about a total that genuinely EXCLUDES them, which is the other half of the reason
+ * this one has to be unambiguous.
  *
  * The verb agrees with the AMOUNT, not with the number of clauses: «1850 €» is plural however
  * few clauses follow it. Only a lone «1 €» takes the singular, and «1 €» means the figure AS
@@ -219,11 +228,12 @@ export function scheduledSentence(scheduled: ScheduledSlice, horizon: string | n
   if (parts.length === 0) return null;
 
   const singular = amounts.length === 1 && Math.round(amounts[0]) === 1;
-  const narrative: Narrative = [prose(' In calendario '), prose(singular ? "c'è ancora " : 'ci sono ancora ')];
+  const narrative: Narrative = [prose(' Nel totale '), prose(singular ? "c'è ancora " : 'ci sono ancora ')];
   parts.forEach((part, index) => {
     if (index > 0) narrative.push(prose(' e '));
     narrative.push(...part);
   });
+  narrative.push(prose(' già in calendario'));
   if (horizon) narrative.push(prose(` da qui ${horizon}`));
   narrative.push(prose('.'));
   return narrative;
@@ -502,9 +512,10 @@ export function describeDeficitMonths(history: SavingsHistory, now: Date): Narra
  * voce più grande è Stipendio (4200 €)." — the inventory's own count, by type, and its
  * largest row.
  *
- * The «di cui … in calendario» clause is what keeps the list honest against the tiles: the
- * register lists rows dated after today, the figures above it do not count them, and this
- * is the sentence that says so.
+ * The «di cui … in calendario» clause is what keeps the list honest: the register lists rows
+ * dated after today, the figures above it COUNT them, and this is the sentence that decomposes
+ * the count the same way `scheduledSentence` decomposes the amount. Both say «di cui» / «nel
+ * totale» on purpose — the page speaks one dialect, and neither clause is an addition.
  */
 export function describeMovements(summary: MovementsSummary): Narrative | null {
   if (summary.count === 0) return null;

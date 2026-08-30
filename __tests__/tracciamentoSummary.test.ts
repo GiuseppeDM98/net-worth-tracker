@@ -455,11 +455,33 @@ describe('summarizeScheduled', () => {
 });
 
 describe('isScheduledRow', () => {
-  it('should call a row scheduled only when it is dated strictly after now', () => {
+  it('should call a row scheduled only when it is dated on a later DAY than now', () => {
     expect(isScheduledRow(makeExpense({ amount: -1, date: d(2026, 9, 28) }), NOW)).toBe(true);
     expect(isScheduledRow(makeExpense({ amount: -1, date: d(2026, 8, 20) }), NOW)).toBe(false);
     // Now itself has happened.
     expect(isScheduledRow(makeExpense({ amount: -1, date: NOW }), NOW)).toBe(false);
+  });
+
+  it('should not call a row scheduled when it is dated TODAY at a later hour', () => {
+    // The fixtures in this file all sit at noon by convention, which is exactly what hid this:
+    // a row saved from the dialog carries its creation TIME, and the page's `now` is frozen at
+    // mount — so a spesa recorded at 18:42 was «in calendario» until the next reload.
+    expect(isScheduledRow(makeExpense({ amount: -1, date: d(2026, 8, 22, 18) }), NOW)).toBe(false);
+    expect(isScheduledRow(makeExpense({ amount: -1, date: new Date(2026, 7, 22, 23, 59, 59) }), NOW)).toBe(false);
+    // A CSV import lands at noon, so the morning is the mirror case: still today, still booked.
+    expect(isScheduledRow(makeExpense({ amount: -1, date: d(2026, 8, 22) }), d(2026, 8, 22, 7))).toBe(false);
+    // Tomorrow at midnight is the first instant that IS scheduled.
+    expect(isScheduledRow(makeExpense({ amount: -1, date: new Date(2026, 7, 23, 0, 0) }), NOW)).toBe(true);
+  });
+
+  it('should split today into what is booked, never into what is scheduled', () => {
+    // The projection divides by the days elapsed, today included, so today's spending has to be
+    // on the paced side of the split or the month-end figure understates it.
+    const rows = [
+      makeExpense({ type: 'variable', amount: -40, date: d(2026, 8, 22, 19) }),
+      makeExpense({ type: 'variable', amount: -60, date: d(2026, 8, 27) }),
+    ];
+    expect(splitSpendingAtDate(rows, NOW)).toEqual({ spentToDate: 40, scheduled: 60 });
   });
 });
 

@@ -1,3 +1,5 @@
+import { ASSET_CLASS_CHART_INDEX } from '@/lib/utils/allocationUtils';
+
 /**
  * Color palette for asset classes
  */
@@ -15,12 +17,14 @@ const ASSET_CLASS_COLORS: Record<string, string> = {
 /**
  * Chart colors for various visualizations.
  *
- * Indices 5-9 also back the theme-independent tail of useChartColors() and the
- * cost-center slots chart-6..8, where they are 4px identity rails on a light card:
- * every hue must clear the WCAG 1.4.11 3:1 floor against white AND against the dark
- * themes' cards — the ~0.12-0.30 relative-luminance band. Teal and orange sit at
- * their -600 steps for exactly this reason (3.74:1 and 3.56:1 vs white); their -500
- * originals measured 2.49:1 and 2.80:1.
+ * This is now only the FALLBACK palette: `useChartColors()` resolves --chart-1..8 from
+ * the active theme and pads just the last two slots from here. It still backs every
+ * Recharts caller that cannot read a CSS variable, and the first paint before the hook's
+ * rAF fires, so the contrast rule below still holds: these hues are also 4px identity
+ * rails on a light card, and every one must clear the WCAG 1.4.11 3:1 floor against white
+ * AND against the dark themes' cards — the ~0.12-0.30 relative-luminance band. Teal and
+ * orange sit at their -600 steps for exactly this reason (3.74:1 and 3.56:1 vs white);
+ * their -500 originals measured 2.49:1 and 2.80:1.
  */
 export const CHART_COLORS = [
   '#3B82F6', // blue
@@ -49,20 +53,19 @@ export function getAssetClassColor(assetClass: string): string {
  * Use this for badge/chip styling so colours follow the active theme.
  * Recharts components must keep using getAssetClassColor (hex) since they
  * cannot consume CSS variables at render time.
+ *
+ * It is DERIVED from `ASSET_CLASS_CHART_INDEX`, the app's single source for a class's chart
+ * slot, and not written by hand: the hand-written version had crypto on --chart-4 while the
+ * charts painted it with slot 2 (= --chart-3), so the same class wore two hues on one screen,
+ * and it stopped at six keys, which is why Trend Following and Carry were as grey as Liquidità.
+ * `cash` keeps the neutral on purpose — liquidity is the absence of a position, not a series.
  */
-// trendFollowing/carry have no dedicated slot yet (only 5 --chart-* vars exist) — they fall back
-// to --muted-foreground below like cash, pending an L2/L3 design pass on the 2 new classes.
-const ASSET_CLASS_CSS_VAR: Record<string, string> = {
-  equity:     '--chart-1',
-  bonds:      '--chart-2',
-  realestate: '--chart-3',
-  crypto:     '--chart-4',
-  commodity:  '--chart-5',
-  cash:       '--muted-foreground',
-};
+const CASH_CSS_VAR = '--muted-foreground';
 
 export function getAssetClassCssVar(assetClass: string): string {
-  return ASSET_CLASS_CSS_VAR[assetClass] ?? '--muted-foreground';
+  if (assetClass === 'cash') return CASH_CSS_VAR;
+  const slot = ASSET_CLASS_CHART_INDEX[assetClass];
+  return slot === undefined ? CASH_CSS_VAR : `--chart-${slot + 1}`;
 }
 
 /**

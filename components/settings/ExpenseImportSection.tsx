@@ -1,12 +1,17 @@
 'use client';
 
 /**
- * ExpenseImportSection — Settings → Spese sub-section.
+ * ExpenseImportSection — Settings → Spese, the «Import CSV» tile.
  *
  * A 4-phase wizard (idle → preview → committing → done) to migrate historical
  * expense/income data from a standardized CSV. Parsing/validation is delegated to
  * the pure lib/utils/expenseImport.ts layer; the Firestore commit/undo to
  * lib/services/expenseImportService.ts. Every import is undoable via its batch id.
+ *
+ * The tile's reading line states the phase (settingsNarrative.describeImport): the
+ * idle promise, the preview's three counts (import/skip/create — nothing moves
+ * without confirmation), the undoable outcome. The preview's figures are flat KPIs
+ * (sub-eyebrow · 18px mono · caption), never tinted sub-cards.
  *
  * Owner-scoped like every other Cashflow surface: `ownerId` comes from
  * `useActiveAccount()`, not `user.uid`, so a shared-account delegate imports into
@@ -16,16 +21,17 @@
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Upload, Download, FileText, AlertTriangle, CheckCircle2, Undo2, Loader2, Info } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
+import { Tile, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { cachedFormatCurrencyEUR, formatDate } from '@/lib/utils/formatters';
+import { describeImport } from '@/lib/utils/settingsNarrative';
 import { getAllCategories } from '@/lib/services/expenseCategoryService';
 import { buildImportPlan, parseImportCsv, buildTemplateCsv } from '@/lib/utils/expenseImport';
 import { commitImportPlan, deleteExpensesByImportBatch } from '@/lib/services/expenseImportService';
@@ -44,6 +50,17 @@ const TYPE_LABELS: Record<string, string> = {
   debt: 'Debiti',
   income: 'Entrate',
 };
+
+/** A flat KPI of the preview: sub-eyebrow, 18px mono figure, muted caption. */
+function PreviewKpi({ label, value, caption }: { label: string; value: string; caption?: string }) {
+  return (
+    <div className="min-w-0">
+      <p className={TILE_SUB_EYEBROW_CLASS}>{label}</p>
+      <p className="mt-1 font-mono text-[18px] font-bold leading-none tracking-[-0.03em] tabular-nums">{value}</p>
+      {caption && <p className="mt-1 text-[11px] leading-[1.4] text-muted-foreground">{caption}</p>}
+    </div>
+  );
+}
 
 export default function ExpenseImportSection({ onImported }: ExpenseImportSectionProps) {
   const { ownerId } = useActiveAccount();
@@ -129,184 +146,182 @@ export default function ExpenseImportSection({ onImported }: ExpenseImportSectio
     }
   };
 
+  const reading =
+    phase === 'preview' && plan
+      ? describeImport({
+          phase: 'preview',
+          fileName,
+          validCount: plan.summary.validCount,
+          skippedCount: plan.summary.skippedCount,
+          newCategoriesCount: plan.summary.newCategoriesCount,
+        })
+      : phase === 'done' && lastBatch
+        ? describeImport({ phase: 'done', created: lastBatch.created })
+        : describeImport({ phase: 'idle' });
+
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <Upload className="h-5 w-5" />
-          <CardTitle>Importa Dati Storici</CardTitle>
+    <Tile eyebrow="Import CSV" aside="anteprima obbligatoria" reading={reading}>
+      {phase === 'idle' && (
+        <>
+          <div className="mt-3.5 flex flex-col gap-3 sm:flex-row">
+            <Button variant="outline" onClick={handleDownloadTemplate} className="w-full sm:w-auto">
+              <Download className="mr-2 h-4 w-4" />
+              Scarica template CSV
+            </Button>
+            <Button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isDemo}
+              className="w-full sm:w-auto"
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              Carica file CSV
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              onChange={handleFile}
+              aria-label="Carica file CSV storico spese"
+            />
+          </div>
+          {isDemo && (
+            <p className="mt-2 text-[11px] leading-[1.4] text-muted-foreground">
+              Il caricamento non è disponibile in modalità demo.
+            </p>
+          )}
+          <div className="mt-auto border-t border-border pt-3 text-[11px] leading-[1.45] text-muted-foreground">
+            Una riga per transazione; le categorie mancanti vengono create; i saldi dei conti non vengono toccati.
+          </div>
+        </>
+      )}
+
+      {phase === 'preview' && plan && (
+        <>
+          <div className="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground">
+            <FileText className="h-3.5 w-3.5" aria-hidden="true" />
+            <span className="truncate">{fileName}</span>
+          </div>
+
+          <div className="mt-3.5 grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-3">
+            <PreviewKpi
+              label="Da importare"
+              value={String(plan.summary.validCount)}
+              caption={`${cachedFormatCurrencyEUR(plan.summary.totalIncome, true)} entrate · ${cachedFormatCurrencyEUR(plan.summary.totalExpense, true)} uscite`}
+            />
+            <PreviewKpi
+              label="Scartate"
+              value={String(plan.summary.skippedCount)}
+              caption={plan.summary.skippedCount > 0 ? 'motivi riga per riga qui sotto' : undefined}
+            />
+            <PreviewKpi
+              label="Da creare"
+              value={String(plan.summary.newCategoriesCount)}
+              caption={
+                plan.summary.dateFrom && plan.summary.dateTo
+                  ? `periodo ${formatDate(plan.summary.dateFrom)} → ${formatDate(plan.summary.dateTo)}`
+                  : undefined
+              }
+            />
+          </div>
+
+          {plan.categoriesToCreate.length > 0 && (
+            <div className="mt-3.5 border-t border-border pt-3">
+              <p className={TILE_SUB_EYEBROW_CLASS}>Categorie che verranno create</p>
+              <ul className="mt-1.5 space-y-0.5 text-[13px] text-muted-foreground">
+                {plan.categoriesToCreate.map((c) => (
+                  // Keyed by (type, name): two same-named categories of different
+                  // types can legitimately be created by the same import.
+                  <li key={`${c.type}::${c.name}`}>
+                    • {c.name} <span className="opacity-70">({TYPE_LABELS[c.type] ?? c.type})</span>
+                    {c.subCategories.length > 0 && (
+                      <span className="opacity-70"> — {c.subCategories.join(', ')}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Deterministic choices the user must SEE before committing — e.g. two
+              same-named same-typed categories, rows attaching to the oldest one. */}
+          {plan.notices.length > 0 && (
+            <div className="mt-3.5 border-t border-border pt-3">
+              <p className={`${TILE_SUB_EYEBROW_CLASS} flex items-center gap-1.5`}>
+                <Info className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                Da sapere prima di importare
+              </p>
+              <ul className="mt-1.5 space-y-0.5 text-[13px] text-muted-foreground">
+                {plan.notices.map((n) => (
+                  <li key={`${n.type}::${n.categoryName}`}>• {n.message}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {plan.errors.length > 0 && (
+            <Collapsible className="mt-3.5 border-t border-border pt-3">
+              <CollapsibleTrigger className="flex items-center gap-2 text-[13px] text-warning-foreground hover:underline">
+                <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+                Mostra {plan.errors.length} righe scartate
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-2">
+                <div className="max-h-56 divide-y divide-border overflow-y-auto rounded-md border border-border text-[13px]">
+                  {plan.errors.map((err, i) => (
+                    <div key={i} className="flex gap-3 px-3 py-2">
+                      <span className="shrink-0 font-mono text-muted-foreground">Riga {err.line}</span>
+                      <span>{err.reason}</span>
+                    </div>
+                  ))}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+
+          <div className="mt-auto flex flex-col gap-3 border-t border-border pt-3.5 sm:flex-row">
+            <Button
+              onClick={handleConfirm}
+              disabled={isDemo || plan.validRows.length === 0}
+              className="w-full sm:w-auto"
+            >
+              Importa {plan.validRows.length} voci
+            </Button>
+            <Button variant="outline" onClick={reset} className="w-full sm:w-auto">
+              Annulla
+            </Button>
+          </div>
+        </>
+      )}
+
+      {phase === 'committing' && (
+        <div className="mt-3.5 flex items-center gap-3 py-4 text-[13px] text-muted-foreground">
+          <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+          Importazione in corso…
         </div>
-      </CardHeader>
-      <CardContent className="p-4 sm:p-6 space-y-4">
-        {phase === 'idle' && (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Migra spese ed entrate storiche da un file CSV. Scarica il template, compilalo con i tuoi
-              dati (una riga per transazione) e caricalo qui. Le categorie mancanti verranno create
-              automaticamente. I saldi dei conti non vengono modificati.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Button variant="outline" onClick={handleDownloadTemplate} className="w-full sm:w-auto">
-                <Download className="mr-2 h-4 w-4" />
-                Scarica template CSV
-              </Button>
-              <Button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isDemo}
-                title={isDemo ? 'Non disponibile in modalità demo' : undefined}
-                className="w-full sm:w-auto"
-              >
-                <Upload className="mr-2 h-4 w-4" />
-                Carica file CSV
-              </Button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv,text/csv"
-                className="hidden"
-                onChange={handleFile}
-                aria-label="Carica file CSV storico spese"
-              />
-            </div>
+      )}
+
+      {phase === 'done' && lastBatch && (
+        <>
+          <div className="mt-3.5 flex items-center gap-2 text-[13px]">
+            <CheckCircle2 className="h-5 w-5 text-positive" aria-hidden="true" />
+            <span className="font-medium">Importate {lastBatch.created} transazioni.</span>
           </div>
-        )}
-
-        {phase === 'preview' && plan && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <FileText className="h-4 w-4" />
-              <span>{fileName}</span>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <SummaryTile label="Transazioni valide" value={String(plan.summary.validCount)} />
-              <SummaryTile label="Righe scartate" value={String(plan.summary.skippedCount)} />
-              <SummaryTile label="Categorie nuove" value={String(plan.summary.newCategoriesCount)} />
-              <SummaryTile label="Totale entrate" value={cachedFormatCurrencyEUR(plan.summary.totalIncome)} />
-              <SummaryTile label="Totale uscite" value={cachedFormatCurrencyEUR(plan.summary.totalExpense)} />
-              <SummaryTile
-                label="Periodo"
-                value={
-                  plan.summary.dateFrom && plan.summary.dateTo
-                    ? `${formatDate(plan.summary.dateFrom)} → ${formatDate(plan.summary.dateTo)}`
-                    : '—'
-                }
-              />
-            </div>
-
-            {plan.categoriesToCreate.length > 0 && (
-              <div className="rounded-md border p-3 space-y-1">
-                <p className="text-sm font-medium">Categorie che verranno create:</p>
-                <ul className="text-sm text-muted-foreground space-y-0.5">
-                  {plan.categoriesToCreate.map((c) => (
-                    // Keyed by (type, name): two same-named categories of different
-                    // types can legitimately be created by the same import.
-                    <li key={`${c.type}::${c.name}`}>
-                      • {c.name} <span className="opacity-70">({TYPE_LABELS[c.type] ?? c.type})</span>
-                      {c.subCategories.length > 0 && (
-                        <span className="opacity-70"> — {c.subCategories.join(', ')}</span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* Deterministic choices the user must SEE before committing — e.g. two
-                same-named same-typed categories, rows attaching to the oldest one. */}
-            {plan.notices.length > 0 && (
-              <div className="rounded-md border p-3 space-y-1">
-                <p className="flex items-center gap-2 text-sm font-medium">
-                  <Info className="h-4 w-4 shrink-0" aria-hidden="true" />
-                  Da sapere prima di importare:
-                </p>
-                <ul className="text-sm text-muted-foreground space-y-0.5">
-                  {plan.notices.map((n) => (
-                    <li key={`${n.type}::${n.categoryName}`}>• {n.message}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {plan.errors.length > 0 && (
-              <Collapsible>
-                <CollapsibleTrigger className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-500 hover:underline">
-                  <AlertTriangle className="h-4 w-4" />
-                  Mostra {plan.errors.length} righe scartate
-                </CollapsibleTrigger>
-                <CollapsibleContent className="mt-2">
-                  <div className="max-h-56 overflow-y-auto rounded-md border divide-y text-sm">
-                    {plan.errors.map((err, i) => (
-                      <div key={i} className="flex gap-3 px-3 py-2">
-                        <span className="shrink-0 font-mono text-muted-foreground">Riga {err.line}</span>
-                        <span>{err.reason}</span>
-                      </div>
-                    ))}
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            )}
-
-            <div className="flex flex-col sm:flex-row gap-3 pt-2">
-              <Button
-                onClick={handleConfirm}
-                disabled={isDemo || plan.validRows.length === 0}
-                title={isDemo ? 'Non disponibile in modalità demo' : undefined}
-                className="w-full sm:w-auto"
-              >
-                Importa {plan.validRows.length} voci
-              </Button>
-              <Button variant="outline" onClick={reset} className="w-full sm:w-auto">
-                Annulla
-              </Button>
-            </div>
+          <div className="mt-auto flex flex-col gap-3 border-t border-border pt-3.5 sm:flex-row">
+            <Button
+              variant="outline"
+              onClick={handleUndo}
+              disabled={undoing || isDemo}
+              className="w-full sm:w-auto"
+            >
+              {undoing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Undo2 className="mr-2 h-4 w-4" />}
+              Annulla import
+            </Button>
+            <Button variant="ghost" onClick={reset} className="w-full sm:w-auto">
+              Importa un altro file
+            </Button>
           </div>
-        )}
-
-        {phase === 'committing' && (
-          <div className="flex items-center gap-3 py-4 text-sm text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            Importazione in corso…
-          </div>
-        )}
-
-        {phase === 'done' && lastBatch && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-sm">
-              <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-500" />
-              <span className="font-medium">Importate {lastBatch.created} transazioni.</span>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Le trovi ora in Cashflow e Analisi, nei mesi corrispondenti. Se qualcosa non va, puoi
-              annullare l&apos;intero import.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Button
-                variant="outline"
-                onClick={handleUndo}
-                disabled={undoing || isDemo}
-                title={isDemo ? 'Non disponibile in modalità demo' : undefined}
-                className="w-full sm:w-auto"
-              >
-                {undoing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Undo2 className="mr-2 h-4 w-4" />}
-                Annulla import
-              </Button>
-              <Button variant="ghost" onClick={reset} className="w-full sm:w-auto">
-                Importa un altro file
-              </Button>
-            </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function SummaryTile({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-md border p-3">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="text-sm font-semibold mt-0.5">{value}</p>
-    </div>
+        </>
+      )}
+    </Tile>
   );
 }

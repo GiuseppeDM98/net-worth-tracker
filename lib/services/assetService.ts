@@ -30,7 +30,10 @@ function getErrorMessage(error: unknown): string {
 
 /**
  * Define asset class ordering priority
- * Order: Azioni → Obbligazioni → Commodities → Real Estate → Cash → Crypto
+ * Order: Azioni → Obbligazioni → Commodities → Real Estate → Cash → Crypto → Trend Following → Carry
+ *
+ * A class absent from this map sorts last (`|| 999` in getAllAssets), which is how trendFollowing
+ * and carry were pushed to the bottom of the Strumenti list regardless of their weight.
  */
 export const ASSET_CLASS_ORDER: Record<string, number> = {
   equity: 1,
@@ -39,6 +42,8 @@ export const ASSET_CLASS_ORDER: Record<string, number> = {
   realestate: 4,
   cash: 5,
   crypto: 6,
+  trendFollowing: 7,
+  carry: 8,
 };
 
 /**
@@ -238,6 +243,11 @@ export async function updateAsset(
     // is AssetDialog with a complete formData, so a bare undefined check is safe here (same
     // reasoning as averageCost/taxRate above, unlike leverageRatio's `in` guard).
     if (updates.displayTicker === undefined) cleanedUpdates.displayTicker = deleteField();
+    // subCategory is optional and user-clearable («Nessuna» in AssetDialog). The `in` guard keeps a
+    // partial caller — a price refresh, a ledger replay — from wiping a classification it never sent.
+    if ('subCategory' in updates && updates.subCategory === undefined) {
+      cleanedUpdates.subCategory = deleteField();
+    }
 
     // Rebuy on the same doc: quantity goes from 0 (sold but kept) back to > 0. Stamp the new
     // holding start so YOC ignores the previous holding's dividends (mirrors the ISIN-reuse path
@@ -277,8 +287,8 @@ export type AssetMetadataFormData = Omit<AssetFormData, 'quantity' | 'averageCos
  * sending quantity/averageCost would wipe the PMC on every metadata save. `updateAsset` is unchanged and still
  * used for cash/realestate.
  *
- * `taxRate`/`displayTicker` keep the same undefined→deleteField() clearing as `updateAsset` (the
- * form always sends the key, undefined when cleared). quantity/averageCost/holdingStartDate are
+ * `taxRate`/`displayTicker`/`subCategory` keep the same undefined→deleteField() clearing as
+ * `updateAsset` (the form always sends the key, undefined when cleared). quantity/averageCost/holdingStartDate are
  * structurally absent from the payload type, so the ledger-derived fields can never be cleared by
  * a metadata edit.
  */
@@ -302,6 +312,11 @@ export async function updateAssetMetadata(
     }
     // displayTicker is a metadata field too — clearable, same rule as updateAsset.
     if (updates.displayTicker === undefined) cleanedUpdates.displayTicker = deleteField();
+    // subCategory too — every ledger type (stock/etf/bond/crypto/commodity) edits through here, and
+    // those are exactly the classes that carry subcategories. Same `in` guard as updateAsset.
+    if ('subCategory' in updates && updates.subCategory === undefined) {
+      cleanedUpdates.subCategory = deleteField();
+    }
 
     await updateDoc(assetRef, cleanedUpdates);
 

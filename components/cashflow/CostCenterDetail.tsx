@@ -55,7 +55,7 @@ import {
   describeYearEndKpi,
 } from '@/lib/utils/costCenterNarrative';
 import { resolveCostCenterColor } from '@/lib/utils/costCenterColors';
-import { toDate } from '@/lib/utils/dateHelpers';
+import { isItalyDayAfter, toDate } from '@/lib/utils/dateHelpers';
 import { useChartColors } from '@/lib/hooks/useChartColors';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -190,7 +190,7 @@ export function CostCenterDetail({
   // --- Every number, from the pure layer ---
   const summary = useMemo(() => summarizeCenter(costCenter, allExpenses, now), [costCenter, allExpenses, now]);
   const stack = useMemo(() => buildCenterMonthStack([{ summary, share: 100, rank: 100 }], now, TRAILING_MONTHS), [summary, now]);
-  const booked = useMemo(() => allExpenses.filter((e) => toDate(e.date) <= now), [allExpenses, now]);
+  const booked = useMemo(() => allExpenses.filter((e) => !isItalyDayAfter(toDate(e.date), now)), [allExpenses, now]);
   const composition = useMemo(() => buildCategoryComposition(booked), [booked]);
   const subComposition = useMemo(() => buildSubCategoryComposition(booked), [booked]);
   const netSubTotal = useMemo(

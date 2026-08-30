@@ -294,7 +294,7 @@ describe('assistant prompt data block', () => {
       expect(content).toContain('priorità alta');
       expect(content).toContain('contributo mensile pianificato 500 €');
       expect(content).toContain('stato: in ritardo');
-      expect(content).toContain('allocazione consigliata per questo obiettivo: bonds 70%, equity 30%');
+      expect(content).toContain('allocazione consigliata per questo obiettivo: Obbligazioni 70%, Azioni 30%');
     });
 
     it('should state the required pace as a projection, with the return it assumes', () => {

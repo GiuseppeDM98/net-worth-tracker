@@ -30,9 +30,10 @@
 
 'use client';
 
-import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
-import { motion } from 'framer-motion';
+import Link from 'next/link';
+import { useTheme } from 'next-themes';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
@@ -47,11 +48,11 @@ import {
 import { resolveAutoEquityBondsSplit } from '@/lib/utils/equityBondsAutoTargets';
 import { AssetAllocationTarget, AssetClass, SubCategoryTarget as SubCategoryTargetType, FamilyMember } from '@/types/assets';
 import { useQueryClient } from '@tanstack/react-query';
-import { formatPercentage } from '@/lib/services/chartService';
+import { formatNumber, formatPercentage } from '@/lib/services/chartService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Select,
   SelectContent,
@@ -59,7 +60,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Save, RotateCcw, Plus, Trash2, ChevronDown, ChevronUp, Edit, Receipt, FlaskConical, Coins, ArrowRightLeft, Settings, PieChart, Palette, Mail, X, Send, Users } from 'lucide-react';
+import { Save, RotateCcw, Plus, Trash2, ChevronDown, Edit, Receipt, FlaskConical, Coins, ArrowRightLeft, Settings, PieChart, Palette, X, Send, Users, Sun, Moon, Monitor } from 'lucide-react';
 import { AccountSharingSection } from '@/components/settings/AccountSharingSection';
 import ExpenseImportSection from '@/components/settings/ExpenseImportSection';
 import { queryKeys } from '@/lib/query/queryKeys';
@@ -84,6 +85,33 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PageTabs } from '@/components/layout/PageTabs';
 import type { TabDef } from '@/components/layout/PageTabBar';
+import { Tile, TILE_CELL_CLASS, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
+import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
+import { applyThemeWithTransition } from '@/lib/utils/themeTransition';
+import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
+import { resolveRitaUnlockAge, DEFAULT_INPS_RETIREMENT_AGE } from '@/lib/utils/pensionUnlock';
+import {
+  describeAllocationTotal,
+  describeAssistantPreferences,
+  describeAutoCalc,
+  describeBtpItalia,
+  describeCashflowSettings,
+  describeClassTargets,
+  describeColorTheme,
+  describeCosts,
+  describeDefaultAccounts,
+  describeDividendCategory,
+  describeExpenseCategories,
+  describeEmails,
+  describeFamily,
+  describeFireToggles,
+  describePerformanceBase,
+  describePlanParameters,
+  describeProfile,
+  describeThemeMode,
+  summarizeExpenseCategories,
+  type ThemeMode,
+} from '@/lib/utils/settingsNarrative';
 
 interface SubTarget {
   name: string;
@@ -134,6 +162,16 @@ const assetClasses: AssetClass[] = [
 // Helper function to round to 2 decimal places
 const roundToTwoDecimals = (value: number): number => {
   return Math.round(value * 100) / 100;
+};
+
+// A percentage with only the decimals the value carries (100 → «100%», 3,5 → «3,5%»).
+const pctLabel = (value: number): string => formatPercentage(value, value % 1 === 0 ? 0 : 1);
+
+// The words the Assistant's own popover uses for the response styles.
+const ASSISTANT_STYLE_LABELS: Record<'balanced' | 'concise' | 'deep', string> = {
+  balanced: 'Bilanciato',
+  concise: 'Conciso',
+  deep: 'Approfondito',
 };
 
 /**
@@ -227,6 +265,94 @@ const SETTINGS_TABS: TabDef[] = [
   { value: 'aspetto',     label: 'Aspetto',     icon: Palette  },
 ];
 
+// The assistant is a route gated by this flag; its state tile follows the same gate.
+const SHOW_ASSISTANT = process.env.NEXT_PUBLIC_ASSISTANT_AI_ENABLED !== 'false';
+
+// Stable no-op store for the SSR/hydration split (same guard ThemePicker uses).
+const neverChanges = () => () => {};
+
+// Aspetto → Modalità: the three next-themes modes, applied with the circle view transition.
+const THEME_MODES = [
+  { value: 'light',  label: 'Chiaro',  Icon: Sun     },
+  { value: 'dark',   label: 'Scuro',   Icon: Moon    },
+  { value: 'system', label: 'Sistema', Icon: Monitor },
+] as const;
+
+// Aspetto → Tema colori. Swatch previews carry each theme's own oklch values on purpose:
+// they PREVIEW a palette that is not active, which no CSS token can express.
+const COLOR_THEME_SWATCHES = [
+  {
+    id: 'default' as ColorTheme,
+    name: 'Default',
+    description: 'Zinc classico',
+    swatchBg: 'oklch(1 0 0)',
+    swatchBgDark: 'oklch(0.145 0 0)',
+    swatchPrimary: 'oklch(0.205 0 0)',
+    swatchPrimaryDark: 'oklch(0.922 0 0)',
+    swatchAccent: 'oklch(0.97 0 0)',
+  },
+  {
+    id: 'solar-dusk' as ColorTheme,
+    name: 'Solar Dusk',
+    description: 'Ambra calda',
+    swatchBg: 'oklch(0.9885 0.0057 84.5659)',
+    swatchBgDark: 'oklch(0.2161 0.0061 56.0434)',
+    swatchPrimary: 'oklch(0.5553 0.1455 48.9975)',
+    swatchPrimaryDark: 'oklch(0.7049 0.1867 47.6044)',
+    swatchAccent: 'oklch(0.9000 0.0500 74.9889)',
+  },
+  {
+    id: 'elegant-luxury' as ColorTheme,
+    name: 'Elegant Luxury',
+    description: 'Borgogna raffinato',
+    swatchBg: 'oklch(0.9779 0.0042 56.3756)',
+    swatchBgDark: 'oklch(0.2161 0.0061 56.0434)',
+    swatchPrimary: 'oklch(0.4650 0.1470 24.9381)',
+    swatchPrimaryDark: 'oklch(0.5054 0.1905 27.5181)',
+    swatchAccent: 'oklch(0.9619 0.0580 95.6174)',
+  },
+  {
+    id: 'midnight-bloom' as ColorTheme,
+    name: 'Midnight Bloom',
+    description: 'Viola profondo',
+    swatchBg: 'oklch(0.9821 0 0)',
+    swatchBgDark: 'oklch(0.2303 0.0125 264.2926)',
+    swatchPrimary: 'oklch(0.5676 0.2021 283.0838)',
+    swatchPrimaryDark: 'oklch(0.5676 0.2021 283.0838)',
+    swatchAccent: 'oklch(0.8214 0.0720 249.3482)',
+  },
+  {
+    id: 'cyberpunk' as ColorTheme,
+    name: 'Cyberpunk',
+    description: 'Neon pink & teal',
+    swatchBg: 'oklch(0.9816 0.0017 247.8390)',
+    swatchBgDark: 'oklch(0.1649 0.0352 281.8285)',
+    swatchPrimary: 'oklch(0.6726 0.2904 341.4084)',
+    swatchPrimaryDark: 'oklch(0.6726 0.2904 341.4084)',
+    swatchAccent: 'oklch(0.8903 0.1739 171.2690)',
+  },
+  {
+    id: 'retro-arcade' as ColorTheme,
+    name: 'Retro Arcade',
+    description: 'Rosso & teal vintage',
+    swatchBg: 'oklch(0.9735 0.0261 90.0953)',
+    swatchBgDark: 'oklch(0.2673 0.0486 219.8169)',
+    swatchPrimary: 'oklch(0.5924 0.2025 355.8943)',
+    swatchPrimaryDark: 'oklch(0.5924 0.2025 355.8943)',
+    swatchAccent: 'oklch(0.6437 0.1019 187.3840)',
+  },
+] as const;
+
+/** Label · mono value row of a read-only declaration tile (Parametri del piano, Assistente, BTP Italia). */
+function DeclarationRow({ label, value, mono = true }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-2">
+      <span className="text-[13px] text-muted-foreground">{label}</span>
+      <span className={cn('text-[13px] font-semibold', mono && 'font-mono tabular-nums')}>{value}</span>
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const { user } = useAuth();
   const { ownerId } = useActiveAccount();
@@ -251,6 +377,21 @@ export default function SettingsPage() {
   const [performanceIncludesPensionFunds, setPerformanceIncludesPensionFunds] = useState<boolean>(false);
   const [performanceIncludesExcludedAssets, setPerformanceIncludesExcludedAssets] = useState<boolean>(false);
   const [pensionReturnStartMonth, setPensionReturnStartMonth] = useState<string>('');
+  // Read-only declarations (state + link tiles). These fields are OWNED by other pages —
+  // FIRE › Calcolatore (Parametri), Coast FIRE (Ipotesi), the Assistant's preferences popover —
+  // so this page reads them for the tile's reading line and never writes them (no snapshot).
+  const [planParams, setPlanParams] = useState<{
+    withdrawalRate?: number;
+    plannedAnnualExpenses?: number;
+    pensionInpsRetirementAge?: number;
+    pensionRitaLongUnemployment: boolean;
+    respectPensionLockInFire: boolean;
+  }>({ pensionRitaLongUnemployment: false, respectPensionLockInFire: false });
+  const [assistantPrefs, setAssistantPrefs] = useState<{
+    responseStyle?: 'balanced' | 'concise' | 'deep';
+    memoryEnabled?: boolean;
+    macroContextEnabled?: boolean;
+  }>({});
   const [monthlyEmailEnabled, setMonthlyEmailEnabled] = useState<boolean>(false);
   const [quarterlyEmailEnabled, setQuarterlyEmailEnabled] = useState<boolean>(false);
   const [semiAnnualEmailEnabled, setSemiAnnualEmailEnabled] = useState<boolean>(false);
@@ -322,6 +463,9 @@ export default function SettingsPage() {
   const [mountedTabs, setMountedTabs] = useState<Set<SettingsTabId>>(new Set([initialTab]));
   const [activeTab, setActiveTab] = useState<SettingsTabId>(initialTab);
   const { colorTheme, setColorTheme } = useColorTheme();
+  const { theme, setTheme } = useTheme();
+  // The active next-themes mode does not exist until hydration (same guard as ThemePicker).
+  const isThemeHydrated = useSyncExternalStore(neverChanges, () => true, () => false);
   const [allocationBaselineKey, setAllocationBaselineKey] = useState('');
   const [generalBaselineKey, setGeneralBaselineKey] = useState('');
   const [familyMemberDrafts, setFamilyMemberDrafts] = useState<FamilyMemberDraft[]>([]);
@@ -486,6 +630,19 @@ export default function SettingsPage() {
         setDividendIncomeSubCategoryId(settingsData.dividendIncomeSubCategoryId || '');
         // Load family members (fondo pensione per-taxpayer RAL/eligibility)
         setFamilyMemberDrafts(toFamilyMemberDrafts(settingsData.familyMembers));
+        // Read-only declarations for the state+link tiles (owned by the FIRE pages / Assistant)
+        setPlanParams({
+          withdrawalRate: settingsData.withdrawalRate,
+          plannedAnnualExpenses: settingsData.plannedAnnualExpenses,
+          pensionInpsRetirementAge: settingsData.pensionInpsRetirementAge,
+          pensionRitaLongUnemployment: settingsData.pensionRitaLongUnemployment ?? false,
+          respectPensionLockInFire: settingsData.respectPensionLockInFire ?? false,
+        });
+        setAssistantPrefs({
+          responseStyle: settingsData.assistantResponseStyle,
+          memoryEnabled: settingsData.assistantMemoryEnabled,
+          macroContextEnabled: settingsData.assistantMacroContextEnabled,
+        });
       }
 
       // Load cash fixed amount settings if available
@@ -551,8 +708,6 @@ export default function SettingsPage() {
 
       setAllocationBaselineKey(
         JSON.stringify({
-          userAge: settingsData?.userAge ?? null,
-          riskFreeRate: settingsData?.riskFreeRate ?? null,
           autoCalculate:
             settingsData?.autoCalculateEquityBonds ??
             (settingsData?.userAge !== undefined && settingsData?.riskFreeRate !== undefined),
@@ -580,6 +735,10 @@ export default function SettingsPage() {
 
       setGeneralBaselineKey(
         JSON.stringify({
+          // Età and risk-free are edited from Preferenze → Profilo (they still feed the
+          // Allocazione formula, whose equity/bonds targets sit in the allocation snapshot).
+          userAge: settingsData?.userAge ?? null,
+          riskFreeRate: settingsData?.riskFreeRate ?? null,
           includePrimaryResidenceInFIRE:
             settingsData?.includePrimaryResidenceInFIRE ?? false,
           goalBasedInvestingEnabled: settingsData?.goalBasedInvestingEnabled ?? false,
@@ -876,37 +1035,8 @@ export default function SettingsPage() {
     await loadExpenseCategories();
   };
 
-  // Dividend settings handlers
-  const handleSaveDividendSettings = async () => {
-    if (!user || !ownerId) return;
-
-    try {
-      setSaving(true);
-      const settingsData = await getSettings(ownerId);
-      const targets = settingsData?.targets || getDefaultTargets();
-
-      await setSettings(ownerId, {
-        userAge,
-        riskFreeRate,
-        // Preserve FIRE settings (Bug #1 & #5 fix)
-        includePrimaryResidenceInFIRE,
-        withdrawalRate: settingsData?.withdrawalRate,
-        plannedAnnualExpenses: settingsData?.plannedAnnualExpenses,
-        targets,
-        dividendIncomeCategoryId: dividendIncomeCategoryId || undefined,
-        dividendIncomeSubCategoryId: dividendIncomeSubCategoryId || undefined,
-      });
-
-      toast.success('Impostazioni dividendi salvate con successo');
-      setDividendBaselineKey(dividendSnapshotKey);
-    } catch (error) {
-      console.error('Error saving dividend settings:', error);
-      toast.error('Errore nel salvataggio delle impostazioni dividendi');
-    } finally {
-      setSaving(false);
-    }
-  };
-
+  // Dividend sync — the CATEGORY itself is saved by the page's one Save (handleSave already
+  // persists it); the tab keeps only the sync action, so the field has a single save surface.
   const handleSyncDividends = async () => {
     if (!user || !ownerId) return;
 
@@ -1375,34 +1505,6 @@ export default function SettingsPage() {
     }
   };
 
-  const handleAddCategory = (assetClass: AssetClass, categoryName: string) => {
-    const state = assetClassStates[assetClass];
-    if (!categoryName.trim()) return;
-
-    const trimmedName = categoryName.trim();
-    if (state.categories.includes(trimmedName)) {
-      toast.error('Questa categoria esiste già');
-      return;
-    }
-
-    updateAssetClassState(assetClass, {
-      categories: [...state.categories, trimmedName],
-    });
-  };
-
-  const handleRemoveCategory = (assetClass: AssetClass, categoryName: string) => {
-    const state = assetClassStates[assetClass];
-    const newCategories = state.categories.filter((c) => c !== categoryName);
-
-    // Also remove from subTargets if present
-    const newSubTargets = state.subTargets.filter((t) => t.name !== categoryName);
-
-    updateAssetClassState(assetClass, {
-      categories: newCategories,
-      subTargets: newSubTargets,
-    });
-  };
-
   // Specific Assets Management Functions
   const toggleSubCategoryExpanded = (assetClass: AssetClass, subIndex: number) => {
     const state = assetClassStates[assetClass];
@@ -1486,8 +1588,6 @@ export default function SettingsPage() {
   const allocationSnapshotKey = useMemo(
     () =>
       JSON.stringify({
-        userAge: userAge ?? null,
-        riskFreeRate: riskFreeRate ?? null,
         autoCalculate,
         cashUseFixedAmount,
         cashFixedAmount: roundToTwoDecimals(cashFixedAmount),
@@ -1509,12 +1609,14 @@ export default function SettingsPage() {
           })),
         })),
       }),
-    [userAge, riskFreeRate, autoCalculate, cashUseFixedAmount, cashFixedAmount, assetClassStates]
+    [autoCalculate, cashUseFixedAmount, cashFixedAmount, assetClassStates]
   );
 
   const generalSnapshotKey = useMemo(
     () =>
       JSON.stringify({
+        userAge: userAge ?? null,
+        riskFreeRate: riskFreeRate ?? null,
         includePrimaryResidenceInFIRE,
         goalBasedInvestingEnabled,
         goalDrivenAllocationEnabled,
@@ -1538,6 +1640,8 @@ export default function SettingsPage() {
         familyMembers: familyMembersSnapshotValue(parseFamilyMemberDrafts(familyMemberDrafts)),
       }),
     [
+      userAge,
+      riskFreeRate,
       includePrimaryResidenceInFIRE,
       goalBasedInvestingEnabled,
       goalDrivenAllocationEnabled,
@@ -1583,12 +1687,28 @@ export default function SettingsPage() {
     hasUnsavedGeneralChanges ||
     hasUnsavedDividendChanges;
 
-  const activeTabHasUnsavedChanges =
-    (activeTab === 'allocazione' && hasUnsavedAllocationChanges) ||
-    (activeTab === 'generale' && hasUnsavedGeneralChanges) ||
-    (activeTab === 'dividendi' && hasUnsavedDividendChanges);
-
-  if (loading) return null;
+  if (loading) {
+    return (
+      <PageContainer width="wide">
+        <PageHeader
+          label="Configurazione"
+          title="Impostazioni"
+          description="Target, preferenze e flussi"
+          separator={false}
+        />
+        <PageTabs
+          tabs={SETTINGS_TABS}
+          value={activeTab}
+          onValueChange={handleTabChange}
+          layoutId="settings-tab-pill"
+          ariaLabel="Sezioni delle Impostazioni"
+          loading
+        >
+          <TileGridSkeleton verdict={false} className="mt-4" cells={[{ span: 5 }, { span: 7 }, { span: 12, lines: 8 }]} />
+        </PageTabs>
+      </PageContainer>
+    );
+  }
 
   const total = calculateTotal();
   const isValidTotal = isTargetTotalValid(total);
@@ -1597,23 +1717,52 @@ export default function SettingsPage() {
   const derivedTargetLeverage = total > 0 ? total / 100 : 1;
   const hasTargetLeverage = derivedTargetLeverage > 1.005;
 
+  // ── Reading-line inputs (numbers from the existing pure utils, words from settingsNarrative) ──
+  const formulaSplit =
+    userAge !== undefined && riskFreeRate !== undefined && Object.keys(assetClassStates).length > 0
+      ? resolveAutoEquityBondsSplit(
+          calculateEquityPercentage(userAge, riskFreeRate),
+          sumOtherClassTargets(assetClassStates, cashUseFixedAmount)
+        )
+      : null;
+  const otherClassTotal = sumOtherClassTargets(assetClassStates, cashUseFixedAmount);
+  const classesWithSubcategories = assetClasses.filter(
+    (assetClass) =>
+      assetClassStates[assetClass]?.subCategoryEnabled && (assetClassStates[assetClass]?.subTargets.length ?? 0) > 0
+  ).length;
+  const classesWithTarget = Object.values(assetClassStates).filter((s) => s && s.targetPercentage > 0).length;
+  const laborCategoryNames = getCategoriesByType('income')
+    .filter((cat) => laborIncomeCategoryIds.includes(cat.id))
+    .map((cat) => cat.name);
+  const familyMembersForReading = parseFamilyMemberDrafts(familyMemberDrafts);
+  const debitAccount = cashAssets.find((a) => a.id === defaultDebitCashAssetId);
+  const creditAccount = cashAssets.find((a) => a.id === defaultCreditCashAssetId);
+  const categoryCounts = summarizeExpenseCategories(expenseCategories);
+  const dividendCategory = expenseCategories.find((cat) => cat.id === dividendIncomeCategoryId);
+  const dividendSubCategory = dividendCategory?.subCategories.find((sub) => sub.id === dividendIncomeSubCategoryId);
+  const inpsAgeShown = planParams.pensionInpsRetirementAge ?? DEFAULT_INPS_RETIREMENT_AGE;
+  const ritaAgeShown = resolveRitaUnlockAge(planParams);
+  const resolvedThemeMode = isThemeHydrated ? (theme as ThemeMode | undefined) : undefined;
+  const activeSwatch = COLOR_THEME_SWATCHES.find((swatch) => swatch.id === colorTheme) ?? COLOR_THEME_SWATCHES[0];
+
   return (
-    <PageContainer>
+    <PageContainer width="wide">
       <PageHeader
         label="Configurazione"
         title="Impostazioni"
-        description="Target di allocazione, preferenze e flussi"
+        description="Target, preferenze e flussi"
         separator={false}
         actions={
           <div className="flex items-center gap-2">
-            {/* Save state as a quiet chip: it is context for the buttons, not a metric. */}
-            {activeTabHasUnsavedChanges ? (
-              <span className="hidden sm:inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-2 py-1 text-xs text-primary">
-                Anteprima attiva: modifiche non salvate
+            {/* Save state as a quiet chip: it is context for the buttons, not a metric.
+                In demo the chip carries the disabled reason in visible copy (never a title). */}
+            {isDemo ? (
+              <span className="hidden sm:inline-flex items-center rounded-full border border-border bg-muted px-2 py-1 text-xs text-muted-foreground">
+                Modalità demo: salvataggio disattivato
               </span>
             ) : hasUnsavedChanges ? (
-              <span className="hidden sm:inline-flex items-center rounded-full border border-border bg-muted px-2 py-1 text-xs text-muted-foreground">
-                Modifiche non salvate in altre sezioni
+              <span className="hidden sm:inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-2 py-1 text-xs text-primary">
+                Anteprima attiva: modifiche non salvate
               </span>
             ) : (
               <span className="hidden sm:inline-flex items-center rounded-full border border-border bg-muted px-2 py-1 text-xs text-muted-foreground">
@@ -1622,12 +1771,12 @@ export default function SettingsPage() {
             )}
             {/* Reset is only meaningful for allocation targets */}
             {activeTab === 'allocazione' && (
-              <Button variant="outline" size="sm" onClick={handleReset} disabled={isDemo} title={isDemo ? 'Non disponibile in modalità demo' : undefined}>
+              <Button variant="outline" size="sm" onClick={handleReset} disabled={isDemo}>
                 <RotateCcw className="h-4 w-4" />
-                <span className="hidden sm:inline">Ripristina Default</span>
+                <span className="hidden sm:inline">Ripristina default</span>
               </Button>
             )}
-            <Button size="sm" onClick={handleSave} disabled={isDemo || saving} title={isDemo ? 'Non disponibile in modalità demo' : undefined}>
+            <Button size="sm" onClick={handleSave} disabled={isDemo || saving}>
               <Save className="h-4 w-4" />
               {saving ? 'Salvataggio...' : 'Salva'}
             </Button>
@@ -1643,744 +1792,715 @@ export default function SettingsPage() {
         ariaLabel="Sezioni delle Impostazioni"
       >
 
-        {/* Tab: Impostazioni Generali (lazy) */}
+        {/* Tab: Preferenze (lazy) — every group is a tile: eyebrow = the group, reading = ONE
+            rule-generated state line (settingsNarrative), controls below. */}
         {mountedTabs.has('generale') && (
-          <TabsContent value="generale" className="mt-6 space-y-4 sm:space-y-6">
-      {hasUnsavedGeneralChanges && (
-        <div className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm text-foreground">
-          Anteprima attiva: i cambi in questa sezione sono visibili subito ma non ancora salvati.
-        </div>
-      )}
+          <TabsContent value="generale" className="mt-4">
+            <div className="grid grid-cols-1 gap-3 tablet:grid-cols-2 desktop:grid-cols-12">
 
-      {/* FIRE & Goals Settings */}
-      <Card>
-        <CardHeader>
-          <CardTitle>FIRE &amp; Obiettivi</CardTitle>
-        </CardHeader>
-        <CardContent className="p-4 sm:p-6">
-          <div className="space-y-4 sm:space-y-6">
-            {/* FIRE Settings (Bug #1 fix) */}
-            <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="firePrimaryResidence" className="text-sm font-medium">
-                  Includi casa di abitazione nel calcolo FIRE
-                </Label>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Include il valore della casa di abitazione nel net worth FIRE
-                </p>
-              </div>
-              <Switch
-                id="firePrimaryResidence"
-                checked={includePrimaryResidenceInFIRE}
-                onCheckedChange={setIncludePrimaryResidenceInFIRE}
-                className={interactiveControlClass}
-              />
-            </div>
-
-            {/* Goal-Based Investing toggle */}
-            <div className="flex items-center justify-between border-t pt-4">
-              <div>
-                <Label htmlFor="goalBasedInvesting" className="text-sm font-medium">
-                  Obiettivi di Investimento
-                </Label>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Assegna porzioni del portafoglio a obiettivi finanziari specifici
-                </p>
-              </div>
-              <Switch
-                id="goalBasedInvesting"
-                checked={goalBasedInvestingEnabled}
-                onCheckedChange={(checked) => {
-                  setGoalBasedInvestingEnabled(checked);
-                  // Disable goal-driven allocation when goals are disabled
-                  if (!checked) setGoalDrivenAllocationEnabled(false);
-                }}
-                className={interactiveControlClass}
-              />
-            </div>
-
-            {/* Goal-Driven Allocation toggle — only visible when goals are enabled */}
-            {goalBasedInvestingEnabled && (
-              <div className="flex items-center justify-between border-t pt-4">
-                <div>
-                  <Label htmlFor="goalDrivenAllocation" className="text-sm font-medium">
-                    Allocazione da Obiettivi
-                  </Label>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    I target sono calcolati in base al gap ancora da colmare per ogni obiettivo, pesato per priorità (Alta 3×, Media 2×, Bassa 1×). Gli obiettivi già raggiunti non influenzano il calcolo.
-                  </p>
-                </div>
-                <Switch
-                  id="goalDrivenAllocation"
-                  checked={goalDrivenAllocationEnabled}
-                  onCheckedChange={setGoalDrivenAllocationEnabled}
-                  className={interactiveControlClass}
-                />
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Calcolo dei rendimenti — quale capitale entra nelle metriche di Rendimenti, e da quando il
-          rendimento del fondo pensione è misurabile. Entrambe le esclusioni sono OFF di default:
-          Rendimenti risponde a "come va il portafoglio che gestisco", Storico al patrimonio totale. */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Calcolo dei rendimenti</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Le metriche di Rendimenti (TWR, Sharpe, volatilità, Max Drawdown) misurano il portafoglio
-            che gestisci attivamente. Il patrimonio completo resta in Storico.
-          </p>
-        </CardHeader>
-        <CardContent className="p-4 sm:p-6">
-          <div className="space-y-4 sm:space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="performanceIncludesPensionFunds" className="text-sm font-medium">
-                  Includi i fondi pensione
-                </Label>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Il fondo pensione è capitale illiquido e non ribilanciabile, che cresce soprattutto
-                  per versamenti (TFR, datoriale, volontario) e non per andamento di mercato.
-                  Includerlo fa leggere quei versamenti come rendimento.
-                </p>
-              </div>
-              <Switch
-                id="performanceIncludesPensionFunds"
-                checked={performanceIncludesPensionFunds}
-                onCheckedChange={setPerformanceIncludesPensionFunds}
-                className={interactiveControlClass}
-              />
-            </div>
-
-            <div className="flex items-center justify-between border-t pt-4">
-              <div>
-                <Label htmlFor="performanceIncludesExcludedAssets" className="text-sm font-medium">
-                  Includi gli asset esclusi dall&apos;allocazione
-                </Label>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Tipicamente la casa in cui vivi: valutata a mano, resta ferma per mesi e poi si
-                  aggiorna con uno scalino. Includerla abbassa la volatilità misurata e alza lo
-                  Sharpe, perché una quota del patrimonio non si muove mai.
-                </p>
-              </div>
-              <Switch
-                id="performanceIncludesExcludedAssets"
-                checked={performanceIncludesExcludedAssets}
-                onCheckedChange={setPerformanceIncludesExcludedAssets}
-                className={interactiveControlClass}
-              />
-            </div>
-
-            <div className="flex items-start justify-between gap-4 border-t pt-4">
-              <div>
-                <Label htmlFor="pensionReturnStartMonth" className="text-sm font-medium">
-                  Rendimento fondo pensione calcolabile da
-                </Label>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Prima di questo mese i versamenti non venivano registrati e il valore del fondo
-                  veniva solo aggiornato a mano: ogni crescita risulterebbe rendimento di mercato.
-                  Lascia vuoto per partire dal primo versamento registrato.
-                </p>
-              </div>
-              <Input
-                id="pensionReturnStartMonth"
-                type="month"
-                value={pensionReturnStartMonth}
-                onChange={(e) => setPensionReturnStartMonth(e.target.value)}
-                className={cn('w-40 shrink-0', interactiveControlClass)}
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Portfolio Cost Settings */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Costi Portfolio</CardTitle>
-        </CardHeader>
-        <CardContent className="p-4 sm:p-6">
-          <div className="space-y-4 sm:space-y-6">
-            {/* Stamp duty (imposta di bollo) */}
-            <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="stampDutyToggle" className="text-sm font-medium">
-                  Imposta di Bollo
-                </Label>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Includi l&apos;imposta di bollo nel costo annuale del portafoglio
-                </p>
-              </div>
-              <Switch
-                id="stampDutyToggle"
-                checked={stampDutyEnabled}
-                onCheckedChange={setStampDutyEnabled}
-                className={interactiveControlClass}
-              />
-            </div>
-
-            {stampDutyEnabled && (
-              <div className="space-y-4 border-t pt-4">
-                <div className="space-y-2">
-                  <Label htmlFor="stampDutyRate">Aliquota (%)</Label>
-                  <Input
-                    id="stampDutyRate"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    max="100"
-                    value={stampDutyRate}
-                    onChange={(e) => setStampDutyRate(parseFloat(e.target.value) || 0)}
-                    placeholder="es. 0.20"
-                    className={interactiveControlClass}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Aliquota annuale imposta di bollo (es. 0.20 per 0.20%). Si applica a tutti gli asset, tranne quelli marcati come esenti nel dialog di modifica asset.
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Sottocategoria conti correnti</Label>
-                  {assetClassStates.cash?.subCategoryEnabled && (assetClassStates.cash?.categories?.length ?? 0) > 0 ? (
-                    <Select value={checkingAccountSubCategory} onValueChange={setCheckingAccountSubCategory}>
-                      <SelectTrigger className={interactiveControlClass}>
-                        <SelectValue placeholder="Seleziona sottocategoria..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">Nessuna (soglia non applicata)</SelectItem>
-                        {assetClassStates.cash.categories.map((cat) => (
-                          <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <p className="text-xs text-amber-600">
-                      Configura le sottocategorie di Liquidità nella sezione &quot;Target Allocazione Asset Class&quot; per abilitare questa opzione.
-                    </p>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    Per i conti correnti l&apos;imposta si applica solo se il valore supera €5.000
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Cashflow Settings — default cash accounts, labor income categories, history start year */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Cashflow</CardTitle>
-        </CardHeader>
-        <CardContent className="p-4 sm:p-6">
-          <div className="space-y-4 sm:space-y-6">
-            {/* Default cash accounts for cashflow */}
-            {cashAssets.length > 0 && (
-              <div className="space-y-4">
-                <div>
-                  <Label className="text-sm font-medium">Conti di Default</Label>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Pre-selezionati nel dialog delle spese/entrate per nuove transazioni
-                  </p>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <Label htmlFor="defaultDebitAccount" className="text-sm">
-                      Conto di Prelievo (spese)
-                    </Label>
-                    <Select value={defaultDebitCashAssetId} onValueChange={setDefaultDebitCashAssetId}>
-                      <SelectTrigger
-                        id="defaultDebitAccount"
-                        className={interactiveControlClass}
-                      >
-                        <SelectValue placeholder="Nessun default" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">Nessun default</SelectItem>
-                        {cashAssets.map((a) => (
-                          <SelectItem key={a.id} value={a.id}>
-                            {a.name} ({a.currency})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+              {/* Profilo — età e risk-free (moved here from Allocazione; the formula still lives there) */}
+              <div className={cn(TILE_CELL_CLASS, 'desktop:col-span-4')}>
+                <Tile eyebrow="Profilo" reading={describeProfile({ userAge, riskFreeRate })}>
+                  <div className="mt-1 flex flex-col divide-y divide-border">
+                    <div className="flex items-center justify-between gap-4 py-3">
+                      <div className="min-w-0">
+                        <Label htmlFor="userAge" className="text-[13px] font-medium">Età</Label>
+                        <p className="mt-0.5 text-[11px] leading-[1.4] text-muted-foreground">Entra nella formula dei target</p>
+                      </div>
+                      <Input
+                        id="userAge"
+                        type="number"
+                        min="0"
+                        max="120"
+                        value={userAge || ''}
+                        onChange={(e) => {
+                          const value = e.target.value ? parseInt(e.target.value) : undefined;
+                          setUserAge(value);
+                        }}
+                        placeholder="anni"
+                        className={cn('w-24 shrink-0 text-right font-mono', interactiveControlClass)}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between gap-4 py-3">
+                      <div className="min-w-0">
+                        <Label htmlFor="riskFreeRate" className="text-[13px] font-medium">Risk-free rate</Label>
+                        <p className="mt-0.5 text-[11px] leading-[1.4] text-muted-foreground">
+                          <a
+                            href="https://www.investing.com/rates-bonds/italy-10-year-bond-yield"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:underline"
+                          >
+                            BTP 10 anni
+                          </a>
+                          {' '}su Investing.com
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        <Input
+                          id="riskFreeRate"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          max="100"
+                          value={riskFreeRate || ''}
+                          onChange={(e) => {
+                            const value = e.target.value ? parseFloat(e.target.value) : undefined;
+                            setRiskFreeRate(value);
+                          }}
+                          placeholder="es. 3.5"
+                          className={cn('w-24 text-right font-mono', interactiveControlClass)}
+                        />
+                        <span className="text-sm text-muted-foreground">%</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="defaultCreditAccount" className="text-sm">
-                      Conto di Accredito (entrate)
-                    </Label>
-                    <Select value={defaultCreditCashAssetId} onValueChange={setDefaultCreditCashAssetId}>
-                      <SelectTrigger
-                        id="defaultCreditAccount"
-                        className={interactiveControlClass}
-                      >
-                        <SelectValue placeholder="Nessun default" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">Nessun default</SelectItem>
-                        {cashAssets.map((a) => (
-                          <SelectItem key={a.id} value={a.id}>
-                            {a.name} ({a.currency})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="mt-auto border-t border-border pt-3 text-[11px] leading-[1.45] text-muted-foreground">
+                    Sharpe e Sortino di Rendimenti usano questo tasso come rendimento privo di rischio.
                   </div>
-                </div>
+                </Tile>
               </div>
-            )}
 
-            {/* Labor income categories — used by dashboard KPI cards to separate work income from investment gains */}
-            <div className="border-t pt-4 space-y-3">
-              <div className="space-y-1">
-                <Label className="text-sm font-medium">Reddito da Lavoro</Label>
-                <p className="text-sm text-muted-foreground">
-                  Categorie usate per le card Guadagnato e Risparmiato da Lavoro nella Dashboard. Includi stipendio, freelance e ogni altra forma di reddito attivo.
-                </p>
-              </div>
-              {getCategoriesByType('income').length === 0 ? (
-                <p className="text-sm text-muted-foreground italic">
-                  Nessuna categoria di tipo &quot;Entrate&quot; trovata. Creane una nella sezione Cashflow.
-                </p>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {getCategoriesByType('income').map((cat) => {
-                    const checked = laborIncomeCategoryIds.includes(cat.id);
-                    return (
-                      <button
-                        key={cat.id}
-                        type="button"
-                        onClick={() =>
-                          setLaborIncomeCategoryIds(
-                            checked
-                              ? laborIncomeCategoryIds.filter((id) => id !== cat.id)
-                              : [...laborIncomeCategoryIds, cat.id]
-                          )
-                        }
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm border transition-colors ${
-                          checked
-                            ? 'bg-primary text-primary-foreground border-primary'
-                            : 'bg-background text-foreground border-border hover:bg-muted'
-                        }`}
-                      >
-                        {checked && (
-                          <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none">
-                            <path d="M2.5 7L5.5 10L11.5 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                        )}
-                        {cat.name}
-                      </button>
-                    );
+              {/* Calcolo dei rendimenti — measurement base + pension-return start month */}
+              <div className={cn(TILE_CELL_CLASS, 'desktop:col-span-4')}>
+                <Tile
+                  eyebrow="Calcolo dei rendimenti"
+                  aside="Rendimenti"
+                  reading={describePerformanceBase({
+                    includesPensionFunds: performanceIncludesPensionFunds,
+                    includesExcludedAssets: performanceIncludesExcludedAssets,
+                    pensionReturnStartMonth,
                   })}
-                </div>
-              )}
-            </div>
-
-            {/* Cashflow history start year — lets users exclude pre-import bulk data from trend charts */}
-            <div className={cashAssets.length > 0 ? 'border-t pt-4 space-y-2' : 'border-t pt-4 space-y-2'}>
-              <Label htmlFor="cashflowHistoryStartYear" className="text-sm font-medium">
-                Anno inizio storico cashflow
-              </Label>
-              <p className="text-sm text-muted-foreground">
-                I dati precedenti a questo anno vengono esclusi dai grafici dello storico totale
-                cashflow. Utile se hai importato transazioni vecchie senza categoria.
-              </p>
-              <Input
-                id="cashflowHistoryStartYear"
-                type="number"
-                min="2000"
-                max={new Date().getFullYear()}
-                step="1"
-                value={cashflowHistoryStartYear}
-                onChange={(e) =>
-                  setCashflowHistoryStartYear(parseInt(e.target.value, 10) || 2025)
-                }
-                className={cn('w-32', interactiveControlClass)}
-              />
-            </div>
-
-            {/* Cost centers toggle — optional feature for tracking expenses by object/project */}
-            <div className="flex items-center justify-between border-t pt-4">
-              <div>
-                <Label htmlFor="costCentersEnabled" className="text-sm font-medium">
-                  Centri di Costo
-                </Label>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Raggruppa le spese per oggetto o progetto (es. &quot;Automobile Dacia&quot;) e
-                  visualizza il costo totale nel tempo con grafici e storico transazioni
-                </p>
-              </div>
-              <Switch
-                id="costCentersEnabled"
-                checked={costCentersEnabled}
-                onCheckedChange={setCostCentersEnabled}
-                className={interactiveControlClass}
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Famiglia — household members a fondo pensione can be attributed to. The IRPEF pension
-          deduction ceiling is per taxpayer, not per account: an account tracking more than one
-          person's fund (e.g. both spouses) needs a RAL per person here, not one shared value, or
-          the Previdenza tax recap silently mixes their contributions together. */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-muted-foreground" />
-            <CardTitle className="text-base">Famiglia</CardTitle>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Aggiungi un membro per ogni persona i cui fondi pensione tracci in questo account, con la
-            propria RAL — il beneficio fiscale in Previdenza si calcola una volta per membro, non
-            sommando tutti i fondi insieme. Colleghi un fondo a un membro dalla sua scheda in
-            Patrimonio.
-          </p>
-        </CardHeader>
-        <CardContent className="p-4 sm:p-6">
-          <div className="space-y-3">
-            {familyMemberDrafts.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-border bg-muted/20 p-4 text-sm text-muted-foreground">
-                Nessun membro inserito. I fondi pensione restano visibili in Previdenza ma senza
-                calcolo del beneficio fiscale finché non li assegni a un membro.
-              </div>
-            ) : (
-              familyMemberDrafts.map((member) => (
-                <div key={member.id} className="rounded-lg border border-border bg-card p-4">
-                  <div className="mb-3 flex items-start justify-between gap-3">
-                    <div className="flex-1 space-y-2">
-                      <Label htmlFor={`family-name-${member.id}`}>Nome</Label>
-                      <Input
-                        id={`family-name-${member.id}`}
-                        value={member.name}
-                        onChange={(e) => updateFamilyMemberRow(member.id, 'name', e.target.value)}
-                        placeholder="es. Giuseppe"
-                        disabled={isDemo}
-                        className={interactiveControlClass}
+                >
+                  <div className="mt-1 flex flex-col divide-y divide-border">
+                    <div className="flex items-center justify-between gap-4 py-3">
+                      <div className="min-w-0">
+                        <Label htmlFor="performanceIncludesPensionFunds" className="text-[13px] font-medium">
+                          Includi i fondi pensione
+                        </Label>
+                        <p className="mt-0.5 text-[11px] leading-[1.4] text-muted-foreground">
+                          Capitale illiquido che cresce per versamenti: includerlo li fa leggere come rendimento
+                        </p>
+                      </div>
+                      <Switch
+                        id="performanceIncludesPensionFunds"
+                        checked={performanceIncludesPensionFunds}
+                        onCheckedChange={setPerformanceIncludesPensionFunds}
+                        className={cn('shrink-0', interactiveControlClass)}
                       />
                     </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeFamilyMemberRow(member.id)}
-                      disabled={isDemo}
-                      aria-label="Rimuovi membro"
-                      className="mt-6 h-10 w-10 shrink-0"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <Label htmlFor={`family-ral-${member.id}`}>Reddito annuo lordo (RAL)</Label>
-                      <Input
-                        id={`family-ral-${member.id}`}
-                        type="number"
-                        inputMode="decimal"
-                        value={member.grossAnnualIncome}
-                        onChange={(e) => updateFamilyMemberRow(member.id, 'grossAnnualIncome', e.target.value)}
-                        placeholder="es. 35000"
-                        disabled={isDemo}
-                        className={interactiveControlClass}
+                    <div className="flex items-center justify-between gap-4 py-3">
+                      <div className="min-w-0">
+                        <Label htmlFor="performanceIncludesExcludedAssets" className="text-[13px] font-medium">
+                          Includi gli asset esclusi
+                        </Label>
+                        <p className="mt-0.5 text-[11px] leading-[1.4] text-muted-foreground">
+                          La casa valutata a mano non si muove mai: abbassa la volatilità e alza lo Sharpe
+                        </p>
+                      </div>
+                      <Switch
+                        id="performanceIncludesExcludedAssets"
+                        checked={performanceIncludesExcludedAssets}
+                        onCheckedChange={setPerformanceIncludesExcludedAssets}
+                        className={cn('shrink-0', interactiveControlClass)}
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor={`family-year-${member.id}`}>Anno prima occupazione</Label>
+                    <div className="flex items-center justify-between gap-4 py-3">
+                      <div className="min-w-0">
+                        <Label htmlFor="pensionReturnStartMonth" className="text-[13px] font-medium">
+                          Rendimento del fondo calcolabile da
+                        </Label>
+                        <p className="mt-0.5 text-[11px] leading-[1.4] text-muted-foreground">
+                          Vuoto = dal primo versamento registrato
+                        </p>
+                      </div>
                       <Input
-                        id={`family-year-${member.id}`}
-                        type="number"
-                        value={member.firstEmploymentYear}
-                        onChange={(e) => updateFamilyMemberRow(member.id, 'firstEmploymentYear', e.target.value)}
-                        placeholder="es. 2022"
-                        disabled={isDemo || !member.isFirstEmploymentPost2007}
-                        className={interactiveControlClass}
+                        id="pensionReturnStartMonth"
+                        type="month"
+                        value={pensionReturnStartMonth}
+                        onChange={(e) => setPensionReturnStartMonth(e.target.value)}
+                        className={cn('w-40 shrink-0', interactiveControlClass)}
                       />
                     </div>
                   </div>
+                  <div className="mt-auto border-t border-border pt-3 text-[11px] leading-[1.45] text-muted-foreground">
+                    Cambiare la base invalida la cache delle metriche: si ricalcolano alla prossima visita di Rendimenti.
+                  </div>
+                </Tile>
+              </div>
 
-                  <div className="mt-3 flex items-center justify-between gap-3 border-t pt-3">
-                    <Label htmlFor={`family-firstjob-${member.id}`} className="text-xs text-muted-foreground">
-                      Prima occupazione dopo il 2007 (abilita il recupero plafond)
-                    </Label>
-                    <Switch
-                      id={`family-firstjob-${member.id}`}
-                      checked={member.isFirstEmploymentPost2007}
-                      onCheckedChange={(checked) => updateFamilyMemberRow(member.id, 'isFirstEmploymentPost2007', checked)}
-                      disabled={isDemo}
-                      className={interactiveControlClass}
+              {/* Costi — imposta di bollo */}
+              <div className={cn(TILE_CELL_CLASS, 'desktop:col-span-4')}>
+                <Tile
+                  eyebrow="Costi"
+                  aside="stima annua"
+                  reading={describeCosts({ stampDutyEnabled, stampDutyRate, checkingAccountSubCategory })}
+                >
+                  <div className="mt-1 flex flex-col divide-y divide-border">
+                    <div className="flex items-center justify-between gap-4 py-3">
+                      <Label htmlFor="stampDutyToggle" className="text-[13px] font-medium">Imposta di bollo</Label>
+                      <Switch
+                        id="stampDutyToggle"
+                        checked={stampDutyEnabled}
+                        onCheckedChange={setStampDutyEnabled}
+                        className={cn('shrink-0', interactiveControlClass)}
+                      />
+                    </div>
+                    {stampDutyEnabled && (
+                      <div className="flex items-center justify-between gap-4 py-3">
+                        <Label htmlFor="stampDutyRate" className="text-[13px] font-medium">Aliquota</Label>
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          <Input
+                            id="stampDutyRate"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max="100"
+                            value={stampDutyRate}
+                            onChange={(e) => setStampDutyRate(parseFloat(e.target.value) || 0)}
+                            placeholder="es. 0.20"
+                            className={cn('w-24 text-right font-mono', interactiveControlClass)}
+                          />
+                          <span className="text-sm text-muted-foreground">%</span>
+                        </div>
+                      </div>
+                    )}
+                    {stampDutyEnabled && (
+                      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3">
+                        <div className="min-w-0">
+                          <p className="text-[13px] font-medium">Sottocategoria conti correnti</p>
+                          <p className="mt-0.5 text-[11px] leading-[1.4] text-muted-foreground">
+                            Applica la soglia dei 5.000&nbsp;€ ai conti
+                          </p>
+                        </div>
+                        {assetClassStates.cash?.subCategoryEnabled && (assetClassStates.cash?.categories?.length ?? 0) > 0 ? (
+                          <Select value={checkingAccountSubCategory} onValueChange={setCheckingAccountSubCategory}>
+                            <SelectTrigger className={cn('w-44', interactiveControlClass)} aria-label="Sottocategoria conti correnti">
+                              <SelectValue placeholder="Seleziona sottocategoria..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none__">Nessuna (soglia non applicata)</SelectItem>
+                              {assetClassStates.cash.categories.map((cat) => (
+                                <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <p className="text-[11px] leading-[1.4] text-warning-foreground">
+                            Configura le sottocategorie di Liquidità nel tab Allocazione per abilitarla.
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-auto border-t border-border pt-3 text-[11px] leading-[1.45] text-muted-foreground">
+                    Gli asset esenti si marcano dal dialog dello strumento, in Patrimonio.
+                  </div>
+                </Tile>
+              </div>
+
+              {/* FIRE e obiettivi — the three toggles this page OWNS */}
+              <div className={cn(TILE_CELL_CLASS, 'desktop:col-span-4')}>
+                <Tile
+                  eyebrow="FIRE e obiettivi"
+                  reading={describeFireToggles({
+                    includePrimaryResidenceInFIRE,
+                    goalBasedInvestingEnabled,
+                    goalDrivenAllocationEnabled,
+                  })}
+                >
+                  <div className="mt-1 flex flex-col divide-y divide-border">
+                    <div className="flex items-center justify-between gap-4 py-3">
+                      <div className="min-w-0">
+                        <Label htmlFor="firePrimaryResidence" className="text-[13px] font-medium">
+                          Casa nel patrimonio FIRE
+                        </Label>
+                        <p className="mt-0.5 text-[11px] leading-[1.4] text-muted-foreground">Lo standard FIRE la esclude</p>
+                      </div>
+                      <Switch
+                        id="firePrimaryResidence"
+                        checked={includePrimaryResidenceInFIRE}
+                        onCheckedChange={setIncludePrimaryResidenceInFIRE}
+                        className={cn('shrink-0', interactiveControlClass)}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between gap-4 py-3">
+                      <div className="min-w-0">
+                        <Label htmlFor="goalBasedInvesting" className="text-[13px] font-medium">
+                          Obiettivi di investimento
+                        </Label>
+                        <p className="mt-0.5 text-[11px] leading-[1.4] text-muted-foreground">
+                          Attiva FIRE › Obiettivi e le assegnazioni del portafoglio
+                        </p>
+                      </div>
+                      <Switch
+                        id="goalBasedInvesting"
+                        checked={goalBasedInvestingEnabled}
+                        onCheckedChange={(checked) => {
+                          setGoalBasedInvestingEnabled(checked);
+                          // Disable goal-driven allocation when goals are disabled
+                          if (!checked) setGoalDrivenAllocationEnabled(false);
+                        }}
+                        className={cn('shrink-0', interactiveControlClass)}
+                      />
+                    </div>
+                    {goalBasedInvestingEnabled && (
+                      <div className="flex items-center justify-between gap-4 py-3">
+                        <div className="min-w-0">
+                          <Label htmlFor="goalDrivenAllocation" className="text-[13px] font-medium">
+                            Allocazione derivata dagli obiettivi
+                          </Label>
+                          <p className="mt-0.5 text-[11px] leading-[1.4] text-muted-foreground">
+                            Target dal gap di ogni obiettivo, pesato per priorità (Alta 3×, Media 2×, Bassa 1×)
+                          </p>
+                        </div>
+                        <Switch
+                          id="goalDrivenAllocation"
+                          checked={goalDrivenAllocationEnabled}
+                          onCheckedChange={setGoalDrivenAllocationEnabled}
+                          className={cn('shrink-0', interactiveControlClass)}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </Tile>
+              </div>
+
+              {/* Parametri del piano — read-only declaration; the FIRE pages stay the only write surfaces */}
+              <div className={cn(TILE_CELL_CLASS, 'desktop:col-span-4')}>
+                <Tile eyebrow="Parametri del piano" aside="sola lettura" reading={describePlanParameters(planParams)}>
+                  <div className="mt-1 flex flex-col divide-y divide-border">
+                    {planParams.withdrawalRate !== undefined && (
+                      <DeclarationRow label="Safe withdrawal rate" value={pctLabel(planParams.withdrawalRate)} />
+                    )}
+                    {planParams.plannedAnnualExpenses !== undefined && (
+                      <DeclarationRow
+                        label="Spese pianificate"
+                        value={`${cachedFormatCurrencyEUR(planParams.plannedAnnualExpenses, true)}/anno`}
+                      />
+                    )}
+                    <DeclarationRow
+                      label="Età pensione INPS"
+                      value={`${inpsAgeShown} anni${planParams.pensionInpsRetirementAge === undefined ? ' · predefinita' : ''}`}
+                    />
+                    <DeclarationRow label="RITA (sblocco fondo)" value={`${ritaAgeShown} anni`} />
+                    <DeclarationRow
+                      label="Vincolo fondo nel FIRE"
+                      value={planParams.respectPensionLockInFire ? 'Attivo' : 'Spento'}
+                      mono={false}
                     />
                   </div>
-                </div>
-              ))
-            )}
-
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={addFamilyMemberRow}
-              disabled={isDemo}
-              className="w-full sm:w-auto"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Aggiungi membro
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Monthly email summary configuration */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Mail className="h-4 w-4 text-muted-foreground" />
-            <CardTitle className="text-base">Report Email Mensili</CardTitle>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Ricevi un riepilogo automatico del patrimonio, cashflow e dividendi via email
-            l&apos;ultimo giorno di ogni mese.
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <Label htmlFor="monthlyEmailEnabled" className="text-sm font-medium">
-                Attiva report mensile
-              </Label>
-              <p className="text-sm text-muted-foreground mt-1">
-                Inviato automaticamente l&apos;ultimo giorno del mese
-              </p>
-            </div>
-            <Switch
-              id="monthlyEmailEnabled"
-              checked={monthlyEmailEnabled}
-              onCheckedChange={setMonthlyEmailEnabled}
-              disabled={isDemo}
-              className={interactiveControlClass}
-            />
-          </div>
-
-          {/* Quarterly email toggle */}
-          <div className="flex items-center justify-between border-t pt-4">
-            <div>
-              <Label htmlFor="quarterlyEmailEnabled" className="text-sm font-medium">
-                Attiva report trimestrale
-              </Label>
-              <p className="text-sm text-muted-foreground mt-1">
-                Inviato automaticamente l&apos;ultimo giorno di marzo, giugno, settembre e dicembre
-              </p>
-            </div>
-            <Switch
-              id="quarterlyEmailEnabled"
-              checked={quarterlyEmailEnabled}
-              onCheckedChange={setQuarterlyEmailEnabled}
-              disabled={isDemo}
-              className={interactiveControlClass}
-            />
-          </div>
-
-          {/* Semi-annual email toggle */}
-          <div className="flex items-center justify-between border-t pt-4">
-            <div>
-              <Label htmlFor="semiAnnualEmailEnabled" className="text-sm font-medium">
-                Attiva report semestrale
-              </Label>
-              <p className="text-sm text-muted-foreground mt-1">
-                Inviato automaticamente il 30 giugno e il 31 dicembre
-              </p>
-            </div>
-            <Switch
-              id="semiAnnualEmailEnabled"
-              checked={semiAnnualEmailEnabled}
-              onCheckedChange={setSemiAnnualEmailEnabled}
-              disabled={isDemo}
-              className={interactiveControlClass}
-            />
-          </div>
-
-          {/* Yearly email toggle */}
-          <div className="flex items-center justify-between border-t pt-4">
-            <div>
-              <Label htmlFor="yearlyEmailEnabled" className="text-sm font-medium">
-                Attiva report annuale
-              </Label>
-              <p className="text-sm text-muted-foreground mt-1">
-                Inviato automaticamente il 31 dicembre
-              </p>
-            </div>
-            <Switch
-              id="yearlyEmailEnabled"
-              checked={yearlyEmailEnabled}
-              onCheckedChange={setYearlyEmailEnabled}
-              disabled={isDemo}
-              className={interactiveControlClass}
-            />
-          </div>
-
-          {/* Weekly budget email toggle */}
-          <div className="flex items-center justify-between border-t pt-4">
-            <div>
-              <Label htmlFor="weeklyBudgetEmailEnabled" className="text-sm font-medium">
-                Attiva report budget settimanale
-              </Label>
-              <p className="text-sm text-muted-foreground mt-1">
-                Inviato ogni domenica con lo stato dei budget mensili e annuali
-              </p>
-            </div>
-            <Switch
-              id="weeklyBudgetEmailEnabled"
-              checked={weeklyBudgetEmailEnabled}
-              onCheckedChange={setWeeklyBudgetEmailEnabled}
-              disabled={isDemo}
-              className={interactiveControlClass}
-            />
-          </div>
-
-          {(monthlyEmailEnabled || quarterlyEmailEnabled || semiAnnualEmailEnabled || yearlyEmailEnabled || weeklyBudgetEmailEnabled) && (
-            <div className="space-y-3 border-t pt-4">
-              <Label className="text-sm font-medium">Destinatari</Label>
-
-              {/* Add new recipient */}
-              <div className="flex gap-2">
-                <Input
-                  type="email"
-                  placeholder="email@esempio.com"
-                  value={newEmailInput}
-                  onChange={(e) => setNewEmailInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      const email = newEmailInput.trim();
-                      if (email && !monthlyEmailRecipients.includes(email)) {
-                        setMonthlyEmailRecipients([...monthlyEmailRecipients, email]);
-                        setNewEmailInput('');
-                      }
-                    }
-                  }}
-                  disabled={isDemo}
-                  className={interactiveControlClass}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={
-                    isDemo ||
-                    !newEmailInput.trim() ||
-                    monthlyEmailRecipients.includes(newEmailInput.trim())
-                  }
-                  onClick={() => {
-                    const email = newEmailInput.trim();
-                    if (email && !monthlyEmailRecipients.includes(email)) {
-                      setMonthlyEmailRecipients([...monthlyEmailRecipients, email]);
-                      setNewEmailInput('');
-                    }
-                  }}
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Aggiungi
-                </Button>
+                  <div className="mt-auto border-t border-border pt-3 text-[11px] leading-[1.45] text-muted-foreground">
+                    Si modificano dove agiscono:{' '}
+                    <Link href="/dashboard/fire-simulations?tab=fire" className="text-foreground underline-offset-2 hover:underline">
+                      FIRE › Calcolatore → Parametri
+                    </Link>
+                    {' '}e{' '}
+                    <Link href="/dashboard/fire-simulations?tab=coast" className="text-foreground underline-offset-2 hover:underline">
+                      Coast FIRE → Ipotesi
+                    </Link>
+                    .
+                  </div>
+                </Tile>
               </div>
 
-              {/* Recipient list */}
-              {monthlyEmailRecipients.length > 0 && (
-                <ul className="space-y-2">
-                  {monthlyEmailRecipients.map((email) => (
-                    <li
-                      key={email}
-                      className="flex items-center justify-between rounded-md border border-border bg-muted/30 px-3 py-2 text-sm"
-                    >
-                      <span className="text-foreground">{email}</span>
-                      <button
-                        type="button"
-                        aria-label={`Rimuovi ${email}`}
-                        disabled={isDemo}
-                        onClick={() =>
-                          setMonthlyEmailRecipients(
-                            monthlyEmailRecipients.filter((r) => r !== email)
-                          )
-                        }
-                        className="text-muted-foreground hover:text-destructive transition-colors disabled:opacity-40"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+              {/* Assistente — read-only mirror; the popover beside the conversation is the write surface */}
+              {SHOW_ASSISTANT ? (
+                <div className={cn(TILE_CELL_CLASS, 'desktop:col-span-4')}>
+                  <Tile eyebrow="Assistente" aside="sola lettura" reading={describeAssistantPreferences(assistantPrefs)}>
+                    <div className="mt-1 flex flex-col divide-y divide-border">
+                      {assistantPrefs.responseStyle !== undefined && (
+                        <DeclarationRow
+                          label="Stile delle risposte"
+                          value={ASSISTANT_STYLE_LABELS[assistantPrefs.responseStyle]}
+                          mono={false}
+                        />
+                      )}
+                      {assistantPrefs.memoryEnabled !== undefined && (
+                        <DeclarationRow
+                          label="Apprendimento automatico"
+                          value={assistantPrefs.memoryEnabled ? 'Attivo' : 'Spento'}
+                          mono={false}
+                        />
+                      )}
+                      {assistantPrefs.macroContextEnabled !== undefined && (
+                        <DeclarationRow
+                          label="Contesto macro (web)"
+                          value={assistantPrefs.macroContextEnabled ? 'Attivo' : 'Spento'}
+                          mono={false}
+                        />
+                      )}
+                    </div>
+                    <div className="mt-auto border-t border-border pt-3 text-[11px] leading-[1.45] text-muted-foreground">
+                      Si modificano{' '}
+                      <Link href="/dashboard/assistant" className="text-foreground underline-offset-2 hover:underline">
+                        dall&apos;Assistente
+                      </Link>
+                      , accanto alla conversazione.
+                    </div>
+                  </Tile>
+                </div>
+              ) : (
+                <div className="hidden desktop:block desktop:col-span-4" aria-hidden="true" />
               )}
 
-              {/* Manual send button */}
-              {/* Manual send buttons — one per enabled period type */}
-              <div className="pt-2 flex flex-wrap gap-2">
-                {([
-                  { type: 'monthly' as const, label: 'Invia mensile ora', enabled: monthlyEmailEnabled },
-                  { type: 'quarterly' as const, label: 'Invia trimestrale ora', enabled: quarterlyEmailEnabled },
-                  { type: 'semiannual' as const, label: 'Invia semestrale ora', enabled: semiAnnualEmailEnabled },
-                  { type: 'yearly' as const, label: 'Invia annuale ora', enabled: yearlyEmailEnabled },
-                  { type: 'weekly-budget' as const, label: 'Invia report budget ora', enabled: weeklyBudgetEmailEnabled },
-                ] as const).filter(({ enabled }) => enabled).map(({ type, label }) => (
-                  <Button
-                    key={type}
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={isDemo || monthlyEmailRecipients.length === 0 || sendingTestEmailType !== null}
-                    onClick={async () => {
-                      setSendingTestEmailType(type);
-                      try {
-                        const res = await authenticatedFetch(
-                          '/api/user/monthly-email/send',
-                          {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ periodType: type }),
-                          }
-                        );
-                        if (res.ok) {
-                          toast.success('Email inviata con successo!');
-                        } else {
-                          const resBody = await res.json().catch(() => ({}));
-                          toast.error(resBody.error ?? "Errore durante l'invio");
-                        }
-                      } catch {
-                        toast.error("Errore durante l'invio dell'email");
-                      } finally {
-                        setSendingTestEmailType(null);
-                      }
-                    }}
-                  >
-                    {sendingTestEmailType === type ? (
-                      <span className="flex items-center gap-2">
-                        <span className="h-3 w-3 rounded-full border-2 border-current border-t-transparent animate-spin" />
-                        Invio in corso...
-                      </span>
+              {/* Cashflow — labor income, history floor, cost centers */}
+              <div className={cn(TILE_CELL_CLASS, 'desktop:col-span-5')}>
+                <Tile
+                  eyebrow="Cashflow"
+                  reading={describeCashflowSettings({
+                    laborCategoryNames,
+                    historyStartYear: cashflowHistoryStartYear,
+                    costCentersEnabled,
+                  })}
+                >
+                  <div className="mt-3">
+                    <p className={TILE_SUB_EYEBROW_CLASS}>Reddito da lavoro</p>
+                    {getCategoriesByType('income').length === 0 ? (
+                      <p className="mt-2 text-[11px] leading-[1.4] text-muted-foreground">
+                        Nessuna categoria di tipo «Entrate»: creane una nel tab Spese.
+                      </p>
                     ) : (
-                      <span className="flex items-center gap-2">
-                        <Send className="h-4 w-4" />
-                        {label}
-                      </span>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {getCategoriesByType('income').map((cat) => {
+                          const checked = laborIncomeCategoryIds.includes(cat.id);
+                          return (
+                            <button
+                              key={cat.id}
+                              type="button"
+                              aria-pressed={checked}
+                              onClick={() =>
+                                setLaborIncomeCategoryIds(
+                                  checked
+                                    ? laborIncomeCategoryIds.filter((id) => id !== cat.id)
+                                    : [...laborIncomeCategoryIds, cat.id]
+                                )
+                              }
+                              className={cn(
+                                'inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs transition-colors',
+                                checked
+                                  ? 'border-primary bg-primary text-primary-foreground'
+                                  : 'border-border bg-background text-foreground hover:bg-muted'
+                              )}
+                            >
+                              {checked && (
+                                <svg className="h-3.5 w-3.5" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                                  <path d="M2.5 7L5.5 10L11.5 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                              )}
+                              {cat.name}
+                            </button>
+                          );
+                        })}
+                      </div>
                     )}
-                  </Button>
-                ))}
+                  </div>
+                  <div className="mt-3 flex flex-col divide-y divide-border border-t border-border">
+                    <div className="flex items-center justify-between gap-4 py-3">
+                      <div className="min-w-0">
+                        <Label htmlFor="cashflowHistoryStartYear" className="text-[13px] font-medium">
+                          Anno inizio storico cashflow
+                        </Label>
+                        <p className="mt-0.5 text-[11px] leading-[1.4] text-muted-foreground">
+                          Esclude i dati importati più vecchi dai grafici dello storico
+                        </p>
+                      </div>
+                      <Input
+                        id="cashflowHistoryStartYear"
+                        type="number"
+                        min="2000"
+                        max={new Date().getFullYear()}
+                        step="1"
+                        value={cashflowHistoryStartYear}
+                        onChange={(e) =>
+                          setCashflowHistoryStartYear(parseInt(e.target.value, 10) || 2025)
+                        }
+                        className={cn('w-24 shrink-0 text-right font-mono', interactiveControlClass)}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between gap-4 py-3">
+                      <div className="min-w-0">
+                        <Label htmlFor="costCentersEnabled" className="text-[13px] font-medium">Centri di Costo</Label>
+                        <p className="mt-0.5 text-[11px] leading-[1.4] text-muted-foreground">
+                          Il tab appare in Cashflow, il selettore nel dialog delle spese
+                        </p>
+                      </div>
+                      <Switch
+                        id="costCentersEnabled"
+                        checked={costCentersEnabled}
+                        onCheckedChange={setCostCentersEnabled}
+                        className={cn('shrink-0', interactiveControlClass)}
+                      />
+                    </div>
+                  </div>
+                </Tile>
               </div>
-              <p className="mt-2 text-xs text-muted-foreground">
-                Invia il riepilogo del periodo corrente per verificare il formato.
-                Ricorda di salvare prima le impostazioni.
-              </p>
+
+              {/* Famiglia — one RAL/eligibility per taxpayer (the IRPEF ceiling is per person) */}
+              <div className={cn(TILE_CELL_CLASS, 'desktop:col-span-7')}>
+                <Tile
+                  eyebrow="Famiglia"
+                  aside={familyMemberDrafts.length === 1 ? '1 membro' : `${familyMemberDrafts.length} membri`}
+                  reading={describeFamily({ members: familyMembersForReading })}
+                >
+                  {familyMemberDrafts.length > 0 && (
+                    <div className="mt-3 hidden grid-cols-[minmax(0,1fr)_120px_150px_110px_44px] items-center gap-x-3 pb-1.5 desktop:grid">
+                      <span className={TILE_SUB_EYEBROW_CLASS}>Nome</span>
+                      <span className={TILE_SUB_EYEBROW_CLASS}>RAL</span>
+                      <span className={TILE_SUB_EYEBROW_CLASS}>Prima occupazione dopo il 2007</span>
+                      <span className={TILE_SUB_EYEBROW_CLASS}>Primo anno</span>
+                      <span aria-hidden="true" />
+                    </div>
+                  )}
+                  <div className="flex flex-col divide-y divide-border">
+                    {familyMemberDrafts.map((member) => (
+                      <div
+                        key={member.id}
+                        className="grid grid-cols-2 items-center gap-3 py-3 desktop:grid-cols-[minmax(0,1fr)_120px_150px_110px_44px] desktop:gap-x-3"
+                      >
+                        <Input
+                          value={member.name}
+                          onChange={(e) => updateFamilyMemberRow(member.id, 'name', e.target.value)}
+                          placeholder="es. Giuseppe"
+                          aria-label="Nome del membro"
+                          disabled={isDemo}
+                          className={cn('col-span-2 desktop:col-span-1', interactiveControlClass)}
+                        />
+                        <Input
+                          type="number"
+                          inputMode="decimal"
+                          value={member.grossAnnualIncome}
+                          onChange={(e) => updateFamilyMemberRow(member.id, 'grossAnnualIncome', e.target.value)}
+                          placeholder="RAL"
+                          aria-label="Reddito annuo lordo (RAL)"
+                          disabled={isDemo}
+                          className={cn('text-right font-mono', interactiveControlClass)}
+                        />
+                        <div className="flex items-center justify-end gap-2 desktop:justify-start">
+                          <Switch
+                            id={`family-firstjob-${member.id}`}
+                            checked={member.isFirstEmploymentPost2007}
+                            onCheckedChange={(checked) => updateFamilyMemberRow(member.id, 'isFirstEmploymentPost2007', checked)}
+                            disabled={isDemo}
+                            aria-label="Prima occupazione dopo il 2007"
+                            className={interactiveControlClass}
+                          />
+                          <Label htmlFor={`family-firstjob-${member.id}`} className="text-[11px] text-muted-foreground desktop:hidden">
+                            Post 2007
+                          </Label>
+                        </div>
+                        <Input
+                          type="number"
+                          value={member.firstEmploymentYear}
+                          onChange={(e) => updateFamilyMemberRow(member.id, 'firstEmploymentYear', e.target.value)}
+                          placeholder="anno"
+                          aria-label="Anno di prima occupazione"
+                          disabled={isDemo || !member.isFirstEmploymentPost2007}
+                          className={cn('text-right font-mono', interactiveControlClass)}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeFamilyMemberRow(member.id)}
+                          disabled={isDemo}
+                          aria-label={`Rimuovi ${member.name || 'membro'}`}
+                          className="h-10 w-10 justify-self-end shrink-0"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className={familyMemberDrafts.length > 0 ? 'mt-2' : 'mt-3'}>
+                    <Button type="button" variant="outline" size="sm" onClick={addFamilyMemberRow} disabled={isDemo}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Aggiungi membro
+                    </Button>
+                  </div>
+                  <div className="mt-auto border-t border-border pt-3 text-[11px] leading-[1.45] text-muted-foreground">
+                    Colleghi un fondo pensione a un membro dalla sua scheda in Patrimonio; «Prima occupazione dopo il 2007»
+                    abilita il recupero del plafond di deducibilità.
+                  </div>
+                </Tile>
+              </div>
+
+              {/* Email periodiche — toggles + recipients + manual send */}
+              <div className={cn(TILE_CELL_CLASS, 'tablet:col-span-2 desktop:col-span-12')}>
+                <Tile
+                  eyebrow="Email periodiche"
+                  aside={monthlyEmailRecipients.length === 1 ? '1 destinatario' : `${monthlyEmailRecipients.length} destinatari`}
+                  reading={describeEmails({
+                    monthly: monthlyEmailEnabled,
+                    quarterly: quarterlyEmailEnabled,
+                    semiAnnual: semiAnnualEmailEnabled,
+                    yearly: yearlyEmailEnabled,
+                    weeklyBudget: weeklyBudgetEmailEnabled,
+                    recipientCount: monthlyEmailRecipients.length,
+                  })}
+                >
+                  <div className="mt-1 grid grid-cols-1 gap-x-10 desktop:grid-cols-2">
+                    <div className="flex flex-col divide-y divide-border">
+                      {([
+                        { id: 'monthlyEmailEnabled', label: 'Report mensile', help: "L'ultimo giorno del mese", checked: monthlyEmailEnabled, onChange: setMonthlyEmailEnabled },
+                        { id: 'quarterlyEmailEnabled', label: 'Report trimestrale', help: 'Marzo, giugno, settembre e dicembre', checked: quarterlyEmailEnabled, onChange: setQuarterlyEmailEnabled },
+                        { id: 'semiAnnualEmailEnabled', label: 'Report semestrale', help: '30 giugno e 31 dicembre', checked: semiAnnualEmailEnabled, onChange: setSemiAnnualEmailEnabled },
+                        { id: 'yearlyEmailEnabled', label: 'Report annuale', help: 'Il 31 dicembre', checked: yearlyEmailEnabled, onChange: setYearlyEmailEnabled },
+                        { id: 'weeklyBudgetEmailEnabled', label: 'Report budget settimanale', help: 'Ogni domenica, con lo stato dei budget', checked: weeklyBudgetEmailEnabled, onChange: setWeeklyBudgetEmailEnabled },
+                      ] as const).map((row) => (
+                        <div key={row.id} className="flex items-center justify-between gap-4 py-3">
+                          <div className="min-w-0">
+                            <Label htmlFor={row.id} className="text-[13px] font-medium">{row.label}</Label>
+                            <p className="mt-0.5 text-[11px] leading-[1.4] text-muted-foreground">{row.help}</p>
+                          </div>
+                          <Switch
+                            id={row.id}
+                            checked={row.checked}
+                            onCheckedChange={row.onChange}
+                            disabled={isDemo}
+                            className={cn('shrink-0', interactiveControlClass)}
+                          />
+                        </div>
+                      ))}
+                    </div>
+
+                    {(monthlyEmailEnabled || quarterlyEmailEnabled || semiAnnualEmailEnabled || yearlyEmailEnabled || weeklyBudgetEmailEnabled) && (
+                      <div className="mt-4 flex flex-col desktop:mt-0 desktop:border-l desktop:border-border desktop:pl-10">
+                        <p className={cn(TILE_SUB_EYEBROW_CLASS, 'pt-3')}>Destinatari</p>
+                        <div className="mt-2 flex gap-2">
+                          <Input
+                            type="email"
+                            placeholder="email@esempio.com"
+                            value={newEmailInput}
+                            onChange={(e) => setNewEmailInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                const email = newEmailInput.trim();
+                                if (email && !monthlyEmailRecipients.includes(email)) {
+                                  setMonthlyEmailRecipients([...monthlyEmailRecipients, email]);
+                                  setNewEmailInput('');
+                                }
+                              }
+                            }}
+                            disabled={isDemo}
+                            aria-label="Nuovo destinatario"
+                            className={interactiveControlClass}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={
+                              isDemo ||
+                              !newEmailInput.trim() ||
+                              monthlyEmailRecipients.includes(newEmailInput.trim())
+                            }
+                            onClick={() => {
+                              const email = newEmailInput.trim();
+                              if (email && !monthlyEmailRecipients.includes(email)) {
+                                setMonthlyEmailRecipients([...monthlyEmailRecipients, email]);
+                                setNewEmailInput('');
+                              }
+                            }}
+                          >
+                            <Plus className="mr-1 h-4 w-4" />
+                            Aggiungi
+                          </Button>
+                        </div>
+
+                        {monthlyEmailRecipients.length > 0 && (
+                          <ul className="mt-2.5 space-y-2">
+                            {monthlyEmailRecipients.map((email) => (
+                              <li
+                                key={email}
+                                className="flex items-center justify-between rounded-md border border-border bg-muted/30 px-3 py-2 text-sm"
+                              >
+                                <span className="truncate text-foreground">{email}</span>
+                                <button
+                                  type="button"
+                                  aria-label={`Rimuovi ${email}`}
+                                  disabled={isDemo}
+                                  onClick={() =>
+                                    setMonthlyEmailRecipients(
+                                      monthlyEmailRecipients.filter((r) => r !== email)
+                                    )
+                                  }
+                                  className="ml-3 shrink-0 text-muted-foreground transition-colors hover:text-destructive disabled:opacity-40"
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+
+                        <div className="mt-3.5 flex flex-wrap gap-2">
+                          {([
+                            { type: 'monthly' as const, label: 'Invia mensile ora', enabled: monthlyEmailEnabled },
+                            { type: 'quarterly' as const, label: 'Invia trimestrale ora', enabled: quarterlyEmailEnabled },
+                            { type: 'semiannual' as const, label: 'Invia semestrale ora', enabled: semiAnnualEmailEnabled },
+                            { type: 'yearly' as const, label: 'Invia annuale ora', enabled: yearlyEmailEnabled },
+                            { type: 'weekly-budget' as const, label: 'Invia report budget ora', enabled: weeklyBudgetEmailEnabled },
+                          ] as const).filter(({ enabled }) => enabled).map(({ type, label }) => (
+                            <Button
+                              key={type}
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={isDemo || monthlyEmailRecipients.length === 0 || sendingTestEmailType !== null}
+                              onClick={async () => {
+                                setSendingTestEmailType(type);
+                                try {
+                                  const res = await authenticatedFetch(
+                                    '/api/user/monthly-email/send',
+                                    {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ periodType: type }),
+                                    }
+                                  );
+                                  if (res.ok) {
+                                    toast.success('Email inviata con successo!');
+                                  } else {
+                                    const resBody = await res.json().catch(() => ({}));
+                                    toast.error(resBody.error ?? "Errore durante l'invio");
+                                  }
+                                } catch {
+                                  toast.error("Errore durante l'invio dell'email");
+                                } finally {
+                                  setSendingTestEmailType(null);
+                                }
+                              }}
+                            >
+                              {sendingTestEmailType === type ? (
+                                <span className="flex items-center gap-2">
+                                  <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                  Invio in corso...
+                                </span>
+                              ) : (
+                                <span className="flex items-center gap-2">
+                                  <Send className="h-4 w-4" />
+                                  {label}
+                                </span>
+                              )}
+                            </Button>
+                          ))}
+                        </div>
+                        <p className="mt-2 text-[11px] leading-[1.45] text-muted-foreground">
+                          Invia il riepilogo del periodo corrente per verificare il formato. Salva prima le impostazioni.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </Tile>
+              </div>
+
             </div>
-          )}
-        </CardContent>
-      </Card>
 
       {/* Development Features — clearly separated from user-facing settings, only shown in dev mode */}
       {enableTestSnapshots && (
-        <div className="border-t border-border pt-6 space-y-4">
+        <div className="mt-6 border-t border-border pt-6 space-y-4">
           <div className="flex items-center gap-2">
             <FlaskConical className="h-4 w-4 text-orange-500" />
             <p className="text-xs uppercase tracking-widest text-orange-500">Strumenti di sviluppo</p>
@@ -2434,1024 +2554,1012 @@ export default function SettingsPage() {
           </TabsContent>
         )}
 
-        {/* Tab: Allocazione (default, always mounted) */}
-        <TabsContent value="allocazione" className="mt-6 space-y-4 sm:space-y-6">
-      {hasUnsavedAllocationChanges && (
-        <div className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm text-foreground">
-          Anteprima attiva: target e dipendenze mostrano già il nuovo assetto prima del salvataggio.
-        </div>
-      )}
+        {/* Tab: Allocazione (default, always mounted) — the total as a tile, the formula's state,
+            the editable target list at the tile's cadence. */}
+        <TabsContent value="allocazione" className="mt-4">
+          <div className="grid grid-cols-1 gap-3 tablet:grid-cols-2 desktop:grid-cols-12">
 
-      {/* Hero — allocation total as dominant primary number */}
-      <Card>
-        <CardContent className="px-6 pt-6 pb-5">
-          <p className="text-xs uppercase tracking-widest text-muted-foreground/70">Allocazione Configurata</p>
-          <div className="flex items-end gap-3 mt-1">
-            <p className={`text-4xl font-bold font-mono ${isValidTotal ? 'text-foreground' : 'text-destructive'}`}>
-              {formatPercentage(total)}
-            </p>
-            {hasTargetLeverage && (
-              <span className="mb-1 rounded-md bg-muted px-2 py-0.5 text-sm font-medium font-mono tabular-nums text-foreground">
-                Leva target {derivedTargetLeverage.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}×
-              </span>
-            )}
-            {cashUseFixedAmount && (
-              <span className="text-sm text-muted-foreground mb-1">esclusa liquidità fissa</span>
-            )}
-          </div>
-          {/* A total above 100% is not an error under leverage — the sum IS the target leverage. */}
-          <p className="mt-1.5 text-xs text-muted-foreground">
-            La somma è l&apos;esposizione desiderata sul capitale investito: 100% = nessuna leva, oltre
-            100% = leva target. Per escludere un asset (casa, fondo pensione) usa il suo ruolo in
-            Patrimonio, non un target qui.
-          </p>
-          <div className="divide-y border-t mt-4">
-            <div className="flex items-center justify-between py-2.5">
-              <span className="text-sm text-muted-foreground">Classi con allocazione &gt; 0%</span>
-              <span className="text-sm font-semibold font-mono">
-                {Object.values(assetClassStates).filter((s) => s && s.targetPercentage > 0).length}
-              </span>
-            </div>
-            {hasTargetLeverage && (
-              <div className="flex items-center justify-between py-2.5">
-                <span className="text-sm text-muted-foreground">Leva target (derivata)</span>
-                <span className="text-sm font-semibold font-mono tabular-nums text-foreground">
-                  {derivedTargetLeverage.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}×
-                </span>
-              </div>
-            )}
-            {autoCalculate && userAge !== undefined && riskFreeRate !== undefined && (
-              <div className="flex items-center justify-between py-2.5">
-                <span className="text-sm text-muted-foreground">Auto-calc attivo</span>
-                {/* The RESOLVED target, not the raw formula: the other classes are funded out of
-                    the equity sleeve, so the two figures differ whenever any of them is set. */}
-                <span className="text-sm font-semibold font-mono text-primary">
-                  {formatPercentage(assetClassStates.equity?.targetPercentage ?? 0, 1)} Azioni
-                </span>
-              </div>
-            )}
-            {!isValidTotal && (
-              <div className="flex items-center justify-between py-2.5">
-                <span className="text-sm text-destructive">Residuo da allocare</span>
-                <span className="text-sm font-semibold font-mono text-destructive">
-                  {formatPercentage(Math.abs(100 - total))}
-                </span>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Profilo — flat divide-y rows: age, risk-free rate, auto-calc */}
-      <Card>
-        <CardContent className="p-0">
-          <div className="divide-y">
-            {/* Età */}
-            <div className="flex items-center justify-between gap-4 px-6 py-4">
-              <div className="min-w-0">
-                <p className="text-sm font-medium">Età</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Usata per il calcolo automatico dei target</p>
-              </div>
-              <Input
-                id="userAge"
-                type="number"
-                min="0"
-                max="120"
-                value={userAge || ''}
-                onChange={(e) => {
-                  const value = e.target.value ? parseInt(e.target.value) : undefined;
-                  setUserAge(value);
-                }}
-                placeholder="anni"
-                className={cn('w-24 text-right font-mono shrink-0', interactiveControlClass)}
-              />
-            </div>
-            {/* Risk-free rate */}
-            <div className="flex items-center justify-between gap-4 px-6 py-4">
-              <div className="min-w-0">
-                <p className="text-sm font-medium">Risk-Free Rate</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  <a
-                    href="https://www.investing.com/rates-bonds/italy-10-year-bond-yield"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline"
-                  >
-                    BTP 10 anni
-                  </a>
-                  {' '}su Investing.com
-                </p>
-              </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <Input
-                  id="riskFreeRate"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max="100"
-                  value={riskFreeRate || ''}
-                  onChange={(e) => {
-                    const value = e.target.value ? parseFloat(e.target.value) : undefined;
-                    setRiskFreeRate(value);
-                  }}
-                  placeholder="es. 3.5"
-                  className={cn('w-24 text-right font-mono', interactiveControlClass)}
-                />
-                <span className="text-sm text-muted-foreground">%</span>
-              </div>
-            </div>
-            {/* Auto-calculate toggle — disabled until both age and rate are set */}
-            <div className="flex items-center justify-between gap-4 px-6 py-4">
-              <div className="min-w-0">
-                <p className="text-sm font-medium">Calcolo automatico Azioni/Obbligazioni</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Formula di{' '}
-                  <a
-                    href="https://www.youtube.com/channel/UCNp1e5n6rlnfm5aWbHe3cJw"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline"
-                  >
-                    The Bull
-                  </a>
-                  : 125 {'−'} età {'−'} (rate {'×'} 5) = % Azioni
-                </p>
-                {/* The formula's own output is only half the story: it prescribes an equity
-                    share, and the classes it says nothing about (materie prime, crypto,
-                    immobili, …) are funded out of that share. Naming both numbers here is what
-                    keeps the Azioni row below from looking like an arbitrary value. */}
-                {autoCalculate && userAge !== undefined && riskFreeRate !== undefined && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Risultato:{' '}
-                    <strong className="text-foreground">
-                      {formatPercentage(calculateEquityPercentage(userAge, riskFreeRate))} Azioni
-                    </strong>
-                    {' '}· Obbligazioni{' '}
-                    {formatPercentage(assetClassStates.bonds?.targetPercentage ?? 0)} (residuo
-                    della formula) · le altre classi (
-                    {formatPercentage(sumOtherClassTargets(assetClassStates, cashUseFixedAmount))})
-                    {' '}scalano dalle Azioni
-                  </p>
-                )}
-              </div>
-              <Switch
-                id="autoCalculate"
-                checked={autoCalculate}
-                onCheckedChange={setAutoCalculate}
-                disabled={userAge === undefined || riskFreeRate === undefined}
-                className={cn('shrink-0', interactiveControlClass)}
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Unified target card — one card, flat divide-y, sub-categories expandable inline */}
-      <Card className="overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold">Target per Asset Class</p>
-            {/* The denominator these percentages apply to is not the net worth — say so here, or the
-                Allocazione page reads as if it had lost money. */}
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Si applicano al patrimonio ribilanciabile: gli asset marcati &quot;Escludi dal
-              ribilanciamento&quot; non entrano nel calcolo.
-            </p>
-          </div>
-          <span
-            className={`shrink-0 text-xs font-semibold font-mono ${isValidTotal ? 'text-green-600' : 'text-red-600'}`}
-          >
-            {formatPercentage(total)}
-            {cashUseFixedAmount && ' (excl. cash)'}
-            {!isValidTotal && ' ≠ 100%'}
-          </span>
-        </div>
-        <div className="divide-y">
-          {assetClasses.map((assetClass) => {
-            const state = assetClassStates[assetClass];
-            if (!state) return null;
-
-            const isAutoCalculated = autoCalculate && (assetClass === 'equity' || assetClass === 'bonds');
-            const isCash = assetClass === 'cash';
-            const subTotal = calculateSubTargetTotal(assetClass);
-            const isValidSubTotal = Math.abs(subTotal - 100) < 0.01;
-
-            return (
-              <div key={assetClass}>
-                {/* Asset class main row */}
-                <div className="flex items-center gap-3 px-6 py-4">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">{assetClassLabels[assetClass]}</p>
-                    {isAutoCalculated && (
-                      <p className="text-xs text-primary mt-0.5">Calcolato automaticamente</p>
+            {/* Allocazione target — the plan's one number */}
+            <div className={cn(TILE_CELL_CLASS, 'desktop:col-span-5')}>
+              <Tile
+                eyebrow="Allocazione target"
+                aside="capitale investito"
+                reading={describeAllocationTotal({
+                  total,
+                  isValid: isValidTotal,
+                  leverageRatio: derivedTargetLeverage,
+                  hasLeverage: hasTargetLeverage,
+                  cashUseFixedAmount,
+                  cashFixedAmount,
+                })}
+              >
+                <div className="mt-3.5 flex items-end gap-3">
+                  <p
+                    className={cn(
+                      'font-mono text-[36px] font-bold leading-none tracking-[-0.03em] tabular-nums',
+                      isValidTotal ? 'text-foreground' : 'text-destructive'
                     )}
-                  </div>
-                  {isCash && !isAutoCalculated && (
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <Switch
-                        id="cashFixedToggle"
-                        checked={cashUseFixedAmount}
-                        onCheckedChange={setCashUseFixedAmount}
-                        className={interactiveControlClass}
-                      />
-                      <Label htmlFor="cashFixedToggle" className="text-xs text-muted-foreground whitespace-nowrap">
-                        fisso €
-                      </Label>
+                  >
+                    {pctLabel(total)}
+                  </p>
+                  {hasTargetLeverage && (
+                    <span className="rounded-full border border-border bg-muted px-2.5 py-0.5 font-mono text-[12px] font-medium tabular-nums">
+                      Leva {formatNumber(derivedTargetLeverage, 2)}×
+                    </span>
+                  )}
+                  {cashUseFixedAmount && (
+                    <span className="pb-0.5 text-[11px] text-muted-foreground">esclusa liquidità fissa</span>
+                  )}
+                </div>
+                <div className="mt-3.5 flex flex-col divide-y divide-border">
+                  <DeclarationRow label="Classi con target > 0" value={`${classesWithTarget} su ${assetClasses.length}`} />
+                  <DeclarationRow
+                    label="Sotto-categorie configurate"
+                    value={classesWithSubcategories === 1 ? '1 classe' : `${classesWithSubcategories} classi`}
+                  />
+                  {!isValidTotal && (
+                    <div className="flex items-center justify-between gap-4 py-2">
+                      <span className="text-[13px] text-destructive">Residuo da allocare</span>
+                      <span className="font-mono text-[13px] font-semibold tabular-nums text-destructive">
+                        {pctLabel(Math.abs(100 - total))}
+                      </span>
                     </div>
                   )}
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <Input
-                      id={assetClass}
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      // No max cap: a single class can exceed 100% of invested capital under leverage.
-                      // The fixed-cash case is a € amount.
-                      value={
-                        isCash && cashUseFixedAmount
-                          ? cashFixedAmount
-                          : state.targetPercentage || 0
-                      }
-                      onChange={(e) => {
-                        if (isCash && cashUseFixedAmount) {
-                          setCashFixedAmount(parseFloat(e.target.value) || 0);
-                        } else {
-                          updateAssetClassState(assetClass, {
-                            targetPercentage: roundToTwoDecimals(parseFloat(e.target.value) || 0),
-                          });
-                        }
-                      }}
-                      disabled={isAutoCalculated}
-                      className={cn(
-                        'w-28 text-right font-mono',
-                        interactiveControlClass,
-                        isAutoCalculated ? 'bg-muted' : ''
-                      )}
-                    />
-                    <span className="text-sm text-muted-foreground w-4 shrink-0">
-                      {isCash && cashUseFixedAmount ? '€' : '%'}
-                    </span>
+                </div>
+                <div className="mt-auto border-t border-border pt-3 text-[11px] leading-[1.45] text-muted-foreground">
+                  Le percentuali si applicano al patrimonio ribilanciabile: gli asset «esclusi dal ribilanciamento» non
+                  entrano. Per escludere un asset (casa, fondo pensione) usa il suo ruolo in Patrimonio, non un target qui.
+                </div>
+              </Tile>
+            </div>
+
+            {/* Auto-calcolo — the formula's switch, with the profile it reads */}
+            <div className={cn(TILE_CELL_CLASS, 'desktop:col-span-7')}>
+              <Tile
+                eyebrow="Auto-calcolo Azioni / Obbligazioni"
+                aside={
+                  userAge !== undefined && riskFreeRate !== undefined
+                    ? `profilo: ${userAge} anni · ${pctLabel(riskFreeRate)}`
+                    : undefined
+                }
+                reading={describeAutoCalc({
+                  enabled: autoCalculate,
+                  userAge,
+                  riskFreeRate,
+                  equityPct: formulaSplit?.equityPercentage,
+                  bondsPct: formulaSplit?.bondsPercentage,
+                  otherTotal: otherClassTotal,
+                })}
+              >
+                <div className="mt-1 flex items-center justify-between gap-4 py-3">
+                  <div className="min-w-0">
+                    <Label htmlFor="autoCalculate" className="text-[13px] font-medium">Calcolo automatico</Label>
+                    <p className="mt-0.5 text-[11px] leading-[1.4] text-muted-foreground">
+                      Formula di{' '}
+                      <a
+                        href="https://www.youtube.com/channel/UCNp1e5n6rlnfm5aWbHe3cJw"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline"
+                      >
+                        The Bull
+                      </a>
+                      : 125 {'−'} età {'−'} (tasso {'×'} 5) = % Azioni; le altre classi scalano dalle Azioni, le
+                      Obbligazioni prendono il residuo
+                    </p>
                   </div>
-                  {/* Sub-category expand/collapse */}
+                  <Switch
+                    id="autoCalculate"
+                    checked={autoCalculate}
+                    onCheckedChange={setAutoCalculate}
+                    disabled={userAge === undefined || riskFreeRate === undefined}
+                    className={cn('shrink-0', interactiveControlClass)}
+                  />
+                </div>
+                <div className="mt-auto border-t border-border pt-3 text-[11px] leading-[1.45] text-muted-foreground">
+                  Età e risk-free rate si impostano in{' '}
                   <button
                     type="button"
-                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0 p-1"
-                    onClick={() => updateAssetClassState(assetClass, { expanded: !state.expanded })}
-                    aria-expanded={state.expanded}
-                    aria-label={`${state.expanded ? 'Chiudi' : 'Apri'} sotto-categorie`}
+                    onClick={() => handleTabChange('generale')}
+                    className="text-foreground underline-offset-2 hover:underline"
                   >
-                    <span className="hidden sm:inline">Sotto-cat.</span>
-                    <ChevronDown
-                      className={cn(
-                        'h-4 w-4 transition-transform duration-200 motion-reduce:transition-none',
-                        state.expanded && 'rotate-180'
-                      )}
-                    />
+                    Preferenze → Profilo
                   </button>
+                  .
                 </div>
-
-                {/* Sub-categories — expandable, indented within the same card */}
-                <Collapsible open={state.expanded}>
-                  <CollapsibleContent
-                    forceMount
-                    className={cn(
-                      'overflow-hidden motion-safe:transition-all motion-safe:duration-200 motion-reduce:transition-none',
-                      'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
-                      'data-[state=closed]:hidden'
-                    )}
-                  >
-                    <div className="bg-muted/20 border-t">
-                      {/* Enable toggle + sub-total */}
-                      <div className="flex items-center justify-between px-6 py-3">
-                        <div className="flex items-center gap-2">
-                          <Switch
-                            id={`toggle-${assetClass}`}
-                            checked={state.subCategoryEnabled}
-                            onCheckedChange={(checked: boolean) =>
-                              handleToggleSubCategories(assetClass, checked)
-                            }
-                            className={interactiveControlClass}
-                          />
-                          <Label htmlFor={`toggle-${assetClass}`} className="text-sm">
-                            Abilita sotto-categorie
-                          </Label>
-                        </div>
-                        {state.subCategoryEnabled && (
-                          <span
-                            className={`text-xs font-semibold font-mono ${
-                              isValidSubTotal ? 'text-green-600' : 'text-red-600'
-                            }`}
-                          >
-                            {formatPercentage(subTotal)}
-                            {!isValidSubTotal && ' ≠ 100%'}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Sub-target rows */}
-                      {state.subCategoryEnabled && (
-                        <div className="px-6 pb-4">
-                          <div className="divide-y border-t">
-                            {state.subTargets
-                              .map((target, originalIndex) => ({ target, originalIndex }))
-                              .sort((a, b) => a.target.name.localeCompare(b.target.name))
-                              .map(({ target, originalIndex }) => {
-                                const specificAssetTotal = calculateSpecificAssetTotal(assetClass, originalIndex);
-                                const isValidSpecificTotal = Math.abs(specificAssetTotal - 100) < 0.01;
-
-                                return (
-                                  <div key={originalIndex} className="space-y-3 py-3">
-                                    {/* Name + % + delete */}
-                                    <div className="flex items-center gap-2">
-                                      <div className="flex-1 min-w-0">
-                                        <Input
-                                          placeholder="Nome sottocategoria"
-                                          value={target.name}
-                                          onChange={(e) =>
-                                            handleSubTargetChange(
-                                              assetClass,
-                                              originalIndex,
-                                              'name',
-                                              e.target.value
-                                            )
-                                          }
-                                          list={`${assetClass}-categories`}
-                                          className={cn('text-sm', interactiveControlClass)}
-                                        />
-                                        <datalist id={`${assetClass}-categories`}>
-                                          {state.categories.map((cat) => (
-                                            <option key={cat} value={cat} />
-                                          ))}
-                                        </datalist>
-                                      </div>
-                                      <Input
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        max="100"
-                                        className={cn(
-                                          'w-24 text-right font-mono shrink-0',
-                                          interactiveControlClass
-                                        )}
-                                        value={target.percentage}
-                                        onChange={(e) =>
-                                          handleSubTargetChange(
-                                            assetClass,
-                                            originalIndex,
-                                            'percentage',
-                                            roundToTwoDecimals(parseFloat(e.target.value) || 0)
-                                          )
-                                        }
-                                      />
-                                      <span className="text-sm text-muted-foreground shrink-0">%</span>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => handleRemoveSubTarget(assetClass, originalIndex)}
-                                        className="shrink-0"
-                                      >
-                                        <Trash2 className="h-4 w-4 text-muted-foreground" />
-                                      </Button>
-                                    </div>
-
-                                    {/* Specific assets toggle + expand */}
-                                    {target.name && (
-                                      <div className="ml-4 space-y-2">
-                                        <div className="flex items-center justify-between">
-                                          <div className="flex items-center gap-2">
-                                            <Switch
-                                              id={`specific-${assetClass}-${originalIndex}`}
-                                              checked={target.specificAssetsEnabled || false}
-                                              onCheckedChange={(checked) =>
-                                                handleToggleSpecificAssets(
-                                                  assetClass,
-                                                  originalIndex,
-                                                  checked
-                                                )
-                                              }
-                                              className={interactiveControlClass}
-                                            />
-                                            <Label
-                                              htmlFor={`specific-${assetClass}-${originalIndex}`}
-                                              className="text-xs text-muted-foreground cursor-pointer"
-                                            >
-                                              Traccia asset specifici
-                                            </Label>
-                                          </div>
-                                          {target.specificAssetsEnabled && (
-                                            <span
-                                              className={`text-xs font-semibold font-mono ${
-                                                isValidSpecificTotal ? 'text-green-600' : 'text-red-600'
-                                              }`}
-                                            >
-                                              {formatPercentage(specificAssetTotal)}
-                                              {!isValidSpecificTotal && ' ≠ 100%'}
-                                            </span>
-                                          )}
-                                        </div>
-
-                                        {target.specificAssetsEnabled && (
-                                          <>
-                                            <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              className="w-full justify-start text-xs h-8"
-                                              onClick={() =>
-                                                toggleSubCategoryExpanded(assetClass, originalIndex)
-                                              }
-                                            >
-                                              <ChevronDown
-                                                className={cn(
-                                                  'mr-1.5 h-3 w-3 transition-transform duration-200 motion-reduce:transition-none',
-                                                  target.expanded && 'rotate-180'
-                                                )}
-                                              />
-                                              {target.expanded ? 'Nascondi' : 'Mostra'} asset specifici
-                                              {target.specificAssets &&
-                                                target.specificAssets.length > 0 && (
-                                                  <span className="ml-1.5 text-muted-foreground">
-                                                    ({target.specificAssets.length})
-                                                  </span>
-                                                )}
-                                            </Button>
-
-                                            <Collapsible open={target.expanded}>
-                                              <CollapsibleContent
-                                                forceMount
-                                                className={cn(
-                                                  'overflow-hidden motion-safe:transition-all motion-safe:duration-200 motion-reduce:transition-none',
-                                                  'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
-                                                  'data-[state=closed]:hidden'
-                                                )}
-                                              >
-                                                <div className="space-y-2 mt-1">
-                                                  {target.specificAssets &&
-                                                    target.specificAssets.map(
-                                                      (specificAsset, specificIndex) => (
-                                                        <div
-                                                          key={specificIndex}
-                                                          className="flex items-center gap-2"
-                                                        >
-                                                          <Input
-                                                            placeholder="Ticker/Nome (es. AAPL)"
-                                                            value={specificAsset.name}
-                                                            onChange={(e) =>
-                                                              handleSpecificAssetChange(
-                                                                assetClass,
-                                                                originalIndex,
-                                                                specificIndex,
-                                                                'name',
-                                                                e.target.value
-                                                              )
-                                                            }
-                                                            className={cn(
-                                                              'flex-1 text-sm',
-                                                              interactiveControlClass
-                                                            )}
-                                                          />
-                                                          <Input
-                                                            type="number"
-                                                            step="0.01"
-                                                            min="0"
-                                                            max="100"
-                                                            className={cn(
-                                                              'w-24 text-sm text-right font-mono shrink-0',
-                                                              interactiveControlClass
-                                                            )}
-                                                            value={specificAsset.targetPercentage}
-                                                            onChange={(e) =>
-                                                              handleSpecificAssetChange(
-                                                                assetClass,
-                                                                originalIndex,
-                                                                specificIndex,
-                                                                'targetPercentage',
-                                                                roundToTwoDecimals(
-                                                                  parseFloat(e.target.value) || 0
-                                                                )
-                                                              )
-                                                            }
-                                                          />
-                                                          <span className="text-xs text-muted-foreground shrink-0">
-                                                            %
-                                                          </span>
-                                                          <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() =>
-                                                              handleRemoveSpecificAsset(
-                                                                assetClass,
-                                                                originalIndex,
-                                                                specificIndex
-                                                              )
-                                                            }
-                                                          >
-                                                            <Trash2 className="h-3 w-3 text-muted-foreground" />
-                                                          </Button>
-                                                        </div>
-                                                      )
-                                                    )}
-                                                  <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    className="w-full text-xs"
-                                                    onClick={() =>
-                                                      handleAddSpecificAsset(assetClass, originalIndex)
-                                                    }
-                                                  >
-                                                    <Plus className="mr-1.5 h-3 w-3" />
-                                                    Aggiungi asset specifico
-                                                  </Button>
-                                                </div>
-                                              </CollapsibleContent>
-                                            </Collapsible>
-                                          </>
-                                        )}
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                          </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="mt-3 w-full sm:w-auto"
-                            onClick={() => handleAddSubTarget(assetClass)}
-                          >
-                            <Plus className="mr-2 h-4 w-4" />
-                            Aggiungi Sotto-Categoria
-                          </Button>
-                          <p className="text-xs text-muted-foreground mt-2">
-                            Le sotto-categorie sono espresse come percentuale di{' '}
-                            {assetClassLabels[assetClass]} ({formatPercentage(state.targetPercentage)})
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </CollapsibleContent>
-                </Collapsible>
-              </div>
-            );
-          })}
-        </div>
-      </Card>
-
-      {/* Notes block: collapsed by default to reduce visual noise */}
-      <Collapsible open={isNotesOpen} onOpenChange={setIsNotesOpen}>
-        <CollapsibleTrigger asChild>
-          <button
-            type="button"
-            className="flex w-full items-center justify-between rounded-lg border border-border px-4 py-3 text-sm text-muted-foreground hover:bg-muted/50 transition-colors"
-          >
-            <span className="font-medium text-foreground">Note e dettagli tecnici</span>
-            <ChevronDown className={cn('h-4 w-4 transition-transform duration-200', isNotesOpen && 'rotate-180')} />
-          </button>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="overflow-hidden data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 duration-200">
-          <div className="rounded-b-lg border border-t-0 border-border bg-muted/30 px-4 py-4">
-            <ul className="space-y-1 text-sm text-muted-foreground">
-              <li>• Il totale delle allocazioni delle asset class deve essere almeno 100%. Oltre il 100% rappresenta una leva target (es. 110% = leva 1,10×)</li>
-              <li>• La liquidità può essere impostata come valore fisso in euro. In questo caso, le percentuali delle altre asset class si applicheranno al patrimonio rimanente (totale - liquidità fissa)</li>
-              <li>• Per ogni asset class con sotto-categorie abilitate, il totale delle sotto-categorie deve essere esattamente 100%</li>
-              <li>• Le sotto-categorie sono espresse come percentuale della loro asset class di appartenenza</li>
-              <li>• Usa il toggle &quot;Abilita&quot; per attivare/disattivare le sotto-categorie per ciascuna asset class</li>
-              <li>• I cambiamenti saranno applicati immediatamente alla pagina Allocazione</li>
-            </ul>
-          </div>
-        </CollapsibleContent>
-      </Collapsible>
-
-        </TabsContent>
-
-        {/* Tab: Spese (lazy) */}
-        {mountedTabs.has('spese') && (
-          <TabsContent value="spese" className="mt-6">
-
-      {/* Expense Categories Management Section */}
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <Receipt className="h-5 w-5" />
-              <CardTitle>Impostazioni Tracciamento Spese</CardTitle>
+              </Tile>
             </div>
-            <Button onClick={handleAddExpenseCategory} size="sm" className="w-full sm:w-auto">
-              <Plus className="mr-2 h-4 w-4" />
-              Nuova Categoria
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="p-4 sm:p-6">
-          {loadingCategories ? (
-            <p className="text-sm text-muted-foreground">Caricamento categorie...</p>
-          ) : (
-            <div className="space-y-6">
-              {/* Categories by type */}
-              {(['income', 'fixed', 'variable', 'debt'] as ExpenseType[]).map((type) => {
-                const categories = getCategoriesByType(type);
-                return (
-                  <div key={type} className="space-y-3">
-                    <h3 className="font-semibold text-sm text-foreground border-b pb-2">
-                      {EXPENSE_TYPE_LABELS[type]}
-                    </h3>
-                    {categories.length === 0 ? (
-                      <p className="text-sm text-muted-foreground italic pl-4">
-                        Nessuna categoria creata
-                      </p>
-                    ) : (
-                      <div className="divide-y">
-                        {categories.map((category) => (
-                          <div
-                            key={category.id}
-                            className="flex items-center justify-between py-3 hover:bg-muted/30 transition-colors"
+
+            {/* Target per classe — the editable list at the tile's cadence */}
+            <div className={cn(TILE_CELL_CLASS, 'tablet:col-span-2 desktop:col-span-12')}>
+              <Tile
+                eyebrow="Target per classe"
+                aside={
+                  <span className="font-mono tabular-nums">
+                    totale {pctLabel(total)}
+                    {cashUseFixedAmount && ' (esclusa liquidità)'}
+                  </span>
+                }
+                reading={describeClassTargets({
+                  classCount: assetClasses.length,
+                  withSubcategories: classesWithSubcategories,
+                  isValid: isValidTotal,
+                })}
+              >
+                <div className="mt-1 flex flex-col divide-y divide-border">
+                  {assetClasses.map((assetClass) => {
+                    const state = assetClassStates[assetClass];
+                    if (!state) return null;
+
+                    const isAutoCalculated = autoCalculate && (assetClass === 'equity' || assetClass === 'bonds');
+                    const isCash = assetClass === 'cash';
+                    const subTotal = calculateSubTargetTotal(assetClass);
+                    const isValidSubTotal = Math.abs(subTotal - 100) < 0.01;
+
+                    return (
+                      <div key={assetClass}>
+                        {/* Asset class main row */}
+                        <div className="flex items-center gap-3 py-3">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[13px] font-medium">{assetClassLabels[assetClass]}</p>
+                            {isAutoCalculated && (
+                              <p className="mt-0.5 text-[11px] text-muted-foreground">Calcolata dalla formula</p>
+                            )}
+                          </div>
+                          {isCash && !isAutoCalculated && (
+                            <div className="flex shrink-0 items-center gap-1.5">
+                              <Switch
+                                id="cashFixedToggle"
+                                checked={cashUseFixedAmount}
+                                onCheckedChange={setCashUseFixedAmount}
+                                className={interactiveControlClass}
+                              />
+                              <Label htmlFor="cashFixedToggle" className="whitespace-nowrap text-[11px] text-muted-foreground">
+                                fisso €
+                              </Label>
+                            </div>
+                          )}
+                          <div className="flex shrink-0 items-center gap-1.5">
+                            <Input
+                              id={assetClass}
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              // No max cap: a single class can exceed 100% of invested capital under leverage.
+                              // The fixed-cash case is a € amount.
+                              value={
+                                isCash && cashUseFixedAmount
+                                  ? cashFixedAmount
+                                  : state.targetPercentage || 0
+                              }
+                              onChange={(e) => {
+                                if (isCash && cashUseFixedAmount) {
+                                  setCashFixedAmount(parseFloat(e.target.value) || 0);
+                                } else {
+                                  updateAssetClassState(assetClass, {
+                                    targetPercentage: roundToTwoDecimals(parseFloat(e.target.value) || 0),
+                                  });
+                                }
+                              }}
+                              disabled={isAutoCalculated}
+                              aria-label={`Target ${assetClassLabels[assetClass]}`}
+                              className={cn(
+                                'w-28 text-right font-mono',
+                                interactiveControlClass,
+                                isAutoCalculated ? 'bg-muted' : ''
+                              )}
+                            />
+                            <span className="w-4 shrink-0 text-sm text-muted-foreground">
+                              {isCash && cashUseFixedAmount ? '€' : '%'}
+                            </span>
+                          </div>
+                          {/* Sub-category expand/collapse */}
+                          <button
+                            type="button"
+                            className="flex shrink-0 items-center gap-1 p-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                            onClick={() => updateAssetClassState(assetClass, { expanded: !state.expanded })}
+                            aria-expanded={state.expanded}
+                            aria-label={`${state.expanded ? 'Chiudi' : 'Apri'} sotto-categorie di ${assetClassLabels[assetClass]}`}
                           >
-                            <div className="flex items-center gap-3">
-                              {(() => {
-                                const CatIcon = category.icon ? getLazyIcon(category.icon) : null;
-                                return (
-                                  <div
-                                    className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-                                    style={{ backgroundColor: category.color ? `${category.color}20` : 'var(--muted)' }}
-                                  >
-                                    {CatIcon ? (
-                                      <Suspense fallback={<div className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: category.color || '#3b82f6' }} />}>
-                                        <CatIcon className="w-3.5 h-3.5" style={{ color: category.color || 'var(--muted-foreground)' }} aria-hidden="true" />
-                                      </Suspense>
-                                    ) : (
-                                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: category.color || '#3b82f6' }} />
+                            <span className="hidden sm:inline">Sotto-cat.</span>
+                            <ChevronDown
+                              className={cn(
+                                'h-4 w-4 transition-transform duration-200 motion-reduce:transition-none',
+                                state.expanded && 'rotate-180'
+                              )}
+                            />
+                          </button>
+                        </div>
+
+                        {/* Sub-categories — expandable, flush to the tile's edge */}
+                        <Collapsible open={state.expanded}>
+                          <CollapsibleContent
+                            forceMount
+                            className={cn(
+                              'overflow-hidden motion-safe:transition-all motion-safe:duration-200 motion-reduce:transition-none',
+                              'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
+                              'data-[state=closed]:hidden'
+                            )}
+                          >
+                            <div className="-mx-5 border-t border-border bg-muted/20 px-5">
+                              {/* Enable toggle + sub-total */}
+                              <div className="flex items-center justify-between py-3">
+                                <div className="flex items-center gap-2">
+                                  <Switch
+                                    id={`toggle-${assetClass}`}
+                                    checked={state.subCategoryEnabled}
+                                    onCheckedChange={(checked: boolean) =>
+                                      handleToggleSubCategories(assetClass, checked)
+                                    }
+                                    className={interactiveControlClass}
+                                  />
+                                  <Label htmlFor={`toggle-${assetClass}`} className="text-[13px]">
+                                    Abilita sotto-categorie
+                                  </Label>
+                                </div>
+                                {state.subCategoryEnabled && (
+                                  <span
+                                    className={cn(
+                                      'font-mono text-xs font-semibold tabular-nums',
+                                      isValidSubTotal ? 'text-muted-foreground' : 'text-destructive'
                                     )}
-                                  </div>
-                                );
-                              })()}
-                              <div>
-                                <p className="font-medium text-sm">{category.name}</p>
-                                {category.subCategories && category.subCategories.length > 0 && (
-                                  <p className="text-xs text-muted-foreground">
-                                    {category.subCategories.length} sotto-{category.subCategories.length === 1 ? 'categoria' : 'categorie'}: {category.subCategories.map(sub => sub.name).join(', ')}
-                                  </p>
+                                  >
+                                    {formatPercentage(subTotal)}
+                                    {!isValidSubTotal && ' ≠ 100%'}
+                                  </span>
                                 )}
                               </div>
+
+                              {/* Sub-target rows */}
+                              {state.subCategoryEnabled && (
+                                <div className="pb-4">
+                                  <div className="divide-y divide-border border-t border-border">
+                                    {state.subTargets
+                                      .map((target, originalIndex) => ({ target, originalIndex }))
+                                      .sort((a, b) => a.target.name.localeCompare(b.target.name))
+                                      .map(({ target, originalIndex }) => {
+                                        const specificAssetTotal = calculateSpecificAssetTotal(assetClass, originalIndex);
+                                        const isValidSpecificTotal = Math.abs(specificAssetTotal - 100) < 0.01;
+
+                                        return (
+                                          <div key={originalIndex} className="space-y-3 py-3">
+                                            {/* Name + % + delete */}
+                                            <div className="flex items-center gap-2">
+                                              <div className="min-w-0 flex-1">
+                                                <Input
+                                                  placeholder="Nome sottocategoria"
+                                                  value={target.name}
+                                                  onChange={(e) =>
+                                                    handleSubTargetChange(
+                                                      assetClass,
+                                                      originalIndex,
+                                                      'name',
+                                                      e.target.value
+                                                    )
+                                                  }
+                                                  list={`${assetClass}-categories`}
+                                                  aria-label="Nome sottocategoria"
+                                                  className={cn('text-sm', interactiveControlClass)}
+                                                />
+                                                <datalist id={`${assetClass}-categories`}>
+                                                  {state.categories.map((cat) => (
+                                                    <option key={cat} value={cat} />
+                                                  ))}
+                                                </datalist>
+                                              </div>
+                                              <Input
+                                                type="number"
+                                                step="0.01"
+                                                min="0"
+                                                max="100"
+                                                aria-label={`Percentuale di ${target.name || 'sottocategoria'}`}
+                                                className={cn(
+                                                  'w-24 shrink-0 text-right font-mono',
+                                                  interactiveControlClass
+                                                )}
+                                                value={target.percentage}
+                                                onChange={(e) =>
+                                                  handleSubTargetChange(
+                                                    assetClass,
+                                                    originalIndex,
+                                                    'percentage',
+                                                    roundToTwoDecimals(parseFloat(e.target.value) || 0)
+                                                  )
+                                                }
+                                              />
+                                              <span className="shrink-0 text-sm text-muted-foreground">%</span>
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => handleRemoveSubTarget(assetClass, originalIndex)}
+                                                aria-label={`Rimuovi ${target.name || 'sottocategoria'}`}
+                                                className="shrink-0"
+                                              >
+                                                <Trash2 className="h-4 w-4 text-muted-foreground" />
+                                              </Button>
+                                            </div>
+
+                                            {/* Specific assets toggle + expand */}
+                                            {target.name && (
+                                              <div className="ml-4 space-y-2">
+                                                <div className="flex items-center justify-between">
+                                                  <div className="flex items-center gap-2">
+                                                    <Switch
+                                                      id={`specific-${assetClass}-${originalIndex}`}
+                                                      checked={target.specificAssetsEnabled || false}
+                                                      onCheckedChange={(checked) =>
+                                                        handleToggleSpecificAssets(
+                                                          assetClass,
+                                                          originalIndex,
+                                                          checked
+                                                        )
+                                                      }
+                                                      className={interactiveControlClass}
+                                                    />
+                                                    <Label
+                                                      htmlFor={`specific-${assetClass}-${originalIndex}`}
+                                                      className="cursor-pointer text-xs text-muted-foreground"
+                                                    >
+                                                      Traccia asset specifici
+                                                    </Label>
+                                                  </div>
+                                                  {target.specificAssetsEnabled && (
+                                                    <span
+                                                      className={cn(
+                                                        'font-mono text-xs font-semibold tabular-nums',
+                                                        isValidSpecificTotal ? 'text-muted-foreground' : 'text-destructive'
+                                                      )}
+                                                    >
+                                                      {formatPercentage(specificAssetTotal)}
+                                                      {!isValidSpecificTotal && ' ≠ 100%'}
+                                                    </span>
+                                                  )}
+                                                </div>
+
+                                                {target.specificAssetsEnabled && (
+                                                  <>
+                                                    <Button
+                                                      variant="ghost"
+                                                      size="sm"
+                                                      className="h-8 w-full justify-start text-xs"
+                                                      onClick={() =>
+                                                        toggleSubCategoryExpanded(assetClass, originalIndex)
+                                                      }
+                                                    >
+                                                      <ChevronDown
+                                                        className={cn(
+                                                          'mr-1.5 h-3 w-3 transition-transform duration-200 motion-reduce:transition-none',
+                                                          target.expanded && 'rotate-180'
+                                                        )}
+                                                      />
+                                                      {target.expanded ? 'Nascondi' : 'Mostra'} asset specifici
+                                                      {target.specificAssets &&
+                                                        target.specificAssets.length > 0 && (
+                                                          <span className="ml-1.5 text-muted-foreground">
+                                                            ({target.specificAssets.length})
+                                                          </span>
+                                                        )}
+                                                    </Button>
+
+                                                    <Collapsible open={target.expanded}>
+                                                      <CollapsibleContent
+                                                        forceMount
+                                                        className={cn(
+                                                          'overflow-hidden motion-safe:transition-all motion-safe:duration-200 motion-reduce:transition-none',
+                                                          'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
+                                                          'data-[state=closed]:hidden'
+                                                        )}
+                                                      >
+                                                        <div className="mt-1 space-y-2">
+                                                          {target.specificAssets &&
+                                                            target.specificAssets.map(
+                                                              (specificAsset, specificIndex) => (
+                                                                <div
+                                                                  key={specificIndex}
+                                                                  className="flex items-center gap-2"
+                                                                >
+                                                                  <Input
+                                                                    placeholder="Ticker/Nome (es. AAPL)"
+                                                                    value={specificAsset.name}
+                                                                    onChange={(e) =>
+                                                                      handleSpecificAssetChange(
+                                                                        assetClass,
+                                                                        originalIndex,
+                                                                        specificIndex,
+                                                                        'name',
+                                                                        e.target.value
+                                                                      )
+                                                                    }
+                                                                    aria-label="Nome asset specifico"
+                                                                    className={cn(
+                                                                      'flex-1 text-sm',
+                                                                      interactiveControlClass
+                                                                    )}
+                                                                  />
+                                                                  <Input
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    min="0"
+                                                                    max="100"
+                                                                    aria-label={`Percentuale di ${specificAsset.name || 'asset specifico'}`}
+                                                                    className={cn(
+                                                                      'w-24 shrink-0 text-right font-mono text-sm',
+                                                                      interactiveControlClass
+                                                                    )}
+                                                                    value={specificAsset.targetPercentage}
+                                                                    onChange={(e) =>
+                                                                      handleSpecificAssetChange(
+                                                                        assetClass,
+                                                                        originalIndex,
+                                                                        specificIndex,
+                                                                        'targetPercentage',
+                                                                        roundToTwoDecimals(
+                                                                          parseFloat(e.target.value) || 0
+                                                                        )
+                                                                      )
+                                                                    }
+                                                                  />
+                                                                  <span className="shrink-0 text-xs text-muted-foreground">
+                                                                    %
+                                                                  </span>
+                                                                  <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    aria-label={`Rimuovi ${specificAsset.name || 'asset specifico'}`}
+                                                                    onClick={() =>
+                                                                      handleRemoveSpecificAsset(
+                                                                        assetClass,
+                                                                        originalIndex,
+                                                                        specificIndex
+                                                                      )
+                                                                    }
+                                                                  >
+                                                                    <Trash2 className="h-3 w-3 text-muted-foreground" />
+                                                                  </Button>
+                                                                </div>
+                                                              )
+                                                            )}
+                                                          <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="w-full text-xs"
+                                                            onClick={() =>
+                                                              handleAddSpecificAsset(assetClass, originalIndex)
+                                                            }
+                                                          >
+                                                            <Plus className="mr-1.5 h-3 w-3" />
+                                                            Aggiungi asset specifico
+                                                          </Button>
+                                                        </div>
+                                                      </CollapsibleContent>
+                                                    </Collapsible>
+                                                  </>
+                                                )}
+                                              </div>
+                                            )}
+                                          </div>
+                                        );
+                                      })}
+                                  </div>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="mt-3 w-full sm:w-auto"
+                                    onClick={() => handleAddSubTarget(assetClass)}
+                                  >
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Aggiungi sotto-categoria
+                                  </Button>
+                                  <p className="mt-2 text-[11px] leading-[1.4] text-muted-foreground">
+                                    Le sotto-categorie sono espresse come percentuale di{' '}
+                                    {assetClassLabels[assetClass]} ({formatPercentage(state.targetPercentage)})
+                                  </p>
+                                </div>
+                              )}
                             </div>
-                            <div className="flex items-center gap-3">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleEditExpenseCategory(category)}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={(event) =>
-                                  handleMoveExpenseCategory(
-                                    category.id,
-                                    category.name,
-                                    calculateDialogOrigin(event.currentTarget)
-                                  )
-                                }
-                                title="Sposta tutte le transazioni"
-                              >
-                                <ArrowRightLeft className="h-4 w-4 text-muted-foreground" />
-                              </Button>
-                              {/* Delete button — 2-click disarm: first click arms (red Elimina),
-                                  second click confirms, auto-disarms after 3s. */}
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className={
-                                  pendingDeleteDirectCategoryId === category.id
-                                    ? 'text-destructive hover:text-destructive hover:bg-destructive/10'
-                                    : ''
-                                }
-                                onClick={(event) => {
-                                  if (pendingDeleteDirectCategoryId === category.id) {
-                                    handleConfirmDirectDelete(category.id);
-                                  } else {
-                                    handleDeleteExpenseCategory(
-                                      category.id,
-                                      category.name,
-                                      calculateDialogOrigin(event.currentTarget)
-                                    );
-                                  }
-                                }}
-                              >
-                                <Trash2
-                                  className={`h-4 w-4 ${
-                                    pendingDeleteDirectCategoryId === category.id
-                                      ? ''
-                                      : 'text-muted-foreground'
-                                  }`}
-                                />
-                                {pendingDeleteDirectCategoryId === category.id && (
-                                  <span className="ml-1 text-xs">Elimina</span>
-                                )}
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
+                          </CollapsibleContent>
+                        </Collapsible>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <div className="mt-6">
-        <ExpenseImportSection onImported={handleExpenseImported} />
-      </div>
-
-          </TabsContent>
-        )}
-
-        {/* Tab: Dividendi (lazy) */}
-        {mountedTabs.has('dividendi') && (
-          <TabsContent value="dividendi" className="mt-6 space-y-4 sm:space-y-6">
-      {hasUnsavedDividendChanges && (
-        <div className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm text-foreground">
-          Anteprima attiva: categoria e sottocategoria dividendi sono aggiornate localmente.
-        </div>
-      )}
-
-      {/* Dividend Settings Section */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Coins className="h-5 w-5 text-primary" />
-            <CardTitle>Impostazioni Dividendi</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent className="p-4 sm:p-6 space-y-4 sm:space-y-6">
-          <p className="text-sm text-muted-foreground">
-            Configura la categoria per le entrate automatiche da dividendi
-          </p>
-
-          <div className="grid gap-4 desktop:grid-cols-2">
-            {/* Dividend Income Category */}
-            <div className="space-y-2">
-              <Label htmlFor="dividendIncomeCategory">Categoria Entrate Dividendi</Label>
-              <div className="flex gap-2">
-                <Select
-                  value={dividendIncomeCategoryId || undefined}
-                  onValueChange={(value) => {
-                    setDividendIncomeCategoryId(value);
-                    setDividendIncomeSubCategoryId(''); // Reset subcategory
-                  }}
-                >
-                  <SelectTrigger
-                    id="dividendIncomeCategory"
-                    className={interactiveControlClass}
-                  >
-                    <SelectValue placeholder="Seleziona categoria" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {getCategoriesByType('income').map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {dividendIncomeCategoryId && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setDividendIncomeCategoryId('');
-                      setDividendIncomeSubCategoryId('');
-                    }}
-                  >
-                    Cancella
-                  </Button>
-                )}
-              </div>
-            </div>
-
-            {/* Dividend Income Subcategory */}
-            <div className="space-y-2">
-              <Label htmlFor="dividendIncomeSubCategory">Sottocategoria (opzionale)</Label>
-              <div className="flex gap-2">
-                <Select
-                  value={dividendIncomeSubCategoryId || undefined}
-                  onValueChange={setDividendIncomeSubCategoryId}
-                  disabled={!dividendIncomeCategoryId}
-                >
-                  <SelectTrigger
-                    id="dividendIncomeSubCategory"
-                    className={interactiveControlClass}
-                  >
-                    <SelectValue placeholder="Seleziona sottocategoria" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {dividendIncomeCategoryId &&
-                      expenseCategories
-                        .find((cat) => cat.id === dividendIncomeCategoryId)
-                        ?.subCategories.map((sub) => (
-                          <SelectItem key={sub.id} value={sub.id}>
-                            {sub.name}
-                          </SelectItem>
-                        ))}
-                  </SelectContent>
-                </Select>
-                {dividendIncomeSubCategoryId && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setDividendIncomeSubCategoryId('')}
-                  >
-                    Cancella
-                  </Button>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t">
-            <Button
-              onClick={handleSaveDividendSettings}
-              disabled={isDemo || saving}
-              title={isDemo ? 'Non disponibile in modalità demo' : undefined}
-              className="flex items-center gap-2"
-            >
-              <Save className="h-4 w-4" />
-              {saving ? 'Salvataggio...' : 'Salva Impostazioni'}
-            </Button>
-
-            {/* Sync button — 2-click disarm: first click turns destructive ("Conferma"),
-                second click executes the sync. Auto-disarms after 3s if not confirmed. */}
-            <Button
-              onClick={handleSyncDividends}
-              disabled={syncingDividends || !dividendIncomeCategoryId}
-              variant={syncConfirmArmed ? 'destructive' : 'outline'}
-              className="flex items-center gap-2"
-            >
-              <Coins className="h-4 w-4" />
-              {syncingDividends
-                ? 'Sincronizzazione...'
-                : syncConfirmArmed
-                ? 'Conferma sincronizzazione'
-                : 'Sincronizza Dividendi Esistenti'}
-            </Button>
-          </div>
-
-          {!dividendIncomeCategoryId && (
-            <p className="text-sm text-amber-600">
-              ⚠️ Configura una categoria per abilitare la sincronizzazione automatica dei dividendi
-            </p>
-          )}
-        </CardContent>
-      </Card>
-
-          </TabsContent>
-        )}
-
-        {/* Tab: Condivisione account */}
-        {mountedTabs.has('condivisione') && (
-          <TabsContent value="condivisione" className="mt-6 space-y-4 sm:space-y-6">
-            <AccountSharingSection disabled={isDemo} />
-          </TabsContent>
-        )}
-
-        {/* Tab: Aspetto */}
-        {mountedTabs.has('aspetto') && (
-          <TabsContent value="aspetto" className="mt-6 space-y-4 sm:space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Palette className="h-5 w-5 text-primary" />
-                  <CardTitle>Tema Colori</CardTitle>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Scegli la palette cromatica dell&apos;interfaccia. La scelta viene salvata automaticamente e sincronizzata su tutti i dispositivi.
-                </p>
-              </CardHeader>
-              <CardContent className="p-4 sm:p-6">
-                <div className="grid grid-cols-2 sm:grid-cols-3 desktop:grid-cols-6 gap-3">
-                  {(
-                    [
-                      {
-                        id: 'default' as ColorTheme,
-                        name: 'Default',
-                        description: 'Zinc classico',
-                        swatchBg: 'oklch(1 0 0)',
-                        swatchBgDark: 'oklch(0.145 0 0)',
-                        swatchPrimary: 'oklch(0.205 0 0)',
-                        swatchPrimaryDark: 'oklch(0.922 0 0)',
-                        swatchAccent: 'oklch(0.97 0 0)',
-                      },
-                      {
-                        id: 'solar-dusk' as ColorTheme,
-                        name: 'Solar Dusk',
-                        description: 'Ambra calda',
-                        swatchBg: 'oklch(0.9885 0.0057 84.5659)',
-                        swatchBgDark: 'oklch(0.2161 0.0061 56.0434)',
-                        swatchPrimary: 'oklch(0.5553 0.1455 48.9975)',
-                        swatchPrimaryDark: 'oklch(0.7049 0.1867 47.6044)',
-                        swatchAccent: 'oklch(0.9000 0.0500 74.9889)',
-                      },
-                      {
-                        id: 'elegant-luxury' as ColorTheme,
-                        name: 'Elegant Luxury',
-                        description: 'Borgogna raffinato',
-                        swatchBg: 'oklch(0.9779 0.0042 56.3756)',
-                        swatchBgDark: 'oklch(0.2161 0.0061 56.0434)',
-                        swatchPrimary: 'oklch(0.4650 0.1470 24.9381)',
-                        swatchPrimaryDark: 'oklch(0.5054 0.1905 27.5181)',
-                        swatchAccent: 'oklch(0.9619 0.0580 95.6174)',
-                      },
-                      {
-                        id: 'midnight-bloom' as ColorTheme,
-                        name: 'Midnight Bloom',
-                        description: 'Viola profondo',
-                        swatchBg: 'oklch(0.9821 0 0)',
-                        swatchBgDark: 'oklch(0.2303 0.0125 264.2926)',
-                        swatchPrimary: 'oklch(0.5676 0.2021 283.0838)',
-                        swatchPrimaryDark: 'oklch(0.5676 0.2021 283.0838)',
-                        swatchAccent: 'oklch(0.8214 0.0720 249.3482)',
-                      },
-                      {
-                        id: 'cyberpunk' as ColorTheme,
-                        name: 'Cyberpunk',
-                        description: 'Neon pink & teal',
-                        swatchBg: 'oklch(0.9816 0.0017 247.8390)',
-                        swatchBgDark: 'oklch(0.1649 0.0352 281.8285)',
-                        swatchPrimary: 'oklch(0.6726 0.2904 341.4084)',
-                        swatchPrimaryDark: 'oklch(0.6726 0.2904 341.4084)',
-                        swatchAccent: 'oklch(0.8903 0.1739 171.2690)',
-                      },
-                      {
-                        id: 'retro-arcade' as ColorTheme,
-                        name: 'Retro Arcade',
-                        description: 'Rosso & teal vintage',
-                        swatchBg: 'oklch(0.9735 0.0261 90.0953)',
-                        swatchBgDark: 'oklch(0.2673 0.0486 219.8169)',
-                        swatchPrimary: 'oklch(0.5924 0.2025 355.8943)',
-                        swatchPrimaryDark: 'oklch(0.5924 0.2025 355.8943)',
-                        swatchAccent: 'oklch(0.6437 0.1019 187.3840)',
-                      },
-                    ] as const
-                  ).map((theme) => {
-                    const isActive = colorTheme === theme.id;
-                    return (
-                      <button
-                        key={theme.id}
-                        onClick={() => setColorTheme(theme.id)}
-                        className={cn(
-                          'relative flex flex-col rounded-lg border-2 p-3 text-left transition-all hover:border-primary/60',
-                          isActive
-                            ? 'border-primary shadow-sm'
-                            : 'border-border'
-                        )}
-                      >
-                        {/* Mini preview */}
-                        <div className="mb-3 overflow-hidden rounded-md border border-border/50 h-16">
-                          {/* Light half */}
-                          <div
-                            className="h-8 w-full flex items-center gap-1.5 px-2"
-                            style={{ background: theme.swatchBg }}
-                          >
-                            <div
-                              className="h-3 w-3 rounded-sm flex-shrink-0"
-                              style={{ background: theme.swatchPrimary }}
-                            />
-                            <div
-                              className="h-2 rounded-full flex-1"
-                              style={{ background: theme.swatchAccent }}
-                            />
-                          </div>
-                          {/* Dark half */}
-                          <div
-                            className="h-8 w-full flex items-center gap-1.5 px-2"
-                            style={{ background: theme.swatchBgDark }}
-                          >
-                            <div
-                              className="h-3 w-3 rounded-sm flex-shrink-0"
-                              style={{ background: theme.swatchPrimaryDark }}
-                            />
-                            <div
-                              className="h-2 rounded-full flex-1 opacity-30"
-                              style={{ background: theme.swatchPrimaryDark }}
-                            />
-                          </div>
-                        </div>
-
-                        <span className="text-sm font-medium leading-none">{theme.name}</span>
-                        <span className="mt-1 text-xs text-muted-foreground">{theme.description}</span>
-
-                        {isActive && (
-                          <div className="absolute top-2 right-2 h-2 w-2 rounded-full bg-primary" />
-                        )}
-                      </button>
                     );
                   })}
                 </div>
-              </CardContent>
-            </Card>
+                <div className="mt-auto border-t border-border pt-3 text-[11px] leading-[1.45] text-muted-foreground">
+                  Il Salva della pagina valida qui: totale ≥ 100%, ogni gruppo di sotto-categorie esattamente 100%. La
+                  liquidità come importo fisso esce dal budget percentuale: le altre classi si applicano al resto.
+                </div>
+              </Tile>
+            </div>
+
+            {/* Note tecniche — collapsed by default, below the grid */}
+            <div className="tablet:col-span-2 desktop:col-span-12">
+              <Collapsible open={isNotesOpen} onOpenChange={setIsNotesOpen}>
+                <CollapsibleTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between rounded-xl border border-border px-4 py-3 text-sm text-muted-foreground transition-colors hover:bg-muted/50"
+                  >
+                    <span className="font-medium text-foreground">Note e dettagli tecnici</span>
+                    <ChevronDown className={cn('h-4 w-4 transition-transform duration-200', isNotesOpen && 'rotate-180')} />
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="overflow-hidden data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 duration-200">
+                  <div className="rounded-b-xl border border-t-0 border-border bg-muted/30 px-4 py-4">
+                    <ul className="space-y-1 text-sm text-muted-foreground">
+                      <li>• Il totale delle allocazioni delle asset class deve essere almeno 100%. Oltre il 100% rappresenta una leva target (es. 110% = leva 1,10×)</li>
+                      <li>• La liquidità può essere impostata come valore fisso in euro. In questo caso, le percentuali delle altre asset class si applicheranno al patrimonio rimanente (totale - liquidità fissa)</li>
+                      <li>• Per ogni asset class con sotto-categorie abilitate, il totale delle sotto-categorie deve essere esattamente 100%</li>
+                      <li>• Le sotto-categorie sono espresse come percentuale della loro asset class di appartenenza</li>
+                      <li>• Usa il toggle &quot;Abilita&quot; per attivare/disattivare le sotto-categorie per ciascuna asset class</li>
+                      <li>• I cambiamenti saranno applicati immediatamente alla pagina Allocazione</li>
+                    </ul>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            </div>
+
+          </div>
+        </TabsContent>
+
+        {/* Tab: Spese (lazy) — default accounts, the CSV import, the category inventory */}
+        {mountedTabs.has('spese') && (
+          <TabsContent value="spese" className="mt-4">
+            <div className="grid grid-cols-1 gap-3 tablet:grid-cols-2 desktop:grid-cols-12">
+
+              {/* Conti di default (moved here from Preferenze: they act in the expense dialog) */}
+              <div className={cn(TILE_CELL_CLASS, 'desktop:col-span-5')}>
+                <Tile
+                  eyebrow="Conti di default"
+                  reading={describeDefaultAccounts({ debitName: debitAccount?.name, creditName: creditAccount?.name })}
+                >
+                  {cashAssets.length === 0 ? (
+                    <p className="mt-3 text-[13px] text-muted-foreground">
+                      Nessun conto disponibile: crea un conto (tipo «Liquidità») in Patrimonio.
+                    </p>
+                  ) : (
+                    <div className="mt-1 flex flex-col divide-y divide-border">
+                      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3">
+                        <div className="min-w-0">
+                          <p className="text-[13px] font-medium">Conto di prelievo</p>
+                          <p className="mt-0.5 text-[11px] leading-[1.4] text-muted-foreground">Per spese e debiti</p>
+                        </div>
+                        <Select value={defaultDebitCashAssetId} onValueChange={setDefaultDebitCashAssetId}>
+                          <SelectTrigger className={cn('w-56', interactiveControlClass)} aria-label="Conto di prelievo">
+                            <SelectValue placeholder="Nessun default" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">Nessun default</SelectItem>
+                            {cashAssets.map((a) => (
+                              <SelectItem key={a.id} value={a.id}>
+                                {a.name} ({a.currency})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3">
+                        <div className="min-w-0">
+                          <p className="text-[13px] font-medium">Conto di accredito</p>
+                          <p className="mt-0.5 text-[11px] leading-[1.4] text-muted-foreground">Per le entrate</p>
+                        </div>
+                        <Select value={defaultCreditCashAssetId} onValueChange={setDefaultCreditCashAssetId}>
+                          <SelectTrigger className={cn('w-56', interactiveControlClass)} aria-label="Conto di accredito">
+                            <SelectValue placeholder="Nessun default" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">Nessun default</SelectItem>
+                            {cashAssets.map((a) => (
+                              <SelectItem key={a.id} value={a.id}>
+                                {a.name} ({a.currency})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+                  <div className="mt-auto border-t border-border pt-3 text-[11px] leading-[1.45] text-muted-foreground">
+                    Pre-selezionati nel dialog di spese ed entrate; solo conti veri, non asset di classe liquidità.
+                  </div>
+                </Tile>
+              </div>
+
+              {/* Import CSV — the section renders its own tile (preview-first, undo per batch) */}
+              <div className={cn(TILE_CELL_CLASS, 'desktop:col-span-7')}>
+                <ExpenseImportSection onImported={handleExpenseImported} />
+              </div>
+
+              {/* Categorie — the management inventory at the tile's cadence */}
+              <div className={cn(TILE_CELL_CLASS, 'tablet:col-span-2 desktop:col-span-12')}>
+                <Tile
+                  eyebrow="Categorie"
+                  aside={
+                    <Button onClick={handleAddExpenseCategory} variant="outline" size="sm" className="h-7 text-[11px]">
+                      <Plus className="mr-1 h-3.5 w-3.5" />
+                      Nuova categoria
+                    </Button>
+                  }
+                  reading={describeExpenseCategories(categoryCounts)}
+                >
+                  {loadingCategories ? (
+                    <p className="mt-3 text-[13px] text-muted-foreground">Caricamento categorie...</p>
+                  ) : (
+                    <div className="mt-1">
+                      {(['income', 'fixed', 'variable', 'debt'] as ExpenseType[]).map((type) => {
+                        const categories = getCategoriesByType(type);
+                        if (categories.length === 0) return null;
+                        return (
+                          <div key={type} className="mt-3 first:mt-2">
+                            <p className={TILE_SUB_EYEBROW_CLASS}>{EXPENSE_TYPE_LABELS[type]}</p>
+                            <div className="mt-1 divide-y divide-border">
+                              {categories.map((category) => (
+                                <div
+                                  key={category.id}
+                                  className="flex items-center justify-between gap-3 py-2.5 transition-colors hover:bg-muted/30"
+                                >
+                                  <div className="flex min-w-0 items-center gap-3">
+                                    {(() => {
+                                      const CatIcon = category.icon ? getLazyIcon(category.icon) : null;
+                                      return (
+                                        <div
+                                          className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg"
+                                          style={{ backgroundColor: category.color ? `${category.color}20` : 'var(--muted)' }}
+                                        >
+                                          {CatIcon ? (
+                                            <Suspense fallback={<div className="h-3.5 w-3.5 rounded-full" style={{ backgroundColor: category.color || '#3b82f6' }} />}>
+                                              <CatIcon className="h-3.5 w-3.5" style={{ color: category.color || 'var(--muted-foreground)' }} aria-hidden="true" />
+                                            </Suspense>
+                                          ) : (
+                                            <div className="h-3 w-3 rounded-full" style={{ backgroundColor: category.color || '#3b82f6' }} />
+                                          )}
+                                        </div>
+                                      );
+                                    })()}
+                                    <div className="min-w-0">
+                                      <p className="truncate text-[13px] font-medium">{category.name}</p>
+                                      {category.subCategories && category.subCategories.length > 0 && (
+                                        <p className="truncate text-[11px] text-muted-foreground">
+                                          {category.subCategories.length} sotto-{category.subCategories.length === 1 ? 'categoria' : 'categorie'}: {category.subCategories.map(sub => sub.name).join(', ')}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex shrink-0 items-center gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      aria-label={`Modifica ${category.name}`}
+                                      onClick={() => handleEditExpenseCategory(category)}
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      aria-label={`Sposta tutte le transazioni di ${category.name}`}
+                                      onClick={(event) =>
+                                        handleMoveExpenseCategory(
+                                          category.id,
+                                          category.name,
+                                          calculateDialogOrigin(event.currentTarget)
+                                        )
+                                      }
+                                    >
+                                      <ArrowRightLeft className="h-4 w-4 text-muted-foreground" />
+                                    </Button>
+                                    {/* Delete button — 2-click disarm: first click arms (red Elimina),
+                                        second click confirms, auto-disarms after 3s. */}
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      aria-label={
+                                        pendingDeleteDirectCategoryId === category.id
+                                          ? `Conferma eliminazione di ${category.name}`
+                                          : `Elimina ${category.name}`
+                                      }
+                                      className={
+                                        pendingDeleteDirectCategoryId === category.id
+                                          ? 'text-destructive hover:bg-destructive/10 hover:text-destructive'
+                                          : ''
+                                      }
+                                      onClick={(event) => {
+                                        if (pendingDeleteDirectCategoryId === category.id) {
+                                          handleConfirmDirectDelete(category.id);
+                                        } else {
+                                          handleDeleteExpenseCategory(
+                                            category.id,
+                                            category.name,
+                                            calculateDialogOrigin(event.currentTarget)
+                                          );
+                                        }
+                                      }}
+                                    >
+                                      <Trash2
+                                        className={`h-4 w-4 ${
+                                          pendingDeleteDirectCategoryId === category.id
+                                            ? ''
+                                            : 'text-muted-foreground'
+                                        }`}
+                                      />
+                                      {pendingDeleteDirectCategoryId === category.id && (
+                                        <span className="ml-1 text-xs">Elimina</span>
+                                      )}
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <div className="mt-auto border-t border-border pt-3 text-[11px] leading-[1.45] text-muted-foreground">
+                    Elimina chiede la riassegnazione se la categoria ha transazioni (altrimenti conferma al secondo
+                    tocco); la freccia sposta tutte le transazioni in un&apos;altra categoria senza eliminarla.
+                  </div>
+                </Tile>
+              </div>
+
+            </div>
+          </TabsContent>
+        )}
+
+        {/* Tab: Dividendi (lazy) — the landing category (saved by the page's Save) + the BTP Italia FOI declaration */}
+        {mountedTabs.has('dividendi') && (
+          <TabsContent value="dividendi" className="mt-4">
+            <div className="grid grid-cols-1 gap-3 tablet:grid-cols-2 desktop:grid-cols-12">
+
+              {/* Entrate da dividendi */}
+              <div className={cn(TILE_CELL_CLASS, 'desktop:col-span-7')}>
+                <Tile
+                  eyebrow="Entrate da dividendi"
+                  reading={describeDividendCategory({
+                    categoryName: dividendCategory?.name,
+                    subCategoryName: dividendSubCategory?.name,
+                  })}
+                >
+                  <div className="mt-1 flex flex-col divide-y divide-border">
+                    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3">
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-medium">Categoria</p>
+                        <p className="mt-0.5 text-[11px] leading-[1.4] text-muted-foreground">Di tipo «Entrate»</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Select
+                          value={dividendIncomeCategoryId || undefined}
+                          onValueChange={(value) => {
+                            setDividendIncomeCategoryId(value);
+                            setDividendIncomeSubCategoryId(''); // Reset subcategory
+                          }}
+                        >
+                          <SelectTrigger className={cn('w-52', interactiveControlClass)} aria-label="Categoria entrate dividendi">
+                            <SelectValue placeholder="Seleziona categoria" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {getCategoriesByType('income').map((cat) => (
+                              <SelectItem key={cat.id} value={cat.id}>
+                                {cat.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {dividendIncomeCategoryId && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setDividendIncomeCategoryId('');
+                              setDividendIncomeSubCategoryId('');
+                            }}
+                          >
+                            Cancella
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3">
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-medium">Sottocategoria</p>
+                        <p className="mt-0.5 text-[11px] leading-[1.4] text-muted-foreground">Opzionale</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Select
+                          value={dividendIncomeSubCategoryId || undefined}
+                          onValueChange={setDividendIncomeSubCategoryId}
+                          disabled={!dividendIncomeCategoryId}
+                        >
+                          <SelectTrigger className={cn('w-52', interactiveControlClass)} aria-label="Sottocategoria entrate dividendi">
+                            <SelectValue placeholder="Seleziona sottocategoria" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {dividendIncomeCategoryId &&
+                              expenseCategories
+                                .find((cat) => cat.id === dividendIncomeCategoryId)
+                                ?.subCategories.map((sub) => (
+                                  <SelectItem key={sub.id} value={sub.id}>
+                                    {sub.name}
+                                  </SelectItem>
+                                ))}
+                          </SelectContent>
+                        </Select>
+                        {dividendIncomeSubCategoryId && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setDividendIncomeSubCategoryId('')}
+                          >
+                            Cancella
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3.5">
+                    {/* Sync button — 2-click disarm: first click turns destructive ("Conferma"),
+                        second click executes the sync. Auto-disarms after 3s if not confirmed. */}
+                    <Button
+                      onClick={handleSyncDividends}
+                      disabled={syncingDividends || !dividendIncomeCategoryId}
+                      variant={syncConfirmArmed ? 'destructive' : 'outline'}
+                      className="flex items-center gap-2"
+                    >
+                      <Coins className="h-4 w-4" />
+                      {syncingDividends
+                        ? 'Sincronizzazione...'
+                        : syncConfirmArmed
+                        ? 'Conferma sincronizzazione'
+                        : 'Sincronizza dividendi esistenti'}
+                    </Button>
+                    {!dividendIncomeCategoryId && (
+                      <p className="mt-2 text-[11px] leading-[1.4] text-warning-foreground">
+                        Scegli una categoria per abilitare la sincronizzazione dei dividendi già registrati.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="mt-auto border-t border-border pt-3 text-[11px] leading-[1.45] text-muted-foreground">
+                    La sincronizzazione chiede conferma al secondo tocco e salta i dividendi già sincronizzati; la
+                    categoria si salva con il Salva della pagina.
+                  </div>
+                </Tile>
+              </div>
+
+              {/* BTP Italia — declaration: the FOI is announced per coupon, from the Dividendi calendar */}
+              <div className={cn(TILE_CELL_CLASS, 'desktop:col-span-5')}>
+                <Tile eyebrow="BTP Italia" aside="FOI" reading={describeBtpItalia()}>
+                  <div className="mt-1 flex flex-col divide-y divide-border">
+                    <DeclarationRow label="Cedola indicizzata" value="fisso + FOI del semestre" mono={false} />
+                    <DeclarationRow label="FOI non ancora annunciato" value="cedola provvisoria, solo fisso" mono={false} />
+                    <DeclarationRow label="Deflazione" value="FOI negativo contato 0" mono={false} />
+                  </div>
+                  <div className="mt-auto border-t border-border pt-3 text-[11px] leading-[1.45] text-muted-foreground">
+                    Si gestisce in{' '}
+                    <Link href="/dashboard/cashflow?tab=dividends" className="text-foreground underline-offset-2 hover:underline">
+                      Cashflow › Dividendi
+                    </Link>
+                    , per singola cedola.
+                  </div>
+                </Tile>
+              </div>
+
+            </div>
+          </TabsContent>
+        )}
+
+        {/* Tab: Condivisione account — the sharing section renders its own tile; beside it, how it works */}
+        {mountedTabs.has('condivisione') && (
+          <TabsContent value="condivisione" className="mt-4">
+            <div className="grid grid-cols-1 gap-3 tablet:grid-cols-2 desktop:grid-cols-12">
+              <div className={cn(TILE_CELL_CLASS, 'desktop:col-span-7')}>
+                <AccountSharingSection disabled={isDemo} />
+              </div>
+              <div className={cn(TILE_CELL_CLASS, 'desktop:col-span-5')}>
+                <Tile
+                  eyebrow="Come funziona"
+                  reading={[{ text: "L'invitata si registra prima; poi l'account condiviso appare nel suo switcher." }]}
+                >
+                  <div className="mt-1 flex flex-col divide-y divide-border">
+                    {[
+                      'La persona si registra con la propria email (deve essere abilitata alla registrazione).',
+                      'Aggiungi qui la stessa email: l’accesso è completo, non esiste un ruolo «sola lettura».',
+                      'Dal suo menu account sceglie quale account vedere; le sue preferenze e il suo tema restano suoi.',
+                    ].map((step, index) => (
+                      <div key={index} className="flex items-start gap-3 py-3">
+                        <span className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-muted font-mono text-[11px] font-semibold">
+                          {index + 1}
+                        </span>
+                        <span className="text-[13px] leading-[1.45]">{step}</span>
+                      </div>
+                    ))}
+                  </div>
+                </Tile>
+              </div>
+            </div>
+          </TabsContent>
+        )}
+
+        {/* Tab: Aspetto — light/dark/system beside the six color themes */}
+        {mountedTabs.has('aspetto') && (
+          <TabsContent value="aspetto" className="mt-4">
+            <div className="grid grid-cols-1 gap-3 tablet:grid-cols-2 desktop:grid-cols-12">
+
+              {/* Modalità — next-themes, per device, with the circle view transition */}
+              <div className={cn(TILE_CELL_CLASS, 'desktop:col-span-4')}>
+                <Tile eyebrow="Modalità" aside="questo dispositivo" reading={describeThemeMode(resolvedThemeMode)}>
+                  <div className="mt-3.5 flex rounded-lg bg-muted p-1" role="group" aria-label="Modalità del tema">
+                    {THEME_MODES.map(({ value, label, Icon }) => {
+                      const isActive = resolvedThemeMode === value;
+                      return (
+                        <button
+                          key={value}
+                          type="button"
+                          aria-pressed={isActive}
+                          onClick={(e) => applyThemeWithTransition(value, e, setTheme)}
+                          className={cn(
+                            'flex h-9 flex-1 items-center justify-center gap-1.5 rounded-md text-[13px] font-medium transition-colors',
+                            isActive ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                          )}
+                        >
+                          <Icon className="h-4 w-4" aria-hidden="true" />
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-auto border-t border-border pt-3 text-[11px] leading-[1.45] text-muted-foreground">
+                    Il passaggio anima con la transizione circolare dal punto del clic; il selettore resta anche nel menu
+                    account della sidebar.
+                  </div>
+                </Tile>
+              </div>
+
+              {/* Tema colori — the six palettes, synced on the account */}
+              <div className={cn(TILE_CELL_CLASS, 'tablet:col-span-2 desktop:col-span-8')}>
+                <Tile eyebrow="Tema colori" aside="tutti i dispositivi" reading={describeColorTheme(activeSwatch.name)}>
+                  <div className="mt-3.5 grid grid-cols-2 gap-2.5 sm:grid-cols-3 desktop:grid-cols-6">
+                    {COLOR_THEME_SWATCHES.map((swatch, index) => {
+                      const isActive = colorTheme === swatch.id;
+                      return (
+                        <button
+                          key={swatch.id}
+                          onClick={() => setColorTheme(swatch.id)}
+                          aria-label={`Colore ${index + 1} di ${COLOR_THEME_SWATCHES.length}: ${swatch.name}`}
+                          aria-pressed={isActive}
+                          className={cn(
+                            'relative flex flex-col rounded-[10px] border-2 p-2.5 text-left transition-all hover:border-primary/60',
+                            isActive ? 'border-primary shadow-sm' : 'border-border'
+                          )}
+                        >
+                          {/* Mini preview: light half over dark half, in the theme's own values */}
+                          <div className="mb-2.5 h-14 overflow-hidden rounded-md border border-border/50" aria-hidden="true">
+                            <div className="flex h-7 w-full items-center gap-1.5 px-2" style={{ background: swatch.swatchBg }}>
+                              <div className="h-3 w-3 flex-shrink-0 rounded-sm" style={{ background: swatch.swatchPrimary }} />
+                              <div className="h-2 flex-1 rounded-full" style={{ background: swatch.swatchAccent }} />
+                            </div>
+                            <div className="flex h-7 w-full items-center gap-1.5 px-2" style={{ background: swatch.swatchBgDark }}>
+                              <div className="h-3 w-3 flex-shrink-0 rounded-sm" style={{ background: swatch.swatchPrimaryDark }} />
+                              <div className="h-2 flex-1 rounded-full opacity-30" style={{ background: swatch.swatchPrimaryDark }} />
+                            </div>
+                          </div>
+                          <span className="text-[13px] font-medium leading-none">{swatch.name}</span>
+                          <span className="mt-1 text-[11px] text-muted-foreground">{swatch.description}</span>
+                          {isActive && (
+                            <div className="absolute right-2 top-2 h-2 w-2 rounded-full bg-primary" aria-hidden="true" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-auto border-t border-border pt-3 text-[11px] leading-[1.45] text-muted-foreground">
+                    La scelta si salva da sola sull&apos;account: nessun Salva necessario.
+                  </div>
+                </Tile>
+              </div>
+
+            </div>
           </TabsContent>
         )}
 

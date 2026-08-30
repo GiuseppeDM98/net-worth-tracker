@@ -16,7 +16,7 @@
 import type { Expense, ExpenseType } from '@/types/expenses';
 import { EXPENSE_TYPE_LABELS } from '@/types/expenses';
 import { type Period, periodToRange, MONTH_NAMES_SHORT } from '@/lib/utils/period';
-import { endOfMonthBound, getItalyDate, getItalyMonth, getItalyMonthYear, getItalyYear, toDate } from '@/lib/utils/dateHelpers';
+import { endOfMonthBound, getItalyDate, getItalyDateIso, getItalyMonth, getItalyMonthYear, getItalyYear, isItalyDayAfter, toDate } from '@/lib/utils/dateHelpers';
 import { getExpenseDate } from '@/lib/utils/expenseHelpers';
 import { getCategoryKey, getCategoryName, resolveDisplayLabels } from '@/lib/utils/expenseGrouping';
 
@@ -80,19 +80,31 @@ function sliceBetween(expenses: Expense[], from: Date, to: Date): Expense[] {
  * materialised as real future-dated rows, and the page shows them rather than hiding them.
  *
  * What is not spent yet is never passed off as spent: `summarizeScheduled` counts it and
- * every sentence built on these totals names it («di cui 1.850 € ancora in calendario»),
- * while the list marks each such row. Two windows that must NOT follow this rule and stay
- * anchored to today: `previousPeriod` (a comparison needs two comparable windows) and
- * `resolveAnchorMonth` (the trailing savings history is history, not the period).
+ * every sentence built on these totals names it as a PART of them («Nel totale ci sono ancora
+ * 1850 € di spese già in calendario»), while the list marks each such row. Two windows that must
+ * NOT follow this rule and stay anchored to today: `previousPeriod` (a comparison needs two
+ * comparable windows) and `resolveAnchorMonth` (the trailing savings history is history, not
+ * the period).
  */
 export function filterExpensesByPeriod(expenses: Expense[], period: Period): Expense[] {
   const range = periodToRange(period);
   return sliceBetween(expenses, range.from, range.to);
 }
 
-/** A row the period counts but that has not happened yet — an instalment, a recurring occurrence. */
+/**
+ * A row the period counts but that has not happened yet — an instalment, a recurring occurrence.
+ *
+ * The comparison is by Italian calendar DAY, not by instant: a row dated today is never scheduled,
+ * whatever hour it carries. See `isItalyDayAfter` for why an instant comparison marks a spesa
+ * recorded an hour ago as «in calendario».
+ */
 export function isScheduledRow(expense: Expense, now: Date): boolean {
-  return getExpenseDate(expense.date) > now;
+  return isItalyDayAfter(getExpenseDate(expense.date), now);
+}
+
+/** `isScheduledRow` with the right-hand side hoisted, for loops over many rows. */
+function isScheduledAfterDay(expense: Expense, todayIso: string): boolean {
+  return getItalyDateIso(getExpenseDate(expense.date)) > todayIso;
 }
 
 export interface ScheduledSlice {
@@ -115,8 +127,9 @@ export function summarizeScheduled(expenses: Expense[], now: Date): ScheduledSli
   let spending = 0;
   let income = 0;
   let throughMonth: number | null = null;
+  const todayIso = getItalyDateIso(now);
   for (const expense of expenses) {
-    if (!isScheduledRow(expense, now)) continue;
+    if (!isScheduledAfterDay(expense, todayIso)) continue;
     count++;
     if (expense.type === 'income') income += expense.amount;
     else if (isSpending(expense)) spending += Math.abs(expense.amount);
@@ -131,14 +144,18 @@ export function summarizeScheduled(expenses: Expense[], now: Date): ScheduledSli
  * recurring rows of the rest of the month): the projection extrapolates only the former and
  * adds the latter as it is — a row due on the 27th is neither "spent" on the 22nd nor to be
  * scaled by 31/22.
+ *
+ * The split is by DAY, like `isScheduledRow`: today belongs to what is already booked, because
+ * today is one of the days the pace divides by.
  */
 export function splitSpendingAtDate(expenses: Expense[], now: Date): { spentToDate: number; scheduled: number } {
   let spentToDate = 0;
   let scheduled = 0;
+  const todayIso = getItalyDateIso(now);
   for (const expense of expenses) {
     if (!isSpending(expense)) continue;
-    if (getExpenseDate(expense.date) <= now) spentToDate += Math.abs(expense.amount);
-    else scheduled += Math.abs(expense.amount);
+    if (isScheduledAfterDay(expense, todayIso)) scheduled += Math.abs(expense.amount);
+    else spentToDate += Math.abs(expense.amount);
   }
   return { spentToDate, scheduled };
 }
@@ -470,11 +487,12 @@ export function summarizeMovements(expenses: Expense[], now: Date): MovementsSum
   let scheduledCount = 0;
   let scheduledTotal = 0;
   let largest: Expense | null = null;
+  const todayIso = getItalyDateIso(now);
   for (const expense of expenses) {
     if (expense.type === 'income') incomeCount++;
     else if (expense.type === 'transfer') transferCount++;
     else expenseCount++;
-    if (isScheduledRow(expense, now)) {
+    if (isScheduledAfterDay(expense, todayIso)) {
       scheduledCount++;
       scheduledTotal += Math.abs(expense.amount);
     }

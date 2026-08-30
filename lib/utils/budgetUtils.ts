@@ -19,7 +19,7 @@ import {
   SpendingForecast,
   SpendingSplit,
 } from '@/types/budget';
-import { getItalyDate, getItalyMonth, getItalyMonthYear, getItalyYear, toDate } from './dateHelpers';
+import { getItalyDate, getItalyDateIso, getItalyMonth, getItalyMonthYear, getItalyYear, toDate } from './dateHelpers';
 import { projectMonthEndWithScheduled } from './spendingProjection';
 
 // Section display order: fixed → variable → debt → income
@@ -181,14 +181,15 @@ export function splitMonthlyTotalExpenses(
 ): SpendingSplit {
   let spentToDate = 0;
   let scheduled = 0;
+  const todayIso = getItalyDateIso(now);
   for (const expense of expenses) {
     if (expense.type === 'transfer') continue;
     if (expense.amount >= 0) continue;
     const date = toDate(expense.date);
     const { month: expMonth, year: expYear } = getItalyMonthYear(date);
     if (expYear !== year || expMonth !== month) continue;
-    if (date <= now) spentToDate += Math.abs(expense.amount);
-    else scheduled += Math.abs(expense.amount);
+    if (getItalyDateIso(date) > todayIso) scheduled += Math.abs(expense.amount);
+    else spentToDate += Math.abs(expense.amount);
   }
   return { spentToDate, scheduled };
 }
@@ -203,13 +204,14 @@ export function splitMonthActualForItem(
 ): SpendingSplit {
   let spentToDate = 0;
   let scheduled = 0;
+  const todayIso = getItalyDateIso(now);
   for (const expense of expenses) {
     const date = toDate(expense.date);
     const { month: expMonth, year: expYear } = getItalyMonthYear(date);
     if (expYear !== year || expMonth !== month) continue;
     if (!expenseMatchesItem(expense, item)) continue;
-    if (date <= now) spentToDate += Math.abs(expense.amount);
-    else scheduled += Math.abs(expense.amount);
+    if (getItalyDateIso(date) > todayIso) scheduled += Math.abs(expense.amount);
+    else spentToDate += Math.abs(expense.amount);
   }
   return { spentToDate, scheduled };
 }

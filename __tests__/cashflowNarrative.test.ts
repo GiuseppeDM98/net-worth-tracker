@@ -146,28 +146,28 @@ describe('buildCashflowVerdict', () => {
     );
   });
 
-  it('should close with what is still in the calendar — the totals include it, so the verdict says it', () => {
+  it('should close by naming the scheduled part AS PART OF the totals, never beside them', () => {
     const both = buildCashflowVerdict({ ...INPUT, scheduled: { count: 3, expenses: 1850, income: 500, throughMonth: 12 } });
     expect(plain(both.sentence)).toBe(
-      'Ad agosto hai messo da parte il 40% (1940 €): entrate 4850 €, spese 2910 €, in calo del 6,4% su luglio. In calendario ci sono ancora 1850 € di spese e 500 € di entrate da qui a fine mese.',
+      'Ad agosto hai messo da parte il 40% (1940 €): entrate 4850 €, spese 2910 €, in calo del 6,4% su luglio. Nel totale ci sono ancora 1850 € di spese e 500 € di entrate già in calendario da qui a fine mese.',
     );
 
     // The verb agrees with the AMOUNT, not with the number of clauses: 406 € is plural.
     const spendingOnly = buildCashflowVerdict({ ...INPUT, scheduled: { count: 2, expenses: 406, income: 0, throughMonth: 10 } });
-    expect(plain(spendingOnly.sentence)).toContain('In calendario ci sono ancora 406 € di spese da qui a fine mese.');
+    expect(plain(spendingOnly.sentence)).toContain('Nel totale ci sono ancora 406 € di spese già in calendario da qui a fine mese.');
 
     // Only a lone «1 €» is singular — and «1 €» is the figure AS PRINTED, so 1,40 € counts.
     const oneEuro = buildCashflowVerdict({ ...INPUT, scheduled: { count: 1, expenses: 1, income: 0, throughMonth: 9 } });
-    expect(plain(oneEuro.sentence)).toContain("In calendario c'è ancora 1 € di spese da qui a fine mese.");
+    expect(plain(oneEuro.sentence)).toContain("Nel totale c'è ancora 1 € di spese già in calendario da qui a fine mese.");
     const roundsToOne = buildCashflowVerdict({ ...INPUT, scheduled: { count: 1, expenses: 1.4, income: 0, throughMonth: 9 } });
-    expect(plain(roundsToOne.sentence)).toContain("In calendario c'è ancora 1 € di spese da qui a fine mese.");
+    expect(plain(roundsToOne.sentence)).toContain("Nel totale c'è ancora 1 € di spese già in calendario da qui a fine mese.");
     // One euro of spending BESIDE income is plural again: two amounts, one verb.
     const oneEuroPlusIncome = buildCashflowVerdict({ ...INPUT, scheduled: { count: 2, expenses: 1, income: 500, throughMonth: 9 } });
-    expect(plain(oneEuroPlusIncome.sentence)).toContain('In calendario ci sono ancora 1 € di spese e 500 € di entrate da qui a fine mese.');
+    expect(plain(oneEuroPlusIncome.sentence)).toContain('Nel totale ci sono ancora 1 € di spese e 500 € di entrate già in calendario da qui a fine mese.');
 
     // A slice with a count but no amounts (transfers only) adds no sentence.
     const transfersOnly = buildCashflowVerdict({ ...INPUT, scheduled: { count: 1, expenses: 0, income: 0, throughMonth: 9 } });
-    expect(plain(transfersOnly.sentence)).not.toContain('In calendario');
+    expect(plain(transfersOnly.sentence)).not.toContain('in calendario');
   });
 
   it('should use the past tense for a closed month and a year', () => {
@@ -421,7 +421,7 @@ describe('describeScheduledHorizon', () => {
 
   it('should let the sentence stand without a horizon', () => {
     const noHorizon = scheduledSentence({ count: 1, expenses: 406, income: 0, throughMonth: 10 }, null);
-    expect(plain(noHorizon)).toBe(' In calendario ci sono ancora 406 € di spese.');
+    expect(plain(noHorizon)).toBe(' Nel totale ci sono ancora 406 € di spese già in calendario.');
   });
 });
 

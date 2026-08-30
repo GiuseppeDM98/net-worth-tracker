@@ -347,6 +347,14 @@ const TYPE_CARDS: { type: AssetType; label: string; title: string; Icon: React.E
 
 // Zod validation schema for asset form
 // Note: .or(z.nan()) allows undefined values for optional numeric fields
+/**
+ * Radix `Select` reserves the empty string for "no value", so the "Nessuna" item needs a sentinel
+ * of its own; `onValueChange` maps it back to '' before the form ever sees it. The subcategory is
+ * optional on purpose (it used to be blocked at submit): a holding without one is bucketed under
+ * `NO_SUBCATEGORY_LABEL` by the allocation engine, so its euros stay visible in Allocazione.
+ */
+const NO_SUB_CATEGORY_VALUE = '__none__';
+
 const assetSchema = z.object({
   ticker: z.string(),
   // User-facing alias for `ticker`. Purely cosmetic — never
@@ -978,11 +986,6 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
   const onSubmit = async (data: AssetFormValues) => {
     if (!user || !ownerId) return;
 
-    if (isSubCategoryEnabled() && !data.subCategory) {
-      toast.error('La sottocategoria è obbligatoria per questa classe di asset');
-      return;
-    }
-
     if (isComposite && !validateComposition()) {
       return;
     }
@@ -1413,8 +1416,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
           {isSubCategoryEnabled() && (
             <div className="space-y-2">
               <Label htmlFor="subCategory">
-                Sottocategoria
-                {isSubCategoryEnabled() && availableSubCategories().length > 0 && ' *'}
+                Sottocategoria <span className="text-muted-foreground font-normal">(opzionale)</span>
               </Label>
 
               {showNewSubCategory ? (
@@ -1454,12 +1456,12 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                 // __create_new__ is a sentinel value — intercepted in onValueChange
                 // to open the inline creation form instead of setting the field.
                 <Select
-                  value={selectedSubCategory}
+                  value={selectedSubCategory || NO_SUB_CATEGORY_VALUE}
                   onValueChange={(value) => {
                     if (value === '__create_new__') {
                       setShowNewSubCategory(true);
                     } else {
-                      setValue('subCategory', value);
+                      setValue('subCategory', value === NO_SUB_CATEGORY_VALUE ? '' : value);
                     }
                   }}
                 >
@@ -1467,12 +1469,16 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                     <SelectValue placeholder="Seleziona sottocategoria" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value={NO_SUB_CATEGORY_VALUE} className="text-muted-foreground">
+                      Nessuna
+                    </SelectItem>
+                    {availableSubCategories().length > 0 && <SelectSeparator />}
                     {availableSubCategories().map((cat) => (
                       <SelectItem key={cat} value={cat}>
                         {cat}
                       </SelectItem>
                     ))}
-                    {availableSubCategories().length > 0 && <SelectSeparator />}
+                    <SelectSeparator />
                     <SelectItem value="__create_new__" className="text-primary">
                       <Plus className="h-3.5 w-3.5" />
                       Crea nuova sottocategoria

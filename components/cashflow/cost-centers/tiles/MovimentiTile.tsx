@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import type { Narrative } from '@/lib/utils/narrative';
 import type { Expense } from '@/types/expenses';
 import { cachedFormatCurrencyEUR, formatDate } from '@/lib/utils/formatters';
-import { toDate } from '@/lib/utils/dateHelpers';
+import { isItalyDayAfter, toDate } from '@/lib/utils/dateHelpers';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Tile, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
@@ -53,7 +53,9 @@ function Chip({ label }: { label: string }) {
 export function MovimentiTile({ expenses, now, aside, reading, visibleCount, onShowMore, className }: MovimentiTileProps) {
   const visible = expenses.slice(0, visibleCount);
   const hidden = Math.max(0, expenses.length - visible.length);
-  const isScheduled = (expense: Expense) => toDate(expense.date) > now;
+  // By Italian calendar DAY, the app's one rule for «in calendario» (dateHelpers → isItalyDayAfter):
+  // a row recorded today carries its creation time and is not scheduled.
+  const isScheduled = (expense: Expense) => isItalyDayAfter(toDate(expense.date), now);
 
   return (
     <Tile eyebrow="Movimenti collegati" aside={<NarrativeText segments={aside} figureClassName="font-medium" />} reading={reading} className={className}>

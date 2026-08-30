@@ -49,6 +49,7 @@ import {
   calculateFIRENetWorth,
 } from './assetService';
 import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
+import { ASSET_CLASS_SEQUENCE } from '@/lib/utils/allocationUtils';
 import { getCategoryKey, getCategoryName, resolveDisplayLabels } from '@/lib/utils/expenseGrouping';
 import { EXPENSE_TYPE_LABELS, type ExpenseType } from '@/types/expenses';
 import {
@@ -244,7 +245,10 @@ function prepareAllocationData(
 
   // Transform compareAllocations output to PDF format
   const assetClassData: AssetClassAllocation[] = [];
-  const assetClasses = ['equity', 'bonds', 'crypto', 'realestate', 'commodity', 'cash'];
+  // The app-wide enumeration, never a literal: a hand-written list silently drops whatever the
+  // AssetClass union gained since it was written — which is how trendFollowing and carry
+  // disappeared from the PDF's allocation table and its rebalancing list, euros included.
+  const assetClasses = ASSET_CLASS_SEQUENCE;
 
   assetClasses.forEach(assetClass => {
     const comparisonData = comparisonResult.byAssetClass[assetClass];
@@ -705,6 +709,8 @@ function getAssetClassName(assetClass: string): string {
     realestate: 'Immobiliare',
     commodity: 'Materie Prime',
     cash: 'Liquidità',
+    trendFollowing: 'Trend Following',
+    carry: 'Carry',
   };
   return names[assetClass] || assetClass;
 }

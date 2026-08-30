@@ -7,6 +7,7 @@
 
 import { useState, useEffect } from 'react';
 import { AssetClass } from '@/types/assets';
+import { ASSET_CLASS_LABELS, ASSET_CLASS_SEQUENCE } from '@/lib/utils/allocationUtils';
 import {
   InvestmentGoal,
   GoalPriority,
@@ -47,14 +48,14 @@ const PRIORITY_OPTIONS: { value: GoalPriority; label: string }[] = [
   { value: 'bassa', label: 'Bassa' },
 ];
 
-const ALLOCATION_CLASSES: { value: AssetClass; label: string }[] = [
-  { value: 'equity', label: 'Azioni' },
-  { value: 'bonds', label: 'Obbligazioni' },
-  { value: 'cash', label: 'Liquidita' },
-  { value: 'realestate', label: 'Immobili' },
-  { value: 'crypto', label: 'Crypto' },
-  { value: 'commodity', label: 'Materie Prime' },
-];
+/**
+ * Every class, in the app's order and with the app's labels. Derived, not hand-written: the old
+ * literal listed six of eight, so a goal could never point at Trend Following or Carry — and it
+ * spelled two of the six differently from the rest of the app («Liquidita», «Crypto»).
+ */
+const ALLOCATION_CLASSES: { value: AssetClass; label: string }[] = ASSET_CLASS_SEQUENCE.map(
+  (value) => ({ value, label: ASSET_CLASS_LABELS[value] ?? value })
+);
 
 export function GoalFormDialog({
   open,

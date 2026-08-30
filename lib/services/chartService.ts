@@ -268,6 +268,8 @@ function getAssetClassName(assetClass: string): string {
     realestate: 'Immobili',
     cash: 'Liquidità',
     commodity: 'Materie Prime',
+    trendFollowing: 'Trend Following',
+    carry: 'Carry',
   };
 
   return names[assetClass] || assetClass;

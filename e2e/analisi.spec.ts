@@ -51,11 +51,15 @@ async function gotoAnalisi(page: Page, query = ''): Promise<void> {
 test('opens with the verdict and states the seeded KPI totals with their YoY pacing', async ({ page }) => {
   await gotoAnalisi(page);
 
-  // The verdict answers before any number: spending fell against the same months of last year.
+  // The verdict answers before any number. The default period is «Anno corrente», which spans
+  // twelve months, so its delta does too and names the bare year — a «su gen–ago 2025» here would
+  // be a delta on a narrower window than the total beside it (owner's call, 2026-08-30;
+  // «Da inizio anno» is the mode that keeps the same-months rule).
   const verdict = page.getByRole('region', { name: 'Verdetto del periodo' });
   await expect(verdict.getByRole('heading', { level: 2 })).toHaveText(`Nel ${CURRENT_YEAR} spendi meno dell'anno scorso.`);
   await expect(verdict).toContainText(`hai speso 780 €`);
-  await expect(verdict).toContainText('−13,3% su gen');
+  await expect(verdict).toContainText(`−13,3% su ${PREVIOUS_YEAR}`);
+  await expect(verdict).not.toContainText('su gen–');
 
   // January-only fixture: Entrate 2000, Spese 780, Risparmio 1220 — the transfer row (+150)
   // must be inside none of them. `.first()`: the income repeats in its category row.
@@ -69,7 +73,8 @@ test('opens with the verdict and states the seeded KPI totals with their YoY pac
   // Rule, and ONE caption for both under the trio, verbatim from the module.
   await expect(periodo.getByText('↓ 13,3%')).toBeVisible();
   await expect(periodo.getByText('↑ 5,3%')).toBeVisible();
-  await expect(periodo.getByText(`vs ${PREVIOUS_YEAR} (stessi mesi`)).toBeVisible();
+  // Same reason: on «Anno corrente» the caption is the bare year, with no «stessi mesi» clause.
+  await expect(periodo.getByText(`vs ${PREVIOUS_YEAR}`, { exact: true })).toBeVisible();
 });
 
 test('lays the tiles on the 12-column grid at 1440 with nothing scrolling sideways', async ({ page }) => {

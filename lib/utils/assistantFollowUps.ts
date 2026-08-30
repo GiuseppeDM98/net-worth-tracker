@@ -7,6 +7,7 @@
 // that moved the most, or a negative cash flow). No network call, no model call —
 // deterministic and unit-testable.
 import { AssistantMode, AssistantMonthContextBundle } from '@/types/assistant';
+import { ASSET_CLASS_LABELS } from '@/lib/utils/allocationUtils';
 
 export interface AssistantFollowUp {
   id: string;
@@ -115,10 +116,14 @@ function deriveContextualFollowUp(
   }, null);
 
   if (largestSwing) {
+    // The label, never the Firestore key: the chip used to read «Perché realestate è cambiata?».
+    // The sentence is built around «l'allocazione» so the verb agrees with THAT and not with the
+    // class, which would need a gender and a number per class to stay grammatical.
+    const swingLabel = ASSET_CLASS_LABELS[largestSwing.assetClass] ?? largestSwing.assetClass;
     return {
       id: `ctx-swing-${largestSwing.assetClass}`,
-      label: `Perché ${largestSwing.assetClass} è cambiata?`,
-      prompt: `Spiegami perché l’allocazione in ${largestSwing.assetClass} è cambiata in questo periodo e se dovrei intervenire.`,
+      label: `Perché è cambiata l’allocazione in ${swingLabel}?`,
+      prompt: `Spiegami perché l’allocazione in ${swingLabel} è cambiata in questo periodo e se dovrei intervenire.`,
     };
   }
 

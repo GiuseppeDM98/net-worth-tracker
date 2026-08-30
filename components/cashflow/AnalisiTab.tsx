@@ -247,8 +247,10 @@ export function AnalisiTab({ allExpenses, categories, loading, historyStartYear 
 
   // Today in the Italian calendar — the tense, the anomaly month and the running bucket.
   const today = useMemo((): MonthRef => getItalyMonthYear(), []);
-  // The same clock as a Date — what splits the period into happened and scheduled.
-  const nowDate = useMemo(() => getItalyDate(), []);
+  // The same clock as a Date — what splits the period into happened and scheduled. A raw instant,
+  // like Tracciamento's: `summarizeScheduled` reads the Italian day off it itself, and handing it
+  // an already-zoned Date would shift it twice.
+  const nowDate = useMemo(() => new Date(), []);
   const currentYear = today.year;
   const calendar = useMemo(() => {
     const date = getItalyDate();
@@ -390,8 +392,10 @@ export function AnalisiTab({ allExpenses, categories, loading, historyStartYear 
   );
 
   // YoY pacing against the year before — scope AND caption from the SAME module the Confronto
-  // reads, so the same-months rule cannot diverge. Null in Storico, for a month that has not
-  // started, or when the previous year predates the tracked history.
+  // reads, so the two cannot diverge on which window they measure. Each period compares on its
+  // OWN span: «Da inizio anno» on the months lived, «Anno corrente» and a closed year on twelve.
+  // Null in Storico, for a month that has not started, or when the previous year predates the
+  // tracked history.
   const comparisonYear = selectedYear !== null && selectedYear - 1 >= historyStartYear ? selectedYear - 1 : null;
   const scope = useMemo(() => resolveComparisonScope(periodMode, selectedMonth, today.month), [periodMode, selectedMonth, today.month]);
   const pacing = useMemo(() => {

@@ -108,7 +108,7 @@ describe('buildFollowUpSuggestions', () => {
 
     // bonds swung the most (|−8000| > |2000|); the zero-change class is ignored.
     expect(result[0].id).toBe('ctx-swing-bonds');
-    expect(result[0].label).toContain('bonds');
+    expect(result[0].label).toContain('Obbligazioni');
   });
 
   it('should ignore allocation changes that are all zero', () => {

@@ -214,6 +214,27 @@ describe('tile readings', () => {
     );
   });
 
+  it('describeComposition should articulate the preposition on the figure AS PRINTED', () => {
+    // Found at the browser collaudo of 2026-08-30: a hard-coded «al » printed «carry al 0,1%».
+    // A class rounding to zero takes «allo», a vowel-initial number name takes «all'».
+    expect(
+      plain(
+        describeComposition([
+          { assetClass: 'equity', percentage: 45 },
+          { assetClass: 'carry', percentage: 0.06 },
+        ])!,
+      ),
+    ).toBe("Azioni al 45,0%; carry allo 0,1%.");
+    expect(
+      plain(
+        describeComposition([
+          { assetClass: 'bonds', percentage: 8.5 },
+          { assetClass: 'trendFollowing', percentage: 11.2 },
+        ])!,
+      ),
+    ).toBe("Trend following all'11,2%; obbligazioni all'8,5%.");
+  });
+
   it('describeCosts should convert the annual cost into a monthly weight and a share of the portfolio', () => {
     expect(plain(describeCosts(1034, 412380.52)!)).toBe('Pesa 86 € al mese, lo 0,25% del patrimonio.');
     expect(plain(describeCosts(1034, 0)!)).toBe('Pesa 86 € al mese.');

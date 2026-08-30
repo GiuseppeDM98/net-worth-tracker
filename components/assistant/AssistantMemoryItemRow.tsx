@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { useArmedDelete } from '@/components/cashflow/budget/useArmedDelete';
 import { cachedFormatCurrencyEUR, formatDate } from '@/lib/utils/formatters';
 import { formatPercentage } from '@/lib/services/chartService';
+import { ASSET_CLASS_LABELS } from '@/lib/utils/allocationUtils';
 import { describeGoalProgress, type GoalProgressReading } from '@/lib/utils/assistantNarrative';
 import { AssistantMemoryItem, AssistantMemorySuggestion, AssistantStructuredGoal } from '@/types/assistant';
 
@@ -212,7 +213,7 @@ export function AssistantMemoryItemRow({
           {structuredGoal ? (
             <p>
               {GOAL_KIND_LABELS[structuredGoal.kind]}
-              {structuredGoal.assetClass ? ` · ${structuredGoal.assetClass}` : ''}
+              {structuredGoal.assetClass ? ` · ${ASSET_CLASS_LABELS[structuredGoal.assetClass] ?? structuredGoal.assetClass}` : ''}
               {structuredGoal.subCategory ? ` · ${structuredGoal.subCategory}` : ''}
               {' · '}
               {(structuredGoal.direction ?? 'at_least') === 'at_least' ? 'almeno' : 'al massimo'}{' '}

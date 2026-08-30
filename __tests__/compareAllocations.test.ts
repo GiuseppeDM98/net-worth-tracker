@@ -192,3 +192,51 @@ describe('compareAllocations — fixed-amount cash target', () => {
     expect(deriveTargetLeverageRatio(fixedCashTargets())).toBe(1);
   });
 });
+
+describe('compareAllocations — the residual sleeve of an unclassified holding', () => {
+  // The subcategory is optional in AssetDialog. Before that, a class with sub-targets could not
+  // contain an unclassified holding at all; now it can, and the euros must stay visible.
+  const withSubTargets = (): AssetAllocationTarget => ({
+    equity: {
+      targetPercentage: 100,
+      subTargets: { World: 70, Emergenti: 30 },
+    },
+  });
+
+  const holdings = () => [
+    makeAsset({ assetClass: 'equity', subCategory: 'World', quantity: 70, currentPrice: 1000 }),
+    makeAsset({ assetClass: 'equity', subCategory: 'Emergenti', quantity: 30, currentPrice: 1000 }),
+    makeAsset({ assetClass: 'equity', quantity: 20, currentPrice: 1000 }),
+  ];
+
+  it('states the unclassified euros as their own untargeted row', () => {
+    const result = compareAllocations(holdings(), withSubTargets());
+    const residual = result.bySubCategory['equity:Senza sottocategoria'];
+    expect(residual).toBeDefined();
+    expect(residual.currentValue).toBe(20000);
+    // 20k of a 120k class.
+    expect(residual.currentPercentage).toBeCloseTo(16.666, 2);
+    // No target means no verdict: the answer to «troppo o troppo poco?» is «classificalo».
+    expect(residual.targetPercentage).toBe(0);
+    expect(residual.differenceValue).toBe(0);
+    expect(residual.action).toBe('OK');
+  });
+
+  it('leaves the targeted sleeves measured against the whole class, and the shares reaching 100%', () => {
+    const result = compareAllocations(holdings(), withSubTargets());
+    // 70k of 120k — genuinely under a 70% target, because 20k of the class is unclassified.
+    expect(result.bySubCategory['equity:World'].currentPercentage).toBeCloseTo(58.333, 2);
+    expect(result.bySubCategory['equity:Emergenti'].currentPercentage).toBeCloseTo(25, 2);
+    const shares = Object.values(result.bySubCategory).reduce((sum, d) => sum + d.currentPercentage, 0);
+    expect(shares).toBeCloseTo(100, 6);
+  });
+
+  it('emits no residual row when every holding of the class carries a sub-category', () => {
+    const classified = [
+      makeAsset({ assetClass: 'equity', subCategory: 'World', quantity: 70, currentPrice: 1000 }),
+      makeAsset({ assetClass: 'equity', subCategory: 'Emergenti', quantity: 30, currentPrice: 1000 }),
+    ];
+    const result = compareAllocations(classified, withSubTargets());
+    expect(result.bySubCategory['equity:Senza sottocategoria']).toBeUndefined();
+  });
+});

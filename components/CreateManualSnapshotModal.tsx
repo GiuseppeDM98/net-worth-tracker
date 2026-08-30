@@ -3,7 +3,11 @@
  *
  * Three Tabs:
  * 1. General: Year, month, total net worth, liquid/illiquid split
- * 2. Asset Classes: Breakdown by 6 classes (equity, bonds, crypto, etc.)
+ * 2. Asset Classes: one euro field per member of the AssetClass union, generated from
+ *    ASSET_CLASS_SEQUENCE. NEVER hand-list the classes here: the sum of the fields is
+ *    cross-validated against the total, so a class the form does not offer makes an honest
+ *    snapshot impossible to enter, not merely incomplete — which is what six hard-coded
+ *    fields did to Trend Following and Carry until 2026-08-30.
  * 3. Individual Assets: Optional granular detail per asset
  *
  * Validation: Three-stage pipeline ensures data integrity
@@ -28,6 +32,8 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ASSET_CLASS_LABELS, ASSET_CLASS_SEQUENCE } from '@/lib/utils/allocationUtils';
+import { emptyClassAmounts, parseAmount, sumClassAmounts } from '@/lib/utils/manualSnapshotAmounts';
 import { Plus, Trash2 } from 'lucide-react';
 
 interface CreateManualSnapshotModalProps {
@@ -60,12 +66,7 @@ export function CreateManualSnapshotModal({
   const [illiquidNetWorth, setIlliquidNetWorth] = useState<string>('');
 
   // Asset class values
-  const [equity, setEquity] = useState<string>('0');
-  const [bonds, setBonds] = useState<string>('0');
-  const [crypto, setCrypto] = useState<string>('0');
-  const [realestate, setRealestate] = useState<string>('0');
-  const [cash, setCash] = useState<string>('0');
-  const [commodity, setCommodity] = useState<string>('0');
+  const [byClass, setByClass] = useState<Record<string, string>>(emptyClassAmounts);
 
   // Asset entries
   const [assets, setAssets] = useState<AssetEntry[]>([]);
@@ -152,22 +153,15 @@ export function CreateManualSnapshotModal({
 
     // Build byAssetClass object
     const byAssetClass: Record<string, number> = {};
-    const equityVal = parseFloat(equity) || 0;
-    const bondsVal = parseFloat(bonds) || 0;
-    const cryptoVal = parseFloat(crypto) || 0;
-    const realestateVal = parseFloat(realestate) || 0;
-    const cashVal = parseFloat(cash) || 0;
-    const commodityVal = parseFloat(commodity) || 0;
-
-    if (equityVal > 0) byAssetClass.equity = equityVal;
-    if (bondsVal > 0) byAssetClass.bonds = bondsVal;
-    if (cryptoVal > 0) byAssetClass.crypto = cryptoVal;
-    if (realestateVal > 0) byAssetClass.realestate = realestateVal;
-    if (cashVal > 0) byAssetClass.cash = cashVal;
-    if (commodityVal > 0) byAssetClass.commodity = commodityVal;
+    // A class left at 0 is absent from the document, not stored as a zero: `byAssetClass` is
+    // read with `?? 0` everywhere, and an explicit zero would claim the user measured it.
+    for (const assetClass of ASSET_CLASS_SEQUENCE) {
+      const value = parseAmount(byClass[assetClass]);
+      if (value > 0) byAssetClass[assetClass] = value;
+    }
 
     // Validate asset class sum
-    const assetClassSum = equityVal + bondsVal + cryptoVal + realestateVal + cashVal + commodityVal;
+    const assetClassSum = sumClassAmounts(byClass);
     if (Math.abs(assetClassSum - totalNW) > 0.01) {
       toast.error(
         `La somma delle Asset Class (${assetClassSum.toFixed(2)}) non corrisponde al Patrimonio Totale (${totalNW.toFixed(2)})`
@@ -238,12 +232,7 @@ export function CreateManualSnapshotModal({
     setTotalNetWorth('');
     setLiquidNetWorth('');
     setIlliquidNetWorth('');
-    setEquity('0');
-    setBonds('0');
-    setCrypto('0');
-    setRealestate('0');
-    setCash('0');
-    setCommodity('0');
+    setByClass(emptyClassAmounts());
     setAssets([]);
   };
 
@@ -347,97 +336,29 @@ export function CreateManualSnapshotModal({
 
           <TabsContent value="assetclass" className="space-y-4 py-4">
             <div className="grid gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="equity">Azioni (€)</Label>
-                <Input
-                  id="equity"
-                  type="number"
-                  value={equity}
-                  onChange={(e) => setEquity(e.target.value)}
-                  placeholder="0"
-                  step="0.01"
-                  min="0"
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="bonds">Obbligazioni (€)</Label>
-                <Input
-                  id="bonds"
-                  type="number"
-                  value={bonds}
-                  onChange={(e) => setBonds(e.target.value)}
-                  placeholder="0"
-                  step="0.01"
-                  min="0"
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="crypto">Criptovalute (€)</Label>
-                <Input
-                  id="crypto"
-                  type="number"
-                  value={crypto}
-                  onChange={(e) => setCrypto(e.target.value)}
-                  placeholder="0"
-                  step="0.01"
-                  min="0"
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="realestate">Immobili (€)</Label>
-                <Input
-                  id="realestate"
-                  type="number"
-                  value={realestate}
-                  onChange={(e) => setRealestate(e.target.value)}
-                  placeholder="0"
-                  step="0.01"
-                  min="0"
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="cash">Liquidità (€)</Label>
-                <Input
-                  id="cash"
-                  type="number"
-                  value={cash}
-                  onChange={(e) => setCash(e.target.value)}
-                  placeholder="0"
-                  step="0.01"
-                  min="0"
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="commodity">Materie Prime (€)</Label>
-                <Input
-                  id="commodity"
-                  type="number"
-                  value={commodity}
-                  onChange={(e) => setCommodity(e.target.value)}
-                  placeholder="0"
-                  step="0.01"
-                  min="0"
-                />
-              </div>
+              {ASSET_CLASS_SEQUENCE.map((assetClass) => (
+                <div key={assetClass} className="grid gap-2">
+                  <Label htmlFor={assetClass}>{ASSET_CLASS_LABELS[assetClass] ?? assetClass} (€)</Label>
+                  <Input
+                    id={assetClass}
+                    type="number"
+                    value={byClass[assetClass] ?? '0'}
+                    onChange={(e) =>
+                      setByClass((previous) => ({ ...previous, [assetClass]: e.target.value }))
+                    }
+                    placeholder="0"
+                    step="0.01"
+                    min="0"
+                  />
+                </div>
+              ))}
             </div>
 
             <div className="rounded-lg bg-amber-50 dark:bg-amber-950 p-3 border border-amber-200 dark:border-amber-800">
               <p className="text-xs text-amber-800 dark:text-amber-200">
                 <strong>Attenzione:</strong> La somma di tutte le Asset Class deve essere uguale al Patrimonio Totale.
                 Somma attuale: €{' '}
-                {(
-                  parseFloat(equity || '0') +
-                  parseFloat(bonds || '0') +
-                  parseFloat(crypto || '0') +
-                  parseFloat(realestate || '0') +
-                  parseFloat(cash || '0') +
-                  parseFloat(commodity || '0')
-                ).toFixed(2)}
+                {sumClassAmounts(byClass).toFixed(2)}
               </p>
             </div>
           </TabsContent>

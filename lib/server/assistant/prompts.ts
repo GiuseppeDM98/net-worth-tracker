@@ -17,6 +17,16 @@
 import { AssistantMemoryItem, AssistantMonthContextBundle, AssistantPreferences } from '@/types/assistant';
 import { getAssistantPeriodLabel } from '@/lib/utils/assistantPeriodLabel';
 import { GoalVerdict } from '@/lib/utils/goalTrajectory';
+import { ASSET_CLASS_LABELS, ASSET_CLASS_SEQUENCE } from '@/lib/utils/allocationUtils';
+
+/**
+ * The class as the app names it on screen. The blocks below are quoted back to the user in
+ * Italian prose, so handing the model 'realestate' or 'trendFollowing' is how a Firestore key
+ * ends up in an answer — and «dell'trendFollowing» is not a sentence in any language.
+ */
+function assetClassLabel(assetClass: string): string {
+  return ASSET_CLASS_LABELS[assetClass] ?? assetClass;
+}
 
 function eur(value: number): string {
   return new Intl.NumberFormat('it-IT', {
@@ -191,7 +201,7 @@ function formatGoalsSection(goals: AssistantMonthContextBundle['goals']): string
     if (goal.recommendedAllocation && Object.keys(goal.recommendedAllocation).length > 0) {
       const mix = Object.entries(goal.recommendedAllocation)
         .sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0))
-        .map(([assetClass, percentage]) => `${assetClass} ${percentage}%`)
+        .map(([assetClass, percentage]) => `${assetClassLabel(assetClass)} ${percentage}%`)
         .join(', ');
       lines.push(`  › allocazione consigliata per questo obiettivo: ${mix}`);
     }
@@ -336,7 +346,7 @@ export function formatBundleForPrompt(
     for (const [assetClass, value] of entries) {
       const pctOfTotal =
         totalNetWorth > 0 ? ` (${pct((value / totalNetWorth) * 100)})` : '';
-      lines.push(`${assetClass}: ${eur(value)}${pctOfTotal}`);
+      lines.push(`${assetClassLabel(assetClass)}: ${eur(value)}${pctOfTotal}`);
     }
     lines.push('');
   }
@@ -353,7 +363,7 @@ export function formatBundleForPrompt(
       const sorted = Object.entries(subCats).sort((a, b) => b[1] - a[1]);
       for (const [subCat, value] of sorted) {
         const pctOfTotal = totalNetWorth > 0 ? ` (${pct((value / totalNetWorth) * 100)})` : '';
-        lines.push(`  ${assetClass} › ${subCat}: ${eur(value)}${pctOfTotal}`);
+        lines.push(`  ${assetClassLabel(assetClass)} › ${subCat}: ${eur(value)}${pctOfTotal}`);
       }
     }
     lines.push('');
@@ -380,7 +390,7 @@ export function formatBundleForPrompt(
       const currentPct = totalNetWorth > 0 ? (currentValue / totalNetWorth) * 100 : 0;
       const gap = currentPct - target.targetPercentage;
       const gapStr = gap >= 0 ? `+${gap.toFixed(1)} p.p.` : `${gap.toFixed(1)} p.p.`;
-      lines.push(`${assetClass}: attuale ${currentPct.toFixed(1)}% | target ${target.targetPercentage}% | gap ${gapStr}`);
+      lines.push(`${assetClassLabel(assetClass)}: attuale ${currentPct.toFixed(1)}% | target ${target.targetPercentage}% | gap ${gapStr}`);
 
       if (target.subTargets) {
         for (const [sub, subTargetPct] of Object.entries(target.subTargets)) {
@@ -390,7 +400,7 @@ export function formatBundleForPrompt(
           const subCurrentPct = totalNetWorth > 0 ? (subCurrentValue / totalNetWorth) * 100 : 0;
           const subGap = subCurrentPct - subTargetOfPortfolio;
           const subGapStr = subGap >= 0 ? `+${subGap.toFixed(1)} p.p.` : `${subGap.toFixed(1)} p.p.`;
-          lines.push(`  › ${sub}: attuale ${subCurrentPct.toFixed(1)}% | target ${subTargetOfPortfolio.toFixed(1)}% (${subTargetPct}% dell'${assetClass}) | gap ${subGapStr}`);
+          lines.push(`  › ${sub}: attuale ${subCurrentPct.toFixed(1)}% | target ${subTargetOfPortfolio.toFixed(1)}% (${subTargetPct}% della classe ${assetClassLabel(assetClass)}) | gap ${subGapStr}`);
         }
       }
     }
@@ -414,7 +424,7 @@ export function formatBundleForPrompt(
         change.percentagePointsChange !== null
           ? ` (${pct(change.percentagePointsChange)} p.p.)`
           : '';
-      lines.push(`${change.assetClass}: ${prev} → ${curr} | Δ ${abs}${pp}`);
+      lines.push(`${assetClassLabel(change.assetClass)}: ${prev} → ${curr} | Δ ${abs}${pp}`);
     }
     lines.push('');
   }
@@ -512,7 +522,10 @@ export const ASSISTANT_SYSTEM_CORE = [
   '## Proporre la creazione di un obiettivo',
   "Non puoi creare, modificare o eliminare obiettivi: puoi solo proporne uno, e la scrittura avviene unicamente quando l'utente preme Conferma sulla card che la tua proposta genera.",
   "Quando — e SOLO quando — l'utente ti chiede di creare un obiettivo, introducilo con una frase che spiega le scelte fatte e poi emetti UN blocco di codice delimitato con linguaggio `goal-proposal` che contenga SOLO JSON valido, senza commenti e senza testo attorno, con questo schema:",
-  '{ "name": string, "targetAmount"?: number, "targetDateIso"?: "YYYY-MM-DD", "priority": "alta" | "media" | "bassa", "monthlyContribution"?: number, "recommendedAllocation"?: { "equity"?: number, "bonds"?: number, "cash"?: number, "crypto"?: number, "realestate"?: number, "commodity"?: number }, "notes"?: string }',
+  // The allocation keys come from ASSET_CLASS_SEQUENCE, the app-wide enumeration: a hand-written
+  // list is how the model stopped being told trendFollowing and carry exist, while
+  // `goalProposal.ts` had been accepting all eight all along.
+  `{ "name": string, "targetAmount"?: number, "targetDateIso"?: "YYYY-MM-DD", "priority": "alta" | "media" | "bassa", "monthlyContribution"?: number, "recommendedAllocation"?: { ${ASSET_CLASS_SEQUENCE.map((cls) => `"${cls}"?: number`).join(', ')} }, "notes"?: string }`,
   "Vincoli: `name` e `priority` sono obbligatori; gli importi sono in euro, senza separatori né simbolo di valuta; le percentuali di `recommendedAllocation` devono sommare esattamente a 100. Un solo blocco per risposta. Non emetterlo mai se l'utente non ha chiesto di creare un obiettivo: per discutere un obiettivo esistente o ipotizzarne uno basta il testo.",
   '',
   '# Casi limite',
