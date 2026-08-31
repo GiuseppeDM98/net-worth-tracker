@@ -283,6 +283,8 @@ describe('describeAssistantPreferences', () => {
 });
 
 describe('describeCashflowSettings', () => {
+  const SPLIT_OFF = { expenseSplitEnabled: false, familyMemberCount: 0 };
+
   it('names up to two labor categories, the history floor and cost centers', () => {
     expect(
       plain(
@@ -290,9 +292,12 @@ describe('describeCashflowSettings', () => {
           laborCategoryNames: ['Stipendio', 'Freelance'],
           historyStartYear: 2023,
           costCentersEnabled: true,
+          ...SPLIT_OFF,
         })
       )
-    ).toBe('Stipendio e Freelance contano come reddito da lavoro; lo storico parte dal 2023; Centri di Costo attivi.');
+    ).toBe(
+      'Stipendio e Freelance contano come reddito da lavoro; lo storico parte dal 2023; Centri di Costo attivi; Divisione spenta.'
+    );
   });
 
   it('counts the overflow past two names and reads the off state', () => {
@@ -302,19 +307,71 @@ describe('describeCashflowSettings', () => {
           laborCategoryNames: ['Stipendio', 'Freelance', 'Bonus'],
           historyStartYear: 2025,
           costCentersEnabled: false,
+          ...SPLIT_OFF,
         })
       )
     ).toBe(
-      'Stipendio, Freelance e 1 altra contano come reddito da lavoro; lo storico parte dal 2025; Centri di Costo spenti.'
+      'Stipendio, Freelance e 1 altra contano come reddito da lavoro; lo storico parte dal 2025; Centri di Costo spenti; Divisione spenta.'
     );
   });
 
   it('reads the empty labor selection', () => {
     expect(
-      plain(describeCashflowSettings({ laborCategoryNames: [], historyStartYear: 2025, costCentersEnabled: false }))
+      plain(
+        describeCashflowSettings({
+          laborCategoryNames: [],
+          historyStartYear: 2025,
+          costCentersEnabled: false,
+          ...SPLIT_OFF,
+        })
+      )
     ).toBe(
-      'Nessuna categoria conta come reddito da lavoro; lo storico parte dal 2025; Centri di Costo spenti.'
+      'Nessuna categoria conta come reddito da lavoro; lo storico parte dal 2025; Centri di Costo spenti; Divisione spenta.'
     );
+  });
+
+  it('states what the Divisione does once two people exist', () => {
+    expect(
+      plain(
+        describeCashflowSettings({
+          laborCategoryNames: ['Stipendio'],
+          historyStartYear: 2025,
+          costCentersEnabled: false,
+          expenseSplitEnabled: true,
+          familyMemberCount: 2,
+        })
+      )
+    ).toBe(
+      'Stipendio conta come reddito da lavoro; lo storico parte dal 2025; Centri di Costo spenti; ogni voce si può marcare come personale e la Divisione ripartisce le comuni fra 2 persone.'
+    );
+  });
+
+  // The toggle can be on with the household half-configured, and the reading has to say which
+  // input is missing instead of promising a division that cannot happen.
+  it('names the missing input when the split is on without two people', () => {
+    expect(
+      plain(
+        describeCashflowSettings({
+          laborCategoryNames: ['Stipendio'],
+          historyStartYear: 2025,
+          costCentersEnabled: false,
+          expenseSplitEnabled: true,
+          familyMemberCount: 1,
+        })
+      )
+    ).toContain('Divisione attiva, ma in Famiglia c\'è una persona sola: servono almeno due.');
+
+    expect(
+      plain(
+        describeCashflowSettings({
+          laborCategoryNames: ['Stipendio'],
+          historyStartYear: 2025,
+          costCentersEnabled: false,
+          expenseSplitEnabled: true,
+          familyMemberCount: 0,
+        })
+      )
+    ).toContain('Divisione attiva, ma senza nessuno in Famiglia non riparte nulla.');
   });
 });
 

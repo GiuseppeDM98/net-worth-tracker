@@ -10,7 +10,7 @@
  * guess at render: the tense follows whether the period is still running, the article
  * follows the percentage AS PRINTED (`articleForPercent`), «ad» before a vowel month.
  *
- * Percentages go through chartService's it-IT formatter (comma decimals); currency through
+ * Percentages go through the it-IT formatter of lib/utils/formatters (comma decimals); currency through
  * `cachedFormatCurrencyEUR` (nbsp before €, four-digit amounts ungrouped).
  */
 
@@ -28,7 +28,7 @@ import type {
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
-import { formatNumber, formatPercentage } from '@/lib/services/chartService';
+import { formatNumberIt as formatNumber, formatPercentageIt as formatPercentage } from '@/lib/utils/formatters';
 import { articleForPercent, ofThePercent, pluralArticleFor } from '@/lib/utils/patrimonioNarrative';
 import { getItalyDate, getItalyMonthYear } from '@/lib/utils/dateHelpers';
 import { MONTH_NAMES } from '@/lib/constants/months';

@@ -269,13 +269,20 @@ export interface CashflowSettingsInput {
   laborCategoryNames: string[];
   historyStartYear: number;
   costCentersEnabled: boolean;
+  expenseSplitEnabled: boolean;
+  // How many people are configured under Famiglia. The split needs two: with fewer, the
+  // toggle is on and nothing happens, so the reading has to say which input is missing
+  // rather than promising a division the page cannot compute.
+  familyMemberCount: number;
 }
 
-/** Cashflow — labor income categories, the history floor, cost centers. */
+/** Cashflow — labor income categories, the history floor, cost centers, the household split. */
 export function describeCashflowSettings({
   laborCategoryNames,
   historyStartYear,
   costCentersEnabled,
+  expenseSplitEnabled,
+  familyMemberCount,
 }: CashflowSettingsInput): Narrative {
   const segments: Narrative = [];
   if (laborCategoryNames.length === 0) {
@@ -295,9 +302,32 @@ export function describeCashflowSettings({
   segments.push(
     prose('; lo storico parte dal '),
     figure(String(historyStartYear)),
-    prose(costCentersEnabled ? '; Centri di Costo attivi.' : '; Centri di Costo spenti.')
+    prose(costCentersEnabled ? '; Centri di Costo attivi' : '; Centri di Costo spenti')
   );
+  segments.push(...describeSplitClause(expenseSplitEnabled, familyMemberCount));
   return segments;
+}
+
+/**
+ * The Divisione clause of the Cashflow reading.
+ *
+ * States the effect downstream — what the tab and the expense dialog will do — and, when the
+ * feature is on without the two people it needs, names the missing input instead of promising
+ * a division that cannot be computed (the Narrative Honesty Rule).
+ */
+function describeSplitClause(enabled: boolean, familyMemberCount: number): Narrative {
+  if (!enabled) return [prose('; Divisione spenta.')];
+  if (familyMemberCount === 0) {
+    return [prose('; Divisione attiva, ma senza nessuno in Famiglia non riparte nulla.')];
+  }
+  if (familyMemberCount === 1) {
+    return [prose('; Divisione attiva, ma in Famiglia c\'\u00e8 una persona sola: servono almeno due.')];
+  }
+  return [
+    prose('; ogni voce si pu\u00f2 marcare come personale e la Divisione ripartisce le comuni fra '),
+    figure(String(familyMemberCount)),
+    prose(' persone.'),
+  ];
 }
 
 export interface FamilyInput {

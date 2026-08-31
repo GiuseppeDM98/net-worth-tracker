@@ -12,6 +12,7 @@
 import { adminDb } from '@/lib/firebase/admin';
 import { Timestamp } from 'firebase-admin/firestore';
 import { Resend } from 'resend';
+import { escapeHtml } from '@/lib/server/emailHtml';
 import { getItalyDate, getItalyYear, getItalyMonth } from '@/lib/utils/dateHelpers';
 import {
   getPeriodActual,
@@ -314,14 +315,6 @@ function statusColor(status: BudgetRowStatus): string {
 }
 
 const dayMonthFormatter = new Intl.DateTimeFormat('it-IT', { day: '2-digit', month: '2-digit' });
-
-/** Escapes the few characters that would break HTML when interpolating a user-entered note. */
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
 
 /** Indented mono breakdown of the expenses behind an over-budget category. */
 function overspendHtml(expenses: OverspendExpense[]): string {

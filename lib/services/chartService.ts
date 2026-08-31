@@ -28,6 +28,7 @@ import { calculateCurrentAllocation } from './assetAllocationService';
 import { getAssetClassColor, getChartColor } from '@/lib/constants/colors';
 import { getItalyYear, getItalyMonth } from '@/lib/utils/dateHelpers';
 import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
+import { formatNumberIt, formatPercentageIt } from '@/lib/utils/formatters';
 
 /**
  * Prepare data for asset class distribution pie chart
@@ -317,21 +318,17 @@ export function formatCurrencyForSankey(value: number): string {
  * Format percentage in Italian format
  */
 export function formatPercentage(value: number, decimals: number = 2): string {
-  return new Intl.NumberFormat('it-IT', {
-    style: 'percent',
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  }).format(value / 100);
+  // The implementation moved to lib/utils/formatters.ts (SDK-free) so server code can reach it;
+  // this stays as the name every chart and narrative module already imports.
+  return formatPercentageIt(value, decimals);
 }
 
 /**
  * Format number in Italian format
  */
 export function formatNumber(value: number, decimals: number = 2): string {
-  return new Intl.NumberFormat('it-IT', {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  }).format(value);
+  // Implementation in lib/utils/formatters.ts (SDK-free); see formatPercentage above.
+  return formatNumberIt(value, decimals);
 }
 
 /**

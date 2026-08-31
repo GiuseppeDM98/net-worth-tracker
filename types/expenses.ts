@@ -109,6 +109,19 @@ export interface Expense {
   // WARNING: If a cost center is renamed, bulk-update all linked expenses via costCenterService.renameCostCenter.
   costCenterId?: string;
   costCenterName?: string;
+  // Who this row belongs to when a household splits its expenses (Cashflow › Divisione).
+  //
+  // ABSENT (or null) MEANS "IN COMUNE", and that default is the whole reason the feature costs
+  // nothing to adopt: every row ever written is already common, so there is no migration, and a
+  // household where most spending is shared only ever marks the exception. A value is the id of a
+  // FamilyMember (types/assets.ts) and means the row is that person's alone — their salary on an
+  // `income` row, their own spending on an expense one.
+  //
+  // Deliberately NOT denormalized to a name, unlike costCenterName: the members live in the
+  // settings document that every consumer already loads, so the label is resolved at read time
+  // and renaming a person costs no bulk update. An id whose member no longer exists is treated as
+  // unassigned rather than folded into anyone else's figures — see lib/utils/expenseSplitSummary.ts.
+  personalMemberId?: string;
   // Set only on expenses written by the historical CSV importer (lib/services/expenseImportService.ts).
   // Groups every row of one import together so the whole batch can be undone in one call.
   importBatchId?: string;
@@ -206,5 +219,6 @@ export interface ExpenseFormData {
   transferCashAssetId?: string; // Destination cash asset for transfers (origin = linkedCashAssetId)
   costCenterId?: string;    // Optional cost center assignment
   costCenterName?: string;  // Denormalized name, must be kept in sync via costCenterService
+  personalMemberId?: string; // FamilyMember this row belongs to; absent = in comune (see Expense)
 }
 

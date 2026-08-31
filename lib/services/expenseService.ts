@@ -187,6 +187,7 @@ export async function createExpense(
       transferCashAssetId: expenseData.transferCashAssetId,
       costCenterId: expenseData.costCenterId,
       costCenterName: expenseData.costCenterName,
+      personalMemberId: expenseData.personalMemberId,
       createdAt: now,
       updatedAt: now,
     });
@@ -266,6 +267,9 @@ async function createRecurringExpenses(
         linkedCashAssetId: index === 0 ? expenseData.linkedCashAssetId : undefined,
         costCenterId: expenseData.costCenterId,
         costCenterName: expenseData.costCenterName,
+        // Every occurrence of a series belongs to the same person: unlike linkedCashAssetId,
+        // which settles only the payment made today, ownership is a property of the expense.
+        personalMemberId: expenseData.personalMemberId,
         createdAt: now,
         updatedAt: now,
       });
@@ -382,6 +386,9 @@ async function createInstallmentExpenses(
         linkedCashAssetId: i === 0 ? expenseData.linkedCashAssetId : undefined,
         costCenterId: expenseData.costCenterId,
         costCenterName: expenseData.costCenterName,
+        // Every occurrence of a series belongs to the same person: unlike linkedCashAssetId,
+        // which settles only the payment made today, ownership is a property of the expense.
+        personalMemberId: expenseData.personalMemberId,
 
         createdAt: now,
         updatedAt: now,

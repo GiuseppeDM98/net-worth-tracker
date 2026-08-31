@@ -175,6 +175,8 @@ async function getSettingsForUser(userId: string): Promise<AssetAllocationSettin
     checkingAccountSubCategory: data.checkingAccountSubCategory,
     cashflowHistoryStartYear: data.cashflowHistoryStartYear,
     laborIncomeCategoryIds: data.laborIncomeCategoryIds ?? [],
+    familyMembers: data.familyMembers ?? [],
+    expenseSplitEnabled: data.expenseSplitEnabled,
     assistantResponseStyle: data.assistantResponseStyle,
     assistantMacroContextEnabled: data.assistantMacroContextEnabled,
     assistantMemoryEnabled: data.assistantMemoryEnabled,

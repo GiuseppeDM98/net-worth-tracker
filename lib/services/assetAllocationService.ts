@@ -106,6 +106,7 @@ export async function getSettings(
       assistantMacroContextEnabled: data.assistantMacroContextEnabled,
       assistantMemoryEnabled: data.assistantMemoryEnabled,
       costCentersEnabled: data.costCentersEnabled,
+      expenseSplitEnabled: data.expenseSplitEnabled,
       monthlyEmailEnabled: data.monthlyEmailEnabled,
       quarterlyEmailEnabled: data.quarterlyEmailEnabled,
       semiAnnualEmailEnabled: data.semiAnnualEmailEnabled,
@@ -295,6 +296,9 @@ export async function setSettings(
       if (settings.costCentersEnabled !== undefined) {
         docData.costCentersEnabled = settings.costCentersEnabled;
       }
+      if (settings.expenseSplitEnabled !== undefined) {
+        docData.expenseSplitEnabled = settings.expenseSplitEnabled;
+      }
       if (settings.monthlyEmailEnabled !== undefined) {
         docData.monthlyEmailEnabled = settings.monthlyEmailEnabled;
       }
@@ -455,6 +459,9 @@ export async function setSettings(
       }
       if (settings.costCentersEnabled !== undefined) {
         docData.costCentersEnabled = settings.costCentersEnabled;
+      }
+      if (settings.expenseSplitEnabled !== undefined) {
+        docData.expenseSplitEnabled = settings.expenseSplitEnabled;
       }
       if (settings.monthlyEmailEnabled !== undefined) {
         docData.monthlyEmailEnabled = settings.monthlyEmailEnabled;

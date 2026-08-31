@@ -12,7 +12,8 @@
  * - Tracking: verdict + tile grid over the period's movements (ExpenseTrackingTab)
  * - Dividends: dividend tracking
  * - Budget: verdict + tile grid over the month's ceiling and the category budgets (BudgetTab)
- * - Cost centers: optional 6th tab (settings.costCentersEnabled) — verdict + tile grid over the centers' whole cost
+ * - Cost centers: optional tab (settings.costCentersEnabled) — verdict + tile grid over the centers' whole cost
+ * - Divisione: optional tab (settings.expenseSplitEnabled) — verdict + tile grid over how a household splits its spending
  *
  * The root is the 1920px tile-page width (`PageContainer width="wide"`): Tracciamento is a
  * 12-column bento, and a bento uses width.
@@ -28,7 +29,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowRightLeft, Coins, Target, Layers, Download, Plus, Settings } from 'lucide-react';
+import { ArrowRightLeft, Coins, Target, Layers, Users, Download, Plus, Settings } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
@@ -37,10 +38,11 @@ import { ExpenseTrackingTab } from '@/components/cashflow/ExpenseTrackingTab';
 import { DividendTrackingTab } from '@/components/dividends/DividendTrackingTab';
 import { BudgetTab } from '@/components/cashflow/BudgetTab';
 import { CostCentersTab } from '@/components/cashflow/CostCentersTab';
+import { ExpenseSplitTab } from '@/components/cashflow/ExpenseSplitTab';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { Dividend } from '@/types/dividend';
-import { Asset } from '@/types/assets';
+import { Asset, FamilyMember } from '@/types/assets';
 import { useExpenses, useExpenseCategories } from '@/lib/hooks/useExpenses';
 import { useAssets } from '@/lib/hooks/useAssets';
 import { queryKeys } from '@/lib/query/queryKeys';
@@ -66,7 +68,7 @@ const CASHFLOW_TABS_BASE: TabDef[] = [
   { value: 'budget',    label: 'Budget',       icon: Target         },
 ];
 
-const VALID_CASHFLOW_TABS = ['tracking', 'dividends', 'budget', 'cost-centers'] as const;
+const VALID_CASHFLOW_TABS = ['tracking', 'dividends', 'budget', 'cost-centers', 'split'] as const;
 type CashflowTabId = (typeof VALID_CASHFLOW_TABS)[number];
 
 function getInitialTab(param: string | null): CashflowTabId {
@@ -86,6 +88,11 @@ export default function CashflowPage() {
   const [activeTab, setActiveTab] = useState<string>(initialTab);
   // null = settings not yet loaded (avoids the tab appearing late after an async flip from false → true)
   const [costCentersEnabled, setCostCentersEnabled] = useState<boolean | null>(null);
+  // Same null-until-loaded contract as the cost centres above: a tab that appears late, after an
+  // async flip from false, moves the tab bar under the reader's cursor.
+  const [expenseSplitEnabled, setExpenseSplitEnabled] = useState<boolean | null>(null);
+  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
+  const [laborIncomeCategoryIds, setLaborIncomeCategoryIds] = useState<string[]>([]);
 
   // React Query hooks for expenses and categories
   const { data: allExpenses = [], isLoading: expensesLoading } = useExpenses(ownerId);
@@ -158,6 +165,9 @@ export default function CashflowPage() {
           setCashflowHistoryStartYear(settings.cashflowHistoryStartYear);
         }
         setCostCentersEnabled(settings?.costCentersEnabled ?? false);
+        setExpenseSplitEnabled(settings?.expenseSplitEnabled ?? false);
+        setFamilyMembers(settings?.familyMembers ?? []);
+        setLaborIncomeCategoryIds(settings?.laborIncomeCategoryIds ?? []);
       } catch (error) {
         // Settings bootstrap is non-fatal for the page: keep safe defaults and log explicitly.
         console.error('Failed to load cashflow settings, using fallback defaults', {
@@ -165,9 +175,11 @@ export default function CashflowPage() {
           operation: 'loadCashflowSettings',
           fallbackHistoryStartYear: 2025,
           fallbackCostCentersEnabled: false,
+          fallbackExpenseSplitEnabled: false,
           error: getErrorMessage(error),
         });
         setCostCentersEnabled(false);
+        setExpenseSplitEnabled(false);
       }
     };
 
@@ -203,9 +215,21 @@ export default function CashflowPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const allTabs: TabDef[] = costCentersEnabled
-    ? [...CASHFLOW_TABS_BASE, { value: 'cost-centers', label: 'Centri di Costo', icon: Layers }]
-    : CASHFLOW_TABS_BASE;
+  const allTabs: TabDef[] = [
+    ...CASHFLOW_TABS_BASE,
+    ...(costCentersEnabled ? [{ value: 'cost-centers', label: 'Centri di Costo', icon: Layers }] : []),
+    ...(expenseSplitEnabled ? [{ value: 'split', label: 'Divisione', icon: Users }] : []),
+  ];
+
+  // A URL naming an OPTIONAL tab whose feature is off used to leave the page blank — no tab bar
+  // and no panel, because `getInitialTab` accepts the id while the panel is gated on the
+  // setting. It is reachable from a bookmark, from a shared link, or simply by turning the
+  // feature off with the tab open. The tab is DERIVED rather than corrected in an effect, so
+  // there is no render where the page is briefly empty. Settled only once the settings have
+  // loaded: before that every optional tab is legitimately unknown, not absent.
+  const settingsLoaded = costCentersEnabled !== null && expenseSplitEnabled !== null;
+  const effectiveTab =
+    settingsLoaded && !allTabs.some((tab) => tab.value === activeTab) ? 'tracking' : activeTab;
 
   return (
     <PageContainer width="wide">
@@ -216,7 +240,7 @@ export default function CashflowPage() {
         separator={false}
         actions={
           <div className="flex items-center gap-2">
-            {activeTab === 'tracking' && (
+            {effectiveTab === 'tracking' && (
               <Button
                 size="sm"
                 disabled={isDemo}
@@ -234,7 +258,7 @@ export default function CashflowPage() {
                 desktop-only: on a phone the add button sits beside the tab's period axis. */}
             {/* Budget's page-level action: the tab owns the dialog, the header dispatches.
                 Desktop-only: on a phone the add button sits under the tab's verdict. */}
-            {activeTab === 'budget' && (
+            {effectiveTab === 'budget' && (
               <Button
                 size="sm"
                 disabled={isDemo}
@@ -248,7 +272,7 @@ export default function CashflowPage() {
               </Button>
             )}
             {/* Centri di Costo's page-level action: same channel, same desktop-only rule. */}
-            {activeTab === 'cost-centers' && (
+            {effectiveTab === 'cost-centers' && (
               <Button
                 size="sm"
                 disabled={isDemo}
@@ -261,7 +285,7 @@ export default function CashflowPage() {
                 Nuovo centro
               </Button>
             )}
-            {activeTab === 'dividends' && (
+            {effectiveTab === 'dividends' && (
               <>
                 <Button
                   size="sm"
@@ -307,17 +331,17 @@ export default function CashflowPage() {
 
       <PageTabs
         tabs={allTabs}
-        value={activeTab}
+        value={effectiveTab}
         onValueChange={handleTabChange}
         layoutId="cashflow-tab"
         ariaLabel="Sezioni di Cashflow"
-        loading={costCentersEnabled === null}
+        loading={costCentersEnabled === null || expenseSplitEnabled === null}
       >
 
         <TabsContent value="tracking" forceMount>
           <motion.div
             initial={false}
-            animate={activeTab === 'tracking' ? 'visible' : 'hidden'}
+            animate={effectiveTab === 'tracking' ? 'visible' : 'hidden'}
             variants={tabPanelSwitch}
           >
             <ExpenseTrackingTab
@@ -334,7 +358,7 @@ export default function CashflowPage() {
           <TabsContent value="dividends" forceMount>
             <motion.div
               initial={false}
-              animate={activeTab === 'dividends' ? 'visible' : 'hidden'}
+              animate={effectiveTab === 'dividends' ? 'visible' : 'hidden'}
               variants={tabPanelSwitch}
             >
               <DividendTrackingTab
@@ -351,7 +375,7 @@ export default function CashflowPage() {
           <TabsContent value="budget" forceMount>
             <motion.div
               initial={false}
-              animate={activeTab === 'budget' ? 'visible' : 'hidden'}
+              animate={effectiveTab === 'budget' ? 'visible' : 'hidden'}
               variants={tabPanelSwitch}
             >
               <BudgetTab
@@ -364,11 +388,27 @@ export default function CashflowPage() {
             </motion.div>
           </TabsContent>
         )}
+        {expenseSplitEnabled && mountedTabs.has('split') && (
+          <TabsContent value="split" forceMount>
+            <motion.div
+              initial={false}
+              animate={effectiveTab === 'split' ? 'visible' : 'hidden'}
+              variants={tabPanelSwitch}
+            >
+              <ExpenseSplitTab
+                allExpenses={allExpenses}
+                familyMembers={familyMembers}
+                laborIncomeCategoryIds={laborIncomeCategoryIds}
+                loading={loading}
+              />
+            </motion.div>
+          </TabsContent>
+        )}
         {costCentersEnabled && mountedTabs.has('cost-centers') && (
           <TabsContent value="cost-centers" forceMount>
             <motion.div
               initial={false}
-              animate={activeTab === 'cost-centers' ? 'visible' : 'hidden'}
+              animate={effectiveTab === 'cost-centers' ? 'visible' : 'hidden'}
               variants={tabPanelSwitch}
             >
               <CostCentersTab />

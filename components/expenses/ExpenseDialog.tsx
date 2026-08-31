@@ -39,7 +39,7 @@ import {
 } from '@/types/expenses';
 import { CostCenter } from '@/types/costCenters';
 import { getCostCenters } from '@/lib/services/costCenterService';
-import { Asset } from '@/types/assets';
+import { Asset, FamilyMember } from '@/types/assets';
 import { createExpense, updateExpense } from '@/lib/services/expenseService';
 import { getAllAssets } from '@/lib/services/assetService';
 import {
@@ -362,6 +362,12 @@ interface FormBodyProps {
   costCentersEnabled: boolean;
   selectedCostCenterId: string;
   setSelectedCostCenterId: (id: string) => void;
+  /** Cashflow › Divisione is on AND the household has someone to attribute a row to. */
+  splitEnabled: boolean;
+  familyMembers: FamilyMember[];
+  /** '' means «in comune» — the default, and what every row written before this feature is. */
+  personalMemberId: string;
+  setPersonalMemberId: (id: string) => void;
   availableCategories: ComboboxOption[];
   availableSubCategories: ComboboxOption[];
   onCreateCategory: (name: string) => void;
@@ -407,6 +413,10 @@ function ExpenseFormBody({
   costCentersEnabled,
   selectedCostCenterId,
   setSelectedCostCenterId,
+  splitEnabled,
+  familyMembers,
+  personalMemberId,
+  setPersonalMemberId,
   availableCategories,
   availableSubCategories,
   onCreateCategory,
@@ -674,6 +684,53 @@ function ExpenseFormBody({
           </p>
         </div>
       ) : null}
+
+      {/* ---- Divisione: di chi è questa voce (feature-gated) ----
+          In the MAIN body and not behind «Impostazioni avanzate», unlike the cost centre: in a
+          household that splits its spending this is touched on most rows, and the default
+          («In comune») is the one that costs no interaction at all.
+          Native radios rather than the SegmentedPill primitive — this picks a VALUE, not a
+          panel, so `role=radio` is what a screen reader should meet, and the browser gives the
+          arrow-key behaviour for free. */}
+      {splitEnabled && familyMembers.length > 0 && selectedType !== 'transfer' && (
+        <fieldset className="space-y-2">
+          <legend className="text-sm font-medium leading-none">
+            {selectedType === 'income' ? 'Entrata di' : 'Spesa di'}
+          </legend>
+          <div className="flex flex-wrap gap-2">
+            {[{ id: '', name: 'In comune' }, ...familyMembers].map((option) => {
+              const checked = personalMemberId === option.id;
+              return (
+                <label
+                  key={option.id || '__common__'}
+                  className={cn(
+                    'inline-flex h-11 cursor-pointer items-center rounded-full border px-4 text-sm transition-colors',
+                    'focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2',
+                    checked
+                      ? 'border-primary bg-primary text-primary-foreground'
+                      : 'border-border bg-background text-foreground hover:bg-muted'
+                  )}
+                >
+                  <input
+                    type="radio"
+                    name="personalMemberId"
+                    className="sr-only"
+                    value={option.id}
+                    checked={checked}
+                    onChange={() => setPersonalMemberId(option.id)}
+                  />
+                  {option.name}
+                </label>
+              );
+            })}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {selectedType === 'income'
+              ? 'Gli stipendi intestati a una persona danno le quote della Divisione.'
+              : 'Le voci in comune si dividono in proporzione agli stipendi; le personali restano a chi le ha fatte.'}
+          </p>
+        </fieldset>
+      )}
 
       {/* ================================================================
           IMPOSTAZIONI AVANZATE
@@ -1107,6 +1164,11 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
   const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
   const [costCentersEnabled, setCostCentersEnabled] = useState(false);
   const [selectedCostCenterId, setSelectedCostCenterId] = useState<string>('__none__');
+  // Divisione: '' is «in comune», the default. Stored as its own state rather than a form field
+  // because it is not validated and has no error state — same shape as the cost centre above.
+  const [splitEnabled, setSplitEnabled] = useState(false);
+  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
+  const [personalMemberId, setPersonalMemberId] = useState<string>('');
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [categoryInitialName, setCategoryInitialName] = useState('');
   const [categoryEditTarget, setCategoryEditTarget] = useState<ExpenseCategory | null>(null);
@@ -1274,6 +1336,8 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
       setDefaultCreditCashAssetId(creditId);
       setCostCentersEnabled(settings?.costCentersEnabled ?? false);
       setCostCenters(centers);
+      setSplitEnabled(settings?.expenseSplitEnabled ?? false);
+      setFamilyMembers(settings?.familyMembers ?? []);
       if (!expense) {
         const currentType = getValues('type');
         const defaultId = currentType === 'income' ? creditId : debitId;
@@ -1308,6 +1372,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
         transferCashAssetId: expense.transferCashAssetId || '__none__',
       });
       setSelectedCostCenterId(expense.costCenterId || '__none__');
+      setPersonalMemberId(expense.personalMemberId || '');
     } else {
       reset({
         type: 'variable',
@@ -1326,6 +1391,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
         transferCashAssetId: '__none__',
       });
       setSelectedCostCenterId('__none__');
+      setPersonalMemberId('');
     }
   }, [expense, reset, open]);
 
@@ -1436,6 +1502,11 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
       data.transferCashAssetId === '__none__' ? undefined : data.transferCashAssetId;
     const resolvedCostCenterId =
       selectedCostCenterId === '__none__' ? undefined : selectedCostCenterId;
+    // A transfer is net-zero and belongs to no one: it moves money between the household's own
+    // accounts, which is exactly what feeding a joint account looks like. Marking it personal
+    // would put plumbing into somebody's column.
+    const resolvedPersonalMemberId =
+      splitEnabled && data.type !== 'transfer' && personalMemberId ? personalMemberId : undefined;
     const resolvedCostCenterName = resolvedCostCenterId
       ? costCenters.find((c) => c.id === resolvedCostCenterId)?.name
       : undefined;
@@ -1474,6 +1545,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
         transferCashAssetId,
         costCenterId: resolvedCostCenterId,
         costCenterName: resolvedCostCenterName,
+        personalMemberId: resolvedPersonalMemberId,
       };
 
       if (expense) {
@@ -1483,6 +1555,9 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
           transferCashAssetId: data.type === 'transfer' ? (transferCashAssetId ?? null) : null,
           costCenterId: resolvedCostCenterId ?? null,
           costCenterName: resolvedCostCenterName ?? null,
+          // updateDoc only touches the fields it is handed and removeUndefinedDeep strips
+          // undefined, so moving a row back to «in comune» has to be written explicitly.
+          personalMemberId: resolvedPersonalMemberId ?? null,
           // `isRecurring: false` above is authoritative, but `recurringDay: undefined` is
           // stripped by removeUndefinedDeep before the write, leaving the old day behind
           // in Firestore. Reachable now that a debt can be turned into a plain expense
@@ -1773,6 +1848,10 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
     costCentersEnabled,
     selectedCostCenterId,
     setSelectedCostCenterId,
+    splitEnabled,
+    familyMembers,
+    personalMemberId,
+    setPersonalMemberId,
     availableCategories,
     availableSubCategories,
     onCreateCategory: handleCreateCategory,

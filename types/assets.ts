@@ -290,6 +290,11 @@ export interface AssetAllocationSettings {
   assistantMacroContextEnabled?: boolean; // Enables macro/web context in assistant flows when explicitly requested
   assistantMemoryEnabled?: boolean; // Allows the assistant to persist reusable user context
   costCentersEnabled?: boolean; // When true, Centri di Costo tab appears in Cashflow and the cost center selector appears in ExpenseDialog
+  // When true, the Divisione tab appears in Cashflow and every expense/income row can be marked as
+  // one person's instead of the household's. Reads familyMembers (who) and laborIncomeCategoryIds
+  // (which income is a salary) — it adds no configuration of its own. Also read SERVER-side by the
+  // monthly email, so it lives in the settings mapper of dashboardOverviewService.ts too.
+  expenseSplitEnabled?: boolean;
   monthlyEmailEnabled?: boolean; // When true, a summary email is sent on the last day of each month
   quarterlyEmailEnabled?: boolean; // When true, a summary email is sent on the last day of each quarter (Mar/Jun/Sep/Dec)
   semiAnnualEmailEnabled?: boolean; // When true, a summary email is sent on the last day of each half-year (Jun 30 / Dec 31)

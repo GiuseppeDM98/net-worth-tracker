@@ -12,12 +12,12 @@
  * asset class — "Vanguard FTSE All-World ha fatto il grosso" — fed by `topInstrumentMovers`,
  * the same price attribution as the class digest before it is folded into classes.
  *
- * Percentages go through chartService's it-IT formatter (comma decimals), currency through
+ * Percentages go through the it-IT formatter of lib/utils/formatters (comma decimals), currency through
  * `cachedFormatCurrencyEUR` (no-break space before €) — AGENTS.md → Italian Localization.
  */
 
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
-import { formatPercentage } from '@/lib/services/chartService';
+import { formatPercentageIt as formatPercentage } from '@/lib/utils/formatters';
 import { MONTH_NAMES } from '@/lib/constants/months';
 import { getItalyDate } from '@/lib/utils/dateHelpers';
 import type { Narrative, NarrativeSegment, PageVerdictModel, VerdictTone } from '@/lib/utils/narrative';

@@ -22,10 +22,18 @@ Companion documents — do not duplicate their content into this file:
 - UI text Italian, code comments English. `formatCurrency()`, `formatDate()` (`DD/MM/YYYY`), `Sottocategoria` (no
   hyphen), `Buongiorno Giuseppe` (no comma). English on purpose: `Hall of Fame`, `FIRE e Simulazioni`, `Cashflow`,
   `Assistente AI` and the standard metric names; `Current Yield` → `Rendimento Corrente`.
-- **`formatPercentage` exists TWICE and the two disagree**: `chartService`'s is `Intl('it-IT')` (`40,71%`),
-  `lib/utils/formatters`' is `toFixed` (`40.71%`); `formatCurrency` matches in both. Import it from the same module the
-  surrounding component uses, or one surface prints both separators. Pure `lib/utils` modules feeding a screen take
-  chartService's and mock the Firebase chain in their tests. Same rule for any hand-rolled `toFixed` next to an `Intl`
+- **`formatPercentage` exists TWICE and the two disagree**: the it-IT one is `Intl('it-IT')` (`40,71%`),
+  `lib/utils/formatters`' `formatPercentage` is `toFixed` (`40.71%`); `formatCurrency` matches in both. Import it from
+  the same module the surrounding component uses, or one surface prints both separators.
+  **The it-IT implementations now live in `lib/utils/formatters.ts` as `formatPercentageIt`/`formatNumberIt`, and
+  `chartService` DELEGATES to them** (2026-08-31), so there is still exactly one implementation and no call site
+  changed. The reason is reach: `chartService` top-level-imports the client Firebase SDK, so a narrative module that
+  took its formatter from there could never be read by SERVER code — the periodic emails would initialise
+  `firebase/auth` inside a Lambda to print a percent sign. **A narrative module the server reads imports from
+  `formatters`, never from `chartService`**; `cashflowNarrative`, `patrimonioNarrative` and `expenseSplitNarrative`
+  are verified SDK-free. `formatNumberIt` is NOT `formatters`' own `formatNumber`: the former takes a `decimals`
+  argument and pins the width, the latter does not. A pure module feeding a screen through `chartService` still mocks
+  the Firebase chain in its tests. Same rule for any hand-rolled `toFixed` next to an `Intl`
   number — including `aria-label` text, where a dot makes a screen reader announce a different figure from the screen.
 - **Curly apostrophes break `.tsx`** (`TS1127`) — delimit with double quotes. **JSX eats the space next to an inline tag
   or wrapped expression** once Prettier breaks the line: write `{' '}` on both sides of `<strong>`/`{expr}`. **An
@@ -194,7 +202,10 @@ Companion documents — do not duplicate their content into this file:
   the page and reading the FORM — that is the half of the round trip where the historical bugs live.
 - **There is a SIXTH place for any setting the SERVER reads**: the settings mapper in
   `lib/services/dashboardOverviewService.ts` re-lists the same fields from the admin doc, independently of
-  `getSettings`. `settingsRoundTrip` does not cover it — check it by hand.
+  `getSettings`. `settingsRoundTrip` does not cover it — check it by hand. **And a SEVENTH for anything the periodic
+  emails read**: `getSettingsAdmin` in `lib/server/monthlyEmailService.ts` is a third independent re-listing, narrow by
+  default (it used to carry only the email fields). `familyMembers` was missing from BOTH server mappers until
+  2026-08-31 and there is no type error for it — an absent field is simply `undefined` server-side.
 - **Store a boolean explicitly, never derive it** from other fields. All feature toggles live in
   `AssetAllocationSettings`, never in `UserPreferences`, and dirty-state snapshot keys contain **only persisted
   fields**, captured *after* the Firestore state is applied.
@@ -783,6 +794,52 @@ Companion documents — do not duplicate their content into this file:
 - **Rows that open a center are `<button>`s whose accessible name is their content** («Apri Fenicottero …»):
   a center sits in Centri AND in Dormienti when idle, so a spec scopes the locator to the tile
   (`getByRole('region', { name: 'Centri', exact: true })`) or `.first()` trips strict mode.
+
+### Cashflow › Divisione (`components/cashflow/ExpenseSplitTab.tsx`, `lib/utils/{expenseSplitSummary,expenseSplitNarrative}.ts`)
+- **Opt-in, like Centri di Costo** (`expenseSplitEnabled`), on **Tracciamento's period axis** — a division is a fact of a
+  month the way a month's savings are. The tab computes nothing: numbers from `expenseSplitSummary.ts`, words from
+  `expenseSplitNarrative.ts`, and the monthly email reads the SAME two modules, so the page and the email can never
+  print two different splits.
+- **ONE field carries the whole feature**: `Expense.personalMemberId`. **Absent (or `null`) MEANS «in comune»** — that
+  default is why there is no migration (every row ever written is already shared) and why the normal case costs no
+  interaction. A value is a `FamilyMember` id, the SAME people as Previdenza's RAL: never a second list of names.
+  It applies to `income` too, and that is where the shares come from.
+- **Deliberately NOT denormalized to a name**, unlike `costCenterName`: the members live in the settings document every
+  consumer already loads, so a rename costs no bulk update. The price is that every reader resolves the label itself.
+- **The share is NEVER invented.** `resolveSplitBasis` returns `unavailable` — with `missingNames` — when fewer than two
+  people exist, when no labor category is configured, or when **one person has no salary in the period**; every
+  split-dependent figure (`share`, `commonShare`, `remaining`) is then `null` and the sentences name the missing input.
+  Without that guard the person who DID record a salary silently carries 100% of the pool. Own spending survives an
+  unavailable basis — it is a fact whatever the shares do.
+- **The base is the PERIOD's attributed labor income** (owner's decision, 2026-08-31), not the RAL and not a trailing
+  window: it is the most faithful reading of «this month» and the most volatile one. Do not «stabilise» it without
+  saying so on screen — the honesty of the feature is that the reading names its base out loud.
+- **`allocateByShare` charges the rounding residual to the LARGEST share**, so the parts sum back to the pool exactly,
+  and **re-rounds after the correction** (`50.02 + (−0.01)` is `50.010000000000005` in binary floating point).
+  **TRAP FOR ITS TEST: with exactly TWO shares the roundings always cancel, so the correction is unreachable in the
+  two-person case this feature was built for.** A fixture on two people is green with the whole branch disabled — it
+  happened, and only a falsification caught it. Test it on three.
+- **A row whose member was deleted is its own bucket** (`SPLIT_UNASSIGNED_LABEL`), never folded back into the pool:
+  charging everyone for a row its owner marked personal is a worse answer than admitting the row lost its owner. The
+  reading declares those euros, so the parts still add up to the whole.
+- **Transfers are skipped whole** — net-zero, and the money one person moves to a joint account is plumbing, not a cost.
+  The control is hidden on `transfer` in the dialog for the same reason. Classification is by `type`, never by sign.
+- **There is NO reconciliation of who paid**, by design: the question is «quanto resta a ciascuno», not «chi deve a
+  chi», so `linkedCashAssetId` is never read. Adding it is a new feature, not a completion of this one.
+- **The dialog control is in the MAIN body, not behind «Impostazioni avanzate»** (where the cost centre sits): it is
+  touched on most rows. It is **native radios**, not `SegmentedPill` — this picks a VALUE, not a panel, so `role=radio`
+  is what a screen reader should meet. Corollary for Playwright: step 1 of the create dialog is ALSO a radiogroup
+  («Tipo di voce»), so «no radios in the dialog» is not a valid assertion — name the control.
+- **Writing it is a FOUR-place fan-out**: the three creators in `expenseService.ts` (single, recurring, instalment —
+  a series belongs to one person on EVERY occurrence, unlike `linkedCashAssetId`) plus `updateExpense`, which the
+  dialog hands `?? null` explicitly: `removeUndefinedDeep` strips `undefined`, so moving a row back to «in comune»
+  has to be written, not omitted.
+- **An optional tab's id is accepted by `getInitialTab` while its panel is gated on the setting**, which used to leave
+  Cashflow **blank** — no tab bar, no content — for `?tab=split` or `?tab=cost-centers` with the feature off (a
+  bookmark, a shared link, or turning the feature off with the tab open). `effectiveTab` is DERIVED in
+  `app/dashboard/cashflow/page.tsx` (never corrected in an effect, or there is a render where the page is empty) and
+  falls back to `tracking`; it is settled only once BOTH optional settings have loaded. Any future optional tab
+  inherits the fix for free — and must read `effectiveTab`, not `activeTab`, in its header actions too.
 
 ### History and Snapshot Baselines
 - Annual deltas use December of the previous year as baseline; Patrimonio `Anno Corrente` uses the previous month as a
@@ -1956,6 +2013,7 @@ Companion documents — do not duplicate their content into this file:
 | Asset / bond | `assetDialogHelpers`, `couponUtils` |
 | Cashflow › Budget | `budgetUtils`, `budgetSummary`, `budgetNarrative` (+ `patrimonioNarrative` for the articles, `weeklyBudgetEmailService`, `monthlyEmailService`) |
 | Centri di costo | `costCenterSummary`, `costCenterNarrative` (+ `patrimonioNarrative` for the articles, `budgetNarrative` for `dayRef`), `costCenterUtils`, `costCenterColors` |
+| Cashflow › Divisione | `expenseSplitSummary`, `expenseSplitNarrative` (+ `cashflowNarrative` for the scheduled clause, `settingsRoundTrip` for the flag) |
 | Cashflow › Tracciamento | `tracciamentoSummary`, `cashflowNarrative` (+ `overviewNarrative` for `projectMonthEndSpending`, `patrimonioNarrative` for the articles) |
 | Impostazioni | **Letture** `settingsNarrative` · **Round-trip** `settingsRoundTrip` · **Formula** `equityBondsAutoTargets` · **Sblocco** `pensionUnlock` |
 | Accesso / Registrazione | **Verdetti, letture ed errori** `authNarrative` · **Policy** `registrationPolicy` (i due devono restare d'accordo sulla precedenza whitelist/flag) |
@@ -2153,6 +2211,14 @@ rules permitting the writes, real `Timestamp` values surviving `removeUndefinedD
 - **A green mechanical check that has never been seen red is indistinguishable from one asserting nothing** — and that
   includes the check's own arithmetic: filtering values by magnitude to drop chart-axis ticks also drops a legitimate
   reading of the same magnitude. Break the thing under test on purpose once.
+- **The fixture can make a branch unreachable, and the test stays green for the wrong reason.** `allocateByShare`'s
+  rounding correction cannot fire on two shares (they always cancel), so a two-person fixture passed with the branch
+  disabled; the same shape appears wherever a guard only bites past a threshold the fixture never crosses. When
+  falsification does NOT turn a test red, the test is the bug — not the falsification.
+- **An assertion of ABSENCE needs a positive anchor first.** `expect(locator).toHaveCount(0)` passes instantly against
+  a page that has not rendered, so it is green in every state including the one it is meant to catch. Wait for
+  something that IS expected in both states (a `forceMount` panel is ideal — attached, not necessarily visible), then
+  assert the absence. A browser check that never saw the feature ON has proven nothing about the feature being OFF.
 
 ### Per-page blind spots
 
@@ -2170,6 +2236,7 @@ Moved verbatim from CLAUDE.md's Known Issues each time that file reached its 40.
 - **Tracciamento**: «Tabella» renders `ExpenseTable` unchanged inside Movimenti; the period slice uses `periodToRange` (browser local time) while the month buckets use the Italian calendar; the phone bar's controls are 36px; `TransactionFeed`/`CompactExpenseRow` carry two pre-existing `react-hooks` errors; a custom range has no previous period; the month-end projection exists only in the current month; `components/dashboard/overview/NarrativeText.tsx` is an unused re-export (knip).
 - **Budget**: `BudgetItemDialog` stays for create/edit (no inline editing); **the ceiling history starts with the first cron run after the deploy** (earlier months read against today's ceiling, «prima quello attuale»), a month's record is its LAST captured configuration; the crossing day comes from the EXPENSE DATES (a backdated row moves it), an annual budget has no crossing sentence; a budget with every threshold off and already exceeded shows only in Per categoria; `app/dashboard/cashflow/page.tsx` carries two pre-existing `react-hooks` findings.
 - **Centri di Costo**: no Playwright spec; `CostCenterDialog` keeps its pre-redesign chrome; an annual ceiling has no crossing day (`crossedOn` is monthly only); «Al mese» divides by the calendar months since the first expense (an idle project reads as a lower monthly cost, by design); «in totale» counts rows dated up to today (a future row is «in calendario»); the subcategory lens and the movements window (25 + «Mostra altre») are per-center, session-only state.
+- **Divisione**: no Playwright spec, and **the feature has never been exercised end-to-end with the flag ON** (the 2026-08-31 collaudo stopped after phase A by the owner's decision) — the pure layer, the flag-off invariance and the build are proven, the writes of `personalMemberId` and the rendering are not; the shares follow the PERIOD's salaries, so a thirteenth month moves them and a month without one recorded has no shares at all (said by name); income attributed to a person outside `laborIncomeCategoryIds` is in neither the pool nor the residual; a running year's pool carries scheduled rows (declared, like Tracciamento); a member deleted after the fact leaves rows in «Senza intestatario»; there is no bulk attribution, so history stays «all in comune» until edited row by row; the per-person tile spans 6 columns at two people and 4 at three or more.
 - **Analisi**: «Fuori scala» runs on ONE month only (25% / 50 € over a 6-month average, hardcoded); a month not started gets «non è ancora iniziato»; «Mostra tutte», the Confronto year and the Flusso toggles are session-only; the Scheda's transactions window is 25 + «Mostra altre»; `EntityDossier` stays Recharts; `SavingsRateTrendSection`/`AndamentoStoricoSection` compute in the component (untested); the Sankey drops small slices on phones; no spec covers «Anno» with a month.
 - **Dividendi**: the payments table dropped *Tax/Netto/Costo per azione*; the calendar day opens the day dialog instead of filtering; under «Mese» no month arrows, under «Anno» they stop at January/December; the 2-click delete keeps its 3 s auto-disarm; the list toolbar is rendered twice. The yield never follows the period (TTM on the current holding); the DPS running-year column is a partial sum; no `averageCost` → the tile becomes an explanation.
 - **Rendimenti**: no Playwright spec; the six benchmark series + FX load on every visit (6h `staleTime`), only a FAILED FX route falls back to USD (the aside says so); Sharpe/Sortino use the settings' risk-free rate; the payload's `drawdownDuration`/`recoveryTime` are no longer displayed (the tiles read `resolveDrawdownStory`); a 1-anno window without the current month's snapshot measures 11 months and says so; the rolling readings live in `PerformanceDettaglio` (untested); `AIAnalysisDialog`/`CustomDateRangeDialog` keep their old chrome.

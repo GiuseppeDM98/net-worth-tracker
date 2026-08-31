@@ -374,6 +374,7 @@ export default function SettingsPage() {
   const [cashflowHistoryStartYear, setCashflowHistoryStartYear] = useState<number>(2025);
   const [laborIncomeCategoryIds, setLaborIncomeCategoryIds] = useState<string[]>([]);
   const [costCentersEnabled, setCostCentersEnabled] = useState<boolean>(false);
+  const [expenseSplitEnabled, setExpenseSplitEnabled] = useState<boolean>(false);
   const [performanceIncludesPensionFunds, setPerformanceIncludesPensionFunds] = useState<boolean>(false);
   const [performanceIncludesExcludedAssets, setPerformanceIncludesExcludedAssets] = useState<boolean>(false);
   const [pensionReturnStartMonth, setPensionReturnStartMonth] = useState<string>('');
@@ -616,6 +617,7 @@ export default function SettingsPage() {
         setCashflowHistoryStartYear(settingsData.cashflowHistoryStartYear ?? 2025);
         setLaborIncomeCategoryIds(settingsData.laborIncomeCategoryIds ?? []);
         setCostCentersEnabled(settingsData.costCentersEnabled ?? false);
+        setExpenseSplitEnabled(settingsData.expenseSplitEnabled ?? false);
         setPerformanceIncludesPensionFunds(settingsData.performanceIncludesPensionFunds ?? false);
         setPerformanceIncludesExcludedAssets(settingsData.performanceIncludesExcludedAssets ?? false);
         setPensionReturnStartMonth(settingsData.pensionReturnStartMonth ?? '');
@@ -755,6 +757,7 @@ export default function SettingsPage() {
           cashflowHistoryStartYear: settingsData?.cashflowHistoryStartYear ?? 2025,
           laborIncomeCategoryIds: [...(settingsData?.laborIncomeCategoryIds ?? [])].sort(),
           costCentersEnabled: settingsData?.costCentersEnabled ?? false,
+          expenseSplitEnabled: settingsData?.expenseSplitEnabled ?? false,
           performanceIncludesPensionFunds: settingsData?.performanceIncludesPensionFunds ?? false,
           performanceIncludesExcludedAssets: settingsData?.performanceIncludesExcludedAssets ?? false,
           pensionReturnStartMonth: settingsData?.pensionReturnStartMonth ?? '',
@@ -1330,6 +1333,7 @@ export default function SettingsPage() {
         cashflowHistoryStartYear,
         laborIncomeCategoryIds,
         costCentersEnabled,
+        expenseSplitEnabled,
         performanceIncludesPensionFunds,
         performanceIncludesExcludedAssets,
         // Stringa vuota = "nessun mese impostato": va salvata come undefined, non come '',
@@ -1628,6 +1632,7 @@ export default function SettingsPage() {
         cashflowHistoryStartYear,
         laborIncomeCategoryIds: [...laborIncomeCategoryIds].sort(),
         costCentersEnabled,
+        expenseSplitEnabled,
         performanceIncludesPensionFunds,
         performanceIncludesExcludedAssets,
         pensionReturnStartMonth,
@@ -1653,6 +1658,7 @@ export default function SettingsPage() {
       cashflowHistoryStartYear,
       laborIncomeCategoryIds,
       costCentersEnabled,
+      expenseSplitEnabled,
       performanceIncludesPensionFunds,
       performanceIncludesExcludedAssets,
       pensionReturnStartMonth,
@@ -2152,6 +2158,8 @@ export default function SettingsPage() {
                     laborCategoryNames,
                     historyStartYear: cashflowHistoryStartYear,
                     costCentersEnabled,
+                    expenseSplitEnabled,
+                    familyMemberCount: familyMembersForReading.length,
                   })}
                 >
                   <div className="mt-3">
@@ -2229,6 +2237,20 @@ export default function SettingsPage() {
                         id="costCentersEnabled"
                         checked={costCentersEnabled}
                         onCheckedChange={setCostCentersEnabled}
+                        className={cn('shrink-0', interactiveControlClass)}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between gap-4 py-3">
+                      <div className="min-w-0">
+                        <Label htmlFor="expenseSplitEnabled" className="text-[13px] font-medium">Divisione delle spese</Label>
+                        <p className="mt-0.5 text-[11px] leading-[1.4] text-muted-foreground">
+                          Il tab appare in Cashflow, e ogni voce si può marcare come personale
+                        </p>
+                      </div>
+                      <Switch
+                        id="expenseSplitEnabled"
+                        checked={expenseSplitEnabled}
+                        onCheckedChange={setExpenseSplitEnabled}
                         className={cn('shrink-0', interactiveControlClass)}
                       />
                     </div>

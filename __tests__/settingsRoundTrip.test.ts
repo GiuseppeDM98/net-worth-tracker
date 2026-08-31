@@ -49,6 +49,7 @@ const STORED_SETTINGS = {
   pensionRitaLongUnemployment: true,
   cashflowHistoryStartYear: 2019,
   familyMembers: [{ id: 'm1', name: 'Giuseppe' }],
+  expenseSplitEnabled: true,
 };
 
 const TARGETS = { equity: { targetPercentage: 100 } } as unknown as AssetAllocationTarget;
@@ -88,6 +89,7 @@ describe('getSettings — lettura', () => {
     expect(settings?.respectPensionLockInFire).toBe(true);
     expect(settings?.cashflowHistoryStartYear).toBe(2019);
     expect(settings?.familyMembers).toEqual([{ id: 'm1', name: 'Giuseppe' }]);
+    expect(settings?.expenseSplitEnabled).toBe(true);
   });
 
   it('returns the RITA rule settings instead of dropping them', async () => {
@@ -231,6 +233,17 @@ describe('setSettings — scrittura, ramo senza targets (merge: true)', () => {
     } as AssetAllocationSettings);
 
     expect(writtenPayload().pensionReturnStartMonth).toBe(DELETE_SENTINEL);
+  });
+
+  // Un flag di funzionalità deve sopravvivere a ENTRAMBE le catene: il ramo `targets` scrive
+  // con setDoc senza merge, quindi un campo non ricopiato lì sparisce al primo salvataggio
+  // dell'allocazione (AGENTS -> Settings — the FIVE places).
+  it('writes expenseSplitEnabled through both chains', async () => {
+    await setSettings('user-1', { expenseSplitEnabled: true } as AssetAllocationSettings);
+    expect(writtenPayload().expenseSplitEnabled).toBe(true);
+
+    await setSettings('user-1', { targets: TARGETS, expenseSplitEnabled: true } as AssetAllocationSettings);
+    expect(writtenPayload().expenseSplitEnabled).toBe(true);
   });
 
   it('does not touch the start month when the key is absent from the update', async () => {

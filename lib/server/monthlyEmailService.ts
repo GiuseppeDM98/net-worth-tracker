@@ -14,6 +14,7 @@
 import { adminDb } from '@/lib/firebase/admin';
 import { Timestamp } from 'firebase-admin/firestore';
 import { Resend } from 'resend';
+import { escapeHtml } from '@/lib/server/emailHtml';
 import { getItalyDate, getItalyMonthYear } from '@/lib/utils/dateHelpers';
 import { MONTH_NAMES } from '@/lib/constants/months';
 import { AssetAllocationSettings } from '@/types/assets';
@@ -42,6 +43,9 @@ import { evaluateBudgetAlerts } from '@/lib/utils/budgetUtils';
 import { DEFAULT_ALERT_THRESHOLDS } from '@/types/budget';
 import type { BudgetAlert, BudgetItem } from '@/types/budget';
 import { type Expense, type ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
+import { summarizeExpenseSplit, type ExpenseSplitSummary } from '@/lib/utils/expenseSplitSummary';
+import { describeMemberBalance, describeSplitBasis } from '@/lib/utils/expenseSplitNarrative';
+import { narrativeToText } from '@/lib/utils/narrative';
 import { getUserSnapshotsAdmin } from '@/lib/server/assetAdminRepository';
 import {
   calculateMonthlyRecords,
@@ -101,6 +105,11 @@ export interface MonthlyEmailData {
   // Threshold alerts for the period's expense budgets — monthly emails only,
   // empty/undefined when the user has no budgets or alerts are disabled.
   budgetAlerts?: BudgetAlert[];
+  // How the household's shared spending divides over this window. Undefined when the feature is
+  // off or the household is not configured — the section then simply does not exist, rather
+  // than rendering an empty box. Built from the SAME pure modules as Cashflow › Divisione, so
+  // the email and the page can never print two different splits.
+  expenseSplit?: ExpenseSplitSummary;
 }
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
@@ -612,6 +621,41 @@ function formatBudgetAlertsForPrompt(emailData: MonthlyEmailData): string[] {
 }
 
 /**
+ * The household split, for the model.
+ *
+ * The window is NAMED in the header, as every figure in this prompt must be: the split is
+ * measured over the email's own period, not over the month, and a model handed a bare
+ * percentage next to a quarterly total will describe it as a monthly one.
+ *
+ * It also states what the residual is made of. «Restano 754 €» is a subtraction with two
+ * subtrahends, and a model that does not know which ones will explain it wrong.
+ */
+function formatExpenseSplitForPrompt(emailData: MonthlyEmailData, label: string): string[] {
+  const summary = emailData.expenseSplit;
+  if (!summary || summary.basis.kind !== 'computed') return [];
+
+  const lines = [
+    `--- DIVISIONE DELLE SPESE IN COMUNE (${label}) ---`,
+    `Spese in comune del periodo: ${formatEur(summary.common.total)}. Le quote sono proporzionali agli stipendi dello stesso periodo.`,
+    'Per ogni persona: «resta» = stipendio − quota di spese in comune − spese personali.',
+  ];
+  for (const balance of summary.members) {
+    if (balance.remaining === null || balance.share === null || balance.commonShare === null) continue;
+    lines.push(
+      `- ${balance.member.name}: stipendio ${formatEur(balance.salary)}, quota in comune ${formatEur(balance.commonShare)} ` +
+        `(${Math.round(balance.share * 100)}%), spese personali ${formatEur(balance.personalSpending)}, resta ${formatEur(balance.remaining)}.`
+    );
+  }
+  if (summary.unassigned.rowCount > 0) {
+    lines.push(
+      `Fuori dalla divisione: ${formatEur(summary.unassigned.total)} su ${summary.unassigned.rowCount} voci intestate a una persona non più configurata.`
+    );
+  }
+  lines.push('');
+  return lines;
+}
+
+/**
  * Builds the prompt for the email AI comment.
  *
  * The body IS the assistant's own numeric block (`formatBundleForPrompt`) over a bundle
@@ -619,8 +663,8 @@ function formatBudgetAlertsForPrompt(emailData: MonthlyEmailData): string[] {
  * future bundle field reaches the emails for free, and the "questo blocco è ESAUSTIVO"
  * guardrails in ASSISTANT_SYSTEM_CORE stop promising blocks the email never sent. Appended
  * to it are the sections only the email has — the precomputed market effect, the
- * deterministic comparisons, the per-category deltas, the Hall of Fame standing and the
- * month's budget alerts.
+ * deterministic comparisons, the per-category deltas, the Hall of Fame standing, the
+ * month's budget alerts and the household split.
  *
  * The largest single expenses are deliberately NOT re-listed: the bundle already carries
  * them, with their date, in `--- SPESE SINGOLE PIU' GRANDI ---`.
@@ -668,6 +712,7 @@ export function buildEmailAiPrompt(
     ...formatCategoryDeltasForPrompt(emailData, comparison),
     ...formatHallOfFameForPrompt(emailData),
     ...formatBudgetAlertsForPrompt(emailData),
+    ...formatExpenseSplitForPrompt(emailData, label),
   ].join('\n');
 
   return {
@@ -802,6 +847,12 @@ export async function getSettingsAdmin(
     yearlyEmailEnabled: data.yearlyEmailEnabled,
     weeklyBudgetEmailEnabled: data.weeklyBudgetEmailEnabled,
     monthlyEmailRecipients: data.monthlyEmailRecipients,
+    // Read by the Divisione section below. This mapper is an INDEPENDENT re-listing of the
+    // settings document (getSettings on the client is the other one): a field missing here is
+    // simply absent server-side, with no type error to catch it.
+    expenseSplitEnabled: data.expenseSplitEnabled,
+    familyMembers: data.familyMembers ?? [],
+    laborIncomeCategoryIds: data.laborIncomeCategoryIds ?? [],
     targets: data.targets,
   } as AssetAllocationSettings;
 }
@@ -1199,6 +1250,8 @@ export async function buildPeriodEmailData(
   // Hall of Fame standing (monthly/yearly only) — never blocks the email on failure.
   const hallOfFameRank = await computeHallOfFameRank(userId, periodType, year, month);
 
+  const expenseSplit = await buildExpenseSplitForPeriod(userId, expensesSnap.docs, new Date());
+
   return {
     periodType,
     year,
@@ -1224,7 +1277,51 @@ export async function buildPeriodEmailData(
     dividendCount,
     hallOfFameRank,
     budgetAlerts,
+    expenseSplit,
   };
+}
+
+/**
+ * The household split over the email's own window, or undefined when there is nothing to say.
+ *
+ * It re-uses `summarizeExpenseSplit` rather than aggregating again: the email's figures and the
+ * ones on Cashflow › Divisione have to be the same figures, and the only way to guarantee that
+ * is for them to come out of the same function. `now` is the real clock, so a period already
+ * closed has no scheduled part and a running one declares it exactly as the page does.
+ *
+ * Returns undefined — never an empty summary — when the feature is off or the household has
+ * fewer than two people: the section is then absent instead of rendering a box with no answer.
+ */
+async function buildExpenseSplitForPeriod(
+  userId: string,
+  expenseDocs: FirebaseFirestore.QueryDocumentSnapshot[],
+  now: Date
+): Promise<ExpenseSplitSummary | undefined> {
+  try {
+    const settings = await getSettingsAdmin(userId);
+    const members = settings?.familyMembers ?? [];
+    if (!settings?.expenseSplitEnabled || members.length < 2) return undefined;
+
+    const expenses = expenseDocs.map((doc) => {
+      const data = doc.data();
+      return {
+        ...data,
+        id: doc.id,
+        date: data.date?.toDate?.() ?? new Date(),
+      } as Expense;
+    });
+
+    return summarizeExpenseSplit({
+      expenses,
+      members,
+      laborIncomeCategoryIds: settings.laborIncomeCategoryIds ?? [],
+      now,
+    });
+  } catch (error) {
+    // Never block an email on this section, like every other optional block here.
+    console.error('Failed to build the expense split section', { userId, error });
+    return undefined;
+  }
 }
 
 /** Backward-compatible wrapper — builds monthly email data. */
@@ -1369,6 +1466,50 @@ function buildHallOfFameLineHtml(data: MonthlyEmailData): string {
   const fg = rank.trend === 'growth' ? '#16a34a' : '#dc2626';
 
   return `<p style="margin:10px 0 0;display:inline-block;font-size:12px;font-weight:600;color:${fg};background:${bg};border-radius:6px;padding:4px 10px;">${text}</p>`;
+}
+
+/**
+ * «Spese in comune» — the household split, one row per person.
+ *
+ * The words come from `expenseSplitNarrative.ts`, the same sentences the Divisione tab prints,
+ * flattened to text: an email renders outside the DOM, so the `Narrative`'s mono and sign
+ * segments cannot carry their tokens here and the colours below are literal hexes like every
+ * other block in this file (a permanent token-drift surface, documented in CLAUDE.md).
+ *
+ * Absent whenever the split could not be computed: an email is a one-way message, so a section
+ * saying «the shares are unavailable» would be a notification the reader cannot act on from
+ * where they are reading it. The page is where that explanation belongs.
+ */
+function buildExpenseSplitSectionHtml(summary: ExpenseSplitSummary | undefined): string {
+  if (!summary || summary.basis.kind !== 'computed') return '';
+
+  const rows = summary.members
+    .map((balance) => {
+      if (balance.remaining === null) return '';
+      const color = balance.remaining < 0 ? '#dc2626' : '#16a34a';
+      return `
+        <tr>
+          <td style="padding:8px 0;border-bottom:1px solid #f3f4f6;">
+            <span style="font-size:13px;font-weight:600;color:#0f172a;">${escapeHtml(balance.member.name)}</span>
+            <span style="float:right;font-size:14px;font-weight:700;color:${color};font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">${formatEur(balance.remaining)}</span>
+            <div style="font-size:12px;color:#64748b;margin-top:2px;">${escapeHtml(narrativeToText(describeMemberBalance(balance)))}</div>
+          </td>
+        </tr>`;
+    })
+    .join('');
+
+  if (!rows) return '';
+
+  return `
+        <tr>
+          <td style="padding:20px 32px;border-bottom:1px solid #f1f5f9;">
+            <p style="margin:0 0 4px;font-size:14px;font-weight:600;color:#0f172a;">Spese in comune</p>
+            <p style="margin:0 0 12px;font-size:12px;color:#64748b;">${escapeHtml(narrativeToText(describeSplitBasis(summary.basis)))}</p>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+              ${rows}
+            </table>
+          </td>
+        </tr>`;
 }
 
 export function generateEmailHtml(data: MonthlyEmailData, comparisonData?: PeriodComparison): string {
@@ -1745,6 +1886,9 @@ export function generateEmailHtml(data: MonthlyEmailData, comparisonData?: Perio
 
         <!-- Budget alerts (monthly only) -->
         ${buildBudgetAlertsSectionHtml(data.budgetAlerts)}
+
+        <!-- Household split (only when configured) -->
+        ${buildExpenseSplitSectionHtml(data.expenseSplit)}
 
         <!-- AI Comment -->
         ${
