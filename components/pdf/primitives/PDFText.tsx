@@ -3,6 +3,8 @@
 
 import { Text, StyleSheet } from '@react-pdf/renderer';
 import type { Style } from '@react-pdf/types';
+import { PRINT_COLORS, PDF_FONTS } from '@/lib/constants/printTokens';
+import { PDF_RAMP } from './PDFTile';
 
 type TextVariant = 'heading' | 'subheading' | 'body' | 'caption' | 'bold';
 
@@ -18,24 +20,24 @@ interface PDFTextProps {
  * Provides consistent styling across all PDF sections and supports custom style overrides
  * via the style prop which will be merged with the variant's base styles.
  *
- * Variant usage guide:
- * - heading: Section titles (18px, bold, black)
- * - subheading: Subsection titles (14px, bold, gray)
- * - body: Regular paragraph text (10px, regular, black) [default]
- * - caption: Small annotations and footnotes (8px, italic, light gray)
- * - bold: Emphasized inline text (10px, bold, black)
+ * Variant usage guide (sizes in POINTS, from PDF_RAMP):
+ * - heading: a block title inside a page (13pt bold)
+ * - subheading: the eyebrow above a block (7pt bold, uppercase, muted) — the app's one eyebrow
+ * - body: reading copy (9.5pt) [default]
+ * - caption: a note or a source line (7.5pt muted)
+ * - bold: an emphasised run inside body copy
  *
- * Note: @react-pdf/renderer only supports Helvetica font family variants:
- * Helvetica, Helvetica-Bold, Helvetica-Oblique, Helvetica-BoldOblique.
- * Custom fonts require additional font registration.
+ * Note: @react-pdf/renderer only supports the standard PDF families without registering font
+ * files — see `PDF_FONTS` in lib/constants/printTokens.ts, which owns that decision and the
+ * reason for it. Sizes come from `PDF_RAMP`, colours from `PRINT_COLORS`: no literal here.
  *
  * @param variant - Typography variant to use (defaults to 'body')
  * @param children - Text content to render
  * @param style - Optional style override(s) merged with variant base styles
  *
  * @example
- * <PDFText variant="heading">Portfolio Summary</PDFText>
- * <PDFText variant="body" style={{ color: '#3B82F6' }}>Blue text</PDFText>
+ * <PDFText variant="heading">Riepilogo</PDFText>
+ * <PDFText variant="caption">Fonte: snapshot di fine mese</PDFText>
  */
 export function PDFText({ variant = 'body', children, style }: PDFTextProps) {
   // Style normalization pattern: Convert single style object or array to unified array format.
@@ -56,33 +58,36 @@ export function PDFText({ variant = 'body', children, style }: PDFTextProps) {
 
 const styles = StyleSheet.create({
   heading: {
-    fontSize: 18,
-    fontFamily: 'Helvetica-Bold',
-    marginBottom: 10,
-    color: '#000000',
+    fontSize: 13,
+    fontFamily: PDF_FONTS.bold,
+    marginBottom: 8,
+    color: PRINT_COLORS.foreground,
   },
   subheading: {
-    fontSize: 14,
-    fontFamily: 'Helvetica-Bold',
+    fontSize: PDF_RAMP.eyebrow,
+    fontFamily: PDF_FONTS.bold,
+    letterSpacing: 0.7,
+    textTransform: 'uppercase',
     marginBottom: 6,
-    color: '#374151',
+    color: PRINT_COLORS.mutedForeground,
   },
   body: {
-    fontSize: 10,
-    fontFamily: 'Helvetica',
+    fontSize: PDF_RAMP.reading,
+    fontFamily: PDF_FONTS.regular,
+    lineHeight: 1.5,
     marginBottom: 4,
-    color: '#000000',
+    color: PRINT_COLORS.foreground,
   },
   caption: {
-    fontSize: 8,
-    fontFamily: 'Helvetica-Oblique',
-    color: '#666666',
+    fontSize: PDF_RAMP.caption,
+    fontFamily: PDF_FONTS.regular,
+    color: PRINT_COLORS.mutedForeground,
     marginBottom: 2,
   },
   bold: {
-    fontSize: 10,
-    fontFamily: 'Helvetica-Bold',
+    fontSize: PDF_RAMP.reading,
+    fontFamily: PDF_FONTS.bold,
     marginBottom: 4,
-    color: '#000000',
+    color: PRINT_COLORS.foreground,
   },
 });

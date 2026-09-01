@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { PRINT_COLORS } from '@/lib/constants/printTokens';
+
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/firebase/config', () => ({ auth: { currentUser: null }, db: {} }));
 
@@ -847,145 +849,158 @@ describe('aggregateExpenses', () => {
 // ─── generateEmailHtml ────────────────────────────────────────────────────────
 
 describe('generateEmailHtml', () => {
-  it('contains Italian month name for monthly', () => {
+  it('opens on the verdict, not on a number', () => {
+    // The fixture grew by 5.000 € while saving 1.500 €, so the residual is +3.500 €: the
+    // market moved it, and the headline is allowed to say so.
     const html = generateEmailHtml(makeMonthlyData());
+    expect(html).toContain('Marzo è cresciuto: il mercato ha spinto');
     expect(html).toContain('Marzo 2025');
   });
 
-  it('contains positive delta arrow ▲', () => {
-    expect(generateEmailHtml(makeMonthlyData())).toContain('▲');
+  it('puts the verdict in the inbox preview, so the reader knows before opening', () => {
+    const html = generateEmailHtml(makeMonthlyData());
+    const preheader = html.slice(html.indexOf('<div style="display:none'), html.indexOf('</div>'));
+    expect(preheader).toContain('Marzo è cresciuto');
   });
 
-  it('contains negative delta arrow ▼ for loss', () => {
-    const html = generateEmailHtml(makeMonthlyData({ netWorthDelta: -3000, netWorthDeltaPct: -2 }));
-    expect(html).toContain('▼');
+  it('never blames the market when the market did not lose', () => {
+    // Δ −3.000 € with +1.500 € saved ⇒ the residual is −4.500 €: the market did lose.
+    expect(generateEmailHtml(makeMonthlyData({ netWorthDelta: -3000, netWorthDeltaPct: -2 }))).toContain(
+      'Marzo è in calo: il mercato ha pesato',
+    );
+    // The same fall with 5.000 € overspent leaves a POSITIVE residual (−3.000 − (−5.000) =
+    // +2.000): the market gained and the flows are what pulled the total down.
+    expect(
+      generateEmailHtml(makeMonthlyData({ netWorthDelta: -3000, netWorthDeltaPct: -2, totalExpenses: 8500 })),
+    ).toContain('nonostante il mercato');
   });
 
-  it('shows top expense categories', () => {
+  it('carries no arrow glyphs: the sign is the colour and the sign of the figure', () => {
+    const html = generateEmailHtml(makeMonthlyData());
+    expect(html).not.toContain('▲');
+    expect(html).not.toContain('▼');
+  });
+
+  it('shows the expense categories with it-IT percentages', () => {
+    // Alimentari 800/2000 = 40%, Trasporti 600/2000 = 30% — commas, never dots (The Comma Rule).
     const html = generateEmailHtml(makeMonthlyData());
     expect(html).toContain('Alimentari');
     expect(html).toContain('Trasporti');
+    expect(html).toContain('40,0%');
+    expect(html).toContain('30,0%');
+    expect(html).not.toContain('40.0%');
   });
 
-  it('shows dividend section when dividendCount > 0', () => {
-    expect(generateEmailHtml(makeMonthlyData())).toContain('Dividendi');
-  });
-
-  it('omits dividend section when dividendCount === 0', () => {
-    const html = generateEmailHtml(makeMonthlyData({ dividendCount: 0, dividendTotal: 0 }));
-    expect(html).not.toContain('Dividendi');
-  });
-
-  it('handles zero expenses (no expense categories section)', () => {
+  it('closes a long category list on a residual row, so the shares reach 100%', () => {
     const html = generateEmailHtml(
-      makeMonthlyData({ totalExpenses: 0, topExpenseCategories: [] })
+      makeMonthlyData({
+        totalExpenses: 2000,
+        topExpenseCategories: Array.from({ length: 9 }, (_, index) => ({
+          key: `cat-${index}`,
+          name: `Categoria ${index}`,
+          amount: 400 - index * 40,
+        })),
+      }),
     );
-    expect(html).not.toContain('Spese per Categoria');
+    expect(html).toContain('Altre 3 categorie');
   });
 
-  it('shows expense category % of total', () => {
-    // Alimentari 800/2000 = 40%, Trasporti 600/2000 = 30%
+  it('shows the composition with the app’s own class labels', () => {
+    // equity = 90000 / 150000 = 60%. The label comes from ASSET_CLASS_LABELS, so the email
+    // cannot call a class something no screen calls it.
     const html = generateEmailHtml(makeMonthlyData());
-    expect(html).toContain('40.0%');
-    expect(html).toContain('30.0%');
+    expect(html).toContain('Azioni');
+    expect(html).toContain('60,0%');
   });
 
-  it('shows income categories section when allIncomeCategories is populated', () => {
+  it('names the class that moved, in percent and in euro, when they differ', () => {
+    const html = generateEmailHtml(
+      makeMonthlyData({
+        assetClassPerformers: {
+          bestPct: { name: 'Criptovalute', deltaPct: 10, deltaAbs: 900 },
+          worstPct: { name: 'Obbligazioni', deltaPct: -5, deltaAbs: -2000 },
+          bestAbs: { name: 'Azioni', deltaPct: 4, deltaAbs: 10000 },
+          worstAbs: { name: 'Obbligazioni', deltaPct: -5, deltaAbs: -2000 },
+        },
+      }),
+    );
+    expect(html).toContain('Andamento per classe');
+    expect(html).toContain('migliore in percentuale');
+    expect(html).toContain('migliore in euro');
+    expect(html).toContain('peggiore');
+  });
+
+  it('omits the class-move tile when nothing is attributable', () => {
+    expect(generateEmailHtml(makeMonthlyData())).not.toContain('Andamento per classe');
+  });
+
+  it('states the savings rate and what net savings means', () => {
+    // saved = 3500 − 2000 = 1500; rate = 1500/3500 ≈ 42,9%
+    const html = generateEmailHtml(makeMonthlyData());
+    expect(html).toContain('42,9%');
+    expect(html).toContain('Risparmio netto = entrate − uscite');
+  });
+
+  it('shows the income categories when there are any', () => {
     const html = generateEmailHtml(
       makeMonthlyData({
         allIncomeCategories: [
           { key: 'cat-stipendio', name: 'Stipendio', amount: 3000 },
           { key: 'cat-freelance', name: 'Freelance', amount: 500 },
         ],
-      })
+      }),
     );
-    expect(html).toContain('Entrate per Categoria');
+    expect(html).toContain('Entrate per categoria');
     expect(html).toContain('Stipendio');
-    expect(html).toContain('Freelance');
-    // 3000/3500 ≈ 85.7%
-    expect(html).toContain('85.7%');
+    expect(html).toContain('85,7%');
   });
 
-  it('omits income categories section when allIncomeCategories is empty', () => {
-    const html = generateEmailHtml(makeMonthlyData({ allIncomeCategories: [] }));
-    expect(html).not.toContain('Entrate per Categoria');
+  it('omits the income tile when nothing came in by category', () => {
+    expect(generateEmailHtml(makeMonthlyData({ allIncomeCategories: [] }))).not.toContain('Entrate per categoria');
   });
 
-  it('shows % allocation column', () => {
-    // equity = 90000 / 150000 * 100 = 60%
-    const html = generateEmailHtml(makeMonthlyData());
-    expect(html).toContain('60.0%');
+  it('omits the expense tile when there was no spending', () => {
+    const html = generateEmailHtml(makeMonthlyData({ totalExpenses: 0, topExpenseCategories: [] }));
+    expect(html).not.toContain('Spese per categoria');
   });
 
-  it('shows performers section when best and worst differ', () => {
-    const entry = { name: 'Azioni', deltaPct: 10, deltaAbs: 10000 };
-    const entryWorst = { name: 'Obbligazioni', deltaPct: -5, deltaAbs: -2000 };
-    const html = generateEmailHtml(
-      makeMonthlyData({
-        assetClassPerformers: {
-          bestPct: entry,
-          worstPct: entryWorst,
-          bestAbs: entry,
-          worstAbs: entryWorst,
-        },
-      })
-    );
-    expect(html).toContain('Migliore');
-    expect(html).toContain('Peggiore');
-    expect(html).toContain('Azioni');
-    expect(html).toContain('Obbligazioni');
-  });
-
-  it('omits performers section when both are null', () => {
-    const html = generateEmailHtml(makeMonthlyData());
-    expect(html).not.toContain('Performance Asset Class');
-  });
-
-  it('shows savings rate in cashflow', () => {
-    // saved = 3500 - 2000 = 1500; rate = 1500/3500 * 100 ≈ 42.9%
-    const html = generateEmailHtml(makeMonthlyData());
-    expect(html).toContain('42.9%');
-  });
-
-  it('shows top 5 individual expenses when present', () => {
+  it('shows the largest single expenses, with the note under the category', () => {
     const html = generateEmailHtml(
       makeMonthlyData({
         topIndividualExpenses: [
           { description: 'Affitto', categoryName: 'Casa', amount: 1200 },
           { description: 'Spesa settimanale', categoryName: 'Alimentari', amount: 250 },
         ],
-      })
+      }),
     );
-    expect(html).toContain('Top 5 Spese del Mese');
+    expect(html).toContain('Spese maggiori');
     expect(html).toContain('Affitto');
     expect(html).toContain('Spesa settimanale');
   });
 
-  it('uses quarterly label for quarterly period type', () => {
-    const html = generateEmailHtml(
-      makeMonthlyData({ periodType: 'quarterly', quarter: 1, month: 3, year: 2026 })
+  it('shows the dividends tile only when something was received', () => {
+    expect(generateEmailHtml(makeMonthlyData())).toContain('Dividendi e cedole');
+    expect(generateEmailHtml(makeMonthlyData({ dividendCount: 0, dividendTotal: 0 }))).not.toContain(
+      'Dividendi e cedole',
     );
-    expect(html).toContain('Q1 2026');
-    expect(html).toContain('Cashflow del Trimestre');
   });
 
-  it('uses yearly label for yearly period type', () => {
-    const html = generateEmailHtml(
-      makeMonthlyData({ periodType: 'yearly', month: 12, year: 2025 })
-    );
-    expect(html).toContain('Anno 2025');
-    expect(html).toContain("Cashflow dell'Anno");
+  it('speaks each period in its own words', () => {
+    const quarterly = generateEmailHtml(makeMonthlyData({ periodType: 'quarterly', quarter: 1, month: 3, year: 2026 }));
+    expect(quarterly).toContain('Q1 2026');
+    expect(quarterly).toContain('Riepilogo trimestrale');
+    expect(quarterly).toContain('Il primo trimestre');
+
+    const yearly = generateEmailHtml(makeMonthlyData({ periodType: 'yearly', month: 12, year: 2025 }));
+    expect(yearly).toContain('Anno 2025');
+    expect(yearly).toContain('Riepilogo annuale');
+
+    const semiannual = generateEmailHtml(makeMonthlyData({ periodType: 'semiannual', semester: 1, month: 6, year: 2026 }));
+    expect(semiannual).toContain('1° Semestre 2026');
+    expect(semiannual).toContain('Riepilogo semestrale');
   });
 
-  it('uses semi-annual label for semiannual period type', () => {
-    const html = generateEmailHtml(
-      makeMonthlyData({ periodType: 'semiannual', semester: 1, month: 6, year: 2026 })
-    );
-    expect(html).toContain('1° Semestre 2026');
-    expect(html).toContain('Cashflow del Semestre');
-  });
-
-  it('renders the comparison table with both axes when a comparison is provided', () => {
+  it('renders the year-earlier tile when the two baselines are different windows', () => {
     const comparison: PeriodComparison = {
       previousEqualsYoy: false,
       vsPrevious: {
@@ -996,7 +1011,7 @@ describe('generateEmailHtml', () => {
         savings: { absChange: -300, pctChange: -16.7 },
       },
       vsYoy: {
-        baselineLabel: 'Marzo 2025',
+        baselineLabel: 'Marzo 2024',
         netWorth: { absChange: 20000, pctChange: 15.4 },
         income: null,
         expenses: { absChange: -200, pctChange: -9.1 },
@@ -1005,51 +1020,38 @@ describe('generateEmailHtml', () => {
       categoryDeltas: [],
     };
     const html = generateEmailHtml(makeMonthlyData(), comparison);
-    expect(html).toContain('Confronti');
-    expect(html).toContain('vs mese precedente');
-    expect(html).toContain('vs Marzo 2025');
-    // Null metrics render as N/D
+    expect(html).toContain('Rispetto a un anno fa');
+    expect(html).toContain('Marzo 2024');
+    // A metric without a baseline is unknowable, not zero.
     expect(html).toContain('N/D');
-    // Explanatory note clarifies the baselines (snapshot vs period totals) for all email types
-    expect(html).toContain('confronto tra gli snapshot di fine periodo');
-    expect(html).toContain('Risparmio netto = Entrate − Uscite');
+    expect(html).toContain('confronta due snapshot di fine periodo');
   });
 
-  it('renders a single comparison column for yearly (previous equals YoY)', () => {
-    const comparison: PeriodComparison = {
-      previousEqualsYoy: true,
-      vsPrevious: {
-        baselineLabel: '2024',
-        netWorth: { absChange: 12000, pctChange: 9.1 },
-        income: { absChange: 1000, pctChange: 2.5 },
-        expenses: { absChange: 500, pctChange: 1.8 },
-        savings: { absChange: 500, pctChange: 5.0 },
-      },
-      vsYoy: {
-        baselineLabel: '2024',
-        netWorth: { absChange: 12000, pctChange: 9.1 },
-        income: { absChange: 1000, pctChange: 2.5 },
-        expenses: { absChange: 500, pctChange: 1.8 },
-        savings: { absChange: 500, pctChange: 5.0 },
-      },
-      categoryDeltas: [],
+  it('drops the year-earlier tile entirely when it would repeat the period tiles', () => {
+    // On a yearly email the previous period IS the previous year (`previousEqualsYoy`), so
+    // every figure in the tile is already printed by Patrimonio and Cashflow above it:
+    // The One-Tile-One-Question Rule. The old «Confronti» table printed it anyway.
+    const identical = {
+      baselineLabel: '2024',
+      netWorth: { absChange: 12000, pctChange: 9.1 },
+      income: { absChange: 1000, pctChange: 2.5 },
+      expenses: { absChange: 500, pctChange: 1.8 },
+      savings: { absChange: 500, pctChange: 5.0 },
     };
     const html = generateEmailHtml(
       makeMonthlyData({ periodType: 'yearly', month: 12, year: 2025 }),
-      comparison
+      { previousEqualsYoy: true, vsPrevious: identical, vsYoy: identical, categoryDeltas: [] } as PeriodComparison,
     );
-    expect(html).toContain('Confronti');
-    expect(html).toContain('vs 2024');
+    expect(html).not.toContain('Rispetto a un anno fa');
   });
 
-  it('omits the comparison table when no comparison is provided', () => {
-    const html = generateEmailHtml(makeMonthlyData());
-    expect(html).not.toContain('>Confronti<');
+  it('omits the year-earlier tile when no comparison was built', () => {
+    expect(generateEmailHtml(makeMonthlyData())).not.toContain('Rispetto a un anno fa');
   });
 
-  it('names the untyped residual in "Spese per Tipo" so the percentages reach 100', () => {
-    // 2.000 € of spending, of which only 1.500 € carries a type: the missing 500 €
-    // used to be dropped from the table while still counting in the total.
+  it('names the untyped residual so the type shares reach 100', () => {
+    // 2.000 € of spending, of which only 1.500 € carries a type: the missing 500 € used to be
+    // dropped from the table while still counting in the total.
     const html = generateEmailHtml(
       makeMonthlyData({
         totalExpenses: 2000,
@@ -1057,10 +1059,10 @@ describe('generateEmailHtml', () => {
           { type: 'fixed', label: 'Spese Fisse', amount: 1000 },
           { type: 'variable', label: 'Spese Variabili', amount: 500 },
         ],
-      })
+      }),
     );
     expect(html).toContain('Non classificate');
-    expect(html).toContain('25.0%'); // 500 / 2000
+    expect(html).toContain('25,0%');
   });
 
   it('omits the untyped row when every expense carries a type', () => {
@@ -1071,16 +1073,38 @@ describe('generateEmailHtml', () => {
           { type: 'fixed', label: 'Spese Fisse', amount: 1200 },
           { type: 'variable', label: 'Spese Variabili', amount: 800 },
         ],
-      })
+      }),
     );
-    expect(html).toContain('Spese per Tipo');
+    expect(html).toContain('Spese Fisse');
     expect(html).not.toContain('Non classificate');
   });
 
-  it('makes the net savings calculation explicit in the cashflow section', () => {
+  it('places the AI comment second — under the verdict, never in its place', () => {
+    const html = generateEmailHtml(makeMonthlyData({ aiComment: 'Il mese chiude con un fenicottero.' }));
+    const verdictAt = html.indexOf('Marzo è cresciuto');
+    const commentAt = html.indexOf('Commento AI');
+    const patrimonioAt = html.indexOf('>Patrimonio<');
+    expect(verdictAt).toBeLessThan(commentAt);
+    expect(commentAt).toBeLessThan(patrimonioAt);
+  });
+
+  it('still opens on a verdict when the AI comment is missing', () => {
+    // Generation is non-blocking, so the comment can simply be absent — which is exactly why
+    // the opening sentence cannot be the comment.
     const html = generateEmailHtml(makeMonthlyData());
-    expect(html).toContain('Entrate − Uscite');
-    expect(html).toContain('del reddito');
+    expect(html).not.toContain('Commento AI');
+    expect(html).toContain('Marzo è cresciuto');
+  });
+
+  it('carries no colour that is not a token', () => {
+    // Every hex in the message must come from `printTokens`; the slate ramp the email used to
+    // run on (#0f172a, #64748b, #94a3b8, #16a34a, #dc2626) is gone.
+    const html = generateEmailHtml(makeMonthlyData());
+    for (const stale of ['#0f172a', '#64748b', '#94a3b8', '#16a34a', '#dc2626', '#f1f5f9', '#f8fafc']) {
+      expect(html).not.toContain(stale);
+    }
+    expect(html).toContain(PRINT_COLORS.foreground);
+    expect(html).toContain(PRINT_COLORS.positive);
   });
 });
 

@@ -15,10 +15,48 @@ import { EMAIL_ANALYSIS_MODEL } from '@/lib/constants/aiModels';
 import { adminDb } from '@/lib/firebase/admin';
 import { Timestamp } from 'firebase-admin/firestore';
 import { Resend } from 'resend';
-import { escapeHtml } from '@/lib/server/emailHtml';
+import {
+  escapeHtml,
+  emailShell,
+  emailVerdict,
+  emailTile,
+  emailHero,
+  emailKeyFigures,
+  emailRankedRows,
+  emailComparisonTable,
+  emailAlertRows,
+  emailProse,
+  type EmailKeyFigure,
+  type EmailRankedRow,
+} from '@/lib/server/emailHtml';
+import {
+  buildPeriodEmailVerdict,
+  describeNetWorthTile,
+  describeMarketSplit,
+  describeCompositionTile,
+  describeClassMovesTile,
+  describeCashflowTile,
+  describeExpenseCategoriesTile,
+  describeIncomeCategoriesTile,
+  describeExpenseTypes,
+  describeTopExpensesTile,
+  describeDividendsTile,
+  describeYearOverYearTile,
+  describeBudgetAlertsTile,
+  periodTitle as periodTitleOf,
+  periodKindLabel,
+  periodScopeLabel,
+  periodEndLabel,
+  periodBaselineHeading,
+  yearEarlierHeading,
+  type EmailPeriod,
+  type PeriodEmailVerdictInput,
+} from '@/lib/utils/emailNarrative';
+import { printChartHexForAssetClass, PRINT_COLORS } from '@/lib/constants/printTokens';
+import { cachedFormatCurrencyEUR, formatPercentageIt } from '@/lib/utils/formatters';
 import { getItalyDate, getItalyMonthYear } from '@/lib/utils/dateHelpers';
-import { MONTH_NAMES } from '@/lib/constants/months';
 import { AssetAllocationSettings } from '@/types/assets';
+import { ASSET_CLASS_LABELS } from '@/lib/utils/allocationUtils';
 import { getDefaultAssistantPreferences } from '@/lib/server/assistant/webSearchPolicy';
 import { getAssistantMemoryDocument } from '@/lib/server/assistant/store';
 import {
@@ -279,24 +317,18 @@ export function getMostRecentCompletedHalfYearEnd(now: Date): { year: number; mo
 
 // ─── Formatting helpers ───────────────────────────────────────────────────────
 
+/** The app's one EUR formatter, in its whole-euro form. */
 function formatEur(amount: number): string {
-  return new Intl.NumberFormat('it-IT', {
-    style: 'currency',
-    currency: 'EUR',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount);
+  return cachedFormatCurrencyEUR(amount, true);
 }
 
 function signedPct(pct: number): string {
-  const sign = pct >= 0 ? '+' : '';
-  return `${sign}${pct.toFixed(1)}%`;
+  return `${pct >= 0 ? '+' : '−'}${formatPercentageIt(Math.abs(pct), 1)}`;
 }
 
 /** EUR amount with an explicit leading "+" for non-negative values (formatEur already prefixes "-"). */
 function signedEur(amount: number): string {
-  const sign = amount >= 0 ? '+' : '';
-  return `${sign}${formatEur(amount)}`;
+  return `${amount >= 0 ? '+' : '−'}${formatEur(Math.abs(amount))}`;
 }
 
 /** Renders a metric delta as "+1.234 € (+3,2%)", or "N/D" when the comparison is unavailable. */
@@ -306,83 +338,31 @@ function formatDelta(delta: MetricDelta | null): string {
   return `${signedEur(delta.absChange)}${pct}`;
 }
 
-const ASSET_CLASS_LABELS: Record<string, string> = {
-  equity: 'Azioni',
-  bonds: 'Obbligazioni',
-  crypto: 'Crypto',
-  realestate: 'Immobili',
-  cash: 'Liquidità',
-  commodity: 'Materie prime',
-  trendFollowing: 'Trend Following',
-  carry: 'Carry',
-};
+// ─── Period labels ────────────────────────────────────────────────────────────
+//
+// Every label the reader sees now comes from `lib/utils/emailNarrative.ts` — the same pure
+// module that writes the verdict. The local `ASSET_CLASS_LABELS` that used to live here went
+// with them: it had drifted from the app's own map ("Crypto" against "Criptovalute", "Materie
+// prime" against "Materie Prime"), so the email named two classes differently from every
+// screen that shows them.
 
-// ─── Period label helpers (pure) ──────────────────────────────────────────────
-
-/** Human-readable semester label, e.g. "1° Semestre 2026". */
-function semesterTitle(data: MonthlyEmailData): string {
-  return `${data.semester}° Semestre ${data.year}`;
+/**
+ * The email's period as the narrative layer sees it. `MonthlyEmailData` carries the same four
+ * fields under different names, and this is the ONE place the two shapes meet.
+ */
+function emailPeriodOf(data: MonthlyEmailData): EmailPeriod {
+  return {
+    kind: data.periodType,
+    year: data.year,
+    month: data.month,
+    quarter: data.quarter,
+    semester: data.semester,
+  };
 }
 
+/** "Agosto 2026", "Q3 2026" — the subject line and the header's scope. */
 function periodTitle(data: MonthlyEmailData): string {
-  if (data.periodType === 'quarterly') return `Q${data.quarter} ${data.year}`;
-  if (data.periodType === 'semiannual') return semesterTitle(data);
-  if (data.periodType === 'yearly') return `Anno ${data.year}`;
-  return `${MONTH_NAMES[data.month - 1]} ${data.year}`;
-}
-
-function comparisonLabel(data: MonthlyEmailData): string {
-  if (data.periodType === 'quarterly') {
-    const prev = getPreviousQuarterEnd(data.year, data.month);
-    return `Q${monthToQuarter(prev.month)} ${prev.year}`;
-  }
-  if (data.periodType === 'semiannual') {
-    const prev = getPreviousHalfEnd(data.year, data.month);
-    return `${monthToSemester(prev.month)}° Semestre ${prev.year}`;
-  }
-  if (data.periodType === 'yearly') return `${data.year - 1}`;
-  return 'mese precedente';
-}
-
-function cashflowSectionLabel(data: MonthlyEmailData): string {
-  if (data.periodType === 'quarterly') return 'Cashflow del Trimestre';
-  if (data.periodType === 'semiannual') return 'Cashflow del Semestre';
-  if (data.periodType === 'yearly') return "Cashflow dell'Anno";
-  return 'Cashflow del Mese';
-}
-
-function expenseCategoryLabel(data: MonthlyEmailData): string {
-  if (data.periodType === 'quarterly') return 'Spese per Categoria (Trimestre)';
-  if (data.periodType === 'semiannual') return 'Spese per Categoria (Semestre)';
-  if (data.periodType === 'yearly') return 'Spese per Categoria (Anno)';
-  return 'Spese per Categoria';
-}
-
-function incomeCategoryLabel(data: MonthlyEmailData): string {
-  if (data.periodType === 'quarterly') return 'Entrate per Categoria (Trimestre)';
-  if (data.periodType === 'semiannual') return 'Entrate per Categoria (Semestre)';
-  if (data.periodType === 'yearly') return 'Entrate per Categoria (Anno)';
-  return 'Entrate per Categoria';
-}
-
-function expenseTypeLabel(data: MonthlyEmailData): string {
-  if (data.periodType === 'quarterly') return 'Spese per Tipo (Trimestre)';
-  if (data.periodType === 'semiannual') return 'Spese per Tipo (Semestre)';
-  if (data.periodType === 'yearly') return 'Spese per Tipo (Anno)';
-  return 'Spese per Tipo';
-}
-
-function topExpenseTransactionLabel(data: MonthlyEmailData): string {
-  // The yearly report widens the list to Top 10 (see buildPeriodEmailData).
-  if (data.periodType === 'quarterly') return 'Top 5 Spese del Trimestre';
-  if (data.periodType === 'semiannual') return 'Top 5 Spese del Semestre';
-  if (data.periodType === 'yearly') return "Top 10 Spese dell'Anno";
-  return 'Top 5 Spese del Mese';
-}
-
-/** Yearly-only — the income Top 10 is not rendered for shorter periods. */
-function topIncomeTransactionLabel(): string {
-  return "Top 10 Entrate dell'Anno";
+  return periodTitleOf(emailPeriodOf(data));
 }
 
 /**
@@ -446,7 +426,7 @@ function simpleMarkdownToHtml(text: string): string {
       // Any-level headings (# ## ###) → compact bold paragraph
       .replace(
         /^#{1,3}\s+(.+)$/gm,
-        '<p style="margin:16px 0 2px;font-size:13px;font-weight:600;color:#0f172a;">$1</p>'
+        `<p style="margin:16px 0 2px;font-size:13px;font-weight:600;color:${PRINT_COLORS.foreground};">$1</p>`
       )
       // Ordered list items (1. 2. 3.) — must run before bullet items to avoid conflicts
       .replace(/^\d+\. (.+)$/gm, `${OLI_OPEN}$1${OLI_CLOSE}`)
@@ -1335,589 +1315,448 @@ export async function buildMonthlyEmailData(
 }
 
 // ─── Email HTML generator ─────────────────────────────────────────────────────
+//
+// The message is a verdict over tiles, the same shape every redesigned page takes: one
+// rule-generated sentence that answers "how did the period go?" before any number, then one
+// tile per question. The words all come from `lib/utils/emailNarrative.ts` and the chrome from
+// `lib/server/emailHtml.ts`; nothing below writes copy or a colour of its own.
+
+/** How many ranked rows a category tile prints before closing on a residual. */
+const RANKED_ROWS_SHOWN = 6;
 
 /**
- * Renders one comparison delta as an email table cell, coloured by whether the change is
- * favourable. For net worth / income / savings higher is better; for expenses lower is better.
+ * `Δ patrimonio − risparmio netto` — the same structural residual the AI prompt is handed,
+ * computed here from the email's own figures rather than from the assistant bundle (which
+ * `generateEmailHtml` does not receive). Null when there is no earlier snapshot: without a
+ * baseline the movement itself is unknown, and an unattributable effect is not a zero one.
  */
-function comparisonCell(delta: MetricDelta | null, higherIsBetter: boolean): string {
-  const base = 'padding:6px 12px;border-bottom:1px solid #f3f4f6;text-align:right;';
-  if (!delta) {
-    return `<td style="${base}color:#94a3b8;">N/D</td>`;
+function marketEffectOf(data: MonthlyEmailData): number | null {
+  if (data.previousNetWorth <= 0) return null;
+  return data.netWorthDelta - (data.totalIncome - data.totalExpenses);
+}
+
+/** The Hall of Fame standing, in the shape the verdict expects. */
+function verdictRank(data: MonthlyEmailData): PeriodEmailVerdictInput['rank'] {
+  const rank = data.hallOfFameRank;
+  if (!rank) return null;
+  return { position: rank.rank, total: rank.total, scope: rank.scope, trend: rank.trend };
+}
+
+/** Ranked rows for a category list: the head, then everything else as one residual row. */
+function rankedCategoryRows(
+  entries: Array<{ name: string; amount: number }>,
+  total: number,
+): EmailRankedRow[] {
+  const positive = entries.filter((entry) => entry.amount > 0).sort((a, b) => b.amount - a.amount);
+  if (positive.length === 0) return [];
+
+  const largest = positive[0].amount;
+  const shown = positive.slice(0, RANKED_ROWS_SHOWN);
+  const rest = positive.slice(RANKED_ROWS_SHOWN);
+
+  const share = (amount: number) => (total > 0 ? formatPercentageIt((amount / total) * 100, 1) : '—');
+
+  const rows: EmailRankedRow[] = shown.map((entry) => ({
+    label: entry.name,
+    amount: formatEur(entry.amount),
+    trailing: share(entry.amount),
+    fill: largest > 0 ? entry.amount / largest : 0,
+  }));
+
+  // The residual closes the list so the shares visibly sum to 100% — a head-of-list whose
+  // percentages stop at 81% reads as missing data rather than as a selection.
+  if (rest.length > 0) {
+    const restTotal = rest.reduce((sum, entry) => sum + entry.amount, 0);
+    rows.push({
+      label: `Altre ${rest.length} categorie`,
+      amount: formatEur(restTotal),
+      trailing: share(restTotal),
+      residual: true,
+    });
   }
-  const isFavourable = higherIsBetter ? delta.absChange >= 0 : delta.absChange <= 0;
-  const color = isFavourable ? '#16a34a' : '#dc2626';
-  return `<td style="${base}color:${color};font-weight:600;">${formatDelta(delta)}</td>`;
+  return rows;
+}
+
+/** The Composizione tile's rows — the one list where colour is an identity, not a rank. */
+function assetClassRows(byAssetClass: Record<string, number>): { rows: EmailRankedRow[]; total: number } {
+  const entries = Object.entries(byAssetClass)
+    .filter(([, value]) => value > 0)
+    .sort(([, a], [, b]) => b - a);
+  const total = entries.reduce((sum, [, value]) => sum + value, 0);
+  const largest = entries[0]?.[1] ?? 0;
+
+  return {
+    total,
+    rows: entries.map(([assetClass, value]) => ({
+      label: ASSET_CLASS_LABELS[assetClass] ?? assetClass,
+      amount: formatEur(value),
+      trailing: total > 0 ? formatPercentageIt((value / total) * 100, 1) : '—',
+      fill: largest > 0 ? value / largest : 0,
+      fillHex: printChartHexForAssetClass(assetClass),
+    })),
+  };
+}
+
+/** Best and worst by percent and by euro, as three at most non-repeating rows. */
+function classMoveRows(performers: AssetClassPerformers): EmailRankedRow[] {
+  const rows: EmailRankedRow[] = [];
+  const push = (entry: AssetClassEntry | null, caption: string) => {
+    if (!entry) return;
+    if (rows.some((row) => row.label === entry.name && row.caption === caption)) return;
+    rows.push({
+      label: entry.name,
+      caption,
+      amount: signedEur(entry.deltaAbs),
+      trailing: signedPct(entry.deltaPct),
+      trailingSign: entry.deltaPct >= 0 ? 'positive' : 'negative',
+    });
+  };
+
+  push(performers.bestPct, 'migliore in percentuale');
+  if (performers.bestAbs && performers.bestAbs.name !== performers.bestPct?.name) {
+    push(performers.bestAbs, 'migliore in euro');
+  }
+  // Only list a loser when one actually lost — a period in which every class gained has none.
+  if (performers.worstPct && performers.worstPct.deltaPct < 0) {
+    push(performers.worstPct, 'peggiore');
+  }
+  return rows;
+}
+
+/** Individual transactions: the category on the row, the note under it when it adds anything. */
+function transactionRows(
+  entries: Array<{ description: string; categoryName: string; subCategoryName?: string }>,
+  amounts: number[],
+  sign?: 'positive',
+): EmailRankedRow[] {
+  return entries.map((entry, index) => {
+    // The note earns its place only when it says something the labels do not already say.
+    const redundant = entry.description === entry.categoryName || entry.description === entry.subCategoryName;
+    const caption = [entry.subCategoryName, redundant ? null : entry.description].filter(Boolean).join(' · ');
+    return {
+      label: entry.categoryName,
+      caption: caption || undefined,
+      amount: sign === 'positive' ? signedEur(amounts[index]) : formatEur(amounts[index]),
+    };
+  });
 }
 
 /**
- * Builds the "Confronti" section: a deterministic table of how net worth, income, expenses and
- * savings changed vs the previous period and (when distinct) vs the same period one year earlier.
- * For yearly emails the two axes coincide, so a single comparison column is rendered.
+ * «Rispetto a un anno fa» — the tile that carries the SECOND baseline.
+ *
+ * It exists only when the year-earlier window differs from the previous period. On a yearly
+ * email the two coincide (`previousEqualsYoy`), and every figure in it would repeat what the
+ * Patrimonio and Cashflow tiles already print: The One-Tile-One-Question Rule. The old
+ * «Confronti» table printed both columns unconditionally, so a yearly email said everything
+ * twice and a monthly one restated its own headline delta.
  */
-function buildComparisonSectionHtml(comparison: PeriodComparison): string {
-  const { vsPrevious, vsYoy, previousEqualsYoy } = comparison;
-  const showYoy = !previousEqualsYoy;
+function buildYearOverYearTile(data: MonthlyEmailData, comparison: PeriodComparison | undefined): string {
+  if (!comparison || comparison.previousEqualsYoy) return '';
+  const period = emailPeriodOf(data);
+  const { vsYoy } = comparison;
 
-  const headerCell = (label: string) =>
-    `<th style="padding:6px 12px;text-align:right;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">${label}</th>`;
+  const reading = describeYearOverYearTile({
+    period,
+    netWorth: vsYoy.netWorth,
+    income: vsYoy.income,
+    expenses: vsYoy.expenses,
+  });
+  if (!reading) return '';
 
-  // Each row: [metric label, vs-previous cell, optional vs-YoY cell]. `higherIsBetter` drives colour.
-  const row = (
-    label: string,
-    prev: MetricDelta | null,
-    yoy: MetricDelta | null,
-    higherIsBetter: boolean
-  ) =>
-    `<tr>
-          <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;">${label}</td>
-          ${comparisonCell(prev, higherIsBetter)}
-          ${showYoy ? comparisonCell(yoy, higherIsBetter) : ''}
-        </tr>`;
+  const row = (label: string, delta: MetricDelta | null, baseline: number | null, higherIsBetter: boolean) => ({
+    label,
+    baseline: baseline === null ? 'N/D' : formatEur(baseline),
+    change: delta === null ? 'N/D' : formatDelta(delta),
+    favourable: delta === null ? null : higherIsBetter ? delta.absChange >= 0 : delta.absChange <= 0,
+  });
 
-  return `<tr>
-          <td style="padding:20px 32px;border-bottom:1px solid #f1f5f9;">
-            <p style="margin:0 0 12px;font-size:14px;font-weight:600;color:#0f172a;">Confronti</p>
-            <table width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;color:#374151;">
-              <thead>
-                <tr style="background:#f8fafc;">
-                  <th style="padding:6px 12px;text-align:left;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">Metrica</th>
-                  ${headerCell(`vs ${vsPrevious.baselineLabel}`)}
-                  ${showYoy ? headerCell(`vs ${vsYoy.baselineLabel}`) : ''}
-                </tr>
-              </thead>
-              <tbody>
-                ${row('Patrimonio netto', vsPrevious.netWorth, vsYoy.netWorth, true)}
-                ${row('Entrate', vsPrevious.income, vsYoy.income, true)}
-                ${row('Uscite', vsPrevious.expenses, vsYoy.expenses, false)}
-                ${row('Risparmio netto', vsPrevious.savings, vsYoy.savings, true)}
-              </tbody>
-            </table>
-            <p style="margin:10px 0 0;font-size:11px;color:#94a3b8;line-height:1.5;">
-              <strong style="color:#64748b;">Patrimonio netto</strong>: confronto tra gli snapshot di fine periodo.
-              <strong style="color:#64748b;">Entrate</strong>, <strong style="color:#64748b;">Uscite</strong> e <strong style="color:#64748b;">Risparmio netto</strong>: totali dell'intero periodo a confronto (Risparmio netto = Entrate − Uscite).
-            </p>
-          </td>
-        </tr>`;
+  // The baseline column is reconstructed from the current figure and the change, because that
+  // is the only pair the comparison set carries — and it is exact, not an approximation.
+  const baselineOf = (current: number, delta: MetricDelta | null) =>
+    delta === null ? null : current - delta.absChange;
+
+  const savings = data.totalIncome - data.totalExpenses;
+  const rows = [
+    row('Patrimonio netto', vsYoy.netWorth, baselineOf(data.currentNetWorth, vsYoy.netWorth), true),
+    row('Entrate', vsYoy.income, baselineOf(data.totalIncome, vsYoy.income), true),
+    row('Uscite', vsYoy.expenses, baselineOf(data.totalExpenses, vsYoy.expenses), false),
+    row('Risparmio netto', vsYoy.savings, baselineOf(savings, vsYoy.savings), true),
+  ];
+
+  return emailTile({
+    eyebrow: 'Rispetto a un anno fa',
+    scope: `vs ${yearEarlierHeading(period)}`,
+    reading,
+    body: emailComparisonTable(['Metrica', yearEarlierHeading(period), 'Variazione'], rows),
+    footer:
+      'Il patrimonio confronta due snapshot di fine periodo; entrate, uscite e risparmio confrontano due periodi interi.',
+  });
 }
 
-/** Exported for unit testing only — callers should use sendMonthlyEmail. */
-/**
- * Renders the budget alerts section. Each alert is one row: label, spent/budget,
- * a percentage, and a sign-aware colour (red = exceeded, amber = warning).
- * Inline hex colours are intentional — email clients don't support CSS tokens.
- * Returns '' when there are no alerts so the section disappears cleanly.
- */
-function buildBudgetAlertsSectionHtml(alerts: BudgetAlert[] | undefined): string {
+/** Budget alerts — monthly emails only, and absent when nothing crossed a threshold. */
+function buildBudgetTile(data: MonthlyEmailData): string {
+  const alerts = data.budgetAlerts;
   if (!alerts || alerts.length === 0) return '';
 
-  const rows = alerts
-    .map((alert) => {
-      const color = alert.level === 'exceeded' ? '#dc2626' : '#d97706';
-      const pct = Math.round(alert.usedRatio * 100);
-      const badge = alert.level === 'exceeded' ? 'Superato' : `${alert.threshold}%`;
-      const forecastNote = alert.forecastedOverrun && alert.level !== 'exceeded'
-        ? ' · sforamento previsto a fine mese'
-        : '';
-      return `
-        <tr>
-          <td style="padding:8px 0;border-bottom:1px solid #f3f4f6;">
-            <span style="display:inline-block;font-size:11px;font-weight:700;color:#ffffff;background:${color};border-radius:4px;padding:2px 6px;margin-right:8px;">${badge}</span>
-            <span style="font-size:13px;color:#0f172a;">${alert.label}</span>
-            <div style="font-size:12px;color:#64748b;margin-top:2px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">
-              ${formatEur(alert.spent)} / ${formatEur(alert.budgetAmount)} &nbsp;·&nbsp; <span style="color:${color};font-weight:600;">${pct}%</span>${forecastNote}
-            </div>
-          </td>
-        </tr>`;
-    })
-    .join('');
+  // `MonthlyEmailData` carries the alerts, not the roster: how many budgets did NOT raise one
+  // is unknown here, so the reading simply omits that clause instead of inventing a total.
+  const reading = describeBudgetAlertsTile(alerts.map((alert) => ({ label: alert.label, level: alert.level })));
 
-  return `
-        <tr>
-          <td style="padding:20px 32px;border-bottom:1px solid #f1f5f9;">
-            <p style="margin:0 0 12px;font-size:14px;font-weight:600;color:#0f172a;">Avvisi Budget</p>
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
-              ${rows}
-            </table>
-          </td>
-        </tr>`;
-}
+  const rows = alerts.map((alert) => {
+    const forecast = alert.forecastedOverrun && alert.level !== 'exceeded' ? ' · sforamento previsto a fine mese' : '';
+    return {
+      label: alert.label,
+      caption: `${formatEur(alert.spent)} / ${formatEur(alert.budgetAmount)} · ${formatPercentageIt(alert.usedRatio * 100, 0)}${forecast}`,
+      level: alert.level,
+    };
+  });
 
-/**
- * Builds the Hall of Fame mention shown under the Net Worth KPI.
- *
- * Growth → "🏆 È il N° miglior mese/anno per crescita del patrimonio (su M)".
- * Decline → "📉 Mese/Anno in calo" (with the decline rank when more than one).
- * Returns '' when there is no ranking (first period, flat change, or scope absent),
- * so the badge simply disappears rather than rendering an empty box.
- */
-function buildHallOfFameLineHtml(data: MonthlyEmailData): string {
-  const rank = data.hallOfFameRank;
-  if (!rank) return '';
-
-  const periodNoun = rank.scope === 'month' ? 'mese' : 'anno';
-  const periodNounCap = rank.scope === 'month' ? 'Mese' : 'Anno';
-
-  const text =
-    rank.trend === 'growth'
-      ? `🏆 È il ${rank.rank}° miglior ${periodNoun} per crescita del patrimonio${rank.total > 1 ? ` (su ${rank.total})` : ''}`
-      : `📉 ${periodNounCap} in calo${rank.total > 1 ? ` — ${rank.rank}° calo più marcato` : ''}`;
-
-  const bg = rank.trend === 'growth' ? '#f0fdf4' : '#fef2f2';
-  const fg = rank.trend === 'growth' ? '#16a34a' : '#dc2626';
-
-  return `<p style="margin:10px 0 0;display:inline-block;font-size:12px;font-weight:600;color:${fg};background:${bg};border-radius:6px;padding:4px 10px;">${text}</p>`;
+  return emailTile({
+    eyebrow: 'Budget',
+    scope: `${alerts.length} fuori linea`,
+    reading,
+    body: emailAlertRows(rows),
+  });
 }
 
 /**
  * «Spese in comune» — the household split, one row per person.
  *
- * The words come from `expenseSplitNarrative.ts`, the same sentences the Divisione tab prints,
- * flattened to text: an email renders outside the DOM, so the `Narrative`'s mono and sign
- * segments cannot carry their tokens here and the colours below are literal hexes like every
- * other block in this file (a permanent token-drift surface, documented in CLAUDE.md).
- *
+ * The words come from `expenseSplitNarrative.ts`, the same sentences the Divisione tab prints.
  * Absent whenever the split could not be computed: an email is a one-way message, so a section
  * saying «the shares are unavailable» would be a notification the reader cannot act on from
  * where they are reading it. The page is where that explanation belongs.
  */
-function buildExpenseSplitSectionHtml(summary: ExpenseSplitSummary | undefined): string {
+function buildExpenseSplitTile(data: MonthlyEmailData): string {
+  const summary = data.expenseSplit;
   if (!summary || summary.basis.kind !== 'computed') return '';
 
-  const rows = summary.members
-    .map((balance) => {
-      if (balance.remaining === null) return '';
-      const color = balance.remaining < 0 ? '#dc2626' : '#16a34a';
-      return `
-        <tr>
-          <td style="padding:8px 0;border-bottom:1px solid #f3f4f6;">
-            <span style="font-size:13px;font-weight:600;color:#0f172a;">${escapeHtml(balance.member.name)}</span>
-            <span style="float:right;font-size:14px;font-weight:700;color:${color};font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">${formatEur(balance.remaining)}</span>
-            <div style="font-size:12px;color:#64748b;margin-top:2px;">${escapeHtml(narrativeToText(describeMemberBalance(balance)))}</div>
-          </td>
-        </tr>`;
-    })
-    .join('');
+  const rows: EmailRankedRow[] = summary.members
+    .filter((balance) => balance.remaining !== null)
+    .map((balance) => ({
+      label: balance.member.name,
+      caption: narrativeToText(describeMemberBalance(balance)),
+      amount: signedEur(balance.remaining as number),
+      trailingSign: (balance.remaining as number) >= 0 ? 'positive' : 'negative',
+    }));
+  if (rows.length === 0) return '';
 
-  if (!rows) return '';
-
-  return `
-        <tr>
-          <td style="padding:20px 32px;border-bottom:1px solid #f1f5f9;">
-            <p style="margin:0 0 4px;font-size:14px;font-weight:600;color:#0f172a;">Spese in comune</p>
-            <p style="margin:0 0 12px;font-size:12px;color:#64748b;">${escapeHtml(narrativeToText(describeSplitBasis(summary.basis)))}</p>
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
-              ${rows}
-            </table>
-          </td>
-        </tr>`;
+  return emailTile({
+    eyebrow: 'Spese in comune',
+    scope: periodScopeLabel(emailPeriodOf(data)),
+    reading: describeSplitBasis(summary.basis),
+    body: emailRankedRows(rows),
+  });
 }
 
+/**
+ * Renders one periodic email — monthly, quarterly, semiannual or yearly.
+ *
+ * There is ONE template for the four: they differ in their labels (which the narrative layer
+ * resolves from the period) and in which tiles exist at all — Budget and the Hall of Fame
+ * standing are monthly, the income Top 10 is yearly, and «Rispetto a un anno fa» disappears on
+ * a yearly email because there the two baselines coincide.
+ */
 export function generateEmailHtml(data: MonthlyEmailData, comparisonData?: PeriodComparison): string {
+  const period = emailPeriodOf(data);
   const title = periodTitle(data);
-  const comparison = comparisonLabel(data);
+  const savings = data.totalIncome - data.totalExpenses;
+  const marketEffect = marketEffectOf(data);
 
-  const deltaPositive = data.netWorthDelta >= 0;
-  const deltaColor = deltaPositive ? '#16a34a' : '#dc2626';
-  const deltaArrow = deltaPositive ? '▲' : '▼';
-  const hallOfFameLine = buildHallOfFameLineHtml(data);
+  const verdict = buildPeriodEmailVerdict({
+    period,
+    currentNetWorth: data.currentNetWorth,
+    previousNetWorth: data.previousNetWorth,
+    netWorthDelta: data.netWorthDelta,
+    netWorthDeltaPct: data.netWorthDeltaPct,
+    totalIncome: data.totalIncome,
+    totalExpenses: data.totalExpenses,
+    marketEffect,
+    rank: verdictRank(data),
+  });
 
-  // Asset class table — with % column and Δ% delta
-  const totalValue = Object.values(data.byAssetClass).reduce(
-    (s, v) => s + (v > 0 ? v : 0),
-    0
+  const tiles: string[] = [
+    emailVerdict({
+      eyebrow: `Net Worth Tracker · ${periodKindLabel(period.kind)}`,
+      scope: title,
+      verdict,
+    }),
+  ];
+
+  // The AI comment is prose and sits SECOND: it can be absent (generation is non-blocking),
+  // and an email whose first words can vanish has no opening at all.
+  if (data.aiComment) {
+    tiles.push(
+      emailTile({
+        eyebrow: 'Commento AI',
+        scope: title,
+        body: emailProse(simpleMarkdownToHtml(data.aiComment)),
+        footer: 'Generato da Assistente AI — verifica sempre le informazioni prima di agire.',
+        muted: true,
+      }),
+    );
+  }
+
+  // ── Patrimonio ──
+  const netWorthFigures: EmailKeyFigure[] = [{ label: 'Liquido', value: formatEur(data.liquidNetWorth) }];
+  if (data.previousNetWorth > 0) {
+    netWorthFigures.push({
+      label: periodBaselineHeading(period),
+      value: formatEur(data.previousNetWorth),
+      muted: true,
+    });
+  }
+  tiles.push(
+    emailTile({
+      eyebrow: 'Patrimonio',
+      scope: `al ${periodEndLabel(period)}`,
+      reading: describeNetWorthTile({
+        period,
+        previousNetWorth: data.previousNetWorth,
+        netWorthDelta: data.netWorthDelta,
+        netWorthDeltaPct: data.netWorthDeltaPct,
+      }),
+      body: emailHero(formatEur(data.currentNetWorth)) + emailKeyFigures(netWorthFigures),
+      footer: describeMarketSplit(marketEffect, savings),
+    }),
   );
-  const assetRows = Object.entries(data.byAssetClass)
-    .filter(([, v]) => v > 0)
-    .sort(([, a], [, b]) => b - a)
-    .map(([cls, value]) => {
-      const pct = totalValue > 0 ? ((value / totalValue) * 100).toFixed(1) : '0.0';
-      const label = ASSET_CLASS_LABELS[cls] ?? cls;
-      return `<tr>
-          <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;">${label}</td>
-          <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;text-align:right;">${formatEur(value)}</td>
-          <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;text-align:right;color:#64748b;font-size:12px;">${pct}%</td>
-        </tr>`;
-    })
-    .join('');
 
-  // Performance spotlight (best/worst Δ%)
-  const { bestPct, worstPct, bestAbs, worstAbs } = data.assetClassPerformers;
-  const hasPctRows = bestPct && worstPct && bestPct.name !== worstPct.name;
-  const hasAbsRows = bestAbs && worstAbs && bestAbs.name !== worstAbs.name;
+  // ── Composizione ──
+  const composition = assetClassRows(data.byAssetClass);
+  if (composition.rows.length > 0) {
+    tiles.push(
+      emailTile({
+        eyebrow: 'Composizione',
+        scope: `${composition.rows.length} class${composition.rows.length === 1 ? 'e' : 'i'}`,
+        reading: describeCompositionTile(
+          Object.entries(data.byAssetClass).map(([assetClass, value]) => ({ assetClass, value })),
+        ),
+        body: emailRankedRows(composition.rows),
+      }),
+    );
+  }
 
-  const perfRow = (
-    arrow: string,
-    label: string,
-    entry: AssetClassEntry,
-    color: string
-  ) =>
-    `<tr>
-      <td style="padding:5px 0;"><span style="color:${color};font-weight:600;">${arrow} ${label}:</span> ${entry.name}</td>
-      <td style="padding:5px 0;text-align:right;color:${color};font-weight:600;">
-        ${signedPct(entry.deltaPct)}
-        <span style="font-weight:400;color:#64748b;margin-left:6px;">(${entry.deltaAbs >= 0 ? '+' : ''}${formatEur(entry.deltaAbs)})</span>
-      </td>
-    </tr>`;
+  // ── Andamento per classe ──
+  const moves = classMoveRows(data.assetClassPerformers);
+  if (moves.length > 0) {
+    tiles.push(
+      emailTile({
+        eyebrow: 'Andamento per classe',
+        scope: periodScopeLabel(period),
+        reading: describeClassMovesTile(data.assetClassPerformers),
+        body: emailRankedRows(moves),
+      }),
+    );
+  }
 
-  const performanceSection =
-    hasPctRows || hasAbsRows
-      ? `<tr>
-          <td style="padding:20px 32px;border-bottom:1px solid #f1f5f9;">
-            <p style="margin:0 0 12px;font-size:14px;font-weight:600;color:#0f172a;">Performance Asset Class</p>
-            <table width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;color:#374151;">
-              ${hasPctRows ? `
-              <tr><td colspan="2" style="padding:4px 0 2px;font-size:11px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;">Variazione %</td></tr>
-              ${perfRow('▲', 'Migliore', bestPct!, '#16a34a')}
-              ${perfRow('▼', 'Peggiore', worstPct!, '#dc2626')}
-              ` : ''}
-              ${hasAbsRows ? `
-              <tr><td colspan="2" style="padding:${hasPctRows ? '12px' : '4px'} 0 2px;font-size:11px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;">Variazione assoluta</td></tr>
-              ${perfRow('▲', 'Migliore', bestAbs!, '#16a34a')}
-              ${perfRow('▼', 'Peggiore', worstAbs!, '#dc2626')}
-              ` : ''}
-            </table>
-          </td>
-        </tr>`
-      : '';
+  // ── Cashflow ──
+  tiles.push(
+    emailTile({
+      eyebrow: 'Cashflow',
+      scope: periodScopeLabel(period),
+      reading: describeCashflowTile({ totalIncome: data.totalIncome, totalExpenses: data.totalExpenses }),
+      body: emailKeyFigures([
+        { label: 'Entrate', value: formatEur(data.totalIncome), sign: 'positive' },
+        { label: 'Uscite', value: `−${formatEur(data.totalExpenses)}`, sign: 'negative' },
+        { label: 'Risparmio netto', value: formatEur(savings), sign: savings >= 0 ? 'positive' : 'negative' },
+      ]),
+      footer: 'Risparmio netto = entrate − uscite, sull’intero periodo.',
+    }),
+  );
 
-  // Expenses by type (Fisse/Variabili/Debiti) with % of total — the spending-mix view.
-  const expenseTypeRow = (label: string, amount: number) => {
-    const pct = data.totalExpenses > 0 ? ((amount / data.totalExpenses) * 100).toFixed(1) : '0.0';
-    return `<tr>
-          <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;">${label}</td>
-          <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;text-align:right;">${formatEur(amount)}</td>
-          <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;text-align:right;color:#64748b;font-size:12px;">${pct}%</td>
-        </tr>`;
-  };
+  // ── Spese per categoria ──
+  const expenseRows = rankedCategoryRows(data.topExpenseCategories, data.totalExpenses);
+  if (expenseRows.length > 0) {
+    // Legacy and imported rows can carry no expense type, and `aggregateExpenses` counts them
+    // in totalExpenses while leaving them out of expensesByType — so the typed rows stopped
+    // short of 100% with nothing explaining the gap. The residual keeps its own name.
+    const typedTotal = data.expensesByType.reduce((sum, entry) => sum + entry.amount, 0);
+    const unclassified = data.totalExpenses - typedTotal;
+    const types = [...data.expensesByType.map((entry) => ({ label: entry.label, amount: entry.amount }))];
+    if (unclassified > 0.005) types.push({ label: 'Non classificate', amount: unclassified });
 
-  // Legacy and imported rows can carry no expense type, and `aggregateExpenses` counts them
-  // in totalExpenses while leaving them out of expensesByType — so the three typed rows
-  // stopped short of 100% with nothing on screen explaining the gap. The residual gets its
-  // own row (the same "Non classificate" bucket the assistant's breakdown uses). The epsilon
-  // is float slack, not a threshold: below half a cent the row would render as "0 €".
-  const typedExpenseTotal = data.expensesByType.reduce((sum, entry) => sum + entry.amount, 0);
-  const unclassifiedExpenseTotal = data.totalExpenses - typedExpenseTotal;
-  const typeRows =
-    data.expensesByType.map((entry) => expenseTypeRow(entry.label, entry.amount)).join('') +
-    (unclassifiedExpenseTotal > 0.005 ? expenseTypeRow('Non classificate', unclassifiedExpenseTotal) : '');
+    tiles.push(
+      emailTile({
+        eyebrow: 'Spese per categoria',
+        scope: `${data.topExpenseCategories.length} categorie`,
+        reading: describeExpenseCategoriesTile(data.topExpenseCategories, RANKED_ROWS_SHOWN),
+        body: emailRankedRows(expenseRows),
+        footer: describeExpenseTypes(types),
+      }),
+    );
+  }
 
-  // All expense categories with % of total
-  const categoryRows = data.topExpenseCategories
-    .map((cat) => {
-      const pct = data.totalExpenses > 0 ? ((cat.amount / data.totalExpenses) * 100).toFixed(1) : '0.0';
-      return `<tr>
-          <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;">${cat.name}</td>
-          <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;text-align:right;">${formatEur(cat.amount)}</td>
-          <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;text-align:right;color:#64748b;font-size:12px;">${pct}%</td>
-        </tr>`;
-    })
-    .join('');
+  // ── Entrate per categoria ──
+  const incomeRows = rankedCategoryRows(data.allIncomeCategories, data.totalIncome);
+  if (incomeRows.length > 0) {
+    tiles.push(
+      emailTile({
+        eyebrow: 'Entrate per categoria',
+        scope: `${data.allIncomeCategories.length} categorie`,
+        reading: describeIncomeCategoriesTile(data.allIncomeCategories, RANKED_ROWS_SHOWN),
+        body: emailRankedRows(incomeRows),
+      }),
+    );
+  }
 
-  // All income categories with % of total
-  const incomeCategoryRows = data.allIncomeCategories
-    .map((cat) => {
-      const pct = data.totalIncome > 0 ? ((cat.amount / data.totalIncome) * 100).toFixed(1) : '0.0';
-      return `<tr>
-          <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;">${cat.name}</td>
-          <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;text-align:right;">${formatEur(cat.amount)}</td>
-          <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;text-align:right;color:#64748b;font-size:12px;">${pct}%</td>
-        </tr>`;
-    })
-    .join('');
+  // ── Spese maggiori ──
+  if (data.topIndividualExpenses.length > 0) {
+    tiles.push(
+      emailTile({
+        eyebrow: 'Spese maggiori',
+        scope: `${data.topIndividualExpenses.length} voci`,
+        reading: describeTopExpensesTile(data.topIndividualExpenses, data.totalExpenses),
+        body: emailRankedRows(
+          transactionRows(
+            data.topIndividualExpenses,
+            data.topIndividualExpenses.map((expense) => expense.amount),
+          ),
+        ),
+      }),
+    );
+  }
 
-  // Top individual expense transactions (5, or 10 for the yearly report)
-  const individualExpenseRows = data.topIndividualExpenses
-    .map((exp) => {
-      // Show category prominently; note below in muted text only when it differs from category
-      const hasNote = exp.description && exp.description !== exp.categoryName;
-      return `<tr>
-          <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;">
-            <span style="display:block;">${exp.categoryName}</span>
-            ${hasNote ? `<span style="display:block;font-size:11px;color:#94a3b8;margin-top:2px;">${exp.description}</span>` : ''}
-          </td>
-          <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;text-align:right;vertical-align:top;">${formatEur(exp.amount)}</td>
-        </tr>`;
-    })
-    .join('');
+  // ── Entrate maggiori — yearly only ──
+  if (data.periodType === 'yearly' && data.topIndividualIncome.length > 0) {
+    tiles.push(
+      emailTile({
+        eyebrow: 'Entrate maggiori',
+        scope: `${data.topIndividualIncome.length} voci`,
+        body: emailRankedRows(
+          transactionRows(
+            data.topIndividualIncome,
+            data.topIndividualIncome.map((income) => income.amount),
+            'positive',
+          ),
+        ),
+      }),
+    );
+  }
 
-  // Top 10 individual income transactions — yearly report only.
-  const individualIncomeRows =
-    data.periodType === 'yearly'
-      ? data.topIndividualIncome
-          .map((inc) => {
-            const hasNote = inc.description && inc.description !== inc.categoryName;
-            return `<tr>
-          <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;">
-            <span style="display:block;">${inc.categoryName}</span>
-            ${hasNote ? `<span style="display:block;font-size:11px;color:#94a3b8;margin-top:2px;">${inc.description}</span>` : ''}
-          </td>
-          <td style="padding:6px 12px;border-bottom:1px solid #f3f4f6;text-align:right;vertical-align:top;color:#16a34a;">${formatEur(inc.amount)}</td>
-        </tr>`;
-          })
-          .join('')
-      : '';
+  // ── Dividendi ──
+  const dividendReading = describeDividendsTile(data.dividendTotal, data.dividendCount);
+  if (dividendReading) {
+    tiles.push(
+      emailTile({
+        eyebrow: 'Dividendi e cedole',
+        scope: periodScopeLabel(period),
+        reading: dividendReading,
+        body: emailHero(cachedFormatCurrencyEUR(data.dividendTotal)),
+      }),
+    );
+  }
 
-  const savedAmount = data.totalIncome - data.totalExpenses;
-  const savingsColor = savedAmount >= 0 ? '#16a34a' : '#dc2626';
-  const savingsRate =
-    data.totalIncome > 0 ? ((savedAmount / data.totalIncome) * 100).toFixed(1) : null;
+  tiles.push(buildYearOverYearTile(data, comparisonData));
+  tiles.push(buildBudgetTile(data));
+  tiles.push(buildExpenseSplitTile(data));
 
-  // "rispetto al mese precedente" vs "rispetto al Q4 2025" vs "rispetto al 2025"
-  const comparisonPhrase =
-    data.periodType === 'monthly'
-      ? `rispetto al ${comparison}`
-      : data.periodType === 'quarterly'
-      ? `rispetto al ${comparison}`
-      : `rispetto al ${comparison}`;
-
-  const comparisonPrevLabel =
-    data.periodType === 'monthly'
-      ? 'Mese precedente'
-      : data.periodType === 'quarterly'
-      ? `Trimestre precedente (${comparison})`
-      : data.periodType === 'semiannual'
-      ? `Semestre precedente (${comparison})`
-      : `Anno precedente (${comparison})`;
-
-  return `<!DOCTYPE html>
-<html lang="it">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Riepilogo ${title}</title>
-</head>
-<body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:32px 16px;">
-    <tr><td align="center">
-      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
-
-        <!-- Header -->
-        <tr>
-          <td style="background:#0f172a;padding:28px 32px;">
-            <p style="margin:0;color:#94a3b8;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;">Net Worth Tracker</p>
-            <h1 style="margin:8px 0 0;color:#f8fafc;font-size:22px;font-weight:700;">Riepilogo ${title}</h1>
-          </td>
-        </tr>
-
-        <!-- Net Worth KPI -->
-        <tr>
-          <td style="padding:28px 32px 20px;border-bottom:1px solid #f1f5f9;">
-            <p style="margin:0 0 4px;color:#64748b;font-size:13px;">Patrimonio Netto</p>
-            <p style="margin:0;font-size:32px;font-weight:700;color:#0f172a;">${formatEur(data.currentNetWorth)}</p>
-            <p style="margin:8px 0 0;font-size:14px;color:${deltaColor};font-weight:600;">
-              ${deltaArrow} ${formatEur(Math.abs(data.netWorthDelta))} (${signedPct(data.netWorthDeltaPct)})
-              <span style="color:#94a3b8;font-weight:400;"> ${comparisonPhrase}</span>
-            </p>
-            ${
-              data.previousNetWorth > 0
-                ? `<p style="margin:4px 0 0;font-size:12px;color:#94a3b8;">${comparisonPrevLabel}: ${formatEur(data.previousNetWorth)} &nbsp;·&nbsp; Liquido: ${formatEur(data.liquidNetWorth)}</p>`
-                : ''
-            }
-            ${hallOfFameLine ? `<br />${hallOfFameLine}` : ''}
-          </td>
-        </tr>
-
-        <!-- Asset class breakdown -->
-        ${
-          assetRows
-            ? `<tr>
-          <td style="padding:20px 32px;border-bottom:1px solid #f1f5f9;">
-            <p style="margin:0 0 12px;font-size:14px;font-weight:600;color:#0f172a;">Allocazione per Asset Class</p>
-            <table width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;color:#374151;">
-              <thead>
-                <tr style="background:#f8fafc;">
-                  <th style="padding:6px 12px;text-align:left;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">Classe</th>
-                  <th style="padding:6px 12px;text-align:right;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">Valore</th>
-                  <th style="padding:6px 12px;text-align:right;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">%</th>
-                </tr>
-              </thead>
-              <tbody>${assetRows}</tbody>
-            </table>
-          </td>
-        </tr>`
-            : ''
-        }
-
-        <!-- Performance spotlight -->
-        ${performanceSection}
-
-        <!-- Cashflow summary -->
-        <tr>
-          <td style="padding:20px 32px;border-bottom:1px solid #f1f5f9;">
-            <p style="margin:0 0 12px;font-size:14px;font-weight:600;color:#0f172a;">${cashflowSectionLabel(data)}</p>
-            <table width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;color:#374151;">
-              <tr>
-                <td style="padding:6px 0;">Entrate totali</td>
-                <td style="padding:6px 0;text-align:right;color:#16a34a;font-weight:600;">${formatEur(data.totalIncome)}</td>
-              </tr>
-              <tr>
-                <td style="padding:6px 0;">Uscite totali</td>
-                <td style="padding:6px 0;text-align:right;color:#dc2626;font-weight:600;">-${formatEur(data.totalExpenses)}</td>
-              </tr>
-              <tr style="border-top:1px solid #e2e8f0;">
-                <td style="padding:8px 0 0;font-weight:600;">
-                  Risparmio netto
-                  <span style="display:block;font-size:11px;color:#94a3b8;font-weight:400;">Entrate − Uscite</span>
-                </td>
-                <td style="padding:8px 0 0;text-align:right;vertical-align:top;color:${savingsColor};font-weight:700;">${formatEur(savedAmount)}${savingsRate !== null ? `<span style="font-size:11px;color:#64748b;font-weight:400;margin-left:4px;">(${savingsRate}% del reddito)</span>` : ''}</td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-
-        <!-- Income by category -->
-        ${
-          incomeCategoryRows
-            ? `<tr>
-          <td style="padding:20px 32px;border-bottom:1px solid #f1f5f9;">
-            <p style="margin:0 0 12px;font-size:14px;font-weight:600;color:#0f172a;">${incomeCategoryLabel(data)}</p>
-            <table width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;color:#374151;">
-              <thead>
-                <tr style="background:#f8fafc;">
-                  <th style="padding:6px 12px;text-align:left;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">Categoria</th>
-                  <th style="padding:6px 12px;text-align:right;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">Totale</th>
-                  <th style="padding:6px 12px;text-align:right;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">%</th>
-                </tr>
-              </thead>
-              <tbody>${incomeCategoryRows}</tbody>
-            </table>
-          </td>
-        </tr>`
-            : ''
-        }
-
-        <!-- Expenses by type (Fisse/Variabili/Debiti) -->
-        ${
-          typeRows
-            ? `<tr>
-          <td style="padding:20px 32px;border-bottom:1px solid #f1f5f9;">
-            <p style="margin:0 0 12px;font-size:14px;font-weight:600;color:#0f172a;">${expenseTypeLabel(data)}</p>
-            <table width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;color:#374151;">
-              <thead>
-                <tr style="background:#f8fafc;">
-                  <th style="padding:6px 12px;text-align:left;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">Tipo</th>
-                  <th style="padding:6px 12px;text-align:right;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">Totale</th>
-                  <th style="padding:6px 12px;text-align:right;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">%</th>
-                </tr>
-              </thead>
-              <tbody>${typeRows}</tbody>
-            </table>
-          </td>
-        </tr>`
-            : ''
-        }
-
-        <!-- Expense categories -->
-        ${
-          categoryRows
-            ? `<tr>
-          <td style="padding:20px 32px;border-bottom:1px solid #f1f5f9;">
-            <p style="margin:0 0 12px;font-size:14px;font-weight:600;color:#0f172a;">${expenseCategoryLabel(data)}</p>
-            <table width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;color:#374151;">
-              <thead>
-                <tr style="background:#f8fafc;">
-                  <th style="padding:6px 12px;text-align:left;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">Categoria</th>
-                  <th style="padding:6px 12px;text-align:right;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">Totale</th>
-                  <th style="padding:6px 12px;text-align:right;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">%</th>
-                </tr>
-              </thead>
-              <tbody>${categoryRows}</tbody>
-            </table>
-          </td>
-        </tr>`
-            : ''
-        }
-
-        <!-- Top individual expense transactions (5, or 10 for yearly) -->
-        ${
-          individualExpenseRows
-            ? `<tr>
-          <td style="padding:20px 32px;border-bottom:1px solid #f1f5f9;">
-            <p style="margin:0 0 12px;font-size:14px;font-weight:600;color:#0f172a;">${topExpenseTransactionLabel(data)}</p>
-            <table width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;color:#374151;">
-              <thead>
-                <tr style="background:#f8fafc;">
-                  <th style="padding:6px 12px;text-align:left;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">Spesa</th>
-                  <th style="padding:6px 12px;text-align:right;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">Importo</th>
-                </tr>
-              </thead>
-              <tbody>${individualExpenseRows}</tbody>
-            </table>
-          </td>
-        </tr>`
-            : ''
-        }
-
-        <!-- Top 10 individual income transactions (yearly report only) -->
-        ${
-          individualIncomeRows
-            ? `<tr>
-          <td style="padding:20px 32px;border-bottom:1px solid #f1f5f9;">
-            <p style="margin:0 0 12px;font-size:14px;font-weight:600;color:#0f172a;">${topIncomeTransactionLabel()}</p>
-            <table width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;color:#374151;">
-              <thead>
-                <tr style="background:#f8fafc;">
-                  <th style="padding:6px 12px;text-align:left;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">Entrata</th>
-                  <th style="padding:6px 12px;text-align:right;font-weight:600;color:#64748b;border-bottom:2px solid #e2e8f0;">Importo</th>
-                </tr>
-              </thead>
-              <tbody>${individualIncomeRows}</tbody>
-            </table>
-          </td>
-        </tr>`
-            : ''
-        }
-
-        <!-- Dividends -->
-        ${
-          data.dividendCount > 0
-            ? `<tr>
-          <td style="padding:20px 32px;border-bottom:1px solid #f1f5f9;">
-            <p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#0f172a;">Dividendi & Cedole</p>
-            <p style="margin:0;font-size:22px;font-weight:700;color:#0f172a;">${formatEur(data.dividendTotal)}</p>
-            <p style="margin:4px 0 0;font-size:12px;color:#94a3b8;">${data.dividendCount} pagament${data.dividendCount === 1 ? 'o' : 'i'} ricevut${data.dividendCount === 1 ? 'o' : 'i'}</p>
-          </td>
-        </tr>`
-            : ''
-        }
-
-        <!-- Comparisons (vs previous period + YoY) -->
-        ${comparisonData ? buildComparisonSectionHtml(comparisonData) : ''}
-
-        <!-- Budget alerts (monthly only) -->
-        ${buildBudgetAlertsSectionHtml(data.budgetAlerts)}
-
-        <!-- Household split (only when configured) -->
-        ${buildExpenseSplitSectionHtml(data.expenseSplit)}
-
-        <!-- AI Comment -->
-        ${
-          data.aiComment
-            ? `<tr>
-          <td style="padding:20px 32px;border-bottom:1px solid #f1f5f9;background:#f8fafc;">
-            <p style="margin:0 0 12px;font-size:14px;font-weight:600;color:#0f172a;">Commento AI</p>
-            <div style="font-size:13px;color:#374151;line-height:1.7;">${simpleMarkdownToHtml(data.aiComment)}</div>
-            <p style="margin:12px 0 0;font-size:11px;color:#94a3b8;">Generato da Assistente AI — verifica sempre le informazioni prima di agire.</p>
-          </td>
-        </tr>`
-            : ''
-        }
-
-        <!-- Footer -->
-        <tr>
-          <td style="padding:20px 32px;background:#f8fafc;">
-            <p style="margin:0;font-size:12px;color:#94a3b8;text-align:center;">
-              Generato automaticamente da Net Worth Tracker &nbsp;·&nbsp; ${title}
-            </p>
-          </td>
-        </tr>
-
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
+  return emailShell({
+    title: `Riepilogo ${title}`,
+    // The inbox preview is the verdict: the reader knows how the period went before opening.
+    preheader: verdict.headline,
+    body: tiles.filter(Boolean).join('\n'),
+    footer: `Generato automaticamente da Net Worth Tracker · ${escapeHtml(title)}`,
+  });
 }
 
 // ─── Sender ───────────────────────────────────────────────────────────────────

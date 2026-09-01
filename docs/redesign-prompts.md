@@ -1877,6 +1877,8 @@ nuovo a meno che non te lo chieda.
 
 ## 23 · Superfici fuori DOM: email e PDF
 
+**Stato**: ✅ fatto il 2026-09-01 (`feature/email-pdf-redesign`) — scostamenti dal prompt: il verdetto delle email è generato da REGOLE e il commento AI scende in seconda posizione (il prompt suggeriva di usare il commento come verdetto: non regge, la sua generazione non blocca l'invio e può mancare); il PDF resta su Helvetica, con l'eccezione alla Mono Mandate dichiarata in `PDF_FONTS`; la copertina diventa la pagina del verdetto invece di un frontespizio; la tabella «Confronti» dell'email diventa «Rispetto a un anno fa» e sparisce sull'annuale. Il prompt resta come riferimento di metodo.
+
 **Superfici**: `lib/server/{monthlyEmailService,weeklyBudgetEmailService}.ts`, `components/pdf/*`, `lib/utils/pdfGenerator.tsx`.
 
 **Modello/effort**: Opus 5 · high — modulo hex condiviso + template HTML; verifica con render in file.
