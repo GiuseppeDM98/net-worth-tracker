@@ -33,7 +33,7 @@ import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useAssets, useDeleteAsset } from '@/lib/hooks/useAssets';
 import { calculateTotalValue } from '@/lib/services/assetService';
 import { useAssetLedgerMeta, useAssetTransactions } from '@/lib/hooks/useAssetTransactions';
-import { migrateAssetLedger } from '@/lib/services/assetTransactionService';
+import { migrateAssetLedger, backfillAverageCostEur } from '@/lib/services/assetTransactionService';
 import { useSnapshots } from '@/lib/hooks/useSnapshots';
 import { useDashboardOverview } from '@/lib/hooks/useDashboardOverview';
 import { useChartColors } from '@/lib/hooks/useChartColors';
@@ -125,6 +125,29 @@ export default function AssetsPage() {
       })
       .catch((error) => {
         console.error('[AssetsPage] Ledger migration failed:', error);
+      });
+  }, [ownerId, isLedgerMetaLoading, ledgerMeta, queryClient]);
+
+  // ─── averageCostEur backfill trigger ───────────────────────────────────────────
+  // One-shot, post-migration: projects the EUR-side PMC onto ledger assets written before the
+  // field existed, so G/P on a foreign-currency position stops comparing a native-currency PMC
+  // against a EUR value. Silent, same posture as the migration above.
+  const averageCostEurBackfillAttemptedRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!ownerId || isLedgerMetaLoading || !ledgerMeta) return;
+    if (ledgerMeta.averageCostEurBackfilledAt) return;
+    if (averageCostEurBackfillAttemptedRef.current === ownerId) return;
+    averageCostEurBackfillAttemptedRef.current = ownerId;
+
+    backfillAverageCostEur(ownerId)
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: queryKeys.assetTransactions.meta(ownerId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.overview(ownerId) });
+      })
+      .catch((error) => {
+        console.error('[AssetsPage] averageCostEur backfill failed:', error);
       });
   }, [ownerId, isLedgerMetaLoading, ledgerMeta, queryClient]);
 

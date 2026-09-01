@@ -283,18 +283,22 @@ export function replayTransactions(transactions: AssetTransaction[]): LedgerPosi
 
 /**
  * Project the replay result into the exact fields written back to assets/{assetId}. Single tested
- * source of truth for the write path. `averageCost: undefined` can only occur for an empty
- * sequence (the route never writes in that case); `holdingStartDate: undefined` means "do not
+ * source of truth for the write path. `averageCost`/`averageCostEur: undefined` can only occur for
+ * an empty sequence (the route never writes in that case) or, for `averageCostEur` alone, when the
+ * position just closed (quantity 0 — see the clamp in replayTransactionsWithEffects, harmless since
+ * every G/P consumer filters on quantity > 0 first); `holdingStartDate: undefined` means "do not
  * write" (see §holdingStartDate).
  */
 export function buildDerivedAssetFields(state: LedgerPositionState): {
   quantity: number;
   averageCost: number | undefined;
+  averageCostEur: number | undefined;
   holdingStartDate: Date | undefined;
 } {
   return {
     quantity: state.quantity,
     averageCost: state.averageCost,
+    averageCostEur: state.averageCostEur,
     holdingStartDate: state.holdingStartDate,
   };
 }

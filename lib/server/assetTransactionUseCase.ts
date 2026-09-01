@@ -64,7 +64,7 @@ export class TradeUseCaseError extends Error {
 
 export interface TradeMutationResult {
   transactionId: string;
-  derived: { quantity: number; averageCost: number | undefined };
+  derived: { quantity: number; averageCost: number | undefined; averageCostEur: number | undefined };
   /** Realized P&L of THIS operation (present only for sells) — lets the UI toast without refetch. */
   realizedPnlEur?: number;
 }
@@ -373,9 +373,15 @@ async function prepareDelete(ownerId: string, transactionId: string): Promise<Pr
 
 async function commitTradeMutation(
   plan: PreparedMutation
-): Promise<{ derived: { quantity: number; averageCost: number | undefined }; realizedDelta?: number }> {
+): Promise<{
+  derived: { quantity: number; averageCost: number | undefined; averageCostEur: number | undefined };
+  realizedDelta?: number;
+}> {
   let outcome:
-    | { derived: { quantity: number; averageCost: number | undefined }; realizedDelta?: number }
+    | {
+        derived: { quantity: number; averageCost: number | undefined; averageCostEur: number | undefined };
+        realizedDelta?: number;
+      }
     | undefined;
 
   await adminDb.runTransaction(async (tx: Transaction) => {
@@ -433,12 +439,14 @@ async function commitTradeMutation(
     // w2: derived asset fields. NEVER deleteField() holdingStartDate — undefined means "leave
     // untouched"; removeUndefinedDeep drops the undefined key so the
     // stored value survives. Written directly, NOT via updateAsset (whose undefined→deleteField()
-    // for averageCost is exactly the trap we avoid).
+    // for averageCost is exactly the trap we avoid). Same "leave untouched at qty 0" posture for
+    // averageCostEur as for averageCost — see buildDerivedAssetFields.
     tx.update(
       assetRef,
       removeUndefinedDeep({
         quantity: derived.quantity,
         averageCost: derived.averageCost,
+        averageCostEur: derived.averageCostEur,
         updatedAt: new Date(),
         ...(derived.holdingStartDate !== undefined ? { holdingStartDate: derived.holdingStartDate } : {}),
       })
@@ -456,7 +464,10 @@ async function commitTradeMutation(
       tx.update(ref, { quantity: currentQuantity + delta, updatedAt: new Date() });
     }
 
-    outcome = { derived: { quantity: derived.quantity, averageCost: derived.averageCost }, realizedDelta };
+    outcome = {
+      derived: { quantity: derived.quantity, averageCost: derived.averageCost, averageCostEur: derived.averageCostEur },
+      realizedDelta,
+    };
   });
 
   if (!outcome) {
@@ -623,4 +634,69 @@ export async function migrateAssetLedger(ownerId: string): Promise<MigrationResu
   );
 
   return { migratedAssetCount: ledgerAssets.length, baselineDate };
+}
+
+// ---------------------------------------------------------------------------
+// averageCostEur backfill (idempotent, per-user, server-side)
+// ---------------------------------------------------------------------------
+
+export type AverageCostEurBackfillResult =
+  | { alreadyBackfilled: true }
+  | { alreadyBackfilled?: false; recomputedAssetCount: number };
+
+/**
+ * One-shot backfill of `averageCostEur` onto ledger asset docs that predate the field. No new FX
+ * lookups: every trade has carried a correct trade-date `priceEur` since the ledger shipped
+ * (including the migration baseline — resolveBaselinePriceEur), so this is a pure re-projection of
+ * data already in `assetTransactions` via buildDerivedAssetFields, exactly what every trade mutation
+ * already writes going forward (commitTradeMutation). Only rewrites quantity/averageCost/averageCostEur
+ * — the fields buildDerivedAssetFields projects — never holdingStartDate (invariant #4).
+ *
+ * Idempotent — `averageCostEurBackfilledAt` on the ledger meta doc is the "done" signal. Requires the
+ * meta doc to already exist (ledger migration must have run first, and the caller is expected to have
+ * awaited migrateAssetLedger before this): with no meta doc yet there is nothing to backfill, and this
+ * returns a no-op WITHOUT creating one, so it can never be mistaken by migrateAssetLedger for
+ * "already migrated".
+ */
+export async function backfillAverageCostEur(ownerId: string): Promise<AverageCostEurBackfillResult> {
+  const metaRef = adminDb.collection(ASSET_TRANSACTIONS_META_COLLECTION).doc(ownerId);
+  const metaSnap = await metaRef.get();
+  if (!metaSnap.exists || metaSnap.data()?.averageCostEurBackfilledAt) {
+    return { alreadyBackfilled: true };
+  }
+
+  const assets = await getUserAssetsAdmin(ownerId);
+  const ledgerAssets = assets.filter((a) => isLedgerAssetType(a.type) && a.quantity > 0);
+
+  let recomputedAssetCount = 0;
+  for (const asset of ledgerAssets) {
+    const tradesSnap = await adminDb
+      .collection(ASSET_TRANSACTIONS_COLLECTION)
+      .where('userId', '==', ownerId)
+      .where('assetId', '==', asset.id)
+      .get();
+    if (tradesSnap.empty) continue;
+
+    const trades = tradesSnap.docs.map((d) => docToAssetTransaction(d.id, d.data() as DocumentData));
+    const state = replayTransactions(trades);
+    const derived = buildDerivedAssetFields(state);
+    await adminDb.collection(ASSETS_COLLECTION).doc(asset.id).update(
+      removeUndefinedDeep({
+        quantity: derived.quantity,
+        averageCost: derived.averageCost,
+        averageCostEur: derived.averageCostEur,
+        updatedAt: new Date(),
+      })
+    );
+    recomputedAssetCount += 1;
+  }
+
+  await metaRef.update({ averageCostEurBackfilledAt: new Date(), updatedAt: new Date() });
+
+  // The overview payload's topAssets.returnPercent reads averageCostEur too (dashboardOverviewService).
+  if (recomputedAssetCount > 0) {
+    await invalidateDashboardOverviewSummaryServer(ownerId, 'average_cost_eur_backfilled');
+  }
+
+  return { recomputedAssetCount };
 }

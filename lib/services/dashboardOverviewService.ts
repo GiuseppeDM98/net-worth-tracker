@@ -46,6 +46,7 @@ import {
 import { calculateMonthlyChange, calculateYearlyChange } from '@/lib/services/snapshotService';
 import { getItalyMonthYear, ITALY_TIMEZONE, toDate } from '@/lib/utils/dateHelpers';
 import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
+import { costBasisPerUnitEur } from '@/lib/utils/patrimonioSummary';
 import {
   DASHBOARD_OVERVIEW_SOURCE_VERSION,
   DASHBOARD_OVERVIEW_SUMMARY_COLLECTION,
@@ -403,10 +404,12 @@ function buildLiveOverviewPayload(
     .filter(a => a.quantity > 0)
     .map(a => {
       const value = calculateAssetValue(a);
-      // Use null instead of undefined — Firestore rejects undefined values.
+      // Use null instead of undefined — Firestore rejects undefined values. Compared in EUR on both
+      // sides (costBasisPerUnitEur), never the native-currency averageCost against the EUR value.
       let returnPercent: number | null = null;
-      if (a.averageCost && a.averageCost > 0) {
-        const costBasis = a.quantity * a.averageCost;
+      const basisPerUnit = costBasisPerUnitEur(a);
+      if (basisPerUnit && basisPerUnit > 0) {
+        const costBasis = a.quantity * basisPerUnit;
         returnPercent = costBasis > 0 ? ((value - costBasis) / costBasis) * 100 : null;
       }
       return {

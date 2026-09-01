@@ -125,6 +125,12 @@ export interface Asset {
   // ledger is the source of truth. cash/realestate keep direct editing and have no ledger.
   quantity: number;
   averageCost?: number; // Native-currency PMC (weighted avg of trade prices, fees excluded). Derived for ledger types — see note on `quantity`.
+  // EUR-equivalent PMC (costBasisEur / quantity — fees and the trade-date FX rate included), same
+  // derivation and lifecycle as `averageCost`. G/P math MUST compare this against the EUR value
+  // (calculateAssetValue), never `averageCost` against it — that mixes a native-currency PMC with a
+  // EUR value. Absent for cash/realestate (no ledger) and, until their next ledger mutation, for
+  // assets that predate this field.
+  averageCostEur?: number;
   taxRate?: number; // Tax rate percentage for unrealized gains (e.g., 26 for 26%)
   totalExpenseRatio?: number; // Total Expense Ratio (TER) as a percentage (e.g., 0.20 for 0.20%)
   stampDutyExempt?: boolean; // If true, asset is excluded from stamp duty (imposta di bollo) calculation (e.g. pension funds, real estate)

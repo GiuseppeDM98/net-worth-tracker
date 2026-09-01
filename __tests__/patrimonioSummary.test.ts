@@ -25,6 +25,7 @@ vi.mock('firebase/firestore', () => ({
 import {
   computeTopWeightShare,
   computeUnrealizedGain,
+  hasCostBasis,
   isCashAccount,
   isHeld,
   rankInstrumentReturns,
@@ -193,6 +194,49 @@ describe('summarizeUnrealizedGains', () => {
 
   it('should report a null percentage when nothing has a cost basis', () => {
     expect(summarizeUnrealizedGains([makeAsset()])).toEqual({ gainLoss: 0, costBasis: 0, gainPercent: null, count: 0 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeUnrealizedGain / hasCostBasis / summarizeUnrealizedGains — currency
+// ---------------------------------------------------------------------------
+
+describe('foreign-currency G/P (averageCostEur, never averageCost against the EUR value)', () => {
+  it('compares averageCostEur to the EUR value, not the native averageCost', () => {
+    // 10 units bought at 100 USD/quota (90 EUR/quota at the trade date), now worth 130 EUR/quota.
+    // Mixing currencies would read costBasis = 10·100 = 1000 and gainLoss = 1300 − 1000 = 300 (+30%).
+    // The correct EUR-side comparison is costBasis = 10·90 = 900, gainLoss = 1300 − 900 = 400 (+44.4%).
+    const asset = makeAsset({
+      currency: 'USD',
+      quantity: 10,
+      currentPrice: 145,
+      currentPriceEur: 130,
+      averageCost: 100,
+      averageCostEur: 90,
+    });
+    expect(computeUnrealizedGain(asset)).toEqual({ gainLoss: 400, gainPercent: 400 / 9 });
+  });
+
+  it('falls back to averageCost for a EUR-native asset without averageCostEur (pre-backfill data)', () => {
+    const asset = makeAsset({ currency: 'EUR', quantity: 10, currentPrice: 120, averageCost: 100 });
+    expect(hasCostBasis(asset)).toBe(true);
+    expect(computeUnrealizedGain(asset)).toEqual({ gainLoss: 200, gainPercent: 20 });
+  });
+
+  it('has no comparable basis for a foreign-currency asset that predates averageCostEur', () => {
+    // Pre-backfill: only the native PMC is on the doc. Showing a G/P here would be exactly today's
+    // bug (native PMC vs EUR value), so this must read as "no basis" until the backfill runs.
+    const asset = makeAsset({ currency: 'USD', quantity: 10, currentPrice: 145, currentPriceEur: 130, averageCost: 100 });
+    expect(hasCostBasis(asset)).toBe(false);
+    expect(computeUnrealizedGain(asset)).toBeNull();
+  });
+
+  it('sums foreign- and EUR-currency positions in one EUR-side total', () => {
+    const assets = [
+      makeAsset({ id: 'usd', currency: 'USD', quantity: 10, currentPrice: 145, currentPriceEur: 130, averageCost: 100, averageCostEur: 90 }),
+      makeAsset({ id: 'eur', currency: 'EUR', quantity: 10, currentPrice: 120, averageCost: 100 }),
+    ];
+    expect(summarizeUnrealizedGains(assets)).toEqual({ gainLoss: 600, costBasis: 1900, gainPercent: 600 / 19, count: 2 });
   });
 });
 

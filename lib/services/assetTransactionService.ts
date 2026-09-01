@@ -35,7 +35,7 @@ import {
 /** Server response for a create/edit/delete (mirrors TradeMutationResult in the use case). */
 export interface AssetTransactionMutationResult {
   transactionId: string;
-  derived: { quantity: number; averageCost?: number };
+  derived: { quantity: number; averageCost?: number; averageCostEur?: number };
   realizedPnlEur?: number;
 }
 
@@ -96,6 +96,8 @@ export async function getAssetLedgerMeta(ownerId: string): Promise<AssetTransact
     migratedAt: toDate(data.migratedAt as never),
     baselineDate: toDate(data.baselineDate as never),
     migratedAssetCount: data.migratedAssetCount as number,
+    averageCostEurBackfilledAt:
+      data.averageCostEurBackfilledAt !== undefined ? toDate(data.averageCostEurBackfilledAt as never) : undefined,
     createdAt: toDate(data.createdAt as never),
     updatedAt: toDate(data.updatedAt as never),
   };
@@ -189,4 +191,18 @@ export async function migrateAssetLedger(ownerId: string): Promise<AssetLedgerMi
     body: JSON.stringify({ userId: ownerId }),
   });
   return parseWriteResponse(response, 'Errore durante la migrazione del registro operazioni.');
+}
+
+export type AverageCostEurBackfillResult =
+  | { alreadyBackfilled: true }
+  | { alreadyBackfilled?: false; recomputedAssetCount: number };
+
+/** Idempotent averageCostEur backfill for the owner. Silent no-op once already run. */
+export async function backfillAverageCostEur(ownerId: string): Promise<AverageCostEurBackfillResult> {
+  const response = await authenticatedFetch('/api/asset-transactions/backfill-average-cost-eur', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId: ownerId }),
+  });
+  return parseWriteResponse(response, 'Errore durante il ricalcolo del PMC in euro.');
 }
