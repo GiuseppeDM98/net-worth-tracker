@@ -292,7 +292,7 @@ export function PerformanceDettaglio({ metrics, periodAside, drawdown, rollingCa
             <RollingTile
               eyebrow="CAGR rolling 12 mesi"
               aside="nel periodo"
-              reading={describeRolling(rollingCagr.map((p) => p.cagr), (v) => signedPercent(v, 1), 'Il CAGR')}
+              reading={describeRolling(rollingCagr.map((p) => p.cagr).filter((v): v is number => v !== null), (v) => signedPercent(v, 1), 'Il CAGR')}
               data={rollingCagr}
               primaryKey="cagr"
               averageKey="cagrMA"

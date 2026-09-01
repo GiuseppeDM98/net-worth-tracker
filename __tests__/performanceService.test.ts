@@ -1097,8 +1097,14 @@ describe('buildCacheKey', () => {
     // l'utente continua a leggere numeri pre-fix per 6 ore. Il test è qui perché il bump è manuale
     // e va ricordato — se questa asserzione fallisce dopo un cambio di matematica, è corretto
     // aggiornarla; se fallisce senza, qualcuno ha rotto il prefisso.
-    expect(buildCacheKey(baseline).startsWith('v5-')).toBe(true)
-    expect(buildCacheKey({ ...baseline, snapshots: [] }).startsWith('v5-')).toBe(true)
+    // v5 -> v6 il 2026-08-30: i flussi seguono la base (fix D1, portfolioFlows.ts). Ogni numero
+    // in cache era stato calcolato con i flussi del Cashflow anche dove la base escludeva la
+    // liquidita', ed e' da buttare.
+    // v6 -> v7 il 2026-08-31: la stessa regola arriva alle finestre rolling, che erano rimaste
+    // fuori dal fix D1 (capitale del portafoglio, flussi del patrimonio), e un CAGR non
+    // misurabile smette di essere scritto come 0.
+    expect(buildCacheKey(baseline).startsWith('v7-')).toBe(true)
+    expect(buildCacheKey({ ...baseline, snapshots: [] }).startsWith('v7-')).toBe(true)
   })
 
   it('ignores the order snapshots arrive in', () => {
@@ -1216,5 +1222,40 @@ describe('preparePerformanceChartData', () => {
     expect(chart.length).toBe(2)
     expect(chart[0].date).toBe('02/2025')
     expect(chart[0].initialCapital).toBe(200000)
+  })
+})
+
+// Importando la storia vera (2024-10 in poi) aprile 2025 e' un mese interamente liquidato, e con
+// qualche saldo netto negativo la base di partenza puo' scendere sotto zero. Un denominatore
+// negativo non fallisce: ribalta il segno, e la catena del TWR si azzera in silenzio.
+describe('una base di partenza non positiva non produce un rendimento', () => {
+  function nw(year: number, month: number, totalNetWorth: number) {
+    return {
+      userId: 'user-1', year, month, totalNetWorth,
+      liquidNetWorth: totalNetWorth, illiquidNetWorth: 0,
+      byAssetClass: {}, byAsset: [], assetAllocation: {},
+      createdAt: new Date(year, month - 1, 28),
+    } as never
+  }
+
+  it('calculateROI returns null on a zero or negative starting capital', () => {
+    expect(calculateROI(-800, 31_000, 31_000)).toBeNull()
+    expect(calculateROI(0, 31_000, 31_000)).toBeNull()
+  })
+
+  it('the TWR skips the month instead of collapsing the chain', () => {
+    // gen 1000 -> feb 1100 (+10%), poi una liquidazione porta la base a -800 e il mese dopo risale.
+    // Senza la guardia il mese ripartito da -800 varrebbe -100% e azzererebbe tutto.
+    const snapshots = [nw(2026, 1, 1000), nw(2026, 2, 1100), nw(2026, 3, -800), nw(2026, 4, 900)]
+    const flows = [
+      { date: new Date(2026, 2, 1), income: 0, expenses: 0, dividendIncome: 0, netCashFlow: -1900 },
+      { date: new Date(2026, 3, 1), income: 0, expenses: 0, dividendIncome: 0, netCashFlow: 1700 },
+    ]
+
+    const twr = calculateTimeWeightedReturn(snapshots, flows, 3)
+
+    expect(twr).not.toBeNull()
+    expect(Number.isFinite(twr!)).toBe(true)
+    expect(twr!).toBeGreaterThan(0)
   })
 })

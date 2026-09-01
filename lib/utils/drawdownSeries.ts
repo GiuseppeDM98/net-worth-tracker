@@ -73,7 +73,9 @@ export function buildTwrIndex(
     const startNetWorth = snapshots[i - 1].totalNetWorth;
     const snapshot = snapshots[i];
 
-    if (startNetWorth !== 0) {
+    // `> 0`, non `!== 0`: un capitale di partenza negativo (mese liquidato, saldi netti negativi)
+    // ribalterebbe il segno del rapporto e farebbe scendere l'indice mentre il portafoglio sale.
+    if (startNetWorth > 0) {
       const cashFlow = cashFlowMap.get(monthKey(snapshot.year, snapshot.month)) ?? 0;
       index *= (snapshot.totalNetWorth - cashFlow) / startNetWorth;
     }

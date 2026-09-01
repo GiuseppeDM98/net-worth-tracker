@@ -333,19 +333,38 @@ describe('describeConsistency', () => {
 });
 
 describe('describeContributions', () => {
+  const ledger = { flowSource: 'cashflow' as const };
+
   it('sets the ledger beside the cashflow', () => {
-    const r = describeContributions({ invested: { investedEur: 16700, divestedEur: 2500, netInvestedEur: 14200 }, netCashFlow: 11850 });
+    const r = describeContributions({ ...ledger, invested: { investedEur: 16700, divestedEur: 2500, netInvestedEur: 14200 }, netCashFlow: 11850, cashflowNet: 11850 });
     expect(plain(r)).toBe('Hai investito 14.200 € dal registro, a fronte di 11.850 € messi da parte.');
   });
 
   it('says when the cashflow is negative and when the ledger sold more than it bought', () => {
-    expect(plain(describeContributions({ invested: { investedEur: 1000, divestedEur: 4000, netInvestedEur: -3000 }, netCashFlow: -2300 }))).toBe('Hai disinvestito 3000 € dal registro, mentre dal cashflow sono usciti 2300 € più di quanto è entrato.');
-    expect(plain(describeContributions({ invested: { investedEur: 5000, divestedEur: 0, netInvestedEur: 5000 }, netCashFlow: -900 }))).toBe('Hai investito 5000 € dal registro, mentre dal cashflow sono usciti 900 € più di quanto è entrato.');
+    expect(plain(describeContributions({ ...ledger, invested: { investedEur: 1000, divestedEur: 4000, netInvestedEur: -3000 }, netCashFlow: -2300, cashflowNet: -2300 }))).toBe('Hai disinvestito 3000 € dal registro, mentre dal cashflow sono usciti 2300 € più di quanto è entrato.');
+    expect(plain(describeContributions({ ...ledger, invested: { investedEur: 5000, divestedEur: 0, netInvestedEur: 5000 }, netCashFlow: -900, cashflowNet: -900 }))).toBe('Hai investito 5000 € dal registro, mentre dal cashflow sono usciti 900 € più di quanto è entrato.');
   });
 
   it('without a ledger it reads the cashflow alone', () => {
-    expect(plain(describeContributions({ invested: null, netCashFlow: 11850 }))).toBe('Dal cashflow hai messo da parte 11.850 € nel periodo; il registro operazioni non è attivo.');
-    expect(plain(describeContributions({ invested: null, netCashFlow: -2300 }))).toBe('Dal cashflow sono usciti 2300 € più di quanto è entrato nel periodo; il registro operazioni non è attivo.');
+    expect(plain(describeContributions({ ...ledger, invested: null, netCashFlow: 11850, cashflowNet: 11850 }))).toBe('Dal cashflow hai messo da parte 11.850 € nel periodo; il registro operazioni non è attivo.');
+    expect(plain(describeContributions({ ...ledger, invested: null, netCashFlow: -2300, cashflowNet: -2300 }))).toBe('Dal cashflow sono usciti 2300 € più di quanto è entrato nel periodo; il registro operazioni non è attivo.');
+  });
+
+  it('reads the MEASURED flow, not the ledger, when the flows follow the portfolio base', () => {
+    // Il registro dice 14.200, la serie misurata 12.400: vince quella misurata, perche' e' quella
+    // che il rendimento ha neutralizzato. Stampare il registro sarebbe un numero mai usato.
+    const r = describeContributions({
+      invested: { investedEur: 16700, divestedEur: 2500, netInvestedEur: 14200 },
+      netCashFlow: 12400,
+      flowSource: 'portfolio',
+      cashflowNet: 11850,
+    });
+    expect(plain(r)).toBe('Sono entrati 12.400 € negli strumenti, a fronte di 11.850 € messi da parte.');
+  });
+
+  it('says it the other way round when the portfolio was net sold', () => {
+    const r = describeContributions({ invested: null, netCashFlow: -3000, flowSource: 'portfolio', cashflowNet: -900 });
+    expect(plain(r)).toBe('Sono usciti 3000 € dagli strumenti, mentre dal cashflow sono usciti 900 € più di quanto è entrato.');
   });
 });
 

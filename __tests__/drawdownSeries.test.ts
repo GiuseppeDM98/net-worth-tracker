@@ -154,3 +154,21 @@ describe('findMaxDrawdown', () => {
     expect(findMaxDrawdown(index).value).toBeCloseTo(0, 10);
   });
 });
+
+describe('buildTwrIndex con una base non positiva', () => {
+  function nw(year: number, month: number, totalNetWorth: number) {
+    return {
+      userId: 'user-1', year, month, totalNetWorth,
+      liquidNetWorth: totalNetWorth, illiquidNetWorth: 0,
+      byAssetClass: {}, byAsset: [], assetAllocation: {},
+      createdAt: new Date(year, month - 1, 28),
+    } as never;
+  }
+
+  it('tiene l\'indice fermo invece di ribaltarne il segno', () => {
+    const index = buildTwrIndex([nw(2026, 1, 1000), nw(2026, 2, -500), nw(2026, 3, 1200)], []);
+
+    expect(index.every((point) => Number.isFinite(point.value))).toBe(true);
+    expect(index[2].value).toBe(index[1].value);
+  });
+});

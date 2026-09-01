@@ -77,6 +77,23 @@ export interface PerformanceMetrics {
   totalContributions: number; // Sum of positive net cash flows
   totalWithdrawals: number; // Sum of negative net cash flows
   netCashFlow: number; // Total contributions - withdrawals
+  /**
+   * Da dove vengono i flussi che neutralizzano il rendimento — i FLUSSI SEGUONO LA BASE.
+   *
+   * `portfolio`: variazioni di quantita' degli strumenti in base (`lib/utils/portfolioFlows.ts`).
+   *   E' la lettura giusta quando la liquidita' sta FUORI dalla base, perche' li' un acquisto e'
+   *   denaro che attraversa il confine — e il Cashflow non puo' vederlo, salta i trasferimenti.
+   * `cashflow`: entrate meno uscite del Cashflow, la lettura giusta quando la base e' tutto il
+   *   patrimonio e solo il denaro esterno lo cambia.
+   *
+   * `mixed`: entrambe, mese per mese. Un flusso di portafoglio e' misurabile solo dove esiste il
+   *   `byAsset` di due mesi consecutivi; dove non c'e' si ricade sul Cashflow, che e' sempre meglio
+   *   di zero. Uno storico con snapshot inseriti a mano finisce naturalmente qui.
+   *
+   * Cambia il significato di `netCashFlow`/`totalContributions`/`totalWithdrawals`, non quello di
+   * `totalIncome`/`totalExpenses`/`totalDividendIncome`, che vengono sempre dal Cashflow.
+   */
+  flowSource: 'portfolio' | 'cashflow' | 'mixed';
   totalIncome: number; // Sum of all income in period (NO dividendi)
   totalExpenses: number; // Sum of all expenses in period
   totalDividendIncome: number; // Sum of all dividend income (rendimento portafoglio)
@@ -115,7 +132,9 @@ export interface PerformanceMetrics {
 export interface RollingPeriodPerformance {
   periodEndDate: Date;
   periodStartDate: Date;
-  cagr: number;
+  // `null` = finestra non misurabile, esattamente come per gli altri due. Un CAGR nullo disegnato
+  // come 0% direbbe «quell'anno non ha reso niente» al posto di «quell'anno non si puo' misurare».
+  cagr: number | null;
   sharpeRatio: number | null;
   volatility: number | null;
 }
@@ -132,7 +151,6 @@ export interface PerformanceData {
 
   // Rolling period trends
   rolling12M: RollingPeriodPerformance[];
-  rolling36M: RollingPeriodPerformance[];
 
   // Metadata
   lastUpdated: Date;
@@ -197,7 +215,6 @@ export interface FirestorePerformanceData {
   fiveYear: FirestorePerformanceMetrics;
   allTime: FirestorePerformanceMetrics;
   rolling12M: FirestoreRollingPeriodPerformance[];
-  rolling36M: FirestoreRollingPeriodPerformance[];
   lastUpdated: Timestamp;
   snapshotCount: number;
 }

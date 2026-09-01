@@ -43,6 +43,8 @@ import {
   prepareMonthlyReturnsHeatmap,
   prepareUnderwaterDrawdownData,
 } from '@/lib/services/performanceService';
+import { buildPortfolioCashFlows } from '@/lib/utils/portfolioFlows';
+import { getAssetTransactions } from '@/lib/services/assetTransactionService';
 import { getUserSnapshots } from '@/lib/services/snapshotService';
 import { getAllAssets } from '@/lib/services/assetService';
 import { getSettings } from '@/lib/services/assetAllocationService';
@@ -53,7 +55,7 @@ import {
   toPerformanceBaseSnapshots,
   type PerformanceBaseOptions,
 } from '@/lib/utils/performanceBase';
-import type { PerformanceData, PerformanceMetrics, TimePeriod } from '@/types/performance';
+import type { CashFlowData, PerformanceData, PerformanceMetrics, TimePeriod } from '@/types/performance';
 import type { MonthlySnapshot } from '@/types/assets';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -248,6 +250,7 @@ export default function PerformancePage() {
   const [showCustomDateDialog, setShowCustomDateDialog] = useState(false);
   const [showAIAnalysisDialog, setShowAIAnalysisDialog] = useState(false);
   const [cachedSnapshots, setCachedSnapshots] = useState<MonthlySnapshot[]>([]);
+  const [cachedPortfolioFlows, setCachedPortfolioFlows] = useState<CashFlowData[] | undefined>(undefined);
   // Kept in state only to name the base under the verdict — the numbers themselves already carry it via
   // cachedSnapshots. Defaults match resolvePerformanceBaseOptions so the caption is right on first paint.
   const [baseOptions, setBaseOptions] = useState<PerformanceBaseOptions>({
@@ -336,9 +339,25 @@ export default function PerformancePage() {
       // heatmap and custom-range helpers read cachedSnapshots directly, so they need the exact same
       // exclusions — and the same settings — or a custom period would disagree with the pre-computed ones.
       const options = resolvePerformanceBaseOptions(baseSettings);
-      const snapshots = toPerformanceBaseSnapshots(rawSnapshots, resolvePerformanceExclusions(assetsForBase, options));
+      const exclusions = resolvePerformanceExclusions(assetsForBase, options);
+      const snapshots = toPerformanceBaseSnapshots(rawSnapshots, exclusions);
       setCachedSnapshots(snapshots);
       setBaseOptions(options);
+      // Stessa regola e stessa condizione del service (getAllPerformanceData): i flussi seguono la
+      // base. Senza questa riga un periodo CUSTOM userebbe i flussi del Cashflow mentre YTD/1Y/…
+      // usano quelli del portafoglio, e i due non tornerebbero.
+      // Stessa condizione, stesse opzioni e stessi asset opachi del service: un periodo CUSTOM che
+      // usasse una fonte diversa da YTD/1Y/… non tornerebbe con i numeri precalcolati.
+      setCachedPortfolioFlows(
+        exclusions.length === 0
+          ? undefined
+          : buildPortfolioCashFlows(
+              snapshots,
+              exclusions,
+              await getAssetTransactions(ownerId).catch(() => []), // già segnalato dal service
+              assetsForBase.filter((a) => a.type === 'pensionFund').map((a) => a.id),
+            ),
+      );
 
       const data = await getAllPerformanceData(ownerId, hasLoadedOnceRef.current);
 
@@ -382,6 +401,7 @@ export default function PerformancePage() {
         endDate,
         undefined,
         performanceData.ytd.dividendCategoryId,
+        cachedPortfolioFlows,
       );
       Object.assign(customMetrics, await fetchYieldMetrics(ownerId, customMetrics));
       setPerformanceData({ ...performanceData, custom: customMetrics });
@@ -509,7 +529,10 @@ export default function PerformancePage() {
     });
     // A 3-month moving average smooths the month-to-month noise without lagging behind the trend.
     return rows.map((entry, index) => {
-      const window = rows.slice(Math.max(0, index - 2), index + 1).map((r) => r.cagr).filter((v) => Number.isFinite(v));
+      const window = rows
+        .slice(Math.max(0, index - 2), index + 1)
+        .map((r) => r.cagr)
+        .filter((v): v is number => v !== null && Number.isFinite(v));
       return { ...entry, cagrMA: window.length > 0 ? window.reduce((s, v) => s + v, 0) / window.length : null };
     });
   }, [performanceData, metrics]);
@@ -735,9 +758,17 @@ export default function PerformancePage() {
         {/* Below desktop the benchmark reads before the contributions: «rispetto a cosa?» is the page's question. */}
         <div className={cn(TILE_CELL_CLASS, 'order-5 desktop:order-none desktop:col-span-3')}>
           <ContributiTile
-            reading={describeContributions({ invested: investedCapital, netCashFlow: metrics.netCashFlow })}
+            reading={describeContributions({
+              invested: investedCapital,
+              netCashFlow: metrics.netCashFlow,
+              flowSource: metrics.flowSource,
+              cashflowNet: metrics.totalIncome - metrics.totalExpenses,
+            })}
             invested={investedCapital}
             netCashFlow={metrics.netCashFlow}
+            totalContributions={metrics.totalContributions}
+            totalWithdrawals={metrics.totalWithdrawals}
+            flowSource={metrics.flowSource}
             totalIncome={metrics.totalIncome}
             totalExpenses={metrics.totalExpenses}
             totalDividendIncome={metrics.totalDividendIncome}

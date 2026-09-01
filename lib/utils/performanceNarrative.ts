@@ -440,27 +440,46 @@ export function describeConsistency(c: ReturnConsistency): Narrative {
 }
 
 /**
- * Two figures that measure two different things, side by side on purpose: the ledger's buys minus
- * sells and the cashflow's income minus spending. Without the ledger the reading says so.
+ * Two figures that measure two different things, side by side on purpose: the capital that went
+ * into the instruments and the cashflow's income minus spending.
+ *
+ * Where the first figure comes from depends on `flowSource` — I FLUSSI SEGUONO LA BASE. Con
+ * `portfolio` (o `mixed`) è la serie MISURATA (`portfolioFlows.ts`), cioè esattamente quella che il
+ * rendimento ha neutralizzato; con `cashflow` la base è tutto il patrimonio e il capitale investito
+ * può solo venire dal registro operazioni, che potrebbe non essere attivo.
  */
 export function describeContributions(input: {
   invested: { investedEur: number; divestedEur: number; netInvestedEur: number } | null;
   netCashFlow: number;
+  flowSource: 'portfolio' | 'cashflow' | 'mixed';
+  /** Entrate meno uscite del Cashflow: il risparmio, sempre e comunque. */
+  cashflowNet: number;
 }): Narrative {
-  const cashflowClause: Narrative =
-    input.netCashFlow >= 0
-      ? [figure(euro(input.netCashFlow)), prose(' messi da parte')]
-      : [prose('dal cashflow sono usciti '), figure(euro(input.netCashFlow)), prose(' più di quanto è entrato')];
+  const savingsClause: Narrative =
+    input.cashflowNet >= 0
+      ? [figure(euro(input.cashflowNet)), prose(' messi da parte')]
+      : [prose('dal cashflow sono usciti '), figure(euro(input.cashflowNet)), prose(' più di quanto è entrato')];
+
+  if (input.flowSource === 'portfolio' || input.flowSource === 'mixed') {
+    const net = input.netCashFlow;
+    const out: Narrative = [
+      prose(net >= 0 ? 'Sono entrati ' : 'Sono usciti '),
+      figure(euro(net)),
+      prose(net >= 0 ? ' negli strumenti' : ' dagli strumenti'),
+    ];
+    out.push(prose(input.cashflowNet >= 0 ? ', a fronte di ' : ', mentre '), ...savingsClause, prose('.'));
+    return out;
+  }
 
   if (!input.invested) {
-    return input.netCashFlow >= 0
-      ? [prose('Dal cashflow hai messo da parte '), figure(euro(input.netCashFlow)), prose(' nel periodo; il registro operazioni non è attivo.')]
-      : [prose('Dal cashflow sono usciti '), figure(euro(input.netCashFlow)), prose(' più di quanto è entrato nel periodo; il registro operazioni non è attivo.')];
+    return input.cashflowNet >= 0
+      ? [prose('Dal cashflow hai messo da parte '), figure(euro(input.cashflowNet)), prose(' nel periodo; il registro operazioni non è attivo.')]
+      : [prose('Dal cashflow sono usciti '), figure(euro(input.cashflowNet)), prose(' più di quanto è entrato nel periodo; il registro operazioni non è attivo.')];
   }
 
   const net = input.invested.netInvestedEur;
   const out: Narrative = [prose(net >= 0 ? 'Hai investito ' : 'Hai disinvestito '), figure(euro(net)), prose(' dal registro')];
-  out.push(prose(input.netCashFlow >= 0 ? ', a fronte di ' : ', mentre '), ...cashflowClause, prose('.'));
+  out.push(prose(input.cashflowNet >= 0 ? ', a fronte di ' : ', mentre '), ...savingsClause, prose('.'));
   return out;
 }
 
