@@ -30,6 +30,17 @@
  * finestra è configurata ma i versamenti al suo interno mancano: un rendimento annualizzato oltre
  * `SUSPICIOUS_ANNUAL_RETURN` non è un fondo pensione brillante, sono versamenti non registrati.
  *
+ * E DALL'ALTRO LATO — `isCoverageContradictory`. La copertura si rompe anche al contrario:
+ * versamenti registrati PIÙ della crescita che dovrebbero spiegare. Succede quando il valore del
+ * fondo conteneva già quei soldi al momento della registrazione (uno storico inserito a posteriori,
+ * mentre «Valore attuale» veniva tenuto aggiornato a mano dall'estratto conto); la correzione
+ * manuale del NAV che ne segue è indistinguibile, da qui, da un crollo di mercato. Caso reale:
+ * cinque mesi di versamenti attribuiti a un mese solo hanno prodotto un TWR di −97 %, stampato
+ * come misura perché la guardia guardava solo verso l'alto. Un fondo non a leva non può perdere più del 100 %,
+ * nessun mese può chiudere sotto zero, e un valore cresciuto non convive con un TWR quasi azzerato:
+ * dove l'aritmetica esce dal reale, il numero non è una misura. Le due cause sono opposte e vogliono
+ * parole diverse, quindi due flag distinti.
+ *
  * Zero import Firebase: funzione pura dei suoi input (invariante #4).
  */
 
@@ -43,6 +54,29 @@ import { hasAssetBreakdown } from '@/lib/utils/snapshotAssetBreakdown';
  * medie a una cifra; il 20% è largo apposta, per segnalare solo i casi grossolani.
  */
 const SUSPICIOUS_ANNUAL_RETURN = 20;
+
+/**
+ * Perdita cumulata oltre la quale il calcolo ha lasciato il reale: senza leva un fondo non può
+ * valere meno di zero, quindi un TWR sotto il −100 % descrive i dati, non il mercato.
+ *
+ * Volutamente all'estremo dell'impossibile e non a una soglia "implausibile": il 2022 ha fatto
+ * −20 % a comparti azionari veri, e una guardia che si mangia i ribassi legittimi è peggio del
+ * problema che risolve. Qui passa solo ciò che è aritmeticamente escluso.
+ */
+const IMPOSSIBLE_CUMULATIVE_LOSS = -100;
+
+/**
+ * TWR sotto il quale una finestra il cui valore è CRESCIUTO si contraddice da sola.
+ *
+ * Il TWR è neutro ai flussi: versare non lo muove. Quindi un fondo che nella finestra è cresciuto
+ * in valore e insieme segna −97 % sta dicendo due cose incompatibili — a meno che i versamenti
+ * siano stati attribuiti al mese sbagliato, che è esattamente il caso da intercettare.
+ *
+ * La soglia sta oltre qualunque ribasso reale: il peggior drawdown di un comparto azionario è
+ * dell'ordine del −40/−55 %, e i versamenti non lo peggiorano. Sotto −75 % con il valore in
+ * crescita non c'è mercato che regga la spiegazione.
+ */
+const CONTRADICTORY_LOSS_WHILE_GROWING = -75;
 
 /** Sotto questa soglia annualizzare amplifica il rumore invece di informare. */
 const MIN_MONTHS_TO_ANNUALIZE = 3;
@@ -84,7 +118,13 @@ export interface PensionReturnResult {
   marketGain: number;
   /** Rendimento cumulato della finestra, in %. */
   twr: number;
-  /** TWR annualizzato; `null` sotto i 3 mesi di copertura. */
+  /**
+   * TWR annualizzato; `null` sotto i 3 mesi di copertura — e `null`, non `NaN`, anche quando
+   * l'indice della finestra è negativo: `Math.pow(negativo, 12/5)` non è definito, e un `NaN`
+   * che scivola a valle supera ogni confronto (`NaN > 20` è `false`) e arriva a schermo come
+   * «NaN%». Il caso è reale, non teorico: bastava un mese in cui i versamenti attribuiti
+   * superano il valore del fondo.
+   */
   annualizedTwr: number | null;
   /**
    * `(guadagno di mercato + contributo datoriale) / (valore iniziale + volontario + TFR)`, in %.
@@ -93,6 +133,20 @@ export interface PensionReturnResult {
   personalReturn: number | null;
   /** Il rendimento è troppo alto per essere vero: mancano versamenti nella finestra. */
   isCoverageSuspicious: boolean;
+  /**
+   * La causa opposta di `isCoverageSuspicious`: i versamenti registrati spiegano PIÙ della
+   * crescita che c'è stata, e il calcolo è finito fuori dal reale. Vero in tre casi:
+   *   - un singolo mese chiude a valore non positivo tolti i suoi versamenti — a quel mese ne sono
+   *     attribuiti più di quanti il fondo intero ne valga;
+   *   - la finestra perde più del 100 % (senza leva non si può perdere più di tutto);
+   *   - il valore è CRESCIUTO ma il TWR segna una perdita oltre ogni ribasso reale: il TWR è neutro
+   *     ai flussi, quindi le due cose insieme non stanno in piedi.
+   *
+   * Non è un rendimento pessimo: è un versamento contato due volte, o già dentro il valore che
+   * l'utente ha inserito a mano. Tenuto separato perché la frase da mostrare è un'altra —
+   * «registra i versamenti mancanti» sarebbe il consiglio esattamente sbagliato.
+   */
+  isCoverageContradictory: boolean;
   /**
    * La finestra è aperta ma non è ancora successo nulla dentro: né il valore si è mosso, né sono
    * stati registrati versamenti. Il `twr` vale allora 0 per ASSENZA di dati, non perché il fondo
@@ -105,8 +159,10 @@ export interface PensionReturnResult {
 /**
  * Il rendimento di questa finestra è una MISURA, o solo un numero che il calcolo ha prodotto?
  *
- * I due stati che dicono di no — `isCoverageSuspicious` e `hasNoMovement` — hanno cause opposte ma
- * la stessa conseguenza sullo schermo: la percentuale va sostituita da una spiegazione, e con essa
+ * I tre stati che dicono di no — `isCoverageSuspicious`, `isCoverageContradictory` e
+ * `hasNoMovement` — hanno cause diverse (versamenti che mancano, versamenti contati due volte,
+ * niente di misurabile) ma la stessa conseguenza sullo schermo: la percentuale va sostituita da
+ * una spiegazione, e con essa
  * TUTTA la scomposizione in euro che la spiegherebbe. «Guadagno di mercato» stampato sotto un avviso
  * che dice «quella differenza non è rendimento di mercato» contraddice l'avviso a quaranta pixel di
  * distanza — ed è il numero, non il testo, che l'occhio legge per primo.
@@ -116,7 +172,7 @@ export interface PensionReturnResult {
  * espressioni separate sono divergite (la card guardava entrambi i flag, il blocco solo uno).
  */
 export function isPensionReturnMeasurable(result: PensionReturnResult): boolean {
-  return !result.isCoverageSuspicious && !result.hasNoMovement;
+  return !result.isCoverageSuspicious && !result.isCoverageContradictory && !result.hasNoMovement;
 }
 
 /** Chiave mensile 'YYYY-MM'. */
@@ -276,12 +332,19 @@ export function computePensionReturn(
   }
 
   let index = 1;
+  // Un mese che, tolti i suoi versamenti, non vale più niente non è un mese di rendimento: è un
+  // mese a cui ne sono stati attribuiti più di quanti il fondo intero ne valga. L'indice da lì in
+  // poi è aritmetica su un dato rotto — si continua a calcolarlo per non perdere `twr`, ma il
+  // flag toglie al risultato lo statuto di misura.
+  let hasNonPositiveMonth = false;
   for (let i = 1; i < windowPoints.length; i++) {
     const startValue = windowPoints[i - 1].value;
     if (startValue === 0) continue;
     const key = monthKey(windowPoints[i].year, windowPoints[i].month);
     const paidIn = sumByNature(contributionsByMonth.get(key) ?? []).total;
-    index *= (windowPoints[i].value - paidIn) / startValue;
+    const netValue = windowPoints[i].value - paidIn;
+    if (netValue <= 0) hasNonPositiveMonth = true;
+    index *= netValue / startValue;
   }
 
   const startValue = windowPoints[0].value;
@@ -290,10 +353,14 @@ export function computePensionReturn(
   const monthsCovered = windowPoints.length - 1;
 
   const twr = (index - 1) * 100;
-  const annualizedTwr =
+  // `Math.pow` di un indice negativo a esponente frazionario è NaN, e un NaN a valle passa ogni
+  // confronto senza far scattare nulla: si normalizza a null, che è già il "non calcolabile" del
+  // campo.
+  const rawAnnualized =
     monthsCovered >= MIN_MONTHS_TO_ANNUALIZE
       ? (Math.pow(index, 12 / monthsCovered) - 1) * 100
       : null;
+  const annualizedTwr = rawAnnualized !== null && Number.isFinite(rawAnnualized) ? rawAnnualized : null;
 
   const marketGain = endValue - startValue - contributionsInWindow.total;
   const ownCapital = startValue + contributionsInWindow.voluntary + contributionsInWindow.tfr;
@@ -313,6 +380,10 @@ export function computePensionReturn(
       ownCapital > 0 ? ((marketGain + contributionsInWindow.employer) / ownCapital) * 100 : null,
     isCoverageSuspicious:
       annualizedTwr !== null && annualizedTwr > SUSPICIOUS_ANNUAL_RETURN,
+    isCoverageContradictory:
+      hasNonPositiveMonth ||
+      twr < IMPOSSIBLE_CUMULATIVE_LOSS ||
+      (endValue - startValue > 0 && twr < CONTRADICTORY_LOSS_WHILE_GROWING),
     hasNoMovement:
       Math.abs(endValue - startValue) < MOVEMENT_EPSILON_EUR &&
       contributionsInWindow.total < MOVEMENT_EPSILON_EUR,

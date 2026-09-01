@@ -190,6 +190,12 @@ export type PensionReturnState =
   | 'measured'
   /** `isCoverageSuspicious`: the growth is too high for the contributions recorded. */
   | 'suspicious'
+  /**
+   * `isCoverageContradictory`: the mirror image — MORE contributions recorded than the growth
+   * they should explain, so the arithmetic left the real. A contribution counted twice, or one
+   * already inside a hand-entered value, never a bad market.
+   */
+  | 'contradictory'
   /** `hasNoMovement`: the window is open but nothing happened inside it. */
   | 'idle'
   /** No contribution recorded and no configured start: the window cannot open. */
@@ -250,7 +256,11 @@ export interface PensionMemberBlock {
 function resolveReturnState(result: PensionReturnResult | null, startMonth: string | null): PensionReturnState {
   if (result) {
     if (isPensionReturnMeasurable(result)) return 'measured';
-    return result.isCoverageSuspicious ? 'suspicious' : 'idle';
+    // Order matters: a contradictory window can also read as idle-ish once the flags overlap, and
+    // the contradiction is the more specific — and the more actionable — of the two.
+    if (result.isCoverageSuspicious) return 'suspicious';
+    if (result.isCoverageContradictory) return 'contradictory';
+    return 'idle';
   }
   return startMonth === null ? 'no-contributions' : 'one-point';
 }

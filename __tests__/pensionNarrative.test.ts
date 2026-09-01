@@ -49,6 +49,7 @@ const RETURN: PensionReturnResult = {
   annualizedTwr: 10.75,
   personalReturn: 8.12,
   isCoverageSuspicious: false,
+  isCoverageContradictory: false,
   hasNoMovement: false,
 };
 
