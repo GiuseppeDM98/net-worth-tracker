@@ -95,8 +95,10 @@ export default function CashflowPage() {
   const [laborIncomeCategoryIds, setLaborIncomeCategoryIds] = useState<string[]>([]);
 
   // React Query hooks for expenses and categories
-  const { data: allExpenses = [], isLoading: expensesLoading } = useExpenses(ownerId);
-  const { data: categories = [], isLoading: categoriesLoading } = useExpenseCategories(ownerId);
+  const { data: allExpenses = [], isLoading: expensesLoading, isError: expensesError } =
+    useExpenses(ownerId);
+  const { data: categories = [], isLoading: categoriesLoading, isError: categoriesError } =
+    useExpenseCategories(ownerId);
   const { data: allAssets = [] } = useAssets(ownerId);
 
   const assetNameMap = useMemo(() => {
@@ -111,9 +113,13 @@ export default function CashflowPage() {
   const [dividends, setDividends] = useState<Dividend[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [otherDataLoading, setOtherDataLoading] = useState(false);
+  const [otherDataFailed, setOtherDataFailed] = useState(false);
   const [otherDataLoaded, setOtherDataLoaded] = useState(false);
 
   const loading = expensesLoading || categoriesLoading || otherDataLoading;
+  // Every tab defaults its data to `[]`, so without this a dropped connection reads as an
+  // empty ledger — the one thing a tracker must never say (lib/utils/statesNarrative.ts).
+  const loadFailed = expensesError || categoriesError;
   const isDemo = useDemoMode();
 
   // Load dividends and assets only when their tabs are mounted
@@ -122,6 +128,7 @@ export default function CashflowPage() {
 
     try {
       setOtherDataLoading(true);
+      setOtherDataFailed(false);
 
       // Fetch only dividends and assets (expenses/categories handled by React Query)
       const [dividendsData, assetsData] = await Promise.all([
@@ -141,6 +148,7 @@ export default function CashflowPage() {
         operation: 'loadOtherData',
         error: getErrorMessage(error),
       });
+      setOtherDataFailed(true);
       toast.error('Errore nel caricamento dei dati');
     } finally {
       setOtherDataLoading(false);
@@ -348,6 +356,7 @@ export default function CashflowPage() {
               allExpenses={allExpenses}
               categories={categories}
               loading={loading}
+                loadFailed={loadFailed}
               onRefresh={handleRefresh}
               assetNameMap={assetNameMap}
             />
@@ -365,6 +374,7 @@ export default function CashflowPage() {
                 dividends={dividends}
                 assets={assets}
                 loading={loading}
+                loadFailed={otherDataFailed}
                 onRefresh={handleRefresh}
               />
             </motion.div>
@@ -382,6 +392,7 @@ export default function CashflowPage() {
                 allExpenses={allExpenses}
                 categories={categories}
                 loading={loading}
+                loadFailed={loadFailed}
                 historyStartYear={cashflowHistoryStartYear}
                 userId={ownerId ?? ''}
               />
@@ -400,6 +411,7 @@ export default function CashflowPage() {
                 familyMembers={familyMembers}
                 laborIncomeCategoryIds={laborIncomeCategoryIds}
                 loading={loading}
+                loadFailed={loadFailed}
               />
             </motion.div>
           </TabsContent>

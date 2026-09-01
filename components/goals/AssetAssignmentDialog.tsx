@@ -13,18 +13,11 @@ import { Asset } from '@/types/assets';
 import { GoalAssetAssignment } from '@/types/goals';
 import { getAvailablePercentage } from '@/lib/services/goalService';
 import { calculateAssetValue } from '@/lib/services/assetService';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
+import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { formatCurrency } from '@/lib/utils/formatters';
+import { formatCurrency, formatPercentageIt } from '@/lib/utils/formatters';
 import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
 import { Search, Loader2 } from 'lucide-react';
 
@@ -99,16 +92,36 @@ export function AssetAssignmentDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Assegna Asset all&apos;Obiettivo</DialogTitle>
-          <DialogDescription>
-            Scegli un asset e la percentuale del suo valore da assegnare a questo obiettivo.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4 py-2">
+    <ResponsiveModal
+      open={open}
+      onClose={onClose}
+      eyebrow="FIRE · Obiettivi"
+      title="Assegna uno strumento"
+      reading="Una quota assegnata esce dalle quote libere e finisce nella traiettoria di questo obiettivo. Lo strumento resta dov'è: cambia solo a chi è destinato."
+      width="md"
+      footer={
+        <>
+          <Button type="button" variant="outline" onClick={onClose}>
+            Annulla
+          </Button>
+          <Button
+            type="button"
+            onClick={handleSave}
+            disabled={
+              saving ||
+              !selectedAssetId ||
+              !percentage ||
+              parseFloat(percentage) <= 0 ||
+              parseFloat(percentage) > maxAllowedPct
+            }
+          >
+            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
+            {saving ? 'Salvataggio...' : existingAssignment ? 'Aggiorna' : 'Assegna'}
+          </Button>
+        </>
+      }
+    >
+        <div className="space-y-4">
           {/* Search */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
@@ -143,8 +156,8 @@ export function AssetAssignmentDialog({
                     : trueAvail === 0 && alreadyAssigned
                       ? { label: 'Nessuna quota libera', cls: 'text-muted-foreground' }
                       : trueAvail < 50
-                        ? { label: `${trueAvail.toFixed(0)}% libero`, cls: 'text-warning-foreground' }
-                        : { label: `${trueAvail.toFixed(0)}% libero`, cls: 'text-positive' };
+                        ? { label: `${formatPercentageIt(trueAvail, 0)} libero`, cls: 'text-warning-foreground' }
+                        : { label: `${formatPercentageIt(trueAvail, 0)} libero`, cls: 'text-positive' };
 
                 return (
                   <button
@@ -157,7 +170,7 @@ export function AssetAssignmentDialog({
                       );
                     }}
                     className={`w-full text-left px-3 py-2.5 hover:bg-muted/30 transition-colors ${
-                      isSelected ? 'bg-accent border-l-2 border-primary' : ''
+                      isSelected ? 'bg-accent' : ''
                     }`}
                   >
                     <div className="flex items-center justify-between">
@@ -207,7 +220,7 @@ export function AssetAssignmentDialog({
                       step="5"
                       value={percentage}
                       onChange={(e) => setPercentage(e.target.value)}
-                      placeholder={`Max ${maxAllowedPct.toFixed(0)}%`}
+                      placeholder={`Max ${formatPercentageIt(maxAllowedPct, 0)}`}
                     />
                     <span className="text-sm text-muted-foreground">%</span>
                   </div>
@@ -228,27 +241,6 @@ export function AssetAssignmentDialog({
             </div>
           )}
         </div>
-
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={onClose}>
-            Annulla
-          </Button>
-          <Button
-            type="button"
-            onClick={handleSave}
-            disabled={
-              saving ||
-              !selectedAssetId ||
-              !percentage ||
-              parseFloat(percentage) <= 0 ||
-              parseFloat(percentage) > maxAllowedPct
-            }
-          >
-            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {saving ? 'Salvataggio...' : existingAssignment ? 'Aggiorna' : 'Assegna'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    </ResponsiveModal>
   );
 }

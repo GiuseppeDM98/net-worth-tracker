@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
+import { describeWriteError, userFacingError } from '@/lib/utils/dialogNarrative';
 import { queryKeys } from '@/lib/query/queryKeys';
 import {
   AssistantChatContextType,
@@ -207,7 +208,7 @@ export function useAssistantStreaming({
 
       if (!response.ok || !response.body) {
         const payload = await response.json().catch(() => null);
-        throw new Error(payload?.error ?? 'Impossibile avviare lo stream dell\'assistente');
+        throw userFacingError(payload?.error ?? 'Impossibile avviare lo stream dell\'assistente');
       }
 
       // Save prompt for retry before clearing draft — retry needs the original text
@@ -274,7 +275,7 @@ export function useAssistantStreaming({
 
           if (event.type === 'error') {
             setIsInterrupted(true);
-            throw new Error(event.error);
+            throw userFacingError(event.error);
           }
         }
       }
@@ -290,7 +291,7 @@ export function useAssistantStreaming({
     } catch (error) {
       // AbortError is a user-initiated stop — keep partial text visible, no toast
       if ((error as Error).name !== 'AbortError') {
-        toast.error((error as Error).message);
+        toast.error(describeWriteError(error));
       }
       setIsInterrupted(true);
       setStreamingMessageId(undefined);

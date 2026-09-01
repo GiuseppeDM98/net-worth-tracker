@@ -1,34 +1,31 @@
 // components/pdf/sections/PortfolioSection.tsx
-// Portfolio assets section with pagination for large portfolios
+// Patrimonio: what the portfolio is worth, then every instrument in it.
 
-import { Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import { PDFText } from '../primitives/PDFText';
 import { PDFTable } from '../primitives/PDFTable';
+import { PDFPage, PDFSection, PDFMetrics, PDFRankedRows, type PDFMetric, type PDFRankedRow } from '../primitives/PDFTile';
 import type { PortfolioData, AssetRow } from '@/types/pdf';
-import { formatCurrency, formatPercentage } from '@/lib/services/chartService';
+import { cachedFormatCurrencyEUR, formatPercentageIt } from '@/lib/utils/formatters';
+import { describePortfolioSection, PDF_SECTION_TITLES } from '@/lib/utils/pdfNarrative';
 
 interface PortfolioSectionProps {
   data: PortfolioData;
+  reportScope: string;
 }
 
 /**
- * Portfolio assets section with automatic pagination for large holdings.
+ * The Patrimonio section, in the cadence of a tile: the answer in words, then the figures, then
+ * the inventory.
  *
- * Multi-page output:
- * - Asset detail pages: 25 assets per page (prevents PDF overflow)
- * - Summary page: Top 10 holdings + aggregated metrics (always rendered last)
- *
- * Why 25 assets per page?
- * Balance between information density and readability. With current table styling,
- * 25 assets fit comfortably on A4 while remaining legible.
+ * The order is the one thing that changed structurally. The section used to open on 25 rows of
+ * table and close on the summary, which is the reading order of a ledger, not of a report: a
+ * reader who stops after the first page should already know what the portfolio is worth.
  */
 
-// Maximum assets per page before creating new page
-const ASSETS_PER_PAGE = 25;
+// Rows per inventory page. Chosen against the current row height (18pt min + 10pt padding) and
+// the 507pt column: 24 rows plus the head and the page chrome fit an A4 without clipping.
+const ASSETS_PER_PAGE = 24;
 
-/**
- * Splits asset array into paginated chunks of ASSETS_PER_PAGE items.
- */
 function paginateAssets(assets: AssetRow[]): AssetRow[][] {
   const pages: AssetRow[][] = [];
   for (let i = 0; i < assets.length; i += ASSETS_PER_PAGE) {
@@ -37,258 +34,120 @@ function paginateAssets(assets: AssetRow[]): AssetRow[][] {
   return pages;
 }
 
-/**
- * Truncates long strings to prevent table overflow.
- * @param maxLength - Character limit (25 for table cells, 30 for headers)
- */
+/** Truncates a name that would otherwise push a table column past its width. */
 function truncate(str: string, maxLength: number): string {
-  if (str.length <= maxLength) return str;
-  return str.substring(0, maxLength - 3) + '...';
+  return str.length <= maxLength ? str : `${str.substring(0, maxLength - 1)}…`;
 }
 
-export function PortfolioSection({ data }: PortfolioSectionProps) {
+const euro = (value: number) => cachedFormatCurrencyEUR(value, true);
+
+export function PortfolioSection({ data, reportScope }: PortfolioSectionProps) {
+  const title = PDF_SECTION_TITLES.portfolio;
+  const footerNote = `${title} · ${reportScope}`;
+
   if (!data || data.assets.length === 0) {
     return (
-      <Page size="A4" style={styles.page}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Portfolio Assets</Text>
-          <View style={styles.divider} />
-        </View>
-        <View style={styles.content}>
-          <PDFText variant="body" style={styles.noData}>
-            Nessun asset presente nel portfolio.
-          </PDFText>
-        </View>
-        <View style={styles.footer}>
-          <Text style={styles.footerText} render={({ pageNumber, totalPages }) => (
-            `Pagina ${pageNumber} di ${totalPages}`
-          )} fixed />
-        </View>
-      </Page>
+      <PDFPage eyebrow="Net Worth Tracker" section={title} footerNote={footerNote}>
+        <PDFSection eyebrow={title} ruled={false}>
+          <PDFText variant="body">Nessuno strumento è registrato in portafoglio.</PDFText>
+        </PDFSection>
+      </PDFPage>
     );
   }
 
   const pages = paginateAssets(data.assets);
-  const totalPages = pages.length + 1; // +1 for summary page
+  const largest = data.assets[0]?.totalValue ?? 0;
+
+  const metrics: PDFMetric[] = [
+    { label: 'Totale', value: euro(data.totalValue), note: `${data.assets.length} strumenti` },
+    {
+      label: 'Liquido',
+      value: euro(data.liquidValue),
+      note: data.totalValue > 0 ? `${formatPercentageIt((data.liquidValue / data.totalValue) * 100, 1)} del totale` : undefined,
+    },
+    {
+      label: 'Illiquido',
+      value: euro(data.illiquidValue),
+      note: data.totalValue > 0 ? `${formatPercentageIt((data.illiquidValue / data.totalValue) * 100, 1)} del totale` : undefined,
+    },
+    {
+      label: 'Guadagno non realizzato',
+      value: `${data.totalUnrealizedGains >= 0 ? '+' : '−'}${euro(Math.abs(data.totalUnrealizedGains))}`,
+      note: `${data.totalUnrealizedGainsPercent >= 0 ? '+' : '−'}${formatPercentageIt(Math.abs(data.totalUnrealizedGainsPercent), 2)} sul capitale versato`,
+      sign: data.totalUnrealizedGains >= 0 ? 'positive' : 'negative',
+    },
+    { label: 'TER medio ponderato', value: formatPercentageIt(data.weightedTER, 2), note: 'sui soli strumenti che ne hanno uno' },
+    { label: 'Costo annuo stimato', value: euro(data.annualCost), note: 'TER × valore, a portafoglio fermo' },
+  ];
+
+  const topRows: PDFRankedRow[] = data.assets.slice(0, 8).map((asset) => ({
+    label: asset.ticker || asset.name,
+    caption: asset.ticker ? truncate(asset.name, 44) : undefined,
+    amount: euro(asset.totalValue),
+    trailing: formatPercentageIt(asset.weight, 1),
+    fill: largest > 0 ? asset.totalValue / largest : 0,
+  }));
 
   return (
     <>
-      {/* Asset detail pages */}
+      <PDFPage eyebrow="Net Worth Tracker" section={title} footerNote={footerNote}>
+        <PDFSection eyebrow={title} scope={`${data.assets.length} strumenti`} reading={describePortfolioSection(data)} ruled={false}>
+          <PDFMetrics items={metrics} />
+        </PDFSection>
+
+        <PDFSection eyebrow="Strumenti principali" scope={`primi ${topRows.length} di ${data.assets.length} per valore`}>
+          <PDFRankedRows rows={topRows} />
+        </PDFSection>
+      </PDFPage>
+
+      {/* The inventory: every instrument, in the order the portfolio is weighted */}
       {pages.map((page, pageIdx) => (
-        <Page key={pageIdx} size="A4" style={styles.page}>
-          <View style={styles.header}>
-            <Text style={styles.title}>
-              Portfolio Assets {pages.length > 1 && `(Pagina ${pageIdx + 1}/${pages.length})`}
-            </Text>
-            <View style={styles.divider} />
-          </View>
-
-          <View style={styles.content}>
+        <PDFPage
+          key={pageIdx}
+          eyebrow="Net Worth Tracker"
+          section={title}
+          footerNote={footerNote}
+        >
+          <PDFSection
+            eyebrow="Elenco strumenti"
+            scope={pages.length > 1 ? `pagina ${pageIdx + 1} di ${pages.length}` : `${data.assets.length} strumenti`}
+            ruled={false}
+          >
             <PDFTable
-              headers={['Ticker', 'Nome', 'Classe', 'Q.TA', 'Prezzo', 'Valore', 'Peso', 'G/P']}
-              rows={page.map(asset => [
+              headers={['Ticker', 'Nome', 'Classe', 'Quantità', 'Prezzo', 'Valore', 'Peso', 'G/P']}
+              rows={page.map((asset) => [
                 asset.ticker,
-                truncate(asset.name, 25),
+                truncate(asset.name, 24),
                 getAssetClassShort(asset.assetClass),
-                asset.quantity.toFixed(2),
-                formatCurrency(asset.currentPrice),
-                formatCurrency(asset.totalValue),
-                formatPercentage(asset.weight),
-                asset.unrealizedGain !== undefined
-                  ? formatCurrency(asset.unrealizedGain)
-                  : '-',
+                asset.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2 }),
+                cachedFormatCurrencyEUR(asset.currentPrice),
+                euro(asset.totalValue),
+                formatPercentageIt(asset.weight, 1),
+                asset.unrealizedGainPercent !== undefined
+                  ? `${asset.unrealizedGainPercent >= 0 ? '+' : '−'}${formatPercentageIt(Math.abs(asset.unrealizedGainPercent), 1)}`
+                  : '—',
               ])}
-              columnWidths={['10%', '23%', '12%', '10%', '11%', '13%', '9%', '12%']}
+              columnWidths={['10%', '24%', '12%', '11%', '12%', '13%', '8%', '10%']}
+              alignRight={[3, 4, 5, 6, 7]}
             />
-          </View>
-
-          <View style={styles.footer}>
-            <Text style={styles.footerText} render={({ pageNumber, totalPages }) => (
-              `Pagina ${pageNumber} di ${totalPages}`
-            )} fixed />
-          </View>
-        </Page>
+          </PDFSection>
+        </PDFPage>
       ))}
-
-      {/* Summary page */}
-      <Page size="A4" style={styles.page}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Portfolio - Riepilogo</Text>
-          <View style={styles.divider} />
-        </View>
-
-        <View style={styles.content}>
-          {/* Summary metrics */}
-          <View style={styles.summaryGrid}>
-            <View style={styles.summaryCard}>
-              <Text style={styles.summaryLabel}>Patrimonio Totale</Text>
-              <Text style={styles.summaryValue}>{formatCurrency(data.totalValue)}</Text>
-            </View>
-
-            <View style={styles.summaryCard}>
-              <Text style={styles.summaryLabel}>Patrimonio Liquido</Text>
-              <Text style={styles.summaryValue}>{formatCurrency(data.liquidValue)}</Text>
-            </View>
-
-            <View style={styles.summaryCard}>
-              <Text style={styles.summaryLabel}>Patrimonio Illiquido</Text>
-              <Text style={styles.summaryValue}>{formatCurrency(data.illiquidValue)}</Text>
-            </View>
-
-            <View style={styles.summaryCard}>
-              <Text style={styles.summaryLabel}>Numero Assets</Text>
-              <Text style={styles.summaryValue}>{data.assets.length}</Text>
-            </View>
-
-            <View style={styles.summaryCard}>
-              <Text style={styles.summaryLabel}>TER Medio Ponderato</Text>
-              <Text style={styles.summaryValue}>{formatPercentage(data.weightedTER)}</Text>
-            </View>
-
-            <View style={styles.summaryCard}>
-              <Text style={styles.summaryLabel}>Costi Annuali Stimati</Text>
-              <Text style={styles.summaryValue}>
-                {formatCurrency(data.annualCost)}
-              </Text>
-            </View>
-
-            <View style={styles.summaryCard}>
-              <Text style={styles.summaryLabel}>G/P Non Realizzato</Text>
-              <Text style={[
-                styles.summaryValue,
-                data.totalUnrealizedGains >= 0 ? styles.positive : styles.negative
-              ]}>
-                {formatCurrency(data.totalUnrealizedGains)}
-              </Text>
-              <Text style={styles.summarySubvalue}>
-                {formatPercentage(data.totalUnrealizedGainsPercent)}
-              </Text>
-            </View>
-          </View>
-
-          {/* Top 10 holdings */}
-          <View style={styles.section}>
-            <PDFText variant="subheading">Top 10 Holdings per Valore</PDFText>
-            <PDFTable
-              headers={['#', 'Ticker', 'Nome', 'Valore', 'Peso']}
-              rows={data.assets.slice(0, 10).map((asset, idx) => [
-                String(idx + 1),
-                asset.ticker,
-                truncate(asset.name, 30),
-                formatCurrency(asset.totalValue),
-                formatPercentage(asset.weight),
-              ])}
-              columnWidths={['8%', '15%', '42%', '20%', '15%']}
-            />
-          </View>
-        </View>
-
-        <View style={styles.footer}>
-          <Text style={styles.footerText} render={({ pageNumber, totalPages }) => (
-            `Pagina ${pageNumber} di ${totalPages}`
-          )} fixed />
-        </View>
-      </Page>
     </>
   );
 }
 
+/** Short class names, so the column stays narrow enough to leave the numbers room. */
 function getAssetClassShort(assetClass: string): string {
   const shorts: Record<string, string> = {
-    equity: 'Azion.',
+    equity: 'Azioni',
     bonds: 'Obblig.',
     crypto: 'Crypto',
-    realestate: 'Immob.',
-    commodity: 'Materie P.',
-    cash: 'Liquid.',
-    trendFollowing: 'Trend F.',
+    realestate: 'Immobili',
+    cash: 'Liquidità',
+    commodity: 'Materie',
+    trendFollowing: 'Trend',
     carry: 'Carry',
   };
-  return shorts[assetClass] || assetClass;
+  return shorts[assetClass] ?? assetClass;
 }
-
-const styles = StyleSheet.create({
-  page: {
-    padding: 40,
-    backgroundColor: '#ffffff',
-    fontFamily: 'Helvetica',
-  },
-  header: {
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 18,
-    fontFamily: 'Helvetica-Bold',
-    color: '#3B82F6',
-    marginBottom: 8,
-  },
-  divider: {
-    height: 2,
-    backgroundColor: '#3B82F6',
-    width: '100%',
-  },
-  content: {
-    flexGrow: 1,
-  },
-  noData: {
-    textAlign: 'center',
-    color: '#6B7280',
-    marginTop: 40,
-  },
-  summaryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 30,
-  },
-  summaryCard: {
-    width: '48%',
-    marginBottom: 15,
-    marginRight: '2%',
-    padding: 12,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 4,
-    borderLeftWidth: 3,
-    borderLeftColor: '#3B82F6',
-  },
-  summaryLabel: {
-    fontSize: 9,
-    fontFamily: 'Helvetica',
-    color: '#6B7280',
-    marginBottom: 4,
-  },
-  summaryValue: {
-    fontSize: 14,
-    fontFamily: 'Helvetica-Bold',
-    color: '#000000',
-  },
-  summarySubvalue: {
-    fontSize: 10,
-    fontFamily: 'Helvetica',
-    color: '#6B7280',
-    marginTop: 2,
-  },
-  positive: {
-    color: '#10B981',
-  },
-  negative: {
-    color: '#EF4444',
-  },
-  section: {
-    marginTop: 20,
-  },
-  footer: {
-    position: 'absolute',
-    bottom: 30,
-    left: 40,
-    right: 40,
-    textAlign: 'center',
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-    paddingTop: 10,
-  },
-  footerText: {
-    fontSize: 8,
-    fontFamily: 'Helvetica',
-    color: '#6B7280',
-  },
-});

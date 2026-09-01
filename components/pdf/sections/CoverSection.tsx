@@ -1,107 +1,90 @@
 // components/pdf/sections/CoverSection.tsx
-// PDF cover page with logo, title, and metadata
+// Page 1: the report's verdict.
 
-import { Page, View, Text, Image, StyleSheet } from '@react-pdf/renderer';
+import { Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
+import { PRINT_COLORS, PDF_FONTS } from '@/lib/constants/printTokens';
+import { PDF_RAMP, PDF_PAGE_MARGIN, PDFVerdict } from '../primitives/PDFTile';
+import { reportScopeLabel, type PageVerdictModel } from '@/lib/utils/pdfNarrative';
 import type { TimeFilter } from '@/types/pdf';
 
 interface CoverSectionProps {
   generatedAt: Date;
   userName: string;
+  verdict: PageVerdictModel;
+  sectionTitles: string[];
   timeFilter?: TimeFilter;
   selectedYear?: number;
   selectedMonth?: number;
 }
 
 /**
- * Derives report type label from time filter and user-selected period.
+ * The cover page.
  *
- * Uses selectedYear/selectedMonth when provided (custom period export),
- * falls back to current date for backwards compatibility.
+ * It used to be a frontispiece: a 36pt blue "Portfolio Report", a pill badge, a 2pt blue rule
+ * and a disclaimer — a whole page that told the reader nothing the file name did not. It is now
+ * the report's verdict, in the same shape every page of the app opens with: eyebrow, one
+ * rule-generated sentence, the facts under it, and the logistics at the foot where they belong.
  *
- * Capitalization logic:
- * Italian month names from toLocaleString() are lowercase ("gennaio", "febbraio").
- * We capitalize the first letter for professional appearance in title context.
- *
- * @returns Formatted report type string
- * - Monthly: "Report Mensile - Gennaio 2024"
- * - Yearly: "Report Annuale - 2024"
- * - Total: "Report Totale"
+ * The words come from `buildReportVerdict`; this component chooses no copy of its own.
  */
-function getReportTypeLabel(
-  timeFilter?: TimeFilter,
-  selectedYear?: number,
-  selectedMonth?: number
-): string {
-  const now = new Date();
-  const year = selectedYear ?? now.getFullYear();
-
-  switch (timeFilter) {
-    case 'monthly': {
-      // Build a Date from the selected month to get Italian locale name
-      const monthIndex = (selectedMonth ?? (now.getMonth() + 1)) - 1;
-      const monthName = new Date(2024, monthIndex).toLocaleString('it-IT', { month: 'long' });
-      const capitalizedMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
-      return `Report Mensile - ${capitalizedMonth} ${year}`;
-    }
-    case 'yearly':
-      return `Report Annuale - ${year}`;
-    case 'total':
-    default:
-      return 'Report Totale';
-  }
-}
-
-/**
- * Professional cover page (title page) for PDF reports.
- *
- * Layout:
- * - Centered design with large title
- * - Report type badge (monthly/yearly/total) with conditional coloring
- * - User name as subtitle
- * - Generation date
- * - Disclaimer text
- *
- * Always rendered first in PDFDocument, not optional.
- *
- * @param generatedAt - Report generation timestamp
- * @param userName - User's display name
- * @param timeFilter - Report period (total/yearly/monthly)
- */
-export function CoverSection({ generatedAt, userName, timeFilter, selectedYear, selectedMonth }: CoverSectionProps) {
-  const formattedDate = format(generatedAt, 'dd/MM/yyyy', { locale: it });
+export function CoverSection({
+  generatedAt,
+  userName,
+  verdict,
+  sectionTitles,
+  timeFilter,
+  selectedYear,
+  selectedMonth,
+}: CoverSectionProps) {
+  const formattedDate = format(generatedAt, 'dd/MM/yyyy · HH:mm', { locale: it });
 
   return (
     <Page size="A4" style={styles.page}>
-      <View style={styles.content}>
-        {/* Title */}
-        <Text style={styles.title}>Portfolio Report</Text>
+      <View style={styles.head}>
+        <Text style={styles.eyebrow}>Net Worth Tracker</Text>
+        <Text style={styles.eyebrow}>{reportScopeLabel(timeFilter, selectedYear, selectedMonth, generatedAt)}</Text>
+      </View>
 
-        {/* Report Type Badge */}
-        {timeFilter && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{getReportTypeLabel(timeFilter, selectedYear, selectedMonth)}</Text>
+      {/* The verdict sits on the optical centre, not the geometric one: the block below it is
+          heavier than the strip above, so a true centre reads as low. */}
+      <View style={styles.middle}>
+        <View style={styles.verdictColumn}>
+          <PDFVerdict verdict={verdict} />
+        </View>
+      </View>
+
+      <View>
+        <View style={styles.rule} />
+        <View style={styles.metaRow}>
+          <View style={styles.metaCell}>
+            <Text style={styles.metaLabel}>Intestatario</Text>
+            <Text style={styles.metaValue}>{userName}</Text>
           </View>
-        )}
+          <View style={styles.metaCell}>
+            <Text style={styles.metaLabel}>Generato il</Text>
+            <Text style={styles.metaValue}>{formattedDate}</Text>
+          </View>
+          <View style={styles.metaCell}>
+            <Text style={styles.metaLabel}>Sezioni</Text>
+            <Text style={styles.metaValue}>{sectionTitles.length} di 7</Text>
+          </View>
+        </View>
+        <Text style={styles.note}>
+          {sectionTitles.join(' · ')}. I dati riflettono lo stato alla data di generazione; le valutazioni sono ai
+          prezzi correnti e possono variare. Documento generato automaticamente: non costituisce consulenza finanziaria.
+        </Text>
+      </View>
 
-        {/* Subtitle */}
-        <Text style={styles.subtitle}>{userName}</Text>
-
-        {/* Date */}
-        <Text style={styles.date}>Generato il {formattedDate}</Text>
-
-        {/* Divider */}
-        <View style={styles.divider} />
-
-        {/* Disclaimer */}
-        <View style={styles.disclaimer}>
-          <Text style={styles.disclaimerText}>
-            Documento generato automaticamente dal Portfolio Tracker.
-          </Text>
-          <Text style={styles.disclaimerText}>
-            I dati riflettono lo stato del portfolio alla data di generazione.
-          </Text>
+      <View style={styles.footer} fixed>
+        <View style={styles.rule} />
+        <View style={styles.footerRow}>
+          <Text style={styles.footerText}>Net Worth Tracker</Text>
+          <Text
+            style={styles.footerText}
+            render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
+          />
         </View>
       </View>
     </Page>
@@ -110,65 +93,36 @@ export function CoverSection({ generatedAt, userName, timeFilter, selectedYear, 
 
 const styles = StyleSheet.create({
   page: {
-    padding: 40,
-    backgroundColor: '#ffffff',
-    fontFamily: 'Helvetica',
-    justifyContent: 'center',
-    alignItems: 'center',
+    paddingTop: PDF_PAGE_MARGIN,
+    paddingBottom: PDF_PAGE_MARGIN + 22,
+    paddingHorizontal: PDF_PAGE_MARGIN,
+    backgroundColor: PRINT_COLORS.background,
+    fontFamily: PDF_FONTS.regular,
+    color: PRINT_COLORS.foreground,
   },
-  content: {
-    alignItems: 'center',
-    width: '100%',
-  },
-  title: {
-    fontSize: 36,
-    fontFamily: 'Helvetica-Bold',
-    color: '#3B82F6',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  badge: {
-    backgroundColor: '#3B82F6',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginBottom: 20,
-  },
-  badgeText: {
-    fontSize: 12,
-    fontFamily: 'Helvetica-Bold',
-    color: '#FFFFFF',
+  head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
+  eyebrow: {
+    fontSize: PDF_RAMP.eyebrow,
+    fontFamily: PDF_FONTS.bold,
+    letterSpacing: 0.7,
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    color: PRINT_COLORS.mutedForeground,
   },
-  subtitle: {
-    fontSize: 20,
-    fontFamily: 'Helvetica',
-    color: '#374151',
-    marginBottom: 30,
-    textAlign: 'center',
+  middle: { flexGrow: 1, justifyContent: 'center', paddingBottom: 60 },
+  verdictColumn: { maxWidth: 400 },
+  rule: { height: 1, backgroundColor: PRINT_COLORS.border },
+  metaRow: { flexDirection: 'row', marginTop: 12 },
+  metaCell: { flexGrow: 1, flexBasis: 0, paddingRight: 12 },
+  metaLabel: {
+    fontSize: PDF_RAMP.metricLabel,
+    fontFamily: PDF_FONTS.bold,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    color: PRINT_COLORS.mutedForeground,
   },
-  date: {
-    fontSize: 14,
-    fontFamily: 'Helvetica',
-    color: '#6B7280',
-    marginBottom: 40,
-  },
-  divider: {
-    width: '60%',
-    height: 2,
-    backgroundColor: '#3B82F6',
-    marginBottom: 40,
-  },
-  disclaimer: {
-    marginTop: 60,
-    paddingHorizontal: 60,
-  },
-  disclaimerText: {
-    fontSize: 10,
-    fontFamily: 'Helvetica-Oblique',
-    color: '#9CA3AF',
-    textAlign: 'center',
-    marginBottom: 6,
-  },
+  metaValue: { fontSize: PDF_RAMP.reading, marginTop: 5 },
+  note: { fontSize: PDF_RAMP.caption, lineHeight: 1.6, color: PRINT_COLORS.mutedForeground, marginTop: 16 },
+  footer: { position: 'absolute', left: PDF_PAGE_MARGIN, right: PDF_PAGE_MARGIN, bottom: 26 },
+  footerRow: { flexDirection: 'row', justifyContent: 'space-between', paddingTop: 7 },
+  footerText: { fontSize: PDF_RAMP.footer, color: PRINT_COLORS.mutedForeground },
 });

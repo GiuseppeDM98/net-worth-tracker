@@ -42,13 +42,16 @@ import {
   ExpenseSubCategory,
   ExpenseType,
 } from '@/types/expenses';
+import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog';
+  armedActionLabel,
+  describeCategoryDeleteReading,
+  describeModalStatus,
+  describeWriteError,
+  pluralize,
+  type ModalStatus,
+} from '@/lib/utils/dialogNarrative';
+import { useArmedDelete } from '@/lib/hooks/useArmedDelete';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -59,7 +62,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { AlertTriangle, Plus, Check } from 'lucide-react';
+import { Plus, Check } from 'lucide-react';
 import { CategoryManagementDialog } from './CategoryManagementDialog';
 import { getAllCategories } from '@/lib/services/expenseCategoryService';
 import { cn } from '@/lib/utils';
@@ -92,6 +95,9 @@ export function CategoryDeleteConfirmDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  /** Which consequence the reader chose: move the rows, or lose them with the category. */
+  const [mode, setMode] = useState<'reassign' | 'delete'>('reassign');
+  const [status, setStatus] = useState<ModalStatus>({ phase: 'idle' });
 
   // ========== State Management ==========
 
@@ -168,6 +174,8 @@ export function CategoryDeleteConfirmDialog({
       setSelectedSubCategoryId('');
       setSearchQuery('');
       setIsDropdownOpen(false);
+      setMode('reassign');
+      setStatus({ phase: 'idle' });
     }
   }, [open, availableCategories]);
 
@@ -233,232 +241,250 @@ export function CategoryDeleteConfirmDialog({
     }
   };
 
+  /**
+   * The one confirm path. Which of the two consequences it carries out is the reader's choice
+   * in the BODY, not a second button in the footer: two acts of very different weight cannot
+   * share the same visual weight, and the old dialog stacked three full-width buttons.
+   */
   const handleConfirm = async () => {
-    if (!selectedCategoryId) {
-      return;
-    }
+    if (mode === 'reassign' && !selectedCategoryId) return;
 
     setIsSubmitting(true);
+    setStatus({ phase: 'submitting' });
     try {
-      // Convert sentinel value to undefined (Radix Select doesn't allow empty string)
-      const subCategoryId = selectedSubCategoryId && selectedSubCategoryId !== '__none__'
-        ? selectedSubCategoryId
-        : undefined;
-      await onConfirm(selectedCategoryId, subCategoryId);
+      if (mode === 'reassign') {
+        // Convert sentinel value to undefined (Radix Select doesn't allow empty string)
+        const subCategoryId = selectedSubCategoryId && selectedSubCategoryId !== '__none__'
+          ? selectedSubCategoryId
+          : undefined;
+        await onConfirm(selectedCategoryId, subCategoryId);
+      } else {
+        await onConfirm(undefined, undefined);
+      }
       onClose();
     } catch (error) {
-      console.error('Error during reassignment:', error);
+      console.error('Error during category deletion:', error);
+      setStatus({ phase: 'error', message: describeWriteError(error) });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleDeleteWithoutReassign = async () => {
-    setIsSubmitting(true);
-    try {
-      await onConfirm(undefined, undefined);
-      onClose();
-    } catch (error) {
-      console.error('Error during deletion:', error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const isDeleting = subCategoryToDelete ? 'sottocategoria' : 'categoria';
+  const kindLabel = subCategoryToDelete ? 'sottocategoria' : 'categoria';
   const nameToDelete = subCategoryToDelete
     ? subCategoryToDelete.name
     : categoryToDelete.name;
 
+  const reading = describeModalStatus(status, {
+    idle: describeCategoryDeleteReading({
+      name: nameToDelete,
+      isSubCategory: !!subCategoryToDelete,
+      expenseCount,
+      // The surface counts the rows but never sums them: a figure it does not have is a clause
+      // that disappears, never a zero (the Narrative Honesty Rule).
+      totalEur: null,
+    }),
+    submitting:
+      mode === 'reassign'
+        ? 'Sto spostando i movimenti e poi elimino.'
+        : 'Sto eliminando i movimenti e poi la categoria.',
+  });
+
+  // The action names the count from the SAME query the reading counts, so the two can never
+  // disagree; armed, it repeats the consequence instead of asking «Confermi?».
+  const actionLabel =
+    mode === 'reassign'
+      ? `Sposta ${pluralize(expenseCount, 'movimento', 'movimenti')} ed elimina`
+      : `Elimina ${pluralize(expenseCount, 'movimento', 'movimenti')} e la ${kindLabel}`;
+
   // ========== Render ==========
 
+
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent
-        className="max-w-lg max-h-[90vh] flex flex-col p-0"
-        style={triggerOrigin ? { transformOrigin: triggerOrigin } : undefined}
+    <>
+      <ResponsiveModal
+        open={open}
+        onClose={onClose}
+        eyebrow={`Categorie ${categoryToDelete.type === 'income' ? 'di entrata' : 'di spesa'}`}
+        title={`Elimina ${nameToDelete}`}
+        reading={reading}
+        width="md"
+        triggerOrigin={triggerOrigin}
+        footerNote="Esc annulla la conferma"
+        footer={
+          <>
+            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+              Annulla
+            </Button>
+            <ArmedConfirmButton
+              label={actionLabel}
+              disabled={isSubmitting || (mode === 'reassign' && !selectedCategoryId)}
+              onConfirm={handleConfirm}
+            />
+          </>
+        }
       >
-        {/* ========== Header Section ========== */}
-        <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
-          <div className="flex items-center gap-2 text-amber-600 mb-2">
-            <AlertTriangle className="h-5 w-5" />
-            <DialogTitle>Impossibile eliminare {isDeleting}</DialogTitle>
-          </div>
-          <DialogDescription className="text-base">
-            {subCategoryToDelete ? (
-              <>
-                La sottocategoria <strong>&quot;{nameToDelete}&quot;</strong> è utilizzata da{' '}
-                <strong>{expenseCount}</strong> {expenseCount === 1 ? 'spesa' : 'spese'}.
-                {' '}Seleziona una nuova categoria e sottocategoria per riassegnare queste spese.
-              </>
-            ) : (
-              <>
-                La categoria <strong>&quot;{nameToDelete}&quot;</strong> è utilizzata da{' '}
-                <strong>{expenseCount}</strong> {expenseCount === 1 ? 'spesa' : 'spese'}.
-                {' '}Seleziona una nuova categoria per riassegnare queste spese.
-              </>
-            )}
-          </DialogDescription>
-        </DialogHeader>
+        <div className="space-y-3">
+          {/* The two consequences as a radiogroup: one is a move, the other is a loss, and the
+              reader chooses between them here so the footer can name what it will do. */}
+          <div role="radiogroup" aria-label="Che cosa fare dei movimenti">
+            <label
+              className={cn(
+                'flex cursor-pointer items-start gap-3 rounded-lg border p-3.5 transition-colors',
+                mode === 'reassign' ? 'border-border bg-muted' : 'border-border hover:bg-muted/50',
+              )}
+            >
+              <input
+                type="radio"
+                name="category-delete-mode"
+                className="mt-1 size-4 accent-[var(--primary)]"
+                checked={mode === 'reassign'}
+                onChange={() => setMode('reassign')}
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-foreground">
+                  Sposta {pluralize(expenseCount, 'movimento', 'movimenti')} in un&apos;altra categoria
+                </p>
+                <p className="mt-0.5 text-xs leading-[1.4] text-muted-foreground">
+                  Gli importi restano nei totali del mese e passano ai budget della categoria che scegli.
+                </p>
 
-        {/* ========== Reassignment Selection Section ========== */}
-        <div className="flex-1 px-6 py-4 space-y-4">
-          {/* Category Selection - Only show if multiple categories available */}
-          {availableCategories.length > 1 && (
-            <div className="space-y-2">
-              <Label htmlFor="category-combobox">
-                Nuova Categoria *
-              </Label>
+                {mode === 'reassign' && (
+                  <div className="mt-3 space-y-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="category-combobox" className="text-xs text-muted-foreground">
+                        Nuova categoria *
+                      </Label>
+                      <div className="relative" ref={dropdownRef}>
+                        <Input
+                          id="category-combobox"
+                          role="combobox"
+                          aria-expanded={isDropdownOpen}
+                          aria-controls="category-listbox"
+                          autoComplete="off"
+                          placeholder={selectedCategory?.name ?? 'Cerca o crea una categoria...'}
+                          value={searchQuery}
+                          onChange={(e) => {
+                            setSearchQuery(e.target.value);
+                            setIsDropdownOpen(true);
+                          }}
+                          onFocus={() => setIsDropdownOpen(true)}
+                        />
 
-              {/* Category Combobox */}
-              <div className="relative">
-                <Input
-                  id="category-combobox"
-                  placeholder="Cerca o seleziona categoria..."
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    setIsDropdownOpen(true);
-                  }}
-                />
-
-                {/* Dropdown list */}
-                {isDropdownOpen && (
-                  <div
-                    ref={dropdownRef}
-                    className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg max-h-60 overflow-auto"
-                  >
-                    {filteredCategories.length === 0 && searchQuery.trim() ? (
-                      <button
-                        type="button"
-                        className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer text-left"
-                        onClick={handleCreateCategory}
-                      >
-                        <Plus className="h-4 w-4 text-primary flex-shrink-0" />
-                        <span className="flex-1">Crea categoria &quot;{searchQuery.trim()}&quot;</span>
-                      </button>
-                    ) : filteredCategories.length === 0 ? (
-                      <div className="p-3 text-sm text-muted-foreground text-center">
-                        Inizia a digitare per cercare o creare una categoria
+                        {isDropdownOpen && (
+                          <div
+                            id="category-listbox"
+                            role="listbox"
+                            aria-label="Categorie disponibili"
+                            className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border border-border bg-popover shadow-[0_4px_24px_rgba(0,0,0,0.28)]"
+                          >
+                            {filteredCategories.length === 0 && searchQuery.trim() ? (
+                              <button
+                                type="button"
+                                className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-sm hover:bg-accent"
+                                onClick={handleCreateCategory}
+                              >
+                                <Plus className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                                <span className="flex-1">Crea la categoria &quot;{searchQuery.trim()}&quot;</span>
+                              </button>
+                            ) : filteredCategories.length === 0 ? (
+                              <p className="p-3 text-center text-sm text-muted-foreground">
+                                Scrivi per cercare una categoria, o per crearne una.
+                              </p>
+                            ) : (
+                              filteredCategories.map((category) => (
+                                <button
+                                  key={category.id}
+                                  type="button"
+                                  role="option"
+                                  aria-selected={selectedCategoryId === category.id}
+                                  className={cn(
+                                    'flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-sm hover:bg-accent',
+                                    selectedCategoryId === category.id && 'bg-accent',
+                                  )}
+                                  onClick={() => handleSelectCategory(category.id)}
+                                >
+                                  {category.color && (
+                                    <span
+                                      className="size-3 shrink-0 rounded-full"
+                                      style={{ backgroundColor: category.color }}
+                                      aria-hidden="true"
+                                    />
+                                  )}
+                                  <span className="flex-1">{category.name}</span>
+                                  {selectedCategoryId === category.id && (
+                                    <Check className="h-4 w-4 shrink-0" aria-hidden="true" />
+                                  )}
+                                </button>
+                              ))
+                            )}
+                          </div>
+                        )}
                       </div>
-                    ) : (
-                      filteredCategories.map((category) => (
-                        <button
-                          key={category.id}
-                          type="button"
-                          className={cn(
-                            "w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer text-left",
-                            selectedCategoryId === category.id && "bg-gray-100 dark:bg-gray-800"
-                          )}
-                          onClick={() => handleSelectCategory(category.id)}
-                        >
-                          {category.color && (
-                            <div
-                              className="w-3 h-3 rounded-full flex-shrink-0"
-                              style={{ backgroundColor: category.color }}
-                            />
-                          )}
-                          <span className="flex-1">{category.name}</span>
-                          {selectedCategoryId === category.id && (
-                            <Check className="h-4 w-4 text-primary flex-shrink-0" />
-                          )}
-                        </button>
-                      ))
+                      {selectedCategory && (
+                        <p className="text-xs text-muted-foreground">
+                          Scelta: <span className="font-medium text-foreground">{selectedCategory.name}</span>
+                        </p>
+                      )}
+                    </div>
+
+                    {selectedCategoryId && filteredSubCategories.length > 0 && (
+                      <div className="space-y-1.5">
+                        <Label htmlFor="new-subcategory" className="text-xs text-muted-foreground">
+                          Nuova sottocategoria <span className="font-normal">(opzionale)</span>
+                        </Label>
+                        <Select value={selectedSubCategoryId} onValueChange={setSelectedSubCategoryId}>
+                          <SelectTrigger id="new-subcategory">
+                            <SelectValue placeholder="Nessuna sottocategoria" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">Nessuna sottocategoria</SelectItem>
+                            {filteredSubCategories.map((subCategory) => (
+                              <SelectItem key={subCategory.id} value={subCategory.id}>
+                                {subCategory.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+
+                    {availableCategories.length === 0 && (
+                      <p className="text-xs leading-[1.4] text-warning-foreground">
+                        Non c&apos;è un&apos;altra categoria dove spostarli: creane una scrivendone il
+                        nome qui sopra, oppure elimina anche i movimenti.
+                      </p>
                     )}
                   </div>
                 )}
               </div>
+            </label>
 
-              {/* Selected category display */}
-              {selectedCategoryId && (
-                <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700">
-                  {selectedCategory?.color && (
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: selectedCategory.color }}
-                    />
-                  )}
-                  <span className="text-sm font-medium">{selectedCategory?.name}</span>
-                </div>
+            <label
+              className={cn(
+                'mt-3 flex cursor-pointer items-start gap-3 rounded-lg border p-3.5 transition-colors',
+                mode === 'delete' ? 'border-destructive bg-destructive/5' : 'border-border hover:bg-muted/50',
               )}
-            </div>
-          )}
-
-          {/* Subcategory Selection (Optional) */}
-          {selectedCategoryId && filteredSubCategories.length > 0 && (
-            <div className="space-y-2">
-              <Label htmlFor="new-subcategory">
-                Nuova Sottocategoria (opzionale)
-              </Label>
-              <Select
-                value={selectedSubCategoryId}
-                onValueChange={setSelectedSubCategoryId}
-              >
-                <SelectTrigger id="new-subcategory">
-                  <SelectValue placeholder="Nessuna sottocategoria" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">Nessuna sottocategoria</SelectItem>
-                  {filteredSubCategories.map((subCategory) => (
-                    <SelectItem key={subCategory.id} value={subCategory.id}>
-                      {subCategory.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {/* Single category case */}
-          {availableCategories.length === 1 && (
-            <div className="p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-800">
-              La categoria selezionata è l&apos;unica disponibile.
-              {' '}Le spese verranno automaticamente riassegnate a questa categoria.
-            </div>
-          )}
-
-          {/* Warning if no categories available */}
-          {availableCategories.length === 0 && (
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800">
-              Non puoi eliminare l&apos;unica categoria con spese associate.
-              {' '}Crea prima una nuova categoria digitando il nome nel campo sopra.
-            </div>
-          )}
+            >
+              <input
+                type="radio"
+                name="category-delete-mode"
+                className="mt-1 size-4 accent-[var(--destructive)]"
+                checked={mode === 'delete'}
+                onChange={() => setMode('delete')}
+              />
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground">
+                  Elimina anche {pluralize(expenseCount, 'movimento', 'movimenti')}
+                </p>
+                <p className="mt-0.5 text-xs leading-[1.4] text-muted-foreground">
+                  Escono da ogni totale, da ogni budget e dallo Storico. Non si annulla.
+                </p>
+              </div>
+            </label>
+          </div>
         </div>
-
-        {/* Action Buttons */}
-        <div className="px-6 pb-6 pt-4 border-t shrink-0 flex flex-col gap-2">
-          <Button
-            type="button"
-            variant="destructive"
-            onClick={handleConfirm}
-            disabled={!selectedCategoryId || isSubmitting || availableCategories.length === 0}
-            className="w-full"
-          >
-            {isSubmitting
-              ? 'Riassegnazione...'
-              : `Conferma ed Elimina`}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleDeleteWithoutReassign}
-            disabled={isSubmitting}
-            className="w-full text-amber-600 hover:text-amber-700 border-amber-300 hover:bg-amber-50"
-          >
-            Elimina senza riassegnare
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onClose}
-            disabled={isSubmitting}
-            className="w-full"
-          >
-            Annulla
-          </Button>
-        </div>
-      </DialogContent>
+      </ResponsiveModal>
 
       {/* Category Creation Dialog */}
       <CategoryManagementDialog
@@ -468,6 +494,45 @@ export function CategoryDeleteConfirmDialog({
         initialType={categoryToDelete.type}
         initialName={searchQuery.trim()}
       />
-    </Dialog>
+    </>
+  );
+}
+
+/**
+ * The destructive primary: two clicks, no timer, Escape disarms (`useArmedDelete`), and the
+ * armed label repeats the consequence rather than asking a question about it.
+ */
+function ArmedConfirmButton({
+  label,
+  disabled,
+  onConfirm,
+}: {
+  label: string;
+  disabled: boolean;
+  onConfirm: () => void;
+}) {
+  const ref = useRef<HTMLButtonElement | null>(null);
+  const { armed, onClick, onBlur } = useArmedDelete(ref, onConfirm);
+  // Emptying a live region announces nothing, so the disarm is announced explicitly.
+  const [wasArmed, setWasArmed] = useState(false);
+  if (armed && !wasArmed) setWasArmed(true);
+
+  return (
+    <>
+      <Button
+        ref={ref}
+        type="button"
+        variant="destructive"
+        onClick={onClick}
+        onBlur={onBlur}
+        disabled={disabled}
+        aria-pressed={armed}
+      >
+        {armed ? armedActionLabel(label) : label}
+      </Button>
+      <span className="sr-only" role="status" aria-live="polite">
+        {armed ? armedActionLabel(label) : wasArmed ? 'Eliminazione annullata' : ''}
+      </span>
+    </>
   );
 }

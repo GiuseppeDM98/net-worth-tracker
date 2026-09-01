@@ -27,7 +27,7 @@ import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { cn } from '@/lib/utils';
 import { Tile, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { NarrativeText } from '@/components/ui/narrative-text';
-import { useArmedDelete } from '@/components/cashflow/budget/useArmedDelete';
+import { useArmedDelete } from '@/lib/hooks/useArmedDelete';
 
 export interface VersamentiTileProps {
   /** The axis year — the eyebrow's scope and the «competenza» hint of a straddling row. */

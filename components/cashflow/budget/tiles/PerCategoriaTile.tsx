@@ -13,7 +13,7 @@ import { Tile, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { NarrativeText } from '@/components/ui/narrative-text';
 import { BudgetTrack } from '@/components/cashflow/budget/BudgetTrack';
 import { progressFillColor, progressTextClass } from '@/components/cashflow/budget/budgetProgressStyle';
-import { useArmedDelete } from '@/components/cashflow/budget/useArmedDelete';
+import { useArmedDelete } from '@/lib/hooks/useArmedDelete';
 
 interface PerCategoriaTileProps {
   rows: CategoryBudgetRows;

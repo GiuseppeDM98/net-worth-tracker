@@ -60,7 +60,6 @@ describe('shouldShowSavingsBadge', () => {
     savingsRate: SAVINGS_RATE_BADGE_THRESHOLD + 5,
     now: MID_AUGUST,
     alreadyCelebrated: false,
-    reducedMotion: false,
   };
 
   it('should show on the first visit of the month when the rate clears the threshold', () => {
@@ -87,7 +86,11 @@ describe('shouldShowSavingsBadge', () => {
     expect(shouldShowSavingsBadge({ ...base, previousMonthIncome: 0 })).toBe(false);
   });
 
-  it('should stay hidden under prefers-reduced-motion', () => {
-    expect(shouldShowSavingsBadge({ ...base, reducedMotion: true })).toBe(false);
+  it('should NOT consult prefers-reduced-motion at all', () => {
+    // Reduced motion reduces the MOTION, not the content: the preference governs the entrance
+    // transition in the component, never whether the reader is told their savings rate.
+    // Extra keys are structurally typed away, so the guard is that the decision is unchanged.
+    expect(shouldShowSavingsBadge(base)).toBe(true);
+    expect(Object.keys(base)).not.toContain('reducedMotion');
   });
 });

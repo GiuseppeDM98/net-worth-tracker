@@ -68,6 +68,8 @@ import { PageVerdict } from '@/components/ui/page-verdict';
 import { TILE_CELL_CLASS } from '@/components/ui/tile';
 import { NarrativeText } from '@/components/ui/narrative-text';
 import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
+import { ErrorNotice } from '@/components/ui/error-notice';
+import { describeReadFailure, resolveSurfaceState } from '@/lib/utils/statesNarrative';
 import type { TileSkeletonCell } from '@/lib/utils/tileGridSkeleton';
 import { cn } from '@/lib/utils';
 import { BudgetItemDialog } from '@/components/cashflow/budget/BudgetItemDialog';
@@ -82,6 +84,8 @@ interface BudgetTabProps {
   allExpenses: Expense[];
   categories: ExpenseCategory[];
   loading: boolean;
+  /** The queries behind `allExpenses`/`categories` failed: say so, never render zeros. */
+  loadFailed: boolean;
   historyStartYear: number;
   userId: string;
 }
@@ -108,7 +112,7 @@ const SKELETON_CELLS: TileSkeletonCell[] = [
 
 const SETTINGS_ID = 'budget-impostazioni';
 
-export function BudgetTab({ allExpenses, categories, loading, historyStartYear, userId }: BudgetTabProps) {
+export function BudgetTab({ allExpenses, categories, loading, loadFailed, historyStartYear, userId }: BudgetTabProps) {
   const isDemo = useDemoMode();
   const { ownerId } = useActiveAccount();
   const budget = useBudgetConfig({ userId, categories, disabled: isDemo });
@@ -170,6 +174,18 @@ export function BudgetTab({ allExpenses, categories, loading, historyStartYear, 
   const scrollToSettings = () => {
     document.getElementById(SETTINGS_ID)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
+
+  if (resolveSurfaceState({ loading: loading || budget.loading, failed: loadFailed }) === 'failed') {
+    return (
+      <ErrorNotice
+        className="max-w-[920px]"
+        notice={describeReadFailure({
+          consequence: 'I movimenti non sono stati letti: senza di essi non si sa quanto del tetto è stato usato.',
+          untouched: 'Budget e movimenti registrati non sono stati toccati.',
+        })}
+      />
+    );
+  }
 
   if (loading || budget.loading) {
     return <TileGridSkeleton cells={SKELETON_CELLS} className="pt-1" />;

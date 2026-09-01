@@ -21,8 +21,11 @@
 
 import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Tile, TILE_CELL_CLASS, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
+import { ErrorNotice } from '@/components/ui/error-notice';
+import { describeReadFailure, resolveSurfaceState } from '@/lib/utils/statesNarrative';
 import { PageVerdict } from '@/components/ui/page-verdict';
 import { NarrativeText } from '@/components/ui/narrative-text';
 import { RankedRows, type RankedRow } from '@/components/ui/ranked-rows';
@@ -55,6 +58,8 @@ interface ExpenseSplitTabProps {
   familyMembers: FamilyMember[];
   laborIncomeCategoryIds: string[];
   loading: boolean;
+  /** The queries behind `allExpenses`/`categories` failed: say so, never render zeros. */
+  loadFailed: boolean;
 }
 
 export function ExpenseSplitTab({
@@ -62,6 +67,7 @@ export function ExpenseSplitTab({
   familyMembers,
   laborIncomeCategoryIds,
   loading,
+  loadFailed,
 }: ExpenseSplitTabProps) {
   const [period, setPeriod] = useState<Period>(() => currentMonthPeriod());
   // ONE `now` per mount, like every other tab: a page whose clock moves under it would move its
@@ -94,12 +100,24 @@ export function ExpenseSplitTab({
     percentage: row.percentage,
   }));
 
+  if (resolveSurfaceState({ loading: loading, failed: loadFailed }) === 'failed') {
+    return (
+      <ErrorNotice
+        className="max-w-[920px]"
+        notice={describeReadFailure({
+          consequence: 'I movimenti non sono stati letti: senza di essi non si sa cosa è stato speso in comune.',
+          untouched: 'I movimenti registrati non sono stati toccati.',
+        })}
+      />
+    );
+  }
+
   if (loading) {
     return (
       <TileGridSkeleton
         cells={SKELETON_CELLS}
         className="pt-1"
-        toolbar={<div className="desktop:hidden mx-auto h-9 w-[190px] animate-pulse rounded-md bg-muted" />}
+        toolbar={<Skeleton className="desktop:hidden mx-auto h-9 w-[190px] rounded-md" />}
       />
     );
   }

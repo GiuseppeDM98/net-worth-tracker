@@ -74,6 +74,8 @@ import { cn } from '@/lib/utils';
 import { PageVerdict } from '@/components/ui/page-verdict';
 import { TILE_CELL_CLASS } from '@/components/ui/tile';
 import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
+import { ErrorNotice } from '@/components/ui/error-notice';
+import { describeReadFailure, resolveSurfaceState } from '@/lib/utils/statesNarrative';
 import { CoastTraguardoTile } from './coast/tiles/CoastTraguardoTile';
 import { AfflussiTile } from './coast/tiles/AfflussiTile';
 import { CoastScenariTile } from './coast/tiles/CoastScenariTile';
@@ -95,21 +97,21 @@ export function CoastFireTab() {
   const [ipotesiOpen, setIpotesiOpen] = useState(false);
 
   // ─── Queries ─────────────────────────────────────────────────────────────────
-  const { data: settings, isLoading: isLoadingSettings } = useQuery<Settings | null>({
+  const { data: settings, isLoading: isLoadingSettings, isError: settingsError } = useQuery<Settings | null>({
     queryKey: ['settings', ownerId],
     queryFn: () => getSettings(ownerId!),
     enabled: !!user && !!ownerId,
     staleTime: 300000,
   });
 
-  const { data: assets, isLoading: isLoadingAssets } = useQuery({
+  const { data: assets, isLoading: isLoadingAssets, isError: assetsError } = useQuery({
     queryKey: ['assets', ownerId],
     queryFn: () => getAllAssets(ownerId!),
     enabled: !!user && !!ownerId,
     staleTime: 300000,
   });
 
-  const { data: annualExpenses, isLoading: isLoadingAnnualExpenses } = useQuery({
+  const { data: annualExpenses, isLoading: isLoadingAnnualExpenses, isError: expensesError } = useQuery({
     queryKey: ['coastFireAnnualExpenses', ownerId],
     queryFn: () => getAnnualExpenses(ownerId!),
     enabled: !!user && !!ownerId,
@@ -248,6 +250,20 @@ export function CoastFireTab() {
   }, [hasUnsavedChanges, pensionConfigurationState]);
 
   // ─── Loading ─────────────────────────────────────────────────────────────────
+  // A failed read comes BEFORE the wait: these queries default to undefined, and a plan built
+  // on a base that was never read is a number with nothing behind it.
+  if (resolveSurfaceState({ loading: isLoadingSettings || isLoadingAssets || isLoadingAnnualExpenses, failed: settingsError || assetsError || expensesError }) === 'failed') {
+    return (
+      <ErrorNotice
+        className="max-w-[920px]"
+        notice={describeReadFailure({
+          consequence: 'Patrimonio, ipotesi e spese annue non sono stati letti: senza di essi non si sa se puoi smettere di versare.',
+          untouched: 'Le ipotesi salvate non sono state toccate.',
+        })}
+      />
+    );
+  }
+
   if (isLoadingSettings || isLoadingAssets || isLoadingAnnualExpenses) {
     return <TileGridSkeleton cells={SKELETON_CELLS} />;
   }

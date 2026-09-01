@@ -64,12 +64,17 @@ export interface SavingsBadgeDecisionInput {
   now: Date;
   /** Whether this month's celebration is already recorded for this account. */
   alreadyCelebrated: boolean;
-  reducedMotion: boolean;
 }
 
-/** All conditions must hold; the order mirrors the cheapest-first checks of the component. */
+/**
+ * All conditions must hold; the order mirrors the cheapest-first checks of the component.
+ *
+ * `prefers-reduced-motion` is deliberately NOT among them (removed 2026-09-01). It used to
+ * suppress the badge outright, which meant a reader who asked the OS for stillness was never
+ * told their savings rate — reduced motion must reduce the MOTION, not the content. The
+ * preference now governs only the entrance transition, in the component.
+ */
 export function shouldShowSavingsBadge(input: SavingsBadgeDecisionInput): boolean {
-  if (input.reducedMotion) return false;
   if (getItalyDate(input.now).getDate() < EARLIEST_DAY_OF_MONTH) return false;
   if (input.previousMonthIncome <= 0) return false;
   if (input.savingsRate < SAVINGS_RATE_BADGE_THRESHOLD) return false;

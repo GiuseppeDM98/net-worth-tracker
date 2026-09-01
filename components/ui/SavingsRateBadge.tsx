@@ -8,8 +8,12 @@
  * user closes it.
  *
  * SHOW LOGIC lives in `lib/utils/savingsRateBadge.ts` (`shouldShowSavingsBadge`): previous-month
- * income > 0, rate >= threshold, day of month >= 5 (earlier data is partial), no reduced-motion
- * preference, and the celebrated month not yet recorded for this account.
+ * income > 0, rate >= threshold, day of month >= 5 (earlier data is partial), and the celebrated
+ * month not yet recorded for this account.
+ *
+ * REDUCED MOTION governs the entrance ONLY (changed 2026-09-01). It used to be a condition of
+ * the show decision, so a reader who had asked the OS for stillness was never told their savings
+ * rate at all — the preference suppressed the content instead of the movement.
  *
  * WHY localStorage (via `celebrationUtils`) keyed on account + month, not sessionStorage:
  * the original "once per browser session" flag was lost with every new tab or window, so the
@@ -30,9 +34,10 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { X } from 'lucide-react';
-import { hasCelebrated, markCelebrated, shouldReduceMotion } from '@/lib/utils/celebrationUtils';
+import { hasCelebrated, markCelebrated } from '@/lib/utils/celebrationUtils';
+import { formatPercentageIt } from '@/lib/utils/formatters';
 import {
   buildSavingsBadgeCelebrationKey,
   computeSavingsRate,
@@ -55,6 +60,7 @@ export function SavingsRateBadge({
   previousMonthExpenses,
 }: SavingsRateBadgeProps) {
   const [visible, setVisible] = useState(false);
+  const prefersReducedMotion = useReducedMotion();
   // Guard against triggering twice within the same component lifecycle (Strict Mode re-runs)
   const triggered = useRef(false);
 
@@ -73,7 +79,6 @@ export function SavingsRateBadge({
       savingsRate,
       now,
       alreadyCelebrated: hasCelebrated(celebrationKey),
-      reducedMotion: shouldReduceMotion(),
     });
     if (!show) return;
 
@@ -100,18 +105,24 @@ export function SavingsRateBadge({
           key="savings-badge"
           role="status"
           aria-live="polite"
-          initial={{ opacity: 0, y: 20, scale: 0.95 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 10 }}
-          transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+          initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 20, scale: 0.95 }}
+          animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
+          exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 10 }}
+          transition={
+            prefersReducedMotion ? { duration: 0 } : { type: 'spring', stiffness: 300, damping: 20 }
+          }
           className="bg-positive/10 border-positive/20 fixed bottom-4 left-4 z-50 flex max-w-[300px] items-start gap-3 rounded-lg border px-4 py-3 shadow-lg"
         >
           <div className="min-w-0">
-            <p className="text-positive text-sm font-semibold">
-              ✦ Ottimo risparmio a {celebratedMonthName}!
+            {/* The ✦ is the one ornament in the product: typographic, not an emoji, and in one
+                place only. No exclamation mark — the app reports, it does not cheer. */}
+            <p className="text-positive text-[13px] font-semibold leading-[1.4]">
+              ✦ Ottimo risparmio a {celebratedMonthName}
             </p>
-            <p className="text-muted-foreground mt-0.5 text-xs">
-              Hai risparmiato il {savingsRate.toFixed(0)}% delle entrate
+            <p className="text-muted-foreground mt-0.5 text-[12px] leading-[1.45]">
+              Hai risparmiato il{' '}
+              <span className="font-mono tabular-nums">{formatPercentageIt(savingsRate, 0)}</span> delle
+              entrate
             </p>
           </div>
           <button

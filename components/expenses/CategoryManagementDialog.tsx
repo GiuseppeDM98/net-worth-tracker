@@ -230,7 +230,7 @@ function CategoryFormBody({
           const flipsSign = (category.type === 'income') !== (selectedType === 'income') &&
             !crossesTransferBoundary(category.type, selectedType);
           return flipsSign ? (
-            <p className="text-xs text-amber-600 dark:text-amber-400">
+            <p className="text-xs text-warning-foreground">
               Attenzione: tutti gli importi cambieranno segno (da {EXPENSE_TYPE_LABELS[category.type]} a {EXPENSE_TYPE_LABELS[selectedType]}).
             </p>
           ) : (
@@ -335,7 +335,7 @@ function CategoryFormBody({
                       onClick={() => handleMoveSubCategory(sub.id)}
                       aria-label={`Sposta transazioni di ${sub.name}`}
                     >
-                      <ArrowRightLeft className="h-3.5 w-3.5 text-blue-500" />
+                      <ArrowRightLeft className="h-3.5 w-3.5 text-muted-foreground" />
                     </Button>
                   )}
                   <Button
@@ -612,7 +612,8 @@ export function CategoryManagementDialog({
     }
   };
 
-  const title = category ? 'Modifica Categoria' : 'Nuova Categoria';
+  const title = category ? 'Modifica categoria' : 'Nuova categoria';
+  const eyebrow = `Categorie · ${category ? 'Modifica' : 'Nuova'}`;
   const baseLabel = category ? 'Salva Modifiche' : 'Crea Categoria';
   const submitLabel = isSubmitting ? 'Salvataggio…' : baseLabel;
 
@@ -674,28 +675,19 @@ export function CategoryManagementDialog({
       <ResponsiveModal
         open={open}
         onClose={onClose}
+        eyebrow={eyebrow}
         title={title}
-        dialogClassName="max-w-3xl"
+        reading="Una categoria appartiene a un tipo solo: quel tipo decide in quali totali e in quali budget finiscono le sue voci."
+        width="lg"
         footer={
-          isMobile ? (
-            <>
-              <Button type="submit" form="category-form" disabled={isSubmitting} className="w-full">
-                {submitLabel}
-              </Button>
-              <Button type="button" variant="outline" className="w-full" disabled={isSubmitting} onClick={onClose}>
-                Annulla
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
-                Annulla
-              </Button>
-              <Button type="submit" form="category-form" disabled={isSubmitting}>
-                {submitLabel}
-              </Button>
-            </>
-          )
+          <>
+            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+              Annulla
+            </Button>
+            <Button type="submit" form="category-form" disabled={isSubmitting}>
+              {submitLabel}
+            </Button>
+          </>
         }
       >
         <form id="category-form" onSubmit={handleSubmit(onSubmit)}>

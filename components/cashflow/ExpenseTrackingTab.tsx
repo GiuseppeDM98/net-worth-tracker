@@ -28,6 +28,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Expense, ExpenseCategory, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
 import {
   getExpensesByRecurringParentId,
@@ -67,6 +68,8 @@ import { MobileFiltersDrawer } from '@/components/cashflow/MobileFiltersDrawer';
 import { PageVerdict } from '@/components/ui/page-verdict';
 import { TILE_CELL_CLASS } from '@/components/ui/tile';
 import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
+import { ErrorNotice } from '@/components/ui/error-notice';
+import { describeReadFailure, resolveSurfaceState } from '@/lib/utils/statesNarrative';
 import { CategoryTile } from '@/components/dashboard/overview/CategoryTile';
 import { CashflowPeriodoTile, type SpendingProjection } from '@/components/cashflow/tiles/CashflowPeriodoTile';
 import { RisparmioTile } from '@/components/cashflow/tiles/RisparmioTile';
@@ -137,6 +140,8 @@ interface ExpenseTrackingTabProps {
   allExpenses: Expense[];
   categories: ExpenseCategory[];
   loading: boolean;
+  /** The queries behind `allExpenses`/`categories` failed: say so, never render zeros. */
+  loadFailed: boolean;
   onRefresh: () => Promise<void>;
   /** id→name map for cash assets; built in the parent to avoid a cross-domain subscription here. */
   assetNameMap: Map<string, string>;
@@ -208,6 +213,7 @@ export function ExpenseTrackingTab({
   allExpenses,
   categories,
   loading,
+  loadFailed,
   onRefresh,
   assetNameMap,
 }: ExpenseTrackingTabProps) {
@@ -665,12 +671,24 @@ export function ExpenseTrackingTab({
   // rows. `now` splits them into happened and scheduled — the clause the tiles above need.
   const movementsSummary = useMemo(() => summarizeMovements(filteredExpenses, now), [filteredExpenses, now]);
 
+  if (resolveSurfaceState({ loading: loading, failed: loadFailed }) === 'failed') {
+    return (
+      <ErrorNotice
+        className="max-w-[920px]"
+        notice={describeReadFailure({
+          consequence: 'I movimenti non sono stati letti: il mese non è misurabile, e uno zero qui sarebbe falso.',
+          untouched: 'I movimenti registrati non sono stati toccati.',
+        })}
+      />
+    );
+  }
+
   if (loading) {
     return (
       <TileGridSkeleton
         cells={SKELETON_CELLS}
         className="pt-1"
-        toolbar={<div className="desktop:hidden mx-auto h-9 w-[190px] animate-pulse rounded-md bg-muted" />}
+        toolbar={<Skeleton className="desktop:hidden mx-auto h-9 w-[190px] rounded-md" />}
       />
     );
   }
@@ -688,7 +706,7 @@ export function ExpenseTrackingTab({
       isDemo={isDemo}
       hasActiveFilters={hasActiveFilters}
       categoryMetaMap={categoryMetaMap}
-      emptyHint="Aggiungi la prima voce per iniziare a tracciare."
+      emptyHint="Nessun movimento registrato nel periodo: aggiungi la prima voce per iniziare a tracciare."
       surface="flat"
     />
   );

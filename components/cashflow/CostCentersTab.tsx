@@ -59,7 +59,8 @@ import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
 import type { TileSkeletonCell } from '@/lib/utils/tileGridSkeleton';
 import { CostCenterDialog } from './CostCenterDialog';
 import { CostCenterDetail } from './CostCenterDetail';
-import { CostCenterErrorNotice } from './CostCenterErrorNotice';
+import { ErrorNotice } from '@/components/ui/error-notice';
+import { describeReadFailure } from '@/lib/utils/statesNarrative';
 import { TotaleTile } from './cost-centers/tiles/TotaleTile';
 import { CentriTile } from './cost-centers/tiles/CentriTile';
 import { DormientiTile } from './cost-centers/tiles/DormientiTile';
@@ -224,7 +225,13 @@ export function CostCentersTab() {
 
       {isError ? (
         /* Before the empty check, never after: `centers` defaults to [] on failure too. */
-        <CostCenterErrorNotice message="Non è stato possibile caricare i centri di costo." />
+        <ErrorNotice
+          className="max-w-[920px]"
+          notice={describeReadFailure({
+            consequence: 'I centri di costo non sono stati letti: senza di essi la pagina direbbe che non ne hai nessuno.',
+            untouched: 'I centri e le spese registrate non sono stati toccati.',
+          })}
+        />
       ) : centers.length === 0 ? (
         <div className="hidden desktop:block">
           <Button onClick={openCreate} disabled={isDemo} variant="outline" size="sm" aria-label={addButtonLabel}>

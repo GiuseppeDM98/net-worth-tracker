@@ -18,14 +18,9 @@
 'use client';
 
 import { useState } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { ResponsiveModal } from '@/components/ui/responsive-modal';
+import { describeWriteError, type ModalStatus } from '@/lib/utils/dialogNarrative';
+import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -72,6 +67,7 @@ export function CreateManualSnapshotModal({
   const [assets, setAssets] = useState<AssetEntry[]>([]);
 
   const [isCreating, setIsCreating] = useState(false);
+  const [status, setStatus] = useState<ModalStatus>({ phase: 'idle' });
 
   const addAsset = () => {
     setAssets([
@@ -127,27 +123,27 @@ export function CreateManualSnapshotModal({
     const illiquidNW = parseFloat(illiquidNetWorth);
 
     if (isNaN(yearNum) || yearNum < 1900 || yearNum > 2100) {
-      toast.error('Inserisci un anno valido');
+      setStatus({ phase: 'error', message: 'L’anno non è valido.' });
       return;
     }
 
     if (isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
-      toast.error('Inserisci un mese valido (1-12)');
+      setStatus({ phase: 'error', message: 'Il mese deve essere un numero da 1 a 12.' });
       return;
     }
 
     if (isNaN(totalNW) || totalNW < 0) {
-      toast.error('Inserisci un Patrimonio Totale valido');
+      setStatus({ phase: 'error', message: 'Il patrimonio totale non è un numero valido.' });
       return;
     }
 
     if (isNaN(liquidNW) || liquidNW < 0) {
-      toast.error('Inserisci un Patrimonio Liquido valido');
+      setStatus({ phase: 'error', message: 'Il patrimonio liquido non è un numero valido.' });
       return;
     }
 
     if (isNaN(illiquidNW) || illiquidNW < 0) {
-      toast.error('Inserisci un Patrimonio Illiquido valido');
+      setStatus({ phase: 'error', message: 'Il patrimonio illiquido non è un numero valido.' });
       return;
     }
 
@@ -163,17 +159,17 @@ export function CreateManualSnapshotModal({
     // Validate asset class sum
     const assetClassSum = sumClassAmounts(byClass);
     if (Math.abs(assetClassSum - totalNW) > 0.01) {
-      toast.error(
-        `La somma delle Asset Class (${assetClassSum.toFixed(2)}) non corrisponde al Patrimonio Totale (${totalNW.toFixed(2)})`
-      );
+      setStatus({ phase: 'error', message:
+        `Le classi sommano a ${cachedFormatCurrencyEUR(assetClassSum)}, il patrimonio totale è ${cachedFormatCurrencyEUR(totalNW)}: i due devono coincidere.`
+      });
       return;
     }
 
     // Validate liquidity sum
     if (Math.abs(liquidNW + illiquidNW - totalNW) > 0.01) {
-      toast.error(
-        `La somma di Liquido e Illiquido (${(liquidNW + illiquidNW).toFixed(2)}) non corrisponde al Patrimonio Totale (${totalNW.toFixed(2)})`
-      );
+      setStatus({ phase: 'error', message:
+        `Liquido e illiquido sommano a ${cachedFormatCurrencyEUR(liquidNW + illiquidNW)}, il patrimonio totale è ${cachedFormatCurrencyEUR(totalNW)}: i due devono coincidere.`
+      });
       return;
     }
 
@@ -219,7 +215,7 @@ export function CreateManualSnapshotModal({
       resetForm();
     } catch (error) {
       console.error('Error creating manual snapshot:', error);
-      toast.error(error instanceof Error ? error.message : 'Errore durante la creazione dello snapshot');
+      setStatus({ phase: 'error', message: describeWriteError(error) });
     } finally {
       setIsCreating(false);
     }
@@ -237,16 +233,28 @@ export function CreateManualSnapshotModal({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Crea Snapshot Manuale</DialogTitle>
-          <DialogDescription>
-            Inserisci i dati storici per creare uno snapshot manuale di un mese passato.
-            Tutti i campi contrassegnati sono obbligatori.
-          </DialogDescription>
-        </DialogHeader>
-
+    <ResponsiveModal
+      open={open}
+      onClose={() => onOpenChange(false)}
+      eyebrow="Storico · Snapshot mensile"
+      title="Crea uno snapshot a mano"
+      reading={
+        status.phase === 'error'
+          ? { narrative: [{ text: status.message ?? '' }], tone: 'negative' }
+          : 'Uno snapshot manuale entra nello Storico come tutti gli altri: le classi devono sommare al patrimonio totale, o il mese risulterebbe incoerente ovunque.'
+      }
+      width="lg"
+      footer={
+        <>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isCreating}>
+            Annulla
+          </Button>
+          <Button onClick={handleCreate} disabled={isCreating}>
+            {isCreating ? 'Creazione...' : 'Crea snapshot'}
+          </Button>
+        </>
+      }
+    >
         <Tabs defaultValue="general" className="w-full">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="general" className="text-xs sm:text-sm">Dati Generali</TabsTrigger>
@@ -327,8 +335,8 @@ export function CreateManualSnapshotModal({
               </div>
             </div>
 
-            <div className="rounded-lg bg-blue-50 dark:bg-blue-950 p-3 border border-blue-200 dark:border-blue-800">
-              <p className="text-xs text-blue-800 dark:text-blue-200">
+            <div className="rounded-lg bg-muted p-3 border border-border">
+              <p className="text-xs text-foreground">
                 <strong>Nota:</strong> La somma di Liquido e Illiquido deve essere uguale al Patrimonio Totale.
               </p>
             </div>
@@ -354,11 +362,11 @@ export function CreateManualSnapshotModal({
               ))}
             </div>
 
-            <div className="rounded-lg bg-amber-50 dark:bg-amber-950 p-3 border border-amber-200 dark:border-amber-800">
-              <p className="text-xs text-amber-800 dark:text-amber-200">
+            <div className="rounded-lg bg-warning p-3 border border-warning-border">
+              <p className="text-xs text-warning-foreground">
                 <strong>Attenzione:</strong> La somma di tutte le Asset Class deve essere uguale al Patrimonio Totale.
-                Somma attuale: €{' '}
-                {sumClassAmounts(byClass).toFixed(2)}
+                Somma attuale:{' '}
+                {cachedFormatCurrencyEUR(sumClassAmounts(byClass))}
               </p>
             </div>
           </TabsContent>
@@ -456,7 +464,7 @@ export function CreateManualSnapshotModal({
                           value={asset.totalValue.toFixed(2)}
                           readOnly
                           disabled
-                          className="bg-gray-50"
+                          className="bg-muted"
                         />
                       </div>
                     </div>
@@ -466,21 +474,6 @@ export function CreateManualSnapshotModal({
             )}
           </TabsContent>
         </Tabs>
-
-        <DialogFooter className="flex-col sm:flex-row gap-2">
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={isCreating}
-            className="w-full sm:w-auto"
-          >
-            Annulla
-          </Button>
-          <Button onClick={handleCreate} disabled={isCreating} className="w-full sm:w-auto">
-            {isCreating ? 'Creazione...' : 'Crea Snapshot'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    </ResponsiveModal>
   );
 }

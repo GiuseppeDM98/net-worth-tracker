@@ -41,9 +41,16 @@ import {
   LedgerValidationError,
 } from '@/lib/utils/assetTransactionUtils';
 import { resolveBondPrice } from '@/components/assets/AssetDialog';
-import { calculateAssetValue } from '@/lib/services/assetService';
-import { formatCurrency } from '@/lib/utils/formatters';
+
+import { cachedFormatCurrencyEUR, formatCurrency } from '@/lib/utils/formatters';
+import {
+  describeModalStatus,
+  describeTradeIntent,
+  describeWriteError,
+  type ModalStatus,
+} from '@/lib/utils/dialogNarrative';
 import { ResponsiveModal } from '@/components/ui/responsive-modal';
+import { TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -130,7 +137,9 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
 
   const createMutation = useCreateAssetTransaction(ownerId || '');
   const updateMutation = useUpdateAssetTransaction(ownerId || '');
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  // The modal's reading IS the status line, so a failure lands there and not in a paragraph of
+  // its own at the bottom of the form (DESIGN.md → The Status-Is-The-Reading Rule).
+  const [status, setStatus] = useState<ModalStatus>({ phase: 'idle' });
 
   // Cash accounts eligible as a settlement target.
   const cashAssets = useMemo(
@@ -180,7 +189,7 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
   // enumerate EVERY field in the new-record branch so stale values never carry across opens.
   useEffect(() => {
     if (!open) return;
-    setSubmitError(null);
+    setStatus({ phase: 'idle' });
     if (transaction) {
       const toBI = (eurVal: number) =>
         isBondPctMode && bondNominal ? eurVal / (bondNominal / 100) : eurVal;
@@ -268,26 +277,27 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
 
   const onSubmit = async (data: TransactionFormValues) => {
     if (isDemo || !ownerId) return;
-    setSubmitError(null);
 
     if (!data.date) {
-      setSubmitError('Inserisci una data.');
+      setStatus({ phase: 'error', message: 'Serve una data per registrare l’operazione.' });
       return;
     }
     const qty = data.quantity;
     if (qty === undefined || isNaN(qty) || qty < 0) {
-      setSubmitError('Inserisci una quantità valida.');
+      setStatus({ phase: 'error', message: 'La quantità non è un numero valido.' });
       return;
     }
     if (data.type !== 'adjustment' && qty <= 0) {
-      setSubmitError('La quantità deve essere maggiore di zero.');
+      setStatus({ phase: 'error', message: 'La quantità deve essere maggiore di zero.' });
       return;
     }
     const rawPrice = data.pricePerUnit;
     if (rawPrice === undefined || isNaN(rawPrice) || rawPrice < 0) {
-      setSubmitError('Inserisci un prezzo valido.');
+      setStatus({ phase: 'error', message: 'Il prezzo non è un numero valido.' });
       return;
     }
+
+    setStatus({ phase: 'submitting' });
     const price = resolveBondPrice(rawPrice, bondNominal, isBondWithIsin);
     const settlement =
       data.linkedCashAssetId && data.linkedCashAssetId !== NO_SETTLEMENT
@@ -333,9 +343,9 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
       }
       onClose();
     } catch (error) {
-      // 422 bodies carry the server's Italian message (forwarded verbatim by the service).
-      const message = error instanceof Error ? error.message : "Errore durante l'operazione.";
-      setSubmitError(message);
+      // A 422 body carries the server's own Italian, marked user-facing by the service; anything
+      // else is translated rather than shown, so an SDK string never reaches the reader.
+      setStatus({ phase: 'error', message: describeWriteError(error) });
     }
   };
 
@@ -348,6 +358,21 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
   const submitting = createMutation.isPending || updateMutation.isPending;
   const formId = 'transaction-form';
 
+  // The reading: what this operation does while idle, what is happening while it saves, and why
+  // it failed if it did. One sentence, in the one place the reader is already looking.
+  const reading = describeModalStatus(submitting ? { phase: 'submitting' } : status, {
+    idle: describeTradeIntent({
+      type,
+      isBaseline,
+      hasSettlement: linkedCashAssetId !== NO_SETTLEMENT,
+      isDemo,
+    }),
+    submitting:
+      type === 'sell'
+        ? 'Sto registrando la vendita e aggiornando la posizione.'
+        : 'Sto registrando l’operazione e aggiornando la posizione.',
+  });
+
   const footer = (
     <>
       <Button type="button" variant="outline" onClick={onClose}>
@@ -358,7 +383,6 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
         form={formId}
         disabled={isDemo || submitting}
         aria-label={isDemo ? 'Non disponibile in modalità demo' : undefined}
-        title={isDemo ? 'Non disponibile in modalità demo' : undefined}
       >
         {submitting ? 'Salvataggio...' : isEdit ? 'Salva modifiche' : 'Registra operazione'}
       </Button>
@@ -369,9 +393,10 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
     <ResponsiveModal
       open={open}
       onClose={onClose}
+      eyebrow={`Registro operazioni · ${asset.name}`}
       title={isEdit ? 'Modifica operazione' : 'Registra operazione'}
-      description={`Registra un'operazione per ${asset.name}.`}
-      dialogClassName="max-w-lg"
+      reading={reading}
+      width="md"
       footer={footer}
     >
       <form id={formId} onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -554,19 +579,20 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
           {errors.note && <p className="text-sm text-destructive">{errors.note.message}</p>}
         </div>
 
-        {/* Live summary */}
+        {/* What the save will do — a sub-tile on the muted surface, at the tile's cadence. */}
         {summary && (
-          <div className="rounded-lg bg-muted/40 p-3 text-sm space-y-1">
-            <div className="flex items-center justify-between">
+          <div className="space-y-1 rounded-xl bg-muted p-3.5">
+            <p className={TILE_SUB_EYEBROW_CLASS}>Cosa succede al salvataggio</p>
+            <div className="flex items-baseline justify-between gap-3 pt-1.5 text-sm">
               <span className="text-muted-foreground">
                 {isEur ? 'Totale' : 'Totale stimato'}
               </span>
               <span className="font-mono font-semibold tabular-nums text-foreground">
-                {formatCurrency(summary.totalEur)}
+                {cachedFormatCurrencyEUR(summary.totalEur)}
               </span>
             </div>
             {type === 'sell' && realizedPreview && 'value' in realizedPreview && (
-              <div className="flex items-center justify-between">
+              <div className="flex items-baseline justify-between gap-3 text-sm">
                 <span className="text-muted-foreground">P&L realizzato stimato</span>
                 <span
                   className={cn(
@@ -587,10 +613,6 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
             )}
           </div>
         )}
-
-        {submitError && (
-          <p className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{submitError}</p>
-        )}
       </form>
     </ResponsiveModal>
   );
@@ -598,10 +620,10 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
 
 // ── Local formatting helpers ────────────────────────────────────────────────
 
-/** Signed EUR, e.g. "+1.234,56 €" / "-89,00 €" — sign always explicit for P&L figures. */
+/** Signed EUR, e.g. "+1.234,56 €" / "−89,00 €" — sign always explicit for P&L figures. */
 function formatSignedEur(value: number): string {
   const sign = value > 0 ? '+' : '';
-  return `${sign}${formatCurrency(value)}`;
+  return `${sign}${cachedFormatCurrencyEUR(value)}`;
 }
 
 /** Compact quantity display (up to 8 decimals for crypto, trailing zeros trimmed). */

@@ -1,6 +1,7 @@
 'use client';
 
 import type { Narrative } from '@/lib/utils/narrative';
+import { Skeleton } from '@/components/ui/skeleton';
 import type { YieldSummary } from '@/lib/utils/dividendAnalytics';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { formatPercentage } from '@/lib/services/chartService';
@@ -69,9 +70,9 @@ export function RendimentoTile({ summary, reading, footer, isLoading, isError, c
         </p>
       ) : isLoading ? (
         <div className="mt-4 space-y-3" aria-hidden="true">
-          <div className="h-[22px] w-2/3 animate-pulse rounded bg-muted" />
-          <div className="h-3.5 w-full animate-pulse rounded bg-muted" />
-          <div className="h-3.5 w-4/5 animate-pulse rounded bg-muted" />
+          <Skeleton className="h-[22px] w-2/3" />
+          <Skeleton className="h-3.5 w-full" />
+          <Skeleton className="h-3.5 w-4/5" />
         </div>
       ) : !summary ? (
         <p className="mt-3 text-[13px] leading-[1.45] text-muted-foreground">

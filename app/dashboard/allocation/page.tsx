@@ -99,6 +99,8 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { PageVerdict } from '@/components/ui/page-verdict';
 import { TILE_CELL_CLASS } from '@/components/ui/tile';
 import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
+import { ErrorNotice } from '@/components/ui/error-notice';
+import { describeReadFailure } from '@/lib/utils/statesNarrative';
 import type { TileSkeletonCell } from '@/lib/utils/tileGridSkeleton';
 import { BilanciamentoTile } from '@/components/allocation/tiles/BilanciamentoTile';
 import { PianoTile } from '@/components/allocation/tiles/PianoTile';
@@ -127,6 +129,8 @@ export default function AllocationPage() {
   const [targets, setTargets] = useState<AssetAllocationTarget | null>(null);
   const [allocation, setAllocation] = useState<AllocationResult | null>(null);
   const [loading, setLoading] = useState(true);
+  /** A failed load is not an empty set: it gets an alert, never a verdict about zeros. */
+  const [loadFailed, setLoadFailed] = useState(false);
   const [usingGoalTargets, setUsingGoalTargets] = useState(false);
 
   // Per-instrument rows of everything IN the allocation — tradable and frozen alike. Each carries
@@ -149,6 +153,7 @@ export default function AllocationPage() {
   const loadData = useCallback(async () => {
     if (!user || !ownerId) return;
     try {
+      setLoadFailed(false);
       const [assetsData, settings, goalData] = await Promise.all([
         getAllAssets(ownerId),
         getSettings(ownerId),
@@ -187,6 +192,7 @@ export default function AllocationPage() {
       setExcludedHoldings(buildHoldings(excluded, calculateAssetValue));
       setAllAssets(assetsData);
     } catch (error) {
+      setLoadFailed(true);
       console.error('Error loading allocation data:', error);
       toast.error('Errore nel caricamento dei dati');
     } finally {
@@ -374,6 +380,25 @@ export default function AllocationPage() {
       <PageContainer width="wide">
         {header}
         <TileGridSkeleton cells={SKELETON_CELLS} />
+      </PageContainer>
+    );
+  }
+
+  // A failed read comes BEFORE the empty branch: `[]` on failure is indistinguishable from `[]`
+  // on a new account, and the empty branch would judge a set that was never read.
+  if (loadFailed) {
+    return (
+      <PageContainer width="wide">
+        {header}
+        <ErrorNotice
+          className="max-w-[920px]"
+          onRetry={() => void loadData()}
+          notice={describeReadFailure({
+            consequence: 'Strumenti e obiettivi di allocazione non sono stati letti: senza di essi il piano non è calcolabile.',
+            untouched: 'Il piano registrato non è stato toccato.',
+            canRetry: true,
+          })}
+        />
       </PageContainer>
     );
   }

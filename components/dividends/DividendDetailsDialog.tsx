@@ -1,7 +1,8 @@
 'use client';
 
 import { Dividend } from '@/types/dividend';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ResponsiveModal } from '@/components/ui/responsive-modal';
+import { describeDividendDayReading } from '@/lib/utils/dialogNarrative';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { format } from 'date-fns';
@@ -31,16 +32,23 @@ export function DividendDetailsDialog({ open, onOpenChange, date, dividends, now
   const sum = (list: Dividend[]) => list.reduce((total, d) => total + (d.netAmountEur ?? d.netAmount), 0);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[80vh] max-w-md flex-col overflow-hidden">
-        <DialogHeader>
-          <DialogTitle className="text-base">{formattedDate}</DialogTitle>
-          <DialogDescription>
-            {dividends.length} {dividends.length === 1 ? 'pagamento' : 'pagamenti'} in questa data.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="flex flex-1 flex-col divide-y divide-border overflow-y-auto">
+    <ResponsiveModal
+      open={open}
+      onClose={() => onOpenChange(false)}
+      eyebrow="Dividendi · Calendario"
+      title={formattedDate}
+      reading={{
+        narrative: describeDividendDayReading({
+          received: received.length,
+          announced: announced.length,
+          receivedEur: sum(received),
+          announcedEur: sum(announced),
+        }),
+        tone: 'neutral',
+      }}
+      width="sm"
+    >
+        <div className="flex flex-col divide-y divide-border">
           {dividends.map((dividend) => {
             const isAnnounced = !isPaid(dividend, now);
             const displayAmount = dividend.netAmountEur ?? dividend.netAmount;
@@ -113,7 +121,6 @@ export function DividendDetailsDialog({ open, onOpenChange, date, dividends, now
             )}
           </div>
         )}
-      </DialogContent>
-    </Dialog>
+    </ResponsiveModal>
   );
 }

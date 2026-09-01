@@ -61,6 +61,8 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { PageVerdict } from '@/components/ui/page-verdict';
 import { TILE_CELL_CLASS } from '@/components/ui/tile';
 import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
+import { ErrorNotice } from '@/components/ui/error-notice';
+import { describeReadFailure } from '@/lib/utils/statesNarrative';
 import type { TileSkeletonCell } from '@/lib/utils/tileGridSkeleton';
 import { RecordPatrimonioTile } from '@/components/hall-of-fame/tiles/RecordPatrimonioTile';
 import { RecordBoardTile } from '@/components/hall-of-fame/tiles/RecordBoardTile';
@@ -147,6 +149,8 @@ export default function HallOfFamePage() {
 
   const [data, setData] = useState<HallOfFameData | null>(null);
   const [loading, setLoading] = useState(true);
+  /** A failed load is not an empty set: it gets an alert, never a verdict about zeros. */
+  const [loadFailed, setLoadFailed] = useState(false);
   const [recalculating, setRecalculating] = useState(false);
 
   const [noteViewOpen, setNoteViewOpen] = useState(false);
@@ -164,8 +168,10 @@ export default function HallOfFamePage() {
     if (!user || !ownerId) return;
     try {
       setLoading(true);
+      setLoadFailed(false);
       setData(await getHallOfFameData(ownerId));
     } catch (error) {
+      setLoadFailed(true);
       console.error('Error loading Hall of Fame data:', error);
       toast.error('Errore nel caricamento dei record');
     } finally {
@@ -383,6 +389,25 @@ export default function HallOfFamePage() {
       <PageContainer width="wide">
         {header}
         <TileGridSkeleton cells={SKELETON_CELLS} />
+      </PageContainer>
+    );
+  }
+
+  // A failed read comes BEFORE the empty branch: `[]` on failure is indistinguishable from `[]`
+  // on a new account, and the empty branch would judge a set that was never read.
+  if (loadFailed) {
+    return (
+      <PageContainer width="wide">
+        {header}
+        <ErrorNotice
+          className="max-w-[920px]"
+          onRetry={() => void loadData()}
+          notice={describeReadFailure({
+            consequence: 'I record non sono stati letti: senza di essi la pagina direbbe che non ne hai nessuno.',
+            untouched: 'Le rilevazioni e le note registrate non sono state toccate.',
+            canRetry: true,
+          })}
+        />
       </PageContainer>
     );
   }

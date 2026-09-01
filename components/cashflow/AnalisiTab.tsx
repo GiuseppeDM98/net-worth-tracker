@@ -38,6 +38,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useChartColors } from '@/lib/hooks/useChartColors';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { MONTH_NAMES } from '@/lib/constants/months';
 import {
@@ -95,6 +96,8 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { PageVerdict } from '@/components/ui/page-verdict';
 import { Tile, TILE_CELL_CLASS } from '@/components/ui/tile';
 import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
+import { ErrorNotice } from '@/components/ui/error-notice';
+import { describeReadFailure, resolveSurfaceState } from '@/lib/utils/statesNarrative';
 import { EntitySearch } from '@/components/cashflow/EntitySearch';
 import { AnalisiPeriodControls } from '@/components/cashflow/analisi/AnalisiPeriodControls';
 import { ConfrontoDisclosure } from '@/components/cashflow/analisi/ConfrontoDisclosure';
@@ -139,6 +142,8 @@ interface AnalisiTabProps {
   /** Full category taxonomy — resolves labels for a URL-restored focus and feeds the entity search. */
   categories: ExpenseCategory[];
   loading: boolean;
+  /** The queries behind `allExpenses`/`categories` failed: say so, never render zeros. */
+  loadFailed: boolean;
   historyStartYear?: number;
 }
 
@@ -239,7 +244,7 @@ function resolvePeriodLabel(period: AnalisiPeriod): string {
   return String(period.year);
 }
 
-export function AnalisiTab({ allExpenses, categories, loading, historyStartYear = 2024 }: AnalisiTabProps) {
+export function AnalisiTab({ allExpenses, categories, loading, loadFailed, historyStartYear = 2024 }: AnalisiTabProps) {
   const COLORS = useChartColors();
   const router = useRouter();
   const pathname = usePathname();
@@ -564,11 +569,28 @@ export function AnalisiTab({ allExpenses, categories, loading, historyStartYear 
   );
 
   // Structural skeleton only on the initial load: a refetch with data present shows the data.
+  // A failed read comes before every reading: `allExpenses` is `[]` on failure too, and a
+  // Sankey of an unread ledger is a picture of nothing presented as a picture of something.
+  if (resolveSurfaceState({ loading: loading, failed: loadFailed }) === 'failed') {
+    return (
+      <>
+        {header}
+        <ErrorNotice
+          className="max-w-[920px]"
+          notice={describeReadFailure({
+            consequence: 'I movimenti non sono stati letti: senza di essi non c’è nulla da confrontare né da scomporre.',
+            untouched: 'I movimenti registrati non sono stati toccati.',
+          })}
+        />
+      </>
+    );
+  }
+
   if (loading && allExpenses.length === 0) {
     return (
       <>
         {header}
-        <TileGridSkeleton cells={SKELETON_CELLS} className="pt-1" toolbar={<div className="mx-auto h-9 w-[280px] animate-pulse rounded-md bg-muted desktop:hidden" />} />
+        <TileGridSkeleton cells={SKELETON_CELLS} className="pt-1" toolbar={<Skeleton className="mx-auto h-9 w-[280px] rounded-md desktop:hidden" />} />
       </>
     );
   }

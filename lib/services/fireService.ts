@@ -965,14 +965,12 @@ export async function getAnnualCashflowData(userId: string): Promise<AnnualCashf
       incomeSources: buildIncomeSourceBreakdown(currentYearExpenses, annualizationFactor),
     };
   } catch (error) {
+    // NOT a zeroed payload (changed 2026-09-01). Swallowing the failure here made a dropped
+    // connection read as «servono spese registrate nel Cashflow» — a sentence about the user's
+    // data, told about data that was never read. The two callers (FIRE › Calcolatore and
+    // What If) both hold an ErrorNotice branch that only a rejection can reach.
     console.error('Error calculating annual cashflow data:', error);
-    return {
-      annualSavings: 0,
-      annualExpensesFromCashflow: 0,
-      referenceYear: getItalyYear(),
-      isAnnualized: true,
-      incomeSources: [],
-    };
+    throw new Error('Failed to fetch annual cashflow data', { cause: error });
   }
 }
 

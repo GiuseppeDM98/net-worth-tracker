@@ -75,6 +75,8 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { PageVerdict } from '@/components/ui/page-verdict';
 import { TILE_CELL_CLASS } from '@/components/ui/tile';
 import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
+import { ErrorNotice } from '@/components/ui/error-notice';
+import { describeReadFailure } from '@/lib/utils/statesNarrative';
 import type { TileSkeletonCell } from '@/lib/utils/tileGridSkeleton';
 import { ExportPDFButton } from '@/components/dashboard/ExportPDFButton';
 import { CreateManualSnapshotModal } from '@/components/CreateManualSnapshotModal';
@@ -110,6 +112,8 @@ export default function HistoryPage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [portfolioSettings, setPortfolioSettings] = useState<AssetAllocationSettings | null>(null);
   const [loading, setLoading] = useState(true);
+  /** A failed load is not an empty set: it gets an alert, never a verdict about zeros. */
+  const [loadFailed, setLoadFailed] = useState(false);
   const [doublingMode, setDoublingMode] = useState<DoublingMode>('geometric');
   const [showManualSnapshotModal, setShowManualSnapshotModal] = useState(false);
   const [noteDialogOpen, setNoteDialogOpen] = useState(false);
@@ -122,6 +126,7 @@ export default function HistoryPage() {
     if (!user || !ownerId) return;
     try {
       setLoading(true);
+      setLoadFailed(false);
       const [snapshotsData, assetsData, targetsData, expensesData, settingsData] = await Promise.all([
         getUserSnapshots(ownerId),
         getAllAssets(ownerId),
@@ -135,6 +140,7 @@ export default function HistoryPage() {
       setExpenses(expensesData);
       setPortfolioSettings(settingsData);
     } catch (error) {
+      setLoadFailed(true);
       console.error('Error loading history data:', error);
       toast.error('Errore nel caricamento dello storico');
     } finally {
@@ -323,6 +329,25 @@ export default function HistoryPage() {
       <PageContainer width="wide">
         {header}
         <TileGridSkeleton cells={SKELETON_CELLS} />
+      </PageContainer>
+    );
+  }
+
+  // A failed read comes BEFORE the empty branch: `[]` on failure is indistinguishable from `[]`
+  // on a new account, and the empty branch would judge a set that was never read.
+  if (loadFailed) {
+    return (
+      <PageContainer width="wide">
+        {header}
+        <ErrorNotice
+          className="max-w-[920px]"
+          onRetry={() => void loadData()}
+          notice={describeReadFailure({
+            consequence: 'Lo storico non è stato letto: senza le rilevazioni mensili non c’è una crescita da misurare.',
+            untouched: 'Le rilevazioni registrate non sono state toccate.',
+            canRetry: true,
+          })}
+        />
       </PageContainer>
     );
   }

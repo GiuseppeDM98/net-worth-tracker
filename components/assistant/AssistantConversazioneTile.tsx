@@ -3,6 +3,7 @@
 import { CornerDownRight, Globe, Loader2 } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { AssistantPromptRows, type PromptRow } from '@/components/assistant/AssistantPromptRows';
+import { Skeleton } from '@/components/ui/skeleton';
 import { AssistantStreamingResponse } from '@/components/assistant/AssistantStreamingResponse';
 import { Tile, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import type { AssistantFollowUp } from '@/lib/utils/assistantFollowUps';
@@ -57,7 +58,10 @@ function StreamStatusChip({
       transition={{ duration: prefersReducedMotion ? 0 : 0.18 }}
       className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-0.5 text-[11px] text-foreground"
     >
-      <Icon className={searching ? 'h-3 w-3 animate-pulse' : 'h-3 w-3 animate-spin'} aria-hidden="true" />
+      <Icon
+        className={searching ? 'h-3 w-3 motion-safe:animate-pulse' : 'h-3 w-3 motion-safe:animate-spin'}
+        aria-hidden="true"
+      />
       {label}
     </motion.span>
   );
@@ -106,9 +110,9 @@ export function AssistantConversazioneTile({
         </div>
       ) : loadingThreadDetail ? (
         <div className="mt-4 space-y-2" role="status" aria-label="Caricamento conversazione">
-          <div className="ml-auto h-10 w-2/3 animate-pulse rounded-xl bg-muted" />
-          <div className="h-3.5 w-full animate-pulse rounded bg-muted" />
-          <div className="h-3.5 w-5/6 animate-pulse rounded bg-muted" />
+          <Skeleton className="ml-auto h-10 w-2/3 rounded-xl" />
+          <Skeleton className="h-3.5 w-full" />
+          <Skeleton className="h-3.5 w-5/6" />
         </div>
       ) : renderedMessages.length === 0 && hasSelectedThread ? (
         <p className="mt-3 text-[13px] text-muted-foreground">Nessun messaggio ancora: scrivi la tua domanda qui sotto.</p>

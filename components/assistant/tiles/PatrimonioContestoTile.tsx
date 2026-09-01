@@ -4,6 +4,7 @@ import { Trophy } from 'lucide-react';
 import type { DashboardOverviewPayload } from '@/types/dashboardOverview';
 import type { AssistantMonthContextBundle } from '@/types/assistant';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
+import { Skeleton } from '@/components/ui/skeleton';
 import { getAssistantPeriodLabel } from '@/lib/utils/assistantPeriodLabel';
 import { describeNetWorthToday, describePeriodNetWorth, type AssistantToday } from '@/lib/utils/assistantNarrative';
 import { MONTH_NAMES } from '@/lib/constants/months';
@@ -39,7 +40,7 @@ export function PatrimonioContestoTile(props: PatrimonioContestoTileProps) {
     return (
       <Tile eyebrow="Patrimonio oggi" aside="a prezzi correnti" reading={describeNetWorthToday(totalValue, overview?.flags.assetCount ?? 0)}>
         {overview === undefined ? (
-          <div className="mt-2.5 h-9 w-40 animate-pulse rounded bg-muted" aria-hidden="true" />
+          <Skeleton className="mt-2.5 h-9 w-40" />
         ) : overview === null ? (
           <p className="mt-3 text-[13px] text-muted-foreground">I dati della Panoramica non sono disponibili.</p>
         ) : (

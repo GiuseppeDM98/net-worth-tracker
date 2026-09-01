@@ -4,6 +4,7 @@ import { Check, X } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { describeWriteError } from '@/lib/utils/dialogNarrative';
 import { Tile } from '@/components/ui/tile';
 import { useUpdateAssistantMemory } from '@/lib/hooks/useAssistantMemory';
 import { formatDate } from '@/lib/utils/formatters';
@@ -38,7 +39,7 @@ export function AssistantSuggestionsBanner({ userId, memory, disabled }: Assista
       await updateMutation.mutateAsync({ action: 'acceptSuggestion', suggestionId, itemId });
       toast.success('Obiettivo segnato come completato');
     } catch (error) {
-      toast.error((error as Error).message);
+      toast.error(describeWriteError(error));
     }
   };
 
@@ -46,7 +47,7 @@ export function AssistantSuggestionsBanner({ userId, memory, disabled }: Assista
     try {
       await updateMutation.mutateAsync({ action: 'ignoreSuggestion', suggestionId });
     } catch (error) {
-      toast.error((error as Error).message);
+      toast.error(describeWriteError(error));
     }
   };
 

@@ -87,6 +87,8 @@ import { PageTabs } from '@/components/layout/PageTabs';
 import type { TabDef } from '@/components/layout/PageTabBar';
 import { Tile, TILE_CELL_CLASS, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
+import { ErrorNotice } from '@/components/ui/error-notice';
+import { describeReadFailure } from '@/lib/utils/statesNarrative';
 import { applyThemeWithTransition } from '@/lib/utils/themeTransition';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { resolveRitaUnlockAge, DEFAULT_INPS_RETIREMENT_AGE } from '@/lib/utils/pensionUnlock';
@@ -359,6 +361,8 @@ export default function SettingsPage() {
   const isDemo = useDemoMode();
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(true);
+  /** A failed read of the settings is not a set of defaults: the form must not offer to save them. */
+  const [loadFailed, setLoadFailed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [userAge, setUserAge] = useState<number | undefined>(undefined);
   const [riskFreeRate, setRiskFreeRate] = useState<number | undefined>(undefined);
@@ -590,6 +594,7 @@ export default function SettingsPage() {
 
     try {
       setLoading(true);
+      setLoadFailed(false);
       const settingsData = await getSettings(ownerId);
       const targets = settingsData?.targets || getDefaultTargets();
 
@@ -779,6 +784,7 @@ export default function SettingsPage() {
         })
       );
     } catch (error) {
+      setLoadFailed(true);
       console.error('Error loading targets:', error);
       toast.error('Errore nel caricamento dei target');
     } finally {
@@ -1712,6 +1718,31 @@ export default function SettingsPage() {
         >
           <TileGridSkeleton verdict={false} className="mt-4" cells={[{ span: 5 }, { span: 7 }, { span: 12, lines: 8 }]} />
         </PageTabs>
+      </PageContainer>
+    );
+  }
+
+  // A failed read must not become a form full of defaults: saving those would OVERWRITE the
+  // settings that were never read (lib/utils/statesNarrative.ts).
+  if (loadFailed) {
+    return (
+      <PageContainer width="wide">
+        <PageHeader
+          label="Configurazione"
+          title="Impostazioni"
+          description="Target, preferenze e flussi"
+          separator={false}
+        />
+        <ErrorNotice
+          className="mt-4 max-w-[920px]"
+          onRetry={() => void loadTargets()}
+          notice={describeReadFailure({
+            consequence:
+              'Le tue impostazioni non sono state lette: il modulo mostrerebbe i valori predefiniti, e salvarli sovrascriverebbe i tuoi.',
+            untouched: 'Nessuna impostazione è stata modificata.',
+            canRetry: true,
+          })}
+        />
       </PageContainer>
     );
   }

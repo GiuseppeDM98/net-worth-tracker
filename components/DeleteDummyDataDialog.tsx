@@ -12,20 +12,22 @@
  */
 'use client';
 
-import { useState, useEffect } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { useEffect, useRef, useState } from 'react';
+import { ResponsiveModal } from '@/components/ui/responsive-modal';
+import { TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { Button } from '@/components/ui/button';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useArmedDelete } from '@/lib/hooks/useArmedDelete';
+import {
+  armedActionLabel,
+  describeDummyDataReading,
+  describeModalStatus,
+  describeWriteError,
+  pluralize,
+  type ModalStatus,
+} from '@/lib/utils/dialogNarrative';
 import { getDummyDataCount, deleteAllDummyData, type DummyDataCount } from '@/lib/services/dummyDataService';
 import { toast } from 'sonner';
-import { AlertTriangle, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 interface DeleteDummyDataDialogProps {
   open: boolean;
@@ -43,6 +45,7 @@ export function DeleteDummyDataDialog({
   const [isLoading, setIsLoading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [dataCount, setDataCount] = useState<DummyDataCount | null>(null);
+  const [status, setStatus] = useState<ModalStatus>({ phase: 'idle' });
 
   // Load count when dialog opens
   useEffect(() => {
@@ -58,17 +61,14 @@ export function DeleteDummyDataDialog({
       setDataCount(count);
     } catch (error) {
       console.error('Error loading dummy data count:', error);
-      toast.error('Errore nel caricamento del conteggio dati');
+      setStatus({ phase: 'error', message: describeWriteError(error) });
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleDelete = async () => {
-    if (!dataCount || dataCount.total === 0) {
-      toast.info('Nessun dato dummy da eliminare');
-      return;
-    }
+    if (!dataCount || dataCount.total === 0) return;
 
     setIsDeleting(true);
 
@@ -87,99 +87,109 @@ export function DeleteDummyDataDialog({
       }
     } catch (error) {
       console.error('Error deleting dummy data:', error);
-      toast.error('Errore durante l\'eliminazione dei dati');
+      setStatus({ phase: 'error', message: describeWriteError(error) });
     } finally {
       setIsDeleting(false);
     }
   };
 
+
+  const reading = describeModalStatus(
+    isDeleting ? { phase: 'submitting' } : status,
+    {
+      idle: isLoading
+        ? [{ text: 'Sto contando i dati di test.' }]
+        : dataCount
+          ? describeDummyDataReading(dataCount)
+          : [{ text: 'Sto contando i dati di test.' }],
+      submitting: 'Sto eliminando i dati di test.',
+    },
+  );
+
+  const total = dataCount?.total ?? 0;
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-amber-500" />
-            Elimina Tutti i Dati Dummy
-          </DialogTitle>
-          <DialogDescription>
-            Questa operazione eliminerà permanentemente tutti i dati di test dal tuo account.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="py-4 space-y-4">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : dataCount ? (
-            <>
-              {dataCount.total === 0 ? (
-                <Alert>
-                  <AlertDescription>
-                    Non ci sono dati dummy da eliminare.
-                  </AlertDescription>
-                </Alert>
-              ) : (
-                <>
-                  <div className="rounded-lg border p-4 space-y-2">
-                    <h3 className="text-sm font-semibold">Dati da Eliminare:</h3>
-                    <div className="space-y-1 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Snapshot:</span>
-                        <span className="font-medium">{dataCount.snapshots}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Spese/Entrate:</span>
-                        <span className="font-medium">{dataCount.expenses}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Categorie:</span>
-                        <span className="font-medium">{dataCount.categories}</span>
-                      </div>
-                      <div className="flex justify-between pt-2 mt-2 border-t">
-                        <span className="font-semibold">Totale:</span>
-                        <span className="font-semibold">{dataCount.total}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <Alert variant="destructive">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertDescription>
-                      <strong>Attenzione:</strong> Questa azione è irreversibile.
-                      Tutti i dati verranno eliminati permanentemente.
-                    </AlertDescription>
-                  </Alert>
-                </>
-              )}
-            </>
-          ) : null}
+    <ResponsiveModal
+      open={open}
+      onClose={() => onOpenChange(false)}
+      eyebrow="Impostazioni · Dati di test"
+      title="Elimina i dati di test"
+      reading={reading}
+      width="sm"
+      footerNote={total > 0 ? 'Esc annulla la conferma' : undefined}
+      footer={
+        <>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isDeleting}>
+            {total === 0 ? 'Chiudi' : 'Annulla'}
+          </Button>
+          {total > 0 && (
+            <ArmedDeleteAll
+              label={`Elimina ${pluralize(total, 'elemento', 'elementi')}`}
+              disabled={isLoading || isDeleting}
+              onConfirm={handleDelete}
+            />
+          )}
+        </>
+      }
+    >
+      {isLoading ? (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden="true" />
         </div>
+      ) : dataCount && dataCount.total > 0 ? (
+        <div className="rounded-xl bg-muted p-3.5">
+          <p className={TILE_SUB_EYEBROW_CLASS}>Che cosa sparisce</p>
+          <dl className="mt-2 divide-y divide-border text-sm">
+            <div className="flex items-baseline justify-between gap-3 py-1.5">
+              <dt className="text-muted-foreground">Snapshot mensili</dt>
+              <dd className="font-mono tabular-nums">{dataCount.snapshots}</dd>
+            </div>
+            <div className="flex items-baseline justify-between gap-3 py-1.5">
+              <dt className="text-muted-foreground">Movimenti</dt>
+              <dd className="font-mono tabular-nums">{dataCount.expenses}</dd>
+            </div>
+            <div className="flex items-baseline justify-between gap-3 py-1.5">
+              <dt className="text-muted-foreground">Categorie</dt>
+              <dd className="font-mono tabular-nums">{dataCount.categories}</dd>
+            </div>
+          </dl>
+        </div>
+      ) : null}
+    </ResponsiveModal>
+  );
+}
 
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={isDeleting}
-          >
-            Annulla
-          </Button>
-          <Button
-            variant="destructive"
-            onClick={handleDelete}
-            disabled={isLoading || isDeleting || !dataCount || dataCount.total === 0}
-          >
-            {isDeleting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Eliminazione...
-              </>
-            ) : (
-              'Elimina Tutto'
-            )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+/** The armed destructive primary: two clicks, no timer, Escape disarms. */
+function ArmedDeleteAll({
+  label,
+  disabled,
+  onConfirm,
+}: {
+  label: string;
+  disabled: boolean;
+  onConfirm: () => void;
+}) {
+  const ref = useRef<HTMLButtonElement | null>(null);
+  const { armed, onClick, onBlur } = useArmedDelete(ref, onConfirm);
+  const [wasArmed, setWasArmed] = useState(false);
+  if (armed && !wasArmed) setWasArmed(true);
+
+  return (
+    <>
+      <Button
+        ref={ref}
+        type="button"
+        variant="destructive"
+        onClick={onClick}
+        onBlur={onBlur}
+        disabled={disabled}
+        aria-pressed={armed}
+      >
+        {armed ? armedActionLabel(label) : label}
+      </Button>
+      <span className="sr-only" role="status" aria-live="polite">
+        {armed ? armedActionLabel(label) : wasArmed ? 'Eliminazione annullata' : ''}
+      </span>
+    </>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { Tabs } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
 import { PageTabBar, type TabDef } from './PageTabBar';
 
 interface PageTabsProps {
@@ -20,7 +21,7 @@ export function PageTabs({ tabs, value, onValueChange, layoutId, ariaLabel, load
     <Tabs value={value} onValueChange={onValueChange} className="w-full">
       {loading ? (
         // Same height as the desktop underline bar (13px label + py-2.5) so nothing jumps.
-        <div className="h-10 w-full border-b border-border/50 bg-muted/30 animate-pulse" />
+        <Skeleton className="h-10 w-full rounded-none border-b border-border/50 bg-muted/30" />
       ) : (
         <PageTabBar tabs={tabs} value={value} onValueChange={onValueChange} layoutId={layoutId} ariaLabel={ariaLabel} />
       )}

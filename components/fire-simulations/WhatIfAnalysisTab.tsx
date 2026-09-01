@@ -81,6 +81,8 @@ import { cn } from '@/lib/utils';
 import { PageVerdict } from '@/components/ui/page-verdict';
 import { TILE_CELL_CLASS } from '@/components/ui/tile';
 import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
+import { ErrorNotice } from '@/components/ui/error-notice';
+import { describeReadFailure, resolveSurfaceState } from '@/lib/utils/statesNarrative';
 import { categoryLeafKeys, collectLeafKeys, sumSelectedIncome } from '@/components/fire-simulations/whatif/incomeSelection';
 import { WhatIfProjectionChart } from '@/components/fire-simulations/whatif/WhatIfProjectionChart';
 import { PrimaDopoTile } from '@/components/fire-simulations/whatif/tiles/PrimaDopoTile';
@@ -115,21 +117,21 @@ export function WhatIfAnalysisTab() {
   const { ownerId } = useActiveAccount();
 
   // ─── Queries ─────────────────────────────────────────────────────────────────
-  const { data: settings, isLoading: isLoadingSettings } = useQuery<Settings | null>({
+  const { data: settings, isLoading: isLoadingSettings, isError: settingsError } = useQuery<Settings | null>({
     queryKey: ['settings', ownerId],
     queryFn: () => getSettings(ownerId!),
     enabled: !!user && !!ownerId,
     staleTime: 300000,
   });
 
-  const { data: assets, isLoading: isLoadingAssets } = useQuery({
+  const { data: assets, isLoading: isLoadingAssets, isError: assetsError } = useQuery({
     queryKey: ['assets', ownerId],
     queryFn: () => getAllAssets(ownerId!),
     enabled: !!user && !!ownerId,
     staleTime: 300000,
   });
 
-  const { data: cashflowData, isLoading: isLoadingCashflow } = useQuery({
+  const { data: cashflowData, isLoading: isLoadingCashflow, isError: cashflowError } = useQuery({
     queryKey: ['annualCashflowData', ownerId],
     queryFn: () => getAnnualCashflowData(ownerId!),
     enabled: !!user && !!ownerId,
@@ -331,6 +333,20 @@ export function WhatIfAnalysisTab() {
   const verdict = useMemo(() => buildWhatIfVerdict({ hasBaseline, event, summary }), [hasBaseline, event, summary]);
 
   // ─── Loading ─────────────────────────────────────────────────────────────────
+  // A failed read comes BEFORE the wait: these queries default to undefined, and a plan built
+  // on a base that was never read is a number with nothing behind it.
+  if (resolveSurfaceState({ loading: isLoadingSettings || isLoadingAssets || isLoadingCashflow, failed: settingsError || assetsError || cashflowError }) === 'failed') {
+    return (
+      <ErrorNotice
+        className="max-w-[920px]"
+        notice={describeReadFailure({
+          consequence: 'Patrimonio, ipotesi e cashflow non sono stati letti: senza la base non c’è uno scenario da confrontare.',
+          untouched: 'Le ipotesi salvate non sono state toccate.',
+        })}
+      />
+    );
+  }
+
   if (isLoadingSettings || isLoadingAssets || isLoadingCashflow) {
     return <TileGridSkeleton cells={SKELETON_CELLS} />;
   }

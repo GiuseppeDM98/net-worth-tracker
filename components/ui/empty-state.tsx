@@ -1,171 +1,37 @@
-/**
- * EmptyState — reusable empty state component with floating icon animation.
- *
- * Designed to be minimal: it communicates absence without dominating the page.
- * The float animation adds life without distracting from the surrounding content.
- *
- * Float keyframes are defined inline so this component is self-contained.
- * `motion-safe:` prefix ensures the animation stops for users who prefer reduced motion.
- */
-
-import React from 'react';
+import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 interface EmptyStateProps {
-  icon: React.ComponentType<{ className?: string }>;
-  title: string;
-  description?: string;
-  action?: React.ReactNode;
+  /** The absence in ONE sentence: what is not there, and what would put it there. */
+  message: string;
+  /**
+   * At most one action, and only on the surface that OWNS the missing thing. A second tile that
+   * would ask for the same thing states the absence and stays silent — a page repeating «Aggiungi
+   * il primo strumento» in four cells is asking four times for one thing.
+   */
+  action?: ReactNode;
   className?: string;
 }
 
-export function EmptyState({
-  icon: Icon,
-  title,
-  description,
-  action,
-  className,
-}: Readonly<EmptyStateProps>) {
+/**
+ * «Nothing is recorded» — the first of the three names of an absence
+ * (DESIGN.md → **The Absence-Has-Three-Names Rule**).
+ *
+ * It is the tile's own reading line, in `text-muted-foreground`: the eyebrow above it is the
+ * tile's, so the question stays visible exactly when there is no answer, and the tile keeps the
+ * height and the alignment it has when it answers — the grid does not reflow when the data
+ * arrives. It carries NO figure, because there is none; a zero here would be the second name,
+ * which is a different fact.
+ *
+ * Superseded on 2026-09-01: the centred 64–104px illustration with a perpetual 6px float. It was
+ * the largest element of a tile that carried no information, it dropped the eyebrow precisely
+ * when the tile could not answer, and it was the one endless animation in the product.
+ */
+export function EmptyState({ message, action, className }: Readonly<EmptyStateProps>) {
   return (
-    <div className={cn('flex flex-col items-center justify-center p-8 text-center', className)}>
-      {/* Float keyframes defined inline — avoids globals.css coupling */}
-      <style>{`
-        @keyframes float {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-6px); }
-        }
-      `}</style>
-
-      <div className="text-muted-foreground/50 mb-3 motion-safe:animate-[float_3s_ease-in-out_infinite]">
-        <Icon className="desktop:w-26 desktop:h-26 h-16 w-16 sm:h-20 sm:w-20" />
-      </div>
-
-      <p className="text-muted-foreground text-sm font-medium">{title}</p>
-
-      {description && (
-        <p className="text-muted-foreground/70 mt-1 max-w-xs text-xs">{description}</p>
-      )}
-
-      {action && <div className="mt-4">{action}</div>}
+    <div className={cn('flex min-w-0 flex-col', className)}>
+      <p className="text-[13px] leading-[1.45] text-muted-foreground">{message}</p>
+      {action && <div className="mt-3.5">{action}</div>}
     </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Icon set for empty states — 24×24, currentColor, monochromatic.
-// Kept in this file to avoid icon sprawl; extract if reused outside EmptyState.
-// ---------------------------------------------------------------------------
-
-/** Seedling growing from soil — use for "no milestones yet" contexts. */
-export function SeedlingIcon({ className }: Readonly<{ className?: string }>) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      {/* Stem */}
-      <line x1="12" y1="20" x2="12" y2="10" />
-      {/* Left leaf */}
-      <path
-        d="M12 14 C9 14 7 12 7 9 C9 9 11 11 12 14Z"
-        fill="currentColor"
-        stroke="none"
-        opacity="0.4"
-      />
-      <path d="M12 14 C9 14 7 12 7 9" />
-      {/* Right leaf */}
-      <path
-        d="M12 11 C15 11 17 9 17 6 C15 6 13 8 12 11Z"
-        fill="currentColor"
-        stroke="none"
-        opacity="0.4"
-      />
-      <path d="M12 11 C15 11 17 9 17 6" />
-      {/* Ground line */}
-      <path d="M8 20 Q12 18 16 20" />
-    </svg>
-  );
-}
-
-/** Calendar with no events — use for "no dividends" contexts. */
-export function CalendarEmptyIcon({ className }: Readonly<{ className?: string }>) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      {/* Calendar body */}
-      <rect x="3" y="4" width="18" height="17" rx="2" />
-      {/* Header bar */}
-      <line x1="3" y1="9" x2="21" y2="9" />
-      {/* Binding posts */}
-      <line x1="8" y1="2" x2="8" y2="6" />
-      <line x1="16" y1="2" x2="16" y2="6" />
-      {/* Empty grid dots */}
-      <circle cx="8" cy="13" r="0.8" fill="currentColor" stroke="none" opacity="0.4" />
-      <circle cx="12" cy="13" r="0.8" fill="currentColor" stroke="none" opacity="0.4" />
-      <circle cx="16" cy="13" r="0.8" fill="currentColor" stroke="none" opacity="0.4" />
-      <circle cx="8" cy="17" r="0.8" fill="currentColor" stroke="none" opacity="0.4" />
-      <circle cx="12" cy="17" r="0.8" fill="currentColor" stroke="none" opacity="0.4" />
-    </svg>
-  );
-}
-
-/** Funnel with an X — use for "no results match filter" contexts. */
-export function FilterEmptyIcon({ className }: Readonly<{ className?: string }>) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      {/* Funnel shape */}
-      <path d="M4 4h16l-6 7v6l-4-2V11Z" />
-      {/* X mark overlay — indicates no match */}
-      <line x1="15" y1="15" x2="19" y2="19" strokeWidth="2" />
-      <line x1="19" y1="15" x2="15" y2="19" strokeWidth="2" />
-    </svg>
-  );
-}
-
-/** Bar chart with no bars — use for "no historical data" contexts. */
-export function ChartEmptyIcon({ className }: Readonly<{ className?: string }>) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      {/* Axes */}
-      <line x1="3" y1="19" x2="21" y2="19" />
-      <line x1="5" y1="19" x2="5" y2="4" />
-      {/* Ghost bars — dashed to indicate absence */}
-      <rect x="8" y="11" width="3" height="8" rx="0.5" strokeDasharray="2 2" opacity="0.4" />
-      <rect x="13" y="7" width="3" height="12" rx="0.5" strokeDasharray="2 2" opacity="0.4" />
-      {/* Upward trend arrow — hints at what will appear */}
-      <polyline points="7 8 11 5 15 7 19 3" strokeDasharray="2 2" opacity="0.4" />
-    </svg>
   );
 }

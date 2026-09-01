@@ -78,10 +78,13 @@ Companion documents — do not duplicate their content into this file:
 - **`CardHeader` is `flex flex-col`**, so a `flex justify-between` row inside it makes a `flex-1` grandchild act
   vertically (`truncate` dies, `shrink-0` siblings get pushed off-screen) — use a plain `<div className="px-4 py-3 flex
   items-start gap-2">`.
-- **`ResponsiveModal`** is the convergence target for form modals (`max-w-4xl` default, footer resolved by the caller,
-  `Description` handled internally); small confirms and the 2-step `AssetDialog` may stay plain `Dialog`s.
+- **`ResponsiveModal` is now the ONE modal** (2026-08-31): every surface with a form, a list or a report goes through
+  it. Only two things stay a plain primitive — `LogoutDialog`, an `AlertDialog` because it interrupts and wants
+  `role="alertdialog"` with the focus on «Annulla», and the popovers, which are not modals. See *Dialog e form
+  trasversali* below.
 - **`DialogDescription`/`DrawerDescription` is required** in every `DialogContent`/`DrawerContent` (`sr-only` if it
-  should not show); never silence the warning with `aria-describedby={undefined}`.
+  should not show); never silence the warning with `aria-describedby={undefined}`. `ResponsiveModal` handles it: the
+  `reading` becomes the Description through `asChild`, and without one the `description` prop is rendered `sr-only`.
 
 ### Layout and Color Tokens
 - Never hardcode structural colors in shell components — `bg-background`, `text-foreground`, `border-border`.
@@ -130,6 +133,88 @@ Companion documents — do not duplicate their content into this file:
   does not clear field arrays.
 - **`useWatch()` for render, `getValues()` for handlers — never `watch()`** (incompatible with the React Compiler, which
   then skips the whole component).
+
+### Stati: caricamento, vuoto, zero, errore (`lib/utils/statesNarrative.ts`, `components/ui/{skeleton,empty-state,error-notice}.tsx`)
+- **An absence has three names, and they are not interchangeable** (DESIGN.md → The Absence-Has-Three-Names Rule):
+  `missing` (nothing recorded) · `zero` (something is, and it is zero) · `failed` (the read did not happen). The
+  `AbsenceKind` union in `statesNarrative.ts` exists so a component cannot collapse them into a boolean.
+- **`resolveSurfaceState({ loading, failed })` is the ONE decision on which of the four states a surface is in**, and
+  `loading` wins over `failed` because React Query re-enters `isLoading` while it retries — a retry is an attempt, not
+  a verdict. What it exists to stop is `loading || !data`, the collapse that made the Panoramica pulse **forever** on a
+  failed read (fixed 2026-09-01); the E2E probe that catches it asserts the skeleton's `role="status"` is GONE once the
+  alert is up.
+- **A failed read is checked BEFORE the empty branch, always.** Every query in this app defaults to `[]` or
+  `undefined`, so a dropped connection is byte-identical to a new account — and the empty branch would then print a
+  verdict about a set that was never read («non hai nessun centro di costo», to someone with eight).
+- **`describeReadFailure` requires its `consequence`.** There is no generic fallback on purpose: a shared module does
+  not know the Italian agreement of a subject it was handed («Classi non è stato letto» is wrong), and a sentence that
+  claims nothing is worse than no sentence. The caller knows what it lost. `untouched` is optional and defaults to
+  «Nessun dato registrato è stato toccato»; `canRetry` and `onRetry` travel together, so no button is ever offered
+  that does nothing.
+- **The reassurance is said once per page**: `compact` drops it inside a cell of 4 columns or fewer, because three
+  lines in a 3/12 cell make the notice taller than the tiles beside it. On a page where several queries fail together
+  at least one of them is wide, so the sentence survives.
+- **A service must not swallow its own failure into zeros.** `getAnnualCashflowData` did (a `catch` returning
+  `annualSavings: 0`), which meant the FIRE calculator answered a dropped connection with «servono spese registrate
+  nel Cashflow» — a sentence about the reader's data, told about data nobody read. It rejects now; both its callers
+  hold an `ErrorNotice` branch that only a rejection can reach. When wiring a new surface, check the service too: an
+  `isError` branch above a service that never rejects is decoration.
+- **`Skeleton` (`components/ui/skeleton.tsx`) is the only muted placeholder.** `motion-safe:animate-pulse` — Tailwind's
+  bare `animate-pulse` has no reduced-motion guard, and it was hand-written in eight files at six different heights —
+  and `aria-hidden`, so the wait is announced once by `TileGridSkeleton`'s `role="status"`. `animate-spin` is
+  deliberately left alone: a spinner IS the "in flight" signal, and at 16px it is not the vestibular problem the
+  preference is about.
+- **Reduced motion reduces the MOTION, not the content.** `shouldShowSavingsBadge` used to take `reducedMotion` as a
+  show condition, so a reader who had asked the OS for stillness was never told their savings rate. It now governs the
+  entrance transition only, in the component. The two remaining `shouldReduceMotion()` callers gate CONFETTI, which is
+  motion carrying nothing — those are correct as they are.
+- **A toast's severity is the icon and a 2px leading rule, never the surface.** Sonner maps `--normal-bg` for every
+  type, so before this an error and a success were the same grey tile with a different 16px glyph. The tint variant was
+  rejected: `bg-*/10` washes the fill with the text's own hue and this project already records those combinations as
+  structurally below AA.
+- **A failed WRITE speaks `describeWriteError`, on a toast exactly as in a modal.** Thirteen call sites passed
+  `(err as Error).message` straight through — the thing that module exists to prevent. Where the message really is the
+  product's own Italian (the assistant hooks' `payload?.error ?? '<italiano>'`), the throw is marked with
+  `userFacingError` so the translation keeps it; everything unmarked takes the generic sentence. The assistant's SSE
+  route no longer forwards the Anthropic SDK's English message to the client either — that string is a log line.
+- **Where the 20 surfaces are**: `app/dashboard/{page,assets,history,performance,allocation,hall-of-fame,settings}`,
+  the five Cashflow tabs (the `loadFailed` prop is threaded from `app/dashboard/{cashflow,analisi}/page.tsx`, because
+  the tabs do not own their queries), Dividendi, the five FIRE tabs, Previdenza and Centri di Costo. Adding a
+  twenty-first means: read the query's `isError`, branch with `resolveSurfaceState`, and write the `consequence`.
+
+### Dialog e form trasversali (`components/ui/responsive-modal.tsx`, `lib/utils/dialogNarrative.ts`)
+- **A modal is a tile lifted off the page** (DESIGN.md → The Modal-Is-A-Tile Rule): eyebrow · title 20px · reading ·
+  body · footer. `ResponsiveModal` owns the whole shell, so a caller passes content and never chrome — and never
+  branches on `useMediaQuery` to order two buttons: the footer is `justify-end` on a dialog and `flex-col-reverse` at
+  `h-11` on a drawer, so writing «Annulla» then the primary in DOM order puts the primary on TOP on a phone.
+- **Four widths, and no others**: `sm` 420 · `md` 560 · `lg` 720 · `xl` 960. `dialogClassName` survives as an escape
+  hatch and currently has no user; reach for a width name first.
+- **The reading IS the status line.** `describeModalStatus(status, copy)` returns the idle/submitting/error sentence
+  and its tone; `ModalStatusLine` renders it as ONE stable node — `role="status" aria-live="polite"
+  aria-atomic="true"` — that is also Radix's `Description`. Two traps, both already paid for on /login: the container
+  must never swap `status` for `alert` (a different node to the a11y tree, and some readers announce nothing across
+  the swap), and `NarrativeText` colours only `mono` segments, so the tone is applied by the component.
+- **`describeWriteError` is the ONE translation of a failed write**, exactly as `describeAuthError` is for a sign-in.
+  11 Firestore codes are mapped; anything else takes a sentence that claims nothing rather than falling through to
+  «Missing or insufficient permissions.» A server message written FOR a reader survives only if the thrower marks it
+  with `userFacingError` — `assetTransactionService.parseWriteResponse` does, because the 422 bodies of the trade
+  routes are the only sentences that know why an operation was refused.
+- **Two-click confirms live in `lib/hooks/useArmedDelete.ts`** (moved there from `components/cashflow/budget/` when
+  the fourth caller appeared). No timer, ever. **Escape while armed means DISARM**, and that cannot be done from the
+  button: Radix's dismiss layer registers its document listener when the dialog MOUNTS, so it always runs before one
+  added at arm time — capture phase included, and `stopPropagation` never reaches it. The hook therefore exports
+  `hasArmedConfirm()`, a module-level count that `ResponsiveModal` reads in `onEscapeKeyDown` to `preventDefault()`.
+  Verified in a browser on 2026-08-31: without it, Escape closed the modal with the row still armed.
+- **The words are pure and tested.** `dialogNarrative.ts` holds every sentence a modal speaks — the status copy, the
+  three `describe*Intent` builders (expense, trade, asset: they name the CONSEQUENCE, not the fields) and the readings
+  that carry figures (movements, category delete/move, a dividend day, the test data). It imports from `formatters`,
+  never `chartService`, so it stays SDK-free.
+- **A summary block inside a modal is `bg-muted`**, never `bg-card` — on this surface that is a card inside a card.
+- **The eyebrow's scope is the SINGULAR of one row's type.** `EXPENSE_TYPE_LABELS` is the plural of a category group
+  («Spese Variabili»); the picker's own label is the one a modal about ONE row wants («Spesa variabile»).
+- **In light mode `--card` and `--background` are both `oklch(1 0 0)`**, so a test that proves a modal is «lifted» by
+  comparing it with the page background passes only in dark mode. What separates it there is the border and the Float
+  shadow; assert the modal's surface equals a TILE's instead.
 
 ### Two-Step Create Dialogs (`AssetDialog`, `ExpenseDialog`)
 - `AssetDialog`: step 1 picks the type, step 2 shows only that type's fields; edit reuses the same visibility logic and
@@ -290,6 +375,51 @@ Companion documents — do not duplicate their content into this file:
   Firebase console (`auth/operation-not-allowed`, mapped). Do not "fix" that by hiding the button behind a flag that
   does not exist.
 
+### Landing pubblica (`app/page.tsx`, `components/landing/LandingPromiseTile.tsx`, `lib/utils/{landingNarrative,landingSampleData}.ts`)
+- **The landing renders the app's OWN tiles, not pictures of them.** `PatrimonioTile`, `CashflowTile`,
+  `ComposizioneTile` and `ObiettivoTile` are imported from `components/dashboard/overview/` and fed an
+  invented profile (`landingSampleData.ts`). A mock-up of the Panoramica would age the moment the
+  Panoramica changed, and the landing is the one surface where staleness is read as dishonesty.
+- **The hero is ONE component for THREE surfaces now.** `PatrimonioTile` used to take the whole
+  `DashboardOverviewPayload` and read five fields of it; it takes those five as props
+  (`variations`, `isNewATH`, `movers`, `assetCount`, `hasCurrentMonthSnapshot`), because the landing
+  has no account and therefore no payload. `movers` no longer defaults to `overview.topMovers`: the
+  Panoramica maps its per-CLASS movers at the call site, Patrimonio passes instruments.
+- **The sample profile has invariants, and `__tests__/landingSampleData.test.ts` pins them**: the six
+  classes sum to the gross total and their shares to 100%, both variations are DERIVED from the
+  sparkline (last two points; the previous December), the market digest is smaller than the monthly
+  variation (the rest is contributions), income − expenses = net in both months, and the month-end
+  projection at day 27 lands below the previous month so the tile's positive token is earned. Change
+  one figure and the tests say which relation broke.
+- **The month is FIXED (agosto 2026), not derived from the clock.** A profile whose month followed
+  today would need its expenses to follow the day too, and a projection computed on the 3rd is
+  nonsense. A snapshot that is labelled ages better than a half-simulated "now".
+- **The verdict is the PRODUCT's promise and is the SAME sentence as /login's** —
+  `PRODUCT_PROMISE_HEADLINE` in `authNarrative.ts`, imported by both. Its one state is
+  `demoAvailable`: without the demo credentials the clause about the demo disappears from the
+  sentence AND the button is not rendered, so the page can never point at a control it does not have.
+- **The «dati d'esempio» declaration belongs to the REGION, not to the tile.** One eyebrow +
+  one 13px reading at the head of the grid (`SAMPLE_PROFILE_EYEBROW`, `describeSampleProfile`), plus
+  the hero's own count line («11 asset · profilo d'esempio»). A caption under a single number reads
+  as a footnote to that number alone; four repetitions of the word read as an apology.
+- **The three promise tiles print no invented figures at all** (`LandingPromiseTile`): they name what
+  a section computes, one measure per row. The only numbers they carry are facts about the TOOL, and
+  each is read from the module that owns it — `BENCHMARKS.length`,
+  `DEFAULT_MONTE_CARLO_SIMULATIONS`, `getPensionDeductionCeiling(year)`. Never type one of those
+  numbers here. `DEFAULT_MONTE_CARLO_SIMULATIONS` had to LEAVE `MonteCarloTab` for
+  `lib/utils/monteCarloParams.ts` (which has no imports at all): the obvious home,
+  `monteCarloService`, imports `chartService` and therefore the client Firebase SDK — the same
+  reach problem that moved the it-IT formatters (→ *Italian Localization*).
+- **The footer counts the asset classes from `ASSET_CLASS_SEQUENCE`.** The pre-redesign landing
+  claimed «6 classi di asset» and kept claiming it after `trendFollowing` and `carry` were added
+  (2026-08-21); PRODUCT.md → *Evidence on Hand* cited that very line as an example of an honest
+  surface, so both were wrong together.
+- **The «Registrati» link mirrors the server**: `resolveRegistrationAccess` again (the same function
+  the registration page uses), and `describeRegistrationInvite` returns `null` on `closed` — an
+  invitation behind a door the server keeps shut is worse than no link.
+- **The page root is `PageContainer width="wide"` with `max-desktop:portrait:pb-0`**: the container's
+  bottom padding exists for the phone's nav pill, and the landing has none.
+
 ### Auto-Calculated Targets (`lib/utils/equityBondsAutoTargets.ts`)
 - **The Bull's formula prescribes an EQUITY share and says nothing about the other classes, so they are funded out of
   Azioni**: `bonds = 100 − formula`, `equity = formula − other`. Charging them to the bond sleeve makes the *defensive*
@@ -332,6 +462,11 @@ Companion documents — do not duplicate their content into this file:
   `NEXT_PUBLIC_DEMO_USER_ID` and **gates every mutation** (buttons disabled with a named `aria-label`, handlers return
   early). The snapshots and notes of that account are shared by every visitor: a write that slips through is visible
   to all of them. The assistant is blocked there outright.
+- **The dashboard's demo banner is the app's cadence on a warning fill** (`app/dashboard/layout.tsx`):
+  the label is `TILE_EYEBROW_CLASS` recoloured to `text-warning-foreground` (the eyebrow's geometry is
+  shared, its colour is not — `--warning` is near-white in light mode), and the consequence is a 12px
+  reading beside it, visible at EVERY width. It used to hide below 640px, which is exactly where a
+  reader needs to be told why a button does nothing.
 
 ### Shared Account / Delegated Access
 - **Viewer vs owner**: `useAuth().user` is the viewer and never changes; `useActiveAccount().ownerId` is whose data is
@@ -417,7 +552,29 @@ Companion documents — do not duplicate their content into this file:
 ### PDF Export (`lib/utils/pdfGenerator.tsx`, `lib/services/pdfDataService.ts`, `lib/utils/pdfTimeFilters.ts`)
 - Seven configurable sections with a Total/Annual/Monthly filter. On Cashflow, **Export Totale applies
   `cashflowHistoryStartYear` as a floor** (fallback 2025); Storico, Rendimenti and FIRE stay unbounded — do not "fix"
-  the asymmetry, the cashflow before the floor is bulk-imported noise.
+  the asymmetry, the cashflow before the floor is bulk-imported noise. **The Cashflow section DECLARES that floor**
+  in its scope line and in a note (`historyFloorYear` on `CashflowData`, set only for a Totale export): a reader told
+  "Totale" otherwise reads the missing years as years without spending (DESIGN → *The Declared-Window Rule*).
+- **A verdict over tiles** (2026-09-01): the cover is the report's verdict, not a frontispiece, and every section is
+  eyebrow · scope · reading · figures. Words from `lib/utils/pdfNarrative.ts`, chrome from
+  `components/pdf/primitives/PDFTile.tsx` (`PDFPage`, `PDFSection`, `PDFMetrics`, `PDFRankedRows`, `PDFNarrative`,
+  `PDFNote`, `PDFHero`, `PDFVerdict`), colours from `printTokens`. The `#3B82F6` accent is gone from every page.
+- **`PDF_RAMP` is DESIGN.md's ramp divided by 4/3**: react-pdf measures in POINTS (72/inch), the spec in CSS pixels
+  (96/inch). A4 is 595×842pt on a 44pt margin, leaving a 507pt column.
+- **There is no monospace and no typographic minus.** react-pdf ships only the standard PDF families unless font
+  files are registered, and Geist arrives through `next/font/google` — so figures are Helvetica and their alignment
+  comes from fixed-width right-aligned COLUMNS (a declared exception to the Mono Mandate, in `PDF_FONTS`). WinAnsi
+  has no U+2212 and react-pdf drops what it cannot encode **silently**: the Allocazione gaps printed «620» where they
+  meant «−620 €». `pdfSafeText` converts it at the boundary — every PDF text node goes through it.
+- **Sub-tiles are a `--muted` fill with no border**: on white paper a 1px rule at 0.92 lightness is invisible, and a
+  4%-ink fill survives a photocopy.
+- **A section's reading must not mix two windows.** `HistoryData` carries `netWorthEvolution` (the filtered series the
+  page tabulates) AND `totalGrowth` (measured between `oldestSnapshot` and `latestSnapshot`); they coincide today
+  because `prepareHistoryData` receives already-filtered snapshots, but the first draft of the reading took its
+  endpoints from one and its delta from the other and printed three numbers that could not all be true.
+- **Verifying it means rendering it.** `renderToFile` from `@react-pdf/renderer` works under Vitest; inflating the
+  content streams and collecting every `scn` operand is what proved no colour outside `printTokens` reaches the page,
+  and reading the extracted text is what caught the missing minus signs. `tsc` catches neither.
 
 ### Cashflow Drill-Down: One Landing Path
 - **There is ONE drill destination and ONE transaction list**: every entity entry point on Analisi (a category row, a
@@ -1517,7 +1674,7 @@ Companion documents — do not duplicate their content into this file:
 **Page and integrations**
 - **The year axis governs the annual tiles and the verdict's annual clauses only, never the fund value or the
   return** (see *Previdenza — a verdict over tiles*); `resolveActivePensionYear` (pure) reconciles the selection with
-  the derived axis so no effect has to sync them. Every tile degrades to `PensionErrorNotice` instead of zeros, and
+  the derived axis so no effect has to sync them. Every tile degrades to an `ErrorNotice` instead of zeros, and
   the copy agrees in number (`fundSubject()` in `pensionNarrative.ts`).
 - **Zod messages must be attached to the TYPE check, not only the constraint**: `valueAsNumber: true` turns an empty
   input into `NaN`, which fails `z.number()` itself — use `z.number({ error: '…' }).positive('…')`.
@@ -1562,7 +1719,7 @@ Companion documents — do not duplicate their content into this file:
   starts later — so the two pages never disagree on a number.
 - **Errors degrade per tile and the verdict says what failed** (`buildPensionLoadErrorVerdict`): a failed
   `pensionContributions` query hides the hero's reading and chips (a `[]` would say «nessun versamento registrato»)
-  and replaces Rendimento, Anno fiscale, Versato and Versamenti with `PensionErrorNotice`; a failed snapshots query
+  and replaces Rendimento, Anno fiscale, Versato and Versamenti with an `ErrorNotice`; a failed snapshots query
   drops the series and the Rendimento tile. `assets`/`settings` errors stay blocking.
 - The ledger's delete is `useArmedDelete` (two clicks, no timer, announced on arm and disarm); the 3 s auto-disarm of
   the old chapter is gone. Playwright locates the tiles by `role=region` + `aria-label` («Il fondo oggi»,
@@ -1708,9 +1865,33 @@ Companion documents — do not duplicate their content into this file:
   funziona».
 
 ### Periodic Emails (`lib/server/monthlyEmailService.ts`, `weeklyBudgetEmailService.ts`)
+- **A verdict over tiles, out of the DOM** (2026-09-01). Both messages open on a RULE-GENERATED
+  verdict from `lib/utils/emailNarrative.ts` — never on the AI comment, whose generation is
+  non-blocking and can simply be absent, which is why an email that opened on it opened on a number
+  whenever Anthropic was unavailable. The comment is a tile on `--muted` in SECOND position. The
+  verdict's headline is also the hidden **preheader**, so the inbox preview answers the question.
+- **Every hex comes from `lib/constants/printTokens.ts`** and nothing else (DESIGN → *The Out-Of-DOM
+  Token Rule*). The chrome — shell, verdict, tile, hero, KPI row, ranked rows, budget track,
+  comparison table, alert rows — lives in `lib/server/emailHtml.ts`, and **every layout is a nested
+  table**: Outlook on Windows renders through Word, so flex and grid do not exist there.
+- **ONE template serves the four period types.** They differ only in labels (resolved from the
+  period by `emailNarrative`) and in which tiles exist: Budget and the Hall of Fame standing are
+  monthly, the income Top 10 is yearly, and **«Rispetto a un anno fa» is ABSENT on a yearly email**
+  (`previousEqualsYoy`) because there the two baselines are the same window and every figure in it
+  is already printed above (The One-Tile-One-Question Rule). The old «Confronti» table printed both
+  columns unconditionally.
+- **The class labels are the app's** (`ASSET_CLASS_LABELS` from `allocationUtils`): the local copy
+  that used to live in `monthlyEmailService.ts` said «Crypto» and «Materie prime» where every screen
+  says «Criptovalute» and «Materie Prime».
+- **`signedPct` and `signedEur` are it-IT** (the Comma Rule reaches the email too): they printed
+  `+6.8%` with a dot and `-498 €` with an ASCII hyphen until 2026-09-01.
+- **A ranked list shows six rows and a residual.** The categories are ranked BY AMOUNT, so a
+  catch-all category outranks real ones — that is correct, and the residual row is what keeps the
+  shares reaching 100%.
 - **Four period types** with independent cron phases, so 31 Dec can send Q4 + H2 + yearly (intentional). Adding one is a
   wide fan-out: the union, `MonthlyEmailData`, the date and label helpers, `buildPeriodEmailData`, `buildAndSend*`, the
   cron phase, the send route and the settings 3-place + toggle + test-send button.
+- **Income targets have their own tile** (`Obiettivi di entrata`): «am I within my budgets?» and «did what I expected arrive?» are two questions, and only the first has a limit to breach. The budget track carries **today's mark on the row's own window** — day of month for a monthly budget, day of year for an annual one — drawn as a split table row, because out of the DOM there is no positioning to overlay it with.
 - **The weekly budget email is a SEPARATE module and nothing in it is weekly**: it is *sent* on Sunday, but its numbers
   are month-to-date and year-to-date. `buildCommentContext` (pure, exported, tested) states the day-of-month, tags the
   overall as a MENSILE ceiling with an A FINE MESE projection and forbids "fine anno"/"settimana" for monthly budgets.
@@ -1795,7 +1976,9 @@ Companion documents — do not duplicate their content into this file:
 - **`SavingsRateBadge` is once per calendar month per account**, recorded in localStorage through
   `celebrationUtils` under `savings_rate_{ownerId}_{YYYY-MM}` — a sessionStorage flag dies with every new window and
   re-greets the user on every login. The decision is pure (`lib/utils/savingsRateBadge.ts`); the effect defers its
-  `setVisible` with `setTimeout(…, 0)` (react-hooks/set-state-in-effect).
+  `setVisible` with `setTimeout(…, 0)` (react-hooks/set-state-in-effect). **`reducedMotion` is NOT part of that
+  decision** (removed 2026-09-01): it used to suppress the badge outright, so a reader who asked the OS for stillness
+  was never told their savings rate. It governs the entrance transition only, in the component.
 
 ### Shared Constants and Fixed Hooks
 - **Rule of Three**: a map used in 3+ files lives in `lib/constants/<domain>.ts`. The canonical symptom of a duplicated
@@ -1828,12 +2011,18 @@ Companion documents — do not duplicate their content into this file:
   which declares the SSR/hydration split in the signature.
 - **`react-hooks/refs`: a custom hook must never RETURN a ref inside its object** — every read of that object during
   render (`del.armed`, `del.onClick`) is flagged "Cannot access refs during render". Take the ref as an argument
-  (`useArmedDelete(ref, onDelete)`, `components/cashflow/budget/useArmedDelete.ts`).
+  (`useArmedDelete(ref, onDelete)`, `lib/hooks/useArmedDelete.ts` — moved there from the budget folder
+  on 2026-08-31, when the fourth caller appeared).
 - **`react-hooks/preserve-manual-memoization` ("Compilation Skipped")**: the compiler refuses to optimize the whole
   component when a dep array is *more specific* than what it infers — align the dep to the inferred value.
 - **Loading skeleton over spinner** on any page investing in count-up and chart scheduling, with `PageContainer` imported
   inside it or wrapped at the call site. Verify it is wired up — `tsc` does not catch an unused component. Mobile CPU
-  budget is ~3-5× tighter, so validate motion in a production build, not `next dev`.
+  budget is ~3-5× tighter, so validate motion in a production build, not `next dev`. The skeleton is a WAIT and never a
+  failure (→ *Stati: caricamento, vuoto, zero, errore*).
+- **Every looping animation carries `motion-safe:`.** Tailwind's `animate-pulse` does not, which is why the app's ONE
+  placeholder is `components/ui/skeleton.tsx` and nothing hand-rolls `animate-pulse bg-muted` any more. `animate-spin`
+  is the deliberate exception: a spinner IS the "in flight" signal. And a preference for less motion must never remove
+  CONTENT — see the `SavingsRateBadge` entry under *Panoramica and Dashboard Data Isolation*.
 
 ### Recharts
 - **`useChartColors()` is mandatory for every series** — read CSS vars after paint and pass `chartColors[0..4]` as props.
@@ -1974,9 +2163,14 @@ Companion documents — do not duplicate their content into this file:
 - **Two-click confirm: no timer, and not `onBlur` alone.** A 3-second auto-disarm is a WCAG 2.2.1 time limit, and Safari
   does not focus a `<button>` on tap. Use a document `pointerdown` listener with a `ref.contains(target)` guard, plus
   Escape, plus `onBlur`. **Disarm BEFORE delegating** — on success the parent usually unmounts, so nothing resets the
-  flag on failure and the next single click fires the destructive action.
+  flag on failure and the next single click fires the destructive action. **Inside a modal, Escape cannot be
+  intercepted from the button**: Radix's dismiss layer registers its document listener when the dialog MOUNTS, so it
+  runs before any listener added at arm time — capture phase included, and `stopPropagation` never reaches it. The
+  hook exports `hasArmedConfirm()` and `ResponsiveModal` calls `preventDefault()` in `onEscapeKeyDown`; without it
+  Escape closes the dialog with the row still armed (seen in a browser, 2026-08-31).
 - **Form error text needs the sign token too**: `text-red-500` fails AA in both modes on a dialog surface AND diverges
-  from `--destructive` on the non-default themes.
+  from `--destructive` on the non-default themes. The dialog sweep of 2026-08-31 retired the last 76 of them; a
+  FORM-level failure now belongs to the modal's reading line, not to a paragraph of its own.
 - **`PageTabBar` tabs carry `aria-label={label}` unconditionally** (closed 2026-08-22): below 1440px the inactive tabs are
   icon-only, so without it they had no accessible name. Pass `ariaLabel` to `PageTabs` so the tablist is named too.
 
@@ -1998,6 +2192,15 @@ Companion documents — do not duplicate their content into this file:
 - **A `tsc` that fails only inside `.next/dev/types/validator.ts` (TS1109 "Expression expected") is a half-written
   generated file**, not a type error: a dev server was killed mid-write. Delete that one file (`next dev` regenerates
   it) — never the whole `.next` of a server someone else may be running.
+- **A surface with no DOM is verified by RENDERING it, not by reading its code.** `tsc` and Vitest
+  see neither a dropped glyph nor a colour that is off-token. For the PDF: `renderToFile` from
+  `@react-pdf/renderer` works under Vitest — inflate the content streams with `zlib`, collect every
+  `scn` operand to prove no colour outside `printTokens` reaches the page, and read the hex text
+  runs to catch characters react-pdf silently dropped. For the two emails: they ARE HTML, so open
+  the rendered file in Chromium (`chromium.launch()`, `file://`) at 390 / 600 / 1440 and assert
+  `documentElement.scrollWidth === clientWidth`. Both are throwaway scripts — **run them from
+  inside the repo** or `playwright` and the `@/` alias do not resolve — and neither check lives in
+  the suite.
 - **Run the suite under `TZ=Europe/Rome` too.** Every date fixture is stamped at noon, twelve hours clear of the DST
   edge, so a whole class of timezone bug is structurally invisible to it — while production dates are **local midnight**
   and the pure layer runs in the user's browser. Compute day-of-year from calendar fields in UTC (`Date.UTC(y,m,d) -
@@ -2017,6 +2220,7 @@ Companion documents — do not duplicate their content into this file:
 | Cashflow › Tracciamento | `tracciamentoSummary`, `cashflowNarrative` (+ `overviewNarrative` for `projectMonthEndSpending`, `patrimonioNarrative` for the articles) |
 | Impostazioni | **Letture** `settingsNarrative` · **Round-trip** `settingsRoundTrip` · **Formula** `equityBondsAutoTargets` · **Sblocco** `pensionUnlock` |
 | Accesso / Registrazione | **Verdetti, letture ed errori** `authNarrative` · **Policy** `registrationPolicy` (i due devono restare d'accordo sulla precedenza whitelist/flag) |
+| Landing pubblica | **Parole** `landingNarrative` · **Invarianti del profilo** `landingSampleData` (+ `authNarrative` per la promessa condivisa e la precedenza registrazioni) |
 | Cashflow › Dividendi | `dividendAnalytics`, `dividendiNarrative` (+ `patrimonioNarrative` for the articles) |
 | Analisi | `analisiSummary`, `analisiNarrative` (+ `cashflowNarrative` for the shared readings, `patrimonioNarrative` for the articles), `expenseGrouping`, `cashflowSankey`, `cashflowComposition`, `comparisonDeltas`, `expenseEntityStats`, `entitySearch` |
 | Transfers / cash | `cashBalanceReconciliation`, `updateCashAssetBalancesAtomic`, `transferFeature` · **Ricorrenze** `recurrenceDates` |
@@ -2192,6 +2396,11 @@ rules permitting the writes, real `Timestamp` values surviving `removeUndefinedD
   project is therefore either not collected at all or collected against the WRONG fixture — and both read as the
   feature being broken, not as a config miss. It should also assert against Firestore rather than the page, plant a
   decoy word that appears nowhere in the seed, delete the documents it created, and delete itself.
+- **A fixture a spec creates should be removed BY THE APP, not by a `curl -X DELETE`.** The dialog verification of
+  2026-08-31 registered a trade to have something to arm: deleting it through the ledger's own button re-ran the
+  replay that rebuilds the asset's quantity and PMC, which a REST delete would have skipped, leaving the asset
+  inconsistent with a register that no longer holds the row. Loop the deletion rather than removing one row: an
+  earlier failed run may have left its own.
 
 ---
 
@@ -2201,6 +2410,9 @@ rules permitting the writes, real `Timestamp` values surviving `removeUndefinedD
   (`assetPricing.ts` is the worked example).
 
 ### Audit habits
+- **An `isError` branch above a service that never rejects is decoration.** Before wiring a surface's failure state,
+  read the service: a `catch` that returns `[]`, `0` or a defaulted object turns every failure into a truthful-looking
+  answer, and the branch can never fire (`getAnnualCashflowData` did exactly that until 2026-09-01).
 - **"Keep" verdicts need the same grep as "Delete" verdicts.** A wrong Delete breaks the build immediately; a wrong Keep
   burns a whole commit polishing a component with zero importers.
 - **A doc comment naming a caller is a claim, not evidence — grep it**, and when the grep contradicts the comment fix the
@@ -2225,12 +2437,14 @@ rules permitting the writes, real `Timestamp` values surviving `removeUndefinedD
 Moved verbatim from CLAUDE.md's Known Issues each time that file reached its 40.000-character budget — three pages on 2026-08-28, three on 2026-08-29, the rest on 2026-08-30. CLAUDE.md now keeps only the cross-cutting entries and points here. These are behaviours that look like bugs and are not — read them before "fixing" one.
 
 - **Accesso e Registrazione**: no Playwright spec (the session's throwaway ones were deleted); `ProtectedRoute` keeps its pre-redesign spinner, the last piece of old chrome on the sign-in path. The submit button stays ENABLED with the password rules unmet, as before the redesign — the refusal is the reading line, not a dead control. That reading lives in a **polite** `role="status"` even on failure: a node that switched to `role="alert"` would change identity in the accessibility tree and some screen readers announce nothing across the swap. On success the form stays frozen until the redirect (it used to re-enable). The outcome toasts are gone from both pages: the tile says the state. `describeAuthError` covers 14 codes and anything else takes the generic sentence, so a NEW Firebase cause is invisible until it is added. The whitelist stays a DEROGATION from `REGISTRATIONS_ENABLED=false` (SETUP.md → Step 5b depends on it): `resolveRegistrationAccess` mirrors that, it does not correct it.
+- **Landing pubblica**: no Playwright spec (the session's throwaway one was deleted after 18/18 green at 1440 and 390, with the demo flag both ON and OFF, and three guards falsified). The sample profile is a FIXED snapshot of agosto 2026, so the Cashflow tile says «agosto» whatever month it is read in — declared, not hidden. The period selector over the sparkline works and filters the invented series: it is the app's own hero, selector included. `ObiettivoTile` shows at most three goals and the sample has exactly three. The three promise tiles carry no `aria` beyond the tile's own region label. The count of colour themes is NOT stated anywhere: `ColorTheme` is a union type with no runtime enumeration, so it could not be read from code and was dropped rather than typed by hand. The page is prerendered as static content, but what the prerender contains is the SPINNER (`loading` is true until Firebase auth resolves in the browser), so `getItalyYear()` — which decides the pension ceiling the Previdenza promise prints — is only ever evaluated on the client.
 - **Assistente**: no Playwright spec (the throwaway specs were deleted); the Cashflow tile is absent for a period without cashflow rows; the savings rate is `netCashFlow / (income + dividends)`; «Patrimonio oggi» prints the GROSS total (the verdict's figure), the old card printed the net; the Conversazione count includes the user's messages; starter rows prefill the composer, follow-up rows submit; the thread sheet keeps its 3 s auto-disarm delete (on request) while the memory rows use `useArmedDelete`; a companion taller than the viewport is reachable only at the end of the scroll (sticky, by design); the «goal reached» tile and the sheet's row are two surfaces of ONE suggestion.
 - **FIRE › Calcolatore**: «FIRE nel {anno}» is the BASE scenario of a deterministic walk on the last full cashflow year (or the running year annualized, said in Base di calcolo) — changed expenses read stale until the year closes; a target reached «today» prints no passive-income clause; the Ventaglio runs only while open, its probability lives in the Traguardo footer; `getFIREData` still runs for runway and history but its `metrics` are ignored; the fan is unavailable without an allocation in the four MC classes; the pension-lock switch is optimistic (a failed save reverts with a toast), disabled in demo; Parametri reopens on every unsaved edit.
-- **Impostazioni**: no Playwright spec (the throwaway ones were deleted); the dialogs keep their pre-redesign chrome; «Parametri del piano» and «Assistente» are READ-ONLY and list only the fields already saved — the assistant's mirror loses on read, so a never-synced preference makes the tile say where the truth lives instead of printing a default; the colour theme and the light/dark mode save themselves, outside the page's Salva; the header chip no longer says WHICH tab has unsaved changes (one sentence for the whole page); the Costi tile shows the rate and the checking subcategory only with the duty on; the category count ignores types outside the four listed (transfers); `settings/page.tsx` carries 7 pre-existing `react-hooks` errors and `AccountSharingSection` 1.
+- **Impostazioni**: no Playwright spec (the throwaway ones were deleted); the dialogs opened from here take the 2026-08-31 modal vocabulary; «Parametri del piano» and «Assistente» are READ-ONLY and list only the fields already saved — the assistant's mirror loses on read, so a never-synced preference makes the tile say where the truth lives instead of printing a default; the colour theme and the light/dark mode save themselves, outside the page's Salva; the header chip no longer says WHICH tab has unsaved changes (one sentence for the whole page); the Costi tile shows the rate and the checking subcategory only with the duty on; the category count ignores types outside the four listed (transfers); `settings/page.tsx` carries 7 pre-existing `react-hooks` errors and `AccountSharingSection` 1.
 - **Allocazione**: no Playwright spec; Esposizione fetches `/api/portfolio/exposure` on mount (Yahoo on the first visit, then the 24 h cache) and truncates names at 128 px; a class held WITHOUT a target never enters `byAssetClass` (`compareAllocations` iterates the targets), so the score charges it as drift — the Bilanciamento reading names it, the verdict lists only targeted classes; a Ribilancia is «a saldo zero» only when the in-band classes carry no gap; «Modifica target» points to Impostazioni even with goal-derived targets; theoretical specific-asset targets are rows without a tick; `BandToggle` snaps 2 or 5 typed in the custom field back to the preset.
 - **FIRE › Coast FIRE**: the verdict's two capital figures are net of the locked fund and only the lock sentence says so; the pension clause reads «la Pensione INPS» for labels starting with «Pension…», «la pensione di Giuseppe» otherwise (every pension listed, never counted); `coast.spec.ts` asserts structure and format only (the fixture fixes expenses, not the clock); the Ipotesi disclosure reopens on every unsaved edit or incomplete pension row, ONE save for four tiles; the «Impatto delle pensioni» table exists from 1440 only; `buildCoastInflowEvents` merges funds unlocking in the same year.
 - **FIRE › Monte Carlo**: no Playwright spec; the paths are unseeded draws (two runs differ by tenths of a point) and the figures are the last run's until «Esegui» (an edited parameter only flags the Parametri footer); the plan is ephemeral, seeded once per mount; the withdrawal is always inflation-indexed; «fino a 81 anni» needs the Coast FIRE age; the histogram's last bin takes the tail past the 95th percentile (said in the footer); `results.medianFinalValue` has no surface.
+- **Dialog e form trasversali**: no Playwright spec (the session's throwaway ones were deleted). Four two-click deletes still auto-disarm on a 3 s timer BY DESIGN, because they live on rows and not in modals and the owner kept them (`AssetRow`, `StrumentiTile`, `DividendTable`, `AssistantThreadList`); the ones that moved into the modal vocabulary lost theirs. `describeWriteError` maps 11 Firestore codes and anything else takes the generic sentence, so a NEW cause is invisible until it is added — and a server message survives only if the thrower marks it `userFacingError`, which today only `assetTransactionService` does. The status line is FORM-level: per-field zod errors keep their own line under the field, and the two can both be visible at once. `dialogClassName` still exists as a width escape hatch and has no user — reach for a `width` name. `AssetDialog` and `ExpenseDialog` carry their pre-existing `react-hooks` errors, untouched by the propagation. `PDFExportDialog`'s «Genera PDF» moved from the body into the footer, so a spec that located it inside the scrollable area needs updating.
 - **FIRE › What If**: no Playwright spec; every event is a year-0 perturbation, nothing persisted; the Coast block reads the SAVED age and pensions (no age → no block); the job-loss picker seeds from `laborIncomeCategoryIds` once per mount; the «Prima e dopo» walk of today stops five years after its last scenario reaches FIRE (a gap after a big purchase, by design); with the bridge on the FIRE numbers are bridge numbers while the chart reads `baseNetWorth`; the Sensibilità reference expenses are session-only; `isPrimaryResidence` is informational.
 - **Patrimonio**: Δ columns are empty for pension funds and cash accounts by design; the Rendimento tile ranks only within the overview's `topAssets` (15 largest); «Movimenti del mese» reads the whole ledger and filters in memory; the 2-click delete auto-disarms on a 3 s timer (kept on request); G/P against PMC compares a native-currency `averageCost` with the EUR value; `TaxCalculatorModal` simulates in the native price but labels €; `AssetDialog.tsx` carries 7 pre-existing `react-hooks` errors. **Two accepted side effects of the optional Sottocategoria** (2026-08-30; neither is new — without the asterisk they are only less signalled): a cash account without the «conti correnti» subcategory loses the 5.000 € stamp-duty threshold (`calculateStampDuty`, a rule Impostazioni already states), and changing Tipo or Classe does not clear `subCategory`, so an out-of-class value can survive invisibly — Radix shows the placeholder because the value is not among the items.
 - **Tracciamento**: «Tabella» renders `ExpenseTable` unchanged inside Movimenti; the period slice uses `periodToRange` (browser local time) while the month buckets use the Italian calendar; the phone bar's controls are 36px; `TransactionFeed`/`CompactExpenseRow` carry two pre-existing `react-hooks` errors; a custom range has no previous period; the month-end projection exists only in the current month; `components/dashboard/overview/NarrativeText.tsx` is an unused re-export (knip).

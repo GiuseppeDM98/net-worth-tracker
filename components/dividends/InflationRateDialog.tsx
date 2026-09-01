@@ -119,20 +119,29 @@ export function InflationRateDialog({ open, coupon, asset, onClose, onSaved }: I
     <ResponsiveModal
       open={open}
       onClose={onClose}
-      title="Tasso di inflazione cedola"
-      description={
-        coupon ? `${coupon.assetTicker} - stacco ${couponDate ? formatDate(couponDate) : ''}` : undefined
+      eyebrow={
+        coupon
+          ? `Dividendi · ${coupon.assetTicker}${couponDate ? ` · Stacco ${formatDate(couponDate)}` : ''}`
+          : 'Dividendi · Cedola provvisoria'
       }
-      dialogClassName="max-w-md"
+      title="Tasso di inflazione della cedola"
+      reading={
+        isDemo
+          ? 'In modalità demo le cedole sono di sola lettura.'
+          : 'Il coefficiente FOI trasforma la cedola provvisoria nell’incasso definitivo: da qui in poi il pagamento smette di essere un minimo.'
+      }
+      width="md"
       footer={
         <>
           <Button variant="outline" onClick={onClose} disabled={saving}>
             Annulla
           </Button>
+          {/* The demo state is said in the reading line above, not in a `title`: a tooltip added
+              by a state change never opens on touch and is ignored by screen readers. */}
           <Button
             onClick={handleSave}
             disabled={saving || !user || !asset || isDemo}
-            title={isDemo ? 'Non disponibile in modalità demo' : undefined}
+            aria-label={isDemo ? 'Non disponibile in modalità demo' : undefined}
           >
             {saving ? 'Salvataggio...' : 'Salva e ricalcola'}
           </Button>

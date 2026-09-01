@@ -38,13 +38,8 @@ import {
   ExpenseSubCategory,
   EXPENSE_TYPE_LABELS,
 } from '@/types/expenses';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog';
+import { ResponsiveModal } from '@/components/ui/responsive-modal';
+import { describeCategoryMoveReading, pluralize } from '@/lib/utils/dialogNarrative';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -55,7 +50,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ArrowRightLeft, Plus, Check } from 'lucide-react';
+import { Plus, Check } from 'lucide-react';
 import { CategoryManagementDialog } from './CategoryManagementDialog';
 import { getAllCategories } from '@/lib/services/expenseCategoryService';
 import { crossesTransferBoundary } from '@/lib/utils/expenseTypeTransition';
@@ -240,28 +235,39 @@ export function CategoryMoveDialog({
   // ========== Render ==========
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent
-        className="max-w-md"
-        style={triggerOrigin ? { transformOrigin: triggerOrigin } : undefined}
+    <>
+      <ResponsiveModal
+        open={open}
+        onClose={onClose}
+        eyebrow={`Categorie · ${EXPENSE_TYPE_LABELS[sourceCategory.type]}`}
+        title={`Sposta i movimenti di ${sourceLabel}`}
+        reading={{
+          narrative: describeCategoryMoveReading({ name: sourceLabel, expenseCount }),
+          tone: 'neutral',
+        }}
+        width="md"
+        triggerOrigin={triggerOrigin}
+        footer={
+          <>
+            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+              Annulla
+            </Button>
+            <Button
+              type="button"
+              onClick={handleConfirm}
+              disabled={!selectedCategoryId || isSubmitting || availableCategories.length === 0}
+            >
+              {isSubmitting
+                ? 'Spostamento...'
+                : `Sposta ${pluralize(expenseCount, 'movimento', 'movimenti')}`}
+            </Button>
+          </>
+        }
       >
-        {/* ========== Header Section ========== */}
-        <DialogHeader>
-          <div className="flex items-center gap-2 text-blue-600 mb-2">
-            <ArrowRightLeft className="h-5 w-5" />
-            <DialogTitle>Sposta Transazioni</DialogTitle>
-          </div>
-          <DialogDescription className="text-base">
-            Sposta {expenseCount === 1 ? (
-              <><strong>1</strong> transazione</>
-            ) : (
-              <><strong>{expenseCount}</strong> transazioni</>
-            )} da <strong>&quot;{sourceLabel}&quot;</strong> ({EXPENSE_TYPE_LABELS[sourceCategory.type]}) verso una nuova destinazione.
-          </DialogDescription>
-        </DialogHeader>
+
 
         {/* ========== Destination Selection Section ========== */}
-        <div className="space-y-4 py-4">
+        <div className="space-y-4">
           {/* Category Selection */}
           {availableCategories.length > 1 && (
             <div className="space-y-2">
@@ -286,12 +292,12 @@ export function CategoryMoveDialog({
                 {isDropdownOpen && (
                   <div
                     ref={dropdownRef}
-                    className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg max-h-60 overflow-auto"
+                    className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-[0_4px_24px_rgba(0,0,0,0.28)] max-h-60 overflow-auto"
                   >
                     {filteredCategories.length === 0 && searchQuery.trim() ? (
                       <button
                         type="button"
-                        className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer text-left"
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent cursor-pointer text-left"
                         onClick={handleCreateCategory}
                       >
                         <Plus className="h-4 w-4 text-primary flex-shrink-0" />
@@ -307,8 +313,8 @@ export function CategoryMoveDialog({
                           key={category.id}
                           type="button"
                           className={cn(
-                            "w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer text-left",
-                            selectedCategoryId === category.id && "bg-gray-100 dark:bg-gray-800"
+                            "w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent cursor-pointer text-left",
+                            selectedCategoryId === category.id && "bg-accent"
                           )}
                           onClick={() => handleSelectCategory(category.id)}
                         >
@@ -334,7 +340,7 @@ export function CategoryMoveDialog({
 
               {/* Selected category display */}
               {selectedCategoryId && selectedCategory && (
-                <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700">
+                <div className="flex items-center gap-2 px-3 py-2 bg-muted rounded-md border border-border">
                   {selectedCategory.color && (
                     <div
                       className="w-3 h-3 rounded-full"
@@ -377,7 +383,7 @@ export function CategoryMoveDialog({
 
           {/* Single category case */}
           {availableCategories.length === 1 && (
-            <div className="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-md text-sm text-blue-800 dark:text-blue-200">
+            <div className="p-3 bg-muted border border-border rounded-lg text-sm text-foreground">
               Le transazioni verranno spostate nella categoria{' '}
               <strong>&quot;{availableCategories[0].name}&quot;</strong> ({EXPENSE_TYPE_LABELS[availableCategories[0].type]}).
             </div>
@@ -385,7 +391,7 @@ export function CategoryMoveDialog({
 
           {/* No categories available */}
           {availableCategories.length === 0 && (
-            <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-md text-sm text-amber-800 dark:text-amber-200">
+            <div className="p-3 bg-warning border border-warning-border rounded-lg text-sm text-warning-foreground">
               Non ci sono altre categorie disponibili.
               {' '}Crea prima una nuova categoria digitando il nome nel campo sopra.
             </div>
@@ -393,34 +399,13 @@ export function CategoryMoveDialog({
 
           {/* Cross-type warning */}
           {selectedCategoryId && selectedCategory && selectedCategory.type !== sourceCategory.type && (
-            <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-md text-sm text-amber-800 dark:text-amber-200">
+            <div className="p-3 bg-warning border border-warning-border rounded-lg text-sm text-warning-foreground">
               Le transazioni cambieranno tipo da <strong>{EXPENSE_TYPE_LABELS[sourceCategory.type]}</strong> a{' '}
               <strong>{EXPENSE_TYPE_LABELS[selectedCategory.type]}</strong>.
             </div>
           )}
         </div>
-
-        {/* ========== Action Buttons ========== */}
-        <div className="flex justify-end gap-2 pt-4 border-t">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onClose}
-            disabled={isSubmitting}
-          >
-            Annulla
-          </Button>
-          <Button
-            type="button"
-            onClick={handleConfirm}
-            disabled={!selectedCategoryId || isSubmitting || availableCategories.length === 0}
-          >
-            {isSubmitting
-              ? 'Spostamento...'
-              : `Sposta ${expenseCount} ${expenseCount === 1 ? 'transazione' : 'transazioni'}`}
-          </Button>
-        </div>
-      </DialogContent>
+      </ResponsiveModal>
 
       {/* Inline Category Creation Dialog */}
       <CategoryManagementDialog
@@ -429,6 +414,6 @@ export function CategoryMoveDialog({
         onSuccess={handleCategoryCreated}
         initialName={searchQuery.trim()}
       />
-    </Dialog>
+    </>
   );
 }

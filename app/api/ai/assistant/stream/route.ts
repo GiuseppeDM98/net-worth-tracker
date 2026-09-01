@@ -346,8 +346,12 @@ export async function POST(request: NextRequest) {
           controller.enqueue(
             encodeAssistantEvent({
               type: 'error',
-              error:
-                error?.message ?? "Errore durante la generazione della risposta dell'assistente",
+              // The SDK's own message is a LOG line (English, provider-named) and is written
+              // above; what crosses to the reader is the product's sentence, and a retryable
+              // failure says so rather than describing an implementation they never chose.
+              error: retryable
+                ? "Il servizio AI è momentaneamente sovraccarico. Riprova fra qualche istante."
+                : "Errore durante la generazione della risposta dell'assistente.",
               retryable,
             })
           );

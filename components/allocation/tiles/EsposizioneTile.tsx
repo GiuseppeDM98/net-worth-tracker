@@ -25,6 +25,7 @@
 import { useMemo, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { usePortfolioExposure } from '@/lib/hooks/usePortfolioExposure';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   summarizeExposure,
   summarizeExposureHighlights,
@@ -81,10 +82,10 @@ function canRenderFormula(source: ExposureRowSource): source is ExposureRowSourc
 function SkeletonRow() {
   return (
     <div className="flex items-center gap-3 py-[9px]">
-      <div className="h-3 w-[128px] shrink-0 animate-pulse rounded bg-muted" />
-      <div className="h-[3px] flex-1 animate-pulse rounded-full bg-muted" />
-      <div className="h-3 w-[64px] shrink-0 animate-pulse rounded bg-muted" />
-      <div className="h-3 w-[34px] shrink-0 animate-pulse rounded bg-muted" />
+      <Skeleton className="h-3 w-[128px] shrink-0" />
+      <Skeleton className="h-[3px] flex-1 rounded-full" />
+      <Skeleton className="h-3 w-[64px] shrink-0" />
+      <Skeleton className="h-3 w-[34px] shrink-0" />
     </div>
   );
 }

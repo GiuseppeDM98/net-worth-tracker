@@ -1,158 +1,103 @@
 /**
- * Landing Page + Route Guard
+ * LANDING PUBBLICA — the Panoramica told to someone who has no data yet (2026-08-31).
  *
- * Authenticated users are redirected immediately to /dashboard.
- * Unauthenticated users see the landing page with:
- *   - "Prova la Demo" → auto-login with shared demo credentials
- *   - "Accedi" → /login
+ * The page takes the shape every redesigned page takes (DESIGN.md → §5 Page Verdict, Tile,
+ * Tile Grid): compact header, a verdict, then a 12-column grid of tiles. What is different is
+ * WHAT the verdict answers — this surface measures nothing about the reader, so the sentence is
+ * the product's promise, generated from the page's state exactly as the two authentication
+ * pages generate theirs (`lib/utils/landingNarrative.ts`).
  *
- * The hero is a faithful Panoramica preview: the product's own data-first
- * language (dominant net-worth number in Geist Mono, variation chip, hero
- * sparkline) IS the brand impression. The preview is illustrative — labelled
- * "Dati dimostrativi" so the surface never fakes a real account (DESIGN.md:
- * honesty over illusion).
+ * The grid renders the app's OWN tiles — the same `PatrimonioTile`, `CashflowTile`,
+ * `ComposizioneTile` and `ObiettivoTile` the Panoramica renders — on an invented profile
+ * (`lib/utils/landingSampleData.ts`), because a picture of the product ages the moment the
+ * product changes. The three tiles after them show no figures at all: they name what a section
+ * computes, with every fact read from the module that owns it.
  *
- * Demo credentials are read from NEXT_PUBLIC_DEMO_* env vars baked in at
- * build time. If those vars are missing the demo CTA is hidden, making this
- * safe for self-hosted deployments that don't want a public demo account.
+ *   Mobile (1 col):  Verdetto → azioni → dichiarazione → Patrimonio → Cashflow → Composizione
+ *                    → Obiettivi → Rendimenti → FIRE → Previdenza
+ *   Desktop (12 col): Patrimonio(5, 2 righe) | Cashflow(4) | Composizione(3)
+ *                                            | Obiettivi(7)
+ *                     Rendimenti(4) | FIRE(4) | Previdenza(4)
+ *
+ * Authenticated visitors never see any of it: they are redirected to /dashboard.
+ *
+ * Demo credentials are read from NEXT_PUBLIC_DEMO_* baked in at build time. Without them the
+ * demo CTA is not rendered AND the verdict drops its clause about it — a self-hosted
+ * deployment must not be told about a button that is not on its page.
  */
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { motion, useReducedMotion } from 'framer-motion';
+import { MotionConfig, motion } from 'framer-motion';
+import { ArrowRight, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { ThemePicker } from '@/components/layout/ThemePicker';
-import { NetWorthSparkline } from '@/components/dashboard/NetWorthSparkline';
-import { SavingsRingChart } from '@/components/dashboard/SavingsRingChart';
-import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
+import { PageContainer } from '@/components/layout/PageContainer';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { PageVerdict } from '@/components/ui/page-verdict';
+import { NarrativeText } from '@/components/ui/narrative-text';
+import { TILE_CELL_CLASS, TILE_EYEBROW_CLASS } from '@/components/ui/tile';
+import { PatrimonioTile, resolveHeroValueClass } from '@/components/dashboard/overview/PatrimonioTile';
+import { CashflowTile } from '@/components/dashboard/overview/CashflowTile';
+import { ComposizioneTile } from '@/components/dashboard/overview/ComposizioneTile';
+import { ObiettivoTile } from '@/components/dashboard/overview/ObiettivoTile';
+import { LandingPromiseTile } from '@/components/landing/LandingPromiseTile';
+import type { SparklinePeriod } from '@/components/dashboard/PeriodSelector';
+
+import { APP_CONFIG } from '@/lib/constants/appConfig';
+import { useChartColors } from '@/lib/hooks/useChartColors';
+import { ASSET_CLASS_CHART_INDEX } from '@/lib/utils/allocationUtils';
+import { filterSparklineByPeriod } from '@/lib/utils/sparklinePeriod';
+import { getItalyYear } from '@/lib/utils/dateHelpers';
+import { cardItem, staggerContainer } from '@/lib/utils/motionVariants';
+import { resolveRegistrationAccess } from '@/lib/utils/authNarrative';
+import { narrativeToText } from '@/lib/utils/narrative';
 import {
-  BarChart3,
-  TrendingUp,
-  Flame,
-  MessageSquare,
-  Wallet,
-  Calendar,
-  ArrowRight,
-  Loader2,
-  ShieldCheck,
-} from 'lucide-react';
-import { toast } from 'sonner';
+  SAMPLE_PROFILE_EYEBROW,
+  buildLandingPromises,
+  buildLandingVerdict,
+  describeDemoAccess,
+  describeProjectFacts,
+  describeRegistrationInvite,
+  describeSampleProfile,
+} from '@/lib/utils/landingNarrative';
+import {
+  SAMPLE_ASSET_CLASSES,
+  SAMPLE_ASSET_COUNT,
+  SAMPLE_COVERAGE_RATIO,
+  SAMPLE_DAYS_IN_MONTH,
+  SAMPLE_DAY_OF_MONTH,
+  SAMPLE_EXPENSE_STATS,
+  SAMPLE_GOALS,
+  SAMPLE_MARKET_MOVERS,
+  SAMPLE_MONTH,
+  SAMPLE_SAVINGS_RATE,
+  SAMPLE_SPARKLINE,
+  SAMPLE_TOTAL_VALUE,
+  SAMPLE_VARIATIONS,
+} from '@/lib/utils/landingSampleData';
+import { cn } from '@/lib/utils';
 
 const DEMO_EMAIL = process.env.NEXT_PUBLIC_DEMO_EMAIL ?? '';
 const DEMO_PASSWORD = process.env.NEXT_PUBLIC_DEMO_PASSWORD ?? '';
 const DEMO_ENABLED = Boolean(DEMO_EMAIL && DEMO_PASSWORD);
 
-const FEATURES = [
-  {
-    icon: BarChart3,
-    title: 'Portfolio Tracking',
-    description: 'Azioni, ETF, obbligazioni, crypto, immobili e liquidità in un unico posto.',
-  },
-  {
-    icon: TrendingUp,
-    title: 'Rendimenti & Storico',
-    description: 'Performance, drawdown, heatmap mensile e confronto YoY del patrimonio.',
-  },
-  {
-    icon: Flame,
-    title: 'FIRE Planning',
-    description: 'Proiezioni deterministiche e Monte Carlo, Coast FIRE e goal-based investing.',
-  },
-  {
-    icon: MessageSquare,
-    title: 'Assistente AI',
-    description: 'Analisi mensile, annuale e YTD con Claude, memoria persistente e obiettivi.',
-  },
-  {
-    icon: Wallet,
-    title: 'Cashflow',
-    description: 'Entrate e uscite, budget, Sankey drill-down e centri di costo.',
-  },
-  {
-    icon: Calendar,
-    title: 'Dividendi & Cedole',
-    description: 'Calendario, download da Borsa Italiana e rendimento totale per asset.',
-  },
-];
-
-/**
- * Illustrative Panoramica data for the hero preview. Not a real account —
- * the preview carries a "Dati dimostrativi" caption so the surface stays honest.
- */
-const PREVIEW_NET_WORTH = 487_250;
-const PREVIEW_DELTA_ABS = 12_480;
-const PREVIEW_DELTA_PCT = 2.63;
-const PREVIEW_SPARKLINE = [
-  398_000, 402_500, 397_800, 411_200, 419_000, 415_600, 428_900, 441_300,
-  438_700, 455_100, 471_800, 487_250,
-].map((totalNetWorth, i) => ({ month: (i % 12) + 1, year: 2025, totalNetWorth }));
-
-const PREVIEW_ROWS: { label: string; mono: string }[] = [
-  { label: 'Liquidità', mono: cachedFormatCurrencyEUR(64_900) },
-  { label: 'Investito', mono: cachedFormatCurrencyEUR(422_350) },
-];
-
-/**
- * Illustrative Cashflow data for the second preview card — demonstrates a
- * second real module (savings rate ring) rather than another text bullet.
- */
-const PREVIEW_SAVINGS_RATE = 38;
-const PREVIEW_CASHFLOW_ROWS: { label: string; mono: string }[] = [
-  { label: 'Entrate', mono: cachedFormatCurrencyEUR(4_200) },
-  { label: 'Spese', mono: cachedFormatCurrencyEUR(2_604) },
-];
-
-/**
- * Proof strip — structural facts about the product, set in the system's own
- * Dominant Value language (Geist Mono value + eyebrow label). Not fabricated
- * financial figures: these describe the tool itself, so the surface stays honest.
- */
-const PROOF_STATS: { value: string; label: string }[] = [
-  { value: '6', label: 'classi di asset' },
-  { value: '6', label: 'temi' },
-  { value: '100%', label: 'open source' },
-  { value: 'AI', label: 'assistente Claude' },
-];
-
-/**
- * Count-up that lands on the target value (counts from a slightly lower start,
- * never from zero — DESIGN.md "numbers land"). rAF-driven, ease-out-quart.
- * Honours prefers-reduced-motion by rendering the final value immediately.
- */
-function CountUpCurrency({ value, durationMs = 1100 }: { value: number; durationMs?: number }) {
-  const reduce = useReducedMotion();
-  const [display, setDisplay] = useState(() => Math.round(value * 0.94));
-  const rafRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    // Reduced motion: render the final value directly (see return) — no
-    // synchronous setState in the effect body.
-    if (reduce) return;
-    const from = Math.round(value * 0.94);
-    const start = performance.now();
-    const tick = (now: number) => {
-      const t = Math.min((now - start) / durationMs, 1);
-      const eased = 1 - Math.pow(1 - t, 4); // ease-out-quart
-      setDisplay(Math.round(from + (value - from) * eased));
-      if (t < 1) rafRef.current = requestAnimationFrame(tick);
-    };
-    rafRef.current = requestAnimationFrame(tick);
-    return () => {
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
-    };
-  }, [value, durationMs, reduce]);
-
-  return <>{cachedFormatCurrencyEUR(reduce ? value : display)}</>;
-}
+const REGISTRATION_ACCESS = resolveRegistrationAccess(
+  APP_CONFIG.REGISTRATIONS_ENABLED,
+  APP_CONFIG.REGISTRATION_WHITELIST_ENABLED,
+);
 
 export default function HomePage() {
   const { user, loading, signIn } = useAuth();
   const router = useRouter();
-  const reduce = useReducedMotion();
+  const chartColors = useChartColors();
   const [demoLoading, setDemoLoading] = useState(false);
+  const [sparklinePeriod, setSparklinePeriod] = useState<SparklinePeriod>('1A');
 
   // Redirect authenticated users straight to the dashboard.
   useEffect(() => {
@@ -161,20 +106,40 @@ export default function HomePage() {
     }
   }, [user, loading, router]);
 
+  const verdict = useMemo(() => buildLandingVerdict(DEMO_ENABLED), []);
+  const demoNote = useMemo(() => describeDemoAccess(DEMO_ENABLED), []);
+  const invite = useMemo(() => describeRegistrationInvite(REGISTRATION_ACCESS), []);
+  // The deduction ceiling the Previdenza promise prints depends on the fiscal year in force.
+  const promises = useMemo(() => buildLandingPromises(getItalyYear()), []);
+
+  // The same remap the Panoramica does, so a class wears the same hue on both surfaces.
+  const assetClassData = useMemo(
+    () =>
+      SAMPLE_ASSET_CLASSES.map((entry) => ({
+        ...entry,
+        color: chartColors[ASSET_CLASS_CHART_INDEX[entry.assetClass ?? ''] ?? 0] ?? entry.color,
+      })),
+    [chartColors],
+  );
+
+  const sparklineDisplay = useMemo(
+    () => filterSparklineByPeriod(SAMPLE_SPARKLINE, sparklinePeriod),
+    [sparklinePeriod],
+  );
+
   const handleDemoLogin = async () => {
     if (!DEMO_ENABLED) return;
     setDemoLoading(true);
     try {
       await signIn(DEMO_EMAIL, DEMO_PASSWORD);
-      // AuthContext will update `user` → the useEffect above will push to /dashboard.
+      // AuthContext updates `user` → the effect above pushes to /dashboard.
     } catch {
       toast.error('Impossibile accedere alla demo. Riprova più tardi.');
       setDemoLoading(false);
     }
   };
 
-  // While auth is resolving, show a minimal spinner so there's no flash of the
-  // landing page for users who are already signed in.
+  // While auth resolves, a minimal spinner: no flash of the landing for a signed-in visitor.
   if (loading) {
     return (
       <div
@@ -187,280 +152,196 @@ export default function HomePage() {
     );
   }
 
-  // Authenticated users are being redirected; return null to avoid flash.
+  // Authenticated visitors are being redirected; render nothing rather than a flash.
   if (user) return null;
 
-  // Entrance motion: a single orchestrated page-load reveal. Reduced motion
-  // collapses every variant to an instant, fully-visible state.
-  const ease = [0.16, 1, 0.3, 1] as const;
-  const reveal = (delay: number) =>
-    reduce
-      ? { initial: false as const, animate: { opacity: 1, y: 0 } }
-      : {
-          initial: { opacity: 0, y: 12 },
-          animate: { opacity: 1, y: 0 },
-          transition: { duration: 0.6, ease, delay },
-        };
-
   return (
-    <div className="flex min-h-screen flex-col bg-background text-foreground">
-      {/* Skip-to-content for keyboard users — visually hidden until focused. */}
-      <a
-        href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:left-4 focus:top-4 focus:rounded-md focus:bg-background focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:ring-2 focus:ring-ring"
-      >
-        Vai al contenuto principale
-      </a>
-
-      {/* ── Navbar ────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-md">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="h-5 w-5 text-foreground" aria-hidden="true" />
-            <span className="text-sm font-semibold tracking-tight">Net Worth Tracker</span>
-          </div>
-          <div className="flex items-center gap-2">
-            {/* Theme toggle reuses the in-app ThemePicker: the circle-reveal
-                view-transition (themeTransition.ts) showcases that light and
-                dark are equally premium (DESIGN §1). next-themes already wraps
-                the app from the root layout, so no extra wiring is needed. */}
-            <ThemePicker />
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/login">Accedi</Link>
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      <main id="main-content">
-        {/* ── Hero ──────────────────────────────────────────────────────── */}
-        <section
-          aria-label="Presentazione"
-          className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6 desktop:py-24"
+    <MotionConfig reducedMotion="user">
+      <div className="flex min-h-screen flex-col bg-background text-foreground">
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-background focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:ring-2 focus:ring-ring"
         >
-          {/* Asymmetric split: pitch on the left, the product's own data hero on
-              the right. On mobile the preview stacks below the copy. */}
-          <div className="grid items-center gap-10 desktop:grid-cols-[1.05fr_0.95fr] desktop:gap-14">
-            {/* ── Left: pitch ── */}
-            <div className="max-w-xl">
-              <motion.p
-                {...reveal(0)}
-                className="mb-5 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground"
-              >
-                Open source · per investitori italiani
-              </motion.p>
+          Vai al contenuto principale
+        </a>
 
-              <motion.h1
-                {...reveal(0.08)}
-                className="text-balance text-[34px] font-bold leading-[1.05] tracking-[-0.03em] sm:text-[40px] desktop:text-[46px]"
-              >
-                Il tuo patrimonio, sotto controllo
-              </motion.h1>
+        {/* The hairline the app's page headers use as their separator — the only chrome above
+            the verdict, as on the two authentication pages. */}
+        <div className="h-px w-full bg-border" />
 
-              <motion.p
-                {...reveal(0.16)}
-                className="mt-5 max-w-md text-pretty text-base leading-relaxed text-muted-foreground sm:text-lg"
-              >
-                Traccia asset, cashflow, dividendi e performance in un&apos;unica app.
-                Pianifica il FIRE, analizza i rendimenti e lascia che l&apos;AI ti aiuti a
-                capire la tua situazione finanziaria.
-              </motion.p>
-
-              <motion.div
-                {...reveal(0.24)}
-                className="mt-8 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center"
-              >
-                {DEMO_ENABLED && (
-                  <Button
-                    size="lg"
-                    onClick={handleDemoLogin}
-                    disabled={demoLoading}
-                    aria-busy={demoLoading}
-                    className="w-full sm:w-auto"
-                  >
-                    {demoLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
-                        Accesso demo...
-                      </>
-                    ) : (
-                      <>
-                        Prova la Demo
-                        <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
-                      </>
-                    )}
+        <main id="main-content" className="flex-1 px-4 pb-10 pt-1 desktop:px-5 desktop:pb-14">
+          {/* The bottom padding of the dashboard container exists for the phone's nav pill,
+              which this page does not have. */}
+          <PageContainer width="wide" className="max-desktop:portrait:pb-0">
+            <PageHeader
+              label="Portfolio Tracker"
+              title="Panoramica"
+              description="dati d’esempio"
+              separator={false}
+              actions={
+                <div className="flex items-center gap-2">
+                  <ThemePicker />
+                  <Button variant="outline" className="h-9" asChild>
+                    <Link href="/login">Accedi</Link>
                   </Button>
-                )}
-                <Button
-                  variant={DEMO_ENABLED ? 'outline' : 'default'}
-                  size="lg"
-                  asChild
-                  className="w-full sm:w-auto"
-                >
-                  <Link href="/login">Accedi</Link>
-                </Button>
+                </div>
+              }
+            />
+
+            <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-4">
+              <motion.div variants={cardItem} className="flex flex-col gap-5 pt-1">
+                <PageVerdict verdict={verdict} ariaLabel="Cos’è Portfolio Tracker" />
+
+                <div className="flex flex-col gap-2.5">
+                  <div className="flex flex-col gap-3 tablet:flex-row tablet:items-center">
+                    {DEMO_ENABLED && (
+                      <Button
+                        size="lg"
+                        onClick={handleDemoLogin}
+                        disabled={demoLoading}
+                        aria-busy={demoLoading}
+                        // 44px on a phone, the app's `lg` height from tablet up: these two are
+                        // the page's only actions, and a thumb is what presses them.
+                        className="h-11 w-full tablet:h-10 tablet:w-auto"
+                      >
+                        {demoLoading ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                            Accesso demo...
+                          </>
+                        ) : (
+                          <>
+                            Prova la demo
+                            <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
+                          </>
+                        )}
+                      </Button>
+                    )}
+                    <Button
+                      variant={DEMO_ENABLED ? 'outline' : 'default'}
+                      size="lg"
+                      asChild
+                      className="h-11 w-full tablet:h-10 tablet:w-auto"
+                    >
+                      <Link href="/login">Accedi</Link>
+                    </Button>
+                  </div>
+
+                  {(demoNote || invite) && (
+                    <p className="text-[13px] leading-[1.45] text-muted-foreground">
+                      {demoNote && <span>{narrativeToText(demoNote)} </span>}
+                      {invite && (
+                        <>
+                          {invite.question}{' '}
+                          <Link
+                            href="/register"
+                            className="font-medium text-foreground underline underline-offset-4 transition-colors hover:text-foreground/70 motion-reduce:transition-none"
+                          >
+                            {invite.linkLabel}
+                          </Link>
+                        </>
+                      )}
+                    </p>
+                  )}
+                </div>
               </motion.div>
 
-              {DEMO_ENABLED && (
-                <motion.p {...reveal(0.32)} className="mt-4 text-xs text-muted-foreground">
-                  La demo è in sola lettura — nessun dato viene modificato.
-                </motion.p>
-              )}
-            </div>
-
-            {/* ── Right: stacked previews (the product speaking its own language) ── */}
-            <div className="space-y-4">
-            <motion.div
-              initial={reduce ? false : { opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={reduce ? undefined : { duration: 0.7, ease, delay: 0.2 }}
-              aria-label="Anteprima della Panoramica con dati dimostrativi"
-              className="rounded-2xl border border-border bg-card p-[22px] shadow-[0_1px_3px_rgba(0,0,0,0.1),0_1px_2px_rgba(0,0,0,0.06)]"
-            >
-              <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                Patrimonio Netto
-              </p>
-              <p className="mt-1.5 font-mono text-[44px] font-bold leading-none tracking-[-0.03em] tabular-nums desktop:text-[54px]">
-                <CountUpCurrency value={PREVIEW_NET_WORTH} />
-              </p>
-
-              {/* Variation chip — the one place data is allowed to own colour. */}
-              <div className="mt-3 inline-flex items-center gap-2 rounded-[9px] bg-positive/10 px-[13px] py-[6px] font-mono text-[15px] font-semibold tracking-[-0.01em] text-positive">
-                <TrendingUp className="h-[13px] w-[13px]" aria-hidden="true" />
-                +{cachedFormatCurrencyEUR(PREVIEW_DELTA_ABS)} (+{PREVIEW_DELTA_PCT.toLocaleString('it-IT', { minimumFractionDigits: 2 })}%)
-                <span className="text-muted-foreground">questo mese</span>
-              </div>
-
-              {/* Edge-to-edge hero sparkline — -mx matches the card padding (22px). */}
-              <div className="-mx-[22px] mt-5" style={{ height: 68 }}>
-                <NetWorthSparkline
-                  data={PREVIEW_SPARKLINE}
-                  filled
-                  color="var(--chart-1)"
-                  height={68}
+              {/* The sample profile is declared ONCE, in the eyebrow's voice, at the head of the
+                  region it governs — a caption under one number would read as a footnote to
+                  that number alone. */}
+              <motion.div
+                variants={cardItem}
+                className="flex flex-col gap-1.5 border-t border-border/40 pt-3"
+              >
+                <p className={TILE_EYEBROW_CLASS}>{SAMPLE_PROFILE_EYEBROW}</p>
+                <NarrativeText
+                  segments={describeSampleProfile()}
+                  className="max-w-[920px] text-[13px] leading-[1.45] text-muted-foreground"
                 />
-              </div>
-              <div className="mt-1 flex justify-between px-px font-mono text-[10px] text-muted-foreground">
-                <span>{cachedFormatCurrencyEUR(PREVIEW_SPARKLINE[0].totalNetWorth, true)}</span>
-                <span>{cachedFormatCurrencyEUR(PREVIEW_NET_WORTH, true)}</span>
-              </div>
+              </motion.div>
 
-              {/* Flat divide-y breakdown — Trade Republic chrome reduction. */}
-              <div className="mt-5 divide-y divide-border border-t border-border">
-                {PREVIEW_ROWS.map((row) => (
-                  <div key={row.label} className="flex items-center justify-between py-3">
-                    <span className="text-[13px] text-muted-foreground">{row.label}</span>
-                    <span className="font-mono text-[13px] tabular-nums">{row.mono}</span>
-                  </div>
-                ))}
-              </div>
-
-              <p className="mt-4 text-[10px] uppercase tracking-[0.08em] text-muted-foreground/70">
-                Dati dimostrativi
-              </p>
-            </motion.div>
-
-            {/* Second preview: a real Cashflow module (savings-rate ring) — proves
-                breadth with an actual system component instead of another bullet. */}
-            <motion.div
-              initial={reduce ? false : { opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={reduce ? undefined : { duration: 0.7, ease, delay: 0.3 }}
-              aria-label="Anteprima del Cashflow con dati dimostrativi"
-              className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_3px_rgba(0,0,0,0.1),0_1px_2px_rgba(0,0,0,0.06)]"
-            >
-              <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                Cashflow · Tasso di Risparmio
-              </p>
-              <div className="mt-3 flex items-center gap-5">
-                <SavingsRingChart rate={PREVIEW_SAVINGS_RATE} size={88} />
-                <div className="min-w-0 flex-1 divide-y divide-border">
-                  {PREVIEW_CASHFLOW_ROWS.map((row) => (
-                    <div key={row.label} className="flex items-center justify-between py-2.5">
-                      <span className="text-[13px] text-muted-foreground">{row.label}</span>
-                      <span className="font-mono text-[13px] tabular-nums">{row.mono}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-            </div>
-          </div>
-        </section>
-
-        {/* ── Proof strip ───────────────────────────────────────────────── */}
-        {/* Structural facts in the system's Dominant Value language (mono value +
-            eyebrow label). border-t/40 is the lighter "chapter" separator. */}
-        <section
-          aria-label="In sintesi"
-          className="border-t border-border/40 px-4 py-12 sm:px-6"
-        >
-          <div className="mx-auto grid max-w-6xl grid-cols-2 gap-px overflow-hidden rounded-2xl border border-border bg-border desktop:grid-cols-4">
-            {PROOF_STATS.map(({ value, label }) => (
-              <div key={label} className="bg-card px-5 py-6 text-center">
-                <p className="font-mono text-[36px] font-bold leading-none tracking-[-0.03em] tabular-nums">
-                  {value}
-                </p>
-                <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                  {label}
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* ── Features ──────────────────────────────────────────────────── */}
-        <section
-          aria-label="Funzionalità"
-          className="border-t border-border/60 px-4 py-16 sm:px-6 desktop:py-20"
-        >
-          <div className="mx-auto max-w-6xl">
-            <h2 className="text-[26px] font-bold tracking-[-0.02em] desktop:text-[32px]">
-              Tutto quello che ti serve
-            </h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Costruito da un investitore italiano per investitori italiani.
-            </p>
-
-            {/*
-             * Flat divide-y feature list (not a card grid). Two columns on
-             * desktop, each an independent divide-y stack — the hairline is the
-             * only separator, no per-item box. Icons are achromatic: in the
-             * default theme colour is owned by data, never by chrome.
-             */}
-            <div className="mt-10 grid gap-x-12 desktop:grid-cols-2">
-              {FEATURES.map(({ icon: Icon, title, description }) => (
-                <div
-                  key={title}
-                  className="flex gap-4 border-b border-border/60 py-5 last:border-b-0 desktop:[&:nth-last-child(2)]:border-b-0"
+              <motion.section
+                variants={staggerContainer}
+                initial="hidden"
+                animate="visible"
+                aria-label="Panoramica su un profilo d’esempio"
+                className="grid grid-cols-1 gap-3 tablet:grid-cols-2 desktop:grid-cols-12"
+              >
+                <motion.div
+                  variants={cardItem}
+                  className={cn(TILE_CELL_CLASS, 'tablet:col-span-2 desktop:col-span-5 desktop:row-span-2')}
                 >
-                  <Icon className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
-                  <div className="min-w-0">
-                    <h3 className="text-sm font-semibold">{title}</h3>
-                    <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
-                      {description}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      </main>
+                  <PatrimonioTile
+                    totalValue={SAMPLE_TOTAL_VALUE}
+                    heroValueClass={resolveHeroValueClass(SAMPLE_TOTAL_VALUE)}
+                    variations={SAMPLE_VARIATIONS}
+                    isNewATH
+                    sparklinePeriod={sparklinePeriod}
+                    onSparklinePeriodChange={setSparklinePeriod}
+                    sparklineDisplay={sparklineDisplay}
+                    movers={SAMPLE_MARKET_MOVERS}
+                    countLine={`${SAMPLE_ASSET_COUNT} asset · profilo d’esempio`}
+                  />
+                </motion.div>
 
-      {/* ── Footer ────────────────────────────────────────────────────── */}
-      <footer className="border-t border-border/60 py-6 text-center text-xs text-muted-foreground">
-        Net Worth Tracker — open source su{' '}
-        <a
-          href="https://github.com/GiuseppeDM98/net-worth-tracker"
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="Net Worth Tracker su GitHub (apre in una nuova scheda)"
-          className="underline underline-offset-2 hover:text-foreground"
-        >
-          GitHub
-        </a>
-      </footer>
-    </div>
+                <motion.div variants={cardItem} className={cn(TILE_CELL_CLASS, 'desktop:col-span-4')}>
+                  <CashflowTile
+                    expenseStats={SAMPLE_EXPENSE_STATS}
+                    month={SAMPLE_MONTH}
+                    dayOfMonth={SAMPLE_DAY_OF_MONTH}
+                    daysInMonth={SAMPLE_DAYS_IN_MONTH}
+                    savingsRate={SAMPLE_SAVINGS_RATE}
+                    coverageRatio={SAMPLE_COVERAGE_RATIO}
+                  />
+                </motion.div>
+
+                <motion.div variants={cardItem} className={cn(TILE_CELL_CLASS, 'desktop:col-span-3')}>
+                  <ComposizioneTile data={assetClassData} />
+                </motion.div>
+
+                <motion.div
+                  variants={cardItem}
+                  className={cn(TILE_CELL_CLASS, 'tablet:col-span-2 desktop:col-span-7')}
+                >
+                  <ObiettivoTile goals={SAMPLE_GOALS} />
+                </motion.div>
+
+                {promises.map((promise) => (
+                  <motion.div
+                    key={promise.key}
+                    variants={cardItem}
+                    className={cn(TILE_CELL_CLASS, 'desktop:col-span-4')}
+                  >
+                    <LandingPromiseTile promise={promise} />
+                  </motion.div>
+                ))}
+              </motion.section>
+            </motion.div>
+          </PageContainer>
+        </main>
+
+        <footer className="border-t border-border px-4 py-4 desktop:px-5">
+          <div className="mx-auto flex w-full max-w-[1920px] flex-col gap-1 text-[11px] text-muted-foreground tablet:flex-row tablet:items-center tablet:justify-between">
+            <span>
+              Portfolio Tracker — open source su{' '}
+              <a
+                href="https://github.com/GiuseppeDM98/net-worth-tracker"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Portfolio Tracker su GitHub (apre in una nuova scheda)"
+                className="underline underline-offset-2 hover:text-foreground"
+              >
+                GitHub
+              </a>
+            </span>
+            <NarrativeText
+              segments={describeProjectFacts()}
+              className="text-[11px] text-muted-foreground"
+              figureClassName="font-semibold"
+            />
+          </div>
+        </footer>
+      </div>
+    </MotionConfig>
   );
 }

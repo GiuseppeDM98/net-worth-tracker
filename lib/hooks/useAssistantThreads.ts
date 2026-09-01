@@ -8,6 +8,7 @@ import {
   AssistantThreadsResponse,
 } from '@/types/assistant';
 import { queryKeys } from '@/lib/query/queryKeys';
+import { userFacingError } from '@/lib/utils/dialogNarrative';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { toDate } from '@/lib/utils/dateHelpers';
 
@@ -34,7 +35,7 @@ async function fetchThreads(userId: string): Promise<AssistantThread[]> {
 
   if (!response.ok) {
     const errorResponse = await response.json().catch(() => null);
-    throw new Error(errorResponse?.error ?? 'Impossibile caricare i thread dell’assistente');
+    throw userFacingError(errorResponse?.error ?? 'Impossibile caricare i thread dell’assistente');
   }
 
   const threadsResponse = (await response.json()) as AssistantThreadsResponse;
@@ -48,7 +49,7 @@ async function fetchThread(threadId: string, userId: string): Promise<AssistantT
 
   if (!response.ok) {
     const errorResponse = await response.json().catch(() => null);
-    throw new Error(errorResponse?.error ?? 'Impossibile caricare la conversazione');
+    throw userFacingError(errorResponse?.error ?? 'Impossibile caricare la conversazione');
   }
 
   const threadResponse = (await response.json()) as AssistantThreadResponse;
@@ -83,7 +84,7 @@ export function useDeleteAssistantThread(userId: string) {
 
       if (!response.ok) {
         const errorResponse = await response.json().catch(() => null);
-        throw new Error(errorResponse?.error ?? 'Impossibile eliminare il thread');
+        throw userFacingError(errorResponse?.error ?? 'Impossibile eliminare il thread');
       }
     },
     onSuccess: () => {

@@ -71,6 +71,8 @@ import { cn } from '@/lib/utils';
 import { PageVerdict } from '@/components/ui/page-verdict';
 import { Tile, TILE_CELL_CLASS } from '@/components/ui/tile';
 import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
+import { ErrorNotice } from '@/components/ui/error-notice';
+import { describeReadFailure, resolveSurfaceState } from '@/lib/utils/statesNarrative';
 import { ObiettiviTile } from '@/components/goals/tiles/ObiettiviTile';
 import { TraiettoriaTile } from '@/components/goals/tiles/TraiettoriaTile';
 import { MilestoneTile } from '@/components/goals/tiles/MilestoneTile';
@@ -106,19 +108,19 @@ export function GoalBasedInvestingTab() {
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
 
   // ─── Queries (shared keys with the other FIRE tabs) ──────────────────────────
-  const { data: settings, isLoading: loadingSettings } = useQuery({
+  const { data: settings, isLoading: loadingSettings, isError: settingsError } = useQuery({
     queryKey: ['settings', ownerId],
     queryFn: () => getSettings(ownerId!),
     enabled: !!user && !!ownerId,
   });
 
-  const { data: assets = [], isLoading: loadingAssets } = useQuery({
+  const { data: assets = [], isLoading: loadingAssets, isError: assetsError } = useQuery({
     queryKey: ['assets', ownerId],
     queryFn: () => getAllAssets(ownerId!),
     enabled: !!user && !!ownerId,
   });
 
-  const { data: goalData, isLoading: loadingGoals } = useQuery({
+  const { data: goalData, isLoading: loadingGoals, isError: goalsError } = useQuery({
     queryKey: ['goalData', ownerId],
     queryFn: () => getGoalData(ownerId!),
     enabled: !!user && !!ownerId,
@@ -224,6 +226,20 @@ export function GoalBasedInvestingTab() {
   };
 
   // ─── Loading ─────────────────────────────────────────────────────────────────
+  // A failed read comes BEFORE the wait: these queries default to undefined, and a plan built
+  // on a base that was never read is a number with nothing behind it.
+  if (resolveSurfaceState({ loading: loadingSettings || loadingAssets || loadingGoals, failed: settingsError || assetsError || goalsError }) === 'failed') {
+    return (
+      <ErrorNotice
+        className="max-w-[920px]"
+        notice={describeReadFailure({
+          consequence: 'Obiettivi e strumenti non sono stati letti: senza di essi la pagina direbbe che non hai obiettivi.',
+          untouched: 'Gli obiettivi e le assegnazioni registrati non sono stati toccati.',
+        })}
+      />
+    );
+  }
+
   if (loadingSettings || loadingAssets || loadingGoals) {
     return <TileGridSkeleton cells={SKELETON_CELLS} />;
   }

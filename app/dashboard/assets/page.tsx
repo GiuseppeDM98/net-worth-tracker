@@ -25,7 +25,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { AlertCircle, Plus, RefreshCw } from 'lucide-react';
+import { Plus, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
@@ -58,6 +58,8 @@ import { computeAssetPerformanceDeltas, computeAssetUnitPriceSeries } from '@/li
 import type { Asset } from '@/types/assets';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { ErrorNotice } from '@/components/ui/error-notice';
+import { describeReadFailure } from '@/lib/utils/statesNarrative';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PageVerdict } from '@/components/ui/page-verdict';
@@ -313,10 +315,14 @@ export default function AssetsPage() {
     return (
       <PageContainer width="wide">
         <PageHeader label="Patrimonio" title="Strumenti e conti" separator={false} />
-        <div role="alert" className="flex items-start gap-3 rounded-2xl border border-border bg-card p-5 text-[13px] text-foreground">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden="true" />
-          <p>Non è stato possibile leggere i tuoi asset. Ricarica la pagina; se il problema persiste, controlla la connessione.</p>
-        </div>
+        <ErrorNotice
+          className="max-w-[920px]"
+          notice={describeReadFailure({
+            consequence:
+              'I tuoi strumenti e conti non sono stati letti: senza di essi la pagina non ha nulla da misurare.',
+            untouched: 'Niente di registrato è stato toccato; se il problema resta, controlla la connessione.',
+          })}
+        />
       </PageContainer>
     );
   }
@@ -339,13 +345,14 @@ export default function AssetsPage() {
 
         <motion.div variants={cardItem} initial="hidden" animate="visible" className="pt-1">
           {overviewUnavailable ? (
-            <div role="alert" className="flex max-w-[920px] items-start gap-3 rounded-2xl border border-border bg-card p-5 text-[13px] text-foreground">
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden="true" />
-              <p>
-                Il riepilogo del patrimonio non è disponibile in questo momento: verdetto, andamento, classi e rendimento
-                torneranno al prossimo caricamento. Conti, movimenti e strumenti sono aggiornati.
-              </p>
-            </div>
+            <ErrorNotice
+              className="max-w-[920px]"
+              notice={describeReadFailure({
+                consequence:
+                  'Il riepilogo del patrimonio non è stato letto: verdetto, andamento, classi e rendimento tornano al prossimo caricamento.',
+                untouched: 'Conti, movimenti e strumenti sono aggiornati.',
+              })}
+            />
           ) : (
             <PageVerdict verdict={verdict} ariaLabel="Verdetto del portafoglio" />
           )}
@@ -360,9 +367,11 @@ export default function AssetsPage() {
           {!overviewUnavailable && (
             <motion.div variants={cardItem} className={cn(TILE_CELL_CLASS, 'tablet:col-span-2 desktop:col-span-5 desktop:row-span-2')}>
               <PatrimonioTile
-                overview={overview}
                 totalValue={totalValue}
                 heroValueClass={heroValueClass}
+                variations={overview.variations}
+                isNewATH={overview.ath?.isNewATH ?? false}
+                hasCurrentMonthSnapshot={overview.flags.currentMonthSnapshotExists}
                 sparklinePeriod={sparklinePeriod}
                 onSparklinePeriodChange={setSparklinePeriod}
                 sparklineDisplay={sparklineDisplay}

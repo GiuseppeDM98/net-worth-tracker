@@ -5,7 +5,7 @@ import { Archive, ArchiveRestore, Check, Pencil, Trash2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { useArmedDelete } from '@/components/cashflow/budget/useArmedDelete';
+import { useArmedDelete } from '@/lib/hooks/useArmedDelete';
 import { cachedFormatCurrencyEUR, formatDate } from '@/lib/utils/formatters';
 import { formatPercentage } from '@/lib/services/chartService';
 import { ASSET_CLASS_LABELS } from '@/lib/utils/allocationUtils';

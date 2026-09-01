@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { describeWriteError } from '@/lib/utils/dialogNarrative';
 import { AssistantComeFunziona } from '@/components/assistant/AssistantComeFunziona';
 import { AssistantComposer } from '@/components/assistant/AssistantComposer';
 import { AssistantConversazioneTile } from '@/components/assistant/AssistantConversazioneTile';
@@ -359,7 +360,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
     try {
       await updateMemoryMutation.mutateAsync({ preferences: patch });
     } catch (error) {
-      toast.error((error as Error).message);
+      toast.error(describeWriteError(error));
     }
   };
 
@@ -390,7 +391,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
       }
       toast.success('Conversazione eliminata');
     } catch (error) {
-      toast.error((error as Error).message);
+      toast.error(describeWriteError(error));
     }
   };
 
@@ -491,13 +492,13 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
 
         {isDemo ? (
           <AssistantLockedState
-            title="Non disponibile in modalità demo"
-            description="L'Assistente AI non è accessibile nell'account demo."
+            eyebrow="Assistente non disponibile"
+            message="L'Assistente AI non è accessibile nell'account demo."
           />
         ) : !assistantConfigured ? (
           <AssistantLockedState
-            title="Servizio AI non configurato"
-            description="La pagina resta accessibile, ma per usare l'assistente devi configurare ANTHROPIC_API_KEY nell'ambiente."
+            eyebrow="Assistente non configurato"
+            message="La pagina resta accessibile, ma per usare l'assistente serve la chiave ANTHROPIC_API_KEY nell'ambiente."
           />
         ) : (
           <>

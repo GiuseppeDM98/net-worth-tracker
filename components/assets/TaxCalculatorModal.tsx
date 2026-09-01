@@ -37,13 +37,7 @@
 
 import { useState, useEffect } from 'react';
 import { Asset } from '@/types/assets';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog';
+import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -52,7 +46,6 @@ import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
 import { getMetricValueColor } from '@/lib/utils/metricColors';
 import { TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { cn } from '@/lib/utils';
-import { Calculator } from 'lucide-react';
 
 // The restyle of 2026-08-22 touches presentation only: every figure in the numeric face on the
 // type ramp (22px hero, 13px rows), sign and warning colours through the theme tokens, no
@@ -158,18 +151,19 @@ export function TaxCalculatorModal({ open, onClose, asset }: TaxCalculatorModalP
   const signedCurrency = (value: number) => `${value >= 0 ? '+' : '−'}${formatCurrency(Math.abs(value))}`;
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Calculator className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
-            Calcolatore plusvalenze
-          </DialogTitle>
-          <DialogDescription>
-            Simula l&apos;impatto fiscale della vendita di una parte di {asset.name}.
-          </DialogDescription>
-        </DialogHeader>
-
+    <ResponsiveModal
+      open={open}
+      onClose={onClose}
+      eyebrow={`Patrimonio · ${asset.name}`}
+      title="Quanto costa vendere"
+      reading="Una simulazione: niente viene registrato. La plusvalenza è calcolata sul PMC del registro operazioni, con l'aliquota dello strumento."
+      width="md"
+      footer={
+        <Button type="button" variant="outline" onClick={onClose}>
+          Chiudi
+        </Button>
+      }
+    >
         <div className="space-y-5">
           {/* Asset facts — flat rows, no sub-card */}
           <div className="divide-y divide-border border-y border-border">
@@ -335,13 +329,7 @@ export function TaxCalculatorModal({ open, onClose, asset }: TaxCalculatorModalP
             </p>
           )}
 
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={onClose}>
-              Chiudi
-            </Button>
-          </div>
         </div>
-      </DialogContent>
-    </Dialog>
+    </ResponsiveModal>
   );
 }

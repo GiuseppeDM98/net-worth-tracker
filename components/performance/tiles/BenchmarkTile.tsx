@@ -1,6 +1,7 @@
 'use client';
 
 import type { Narrative } from '@/lib/utils/narrative';
+import { Skeleton } from '@/components/ui/skeleton';
 import type { BenchmarkRanking } from '@/lib/utils/performanceSummary';
 import { formatNumber, formatPercentage } from '@/lib/services/chartService';
 import { getMetricValueColor } from '@/lib/utils/metricColors';
@@ -58,7 +59,7 @@ export function BenchmarkTile({ reading, ranking, portfolioTWR, numberOfMonths, 
     >
       {reading === null && isLoading && (
         <div className="mt-2 space-y-2" aria-hidden="true">
-          <div className="h-[13px] w-4/5 animate-pulse rounded bg-muted" />
+          <Skeleton className="h-[13px] w-4/5" />
         </div>
       )}
       <div className="mt-3 overflow-x-auto -mx-5 px-5">

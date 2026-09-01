@@ -30,6 +30,7 @@ import type {
   ReturnConsistency,
 } from '@/lib/utils/performanceSummary';
 import {
+  describeAnalysisBase,
   buildPerformanceVerdict,
   describeBenchmarkRanking,
   describeCapitalAndMarket,
@@ -466,5 +467,28 @@ describe('describeReturnMetrics / describeDrawdownDetail / describeYields', () =
     expect(plain(describeYields({ yocNet: 3.1, currentYieldNet: null }))).toBe('I dividendi rendono il 3,1% netto sul costo.');
     expect(plain(describeYields({ yocNet: null, currentYieldNet: 2.6 }))).toBe('I dividendi rendono il 2,6% netto sul prezzo di oggi; nessun costo medio per lo YOC.');
     expect(describeYields({ yocNet: null, currentYieldNet: null })).toBeNull();
+  });
+});
+
+describe('describeAnalysisBase', () => {
+  it('names the window and what was paid into it', () => {
+    expect(plain(describeAnalysisBase({ monthsMeasured: 31, netCashFlow: 18400 }))).toBe(
+      '31 mesi di storico, con 18.400 € versati nel periodo.',
+    );
+  });
+
+  it('says «prelevati» when the flows went the other way', () => {
+    expect(plain(describeAnalysisBase({ monthsMeasured: 12, netCashFlow: -5000 }))).toBe(
+      '12 mesi di storico, con 5000 € prelevati nel periodo.',
+    );
+  });
+
+  it('drops the contribution clause when nothing moved', () => {
+    expect(plain(describeAnalysisBase({ monthsMeasured: 6, netCashFlow: 0 }))).toBe('6 mesi di storico.');
+    expect(plain(describeAnalysisBase({ monthsMeasured: 6, netCashFlow: null }))).toBe('6 mesi di storico.');
+  });
+
+  it('agrees in number on a single month', () => {
+    expect(plain(describeAnalysisBase({ monthsMeasured: 1, netCashFlow: null }))).toBe('1 mese di storico.');
   });
 });

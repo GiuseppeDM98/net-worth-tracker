@@ -35,6 +35,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useDividendStats } from '@/lib/hooks/useDividendStats';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { Dividend } from '@/types/dividend';
@@ -68,6 +69,8 @@ import {
 import { PageVerdict } from '@/components/ui/page-verdict';
 import { TILE_CELL_CLASS } from '@/components/ui/tile';
 import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
+import { ErrorNotice } from '@/components/ui/error-notice';
+import { describeReadFailure, resolveSurfaceState } from '@/lib/utils/statesNarrative';
 import type { TileSkeletonCell } from '@/lib/utils/tileGridSkeleton';
 import { Download, Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -118,6 +121,8 @@ interface DividendTrackingTabProps {
   dividends: Dividend[];
   assets: Asset[];
   loading: boolean;
+  /** The dividends/assets read failed: say so, never render an unread ledger as zero. */
+  loadFailed: boolean;
   onRefresh: () => Promise<void>;
 }
 
@@ -147,7 +152,7 @@ const SKELETON_CELLS: TileSkeletonCell[] = [
 
 const ALL = '__all__';
 
-export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: DividendTrackingTabProps) {
+export function DividendTrackingTab({ dividends, assets, loading, loadFailed, onRefresh }: DividendTrackingTabProps) {
   const { user } = useAuth();
   const { ownerId } = useActiveAccount();
   const isDemo = useDemoMode();
@@ -401,12 +406,24 @@ export function DividendTrackingTab({ dividends, assets, loading, onRefresh }: D
     toast.success(`Esportati ${listDividends.length} dividendi in CSV`);
   };
 
+  if (resolveSurfaceState({ loading: loading, failed: loadFailed }) === 'failed') {
+    return (
+      <ErrorNotice
+        className="max-w-[920px]"
+        notice={describeReadFailure({
+          consequence: 'Dividendi e strumenti non sono stati letti: un incasso non letto non è un incasso mancato.',
+          untouched: 'I dividendi registrati non sono stati toccati.',
+        })}
+      />
+    );
+  }
+
   if (loading) {
     return (
       <TileGridSkeleton
         cells={SKELETON_CELLS}
         className="pt-1"
-        toolbar={<div className="mx-auto h-9 w-full max-w-[320px] animate-pulse rounded-lg bg-muted desktop:hidden" />}
+        toolbar={<Skeleton className="mx-auto h-9 w-full max-w-[320px] rounded-lg desktop:hidden" />}
       />
     );
   }

@@ -39,6 +39,7 @@ import {
 } from '@/types/expenses';
 import { CostCenter } from '@/types/costCenters';
 import { getCostCenters } from '@/lib/services/costCenterService';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Asset, FamilyMember } from '@/types/assets';
 import { createExpense, updateExpense } from '@/lib/services/expenseService';
 import { getAllAssets } from '@/lib/services/assetService';
@@ -60,7 +61,6 @@ import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -102,7 +102,13 @@ import {
   RECURRENCE_FREQUENCY_LABELS,
   resolveRecurrenceFrequency,
 } from '@/lib/utils/recurrenceDates';
-import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
+import {
+  describeExpenseIntent,
+  describeModalStatus,
+  describeWriteError,
+  EXPENSE_TYPE_PICKER_READING,
+  type ModalStatus,
+} from '@/lib/utils/dialogNarrative';
 import { cn } from '@/lib/utils';
 
 
@@ -182,20 +188,22 @@ type ExpenseFormValues = z.infer<typeof expenseSchema>;
 // Helpers
 // ---------------------------------------------------------------------------
 
+// Sentence case, like every other title in the app: a modal title is a sentence about an act,
+// not a headline in a newspaper.
 const CREATE_TITLES: Record<ExpenseType, string> = {
-  variable: 'Nuova Spesa Variabile',
-  fixed: 'Nuova Spesa Fissa',
-  debt: 'Nuovo Debito',
-  income: 'Nuova Entrata',
-  transfer: 'Nuovo Trasferimento',
+  variable: 'Nuova spesa variabile',
+  fixed: 'Nuova spesa fissa',
+  debt: 'Nuovo debito',
+  income: 'Nuova entrata',
+  transfer: 'Nuovo trasferimento',
 };
 
 const EDIT_TITLES: Record<ExpenseType, string> = {
-  variable: 'Modifica Spesa',
-  fixed: 'Modifica Spesa',
-  debt: 'Modifica Debito',
-  income: 'Modifica Entrata',
-  transfer: 'Modifica Trasferimento',
+  variable: 'Modifica spesa',
+  fixed: 'Modifica spesa',
+  debt: 'Modifica debito',
+  income: 'Modifica entrata',
+  transfer: 'Modifica trasferimento',
 };
 
 /**
@@ -210,9 +218,9 @@ interface TypeOption {
 }
 
 const TYPE_OPTIONS: TypeOption[] = [
-  { value: 'variable', label: 'Spesa Variabile', description: 'Ristorante, shopping, svago, imprevisti', Icon: ShoppingCart },
-  { value: 'fixed', label: 'Spesa Fissa', description: 'Affitto, abbonamenti, bollette, utenze', Icon: Receipt },
-  { value: 'debt', label: 'Debito / Rata', description: 'Mutuo, prestito, finanziamento ricorrente', Icon: CreditCard },
+  { value: 'variable', label: 'Spesa variabile', description: 'Ristorante, shopping, svago, imprevisti', Icon: ShoppingCart },
+  { value: 'fixed', label: 'Spesa fissa', description: 'Affitto, abbonamenti, bollette, utenze', Icon: Receipt },
+  { value: 'debt', label: 'Debito / rata', description: 'Mutuo, prestito, finanziamento ricorrente', Icon: CreditCard },
   { value: 'income', label: 'Entrata', description: 'Stipendio, bonus, dividendi, rimborsi', Icon: TrendingUp },
   { value: 'transfer', label: 'Trasferimento', description: 'Sposta denaro tra conti', Icon: ArrowLeftRight },
 ];
@@ -285,10 +293,9 @@ interface ExpenseTypePickerProps {
  */
 function ExpenseTypePicker({ selectedType, onSelect }: Readonly<ExpenseTypePickerProps>) {
   return (
+    // No introductory paragraph: the modal's reading line already says what the type decides,
+    // and a second copy of it a row below is the same job done twice.
     <div>
-      <p className="text-sm text-muted-foreground mb-5">
-        Scegli il tipo di voce da registrare
-      </p>
       <div
         role="radiogroup"
         aria-label="Tipo di voce"
@@ -487,7 +494,7 @@ function ExpenseFormBody({
             )}
           />
           {typeChangeNotice && (
-            <p className="text-xs text-amber-600 dark:text-amber-400">{typeChangeNotice}</p>
+            <p className="text-xs text-warning-foreground">{typeChangeNotice}</p>
           )}
         </div>
       )}
@@ -549,7 +556,7 @@ function ExpenseFormBody({
         <div className="space-y-2">
           <Label htmlFor="categoryId">Categoria *</Label>
           {loadingCategories ? (
-            <div className="h-9 rounded-md bg-muted animate-pulse" />
+            <Skeleton className="h-9 rounded-md" />
           ) : (
             <>
               <SearchableCombobox
@@ -1153,9 +1160,9 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
   const { user } = useAuth();
   const { ownerId } = useActiveAccount();
   const queryClient = useQueryClient();
-  const isMobile = useMediaQuery('(max-width: 768px)');
 
-
+  // The modal's reading IS the status line: what the form wants, what it is doing, how it went.
+  const [status, setStatus] = useState<ModalStatus>({ phase: 'idle' });
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
   const [cashAssets, setCashAssets] = useState<Asset[]>([]);
@@ -1255,6 +1262,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
     if (!open) return;
     // Re-run on every open so a second "nuova voce" starts from the picker again — without
     // `open` in the deps, `expense` stays null between opens and the step is never reset.
+    setStatus({ phase: 'idle' });
     setStep(expense ? 2 : 1);
     setAdvancedOpen(isAdvancedPrePopulated(expense));
     transferCategoryIdRef.current = null; // Reset transfer category cache on dialog open
@@ -1478,16 +1486,20 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
   };
 
   const onSubmit = async (data: ExpenseFormValues) => {
+    // Every refusal lands on the modal's reading line, where the reader is already looking —
+    // a toast in the corner asks them to look away from the form that caused it.
     if (!user || !ownerId) {
-      toast.error('Devi essere autenticato');
+      setStatus({ phase: 'error', message: 'La sessione è scaduta: rientra e riprova.' });
       return;
     }
 
     const category = categories.find((cat) => cat.id === data.categoryId);
     if (!category) {
-      toast.error('Categoria non trovata');
+      setStatus({ phase: 'error', message: 'La categoria scelta non esiste più: scegline un’altra.' });
       return;
     }
+
+    setStatus({ phase: 'submitting' });
 
     let subCategoryName: string | undefined;
     if (data.subCategoryId) {
@@ -1715,32 +1727,36 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
       onClose();
     } catch (error) {
       console.error('Error saving expense:', error);
-      toast.error('Errore nel salvataggio della spesa');
+      setStatus({ phase: 'error', message: describeWriteError(error) });
     }
   };
 
   const isTypePicker = !isEdit && step === 1;
 
   // Both titles follow the SELECTED type, not the stored one: in edit mode the type is
-  // now changeable, and a header still saying "Modifica Entrata" while the form has
+  // now changeable, and a header still saying "Modifica entrata" while the form has
   // been switched to a spesa would contradict the control right below it. On step 1 no
   // type has been chosen yet, so the header names the flow instead.
-  let dialogTitle: string;
-  if (isTypePicker) {
-    dialogTitle = 'Nuova Voce';
-  } else {
-    dialogTitle = isEdit ? EDIT_TITLES[selectedType] : CREATE_TITLES[selectedType];
-  }
-  let dialogDescription: string;
-  if (isTypePicker) {
-    dialogDescription = 'Scegli il tipo di voce da registrare';
-  } else {
-    dialogDescription = isEdit
-      ? 'Modifica i dettagli della voce selezionata'
-      : 'Inserisci i dettagli della nuova voce';
-  }
-  const baseLabel = isEdit ? 'Salva modifiche' : 'Crea voce';
-  const submitLabel = isSubmitting ? 'Salvataggio...' : baseLabel;
+  const dialogTitle = isTypePicker
+    ? 'Che cosa vuoi registrare?'
+    : isEdit
+      ? EDIT_TITLES[selectedType]
+      : CREATE_TITLES[selectedType];
+
+  // The eyebrow carries the context and, after a centred dot, the scope — which is where the
+  // type badge went: a Badge beside the title was a second label register for the same fact.
+  // The scope names ONE row's type, so it takes the picker's singular label («Spesa variabile»)
+  // and not `EXPENSE_TYPE_LABELS`, which is the plural of a category group («Spese Variabili»).
+  const dialogEyebrow = isTypePicker
+    ? 'Nuova voce · Passo 1 di 2'
+    : `${isEdit ? 'Modifica voce' : 'Nuova voce'} · ${TYPE_OPTIONS.find((o) => o.value === selectedType)?.label ?? ''}`;
+
+  const reading = describeModalStatus(isSubmitting ? { phase: 'submitting' } : status, {
+    idle: isTypePicker ? EXPENSE_TYPE_PICKER_READING : describeExpenseIntent(selectedType),
+    submitting: isEdit ? 'Sto salvando le modifiche.' : 'Sto registrando la voce.',
+  });
+
+  const submitLabel = isSubmitting ? 'Salvataggio...' : isEdit ? 'Salva modifiche' : 'Crea voce';
 
   /**
    * Re-point the category when the type changes.
@@ -1868,36 +1884,18 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
       <ResponsiveModal
         open={open}
         onClose={onClose}
+        eyebrow={dialogEyebrow}
         title={dialogTitle}
-        description={dialogDescription}
-        headerExtra={
-          isEdit ? (
-            <Badge variant="outline" className="ml-auto text-xs font-normal">
-              {EXPENSE_TYPE_LABELS[selectedType]}
-            </Badge>
-          ) : undefined
-        }
+        reading={reading}
+        width="lg"
         footer={
           /* Step 1 has nothing to submit: picking a card IS the action, so the only footer
-             control is the way out. */
+             control is the way out. The modal lays the buttons out — «Annulla» then the
+             primary in DOM order — so no caller branches on the viewport any more. */
           isTypePicker ? (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              className={isMobile ? 'w-full' : undefined}
-            >
+            <Button type="button" variant="outline" onClick={onClose}>
               Annulla
             </Button>
-          ) : isMobile ? (
-            <>
-              <Button type="submit" form="expense-form" disabled={isSubmitting} className="w-full">
-                {submitLabel}
-              </Button>
-              <Button type="button" variant="outline" className="w-full" disabled={isSubmitting} onClick={onClose}>
-                Annulla
-              </Button>
-            </>
           ) : (
             <>
               <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>

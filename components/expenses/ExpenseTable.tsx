@@ -52,6 +52,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Edit, Trash2, TrendingUp, TrendingDown, Calendar, ChevronLeft, ChevronRight, ExternalLink, ArrowUp, ArrowDown, ChevronsUpDown } from 'lucide-react';
@@ -374,14 +375,13 @@ export function ExpenseTable({ expenses, onEdit, onRefresh, isDemo = false, hasA
 
   if (expenses.length === 0) {
     return (
-      <div className="rounded-md border border-dashed p-8 text-center">
-        <p className="text-muted-foreground">Nessuna voce trovata</p>
-        <p className="text-sm text-muted-foreground mt-2">
-          {hasActiveFilters
-            ? 'Nessun risultato per i filtri applicati. Prova ad azzerare i filtri.'
-            : 'Clicca su "Nuova Spesa" per aggiungere la prima voce'}
-        </p>
-      </div>
+      <EmptyState
+        message={
+          hasActiveFilters
+            ? 'Nessun movimento passa i filtri applicati: azzerali per rivedere il periodo intero.'
+            : 'Nessun movimento registrato nel periodo: aggiungi la prima voce per iniziare a tracciare.'
+        }
+      />
     );
   }
 

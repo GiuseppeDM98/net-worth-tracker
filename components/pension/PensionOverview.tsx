@@ -29,7 +29,7 @@
  * delete is a two-click confirm without a timer inside `VersamentiTile`.
  *
  * NIENTE ZERI CHE NON SONO STATI LETTI. The four queries default to `[]`, so the skeleton waits
- * for all four and a failed query replaces the tiles that depend on it with `PensionErrorNotice`
+ * for all four and a failed query replaces the tiles that depend on it with an `ErrorNotice`
  * — never a zero — and the verdict says what did not load instead of judging an empty set.
  */
 
@@ -88,7 +88,8 @@ import { PageVerdict } from '@/components/ui/page-verdict';
 import { SegmentedPill } from '@/components/ui/segmented-pill';
 import { Tile, TILE_CELL_CLASS } from '@/components/ui/tile';
 import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
-import { PensionErrorNotice } from '@/components/pension/PensionErrorNotice';
+import { ErrorNotice } from '@/components/ui/error-notice';
+import { describeReadFailure } from '@/lib/utils/statesNarrative';
 import { PensionDettaglio } from '@/components/pension/PensionDettaglio';
 import { FondoOggiTile } from '@/components/pension/tiles/FondoOggiTile';
 import { RendimentoTile } from '@/components/pension/tiles/RendimentoTile';
@@ -195,7 +196,13 @@ export function PensionOverview() {
 
   // Without assets or settings it is not even known whether the user owns a fund: blocking.
   if (assetsError || settingsError) {
-    return <PensionErrorNotice message="Non è stato possibile caricare i tuoi fondi pensione." />;
+    return <ErrorNotice
+        className="max-w-[920px]"
+        notice={describeReadFailure({
+          consequence: "I tuoi fondi pensione non sono stati letti: senza di essi la pagina non sa nemmeno se ne possiedi uno.",
+          untouched: "I versamenti registrati non sono stati toccati.",
+        })}
+      />;
   }
 
   // ─── Empty: the verdict says so, one tile points at Patrimonio ──────────────
@@ -257,7 +264,13 @@ export function PensionOverview() {
 
         <div className={cn(TILE_CELL_CLASS, 'order-2 desktop:order-none desktop:col-span-3')}>
           {contributionsError || snapshotsError ? (
-            <PensionErrorNotice message="Non è stato possibile caricare i dati da cui si calcola il rendimento." />
+            <ErrorNotice
+              compact
+              notice={describeReadFailure({
+                subject: 'Rendimento',
+                consequence: 'I dati da cui si calcola il rendimento non sono stati letti.',
+              })}
+            />
           ) : (
             <RendimentoTile reading={describeRendimento(blocks)} aside={describeRendimentoAside(blocks)} footer={RENDIMENTO_FOOTER} blocks={blocks} />
           )}
@@ -265,7 +278,13 @@ export function PensionOverview() {
 
         <div className={cn(TILE_CELL_CLASS, 'order-3 desktop:order-none desktop:col-span-4')}>
           {contributionsError ? (
-            <PensionErrorNotice message="Non è stato possibile caricare i versamenti: il beneficio fiscale non è calcolabile." />
+            <ErrorNotice
+              compact
+              notice={describeReadFailure({
+                subject: 'Anno fiscale',
+                consequence: 'I versamenti non sono stati letti: il beneficio fiscale non è calcolabile.',
+              })}
+            />
           ) : (
             <AnnoFiscaleTile taxYear={activeYear} reading={describeAnnoFiscale(blocks, activeYear)} aside={describeAnnoFiscaleAside(blocks)} footer={ANNO_FISCALE_FOOTER} blocks={blocks} />
           )}
@@ -273,7 +292,13 @@ export function PensionOverview() {
 
         <div className={cn(TILE_CELL_CLASS, 'order-4 tablet:col-span-2 desktop:order-none desktop:col-span-7')}>
           {contributionsError ? (
-            <PensionErrorNotice message="Non è stato possibile caricare i versamenti dell'anno." />
+            <ErrorNotice
+              notice={describeReadFailure({
+                subject: 'Versato',
+                consequence: "I versamenti dell'anno non sono stati letti.",
+                untouched: 'I versamenti registrati non sono stati toccati.',
+              })}
+            />
           ) : (
             <VersatoTile taxYear={activeYear} reading={describeVersato(versato)} aside="per natura" footer={describeVersatoFooter(versato)} rows={versato.rows} />
           )}
@@ -281,7 +306,13 @@ export function PensionOverview() {
 
         <div className={cn(TILE_CELL_CLASS, 'order-5 tablet:col-span-2 desktop:order-none desktop:col-span-12')}>
           {contributionsError ? (
-            <PensionErrorNotice message="Non è stato possibile caricare lo storico dei versamenti." />
+            <ErrorNotice
+              notice={describeReadFailure({
+                subject: 'Versamenti',
+                consequence: 'Lo storico dei versamenti non è stato letto.',
+                untouched: 'I versamenti registrati non sono stati toccati.',
+              })}
+            />
           ) : (
             <VersamentiTile
               taxYear={activeYear}

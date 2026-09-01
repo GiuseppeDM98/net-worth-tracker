@@ -15,6 +15,17 @@
  *     allocation you already had" (the MC tab's effect simply skips the update).
  */
 
+/**
+ * Paths a single Monte Carlo scenario is run with by default. A run is three scenarios
+ * (bear · base · bull), so a default execution draws three times this many paths.
+ *
+ * It lives here rather than in `MonteCarloTab` because a second surface states it in words:
+ * the public landing tells a visitor what the FIRE section computes, and a copy of the
+ * number there would drift from the one the tab actually seeds (AGENTS.md → Quick-Fix
+ * Reference: the divergent copy is the one the user sees).
+ */
+export const DEFAULT_MONTE_CARLO_SIMULATIONS = 10000;
+
 export interface MonteCarloAllocationPercentages {
   equityPercentage: number;
   bondsPercentage: number;

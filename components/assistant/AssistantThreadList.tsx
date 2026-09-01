@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { Bot, Check, Loader2, Trash2, X } from 'lucide-react';
+import { Check, Loader2, Trash2, X } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
@@ -113,10 +113,8 @@ export function AssistantThreadList({
   if (threads.length === 0) {
     return (
       <EmptyState
-        icon={Bot}
-        title="Nessuna conversazione"
-        description="Il primo messaggio crea automaticamente una nuova conversazione."
-        className="py-6"
+        className="py-2"
+        message="Nessuna conversazione: il primo messaggio ne apre una."
       />
     );
   }

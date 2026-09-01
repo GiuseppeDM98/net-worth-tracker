@@ -25,7 +25,7 @@ import {
   DrawerTitle,
 } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
-import { EmptyState, FilterEmptyIcon } from '@/components/ui/empty-state';
+import { EmptyState } from '@/components/ui/empty-state';
 import { cn } from '@/lib/utils';
 import { TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
@@ -333,7 +333,7 @@ export function TransactionFeed({
   isDemo,
   hasActiveFilters,
   categoryMetaMap,
-  emptyHint = 'Aggiungi la prima voce per iniziare a tracciare.',
+  emptyHint = 'Nessun movimento registrato nel periodo: aggiungi la prima voce per iniziare a tracciare.',
   surface = 'card',
   className,
 }: Readonly<TransactionFeedProps>) {
@@ -377,14 +377,12 @@ export function TransactionFeed({
   if (transactions.length === 0) {
     return (
       <EmptyState
-        icon={FilterEmptyIcon}
-        title="Nessuna voce trovata"
-        description={
+        className={className}
+        message={
           hasActiveFilters
-            ? 'Nessun risultato per i filtri applicati. Prova ad azzerare i filtri.'
+            ? 'Nessun movimento passa i filtri applicati: azzerali per rivedere il periodo intero.'
             : emptyHint
         }
-        className={className}
       />
     );
   }

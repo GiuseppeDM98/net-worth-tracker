@@ -32,10 +32,12 @@ export default function AnalisiPage() {
   const { user } = useAuth();
   const { ownerId } = useActiveAccount();
 
-  const { data: allExpenses = [], isLoading: expensesLoading } = useExpenses(ownerId);
+  const { data: allExpenses = [], isLoading: expensesLoading, isError: expensesError } =
+    useExpenses(ownerId);
   // The taxonomy feeds AnalisiTab directly (entity search + URL-focus label
   // resolution) and shares the RQ cache with the Cashflow page's sibling tabs.
-  const { data: categories = [], isLoading: categoriesLoading } = useExpenseCategories(ownerId);
+  const { data: categories = [], isLoading: categoriesLoading, isError: categoriesError } =
+    useExpenseCategories(ownerId);
 
   const [cashflowHistoryStartYear, setCashflowHistoryStartYear] = useState<number>(
     new Date().getFullYear() - 1
@@ -70,6 +72,9 @@ export default function AnalisiPage() {
   }, [user, ownerId]);
 
   const loading = expensesLoading || categoriesLoading || !settingsSettled;
+  // A failed read is not an empty ledger: `= []` above hides the difference, so the flag
+  // travels with the data (lib/utils/statesNarrative.ts).
+  const loadFailed = expensesError || categoriesError;
 
   return (
     <PageContainer width="wide">
@@ -77,6 +82,7 @@ export default function AnalisiPage() {
         allExpenses={allExpenses}
         categories={categories}
         loading={loading}
+        loadFailed={loadFailed}
         historyStartYear={cashflowHistoryStartYear}
       />
     </PageContainer>

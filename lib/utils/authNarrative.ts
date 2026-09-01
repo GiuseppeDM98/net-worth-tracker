@@ -71,10 +71,18 @@ export function resolveRegistrationAccess(
   return registrationsEnabled ? 'open' : 'closed';
 }
 
+/**
+ * The product's promise, in one sentence. It is the headline of BOTH public surfaces — the
+ * landing and the sign-in page — because they answer the same question ("what is this?") and a
+ * second phrasing of one answer drifts (DESIGN.md → the Assistente's Conversation-Is-Content
+ * Rule makes the same point about the Panoramica's verdict).
+ */
+export const PRODUCT_PROMISE_HEADLINE = 'Il tuo patrimonio, spiegato prima che misurato.';
+
 /** The verdict of /login: the product's promise, in the neutral tone it never leaves. */
 export function buildLoginVerdict(): PageVerdictModel {
   return {
-    headline: 'Il tuo patrimonio, spiegato prima che misurato.',
+    headline: PRODUCT_PROMISE_HEADLINE,
     tone: 'neutral',
     sentence: [
       {

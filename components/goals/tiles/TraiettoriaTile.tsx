@@ -19,7 +19,7 @@ import type { TraiettoriaChip } from '@/lib/utils/goalsNarrative';
 import { cn } from '@/lib/utils';
 import { Tile, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { NarrativeText } from '@/components/ui/narrative-text';
-import { useArmedDelete } from '@/components/cashflow/budget/useArmedDelete';
+import { useArmedDelete } from '@/lib/hooks/useArmedDelete';
 
 interface TraiettoriaTileProps {
   reading: Narrative;

@@ -186,9 +186,11 @@ describe('buildWeeklyBudgetData', () => {
 
     const data = await buildWeeklyBudgetData('u1', now);
     const html = buildWeeklyBudgetEmailHtml(data!);
-    expect(html).toContain('Riepilogo settimanale budget');
+    expect(html).toContain('Stato dei budget');
     expect(html).toContain('Vacanze');
     expect(html).toContain('Budget annuali');
+    // The email opens on a rule-generated verdict, like every other surface.
+    expect(html).toMatch(/budget (è in linea|su \d+ (è|sono) in linea)|tetto del mese/);
   });
 
   it('states in the email that the amounts are month-to-date, not weekly', async () => {
@@ -200,10 +202,13 @@ describe('buildWeeklyBudgetData', () => {
 
     const data = await buildWeeklyBudgetData('u1', now);
     const html = buildWeeklyBudgetEmailHtml(data!);
-    expect(html).toContain('dal 1° del mese a oggi');
-    expect(html).toContain('non sono settimanali');
+    // Each tile names its own window in its scope, with the month spelled out.
+    expect(html).toMatch(/dal 1° [a-zà-ù]+ a oggi/);
+    expect(html).toContain('nessun importo è settimanale');
     // A bare "proiezione €X" was read as a year-end figure — the horizon must be spelled out.
     expect(html).toContain('proiezione a fine mese');
+    // And the verdict states where in the month we are, which is what makes the ceiling legible.
+    expect(html).toMatch(/Al giorno/);
   });
 });
 

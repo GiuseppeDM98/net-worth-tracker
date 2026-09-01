@@ -63,7 +63,8 @@ import { PageVerdict } from '@/components/ui/page-verdict';
 import { TILE_CELL_CLASS } from '@/components/ui/tile';
 import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
 import type { TileSkeletonCell } from '@/lib/utils/tileGridSkeleton';
-import { CostCenterErrorNotice } from './CostCenterErrorNotice';
+import { ErrorNotice } from '@/components/ui/error-notice';
+import { describeReadFailure } from '@/lib/utils/statesNarrative';
 import { CostoTile } from './cost-centers/tiles/CostoTile';
 import { CategorieTile } from './cost-centers/tiles/CategorieTile';
 import { CicloTile } from './cost-centers/tiles/CicloTile';
@@ -280,7 +281,13 @@ export function CostCenterDetail({
       {loading ? (
         <TileGridSkeleton verdict={false} cells={SKELETON_CELLS} />
       ) : isError ? (
-        <CostCenterErrorNotice message="Non è stato possibile caricare le spese di questo centro." />
+        <ErrorNotice
+          className="max-w-[920px]"
+          notice={describeReadFailure({
+            consequence: 'Le spese collegate a questo centro non sono state lette: il costo del progetto non è calcolabile.',
+            untouched: 'Il centro e le spese registrate non sono stati toccati.',
+          })}
+        />
       ) : (
         /* ── Tile grid ─────────────────────────────────────────────────────────── */
         <div className="grid grid-cols-1 gap-3 tablet:grid-cols-2 desktop:grid-cols-12">

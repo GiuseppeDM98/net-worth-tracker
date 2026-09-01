@@ -7,16 +7,8 @@
 'use client';
 
 import type { CSSProperties, RefObject } from 'react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
 import { toDate } from '@/lib/utils/dateHelpers';
 import { Dividend, DividendType } from '@/types/dividend';
@@ -57,32 +49,44 @@ export function DividendRecordDetailsDialog({
   const netAmount = dividend.netAmountEur ?? dividend.netAmount;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent ref={dialogRef} style={style} className="max-w-xl">
-        <DialogHeader className="space-y-3">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <DialogTitle className="text-xl">{dividend.assetTicker}</DialogTitle>
-              <DialogDescription className="mt-1">
-                {dividend.assetName}
-              </DialogDescription>
-            </div>
-            <div className="flex flex-col items-end gap-1.5">
-              {/* Type is plain text on a neutral outline: the six literal Tailwind palettes this
-                  used to carry stayed the same hue on every theme, and the only thing worth a
-                  colour here is a figure that is not final. */}
-              <Badge variant="outline" className="font-normal text-muted-foreground">
-                {dividendTypeLabels[dividend.dividendType]}
-              </Badge>
-              {dividend.isProvisional && (
-                <Badge variant="outline" className="border-warning-border font-normal text-warning-foreground">
-                  Provvisoria
-                </Badge>
-              )}
-            </div>
-          </div>
-        </DialogHeader>
-
+    <ResponsiveModal
+      open={open}
+      onClose={() => onOpenChange(false)}
+      eyebrow={`Dividendi · ${dividendTypeLabels[dividend.dividendType]}${dividend.isProvisional ? ' · Provvisoria' : ''}`}
+      title={dividend.assetTicker}
+      reading={
+        dividend.isProvisional
+          ? 'La cedola è provvisoria: manca la componente d’inflazione, quindi il netto qui sotto è un minimo, non l’incasso finale.'
+          : `${dividend.assetName}. Il netto è già al netto della ritenuta e, per una valuta estera, convertito al cambio del pagamento.`
+      }
+      width="md"
+      contentRef={dialogRef}
+      triggerOrigin={style?.transformOrigin as string | undefined}
+      footerNote="Dettaglio del pagamento selezionato"
+      footer={
+        <>
+          <Button
+            variant="outline"
+            onClick={() => {
+              onOpenChange(false);
+              onEdit(dividend);
+            }}
+          >
+            Modifica
+          </Button>
+          {dividend.isProvisional && onSetInflationRate && (
+            <Button
+              onClick={() => {
+                onOpenChange(false);
+                onSetInflationRate(dividend);
+              }}
+            >
+              Imposta tasso inflazione
+            </Button>
+          )}
+        </>
+      }
+    >
         <div className="grid gap-4 desktop:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
           <div className="space-y-4 rounded-lg border border-border/70 bg-muted/30 p-4">
             <div className="space-y-1">
@@ -125,7 +129,7 @@ export function DividendRecordDetailsDialog({
               <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
                 Netto
               </p>
-              <p className="text-2xl font-semibold text-green-600 desktop:text-3xl">
+              <p className="text-2xl font-semibold text-positive desktop:text-3xl">
                 {formatCurrency(netAmount)}
               </p>
               {dividend.currency.toUpperCase() !== 'EUR' && dividend.netAmountEur !== undefined && (
@@ -146,7 +150,7 @@ export function DividendRecordDetailsDialog({
               </div>
               <div className="flex items-center justify-between gap-4">
                 <span className="text-muted-foreground">Tasse</span>
-                <span className="font-medium text-red-600">{formatCurrency(taxAmount)}</span>
+                <span className="font-medium text-destructive">{formatCurrency(taxAmount)}</span>
               </div>
             </div>
           </div>
@@ -161,33 +165,6 @@ export function DividendRecordDetailsDialog({
           </div>
         )}
 
-        <DialogFooter className="sm:justify-between">
-          <p className="text-xs text-muted-foreground">
-            Dettaglio contestuale del pagamento selezionato
-          </p>
-          <div className="flex gap-2">
-            {dividend.isProvisional && onSetInflationRate && (
-              <Button
-                onClick={() => {
-                  onOpenChange(false);
-                  onSetInflationRate(dividend);
-                }}
-              >
-                Imposta tasso inflazione
-              </Button>
-            )}
-            <Button
-              variant="outline"
-              onClick={() => {
-                onOpenChange(false);
-                onEdit(dividend);
-              }}
-            >
-              Modifica
-            </Button>
-          </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    </ResponsiveModal>
   );
 }

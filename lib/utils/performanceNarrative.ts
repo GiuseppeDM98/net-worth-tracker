@@ -619,3 +619,23 @@ export function describeYields(y: { yocNet: number | null; currentYieldNet: numb
     prose(' netto sul prezzo di oggi; nessun costo medio per lo YOC.'),
   ];
 }
+
+/**
+ * «31 mesi di storico, con 18.400 € versati nel periodo.» — what the figures beside it are
+ * measured ON, for the tile of the AI analysis that answers exactly that.
+ *
+ * The contribution clause disappears when nothing moved in or out: «con 0 € versati» is a
+ * sentence about an absence, and the reading already says how long the window is.
+ */
+export function describeAnalysisBase(input: { monthsMeasured: number; netCashFlow: number | null }): Narrative {
+  const out: Narrative = [
+    figure(`${input.monthsMeasured} ${pluralize(input.monthsMeasured, 'mese', 'mesi')}`),
+    prose(' di storico'),
+  ];
+  if (input.netCashFlow !== null && Math.round(input.netCashFlow) !== 0) {
+    const verb = input.netCashFlow > 0 ? 'versati' : 'prelevati';
+    out.push(prose(', con '), figure(euro(input.netCashFlow)), prose(` ${verb} nel periodo`));
+  }
+  out.push(prose('.'));
+  return out;
+}

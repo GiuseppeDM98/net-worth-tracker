@@ -27,13 +27,7 @@ import {
 } from '@/lib/utils/costCenterColors';
 import { useChartColors } from '@/lib/hooks/useChartColors';
 import { createCostCenter, updateCostCenter } from '@/lib/services/costCenterService';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -127,27 +121,29 @@ export function CostCenterDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      {/* max-h here, scroll on the BODY below — not on this element. The dialog is vertically
-          centred and had no scroll container at all, so on a short viewport (a phone in
-          landscape, a desktop window at ~500px) the form grew past the screen and Annulla/Crea
-          became unreachable: the cancel path itself. Scrolling DialogContent would have fixed
-          that and broken something else, because its close button is `absolute top-4 right-4`
-          and would have scrolled away with the content. */}
-      <DialogContent className="sm:max-w-md max-h-[85dvh]">
-        <DialogHeader>
-          <DialogTitle>
-            {costCenter ? 'Modifica centro di costo' : 'Nuovo centro di costo'}
-          </DialogTitle>
-          <DialogDescription className="sr-only">
-            {costCenter
-              ? 'Modifica nome, descrizione e colore del centro di costo.'
-              : 'Crea un nuovo centro di costo per raggruppare le spese per oggetto o progetto.'}
-          </DialogDescription>
-        </DialogHeader>
-
-        {/* min-h-0 is what lets a grid child actually shrink below its content height. */}
-        <div className="min-h-0 space-y-4 overflow-y-auto py-2">
+    <ResponsiveModal
+      open={open}
+      onClose={onClose}
+      eyebrow="Cashflow · Centri di costo"
+      title={costCenter ? 'Modifica centro di costo' : 'Nuovo centro di costo'}
+      reading={
+        costCenter
+          ? 'Il nome e il colore seguono il centro ovunque compaia; le spese già collegate restano dove sono.'
+          : 'Un centro raggruppa le spese di un progetto: il suo costo è il costo di sempre, senza periodo.'
+      }
+      width="md"
+      footer={
+        <>
+          <Button variant="outline" onClick={onClose} disabled={saving}>
+            Annulla
+          </Button>
+          <Button onClick={handleSave} disabled={saving || !name.trim()}>
+            {saving ? 'Salvataggio...' : costCenter ? 'Aggiorna' : 'Crea'}
+          </Button>
+        </>
+      }
+    >
+        <div className="space-y-4">
           {/* Name */}
           <div className="space-y-2">
             <Label htmlFor="ccName">Nome *</Label>
@@ -251,16 +247,6 @@ export function CostCenterDialog({
             </p>
           </div>
         </div>
-
-        <div className="flex justify-end gap-2 pt-2">
-          <Button variant="outline" onClick={onClose} disabled={saving}>
-            Annulla
-          </Button>
-          <Button onClick={handleSave} disabled={saving || !name.trim()}>
-            {saving ? 'Salvataggio...' : costCenter ? 'Aggiorna' : 'Crea'}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+    </ResponsiveModal>
   );
 }

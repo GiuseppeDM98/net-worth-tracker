@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { ASSISTANT_MODEL } from '@/lib/constants/aiModels';
 import { AssistantMemoryItem, AssistantMessage, AssistantMode, AssistantMonthContextBundle, AssistantMonthSelectorValue, AssistantPreferences } from '@/types/assistant';
 import {
   AssistantPromptParts,
@@ -152,7 +153,7 @@ export async function streamAssistantResponse({
     const chatMaxTokens = enableWebSearch ? 16000 : 12000;
     const { system, userContent } = buildPrompt(mode, prompt, contextBundle, month, preferences, memoryItems);
     const stream = await anthropic.messages.create({
-      model: 'claude-sonnet-5',
+      model: ASSISTANT_MODEL,
       max_tokens: isStructuredAnalysis ? 18000 : chatMaxTokens,
       // Static role/domain/guardrail/format instructions, identical for every user and
       // every request of this mode. No cache_control: this app's traffic pattern

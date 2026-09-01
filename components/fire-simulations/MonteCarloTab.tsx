@@ -41,7 +41,7 @@ import { calculateAssetValue, calculateLiquidNetWorth, calculateTotalValue, getA
 import { calculateCurrentAllocation, getDefaultTargets, getSettings, setSettings } from '@/lib/services/assetAllocationService';
 import { buildParamsFromScenario, getDefaultMarketParameters, getDefaultMonteCarloScenarios, runMonteCarloSimulation } from '@/lib/services/monteCarloService';
 import { resolvePensionLockState, resolveRitaUnlockAge } from '@/lib/utils/pensionUnlock';
-import { deriveMonteCarloAllocation } from '@/lib/utils/monteCarloParams';
+import { DEFAULT_MONTE_CARLO_SIMULATIONS, deriveMonteCarloAllocation } from '@/lib/utils/monteCarloParams';
 import { getItalyYear } from '@/lib/utils/dateHelpers';
 import { summarizeLock } from '@/lib/utils/fireSummary';
 import {
@@ -82,6 +82,8 @@ import { cn } from '@/lib/utils';
 import { PageVerdict } from '@/components/ui/page-verdict';
 import { TILE_CELL_CLASS } from '@/components/ui/tile';
 import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
+import { ErrorNotice } from '@/components/ui/error-notice';
+import { describeReadFailure, resolveSurfaceState } from '@/lib/utils/statesNarrative';
 import { MonteCarloFanChart } from '@/components/monte-carlo/MonteCarloFanChart';
 import { MonteCarloDettaglio } from '@/components/monte-carlo/MonteCarloDettaglio';
 import { ProbabilitaTile } from '@/components/monte-carlo/tiles/ProbabilitaTile';
@@ -98,7 +100,7 @@ const SKELETON_CELLS: TileSkeletonCell[] = [
 ];
 
 const DEFAULT_RETIREMENT_YEARS = 30;
-const DEFAULT_SIMULATIONS = 10000;
+const DEFAULT_SIMULATIONS = DEFAULT_MONTE_CARLO_SIMULATIONS;
 const DEFAULT_WITHDRAWAL = 30000;
 
 /** A run keeps the inputs it was made with, so the page can tell a stale form from a fresh one. */
@@ -124,14 +126,14 @@ export function MonteCarloTab() {
   const isDemo = useDemoMode();
 
   // ─── Queries (shared keys with the other FIRE tabs) ──────────────────────────
-  const { data: assets, isLoading: isLoadingAssets } = useQuery({
+  const { data: assets, isLoading: isLoadingAssets, isError: assetsError } = useQuery({
     queryKey: ['assets', ownerId],
     queryFn: () => getAllAssets(ownerId!),
     enabled: !!user && !!ownerId,
     staleTime: 300000,
   });
 
-  const { data: settings, isLoading: isLoadingSettings } = useQuery({
+  const { data: settings, isLoading: isLoadingSettings, isError: settingsError } = useQuery({
     queryKey: ['settings', ownerId],
     queryFn: () => getSettings(ownerId!),
     enabled: !!user && !!ownerId,
@@ -301,6 +303,20 @@ export function MonteCarloTab() {
 
   // ─── Loading: until the seeded plan has run once ─────────────────────────────
   const awaitingFirstRun = runnable && canRun && !lastRun;
+  // A failed read comes BEFORE the wait: these queries default to undefined, and a plan built
+  // on a base that was never read is a number with nothing behind it.
+  if (resolveSurfaceState({ loading: isLoadingAssets || isLoadingSettings, failed: assetsError || settingsError }) === 'failed') {
+    return (
+      <ErrorNotice
+        className="max-w-[920px]"
+        notice={describeReadFailure({
+          consequence: 'Patrimonio e ipotesi non sono stati letti: la simulazione girerebbe su una base che non esiste.',
+          untouched: 'Le ipotesi salvate non sono state toccate.',
+        })}
+      />
+    );
+  }
+
   if (isLoadingAssets || isLoadingSettings || !form || !params || !typedPlan || awaitingFirstRun) {
     return <TileGridSkeleton cells={SKELETON_CELLS} />;
   }

@@ -70,8 +70,10 @@ export function EntitySearch({
       <ResponsiveModal
         open={open}
         onClose={handleClose}
+        eyebrow="Analisi · Ricerca"
         title="Vai a categoria"
-        dialogClassName="max-w-lg"
+        reading="Scegliendo una voce, la Scheda si apre sotto le tessere con il totale del periodo, la quota sul padre e l'andamento."
+        width="md"
       >
         {/* shouldFilter={false}: matching and ranking live in searchEntities
             (accent-folded, label-prefix first); cmdk's own substring filter

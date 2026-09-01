@@ -4,13 +4,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog';
+import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -311,15 +305,35 @@ export function PDFExportDialog({
   ];
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Esporta Report PDF</DialogTitle>
-          <DialogDescription>
-            Seleziona il periodo e le sezioni da includere nel report portfolio
-          </DialogDescription>
-        </DialogHeader>
-
+    <ResponsiveModal
+      open={open}
+      onClose={() => onOpenChange(false)}
+      eyebrow="Report · PDF"
+      title="Esporta un report"
+      reading={
+        selectedCount === 0
+          ? 'Scegli almeno una sezione: senza, il report non avrebbe nulla da stampare.'
+          : `${selectedCount === 1 ? 'Una sezione' : `${selectedCount} sezioni`} nel report, sul periodo che scegli qui sopra.`
+      }
+      width="md"
+      footer={
+        <>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
+            Annulla
+          </Button>
+          <Button onClick={handleExport} disabled={loading || selectedCount === 0}>
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                Generazione...
+              </>
+            ) : (
+              'Genera PDF'
+            )}
+          </Button>
+        </>
+      }
+    >
         <div className="space-y-4">
           {/* Time filter radio group */}
           <div className="space-y-2 pb-4 border-b">
@@ -495,47 +509,17 @@ export function PDFExportDialog({
 
             {/* Warning for disabled sections based on period selection */}
             {timeFilter === 'monthly' && (
-              <div className="text-xs text-amber-600 dark:text-amber-500">
+              <div className="text-xs text-warning-foreground dark:text-warning-foreground">
                 Solo la sezione Entrate e Uscite è disponibile per export mensile
               </div>
             )}
             {isPastPeriod && timeFilter === 'yearly' && (
-              <div className="text-xs text-amber-600 dark:text-amber-500">
+              <div className="text-xs text-warning-foreground dark:text-warning-foreground">
                 Portfolio, Allocation, FIRE e Riepilogo non sono disponibili per anni passati (dati storici solo aggregati)
               </div>
             )}
 
-            {/* Action buttons */}
-            <div className="flex gap-2 pt-2">
-              <Button
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                disabled={loading}
-              >
-                Annulla
-              </Button>
-              <Button
-                onClick={handleExport}
-                disabled={loading || selectedCount === 0}
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Generazione...
-                  </>
-                ) : (
-                  'Genera PDF'
-                )}
-              </Button>
-            </div>
           </div>
-
-          {/* Warning messages */}
-          {selectedCount === 0 && (
-            <div className="text-xs text-amber-600 dark:text-amber-500">
-              Seleziona almeno una sezione per generare il PDF
-            </div>
-          )}
 
           {loading && (
             <div className="text-xs text-muted-foreground">
@@ -543,7 +527,6 @@ export function PDFExportDialog({
             </div>
           )}
         </div>
-      </DialogContent>
-    </Dialog>
+    </ResponsiveModal>
   );
 }

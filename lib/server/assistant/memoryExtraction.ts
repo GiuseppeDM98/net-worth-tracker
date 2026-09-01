@@ -24,10 +24,11 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { AssistantMemoryItem, AssistantStructuredGoal } from '@/types/assistant';
+import { MEMORY_EXTRACTION_MODEL } from '@/lib/constants/aiModels';
 
 // Haiku is used for extraction to keep latency and cost low.
 // The prompt is tightly scoped so a smaller model is reliable enough.
-const EXTRACTION_MODEL = 'claude-haiku-4-5-20251001';
+const EXTRACTION_MODEL = MEMORY_EXTRACTION_MODEL;
 
 const MEMORY_TOOL_NAME = 'save_memory_items';
 

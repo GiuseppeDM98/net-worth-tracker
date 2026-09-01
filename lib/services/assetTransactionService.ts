@@ -23,6 +23,7 @@ import { db } from '@/lib/firebase/config';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { toDate } from '@/lib/utils/dateHelpers';
 import { sortTransactionsForReplay } from '@/lib/utils/assetTransactionUtils';
+import { userFacingError } from '@/lib/utils/dialogNarrative';
 import {
   ASSET_TRANSACTIONS_COLLECTION,
   ASSET_TRANSACTIONS_META_COLLECTION,
@@ -118,7 +119,11 @@ async function parseWriteResponse<T>(response: Response, fallbackMessage: string
       typeof body === 'object' && body !== null && 'error' in body && typeof body.error === 'string'
         ? body.error
         : fallbackMessage;
-    throw new Error(message);
+    // Marked user-facing: the route writes these in Italian FOR a reader ("Non puoi vendere 12
+    // quote: ne possiedi 8"), and `describeWriteError` has no way to tell them from an SDK
+    // string unless the thrower says so — so without the mark the only sentences that know
+    // WHY a trade was refused would be dropped for a generic one.
+    throw userFacingError(message);
   }
 
   return body as T;

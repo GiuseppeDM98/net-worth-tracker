@@ -50,20 +50,21 @@ import { useAssets } from '@/lib/hooks/useAssets';
 import { useAssetLedgerMeta, useCreateAssetTransaction } from '@/lib/hooks/useAssetTransactions';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query/queryKeys';
-import { formatCurrency } from '@/lib/utils/formatters';
+import { formatCurrency, formatNumberIt, formatPercentageIt } from '@/lib/utils/formatters';
 import { resolveAllocationRole } from '@/lib/utils/allocationUtils';
 import { suggestIsLiquid } from '@/lib/utils/assetLiquidity';
 import { hasMarketPrice } from '@/lib/utils/assetPricing';
 import { scheduleNextCoupon, scheduleFinalPremium } from '@/lib/services/couponScheduling';
 import { getTargets, addSubCategory, getSettings } from '@/lib/services/assetAllocationService';
 import type { Settings } from '@/types/settings';
+import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  ASSET_TYPE_PICKER_READING,
+  describeAssetIntent,
+  describeModalStatus,
+  describeWriteError,
+  type ModalStatus,
+} from '@/lib/utils/dialogNarrative';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -137,7 +138,7 @@ async function fetchMarketPrice(
       const price = resolveBondPrice(quote.price, bondNominalValue, isBondWithIsin);
       const currency: string | undefined = quote.currency?.trim() || undefined;
       const priceEur: number | undefined = quote.currentPriceEur > 0 ? quote.currentPriceEur : undefined;
-      toast.success(`Prezzo recuperato da ${source}: ${price.toFixed(2)} ${quote.currency}`);
+      toast.success(`Prezzo recuperato da ${source}: ${formatNumberIt(price)} ${quote.currency}`);
       return { price, currency, priceEur };
     }
 
@@ -355,6 +356,9 @@ const TYPE_CARDS: { type: AssetType; label: string; title: string; Icon: React.E
  */
 const NO_SUB_CATEGORY_VALUE = '__none__';
 
+/** The form's id, so the footer's submit can live outside the `<form>` in the modal's footer. */
+const ASSET_FORM_ID = 'asset-form';
+
 const assetSchema = z.object({
   ticker: z.string(),
   // User-facing alias for `ticker`. Purely cosmetic — never
@@ -492,6 +496,8 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
   const { ownerId } = useActiveAccount();
   const queryClient = useQueryClient();
   const [step, setStep] = useState<1 | 2>(1);
+  // The modal's reading IS the status line, so a refusal lands where the reader is looking.
+  const [status, setStatus] = useState<ModalStatus>({ phase: 'idle' });
   const isEdit = !!asset;
 
   // Trade-ledger wiring (Phase C). Ledger assets (stock/etf/bond/crypto/commodity) manage quantity
@@ -695,6 +701,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
     // Re-run on every open so a second "new asset" dialog starts clean.
     // Without `open` in deps, `asset` stays null between opens and the effect never re-fires.
     if (!open) return;
+    setStatus({ phase: 'idle' });
     setStep(asset ? 2 : 1);
     setAllocationRoleTouched(false);
     setIsLiquidTouched(false);
@@ -900,7 +907,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
       setShowNewSubCategory(false);
     } catch (error: any) {
       console.error('Error adding subcategory:', error);
-      toast.error(error.message || 'Errore nella creazione della sottocategoria');
+      toast.error(describeWriteError(error));
     } finally {
       setIsAddingSubCategory(false);
     }
@@ -951,7 +958,10 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
 
     // Check if total is within 0.01% of 100% to account for floating-point errors
     if (Math.abs(totalPercentage - 100) > 0.01) {
-      toast.error(`La somma delle percentuali deve essere 100% (attuale: ${totalPercentage.toFixed(2)}%)`);
+      setStatus({
+        phase: 'error',
+        message: `Le percentuali della composizione devono sommare al 100%: adesso fanno ${formatPercentageIt(totalPercentage)}.`,
+      });
       return false;
     }
 
@@ -1023,7 +1033,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
             ? resolveBondPrice(data.averageCost, data.bondNominalValue, isBondWithIsin)
             : 0;
         if (ledgerOpeningPrice <= 0) {
-          toast.error('Inserisci un prezzo di acquisto valido');
+          setStatus({ phase: 'error', message: 'Serve un prezzo di acquisto maggiore di zero.' });
           return;
         }
         if (shouldUpdatePrice(data.type, data.subCategory)) {
@@ -1040,7 +1050,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
         }
       } else if (data.manualPrice && !isNaN(data.manualPrice) && data.manualPrice > 0) {
         currentPrice = resolveBondPrice(data.manualPrice, data.bondNominalValue, isBondWithIsin);
-        toast.success(`Prezzo manuale impostato: ${currentPrice.toFixed(2)} ${data.currency}`);
+        toast.success(`Prezzo manuale impostato: ${formatNumberIt(currentPrice)} ${data.currency}`);
       } else if (shouldUpdatePrice(data.type, data.subCategory)) {
         const fetched = await fetchMarketPrice(data.ticker, data.isin, data.bondNominalValue, isBondWithIsin);
         currentPrice = fetched.price;
@@ -1097,7 +1107,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
         // retries via «Registra operazione». We accept the two-step gap for a simpler create flow.
         const openingQty = data.quantity;
         if (isNaN(openingQty) || openingQty <= 0) {
-          toast.error('Inserisci una quantità valida');
+          setStatus({ phase: 'error', message: 'Serve una quantità maggiore di zero.' });
           return;
         }
         savedAssetId = await createAsset(ownerId, { ...formData, quantity: 0, averageCost: undefined });
@@ -1145,7 +1155,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
       onClose();
     } catch (error) {
       console.error('Error saving asset:', error);
-      toast.error("Errore nel salvataggio dell'asset");
+      setStatus({ phase: 'error', message: describeWriteError(error) });
     } finally {
       setFetchingPrice(false);
     }
@@ -1169,7 +1179,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
         placeholder="es. 26"
       />
       {errors.taxRate && (
-        <p className="text-sm text-red-500">{errors.taxRate.message}</p>
+        <p className="text-sm text-destructive">{errors.taxRate.message}</p>
       )}
       <p className="text-xs text-muted-foreground">
         Percentuale di tassazione su plusvalenze e proventi (dividendi/cedole) (es. 26 per 26%)
@@ -1186,34 +1196,67 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
     </div>
   );
 
-  return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0">
-        <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
-          <DialogTitle>
-            {isEdit
-              ? 'Modifica Asset'
-              : step === 1
-              ? 'Aggiungi Asset'
-              : TYPE_CARDS.find(c => c.type === selectedType)?.title ?? 'Nuovo Asset'}
-          </DialogTitle>
-          {/* sr-only: visually hidden but accessible to screen readers — silences Radix UI aria-describedby warning */}
-          <DialogDescription className="sr-only">
-            {isEdit
-              ? "Modifica i dettagli dell'asset selezionato."
-              : 'Inserisci i dettagli del nuovo asset da aggiungere al portafoglio.'}
-          </DialogDescription>
-        </DialogHeader>
+  const isTypePicker = !isEdit && step === 1;
 
-        {/* Step 1: type picker — create mode only */}
-        {!isEdit && step === 1 && (
-          <div className="flex-1 overflow-y-auto px-6 py-6">
-            <p className="text-sm text-muted-foreground mb-5">
-              Scegli il tipo di asset da aggiungere al portafoglio
-            </p>
+  // The reading IS the status line: what the form wants, what it is doing, how it went.
+  const reading = describeModalStatus(
+    isSubmitting || fetchingPrice ? { phase: 'submitting' } : status,
+    {
+      idle: isTypePicker
+        ? ASSET_TYPE_PICKER_READING
+        : describeAssetIntent({ isEdit, hasLedger: isLedgerEdit, isLedgerCreate }),
+      submitting: fetchingPrice ? 'Sto recuperando il prezzo di mercato.' : 'Sto salvando lo strumento.',
+    },
+  );
+
+  return (
+    <ResponsiveModal
+      open={open}
+      onClose={onClose}
+      eyebrow={
+        isTypePicker
+          ? 'Patrimonio · Passo 1 di 2'
+          : `Patrimonio · ${isEdit ? 'Modifica strumento' : TYPE_CARDS.find((c) => c.type === selectedType)?.label ?? 'Nuovo strumento'}`
+      }
+      title={
+        isEdit
+          ? asset?.name || 'Modifica strumento'
+          : isTypePicker
+            ? 'Che cosa vuoi aggiungere?'
+            : TYPE_CARDS.find((c) => c.type === selectedType)?.title ?? 'Nuovo strumento'
+      }
+      reading={reading}
+      width="lg"
+      footer={
+        isTypePicker ? (
+          <Button type="button" variant="outline" onClick={onClose}>
+            Annulla
+          </Button>
+        ) : (
+          <>
+            <Button type="button" variant="outline" onClick={onClose}>
+              Annulla
+            </Button>
+            <Button type="submit" form={ASSET_FORM_ID} disabled={isSubmitting || fetchingPrice}>
+              {fetchingPrice
+                ? 'Recupero prezzo...'
+                : isSubmitting
+                  ? 'Salvataggio...'
+                  : asset
+                    ? 'Salva modifiche'
+                    : 'Crea strumento'}
+            </Button>
+          </>
+        )
+      }
+    >
+        {/* Step 1: type picker — create mode only. No introductory paragraph: the reading line
+            above already says what the type decides. */}
+        {isTypePicker && (
+          <div>
             {/* role="radiogroup" + role="radio" exposes mutually exclusive selection to screen readers.
                 aria-checked reflects the form default (etf) until the user makes a choice. */}
-            <div role="radiogroup" aria-label="Tipo di asset" className="grid grid-cols-2 gap-3">
+            <div role="radiogroup" aria-label="Tipo di asset" className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {TYPE_CARDS.map(({ type: t, label, Icon, description }, idx) => (
                 <button
                   key={t}
@@ -1221,9 +1264,9 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                   role="radio"
                   aria-checked={selectedType === t}
                   onClick={() => handleTypeSelect(t)}
-                  className={`flex items-start gap-3 rounded-lg border border-border bg-card p-4 text-left transition-colors duration-150 ease-out hover:bg-muted/50 hover:border-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring${idx === TYPE_CARDS.length - 1 && TYPE_CARDS.length % 2 !== 0 ? ' col-span-2' : ''}`}
+                  className={`flex items-start gap-3 rounded-lg border border-border p-4 text-left transition-colors duration-150 ease-out hover:bg-muted/50 hover:border-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring${idx === TYPE_CARDS.length - 1 && TYPE_CARDS.length % 2 !== 0 ? ' sm:col-span-2' : ''}`}
                 >
-                  <Icon className="h-5 w-5 mt-0.5 text-muted-foreground shrink-0" />
+                  <Icon className="h-5 w-5 mt-0.5 text-muted-foreground shrink-0" aria-hidden="true" />
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-foreground">{label}</p>
                     <p className="text-xs text-muted-foreground leading-snug mt-0.5">{description}</p>
@@ -1236,8 +1279,8 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
 
         {/* Step 2: form — edit mode OR create mode after type selection */}
         {(isEdit || step === 2) && (
-        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col flex-1 min-h-0">
-          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+        <form id={ASSET_FORM_ID} onSubmit={handleSubmit(onSubmit)}>
+          <div className="space-y-4">
 
           {/* Back to type picker — create mode only */}
           {!isEdit && (
@@ -1278,7 +1321,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                 </SelectContent>
               </Select>
               {errors.assetClass && (
-                <p className="text-sm text-red-500">{errors.assetClass.message}</p>
+                <p className="text-sm text-destructive">{errors.assetClass.message}</p>
               )}
             </div>
           )}
@@ -1294,7 +1337,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                 placeholder="es. VWCE.DE"
               />
               {errors.ticker && (
-                <p className="text-sm text-red-500">{errors.ticker.message}</p>
+                <p className="text-sm text-destructive">{errors.ticker.message}</p>
               )}
             </div>
             )}
@@ -1307,7 +1350,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                 placeholder="es. Vanguard FTSE All-World"
               />
               {errors.name && (
-                <p className="text-sm text-red-500">{errors.name.message}</p>
+                <p className="text-sm text-destructive">{errors.name.message}</p>
               )}
             </div>
           </div>
@@ -1343,7 +1386,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
               }
             />
             {errors.isin && (
-              <p className="text-sm text-red-500">{errors.isin.message}</p>
+              <p className="text-sm text-destructive">{errors.isin.message}</p>
             )}
             <p className="text-xs text-muted-foreground">
               Necessario per dividendi automatici (azioni/ETF) e aggiornamento prezzi obbligazioni MOT
@@ -1381,7 +1424,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                 </SelectContent>
               </Select>
               {errors.type && (
-                <p className="text-sm text-red-500">{errors.type.message}</p>
+                <p className="text-sm text-destructive">{errors.type.message}</p>
               )}
             </div>
 
@@ -1405,7 +1448,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                 </SelectContent>
               </Select>
               {errors.assetClass && (
-                <p className="text-sm text-red-500">
+                <p className="text-sm text-destructive">
                   {errors.assetClass.message}
                 </p>
               )}
@@ -1498,7 +1541,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                 placeholder="EUR"
               />
               {errors.currency && (
-                <p className="text-sm text-red-500">{errors.currency.message}</p>
+                <p className="text-sm text-destructive">{errors.currency.message}</p>
               )}
             </div>
 
@@ -1515,17 +1558,17 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                 {...register('quantity', { valueAsNumber: true })}
               />
               {errors.quantity && (
-                <p className="text-sm text-red-500">{errors.quantity.message}</p>
+                <p className="text-sm text-destructive">{errors.quantity.message}</p>
               )}
               {/* Show hint only in edit mode — in create mode there's no previous quantity to compare.
                   Quantity changes represent capital flowing in/out of the portfolio. */}
               {isEdit && asset && selectedAssetClass !== 'cash' && (watchQuantity ?? 0) > (asset.quantity ?? 0) && (
-                <p className="text-xs text-amber-600 dark:text-amber-400">
+                <p className="text-xs text-warning-foreground">
                   Hai investito nuovo capitale? Se i fondi provengono dall&apos;esterno del portafoglio tracciato, registra un&apos;entrata nel cashflow per mantenere le metriche di performance accurate.
                 </p>
               )}
               {isEdit && asset && selectedAssetClass !== 'cash' && (watchQuantity ?? 0) < (asset.quantity ?? 0) && (
-                <p className="text-xs text-amber-600 dark:text-amber-400">
+                <p className="text-xs text-warning-foreground">
                   Hai venduto questo asset? Se il ricavato è uscito dal portafoglio tracciato, registra un&apos;uscita nel cashflow per mantenere le metriche di performance accurate.
                 </p>
               )}
@@ -1594,7 +1637,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                     placeholder="es. 5"
                   />
                   {errors.quantity && (
-                    <p className="text-sm text-red-500">{errors.quantity.message}</p>
+                    <p className="text-sm text-destructive">{errors.quantity.message}</p>
                   )}
                 </div>
                 <div className="space-y-2">
@@ -1612,7 +1655,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                     placeholder={isBondPctMode ? 'es. 100' : 'es. 85.1234'}
                   />
                   {errors.averageCost && (
-                    <p className="text-sm text-red-500">{errors.averageCost.message}</p>
+                    <p className="text-sm text-destructive">{errors.averageCost.message}</p>
                   )}
                   {isBondPctMode && (() => {
                     const biPrice = watchAverageCost;
@@ -1943,7 +1986,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
 
                 {composition.length > 0 && (
                   <p className="text-xs text-muted-foreground">
-                    Totale: {composition.reduce((sum, c) => sum + c.percentage, 0).toFixed(2)}% (deve essere 100%)
+                    Totale: {formatPercentageIt(composition.reduce((sum, c) => sum + c.percentage, 0))} (deve essere 100%)
                   </p>
                 )}
               </div>
@@ -1985,7 +2028,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                     placeholder="es. 150000"
                   />
                   {errors.outstandingDebt && (
-                    <p className="text-sm text-red-500">{errors.outstandingDebt.message}</p>
+                    <p className="text-sm text-destructive">{errors.outstandingDebt.message}</p>
                   )}
                   <p className="text-xs text-muted-foreground">
                     Il valore netto dell&apos;immobile sarà calcolato come: valore lordo - debito residuo
@@ -2082,7 +2125,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                         placeholder="es. 4.00"
                       />
                       {errors.bondCouponRate && (
-                        <p className="text-sm text-red-500">{errors.bondCouponRate.message}</p>
+                        <p className="text-sm text-destructive">{errors.bondCouponRate.message}</p>
                       )}
                     </div>
                     <div className="space-y-2">
@@ -2113,7 +2156,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                         {...register('bondIssueDate')}
                       />
                       {errors.bondIssueDate && (
-                        <p className="text-sm text-red-500">{errors.bondIssueDate.message}</p>
+                        <p className="text-sm text-destructive">{errors.bondIssueDate.message}</p>
                       )}
                       <p className="text-xs text-muted-foreground">Ancora del calendario cedolare</p>
                     </div>
@@ -2125,7 +2168,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                         {...register('bondMaturityDate')}
                       />
                       {errors.bondMaturityDate && (
-                        <p className="text-sm text-red-500">{errors.bondMaturityDate.message}</p>
+                        <p className="text-sm text-destructive">{errors.bondMaturityDate.message}</p>
                       )}
                       <p className="text-xs text-muted-foreground">Nessuna cedola oltre questa data</p>
                     </div>
@@ -2145,7 +2188,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                       placeholder="es. 1000"
                     />
                     {errors.bondNominalValue && (
-                      <p className="text-sm text-red-500">{errors.bondNominalValue.message}</p>
+                      <p className="text-sm text-destructive">{errors.bondNominalValue.message}</p>
                     )}
                     {/* Dynamic coupon preview based on current form values */}
                     {(() => {
@@ -2160,7 +2203,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                         const total = perShare * qty;
                         return (
                           <p className="text-xs text-primary font-medium">
-                            → {watchBondIsInflationLinked ? 'Cedola minima (solo fisso)' : 'Cedola stimata'}: {perShare.toFixed(2)} {watchCurrency}/unità × {qty} = {total.toFixed(2)} {watchCurrency} per pagamento
+                            → {watchBondIsInflationLinked ? 'Cedola minima (solo fisso)' : 'Cedola stimata'}: {formatNumberIt(perShare)} {watchCurrency}/unità × {formatNumberIt(qty, 0)} = {formatNumberIt(total)} {watchCurrency} per pagamento
                             {watchBondIsInflationLinked && (
                               <span className="block font-normal text-muted-foreground">La componente inflazione FOI si aggiunge a ogni periodo (inserita dalla tab Dividendi).</span>
                             )}
@@ -2278,7 +2321,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                       placeholder="es. 0.80"
                     />
                     {errors.bondFinalPremiumRate && (
-                      <p className="text-sm text-red-500">{errors.bondFinalPremiumRate.message}</p>
+                      <p className="text-sm text-destructive">{errors.bondFinalPremiumRate.message}</p>
                     )}
                     {(() => {
                       const premRate = watchBondFinalPremiumRate;
@@ -2289,7 +2332,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                         const total = perShare * qty;
                         return (
                           <p className="text-xs text-primary font-medium">
-                            → Premio stimato: {perShare.toFixed(2)} {watchCurrency}/unità × {qty} = {total.toFixed(2)} {watchCurrency} alla scadenza
+                            → Premio stimato: {formatNumberIt(perShare)} {watchCurrency}/unità × {formatNumberIt(qty, 0)} = {formatNumberIt(total)} {watchCurrency} alla scadenza
                           </p>
                         );
                       }
@@ -2363,7 +2406,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                       placeholder={isBondPctMode ? 'es. 100 (acquistato a 100 su Borsa Italiana)' : 'es. 85.1234'}
                     />
                     {errors.averageCost && (
-                      <p className="text-sm text-red-500">{errors.averageCost.message}</p>
+                      <p className="text-sm text-destructive">{errors.averageCost.message}</p>
                     )}
                     <p className="text-xs text-muted-foreground">
                       {isBondPctMode
@@ -2510,7 +2553,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                   placeholder="es. 0.20"
                 />
                 {errors.totalExpenseRatio && (
-                  <p className="text-sm text-red-500">{errors.totalExpenseRatio.message}</p>
+                  <p className="text-sm text-destructive">{errors.totalExpenseRatio.message}</p>
                 )}
                 <p className="text-xs text-muted-foreground">
                   Percentuale annuale dei costi di gestione (es. 0.20 per 0.20%)
@@ -2540,7 +2583,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
               </span>
             </div>
             {errors.leverageRatio && (
-              <p className="text-sm text-red-500">{errors.leverageRatio.message}</p>
+              <p className="text-sm text-destructive">{errors.leverageRatio.message}</p>
             )}
             <p className="text-xs text-muted-foreground">
               Solo per ETF a leva (es. 2 = 2×): moltiplica l&apos;esposizione nozionale in
@@ -2579,7 +2622,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                 }
               />
               {errors.manualPrice && (
-                <p className="text-sm text-red-500">{errors.manualPrice.message}</p>
+                <p className="text-sm text-destructive">{errors.manualPrice.message}</p>
               )}
               <p className="text-xs text-muted-foreground">
                 {isBondPctMode
@@ -2603,17 +2646,8 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
           )}
 
           </div>
-          <div className="px-6 pb-6 pt-4 border-t shrink-0 flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={onClose}>
-              Annulla
-            </Button>
-            <Button type="submit" disabled={isSubmitting || fetchingPrice}>
-              {fetchingPrice ? 'Recupero prezzo...' : isSubmitting ? 'Salvataggio...' : asset ? 'Salva Modifiche' : 'Crea'}
-            </Button>
-          </div>
         </form>
         )}
-      </DialogContent>
-    </Dialog>
+    </ResponsiveModal>
   );
 }

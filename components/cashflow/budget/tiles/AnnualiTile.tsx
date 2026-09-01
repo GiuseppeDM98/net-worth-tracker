@@ -13,7 +13,7 @@ import { Tile } from '@/components/ui/tile';
 import { NarrativeText } from '@/components/ui/narrative-text';
 import { BudgetTrack } from '@/components/cashflow/budget/BudgetTrack';
 import { progressFillColor, progressTextClass } from '@/components/cashflow/budget/budgetProgressStyle';
-import { useArmedDelete } from '@/components/cashflow/budget/useArmedDelete';
+import { useArmedDelete } from '@/lib/hooks/useArmedDelete';
 
 interface AnnualiTileProps {
   summary: AnnualBudgetSummary;

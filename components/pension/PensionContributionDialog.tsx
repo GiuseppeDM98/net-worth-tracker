@@ -184,9 +184,10 @@ export function PensionContributionDialog({ open, onClose, defaultAssetId }: Pen
     <ResponsiveModal
       open={open}
       onClose={onClose}
-      title="Registra versamento"
-      description="Aggiungi un versamento al fondo pensione: fondo, natura, importo, data e anno fiscale."
-      dialogClassName="max-w-md"
+      eyebrow="Previdenza · Versamenti"
+      title="Registra un versamento"
+      reading="Un versamento volontario scala il conto collegato e alza la deduzione IRPEF dell’anno fiscale che scegli; quello del datore no — è compenso, non capitale tuo."
+      width="md"
       footer={footer}
     >
       {!hasFunds ? (

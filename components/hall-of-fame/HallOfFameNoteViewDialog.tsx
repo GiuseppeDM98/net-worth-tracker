@@ -1,14 +1,8 @@
 'use client';
 
 import type { CSSProperties, RefObject } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
+import { ResponsiveModal } from '@/components/ui/responsive-modal';
+import { TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { Button } from '@/components/ui/button';
 import { HallOfFameNote } from '@/types/hall-of-fame';
 import { MONTH_NAMES } from '@/lib/constants/months';
@@ -41,68 +35,61 @@ export function HallOfFameNoteViewDialog({
   const yearlySections = note.sections.filter((s) => YEARLY_SECTION_KEYS.includes(s));
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        ref={dialogRef}
-        style={style}
-        className="max-w-lg max-h-[80vh] overflow-hidden flex flex-col"
-      >
-        <DialogHeader>
-          <DialogTitle>Visualizza Nota</DialogTitle>
-          <DialogDescription>
-            {periodText} — {note.sections.length === 1 ? '1 sezione' : `${note.sections.length} sezioni`}
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="flex-1 overflow-y-auto space-y-4">
-          <div className="space-y-1">
-            <p className="text-sm font-medium text-muted-foreground">Periodo:</p>
-            <p className="text-base">{periodText}</p>
-          </div>
-
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-muted-foreground">Sezioni Associate:</p>
-
-              {monthlySections.length > 0 && (
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-muted-foreground">Ranking Mensili:</p>
-                <ul className="list-disc list-inside ml-2 space-y-1">
-                  {monthlySections.map((section) => (
-                    <li key={section} className="text-sm">{SECTION_LABELS[section]}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {yearlySections.length > 0 && (
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-muted-foreground">Ranking Annuali:</p>
-                <ul className="list-disc list-inside ml-2 space-y-1">
-                  {yearlySections.map((section) => (
-                    <li key={section} className="text-sm">{SECTION_LABELS[section]}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-muted-foreground">Nota:</p>
-            <div className="max-h-[300px] overflow-y-auto border border-border rounded-lg p-3 bg-muted/50">
-              <p className="text-base whitespace-pre-wrap">{note.text}</p>
-            </div>
-          </div>
-        </div>
-
-        <DialogFooter className="gap-2">
+    <ResponsiveModal
+      open={open}
+      onClose={() => onOpenChange(false)}
+      eyebrow={`Hall of Fame · ${periodText}`}
+      title="La tua nota"
+      reading={
+        note.sections.length === 1
+          ? `Appesa a una classifica: ${SECTION_LABELS[note.sections[0]]}.`
+          : `Appesa a ${note.sections.length} classifiche di questo periodo.`
+      }
+      width="md"
+      contentRef={dialogRef}
+      triggerOrigin={style?.transformOrigin as string | undefined}
+      footer={
+        <>
           <Button type="button" variant="outline" onClick={onEditClick}>
-            Modifica Nota
+            Modifica
           </Button>
           <Button type="button" onClick={() => onOpenChange(false)}>
             Chiudi
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <p className="whitespace-pre-wrap text-sm leading-[1.6] text-foreground">{note.text}</p>
+
+        <div className="space-y-2 border-t border-border pt-3.5">
+          {monthlySections.length > 0 && (
+            <div>
+              <p className={TILE_SUB_EYEBROW_CLASS}>Classifiche mensili</p>
+              <ul className="mt-1.5 divide-y divide-border">
+                {monthlySections.map((section) => (
+                  <li key={section} className="py-1.5 text-[13px]">
+                    {SECTION_LABELS[section]}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {yearlySections.length > 0 && (
+            <div>
+              <p className={TILE_SUB_EYEBROW_CLASS}>Classifiche annuali</p>
+              <ul className="mt-1.5 divide-y divide-border">
+                {yearlySections.map((section) => (
+                  <li key={section} className="py-1.5 text-[13px]">
+                    {SECTION_LABELS[section]}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      </div>
+    </ResponsiveModal>
   );
 }

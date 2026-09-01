@@ -9,6 +9,7 @@ import {
   getApiAuthErrorResponse,
   requireFirebaseAuth,
 } from '@/lib/server/apiAuth';
+import { PERFORMANCE_ANALYSIS_MODEL } from '@/lib/constants/aiModels';
 import { checkRateLimit } from '@/lib/server/rateLimit';
 
 const ANALYZE_RATE_LIMIT_MAX = 10;
@@ -50,13 +51,13 @@ const anthropic = new Anthropic({
  * May throw — caller catches and maps the error to an HTTP response.
  *
  * MODEL CONFIG:
- * - claude-sonnet-4-6 for optimal cost/quality balance
+ * - PERFORMANCE_ANALYSIS_MODEL (lib/constants/aiModels.ts) for optimal cost/quality balance
  * - Extended Thinking (10k budget) for deeper financial reasoning
  * - web_search_20250305: Claude autonomously searches for market events (max 3 uses)
  */
 async function callAnthropicForPerformanceAnalysis(prompt: string) {
   return anthropic.messages.create({
-    model: 'claude-sonnet-4-6',
+    model: PERFORMANCE_ANALYSIS_MODEL,
     max_tokens: 16000, // thinking 10k + output ~6k max
     thinking: {
       type: 'enabled',

@@ -8,19 +8,13 @@
  * - Multi-section checkboxes: select which ranking tables show this note
  * - Text editor: 500 character max with real-time counter
  * - Edit mode: pre-populate when editing existing note
- * - Delete button: 2-click inline confirmation with 3s auto-disarm
+ * - Delete button: 2-click inline confirmation without a timer (`useArmedDelete`)
  */
 
 import type { CSSProperties, RefObject } from 'react';
 import { useState, useEffect, useMemo, useRef } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
+import { useArmedDelete } from '@/lib/hooks/useArmedDelete';
+import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -74,10 +68,6 @@ export function HallOfFameNoteDialog({
   const [selectedSections, setSelectedSections] = useState<Set<HallOfFameSectionKey>>(new Set());
   const [saving, setSaving] = useState(false);
 
-  // 2-click inline delete state
-  const [pendingDelete, setPendingDelete] = useState(false);
-  const deleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   useEffect(() => {
     if (!open) return;
 
@@ -93,16 +83,7 @@ export function HallOfFameNoteDialog({
       setNoteText('');
       setSelectedSections(new Set());
     }
-
-    // Reset delete state when dialog reopens
-    setPendingDelete(false);
-    if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
   }, [open, editNote, availableYears]);
-
-  // Clean up timer on unmount
-  useEffect(() => {
-    return () => { if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current); };
-  }, []);
 
   const monthRequired = useMemo(
     () => Array.from(selectedSections).some((s) => MONTHLY_SECTION_KEYS.includes(s)),
@@ -152,19 +133,9 @@ export function HallOfFameNoteDialog({
     }
   }
 
-  // First click arms; second click within 3s confirms
-  function handleDeleteClick() {
+  /** The confirmed delete. Arming it is `useArmedDelete`'s job — no timer (WCAG 2.2.1). */
+  function performDelete() {
     if (!editNote || !onDelete) return;
-
-    if (!pendingDelete) {
-      setPendingDelete(true);
-      deleteTimerRef.current = setTimeout(() => setPendingDelete(false), 3000);
-      return;
-    }
-
-    // Second click — confirmed
-    if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
-    setPendingDelete(false);
     setSaving(true);
     onDelete(editNote.id)
       .then(() => { toast.success('Nota eliminata'); onOpenChange(false); })
@@ -173,22 +144,33 @@ export function HallOfFameNoteDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        ref={dialogRef}
-        style={style}
-        className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto"
-      >
-        <DialogHeader>
-          <DialogTitle>
-            {editNote ? 'Modifica Nota Hall of Fame' : 'Aggiungi Nota Hall of Fame'}
-          </DialogTitle>
-          <DialogDescription>
-            {editNote
-              ? 'Modifica il testo o le sezioni associate a questa nota.'
-              : 'Aggiungi un commento contestuale per un periodo specifico.'}
-          </DialogDescription>
-        </DialogHeader>
+    <ResponsiveModal
+      open={open}
+      onClose={() => onOpenChange(false)}
+      eyebrow="Hall of Fame · Note"
+      title={editNote ? 'Modifica la nota' : 'Aggiungi una nota'}
+      reading={
+        selectedSections.size === 0
+          ? 'Scegli il periodo e almeno una classifica: la nota compare accanto ai record che scegli.'
+          : `La nota comparirà su ${selectedSections.size === 1 ? 'una classifica' : `${selectedSections.size} classifiche`} di questo periodo.`
+      }
+      width="lg"
+      contentRef={dialogRef}
+      triggerOrigin={style?.transformOrigin as string | undefined}
+      footer={
+        <>
+          {editNote && onDelete && (
+            <ArmedNoteDelete disabled={saving} onConfirm={performDelete} />
+          )}
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+            Annulla
+          </Button>
+          <Button type="button" onClick={handleSave} disabled={!canSave || saving}>
+            {saving ? 'Salvataggio...' : 'Salva'}
+          </Button>
+        </>
+      }
+    >
 
         <div className="space-y-6 py-4">
           {/* Period Selection */}
@@ -286,7 +268,7 @@ export function HallOfFameNoteDialog({
                 isOverLimit
                   ? 'text-destructive'
                   : remainingChars < 50
-                  ? 'text-amber-500 dark:text-amber-400'
+                  ? 'text-warning-foreground'
                   : 'text-muted-foreground'
               )}
             >
@@ -294,36 +276,36 @@ export function HallOfFameNoteDialog({
             </p>
           </div>
 
-          {!canSave && selectedSections.size === 0 && (
-            <p className="text-sm text-amber-600 dark:text-amber-400">
-              Seleziona almeno una sezione dove mostrare questa nota
-            </p>
-          )}
         </div>
+    </ResponsiveModal>
+  );
+}
 
-        <DialogFooter className="flex justify-between sm:justify-between">
-          <div>
-            {editNote && onDelete && (
-              <Button
-                type="button"
-                variant="destructive"
-                onClick={handleDeleteClick}
-                disabled={saving}
-              >
-                {pendingDelete ? 'Conferma eliminazione' : 'Elimina'}
-              </Button>
-            )}
-          </div>
-          <div className="flex gap-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-              Annulla
-            </Button>
-            <Button type="button" onClick={handleSave} disabled={!canSave || saving}>
-              {saving ? 'Salvataggio...' : 'Salva'}
-            </Button>
-          </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+/** The note's delete: two clicks, no timer, Escape disarms. */
+function ArmedNoteDelete({ disabled, onConfirm }: { disabled: boolean; onConfirm: () => void }) {
+  const ref = useRef<HTMLButtonElement | null>(null);
+  const { armed, onClick, onBlur } = useArmedDelete(ref, onConfirm);
+  const [wasArmed, setWasArmed] = useState(false);
+  if (armed && !wasArmed) setWasArmed(true);
+
+  return (
+    <>
+      <Button
+        ref={ref}
+        type="button"
+        variant={armed ? 'destructive' : 'outline'}
+        className={cn(!armed && 'text-destructive hover:text-destructive')}
+        onClick={onClick}
+        onBlur={onBlur}
+        disabled={disabled}
+        aria-pressed={armed}
+        aria-label={armed ? 'Premi di nuovo per eliminare la nota' : 'Elimina la nota'}
+      >
+        {armed ? 'Premi di nuovo per eliminare' : 'Elimina'}
+      </Button>
+      <span className="sr-only" role="status" aria-live="polite">
+        {armed ? 'Premi di nuovo per eliminare la nota' : wasArmed ? 'Eliminazione annullata' : ''}
+      </span>
+    </>
   );
 }

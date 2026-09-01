@@ -8,6 +8,7 @@ import {
   AssistantPreferences,
 } from '@/types/assistant';
 import { queryKeys } from '@/lib/query/queryKeys';
+import { userFacingError } from '@/lib/utils/dialogNarrative';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { toDate } from '@/lib/utils/dateHelpers';
 
@@ -36,7 +37,7 @@ async function fetchMemory(userId: string): Promise<AssistantMemoryDocument> {
 
   if (!response.ok) {
     const payload = await response.json().catch(() => null);
-    throw new Error(payload?.error ?? 'Impossibile caricare memoria e preferenze');
+    throw userFacingError(payload?.error ?? 'Impossibile caricare memoria e preferenze');
   }
 
   const payload = (await response.json()) as AssistantMemoryResponse;
@@ -76,7 +77,7 @@ export function useUpdateAssistantMemory(userId: string) {
 
       if (!response.ok) {
         const payload = await response.json().catch(() => null);
-        throw new Error(payload?.error ?? 'Impossibile aggiornare la memoria');
+        throw userFacingError(payload?.error ?? 'Impossibile aggiornare la memoria');
       }
 
       const payload = (await response.json()) as AssistantMemoryResponse;
@@ -108,7 +109,7 @@ export function useDeleteAssistantMemory(userId: string) {
 
       if (!response.ok) {
         const payload = await response.json().catch(() => null);
-        throw new Error(payload?.error ?? 'Impossibile eliminare la memoria');
+        throw userFacingError(payload?.error ?? 'Impossibile eliminare la memoria');
       }
 
       const payload = (await response.json()) as AssistantMemoryResponse;

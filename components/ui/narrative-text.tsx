@@ -16,6 +16,22 @@ interface NarrativeTextProps {
 export function NarrativeText({ segments, className, figureClassName = 'font-semibold' }: NarrativeTextProps) {
   return (
     <p className={cn('m-0', className)}>
+      <NarrativeSegments segments={segments} figureClassName={figureClassName} />
+    </p>
+  );
+}
+
+/**
+ * The segments alone, without the paragraph around them — for the surfaces that own their own
+ * element because it carries something else too (the modal's status line is a live region and
+ * Radix's `Description` at once, and a `<p>` inside a `<p>` is not valid HTML).
+ */
+export function NarrativeSegments({
+  segments,
+  figureClassName = 'font-semibold',
+}: Omit<NarrativeTextProps, 'className'>) {
+  return (
+    <>
       {segments.map((segment, i) =>
         segment.mono ? (
           <span
@@ -34,6 +50,6 @@ export function NarrativeText({ segments, className, figureClassName = 'font-sem
           <span key={i}>{segment.text}</span>
         ),
       )}
-    </p>
+    </>
   );
 }

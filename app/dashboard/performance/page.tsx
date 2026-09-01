@@ -34,6 +34,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   getAllPerformanceData,
   calculatePerformanceForPeriod,
@@ -62,6 +63,8 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { PageVerdict } from '@/components/ui/page-verdict';
 import { TILE_CELL_CLASS } from '@/components/ui/tile';
 import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
+import { ErrorNotice } from '@/components/ui/error-notice';
+import { describeReadFailure } from '@/lib/utils/statesNarrative';
 import type { TileSkeletonCell } from '@/lib/utils/tileGridSkeleton';
 import { useBenchmarkReturns } from '@/lib/hooks/useBenchmarkReturns';
 import { useFxRates } from '@/lib/hooks/useFxRates';
@@ -239,6 +242,8 @@ export default function PerformancePage() {
   const [isPendingPeriodChange, startPeriodTransition] = useTransition();
   const [performanceData, setPerformanceData] = useState<PerformanceData | null>(null);
   const [loading, setLoading] = useState(true);
+  /** A failed load is not an empty set: it gets an alert, never a verdict about zeros. */
+  const [loadFailed, setLoadFailed] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('YTD');
   const [showCustomDateDialog, setShowCustomDateDialog] = useState(false);
   const [showAIAnalysisDialog, setShowAIAnalysisDialog] = useState(false);
@@ -320,6 +325,7 @@ export default function PerformancePage() {
       const isInitialLoad = !hasLoadedOnceRef.current;
       if (isInitialLoad) setLoading(true);
       else setIsRefreshing(true);
+      setLoadFailed(false);
 
       const [rawSnapshots, assetsForBase, baseSettings] = await Promise.all([
         getUserSnapshots(ownerId),
@@ -343,6 +349,7 @@ export default function PerformancePage() {
       setPerformanceData(data);
       hasLoadedOnceRef.current = true;
     } catch (error) {
+      setLoadFailed(true);
       console.error('Error loading performance data:', error);
       toast.error('Errore nel caricamento delle metriche di performance');
     } finally {
@@ -572,7 +579,26 @@ export default function PerformancePage() {
     return (
       <PageContainer width="wide">
         {header}
-        <TileGridSkeleton cells={SKELETON_CELLS} toolbar={<div className="h-9 w-72 animate-pulse rounded-full bg-muted" aria-hidden="true" />} />
+        <TileGridSkeleton cells={SKELETON_CELLS} toolbar={<Skeleton className="h-9 w-72 rounded-full" />} />
+      </PageContainer>
+    );
+  }
+
+  // A failed read comes BEFORE the empty branch: `[]` on failure is indistinguishable from `[]`
+  // on a new account, and the empty branch would judge a set that was never read.
+  if (loadFailed) {
+    return (
+      <PageContainer width="wide">
+        {header}
+        <ErrorNotice
+          className="max-w-[920px]"
+          onRetry={() => void loadPerformanceData()}
+          notice={describeReadFailure({
+            consequence: 'Le metriche di rendimento non sono state lette: un rendimento non misurato non è uno zero.',
+            untouched: 'Le rilevazioni e le operazioni registrate non sono state toccate.',
+            canRetry: true,
+          })}
+        />
       </PageContainer>
     );
   }
@@ -776,6 +802,9 @@ export default function PerformancePage() {
             if (!open) setAiDialogOrigin(undefined);
           }}
           metrics={metrics}
+          // The modal's title IS this verdict: one sentence judging these numbers, never a
+          // second phrasing of it inside the dialog (DESIGN.md → The Verdict-First Rule).
+          verdict={verdict}
           timePeriod={selectedPeriod}
           userId={ownerId}
           triggerOrigin={aiDialogOrigin}

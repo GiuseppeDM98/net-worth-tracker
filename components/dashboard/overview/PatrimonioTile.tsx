@@ -1,7 +1,7 @@
 'use client';
 
 import { TrendingDown, TrendingUp, Trophy } from 'lucide-react';
-import type { DashboardOverviewPayload, DashboardOverviewSparklinePoint } from '@/types/dashboardOverview';
+import type { DashboardOverviewSparklinePoint } from '@/types/dashboardOverview';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { formatPercentage } from '@/lib/services/chartService';
 import { signChipClass, signTextClass } from '@/lib/utils/metricColors';
@@ -31,20 +31,32 @@ export interface MarketDigestEntry {
   delta: number;
 }
 
+/** The two windows the hero chips read, either of them absent when there is no baseline. */
+export interface PatrimonioTileVariations {
+  monthly: { value: number; percentage: number } | null;
+  yearly: { value: number; percentage: number } | null;
+}
+
 interface PatrimonioTileProps {
-  overview: DashboardOverviewPayload;
   totalValue: number;
   heroValueClass: string;
+  variations: PatrimonioTileVariations;
+  /** Renders the "Massimo storico" chip. */
+  isNewATH?: boolean;
   sparklinePeriod: SparklinePeriod;
   onSparklinePeriodChange: (period: SparklinePeriod) => void;
   sparklineDisplay: DashboardOverviewSparklinePoint[];
   /**
-   * The "Mercato:" digest. Defaults to the payload's per-class movers (the Panoramica);
-   * Patrimonio passes its top instruments instead, so the two pages never print the same line.
+   * The "Mercato:" digest. The Panoramica passes the payload's per-class movers, Patrimonio its
+   * top instruments, so the two pages never print the same line.
    */
   movers?: MarketDigestEntry[];
   /** The muted count line under the digest; defaults to "N asset in portafoglio". */
   countLine?: string;
+  /** Feeds that default line; ignored once `countLine` is given. */
+  assetCount?: number;
+  /** Appends "· snapshot del mese presente" to whichever count line is shown. */
+  hasCurrentMonthSnapshot?: boolean;
   className?: string;
 }
 
@@ -86,21 +98,27 @@ export function VariationChip({
  * The dominant tile: net worth, its two variations, the all-time-high chip, the sparkline on
  * the selected period, and the market digest. Spans two rows on desktop, so the sparkline is
  * the element that stretches (`flex-1`) — the number and the chips keep their size.
+ *
+ * It takes the FIGURES it draws, not the overview payload it used to receive: three surfaces
+ * render this one hero — the Panoramica, Patrimonio and the public landing, which has no
+ * account and therefore no payload — and a second hero built for the third would drift from
+ * the other two (AGENTS.md → Panoramica: the hero tile is ONE component).
  */
 export function PatrimonioTile({
-  overview,
   totalValue,
   heroValueClass,
+  variations,
+  isNewATH = false,
   sparklinePeriod,
   onSparklinePeriodChange,
   sparklineDisplay,
-  movers: moversProp,
+  movers = [],
   countLine,
+  assetCount = 0,
+  hasCurrentMonthSnapshot = false,
   className,
 }: PatrimonioTileProps) {
   const hasSparkline = sparklineDisplay.length >= 2;
-  const movers: MarketDigestEntry[] =
-    moversProp ?? (overview.topMovers ?? []).map((m) => ({ key: m.assetClass, label: m.label, delta: m.delta }));
 
   return (
     <OverviewTile eyebrow="Patrimonio totale lordo" className={className} ariaLabel="Patrimonio">
@@ -111,23 +129,23 @@ export function PatrimonioTile({
       />
 
       {/* Variation chips + record, one grouped row from tablet up, a column on phones. */}
-      {(overview.variations.monthly || overview.variations.yearly || overview.ath?.isNewATH) && (
+      {(variations.monthly || variations.yearly || isNewATH) && (
         <div className="mt-4 flex flex-col gap-2.5 tablet:flex-row tablet:flex-wrap tablet:items-start tablet:gap-x-2.5 tablet:gap-y-2">
-          {overview.variations.monthly && (
+          {variations.monthly && (
             <VariationChip
-              value={overview.variations.monthly.value}
-              percentage={overview.variations.monthly.percentage}
+              value={variations.monthly.value}
+              percentage={variations.monthly.percentage}
               caption="questo mese"
             />
           )}
-          {overview.variations.yearly && (
+          {variations.yearly && (
             <VariationChip
-              value={overview.variations.yearly.value}
-              percentage={overview.variations.yearly.percentage}
+              value={variations.yearly.value}
+              percentage={variations.yearly.percentage}
               caption="da inizio anno"
             />
           )}
-          {overview.ath?.isNewATH && (
+          {isNewATH && (
             <span className="inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-[9px] bg-positive/10 px-[11px] py-[6px] text-[12px] font-semibold leading-none text-positive">
               <Trophy className="h-[13px] w-[13px]" aria-hidden="true" />
               Massimo storico
@@ -182,10 +200,8 @@ export function PatrimonioTile({
         )}
         <p className="font-mono tabular-nums">
           {countLine ??
-            (overview.flags.assetCount === 0
-              ? 'Aggiungi asset per iniziare'
-              : `${overview.flags.assetCount} asset in portafoglio`)}
-          {overview.flags.currentMonthSnapshotExists && ' · snapshot del mese presente'}
+            (assetCount === 0 ? 'Aggiungi asset per iniziare' : `${assetCount} asset in portafoglio`)}
+          {hasCurrentMonthSnapshot && ' · snapshot del mese presente'}
         </p>
       </div>
     </OverviewTile>
