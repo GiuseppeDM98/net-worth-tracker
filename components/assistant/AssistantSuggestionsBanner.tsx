@@ -25,7 +25,7 @@ interface AssistantSuggestionsBannerProps {
  * goal is the one place the positive token is a verdict rather than decoration.
  *
  * «Ignora» is durable: the server compares the ignore against the item's `updatedAt`, so the
- * suggestion comes back only after the goal itself changes (AGENTS.md → Assistant).
+ * suggestion comes back only after the goal itself changes (doc/guide/assistente.md § Assistant).
  */
 export function AssistantSuggestionsBanner({ userId, memory, disabled }: AssistantSuggestionsBannerProps) {
   const prefersReducedMotion = useReducedMotion();

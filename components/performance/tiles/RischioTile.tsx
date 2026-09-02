@@ -48,7 +48,7 @@ function Value({ value, className }: { value: string | null; className?: string 
 /**
  * «Quanto rischio?» — volatility, Sharpe, Sortino and the deepest drawdown with its months, as
  * flat rows. Below three measured months the ratios are `—` and the reading says why: a
- * deviation on two points is noise, not a statistic (AGENTS.md → no silent filters, floors instead).
+ * deviation on two points is noise, not a statistic (doc/guide/rendimenti.md § Rendimenti — the measurement window).
  */
 export function RischioTile({ reading, monthsMeasured, riskFreeRate, volatility, sharpeRatio, sortinoRatio, drawdown, className }: RischioTileProps) {
   const duration = drawdown

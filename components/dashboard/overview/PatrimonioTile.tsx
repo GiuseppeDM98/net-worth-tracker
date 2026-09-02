@@ -14,7 +14,7 @@ import { OverviewTile, TILE_SUB_EYEBROW_CLASS } from './OverviewTile';
 /**
  * The hero number's size class. A 7-8 figure total at 44/54px would wrap inside the tile, so
  * the step-down keys off the formatted string's length (the tile's width does not vary; the
- * string does) — AGENTS.md → Panoramica.
+ * string does) — doc/guide/panoramica.md § Panoramica and Dashboard Data Isolation.
  */
 export function resolveHeroValueClass(totalValue: number): string {
   const formattedLength = cachedFormatCurrencyEUR(totalValue).length;
@@ -102,7 +102,7 @@ export function VariationChip({
  * It takes the FIGURES it draws, not the overview payload it used to receive: three surfaces
  * render this one hero — the Panoramica, Patrimonio and the public landing, which has no
  * account and therefore no payload — and a second hero built for the third would drift from
- * the other two (AGENTS.md → Panoramica: the hero tile is ONE component).
+ * the other two (doc/guide/panoramica.md § Panoramica and Dashboard Data Isolation).
  */
 export function PatrimonioTile({
   totalValue,

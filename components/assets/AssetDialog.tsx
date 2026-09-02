@@ -1301,7 +1301,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
               picker. Defaults to 'equity' (set by `handleTypeSelect` in step 1), editable here
               before the suggestion effects below fire (allocationRole off `selectedAssetClass`,
               isLiquid off type/subCategory). Trend Following/Carry have no dedicated color/target yet in
-              Impostazioni (AGENTS.md → Leva L0) — offered anyway since they exist for leveraged ETFs. */}
+              Impostazioni (doc/guide/allocazione.md § Allocation — the two plans and the leverage engine) — offered anyway since they exist for leveraged ETFs. */}
           {!isEdit && selectedType === 'etf' && (
             <div className="space-y-2">
               <Label htmlFor="assetClassEtf">Classe Asset *</Label>

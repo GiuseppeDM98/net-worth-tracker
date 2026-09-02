@@ -292,7 +292,7 @@ export interface AccumulationSimulationParams {
   numberOfSimulations: number;
 
   // Pension inflows at TODAY's value (no deterministic fund growth inside a stochastic
-  // run — AGENTS → FIRE, What If and Goals). Order per year: inflow → return → savings.
+  // run — doc/guide/fire.md § FIRE, What If and Goals). Order per year: inflow → return → savings.
   capitalInflows?: MonteCarloCapitalInflow[];
 }
 

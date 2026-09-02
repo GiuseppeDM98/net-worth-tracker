@@ -486,14 +486,14 @@
 
 ## 📚 Documentation
 
-- Refreshed `docs/screenshots/cashflow-sankey.png` and `docs/screenshots/cashflow-drilldown.png` on the redesigned Analisi (synthetic data): the flow tile with its subcategory layer, and the card of a subcategory.
+- Refreshed `doc/screenshots/cashflow-sankey.png` and `doc/screenshots/cashflow-drilldown.png` on the redesigned Analisi (synthetic data): the flow tile with its subcategory layer, and the card of a subcategory.
 - DESIGN.md documents the sixth propagated page: "Scheda inside the Grid" (the focused entity as a tile of its own) and the neutral-baseline rule of the in-tile bars (last year's month beside this year's, a gap where the baseline is unknowable).
 - DESIGN.md documents the third propagated page with two new rules: **Received vs Announced** (money in the account and money merely promised are never one figure, and both are bounded by the page's period) and **the Off-Axis Tile** (a tile measured on a window the page's selector cannot change must name that window instead of appearing to follow it). AGENTS.md gained a *Cashflow › Dividendi* section; `.impeccable/design.json` mirrors the new rules.
-- Refreshed `docs/screenshots/dividend-calendar.png` on the redesigned Dividendi tab (synthetic data).
+- Refreshed `doc/screenshots/dividend-calendar.png` on the redesigned Dividendi tab (synthetic data).
 - DESIGN.md documents the first propagated page: "Table inside a Tile" (the Patrimonio instruments table with the tile's cadence), the Page Verdict primitive in `components/ui`, and the rule that a Δ is a unit-price variation; AGENTS.md gained a *Patrimonio* section.
 - DESIGN.md now documents the "Verdict over Tiles" shape set by the redesigned Overview (Page Verdict, Tile, Tile Grid, the honesty rules for generated sentences) and marks the patterns it supersedes; `.impeccable/design.json` and PRODUCT.md are aligned.
-- Added `docs/redesign-prompts.md`: one ready-to-use prompt per app section (navigation, every page and tab, login/register, landing, dialogs, states, email/PDF) to propagate the new style page by page, with a suggested model/effort and a screenshot rule.
-- Refreshed `docs/screenshots/portfolio-overview.png` on the new Overview (synthetic data).
+- Added `doc/redesign-prompts.md`: one ready-to-use prompt per app section (navigation, every page and tab, login/register, landing, dialogs, states, email/PDF) to propagate the new style page by page, with a suggested model/effort and a screenshot rule.
+- Refreshed `doc/screenshots/portfolio-overview.png` on the new Overview (synthetic data).
 
 ## 🔒 Security
 

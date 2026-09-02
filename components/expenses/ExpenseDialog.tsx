@@ -1573,7 +1573,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
           // `isRecurring: false` above is authoritative, but `recurringDay: undefined` is
           // stripped by removeUndefinedDeep before the write, leaving the old day behind
           // in Firestore. Reachable now that a debt can be turned into a plain expense
-          // from this form — see AGENTS.md → Firestore Optional Field Deletion.
+          // from this form — see AGENTS.md § Firestore Writes.
           recurringDay: expenseData.isRecurring ? expenseData.recurringDay : deleteField(),
           recurringFrequency: expenseData.isRecurring
             ? expenseData.recurringFrequency

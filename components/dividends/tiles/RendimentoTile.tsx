@@ -48,7 +48,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
  * by the server over the trailing twelve months on the CURRENT holding, and DPS growth over
  * closed calendar years. That is stated in the aside and spelled out in the footer, because a
  * view that shows figures from a window other than the picker's must name that window
- * (AGENTS.md → Centri di Costo).
+ * (doc/guide/centri-di-costo.md § Centri di Costo).
  *
  * A failed fetch is an alert, not an empty tile: the rest of the page keeps working.
  */

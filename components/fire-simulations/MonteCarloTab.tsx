@@ -142,7 +142,7 @@ export function MonteCarloTab() {
 
   // ─── The pension lock (governs the whole FIRE page) ──────────────────────────
   // With the lock on, the locked funds leave the starting portfolio and re-enter the simulation
-  // as capital inflows at their unlock year, at TODAY's value (AGENTS → FIRE, What If and Goals).
+  // as capital inflows at their unlock year, at TODAY's value (doc/guide/fire.md § FIRE, What If and Goals).
   const respectPensionLockIn = settings?.respectPensionLockInFire ?? false;
   const pensionLockState = useMemo(() => {
     if (!respectPensionLockIn || !assets) return null;

@@ -6,7 +6,7 @@
  * `__tests__/**\/*.test.ts`, so logic living inside a `.tsx` has no way to be covered at
  * all. The shapes below are plain objects; @nivo/sankey consumes them structurally.
  *
- * A second, structural reason to keep this file free of React: AGENTS.md records that
+ * A second, structural reason to keep this file free of React: AGENTS.md § Recharts records that
  * `useChartColors()` must never reach a Nivo component (react-spring cannot interpolate
  * oklch and crashes on arity). The palettes live here precisely because a module that
  * cannot import a hook cannot break that rule.

@@ -208,6 +208,19 @@ See [`.env.local.example`](.env.local.example) for detailed comments on each var
 - **Shared layout system** (`PageContainer`, `PageHeader`, `PageTabBar`) for consistent page structure
 - **Timezone-aware** date handling (Europe/Rome)
 
+## Documentation
+
+For contributors and AI agents, the repo keeps its guidance split by scope:
+
+| File | Scope |
+| --- | --- |
+| [`CLAUDE.md`](CLAUDE.md) | Index — what each feature is and where it lives |
+| [`AGENTS.md`](AGENTS.md) | Repo-wide conventions, data/state patterns, UI patterns, testing, workflow |
+| [`doc/guide/`](doc/guide/) | One file per domain (a page, a tab, a subsystem) — the full rules and blind spots for that area |
+| [`DESIGN.md`](DESIGN.md) | The aesthetic spec (normative) |
+| [`PRODUCT.md`](PRODUCT.md) · [`SETUP.md`](SETUP.md) · [`WORKFLOW.md`](WORKFLOW.md) | Positioning · environment/emulators · session rules |
+| [`doc/redesign-prompts.md`](doc/redesign-prompts.md) | Ready-to-paste prompts for the page-by-page redesign propagation |
+
 ## Tech Stack
 
 | Category | Technology | Purpose |
@@ -373,45 +386,45 @@ See [LICENSE.md](LICENSE.md) for the full license text.
 
 ### Dashboard & Portfolio
 
-![Portfolio overview](docs/screenshots/portfolio-overview.png)
+![Portfolio overview](doc/screenshots/portfolio-overview.png)
 *Overview: the month's verdict over a grid of tiles — net worth, liquidity, cashflow, composition, costs, goals*
 
-![Asset allocation](docs/screenshots/asset-allocation.png)
+![Asset allocation](doc/screenshots/asset-allocation.png)
 *Allocazione: the verdict over Bilanciamento, Piano, Per classe and Esposizione*
 
 ### Cashflow
 
-![Cashflow Sankey](docs/screenshots/cashflow-sankey.png)
+![Cashflow Sankey](doc/screenshots/cashflow-sankey.png)
 *Analisi: the flow of the year as a 5-layer Sankey inside its tile — a type drills by a click, a category opens its Scheda*
 
-![Cashflow drill-down](docs/screenshots/cashflow-drilldown.png)
+![Cashflow drill-down](doc/screenshots/cashflow-drilldown.png)
 *Analisi: the Scheda of a subcategory — period total, per-year table with signed deltas, 24-month trend, transactions*
 
 ### Performance & History
 
-![Performance metrics](docs/screenshots/performance-metrics.png)
+![Performance metrics](doc/screenshots/performance-metrics.png)
 *Rendimenti: the verdict — how much the portfolio returns, and against what — over the TWR, the risk figures and the six model portfolios*
 
-![Monthly heatmap](docs/screenshots/monthly-heatmap.png)
+![Monthly heatmap](doc/screenshots/monthly-heatmap.png)
 *Rendimenti: the Consistenza tile — positive months over the measured ones, and every month's return as a heatmap*
 
-![Net worth history](docs/screenshots/history-networth.png)
+![Net worth history](doc/screenshots/history-networth.png)
 *Net worth evolution over time*
 
 ### FIRE & Simulations
 
-![FIRE calculator](docs/screenshots/fire-calculator.png)
+![FIRE calculator](doc/screenshots/fire-calculator.png)
 *FIRE projections with Bear/Base/Bull scenarios*
 
-![Monte Carlo](docs/screenshots/monte-carlo.png)
+![Monte Carlo](doc/screenshots/monte-carlo.png)
 *FIRE › Monte Carlo — the verdict over Probabilità, Distribuzione and Scenari a confronto*
 
 ### Dividends & Hall of Fame
 
-![Dividend calendar](docs/screenshots/dividend-calendar.png)
+![Dividend calendar](doc/screenshots/dividend-calendar.png)
 *Dividendi: the payments tile in calendar view — received and expected kept apart, day by day*
 
-![Hall of Fame](docs/screenshots/hall-of-fame.png)
+![Hall of Fame](doc/screenshots/hall-of-fame.png)
 *Hall of Fame: the record month named first, then the rankings — net worth, income, what a month kept, and the years*
 
 ## Star History

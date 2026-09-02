@@ -174,7 +174,7 @@ export function WhatIfAnalysisTab() {
     () => (pensionLockState?.inflows ?? []).map((inflow) => ({ yearsFromNow: inflow.yearsFromNow, amountToday: inflow.amount })),
     [pensionLockState],
   );
-  // Multi-fund unlocks aggregate on the LATEST year, as the Calcolatore does (AGENTS → FIRE).
+  // Multi-fund unlocks aggregate on the LATEST year, as the Calcolatore does (doc/guide/fire.md § FIRE, What If and Goals).
   const pensionUnlockYears = pensionLockState && pensionLockState.inflows.length > 0 ? Math.max(...pensionLockState.inflows.map((inflow) => inflow.yearsFromNow)) : 0;
   const pensionBridge = useMemo(
     () => (pensionLockedValue > 0 && pensionUnlockYears > 0 ? { valueToday: pensionLockedValue, yearsToUnlock: pensionUnlockYears } : null),

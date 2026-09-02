@@ -18,7 +18,7 @@
  *
  * The page owns every dialog — one AssetDialog serves the header's "Aggiungi asset", the
  * Liquidità tile's "Aggiungi conto" and the table's Modifica — so a mutation invalidates the
- * assets AND the overview in one place (AGENTS.md → dual invalidation).
+ * assets AND the overview in one place (doc/guide/patrimonio.md § Patrimonio).
  */
 
 'use client';
@@ -130,7 +130,7 @@ export default function AssetsPage() {
 
   // The whole ledger of the owner, filtered to the month in memory: a month query would need a
   // (userId, date) composite index that does not exist, and every trade mutation already
-  // invalidates this cache (AGENTS.md → Asset Trade Ledger).
+  // invalidates this cache (doc/guide/registro-operazioni.md § Asset Trade Ledger).
   const { data: trades = [], isLoading: loadingTrades } = useAssetTransactions(ownerId, undefined, { enabled: ledgerReady });
 
   // ─── Dialog state ─────────────────────────────────────────────────────────────

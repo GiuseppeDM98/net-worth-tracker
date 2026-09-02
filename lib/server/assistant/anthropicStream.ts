@@ -205,7 +205,7 @@ export async function streamAssistantResponse({
     // Hitting the ceiling leaves the answer cut off mid-sentence. Saying so turns a
     // response that looks broken into one the user knows how to continue — the same
     // reason the prompt's subcategory valve announces itself instead of truncating
-    // quietly (AGENTS.md -> A Silent Cap in a Context Builder...).
+    // quietly (doc/guide/assistente.md § Assistant — the silent-cap rule).
     let text = aggregatedText.trim();
     if (stopReason === 'max_tokens' && text.length > 0) {
       onText(TRUNCATION_NOTICE);
