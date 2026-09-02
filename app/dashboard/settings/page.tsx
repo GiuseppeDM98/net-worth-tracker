@@ -511,7 +511,7 @@ export default function SettingsPage() {
       getAllAssets(ownerId).then((assets) =>
         // Default debit/credit account picker: an actual conto, not just a "cash-class" asset —
         // a money-market ETF (assetClass 'cash') is not a settlement account. Strict convention
-        // (convenzione stretta, AGENTS.md → hardening 2026-07-26).
+        // (convenzione stretta, doc/guide/patrimonio.md § Asset Pricing, FX and Assets).
         setCashAssets(assets.filter((a) => a.type === 'cash' && a.assetClass === 'cash'))
       );
     }

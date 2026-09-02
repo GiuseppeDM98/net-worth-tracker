@@ -55,7 +55,7 @@ interface UseAssistantStreamingArgs {
  *
  * NOTE: streamingMessages is NEVER cleared in a useEffect([selectedThreadId]) —
  * the meta event sets the thread id mid-stream and such an effect would wipe the
- * buffer before text arrives (AGENTS.md → Assistant). Callers reset explicitly
+ * buffer before text arrives (doc/guide/assistente.md § Assistant). Callers reset explicitly
  * via resetStream() on thread switches.
  */
 export function useAssistantStreaming({

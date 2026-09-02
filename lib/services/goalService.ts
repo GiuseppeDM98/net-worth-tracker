@@ -18,7 +18,7 @@ import { serializeGoalForFirestore } from '@/lib/utils/goalMath';
 // The math the server also needs — calculateGoalProgress and
 // deriveTargetAllocationFromGoals — lives in lib/utils/goalMath.ts and is
 // re-exported here: this module imports the client Firestore SDK at top level,
-// so server-only code can never import it (AGENTS.md → Panoramica and Dashboard
+// so server-only code can never import it (doc/guide/panoramica.md § Panoramica and Dashboard
 // Data Isolation). Client call sites keep importing them from here.
 
 export {

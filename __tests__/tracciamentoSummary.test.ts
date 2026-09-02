@@ -4,7 +4,7 @@
  * anchored month series behind the two charts, the savings history, the category ranking
  * with its residual and the movements count. Pure: no React, no Firebase.
  *
- * Classification is ALWAYS by `type`, never by the sign of `amount` (AGENTS.md → Expense
+ * Classification is ALWAYS by `type`, never by the sign of `amount` (doc/guide/cashflow.md § Expense
  * Sign Convention): every fixture carries an explicit type, and one income row is negative
  * on purpose (a reversal) to prove the rule.
  */

@@ -79,7 +79,7 @@ export const SAMPLE_VARIATIONS = {
 /**
  * The "Mercato:" digest — the price effect of the month, never the flows. It sums to 2360 €
  * of the month's 3180 €: the remaining 820 € are contributions, which is exactly the split
- * the real digest makes (AGENTS.md → Panoramica: topMovers are market return).
+ * the real digest makes (doc/guide/panoramica.md § Panoramica and Dashboard Data Isolation).
  */
 export const SAMPLE_MARKET_MOVERS: MarketDigestEntry[] = [
   { key: 'equity', label: 'Azioni', delta: 2140 },

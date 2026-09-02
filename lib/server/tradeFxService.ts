@@ -6,7 +6,7 @@ import type { Asset } from '@/types/assets';
  * Trade FX resolution (Registro operazioni asset).
  *
  * A trade's `priceEur` is resolved SERVER-SIDE only: Frankfurter is silently blocked from the
- * browser (AGENTS.md → FX Conversion), and storing a trade without a trustworthy `priceEur` would
+ * browser (doc/guide/patrimonio.md § Asset Pricing, FX and Assets), and storing a trade without a trustworthy `priceEur` would
  * corrupt every EUR metric. Network calls happen here, BEFORE the Firestore transaction — never
  * inside it (AGENTS.md → runTransaction).
  */

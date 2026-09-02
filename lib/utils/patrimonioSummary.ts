@@ -19,7 +19,7 @@ import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
 
 /**
  * A cash ACCOUNT is `type === 'cash' && assetClass === 'cash'` — the cash-picker rule
- * (AGENTS.md → Asset Pricing, FX and Assets): a money-market ETF carries `assetClass: 'cash'`
+ * (doc/guide/patrimonio.md § Asset Pricing, FX and Assets): a money-market ETF carries `assetClass: 'cash'`
  * but is an instrument, and belongs in the table.
  */
 export function isCashAccount(asset: Pick<Asset, 'type' | 'assetClass'>): boolean {
@@ -27,7 +27,7 @@ export function isCashAccount(asset: Pick<Asset, 'type' | 'assetClass'>): boolea
 }
 
 /**
- * A position still held. `quantity = 0` marks a sold asset (AGENTS.md → Asset Pricing): it stays
+ * A position still held. `quantity = 0` marks a sold asset (doc/guide/patrimonio.md § Asset Pricing, FX and Assets): it stays
  * in the table with its «Azzerato» badge, but it is not something the user owns — every count,
  * share and sum on the page runs over held positions only.
  */

@@ -49,8 +49,8 @@ components/dashboard/overview/*) è il riferimento di implementazione: stesse pr
 (verdetto → griglia 12 colonne → dettaglio sotto la piega), stesso rigore sui numeri.
 
 Contesto, da fare TASSATIVAMENTE prima di ogni cosa:
-- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (pattern, gotcha — in particolare
-  «Panoramica and Dashboard Data Isolation» e la sezione della pagina che tocchiamo), WORKFLOW.md
+- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (convenzioni e gotcha trasversali) e doc/guide/<pagina>.md (le regole
+  e i blind spot della pagina che tocchiamo; per la Panoramica, doc/guide/panoramica.md), WORKFLOW.md
   (regole di sessione e collaudo guidato), DESIGN.md (normativo: il nuovo stile È lì),
   COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice.
 - Crea il branch PRIMA di editare. Crea SESSION_NOTES.md per tracciare il lavoro.
@@ -77,7 +77,7 @@ Metodo, in quest'ordine:
    file toccati, e una spec Playwright usa-e-getta sugli emulatori a 1440 e 390 che verifichi
    verdetto/tessere/zero overflow (main.scrollWidth === clientWidth). Cancella la spec, esporta e
    spegni gli emulatori.
-6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), AGENTS.md (sezione della pagina),
+6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), doc/guide/<pagina>.md (regole e blind spot della pagina; AGENTS.md solo se cambia una regola trasversale),
    DESIGN.md (marca «superseded» i pattern che la pagina abbandona; aggiungi al ramp solo misure
    davvero usate) e .impeccable/design.json (narrative specchio verbatim). Draft Release Temp.md.
 7. Nessun commit senza il mio OK esplicito. Rispondi in italiano; codice e commenti in inglese.
@@ -112,14 +112,14 @@ drawer aperto (terzo artboard). Nessuna pagina dentro: usa la Panoramica come co
 Verifica: Playwright a 1440 (sidebar) e 390 portrait (pill + drawer), più 1024 landscape
 (nessuna pill, barra con trigger). Nessun overflow.
 
-SCREENSHOT PER IL README. Se in docs/screenshots/ esiste uno screenshot della superficie che
+SCREENSHOT PER IL README. Se in doc/screenshots/ esiste uno screenshot della superficie che
 abbiamo ridisegnato, va rifatto a fine sessione (il README lo referenzia): account SINTETICO
 sull'emulatore (mai i miei dati — seed usa-e-getta con displayName «Mario», numeri plausibili
 e coerenti tra loro), viewport 1690×940 a deviceScaleFactor 2, tema scuro di default
 (localStorage theme=dark, nessun data-theme), spec Playwright usa-e-getta con login via form,
 stesso nome file; poi cancella le fixture dall'emulatore, esporta, spegni, elimina seed e spec,
 e annota in PRODUCT.md → Evidence on Hand quali screenshot sono della nuova generazione.
-Qui: oggi nessuno screenshot di questa superficie esiste in docs/screenshots/ — non crearne uno
+Qui: oggi nessuno screenshot di questa superficie esiste in doc/screenshots/ — non crearne uno
 nuovo a meno che non te lo chieda.
 ```
 
@@ -141,8 +141,8 @@ components/dashboard/overview/*) è il riferimento di implementazione: stesse pr
 (verdetto → griglia 12 colonne → dettaglio sotto la piega), stesso rigore sui numeri.
 
 Contesto, da fare TASSATIVAMENTE prima di ogni cosa:
-- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (pattern, gotcha — in particolare
-  «Panoramica and Dashboard Data Isolation» e la sezione della pagina che tocchiamo), WORKFLOW.md
+- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (convenzioni e gotcha trasversali) e doc/guide/<pagina>.md (le regole
+  e i blind spot della pagina che tocchiamo; per la Panoramica, doc/guide/panoramica.md), WORKFLOW.md
   (regole di sessione e collaudo guidato), DESIGN.md (normativo: il nuovo stile È lì),
   COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice.
 - Crea il branch PRIMA di editare. Crea SESSION_NOTES.md per tracciare il lavoro.
@@ -169,7 +169,7 @@ Metodo, in quest'ordine:
    file toccati, e una spec Playwright usa-e-getta sugli emulatori a 1440 e 390 che verifichi
    verdetto/tessere/zero overflow (main.scrollWidth === clientWidth). Cancella la spec, esporta e
    spegni gli emulatori.
-6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), AGENTS.md (sezione della pagina),
+6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), doc/guide/<pagina>.md (regole e blind spot della pagina; AGENTS.md solo se cambia una regola trasversale),
    DESIGN.md (marca «superseded» i pattern che la pagina abbandona; aggiungi al ramp solo misure
    davvero usate) e .impeccable/design.json (narrative specchio verbatim). Draft Release Temp.md.
 7. Nessun commit senza il mio OK esplicito. Rispondi in italiano; codice e commenti in inglese.
@@ -205,14 +205,14 @@ Vincoli: mutazioni invalidano assets.all + dashboard.overview (AGENTS); regola d
 picker; requiresManualPricing è l'unica fonte. Rendimenti per strumento: da topAssets o dal
 registro, mai ricalcolati nel componente.
 
-SCREENSHOT PER IL README. Se in docs/screenshots/ esiste uno screenshot della superficie che
+SCREENSHOT PER IL README. Se in doc/screenshots/ esiste uno screenshot della superficie che
 abbiamo ridisegnato, va rifatto a fine sessione (il README lo referenzia): account SINTETICO
 sull'emulatore (mai i miei dati — seed usa-e-getta con displayName «Mario», numeri plausibili
 e coerenti tra loro), viewport 1690×940 a deviceScaleFactor 2, tema scuro di default
 (localStorage theme=dark, nessun data-theme), spec Playwright usa-e-getta con login via form,
 stesso nome file; poi cancella le fixture dall'emulatore, esporta, spegni, elimina seed e spec,
 e annota in PRODUCT.md → Evidence on Hand quali screenshot sono della nuova generazione.
-Qui: oggi nessuno screenshot di questa superficie esiste in docs/screenshots/ — non crearne uno
+Qui: oggi nessuno screenshot di questa superficie esiste in doc/screenshots/ — non crearne uno
 nuovo a meno che non te lo chieda.
 ```
 
@@ -234,8 +234,8 @@ components/dashboard/overview/*) è il riferimento di implementazione: stesse pr
 (verdetto → griglia 12 colonne → dettaglio sotto la piega), stesso rigore sui numeri.
 
 Contesto, da fare TASSATIVAMENTE prima di ogni cosa:
-- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (pattern, gotcha — in particolare
-  «Panoramica and Dashboard Data Isolation» e la sezione della pagina che tocchiamo), WORKFLOW.md
+- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (convenzioni e gotcha trasversali) e doc/guide/<pagina>.md (le regole
+  e i blind spot della pagina che tocchiamo; per la Panoramica, doc/guide/panoramica.md), WORKFLOW.md
   (regole di sessione e collaudo guidato), DESIGN.md (normativo: il nuovo stile È lì),
   COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice.
 - Crea il branch PRIMA di editare. Crea SESSION_NOTES.md per tracciare il lavoro.
@@ -262,7 +262,7 @@ Metodo, in quest'ordine:
    file toccati, e una spec Playwright usa-e-getta sugli emulatori a 1440 e 390 che verifichi
    verdetto/tessere/zero overflow (main.scrollWidth === clientWidth). Cancella la spec, esporta e
    spegni gli emulatori.
-6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), AGENTS.md (sezione della pagina),
+6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), doc/guide/<pagina>.md (regole e blind spot della pagina; AGENTS.md solo se cambia una regola trasversale),
    DESIGN.md (marca «superseded» i pattern che la pagina abbandona; aggiungi al ramp solo misure
    davvero usate) e .impeccable/design.json (narrative specchio verbatim). Draft Release Temp.md.
 7. Nessun commit senza il mio OK esplicito. Rispondi in italiano; codice e commenti in inglese.
@@ -292,14 +292,14 @@ sono due numeri diversi di proposito; delete dal feed = drawer-confirm e branch 
 ExpenseDialog 2-step su create, single-step su edit, cambio tipo con avvisi. Il FAB mobile
 resta l'unica azione «aggiungi» in portrait.
 
-SCREENSHOT PER IL README. Se in docs/screenshots/ esiste uno screenshot della superficie che
+SCREENSHOT PER IL README. Se in doc/screenshots/ esiste uno screenshot della superficie che
 abbiamo ridisegnato, va rifatto a fine sessione (il README lo referenzia): account SINTETICO
 sull'emulatore (mai i miei dati — seed usa-e-getta con displayName «Mario», numeri plausibili
 e coerenti tra loro), viewport 1690×940 a deviceScaleFactor 2, tema scuro di default
 (localStorage theme=dark, nessun data-theme), spec Playwright usa-e-getta con login via form,
 stesso nome file; poi cancella le fixture dall'emulatore, esporta, spegni, elimina seed e spec,
 e annota in PRODUCT.md → Evidence on Hand quali screenshot sono della nuova generazione.
-Qui: oggi nessuno screenshot di questa superficie esiste in docs/screenshots/ — non crearne uno
+Qui: oggi nessuno screenshot di questa superficie esiste in doc/screenshots/ — non crearne uno
 nuovo a meno che non te lo chieda.
 ```
 
@@ -321,8 +321,8 @@ components/dashboard/overview/*) è il riferimento di implementazione: stesse pr
 (verdetto → griglia 12 colonne → dettaglio sotto la piega), stesso rigore sui numeri.
 
 Contesto, da fare TASSATIVAMENTE prima di ogni cosa:
-- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (pattern, gotcha — in particolare
-  «Panoramica and Dashboard Data Isolation» e la sezione della pagina che tocchiamo), WORKFLOW.md
+- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (convenzioni e gotcha trasversali) e doc/guide/<pagina>.md (le regole
+  e i blind spot della pagina che tocchiamo; per la Panoramica, doc/guide/panoramica.md), WORKFLOW.md
   (regole di sessione e collaudo guidato), DESIGN.md (normativo: il nuovo stile È lì),
   COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice.
 - Crea il branch PRIMA di editare. Crea SESSION_NOTES.md per tracciare il lavoro.
@@ -349,7 +349,7 @@ Metodo, in quest'ordine:
    file toccati, e una spec Playwright usa-e-getta sugli emulatori a 1440 e 390 che verifichi
    verdetto/tessere/zero overflow (main.scrollWidth === clientWidth). Cancella la spec, esporta e
    spegni gli emulatori.
-6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), AGENTS.md (sezione della pagina),
+6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), doc/guide/<pagina>.md (regole e blind spot della pagina; AGENTS.md solo se cambia una regola trasversale),
    DESIGN.md (marca «superseded» i pattern che la pagina abbandona; aggiungi al ramp solo misure
    davvero usate) e .impeccable/design.json (narrative specchio verbatim). Draft Release Temp.md.
 7. Nessun commit senza il mio OK esplicito. Rispondi in italiano; codice e commenti in inglese.
@@ -375,14 +375,14 @@ Tessere:
 Vincoli: received = paymentDate; tasse = taxRate dell'asset; il coupon cron è l'unica fonte
 delle spese cedola; DividendDialog/DividendDetailsDialog restyle a ramp, logica invariata.
 
-SCREENSHOT PER IL README. Se in docs/screenshots/ esiste uno screenshot della superficie che
+SCREENSHOT PER IL README. Se in doc/screenshots/ esiste uno screenshot della superficie che
 abbiamo ridisegnato, va rifatto a fine sessione (il README lo referenzia): account SINTETICO
 sull'emulatore (mai i miei dati — seed usa-e-getta con displayName «Mario», numeri plausibili
 e coerenti tra loro), viewport 1690×940 a deviceScaleFactor 2, tema scuro di default
 (localStorage theme=dark, nessun data-theme), spec Playwright usa-e-getta con login via form,
 stesso nome file; poi cancella le fixture dall'emulatore, esporta, spegni, elimina seed e spec,
 e annota in PRODUCT.md → Evidence on Hand quali screenshot sono della nuova generazione.
-Qui: docs/screenshots/dividend-calendar.png.
+Qui: doc/screenshots/dividend-calendar.png.
 ```
 
 ## 04 · Cashflow · Budget
@@ -403,8 +403,8 @@ components/dashboard/overview/*) è il riferimento di implementazione: stesse pr
 (verdetto → griglia 12 colonne → dettaglio sotto la piega), stesso rigore sui numeri.
 
 Contesto, da fare TASSATIVAMENTE prima di ogni cosa:
-- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (pattern, gotcha — in particolare
-  «Panoramica and Dashboard Data Isolation» e la sezione della pagina che tocchiamo), WORKFLOW.md
+- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (convenzioni e gotcha trasversali) e doc/guide/<pagina>.md (le regole
+  e i blind spot della pagina che tocchiamo; per la Panoramica, doc/guide/panoramica.md), WORKFLOW.md
   (regole di sessione e collaudo guidato), DESIGN.md (normativo: il nuovo stile È lì),
   COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice.
 - Crea il branch PRIMA di editare. Crea SESSION_NOTES.md per tracciare il lavoro.
@@ -431,7 +431,7 @@ Metodo, in quest'ordine:
    file toccati, e una spec Playwright usa-e-getta sugli emulatori a 1440 e 390 che verifichi
    verdetto/tessere/zero overflow (main.scrollWidth === clientWidth). Cancella la spec, esporta e
    spegni gli emulatori.
-6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), AGENTS.md (sezione della pagina),
+6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), doc/guide/<pagina>.md (regole e blind spot della pagina; AGENTS.md solo se cambia una regola trasversale),
    DESIGN.md (marca «superseded» i pattern che la pagina abbandona; aggiungi al ramp solo misure
    davvero usate) e .impeccable/design.json (narrative specchio verbatim). Draft Release Temp.md.
 7. Nessun commit senza il mio OK esplicito. Rispondi in italiano; codice e commenti in inglese.
@@ -442,7 +442,7 @@ Domanda: «Sto rispettando il budget?»
 
 Verdetto (budgetNarrative.ts): «A 9 giorni dalla fine del mese hai usato il 71% del tetto
 (2.910 € su 4.100 €): al ritmo attuale chiudi a 4.120 €, 20 € oltre.» Toni: sotto/oltre
-proiezione. Orizzonte SEMPRE nominato (mensile vs annuale = YTD, AGENTS → Budget).
+proiezione. Orizzonte SEMPRE nominato (mensile vs annuale = YTD, doc/guide/cashflow-budget.md).
 
 Tessere:
 - Tetto del mese (5, 2 righe): speso/tetto, barra 3px, proiezione a fine mese, giorni
@@ -456,14 +456,14 @@ Tessere:
 Vincoli: opt-in; mai riconciliare con categories vuote; l'overall è un tetto su TUTTE le spese,
 il validatore somma solo le categorie mensili; copy con orizzonte e scope.
 
-SCREENSHOT PER IL README. Se in docs/screenshots/ esiste uno screenshot della superficie che
+SCREENSHOT PER IL README. Se in doc/screenshots/ esiste uno screenshot della superficie che
 abbiamo ridisegnato, va rifatto a fine sessione (il README lo referenzia): account SINTETICO
 sull'emulatore (mai i miei dati — seed usa-e-getta con displayName «Mario», numeri plausibili
 e coerenti tra loro), viewport 1690×940 a deviceScaleFactor 2, tema scuro di default
 (localStorage theme=dark, nessun data-theme), spec Playwright usa-e-getta con login via form,
 stesso nome file; poi cancella le fixture dall'emulatore, esporta, spegni, elimina seed e spec,
 e annota in PRODUCT.md → Evidence on Hand quali screenshot sono della nuova generazione.
-Qui: oggi nessuno screenshot di questa superficie esiste in docs/screenshots/ — non crearne uno
+Qui: oggi nessuno screenshot di questa superficie esiste in doc/screenshots/ — non crearne uno
 nuovo a meno che non te lo chieda.
 ```
 
@@ -485,8 +485,8 @@ components/dashboard/overview/*) è il riferimento di implementazione: stesse pr
 (verdetto → griglia 12 colonne → dettaglio sotto la piega), stesso rigore sui numeri.
 
 Contesto, da fare TASSATIVAMENTE prima di ogni cosa:
-- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (pattern, gotcha — in particolare
-  «Panoramica and Dashboard Data Isolation» e la sezione della pagina che tocchiamo), WORKFLOW.md
+- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (convenzioni e gotcha trasversali) e doc/guide/<pagina>.md (le regole
+  e i blind spot della pagina che tocchiamo; per la Panoramica, doc/guide/panoramica.md), WORKFLOW.md
   (regole di sessione e collaudo guidato), DESIGN.md (normativo: il nuovo stile È lì),
   COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice.
 - Crea il branch PRIMA di editare. Crea SESSION_NOTES.md per tracciare il lavoro.
@@ -513,7 +513,7 @@ Metodo, in quest'ordine:
    file toccati, e una spec Playwright usa-e-getta sugli emulatori a 1440 e 390 che verifichi
    verdetto/tessere/zero overflow (main.scrollWidth === clientWidth). Cancella la spec, esporta e
    spegni gli emulatori.
-6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), AGENTS.md (sezione della pagina),
+6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), doc/guide/<pagina>.md (regole e blind spot della pagina; AGENTS.md solo se cambia una regola trasversale),
    DESIGN.md (marca «superseded» i pattern che la pagina abbandona; aggiungi al ramp solo misure
    davvero usate) e .impeccable/design.json (narrative specchio verbatim). Draft Release Temp.md.
 7. Nessun commit senza il mio OK esplicito. Rispondi in italiano; codice e commenti in inglese.
@@ -537,14 +537,14 @@ budget/proiezione/grafico nominano la propria finestra; delete = unlink con cont
 stessa query; colori = slot chart-1..8 via resolveCostCenterColor. Questi tre componenti non
 hanno test: scrivi almeno i test del layer puro che estrai.
 
-SCREENSHOT PER IL README. Se in docs/screenshots/ esiste uno screenshot della superficie che
+SCREENSHOT PER IL README. Se in doc/screenshots/ esiste uno screenshot della superficie che
 abbiamo ridisegnato, va rifatto a fine sessione (il README lo referenzia): account SINTETICO
 sull'emulatore (mai i miei dati — seed usa-e-getta con displayName «Mario», numeri plausibili
 e coerenti tra loro), viewport 1690×940 a deviceScaleFactor 2, tema scuro di default
 (localStorage theme=dark, nessun data-theme), spec Playwright usa-e-getta con login via form,
 stesso nome file; poi cancella le fixture dall'emulatore, esporta, spegni, elimina seed e spec,
 e annota in PRODUCT.md → Evidence on Hand quali screenshot sono della nuova generazione.
-Qui: oggi nessuno screenshot di questa superficie esiste in docs/screenshots/ — non crearne uno
+Qui: oggi nessuno screenshot di questa superficie esiste in doc/screenshots/ — non crearne uno
 nuovo a meno che non te lo chieda.
 ```
 
@@ -566,8 +566,8 @@ components/dashboard/overview/*) è il riferimento di implementazione: stesse pr
 (verdetto → griglia 12 colonne → dettaglio sotto la piega), stesso rigore sui numeri.
 
 Contesto, da fare TASSATIVAMENTE prima di ogni cosa:
-- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (pattern, gotcha — in particolare
-  «Panoramica and Dashboard Data Isolation» e la sezione della pagina che tocchiamo), WORKFLOW.md
+- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (convenzioni e gotcha trasversali) e doc/guide/<pagina>.md (le regole
+  e i blind spot della pagina che tocchiamo; per la Panoramica, doc/guide/panoramica.md), WORKFLOW.md
   (regole di sessione e collaudo guidato), DESIGN.md (normativo: il nuovo stile È lì),
   COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice.
 - Crea il branch PRIMA di editare. Crea SESSION_NOTES.md per tracciare il lavoro.
@@ -594,7 +594,7 @@ Metodo, in quest'ordine:
    file toccati, e una spec Playwright usa-e-getta sugli emulatori a 1440 e 390 che verifichi
    verdetto/tessere/zero overflow (main.scrollWidth === clientWidth). Cancella la spec, esporta e
    spegni gli emulatori.
-6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), AGENTS.md (sezione della pagina),
+6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), doc/guide/<pagina>.md (regole e blind spot della pagina; AGENTS.md solo se cambia una regola trasversale),
    DESIGN.md (marca «superseded» i pattern che la pagina abbandona; aggiungi al ramp solo misure
    davvero usate) e .impeccable/design.json (narrative specchio verbatim). Draft Release Temp.md.
 7. Nessun commit senza il mio OK esplicito. Rispondi in italiano; codice e commenti in inglese.
@@ -620,14 +620,14 @@ Tessere:
 Vincoli: un solo landing path (handleEntitySelect); chiavi per id mai per nome; focus
 sopravvive al cambio periodo; cashflowHistoryStartYear condiviso.
 
-SCREENSHOT PER IL README. Se in docs/screenshots/ esiste uno screenshot della superficie che
+SCREENSHOT PER IL README. Se in doc/screenshots/ esiste uno screenshot della superficie che
 abbiamo ridisegnato, va rifatto a fine sessione (il README lo referenzia): account SINTETICO
 sull'emulatore (mai i miei dati — seed usa-e-getta con displayName «Mario», numeri plausibili
 e coerenti tra loro), viewport 1690×940 a deviceScaleFactor 2, tema scuro di default
 (localStorage theme=dark, nessun data-theme), spec Playwright usa-e-getta con login via form,
 stesso nome file; poi cancella le fixture dall'emulatore, esporta, spegni, elimina seed e spec,
 e annota in PRODUCT.md → Evidence on Hand quali screenshot sono della nuova generazione.
-Qui: docs/screenshots/cashflow-sankey.png, docs/screenshots/cashflow-drilldown.png.
+Qui: doc/screenshots/cashflow-sankey.png, doc/screenshots/cashflow-drilldown.png.
 ```
 
 ## 07 · Rendimenti
@@ -648,8 +648,8 @@ components/dashboard/overview/*) è il riferimento di implementazione: stesse pr
 (verdetto → griglia 12 colonne → dettaglio sotto la piega), stesso rigore sui numeri.
 
 Contesto, da fare TASSATIVAMENTE prima di ogni cosa:
-- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (pattern, gotcha — in particolare
-  «Panoramica and Dashboard Data Isolation» e la sezione della pagina che tocchiamo), WORKFLOW.md
+- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (convenzioni e gotcha trasversali) e doc/guide/<pagina>.md (le regole
+  e i blind spot della pagina che tocchiamo; per la Panoramica, doc/guide/panoramica.md), WORKFLOW.md
   (regole di sessione e collaudo guidato), DESIGN.md (normativo: il nuovo stile È lì),
   COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice.
 - Crea il branch PRIMA di editare. Crea SESSION_NOTES.md per tracciare il lavoro.
@@ -676,7 +676,7 @@ Metodo, in quest'ordine:
    file toccati, e una spec Playwright usa-e-getta sugli emulatori a 1440 e 390 che verifichi
    verdetto/tessere/zero overflow (main.scrollWidth === clientWidth). Cancella la spec, esporta e
    spegni gli emulatori.
-6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), AGENTS.md (sezione della pagina),
+6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), doc/guide/<pagina>.md (regole e blind spot della pagina; AGENTS.md solo se cambia una regola trasversale),
    DESIGN.md (marca «superseded» i pattern che la pagina abbandona; aggiungi al ramp solo misure
    davvero usate) e .impeccable/design.json (narrative specchio verbatim). Draft Release Temp.md.
 7. Nessun commit senza il mio OK esplicito. Rispondi in italiano; codice e commenti in inglese.
@@ -706,14 +706,14 @@ Vincoli: il periodo non si ri-deriva mai da new Date() (metrics.nominalPeriodSta
 performance-cache + CACHE_MATH_VERSION se cambi un calcolo; selettore periodo con Custom come
 chip, non slot; Rendimenti ha la «base configurabile» in Impostazioni → nominala.
 
-SCREENSHOT PER IL README. Se in docs/screenshots/ esiste uno screenshot della superficie che
+SCREENSHOT PER IL README. Se in doc/screenshots/ esiste uno screenshot della superficie che
 abbiamo ridisegnato, va rifatto a fine sessione (il README lo referenzia): account SINTETICO
 sull'emulatore (mai i miei dati — seed usa-e-getta con displayName «Mario», numeri plausibili
 e coerenti tra loro), viewport 1690×940 a deviceScaleFactor 2, tema scuro di default
 (localStorage theme=dark, nessun data-theme), spec Playwright usa-e-getta con login via form,
 stesso nome file; poi cancella le fixture dall'emulatore, esporta, spegni, elimina seed e spec,
 e annota in PRODUCT.md → Evidence on Hand quali screenshot sono della nuova generazione.
-Qui: docs/screenshots/performance-metrics.png, docs/screenshots/monthly-heatmap.png.
+Qui: doc/screenshots/performance-metrics.png, doc/screenshots/monthly-heatmap.png.
 ```
 
 ## 08 · Storico
@@ -734,8 +734,8 @@ components/dashboard/overview/*) è il riferimento di implementazione: stesse pr
 (verdetto → griglia 12 colonne → dettaglio sotto la piega), stesso rigore sui numeri.
 
 Contesto, da fare TASSATIVAMENTE prima di ogni cosa:
-- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (pattern, gotcha — in particolare
-  «Panoramica and Dashboard Data Isolation» e la sezione della pagina che tocchiamo), WORKFLOW.md
+- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (convenzioni e gotcha trasversali) e doc/guide/<pagina>.md (le regole
+  e i blind spot della pagina che tocchiamo; per la Panoramica, doc/guide/panoramica.md), WORKFLOW.md
   (regole di sessione e collaudo guidato), DESIGN.md (normativo: il nuovo stile È lì),
   COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice.
 - Crea il branch PRIMA di editare. Crea SESSION_NOTES.md per tracciare il lavoro.
@@ -762,7 +762,7 @@ Metodo, in quest'ordine:
    file toccati, e una spec Playwright usa-e-getta sugli emulatori a 1440 e 390 che verifichi
    verdetto/tessere/zero overflow (main.scrollWidth === clientWidth). Cancella la spec, esporta e
    spegni gli emulatori.
-6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), AGENTS.md (sezione della pagina),
+6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), doc/guide/<pagina>.md (regole e blind spot della pagina; AGENTS.md solo se cambia una regola trasversale),
    DESIGN.md (marca «superseded» i pattern che la pagina abbandona; aggiungi al ramp solo misure
    davvero usate) e .impeccable/design.json (narrative specchio verbatim). Draft Release Temp.md.
 7. Nessun commit senza il mio OK esplicito. Rispondi in italiano; codice e commenti in inglese.
@@ -788,14 +788,14 @@ Vincoli: snapshot = fotografia congelata; byAsset.totalValue mai ricalcolato; st
 pre-normalizzato senza stackOffset; slot 5-9 non theme-aware (Known Issues — non peggiorare);
 Recharts: tick CHART_TICK_STYLE, tre stili tooltip, role="img" sul chart.
 
-SCREENSHOT PER IL README. Se in docs/screenshots/ esiste uno screenshot della superficie che
+SCREENSHOT PER IL README. Se in doc/screenshots/ esiste uno screenshot della superficie che
 abbiamo ridisegnato, va rifatto a fine sessione (il README lo referenzia): account SINTETICO
 sull'emulatore (mai i miei dati — seed usa-e-getta con displayName «Mario», numeri plausibili
 e coerenti tra loro), viewport 1690×940 a deviceScaleFactor 2, tema scuro di default
 (localStorage theme=dark, nessun data-theme), spec Playwright usa-e-getta con login via form,
 stesso nome file; poi cancella le fixture dall'emulatore, esporta, spegni, elimina seed e spec,
 e annota in PRODUCT.md → Evidence on Hand quali screenshot sono della nuova generazione.
-Qui: docs/screenshots/history-networth.png.
+Qui: doc/screenshots/history-networth.png.
 ```
 
 ## 09 · Hall of Fame
@@ -816,8 +816,8 @@ components/dashboard/overview/*) è il riferimento di implementazione: stesse pr
 (verdetto → griglia 12 colonne → dettaglio sotto la piega), stesso rigore sui numeri.
 
 Contesto, da fare TASSATIVAMENTE prima di ogni cosa:
-- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (pattern, gotcha — in particolare
-  «Panoramica and Dashboard Data Isolation» e la sezione della pagina che tocchiamo), WORKFLOW.md
+- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (convenzioni e gotcha trasversali) e doc/guide/<pagina>.md (le regole
+  e i blind spot della pagina che tocchiamo; per la Panoramica, doc/guide/panoramica.md), WORKFLOW.md
   (regole di sessione e collaudo guidato), DESIGN.md (normativo: il nuovo stile È lì),
   COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice.
 - Crea il branch PRIMA di editare. Crea SESSION_NOTES.md per tracciare il lavoro.
@@ -844,7 +844,7 @@ Metodo, in quest'ordine:
    file toccati, e una spec Playwright usa-e-getta sugli emulatori a 1440 e 390 che verifichi
    verdetto/tessere/zero overflow (main.scrollWidth === clientWidth). Cancella la spec, esporta e
    spegni gli emulatori.
-6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), AGENTS.md (sezione della pagina),
+6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), doc/guide/<pagina>.md (regole e blind spot della pagina; AGENTS.md solo se cambia una regola trasversale),
    DESIGN.md (marca «superseded» i pattern che la pagina abbandona; aggiungi al ramp solo misure
    davvero usate) e .impeccable/design.json (narrative specchio verbatim). Draft Release Temp.md.
 7. Nessun commit senza il mio OK esplicito. Rispondi in italiano; codice e commenti in inglese.
@@ -862,14 +862,14 @@ Tessere: Record del patrimonio (5, 2 righe: podio mesi + sparkline dei top 12), 
 Lo switcher periodo+categoria resta, come SegmentedPill sopra la griglia.
 Stessa definizione di record dell'email (hallOfFameRecords.ts): non reimplementare.
 
-SCREENSHOT PER IL README. Se in docs/screenshots/ esiste uno screenshot della superficie che
+SCREENSHOT PER IL README. Se in doc/screenshots/ esiste uno screenshot della superficie che
 abbiamo ridisegnato, va rifatto a fine sessione (il README lo referenzia): account SINTETICO
 sull'emulatore (mai i miei dati — seed usa-e-getta con displayName «Mario», numeri plausibili
 e coerenti tra loro), viewport 1690×940 a deviceScaleFactor 2, tema scuro di default
 (localStorage theme=dark, nessun data-theme), spec Playwright usa-e-getta con login via form,
 stesso nome file; poi cancella le fixture dall'emulatore, esporta, spegni, elimina seed e spec,
 e annota in PRODUCT.md → Evidence on Hand quali screenshot sono della nuova generazione.
-Qui: docs/screenshots/hall-of-fame.png.
+Qui: doc/screenshots/hall-of-fame.png.
 ```
 
 ## 10 · Allocazione
@@ -890,8 +890,8 @@ components/dashboard/overview/*) è il riferimento di implementazione: stesse pr
 (verdetto → griglia 12 colonne → dettaglio sotto la piega), stesso rigore sui numeri.
 
 Contesto, da fare TASSATIVAMENTE prima di ogni cosa:
-- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (pattern, gotcha — in particolare
-  «Panoramica and Dashboard Data Isolation» e la sezione della pagina che tocchiamo), WORKFLOW.md
+- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (convenzioni e gotcha trasversali) e doc/guide/<pagina>.md (le regole
+  e i blind spot della pagina che tocchiamo; per la Panoramica, doc/guide/panoramica.md), WORKFLOW.md
   (regole di sessione e collaudo guidato), DESIGN.md (normativo: il nuovo stile È lì),
   COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice.
 - Crea il branch PRIMA di editare. Crea SESSION_NOTES.md per tracciare il lavoro.
@@ -918,7 +918,7 @@ Metodo, in quest'ordine:
    file toccati, e una spec Playwright usa-e-getta sugli emulatori a 1440 e 390 che verifichi
    verdetto/tessere/zero overflow (main.scrollWidth === clientWidth). Cancella la spec, esporta e
    spegni gli emulatori.
-6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), AGENTS.md (sezione della pagina),
+6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), doc/guide/<pagina>.md (regole e blind spot della pagina; AGENTS.md solo se cambia una regola trasversale),
    DESIGN.md (marca «superseded» i pattern che la pagina abbandona; aggiungi al ramp solo misure
    davvero usate) e .impeccable/design.json (narrative specchio verbatim). Draft Release Temp.md.
 7. Nessun commit senza il mio OK esplicito. Rispondi in italiano; codice e commenti in inglese.
@@ -943,14 +943,14 @@ Vincoli (AGENTS): allocationRole partizionato PRIMA di compareAllocations; il to
 piccolo del patrimonio e la lettura lo dice; i piani non nominano mai un frozen; score
 band-independent; ActionChip via useActionColors, mai token di segno.
 
-SCREENSHOT PER IL README. Se in docs/screenshots/ esiste uno screenshot della superficie che
+SCREENSHOT PER IL README. Se in doc/screenshots/ esiste uno screenshot della superficie che
 abbiamo ridisegnato, va rifatto a fine sessione (il README lo referenzia): account SINTETICO
 sull'emulatore (mai i miei dati — seed usa-e-getta con displayName «Mario», numeri plausibili
 e coerenti tra loro), viewport 1690×940 a deviceScaleFactor 2, tema scuro di default
 (localStorage theme=dark, nessun data-theme), spec Playwright usa-e-getta con login via form,
 stesso nome file; poi cancella le fixture dall'emulatore, esporta, spegni, elimina seed e spec,
 e annota in PRODUCT.md → Evidence on Hand quali screenshot sono della nuova generazione.
-Qui: docs/screenshots/asset-allocation.png.
+Qui: doc/screenshots/asset-allocation.png.
 ```
 
 ## 11 · FIRE · Calcolatore
@@ -971,8 +971,8 @@ components/dashboard/overview/*) è il riferimento di implementazione: stesse pr
 (verdetto → griglia 12 colonne → dettaglio sotto la piega), stesso rigore sui numeri.
 
 Contesto, da fare TASSATIVAMENTE prima di ogni cosa:
-- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (pattern, gotcha — in particolare
-  «Panoramica and Dashboard Data Isolation» e la sezione della pagina che tocchiamo), WORKFLOW.md
+- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (convenzioni e gotcha trasversali) e doc/guide/<pagina>.md (le regole
+  e i blind spot della pagina che tocchiamo; per la Panoramica, doc/guide/panoramica.md), WORKFLOW.md
   (regole di sessione e collaudo guidato), DESIGN.md (normativo: il nuovo stile È lì),
   COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice.
 - Crea il branch PRIMA di editare. Crea SESSION_NOTES.md per tracciare il lavoro.
@@ -999,7 +999,7 @@ Metodo, in quest'ordine:
    file toccati, e una spec Playwright usa-e-getta sugli emulatori a 1440 e 390 che verifichi
    verdetto/tessere/zero overflow (main.scrollWidth === clientWidth). Cancella la spec, esporta e
    spegni gli emulatori.
-6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), AGENTS.md (sezione della pagina),
+6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), doc/guide/<pagina>.md (regole e blind spot della pagina; AGENTS.md solo se cambia una regola trasversale),
    DESIGN.md (marca «superseded» i pattern che la pagina abbandona; aggiungi al ramp solo misure
    davvero usate) e .impeccable/design.json (narrative specchio verbatim). Draft Release Temp.md.
 7. Nessun commit senza il mio OK esplicito. Rispondi in italiano; codice e commenti in inglese.
@@ -1022,14 +1022,14 @@ Vincoli: What If = perturbazione, niente eventi a metà proiezione; il Ventaglio
 camminata deterministica (test di coerenza); memoizza ogni input del fan; config-first
 collapse con useRef seeded.
 
-SCREENSHOT PER IL README. Se in docs/screenshots/ esiste uno screenshot della superficie che
+SCREENSHOT PER IL README. Se in doc/screenshots/ esiste uno screenshot della superficie che
 abbiamo ridisegnato, va rifatto a fine sessione (il README lo referenzia): account SINTETICO
 sull'emulatore (mai i miei dati — seed usa-e-getta con displayName «Mario», numeri plausibili
 e coerenti tra loro), viewport 1690×940 a deviceScaleFactor 2, tema scuro di default
 (localStorage theme=dark, nessun data-theme), spec Playwright usa-e-getta con login via form,
 stesso nome file; poi cancella le fixture dall'emulatore, esporta, spegni, elimina seed e spec,
 e annota in PRODUCT.md → Evidence on Hand quali screenshot sono della nuova generazione.
-Qui: docs/screenshots/fire-calculator.png.
+Qui: doc/screenshots/fire-calculator.png.
 ```
 
 ## 12 · FIRE · Coast FIRE
@@ -1050,8 +1050,8 @@ components/dashboard/overview/*) è il riferimento di implementazione: stesse pr
 (verdetto → griglia 12 colonne → dettaglio sotto la piega), stesso rigore sui numeri.
 
 Contesto, da fare TASSATIVAMENTE prima di ogni cosa:
-- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (pattern, gotcha — in particolare
-  «Panoramica and Dashboard Data Isolation» e la sezione della pagina che tocchiamo), WORKFLOW.md
+- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (convenzioni e gotcha trasversali) e doc/guide/<pagina>.md (le regole
+  e i blind spot della pagina che tocchiamo; per la Panoramica, doc/guide/panoramica.md), WORKFLOW.md
   (regole di sessione e collaudo guidato), DESIGN.md (normativo: il nuovo stile È lì),
   COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice.
 - Crea il branch PRIMA di editare. Crea SESSION_NOTES.md per tracciare il lavoro.
@@ -1078,7 +1078,7 @@ Metodo, in quest'ordine:
    file toccati, e una spec Playwright usa-e-getta sugli emulatori a 1440 e 390 che verifichi
    verdetto/tessere/zero overflow (main.scrollWidth === clientWidth). Cancella la spec, esporta e
    spegni gli emulatori.
-6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), AGENTS.md (sezione della pagina),
+6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), doc/guide/<pagina>.md (regole e blind spot della pagina; AGENTS.md solo se cambia una regola trasversale),
    DESIGN.md (marca «superseded» i pattern che la pagina abbandona; aggiungi al ramp solo misure
    davvero usate) e .impeccable/design.json (narrative specchio verbatim). Draft Release Temp.md.
 7. Nessun commit senza il mio OK esplicito. Rispondi in italiano; codice e commenti in inglese.
@@ -1095,14 +1095,14 @@ coastFireView, non in un nuovo modulo.
 Tessere: Shortfall (5, 2 righe: numero + proiezione che riempie), Timeline degli afflussi (7:
 sblocco fondo + pensioni statali, A VALORE DI OGGI), Ipotesi (collassabile, il form draft).
 
-SCREENSHOT PER IL README. Se in docs/screenshots/ esiste uno screenshot della superficie che
+SCREENSHOT PER IL README. Se in doc/screenshots/ esiste uno screenshot della superficie che
 abbiamo ridisegnato, va rifatto a fine sessione (il README lo referenzia): account SINTETICO
 sull'emulatore (mai i miei dati — seed usa-e-getta con displayName «Mario», numeri plausibili
 e coerenti tra loro), viewport 1690×940 a deviceScaleFactor 2, tema scuro di default
 (localStorage theme=dark, nessun data-theme), spec Playwright usa-e-getta con login via form,
 stesso nome file; poi cancella le fixture dall'emulatore, esporta, spegni, elimina seed e spec,
 e annota in PRODUCT.md → Evidence on Hand quali screenshot sono della nuova generazione.
-Qui: oggi nessuno screenshot di questa superficie esiste in docs/screenshots/ — non crearne uno
+Qui: oggi nessuno screenshot di questa superficie esiste in doc/screenshots/ — non crearne uno
 nuovo a meno che non te lo chieda.
 ```
 
@@ -1124,8 +1124,8 @@ components/dashboard/overview/*) è il riferimento di implementazione: stesse pr
 (verdetto → griglia 12 colonne → dettaglio sotto la piega), stesso rigore sui numeri.
 
 Contesto, da fare TASSATIVAMENTE prima di ogni cosa:
-- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (pattern, gotcha — in particolare
-  «Panoramica and Dashboard Data Isolation» e la sezione della pagina che tocchiamo), WORKFLOW.md
+- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (convenzioni e gotcha trasversali) e doc/guide/<pagina>.md (le regole
+  e i blind spot della pagina che tocchiamo; per la Panoramica, doc/guide/panoramica.md), WORKFLOW.md
   (regole di sessione e collaudo guidato), DESIGN.md (normativo: il nuovo stile È lì),
   COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice.
 - Crea il branch PRIMA di editare. Crea SESSION_NOTES.md per tracciare il lavoro.
@@ -1152,7 +1152,7 @@ Metodo, in quest'ordine:
    file toccati, e una spec Playwright usa-e-getta sugli emulatori a 1440 e 390 che verifichi
    verdetto/tessere/zero overflow (main.scrollWidth === clientWidth). Cancella la spec, esporta e
    spegni gli emulatori.
-6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), AGENTS.md (sezione della pagina),
+6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), doc/guide/<pagina>.md (regole e blind spot della pagina; AGENTS.md solo se cambia una regola trasversale),
    DESIGN.md (marca «superseded» i pattern che la pagina abbandona; aggiungi al ramp solo misure
    davvero usate) e .impeccable/design.json (narrative specchio verbatim). Draft Release Temp.md.
 7. Nessun commit senza il mio OK esplicito. Rispondi in italiano; codice e commenti in inglese.
@@ -1170,14 +1170,14 @@ Sensibilità (12: la sezione esistente a cadenza tessera).
 Vincolo: la selezione delle fonti di reddito perse vive nella UI, il layer puro resta
 category-agnostic.
 
-SCREENSHOT PER IL README. Se in docs/screenshots/ esiste uno screenshot della superficie che
+SCREENSHOT PER IL README. Se in doc/screenshots/ esiste uno screenshot della superficie che
 abbiamo ridisegnato, va rifatto a fine sessione (il README lo referenzia): account SINTETICO
 sull'emulatore (mai i miei dati — seed usa-e-getta con displayName «Mario», numeri plausibili
 e coerenti tra loro), viewport 1690×940 a deviceScaleFactor 2, tema scuro di default
 (localStorage theme=dark, nessun data-theme), spec Playwright usa-e-getta con login via form,
 stesso nome file; poi cancella le fixture dall'emulatore, esporta, spegni, elimina seed e spec,
 e annota in PRODUCT.md → Evidence on Hand quali screenshot sono della nuova generazione.
-Qui: oggi nessuno screenshot di questa superficie esiste in docs/screenshots/ — non crearne uno
+Qui: oggi nessuno screenshot di questa superficie esiste in doc/screenshots/ — non crearne uno
 nuovo a meno che non te lo chieda.
 ```
 
@@ -1199,8 +1199,8 @@ components/dashboard/overview/*) è il riferimento di implementazione: stesse pr
 (verdetto → griglia 12 colonne → dettaglio sotto la piega), stesso rigore sui numeri.
 
 Contesto, da fare TASSATIVAMENTE prima di ogni cosa:
-- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (pattern, gotcha — in particolare
-  «Panoramica and Dashboard Data Isolation» e la sezione della pagina che tocchiamo), WORKFLOW.md
+- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (convenzioni e gotcha trasversali) e doc/guide/<pagina>.md (le regole
+  e i blind spot della pagina che tocchiamo; per la Panoramica, doc/guide/panoramica.md), WORKFLOW.md
   (regole di sessione e collaudo guidato), DESIGN.md (normativo: il nuovo stile È lì),
   COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice.
 - Crea il branch PRIMA di editare. Crea SESSION_NOTES.md per tracciare il lavoro.
@@ -1227,7 +1227,7 @@ Metodo, in quest'ordine:
    file toccati, e una spec Playwright usa-e-getta sugli emulatori a 1440 e 390 che verifichi
    verdetto/tessere/zero overflow (main.scrollWidth === clientWidth). Cancella la spec, esporta e
    spegni gli emulatori.
-6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), AGENTS.md (sezione della pagina),
+6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), doc/guide/<pagina>.md (regole e blind spot della pagina; AGENTS.md solo se cambia una regola trasversale),
    DESIGN.md (marca «superseded» i pattern che la pagina abbandona; aggiungi al ramp solo misure
    davvero usate) e .impeccable/design.json (narrative specchio verbatim). Draft Release Temp.md.
 7. Nessun commit senza il mio OK esplicito. Rispondi in italiano; codice e commenti in inglese.
@@ -1246,14 +1246,14 @@ Variant B, con la riga read-only degli afflussi pensione a valore di oggi).
 Vincolo: deriveMonteCarloAllocation è l'unico normalizzatore; ordine inflow → return →
 withdrawal.
 
-SCREENSHOT PER IL README. Se in docs/screenshots/ esiste uno screenshot della superficie che
+SCREENSHOT PER IL README. Se in doc/screenshots/ esiste uno screenshot della superficie che
 abbiamo ridisegnato, va rifatto a fine sessione (il README lo referenzia): account SINTETICO
 sull'emulatore (mai i miei dati — seed usa-e-getta con displayName «Mario», numeri plausibili
 e coerenti tra loro), viewport 1690×940 a deviceScaleFactor 2, tema scuro di default
 (localStorage theme=dark, nessun data-theme), spec Playwright usa-e-getta con login via form,
 stesso nome file; poi cancella le fixture dall'emulatore, esporta, spegni, elimina seed e spec,
 e annota in PRODUCT.md → Evidence on Hand quali screenshot sono della nuova generazione.
-Qui: docs/screenshots/monte-carlo.png.
+Qui: doc/screenshots/monte-carlo.png.
 ```
 
 ## 15 · FIRE · Obiettivi (Goal-Based Investing)
@@ -1274,8 +1274,8 @@ components/dashboard/overview/*) è il riferimento di implementazione: stesse pr
 (verdetto → griglia 12 colonne → dettaglio sotto la piega), stesso rigore sui numeri.
 
 Contesto, da fare TASSATIVAMENTE prima di ogni cosa:
-- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (pattern, gotcha — in particolare
-  «Panoramica and Dashboard Data Isolation» e la sezione della pagina che tocchiamo), WORKFLOW.md
+- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (convenzioni e gotcha trasversali) e doc/guide/<pagina>.md (le regole
+  e i blind spot della pagina che tocchiamo; per la Panoramica, doc/guide/panoramica.md), WORKFLOW.md
   (regole di sessione e collaudo guidato), DESIGN.md (normativo: il nuovo stile È lì),
   COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice.
 - Crea il branch PRIMA di editare. Crea SESSION_NOTES.md per tracciare il lavoro.
@@ -1302,7 +1302,7 @@ Metodo, in quest'ordine:
    file toccati, e una spec Playwright usa-e-getta sugli emulatori a 1440 e 390 che verifichi
    verdetto/tessere/zero overflow (main.scrollWidth === clientWidth). Cancella la spec, esporta e
    spegni gli emulatori.
-6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), AGENTS.md (sezione della pagina),
+6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), doc/guide/<pagina>.md (regole e blind spot della pagina; AGENTS.md solo se cambia una regola trasversale),
    DESIGN.md (marca «superseded» i pattern che la pagina abbandona; aggiungi al ramp solo misure
    davvero usate) e .impeccable/design.json (narrative specchio verbatim). Draft Release Temp.md.
 7. Nessun commit senza il mio OK esplicito. Rispondi in italiano; codice e commenti in inglese.
@@ -1322,14 +1322,14 @@ goalDrivenAllocationEnabled), Assegnazioni (12: asset per obiettivo con AssetAss
 Vincoli: goalMath SDK-free; serializeGoalForFirestore è l'allowlist; il doc goal si riscrive
 intero in transazione.
 
-SCREENSHOT PER IL README. Se in docs/screenshots/ esiste uno screenshot della superficie che
+SCREENSHOT PER IL README. Se in doc/screenshots/ esiste uno screenshot della superficie che
 abbiamo ridisegnato, va rifatto a fine sessione (il README lo referenzia): account SINTETICO
 sull'emulatore (mai i miei dati — seed usa-e-getta con displayName «Mario», numeri plausibili
 e coerenti tra loro), viewport 1690×940 a deviceScaleFactor 2, tema scuro di default
 (localStorage theme=dark, nessun data-theme), spec Playwright usa-e-getta con login via form,
 stesso nome file; poi cancella le fixture dall'emulatore, esporta, spegni, elimina seed e spec,
 e annota in PRODUCT.md → Evidence on Hand quali screenshot sono della nuova generazione.
-Qui: oggi nessuno screenshot di questa superficie esiste in docs/screenshots/ — non crearne uno
+Qui: oggi nessuno screenshot di questa superficie esiste in doc/screenshots/ — non crearne uno
 nuovo a meno che non te lo chieda.
 ```
 
@@ -1351,8 +1351,8 @@ components/dashboard/overview/*) è il riferimento di implementazione: stesse pr
 (verdetto → griglia 12 colonne → dettaglio sotto la piega), stesso rigore sui numeri.
 
 Contesto, da fare TASSATIVAMENTE prima di ogni cosa:
-- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (pattern, gotcha — in particolare
-  «Panoramica and Dashboard Data Isolation» e la sezione della pagina che tocchiamo), WORKFLOW.md
+- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (convenzioni e gotcha trasversali) e doc/guide/<pagina>.md (le regole
+  e i blind spot della pagina che tocchiamo; per la Panoramica, doc/guide/panoramica.md), WORKFLOW.md
   (regole di sessione e collaudo guidato), DESIGN.md (normativo: il nuovo stile È lì),
   COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice.
 - Crea il branch PRIMA di editare. Crea SESSION_NOTES.md per tracciare il lavoro.
@@ -1379,7 +1379,7 @@ Metodo, in quest'ordine:
    file toccati, e una spec Playwright usa-e-getta sugli emulatori a 1440 e 390 che verifichi
    verdetto/tessere/zero overflow (main.scrollWidth === clientWidth). Cancella la spec, esporta e
    spegni gli emulatori.
-6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), AGENTS.md (sezione della pagina),
+6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), doc/guide/<pagina>.md (regole e blind spot della pagina; AGENTS.md solo se cambia una regola trasversale),
    DESIGN.md (marca «superseded» i pattern che la pagina abbandona; aggiungi al ramp solo misure
    davvero usate) e .impeccable/design.json (narrative specchio verbatim). Draft Release Temp.md.
 7. Nessun commit senza il mio OK esplicito. Rispondi in italiano; codice e commenti in inglese.
@@ -1402,14 +1402,14 @@ Vincoli: valore in quantity a prezzo 1 (assertFundValueLivesInQuantity); contrib
 attribuita al mese del createdAt; ceiling per contribuente non per conto; ogni capitolo
 degrada a PensionErrorNotice, mai a zeri.
 
-SCREENSHOT PER IL README. Se in docs/screenshots/ esiste uno screenshot della superficie che
+SCREENSHOT PER IL README. Se in doc/screenshots/ esiste uno screenshot della superficie che
 abbiamo ridisegnato, va rifatto a fine sessione (il README lo referenzia): account SINTETICO
 sull'emulatore (mai i miei dati — seed usa-e-getta con displayName «Mario», numeri plausibili
 e coerenti tra loro), viewport 1690×940 a deviceScaleFactor 2, tema scuro di default
 (localStorage theme=dark, nessun data-theme), spec Playwright usa-e-getta con login via form,
 stesso nome file; poi cancella le fixture dall'emulatore, esporta, spegni, elimina seed e spec,
 e annota in PRODUCT.md → Evidence on Hand quali screenshot sono della nuova generazione.
-Qui: oggi nessuno screenshot di questa superficie esiste in docs/screenshots/ — non crearne uno
+Qui: oggi nessuno screenshot di questa superficie esiste in doc/screenshots/ — non crearne uno
 nuovo a meno che non te lo chieda.
 ```
 
@@ -1431,8 +1431,8 @@ components/dashboard/overview/*) è il riferimento di implementazione: stesse pr
 (verdetto → griglia 12 colonne → dettaglio sotto la piega), stesso rigore sui numeri.
 
 Contesto, da fare TASSATIVAMENTE prima di ogni cosa:
-- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (pattern, gotcha — in particolare
-  «Panoramica and Dashboard Data Isolation» e la sezione della pagina che tocchiamo), WORKFLOW.md
+- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (convenzioni e gotcha trasversali) e doc/guide/<pagina>.md (le regole
+  e i blind spot della pagina che tocchiamo; per la Panoramica, doc/guide/panoramica.md), WORKFLOW.md
   (regole di sessione e collaudo guidato), DESIGN.md (normativo: il nuovo stile È lì),
   COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice.
 - Crea il branch PRIMA di editare. Crea SESSION_NOTES.md per tracciare il lavoro.
@@ -1459,7 +1459,7 @@ Metodo, in quest'ordine:
    file toccati, e una spec Playwright usa-e-getta sugli emulatori a 1440 e 390 che verifichi
    verdetto/tessere/zero overflow (main.scrollWidth === clientWidth). Cancella la spec, esporta e
    spegni gli emulatori.
-6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), AGENTS.md (sezione della pagina),
+6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), doc/guide/<pagina>.md (regole e blind spot della pagina; AGENTS.md solo se cambia una regola trasversale),
    DESIGN.md (marca «superseded» i pattern che la pagina abbandona; aggiungi al ramp solo misure
    davvero usate) e .impeccable/design.json (narrative specchio verbatim). Draft Release Temp.md.
 7. Nessun commit senza il mio OK esplicito. Rispondi in italiano; codice e commenti in inglese.
@@ -1478,14 +1478,14 @@ ultima verifica, «Ignora» durevole) e fatti; thread sheet mobile invariata.
 Vincoli: MARKDOWN_COMPONENTS module-level; Popover non DropdownMenu per pannelli con
 Select/Switch; aria-live sul flusso; bloccato in demo.
 
-SCREENSHOT PER IL README. Se in docs/screenshots/ esiste uno screenshot della superficie che
+SCREENSHOT PER IL README. Se in doc/screenshots/ esiste uno screenshot della superficie che
 abbiamo ridisegnato, va rifatto a fine sessione (il README lo referenzia): account SINTETICO
 sull'emulatore (mai i miei dati — seed usa-e-getta con displayName «Mario», numeri plausibili
 e coerenti tra loro), viewport 1690×940 a deviceScaleFactor 2, tema scuro di default
 (localStorage theme=dark, nessun data-theme), spec Playwright usa-e-getta con login via form,
 stesso nome file; poi cancella le fixture dall'emulatore, esporta, spegni, elimina seed e spec,
 e annota in PRODUCT.md → Evidence on Hand quali screenshot sono della nuova generazione.
-Qui: oggi nessuno screenshot di questa superficie esiste in docs/screenshots/ — non crearne uno
+Qui: oggi nessuno screenshot di questa superficie esiste in doc/screenshots/ — non crearne uno
 nuovo a meno che non te lo chieda.
 ```
 
@@ -1507,8 +1507,8 @@ components/dashboard/overview/*) è il riferimento di implementazione: stesse pr
 (verdetto → griglia 12 colonne → dettaglio sotto la piega), stesso rigore sui numeri.
 
 Contesto, da fare TASSATIVAMENTE prima di ogni cosa:
-- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (pattern, gotcha — in particolare
-  «Panoramica and Dashboard Data Isolation» e la sezione della pagina che tocchiamo), WORKFLOW.md
+- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (convenzioni e gotcha trasversali) e doc/guide/<pagina>.md (le regole
+  e i blind spot della pagina che tocchiamo; per la Panoramica, doc/guide/panoramica.md), WORKFLOW.md
   (regole di sessione e collaudo guidato), DESIGN.md (normativo: il nuovo stile È lì),
   COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice.
 - Crea il branch PRIMA di editare. Crea SESSION_NOTES.md per tracciare il lavoro.
@@ -1535,7 +1535,7 @@ Metodo, in quest'ordine:
    file toccati, e una spec Playwright usa-e-getta sugli emulatori a 1440 e 390 che verifichi
    verdetto/tessere/zero overflow (main.scrollWidth === clientWidth). Cancella la spec, esporta e
    spegni gli emulatori.
-6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), AGENTS.md (sezione della pagina),
+6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), doc/guide/<pagina>.md (regole e blind spot della pagina; AGENTS.md solo se cambia una regola trasversale),
    DESIGN.md (marca «superseded» i pattern che la pagina abbandona; aggiungi al ramp solo misure
    davvero usate) e .impeccable/design.json (narrative specchio verbatim). Draft Release Temp.md.
 7. Nessun commit senza il mio OK esplicito. Rispondi in italiano; codice e commenti in inglese.
@@ -1565,14 +1565,14 @@ Per tab:
 Vincoli: le CINQUE (+ sesta server) sedi di ogni setting; booleani espliciti; dirty-snapshot
 solo di campi persistiti; invalidate ['settings', ownerId].
 
-SCREENSHOT PER IL README. Se in docs/screenshots/ esiste uno screenshot della superficie che
+SCREENSHOT PER IL README. Se in doc/screenshots/ esiste uno screenshot della superficie che
 abbiamo ridisegnato, va rifatto a fine sessione (il README lo referenzia): account SINTETICO
 sull'emulatore (mai i miei dati — seed usa-e-getta con displayName «Mario», numeri plausibili
 e coerenti tra loro), viewport 1690×940 a deviceScaleFactor 2, tema scuro di default
 (localStorage theme=dark, nessun data-theme), spec Playwright usa-e-getta con login via form,
 stesso nome file; poi cancella le fixture dall'emulatore, esporta, spegni, elimina seed e spec,
 e annota in PRODUCT.md → Evidence on Hand quali screenshot sono della nuova generazione.
-Qui: oggi nessuno screenshot di questa superficie esiste in docs/screenshots/ — non crearne uno
+Qui: oggi nessuno screenshot di questa superficie esiste in doc/screenshots/ — non crearne uno
 nuovo a meno che non te lo chieda.
 ```
 
@@ -1594,8 +1594,8 @@ components/dashboard/overview/*) è il riferimento di implementazione: stesse pr
 (verdetto → griglia 12 colonne → dettaglio sotto la piega), stesso rigore sui numeri.
 
 Contesto, da fare TASSATIVAMENTE prima di ogni cosa:
-- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (pattern, gotcha — in particolare
-  «Panoramica and Dashboard Data Isolation» e la sezione della pagina che tocchiamo), WORKFLOW.md
+- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (convenzioni e gotcha trasversali) e doc/guide/<pagina>.md (le regole
+  e i blind spot della pagina che tocchiamo; per la Panoramica, doc/guide/panoramica.md), WORKFLOW.md
   (regole di sessione e collaudo guidato), DESIGN.md (normativo: il nuovo stile È lì),
   COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice.
 - Crea il branch PRIMA di editare. Crea SESSION_NOTES.md per tracciare il lavoro.
@@ -1622,7 +1622,7 @@ Metodo, in quest'ordine:
    file toccati, e una spec Playwright usa-e-getta sugli emulatori a 1440 e 390 che verifichi
    verdetto/tessere/zero overflow (main.scrollWidth === clientWidth). Cancella la spec, esporta e
    spegni gli emulatori.
-6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), AGENTS.md (sezione della pagina),
+6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), doc/guide/<pagina>.md (regole e blind spot della pagina; AGENTS.md solo se cambia una regola trasversale),
    DESIGN.md (marca «superseded» i pattern che la pagina abbandona; aggiungi al ramp solo misure
    davvero usate) e .impeccable/design.json (narrative specchio verbatim). Draft Release Temp.md.
 7. Nessun commit senza il mio OK esplicito. Rispondi in italiano; codice e commenti in inglese.
@@ -1639,14 +1639,14 @@ abilitata» in parole; password: requisiti come righe che si spuntano, non parag
 Mobile 390 prima: la tessera prende tutta la larghezza meno 16px.
 Niente logica nuova; ProtectedRoute invariato; nessun dato reale sul canvas.
 
-SCREENSHOT PER IL README. Se in docs/screenshots/ esiste uno screenshot della superficie che
+SCREENSHOT PER IL README. Se in doc/screenshots/ esiste uno screenshot della superficie che
 abbiamo ridisegnato, va rifatto a fine sessione (il README lo referenzia): account SINTETICO
 sull'emulatore (mai i miei dati — seed usa-e-getta con displayName «Mario», numeri plausibili
 e coerenti tra loro), viewport 1690×940 a deviceScaleFactor 2, tema scuro di default
 (localStorage theme=dark, nessun data-theme), spec Playwright usa-e-getta con login via form,
 stesso nome file; poi cancella le fixture dall'emulatore, esporta, spegni, elimina seed e spec,
 e annota in PRODUCT.md → Evidence on Hand quali screenshot sono della nuova generazione.
-Qui: oggi nessuno screenshot di questa superficie esiste in docs/screenshots/ — non crearne uno
+Qui: oggi nessuno screenshot di questa superficie esiste in doc/screenshots/ — non crearne uno
 nuovo a meno che non te lo chieda.
 ```
 
@@ -1668,8 +1668,8 @@ components/dashboard/overview/*) è il riferimento di implementazione: stesse pr
 (verdetto → griglia 12 colonne → dettaglio sotto la piega), stesso rigore sui numeri.
 
 Contesto, da fare TASSATIVAMENTE prima di ogni cosa:
-- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (pattern, gotcha — in particolare
-  «Panoramica and Dashboard Data Isolation» e la sezione della pagina che tocchiamo), WORKFLOW.md
+- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (convenzioni e gotcha trasversali) e doc/guide/<pagina>.md (le regole
+  e i blind spot della pagina che tocchiamo; per la Panoramica, doc/guide/panoramica.md), WORKFLOW.md
   (regole di sessione e collaudo guidato), DESIGN.md (normativo: il nuovo stile È lì),
   COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice.
 - Crea il branch PRIMA di editare. Crea SESSION_NOTES.md per tracciare il lavoro.
@@ -1696,7 +1696,7 @@ Metodo, in quest'ordine:
    file toccati, e una spec Playwright usa-e-getta sugli emulatori a 1440 e 390 che verifichi
    verdetto/tessere/zero overflow (main.scrollWidth === clientWidth). Cancella la spec, esporta e
    spegni gli emulatori.
-6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), AGENTS.md (sezione della pagina),
+6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), doc/guide/<pagina>.md (regole e blind spot della pagina; AGENTS.md solo se cambia una regola trasversale),
    DESIGN.md (marca «superseded» i pattern che la pagina abbandona; aggiungi al ramp solo misure
    davvero usate) e .impeccable/design.json (narrative specchio verbatim). Draft Release Temp.md.
 7. Nessun commit senza il mio OK esplicito. Rispondi in italiano; codice e commenti in inglese.
@@ -1713,14 +1713,14 @@ Demo: il banner giallo in dashboard resta ma a ramp (warning tokens); la CTA dem
 se mancano le NEXT_PUBLIC_DEMO_*.
 Copy italiano, specifico; nessun lorem; prezzi/claim inventati = zero.
 
-SCREENSHOT PER IL README. Se in docs/screenshots/ esiste uno screenshot della superficie che
+SCREENSHOT PER IL README. Se in doc/screenshots/ esiste uno screenshot della superficie che
 abbiamo ridisegnato, va rifatto a fine sessione (il README lo referenzia): account SINTETICO
 sull'emulatore (mai i miei dati — seed usa-e-getta con displayName «Mario», numeri plausibili
 e coerenti tra loro), viewport 1690×940 a deviceScaleFactor 2, tema scuro di default
 (localStorage theme=dark, nessun data-theme), spec Playwright usa-e-getta con login via form,
 stesso nome file; poi cancella le fixture dall'emulatore, esporta, spegni, elimina seed e spec,
 e annota in PRODUCT.md → Evidence on Hand quali screenshot sono della nuova generazione.
-Qui: oggi nessuno screenshot di questa superficie esiste in docs/screenshots/ — non crearne uno
+Qui: oggi nessuno screenshot di questa superficie esiste in doc/screenshots/ — non crearne uno
 nuovo a meno che non te lo chieda.
 ```
 
@@ -1742,8 +1742,8 @@ components/dashboard/overview/*) è il riferimento di implementazione: stesse pr
 (verdetto → griglia 12 colonne → dettaglio sotto la piega), stesso rigore sui numeri.
 
 Contesto, da fare TASSATIVAMENTE prima di ogni cosa:
-- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (pattern, gotcha — in particolare
-  «Panoramica and Dashboard Data Isolation» e la sezione della pagina che tocchiamo), WORKFLOW.md
+- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (convenzioni e gotcha trasversali) e doc/guide/<pagina>.md (le regole
+  e i blind spot della pagina che tocchiamo; per la Panoramica, doc/guide/panoramica.md), WORKFLOW.md
   (regole di sessione e collaudo guidato), DESIGN.md (normativo: il nuovo stile È lì),
   COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice.
 - Crea il branch PRIMA di editare. Crea SESSION_NOTES.md per tracciare il lavoro.
@@ -1770,7 +1770,7 @@ Metodo, in quest'ordine:
    file toccati, e una spec Playwright usa-e-getta sugli emulatori a 1440 e 390 che verifichi
    verdetto/tessere/zero overflow (main.scrollWidth === clientWidth). Cancella la spec, esporta e
    spegni gli emulatori.
-6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), AGENTS.md (sezione della pagina),
+6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), doc/guide/<pagina>.md (regole e blind spot della pagina; AGENTS.md solo se cambia una regola trasversale),
    DESIGN.md (marca «superseded» i pattern che la pagina abbandona; aggiungi al ramp solo misure
    davvero usate) e .impeccable/design.json (narrative specchio verbatim). Draft Release Temp.md.
 7. Nessun commit senza il mio OK esplicito. Rispondi in italiano; codice e commenti in inglese.
@@ -1789,14 +1789,14 @@ AssetMovementsDialog: la tabella movimenti a cadenza tessera (eyebrow + lettura 
 Lavora su un canvas di 6 artboard (i sei dialog più usati) prima del codice; poi applica il
 vocabolario agli altri per analogia, senza toccare la logica.
 
-SCREENSHOT PER IL README. Se in docs/screenshots/ esiste uno screenshot della superficie che
+SCREENSHOT PER IL README. Se in doc/screenshots/ esiste uno screenshot della superficie che
 abbiamo ridisegnato, va rifatto a fine sessione (il README lo referenzia): account SINTETICO
 sull'emulatore (mai i miei dati — seed usa-e-getta con displayName «Mario», numeri plausibili
 e coerenti tra loro), viewport 1690×940 a deviceScaleFactor 2, tema scuro di default
 (localStorage theme=dark, nessun data-theme), spec Playwright usa-e-getta con login via form,
 stesso nome file; poi cancella le fixture dall'emulatore, esporta, spegni, elimina seed e spec,
 e annota in PRODUCT.md → Evidence on Hand quali screenshot sono della nuova generazione.
-Qui: oggi nessuno screenshot di questa superficie esiste in docs/screenshots/ — non crearne uno
+Qui: oggi nessuno screenshot di questa superficie esiste in doc/screenshots/ — non crearne uno
 nuovo a meno che non te lo chieda.
 ```
 
@@ -1818,8 +1818,8 @@ components/dashboard/overview/*) è il riferimento di implementazione: stesse pr
 (verdetto → griglia 12 colonne → dettaglio sotto la piega), stesso rigore sui numeri.
 
 Contesto, da fare TASSATIVAMENTE prima di ogni cosa:
-- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (pattern, gotcha — in particolare
-  «Panoramica and Dashboard Data Isolation» e la sezione della pagina che tocchiamo), WORKFLOW.md
+- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (convenzioni e gotcha trasversali) e doc/guide/<pagina>.md (le regole
+  e i blind spot della pagina che tocchiamo; per la Panoramica, doc/guide/panoramica.md), WORKFLOW.md
   (regole di sessione e collaudo guidato), DESIGN.md (normativo: il nuovo stile È lì),
   COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice.
 - Crea il branch PRIMA di editare. Crea SESSION_NOTES.md per tracciare il lavoro.
@@ -1846,7 +1846,7 @@ Metodo, in quest'ordine:
    file toccati, e una spec Playwright usa-e-getta sugli emulatori a 1440 e 390 che verifichi
    verdetto/tessere/zero overflow (main.scrollWidth === clientWidth). Cancella la spec, esporta e
    spegni gli emulatori.
-6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), AGENTS.md (sezione della pagina),
+6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), doc/guide/<pagina>.md (regole e blind spot della pagina; AGENTS.md solo se cambia una regola trasversale),
    DESIGN.md (marca «superseded» i pattern che la pagina abbandona; aggiungi al ramp solo misure
    davvero usate) e .impeccable/design.json (narrative specchio verbatim). Draft Release Temp.md.
 7. Nessun commit senza il mio OK esplicito. Rispondi in italiano; codice e commenti in inglese.
@@ -1857,21 +1857,21 @@ Se hai domande che cambiano davvero il lavoro, falle PRIMA del canvas.
   della pagina) parametrizzato dagli span; le pagine ridisegnate lo usano, gli altri skeleton
   si cancellano man mano (non ora).
 - Vuoto: un EmptyState a cadenza tessera (eyebrow + UNA frase + UNA azione), mai illustrazione.
-  Distinzione obbligatoria: «nessun dato» ≠ «0» ≠ «errore» (AGENTS: expenseStats null ≠ 0; un
+  Distinzione obbligatoria: «nessun dato» ≠ «0» ≠ «errore» (AGENTS.md § Stati: caricamento, vuoto, zero, errore — expenseStats null ≠ 0; un
   fetch fallito va in role="alert").
 - Errore: notice con token warning/destructive, la frase dice cosa manca e cosa fare.
 - Notifiche: SavingsRateBadge (una volta al mese, già fatto) e i toast: stessa tipografia,
   niente emoji salvo il ✦ già in uso (decidi sul canvas se tenerlo).
 - Riduci motion: useReducedMotion rispettato ovunque; count-up solo nei leaf.
 
-SCREENSHOT PER IL README. Se in docs/screenshots/ esiste uno screenshot della superficie che
+SCREENSHOT PER IL README. Se in doc/screenshots/ esiste uno screenshot della superficie che
 abbiamo ridisegnato, va rifatto a fine sessione (il README lo referenzia): account SINTETICO
 sull'emulatore (mai i miei dati — seed usa-e-getta con displayName «Mario», numeri plausibili
 e coerenti tra loro), viewport 1690×940 a deviceScaleFactor 2, tema scuro di default
 (localStorage theme=dark, nessun data-theme), spec Playwright usa-e-getta con login via form,
 stesso nome file; poi cancella le fixture dall'emulatore, esporta, spegni, elimina seed e spec,
 e annota in PRODUCT.md → Evidence on Hand quali screenshot sono della nuova generazione.
-Qui: oggi nessuno screenshot di questa superficie esiste in docs/screenshots/ — non crearne uno
+Qui: oggi nessuno screenshot di questa superficie esiste in doc/screenshots/ — non crearne uno
 nuovo a meno che non te lo chieda.
 ```
 
@@ -1893,8 +1893,8 @@ components/dashboard/overview/*) è il riferimento di implementazione: stesse pr
 (verdetto → griglia 12 colonne → dettaglio sotto la piega), stesso rigore sui numeri.
 
 Contesto, da fare TASSATIVAMENTE prima di ogni cosa:
-- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (pattern, gotcha — in particolare
-  «Panoramica and Dashboard Data Isolation» e la sezione della pagina che tocchiamo), WORKFLOW.md
+- Leggi CLAUDE.md (stato corrente, Known Issues), AGENTS.md (convenzioni e gotcha trasversali) e doc/guide/<pagina>.md (le regole
+  e i blind spot della pagina che tocchiamo; per la Panoramica, doc/guide/panoramica.md), WORKFLOW.md
   (regole di sessione e collaudo guidato), DESIGN.md (normativo: il nuovo stile È lì),
   COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice.
 - Crea il branch PRIMA di editare. Crea SESSION_NOTES.md per tracciare il lavoro.
@@ -1921,7 +1921,7 @@ Metodo, in quest'ordine:
    file toccati, e una spec Playwright usa-e-getta sugli emulatori a 1440 e 390 che verifichi
    verdetto/tessere/zero overflow (main.scrollWidth === clientWidth). Cancella la spec, esporta e
    spegni gli emulatori.
-6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), AGENTS.md (sezione della pagina),
+6. DOC: CLAUDE.md (Latest + Known Issues + Key Files), doc/guide/<pagina>.md (regole e blind spot della pagina; AGENTS.md solo se cambia una regola trasversale),
    DESIGN.md (marca «superseded» i pattern che la pagina abbandona; aggiungi al ramp solo misure
    davvero usate) e .impeccable/design.json (narrative specchio verbatim). Draft Release Temp.md.
 7. Nessun commit senza il mio OK esplicito. Rispondi in italiano; codice e commenti in inglese.
@@ -1939,14 +1939,14 @@ Cashflow.
 Verifica: render delle email in un file HTML e del PDF via script usa-e-getta, confronto
 visivo sul canvas; nessun invio reale.
 
-SCREENSHOT PER IL README. Se in docs/screenshots/ esiste uno screenshot della superficie che
+SCREENSHOT PER IL README. Se in doc/screenshots/ esiste uno screenshot della superficie che
 abbiamo ridisegnato, va rifatto a fine sessione (il README lo referenzia): account SINTETICO
 sull'emulatore (mai i miei dati — seed usa-e-getta con displayName «Mario», numeri plausibili
 e coerenti tra loro), viewport 1690×940 a deviceScaleFactor 2, tema scuro di default
 (localStorage theme=dark, nessun data-theme), spec Playwright usa-e-getta con login via form,
 stesso nome file; poi cancella le fixture dall'emulatore, esporta, spegni, elimina seed e spec,
 e annota in PRODUCT.md → Evidence on Hand quali screenshot sono della nuova generazione.
-Qui: oggi nessuno screenshot di questa superficie esiste in docs/screenshots/ — non crearne uno
+Qui: oggi nessuno screenshot di questa superficie esiste in doc/screenshots/ — non crearne uno
 nuovo a meno che non te lo chieda.
 ```
 
@@ -1961,5 +1961,5 @@ nuovo a meno che non te lo chieda.
 - [ ] Playwright usa-e-getta a 1440 e 390: verdetto, tessere, zero overflow — poi cancellata
 - [ ] Emulatori esportati (`/_admin/export`) e spenti
 - [ ] CLAUDE.md / AGENTS.md / DESIGN.md (+ sidecar) / Draft Release Temp.md aggiornati; pattern abbandonati marcati «superseded»
-- [ ] Screenshot in docs/screenshots/ rifatto se la superficie ne ha uno (account sintetico, 1690×940 @2×, tema scuro)
+- [ ] Screenshot in doc/screenshots/ rifatto se la superficie ne ha uno (account sintetico, 1690×940 @2×, tema scuro)
 - [ ] SESSION_NOTES.md cancellato al commit; un commit, su OK esplicito

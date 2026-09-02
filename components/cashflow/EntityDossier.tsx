@@ -430,7 +430,7 @@ export function EntityDossier({ allExpenses, scope, color, period, periodLabel, 
     </div>
   );
 
-  // Trend mensile — period-independent. Always rendered (AGENTS.md: rolling charts never
+  // Trend mensile — period-independent. Always rendered (AGENTS.md § Recharts — rolling charts always render, never
   // disappear silently); the empty window states itself.
   const trend = (
     <div>

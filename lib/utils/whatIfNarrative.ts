@@ -9,7 +9,7 @@
  *
  * Two things this tab must keep straight. The event is stated in the terms the pure layer knows
  * — months, an amount, a share of the household income — never a category or a person: which
- * income stops is the UI's business (AGENTS → FIRE, What If and Goals). And the only signed
+ * income stops is the UI's business (doc/guide/fire.md § FIRE, What If and Goals). And the only signed
  * figures are the DELTAS: a year later is a loss, a lower FIRE number is a gain, the bounds and
  * the years stay uncoloured, and the headline's tone follows the delta in years.
  *

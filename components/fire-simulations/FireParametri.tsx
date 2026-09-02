@@ -8,7 +8,7 @@
  *
  * Config-first: the disclosure opens by itself only when no SWR is saved yet, or when an unsaved
  * edit appears — the page owns that state (`open`/`onOpenChange`) because the decision has to be
- * taken ONCE after the form has settled (AGENTS → FIRE: a `useRef` seeded flag, never the
+ * taken ONCE after the form has settled (doc/guide/fire.md § FIRE, What If and Goals: a `useRef` seeded flag, never the
  * transient `hasUnsavedChanges`). Every edit here is a PREVIEW — the verdict and the tiles read
  * the typed values at once — until «Salva»; the trigger carries an amber dot while something is
  * unsaved, so the state is visible with the panel closed.

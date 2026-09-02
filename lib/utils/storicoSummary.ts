@@ -6,7 +6,7 @@
  * Two figures here are deliberately NOT what Rendimenti computes, and the difference is the
  * point of the page: the growth since the first snapshot and its CAGR are WEALTH growth —
  * contributions included, `(latest / first) ^ (12 / months) − 1` — never an investment return
- * (AGENTS.md → History and Snapshot Baselines: two CAGR formulas, intentionally different).
+ * (doc/guide/storico.md § History and Snapshot Baselines).
  *
  * The pace has ONE basis for the whole page: the average monthly increase of the last twelve
  * months, in euro. It decides «accelera / rallenta» in the verdict AND the next-doubling

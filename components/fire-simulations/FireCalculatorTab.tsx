@@ -355,7 +355,7 @@ export function FireCalculatorTab() {
   // Fan (Ventaglio) inputs: market exposure from the REAL portfolio via the shared normalizer
   // (identical to the Monte Carlo tab's), market params from the saved MC base scenario or the
   // defaults, expenses inflated with the SAME base-scenario inflation as the deterministic
-  // target line. Inflows at TODAY's value, per the MC convention (AGENTS → FIRE).
+  // target line. Inflows at TODAY's value, per the MC convention (doc/guide/fire.md § FIRE, What If and Goals).
   const pensionCapitalInflows = useMemo(
     () => (pensionLockState?.inflows ?? []).map((inflow) => ({ year: inflow.yearsFromNow, amount: inflow.amount })),
     [pensionLockState],
