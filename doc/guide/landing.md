@@ -45,7 +45,7 @@
 - **The «Registrati» link mirrors the server**: `resolveRegistrationAccess` again (the same function
   the registration page uses), and `describeRegistrationInvite` returns `null` on `closed` — an
   invitation behind a door the server keeps shut is worse than no link.
-- **The page root is `PageContainer width="wide"` with `max-desktop:portrait:pb-0`**: the container's
+- **The page root is `PageContainer` (1920px) with `max-desktop:portrait:pb-0`**: the container's
   bottom padding exists for the phone's nav pill, and the landing has none.
 
 ## Per-page blind spots

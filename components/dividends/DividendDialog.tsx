@@ -13,7 +13,7 @@
  */
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useForm, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -125,14 +125,9 @@ export function DividendDialog({ open, onClose, dividend, onSuccess }: DividendD
   const totalTax = withholdingTax * sharesHeld;
   const totalNet = netAmountPerShare * sharesHeld;
 
-  // Load assets when dialog opens
-  useEffect(() => {
-    if (open && user) {
-      loadAssets();
-    }
-  }, [open, user]);
-
-  const loadAssets = async () => {
+  // Memoized on what it reads, so the effect below can declare it as a dependency without
+  // re-running on every render.
+  const loadAssets = useCallback(async () => {
     if (!user || !ownerId) return;
 
     try {
@@ -150,7 +145,18 @@ export function DividendDialog({ open, onClose, dividend, onSuccess }: DividendD
     } finally {
       setLoadingAssets(false);
     }
-  };
+  }, [user, ownerId]);
+
+  // Load assets when dialog opens. Deferred so the effect body itself sets no state — the
+  // loader flips `loadingAssets` before its await (react-hooks/set-state-in-effect); the
+  // cleanup drops a load the close beat to it.
+  useEffect(() => {
+    if (!open || !user) return;
+    const timer = setTimeout(() => {
+      loadAssets();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [open, user, loadAssets]);
 
   /**
    * Auto-calculate 26% Italian withholding tax for NEW dividends only
@@ -390,7 +396,7 @@ export function DividendDialog({ open, onClose, dividend, onSuccess }: DividendD
               <p className="text-sm text-destructive">{errors.sharesHeld.message}</p>
             )}
             <p className="text-xs text-muted-foreground">
-              Precompilato con la quantità attuale dell'asset
+              Precompilato con la quantità attuale dell&apos;asset
             </p>
           </div>
 

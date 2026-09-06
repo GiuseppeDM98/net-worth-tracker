@@ -24,7 +24,7 @@
  * @param onRefresh - Callback to refresh expense list after deletion
  */
 
-import { useState, useMemo, useEffect, Suspense } from 'react';
+import { useState, useMemo, Suspense } from 'react';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
@@ -319,28 +319,30 @@ export function ExpenseTable({ expenses, onEdit, onRefresh, isDemo = false, hasA
   }, [sortedExpenses, startIndex, endIndex]);
 
   /**
-   * Why reset to page 1 when expenses.length or sortBy changes?
-   *
-   * - If expenses.length changes (add/delete), staying on page 3 might show empty results
-   * - If sort changes, the "page 3" items are now completely different items, confusing UX
-   *
-   * Better to reset to page 1 so user sees the top of the newly sorted/filtered list.
-   */
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [expenses.length, sortCol, sortDir, pageSize]);
-
-  /**
-   * Why reset sort when expenses array changes?
+   * Why reset sort when the expenses array changes, and page 1 when the view changes?
    *
    * The expenses prop is pre-filtered by parent (e.g., by month, type, category).
    * When filters change, user likely wants to see the new filtered data in default
    * date order, not in whatever sort state was previously active. Clearing sort
    * provides a predictable "reset" behavior when switching filters.
+   *
+   * - If expenses.length changes (add/delete), staying on page 3 might show empty results
+   * - If sort or page size changes, the "page 3" items are now completely different items
+   *
+   * Both adjustments happen during render, keyed on the previous values (React's "adjusting
+   * state when a prop changes"): a setter called synchronously in an effect is banned by
+   * `react-hooks/set-state-in-effect`, and this way the reset lands in the same commit.
    */
-  useEffect(() => {
+  const [prevView, setPrevView] = useState({ length: expenses.length, sortCol, sortDir, pageSize });
+  if (prevView.length !== expenses.length) {
+    // A new list clears the sort, and the cleared sort is what the next render will see.
+    setPrevView({ length: expenses.length, sortCol: null, sortDir, pageSize });
     setSortCol(null);
-  }, [expenses.length]);
+    setCurrentPage(1);
+  } else if (prevView.sortCol !== sortCol || prevView.sortDir !== sortDir || prevView.pageSize !== pageSize) {
+    setPrevView({ length: expenses.length, sortCol, sortDir, pageSize });
+    setCurrentPage(1);
+  }
 
   const handlePreviousPage = () => {
     setCurrentPage((prev: number) => Math.max(1, prev - 1));

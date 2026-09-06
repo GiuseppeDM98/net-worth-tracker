@@ -8,7 +8,7 @@ import type { Asset } from '@/types/assets';
  * A trade's `priceEur` is resolved SERVER-SIDE only: Frankfurter is silently blocked from the
  * browser (doc/guide/patrimonio.md § Asset Pricing, FX and Assets), and storing a trade without a trustworthy `priceEur` would
  * corrupt every EUR metric. Network calls happen here, BEFORE the Firestore transaction — never
- * inside it (AGENTS.md → runTransaction).
+ * inside it (AGENTS.md § Firestore Writes, `runTransaction`).
  */
 
 // Frankfurter historical/latest FX. The benchmark pipeline already depends on Frankfurter, so this

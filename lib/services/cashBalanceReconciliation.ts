@@ -64,11 +64,6 @@ export interface TransferDeleteParams {
   amount: number;
 }
 
-interface SingleDeleteParams {
-  linkedAssetId: string;
-  signedAmount: number;
-}
-
 // ─── Reconciliation Functions ─────────────────────────────────────────────────
 
 /**

@@ -389,6 +389,30 @@ service still answers*. Find the real owner and stop it by PID:
 Get-NetTCPConnection -LocalPort 8080 -State Listen
 ```
 
+### The emulator refuses to start for lack of Java 21 (Windows)
+
+Moved here from AGENTS.md on 2026-09-06; on macOS a Homebrew OpenJDK (26 at the time of writing) starts the emulators
+with `JAVA_HOME` unset, and `kill -INT` on the `firebase` CLI process runs the export-on-exit.
+
+**The emulator needs Java ≥ 21; this machine now HAS it, and a shell already running may still not see it.** Temurin
+  21 (`C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot`) was installed on 2026-08-30, the USER `JAVA_HOME`
+  points at it and the user `PATH` carries `%JAVA_HOME%\bin`; the `Oracle\Java\javapath` shim — which resolved `java` to
+  the JDK 15 whatever `JAVA_HOME` said — was removed from BOTH the user and machine scopes (the directory is still on
+  disk, it is only off the PATH). **An environment change never reaches a process that is already running**: a session
+  started before it keeps the old `PATH`, so `java -version` inside it still prints 15 and `(Get-Command java).Source`
+  still names the shim — which is what the pre-2026-08-30 note above recorded as "this machine has no JDK 21". Read the
+  SCOPES, not the process: `[Environment]::GetEnvironmentVariable('Path','Machine')` and `…'User'`, plus
+  `[Environment]::GetEnvironmentVariable('JAVA_HOME','User')`. A new terminal picks the change up. The portable route of
+  SETUP.md → Step 6 remains the fallback where it has not been picked up (`winget` is NOT on this shell's PATH): fetch
+  the zip directly
+  (`https://api.adoptium.net/v3/binary/latest/21/ga/windows/x64/jdk/hotspot/normal/eclipse`), expand it into the session
+  scratchpad and export `JAVA_HOME`/`PATH` for the `npm run emulators` process only — no system change, nothing to undo.
+  **In the Bash tool, `PATH` entries must be MSYS paths (`/c/Users/…`), not `C:/Users/…`**: `PATH` is colon-separated, so a
+  drive letter splits the entry in two, the portable JDK never resolves, `java -version` still prints the system 15 and
+  firebase-tools dies with "no longer supports Java version before 21" — a failure that reads as a missing download
+  (verified 2026-08-30). `JAVA_HOME` itself is fine either way; check with `which java` before starting the emulators. Stopping the npm wrapper does **not** kill
+  the JVM: the ports stay taken and the next start fails with "port taken", naming no stale process. Free them by PID — `netstat -ano | grep LISTENING | grep :8080`, then `taskkill //PID <pid> //F //T`, the same for `next dev` on :3100 — and only AFTER the Hub export.
+
 ### `npm run start` refuses to serve the build
 
 `next.config.ts` sets `output: "standalone"`, so Next warns and refuses. Motion and

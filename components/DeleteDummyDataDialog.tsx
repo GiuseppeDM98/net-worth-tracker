@@ -12,7 +12,7 @@
  */
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import { TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { Button } from '@/components/ui/button';
@@ -47,14 +47,7 @@ export function DeleteDummyDataDialog({
   const [dataCount, setDataCount] = useState<DummyDataCount | null>(null);
   const [status, setStatus] = useState<ModalStatus>({ phase: 'idle' });
 
-  // Load count when dialog opens
-  useEffect(() => {
-    if (open) {
-      loadDataCount();
-    }
-  }, [open, userId]);
-
-  const loadDataCount = async () => {
+  const loadDataCount = useCallback(async () => {
     setIsLoading(true);
     try {
       const count = await getDummyDataCount(userId);
@@ -65,7 +58,17 @@ export function DeleteDummyDataDialog({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [userId]);
+
+  // Load count when dialog opens
+  useEffect(() => {
+    if (!open) return;
+    // Deferred so the effect body itself sets no state (react-hooks/set-state-in-effect).
+    const timer = setTimeout(() => {
+      loadDataCount();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [open, loadDataCount]);
 
   const handleDelete = async () => {
     if (!dataCount || dataCount.total === 0) return;

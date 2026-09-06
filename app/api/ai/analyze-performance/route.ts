@@ -69,11 +69,58 @@ async function callAnthropicForPerformanceAnalysis(prompt: string) {
         type: 'web_search_20250305',
         name: 'web_search',
         max_uses: 3, // limit to keep latency reasonable
-      } as any,
+      },
     ],
     messages: [{ role: 'user', content: prompt }],
     stream: true,
   });
+}
+
+interface AnthropicFailure {
+  /** `type` of the error body attached to the thrown value, when it carries one. */
+  bodyType?: string;
+  /** `message` of that same error body, when it carries one. */
+  bodyMessage?: string;
+  /** The thrown value's own `message`, the fallback when the body has none. */
+  message?: string;
+}
+
+/** The object stored at `key`, when `value` is an object holding one there. */
+function readNestedObject(value: unknown, key: string): object | undefined {
+  if (typeof value !== 'object' || value === null || !(key in value)) return undefined;
+  const nested = (value as Record<string, unknown>)[key];
+  return typeof nested === 'object' && nested !== null ? nested : undefined;
+}
+
+/** The string stored at `key`, when `value` holds one there. */
+function readStringField(value: object | undefined, key: string): string | undefined {
+  if (value === undefined || !(key in value)) return undefined;
+  const field = (value as Record<string, unknown>)[key];
+  return typeof field === 'string' ? field : undefined;
+}
+
+/**
+ * Reads a failed request from every shape the thrown value can take.
+ *
+ * `Anthropic.APIError` (sdk 0.110) lifts the inner type to `error.type` and stores the
+ * WHOLE response envelope under `error.error`, so there `error.error.type` is the constant
+ * `'error'` and the body that matters sits at `error.error.error`. A raw envelope
+ * `{ error: { type, message } }` holds it one level up. Both are unwrapped so an overload
+ * is recognised from the real SDK error and from the mocks alike; the thrown value's own
+ * `message` stays the fallback, and a non-object yields the default sentence downstream.
+ */
+function readAnthropicFailure(error: unknown): AnthropicFailure {
+  if (typeof error !== 'object' || error === null) return {};
+  const failure: AnthropicFailure = {};
+  if ('message' in error && typeof error.message === 'string') failure.message = error.message;
+  const body = readNestedObject(error, 'error');
+  const innerBody = readNestedObject(body, 'error') ?? body;
+  const bodyType =
+    error instanceof Anthropic.APIError ? error.type ?? undefined : readStringField(innerBody, 'type');
+  if (bodyType !== undefined) failure.bodyType = bodyType;
+  const bodyMessage = readStringField(innerBody, 'message');
+  if (bodyMessage !== undefined) failure.bodyMessage = bodyMessage;
+  return failure;
 }
 
 /**
@@ -83,7 +130,7 @@ async function callAnthropicForPerformanceAnalysis(prompt: string) {
  * Tool use and thinking blocks are silently skipped — only text_delta chunks
  * (Claude's written response) are forwarded to the client.
  */
-function buildPerformanceSseStream(anthropicStream: AsyncIterable<any>): ReadableStream {
+function buildPerformanceSseStream(anthropicStream: AsyncIterable<Anthropic.MessageStreamEvent>): ReadableStream {
   const encoder = new TextEncoder();
   return new ReadableStream({
     async start(controller) {
@@ -97,12 +144,13 @@ function buildPerformanceSseStream(anthropicStream: AsyncIterable<any>): Readabl
         }
         controller.enqueue(encoder.encode('data: [DONE]\n\n'));
         controller.close();
-      } catch (streamError: any) {
+      } catch (streamError: unknown) {
         console.error('[API /ai/analyze-performance] Stream error:', streamError);
+        const failure = readAnthropicFailure(streamError);
         const errorMsg =
-          streamError?.error?.type === 'overloaded_error'
+          failure.bodyType === 'overloaded_error'
             ? 'I server AI sono temporaneamente sovraccarichi. Clicca "Rigenera" per riprovare.'
-            : (streamError?.error?.message || streamError.message || 'Errore durante la generazione');
+            : (failure.bodyMessage || failure.message || 'Errore durante la generazione');
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: errorMsg })}\n\n`));
         controller.enqueue(encoder.encode('data: [DONE]\n\n'));
         controller.close();
@@ -162,16 +210,17 @@ export async function POST(request: NextRequest) {
     let anthropicStream;
     try {
       anthropicStream = await callAnthropicForPerformanceAnalysis(prompt);
-    } catch (apiError: any) {
+    } catch (apiError: unknown) {
       console.error('[API /ai/analyze-performance] Anthropic API error:', apiError);
-      if (apiError?.error?.type === 'overloaded_error') {
+      const failure = readAnthropicFailure(apiError);
+      if (failure.bodyType === 'overloaded_error') {
         return NextResponse.json(
           { error: 'I server AI sono temporaneamente sovraccarichi. Riprova tra qualche secondo.', retryable: true },
           { status: 503 }
         );
       }
       return NextResponse.json(
-        { error: 'Errore nella chiamata AI: ' + (apiError?.error?.message || apiError.message), retryable: false },
+        { error: 'Errore nella chiamata AI: ' + (failure.bodyMessage || failure.message), retryable: false },
         { status: 500 }
       );
     }

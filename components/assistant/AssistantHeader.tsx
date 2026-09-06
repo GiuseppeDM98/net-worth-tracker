@@ -61,7 +61,6 @@ export function AssistantHeader({
       label="Assistente AI"
       title="Un periodo, una risposta"
       description={description}
-      separator={false}
       actions={
         <>
           <Button

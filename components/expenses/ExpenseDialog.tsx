@@ -347,7 +347,6 @@ interface ExpenseDialogProps {
 interface FormBodyProps {
   form: UseFormReturn<ExpenseFormValues>;
   onSubmit: (data: ExpenseFormValues) => Promise<void>;
-  isEdit: boolean;
   selectedType: ExpenseType;
   selectedCategoryId: string | undefined;
   watchedSubCategoryId: string | undefined;
@@ -399,7 +398,6 @@ interface FormBodyProps {
 function ExpenseFormBody({
   form,
   onSubmit,
-  isEdit,
   selectedType,
   selectedCategoryId,
   watchedSubCategoryId,
@@ -1258,23 +1256,89 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
     selectedRecurringDay,
   ]);
 
+  // Fetched once per opening. Both are `useCallback`s so the effects that call them can name them
+  // as dependencies. `loadCashAssets` is promise-style on purpose: its setters run inside
+  // `.then`, which the `react-hooks/set-state-in-effect` rule accepts from an effect — an
+  // `await` in an async function it does not see through. `loadCategories` raises its loading
+  // flag synchronously, so the effect defers it instead (see there).
+  const loadCategories = useCallback(async () => {
+    if (!user || !ownerId) return;
+    try {
+      setLoadingCategories(true);
+      const allCategories = await getAllCategories(ownerId);
+      setCategories(allCategories);
+    } catch (error) {
+      console.error('Error loading categories:', error);
+      toast.error('Errore nel caricamento delle categorie');
+    } finally {
+      setLoadingCategories(false);
+    }
+  }, [user, ownerId]);
+
+  const loadCashAssets = useCallback((): Promise<void> => {
+    if (!user || !ownerId) return Promise.resolve();
+    return Promise.all([getAllAssets(ownerId), getSettings(ownerId), getCostCenters(ownerId)])
+      .then(([allAssets, settings, centers]) => {
+        setCashAssets(allAssets.filter((a) => a.type === 'cash' && a.assetClass === 'cash'));
+        const debitId = settings?.defaultDebitCashAssetId || '__none__';
+        const creditId = settings?.defaultCreditCashAssetId || '__none__';
+        setDefaultDebitCashAssetId(debitId);
+        setDefaultCreditCashAssetId(creditId);
+        setCostCentersEnabled(settings?.costCentersEnabled ?? false);
+        setCostCenters(centers);
+        setSplitEnabled(settings?.expenseSplitEnabled ?? false);
+        setFamilyMembers(settings?.familyMembers ?? []);
+        if (!expense) {
+          const currentType = getValues('type');
+          const defaultId = currentType === 'income' ? creditId : debitId;
+          if (defaultId !== '__none__') {
+            setValue('linkedCashAssetId', defaultId);
+          }
+        }
+      })
+      .catch((error) => console.error('Error loading cash assets:', error));
+  }, [user, ownerId, expense, getValues, setValue]);
+
+  // The transfer category id fetched during THIS opening (see the auto-set effect below).
+  const transferCategoryIdRef = useRef<string | null>(null);
+
+  // The step, the status line, the advanced disclosure and the two non-form fields belong to
+  // one opening over one row: they are adjusted during render when `open` or `expense` changes
+  // (React's "adjusting state when a prop changes"), never from an effect
+  // (`react-hooks/set-state-in-effect`). Re-running on every open is what makes a second
+  // "nuova voce" start from the picker again — `expense` stays null between opens. The form
+  // itself is reset in the effect further down: `reset` is not a state setter.
+  const [openSubject, setOpenSubject] = useState<{
+    open: boolean;
+    expense: Expense | null | undefined;
+  } | null>(null);
+  if (!openSubject || openSubject.open !== open || openSubject.expense !== expense) {
+    setOpenSubject({ open, expense });
+    if (open) {
+      setStatus({ phase: 'idle' });
+      setStep(expense ? 2 : 1);
+      setAdvancedOpen(isAdvancedPrePopulated(expense));
+      setSelectedCostCenterId(expense?.costCenterId || '__none__');
+      setPersonalMemberId(expense?.personalMemberId || '');
+    }
+  }
+
   useEffect(() => {
     if (!open) return;
-    // Re-run on every open so a second "nuova voce" starts from the picker again — without
-    // `open` in the deps, `expense` stays null between opens and the step is never reset.
-    setStatus({ phase: 'idle' });
-    setStep(expense ? 2 : 1);
-    setAdvancedOpen(isAdvancedPrePopulated(expense));
     transferCategoryIdRef.current = null; // Reset transfer category cache on dialog open
   }, [open, expense]);
 
   useEffect(() => {
-    if (open && user) {
-      loadCategories();
-      loadCashAssets();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, user]);
+    if (!open || !user) return;
+    // `loadCategories` raises the loading flag BEFORE its first await (the Select shows it, and
+    // the two handlers that re-fetch rely on it), so from an effect it is deferred a tick — the
+    // sanctioned way to keep a synchronous setter out of an effect body (AGENTS.md → Motion).
+    const timer = setTimeout(() => {
+      void loadCategories();
+    }, 0);
+    loadCashAssets();
+    return () => clearTimeout(timer);
+  }, [open, user, loadCategories, loadCashAssets]);
 
   useEffect(() => {
     if (!expense) {
@@ -1287,7 +1351,6 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
   // Runs in edit mode too (a row re-typed INTO a transfer needs a transfer category),
   // but never overrides a transfer category already in place — whether the row's own
   // (transfer → transfer edits) or one the user picked by hand.
-  const transferCategoryIdRef = useRef<string | null>(null);
   useEffect(() => {
     if (selectedType === 'transfer' && user && ownerId && open) {
       const currentCategoryId = getValues('categoryId');
@@ -1313,50 +1376,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
         loadCategories();
       }).catch(console.error);
     }
-  }, [selectedType, user, open, getValues, setValue, categories]);
-
-  const loadCategories = async () => {
-    if (!user || !ownerId) return;
-    try {
-      setLoadingCategories(true);
-      const allCategories = await getAllCategories(ownerId);
-      setCategories(allCategories);
-    } catch (error) {
-      console.error('Error loading categories:', error);
-      toast.error('Errore nel caricamento delle categorie');
-    } finally {
-      setLoadingCategories(false);
-    }
-  };
-
-  const loadCashAssets = async () => {
-    if (!user || !ownerId) return;
-    try {
-      const [allAssets, settings, centers] = await Promise.all([
-        getAllAssets(ownerId),
-        getSettings(ownerId),
-        getCostCenters(ownerId),
-      ]);
-      setCashAssets(allAssets.filter((a) => a.type === 'cash' && a.assetClass === 'cash'));
-      const debitId = settings?.defaultDebitCashAssetId || '__none__';
-      const creditId = settings?.defaultCreditCashAssetId || '__none__';
-      setDefaultDebitCashAssetId(debitId);
-      setDefaultCreditCashAssetId(creditId);
-      setCostCentersEnabled(settings?.costCentersEnabled ?? false);
-      setCostCenters(centers);
-      setSplitEnabled(settings?.expenseSplitEnabled ?? false);
-      setFamilyMembers(settings?.familyMembers ?? []);
-      if (!expense) {
-        const currentType = getValues('type');
-        const defaultId = currentType === 'income' ? creditId : debitId;
-        if (defaultId !== '__none__') {
-          setValue('linkedCashAssetId', defaultId);
-        }
-      }
-    } catch (error) {
-      console.error('Error loading cash assets:', error);
-    }
-  };
+  }, [selectedType, user, ownerId, open, getValues, setValue, categories, loadCategories]);
 
   useEffect(() => {
     if (!open) return;
@@ -1379,8 +1399,6 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
         linkedCashAssetId: expense.linkedCashAssetId || '__none__',
         transferCashAssetId: expense.transferCashAssetId || '__none__',
       });
-      setSelectedCostCenterId(expense.costCenterId || '__none__');
-      setPersonalMemberId(expense.personalMemberId || '');
     } else {
       reset({
         type: 'variable',
@@ -1398,8 +1416,6 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
         linkedCashAssetId: '__none__',
         transferCashAssetId: '__none__',
       });
-      setSelectedCostCenterId('__none__');
-      setPersonalMemberId('');
     }
   }, [expense, reset, open]);
 
@@ -1843,7 +1859,6 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
   const formBodyProps: FormBodyProps = {
     form,
     onSubmit,
-    isEdit,
     selectedType,
     selectedCategoryId,
     watchedSubCategoryId,

@@ -14,8 +14,8 @@
  * section tinted with chart slots, which say nothing about better or worse on a themed palette.
  *
  * Below `desktop:` the matrix has no rows and columns: each expense level is a block with its
- * savings cells in a two-column grid, labelled explicitly (AGENTS → a cardified view needs its
- * own reading note).
+ * savings cells in a two-column grid, labelled explicitly (AGENTS.md § Hierarchy, Density and Disclosure —
+ * a cardified mobile view needs its own reading note).
  */
 
 import type { FIRESensitivityCell, FIRESensitivityMatrix } from '@/lib/services/fireService';

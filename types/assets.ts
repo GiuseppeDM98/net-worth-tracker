@@ -377,7 +377,7 @@ export interface PieChartData {
   color: string;
   /** Raw asset-class key (e.g. 'equity'), set only by asset-class distribution data. */
   assetClass?: string;
-  [key: string]: any; // Index signature for Recharts compatibility
+  [key: string]: unknown; // Index signature for Recharts compatibility
 }
 
 export interface User {

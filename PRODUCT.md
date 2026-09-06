@@ -31,7 +31,7 @@ A single place where an Italian self-directed investor can see their whole finan
 Three further behaviours are visible in the product and are *consequences* of that promise rather than the promise itself — recorded so future work does not mistake one for the other:
 
 - refusing to state a number — or a sentence — it cannot stand behind (no annualization under six months, `—` instead of volatility with fewer than three monthly returns, an explanation instead of a `0,00%` pension return when the window is idle or suspicious, `Panoramica · dati d'esempio` above the landing's grid, and no figure at all on the three tiles that would have had to invent one; a month that fell while the market gained is "in calo, nonostante il mercato", never "il mercato ha pesato"; the Panoramica's market digest measures the price effect on what was held, never the user's own buys and sells, and hides rather than guesses when the previous snapshot has no per-asset breakdown);
-- verdict-first information architecture — since 2026-08-22 the Panoramica opens with one rule-generated sentence that answers "come va?" before any number, over a grid of tiles that each answer one question with a reading line above the figures; the older "one dominant number plus a verdict, detail behind a collapsible" shape survives on the pages not yet propagated (`doc/redesign-prompts.md` is the plan);
+- verdict-first information architecture — since 2026-08-22 the Panoramica opens with one rule-generated sentence that answers "come va?" before any number, over a grid of tiles that each answer one question with a reading line above the figures; since 2026-09-01 every page, the dialogs, the four states and the email/PDF are on that shape — the older "one dominant number plus a verdict, detail behind a collapsible" shape is gone;
 - complete private ownership (AGPL self-hostable, no analytics or telemetry, illiquid and manually-valued assets modelled as first-class).
 
 ## Operating Context
@@ -77,7 +77,7 @@ L'app è la Apple dei personal tracker finanziari: non lo strumento più ricco d
 
 Binding anti-references: Bloomberg terminal (too cold and dense), Revolut-style consumer fintech (too light for serious data), Material Design (too generic), and **ostentated complexity** (UI that demonstrates how hard the domain is instead of hiding it behind a calm surface).
 
-**Visual authority lives in `DESIGN.md`, not here.** It is hand-maintained and must never be regenerated; its YAML frontmatter (OKLCH palette, the enumerated 9→54px type ramp) is the normative layer, and `.impeccable/design.json` is only an extensions sidecar. Since 2026-08-22 it documents the "Verdict over Tiles" shape set by the Panoramica and marks the patterns that shape superseded; the app is being propagated onto it page by page, so two generations coexist by design until the plan in `doc/redesign-prompts.md` is done. CLAUDE.md's aesthetic summary is a known-incomplete paraphrase — do not treat it as the source.
+**Visual authority lives in `DESIGN.md`, not here.** It is hand-maintained and must never be regenerated; its YAML frontmatter (OKLCH palette, the enumerated 9→54px type ramp) is the normative layer, and `.impeccable/design.json` is only an extensions sidecar. Since 2026-08-22 it documents the "Verdict over Tiles" shape set by the Panoramica and marks the patterns that shape superseded; the propagation closed on 2026-09-01 (twenty-three sections) and on 2026-09-06 the file was re-read against the finished code, so what it describes is what ships. CLAUDE.md carries only a pointer to it — do not treat CLAUDE.md as the source.
 
 ## Evidence on Hand
 
@@ -117,4 +117,4 @@ What **is** binding is the de-facto house standard, enforced by review:
 - `prefers-reduced-motion` honoured through a single source of truth (Framer `useReducedMotion` / `MotionConfig reducedMotion="user"`), plus a global `.animate-spin` kill and `matchMedia` checks in imperative animations.
 - Sign colour always through `getMetricValueColor()`; chart colour through `useChartColors()`, whose luminance guard falls back when OKLCH L > 0.82 in light or < 0.30 in dark.
 
-**Known open defect**: `PageTabBar`'s compact/pill mode renders no accessible name for inactive tabs below the 1440px breakpoint, affecting the Impostazioni, Cashflow and FIRE tab bars.
+**No open accessibility defect is known**: the last one — `PageTabBar`'s icon-only tabs below 1440px had no accessible name — was closed on 2026-08-22 (`aria-label` on every tab, the tablist named through `ariaLabel`).

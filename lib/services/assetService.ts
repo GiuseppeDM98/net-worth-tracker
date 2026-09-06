@@ -6,12 +6,9 @@ import {
   addDoc,
   setDoc,
   updateDoc,
-  deleteDoc,
   query,
   where,
   limit,
-  Timestamp,
-  orderBy,
   deleteField,
   runTransaction,
 } from 'firebase/firestore';

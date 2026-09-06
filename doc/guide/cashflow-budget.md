@@ -75,4 +75,10 @@
 
 ## Per-page blind spots
 
+- **`useBudgetConfig` derives what it used to write** (2026-09-06): `items` is a `useMemo` reconcile over the saved list
+  and `saveStatus` comes from `editSeq`/`lastWrite`, so three transient readings differ from before while every write is
+  identical — a write landing while a newer edit is queued shows «saving» instead of a brief «saved»; after an error a
+  category refetch retries silently while the status still says «error»; and `loading` turns true again on an account
+  switch. An error never retries by itself: `lastWrite` is not a dependency of the autosave.
+
 - **Budget**: `BudgetItemDialog` stays for create/edit (no inline editing); **the ceiling history starts with the first cron run after the deploy** (earlier months read against today's ceiling, «prima quello attuale»), a month's record is its LAST captured configuration; the crossing day comes from the EXPENSE DATES (a backdated row moves it), an annual budget has no crossing sentence; a budget with every threshold off and already exceeded shows only in Per categoria; `app/dashboard/cashflow/page.tsx` carries two pre-existing `react-hooks` findings.

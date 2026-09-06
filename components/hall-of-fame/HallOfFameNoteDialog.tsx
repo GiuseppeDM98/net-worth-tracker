@@ -12,7 +12,7 @@
  */
 
 import type { CSSProperties, RefObject } from 'react';
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useArmedDelete } from '@/lib/hooks/useArmedDelete';
 import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import { Button } from '@/components/ui/button';
@@ -68,22 +68,35 @@ export function HallOfFameNoteDialog({
   const [selectedSections, setSelectedSections] = useState<Set<HallOfFameSectionKey>>(new Set());
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (!open) return;
-
-    if (editNote) {
-      setSelectedYear(editNote.year);
-      setSelectedMonth(editNote.month ?? null);
-      setNoteText(editNote.text);
-      setSelectedSections(new Set(editNote.sections));
-    } else {
-      const currentYear = getItalyYear();
-      setSelectedYear(availableYears.includes(currentYear) ? currentYear : (availableYears[0] ?? null));
-      setSelectedMonth(null);
-      setNoteText('');
-      setSelectedSections(new Set());
+  // Seed the form on open — and whenever the note or the years change while open — during
+  // render (React's adjust-state-during-render) rather than in an effect (react-hooks/set-state-
+  // in-effect): the seeded form is the one painted, never the previous draft for a frame.
+  const [seededFor, setSeededFor] = useState<{
+    open: boolean;
+    editNote: typeof editNote;
+    availableYears: number[] | null;
+  }>({ open: false, editNote: undefined, availableYears: null });
+  if (
+    seededFor.open !== open ||
+    seededFor.editNote !== editNote ||
+    seededFor.availableYears !== availableYears
+  ) {
+    setSeededFor({ open, editNote, availableYears });
+    if (open) {
+      if (editNote) {
+        setSelectedYear(editNote.year);
+        setSelectedMonth(editNote.month ?? null);
+        setNoteText(editNote.text);
+        setSelectedSections(new Set(editNote.sections));
+      } else {
+        const currentYear = getItalyYear();
+        setSelectedYear(availableYears.includes(currentYear) ? currentYear : (availableYears[0] ?? null));
+        setSelectedMonth(null);
+        setNoteText('');
+        setSelectedSections(new Set());
+      }
     }
-  }, [open, editNote, availableYears]);
+  }
 
   const monthRequired = useMemo(
     () => Array.from(selectedSections).some((s) => MONTHLY_SECTION_KEYS.includes(s)),

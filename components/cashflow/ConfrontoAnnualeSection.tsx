@@ -67,7 +67,7 @@ const formatSignedCurrency = (value: number): string => (value > 0 ? `+${formatC
 /** «+4,2%» / «−6,3%» — the same typographic sign. */
 const formatSignedPercent = (value: number): string => (value > 0 ? `+${formatPercentage(value, 1)}` : formatPercentage(value, 1).replace(/^-/, '−'));
 
-// Spending sign semantics are inverted (DESIGN.md): a positive delta means spending grew →
+// Spending sign semantics are inverted (DESIGN.md § Do: `positiveGood`): a positive delta means spending grew →
 // destructive; a drop is good → positive token.
 const deltaTextClass = (delta: number): string => (delta > 0 ? 'text-destructive' : delta < 0 ? 'text-positive' : 'text-muted-foreground');
 

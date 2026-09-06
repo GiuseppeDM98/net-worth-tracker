@@ -213,6 +213,10 @@
 
 ## 🐛 Bug Fixes
 
+- Fixed a dividend keeping a link to a cashflow row that had been deleted: removing the income row now really detaches it, so the dividend can be re-linked and no longer points at a row that does not exist.
+- Fixed the assistant and the Rendimenti analysis answering an Anthropic overload with a generic error: they now say the servers are temporarily busy and invite you to retry, as intended.
+- Fixed the dividend dialog keeping the previous account's instruments when you switch the active account while it is open: the list now follows the account you are looking at.
+
 - Fixed **two asset classes being called the wrong thing in emails**: the summaries said "Crypto" and "Materie prime" where every screen in the app says "Criptovalute" and "Materie Prime".
 - Fixed **percentages in emails printing with an English decimal point** — `+6.8%` instead of `+6,8%` — and negative amounts using a hyphen where the rest of the app uses a proper minus sign.
 
@@ -355,6 +359,7 @@
 
 ## 🔧 Improvements
 
+
 - Improved the **layout of every periodic email**: each block is now a tile that asks one question — Patrimonio, Composizione, Andamento per classe, Cashflow, Spese per categoria, Entrate per categoria, Spese maggiori, Dividendi, Budget, Spese in comune — with a small caps label, the window it covers on the right, one line of reading, then the figures. Categories carry a bar whose length is their rank and close on an "Altre 3 categorie" row, so the percentages add up to 100 instead of stopping at 81. The AI comment moved from the end of the message to second position, where you actually read it.
 - Improved the **budget email's honesty about its own numbers**. It arrives on Sunday and none of its figures are weekly: the ceiling and the monthly budgets are "dal 1° agosto a oggi", the annual ones "da inizio anno a oggi", and the projections land at month end. Each block now says so.
 - Improved the **PDF export's first page**: it is now the report's verdict rather than a title page — "Il patrimonio è cresciuto del 12,4% da quando lo registri.", what it is worth, over how many instruments, and how much of the change was money you put in — with your name, the date and the sections included at the foot. Each of the seven sections then reads like a page of the app: the question, the window, one sentence, then the figures.
@@ -486,15 +491,20 @@
 
 ## 📚 Documentation
 
+- DESIGN.md was re-read against the finished code: the frontmatter now declares the light chart palette (the one the emails and the PDF mirror), the warning surface, the dark sign values and every type step in use; the patterns that no page renders any more are marked superseded; the literal hexes that legitimately live in the DOM are inventoried and the three chrome hues that break the Zero-Chroma Rule are recorded as debt. PRODUCT.md, DEVELOPMENT_GUIDELINES.md and CLAUDE.md follow. `doc/redesign-prompts.md` is retired — the propagation it drove is complete. AGENTS.md is back under its size ceiling: five cross-cutting subsystems (states, dialogs, settings write fan-out, shared account and demo mode, colour themes) moved verbatim into `doc/guide/`, with a stub each in the core.
+
 - Refreshed `doc/screenshots/cashflow-sankey.png` and `doc/screenshots/cashflow-drilldown.png` on the redesigned Analisi (synthetic data): the flow tile with its subcategory layer, and the card of a subcategory.
 - DESIGN.md documents the sixth propagated page: "Scheda inside the Grid" (the focused entity as a tile of its own) and the neutral-baseline rule of the in-tile bars (last year's month beside this year's, a gap where the baseline is unknowable).
 - DESIGN.md documents the third propagated page with two new rules: **Received vs Announced** (money in the account and money merely promised are never one figure, and both are bounded by the page's period) and **the Off-Axis Tile** (a tile measured on a window the page's selector cannot change must name that window instead of appearing to follow it). AGENTS.md gained a *Cashflow › Dividendi* section; `.impeccable/design.json` mirrors the new rules.
 - Refreshed `doc/screenshots/dividend-calendar.png` on the redesigned Dividendi tab (synthetic data).
 - DESIGN.md documents the first propagated page: "Table inside a Tile" (the Patrimonio instruments table with the tile's cadence), the Page Verdict primitive in `components/ui`, and the rule that a Δ is a unit-price variation; AGENTS.md gained a *Patrimonio* section.
 - DESIGN.md now documents the "Verdict over Tiles" shape set by the redesigned Overview (Page Verdict, Tile, Tile Grid, the honesty rules for generated sentences) and marks the patterns it supersedes; `.impeccable/design.json` and PRODUCT.md are aligned.
-- Added `doc/redesign-prompts.md`: one ready-to-use prompt per app section (navigation, every page and tab, login/register, landing, dialogs, states, email/PDF) to propagate the new style page by page, with a suggested model/effort and a screenshot rule.
 - Refreshed `doc/screenshots/portfolio-overview.png` on the new Overview (synthetic data).
 
 ## 🔒 Security
 
 - Updated several dependencies to resolve known security advisories (`npm audit fix`), including the high-severity ones in the app's own dependency tree. Next.js sits on its security-backport line (16.2.12).
+
+## 🏗️ Technical
+
+- The code base lints clean: `npm run lint` went from 314 problems to zero without a single new suppression. Every `any` became the real type, state that used to be written from inside an effect now derives from its subject or settles during render, and the icon pickers no longer build a component per render. Two defects surfaced while typing and are fixed above with regression tests. The page container has one width and the page header no unused prop; the category icons live in one lazy map.

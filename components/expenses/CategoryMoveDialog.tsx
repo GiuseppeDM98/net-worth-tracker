@@ -89,8 +89,14 @@ export function CategoryMoveDialog({
 
   // Inline category creation dialog state
   const [createCategoryDialogOpen, setCreateCategoryDialogOpen] = useState(false);
-  // Why local categories: track inline creation without forcing parent re-render
-  const [localCategories, setLocalCategories] = useState<ExpenseCategory[]>(allCategories);
+  // Why local categories: track inline creation without forcing parent re-render. The override
+  // is stored WITH the prop it replaces, so a fresh `allCategories` makes it stale and the prop
+  // wins again — no effect, no extra render (AGENTS.md → React Query and Derived State).
+  const [localOverride, setLocalOverride] = useState<{
+    base: ExpenseCategory[];
+    categories: ExpenseCategory[];
+  } | null>(null);
+  const localCategories = localOverride?.base === allCategories ? localOverride.categories : allCategories;
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -140,31 +146,29 @@ export function CategoryMoveDialog({
     return subs;
   }, [selectedCategory, selectedCategoryId, sourceCategory.id, sourceSubCategory]);
 
-  // Sync local categories when prop changes
-  useEffect(() => {
-    setLocalCategories(allCategories);
-  }, [allCategories]);
+  // ========== Dialog Lifecycle ==========
 
-  // ========== Dialog Lifecycle Effects ==========
-
-  // Reset selections only when dialog opens, not when availableCategories changes
-  // (otherwise inline category creation triggers a reset that wipes the auto-selection)
-  useEffect(() => {
+  // Reset selections only when the dialog opens, not when availableCategories changes
+  // (otherwise inline category creation triggers a reset that wipes the auto-selection).
+  // Adjusted during render on the `open` transition (React's "adjusting state when a prop
+  // changes"), never from an effect (`react-hooks/set-state-in-effect`).
+  const [prevOpen, setPrevOpen] = useState<boolean | null>(null);
+  if (prevOpen !== open) {
+    setPrevOpen(open);
     if (open) {
       setSelectedCategoryId('');
       setSelectedSubCategoryId('');
       setSearchQuery('');
       setIsDropdownOpen(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }
 
-  // Auto-select when only one category available (runs after initial reset)
-  useEffect(() => {
-    if (open && availableCategories.length === 1 && !selectedCategoryId) {
-      setSelectedCategoryId(availableCategories[0].id);
-    }
-  }, [open, availableCategories, selectedCategoryId]);
+  // Auto-select when only one category is available and nothing is selected yet. On the
+  // opening render the reset above has not landed in `selectedCategoryId` yet, so this fires
+  // on the re-render that follows it — the same two-step the effects used to take.
+  if (open && availableCategories.length === 1 && !selectedCategoryId) {
+    setSelectedCategoryId(availableCategories[0].id);
+  }
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -201,7 +205,7 @@ export function CategoryMoveDialog({
   const handleCategoryCreated = async () => {
     if (user && ownerId) {
       const updatedCategories = await getAllCategories(ownerId);
-      setLocalCategories(updatedCategories);
+      setLocalOverride({ base: allCategories, categories: updatedCategories });
 
       // Auto-select newest category
       const newestCategory = updatedCategories

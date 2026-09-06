@@ -49,7 +49,7 @@ async function fetchYearContext(userId: string, year: number): Promise<Assistant
   return contextResponse.bundle as AssistantMonthContextBundle;
 }
 
-async function fetchYtdContext(userId: string, currentYear: number): Promise<AssistantMonthContextBundle> {
+async function fetchYtdContext(userId: string): Promise<AssistantMonthContextBundle> {
   const response = await authenticatedFetch(
     `/api/ai/assistant/context?userId=${encodeURIComponent(userId)}&mode=ytd_analysis`
   );
@@ -63,7 +63,7 @@ async function fetchYtdContext(userId: string, currentYear: number): Promise<Ass
   return contextResponse.bundle as AssistantMonthContextBundle;
 }
 
-async function fetchHistoryContext(userId: string, startYear: number): Promise<AssistantMonthContextBundle> {
+async function fetchHistoryContext(userId: string): Promise<AssistantMonthContextBundle> {
   const response = await authenticatedFetch(
     `/api/ai/assistant/context?userId=${encodeURIComponent(userId)}&mode=history_analysis`
   );
@@ -125,7 +125,7 @@ function useAssistantYtdContext(
     queryKey: enabled
       ? queryKeys.assistant.contextYtd(userId!, currentYear!)
       : ['assistant', 'context', 'disabled'],
-    queryFn: () => fetchYtdContext(userId!, currentYear!),
+    queryFn: () => fetchYtdContext(userId!),
     enabled,
     // YTD data changes frequently — shorter stale time
     staleTime: 2 * 60 * 1000,
@@ -144,7 +144,7 @@ function useAssistantHistoryContext(
     queryKey: enabled
       ? queryKeys.assistant.contextHistory(userId!, startYear!)
       : ['assistant', 'context', 'disabled'],
-    queryFn: () => fetchHistoryContext(userId!, startYear!),
+    queryFn: () => fetchHistoryContext(userId!),
     enabled,
     staleTime: 5 * 60 * 1000,
   });

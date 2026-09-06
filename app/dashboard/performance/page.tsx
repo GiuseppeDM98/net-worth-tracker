@@ -552,7 +552,6 @@ export default function PerformancePage() {
       label="Analisi"
       title="Rendimenti"
       description={describeHeaderWindow(metrics)}
-      separator={false}
       actions={
         <>
           <div className="hidden items-center gap-2 desktop:flex">{headerActions(false)}</div>
@@ -577,7 +576,7 @@ export default function PerformancePage() {
   // ─── Loading and empty states ───────────────────────────────────────────────
   if (loading) {
     return (
-      <PageContainer width="wide">
+      <PageContainer>
         {header}
         <TileGridSkeleton cells={SKELETON_CELLS} toolbar={<Skeleton className="h-9 w-72 rounded-full" />} />
       </PageContainer>
@@ -588,7 +587,7 @@ export default function PerformancePage() {
   // on a new account, and the empty branch would judge a set that was never read.
   if (loadFailed) {
     return (
-      <PageContainer width="wide">
+      <PageContainer>
         {header}
         <ErrorNotice
           className="max-w-[920px]"
@@ -605,7 +604,7 @@ export default function PerformancePage() {
 
   if (!performanceData || !metrics || metrics.hasInsufficientData) {
     return (
-      <PageContainer width="wide">
+      <PageContainer>
         {header}
         <div className="flex flex-col gap-3 pt-1 desktop:flex-row desktop:items-start desktop:justify-between desktop:gap-6">
           <PageVerdict
@@ -659,7 +658,7 @@ export default function PerformancePage() {
 
   // ─── Render ─────────────────────────────────────────────────────────────────
   return (
-    <PageContainer width="wide">
+    <PageContainer>
       {header}
 
       {/* ── Verdict, with the one period axis beside it from desktop ─────────────── */}

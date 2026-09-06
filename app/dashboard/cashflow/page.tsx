@@ -15,7 +15,7 @@
  * - Cost centers: optional tab (settings.costCentersEnabled) — verdict + tile grid over the centers' whole cost
  * - Divisione: optional tab (settings.expenseSplitEnabled) — verdict + tile grid over how a household splits its spending
  *
- * The root is the 1920px tile-page width (`PageContainer width="wide"`): Tracciamento is a
+ * The root is the 1920px tile-page width (`PageContainer`): Tracciamento is a
  * 12-column bento, and a bento uses width.
  *
  * WHY LAZY LOADING:
@@ -25,7 +25,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useQueryClient } from '@tanstack/react-query';
@@ -123,7 +123,7 @@ export default function CashflowPage() {
   const isDemo = useDemoMode();
 
   // Load dividends and assets only when their tabs are mounted
-  const loadOtherData = async () => {
+  const loadOtherData = useCallback(async () => {
     if (!user || !ownerId || otherDataLoaded) return;
 
     try {
@@ -153,14 +153,17 @@ export default function CashflowPage() {
     } finally {
       setOtherDataLoading(false);
     }
-  };
+  }, [user, ownerId, otherDataLoaded]);
 
   useEffect(() => {
     const needsOtherData = mountedTabs.has('dividends');
-    if (user && ownerId && needsOtherData && !otherDataLoaded) {
+    if (!user || !ownerId || !needsOtherData || otherDataLoaded) return;
+    // Deferred so the effect body itself sets no state (react-hooks/set-state-in-effect).
+    const timer = setTimeout(() => {
       loadOtherData();
-    }
-  }, [user, ownerId, mountedTabs, otherDataLoaded]);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [user, ownerId, mountedTabs, otherDataLoaded, loadOtherData]);
 
   // Load cashflow history start year from user settings (one-time read per session)
   useEffect(() => {
@@ -240,12 +243,11 @@ export default function CashflowPage() {
     settingsLoaded && !allTabs.some((tab) => tab.value === activeTab) ? 'tracking' : activeTab;
 
   return (
-    <PageContainer width="wide">
+    <PageContainer>
       <PageHeader
         label="Operatività"
         title="Cashflow"
         description="Traccia e analizza le tue entrate e uscite nel tempo"
-        separator={false}
         actions={
           <div className="flex items-center gap-2">
             {effectiveTab === 'tracking' && (

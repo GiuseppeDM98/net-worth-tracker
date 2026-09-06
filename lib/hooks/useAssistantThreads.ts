@@ -12,7 +12,7 @@ import { userFacingError } from '@/lib/utils/dialogNarrative';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { toDate } from '@/lib/utils/dateHelpers';
 
-function normalizeThread(thread: any): AssistantThread {
+function normalizeThread(thread: AssistantThread): AssistantThread {
   return {
     ...thread,
     createdAt: toDate(thread.createdAt),

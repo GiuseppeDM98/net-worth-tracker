@@ -28,7 +28,6 @@ import {
   summarizeRecordStats,
 } from '@/lib/utils/hallOfFameRecords';
 import type { MonthlySnapshot } from '@/types/assets';
-import type { Expense } from '@/types/expenses';
 
 function snap(year: number, month: number, totalNetWorth: number): MonthlySnapshot {
   return {

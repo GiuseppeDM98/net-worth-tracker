@@ -30,7 +30,7 @@ import {
   calculateCurrentYieldMetrics,
 } from '@/lib/services/performanceService'
 import { MonthlySnapshot } from '@/types/assets'
-import { CashFlowData } from '@/types/performance'
+import { CashFlowData, TimePeriod } from '@/types/performance'
 import { Expense, ExpenseType } from '@/types/expenses'
 
 // Helper to create minimal snapshot objects for testing
@@ -449,7 +449,8 @@ describe('getSnapshotsForPeriod', () => {
   })
 
   it('should return empty array for unknown period', () => {
-    expect(getSnapshotsForPeriod(allSnapshots, 'UNKNOWN' as any)).toEqual([])
+    // Deliberately outside the TimePeriod union: the fallback branch is what is under test.
+    expect(getSnapshotsForPeriod(allSnapshots, 'UNKNOWN' as unknown as TimePeriod)).toEqual([])
   })
 
   // ─── Baseline lookback tests ───
@@ -768,7 +769,9 @@ function makeAsset(
   averageCost: number,
   currentPrice = averageCost
 ) {
-  return { id, quantity, averageCost, currentPrice }
+  // ticker and name are part of AssetInput's contract even though the aggregate metrics
+  // under test never print them; mirror the yieldOnCost fixture.
+  return { id, ticker: id.toUpperCase(), name: id, quantity, averageCost, currentPrice }
 }
 
 describe('calculateYocMetrics', () => {

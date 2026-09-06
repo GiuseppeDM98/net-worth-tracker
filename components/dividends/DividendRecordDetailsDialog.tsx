@@ -107,7 +107,7 @@ export function DividendRecordDetailsDialog({
 
             <div className="space-y-1 border-t border-border/60 pt-4">
               <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                Quantita' e base
+                Quantita&apos; e base
               </p>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>

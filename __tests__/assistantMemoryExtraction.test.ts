@@ -10,6 +10,7 @@
  */
 
 import { describe, expect, it, vi } from 'vitest';
+import type Anthropic from '@anthropic-ai/sdk';
 import {
   dedupeMemoryItems,
   extractMemoryCandidates,
@@ -32,7 +33,7 @@ function mockClientReturningToolInput(input: unknown) {
         content: [{ type: 'tool_use', id: 'toolu_1', name: 'save_memory_items', input }],
       }),
     },
-  } as any;
+  } as unknown as Anthropic;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -213,9 +214,9 @@ describe('extractMemoryCandidates', () => {
 
     await extractMemoryCandidates('Ciao, come stai?', 'Sto bene, grazie!', client);
 
-    const request = client.messages.create.mock.calls[0][0];
+    const request = vi.mocked(client.messages.create).mock.calls[0][0];
     expect(request.tool_choice).toEqual({ type: 'tool', name: 'save_memory_items' });
-    expect(request.tools[0].name).toBe('save_memory_items');
+    expect(request.tools?.[0]?.name).toBe('save_memory_items');
   });
 
   it('returns the candidates carried by the tool input', async () => {
@@ -411,7 +412,7 @@ describe('extractMemoryCandidates', () => {
           content: [{ type: 'text', text: 'Mi dispiace, non posso rispondere.' }],
         }),
       },
-    } as any;
+    } as unknown as Anthropic;
 
     await expect(extractMemoryCandidates('test', 'test', client)).resolves.toEqual([]);
   });
@@ -421,7 +422,7 @@ describe('extractMemoryCandidates', () => {
       messages: {
         create: vi.fn().mockRejectedValue(new Error('API rate limit exceeded')),
       },
-    } as any;
+    } as unknown as Anthropic;
 
     await expect(extractMemoryCandidates('test', 'test', client)).resolves.toEqual([]);
   });
@@ -464,7 +465,7 @@ describe('extractStructuredGoalFromText', () => {
   it('returns undefined when the call fails — the goal is saved, just not tracked', async () => {
     const client = {
       messages: { create: vi.fn().mockRejectedValue(new Error('overloaded')) },
-    } as any;
+    } as unknown as Anthropic;
 
     await expect(extractStructuredGoalFromText('Patrimonio a 500k', client)).resolves.toBeUndefined();
   });

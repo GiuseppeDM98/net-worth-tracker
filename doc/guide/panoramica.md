@@ -13,10 +13,9 @@
   a server needs lives in `lib/utils/goalMath.ts` and the Admin reads/writes in `lib/server/goalData.ts`.
 - **Hero number overflow is a length-driven step-down**, not a container query: `heroValueClass` keys off the formatted
   string's length (>13 chars → `text-[32px] desktop:text-[40px]`). The tile's width does not vary; the string does.
-- **Propagating the redesign to another page starts from `doc/redesign-prompts.md`** (one prompt per section, with
-  the canvas-first method and the screenshot rule); the rules themselves live in DESIGN.md → §5 Page Verdict / Tile /
-  Tile Grid. Patterns a redesigned page abandons are marked «superseded» in DESIGN.md, never deleted while another
-  page still uses them.
+- **The redesign is propagated everywhere** (twenty-three sections, the last on 2026-09-01; the per-section prompt
+  file was retired on 2026-09-06). The rules live in DESIGN.md → §5 Page Verdict / Tile / Tile Grid. Patterns a page
+  abandoned are marked «superseded» in DESIGN.md, never deleted while another page still uses them.
 - **The hero tile is ONE component for two pages**: `components/dashboard/overview/PatrimonioTile.tsx` renders the
   Panoramica's hero and, with `movers`/`countLine`, Patrimonio's — a second hero would drift (the pre-v3 twin did).
   `ComposizioneTile` likewise takes `eyebrow`/`footer`. `resolveHeroValueClass` is the one overflow step-down.
@@ -65,3 +64,8 @@
   `setVisible` with `setTimeout(…, 0)` (react-hooks/set-state-in-effect). **`reducedMotion` is NOT part of that
   decision** (removed 2026-09-01): it used to suppress the badge outright, so a reader who asked the OS for stillness
   was never told their savings rate. It governs the entrance transition only, in the component.
+- **`useCountUp` is a state machine, settled during render** (2026-09-06, `lib/utils/useCountUp.ts`): every jump branch
+  (null, the once-latch, a zero target, reduced motion, start = target) is decided by the pure `settleTarget()` and only
+  the rAF ticks write. Two readings changed, neither a bug: the first frame shows the start value instead of `null`, and
+  a `null` target hides the stale number on the same render. A tick queued before a newer target's cleanup is dropped
+  by the writer's own guard.

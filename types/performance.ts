@@ -148,7 +148,7 @@ export interface PerformanceChartData {
   contributions: number; // Cumulative cash paid in since the period start (negative if net withdrawn)
   investedBase: number; // initialCapital + contributions — the plotted area
   returns: number; // Market growth: netWorth - investedBase (negative in a losing period)
-  [key: string]: any; // For Recharts compatibility
+  [key: string]: unknown; // For Recharts compatibility
 }
 
 // Monthly returns heatmap data
