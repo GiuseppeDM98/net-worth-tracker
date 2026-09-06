@@ -508,9 +508,24 @@ export function describeDeficitMonths(history: SavingsHistory, now: Date): Narra
 }
 
 /**
- * "47 movimenti: 40 spese, 5 entrate e 2 trasferimenti, di cui 2 in calendario (406 €); la
- * voce più grande è Stipendio (4200 €)." — the inventory's own count, by type, and its
- * largest row.
+ * "N spese per 3200 €" — a count with the amount it adds up to. A negative total (income
+ * reversed to more than it was received) keeps its minus and its colour, like every other
+ * signed figure of the page.
+ */
+function countWithTotal(count: number, singular: string, plural: string, total: number): Narrative {
+  const amount = total < 0 ? signed(`−${euro(total)}`, 'negative') : figure(euro(total));
+  return [figure(String(count)), prose(` ${pluralize(count, singular, plural)} per `), amount];
+}
+
+/**
+ * "47 movimenti: 40 spese per 3200 €, 5 entrate per 4500 € e 2 trasferimenti per 500 €, di
+ * cui 2 in calendario (406 €); la voce più grande è Stipendio (4200 €)." — the inventory's
+ * own count and sum by type, and its largest row.
+ *
+ * The sums are what makes a free-text search an aggregate: with «caffè» typed in the toolbar
+ * the reading answers «120 movimenti: 120 spese per 264 €», which is the whole point of
+ * reusing one note as an implicit subcategory. They are the sums of the rows the list SHOWS
+ * (`filteredExpenses`), never of the period — that is what the tiles above are for.
  *
  * The «di cui … in calendario» clause is what keeps the list honest: the register lists rows
  * dated after today, the figures above it COUNT them, and this is the sentence that decomposes
@@ -521,10 +536,10 @@ export function describeMovements(summary: MovementsSummary): Narrative | null {
   if (summary.count === 0) return null;
 
   const parts: Narrative[] = [];
-  if (summary.expenseCount > 0) parts.push([figure(String(summary.expenseCount)), prose(` ${pluralize(summary.expenseCount, 'spesa', 'spese')}`)]);
-  if (summary.incomeCount > 0) parts.push([figure(String(summary.incomeCount)), prose(` ${pluralize(summary.incomeCount, 'entrata', 'entrate')}`)]);
+  if (summary.expenseCount > 0) parts.push(countWithTotal(summary.expenseCount, 'spesa', 'spese', summary.expenseTotal));
+  if (summary.incomeCount > 0) parts.push(countWithTotal(summary.incomeCount, 'entrata', 'entrate', summary.incomeTotal));
   if (summary.transferCount > 0) {
-    parts.push([figure(String(summary.transferCount)), prose(` ${pluralize(summary.transferCount, 'trasferimento', 'trasferimenti')}`)]);
+    parts.push(countWithTotal(summary.transferCount, 'trasferimento', 'trasferimenti', summary.transferTotal));
   }
 
   const narrative: Narrative = [figure(String(summary.count)), prose(` ${pluralize(summary.count, 'movimento', 'movimenti')}: `)];
