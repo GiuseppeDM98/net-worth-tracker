@@ -213,6 +213,8 @@
 
 ## 🐛 Bug Fixes
 
+- Fixed a dividend keeping a link to a cashflow row that had been deleted: removing the income row now really detaches it, so the dividend can be re-linked and no longer points at a row that does not exist.
+- Fixed the assistant and the Rendimenti analysis answering an Anthropic overload with a generic error: they now say the servers are temporarily busy and invite you to retry, as intended.
 - Fixed the dividend dialog keeping the previous account's instruments when you switch the active account while it is open: the list now follows the account you are looking at.
 
 - Fixed **two asset classes being called the wrong thing in emails**: the summaries said "Crypto" and "Materie prime" where every screen in the app says "Criptovalute" and "Materie Prime".
@@ -505,4 +507,4 @@
 
 ## 🏗️ Technical
 
-- The code base lints clean: `npm run lint` went from 314 problems to zero without a single new suppression. Every `any` became the real type, state that used to be written from inside an effect now derives from its subject or settles during render, and the icon pickers no longer build a component per render. Two suspected defects surfaced while typing and are recorded in CLAUDE.md rather than fixed: a dividend's unlink from its cashflow row never lands, and the Anthropic «overloaded» branch no longer matches the SDK's error shape.
+- The code base lints clean: `npm run lint` went from 314 problems to zero without a single new suppression. Every `any` became the real type, state that used to be written from inside an effect now derives from its subject or settles during render, and the icon pickers no longer build a component per render. Two defects surfaced while typing and are fixed above with regression tests. The page container has one width and the page header no unused prop; the category icons live in one lazy map.

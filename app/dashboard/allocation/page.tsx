@@ -352,7 +352,6 @@ export default function AllocationPage() {
       label="Pianificazione"
       title="Allocazione"
       description={headerDescription}
-      separator={false}
       actions={
         <Link href="/dashboard/settings" className="hidden desktop:block">
           <Button variant="outline" className="h-8 gap-1.5 px-2.5 text-xs">
@@ -377,7 +376,7 @@ export default function AllocationPage() {
   // ─── Loading and empty states ───────────────────────────────────────────────
   if (loading) {
     return (
-      <PageContainer width="wide">
+      <PageContainer>
         {header}
         <TileGridSkeleton cells={SKELETON_CELLS} />
       </PageContainer>
@@ -388,7 +387,7 @@ export default function AllocationPage() {
   // on a new account, and the empty branch would judge a set that was never read.
   if (loadFailed) {
     return (
-      <PageContainer width="wide">
+      <PageContainer>
         {header}
         <ErrorNotice
           className="max-w-[920px]"
@@ -405,7 +404,7 @@ export default function AllocationPage() {
 
   if (!hasAssets || !bandedAllocation || !balanceSummary || !balanceScore || !planView) {
     return (
-      <PageContainer width="wide">
+      <PageContainer>
         {header}
         <div className="pt-1">
           <PageVerdict verdict={verdict} ariaLabel="Verdetto sull'allocazione" />
@@ -417,7 +416,7 @@ export default function AllocationPage() {
 
   // ─── Render ─────────────────────────────────────────────────────────────────
   return (
-    <PageContainer width="wide">
+    <PageContainer>
       {header}
 
       <div className="pt-1">

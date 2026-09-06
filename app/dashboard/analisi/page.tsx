@@ -77,7 +77,7 @@ export default function AnalisiPage() {
   const loadFailed = expensesError || categoriesError;
 
   return (
-    <PageContainer width="wide">
+    <PageContainer>
       <AnalisiTab
         allExpenses={allExpenses}
         categories={categories}

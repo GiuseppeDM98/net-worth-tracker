@@ -13,14 +13,16 @@ Next.js app for Italian investors: net worth, assets, cashflow, dividends, perfo
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic.
-- `tsc` clean; **151 files / 3440 tests** green + **37 Playwright E2E specs** (40 green in one run incl. 3 auth setups). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, which structurally hides timezone bugs.
+- `tsc` clean; **154 files / 3449 tests** green + **37 Playwright E2E specs** (40 green in one run incl. 3 auth setups). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, which structurally hides timezone bugs.
 - Latest (2026-09-06): **ESLint a zero e la spec riletta contro il codice finito.** `npm run lint` da
   **314 problemi a 0** senza un `eslint-disable` nuovo: 113 `any` → tipi reali (`Asset`, `DocumentData`,
   i tipi dell'SDK Anthropic, `catch (e: unknown)` con narrowing che legge gli stessi percorsi); 36
   `set-state-in-effect` sciolti derivando lo stato o «settling» in render sul soggetto `(open, record)`
   (`setTimeout(0)` solo per un loader); mappe `lazy()` a livello di modulo per i
-  `static-components`; `.agents/**` e `.next-*/**` ignorati. Due bug veri emersi tipizzando e NON
-  corretti (Known Issues). DESIGN.md riletto contro il codice: palette chart LIGHT nel frontmatter
+  `static-components`; `.agents/**` e `.next-*/**` ignorati. Due bug veri emersi tipizzando, corretti nel secondo
+  commit con test rossi-poi-verdi: l'unlink di `expenseId` (`FieldValue.delete()`) e il ramo
+  `overloaded_error` (`instanceof Anthropic.APIError` → `error.type`). Potati `PageContainer.width`,
+  `PageHeader.separator` e la seconda mappa di icone lazy. DESIGN.md riletto contro il codice: palette chart LIGHT nel frontmatter
   («Indigo = azioni» vale solo in dark), `--warning*`, segni dark, ogni passo tipografico in uso;
   i pattern a zero implementazioni marcati superati; inventario degli hex DOM-side e tre tinte del
   chrome fuori Zero-Chroma dichiarate. `doc/redesign-prompts.md` ritirato; `.impeccable/config.json`
@@ -39,7 +41,7 @@ One line per feature: what it is, then where it is described. *What the user see
 - **Shared account**: a second user as full co-owner; **viewer** (`user.uid`) ≠ **owner** (`ownerId`, `useActiveAccount()`), grants in `account-access/{ownerUid}`, enforced in `firestore.rules` + `assertCanAccessAccount`. AGENTS → *Shared Account / Delegated Access*.
 - **Landing pubblica**: la Panoramica per chi non ha dati — le tessere vere dell'app su un profilo inventato e dichiarato, più tre tessere che dicono cosa calcolano. doc/guide/landing.md; DESIGN → *The Sample-Data Rule*.
 - **Demo mode**: auto-login dalla landing; `useDemoMode()` gates every mutation. AGENTS → *Demo Mode*.
-- **Shell**: compact `PageHeader` (one variant) · `PageTabBar` · `PageContainer width="wide"` + `TileGridSkeleton` · sidebar with eyebrow group labels · bottom pill + «Altro» drawer. DESIGN → §5 Compact Page Header / Tile Grid; AGENTS → *Navigation*.
+- **Shell**: compact `PageHeader` (one variant) · `PageTabBar` · `PageContainer` (1920, its only width) + `TileGridSkeleton` · sidebar with eyebrow group labels · bottom pill + «Altro» drawer. DESIGN → §5 Compact Page Header / Tile Grid; AGENTS → *Navigation*.
 - **Panoramica**: a rule-generated verdict over a 12-column tile grid, one question per tile, on `GET /api/dashboard/overview`. README → *Portfolio Management*; doc/guide/panoramica.md; DESIGN → §5 Page Verdict / Tile / Tile Grid.
 - **Patrimonio**: the verdict's driver is an instrument; six tiles, Strumenti is the management table at the tile's cadence; a Δ is a unit-price variation; the Sottocategoria is optional. doc/guide/patrimonio.md.
 - **AssetDialog + Asset trade ledger (Registro operazioni)**: 2-step create; BUY/SELL/ADJUSTMENT with cash settlement, Admin-API writes, the asset doc rebuilt by full replay. README → *Portfolio Management*; AGENTS → *Two-Step Create Dialogs*; doc/guide/registro-operazioni.md.
@@ -97,8 +99,6 @@ Firestore client + admin · Yahoo Finance (prices, benchmark history) · Borsa I
 - **The icon rail's 44px targets are measured at 1440 with a mouse**; no fixture covers a ≥1440px tablet in landscape.
 - **Otto superfici stanno ancora fuori dal vocabolario delle modali** (2026-09-06): `app/dashboard/page.tsx`, `dividends/{DividendiDettaglio,DividendTrackingTab}`, `expenses/ExpenseTable`, `cashflow/{ExpenseTrackingTab,TransactionFeed,MobileFiltersDrawer}`, `assistant/AssistantSheets` montano `Dialog`/`AlertDialog`/`Drawer`/`Sheet` grezzi (titolo 18/16px, quinta larghezza 512px). Elenco in DESIGN.md → §5 Modal, Coverage.
 - **Tre tinte del chrome violano la Zero-Chroma Rule** (`switch.tsx` ON blu in dark, `ProtectedRoute` spinner, mask-icon smeraldo) più `ExpenseTable.tsx` `text-emerald-*`; gli altri ~100 hex DOM-side sono eccezioni dichiarate in DESIGN.md → The DOM-side hex inventory.
-- **Due residui della generazione precedente nel codice del shell**: `PageContainer` conserva il default `default` (1600px) che nessun chiamante usa (33/33 passano `width="wide"`), e `PageHeader` accetta una prop `separator` che è un no-op passato da 18 chiamanti. Da potare in una sessione di pulizia; DESIGN.md li segna già superati.
-- **Due bug noti, non corretti (2026-09-06)**: `deleteExpenseForDividend` scrive `expenseId: undefined`, scartato prima della write → lo scollegamento non avviene mai (serve `deleteField()`); e il test `error.error.type === 'overloaded_error'` (`anthropicStream.ts`, `analyze-performance/route.ts`) è morto con l'SDK 0.110 (il tipo sta su `error.type`) → un sovraccarico cade nel ramo generico. Cambiano comportamento raggiungibile: decisione del proprietario, commentati in loco.
 - **`.impeccable/design.json` non è il mirror verbatim che DESIGN.md dichiara** (13 regole su 41 già diverse prima del 2026-09-06, `components` ferma alla generazione precedente): si rigenera col plugin, non a mano; in sessione si sincronizza solo ciò che si è cambiato in DESIGN.md.
 - **The market digest's blind spots**: a position opened this month contributes 0 until next month; a pension fund counts only from `pensionReturnStartMonth`; hand-valued assets other than funds and real estate never show a market effect; real estate is gross of debt.
 

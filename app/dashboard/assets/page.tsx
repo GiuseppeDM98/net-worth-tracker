@@ -304,8 +304,8 @@ export default function AssetsPage() {
   // set, so an error is an alert, never a skeleton that never lifts.
   if (loadingAssets || loadingOverview || loadingSnapshots || isLedgerMetaLoading) {
     return (
-      <PageContainer width="wide">
-        <PageHeader label="Patrimonio" title="Strumenti e conti" separator={false} />
+      <PageContainer>
+        <PageHeader label="Patrimonio" title="Strumenti e conti" />
         <TileGridSkeleton cells={SKELETON_CELLS} />
       </PageContainer>
     );
@@ -313,8 +313,8 @@ export default function AssetsPage() {
 
   if (assetsError) {
     return (
-      <PageContainer width="wide">
-        <PageHeader label="Patrimonio" title="Strumenti e conti" separator={false} />
+      <PageContainer>
+        <PageHeader label="Patrimonio" title="Strumenti e conti" />
         <ErrorNotice
           className="max-w-[920px]"
           notice={describeReadFailure({
@@ -333,13 +333,12 @@ export default function AssetsPage() {
 
   // ─── Render ───────────────────────────────────────────────────────────────────
   return (
-    <PageContainer width="wide">
+    <PageContainer>
       <motion.div layout="position" transition={springLayoutTransition} className="space-y-4">
         <PageHeader
           label="Patrimonio"
           title="Strumenti e conti"
           description={lastPriceUpdate ?? undefined}
-          separator={false}
           actions={headerActions}
         />
 

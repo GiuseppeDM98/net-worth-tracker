@@ -1631,12 +1631,11 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <PageContainer width="wide">
+      <PageContainer>
         <PageHeader
           label="Configurazione"
           title="Impostazioni"
           description="Target, preferenze e flussi"
-          separator={false}
         />
         <PageTabs
           tabs={SETTINGS_TABS}
@@ -1656,12 +1655,11 @@ export default function SettingsPage() {
   // settings that were never read (lib/utils/statesNarrative.ts).
   if (loadFailed) {
     return (
-      <PageContainer width="wide">
+      <PageContainer>
         <PageHeader
           label="Configurazione"
           title="Impostazioni"
           description="Target, preferenze e flussi"
-          separator={false}
         />
         <ErrorNotice
           className="mt-4 max-w-[920px]"
@@ -1713,12 +1711,11 @@ export default function SettingsPage() {
   const activeSwatch = COLOR_THEME_SWATCHES.find((swatch) => swatch.id === colorTheme) ?? COLOR_THEME_SWATCHES[0];
 
   return (
-    <PageContainer width="wide">
+    <PageContainer>
       <PageHeader
         label="Configurazione"
         title="Impostazioni"
         description="Target, preferenze e flussi"
-        separator={false}
         actions={
           <div className="flex items-center gap-2">
             {/* Save state as a quiet chip: it is context for the buttons, not a metric.

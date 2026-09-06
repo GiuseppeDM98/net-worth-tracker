@@ -12,14 +12,15 @@ import type { LucideProps } from 'lucide-react';
 type LazyIconComponent = React.LazyExoticComponent<React.ComponentType<LucideProps>>;
 
 /**
- * One lazy component per curated icon, built ONCE at module load. `React.lazy` only registers
- * the import thunk, so the whole set costs nothing until an icon is first rendered — the same
- * on-demand loading the old per-name cache gave, without the cache. The map exists so a render
- * can READ a component by name instead of obtaining it from a call: to the React Compiler a
- * component returned by a call during render is a new type every render
- * (`react-hooks/static-components`), even when the callee caches it.
+ * Every curated category icon as a lazy component, built ONCE at module load and shared by
+ * the picker, the feed, the drawer, the table and Impostazioni: ONE cache, so a name never
+ * maps to two instances. `React.lazy` only registers the import thunk, so the whole set costs
+ * nothing until an icon is first rendered — no chunk is requested before then. It is a map,
+ * not a function, so a render can READ a component by name instead of obtaining it from a
+ * call: to the React Compiler a component returned by a call during render is a new type
+ * every render (`react-hooks/static-components`), even when the callee caches it.
  */
-const LAZY_ICONS: Partial<Record<string, LazyIconComponent>> = Object.fromEntries(
+export const LAZY_CATEGORY_ICONS: Partial<Record<string, LazyIconComponent>> = Object.fromEntries(
   CATEGORY_ICON_NAMES.map((name) => [
     name,
     lazy(() =>
@@ -32,11 +33,11 @@ const LAZY_ICONS: Partial<Record<string, LazyIconComponent>> = Object.fromEntrie
 
 /**
  * Resolve a Lucide icon component by name from the curated set. Returns null for unknown
- * icon names. For a lookup INSIDE a component body prefer `CategoryIcon` below, or the map
- * read `LAZY_CATEGORY_ICONS[name]` in `components/cashflow/CompactExpenseRow.tsx`.
+ * icon names. For a lookup INSIDE a component body prefer `CategoryIcon` below or the map
+ * read `LAZY_CATEGORY_ICONS[name]`: both are property reads of a module constant.
  */
 export function getLazyIcon(name: string): LazyIconComponent | null {
-  return LAZY_ICONS[name] ?? null;
+  return LAZY_CATEGORY_ICONS[name] ?? null;
 }
 
 interface CategoryIconProps extends LucideProps {
@@ -51,7 +52,7 @@ interface CategoryIconProps extends LucideProps {
  * render and never created there. The remaining props go to the Lucide icon as-is.
  */
 export function CategoryIcon({ name, fallback, ...iconProps }: Readonly<CategoryIconProps>) {
-  const Icon = LAZY_ICONS[name];
+  const Icon = LAZY_CATEGORY_ICONS[name];
   if (!Icon) return fallback;
   return (
     <Suspense fallback={fallback}>

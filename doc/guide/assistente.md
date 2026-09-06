@@ -126,7 +126,7 @@
 - **Rows, not chips, inside a tile**: `AssistantPromptRows` renders the starter questions (the one whose `chip.mode === mode`
   first and bold) and the follow-ups; a row is `min-h-11` below `desktop:`. A starter still PREFILLS the composer (the period must
   be confirmed); a follow-up submits directly.
-- **Layout**: `PageContainer width="wide"`; verdict + `AssistantPeriodSelector` in `flex desktop:flex-row desktop:justify-between`;
+- **Layout**: `PageContainer` (1920, its only width); verdict + `AssistantPeriodSelector` in `flex desktop:flex-row desktop:justify-between`;
   the grid is `desktop:grid-cols-[2fr_1fr] desktop:items-start`, the companion `desktop:sticky desktop:top-5 desktop:self-start`
   (sticky needs self-start, AGENTS.md § Tailwind Breakpoints) and it renders AFTER the composer on a phone; the composer stays
   `sticky bottom-0 max-desktop:portrait:bottom-20` inside the left column. The pill's strip bleeds `max-desktop:-mx-4

@@ -19,12 +19,11 @@ import { PageHeader } from '@/components/layout/PageHeader';
 
 export default function PensionPage() {
   return (
-    <PageContainer width="wide">
+    <PageContainer>
       <PageHeader
         label="Pianificazione"
         title="Previdenza"
         description="Versamenti, beneficio fiscale e plafond del tuo fondo pensione"
-        separator={false}
         actions={<PensionHeaderAction />}
       />
       <PensionOverview />

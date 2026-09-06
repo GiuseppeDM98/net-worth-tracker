@@ -119,20 +119,34 @@ function buildMessagesArray(
 const TRUNCATION_NOTICE =
   '\n\n_(Risposta interrotta: ho raggiunto il limite di lunghezza. Chiedimi di continuare o restringi la domanda.)_';
 
-// Known defect (2026-09-06, kept until the owner decides): with @anthropic-ai/sdk 0.110 the inner
-// type lives on `error.type` and `error.error` is the whole envelope, so the `error.error.type`
-// read below never matches 'overloaded_error' and an overload falls through to the generic branch.
-// The fix (`error instanceof Anthropic.APIError && error.type === …`) changes reachable behaviour.
+/** The object stored at `key`, when `value` is an object holding one there. */
+function readNestedObject(value: unknown, key: string): object | undefined {
+  if (typeof value !== 'object' || value === null || !(key in value)) return undefined;
+  const nested = (value as Record<string, unknown>)[key];
+  return typeof nested === 'object' && nested !== null ? nested : undefined;
+}
+
+/** The string stored at `key`, when `value` holds one there. */
+function readStringField(value: object | undefined, key: string): string | undefined {
+  if (value === undefined || !(key in value)) return undefined;
+  const field = (value as Record<string, unknown>)[key];
+  return typeof field === 'string' ? field : undefined;
+}
+
 /**
- * The `type` inside the error body a failed request carries, read exactly where this
- * module has always read it (`error.error.type`) so the overload branch keeps its reach.
- * A thrown value that is not an object holding an object `error` reads as undefined.
+ * The inner `type` of a failed Anthropic request, wherever the thrown value keeps it.
+ *
+ * `Anthropic.APIError` (sdk 0.110) lifts it to `error.type` and stores the WHOLE response
+ * envelope under `error.error`, so there `error.error.type` is the constant `'error'` and
+ * the inner type sits at `error.error.error.type`. A raw envelope `{ error: { type } }` —
+ * what the mocks and the pre-SDK callers throw — holds it one level up. Both are read so
+ * the overload branch is reached by the real SDK error and by the mocks alike.
  */
 function readAnthropicErrorType(error: unknown): string | undefined {
-  if (typeof error !== 'object' || error === null || !('error' in error)) return undefined;
-  const body = error.error;
-  if (typeof body !== 'object' || body === null || !('type' in body)) return undefined;
-  return typeof body.type === 'string' ? body.type : undefined;
+  if (error instanceof Anthropic.APIError) return error.type ?? undefined;
+  const body = readNestedObject(error, 'error');
+  const innerBody = readNestedObject(body, 'error') ?? body;
+  return readStringField(innerBody, 'type');
 }
 
 export async function streamAssistantResponse({

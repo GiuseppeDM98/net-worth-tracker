@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { adminDb } from '@/lib/firebase/admin';
-import { Timestamp } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import {
   Dividend,
   DividendFormData,
@@ -292,7 +292,8 @@ export async function createDividend(
 export async function updateDividend(
   dividendId: string,
   // expenseId is not a form field: only the income sync writes it, to link (or unlink)
-  // the expense row it created for this dividend.
+  // the expense row it created for this dividend. Passing the key with `undefined` is
+  // the unlink — see the delete sentinel below; omitting the key leaves the link alone.
   updates: Partial<DividendFormData> & Pick<Dividend, 'expenseId'>
 ): Promise<void> {
   try {
@@ -348,8 +349,16 @@ export async function updateDividend(
       exchangeRate = undefined;
     }
 
+    // A present-but-undefined `expenseId` is the unlink request. `removeUndefinedFields` would
+    // drop the key and the stale link would survive the write, so it becomes the Admin delete
+    // sentinel — a class instance the deep clean keeps. The `in` guard is what keeps a partial
+    // caller (the PATCH route, a price refresh) that simply omits the field from wiping it.
+    const expenseIdUpdate =
+      'expenseId' in updates && updates.expenseId === undefined ? { expenseId: FieldValue.delete() } : {};
+
     const cleanedUpdates = removeUndefinedFields({
       ...updates,
+      ...expenseIdUpdate,
       netAmount,
       exDate: exDate ? Timestamp.fromDate(exDate) : undefined,
       paymentDate: paymentDate ? Timestamp.fromDate(paymentDate) : undefined,

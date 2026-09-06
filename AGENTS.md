@@ -375,8 +375,8 @@ about a domain goes in that domain's guide, never here.
   remounts it (`AnimatePresence` enter never plays, `useEffect([])` re-fires) and the React Compiler throws.
   **`react-hooks/static-components` flags ANY component obtained from a call during render, a `useMemo(() => lazy(…))`
   included** (probed 2026-09-06): only a property read of a module constant passes, so the icon pickers keep a
-  module-level map (`LAZY_ICONS` in `IconPickerPopover`, `LAZY_CATEGORY_ICONS` in `CompactExpenseRow` — two views over
-  the same lazy instances, foldable into one; `lazy()` registers a thunk, the chunk still loads on demand).
+  ONE module-level map, `LAZY_CATEGORY_ICONS` in `IconPickerPopover` (shared by the picker, the feed, the drawer and
+  the table; `lazy()` registers a thunk, the chunk still loads on demand).
 - Pure `lib/utils` modules reach `calculateAssetValue` in one of two established ways — check the precedent: **injected**
   as a `valueOf` param (`allocationUtils`, `pensionFire`) or **imported directly** with the test mocking
   `@/lib/firebase/config` + `firebase/firestore` + `authFetch` + `dashboardOverviewInvalidation`.
@@ -693,7 +693,7 @@ file used to carry.
   size on `sidebarMenuButtonVariants` (`size-11!`, `p-3.5!`, `justify-center`) are what make every collapsed target
   44×44; `SidebarGroup`/`SidebarHeader`/`SidebarFooter` drop to `p-1.5` in icon mode for the same reason. A custom
   button in the rail (the collapse toggle) needs its own `group-data-[state=collapsed]:size-11`.
-- **`PageContainer width="wide"`** is the 1920px root of a tile page; the loading state must use the same width or
+- **`PageContainer`** is the 1920px root of a tile page (its only width since 2026-09-06); the loading state must use the same width or
   the page jumps when data lands (the Panoramica's skeleton was 1600 while the page was 1920). The loading state of a
   tile page is `TileGridSkeleton` with the page's own `cells` — never a per-page skeleton component.
 - **A shell component that reads `useSearchParams` puts it in a child rendered inside `<Suspense>`** (`AddExpenseFab` in

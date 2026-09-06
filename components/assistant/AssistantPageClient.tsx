@@ -409,7 +409,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   if (loadingThreads) {
     return (
       <ProtectedRoute>
-        <PageContainer width="wide">
+        <PageContainer>
           <AssistantHeader
             isDemo={isDemo}
             isStreaming={false}
@@ -457,7 +457,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
 
   return (
     <ProtectedRoute>
-      <PageContainer width="wide">
+      <PageContainer>
         <AssistantHeader
           isDemo={isDemo}
           isStreaming={isStreaming}

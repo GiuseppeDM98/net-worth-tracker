@@ -325,7 +325,6 @@ export default function HallOfFamePage() {
       label="Analisi"
       title="Hall of Fame"
       description={describeHallOfFameHeader(summary.stats)}
-      separator={false}
       actions={
         <>
           <div className="hidden items-center gap-2 desktop:flex">{headerActions(false)}</div>
@@ -386,7 +385,7 @@ export default function HallOfFamePage() {
   // ─── Loading and empty states ───────────────────────────────────────────────
   if (loading) {
     return (
-      <PageContainer width="wide">
+      <PageContainer>
         {header}
         <TileGridSkeleton cells={SKELETON_CELLS} />
       </PageContainer>
@@ -397,7 +396,7 @@ export default function HallOfFamePage() {
   // on a new account, and the empty branch would judge a set that was never read.
   if (loadFailed) {
     return (
-      <PageContainer width="wide">
+      <PageContainer>
         {header}
         <ErrorNotice
           className="max-w-[920px]"
@@ -414,7 +413,7 @@ export default function HallOfFamePage() {
 
   if (!summary.hasRecords) {
     return (
-      <PageContainer width="wide">
+      <PageContainer>
         {header}
         <div className="pt-1">
           <PageVerdict verdict={verdict} ariaLabel="Verdetto sui record" />
@@ -444,7 +443,7 @@ export default function HallOfFamePage() {
   );
 
   return (
-    <PageContainer width="wide">
+    <PageContainer>
       {header}
 
       <div className="pt-1">

@@ -112,11 +112,10 @@ export async function deleteExpenseForDividend(
     // Delete the expense using Admin SDK
     await adminDb.collection('expenses').doc(expenseId).delete();
 
-    // Remove expense reference from dividend
+    // Remove expense reference from dividend: the key must be PRESENT with `undefined`,
+    // because `updateDividend` turns exactly that shape into the Firestore delete sentinel
+    // (a plain omission would leave the stale link in place).
     await updateDividend(dividendId, {
-      // Known defect (2026-09-06, kept until the owner decides): `removeUndefinedFields` strips this key
-      // before the write, so the stale `expenseId` is never cleared. The fix is `deleteField()` with an
-      // `'expenseId' in updates` guard — it adds a write, which is why it is not made here.
       expenseId: undefined,
     });
   } catch (error) {

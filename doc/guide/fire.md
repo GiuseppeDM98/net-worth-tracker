@@ -86,7 +86,7 @@
   Coast, What If, Monte Carlo — Obiettivi already did). The React Query keys were namespaced by `ownerId` while the
   functions took `user!.uid`, so a guest on a shared account saw their OWN (empty) FIRE data and saved settings on
   their own doc. `enabled: !!user && !!ownerId` gates every query; `ownerId!` is safe past that gate.
-- **`PageContainer width="wide"` on every FIRE tab** (Obiettivi joined on 2026-08-26, the last of the five). Every
+- **`PageContainer` (1920px) on every FIRE tab** (Obiettivi joined on 2026-08-26, the last of the five; the `width` prop went on 2026-09-06). Every
   propagated tab loads as `TileGridSkeleton` with its own cells (`FireCalculatorSkeleton`, `GoalsSkeleton`,
   `WhatIfAnalysisSkeleton` and `MonteCarloSkeleton` are gone).
 - **The passive income at the FIRE year is nominal and never stands alone** in the verdict: beside today's expenses

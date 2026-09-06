@@ -303,7 +303,6 @@ export default function HistoryPage() {
       label="Analisi"
       title="Storico"
       description={describeStoricoHeader(growth)}
-      separator={false}
       actions={
         <>
           <div className="hidden items-center gap-2 desktop:flex">{headerActions(false)}</div>
@@ -326,7 +325,7 @@ export default function HistoryPage() {
   // ─── Loading and empty states ───────────────────────────────────────────────
   if (loading) {
     return (
-      <PageContainer width="wide">
+      <PageContainer>
         {header}
         <TileGridSkeleton cells={SKELETON_CELLS} />
       </PageContainer>
@@ -337,7 +336,7 @@ export default function HistoryPage() {
   // on a new account, and the empty branch would judge a set that was never read.
   if (loadFailed) {
     return (
-      <PageContainer width="wide">
+      <PageContainer>
         {header}
         <ErrorNotice
           className="max-w-[920px]"
@@ -354,7 +353,7 @@ export default function HistoryPage() {
 
   if (!growth) {
     return (
-      <PageContainer width="wide">
+      <PageContainer>
         {header}
         <div className="pt-1">
           <PageVerdict verdict={verdict} ariaLabel="Verdetto sullo storico" />
@@ -367,7 +366,7 @@ export default function HistoryPage() {
 
   // ─── Render ─────────────────────────────────────────────────────────────────
   return (
-    <PageContainer width="wide">
+    <PageContainer>
       {header}
 
       <div className="pt-1">

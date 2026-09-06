@@ -15,7 +15,7 @@
  * - Cost centers: optional tab (settings.costCentersEnabled) — verdict + tile grid over the centers' whole cost
  * - Divisione: optional tab (settings.expenseSplitEnabled) — verdict + tile grid over how a household splits its spending
  *
- * The root is the 1920px tile-page width (`PageContainer width="wide"`): Tracciamento is a
+ * The root is the 1920px tile-page width (`PageContainer`): Tracciamento is a
  * 12-column bento, and a bento uses width.
  *
  * WHY LAZY LOADING:
@@ -243,12 +243,11 @@ export default function CashflowPage() {
     settingsLoaded && !allTabs.some((tab) => tab.value === activeTab) ? 'tracking' : activeTab;
 
   return (
-    <PageContainer width="wide">
+    <PageContainer>
       <PageHeader
         label="Operatività"
         title="Cashflow"
         description="Traccia e analizza le tue entrate e uscite nel tempo"
-        separator={false}
         actions={
           <div className="flex items-center gap-2">
             {effectiveTab === 'tracking' && (

@@ -265,7 +265,7 @@ Each commit should represent a single logical change. If your commit message req
 ## 🎨 Design System
 
 Before implementing any UI feature, read **DESIGN.md** — it is the authoritative source for:
-- The page shape: a rule-generated **Page Verdict** over a 12-column **Tile Grid**, one question per tile, a reading line above the figures (`components/ui/{page-verdict,tile}.tsx`, `PageContainer width="wide"`)
+- The page shape: a rule-generated **Page Verdict** over a 12-column **Tile Grid**, one question per tile, a reading line above the figures (`components/ui/{page-verdict,tile}.tsx`, `PageContainer`, 1920px)
 - OKLCH color tokens and their names; sign colours only through `text-positive`/`text-destructive` (`getMetricValueColor`); out of the DOM a hex comes only from `lib/constants/printTokens.ts`
 - The enumerated type ramp (9 → 54px: `TILE_EYEBROW_CLASS` 10px, readings 13px, hero 44/54px) and the Mono Mandate for every figure
 - The named rules, cited by name in code comments (The Absence-Has-Three-Names Rule → `resolveSurfaceState`; The Modal-Is-A-Tile Rule → `ResponsiveModal` at four widths; The Narrative Honesty Rule; The Out-Of-DOM Token Rule)

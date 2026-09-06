@@ -85,24 +85,41 @@ interface AnthropicFailure {
   message?: string;
 }
 
-// Known defect (2026-09-06, kept until the owner decides): with @anthropic-ai/sdk 0.110 the inner
-// type lives on `error.type` and `error.error` is the whole envelope, so the `error.error.type`
-// read below never matches 'overloaded_error' and an overload falls through to the generic branch.
-// The fix (`error instanceof Anthropic.APIError && error.type === …`) changes reachable behaviour.
+/** The object stored at `key`, when `value` is an object holding one there. */
+function readNestedObject(value: unknown, key: string): object | undefined {
+  if (typeof value !== 'object' || value === null || !(key in value)) return undefined;
+  const nested = (value as Record<string, unknown>)[key];
+  return typeof nested === 'object' && nested !== null ? nested : undefined;
+}
+
+/** The string stored at `key`, when `value` holds one there. */
+function readStringField(value: object | undefined, key: string): string | undefined {
+  if (value === undefined || !(key in value)) return undefined;
+  const field = (value as Record<string, unknown>)[key];
+  return typeof field === 'string' ? field : undefined;
+}
+
 /**
- * Reads a failed request the way this route has always read it: the attached error
- * body first (`error.error`), the thrown value's own message second. Anything that is
- * not an object carries nothing and yields the default sentence downstream.
+ * Reads a failed request from every shape the thrown value can take.
+ *
+ * `Anthropic.APIError` (sdk 0.110) lifts the inner type to `error.type` and stores the
+ * WHOLE response envelope under `error.error`, so there `error.error.type` is the constant
+ * `'error'` and the body that matters sits at `error.error.error`. A raw envelope
+ * `{ error: { type, message } }` holds it one level up. Both are unwrapped so an overload
+ * is recognised from the real SDK error and from the mocks alike; the thrown value's own
+ * `message` stays the fallback, and a non-object yields the default sentence downstream.
  */
 function readAnthropicFailure(error: unknown): AnthropicFailure {
   if (typeof error !== 'object' || error === null) return {};
   const failure: AnthropicFailure = {};
   if ('message' in error && typeof error.message === 'string') failure.message = error.message;
-  if (!('error' in error)) return failure;
-  const body = error.error;
-  if (typeof body !== 'object' || body === null) return failure;
-  if ('type' in body && typeof body.type === 'string') failure.bodyType = body.type;
-  if ('message' in body && typeof body.message === 'string') failure.bodyMessage = body.message;
+  const body = readNestedObject(error, 'error');
+  const innerBody = readNestedObject(body, 'error') ?? body;
+  const bodyType =
+    error instanceof Anthropic.APIError ? error.type ?? undefined : readStringField(innerBody, 'type');
+  if (bodyType !== undefined) failure.bodyType = bodyType;
+  const bodyMessage = readStringField(innerBody, 'message');
+  if (bodyMessage !== undefined) failure.bodyMessage = bodyMessage;
   return failure;
 }
 
