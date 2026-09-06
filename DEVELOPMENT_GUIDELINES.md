@@ -265,14 +265,14 @@ Each commit should represent a single logical change. If your commit message req
 ## 🎨 Design System
 
 Before implementing any UI feature, read **DESIGN.md** — it is the authoritative source for:
-- OKLCH color tokens and semantic color names
-- Typography scale with exact values (`text-[44px]`, `text-[22px]`, `font-mono`, etc.)
-- Layout vocabulary (`desktop:grid-cols-[2fr_1fr]`, hero patterns, `divide-y` lists)
-- Breakpoint rules (`desktop:` at 1440px — never use `lg:` for wide-screen layouts)
-- Animation standards (spring physics: stiffness 400, damping 35)
-- Anti-patterns (no decorative progress bars, no nested card-within-card, no hardcoded hex colors)
+- The page shape: a rule-generated **Page Verdict** over a 12-column **Tile Grid**, one question per tile, a reading line above the figures (`components/ui/{page-verdict,tile}.tsx`, `PageContainer width="wide"`)
+- OKLCH color tokens and their names; sign colours only through `text-positive`/`text-destructive` (`getMetricValueColor`); out of the DOM a hex comes only from `lib/constants/printTokens.ts`
+- The enumerated type ramp (9 → 54px: `TILE_EYEBROW_CLASS` 10px, readings 13px, hero 44/54px) and the Mono Mandate for every figure
+- The named rules, cited by name in code comments (The Absence-Has-Three-Names Rule → `resolveSurfaceState`; The Modal-Is-A-Tile Rule → `ResponsiveModal` at four widths; The Narrative Honesty Rule; The Out-Of-DOM Token Rule)
+- Breakpoint rules (`desktop:` at 1440px — never use `lg:` for wide-screen layouts) and the spring standard (stiffness 400, damping 35)
+- Anti-patterns (no decorative progress bars — a 3px *informational* track is a primitive, decoration is not — no nested card-within-card, no hardcoded hex in the DOM)
 
-CLAUDE.md contains a summary of design intent; DESIGN.md is the full spec.
+The per-page rules live in `doc/guide/<page>.md`; CLAUDE.md only points at DESIGN.md.
 
 ---
 

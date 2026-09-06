@@ -51,7 +51,7 @@ export async function createExpenseFromDividend(
     // Update dividend with expense reference
     await updateDividend(dividend.id, {
       expenseId: expenseRef.id,
-    } as any);
+    });
 
     console.log(`[dividendIncomeService] Created expense in ${expenseCurrency} (amount: ${expenseAmount.toFixed(2)})`);
     return expenseRef.id;
@@ -114,8 +114,11 @@ export async function deleteExpenseForDividend(
 
     // Remove expense reference from dividend
     await updateDividend(dividendId, {
+      // Known defect (2026-09-06, kept until the owner decides): `removeUndefinedFields` strips this key
+      // before the write, so the stale `expenseId` is never cleared. The fix is `deleteField()` with an
+      // `'expenseId' in updates` guard — it adds a write, which is why it is not made here.
       expenseId: undefined,
-    } as any);
+    });
   } catch (error) {
     console.error('Error deleting expense for dividend:', error);
     throw new Error('Failed to delete expense for dividend');

@@ -1,6 +1,6 @@
 {
  "schemaVersion": 2,
- "generatedAt": "2026-09-01T13:45:00.000Z",
+ "generatedAt": "2026-09-06T00:00:00.000Z",
  "title": "Design System: Net Worth Tracker",
  "extensions": {
   "colorMeta": {
@@ -287,7 +287,7 @@
    },
    "scale": {
     "displayName": "Trade Republic Ramp",
-    "purpose": "The enumerated step ladder (9/10/11/12/13/15/18/22/24/30/32/36/40/44/54px) declared in the DESIGN.md frontmatter. The jump 22 -> 36 -> 44 -> 54 is intentional; text-2xl (24px) is never a hero NUMBER size — 24/30px are the Verdict Headline (prose). The 32/40px pair is the hero overflow step-down, not a step to reach for."
+    "purpose": "The enumerated step ladder (9/9.5/10/11/12/13/14/15/16/17/18/20/22/24/30/32/36/40/44/54px) declared in the DESIGN.md frontmatter. The jump 22 -> 36 -> 44 -> 54 is intentional; text-2xl (24px) is never a hero NUMBER size — 24/30px are the Verdict Headline (prose). The 32/40px pair is the hero overflow step-down, not a step to reach for."
    },
    "verdict": {
     "displayName": "Verdict Headline",
@@ -534,7 +534,7 @@
    },
    {
     "name": "The Ramp Lives in the Frontmatter",
-    "body": "The enumerated step ladder — 9/10/11/12/13/15/22/32/36/40/44/54px — is declared in `typography.scale`, because the named roles above cannot express a ramp. Two consequences. First, the two layers of this file must agree: the prose documented the Trade Republic scale for months while the frontmatter still said `display: clamp(1.75rem, 3vw, 2.5rem)`, which made every documented hero size read as off-system. Second, a linter takes its font sizes **only** from the frontmatter (`typography` + `typography.scale`) — from `.impeccable/design.json` it takes only `colorMeta` and `roundedMeta`. So a `design-system-font-size` finding is never fixed by regenerating the sidecar, whatever the tool's own hint suggests; declare the size here instead. 32px and 40px sit in the ramp because they are genuinely used — they are the hero **overflow step-down** (`doc/guide/panoramica.md`), not a step to reach for.",
+    "body": "The enumerated step ladder — 9 / 9.5 / 10 / 11 / 12 / 13 / 14 / 15 / 16 / 17 / 18 / 20 / 22 / 24 / 30 / 32 / 36 / 40 / 44 / 54px, twenty steps, every one with at least one use in the tree (re-counted 2026-09-06; the workhorses are 13 and 11, four hundred uses each, and 17, 24 and 30 each live in ONE file: `PageHeader`, `page-verdict`) — is declared in `typography.scale`, because the named roles above cannot express a ramp, and this sentence and that list must name the SAME steps: until 2026-09-06 the prose enumerated twelve while the frontmatter held sixteen. Two consequences. First, the two layers of this file must agree: the prose documented the Trade Republic scale for months while the frontmatter still said `display: clamp(1.75rem, 3vw, 2.5rem)`, which made every documented hero size read as off-system (`display` is the 54px page hero since 2026-09-06). Second, a linter takes its font sizes **only** from the frontmatter (`typography` + `typography.scale`) — from `.impeccable/design.json` it takes only `colorMeta` and `typographyMeta`, the sidecar's two meta keys. So a `design-system-font-size` finding is never fixed by regenerating the sidecar, whatever the tool's own hint suggests; declare the size here instead. 32px and 40px sit in the ramp because they are genuinely used — they are the hero **overflow step-down** (`doc/guide/panoramica.md`, `resolveHeroValueClass`), not a step to reach for. Two sizes stay OUTSIDE it on purpose: `text-base md:text-sm` on every input (16px below `md:`, the iOS zoom guard — the field, not the ramp, decides), and shadcn's `text-[0.8rem]` weekday cells in the calendar and the period picker.",
     "section": "typography"
    },
    {
@@ -710,14 +710,14 @@
    "**Do** use `oklch()` for all custom color definitions. This project is OKLCH-native; hex values in CSS are approximations of the canonical color.",
    "**Do** let the five named themes handle personality. Resist adding theme-like color to the default palette.",
    "**Do** use the view-transition circle reveal (`0.45s cubic-bezier(0.4, 0, 0.2, 1)`) for dark/light mode toggling. The origin coordinates are set inline from the click position.",
-   "**Do** use `requestIdleCallback` (with `setTimeout(0)` fallback) to schedule heavy SVG mount after a count-up animation settles. The `heroSettled + chartRenderReady` pattern prevents frame budget competition between animations and chart render.",
+   "**Do** use `requestIdleCallback` (with `setTimeout(0)` fallback) to schedule heavy SVG mount after a count-up animation settles. The `heroSettled + chartRenderReady` pattern prevents frame budget competition between animations and chart render. (No page implements it since the Panoramica's charts became hand-written SVG — see **Deferred Chart Mount**, superseded 2026-09-06; the guidance is for the next Recharts chart under a count-up.)",
    "**Do** isolate count-up animations in leaf components (`OverviewAnimatedCurrency`), not in the page component. Each rAF tick re-renders only the leaf, keeping the rest of the tree stable.",
-   "**Do** use `useAnimation + useEffect([])` (empty deps) for \"animate once on mount\" ring charts. This prevents the ring from restarting whenever a parent component re-renders due to unrelated state changes. (No surface draws one since 2026-08-31 — the guidance is here for the next ring, not for a live one.)",
-   "**Do** use `-mx-[N]px` negative margin (matching the card padding) to create edge-to-edge charts inside a card — `preserveAspectRatio=\"none\"` on the SVG fills the broken-out container correctly.",
+   "**Do** use `useAnimation + useEffect([])` (empty deps) for \"animate once on mount\" ring charts. This prevents the ring from restarting whenever a parent component re-renders due to unrelated state changes. (No surface draws a RATE ring since 2026-08-31; the one ring left, `BalanceRing`, is a bounded 0-100 score animated through `initial`/`animate` under `useReducedMotion` — the guidance here is for the next ring that would need `useAnimation`, not for a live one.)",
+   "**Do** use a negative margin matching the container's padding — `-mx-5` for the tile's `p-5` — to create edge-to-edge charts inside a tile — `preserveAspectRatio=\"none\"` on the SVG fills the broken-out container correctly.",
    "**Do** use the 12-column Tile Grid for a redesigned page (dominant tile `desktop:col-span-5 desktop:row-span-2`). `desktop:grid-cols-[2fr_1fr]` survives only on the Assistente, where the conversation is the content (The Conversation-Is-Content Rule).",
    "**Do** use `border-t border-border/40 pt-4` for section separators within a page scroll flow. The 40% opacity is lighter than structural borders — it suggests chapter, not division.",
-   "**Do** use `bg-muted/40 rounded-xl p-3.5` (no border) for KPI chip grids inside persistent, always-visible sections. Reserve the full-opacity `bg-muted` with `border border-border` for parameter tiles in collapsible zones.",
-   "**Do** use `mt-auto` inside `flex flex-col h-full` CardContent to pin optional secondary content to the card bottom. The pattern requires `h-full` on both Card and CardContent; without both, `mt-auto` has no space to push against.",
+   "**Do** reserve the full-opacity `bg-muted` with `border border-border` for parameter tiles (Muted Sub-tile, Variant B) — inside a tile the KPIs are bare figures, and a summary block inside a modal is a sub-tile on `bg-muted`. (The `bg-muted/40 rounded-xl p-3.5` KPI chip grid this Do used to prescribe is superseded and has 0 uses — see Muted Sub-tile, Variant A.)",
+   "**Do** use `mt-auto border-t pt-3.5` inside a `Tile` to pin the optional secondary fact to the tile's bottom: the tile is already a flex column and the grid cell stretches it (`[&>section]:flex-1`), so nothing else is required — the `<Card>` + `CardContent h-full` form of the same idea is superseded (see **Card Sticky Footer**).",
    "**Do** use `rounded-[2px]` for chart legend color swatches (color keys). Use `rounded-full` for inline dot indicators (row bullets, status dots). The distinction is semantic: square = color key, circle = inline marker.",
    "**Do** lay out a row of same-purpose, different-length chips as a grid (`grid grid-cols-1 gap-2 tablet:grid-cols-2`), not `flex-wrap`, so every chip shares the same column width without any JS measurement — see **The Equal-Column Chip Rule**. Full-width chip rows only: inside a tile the chips are grouped (**The Grouped Chip Rule**), as on the Panoramica and Patrimonio since 2026-08-22.",
    "**Do** duplicate responsive blocks with `desktop:hidden` / `hidden desktop:grid` when the same data must be positioned differently across breakpoints (e.g. TER + cost metrics in the hero card footer on desktop, as standalone cards below the hero on mobile). Redundant DOM is preferable to a convoluted single implementation that degrades at both sizes.",

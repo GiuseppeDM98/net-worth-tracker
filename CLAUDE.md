@@ -14,28 +14,18 @@ Next.js app for Italian investors: net worth, assets, cashflow, dividends, perfo
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic.
 - `tsc` clean; **151 files / 3440 tests** green + **37 Playwright E2E specs** (40 green in one run incl. 3 auth setups). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, which structurally hides timezone bugs.
-- Latest (2026-09-01): **Email e PDF — un hex ha una dichiarazione dietro** (ventitreesima
-  propagazione, la prima su superfici senza DOM). Un client di posta e `@react-pdf/renderer` non
-  vedono `globals.css`: ogni colore lì è un letterale, e quei letterali erano derivati su palette
-  che l'app non possiede — le email sulla rampa slate di Tailwind, il PDF su un accento `#3B82F6`
-  che violava la Zero-Chroma Rule su ogni pagina, senza che nulla nel codice potesse accorgersene.
-  (1) **`printTokens.ts`** è l'UNICA sede di un hex fuori dal DOM; il test ri-deriva l'aritmetica
-  OKLCH→sRGB, quindi una modifica a mano fallisce. (2) **`emailNarrative.ts`** e **`pdfNarrative.ts`**,
-  puri e testati: il verdetto nasce da REGOLE e il commento AI scende in seconda posizione — la sua
-  generazione non blocca l'invio, quindi un'email che si apriva su di lui si apriva su un numero
-  ogni volta che Anthropic non rispondeva. Il verdetto è anche il **preheader**. (3) **Un solo
-  template per i quattro periodi**; «Confronti» diventa «Rispetto a un anno fa» e **sparisce
-  sull'annuale** (`previousEqualsYoy`), dove ripeteva sé stessa. (4) **Il PDF perde il
-  frontespizio**: pagina 1 è il verdetto, sette sezioni alla cadenza della tessera, titoli italiani.
-  (5) **Due vincoli del medium dichiarati invece che aggirati**: niente monospace (l'allineamento
-  viene dalla colonna) e niente meno tipografico (WinAnsi non ha U+2212 e react-pdf scarta in
-  SILENZIO: Allocazione stampava «620» per «−620 €»; `pdfSafeText` converte al confine).
-  (6) **Il pavimento `cashflowHistoryStartYear` è DETTO** nella riga di scopo del Cashflow.
-  Corretti in corsa: `ASSET_CLASS_LABELS` locale dell'email («Crypto», «Materie prime»), `signedPct`
-  col punto decimale, una lettura dello Storico che mescolava due finestre. Collaudo: render delle
-  due email e del PDF con spec usa-e-getta (colori estratti dagli stream: solo token; zero overflow
-  a 390/600/1440), due falsificazioni per modulo viste rosse, suite 3440, build verde. AGENTS →
-  *Periodic Emails*, *PDF Export*; DESIGN → **The Out-Of-DOM Token Rule**, **The Declared-Window Rule**.
+- Latest (2026-09-06): **ESLint a zero e la spec riletta contro il codice finito.** `npm run lint` da
+  **314 problemi a 0** senza un `eslint-disable` nuovo: 113 `any` → tipi reali (`Asset`, `DocumentData`,
+  i tipi dell'SDK Anthropic, `catch (e: unknown)` con narrowing che legge gli stessi percorsi); 36
+  `set-state-in-effect` sciolti derivando lo stato o «settling» in render sul soggetto `(open, record)`
+  (`setTimeout(0)` solo per un loader); mappe `lazy()` a livello di modulo per i
+  `static-components`; `.agents/**` e `.next-*/**` ignorati. Due bug veri emersi tipizzando e NON
+  corretti (Known Issues). DESIGN.md riletto contro il codice: palette chart LIGHT nel frontmatter
+  («Indigo = azioni» vale solo in dark), `--warning*`, segni dark, ogni passo tipografico in uso;
+  i pattern a zero implementazioni marcati superati; inventario degli hex DOM-side e tre tinte del
+  chrome fuori Zero-Chroma dichiarate. `doc/redesign-prompts.md` ritirato; `.impeccable/config.json`
+  senza 8 deroghe orfane. Collaudo: suite 3440 (anche `TZ=Europe/Rome`), `tsc`, Playwright 40/40
+  sugli emulatori, giro guidato (cinque verifiche, ok).
 
 ## Architecture Snapshot
 - App Router; protected pages under `app/dashboard/*`.
@@ -69,9 +59,9 @@ One line per feature: what it is, then where it is described. *What the user see
 - **Assistente AI**: «su quali numeri ragiona l'assistente?» — the verdict IS the context, on the period axis; the conversation as a tile beside a sticky companion (Patrimonio · Cashflow · Cosa sa di te); SSE streaming, five modes, gated web search, proactive memory, goals; flag `NEXT_PUBLIC_ASSISTANT_AI_ENABLED`, blocked in demo. doc/guide/assistente.md.
 - **Hall of Fame**: «quali sono stati i mesi e gli anni migliori?» senza asse — un record è una posizione; la classifica completa vive nel Dettaglio. README → *Other*; doc/guide/hall-of-fame.md.
 - **Impostazioni**: sei tab, nessun verdetto (è un form) ma la cadenza delle tessere; un solo Salva per pagina, e due tessere che dichiarano senza scrivere. doc/guide/impostazioni.md; il fan-out di scrittura in AGENTS → *Settings — the FIVE places*.
-- **Accesso e Registrazione**: due pagine pubbliche, una colonna da 420 con UNA tessera; il verdetto è generato dallo stato (accesso · aperta · su invito · chiusa), la lettura è la status line del form, gli errori sono parole italiane e mai la stringa di Firebase. doc/guide/accesso-registrazione.md; DESIGN → §5 Status-Is-The-Reading.
+- **Accesso e Registrazione**: due pagine pubbliche, una colonna da 420 con UNA tessera; il verdetto è generato dallo stato (accesso · aperta · su invito · chiusa), la lettura è la status line del form, gli errori sono parole italiane e mai la stringa di Firebase. doc/guide/accesso-registrazione.md; DESIGN → The Status-Is-The-Reading Rule.
 - **Stati**: caricamento · nulla di registrato · zero misurato · lettura fallita — quattro forme distinte alla cadenza della tessera, su 20 superfici. AGENTS → *Stati: caricamento, vuoto, zero, errore*; DESIGN → **The Absence-Has-Three-Names Rule**.
-- **Dialog e form trasversali**: 29 modali su un vocabolario unico — occhiello · titolo 20px · riga di lettura (che è la status line del form) · corpo · footer, in `ResponsiveModal` a quattro larghezze. AGENTS → *Dialog e form trasversali*; DESIGN → **The Modal-Is-A-Tile Rule**, §5 Modal.
+- **Dialog e form trasversali**: 29 modali su un vocabolario unico — occhiello · titolo 20px · riga di lettura (che è la status line del form) · corpo · footer, in `ResponsiveModal` a quattro larghezze; otto superfici montano ancora `Dialog`/`AlertDialog`/`Drawer`/`Sheet` grezzi (Known Issues). AGENTS → *Dialog e form trasversali*; DESIGN → **The Modal-Is-A-Tile Rule**, §5 Modal.
 - **Email periodiche · Email budget**: quattro periodi su UN template — verdetto da regole (anche come preheader), commento AI secondo, poi le tessere; «Rispetto a un anno fa» sparisce sull'annuale. La budget arriva la domenica e non contiene nulla di settimanale: ogni tessera dichiara la propria finestra. doc/guide/email-pdf.md.
 - **PDF export**: sette sezioni alla cadenza della tessera, la copertina è il verdetto, il pavimento del Cashflow è detto; niente monospace né meno tipografico, dichiarati. doc/guide/email-pdf.md.
 - **Token fuori dal DOM · Multi-theme**: `lib/constants/printTokens.ts` è l'unica sede di un hex per email e PDF (DESIGN → **The Out-Of-DOM Token Rule**); temi in AGENTS → *Color Theme System*.
@@ -102,10 +92,14 @@ Firestore client + admin · Yahoo Finance (prices, benchmark history) · Borsa I
 - **A running year is the WHOLE calendar year on Tracciamento and Analisi**, so its figures include what is only scheduled; each verdict declares it with amount and horizon, each such row is chipped «In calendario» and drops its sign colour. **«Da inizio anno» (YTD) is the other window** (`Period.kind = 'ytd'`, Analisi's fourth `PeriodMode`): it runs to the END of today's month, not to today, so it carries scheduled rows too. **On «Anno corrente» the delta compares twelve months against twelve** (`resolveComparisonScope` → `fullYear`), biased downward as the year runs; YTD keeps `sameMonths`, and Tracciamento's verdict and a category's Scheda still say «stessi mesi». Not extended to Panoramica, Storico, Budget or Centri di Costo. DESIGN → *The Scheduled-Is-Not-Spent Rule*.
 - **Le 5 spec del Calcolatore FIRE falliscono se la suite E2E gira prima del 5 del mese**: `seedEmulator.ts` data le spese al giorno 5 del mese corrente e `getAnnualCashflowData` interroga «inizio anno → adesso», quindi la finestra è vuota. Artefatto della fixture, non una regressione.
 - **Il ramo `isError` copre 20 superfici, non ogni query**: cablate quelle da cui dipende il verdetto o l'inventario, non le secondarie (prezzi, benchmark, FX) — una di quelle che fallisce degrada ancora in silenzio.
-- **32 `animate-spin` restano senza `motion-safe`** (scelta: uno spinner È il segnale «in volo»). Il pulse invece l'ha ovunque.
 - **Per-page blind spots** — the behaviours that look like bugs and are not — live at the end of each `doc/guide/<page>.md` (one *Per-page blind spots* section per page). Moved there verbatim from this file's Known Issues; CLAUDE.md keeps only the cross-cutting ones.
 - **Divisione's shares follow the PERIOD's salaries** (owner's call): a thirteenth salary moves the percentage, and a month with no salary recorded has no shares at all — `resolveSplitBasis` says so by name instead of printing 100/0. It **shipped without an end-to-end run with the flag ON**: the pure layer, flag-off invariance, `tsc`, suite and build are proven; the `personalMemberId` writes and the rendering are not. doc/guide/cashflow-divisione.md.
 - **The icon rail's 44px targets are measured at 1440 with a mouse**; no fixture covers a ≥1440px tablet in landscape.
+- **Otto superfici stanno ancora fuori dal vocabolario delle modali** (2026-09-06): `app/dashboard/page.tsx`, `dividends/{DividendiDettaglio,DividendTrackingTab}`, `expenses/ExpenseTable`, `cashflow/{ExpenseTrackingTab,TransactionFeed,MobileFiltersDrawer}`, `assistant/AssistantSheets` montano `Dialog`/`AlertDialog`/`Drawer`/`Sheet` grezzi (titolo 18/16px, quinta larghezza 512px). Elenco in DESIGN.md → §5 Modal, Coverage.
+- **Tre tinte del chrome violano la Zero-Chroma Rule** (`switch.tsx` ON blu in dark, `ProtectedRoute` spinner, mask-icon smeraldo) più `ExpenseTable.tsx` `text-emerald-*`; gli altri ~100 hex DOM-side sono eccezioni dichiarate in DESIGN.md → The DOM-side hex inventory.
+- **Due residui della generazione precedente nel codice del shell**: `PageContainer` conserva il default `default` (1600px) che nessun chiamante usa (33/33 passano `width="wide"`), e `PageHeader` accetta una prop `separator` che è un no-op passato da 18 chiamanti. Da potare in una sessione di pulizia; DESIGN.md li segna già superati.
+- **Due bug noti, non corretti (2026-09-06)**: `deleteExpenseForDividend` scrive `expenseId: undefined`, scartato prima della write → lo scollegamento non avviene mai (serve `deleteField()`); e il test `error.error.type === 'overloaded_error'` (`anthropicStream.ts`, `analyze-performance/route.ts`) è morto con l'SDK 0.110 (il tipo sta su `error.type`) → un sovraccarico cade nel ramo generico. Cambiano comportamento raggiungibile: decisione del proprietario, commentati in loco.
+- **`.impeccable/design.json` non è il mirror verbatim che DESIGN.md dichiara** (13 regole su 41 già diverse prima del 2026-09-06, `components` ferma alla generazione precedente): si rigenera col plugin, non a mano; in sessione si sincronizza solo ciò che si è cambiato in DESIGN.md.
 - **The market digest's blind spots**: a position opened this month contributes 0 until next month; a pension fund counts only from `pensionReturnStartMonth`; hand-valued assets other than funds and real estate never show a market effect; real estate is gross of debt.
 
 ## Key Files
@@ -116,7 +110,7 @@ Tests are not listed: every pure module has `__tests__/{module}.test.ts`, every 
 - **Shared account**: `contexts/ActiveAccountContext.tsx`, `lib/services/accountAccessService.ts`, `app/api/account/members/route.ts`, `lib/server/apiAuth.ts`, `firestore.rules`, `components/settings/AccountSharingSection.tsx`; collection `account-access/{ownerUid}`
 - **Shared primitives**: `components/ui/{composition-list,composition-bar,segmented-pill,drill-breadcrumb,chart-hover}.tsx`, `lib/utils/compositionShading.ts`
 - **Stati**: puro `lib/utils/statesNarrative.ts` (`AbsenceKind`, `resolveSurfaceState` = l'unica decisione attesa/fallimento, `describeReadFailure`, `describeLastSuccessfulRead`); `components/ui/{skeleton,empty-state,error-notice,tile-grid-skeleton}.tsx` (`Skeleton` = l'unico placeholder muted, `motion-safe` e `aria-hidden`); `components/ui/sonner.tsx` (la severità del toast); `components/ui/SavingsRateBadge.tsx` sopra `lib/utils/savingsRateBadge.ts`
-- **Dialog e form trasversali**: `components/ui/responsive-modal.tsx` (la modale, con `ModalWidth` sm/md/lg/xl) + `components/ui/modal-status-line.tsx`; puro `lib/utils/dialogNarrative.ts` (le parole di ogni modale: `describeModalStatus`, `describeWriteError`/`userFacingError`, `armedActionLabel`, i tre `describe*Intent` e le letture con cifre); `lib/hooks/useArmedDelete.ts` (2-click senza timer, + `hasArmedConfirm`); `lib/constants/aiModels.ts` (i quattro id dei modelli Anthropic, letti anche dalle route). Le 29 superfici passano tutte di lì tranne `components/layout/LogoutDialog.tsx`, che resta `AlertDialog` perché interrompe
+- **Dialog e form trasversali**: `components/ui/responsive-modal.tsx` (la modale, con `ModalWidth` sm/md/lg/xl) + `components/ui/modal-status-line.tsx`; puro `lib/utils/dialogNarrative.ts` (le parole di ogni modale: `describeModalStatus`, `describeWriteError`/`userFacingError`, `armedActionLabel`, i tre `describe*Intent` e le letture con cifre); `lib/hooks/useArmedDelete.ts` (2-click senza timer, + `hasArmedConfirm`); `lib/constants/aiModels.ts` (i quattro id dei modelli Anthropic, letti anche dalle route). Le 29 superfici passano tutte di lì tranne `components/layout/LogoutDialog.tsx`, che resta `AlertDialog` perché interrompe — e le otto ancora sui primitivi grezzi elencate in Known Issues
 - **Shared utils** (each the single source of its rule): `lib/utils/formatters.ts` · `metricColors.ts` (`getMetricValueColor`) · `assetPricing.ts` (`requiresManualPricing`) · `assetLiquidity.ts` (`suggestIsLiquid`) · `expenseTypeTransition.ts` (`needsSignFlip`/`crossesTransferBoundary`) · `firestoreData.ts` (`removeUndefinedDeep`) · `dateHelpers.ts` (`endOfMonthBound`, `getItalyDateIso`, `isItalyDayAfter`)
 - **Rendimenti**: `app/dashboard/performance/page.tsx`, `components/performance/tiles/*` (seven tiles), `components/performance/{GrowthOfHundredChart,CapitalMarketChart,MonthlyReturnsHeatmap,PerformancePeriodPicker,PerformanceDettaglio,UnderwaterDrawdownChart,CustomDateRangeDialog,AIAnalysisDialog}.tsx`; pure `lib/utils/{performanceNarrative,performanceSummary}.ts` (words · numbers), `performanceBase.ts`, `drawdownSeries.ts`, `lib/services/performanceService.ts` (window, IRR, `CACHE_MATH_VERSION`), `cashFlowMap.ts`, `benchmarkPeriodReturn.ts`. Cache `performance-cache/{userId}`
 - **Yields**: `lib/utils/yieldOnCost.ts` (`computeDividendYieldMetrics` — single source), consumed by Rendimenti and `app/api/dividends/stats/route.ts`
@@ -155,8 +149,8 @@ Tests are not listed: every pure module has `__tests__/{module}.test.ts`, every 
 - **PDF export**: `lib/utils/pdfGenerator.tsx` → `lib/services/pdfDataService.ts` → `components/pdf/{PDFDocument,sections/*}`; `lib/utils/pdfTimeFilters.ts` (`DEFAULT_CASHFLOW_HISTORY_START_YEAR`); types `types/pdf.ts` (`CashflowData.historyFloorYear`/`windowMonths` = il pavimento dichiarato)
 
 ## Design Context
-Propagation plan: **`doc/redesign-prompts.md`** — one ready-to-paste prompt per section (shell, every page/tab, auth, landing, dialogs, states, email/PDF) with the recommended model/effort and the closing checklist.
+The propagation is finished: twenty-three sections, the last on 2026-09-01; the per-section prompt file was retired on 2026-09-06, so a change to a page starts from its `doc/guide/<page>.md` and from DESIGN.md's named rules, not from a prompt.
 
-Authoritative aesthetic spec: **DESIGN.md** (Apple + Linear/Vercel + Trade Republic; form-follows-function) — hand-maintained, **never regenerate it**; its YAML frontmatter is the normative layer read by the impeccable detector, `.impeccable/design.json` is only the extensions sidecar. Product truth lives in **PRODUCT.md**. Principles: (1) data first, decoration never; (2) motion with a purpose; (3) density is a feature; (4) precision builds trust; (5) personality lives in the details.
+Authoritative aesthetic spec: **DESIGN.md** — hand-maintained, **never regenerate it**; its YAML frontmatter is the normative layer read by the impeccable detector, `.impeccable/design.json` only the extensions sidecar. Product truth lives in **PRODUCT.md**. This file carries no paraphrase: rules are cited by name (DESIGN → **The X Rule**) and enforced by `components/ui/{tile,page-verdict,responsive-modal}.tsx`, `statesNarrative.ts` and `printTokens.ts`.
 
-**Last updated**: 2026-09-01. DESIGN.md documents the "Verdict over Tiles" shape, the shell and the twenty-three propagations, Patrimonio to Email e PDF. The last one is the first on surfaces with no DOM: it adds **The Out-Of-DOM Token Rule** and **The Declared-Window Rule**, gains §5 **Email Shell and Email Tile** and **PDF Page and PDF Section**, and marks three patterns superseded (the inline out-of-DOM palette, the section-per-block email, the blue report). Superseded patterns stay marked. History: `git log`.
+**Last updated**: 2026-09-06. DESIGN.md documents the "Verdict over Tiles" shape, the shell and the twenty-three propagations, and was re-read against the finished code on 2026-09-06 (light chart palette, warning surface, dark sign values and every scale step in the frontmatter; zero-implementation patterns superseded; the DOM-side hex inventory declared). Superseded patterns stay marked. History: `git log`.

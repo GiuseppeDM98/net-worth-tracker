@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { AssetClass } from '@/types/assets';
 import { ASSET_CLASS_LABELS, ASSET_CLASS_SEQUENCE } from '@/lib/utils/allocationUtils';
 import {
@@ -56,7 +56,6 @@ export function GoalFormDialog({
   onClose,
   onSave,
   goal,
-  existingGoals,
 }: GoalFormDialogProps) {
   const isEditing = !!goal;
 
@@ -70,29 +69,37 @@ export function GoalFormDialog({
   const [allocation, setAllocation] = useState<Partial<Record<AssetClass, number>>>({});
   const [saving, setSaving] = useState(false);
 
-  // Reset form on open; guard prevents spurious reset on close
-  useEffect(() => {
-    if (!open) return;
-    if (goal) {
-      setName(goal.name);
-      setTargetAmount(goal.targetAmount?.toString() ?? '');
-      setTargetDate(goal.targetDate || '');
-      setMonthlyContribution(goal.monthlyContribution?.toString() ?? '');
-      setPriority(goal.priority);
-      setColor(goal.color);
-      setNotes(goal.notes || '');
-      setAllocation(goal.recommendedAllocation || {});
-    } else {
-      setName('');
-      setTargetAmount('');
-      setTargetDate('');
-      setMonthlyContribution('');
-      setPriority('media');
-      setColor(GOAL_COLORS[0]);
-      setNotes('');
-      setAllocation({});
+  // Reset the form on open — and when the edited goal changes while open — during render
+  // (React's adjust-state-during-render) rather than in an effect (react-hooks/set-state-in-
+  // effect): the seeded form is the one painted, never the previous draft for a frame.
+  const [seededFor, setSeededFor] = useState<{ open: boolean; goal: typeof goal }>({
+    open: false,
+    goal: null,
+  });
+  if (seededFor.open !== open || seededFor.goal !== goal) {
+    setSeededFor({ open, goal });
+    if (open) {
+      if (goal) {
+        setName(goal.name);
+        setTargetAmount(goal.targetAmount?.toString() ?? '');
+        setTargetDate(goal.targetDate || '');
+        setMonthlyContribution(goal.monthlyContribution?.toString() ?? '');
+        setPriority(goal.priority);
+        setColor(goal.color);
+        setNotes(goal.notes || '');
+        setAllocation(goal.recommendedAllocation || {});
+      } else {
+        setName('');
+        setTargetAmount('');
+        setTargetDate('');
+        setMonthlyContribution('');
+        setPriority('media');
+        setColor(GOAL_COLORS[0]);
+        setNotes('');
+        setAllocation({});
+      }
     }
-  }, [open, goal]);
+  }
 
   const handleTemplateSelect = (templateName: string) => {
     const template = GOAL_TEMPLATES.find((t) => t.name === templateName);

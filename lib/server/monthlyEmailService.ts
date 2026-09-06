@@ -15,6 +15,7 @@ import { EMAIL_ANALYSIS_MODEL } from '@/lib/constants/aiModels';
 import { adminDb } from '@/lib/firebase/admin';
 import { Timestamp } from 'firebase-admin/firestore';
 import { Resend } from 'resend';
+import type Anthropic from '@anthropic-ai/sdk';
 import {
   escapeHtml,
   emailShell,
@@ -54,7 +55,7 @@ import {
 } from '@/lib/utils/emailNarrative';
 import { printChartHexForAssetClass, PRINT_COLORS } from '@/lib/constants/printTokens';
 import { cachedFormatCurrencyEUR, formatPercentageIt } from '@/lib/utils/formatters';
-import { getItalyDate, getItalyMonthYear } from '@/lib/utils/dateHelpers';
+import { getItalyDate } from '@/lib/utils/dateHelpers';
 import { AssetAllocationSettings } from '@/types/assets';
 import { ASSET_CLASS_LABELS } from '@/lib/utils/allocationUtils';
 import { getDefaultAssistantPreferences } from '@/lib/server/assistant/webSearchPolicy';
@@ -229,7 +230,6 @@ export function getPreviousQuarterEnd(
 export function getMostRecentCompletedQuarterEnd(now: Date): { year: number; month: number } {
   const italyDate = getItalyDate(now);
   const year = italyDate.getFullYear();
-  const currentMonth = italyDate.getMonth() + 1;
   // Quarter-end months in reverse order
   const quarterEndMonths = [12, 9, 6, 3];
   for (const qMonth of quarterEndMonths) {
@@ -788,7 +788,7 @@ async function generateEmailAiComment(
                 type: 'web_search_20250305',
                 name: 'web_search',
                 max_uses: 3,
-              } as any,
+              } satisfies Anthropic.WebSearchTool20250305,
             ],
           }
         : {}),

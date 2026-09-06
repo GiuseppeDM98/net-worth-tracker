@@ -16,13 +16,12 @@
  * and cause unnecessary API calls.
  *
  * Devtools:
- * Enabled in all environments with initialIsOpen={false}.
- * Useful for debugging cache state and query behavior in development.
+ * Not mounted. `@tanstack/react-query-devtools` stays installed for ad-hoc debugging of
+ * cache state, but rendering it here would ship the panel to every environment.
  */
 'use client';
 
 import { QueryClient, QueryClientProvider as TanStackQueryClientProvider } from '@tanstack/react-query';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { useState } from 'react';
 
 export function QueryClientProvider({ children }: { children: React.ReactNode }) {

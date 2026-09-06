@@ -64,7 +64,10 @@ const baseAsset: Asset & { id: string } = {
   currency: 'EUR',
   isLiquid: true,
   includeInHistoryTables: true,
-} as any;
+  lastPriceUpdate: new Date('2024-01-01'),
+  createdAt: new Date('2024-01-01'),
+  updatedAt: new Date('2024-01-01'),
+};
 
 function makeFormData(overrides: Partial<DividendFormData> = {}): DividendFormData {
   return {

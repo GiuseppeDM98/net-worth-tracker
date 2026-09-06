@@ -12,7 +12,7 @@
  * A curated 8-color palette is enough to distinguish cost centers at a glance.
  */
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import {
@@ -48,6 +48,31 @@ interface CostCenterDialogProps {
   onSuccess: (costCenter: CostCenter) => void;
 }
 
+interface CostCenterFields {
+  name: string;
+  description: string;
+  color: string;
+  /** Optional spending ceiling. Empty string = no budget; the field is opt-in. */
+  budgetAmount: string;
+  budgetPeriod: CostCenterBudgetPeriod;
+}
+
+/** The form's values for a subject: the center being edited, or the blank form for a new one. */
+function fieldsFor(costCenter: CostCenter | null | undefined): CostCenterFields {
+  if (!costCenter) {
+    return { name: '', description: '', color: COST_CENTER_COLOR_KEYS[0], budgetAmount: '', budgetPeriod: 'annual' };
+  }
+  return {
+    name: costCenter.name,
+    description: costCenter.description ?? '',
+    // A pre-migration document still holds a hex, which matches no slot key — resolving it
+    // to its slot both highlights the right swatch and migrates the value on the next save.
+    color: COST_CENTER_COLOR_KEYS[resolveCostCenterColorSlot(costCenter.color, costCenter.id)],
+    budgetAmount: costCenter.budgetAmount != null ? String(costCenter.budgetAmount) : '',
+    budgetPeriod: costCenter.budgetPeriod ?? 'annual',
+  };
+}
+
 export function CostCenterDialog({
   open,
   onClose,
@@ -56,33 +81,23 @@ export function CostCenterDialog({
 }: CostCenterDialogProps) {
   const { user } = useAuth();
   const { ownerId } = useActiveAccount();
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [color, setColor] = useState<string>(COST_CENTER_COLOR_KEYS[0]);
   const chartColors = useChartColors();
-  // Optional spending ceiling. Empty string = no budget; the field is opt-in.
-  const [budgetAmount, setBudgetAmount] = useState('');
-  const [budgetPeriod, setBudgetPeriod] = useState<CostCenterBudgetPeriod>('annual');
+  const [fields, setFields] = useState<CostCenterFields>(() => fieldsFor(costCenter));
   const [saving, setSaving] = useState(false);
 
-  // Populate fields when editing an existing cost center
-  useEffect(() => {
-    if (costCenter) {
-      setName(costCenter.name);
-      setDescription(costCenter.description ?? '');
-      // A pre-migration document still holds a hex, which matches no slot key — resolving it
-      // to its slot both highlights the right swatch and migrates the value on the next save.
-      setColor(COST_CENTER_COLOR_KEYS[resolveCostCenterColorSlot(costCenter.color, costCenter.id)]);
-      setBudgetAmount(costCenter.budgetAmount != null ? String(costCenter.budgetAmount) : '');
-      setBudgetPeriod(costCenter.budgetPeriod ?? 'annual');
-    } else {
-      setName('');
-      setDescription('');
-      setColor(COST_CENTER_COLOR_KEYS[0]);
-      setBudgetAmount('');
-      setBudgetPeriod('annual');
-    }
-  }, [costCenter, open]);
+  // Populate the fields from the subject on every open and on every change of center. Done
+  // while rendering, before anything reads them — the React "adjust state when a prop
+  // changes" pattern — because the same reset inside an effect is banned by
+  // react-hooks/set-state-in-effect and would paint one frame with the previous center's values.
+  const [prevSubject, setPrevSubject] = useState({ open, costCenter });
+  if (prevSubject.open !== open || prevSubject.costCenter !== costCenter) {
+    setPrevSubject({ open, costCenter });
+    setFields(fieldsFor(costCenter));
+  }
+
+  const { name, description, color, budgetAmount, budgetPeriod } = fields;
+  const setField = <K extends keyof CostCenterFields>(key: K, value: CostCenterFields[K]) =>
+    setFields((current) => ({ ...current, [key]: value }));
 
   const handleSave = async () => {
     if (!user || !ownerId || !name.trim()) return;
@@ -151,7 +166,7 @@ export function CostCenterDialog({
               id="ccName"
               placeholder="es. Automobile Dacia"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => setField('name', e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
@@ -169,7 +184,7 @@ export function CostCenterDialog({
               id="ccDesc"
               placeholder="es. Spese per la Dacia Sandero"
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={(e) => setField('description', e.target.value)}
             />
           </div>
 
@@ -187,7 +202,7 @@ export function CostCenterDialog({
                     'group grid h-11 w-11 place-items-center rounded-full',
                     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background'
                   )}
-                  onClick={() => setColor(key)}
+                  onClick={() => setField('color', key)}
                   aria-label={`${colorLabel(i)}${color === key ? ' (selezionato)' : ''}`}
                   aria-pressed={color === key}
                 >
@@ -226,7 +241,7 @@ export function CostCenterDialog({
                   step="50"
                   placeholder="0"
                   value={budgetAmount}
-                  onChange={(e) => setBudgetAmount(e.target.value)}
+                  onChange={(e) => setField('budgetAmount', e.target.value)}
                   className="pl-7 font-mono"
                 />
               </div>
@@ -236,7 +251,7 @@ export function CostCenterDialog({
                   { value: 'annual', label: 'Annuale' },
                 ]}
                 value={budgetPeriod}
-                onChange={setBudgetPeriod}
+                onChange={(value) => setField('budgetPeriod', value)}
                 aria-label="Periodo del tetto di spesa"
                 className="sm:w-[180px]"
               />

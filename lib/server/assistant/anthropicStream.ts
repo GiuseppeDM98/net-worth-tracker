@@ -119,6 +119,22 @@ function buildMessagesArray(
 const TRUNCATION_NOTICE =
   '\n\n_(Risposta interrotta: ho raggiunto il limite di lunghezza. Chiedimi di continuare o restringi la domanda.)_';
 
+// Known defect (2026-09-06, kept until the owner decides): with @anthropic-ai/sdk 0.110 the inner
+// type lives on `error.type` and `error.error` is the whole envelope, so the `error.error.type`
+// read below never matches 'overloaded_error' and an overload falls through to the generic branch.
+// The fix (`error instanceof Anthropic.APIError && error.type === …`) changes reachable behaviour.
+/**
+ * The `type` inside the error body a failed request carries, read exactly where this
+ * module has always read it (`error.error.type`) so the overload branch keeps its reach.
+ * A thrown value that is not an object holding an object `error` reads as undefined.
+ */
+function readAnthropicErrorType(error: unknown): string | undefined {
+  if (typeof error !== 'object' || error === null || !('error' in error)) return undefined;
+  const body = error.error;
+  if (typeof body !== 'object' || body === null || !('type' in body)) return undefined;
+  return typeof body.type === 'string' ? body.type : undefined;
+}
+
 export async function streamAssistantResponse({
   mode,
   prompt,
@@ -169,7 +185,7 @@ export async function streamAssistantResponse({
                 type: 'web_search_20250305',
                 name: 'web_search',
                 max_uses: isStructuredAnalysis ? 2 : 3,
-              } as any,
+              } satisfies Anthropic.WebSearchTool20250305,
             ],
           }
         : {}),
@@ -217,8 +233,8 @@ export async function streamAssistantResponse({
       text,
       webSearchUsed,
     };
-  } catch (error: any) {
-    if (error?.error?.type === 'overloaded_error') {
+  } catch (error: unknown) {
+    if (readAnthropicErrorType(error) === 'overloaded_error') {
       const overloadedError = new Error(
         'I server AI sono temporaneamente sovraccarichi. Riprova tra qualche secondo.'
       ) as Error & { retryable?: boolean; status?: number };

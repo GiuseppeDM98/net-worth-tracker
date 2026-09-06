@@ -5,33 +5,6 @@
     "ignoreValues": [
       {
         "rule": "design-system-color",
-        "value": "rgba(128,128,128,0.1)",
-        "createdAt": "2026-07-24T12:14:06.148Z",
-        "reason": "Pre-existing Recharts tooltip cursor fill used across every chart in History (and elsewhere) since before this session; not introduced by the pension-fund P3 work"
-      },
-      {
-        "rule": "side-tab",
-        "value": "*",
-        "files": [
-          "app/dashboard/history/page.tsx"
-        ],
-        "createdAt": "2026-07-24T12:14:13.677Z",
-        "reason": "False positive: hits a code COMMENT string that documents a border being removed (\"No side-stripe borders: removed border-l-4...\"), not an actual CSS border"
-      },
-      {
-        "rule": "design-system-font-size",
-        "value": "10px",
-        "createdAt": "2026-07-24T12:14:31.668Z",
-        "reason": "Pre-existing small-caption font size used before this session in FireCalculatorTab/allocation/performance pages; not introduced by the pension-fund P3 work"
-      },
-      {
-        "rule": "design-system-font-size",
-        "value": "11px",
-        "createdAt": "2026-07-24T12:14:31.745Z",
-        "reason": "Pre-existing small-caption font size (Dettaglio divider label) used before this session; not introduced by the pension-fund P3 work"
-      },
-      {
-        "rule": "design-system-color",
         "value": "#9ca3af",
         "createdAt": "2026-07-24T12:14:40.718Z",
         "reason": "Pre-existing 'Altri' bucket gray in prepareAssetDistributionData, predates this session's pension-fund P3 work"
@@ -44,15 +17,6 @@
         ],
         "createdAt": "2026-08-13T00:00:00.000Z",
         "reason": "User-picked category palette (CATEGORY_COLORS + the #3b82f6 form default): data colours stored per-category in Firestore, not theme tokens. Confirmed intentional by Giuseppe 2026-08-13"
-      },
-      {
-        "rule": "design-system-color",
-        "value": "*",
-        "files": [
-          "lib/server/monthlyEmailService.ts"
-        ],
-        "createdAt": "2026-08-13T00:00:00.000Z",
-        "reason": "Email HTML renders outside the DOM: CSS custom properties cannot reach it, every colour is a literal hex by construction (CLAUDE.md Known Issue on the email/PDF token-drift surface). Confirmed by Giuseppe 2026-08-13"
       },
       {
         "rule": "design-system-color",
@@ -71,33 +35,6 @@
         ],
         "createdAt": "2026-08-13T00:00:00.000Z",
         "reason": "Liquidity-chart slice colour baked into the server payload; remapped to the active theme at render time per AGENTS.md 'Server-cached chart data'. Confirmed by Giuseppe 2026-08-13"
-      },
-      {
-        "rule": "design-system-font-size",
-        "value": "34px",
-        "files": [
-          "components/allocation/AllocationHero.tsx"
-        ],
-        "createdAt": "2026-08-13T00:00:00.000Z",
-        "reason": "Paired-number hero variant: two 34px (desktop 40px) figures replace the single 44px hero when leverage shows investito + esposizione side by side. Pre-existing deliberate step, confirmed by Giuseppe 2026-08-13"
-      },
-      {
-        "rule": "design-system-radius",
-        "value": "*",
-        "files": [
-          "lib/server/monthlyEmailService.ts"
-        ],
-        "createdAt": "2026-08-17T17:43:40.622Z",
-        "reason": "Whole file is email HTML: it renders outside the DOM, so DESIGN.md tokens and the radius scale can never reach it (AGENTS.md -> Layout and Color Tokens). Flagged lines are pre-existing and untouched by this change."
-      },
-      {
-        "rule": "design-system-font",
-        "value": "*",
-        "files": [
-          "lib/server/monthlyEmailService.ts"
-        ],
-        "createdAt": "2026-08-17T17:43:40.776Z",
-        "reason": "Email HTML: no webfonts and no CSS variables reach an email client, so the monospace stack is spelled out (AGENTS.md). Pre-existing, untouched."
       }
     ]
   }

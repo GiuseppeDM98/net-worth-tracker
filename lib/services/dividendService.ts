@@ -6,7 +6,6 @@ import {
   Dividend,
   DividendFormData,
   DividendStats,
-  DividendType,
 } from '@/types/dividend';
 import { convertMultipleToEur, getExchangeRateToEur } from './currencyConversionService';
 import { removeUndefinedDeep as removeUndefinedFields } from '@/lib/utils/firestoreData';
@@ -292,7 +291,9 @@ export async function createDividend(
  */
 export async function updateDividend(
   dividendId: string,
-  updates: Partial<DividendFormData>
+  // expenseId is not a form field: only the income sync writes it, to link (or unlink)
+  // the expense row it created for this dividend.
+  updates: Partial<DividendFormData> & Pick<Dividend, 'expenseId'>
 ): Promise<void> {
   try {
     // Convert dates to Date objects if they're strings, then to Timestamps

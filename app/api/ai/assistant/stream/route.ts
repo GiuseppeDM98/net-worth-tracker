@@ -43,6 +43,17 @@ const STREAM_RATE_LIMIT_MAX = 30;
 const STREAM_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 
 /**
+ * What `streamAssistantResponse` throws on an upstream overload: a plain Error carrying
+ * `retryable` and `status` (see anthropicStream.ts). Every other failure that reaches the
+ * stream's catch is an Error without them, so both stay optional.
+ */
+type UpstreamFailure = Error & { retryable?: boolean; status?: number };
+
+function isUpstreamFailure(error: unknown): error is UpstreamFailure {
+  return error instanceof Error;
+}
+
+/**
  * Extracts memory candidates from a completed exchange, persists the new items
  * and re-evaluates every active structured goal.
  *
@@ -335,13 +346,14 @@ export async function POST(request: NextRequest) {
             })
           );
           controller.close();
-        } catch (error: any) {
-          const retryable = Boolean(error?.retryable);
+        } catch (error: unknown) {
+          const failure = isUpstreamFailure(error) ? error : undefined;
+          const retryable = failure?.retryable === true;
           // Log with retryable flag so on-call can distinguish overload spikes from bugs
           console.error('[assistant/stream] stream error', {
             retryable,
-            status: error?.status,
-            message: error?.message,
+            status: failure?.status,
+            message: failure?.message,
           });
           controller.enqueue(
             encodeAssistantEvent({

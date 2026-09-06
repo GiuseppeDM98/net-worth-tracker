@@ -25,7 +25,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useQueryClient } from '@tanstack/react-query';
@@ -123,7 +123,7 @@ export default function CashflowPage() {
   const isDemo = useDemoMode();
 
   // Load dividends and assets only when their tabs are mounted
-  const loadOtherData = async () => {
+  const loadOtherData = useCallback(async () => {
     if (!user || !ownerId || otherDataLoaded) return;
 
     try {
@@ -153,14 +153,17 @@ export default function CashflowPage() {
     } finally {
       setOtherDataLoading(false);
     }
-  };
+  }, [user, ownerId, otherDataLoaded]);
 
   useEffect(() => {
     const needsOtherData = mountedTabs.has('dividends');
-    if (user && ownerId && needsOtherData && !otherDataLoaded) {
+    if (!user || !ownerId || !needsOtherData || otherDataLoaded) return;
+    // Deferred so the effect body itself sets no state (react-hooks/set-state-in-effect).
+    const timer = setTimeout(() => {
       loadOtherData();
-    }
-  }, [user, ownerId, mountedTabs, otherDataLoaded]);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [user, ownerId, mountedTabs, otherDataLoaded, loadOtherData]);
 
   // Load cashflow history start year from user settings (one-time read per session)
   useEffect(() => {

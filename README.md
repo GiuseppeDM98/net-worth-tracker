@@ -219,7 +219,6 @@ For contributors and AI agents, the repo keeps its guidance split by scope:
 | [`doc/guide/`](doc/guide/) | One file per domain (a page, a tab, a subsystem) — the full rules and blind spots for that area |
 | [`DESIGN.md`](DESIGN.md) | The aesthetic spec (normative) |
 | [`PRODUCT.md`](PRODUCT.md) · [`SETUP.md`](SETUP.md) · [`WORKFLOW.md`](WORKFLOW.md) | Positioning · environment/emulators · session rules |
-| [`doc/redesign-prompts.md`](doc/redesign-prompts.md) | Ready-to-paste prompts for the page-by-page redesign propagation |
 
 ## Tech Stack
 

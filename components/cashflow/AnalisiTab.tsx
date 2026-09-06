@@ -444,7 +444,7 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
         anomalies,
         anomalyMonth: singleMonth,
       }),
-    [period, today, historyStartYear, totals, pacing, baseline, expenseSlices, movers, anomalies, singleMonth],
+    [period, today, historyStartYear, totals, scheduled, pacing, baseline, expenseSlices, movers, anomalies, singleMonth],
   );
 
   const periodoReading = describePeriodCashflow(

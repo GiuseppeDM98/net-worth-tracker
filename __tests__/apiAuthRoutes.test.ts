@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
+import type { Asset } from '@/types/assets';
 
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/firebase/config', () => ({
@@ -200,7 +201,7 @@ vi.mock('@/lib/services/assetService', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/services/assetService')>();
   return {
     ...actual,
-    calculateAssetValue: vi.fn((asset: any) => asset.quantity * asset.currentPrice),
+    calculateAssetValue: vi.fn((asset: Asset) => asset.quantity * asset.currentPrice),
     calculateTotalValue: vi.fn(() => 1000),
     calculateLiquidNetWorth: vi.fn(() => 700),
     calculateIlliquidNetWorth: vi.fn(() => 300),

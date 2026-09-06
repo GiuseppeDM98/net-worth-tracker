@@ -24,7 +24,7 @@ import { getSettings } from './assetAllocationService';
 import { getAllAssets } from './assetService';
 import { buildCashFlowMap, monthKey } from '@/lib/utils/cashFlowMap';
 import { endOfMonthBound } from '@/lib/utils/dateHelpers';
-import { computeDividendYieldMetrics } from '@/lib/utils/yieldOnCost';
+import { computeDividendYieldMetrics, type AssetInput, type DividendInput } from '@/lib/utils/yieldOnCost';
 import { buildTwrIndex, computeDrawdownSeries, findMaxDrawdown } from '@/lib/utils/drawdownSeries';
 import {
   resolvePerformanceBaseOptions,
@@ -581,8 +581,8 @@ export function calculateRecoveryTime(
  *          yocDividendsGross/Net report dividends actually received from held assets (display).
  */
 export function calculateYocMetrics(
-  dividends: any[],
-  assets: any[],
+  dividends: DividendInput[],
+  assets: AssetInput[],
   startDate: Date,
   endDate: Date,
   numberOfMonths: number
@@ -648,8 +648,8 @@ export function calculateYocMetrics(
  * @returns Object with Current Yield metrics or null if insufficient data
  */
 export function calculateCurrentYieldMetrics(
-  dividends: any[],
-  assets: any[],
+  dividends: DividendInput[],
+  assets: AssetInput[],
   startDate: Date,
   endDate: Date,
   numberOfMonths: number

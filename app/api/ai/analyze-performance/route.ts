@@ -69,11 +69,41 @@ async function callAnthropicForPerformanceAnalysis(prompt: string) {
         type: 'web_search_20250305',
         name: 'web_search',
         max_uses: 3, // limit to keep latency reasonable
-      } as any,
+      },
     ],
     messages: [{ role: 'user', content: prompt }],
     stream: true,
   });
+}
+
+interface AnthropicFailure {
+  /** `type` of the error body attached to the thrown value, when it carries one. */
+  bodyType?: string;
+  /** `message` of that same error body, when it carries one. */
+  bodyMessage?: string;
+  /** The thrown value's own `message`, the fallback when the body has none. */
+  message?: string;
+}
+
+// Known defect (2026-09-06, kept until the owner decides): with @anthropic-ai/sdk 0.110 the inner
+// type lives on `error.type` and `error.error` is the whole envelope, so the `error.error.type`
+// read below never matches 'overloaded_error' and an overload falls through to the generic branch.
+// The fix (`error instanceof Anthropic.APIError && error.type === …`) changes reachable behaviour.
+/**
+ * Reads a failed request the way this route has always read it: the attached error
+ * body first (`error.error`), the thrown value's own message second. Anything that is
+ * not an object carries nothing and yields the default sentence downstream.
+ */
+function readAnthropicFailure(error: unknown): AnthropicFailure {
+  if (typeof error !== 'object' || error === null) return {};
+  const failure: AnthropicFailure = {};
+  if ('message' in error && typeof error.message === 'string') failure.message = error.message;
+  if (!('error' in error)) return failure;
+  const body = error.error;
+  if (typeof body !== 'object' || body === null) return failure;
+  if ('type' in body && typeof body.type === 'string') failure.bodyType = body.type;
+  if ('message' in body && typeof body.message === 'string') failure.bodyMessage = body.message;
+  return failure;
 }
 
 /**
@@ -83,7 +113,7 @@ async function callAnthropicForPerformanceAnalysis(prompt: string) {
  * Tool use and thinking blocks are silently skipped — only text_delta chunks
  * (Claude's written response) are forwarded to the client.
  */
-function buildPerformanceSseStream(anthropicStream: AsyncIterable<any>): ReadableStream {
+function buildPerformanceSseStream(anthropicStream: AsyncIterable<Anthropic.MessageStreamEvent>): ReadableStream {
   const encoder = new TextEncoder();
   return new ReadableStream({
     async start(controller) {
@@ -97,12 +127,13 @@ function buildPerformanceSseStream(anthropicStream: AsyncIterable<any>): Readabl
         }
         controller.enqueue(encoder.encode('data: [DONE]\n\n'));
         controller.close();
-      } catch (streamError: any) {
+      } catch (streamError: unknown) {
         console.error('[API /ai/analyze-performance] Stream error:', streamError);
+        const failure = readAnthropicFailure(streamError);
         const errorMsg =
-          streamError?.error?.type === 'overloaded_error'
+          failure.bodyType === 'overloaded_error'
             ? 'I server AI sono temporaneamente sovraccarichi. Clicca "Rigenera" per riprovare.'
-            : (streamError?.error?.message || streamError.message || 'Errore durante la generazione');
+            : (failure.bodyMessage || failure.message || 'Errore durante la generazione');
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: errorMsg })}\n\n`));
         controller.enqueue(encoder.encode('data: [DONE]\n\n'));
         controller.close();
@@ -162,16 +193,17 @@ export async function POST(request: NextRequest) {
     let anthropicStream;
     try {
       anthropicStream = await callAnthropicForPerformanceAnalysis(prompt);
-    } catch (apiError: any) {
+    } catch (apiError: unknown) {
       console.error('[API /ai/analyze-performance] Anthropic API error:', apiError);
-      if (apiError?.error?.type === 'overloaded_error') {
+      const failure = readAnthropicFailure(apiError);
+      if (failure.bodyType === 'overloaded_error') {
         return NextResponse.json(
           { error: 'I server AI sono temporaneamente sovraccarichi. Riprova tra qualche secondo.', retryable: true },
           { status: 503 }
         );
       }
       return NextResponse.json(
-        { error: 'Errore nella chiamata AI: ' + (apiError?.error?.message || apiError.message), retryable: false },
+        { error: 'Errore nella chiamata AI: ' + (failure.bodyMessage || failure.message), retryable: false },
         { status: 500 }
       );
     }

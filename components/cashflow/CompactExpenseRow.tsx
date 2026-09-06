@@ -1,11 +1,29 @@
 'use client';
 
-import { Suspense } from 'react';
+import { Suspense, type ComponentType, type LazyExoticComponent } from 'react';
+import type { LucideProps } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { getLazyIcon } from '@/components/expenses/IconPickerPopover';
+import { CATEGORY_ICON_NAMES } from '@/lib/constants/categoryIcons';
 import type { Expense, ExpenseType } from '@/types/expenses';
+
+/**
+ * Every category icon as a lazy component, resolved ONCE at module load through
+ * `getLazyIcon`, so the feed, the drawer, the table and the picker share one cache and no
+ * chunk is requested until an icon is rendered. In render an icon is a plain lookup: a
+ * component obtained from a CALL during render is a new type every render to the React
+ * Compiler (`react-hooks/static-components`), even when the callee caches it. This map and
+ * `IconPickerPopover`'s `LAZY_ICONS` are two views over the same instances; they can be folded into one.
+ */
+export const LAZY_CATEGORY_ICONS: Partial<Record<string, LazyExoticComponent<ComponentType<LucideProps>>>> =
+  Object.fromEntries(
+    CATEGORY_ICON_NAMES.flatMap((name) => {
+      const Icon = getLazyIcon(name);
+      return Icon ? [[name, Icon] as const] : [];
+    }),
+  );
 
 // Tailwind dot-color classes keyed by expense type.
 // All entries use semantic token references to stay theme-aware across all 6 colour themes;
@@ -63,7 +81,7 @@ export function CompactExpenseRow({
     >
       {/* Category icon badge or type dot */}
       {(() => {
-        const CatIcon = categoryIcon ? getLazyIcon(categoryIcon) : null;
+        const CatIcon = categoryIcon ? LAZY_CATEGORY_ICONS[categoryIcon] : undefined;
         if (CatIcon) {
           return (
             <div

@@ -17,7 +17,7 @@
  * so re-deriving equivalent drafts never reads as an unsaved change.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { getDefaultTargets, setSettings } from '@/lib/services/assetAllocationService';
@@ -48,11 +48,30 @@ import type { Settings } from '@/types/settings';
 
 const DEFAULT_COAST_RETIREMENT_AGE = 60;
 
+interface DraftState {
+  userAge: string;
+  retirementAge: string;
+  useCustomExpenses: boolean;
+  customExpenses: string;
+  pensions: CoastFirePensionDraft[];
+  taxBrackets: CoastFireTaxBracketDraft[];
+}
+
+/** The form before the settings have loaded — the shape every field started from. */
+const BLANK_DRAFT: DraftState = {
+  userAge: '',
+  retirementAge: String(DEFAULT_COAST_RETIREMENT_AGE),
+  useCustomExpenses: false,
+  customExpenses: '',
+  pensions: [],
+  taxBrackets: [],
+};
+
 /**
- * The saved settings as form strings. One function, so the load effect and the "Annulla" button
- * cannot drift apart — they used to be two copies of the same six assignments.
+ * The saved settings as form strings. One function, so the seed and the "Annulla" button cannot
+ * drift apart — they used to be two copies of the same six assignments.
  */
-function toDraftState(settings: Settings | null | undefined) {
+function toDraftState(settings: Settings | null | undefined): DraftState {
   return {
     userAge: settings?.userAge !== undefined ? String(settings.userAge) : '',
     retirementAge: String(settings?.coastFireRetirementAge ?? DEFAULT_COAST_RETIREMENT_AGE),
@@ -117,26 +136,36 @@ export function useCoastFireSettingsDraft({
 }: UseCoastFireSettingsDraftInput): CoastFireSettingsDraft {
   const queryClient = useQueryClient();
 
-  const [userAge, setUserAge] = useState('');
-  const [retirementAge, setRetirementAge] = useState(String(DEFAULT_COAST_RETIREMENT_AGE));
-  const [useCustomExpenses, setUseCustomExpensesState] = useState(false);
-  const [customExpenses, setCustomExpenses] = useState('');
-  const [pensions, setPensions] = useState<CoastFirePensionDraft[]>([]);
-  const [taxBrackets, setTaxBrackets] = useState<CoastFireTaxBracketDraft[]>([]);
+  // The draft is stored WITH the settings it was seeded from and read back only while those are
+  // still the saved ones: a new document (a save, another account) falls back to its own seed
+  // with no effect re-seeding six fields (react-hooks/set-state-in-effect). While the settings
+  // load the seed is the blank form, exactly as the initial state used to be.
+  const seed = useMemo(
+    () => (isLoadingSettings ? BLANK_DRAFT : toDraftState(settings)),
+    [isLoadingSettings, settings]
+  );
+  const [draft, setDraft] = useState<{ seed: DraftState; values: DraftState } | null>(null);
+  const values = draft?.seed === seed ? draft.values : seed;
+  const { userAge, retirementAge, useCustomExpenses, customExpenses, pensions, taxBrackets } = values;
+
+  /** Applies an edit to the current draft, seeding it from `seed` when it is the first one. */
+  const updateDraft = (patch: (current: DraftState) => Partial<DraftState>) =>
+    setDraft((previous) => {
+      const current = previous?.seed === seed ? previous.values : seed;
+      return { seed, values: { ...current, ...patch(current) } };
+    });
+  const setUserAge = (value: string) => updateDraft(() => ({ userAge: value }));
+  const setRetirementAge = (value: string) => updateDraft(() => ({ retirementAge: value }));
+  const setUseCustomExpensesState = (value: boolean) =>
+    updateDraft(() => ({ useCustomExpenses: value }));
+  const setCustomExpenses = (value: string) => updateDraft(() => ({ customExpenses: value }));
+  const setPensions = (update: (current: CoastFirePensionDraft[]) => CoastFirePensionDraft[]) =>
+    updateDraft((current) => ({ pensions: update(current.pensions) }));
+  const setTaxBrackets = (
+    update: (current: CoastFireTaxBracketDraft[]) => CoastFireTaxBracketDraft[]
+  ) => updateDraft((current) => ({ taxBrackets: update(current.taxBrackets) }));
 
   const savedRetirementAge = settings?.coastFireRetirementAge ?? DEFAULT_COAST_RETIREMENT_AGE;
-
-  useEffect(() => {
-    if (isLoadingSettings) return;
-
-    const draft = toDraftState(settings);
-    setUserAge(draft.userAge);
-    setRetirementAge(draft.retirementAge);
-    setUseCustomExpensesState(draft.useCustomExpenses);
-    setCustomExpenses(draft.customExpenses);
-    setPensions(draft.pensions);
-    setTaxBrackets(draft.taxBrackets);
-  }, [isLoadingSettings, settings]);
 
   const parsedCurrentAge = parseOptionalInteger(userAge);
   const parsedRetirementAgeRaw = parseOptionalInteger(retirementAge);
@@ -284,13 +313,8 @@ export function useCoastFireSettingsDraft({
     },
     resetToSaved: () => {
       if (isLoadingSettings) return;
-      const draft = toDraftState(settings);
-      setUserAge(draft.userAge);
-      setRetirementAge(draft.retirementAge);
-      setUseCustomExpensesState(draft.useCustomExpenses);
-      setCustomExpenses(draft.customExpenses);
-      setPensions(draft.pensions);
-      setTaxBrackets(draft.taxBrackets);
+      // Dropping the draft reads the saved seed again — the same six assignments, derived.
+      setDraft(null);
     },
   };
 }

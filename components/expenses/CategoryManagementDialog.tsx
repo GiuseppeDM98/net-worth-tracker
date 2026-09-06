@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, Suspense } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -41,8 +41,8 @@ import { toast } from 'sonner';
 import { Plus, X, ArrowRightLeft, Check, Tag } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { CategoryMoveDialog } from './CategoryMoveDialog';
-import { IconPickerPopover, getLazyIcon } from './IconPickerPopover';
-import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
+import { IconPickerPopover, CategoryIcon } from './IconPickerPopover';
+import { CATEGORY_ICONS } from '@/lib/constants/categoryIcons';
 import { cn } from '@/lib/utils';
 
 
@@ -142,8 +142,9 @@ function CategoryFormBody({
   const selectedName  = useWatch({ control, name: 'name' });
   const subInputRef   = useRef<HTMLInputElement>(null);
 
-  // Resolve the icon for the live preview
-  const PreviewIcon = selectedIcon ? getLazyIcon(selectedIcon) : null;
+  // The live preview shows the icon only for a name in the curated set (an unknown name keeps
+  // the coloured tag); the component itself is read from the module-level map by `CategoryIcon`.
+  const hasPreviewIcon = !!selectedIcon && !!CATEGORY_ICONS[selectedIcon];
 
   return (
     <div className="space-y-6">
@@ -154,10 +155,14 @@ function CategoryFormBody({
           style={{ backgroundColor: selectedColor ? `${selectedColor}20` : 'var(--muted)' }}
           aria-label="Anteprima categoria"
         >
-          {PreviewIcon ? (
-            <Suspense fallback={<Tag className="h-6 w-6 text-muted-foreground" aria-hidden="true" />}>
-              <PreviewIcon className="h-6 w-6" style={{ color: selectedColor ?? 'var(--muted-foreground)' }} aria-hidden="true" />
-            </Suspense>
+          {hasPreviewIcon ? (
+            <CategoryIcon
+              name={selectedIcon}
+              fallback={<Tag className="h-6 w-6 text-muted-foreground" aria-hidden="true" />}
+              className="h-6 w-6"
+              style={{ color: selectedColor ?? 'var(--muted-foreground)' }}
+              aria-hidden="true"
+            />
           ) : (
             <Tag className="h-6 w-6" style={{ color: selectedColor ?? 'var(--muted-foreground)' }} aria-hidden="true" />
           )}
@@ -412,7 +417,6 @@ export function CategoryManagementDialog({
 }: Readonly<CategoryManagementDialogProps>) {
   const { user } = useAuth();
   const { ownerId } = useActiveAccount();
-  const isMobile = useMediaQuery('(max-width: 768px)');
 
   const [subCategories, setSubCategories] = useState<ExpenseSubCategory[]>([]);
   const [newSubCategoryName, setNewSubCategoryName] = useState('');
@@ -434,8 +438,20 @@ export function CategoryManagementDialog({
   // known yet: the boundary options stay disabled until the fetch resolves, so a
   // slow or failed count can never let a corrupting conversion through.
   const [linkedExpenseCount, setLinkedExpenseCount] = useState<number | null>(null);
-  useEffect(() => {
+  // The count belongs to ONE (open, category, owner) triple: it goes back to "not known" the
+  // moment any of them changes, during render (React's "adjusting state when a prop changes")
+  // rather than in the effect, which only issues the fetch — a setter called synchronously in
+  // an effect body is banned by `react-hooks/set-state-in-effect`.
+  const [countSubject, setCountSubject] = useState<{
+    open: boolean;
+    category: ExpenseCategory | null | undefined;
+    ownerId: string | null | undefined;
+  } | null>(null);
+  if (!countSubject || countSubject.open !== open || countSubject.category !== category || countSubject.ownerId !== ownerId) {
+    setCountSubject({ open, category, ownerId });
     setLinkedExpenseCount(null);
+  }
+  useEffect(() => {
     if (!open || !category || !ownerId) return;
     getExpenseCountByCategoryId(category.id, ownerId)
       .then(setLinkedExpenseCount)
@@ -448,18 +464,40 @@ export function CategoryManagementDialog({
   });
   const { handleSubmit, reset, formState: { isSubmitting } } = form;
 
+  // The subcategory list and the new-subcategory draft follow the opened record: they are
+  // adjusted during render when the record (or one of the initial values) changes, and the
+  // form itself is reset in the effect below — `reset` is not a state setter.
+  const [resetSubject, setResetSubject] = useState<{
+    open: boolean;
+    category: ExpenseCategory | null | undefined;
+    initialType: ExpenseType | undefined;
+    initialName: string | undefined;
+    initialSubCategoryName: string | undefined;
+  } | null>(null);
+  if (
+    !resetSubject ||
+    resetSubject.open !== open ||
+    resetSubject.category !== category ||
+    resetSubject.initialType !== initialType ||
+    resetSubject.initialName !== initialName ||
+    resetSubject.initialSubCategoryName !== initialSubCategoryName
+  ) {
+    setResetSubject({ open, category, initialType, initialName, initialSubCategoryName });
+    if (open) {
+      setSubCategories(category ? category.subCategories || [] : []);
+      setNewSubCategoryName(initialSubCategoryName || '');
+      setNewSubCategoryIcon(undefined);
+    }
+  }
+
   // Reset form whenever open/category changes
   useEffect(() => {
     if (!open) return;
     if (category) {
       reset({ name: category.name, type: category.type, color: category.color || '#3b82f6', icon: category.icon });
-      setSubCategories(category.subCategories || []);
     } else {
       reset({ name: initialName || '', type: initialType || 'variable', color: '#3b82f6', icon: undefined });
-      setSubCategories([]);
     }
-    setNewSubCategoryName(initialSubCategoryName || '');
-    setNewSubCategoryIcon(undefined);
   }, [open, category, reset, initialType, initialName, initialSubCategoryName]);
 
   // ---- Subcategory handlers ----

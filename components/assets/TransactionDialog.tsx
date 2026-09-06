@@ -185,11 +185,31 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
   const fees = useWatch({ control, name: 'fees' });
   const linkedCashAssetId = useWatch({ control, name: 'linkedCashAssetId' });
 
+  // The status line belongs to one opening over one trade: it goes back to idle during render
+  // when that subject changes (React's "adjusting state when a prop changes") — the same
+  // moments the reset effect below fires — never from the effect itself
+  // (`react-hooks/set-state-in-effect`).
+  const [statusSubject, setStatusSubject] = useState<{
+    open: boolean;
+    transaction: AssetTransaction | null | undefined;
+    isBondPctMode: boolean;
+    bondNominal: number | undefined;
+  } | null>(null);
+  if (
+    !statusSubject ||
+    statusSubject.open !== open ||
+    statusSubject.transaction !== transaction ||
+    statusSubject.isBondPctMode !== isBondPctMode ||
+    statusSubject.bondNominal !== bondNominal
+  ) {
+    setStatusSubject({ open, transaction, isBondPctMode, bondNominal });
+    if (open) setStatus({ phase: 'idle' });
+  }
+
   // Reset on open (Dialog Form Reset Pattern): include `open` in deps + `if (!open) return`, and
   // enumerate EVERY field in the new-record branch so stale values never carry across opens.
   useEffect(() => {
     if (!open) return;
-    setStatus({ phase: 'idle' });
     if (transaction) {
       const toBI = (eurVal: number) =>
         isBondPctMode && bondNominal ? eurVal / (bondNominal / 100) : eurVal;

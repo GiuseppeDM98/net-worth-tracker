@@ -2,13 +2,14 @@
  * Dialog for assigning an asset (by percentage) to a goal.
  * Shows available assets with their total value and already-assigned percentages.
  *
- * Bug fix: reset used useState(initializer) which only fires once.
- * Corrected to useEffect([open]) with guard `if (!open) return`.
+ * The reset runs on every opening: a useState initializer fires once per mount, and an effect
+ * setting state is banned (react-hooks/set-state-in-effect), so it is an adjust-during-render
+ * keyed on `open`.
  */
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Asset } from '@/types/assets';
 import { GoalAssetAssignment } from '@/types/goals';
 import { getAvailablePercentage } from '@/lib/services/goalService';
@@ -43,13 +44,18 @@ export function AssetAssignmentDialog({
   const [percentage, setPercentage] = useState('');
   const [saving, setSaving] = useState(false);
 
-  // Reset fields each time the dialog opens; guard prevents reset on close
-  useEffect(() => {
-    if (!open) return;
-    setSearchTerm('');
-    setSelectedAssetId(null);
-    setPercentage('');
-  }, [open]);
+  // Reset fields each time the dialog opens, during render (React's adjust-state-during-render)
+  // rather than in an effect (react-hooks/set-state-in-effect): the blank form is the one
+  // painted, never the previous draft for a frame. Closing keeps the draft, as before.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) {
+      setSearchTerm('');
+      setSelectedAssetId(null);
+      setPercentage('');
+    }
+  }
 
   const filteredAssets = useMemo(() => {
     const term = searchTerm.toLowerCase();

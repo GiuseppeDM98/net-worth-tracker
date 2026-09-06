@@ -159,7 +159,8 @@ export interface AssistantMemoryResponse extends AssistantMemoryDocument {
   hasDummySnapshots: boolean;
 }
 
-export interface AssistantThreadResponse extends AssistantThreadDetail {}
+// The GET endpoint returns the thread detail as-is; the alias keeps the wire type nameable.
+export type AssistantThreadResponse = AssistantThreadDetail;
 
 export interface AssistantCreateThreadInput {
   userId: string;

@@ -88,7 +88,7 @@ const monthOf = (expense: Expense): { year: number; month: number } => {
 };
 
 /**
- * Sign classes for a delta, with spending semantics inverted (DESIGN.md positiveGood rule):
+ * Sign classes for a delta, with spending semantics inverted (DESIGN.md § Do: `positiveGood`):
  * spending UP is bad, income UP is good. Shared by the year rows and the subcategory rows so
  * the two can never disagree on a colour.
  */

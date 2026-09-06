@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 
 export interface UseCountUpOptions {
   /** Delay in ms before animation starts. Default: 60 */
@@ -22,6 +22,68 @@ export interface UseCountUpOptions {
 }
 
 /**
+ * The animation as one piece of state, keyed on the target it answers to.
+ *
+ * `target` is the subject; `value` the number on screen; `from` is non-null while an animation
+ * from that number to `target` is pending or running (the effect below drives it); `hasAnimated`
+ * is the once-mode latch, set only when a real (non-zero) count-up completes.
+ */
+interface CountUpState {
+  target: number | null;
+  value: number | null;
+  from: number | null;
+  hasAnimated: boolean;
+}
+
+const INITIAL_STATE: CountUpState = { target: null, value: null, from: null, hasAnimated: false };
+
+function prefersReducedMotion(): boolean {
+  return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+/**
+ * Where a new target lands BEFORE any animation frame: the immediate value and whether a
+ * count-up follows. Pure, so the decision is taken during render (React's adjust-state-during-
+ * render pattern) instead of in an effect — a synchronous setState in an effect is banned by
+ * react-hooks/set-state-in-effect, and every branch here used to be one.
+ */
+function settleTarget(
+  previous: CountUpState,
+  target: number | null,
+  once: boolean,
+  fromPrevious: boolean
+): CountUpState {
+  // No value to show; the next target starts from zero again (the seeds reset with it).
+  if (target === null) {
+    return { target: null, value: null, from: null, hasAnimated: previous.hasAnimated };
+  }
+
+  // Already animated once — update silently without re-animating. Handles cases like a
+  // snapshot overwrite where the underlying data changes after mount.
+  if (once && previous.hasAnimated) {
+    return { target, value: target, from: null, hasAnimated: true };
+  }
+
+  // A zero target jumps immediately without counting as "animated" in once-mode: during the
+  // loading phase every metric computes to 0 from empty assets, and the animation must fire
+  // when the real data arrives, not on that phase.
+  if (target === 0 && !fromPrevious) {
+    return { target, value: 0, from: null, hasAnimated: previous.hasAnimated };
+  }
+
+  if (prefersReducedMotion()) {
+    return { target, value: target, from: null, hasAnimated: previous.hasAnimated || once };
+  }
+
+  const startValue = fromPrevious ? previous.value ?? previous.target ?? 0 : 0;
+  if (startValue === target) {
+    return { target, value: target, from: null, hasAnimated: previous.hasAnimated || once };
+  }
+
+  return { target, value: startValue, from: startValue, hasAnimated: previous.hasAnimated };
+}
+
+/**
  * Animates a numeric value from 0 to the target over ~700ms using ease-out-quart.
  * Respects prefers-reduced-motion.
  *
@@ -34,97 +96,58 @@ export function useCountUp(
 ): number | null {
   const { startDelay = 60, duration = 500, once = false, fromPrevious = false } = options;
 
-  const [current, setCurrent] = useState<number | null>(null);
-  const rafRef = useRef<number | undefined>(undefined);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const hasAnimatedRef = useRef(false);
-  const currentRef = useRef<number | null>(null);
-  const previousTargetRef = useRef<number | null>(null);
+  const [state, setState] = useState<CountUpState>(INITIAL_STATE);
 
-  const updateCurrent = (nextValue: number | null) => {
-    currentRef.current = nextValue;
-    setCurrent(nextValue);
-  };
+  // A new target is settled on the render that brings it: React re-renders at once with the
+  // new state, so the old number is never painted under the new target.
+  if (!Object.is(state.target, target)) {
+    setState(settleTarget(state, target, once, fromPrevious));
+  }
 
+  const { from, target: animatingTo } = state;
+
+  // The count-up itself: the only writer that runs outside render, one frame at a time. Keyed on
+  // the pair (from, target) and not on the whole state, so its own ticks never restart it.
   useEffect(() => {
-    // When `once` is true, skip any re-trigger after the first meaningful animation.
-    // "Meaningful" = target is non-zero (target=0 during loading is ignored so that
-    // the animation fires when real data arrives, not during the empty-assets phase).
-    if (once && hasAnimatedRef.current) {
-      // Already animated once — update value silently without re-animating.
-      // Handles cases like snapshot overwrite where underlying data changes after mount.
-      updateCurrent(target);
-      previousTargetRef.current = target;
-      return;
-    }
-
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    if (timerRef.current) clearTimeout(timerRef.current);
-
-    if (target === null) {
-      updateCurrent(null);
-      previousTargetRef.current = null;
-      return;
-    }
-
-    // For zero targets, jump immediately without counting as "animated" in once-mode.
-    // This handles the loading phase where all metrics compute to 0 from empty assets.
-    if (target === 0 && !fromPrevious) {
-      updateCurrent(0);
-      previousTargetRef.current = 0;
-      return;
-    }
-
-    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      updateCurrent(target);
-      previousTargetRef.current = target;
-      if (once) hasAnimatedRef.current = true;
-      return;
-    }
-
-    const startValue = fromPrevious
-      ? currentRef.current ?? previousTargetRef.current ?? 0
-      : 0;
-
-    if (startValue === target) {
-      updateCurrent(target);
-      previousTargetRef.current = target;
-      if (once) hasAnimatedRef.current = true;
-      return;
-    }
+    if (from === null || animatingTo === null) return;
 
     let startTime: number | null = null;
-    updateCurrent(startValue);
+    let rafId: number | undefined;
 
-    timerRef.current = setTimeout(() => {
+    const timer = setTimeout(() => {
       const tick = (now: number) => {
         if (startTime === null) startTime = now;
         const elapsed = now - startTime;
         const progress = Math.min(elapsed / duration, 1);
         // ease-out-quart: fast start, smooth deceleration
         const eased = 1 - Math.pow(1 - progress, 4);
-        const nextValue = progress >= 1
-          ? target
-          : startValue + (target - startValue) * eased;
-        updateCurrent(nextValue);
-        if (progress < 1) {
-          rafRef.current = requestAnimationFrame(tick);
-        } else if (once) {
-          // Mark as animated only after completing a real (non-zero) animation
-          hasAnimatedRef.current = true;
-        }
+        const nextValue = progress >= 1 ? animatingTo : from + (animatingTo - from) * eased;
+        const finished = progress >= 1;
+
+        setState((previous) => {
+          // A newer target has already replaced this animation: its cleanup cancelled the
+          // frame, but a tick queued before it could still land — leave the new state alone.
+          if (previous.target !== animatingTo || previous.from !== from) return previous;
+          return {
+            ...previous,
+            value: nextValue,
+            from: finished ? null : previous.from,
+            // Mark as animated only after completing a real (non-zero) animation
+            hasAnimated: finished && once ? true : previous.hasAnimated,
+          };
+        });
+
+        if (!finished) rafId = requestAnimationFrame(tick);
       };
-      rafRef.current = requestAnimationFrame(tick);
+      rafId = requestAnimationFrame(tick);
     }, startDelay);
 
-    previousTargetRef.current = target;
-
     return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      if (timerRef.current) clearTimeout(timerRef.current);
+      clearTimeout(timer);
+      if (rafId !== undefined) cancelAnimationFrame(rafId);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [target]);
+  }, [from, animatingTo, duration, startDelay, once]);
 
-  return current;
+  // Null is the absence of a value: derived from the target, never waited for.
+  return target === null ? null : state.value;
 }

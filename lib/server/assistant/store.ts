@@ -1,5 +1,5 @@
 import { adminDb } from '@/lib/firebase/admin';
-import { FieldValue, Timestamp } from 'firebase-admin/firestore';
+import { DocumentData, FieldValue, Timestamp } from 'firebase-admin/firestore';
 import {
   AssistantGoalEvaluationResult,
   AssistantCreateThreadInput,
@@ -50,7 +50,7 @@ function buildThreadTitleFromPrompt(prompt: string, mode: AssistantMode): string
   return collapsedPrompt.slice(0, 60);
 }
 
-function mapThread(docId: string, data: Record<string, any>): AssistantThread {
+function mapThread(docId: string, data: DocumentData): AssistantThread {
   return {
     id: docId,
     userId: data.userId,
@@ -65,7 +65,7 @@ function mapThread(docId: string, data: Record<string, any>): AssistantThread {
   };
 }
 
-function mapMessage(threadId: string, docId: string, data: Record<string, any>): AssistantMessage {
+function mapMessage(threadId: string, docId: string, data: DocumentData): AssistantMessage {
   return {
     id: docId,
     threadId,
@@ -79,7 +79,7 @@ function mapMessage(threadId: string, docId: string, data: Record<string, any>):
   };
 }
 
-function mapMemoryItem(doc: Record<string, any>, userId: string): AssistantMemoryItem {
+function mapMemoryItem(doc: DocumentData, userId: string): AssistantMemoryItem {
   return {
     id: doc.id,
     userId,
@@ -99,7 +99,7 @@ function mapMemoryItem(doc: Record<string, any>, userId: string): AssistantMemor
   };
 }
 
-function mapMemorySuggestion(doc: Record<string, any>, userId: string): AssistantMemorySuggestion {
+function mapMemorySuggestion(doc: DocumentData, userId: string): AssistantMemorySuggestion {
   return {
     id: doc.id,
     userId,
@@ -221,7 +221,7 @@ export async function getAssistantThread(threadId: string, userId: string): Prom
     throw new AssistantStoreError(404, 'Thread non trovato');
   }
 
-  const thread = mapThread(threadSnapshot.id, threadSnapshot.data() as Record<string, any>);
+  const thread = mapThread(threadSnapshot.id, threadSnapshot.data() as DocumentData);
 
   if (thread.userId !== userId) {
     throw new AssistantStoreError(403, 'Thread non appartenente all’utente autenticato');
@@ -316,7 +316,7 @@ export async function getAssistantMemoryDocument(userId: string): Promise<Assist
     };
   }
 
-  const data = memorySnapshot.data() as Record<string, any>;
+  const data = memorySnapshot.data() as DocumentData;
   const storedPreferences = data.preferences ?? {};
 
   return {
@@ -329,10 +329,10 @@ export async function getAssistantMemoryDocument(userId: string): Promise<Assist
         storedPreferences.includeDummySnapshots ?? syncedPreferences.includeDummySnapshots,
     },
     items: Array.isArray(data.items)
-      ? data.items.map((item: Record<string, any>) => mapMemoryItem(item, userId))
+      ? data.items.map((item: DocumentData) => mapMemoryItem(item, userId))
       : [],
     suggestions: Array.isArray(data.suggestions)
-      ? data.suggestions.map((suggestion: Record<string, any>) => mapMemorySuggestion(suggestion, userId))
+      ? data.suggestions.map((suggestion: DocumentData) => mapMemorySuggestion(suggestion, userId))
       : [],
     updatedAt: data.updatedAt ? toDate(data.updatedAt) : null,
   };
@@ -546,7 +546,7 @@ export async function applyAssistantMemoryMutations(
   return adminDb.runTransaction(async (tx) => {
     // The only read in this transaction — must precede the tx.set below.
     const snapshot = await tx.get(memoryRef);
-    const data = snapshot.exists ? (snapshot.data() as Record<string, any>) : null;
+    const data = snapshot.exists ? (snapshot.data() as DocumentData) : null;
     const storedPreferences = data?.preferences ?? {};
     const preferences: AssistantPreferences = {
       responseStyle: storedPreferences.responseStyle ?? syncedPreferences.responseStyle,
@@ -556,10 +556,10 @@ export async function applyAssistantMemoryMutations(
     };
 
     let items: AssistantMemoryItem[] = Array.isArray(data?.items)
-      ? data!.items.map((item: Record<string, any>) => mapMemoryItem(item, userId))
+      ? data!.items.map((item: DocumentData) => mapMemoryItem(item, userId))
       : [];
     let suggestions: AssistantMemorySuggestion[] = Array.isArray(data?.suggestions)
-      ? data!.suggestions.map((s: Record<string, any>) => mapMemorySuggestion(s, userId))
+      ? data!.suggestions.map((s: DocumentData) => mapMemorySuggestion(s, userId))
       : [];
 
     const now = Timestamp.now();

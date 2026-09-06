@@ -16,7 +16,7 @@ const {
 }));
 
 // Per-collection doc/query mocks — filled per-test in adminDb mock
-const collectionMocks: Record<string, any> = {};
+const collectionMocks: Record<string, unknown> = {};
 
 vi.mock('@/lib/firebase/admin', () => ({
   adminDb: {
@@ -61,19 +61,19 @@ import {
   runExpenseCreation,
   runNextCouponScheduling,
 } from '@/lib/server/dividendProcessor';
-import { Timestamp } from 'firebase-admin/firestore';
+import { Timestamp, type QueryDocumentSnapshot } from 'firebase-admin/firestore';
 import { getFollowingCouponDate } from '@/lib/utils/couponUtils';
 
 // Helper: create a minimal Firestore-like QueryDocumentSnapshot
 function makeUserDoc(id: string) {
-  return { id } as any;
+  return { id } as unknown as QueryDocumentSnapshot;
 }
 
-function makeQuerySnapshot(docs: any[]) {
+function makeQuerySnapshot(docs: unknown[]) {
   return { docs, empty: docs.length === 0, size: docs.length };
 }
 
-function makeAssetDoc(data: Record<string, any>) {
+function makeAssetDoc(data: Record<string, unknown>) {
   return {
     exists: true,
     id: data.id,
@@ -81,11 +81,11 @@ function makeAssetDoc(data: Record<string, any>) {
   };
 }
 
-function makeDocRef(docData: any) {
+function makeDocRef(docData: unknown) {
   return { get: vi.fn().mockResolvedValue(docData) };
 }
 
-function makeCollection(queryResult: any) {
+function makeCollection(queryResult: unknown) {
   const chain = {
     where: vi.fn(() => chain),
     orderBy: vi.fn(() => chain),
@@ -203,7 +203,7 @@ describe('runExpenseCreation', () => {
     };
   }
 
-  function makeDividendDoc(overrides: Record<string, any>) {
+  function makeDividendDoc(overrides: Record<string, unknown>) {
     return {
       id: overrides.id ?? 'div-1',
       data: () => ({
@@ -353,7 +353,7 @@ describe('runNextCouponScheduling', () => {
       makeQuerySnapshot([makeCouponDoc(() => new Date('2026-06-10T00:00:00.000Z'))])
     );
     makeBondAsset(new Date('2020-01-01')); // already matured
-    (getFollowingCouponDate as any).mockReturnValue(null);
+    vi.mocked(getFollowingCouponDate).mockReturnValue(null);
 
     const result = await runNextCouponScheduling([makeUserDoc('u1')], todayStart, todayEnd, lookbackStart);
 
@@ -364,7 +364,7 @@ describe('runNextCouponScheduling', () => {
 
   it('skips when the upcoming coupon already exists (idempotency)', async () => {
     // The next coupon is in the future and already stored → chain healed, nothing to do.
-    (getFollowingCouponDate as any).mockReturnValue(futureDate);
+    vi.mocked(getFollowingCouponDate).mockReturnValue(futureDate);
     isDuplicateDividendMock.mockResolvedValue(true);
     collectionMocks['dividends'] = makeCollection(
       makeQuerySnapshot([makeCouponDoc(() => new Date('2026-06-10T00:00:00.000Z'))])
@@ -379,7 +379,7 @@ describe('runNextCouponScheduling', () => {
   });
 
   it('schedules the next coupon for a coupon paid today', async () => {
-    (getFollowingCouponDate as any).mockReturnValue(futureDate);
+    vi.mocked(getFollowingCouponDate).mockReturnValue(futureDate);
     isDuplicateDividendMock.mockResolvedValue(false);
     createDividendMock.mockResolvedValue('next-coupon-id');
     collectionMocks['dividends'] = makeCollection(
@@ -397,7 +397,7 @@ describe('runNextCouponScheduling', () => {
   it('heals the chain from a coupon whose payment date already passed', async () => {
     // A coupon dated a few days ago was never advanced; its successor (future)
     // is missing and must be created so the bond has an upcoming coupon again.
-    (getFollowingCouponDate as any).mockReturnValue(futureDate);
+    vi.mocked(getFollowingCouponDate).mockReturnValue(futureDate);
     isDuplicateDividendMock.mockResolvedValue(false);
     createDividendMock.mockResolvedValue('healed-coupon-id');
     collectionMocks['dividends'] = makeCollection(

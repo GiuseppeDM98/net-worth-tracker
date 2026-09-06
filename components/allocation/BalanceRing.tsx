@@ -5,7 +5,8 @@
  *
  * WHY a ring, when the rule is «flat rows over donuts»: the score is ONE figure on a 0-100 scale,
  * and the ring is the shape that shows how far it is from 100 without a second number — a
- * part-of-whole read with a single slice, exactly the case DESIGN.md keeps a ring for. The number
+ * part-of-whole read with a single slice — the ONE ring DESIGN.md still keeps (§5 Savings / Metric
+ * Ring Chart: a bounded 0-100 score is not a rate). The number
  * carries the meaning; the arc's colour is reinforcement drawn from the action hues (OK / COMPRA /
  * VENDI through `useActionColors`), never from the sign tokens: a drift is neither a gain nor a
  * loss. The ring is the tile's only consumer of those hues, so resolving them here IS the one

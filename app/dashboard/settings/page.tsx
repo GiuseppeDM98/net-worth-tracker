@@ -30,7 +30,7 @@
 
 'use client';
 
-import React, { Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import React, { Suspense, useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useTheme } from 'next-themes';
@@ -504,92 +504,36 @@ export default function SettingsPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    if (user && ownerId) {
-      loadTargets();
-      loadExpenseCategories();
-      getAllAssets(ownerId).then((assets) =>
-        // Default debit/credit account picker: an actual conto, not just a "cash-class" asset —
-        // a money-market ETF (assetClass 'cash') is not a settlement account. Strict convention
-        // (convenzione stretta, doc/guide/patrimonio.md § Asset Pricing, FX and Assets).
-        setCashAssets(assets.filter((a) => a.type === 'cash' && a.assetClass === 'cash'))
-      );
-    }
-  }, [user, ownerId]);
-
-  // Auto-calculate equity and bonds percentages when age or risk-free rate changes
-  useEffect(() => {
+  // Auto-calculated Azioni/Obbligazioni: the pair is a function of age, risk-free rate and the
+  // other classes' targets (the others are funded out of the equity sleeve, so raising the
+  // crypto target lowers Azioni while Obbligazioni stay at the formula's residual). It is
+  // applied during render (React's adjust-state-during-render) whenever it moved — the two
+  // effects it replaces set the same values, one on age/rate/toggle, one on the other classes
+  // (react-hooks/set-state-in-effect); writing only when something moved is what keeps this
+  // from looping on its own write.
+  if (
+    autoCalculate &&
+    userAge !== undefined &&
+    riskFreeRate !== undefined &&
+    Object.keys(assetClassStates).length > 0
+  ) {
+    const { equityPercentage, bondsPercentage } = resolveAutoEquityBondsSplit(
+      calculateEquityPercentage(userAge, riskFreeRate),
+      sumOtherClassTargets(assetClassStates, cashUseFixedAmount)
+    );
     if (
-      autoCalculate &&
-      userAge !== undefined &&
-      riskFreeRate !== undefined &&
-      Object.keys(assetClassStates).length > 0
+      assetClassStates.equity?.targetPercentage !== equityPercentage ||
+      assetClassStates.bonds?.targetPercentage !== bondsPercentage
     ) {
-      const { equityPercentage, bondsPercentage } = resolveAutoEquityBondsSplit(
-        calculateEquityPercentage(userAge, riskFreeRate),
-        sumOtherClassTargets(assetClassStates, cashUseFixedAmount)
-      );
-
-      // Update equity and bonds percentages
-      setAssetClassStates((prev) => ({
-        ...prev,
-        equity: {
-          ...prev.equity,
-          targetPercentage: equityPercentage,
-        },
-        bonds: {
-          ...prev.bonds,
-          targetPercentage: bondsPercentage,
-        },
-      }));
+      setAssetClassStates({
+        ...assetClassStates,
+        equity: { ...assetClassStates.equity, targetPercentage: equityPercentage },
+        bonds: { ...assetClassStates.bonds, targetPercentage: bondsPercentage },
+      });
     }
-  }, [userAge, riskFreeRate, autoCalculate]);
+  }
 
-  // Recalculate the pair when another asset class changes. Both targets move now, not just
-  // bonds: the other classes are funded out of the equity sleeve, so raising the crypto target
-  // lowers Azioni while Obbligazioni stay at the formula's residual.
-  useEffect(() => {
-    if (
-      autoCalculate &&
-      userAge !== undefined &&
-      riskFreeRate !== undefined &&
-      Object.keys(assetClassStates).length > 0
-    ) {
-      const { equityPercentage, bondsPercentage } = resolveAutoEquityBondsSplit(
-        calculateEquityPercentage(userAge, riskFreeRate),
-        sumOtherClassTargets(assetClassStates, cashUseFixedAmount)
-      );
-
-      // Only update when something actually moved — this effect also runs as a consequence of
-      // its own writes, and an unconditional setState would loop.
-      if (
-        assetClassStates.equity?.targetPercentage !== equityPercentage ||
-        assetClassStates.bonds?.targetPercentage !== bondsPercentage
-      ) {
-        setAssetClassStates((prev) => ({
-          ...prev,
-          equity: {
-            ...prev.equity,
-            targetPercentage: equityPercentage,
-          },
-          bonds: {
-            ...prev.bonds,
-            targetPercentage: bondsPercentage,
-          },
-        }));
-      }
-    }
-  }, [
-    assetClassStates.crypto?.targetPercentage,
-    assetClassStates.realestate?.targetPercentage,
-    assetClassStates.cash?.targetPercentage,
-    assetClassStates.commodity?.targetPercentage,
-    assetClassStates.trendFollowing?.targetPercentage,
-    assetClassStates.carry?.targetPercentage,
-    cashUseFixedAmount,
-  ]);
-
-  const loadTargets = async () => {
+  const loadTargets = useCallback(async () => {
     if (!user || !ownerId) return;
 
     try {
@@ -790,9 +734,9 @@ export default function SettingsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, ownerId]);
 
-  const loadExpenseCategories = async () => {
+  const loadExpenseCategories = useCallback(async () => {
     if (!user || !ownerId) return;
 
     try {
@@ -805,7 +749,25 @@ export default function SettingsPage() {
     } finally {
       setLoadingCategories(false);
     }
-  };
+  }, [user, ownerId]);
+
+  // First load, and again when the viewed account changes (AGENTS → Shared Account: manual
+  // loaders key on ownerId).
+  useEffect(() => {
+    if (!user || !ownerId) return;
+    // Deferred so the effect body itself sets no state (react-hooks/set-state-in-effect).
+    const timer = setTimeout(() => {
+      loadTargets();
+      loadExpenseCategories();
+    }, 0);
+    getAllAssets(ownerId).then((assets) =>
+      // Default debit/credit account picker: an actual conto, not just a "cash-class" asset —
+      // a money-market ETF (assetClass 'cash') is not a settlement account. Strict convention
+      // (convenzione stretta, doc/guide/patrimonio.md § Asset Pricing, FX and Assets).
+      setCashAssets(assets.filter((a) => a.type === 'cash' && a.assetClass === 'cash'))
+    );
+    return () => clearTimeout(timer);
+  }, [user, ownerId, loadTargets, loadExpenseCategories]);
 
   // Refresh categories (the import may have created new ones) and invalidate every
   // Cashflow query key that reads expenses/categories/overview data, so the freshly
@@ -1595,9 +1557,12 @@ export default function SettingsPage() {
     );
   };
 
-  const allocationSnapshotKey = useMemo(
-    () =>
-      JSON.stringify({
+  // The three dirty-state keys are plain strings compared by value with the baselines captured
+  // after the Firestore state is applied. They are NOT wrapped in useMemo on purpose: nothing
+  // consumes them as a value (only `!==` and the save handler), so the React Compiler prunes the
+  // scope and a manual memo becomes one it "could not preserve" (react-hooks/preserve-manual-
+  // memoization). Three small JSON.stringify calls per render cost less than the comparison.
+  const allocationSnapshotKey = JSON.stringify({
         autoCalculate,
         cashUseFixedAmount,
         cashFixedAmount: roundToTwoDecimals(cashFixedAmount),
@@ -1618,13 +1583,9 @@ export default function SettingsPage() {
             })),
           })),
         })),
-      }),
-    [autoCalculate, cashUseFixedAmount, cashFixedAmount, assetClassStates]
-  );
+      });
 
-  const generalSnapshotKey = useMemo(
-    () =>
-      JSON.stringify({
+  const generalSnapshotKey = JSON.stringify({
         userAge: userAge ?? null,
         riskFreeRate: riskFreeRate ?? null,
         includePrimaryResidenceInFIRE,
@@ -1649,43 +1610,12 @@ export default function SettingsPage() {
         weeklyBudgetEmailEnabled,
         monthlyEmailRecipients: [...monthlyEmailRecipients].sort(),
         familyMembers: familyMembersSnapshotValue(parseFamilyMemberDrafts(familyMemberDrafts)),
-      }),
-    [
-      userAge,
-      riskFreeRate,
-      includePrimaryResidenceInFIRE,
-      goalBasedInvestingEnabled,
-      goalDrivenAllocationEnabled,
-      stampDutyEnabled,
-      stampDutyRate,
-      checkingAccountSubCategory,
-      defaultDebitCashAssetId,
-      defaultCreditCashAssetId,
-      cashflowHistoryStartYear,
-      laborIncomeCategoryIds,
-      costCentersEnabled,
-      expenseSplitEnabled,
-      performanceIncludesPensionFunds,
-      performanceIncludesExcludedAssets,
-      pensionReturnStartMonth,
-      monthlyEmailEnabled,
-      quarterlyEmailEnabled,
-      semiAnnualEmailEnabled,
-      yearlyEmailEnabled,
-      weeklyBudgetEmailEnabled,
-      monthlyEmailRecipients,
-      familyMemberDrafts,
-    ]
-  );
+      });
 
-  const dividendSnapshotKey = useMemo(
-    () =>
-      JSON.stringify({
+  const dividendSnapshotKey = JSON.stringify({
         dividendIncomeCategoryId: dividendIncomeCategoryId || '',
         dividendIncomeSubCategoryId: dividendIncomeSubCategoryId || '',
-      }),
-    [dividendIncomeCategoryId, dividendIncomeSubCategoryId]
-  );
+      });
 
   const hasUnsavedAllocationChanges =
     allocationBaselineKey.length > 0 && allocationSnapshotKey !== allocationBaselineKey;

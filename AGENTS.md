@@ -139,7 +139,10 @@ about a domain goes in that domain's guide, never here.
   to the default with no effect and no extra render.
 
 ### Dialog Form Reset
-- The reset `useEffect` must include `open` in its deps and start with `if (!open) return`.
+- The reset `useEffect` must include `open` in its deps and start with `if (!open) return`. It holds ONLY the
+  react-hook-form calls (`reset`, `setValue`, `replaceTiers`); every `useState` setter of the dialog's own UI state
+  (step, status, toggles, a selected id) is settled during render, keyed on `(open, record)` — see *Motion* →
+  `react-hooks/set-state-in-effect` (2026-09-06).
 - The new-record branch must enumerate **every** field, optional ones included, and call `replaceTiers([])` — `reset()`
   does not clear field arrays.
 - **`useWatch()` for render, `getValues()` for handlers — never `watch()`** (incompatible with the React Compiler, which
@@ -226,7 +229,7 @@ about a domain goes in that domain's guide, never here.
 - **In light mode `--card` and `--background` are both `oklch(1 0 0)`**, so a test that proves a modal is «lifted» by
   comparing it with the page background passes only in dark mode. What separates it there is the border and the Float
   shadow; assert the modal's surface equals a TILE's instead.
-- **Blind spot** (looks like a bug, is not): no Playwright spec (the session's throwaway ones were deleted). Four two-click deletes still auto-disarm on a 3 s timer BY DESIGN, because they live on rows and not in modals and the owner kept them (`AssetRow`, `StrumentiTile`, `DividendTable`, `AssistantThreadList`); the ones that moved into the modal vocabulary lost theirs. `describeWriteError` maps 11 Firestore codes and anything else takes the generic sentence, so a NEW cause is invisible until it is added — and a server message survives only if the thrower marks it `userFacingError`, which today only `assetTransactionService` does. The status line is FORM-level: per-field zod errors keep their own line under the field, and the two can both be visible at once. `dialogClassName` still exists as a width escape hatch and has no user — reach for a `width` name. `AssetDialog` and `ExpenseDialog` carry their pre-existing `react-hooks` errors, untouched by the propagation. `PDFExportDialog`'s «Genera PDF» moved from the body into the footer, so a spec that located it inside the scrollable area needs updating.
+- **Blind spot** (looks like a bug, is not): no Playwright spec (the session's throwaway ones were deleted). Four two-click deletes still auto-disarm on a 3 s timer BY DESIGN, because they live on rows and not in modals and the owner kept them (`AssetRow`, `StrumentiTile`, `DividendTable`, `AssistantThreadList`); the ones that moved into the modal vocabulary lost theirs. `describeWriteError` maps 11 Firestore codes and anything else takes the generic sentence, so a NEW cause is invisible until it is added — and a server message survives only if the thrower marks it `userFacingError`, which today only `assetTransactionService` does. The status line is FORM-level: per-field zod errors keep their own line under the field, and the two can both be visible at once. `dialogClassName` still exists as a width escape hatch and has no user — reach for a `width` name. `PDFExportDialog`'s «Genera PDF» moved from the body into the footer, so a spec that located it inside the scrollable area needs updating.
 
 ### Two-Step Create Dialogs (`AssetDialog`, `ExpenseDialog`)
 - `AssetDialog`: step 1 picks the type, step 2 shows only that type's fields; edit reuses the same visibility logic and
@@ -248,8 +251,9 @@ about a domain goes in that domain's guide, never here.
   forms*; a discriminant that only re-labels things does NOT earn a step.
 - **Create opens on step 1, edit skips to step 2** — changing a saved record's type is a different act, with
   reconciliation consequences the in-form notice must explain, so the `Select` stays there and only there.
-- **`setStep(record ? 2 : 1)` belongs in the `open` effect**, not in `useState`'s initializer: without `open` in the deps
-  the record prop stays null between opens and the second "new" reopens on the form.
+- **`setStep(record ? 2 : 1)` is settled during render on the `(open, record)` subject**, never in `useState`'s
+  initializer (the record prop stays null between opens and the second "new" would reopen on the form) and, since
+  2026-09-06, no longer in the `open` effect either (`react-hooks/set-state-in-effect`).
 - **Make the back-link callback OPTIONAL and let its absence select the `Select`** (`onBackToTypePicker?`), so the two
   controls are mutually exclusive by construction rather than via a second boolean that can drift.
 - **The picker is a module-level component**, and the type entry carries `Icon` as the COMPONENT, never a rendered node.
@@ -369,6 +373,10 @@ about a domain goes in that domain's guide, never here.
 ### Dynamic Imports and Module Hygiene
 - **Components must be at module level** — one defined inside a render body is a new type every render, so React
   remounts it (`AnimatePresence` enter never plays, `useEffect([])` re-fires) and the React Compiler throws.
+  **`react-hooks/static-components` flags ANY component obtained from a call during render, a `useMemo(() => lazy(…))`
+  included** (probed 2026-09-06): only a property read of a module constant passes, so the icon pickers keep a
+  module-level map (`LAZY_ICONS` in `IconPickerPopover`, `LAZY_CATEGORY_ICONS` in `CompactExpenseRow` — two views over
+  the same lazy instances, foldable into one; `lazy()` registers a thunk, the chunk still loads on demand).
 - Pure `lib/utils` modules reach `calculateAssetValue` in one of two established ways — check the precedent: **injected**
   as a `valueOf` param (`allocationUtils`, `pensionFire`) or **imported directly** with the test mocking
   `@/lib/firebase/config` + `firebase/firestore` + `authFetch` + `dashboardOverviewInvalidation`.
@@ -399,7 +407,7 @@ file used to carry.
 - Overview data flows through `GET /api/dashboard/overview` + `useDashboardOverview()` only — no page-level fan-out, no full-history expense queries; `dashboardOverviewSummaries/{userId}` is server-owned and every overview-relevant mutation invalidates it. Both endpoints owner-scoped.
 - `topMovers`/`marketEffect` are MARKET return (`q_prev × (u_curr − u_prev)`), never the user's flows; `[]` when the previous snapshot has no `byAsset`, `null` when not attributable (≠ measured 0). Pension funds are their own "Previdenza" line; real estate is measured gross of debt.
 - Every sentence from `overviewNarrative.ts` — a falling month blames the market only when `marketEffect < 0`.
-- Il resto — the hero step-down, the tile grid, `doc/redesign-prompts.md` propagation, the Italian-copy test trap — in `doc/guide/panoramica.md`.
+- Il resto — the hero step-down, the tile grid, the superseded-pattern rule, the Italian-copy test trap — in `doc/guide/panoramica.md`.
 
 ### Patrimonio · Asset Pricing, FX and Assets → `doc/guide/patrimonio.md`
 - "Does this asset have a market price?" is ONE rule in `assetPricing.ts` (`hasMarketPrice`/`requiresManualPricing`); a new hand-valued type goes in `MANUALLY_VALUED_TYPES` and nowhere else.
@@ -560,15 +568,23 @@ file used to carry.
   chevron on an expandable row**; with Radix, `CollapsibleTrigger asChild` propagates `data-state`.
 - **An auto-dismiss timer must live in its OWN `useEffect([visible])`** — in an effect that also depends on data props, a
   refetch cancels the timer, the re-run hits the guard without re-arming, and the badge sticks.
-- **`react-hooks/set-state-in-effect`**: defer a synchronous `setState` with `setTimeout(…, 0)` (returning the cleanup).
-  The classic `mounted` guard is therefore banned — use `useSyncExternalStore(neverChanges, () => true, () => false)`,
-  which declares the SSR/hydration split in the signature.
+- **`react-hooks/set-state-in-effect` — four answers, in this order** (the 36 remaining cases went this way on
+  2026-09-06; lint is at zero and stays there): (1) derive it — `useMemo`, or delete the state when it equals a form
+  field; (2) store the state WITH its subject (`useState<{ key, value } | null>`, → *React Query and Derived State*);
+  (3) settle it DURING render — `const [prev, setPrev] = useState(x); if (prev !== x) { setPrev(x); setDep(…) }`, before
+  any early return, dependent state only — which is how every dialog now resets on `(open, record)`; (4) `setTimeout(…, 0)`
+  with its cleanup, ONLY for a loader that must raise `loading` before its `await` (the compiler does not model `await`:
+  a `setState` before one counts as synchronous). Deferring a dialog's reset paints one frame with the old state and
+  hides the real defect. The classic `mounted` guard is banned — `useSyncExternalStore(neverChanges, () => true,
+  () => false)` declares the SSR/hydration split in the signature.
 - **`react-hooks/refs`: a custom hook must never RETURN a ref inside its object** — every read of that object during
   render (`del.armed`, `del.onClick`) is flagged "Cannot access refs during render". Take the ref as an argument
   (`useArmedDelete(ref, onDelete)`, `lib/hooks/useArmedDelete.ts` — moved there from the budget folder
   on 2026-08-31, when the fourth caller appeared).
 - **`react-hooks/preserve-manual-memoization` ("Compilation Skipped")**: the compiler refuses to optimize the whole
-  component when a dep array is *more specific* than what it infers — align the dep to the inferred value.
+  component when a dep array is *more specific* than what it infers — align the dep to the inferred value. The OTHER
+  message, "memoized in source but not in output", cannot be aligned away: a `useMemo` whose value never escapes (only
+  compared with `!==`, as the settings page's snapshot keys were) is pruned by the compiler — inline the computation.
 - **Loading skeleton over spinner** on any page investing in count-up and chart scheduling, with `PageContainer` imported
   inside it or wrapped at the call site. Verify it is wired up — `tsc` does not catch an unused component. Mobile CPU
   budget is ~3-5× tighter, so validate motion in a production build, not `next dev`. The skeleton is a WAIT and never a
@@ -622,6 +638,9 @@ file used to carry.
 ### Color Theme System
 - **Parallel theming**: next-themes owns `.dark`, the custom system owns `data-theme` — fully independent. CSS:
   `[data-theme="name"]` for light, `.dark[data-theme="name"]` for dark; `ColorThemeContext` lives inside `AuthProvider`.
+  **The theme is an external store** (2026-09-06): `useSyncExternalStore` over localStorage with `'default'` as the
+  server snapshot; the `data-theme` attribute is a pure effect on the value, `writeStoredTheme` applies it before the
+  re-render, and the Firestore sync depends on `uid` alone (rewriting an equal value is a no-op in every sink).
 - **`useChartColors` timing**: `useEffect + useState + requestAnimationFrame`, NOT `useMemo` — `getComputedStyle` during
   render runs before next-themes has updated the DOM and yields stale colours on a theme switch.
 - **oklch luminance filter**: L > 0.82 in light or L < 0.30 in dark falls back to the static palette, so a theme with
@@ -739,6 +758,9 @@ file used to carry.
 - **Phantom `tsc` errors**: `papaparse` and `@playwright/test` are declared but can be missing from the (untracked, branch-shared) `node_modules`. The tell is ~25 errors clustered in `e2e/` and `lib/utils/expenseImport.ts` rather than in what you touched — run `npm install` first.
 - `npm test -- <file>` / `npx vitest run <file>` for targeted tests; **`npx tsc --noEmit` before any PR**, re-run AFTER
   writing the tests, not only after the code.
+- **`npm run lint` is at zero since 2026-09-06 and stays there**: a new `any` gets its real type, a new `eslint-disable`
+  is not written. The config ignores `.agents/**` (the plugin's vendored scripts) and the `.next-*/**` dist dirs — a
+  Playwright run used to leave ~170 generated-file findings behind.
 - **A slow `await import()` inside a test body reads as flakiness, not as slowness.** A heavy module graph is a FIXTURE:
   imported in a test body it charges its one-time cost to whichever case runs first, so under full-suite load that case
   blows the 5 s default and the failure MOVES with the run order. Hoist it into `beforeAll` with an explicit timeout —
@@ -903,24 +925,9 @@ rules permitting the writes, real `Timestamp` values surviving `removeUndefinedD
 - **Two `boundingBox()` calls sample two different FRAMES.** While a drawer slides up the second element reads as
   *higher* than the first and a one-column layout looks like two. Read every rect a single assertion compares in ONE
   `evaluate()`. Same rule for anything measured during an animation.
-- **The emulator needs Java ≥ 21; this machine now HAS it, and a shell already running may still not see it.** Temurin
-  21 (`C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot`) was installed on 2026-08-30, the USER `JAVA_HOME`
-  points at it and the user `PATH` carries `%JAVA_HOME%\bin`; the `Oracle\Java\javapath` shim — which resolved `java` to
-  the JDK 15 whatever `JAVA_HOME` said — was removed from BOTH the user and machine scopes (the directory is still on
-  disk, it is only off the PATH). **An environment change never reaches a process that is already running**: a session
-  started before it keeps the old `PATH`, so `java -version` inside it still prints 15 and `(Get-Command java).Source`
-  still names the shim — which is what the pre-2026-08-30 note above recorded as "this machine has no JDK 21". Read the
-  SCOPES, not the process: `[Environment]::GetEnvironmentVariable('Path','Machine')` and `…'User'`, plus
-  `[Environment]::GetEnvironmentVariable('JAVA_HOME','User')`. A new terminal picks the change up. The portable route of
-  SETUP.md → Step 6 remains the fallback where it has not been picked up (`winget` is NOT on this shell's PATH): fetch
-  the zip directly
-  (`https://api.adoptium.net/v3/binary/latest/21/ga/windows/x64/jdk/hotspot/normal/eclipse`), expand it into the session
-  scratchpad and export `JAVA_HOME`/`PATH` for the `npm run emulators` process only — no system change, nothing to undo.
-  **In the Bash tool, `PATH` entries must be MSYS paths (`/c/Users/…`), not `C:/Users/…`**: `PATH` is colon-separated, so a
-  drive letter splits the entry in two, the portable JDK never resolves, `java -version` still prints the system 15 and
-  firebase-tools dies with "no longer supports Java version before 21" — a failure that reads as a missing download
-  (verified 2026-08-30). `JAVA_HOME` itself is fine either way; check with `which java` before starting the emulators. Stopping the npm wrapper does **not** kill
-  the JVM: the ports stay taken and the next start fails with "port taken", naming no stale process. Free them by PID — `netstat -ano | grep LISTENING | grep :8080`, then `taskkill //PID <pid> //F //T`, the same for `next dev` on :3100 — and only AFTER the Hub export.
+- **Java for the emulators**: the Firestore emulator needs a JDK ≥ 21; on macOS the Homebrew OpenJDK is enough with
+  `JAVA_HOME` unset (verified 2026-09-06), on Windows the whole ritual — Temurin 21, the `javapath` shim, MSYS `PATH`
+  entries, freeing a held port by PID — is SETUP.md → *Local Verification Troubleshooting*.
 - **Ports 8080/9099 answering is not proof that OUR emulators are up.** On 2026-08-27 they were another repo's suite
   (`chronostep-9ab39`, started by hand with `--single_project_mode`): every seed «succeeded» into its `demo-net-worth`
   namespace and `auth.setup.ts` died on `auth/user-not-found` — the client signs in against the emulator's own project.

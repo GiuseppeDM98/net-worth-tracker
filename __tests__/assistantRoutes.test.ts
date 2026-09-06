@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import type { AssistantMonthContextBundle } from '@/types/assistant';
+import type { streamAssistantResponse } from '@/lib/server/assistant/anthropicStream';
 
 const {
   verifyIdTokenMock,
@@ -293,12 +294,14 @@ describe('Assistant private API routes', () => {
         webSearchUsed: true,
       });
     updateAssistantThreadMetadataMock.mockResolvedValue(undefined);
-    streamAssistantResponseMock.mockImplementation(async ({ onStatus, onText }: any) => {
-      onStatus('writing');
-      onText('Risposta');
-      onStatus('saving');
-      return { text: 'Risposta', webSearchUsed: true };
-    });
+    streamAssistantResponseMock.mockImplementation(
+      async ({ onStatus, onText }: Parameters<typeof streamAssistantResponse>[0]) => {
+        onStatus('writing');
+        onText('Risposta');
+        onStatus('saving');
+        return { text: 'Risposta', webSearchUsed: true };
+      }
+    );
   });
 
   it('returns 401 for threads route without Authorization header', async () => {
