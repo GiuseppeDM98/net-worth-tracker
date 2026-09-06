@@ -21,8 +21,9 @@ Companion documents — do not duplicate their content into this file:
 
 **This file is every rule that holds repo-wide** — conventions, data/state patterns, UI
 patterns, testing, workflow. Read it every session. **A rule about one area's behaviour lives
-in `doc/guide/<tema>.md`** (one file per page, tab, integration or subsystem): open the guide
-for the area you are about to touch. Each guide opens with a scope line and ends with its
+in `doc/guide/<tema>.md`** (one file per page, tab, integration or subsystem — since 2026-09-06 also the
+cross-cutting subsystems: `stati`, `dialog`, `temi`, `account-condiviso-demo`, and Settings inside `impostazioni`):
+open the guide for the area you are about to touch. Each guide opens with a scope line and ends with its
 *Per-page blind spots* — behaviours that look like bugs and are not. Section 3 is the index:
 the 3–4 things to know before opening each guide, then the pointer. A session-closing lesson
 about a domain goes in that domain's guide, never here.
@@ -148,89 +149,6 @@ about a domain goes in that domain's guide, never here.
 - **`useWatch()` for render, `getValues()` for handlers — never `watch()`** (incompatible with the React Compiler, which
   then skips the whole component).
 
-### Stati: caricamento, vuoto, zero, errore (`lib/utils/statesNarrative.ts`, `components/ui/{skeleton,empty-state,error-notice}.tsx`)
-- **An absence has three names, and they are not interchangeable** (DESIGN.md → The Absence-Has-Three-Names Rule):
-  `missing` (nothing recorded) · `zero` (something is, and it is zero) · `failed` (the read did not happen). The
-  `AbsenceKind` union in `statesNarrative.ts` exists so a component cannot collapse them into a boolean.
-- **`resolveSurfaceState({ loading, failed })` is the ONE decision on which of the four states a surface is in**, and
-  `loading` wins over `failed` because React Query re-enters `isLoading` while it retries — a retry is an attempt, not
-  a verdict. What it exists to stop is `loading || !data`, the collapse that made the Panoramica pulse **forever** on a
-  failed read (fixed 2026-09-01); the E2E probe that catches it asserts the skeleton's `role="status"` is GONE once the
-  alert is up.
-- **A failed read is checked BEFORE the empty branch, always.** Every query in this app defaults to `[]` or
-  `undefined`, so a dropped connection is byte-identical to a new account — and the empty branch would then print a
-  verdict about a set that was never read («non hai nessun centro di costo», to someone with eight).
-- **`describeReadFailure` requires its `consequence`.** There is no generic fallback on purpose: a shared module does
-  not know the Italian agreement of a subject it was handed («Classi non è stato letto» is wrong), and a sentence that
-  claims nothing is worse than no sentence. The caller knows what it lost. `untouched` is optional and defaults to
-  «Nessun dato registrato è stato toccato»; `canRetry` and `onRetry` travel together, so no button is ever offered
-  that does nothing.
-- **The reassurance is said once per page**: `compact` drops it inside a cell of 4 columns or fewer, because three
-  lines in a 3/12 cell make the notice taller than the tiles beside it. On a page where several queries fail together
-  at least one of them is wide, so the sentence survives.
-- **A service must not swallow its own failure into zeros.** `getAnnualCashflowData` did (a `catch` returning
-  `annualSavings: 0`), which meant the FIRE calculator answered a dropped connection with «servono spese registrate
-  nel Cashflow» — a sentence about the reader's data, told about data nobody read. It rejects now; both its callers
-  hold an `ErrorNotice` branch that only a rejection can reach. When wiring a new surface, check the service too: an
-  `isError` branch above a service that never rejects is decoration.
-- **`Skeleton` (`components/ui/skeleton.tsx`) is the only muted placeholder.** `motion-safe:animate-pulse` — Tailwind's
-  bare `animate-pulse` has no reduced-motion guard, and it was hand-written in eight files at six different heights —
-  and `aria-hidden`, so the wait is announced once by `TileGridSkeleton`'s `role="status"`. `animate-spin` is
-  deliberately left alone: a spinner IS the "in flight" signal, and at 16px it is not the vestibular problem the
-  preference is about.
-- **Reduced motion reduces the MOTION, not the content.** `shouldShowSavingsBadge` used to take `reducedMotion` as a
-  show condition, so a reader who had asked the OS for stillness was never told their savings rate. It now governs the
-  entrance transition only, in the component. The two remaining `shouldReduceMotion()` callers gate CONFETTI, which is
-  motion carrying nothing — those are correct as they are.
-- **A toast's severity is the icon and a 2px leading rule, never the surface.** Sonner maps `--normal-bg` for every
-  type, so before this an error and a success were the same grey tile with a different 16px glyph. The tint variant was
-  rejected: `bg-*/10` washes the fill with the text's own hue and this project already records those combinations as
-  structurally below AA.
-- **A failed WRITE speaks `describeWriteError`, on a toast exactly as in a modal.** Thirteen call sites passed
-  `(err as Error).message` straight through — the thing that module exists to prevent. Where the message really is the
-  product's own Italian (the assistant hooks' `payload?.error ?? '<italiano>'`), the throw is marked with
-  `userFacingError` so the translation keeps it; everything unmarked takes the generic sentence. The assistant's SSE
-  route no longer forwards the Anthropic SDK's English message to the client either — that string is a log line.
-- **Where the 20 surfaces are**: `app/dashboard/{page,assets,history,performance,allocation,hall-of-fame,settings}`,
-  the five Cashflow tabs (the `loadFailed` prop is threaded from `app/dashboard/{cashflow,analisi}/page.tsx`, because
-  the tabs do not own their queries), Dividendi, the five FIRE tabs, Previdenza and Centri di Costo. Adding a
-  twenty-first means: read the query's `isError`, branch with `resolveSurfaceState`, and write the `consequence`.
-
-### Dialog e form trasversali (`components/ui/responsive-modal.tsx`, `lib/utils/dialogNarrative.ts`)
-- **A modal is a tile lifted off the page** (DESIGN.md → The Modal-Is-A-Tile Rule): eyebrow · title 20px · reading ·
-  body · footer. `ResponsiveModal` owns the whole shell, so a caller passes content and never chrome — and never
-  branches on `useMediaQuery` to order two buttons: the footer is `justify-end` on a dialog and `flex-col-reverse` at
-  `h-11` on a drawer, so writing «Annulla» then the primary in DOM order puts the primary on TOP on a phone.
-- **Four widths, and no others**: `sm` 420 · `md` 560 · `lg` 720 · `xl` 960. `dialogClassName` survives as an escape
-  hatch and currently has no user; reach for a width name first.
-- **The reading IS the status line.** `describeModalStatus(status, copy)` returns the idle/submitting/error sentence
-  and its tone; `ModalStatusLine` renders it as ONE stable node — `role="status" aria-live="polite"
-  aria-atomic="true"` — that is also Radix's `Description`. Two traps, both already paid for on /login: the container
-  must never swap `status` for `alert` (a different node to the a11y tree, and some readers announce nothing across
-  the swap), and `NarrativeText` colours only `mono` segments, so the tone is applied by the component.
-- **`describeWriteError` is the ONE translation of a failed write**, exactly as `describeAuthError` is for a sign-in.
-  11 Firestore codes are mapped; anything else takes a sentence that claims nothing rather than falling through to
-  «Missing or insufficient permissions.» A server message written FOR a reader survives only if the thrower marks it
-  with `userFacingError` — `assetTransactionService.parseWriteResponse` does, because the 422 bodies of the trade
-  routes are the only sentences that know why an operation was refused.
-- **Two-click confirms live in `lib/hooks/useArmedDelete.ts`** (moved there from `components/cashflow/budget/` when
-  the fourth caller appeared). No timer, ever. **Escape while armed means DISARM**, and that cannot be done from the
-  button: Radix's dismiss layer registers its document listener when the dialog MOUNTS, so it always runs before one
-  added at arm time — capture phase included, and `stopPropagation` never reaches it. The hook therefore exports
-  `hasArmedConfirm()`, a module-level count that `ResponsiveModal` reads in `onEscapeKeyDown` to `preventDefault()`.
-  Verified in a browser on 2026-08-31: without it, Escape closed the modal with the row still armed.
-- **The words are pure and tested.** `dialogNarrative.ts` holds every sentence a modal speaks — the status copy, the
-  three `describe*Intent` builders (expense, trade, asset: they name the CONSEQUENCE, not the fields) and the readings
-  that carry figures (movements, category delete/move, a dividend day, the test data). It imports from `formatters`,
-  never `chartService`, so it stays SDK-free.
-- **A summary block inside a modal is `bg-muted`**, never `bg-card` — on this surface that is a card inside a card.
-- **The eyebrow's scope is the SINGULAR of one row's type.** `EXPENSE_TYPE_LABELS` is the plural of a category group
-  («Spese Variabili»); the picker's own label is the one a modal about ONE row wants («Spesa variabile»).
-- **In light mode `--card` and `--background` are both `oklch(1 0 0)`**, so a test that proves a modal is «lifted» by
-  comparing it with the page background passes only in dark mode. What separates it there is the border and the Float
-  shadow; assert the modal's surface equals a TILE's instead.
-- **Blind spot** (looks like a bug, is not): no Playwright spec (the session's throwaway ones were deleted). Four two-click deletes still auto-disarm on a 3 s timer BY DESIGN, because they live on rows and not in modals and the owner kept them (`AssetRow`, `StrumentiTile`, `DividendTable`, `AssistantThreadList`); the ones that moved into the modal vocabulary lost theirs. `describeWriteError` maps 11 Firestore codes and anything else takes the generic sentence, so a NEW cause is invisible until it is added — and a server message survives only if the thrower marks it `userFacingError`, which today only `assetTransactionService` does. The status line is FORM-level: per-field zod errors keep their own line under the field, and the two can both be visible at once. `dialogClassName` still exists as a width escape hatch and has no user — reach for a `width` name. `PDFExportDialog`'s «Genera PDF» moved from the body into the footer, so a spec that located it inside the scrollable area needs updating.
-
 ### Two-Step Create Dialogs (`AssetDialog`, `ExpenseDialog`)
 - `AssetDialog`: step 1 picks the type, step 2 shows only that type's fields; edit reuses the same visibility logic and
   shows a ledger asset's quantity/PMC read-only (the ledger owns them). Class select for ETFs, optional `displayTicker`,
@@ -281,45 +199,6 @@ about a domain goes in that domain's guide, never here.
   they mock Firestore away; only an emulator exercise driving the CLIENT SDK evaluates the rules.
 - **Max 3 `.where()` calls** on a chain that will be unit-tested; a 4th breaks the mock chain.
 
-### Settings — the FIVE places
-- A new setting must be added to all five or it silently disappears: the type (`types/assets.ts`), the read mapping in
-  `assetAllocationService.getSettings`, **BOTH** write chains in `setSettings` (the `targets` branch uses `setDoc` with
-  no merge), and the state/load/save/dirty-snapshot wiring — usually `settings/page.tsx`, but a FIRE-only toggle wires
-  from `FireCalculatorTab.tsx` instead: the 5th place is "wherever the field's own save button lives". Guarded by
-  `settingsRoundTrip`, whose `STORED_SETTINGS` fixture must carry the new field, or the round-trip stays green while the
-  read mapping is still broken.
-- **A user-clearable field needs a different shape per branch**: `delete docData.x` in the no-merge branch,
-  `deleteField()` in the merge branch — and the guard is `'x' in settings`, not `x !== undefined`. **The bug this
-  prevents is invisible until a hard refresh**: the write succeeds, the toast says «salvate», the form still shows the
-  cleared field — and the old value comes back on the next load, because the no-merge branch rebuilds the document from
-  `...existingData` and `!== undefined` never overwrites it. On 2026-08-29 four fields were found without the guard and
-  fixed — `userAge`, `riskFreeRate`, `dividendIncomeCategoryId`, `dividendIncomeSubCategoryId` — with the round-trip
-  cases added to `settingsRoundTrip` (they fail on the pre-fix service, checked). **Adding the guard is safe only
-  because `getSettings` returns EVERY key**: the callers that spread `...settings` (the FIRE tabs, Coast, Monte Carlo)
-  carry the current value, so the guard rewrites it unchanged or deletes an already-absent field; callers that build a
-  fresh object (registration) omit the key entirely. Re-check that before guarding a new field.
-- **Only a hard refresh proves a setting was saved.** Reading the value back from Firestore proves the WRITE landed;
-  it says nothing about whether `getSettings` maps the field back into the form. Verify a settings change by reloading
-  the page and reading the FORM — that is the half of the round trip where the historical bugs live.
-- **There is a SIXTH place for any setting the SERVER reads**: the settings mapper in
-  `lib/services/dashboardOverviewService.ts` re-lists the same fields from the admin doc, independently of
-  `getSettings`. `settingsRoundTrip` does not cover it — check it by hand. **And a SEVENTH for anything the periodic
-  emails read**: `getSettingsAdmin` in `lib/server/monthlyEmailService.ts` is a third independent re-listing, narrow by
-  default (it used to carry only the email fields). `familyMembers` was missing from BOTH server mappers until
-  2026-08-31 and there is no type error for it — an absent field is simply `undefined` server-side.
-- **Store a boolean explicitly, never derive it** from other fields. All feature toggles live in
-  `AssetAllocationSettings`, never in `UserPreferences`, and dirty-state snapshot keys contain **only persisted
-  fields**, captured *after* the Firestore state is applied.
-- **One Save button validates the whole page** — `handleSave` returns early when allocation targets do not total 100, and
-  must `invalidateQueries(['settings', ownerId])`, which `AssetDialog` reads. **A tab must not grow a second Save**: the
-  Dividendi one was deleted on 2026-08-29 because `handleSave` already persisted its two fields, so the tab's own button
-  was a second write path for the same data (it also re-read the doc first, and could therefore clobber a concurrent edit).
-- **A field's dirty-snapshot must follow the TAB THAT EDITS IT, not the tab that consumes it**: `userAge`/`riskFreeRate`
-  moved from `allocationSnapshotKey` to `generalSnapshotKey` when the Profilo tile moved to Preferenze, while the
-  auto-calculated `equity`/`bonds` targets they FEED stayed in the allocation snapshot. Get this wrong and the header's
-  chip says "salvato" over an edited field.
-- `cashflowHistoryStartYear` is shared (Cashflow / Storico / Assistant / overview) — never rename it page-specifically.
-
 ### Caching
 - **Per-user pre-computed cache** (`performance-cache/{userId}`): the key encodes **every** determining input — a hash of
   the WHOLE snapshot series, the base signature, the risk-free rate, the dividend category. TTL fallback (6h) covers what
@@ -345,31 +224,6 @@ about a domain goes in that domain's guide, never here.
 - **Do NOT bump `firebase-admin` past 13.x** — `@14 → jwks-rsa@4 → jose@6` is pure ESM and Vercel's Lambda runtime
   `require()`s it (`ERR_REQUIRE_ESM` on every Admin route).
 
-### Demo Mode
-- The public landing (`app/page.tsx`) auto-logs into the demo account; `useDemoMode()` compares `user.uid` with
-  `NEXT_PUBLIC_DEMO_USER_ID` and **gates every mutation** (buttons disabled with a named `aria-label`, handlers return
-  early). The snapshots and notes of that account are shared by every visitor: a write that slips through is visible
-  to all of them. The assistant is blocked there outright.
-- **The dashboard's demo banner is the app's cadence on a warning fill** (`app/dashboard/layout.tsx`):
-  the label is `TILE_EYEBROW_CLASS` recoloured to `text-warning-foreground` (the eyebrow's geometry is
-  shared, its colour is not — `--warning` is near-white in light mode), and the consequence is a 12px
-  reading beside it, visible at EVERY width. It used to hide below 640px, which is exactly where a
-  reader needs to be told why a button does nothing.
-
-### Shared Account / Delegated Access
-- **Viewer vs owner**: `useAuth().user` is the viewer and never changes; `useActiveAccount().ownerId` is whose data is
-  displayed. Pass `ownerId` in data-scoped hooks and pages; keep `user.uid` only for theme, profile, PDF author,
-  `useDemoMode` and the sharing UI.
-- **Grant model**: `account-access/{ownerUid}` with `memberUids` read by the rules and the `array-contains` discovery
-  query; the rest is denormalized because a member cannot read `users/{ownerUid}`.
-- **Three enforcement layers, kept in sync**: `firestore.rules` (`canAccess(ownerUid)` per collection, `create` uses
-  `canAccess(request.resource.data.userId)`, `userPreferences` stays `isOwner`, `account-access` is **write:false**),
-  `assertCanAccessAccount` on Admin routes, and the client substituting `ownerId`. **Rules changes are inert until
-  deployed.**
-- **Switching gotcha**: React Query keys namespace by the id passed in, but manual `useEffect` loaders (settings, history,
-  performance, allocation, hall of fame) must include `ownerId` in their deps. The switcher must exist in BOTH the
-  Sidebar and the `SecondaryMenuDrawer`, since portrait has no Sidebar.
-
 ### Dynamic Imports and Module Hygiene
 - **Components must be at module level** — one defined inside a render body is a new type every render, so React
   remounts it (`AnimatePresence` enter never plays, `useEffect([])` re-fires) and the React Compiler throws.
@@ -380,7 +234,7 @@ about a domain goes in that domain's guide, never here.
 - Pure `lib/utils` modules reach `calculateAssetValue` in one of two established ways — check the precedent: **injected**
   as a `valueOf` param (`allocationUtils`, `pensionFire`) or **imported directly** with the test mocking
   `@/lib/firebase/config` + `firebase/firestore` + `authFetch` + `dashboardOverviewInvalidation`.
-- Functions that call `new Date()` internally are untestable — pass `now: Date` explicitly. **shadcn vendored surface
+- **Functions that call `new Date()` internally are untestable** — pass `now: Date` explicitly. **shadcn vendored surface
   policy**: `components/ui/**` is knip-ignored and standard shadcn API stays even at zero references; only **custom
   additions made in this repo** get deleted.
 - **CSS custom property liveness — the 5-check sweep.** A token is live if ANY holds: `var(--name` in `.ts/.tsx/.css`; if
@@ -532,7 +386,7 @@ file used to carry.
 - The page has NO verdict and must not grow one (a configuration page measures nothing) — it keeps the CADENCE: 22 `describe*` functions in `settingsNarrative.ts`, NO `build*Verdict`.
 - A reading declares the effect DOWNSTREAM, not the control under it; the Narrative Honesty Rule holds (a missing input drops its clause).
 - A field another page OWNS is DECLARED, never edited here («Parametri del piano» from FIRE, «Assistente» a mirror that loses on read). The colour theme and light/dark mode save themselves, outside `handleSave`.
-- The write fan-out for any setting (the FIVE/SIX/SEVEN places) is `AGENTS.md § Settings — the FIVE places`.
+- The write fan-out for any setting (the FIVE/SIX/SEVEN places) is `doc/guide/impostazioni.md § Settings — the FIVE places` (stub below).
 - Il resto — the applicative-default naming rule, `ExpenseImportSection`/`AccountSharingSection`, the blind spots — in `doc/guide/impostazioni.md`.
 
 ### Accesso e Registrazione → `doc/guide/accesso-registrazione.md`
@@ -548,6 +402,66 @@ file used to carry.
 - The «dati d'esempio» declaration belongs to the REGION, not the tile. The three promise tiles print NO invented figures — only facts about the TOOL, each read from the module that owns it (`BENCHMARKS.length`, `DEFAULT_MONTE_CARLO_SIMULATIONS`, `getPensionDeductionCeiling`).
 - The footer counts asset classes from `ASSET_CLASS_SEQUENCE`; the «Registrati» link mirrors the server.
 - Il resto — the hero-is-one-component rule, the sample-profile invariants, the blind spots — in `doc/guide/landing.md`.
+
+### Stati: caricamento, vuoto, zero, errore → `doc/guide/stati.md`
+- An absence has three names — `missing` · `zero` · `failed` (`AbsenceKind`, `lib/utils/statesNarrative.ts`) — and a
+  failed read is checked BEFORE the empty branch, always: every query defaults to `[]`/`undefined`, so a dropped
+  connection is byte-identical to a new account.
+- `resolveSurfaceState({ loading, failed })` is the ONE decision on which state a surface is in; `loading` wins over
+  `failed` (a React Query retry is an attempt, not a verdict). Never `loading || !data`.
+- `describeReadFailure` requires its `consequence` (the caller knows what it lost); `canRetry`/`onRetry` travel together.
+  A service must not swallow its failure into zeros — an `isError` branch above a service that never rejects is decoration.
+- `Skeleton` is the only muted placeholder (`motion-safe:animate-pulse`, `aria-hidden`); a toast's severity is the icon
+  and a 2px rule, never a `bg-*/10` surface; a failed WRITE speaks `describeWriteError`, never `(err as Error).message`.
+- Il resto — the `compact` reassurance rule, reduced motion vs content, the 20 surfaces and how to add the twenty-first — in `doc/guide/stati.md`.
+
+### Dialog e form trasversali → `doc/guide/dialog.md`
+- A modal is a tile lifted off the page (DESIGN.md → The Modal-Is-A-Tile Rule): eyebrow · title 20px · reading · body ·
+  footer, all owned by `ResponsiveModal` — a caller passes content, never chrome, and never orders the footer with
+  `useMediaQuery`. Four widths and no others: `sm` 420 · `md` 560 · `lg` 720 · `xl` 960.
+- The reading IS the status line: `describeModalStatus` + `ModalStatusLine`, ONE stable `role="status"` node that is
+  also Radix's `Description` — never swap it for `alert`.
+- `describeWriteError` (`lib/utils/dialogNarrative.ts`) is the ONE translation of a failed write; a server sentence
+  survives only if the thrower marks it `userFacingError`.
+- Two-click confirms live in `lib/hooks/useArmedDelete.ts`: no timer, ever; Escape while armed means DISARM, enforced
+  through `hasArmedConfirm()` in `ResponsiveModal`'s `onEscapeKeyDown`. The two form rules stay here: § Dialog Form Reset, § Two-Step Create Dialogs.
+- Il resto — the status-line a11y traps, the `bg-muted` summary block, the singular eyebrow, the light-mode «lifted» test trap, the blind spots — in `doc/guide/dialog.md`.
+
+### Settings — the FIVE places → `doc/guide/impostazioni.md`
+- A new setting must land in all five or it silently disappears: the type (`types/assets.ts`), the read mapping in
+  `assetAllocationService.getSettings`, BOTH write chains in `setSettings` (the `targets` branch is `setDoc` with no
+  merge), and the state/load/save/dirty-snapshot wiring wherever the field's own Save button lives. `settingsRoundTrip`'s
+  `STORED_SETTINGS` fixture must carry it.
+- A user-clearable field has a different shape per branch — `delete docData.x` (no-merge) vs `deleteField()` (merge) —
+  guarded by `'x' in settings`, never `x !== undefined`; safe only because `getSettings` returns EVERY key.
+- SIXTH place for anything the SERVER reads (`lib/services/dashboardOverviewService.ts`), SEVENTH for the periodic emails
+  (`getSettingsAdmin`, `lib/server/monthlyEmailService.ts`); neither is covered by the round-trip.
+- Only a hard refresh proves a setting was saved; one Save per page; booleans stored, never derived; a dirty snapshot
+  follows the tab that EDITS a field.
+- Il resto — la storia dei quattro campi senza guardia, il secondo Salva dei Dividendi, `cashflowHistoryStartYear` condiviso — in `doc/guide/impostazioni.md`.
+
+### Demo Mode · Shared Account / Delegated Access → `doc/guide/account-condiviso-demo.md`
+- **Demo**: the landing (`app/page.tsx`) auto-logs into the demo account; `useDemoMode()` (`lib/hooks/useDemoMode.ts`)
+  compares `user.uid` with `NEXT_PUBLIC_DEMO_USER_ID` and **gates every mutation** — the account's data is shared by
+  every visitor, and the assistant is blocked outright.
+- **Viewer vs owner**: `useAuth().user` is the viewer and never changes; `useActiveAccount().ownerId` is whose data is
+  displayed. Data-scoped hooks and pages take `ownerId`; `user.uid` stays only for theme, profile, PDF author,
+  `useDemoMode` and the sharing UI. Manual `useEffect` loaders include `ownerId` in their deps.
+- **Grant model**: `account-access/{ownerUid}` with `memberUids`, read by the rules and the `array-contains` discovery
+  query. **Three enforcement layers, kept in sync**: `firestore.rules` (`canAccess(ownerUid)`, `account-access` is
+  write:false), `assertCanAccessAccount` on Admin routes, the client substituting `ownerId`. Rules changes are inert until deployed.
+- Il resto — il banner demo, il dettaglio per collezione delle rules, lo switcher in Sidebar E `SecondaryMenuDrawer` — in `doc/guide/account-condiviso-demo.md`.
+
+### Color Theme System → `doc/guide/temi.md`
+- **Parallel theming**: next-themes owns `.dark`, the custom system owns `data-theme` (`[data-theme="name"]` light,
+  `.dark[data-theme="name"]` dark; `ColorThemeContext` inside `AuthProvider`). **The theme is an external store**
+  (`useSyncExternalStore` over localStorage, `'default'` as the server snapshot, 2026-09-06).
+- **`useChartColors` timing**: `useEffect + useState + requestAnimationFrame`, NOT `useMemo`. **The token you AUTHOR is
+  not the token the browser RETURNS**: Turbopack transpiles `oklch()` to `lab(…)`, so never assert `/^oklch\(/` and know
+  the luminance fallback is inert there (2026-08-30).
+- **A user-chosen identity colour is a SLOT, not a hex** (`'chart-1'..'chart-8'`, `resolveCostCenterColor`): migrate
+  without a backfill, derive the no-colour fallback from the document id; indices 0-7 theme-aware, 8-9 static.
+- Il resto — il filtro di luminanza oklch, `useActionColors`, i sign token contati per tema, il significato fisso di `--chart-6/7/8`, `getAssetClassCssVar`, la checklist «Adding a theme» — in `doc/guide/temi.md`.
 
 ---
 
@@ -588,7 +502,7 @@ file used to carry.
 - **Loading skeleton over spinner** on any page investing in count-up and chart scheduling, with `PageContainer` imported
   inside it or wrapped at the call site. Verify it is wired up — `tsc` does not catch an unused component. Mobile CPU
   budget is ~3-5× tighter, so validate motion in a production build, not `next dev`. The skeleton is a WAIT and never a
-  failure (→ *Stati: caricamento, vuoto, zero, errore*).
+  failure (→ `doc/guide/stati.md § Stati: caricamento, vuoto, zero, errore`).
 - **Every looping animation carries `motion-safe:`.** Tailwind's `animate-pulse` does not, which is why the app's ONE
   placeholder is `components/ui/skeleton.tsx` and nothing hand-rolls `animate-pulse bg-muted` any more. `animate-spin`
   is the deliberate exception: a spinner IS the "in flight" signal. And a preference for less motion must never remove
@@ -634,49 +548,6 @@ file used to carry.
   Positional remap (`chartColors[i]`) is only safe with no cross-page colour identity: asset-class data remaps via
   `ASSET_CLASS_CHART_INDEX[d.assetClass]`.
 - A sticky `<thead>` needs a fully opaque token, never an alpha background.
-
-### Color Theme System
-- **Parallel theming**: next-themes owns `.dark`, the custom system owns `data-theme` — fully independent. CSS:
-  `[data-theme="name"]` for light, `.dark[data-theme="name"]` for dark; `ColorThemeContext` lives inside `AuthProvider`.
-  **The theme is an external store** (2026-09-06): `useSyncExternalStore` over localStorage with `'default'` as the
-  server snapshot; the `data-theme` attribute is a pure effect on the value, `writeStoredTheme` applies it before the
-  re-render, and the Firestore sync depends on `uid` alone (rewriting an equal value is a no-op in every sink).
-- **`useChartColors` timing**: `useEffect + useState + requestAnimationFrame`, NOT `useMemo` — `getComputedStyle` during
-  render runs before next-themes has updated the DOM and yields stale colours on a theme switch.
-- **oklch luminance filter**: L > 0.82 in light or L < 0.30 in dark falls back to the static palette, so a theme with
-  chart colours at extreme luminance always falls back — fix it at the CSS level. Below ~0.015 chroma everything looks
-  identically gray, so `--card`/`--background`/`--muted` need chroma ≥ 0.020.
-- **The token you AUTHOR is not the token the browser RETURNS.** Turbopack's CSS transform transpiles `oklch()` for the
-  build's browser targets, and `getComputedStyle(document.documentElement).getPropertyValue('--chart-6')` came back as a
-  `lab(…)` string under `npm run dev:e2e` (measured 2026-08-30). Two consequences. A Playwright assertion on a resolved
-  token must compare CHANNELS or DISTINCTNESS — never match `/^oklch\(/`, a regex on the authored syntax that fails on a
-  correct value and can only ever pass by accident. And `parseOklchL` returns `null` for anything not literally
-  `oklch(`, so the luminance fallback above is **inert** wherever the served string is transpiled: the colour passes
-  through unfiltered. Read the served string before trusting either.
-- **Action/semantic colors that must follow the theme: clamp lightness, do not index-fallback.** `useActionColors` clamps
-  only the oklch L channel, preserving hue and chroma; `useChartColors`' same-index fallback would lose the theme hue and
-  can collapse two states onto one colour. Resolve **once per section** and pass the colour down.
-- **Sign tokens must be verified per theme**: `--positive` is declared twice and no theme overrides it, so one value fixes
-  all twelve combinations, while `--destructive` is declared **twelve times** (cyberpunk's is orange) and must be
-  measured per theme. Never assume a token change lands globally without counting its declarations.
-- **A user-chosen identity colour is a SLOT, not a hex** (`'chart-1'..'chart-8'`, resolved by `resolveCostCenterColor`).
-  Three rules: **migrate without a backfill** (`LEGACY_HEX_SLOTS` maps each old hex to the slot at the same position);
-  **derive the no-colour fallback from the document id** (FNV-1a), never from the row's rank, which repaints half the
-  list on every period switch; **indices 0-7 are theme-aware** (`--chart-1..8` exist in all twelve blocks since
-  2026-08-30), 8-9 still pad from the static `CHART_COLORS`.
-- **`--chart-6/7/8` carry a meaning across every theme** (2026-08-30): 6 = Materie Prime (gold/olive), 7 = Trend
-  Following (teal/cyan), 8 = Carry (rose/magenta) — the hue band is held per theme across light AND dark so a slot does
-  not change identity when the mode flips, and only L and C are re-pitched to the block's surface. Before this the tail
-  padded from `CHART_COLORS`, where the static teal at index 6 measured **ΔE00 0.87** from the default theme's
-  `--chart-2`: Trend Following and Obbligazioni were not similar, they were the same colour.
-- **`ASSET_CLASS_CSS_VAR` no longer exists.** `getAssetClassCssVar` DERIVES the token from `ASSET_CLASS_CHART_INDEX`
-  (`--chart-${slot + 1}`), because the hand-written map was a second source that disagreed with the first: crypto's chip
-  was `--chart-4` while its chart slot was 2, so one class wore two hues on one screen. `cash` keeps
-  `--muted-foreground` on purpose — liquidity is the absence of a position, not a series.
-- **Adding a theme**: CSS blocks `[data-theme="name"]` + `.dark[data-theme="name"]`, the `ColorTheme` union, an entry in
-  `COLOR_THEME_SWATCHES` (module level in `settings/page.tsx`), the swatch grid columns, `tsc`. The swatch previews carry
-  each theme's own literal oklch values ON PURPOSE — they preview a palette that is NOT active, which no CSS token can
-  express — and the accessible name is the POSITION («Colore 3 di 6: Midnight Bloom»), never the hue.
 
 ### Navigation
 - **Single source for nav arrays**: `lib/constants/navigation.ts` — Sidebar, BottomNavigation and SecondaryMenuDrawer all
@@ -755,31 +626,29 @@ file used to carry.
 > guided-verification protocol — live in **WORKFLOW.md**.
 
 ### Commands
-- **Phantom `tsc` errors**: `papaparse` and `@playwright/test` are declared but can be missing from the (untracked, branch-shared) `node_modules`. The tell is ~25 errors clustered in `e2e/` and `lib/utils/expenseImport.ts` rather than in what you touched — run `npm install` first.
+- **Phantom `tsc` errors**: `papaparse` and `@playwright/test` are declared but can be missing from the (untracked,
+  branch-shared) `node_modules` — the tell is ~25 errors clustered in `e2e/` and `lib/utils/expenseImport.ts` rather
+  than in what you touched. Run `npm install` first.
 - `npm test -- <file>` / `npx vitest run <file>` for targeted tests; **`npx tsc --noEmit` before any PR**, re-run AFTER
   writing the tests, not only after the code.
 - **`npm run lint` is at zero since 2026-09-06 and stays there**: a new `any` gets its real type, a new `eslint-disable`
   is not written. The config ignores `.agents/**` (the plugin's vendored scripts) and the `.next-*/**` dist dirs — a
   Playwright run used to leave ~170 generated-file findings behind.
-- **A slow `await import()` inside a test body reads as flakiness, not as slowness.** A heavy module graph is a FIXTURE:
-  imported in a test body it charges its one-time cost to whichever case runs first, so under full-suite load that case
-  blows the 5 s default and the failure MOVES with the run order. Hoist it into `beforeAll` with an explicit timeout —
-  after checking nothing is read at module scope, otherwise per-test `vi.resetModules()` was load-bearing.
+- **A heavy module graph is a FIXTURE**: hoist a slow `await import()` into `beforeAll` with an explicit timeout (after
+  checking nothing is read at module scope, or per-test `vi.resetModules()` was load-bearing). Inside a test body its
+  one-time cost lands on whichever case runs first, so the failure moves with the run order and reads as flakiness.
 - **A `tsc` that fails only inside `.next/dev/types/validator.ts` (TS1109 "Expression expected") is a half-written
-  generated file**, not a type error: a dev server was killed mid-write. Delete that one file (`next dev` regenerates
-  it) — never the whole `.next` of a server someone else may be running.
-- **A surface with no DOM is verified by RENDERING it, not by reading its code.** `tsc` and Vitest
-  see neither a dropped glyph nor a colour that is off-token. For the PDF: `renderToFile` from
-  `@react-pdf/renderer` works under Vitest — inflate the content streams with `zlib`, collect every
-  `scn` operand to prove no colour outside `printTokens` reaches the page, and read the hex text
-  runs to catch characters react-pdf silently dropped. For the two emails: they ARE HTML, so open
-  the rendered file in Chromium (`chromium.launch()`, `file://`) at 390 / 600 / 1440 and assert
-  `documentElement.scrollWidth === clientWidth`. Both are throwaway scripts — **run them from
-  inside the repo** or `playwright` and the `@/` alias do not resolve — and neither check lives in
-  the suite.
+  generated file** left by a dev server killed mid-write: delete that one file, never the whole `.next` of a server
+  someone else may be running.
+- **A surface with no DOM is verified by RENDERING it** — `tsc` and Vitest see neither a dropped glyph nor an off-token
+  colour. PDF: `renderToFile` from `@react-pdf/renderer` under Vitest, inflate the content streams with `zlib`, collect
+  every `scn` operand (no colour outside `printTokens`), read the hex text runs (silently dropped characters). Emails:
+  open the rendered HTML in Chromium (`chromium.launch()`, `file://`) at 390 / 600 / 1440 and assert
+  `documentElement.scrollWidth === clientWidth`. Both are throwaway scripts run from INSIDE the repo (or `playwright`
+  and the `@/` alias do not resolve); neither check lives in the suite.
 - **Run the suite under `TZ=Europe/Rome` too.** Every date fixture is stamped at noon, twelve hours clear of the DST
-  edge, so a whole class of timezone bug is structurally invisible to it — while production dates are **local midnight**
-  and the pure layer runs in the user's browser. Compute day-of-year from calendar fields in UTC (`Date.UTC(y,m,d) -
+  edge, so a whole class of timezone bug is structurally invisible — while production dates are **local midnight** and
+  the pure layer runs in the user's browser. Compute day-of-year from calendar fields in UTC (`Date.UTC(y,m,d) -
   Date.UTC(y,0,0)`) and add at least one fixture built the way the dialog builds one. Area suites per change:
 
 | Area | Suites |
@@ -806,162 +675,118 @@ file used to carry.
 Touching `types/assets.ts`'s `AssetType` also means `assetDialogHelpers` + `allocationUtils` + the three ledger suites;
 widening `AssetClass` also means `ASSET_CLASS_SEQUENCE` and everything reading it.
 
-- **`firebase deploy --only firestore:rules` with a stale CLI login fails with a 401 on `serviceusage`**, not with "please
-  log in". In this non-interactive shell the fix is the code flow — `npx firebase logout` (drops the dead refresh
-  token), `npx firebase login --no-localhost`, open the URL of THAT run, then `npx firebase login <code>`; a code from an
-  earlier run's URL is refused. `firebase` is not global here: always `npx firebase`.
+- **`firebase deploy --only firestore:rules` with a stale CLI login fails with a 401 on `serviceusage`**, not with
+  "please log in". Fix by the code flow: `npx firebase logout`, `npx firebase login --no-localhost`, open the URL of
+  THAT run, `npx firebase login <code>` (a code from an earlier run's URL is refused). Always `npx firebase`.
 - `npx knip` uses the root `knip.json`: `components/ui/**` and `public/sw.js` ignored, `firebase-tools` an ignored
-  dependency, and `ignoreExportsUsedInFile: true` means remaining EXPORT_ONLY findings are deliberate prop surface.
+  dependency, `ignoreExportsUsedInFile: true` — remaining EXPORT_ONLY findings are deliberate prop surface.
 - Emulators, Playwright, production-build verification and their environment traps: **SETUP.md → Steps 6-7**.
 
 ### Proving a refactor changed no number
-- **Measure the noise floor BEFORE interpreting a diff.** Anything downstream of a `new Date()` drifts continuously:
-  two dumps of *identical* code differ by cents at two minutes and by ~0,25 € at forty. Take two dumps of unchanged
-  code first; whatever they disagree on is not your change.
-- **The valid comparison is old-vs-new MINUTES apart**, not before-work-vs-after-work: `git checkout --` the modified
-  files, delete the new ones, dump, then restore from a patch (`git diff > …` + `git apply --include=…`, since a
-  whole-tree patch fails on files you never reverted).
-- **Compare the SET of rendered values, not the page text** — a redesign moves everything. Extract every euro amount and
-  percentage from both dumps and assert each old value has a match within the noise floor; new values appearing is the
-  feature, old values disappearing is the bug.
-- **Drive it from a throwaway Playwright spec that opens every collapsible** and samples charts by hovering at fixed
-  fractions of their width, so figures behind a disclosure and figures that exist only in a tooltip are both captured.
+- **Measure the noise floor BEFORE interpreting a diff**: anything downstream of `new Date()` drifts (cents at two
+  minutes, ~0,25 € at forty), so two dumps of unchanged code come first and whatever they disagree on is not your change.
+  **The valid comparison is old-vs-new MINUTES apart**: `git checkout --` the modified files, delete the new ones, dump,
+  restore from a patch (`git diff > …` + `git apply --include=…`, a whole-tree patch fails on files never reverted).
+- **Compare the SET of rendered values, not the page text** (a redesign moves everything): every euro amount and
+  percentage of the old dump must match one of the new within the noise floor — new values are the feature, missing
+  old values the bug. Drive it from a throwaway Playwright spec that opens every collapsible and samples charts by
+  hovering at fixed fractions of their width, so figures behind a disclosure or inside a tooltip are captured too.
 
 ### Emulator Exercise Scripts
-A collection whose value is in the *wiring* gets one: the unit suites mock Firestore away, so only an exercise covers the
-rules permitting the writes, real `Timestamp` values surviving `removeUndefinedDeep` and the real atomic transaction.
-- **Write them as `.mts`** — a `.ts` script is CJS under tsx and has no top-level await, and neither does `npx tsx -e`.
-- **A throwaway one-off (Python, Node) is a FILE too, never a bash heredoc**: a heredoc whose body carries apostrophes or
-  backticks dies in the tool shell with «unexpected EOF while looking for matching `'`» before running a line — write it
-  to the session scratchpad and run it by path (the doc updates of 2026-08-25 went that way after one failed heredoc).
-- **Run a throwaway script from INSIDE the repo** (`scripts/*.tmp.mts`, untracked, deleted in phase F): from the session
-  scratchpad `firebase-admin` fails with `ERR_MODULE_NOT_FOUND` — resolution starts at the script's directory — and the
-  seed dies silently before the login it was meant to enable. A throwaway Playwright spec likewise lives in `e2e/`
-  (it must match a project's `testMatch`); it can override the project's session with `test.use({ storageState: {
-  cookies: [], origins: [] }, viewport, deviceScaleFactor, colorScheme })` and log in through the form. A README capture also hides the Next dev badge first (`page.addStyleTag({ content: 'nextjs-portal { display: none !important; }' })`): it sits bottom-left in every dev screenshot.
-  **Drive the mutations through the app's services** (client SDK, rule-evaluated) and do the script's own reads and
-  fixture edits with the Admin SDK: from an `.mts` file a `doc()` imported there rejects a `db` built here, while
-  sign-in still works, which makes the failure look unrelated.
-- Prefer verifying with **two independent paths**: compute the expected figure in the script from the same real
-  snapshots — a same-code-path comparison would be circular.
-- **On a shared account an exercise cannot pin ABSOLUTE values.** The emulator carries other suites' fixtures, so an
-  assertion written against the record the script just planted measures the fixture, not the code (a pension exercise
-  expecting 10.000 read 39.800, because another seed's fund was still there). Derive the expectation from what is
-  ACTUALLY in the collection, then assert the planted record is contained in it.
-- **A throwaway fixture must not share document ids with the seed** (`{uid}-{year}-{month}` is the trap): overwriting
-  them means deleting the fixture also deletes the seed's own rows. Re-seed if it happens.
-- **A stale `.next-e2e` serves stale CSS as readily as stale routes.** A 404 from `npm run dev:e2e` on a route that
-  exists is that cache, not a routing bug — and so is a BRAND-NEW CSS custom property resolving to the empty string in
-  the browser while it is plainly there in `app/globals.css` (2026-08-30: `--chart-6/7/8` read `''` until the dist dir
-  was deleted and the server restarted, which reads as "the tokens were never added"). Delete the dist dir and restart
-  before doubting the selector, the token or your own edit. Use a fresh
-  dist dir (`NEXT_DIST_DIR=.next-throwaway`) rather than deleting someone else's, and **keep the `.next-` prefix**,
-  which is what `.gitignore` matches. Two traps on the way out: `next dev` rewrites `tsconfig.json`, so check it out
-  again; and the server keeps writing briefly after it is stopped, so delete the dist dir after the process is gone.
-- **A Firestore `DELETE` on a document that does not exist answers 200**, so a phase-F cleanup aimed at the wrong
-  collection reports success and leaves the fixture in the export. Know where each write actually lands before deleting:
-  a registration plants `users/{uid}` AND `assetAllocationTargets/{uid}` — `setSettings` writes to
-  `assetAllocationTargets`, NOT to a `settings` collection (verified 2026-08-30). Confirm with `listCollectionIds` and a
-  `GET` per candidate, then grep the export for the uid rather than trusting the delete's status code.
-- **A throwaway account that logs in leaves `dashboardOverviewSummaries/{uid}` behind** (the server-owned overview
-  summary is written on the first dashboard visit): a wipe that deletes only what the seed planted keeps it in the
-  export — grep the exported `output-0` for the uid before calling the restore done. The Hub export body takes a
-  forward-slash path (`{"path": "C:/…/.emulator-data"}`); a backslashed one 400s with a JSON escape error.
-- **Stopping the emulators: export FIRST, then kill.** `--export-on-exit` only runs on a SIGINT delivered to the
-  `firebase` CLI process itself, so killing the wrapper (all Windows really offers) skips the export and
-  `.emulator-data/` keeps its startup timestamp — the session's data is lost on the next import. Use the Emulator Hub:
-  `POST http://127.0.0.1:4400/_admin/export` with `{"path": "<abs>/.emulator-data"}` (**`/_admin/export`, not
-  `/emulators/export`, which 404s**), then terminate. **Verify the directory's timestamp moved**: a 200 with an
-  unchanged mtime is the failure that looks like success.
+A collection whose value is in the *wiring* gets one: the unit suites mock Firestore away, so only an exercise covers
+the rules permitting the writes, real `Timestamp` values surviving `removeUndefinedDeep` and the real atomic transaction.
+- **A throwaway is an `.mts` FILE run from INSIDE the repo** (`scripts/*.tmp.mts`, untracked, deleted in phase F): a
+  `.ts` script is CJS under tsx with no top-level await (nor has `npx tsx -e`); a bash heredoc with an apostrophe or a
+  backtick dies with «unexpected EOF» before running a line (2026-08-25); from the session scratchpad `firebase-admin`
+  fails with `ERR_MODULE_NOT_FOUND` and the seed dies silently before the login it was meant to enable. A throwaway
+  Playwright spec likewise lives in `e2e/` (it must match a project's `testMatch`), may override the session with
+  `test.use({ storageState: { cookies: [], origins: [] }, viewport, deviceScaleFactor, colorScheme })` and log in
+  through the form; a README capture hides the Next dev badge first (`page.addStyleTag({ content: 'nextjs-portal {
+  display: none !important; }' })`).
+- **Drive the mutations through the app's services** (client SDK, rule-evaluated) and the script's own reads and fixture
+  edits with the Admin SDK — from an `.mts` file a `doc()` imported there rejects a `db` built here while sign-in still
+  works, which makes the failure look unrelated. Verify by **two independent paths** (the expected figure computed in
+  the script from the same real snapshots; a same-code-path comparison is circular).
+- **On a shared account an exercise cannot pin ABSOLUTE values** (a pension exercise expecting 10.000 read 39.800 —
+  another seed's fund was still there): derive the expectation from what is ACTUALLY in the collection, then assert the
+  planted record is contained in it. **A throwaway fixture must not share document ids with the seed**
+  (`{uid}-{year}-{month}` is the trap): deleting it would delete the seed's rows — re-seed if it happens.
+- **A stale `.next-e2e` serves stale CSS as readily as stale routes**: a 404 on a route that exists, or a BRAND-NEW CSS
+  custom property reading `''` in the browser while it is in `app/globals.css` (2026-08-30, `--chart-6/7/8`), is that
+  cache. Delete the dist dir and restart before doubting your edit; prefer a fresh `NEXT_DIST_DIR=.next-throwaway`
+  (keep the `.next-` prefix, what `.gitignore` matches) over someone else's; `next dev` rewrites `tsconfig.json`
+  (check it out again) and keeps writing briefly after it is stopped (delete the dir after the process is gone).
+- **A Firestore `DELETE` on a missing document answers 200**, so a phase-F cleanup aimed at the wrong collection reports
+  success. Know where each write lands: a registration plants `users/{uid}` AND `assetAllocationTargets/{uid}`
+  (`setSettings` writes there, NOT to a `settings` collection — verified 2026-08-30); a throwaway account that logs in
+  also leaves `dashboardOverviewSummaries/{uid}` (written on the first dashboard visit). Confirm with
+  `listCollectionIds` and a `GET` per candidate, then grep the exported `output-0` for the uid before calling the
+  restore done.
+- **Stopping the emulators: export FIRST, then kill.** `--export-on-exit` runs only on a SIGINT delivered to the
+  `firebase` CLI process itself: on macOS `kill -INT <cli pid>` does it (2026-09-06); on Windows, where only the wrapper
+  can be killed, POST `http://127.0.0.1:4400/_admin/export` with `{"path": "<abs>/.emulator-data"}` (forward slashes —
+  a backslashed path 400s; `/emulators/export` 404s), then terminate. **Verify the directory's mtime moved**: a 200 with
+  an unchanged mtime is the failure that looks like success.
 
 ### Browser-Driven E2E (Playwright)
 - **What belongs here**: only what needs a real layout — the `desktop:` switch at 1440px, a collapsible, a state flash,
-  computed font sizes, bounding boxes, overflow. The arithmetic stays with Vitest.
-- **Two limits the suite cannot cover**: a race between concurrent queries is **not reproducible locally** (the Firestore
-  Web SDK multiplexes every target onto ONE webchannel), and an **error branch is not reachable by cutting the network**
-  (the SDK treats an unreachable backend as offline and retries).
-- **`workers: 1`, non-negotiable** — the specs share emulator accounts. **Give the suite its OWN fixture, not another
-  script's end state**, with numbers that make the assertion meaningful (dating every Analisi expense to January keeps
-  its figures exact whatever month the suite runs in).
-- **A fixture may need tuning so the thing under test is on screen at all** — the Coast fixture picks the RITA
-  long-unemployment variant only because the ordinary rule puts the unlock past the end of the projection. Choose the
-  fixture from what the assertion must see, and say so in the file.
-- **`e2e/global-setup.ts` runs every seed**, in order: Previdenza → Coast (needs the pension fund) → degraded → Analisi.
-  A new fixture is an `npm run e2e:seed:*` script plus one `spawnSync` there — and it re-runs on EVERY invocation, so a
-  test that patches Firestore must do the patch inside the test, never between two runs.
-- **Re-seeding an account mid-suite logs it out**: `auth.updateUser(uid, { password })` revokes the refresh tokens and
-  invalidates the parked `storageState`. Split the seed — creation once from `global-setup`, data-only per test.
-- **`storageState` does NOT capture IndexedDB unless you ask for it**, and the Firebase session lives there: the file
-  looks valid and every spec silently lands on `/login`. Pass `{ path, indexedDB: true }`.
+  computed font sizes, bounding boxes, overflow; the arithmetic stays with Vitest. **Two limits**: a race between
+  concurrent queries is not reproducible locally (the Firestore Web SDK multiplexes every target onto ONE webchannel),
+  and an error branch is not reachable by cutting the network (the SDK treats an unreachable backend as offline).
+- **`workers: 1`, non-negotiable** (the specs share emulator accounts). **Give the suite its OWN fixture**, tuned so the
+  thing under test is on screen at all (Analisi dates every expense to January so its figures are exact in any month;
+  Coast picks the RITA long-unemployment variant because the ordinary unlock falls past the projection) and say so in
+  the file. `e2e/global-setup.ts` runs every seed, in order Previdenza → Coast → degraded → Analisi, on EVERY
+  invocation: a new fixture is an `npm run e2e:seed:*` script plus one `spawnSync` there, and a test that patches
+  Firestore does it inside the test. **Re-seeding an account mid-suite logs it out** (`auth.updateUser(uid, { password })`
+  revokes the refresh tokens and the parked `storageState`): creation once from `global-setup`, data-only per test.
+- **`storageState` does NOT capture IndexedDB unless asked** (`{ path, indexedDB: true }`) — the Firebase session lives
+  there, the file looks valid and every spec lands on `/login`. **Drive the dev server on `localhost`, never
+  `127.0.0.1`**: Next blocks cross-origin dev resources from the bare IP, the page never hydrates and the login form
+  submits natively — indistinguishable from a wrong password.
 - **Prove the test can fail before trusting it** (the 1440px assertions were re-run at 1200px, where they must fail).
-- **`page.addInitScript` runs BEFORE `document.documentElement` exists**: observing it throws, the init script dies on
-  that line, and the spec passes because it observed *nothing*. **Observe `document`** with `subtree: true`.
-- **`innerText` applies `text-transform`; `textContent` does not** — a marker taken from an uppercase eyebrow never
-  matches `body.innerText`, and a falsification run using such a string stays green. `innerText` also returns `''`
-  for anything not rendered, so a Recharts tooltip read that way is empty even when open: use `textContent`.
-- **`boundingBox()` is viewport-relative, so hovering a chart below the fold does nothing** — `page.mouse.move` past the
-  window height lands outside it and the tooltip never opens, which reads exactly like "this chart has no tooltip".
-  `scrollIntoViewIfNeeded()` first, then read the box.
-- **A throwaway spec left in `e2e/` is collected by the BROAD projects too.** `desktop`'s `testMatch` catches any
-  `*.spec.ts`, so a verification spec written for its own fixture account runs again under the base account in a full
-  `npx playwright test` and fails there — three red tests that look like a regression and are not. Give a throwaway its
-  OWN config (`playwright.<name>.config.ts` with its own setup project and a narrow `testMatch`), run it with
-  `--config=`, and DELETE it before the full suite (2026-08-28).
-- **The period and axis controls are not buttons.** The Cashflow picker is a `combobox` named
-  «Periodo selezionato: {label}»; `SegmentedPill` renders its options as `tab`; the instalment toggle sits behind the
-  «Impostazioni avanzate» disclosure and must be opened first; the two-step create dialog labels its types with a
-  capital («Spesa Variabile»). Read the failure's page snapshot before guessing a second selector (2026-08-28).
-- **Responsive DOM duplicates make `.first()` a trap** (the DOM-first node is usually the HIDDEN mobile copy) — filter
-  with `.filter({ visible: true })`. **A collapsed CSS-grid region is still "visible" to Playwright**: scope through the
-  toggle's `aria-controls` id and assert the collapse by measuring height.
-- **`CompositionList` clickable rows are `<button role="listitem">` — the explicit role WINS**; the accessible name is
-  `"{name}, {value}, {share}%"`. `PageTabBar`'s tabs are locatable by name at every width (`aria-label`), but below
-  1440px the inactive ones are icon-only, so `getByText` finds nothing — use `getByRole('tab', { name })`.
-- **A `fill()` right after `goto(…, { waitUntil: 'domcontentloaded' })` can be silently wiped** by hydration reconciling
-  the input back to its initial React state — use `waitUntil: 'load'` and verify with `.inputValue()`.
-- **Drive the dev server on `localhost`, never `127.0.0.1`**: Next blocks cross-origin dev resources from the bare IP,
-  which kills the dev client, leaves the page unhydrated, and makes the login form submit natively — indistinguishable
-  from a wrong password.
-- **Two `boundingBox()` calls sample two different FRAMES.** While a drawer slides up the second element reads as
-  *higher* than the first and a one-column layout looks like two. Read every rect a single assertion compares in ONE
-  `evaluate()`. Same rule for anything measured during an animation.
-- **Java for the emulators**: the Firestore emulator needs a JDK ≥ 21; on macOS the Homebrew OpenJDK is enough with
-  `JAVA_HOME` unset (verified 2026-09-06), on Windows the whole ritual — Temurin 21, the `javapath` shim, MSYS `PATH`
-  entries, freeing a held port by PID — is SETUP.md → *Local Verification Troubleshooting*.
-- **Ports 8080/9099 answering is not proof that OUR emulators are up.** On 2026-08-27 they were another repo's suite
-  (`chronostep-9ab39`, started by hand with `--single_project_mode`): every seed «succeeded» into its `demo-net-worth`
-  namespace and `auth.setup.ts` died on `auth/user-not-found` — the client signs in against the emulator's own project.
-  Before trusting the ports read the owner's command line (`Get-CimInstance Win32_Process -Filter "ProcessId=<pid>" |
-  select CommandLine`); a foreign suite is never killed, and what the seeds left there is wiped with
+- **Reading the page — the traps, each seen once**: `page.addInitScript` runs BEFORE `document.documentElement` exists
+  (observe `document` with `subtree: true`, or the script dies and the spec passes having observed nothing);
+  `innerText` applies `text-transform` and is `''` for anything not rendered (an uppercase eyebrow marker or an open
+  Recharts tooltip need `textContent`); `boundingBox()` is viewport-relative (`scrollIntoViewIfNeeded()` before hovering
+  a chart below the fold) and two calls sample two FRAMES (read every rect one assertion compares in ONE `evaluate()`,
+  never during an animation); responsive DOM duplicates make `.first()` the HIDDEN mobile copy (`.filter({ visible:
+  true })`); a collapsed CSS-grid region is still "visible" (scope through the toggle's `aria-controls` and measure
+  height); a `fill()` right after `goto(…, { waitUntil: 'domcontentloaded' })` is wiped by hydration (`waitUntil:
+  'load'`, then `.inputValue()`).
+- **Locators — the controls are not buttons** (2026-08-28: read the failure's page snapshot before guessing a second
+  selector): the Cashflow picker is a `combobox` named «Periodo selezionato: {label}», `SegmentedPill` options are
+  `tab`, the instalment toggle sits behind the «Impostazioni avanzate» disclosure, the two-step create dialog capitalises
+  its types («Spesa Variabile»), `CompositionList` rows are `<button role="listitem">` named `"{name}, {value},
+  {share}%"`, `PageTabBar` tabs are named at every width but icon-only below 1440px (`getByRole('tab', { name })`, not
+  `getByText`). `getByRole(…, { name })` matches SUBSTRINGS («Avvisi» resolves «Avvisi soglia») and `getByLabel` matches
+  substrings case-insensitively («Azioni (€)» resolves «Obbligazioni (€)» — a strict-mode violation naming two inputs
+  that reads as the field missing, 2026-08-30): pass `exact: true` on every generated field.
+- **Numbers on the page**: on the BASE account FIRE figures depend on the RUN MONTH, so a spec there asserts STRUCTURE
+  and FORMAT, never amounts; the euro regex must accept ungrouped four-digit amounts,
+  `(\d{1,3}(\.\d{3})+|\d{1,4}),\d{2}` (CLDR `minimumGroupingDigits = 2`, the *Italian Localization* trap); Node's
+  `Intl` puts a NARROW no-break space (U+202F) before `€`, the browser a plain one (U+00A0) — flatten both sides. A
+  decoy-absence check on Cashflow must scope to `[role="tabpanel"][data-state="active"]` — every tab stays mounted
+  (`forceMount`) and hidden.
+- **A settings change is only verified by a RELOAD** (2026-08-29: four fields wrote fine and came back old on the next
+  load — the form is rebuilt by `getSettings`, the half where the bugs live): drive the UI, save,
+  `page.reload({waitUntil: 'load'})`, assert on the INPUTS, and test setting and CLEARING separately.
+- **A throwaway spec: own config, right filename, removed by the app, deleted.** The broad `desktop` project collects any
+  `*.spec.ts`, so a spec written for its own fixture account fails under the base account in a full run — give it
+  `playwright.<name>.config.ts` with its own setup project and a narrow `testMatch`, run with `--config=`, delete it
+  before the full suite (2026-08-28). The FILENAME chooses the account: `*.spec.ts` → `desktop`, `*.mobile.spec.ts` →
+  `mobile`, `*.degraded.spec.ts` → degraded, and only a name containing `analisi.spec.ts` reaches the Analisi fixture
+  (`desktop` carries `testIgnore: /analisi\./`) — a name after what it verifies is not collected, or collected against
+  the WRONG fixture. It asserts on Firestore, plants a decoy word absent from the seed, and removes its fixture BY THE
+  APP, not by `curl -X DELETE` (2026-08-31: deleting a trade through the ledger's button re-ran the replay a REST delete
+  skips), looping the deletion because an earlier failed run may have left its own.
+- **Java for the emulators**: a JDK ≥ 21; on macOS the Homebrew OpenJDK is enough with `JAVA_HOME` unset (verified
+  2026-09-06); the Windows ritual (Temurin 21, the `javapath` shim, MSYS `PATH`, freeing a held port by PID) is
+  SETUP.md → *Local Verification Troubleshooting*. **Ports 8080/9099 answering is not proof that OUR emulators are up**
+  (2026-08-27: another repo's suite, `chronostep-9ab39`, took every seed into its own `demo-net-worth` namespace and
+  `auth.setup.ts` died on `auth/user-not-found`): read the owner's command line (`Get-CimInstance Win32_Process -Filter
+  "ProcessId=<pid>" | select CommandLine`), never kill a foreign suite, and wipe what the seeds left there with
   `DELETE /emulator/v1/projects/demo-net-worth/databases/(default)/documents` and `…/projects/demo-net-worth/accounts`.
-- **On the BASE account, FIRE figures depend on the RUN MONTH**, so a spec there asserts STRUCTURE and FORMAT, never
-  exact amounts — and the euro-format regex must accept ungrouped four-digit amounts:
-  `(\d{1,3}(\.\d{3})+|\d{1,4}),\d{2}` (CLDR `minimumGroupingDigits = 2`, the *Italian Localization* trap).
-- **A spec that formats its own expected euro with Node's `Intl` never matches the page**: Node's ICU puts a NARROW
-  no-break space (U+202F) before `€`, the browser a plain one (U+00A0) — flatten BOTH on both sides before comparing.
-  And a decoy-absence check on `main` fails on Cashflow, where every tab stays mounted (`forceMount`) and hidden: scope
-  it to `[role="tabpanel"][data-state="active"]`. **`getByRole(…, { name })` matches substrings**: «Avvisi» also
-  resolves «Avvisi soglia», «Impostazioni del budget» also «Vai alle impostazioni del budget» — pass `exact: true`.
-  **`getByLabel` matches by substring AND case-insensitively**, which is worse here because Italian class labels nest:
-  a search for «Azioni (€)» also resolves «Obbligazioni (€)», so a form whose fields are generated from
-  `ASSET_CLASS_SEQUENCE` answers with a strict-mode violation naming two inputs — indistinguishable, at a glance, from
-  the field not existing (2026-08-30, the manual-snapshot dialog). Pass `{ exact: true }` on every generated field.
-- **A settings change is only verified by a RELOAD.** Reading the value back from Firestore proves the write; the form
-  is rebuilt by `getSettings`, and that is the half where the bugs live (2026-08-29: four fields wrote fine and came
-  back to their old value on the next load). Drive the UI, save, `page.reload({waitUntil: 'load'})`, then assert on the
-  INPUTS. And test the two directions separately — setting a value and CLEARING it fail for different reasons.
-- **A throwaway session spec must match an existing project's `testMatch`, and the FILENAME chooses the account.**
-  `*.spec.ts` → `desktop` (base account), `*.mobile.spec.ts` → `mobile`, `*.degraded.spec.ts` → the degraded account,
-  and **only a name containing `analisi.spec.ts` reaches the Analisi fixture account** (`testMatch: /analisi\.spec\.ts/`,
-  while `desktop` carries `testIgnore: /analisi\./`). A throwaway named after what it verifies rather than after its
-  project is therefore either not collected at all or collected against the WRONG fixture — and both read as the
-  feature being broken, not as a config miss. It should also assert against Firestore rather than the page, plant a
-  decoy word that appears nowhere in the seed, delete the documents it created, and delete itself.
-- **A fixture a spec creates should be removed BY THE APP, not by a `curl -X DELETE`.** The dialog verification of
-  2026-08-31 registered a trade to have something to arm: deleting it through the ledger's own button re-ran the
-  replay that rebuilds the asset's quantity and PMC, which a REST delete would have skipped, leaving the asset
-  inconsistent with a register that no longer holds the row. Loop the deletion rather than removing one row: an
-  earlier failed run may have left its own.
 
 ---
 
@@ -971,36 +796,25 @@ rules permitting the writes, real `Timestamp` values surviving `removeUndefinedD
   (`assetPricing.ts` is the worked example).
 
 ### Audit habits
-- **An `isError` branch above a service that never rejects is decoration.** Before wiring a surface's failure state,
-  read the service: a `catch` that returns `[]`, `0` or a defaulted object turns every failure into a truthful-looking
-  answer, and the branch can never fire (`getAnnualCashflowData` did exactly that until 2026-09-01).
-- **"Keep" verdicts need the same grep as "Delete" verdicts.** A wrong Delete breaks the build immediately; a wrong Keep
-  burns a whole commit polishing a component with zero importers.
-- **A doc comment naming a caller is a claim, not evidence — grep it**, and when the grep contradicts the comment fix the
-  comment in the same commit. This covers page/component docstrings, not just the `.md` files.
-- **Knip marks a dead chain's intermediate links "live"** because the orphan still imports them: trace the call graph
-  inward, verify each link independently, and delete the whole chain in ONE commit. Likewise **a function that always
-  returns `[]` keeps its whole downstream pipeline "live"** — read the function that decides *what* gets captured.
-- **A green mechanical check that has never been seen red is indistinguishable from one asserting nothing** — and that
-  includes the check's own arithmetic: filtering values by magnitude to drop chart-axis ticks also drops a legitimate
-  reading of the same magnitude. Break the thing under test on purpose once.
-- **The fixture can make a branch unreachable, and the test stays green for the wrong reason.** `allocateByShare`'s
-  rounding correction cannot fire on two shares (they always cancel), so a two-person fixture passed with the branch
-  disabled; the same shape appears wherever a guard only bites past a threshold the fixture never crosses. When
-  falsification does NOT turn a test red, the test is the bug — not the falsification.
-- **An assertion of ABSENCE needs a positive anchor first.** `expect(locator).toHaveCount(0)` passes instantly against
-  a page that has not rendered, so it is green in every state including the one it is meant to catch. Wait for
-  something that IS expected in both states (a `forceMount` panel is ideal — attached, not necessarily visible), then
-  assert the absence. A browser check that never saw the feature ON has proven nothing about the feature being OFF.
+- **An `isError` branch above a service that never rejects is decoration**: a `catch` returning `[]`, `0` or a defaulted
+  object turns every failure into a truthful-looking answer (`getAnnualCashflowData` did until 2026-09-01). Read the
+  service before wiring a failure state.
+- **"Keep" verdicts need the same grep as "Delete" verdicts**, and **a doc comment naming a caller is a claim, not
+  evidence — grep it** and fix the comment in the same commit (page docstrings included). **Knip marks a dead chain's
+  intermediate links "live"** (the orphan still imports them) and **a function that always returns `[]` keeps its
+  downstream pipeline "live"**: trace inward, verify each link, delete the chain in ONE commit.
+- **A green check that has never been seen red asserts nothing** — including the check's own arithmetic (a magnitude
+  filter meant for axis ticks also drops a legitimate reading). Break the thing under test once. **The fixture can make
+  a branch unreachable**: `allocateByShare`'s rounding correction cannot fire on two shares, so a two-person fixture
+  stayed green with the branch disabled — when falsification does NOT turn a test red, the test is the bug.
+- **An assertion of ABSENCE needs a positive anchor first**: `toHaveCount(0)` passes against a page that has not
+  rendered. Wait for something expected in both states (a `forceMount` panel: attached, not necessarily visible), then
+  assert the absence; a browser check that never saw the feature ON proves nothing about it OFF.
 
 ### Per-page blind spots
-
-The list of "looks like a bug, is not" behaviours moved into the domain guides: **each
-`doc/guide/<page>.md` ends with its own *Per-page blind spots* section.** Read it before
-"fixing" anything on that page. The entries were moved verbatim from CLAUDE.md's Known Issues
-(three pages 2026-08-28, three 2026-08-29, the rest 2026-08-30); CLAUDE.md keeps only the
-cross-cutting ones. The single blind-spot that is not per-page stays in
-*Data and State Patterns → Dialog e form trasversali* above.
+The "looks like a bug, is not" behaviours live at the end of each `doc/guide/<page>.md` (*Per-page blind spots*,
+moved verbatim from CLAUDE.md's Known Issues on 2026-08-28/29/30); read it before "fixing" anything on that page.
+CLAUDE.md keeps only the cross-cutting ones.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

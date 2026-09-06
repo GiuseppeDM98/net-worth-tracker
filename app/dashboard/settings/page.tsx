@@ -751,7 +751,7 @@ export default function SettingsPage() {
     }
   }, [user, ownerId]);
 
-  // First load, and again when the viewed account changes (AGENTS → Shared Account: manual
+  // First load, and again when the viewed account changes (doc/guide/account-condiviso-demo.md § Shared Account / Delegated Access: manual
   // loaders key on ownerId).
   useEffect(() => {
     if (!user || !ownerId) return;

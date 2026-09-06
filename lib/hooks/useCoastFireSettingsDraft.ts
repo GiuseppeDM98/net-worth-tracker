@@ -13,7 +13,7 @@
  * self-contained (thirteen pieces of state, one effect, one mutation, seven handlers). Keeping it
  * here is what lets the tab read as a page instead of a form.
  *
- * The dirty snapshot keys contain ONLY persisted fields (AGENTS → *Settings — the FIVE places*),
+ * The dirty snapshot keys contain ONLY persisted fields (doc/guide/impostazioni.md § Settings — the FIVE places),
  * so re-deriving equivalent drafts never reads as an unsaved change.
  */
 

@@ -27,7 +27,9 @@ Next.js app for Italian investors: net worth, assets, cashflow, dividends, perfo
   i pattern a zero implementazioni marcati superati; inventario degli hex DOM-side e tre tinte del
   chrome fuori Zero-Chroma dichiarate. `doc/redesign-prompts.md` ritirato; `.impeccable/config.json`
   senza 8 deroghe orfane. Collaudo: suite 3440 (anche `TZ=Europe/Rome`), `tsc`, Playwright 40/40
-  sugli emulatori, giro guidato (cinque verifiche, ok).
+  sugli emulatori, giro guidato (cinque verifiche, ok). Terzo commit: AGENTS.md snellito da 1014 a
+  ~830 righe — Stati, Dialog, Settings, Account condiviso/Demo e Temi sono guide in `doc/guide/`, il
+  nucleo tiene gli stub; §5-6 riscritti come regola + data + dove è fissata, senza perdere una data.
 
 ## Architecture Snapshot
 - App Router; protected pages under `app/dashboard/*`.
@@ -38,9 +40,9 @@ Next.js app for Italian investors: net worth, assets, cashflow, dividends, perfo
 ## Key Features (Active)
 One line per feature: what it is, then where it is described. *What the user sees* → README.md; *repo-wide rules* → AGENTS.md; *the rules and traps of one area* → `doc/guide/<tema>.md`; *the aesthetic* → DESIGN.md.
 
-- **Shared account**: a second user as full co-owner; **viewer** (`user.uid`) ≠ **owner** (`ownerId`, `useActiveAccount()`), grants in `account-access/{ownerUid}`, enforced in `firestore.rules` + `assertCanAccessAccount`. AGENTS → *Shared Account / Delegated Access*.
+- **Shared account**: a second user as full co-owner; **viewer** (`user.uid`) ≠ **owner** (`ownerId`, `useActiveAccount()`), grants in `account-access/{ownerUid}`, enforced in `firestore.rules` + `assertCanAccessAccount`. doc/guide/account-condiviso-demo.md.
 - **Landing pubblica**: la Panoramica per chi non ha dati — le tessere vere dell'app su un profilo inventato e dichiarato, più tre tessere che dicono cosa calcolano. doc/guide/landing.md; DESIGN → *The Sample-Data Rule*.
-- **Demo mode**: auto-login dalla landing; `useDemoMode()` gates every mutation. AGENTS → *Demo Mode*.
+- **Demo mode**: auto-login dalla landing; `useDemoMode()` gates every mutation. doc/guide/account-condiviso-demo.md.
 - **Shell**: compact `PageHeader` (one variant) · `PageTabBar` · `PageContainer` (1920, its only width) + `TileGridSkeleton` · sidebar with eyebrow group labels · bottom pill + «Altro» drawer. DESIGN → §5 Compact Page Header / Tile Grid; AGENTS → *Navigation*.
 - **Panoramica**: a rule-generated verdict over a 12-column tile grid, one question per tile, on `GET /api/dashboard/overview`. README → *Portfolio Management*; doc/guide/panoramica.md; DESIGN → §5 Page Verdict / Tile / Tile Grid.
 - **Patrimonio**: the verdict's driver is an instrument; six tiles, Strumenti is the management table at the tile's cadence; a Δ is a unit-price variation; the Sottocategoria is optional. doc/guide/patrimonio.md.
@@ -60,13 +62,13 @@ One line per feature: what it is, then where it is described. *What the user see
 - **Goal-Based Investing (FIRE › Obiettivi)**: «sono in rotta?» over five tiles + «Dettaglio»; the Assistant proposes, only the user writes; SDK-free math in `goalMath.ts`. doc/guide/fire.md.
 - **Assistente AI**: «su quali numeri ragiona l'assistente?» — the verdict IS the context, on the period axis; the conversation as a tile beside a sticky companion (Patrimonio · Cashflow · Cosa sa di te); SSE streaming, five modes, gated web search, proactive memory, goals; flag `NEXT_PUBLIC_ASSISTANT_AI_ENABLED`, blocked in demo. doc/guide/assistente.md.
 - **Hall of Fame**: «quali sono stati i mesi e gli anni migliori?» senza asse — un record è una posizione; la classifica completa vive nel Dettaglio. README → *Other*; doc/guide/hall-of-fame.md.
-- **Impostazioni**: sei tab, nessun verdetto (è un form) ma la cadenza delle tessere; un solo Salva per pagina, e due tessere che dichiarano senza scrivere. doc/guide/impostazioni.md; il fan-out di scrittura in AGENTS → *Settings — the FIVE places*.
+- **Impostazioni**: sei tab, nessun verdetto (è un form) ma la cadenza delle tessere; un solo Salva per pagina, e due tessere che dichiarano senza scrivere. doc/guide/impostazioni.md; il fan-out di scrittura in doc/guide/impostazioni.md § Settings — the FIVE places.
 - **Accesso e Registrazione**: due pagine pubbliche, una colonna da 420 con UNA tessera; il verdetto è generato dallo stato (accesso · aperta · su invito · chiusa), la lettura è la status line del form, gli errori sono parole italiane e mai la stringa di Firebase. doc/guide/accesso-registrazione.md; DESIGN → The Status-Is-The-Reading Rule.
-- **Stati**: caricamento · nulla di registrato · zero misurato · lettura fallita — quattro forme distinte alla cadenza della tessera, su 20 superfici. AGENTS → *Stati: caricamento, vuoto, zero, errore*; DESIGN → **The Absence-Has-Three-Names Rule**.
-- **Dialog e form trasversali**: 29 modali su un vocabolario unico — occhiello · titolo 20px · riga di lettura (che è la status line del form) · corpo · footer, in `ResponsiveModal` a quattro larghezze; otto superfici montano ancora `Dialog`/`AlertDialog`/`Drawer`/`Sheet` grezzi (Known Issues). AGENTS → *Dialog e form trasversali*; DESIGN → **The Modal-Is-A-Tile Rule**, §5 Modal.
+- **Stati**: caricamento · nulla di registrato · zero misurato · lettura fallita — quattro forme distinte alla cadenza della tessera, su 20 superfici. doc/guide/stati.md; DESIGN → **The Absence-Has-Three-Names Rule**.
+- **Dialog e form trasversali**: 29 modali su un vocabolario unico — occhiello · titolo 20px · riga di lettura (che è la status line del form) · corpo · footer, in `ResponsiveModal` a quattro larghezze; otto superfici montano ancora `Dialog`/`AlertDialog`/`Drawer`/`Sheet` grezzi (Known Issues). doc/guide/dialog.md; DESIGN → **The Modal-Is-A-Tile Rule**, §5 Modal.
 - **Email periodiche · Email budget**: quattro periodi su UN template — verdetto da regole (anche come preheader), commento AI secondo, poi le tessere; «Rispetto a un anno fa» sparisce sull'annuale. La budget arriva la domenica e non contiene nulla di settimanale: ogni tessera dichiara la propria finestra. doc/guide/email-pdf.md.
 - **PDF export**: sette sezioni alla cadenza della tessera, la copertina è il verdetto, il pavimento del Cashflow è detto; niente monospace né meno tipografico, dichiarati. doc/guide/email-pdf.md.
-- **Token fuori dal DOM · Multi-theme**: `lib/constants/printTokens.ts` è l'unica sede di un hex per email e PDF (DESIGN → **The Out-Of-DOM Token Rule**); temi in AGENTS → *Color Theme System*.
+- **Token fuori dal DOM · Multi-theme**: `lib/constants/printTokens.ts` è l'unica sede di un hex per email e PDF (DESIGN → **The Out-Of-DOM Token Rule**); temi in doc/guide/temi.md.
 
 ## Testing
 - Vitest: `npx vitest run <file>`, `npm test -- <file>`, `npx tsc --noEmit`. New tests in `__tests__/`; prefer pure functions over Firestore-coupled code.
@@ -87,7 +89,7 @@ Firestore client + admin · Yahoo Finance (prices, benchmark history) · Borsa I
 - **Rendimenti before `byAsset`: correct denominator, wrong numerator** (2023-01 → 2025-10 on the real account): the basis step is removed, but the excluded assets' variation stays inside the measured return. Not reconstructible.
 - **TWR monthly-bucket artifact (by design)**: an expense is neutralised only when the net-worth drop and the cash flow land in the same month; recording a purchase both as an expense and as an asset produces a phantom gain. Record balances in the month they belong to.
 - **The Assistant's cashflow figures changed on 2026-07-29**; saved threads are prose and are not regenerated.
-- **Chart slots 8-9 are still not theme-aware** (`useChartColors()` pads the last two from the static `CHART_COLORS`): slot 8 is Storico's synthetic «Previdenza» band and 9 is unused by the class palette, so nothing user-facing collides. Slots 0-7 are theme-aware since 2026-08-30. AGENTS → *Color Theme System*.
+- **Chart slots 8-9 are still not theme-aware** (`useChartColors()` pads the last two from the static `CHART_COLORS`): slot 8 is Storico's synthetic «Previdenza» band and 9 is unused by the class palette, so nothing user-facing collides. Slots 0-7 are theme-aware since 2026-08-30. doc/guide/temi.md.
 - **Fuori dal DOM restano tre punti ciechi**: le email non rispecchiano i cinque temi nominati (scelta — si leggono su una scheda bianca); «un hex sta solo in `printTokens`» è documentato ma **non applicato da un linter**; e `@react-pdf/renderer` scarta in SILENZIO ogni carattere fuori da WinAnsi (`pdfSafeText` copre U+2212; frecce, simboli ed emoji no). Le tre superfici si verificano solo renderizzandole, e **nessuna di quelle verifiche è nella suite**. doc/guide/email-pdf.md.
 - **Sign-colour CHIPS sit below AA, structurally** (`bg-positive/10 text-positive` washes the background with the text's hue: 15 of 24 combinations at 3.34–4.40:1; deliberately not fixed). `MonthlyReturnsHeatmap` fills its cells with the sign tokens at 30/55/85% (the figure is never printed in the cell, so the AA text floor does not apply).
 - **A confirmed goal proposal can be confirmed again after a reload** (accepted for v1): reopening the thread re-parses the fenced block and a second press creates a SECOND goal.
