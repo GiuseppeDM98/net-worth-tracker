@@ -15,6 +15,16 @@
 - **`byAsset.price` is RAW NATIVE CURRENCY**, so `totalValue ≠ quantity × price` for USD/GBp/real-estate; the per-unit EUR
   figure is `u = totalValue / quantity`, and attribution is `priceEffect = q_prev·(u_curr−u_prev)` + `quantityEffect =
   (q_curr−q_prev)·u_curr` (sum = Δ exactly). **A row at quantity 0 is a CLOSED position** (2026-09-06): the cron writes every asset, sold ones included, and read as present its unit value is 0 — a 14.830 € sale printed as «prezzo −14.830 €» on the real account (Xtrackers Overnight, agosto 2026). `attributeSelectedChange` now treats `quantity ≤ 0` as absent on both sides, so the sale is all quantity and the rebuy from that row a pure open; the row itself is still listed at 0 €.
+- **A snapshot document has two natures, and only one of them is recomputed.** The figures
+  (`totalNetWorth`, `byAssetClass`, `byAsset`, `assetAllocation`, `pension`…) are derived from the assets on every
+  write; the **note** the user types on Storico is derived from nothing. Both writers replace the document with a bare
+  `.set()` — correct for the figures, since a Firestore `merge` keeps the `byAssetClass` key of an asset class that has
+  LEFT the portfolio, a snapshot that can never go back down — so the note has to ride across the replace explicitly:
+  `preserveUserAuthoredSnapshotFields` (`lib/utils/snapshotUserFields.ts`), called by
+  `app/api/portfolio/snapshot/route.ts` and `.../snapshot/manual/route.ts`. Until 2026-09-07 neither did, and since the
+  cron runs DAILY on the CURRENT month a note typed there was erased the same evening — a note on a PAST month
+  survived, which is why the bug read as «dopo qualche giorno». **A new `MonthlySnapshot` field that no pipeline
+  derives goes in `SNAPSHOT_USER_AUTHORED_FIELDS` or the cron eats it too.**
 - **TWR neutralises a cash flow only when the net-worth drop and the flow land in the SAME monthly snapshot** — the fix
   is data entry, never re-bucketing cash flows or excluding cash (CLAUDE.md → Known Issues has the mirror case).
 - **Two CAGR formulas, intentionally different**: Storico's verdict = `(endNW/startNW)^(12/months) − 1` (wealth growth, said «versamenti inclusi»),

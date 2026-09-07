@@ -13,32 +13,18 @@ Next.js app for Italian investors: net worth, assets, cashflow, dividends, perfo
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic.
-- `tsc` clean; **155 files / 3493 tests** green + **39 Playwright E2E specs** (42 green in one run incl. 3 auth setups). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, which structurally hides timezone bugs.
-- Latest (2026-09-06, sera): **I fondi pensione entrano onesti in Rendimenti, e la pagina dice da dove viene il
-  rendimento.** Il toggle «Includi i fondi pensione» era un OR con il ruolo `excluded` — sull'account reale (tre fondi,
-  tutti `excluded`) accenderlo non cambiava un numero — e, dove passava, leggeva TFR/datoriale/busta paga come
-  rendimento (YTD 16,28% invece di 12,02%). Ora `resolvePerformanceBase` (UNA risoluzione per service e pagina) fa
-  vincere il toggle sul ruolo, porta i fondi nella base dal mese tracciato (`resolvePensionReturnStart`) con il loro
-  valore come FLUSSO d'ingresso e ogni versamento successivo da fuori come flusso nel suo `valueEffectMonth`; un
-  volontario da conto con i fondi FUORI è un'uscita (la vecchia KNOWN LIMITATION sparisce). I flussi viaggiano sul
-  canale `CashFlowData.pensionFlow` (`externalFlowOf` = `netCashFlow + pensionFlow`, sommato da `buildCashFlowMap`
-  così TWR/volatilità/drawdown/heatmap/IRR lo vedono; ROI e CAGR esplicitamente), `netCashFlow` resta il risparmio
-  della tessera Contributi, che mostra il canale pensione a parte con l'ingresso nominato per mese; la didascalia
-  della base nomina il mese («più i fondi pensione da luglio 2026»); `CACHE_MATH_VERSION` v6 e la chiave porta
-  entry month e flussi. Nuova tessera **«Da dove viene il rendimento»** (`performanceAttribution.ts`): effetto prezzo
-  per strumento in euro sui mesi con `byAsset` (fondi = Δ − versamenti dopo l'ingresso, immobili al lordo del debito,
-  dividendi incassati dal registro aggiunti allo strumento), riconciliato al numeratore del TWR con «Non attribuito»
-  come riga di chiusura e la copertura dichiarata; tabella completa nel Dettaglio; griglia 7 · 5 / 12 (5 · 7 senza
-  vendite). **Bug trovato sui dati reali e corretto**: `attributeSelectedChange` leggeva una riga `byAsset` a quantità
-  0 (il cron scrive anche gli asset venduti) come prezzo crollato a zero — Storico stampava «prezzo −14.830 €» su una
-  vendita (Xtrackers Overnight, ago 2026). Collaudo: suite 3493 (anche `TZ=Europe/Rome`), `tsc`, lint 0, Playwright 42/42, la pipeline
-  VERA sul dump di produzione in sola lettura (OFF invariato, ON 12,02%, attribuzione che riconcilia: 19.162 € +
-  −2.326 € = 16.836 €), nuova spec `e2e/performance.degraded.spec.ts` su una fixture propria (`e2e:seed -- performance`)
-  con due verifiche sui dati dell'emulatore (lo snapshot dell'ingresso, la chiave della cache del service), falsificata
-  ripristinando il vecchio OR (rossa), giro guidato del 2026-09-07 (cinque verifiche, ok) — la seconda verifica sui dati ha
-  scoperto che `writePerformanceCache` falliva in silenzio su ogni account con un `undefined` nelle metriche (nessun
-  drawdown, nessuna categoria dividendi): ora scrive via `removeUndefinedDeep`. Il `dividendService` è server-only: la
-  pagina legge i dividendi da `dividendReceiptsService.ts` (client), trovato dal browser e non da `tsc`.
+- `tsc` clean; **156 files / 3500 tests** green + **39 Playwright E2E specs** (42 green in one run incl. 3 auth setups). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, which structurally hides timezone bugs.
+- Latest (2026-09-07): **La nota dello Storico sopravvive al cron della sera.** Un documento snapshot ha due nature —
+  le cifre che la pipeline RICALCOLA a ogni scrittura e la `note` che scrive solo l'utente — ed entrambi i writer
+  (`app/api/portfolio/snapshot/route.ts`, `.../snapshot/manual/route.ts`) sostituivano il documento con un `.set()`
+  nudo che non conteneva `note`: il cron gira OGNI SERA sul mese CORRENTE, quindi una nota messa lì spariva la notte
+  stessa (una su un mese passato sopravviveva — ecco perché il sintomo si leggeva «dopo qualche giorno»).
+  `preserveUserAuthoredSnapshotFields` (`lib/utils/snapshotUserFields.ts`, `SNAPSHOT_USER_AUTHORED_FIELDS`) riporta i
+  campi d'autore attraverso la sostituzione; **un `merge: true` sarebbe stato sbagliato**, perché farebbe risorgere in
+  `byAssetClass` la chiave di una classe uscita dal portafoglio. Collaudo: 7 unit sul modulo puro + 1 sulla rotta
+  (falsificata, rossa), suite 3500 sotto `TZ=Europe/Rome`, `tsc`, lint 0, Playwright 42/42, cinque verifiche sui dati
+  dell'emulatore da uno script usa e getta poi cancellato (il cron sul mese corrente e lo snapshot manuale su un mese
+  passato, anch'esse falsificate) e il giro guidato del 2026-09-07 con due note a schermo.
 
 ## Architecture Snapshot
 - App Router; protected pages under `app/dashboard/*`.
@@ -131,7 +117,7 @@ Entry points only: each `doc/guide/<tema>.md` opens with the full file list of i
 - **Cashflow**: `app/dashboard/cashflow/page.tsx`; Tracciamento `components/cashflow/ExpenseTrackingTab.tsx` + `components/cashflow/{TransactionFeed,CompactExpenseRow,MobileFiltersDrawer}.tsx`, pure `lib/utils/{tracciamentoSummary,cashflowNarrative}.ts`; Budget `components/cashflow/BudgetTab.tsx` + `components/cashflow/budget/*`, pure `lib/utils/{budgetSummary,budgetNarrative,budgetUtils,budgetHistory}.ts`, `lib/hooks/{useBudgetConfig,useBudgetHistory}.ts`, `lib/server/budgetHistoryService.ts` (cron phase 8), collections `budgets/{userId}`, `budgetHistory/{userId}/months/{YYYY-MM}`; Divisione `components/cashflow/ExpenseSplitTab.tsx`, pure `lib/utils/{expenseSplitSummary,expenseSplitNarrative}.ts` (`resolveSplitBasis`, `allocateByShare`); Centri di Costo `components/cashflow/{CostCentersTab,CostCenterDetail,CostCenterDialog}.tsx` + `cost-centers/*`, pure `lib/utils/{costCenterSummary,costCenterNarrative,costCenterUtils}.ts`, `costCenterStyles.ts` (`CHART_TICK_STYLE`); services `lib/services/{budgetService,costCenterService,cashBalanceReconciliation,expenseImportService}.ts`, `lib/utils/expenseImport.ts`
 - **Analisi**: `components/cashflow/AnalisiTab.tsx` (`handleEntitySelect`) + `components/cashflow/analisi/*`, `components/cashflow/{EntityDossier,EntitySearch,ConfrontoAnnualeSection,CashflowSankeyChart,SavingsRateTrendSection,AndamentoStoricoSection}.tsx`; pure `lib/utils/{analisiSummary,analisiNarrative,expenseGrouping,cashflowSankey,cashflowComposition,expenseCategoryMatching,comparisonDeltas,expenseEntityStats,entitySearch}.ts`
 - **Dividendi**: `components/dividends/DividendTrackingTab.tsx` + `tiles/*` + `DividendiDettaglio.tsx`, pure `lib/utils/{dividendAnalytics,dividendiNarrative}.ts`, `lib/hooks/useDividendStats.ts` → `app/api/dividends/stats/route.ts`; registry and coupons `components/dividends/{DividendTable,DividendCalendar,DividendDialog,DividendDetailsDialog,DividendRecordDetailsDialog,InflationRateDialog,ProvisionalCouponBanner}.tsx`, `lib/utils/couponUtils.ts`, `lib/services/couponScheduling.ts`, `types/dividend.ts`
-- **Storico / snapshots**: `app/dashboard/history/page.tsx`, `components/history/*` (+ `tiles/*`), pure `lib/utils/{storicoSummary,storicoNarrative,snapshotAssetBreakdown,historyComposition}.ts`, `lib/services/{chartService,snapshotService}.ts`, `components/CreateManualSnapshotModal.tsx` over `lib/utils/manualSnapshotAmounts.ts`; collection `monthly-snapshots`
+- **Storico / snapshots**: `app/dashboard/history/page.tsx`, `components/history/*` (+ `tiles/*`), pure `lib/utils/{storicoSummary,storicoNarrative,snapshotAssetBreakdown,historyComposition,snapshotUserFields}.ts` (`preserveUserAuthoredSnapshotFields` = i campi che nessuna pipeline ricalcola, portati attraverso la sostituzione), `lib/services/{chartService,snapshotService}.ts`, `components/CreateManualSnapshotModal.tsx` over `lib/utils/manualSnapshotAmounts.ts`; collection `monthly-snapshots`
 - **Hall of Fame**: `app/dashboard/hall-of-fame/page.tsx`, `components/hall-of-fame/*` (+ `tiles/*`), pure `lib/utils/{hallOfFameSummary,hallOfFameNarrative}.ts` over `lib/utils/hallOfFameRecords.ts` (the ONE definition of record and ranking, shared with the email), `lib/constants/hallOfFame.ts`, `lib/services/hallOfFameService{,.server}.ts`, `app/api/hall-of-fame/recalculate/route.ts`; collection `hall-of-fame/{userId}`
 - **Benchmark**: `lib/constants/benchmarks.ts`, `app/api/benchmarks/*`, `lib/server/ecbRatesService.ts`; caches `benchmark-cache/*`, `fx-rate-cache/usd-eur`, `ecb-rate-cache/deposit-rate`
 - **FIRE**: Calcolatore `components/fire-simulations/FireCalculatorTab.tsx` + `tiles/*` + `{FireParametri,FireDettaglio,FIREProjectionChart,FireFanChart,SettledValue}.tsx`, pure `lib/utils/{fireSummary,fireNarrative}.ts`; shared `lib/services/{fireService,whatIfService,monteCarloService,goalService}.ts`, `lib/utils/{pensionUnlock,monteCarloParams,goalTrajectory,goalMath}.ts` (`pensionUnlock` = the single unlock resolution, `deriveMonteCarloAllocation`, `serializeGoalForFirestore` = the persistence allowlist); Coast `CoastFireTab.tsx` + `coast/*`, pure `lib/utils/coastFireView.ts`, `lib/hooks/useCoastFireSettingsDraft.ts`; What If `WhatIfAnalysisTab.tsx` + `whatif/*`, pure `lib/utils/{whatIfSummary,whatIfNarrative}.ts`, `types/whatIf.ts`; Monte Carlo `MonteCarloTab.tsx` + `components/monte-carlo/*` (`SCENARIO_SLOT`), pure `lib/utils/{monteCarloSummary,monteCarloNarrative}.ts`; Obiettivi `GoalBasedInvestingTab.tsx` + `components/goals/*`, pure `lib/utils/{goalsSummary,goalsNarrative}.ts`; specs `e2e/fire*.spec.ts`, `e2e/coast*.spec.ts`, fixture `scripts/seedCoastFireE2E.mts`

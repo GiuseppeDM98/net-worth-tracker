@@ -292,7 +292,9 @@ describe('Private API route auth', () => {
       ],
     });
 
-    snapshotDocGetMock.mockResolvedValue({ exists: false });
+    // `data()` matters: the route carries the user-authored fields of the stored
+    // snapshot (the Storico note) across its full-replace write.
+    snapshotDocGetMock.mockResolvedValue({ exists: false, data: () => undefined });
     snapshotDocSetMock.mockResolvedValue(undefined);
     overviewSummaryDocGetMock.mockResolvedValue({ exists: false });
     overviewSummaryDocSetMock.mockResolvedValue(undefined);
@@ -754,5 +756,26 @@ describe('Private API route auth', () => {
     });
     expect(verifyIdTokenMock).not.toHaveBeenCalled();
     expect(snapshotDocSetMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the Storico note of the snapshot it overwrites', async () => {
+    // The cron rewrites the CURRENT month every evening with a full `.set()`, so before
+    // 2026-09-07 a note typed on Storico lasted exactly until that night.
+    snapshotDocGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({ userId: 'user-1', totalNetWorth: 1, note: 'ornitorinco' }),
+    });
+
+    await snapshotRoute(
+      createJsonRequest('http://localhost/api/portfolio/snapshot', {
+        method: 'POST',
+        body: { userId: 'user-1', cronSecret: 'test-cron-secret' },
+      })
+    );
+
+    const written = snapshotDocSetMock.mock.calls[0][0];
+    expect(written.note).toBe('ornitorinco');
+    // The recomputed half is still replaced, never merged with the stored document.
+    expect(written.totalNetWorth).not.toBe(1);
   });
 });
