@@ -46,6 +46,7 @@ import {
 import { calculateMonthlyChange, calculateYearlyChange } from '@/lib/services/snapshotService';
 import { getItalyMonthYear, ITALY_TIMEZONE, toDate } from '@/lib/utils/dateHelpers';
 import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
+import { costBasisPerUnitEur } from '@/lib/utils/costBasisEur';
 import {
   DASHBOARD_OVERVIEW_SOURCE_VERSION,
   DASHBOARD_OVERVIEW_SUMMARY_COLLECTION,
@@ -403,10 +404,12 @@ function buildLiveOverviewPayload(
     .filter(a => a.quantity > 0)
     .map(a => {
       const value = calculateAssetValue(a);
-      // Use null instead of undefined — Firestore rejects undefined values.
+      // Use null instead of undefined — Firestore rejects undefined values. Compared in EUR on both
+      // sides (costBasisPerUnitEur), never the native-currency averageCost against the EUR value.
       let returnPercent: number | null = null;
-      if (a.averageCost && a.averageCost > 0) {
-        const costBasis = a.quantity * a.averageCost;
+      const basisPerUnit = costBasisPerUnitEur(a);
+      if (basisPerUnit && basisPerUnit > 0) {
+        const costBasis = a.quantity * basisPerUnit;
         returnPercent = costBasis > 0 ? ((value - costBasis) / costBasis) * 100 : null;
       }
       return {
@@ -463,8 +466,9 @@ function buildLiveOverviewPayload(
     },
     flags: {
       assetCount: assets.filter((asset) => asset.quantity > 0).length,
+      // A foreign asset with only a native PMC has no basis the EUR figures can use (costBasisEur.ts).
       hasCostBasisTracking: assets.some(
-        (asset) => (asset.averageCost && asset.averageCost > 0) || (asset.taxRate && asset.taxRate > 0)
+        (asset) => costBasisPerUnitEur(asset) !== undefined || (asset.taxRate && asset.taxRate > 0)
       ),
       hasTERTracking: assets.some((asset) => !!(asset.totalExpenseRatio && asset.totalExpenseRatio > 0)),
       hasStampDuty: !!(settings?.stampDutyEnabled && annualStampDuty > 0),

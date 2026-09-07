@@ -132,6 +132,7 @@ export async function GET(request: NextRequest) {
       currentPriceEur: doc.data().currentPriceEur as number | undefined,
       currency: doc.data().currency as string | undefined,
       averageCost: doc.data().averageCost,
+      averageCostEur: doc.data().averageCostEur as number | undefined,
       // Prefer the exact start stamped at (re)purchase; fall back to the snapshot-derived value.
       holdingStartDate: doc.data().holdingStartDate?.toDate() ?? holdingStarts.get(doc.id),
     }));

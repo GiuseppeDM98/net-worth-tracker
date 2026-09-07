@@ -2,7 +2,7 @@
 
 import { TrendingDown, TrendingUp } from 'lucide-react';
 import type { Narrative } from '@/lib/utils/narrative';
-import type { DrawdownStatus, GrowthOfHundredSeries, HeroReturn } from '@/lib/utils/performanceSummary';
+import type { DrawdownStatus, GrowthOfHundredSeries, HeroReturn, PeriodReturnChip } from '@/lib/utils/performanceSummary';
 import { formatNumber, formatPercentage } from '@/lib/services/chartService';
 import { getMetricValueColor, signChipClass } from '@/lib/utils/metricColors';
 import { useCountUp } from '@/lib/utils/useCountUp';
@@ -20,8 +20,8 @@ interface RendimentoTileProps {
   benchmark: { name: string; delta: number } | null;
   benchmarkLoading: boolean;
   benchmarkName: string;
-  /** The plain period return, never annualised — the second chip. */
-  roi: number | null;
+  /** The period's CUMULATIVE TWR, never annualised — the second chip; null when the hero already is the period return. */
+  periodReturn: PeriodReturnChip | null;
   /** Where the portfolio stands today against the period's peak. */
   drawdown: DrawdownStatus | null;
   series: GrowthOfHundredSeries;
@@ -60,9 +60,11 @@ function Chip({ value, caption, children }: { value: number | null; caption: str
 
 /**
  * «Quanto rende?» — the dominant tile: the TWR (annualised, or the period return below six
- * months, and the qualifier says which), the gap against the reference model, the plain period
- * return and today's distance from the period's peak as grouped chips, then the growth-of-100
- * plot, which is the element that stretches when the tile spans two rows.
+ * months, and the qualifier says which), the gap against the reference model, the period's
+ * cumulative return (the same TWR de-annualised, never the ROI: a gain over the first month's
+ * capital is not the period's return) and today's distance from the period's peak as grouped
+ * chips, then the growth-of-100 plot, which is the element that stretches when the tile spans
+ * two rows.
  */
 export function RendimentoTile({
   aside,
@@ -72,7 +74,7 @@ export function RendimentoTile({
   benchmark,
   benchmarkLoading,
   benchmarkName,
-  roi,
+  periodReturn,
   drawdown,
   series,
   footer,
@@ -105,10 +107,10 @@ export function RendimentoTile({
             </Chip>
           )
         )}
-        {roi !== null && (
-          <Chip value={roi} caption="ROI del periodo">
-            {roi > 0 ? '+' : roi < 0 ? '−' : ''}
-            {formatPercentage(Math.abs(roi), 1)}
+        {periodReturn && (
+          <Chip value={periodReturn.value} caption={periodReturn.label}>
+            {periodReturn.value > 0 ? '+' : periodReturn.value < 0 ? '−' : ''}
+            {formatPercentage(Math.abs(periodReturn.value), 1)}
           </Chip>
         )}
         {drawdown && (

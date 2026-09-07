@@ -66,15 +66,16 @@ export interface MobileFiltersDrawerProps {
   mobileSortKey?: string;
   onSortChange?: (key: string) => void;
   sortOptions?: { value: string; label: string; shortLabel: string }[];
-  /** Render the inline PeriodPicker; Tracciamento keeps the period beside the verdict and passes false. */
-  showPeriod?: boolean;
 }
 
 /**
  * Mobile-only filter bar (hidden on desktop via `desktop:hidden`).
  *
  * Renders a single row:
- *   [PeriodPicker] [Filtri ①]
+ *   [PeriodPicker] [Filtri ①] [⇅]
+ *
+ * The period is the page's axis, repeated here so the window can be changed from beside the
+ * list it slices — a search («caffè») is always read over one.
  *
  * Tapping "Filtri" opens a vaul bottom drawer with:
  *   • Free-text search
@@ -82,7 +83,6 @@ export interface MobileFiltersDrawerProps {
  *   • Subcategory select (conditional)
  *   • Account select (conditional)
  *
- * Sort lives outside this component, in the Voci card header.
  * All filter state lives in the parent — this component is purely presentational.
  */
 export function MobileFiltersDrawer({
@@ -106,21 +106,23 @@ export function MobileFiltersDrawer({
   mobileSortKey,
   onSortChange,
   sortOptions,
-  showPeriod = true,
 }: MobileFiltersDrawerProps) {
   const [open, setOpen] = useState(false);
 
   return (
     <div className="flex items-center justify-center gap-2 desktop:hidden">
-      {/* Period picker — max-w caps the button when a custom range label is long */}
-      {showPeriod && (
-        <PeriodPicker
-          value={period}
-          onChange={onPeriodChange}
-          availableYears={availableYears}
-          className="shrink-0 max-w-[170px]"
-        />
-      )}
+      {/* Period picker — the trigger's own `min-w-[190px]` is overridden so that, when the row
+          runs out of room, the picker yields (its label truncates) before «Filtri» and the sort do.
+          At 360 the three controls fit even without it (e2e/cashflow.mobile.spec.ts measured it
+          with the override removed): the override is the slack, not the fix. max-w caps the button
+          when a custom range label is long. */}
+      <PeriodPicker
+        value={period}
+        onChange={onPeriodChange}
+        availableYears={availableYears}
+        className="min-w-0 shrink max-w-[170px]"
+        ariaLabelPrefix="Periodo dei movimenti"
+      />
 
       {/* Filter button — badge shows count of active drawer filters */}
       <div className="relative shrink-0">

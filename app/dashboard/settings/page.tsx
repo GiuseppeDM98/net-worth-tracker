@@ -381,6 +381,7 @@ export default function SettingsPage() {
   const [expenseSplitEnabled, setExpenseSplitEnabled] = useState<boolean>(false);
   const [performanceIncludesPensionFunds, setPerformanceIncludesPensionFunds] = useState<boolean>(false);
   const [performanceIncludesExcludedAssets, setPerformanceIncludesExcludedAssets] = useState<boolean>(false);
+  const [performanceExcludesCash, setPerformanceExcludesCash] = useState<boolean>(false);
   const [pensionReturnStartMonth, setPensionReturnStartMonth] = useState<string>('');
   // Read-only declarations (state + link tiles). These fields are OWNED by other pages —
   // FIRE › Calcolatore (Parametri), Coast FIRE (Ipotesi), the Assistant's preferences popover —
@@ -569,6 +570,7 @@ export default function SettingsPage() {
         setExpenseSplitEnabled(settingsData.expenseSplitEnabled ?? false);
         setPerformanceIncludesPensionFunds(settingsData.performanceIncludesPensionFunds ?? false);
         setPerformanceIncludesExcludedAssets(settingsData.performanceIncludesExcludedAssets ?? false);
+        setPerformanceExcludesCash(settingsData.performanceExcludesCash ?? false);
         setPensionReturnStartMonth(settingsData.pensionReturnStartMonth ?? '');
         setMonthlyEmailEnabled(settingsData.monthlyEmailEnabled ?? false);
         setQuarterlyEmailEnabled(settingsData.quarterlyEmailEnabled ?? false);
@@ -709,6 +711,7 @@ export default function SettingsPage() {
           expenseSplitEnabled: settingsData?.expenseSplitEnabled ?? false,
           performanceIncludesPensionFunds: settingsData?.performanceIncludesPensionFunds ?? false,
           performanceIncludesExcludedAssets: settingsData?.performanceIncludesExcludedAssets ?? false,
+          performanceExcludesCash: settingsData?.performanceExcludesCash ?? false,
           pensionReturnStartMonth: settingsData?.pensionReturnStartMonth ?? '',
           monthlyEmailEnabled: settingsData?.monthlyEmailEnabled ?? false,
           quarterlyEmailEnabled: settingsData?.quarterlyEmailEnabled ?? false,
@@ -1304,6 +1307,7 @@ export default function SettingsPage() {
         expenseSplitEnabled,
         performanceIncludesPensionFunds,
         performanceIncludesExcludedAssets,
+        performanceExcludesCash,
         // Stringa vuota = "nessun mese impostato": va salvata come undefined, non come '',
         // altrimenti pensionReturn la leggerebbe come una data da parsare.
         pensionReturnStartMonth: pensionReturnStartMonth || undefined,
@@ -1602,6 +1606,7 @@ export default function SettingsPage() {
         expenseSplitEnabled,
         performanceIncludesPensionFunds,
         performanceIncludesExcludedAssets,
+        performanceExcludesCash,
         pensionReturnStartMonth,
         monthlyEmailEnabled,
         quarterlyEmailEnabled,
@@ -1833,6 +1838,7 @@ export default function SettingsPage() {
                   reading={describePerformanceBase({
                     includesPensionFunds: performanceIncludesPensionFunds,
                     includesExcludedAssets: performanceIncludesExcludedAssets,
+                    excludesCash: performanceExcludesCash,
                     pensionReturnStartMonth,
                   })}
                 >
@@ -1866,6 +1872,22 @@ export default function SettingsPage() {
                         id="performanceIncludesExcludedAssets"
                         checked={performanceIncludesExcludedAssets}
                         onCheckedChange={setPerformanceIncludesExcludedAssets}
+                        className={cn('shrink-0', interactiveControlClass)}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between gap-4 py-3">
+                      <div className="min-w-0">
+                        <Label htmlFor="performanceExcludesCash" className="text-[13px] font-medium">
+                          Liquidità fuori dalla base
+                        </Label>
+                        <p className="mt-0.5 text-[11px] leading-[1.4] text-muted-foreground">
+                          I conti escono dai rendimenti (restano nell&apos;Allocazione); un ETF monetario ha un prezzo e resta dentro. Gli acquisti pagati dai conti diventano flussi misurati
+                        </p>
+                      </div>
+                      <Switch
+                        id="performanceExcludesCash"
+                        checked={performanceExcludesCash}
+                        onCheckedChange={setPerformanceExcludesCash}
                         className={cn('shrink-0', interactiveControlClass)}
                       />
                     </div>

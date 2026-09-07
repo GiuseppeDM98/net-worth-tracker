@@ -116,6 +116,7 @@ export async function getSettings(
       familyMembers: data.familyMembers,
       performanceIncludesPensionFunds: data.performanceIncludesPensionFunds,
       performanceIncludesExcludedAssets: data.performanceIncludesExcludedAssets,
+      performanceExcludesCash: data.performanceExcludesCash,
       pensionReturnStartMonth: data.pensionReturnStartMonth,
       targets: data.targets as AssetAllocationTarget,
     };
@@ -326,6 +327,9 @@ export async function setSettings(
       if (settings.performanceIncludesExcludedAssets !== undefined) {
         docData.performanceIncludesExcludedAssets = settings.performanceIncludesExcludedAssets;
       }
+      if (settings.performanceExcludesCash !== undefined) {
+        docData.performanceExcludesCash = settings.performanceExcludesCash;
+      }
       // Clearable (empty month input = "parti dal primo versamento"). Same shape as the default
       // cash accounts above: this branch writes WITHOUT merge, so dropping the key removes it.
       if ('pensionReturnStartMonth' in settings) {
@@ -489,6 +493,9 @@ export async function setSettings(
       }
       if (settings.performanceIncludesExcludedAssets !== undefined) {
         docData.performanceIncludesExcludedAssets = settings.performanceIncludesExcludedAssets;
+      }
+      if (settings.performanceExcludesCash !== undefined) {
+        docData.performanceExcludesCash = settings.performanceExcludesCash;
       }
       // Clearable, and this branch merges — omitting the key would leave the old month in place,
       // so an explicit deleteField() is required (same as the default cash accounts above).

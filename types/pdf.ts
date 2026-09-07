@@ -229,6 +229,12 @@ export interface SummaryData {
 export interface PerformanceData {
   metrics: PerformanceMetrics;
   periodLabel: string;  // "YTD 2026" or "Storico Totale"
+  /**
+   * The measured base, in the page's own words (`describeMeasurementBase`): the report measures the
+   * SAME capital as the Rendimenti page — the managed portfolio, pension funds in as flows when the
+   * toggle says so — and says it, since a reader told «Rendimenti» otherwise assumes the whole net worth.
+   */
+  baseLabel: string;
 }
 
 // ============================================

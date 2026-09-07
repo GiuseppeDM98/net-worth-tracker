@@ -24,8 +24,14 @@
  * so both surfaces report one consistent number for the same portfolio.
  *
  * MULTI-CURRENCY: per-share EUR is derived as (grossAmountEur ?? grossAmount) / quantity
- * (net analogously), so non-EUR dividends use their EUR conversion when available.
+ * (net analogously), so non-EUR dividends use their EUR conversion when available — and the
+ * denominators are EUR too: the PMC through `costBasisPerUnitEur` (the ledger's EUR PMC, fees
+ * included; the native one only for a EUR asset) and the price through `unitPriceEur`
+ * (lib/utils/costBasisEur.ts). A foreign asset without a EUR PMC yet has no yield on cost —
+ * it is left out, never measured against its dollar PMC.
  */
+
+import { costBasisPerUnitEur, unitPriceEur } from '@/lib/utils/costBasisEur';
 
 export interface DividendInput {
   assetId: string;
@@ -42,8 +48,15 @@ export interface AssetInput {
   ticker: string;
   name: string;
   quantity: number;
+  /** Native PMC (fees excluded); the denominator only for a EUR asset without `averageCostEur`. */
   averageCost?: number;
+  /** The ledger's EUR PMC, purchase fees included — the denominator when present. */
+  averageCostEur?: number;
   currentPrice: number;
+  /** The price updater's EUR price for a foreign asset. */
+  currentPriceEur?: number;
+  /** Absent reads as EUR (costBasisEur.ts). */
+  currency?: string;
   // Optional lower date bound for the CURRENT continuous holding. When set, dividends paid
   // before this date are ignored — this is how a sold-and-rebought instrument (same id) stops
   // counting dividends from its previous holding against the new cost basis. Derived from the
@@ -168,21 +181,24 @@ export function computeDividendYieldMetrics(
 
   dpsGross.forEach((periodDpsGross, assetId) => {
     const asset = assetsMap.get(assetId);
-    // Require a known cost basis to express a yield on cost
-    if (!asset || !asset.averageCost || asset.averageCost <= 0 || asset.quantity <= 0) return;
+    if (!asset || asset.quantity <= 0) return;
+    // Require a EUR cost basis to express a yield on cost: the dividends above are EUR.
+    const averageCost = costBasisPerUnitEur(asset);
+    if (averageCost === undefined) return;
+    const currentPrice = unitPriceEur(asset);
 
     const annualizedDpsGross = annualize(periodDpsGross);
     const annualizedDpsNet = annualize(dpsNet.get(assetId) ?? 0);
-    const costBasis = asset.quantity * asset.averageCost;
-    const marketValue = asset.quantity * asset.currentPrice;
+    const costBasis = asset.quantity * averageCost;
+    const marketValue = asset.quantity * currentPrice;
 
     result.push({
       assetId,
       assetTicker: asset.ticker,
       assetName: asset.name,
       quantity: asset.quantity,
-      averageCost: asset.averageCost,
-      currentPrice: asset.currentPrice,
+      averageCost,
+      currentPrice,
       annualizedDpsGross,
       annualizedDpsNet,
       realizedGross: realizedGross.get(assetId) ?? 0,
@@ -191,10 +207,10 @@ export function computeDividendYieldMetrics(
       annualIncomeNet: annualizedDpsNet * asset.quantity,
       costBasis,
       marketValue,
-      yocGrossPct: (annualizedDpsGross / asset.averageCost) * 100,
-      yocNetPct: (annualizedDpsNet / asset.averageCost) * 100,
-      currentYieldGrossPct: asset.currentPrice > 0 ? (annualizedDpsGross / asset.currentPrice) * 100 : 0,
-      currentYieldNetPct: asset.currentPrice > 0 ? (annualizedDpsNet / asset.currentPrice) * 100 : 0,
+      yocGrossPct: (annualizedDpsGross / averageCost) * 100,
+      yocNetPct: (annualizedDpsNet / averageCost) * 100,
+      currentYieldGrossPct: currentPrice > 0 ? (annualizedDpsGross / currentPrice) * 100 : 0,
+      currentYieldNetPct: currentPrice > 0 ? (annualizedDpsNet / currentPrice) * 100 : 0,
     });
   });
 

@@ -26,9 +26,18 @@
  * `externalFlowOf` è l'UNICA somma dei due canali — la mappa la usa, e così ogni formula che
  * neutralizza i flussi la vede senza saperlo. `mergePensionFlows` è dove i flussi entrano nella
  * serie, mese per mese, una volta sola.
+ *
+ * IL TERZO CANALE: I FLUSSI MISURATI SUL CONFINE DELLA BASE (2026-09-07)
+ * Quando la base è un sottoinsieme del patrimonio, il risparmio del Cashflow non è il capitale che
+ * l'ha attraversata: un acquisto pagato da un conto fuori dalla base è denaro che entra, e il
+ * Cashflow salta i trasferimenti per costruzione (issue/PR #319). Per i mesi in cui il confine si
+ * può misurare — registro operazioni e Δquantità del `byAsset`, `lib/utils/portfolioFlows.ts` —
+ * `portfolioFlow` SOSTITUISCE `netCashFlow` in `externalFlowOf`; dove non si può (`null`/assente)
+ * si torna al risparmio del Cashflow. `netCashFlow` non cambia mai significato: resta ciò che la
+ * tessera Contributi stampa come «messi da parte».
  */
 
-import type { CashFlowData, PensionBoundaryFlow } from '@/types/performance';
+import type { CashFlowData, PensionBoundaryFlow, PortfolioBoundaryFlow } from '@/types/performance';
 
 /**
  * La chiave `YYYY-MM` di un mese.
@@ -51,12 +60,13 @@ export function monthKeyOf(date: Date): string {
 }
 
 /**
- * Tutto il capitale esterno che ha attraversato la base in un mese: il risparmio del cashflow più il
- * canale dei fondi pensione. È il numero che ogni formula di rendimento sottrae — mai `netCashFlow`
- * da solo, che è la metà stampata dalla tessera Contributi.
+ * Tutto il capitale esterno che ha attraversato la base in un mese: il flusso misurato sul confine
+ * quando il mese lo ha (`portfolioFlow`), altrimenti il risparmio del cashflow, più il canale dei
+ * fondi pensione. È il numero che ogni formula di rendimento sottrae — mai `netCashFlow` da solo,
+ * che è la metà stampata dalla tessera Contributi.
  */
 export function externalFlowOf(cashFlow: CashFlowData): number {
-  return cashFlow.netCashFlow + (cashFlow.pensionFlow ?? 0);
+  return (cashFlow.portfolioFlow ?? cashFlow.netCashFlow) + (cashFlow.pensionFlow ?? 0);
 }
 
 /**
@@ -119,6 +129,55 @@ export function mergePensionFlows(
       dividendIncome: 0,
       netCashFlow: 0,
       pensionFlow: flow.amount,
+    });
+  }
+
+  return [...byMonth.values()].sort((a, b) => a.date.getTime() - b.date.getTime());
+}
+
+/**
+ * Innesta i flussi misurati sul confine della base nella serie mensile, dentro una finestra.
+ *
+ * Stessa forma di `mergePensionFlows`: un mese già presente riceve il suo `portfolioFlow`, un mese
+ * che il cashflow non conosce nasce come riga a zero con il solo flusso misurato. Un mese della
+ * finestra SENZA flusso misurato resta com'è, con `portfolioFlow` assente: è `externalFlowOf` a
+ * ricadere sul risparmio del cashflow, e la distinzione fra «misurato a zero» e «non misurabile»
+ * sopravvive fino alla formula. `netCashFlow`, `income` ed `expenses` non vengono toccati.
+ *
+ * @param cashFlows - La serie costruita dalle spese (qualsiasi ordine; non viene mutata)
+ * @param portfolioFlows - I flussi da `resolvePerformanceBase`, di qualsiasi periodo
+ * @param startDate - Primo giorno della finestra (il suo mese è il primo incluso)
+ * @param endDate - Ultimo istante della finestra (il suo mese è l'ultimo incluso)
+ * @returns Una nuova serie, ordinata per data
+ */
+export function mergePortfolioFlows(
+  cashFlows: CashFlowData[],
+  portfolioFlows: PortfolioBoundaryFlow[],
+  startDate: Date,
+  endDate: Date
+): CashFlowData[] {
+  const firstKey = monthKeyOf(startDate);
+  const lastKey = monthKeyOf(endDate);
+  const inWindow = portfolioFlows.filter((flow) => flow.month >= firstKey && flow.month <= lastKey);
+  if (inWindow.length === 0) return cashFlows;
+
+  const byMonth = new Map<string, CashFlowData>(
+    cashFlows.map((cashFlow) => [monthKeyOf(cashFlow.date), { ...cashFlow }])
+  );
+  for (const flow of inWindow) {
+    const existing = byMonth.get(flow.month);
+    if (existing) {
+      existing.portfolioFlow = (existing.portfolioFlow ?? 0) + flow.amount;
+      continue;
+    }
+    const [year, month] = flow.month.split('-').map(Number);
+    byMonth.set(flow.month, {
+      date: new Date(year, month - 1, 1),
+      income: 0,
+      expenses: 0,
+      dividendIncome: 0,
+      netCashFlow: 0,
+      portfolioFlow: flow.amount,
     });
   }
 

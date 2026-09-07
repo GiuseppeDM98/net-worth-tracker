@@ -49,6 +49,7 @@ const RETURN: PensionReturnResult = {
   annualizedTwr: 10.75,
   personalReturn: 8.12,
   isCoverageSuspicious: false,
+  isCoverageContradictory: false,
   hasNoMovement: false,
 };
 
@@ -165,6 +166,16 @@ describe('buildPensionVerdict', () => {
       'Il fondo di Mario vale 31.450 €: il rendimento non è misurabile perché mancano versamenti registrati, nel 2026 il datore ha aggiunto 134 € e il fisco restituisce circa 275 €.'
     );
 
+    const contradictory = buildPensionVerdict({
+      blocks: [{ ...MARIO, returnState: 'contradictory', return: { ...RETURN, isCoverageContradictory: true, twr: -97.33 } }],
+      taxYear: 2026,
+      currentYear: 2026,
+    });
+    expect(contradictory.headline).toBe('Il rendimento del fondo non è misurabile.');
+    expect(contradictory.tone).toBe('neutral');
+    expect(plain(contradictory.sentence)).toContain('il rendimento non è misurabile perché risultano più versamenti della crescita');
+    expect(plain(contradictory.sentence)).not.toContain('−97');
+
     const idle = buildPensionVerdict({ blocks: [{ ...MARIO, returnState: 'idle', return: { ...RETURN, hasNoMovement: true, twr: 0 } }], taxYear: 2026, currentYear: 2026 });
     expect(plain(idle.sentence)).toContain('da novembre 2025 il valore non si è ancora mosso');
 
@@ -278,6 +289,14 @@ describe('Rendimento', () => {
       'Il fondo è cresciuto di 3000 € ma risultano registrati solo 100 € di versamenti: la differenza verrebbe letta come rendimento di mercato, e non lo è. Registra i versamenti mancanti, oppure indica da quale mese il calcolo è affidabile nelle Impostazioni.'
     );
     expect(plain(describeRendimento([{ ...suspicious, hasConfiguredStart: true }]))).toMatch(/Registra i versamenti mancanti\.$/);
+
+    // The mirror image: the advice is NOT «registra i versamenti mancanti».
+    const contradictory = { ...MARIO, returnState: 'contradictory' as const, return: { ...RETURN, isCoverageContradictory: true, valueGrowth: 1_520, contributions: { ...RETURN.contributions, total: 2_250 } } };
+    expect(plain(describeRendimento([contradictory]))).toBe(
+      'Il fondo è cresciuto di 1520 € ma risultano registrati 2250 € di versamenti, più della crescita stessa: o alcuni erano già inclusi nel valore che hai inserito a mano, o sono stati contati due volte. Non è un rendimento negativo, è un dato da sistemare: indica da quale mese il calcolo è affidabile nelle Impostazioni.'
+    );
+    expect(plain(describeRendimento([{ ...contradictory, hasConfiguredStart: true }]))).toMatch(/è un dato da sistemare\.$/);
+    expect(plain(describeRendimento([contradictory]))).not.toContain('Registra i versamenti mancanti');
 
     const idle = { ...MARIO, returnState: 'idle' as const, return: { ...RETURN, hasNoMovement: true } };
     expect(plain(describeRendimento([idle]))).toBe(

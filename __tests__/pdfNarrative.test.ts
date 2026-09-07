@@ -292,15 +292,19 @@ describe('describeCashflowSection', () => {
 });
 
 describe('describePerformanceSection', () => {
-  it('leads on the metric the app itself calls recommended', () => {
+  it('leads on the metric the app itself calls recommended, named annualised, the CAGR beside it and never as its annualised form', () => {
     expect(
       plain(
         describePerformanceSection({
           periodLabel: 'Storico Totale',
+          baseLabel: 'Base: portafoglio gestito, al netto degli asset esclusi dall’allocazione.',
           metrics: { timeWeightedReturn: 8.41, cagr: 7.9 },
         } as PerformanceData),
       ),
-    ).toBe('Il rendimento time-weighted del periodo è +8,41% su Storico Totale, pari al +7,90% annualizzato.');
+    ).toBe('Il rendimento time-weighted annualizzato è +8,41% su Storico Totale; il CAGR, con i versamenti nel capitale iniziale, è +7,90%.');
+    expect(
+      plain(describePerformanceSection({ periodLabel: 'YTD 2026', baseLabel: 'Base: patrimonio totale.', metrics: { timeWeightedReturn: 8.41, cagr: null } } as PerformanceData)),
+    ).toBe('Il rendimento time-weighted annualizzato è +8,41% su YTD 2026.');
   });
 
   it('says it is not calculable rather than printing a zero', () => {

@@ -73,6 +73,28 @@
  * (`CashFlowData.pensionFlow`), non in `netCashFlow`: la tessera Contributi non deve leggere
  * l'ingresso di un fondo come «messi da parte».
  *
+ * I FLUSSI SEGUONO LA BASE (2026-09-07, issue/PR #319 rifatta qui)
+ * Una base è due metà: QUALE capitale e QUALI flussi. Il risparmio del Cashflow è il capitale che
+ * entra nel PATRIMONIO dall'esterno — giusto quando la base è tutto il patrimonio, sbagliato appena
+ * è un sottoinsieme: un acquisto pagato da un conto fuori dalla base è denaro che entra, e il
+ * Cashflow salta i trasferimenti per costruzione, quindi ogni acquisto veniva letto come rendimento.
+ * Quando qualcosa è fuori dalla base in qualche mese, `portfolioFlows` misura ciò che ne attraversa il
+ * confine, strumento per strumento e mese per mese dove entrambi gli snapshot hanno il `byAsset`
+ * (`lib/utils/portfolioFlows.ts`: registro operazioni dove lo strumento è coperto, Δquantità
+ * altrove, un conto dentro la base conta il suo saldo, baseline e rettifiche non muovono denaro).
+ * Viaggiano sul terzo canale `CashFlowData.portfolioFlow`, che nei mesi misurati SOSTITUISCE il
+ * risparmio in `externalFlowOf`; `netCashFlow` resta «messi da parte». Con niente escluso la lista
+ * è vuota e non cambia un decimale.
+ *
+ * LA LIQUIDITÀ FUORI DALLA BASE (`excludeCash`, 2026-09-07)
+ * Un interruttore delle sole Impostazioni Rendimenti toglie i conti di tipo `cash` dalla base senza
+ * toccare il loro ruolo di allocazione; un ETF monetario ha un prezzo e resta dentro. Acceso, il
+ * capitale che i conti pagano agli strumenti è un flusso misurato — è la ragione per cui il toggle
+ * esiste solo ora: senza i flussi misurati, escludere la liquidità avrebbe letto ogni acquisto come
+ * rendimento. `classifyContribution` guarda anche il conto: un volontario da un conto fuori dalla
+ * base è capitale entrato nel fondo; da un conto dentro, in un mese misurato, è un `transfer` che
+ * annulla il calo di saldo già contato (capitale spostato, non entrato).
+ *
  * L'ALTRA METÀ DELLA BASE: DA QUALE MESE (`resolveHasBaseline`, 2026-07-28)
  * La base non è solo *quale capitale* si misura, è anche *da quale mese*. Il primo snapshot di un
  * periodo può essere due cose diverse — la valutazione di partenza pre-periodo (dicembre per lo YTD)
@@ -83,12 +105,15 @@
  */
 
 import type { Asset, AssetAllocationSettings, MonthlySnapshot } from '@/types/assets';
-import type { PensionBoundaryFlow, PeriodMonth } from '@/types/performance';
+import type { AssetTransaction } from '@/types/assetTransactions';
+import type { PensionBoundaryFlow, PeriodMonth, PortfolioBoundaryFlow } from '@/types/performance';
 import type { PensionContribution } from '@/types/pension';
 import { resolveAllocationRole } from '@/lib/utils/allocationUtils';
+import { requiresManualPricing } from '@/lib/utils/assetPricing';
 import { hasAssetBreakdown } from '@/lib/utils/snapshotAssetBreakdown';
 import { resolvePensionReturnStart, valueEffectMonth } from '@/lib/utils/pensionReturn';
 import { monthKey } from '@/lib/utils/cashFlowMap';
+import { buildPortfolioBoundaryFlows } from '@/lib/utils/portfolioFlows';
 
 export type PerformanceBase = 'portfolio' | 'netWorth';
 
@@ -106,14 +131,21 @@ export interface PerformanceBaseOptions {
   includePensionFunds?: boolean;
   /** `true` = gli asset `allocationRole: 'excluded'` restano nella base. Default `false`. */
   includeExcludedAssets?: boolean;
+  /**
+   * `true` = i conti di tipo `cash` escono dalla base («Liquidità fuori dalla base», 2026-09-07),
+   * senza toccare il loro ruolo di allocazione. Un ETF monetario ha un prezzo e resta dentro.
+   * Default `false`. Acceso, il capitale che entra negli strumenti pagato da un conto è un flusso
+   * misurato (`portfolioFlows`), non un rendimento.
+   */
+  excludeCash?: boolean;
 }
 
 /**
  * Traduce le impostazioni salvate in opzioni della base.
  *
  * Esiste per un motivo solo: i due chiamanti devono leggere gli STESSI campi con gli STESSI default.
- * Un'impostazione assente (account mai configurato) vale `false` su entrambi i flag, cioè la base
- * esclusiva — mai dedurre il contrario dal silenzio.
+ * Un'impostazione assente (account mai configurato) vale `false` su ogni flag, cioè la base
+ * esclusiva con la liquidità dentro — mai dedurre il contrario dal silenzio.
  */
 export function resolvePerformanceBaseOptions(
   settings: AssetAllocationSettings | null | undefined
@@ -121,6 +153,7 @@ export function resolvePerformanceBaseOptions(
   return {
     includePensionFunds: settings?.performanceIncludesPensionFunds ?? false,
     includeExcludedAssets: settings?.performanceIncludesExcludedAssets ?? false,
+    excludeCash: settings?.performanceExcludesCash ?? false,
   };
 }
 
@@ -140,8 +173,8 @@ export function resolvePerformanceExclusions(
   assets: Asset[],
   options: PerformanceBaseOptions = {}
 ): string[] {
-  const { includePensionFunds = false, includeExcludedAssets = false } = options;
-  if (includePensionFunds && includeExcludedAssets) return [];
+  const { includePensionFunds = false, includeExcludedAssets = false, excludeCash = false } = options;
+  if (includePensionFunds && includeExcludedAssets && !excludeCash) return [];
 
   const excluded = new Set<string>();
   for (const asset of assets) {
@@ -150,6 +183,12 @@ export function resolvePerformanceExclusions(
     // silent no-op — see the header.
     if (asset.type === 'pensionFund') {
       if (!includePensionFunds) excluded.add(asset.id);
+      continue;
+    }
+    // A cash account answers to the liquidity toggle first: out of the base by TYPE, its allocation
+    // role untouched (the Allocazione page keeps it). A money-market ETF is not `cash` and stays in.
+    if (excludeCash && asset.type === 'cash') {
+      excluded.add(asset.id);
       continue;
     }
     if (!includeExcludedAssets && resolveAllocationRole(asset) === 'excluded') excluded.add(asset.id);
@@ -263,6 +302,13 @@ export interface PerformanceBaseResolution {
   snapshots: MonthlySnapshot[];
   /** Every crossing of the base's boundary through the pension funds, any period. */
   pensionFlows: PensionBoundaryFlow[];
+  /**
+   * The measured boundary flows (`lib/utils/portfolioFlows.ts`), one per measurable month, any
+   * period — EMPTY when the base is the whole net worth, where the cashflow's savings are the
+   * right flows and nothing is measured. The flows follow the base: a subset base measures what
+   * crosses its boundary, from the ledger and the quantities.
+   */
+  portfolioFlows: PortfolioBoundaryFlow[];
 }
 
 /** Sum of the pension funds' value frozen in one snapshot. */
@@ -295,27 +341,57 @@ function resolvePensionEntryMonth(
   return entry ? monthKey(entry.year, entry.month) : null;
 }
 
+/** What the contribution rule needs to know about the rest of the base. */
+interface ContributionContext {
+  fundIds: Set<string>;
+  entryMonth: string | null;
+  /** The `assetId`s outside the base in every month (the role-excluded ones, the cash accounts with the toggle). */
+  excludedIds: Set<string>;
+  /** The liquidity toggle: every cash account is out, so a contribution from an account we cannot place came from outside too. */
+  cashExcludedByToggle: boolean;
+  /** The months whose flows are measured from the quantities/ledger (`portfolioFlows`). */
+  measuredMonths: Set<string>;
+}
+
 /**
- * Whether one contribution crossed the base's boundary, and in which direction — the ONE rule.
+ * Whether one contribution crossed the base's boundary, and in which direction — the ONE rule:
+ * a contribution is a flow iff it crosses the base's boundary.
  *
  * `month > entryMonth` means the fund was already inside the base when the value moved (the entry
  * month itself is covered by the entry flow, which carries the fund's whole value). A voluntary
  * contribution paid from a cash account is recognised by its `linkedExpenseId` (the transfer the
  * service wrote); one without it was withheld from payroll and came from outside, like TFR.
+ *
+ * The cash side matters twice (2026-09-07). Its account can be OUT of the base (the liquidity
+ * toggle, or a role-excluded account): then the transfer crosses the boundary whatever the fund
+ * does — in when the fund is inside, nowhere when both are out. And when the month's flows are
+ * MEASURED from the quantities, the account's balance drop is already counted there: a fund
+ * inside gets a `transfer` entry that restores its side (the two cancel: capital moved within
+ * the base), a fund outside gets nothing (the withdrawal is the balance drop itself). Until then
+ * a voluntary from a cash account was a `withdrawal` in every case with the fund out, and the
+ * rule did not know whether that account was in the base at all.
  */
-function classifyContribution(
-  contribution: PensionContribution,
-  fundIds: Set<string>,
-  entryMonth: string | null
-): PensionBoundaryFlow | null {
+function classifyContribution(contribution: PensionContribution, ctx: ContributionContext): PensionBoundaryFlow | null {
   const month = valueEffectMonth(contribution);
-  const fundInBase = entryMonth !== null && month > entryMonth && fundIds.has(contribution.assetId);
+  const fundInBase = ctx.entryMonth !== null && month > ctx.entryMonth && ctx.fundIds.has(contribution.assetId);
   const fromCash = contribution.source === 'voluntary' && !!contribution.linkedExpenseId;
+  const amount = contribution.amount;
+
+  if (!fromCash) {
+    // TFR, employer share, payroll-withheld voluntary: outside money, a flow only when the fund is in.
+    return fundInBase ? { month, amount, kind: 'contribution' } : null;
+  }
+
+  // An account we cannot place (no `sourceCashAssetId`) is read as a tracked one, inside unless the toggle took every cash account out.
+  const cashInBase = contribution.sourceCashAssetId ? !ctx.excludedIds.has(contribution.sourceCashAssetId) : !ctx.cashExcludedByToggle;
+  const monthMeasured = ctx.measuredMonths.has(month);
 
   if (fundInBase) {
-    return fromCash ? null : { month, amount: contribution.amount, kind: 'contribution' };
+    if (!cashInBase) return { month, amount, kind: 'contribution' };
+    return monthMeasured ? { month, amount, kind: 'transfer' } : null;
   }
-  return fromCash ? { month, amount: -contribution.amount, kind: 'withdrawal' } : null;
+  if (!cashInBase) return null;
+  return monthMeasured ? null : { month, amount: -amount, kind: 'withdrawal' };
 }
 
 /**
@@ -332,23 +408,32 @@ function classifyContribution(
  * funds (actual values, or the E₀ backfill before `byAsset`), the months from it on WITH them, and
  * the flows are the entry value plus every later contribution that came from outside.
  *
+ * The flows follow the base (2026-09-07). When anything is out of the base in any month — a
+ * role-excluded asset, the cash accounts with the liquidity toggle, the pension funds before their
+ * entry or with the toggle off — the cashflow's savings are not the capital that crossed its
+ * boundary, and `portfolioFlows` measures it instead, month by month where both snapshots carry a
+ * breakdown (`lib/utils/portfolioFlows.ts`). With nothing ever excluded the list is empty and the
+ * cashflow stays the source: on such an account not a decimal moves.
+ *
  * @param input.snapshots - The account's snapshots, any order (the order is preserved)
  * @param input.assets - Every asset of the account
  * @param input.contributions - Every pension contribution of the account, any period
- * @param input.settings - The saved settings (the two toggles and `pensionReturnStartMonth`)
+ * @param input.settings - The saved settings (the three toggles and `pensionReturnStartMonth`)
+ * @param input.trades - The trade ledger, any period; absent = the quantities alone measure the flows
  */
 export function resolvePerformanceBase(input: {
   snapshots: MonthlySnapshot[];
   assets: Asset[];
   contributions: PensionContribution[];
   settings: AssetAllocationSettings | null | undefined;
+  trades?: AssetTransaction[];
 }): PerformanceBaseResolution {
-  const { snapshots, assets, contributions, settings } = input;
+  const { snapshots, assets, contributions, settings, trades = [] } = input;
   const options = resolvePerformanceBaseOptions(settings);
   const pensionFundIds = assets.filter((asset) => asset.type === 'pensionFund').map((asset) => asset.id);
   const fundIds = new Set(pensionFundIds);
 
-  // Everything the role keeps out, whatever the pension toggle says.
+  // Everything the role (and the liquidity toggle) keeps out, whatever the pension toggle says.
   const otherExcluded = resolvePerformanceExclusions(assets, { ...options, includePensionFunds: true });
   const outEverywhere = [...otherExcluded, ...pensionFundIds];
 
@@ -357,8 +442,22 @@ export function resolvePerformanceBase(input: {
       ? resolvePensionEntryMonth(snapshots, fundIds, resolvePensionReturnStart(contributions, settings?.pensionReturnStartMonth))
       : null;
 
+  // The measured boundary flows. Opaque to the quantity branch: every hand-valued instrument
+  // except the cash accounts (a balance IS money), the pension funds first among them — their money
+  // rides the pension channel below.
+  const baseIsSubset = outEverywhere.length > 0;
+  const opaqueIds = assets.filter((asset) => asset.type !== 'cash' && requiresManualPricing(asset)).map((asset) => asset.id);
+  const portfolioFlows = baseIsSubset ? buildPortfolioBoundaryFlows(snapshots, otherExcluded, trades, [...new Set([...opaqueIds, ...pensionFundIds])]) : [];
+
+  const contributionContext: ContributionContext = {
+    fundIds,
+    entryMonth: pensionEntryMonth,
+    excludedIds: new Set(otherExcluded),
+    cashExcludedByToggle: options.excludeCash === true,
+    measuredMonths: new Set(portfolioFlows.map((flow) => flow.month)),
+  };
   const contributionFlows = contributions
-    .map((contribution) => classifyContribution(contribution, fundIds, pensionEntryMonth))
+    .map((contribution) => classifyContribution(contribution, contributionContext))
     .filter((flow): flow is PensionBoundaryFlow => flow !== null);
 
   if (pensionEntryMonth === null) {
@@ -369,6 +468,7 @@ export function resolvePerformanceBase(input: {
       excludedAssetIds: outEverywhere,
       snapshots: toPerformanceBaseSnapshots(snapshots, outEverywhere),
       pensionFlows: contributionFlows,
+      portfolioFlows,
     };
   }
 
@@ -391,5 +491,6 @@ export function resolvePerformanceBase(input: {
     excludedAssetIds: otherExcluded,
     snapshots: projected,
     pensionFlows: [entryFlow, ...contributionFlows].sort((a, b) => a.month.localeCompare(b.month)),
+    portfolioFlows,
   };
 }

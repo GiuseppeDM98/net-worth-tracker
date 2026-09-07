@@ -313,6 +313,61 @@ describe('summarizePensionMembers', () => {
     expect(onePoint[0].returnState).toBe('one-point');
     expect(onePoint[0].return).toBeNull();
   });
+
+  it('reads more contributions than growth as «contradictory», and lets it win over «suspicious»', () => {
+    // Five months of contributions recorded on one day, so valueEffectMonth attributes them all to
+    // August: the window reads them as market on the way up, then subtracts 2.250 € from a month
+    // worth 2.270 € (PR #323's case on round figures).
+    const recorded = new Date(2026, 7, 28);
+    const backfilled = [
+      contribution('b1', 'fund-1', 'tfr', 400, new Date(2026, 3, 15), 2026, recorded),
+      contribution('b2', 'fund-1', 'employer', 350, new Date(2026, 3, 15), 2026, recorded),
+      contribution('b3', 'fund-1', 'tfr', 200, new Date(2026, 4, 15), 2026, recorded),
+      contribution('b4', 'fund-1', 'employer', 175, new Date(2026, 4, 15), 2026, recorded),
+      contribution('b5', 'fund-1', 'tfr', 200, new Date(2026, 5, 15), 2026, recorded),
+      contribution('b6', 'fund-1', 'employer', 175, new Date(2026, 5, 15), 2026, recorded),
+      contribution('b7', 'fund-1', 'tfr', 200, new Date(2026, 6, 15), 2026, recorded),
+      contribution('b8', 'fund-1', 'employer', 175, new Date(2026, 6, 15), 2026, recorded),
+      contribution('b9', 'fund-1', 'tfr', 200, new Date(2026, 7, 15), 2026, recorded),
+      contribution('b10', 'fund-1', 'employer', 175, new Date(2026, 7, 15), 2026, recorded),
+    ];
+    const contradictory = summarizePensionMembers({
+      ...INPUT,
+      configuredStartMonth: '2026-04',
+      contributions: backfilled,
+      snapshots: [
+        snapshot(2026, 4, { 'fund-1': 750 }),
+        snapshot(2026, 5, { 'fund-1': 1_125 }),
+        snapshot(2026, 6, { 'fund-1': 1_500 }),
+        snapshot(2026, 7, { 'fund-1': 1_875 }),
+        snapshot(2026, 8, { 'fund-1': 2_270 }),
+      ],
+      funds: [fund('fund-1', 'Fondo Cometa', 2_270, 'm1')],
+    });
+    expect(contradictory[0].returnState).toBe('contradictory');
+    expect(contradictory[0].return?.isCoverageContradictory).toBe(true);
+
+    // The overlap: two non-positive months (index negative, then positive again) and a recovery
+    // that annualizes far past the suspicious threshold — both flags true, the contradiction wins.
+    const overlap = summarizePensionMembers({
+      ...INPUT,
+      configuredStartMonth: '2026-01',
+      contributions: [
+        contribution('o1', 'fund-1', 'voluntary', 600, new Date(2026, 1, 10), 2026),
+        contribution('o2', 'fund-1', 'voluntary', 300, new Date(2026, 2, 10), 2026),
+      ],
+      snapshots: [
+        snapshot(2026, 1, { 'fund-1': 1_000 }),
+        snapshot(2026, 2, { 'fund-1': 500 }), // net of 600 paid in: −100
+        snapshot(2026, 3, { 'fund-1': 250 }), // net of 300 paid in: −50
+        snapshot(2026, 4, { 'fund-1': 50_000 }),
+      ],
+      funds: [fund('fund-1', 'Fondo Cometa', 50_000, 'm1')],
+    });
+    expect(overlap[0].return?.isCoverageSuspicious).toBe(true);
+    expect(overlap[0].return?.isCoverageContradictory).toBe(true);
+    expect(overlap[0].returnState).toBe('contradictory');
+  });
 });
 
 describe('summarizeVersato', () => {

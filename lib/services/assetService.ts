@@ -16,6 +16,7 @@ import { db } from '@/lib/firebase/config';
 import { removeUndefinedDeep as removeUndefinedFields } from '@/lib/utils/firestoreData';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { suggestIsLiquid } from '@/lib/utils/assetLiquidity';
+import { costBasisPerUnitEur, unitPriceEur } from '@/lib/utils/costBasisEur';
 import { invalidateDashboardOverviewSummary } from '@/lib/services/dashboardOverviewInvalidation';
 import { Asset, AssetFormData, BondDetails } from '@/types/assets';
 
@@ -524,29 +525,10 @@ export async function deleteAsset(assetId: string, userId: string): Promise<void
  * @returns Total asset value (quantity × price, minus outstanding debt for real estate)
  */
 export function calculateAssetValue(asset: Asset): number {
-  // For non-EUR assets, prefer the pre-converted EUR price stored during price updates.
-  // This avoids async FX calls at read time while keeping portfolio totals in EUR.
-  // Falls back to currentPrice for EUR assets and pre-migration documents that
-  // were not yet updated after this change was deployed.
-  //
-  // GBp safety guard: Yahoo Finance returns LSE prices in pence (GBp), not pounds.
-  // priceUpdater.ts normalises GBp→GBP (÷100) before writing to Firestore, but
-  // legacy assets or assets whose price was never refreshed may still carry the
-  // raw pence value with currency='GBp'. Dividing by 100 here keeps the fallback
-  // path safe even for those documents.
-  const isGBpFallback = asset.currency === 'GBp'; // lowercase 'p' = pence
-  const normalizedFallbackPrice = isGBpFallback
-    ? asset.currentPrice / 100
-    : asset.currentPrice;
-
-  const priceInEur =
-    asset.currency &&
-    asset.currency.toUpperCase() !== 'EUR' &&
-    asset.currentPriceEur !== undefined
-      ? asset.currentPriceEur
-      : normalizedFallbackPrice;
-
-  const baseValue = asset.quantity * priceInEur;
+  // The unit price in EUR (`unitPriceEur`, costBasisEur.ts): the pre-converted currentPriceEur
+  // stored by the price updater for a foreign asset — no FX call at read time — else the native
+  // price with the GBp guard. Per unit there, so the sale simulation and the yields share it.
+  const baseValue = asset.quantity * unitPriceEur(asset);
 
   // For real estate with outstanding debt, subtract the debt to get net equity.
   // Use Math.max(0, ...) to prevent negative values for underwater mortgages
@@ -690,28 +672,22 @@ export function calculateIlliquidFIRENetWorth(assets: Asset[], includePrimaryRes
 }
 
 /**
- * Calculate unrealized gains for a single asset
+ * One position's unrealized gain in EUR: the value (EUR) minus quantity × the EUR PMC, purchase
+ * fees included (`costBasisPerUnitEur`) — the same subtraction `computeUnrealizedGain`
+ * (patrimonioSummary) makes for the table, so the overview's total, the estimated taxes and the
+ * PDF print the figure the Patrimonio page shows (pinned by __tests__/assetService.test.ts).
  *
- * Returns 0 if averageCost is not set because gains cannot be calculated
- * without a cost basis (we don't know the purchase price).
- *
- * @param asset - Asset to calculate gains for
- * @returns Unrealized gain/loss (current value - cost basis)
+ * Zero where there is nothing to measure: a cash account (its balance is not invested capital), a
+ * pension fund (a leftover `averageCost` from a type conversion is not a PMC, and its exit
+ * taxation is another regime), a closed position, or a foreign asset the ledger has not projected
+ * a EUR PMC for yet — never a dollar PMC against a euro value.
  */
 export function calculateUnrealizedGains(asset: Asset): number {
-  // Cannot calculate gains without cost basis - return 0 as neutral value
-  if (!asset.averageCost || asset.averageCost <= 0) {
-    return 0;
-  }
-
-  // Use calculateAssetValue() for the current side so the price is always
-  // EUR-normalised (via currentPriceEur when available, or the GBp-safe fallback).
-  // averageCost is stored in the asset's native currency as entered by the user,
-  // so gains for non-EUR assets are expressed in the native currency — a known
-  // display-only limitation that is acceptable and consistent with AssetCard.
-  const currentValue = calculateAssetValue(asset);
-  const costBasis = asset.quantity * asset.averageCost;
-  return currentValue - costBasis;
+  if (asset.quantity <= 0 || asset.type === 'pensionFund') return 0;
+  if (asset.type === 'cash' && asset.assetClass === 'cash') return 0;
+  const basisPerUnit = costBasisPerUnitEur(asset);
+  if (basisPerUnit === undefined) return 0;
+  return calculateAssetValue(asset) - asset.quantity * basisPerUnit;
 }
 
 /**

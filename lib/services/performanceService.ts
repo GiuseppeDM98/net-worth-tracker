@@ -23,13 +23,14 @@ import { getUserSnapshots } from './snapshotService';
 import { getSettings } from './assetAllocationService';
 import { getAllAssets } from './assetService';
 import { getPensionContributions } from './pensionContributionService';
-import { buildCashFlowMap, externalFlowOf, mergePensionFlows, monthKey, monthKeyOf } from '@/lib/utils/cashFlowMap';
+import { getAssetTransactions } from './assetTransactionService';
+import { buildCashFlowMap, externalFlowOf, mergePensionFlows, mergePortfolioFlows, monthKey, monthKeyOf } from '@/lib/utils/cashFlowMap';
 import { removeUndefinedDeep } from '@/lib/utils/firestoreData';
 import { endOfMonthBound } from '@/lib/utils/dateHelpers';
 import { computeDividendYieldMetrics, type AssetInput, type DividendInput } from '@/lib/utils/yieldOnCost';
 import { buildTwrIndex, computeDrawdownSeries, findMaxDrawdown } from '@/lib/utils/drawdownSeries';
 import { resolvePerformanceBase, type PerformanceBaseResolution } from '@/lib/utils/performanceBase';
-import type { PensionBoundaryFlow } from '@/types/performance';
+import type { FlowSource, PensionBoundaryFlow, PortfolioBoundaryFlow } from '@/types/performance';
 
 const PERFORMANCE_CACHE_COLLECTION = 'performance-cache';
 
@@ -45,9 +46,12 @@ const PERFORMANCE_CACHE_COLLECTION = 'performance-cache';
  * TWR annualization; v3 = rolling windows; v4 = IRR signs and timeline; v5 = volatility without
  * the ±50% filter, and its 3-observation floor; v6 = the pension toggle wins over the allocation
  * role, and the funds enter the base as a flow with their contributions neutralised
- * (`resolvePerformanceBase`, `CashFlowData.pensionFlow`).
+ * (`resolvePerformanceBase`, `CashFlowData.pensionFlow`); v7 = the flows follow the base — a
+ * subset base measures what crosses its boundary from the ledger and the quantities
+ * (`CashFlowData.portfolioFlow`), a non-positive starting value yields no return instead of a
+ * flipped sign, a rolling CAGR that cannot be measured is null, the unread 36-month series is gone.
  */
-const CACHE_MATH_VERSION = 'v6';
+const CACHE_MATH_VERSION = 'v7';
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -101,7 +105,9 @@ export function calculateROI(
   endNW: number,
   netCashFlow: number
 ): number | null {
-  if (startNW === 0) return null;
+  // A non-positive starting capital has no percentage return: dividing by a negative one (net debt,
+  // a month fully liquidated) flipped the sign in silence until 2026-09-07.
+  if (startNW <= 0) return null;
 
   const gain = endNW - startNW - netCashFlow;
   return (gain / startNW) * 100;
@@ -176,7 +182,7 @@ export function calculateTimeWeightedReturn(
     const cashFlow = cashFlowMap.get(monthKey(currSnapshot.year, currSnapshot.month)) || 0;
 
     // Calculate sub-period return: (End NW - Cash Flow) / Start NW - 1
-    if (startNW === 0) continue; // Skip if zero starting value
+    if (startNW <= 0) continue; // No return from a non-positive starting value (a negative one would flip the sign)
     const periodReturn = ((endNW - cashFlow) / startNW) - 1;
 
     // Link returns geometrically
@@ -300,7 +306,7 @@ export function calculateIRR(
   numberOfMonths: number,
   periodStart: Date
 ): number | null {
-  if (numberOfMonths < 1 || startNW === 0) return null;
+  if (numberOfMonths < 1 || startNW <= 0) return null;
 
   const flows: DatedFlow[] = [{ amount: -startNW, monthsFromStart: 0 }];
 
@@ -409,7 +415,7 @@ export function calculateVolatility(
     const prevNW = snapshots[i - 1].totalNetWorth;
     const currNW = snapshots[i].totalNetWorth;
 
-    if (prevNW === 0) continue;
+    if (prevNW <= 0) continue;
 
     const cashFlow = cashFlowMap.get(monthKey(snapshots[i].year, snapshots[i].month)) || 0;
 
@@ -970,6 +976,9 @@ export function getCashFlowsFromExpenses(
  * @param pensionFlows - The pension funds' boundary flows from `resolvePerformanceBase` (any
  *   period; the window is applied here). They ride the second channel of `CashFlowData`, so every
  *   flow-neutralised formula sees them while `netCashFlow` keeps its cashflow meaning.
+ * @param portfolioFlows - The measured boundary flows from `resolvePerformanceBase` (any period):
+ *   for the months they cover they REPLACE the cashflow's savings in every formula
+ *   (`externalFlowOf`); empty when the base is the whole net worth.
  */
 export async function calculatePerformanceForPeriod(
   userId: string,
@@ -980,7 +989,8 @@ export async function calculatePerformanceForPeriod(
   customEndDate?: Date,
   preFetchedExpenses?: Expense[],
   dividendCategoryId?: string,
-  pensionFlows: PensionBoundaryFlow[] = []
+  pensionFlows: PensionBoundaryFlow[] = [],
+  portfolioFlows: PortfolioBoundaryFlow[] = []
 ): Promise<PerformanceMetrics> {
   // One clock for the whole computation: period selection, the nominal start recorded in the
   // payload and the dividend cap must not disagree because they each called new Date().
@@ -1028,6 +1038,10 @@ export async function calculatePerformanceForPeriod(
     totalDividendIncome: 0,
     pensionFlow: 0,
     pensionEntryFlow: 0,
+    pensionInternalFlow: 0,
+    portfolioFlow: 0,
+    flowSource: 'cashflow',
+    measuredFlowMonths: 0,
     numberOfMonths: 0,
     yocGross: null,
     yocNet: null,
@@ -1093,7 +1107,9 @@ export async function calculatePerformanceForPeriod(
   const expenseCashFlows = preFetchedExpenses
     ? getCashFlowsFromExpenses(preFetchedExpenses, startDate, endDate, dividendCategoryId)
     : await getCashFlowsForPeriod(userId, startDate, endDate, dividendCategoryId);
-  const cashFlows = mergePensionFlows(expenseCashFlows, pensionFlows, startDate, endDate);
+  // The measured boundary flows first (they replace the savings month by month), then the pension
+  // channel on top: `externalFlowOf` reads `(portfolioFlow ?? netCashFlow) + pensionFlow`.
+  const cashFlows = mergePensionFlows(mergePortfolioFlows(expenseCashFlows, portfolioFlows, startDate, endDate), pensionFlows, startDate, endDate);
 
   // Calculate net cash flow totals
   let totalContributions = 0;
@@ -1123,10 +1139,16 @@ export async function calculatePerformanceForPeriod(
   const pensionFlow = cashFlows.reduce((sum, cf) => sum + (cf.pensionFlow ?? 0), 0);
   const firstMonthKey = monthKeyOf(startDate);
   const lastMonthKey = monthKeyOf(endDate);
-  const pensionEntryFlow = pensionFlows
-    .filter((flow) => flow.kind === 'entry' && flow.month >= firstMonthKey && flow.month <= lastMonthKey)
-    .reduce((sum, flow) => sum + flow.amount, 0);
-  const externalFlow = netCashFlow + pensionFlow;
+  const inWindow = (flow: { month: string }) => flow.month >= firstMonthKey && flow.month <= lastMonthKey;
+  const pensionEntryFlow = pensionFlows.filter((flow) => flow.kind === 'entry' && inWindow(flow)).reduce((sum, flow) => sum + flow.amount, 0);
+  const pensionInternalFlow = pensionFlows.filter((flow) => flow.kind === 'transfer' && inWindow(flow)).reduce((sum, flow) => sum + flow.amount, 0);
+
+  // The measured boundary flows: which months they covered, and what the formulas actually
+  // neutralised — the sum of `externalFlowOf` over the series, never `netCashFlow` alone.
+  const measuredFlowMonths = cashFlows.filter((cf) => cf.portfolioFlow !== undefined && cf.portfolioFlow !== null).length;
+  const portfolioFlow = cashFlows.reduce((sum, cf) => sum + (cf.portfolioFlow ?? 0), 0);
+  const flowSource: FlowSource = measuredFlowMonths === 0 ? 'cashflow' : measuredFlowMonths >= numberOfMonths ? 'portfolio' : 'mixed';
+  const externalFlow = cashFlows.reduce((sum, cf) => sum + externalFlowOf(cf), 0);
 
   // Calculate metrics
   const roi = calculateROI(
@@ -1226,6 +1248,10 @@ export async function calculatePerformanceForPeriod(
     totalDividendIncome,
     pensionFlow,
     pensionEntryFlow,
+    pensionInternalFlow,
+    portfolioFlow,
+    flowSource,
+    measuredFlowMonths,
     numberOfMonths,
     ...yocMetrics,  // Spread YOC fields (will be populated by client via API)
     ...currentYieldMetrics,  // Spread Current Yield fields (will be populated by client via API)
@@ -1287,7 +1313,6 @@ function serializePerformanceData(data: PerformanceData): FirestorePerformanceDa
     fiveYear: serializeMetrics(data.fiveYear),
     allTime: serializeMetrics(data.allTime),
     rolling12M: data.rolling12M.map(serializeRolling),
-    rolling36M: data.rolling36M.map(serializeRolling),
     lastUpdated: Timestamp.fromDate(data.lastUpdated),
     snapshotCount: data.snapshotCount,
   };
@@ -1302,7 +1327,6 @@ function deserializePerformanceData(raw: FirestorePerformanceData): PerformanceD
     allTime: deserializeMetrics(raw.allTime),
     custom: null,
     rolling12M: raw.rolling12M.map(deserializeRolling),
-    rolling36M: raw.rolling36M.map(deserializeRolling),
     lastUpdated: raw.lastUpdated.toDate(),
     snapshotCount: raw.snapshotCount,
   };
@@ -1364,17 +1388,19 @@ async function writePerformanceCache(userId: string, cacheKey: string, data: Per
  */
 function hashSnapshotSeries(snapshots: MonthlySnapshot[]): string {
   const sorted = [...snapshots].sort((a, b) => (a.year !== b.year ? a.year - b.year : a.month - b.month));
+  // Rounded to the euro: cents drift with FX re-conversions and would churn the key for nothing.
+  return hashTokens(sorted.map((snapshot) => `${snapshot.year}-${snapshot.month}:${Math.round(snapshot.totalNetWorth)};`));
+}
 
+/** FNV-1a over a list of tokens, in the order given (the caller sorts what must be order-free). */
+function hashTokens(tokens: string[]): string {
   let hash = 0x811c9dc5; // FNV offset basis
-  for (const snapshot of sorted) {
-    // Rounded to the euro: cents drift with FX re-conversions and would churn the key for nothing.
-    const token = `${snapshot.year}-${snapshot.month}:${Math.round(snapshot.totalNetWorth)};`;
+  for (const token of tokens) {
     for (let i = 0; i < token.length; i++) {
       hash ^= token.charCodeAt(i);
       hash = Math.imul(hash, 0x01000193); // FNV prime
     }
   }
-
   return (hash >>> 0).toString(36);
 }
 
@@ -1405,16 +1431,19 @@ function hashSnapshotSeries(snapshots: MonthlySnapshot[]): string {
  */
 export function buildCacheKey(inputs: {
   snapshots: MonthlySnapshot[];
-  base: Pick<PerformanceBaseResolution, 'options' | 'pensionEntryMonth' | 'pensionFlows'>;
+  base: Pick<PerformanceBaseResolution, 'options' | 'pensionEntryMonth' | 'pensionFlows' | 'portfolioFlows'>;
   riskFreeRate: number;
   dividendCategoryId?: string;
 }): string {
   const { snapshots, base, riskFreeRate, dividendCategoryId } = inputs;
 
-  // The two toggles, the month the funds enter, and every boundary flow (a contribution recorded
-  // today rewrites the flows while the snapshots stay byte-identical, so the flows must be here).
+  // The three toggles, the month the funds enter, and every boundary flow of both channels (a
+  // contribution recorded today, or a trade recorded in the ledger, rewrites the flows while the
+  // snapshots stay byte-identical, so the flows must be here). The measured flows are hashed as a
+  // series: they are the exact input the numbers depend on, whatever trade produced them.
   const flowsSignature = base.pensionFlows.map((flow) => `${flow.month}${flow.kind[0]}${Math.round(flow.amount)}`).join(',') || 'none';
-  const baseSignature = `p${base.options.includePensionFunds ? 1 : 0}e${base.options.includeExcludedAssets ? 1 : 0}-pe${base.pensionEntryMonth ?? 'none'}-pf${flowsSignature}`;
+  const measuredSignature = hashTokens(base.portfolioFlows.map((flow) => `${flow.month}:${Math.round(flow.amount)}${flow.source[0]}`));
+  const baseSignature = `p${base.options.includePensionFunds ? 1 : 0}e${base.options.includeExcludedAssets ? 1 : 0}c${base.options.excludeCash ? 1 : 0}-pe${base.pensionEntryMonth ?? 'none'}-pf${flowsSignature}-mf${base.portfolioFlows.length}${measuredSignature}`;
   const settingsSignature = `r${riskFreeRate}d${dividendCategoryId ?? 'none'}`;
 
   if (snapshots.length === 0) return `${CACHE_MATH_VERSION}-0-${baseSignature}-${settingsSignature}`;
@@ -1450,23 +1479,27 @@ export function buildCacheKey(inputs: {
  * @returns Complete performance data for all periods
  */
 export async function getAllPerformanceData(userId: string, forceRefresh = false): Promise<PerformanceData> {
-  // ==== STEP 1: Fetch snapshots, settings, assets and pension contributions in parallel ====
-  const [rawSnapshots, settings, assets, contributions] = await Promise.all([
+  // ==== STEP 1: Fetch snapshots, settings, assets, pension contributions and the ledger in parallel ====
+  // The ledger read is not guarded: a registry that cannot be read is a failed load (the page's
+  // isError branch), never an empty one silently measured from the quantities alone.
+  const [rawSnapshots, settings, assets, contributions, trades] = await Promise.all([
     getUserSnapshots(userId),
     getSettings(userId),
     getAllAssets(userId),
     getPensionContributions(userId),
+    getAssetTransactions(userId),
   ]);
 
   // Rendimenti measures the ACTIVELY MANAGED portfolio: by default the pension funds and the
   // non-allocated assets (the home you live in) are out of every metric below; with the pension
   // toggle on, the funds enter the base from the month their contributions are tracked, as a flow,
-  // and every later contribution is a flow too — see performanceBase.ts.
-  // WARNING: app/dashboard/performance/page.tsx resolves the same base for its client-side
-  // chart/heatmap/custom-range helpers through the SAME function. Keep both call sites on
-  // `resolvePerformanceBase` or a custom period silently disagrees with the pre-computed ones.
-  const base = resolvePerformanceBase({ snapshots: rawSnapshots, assets, contributions, settings });
-  const { snapshots, pensionFlows } = base;
+  // and every later contribution is a flow too; with the liquidity toggle the cash accounts are
+  // out and what they pay for is measured as a flow — see performanceBase.ts.
+  // WARNING: app/dashboard/performance/page.tsx and lib/services/pdfDataService.ts resolve the
+  // same base through the SAME function. Keep every call site on `resolvePerformanceBase` or a
+  // custom period (or the report) silently disagrees with the pre-computed ones.
+  const base = resolvePerformanceBase({ snapshots: rawSnapshots, assets, contributions, settings, trades });
+  const { snapshots, pensionFlows, portfolioFlows } = base;
 
   // `??`, not `||`: a deliberate 0% risk-free rate is a legitimate setting (it makes Sharpe the raw
   // return over volatility) and must not be silently replaced by the 2.5% default.
@@ -1507,17 +1540,12 @@ export async function getAllPerformanceData(userId: string, forceRefresh = false
   }
 
   // ==== STEP 4: Calculate metrics for all time periods ====
-  const [ytd, oneYear, threeYear, fiveYear, allTime] = await Promise.all([
-    calculatePerformanceForPeriod(userId, snapshots, 'YTD', riskFreeRate, undefined, undefined, allExpenses, dividendCategoryId, pensionFlows),
-    calculatePerformanceForPeriod(userId, snapshots, '1Y', riskFreeRate, undefined, undefined, allExpenses, dividendCategoryId, pensionFlows),
-    calculatePerformanceForPeriod(userId, snapshots, '3Y', riskFreeRate, undefined, undefined, allExpenses, dividendCategoryId, pensionFlows),
-    calculatePerformanceForPeriod(userId, snapshots, '5Y', riskFreeRate, undefined, undefined, allExpenses, dividendCategoryId, pensionFlows),
-    calculatePerformanceForPeriod(userId, snapshots, 'ALL', riskFreeRate, undefined, undefined, allExpenses, dividendCategoryId, pensionFlows),
-  ]);
+  const periodOf = (period: TimePeriod) =>
+    calculatePerformanceForPeriod(userId, snapshots, period, riskFreeRate, undefined, undefined, allExpenses, dividendCategoryId, pensionFlows, portfolioFlows);
+  const [ytd, oneYear, threeYear, fiveYear, allTime] = await Promise.all([periodOf('YTD'), periodOf('1Y'), periodOf('3Y'), periodOf('5Y'), periodOf('ALL')]);
 
-  // ==== STEP 5: Calculate rolling periods (reuse allExpenses — no extra Firestore queries) ====
-  const rolling12M = await calculateRollingPeriods(userId, snapshots, 12, riskFreeRate, dividendCategoryId, allExpenses, pensionFlows);
-  const rolling36M = await calculateRollingPeriods(userId, snapshots, 36, riskFreeRate, dividendCategoryId, allExpenses, pensionFlows);
+  // ==== STEP 5: Calculate the rolling 12-month windows (reuse allExpenses — no extra Firestore queries) ====
+  const rolling12M = await calculateRollingPeriods(userId, snapshots, 12, riskFreeRate, dividendCategoryId, allExpenses, pensionFlows, portfolioFlows);
 
   const result: PerformanceData = {
     ytd,
@@ -1527,7 +1555,6 @@ export async function getAllPerformanceData(userId: string, forceRefresh = false
     allTime,
     custom: null,
     rolling12M,
-    rolling36M,
     lastUpdated: new Date(),
     snapshotCount: snapshots.length,
   };
@@ -1562,6 +1589,9 @@ export async function getAllPerformanceData(userId: string, forceRefresh = false
  * @param riskFreeRate - Risk-free rate for Sharpe ratio calculation
  * @param dividendCategoryId - Category ID for dividend income (from user settings)
  * @param pensionFlows - The pension funds' boundary flows (see calculatePerformanceForPeriod)
+ * @param portfolioFlows - The measured boundary flows (see calculatePerformanceForPeriod): a window
+ *   measured on the base takes the base's flows, or its CAGR subtracts the whole net worth's
+ *   savings from a reduced capital
  * @returns Array of rolling period performance data
  */
 export async function calculateRollingPeriods(
@@ -1571,7 +1601,8 @@ export async function calculateRollingPeriods(
   riskFreeRate: number,
   dividendCategoryId?: string,
   prefetchedExpenses?: Expense[],
-  pensionFlows: PensionBoundaryFlow[] = []
+  pensionFlows: PensionBoundaryFlow[] = [],
+  portfolioFlows: PortfolioBoundaryFlow[] = []
 ): Promise<RollingPeriodPerformance[]> {
   const sortedSnapshots = [...allSnapshots]
     .sort((a, b) => {
@@ -1608,7 +1639,7 @@ export async function calculateRollingPeriods(
     const windowSnapshots = sortedSnapshots.slice(i - windowMonths, i + 1);
     // OPTIMIZATION: Use in-memory filtering instead of Firestore query
     const cashFlows = mergePensionFlows(
-      getCashFlowsFromExpenses(allExpenses, periodStartDate, periodEndDate, dividendCategoryId),
+      mergePortfolioFlows(getCashFlowsFromExpenses(allExpenses, periodStartDate, periodEndDate, dividendCategoryId), portfolioFlows, periodStartDate, periodEndDate),
       pensionFlows,
       periodStartDate,
       periodEndDate
@@ -1635,7 +1666,9 @@ export async function calculateRollingPeriods(
     rollingPeriods.push({
       periodEndDate,
       periodStartDate,
-      cagr: cagr || 0,
+      // `?? null`, never `|| 0`: a window that ends where it started is a real 0%, a window with no
+      // measurable rate is nothing — the old `|| 0` printed both as «flat».
+      cagr: cagr ?? null,
       sharpeRatio,
       volatility,
     });
@@ -1742,7 +1775,7 @@ export function prepareMonthlyReturnsHeatmap(
     const startNW = prevSnapshot.totalNetWorth;
     const endNW = currSnapshot.totalNetWorth;
 
-    if (startNW === 0) continue; // Skip if zero starting value
+    if (startNW <= 0) continue; // No return from a non-positive starting value (a negative one would flip the sign)
 
     // Get cash flow for current month
     const cfKey = monthKey(currSnapshot.year, currSnapshot.month);

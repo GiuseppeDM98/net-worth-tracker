@@ -97,6 +97,8 @@ export function describeProfile({ userAge, riskFreeRate }: ProfileInput): Narrat
 export interface PerformanceBaseInput {
   includesPensionFunds: boolean;
   includesExcludedAssets: boolean;
+  /** «Liquidità fuori dalla base»: the cash accounts leave the metrics, what they pay for is a measured flow. */
+  excludesCash?: boolean;
   /** ISO 'YYYY-MM'; empty string = start from the first recorded contribution. */
   pensionReturnStartMonth: string;
 }
@@ -105,6 +107,7 @@ export interface PerformanceBaseInput {
 export function describePerformanceBase({
   includesPensionFunds,
   includesExcludedAssets,
+  excludesCash = false,
   pensionReturnStartMonth,
 }: PerformanceBaseInput): Narrative {
   let base: string;
@@ -117,10 +120,11 @@ export function describePerformanceBase({
   } else {
     base = 'Base completa: fondi pensione (dal mese tracciato) e asset esclusi contano nelle metriche';
   }
+  const cashClause = excludesCash ? '; la liquidità resta fuori e gli acquisti pagati dai conti sono flussi misurati, non rendimento' : '';
   const monthClause = pensionReturnStartMonth
     ? `; il rendimento del fondo si misura da ${monthYearInSentence(pensionReturnStartMonth)}.`
     : '; il rendimento del fondo si misura dal primo versamento registrato.';
-  return [prose(base), prose(monthClause)];
+  return [prose(base), prose(cashClause), prose(monthClause)];
 }
 
 /** For checking accounts the stamp duty applies only above this balance (Italian rule). */

@@ -6,8 +6,8 @@
  * string separate per costruire e per interrogare la chiave.
  */
 import { describe, it, expect } from 'vitest';
-import { buildCashFlowMap, externalFlowOf, mergePensionFlows, monthKey, monthKeyOf } from '@/lib/utils/cashFlowMap';
-import type { CashFlowData, PensionBoundaryFlow } from '@/types/performance';
+import { buildCashFlowMap, externalFlowOf, mergePensionFlows, mergePortfolioFlows, monthKey, monthKeyOf } from '@/lib/utils/cashFlowMap';
+import type { CashFlowData, PensionBoundaryFlow, PortfolioBoundaryFlow } from '@/types/performance';
 
 function cashFlow(year: number, month: number, netCashFlow: number, day = 1): CashFlowData {
   return {
@@ -73,6 +73,42 @@ describe('externalFlowOf', () => {
     expect(externalFlowOf(cashFlow(2026, 7, 1000))).toBe(1000);
     expect(externalFlowOf({ ...cashFlow(2026, 7, 1000), pensionFlow: 517 })).toBe(1517);
     expect(externalFlowOf({ ...cashFlow(2026, 7, -200), pensionFlow: -152 })).toBe(-352);
+  });
+
+  it('lets a measured boundary flow REPLACE the savings, a measured zero included, and a null fall back to them', () => {
+    // The flows follow the base: what crossed its boundary, not what the cashflow saved.
+    expect(externalFlowOf({ ...cashFlow(2026, 7, 1000), portfolioFlow: 4200 })).toBe(4200);
+    expect(externalFlowOf({ ...cashFlow(2026, 7, 1000), portfolioFlow: 0 })).toBe(0);
+    expect(externalFlowOf({ ...cashFlow(2026, 7, 1000), portfolioFlow: null })).toBe(1000);
+    expect(externalFlowOf({ ...cashFlow(2026, 7, 1000), portfolioFlow: 4200, pensionFlow: 517 })).toBe(4717);
+  });
+});
+
+describe('mergePortfolioFlows', () => {
+  const measured = (month: string, amount: number): PortfolioBoundaryFlow => ({ month, amount, source: 'quantities' });
+  const window = { start: new Date(2026, 0, 1), end: new Date(2026, 8, 30, 23, 59, 59) };
+
+  it('sets the flow on the month the cashflow already has, leaving netCashFlow untouched, and creates a zero row for one it does not', () => {
+    const merged = mergePortfolioFlows([cashFlow(2026, 7, 500)], [measured('2026-07', 4200), measured('2026-08', 0)], window.start, window.end);
+
+    expect(merged.map((cf) => [cf.date.getMonth() + 1, cf.netCashFlow, cf.portfolioFlow])).toEqual([
+      [7, 500, 4200],
+      [8, 0, 0],
+    ]);
+  });
+
+  it('leaves a month without a measured flow WITHOUT the field, so the fallback to the savings survives to the formula', () => {
+    const merged = mergePortfolioFlows([cashFlow(2026, 6, 300), cashFlow(2026, 7, 500)], [measured('2026-07', 4200)], window.start, window.end);
+
+    expect(merged[0].portfolioFlow).toBeUndefined();
+    expect(externalFlowOf(merged[0])).toBe(300);
+    expect(externalFlowOf(merged[1])).toBe(4200);
+  });
+
+  it('keeps flows outside the window out, and returns the input as is when none falls inside', () => {
+    const input = [cashFlow(2026, 7, 500)];
+    expect(mergePortfolioFlows(input, [measured('2025-12', 9)], window.start, window.end)).toBe(input);
+    expect(mergePortfolioFlows(input, [measured('2026-07', 1), measured('2026-10', 9)], window.start, window.end)).toHaveLength(1);
   });
 });
 

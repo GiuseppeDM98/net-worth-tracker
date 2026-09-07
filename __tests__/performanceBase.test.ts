@@ -375,14 +375,79 @@ describe('resolvePerformanceBase', () => {
   const fromCashMay = makeContribution({ amount: 150, source: 'voluntary', linkedExpenseId: 'transfer-1', sourceCashAssetId: 'cash-1', createdAt: new Date(2026, 4, 10) });
   const fromCashAugust = makeContribution({ amount: 200, source: 'voluntary', linkedExpenseId: 'transfer-2', sourceCashAssetId: 'cash-1', createdAt: new Date(2026, 7, 20) });
 
-  it('with the toggle off projects the funds out everywhere and only a cash-funded voluntary leaves the base', () => {
+  it('with the toggle off projects the funds out everywhere; a cash-funded voluntary is a withdrawal only where the quantities do not already see it', () => {
     const base = resolvePerformanceBase({ snapshots, assets, contributions: [tfrJuly, fromCashMay, payrollAugust], settings: { pensionReturnStartMonth: '2026-07' } as never });
 
     expect(base.pensionEntryMonth).toBeNull();
     expect(base.excludedAssetIds.sort()).toEqual(['fund-1', 'house-1']);
     expect(base.snapshots.map((s) => s.totalNetWorth)).toEqual([100000, 101000, 102000, 103000, 104000]);
-    // TFR and payroll money never touched the measured portfolio; the May transfer did (cash → fund).
-    expect(base.pensionFlows).toEqual([{ month: '2026-05', amount: -150, kind: 'withdrawal' }]);
+    // The base is a subset (house and fund out), so every pair with a breakdown measures its flow:
+    // nothing was bought or sold, four measured zeros.
+    expect(base.portfolioFlows).toEqual(['2026-05', '2026-06', '2026-07', '2026-08'].map((month) => ({ month, amount: 0, source: 'quantities' })));
+    // TFR and payroll money never touched the measured portfolio. The May transfer (cash → fund) left
+    // the base, but May is a MEASURED month and the account is inside: its balance drop is the
+    // withdrawal, counted by the quantities — a pension entry too would count it twice.
+    expect(base.pensionFlows).toEqual([]);
+
+    // The same transfer in a month no pair measures (March, before the first breakdown pair) is the
+    // withdrawal the pension channel has always carried.
+    const march = resolvePerformanceBase({
+      snapshots,
+      assets,
+      contributions: [makeContribution({ amount: 150, source: 'voluntary', linkedExpenseId: 'transfer-0', sourceCashAssetId: 'cash-1', createdAt: new Date(2026, 2, 10) })],
+      settings: { pensionReturnStartMonth: '2026-07' } as never,
+    });
+    expect(march.pensionFlows).toEqual([{ month: '2026-03', amount: -150, kind: 'withdrawal' }]);
+  });
+
+  it('measures the boundary flows only when the base is a subset: with nothing excluded the cashflow stays the source', () => {
+    const etfOnly = [makeAsset({ id: 'etf-1', type: 'etf' })];
+    const whole = resolvePerformanceBase({ snapshots, assets: etfOnly, contributions: [], settings: null });
+    expect(whole.excludedAssetIds).toEqual([]);
+    expect(whole.portfolioFlows).toEqual([]);
+
+    // A house out of the base makes it a subset, and the ETF's purchases become measured flows.
+    const bought = [
+      makeSnapshot({ year: 2026, month: 1, totalNetWorth: 61000, illiquidNetWorth: 60000, byAsset: [{ assetId: 'etf-1', ticker: 'V', name: 'ETF', quantity: 10, price: 100, totalValue: 1000 }, { assetId: 'house-1', ticker: '', name: 'Casa', quantity: 1, price: 60000, totalValue: 60000 }] }),
+      makeSnapshot({ year: 2026, month: 2, totalNetWorth: 62200, illiquidNetWorth: 60000, byAsset: [{ assetId: 'etf-1', ticker: 'V', name: 'ETF', quantity: 20, price: 110, totalValue: 2200 }, { assetId: 'house-1', ticker: '', name: 'Casa', quantity: 1, price: 60000, totalValue: 60000 }] }),
+    ];
+    const subset = resolvePerformanceBase({ snapshots: bought, assets: [etfOnly[0], makeAsset({ id: 'house-1', type: 'realestate', allocationRole: 'excluded' })], contributions: [], settings: null });
+    expect(subset.portfolioFlows).toEqual([{ month: '2026-02', amount: 1100, source: 'quantities' }]);
+    // The ledger, where it covers the instrument, dates and prices the purchase itself.
+    const withLedger = resolvePerformanceBase({
+      snapshots: bought,
+      assets: [etfOnly[0], makeAsset({ id: 'house-1', type: 'realestate', allocationRole: 'excluded' })],
+      contributions: [],
+      settings: null,
+      trades: [{ id: 't1', userId: 'user-1', assetId: 'etf-1', type: 'buy', date: new Date(2026, 1, 14), quantity: 10, pricePerUnit: 105, priceEur: 105, fees: 2, createdAt: new Date(), updatedAt: new Date() }],
+    });
+    expect(withLedger.portfolioFlows).toEqual([{ month: '2026-02', amount: 1052, source: 'ledger' }]);
+  });
+
+  it('with the liquidity toggle the cash accounts leave the base by type, their role untouched, and what they pay for is a measured flow', () => {
+    const cash = makeAsset({ id: 'cash-1', type: 'cash' });
+    const etf = makeAsset({ id: 'etf-1', type: 'etf' });
+    const rows = (cashBalance: number, units: number) => [
+      { assetId: 'cash-1', ticker: '', name: 'Conto', quantity: cashBalance, price: 1, totalValue: cashBalance },
+      { assetId: 'etf-1', ticker: 'V', name: 'ETF', quantity: units, price: 100, totalValue: units * 100 },
+    ];
+    const series = [
+      makeSnapshot({ year: 2026, month: 1, totalNetWorth: 6000, illiquidNetWorth: 0, byAsset: rows(5000, 10) }),
+      makeSnapshot({ year: 2026, month: 2, totalNetWorth: 6000, illiquidNetWorth: 0, byAsset: rows(4000, 20) }),
+    ];
+
+    const cashIn = resolvePerformanceBase({ snapshots: series, assets: [cash, etf], contributions: [], settings: null });
+    expect(cashIn.excludedAssetIds).toEqual([]);
+    expect(cashIn.snapshots.map((s) => s.totalNetWorth)).toEqual([6000, 6000]);
+    expect(cashIn.portfolioFlows).toEqual([]);
+
+    const cashOut = resolvePerformanceBase({ snapshots: series, assets: [cash, etf], contributions: [], settings: { performanceExcludesCash: true } as never });
+    expect(cashOut.options.excludeCash).toBe(true);
+    expect(cashOut.excludedAssetIds).toEqual(['cash-1']);
+    expect(cashOut.snapshots.map((s) => s.totalNetWorth)).toEqual([1000, 2000]);
+    // The 1000 € that moved from the account into the ETF crossed the boundary: a flow, not a return.
+    expect(cashOut.portfolioFlows).toEqual([{ month: '2026-02', amount: 1000, source: 'quantities' }]);
+    expect(resolvePerformanceExclusions([cash, etf], { excludeCash: true, includePensionFunds: true, includeExcludedAssets: true })).toEqual(['cash-1']);
   });
 
   it('with the toggle on enters the funds at the trusted start month, as a flow, and neutralises later contributions', () => {
@@ -400,8 +465,23 @@ describe('resolvePerformanceBase', () => {
     expect(base.snapshots.map((s) => s.totalNetWorth)).toEqual([100000, 101000, 102000, 134800, 135600]);
     expect(base.pensionFlows).toEqual([
       { month: '2026-07', amount: 31800, kind: 'entry' },
-      // August: TFR-like money from outside is a flow; the voluntary paid from a cash account inside the base is not.
+      // August: TFR-like money from outside is a flow; the voluntary paid from a cash account inside
+      // the base is a `transfer` — August is measured, the quantities already counted the account's
+      // −200, and this +200 restores the fund's side so capital moved within the base nets to zero.
       { month: '2026-08', amount: 10, kind: 'contribution' },
+      { month: '2026-08', amount: 200, kind: 'transfer' },
+    ]);
+
+    // The same voluntary from an account OUT of the base (the liquidity toggle) is money that entered.
+    const cashOut = resolvePerformanceBase({
+      snapshots,
+      assets: [...assets, makeAsset({ id: 'cash-1', type: 'cash' })],
+      contributions: [fromCashAugust],
+      settings: { performanceIncludesPensionFunds: true, performanceExcludesCash: true, pensionReturnStartMonth: '2026-07' } as never,
+    });
+    expect(cashOut.pensionFlows).toEqual([
+      { month: '2026-07', amount: 31800, kind: 'entry' },
+      { month: '2026-08', amount: 200, kind: 'contribution' },
     ]);
   });
 
@@ -426,8 +506,8 @@ describe('resolvePerformanceBase', () => {
 
   it('falls back to the first recorded contribution for the start, and enters at the first breakdown month with a fund at or after it', () => {
     // No setting: the window starts at the first contribution's accounting DATE (May), and the fund
-    // enters at the May snapshot. A cash-funded voluntary in May is inside the entry value AND left the
-    // cash: the withdrawal stays, the entry carries the fund.
+    // enters at the May snapshot. A cash-funded voluntary in May is inside the entry value; the cash
+    // it left is the account's balance drop, and May is a measured month — the quantities count it.
     const base = resolvePerformanceBase({
       snapshots,
       assets,
@@ -436,10 +516,7 @@ describe('resolvePerformanceBase', () => {
     });
 
     expect(base.pensionEntryMonth).toBe('2026-05');
-    expect(base.pensionFlows).toEqual([
-      { month: '2026-05', amount: 29800, kind: 'entry' },
-      { month: '2026-05', amount: -150, kind: 'withdrawal' },
-    ]);
+    expect(base.pensionFlows).toEqual([{ month: '2026-05', amount: 29800, kind: 'entry' }]);
   });
 
   it('with the toggle on and a start before the breakdown era enters at the first month that has the fund', () => {
@@ -460,20 +537,29 @@ describe('resolvePerformanceBase', () => {
     expect(base.pensionFlows).toEqual([{ month: '2026-04', amount: 27000, kind: 'entry' }]);
   });
 
-  it('ignores a contribution to a fund the account no longer has, unless it left a cash account', () => {
-    const base = resolvePerformanceBase({
+  it('ignores a contribution to a fund the account no longer has, unless it left a cash account in a month the quantities do not measure', () => {
+    const settings = { performanceIncludesPensionFunds: true, pensionReturnStartMonth: '2026-07' } as never;
+    const tfrGone = makeContribution({ amount: 500, assetId: 'fund-gone', createdAt: new Date(2026, 7, 5) });
+
+    // August is measured: the cash that left for the vanished fund is the account's balance drop.
+    const measured = resolvePerformanceBase({
       snapshots,
       assets,
-      contributions: [
-        makeContribution({ amount: 500, assetId: 'fund-gone', createdAt: new Date(2026, 7, 5) }),
-        makeContribution({ amount: 70, assetId: 'fund-gone', source: 'voluntary', linkedExpenseId: 't', createdAt: new Date(2026, 7, 6) }),
-      ],
-      settings: { performanceIncludesPensionFunds: true, pensionReturnStartMonth: '2026-07' } as never,
+      contributions: [tfrGone, makeContribution({ amount: 70, assetId: 'fund-gone', source: 'voluntary', linkedExpenseId: 't', createdAt: new Date(2026, 7, 6) })],
+      settings,
     });
+    expect(measured.pensionFlows).toEqual([{ month: '2026-07', amount: 31800, kind: 'entry' }]);
 
-    expect(base.pensionFlows).toEqual([
+    // March is not: the withdrawal is the pension channel's to carry.
+    const unmeasured = resolvePerformanceBase({
+      snapshots,
+      assets,
+      contributions: [tfrGone, makeContribution({ amount: 70, assetId: 'fund-gone', source: 'voluntary', linkedExpenseId: 't', createdAt: new Date(2026, 2, 6) })],
+      settings,
+    });
+    expect(unmeasured.pensionFlows).toEqual([
+      { month: '2026-03', amount: -70, kind: 'withdrawal' },
       { month: '2026-07', amount: 31800, kind: 'entry' },
-      { month: '2026-08', amount: -70, kind: 'withdrawal' },
     ]);
   });
 });

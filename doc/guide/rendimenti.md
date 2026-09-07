@@ -8,10 +8,35 @@
   subtract a **constant `E₀`** (the excluded total of the earliest snapshot that HAS one), which cancels in `(V_end −
   CF)/V_start`. A snapshot that has `byAsset` but omits the asset is evidence of absence → subtract 0, never backfill.
   **Documented approximation**: the backfill fixes the DENOMINATOR of historical months, not the numerator.
-- **ONE resolution, TWO callers** (2026-09-06): `resolvePerformanceBase({ snapshots, assets, contributions, settings })` is
-  the only way to build the base — `getAllPerformanceData` AND the page's `cachedSnapshots`/custom range both call it. It
-  returns the projected snapshots, `excludedAssetIds`, `pensionEntryMonth` and the `pensionFlows`; `buildCacheKey`
-  fingerprints all of them (a contribution recorded today rewrites the flows while every snapshot stays byte-identical).
+- **ONE resolution, THREE callers** (2026-09-06, the PDF since 2026-09-07): `resolvePerformanceBase({ snapshots, assets,
+  contributions, settings, trades })` is the only way to build the base — `getAllPerformanceData`, the page's
+  `cachedSnapshots`/custom range AND `pdfDataService.preparePerformanceData` all call it (until 2026-09-07 the PDF ran on
+  the RAW snapshots with no pension flow, printing a different TWR and ROI under the same title; its scope line now
+  carries `describeMeasurementBase`). It returns the projected snapshots, `excludedAssetIds`, `pensionEntryMonth`, the
+  `pensionFlows` and the `portfolioFlows`; `buildCacheKey` fingerprints all of them (a contribution recorded today, or a
+  trade in the ledger, rewrites the flows while every snapshot stays byte-identical).
+- **The flows follow the base** (2026-09-07, issue/PR #319 reimplemented on the base): a base is two halves, WHICH
+  capital and WHICH flows, and the cashflow's savings are the capital that entered the NET WORTH — wrong the moment the
+  base is a subset, since a purchase paid from an account outside it is capital coming in and the cashflow skips
+  transfers. When anything is out of the base in any month (a role-excluded asset, the cash accounts with the toggle,
+  the funds before entry or with the toggle off), `lib/utils/portfolioFlows.ts` measures the boundary crossings for
+  every month whose two snapshots both carry `byAsset`: the **trade ledger** for an instrument from its first trade on
+  (dated to the operation, buys plus fees in, sells net of fees out; a covered instrument with no trade in a month is a
+  0, not a gap), the **quantity changes** `(q₁ − q₀) × p₁` for the others — a cash account inside the base counts its
+  balance, so an internal purchase nets to zero and a deposit is outside money. A migration **baseline and an
+  `adjustment` cover the instrument but move no money** (the original PR counted the baseline as a buy: −57% on the
+  real account's July 2026). **Flow-opaque instruments** — every hand-valued asset except cash: pension funds,
+  properties — contribute 0 to the quantity branch; the funds' money rides its own channel. A month with no entry is NOT
+  measurable and falls back to the cashflow's savings; with nothing ever excluded the list is empty and not a decimal
+  moves. Declared limits: end-of-month price on the quantity branch, a split or an in-kind transfer reads as a flow, a
+  trade left out of the ledger vanishes, interest credited on an account inside the base reads as a deposit.
+- **«Liquidità fuori dalla base»** (`performanceExcludesCash`, default OFF): the `cash` accounts leave the base by TYPE,
+  their `allocationRole` untouched (Allocazione keeps them); a money-market ETF has a price and stays in. It exists only
+  now because without the measured flows it would read every purchase as return. `classifyContribution` reads the
+  account too (`sourceCashAssetId`): a voluntary from an account OUT of the base is capital that entered the fund
+  (`contribution`); from an account inside, in a measured month, it is a `transfer` (+amount) that cancels the balance
+  drop the quantities counted — capital moved within the base; with the fund out and the month measured, the withdrawal
+  IS the balance drop and the channel carries nothing.
 - **The pension toggle wins over the allocation role.** A `pensionFund` answers to «Includi i fondi pensione» ONLY: its
   `allocationRole` (almost always `excluded`, two of the real account's three through the legacy flag) never vetoes it.
   Until 2026-09-06 the two exclusions were in OR and the toggle was a silent no-op on any fund marked excluded.
@@ -25,12 +50,14 @@
   rule: a contribution is a flow iff it crosses the base's boundary.** A toggle that is ON with nothing trackable keeps
   the funds out and the caption says why. On the real account (2026-09-06): YTD TWR 12,59% OFF, 12,02% ON, 16,28% had the
   contributions been read as return.
-- **The flows ride a second channel, never `netCashFlow`.** `CashFlowData.pensionFlow` is merged by `mergePensionFlows`
-  inside `calculatePerformanceForPeriod`/`calculateRollingPeriods`; `buildCashFlowMap` sums `externalFlowOf(cf)` =
-  `netCashFlow + pensionFlow`, so TWR, volatility, drawdown, heatmap, Evoluzione and IRR see it without knowing; ROI and
-  CAGR use `netCashFlow + pensionFlow` explicitly. `metrics.netCashFlow` stays the cashflow's savings (the Contributi
-  tile's «Contributi netti»); `metrics.pensionFlow`/`pensionEntryFlow` are shown apart, with the entry named by month —
-  a 31.852 € entry printed as «messi da parte» would be a lie.
+- **The flows ride their own channels, never `netCashFlow`.** `CashFlowData.pensionFlow` (merged by `mergePensionFlows`)
+  and `CashFlowData.portfolioFlow` (merged by `mergePortfolioFlows`, `null`/absent = not measurable, `0` = measured and
+  still) inside `calculatePerformanceForPeriod`/`calculateRollingPeriods`; `buildCashFlowMap` sums `externalFlowOf(cf)`
+  = `(portfolioFlow ?? netCashFlow) + pensionFlow`, so TWR, volatility, drawdown, heatmap, Evoluzione and IRR see them
+  without knowing; ROI and CAGR sum `externalFlowOf` over the series. `metrics.netCashFlow` stays the cashflow's savings
+  (the Contributi tile's «Contributi netti»); `metrics.pensionFlow`/`pensionEntryFlow`/`pensionInternalFlow` and
+  `metrics.portfolioFlow`/`flowSource`/`measuredFlowMonths` are shown apart («Capitale entrato nella base», with its
+  coverage) — a 31.852 € entry printed as «messi da parte» would be a lie, and so would a purchase.
 - **Drawdown runs on a geometric TWR index, never on `netWorth − cumulativeCashFlow`**: `buildTwrIndex` chains the SAME
   monthly return the heatmap shows.
 - **The cache document is written through `removeUndefinedDeep`** (2026-09-06): the metrics carry explicit `undefined`s
@@ -55,8 +82,15 @@
 - **`buildCashFlowMap`/`monthKey` is the only monthly indexing of cash flows** — TWR, volatility, heatmap, Evoluzione and
   `drawdownSeries` read the SAME series, and flows in the same month are **summed**.
 - **Below 6 months the hero states the PERIOD return, not an annualized one** (`resolveHeroReturn`): +4% over two months
-  annualizes to "+26% a year", a forecast dressed as a measurement. Only the displayed figure changes. **ROI and CAGR
-  correct for cash flows in two DIFFERENT ways and are not convertible**, so both tooltips state both formulas.
+  annualizes to "+26% a year", a forecast dressed as a measurement. Only the displayed figure changes. **The Rendimento
+  tile's second chip is the period's CUMULATIVE TWR** (`resolvePeriodReturnChip`, `deannualizeReturn` = the page's ONE
+  de-annualisation; omitted below six months and at exactly twelve, where it would repeat the hero). Until 2026-09-07
+  it was the ROI captioned «ROI del periodo» (issue #324): a gain over the FIRST month's capital, +126% against a +134%
+  cumulative TWR on the real account, +73% against +30% on another — not the period's return and growing with the window
+  on a saver's account. The ROI keeps its formula and lives in the Dettaglio, the AI prompt and the PDF, worded «sul
+  capitale iniziale». **ROI and CAGR correct for cash flows in two DIFFERENT ways and are not convertible**, so both
+  tooltips state both formulas, and a non-positive starting capital yields `null` for every ratio (a negative one
+  flipped the sign in silence until 2026-09-07).
 - **Benchmark**: every model is EUR-converted (`applyFxConversion`, the portfolio is EUR-denominated) before the verdict's gap and the Benchmark tile are computed — one basis for the whole page since 2026-08-25 (the old table's USD default and its toggle are gone); while FX is loading nothing is ranked, only a FAILED FX route falls back to USD and the tile's aside says so.
   `benchmarkPeriodReturn.ts` is the single source for indexing + annualization — never re-inline it. Each benchmark's
   final value comes from **its own** last available month, or every cell renders "–".
@@ -99,7 +133,17 @@
 - **Grid**: the tile takes 7 beside Plusvalenze (5) and Capitale e mercato moves to 12; without a closed sale it takes 5
   beside Capitale e mercato (7). The tile lists the top 6 by |total| and folds the rest into «Altri strumenti», then
   «Non attribuito» and «Mercato» = the gain, so the rows visibly add up.
+- **The residual guard says WHERE the residual comes from** (2026-09-07, the structural answer to issue #320, which
+  asked for a per-month reconciliation between the ledger and the snapshots). A period's «Non attribuito» is a sum, and
+  a sum hides whether it is nine small interest credits or one balance typed wrong in March: `attributePeriodReturn`
+  also reads the residual MONTH BY MONTH against the month's starting base and returns in `residualMonths` (largest
+  share first) every month whose unattributed part exceeds `RESIDUAL_ALERT_SHARE` (2%) of it. The tile's reading names
+  the months in brackets («… non sono attribuibili a uno strumento (in marzo 2026 oltre il 2% della base)»), the
+  Dettaglio's adds the figures and the three usual causes; at most three months are listed and the rest counted, never
+  cut silently. It is a guard, not a diagnosis: the monthly figure is price effects only (the registry's dividends are
+  netted at period level), so a large dividend credited to an account in the base trips it as honestly as a
+  hand-corrected balance. A month that starts from a zero base has no share and is never flagged.
 
 ## Per-page blind spots
 
-- **Rendimenti**: `e2e/performance.spec.ts` covers the structure only (the base caption, the attribution tile, the pension channel on and off); the six benchmark series + FX load on every visit (6h `staleTime`), only a FAILED FX route falls back to USD (the aside says so); Sharpe/Sortino use the settings' risk-free rate; the payload's `drawdownDuration`/`recoveryTime` are no longer displayed (the tiles read `resolveDrawdownStory`); a 1-anno window without the current month's snapshot measures 11 months and says so; the rolling readings live in `PerformanceDettaglio` (untested); `AIAnalysisDialog`/`CustomDateRangeDialog` keep their old chrome; **with the pension toggle ON, a period that straddles `pensionEntryMonth` carries the funds' whole value as a flow in that month** — «Capitale immesso» jumps by it and the Contributi tile names it as the entry, not as savings; **a pension fund's statement credited late still reads as a temporary market loss** (the Previdenza blind spot, now on this page too); **«Non attribuito» is not a bug**: it is every euro that moved the total without moving an instrument's unit value, and on the real account it was −2.326 € on a 16.836 € YTD gain.
+- **Rendimenti**: `e2e/performance.degraded.spec.ts` covers the structure only (the base caption, the attribution tile, the pension channel on and off); the six benchmark series + FX load on every visit (6h `staleTime`), only a FAILED FX route falls back to USD (the aside says so); Sharpe/Sortino use the settings' risk-free rate; the payload's `drawdownDuration`/`recoveryTime` are no longer displayed (the tiles read `resolveDrawdownStory`); a 1-anno window without the current month's snapshot measures 11 months and says so; the rolling readings live in `PerformanceDettaglio` (untested; a rolling CAGR with no measurable rate is `null` and leaves a gap, never a 0); `AIAnalysisDialog`/`CustomDateRangeDialog` keep their old chrome; **with the pension toggle ON, a period that straddles `pensionEntryMonth` carries the funds' whole value as a flow in that month** — «Capitale immesso» jumps by it and the Contributi tile names it as the entry, not as savings; **a pension fund's statement credited late still reads as a temporary market loss** (the Previdenza blind spot, now on this page too); **«Non attribuito» is not a bug**: it is every euro that moved the total without moving an instrument's unit value, and on the real account it was −2.326 € on a 16.836 € YTD gain — since 2026-09-07 the months where it exceeds 2% of the base are named, not explained (a dividend landing in cash trips the guard too); **on any account with something out of the base — the default — the months with `byAsset` on both snapshots neutralise the MEASURED boundary flows, not the cashflow's savings** (2026-09-07): a deposit on an account inside the base is a flow even if no income row exists, interest credited on it reads as a deposit, a split or an in-kind transfer as a purchase, a trade left out of the ledger vanishes for a covered instrument, and the months before `byAsset` (2025-11 on the real account) still use the cashflow — the Contributi tile says how many months were measured; **«Liquidità fuori dalla base» measured on the real account (2026-09-07, in memory)**: ON → YTD 15,36% (OFF 14,73%), 1Y 16,81% (16,03%), ALL 29,76% (27,08%), measured flows +5.058 € (the net buys) instead of −650 € (the accounts' net balance change); the four accounts are 3% of the base, so the gain is cleanliness, not size, and the ALL window stays mixed before 2025-12 because the cashflow's savings landed on accounts that are then outside the base.

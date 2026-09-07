@@ -44,6 +44,7 @@ import { useDeleteAsset } from '@/lib/hooks/useAssets';
 import { resolveDisplayAssetClass } from '@/lib/utils/assetDisplayClass';
 import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
 import { requiresManualPricing } from '@/lib/utils/assetPricing';
+import { costBasisPerUnitEur, isEurNative } from '@/lib/utils/costBasisEur';
 import { getMetricValueColor } from '@/lib/utils/metricColors';
 import type { AssetPerformanceData } from '@/lib/utils/assetPerformanceDeltas';
 import { computeTopWeightShare, computeUnrealizedGain, hasCostBasis, isHeld } from '@/lib/utils/patrimonioSummary';
@@ -252,6 +253,10 @@ export function StrumentiTile({
     const gainLoss = gain?.gainLoss ?? 0;
     const gainPct = gain?.gainPercent ?? 0;
     const isMortgaged = asset.assetClass === 'realestate' && !!asset.outstandingDebt && asset.outstandingDebt > 0;
+    // The PMC cell is the EUR PMC (fees included — the one the G/P beside it uses); a foreign row
+    // keeps its native PMC under it, alone when the ledger has not projected the EUR one yet.
+    const pmcEur = costBasisPerUnitEur(asset);
+    const nativePmc = !isEurNative(asset) && asset.averageCost ? asset.averageCost : undefined;
 
     return (
       <tr
@@ -290,7 +295,18 @@ export function StrumentiTile({
         <td className={cn(CELL_CLASS, 'font-mono tabular-nums')}>{formatNumber(asset.quantity, 2)}</td>
         <td className={cn(CELL_CLASS, 'font-mono tabular-nums')}>{formatCurrency(asset.currentPrice, asset.currency, 4)}</td>
         <td className={cn(CELL_CLASS, 'font-mono tabular-nums')}>
-          {asset.averageCost ? formatCurrency(asset.averageCost, asset.currency, 4) : <span className="text-muted-foreground">-</span>}
+          {pmcEur !== undefined || nativePmc !== undefined ? (
+            <span className="flex flex-col items-end leading-tight">
+              {pmcEur !== undefined && <span>{formatCurrency(pmcEur, 'EUR', 4)}</span>}
+              {nativePmc !== undefined && (
+                <span className={cn(pmcEur !== undefined && 'text-[11px] text-muted-foreground')}>
+                  {formatCurrency(nativePmc, asset.currency, 4)}
+                </span>
+              )}
+            </span>
+          ) : (
+            <span className="text-muted-foreground">-</span>
+          )}
         </td>
         <td className={cn(CELL_CLASS, 'font-mono tabular-nums text-muted-foreground')}>
           {asset.totalExpenseRatio ? formatPercentage(asset.totalExpenseRatio, 2) : '-'}
@@ -543,7 +559,10 @@ export function StrumentiTile({
           <p className="mt-auto border-t border-border pt-3.5 text-[11px] text-muted-foreground">
             {manualCount > 0 && <span>Righe evidenziate: prezzo inserito a mano.</span>}
             {manualCount > 0 && <span className="hidden desktop:inline"> · </span>}
-            <span className="hidden desktop:inline">Le colonne dietro «Andamento» sono variazioni di prezzo, non G/P.</span>
+            <span className="hidden desktop:inline">
+              Il PMC è in euro e include le commissioni d&apos;acquisto; uno strumento in valuta mostra sotto anche il PMC nella sua
+              valuta. Le colonne dietro «Andamento» sono variazioni di prezzo, non G/P.
+            </span>
             <span className="desktop:hidden">{manualCount === 0 && 'Apri una riga per i dettagli, le variazioni di prezzo e le azioni.'}</span>
           </p>
         </>

@@ -35,6 +35,16 @@
  * covers («sui 10 mesi con il dettaglio per strumento») instead of pretending the sum is the
  * whole period's.
  *
+ * THE RESIDUAL GUARD (2026-09-07, the structural answer to issue #320)
+ * A period's residual is a sum, and a sum hides where it came from: −2.326 € over nine months can
+ * be nine small corrections or one balance typed wrong in March. So the residual is also read
+ * MONTH BY MONTH against the month's starting base (`prev.totalNetWorth`), and every month whose
+ * unattributed part exceeds `RESIDUAL_ALERT_SHARE` of it is returned in `residualMonths` for the
+ * reading to name. It is a guard, not a diagnosis: the monthly figure is price effects only (the
+ * registry's dividends are netted at period level), so a large dividend credited to an account in
+ * the base trips it as honestly as a hand-corrected balance or an expense paid from an untracked
+ * account. It says WHERE to look, never what happened.
+ *
  * Zero Firebase imports: a pure function of its inputs, like every `*Summary` module.
  */
 
@@ -71,6 +81,22 @@ export interface AttributionCoverage {
   lastAttributed: PeriodMonth | null;
 }
 
+/** A month whose unattributed part is out of proportion with its starting base. */
+export interface ResidualMonth {
+  month: PeriodMonth;
+  /** The month's gain minus its price effects (dividends not netted — see the header). */
+  unattributed: number;
+  /** `|unattributed| / starting base`, a fraction (0.04 = 4%). */
+  share: number;
+}
+
+/**
+ * Above this share of the month's starting base the unattributed part is named month by month.
+ * 2% is the size of a large cash interest credit or a dividend on a small account; a hand-typed
+ * balance or an untracked expense lands well above it.
+ */
+export const RESIDUAL_ALERT_SHARE = 0.02;
+
 export interface ReturnAttribution {
   /** Every instrument with a non-zero figure, largest |total| first. */
   rows: InstrumentContribution[];
@@ -81,6 +107,8 @@ export interface ReturnAttribution {
   /** `gain − attributed`: what moved the total without moving any instrument's unit value. */
   unattributed: number;
   coverage: AttributionCoverage;
+  /** The months whose unattributed part exceeds `RESIDUAL_ALERT_SHARE` of their base, largest share first. */
+  residualMonths: ResidualMonth[];
 }
 
 export interface AttributionInput {
@@ -134,7 +162,10 @@ export function attributePeriodReturn(input: AttributionInput): ReturnAttributio
     rows.map((row) => (realEstateIds.has(row.assetId) ? { ...row, totalValue: row.quantity * row.price } : row));
 
   const effects = new Map<string, { marketEffect: number; months: number; name: string; ticker: string }>();
+  // The running month's price effects, for the residual guard.
+  let monthAttributed = 0;
   const record = (row: SnapshotAsset, effect: number) => {
+    monthAttributed += effect;
     const current = effects.get(row.assetId) ?? { marketEffect: 0, months: 0, name: row.name, ticker: row.ticker };
     current.marketEffect += effect;
     current.months += 1;
@@ -149,6 +180,7 @@ export function attributePeriodReturn(input: AttributionInput): ReturnAttributio
   let attributedMonths = 0;
   let firstAttributed: PeriodMonth | null = null;
   let lastAttributed: PeriodMonth | null = null;
+  const residualMonths: ResidualMonth[] = [];
 
   for (let i = 1; i < ordered.length; i++) {
     const prev = ordered[i - 1];
@@ -156,10 +188,12 @@ export function attributePeriodReturn(input: AttributionInput): ReturnAttributio
     if (!hasAssetBreakdown(prev) || !hasAssetBreakdown(curr)) continue;
 
     const currKey = monthKey(curr.year, curr.month);
-    gain += curr.totalNetWorth - prev.totalNetWorth - (flowByMonth.get(currKey) ?? 0);
+    const monthGain = curr.totalNetWorth - prev.totalNetWorth - (flowByMonth.get(currKey) ?? 0);
+    gain += monthGain;
     attributedMonths += 1;
     firstAttributed ??= { year: curr.year, month: curr.month };
     lastAttributed = { year: curr.year, month: curr.month };
+    monthAttributed = 0;
 
     const prevRows = grossRows(prev.byAsset);
     const currRows = grossRows(curr.byAsset);
@@ -180,7 +214,14 @@ export function attributePeriodReturn(input: AttributionInput): ReturnAttributio
       const { priceEffect } = attributeSelectedChange(prevRows, currRows, new Set([row.assetId]));
       record(row, priceEffect);
     }
+
+    // The guard: a month's residual against the base it started from (a base of zero has no share).
+    const monthUnattributed = monthGain - monthAttributed;
+    if (prev.totalNetWorth > 0 && Math.abs(monthUnattributed) > RESIDUAL_ALERT_SHARE * prev.totalNetWorth) {
+      residualMonths.push({ month: { year: curr.year, month: curr.month }, unattributed: monthUnattributed, share: Math.abs(monthUnattributed) / prev.totalNetWorth });
+    }
   }
+  residualMonths.sort((a, b) => b.share - a.share);
 
   const rows: InstrumentContribution[] = [...effects.entries()]
     .map(([assetId, effect]) => {
@@ -207,6 +248,7 @@ export function attributePeriodReturn(input: AttributionInput): ReturnAttributio
     gain,
     unattributed: gain - attributed,
     coverage: { measuredMonths: Math.max(0, ordered.length - 1), attributedMonths, firstAttributed, lastAttributed },
+    residualMonths,
   };
 }
 

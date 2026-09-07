@@ -148,11 +148,18 @@ export interface HeroReturn {
 }
 
 /**
+ * The ONE de-annualisation of the page: `(1 + annual)^(months/12) − 1`, the exact inverse of the
+ * annualisation the TWR already applied, so no information is invented — the cumulative return
+ * the portfolio actually produced over the period is recovered. The hero below six months, the
+ * period-return chip and the narrative's benchmark gap all take this step; a second copy of the
+ * formula is how two figures of the same page drift apart.
+ */
+export function deannualizeReturn(annualizedPct: number, numberOfMonths: number): number {
+  return (Math.pow(1 + annualizedPct / 100, numberOfMonths / 12) - 1) * 100;
+}
+
+/**
  * Decide whether the hero states an annualized rate or the return of the period itself.
- *
- * De-annualizing is the exact inverse of the annualization the TWR already applied:
- * `(1 + annual)^(months/12) − 1`, so no information is invented — the cumulative return the
- * portfolio actually produced is recovered.
  *
  * Only the DISPLAYED number changes. The verdict and the benchmark delta keep using the annualized
  * TWR, because comparing to a risk-free rate or to a benchmark is only meaningful per year.
@@ -172,12 +179,39 @@ export function resolveHeroReturn(
     return { value: annualizedReturn, isPeriodReturn: false, label: 'annualizzato' };
   }
 
-  const periodReturn = (Math.pow(1 + annualizedReturn / 100, numberOfMonths / 12) - 1) * 100;
+  const periodReturn = deannualizeReturn(annualizedReturn, numberOfMonths);
   return {
     value: isFinite(periodReturn) ? periodReturn : null,
     isPeriodReturn: true,
     label: numberOfMonths === 1 ? 'nel mese' : `nei ${numberOfMonths} mesi`,
   };
+}
+
+export interface PeriodReturnChip {
+  /** The cumulative TWR of the period, in percent. */
+  value: number;
+  /** «cumulato in 9 mesi» — the qualifier under the chip. */
+  label: string;
+}
+
+/**
+ * The second chip of the Rendimento tile: the return the portfolio produced over the WHOLE period,
+ * cumulative, beside the annualised hero. Until 2026-09-07 that chip printed the ROI under the
+ * caption «ROI del periodo» — a gain divided by the FIRST month's capital, which is not the
+ * period's return and grows with the window on a saver's account (+126% against a +134%
+ * cumulative TWR on the real account, +73% against +30% on another). `null` when the hero is
+ * already the period return (below six months, One-Tile-One-Question), when there is nothing to
+ * de-annualise, or over exactly twelve months, where the two figures coincide.
+ */
+export function resolvePeriodReturnChip(
+  annualizedReturn: number | null,
+  numberOfMonths: number,
+  heroReturn: Pick<HeroReturn, 'isPeriodReturn'>
+): PeriodReturnChip | null {
+  if (annualizedReturn === null || heroReturn.isPeriodReturn || numberOfMonths <= 0 || numberOfMonths === 12) return null;
+  const value = deannualizeReturn(annualizedReturn, numberOfMonths);
+  if (!isFinite(value)) return null;
+  return { value, label: `cumulato in ${numberOfMonths} mesi` };
 }
 
 /**
