@@ -699,7 +699,7 @@ export async function reassignExpensesCategory(
     let count = 0;
 
     querySnapshot.docs.forEach(docSnapshot => {
-      const updates: any = {
+      const updates: Record<string, unknown> = {
         categoryId: newCategoryId,
         categoryName: newCategoryName,
         updatedAt: new Date(),
@@ -751,7 +751,7 @@ export async function clearExpensesCategoryAssignment(
     let count = 0;
 
     querySnapshot.docs.forEach(docSnapshot => {
-      const updates: any = {
+      const updates: Record<string, unknown> = {
         categoryId: 'uncategorized',
         categoryName: 'Uncategorized',
         subCategoryId: null,
@@ -800,7 +800,7 @@ export async function reassignExpensesSubCategory(
     let count = 0;
 
     querySnapshot.docs.forEach(docSnapshot => {
-      const updates: any = {
+      const updates: Record<string, unknown> = {
         updatedAt: new Date(),
       };
 
@@ -867,7 +867,7 @@ export async function moveExpensesToCategory(
     let count = 0;
 
     querySnapshot.docs.forEach(docSnapshot => {
-      const updates: any = {
+      const updates: Record<string, unknown> = {
         categoryId: newCategoryId,
         categoryName: newCategoryName,
         type: newType,
@@ -943,7 +943,7 @@ export async function moveExpensesFromSubCategory(
     let count = 0;
 
     querySnapshot.docs.forEach(docSnapshot => {
-      const updates: any = {
+      const updates: Record<string, unknown> = {
         categoryId: newCategoryId,
         categoryName: newCategoryName,
         type: newType,

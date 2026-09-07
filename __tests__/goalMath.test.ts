@@ -13,7 +13,7 @@ import { describe, it, expect, vi } from 'vitest';
 // goalMath imports calculateAssetValue from assetService, which pulls the client SDK.
 vi.mock('@/lib/firebase/config', () => ({ db: {} }));
 vi.mock('@/lib/services/assetService', () => ({
-  calculateAssetValue: (asset: any) => {
+  calculateAssetValue: (asset: Asset) => {
     const base = asset.quantity * asset.currentPrice;
     return asset.outstandingDebt ? Math.max(0, base - asset.outstandingDebt) : base;
   },

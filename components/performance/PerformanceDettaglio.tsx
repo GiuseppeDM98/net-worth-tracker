@@ -17,15 +17,16 @@ import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, X
 import type { PerformanceMetrics, RollingPeriodPerformance, UnderwaterDrawdownData } from '@/types/performance';
 import type { Narrative } from '@/lib/utils/narrative';
 import type { DrawdownStory } from '@/lib/utils/performanceSummary';
-import { describeDrawdownDetail, describeReturnMetrics, describeYields } from '@/lib/utils/performanceNarrative';
+import type { ReturnAttribution } from '@/lib/utils/performanceAttribution';
+import { describeAttributionCoverage, describeDrawdownDetail, describeReturnMetrics, describeYields } from '@/lib/utils/performanceNarrative';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { formatNumber, formatPercentage } from '@/lib/services/chartService';
-import { getMetricValueColor } from '@/lib/utils/metricColors';
+import { getMetricValueColor, signTextClass } from '@/lib/utils/metricColors';
 import { useChartColors } from '@/lib/hooks/useChartColors';
 import { cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Tile, TILE_CELL_CLASS, TILE_EYEBROW_CLASS } from '@/components/ui/tile';
+import { Tile, TILE_CELL_CLASS, TILE_EYEBROW_CLASS, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { CHART_TICK_STYLE } from '@/components/cashflow/costCenterStyles';
 import { UnderwaterDrawdownChart } from '@/components/performance/UnderwaterDrawdownChart';
 
@@ -39,8 +40,75 @@ interface PerformanceDettaglioProps {
   rollingCagr: RollingCagrPoint[];
   rollingSharpe: RollingSharpePoint[];
   underwater: UnderwaterDrawdownData[];
+  /** Every instrument's contribution to the period's market gain; null before the base is resolved. */
+  attribution: ReturnAttribution | null;
   /** Changes with the period, so the charts replay their entrance once per window. */
   renderKey: string;
+}
+
+/** «+16.569 €» / «−877 €» / «0 €» — the tile's euro figure, typographic minus. */
+function signedEuro(value: number): string {
+  return `${value > 0 ? '+' : value < 0 ? '−' : ''}${cachedFormatCurrencyEUR(Math.abs(value), true)}`;
+}
+
+/** A figure that prints as zero carries no sign colour (the rule of every Storico effect). */
+function euroClass(value: number): string {
+  return Math.abs(Math.round(value)) < 1 ? 'text-foreground' : signTextClass(value);
+}
+
+const ATTRIBUTION_CELL_CLASS = 'py-[9px] text-right font-mono text-[13px] tabular-nums';
+
+/**
+ * The full attribution table: every instrument, its months, the price effect and the dividends
+ * apart, then the residual and the market's own figure as the two closing rows — a table inside a
+ * tile (DESIGN.md → Table inside a Tile), scrolling inside its own wrapper below 1440.
+ */
+function AttributionTable({ attribution }: { attribution: ReturnAttribution }) {
+  return (
+    <div className="-mx-5 mt-3 overflow-x-auto px-5">
+      <table className="w-full min-w-[560px] border-collapse">
+        <thead>
+          <tr className="border-b border-border">
+            <th scope="col" className={cn(TILE_SUB_EYEBROW_CLASS, 'py-2 text-left font-semibold')}>Strumento</th>
+            <th scope="col" className={cn(TILE_SUB_EYEBROW_CLASS, 'py-2 text-right font-semibold')}>Mesi</th>
+            <th scope="col" className={cn(TILE_SUB_EYEBROW_CLASS, 'py-2 text-right font-semibold')}>Prezzo</th>
+            <th scope="col" className={cn(TILE_SUB_EYEBROW_CLASS, 'py-2 text-right font-semibold')}>Dividendi</th>
+            <th scope="col" className={cn(TILE_SUB_EYEBROW_CLASS, 'py-2 text-right font-semibold')}>Totale</th>
+          </tr>
+        </thead>
+        <tbody>
+          {attribution.rows.map((row) => (
+            <tr key={row.assetId} className="border-b border-border">
+              <th scope="row" className="py-[9px] pr-3 text-left text-[13px] font-normal text-foreground">
+                <span className="block truncate">{row.name}</span>
+                {row.isPensionFund && <span className="block text-[11px] text-muted-foreground">fondo pensione, al netto dei versamenti</span>}
+              </th>
+              <td className={cn(ATTRIBUTION_CELL_CLASS, 'text-muted-foreground')}>{row.monthsAttributed}</td>
+              <td className={cn(ATTRIBUTION_CELL_CLASS, euroClass(row.marketEffect))}>{signedEuro(row.marketEffect)}</td>
+              <td className={cn(ATTRIBUTION_CELL_CLASS, row.dividends ? 'text-foreground' : 'text-muted-foreground')}>{row.dividends ? signedEuro(row.dividends) : '—'}</td>
+              <td className={cn(ATTRIBUTION_CELL_CLASS, 'font-semibold', euroClass(row.total))}>{signedEuro(row.total)}</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr className="border-b border-border">
+            <th scope="row" className="py-[9px] pr-3 text-left text-[13px] font-normal text-muted-foreground">Non attribuito</th>
+            <td className={ATTRIBUTION_CELL_CLASS} />
+            <td className={ATTRIBUTION_CELL_CLASS} />
+            <td className={ATTRIBUTION_CELL_CLASS} />
+            <td className={cn(ATTRIBUTION_CELL_CLASS, 'text-muted-foreground')}>{signedEuro(attribution.unattributed)}</td>
+          </tr>
+          <tr>
+            <th scope="row" className="py-[9px] pr-3 text-left text-[13px] font-semibold text-foreground">Mercato</th>
+            <td className={cn(ATTRIBUTION_CELL_CLASS, 'text-muted-foreground')}>{attribution.coverage.attributedMonths}</td>
+            <td className={ATTRIBUTION_CELL_CLASS} />
+            <td className={ATTRIBUTION_CELL_CLASS} />
+            <td className={cn(ATTRIBUTION_CELL_CLASS, 'font-bold', euroClass(attribution.gain))}>{signedEuro(attribution.gain)}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  );
 }
 
 // ─── Rows ─────────────────────────────────────────────────────────────────────
@@ -171,7 +239,7 @@ function describeRolling(values: number[], format: (v: number) => string, name: 
 
 // ─── The disclosure ───────────────────────────────────────────────────────────
 
-export function PerformanceDettaglio({ metrics, periodAside, drawdown, rollingCagr, rollingSharpe, underwater, renderKey }: PerformanceDettaglioProps) {
+export function PerformanceDettaglio({ metrics, periodAside, drawdown, rollingCagr, rollingSharpe, underwater, attribution, renderKey }: PerformanceDettaglioProps) {
   const [open, setOpen] = useState(false);
 
   const yields = describeYields({ yocNet: metrics.yocNet, currentYieldNet: metrics.currentYieldNet });
@@ -183,7 +251,7 @@ export function PerformanceDettaglio({ metrics, periodAside, drawdown, rollingCa
       <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 border-t border-border/40 py-3 text-left" aria-label="Dettaglio">
         <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <span className={TILE_EYEBROW_CLASS}>Dettaglio</span>
-          <span className="text-[13px] text-muted-foreground">Tutte le metriche, i grafici rolling, il drawdown nel tempo e il metodo</span>
+          <span className="text-[13px] text-muted-foreground">Tutte le metriche, il contributo di ogni strumento, i grafici rolling, il drawdown nel tempo e il metodo</span>
         </span>
         <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform', open && 'rotate-180')} aria-hidden="true" />
       </CollapsibleTrigger>
@@ -288,6 +356,20 @@ export function PerformanceDettaglio({ metrics, periodAside, drawdown, rollingCa
             </div>
           )}
 
+          {attribution && (
+            <div className={cn(TILE_CELL_CLASS, 'tablet:col-span-2 desktop:col-span-12')}>
+              <Tile eyebrow="Contributo per strumento" aside={periodAside} reading={describeAttributionCoverage(attribution)}>
+                {attribution.rows.length > 0 && <AttributionTable attribution={attribution} />}
+                <p className="mt-auto border-t border-border pt-3.5 text-[11px] leading-[1.45] text-muted-foreground">
+                  Prezzo = effetto prezzo sulla quantità detenuta a inizio mese, in euro, sommato sui mesi con il dettaglio per
+                  strumento; un fondo pensione vale la sua variazione al netto dei versamenti, un immobile è al lordo del debito.
+                  Dividendi = incassati nel periodo dal registro dividendi. La somma delle righe più «Non attribuito» è il guadagno di
+                  mercato che il TWR misura sugli stessi mesi.
+                </p>
+              </Tile>
+            </div>
+          )}
+
           <div className={cn(TILE_CELL_CLASS, 'desktop:col-span-6')}>
             <RollingTile
               eyebrow="CAGR rolling 12 mesi"
@@ -366,6 +448,13 @@ export function PerformanceDettaglio({ metrics, periodAside, drawdown, rollingCa
                   I contributi netti sono entrate meno uscite registrate in Cashflow, trasferimenti esclusi; i dividendi sono rendimento, non
                   contributo. Il capitale investito conta acquisti meno vendite dal registro operazioni. «Capitale immesso» è il patrimonio
                   iniziale più i contributi netti cumulati: la distanza dal patrimonio è il mercato.
+                </div>
+                <div>
+                  <p className="mb-1 font-semibold text-foreground">Contributo per strumento</p>
+                  Per ogni mese con il dettaglio per strumento, effetto prezzo = quantità a inizio mese × variazione del valore unitario in
+                  euro; le somme per strumento sono esatte e additive, e la differenza dal guadagno di mercato del TWR è dichiarata come
+                  «Non attribuito». Un fondo pensione entra nella base dal mese in cui i versamenti sono tracciati: il suo ingresso è un
+                  flusso, i versamenti successivi anche, e la sua variazione al netto dei versamenti è rendimento.
                 </div>
                 <div>
                   <p className="mb-1 font-semibold text-foreground">Heatmap e underwater</p>

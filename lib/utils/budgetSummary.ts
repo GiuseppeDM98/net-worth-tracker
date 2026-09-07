@@ -151,7 +151,7 @@ function daysInYear(year: number): number {
   return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0 ? 366 : 365;
 }
 
-/** Day of year from calendar fields, so DST never shifts it (AGENTS.md → TZ). */
+/** Day of year from calendar fields, so DST never shifts it (AGENTS.md § Commands, `TZ=Europe/Rome`). */
 function dayOfYear(date: Date): number {
   return Math.round((Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) - Date.UTC(date.getFullYear(), 0, 0)) / 86_400_000);
 }

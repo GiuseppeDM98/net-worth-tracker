@@ -55,7 +55,11 @@ export function AccountSharingSection({
   }, []);
 
   useEffect(() => {
-    loadMembers();
+    // Deferred so the effect body itself sets no state (react-hooks/set-state-in-effect).
+    const timer = setTimeout(() => {
+      loadMembers();
+    }, 0);
+    return () => clearTimeout(timer);
   }, [loadMembers]);
 
   const handleAdd = async () => {

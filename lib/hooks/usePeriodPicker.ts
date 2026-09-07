@@ -53,6 +53,16 @@ export interface UsePeriodPickerReturn {
 
 // ─── Pure helpers used by the hook ───────────────────────────────────────────
 
+/** A text input's raw value and the calendar range it belongs to. */
+interface TextDraft {
+  range: DateRange | undefined;
+  text: string;
+}
+
+function formatDay(day: Date | undefined): string {
+  return day ? format(day, 'dd/MM/yyyy') : '';
+}
+
 function buildRangeLabel(range: { from?: Date; to?: Date } | undefined, locale: Locale): string {
   if (range?.from && range.to) {
     return `${format(range.from, 'd MMM', { locale })} – ${format(range.to, 'd MMM yyyy', { locale })}`;
@@ -68,7 +78,7 @@ export function usePeriodPicker({
   onChange,
   availableYears = [],
 }: UsePeriodPickerOptions): UsePeriodPickerReturn {
-  const [open, setOpen] = React.useState(false);
+  const [open, setOpenState] = React.useState(false);
 
   const [calendarRange, setCalendarRange] = React.useState<DateRange | undefined>(() => {
     const r = periodToRange(value);
@@ -77,28 +87,30 @@ export function usePeriodPicker({
 
   const [calendarMonth, setCalendarMonth] = React.useState<Date>(() => periodToRange(value).from);
 
-  const [fromText, setFromText] = React.useState('');
-  const [toText, setToText] = React.useState('');
+  // What the user typed, stored WITH the range it was typed against: while the range is the
+  // same the raw text stays (a half-typed date must not be reformatted under the cursor); as
+  // soon as the range moves — a parsed date, a calendar click — the text is derived from it.
+  // Derived, so no effect re-syncs it (react-hooks/set-state-in-effect).
+  const [fromDraft, setFromDraft] = React.useState<TextDraft | null>(null);
+  const [toDraft, setToDraft] = React.useState<TextDraft | null>(null);
+  const fromText =
+    fromDraft !== null && fromDraft.range === calendarRange
+      ? fromDraft.text
+      : formatDay(calendarRange?.from);
+  const toText =
+    toDraft !== null && toDraft.range === calendarRange ? toDraft.text : formatDay(calendarRange?.to);
 
-  // Capture the `value` at the moment the picker opens so the calendar syncs
-  // to the current period without tracking every intermediate change the parent
-  // makes while the picker is closed.
-  const valueOnOpenRef = React.useRef(value);
-  React.useEffect(() => {
-    if (open) {
-      valueOnOpenRef.current = value;
+  // The calendar syncs to the current period at the moment the picker opens — and only then,
+  // so the parent's intermediate changes while it is closed are not tracked. Opening is an
+  // event (`setOpen(true)` is the one way in), so the sync lives in the setter, not in an effect.
+  const setOpen = (next: boolean) => {
+    if (next) {
       const r = periodToRange(value);
       setCalendarRange({ from: r.from, to: r.to });
       setCalendarMonth(r.from);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: sync only on open, not every value change
-  }, [open]);
-
-  // Keep text inputs in sync with calendar range
-  React.useEffect(() => {
-    setFromText(calendarRange?.from ? format(calendarRange.from, 'dd/MM/yyyy') : '');
-    setToText(calendarRange?.to ? format(calendarRange.to, 'dd/MM/yyyy') : '');
-  }, [calendarRange]);
+    setOpenState(next);
+  };
 
   const handlePreset = (period: Period) => {
     onChange(period);
@@ -126,7 +138,7 @@ export function usePeriodPicker({
 
   const handleFromTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
-    setFromText(val);
+    setFromDraft({ range: calendarRange, text: val });
     const parsed = parseDateInput(val);
     if (parsed) {
       setCalendarRange(prev => ({ from: parsed, to: prev?.to }));
@@ -136,7 +148,7 @@ export function usePeriodPicker({
 
   const handleToTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
-    setToText(val);
+    setToDraft({ range: calendarRange, text: val });
     const parsed = parseDateInput(val);
     // Do NOT fall back to `parsed` for `from` — if the user is typing the end
     // date before the start date, silently setting from=to produces a

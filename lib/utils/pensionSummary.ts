@@ -266,7 +266,7 @@ function summarizeMemberTax(
   const natures = byYearNature[taxYear] ?? { tfr: 0, voluntary: 0, employer: 0 };
 
   // The enrollment fallback reads the MEMBER's own history: the account-wide map would leak one
-  // person's years into another's plafond fold (AGENTS.md → Fondo Pensione).
+  // person's years into another's plafond fold (doc/guide/previdenza.md § Fondo Pensione).
   const enrollmentYear = (() => {
     if (member.firstEmploymentYear) return member.firstEmploymentYear;
     const years = Object.keys(deductibleByYear).map(Number);

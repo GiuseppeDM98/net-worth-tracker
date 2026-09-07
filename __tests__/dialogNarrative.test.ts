@@ -21,7 +21,7 @@ import { narrativeToText, type Narrative } from '@/lib/utils/narrative';
 
 /**
  * `Intl('it-IT')` puts a NO-BREAK space before the €, and the tests read the way the screen
- * prints — so the nbsp is flattened rather than the formatter "fixed" (AGENTS.md → Panoramica).
+ * prints — so the nbsp is flattened rather than the formatter "fixed" (doc/guide/panoramica.md § Panoramica and Dashboard Data Isolation).
  */
 function plain(narrative: Narrative): string {
   return narrativeToText(narrative).replace(/ /g, ' ');

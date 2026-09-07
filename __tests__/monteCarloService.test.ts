@@ -147,7 +147,7 @@ describe('runMonteCarloSimulation — capital inflows', () => {
  * be compared FLOAT-FOR-FLOAT against calculateFIREProjection's base scenario — the spec's key
  * coherence requirement ("a volatilità 0 il ventaglio collassa sulla proiezione deterministica").
  * The comparison deliberately runs WITHOUT capital inflows: the deterministic bridge grows the
- * pension compartment while a Monte Carlo run adds inflows at TODAY's value (AGENTS → FIRE),
+ * pension compartment while a Monte Carlo run adds inflows at TODAY's value (doc/guide/fire.md § FIRE, What If and Goals),
  * so identity only holds — and only must hold — on the shared, inflow-free model.
  */
 function makeAccumulationParams(

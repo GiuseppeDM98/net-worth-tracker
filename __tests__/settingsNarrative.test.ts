@@ -113,7 +113,7 @@ describe('describePerformanceBase', () => {
           pensionReturnStartMonth: '',
         })
       )
-    ).toContain('Base allargata ai fondi pensione');
+    ).toContain('Base allargata ai fondi pensione dal mese tracciato (i versamenti sono flussi, non rendimento)');
     expect(
       plain(
         describePerformanceBase({

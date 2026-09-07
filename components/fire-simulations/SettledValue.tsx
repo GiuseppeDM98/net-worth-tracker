@@ -4,7 +4,7 @@
  * Count-up leaf nodes of the FIRE tab. Every preview edit (SWR, the pension lock, a scenario
  * parameter) changes the figures instantly, so they settle from their previous value rather than
  * replaying a count from zero. Leaf components isolate the per-frame re-renders from the tiles
- * around them (AGENTS.md → Panoramica: count-up lives in leaf nodes, never in the page).
+ * around them (doc/guide/panoramica.md § Panoramica and Dashboard Data Isolation).
  */
 
 import { formatCurrency, formatPercentage } from '@/lib/services/chartService';

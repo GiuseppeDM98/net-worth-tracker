@@ -122,7 +122,7 @@ async function getSnapshotsForUser(userId: string): Promise<MonthlySnapshot[]> {
 async function getPensionContributionsForUser(userId: string): Promise<PensionContribution[]> {
   const snapshot = await adminDb
     // Literal on purpose: `pensionContributionService` exports the constant but top-level-imports
-    // the CLIENT Firebase SDK (the same trap as goalService — AGENTS.md → Panoramica).
+    // the CLIENT Firebase SDK (the same trap as goalService — doc/guide/panoramica.md § Panoramica and Dashboard Data Isolation).
     .collection('pensionContributions')
     .where('userId', '==', userId)
     .get();

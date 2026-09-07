@@ -5,11 +5,12 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import type { Asset } from '@/types/assets';
 
 // Mock Firebase-dependent modules before importing goalService
 vi.mock('@/lib/firebase/config', () => ({ db: {} }));
 vi.mock('@/lib/services/assetService', () => ({
-  calculateAssetValue: (asset: any) => {
+  calculateAssetValue: (asset: Asset) => {
     const base = asset.quantity * asset.currentPrice;
     return asset.outstandingDebt ? Math.max(0, base - asset.outstandingDebt) : base;
   },

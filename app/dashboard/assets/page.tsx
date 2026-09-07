@@ -18,7 +18,7 @@
  *
  * The page owns every dialog — one AssetDialog serves the header's "Aggiungi asset", the
  * Liquidità tile's "Aggiungi conto" and the table's Modifica — so a mutation invalidates the
- * assets AND the overview in one place (AGENTS.md → dual invalidation).
+ * assets AND the overview in one place (doc/guide/patrimonio.md § Patrimonio).
  */
 
 'use client';
@@ -130,7 +130,7 @@ export default function AssetsPage() {
 
   // The whole ledger of the owner, filtered to the month in memory: a month query would need a
   // (userId, date) composite index that does not exist, and every trade mutation already
-  // invalidates this cache (AGENTS.md → Asset Trade Ledger).
+  // invalidates this cache (doc/guide/registro-operazioni.md § Asset Trade Ledger).
   const { data: trades = [], isLoading: loadingTrades } = useAssetTransactions(ownerId, undefined, { enabled: ledgerReady });
 
   // ─── Dialog state ─────────────────────────────────────────────────────────────
@@ -304,8 +304,8 @@ export default function AssetsPage() {
   // set, so an error is an alert, never a skeleton that never lifts.
   if (loadingAssets || loadingOverview || loadingSnapshots || isLedgerMetaLoading) {
     return (
-      <PageContainer width="wide">
-        <PageHeader label="Patrimonio" title="Strumenti e conti" separator={false} />
+      <PageContainer>
+        <PageHeader label="Patrimonio" title="Strumenti e conti" />
         <TileGridSkeleton cells={SKELETON_CELLS} />
       </PageContainer>
     );
@@ -313,8 +313,8 @@ export default function AssetsPage() {
 
   if (assetsError) {
     return (
-      <PageContainer width="wide">
-        <PageHeader label="Patrimonio" title="Strumenti e conti" separator={false} />
+      <PageContainer>
+        <PageHeader label="Patrimonio" title="Strumenti e conti" />
         <ErrorNotice
           className="max-w-[920px]"
           notice={describeReadFailure({
@@ -333,13 +333,12 @@ export default function AssetsPage() {
 
   // ─── Render ───────────────────────────────────────────────────────────────────
   return (
-    <PageContainer width="wide">
+    <PageContainer>
       <motion.div layout="position" transition={springLayoutTransition} className="space-y-4">
         <PageHeader
           label="Patrimonio"
           title="Strumenti e conti"
           description={lastPriceUpdate ?? undefined}
-          separator={false}
           actions={headerActions}
         />
 

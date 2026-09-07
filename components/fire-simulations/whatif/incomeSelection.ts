@@ -1,6 +1,6 @@
 /**
  * The job-loss income picker's keys and sum — UI-side on purpose: the pure What If layer is
- * category-agnostic and receives only the SUM of the sources the user ticked (AGENTS → FIRE,
+ * category-agnostic and receives only the SUM of the sources the user ticked (doc/guide/fire.md § FIRE,
  * What If and Goals). Selection is keyed per subcategory leaf so a category can be partially
  * selected (one partner's salary lost, the other retained).
  */

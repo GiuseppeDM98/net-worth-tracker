@@ -9,7 +9,7 @@
  *
  * Config-first: the disclosure opens by itself only while no age is saved, or when an unsaved
  * edit or an incomplete pension appears — the tab owns that state (`open`/`onOpenChange`) because
- * the decision has to be taken ONCE after the form has settled (AGENTS → FIRE: a `useRef`
+ * the decision has to be taken ONCE after the form has settled (doc/guide/fire.md § FIRE, What If and Goals: a `useRef`
  * seeded flag, never the transient `hasUnsavedChanges`). Every edit here is a PREVIEW — the
  * verdict and the tiles read the typed values at once — until «Salva ipotesi»: ONE save for the
  * four tiles, because the form is one document (`useCoastFireSettingsDraft` has one mutation),

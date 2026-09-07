@@ -114,7 +114,7 @@ export const SAMPLE_PROFILE_EYEBROW = 'Panoramica · dati d’esempio';
  *
  * `year` decides the pension deduction ceiling, which changed in 2026 and will change again;
  * it is passed in rather than read from a clock so the copy stays a pure function of its
- * inputs (AGENTS.md → functions that call `new Date()` internally are untestable).
+ * inputs (AGENTS.md § Dynamic Imports and Module Hygiene: functions that call `new Date()` internally are untestable).
  */
 export function buildLandingPromises(year: number): LandingPromise[] {
   const benchmarkCount = BENCHMARKS.length;

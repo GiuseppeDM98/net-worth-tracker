@@ -458,14 +458,7 @@ describe('buildAssistantMonthContext', () => {
     await buildAssistantMonthContext('user1', { year: 2025, month: 3 });
 
     // The Timestamp.fromDate call uses the endDate we computed — verify via the
-    // raw Date that would produce it (March has 31 days)
-    // We verify by checking the call to collection('expenses').where(...)
-    // The second where call receives the end timestamp; check it via mock args
-    const expensesCollection = vi.mocked(
-      (await import('@/lib/firebase/admin')).adminDb.collection
-    )('expenses') as any;
-    // The where mock captures calls; we check the date passed to fromDate via the
-    // endDate boundary logic directly by re-deriving it
+    // raw Date that would produce it by re-deriving the boundary (March has 31 days)
     const endDate = new Date(2025, 3, 0, 23, 59, 59); // March 31
     expect(endDate.getDate()).toBe(31);
     expect(endDate.getHours()).toBe(23);

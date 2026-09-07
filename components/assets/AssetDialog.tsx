@@ -33,8 +33,9 @@
  */
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import type { Timestamp } from 'firebase/firestore';
 import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -480,6 +481,11 @@ const ALLOCATION_ROLE_OPTIONS: { value: AllocationRole; label: string; descripti
   },
 ];
 
+/** Today as the `YYYY-MM-DD` an `<input type="date">` wants (UTC calendar day, as before). */
+function isoDateToday(): string {
+  return new Date().toISOString().split('T')[0];
+}
+
 const assetClasses: { value: AssetClass; label: string }[] = [
   { value: 'equity', label: 'Azioni' },
   { value: 'bonds', label: 'Obbligazioni' },
@@ -520,7 +526,6 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
   const [newSubCategoryName, setNewSubCategoryName] = useState('');
   const [isAddingSubCategory, setIsAddingSubCategory] = useState(false);
   const [composition, setComposition] = useState<AssetComposition[]>([]);
-  const [isComposite, setIsComposite] = useState(false);
   const [hasOutstandingDebt, setHasOutstandingDebt] = useState(false);
   // True once the user has picked an allocation role by hand — from then on the type/sub-category
   // driven suggestion stops overriding their choice.
@@ -588,7 +593,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
   const isLedgerEdit = isEdit && !!asset && isLedgerAssetType(asset.type);
   const isLedgerCreate = !isEdit && !!selectedType && isLedgerAssetType(selectedType);
   const ledgerCreateReady = isLedgerCreate && ledgerMeta != null;
-  const todayIso = new Date().toISOString().split('T')[0];
+  const todayIso = isoDateToday();
   const baselineIso = ledgerMeta ? ledgerMeta.baselineDate.toISOString().split('T')[0] : undefined;
   // True when the bond qualifies for % of par ↔ EUR conversion:
   // must have ISIN (triggers Borsa Italiana pricing) AND nominalValue > 1.
@@ -660,51 +665,99 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
     }
   }, [isEdit, isLiquidTouched, selectedType, selectedSubCategory, watchIsLiquid, setValue]);
 
+  // The three blocks below adjust UI state DURING render when the thing it follows changes
+  // (React's "adjusting state when a prop changes"), never from an effect — a setter called
+  // synchronously in an effect body is banned by `react-hooks/set-state-in-effect`. Each keeps
+  // the previous value of its subject in state and acts only on a change; React re-renders
+  // before committing, so the adjustment lands in the same paint. Source order matters: the
+  // open/asset reset comes LAST, so on a reopen it has the final word over the two above it.
+
   // Auto-activate bond detail toggles for new bond assets
   // When type=bond and assetClass=bonds, automatically open the bond details and cost basis sections
   // so the user sees the available fields without needing to manually toggle them.
   // Only applies to new assets (!asset) to avoid overriding the user's existing saved state.
-  useEffect(() => {
-    if (!asset && selectedType === 'bond' && selectedAssetClass === 'bonds') {
+  const isNewBond = !asset && selectedType === 'bond' && selectedAssetClass === 'bonds';
+  const [prevIsNewBond, setPrevIsNewBond] = useState(isNewBond);
+  if (prevIsNewBond !== isNewBond) {
+    setPrevIsNewBond(isNewBond);
+    if (isNewBond) {
       setShowBondDetails(true);
       setShowCostBasis(true);
     }
-  }, [selectedType, selectedAssetClass, asset]);
+  }
 
-  // Gestisci il toggle della composizione
-  useEffect(() => {
-    setIsComposite(watchIsComposite || false);
-    if (!watchIsComposite) {
+  // The composition switch is the form field itself; the entries are cleared when it turns off.
+  const isComposite = !!watchIsComposite;
+  const [prevIsComposite, setPrevIsComposite] = useState(isComposite);
+  if (prevIsComposite !== isComposite) {
+    setPrevIsComposite(isComposite);
+    if (!isComposite) {
       setComposition([]);
     }
-  }, [watchIsComposite]);
+  }
+
+  // Everything a reopen must reset that is NOT a form field: the step, the status line, the
+  // touched flags, the section toggles, the composition and the calculator. Re-running on every
+  // open is what makes a second "new asset" start clean — `asset` stays null between opens.
+  // The form itself is reset in the effect further down: `reset`, `setValue` and `replaceTiers`
+  // are not state setters.
+  const [openSubject, setOpenSubject] = useState<{ open: boolean; asset: Asset | null | undefined } | null>(null);
+  if (!openSubject || openSubject.open !== open || openSubject.asset !== asset) {
+    setOpenSubject({ open, asset });
+    if (open) {
+      setStatus({ phase: 'idle' });
+      setStep(asset ? 2 : 1);
+      setAllocationRoleTouched(false);
+      setIsLiquidTouched(false);
+      // Reset calculator on every open to avoid stale data from previous session
+      setShowCostCalculator(false);
+      setBrokerEntries([{ qty: '', price: '' }]);
+      if (asset) {
+        setComposition(asset.composition && asset.composition.length > 0 ? asset.composition : []);
+        setHasOutstandingDebt(!!(asset.outstandingDebt && asset.outstandingDebt > 0));
+        setShowCostBasis(!!((asset.averageCost && asset.averageCost > 0) || (asset.taxRate && asset.taxRate > 0)));
+        setShowTER(!!(asset.totalExpenseRatio && asset.totalExpenseRatio > 0));
+        setShowBondDetails(!!asset.bondDetails);
+        // The step-up switch follows the saved schedule only when the asset HAS bond details;
+        // without them it keeps its previous value, exactly as before this block existed.
+        if (asset.bondDetails) {
+          const schedule = asset.bondDetails.couponRateSchedule;
+          setShowStepUp(!!(schedule && schedule.length > 0));
+        }
+      } else {
+        setComposition([]);
+        setHasOutstandingDebt(false);
+        setShowCostBasis(false);
+        setShowTER(false);
+        setShowBondDetails(false);
+        setShowStepUp(false);
+      }
+    }
+  }
+
+  // Promise-style on purpose: the setter runs inside `.then`, which the
+  // `react-hooks/set-state-in-effect` rule accepts from an effect — an `await` in an async
+  // function it does not see through.
+  const loadAllocationTargets = useCallback((): Promise<void> => {
+    if (!user || !ownerId) return Promise.resolve();
+
+    return getTargets(ownerId)
+      .then((targets) => setAllocationTargets(targets))
+      .catch((error) => console.error('Error loading allocation targets:', error));
+  }, [user, ownerId]);
 
   // Load allocation targets when dialog opens
   useEffect(() => {
     if (open && user) {
       loadAllocationTargets();
     }
-  }, [open, user]);
-
-  const loadAllocationTargets = async () => {
-    if (!user || !ownerId) return;
-
-    try {
-      const targets = await getTargets(ownerId);
-      setAllocationTargets(targets);
-    } catch (error) {
-      console.error('Error loading allocation targets:', error);
-    }
-  };
+  }, [open, user, loadAllocationTargets]);
 
   useEffect(() => {
     // Re-run on every open so a second "new asset" dialog starts clean.
     // Without `open` in deps, `asset` stays null between opens and the effect never re-fires.
     if (!open) return;
-    setStatus({ phase: 'idle' });
-    setStep(asset ? 2 : 1);
-    setAllocationRoleTouched(false);
-    setIsLiquidTouched(false);
+    const todayIso = isoDateToday();
 
     if (asset) {
       // Legacy fallback for documents saved before `isLiquid` existed — the same
@@ -766,33 +819,12 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
         pensionFamilyMemberId: asset.pensionFundDetails?.familyMemberId || '__none__',
       });
 
-      if (asset.composition && asset.composition.length > 0) {
-        setComposition(asset.composition);
-        setIsComposite(true);
-      } else {
-        setComposition([]);
-        setIsComposite(false);
-      }
-
-      // Set hasOutstandingDebt state based on asset data
-      setHasOutstandingDebt(!!(asset.outstandingDebt && asset.outstandingDebt > 0));
-
-      // Set showCostBasis state based on asset data
-      setShowCostBasis(!!((asset.averageCost && asset.averageCost > 0) || (asset.taxRate && asset.taxRate > 0)));
-
-      // Set showTER state based on asset data
-      setShowTER(!!(asset.totalExpenseRatio && asset.totalExpenseRatio > 0));
-
-      // Reset calculator on every open to avoid stale data from previous session
-      setShowCostCalculator(false);
-      setBrokerEntries([{ qty: '', price: '' }]);
-
-      // Set bond details state and pre-fill form fields
-      setShowBondDetails(!!asset.bondDetails);
+      // Pre-fill the bond detail fields (the toggles were set during render, above)
       if (asset.bondDetails) {
         const bd = asset.bondDetails;
-        // Convert Timestamp or Date to ISO date string for <input type="date">
-        const toDateStr = (d: Date | any): string => {
+        // Convert Timestamp or Date to ISO date string for <input type="date">: the type says
+        // Date, but a document read straight from Firestore still carries a Timestamp.
+        const toDateStr = (d: Date | Timestamp): string => {
           const date = d instanceof Date ? d : d.toDate();
           return date.toISOString().split('T')[0];
         };
@@ -803,13 +835,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
         setValue('bondNominalValue', bd.nominalValue);
         setValue('bondFinalPremiumRate', bd.finalPremiumRate);
         setValue('bondIsInflationLinked', !!bd.isInflationLinked);
-        if (bd.couponRateSchedule && bd.couponRateSchedule.length > 0) {
-          setShowStepUp(true);
-          replaceTiers(bd.couponRateSchedule);
-        } else {
-          setShowStepUp(false);
-          replaceTiers([]);
-        }
+        replaceTiers(bd.couponRateSchedule && bd.couponRateSchedule.length > 0 ? bd.couponRateSchedule : []);
       }
     } else {
       reset({
@@ -849,17 +875,8 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
         pensionFamilyMemberId: '__none__',
       });
       replaceTiers([]);
-      setComposition([]);
-      setIsComposite(false);
-      setHasOutstandingDebt(false);
-      setShowCostBasis(false);
-      setShowTER(false);
-      setShowBondDetails(false);
-      setShowStepUp(false);
-      setShowCostCalculator(false);
-      setBrokerEntries([{ qty: '', price: '' }]);
     }
-  }, [asset, reset, open]);
+  }, [asset, reset, open, setValue, replaceTiers]);
 
   // Selects the asset type in step 1, auto-derives the class, and advances to step 2
   const handleTypeSelect = (type: AssetType) => {
@@ -905,7 +922,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
       // Reset
       setNewSubCategoryName('');
       setShowNewSubCategory(false);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error adding subcategory:', error);
       toast.error(describeWriteError(error));
     } finally {
@@ -921,7 +938,11 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
     setComposition(composition.filter((_, i) => i !== index));
   };
 
-  const updateCompositionEntry = (index: number, field: 'assetClass' | 'percentage' | 'subCategory', value: any) => {
+  const updateCompositionEntry = <K extends 'assetClass' | 'percentage' | 'subCategory'>(
+    index: number,
+    field: K,
+    value: AssetComposition[K]
+  ) => {
     const updated = [...composition];
     updated[index] = { ...updated[index], [field]: value };
     setComposition(updated);
@@ -1074,7 +1095,9 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
         if (!shouldUpdatePrice(data.type, data.subCategory)) {
           formData.currentPrice = asset.currentPrice;
         }
-        const { quantity: _ledgerQty, averageCost: _ledgerPmc, ...metadata } = formData;
+        const metadata: Partial<AssetFormData> = { ...formData };
+        delete metadata.quantity;
+        delete metadata.averageCost;
         await updateAssetMetadata(asset.id, metadata);
         savedAssetId = asset.id;
         toast.success('Asset aggiornato con successo');
@@ -1301,7 +1324,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
               picker. Defaults to 'equity' (set by `handleTypeSelect` in step 1), editable here
               before the suggestion effects below fire (allocationRole off `selectedAssetClass`,
               isLiquid off type/subCategory). Trend Following/Carry have no dedicated color/target yet in
-              Impostazioni (AGENTS.md → Leva L0) — offered anyway since they exist for leveraged ETFs. */}
+              Impostazioni (doc/guide/allocazione.md § Allocation — the two plans and the leverage engine) — offered anyway since they exist for leveraged ETFs. */}
           {!isEdit && selectedType === 'etf' && (
             <div className="space-y-2">
               <Label htmlFor="assetClassEtf">Classe Asset *</Label>

@@ -47,12 +47,11 @@ export default function FireSimulationsPage() {
   const [activeTab, setActiveTab] = useState<TabValue>('fire');
 
   return (
-    <PageContainer width="wide">
+    <PageContainer>
       <PageHeader
         label="Pianificazione"
         title="FIRE e Simulazioni"
         description="Libertà finanziaria e sostenibilità del piano"
-        separator={false}
       />
 
       <PageTabs

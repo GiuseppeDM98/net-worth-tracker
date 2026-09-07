@@ -172,12 +172,11 @@ export default function HomePage() {
         <main id="main-content" className="flex-1 px-4 pb-10 pt-1 desktop:px-5 desktop:pb-14">
           {/* The bottom padding of the dashboard container exists for the phone's nav pill,
               which this page does not have. */}
-          <PageContainer width="wide" className="max-desktop:portrait:pb-0">
+          <PageContainer className="max-desktop:portrait:pb-0">
             <PageHeader
               label="Portfolio Tracker"
               title="Panoramica"
               description="dati d’esempio"
-              separator={false}
               actions={
                 <div className="flex items-center gap-2">
                   <ThemePicker />

@@ -237,7 +237,7 @@ describe('setSettings — scrittura, ramo senza targets (merge: true)', () => {
 
   // Un flag di funzionalità deve sopravvivere a ENTRAMBE le catene: il ramo `targets` scrive
   // con setDoc senza merge, quindi un campo non ricopiato lì sparisce al primo salvataggio
-  // dell'allocazione (AGENTS -> Settings — the FIVE places).
+  // dell'allocazione (doc/guide/impostazioni.md § Settings — the FIVE places).
   it('writes expenseSplitEnabled through both chains', async () => {
     await setSettings('user-1', { expenseSplitEnabled: true } as AssetAllocationSettings);
     expect(writtenPayload().expenseSplitEnabled).toBe(true);

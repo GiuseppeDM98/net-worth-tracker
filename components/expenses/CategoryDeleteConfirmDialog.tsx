@@ -40,7 +40,6 @@ import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import {
   ExpenseCategory,
   ExpenseSubCategory,
-  ExpenseType,
 } from '@/types/expenses';
 import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import {
@@ -103,8 +102,14 @@ export function CategoryDeleteConfirmDialog({
 
   // New category creation dialog state
   const [createCategoryDialogOpen, setCreateCategoryDialogOpen] = useState(false);
-  // Why local categories: We need to track inline category creation without forcing parent re-render
-  const [localCategories, setLocalCategories] = useState<ExpenseCategory[]>(allCategories);
+  // Why local categories: We need to track inline category creation without forcing parent re-render.
+  // The override is stored WITH the prop it replaces: a fresh `allCategories` makes it stale and
+  // the prop wins again, with no effect and no extra render (AGENTS.md → React Query and Derived State).
+  const [localOverride, setLocalOverride] = useState<{
+    base: ExpenseCategory[];
+    categories: ExpenseCategory[];
+  } | null>(null);
+  const localCategories = localOverride?.base === allCategories ? localOverride.categories : allCategories;
 
   // Ref for click outside detection
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -149,15 +154,18 @@ export function CategoryDeleteConfirmDialog({
     ? availableSubCategories.filter(sub => sub.id !== subCategoryToDelete.id)
     : availableSubCategories;
 
-  // Update local categories when allCategories prop changes
-  useEffect(() => {
-    setLocalCategories(allCategories);
-  }, [allCategories]);
+  // ========== Dialog Lifecycle ==========
 
-  // ========== Dialog Lifecycle Effects ==========
-
-  useEffect(() => {
-    // Reset selections when dialog opens/closes
+  // The selections belong to one opening of the dialog over one list of categories: they are
+  // reset during render when either changes (React's "adjusting state when a prop changes"),
+  // never from an effect (`react-hooks/set-state-in-effect`). A new list while open resets
+  // them too, exactly as the effect that preceded this block did.
+  const [resetSubject, setResetSubject] = useState<{
+    open: boolean;
+    categories: ExpenseCategory[];
+  } | null>(null);
+  if (!resetSubject || resetSubject.open !== open || resetSubject.categories !== availableCategories) {
+    setResetSubject({ open, categories: availableCategories });
     if (open) {
       /**
        * Why auto-select when only one category?
@@ -177,7 +185,7 @@ export function CategoryDeleteConfirmDialog({
       setMode('reassign');
       setStatus({ phase: 'idle' });
     }
-  }, [open, availableCategories]);
+  }
 
   /**
    * Why click-outside detection for dropdown?
@@ -228,7 +236,7 @@ export function CategoryDeleteConfirmDialog({
     // Reload categories from database to get the newly created one
     if (user && ownerId) {
       const updatedCategories = await getAllCategories(ownerId);
-      setLocalCategories(updatedCategories);
+      setLocalOverride({ base: allCategories, categories: updatedCategories });
 
       // Auto-select the newly created category (most recent by timestamp)
       const newestCategory = updatedCategories

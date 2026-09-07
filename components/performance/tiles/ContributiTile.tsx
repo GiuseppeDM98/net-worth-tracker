@@ -15,6 +15,9 @@ interface ContributiTileProps {
   totalIncome: number;
   totalExpenses: number;
   totalDividendIncome: number;
+  /** The pension channel of the period (0 when empty): its block appears only when it carries money. */
+  pensionFlow: number;
+  pensionEntryFlow: number;
   className?: string;
 }
 
@@ -48,7 +51,8 @@ function Help({ label, children }: { label: string; children: React.ReactNode })
  * purpose: the ledger's buys minus sells and the cashflow's income minus spending. They are not
  * two versions of one number, and each carries its own definition behind the «?».
  */
-export function ContributiTile({ reading, invested, netCashFlow, totalIncome, totalExpenses, totalDividendIncome, className }: ContributiTileProps) {
+export function ContributiTile({ reading, invested, netCashFlow, totalIncome, totalExpenses, totalDividendIncome, pensionFlow, pensionEntryFlow, className }: ContributiTileProps) {
+  const hasPensionFlow = Math.round(pensionFlow) !== 0;
   return (
     <Tile eyebrow="Contributi" aside="nel periodo" reading={reading} className={className}>
       <div className={cn('mt-4 grid gap-4', invested ? 'grid-cols-1 tablet:grid-cols-2' : 'grid-cols-1')}>
@@ -83,6 +87,27 @@ export function ContributiTile({ reading, invested, netCashFlow, totalIncome, to
             <span className="font-mono tabular-nums">{cachedFormatCurrencyEUR(totalExpenses, true)}</span>
           </p>
         </div>
+        {/* The pension channel: capital that crossed the base's boundary through the funds. Kept out of
+            «Contributi netti» on purpose — the funds' entry into the base is not money set aside. */}
+        {hasPensionFlow && (
+          <div className={cn('min-w-0', invested && 'tablet:col-span-2')}>
+            <p className={cn(TILE_SUB_EYEBROW_CLASS, 'flex items-center')}>
+              Fondi pensione
+              <Help label="Fondi pensione">
+                Capitale che ha attraversato il confine della base attraverso i fondi pensione: TFR, datoriale e busta paga
+                entrati da fuori, l&apos;ingresso del fondo nella base nel mese da cui i suoi versamenti sono tracciati, o un
+                volontario uscito da un conto verso un fondo fuori dalla base. Conta nel ROI, nel CAGR e nel TWR come ogni
+                altro flusso, ma non è risparmio: resta fuori dai contributi netti.
+              </Help>
+            </p>
+            <p className={cn(KPI_VALUE_CLASS, 'mt-1.5 text-foreground')}>{signedEuro(pensionFlow)}</p>
+            {Math.round(pensionEntryFlow) > 0 && (
+              <p className="mt-1.5 text-[11px] text-muted-foreground">
+                di cui ingresso nella base <span className="font-mono tabular-nums">{cachedFormatCurrencyEUR(pensionEntryFlow, true)}</span>
+              </p>
+            )}
+          </div>
+        )}
       </div>
       <p className="mt-auto border-t border-border pt-3.5 text-[11px] leading-[1.45] text-muted-foreground">
         {invested

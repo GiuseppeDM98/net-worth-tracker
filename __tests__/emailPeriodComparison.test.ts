@@ -10,7 +10,6 @@ const { resendSendMock } = vi.hoisted(() => ({
 vi.mock('resend', () => {
   class ResendMock {
     emails = { send: resendSendMock };
-    constructor(_apiKey?: string) {}
   }
   return { Resend: ResendMock };
 });
@@ -18,11 +17,18 @@ vi.mock('resend', () => {
 // Per-collection query results — filled per-test. Every query against a collection returns
 // the same docs regardless of the where() filters, which is sufficient: for non-yearly periods
 // the previous-period and YoY queries hit the same mock, so their deltas come out identical.
-const collectionMocks: Record<string, any> = {};
+const collectionMocks: Record<string, unknown> = {};
+
+/** The chainable shape the mocked adminDb query exposes; every node resolves to the same result. */
+interface QueryChainMock {
+  where: () => QueryChainMock;
+  limit: () => { get: () => Promise<unknown> };
+  get: () => Promise<unknown>;
+}
 
 function buildQueryMock(name: string) {
   const result = () => Promise.resolve(collectionMocks[name] ?? { empty: true, docs: [] });
-  function chainNode(): any {
+  function chainNode(): QueryChainMock {
     return {
       where: () => chainNode(),
       limit: () => ({ get: vi.fn().mockImplementation(result) }),

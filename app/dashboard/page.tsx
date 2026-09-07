@@ -262,12 +262,12 @@ export default function DashboardPage() {
   });
 
   const pageChrome = (
-    <PageHeader label="Panoramica" title={header.title} description={header.date} separator={false} />
+    <PageHeader label="Panoramica" title={header.title} description={header.date} />
   );
 
   if (overviewState === 'loading') {
     return (
-      <PageContainer width="wide">
+      <PageContainer>
         {pageChrome}
         <TileGridSkeleton />
       </PageContainer>
@@ -278,7 +278,7 @@ export default function DashboardPage() {
   // says WHY the page is here.
   if (overviewState === 'failed' || !overview || !verdict) {
     return (
-      <PageContainer width="wide">
+      <PageContainer>
         {pageChrome}
         {/* The whole page reads ONE payload, so no tile is left that could answer: the grid is
             absent rather than filled with six cells repeating the same failure. */}
@@ -302,13 +302,12 @@ export default function DashboardPage() {
 
   // ─── Render ───────────────────────────────────────────────────────────────────
   return (
-    <PageContainer width="wide">
+    <PageContainer>
       <motion.div layout="position" transition={springLayoutTransition} className="space-y-4">
         <PageHeader
           label="Panoramica"
           title={header.title}
           description={header.date}
-          separator={false}
           actions={snapshotAction}
         />
 

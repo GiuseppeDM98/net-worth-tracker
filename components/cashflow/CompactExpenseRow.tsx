@@ -4,7 +4,7 @@ import { Suspense } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
-import { getLazyIcon } from '@/components/expenses/IconPickerPopover';
+import { LAZY_CATEGORY_ICONS } from '@/components/expenses/IconPickerPopover';
 import type { Expense, ExpenseType } from '@/types/expenses';
 
 // Tailwind dot-color classes keyed by expense type.
@@ -61,9 +61,11 @@ export function CompactExpenseRow({
       onClick={() => onSelect(expense)}
       aria-label={`${title}, ${amountLabel}`}
     >
-      {/* Category icon badge or type dot */}
+      {/* Category icon badge or type dot. The icon is a LOOKUP in the shared module-level
+          map, never a call: a component obtained from a call during render is a new type
+          every render to the React Compiler (`react-hooks/static-components`). */}
       {(() => {
-        const CatIcon = categoryIcon ? getLazyIcon(categoryIcon) : null;
+        const CatIcon = categoryIcon ? LAZY_CATEGORY_ICONS[categoryIcon] : undefined;
         if (CatIcon) {
           return (
             <div

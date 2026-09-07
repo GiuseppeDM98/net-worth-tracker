@@ -37,7 +37,8 @@ import type {
   TimeFilter,
 } from '@/types/pdf';
 import type { TimePeriod } from '@/types/performance';
-import type { Asset, MonthlySnapshot } from '@/types/assets';
+import type { Asset, AssetAllocationTarget, MonthlySnapshot } from '@/types/assets';
+import type { Expense } from '@/types/expenses';
 import {
   calculateAssetValue,
   calculateTotalValue,
@@ -63,7 +64,7 @@ import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { calculatePerformanceForPeriod } from './performanceService';
 
 // Cached expenses to avoid duplicate fetching
-let cachedExpenses: any[] | null = null;
+let cachedExpenses: Expense[] | null = null;
 let cachedUserId: string | null = null;
 
 /**
@@ -231,7 +232,7 @@ function preparePortfolioData(assets: Asset[]): PortfolioData {
  */
 function prepareAllocationData(
   assets: Asset[],
-  targets: any
+  targets: AssetAllocationTarget
 ): AllocationData {
   // Use compareAllocations() which handles all complex logic including fixed cash
   const comparisonResult = compareAllocations(assets, targets);
@@ -413,7 +414,7 @@ function calculateYoYComparison(snapshots: MonthlySnapshot[]): YoYDataPoint[] {
 /**
  * Prepare cashflow data from expenses
  */
-function prepareCashflowData(expenses: any[], historyFloorYear: number | null): CashflowData {
+function prepareCashflowData(expenses: Expense[], historyFloorYear: number | null): CashflowData {
   if (expenses.length === 0) {
     return {
       totalIncome: 0,
@@ -481,10 +482,16 @@ function prepareCashflowData(expenses: any[], historyFloorYear: number | null): 
   const labels = resolveDisplayLabels(
     topSlice.map(({ key, categoryName, qualifier }) => ({ key, name: categoryName, qualifier }))
   );
-  const topCategories: CategoryBreakdown[] = topSlice.map(({ key, qualifier: _qualifier, ...cat }) => ({
-    ...cat,
-    categoryName: labels.get(key) ?? cat.categoryName,
-  }));
+  // Built field by field: the qualifier has done its job inside the label and must not
+  // reach the PDF as a column of its own.
+  const topCategories: CategoryBreakdown[] = topSlice.map(
+    ({ key, categoryName, amount, percent, transactionCount }) => ({
+      categoryName: labels.get(key) ?? categoryName,
+      amount,
+      percent,
+      transactionCount,
+    })
+  );
 
   const netCashflow = totalIncome - totalExpenses;
   const incomeToExpenseRatio = totalExpenses > 0 ? totalIncome / totalExpenses : 0;
@@ -513,7 +520,7 @@ function prepareCashflowData(expenses: any[], historyFloorYear: number | null): 
  */
 async function prepareFireData(
   userId: string,
-  expenses: any[],
+  expenses: Expense[],
   currentNetWorth: number
 ): Promise<FireData> {
   const annualExpenses = await getAnnualExpenses(userId);
@@ -557,7 +564,7 @@ async function preparePerformanceData(
   userId: string,
   snapshots: MonthlySnapshot[],
   timeFilter: TimeFilter = 'total',
-  cachedExpenses?: any[],
+  cachedExpenses?: Expense[],
   selectedYear?: number
 ): Promise<PerformanceData | null> {
   // Early exit for monthly exports (performance metrics not meaningful for single month)

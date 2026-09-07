@@ -25,7 +25,7 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - Bond coupon scheduling: automatic coupon generation with step-up rate tiers and final premium (Premio Finale) support — full BTP Valore compatible
 - Average cost tracking with 4-decimal precision, including a built-in multi-broker PMC calculator for positions spread across multiple brokers
 - **Operations register (Registro operazioni)**: record explicit Buy / Sell / Adjustment operations on each tracked investment (stocks, ETFs, bonds, crypto, commodities), with an optional settlement account whose balance updates automatically — operations are net-worth-neutral (money simply moves between the asset and your cash). A per-asset "Movimenti" view lists your full operation history alongside realized P&L, total return, and money-weighted return (XIRR); each sale row also shows its realized gain/loss as a percentage and the average cost (PMC) at the moment of that sale. A sale shows an estimated realized-P&L preview before you confirm. For tracked investments, quantity and average cost are managed through the register, so editing an asset can never overwrite its cost basis. The register also powers "Capitale investito" and "Plusvalenze realizzate" on Performance and the total-return breakdown on Dividends (see below)
-- **Fondo Pensione (Previdenza)**: track your Italian complementary pension as a manually-valued asset — no ticker, valued from your statement, with its own equity/bond mix. The Previdenza page (redesigned 2026-08-26) opens with a one-sentence verdict on whether the fund is working — "Il fondo sta lavorando." / "Il fondo ha perso terreno." / "Il rendimento del fondo non è misurabile." — followed, for each contributor, by the three causes of growth as three numbers: what the market returned on the trusted window (a TWR, net of contributions), what the employer added in the year and what the tax office gives back; a cause with nothing behind it drops its clause, and a return that cannot be measured is said as such instead of a percentage. Then five tiles: the fund today (its live value, this month's market effect — the same figure the Overview's digest prints — everything ever paid in, the value series closed on today's value), the return (TWR, annualised, market gain, the return on your own capital with the employer's share kept apart — employer contributions are pay, not investment return), the fiscal year (what was deducted against the ceiling, the estimated IRPEF saving, the "extra-deducibilità" plafond if you're eligible), the year's contributions by nature and the ledger of the year with a two-click delete that reverses the contribution's effect. The fiscal year sits beside the verdict and drives the annual tiles; the fund's value and its return keep their own windows. Contributions are TFR, employer, or a voluntary payment debited from a linked cash account; an existing tracked investment can be converted into a pension fund without losing its value or history. If you track more than one person's pension fund in the same account (e.g. both spouses), add each as a family member in Settings — the verdict, the return and the tax-saving estimate are computed once per person against their own funds and income, never mixed. Your pension fund counts toward your true asset-class exposure on Allocazione (it's locked, not tradable, so no plan ever buys or sells it) and has its own Previdenza tile there; Storico shows it as a dedicated "Previdenza" band; and Performance metrics exclude it by default, since it's capital fed by contributions rather than market activity. Pick the month your contributions became fully recorded in Settings; before it, contributions and growth are indistinguishable and no return is shown. One thing to know: a contribution is attributed to the month you record it, so if your fund credits contributions with a lag and you copy its value from the website every month, the month you record reads the market a little low and the month the fund credits it a little high — the window's total is right as soon as the fund credits it and you update the value.
+- **Fondo Pensione (Previdenza)**: track your Italian complementary pension as a manually-valued asset — no ticker, valued from your statement, with its own equity/bond mix. The Previdenza page (redesigned 2026-08-26) opens with a one-sentence verdict on whether the fund is working — "Il fondo sta lavorando." / "Il fondo ha perso terreno." / "Il rendimento del fondo non è misurabile." — followed, for each contributor, by the three causes of growth as three numbers: what the market returned on the trusted window (a TWR, net of contributions), what the employer added in the year and what the tax office gives back; a cause with nothing behind it drops its clause, and a return that cannot be measured is said as such instead of a percentage. Then five tiles: the fund today (its live value, this month's market effect — the same figure the Overview's digest prints — everything ever paid in, the value series closed on today's value), the return (TWR, annualised, market gain, the return on your own capital with the employer's share kept apart — employer contributions are pay, not investment return), the fiscal year (what was deducted against the ceiling, the estimated IRPEF saving, the "extra-deducibilità" plafond if you're eligible), the year's contributions by nature and the ledger of the year with a two-click delete that reverses the contribution's effect. The fiscal year sits beside the verdict and drives the annual tiles; the fund's value and its return keep their own windows. Contributions are TFR, employer, or a voluntary payment debited from a linked cash account; an existing tracked investment can be converted into a pension fund without losing its value or history. If you track more than one person's pension fund in the same account (e.g. both spouses), add each as a family member in Settings — the verdict, the return and the tax-saving estimate are computed once per person against their own funds and income, never mixed. Your pension fund counts toward your true asset-class exposure on Allocazione (it's locked, not tradable, so no plan ever buys or sells it) and has its own Previdenza tile there; Storico shows it as a dedicated "Previdenza" band; and Performance metrics leave it out by default, since it's capital fed by contributions rather than market activity — switch «Includi i fondi pensione» on and the fund counts from the month its contributions are recorded, with every contribution treated as capital paid in rather than return, so only the fund's own market effect reaches your TWR. Pick the month your contributions became fully recorded in Settings; before it, contributions and growth are indistinguishable and no return is shown. One thing to know: a contribution is attributed to the month you record it, so if your fund credits contributions with a lag and you copy its value from the website every month, the month you record reads the market a little low and the month the fund credits it a little high — the window's total is right as soon as the fund credits it and you update the value.
 - Current vs target asset allocation visualization
 - **Automatic Azioni/Obbligazioni targets** (opt-in, Settings → Allocazione): enter your age and the risk-free rate and The Bull's rule of thumb (`125 − age − rate × 5`) sets the equity share. Obbligazioni take the formula's residual and stay there; every other class you allocate — materie prime, crypto, immobili, trend following, carry — is funded out of the Azioni side, so a satellite sleeve never eats into the defensive part of the portfolio. The summary line states all three figures, and the targets always total 100%
 - Asset allocation as a verdict over tiles (redesigned 2026-08-25): the page opens with one sentence — "Allineato al 96%." — followed by the facts in words (which classes drift and by how many points, the leverage against its target when there is one, and where the next 1000 € would go), then a grid of tiles. **Bilanciamento**: the band-independent balance score as a ring, the share out of position, the classes off target under the drift threshold you pick right there (±2% / ±5% / the 5/25 rule / custom — it reclassifies the chips, never the score), the current mix over the target mix as two bars on one legend, and what the total holds but cannot move and what it leaves out. **Piano**: **Ribilancia** (a consolidated trade list, how much to buy/trim per class), **Versa** (a no-sell contribution planner: where new cash goes, drilling class → sub-category → the individual instrument to buy, following your specific-asset targets) and **Preleva** (the decumulation mirror: "I need €X, what do I sell?" — it draws first from whatever sits *above* target, down to the instrument and the position you'll be left holding) behind one switch, the amount shared with the verdict. **Per classe**: every class on one line — current and target share, the gap in euro, a tick that shows where it sits — with sub-categories and theoretical specific-asset targets inline; a sub-category is optional on an asset, and inside a class where you set sub-category targets whatever carries none is listed last as "Senza sottocategoria" — its value still counts in the class, it simply has no target of its own: no gap, no COMPRA/VENDI chip, and the contribution plan never sends new money there (a withdrawal can still draw from it pro-rata, like any untargeted sleeve). Then **Esposizione** and **Previdenza**, and the non-tradable and the excluded holdings below behind a "Dettaglio" disclosure. COMPRA / VENDI / OK action chips; colors follow the selected theme
@@ -37,11 +37,11 @@ The app integrates with Yahoo Finance for real-time price updates and includes a
 - Holdings with **no market quote** — cash accounts, real estate, private equity and pension funds, plus anything you've switched off automatic updates for — carry a subtle row (and card) tint, so you can tell at a glance which values you're responsible for keeping up to date. It marks manual pricing, not illiquidity
 
 ### Performance Analytics
-- **Rendimenti** opens with a one-sentence verdict — "Nell'ultimo anno il portafoglio rende più del 60/40." / "…rende, ma il rischio pesa." / "…perde." — followed by the facts in words (the TWR, the gap against the 60/40 in points, the Sharpe, the deepest drawdown with its month and how long it took to recover, how many months were positive) and the measured basis named under it, then a grid of tiles: the return with the growth of 100 € against the 60/40; volatility, Sharpe, Sortino and the max drawdown with its months; the heatmap of monthly returns; the capital invested through the register beside the net contributions from the cashflow; the six model portfolios ranked in EUR; realized gains per fiscal year; and the invested base under the net worth. The fifteen metrics, the rolling charts, the underwater chart and the method sit below behind a "Dettaglio" disclosure, with metric definitions in inline popovers
+- **Rendimenti** opens with a one-sentence verdict — "Nell'ultimo anno il portafoglio rende più del 60/40." / "…rende, ma il rischio pesa." / "…perde." — followed by the facts in words (the TWR, the gap against the 60/40 in points, the Sharpe, the deepest drawdown with its month and how long it took to recover, how many months were positive) and the measured basis named under it, then a grid of tiles: the return with the growth of 100 € against the 60/40; volatility, Sharpe, Sortino and the max drawdown with its months; the heatmap of monthly returns; the capital invested through the register beside the net contributions from the cashflow; the six model portfolios ranked in EUR; realized gains per fiscal year; **where the return came from** — the period's market gain instrument by instrument, in euro, with the dividends each one paid, closed by what no instrument explains so the rows visibly add up to the market's figure; and the invested base under the net worth. The fifteen metrics, the full attribution table, the rolling charts, the underwater chart and the method sit below behind a "Dettaglio" disclosure, with metric definitions in inline popovers
 - The verdict names the window actually measured ("Negli ultimi 11 mesi" when a year finds eleven monthly snapshots, "Da aprile" for a year-to-date that starts there) and every gap beside a figure is on that figure's basis; the period selector (YTD / 1 anno / 3 anni / 5 anni / Storico) sits beside the verdict, and a custom date range is a dismissible chip under it, never a tab that looks disabled
 - Yield on Cost (YOC) and Current Yield calculations
 - Monthly returns heatmap in the app's sign colours (three intensities, so it follows all six themes) and underwater drawdown chart. Both read the same series: the max drawdown, its duration, its recovery and the Underwater chart all chain the monthly returns shown in the heatmap, so the chart is exactly the compounding of the months above it and the percentages don't shift as your contributions accumulate
-- **Configurable calculation basis** (Settings → Preferenze): performance metrics measure the portfolio you actively manage, so pension funds and assets excluded from your allocation (typically your home) are left out by default — either can be brought back in, and the page states which basis it is using. Leaving a hand-valued property out raises measured volatility and lowers Sharpe, because a value that never moves between updates quietly damps your measured risk
+- **Configurable calculation basis** (Settings → Preferenze): performance metrics measure the portfolio you actively manage, so pension funds and assets excluded from your allocation (typically your home) are left out by default — either can be brought back in, and the page states which basis it is using. Bringing a pension fund in is honest by construction: it enters the base from the month its contributions are recorded (the page names that month), its entry and every later contribution count as capital paid in, never as return, and the pension switch decides on its own even for a fund marked «escluso dall'allocazione». Leaving a hand-valued property out raises measured volatility and lowers Sharpe, because a value that never moves between updates quietly damps your measured risk
 - **Honest measurement rules**: the first snapshot of a period is the starting valuation, so the measured window opens the month after it and your first month's savings are never counted as return; below six months the headline states the *period* return instead of an annualized one (extrapolating a year from two months is a forecast, not a measurement); volatility and Sharpe show "—" rather than a number when fewer than three monthly returns are available, and they include every month — no hidden outlier filter that would let a real crash disappear from the metric meant to report it. The Money-Weighted Return (IRR) treats contributions as money paid in, discounted over the time it was actually invested
 - **Capitale e mercato**: one area (the capital that entered the portfolio — your net worth at the start of the period plus net contributions) under the net-worth line; the gap between the two is what the market produced, and hovering a month reads its net worth, invested base and market return. Contributions can legitimately go negative in a window where tracked spending outpaces tracked income, and the chart shows that honestly instead of hiding it
 - Rolling 12-month CAGR and Sharpe Ratio charts with 3-month moving average; always visible with an informative empty state when data is insufficient
@@ -208,6 +208,18 @@ See [`.env.local.example`](.env.local.example) for detailed comments on each var
 - **Shared layout system** (`PageContainer`, `PageHeader`, `PageTabBar`) for consistent page structure
 - **Timezone-aware** date handling (Europe/Rome)
 
+## Documentation
+
+For contributors and AI agents, the repo keeps its guidance split by scope:
+
+| File | Scope |
+| --- | --- |
+| [`CLAUDE.md`](CLAUDE.md) | Index — what each feature is and where it lives |
+| [`AGENTS.md`](AGENTS.md) | Repo-wide conventions, data/state patterns, UI patterns, testing, workflow |
+| [`doc/guide/`](doc/guide/) | One file per domain — a page, a tab, a subsystem (`stati`, `dialog`, `temi`, `account-condiviso-demo`) — the full rules and blind spots for that area |
+| [`DESIGN.md`](DESIGN.md) | The aesthetic spec (normative) |
+| [`PRODUCT.md`](PRODUCT.md) · [`SETUP.md`](SETUP.md) · [`WORKFLOW.md`](WORKFLOW.md) | Positioning · environment/emulators · session rules |
+
 ## Tech Stack
 
 | Category | Technology | Purpose |
@@ -373,45 +385,45 @@ See [LICENSE.md](LICENSE.md) for the full license text.
 
 ### Dashboard & Portfolio
 
-![Portfolio overview](docs/screenshots/portfolio-overview.png)
+![Portfolio overview](doc/screenshots/portfolio-overview.png)
 *Overview: the month's verdict over a grid of tiles — net worth, liquidity, cashflow, composition, costs, goals*
 
-![Asset allocation](docs/screenshots/asset-allocation.png)
+![Asset allocation](doc/screenshots/asset-allocation.png)
 *Allocazione: the verdict over Bilanciamento, Piano, Per classe and Esposizione*
 
 ### Cashflow
 
-![Cashflow Sankey](docs/screenshots/cashflow-sankey.png)
+![Cashflow Sankey](doc/screenshots/cashflow-sankey.png)
 *Analisi: the flow of the year as a 5-layer Sankey inside its tile — a type drills by a click, a category opens its Scheda*
 
-![Cashflow drill-down](docs/screenshots/cashflow-drilldown.png)
+![Cashflow drill-down](doc/screenshots/cashflow-drilldown.png)
 *Analisi: the Scheda of a subcategory — period total, per-year table with signed deltas, 24-month trend, transactions*
 
 ### Performance & History
 
-![Performance metrics](docs/screenshots/performance-metrics.png)
+![Performance metrics](doc/screenshots/performance-metrics.png)
 *Rendimenti: the verdict — how much the portfolio returns, and against what — over the TWR, the risk figures and the six model portfolios*
 
-![Monthly heatmap](docs/screenshots/monthly-heatmap.png)
+![Monthly heatmap](doc/screenshots/monthly-heatmap.png)
 *Rendimenti: the Consistenza tile — positive months over the measured ones, and every month's return as a heatmap*
 
-![Net worth history](docs/screenshots/history-networth.png)
+![Net worth history](doc/screenshots/history-networth.png)
 *Net worth evolution over time*
 
 ### FIRE & Simulations
 
-![FIRE calculator](docs/screenshots/fire-calculator.png)
+![FIRE calculator](doc/screenshots/fire-calculator.png)
 *FIRE projections with Bear/Base/Bull scenarios*
 
-![Monte Carlo](docs/screenshots/monte-carlo.png)
+![Monte Carlo](doc/screenshots/monte-carlo.png)
 *FIRE › Monte Carlo — the verdict over Probabilità, Distribuzione and Scenari a confronto*
 
 ### Dividends & Hall of Fame
 
-![Dividend calendar](docs/screenshots/dividend-calendar.png)
+![Dividend calendar](doc/screenshots/dividend-calendar.png)
 *Dividendi: the payments tile in calendar view — received and expected kept apart, day by day*
 
-![Hall of Fame](docs/screenshots/hall-of-fame.png)
+![Hall of Fame](doc/screenshots/hall-of-fame.png)
 *Hall of Fame: the record month named first, then the rankings — net worth, income, what a month kept, and the years*
 
 ## Star History

@@ -119,6 +119,36 @@ function buildMessagesArray(
 const TRUNCATION_NOTICE =
   '\n\n_(Risposta interrotta: ho raggiunto il limite di lunghezza. Chiedimi di continuare o restringi la domanda.)_';
 
+/** The object stored at `key`, when `value` is an object holding one there. */
+function readNestedObject(value: unknown, key: string): object | undefined {
+  if (typeof value !== 'object' || value === null || !(key in value)) return undefined;
+  const nested = (value as Record<string, unknown>)[key];
+  return typeof nested === 'object' && nested !== null ? nested : undefined;
+}
+
+/** The string stored at `key`, when `value` holds one there. */
+function readStringField(value: object | undefined, key: string): string | undefined {
+  if (value === undefined || !(key in value)) return undefined;
+  const field = (value as Record<string, unknown>)[key];
+  return typeof field === 'string' ? field : undefined;
+}
+
+/**
+ * The inner `type` of a failed Anthropic request, wherever the thrown value keeps it.
+ *
+ * `Anthropic.APIError` (sdk 0.110) lifts it to `error.type` and stores the WHOLE response
+ * envelope under `error.error`, so there `error.error.type` is the constant `'error'` and
+ * the inner type sits at `error.error.error.type`. A raw envelope `{ error: { type } }` —
+ * what the mocks and the pre-SDK callers throw — holds it one level up. Both are read so
+ * the overload branch is reached by the real SDK error and by the mocks alike.
+ */
+function readAnthropicErrorType(error: unknown): string | undefined {
+  if (error instanceof Anthropic.APIError) return error.type ?? undefined;
+  const body = readNestedObject(error, 'error');
+  const innerBody = readNestedObject(body, 'error') ?? body;
+  return readStringField(innerBody, 'type');
+}
+
 export async function streamAssistantResponse({
   mode,
   prompt,
@@ -169,7 +199,7 @@ export async function streamAssistantResponse({
                 type: 'web_search_20250305',
                 name: 'web_search',
                 max_uses: isStructuredAnalysis ? 2 : 3,
-              } as any,
+              } satisfies Anthropic.WebSearchTool20250305,
             ],
           }
         : {}),
@@ -205,7 +235,7 @@ export async function streamAssistantResponse({
     // Hitting the ceiling leaves the answer cut off mid-sentence. Saying so turns a
     // response that looks broken into one the user knows how to continue — the same
     // reason the prompt's subcategory valve announces itself instead of truncating
-    // quietly (AGENTS.md -> A Silent Cap in a Context Builder...).
+    // quietly (doc/guide/assistente.md § Assistant, the silent-cap rule).
     let text = aggregatedText.trim();
     if (stopReason === 'max_tokens' && text.length > 0) {
       onText(TRUNCATION_NOTICE);
@@ -217,8 +247,8 @@ export async function streamAssistantResponse({
       text,
       webSearchUsed,
     };
-  } catch (error: any) {
-    if (error?.error?.type === 'overloaded_error') {
+  } catch (error: unknown) {
+    if (readAnthropicErrorType(error) === 'overloaded_error') {
       const overloadedError = new Error(
         'I server AI sono temporaneamente sovraccarichi. Riprova tra qualche secondo.'
       ) as Error & { retryable?: boolean; status?: number };

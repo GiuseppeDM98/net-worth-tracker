@@ -444,7 +444,7 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
         anomalies,
         anomalyMonth: singleMonth,
       }),
-    [period, today, historyStartYear, totals, pacing, baseline, expenseSlices, movers, anomalies, singleMonth],
+    [period, today, historyStartYear, totals, scheduled, pacing, baseline, expenseSlices, movers, anomalies, singleMonth],
   );
 
   const periodoReading = describePeriodCashflow(
@@ -563,7 +563,6 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
       label="Analisi"
       title="Analisi Cashflow"
       description="Dove vanno i soldi, e cosa è cambiato"
-      separator={false}
       actions={<EntitySearch categories={categories} expenses={baseExpenses} onSelect={handleEntitySelect} />}
     />
   );

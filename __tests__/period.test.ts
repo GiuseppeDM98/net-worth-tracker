@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   periodLabel,
   periodToRange,
@@ -123,13 +123,13 @@ describe('periodToRange', () => {
 
   it('handles February correctly in a leap year', () => {
     const p: Period = { kind: 'month', year: 2024, month: 2 };
-    const { from, to } = periodToRange(p);
+    const { to } = periodToRange(p);
     expect(to.getDate()).toBe(29); // 2024 is a leap year
   });
 
   it('handles February correctly in a non-leap year', () => {
     const p: Period = { kind: 'month', year: 2023, month: 2 };
-    const { from, to } = periodToRange(p);
+    const { to } = periodToRange(p);
     expect(to.getDate()).toBe(28);
   });
 });

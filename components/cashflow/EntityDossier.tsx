@@ -88,7 +88,7 @@ const monthOf = (expense: Expense): { year: number; month: number } => {
 };
 
 /**
- * Sign classes for a delta, with spending semantics inverted (DESIGN.md positiveGood rule):
+ * Sign classes for a delta, with spending semantics inverted (DESIGN.md § Do: `positiveGood`):
  * spending UP is bad, income UP is good. Shared by the year rows and the subcategory rows so
  * the two can never disagree on a colour.
  */
@@ -430,7 +430,7 @@ export function EntityDossier({ allExpenses, scope, color, period, periodLabel, 
     </div>
   );
 
-  // Trend mensile — period-independent. Always rendered (AGENTS.md: rolling charts never
+  // Trend mensile — period-independent. Always rendered (AGENTS.md § Recharts — rolling charts always render, never
   // disappear silently); the empty window states itself.
   const trend = (
     <div>

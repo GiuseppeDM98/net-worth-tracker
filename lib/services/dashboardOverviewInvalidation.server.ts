@@ -1,4 +1,3 @@
-import { Timestamp } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
 import {
   DASHBOARD_OVERVIEW_SOURCE_VERSION,

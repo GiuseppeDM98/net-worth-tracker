@@ -69,15 +69,6 @@ function getMonthDateRange(year: number, month: number): { startDate: Date; endD
 }
 
 /**
- * Returns the first and last moment of the given year as Date objects.
- */
-function getYearDateRange(year: number): { startDate: Date; endDate: Date } {
-  const startDate = new Date(year, 0, 1, 0, 0, 0); // Jan 1
-  const endDate = new Date(year, 11, 31, 23, 59, 59); // Dec 31
-  return { startDate, endDate };
-}
-
-/**
  * Finds a snapshot for the exact year/month.
  * Dummy snapshots are excluded unless includeDummy is true (test accounts only).
  */

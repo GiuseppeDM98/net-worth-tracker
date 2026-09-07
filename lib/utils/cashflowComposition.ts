@@ -2,7 +2,7 @@
  * Composition rankings for the Analisi tab — pure, colour-free.
  *
  * WHY A SEPARATE MODULE FROM cashflowSankey
- * The Analisi page has two independent drill-down paths (AGENTS.md → Cashflow
+ * The Analisi page has two independent drill-down paths (doc/guide/cashflow.md § Cashflow
  * Drill-Down): the Sankey and the CompositionList below it. They answer different
  * questions — a flow versus a ranking — so they keep different shapes and different
  * code. What they must share is the answer to "which rows are the same bucket", and

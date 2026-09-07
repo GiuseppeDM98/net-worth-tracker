@@ -11,14 +11,17 @@
  *
  *   Desktop (12 col): Rendimento(5, 2 rows) | Rischio(3)    | Consistenza(4)
  *                                           | Contributi(3) | Benchmark(4)
- *                     Plusvalenze(5)        | Capitale e mercato(7)   — Capitale takes 12 without sells
- *   Mobile (1 col):   Rendimento → Rischio → Consistenza → Benchmark → Contributi → Plusvalenze → Capitale e mercato
+ *                     Da dove viene il rendimento(7) | Plusvalenze(5)
+ *                     Capitale e mercato(12)
+ *                     — without a closed sale Plusvalenze is absent: Attribuzione(5) | Capitale e mercato(7)
+ *   Mobile (1 col):   Rendimento → Rischio → Consistenza → Benchmark → Contributi → Attribuzione → Plusvalenze → Capitale e mercato
  *
  * CALCULATION ENGINE (unchanged): every metric comes from performanceService.ts — TWR, IRR,
  * Sharpe, volatility, drawdown, rolling windows — cached in performance-cache/{userId} under
- * CACHE_MATH_VERSION. The snapshots are fetched once, projected onto the configurable base
- * (performanceBase.ts) and cached in state, so a period switch and a custom range recompute
- * from memory. The window is always read back off the payload (`nominalPeriodStart`,
+ * CACHE_MATH_VERSION. The snapshots are fetched once, resolved onto the configurable base
+ * (`resolvePerformanceBase`: which capital, from which month the pension funds count, which
+ * boundary flows) and cached in state, so a period switch and a custom range recompute from
+ * memory. The window is always read back off the payload (`nominalPeriodStart`,
  * `selectSnapshotsForMetrics`), never re-derived from today's date.
  *
  * Every figure a tile shows that the payload does not carry is computed in a pure, tested util
@@ -46,15 +49,14 @@ import {
 import { getUserSnapshots } from '@/lib/services/snapshotService';
 import { getAllAssets } from '@/lib/services/assetService';
 import { getSettings } from '@/lib/services/assetAllocationService';
-import {
-  resolveHasBaseline,
-  resolvePerformanceBaseOptions,
-  resolvePerformanceExclusions,
-  toPerformanceBaseSnapshots,
-  type PerformanceBaseOptions,
-} from '@/lib/utils/performanceBase';
+import { getPensionContributions } from '@/lib/services/pensionContributionService';
+// The Admin-SDK dividendService is server-only: a client page reads the registry through this one.
+import { getDividendReceipts } from '@/lib/services/dividendReceiptsService';
+import { resolveHasBaseline, resolvePerformanceBase, type PerformanceBaseResolution } from '@/lib/utils/performanceBase';
+import { attributePeriodReturn, sumDividendsByAsset, type DividendReceipt } from '@/lib/utils/performanceAttribution';
 import type { PerformanceData, PerformanceMetrics, TimePeriod } from '@/types/performance';
-import type { MonthlySnapshot } from '@/types/assets';
+import type { Asset, MonthlySnapshot } from '@/types/assets';
+import type { PensionContribution } from '@/types/pension';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
@@ -84,6 +86,7 @@ import {
 } from '@/lib/utils/performanceSummary';
 import {
   buildPerformanceVerdict,
+  describeAttribution,
   describeBenchmarkRanking,
   describeCapitalAndMarket,
   describeConsistency,
@@ -108,6 +111,7 @@ import { ConsistenzaTile } from '@/components/performance/tiles/ConsistenzaTile'
 import { ContributiTile } from '@/components/performance/tiles/ContributiTile';
 import { BenchmarkTile } from '@/components/performance/tiles/BenchmarkTile';
 import { PlusvalenzeTile } from '@/components/performance/tiles/PlusvalenzeTile';
+import { AttribuzioneTile } from '@/components/performance/tiles/AttribuzioneTile';
 import { CapitaleMercatoTile } from '@/components/performance/tiles/CapitaleMercatoTile';
 import { PerformanceDettaglio } from '@/components/performance/PerformanceDettaglio';
 
@@ -126,8 +130,16 @@ const SKELETON_CELLS: TileSkeletonCell[] = [
   { span: 3, lines: 4 },
   { span: 4, lines: 8 },
   { span: 5, lines: 5 },
-  { span: 7, lines: 6 },
+  { span: 7, lines: 7 },
+  { span: 12, lines: 6 },
 ];
+
+/** The base before the first load: the product default, so the caption under the verdict is right on first paint. */
+const DEFAULT_BASE: Pick<PerformanceBaseResolution, 'options' | 'pensionEntryMonth' | 'pensionFundIds'> = {
+  options: { includePensionFunds: false, includeExcludedAssets: false },
+  pensionEntryMonth: null,
+  pensionFundIds: [],
+};
 
 /** The reference model of the verdict: the first definition, the classic balanced allocation. */
 const REFERENCE_BENCHMARK = BENCHMARKS[0];
@@ -248,12 +260,12 @@ export default function PerformancePage() {
   const [showCustomDateDialog, setShowCustomDateDialog] = useState(false);
   const [showAIAnalysisDialog, setShowAIAnalysisDialog] = useState(false);
   const [cachedSnapshots, setCachedSnapshots] = useState<MonthlySnapshot[]>([]);
-  // Kept in state only to name the base under the verdict — the numbers themselves already carry it via
-  // cachedSnapshots. Defaults match resolvePerformanceBaseOptions so the caption is right on first paint.
-  const [baseOptions, setBaseOptions] = useState<PerformanceBaseOptions>({
-    includePensionFunds: false,
-    includeExcludedAssets: false,
-  });
+  // The resolved base (which capital, the pension entry month, the boundary flows), the inputs the
+  // attribution reads beside it, and the dividends it adds to each instrument.
+  const [base, setBase] = useState<PerformanceBaseResolution | null>(null);
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [pensionContributions, setPensionContributions] = useState<PensionContribution[]>([]);
+  const [dividends, setDividends] = useState<DividendReceipt[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [customDialogOrigin, setCustomDialogOrigin] = useState<string | undefined>(undefined);
   const [aiDialogOrigin, setAiDialogOrigin] = useState<string | undefined>(undefined);
@@ -327,18 +339,22 @@ export default function PerformancePage() {
       else setIsRefreshing(true);
       setLoadFailed(false);
 
-      const [rawSnapshots, assetsForBase, baseSettings] = await Promise.all([
+      const [rawSnapshots, loadedAssets, baseSettings, contributions, loadedDividends] = await Promise.all([
         getUserSnapshots(ownerId),
         getAllAssets(ownerId),
         getSettings(ownerId),
+        getPensionContributions(ownerId),
+        getDividendReceipts(ownerId),
       ]);
-      // Same portfolio base as getAllPerformanceData (performanceBase.ts): the client-side chart,
-      // heatmap and custom-range helpers read cachedSnapshots directly, so they need the exact same
-      // exclusions — and the same settings — or a custom period would disagree with the pre-computed ones.
-      const options = resolvePerformanceBaseOptions(baseSettings);
-      const snapshots = toPerformanceBaseSnapshots(rawSnapshots, resolvePerformanceExclusions(assetsForBase, options));
-      setCachedSnapshots(snapshots);
-      setBaseOptions(options);
+      // The SAME base resolution as getAllPerformanceData (performanceBase.ts): the client-side chart,
+      // heatmap, custom-range and attribution helpers read cachedSnapshots and the flows directly, so
+      // they need the exact same projection or a custom period would disagree with the pre-computed ones.
+      const resolved = resolvePerformanceBase({ snapshots: rawSnapshots, assets: loadedAssets, contributions, settings: baseSettings });
+      setCachedSnapshots(resolved.snapshots);
+      setBase(resolved);
+      setAssets(loadedAssets);
+      setPensionContributions(contributions);
+      setDividends(loadedDividends);
 
       const data = await getAllPerformanceData(ownerId, hasLoadedOnceRef.current);
 
@@ -382,6 +398,7 @@ export default function PerformancePage() {
         endDate,
         undefined,
         performanceData.ytd.dividendCategoryId,
+        base?.pensionFlows ?? [],
       );
       Object.assign(customMetrics, await fetchYieldMetrics(ownerId, customMetrics));
       setPerformanceData({ ...performanceData, custom: customMetrics });
@@ -471,6 +488,20 @@ export default function PerformancePage() {
     [metrics, heatmapData],
   );
 
+  // Da dove viene il rendimento: the market gain of the SAME window and base, instrument by
+  // instrument, with the dividends received in it (capped at today like every dividend figure).
+  const attribution = useMemo(() => {
+    if (!metrics || !base || periodSnapshots.length === 0) return null;
+    return attributePeriodReturn({
+      snapshots: periodSnapshots,
+      cashFlows: metrics.cashFlows,
+      excludedAssetIds: base.excludedAssetIds,
+      pension: { fundIds: base.pensionFundIds, entryMonth: base.pensionEntryMonth, contributions: pensionContributions },
+      assets,
+      dividendsByAsset: sumDividendsByAsset(dividends, metrics.startDate, metrics.dividendEndDate),
+    });
+  }, [metrics, base, periodSnapshots, pensionContributions, assets, dividends]);
+
   // Capitale investito: the SAME period bounds as the page, never a recalculated window.
   const investedCapital = useMemo(() => {
     if (!metrics || !isLedgerMigrated) return null;
@@ -552,7 +583,6 @@ export default function PerformancePage() {
       label="Analisi"
       title="Rendimenti"
       description={describeHeaderWindow(metrics)}
-      separator={false}
       actions={
         <>
           <div className="hidden items-center gap-2 desktop:flex">{headerActions(false)}</div>
@@ -577,7 +607,7 @@ export default function PerformancePage() {
   // ─── Loading and empty states ───────────────────────────────────────────────
   if (loading) {
     return (
-      <PageContainer width="wide">
+      <PageContainer>
         {header}
         <TileGridSkeleton cells={SKELETON_CELLS} toolbar={<Skeleton className="h-9 w-72 rounded-full" />} />
       </PageContainer>
@@ -588,7 +618,7 @@ export default function PerformancePage() {
   // on a new account, and the empty branch would judge a set that was never read.
   if (loadFailed) {
     return (
-      <PageContainer width="wide">
+      <PageContainer>
         {header}
         <ErrorNotice
           className="max-w-[920px]"
@@ -605,7 +635,7 @@ export default function PerformancePage() {
 
   if (!performanceData || !metrics || metrics.hasInsufficientData) {
     return (
-      <PageContainer width="wide">
+      <PageContainer>
         {header}
         <div className="flex flex-col gap-3 pt-1 desktop:flex-row desktop:items-start desktop:justify-between desktop:gap-6">
           <PageVerdict
@@ -659,7 +689,7 @@ export default function PerformancePage() {
 
   // ─── Render ─────────────────────────────────────────────────────────────────
   return (
-    <PageContainer width="wide">
+    <PageContainer>
       {header}
 
       {/* ── Verdict, with the one period axis beside it from desktop ─────────────── */}
@@ -670,7 +700,7 @@ export default function PerformancePage() {
             {/* The measured base, named where the numbers are — the recurring question is why the
                 drawdown does not match Storico, and the answer is that they measure different capitals. */}
             <p className="max-w-[920px] text-[12px] leading-[1.5] text-muted-foreground">
-              {describeMeasurementBase(baseOptions)}{' '}
+              {describeMeasurementBase(base ?? DEFAULT_BASE)}{' '}
               <Link href="/dashboard/settings" className="underline hover:no-underline">
                 Cambia base
               </Link>
@@ -735,12 +765,18 @@ export default function PerformancePage() {
         {/* Below desktop the benchmark reads before the contributions: «rispetto a cosa?» is the page's question. */}
         <div className={cn(TILE_CELL_CLASS, 'order-5 desktop:order-none desktop:col-span-3')}>
           <ContributiTile
-            reading={describeContributions({ invested: investedCapital, netCashFlow: metrics.netCashFlow })}
+            reading={describeContributions({
+              invested: investedCapital,
+              netCashFlow: metrics.netCashFlow,
+              pension: { flow: metrics.pensionFlow, entryFlow: metrics.pensionEntryFlow, entryMonth: base?.pensionEntryMonth ?? null },
+            })}
             invested={investedCapital}
             netCashFlow={metrics.netCashFlow}
             totalIncome={metrics.totalIncome}
             totalExpenses={metrics.totalExpenses}
             totalDividendIncome={metrics.totalDividendIncome}
+            pensionFlow={metrics.pensionFlow}
+            pensionEntryFlow={metrics.pensionEntryFlow}
           />
         </div>
 
@@ -756,18 +792,27 @@ export default function PerformancePage() {
           />
         </div>
 
+        {/* The attribution sits beside the realized gains — the two «where does the money come from»
+            tiles — and, without a closed sale, beside the capital chart instead. */}
+        {attribution && (
+          <div className={cn(TILE_CELL_CLASS, 'order-6 desktop:order-none', realizedSummary ? 'desktop:col-span-7' : 'desktop:col-span-5')}>
+            <AttribuzioneTile aside={periodAside} reading={describeAttribution(attribution)} attribution={attribution} />
+          </div>
+        )}
+
         {realizedSummary && (
-          <div className={cn(TILE_CELL_CLASS, 'order-6 desktop:order-none desktop:col-span-5')}>
+          <div className={cn(TILE_CELL_CLASS, 'order-7 desktop:order-none desktop:col-span-5')}>
             <PlusvalenzeTile reading={describeRealizedGains(realizedSummary, currentYear)} summary={realizedSummary} skippedAssets={realizedGains.skippedAssets} />
           </div>
         )}
 
-        {/* Without a closed sale the Plusvalenze tile is absent and this one takes the whole row. */}
-        <div className={cn(TILE_CELL_CLASS, 'order-7 tablet:col-span-2 desktop:order-none', realizedSummary ? 'desktop:col-span-7' : 'desktop:col-span-12')}>
+        {/* With a closed sale the capital chart takes the whole row; without it, the seven columns beside the attribution. */}
+        <div className={cn(TILE_CELL_CLASS, 'order-8 tablet:col-span-2 desktop:order-none', realizedSummary ? 'desktop:col-span-12' : 'desktop:col-span-7')}>
           <CapitaleMercatoTile
             aside={`${periodAside} · base misurata`}
             reading={lastChartPoint ? describeCapitalAndMarket(lastChartPoint, windowEnd) : null}
             data={chartData}
+            pensionFlow={metrics.pensionFlow}
           />
         </div>
       </div>
@@ -780,6 +825,7 @@ export default function PerformancePage() {
         rollingCagr={rollingCagr}
         rollingSharpe={rollingSharpe}
         underwater={underwaterData}
+        attribution={attribution}
         renderKey={periodRenderKey}
       />
 

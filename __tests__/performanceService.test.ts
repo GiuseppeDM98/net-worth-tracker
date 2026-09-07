@@ -30,7 +30,7 @@ import {
   calculateCurrentYieldMetrics,
 } from '@/lib/services/performanceService'
 import { MonthlySnapshot } from '@/types/assets'
-import { CashFlowData } from '@/types/performance'
+import { CashFlowData, TimePeriod, PensionBoundaryFlow } from '@/types/performance'
 import { Expense, ExpenseType } from '@/types/expenses'
 
 // Helper to create minimal snapshot objects for testing
@@ -449,7 +449,8 @@ describe('getSnapshotsForPeriod', () => {
   })
 
   it('should return empty array for unknown period', () => {
-    expect(getSnapshotsForPeriod(allSnapshots, 'UNKNOWN' as any)).toEqual([])
+    // Deliberately outside the TimePeriod union: the fallback branch is what is under test.
+    expect(getSnapshotsForPeriod(allSnapshots, 'UNKNOWN' as unknown as TimePeriod)).toEqual([])
   })
 
   // ─── Baseline lookback tests ───
@@ -768,7 +769,9 @@ function makeAsset(
   averageCost: number,
   currentPrice = averageCost
 ) {
-  return { id, quantity, averageCost, currentPrice }
+  // ticker and name are part of AssetInput's contract even though the aggregate metrics
+  // under test never print them; mirror the yieldOnCost fixture.
+  return { id, ticker: id.toUpperCase(), name: id, quantity, averageCost, currentPrice }
 }
 
 describe('calculateYocMetrics', () => {
@@ -1083,7 +1086,7 @@ describe('buildCacheKey', () => {
   ]
   const baseline = {
     snapshots,
-    baseOptions: {},
+    base: { options: {}, pensionEntryMonth: null, pensionFlows: [] as PensionBoundaryFlow[] },
     riskFreeRate: 2.5,
     dividendCategoryId: 'div-cat',
   }
@@ -1097,8 +1100,8 @@ describe('buildCacheKey', () => {
     // l'utente continua a leggere numeri pre-fix per 6 ore. Il test è qui perché il bump è manuale
     // e va ricordato — se questa asserzione fallisce dopo un cambio di matematica, è corretto
     // aggiornarla; se fallisce senza, qualcuno ha rotto il prefisso.
-    expect(buildCacheKey(baseline).startsWith('v5-')).toBe(true)
-    expect(buildCacheKey({ ...baseline, snapshots: [] }).startsWith('v5-')).toBe(true)
+    expect(buildCacheKey(baseline).startsWith('v6-')).toBe(true)
+    expect(buildCacheKey({ ...baseline, snapshots: [] }).startsWith('v6-')).toBe(true)
   })
 
   it('ignores the order snapshots arrive in', () => {
@@ -1140,11 +1143,24 @@ describe('buildCacheKey', () => {
   })
 
   it('changes when either exclusion of the metrics base is flipped', () => {
-    const withPension = buildCacheKey({ ...baseline, baseOptions: { includePensionFunds: true } })
-    const withExcluded = buildCacheKey({ ...baseline, baseOptions: { includeExcludedAssets: true } })
+    const withPension = buildCacheKey({ ...baseline, base: { ...baseline.base, options: { includePensionFunds: true } } })
+    const withExcluded = buildCacheKey({ ...baseline, base: { ...baseline.base, options: { includeExcludedAssets: true } } })
     expect(withPension).not.toBe(buildCacheKey(baseline))
     expect(withExcluded).not.toBe(buildCacheKey(baseline))
     expect(withPension).not.toBe(withExcluded)
+  })
+
+  it('changes when the funds enter the base in another month, or a boundary flow changes', () => {
+    // A contribution recorded today rewrites the flows while every snapshot stays byte-identical:
+    // without the flows in the key the page would keep the pre-contribution numbers for 6 hours.
+    const entered = buildCacheKey({ ...baseline, base: { ...baseline.base, pensionEntryMonth: '2026-07' } })
+    const enteredLater = buildCacheKey({ ...baseline, base: { ...baseline.base, pensionEntryMonth: '2026-08' } })
+    const withFlow = buildCacheKey({ ...baseline, base: { ...baseline.base, pensionFlows: [{ month: '2026-08', amount: 10, kind: 'contribution' }] } })
+    const withOtherFlow = buildCacheKey({ ...baseline, base: { ...baseline.base, pensionFlows: [{ month: '2026-08', amount: 12, kind: 'contribution' }] } })
+    expect(entered).not.toBe(buildCacheKey(baseline))
+    expect(entered).not.toBe(enteredLater)
+    expect(withFlow).not.toBe(buildCacheKey(baseline))
+    expect(withFlow).not.toBe(withOtherFlow)
   })
 
   it('handles an empty history without pretending it is the same as any other input', () => {
@@ -1216,5 +1232,61 @@ describe('preparePerformanceChartData', () => {
     expect(chart.length).toBe(2)
     expect(chart[0].date).toBe('02/2025')
     expect(chart[0].initialCapital).toBe(200000)
+  })
+})
+
+// ─── Il canale dei fondi pensione dentro calculatePerformanceForPeriod ───
+
+import { calculatePerformanceForPeriod } from '@/lib/services/performanceService'
+
+describe('calculatePerformanceForPeriod with pension boundary flows', () => {
+  // Giugno → agosto, periodo CUSTOM (nessun orologio): il fondo entra a luglio con 31800 di flusso,
+  // ad agosto riceve 10 dall'esterno; il cashflow risparmia 500 a luglio. Il mercato non muove nulla.
+  const snapshots = [
+    makeSnapshot(2026, 6, 100000),
+    makeSnapshot(2026, 7, 132300), // 100000 + 500 risparmiati + 31800 di fondo entrato
+    makeSnapshot(2026, 8, 132310), // + 10 versati
+  ]
+  const expenses = [makeExpense(2026, 7, 10, 'income', 500)]
+  const flows: PensionBoundaryFlow[] = [
+    { month: '2026-07', amount: 31800, kind: 'entry' },
+    { month: '2026-08', amount: 10, kind: 'contribution' },
+  ]
+
+  it('neutralises the entry and the contribution: a portfolio that only received capital rends 0', async () => {
+    const m = await calculatePerformanceForPeriod('u', snapshots, 'CUSTOM', 2.5, new Date(2026, 6, 1), new Date(2026, 7, 31, 23, 59, 59), expenses, undefined, flows)
+
+    expect(m.hasInsufficientData).toBe(false)
+    expect(m.timeWeightedReturn).toBeCloseTo(0, 6)
+    expect(m.roi).toBeCloseTo(0, 6)
+    expect(m.moneyWeightedReturn).toBeCloseTo(0, 4)
+  })
+
+  it('keeps netCashFlow as the cashflow savings and reports the pension channel apart', async () => {
+    const m = await calculatePerformanceForPeriod('u', snapshots, 'CUSTOM', 2.5, new Date(2026, 6, 1), new Date(2026, 7, 31, 23, 59, 59), expenses, undefined, flows)
+
+    expect(m.netCashFlow).toBe(500)
+    expect(m.totalIncome).toBe(500)
+    expect(m.pensionFlow).toBe(31810)
+    expect(m.pensionEntryFlow).toBe(31800)
+    expect(m.cashFlows.map((cf) => [cf.netCashFlow, cf.pensionFlow ?? 0])).toEqual([
+      [500, 31800],
+      [0, 10],
+    ])
+  })
+
+  it('without the flows the same history reads the fund as a +31% return (the naive inclusion)', async () => {
+    const m = await calculatePerformanceForPeriod('u', snapshots, 'CUSTOM', 2.5, new Date(2026, 6, 1), new Date(2026, 7, 31, 23, 59, 59), expenses)
+
+    expect(m.pensionFlow).toBe(0)
+    expect(m.pensionEntryFlow).toBe(0)
+    expect(m.roi).toBeCloseTo(31.81, 1)
+  })
+
+  it('leaves an entry outside the window out of pensionEntryFlow', async () => {
+    const m = await calculatePerformanceForPeriod('u', snapshots, 'CUSTOM', 2.5, new Date(2026, 7, 1), new Date(2026, 7, 31, 23, 59, 59), expenses, undefined, flows)
+
+    expect(m.pensionFlow).toBe(10)
+    expect(m.pensionEntryFlow).toBe(0)
   })
 })

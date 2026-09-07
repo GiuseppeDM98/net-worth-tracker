@@ -389,7 +389,7 @@ export function describeSummarySection(data: SummaryData): Narrative {
 /**
  * The Cashflow section's scope line — the ONE place the export's floor is spoken.
  *
- * On a Totale export `cashflowHistoryStartYear` floors the window (AGENTS.md → PDF Export);
+ * On a Totale export `cashflowHistoryStartYear` floors the window (doc/guide/email-pdf.md § PDF Export);
  * Storico, Rendimenti and FIRE stay unbounded. That asymmetry is deliberate — the cashflow
  * before the floor is bulk-imported noise — but a reader who is not told will read "Totale" as
  * "everything" and conclude their first years had no spending.

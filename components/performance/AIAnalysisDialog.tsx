@@ -146,9 +146,12 @@ export function AIAnalysisDialog({
   };
 
   useEffect(() => {
-    if (open && !analysis && !loading) {
+    if (!open || analysis || loading) return;
+    // Deferred so the effect body itself sets no state (react-hooks/set-state-in-effect).
+    const timer = setTimeout(() => {
       fetchAnalysis();
-    }
+    }, 0);
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 

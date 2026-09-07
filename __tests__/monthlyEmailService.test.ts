@@ -12,17 +12,23 @@ const { resendSendMock } = vi.hoisted(() => ({
 vi.mock('resend', () => {
   class ResendMock {
     emails = { send: resendSendMock };
-    constructor(_apiKey?: string) {}
   }
   return { Resend: ResendMock };
 });
 
 // Per-collection query chains — filled per-test
-const collectionMocks: Record<string, any> = {};
+const collectionMocks: Record<string, unknown> = {};
+
+/** The chainable shape the mocked adminDb query exposes; every node resolves to the same result. */
+interface QueryChainMock {
+  where: () => QueryChainMock;
+  limit: () => { get: () => Promise<unknown> };
+  get: () => Promise<unknown>;
+}
 
 // Snapshot returned by adminDb.collection('budgets').doc(uid).get() — mock-prefixed
 // so it can be referenced inside the hoisted vi.mock factory. Default: no budget doc.
-let mockBudgetDoc: { exists: boolean; data?: () => any } = { exists: false };
+let mockBudgetDoc: { exists: boolean; data?: () => Record<string, unknown> } = { exists: false };
 
 // Build a reusable chainable query builder for the adminDb mock.
 // The real service uses: .where().where().where().limit().get() (3 conditions)
@@ -33,7 +39,7 @@ function buildQueryMock(name: string) {
       Promise.resolve(collectionMocks[name] ?? { empty: true, docs: [] })
     ),
   });
-  function chainNode(): any {
+  function chainNode(): QueryChainMock {
     return {
       where: () => chainNode(),
       limit: () => terminal(),

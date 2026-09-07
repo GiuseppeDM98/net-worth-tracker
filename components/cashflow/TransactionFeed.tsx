@@ -35,7 +35,7 @@ import { describeRecurrence } from '@/lib/utils/recurrenceDates';
 import { isScheduledRow } from '@/lib/utils/tracciamentoSummary';
 import type { Expense, ExpenseType } from '@/types/expenses';
 import { CompactExpenseRow, TYPE_DOT_CLASS } from '@/components/cashflow/CompactExpenseRow';
-import { getLazyIcon } from '@/components/expenses/IconPickerPopover';
+import { LAZY_CATEGORY_ICONS } from '@/components/expenses/IconPickerPopover';
 
 // ─── Italian type labels ───────────────────────────────────────────────────────
 
@@ -47,9 +47,9 @@ const EXPENSE_TYPE_LABELS: Record<ExpenseType, string> = {
   transfer: 'Trasferimento',
 };
 
-// Module-level component required by the React Compiler — getLazyIcon calls React.lazy()
-// which must never be called inside a render function (it would reset the component each
-// render).
+// Module-level component, and the icon is a LOOKUP in the shared map, never a call: a
+// component obtained from a call during render is a new type every render to the React
+// Compiler (`react-hooks/static-components`), which would remount it and reset Suspense.
 function TransactionDetailIcon({
   iconName,
   color,
@@ -59,7 +59,7 @@ function TransactionDetailIcon({
   color?: string;
   type: ExpenseType;
 }) {
-  const Icon = iconName ? getLazyIcon(iconName) : null;
+  const Icon = iconName ? LAZY_CATEGORY_ICONS[iconName] : undefined;
   const dot = (
     <span className={cn('h-2.5 w-2.5 rounded-full', TYPE_DOT_CLASS[type] ?? 'bg-muted-foreground')} />
   );

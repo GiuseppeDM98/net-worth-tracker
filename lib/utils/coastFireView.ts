@@ -276,7 +276,7 @@ export function parseTaxBracketDrafts(drafts: CoastFireTaxBracketDraft[]): Coast
 
 /**
  * Dirty-state keys: only the persisted fields, so a re-render of equivalent drafts never reads
- * as an unsaved change (AGENTS → *Settings — the FIVE places*).
+ * as an unsaved change (doc/guide/impostazioni.md § Settings — the FIVE places).
  */
 export function buildPensionSnapshotKey(pensions: CoastFirePensionInput[]): string {
   return JSON.stringify(

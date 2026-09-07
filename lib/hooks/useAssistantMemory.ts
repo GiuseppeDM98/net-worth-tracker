@@ -5,6 +5,7 @@ import {
   AssistantMemoryDocument,
   AssistantMemoryItem,
   AssistantMemoryResponse,
+  AssistantMemorySuggestion,
   AssistantPreferences,
 } from '@/types/assistant';
 import { queryKeys } from '@/lib/query/queryKeys';
@@ -59,7 +60,8 @@ export function useUpdateAssistantMemory(userId: string) {
     mutationFn: async (updates: {
       preferences?: Partial<AssistantPreferences>;
       item?: Partial<AssistantMemoryItem> & Pick<AssistantMemoryItem, 'id' | 'text' | 'category'>;
-      suggestion?: any;
+      suggestion?: Partial<AssistantMemorySuggestion> &
+        Pick<AssistantMemorySuggestion, 'id' | 'itemId' | 'type' | 'status' | 'evidenceSummary' | 'evaluation'>;
       action?: 'acceptSuggestion' | 'ignoreSuggestion' | 'reactivateGoal';
       suggestionId?: string;
       itemId?: string;

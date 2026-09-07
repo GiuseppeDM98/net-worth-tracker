@@ -7,28 +7,21 @@ interface PageHeaderProps {
   description?: string;
   actions?: React.ReactNode;
   className?: string;
-  /**
-   * Kept for the call sites that pass it: the compact header draws no separator, and the
-   * `legacy` variant that did was deleted with the last un-propagated page (Previdenza,
-   * 2026-08-26). Pass false when PageTabs follows — the tab bar's underline is the separation.
-   */
-  separator?: boolean;
 }
 
 /**
- * The compact page header (the default since the shell redesign, the only variant since the
- * last propagation): on `desktop:` ONE line — eyebrow · title · description, actions on the
- * right, no separator — because on a redesigned page the real headline is the verdict in the
- * content. The eyebrow is the tiles' eyebrow (10px, 0.1em) so the page has a single eyebrow
- * voice. The mobile sticky navbar is one block, and its title is what the user anchors to
- * while scrolling.
+ * The compact page header (the default since the shell redesign, the only one since the last
+ * propagation): on `desktop:` ONE line — eyebrow · title · description, actions on the right
+ * — because on a redesigned page the real headline is the verdict in the content. It draws
+ * no separator: when a tab bar follows, its underline is the separation. The eyebrow is the
+ * tiles' eyebrow (10px, 0.1em) so the page has a single eyebrow voice. The mobile sticky
+ * navbar is one block, and its title is what the user anchors to while scrolling.
  */
-export function PageHeader({ title, label, description, actions, className, separator = true }: PageHeaderProps) {
+export function PageHeader({ title, label, description, actions, className }: PageHeaderProps) {
   return (
-    <div className={cn(!separator && '-mb-0', className)}>
+    <div className={className}>
       {/* Mobile sticky navbar — title + description in one block so the header
-          feels like a unified navbar. When separator=false the negative bottom
-          margin eats the parent space-y gap, making the tab bar flush. */}
+          feels like a unified navbar. */}
       <div className="sticky top-0 z-20 -mx-4 px-4 pt-1 pb-2 flex flex-col bg-background/95 backdrop-blur-sm desktop:hidden">
         <div className="flex items-center justify-between">
           <h1 className="text-[17px] font-semibold tracking-tight truncate min-w-0">{title}</h1>

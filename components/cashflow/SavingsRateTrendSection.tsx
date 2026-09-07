@@ -46,7 +46,7 @@ const SAVINGS_TARGET = 20;
  * this correctly represents "no data" rather than "zero savings".
  *
  * YAxis domain={['auto', 'auto']} scales to the actual data range to prevent
- * the flat-line problem (AGENTS.md: "Recharts Sparkline — flat line on large
+ * the flat-line problem (AGENTS.md § Recharts — sparkline flat-line on large
  * absolute numbers").
  */
 function SavingsRateLineChart({
@@ -76,7 +76,7 @@ function SavingsRateLineChart({
           domain={['auto', 'auto']}
         />
 
-        {/* CSS vars for tooltip — never hardcoded hex (AGENTS.md: "Recharts tooltip") */}
+        {/* CSS vars for tooltip — never hardcoded hex (AGENTS.md § Recharts — tooltip style props) */}
         <Tooltip
           formatter={(value) =>
             value != null ? [formatPercentage(Number(value), 1), 'Tasso di risparmio'] : ['—', '']

@@ -1,7 +1,7 @@
 import { doc, getDoc, setDoc, deleteField } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { invalidateDashboardOverviewSummary } from '@/lib/services/dashboardOverviewInvalidation';
-import { Asset, AssetClass, AssetAllocationTarget, AssetAllocationSettings, AllocationResult, SubCategoryTarget, SpecificAssetAllocation, AllocationData } from '@/types/assets';
+import { Asset, AssetClass, AssetAllocationTarget, AssetAllocationSettings, AllocationResult, SpecificAssetAllocation, AllocationData } from '@/types/assets';
 import { calculateAssetValue, calculateTotalValue } from './assetService';
 import { expandAssetExposure } from '@/lib/utils/assetExposureUtils';
 import { partitionByAllocationRole, ASSET_CLASS_SEQUENCE, NO_SUBCATEGORY_LABEL } from '@/lib/utils/allocationUtils';
@@ -157,7 +157,7 @@ export async function setSettings(
       const existingData = existingDoc.exists() ? existingDoc.data() : {};
 
       // Build complete document with all fields
-      const docData: any = {
+      const docData: Record<string, unknown> = {
         ...existingData, // Keep all existing fields
         userId,
         targets: settings.targets, // COMPLETELY REPLACE targets (not merge)
@@ -340,7 +340,7 @@ export async function setSettings(
       await setDoc(targetRef, docData);
     } else {
       // No targets update, use normal merge behavior
-      const docData: any = {
+      const docData: Record<string, unknown> = {
         userId,
         updatedAt: new Date(),
       };

@@ -28,7 +28,32 @@ export interface CashFlowData {
   income: number; // External income (salary, bonuses, gifts) - NO dividends
   expenses: number; // All expenses
   dividendIncome: number; // Dividend income (portfolio-generated returns)
-  netCashFlow: number; // income - expenses (WITHOUT dividends)
+  netCashFlow: number; // income - expenses (WITHOUT dividends) — the cashflow's own savings figure
+  /**
+   * Capital that crossed the boundary of the MEASURED BASE through the pension funds this month,
+   * signed (+ into the base). It is a second channel on purpose: `netCashFlow` stays what the
+   * Contributi tile prints («messi da parte»), while every return formula reads
+   * `externalFlowOf(cf)` = `netCashFlow + pensionFlow` (lib/utils/cashFlowMap.ts). Built by
+   * `resolvePerformanceBase` (lib/utils/performanceBase.ts); absent means 0.
+   */
+  pensionFlow?: number;
+}
+
+/**
+ * One month's crossing of the measured base's boundary by the pension funds.
+ *
+ * `entry` — the funds' whole value in the month they ENTER the base (from `pensionReturnStartMonth`
+ * on, with the toggle ON): their opening valuation is capital that arrived, not a return.
+ * `contribution` — TFR, employer and payroll-withheld voluntary money that reached a fund inside
+ * the base: it came from outside, so it is a flow, never a return.
+ * `withdrawal` — a voluntary contribution paid from a cash account while the funds are OUT of the
+ * base: the cash left the measured portfolio (negative amount).
+ * `month` is the month the value MOVED (`valueEffectMonth`), never the accounting date.
+ */
+export interface PensionBoundaryFlow {
+  month: string; // 'YYYY-MM'
+  amount: number; // signed: + into the base, − out of it
+  kind: 'entry' | 'contribution' | 'withdrawal';
 }
 
 // Portfolio performance metrics calculated over a specific time period.
@@ -76,10 +101,16 @@ export interface PerformanceMetrics {
   dividendCategoryId?: string; // Category ID for dividend income (from settings)
   totalContributions: number; // Sum of positive net cash flows
   totalWithdrawals: number; // Sum of negative net cash flows
-  netCashFlow: number; // Total contributions - withdrawals
+  netCashFlow: number; // Total contributions - withdrawals (the cashflow's savings; pension flows apart)
   totalIncome: number; // Sum of all income in period (NO dividendi)
   totalExpenses: number; // Sum of all expenses in period
   totalDividendIncome: number; // Sum of all dividend income (rendimento portafoglio)
+  // Pension-fund capital that crossed the base's boundary in the period (Σ CashFlowData.pensionFlow),
+  // and the part of it that is the funds' ENTRY into the base — 0 when the entry month is outside the
+  // window. ROI, CAGR, IRR and every flow-neutralised formula count netCashFlow + pensionFlow; the
+  // Contributi tile keeps them apart, because an entry is not money the user set aside.
+  pensionFlow: number;
+  pensionEntryFlow: number;
   numberOfMonths: number; // Number of months in period
 
   // Yield on Cost (YOC) Metrics
@@ -148,7 +179,7 @@ export interface PerformanceChartData {
   contributions: number; // Cumulative cash paid in since the period start (negative if net withdrawn)
   investedBase: number; // initialCapital + contributions — the plotted area
   returns: number; // Market growth: netWorth - investedBase (negative in a losing period)
-  [key: string]: any; // For Recharts compatibility
+  [key: string]: unknown; // For Recharts compatibility
 }
 
 // Monthly returns heatmap data
@@ -167,6 +198,7 @@ export interface FirestoreCashFlowData {
   expenses: number;
   dividendIncome: number;
   netCashFlow: number;
+  pensionFlow?: number;
 }
 
 // Firestore-serialized version of PerformanceMetrics (Date fields → Timestamp)

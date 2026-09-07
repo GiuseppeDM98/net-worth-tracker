@@ -162,7 +162,7 @@ export interface CashflowData {
   // The floor a Totale export applied (`cashflowHistoryStartYear`), or null when the window is
   // bounded by the picked period instead. It exists so the section can DECLARE the floor —
   // Storico, Rendimenti and FIRE stay unbounded, and a reader told "Totale" will otherwise
-  // read the gap as months with no spending (AGENTS.md → PDF Export).
+  // read the gap as months with no spending (doc/guide/email-pdf.md § PDF Export).
   historyFloorYear: number | null;
 }
 
