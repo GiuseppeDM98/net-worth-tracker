@@ -328,19 +328,25 @@ export function describeCashflowSection(data: CashflowData): Narrative {
   return narrative;
 }
 
-/** Rendimenti: the one figure the page itself calls the recommended one, and its window. */
+/**
+ * Rendimenti: the one figure the page itself calls the recommended one, named for what it is —
+ * the TWR the service returns is ANNUALISED, and the CAGR beside it is a different correction for
+ * the cash flows (added to the starting capital), not the annualised form of the TWR; until
+ * 2026-09-07 the sentence called the first «del periodo» and the second «pari al … annualizzato».
+ * The base is on the section's scope line, not repeated here.
+ */
 export function describePerformanceSection(data: PerformanceData): Narrative {
   const twr = data.metrics.timeWeightedReturn;
   if (twr === undefined || twr === null) {
     return [prose('Il rendimento non è calcolabile su questa finestra.')];
   }
   const narrative: Narrative = [
-    prose('Il rendimento time-weighted del periodo è '),
+    prose('Il rendimento time-weighted annualizzato è '),
     signedPercent(twr, 2),
     prose(` su ${data.periodLabel}`),
   ];
   if (data.metrics.cagr !== undefined && data.metrics.cagr !== null) {
-    narrative.push(prose(', pari al '), signedPercent(data.metrics.cagr, 2), prose(' annualizzato'));
+    narrative.push(prose('; il CAGR, con i versamenti nel capitale iniziale, è '), signedPercent(data.metrics.cagr, 2));
   }
   narrative.push(prose('.'));
   return narrative;

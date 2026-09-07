@@ -31,5 +31,8 @@ export const DASHBOARD_OVERVIEW_SUMMARY_COLLECTION = 'dashboardOverviewSummaries
 // Italian label for trendFollowing/carry instead of the raw Firestore key (the Composizione and
 // Classi tiles print that string verbatim), and expensesScheduled now splits by Italian calendar
 // DAY, so a row recorded today counts as spent rather than as scheduled.
-export const DASHBOARD_OVERVIEW_SOURCE_VERSION = 14;
+// Bumped from 14→15: every G/P figure (metrics.unrealizedGains, estimatedTaxes, netTotal,
+// topAssets[].returnPercent, flags.hasCostBasisTracking) now stands against the EUR PMC with
+// purchase fees included (lib/utils/costBasisEur.ts), never the native averageCost.
+export const DASHBOARD_OVERVIEW_SOURCE_VERSION = 15;
 export const DASHBOARD_OVERVIEW_SUMMARY_TTL_MS = 5 * 60 * 1000;

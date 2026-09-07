@@ -19,7 +19,7 @@
 
 import type { DoublingMilestone, MonthlySnapshot } from '@/types/assets';
 import type { Expense } from '@/types/expenses';
-import { getItalyYear } from '@/lib/utils/dateHelpers';
+import { getItalyMonth, getItalyYear } from '@/lib/utils/dateHelpers';
 
 export interface PeriodMonth {
   year: number;
@@ -331,54 +331,128 @@ export function selectTrailingMonths<T extends PeriodMonth>(rows: T[], count: nu
 
 // ─── Lavoro e investimenti ────────────────────────────────────────────────────
 
+/**
+ * A window of the recap: the cashflow rows dated from the month AFTER `baseline` to the month of
+ * `latest` (both snapshots), and the net-worth growth between the two — the Driver's window
+ * (`prepareSavingsVsInvestmentData`), one per year, so the two tiles measure the same interval by
+ * construction (DESIGN.md → The Same-Basis Rule).
+ */
+export interface LaborWindow {
+  /** The snapshot the window is measured FROM; its own month is NOT counted. */
+  baseline: PeriodMonth;
+  /** The last snapshot of the window, counted. */
+  latest: PeriodMonth;
+}
+
+/** One income category outside the labor ones, with what it brought in over the window. */
+export interface OtherIncomeCategory {
+  categoryId: string;
+  name: string;
+  amount: number;
+}
+
 export interface LaborMetrics {
   startYear: number;
-  /** Income in the labor categories since the floor. */
+  /** The first and the last month whose cashflow rows are counted. */
+  since: PeriodMonth;
+  until: PeriodMonth;
+  /** Income in the labor categories over the window. */
   totalLaborIncome: number;
   /** Labor income plus all spending (spending is negative in the ledger). */
   totalSavedFromWork: number;
-  /** All spending since the floor, negative as stored; transfers excluded (net-zero). */
+  /** All spending over the window, negative as stored; transfers excluded (net-zero). */
   totalExpensesSum: number;
-  /** Net-worth growth since the floor's baseline minus every inflow and outflow: the market's share. */
+  /** Income OUTSIDE the labor categories (dividends, rents, refunds…) — the cause the old recap never named. */
+  otherIncome: number;
+  /** `otherIncome` by category, heaviest first. */
+  otherIncomeByCategory: OtherIncomeCategory[];
+  /** Σ (latest − baseline) over the windows: the total the three causes add up to. */
+  netWorthGrowth: number;
+  /** Net-worth growth minus every inflow and outflow: the market's share. */
   totalInvestmentGrowthGross: number;
   totalInvestmentGrowthNet: number;
+  /** Labor income over spending (1 = the work pays exactly the bills); null without spending or without labor income. */
+  coverage: number | null;
 }
 
+/** The Driver's yearly rows as recap windows; a legacy row without a baseline is a December-based one. */
+export function laborWindowsOf(rows: Array<Pick<DriverYear, 'year' | 'baseline' | 'latest'>>): LaborWindow[] {
+  return rows.map((row) => ({ baseline: row.baseline ?? { year: Number(row.year) - 1, month: 12 }, latest: row.latest }));
+}
+
+const monthIndex = (period: PeriodMonth) => period.year * 12 + (period.month - 1);
+
 /**
- * The «Lavoro e investimenti» recap: what the labor categories brought in since the cashflow
- * floor, what was left after all spending, and the market's share of the growth over the same
- * window (from December of the year before the floor, or the floor's first snapshot).
- * `estimatedTaxes` is the Patrimonio's estimate on latent gains, passed in so this stays SDK-free.
- * Transfers are skipped: they are net-zero and stored positive, so counting them as spending
- * would inflate the savings and deflate the market by the same amount.
+ * The «Lavoro e investimenti» recap over the given windows: what the labor categories brought
+ * in, what was left after all spending, what the OTHER income categories added, and the market's
+ * share — three causes that add up exactly to the net-worth growth of the same windows:
+ *
+ *   savedFromWork + otherIncome + investmentGrowthGross = netWorthGrowth
+ *
+ * The windows are the Driver's, so a running year stops at its last snapshot and the recurring
+ * rows already materialised for the months to come do not count (until 2026-09-07 the recap had
+ * no right edge and read every future instalment as already paid, while the ΔNW it subtracted
+ * stopped at the last snapshot: two windows in one subtraction). `estimatedTaxes` is the
+ * Patrimonio's estimate on latent gains, passed in so this stays SDK-free; pass 0 for a single
+ * year, since a tax on today's latent gains belongs to no year. Transfers are skipped: they are
+ * net-zero and stored positive.
  */
 export function summarizeLaborMetrics(
   snapshots: MonthlySnapshot[],
   expenses: Expense[],
   laborCategoryIds: string[],
   startYear: number,
+  windows: LaborWindow[],
   estimatedTaxes: number,
 ): LaborMetrics | null {
-  if (laborCategoryIds.length === 0 || expenses.length === 0) return null;
+  if (laborCategoryIds.length === 0 || expenses.length === 0 || windows.length === 0) return null;
   const categorySet = new Set(laborCategoryIds);
-  const inWindow = expenses.filter((e) => e.type !== 'transfer' && getItalyYear(e.date) >= startYear);
+  const byMonth = new Map<number, MonthlySnapshot>();
+  snapshots.forEach((s) => byMonth.set(monthIndex(s), s));
+
+  const ordered = [...windows].sort((a, b) => monthIndex(a.baseline) - monthIndex(b.baseline));
+  const ranges = ordered
+    .map((w) => ({ from: monthIndex(w.baseline) + 1, to: monthIndex(w.latest), baseline: byMonth.get(monthIndex(w.baseline)), latest: byMonth.get(monthIndex(w.latest)) }))
+    .filter((r): r is typeof r & { baseline: MonthlySnapshot; latest: MonthlySnapshot } => !!r.baseline && !!r.latest && r.to >= r.from);
+  if (ranges.length === 0) return null;
+
+  const inWindow = expenses.filter((e) => {
+    if (e.type === 'transfer') return false;
+    const key = getItalyYear(e.date) * 12 + (getItalyMonth(e.date) - 1);
+    return ranges.some((r) => key >= r.from && key <= r.to);
+  });
   const totalLaborIncome = inWindow.filter((e) => e.type === 'income' && categorySet.has(e.categoryId)).reduce((sum, e) => sum + e.amount, 0);
-  const allIncome = inWindow.filter((e) => e.type === 'income').reduce((sum, e) => sum + e.amount, 0);
   const totalExpensesSum = inWindow.filter((e) => e.type !== 'income').reduce((sum, e) => sum + e.amount, 0);
 
-  const ordered = sortSnapshots(snapshots);
-  const relevant = ordered.filter((s) => s.year >= startYear);
-  let totalInvestmentGrowthGross = 0;
-  if (relevant.length > 0) {
-    const baseline = ordered.find((s) => s.year === startYear - 1 && s.month === 12) ?? relevant[0];
-    totalInvestmentGrowthGross = relevant[relevant.length - 1].totalNetWorth - baseline.totalNetWorth - (allIncome + totalExpensesSum);
-  }
+  const otherByCategory = new Map<string, OtherIncomeCategory>();
+  inWindow
+    .filter((e) => e.type === 'income' && !categorySet.has(e.categoryId))
+    .forEach((e) => {
+      const current = otherByCategory.get(e.categoryId) ?? { categoryId: e.categoryId, name: e.categoryName, amount: 0 };
+      current.amount += e.amount;
+      otherByCategory.set(e.categoryId, current);
+    });
+  const otherIncomeByCategory = [...otherByCategory.values()].sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
+  const otherIncome = otherIncomeByCategory.reduce((sum, c) => sum + c.amount, 0);
+
+  const netWorthGrowth = ranges.reduce((sum, r) => sum + (r.latest.totalNetWorth - r.baseline.totalNetWorth), 0);
+  const totalInvestmentGrowthGross = netWorthGrowth - (totalLaborIncome + otherIncome + totalExpensesSum);
+  const spending = Math.abs(totalExpensesSum);
+  const first = ranges[0];
+  const lastRange = ranges[ranges.length - 1];
+
   return {
     startYear,
+    since: addMonths(first.baseline, 1),
+    until: { year: lastRange.latest.year, month: lastRange.latest.month },
     totalLaborIncome,
     totalSavedFromWork: totalLaborIncome + totalExpensesSum,
     totalExpensesSum,
+    otherIncome,
+    otherIncomeByCategory,
+    netWorthGrowth,
     totalInvestmentGrowthGross,
     totalInvestmentGrowthNet: totalInvestmentGrowthGross - estimatedTaxes,
+    coverage: spending > 0 && totalLaborIncome > 0 ? totalLaborIncome / spending : null,
   };
 }

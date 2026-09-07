@@ -57,13 +57,12 @@ vi.mock('@/lib/firebase/admin', () => {
     set: async (data: Record<string, unknown>) => {
       store.set(key(collection, id), { ...data });
     },
+    update: async (data: Record<string, unknown>) => {
+      store.set(key(collection, id), { ...(store.get(key(collection, id)) ?? {}), ...data });
+    },
   });
-  const makeQuery = (collection: string, filters: Filter[]): Record<string, unknown> => ({
-    _collection: collection,
-    _filters: filters,
-    where: (field: string, _op: string, value: unknown) =>
-      makeQuery(collection, [...filters, { field, value }]),
-    run: () => {
+  const makeQuery = (collection: string, filters: Filter[]): Record<string, unknown> => {
+    const run = () => {
       const docs: { id: string; data: () => Record<string, unknown> }[] = [];
       for (const [k, value] of store) {
         if (!k.startsWith(`${collection}/`)) continue;
@@ -71,9 +70,17 @@ vi.mock('@/lib/firebase/admin', () => {
           docs.push({ id: k.slice(collection.length + 1), data: () => value });
         }
       }
-      return { docs };
-    },
-  });
+      return { docs, empty: docs.length === 0 };
+    };
+    return {
+      _collection: collection,
+      _filters: filters,
+      where: (field: string, _op: string, value: unknown) => makeQuery(collection, [...filters, { field, value }]),
+      run,
+      // Outside a transaction (the backfill reads a ledger with a plain query).
+      get: async () => run(),
+    };
+  };
 
   const adminDb = {
     collection: (name: string) => ({
@@ -121,6 +128,7 @@ vi.mock('@/lib/firebase/admin', () => {
 import { POST as createRoute } from '@/app/api/asset-transactions/route';
 import { PUT as editRoute, DELETE as deleteRoute } from '@/app/api/asset-transactions/[transactionId]/route';
 import { POST as migrateRoute } from '@/app/api/asset-transactions/migrate/route';
+import { POST as backfillRoute } from '@/app/api/asset-transactions/backfill-average-cost-eur/route';
 
 function createJsonRequest(
   url: string,
@@ -395,5 +403,62 @@ describe('Asset trade-ledger routes', () => {
     );
     expect(second.status).toBe(200);
     await expect(second.json()).resolves.toEqual({ alreadyMigrated: true });
+  });
+
+  describe('POST /api/asset-transactions/backfill-average-cost-eur', () => {
+    const backfill = (userId: string, headers?: Record<string, string>) =>
+      backfillRoute(
+        createJsonRequest('http://localhost/api/asset-transactions/backfill-average-cost-eur', {
+          method: 'POST',
+          body: { userId },
+          headers,
+        })
+      );
+
+    it('returns 401 without an Authorization header', async () => {
+      const response = await backfill('user-1');
+      expect(response.status).toBe(401);
+      expect(verifyIdTokenMock).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 for a non-member acting on another owner’s data', async () => {
+      seedMeta('owner-2');
+      const response = await backfill('owner-2', AUTH);
+      expect(response.status).toBe(403);
+      expect(store.get(docKey('assetTransactionsMeta', 'owner-2'))!.averageCostEurBackfilledAt).toBeUndefined();
+    });
+
+    it('is a no-op before the ledger migration (no meta doc) and never creates one', async () => {
+      const response = await backfill('user-1', AUTH);
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ alreadyBackfilled: true });
+      expect(store.has(docKey('assetTransactionsMeta', 'user-1'))).toBe(false);
+    });
+
+    it('projects averageCostEur for the owner once, then reports alreadyBackfilled', async () => {
+      seedMeta('user-1');
+      store.set(docKey('assets', 'asset-1'), { userId: 'user-1', type: 'etf', currency: 'USD', quantity: 10, averageCost: 100, currentPrice: 145 });
+      store.set(docKey('assetTransactions', 't1'), {
+        userId: 'user-1',
+        assetId: 'asset-1',
+        type: 'buy',
+        date: new Date(2026, 0, 5),
+        quantity: 10,
+        pricePerUnit: 100,
+        priceEur: 90,
+        fees: 5,
+        isBaseline: false,
+      });
+      getUserAssetsAdminMock.mockResolvedValue([{ id: 'asset-1', type: 'etf', quantity: 10 }]);
+
+      const first = await backfill('user-1', AUTH);
+      expect(first.status).toBe(200);
+      await expect(first.json()).resolves.toEqual({ recomputedAssetCount: 1, skippedAssetCount: 0 });
+      expect(store.get(docKey('assets', 'asset-1'))).toMatchObject({ averageCost: 100, averageCostEur: 90.5, quantity: 10 });
+
+      const second = await backfill('user-1', AUTH);
+      expect(second.status).toBe(200);
+      await expect(second.json()).resolves.toEqual({ alreadyBackfilled: true });
+    });
   });
 });

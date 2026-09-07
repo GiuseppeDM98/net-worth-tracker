@@ -44,6 +44,7 @@ import type { Asset, MonthlySnapshot, AssetAllocationTarget, DoublingMode, Asset
 import type { Expense } from '@/types/expenses';
 import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
 import {
+  laborWindowsOf,
   projectNextDoubling,
   resolveFeaturedDriverYear,
   selectDriverYears,
@@ -56,6 +57,7 @@ import {
   summarizeMonthlyMoves,
   sumDriverYears,
   withMonthDeltas,
+  type LaborMetrics,
 } from '@/lib/utils/storicoSummary';
 import {
   buildStoricoVerdict,
@@ -231,13 +233,23 @@ export default function HistoryPage() {
   const yearlyVariation = useMemo(() => prepareYoYVariationData(ordered), [ordered]);
 
   // Lavoro e investimenti — only when the labor categories are configured; the maths is the pure
-  // `summarizeLaborMetrics`, the tax estimate is the Patrimonio's (Firebase-coupled, so passed in).
+  // `summarizeLaborMetrics` over the Driver's own windows (baseline → last snapshot, one per year),
+  // so the recap and the Driver measure the same interval by construction; the tax estimate is the
+  // Patrimonio's (Firebase-coupled, so passed in) and belongs to the cumulative recap only.
   const laborMetrics = useMemo(() => {
     const categoryIds = portfolioSettings?.laborIncomeCategoryIds ?? [];
-    const metrics = summarizeLaborMetrics(ordered, expenses, categoryIds, startYear, calculateTotalEstimatedTaxes(assets));
-    if (!metrics) return null;
-    return { metrics, chartData: prepareMonthlyLaborMetricsData(ordered, expenses, categoryIds, startYear) };
-  }, [expenses, ordered, portfolioSettings, assets, startYear]);
+    const all = summarizeLaborMetrics(ordered, expenses, categoryIds, startYear, laborWindowsOf(driverYears), calculateTotalEstimatedTaxes(assets));
+    if (!all) return null;
+    const years = driverYears
+      .map((row) => ({ year: Number(row.year), metrics: summarizeLaborMetrics(ordered, expenses, categoryIds, startYear, laborWindowsOf([row]), 0) }))
+      .filter((entry): entry is { year: number; metrics: LaborMetrics } => entry.metrics !== null);
+    return {
+      all,
+      years,
+      chartData: prepareMonthlyLaborMetricsData(ordered, expenses, categoryIds, startYear),
+      hasDividendCategory: Boolean(portfolioSettings?.dividendIncomeCategoryId),
+    };
+  }, [expenses, ordered, portfolioSettings, assets, startYear, driverYears]);
 
   // Valore per strumento.
   const displayTickerByAssetId = useMemo(() => {

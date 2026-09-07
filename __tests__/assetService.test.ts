@@ -29,7 +29,13 @@ vi.mock('firebase/firestore', () => ({
   getDocs: vi.fn(),
 }));
 
-import { calculateStampDuty } from '@/lib/services/assetService';
+import {
+  calculateStampDuty,
+  calculateTotalEstimatedTaxes,
+  calculateTotalUnrealizedGains,
+  calculateUnrealizedGains,
+} from '@/lib/services/assetService';
+import { summarizeUnrealizedGains } from '@/lib/utils/patrimonioSummary';
 
 function makeAsset(overrides: Partial<Asset> = {}): Asset {
   return {
@@ -104,5 +110,47 @@ describe('calculateStampDuty', () => {
     const exempt = makeAsset({ id: 'exempt', quantity: 10, currentPrice: 100, stampDutyExempt: true });
 
     expect(calculateStampDuty([sold, exempt], 0.2)).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// calculateUnrealizedGains — EUR against EUR, fees included, ONE number with the table
+// ---------------------------------------------------------------------------
+
+describe('calculateUnrealizedGains', () => {
+  it('stands the EUR value against the EUR PMC with fees, never the native PMC (PR #326)', () => {
+    // 10 units at 100 USD (90 € at the trade date, 91 € with the fees); now 130 € a unit.
+    const usd = makeAsset({ currency: 'USD', quantity: 10, currentPrice: 145, currentPriceEur: 130, averageCost: 100, averageCostEur: 91 });
+    expect(calculateUnrealizedGains(usd)).toBeCloseTo(1300 - 910, 6);
+  });
+
+  it('counts the purchase fees on a EUR position too — the fiscal cost the gain is taxed on', () => {
+    const eur = makeAsset({ currency: 'EUR', quantity: 10, currentPrice: 120, averageCost: 100, averageCostEur: 101 });
+    expect(calculateUnrealizedGains(eur)).toBeCloseTo(1200 - 1010, 6);
+    // Estimated taxes follow the same basis.
+    expect(calculateTotalEstimatedTaxes([{ ...eur, taxRate: 26 }])).toBeCloseTo(190 * 0.26, 6);
+  });
+
+  it('is zero where there is nothing to measure', () => {
+    const foreignWithoutEurPmc = makeAsset({ currency: 'USD', quantity: 10, currentPrice: 145, currentPriceEur: 130, averageCost: 100 });
+    const pensionLeftover = makeAsset({ type: 'pensionFund', quantity: 5000, currentPrice: 1, averageCost: 0.8 });
+    const cashAccount = makeAsset({ type: 'cash', assetClass: 'cash', quantity: 5000, currentPrice: 1, averageCost: 1 });
+    const closed = makeAsset({ quantity: 0, currentPrice: 120, averageCost: 100 });
+    for (const asset of [foreignWithoutEurPmc, pensionLeftover, cashAccount, closed]) {
+      expect(calculateUnrealizedGains(asset)).toBe(0);
+    }
+  });
+
+  it('adds up to the figure the Patrimonio table prints (summarizeUnrealizedGains)', () => {
+    const assets = [
+      makeAsset({ id: 'usd', currency: 'USD', quantity: 10, currentPrice: 145, currentPriceEur: 130, averageCost: 100, averageCostEur: 91 }),
+      makeAsset({ id: 'eur', currency: 'EUR', quantity: 10, currentPrice: 120, averageCost: 100, averageCostEur: 101 }),
+      makeAsset({ id: 'legacy', currency: 'EUR', quantity: 4, currentPrice: 50, averageCost: 40 }),
+      makeAsset({ id: 'usd-old', currency: 'USD', quantity: 10, currentPrice: 145, currentPriceEur: 130, averageCost: 100 }),
+      makeAsset({ id: 'fund', type: 'pensionFund', quantity: 5000, currentPrice: 1, averageCost: 0.8 }),
+      makeAsset({ id: 'cash', type: 'cash', assetClass: 'cash', quantity: 5000, currentPrice: 1, averageCost: 1 }),
+    ];
+    expect(calculateTotalUnrealizedGains(assets)).toBeCloseTo(summarizeUnrealizedGains(assets).gainLoss, 6);
+    expect(calculateTotalUnrealizedGains(assets)).toBeCloseTo(390 + 190 + 40, 6);
   });
 });

@@ -42,7 +42,6 @@ import type { Expense } from '@/types/expenses';
 import {
   calculateAssetValue,
   calculateTotalValue,
-  calculateUnrealizedGains,
   calculateLiquidNetWorth,
   calculateIlliquidNetWorth,
   calculatePortfolioWeightedTER,
@@ -50,6 +49,7 @@ import {
   calculateFIRENetWorth,
 } from './assetService';
 import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
+import { computeUnrealizedGain } from '@/lib/utils/patrimonioSummary';
 import { ASSET_CLASS_SEQUENCE } from '@/lib/utils/allocationUtils';
 import { getCategoryKey, getCategoryName, resolveDisplayLabels } from '@/lib/utils/expenseGrouping';
 import { EXPENSE_TYPE_LABELS, type ExpenseType } from '@/types/expenses';
@@ -58,6 +58,10 @@ import {
   getSettings,
 } from './assetAllocationService';
 import { getAllExpenses } from './expenseService';
+import { getPensionContributions } from './pensionContributionService';
+import { getAssetTransactions } from './assetTransactionService';
+import { resolvePerformanceBase } from '@/lib/utils/performanceBase';
+import { describeMeasurementBase } from '@/lib/utils/performanceNarrative';
 import { getAnnualExpenses, getAnnualIncome, calculateFIREMetrics } from './fireService';
 import { filterExpensesByTime, DEFAULT_CASHFLOW_HISTORY_START_YEAR } from '@/lib/utils/pdfTimeFilters';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
@@ -145,6 +149,7 @@ export async function fetchPDFData(
       data.performance = await preparePerformanceData(
         userId,
         context.snapshots,
+        context.assets,
         timeFilter,
         cachedExpenses ?? undefined,
         selectedYear
@@ -190,8 +195,10 @@ function preparePortfolioData(assets: Asset[]): PortfolioData {
   let totalUnrealizedGains = 0;
   const assetRows: AssetRow[] = assets.map(asset => {
     const value = calculateAssetValue(asset);
-    const unrealizedGain = calculateUnrealizedGains(asset);
-    totalUnrealizedGains += unrealizedGain;
+    // The same G/P as the Strumenti table: EUR value against the EUR PMC, fees included
+    // (costBasisEur.ts); a foreign asset without a EUR PMC prints no G/P rather than a wrong one.
+    const gain = computeUnrealizedGain(asset);
+    totalUnrealizedGains += gain?.gainLoss ?? 0;
 
     return {
       ticker: getAssetDisplayTicker(asset),
@@ -202,10 +209,8 @@ function preparePortfolioData(assets: Asset[]): PortfolioData {
       currentPrice: asset.currentPrice,
       totalValue: value,
       weight: totalValue > 0 ? (value / totalValue) * 100 : 0,
-      unrealizedGain: asset.averageCost ? unrealizedGain : undefined,
-      unrealizedGainPercent: asset.averageCost && asset.averageCost > 0
-        ? ((asset.currentPrice - asset.averageCost) / asset.averageCost) * 100
-        : undefined,
+      unrealizedGain: gain?.gainLoss,
+      unrealizedGainPercent: gain?.gainPercent,
       ter: asset.totalExpenseRatio,
       isLiquid: asset.isLiquid !== false,
     };
@@ -553,16 +558,24 @@ async function prepareFireData(
  *
  * Monthly exports are not supported as performance metrics require multiple time periods.
  *
+ * The report measures the SAME base as the Rendimenti page: the snapshots are projected through
+ * `resolvePerformanceBase` (the one resolution, doc/guide/rendimenti.md) and the pension boundary
+ * flows ride along. Until 2026-09-07 this was a third call site on the RAW snapshots — the whole
+ * net worth, house included, with no pension flow — so the PDF printed a different TWR and ROI
+ * from the page under the same title, and told no one which perimeter it meant.
+ *
  * @param userId - User ID for fetching settings and dividends
  * @param snapshots - Monthly snapshots for performance calculation (already pre-filtered)
+ * @param assets - Every asset of the account, to resolve the base
  * @param timeFilter - Time filter ('yearly' or 'total', monthly returns null)
  * @param cachedExpenses - Optional pre-fetched expenses to avoid duplicate queries
  * @param selectedYear - User-selected year for yearly exports (affects period label)
- * @returns PerformanceData with metrics and period label, or null if insufficient data
+ * @returns PerformanceData with metrics, period label and base label, or null if insufficient data
  */
 async function preparePerformanceData(
   userId: string,
   snapshots: MonthlySnapshot[],
+  assets: Asset[],
   timeFilter: TimeFilter = 'total',
   cachedExpenses?: Expense[],
   selectedYear?: number
@@ -579,21 +592,28 @@ async function preparePerformanceData(
   const timePeriod: TimePeriod = (timeFilter === 'yearly' && !isPastYear) ? 'YTD' : 'ALL';
 
   try {
-    // Fetch settings for risk-free rate and dividend category
-    const settings = await getSettings(userId);
+    // Settings (risk-free rate, dividend category, the three base toggles), the pension
+    // contributions the base needs to place the funds' entry and their flows, and the trade ledger
+    // the measured boundary flows prefer — the SAME inputs the page and the service give the base,
+    // or the report prints a different TWR under the same title (the owner's own export showed
+    // 26,05% against the page's 27,08% while the ledger was left out, 2026-09-07).
+    const [settings, contributions, trades] = await Promise.all([getSettings(userId), getPensionContributions(userId), getAssetTransactions(userId)]);
     const riskFreeRate = settings?.riskFreeRate ?? 2.5;
     const dividendCategoryId = settings?.dividendIncomeCategoryId;
+    const base = resolvePerformanceBase({ snapshots, assets, contributions, settings, trades });
 
-    // Calculate base performance metrics
+    // Calculate base performance metrics on the projected snapshots, both flow channels merged in
     const metrics = await calculatePerformanceForPeriod(
       userId,
-      snapshots,
+      base.snapshots,
       timePeriod,
       riskFreeRate,
       undefined,
       undefined,
       cachedExpenses,
-      dividendCategoryId
+      dividendCategoryId,
+      base.pensionFlows,
+      base.portfolioFlows
     );
 
     // Early exit if insufficient data (< 2 snapshots)
@@ -643,7 +663,8 @@ async function preparePerformanceData(
 
     return {
       metrics,
-      periodLabel
+      periodLabel,
+      baseLabel: describeMeasurementBase(base),
     };
 
   } catch (error) {

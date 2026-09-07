@@ -9,7 +9,7 @@ interface MovimentiTileProps {
   reading: Narrative | null;
   /** The desktop filter toolbar (search, categories, account, sort, view, export); absent below `desktop:`. */
   toolbar?: ReactNode;
-  /** The phone's «Filtri · ordina» bar, next to the list it narrows; absent from `desktop:`. */
+  /** The phone's «periodo · Filtri · ordina» bar, next to the list it narrows; absent from `desktop:`. */
   mobileToolbar?: ReactNode;
   /** The feed or the table. */
   children: ReactNode;

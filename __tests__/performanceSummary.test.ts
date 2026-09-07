@@ -14,7 +14,9 @@ import {
   computeBenchmarkDelta,
   computeReturnConsistency,
   computeDrawdownStatus,
+  deannualizeReturn,
   resolveHeroReturn,
+  resolvePeriodReturnChip,
 } from '@/lib/utils/performanceSummary';
 
 // ---------------------------------------------------------------------------
@@ -220,5 +222,25 @@ describe('resolveHeroReturn', () => {
 
     expect(result.value).toBeNull();
     expect(result.isPeriodReturn).toBe(false);
+  });
+});
+
+describe('deannualizeReturn / resolvePeriodReturnChip', () => {
+  it('is the exact inverse of the annualisation, and the step the hero takes below six months', () => {
+    // +26,05% a year over 44 months is +133,7% cumulative (the real account's «Storico» window).
+    expect(deannualizeReturn(26.05, 44)).toBeCloseTo(133.72, 1);
+    expect(deannualizeReturn(12, 12)).toBeCloseTo(12, 9);
+    expect(deannualizeReturn(26.5319, 2)).toBeCloseTo(resolveHeroReturn(26.5319, 2).value!, 9);
+  });
+
+  it('offers the cumulative TWR as the second chip when the hero is annualised, and nothing when the hero already is the period return', () => {
+    const annualised = resolveHeroReturn(26.05, 44);
+    expect(resolvePeriodReturnChip(26.05, 44, annualised)).toEqual({ value: expect.closeTo(133.72, 1), label: 'cumulato in 44 mesi' });
+    // Below six months the hero IS the period return: a second copy would answer the same question twice.
+    expect(resolvePeriodReturnChip(26.5319, 2, resolveHeroReturn(26.5319, 2))).toBeNull();
+    // Over exactly twelve months the two figures coincide.
+    expect(resolvePeriodReturnChip(12.63, 12, resolveHeroReturn(12.63, 12))).toBeNull();
+    expect(resolvePeriodReturnChip(null, 9, resolveHeroReturn(null, 9))).toBeNull();
+    expect(resolvePeriodReturnChip(11.47, 0, annualised)).toBeNull();
   });
 });

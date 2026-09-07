@@ -105,6 +105,8 @@ function marketClause(block: PensionMemberBlock): Narrative {
       return [prose(`da ${start} il mercato ha reso `), signedPct(block.return!.twr), prose(' (TWR)')];
     case 'suspicious':
       return [prose('il rendimento non è misurabile perché mancano versamenti registrati')];
+    case 'contradictory':
+      return [prose('il rendimento non è misurabile perché risultano più versamenti della crescita')];
     case 'idle':
       return [prose(`da ${start} il valore non si è ancora mosso`)];
     case 'no-contributions':
@@ -278,6 +280,18 @@ function rendimentoClause(block: PensionMemberBlock, named: boolean): Narrative 
         amount(r.contributions.total),
         prose(' di versamenti: la differenza verrebbe letta come rendimento di mercato, e non lo è. Registra i versamenti mancanti'),
         prose(block.hasConfiguredStart ? '.' : ', oppure indica da quale mese il calcolo è affidabile nelle Impostazioni.'),
+      ];
+      break;
+    }
+    case 'contradictory': {
+      const r = result!;
+      body = [
+        prose(`${many ? 'i fondi sono cresciuti' : 'il fondo è cresciuto'} di `),
+        amount(r.valueGrowth),
+        prose(' ma risultano registrati '),
+        amount(r.contributions.total),
+        prose(' di versamenti, più della crescita stessa: o alcuni erano già inclusi nel valore che hai inserito a mano, o sono stati contati due volte. Non è un rendimento negativo, è un dato da sistemare'),
+        prose(block.hasConfiguredStart ? '.' : ': indica da quale mese il calcolo è affidabile nelle Impostazioni.'),
       ];
       break;
     }

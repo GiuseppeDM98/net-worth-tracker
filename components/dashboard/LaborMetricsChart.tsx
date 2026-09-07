@@ -36,7 +36,7 @@ export default function LaborMetricsChart({ data, isMobile }: LaborMetricsChartP
           data={data}
           margin={{ top: 4, right: 20, left: 0, bottom: 0 }}
           role="img"
-          aria-label={`Guadagnato da lavoro, risparmiato da lavoro e crescita lorda degli investimenti per mese, da ${first} a ${last}: la prima serie è il primo colore del tema, la seconda il secondo, la terza il quinto.`}
+          aria-label={`Guadagnato da lavoro, risparmiato da lavoro e mercato per mese, da ${first} a ${last}: la prima serie è il primo colore del tema, la seconda il secondo, la terza il quinto.`}
           accessibilityLayer={false}
         >
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
@@ -52,7 +52,8 @@ export default function LaborMetricsChart({ data, isMobile }: LaborMetricsChartP
           <Legend wrapperStyle={LEGEND_STYLE} iconType="square" iconSize={8} />
           <Line type="monotone" dataKey="laborIncome" stroke={chartColors[0] ?? 'var(--chart-1)'} strokeWidth={2} name="Guadagnato da lavoro" dot={false} animationDuration={600} animationEasing="ease-out" />
           <Line type="monotone" dataKey="savedFromWork" stroke={chartColors[1] ?? 'var(--chart-2)'} strokeWidth={2} name="Risparmiato da lavoro" dot={false} animationDuration={600} animationEasing="ease-out" />
-          <Line type="monotone" dataKey="investmentGrowth" stroke={chartColors[4] ?? 'var(--chart-5)'} strokeWidth={2} name="Crescita investimenti, lordo" dot={false} animationDuration={600} animationEasing="ease-out" />
+          {/* «Mercato», the same word as the row above it (the series is the month's gross market share). */}
+          <Line type="monotone" dataKey="investmentGrowth" stroke={chartColors[4] ?? 'var(--chart-5)'} strokeWidth={2} name="Mercato" dot={false} animationDuration={600} animationEasing="ease-out" />
         </LineChart>
       </ResponsiveContainer>
     </div>

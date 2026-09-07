@@ -13,6 +13,7 @@ vi.mock('@/lib/services/assetAllocationService', () => ({}))
 
 import {
   buildCacheKey,
+  calculateRollingPeriods,
   calculateROI,
   calculateCAGR,
   calculateTimeWeightedReturn,
@@ -30,7 +31,7 @@ import {
   calculateCurrentYieldMetrics,
 } from '@/lib/services/performanceService'
 import { MonthlySnapshot } from '@/types/assets'
-import { CashFlowData, TimePeriod, PensionBoundaryFlow } from '@/types/performance'
+import { CashFlowData, TimePeriod, PensionBoundaryFlow, PortfolioBoundaryFlow } from '@/types/performance'
 import { Expense, ExpenseType } from '@/types/expenses'
 
 // Helper to create minimal snapshot objects for testing
@@ -80,6 +81,11 @@ describe('calculateROI', () => {
 
   it('should return null when start NW is zero', () => {
     expect(calculateROI(0, 100000, 5000)).toBeNull()
+  })
+
+  it('should return null, never a flipped sign, when start NW is negative', () => {
+    // Net debt at the start: −10000 → 5000 is not a −150% return.
+    expect(calculateROI(-10000, 5000, 0)).toBeNull()
   })
 
   it('should handle zero gain', () => {
@@ -540,6 +546,12 @@ describe('getSnapshotsForPeriod', () => {
 describe('calculateTimeWeightedReturn', () => {
   it('should return null with fewer than 2 snapshots', () => {
     expect(calculateTimeWeightedReturn([makeSnapshot(2025, 3, 100000)], [])).toBeNull()
+  })
+
+  it('skips a month whose starting value is negative instead of chaining a flipped factor', () => {
+    // −1000 → 500 → 550: the first pair has no return, the second is +10% over the measured span.
+    const twr = calculateTimeWeightedReturn([makeSnapshot(2025, 1, -1000), makeSnapshot(2025, 2, 500), makeSnapshot(2025, 3, 550)], [])
+    expect(twr).toBeCloseTo((Math.pow(1.1, 12 / 2) - 1) * 100, 6)
   })
 
   it('should equal CAGR over the MEASURED months when no cashflows (2 snapshots)', () => {
@@ -1086,7 +1098,7 @@ describe('buildCacheKey', () => {
   ]
   const baseline = {
     snapshots,
-    base: { options: {}, pensionEntryMonth: null, pensionFlows: [] as PensionBoundaryFlow[] },
+    base: { options: {}, pensionEntryMonth: null, pensionFlows: [] as PensionBoundaryFlow[], portfolioFlows: [] as PortfolioBoundaryFlow[] },
     riskFreeRate: 2.5,
     dividendCategoryId: 'div-cat',
   }
@@ -1100,8 +1112,8 @@ describe('buildCacheKey', () => {
     // l'utente continua a leggere numeri pre-fix per 6 ore. Il test è qui perché il bump è manuale
     // e va ricordato — se questa asserzione fallisce dopo un cambio di matematica, è corretto
     // aggiornarla; se fallisce senza, qualcuno ha rotto il prefisso.
-    expect(buildCacheKey(baseline).startsWith('v6-')).toBe(true)
-    expect(buildCacheKey({ ...baseline, snapshots: [] }).startsWith('v6-')).toBe(true)
+    expect(buildCacheKey(baseline).startsWith('v7-')).toBe(true)
+    expect(buildCacheKey({ ...baseline, snapshots: [] }).startsWith('v7-')).toBe(true)
   })
 
   it('ignores the order snapshots arrive in', () => {
@@ -1125,6 +1137,16 @@ describe('buildCacheKey', () => {
   it('changes when a snapshot is added', () => {
     const extended = [...snapshots, makeSnapshot(2025, 4, 112000)]
     expect(buildCacheKey({ ...baseline, snapshots: extended })).not.toBe(buildCacheKey(baseline))
+  })
+
+  it('changes when a measured boundary flow changes or the liquidity toggle flips, while the snapshots stay identical', () => {
+    // A trade recorded in the ledger rewrites the measured flows and nothing else; the toggle rewrites the base.
+    const measured = { ...baseline, base: { ...baseline.base, portfolioFlows: [{ month: '2025-02', amount: 1000, source: 'ledger' as const }] } }
+    expect(buildCacheKey(measured)).not.toBe(buildCacheKey(baseline))
+    const corrected = { ...baseline, base: { ...baseline.base, portfolioFlows: [{ month: '2025-02', amount: 1100, source: 'ledger' as const }] } }
+    expect(buildCacheKey(corrected)).not.toBe(buildCacheKey(measured))
+    const cashOut = { ...baseline, base: { ...baseline.base, options: { excludeCash: true } } }
+    expect(buildCacheKey(cashOut)).not.toBe(buildCacheKey(baseline))
   })
 
   it('changes when the risk-free rate changes (A9)', () => {
@@ -1288,5 +1310,52 @@ describe('calculatePerformanceForPeriod with pension boundary flows', () => {
 
     expect(m.pensionFlow).toBe(10)
     expect(m.pensionEntryFlow).toBe(0)
+  })
+})
+
+describe('calculatePerformanceForPeriod with measured boundary flows', () => {
+  // Giugno → agosto: a luglio entrano 1000 € negli strumenti pagati da un conto FUORI dalla base
+  // (il cashflow salta il trasferimento e vede solo 500 di risparmio); ad agosto non si muove nulla.
+  const snapshots = [makeSnapshot(2026, 6, 100000), makeSnapshot(2026, 7, 101000), makeSnapshot(2026, 8, 101000)]
+  const expenses = [makeExpense(2026, 7, 10, 'income', 500)]
+  const window = [new Date(2026, 6, 1), new Date(2026, 7, 31, 23, 59, 59)] as const
+  const measured: PortfolioBoundaryFlow[] = [{ month: '2026-07', amount: 1000, source: 'ledger' }]
+
+  it('neutralises the measured flow instead of the savings: capital that entered the base is not return', async () => {
+    const m = await calculatePerformanceForPeriod('u', snapshots, 'CUSTOM', 2.5, window[0], window[1], expenses, undefined, [], measured)
+
+    expect(m.timeWeightedReturn).toBeCloseTo(0, 6)
+    expect(m.roi).toBeCloseTo(0, 6)
+    expect(m.moneyWeightedReturn).toBeCloseTo(0, 4)
+    // The cashflow's figure keeps its meaning; the measured one is reported apart, with its coverage.
+    expect(m.netCashFlow).toBe(500)
+    expect(m.portfolioFlow).toBe(1000)
+    expect(m.measuredFlowMonths).toBe(1)
+    expect(m.flowSource).toBe('mixed')
+    expect(m.cashFlows.map((cf) => [cf.netCashFlow, cf.portfolioFlow])).toEqual([[500, 1000]])
+  })
+
+  it('without the measured flows the same history reads the purchase as a +0,5% gain (the old reading)', async () => {
+    const m = await calculatePerformanceForPeriod('u', snapshots, 'CUSTOM', 2.5, window[0], window[1], expenses)
+
+    expect(m.flowSource).toBe('cashflow')
+    expect(m.portfolioFlow).toBe(0)
+    expect(m.measuredFlowMonths).toBe(0)
+    expect(m.roi).toBeCloseTo(0.5, 6)
+  })
+
+  it('says «portfolio» when every measured month carried a flow, zeros included', async () => {
+    const m = await calculatePerformanceForPeriod('u', snapshots, 'CUSTOM', 2.5, window[0], window[1], expenses, undefined, [], [...measured, { month: '2026-08', amount: 0, source: 'quantities' }])
+
+    expect(m.flowSource).toBe('portfolio')
+    expect(m.measuredFlowMonths).toBe(2)
+  })
+
+  it('a rolling window with no measurable growth rate carries null, never a 0 that reads as flat', async () => {
+    // 1000 → 500 with 1500 spent: the adjusted starting capital is negative, so the CAGR has no meaning.
+    const rolling = await calculateRollingPeriods('u', [makeSnapshot(2026, 1, 1000), makeSnapshot(2026, 2, 500)], 1, 2.5, undefined, [makeExpense(2026, 2, 10, 'fixed', -1500)])
+
+    expect(rolling).toHaveLength(1)
+    expect(rolling[0].cagr).toBeNull()
   })
 })

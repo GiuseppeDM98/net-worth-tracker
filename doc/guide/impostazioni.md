@@ -37,7 +37,10 @@
   no merge), and the state/load/save/dirty-snapshot wiring — usually `settings/page.tsx`, but a FIRE-only toggle wires
   from `FireCalculatorTab.tsx` instead: the 5th place is "wherever the field's own save button lives". Guarded by
   `settingsRoundTrip`, whose `STORED_SETTINGS` fixture must carry the new field, or the round-trip stays green while the
-  read mapping is still broken.
+  read mapping is still broken. Worked example (2026-09-07): `performanceExcludesCash` («Liquidità fuori dalla base») —
+  type, `getSettings`, both `setSettings` branches, the page's state/load/two snapshots/save/Switch, the reading's
+  `excludesCash` clause in `describePerformanceBase`, the fixture; its consumer is `resolvePerformanceBaseOptions`
+  (Rendimenti + PDF), which reads it with the same `?? false` default as the two toggles beside it.
 - **A user-clearable field needs a different shape per branch**: `delete docData.x` in the no-merge branch,
   `deleteField()` in the merge branch — and the guard is `'x' in settings`, not `x !== undefined`. **The bug this
   prevents is invisible until a hard refresh**: the write succeeds, the toast says «salvate», the form still shows the

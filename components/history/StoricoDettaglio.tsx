@@ -18,7 +18,8 @@ import { useReducedMotion } from 'framer-motion';
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { Narrative } from '@/lib/utils/narrative';
 import type { PeriodMonth } from '@/lib/utils/storicoSummary';
-import { describeLabor, describeMonthlyDrivers, describeNotes, describeYearlyVariation, formatPeriodMonth, type LaborMetricsInput, type MonthlyDriverRow, type YearlyVariationRow } from '@/lib/utils/storicoNarrative';
+import { describeLabor, describeLaborTaxes, describeLaborWindow, describeMonthlyDrivers, describeNotes, describeOtherIncome, describeYearlyVariation, DIVIDENDS_OUTSIDE_CASHFLOW, formatPeriodMonth, type LaborMetricsInput, type MonthlyDriverRow, type YearlyVariationRow } from '@/lib/utils/storicoNarrative';
+import { NarrativeText } from '@/components/ui/narrative-text';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { formatCurrency, formatCurrencyCompact, formatPercentage, type prepareMonthlyLaborMetricsData } from '@/lib/services/chartService';
 import { signTextClass } from '@/lib/utils/metricColors';
@@ -36,6 +37,19 @@ export interface StoricoNote extends PeriodMonth {
   note: string;
 }
 
+/**
+ * The «Lavoro e investimenti» figures: the cumulative recap over every Driver year («Dal 2025»),
+ * one recap per year for the Select, the monthly series under the rows, and whether the settings
+ * carry a dividend category (without it the receipts never reach the cashflow and stay in «Mercato»).
+ */
+export interface LaborTileData {
+  all: LaborMetricsInput;
+  /** Newest first, as the Driver lists its years. */
+  years: Array<{ year: number; metrics: LaborMetricsInput }>;
+  chartData: ReturnType<typeof prepareMonthlyLaborMetricsData>;
+  hasDividendCategory: boolean;
+}
+
 interface StoricoDettaglioProps {
   currentYear: number;
   /** The cashflow floor: the monthly rows start there, and the tile says so. */
@@ -45,7 +59,7 @@ interface StoricoDettaglioProps {
   monthlyDrivers: MonthlyDriverRow[];
   /** The years a month row exists for, newest first. */
   driverYears: number[];
-  labor: { metrics: LaborMetricsInput; chartData: ReturnType<typeof prepareMonthlyLaborMetricsData> } | null;
+  labor: LaborTileData | null;
   /** Newest first. */
   notes: StoricoNote[];
   snapshotCount: number;
@@ -200,21 +214,54 @@ function MonthlyDriversTile({ rows, years, startYear }: { rows: MonthlyDriverRow
 
 // ─── Lavoro e investimenti ────────────────────────────────────────────────────
 
-function LaborRow({ label, caption, value, signedValue = true }: { label: string; caption: string; value: number; signedValue?: boolean }) {
+/** A figure under a euro is neither a gain nor a loss: no sign, no colour (the sign is decided on the PRINTED value). */
+const isPrintedZero = (value: number) => Math.abs(Math.round(value)) < 1;
+const signedOrZero = (value: number) => (isPrintedZero(value) ? cachedFormatCurrencyEUR(0, true) : signed(value));
+/** A figure inside an 11px caption keeps the Mono Mandate. */
+const Mono = ({ value }: { value: number }) => <span className="font-mono tabular-nums">{cachedFormatCurrencyEUR(Math.abs(value), true)}</span>;
+
+type LaborRowTone = 'cause' | 'total';
+
+/**
+ * One cause of the growth (signed and coloured on the printed value) or the total they add up
+ * to (bold, the closing row of a Ranked Rows with Residual list — DESIGN.md).
+ */
+function LaborRow({ label, caption, value, tone = 'cause' }: { label: string; caption: React.ReactNode; value: number; tone?: LaborRowTone }) {
   return (
     <div className="flex items-center justify-between gap-3 py-[9px]">
       <span className="min-w-0">
-        <span className="block text-[13px] text-foreground">{label}</span>
+        <span className={cn('block text-[13px] text-foreground', tone === 'total' && 'font-semibold')}>{label}</span>
         <span className="block text-[11px] text-muted-foreground">{caption}</span>
       </span>
-      <span className={cn('shrink-0 font-mono text-[15px] font-semibold tabular-nums', signedValue ? signTextClass(value) : 'text-foreground')}>{signedValue ? signed(value) : cachedFormatCurrencyEUR(value, true)}</span>
+      <span className={cn('shrink-0 font-mono text-[15px] tabular-nums', tone === 'total' ? 'font-bold' : 'font-semibold', isPrintedZero(value) ? 'text-foreground' : signTextClass(value))}>{signedOrZero(value)}</span>
     </div>
   );
 }
 
-function LaborTile({ labor }: { labor: StoricoDettaglioProps['labor'] }) {
+const lowerFirst = (text: string) => text.charAt(0).toLowerCase() + text.slice(1);
+
+/**
+ * «Lavoro e investimenti»: three causes that add up to the growth of the same window —
+ * what was saved from work, what the other income categories brought in, what the market
+ * added — closed by the total, so nothing is left to the eye to attribute (the old four rows
+ * named two causes of three, and the reader handed the dividends to the market). The window
+ * is the Driver's (baseline → last snapshot), selectable per year like the tile beside it; the
+ * taxes are a footer on the cumulative recap only, since an estimate on today's latent gains
+ * belongs to no year.
+ */
+function LaborTile({ labor, startYear }: { labor: LaborTileData | null; startYear: number }) {
+  const [year, setYear] = useState<'all' | number>('all');
   const isMobile = useMediaQuery('(max-width: 767px)');
-  if (!labor) {
+  const metrics = useMemo(() => {
+    if (!labor) return null;
+    if (year === 'all') return labor.all;
+    return labor.years.find((entry) => entry.year === year)?.metrics ?? labor.all;
+  }, [labor, year]);
+  const chartData = useMemo(() => (!labor ? [] : year === 'all' ? labor.chartData : labor.chartData.filter((row) => row.year === year)), [labor, year]);
+  const reading = useMemo(() => (metrics ? describeLabor(metrics) : null), [metrics]);
+  const taxes = useMemo(() => (metrics && year === 'all' ? describeLaborTaxes(metrics) : null), [metrics, year]);
+
+  if (!labor || !metrics) {
     return (
       <Tile eyebrow="Lavoro e investimenti" reading={null}>
         <p className="mt-3 text-[13px] leading-[1.45] text-muted-foreground">
@@ -229,21 +276,50 @@ function LaborTile({ labor }: { labor: StoricoDettaglioProps['labor'] }) {
       </Tile>
     );
   }
-  const { metrics, chartData } = labor;
+
+  const aside =
+    labor.years.length > 0 ? (
+      <Select value={String(year)} onValueChange={(v) => setYear(v === 'all' ? 'all' : Number(v))}>
+        <SelectTrigger size="sm" className="gap-1.5 px-2.5 text-[11px] font-medium text-foreground data-[size=sm]:h-11 desktop:data-[size=sm]:h-7" aria-label="Anno del recap lavoro e investimenti">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Dal {startYear}</SelectItem>
+          {labor.years.map((entry) => (
+            <SelectItem key={entry.year} value={String(entry.year)}>
+              {entry.year}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    ) : undefined;
+
   return (
-    <Tile eyebrow="Lavoro e investimenti" aside={`dal ${metrics.startYear} · categorie «reddito da lavoro»`} reading={describeLabor(metrics)}>
+    <Tile eyebrow="Lavoro e investimenti" aside={aside} reading={reading}>
       <div className="mt-3 flex flex-col divide-y divide-border">
-        <LaborRow label="Guadagnato da lavoro" caption="entrate nelle categorie «reddito da lavoro»" value={metrics.totalLaborIncome} signedValue={false} />
-        <LaborRow label="Risparmiato da lavoro" caption={`reddito da lavoro meno tutte le spese (${cachedFormatCurrencyEUR(Math.abs(metrics.totalExpensesSum), true)})`} value={metrics.totalSavedFromWork} />
-        <LaborRow label="Crescita investimenti, lordo" caption="crescita del patrimonio non spiegata dalle entrate" value={metrics.totalInvestmentGrowthGross} />
-        <LaborRow label="Crescita investimenti, netto" caption={`al netto di ${cachedFormatCurrencyEUR(Math.abs(metrics.totalInvestmentGrowthGross - metrics.totalInvestmentGrowthNet), true)} di tasse stimate`} value={metrics.totalInvestmentGrowthNet} />
+        <LaborRow
+          label="Risparmiato da lavoro"
+          caption={
+            <>
+              reddito da lavoro <Mono value={metrics.totalLaborIncome} /> meno tutte le spese <Mono value={metrics.totalExpensesSum} />
+            </>
+          }
+          value={metrics.totalSavedFromWork}
+        />
+        <LaborRow label="Altre entrate" caption={describeOtherIncome(metrics.otherIncomeByCategory)} value={metrics.otherIncome} />
+        <LaborRow label="Mercato" caption="la crescita che nessuna entrata spiega" value={metrics.totalInvestmentGrowthGross} />
+        <LaborRow label="Crescita del patrimonio" caption={lowerFirst(describeLaborWindow(metrics))} value={metrics.netWorthGrowth} tone="total" />
       </div>
       {chartData.length > 0 && (
         <div className="mt-3 border-t border-border pt-3">
           <LaborMetricsChart data={chartData} isMobile={isMobile} />
         </div>
       )}
-      <p className="mt-auto border-t border-border pt-3.5 text-[11px] leading-[1.45] text-muted-foreground">Dividendi e affitti non rientrano nel risparmio da lavoro; le tasse stimate sono quelle del Patrimonio sulle plusvalenze latenti.</p>
+      <div className="mt-auto flex flex-col gap-1 border-t border-border pt-3.5 text-[11px] leading-[1.45] text-muted-foreground">
+        {taxes && <NarrativeText segments={taxes} figureClassName="font-medium" />}
+        {!labor.hasDividendCategory && <p className="m-0">{DIVIDENDS_OUTSIDE_CASHFLOW}</p>}
+        <p className="m-0">Le tre cause sommano alla crescita della stessa finestra, chiusa sull&apos;ultimo snapshot come il Driver: le righe già in calendario per i mesi a venire non contano.</p>
+      </div>
     </Tile>
   );
 }
@@ -306,7 +382,7 @@ export function StoricoDettaglio({ currentYear, startYear, yearlyVariation, mont
             <MonthlyDriversTile rows={monthlyDrivers} years={driverYears} startYear={startYear} />
           </div>
           <div className={cn(TILE_CELL_CLASS, 'tablet:col-span-2 desktop:col-span-7')}>
-            <LaborTile labor={labor} />
+            <LaborTile labor={labor} startYear={startYear} />
           </div>
           <div className={cn(TILE_CELL_CLASS, 'tablet:col-span-2 desktop:col-span-5')}>
             <NotesTile notes={notes} snapshotCount={snapshotCount} onAddNote={onAddNote} disabled={disabled} />

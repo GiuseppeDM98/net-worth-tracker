@@ -1,5 +1,6 @@
 // components/pdf/sections/PerformanceSection.tsx
-// Rendimenti: how the portfolio performed, and against how much risk.
+// Rendimenti: how the portfolio performed, and against how much risk — on the SAME base as the
+// Rendimenti page (`resolvePerformanceBase` in pdfDataService), named on the scope line.
 
 import { PDFPage, PDFSection, PDFMetrics, PDFNote, type PDFMetric } from '../primitives/PDFTile';
 import type { PerformanceData } from '@/types/pdf';
@@ -55,7 +56,7 @@ function months(count: number | null): string {
 export function PerformanceSection({ data, reportScope }: PerformanceSectionProps) {
   const title = PDF_SECTION_TITLES.performance;
   const footerNote = `${title} · ${reportScope}`;
-  const { metrics, periodLabel } = data;
+  const { metrics, periodLabel, baseLabel } = data;
 
   const hasDividendData =
     metrics.yocGross !== null ||
@@ -64,9 +65,10 @@ export function PerformanceSection({ data, reportScope }: PerformanceSectionProp
     metrics.currentYieldNet !== null;
 
   const returnMetrics: PDFMetric[] = [
-    { label: 'Time-weighted return', value: signedPct(metrics.timeWeightedReturn), sign: sign(metrics.timeWeightedReturn), note: 'la metrica raccomandata' },
-    { label: 'CAGR', value: signedPct(metrics.cagr), sign: sign(metrics.cagr), note: 'crescita annualizzata' },
-    { label: 'ROI totale', value: signedPct(metrics.roi), sign: sign(metrics.roi), note: 'sul capitale versato' },
+    { label: 'Time-weighted return', value: signedPct(metrics.timeWeightedReturn), sign: sign(metrics.timeWeightedReturn), note: 'annualizzato, la metrica raccomandata' },
+    { label: 'CAGR', value: signedPct(metrics.cagr), sign: sign(metrics.cagr), note: 'i versamenti nel capitale iniziale' },
+    // The denominator IS the first month's capital: a note saying «versato» here was false (2026-09-07).
+    { label: 'ROI totale', value: signedPct(metrics.roi), sign: sign(metrics.roi), note: 'sul capitale iniziale' },
     { label: 'Money-weighted (IRR)', value: signedPct(metrics.moneyWeightedReturn), sign: sign(metrics.moneyWeightedReturn), note: 'tiene conto di quando hai versato' },
   ];
 
@@ -87,6 +89,12 @@ export function PerformanceSection({ data, reportScope }: PerformanceSectionProp
       note: `entrate ${euro(metrics.totalIncome)} · uscite ${euro(metrics.totalExpenses)}`,
     },
     { label: 'Dividendi incassati', value: euro(metrics.totalDividendIncome), note: 'lordi, nel periodo' },
+    // The pension channel, when the funds are in the base: capital that crossed its boundary and is neutralised like a contribution.
+    ...(metrics.pensionFlow ? [{ label: 'Flussi dei fondi pensione', value: euro(metrics.pensionFlow), sign: sign(metrics.pensionFlow), note: 'ingresso nella base e versamenti, non rendimento' } satisfies PDFMetric] : []),
+    // The measured boundary flows: with a subset base this is what the formulas neutralised, not the savings.
+    ...(metrics.flowSource !== 'cashflow' && metrics.measuredFlowMonths > 0
+      ? [{ label: 'Capitale entrato nella base', value: euro(metrics.portfolioFlow), sign: sign(metrics.portfolioFlow), note: `misurato su ${metrics.measuredFlowMonths} mesi su ${metrics.numberOfMonths} (registro e quantità)` } satisfies PDFMetric]
+      : []),
   ];
 
   const dividendMetrics: PDFMetric[] = [
@@ -98,7 +106,7 @@ export function PerformanceSection({ data, reportScope }: PerformanceSectionProp
 
   return (
     <PDFPage eyebrow="Net Worth Tracker" section={title} footerNote={footerNote}>
-      <PDFSection eyebrow={title} scope={periodLabel} reading={describePerformanceSection(data)} ruled={false}>
+      <PDFSection eyebrow={title} scope={`${periodLabel} · ${baseLabel}`} reading={describePerformanceSection(data)} ruled={false}>
         <PDFMetrics items={returnMetrics} perRow={2} />
         <PDFNote>
           Il time-weighted return misura il portafoglio ignorando quando hai versato: è il numero da confrontare con un

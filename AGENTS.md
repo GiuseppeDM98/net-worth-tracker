@@ -280,13 +280,15 @@ file used to carry.
 - GBp (pence) ≠ GBP — normalize `price / 100` before any FX; never call Frankfurter from the browser; `quantity = 0` marks a sold asset; bond prices are `% of par`.
 - Patrimonio Δ columns are UNIT-PRICE variations, not P&L; `isHeld` (`quantity > 0`) gates every count/share/sum; the page owns every dialog for one dual invalidation.
 - Every number not in the payload is born in `patrimonioSummary.ts`; the verdict's driver is an INSTRUMENT.
-- Il resto — `suggestIsLiquid`, the cash-account picker rule, the article helpers, the failed-overview branch — in `doc/guide/patrimonio.md`.
+- Every G/P, tax estimate, YOC and PMC cell stands EUR against EUR through `lib/utils/costBasisEur.ts` (`costBasisPerUnitEur` = the ledger's `averageCostEur`, fees included; the native PMC only for a EUR asset; `undefined` for a foreign asset without one — print nothing, never dollars against euros).
+- Il resto — `suggestIsLiquid`, the cash-account picker rule, the article helpers, the failed-overview branch, the `averageCostEur` backfill — in `doc/guide/patrimonio.md`.
 
 ### Asset Trade Ledger → `doc/guide/registro-operazioni.md`
 - ALL trade money-math (replay, PMC, realized P&L, XIRR, invested capital) lives in `assetTransactionUtils.ts`, pure; the service/route layer is a thin atomic writer. A new `AssetTransactionType` updates the replay switch, the zod schema AND `TransactionDialog`.
 - Writes are Admin-API-only, all reads before any writes, derived fields written in-tx (never via `updateAsset`); ledger-type edits go through `updateAssetMetadata`.
 - The migration baseline (`isBaseline` BUY) NEVER stamps `holdingStartDate`; `replayTransactions` returning `holdingStartDate: undefined` means leave the doc untouched (never `deleteField()`).
 - Per-transaction derived data comes from `replayTransactionsWithEffects` (one pass), never re-running replay on every prefix.
+- `buildDerivedAssetFields` projects `quantity`, the native `averageCost` AND `averageCostEur` (fees included) onto the asset doc; `backfillAverageCostEur` adds the third to pre-existing docs once, writing only that field.
 - Il resto — `resolveBondPrice` reuse, the two `totalReturnAssets` paths, the static-copy audit rule — in `doc/guide/registro-operazioni.md`.
 
 ### Cashflow — expense mechanics → `doc/guide/cashflow.md`
@@ -301,6 +303,7 @@ file used to carry.
 - A period is its WHOLE calendar span; what has not happened is DECLARED (`scheduledSentence`, chip «In calendario», sign colour dropped). `isScheduledRow` = after today by Italian calendar DAY (`isItalyDayAfter`), shared with `budgetUtils` and `costCenterSummary`.
 - «Da inizio anno» (`Period.kind = 'ytd'`) and «Anno corrente» (`'current'`, full-year delta since 2026-08-30) are different windows and must never be treated as one.
 - Every number from `tracciamentoSummary.ts`, every sentence from `cashflowNarrative.ts`. The previous period is honest or absent (a running year → the SAME months of the year before).
+- Below `desktop:` the Movimenti tile's bar repeats the period picker beside the filters — a second HANDLE on the same `period`, never a second axis (its own accessible name, `min-w-0`; `e2e/cashflow.mobile.spec.ts`). The tile's reading totals each type of the rows it is handed (a search on a note is its own total).
 - Il resto — the two windows anchored to today, the month-end projection, the feed, the mobile filters — in `doc/guide/cashflow-tracciamento.md`.
 
 ### Analisi — a verdict over tiles → `doc/guide/cashflow-analisi.md`
@@ -343,7 +346,7 @@ file used to carry.
 - Reuse `byAsset.totalValue` for historical per-instrument value (never recompute); `byAsset.price` is RAW NATIVE currency, so attribution is `priceEffect = q_prev·(u_curr−u_prev)` + `quantityEffect` (sum = Δ exactly).
 - Both snapshot writers REPLACE the document, so a new `MonthlySnapshot` field the pipeline does not recompute goes in `SNAPSHOT_USER_AUTHORED_FIELDS` or the daily cron erases it (§ *Firestore Writes*).
 - Two CAGR formulas, intentionally different: Storico's verdict = `(endNW/startNW)^(12/months)−1` (wealth growth, «versamenti inclusi»); Rendimenti = investment return. ONE pace for the page (`summarizeGrowthPace`, trailing 12 months, linear); do not compound it.
-- The Driver is floored at `cashflowHistoryStartYear`; a running year never counts materialised future rows.
+- The Driver is floored at `cashflowHistoryStartYear`; a running year never counts materialised future rows. «Lavoro e investimenti» measures the Driver's own windows (`laborWindowsOf(driverYears)`, month after the baseline → last snapshot) and returns three causes that add up to the growth — savings from work, other income, market — never a window of its own (it had no right edge until 2026-09-07).
 - Il resto — `buildMonthAssetBreakdown`, the manual-snapshot cross-validation, the Recharts-in-a-flex-tile technique — in `doc/guide/storico.md`.
 
 ### Hall of Fame — a verdict over tiles → `doc/guide/hall-of-fame.md`
@@ -354,11 +357,12 @@ file used to carry.
 - Il resto — the podium-vs-chronology split, `NoteTrigger`, the section-key fan-out — in `doc/guide/hall-of-fame.md`.
 
 ### Rendimenti → `doc/guide/rendimenti.md`
-- Any exclusion read from `byAsset` MUST be backfilled across pre-`byAsset` months (subtract a constant `E₀`) or it becomes a phantom crash — this fixes the DENOMINATOR, not the numerator. The base is resolved ONCE by `resolvePerformanceBase` for BOTH call sites (service and page); `buildCacheKey` fingerprints its options, entry month and flows.
-- The pension toggle WINS over a fund's `allocationRole` (it was an OR, and a no-op on every fund marked `excluded`). ON, the funds enter the base from the tracked month as a FLOW and every later outside contribution is a flow (`CashFlowData.pensionFlow`, the second channel `externalFlowOf` sums); `netCashFlow` stays the cashflow's savings. A contribution is a flow iff it crosses the base's boundary.
+- Any exclusion read from `byAsset` MUST be backfilled across pre-`byAsset` months (subtract a constant `E₀`) or it becomes a phantom crash — this fixes the DENOMINATOR, not the numerator. The base is resolved ONCE by `resolvePerformanceBase` for its THREE call sites (service, page, PDF); `buildCacheKey` fingerprints its options, entry month and both flow channels.
+- The pension toggle WINS over a fund's `allocationRole` (it was an OR, and a no-op on every fund marked `excluded`). ON, the funds enter the base from the tracked month as a FLOW and every later outside contribution is a flow (`CashFlowData.pensionFlow`); `netCashFlow` stays the cashflow's savings. A contribution is a flow iff it crosses the base's boundary.
+- **The flows follow the base** (2026-09-07): with anything out of the base, the months with `byAsset` on both snapshots neutralise the MEASURED boundary flows (`lib/utils/portfolioFlows.ts`: ledger first per instrument, quantities as the net, baseline/adjustment move no money, hand-valued instruments opaque) on the third channel `CashFlowData.portfolioFlow`; `externalFlowOf` = `(portfolioFlow ?? netCashFlow) + pensionFlow`. «Liquidità fuori dalla base» (`performanceExcludesCash`) takes the `cash` accounts out by type. The Rendimento tile's second chip is the cumulative TWR (`resolvePeriodReturnChip`), never the ROI.
 - The first snapshot of a period is the starting valuation, never a measured month — the window opens on the 1st of the month AFTER it. The page must NEVER re-derive the window from `new Date()` (`metrics.nominalPeriodStart` travels in the payload).
 - No silent filters inside a single metric — volatility/Sharpe floor at ≥ 3 monthly returns, else `null` with a reason. Below 6 months the hero is the PERIOD return, not annualized.
-- The per-instrument attribution (`performanceAttribution.ts`) is EURO and reconciled: Σ rows + «Non attribuito» = the TWR numerator over the months with `byAsset`; a row at quantity 0 is a closed position (`attributeSelectedChange`).
+- The per-instrument attribution (`performanceAttribution.ts`) is EURO and reconciled: Σ rows + «Non attribuito» = the TWR numerator over the months with `byAsset`; a row at quantity 0 is a closed position (`attributeSelectedChange`). The residual is also read month by month: a month whose unattributed part exceeds `RESIDUAL_ALERT_SHARE` (2%) of its starting base is NAMED in the reading (`residualMonths`) — where to look, never what happened.
 - Il resto — EUR-converted benchmarks, drawdown on a geometric TWR index, IRR sign convention, the verdict-over-tiles rules, the heatmap — in `doc/guide/rendimenti.md`.
 
 ### Allocazione → `doc/guide/allocazione.md`
@@ -373,6 +377,7 @@ file used to carry.
 - Contributions run on the CLIENT SDK (not an Admin route); `taxYear` (validated ±1 year from `date`) groups every roll-up, never `date.getFullYear()`; contributions never touch spending or savings.
 - Three causes of growth, three numbers — never one blended percentage: employer share leaves the TWR (returns in `personalReturn`), TFR is deferred salary (denominator only), the IRPEF saving is its own per-taxpayer card. `isFirstEmploymentPost2007` ON without a full history inflates the plafond.
 - The window starts where data is trustworthy (`resolvePensionReturnStart`); a contribution is attributed to the month its VALUE MOVED (`createdAt`). `MonthlySnapshot.pension` is FROZEN at write time.
+- A return is a measure only through `isPensionReturnMeasurable`: too high (`isCoverageSuspicious`, missing contributions) OR out of the real (`isCoverageContradictory`: a month at or below zero net of its contributions, a loss beyond 100%, growth with a TWR below −75%) — and `resolveReturnState` reads the contradiction FIRST, because its advice is the opposite of the suspicious one's.
 - Il resto — the two tax mechanisms, `overlayLivePensionValue`, the per-contributor return, the verdict-over-tiles rules — in `doc/guide/previdenza.md`.
 
 ### FIRE, What If and Goals → `doc/guide/fire.md`
@@ -392,7 +397,7 @@ file used to carry.
 ### Periodic Emails · PDF Export → `doc/guide/email-pdf.md`
 - Both render OUTSIDE the DOM: every hex comes from `lib/constants/printTokens.ts` and nothing else; every email layout is a nested table (Outlook = Word). Verify by RENDERING — no check is in the suite.
 - A verdict over tiles: the email opens on a RULE-generated verdict (also the preheader), the AI comment is a tile in SECOND position and non-blocking. ONE template for the four periods; «Rispetto a un anno fa» is ABSENT on a yearly email (`previousEqualsYoy`).
-- PDF: the cover IS the verdict; on Cashflow, Export Totale applies `cashflowHistoryStartYear` as a floor and DECLARES it. No monospace, no typographic minus — `pdfSafeText` converts U+2212 at the boundary (react-pdf drops unencodable chars silently).
+- PDF: the cover IS the verdict; on Cashflow, Export Totale applies `cashflowHistoryStartYear` as a floor and DECLARES it; the Rendimenti section measures the page's base (`resolvePerformanceBase`, `baseLabel` on its scope line), never the raw snapshots. No monospace, no typographic minus — `pdfSafeText` converts U+2212 at the boundary (react-pdf drops unencodable chars silently).
 - The weekly budget email is a SEPARATE module and nothing in it is weekly (month-to-date + year-to-date); name every figure's window.
 - Il resto — `PDF_RAMP`, the class labels, `signedPct`/`signedEur` it-IT, the deterministic-comparison rule, the AI-prompt body — in `doc/guide/email-pdf.md`.
 
@@ -659,7 +664,20 @@ file used to carry.
   every `scn` operand (no colour outside `printTokens`), read the hex text runs (silently dropped characters). Emails:
   open the rendered HTML in Chromium (`chromium.launch()`, `file://`) at 390 / 600 / 1440 and assert
   `documentElement.scrollWidth === clientWidth`. Both are throwaway scripts run from INSIDE the repo (or `playwright`
-  and the `@/` alias do not resolve); neither check lives in the suite.
+  and the `@/` alias do not resolve); neither check lives in the suite. **A render with hand-built data proves the
+  WORDS, not the data path** (2026-09-07: the Rendimenti section rendered 10/10 with typed-in metrics while the real
+  export still ran the base without the ledger — 26,05% against the page's 27,08%): run `fetchPDFData` itself through
+  the client SDK on the emulators, with `globalThis.fetch` prefixing the tour server's origin to the relative `/api/…`
+  routes the services call, and compare with the page's payload.
+- **A trial merge of an open PR runs in a worktree, never in the main checkout** (2026-09-07): fetch the head as
+  `refs/pr/<N>`, `git merge --no-commit --no-ff refs/pr/<N>`, then `tsc`, the area suites and eslint, then `git merge
+  --abort`. A worktree has no `node_modules`: a directory junction to the main one (`New-Item -ItemType Junction` in
+  PowerShell — `cmd //c mklink` is refused by the sandbox), removed with `rmdir`, which drops only the link. Two at a
+  time on 16 GB; a conflicting PR is judged on `git merge-tree --write-tree` and `git show <tree>:<path>`, never resolved
+  by guessing. **Merging an accepted PR "with changes" means applying its diff to the working tree, not merging its
+  commits** (2026-09-07): `git diff base...head > pr.patch`, `git apply --reject`, the rejected hunk redone by hand
+  (develop had moved under it), then the session's own fixes on top — one commit, the author as `Co-authored-by`, and
+  the review's list of changes visible in the same diff.
 - **Run the suite under `TZ=Europe/Rome` too.** Every date fixture is stamped at noon, twelve hours clear of the DST
   edge, so a whole class of timezone bug is structurally invisible — while production dates are **local midnight** and
   the pure layer runs in the user's browser. Compute day-of-year from calendar fields in UTC (`Date.UTC(y,m,d) -
@@ -711,7 +729,9 @@ A collection whose value is in the *wiring* gets one: the unit suites mock Fires
 the rules permitting the writes, real `Timestamp` values surviving `removeUndefinedDeep` and the real atomic transaction.
 - **A throwaway is an `.mts` FILE run from INSIDE the repo** (`scripts/*.tmp.mts`, untracked, deleted in phase F): a
   `.ts` script is CJS under tsx with no top-level await (nor has `npx tsx -e`); a bash heredoc with an apostrophe or a
-  backtick dies with «unexpected EOF» before running a line (2026-08-25); from the session scratchpad `firebase-admin`
+  backtick dies with «unexpected EOF» before running a line (2026-08-25) — and the tracked files are CRLF on a Windows
+  clone, so an exact-match patch from a script must normalise `\r\n` before comparing and restore it on write
+  (2026-09-07); from the session scratchpad `firebase-admin`
   fails with `ERR_MODULE_NOT_FOUND` and the seed dies silently before the login it was meant to enable. A throwaway
   Playwright spec likewise lives in `e2e/` (it must match a project's `testMatch`), may override the session with
   `test.use({ storageState: { cookies: [], origins: [] }, viewport, deviceScaleFactor, colorScheme })` and log in
@@ -744,6 +764,14 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   emulators (`NEXT_PUBLIC_USE_FIREBASE_EMULATOR=true` + the demo `NEXT_PUBLIC_FIREBASE_*` vars), so nothing it does
   can reach production. Production data has names with a leading space and rows at quantity 0: `trim()` and
   `quantity > 0` are not hygiene, they are correctness.
+- **A production MIRROR in the emulators, for a tour on real data** (2026-09-07): `npm run mirror:seed -- <email>` and
+  `npm run mirror:remove` (`scripts/mirrorProdAccount.mts`). Two PROCESSES in one command, never one — the parent reads
+  production (the dump rules above: `.get()` only, refuses `FIRESTORE_EMULATOR_HOST`) and spawns itself as a child WITH
+  the emulator variables, the dump on its stdin, because the env var is per process and one Admin SDK cannot see both;
+  nothing touches the disk. The child re-keys everything to `prod-mirror` (`userId` on every row, the snapshot ids
+  `{uid}-{y}-{m}`, the per-user docs), creates `mirror@example.com` / `test1234`, and leaves the caches out so the app
+  recomputes with the current math. The account is a standard; the data is removed at the end of the session
+  (`MIRROR_UID=… npm run mirror:remove` clears one seeded under another id).
 - **Stopping the emulators: export FIRST, then kill.** `--export-on-exit` runs only on a SIGINT delivered to the
   `firebase` CLI process itself: on macOS `kill -INT <cli pid>` does it (2026-09-06); on Windows, where only the wrapper
   can be killed, POST `http://127.0.0.1:4400/_admin/export` with `{"path": "<abs>/.emulator-data"}` (forward slashes —
@@ -790,6 +818,12 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   `Intl` puts a NARROW no-break space (U+202F) before `€`, the browser a plain one (U+00A0) — flatten both sides. A
   decoy-absence check on Cashflow must scope to `[role="tabpanel"][data-state="active"]` — every tab stays mounted
   (`forceMount`) and hidden.
+- **Three traps of a tour spec, each seen once (2026-09-07)**: `/dashboard/settings` opens on `?tab=allocazione`, so a
+  control of the Generale tile needs `?tab=generale` in the URL or it is never in the DOM; a Recharts legend repeats
+  the labels of the rows above it, so `getByText(label, { exact: true })` inside the tile is a strict-mode violation
+  (`.first()` — the rows come first); a dev server compiles a route on its first hit and the settings page takes more
+  than Playwright's 30s default (`test.setTimeout`), which reads as «element not found» on a page that is still
+  compiling.
 - **A settings change is only verified by a RELOAD** (2026-08-29: four fields wrote fine and came back old on the next
   load — the form is rebuilt by `getSettings`, the half where the bugs live): drive the UI, save,
   `page.reload({waitUntil: 'load'})`, assert on the INPUTS, and test setting and CLEARING separately.
@@ -828,7 +862,10 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
 - **A green check that has never been seen red asserts nothing** — including the check's own arithmetic (a magnitude
   filter meant for axis ticks also drops a legitimate reading). Break the thing under test once. **The fixture can make
   a branch unreachable**: `allocateByShare`'s rounding correction cannot fire on two shares, so a two-person fixture
-  stayed green with the branch disabled — when falsification does NOT turn a test red, the test is the bug.
+  stayed green with the branch disabled — when falsification does NOT turn a test red, the test is the bug. **And a test
+  can PIN the defect**: `summarizeLaborMetrics` counted the baseline's own month and had no right edge, and both
+  behaviours were asserted as expected values (2026-09-07) — a fixture with no row after the last snapshot cannot see a
+  missing edge. Put one row past every boundary the function is supposed to have.
 - **A fire-and-forget whose `catch` only logs is verified by READING the document it should have written.**
   `writePerformanceCache` had failed on every account with an `undefined` in its metrics (no drawdown, no dividend
   category — the client Firestore rejects `undefined`) with a browser `console.warn` as the only trace; the E2E

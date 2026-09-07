@@ -43,6 +43,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { formatCurrency, formatNumber, formatPercentage } from '@/lib/services/chartService';
 import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
+import { costBasisPerUnitEur, isEurNative, unitPriceEur } from '@/lib/utils/costBasisEur';
 import { getMetricValueColor } from '@/lib/utils/metricColors';
 import { TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { cn } from '@/lib/utils';
@@ -85,15 +86,22 @@ export function TaxCalculatorModal({ open, onClose, asset }: TaxCalculatorModalP
    * 1. Quantity mode: user enters units → calculate sale value
    * 2. Target value mode: user enters desired amount → calculate required units
    */
+  // Both sides in EUR (costBasisEur.ts): the unit price the value is computed with and the EUR
+  // PMC, purchase fees included — the fiscal cost the gain is taxed on. Before 2026-09-07 a USD
+  // position was simulated in dollars and labelled €.
+  const currentPrice = unitPriceEur(asset);
+  const averageCost = costBasisPerUnitEur(asset) ?? 0;
+  const showsNativeFigures = !isEurNative(asset);
+
   const calculateResults = () => {
     let quantity = 0;
 
     if (inputMode === 'quantity') {
       quantity = parseFloat(quantityInput) || 0;
     } else {
-      // Target value mode: reverse calculate quantity from desired sale amount
+      // Target value mode: reverse calculate quantity from desired sale amount (EUR)
       const targetValue = parseFloat(targetValueInput) || 0;
-      quantity = asset.currentPrice > 0 ? targetValue / asset.currentPrice : 0;
+      quantity = currentPrice > 0 ? targetValue / currentPrice : 0;
     }
 
     // Ensure quantity is not negative
@@ -105,8 +113,6 @@ export function TaxCalculatorModal({ open, onClose, asset }: TaxCalculatorModalP
     const exceedsOwned = quantity > asset.quantity;
     const clampedQuantity = Math.min(quantity, asset.quantity);
 
-    const currentPrice = asset.currentPrice;
-    const averageCost = asset.averageCost || 0;
     const taxRate = asset.taxRate || 0;
 
     // Step 1-2: Calculate sale value and cost basis
@@ -156,7 +162,7 @@ export function TaxCalculatorModal({ open, onClose, asset }: TaxCalculatorModalP
       onClose={onClose}
       eyebrow={`Patrimonio · ${asset.name}`}
       title="Quanto costa vendere"
-      reading="Una simulazione: niente viene registrato. La plusvalenza è calcolata sul PMC del registro operazioni, con l'aliquota dello strumento."
+      reading="Una simulazione: niente viene registrato. La plusvalenza è calcolata in euro sul PMC del registro operazioni, commissioni d'acquisto incluse, con l'aliquota dello strumento."
       width="md"
       footer={
         <Button type="button" variant="outline" onClick={onClose}>
@@ -170,8 +176,14 @@ export function TaxCalculatorModal({ open, onClose, asset }: TaxCalculatorModalP
             {[
               { label: 'Ticker', value: getAssetDisplayTicker(asset) },
               { label: 'Quantità posseduta', value: formatNumber(asset.quantity, 4) },
-              { label: 'Prezzo corrente', value: formatCurrency(asset.currentPrice, asset.currency, 4) },
-              { label: 'PMC', value: formatCurrency(asset.averageCost || 0, asset.currency, 4) },
+              { label: 'Prezzo corrente', value: formatCurrency(currentPrice, 'EUR', 4) },
+              ...(showsNativeFigures
+                ? [{ label: `Prezzo corrente (${asset.currency})`, value: formatCurrency(asset.currentPrice, asset.currency, 4) }]
+                : []),
+              { label: 'PMC', value: formatCurrency(averageCost, 'EUR', 4) },
+              ...(showsNativeFigures && asset.averageCost
+                ? [{ label: `PMC (${asset.currency})`, value: formatCurrency(asset.averageCost, asset.currency, 4) }]
+                : []),
               { label: 'Aliquota fiscale', value: formatPercentage(asset.taxRate || 0, 0) },
             ].map((row) => (
               <div key={row.label} className="flex items-center justify-between gap-3 py-2">
@@ -267,8 +279,8 @@ export function TaxCalculatorModal({ open, onClose, asset }: TaxCalculatorModalP
 
               <div className="divide-y divide-border border-t border-border">
                 {[
-                  { label: 'Prezzo per unità', value: formatCurrency(results.currentPrice, asset.currency, 4) },
-                  { label: 'Prezzo medio di carico (PMC)', value: formatCurrency(results.averageCost, asset.currency, 4) },
+                  { label: 'Prezzo per unità', value: formatCurrency(results.currentPrice, 'EUR', 4) },
+                  { label: 'Prezzo medio di carico (PMC)', value: formatCurrency(results.averageCost, 'EUR', 4) },
                 ].map((row) => (
                   <div key={row.label} className="flex items-center justify-between gap-3 py-2">
                     <span className={ROW_LABEL_CLASS}>{row.label}</span>

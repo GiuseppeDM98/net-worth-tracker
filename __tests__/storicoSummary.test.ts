@@ -11,6 +11,7 @@ import type { Expense } from '@/types/expenses';
 import {
   addMonths,
   CAGR_MIN_MONTHS,
+  laborWindowsOf,
   monthSpan,
   PACE_MIN_HISTORY_MONTHS,
   projectNextDoubling,
@@ -319,35 +320,84 @@ describe('driver helpers', () => {
 });
 
 describe('summarizeLaborMetrics', () => {
-  const expense = (id: string, type: Expense['type'], categoryId: string, amount: number, year: number): Expense =>
-    ({ id, userId: 'u', type, categoryId, categoryName: categoryId, amount, currency: 'EUR', date: new Date(year, 5, 5, 12), createdAt: new Date(), updatedAt: new Date() }) as Expense;
+  const expense = (id: string, type: Expense['type'], categoryId: string, amount: number, date: Date): Expense =>
+    ({ id, userId: 'u', type, categoryId, categoryName: categoryId, amount, currency: 'EUR', date, createdAt: new Date(), updatedAt: new Date() }) as Expense;
   const snapshots = [snap(2024, 12, 100000), snap(2025, 6, 120000), snap(2026, 6, 151100)];
+  // The Driver's windows: 2025 from December 2024 to June 2025, 2026 from June 2025 to June 2026.
+  const windows = laborWindowsOf([
+    { year: '2026', baseline: { year: 2025, month: 6 }, latest: { year: 2026, month: 6 } },
+    { year: '2025', baseline: { year: 2024, month: 12 }, latest: { year: 2025, month: 6 } },
+  ]);
   const expenses = [
-    expense('a', 'income', 'stipendio', 78400, 2025),
-    expense('b', 'income', 'dividendi', 1000, 2025),
-    expense('c', 'fixed', 'casa', -41500, 2025),
-    expense('d', 'transfer', 'giroconto', 10000, 2025),
-    expense('e', 'income', 'stipendio', 50000, 2023), // before the floor
+    expense('a', 'income', 'stipendio', 78400, new Date(2025, 5, 5, 12)),
+    expense('b', 'income', 'dividendi', 1000, new Date(2025, 5, 5, 12)),
+    expense('c', 'fixed', 'casa', -41500, new Date(2025, 5, 5, 12)),
+    expense('d', 'transfer', 'giroconto', 10000, new Date(2025, 5, 5, 12)),
+    expense('e', 'income', 'stipendio', 50000, new Date(2023, 5, 5, 12)), // before the floor
+    // The rows the OLD recap counted and the Driver never did: a materialised instalment after the
+    // last snapshot, and a row in the baseline's own month (the window opens the month AFTER it).
+    expense('f', 'fixed', 'rata', -800, new Date(2026, 10, 5, 12)),
+    expense('g', 'income', 'stipendio', 5000, new Date(2024, 11, 5, 12)),
+    // Local midnight on the last day of the last counted month — the way the dialog stamps a row.
+    expense('h', 'variable', 'spesa', -100, new Date(2026, 5, 30)),
   ];
 
-  it('should read labor income, savings and the market share since the floor, skipping transfers', () => {
-    const m = summarizeLaborMetrics(snapshots, expenses, ['stipendio'], 2025, 2300)!;
+  it('should count the rows of the Driver windows only: three causes that add up to the growth of the same windows', () => {
+    const m = summarizeLaborMetrics(snapshots, expenses, ['stipendio'], 2025, windows, 2300)!;
     expect(m).toEqual({
       startYear: 2025,
+      since: { year: 2025, month: 1 },
+      until: { year: 2026, month: 6 },
       totalLaborIncome: 78400,
-      totalSavedFromWork: 36900,
-      totalExpensesSum: -41500,
-      // 151100 − 100000 − (79400 − 41500) = 13200: the transfer changes nothing.
-      totalInvestmentGrowthGross: 13200,
-      totalInvestmentGrowthNet: 10900,
+      totalSavedFromWork: 36800,
+      totalExpensesSum: -41600,
+      otherIncome: 1000,
+      otherIncomeByCategory: [{ categoryId: 'dividendi', name: 'dividendi', amount: 1000 }],
+      // (120000 − 100000) + (151100 − 120000): the two windows, never a snapshot counted twice.
+      netWorthGrowth: 51100,
+      // 51100 − (78400 + 1000 − 41600) = 13300: the transfer, the future instalment and the baseline-month salary change nothing.
+      totalInvestmentGrowthGross: 13300,
+      totalInvestmentGrowthNet: 11000,
+      coverage: 78400 / 41600,
     });
-    expect(summarizeLaborMetrics(snapshots, expenses.filter((e) => e.type !== 'transfer'), ['stipendio'], 2025, 2300)).toEqual(m);
+    expect(m.totalSavedFromWork + m.otherIncome + m.totalInvestmentGrowthGross).toBeCloseTo(m.netWorthGrowth, 6);
+    expect(summarizeLaborMetrics(snapshots, expenses.filter((e) => e.type !== 'transfer'), ['stipendio'], 2025, windows, 2300)).toEqual(m);
   });
 
-  it('should fall back to the floor\'s first snapshot without a prior December, and give null without categories or expenses', () => {
-    const m = summarizeLaborMetrics(snapshots.slice(1), expenses, ['stipendio'], 2025, 0)!;
-    expect(m.totalInvestmentGrowthGross).toBe(151100 - 120000 - (79400 - 41500));
-    expect(summarizeLaborMetrics(snapshots, expenses, [], 2025, 0)).toBeNull();
-    expect(summarizeLaborMetrics(snapshots, [], ['stipendio'], 2025, 0)).toBeNull();
+  it('should measure one year on its own window, and the cumulative recap is the sum of the years', () => {
+    const y2025 = summarizeLaborMetrics(snapshots, expenses, ['stipendio'], 2025, [windows[1]], 0)!;
+    const y2026 = summarizeLaborMetrics(snapshots, expenses, ['stipendio'], 2025, [windows[0]], 0)!;
+    expect(y2025).toMatchObject({ since: { year: 2025, month: 1 }, until: { year: 2025, month: 6 }, totalLaborIncome: 78400, totalExpensesSum: -41500, otherIncome: 1000, netWorthGrowth: 20000, totalInvestmentGrowthGross: 20000 - 37900 });
+    expect(y2026).toMatchObject({ since: { year: 2025, month: 7 }, until: { year: 2026, month: 6 }, totalLaborIncome: 0, totalExpensesSum: -100, otherIncome: 0, otherIncomeByCategory: [], netWorthGrowth: 31100, totalInvestmentGrowthGross: 31200, coverage: null });
+    const all = summarizeLaborMetrics(snapshots, expenses, ['stipendio'], 2025, windows, 0)!;
+    expect(all.netWorthGrowth).toBe(y2025.netWorthGrowth + y2026.netWorthGrowth);
+    expect(all.totalInvestmentGrowthGross).toBe(y2025.totalInvestmentGrowthGross + y2026.totalInvestmentGrowthGross);
+  });
+
+  it('should rank the other income categories by weight and drop the coverage without spending or without labor income', () => {
+    const rows = [
+      expense('a', 'income', 'stipendio', 3000, new Date(2025, 2, 5, 12)),
+      expense('b', 'income', 'rimborsi', 200, new Date(2025, 2, 5, 12)),
+      expense('c', 'income', 'dividendi', 900, new Date(2025, 3, 5, 12)),
+      expense('d', 'income', 'rimborsi', 300, new Date(2025, 4, 5, 12)),
+    ];
+    const m = summarizeLaborMetrics(snapshots, rows, ['stipendio'], 2025, [windows[1]], 0)!;
+    expect(m.otherIncomeByCategory).toEqual([
+      { categoryId: 'dividendi', name: 'dividendi', amount: 900 },
+      { categoryId: 'rimborsi', name: 'rimborsi', amount: 500 },
+    ]);
+    expect(m.coverage).toBeNull();
+    expect(summarizeLaborMetrics(snapshots, rows, ['affitti'], 2025, [windows[1]], 0)!.coverage).toBeNull();
+  });
+
+  it('should give null without categories, expenses, windows or the windows\' snapshots', () => {
+    expect(summarizeLaborMetrics(snapshots, expenses, [], 2025, windows, 0)).toBeNull();
+    expect(summarizeLaborMetrics(snapshots, [], ['stipendio'], 2025, windows, 0)).toBeNull();
+    expect(summarizeLaborMetrics(snapshots, expenses, ['stipendio'], 2025, [], 0)).toBeNull();
+    expect(summarizeLaborMetrics(snapshots, expenses, ['stipendio'], 2025, [{ baseline: { year: 2022, month: 12 }, latest: { year: 2023, month: 6 } }], 0)).toBeNull();
+  });
+
+  it('should read a legacy Driver row without a baseline as a December-based window', () => {
+    expect(laborWindowsOf([{ year: '2026', latest: { year: 2026, month: 8 } }])).toEqual([{ baseline: { year: 2025, month: 12 }, latest: { year: 2026, month: 8 } }]);
   });
 });

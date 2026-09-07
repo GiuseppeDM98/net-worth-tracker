@@ -6,8 +6,9 @@
  * picker, and under it a 12-column bento of tiles, each answering ONE question with a reading
  * line over its figures. The inventory (TransactionFeed / ExpenseTable) is the last tile.
  *
- *   Mobile (1 col):   Verdict → [periodo · Filtri · ordina] → Cashflow del periodo → Spese per
- *                     categoria → Entrate per categoria → Risparmio nel tempo → Movimenti
+ *   Mobile (1 col):   Verdict → [periodo] → Cashflow del periodo → Spese per categoria →
+ *                     Entrate per categoria → Risparmio nel tempo → Movimenti, whose own bar
+ *                     repeats the period next to [Filtri · ordina]
  *   Desktop (12 col): Cashflow del periodo (5, 2 rows) | Spese (4) | Entrate (3)
  *                                                      | Risparmio nel tempo (7)
  *                     Movimenti (12)
@@ -719,10 +720,12 @@ export function ExpenseTrackingTab({
     </Link>
   );
 
-  // The phone's filters sit INSIDE the tile they narrow (the period stays beside the verdict).
+  // The phone's filters sit INSIDE the tile they narrow, and so does a second handle on the
+  // period: a search is read over a window ("quanto ho speso di caffè quest'anno?"), and with
+  // the only picker four tiles up, changing the window meant scrolling away from the answer.
+  // The two pickers drive the SAME `period` — one axis with two handles, never two axes.
   const mobileToolbar = (
     <MobileFiltersDrawer
-      showPeriod={false}
       period={period}
       onPeriodChange={setPeriod}
       availableYears={availableYears}

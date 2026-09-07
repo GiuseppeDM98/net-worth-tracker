@@ -262,10 +262,10 @@ export function PerformanceDettaglio({ metrics, periodAside, drawdown, rollingCa
               <div className="mt-3 flex flex-col divide-y divide-border">
                 <Row
                   label="ROI totale"
-                  sub="senza annualizzazione"
+                  sub="sul capitale iniziale"
                   value={metrics.roi === null ? null : signedPercent(metrics.roi)}
                   valueClass={getMetricValueColor(metrics.roi, 'percentage')}
-                  help="Guadagno o perdita del periodo: (valore finale − valore iniziale − contributi netti) / valore iniziale. I versamenti vengono TOLTI dal guadagno, perché non sono rendimento. Cambia tra periodi perché copre durate diverse: per confrontare usa il TWR."
+                  help="Guadagno o perdita del periodo sul capitale del primo mese: (valore finale − valore iniziale − contributi netti) / valore iniziale. I versamenti vengono TOLTI dal guadagno, perché non sono rendimento, ma non entrano nel denominatore: con versamenti importanti il numero cresce con la lunghezza della finestra e non è confrontabile fra periodi, né è il rendimento del periodo (quello è il TWR cumulato nella tessera Rendimento)."
                 />
                 <Row
                   label="CAGR"
@@ -374,7 +374,7 @@ export function PerformanceDettaglio({ metrics, periodAside, drawdown, rollingCa
             <RollingTile
               eyebrow="CAGR rolling 12 mesi"
               aside="nel periodo"
-              reading={describeRolling(rollingCagr.map((p) => p.cagr), (v) => signedPercent(v, 1), 'Il CAGR')}
+              reading={describeRolling(rollingCagr.map((p) => p.cagr).filter((v): v is number => v !== null), (v) => signedPercent(v, 1), 'Il CAGR')}
               data={rollingCagr}
               primaryKey="cagr"
               averageKey="cagrMA"
@@ -434,8 +434,9 @@ export function PerformanceDettaglio({ metrics, periodAside, drawdown, rollingCa
                 <div>
                   <p className="mb-1 font-semibold text-foreground">TWR, ROI, CAGR, IRR</p>
                   Il TWR concatena i rendimenti mensili al netto dei flussi ed è annualizzato; sotto i 6 mesi la pagina mostra il rendimento
-                  del periodo. Il ROI toglie i versamenti dal guadagno, il CAGR li aggiunge al capitale iniziale: rispondono a domande diverse e
-                  non si convertono. L&apos;IRR è il tasso che spiega il tuo flusso di versamenti e prelievi.
+                  del periodo. Il ROI toglie i versamenti dal guadagno e divide per il capitale iniziale, il CAGR li aggiunge al capitale
+                  iniziale: rispondono a domande diverse e non si convertono, e nessuno dei due è il rendimento del periodo. L&apos;IRR è il
+                  tasso che spiega il tuo flusso di versamenti e prelievi.
                 </div>
                 <div>
                   <p className="mb-1 font-semibold text-foreground">Rischio</p>

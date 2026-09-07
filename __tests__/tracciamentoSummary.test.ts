@@ -341,6 +341,82 @@ describe('summarizeMovements', () => {
     expect(summary.largest).toEqual({ label: 'Stipendio', amount: 4200, type: 'income' });
   });
 
+  it('should sum each type the way the page does: spending as a magnitude, income signed, transfers as moved', () => {
+    const summary = summarizeMovements(AUGUST_ROWS, NOW);
+
+    expect(summary.expenseTotal).toBe(2910);
+    expect(summary.incomeTotal).toBe(4850);
+    expect(summary.transferTotal).toBe(1500);
+  });
+
+  it('should classify the totals by type, not by sign: a positive spending row still raises the spending total', () => {
+    const summary = summarizeMovements(
+      [
+        makeExpense({ type: 'income', amount: 1000, date: d(2026, 8) }),
+        makeExpense({ type: 'income', amount: -100, date: d(2026, 8) }),
+        makeExpense({ type: 'variable', amount: 50, date: d(2026, 8) }),
+        makeExpense({ type: 'variable', amount: -400, date: d(2026, 8) }),
+      ],
+      NOW,
+    );
+
+    expect(summary.incomeTotal).toBe(900);
+    expect(summary.expenseTotal).toBe(450);
+  });
+
+  it('should total spending exactly as the period tile does (summarizePeriodCashflow)', () => {
+    // Two implementations of «quanto ho speso» would drift; the tile and the inventory must agree.
+    const rows = [
+      ...AUGUST_ROWS,
+      makeExpense({ type: 'variable', amount: 30, date: d(2026, 8) }), // a positive spending row
+      makeExpense({ type: 'income', amount: -50, date: d(2026, 8) }), // a reversal of income
+    ];
+    const movements = summarizeMovements(rows, NOW);
+    const period = summarizePeriodCashflow(rows);
+    expect(movements.expenseTotal).toBeCloseTo(period.expenses, 6);
+    expect(movements.incomeTotal).toBeCloseTo(period.income, 6);
+  });
+
+  it('should count a transfer as the amount MOVED whatever its sign', () => {
+    const summary = summarizeMovements(
+      [
+        makeExpense({ type: 'transfer', amount: -300, date: d(2026, 8) }),
+        makeExpense({ type: 'transfer', amount: 200, date: d(2026, 8) }),
+      ],
+      NOW,
+    );
+    expect(summary.transferTotal).toBe(500);
+  });
+
+  it('should keep a scheduled row inside its type total AND inside the calendar subset', () => {
+    const summary = summarizeMovements(
+      [
+        makeExpense({ type: 'fixed', amount: -100, date: d(2026, 8) }),
+        makeExpense({ type: 'fixed', amount: -406, date: new Date(2026, 8, 28, 12) }), // after NOW
+      ],
+      NOW,
+    );
+    expect(summary.expenseTotal).toBe(506);
+    expect(summary.scheduled).toEqual({ count: 1, total: 406 });
+  });
+
+  it('should sum the rows it is handed: a search on one note is its own total', () => {
+    // One recurring note used as an implicit subcategory. The list is already filtered by the
+    // toolbar — summarizeMovements only totals what it receives.
+    const summary = summarizeMovements(
+      [
+        makeExpense({ type: 'variable', amount: -1.2, categoryName: 'Bar', notes: 'caffè', date: d(2026, 3) }),
+        makeExpense({ type: 'variable', amount: -1.2, categoryName: 'Bar', notes: 'caffè', date: d(2026, 5) }),
+        makeExpense({ type: 'variable', amount: -2.6, categoryName: 'Bar', notes: 'caffè', date: d(2026, 8) }),
+      ],
+      NOW,
+    );
+
+    expect(summary).toMatchObject({ count: 3, expenseCount: 3, incomeCount: 0, transferCount: 0 });
+    expect(summary.expenseTotal).toBeCloseTo(5, 5);
+    expect(summary.largest).toEqual({ label: 'caffè', amount: 2.6, type: 'variable' });
+  });
+
   it('should label the largest by its note when there is one', () => {
     const summary = summarizeMovements(
       [makeExpense({ type: 'fixed', amount: -820, categoryName: 'Casa', notes: 'Rata mutuo ', date: d(2026, 8) })],
@@ -377,6 +453,9 @@ describe('summarizeMovements', () => {
       expenseCount: 0,
       incomeCount: 0,
       transferCount: 0,
+      expenseTotal: 0,
+      incomeTotal: 0,
+      transferTotal: 0,
       largest: null,
       scheduled: { count: 0, total: 0 },
     });

@@ -466,6 +466,12 @@ export interface MovementsSummary {
   expenseCount: number;
   incomeCount: number;
   transferCount: number;
+  /** Spending as a magnitude (the `calculateTotalExpenses` convention): a positive row is not income. */
+  expenseTotal: number;
+  /** Income as a SIGNED sum, like `summarizePeriodCashflow`: a reversal lowers the total. */
+  incomeTotal: number;
+  /** The amount MOVED between accounts — an inventory figure, never a flow (a transfer is net-zero). */
+  transferTotal: number;
   /** The row with the largest absolute amount, labelled like the feed (note, else category). */
   largest: { label: string; amount: number; type: ExpenseType } | null;
   /**
@@ -477,21 +483,37 @@ export interface MovementsSummary {
 }
 
 /**
- * The inventory of a list of rows. `now` splits it into what has happened and what is only
- * in the calendar: the register lists both, and the reading must not let them read as one.
+ * The inventory of a list of rows: how many of each type, how much they add up to, the
+ * largest of them. `now` splits it into what has happened and what is only in the calendar:
+ * the register lists both, and the reading must not let them read as one.
+ *
+ * The totals answer «quanto fanno in tutto le righe che sto guardando?» — the question a
+ * free-text search asks when a recurring note ("caffè") is used as an implicit subcategory.
+ * They are the totals of the argument, so with the toolbar narrowing the list they are the
+ * totals of the filtered slice, never of the period.
  */
 export function summarizeMovements(expenses: Expense[], now: Date): MovementsSummary {
   let expenseCount = 0;
   let incomeCount = 0;
   let transferCount = 0;
+  let expenseTotal = 0;
+  let incomeTotal = 0;
+  let transferTotal = 0;
   let scheduledCount = 0;
   let scheduledTotal = 0;
   let largest: Expense | null = null;
   const todayIso = getItalyDateIso(now);
   for (const expense of expenses) {
-    if (expense.type === 'income') incomeCount++;
-    else if (expense.type === 'transfer') transferCount++;
-    else expenseCount++;
+    if (expense.type === 'income') {
+      incomeCount++;
+      incomeTotal += expense.amount;
+    } else if (expense.type === 'transfer') {
+      transferCount++;
+      transferTotal += Math.abs(expense.amount);
+    } else {
+      expenseCount++;
+      expenseTotal += Math.abs(expense.amount);
+    }
     if (isScheduledAfterDay(expense, todayIso)) {
       scheduledCount++;
       scheduledTotal += Math.abs(expense.amount);
@@ -503,6 +525,9 @@ export function summarizeMovements(expenses: Expense[], now: Date): MovementsSum
     expenseCount,
     incomeCount,
     transferCount,
+    expenseTotal,
+    incomeTotal,
+    transferTotal,
     largest: largest
       ? { label: largest.notes?.trim() || largest.categoryName, amount: Math.abs(largest.amount), type: largest.type }
       : null,
