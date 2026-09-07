@@ -14,7 +14,7 @@
   picker built on it must filter to non-empty `byAsset` — the resulting gaps are correct.
 - **`byAsset.price` is RAW NATIVE CURRENCY**, so `totalValue ≠ quantity × price` for USD/GBp/real-estate; the per-unit EUR
   figure is `u = totalValue / quantity`, and attribution is `priceEffect = q_prev·(u_curr−u_prev)` + `quantityEffect =
-  (q_curr−q_prev)·u_curr` (sum = Δ exactly).
+  (q_curr−q_prev)·u_curr` (sum = Δ exactly). **A row at quantity 0 is a CLOSED position** (2026-09-06): the cron writes every asset, sold ones included, and read as present its unit value is 0 — a 14.830 € sale printed as «prezzo −14.830 €» on the real account (Xtrackers Overnight, agosto 2026). `attributeSelectedChange` now treats `quantity ≤ 0` as absent on both sides, so the sale is all quantity and the rebuy from that row a pure open; the row itself is still listed at 0 €.
 - **TWR neutralises a cash flow only when the net-worth drop and the flow land in the SAME monthly snapshot** — the fix
   is data entry, never re-bucketing cash flows or excluding cash (CLAUDE.md → Known Issues has the mirror case).
 - **Two CAGR formulas, intentionally different**: Storico's verdict = `(endNW/startNW)^(12/months) − 1` (wealth growth, said «versamenti inclusi»),

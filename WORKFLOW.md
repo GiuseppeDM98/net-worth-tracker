@@ -135,6 +135,11 @@ The app **is** locally runnable; there is no fallback to declare.
 
 - **The tour server**: `npm run dev:emulator` → `http://localhost:3000`. It reads the emulators, so
   nothing seen there can touch production data.
+- **One `next dev` at a time.** Stop the :3100 server before the tour: it exists for the suite only.
+  On 2026-09-07 three background processes (the emulators and two `next dev`) plus Playwright and
+  Vitest exhausted the machine's memory and the system killed all three; an emulator killed that
+  way exports nothing, so the fixtures have to be re-seeded. The tour runs on the emulators plus
+  ONE server.
 - **Getting in**: the login is email/password on `/login` — no OAuth, no MFA, so it is a five-second
   manual step and also fully scriptable. Fixture identities (all password `test1234`):
 

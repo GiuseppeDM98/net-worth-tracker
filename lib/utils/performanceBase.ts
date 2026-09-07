@@ -51,9 +51,27 @@
  * `PerformanceBase` resta il seam minimale: due valori oggi — `portfolio` (applica le esclusioni) e
  * `netWorth` (tutto) — pronti a crescere senza riscrivere i chiamanti.
  *
- * KNOWN LIMITATION: un versamento VOLONTARIO è un trasferimento dal portafoglio (cassa) verso il
- * fondo escluso, quindi sulla base `portfolio` appare come un piccolo deflusso non neutralizzato.
- * TFR e datoriale non toccano mai il portafoglio e non sono interessati.
+ * IL TOGGLE VINCE SUL RUOLO (2026-09-06)
+ * Un fondo pensione porta quasi sempre anche `allocationRole: 'excluded'` — è la scelta naturale
+ * per un capitale bloccato fino alla pensione — e le due esclusioni erano in OR: sull'account
+ * reale «Includi i fondi pensione» acceso non cambiava un numero, perché il ruolo teneva i fondi
+ * fuori comunque. Per un asset di tipo `pensionFund` decide SOLO il toggle pensione; il ruolo
+ * governa gli altri asset (la casa, il private equity).
+ *
+ * FONDI DENTRO, MA ONESTI: L'INGRESSO E I FLUSSI DI CONFINE (2026-09-06)
+ * Con il toggle acceso il fondo non entra «da sempre»: la sua crescita è rendimento solo da quando
+ * i versamenti sono tracciati (`resolvePensionReturnStart`, la stessa regola di Previdenza e della
+ * Panoramica), quindi prima di quel mese resta fuori come oggi. Nel mese d'ingresso il suo intero
+ * valore è un FLUSSO — capitale che entra nella base misurata, come la prima apparizione di uno
+ * strumento è un effetto quantità in Storico — e da lì in poi ogni versamento è un flusso nel mese
+ * in cui ha mosso il valore (`valueEffectMonth`). Regola unica, in `resolvePerformanceBase`:
+ * un versamento è un flusso se e solo se attraversa il confine della base. Fondi dentro → TFR,
+ * datoriale e un volontario da busta paga entrano da fuori (+); un volontario da conto è interno
+ * (0). Fondi fuori → un volontario da conto (`linkedExpenseId`) è cassa che esce (−), TFR e
+ * datoriale non toccano la base (0). Con questo sparisce la vecchia limitazione dichiarata del
+ * volontario letto come deflusso non neutralizzato. I flussi viaggiano su un canale proprio
+ * (`CashFlowData.pensionFlow`), non in `netCashFlow`: la tessera Contributi non deve leggere
+ * l'ingresso di un fondo come «messi da parte».
  *
  * L'ALTRA METÀ DELLA BASE: DA QUALE MESE (`resolveHasBaseline`, 2026-07-28)
  * La base non è solo *quale capitale* si misura, è anche *da quale mese*. Il primo snapshot di un
@@ -65,9 +83,12 @@
  */
 
 import type { Asset, AssetAllocationSettings, MonthlySnapshot } from '@/types/assets';
-import type { PeriodMonth } from '@/types/performance';
+import type { PensionBoundaryFlow, PeriodMonth } from '@/types/performance';
+import type { PensionContribution } from '@/types/pension';
 import { resolveAllocationRole } from '@/lib/utils/allocationUtils';
 import { hasAssetBreakdown } from '@/lib/utils/snapshotAssetBreakdown';
+import { resolvePensionReturnStart, valueEffectMonth } from '@/lib/utils/pensionReturn';
+import { monthKey } from '@/lib/utils/cashFlowMap';
 
 export type PerformanceBase = 'portfolio' | 'netWorth';
 
@@ -124,7 +145,13 @@ export function resolvePerformanceExclusions(
 
   const excluded = new Set<string>();
   for (const asset of assets) {
-    if (!includePensionFunds && asset.type === 'pensionFund') excluded.add(asset.id);
+    // A pension fund answers to its own toggle only: its allocation role (usually `excluded`, the
+    // natural pick for capital locked until retirement) must not veto it, or the toggle is a
+    // silent no-op — see the header.
+    if (asset.type === 'pensionFund') {
+      if (!includePensionFunds) excluded.add(asset.id);
+      continue;
+    }
     if (!includeExcludedAssets && resolveAllocationRole(asset) === 'excluded') excluded.add(asset.id);
   }
 
@@ -217,4 +244,152 @@ export function toPerformanceBaseSnapshots(
       illiquidNetWorth: Math.max(0, snapshot.illiquidNetWorth - excludedValue),
     };
   });
+}
+
+/** The whole base, resolved once for both callers (the service and the page). */
+export interface PerformanceBaseResolution {
+  options: PerformanceBaseOptions;
+  /** The account's pension funds, whatever the options say. */
+  pensionFundIds: string[];
+  /**
+   * 'YYYY-MM' of the snapshot from which the funds are IN the base — the first month at or after
+   * `resolvePensionReturnStart` whose breakdown carries a fund. `null` = out in every month: the
+   * toggle is off, there are no funds, or nothing is trackable yet.
+   */
+  pensionEntryMonth: string | null;
+  /** Out of the base in EVERY month: the role-excluded assets, plus the funds when they never enter. */
+  excludedAssetIds: string[];
+  /** The snapshots projected on the base, in the input order. */
+  snapshots: MonthlySnapshot[];
+  /** Every crossing of the base's boundary through the pension funds, any period. */
+  pensionFlows: PensionBoundaryFlow[];
+}
+
+/** Sum of the pension funds' value frozen in one snapshot. */
+function sumPensionValue(snapshot: MonthlySnapshot, fundIds: Set<string>): number {
+  return (snapshot.byAsset ?? []).reduce(
+    (sum, entry) => (fundIds.has(entry.assetId) ? sum + entry.totalValue : sum),
+    0
+  );
+}
+
+/**
+ * The month the funds enter the base: the earliest snapshot at or after the trusted start whose
+ * breakdown carries a fund with a value. A snapshot before `byAsset` cannot say what the fund was
+ * worth, and one with a breakdown but no fund is evidence the fund did not exist yet.
+ */
+function resolvePensionEntryMonth(
+  snapshots: MonthlySnapshot[],
+  fundIds: Set<string>,
+  trustedStartMonth: string | null
+): string | null {
+  if (!trustedStartMonth) return null;
+  const entry = [...snapshots]
+    .sort((a, b) => (a.year !== b.year ? a.year - b.year : a.month - b.month))
+    .find(
+      (snapshot) =>
+        monthKey(snapshot.year, snapshot.month) >= trustedStartMonth &&
+        hasAssetBreakdown(snapshot) &&
+        sumPensionValue(snapshot, fundIds) > 0
+    );
+  return entry ? monthKey(entry.year, entry.month) : null;
+}
+
+/**
+ * Whether one contribution crossed the base's boundary, and in which direction — the ONE rule.
+ *
+ * `month > entryMonth` means the fund was already inside the base when the value moved (the entry
+ * month itself is covered by the entry flow, which carries the fund's whole value). A voluntary
+ * contribution paid from a cash account is recognised by its `linkedExpenseId` (the transfer the
+ * service wrote); one without it was withheld from payroll and came from outside, like TFR.
+ */
+function classifyContribution(
+  contribution: PensionContribution,
+  fundIds: Set<string>,
+  entryMonth: string | null
+): PensionBoundaryFlow | null {
+  const month = valueEffectMonth(contribution);
+  const fundInBase = entryMonth !== null && month > entryMonth && fundIds.has(contribution.assetId);
+  const fromCash = contribution.source === 'voluntary' && !!contribution.linkedExpenseId;
+
+  if (fundInBase) {
+    return fromCash ? null : { month, amount: contribution.amount, kind: 'contribution' };
+  }
+  return fromCash ? { month, amount: -contribution.amount, kind: 'withdrawal' } : null;
+}
+
+/**
+ * Resolve the measured base once: which snapshots, which exclusions, which pension flows.
+ *
+ * WARNING (checklist comment): the TWO callers must both go through here —
+ * `lib/services/performanceService.ts` (`getAllPerformanceData`) and
+ * `app/dashboard/performance/page.tsx` (`cachedSnapshots` + the custom range) — or a custom period
+ * disagrees with the pre-computed ones. `buildCacheKey` fingerprints the resolution.
+ *
+ * With the funds OUT (toggle off, no fund, or no trustable start) the projection is the one the
+ * file has always made, and the only flows are the voluntary contributions that left a cash
+ * account. With the funds IN, the months before `pensionEntryMonth` are projected WITHOUT the
+ * funds (actual values, or the E₀ backfill before `byAsset`), the months from it on WITH them, and
+ * the flows are the entry value plus every later contribution that came from outside.
+ *
+ * @param input.snapshots - The account's snapshots, any order (the order is preserved)
+ * @param input.assets - Every asset of the account
+ * @param input.contributions - Every pension contribution of the account, any period
+ * @param input.settings - The saved settings (the two toggles and `pensionReturnStartMonth`)
+ */
+export function resolvePerformanceBase(input: {
+  snapshots: MonthlySnapshot[];
+  assets: Asset[];
+  contributions: PensionContribution[];
+  settings: AssetAllocationSettings | null | undefined;
+}): PerformanceBaseResolution {
+  const { snapshots, assets, contributions, settings } = input;
+  const options = resolvePerformanceBaseOptions(settings);
+  const pensionFundIds = assets.filter((asset) => asset.type === 'pensionFund').map((asset) => asset.id);
+  const fundIds = new Set(pensionFundIds);
+
+  // Everything the role keeps out, whatever the pension toggle says.
+  const otherExcluded = resolvePerformanceExclusions(assets, { ...options, includePensionFunds: true });
+  const outEverywhere = [...otherExcluded, ...pensionFundIds];
+
+  const pensionEntryMonth =
+    options.includePensionFunds && pensionFundIds.length > 0
+      ? resolvePensionEntryMonth(snapshots, fundIds, resolvePensionReturnStart(contributions, settings?.pensionReturnStartMonth))
+      : null;
+
+  const contributionFlows = contributions
+    .map((contribution) => classifyContribution(contribution, fundIds, pensionEntryMonth))
+    .filter((flow): flow is PensionBoundaryFlow => flow !== null);
+
+  if (pensionEntryMonth === null) {
+    return {
+      options,
+      pensionFundIds,
+      pensionEntryMonth: null,
+      excludedAssetIds: outEverywhere,
+      snapshots: toPerformanceBaseSnapshots(snapshots, outEverywhere),
+      pensionFlows: contributionFlows,
+    };
+  }
+
+  const withoutFunds = toPerformanceBaseSnapshots(snapshots, outEverywhere);
+  const withFunds = toPerformanceBaseSnapshots(snapshots, otherExcluded);
+  const projected = snapshots.map((snapshot, index) =>
+    monthKey(snapshot.year, snapshot.month) >= pensionEntryMonth ? withFunds[index] : withoutFunds[index]
+  );
+  const entrySnapshot = snapshots.find((snapshot) => monthKey(snapshot.year, snapshot.month) === pensionEntryMonth)!;
+  const entryFlow: PensionBoundaryFlow = {
+    month: pensionEntryMonth,
+    amount: sumPensionValue(entrySnapshot, fundIds),
+    kind: 'entry',
+  };
+
+  return {
+    options,
+    pensionFundIds,
+    pensionEntryMonth,
+    excludedAssetIds: otherExcluded,
+    snapshots: projected,
+    pensionFlows: [entryFlow, ...contributionFlows].sort((a, b) => a.month.localeCompare(b.month)),
+  };
 }

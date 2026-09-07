@@ -13,25 +13,32 @@ Next.js app for Italian investors: net worth, assets, cashflow, dividends, perfo
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic.
-- `tsc` clean; **154 files / 3449 tests** green + **37 Playwright E2E specs** (40 green in one run incl. 3 auth setups). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, which structurally hides timezone bugs.
-- Latest (2026-09-06): **ESLint a zero e la spec riletta contro il codice finito.** `npm run lint` da
-  **314 problemi a 0** senza un `eslint-disable` nuovo: 113 `any` → tipi reali (`Asset`, `DocumentData`,
-  i tipi dell'SDK Anthropic, `catch (e: unknown)` con narrowing che legge gli stessi percorsi); 36
-  `set-state-in-effect` sciolti derivando lo stato o «settling» in render sul soggetto `(open, record)`
-  (`setTimeout(0)` solo per un loader); mappe `lazy()` a livello di modulo per i
-  `static-components`; `.agents/**` e `.next-*/**` ignorati. Due bug veri emersi tipizzando, corretti nel secondo
-  commit con test rossi-poi-verdi: l'unlink di `expenseId` (`FieldValue.delete()`) e il ramo
-  `overloaded_error` (`instanceof Anthropic.APIError` → `error.type`). Potati `PageContainer.width`,
-  `PageHeader.separator` e la seconda mappa di icone lazy. DESIGN.md riletto contro il codice: palette chart LIGHT nel frontmatter
-  («Indigo = azioni» vale solo in dark), `--warning*`, segni dark, ogni passo tipografico in uso;
-  i pattern a zero implementazioni marcati superati; inventario degli hex DOM-side e tre tinte del
-  chrome fuori Zero-Chroma dichiarate. `doc/redesign-prompts.md` ritirato; `.impeccable/config.json`
-  senza 8 deroghe orfane. Collaudo: suite 3440 (anche `TZ=Europe/Rome`), `tsc`, Playwright 40/40
-  sugli emulatori, giro guidato (cinque verifiche, ok). Terzo commit: AGENTS.md snellito da 1014 a
-  ~830 righe — Stati, Dialog, Settings, Account condiviso/Demo e Temi sono guide in `doc/guide/`, il
-  nucleo tiene gli stub; §5-6 riscritti come regola + data + dove è fissata, senza perdere una data.
-  Quarto commit: CLAUDE.md a ~31 KB (Key Files = soli entry point, le guide portano le liste),
-  `doc/guide/fire.md` diviso per tab, sidecar impeccable rigenerato da DESIGN.md con la procedura del plugin.
+- `tsc` clean; **155 files / 3493 tests** green + **39 Playwright E2E specs** (42 green in one run incl. 3 auth setups). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, which structurally hides timezone bugs.
+- Latest (2026-09-06, sera): **I fondi pensione entrano onesti in Rendimenti, e la pagina dice da dove viene il
+  rendimento.** Il toggle «Includi i fondi pensione» era un OR con il ruolo `excluded` — sull'account reale (tre fondi,
+  tutti `excluded`) accenderlo non cambiava un numero — e, dove passava, leggeva TFR/datoriale/busta paga come
+  rendimento (YTD 16,28% invece di 12,02%). Ora `resolvePerformanceBase` (UNA risoluzione per service e pagina) fa
+  vincere il toggle sul ruolo, porta i fondi nella base dal mese tracciato (`resolvePensionReturnStart`) con il loro
+  valore come FLUSSO d'ingresso e ogni versamento successivo da fuori come flusso nel suo `valueEffectMonth`; un
+  volontario da conto con i fondi FUORI è un'uscita (la vecchia KNOWN LIMITATION sparisce). I flussi viaggiano sul
+  canale `CashFlowData.pensionFlow` (`externalFlowOf` = `netCashFlow + pensionFlow`, sommato da `buildCashFlowMap`
+  così TWR/volatilità/drawdown/heatmap/IRR lo vedono; ROI e CAGR esplicitamente), `netCashFlow` resta il risparmio
+  della tessera Contributi, che mostra il canale pensione a parte con l'ingresso nominato per mese; la didascalia
+  della base nomina il mese («più i fondi pensione da luglio 2026»); `CACHE_MATH_VERSION` v6 e la chiave porta
+  entry month e flussi. Nuova tessera **«Da dove viene il rendimento»** (`performanceAttribution.ts`): effetto prezzo
+  per strumento in euro sui mesi con `byAsset` (fondi = Δ − versamenti dopo l'ingresso, immobili al lordo del debito,
+  dividendi incassati dal registro aggiunti allo strumento), riconciliato al numeratore del TWR con «Non attribuito»
+  come riga di chiusura e la copertura dichiarata; tabella completa nel Dettaglio; griglia 7 · 5 / 12 (5 · 7 senza
+  vendite). **Bug trovato sui dati reali e corretto**: `attributeSelectedChange` leggeva una riga `byAsset` a quantità
+  0 (il cron scrive anche gli asset venduti) come prezzo crollato a zero — Storico stampava «prezzo −14.830 €» su una
+  vendita (Xtrackers Overnight, ago 2026). Collaudo: suite 3493 (anche `TZ=Europe/Rome`), `tsc`, lint 0, Playwright 42/42, la pipeline
+  VERA sul dump di produzione in sola lettura (OFF invariato, ON 12,02%, attribuzione che riconcilia: 19.162 € +
+  −2.326 € = 16.836 €), nuova spec `e2e/performance.degraded.spec.ts` su una fixture propria (`e2e:seed -- performance`)
+  con due verifiche sui dati dell'emulatore (lo snapshot dell'ingresso, la chiave della cache del service), falsificata
+  ripristinando il vecchio OR (rossa), giro guidato del 2026-09-07 (cinque verifiche, ok) — la seconda verifica sui dati ha
+  scoperto che `writePerformanceCache` falliva in silenzio su ogni account con un `undefined` nelle metriche (nessun
+  drawdown, nessuna categoria dividendi): ora scrive via `removeUndefinedDeep`. Il `dividendService` è server-only: la
+  pagina legge i dividendi da `dividendReceiptsService.ts` (client), trovato dal browser e non da `tsc`.
 
 ## Architecture Snapshot
 - App Router; protected pages under `app/dashboard/*`.
@@ -56,7 +63,7 @@ One line per feature: what it is, then where it is described. *What the user see
 - **Expense CSV Import**: preview-first, one-tap undo by `importBatchId`. doc/guide/cashflow.md.
 - **Analisi**: «dove vanno i soldi, e cosa è cambiato?» on the four-mode axis; a running year is compared full year against full year; the focused entity is a tile; the app's only Sankey. README → *Cashflow*; doc/guide/cashflow-analisi.md; doc/guide/cashflow.md (grouping, Sankey, drill-down).
 - **Dividendi**: «quanto rendono i miei flussi?»; received and announced are never one figure; BTP Italia coupons. README → *Dividends*; doc/guide/cashflow-dividendi.md.
-- **Rendimenti**: «quanto rende il portafoglio, e rispetto a cosa?» on one axis, a configurable base, six benchmarks in EUR. README → *Performance Analytics*; doc/guide/rendimenti.md.
+- **Rendimenti**: «quanto rende il portafoglio, e rispetto a cosa?» on one axis, a configurable base (the pension funds enter it honestly: from the tracked month, their entry and every later contribution a FLOW on `CashFlowData.pensionFlow`), six benchmarks in EUR, and «Da dove viene il rendimento» — the market gain per instrument in euro, reconciled to the TWR numerator with the residual declared. README → *Performance Analytics*; doc/guide/rendimenti.md.
 - **Storico**: «come sono arrivato qui?» with no axis — wealth growth (contributions included), ONE pace for the verdict and the next doubling, per-instrument price/quantity attribution. README → *Historical Analysis*; doc/guide/storico.md.
 - **Allocazione**: «sono allineato al piano, e cosa faccio con i prossimi soldi?» with no axis — five tiles + Dettaglio; `allocationRole` partitioned BEFORE `compareAllocations`; an unclassified holding is a row without a target; leverage as notional exposure. doc/guide/allocazione.md.
 - **Previdenza**: «il fondo sta lavorando?» as a verdict per contributor (three causes, three numbers) over five tiles + «Dettaglio», the fiscal year beside the verdict; a price-1, frozen asset. README → *Portfolio Management*; doc/guide/previdenza.md.
@@ -88,7 +95,8 @@ Firestore client + admin · Yahoo Finance (prices, benchmark history) · Borsa I
 - **Two deliberate dependency pins keep advisories open.** `firebase-admin` at `^13.6.0` (@14 pulls pure-ESM `jose@6` → `ERR_REQUIRE_ESM` on Vercel; 8 moderate `uuid` advisories stay) and `next` at `~16.2.12` (16.3.0 breaks Vercel at `onBuildComplete`; 2 HIGH libvips advisories via `sharp`, low exposure). **Unpin next and re-run `npm audit fix` once Vercel digests 16.3.x.**
 - **Shared account setup** prerequisites (whitelist, guest registers first, rules deployed): SETUP.md → Step 5b.
 - **YOC/Current Yield** exclude sold assets and are scoped to the current holding via `holdingStartDate`; a sell+rebuy inside one month counts the prior holding's dividends against the new cost basis (an overstated YOC, never a regression).
-- **Rendimenti before `byAsset`: correct denominator, wrong numerator** (2023-01 → 2025-10 on the real account): the basis step is removed, but the excluded assets' variation stays inside the measured return. Not reconstructible.
+- **Rendimenti before `byAsset`: correct denominator, wrong numerator** (2023-01 → 2025-10 on the real account): the basis step is removed, but the excluded assets' variation stays inside the measured return. Not reconstructible — and those months cannot be attributed to an instrument either: «Da dove viene il rendimento» names the months it covers.
+- **«Non attribuito» in Rendimenti is a measurement, not a bug**: cash interest, balances corrected by hand, expenses paid from untracked accounts and dividends recorded in only one of cashflow/registry all move the total without moving an instrument's unit value (−2.326 € on a 16.836 € YTD gain on the real account). Per-instrument dividends come from the `dividends` registry, the gain from the cashflow: a dividend present in one place only lands there. With the pension toggle ON, a period straddling the entry month carries the funds' whole value as a flow in that month, and a late-credited statement reads as a temporary market loss on this page too.
 - **TWR monthly-bucket artifact (by design)**: an expense is neutralised only when the net-worth drop and the cash flow land in the same month; recording a purchase both as an expense and as an asset produces a phantom gain. Record balances in the month they belong to.
 - **The Assistant's cashflow figures changed on 2026-07-29**; saved threads are prose and are not regenerated.
 - **Chart slots 8-9 are still not theme-aware** (`useChartColors()` pads the last two from the static `CHART_COLORS`): slot 8 is Storico's synthetic «Previdenza» band and 9 is unused by the class palette, so nothing user-facing collides. Slots 0-7 are theme-aware since 2026-08-30. doc/guide/temi.md.
@@ -117,7 +125,7 @@ Entry points only: each `doc/guide/<tema>.md` opens with the full file list of i
 - **Overview**: `app/dashboard/page.tsx`, `app/api/dashboard/overview/route.ts`, `lib/services/dashboardOverviewService.ts`, `lib/hooks/useDashboardOverview.ts`, `components/dashboard/overview/*` (`PatrimonioTile` exports `resolveHeroValueClass`), pure `lib/utils/{overviewNarrative,dashboardOverviewUtils,sparklinePeriod,savingsRateBadge}.ts`
 - **Patrimonio**: `app/dashboard/assets/page.tsx` (owns every dialog), `components/assets/*` (+ `PatrimonioTile`/`ComposizioneTile` reused from the overview), pure `lib/utils/{patrimonioNarrative,patrimonioSummary,assetPerformanceDeltas}.ts`; `lib/services/assetService.ts`, `types/assets.ts`
 - **Asset trade ledger**: engine `lib/utils/assetTransactionUtils.ts` + `types/assetTransactions.ts`; server `lib/server/{assetTransactionUseCase,tradeFxService}.ts` + `app/api/asset-transactions/*`; client `lib/services/assetTransactionService.ts`, UI `components/assets/{TransactionDialog,AssetMovementsDialog}.tsx`; collections `assetTransactions`/`assetTransactionsMeta`
-- **Rendimenti**: `app/dashboard/performance/page.tsx`, `components/performance/*` (+ `tiles/*`), pure `lib/utils/{performanceNarrative,performanceSummary,performanceBase,drawdownSeries,cashFlowMap,benchmarkPeriodReturn}.ts`, `lib/services/performanceService.ts` (`CACHE_MATH_VERSION`); cache `performance-cache/{userId}`. Yields: `lib/utils/yieldOnCost.ts` (`computeDividendYieldMetrics`, also behind `app/api/dividends/stats/route.ts`)
+- **Rendimenti**: `app/dashboard/performance/page.tsx`, `components/performance/*` (+ `tiles/*`, `AttribuzioneTile`), pure `lib/utils/{performanceNarrative,performanceSummary,performanceBase,performanceAttribution,drawdownSeries,cashFlowMap,benchmarkPeriodReturn}.ts` (`resolvePerformanceBase` = the ONE base for service and page; `externalFlowOf`/`mergePensionFlows` = the pension channel; `attributePeriodReturn`), `lib/services/performanceService.ts` (`CACHE_MATH_VERSION`); cache `performance-cache/{userId}`; spec `e2e/performance.degraded.spec.ts` on `npm run e2e:seed -- performance`. Yields: `lib/utils/yieldOnCost.ts` (`computeDividendYieldMetrics`, also behind `app/api/dividends/stats/route.ts`)
 - **Allocazione / exposure**: `app/dashboard/allocation/page.tsx`, `components/allocation/*` (+ `tiles/*`), pure `lib/utils/{allocazioneSummary,allocazioneNarrative}.ts` over `lib/utils/{allocationUtils,leverageAwareAllocationUtils,assetExposureUtils}.ts` (`allocationUtils` owns `ASSET_CLASS_SEQUENCE`, `ASSET_CLASS_LABELS`, `ASSET_CLASS_CHART_INDEX`), `lib/services/assetAllocationService.ts`, `lib/server/portfolioExposureService.ts`; `exposure-cache/{userId}`
 - **Previdenza**: `types/pension.ts`, pure `lib/utils/{pensionSummary,pensionNarrative}.ts` over `lib/utils/{pensionDeduction,pensionContributions,pensionReturn,pensionFire,pensionFamilyMembers}.ts`, `lib/services/pensionContributionService.ts` (`assertFundValueLivesInQuantity`), `app/dashboard/pension/page.tsx`, `components/pension/*`; collection `pensionContributions`
 - **Cashflow**: `app/dashboard/cashflow/page.tsx`; Tracciamento `components/cashflow/ExpenseTrackingTab.tsx` + `components/cashflow/{TransactionFeed,CompactExpenseRow,MobileFiltersDrawer}.tsx`, pure `lib/utils/{tracciamentoSummary,cashflowNarrative}.ts`; Budget `components/cashflow/BudgetTab.tsx` + `components/cashflow/budget/*`, pure `lib/utils/{budgetSummary,budgetNarrative,budgetUtils,budgetHistory}.ts`, `lib/hooks/{useBudgetConfig,useBudgetHistory}.ts`, `lib/server/budgetHistoryService.ts` (cron phase 8), collections `budgets/{userId}`, `budgetHistory/{userId}/months/{YYYY-MM}`; Divisione `components/cashflow/ExpenseSplitTab.tsx`, pure `lib/utils/{expenseSplitSummary,expenseSplitNarrative}.ts` (`resolveSplitBasis`, `allocateByShare`); Centri di Costo `components/cashflow/{CostCentersTab,CostCenterDetail,CostCenterDialog}.tsx` + `cost-centers/*`, pure `lib/utils/{costCenterSummary,costCenterNarrative,costCenterUtils}.ts`, `costCenterStyles.ts` (`CHART_TICK_STYLE`); services `lib/services/{budgetService,costCenterService,cashBalanceReconciliation,expenseImportService}.ts`, `lib/utils/expenseImport.ts`
@@ -138,4 +146,4 @@ The propagation is finished: twenty-three sections, the last on 2026-09-01; the 
 
 Authoritative aesthetic spec: **DESIGN.md** — hand-maintained, **never regenerate it**; its YAML frontmatter is the normative layer read by the impeccable detector, `.impeccable/design.json` only the extensions sidecar. Product truth lives in **PRODUCT.md**. This file carries no paraphrase: rules are cited by name (DESIGN → **The X Rule**) and enforced by `components/ui/{tile,page-verdict,responsive-modal}.tsx`, `statesNarrative.ts` and `printTokens.ts`.
 
-**Last updated**: 2026-09-06. DESIGN.md documents the "Verdict over Tiles" shape, the shell and the twenty-three propagations, and was re-read against the finished code on 2026-09-06 (light chart palette, warning surface, dark sign values and every scale step in the frontmatter; zero-implementation patterns superseded; the DOM-side hex inventory declared). Superseded patterns stay marked. History: `git log`.
+**Last updated**: 2026-09-07. DESIGN.md documents the "Verdict over Tiles" shape, the shell and the twenty-three propagations, and was re-read against the finished code on 2026-09-06 (light chart palette, warning surface, dark sign values and every scale step in the frontmatter; zero-implementation patterns superseded; the DOM-side hex inventory declared); Rendimenti's grid gained the «Da dove viene il rendimento» tile on 2026-09-06 inside the same rules (Ranked Rows with Residual). Superseded patterns stay marked. History: `git log`.

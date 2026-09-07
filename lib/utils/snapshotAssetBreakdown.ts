@@ -144,6 +144,10 @@ export function sumSelectedValues(
  *   - Asset present in only one month (a full open/close): the change is a pure quantity action,
  *     so the whole ΔtotalValue is attributed to quantityEffect (priceEffect = 0). This sidesteps
  *     the undefined unit value of the absent side (u would be 0/0).
+ *   - A row held at quantity 0 counts as ABSENT. The snapshot cron writes every asset, sold ones
+ *     included (`quantity: 0, totalValue: 0`), and read as "present" its unit value is 0: a
+ *     14.830 € sale became a −14.830 € PRICE effect on the real account (2026-08). A sale to zero
+ *     is a full close, all quantity, and so is the rebuy that starts from that row.
  *
  * @param previousByAsset - The earlier month's asset breakdown
  * @param currentByAsset - The later month's asset breakdown
@@ -155,12 +159,9 @@ export function attributeSelectedChange(
   currentByAsset: SnapshotAsset[],
   selectedIds: Set<string>
 ): ChangeAttribution {
-  const previousById = new Map(
-    previousByAsset.filter((a) => selectedIds.has(a.assetId)).map((a) => [a.assetId, a])
-  );
-  const currentById = new Map(
-    currentByAsset.filter((a) => selectedIds.has(a.assetId)).map((a) => [a.assetId, a])
-  );
+  const held = (rows: SnapshotAsset[]) => rows.filter((a) => selectedIds.has(a.assetId) && a.quantity > 0);
+  const previousById = new Map(held(previousByAsset).map((a) => [a.assetId, a]));
+  const currentById = new Map(held(currentByAsset).map((a) => [a.assetId, a]));
 
   let priceEffect = 0;
   let quantityEffect = 0;

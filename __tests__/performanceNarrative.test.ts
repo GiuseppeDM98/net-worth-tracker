@@ -35,6 +35,8 @@ import {
   describeBenchmarkRanking,
   describeCapitalAndMarket,
   describeConsistency,
+  describeAttribution,
+  describeAttributionCoverage,
   describeContributions,
   describeDrawdownDetail,
   describeGrowthOfHundred,
@@ -433,11 +435,104 @@ describe('describeCapitalAndMarket', () => {
 });
 
 describe('describeMeasurementBase', () => {
-  const both: PerformanceBaseOptions = { includePensionFunds: false, includeExcludedAssets: false };
+  const base = (options: PerformanceBaseOptions, pensionEntryMonth: string | null = null, pensionFundIds = ['fund-1']) => ({ options, pensionEntryMonth, pensionFundIds });
+
   it('names what is left out of the base', () => {
-    expect(describeMeasurementBase(both)).toBe("Base: portafoglio gestito, al netto di fondo pensione e immobili esclusi dall'allocazione.");
-    expect(describeMeasurementBase({ includePensionFunds: true, includeExcludedAssets: false })).toBe("Base: portafoglio gestito, al netto di immobili esclusi dall'allocazione.");
-    expect(describeMeasurementBase({ includePensionFunds: true, includeExcludedAssets: true })).toBe('Base: patrimonio totale, fondo pensione e immobili inclusi.');
+    expect(describeMeasurementBase(base({ includePensionFunds: false, includeExcludedAssets: false }))).toBe("Base: portafoglio gestito, al netto dei fondi pensione e degli asset esclusi dall'allocazione.");
+    expect(describeMeasurementBase(base({ includePensionFunds: false, includeExcludedAssets: true }))).toBe('Base: portafoglio gestito, al netto dei fondi pensione.');
+  });
+
+  it('names the month the funds entered and what a contribution is from then on', () => {
+    expect(describeMeasurementBase(base({ includePensionFunds: true, includeExcludedAssets: false }, '2026-07'))).toBe(
+      "Base: portafoglio gestito più i fondi pensione da luglio 2026 (i versamenti sono flussi, non rendimento), al netto degli asset esclusi dall'allocazione."
+    );
+    expect(describeMeasurementBase(base({ includePensionFunds: true, includeExcludedAssets: true }, '2026-07'))).toBe(
+      'Base: patrimonio totale, con i fondi pensione da luglio 2026 (i versamenti sono flussi, non rendimento).'
+    );
+  });
+
+  it('says why the funds are still out when the toggle is on but nothing is trackable', () => {
+    expect(describeMeasurementBase(base({ includePensionFunds: true, includeExcludedAssets: false }, null))).toBe(
+      "Base: portafoglio gestito, al netto degli asset esclusi dall'allocazione. I fondi pensione restano fuori finché non c’è un versamento registrato o un mese di partenza in Impostazioni."
+    );
+    expect(describeMeasurementBase(base({ includePensionFunds: true, includeExcludedAssets: true }, null))).toBe(
+      'Base: patrimonio totale. I fondi pensione restano fuori finché non c’è un versamento registrato o un mese di partenza in Impostazioni.'
+    );
+  });
+
+  it('drops every pension clause on an account with no fund', () => {
+    expect(describeMeasurementBase(base({ includePensionFunds: true, includeExcludedAssets: false }, null, []))).toBe("Base: portafoglio gestito, al netto degli asset esclusi dall'allocazione.");
+    expect(describeMeasurementBase(base({ includePensionFunds: true, includeExcludedAssets: true }, null, []))).toBe('Base: patrimonio totale.');
+  });
+});
+
+describe('describeContributions — the pension channel', () => {
+  const invested = { investedEur: 16700, divestedEur: 2500, netInvestedEur: 14200 };
+
+  it('adds the funds\' entry as its own sentence, with its month, after the cashflow', () => {
+    expect(plain(describeContributions({ invested, netCashFlow: 11850, pension: { flow: 31862, entryFlow: 31852, entryMonth: '2026-07' } }))).toBe(
+      "Hai investito 14.200 € dal registro, a fronte di 11.850 € messi da parte. Nei fondi pensione sono entrati 31.862 €, di cui 31.852 € per l'ingresso del fondo nella base a luglio 2026."
+    );
+  });
+
+  it('names outside money when there is no entry, and money leaving the base when the funds are out', () => {
+    expect(plain(describeContributions({ invested: null, netCashFlow: 500, pension: { flow: 1214, entryFlow: 0, entryMonth: '2026-07' } }))).toBe(
+      'Dal cashflow hai messo da parte 500 € nel periodo; il registro operazioni non è attivo. Nei fondi pensione sono entrati 1214 € da fuori (TFR, datoriale, busta paga).'
+    );
+    expect(plain(describeContributions({ invested: null, netCashFlow: 500, pension: { flow: -152, entryFlow: 0, entryMonth: null } }))).toBe(
+      'Dal cashflow hai messo da parte 500 € nel periodo; il registro operazioni non è attivo. Dai conti sono passati 152 € ai fondi pensione, fuori dalla base.'
+    );
+  });
+
+  it('says nothing about the channel when it is empty', () => {
+    expect(plain(describeContributions({ invested: null, netCashFlow: 500, pension: { flow: 0, entryFlow: 0, entryMonth: null } }))).toBe(
+      'Dal cashflow hai messo da parte 500 € nel periodo; il registro operazioni non è attivo.'
+    );
+  });
+});
+
+describe('describeAttribution', () => {
+  const row = (name: string, total: number) => ({ assetId: name, name, ticker: '', marketEffect: total, dividends: 0, total, isPensionFund: false, monthsAttributed: 9 });
+  const full = { measuredMonths: 9, attributedMonths: 9, firstAttributed: { year: 2026, month: 1 }, lastAttributed: { year: 2026, month: 9 } };
+
+  it('names the gain, the two biggest instruments and the residual', () => {
+    const r = describeAttribution({ rows: [row('Vanguard All-World', 16569), row('MSCI World', 2977), row('Oro', -877)], attributed: 18669, gain: 16836, unattributed: -1833, coverage: full });
+    expect(plain(r)).toBe('Il mercato ha reso +16.836 €: Vanguard All-World ne ha portati +16.569 €, MSCI World +2977 €; −1833 € non sono attribuibili a uno strumento.');
+    const segment = (text: string) => r.find((seg) => seg.text.replace(/\u00a0/g, ' ') === text);
+    expect(segment('+16.836 €')?.sign).toBe('positive');
+    expect(segment('−1833 €')?.sign).toBe('negative');
+  });
+
+  it('reads a losing period with «tolto» and a losing instrument with «tolti», and drops a residual under a euro', () => {
+    expect(plain(describeAttribution({ rows: [row('Vanguard All-World', -7275)], attributed: -7275, gain: -7275.4, unattributed: -0.4, coverage: full }))).toBe(
+      'Il mercato ha tolto −7275 €: Vanguard All-World ne ha tolti −7275 €.'
+    );
+  });
+
+  it('names the covered window when only part of the period has a breakdown', () => {
+    const coverage = { measuredMonths: 44, attributedMonths: 10, firstAttributed: { year: 2025, month: 12 }, lastAttributed: { year: 2026, month: 9 } };
+    expect(plain(describeAttribution({ rows: [row('Vanguard All-World', 20000)], attributed: 20000, gain: 21000, unattributed: 1000, coverage }))).toBe(
+      'Il mercato ha reso +21.000 € nei 10 mesi con il dettaglio per strumento (da dicembre 2025): Vanguard All-World ne ha portati +20.000 €; +1000 € non sono attribuibili a uno strumento.'
+    );
+  });
+
+  it('reads the coverage for the Dettaglio: instruments, months, window and residual', () => {
+    expect(plain(describeAttributionCoverage({ rows: [row('a', 1), row('b', 2), row('c', 3)], attributed: 6, gain: 8, unattributed: 2, coverage: full }))).toBe(
+      '3 strumenti attribuiti su 9 mesi (da gennaio a settembre 2026); +2 € non attribuibili a uno strumento.'
+    );
+    expect(plain(describeAttributionCoverage({ rows: [row('a', 1)], attributed: 1, gain: 1, unattributed: 0.2, coverage: { ...full, measuredMonths: 12, attributedMonths: 1, firstAttributed: { year: 2026, month: 9 }, lastAttributed: { year: 2026, month: 9 } } }))).toBe(
+      '1 strumento attribuito su 1 mese (settembre 2026) dei 12 misurati.'
+    );
+    expect(plain(describeAttributionCoverage({ rows: [], attributed: 0, gain: 0, unattributed: 0, coverage: { measuredMonths: 3, attributedMonths: 0, firstAttributed: null, lastAttributed: null } }))).toBe(
+      'Nessun mese del periodo ha il dettaglio per strumento.'
+    );
+  });
+
+  it('says when nothing can be attributed, and when nothing moved', () => {
+    expect(plain(describeAttribution({ rows: [], attributed: 0, gain: 0, unattributed: 0, coverage: { measuredMonths: 3, attributedMonths: 0, firstAttributed: null, lastAttributed: null } }))).toBe(
+      'Nessun mese del periodo ha il dettaglio per strumento: l’attribuzione parte dagli snapshot che lo registrano.'
+    );
+    expect(plain(describeAttribution({ rows: [], attributed: 0, gain: 0, unattributed: 0, coverage: full }))).toBe('Il mercato ha chiuso in pari: nessuno strumento ha mosso il rendimento.');
   });
 });
 
