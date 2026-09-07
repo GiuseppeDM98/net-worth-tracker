@@ -79,6 +79,11 @@ export interface AssetTransactionsMeta {
   migratedAt: Date;
   baselineDate: Date;        // start-of-day (Italy) of migration day; global floor for trade dates
   migratedAssetCount: number;
+  // One-shot signal for backfillAverageCostEur (assetTransactionUseCase.ts): every ledger asset's
+  // averageCostEur is derivable from trades that already carry a correct per-trade priceEur, so the
+  // backfill only needs to run once, after migration, to project it onto pre-existing asset docs.
+  // Absent until the backfill has run for this owner.
+  averageCostEurBackfilledAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }

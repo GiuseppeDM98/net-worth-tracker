@@ -50,6 +50,9 @@ import { getUserSnapshots } from '@/lib/services/snapshotService';
 import { getAllAssets } from '@/lib/services/assetService';
 import { getSettings } from '@/lib/services/assetAllocationService';
 import { getPensionContributions } from '@/lib/services/pensionContributionService';
+import { getAssetTransactions } from '@/lib/services/assetTransactionService';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/query/queryKeys';
 // The Admin-SDK dividendService is server-only: a client page reads the registry through this one.
 import { getDividendReceipts } from '@/lib/services/dividendReceiptsService';
 import { resolveHasBaseline, resolvePerformanceBase, type PerformanceBaseResolution } from '@/lib/utils/performanceBase';
@@ -81,6 +84,7 @@ import {
   computeSortinoRatio,
   resolveDrawdownStory,
   resolveHeroReturn,
+  resolvePeriodReturnChip,
   summarizePerformance,
   summarizeRealizedGains,
 } from '@/lib/utils/performanceSummary';
@@ -276,6 +280,9 @@ export default function PerformancePage() {
   const { data: ledgerMeta } = useAssetLedgerMeta(ownerId);
   const isLedgerMigrated = !!ledgerMeta;
   const { data: ledgerTrades = [] } = useAssetTransactions(ownerId, undefined, { enabled: isLedgerMigrated });
+  // The base resolution reads the ledger too (the measured flows prefer it): through the SAME query
+  // key as the hook above, so the two share one read instead of two.
+  const queryClient = useQueryClient();
 
   // The six model portfolios, one fixed hook each (React rules: a stable hook count), all enabled:
   // the Benchmark tile is always on the page. The FX series is what makes them EUR — the portfolio is
@@ -339,17 +346,18 @@ export default function PerformancePage() {
       else setIsRefreshing(true);
       setLoadFailed(false);
 
-      const [rawSnapshots, loadedAssets, baseSettings, contributions, loadedDividends] = await Promise.all([
+      const [rawSnapshots, loadedAssets, baseSettings, contributions, loadedDividends, trades] = await Promise.all([
         getUserSnapshots(ownerId),
         getAllAssets(ownerId),
         getSettings(ownerId),
         getPensionContributions(ownerId),
         getDividendReceipts(ownerId),
+        queryClient.fetchQuery({ queryKey: queryKeys.assetTransactions.all(ownerId), queryFn: () => getAssetTransactions(ownerId) }),
       ]);
       // The SAME base resolution as getAllPerformanceData (performanceBase.ts): the client-side chart,
       // heatmap, custom-range and attribution helpers read cachedSnapshots and the flows directly, so
       // they need the exact same projection or a custom period would disagree with the pre-computed ones.
-      const resolved = resolvePerformanceBase({ snapshots: rawSnapshots, assets: loadedAssets, contributions, settings: baseSettings });
+      const resolved = resolvePerformanceBase({ snapshots: rawSnapshots, assets: loadedAssets, contributions, settings: baseSettings, trades });
       setCachedSnapshots(resolved.snapshots);
       setBase(resolved);
       setAssets(loadedAssets);
@@ -399,6 +407,7 @@ export default function PerformancePage() {
         undefined,
         performanceData.ytd.dividendCategoryId,
         base?.pensionFlows ?? [],
+        base?.portfolioFlows ?? [],
       );
       Object.assign(customMetrics, await fetchYieldMetrics(ownerId, customMetrics));
       setPerformanceData({ ...performanceData, custom: customMetrics });
@@ -477,6 +486,8 @@ export default function PerformancePage() {
   // the extrapolation to mean anything. Verdict quality and the benchmark delta keep the ANNUALIZED
   // figure: «beats the risk-free rate» and «vs benchmark» are per-year comparisons.
   const heroReturn = resolveHeroReturn(metrics?.timeWeightedReturn ?? null, metrics?.numberOfMonths ?? 0);
+  // The second chip: the period's cumulative TWR (the ROI, a gain over the first month's capital, lives in the Dettaglio).
+  const periodReturnChip = resolvePeriodReturnChip(metrics?.timeWeightedReturn ?? null, metrics?.numberOfMonths ?? 0, heroReturn);
   const quality = metrics
     ? summarizePerformance({ timeWeightedReturn: metrics.timeWeightedReturn, sharpeRatio: metrics.sharpeRatio, riskFreeRate: metrics.riskFreeRate })
     : null;
@@ -540,7 +551,7 @@ export default function PerformancePage() {
     });
     // A 3-month moving average smooths the month-to-month noise without lagging behind the trend.
     return rows.map((entry, index) => {
-      const window = rows.slice(Math.max(0, index - 2), index + 1).map((r) => r.cagr).filter((v) => Number.isFinite(v));
+      const window = rows.slice(Math.max(0, index - 2), index + 1).map((r) => r.cagr).filter((v): v is number => v !== null && Number.isFinite(v));
       return { ...entry, cagrMA: window.length > 0 ? window.reduce((s, v) => s + v, 0) / window.length : null };
     });
   }, [performanceData, metrics]);
@@ -739,7 +750,7 @@ export default function PerformancePage() {
             benchmark={benchmark}
             benchmarkLoading={benchmark === null && isAnyBenchmarkLoading}
             benchmarkName={REFERENCE_BENCHMARK.name}
-            roi={metrics.roi}
+            periodReturn={periodReturnChip}
             drawdown={drawdownStatus}
             series={growthSeries}
             footer={`${baseMonthLabel ? `Base 100 a fine ${baseMonthLabel} · ` : ''}benchmark in ${benchmarkCurrency === 'EUR' ? 'EUR ai cambi di fine mese' : 'USD (cambi non disponibili)'} · il primo snapshot è la valutazione di partenza, non un mese misurato`}
@@ -768,7 +779,8 @@ export default function PerformancePage() {
             reading={describeContributions({
               invested: investedCapital,
               netCashFlow: metrics.netCashFlow,
-              pension: { flow: metrics.pensionFlow, entryFlow: metrics.pensionEntryFlow, entryMonth: base?.pensionEntryMonth ?? null },
+              pension: { flow: metrics.pensionFlow, entryFlow: metrics.pensionEntryFlow, entryMonth: base?.pensionEntryMonth ?? null, internalFlow: metrics.pensionInternalFlow },
+              portfolio: { flow: metrics.portfolioFlow, source: metrics.flowSource, measuredMonths: metrics.measuredFlowMonths, totalMonths: metrics.numberOfMonths },
             })}
             invested={investedCapital}
             netCashFlow={metrics.netCashFlow}
@@ -777,6 +789,11 @@ export default function PerformancePage() {
             totalDividendIncome={metrics.totalDividendIncome}
             pensionFlow={metrics.pensionFlow}
             pensionEntryFlow={metrics.pensionEntryFlow}
+            pensionInternalFlow={metrics.pensionInternalFlow}
+            portfolioFlow={metrics.portfolioFlow}
+            flowSource={metrics.flowSource}
+            measuredFlowMonths={metrics.measuredFlowMonths}
+            numberOfMonths={metrics.numberOfMonths}
           />
         </div>
 

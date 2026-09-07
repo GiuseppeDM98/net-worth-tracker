@@ -15,6 +15,28 @@
 - **GBp (pence) ≠ GBP**: normalize `price / 100` before any FX call or values inflate 100×. **Never call Frankfurter from
   the browser** — all FX is server-side via `/api/prices/quote`. `quantity = 0` marks a sold asset, cash balance lives
   in `quantity`, and Borsa Italiana bond prices are `% of par` (`rawPrice * nominalValue / 100`).
+- **Every G/P stands EUR against EUR, fees included — ONE rule in `lib/utils/costBasisEur.ts`** (2026-09-07, PR #326
+  merged with changes). `costBasisPerUnitEur` is the ledger's `averageCostEur` (the position's cost at trade-date
+  rates, purchase fees INCLUDED — the fiscal cost a capital gain is taxed on) when the ledger has projected it, the
+  native `averageCost` only for a EUR-native asset until the backfill reaches it, and `undefined` for a foreign asset
+  without a EUR PMC — the consumers then print nothing rather than a dollar PMC against a euro value, which is what
+  every G/P did before. `unitPriceEur` is the per-unit twin of `calculateAssetValue`'s rule (`currentPriceEur`, else
+  the native price with the GBp guard). The consumers, all on the same two functions: `computeUnrealizedGain` /
+  `summarizeUnrealizedGains` (the table, the mobile row, the Sintesi), `assetService.calculateUnrealizedGains` (the
+  overview's total, the estimated taxes, `netTotal`; pinned equal to the table's sum by `assetService.test.ts`),
+  `dashboardOverviewService` (`topAssets[].returnPercent`, `hasCostBasisTracking`; payload version 15),
+  `pdfDataService` (the Patrimonio section's rows), `TaxCalculatorModal` (the simulation runs in EUR on both sides
+  and shows the native price and PMC as extra rows on a foreign asset), `yieldOnCost` (YOC and current yield over the
+  EUR PMC and the EUR price; a foreign asset without a EUR PMC is left out). **The PMC cell prints the EUR PMC**, and
+  on a foreign row the native one under it (alone until the backfill). The owner's call: a PMC with fees is the
+  broker's fiscal figure; a EUR position's G/P therefore drops by its total purchase fees.
+- **`averageCostEur` is projected by every ledger mutation and, once, by `backfillAverageCostEur`** (`POST
+  /api/asset-transactions/backfill-average-cost-eur`, fired by the Patrimonio page after the ledger migration, gated on
+  the demo like every write): a pure re-projection of the trades' own `priceEur` — no FX call — that writes ONLY
+  `averageCostEur`, skips a closed position, logs and counts a ledger the replay rejects instead of failing, and stamps
+  `averageCostEurBackfilledAt` on the meta doc so it never runs twice. Until an account opens Patrimonio once, its
+  foreign positions have no G/P on the Panoramica and in the PDF, and its EUR positions measure against the
+  fee-excluded native PMC: honest, and one visit away from the fiscal figure.
 - **Patrimonio Δ columns are UNIT-PRICE variations over time windows, not profit/loss and not value changes**
   (`lib/utils/assetPerformanceDeltas.ts`): the canonical EUR unit `totalValue / quantity` of the snapshot row against
   today's, the property (by TYPE `realestate` — a REIT ETF in that class is a quoted fund) gross of debt, pension
@@ -80,4 +102,4 @@
 
 ## Per-page blind spots
 
-- **Patrimonio**: Δ columns are empty for pension funds and cash accounts by design; the Rendimento tile ranks only within the overview's `topAssets` (15 largest); «Movimenti del mese» reads the whole ledger and filters in memory; the 2-click delete auto-disarms on a 3 s timer (kept on request); G/P against PMC compares a native-currency `averageCost` with the EUR value; `TaxCalculatorModal` simulates in the native price but labels €; `AssetDialog.tsx` carries 7 pre-existing `react-hooks` errors. **Two accepted side effects of the optional Sottocategoria** (2026-08-30; neither is new — without the asterisk they are only less signalled): a cash account without the «conti correnti» subcategory loses the 5.000 € stamp-duty threshold (`calculateStampDuty`, a rule Impostazioni already states), and changing Tipo or Classe does not clear `subCategory`, so an out-of-class value can survive invisibly — Radix shows the placeholder because the value is not among the items.
+- **Patrimonio**: Δ columns are empty for pension funds and cash accounts by design; the Rendimento tile ranks only within the overview's `topAssets` (15 largest); «Movimenti del mese» reads the whole ledger and filters in memory; the 2-click delete auto-disarms on a 3 s timer (kept on request); **a foreign-currency position has no G/P, no YOC and no PMC in euro until its ledger has projected `averageCostEur`** (the backfill runs on the first visit to Patrimonio; before it, the Panoramica's «Asset principali» and the PDF print no return for it — never the old dollar-against-euro figure); a EUR position measured against the native PMC before the backfill reads a G/P higher by its purchase fees; `AssetDialog.tsx` carries 7 pre-existing `react-hooks` errors. **Two accepted side effects of the optional Sottocategoria** (2026-08-30; neither is new — without the asterisk they are only less signalled): a cash account without the «conti correnti» subcategory loses the 5.000 € stamp-duty threshold (`calculateStampDuty`, a rule Impostazioni already states), and changing Tipo or Classe does not clear `subCategory`, so an out-of-class value can survive invisibly — Radix shows the placeholder because the value is not among the items.

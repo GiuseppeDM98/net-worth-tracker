@@ -9,6 +9,14 @@
   the asymmetry, the cashflow before the floor is bulk-imported noise. **The Cashflow section DECLARES that floor**
   in its scope line and in a note (`historyFloorYear` on `CashflowData`, set only for a Totale export): a reader told
   "Totale" otherwise reads the missing years as years without spending (DESIGN → *The Declared-Window Rule*).
+- **The Rendimenti section measures the SAME base as the page** (2026-09-07, issue #324): `preparePerformanceData`
+  receives the assets, reads the pension contributions and resolves `resolvePerformanceBase` — projected snapshots,
+  pension and measured flows — before calling `calculatePerformanceForPeriod`; `PerformanceData.baseLabel`
+  (`describeMeasurementBase`) sits on the section's scope line beside the window. Until then it ran on the RAW
+  snapshots with no flow channel (the whole net worth, house included: +105% annualised against the page's +26% on one
+  account) and told no one. Its words are named for what they are: the TWR «annualizzato», the ROI «sul capitale
+  iniziale» (the note used to say «sul capitale versato», false), the CAGR beside the TWR and never as its annualised
+  form; a «Capitale entrato nella base» row appears when the flows were measured.
 - **A verdict over tiles** (2026-09-01): the cover is the report's verdict, not a frontispiece, and every section is
   eyebrow · scope · reading · figures. Words from `lib/utils/pdfNarrative.ts`, chrome from
   `components/pdf/primitives/PDFTile.tsx` (`PDFPage`, `PDFSection`, `PDFMetrics`, `PDFRankedRows`, `PDFNarrative`,
@@ -28,7 +36,13 @@
   endpoints from one and its delta from the other and printed three numbers that could not all be true.
 - **Verifying it means rendering it.** `renderToFile` from `@react-pdf/renderer` works under Vitest; inflating the
   content streams and collecting every `scn` operand is what proved no colour outside `printTokens` reaches the page,
-  and reading the extracted text is what caught the missing minus signs. `tsc` catches neither.
+  and reading the extracted text is what caught the missing minus signs. `tsc` catches neither. The text comes out as
+  hex WinAnsi (`<53746f72>` = «Stor») inside kerned `TJ` arrays that split words, and the metric labels are printed
+  uppercase: compare space-free and case-insensitively. **And render with the REAL data path too** (2026-09-07): a
+  section rendered from hand-typed metrics passed every word while the owner's own export still ran
+  `preparePerformanceData` without the ledger (26,05% against the page's 27,08%) — call `fetchPDFData` through the
+  client SDK on the emulators (a `globalThis.fetch` shim prefixes the tour server's origin to the relative yield
+  routes) and compare its metrics with `getAllPerformanceData`'s.
 
 ## Periodic Emails (`lib/server/monthlyEmailService.ts`, `weeklyBudgetEmailService.ts`)
 

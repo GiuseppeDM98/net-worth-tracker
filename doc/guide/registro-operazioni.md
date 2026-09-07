@@ -12,6 +12,12 @@
 - ALL trade money-math lives here (replay, PMC, realized P&L, XIRR, total return, invested capital); the service/route
   layer is a thin atomic writer. A new `AssetTransactionType` must update the replay switch, the zod schema AND
   `TransactionDialog`. **Native PMC excludes fees**, which live only on the EUR side, and a sell never moves it.
+  **The EUR side is the one the app measures against** (2026-09-07): `buildDerivedAssetFields` projects
+  `averageCostEur` (= `costBasisEur / quantity`, fees included) onto the asset doc beside `quantity` and the native
+  `averageCost`, and `lib/utils/costBasisEur.ts` is the ONE reader of the pair — doc/guide/patrimonio.md § Asset
+  Pricing. `backfillAverageCostEur` (use case + route + the Patrimonio page's one-shot trigger) projects the field onto
+  the docs written before it existed; it writes ONLY that field, and a ledger the replay rejects is counted in
+  `skippedAssetCount`, never fatal.
 - **The migration baseline (`isBaseline` BUY) NEVER stamps `holdingStartDate`**, and `replayTransactions` returning
   `holdingStartDate: undefined` means **leave the asset doc untouched** — never `deleteField()`, which would zero YOC for
   the whole portfolio.

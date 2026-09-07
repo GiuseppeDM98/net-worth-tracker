@@ -190,6 +190,12 @@ export type PensionReturnState =
   | 'measured'
   /** `isCoverageSuspicious`: the growth is too high for the contributions recorded. */
   | 'suspicious'
+  /**
+   * `isCoverageContradictory`: the mirror image — MORE contributions recorded than the growth
+   * they should explain, so the arithmetic left the real. A contribution counted twice, or one
+   * already inside a hand-entered value, never a bad market.
+   */
+  | 'contradictory'
   /** `hasNoMovement`: the window is open but nothing happened inside it. */
   | 'idle'
   /** No contribution recorded and no configured start: the window cannot open. */
@@ -250,7 +256,14 @@ export interface PensionMemberBlock {
 function resolveReturnState(result: PensionReturnResult | null, startMonth: string | null): PensionReturnState {
   if (result) {
     if (isPensionReturnMeasurable(result)) return 'measured';
-    return result.isCoverageSuspicious ? 'suspicious' : 'idle';
+    // Order matters, and the contradiction comes FIRST. The two flags can both be true: a month
+    // that closes at or below zero net of its contributions turns the index negative, a second one
+    // turns it positive again, and a recovery on top can annualize past the suspicious threshold.
+    // That window is broken data, not a fund with missing contributions — and «registra i
+    // versamenti mancanti» would be exactly the wrong advice for it (the suspicious reading's).
+    if (result.isCoverageContradictory) return 'contradictory';
+    if (result.isCoverageSuspicious) return 'suspicious';
+    return 'idle';
   }
   return startMonth === null ? 'no-contributions' : 'one-point';
 }

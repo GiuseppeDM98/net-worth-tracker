@@ -12,6 +12,7 @@ import type { Asset } from '@/types/assets';
 import type { AssetTransaction } from '@/types/assetTransactions';
 import type { DashboardOverviewTopAsset } from '@/types/dashboardOverview';
 import { calculateAssetValue } from '@/lib/services/assetService';
+import { costBasisPerUnitEur } from '@/lib/utils/costBasisEur';
 import { hasMarketPrice } from '@/lib/utils/assetPricing';
 import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
 
@@ -130,6 +131,9 @@ export interface UnrealizedGainsSummary {
   count: number;
 }
 
+/** The EUR PMC to compare against `calculateAssetValue` (itself always EUR) — see costBasisEur.ts. */
+export { costBasisPerUnitEur };
+
 /**
  * Whether an asset's G/P against its PMC is meaningful. Cash accounts do not represent invested
  * capital (their cost basis would dilute the percentage without adding any gain), and a pension
@@ -138,16 +142,19 @@ export interface UnrealizedGainsSummary {
  */
 export function hasCostBasis(asset: Asset): boolean {
   if (isCashAccount(asset) || asset.type === 'pensionFund' || !isHeld(asset)) return false;
-  return !!asset.averageCost && asset.averageCost > 0;
+  const basis = costBasisPerUnitEur(asset);
+  return basis !== undefined && basis > 0;
 }
 
 /**
  * One position's G/P against its PMC — the figure the table cell, the mobile row and the sort
- * share. Null when `hasCostBasis` says there is no PMC to measure against.
+ * share. Both sides of the subtraction are EUR (see `costBasisPerUnitEur`), so a foreign-currency
+ * position is never measured against its own native-currency PMC. Null when `hasCostBasis` says
+ * there is no PMC to measure against.
  */
 export function computeUnrealizedGain(asset: Asset): { gainLoss: number; gainPercent: number } | null {
   if (!hasCostBasis(asset)) return null;
-  const basis = asset.quantity * (asset.averageCost as number);
+  const basis = asset.quantity * (costBasisPerUnitEur(asset) as number);
   const gainLoss = calculateAssetValue(asset) - basis;
   return { gainLoss, gainPercent: basis > 0 ? (gainLoss / basis) * 100 : 0 };
 }
@@ -160,7 +167,7 @@ export function summarizeUnrealizedGains(assets: Asset[]): UnrealizedGainsSummar
     const gain = computeUnrealizedGain(asset);
     if (!gain) continue;
     gainLoss += gain.gainLoss;
-    costBasis += asset.quantity * (asset.averageCost as number);
+    costBasis += asset.quantity * (costBasisPerUnitEur(asset) as number);
     count += 1;
   }
   return {

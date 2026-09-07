@@ -34,11 +34,17 @@ interface PeriodPickerProps {
   readonly onChange: (period: Period) => void;
   readonly availableYears?: number[];
   readonly className?: string;
+  /**
+   * The accessible name's prefix («Periodo selezionato» by default). A page that mounts a SECOND
+   * picker on the same axis (Tracciamento's Movimenti tile) names it differently, or a screen
+   * reader hears two identical controls.
+   */
+  readonly ariaLabelPrefix?: string;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function PeriodPicker({ value, onChange, availableYears = [], className }: PeriodPickerProps) {
+export function PeriodPicker({ value, onChange, availableYears = [], className, ariaLabelPrefix = 'Periodo selezionato' }: PeriodPickerProps) {
   const isMobile = useMediaQuery('(max-width: 639px)');
   // Stable reference: preset labels are relative to «today» and don't change mid-session.
   const now = React.useMemo(() => new Date(), []);
@@ -61,7 +67,7 @@ export function PeriodPicker({ value, onChange, availableYears = [], className }
       variant="outline"
       role="combobox"
       aria-expanded={open}
-      aria-label={`Periodo selezionato: ${label}`}
+      aria-label={`${ariaLabelPrefix}: ${label}`}
       className={cn(
         'justify-between gap-2 min-w-[190px] font-normal',
         isCustom && 'text-primary border-primary/40',

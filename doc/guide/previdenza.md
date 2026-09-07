@@ -60,9 +60,21 @@
 - **The series ends at the fund's LIVE value, not the current month's snapshot** (`overlayLivePensionValue`): the asset
   rises immediately while the snapshot waits for the cron, so the TWR would drop by exactly the amount paid in. Storico
   and Rendimenti stay snapshot-based.
-- **`isPensionReturnMeasurable` = `!isCoverageSuspicious && !hasNoMovement` is ONE predicate with two consumers.**
-  *When two places must agree on whether data is trustworthy, the agreement is a named function.* An annualized return
-  above 20% means missing contributions, not a brilliant fund.
+- **`isPensionReturnMeasurable` = `!isCoverageSuspicious && !isCoverageContradictory && !hasNoMovement` is ONE
+  predicate with two consumers.** *When two places must agree on whether data is trustworthy, the agreement is a named
+  function.* An annualized return above 20% means missing contributions, not a brilliant fund — and its mirror image
+  (2026-09-07, PR #323 merged with changes) is **`isCoverageContradictory`**: MORE contributions recorded than the
+  growth they should explain, true on a three-flag predicate — a month that closes at or below zero net of its
+  contributions (impossible: a fund is not worth less than nothing), a cumulative loss beyond 100% (impossible too, and
+  in practice subsumed by the first: a negative index needs an odd number of negative factors), and a value that GREW
+  while the TWR reads below −75% (a plausibility judgement: the threshold sits beyond any real drawdown, and a fund that
+  crossed it with contributions lifting it back above its opening value would be misread — accepted). The real case:
+  five months of contributions recorded on one day, attributed by `valueEffectMonth` to that month, read as +50/+33/+25%
+  of «market» on the way up and then −97% when 2.250 € were subtracted from a 2.270 € month — printed as a measure while
+  the guard only looked upward. **`resolveReturnState` reads the contradiction BEFORE the suspicion**: both flags can be
+  true (two non-positive months turn the index positive again, a recovery annualizes past 20%), and «registra i
+  versamenti mancanti» is exactly the wrong advice for broken data. `annualizedTwr` normalises a NaN (a negative index
+  under a fractional power) to `null`, which is already the field's «not computable».
 
 ### Page and integrations
 - **The year axis governs the annual tiles and the verdict's annual clauses only, never the fund value or the
@@ -106,9 +118,11 @@
 - **The return is computed per contributor**: the same `pensionReturn.ts` functions on the member's funds and the
   member's contributions (the configured `pensionReturnStartMonth` still wins for everyone), so the verdict and the
   Rendimento tile print the SAME TWR. A fund linked to no member is its own block, named by the fund, without a tax
-  clause — never folded into someone else's RAL. `returnState` (`measured` · `suspicious` · `idle` ·
+  clause — never folded into someone else's RAL. `returnState` (`measured` · `suspicious` · `contradictory` · `idle` ·
   `no-contributions` · `one-point`) is the one discriminator the verdict, the tile and the Dettaglio read; when it is
-  not `measured` the percentage is replaced by the reason everywhere, and «Da dove viene la crescita» is absent.
+  not `measured` the percentage is replaced by the reason everywhere, and «Da dove viene la crescita» is absent. The
+  `contradictory` sentence says «più versamenti della crescita … o già inclusi nel valore inserito a mano, o contati due
+  volte» and offers the configured start month — never «registra i versamenti mancanti».
 - **The year axis sits beside the verdict** (Tracciamento's shape) and governs the verdict's two annual clauses,
   «Anno fiscale», «Versato nel {Y}» and «Versamenti {Y}»; «Il fondo oggi» and «Rendimento» are OFF it and name their
   own window in the aside («oggi», «nov 2025 → ago 2026»). The month digest of the hero (`monthEffect`) is measured
@@ -128,4 +142,4 @@
 
 ## Per-page blind spots
 
-- **Previdenza**: a contribution the fund credits late reads as a temporary market loss in the month it is recorded (the window's total heals once credited and the value updated — by design, → *Fondo Pensione*); the sparkline starts where the snapshots carry `byAsset`; the month chip needs the previous month's snapshot; two contributors stack one block per person; the IRPEF saving uses the default brackets; the dialog keeps its old chrome.
+- **Previdenza**: a contribution the fund credits late reads as a temporary market loss in the month it is recorded (the window's total heals once credited and the value updated — by design, → *Fondo Pensione*); the sparkline starts where the snapshots carry `byAsset`; the month chip needs the previous month's snapshot; two contributors stack one block per person; the IRPEF saving uses the default brackets; the dialog keeps its old chrome; **the contradictory guard covers the WINDOW's return only** (2026-09-07): the month chip of «Il fondo oggi» (`monthEffect`), the Panoramica's market digest and Rendimenti's per-instrument attribution all read `Δvalue − contributions moved that month` for a single month without it, so the same backfilled contributions print a −2.250 € «market» effect for that month on those three surfaces — a month, not a return, and said as such nowhere yet.

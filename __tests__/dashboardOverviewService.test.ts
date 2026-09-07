@@ -415,3 +415,67 @@ describe('dashboardOverviewService', () => {
     expect(overviewSummaryDocSetMock).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('dashboardOverviewService — G/P in EUR on both sides (costBasisEur.ts)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    overviewSummaryDocSetMock.mockResolvedValue(undefined);
+    goalDocGetMock.mockResolvedValue({ exists: false });
+    overviewSummaryDocGetMock.mockResolvedValue({ exists: false });
+    snapshotsGetMock.mockResolvedValue({ docs: [] });
+    settingsDocGetMock.mockResolvedValue({ exists: false });
+    expensesGetMock.mockResolvedValue({ docs: [] });
+  });
+
+  const usdAsset = (id: string, extra: Record<string, unknown>) => ({
+    id,
+    data: () => ({
+      userId: 'user-1',
+      ticker: id.toUpperCase(),
+      name: id,
+      type: 'etf',
+      assetClass: 'equity',
+      currency: 'USD',
+      quantity: 10,
+      currentPrice: 145,
+      currentPriceEur: 130,
+      averageCost: 100,
+      stampDutyExempt: false,
+      isLiquid: true,
+      lastPriceUpdate: new Date('2026-04-06T09:00:00.000Z'),
+      createdAt: new Date('2025-01-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-04-06T09:00:00.000Z'),
+      ...extra,
+    }),
+  });
+
+  it('measures a USD position against its EUR PMC with fees, and prints nothing for one without it', async () => {
+    assetsGetMock.mockResolvedValue({
+      docs: [
+        // 10 units, EUR PMC 91 (fees included), worth 1.300 €: +390 €, +42,86 %, taxed at 26 %.
+        usdAsset('vusa', { averageCostEur: 91, taxRate: 26 }),
+        // Pre-backfill: only the native PMC — a G/P here would be dollars against euros.
+        usdAsset('legacy', {}),
+      ],
+    });
+
+    const result = await getDashboardOverview('user-1');
+
+    expect(result.freshness.source).toBe('live_recompute');
+    expect(result.metrics.unrealizedGains).toBeCloseTo(390, 6);
+    expect(result.metrics.estimatedTaxes).toBeCloseTo(390 * 0.26, 6);
+    expect(result.flags.hasCostBasisTracking).toBe(true);
+    const byId = new Map((result.topAssets ?? []).map((a) => [a.id, a]));
+    expect(byId.get('vusa')?.returnPercent).toBeCloseTo((390 / 910) * 100, 6);
+    expect(byId.get('legacy')?.returnPercent).toBeNull();
+  });
+
+  it('reports no cost-basis tracking when the only PMCs are native ones on foreign assets', async () => {
+    assetsGetMock.mockResolvedValue({ docs: [usdAsset('legacy', {})] });
+
+    const result = await getDashboardOverview('user-1');
+
+    expect(result.flags.hasCostBasisTracking).toBe(false);
+    expect(result.metrics.unrealizedGains).toBe(0);
+  });
+});

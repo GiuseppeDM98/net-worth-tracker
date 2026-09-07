@@ -30,6 +30,9 @@ import {
   describeEvolution,
   describeEvolutionAside,
   describeLabor,
+  describeLaborTaxes,
+  describeLaborWindow,
+  describeOtherIncome,
   describeMonthBreakdown,
   describeMonthlyDrivers,
   describeNotes,
@@ -431,12 +434,53 @@ describe('Dettaglio readings', () => {
     expect(describeMonthlyDrivers([])).toBeNull();
   });
 
-  it('should read the labor figures since the cashflow floor', () => {
-    const metrics = { startYear: 2025, totalLaborIncome: 78400, totalSavedFromWork: 36900, totalExpensesSum: -41500, totalInvestmentGrowthGross: 14200, totalInvestmentGrowthNet: 11900 };
-    expect(plain(describeLabor(metrics))).toBe('Dal 2025 hai guadagnato 78.400 € lavorando e ne hai messi da parte 36.900 €; il mercato ha aggiunto 14.200 € lordi, 11.900 € al netto delle tasse stimate.');
-    expect(plain(describeLabor({ ...metrics, totalSavedFromWork: -2000, totalInvestmentGrowthGross: -3000, totalInvestmentGrowthNet: -3000 }))).toBe('Dal 2025 hai guadagnato 78.400 € lavorando e hai speso 2000 € più di quanto hai guadagnato; il mercato ha tolto 3000 €.');
-    // Taxes are estimated on every latent gain, so a positive gross can be a negative net: the minus is in the words.
-    expect(plain(describeLabor({ ...metrics, totalInvestmentGrowthGross: 1200, totalInvestmentGrowthNet: -300 }))).toBe('Dal 2025 hai guadagnato 78.400 € lavorando e ne hai messi da parte 36.900 €; il mercato ha aggiunto 1200 € lordi, ma le tasse stimate pesano di più: −300 € al netto.');
+  const LABOR = {
+    startYear: 2025,
+    since: { year: 2025, month: 1 },
+    until: { year: 2026, month: 6 },
+    totalLaborIncome: 78400,
+    totalSavedFromWork: 36900,
+    totalExpensesSum: -41500,
+    otherIncome: 6500,
+    otherIncomeByCategory: [
+      { categoryId: 'd', name: 'Dividendi', amount: 4100 },
+      { categoryId: 'a', name: 'Affitti', amount: 2400 },
+    ],
+    netWorthGrowth: 57600,
+    totalInvestmentGrowthGross: 14200,
+    totalInvestmentGrowthNet: 11900,
+    coverage: 78400 / 41500,
+  };
+
+  it('should lead the labor recap with the coverage, then the two amounts and the market', () => {
+    expect(plain(describeLabor(LABOR))).toBe('Da gennaio 2025 a giugno 2026 il lavoro ha coperto il 189% delle spese: 78.400 € guadagnati lavorando contro 41.500 € spesi; il mercato ha aggiunto 14.200 €.');
+    expect(plain(describeLabor({ ...LABOR, totalInvestmentGrowthGross: -3000, totalInvestmentGrowthNet: -3000 }))).toBe('Da gennaio 2025 a giugno 2026 il lavoro ha coperto il 189% delle spese: 78.400 € guadagnati lavorando contro 41.500 € spesi; il mercato ha tolto 3000 €.');
+    // No ratio without both sides: the sentence names what is missing instead.
+    expect(plain(describeLabor({ ...LABOR, totalExpensesSum: 0, totalSavedFromWork: 78400, coverage: null }))).toBe('Da gennaio 2025 a giugno 2026 hai guadagnato 78.400 € lavorando e non risulta nessuna spesa; il mercato ha aggiunto 14.200 €.');
+    expect(plain(describeLabor({ ...LABOR, totalLaborIncome: 0, totalSavedFromWork: -41500, coverage: null }))).toBe('Da gennaio 2025 a giugno 2026 non risulta reddito nelle categorie «reddito da lavoro» e hai speso 41.500 €; il mercato ha aggiunto 14.200 €.');
+  });
+
+  it('should name the recap window by its months, the closing month always said', () => {
+    expect(describeLaborWindow(LABOR)).toBe('Da gennaio 2025 a giugno 2026');
+    expect(describeLaborWindow({ since: { year: 2026, month: 1 }, until: { year: 2026, month: 8 } })).toBe('Da gennaio ad agosto 2026');
+    expect(describeLaborWindow({ since: { year: 2026, month: 8 }, until: { year: 2026, month: 8 } })).toBe('Ad agosto 2026');
+  });
+
+  it('should caption the other income by category, three named, and say when there is none', () => {
+    // A caption is a plain string, so the no-break space before € is flattened here, as `plain` does for a Narrative.
+    const flat = (text: string) => text.replace(/ /g, ' ');
+    expect(flat(describeOtherIncome(LABOR.otherIncomeByCategory))).toBe('Dividendi 4100 € · Affitti 2400 €');
+    const five = ['A', 'B', 'C', 'D', 'E'].map((name, i) => ({ categoryId: name, name, amount: 500 - i }));
+    expect(flat(describeOtherIncome(five))).toBe('A 500 € · B 499 € · C 498 € e altre 2');
+    expect(flat(describeOtherIncome(five.slice(0, 4)))).toBe("A 500 € · B 499 € · C 498 € e un'altra");
+    expect(describeOtherIncome([])).toBe('nessuna entrata fuori dalle categorie «reddito da lavoro»');
+  });
+
+  it('should put the estimated taxes in a footer sentence, and none when nothing is estimated', () => {
+    expect(plain(describeLaborTaxes(LABOR))).toBe('Al netto di 2300 € di tasse stimate sulle plusvalenze latenti, il mercato vale +11.900 €.');
+    // Taxes are estimated on every latent gain, so a positive gross can be a negative net: the minus is in the figure.
+    expect(plain(describeLaborTaxes({ totalInvestmentGrowthGross: 1200, totalInvestmentGrowthNet: -300 }))).toBe('Al netto di 1500 € di tasse stimate sulle plusvalenze latenti, il mercato vale −300 €.');
+    expect(describeLaborTaxes({ totalInvestmentGrowthGross: 1200, totalInvestmentGrowthNet: 1200 })).toBeNull();
   });
 
   it('should count the notes', () => {

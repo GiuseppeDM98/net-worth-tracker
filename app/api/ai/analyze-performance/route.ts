@@ -278,7 +278,8 @@ Prima di rispondere, usa la web search per trovare i principali eventi di mercat
 Poi analizza le seguenti metriche di performance del portafoglio per il periodo ${periodLabel} ${dateRange}:
 
 **Metriche di Rendimento:**
-- ROI Totale: ${formatMetric(performanceMetrics.roi)}
+- ROI sul capitale iniziale (guadagno netto dei versamenti diviso il capitale del primo mese, NON il rendimento del periodo): ${formatMetric(performanceMetrics.roi)}
+- Flussi neutralizzati dalle formule: ${performanceMetrics.flowSource === 'cashflow' ? 'il risparmio del cashflow (contributi netti)' : `il capitale entrato nella base misurato su registro e quantità (${performanceMetrics.measuredFlowMonths} mesi su ${performanceMetrics.numberOfMonths}${performanceMetrics.flowSource === 'mixed' ? ', altrove il risparmio del cashflow' : ''})`}
 - CAGR: ${formatMetric(performanceMetrics.cagr)}
 - Time-Weighted Return: ${formatMetric(performanceMetrics.timeWeightedReturn)}
 - Money-Weighted Return (IRR): ${formatMetric(performanceMetrics.moneyWeightedReturn)}

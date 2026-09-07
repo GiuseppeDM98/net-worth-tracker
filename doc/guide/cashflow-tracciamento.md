@@ -107,8 +107,14 @@
   shape (`category`, `categoryKey`, `amount`, `percentage`) so `rankCategories` feeds the same component, and the
   residual row appears only when categories were cut.
 - **Below `desktop:` the period stays under the verdict and the filters move INTO the Movimenti tile**
-  (`MobileFiltersDrawer showPeriod={false}` in the tile's `mobileToolbar` slot): the drawer narrows that list, and
-  four tiles away from it the badge read as unrelated. «Ripristina» (desktop toolbar and drawer alike) resets the list
+  (`MobileFiltersDrawer` in the tile's `mobileToolbar` slot): the drawer narrows that list, and four tiles away from
+  it the badge read as unrelated. **Since 2026-09-07 the drawer's bar repeats the period picker** beside «Filtri» and
+  the sort (PR #332): a search («caffè») is read over a window, and with the only picker four tiles up, changing the
+  window meant scrolling away from the answer. It is a second handle on the SAME `period` state — never a second
+  axis — with its own accessible name («Periodo dei movimenti») and `min-w-0` over the trigger's `min-w-[190px]`,
+  so the picker yields before «Filtri» and the sort when a phone runs out of room; `e2e/cashflow.mobile.spec.ts`
+  measures `main` at 390 and 360 (green even with the override removed — it pins the fit, not a fix) and drives the
+  page's period from the tile. «Ripristina» (desktop toolbar and drawer alike) resets the list
   filters and the sort, **never the period** — the axis belongs to the picker — and `hasActiveFilters` no longer
   counts a non-current month as a filter. The landscape «Aggiungi» button lives beside the period
   (`max-desktop:portrait:hidden`): in portrait the bottom-nav FAB (`cashflow:add-expense`) is the only add

@@ -278,8 +278,21 @@ describe('replayTransactions — position replay and PMC', () => {
     expect(derived).toEqual({
       quantity: 10,
       averageCost: state.averageCost,
+      averageCostEur: state.averageCostEur,
       holdingStartDate: state.holdingStartDate,
     });
+  });
+
+  it('projects a distinct averageCostEur when the trade FX differs from the native price', () => {
+    // Native price 100 USD/quota, but the trade-date FX made it 90 EUR/quota — the two PMCs must
+    // diverge, otherwise the projection is silently collapsing the EUR side back onto the native one.
+    const state = replayTransactions([
+      tx({ type: 'buy', date: day(0), quantity: 10, pricePerUnit: 100, priceEur: 90 }),
+    ]);
+    const derived = buildDerivedAssetFields(state);
+
+    expect(derived.averageCost).toBe(100);
+    expect(derived.averageCostEur).toBe(90);
   });
 
   it('orders baseline, then buy before sell, then by createdAt, then by id', () => {

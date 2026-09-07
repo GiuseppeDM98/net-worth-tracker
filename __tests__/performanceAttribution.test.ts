@@ -57,6 +57,8 @@ describe('attributePeriodReturn', () => {
     expect(result.unattributed).toBe(250); // the 220 buy that no flow explains + the 30 of interest
     expect(result.attributed + result.unattributed).toBe(result.gain);
     expect(result.coverage).toEqual({ measuredMonths: 1, attributedMonths: 1, firstAttributed: { year: 2026, month: 2 }, lastAttributed: { year: 2026, month: 2 } });
+    // 250 on a 3000 base is 8,3%: the guard names February.
+    expect(result.residualMonths).toEqual([{ month: { year: 2026, month: 2 }, unattributed: 250, share: 250 / 3000 }]);
   });
 
   it('sums the months, ranks by absolute figure and skips instruments out of the base', () => {
@@ -164,10 +166,51 @@ describe('attributePeriodReturn', () => {
     expect(result.rows[0].total).toBe(100);
   });
 
+  it('names the months whose residual is out of proportion with their starting base (the #320 guard)', () => {
+    // Jan→Feb: ETF +100 of price and a cash balance typed 500 too high (no flow explains it) on a
+    // 3000 base: 16,7% unattributed. Feb→Mar: ETF +50, and 40 € of interest on a 3650 base: 1,1%,
+    // under the 2% threshold — a normal month.
+    const snapshots = [
+      snapshot(2026, 1, 3000, [row('etf', 10, 1000), row('cash', 2000, 2000)]),
+      snapshot(2026, 2, 3600, [row('etf', 10, 1100), row('cash', 2500, 2500)]),
+      snapshot(2026, 3, 3690, [row('etf', 10, 1150), row('cash', 2540, 2540)]),
+    ];
+    const result = attributePeriodReturn({ snapshots, cashFlows: [], excludedAssetIds: [], pension: noPension, assets });
+
+    expect(result.gain).toBe(690);
+    expect(result.unattributed).toBe(540);
+    expect(result.residualMonths).toEqual([{ month: { year: 2026, month: 2 }, unattributed: 500, share: 500 / 3000 }]);
+  });
+
+  it('ranks the flagged months by share, and never flags a month that started from nothing', () => {
+    const snapshots = [
+      snapshot(2026, 1, 0, [row('cash', 0, 0)]),
+      snapshot(2026, 2, 1000, [row('cash', 1000, 1000)]), // from an empty base: no share to speak of
+      snapshot(2026, 3, 1030, [row('cash', 1030, 1030)]), // +3%
+      snapshot(2026, 4, 1130, [row('cash', 1130, 1130)]), // +9,7%
+    ];
+    const result = attributePeriodReturn({ snapshots, cashFlows: [], excludedAssetIds: [], pension: noPension, assets });
+
+    expect(result.residualMonths.map((m) => m.month.month)).toEqual([4, 3]);
+    expect(result.residualMonths[0].share).toBeCloseTo(100 / 1030, 9);
+  });
+
+  it('reads a month whose flow explains the move as clean, even with a big unattributed sum elsewhere', () => {
+    // A 2000 deposit on the cash account, matched by the flow: nothing unattributed that month.
+    const snapshots = [
+      snapshot(2026, 1, 3000, [row('etf', 10, 1000), row('cash', 2000, 2000)]),
+      snapshot(2026, 2, 5000, [row('etf', 10, 1000), row('cash', 4000, 4000)]),
+    ];
+    const result = attributePeriodReturn({ snapshots, cashFlows: [cashFlow(2026, 2, 2000)], excludedAssetIds: [], pension: noPension, assets });
+
+    expect(result.unattributed).toBe(0);
+    expect(result.residualMonths).toEqual([]);
+  });
+
   it('returns an empty attribution when no pair has a breakdown', () => {
     const result = attributePeriodReturn({ snapshots: [snapshot(2025, 1, 100, null), snapshot(2025, 2, 110, null)], cashFlows: [], excludedAssetIds: [], pension: noPension, assets });
 
-    expect(result).toEqual({ rows: [], attributed: 0, gain: 0, unattributed: 0, coverage: { measuredMonths: 1, attributedMonths: 0, firstAttributed: null, lastAttributed: null } });
+    expect(result).toEqual({ rows: [], attributed: 0, gain: 0, unattributed: 0, coverage: { measuredMonths: 1, attributedMonths: 0, firstAttributed: null, lastAttributed: null }, residualMonths: [] });
   });
 });
 

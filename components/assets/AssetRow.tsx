@@ -9,6 +9,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { formatCurrency, formatNumber, formatPercentage } from '@/lib/services/chartService';
 import { calculateAssetValue } from '@/lib/services/assetService';
 import { computeUnrealizedGain } from '@/lib/utils/patrimonioSummary';
+import { costBasisPerUnitEur, isEurNative } from '@/lib/utils/costBasisEur';
 import { getAssetClassCssVar } from '@/lib/constants/colors';
 import { ASSET_CLASS_LABELS } from '@/lib/utils/allocationUtils';
 import { resolveDisplayAssetClass } from '@/lib/utils/assetDisplayClass';
@@ -144,10 +145,14 @@ export function AssetRow({
     }
   };
 
+  // The EUR PMC (fees included, the G/P's basis) and, on a foreign row, the native one beside it.
+  const pmcEur = costBasisPerUnitEur(asset);
+  const nativePmc = !isEurNative(asset) && asset.averageCost ? asset.averageCost : undefined;
   const details: Array<{ label: string; value: string; className?: string }> = [
     { label: 'Quantità', value: formatNumber(asset.quantity, 2) },
     { label: 'Prezzo', value: formatCurrency(asset.currentPrice, asset.currency, 4) },
-    ...(asset.averageCost ? [{ label: 'PMC', value: formatCurrency(asset.averageCost, asset.currency, 4) }] : []),
+    ...(pmcEur !== undefined ? [{ label: 'PMC', value: formatCurrency(pmcEur, 'EUR', 4) }] : []),
+    ...(nativePmc !== undefined ? [{ label: `PMC (${asset.currency})`, value: formatCurrency(nativePmc, asset.currency, 4) }] : []),
     ...(asset.totalExpenseRatio ? [{ label: 'TER', value: formatPercentage(asset.totalExpenseRatio, 2) }] : []),
     { label: 'Peso', value: weight === null ? '—' : formatPercentage(weight, 2) },
     ...(hasGainLoss

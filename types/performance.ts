@@ -8,7 +8,6 @@ export type TimePeriod =
   | '5Y' // Last 60 months
   | 'ALL' // All available data
   | 'ROLLING_12M' // Rolling 12-month periods
-  | 'ROLLING_36M' // Rolling 36-month periods
   | 'CUSTOM'; // User-defined date range
 
 // A calendar month, 1-based (month 1 = January) — the granularity every snapshot lives at.
@@ -37,7 +36,37 @@ export interface CashFlowData {
    * `resolvePerformanceBase` (lib/utils/performanceBase.ts); absent means 0.
    */
   pensionFlow?: number;
+  /**
+   * The capital that crossed the boundary of the MEASURED BASE through the instruments inside it
+   * this month, MEASURED — from the trade ledger where the instrument is covered by it, from the
+   * quantity changes of the snapshots' `byAsset` otherwise (lib/utils/portfolioFlows.ts) — signed
+   * (+ into the base). It replaces `netCashFlow` in every return formula for the months it exists:
+   * when the base is a subset of the net worth the cashflow's savings are not what entered it
+   * (a purchase paid from an account outside the base is capital coming in, and the cashflow
+   * skips transfers). Absent or `null` = the month is NOT measurable (no breakdown on one of its
+   * two snapshots) and `externalFlowOf` falls back to `netCashFlow`; `0` = measured, nothing moved.
+   * Built by `resolvePerformanceBase`, merged by `mergePortfolioFlows`.
+   */
+  portfolioFlow?: number | null;
 }
+
+/** Which source produced a month's measured flow — the reading names it. */
+export type PortfolioFlowSource = 'ledger' | 'quantities' | 'mixed';
+
+/**
+ * One month's crossing of the measured base's boundary through the instruments inside it: buys
+ * minus sells from the ledger for the covered instruments, quantity changes valued at the month's
+ * price for the others, cash accounts' balance changes when they are in the base. Only the months
+ * whose two snapshots both carry `byAsset` produce one; a month with no entry is not measurable.
+ */
+export interface PortfolioBoundaryFlow {
+  month: string; // 'YYYY-MM'
+  amount: number; // signed: + into the base, − out of it
+  source: PortfolioFlowSource;
+}
+
+/** Where the period's flows came from: the cashflow's savings, the measured boundary, or both by month. */
+export type FlowSource = 'cashflow' | 'portfolio' | 'mixed';
 
 /**
  * One month's crossing of the measured base's boundary by the pension funds.
@@ -48,12 +77,16 @@ export interface CashFlowData {
  * the base: it came from outside, so it is a flow, never a return.
  * `withdrawal` — a voluntary contribution paid from a cash account while the funds are OUT of the
  * base: the cash left the measured portfolio (negative amount).
+ * `transfer` — a voluntary contribution paid from a cash account INSIDE the base to a fund inside
+ * it, in a month whose flows are measured from the quantities: the account's balance drop is
+ * already counted there, so this entry (+amount) restores the fund's side and the two cancel —
+ * capital that moved within the base is not a flow.
  * `month` is the month the value MOVED (`valueEffectMonth`), never the accounting date.
  */
 export interface PensionBoundaryFlow {
   month: string; // 'YYYY-MM'
   amount: number; // signed: + into the base, − out of it
-  kind: 'entry' | 'contribution' | 'withdrawal';
+  kind: 'entry' | 'contribution' | 'withdrawal' | 'transfer';
 }
 
 // Portfolio performance metrics calculated over a specific time period.
@@ -111,6 +144,18 @@ export interface PerformanceMetrics {
   // Contributi tile keeps them apart, because an entry is not money the user set aside.
   pensionFlow: number;
   pensionEntryFlow: number;
+  /** The part of `pensionFlow` that only restores a transfer from an account inside the base (kind `transfer`): not money from outside. */
+  pensionInternalFlow: number;
+  /**
+   * Σ CashFlowData.portfolioFlow over the months it was measured: the capital that crossed the
+   * base's boundary through the instruments, as the ledger and the quantities saw it. 0 when no
+   * month was measured (`flowSource === 'cashflow'`); then every formula used the cashflow's savings.
+   */
+  portfolioFlow: number;
+  /** Which flows the formulas neutralised: the cashflow's savings, the measured boundary, or both. */
+  flowSource: FlowSource;
+  /** How many of the period's measured months carried a measured boundary flow. */
+  measuredFlowMonths: number;
   numberOfMonths: number; // Number of months in period
 
   // Yield on Cost (YOC) Metrics
@@ -146,7 +191,8 @@ export interface PerformanceMetrics {
 export interface RollingPeriodPerformance {
   periodEndDate: Date;
   periodStartDate: Date;
-  cagr: number;
+  /** `null` when the window has no measurable growth rate (a non-positive adjusted start), never a 0 that reads as «flat». */
+  cagr: number | null;
   sharpeRatio: number | null;
   volatility: number | null;
 }
@@ -161,9 +207,8 @@ export interface PerformanceData {
   allTime: PerformanceMetrics;
   custom: PerformanceMetrics | null;
 
-  // Rolling period trends
+  // Rolling period trends (the 36-month series was computed, cached and never read by any surface — dropped 2026-09-07)
   rolling12M: RollingPeriodPerformance[];
-  rolling36M: RollingPeriodPerformance[];
 
   // Metadata
   lastUpdated: Date;
@@ -199,6 +244,7 @@ export interface FirestoreCashFlowData {
   dividendIncome: number;
   netCashFlow: number;
   pensionFlow?: number;
+  portfolioFlow?: number | null;
 }
 
 // Firestore-serialized version of PerformanceMetrics (Date fields → Timestamp)
@@ -229,7 +275,6 @@ export interface FirestorePerformanceData {
   fiveYear: FirestorePerformanceMetrics;
   allTime: FirestorePerformanceMetrics;
   rolling12M: FirestoreRollingPeriodPerformance[];
-  rolling36M: FirestoreRollingPeriodPerformance[];
   lastUpdated: Timestamp;
   snapshotCount: number;
 }

@@ -23,7 +23,7 @@ import { articleForPercent, atThePercent, monthWithPrepositionA } from '@/lib/ut
 import type { Narrative, NarrativeSegment, PageVerdictModel, VerdictTone } from '@/lib/utils/narrative';
 import type { DoublingMode, DoublingTimeSummary } from '@/types/assets';
 import type { CompositionCut, CompositionSeries } from '@/lib/utils/historyComposition';
-import { resolveDriverShares, runningSinceMonth, type AllTimeHigh, type DoublingProjection, type DriverYear, type GrowthPace, type GrowthSummary, type LaborMetrics, type MonthlyMoves, type PeriodMonth } from '@/lib/utils/storicoSummary';
+import { resolveDriverShares, runningSinceMonth, type AllTimeHigh, type DoublingProjection, type DriverYear, type GrowthPace, type GrowthSummary, type LaborMetrics, type MonthlyMoves, type OtherIncomeCategory, type PeriodMonth } from '@/lib/utils/storicoSummary';
 import type { MonthAssetBreakdown } from '@/lib/utils/snapshotAssetBreakdown';
 
 // ─── Formatting helpers ───────────────────────────────────────────────────────
@@ -515,23 +515,77 @@ export function describeMonthlyDrivers(rows: MonthlyDriverRow[]): Narrative | nu
 export type LaborMetricsInput = LaborMetrics;
 
 /**
- * «Dal 2025 hai guadagnato 78.400 € lavorando e ne hai messi da parte 36.900 €; il mercato ha
- * aggiunto 14.200 € lordi, 11.900 € al netto delle tasse stimate.» The taxes are estimated on
- * ALL latent gains, so a positive gross can turn negative net — then the minus is in the text.
+ * «Da gennaio 2025 a settembre 2026», «Da gennaio a settembre 2026», «A settembre 2026» — the
+ * months the recap counts, named so the closing month is said (DESIGN.md → The Same-Basis Rule:
+ * the window closes on a snapshot, never on «oggi»).
+ */
+export function describeLaborWindow(metrics: Pick<LaborMetrics, 'since' | 'until'>): string {
+  const { since, until } = metrics;
+  const untilText = `${monthWithPrepositionA(until.month)} ${until.year}`;
+  if (since.year === until.year && since.month === until.month) return capitalize(untilText);
+  const sinceMonth = MONTH_NAMES[since.month - 1].toLowerCase();
+  if (since.year === until.year) return `Da ${sinceMonth} ${untilText}`;
+  return `Da ${sinceMonth} ${since.year} ${untilText}`;
+}
+
+/**
+ * «Da gennaio 2025 a settembre 2026 il lavoro ha coperto il 121% delle spese: 90.183 € guadagnati
+ * lavorando contro 74.736 € spesi; il mercato ha aggiunto 49.295 €.» The coverage leads because
+ * it answers «il lavoro mi mantiene?» without knowing the amounts — above 100% the work alone
+ * pays the bills and everything else is accumulation. It needs both sides: without spending or
+ * without labor income the sentence says which is missing instead of a ratio. The taxes are a
+ * footer, not a clause: an estimate on latent gains is not a fact of the window.
  */
 export function describeLabor(metrics: LaborMetricsInput): Narrative {
-  const saved: Narrative =
-    metrics.totalSavedFromWork >= 0
-      ? [prose(' e ne hai messi da parte '), currencyWithSign(metrics.totalSavedFromWork)]
-      : [prose(' e hai speso '), currencyWithSign(metrics.totalSavedFromWork), prose(' più di quanto hai guadagnato')];
+  const window = describeLaborWindow(metrics);
   const market: Narrative =
     metrics.totalInvestmentGrowthGross < 0
       ? [prose('; il mercato ha tolto '), currencyWithSign(metrics.totalInvestmentGrowthGross), prose('.')]
-      : metrics.totalInvestmentGrowthNet >= 0
-        ? [prose('; il mercato ha aggiunto '), currencyWithSign(metrics.totalInvestmentGrowthGross), prose(' lordi, '), currencyWithSign(metrics.totalInvestmentGrowthNet), prose(' al netto delle tasse stimate.')]
-        : [prose('; il mercato ha aggiunto '), currencyWithSign(metrics.totalInvestmentGrowthGross), prose(' lordi, ma le tasse stimate pesano di più: '), signedCurrency(metrics.totalInvestmentGrowthNet), prose(' al netto.')];
-  return [prose(`Dal ${metrics.startYear} hai guadagnato `), amount(metrics.totalLaborIncome), prose(' lavorando'), ...saved, ...market];
+      : [prose('; il mercato ha aggiunto '), currencyWithSign(metrics.totalInvestmentGrowthGross), prose('.')];
+  if (metrics.coverage !== null) {
+    return [
+      prose(`${window} il lavoro ha coperto il `),
+      figure(formatPercentage(metrics.coverage * 100, 0)),
+      prose(' delle spese: '),
+      amount(metrics.totalLaborIncome),
+      prose(' guadagnati lavorando contro '),
+      amount(metrics.totalExpensesSum),
+      prose(' spesi'),
+      ...market,
+    ];
+  }
+  if (metrics.totalLaborIncome > 0) {
+    return [prose(`${window} hai guadagnato `), amount(metrics.totalLaborIncome), prose(' lavorando e non risulta nessuna spesa'), ...market];
+  }
+  const spent: Narrative = metrics.totalExpensesSum < 0 ? [prose(' e hai speso '), amount(metrics.totalExpensesSum)] : [];
+  return [prose(`${window} non risulta reddito nelle categorie «reddito da lavoro»`), ...spent, ...market];
 }
+
+/**
+ * «Rimborsi 3468 € · Assegno Unico 2100 € e altre 2» — the caption under «Altre entrate»,
+ * heaviest first, three named; «nessuna entrata fuori dal lavoro» when the window has none.
+ */
+export function describeOtherIncome(categories: OtherIncomeCategory[], max = 3): string {
+  if (categories.length === 0) return 'nessuna entrata fuori dalle categorie «reddito da lavoro»';
+  const shown = categories.slice(0, max).map((c) => `${c.name} ${cachedFormatCurrencyEUR(Math.abs(c.amount), true)}`);
+  const rest = categories.length - shown.length;
+  if (rest === 0) return shown.join(' · ');
+  return `${shown.join(' · ')} e ${rest === 1 ? "un'altra" : `altre ${rest}`}`;
+}
+
+/**
+ * «Al netto di 2300 € di tasse stimate sulle plusvalenze latenti, il mercato vale +11.900 €.» —
+ * the Patrimonio's estimate on ALL latent gains, so a positive gross can turn negative net and the
+ * minus is in the figure. `null` when nothing is estimated: the sentence must not print a zero.
+ */
+export function describeLaborTaxes(metrics: Pick<LaborMetrics, 'totalInvestmentGrowthGross' | 'totalInvestmentGrowthNet'>): Narrative | null {
+  const taxes = metrics.totalInvestmentGrowthGross - metrics.totalInvestmentGrowthNet;
+  if (isPrintedZero(cachedFormatCurrencyEUR(Math.abs(taxes), true)) || taxes <= 0) return null;
+  return [prose('Al netto di '), amount(taxes), prose(' di tasse stimate sulle plusvalenze latenti, il mercato vale '), signedCurrency(metrics.totalInvestmentGrowthNet), prose('.')];
+}
+
+/** Said only when the settings carry no dividend category: those receipts never become a cashflow row, so they stay inside «Mercato». */
+export const DIVIDENDS_OUTSIDE_CASHFLOW = 'Senza una categoria «dividendi» nelle Impostazioni gli incassi non passano dal cashflow e restano dentro «Mercato».';
 
 /** «4 note su 83 rilevazioni; l'ultima a febbraio 2025.» — counted on snapshots, since a gappy history has fewer of them than months. */
 export function describeNotes(count: number, snapshotCount: number, last: PeriodMonth | null): Narrative {
