@@ -19,6 +19,7 @@ import {
 } from '@/lib/server/apiAuth';
 import { snapshotRequestSchema, parseOr400 } from '@/lib/server/validation';
 import { invalidateDashboardOverviewSummaryServer } from '@/lib/services/dashboardOverviewInvalidation.server';
+import { preserveUserAuthoredSnapshotFields } from '@/lib/utils/snapshotUserFields';
 
 const SNAPSHOTS_COLLECTION = 'monthly-snapshots';
 
@@ -225,7 +226,18 @@ export async function POST(request: NextRequest) {
     };
 
     // Save snapshot
-    await existingSnapshotDocumentRef.set(monthlySnapshotDocument);
+    //
+    // `.set()` without merge REPLACES the document, which is what the recomputed fields
+    // want (a merge would keep the `byAssetClass` key of a class that left the portfolio).
+    // The user's note is not recomputed by anything, so it has to ride across the replace:
+    // this cron runs DAILY on the CURRENT month, so a bare replace erased the note the
+    // evening it was written (Storico, 2026-09-07). See `snapshotUserFields.ts`.
+    await existingSnapshotDocumentRef.set(
+      preserveUserAuthoredSnapshotFields(
+        monthlySnapshotDocument,
+        existingSnapshotDocument.data()
+      )
+    );
     await invalidateDashboardOverviewSummaryServer(
       userId,
       existingSnapshotDocument.exists ? 'snapshot_overwritten' : 'snapshot_created'

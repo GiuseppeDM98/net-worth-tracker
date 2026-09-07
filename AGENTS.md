@@ -190,6 +190,14 @@ about a domain goes in that domain's guide, never here.
   `__tests__/updateCashAssetBalancesAtomic.test.ts`), and fire success toasts AFTER the reconcile returns.
 - Firestore rejects `undefined` inside an array element, and `assetAllocationService.ts` builds `docData` by hand, so its
   array fields need a whitelisting serializer with conditional spreads.
+- **A bare `.set()` on a server-owned doc DELETES every field its object omits, and the daily cron re-runs them all.**
+  So when a saved value disappears "sometimes", the first question is *which periodic write targets this document, and
+  over which window* — never a TTL. The window is what makes it look intermittent: the snapshot cron rewrites only the
+  CURRENT month, so a Storico note on the month in progress died that night while one on a past month lived forever
+  (2026-09-07, `preserveUserAuthoredSnapshotFields`, pinned by `__tests__/apiAuthRoutes.test.ts` → *keeps the Storico
+  note of the snapshot it overwrites*). Keep the replace and carry the hand-written fields across it; `merge: true` is
+  the wrong fix whenever the doc holds a MAP the pipeline recomputes, since merging resurrects keys that should have
+  disappeared.
 
 ### Firestore Queries and the Rules
 - **A `list` must carry the constraint the rule needs, or it is refused entirely.** Every collection guarded by
@@ -333,6 +341,7 @@ file used to carry.
 ### Storico · History and Snapshot Baselines → `doc/guide/storico.md`
 - The snapshot cron runs DAILY (the name lies); a snapshot is a frozen photo (adding an asset never updates an old one). Annual deltas use December of the previous year as baseline.
 - Reuse `byAsset.totalValue` for historical per-instrument value (never recompute); `byAsset.price` is RAW NATIVE currency, so attribution is `priceEffect = q_prev·(u_curr−u_prev)` + `quantityEffect` (sum = Δ exactly).
+- Both snapshot writers REPLACE the document, so a new `MonthlySnapshot` field the pipeline does not recompute goes in `SNAPSHOT_USER_AUTHORED_FIELDS` or the daily cron erases it (§ *Firestore Writes*).
 - Two CAGR formulas, intentionally different: Storico's verdict = `(endNW/startNW)^(12/months)−1` (wealth growth, «versamenti inclusi»); Rendimenti = investment return. ONE pace for the page (`summarizeGrowthPace`, trailing 12 months, linear); do not compound it.
 - The Driver is floored at `cashflowHistoryStartYear`; a running year never counts materialised future rows.
 - Il resto — `buildMonthAssetBreakdown`, the manual-snapshot cross-validation, the Recharts-in-a-flex-tile technique — in `doc/guide/storico.md`.
