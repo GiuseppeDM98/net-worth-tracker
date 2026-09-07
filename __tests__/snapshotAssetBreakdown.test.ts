@@ -199,6 +199,19 @@ describe('attributeSelectedChange', () => {
     });
   });
 
+  it('treats a row held at quantity 0 as a closed position, never as a price collapsed to zero', () => {
+    // The snapshot cron writes EVERY asset, sold ones included (quantity 0, totalValue 0). Read as
+    // "present", the unit value 0 turned a 14.830 € sale into a −14.830 € PRICE effect on the real
+    // account (Xtrackers Overnight, 2026-08). A sale to zero is all quantity, like a full close.
+    const prev = [makeAsset({ assetId: 'xeon', quantity: 99, totalValue: 14830 })];
+    const soldOut = [makeAsset({ assetId: 'xeon', quantity: 0, totalValue: 0 })];
+    const rebought = [makeAsset({ assetId: 'xeon', quantity: 93, totalValue: 13960 })];
+
+    expect(attributeSelectedChange(prev, soldOut, new Set(['xeon']))).toEqual({ priceEffect: 0, quantityEffect: -14830 });
+    // The rebuy the month after starts from a 0-quantity row: a pure open, not a price move from 0.
+    expect(attributeSelectedChange(soldOut, rebought, new Set(['xeon']))).toEqual({ priceEffect: 0, quantityEffect: 13960 });
+  });
+
   it('ignores assets that are not selected', () => {
     const prev = [
       makeAsset({ assetId: 'a', quantity: 10, totalValue: 1000 }),

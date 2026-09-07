@@ -85,8 +85,12 @@
   `calculateCurrentAllocation` applied**, using the fund's CURRENT `composition` (a documented approximation); **FIRE's
   lock-in toggle subtracts from BOTH `currentNetWorth` and `illiquidNetWorth`** — and it is a bridge
   model across the whole FIRE page (see doc/guide/fire.md § FIRE, What If and Goals).
-- **`performanceBase.ts` reads `byAsset`, never `byAssetClass`**, and the exclusion is applied in TWO places because the
-  Rendimenti page has two independent snapshot-fetch paths.
+- **`performanceBase.ts` reads `byAsset`, never `byAssetClass`**, and both of Rendimenti's snapshot-fetch paths go
+  through ONE `resolvePerformanceBase`. Since 2026-09-06 «Includi i fondi pensione» wins over the fund's
+  `allocationRole` and, ON, brings the funds into the base from the `resolvePensionReturnStart` month as a FLOW (their
+  whole value), with every later outside contribution a flow in its `valueEffectMonth` — the same two rules this page
+  uses. A late-credited statement therefore reads as a temporary market loss on Rendimenti too
+  (doc/guide/rendimenti.md § measurement base).
 
 ## Previdenza — a verdict over tiles (`components/pension/PensionOverview.tsx`, `components/pension/tiles/*`, `lib/utils/{pensionSummary,pensionNarrative}.ts`)
 

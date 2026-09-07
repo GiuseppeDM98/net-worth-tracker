@@ -223,6 +223,10 @@ about a domain goes in that domain's guide, never here.
 - **`REGISTRATION_WHITELIST` has no `NEXT_PUBLIC_` prefix**, and `lib/constants/appConfig.ts` must stay client-safe.
 - **Do NOT bump `firebase-admin` past 13.x** — `@14 → jwks-rsa@4 → jose@6` is pure ESM and Vercel's Lambda runtime
   `require()`s it (`ERR_REQUIRE_ESM` on every Admin route).
+- **A `server-only` module is not protected by `tsc`.** Importing `lib/services/dividendService.ts` (Admin SDK) from a
+  client page type-checks and dies in the browser as a Next build error («You're importing a module that depends on
+  "server-only"»); the browser is the check (2026-09-06, the Rendimenti page's first Playwright run). A client page reads
+  such a registry through a client reader — `lib/services/dividendReceiptsService.ts` is the worked example.
 
 ### Dynamic Imports and Module Hygiene
 - **Components must be at module level** — one defined inside a render body is a new type every render, so React
@@ -341,11 +345,12 @@ file used to carry.
 - Il resto — the podium-vs-chronology split, `NoteTrigger`, the section-key fan-out — in `doc/guide/hall-of-fame.md`.
 
 ### Rendimenti → `doc/guide/rendimenti.md`
-- Any exclusion read from `byAsset` MUST be backfilled across pre-`byAsset` months (subtract a constant `E₀`) or it becomes a phantom crash — this fixes the DENOMINATOR, not the numerator. The base is user-configurable and TWO call sites must stay in sync (`buildCacheKey` embeds the base signature).
+- Any exclusion read from `byAsset` MUST be backfilled across pre-`byAsset` months (subtract a constant `E₀`) or it becomes a phantom crash — this fixes the DENOMINATOR, not the numerator. The base is resolved ONCE by `resolvePerformanceBase` for BOTH call sites (service and page); `buildCacheKey` fingerprints its options, entry month and flows.
+- The pension toggle WINS over a fund's `allocationRole` (it was an OR, and a no-op on every fund marked `excluded`). ON, the funds enter the base from the tracked month as a FLOW and every later outside contribution is a flow (`CashFlowData.pensionFlow`, the second channel `externalFlowOf` sums); `netCashFlow` stays the cashflow's savings. A contribution is a flow iff it crosses the base's boundary.
 - The first snapshot of a period is the starting valuation, never a measured month — the window opens on the 1st of the month AFTER it. The page must NEVER re-derive the window from `new Date()` (`metrics.nominalPeriodStart` travels in the payload).
 - No silent filters inside a single metric — volatility/Sharpe floor at ≥ 3 monthly returns, else `null` with a reason. Below 6 months the hero is the PERIOD return, not annualized.
-- Every benchmark model is EUR-converted before the verdict's gap; `benchmarkPeriodReturn.ts` is the single indexing source.
-- Il resto — drawdown on a geometric TWR index, IRR sign convention, the verdict-over-tiles rules, the heatmap — in `doc/guide/rendimenti.md`.
+- The per-instrument attribution (`performanceAttribution.ts`) is EURO and reconciled: Σ rows + «Non attribuito» = the TWR numerator over the months with `byAsset`; a row at quantity 0 is a closed position (`attributeSelectedChange`).
+- Il resto — EUR-converted benchmarks, drawdown on a geometric TWR index, IRR sign convention, the verdict-over-tiles rules, the heatmap — in `doc/guide/rendimenti.md`.
 
 ### Allocazione → `doc/guide/allocazione.md`
 - `Asset.allocationRole` is ONE field, THREE values: `tradable` (default), `frozen` (in the denominator, never in the plans), `excluded` (out of the page entirely). No role is ever inferred at read time.
@@ -654,7 +659,7 @@ file used to carry.
 | Area | Suites |
 | --- | --- |
 | Overview / materialized summary | `apiAuthRoutes`, `dashboardOverviewService`, `dashboardOverviewUtils` · **Verdetto e letture** `overviewNarrative` · **Badge** `savingsRateBadge` |
-| Rendimenti | `performanceService` (+ `performanceBase`, `drawdownSeries`, `cashFlowMap`) · **Verdetto e letture** `performanceNarrative`, `performanceSummaryTiles`, `performanceSummary` (+ `patrimonioNarrative` for the articles) |
+| Rendimenti | `performanceService` (+ `performanceBase`, `drawdownSeries`, `cashFlowMap`) · **Attribuzione** `performanceAttribution`, `snapshotAssetBreakdown` · **Verdetto e letture** `performanceNarrative`, `performanceSummaryTiles`, `performanceSummary` (+ `patrimonioNarrative` for the articles) · **Browser** `e2e/performance.degraded.spec.ts` |
 | Storico | `storicoSummary`, `storicoNarrative`, `snapshotAssetBreakdown`, `chartService`, `historyComposition` · **FIRE/Goals** `fireService`, `monteCarloService`, `monteCarloSummary`, `monteCarloNarrative`, `goalService`, `goalMath`, `goalProposal`, `coastFireView`, `whatIfService`, `whatIfSummary`, `whatIfNarrative` |
 | Assistant | `assistantRoutes`, `assistantWebSearchPolicy`, `assistantMonthContextService` · **Verdetto e letture** `assistantNarrative` (+ `overviewNarrative` for the no-context verdict) · **Obiettivi** `assistantGoalEvaluation`, `assistantGoalEvaluationService`, `assistantMemoryExtraction`, `assistantMemoryStore` · **Goal-Based** `goalMath`, `goalProposal`, `apiAuthRoutes` |
 | Dividendi / cron | `dividendUseCase`, `dividendProcessor` · **Email** `monthlyEmailService` |
@@ -722,6 +727,14 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   also leaves `dashboardOverviewSummaries/{uid}` (written on the first dashboard visit). Confirm with
   `listCollectionIds` and a `GET` per candidate, then grep the exported `output-0` for the uid before calling the
   restore done.
+- **Reading PRODUCTION for a realistic test — read-only, and only this way** (2026-09-06): a throwaway `.mts` inside
+  the repo with the Admin SDK initialised from `.env.local` (`import nextEnv from '@next/env'` — it is CJS, the named
+  `loadEnvConfig` import fails) that calls nothing but `.get()`; a guard that refuses to run with
+  `FIRESTORE_EMULATOR_HOST` set; the dump written to the session scratchpad, never into the repo, and deleted with the
+  script. The analysis then runs the REAL pipeline functions over the dump with the client SDK routed to the (down)
+  emulators (`NEXT_PUBLIC_USE_FIREBASE_EMULATOR=true` + the demo `NEXT_PUBLIC_FIREBASE_*` vars), so nothing it does
+  can reach production. Production data has names with a leading space and rows at quantity 0: `trim()` and
+  `quantity > 0` are not hygiene, they are correctness.
 - **Stopping the emulators: export FIRST, then kill.** `--export-on-exit` runs only on a SIGINT delivered to the
   `firebase` CLI process itself: on macOS `kill -INT <cli pid>` does it (2026-09-06); on Windows, where only the wrapper
   can be killed, POST `http://127.0.0.1:4400/_admin/export` with `{"path": "<abs>/.emulator-data"}` (forward slashes —
@@ -807,6 +820,11 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   filter meant for axis ticks also drops a legitimate reading). Break the thing under test once. **The fixture can make
   a branch unreachable**: `allocateByShare`'s rounding correction cannot fire on two shares, so a two-person fixture
   stayed green with the branch disabled — when falsification does NOT turn a test red, the test is the bug.
+- **A fire-and-forget whose `catch` only logs is verified by READING the document it should have written.**
+  `writePerformanceCache` had failed on every account with an `undefined` in its metrics (no drawdown, no dividend
+  category — the client Firestore rejects `undefined`) with a browser `console.warn` as the only trace; the E2E
+  assertion on `performance-cache/{uid}` found it (2026-09-06, `e2e/performance.degraded.spec.ts`). `removeUndefinedDeep`
+  before every `setDoc`, like every other write.
 - **An assertion of ABSENCE needs a positive anchor first**: `toHaveCount(0)` passes against a page that has not
   rendered. Wait for something expected in both states (a `forceMount` panel: attached, not necessarily visible), then
   assert the absence; a browser check that never saw the feature ON proves nothing about it OFF.

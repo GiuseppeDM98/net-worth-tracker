@@ -53,6 +53,9 @@ const MEMBER_NAME = 'Marco';
 const DEGRADED_UID = 'test-user-degraded';
 const DEGRADED_EMAIL = 'degraded@example.com';
 const DEGRADED_FUND_ID = 'e2e-degraded-fund';
+/** L'ETF dello scenario `performance`; cancellato dal reset così gli altri scenari non lo vedono. */
+const DEGRADED_ETF_ID = 'e2e-degraded-perf-etf';
+const DEGRADED_ETF_NAME = 'ETF Mondo E2E';
 const DEGRADED_FUND_NAME = 'Fondo Pensione Degradato';
 const DEGRADED_MEMBER_ID = 'e2e-degraded-member';
 const DEGRADED_MEMBER_NAME = 'Anna';
@@ -65,10 +68,38 @@ const DEGRADED_MEMBER_NAME = 'Anna';
  * esistenti, quindi riseminare l'utente a ogni scenario buttava fuori la sessione parcheggiata da
  * `auth.degraded.setup.ts` e ogni test degradato finiva sulla pagina di login.
  */
-type Scenario = 'default' | 'degraded-user' | DataScenario;
+type Scenario = 'default' | 'degraded-user' | 'performance' | DataScenario;
 
 /** Gli scenari che scrivono dati previdenziali, cioè tutti tranne i due che gestiscono un account. */
 type DataScenario = 'suspicious' | 'idle' | 'fresh';
+
+/**
+ * Lo scenario di Rendimenti: il fondo pensione DENTRO la base misurata, con un ETF accanto.
+ *
+ * Scritto sull'account degradato per lo stesso motivo degli altri scenari — l'account base porta le
+ * spese del mese corrente e i suoi snapshot dipendono dal mese di esecuzione, mentre qui ogni cifra
+ * deve essere esatta: `e2e/performance.degraded.spec.ts` afferma gli euro dell'attribuzione.
+ *
+ * Le proprietà che reggono le asserzioni:
+ *  - l'ETF rende +2%, +1,5% e +2% (100 quote, prezzo 100 → 102 → 103,53 → 105,60): +560 € di effetto
+ *    prezzo in tre mesi, e nessun altro movimento nella base con il toggle OFF — tre rendimenti NON
+ *    identici, o la volatilità è zero e lo Sharpe stampa un numero a quindici cifre;
+ *  - il fondo porta `allocationRole: 'excluded'` di proposito — è il ruolo naturale di un capitale
+ *    bloccato ed è ciò che rendeva il toggle un no-op prima del 2026-09-06: il toggle deve vincere;
+ *  - l'unico versamento (TFR 900 €) è datato 30/06 ma registrato il 5/07: la finestra tracciata parte
+ *    da giugno (data contabile), il fondo entra nella base con lo snapshot di giugno (20.100 €) e il
+ *    salto di luglio è 900 di versamento + 100 di mercato, agosto +100 di solo mercato;
+ *  - nessuna spesa: i cash flow del cashflow sono 0 e il canale pensione è l'unico flusso.
+ */
+const PERFORMANCE_SERIES: Array<{ month: number; etfPrice: number; fund: number }> = [
+  { month: 5, etfPrice: 100, fund: 20_000 },
+  { month: 6, etfPrice: 102, fund: 20_100 },
+  { month: 7, etfPrice: 103.53, fund: 21_100 },
+  { month: 8, etfPrice: 105.6, fund: 21_200 },
+];
+const PERFORMANCE_ETF_QUANTITY = 100;
+/** Dated 30 June, recorded 5 July (month indexes are 0-based); the Dates are built where CURRENT_YEAR is in scope. */
+const PERFORMANCE_CONTRIBUTION = { id: 'e2e-degraded-perf-tfr', amount: 900, dateMonthIndex: 5, dateDay: 30, createdMonthIndex: 6, createdDay: 5 };
 
 /**
  * I tre stati in cui la pagina rifiuta di mostrare una percentuale, ciascuno costruito dal suo
@@ -323,6 +354,10 @@ async function resetDegradedData(): Promise<void> {
 
   const batch = db.batch();
   for (const doc of [...snapshots.docs, ...contributions.docs]) batch.delete(doc.ref);
+  // The performance scenario's ETF must not survive into a Previdenza scenario (a delete of a
+  // missing document is a no-op).
+  batch.delete(db.collection('assets').doc(DEGRADED_ETF_ID));
+  batch.delete(db.collection('performance-cache').doc(DEGRADED_UID));
   await batch.commit();
 
   console.info(`  ✓ reset (${snapshots.size} snapshot, ${contributions.size} versamenti rimossi)`);
@@ -404,8 +439,97 @@ async function seedDegradedScenario(scenario: DataScenario): Promise<void> {
   console.info(`  → scenario «${scenario}»: ${description}`);
 }
 
+/**
+ * Lo scenario di Rendimenti (vedi `PERFORMANCE_SERIES`): fondo `excluded` + ETF, quattro snapshot con
+ * entrambi in `byAsset`, un TFR, il toggle «Includi i fondi pensione» OFF (la spec lo accende via REST
+ * e lo rimette OFF).
+ */
+async function seedPerformanceScenario(): Promise<void> {
+  await resetDegradedData();
+  const last = PERFORMANCE_SERIES[PERFORMANCE_SERIES.length - 1];
+  const base = { userId: DEGRADED_UID, currency: 'EUR', lastPriceUpdate: now, createdAt: now, updatedAt: now };
+
+  await Promise.all([
+    db.collection('assets').doc(DEGRADED_FUND_ID).set({
+      ...base,
+      name: DEGRADED_FUND_NAME,
+      ticker: '',
+      type: 'pensionFund',
+      assetClass: 'equity',
+      quantity: last.fund,
+      currentPrice: 1,
+      isLiquid: false,
+      allocationRole: 'excluded',
+      pensionFundDetails: { familyMemberId: DEGRADED_MEMBER_ID },
+    }),
+    db.collection('assets').doc(DEGRADED_ETF_ID).set({
+      ...base,
+      name: DEGRADED_ETF_NAME,
+      ticker: 'E2EW',
+      type: 'etf',
+      assetClass: 'equity',
+      quantity: PERFORMANCE_ETF_QUANTITY,
+      currentPrice: last.etfPrice,
+      isLiquid: true,
+      allocationRole: 'tradable',
+    }),
+    db.collection('assetAllocationTargets').doc(DEGRADED_UID).set(
+      {
+        userId: DEGRADED_UID,
+        performanceIncludesPensionFunds: false,
+        performanceIncludesExcludedAssets: false,
+        familyMembers: [
+          { id: DEGRADED_MEMBER_ID, name: DEGRADED_MEMBER_NAME, grossAnnualIncome: 35_000, isFirstEmploymentPost2007: true, firstEmploymentYear: 2015 },
+        ],
+      },
+      { merge: true }
+    ),
+    db.collection('pensionContributions').doc(PERFORMANCE_CONTRIBUTION.id).set({
+      userId: DEGRADED_UID,
+      assetId: DEGRADED_FUND_ID,
+      source: 'tfr',
+      amount: PERFORMANCE_CONTRIBUTION.amount,
+      date: new Date(CURRENT_YEAR, PERFORMANCE_CONTRIBUTION.dateMonthIndex, PERFORMANCE_CONTRIBUTION.dateDay),
+      taxYear: CURRENT_YEAR,
+      deductible: false,
+      createdAt: new Date(CURRENT_YEAR, PERFORMANCE_CONTRIBUTION.createdMonthIndex, PERFORMANCE_CONTRIBUTION.createdDay),
+    }),
+    ...PERFORMANCE_SERIES.map(({ month, etfPrice, fund }) => {
+      const etf = PERFORMANCE_ETF_QUANTITY * etfPrice;
+      return db
+        .collection('monthly-snapshots')
+        .doc(`${DEGRADED_UID}-${CURRENT_YEAR}-${month}`)
+        .set({
+          userId: DEGRADED_UID,
+          year: CURRENT_YEAR,
+          month,
+          totalNetWorth: etf + fund,
+          liquidNetWorth: etf,
+          illiquidNetWorth: fund,
+          byAssetClass: { equity: etf + fund },
+          byAsset: [
+            { assetId: DEGRADED_ETF_ID, ticker: 'E2EW', name: DEGRADED_ETF_NAME, quantity: PERFORMANCE_ETF_QUANTITY, price: etfPrice, totalValue: etf },
+            { assetId: DEGRADED_FUND_ID, ticker: '', name: DEGRADED_FUND_NAME, quantity: fund, price: 1, totalValue: fund },
+          ],
+          assetAllocation: {},
+          createdAt: new Date(CURRENT_YEAR, month - 1, 28),
+        });
+    }),
+  ]);
+
+  console.info(`  ✓ ${DEGRADED_ETF_NAME} + ${DEGRADED_FUND_NAME} (excluded), ${PERFORMANCE_SERIES.length} snapshot, 1 TFR`);
+  console.info('  → scenario «performance»: il fondo pensione dentro la base di Rendimenti, da giugno');
+}
+
 async function main(): Promise<void> {
   const scenario = (process.argv[2] ?? 'default') as Scenario;
+
+  if (scenario === 'performance') {
+    console.info(`\nSeeding scenario «performance» into ${PROJECT_ID} (emulator)…\n`);
+    await seedPerformanceScenario();
+    console.info('\nDone.\n');
+    return;
+  }
 
   if (scenario === 'degraded-user') {
     console.info(`\nCreating the degraded-scenario account in ${PROJECT_ID} (emulator)…\n`);
@@ -417,7 +541,7 @@ async function main(): Promise<void> {
   if (scenario !== 'default') {
     if (!(scenario in DEGRADED_SCENARIOS)) {
       console.error(
-        `Scenario sconosciuto: «${scenario}». Attesi: ${Object.keys(DEGRADED_SCENARIOS).join(', ')}.`
+        `Scenario sconosciuto: «${scenario}». Attesi: ${[...Object.keys(DEGRADED_SCENARIOS), 'performance'].join(', ')}.`
       );
       process.exit(1);
     }

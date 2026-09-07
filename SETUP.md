@@ -337,7 +337,7 @@ Three fixture accounts, each seeded by the global setup:
 
 | Script | Account | Why it is separate |
 | --- | --- | --- |
-| `npm run e2e:seed` | base + `test-user-degraded` | Pension data layered on the Step 6 seed; the degraded scenarios take an argument (`suspicious` \| `idle` \| `fresh`) |
+| `npm run e2e:seed` | base + `test-user-degraded` | Pension data layered on the Step 6 seed; the degraded scenarios take an argument (`suspicious` \| `idle` \| `fresh` \| `performance` — the last one is Rendimenti's: an ETF beside a pension fund marked `excluded`, four snapshots, one TFR, for `e2e/performance.degraded.spec.ts`) |
 | `npm run e2e:seed:analisi` | `test-user-analisi` | Every expense dated **January**, so year-to-date windows contain them whatever month the suite runs in and every asserted figure stays exact all year. The base seed's current-month expenses would pollute them |
 
 Run either on its own if you want that data in the browser for manual inspection.

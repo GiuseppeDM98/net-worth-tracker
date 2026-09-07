@@ -111,11 +111,11 @@ export function describePerformanceBase({
   if (!includesPensionFunds && !includesExcludedAssets) {
     base = 'Base gestita: fondi pensione e asset esclusi restano fuori';
   } else if (includesPensionFunds && !includesExcludedAssets) {
-    base = 'Base allargata ai fondi pensione (i versamenti pesano nel rendimento); gli asset esclusi restano fuori';
+    base = 'Base allargata ai fondi pensione dal mese tracciato (i versamenti sono flussi, non rendimento); gli asset esclusi restano fuori';
   } else if (!includesPensionFunds && includesExcludedAssets) {
     base = 'Base allargata agli asset esclusi (la casa ferma abbassa la volatilità); i fondi pensione restano fuori';
   } else {
-    base = 'Base completa: fondi pensione e asset esclusi contano nelle metriche';
+    base = 'Base completa: fondi pensione (dal mese tracciato) e asset esclusi contano nelle metriche';
   }
   const monthClause = pensionReturnStartMonth
     ? `; il rendimento del fondo si misura da ${monthYearInSentence(pensionReturnStartMonth)}.`

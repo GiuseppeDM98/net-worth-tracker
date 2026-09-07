@@ -1843,7 +1843,7 @@ export default function SettingsPage() {
                           Includi i fondi pensione
                         </Label>
                         <p className="mt-0.5 text-[11px] leading-[1.4] text-muted-foreground">
-                          Capitale illiquido che cresce per versamenti: includerlo li fa leggere come rendimento
+                          Dentro dal mese in cui i versamenti sono tracciati: TFR, datoriale e busta paga sono flussi, non rendimento
                         </p>
                       </div>
                       <Switch
