@@ -30,7 +30,7 @@
  * QUERY SHAPE — no composite index. Reads use equality filters only (`userId`, optionally `assetId`)
  * with NO `orderBy`; the ordering is applied in memory. A profile records ~12–24 contributions a
  * year, so sorting client-side is free, and it keeps `firestore.indexes.json` untouched. Same
- * reasoning as `getAssetTransactions` / `getUserSnapshotsAdmin`. (Spec 01 §5 recommended option.)
+ * reasoning as `getAssetTransactions` / `getUserSnapshotsAdmin`.
  */
 
 import { collection, doc, getDocs, addDoc, deleteDoc, query, where, Timestamp } from 'firebase/firestore';

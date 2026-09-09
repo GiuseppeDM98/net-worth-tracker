@@ -156,6 +156,14 @@ export interface CashflowData {
   monthlyTrend: MonthlyTrendPoint[];
   numberOfMonthsTracked: number;  // Number of unique months with tracked expenses
   averageMonthlySavings: number;  // netCashflow / numberOfMonthsTracked
+  // The months the figures actually cover, 'YYYY-MM', ascending. The section prints the first
+  // and the last as its scope: on a Totale export the window is NOT all of history.
+  windowMonths: string[];
+  // The floor a Totale export applied (`cashflowHistoryStartYear`), or null when the window is
+  // bounded by the picked period instead. It exists so the section can DECLARE the floor —
+  // Storico, Rendimenti and FIRE stay unbounded, and a reader told "Totale" will otherwise
+  // read the gap as months with no spending (doc/guide/email-pdf.md § PDF Export).
+  historyFloorYear: number | null;
 }
 
 export interface CategoryBreakdown {
@@ -221,6 +229,12 @@ export interface SummaryData {
 export interface PerformanceData {
   metrics: PerformanceMetrics;
   periodLabel: string;  // "YTD 2026" or "Storico Totale"
+  /**
+   * The measured base, in the page's own words (`describeMeasurementBase`): the report measures the
+   * SAME capital as the Rendimenti page — the managed portfolio, pension funds in as flows when the
+   * toggle says so — and says it, since a reader told «Rendimenti» otherwise assumes the whole net worth.
+   */
+  baseLabel: string;
 }
 
 // ============================================

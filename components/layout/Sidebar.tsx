@@ -18,10 +18,10 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { AssistenteBanner } from '@/components/layout/AssistenteBanner';
 import { LogoutDialog } from '@/components/layout/LogoutDialog';
 import { ThemePicker } from '@/components/layout/ThemePicker';
+import { TILE_EYEBROW_CLASS } from '@/components/ui/tile';
+import { SIDEBAR_AVATAR_CLASS } from '@/components/layout/shellStyles';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,17 +36,14 @@ import { cn } from '@/lib/utils';
 import { useLogout } from '@/lib/hooks/useLogout';
 import { isNavItemActive } from '@/lib/utils/navUtils';
 import { getAccountLabel, getDisplayInfo } from '@/lib/utils/userDisplayUtils';
-import { primaryNav, analysisNav, planningNav, type NavItem } from '@/lib/constants/navigation';
 import {
-  Bot,
-  Settings,
-  LogOut,
-  ChevronsUpDown,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Check,
-  Users,
-} from 'lucide-react';
+  primaryNav,
+  analysisNav,
+  planningNav,
+  assistantNavItem,
+  type NavItem,
+} from '@/lib/constants/navigation';
+import { Settings, LogOut, ChevronsUpDown, PanelLeftClose, PanelLeftOpen, Check, Users } from 'lucide-react';
 
 function NavItems({ items }: { items: NavItem[] }) {
   const pathname = usePathname();
@@ -88,13 +85,19 @@ function NavItems({ items }: { items: NavItem[] }) {
   );
 }
 
+/**
+ * The desktop sidebar (and the Sheet it becomes below 1440px). Chrome is kept to what
+ * separates: a wordmark, three groups of routes with the tiles' eyebrow as group label, one
+ * hairline before the assistant, the account at the bottom. The active route is the only
+ * highlighted surface and it is `--sidebar-accent` — no hue in the navigation of the default
+ * theme (DESIGN.md → The Zero-Chroma Rule). Collapsed to the icon rail every target is 44px.
+ */
 export function AppSidebar() {
   const { user } = useAuth();
   const { ownerId, accessibleAccounts, switchAccount, isSharedView } =
     useActiveAccount();
   const { isMobile, setOpenMobile, toggleSidebar, state } = useSidebar();
   const { confirmLogout, setConfirmLogout, handleSignOut } = useLogout();
-  const pathname = usePathname();
 
   const closeMobile = () => {
     if (isMobile) setOpenMobile(false);
@@ -104,37 +107,33 @@ export function AppSidebar() {
   const activeAccount = accessibleAccounts.find((a) => a.ownerId === ownerId);
 
   const showAssistant = process.env.NEXT_PUBLIC_ASSISTANT_AI_ENABLED !== 'false';
-  const isAssistantActive =
-    pathname === '/dashboard/assistant' || pathname.startsWith('/dashboard/assistant/');
 
   return (
     <>
       <Sidebar collapsible="icon">
         {/*
           Header — visible in both desktop and Sheet (tablet landscape / mobile).
-          Collapse toggle is desktop-only (hidden desktop:flex).
-          Logo+name hides only in desktop icon-collapsed mode via group CSS selector.
+          Collapse toggle is desktop-only (hidden desktop:flex); in the icon rail it is the
+          only thing left and grows to the rail's 44px target.
+          The wordmark hides only in desktop icon-collapsed mode via group CSS selector.
         */}
-        <SidebarHeader className="p-2">
+        <SidebarHeader>
           <div className="flex items-center gap-1">
-            {/* Logo + name */}
             <Link
               href="/dashboard"
               onClick={closeMobile}
-              className="flex flex-1 min-w-0 items-center gap-2 rounded-md px-1 py-1 hover:bg-sidebar-accent transition-colors group-data-[state=collapsed]:hidden"
+              className="flex h-8 flex-1 min-w-0 items-center rounded-md px-2 text-[13px] font-semibold tracking-[-0.01em] hover:bg-sidebar-accent transition-colors group-data-[state=collapsed]:hidden"
             >
-              <div className="flex aspect-square size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground text-xs font-bold">
-                NW
-              </div>
-              <span className="truncate text-sm font-semibold">Portfolio Tracker</span>
+              <span className="truncate">Portfolio Tracker</span>
             </Link>
-            {/* Collapse/expand toggle — desktop only */}
             <TooltipProvider delayDuration={300}>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
+                    type="button"
                     onClick={toggleSidebar}
-                    className="hidden desktop:flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/40 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors group-data-[state=collapsed]:mx-auto"
+                    aria-label={state === 'expanded' ? 'Comprimi sidebar' : 'Espandi sidebar'}
+                    className="hidden desktop:flex size-8 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/40 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors group-data-[state=collapsed]:mx-auto group-data-[state=collapsed]:size-11"
                   >
                     {state === 'expanded'
                       ? <PanelLeftClose className="size-4" />
@@ -166,53 +165,35 @@ export function AppSidebar() {
           {/* Thin rule separates core navigation from analytical/planning sections */}
           <div className="mx-3 border-t border-sidebar-border" />
 
-          {/* Analysis routes */}
           <SidebarGroup>
-            <SidebarGroupLabel>Analisi</SidebarGroupLabel>
+            <SidebarGroupLabel className={cn(TILE_EYEBROW_CLASS, 'h-6 text-sidebar-foreground/60')}>Analisi</SidebarGroupLabel>
             <SidebarGroupContent>
               <NavItems items={analysisNav} />
             </SidebarGroupContent>
           </SidebarGroup>
 
-          {/* Planning routes */}
           <SidebarGroup>
-            <SidebarGroupLabel>Pianificazione</SidebarGroupLabel>
+            <SidebarGroupLabel className={cn(TILE_EYEBROW_CLASS, 'h-6 text-sidebar-foreground/60')}>Pianificazione</SidebarGroupLabel>
             <SidebarGroupContent>
               <NavItems items={planningNav} />
             </SidebarGroupContent>
           </SidebarGroup>
 
-          {/* AI assistant — full banner when expanded, violet icon square when icon-only */}
+          {/* The assistant is a route like the others: a row after a hairline, no banner. */}
           {showAssistant && (
-            <SidebarGroup className="mt-2 pb-3">
-              <SidebarGroupContent>
-                {/* Full banner card — hidden in desktop icon-collapsed mode */}
-                <div className="group-data-[state=collapsed]:hidden">
-                  <AssistenteBanner onClick={closeMobile} />
-                </div>
-                {/* Violet rounded icon — desktop icon-collapsed mode only */}
-                <div className="hidden group-data-[state=collapsed]:flex justify-center">
-                  <Link
-                    href="/dashboard/assistant"
-                    onClick={closeMobile}
-                    title="Assistente AI"
-                    className={cn(
-                      'flex size-8 items-center justify-center rounded-xl transition-colors duration-150',
-                      isAssistantActive
-                        ? 'bg-violet-500/25 text-violet-500 dark:text-violet-400'
-                        : 'bg-violet-500/15 text-violet-500 dark:text-violet-400 hover:bg-violet-500/25'
-                    )}
-                  >
-                    <Bot className="size-4" />
-                  </Link>
-                </div>
-              </SidebarGroupContent>
-            </SidebarGroup>
+            <>
+              <div className="mx-3 border-t border-sidebar-border" />
+              <SidebarGroup>
+                <SidebarGroupContent>
+                  <NavItems items={[assistantNavItem]} />
+                </SidebarGroupContent>
+              </SidebarGroup>
+            </>
           )}
         </SidebarContent>
 
-        {/* Footer — SidebarMenuButton size="lg" auto-collapses to avatar-only in icon mode */}
-        <SidebarFooter>
+        {/* Footer — in icon mode the button becomes a 44px square around the avatar */}
+        <SidebarFooter className="border-t border-sidebar-border">
           <SidebarMenu>
             <SidebarMenuItem>
               <DropdownMenu>
@@ -220,25 +201,21 @@ export function AppSidebar() {
                   <SidebarMenuButton
                     size="lg"
                     tooltip={displayName}
-                    className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                    className="h-11 data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                   >
-                    <Avatar className="size-8 shrink-0 rounded-lg">
-                      <AvatarFallback className="rounded-lg bg-primary text-primary-foreground text-xs font-semibold">
-                        {initials}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="grid flex-1 overflow-hidden text-left text-sm leading-tight">
-                      <span className="truncate font-medium text-sidebar-foreground">{displayName}</span>
+                    <span className={SIDEBAR_AVATAR_CLASS} aria-hidden="true">{initials}</span>
+                    <div className="grid flex-1 overflow-hidden text-left leading-tight">
+                      <span className="truncate text-[13px] font-medium text-sidebar-foreground">{displayName}</span>
                       {/* When viewing a shared account, surface WHOSE data is active
                           instead of the viewer's own email — otherwise the account
                           being edited is invisible. */}
                       {isSharedView && activeAccount ? (
-                        <span className="truncate text-xs text-primary">
+                        <span className="truncate text-[11px] text-primary">
                           Vedi: {getAccountLabel(activeAccount)}
                         </span>
                       ) : (
                         /* text-sidebar-foreground/50: footer sits on --sidebar, not --background */
-                        <span className="truncate text-xs text-sidebar-foreground/50">{user?.email}</span>
+                        <span className="truncate text-[11px] text-sidebar-foreground/50">{user?.email}</span>
                       )}
                     </div>
                     <ChevronsUpDown className="ml-auto size-4 shrink-0 text-sidebar-foreground/50" />

@@ -6,7 +6,9 @@ export interface CostCenter {
   userId: string;
   name: string;
   description?: string;
-  // Hex color for visual distinction in list and charts.
+  // Identity colour for list rows and chart series, persisted as a palette SLOT KEY
+  // ('chart-1'…'chart-8'); pre-migration documents still hold a raw hex. Both are resolved
+  // against the active theme by resolveCostCenterColor() — never paint this value directly.
   color?: string;
   // Optional spending ceiling. When set, the detail/list show a budget verdict and
   // the projected annual cost is compared against it. `budgetAmount` is interpreted
@@ -31,43 +33,13 @@ export interface CostCenterFormData {
   budgetPeriod?: CostCenterBudgetPeriod;
 }
 
-// The period axis driving the Panoramica hero, per-center figures and ranking.
-// Mirrors the period vocabulary used elsewhere in Cashflow/Analisi.
-export type CostCenterPeriod = 'month' | 'year' | 'rolling12' | 'all';
-
 // Lifecycle status derived at read time from the last activity + archivedAt.
 export type CostCenterLifecycle = 'active' | 'dormant' | 'archived';
 
-// Per-center figures computed for the selected period (pure layer output).
-export interface CostCenterPeriodStats {
-  totalSpent: number;       // Always positive for display
-  transactionCount: number;
-  averageMonthly: number;   // totalSpent / calendar months in the period window
-  firstActivityDate: Date | null;
-  lastActivityDate: Date | null;
-}
-
-// Projected full-year cost from the year-to-date pace (B2).
-export interface CostCenterAnnualForecast {
-  spentYtd: number;
-  projectedTotal: number;
-  // 0..1 — how far through the year we are (drives the "early year, low confidence" copy).
-  yearProgress: number;
-}
-
-// Budget verdict for a center with a ceiling set (B1).
-export interface CostCenterBudgetVerdict {
-  spent: number;
-  budgetAmount: number;
-  budgetPeriod: CostCenterBudgetPeriod;
-  ratio: number;            // spent / budgetAmount (can exceed 1)
-  remaining: number;        // budgetAmount - spent (can be negative)
-  status: 'ok' | 'warning' | 'over';
-}
-
 // One slice of the per-category composition breakdown (A4).
 export interface CostCenterCategorySlice {
-  categoryName: string;
+  key: string;              // categoryId (name-fallback for legacy rows), or "Altro" for the tail slice
+  categoryName: string;     // display label; carries a type qualifier when two keys share a name
   total: number;            // Always positive
   pct: number;              // 0..1 share of the center total
   transactionCount: number;
@@ -89,47 +61,6 @@ export interface CostCenterRecurringSplit {
   recurringPct: number;     // 0..1
 }
 
-// One bucket of the stacked-by-category monthly series (A4 chart).
-// `byCategory` keys are the top categories; the rest collapse into "Altro".
-export interface CostCenterMonthlyBucket {
-  label: string;            // e.g. "Gen 25"
-  year: number;
-  month: number;            // 1-based
-  total: number;
-  byCategory: Record<string, number>;
-}
-
-export interface CostCenterMonthlySeries {
-  buckets: CostCenterMonthlyBucket[];
-  categories: string[];     // ordered category keys present across buckets (for stacked bars)
-}
-
-// One bucket of the cross-center comparison series (B3).
-// `byCenter` keys are center ids.
-interface CostCenterComparisonBucket {
-  label: string;
-  year: number;
-  month: number;
-  byCenter: Record<string, number>;
-}
-
-export interface CostCenterComparisonSeries {
-  buckets: CostCenterComparisonBucket[];
-  centers: { id: string; name: string; color?: string }[];
-}
-
-// Palette for the color picker in CostCenterDialog.
-// WARNING: If you add or change a color here, also update COLOR_LABELS in CostCenterDialog.tsx
-// (those labels are what screen readers announce — hex values are unpronounceable).
-export const COST_CENTER_COLORS = [
-  '#3b82f6', // blue
-  '#10b981', // emerald
-  '#f59e0b', // amber
-  '#ef4444', // red
-  '#8b5cf6', // violet
-  '#ec4899', // pink
-  '#06b6d4', // cyan
-  '#84cc16', // lime
-] as const;
-
-type CostCenterColor = typeof COST_CENTER_COLORS[number];
+// The picker's palette lives in lib/utils/costCenterColors.ts, because a center's colour is
+// now a theme slot resolved at render time rather than a stored hex — see that module's header
+// for why, and for how legacy hex documents keep their identity without a backfill.

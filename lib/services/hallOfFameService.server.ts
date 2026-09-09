@@ -2,13 +2,15 @@ import { adminDb } from '@/lib/firebase/admin';
 import { MonthlySnapshot } from '@/types/assets';
 import { Expense } from '@/types/expenses';
 import { toDate } from '@/lib/utils/dateHelpers';
-import { calculateMonthlyRecords, calculateYearlyRecords } from '@/lib/utils/hallOfFameRecords';
+import {
+  buildHallOfFameRankings,
+  calculateMonthlyRecords,
+  calculateYearlyRecords,
+} from '@/lib/utils/hallOfFameRecords';
 
 const COLLECTION_NAME = 'hall-of-fame';
 const SNAPSHOTS_COLLECTION = 'monthly-snapshots';
 const EXPENSES_COLLECTION = 'expenses';
-const MAX_MONTHLY_RECORDS = 20;
-const MAX_YEARLY_RECORDS = 10;
 
 /**
  * Recupera tutti gli snapshot per un utente (versione server-side)
@@ -73,58 +75,13 @@ export async function updateHallOfFame(userId: string): Promise<void> {
       getAllExpensesServer(userId),
     ]);
 
-    // Calcola record mensili e annuali
+    // One definition of a record and of a ranking, shared with the client writer and the
+    // periodic email (lib/utils/hallOfFameRecords.ts). This file owns the Admin-SDK I/O only.
     const monthlyRecords = calculateMonthlyRecords(snapshots, expenses);
     const yearlyRecords = calculateYearlyRecords(snapshots, expenses);
-
-    // Crea i ranking
     const hallOfFameData = {
       userId,
-
-      // Migliori mesi per crescita NW (ordinati per netWorthDiff decrescente)
-      bestMonthsByNetWorthGrowth: [...monthlyRecords]
-        .filter(r => r.netWorthDiff > 0)
-        .sort((a, b) => b.netWorthDiff - a.netWorthDiff)
-        .slice(0, MAX_MONTHLY_RECORDS),
-
-      // Migliori mesi per entrate
-      bestMonthsByIncome: [...monthlyRecords]
-        .sort((a, b) => b.totalIncome - a.totalIncome)
-        .slice(0, MAX_MONTHLY_RECORDS),
-
-      // Peggiori mesi per decremento NW (ordinati per netWorthDiff crescente, cioè valori più negativi)
-      worstMonthsByNetWorthDecline: [...monthlyRecords]
-        .filter(r => r.netWorthDiff < 0)
-        .sort((a, b) => a.netWorthDiff - b.netWorthDiff)
-        .slice(0, MAX_MONTHLY_RECORDS),
-
-      // Peggiori mesi per spese
-      worstMonthsByExpenses: [...monthlyRecords]
-        .sort((a, b) => b.totalExpenses - a.totalExpenses)
-        .slice(0, MAX_MONTHLY_RECORDS),
-
-      // Migliori anni per crescita NW
-      bestYearsByNetWorthGrowth: [...yearlyRecords]
-        .filter(r => r.netWorthDiff > 0)
-        .sort((a, b) => b.netWorthDiff - a.netWorthDiff)
-        .slice(0, MAX_YEARLY_RECORDS),
-
-      // Migliori anni per entrate
-      bestYearsByIncome: [...yearlyRecords]
-        .sort((a, b) => b.totalIncome - a.totalIncome)
-        .slice(0, MAX_YEARLY_RECORDS),
-
-      // Peggiori anni per decremento NW
-      worstYearsByNetWorthDecline: [...yearlyRecords]
-        .filter(r => r.netWorthDiff < 0)
-        .sort((a, b) => a.netWorthDiff - b.netWorthDiff)
-        .slice(0, MAX_YEARLY_RECORDS),
-
-      // Peggiori anni per spese
-      worstYearsByExpenses: [...yearlyRecords]
-        .sort((a, b) => b.totalExpenses - a.totalExpenses)
-        .slice(0, MAX_YEARLY_RECORDS),
-
+      ...buildHallOfFameRankings(monthlyRecords, yearlyRecords),
       updatedAt: new Date(),
     };
 

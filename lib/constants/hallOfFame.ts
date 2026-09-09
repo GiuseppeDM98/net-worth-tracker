@@ -7,10 +7,12 @@ export const SECTION_LABELS: Record<HallOfFameSectionKey, string> = {
   bestMonthsByIncome:          'Miglior Mese: Entrate',
   worstMonthsByNetWorthDecline:'Peggior Mese: Calo Patrimonio',
   worstMonthsByExpenses:       'Peggior Mese: Spese',
+  bestMonthsBySavings:         'Miglior Mese: Risparmio',
   bestYearsByNetWorthGrowth:   'Miglior Anno: Crescita Patrimonio',
   bestYearsByIncome:           'Miglior Anno: Entrate',
   worstYearsByNetWorthDecline: 'Peggior Anno: Calo Patrimonio',
   worstYearsByExpenses:        'Peggior Anno: Spese',
+  bestYearsBySavings:          'Miglior Anno: Risparmio',
 };
 
 export const MONTHLY_SECTION_KEYS: HallOfFameSectionKey[] = [
@@ -18,6 +20,7 @@ export const MONTHLY_SECTION_KEYS: HallOfFameSectionKey[] = [
   'bestMonthsByIncome',
   'worstMonthsByNetWorthDecline',
   'worstMonthsByExpenses',
+  'bestMonthsBySavings',
 ];
 
 export const YEARLY_SECTION_KEYS: HallOfFameSectionKey[] = [
@@ -25,4 +28,5 @@ export const YEARLY_SECTION_KEYS: HallOfFameSectionKey[] = [
   'bestYearsByIncome',
   'worstYearsByNetWorthDecline',
   'worstYearsByExpenses',
+  'bestYearsBySavings',
 ];

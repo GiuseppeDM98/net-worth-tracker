@@ -34,6 +34,15 @@ export const STORAGE_STATE = 'e2e/.auth/user.json';
  */
 export const DEGRADED_STORAGE_STATE = 'e2e/.auth/degraded.json';
 
+/**
+ * Sessione dell'account fixture di Analisi. Account separato per lo stesso motivo
+ * dell'account degradato: il seed base scrive spese del MESE CORRENTE su test-user-1,
+ * e le spec di Analisi affermano cifre esatte — ogni totale derivarebbe dalla data di
+ * esecuzione. La fixture (scripts/seedAnalisiE2E.mts) data tutto a gennaio, così ogni
+ * finestra year-to-date la contiene in qualunque mese giri la suite.
+ */
+export const ANALISI_STORAGE_STATE = 'e2e/.auth/analisi.json';
+
 export default defineConfig({
   testDir: './e2e',
   globalSetup: './e2e/global-setup.ts',
@@ -53,12 +62,37 @@ export default defineConfig({
   projects: [
     { name: 'setup', testMatch: /auth\.setup\.ts/ },
     { name: 'setup-degraded', testMatch: /auth\.degraded\.setup\.ts/ },
+    { name: 'setup-analisi', testMatch: /auth\.analisi\.setup\.ts/ },
     {
       name: 'desktop',
       // 1440px is the project's `desktop:` breakpoint — the width where the layout switches.
       use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 }, storageState: STORAGE_STATE },
       dependencies: ['setup'],
-      testIgnore: /\.(mobile|degraded)\.spec\.ts/,
+      // analisi.* runs in its own projects on the dedicated fixture account.
+      testIgnore: [/\.(mobile|degraded)\.spec\.ts/, /analisi\./],
+    },
+    {
+      // Analisi on its own fixture account — same desktop width as the main project.
+      name: 'analisi',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1440, height: 900 },
+        storageState: ANALISI_STORAGE_STATE,
+      },
+      dependencies: ['setup-analisi'],
+      testMatch: /analisi\.spec\.ts/,
+    },
+    {
+      name: 'analisi-mobile',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 390, height: 844 },
+        hasTouch: true,
+        isMobile: true,
+        storageState: ANALISI_STORAGE_STATE,
+      },
+      dependencies: ['setup-analisi'],
+      testMatch: /analisi\.mobile\.spec\.ts/,
     },
     {
       // Gli stati in cui il rendimento NON è una misura. Stessa larghezza del progetto desktop —
@@ -86,6 +120,7 @@ export default defineConfig({
       },
       dependencies: ['setup'],
       testMatch: /\.mobile\.spec\.ts/,
+      testIgnore: /analisi\./,
     },
   ],
 

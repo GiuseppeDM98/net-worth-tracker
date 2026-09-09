@@ -75,6 +75,42 @@ export function formatPercentage(value: number, decimals: number = 2): string {
 }
 
 /**
+ * The it-IT percentage — `40,71%`, comma decimals — and THE one implementation of it.
+ *
+ * It used to live in `lib/services/chartService.ts`, which every narrative module imported it
+ * from; `chartService` now delegates here, so nothing about the two-formatters situation above
+ * changed (`formatPercentage` is still the `toFixed` one, and the rule is still "import it from
+ * the same module the surrounding component uses").
+ *
+ * What moving it buys is reach: `chartService` top-level-imports the client Firebase SDK, so a
+ * narrative module that took its formatter from there could never be read by SERVER code — the
+ * periodic emails would initialise `firebase/auth` inside a Lambda just to print a percent sign.
+ * This module imports nothing but date-fns, so a narrative built on it travels everywhere.
+ */
+export function formatPercentageIt(value: number, decimals: number = 2): string {
+  return new Intl.NumberFormat('it-IT', {
+    style: 'percent',
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(value / 100);
+}
+
+/**
+ * The it-IT number with a FIXED number of decimals — `1,67`, the coverage ratio's face.
+ *
+ * Not the same function as `formatNumber` above, which takes no `decimals` and therefore prints
+ * `1,67` and `2` differently: a column of ratios needs them all to the same width. Moved out of
+ * `chartService` for the same reason as `formatPercentageIt` — the narrative layer it serves is
+ * read by server code, and `chartService` carries the client Firebase SDK.
+ */
+export function formatNumberIt(value: number, decimals: number = 2): string {
+  return new Intl.NumberFormat('it-IT', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(value);
+}
+
+/**
  * Format a date in Italian format (DD/MM/YYYY)
  * @param date - The date to format
  * @returns Formatted date string

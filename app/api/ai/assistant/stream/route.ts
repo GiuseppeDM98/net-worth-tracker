@@ -13,7 +13,6 @@ import {
   getAssistantThread,
   getAssistantThreadDetail,
   isAssistantStoreError,
-  updateAssistantMemoryDocument,
   updateAssistantThreadMetadata,
 } from '@/lib/server/assistant/store';
 import {
@@ -29,14 +28,14 @@ import {
   buildAssistantYearContext,
   buildAssistantYtdContext,
   buildAssistantHistoryContext,
-  buildAssistantQuarterContext,
 } from '@/lib/services/assistantMonthContextService';
-import { AssistantMonthContextBundle, AssistantStreamEvent, AssistantStreamRequest } from '@/types/assistant';
 import {
-  buildGoalCompletionSuggestions,
-  evaluateStructuredGoal,
-  parseStructuredGoalFromText,
-} from '@/lib/server/assistant/goalEvaluation';
+  AssistantMemoryItem,
+  AssistantMonthContextBundle,
+  AssistantStreamEvent,
+  AssistantStreamRequest,
+} from '@/types/assistant';
+import { evaluateActiveGoals } from '@/lib/server/assistant/goalEvaluationService';
 import { adminDb } from '@/lib/firebase/admin';
 import { checkRateLimit } from '@/lib/server/rateLimit';
 
@@ -44,9 +43,29 @@ const STREAM_RATE_LIMIT_MAX = 30;
 const STREAM_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 
 /**
- * Extracts memory candidates from a completed exchange and persists new items.
+ * What `streamAssistantResponse` throws on an upstream overload: a plain Error carrying
+ * `retryable` and `status` (see anthropicStream.ts). Every other failure that reaches the
+ * stream's catch is an Error without them, so both stay optional.
+ */
+type UpstreamFailure = Error & { retryable?: boolean; status?: number };
+
+function isUpstreamFailure(error: unknown): error is UpstreamFailure {
+  return error instanceof Error;
+}
+
+/**
+ * Extracts memory candidates from a completed exchange, persists the new items
+ * and re-evaluates every active structured goal.
+ *
  * Runs fire-and-forget after the stream closes — errors are logged but never
  * propagated so they cannot affect the user-facing chat experience.
+ *
+ * The goal evaluation is UNCONDITIONAL: it no longer depends on the
+ * request having built a context bundle, and it no longer uses that bundle even
+ * when there is one. `evaluateActiveGoals` builds the current month itself —
+ * asking about March 2023 must not measure the user's goals against March 2023.
+ * The items extracted here are handed to it unwritten so the whole turn still
+ * costs ONE Firestore transaction.
  *
  * Anthropic client is instantiated lazily inside this function so module-level
  * initialization does not fail in test environments where ANTHROPIC_API_KEY is absent.
@@ -56,11 +75,10 @@ async function extractAndSaveMemory(
   threadId: string,
   messageId: string,
   userMessage: string,
-  assistantMessage: string,
-  contextBundle: AssistantMonthContextBundle | null
+  assistantMessage: string
 ): Promise<void> {
   try {
-    let memoryDoc = await getAssistantMemoryDocument(userId);
+    const memoryDoc = await getAssistantMemoryDocument(userId);
 
     // Respect the user's memoryEnabled toggle — never extract when disabled
     if (!memoryDoc.preferences.memoryEnabled) return;
@@ -74,58 +92,22 @@ async function extractAndSaveMemory(
     const candidates = await extractMemoryCandidates(userMessage, assistantMessage, anthropicClient);
     const newCandidates = dedupeMemoryItems(candidates, memoryDoc.items);
 
-    // Save each new item sequentially to keep Firestore writes simple
-    for (const candidate of newCandidates) {
-      const itemId = `mem_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-      await updateAssistantMemoryDocument(userId, {
-        item: {
-          id: itemId,
-          category: candidate.category,
-          text: candidate.text,
-          structuredGoal:
-            candidate.category === 'goal'
-              ? parseStructuredGoalFromText(candidate.text)
-              : undefined,
-          sourceThreadId: threadId,
-          sourceMessageId: messageId,
-          status: 'active',
-        },
-      });
-    }
+    const now = new Date();
+    const pendingItems: AssistantMemoryItem[] = newCandidates.map((candidate) => ({
+      id: `mem_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      userId,
+      category: candidate.category,
+      text: candidate.text,
+      // Already structured by the extraction tool — nothing is parsed from the text.
+      structuredGoal: candidate.structuredGoal,
+      sourceThreadId: threadId,
+      sourceMessageId: messageId,
+      createdAt: now,
+      updatedAt: now,
+      status: 'active' as const,
+    }));
 
-    memoryDoc = await getAssistantMemoryDocument(userId);
-
-    if (!contextBundle) return;
-
-    const activeStructuredGoals = memoryDoc.items.filter(
-      (item) => item.category === 'goal' && item.status === 'active' && item.structuredGoal
-    );
-
-    for (const item of activeStructuredGoals) {
-      const evaluation = evaluateStructuredGoal(item.structuredGoal!, contextBundle);
-      if (evaluation) {
-        await updateAssistantMemoryDocument(userId, {
-          item: {
-            ...item,
-            lastEvaluationAt: new Date(),
-            lastEvaluationResult: evaluation,
-          },
-        });
-      }
-
-      const suggestion = buildGoalCompletionSuggestions(
-        userId,
-        [item],
-        contextBundle,
-        memoryDoc.suggestions,
-        ({ itemId }) => `goal_suggestion_${itemId}`
-      )[0];
-
-      if (suggestion) {
-        await updateAssistantMemoryDocument(userId, { suggestion });
-        memoryDoc.suggestions = [suggestion, ...memoryDoc.suggestions];
-      }
-    }
+    await evaluateActiveGoals(userId, { pendingItems, now });
   } catch (error) {
     // Memory extraction is non-fatal — log server-side only
     console.error('[memory extraction] Failed for user', userId, error);
@@ -153,11 +135,15 @@ export async function POST(request: NextRequest) {
     const decodedToken = await requireFirebaseAuth(request);
 
     if (!process.env.ANTHROPIC_API_KEY) {
+      // 503, not 500: this is a known, expected unavailability (missing config), the
+      // same condition the page itself detects server-side to render the "Servizio AI
+      // non configurato" EmptyState — one error surface, not a 500 here and an
+      // EmptyState there for the same root cause.
       return NextResponse.json(
         {
           error: "Servizio AI non configurato. Aggiungi ANTHROPIC_API_KEY per abilitare l'assistente.",
         },
-        { status: 500 }
+        { status: 503 }
       );
     }
 
@@ -214,24 +200,13 @@ export async function POST(request: NextRequest) {
 
     const includeDummy = preferences.includeDummySnapshots ?? false;
 
-    let contextBundle = null;
+    let contextBundle: AssistantMonthContextBundle | null = null;
     if (body.mode === 'year_analysis' && body.year) {
       contextBundle = await buildAssistantYearContext(body.userId, body.year, includeDummy);
     } else if (body.mode === 'ytd_analysis') {
       contextBundle = await buildAssistantYtdContext(body.userId, includeDummy);
     } else if (body.mode === 'history_analysis') {
       contextBundle = await buildAssistantHistoryContext(body.userId, await fetchHistoryStartYear(body.userId), includeDummy);
-    } else if (body.mode === 'quarter_analysis' && body.month) {
-      // The request carries a month selector, not a quarter number: the quarter is the one the
-      // selected month belongs to (Jan-Mar → Q1, …). Without this branch the request fell through
-      // to the monthly builder below and a quarterly analysis was answered on one month of data —
-      // wrong baseline (previous month instead of previous quarter-end) and a third of the cashflow.
-      contextBundle = await buildAssistantQuarterContext(
-        body.userId,
-        body.month.year,
-        Math.ceil(body.month.month / 3),
-        includeDummy
-      );
     } else if (body.mode === 'chat') {
       // Chat mode: build context only when chatContext is set and not 'none'
       if (body.chatContext === 'year' && body.year) {
@@ -349,8 +324,7 @@ export async function POST(request: NextRequest) {
             thread.id,
             assistantMessage.id,
             body.prompt.trim(),
-            result.text,
-            contextBundle
+            result.text
           ).catch((err) => console.error('[stream] extractAndSaveMemory uncaught:', err));
 
           await updateAssistantThreadMetadata(thread.id, {
@@ -372,19 +346,24 @@ export async function POST(request: NextRequest) {
             })
           );
           controller.close();
-        } catch (error: any) {
-          const retryable = Boolean(error?.retryable);
+        } catch (error: unknown) {
+          const failure = isUpstreamFailure(error) ? error : undefined;
+          const retryable = failure?.retryable === true;
           // Log with retryable flag so on-call can distinguish overload spikes from bugs
           console.error('[assistant/stream] stream error', {
             retryable,
-            status: error?.status,
-            message: error?.message,
+            status: failure?.status,
+            message: failure?.message,
           });
           controller.enqueue(
             encodeAssistantEvent({
               type: 'error',
-              error:
-                error?.message ?? "Errore durante la generazione della risposta dell'assistente",
+              // The SDK's own message is a LOG line (English, provider-named) and is written
+              // above; what crosses to the reader is the product's sentence, and a retryable
+              // failure says so rather than describing an implementation they never chose.
+              error: retryable
+                ? "Il servizio AI è momentaneamente sovraccarico. Riprova fra qualche istante."
+                : "Errore durante la generazione della risposta dell'assistente.",
               retryable,
             })
           );

@@ -1,31 +1,30 @@
 /**
  * Hall of Fame Service
  *
- * Calculates and stores portfolio performance rankings (best/worst months and years).
+ * The client-side writer and reader of `hall-of-fame/{userId}`, plus the note CRUD.
  *
- * Features:
- * - Monthly rankings: Net worth growth, income, expenses (top 20)
- * - Yearly rankings: Annual performance metrics (top 10)
- * - Current period highlighting: Identifies if current month/year is in top rankings
- * - Pre-calculated data: Rankings stored in Firestore for fast retrieval
+ * It owns the I/O and NOTHING else: what a record is, and what a ranking is, live in the pure
+ * `lib/utils/hallOfFameRecords.ts` — the same module the server writer
+ * (`hallOfFameService.server.ts`) and the periodic email use. This file used to carry its own
+ * copy of the record builders, which is exactly how the app and the email drift apart.
  *
- * Calculation logic:
- * - Monthly: Month-over-month net worth change + income/expense totals for that month
- * - Yearly: Year-over-year net worth change + annual income/expense totals
+ * Rankings are pre-calculated on write so the page reads one document instead of the whole
+ * history; the page's own reading layer is `lib/utils/hallOfFameSummary.ts`.
  */
 
 import { db } from '@/lib/firebase/config';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { HallOfFameData, MonthlyRecord, YearlyRecord, HallOfFameNote, HallOfFameSectionKey } from '@/types/hall-of-fame';
-import { MonthlySnapshot } from '@/types/assets';
+import { HallOfFameData, HallOfFameNote, HallOfFameSectionKey } from '@/types/hall-of-fame';
 import { getUserSnapshots } from './snapshotService';
-import { getAllExpenses, calculateTotalIncome, calculateTotalExpenses } from './expenseService';
-import { Expense } from '@/types/expenses';
-import { getItalyMonthYear, getItalyYear, toDate } from '@/lib/utils/dateHelpers';
+import { getAllExpenses } from './expenseService';
+import { toDate } from '@/lib/utils/dateHelpers';
+import {
+  buildHallOfFameRankings,
+  calculateMonthlyRecords,
+  calculateYearlyRecords,
+} from '@/lib/utils/hallOfFameRecords';
 
 const COLLECTION_NAME = 'hall-of-fame';
-const MAX_MONTHLY_RECORDS = 20;
-const MAX_YEARLY_RECORDS = 10;
 
 /**
  * Fetch Hall of Fame data for a user
@@ -57,146 +56,11 @@ export async function getHallOfFameData(userId: string): Promise<HallOfFameData 
 }
 
 /**
- * Format month and year as MM/YYYY string
+ * Recalculate and store every ranking for a user.
  *
- * @param month - Month number (1-12)
- * @param year - Year number
- * @returns Formatted string in MM/YYYY format
- */
-function formatMonthYear(month: number, year: number): string {
-  return `${month.toString().padStart(2, '0')}/${year}`;
-}
-
-/**
- * Calculate monthly records from all snapshots
- *
- * Computes month-over-month net worth changes and aggregates
- * income/expenses for each month to identify best/worst periods.
- *
- * @param snapshots - All monthly snapshots for the user
- * @param expenses - All expenses for the user
- * @returns Array of monthly records with net worth diff and expense totals
- */
-function calculateMonthlyRecords(
-  snapshots: MonthlySnapshot[],
-  expenses: Expense[]
-): MonthlyRecord[] {
-  // Sort snapshots chronologically (oldest first) to calculate month-over-month changes
-  const sortedSnapshots = [...snapshots].sort((a, b) => {
-    if (a.year !== b.year) return a.year - b.year;
-    return a.month - b.month;
-  });
-
-  const monthlyRecords: MonthlyRecord[] = [];
-
-  for (let i = 1; i < sortedSnapshots.length; i++) {
-    const current = sortedSnapshots[i];
-    const previous = sortedSnapshots[i - 1];
-
-    // Calculate net worth difference between consecutive months
-    const netWorthDiff = current.totalNetWorth - previous.totalNetWorth;
-    const previousNetWorth = previous.totalNetWorth;
-
-    // Filter expenses for the current month to aggregate income/expense totals
-    const monthExpenses = expenses.filter(expense => {
-      const { month, year } = getItalyMonthYear(toDate(expense.date));
-      return year === current.year && month === current.month;
-    });
-
-    const totalIncome = calculateTotalIncome(monthExpenses);
-    const totalExpenses = Math.abs(calculateTotalExpenses(monthExpenses));
-
-    monthlyRecords.push({
-      year: current.year,
-      month: current.month,
-      monthYear: formatMonthYear(current.month, current.year),
-      netWorthDiff,
-      previousNetWorth,
-      totalIncome,
-      totalExpenses,
-    });
-  }
-
-  return monthlyRecords;
-}
-
-/**
- * Calculate yearly records from all snapshots
- *
- * Aggregates snapshots by year to compute year-over-year net worth
- * changes and total income/expenses for ranking best/worst years.
- *
- * @param snapshots - All monthly snapshots for the user
- * @param expenses - All expenses for the user
- * @returns Array of yearly records with annual net worth diff and totals
- */
-function calculateYearlyRecords(
-  snapshots: MonthlySnapshot[],
-  expenses: Expense[]
-): YearlyRecord[] {
-  // Group snapshots by year to aggregate annual data
-  const snapshotsByYear = snapshots.reduce((acc, snapshot) => {
-    if (!acc[snapshot.year]) {
-      acc[snapshot.year] = [];
-    }
-    acc[snapshot.year].push(snapshot);
-    return acc;
-  }, {} as Record<number, MonthlySnapshot[]>);
-
-  const expensesByYear = expenses.reduce((acc, expense) => {
-    const year = getItalyYear(toDate(expense.date));
-    if (!acc[year]) {
-      acc[year] = [];
-    }
-    acc[year].push(expense);
-    return acc;
-  }, {} as Record<number, Expense[]>);
-
-  const yearlyRecords: YearlyRecord[] = [];
-  const years = new Set<number>([
-    ...Object.keys(snapshotsByYear).map(Number),
-    ...Object.keys(expensesByYear).map(Number),
-  ]);
-
-  for (const year of Array.from(years).sort((a, b) => a - b)) {
-    const yearSnapshots = snapshotsByYear[year] ?? [];
-    const sorted = [...yearSnapshots].sort((a, b) => a.month - b.month);
-    const lastSnapshot = sorted[sorted.length - 1];
-
-    // Use December of previous year as baseline so January is included in the delta.
-    // Falls back to first snapshot of this year when prior December doesn't exist.
-    const prevSorted = [...(snapshotsByYear[year - 1] ?? [])].sort((a, b) => a.month - b.month);
-    const baselineSnapshot = prevSorted.at(-1) ?? sorted[0];
-
-    const hasNetWorthData = !!(lastSnapshot && baselineSnapshot);
-    const netWorthDiff = hasNetWorthData ? lastSnapshot.totalNetWorth - baselineSnapshot.totalNetWorth : 0;
-    const startOfYearNetWorth = baselineSnapshot?.totalNetWorth ?? 0;
-    const yearExpenses = expensesByYear[year] ?? [];
-    const totalIncome = calculateTotalIncome(yearExpenses);
-    const totalExpenses = Math.abs(calculateTotalExpenses(yearExpenses));
-
-    yearlyRecords.push({
-      year,
-      netWorthDiff,
-      startOfYearNetWorth,
-      totalIncome,
-      totalExpenses,
-    });
-  }
-
-  return yearlyRecords;
-}
-
-/**
- * Update Hall of Fame rankings for a user
- *
- * Recalculates all monthly and yearly records from snapshots and expenses,
- * then generates Top 20 monthly and Top 10 yearly rankings across categories:
- * - Best/worst months and years by net worth growth/decline
- * - Best months and years by income
- * - Worst months and years by expenses
- *
- * This should be called after each new monthly snapshot is created.
+ * Called after a snapshot is created from the Panoramica; the daily cron and the recalculate
+ * route use the Admin-SDK twin. Existing notes are read back and re-written untouched: a
+ * ranking update must never cost the user a note.
  *
  * @param userId - The user ID to update Hall of Fame for
  */
@@ -208,59 +72,13 @@ export async function updateHallOfFame(userId: string): Promise<void> {
       getAllExpenses(userId),
     ]);
 
-    // Calculate monthly and yearly records from raw data
+    // The record definition and every ranking live in ONE pure module, shared with the
+    // server writer and the periodic email: a second copy here drifted the moment either changed.
     const monthlyRecords = calculateMonthlyRecords(snapshots, expenses);
     const yearlyRecords = calculateYearlyRecords(snapshots, expenses);
-
-    // Create rankings by sorting records across different dimensions
     const hallOfFameData = {
       userId,
-      // notes: [],  ← REMOVED: Notes are preserved from existing document (see below)
-
-      // Best months by net worth growth (sorted descending by netWorthDiff)
-      bestMonthsByNetWorthGrowth: [...monthlyRecords]
-        .filter(r => r.netWorthDiff > 0)
-        .sort((a, b) => b.netWorthDiff - a.netWorthDiff)
-        .slice(0, MAX_MONTHLY_RECORDS),
-
-      // Best months by income
-      bestMonthsByIncome: [...monthlyRecords]
-        .sort((a, b) => b.totalIncome - a.totalIncome)
-        .slice(0, MAX_MONTHLY_RECORDS),
-
-      // Worst months by net worth decline (sorted ascending, i.e., most negative values first)
-      worstMonthsByNetWorthDecline: [...monthlyRecords]
-        .filter(r => r.netWorthDiff < 0)
-        .sort((a, b) => a.netWorthDiff - b.netWorthDiff)
-        .slice(0, MAX_MONTHLY_RECORDS),
-
-      // Worst months by expenses
-      worstMonthsByExpenses: [...monthlyRecords]
-        .sort((a, b) => b.totalExpenses - a.totalExpenses)
-        .slice(0, MAX_MONTHLY_RECORDS),
-
-      // Best years by net worth growth
-      bestYearsByNetWorthGrowth: [...yearlyRecords]
-        .filter(r => r.netWorthDiff > 0)
-        .sort((a, b) => b.netWorthDiff - a.netWorthDiff)
-        .slice(0, MAX_YEARLY_RECORDS),
-
-      // Best years by income
-      bestYearsByIncome: [...yearlyRecords]
-        .sort((a, b) => b.totalIncome - a.totalIncome)
-        .slice(0, MAX_YEARLY_RECORDS),
-
-      // Worst years by net worth decline
-      worstYearsByNetWorthDecline: [...yearlyRecords]
-        .filter(r => r.netWorthDiff < 0)
-        .sort((a, b) => a.netWorthDiff - b.netWorthDiff)
-        .slice(0, MAX_YEARLY_RECORDS),
-
-      // Worst years by expenses
-      worstYearsByExpenses: [...yearlyRecords]
-        .sort((a, b) => b.totalExpenses - a.totalExpenses)
-        .slice(0, MAX_YEARLY_RECORDS),
-
+      ...buildHallOfFameRankings(monthlyRecords, yearlyRecords),
       updatedAt: new Date(),
     };
 

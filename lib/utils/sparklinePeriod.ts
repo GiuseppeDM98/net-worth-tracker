@@ -1,9 +1,10 @@
 /**
  * Slices the hero sparkline's monthly history down to a selected period.
  *
- * Pure and framework-free so it's directly unit-testable. The server provides
- * up to 40 monthly points (see dashboardOverviewService.ts) — one per month, so
- * "1M" really means "this month vs last" (2 points), not intra-month granularity.
+ * Pure and framework-free so it's directly unit-testable. The server provides the
+ * whole snapshot history (see dashboardOverviewService.ts) — one point per month, so
+ * "1M" really means "this month vs last" (2 points), not intra-month granularity, and
+ * "All" is every month recorded.
  */
 
 import type { DashboardOverviewSparklinePoint } from '@/types/dashboardOverview';

@@ -69,7 +69,9 @@ function DrawerContent({
       <DrawerPrimitive.Content
         data-slot="drawer-content"
         className={cn(
-          "fixed inset-x-0 bottom-0 z-50 flex flex-col rounded-t-[10px] border bg-background",
+          // `bg-card`, like the Dialog: the two are one surface at two widths, and a sheet the
+          // colour of the page under it reads as part of that page (DESIGN.md §2).
+          "fixed inset-x-0 bottom-0 z-50 flex flex-col rounded-t-[10px] border bg-card",
           // Max height: 92vh so the top is always visible
           "max-h-[92dvh]",
           minHeight && minHeightMap[minHeight],

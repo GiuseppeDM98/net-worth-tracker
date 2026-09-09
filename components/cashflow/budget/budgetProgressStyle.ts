@@ -1,35 +1,26 @@
-// Token-based progress styling for budgets.
+// Colour of a budget's progress, as a theme token (Data Owns Color): the chrome stays
+// achromatic and only the fill / percentage text carries meaning.
 //
-// Colour follows the data (Data Owns Color): the chrome stays achromatic and only
-// the progress fill / percentage text carries semantic colour, sourced from the
-// theme's semantic tokens (no hardcoded emerald/amber/red palette values).
-//
-// `inverted` flips the meaning for income targets:
-//   expense → filling toward 100% is bad   (ok < warning < over)
-//   income  → reaching 100% is good         (neutral < warning < ok)
+// A spending budget under its limit is NOT a gain — the sign tokens mean gain and loss and
+// nothing else (AGENTS.md → Layout and Color Tokens) — so the fill stays `--foreground`
+// until the budget is nearly used (`--warning-foreground` from 90%) or exceeded
+// (`--destructive`). An income target is the inverse: reaching it is good, and only then
+// does it take the positive token; before that it is simply muted.
 
-const WARNING_THRESHOLD = 0.8;
+const WARNING_THRESHOLD = 0.9;
 
-/** CSS colour for the progress-bar fill, as a theme token. Use in inline style. */
+/** CSS colour for the progress fill. Use in inline style. */
 export function progressFillColor(ratio: number, inverted = false): string {
-  if (inverted) {
-    if (ratio >= 1) return 'var(--positive)';
-    if (ratio >= WARNING_THRESHOLD) return 'var(--warning-foreground)';
-    return 'var(--muted-foreground)';
-  }
+  if (inverted) return ratio >= 1 ? 'var(--positive)' : 'var(--muted-foreground)';
   if (ratio > 1) return 'var(--destructive)';
   if (ratio >= WARNING_THRESHOLD) return 'var(--warning-foreground)';
-  return 'var(--positive)';
+  return 'var(--foreground)';
 }
 
 /** Tailwind text-colour utility for the inline percentage, matching the fill. */
 export function progressTextClass(ratio: number, inverted = false): string {
-  if (inverted) {
-    if (ratio >= 1) return 'text-positive';
-    if (ratio >= WARNING_THRESHOLD) return 'text-warning-foreground';
-    return 'text-muted-foreground';
-  }
+  if (inverted) return ratio >= 1 ? 'text-positive' : 'text-muted-foreground';
   if (ratio > 1) return 'text-destructive';
   if (ratio >= WARNING_THRESHOLD) return 'text-warning-foreground';
-  return 'text-positive';
+  return 'text-foreground';
 }

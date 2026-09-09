@@ -17,15 +17,25 @@ interface PageTabBarProps {
   value: string;
   onValueChange: (v: string) => void;
   layoutId: string;
+  /** Accessible name of the tablist — what the tabs switch between ("Sezioni di Cashflow"). */
+  ariaLabel?: string;
   className?: string;
 }
 
-export function PageTabBar({ tabs, value, onValueChange, layoutId, className }: PageTabBarProps) {
+/**
+ * Section tabs of a page. Below `desktop:` a centred segmented pill (active tab = icon +
+ * label, the others icon only); from `desktop:` an underline bar that sits directly under the
+ * compact page header and doubles as its separator — the header keeps the page title, the
+ * tab keeps the section, so no title is printed twice. Every tab carries `aria-label`
+ * unconditionally: the icon-only pill had no accessible name below 1440px.
+ */
+export function PageTabBar({ tabs, value, onValueChange, layoutId, ariaLabel, className }: PageTabBarProps) {
   return (
     <>
       {/* Mobile / tablet (< 1440px): Segmented Pill — active tab shows label, inactive shows icon only */}
       <div
         role="tablist"
+        aria-label={ariaLabel}
         className="desktop:hidden flex w-fit max-w-full mx-auto overflow-x-auto scrollbar-none bg-muted rounded-lg p-1 my-2"
       >
         {tabs.map(({ value: tv, label, icon: Icon }) => {
@@ -39,6 +49,7 @@ export function PageTabBar({ tabs, value, onValueChange, layoutId, className }: 
               type="button"
               role="tab"
               aria-selected={isActive}
+              aria-label={label}
               onClick={() => onValueChange(tv)}
               transition={SPRING}
               className={cn(
@@ -46,7 +57,7 @@ export function PageTabBar({ tabs, value, onValueChange, layoutId, className }: 
                 isActive ? 'text-foreground' : 'text-muted-foreground',
               )}
             >
-              {Icon && <Icon className="h-3.5 w-3.5 shrink-0" />}
+              {Icon && <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />}
               {showLabel && <span>{label}</span>}
               {isActive && (
                 <motion.div
@@ -60,11 +71,12 @@ export function PageTabBar({ tabs, value, onValueChange, layoutId, className }: 
         })}
       </div>
 
-      {/* Desktop (≥ 1440px): animated underline tab bar */}
+      {/* Desktop (≥ 1440px): underline bar, 13px labels, flush under the compact header */}
       <div
         role="tablist"
+        aria-label={ariaLabel}
         className={cn(
-          'hidden desktop:flex border-b border-border mb-1 overflow-x-auto scrollbar-none',
+          'hidden desktop:flex border-b border-border overflow-x-auto scrollbar-none',
           className,
         )}
       >
@@ -76,13 +88,14 @@ export function PageTabBar({ tabs, value, onValueChange, layoutId, className }: 
               type="button"
               role="tab"
               aria-selected={isActive}
+              aria-label={label}
               onClick={() => onValueChange(tv)}
               className={cn(
-                'relative flex shrink-0 items-center gap-1.5 px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap',
+                'relative flex shrink-0 items-center gap-1.5 px-3.5 py-2.5 text-[13px] font-medium transition-colors whitespace-nowrap',
                 isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
               )}
             >
-              {Icon && <Icon className="h-4 w-4 shrink-0" />}
+              {Icon && <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />}
               {label}
               {isActive && (
                 <motion.div

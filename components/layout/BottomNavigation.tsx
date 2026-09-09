@@ -1,10 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { MoreHorizontal, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { SecondaryMenuDrawer } from './SecondaryMenuDrawer';
 import { isNavItemActive } from '@/lib/utils/navUtils';
@@ -17,6 +17,38 @@ const PILL_STYLE = {
   boxShadow: '0 4px 24px rgba(0,0,0,0.28)',
 };
 
+/**
+ * The «+» that adds an expense. It belongs to Cashflow › Tracciamento and nowhere else: on
+ * Dividendi and Budget the tab's own add button sits under the verdict, and a FAB that still
+ * added an EXPENSE there read as the tab's add affordance. The tab is the URL's `?tab=`
+ * (the Cashflow page canonicalises it on mount), absent = Tracciamento.
+ */
+function AddExpenseFab({ pathname }: { pathname: string }) {
+  const searchParams = useSearchParams();
+  const isOnCashflow = pathname === '/dashboard/cashflow' || pathname.startsWith('/dashboard/cashflow/');
+  const tab = searchParams.get('tab');
+  const isOnTracciamento = isOnCashflow && (tab === null || tab === 'tracking');
+
+  return (
+    <AnimatePresence mode="popLayout">
+      {isOnTracciamento && (
+        <motion.button
+          type="button"
+          aria-label="Aggiungi nuova voce"
+          initial={{ scale: 0.6, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.6, opacity: 0 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+          onClick={() => window.dispatchEvent(new CustomEvent('cashflow:add-expense'))}
+          className="flex size-14 flex-none items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg"
+        >
+          <Plus className="size-5" aria-hidden="true" />
+        </motion.button>
+      )}
+    </AnimatePresence>
+  );
+}
+
 export function BottomNavigation() {
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -26,13 +58,6 @@ export function BottomNavigation() {
   const isAltroActive = secondaryHrefs.some(
     (href) => pathname === href || pathname.startsWith(href + '/')
   );
-  const isOnCashflow =
-    pathname === '/dashboard/cashflow' || pathname.startsWith('/dashboard/cashflow/');
-
-  const handleAddExpense = () => {
-    window.dispatchEvent(new CustomEvent('cashflow:add-expense'));
-  };
-
   // Zero-duration transition disables the sliding-pill animation for users
   // who have requested reduced motion at the OS level.
   const pillTransition = prefersReducedMotion
@@ -111,23 +136,11 @@ export function BottomNavigation() {
             </div>
           </motion.nav>
 
-          {/* Add expense button — cashflow route only, matches pill height */}
-          <AnimatePresence mode="popLayout">
-            {isOnCashflow && (
-              <motion.button
-                type="button"
-                aria-label="Aggiungi nuova voce"
-                initial={{ scale: 0.6, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.6, opacity: 0 }}
-                transition={{ type: 'spring', stiffness: 400, damping: 28 }}
-                onClick={handleAddExpense}
-                className="flex size-14 flex-none items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg"
-              >
-                <Plus className="size-5" aria-hidden="true" />
-              </motion.button>
-            )}
-          </AnimatePresence>
+          {/* Add expense button — the Tracciamento tab only, matches pill height. Its own
+              component because `useSearchParams` wants a Suspense boundary in a layout. */}
+          <Suspense fallback={null}>
+            <AddExpenseFab pathname={pathname} />
+          </Suspense>
         </div>
       </div>
 

@@ -1,5 +1,5 @@
 import { adminDb } from '@/lib/firebase/admin';
-import { FieldValue, Timestamp } from 'firebase-admin/firestore';
+import { DocumentData, FieldValue, Timestamp } from 'firebase-admin/firestore';
 import {
   AssistantGoalEvaluationResult,
   AssistantCreateThreadInput,
@@ -14,7 +14,6 @@ import {
 } from '@/types/assistant';
 import { toDate } from '@/lib/utils/dateHelpers';
 import { getDefaultAssistantPreferences } from './webSearchPolicy';
-import { parseStructuredGoalFromText } from './goalEvaluation';
 
 const THREADS_COLLECTION = 'assistantThreads';
 const MEMORY_COLLECTION = 'assistantMemory';
@@ -39,7 +38,6 @@ function getDefaultThreadTitle(mode: AssistantMode): string {
   if (mode === 'year_analysis') return 'Nuova analisi annuale';
   if (mode === 'ytd_analysis') return 'Nuova analisi YTD';
   if (mode === 'history_analysis') return 'Nuova analisi storico';
-  if (mode === 'quarter_analysis') return 'Nuova analisi trimestrale';
   return 'Nuova conversazione';
 }
 
@@ -52,7 +50,7 @@ function buildThreadTitleFromPrompt(prompt: string, mode: AssistantMode): string
   return collapsedPrompt.slice(0, 60);
 }
 
-function mapThread(docId: string, data: Record<string, any>): AssistantThread {
+function mapThread(docId: string, data: DocumentData): AssistantThread {
   return {
     id: docId,
     userId: data.userId,
@@ -67,7 +65,7 @@ function mapThread(docId: string, data: Record<string, any>): AssistantThread {
   };
 }
 
-function mapMessage(threadId: string, docId: string, data: Record<string, any>): AssistantMessage {
+function mapMessage(threadId: string, docId: string, data: DocumentData): AssistantMessage {
   return {
     id: docId,
     threadId,
@@ -81,7 +79,7 @@ function mapMessage(threadId: string, docId: string, data: Record<string, any>):
   };
 }
 
-function mapMemoryItem(doc: Record<string, any>, userId: string): AssistantMemoryItem {
+function mapMemoryItem(doc: DocumentData, userId: string): AssistantMemoryItem {
   return {
     id: doc.id,
     userId,
@@ -101,7 +99,7 @@ function mapMemoryItem(doc: Record<string, any>, userId: string): AssistantMemor
   };
 }
 
-function mapMemorySuggestion(doc: Record<string, any>, userId: string): AssistantMemorySuggestion {
+function mapMemorySuggestion(doc: DocumentData, userId: string): AssistantMemorySuggestion {
   return {
     id: doc.id,
     userId,
@@ -223,7 +221,7 @@ export async function getAssistantThread(threadId: string, userId: string): Prom
     throw new AssistantStoreError(404, 'Thread non trovato');
   }
 
-  const thread = mapThread(threadSnapshot.id, threadSnapshot.data() as Record<string, any>);
+  const thread = mapThread(threadSnapshot.id, threadSnapshot.data() as DocumentData);
 
   if (thread.userId !== userId) {
     throw new AssistantStoreError(403, 'Thread non appartenente all’utente autenticato');
@@ -315,11 +313,10 @@ export async function getAssistantMemoryDocument(userId: string): Promise<Assist
       items: [],
       suggestions: [],
       updatedAt: null,
-      hasDummySnapshots: false,
     };
   }
 
-  const data = memorySnapshot.data() as Record<string, any>;
+  const data = memorySnapshot.data() as DocumentData;
   const storedPreferences = data.preferences ?? {};
 
   return {
@@ -332,22 +329,163 @@ export async function getAssistantMemoryDocument(userId: string): Promise<Assist
         storedPreferences.includeDummySnapshots ?? syncedPreferences.includeDummySnapshots,
     },
     items: Array.isArray(data.items)
-      ? data.items.map((item: Record<string, any>) => mapMemoryItem(item, userId))
+      ? data.items.map((item: DocumentData) => mapMemoryItem(item, userId))
       : [],
     suggestions: Array.isArray(data.suggestions)
-      ? data.suggestions.map((suggestion: Record<string, any>) => mapMemorySuggestion(suggestion, userId))
+      ? data.suggestions.map((suggestion: DocumentData) => mapMemorySuggestion(suggestion, userId))
       : [],
     updatedAt: data.updatedAt ? toDate(data.updatedAt) : null,
-    hasDummySnapshots: false,
   };
+}
+
+/**
+ * Computes whether the user has at least one dummy (test fixture) snapshot.
+ * The only truthful place to answer this — never fabricate it elsewhere as `false`.
+ */
+export async function computeHasDummySnapshots(userId: string): Promise<boolean> {
+  const snapshot = await adminDb
+    .collection('monthly-snapshots')
+    .where('userId', '==', userId)
+    .where('isDummy', '==', true)
+    .limit(1)
+    .get();
+  return !snapshot.empty;
+}
+
+type AssistantMemoryItemInput = Partial<AssistantMemoryItem> &
+  Pick<AssistantMemoryItem, 'id' | 'text' | 'category'>;
+type AssistantMemorySuggestionInput = Partial<AssistantMemorySuggestion> &
+  Pick<AssistantMemorySuggestion, 'id' | 'itemId' | 'type' | 'status' | 'evidenceSummary' | 'evaluation'>;
+
+/**
+ * True when two structured goals describe the same target. Compared field by
+ * field rather than by JSON string: key order is an implementation detail of
+ * whoever built the object, and a false "changed" verdict would expire a
+ * durable "Ignora" (see `isSuggestionStillBinding` in goalEvaluation.ts).
+ */
+function isSameStructuredGoal(
+  a: AssistantMemoryItem['structuredGoal'],
+  b: AssistantMemoryItem['structuredGoal']
+): boolean {
+  if (!a || !b) return a === b;
+  return (
+    a.kind === b.kind &&
+    a.targetValue === b.targetValue &&
+    a.unit === b.unit &&
+    a.direction === b.direction &&
+    a.assetClass === b.assetClass &&
+    a.subCategory === b.subCategory &&
+    a.deadlineIso === b.deadlineIso
+  );
+}
+
+/**
+ * Merges one item patch into the items array. Only fields the caller actually
+ * included in `input` overwrite existing metadata — a patch carrying just `text`
+ * must not wipe sourceThreadId/evidenceSummary/evaluation history. Previously the
+ * merge object set every field unconditionally from `input`, so an absent field
+ * became an explicit `undefined` that won the `{...existing, ...patch}` spread.
+ *
+ * Two rules that are not obvious from the signature:
+ *
+ * - **The caller owns `structuredGoal`.** This function no longer derives it from
+ *   the text (the regex parser is gone): the extraction tool and the
+ *   PATCH route decide, and a goal patch that carries no structure clears it —
+ *   an un-trackable goal is stated as such in the panel, which is safer than
+ *   keeping a structure that contradicts the edited text.
+ * - **`updatedAt` marks the last CONTENT change** (text, category, structured
+ *   goal, status), not the last write. Re-evaluation stamps must not bump it, or
+ *   the durable-ignore rule would treat every daily cron run as a user edit and
+ *   the completion banner would come back forever.
+ */
+function mergeMemoryItem(
+  items: AssistantMemoryItem[],
+  userId: string,
+  input: AssistantMemoryItemInput,
+  now: Date
+): AssistantMemoryItem[] {
+  const itemIndex = items.findIndex((item) => item.id === input.id);
+  const structuredGoal = input.category === 'goal' ? input.structuredGoal : undefined;
+
+  const patch: Partial<AssistantMemoryItem> = {
+    id: input.id,
+    category: input.category,
+    text: input.text,
+    structuredGoal,
+    updatedAt: now,
+    ...(input.sourceThreadId !== undefined ? { sourceThreadId: input.sourceThreadId } : {}),
+    ...(input.sourceMessageId !== undefined ? { sourceMessageId: input.sourceMessageId } : {}),
+    ...(input.derivedFromContext !== undefined ? { derivedFromContext: input.derivedFromContext } : {}),
+    ...(input.evidenceSummary !== undefined ? { evidenceSummary: input.evidenceSummary } : {}),
+    ...(input.lastEvaluationAt !== undefined ? { lastEvaluationAt: input.lastEvaluationAt } : {}),
+    ...(input.lastEvaluationResult !== undefined ? { lastEvaluationResult: input.lastEvaluationResult } : {}),
+  };
+
+  if (input.status !== undefined) {
+    patch.status = input.status;
+    // completedAt tracks an EXPLICIT status change: set on completion, cleared on any
+    // other explicit change (reactivateGoal relies on passing completedAt: undefined).
+    // A patch that never touches status must never touch completedAt either.
+    patch.completedAt = input.status === 'completed' ? (input.completedAt ?? now) : undefined;
+  }
+
+  if (itemIndex >= 0) {
+    const existing = items[itemIndex];
+    const updated = { ...existing, ...patch };
+    const contentChanged =
+      updated.text !== existing.text ||
+      updated.category !== existing.category ||
+      updated.status !== existing.status ||
+      !isSameStructuredGoal(updated.structuredGoal, existing.structuredGoal);
+
+    if (!contentChanged) {
+      updated.updatedAt = existing.updatedAt;
+    }
+
+    return items.map((item, idx) => (idx === itemIndex ? updated : item));
+  }
+
+  const created = {
+    userId,
+    createdAt: now,
+    status: 'active' as const,
+    ...patch,
+  } as AssistantMemoryItem;
+  return [created, ...items];
+}
+
+function mergeMemorySuggestion(
+  suggestions: AssistantMemorySuggestion[],
+  userId: string,
+  input: AssistantMemorySuggestionInput,
+  now: Date
+): AssistantMemorySuggestion[] {
+  const suggestionIndex = suggestions.findIndex((suggestion) => suggestion.id === input.id);
+  const existing = suggestionIndex >= 0 ? suggestions[suggestionIndex] : undefined;
+  const suggestion: AssistantMemorySuggestion = {
+    id: input.id,
+    userId,
+    itemId: input.itemId,
+    type: input.type,
+    status: input.status,
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+    evidenceSummary: input.evidenceSummary,
+    evaluation: input.evaluation,
+  };
+
+  if (suggestionIndex >= 0) {
+    return suggestions.map((s, idx) => (idx === suggestionIndex ? suggestion : s));
+  }
+  return [suggestion, ...suggestions];
 }
 
 export async function updateAssistantMemoryDocument(
   userId: string,
   updates: {
     preferences?: Partial<AssistantPreferences>;
-    item?: Partial<AssistantMemoryItem> & Pick<AssistantMemoryItem, 'id' | 'text' | 'category'>;
-    suggestion?: Partial<AssistantMemorySuggestion> & Pick<AssistantMemorySuggestion, 'id' | 'itemId' | 'type' | 'status' | 'evidenceSummary' | 'evaluation'>;
+    item?: AssistantMemoryItemInput;
+    suggestion?: AssistantMemorySuggestionInput;
   }
 ): Promise<AssistantMemoryDocument> {
   const current = await getAssistantMemoryDocument(userId);
@@ -357,67 +495,10 @@ export async function updateAssistantMemoryDocument(
     ...updates.preferences,
   };
 
-  const items = [...current.items];
-  const suggestions = [...current.suggestions];
-
-  if (updates.item) {
-    const itemIndex = items.findIndex((item) => item.id === updates.item!.id);
-    const structuredGoal =
-      updates.item.category === 'goal'
-        ? (updates.item.structuredGoal ?? parseStructuredGoalFromText(updates.item.text))
-        : undefined;
-    const baseItem: AssistantMemoryItem = {
-      id: updates.item.id,
-      userId,
-      category: updates.item.category,
-      text: updates.item.text,
-      structuredGoal,
-      sourceThreadId: updates.item.sourceThreadId,
-      sourceMessageId: updates.item.sourceMessageId,
-      createdAt: itemIndex >= 0 ? items[itemIndex].createdAt : now.toDate(),
-      updatedAt: now.toDate(),
-      completedAt:
-        updates.item.status === 'completed'
-          ? (updates.item.completedAt ?? now.toDate())
-          : undefined,
-      derivedFromContext: updates.item.derivedFromContext,
-      evidenceSummary: updates.item.evidenceSummary,
-      lastEvaluationAt: updates.item.lastEvaluationAt,
-      lastEvaluationResult: updates.item.lastEvaluationResult,
-      status: updates.item.status ?? 'active',
-    };
-
-    if (itemIndex >= 0) {
-      items[itemIndex] = {
-        ...items[itemIndex],
-        ...baseItem,
-      };
-    } else {
-      items.unshift(baseItem);
-    }
-  }
-
-  if (updates.suggestion) {
-    const suggestionIndex = suggestions.findIndex((suggestion) => suggestion.id === updates.suggestion!.id);
-    const existingSuggestion = suggestionIndex >= 0 ? suggestions[suggestionIndex] : undefined;
-    const suggestion: AssistantMemorySuggestion = {
-      id: updates.suggestion.id,
-      userId,
-      itemId: updates.suggestion.itemId,
-      type: updates.suggestion.type,
-      status: updates.suggestion.status,
-      createdAt: existingSuggestion?.createdAt ?? now.toDate(),
-      updatedAt: now.toDate(),
-      evidenceSummary: updates.suggestion.evidenceSummary,
-      evaluation: updates.suggestion.evaluation,
-    };
-
-    if (suggestionIndex >= 0) {
-      suggestions[suggestionIndex] = suggestion;
-    } else {
-      suggestions.unshift(suggestion);
-    }
-  }
+  const items = updates.item ? mergeMemoryItem(current.items, userId, updates.item, now.toDate()) : current.items;
+  const suggestions = updates.suggestion
+    ? mergeMemorySuggestion(current.suggestions, userId, updates.suggestion, now.toDate())
+    : current.suggestions;
 
   await Promise.all([
     adminDb.collection(MEMORY_COLLECTION).doc(userId).set(
@@ -437,8 +518,72 @@ export async function updateAssistantMemoryDocument(
     items,
     suggestions,
     updatedAt: now.toDate(),
-    hasDummySnapshots: false,
   };
+}
+
+export type AssistantMemoryMutation =
+  | { kind: 'item'; item: AssistantMemoryItemInput }
+  | { kind: 'suggestion'; suggestion: AssistantMemorySuggestionInput };
+
+/**
+ * Applies a batch of item/suggestion mutations to a user's memory document in ONE
+ * Firestore transaction, instead of one read-modify-write Firestore round trip per
+ * mutation. Consolidates `extractAndSaveMemory`'s ~10 writes per turn into one, and
+ * the transaction also serializes correctly against a concurrent panel PATCH — the
+ * previous get-then-set sequence could silently lose one side of the race.
+ */
+export async function applyAssistantMemoryMutations(
+  userId: string,
+  mutations: AssistantMemoryMutation[]
+): Promise<AssistantMemoryDocument> {
+  if (mutations.length === 0) {
+    return getAssistantMemoryDocument(userId);
+  }
+
+  const memoryRef = adminDb.collection(MEMORY_COLLECTION).doc(userId);
+  const syncedPreferences = await getSyncedAssistantPreferences(userId);
+
+  return adminDb.runTransaction(async (tx) => {
+    // The only read in this transaction — must precede the tx.set below.
+    const snapshot = await tx.get(memoryRef);
+    const data = snapshot.exists ? (snapshot.data() as DocumentData) : null;
+    const storedPreferences = data?.preferences ?? {};
+    const preferences: AssistantPreferences = {
+      responseStyle: storedPreferences.responseStyle ?? syncedPreferences.responseStyle,
+      includeMacroContext: storedPreferences.includeMacroContext ?? syncedPreferences.includeMacroContext,
+      memoryEnabled: storedPreferences.memoryEnabled ?? syncedPreferences.memoryEnabled,
+      includeDummySnapshots: storedPreferences.includeDummySnapshots ?? syncedPreferences.includeDummySnapshots,
+    };
+
+    let items: AssistantMemoryItem[] = Array.isArray(data?.items)
+      ? data!.items.map((item: DocumentData) => mapMemoryItem(item, userId))
+      : [];
+    let suggestions: AssistantMemorySuggestion[] = Array.isArray(data?.suggestions)
+      ? data!.suggestions.map((s: DocumentData) => mapMemorySuggestion(s, userId))
+      : [];
+
+    const now = Timestamp.now();
+    for (const mutation of mutations) {
+      if (mutation.kind === 'item') {
+        items = mergeMemoryItem(items, userId, mutation.item, now.toDate());
+      } else {
+        suggestions = mergeMemorySuggestion(suggestions, userId, mutation.suggestion, now.toDate());
+      }
+    }
+
+    tx.set(
+      memoryRef,
+      {
+        preferences,
+        items: items.map(serializeMemoryItem),
+        suggestions: suggestions.map(serializeMemorySuggestion),
+        updatedAt: now,
+      },
+      { merge: true }
+    );
+
+    return { preferences, items, suggestions, updatedAt: now.toDate() };
+  });
 }
 
 export async function deleteAssistantMemoryDocument(
@@ -453,7 +598,6 @@ export async function deleteAssistantMemoryDocument(
       items: [],
       suggestions: [],
       updatedAt: new Date(),
-      hasDummySnapshots: false,
     };
 
     await adminDb.collection(MEMORY_COLLECTION).doc(userId).set(
@@ -491,7 +635,6 @@ export async function deleteAssistantMemoryDocument(
     items: filteredItems,
     suggestions: filteredSuggestions,
     updatedAt: new Date(),
-    hasDummySnapshots: false,
   };
 }
 

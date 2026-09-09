@@ -14,14 +14,7 @@
 'use client';
 
 import { useState } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -134,17 +127,25 @@ export function CreateDummySnapshotModal({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Crea Dati di Test Fittizi</DialogTitle>
-          <DialogDescription>
-            Genera snapshot, spese ed entrate fittizi per testare grafici, statistiche e Hall of Fame.
-            I dati verranno creati retroattivamente a partire da oggi.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="grid gap-4 py-4">
+    <ResponsiveModal
+      open={open}
+      onClose={() => onOpenChange(false)}
+      eyebrow="Impostazioni · Dati di test"
+      title="Genera dati di test"
+      reading="I dati finiscono nelle stesse collezioni di quelli veri, indietro nel tempo a partire da oggi: li riconosci solo dal pulsante che li elimina tutti."
+      width="sm"
+      footer={
+        <>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isGenerating}>
+            Annulla
+          </Button>
+          <Button onClick={handleGenerate} disabled={isGenerating}>
+            {isGenerating ? 'Generazione...' : generateExpenses ? 'Genera dati di test' : 'Genera snapshot'}
+          </Button>
+        </>
+      }
+    >
+        <div className="grid gap-4">
           {/* Net Worth Section */}
           <div className="space-y-4">
             <h3 className="text-sm font-semibold">Dati Patrimonio</h3>
@@ -260,28 +261,14 @@ export function CreateDummySnapshotModal({
             )}
           </div>
 
-          <div className="rounded-lg bg-amber-50 dark:bg-amber-950 p-3 border border-amber-200 dark:border-amber-800">
-            <p className="text-xs text-amber-800 dark:text-amber-200">
+          <div className="rounded-lg bg-warning p-3 border border-warning-border">
+            <p className="text-xs text-warning-foreground">
               <strong>Attenzione:</strong> I dati verranno salvati nelle stesse collection
               dei dati reali. Puoi eliminarli usando il pulsante &quot;Elimina Tutti i Dati Dummy&quot;
               in questa pagina o manualmente da Firebase Console.
             </p>
           </div>
         </div>
-
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={isGenerating}
-          >
-            Annulla
-          </Button>
-          <Button onClick={handleGenerate} disabled={isGenerating}>
-            {isGenerating ? 'Generazione...' : generateExpenses ? 'Genera Dati di Test' : 'Genera Snapshot'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    </ResponsiveModal>
   );
 }

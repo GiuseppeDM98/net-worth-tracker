@@ -12,7 +12,7 @@
  */
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import { Button } from '@/components/ui/button';
@@ -49,10 +49,15 @@ export function InflationRateDialog({ open, coupon, asset, onClose, onSaved }: I
   const [rateInput, setRateInput] = useState('');
   const [saving, setSaving] = useState(false);
 
-  // Reset the input on each open (dialog form-reset convention).
-  useEffect(() => {
+  // Reset the input on each open and on a change of coupon (dialog form-reset convention).
+  // Done while rendering, before anything reads the input — the React "adjust state when a
+  // prop changes" pattern — because the same reset inside an effect is banned by
+  // react-hooks/set-state-in-effect and would paint one frame with the previous rate.
+  const [prevSubject, setPrevSubject] = useState({ open, couponId: coupon?.id });
+  if (prevSubject.open !== open || prevSubject.couponId !== coupon?.id) {
+    setPrevSubject({ open, couponId: coupon?.id });
     if (open) setRateInput('');
-  }, [open, coupon?.id]);
+  }
 
   const bondDetails = asset?.bondDetails;
   const couponDate = coupon ? toDate(coupon.paymentDate) : null;
@@ -119,20 +124,29 @@ export function InflationRateDialog({ open, coupon, asset, onClose, onSaved }: I
     <ResponsiveModal
       open={open}
       onClose={onClose}
-      title="Tasso di inflazione cedola"
-      description={
-        coupon ? `${coupon.assetTicker} - stacco ${couponDate ? formatDate(couponDate) : ''}` : undefined
+      eyebrow={
+        coupon
+          ? `Dividendi · ${coupon.assetTicker}${couponDate ? ` · Stacco ${formatDate(couponDate)}` : ''}`
+          : 'Dividendi · Cedola provvisoria'
       }
-      dialogClassName="max-w-md"
+      title="Tasso di inflazione della cedola"
+      reading={
+        isDemo
+          ? 'In modalità demo le cedole sono di sola lettura.'
+          : 'Il coefficiente FOI trasforma la cedola provvisoria nell’incasso definitivo: da qui in poi il pagamento smette di essere un minimo.'
+      }
+      width="md"
       footer={
         <>
           <Button variant="outline" onClick={onClose} disabled={saving}>
             Annulla
           </Button>
+          {/* The demo state is said in the reading line above, not in a `title`: a tooltip added
+              by a state change never opens on touch and is ignored by screen readers. */}
           <Button
             onClick={handleSave}
             disabled={saving || !user || !asset || isDemo}
-            title={isDemo ? 'Non disponibile in modalità demo' : undefined}
+            aria-label={isDemo ? 'Non disponibile in modalità demo' : undefined}
           >
             {saving ? 'Salvataggio...' : 'Salva e ricalcola'}
           </Button>

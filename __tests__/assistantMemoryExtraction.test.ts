@@ -1,20 +1,40 @@
 /**
- * Unit tests for the memory extraction pipeline — Step 5.
+ * Unit tests for the memory extraction pipeline.
  *
  * Covers:
  * - dedupeMemoryItems: exact match, near-duplicate (Jaccard), cross-category
- * - extractMemoryCandidates: valid LLM response, malformed JSON, API error
+ * - extractMemoryCandidates: forced tool use, zod validation of the tool input,
+ *   API error
+ * - extractStructuredGoalFromText: the single-item path used by the memory panel
  * - memoryEnabled gating: no extraction when preference is off
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import type Anthropic from '@anthropic-ai/sdk';
 import {
   dedupeMemoryItems,
   extractMemoryCandidates,
+  extractStructuredGoalFromText,
   isSimilarText,
   normalizeText,
 } from '@/lib/server/assistant/memoryExtraction';
 import { AssistantMemoryItem } from '@/types/assistant';
+
+/**
+ * Builds a mock Anthropic client returning ONE forced tool_use block carrying
+ * `input` — the shape the extractor actually reads. Anything the model could
+ * plausibly emit goes in here untyped on purpose: the point of the zod layer is
+ * that a wrong payload is data, not a crash.
+ */
+function mockClientReturningToolInput(input: unknown) {
+  return {
+    messages: {
+      create: vi.fn().mockResolvedValue({
+        content: [{ type: 'tool_use', id: 'toolu_1', name: 'save_memory_items', input }],
+      }),
+    },
+  } as unknown as Anthropic;
+}
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -141,135 +161,313 @@ describe('dedupeMemoryItems', () => {
 
     expect(dedupeMemoryItems(candidates, [])).toHaveLength(2);
   });
+
+  it('dedupes near-identical candidates within the same batch (no existing items)', () => {
+    // Two candidates from the same extraction call, same category, near-identical
+    // wording — previously both survived because dedupeMemoryItems only ever
+    // compared against existingItems, never against sibling candidates.
+    const candidates = [
+      { category: 'risk' as const, text: 'Preferisco investimenti a basso rischio e alta liquidità' },
+      { category: 'risk' as const, text: 'Preferisco investimenti a basso rischio con alta liquidità' },
+    ];
+
+    const result = dedupeMemoryItems(candidates, []);
+    expect(result).toHaveLength(1);
+    expect(result[0].text).toBe('Preferisco investimenti a basso rischio e alta liquidità');
+  });
+
+  it('keeps an exact intra-batch duplicate out even across a longer batch', () => {
+    const candidates = [
+      { category: 'fact' as const, text: 'Ho un mutuo a tasso fisso' },
+      { category: 'fact' as const, text: 'Possiedo un immobile a Milano' },
+      { category: 'fact' as const, text: 'Ho un mutuo a tasso fisso' },
+    ];
+
+    const result = dedupeMemoryItems(candidates, []);
+    expect(result).toHaveLength(2);
+    expect(result.map((c) => c.text)).toEqual([
+      'Ho un mutuo a tasso fisso',
+      'Possiedo un immobile a Milano',
+    ]);
+  });
+
+  it('documents the short-text (<=2 words) exact-match fallback within a batch', () => {
+    // isSimilarText falls back to exact normalized match for short strings — two
+    // distinct short candidates are NOT deduped against each other even though a
+    // human would read them as related. A real semantic fix belongs to the
+    // extraction layer; this only documents today's behavior so it does not
+    // silently drift.
+    const candidates = [
+      { category: 'risk' as const, text: 'rischio basso' },
+      { category: 'risk' as const, text: 'rischio alto' },
+    ];
+
+    expect(dedupeMemoryItems(candidates, [])).toHaveLength(2);
+  });
 });
 
 // ── extractMemoryCandidates ──────────────────────────────────────────────────
 
 describe('extractMemoryCandidates', () => {
-  it('returns parsed candidates from a valid LLM response', async () => {
-    const mockAnthropicClient = {
-      messages: {
-        create: vi.fn().mockResolvedValue({
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify([
-                { category: 'goal', text: 'FIRE a 45 anni con 800k' },
-                { category: 'risk', text: 'Bassa tolleranza al rischio' },
-              ]),
-            },
-          ],
-        }),
-      },
-    } as any;
+  it('forces the save_memory_items tool on every call', async () => {
+    const client = mockClientReturningToolInput({ items: [] });
 
-    const result = await extractMemoryCandidates('Voglio il FIRE a 45 anni', 'Ottimo obiettivo', mockAnthropicClient);
+    await extractMemoryCandidates('Ciao, come stai?', 'Sto bene, grazie!', client);
+
+    const request = vi.mocked(client.messages.create).mock.calls[0][0];
+    expect(request.tool_choice).toEqual({ type: 'tool', name: 'save_memory_items' });
+    expect(request.tools?.[0]?.name).toBe('save_memory_items');
+  });
+
+  it('returns the candidates carried by the tool input', async () => {
+    const client = mockClientReturningToolInput({
+      items: [
+        { category: 'goal', text: 'FIRE a 45 anni con 800k' },
+        { category: 'risk', text: 'Bassa tolleranza al rischio' },
+      ],
+    });
+
+    const result = await extractMemoryCandidates('Voglio il FIRE a 45 anni', 'Ottimo obiettivo', client);
+
     expect(result).toHaveLength(2);
     expect(result[0].category).toBe('goal');
     expect(result[1].category).toBe('risk');
   });
 
-  it('returns empty array when LLM returns empty array', async () => {
-    const mockAnthropicClient = {
-      messages: {
-        create: vi.fn().mockResolvedValue({
-          content: [{ type: 'text', text: '[]' }],
-        }),
-      },
-    } as any;
+  it('returns a structured goal with a numeric target, direction and deadline', async () => {
+    // "1,5M" was the canonical failure of the old parser: it stripped every dot
+    // and read fifteen million. The number now arrives already converted.
+    const client = mockClientReturningToolInput({
+      items: [
+        {
+          category: 'goal',
+          text: 'Arrivare a 1,5M di patrimonio entro il 2030',
+          structuredGoal: {
+            kind: 'net_worth_target',
+            targetValue: 1500000,
+            direction: 'at_least',
+            deadlineIso: '2030-12-31',
+          },
+        },
+      ],
+    });
 
-    const result = await extractMemoryCandidates('Ciao, come stai?', 'Sto bene, grazie!', mockAnthropicClient);
-    expect(result).toHaveLength(0);
+    const result = await extractMemoryCandidates('Voglio arrivare a 1,5M', 'Ok', client);
+
+    expect(result[0].structuredGoal).toEqual({
+      kind: 'net_worth_target',
+      targetValue: 1500000,
+      unit: 'eur',
+      direction: 'at_least',
+      deadlineIso: '2030-12-31',
+    });
   });
 
-  it('strips markdown code fence from LLM response', async () => {
-    const mockAnthropicClient = {
-      messages: {
-        create: vi.fn().mockResolvedValue({
-          content: [
-            {
-              type: 'text',
-              text: '```json\n[{"category":"fact","text":"Ho un mutuo a tasso fisso"}]\n```',
-            },
-          ],
-        }),
-      },
-    } as any;
+  it('derives unit from kind — percentage goals are never euros', async () => {
+    const client = mockClientReturningToolInput({
+      items: [
+        {
+          category: 'goal',
+          text: 'Portare la liquidità sotto il 10%',
+          structuredGoal: {
+            kind: 'asset_class_percentage_target',
+            targetValue: 10,
+            direction: 'at_most',
+            assetClass: 'cash',
+          },
+        },
+      ],
+    });
 
-    const result = await extractMemoryCandidates('Ho un mutuo a tasso fisso', 'Ok', mockAnthropicClient);
+    const result = await extractMemoryCandidates('Porta la liquidità sotto il 10%', 'Ok', client);
+
+    expect(result[0].structuredGoal).toEqual({
+      kind: 'asset_class_percentage_target',
+      targetValue: 10,
+      unit: 'percent',
+      direction: 'at_most',
+      assetClass: 'cash',
+    });
+  });
+
+  it('renames subCategoryName to the domain field', async () => {
+    const client = mockClientReturningToolInput({
+      items: [
+        {
+          category: 'goal',
+          text: 'Azioni USA a 50k',
+          structuredGoal: {
+            kind: 'sub_category_value_target',
+            targetValue: 50000,
+            direction: 'at_least',
+            subCategoryName: 'Azioni USA',
+          },
+        },
+      ],
+    });
+
+    const result = await extractMemoryCandidates('Azioni USA a 50k', 'Ok', client);
+
+    expect(result[0].structuredGoal?.subCategory).toBe('Azioni USA');
+  });
+
+  it('keeps the goal but drops a structure the evaluator could not read', async () => {
+    // An asset-class goal with no asset class is unevaluable. The text still
+    // becomes a memory item — it is simply not auto-trackable.
+    const client = mockClientReturningToolInput({
+      items: [
+        {
+          category: 'goal',
+          text: 'Aumentare la parte azionaria',
+          structuredGoal: {
+            kind: 'asset_class_value_target',
+            targetValue: 50000,
+            direction: 'at_least',
+          },
+        },
+      ],
+    });
+
+    const result = await extractMemoryCandidates('Voglio più azioni', 'Ok', client);
+
     expect(result).toHaveLength(1);
-    expect(result[0].text).toBe('Ho un mutuo a tasso fisso');
+    expect(result[0].structuredGoal).toBeUndefined();
   });
 
-  it('returns empty array on malformed JSON without throwing', async () => {
-    const mockAnthropicClient = {
+  it('ignores a structured goal attached to a non-goal category', async () => {
+    const client = mockClientReturningToolInput({
+      items: [
+        {
+          category: 'preference',
+          text: 'Preferisco analisi mensili',
+          structuredGoal: {
+            kind: 'net_worth_target',
+            targetValue: 500000,
+            direction: 'at_least',
+          },
+        },
+      ],
+    });
+
+    const result = await extractMemoryCandidates('test', 'test', client);
+
+    expect(result[0].structuredGoal).toBeUndefined();
+  });
+
+  it('discards items with an invalid category and keeps the valid ones', async () => {
+    const client = mockClientReturningToolInput({
+      items: [
+        { category: 'invalid_category', text: 'questo non va salvato' },
+        { category: 'goal', text: 'FIRE a 50 anni' },
+      ],
+    });
+
+    const result = await extractMemoryCandidates('test', 'test', client);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].category).toBe('goal');
+  });
+
+  it('discards items whose text exceeds 120 characters', async () => {
+    const client = mockClientReturningToolInput({
+      items: [
+        { category: 'fact', text: 'a'.repeat(121) },
+        { category: 'goal', text: 'FIRE a 50 anni' },
+      ],
+    });
+
+    const result = await extractMemoryCandidates('test', 'test', client);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].text).toBe('FIRE a 50 anni');
+  });
+
+  it('discards a target the model sent as a string instead of a number', async () => {
+    const client = mockClientReturningToolInput({
+      items: [
+        {
+          category: 'goal',
+          text: 'Patrimonio a 500k',
+          structuredGoal: { kind: 'net_worth_target', targetValue: '500k', direction: 'at_least' },
+        },
+      ],
+    });
+
+    const result = await extractMemoryCandidates('test', 'test', client);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].structuredGoal).toBeUndefined();
+  });
+
+  it('returns an empty array when the tool input is not the expected shape', async () => {
+    const client = mockClientReturningToolInput({ memories: 'niente' });
+
+    await expect(extractMemoryCandidates('test', 'test', client)).resolves.toEqual([]);
+  });
+
+  it('returns an empty array when the model answered without calling the tool', async () => {
+    const client = {
       messages: {
         create: vi.fn().mockResolvedValue({
           content: [{ type: 'text', text: 'Mi dispiace, non posso rispondere.' }],
         }),
       },
-    } as any;
+    } as unknown as Anthropic;
 
-    const result = await extractMemoryCandidates('test', 'test', mockAnthropicClient);
-    expect(result).toHaveLength(0);
+    await expect(extractMemoryCandidates('test', 'test', client)).resolves.toEqual([]);
   });
 
-  it('returns empty array when Anthropic API throws — never propagates error', async () => {
-    const mockAnthropicClient = {
+  it('returns an empty array when the Anthropic API throws — never propagates', async () => {
+    const client = {
       messages: {
         create: vi.fn().mockRejectedValue(new Error('API rate limit exceeded')),
       },
-    } as any;
+    } as unknown as Anthropic;
 
-    // Must not throw — extraction errors are non-fatal
+    await expect(extractMemoryCandidates('test', 'test', client)).resolves.toEqual([]);
+  });
+});
+
+// ── extractStructuredGoalFromText ────────────────────────────────────────────
+
+describe('extractStructuredGoalFromText', () => {
+  it('structures a goal typed by hand in the memory panel', async () => {
+    const client = mockClientReturningToolInput({
+      items: [
+        {
+          category: 'goal',
+          text: 'Ridurre il cash a 20k',
+          structuredGoal: { kind: 'cash_target', targetValue: 20000, direction: 'at_most' },
+        },
+      ],
+    });
+
+    const goal = await extractStructuredGoalFromText('Ridurre il cash a 20k', client);
+
+    expect(goal).toEqual({
+      kind: 'cash_target',
+      targetValue: 20000,
+      unit: 'eur',
+      direction: 'at_most',
+    });
+  });
+
+  it('returns undefined for a goal with no measurable number', async () => {
+    const client = mockClientReturningToolInput({
+      items: [{ category: 'goal', text: 'Andare in pensione sereno' }],
+    });
+
     await expect(
-      extractMemoryCandidates('test', 'test', mockAnthropicClient)
-    ).resolves.toEqual([]);
+      extractStructuredGoalFromText('Andare in pensione sereno', client)
+    ).resolves.toBeUndefined();
   });
 
-  it('filters items with invalid category', async () => {
-    const mockAnthropicClient = {
-      messages: {
-        create: vi.fn().mockResolvedValue({
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify([
-                { category: 'invalid_category', text: 'questo non va salvato' },
-                { category: 'goal', text: 'FIRE a 50 anni' },
-              ]),
-            },
-          ],
-        }),
-      },
-    } as any;
+  it('returns undefined when the call fails — the goal is saved, just not tracked', async () => {
+    const client = {
+      messages: { create: vi.fn().mockRejectedValue(new Error('overloaded')) },
+    } as unknown as Anthropic;
 
-    const result = await extractMemoryCandidates('test', 'test', mockAnthropicClient);
-    expect(result).toHaveLength(1);
-    expect(result[0].category).toBe('goal');
-  });
-
-  it('filters items with text exceeding 120 characters', async () => {
-    const longText = 'a'.repeat(121);
-    const mockAnthropicClient = {
-      messages: {
-        create: vi.fn().mockResolvedValue({
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify([
-                { category: 'fact', text: longText },
-                { category: 'goal', text: 'FIRE a 50 anni' },
-              ]),
-            },
-          ],
-        }),
-      },
-    } as any;
-
-    const result = await extractMemoryCandidates('test', 'test', mockAnthropicClient);
-    expect(result).toHaveLength(1);
-    expect(result[0].text).toBe('FIRE a 50 anni');
+    await expect(extractStructuredGoalFromText('Patrimonio a 500k', client)).resolves.toBeUndefined();
   });
 });
 

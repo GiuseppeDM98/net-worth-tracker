@@ -88,6 +88,14 @@ vi.mock('@/lib/firebase/admin', () => ({
         };
       }
 
+      if (name === 'pensionContributions') {
+        return {
+          where: vi.fn(() => ({
+            get: vi.fn(async () => ({ docs: [] })),
+          })),
+        };
+      }
+
       throw new Error(`Unexpected collection: ${name}`);
     }),
   },
@@ -103,6 +111,7 @@ vi.mock('@/lib/utils/dateHelpers', async () => {
 });
 
 import { getDashboardOverview } from '@/lib/services/dashboardOverviewService';
+import { DASHBOARD_OVERVIEW_SOURCE_VERSION } from '@/lib/services/dashboardOverviewConstants';
 
 describe('dashboardOverviewService', () => {
   beforeEach(() => {
@@ -148,9 +157,9 @@ describe('dashboardOverviewService', () => {
         },
         updatedAt: new Date(),
         computedAt: new Date(),
-        // Must match DASHBOARD_OVERVIEW_SOURCE_VERSION (currently 4) for the cache to be
-        // considered fresh. Tests that rely on recompute can use an old version number.
-        sourceVersion: 4,
+        // Must match DASHBOARD_OVERVIEW_SOURCE_VERSION for the cache to be considered
+        // fresh. Tests that rely on recompute can use an old version number.
+        sourceVersion: DASHBOARD_OVERVIEW_SOURCE_VERSION,
         invalidatedAt: null,
       }),
     });
@@ -252,8 +261,27 @@ describe('dashboardOverviewService', () => {
       ],
     });
 
+    // Forty-four old months before the two that matter: «All» must carry every one of them
+    // (the sparkline used to be capped at the last 40 snapshots).
+    const oldMonths = Array.from({ length: 44 }, (_, i) => {
+      const year = 2022 + Math.floor(i / 12);
+      const month = (i % 12) + 1;
+      return {
+        data: () => ({
+          userId: 'user-1',
+          year,
+          month,
+          totalNetWorth: 10000 + i * 100,
+          liquidNetWorth: 5000,
+          illiquidNetWorth: 5000 + i * 100,
+          createdAt: new Date(Date.UTC(year, month - 1, 28)),
+        }),
+      };
+    });
+
     snapshotsGetMock.mockResolvedValue({
       docs: [
+        ...oldMonths,
         {
           data: () => ({
             userId: 'user-1',
@@ -320,6 +348,21 @@ describe('dashboardOverviewService', () => {
               updatedAt: new Date('2026-04-03T10:00:00.000Z'),
             }),
           },
+          {
+            // Dated after "now": counted in the month, reported as scheduled for the projection.
+            id: 'expense-scheduled',
+            data: () => ({
+              userId: 'user-1',
+              type: 'fixed',
+              categoryId: 'rent',
+              categoryName: 'Rata',
+              amount: -250,
+              currency: 'EUR',
+              date: new Date('2099-01-28T10:00:00.000Z'),
+              createdAt: new Date('2026-04-03T10:00:00.000Z'),
+              updatedAt: new Date('2026-04-03T10:00:00.000Z'),
+            }),
+          },
         ],
       })
       .mockResolvedValueOnce({
@@ -362,9 +405,77 @@ describe('dashboardOverviewService', () => {
     expect(result.flags.assetCount).toBe(2);
     expect(result.flags.hasCostBasisTracking).toBe(true);
     expect(result.flags.hasTERTracking).toBe(true);
-    expect(result.expenseStats?.currentMonth.net).toBe(2000);
+    // 44 old + Dec 2025 + Mar 2026 snapshots, plus the live point: nothing is cut.
+    expect(result.sparklineData).toHaveLength(47);
+    expect(result.sparklineData?.[0]).toMatchObject({ year: 2022, month: 1, totalNetWorth: 10000 });
+    expect(result.expenseStats?.currentMonth.net).toBe(1750);
+    expect(result.expenseStats?.currentMonth.expensesScheduled).toBe(250);
     expect(result.variations.monthly?.value).toBe(1000);
     expect(result.variations.monthly?.percentage).toBeCloseTo(5.2631578947, 6);
     expect(overviewSummaryDocSetMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('dashboardOverviewService — G/P in EUR on both sides (costBasisEur.ts)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    overviewSummaryDocSetMock.mockResolvedValue(undefined);
+    goalDocGetMock.mockResolvedValue({ exists: false });
+    overviewSummaryDocGetMock.mockResolvedValue({ exists: false });
+    snapshotsGetMock.mockResolvedValue({ docs: [] });
+    settingsDocGetMock.mockResolvedValue({ exists: false });
+    expensesGetMock.mockResolvedValue({ docs: [] });
+  });
+
+  const usdAsset = (id: string, extra: Record<string, unknown>) => ({
+    id,
+    data: () => ({
+      userId: 'user-1',
+      ticker: id.toUpperCase(),
+      name: id,
+      type: 'etf',
+      assetClass: 'equity',
+      currency: 'USD',
+      quantity: 10,
+      currentPrice: 145,
+      currentPriceEur: 130,
+      averageCost: 100,
+      stampDutyExempt: false,
+      isLiquid: true,
+      lastPriceUpdate: new Date('2026-04-06T09:00:00.000Z'),
+      createdAt: new Date('2025-01-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-04-06T09:00:00.000Z'),
+      ...extra,
+    }),
+  });
+
+  it('measures a USD position against its EUR PMC with fees, and prints nothing for one without it', async () => {
+    assetsGetMock.mockResolvedValue({
+      docs: [
+        // 10 units, EUR PMC 91 (fees included), worth 1.300 €: +390 €, +42,86 %, taxed at 26 %.
+        usdAsset('vusa', { averageCostEur: 91, taxRate: 26 }),
+        // Pre-backfill: only the native PMC — a G/P here would be dollars against euros.
+        usdAsset('legacy', {}),
+      ],
+    });
+
+    const result = await getDashboardOverview('user-1');
+
+    expect(result.freshness.source).toBe('live_recompute');
+    expect(result.metrics.unrealizedGains).toBeCloseTo(390, 6);
+    expect(result.metrics.estimatedTaxes).toBeCloseTo(390 * 0.26, 6);
+    expect(result.flags.hasCostBasisTracking).toBe(true);
+    const byId = new Map((result.topAssets ?? []).map((a) => [a.id, a]));
+    expect(byId.get('vusa')?.returnPercent).toBeCloseTo((390 / 910) * 100, 6);
+    expect(byId.get('legacy')?.returnPercent).toBeNull();
+  });
+
+  it('reports no cost-basis tracking when the only PMCs are native ones on foreign assets', async () => {
+    assetsGetMock.mockResolvedValue({ docs: [usdAsset('legacy', {})] });
+
+    const result = await getDashboardOverview('user-1');
+
+    expect(result.flags.hasCostBasisTracking).toBe(false);
+    expect(result.metrics.unrealizedGains).toBe(0);
   });
 });

@@ -37,11 +37,11 @@ import type {
   TimeFilter,
 } from '@/types/pdf';
 import type { TimePeriod } from '@/types/performance';
-import type { Asset, MonthlySnapshot } from '@/types/assets';
+import type { Asset, AssetAllocationTarget, MonthlySnapshot } from '@/types/assets';
+import type { Expense } from '@/types/expenses';
 import {
   calculateAssetValue,
   calculateTotalValue,
-  calculateUnrealizedGains,
   calculateLiquidNetWorth,
   calculateIlliquidNetWorth,
   calculatePortfolioWeightedTER,
@@ -49,19 +49,26 @@ import {
   calculateFIRENetWorth,
 } from './assetService';
 import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
+import { computeUnrealizedGain } from '@/lib/utils/patrimonioSummary';
+import { ASSET_CLASS_SEQUENCE } from '@/lib/utils/allocationUtils';
+import { getCategoryKey, getCategoryName, resolveDisplayLabels } from '@/lib/utils/expenseGrouping';
+import { EXPENSE_TYPE_LABELS, type ExpenseType } from '@/types/expenses';
 import {
   compareAllocations,
   getSettings,
 } from './assetAllocationService';
 import { getAllExpenses } from './expenseService';
+import { getPensionContributions } from './pensionContributionService';
+import { getAssetTransactions } from './assetTransactionService';
+import { resolvePerformanceBase } from '@/lib/utils/performanceBase';
+import { describeMeasurementBase } from '@/lib/utils/performanceNarrative';
 import { getAnnualExpenses, getAnnualIncome, calculateFIREMetrics } from './fireService';
-import { formatCurrency, formatPercentage } from './chartService';
-import { filterExpensesByTime } from '@/lib/utils/pdfTimeFilters';
+import { filterExpensesByTime, DEFAULT_CASHFLOW_HISTORY_START_YEAR } from '@/lib/utils/pdfTimeFilters';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { calculatePerformanceForPeriod } from './performanceService';
 
 // Cached expenses to avoid duplicate fetching
-let cachedExpenses: any[] | null = null;
+let cachedExpenses: Expense[] | null = null;
 let cachedUserId: string | null = null;
 
 /**
@@ -119,7 +126,13 @@ export async function fetchPDFData(
         selectedMonth,
         settings?.cashflowHistoryStartYear
       );
-      data.cashflow = prepareCashflowData(filteredExpenses);
+      // Only a Totale export carries a floor; a picked year or month is bounded by itself.
+      data.cashflow = prepareCashflowData(
+        filteredExpenses,
+        timeFilter === 'total'
+          ? (settings?.cashflowHistoryStartYear ?? DEFAULT_CASHFLOW_HISTORY_START_YEAR)
+          : null,
+      );
     }
 
     // FIRE: uses all expenses (not filtered) - FIRE needs complete annual data
@@ -136,6 +149,7 @@ export async function fetchPDFData(
       data.performance = await preparePerformanceData(
         userId,
         context.snapshots,
+        context.assets,
         timeFilter,
         cachedExpenses ?? undefined,
         selectedYear
@@ -181,8 +195,10 @@ function preparePortfolioData(assets: Asset[]): PortfolioData {
   let totalUnrealizedGains = 0;
   const assetRows: AssetRow[] = assets.map(asset => {
     const value = calculateAssetValue(asset);
-    const unrealizedGain = calculateUnrealizedGains(asset);
-    totalUnrealizedGains += unrealizedGain;
+    // The same G/P as the Strumenti table: EUR value against the EUR PMC, fees included
+    // (costBasisEur.ts); a foreign asset without a EUR PMC prints no G/P rather than a wrong one.
+    const gain = computeUnrealizedGain(asset);
+    totalUnrealizedGains += gain?.gainLoss ?? 0;
 
     return {
       ticker: getAssetDisplayTicker(asset),
@@ -193,10 +209,8 @@ function preparePortfolioData(assets: Asset[]): PortfolioData {
       currentPrice: asset.currentPrice,
       totalValue: value,
       weight: totalValue > 0 ? (value / totalValue) * 100 : 0,
-      unrealizedGain: asset.averageCost ? unrealizedGain : undefined,
-      unrealizedGainPercent: asset.averageCost && asset.averageCost > 0
-        ? ((asset.currentPrice - asset.averageCost) / asset.averageCost) * 100
-        : undefined,
+      unrealizedGain: gain?.gainLoss,
+      unrealizedGainPercent: gain?.gainPercent,
       ter: asset.totalExpenseRatio,
       isLiquid: asset.isLiquid !== false,
     };
@@ -223,7 +237,7 @@ function preparePortfolioData(assets: Asset[]): PortfolioData {
  */
 function prepareAllocationData(
   assets: Asset[],
-  targets: any
+  targets: AssetAllocationTarget
 ): AllocationData {
   // Use compareAllocations() which handles all complex logic including fixed cash
   const comparisonResult = compareAllocations(assets, targets);
@@ -242,7 +256,10 @@ function prepareAllocationData(
 
   // Transform compareAllocations output to PDF format
   const assetClassData: AssetClassAllocation[] = [];
-  const assetClasses = ['equity', 'bonds', 'crypto', 'realestate', 'commodity', 'cash'];
+  // The app-wide enumeration, never a literal: a hand-written list silently drops whatever the
+  // AssetClass union gained since it was written — which is how trendFollowing and carry
+  // disappeared from the PDF's allocation table and its rebalancing list, euros included.
+  const assetClasses = ASSET_CLASS_SEQUENCE;
 
   assetClasses.forEach(assetClass => {
     const comparisonData = comparisonResult.byAssetClass[assetClass];
@@ -402,7 +419,7 @@ function calculateYoYComparison(snapshots: MonthlySnapshot[]): YoYDataPoint[] {
 /**
  * Prepare cashflow data from expenses
  */
-function prepareCashflowData(expenses: any[]): CashflowData {
+function prepareCashflowData(expenses: Expense[], historyFloorYear: number | null): CashflowData {
   if (expenses.length === 0) {
     return {
       totalIncome: 0,
@@ -413,13 +430,18 @@ function prepareCashflowData(expenses: any[]): CashflowData {
       monthlyTrend: [],
       numberOfMonthsTracked: 0,
       averageMonthlySavings: 0,
+      windowMonths: [],
+      historyFloorYear,
     };
   }
 
   let totalIncome = 0;
   let totalExpenses = 0;
 
-  const categoryMap: Record<string, CategoryBreakdown> = {};
+  // Keyed by category id (name-fallback for legacy rows): two same-named categories
+  // are two distinct documents and must stay two rows — see lib/utils/expenseGrouping.ts.
+  // The qualifier is transient: it feeds label disambiguation and never reaches the PDF type.
+  const categoryMap: Record<string, CategoryBreakdown & { qualifier: string }> = {};
   const monthsSet = new Set<string>();
 
   expenses.forEach(expense => {
@@ -427,7 +449,7 @@ function prepareCashflowData(expenses: any[]): CashflowData {
 
     // Track unique months
     const date = expense.date;
-    const monthKey = `${date.getFullYear()}-${date.getMonth() + 1}`;
+    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     monthsSet.add(monthKey);
 
     if (expense.type === 'transfer') return;
@@ -437,10 +459,11 @@ function prepareCashflowData(expenses: any[]): CashflowData {
       totalExpenses += amount;
 
       // Aggregate by category
-      const key = expense.categoryName;
+      const key = getCategoryKey(expense);
       if (!categoryMap[key]) {
         categoryMap[key] = {
-          categoryName: expense.categoryName,
+          categoryName: getCategoryName(expense),
+          qualifier: EXPENSE_TYPE_LABELS[expense.type as ExpenseType] ?? '',
           amount: 0,
           percent: 0,
           transactionCount: 0,
@@ -452,14 +475,28 @@ function prepareCashflowData(expenses: any[]): CashflowData {
   });
 
   // Calculate percentages and sort by amount
-  const byCategory = Object.values(categoryMap);
+  const byCategory = Object.entries(categoryMap).map(([key, cat]) => ({ key, ...cat }));
   byCategory.forEach(cat => {
     cat.percent = totalExpenses > 0 ? (cat.amount / totalExpenses) * 100 : 0;
   });
   byCategory.sort((a, b) => b.amount - a.amount);
 
-  // Take top 5 categories
-  const topCategories = byCategory.slice(0, 5);
+  // Take top 5 categories; a name shared by two keys in the rendered slice gets its
+  // type qualifier appended ("Casa (Spese Fisse)").
+  const topSlice = byCategory.slice(0, 5);
+  const labels = resolveDisplayLabels(
+    topSlice.map(({ key, categoryName, qualifier }) => ({ key, name: categoryName, qualifier }))
+  );
+  // Built field by field: the qualifier has done its job inside the label and must not
+  // reach the PDF as a column of its own.
+  const topCategories: CategoryBreakdown[] = topSlice.map(
+    ({ key, categoryName, amount, percent, transactionCount }) => ({
+      categoryName: labels.get(key) ?? categoryName,
+      amount,
+      percent,
+      transactionCount,
+    })
+  );
 
   const netCashflow = totalIncome - totalExpenses;
   const incomeToExpenseRatio = totalExpenses > 0 ? totalIncome / totalExpenses : 0;
@@ -477,6 +514,9 @@ function prepareCashflowData(expenses: any[]): CashflowData {
     monthlyTrend: [],
     numberOfMonthsTracked,
     averageMonthlySavings,
+    // Zero-padded and sorted, so 'YYYY-MM' sorts chronologically as a string.
+    windowMonths: Array.from(monthsSet).sort(),
+    historyFloorYear,
   };
 }
 
@@ -485,7 +525,7 @@ function prepareCashflowData(expenses: any[]): CashflowData {
  */
 async function prepareFireData(
   userId: string,
-  expenses: any[],
+  expenses: Expense[],
   currentNetWorth: number
 ): Promise<FireData> {
   const annualExpenses = await getAnnualExpenses(userId);
@@ -518,18 +558,26 @@ async function prepareFireData(
  *
  * Monthly exports are not supported as performance metrics require multiple time periods.
  *
+ * The report measures the SAME base as the Rendimenti page: the snapshots are projected through
+ * `resolvePerformanceBase` (the one resolution, doc/guide/rendimenti.md) and the pension boundary
+ * flows ride along. Until 2026-09-07 this was a third call site on the RAW snapshots — the whole
+ * net worth, house included, with no pension flow — so the PDF printed a different TWR and ROI
+ * from the page under the same title, and told no one which perimeter it meant.
+ *
  * @param userId - User ID for fetching settings and dividends
  * @param snapshots - Monthly snapshots for performance calculation (already pre-filtered)
+ * @param assets - Every asset of the account, to resolve the base
  * @param timeFilter - Time filter ('yearly' or 'total', monthly returns null)
  * @param cachedExpenses - Optional pre-fetched expenses to avoid duplicate queries
  * @param selectedYear - User-selected year for yearly exports (affects period label)
- * @returns PerformanceData with metrics and period label, or null if insufficient data
+ * @returns PerformanceData with metrics, period label and base label, or null if insufficient data
  */
 async function preparePerformanceData(
   userId: string,
   snapshots: MonthlySnapshot[],
+  assets: Asset[],
   timeFilter: TimeFilter = 'total',
-  cachedExpenses?: any[],
+  cachedExpenses?: Expense[],
   selectedYear?: number
 ): Promise<PerformanceData | null> {
   // Early exit for monthly exports (performance metrics not meaningful for single month)
@@ -544,21 +592,28 @@ async function preparePerformanceData(
   const timePeriod: TimePeriod = (timeFilter === 'yearly' && !isPastYear) ? 'YTD' : 'ALL';
 
   try {
-    // Fetch settings for risk-free rate and dividend category
-    const settings = await getSettings(userId);
+    // Settings (risk-free rate, dividend category, the three base toggles), the pension
+    // contributions the base needs to place the funds' entry and their flows, and the trade ledger
+    // the measured boundary flows prefer — the SAME inputs the page and the service give the base,
+    // or the report prints a different TWR under the same title (the owner's own export showed
+    // 26,05% against the page's 27,08% while the ledger was left out, 2026-09-07).
+    const [settings, contributions, trades] = await Promise.all([getSettings(userId), getPensionContributions(userId), getAssetTransactions(userId)]);
     const riskFreeRate = settings?.riskFreeRate ?? 2.5;
     const dividendCategoryId = settings?.dividendIncomeCategoryId;
+    const base = resolvePerformanceBase({ snapshots, assets, contributions, settings, trades });
 
-    // Calculate base performance metrics
+    // Calculate base performance metrics on the projected snapshots, both flow channels merged in
     const metrics = await calculatePerformanceForPeriod(
       userId,
-      snapshots,
+      base.snapshots,
       timePeriod,
       riskFreeRate,
       undefined,
       undefined,
       cachedExpenses,
-      dividendCategoryId
+      dividendCategoryId,
+      base.pensionFlows,
+      base.portfolioFlows
     );
 
     // Early exit if insufficient data (< 2 snapshots)
@@ -608,7 +663,8 @@ async function preparePerformanceData(
 
     return {
       metrics,
-      periodLabel
+      periodLabel,
+      baseLabel: describeMeasurementBase(base),
     };
 
   } catch (error) {
@@ -691,6 +747,8 @@ function getAssetClassName(assetClass: string): string {
     realestate: 'Immobiliare',
     commodity: 'Materie Prime',
     cash: 'Liquidità',
+    trendFollowing: 'Trend Following',
+    carry: 'Carry',
   };
   return names[assetClass] || assetClass;
 }

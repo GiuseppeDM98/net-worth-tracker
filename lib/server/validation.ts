@@ -129,6 +129,16 @@ export const assetTransactionUpdateSchema = assetTransactionBaseSchema
   .superRefine(refineAssetTransaction);
 
 /**
+ * Goal-Based Investing: the assistant's ```goal-proposal payload IS the body of
+ * POST /api/goals, so there is one schema for both.
+ *
+ * It is defined in `lib/utils/goalProposal.ts` rather than here because the proposal
+ * card validates the same payload in the browser before rendering, and this module is
+ * `server-only`. Re-exported so route handlers still reach their schemas from one place.
+ */
+export { goalProposalSchema } from '@/lib/utils/goalProposal';
+
+/**
  * Parse helper: runs safeParse and returns either the typed data or a
  * ready-to-return 400 NextResponse with flattened zod error details.
  */

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { UnderwaterDrawdownData } from '@/types/performance';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -15,7 +15,7 @@ interface UnderwaterDrawdownChartProps {
 
 interface CustomTooltipProps {
   active?: boolean;
-  payload?: any[];
+  payload?: Array<{ value: number }>;
   label?: string;
 }
 
@@ -69,15 +69,6 @@ export function UnderwaterDrawdownChart({
   const prefersReducedMotion = useReducedMotion();
   const gradientId = useId();
 
-  const deepestPoint = useMemo(() => (
-    data.reduce<UnderwaterDrawdownData | null>((lowestPoint, currentPoint) => {
-      if (!lowestPoint || currentPoint.drawdown < lowestPoint.drawdown) {
-        return currentPoint;
-      }
-      return lowestPoint;
-    }, null)
-  ), [data]);
-
   // Read --destructive once after paint so the color is theme-aware
   const [destructiveColor, setDestructiveColor] = useState('oklch(0.5771 0.2152 27.325)');
   useEffect(() => {
@@ -104,16 +95,6 @@ export function UnderwaterDrawdownChart({
       animate={prefersReducedMotion ? 'idle' : 'settle'}
       className="space-y-3"
     >
-      {deepestPoint && (
-        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-          <span className="rounded-full border border-border bg-muted/40 px-2.5 py-1">
-            Max Drawdown {formatPercentage(deepestPoint.drawdown)}
-          </span>
-          <span className="rounded-full border border-border bg-muted/40 px-2.5 py-1">
-            Punto piu&apos; profondo {deepestPoint.date}
-          </span>
-        </div>
-      )}
       <ResponsiveContainer width="100%" height={height}>
       <AreaChart data={data}>
         <defs>

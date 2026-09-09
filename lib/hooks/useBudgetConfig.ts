@@ -49,89 +49,108 @@ export interface UseBudgetConfigResult {
  * budget) so the UI can surface the error without persisting a bad state.
  */
 export function useBudgetConfig({ userId, categories, disabled }: UseBudgetConfigArgs): UseBudgetConfigResult {
-  const [loading, setLoading] = useState(true);
-  const [items, setItems] = useState<BudgetItem[]>([]);
+  // The saved items as loaded; `items` below is this list reconciled against the live categories.
+  const [savedItems, setSavedItems] = useState<BudgetItem[]>([]);
   const [overallMonthlyAmount, setOverallState] = useState<number | undefined>(undefined);
   const [alertsEnabled, setAlertsEnabledState] = useState(true);
   const [alertThresholds, setAlertThresholdsState] = useState<number[]>(DEFAULT_ALERT_THRESHOLDS);
-  const [saveStatus, setSaveStatus] = useState<BudgetSaveStatus>('idle');
+  // Loading is derived: the config is in flight until the load for THIS user has settled.
+  const [loadedUserId, setLoadedUserId] = useState<string | null>(null);
+  const loading = !!userId && loadedUserId !== userId;
 
-  // dirtyRef gates auto-save so reconcile (a non-user cleanup) never triggers a write.
-  const dirtyRef = useRef(false);
+  // Every user edit bumps `editSeq`; a write records the sequence it persisted. The two together
+  // replace the old dirty flag AND the status state: dirty = the latest edit is not the one
+  // written, and the status is derived from them (nothing sets it inside an effect).
+  const [editSeq, setEditSeq] = useState(0);
+  const [lastWrite, setLastWrite] = useState<{ seq: number; status: 'saved' | 'error' } | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Load saved config once per user
   useEffect(() => {
-    if (!userId) {
-      setLoading(false);
-      return;
-    }
+    if (!userId) return;
     let active = true;
     getBudgetConfig(userId)
       .then((cfg) => {
         if (!active || !cfg) return;
-        // Store the raw saved items; reconcile runs in its own effect once
-        // categories are loaded. Reconciling here would drop every category
-        // budget as an "orphan" when categories haven't loaded yet.
-        setItems(cfg.items);
+        // Store the raw saved items; the reconcile below runs once categories are loaded.
+        // Reconciling here would drop every category budget as an "orphan" when categories
+        // haven't loaded yet.
+        setSavedItems(cfg.items);
         setOverallState(cfg.overallMonthlyAmount);
         setAlertsEnabledState(cfg.alertsEnabled ?? true);
         setAlertThresholdsState(cfg.alertThresholds ?? DEFAULT_ALERT_THRESHOLDS);
       })
       .catch(() => toast.error('Errore nel caricamento del budget'))
       .finally(() => {
-        if (active) setLoading(false);
+        if (active) setLoadedUserId(userId);
       });
     return () => {
       active = false;
     };
-    // categories intentionally excluded — reconcile-on-categories runs in its own effect.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
-  // Reconcile against live categories once they are loaded: refresh denormalized
-  // names + kind and drop genuine orphans. Gated on categories.length > 0 so an
-  // empty (still-loading) categories list never wipes the saved budgets.
-  // Does not mark dirty: orphan cleanup persists on the next real edit.
-  useEffect(() => {
-    if (loading || categories.length === 0) return;
-    setItems((prev) => {
-      const next = reconcileBudgetItems(categories, prev);
-      return next.length === prev.length && next.every((it, i) => it === prev[i]) ? prev : next;
-    });
-  }, [categories, loading]);
+  // Reconcile against live categories once they are loaded: refresh denormalized names + kind
+  // and drop genuine orphans. Gated on categories.length > 0 so an empty (still-loading)
+  // categories list never wipes the saved budgets. Derived rather than written back, so it is
+  // never an edit: orphan cleanup persists on the next real one, exactly as before. The saved
+  // list is returned as is when nothing moved, so the auto-save below sees the same identity.
+  const items = useMemo(() => {
+    if (loading || categories.length === 0) return savedItems;
+    const next = reconcileBudgetItems(categories, savedItems);
+    return next.length === savedItems.length && next.every((it, i) => it === savedItems[i])
+      ? savedItems
+      : next;
+  }, [categories, loading, savedItems]);
 
   const validation = useMemo(
     () => validateBudgetAllocation(items, overallMonthlyAmount),
     [items, overallMonthlyAmount]
   );
 
-  // Debounced auto-save, paused while the allocation is invalid.
+  const isWritten = lastWrite?.seq === editSeq && lastWrite.status === 'saved';
+
+  const saveStatus: BudgetSaveStatus =
+    loading || disabled || editSeq === 0
+      ? 'idle'
+      : lastWrite?.seq === editSeq
+        ? lastWrite.status
+        : validation.valid
+          ? 'saving'
+          : 'invalid';
+
+  // Debounced auto-save, paused while the allocation is invalid. Keyed on `isWritten` and not on
+  // `lastWrite`: a write landing while a newer edit is already queued must not restart its timer.
   useEffect(() => {
-    if (loading || disabled || !dirtyRef.current) return;
-    if (!validation.valid) {
-      setSaveStatus('invalid');
-      return;
-    }
-    setSaveStatus('saving');
+    if (loading || disabled || editSeq === 0 || isWritten || !validation.valid) return;
+    const seqToWrite = editSeq;
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(async () => {
       try {
         await saveBudgetConfig(userId, items, { overallMonthlyAmount, alertsEnabled, alertThresholds });
-        dirtyRef.current = false;
-        setSaveStatus('saved');
+        setLastWrite({ seq: seqToWrite, status: 'saved' });
       } catch {
-        setSaveStatus('error');
+        setLastWrite({ seq: seqToWrite, status: 'error' });
         toast.error('Errore nel salvataggio del budget');
       }
     }, AUTOSAVE_DELAY_MS);
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [items, overallMonthlyAmount, alertsEnabled, alertThresholds, validation.valid, loading, disabled, userId]);
+  }, [
+    items,
+    overallMonthlyAmount,
+    alertsEnabled,
+    alertThresholds,
+    validation.valid,
+    loading,
+    disabled,
+    userId,
+    editSeq,
+    isWritten,
+  ]);
 
   const markDirty = () => {
-    dirtyRef.current = true;
+    setEditSeq((seq) => seq + 1);
   };
 
   return {
@@ -144,7 +163,7 @@ export function useBudgetConfig({ userId, categories, disabled }: UseBudgetConfi
     saveStatus,
     upsertItem: (item) => {
       markDirty();
-      setItems((prev) => {
+      setSavedItems((prev) => {
         const idx = prev.findIndex((p) => p.id === item.id);
         if (idx >= 0) {
           const next = [...prev];
@@ -156,7 +175,7 @@ export function useBudgetConfig({ userId, categories, disabled }: UseBudgetConfi
     },
     deleteItem: (id) => {
       markDirty();
-      setItems((prev) => prev.filter((p) => p.id !== id));
+      setSavedItems((prev) => prev.filter((p) => p.id !== id));
     },
     setOverall: (amount) => {
       markDirty();

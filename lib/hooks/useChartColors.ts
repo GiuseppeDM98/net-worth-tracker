@@ -19,9 +19,13 @@ function parseOklchL(value: string): number | null {
 /**
  * Returns a 10-color palette that respects the active color theme.
  *
- * Indices 0–4 resolve --chart-1 through --chart-5 from the current theme's
- * CSS variables. Indices 5–9 fall back to the static CHART_COLORS palette
- * (rarely needed — most charts have ≤5 categories).
+ * Indices 0–7 resolve --chart-1 through --chart-8 from the current theme's
+ * CSS variables; 8–9 still fall back to the static CHART_COLORS palette.
+ *
+ * It used to stop at 5, which is how the eight asset classes ended up with two
+ * theme-independent tails: `ASSET_CLASS_CHART_INDEX` gives commodity slot 5,
+ * trendFollowing 6 and carry 7, and on the default theme the static teal at index 6
+ * measured ΔE00 0.87 from --chart-2 — not "close to" Obbligazioni, the same colour.
  *
  * Uses useEffect + requestAnimationFrame to read CSS vars AFTER the browser
  * has recalculated styles following a theme change. useMemo would read them
@@ -38,7 +42,7 @@ export function useChartColors(): string[] {
       const style = getComputedStyle(document.documentElement);
       const isDark = resolvedTheme === 'dark';
 
-      const themePalette = [1, 2, 3, 4, 5].map((n) =>
+      const themePalette = [1, 2, 3, 4, 5, 6, 7, 8].map((n) =>
         style.getPropertyValue(`--chart-${n}`).trim()
       );
 
@@ -57,7 +61,7 @@ export function useChartColors(): string[] {
         return color;
       });
 
-      setColors([...resolved, ...CHART_COLORS.slice(5, 10)]);
+      setColors([...resolved, ...CHART_COLORS.slice(8, 10)]);
     });
     return () => cancelAnimationFrame(frame);
   }, [colorTheme, resolvedTheme]);

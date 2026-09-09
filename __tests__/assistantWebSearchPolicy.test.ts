@@ -20,6 +20,23 @@ describe('Assistant web search policy', () => {
     expect(shouldUseWebSearch('Spiegami come leggere meglio la mia asset allocation')).toBe(false);
   });
 
+  it('does NOT trigger on "pilastro", a false positive of the old .includes() match on "pil"', () => {
+    expect(shouldUseWebSearch('Qual è il primo pilastro della mia strategia di risparmio?')).toBe(false);
+  });
+
+  it('does NOT trigger on "pilota", another substring false positive of "pil"', () => {
+    expect(shouldUseWebSearch('Chi è il pilota di questo fondo?')).toBe(false);
+  });
+
+  it('triggers on the whole word "PIL" (gross domestic product), case-insensitively', () => {
+    expect(shouldUseWebSearch('Come impatta il PIL sui mercati?')).toBe(true);
+  });
+
+  it('still matches the "geopolit" stem across its inflections (deliberate prefix match)', () => {
+    expect(shouldUseWebSearch('Cosa ne pensi della situazione geopolitica attuale?')).toBe(true);
+    expect(shouldUseWebSearch('Rischio geopolitico in aumento nel 2026')).toBe(true);
+  });
+
   it('uses includeMacroContext only for month analysis mode', () => {
     expect(
       resolveAssistantWebSearchPolicy('month_analysis', 'Analizza il mese', {

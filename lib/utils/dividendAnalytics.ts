@@ -21,19 +21,13 @@
 
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
-import { Dividend } from '@/types/dividend';
+import { Dividend, DividendStatsPayload, DividendType } from '@/types/dividend';
 import { toDate, getItalyMonth, getItalyYear } from '@/lib/utils/dateHelpers';
 
 // The period axis driving every figure on the tab. Mirrors the Cost Centers axis;
 // "year" is the current calendar year (Jan 1 → now), which for a calendar-based tracker
 // is the same as year-to-date — so we deliberately don't carry a separate YTD option.
 export type DividendPeriod = 'month' | 'year' | 'rolling12' | 'all';
-
-// Payers beyond this rank collapse into a single "Altri" slice in the ranked list, to
-// keep the leaderboard readable instead of sprouting a long tail of tiny rows.
-export const MAX_RANKED_PAYERS = 8;
-
-const OTHER_PAYER_LABEL = 'Altri';
 
 // ==================== Money helpers ====================
 
@@ -96,30 +90,53 @@ function noonOf({ year, month }: YearMonth): Date {
  * - rolling12: the trailing 12 calendar months, current month included
  * - all: every paid dividend
  */
+/** The month bounds of a period, inclusive. `null` means unbounded on that side ("all"). */
+export interface PeriodBounds {
+  from: YearMonth | null;
+  to: YearMonth | null;
+}
+
+/**
+ * The calendar window a period stands for, upper bound INCLUDED — and the upper bound is the
+ * end of the period's own unit, not today.
+ *
+ * That distinction is the whole point: a payment announced for the 28th is genuinely "of this
+ * month" and belongs in the month's list, while one announced for 2032 is not, and used to show
+ * up there because announced rows carried no upper bound at all. Every figure that counts INCOME
+ * still gates on `isPaid` as well — the bounds decide what belongs to the period, `isPaid`
+ * decides what has actually arrived.
+ */
+export function resolvePeriodBounds(period: DividendPeriod, now: Date = new Date()): PeriodBounds {
+  const current = toYearMonth(now);
+  switch (period) {
+    case 'month':
+      return { from: current, to: current };
+    case 'year':
+      return { from: { year: current.year, month: 1 }, to: { year: current.year, month: 12 } };
+    case 'rolling12':
+      return { from: subtractMonths(current, 11), to: current };
+    case 'all':
+      return { from: null, to: null };
+  }
+}
+
+/** Whether a payment date falls inside the period's calendar window. */
+function isInPeriodWindow(date: Date, bounds: PeriodBounds): boolean {
+  const ym = toYearMonth(date);
+  if (bounds.from && !isOnOrAfter(ym, bounds.from)) return false;
+  if (bounds.to && !isOnOrAfter(bounds.to, ym)) return false;
+  return true;
+}
+
 export function filterPaidByPeriod(
   dividends: Dividend[],
   period: DividendPeriod,
   now: Date = new Date(),
 ): Dividend[] {
-  const paid = dividends.filter((d) => isPaid(d, now));
-  if (period === 'all') return paid;
-
-  const current = toYearMonth(now);
-
-  if (period === 'month') {
-    return paid.filter((d) => {
-      const ym = toYearMonth(toDate(d.paymentDate));
-      return ym.year === current.year && ym.month === current.month;
-    });
-  }
-
-  if (period === 'year') {
-    return paid.filter((d) => getItalyYear(toDate(d.paymentDate)) === current.year);
-  }
-
-  // rolling12: lower bound is 11 months before the current month
-  const lowerBound = subtractMonths(current, 11);
-  return paid.filter((d) => isOnOrAfter(toYearMonth(toDate(d.paymentDate)), lowerBound));
+  const bounds = resolvePeriodBounds(period, now);
+  // A paid dividend is by definition on or before today, so the upper bound never excludes one:
+  // this is the same set the four hand-written branches used to produce.
+  return dividends.filter((d) => isPaid(d, now) && isInPeriodWindow(toDate(d.paymentDate), bounds));
 }
 
 /**
@@ -217,16 +234,6 @@ export function computeNetComparison(
   return { current, previous, deltaPct };
 }
 
-/**
- * Total net of dividends announced but not yet paid (payment date in the future).
- * Independent of the selected period — "in arrivo" is always forward-looking.
- */
-export function computeUpcomingNet(dividends: Dividend[], now: Date = new Date()): number {
-  return dividends
-    .filter((d) => !isPaid(d, now))
-    .reduce((sum, d) => sum + netEur(d), 0);
-}
-
 // ==================== Payer ranking (leaderboard) ====================
 
 export interface PayerRow {
@@ -238,10 +245,11 @@ export interface PayerRow {
 }
 
 /**
- * Ranks the period's payers by net income, descending. Payers past MAX_RANKED_PAYERS
- * collapse into a single "Altri" row so the leaderboard stays scannable.
+ * The period's payers folded by asset and sorted by net, descending. Private: every surface
+ * goes through `rankPayerShares`, which adds the residual row the tiles need — two rankings
+ * of the same thing would drift.
  */
-export function rankPayers(
+function rankPayersRaw(
   dividends: Dividend[],
   period: DividendPeriod,
   now: Date = new Date(),
@@ -262,19 +270,7 @@ export function rankPayers(
     byAsset.set(d.assetId, row);
   }
 
-  const sorted = [...byAsset.values()].sort((a, b) => b.net - a.net);
-  if (sorted.length <= MAX_RANKED_PAYERS) return sorted;
-
-  const head = sorted.slice(0, MAX_RANKED_PAYERS);
-  const tail = sorted.slice(MAX_RANKED_PAYERS);
-  head.push({
-    assetId: OTHER_PAYER_LABEL,
-    assetTicker: OTHER_PAYER_LABEL,
-    assetName: `${tail.length} altri strumenti`,
-    net: tail.reduce((sum, r) => sum + r.net, 0),
-    count: tail.reduce((sum, r) => sum + r.count, 0),
-  });
-  return head;
+  return [...byAsset.values()].sort((a, b) => b.net - a.net);
 }
 
 // ==================== Time series (sparkline + charts) ====================
@@ -294,45 +290,19 @@ function monthLabel(year: number, month: number): string {
   return format(new Date(year, month - 1, 1), 'MMM yy', { locale: it });
 }
 
+/** "gen" — the axis label of an in-tile bar chart, where the year is stated once above it. */
+function shortMonthLabel(month: number): string {
+  return format(new Date(2000, month - 1, 1), 'MMM', { locale: it });
+}
+
 export interface MonthlyNetPoint {
+  /** "gen 26" — names the point unambiguously in a tooltip or an aria-label. */
   label: string;
+  /** "gen" — the axis label under an in-tile bar. */
+  shortLabel: string;
   year: number;
   month: number;
   net: number;
-}
-
-/**
- * Gap-free monthly net-income series across the paid dividends, oldest → newest.
- * Feeds both the hero sparkline and the monthly chart. `maxMonths`, when given, keeps
- * only the most recent N months (e.g. 12 for the sparkline).
- */
-export function buildMonthlyNetSeries(
-  dividends: Dividend[],
-  now: Date = new Date(),
-  maxMonths?: number,
-): MonthlyNetPoint[] {
-  const paid = dividends.filter((d) => isPaid(d, now));
-  if (paid.length === 0) return [];
-
-  const dates = paid.map((d) => toDate(d.paymentDate));
-  const first = toYearMonth(dates.reduce((min, d) => (d < min ? d : min), dates[0]));
-  const last = toYearMonth(dates.reduce((max, d) => (d > max ? d : max), dates[0]));
-  let axis = enumerateMonths(first, last);
-  if (maxMonths && axis.length > maxMonths) axis = axis.slice(-maxMonths);
-
-  const netByKey = new Map<string, number>();
-  for (const d of paid) {
-    const ym = toYearMonth(toDate(d.paymentDate));
-    const key = `${ym.year}-${ym.month}`;
-    netByKey.set(key, (netByKey.get(key) ?? 0) + netEur(d));
-  }
-
-  return axis.map(({ year, month }) => ({
-    label: monthLabel(year, month),
-    year,
-    month,
-    net: netByKey.get(`${year}-${month}`) ?? 0,
-  }));
 }
 
 export interface YearlyNetPoint {
@@ -438,36 +408,414 @@ export function computeReliability(
   };
 }
 
-// ==================== Period → date bounds (for the stats API) ====================
+// ==================== Payer ranking, shaped for the tiles ====================
+
+/** One row of a ranked list, the shape `RankedRows` renders (label · bar · amount · share). */
+export interface PayerRankingRow {
+  key: string;
+  label: string;
+  amount: number;
+  /** Share of `total`, 0-100. */
+  percentage: number;
+}
+
+export interface PayerRanking {
+  rows: PayerRankingRow[];
+  /** What the cut left out, so the shares visibly add up to `total`; null when nothing was cut. */
+  remainder: { label: string; amount: number; percentage: number } | null;
+  /** The period's whole net income — the denominator every share is measured against. */
+  total: number;
+  /** Distinct payers in the period, cut or not. */
+  payerCount: number;
+  top: PayerRow | null;
+}
 
 /**
- * Resolves the selected period to concrete {startDate, endDate} bounds, so the
- * server-computed advanced sections (YOC, DPS growth, total return) stay consistent
- * with the in-memory period axis. "all" returns undefined bounds (no date filter).
+ * The period's payers as ranked rows plus a residual — the same shape the category tiles use,
+ * so one primitive renders both. Only RECEIVED payments count: a leaderboard that credits an
+ * announced coupon would rank money nobody has.
  */
-export function periodToDateBounds(
+export function rankPayerShares(
+  dividends: Dividend[],
   period: DividendPeriod,
   now: Date = new Date(),
-): { startDate?: Date; endDate?: Date } {
-  if (period === 'all') return {};
+  limit = 5,
+): PayerRanking {
+  // rankPayers already folds by asset, sorts by net and scopes to the period's PAID rows;
+  // asking it for the raw list (no "Altri" collapse) keeps the two functions in step.
+  const payers = rankPayersRaw(dividends, period, now);
+  const total = payers.reduce((sum, p) => sum + p.net, 0);
+  if (payers.length === 0) return { rows: [], remainder: null, total: 0, payerCount: 0, top: null };
 
+  const shown = payers.slice(0, limit);
+  const cut = payers.slice(limit);
+  const share = (value: number) => (total > 0 ? (value / total) * 100 : 0);
+
+  const remainderAmount = cut.reduce((sum, p) => sum + p.net, 0);
+  return {
+    rows: shown.map((p) => ({ key: p.assetId, label: p.assetTicker || p.assetName, amount: p.net, percentage: share(p.net) })),
+    remainder: cut.length > 0
+      ? { label: `Altri ${cut.length} ${cut.length === 1 ? 'strumento' : 'strumenti'}`, amount: remainderAmount, percentage: share(remainderAmount) }
+      : null,
+    total,
+    payerCount: payers.length,
+    top: payers[0],
+  };
+}
+
+// ==================== Yearly income ====================
+
+export interface YearlyIncomePoint {
+  year: number;
+  gross: number;
+  net: number;
+  /** True for the calendar year `now` falls in — drawn, but never ranked. */
+  ongoing: boolean;
+}
+
+export interface YearlyIncomeSummary {
+  /** Gap-free, oldest → newest, at most `maxYears`. */
+  years: YearlyIncomePoint[];
+  /** Closed years among those drawn — the denominator of `average`. */
+  closedCount: number;
+  average: number | null;
+  best: YearlyIncomePoint | null;
+  worst: YearlyIncomePoint | null;
+  ongoing: YearlyIncomePoint | null;
+}
+
+/**
+ * Net income per calendar year, with the running year drawn but excluded from every
+ * comparison: at the end of August a year that is two thirds done would be "the worst year"
+ * by construction. The axis is gap-free so a silent year reads as a zero and not as a hole,
+ * and it is capped at `maxYears` so the average the reading states is the average of the
+ * bars the user can see.
+ */
+export function summarizeYearlyIncome(
+  dividends: Dividend[],
+  now: Date = new Date(),
+  maxYears = 6,
+): YearlyIncomeSummary {
+  const series = buildYearlySeries(dividends, now);
+  if (series.length === 0) {
+    return { years: [], closedCount: 0, average: null, best: null, worst: null, ongoing: null };
+  }
+
+  const currentYear = getItalyYear(now);
+  const byYear = new Map(series.map((entry) => [entry.year, entry]));
+  const first = series[0].year;
+  const last = Math.max(series[series.length - 1].year, currentYear);
+
+  const all: YearlyIncomePoint[] = [];
+  for (let year = first; year <= last; year++) {
+    const entry = byYear.get(year);
+    all.push({ year, gross: entry?.gross ?? 0, net: entry?.net ?? 0, ongoing: year === currentYear });
+  }
+  const years = all.slice(-maxYears);
+
+  const closed = years.filter((y) => !y.ongoing);
+  const average = closed.length > 0 ? closed.reduce((sum, y) => sum + y.net, 0) / closed.length : null;
+  const sorted = [...closed].sort((a, b) => b.net - a.net);
+
+  return {
+    years,
+    closedCount: closed.length,
+    average,
+    best: sorted[0] ?? null,
+    worst: sorted[sorted.length - 1] ?? null,
+    ongoing: years.find((y) => y.ongoing) ?? null,
+  };
+}
+
+// ==================== Announced payments ====================
+
+export interface UpcomingPayment {
+  id: string;
+  assetId: string;
+  assetTicker: string;
+  assetName: string;
+  paymentDate: Date;
+  net: number;
+  /** An inflation-linked coupon still at its guaranteed fixed floor: the figure is not final. */
+  isProvisional: boolean;
+}
+
+/** The announced payments, soonest first — what the hero tile lists and the verdict names. */
+export function nextPayments(dividends: Dividend[], now: Date = new Date(), limit = 3): UpcomingPayment[] {
+  return dividends
+    .filter((d) => !isPaid(d, now))
+    .sort((a, b) => toDate(a.paymentDate).getTime() - toDate(b.paymentDate).getTime())
+    .slice(0, limit)
+    .map((d) => ({
+      id: d.id,
+      assetId: d.assetId,
+      assetTicker: d.assetTicker,
+      assetName: d.assetName,
+      paymentDate: toDate(d.paymentDate),
+      net: netEur(d),
+      isProvisional: d.isProvisional === true,
+    }));
+}
+
+// ==================== The list's own inventory ====================
+
+export interface PaymentsInventory {
+  /** Rows listed, received and announced together — this counts the LIST, not the income. */
+  total: number;
+  receivedCount: number;
+  receivedNet: number;
+  announcedCount: number;
+  announcedNet: number;
+  largest: { label: string; net: number; dividendType: DividendType } | null;
+}
+
+/**
+ * What the Pagamenti tile is holding. Received and announced are counted and totalled
+ * SEPARATELY and never added: one is money in the account, the other is a promise, and a
+ * single figure covering both would tell the user they already have what they do not.
+ */
+export function summarizePayments(list: Dividend[], now: Date = new Date()): PaymentsInventory {
+  let receivedCount = 0;
+  let receivedNet = 0;
+  let announcedCount = 0;
+  let announcedNet = 0;
+  let largest: Dividend | null = null;
+
+  for (const d of list) {
+    const net = netEur(d);
+    if (isPaid(d, now)) {
+      receivedCount += 1;
+      receivedNet += net;
+    } else {
+      announcedCount += 1;
+      announcedNet += net;
+    }
+    if (!largest || net > netEur(largest)) largest = d;
+  }
+
+  return {
+    total: list.length,
+    receivedCount,
+    receivedNet,
+    announcedCount,
+    announcedNet,
+    largest: largest
+      ? { label: largest.assetTicker || largest.assetName, net: netEur(largest), dividendType: largest.dividendType }
+      : null,
+  };
+}
+
+// ==================== Month windows the tiles draw ====================
+
+/** Enumerate a gap-free monthly net series between two {year, month} bounds, inclusive. */
+function buildMonthWindow(dividends: Dividend[], from: YearMonth, to: YearMonth, now: Date): MonthlyNetPoint[] {
+  const netByKey = new Map<string, number>();
+  for (const d of dividends) {
+    if (!isPaid(d, now)) continue; // an announced payment is not income yet
+    const ym = toYearMonth(toDate(d.paymentDate));
+    const key = `${ym.year}-${ym.month}`;
+    netByKey.set(key, (netByKey.get(key) ?? 0) + netEur(d));
+  }
+  return enumerateMonths(from, to).map(({ year, month }) => ({
+    label: monthLabel(year, month),
+    shortLabel: shortMonthLabel(month),
+    year,
+    month,
+    net: netByKey.get(`${year}-${month}`) ?? 0,
+  }));
+}
+
+export interface MonthlyWindow {
+  points: MonthlyNetPoint[];
+  /** `${year}-${month}` of the month the page is about; null when the period is not one month. */
+  highlightKey: string | null;
+}
+
+/**
+ * The months the hero's bars draw. A month shows the trailing `trailing` months and outlines
+ * itself; a year shows its own months from January to the running one (the future is not
+ * data); the trailing window and the whole history show twelve — the tile's sub-eyebrow names
+ * whichever window it got, because a chart on a different window from the KPIs must say so.
+ */
+export function resolveMonthlyWindow(
+  dividends: Dividend[],
+  period: DividendPeriod,
+  now: Date = new Date(),
+  trailing = 6,
+): MonthlyWindow {
   const current = toYearMonth(now);
-
+  if (period === 'year') {
+    return { points: buildMonthWindow(dividends, { year: current.year, month: 1 }, current, now), highlightKey: null };
+  }
   if (period === 'month') {
     return {
-      startDate: new Date(current.year, current.month - 1, 1, 0, 0, 0),
-      endDate: now,
+      points: buildMonthWindow(dividends, subtractMonths(current, trailing - 1), current, now),
+      highlightKey: `${current.year}-${current.month}`,
     };
   }
+  return { points: buildMonthWindow(dividends, subtractMonths(current, 11), current, now), highlightKey: null };
+}
 
-  if (period === 'year') {
-    return { startDate: new Date(current.year, 0, 1, 0, 0, 0), endDate: now };
-  }
+export interface CoverageMonth {
+  key: string;
+  year: number;
+  month: number;
+  label: string;
+  net: number;
+  /** Whether at least one payment landed in this month. */
+  paid: boolean;
+}
 
-  // rolling12
-  const lower = subtractMonths(current, 11);
+/**
+ * One cell per month of the reliability window, filled when that month paid. Returns an EMPTY
+ * array when the window is longer than `maxMonths`: five years of coverage as sixty squares is
+ * not a reading, and drawing a slice of the window under a KPI measured on the whole of it
+ * would put two different windows in one tile.
+ */
+export function buildCoverageMonths(
+  dividends: Dividend[],
+  period: DividendPeriod,
+  now: Date = new Date(),
+  maxMonths = 24,
+): CoverageMonth[] {
+  const scoped = filterPaidByPeriod(dividends, period, now);
+  const span = monthsInWindow(period, scoped, now);
+  if (span < 1 || span > maxMonths) return [];
+
+  const current = toYearMonth(now);
+  const from = period === 'year' ? { year: current.year, month: 1 } : subtractMonths(current, span - 1);
+  return buildMonthWindow(scoped, from, current, now).map((point) => ({
+    key: `${point.year}-${point.month}`,
+    year: point.year,
+    month: point.month,
+    label: point.shortLabel,
+    net: point.net,
+    paid: point.net !== 0,
+  }));
+}
+
+// ==================== Yield (server-measured, TTM) ====================
+
+export interface YieldSummary {
+  yocGross: number | null;
+  yocNet: number | null;
+  currentYieldGross: number | null;
+  /** yocGross − currentYieldGross, in percentage points; null when either is missing. */
+  spread: number | null;
+  dpsMedianGrowth: number | null;
+  ttmGross: number | null;
+  costBasis: number | null;
+  /** Held instruments with a cost basis — what the figures are measured over. */
+  coverage: number;
+}
+
+/**
+ * Reads the yield block of the stats payload into what the Rendimento tile shows. Returns null
+ * when the portfolio has no yield on cost at all (no held instrument carries an average cost),
+ * which is what makes the verdict's yield clause disappear instead of printing a placeholder.
+ */
+export function summarizeYield(payload: DividendStatsPayload | null): YieldSummary | null {
+  if (!payload || payload.portfolioYieldOnCost === undefined) return null;
+
+  const assets = payload.yieldOnCostAssets ?? [];
+  const currentYieldGross = payload.portfolioCurrentYieldGross ?? null;
+  const yocGross = payload.portfolioYieldOnCost;
+
   return {
-    startDate: new Date(lower.year, lower.month - 1, 1, 0, 0, 0),
-    endDate: now,
+    yocGross,
+    yocNet: payload.portfolioYieldOnCostNet ?? null,
+    currentYieldGross,
+    spread: currentYieldGross === null ? null : yocGross - currentYieldGross,
+    dpsMedianGrowth: payload.dividendGrowthData?.portfolioMedianGrowth ?? null,
+    ttmGross: assets.length > 0 ? assets.reduce((sum, a) => sum + a.ttmGrossDividends, 0) : null,
+    costBasis: payload.totalCostBasis ?? null,
+    coverage: assets.length,
   };
+}
+
+// ==================== The two server tables under «Dettaglio» ====================
+
+export interface DpsGrowthSummary {
+  /** Instruments with a DPS history at all. */
+  coverage: number;
+  /** Portfolio median of the latest closed-year YoY; null when no instrument has two years. */
+  median: number | null;
+  /** Best latest YoY, and who; null when nothing can be compared year over year. */
+  best: { assetTicker: string; latestYoyGrowth: number } | null;
+  /** Every calendar year present in the table, ascending — the column set. */
+  years: number[];
+  /** The running calendar year, when it is one of the columns: partial, so never compared. */
+  ongoingYear: number | null;
+}
+
+/**
+ * What the DPS growth table says in one line. The median is the SERVER'S (one definition of a
+ * portfolio growth rate, not two); everything else here is a read over the same rows the table
+ * draws, so the reading can never name a figure the table does not show.
+ */
+export function summarizeDpsGrowth(payload: DividendStatsPayload | null, now: Date = new Date()): DpsGrowthSummary | null {
+  const growth = payload?.dividendGrowthData;
+  if (!growth || growth.byAsset.length === 0) return null;
+
+  const years = [...new Set(growth.byAsset.flatMap((a) => a.yearlyDps.map((y) => y.year)))].sort((a, b) => a - b);
+  const currentYear = getItalyYear(now);
+  const ranked = growth.byAsset
+    .filter((a): a is typeof a & { latestYoyGrowth: number } => a.latestYoyGrowth !== undefined)
+    .sort((a, b) => b.latestYoyGrowth - a.latestYoyGrowth);
+
+  return {
+    coverage: growth.byAsset.length,
+    median: growth.portfolioMedianGrowth ?? null,
+    best: ranked[0] ? { assetTicker: ranked[0].assetTicker, latestYoyGrowth: ranked[0].latestYoyGrowth } : null,
+    years,
+    ongoingYear: years.includes(currentYear) ? currentYear : null,
+  };
+}
+
+export interface TotalReturnSummary {
+  count: number;
+  /** Plain mean of the per-instrument total returns — the rows are not weighted by size. */
+  average: number;
+  best: { assetTicker: string; totalReturnPercentage: number };
+  worst: { assetTicker: string; totalReturnPercentage: number };
+  /** How many rows are below zero — what makes "la sola sotto zero" an honest phrase. */
+  negativeCount: number;
+}
+
+/** The one-line read over the per-instrument total return table. */
+export function summarizeTotalReturn(payload: DividendStatsPayload | null): TotalReturnSummary | null {
+  const rows = payload?.totalReturnAssets ?? [];
+  if (rows.length === 0) return null;
+
+  const sorted = [...rows].sort((a, b) => b.totalReturnPercentage - a.totalReturnPercentage);
+  const best = sorted[0];
+  const worst = sorted[sorted.length - 1];
+
+  return {
+    count: rows.length,
+    average: rows.reduce((sum, r) => sum + r.totalReturnPercentage, 0) / rows.length,
+    best: { assetTicker: best.assetTicker, totalReturnPercentage: best.totalReturnPercentage },
+    worst: { assetTicker: worst.assetTicker, totalReturnPercentage: worst.totalReturnPercentage },
+    negativeCount: rows.filter((r) => r.totalReturnPercentage < 0).length,
+  };
+}
+
+/**
+ * What the Pagamenti list holds: every payment whose date falls inside the period's calendar
+ * window, received or announced.
+ *
+ * It is the SAME window as the income figures, with the `isPaid` gate lifted — so a coupon
+ * announced for later this month is listed under this month, and one announced for 2032 is not.
+ * The first version kept every announced row whatever the period, which put a 2032 final premium
+ * in the «agosto» list and made the aside's «N voci» a claim the period did not support.
+ * `summarizePayments` still counts and totals the two halves apart, so widening the list to
+ * announced rows never widens an income figure.
+ */
+export function sliceForList(
+  dividends: Dividend[],
+  period: DividendPeriod,
+  now: Date = new Date(),
+): Dividend[] {
+  const bounds = resolvePeriodBounds(period, now);
+  return dividends.filter((d) => isInPeriodWindow(toDate(d.paymentDate), bounds));
 }

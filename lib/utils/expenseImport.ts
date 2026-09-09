@@ -9,20 +9,27 @@
  * - Tolerant to Italian-locale CSVs: delimiter auto-detected (`;`/`,`/tab via Papa
  *   Parse), decimal separator handled for both `1.234,56` (IT) and `1234.56` (EN).
  * - Headers accepted in Italian (canonical) or English (alias), case-insensitive.
- * - `type` optional → falls back to `variable`; `transfer` rows are skipped (a
- *   transfer needs origin/destination cash assets that a CSV cannot provide).
- * - Category type belongs to the category, not the row: a category name used with
- *   conflicting types (within the file, or vs an existing category) is rejected.
+ * - `type` optional → inherits the type of the single existing same-named category
+ *   when there is exactly one, falls back to `variable` when there is none, and is
+ *   rejected as ambiguous when same-named categories of different types exist;
+ *   `transfer` rows are skipped (a transfer needs origin/destination cash assets
+ *   that a CSV cannot provide).
+ * - Category identity is (name, type) — the same rule as the rest of the app
+ *   (lib/utils/expenseGrouping.ts): "Casa" fissa and "Casa" variabile are two
+ *   distinct categories, resolvable and creatable side by side. When two existing
+ *   categories share BOTH name and type, rows attach to the OLDEST document
+ *   (deterministic) and the plan carries a notice the preview must show.
  */
 
 import Papa from 'papaparse';
-import { ExpenseCategory } from '@/types/expenses';
+import { ExpenseCategory, EXPENSE_TYPE_LABELS } from '@/types/expenses';
 import {
   RawRow,
   PlannedExpenseRow,
   RowError,
   CategoryToCreate,
   SubCategoryToCreate,
+  ImportNotice,
   ImportPlan,
   ImportSummary,
   ImportableExpenseType,
@@ -192,20 +199,44 @@ export function parseImportCsv(raw: string): RawRow[] {
 const norm = (s: string): string => s.trim().toLowerCase();
 
 /**
+ * The category identity the import resolves against: (normalized name, type).
+ * Shared with the commit layer (expenseImportService) so plan and write can never
+ * disagree on which document a row attaches to.
+ */
+export function categoryMatchKey(name: string, type: string): string {
+  return `${type}::${norm(name)}`;
+}
+
+/**
  * Turn raw rows into a full ImportPlan against the user's existing categories.
  *
- * Row-level validation produces PlannedExpenseRows or RowErrors. Then a
- * category-consistency pass rejects any category name used with conflicting
- * types (internally or vs an existing category) — those rows move to errors.
- * Finally it derives which categories / subcategories must be created and a
- * human-facing summary.
+ * Row-level validation produces PlannedExpenseRows or RowErrors. Categories are
+ * resolved by (name, type): a same-named category of a different type is a
+ * different document, never a conflict. Rows without a type inherit the single
+ * existing namesake's type (ambiguous namesakes are rejected with the reason).
+ * Two existing categories sharing BOTH name and type resolve to the oldest one,
+ * and the plan carries a notice the preview must display. Finally it derives
+ * which categories / subcategories must be created and a human-facing summary.
  */
 export function buildImportPlan(rows: RawRow[], existingCategories: ExpenseCategory[]): ImportPlan {
-  const existingByName = new Map<string, ExpenseCategory>();
-  existingCategories.forEach((c) => existingByName.set(norm(c.name), c));
+  // (name, type) → existing categories, oldest first: [0] is the resolution target.
+  const existingByKey = new Map<string, ExpenseCategory[]>();
+  // name → importable types it exists under, for the untyped-row inheritance rule.
+  const existingTypesByName = new Map<string, Set<ImportableExpenseType>>();
+  for (const c of existingCategories) {
+    if (!(IMPORTABLE_TYPES as string[]).includes(c.type)) continue; // transfer categories are not importable targets
+    const key = categoryMatchKey(c.name, c.type);
+    existingByKey.set(key, [...(existingByKey.get(key) ?? []), c]);
+    const nameKey = norm(c.name);
+    if (!existingTypesByName.has(nameKey)) existingTypesByName.set(nameKey, new Set());
+    existingTypesByName.get(nameKey)!.add(c.type as ImportableExpenseType);
+  }
+  for (const list of existingByKey.values()) {
+    list.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  }
 
   const errors: RowError[] = [];
-  const candidates: PlannedExpenseRow[] = [];
+  const validRows: PlannedExpenseRow[] = [];
 
   for (const row of rows) {
     if (!row.categoria) {
@@ -232,7 +263,20 @@ export function buildImportPlan(rows: RawRow[], existingCategories: ExpenseCateg
     }
     let type: ImportableExpenseType;
     if (rawType === '') {
-      type = 'variable'; // fallback for untyped expenses
+      // Untyped row: inherit the type of the single existing namesake — defaulting
+      // blindly to 'variable' beside an existing fixed "Casa" would silently create
+      // a same-named duplicate. Ambiguous namesakes need the user to say which.
+      const namesakeTypes = existingTypesByName.get(norm(row.categoria)) ?? new Set<ImportableExpenseType>();
+      if (namesakeTypes.size > 1) {
+        const labels = [...namesakeTypes].map((t) => EXPENSE_TYPE_LABELS[t]).join(' e ');
+        errors.push({
+          line: row.line,
+          reason: `Tipo mancante e ambiguo: "${row.categoria}" esiste sia come ${labels}. Specifica il tipo nella colonna "tipo".`,
+          raw: row,
+        });
+        continue;
+      }
+      type = namesakeTypes.size === 1 ? [...namesakeTypes][0] : 'variable';
     } else if ((IMPORTABLE_TYPES as string[]).includes(rawType)) {
       type = rawType as ImportableExpenseType;
     } else {
@@ -240,56 +284,47 @@ export function buildImportPlan(rows: RawRow[], existingCategories: ExpenseCateg
       continue;
     }
 
-    candidates.push({
+    const resolved = existingByKey.get(categoryMatchKey(row.categoria, type))?.[0];
+    validRows.push({
       line: row.line,
       date,
       amount,
       type,
       categoryName: row.categoria.trim(),
+      categoryId: resolved?.id,
       subCategoryName: row.sottocategoria ? row.sottocategoria.trim() : undefined,
       notes: row.note || undefined,
       currency: (row.valuta || 'EUR').toUpperCase(),
     });
   }
 
-  // Category-consistency pass: a category name must have exactly one type.
-  const typesByCategory = new Map<string, Set<ImportableExpenseType>>();
-  for (const c of candidates) {
-    const key = norm(c.categoryName);
-    if (!typesByCategory.has(key)) typesByCategory.set(key, new Set());
-    typesByCategory.get(key)!.add(c.type);
-    const existing = existingByName.get(key);
-    if (existing && existing.type !== 'transfer') typesByCategory.get(key)!.add(existing.type as ImportableExpenseType);
-  }
-
-  const conflictingCategories = new Set<string>();
-  for (const [key, types] of typesByCategory) {
-    if (types.size > 1) conflictingCategories.add(key);
-  }
-
-  const validRows: PlannedExpenseRow[] = [];
-  for (const c of candidates) {
-    const key = norm(c.categoryName);
-    if (conflictingCategories.has(key)) {
-      const existing = existingByName.get(key);
-      const detail = existing
-        ? `la categoria "${c.categoryName}" esiste già come "${existing.type}"`
-        : `la categoria "${c.categoryName}" è usata con tipi diversi nel file`;
-      errors.push({ line: c.line, reason: `Conflitto di tipo: ${detail}.`, raw: { categoria: c.categoryName } });
-    } else {
-      validRows.push(c);
-    }
-  }
-
-  // Derive categories / subcategories to create from the surviving valid rows.
+  // Derive categories / subcategories to create from the valid rows — keyed by
+  // (name, type), so "Casa" fissa and "Casa" variabile can be created side by side.
   const categoriesToCreate: CategoryToCreate[] = [];
   const subCategoriesToCreate: SubCategoryToCreate[] = [];
+  const notices: ImportNotice[] = [];
   const newCatByKey = new Map<string, CategoryToCreate>();
   const subAddByKey = new Map<string, SubCategoryToCreate>();
+  const noticedKeys = new Set<string>();
 
   for (const c of validRows) {
-    const key = norm(c.categoryName);
-    const existing = existingByName.get(key);
+    const key = categoryMatchKey(c.categoryName, c.type);
+    const existingList = existingByKey.get(key);
+    const existing = existingList?.[0];
+
+    // Two existing categories share this exact (name, type): the attachment to the
+    // oldest is deterministic but must be DISCLOSED, not silent — the preview is
+    // mandatory before any write, so this is where the user gets to see it.
+    if (existingList && existingList.length > 1 && !noticedKeys.has(key)) {
+      noticedKeys.add(key);
+      notices.push({
+        categoryName: existing!.name,
+        type: c.type,
+        duplicateCount: existingList.length,
+        message: `Esistono ${existingList.length} categorie «${existing!.name}» (${EXPENSE_TYPE_LABELS[c.type]}): le righe importate verranno agganciate alla più vecchia.`,
+      });
+    }
+
     if (!existing) {
       let entry = newCatByKey.get(key);
       if (!entry) {
@@ -317,7 +352,7 @@ export function buildImportPlan(rows: RawRow[], existingCategories: ExpenseCateg
   }
 
   const summary = buildSummary(validRows, errors, categoriesToCreate.length);
-  return { validRows, errors, categoriesToCreate, subCategoriesToCreate, summary };
+  return { validRows, errors, categoriesToCreate, subCategoriesToCreate, notices, summary };
 }
 
 function buildSummary(validRows: PlannedExpenseRow[], errors: RowError[], newCategoriesCount: number): ImportSummary {

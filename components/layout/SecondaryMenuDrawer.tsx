@@ -4,7 +4,6 @@ import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,7 +13,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { AssistenteBanner } from '@/components/layout/AssistenteBanner';
 import { LogoutDialog } from '@/components/layout/LogoutDialog';
 import { ThemePicker } from '@/components/layout/ThemePicker';
 import { Settings, LogOut, MoreVertical, Users, Check } from 'lucide-react';
@@ -24,7 +22,9 @@ import { useLogout } from '@/lib/hooks/useLogout';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { getAccountLabel, getDisplayInfo } from '@/lib/utils/userDisplayUtils';
-import { analysisNav, planningNav } from '@/lib/constants/navigation';
+import { analysisNav, planningNav, assistantNavItem } from '@/lib/constants/navigation';
+import { SIDEBAR_AVATAR_CLASS } from '@/components/layout/shellStyles';
+import { TILE_EYEBROW_CLASS } from '@/components/ui/tile';
 
 interface SecondaryMenuDrawerProps {
   open: boolean;
@@ -124,7 +124,8 @@ export function SecondaryMenuDrawer({ open, onOpenChange }: SecondaryMenuDrawerP
         : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
     );
 
-  const sectionLabel = 'px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/40';
+  // The tiles' eyebrow, on the sidebar surface: the same label the desktop sidebar uses.
+  const sectionLabel = cn(TILE_EYEBROW_CLASS, 'px-3 pb-1 text-sidebar-foreground/60');
 
   return (
     <>
@@ -180,9 +181,9 @@ export function SecondaryMenuDrawer({ open, onOpenChange }: SecondaryMenuDrawerP
                 initial="hidden"
                 animate="visible"
               >
-                {/* Statistiche group */}
+                {/* Analisi group — the same label as the desktop sidebar */}
                 <div className="mb-1">
-                  <motion.p variants={drawerItem} className={sectionLabel}>Statistiche</motion.p>
+                  <motion.p variants={drawerItem} className={sectionLabel}>Analisi</motion.p>
                   {/* motion.li carries the stagger variant; the inner Link keeps
                       aria-current, Next.js prefetching, and right-click semantics. */}
                   <ul className="m-0 list-none p-0">
@@ -224,40 +225,47 @@ export function SecondaryMenuDrawer({ open, onOpenChange }: SecondaryMenuDrawerP
                   </ul>
                 </div>
 
-                {/* Assistente AI banner */}
+                {/* Assistente AI — a route like the others, after a hairline */}
                 {process.env.NEXT_PUBLIC_ASSISTANT_AI_ENABLED !== 'false' && (
-                  <motion.div variants={drawerItem} className="py-2">
-                    <AssistenteBanner onClick={() => onOpenChange(false)} />
-                  </motion.div>
+                  <ul className="m-0 list-none border-t border-sidebar-border p-0 pt-1 mx-1 mt-1">
+                    <motion.li variants={drawerItem}>
+                      <Link
+                        href={assistantNavItem.href}
+                        aria-current={isActive(assistantNavItem.href) ? 'page' : undefined}
+                        onClick={() => onOpenChange(false)}
+                        className={navItemCn(isActive(assistantNavItem.href))}
+                      >
+                        <assistantNavItem.icon className="size-5 shrink-0" />
+                        {assistantNavItem.name}
+                      </Link>
+                    </motion.li>
+                  </ul>
                 )}
               </motion.nav>
 
               {/* Footer: user identity + account options dropdown */}
               <div className="shrink-0 border-t border-sidebar-border">
                 <div className="flex items-center gap-3 px-4 py-3">
-                  <Avatar className="size-8 shrink-0 rounded-lg">
-                    <AvatarFallback className="rounded-lg bg-primary text-primary-foreground text-xs font-semibold">
-                      {initials}
-                    </AvatarFallback>
-                  </Avatar>
+                  <span className={SIDEBAR_AVATAR_CLASS} aria-hidden="true">{initials}</span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{displayName}</p>
+                    <p className="truncate text-[13px] font-medium">{displayName}</p>
                     {/* When viewing a shared account, surface WHOSE data is active
                         instead of the viewer's own email — otherwise the account
                         being edited is invisible. Same rule as AppSidebar. */}
                     {isSharedView && activeAccount ? (
-                      <p className="truncate text-xs text-primary">
+                      <p className="truncate text-[11px] text-primary">
                         Vedi: {getAccountLabel(activeAccount)}
                       </p>
                     ) : (
-                      <p className="truncate text-xs text-sidebar-foreground/50">{user?.email}</p>
+                      <p className="truncate text-[11px] text-sidebar-foreground/50">{user?.email}</p>
                     )}
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <button
                         aria-label="Opzioni account"
-                        className="ml-auto flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                        // 44px: this is a touch target on a phone, not a desktop affordance.
+                        className="ml-auto flex size-11 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
                       >
                         <MoreVertical className="size-4" />
                       </button>

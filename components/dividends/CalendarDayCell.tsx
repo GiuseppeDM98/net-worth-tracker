@@ -1,120 +1,82 @@
 'use client';
 
-import { motion } from 'framer-motion';
 import { Dividend } from '@/types/dividend';
-import { Badge } from '@/components/ui/badge';
-import { formatCurrency } from '@/lib/utils/formatters';
+import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { cn } from '@/lib/utils';
-import { metricSettleTransition } from '@/lib/utils/motionVariants';
 
 interface CalendarDayCellProps {
   date: Date;
   isCurrentMonth: boolean;
   isToday: boolean;
-  isSelected: boolean;
   dividends: Dividend[];
   onClick: (date: Date) => void;
   /** Pre-built accessible label passed from the parent calendar grid. */
   ariaLabel: string;
+  /** Every payment on this day is still in the future: a promise, not income. */
+  announced: boolean;
 }
 
+/**
+ * One day of the payments calendar.
+ *
+ * Two colour decisions, both token-driven since the 2026-08-23 redesign. A day that PAID is
+ * washed with `--muted`, not with a green fill: twenty green cells in a month would make the
+ * calendar the loudest surface on the page, and the amount already carries the sign colour.
+ * A day whose payments are only ANNOUNCED keeps a fainter wash and a muted amount — the
+ * distinction the old cell did not draw at all, so an expected coupon read exactly like cash
+ * in the account.
+ */
 export function CalendarDayCell({
   date,
   isCurrentMonth,
   isToday,
-  isSelected,
   dividends,
   onClick,
   ariaLabel,
+  announced,
 }: CalendarDayCellProps) {
-  const dayNumber = date.getDate();
   const hasDividends = dividends.length > 0;
-
-  // EUR amount if available (for converted dividends), otherwise original currency
-  const totalNet = dividends.reduce((sum, div) => {
-    const amount = div.netAmountEur ?? div.netAmount;
-    return sum + amount;
-  }, 0);
-
-  const handleClick = () => {
-    if (hasDividends) {
-      onClick(date);
-    }
-  };
+  const totalNet = dividends.reduce((sum, div) => sum + (div.netAmountEur ?? div.netAmount), 0);
 
   return (
     <button
       type="button"
       role="gridcell"
-      onClick={handleClick}
+      onClick={() => hasDividends && onClick(date)}
       disabled={!hasDividends}
       aria-label={ariaLabel}
-      aria-selected={isSelected}
-      // aria-current="date" marks today — screen readers announce it as the current date
       aria-current={isToday ? 'date' : undefined}
       className={cn(
-        'relative border border-border p-1 text-left desktop:p-2',
-        'min-h-[60px] desktop:min-h-[80px]',
-        'flex flex-col gap-1',
+        'relative flex min-h-[58px] flex-col gap-1 border-b border-r border-border p-1.5 text-left desktop:min-h-[76px] desktop:p-2',
         'transition-colors motion-reduce:transition-none',
-
-        hasDividends && 'cursor-pointer hover:bg-accent',
-        !hasDividends && 'cursor-default',
-
+        hasDividends ? 'cursor-pointer hover:bg-muted' : 'cursor-default',
         isCurrentMonth ? 'text-foreground' : 'text-muted-foreground opacity-50',
-
-        // ring-primary uses the active theme's primary color instead of a hardcoded blue
-        isToday && !isSelected && 'ring-2 ring-inset ring-primary',
-
-        isSelected && 'border-primary bg-primary/8 shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.25)]',
-
-        hasDividends && !isSelected && 'bg-green-50 dark:bg-green-950/20',
-        hasDividends && !isSelected && 'hover:bg-green-100 dark:hover:bg-green-900/30'
+        hasDividends && (announced ? 'bg-muted/35' : 'bg-muted/60'),
+        isToday && 'shadow-[inset_0_0_0_2px_var(--primary)]',
       )}
     >
-      {isSelected && (
-        <motion.div
-          layout
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-1 rounded-md border border-primary/20 bg-primary/5"
-          initial={{ opacity: 0, scale: 0.98 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.98 }}
-          transition={metricSettleTransition}
-        />
-      )}
+      <span className="text-[12px] font-medium desktop:text-[13px]">{date.getDate()}</span>
 
-      {/* Day number */}
-      <div className={cn(
-        'relative z-10 text-xs font-medium desktop:text-sm',
-        isSelected && 'text-primary'
-      )}>
-        {dayNumber}
-      </div>
-
-      {/* Dividend information */}
       {hasDividends && (
-        <div className="relative z-10 flex flex-1 flex-col gap-1 text-xs">
+        <span className="flex min-w-0 flex-col gap-0.5">
           {dividends.length === 1 ? (
-            <>
-              <div className="font-semibold truncate">
-                {dividends[0].assetTicker}
-              </div>
-              <div className="text-emerald-600 dark:text-emerald-400 font-medium truncate">
-                {formatCurrency(dividends[0].netAmountEur ?? dividends[0].netAmount)}
-              </div>
-            </>
+            <span className="hidden truncate text-[11px] font-medium desktop:block">
+              {dividends[0].assetTicker || dividends[0].assetName}
+            </span>
           ) : (
-            <>
-              <Badge variant="secondary" className="w-fit text-xs px-1 py-0">
-                {dividends.length}
-              </Badge>
-              <div className="text-emerald-600 dark:text-emerald-400 font-medium truncate">
-                {formatCurrency(totalNet)}
-              </div>
-            </>
+            <span className="hidden w-fit rounded-[4px] bg-background px-1 font-mono text-[10px] tabular-nums text-muted-foreground desktop:block">
+              {dividends.length}
+            </span>
           )}
-        </div>
+          <span
+            className={cn(
+              'truncate font-mono text-[11px] font-semibold tabular-nums desktop:text-[12px]',
+              announced ? 'text-muted-foreground' : 'text-positive',
+            )}
+          >
+            {cachedFormatCurrencyEUR(totalNet, true)}
+          </span>
+        </span>
       )}
     </button>
   );

@@ -2,8 +2,9 @@
  * Cash Balance Reconciliation Service
  *
  * Handles cash asset balance updates when expenses are created, edited, or deleted.
- * Transfer operations are executed atomically via a single Firestore transaction
- * to prevent partial-update corruption on network failure.
+ * Transfer operations — including edits that re-type a row across the transfer
+ * boundary (transfer ↔ spesa/entrata) — are executed atomically via a single
+ * Firestore transaction to prevent partial-update corruption on network failure.
  */
 
 import { updateCashAssetBalance, updateCashAssetBalancesAtomic } from '@/lib/services/assetService';
@@ -26,6 +27,26 @@ export interface SingleReconcileEditParams {
   newSignedAmount: number;
 }
 
+export interface TransferToSingleParams {
+  oldOriginId?: string;
+  oldDestId?: string;
+  /** Absolute amount of the old transfer (transfers are stored positive). */
+  oldAmount: number;
+  newLinkedAssetId?: string;
+  /** Signed per convention: income positive, expenses negative. */
+  newSignedAmount: number;
+}
+
+export interface SingleToTransferParams {
+  oldLinkedAssetId?: string;
+  /** Signed as stored: income positive, expenses negative. */
+  oldSignedAmount: number;
+  newOriginId?: string;
+  newDestId?: string;
+  /** Absolute amount of the new transfer. */
+  newAmount: number;
+}
+
 export interface TransferCreateParams {
   originId?: string;
   destId?: string;
@@ -43,12 +64,28 @@ export interface TransferDeleteParams {
   amount: number;
 }
 
-interface SingleDeleteParams {
-  linkedAssetId: string;
-  signedAmount: number;
-}
-
 // ─── Reconciliation Functions ─────────────────────────────────────────────────
+
+/**
+ * Aggregate per-asset deltas (old and new sides may share an account), drop the
+ * ones that cancel out, and commit the rest in a single Firestore transaction.
+ * Returns true if any balance was written.
+ */
+async function commitNetDeltas(entries: Array<[id: string | undefined, delta: number]>): Promise<boolean> {
+  const deltas = new Map<string, number>();
+  for (const [id, delta] of entries) {
+    if (!id) continue;
+    deltas.set(id, (deltas.get(id) ?? 0) + delta);
+  }
+
+  const updates = Array.from(deltas.entries())
+    .filter(([, signedDelta]) => Math.abs(signedDelta) > 0.001)
+    .map(([assetId, signedDelta]) => ({ assetId, signedDelta }));
+  if (updates.length === 0) return false;
+
+  await updateCashAssetBalancesAtomic(updates);
+  return true;
+}
 
 /**
  * Reconcile cash balances when editing a transfer.
@@ -58,23 +95,44 @@ interface SingleDeleteParams {
 export async function reconcileTransferEdit(params: TransferReconcileParams): Promise<boolean> {
   const { oldOriginId, oldDestId, newOriginId, newDestId, oldAmount, newAmount } = params;
 
-  // Aggregate net deltas per asset (handles the case where old and new IDs overlap)
-  const deltas = new Map<string, number>();
-  const apply = (id: string | undefined, delta: number) => {
-    if (!id) return;
-    deltas.set(id, (deltas.get(id) ?? 0) + delta);
-  };
+  return commitNetDeltas([
+    [oldOriginId, +oldAmount],  // reverse old origin debit
+    [oldDestId, -oldAmount],    // reverse old destination credit
+    [newOriginId, -newAmount],  // apply new origin debit
+    [newDestId, +newAmount],    // apply new destination credit
+  ]);
+}
 
-  apply(oldOriginId, +oldAmount);   // reverse old origin debit
-  apply(oldDestId, -oldAmount);     // reverse old destination credit
-  apply(newOriginId, -newAmount);   // apply new origin debit
-  apply(newDestId, +newAmount);     // apply new destination credit
+/**
+ * Reconcile cash balances when an edit re-types a transfer into a single-account
+ * entry (spesa/entrata): reverse the old origin/destination pair, then apply the
+ * new signed amount to the linked account. Atomic, so a same-account re-type
+ * (origin becomes the linked account) nets out instead of double-writing.
+ */
+export async function reconcileTransferToSingleEdit(params: TransferToSingleParams): Promise<boolean> {
+  const { oldOriginId, oldDestId, oldAmount, newLinkedAssetId, newSignedAmount } = params;
 
-  const updates = Array.from(deltas.entries()).map(([assetId, signedDelta]) => ({ assetId, signedDelta }));
-  if (updates.length === 0) return false;
+  return commitNetDeltas([
+    [oldOriginId, +oldAmount],            // reverse old origin debit
+    [oldDestId, -oldAmount],              // reverse old destination credit
+    [newLinkedAssetId, newSignedAmount],  // apply new single-account effect
+  ]);
+}
 
-  await updateCashAssetBalancesAtomic(updates);
-  return true;
+/**
+ * Reconcile cash balances when an edit re-types a single-account entry
+ * (spesa/entrata) into a transfer: reverse the old signed effect, then apply the
+ * new origin debit / destination credit pair. The reversal is -oldSignedAmount,
+ * so a former income (stored positive) is debited back — not re-credited.
+ */
+export async function reconcileSingleToTransferEdit(params: SingleToTransferParams): Promise<boolean> {
+  const { oldLinkedAssetId, oldSignedAmount, newOriginId, newDestId, newAmount } = params;
+
+  return commitNetDeltas([
+    [oldLinkedAssetId, -oldSignedAmount],  // reverse old single-account effect
+    [newOriginId, -newAmount],             // apply new origin debit
+    [newDestId, +newAmount],               // apply new destination credit
+  ]);
 }
 
 /**

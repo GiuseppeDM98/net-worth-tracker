@@ -1,6 +1,7 @@
 import {
   MonteCarloParams,
   MonteCarloResults,
+  MonteCarloCapitalInflow,
   SingleSimulationResult,
   PercentilesData,
   MonteCarloScenarios,
@@ -47,9 +48,23 @@ function runSingleSimulation(
   simulationId: number
 ): SingleSimulationResult {
   let portfolio = params.initialPortfolio;
+
+  // Capital inflows: defined order is inflow → market return → withdrawal, so an
+  // inflow earns its own year's return before that year's withdrawal. Inflows at year <= 0
+  // are simply part of the starting portfolio.
+  const inflows = params.capitalInflows ?? [];
+  for (const inflow of inflows) {
+    if (inflow.year <= 0) portfolio += inflow.amount;
+  }
+
   const path: { year: number; value: number }[] = [{ year: 0, value: portfolio }];
 
   for (let year = 1; year <= params.retirementYears; year++) {
+    // Add the inflows landing this year BEFORE applying the market return
+    for (const inflow of inflows) {
+      if (inflow.year === year) portfolio += inflow.amount;
+    }
+
     // Generate random returns for each asset class
     const equityReturn = randomNormal(params.equityReturn, params.equityVolatility);
     const bondsReturn = randomNormal(params.bondsReturn, params.bondsVolatility);
@@ -135,25 +150,33 @@ function calculatePercentiles(
 }
 
 /**
- * Create distribution bins for final portfolio values
+ * Create distribution bins for final portfolio values.
+ *
+ * Equal-width bins from the smallest final value up to the 95TH PERCENTILE, the last bin taking
+ * the tail up to the maximum (2026-08-26): a thirty-year run has a heavy right tail, and bins
+ * stretched to an outlier of ten times the median left nine of ten bins empty. The last bin is
+ * therefore wider than the others and the surface says so (the Distribuzione footer).
  */
 function createDistribution(
   simulations: SingleSimulationResult[],
   bins: number = 10
-): { range: string; count: number; percentage: number }[] {
+): MonteCarloResults['distribution'] {
   const finalValues = simulations.map((sim) => sim.finalValue);
-  const maxValue = Math.max(...finalValues);
-  const minValue = Math.min(...finalValues);
-  const binSize = (maxValue - minValue) / bins;
+  const sorted = [...finalValues].sort((a, b) => a - b);
+  const maxValue = sorted[sorted.length - 1];
+  const minValue = sorted[0];
+  const p95 = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))];
+  const cap = p95 > minValue ? p95 : maxValue;
+  // A flat distribution (every path identical) still needs a positive width.
+  const binSize = cap > minValue ? (cap - minValue) / bins : 1;
 
-  const distribution: { range: string; count: number; percentage: number }[] = [];
+  const distribution: MonteCarloResults['distribution'] = [];
 
   for (let i = 0; i < bins; i++) {
+    const isLast = i === bins - 1;
     const rangeStart = minValue + i * binSize;
-    const rangeEnd = minValue + (i + 1) * binSize;
-    const count = finalValues.filter(
-      (val) => val >= rangeStart && (i === bins - 1 ? val <= rangeEnd : val < rangeEnd)
-    ).length;
+    const rangeEnd = isLast ? Math.max(maxValue, minValue + bins * binSize) : minValue + (i + 1) * binSize;
+    const count = finalValues.filter((val) => val >= rangeStart && (isLast ? val <= rangeEnd : val < rangeEnd)).length;
 
     const rangeLabel =
       rangeStart === 0 && rangeEnd === 0
@@ -164,6 +187,8 @@ function createDistribution(
       range: rangeLabel,
       count,
       percentage: (count / simulations.length) * 100,
+      from: rangeStart,
+      to: rangeEnd,
     });
   }
 
@@ -234,6 +259,155 @@ export function runMonteCarloSimulation(params: MonteCarloParams): MonteCarloRes
     distribution,
     simulations,
   };
+}
+
+// ===== Accumulation simulation (Ventaglio view on the FIRE tab) =====
+
+export interface AccumulationSimulationParams {
+  initialPortfolio: number;
+  /** Added each year until that path reaches FIRE — same rule as calculateFIREProjection. */
+  annualSavings: number;
+  /** Today's annual expenses; inflated each year to build the moving FIRE target. */
+  annualExpenses: number;
+  withdrawalRate: number; // %
+  /** % — the moving target's inflation, matching the deterministic base scenario's. */
+  expenseInflationRate: number;
+  /** Simulation horizon in years (the caller caps it — the Ventaglio uses min(deterministic, 40)). */
+  years: number;
+
+  // 4-class allocation (summing to 100) + per-class market parameters, as in MonteCarloParams.
+  equityPercentage: number;
+  bondsPercentage: number;
+  realEstatePercentage: number;
+  commoditiesPercentage: number;
+  equityReturn: number;
+  equityVolatility: number;
+  bondsReturn: number;
+  bondsVolatility: number;
+  realEstateReturn: number;
+  realEstateVolatility: number;
+  commoditiesReturn: number;
+  commoditiesVolatility: number;
+
+  numberOfSimulations: number;
+
+  // Pension inflows at TODAY's value (no deterministic fund growth inside a stochastic
+  // run — doc/guide/fire.md § FIRE, What If and Goals). Order per year: inflow → return → savings.
+  capitalInflows?: MonteCarloCapitalInflow[];
+}
+
+export interface AccumulationPercentilePoint extends PercentilesData {
+  /** Moving FIRE number at this year (deterministic — inflation only, no randomness). */
+  fireTarget: number;
+  /** Cumulative % of paths that have reached FIRE by this year. */
+  fireProbability: number;
+}
+
+export interface AccumulationSimulationResult {
+  /** One full path per simulation, year 0..years — no path ever fails (accumulation only). */
+  paths: { year: number; value: number }[][];
+  percentiles: AccumulationPercentilePoint[];
+  /** Per path, the first year its portfolio met the moving FIRE target (null = never). */
+  fireYears: (number | null)[];
+}
+
+/**
+ * Accumulation-phase Monte Carlo for the FIRE Ventaglio view.
+ *
+ * Per year, per path: capital inflows land first (at today's value), the portfolio takes one
+ * random weighted market return, savings are added while the path has not yet reached FIRE,
+ * expenses inflate, and the path is checked against the moving FIRE target
+ * (inflatedExpenses ÷ withdrawalRate) — the same formula as the deterministic projection.
+ * At zero volatility every step degenerates to calculateFIREProjection's base-scenario float
+ * chain, which is the coherence property the tests pin.
+ *
+ * No withdrawals and no failures: decumulation stays with runMonteCarloSimulation (MC tab).
+ * The new number this engine adds is `fireProbability`: the cumulative share of paths that
+ * have reached FIRE by each year, which the deterministic projection cannot express.
+ */
+export function runAccumulationSimulation(
+  params: AccumulationSimulationParams
+): AccumulationSimulationResult {
+  const wrDecimal = params.withdrawalRate / 100;
+  const inflows = params.capitalInflows ?? [];
+  const startingInflow = inflows
+    .filter((inflow) => inflow.year <= 0)
+    .reduce((sum, inflow) => sum + inflow.amount, 0);
+
+  // The moving target is deterministic (inflation only) — computed once, shared by all paths.
+  const fireTargets: number[] = [];
+  let targetExpenses = params.annualExpenses;
+  fireTargets.push(wrDecimal > 0 ? targetExpenses / wrDecimal : 0);
+  for (let year = 1; year <= params.years; year++) {
+    targetExpenses *= 1 + params.expenseInflationRate / 100;
+    fireTargets.push(wrDecimal > 0 ? targetExpenses / wrDecimal : 0);
+  }
+
+  const paths: { year: number; value: number }[][] = [];
+  const fireYears: (number | null)[] = [];
+
+  for (let sim = 0; sim < params.numberOfSimulations; sim++) {
+    let portfolio = params.initialPortfolio + startingInflow;
+    const path: { year: number; value: number }[] = [{ year: 0, value: portfolio }];
+    let fireYear: number | null = null;
+
+    for (let year = 1; year <= params.years; year++) {
+      for (const inflow of inflows) {
+        if (inflow.year === year) portfolio += inflow.amount;
+      }
+
+      const equityReturn = randomNormal(params.equityReturn, params.equityVolatility);
+      const bondsReturn = randomNormal(params.bondsReturn, params.bondsVolatility);
+      const realEstateReturn = randomNormal(params.realEstateReturn, params.realEstateVolatility);
+      const commoditiesReturn = randomNormal(
+        params.commoditiesReturn,
+        params.commoditiesVolatility
+      );
+      const portfolioReturn =
+        (equityReturn * params.equityPercentage) / 100 +
+        (bondsReturn * params.bondsPercentage) / 100 +
+        (realEstateReturn * params.realEstatePercentage) / 100 +
+        (commoditiesReturn * params.commoditiesPercentage) / 100;
+
+      portfolio *= 1 + portfolioReturn / 100;
+
+      // Savings stop once the path retires — same rule as the deterministic projection.
+      if (fireYear === null) portfolio += params.annualSavings;
+
+      if (fireYear === null && wrDecimal > 0 && portfolio >= fireTargets[year]) {
+        fireYear = year;
+      }
+
+      path.push({ year, value: portfolio });
+    }
+
+    paths.push(path);
+    fireYears.push(fireYear);
+  }
+
+  // Percentiles per year. Every path has full length, so the values array is always complete
+  // and the sort makes p10 ≤ p25 ≤ p50 ≤ p75 ≤ p90 hold by construction.
+  const percentiles: AccumulationPercentilePoint[] = [];
+  for (let year = 0; year <= params.years; year++) {
+    const valuesAtYear = paths.map((path) => path[year].value).sort((a, b) => a - b);
+    const at = (fraction: number) => valuesAtYear[Math.floor(valuesAtYear.length * fraction)];
+    const reachedCount = fireYears.filter(
+      (fireYear) => fireYear !== null && fireYear <= year
+    ).length;
+
+    percentiles.push({
+      year,
+      p10: at(0.1),
+      p25: at(0.25),
+      p50: at(0.5),
+      p75: at(0.75),
+      p90: at(0.9),
+      fireTarget: fireTargets[year],
+      fireProbability: (reachedCount / paths.length) * 100,
+    });
+  }
+
+  return { paths, percentiles, fireYears };
 }
 
 /**

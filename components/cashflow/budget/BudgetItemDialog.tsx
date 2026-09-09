@@ -5,7 +5,6 @@ import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BudgetItem, BudgetKind, BudgetPeriod } from '@/types/budget';
 import { Expense, ExpenseCategory } from '@/types/expenses';
@@ -156,29 +155,29 @@ export function BudgetItemDialog({
     : '';
 
   const footer = (
-    <div className="flex gap-2 justify-end">
+    <>
       <Button variant="outline" onClick={onClose}>Annulla</Button>
       <Button onClick={handleSubmit} disabled={!canSubmit}>
         {isEdit ? 'Salva' : 'Aggiungi'}
       </Button>
-    </div>
+    </>
   );
 
   return (
     <ResponsiveModal
       open={open}
       onClose={onClose}
+      // The badge that used to sit beside the title is the eyebrow's scope now: one label
+      // register for one fact (DESIGN.md → The One-Eyebrow Rule).
+      eyebrow={`Budget · ${kind === 'income' ? 'Entrata' : 'Spesa'} · ${period === 'annual' ? 'Annuale' : 'Mensile'}`}
       title={isEdit ? 'Modifica budget' : 'Nuovo budget'}
-      description="Imposta un limite di spesa per categoria o un obiettivo di entrata."
-      headerExtra={
-        isEdit ? (
-          <Badge variant="outline">
-            {kind === 'income' ? 'Entrata' : 'Spesa'} · {period === 'annual' ? 'Annuale' : 'Mensile'}
-          </Badge>
-        ) : undefined
+      reading={
+        kind === 'income'
+          ? 'Un obiettivo di entrata non ha il segno del calendario: si raggiunge, non si consuma.'
+          : 'Il tetto vale sul periodo scelto e la traccia lo legge contro il giorno di oggi.'
       }
       footer={footer}
-      dialogClassName="max-w-md"
+      width="md"
     >
       <div className="space-y-4">
         {!isEdit && (

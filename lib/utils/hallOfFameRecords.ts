@@ -13,7 +13,7 @@
  */
 
 import { MonthlySnapshot } from '@/types/assets';
-import { MonthlyRecord, YearlyRecord } from '@/types/hall-of-fame';
+import { HallOfFameData, HallOfFameStats, MonthlyRecord, YearlyRecord } from '@/types/hall-of-fame';
 import { Expense } from '@/types/expenses';
 import { calculateTotalIncome, calculateTotalExpenses } from '@/lib/services/expenseService';
 import { getItalyMonthYear, getItalyYear, toDate } from '@/lib/utils/dateHelpers';
@@ -179,4 +179,139 @@ export function rankPeriodByNetWorthGrowth(
   if (index === -1) return null;
 
   return { rank: index + 1, total: ranked.length, trend };
+}
+
+// ─── Savings records ──────────────────────────────────────────────────────────
+
+/** What a period kept: income minus expenses. Both aggregates are already absolute. */
+export function periodSavings(record: { totalIncome: number; totalExpenses: number }): number {
+  return record.totalIncome - record.totalExpenses;
+}
+
+/**
+ * Periods ranked by what they kept, best first.
+ *
+ * Only periods WITH income enter the ranking. Without that guard the winner would
+ * systematically be the month with the least DATA — an untracked month has zero income and
+ * zero expenses, so it saves exactly as much as a month that earned nothing, and it would
+ * outrank every real month that actually spent something.
+ *
+ * @param records Monthly or yearly records; never mutated.
+ * @param limit   How many positions to keep.
+ */
+export function rankBySavings<T extends { totalIncome: number; totalExpenses: number }>(
+  records: T[],
+  limit: number,
+): T[] {
+  return [...records]
+    .filter((record) => record.totalIncome > 0)
+    .sort((a, b) => periodSavings(b) - periodSavings(a))
+    .slice(0, limit);
+}
+
+// ─── Stats ────────────────────────────────────────────────────────────────────
+
+/**
+ * The figures that surround the rankings: how much history they were drawn from, and the
+ * average monthly flows.
+ *
+ * They are stored alongside the rankings because they cannot be recovered from them: the
+ * document keeps only the top slices, so «the month with the most income is 62% above your
+ * average» has no denominator without this. Averages are over EVERY month with a record,
+ * including the untracked ones — the count is what the page says it is.
+ */
+export function summarizeRecordStats(
+  monthlyRecords: MonthlyRecord[],
+  yearlyRecords: YearlyRecord[],
+): HallOfFameStats {
+  const monthCount = monthlyRecords.length;
+  const sorted = [...monthlyRecords].sort((a, b) => (a.year !== b.year ? a.year - b.year : a.month - b.month));
+  const totalIncome = monthlyRecords.reduce((sum, record) => sum + record.totalIncome, 0);
+  const totalExpenses = monthlyRecords.reduce((sum, record) => sum + record.totalExpenses, 0);
+
+  return {
+    monthCount,
+    yearCount: yearlyRecords.length,
+    averageMonthlyIncome: monthCount > 0 ? totalIncome / monthCount : 0,
+    averageMonthlyExpenses: monthCount > 0 ? totalExpenses / monthCount : 0,
+    firstMonth: sorted[0] ? { year: sorted[0].year, month: sorted[0].month } : null,
+    lastMonth: sorted.at(-1) ? { year: sorted.at(-1)!.year, month: sorted.at(-1)!.month } : null,
+  };
+}
+
+// ─── Rankings ─────────────────────────────────────────────────────────────────
+
+/** Positions kept per monthly ranking — enough to read a history month by month. */
+export const MAX_MONTHLY_RECORDS = 20;
+/** Positions kept per yearly ranking — fewer, because a year is a rarer event. */
+export const MAX_YEARLY_RECORDS = 10;
+
+/** Every ranking of the stored document, plus the figures that surround them. */
+export type HallOfFameRankings = Pick<
+  HallOfFameData,
+  | 'bestMonthsByNetWorthGrowth'
+  | 'bestMonthsByIncome'
+  | 'worstMonthsByNetWorthDecline'
+  | 'worstMonthsByExpenses'
+  | 'bestMonthsBySavings'
+  | 'bestYearsByNetWorthGrowth'
+  | 'bestYearsByIncome'
+  | 'worstYearsByNetWorthDecline'
+  | 'worstYearsByExpenses'
+  | 'bestYearsBySavings'
+> & { stats: HallOfFameStats };
+
+/**
+ * The ONE definition of what a Hall of Fame ranking is.
+ *
+ * Both writers call it — the client `updateHallOfFame` (after a snapshot from the Panoramica)
+ * and the server one (the daily cron, and the recalculate route) — so a ranking can never mean
+ * one thing in the app and another in the email. Growth and decline rankings EXCLUDE the flat
+ * periods: a month that ended exactly where it started belongs to neither.
+ *
+ * @param monthlyRecords Every month with a record, from `calculateMonthlyRecords`.
+ * @param yearlyRecords  Every year with a record, from `calculateYearlyRecords`.
+ */
+export function buildHallOfFameRankings(
+  monthlyRecords: MonthlyRecord[],
+  yearlyRecords: YearlyRecord[],
+): HallOfFameRankings {
+  const byDesc = <T>(pick: (record: T) => number) => (a: T, b: T) => pick(b) - pick(a);
+  const byAsc = <T>(pick: (record: T) => number) => (a: T, b: T) => pick(a) - pick(b);
+
+  return {
+    bestMonthsByNetWorthGrowth: monthlyRecords
+      .filter((record) => record.netWorthDiff > 0)
+      .sort(byDesc((record) => record.netWorthDiff))
+      .slice(0, MAX_MONTHLY_RECORDS),
+    bestMonthsByIncome: [...monthlyRecords]
+      .sort(byDesc((record) => record.totalIncome))
+      .slice(0, MAX_MONTHLY_RECORDS),
+    worstMonthsByNetWorthDecline: monthlyRecords
+      .filter((record) => record.netWorthDiff < 0)
+      .sort(byAsc((record) => record.netWorthDiff))
+      .slice(0, MAX_MONTHLY_RECORDS),
+    worstMonthsByExpenses: [...monthlyRecords]
+      .sort(byDesc((record) => record.totalExpenses))
+      .slice(0, MAX_MONTHLY_RECORDS),
+    bestMonthsBySavings: rankBySavings(monthlyRecords, MAX_MONTHLY_RECORDS),
+
+    bestYearsByNetWorthGrowth: yearlyRecords
+      .filter((record) => record.netWorthDiff > 0)
+      .sort(byDesc((record) => record.netWorthDiff))
+      .slice(0, MAX_YEARLY_RECORDS),
+    bestYearsByIncome: [...yearlyRecords]
+      .sort(byDesc((record) => record.totalIncome))
+      .slice(0, MAX_YEARLY_RECORDS),
+    worstYearsByNetWorthDecline: yearlyRecords
+      .filter((record) => record.netWorthDiff < 0)
+      .sort(byAsc((record) => record.netWorthDiff))
+      .slice(0, MAX_YEARLY_RECORDS),
+    worstYearsByExpenses: [...yearlyRecords]
+      .sort(byDesc((record) => record.totalExpenses))
+      .slice(0, MAX_YEARLY_RECORDS),
+    bestYearsBySavings: rankBySavings(yearlyRecords, MAX_YEARLY_RECORDS),
+
+    stats: summarizeRecordStats(monthlyRecords, yearlyRecords),
+  };
 }

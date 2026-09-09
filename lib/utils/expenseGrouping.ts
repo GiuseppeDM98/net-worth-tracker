@@ -144,15 +144,3 @@ export function selectExpensesForDrillDown(
   });
 }
 
-/**
- * Whether a category is worth its own subcategory level.
- *
- * Scoped by type, unlike the name-only checks it replaces: a fixed "Casa" with no
- * subcategories used to answer `true` merely because the variable "Casa" had some,
- * dropping the reader onto an empty drill-down.
- */
-export function categoryHasRealSubCategories(expenses: Expense[], category: CategoryScope): boolean {
-  return selectExpensesForDrillDown(expenses, category).some(
-    (expense) => getSubCategoryKey(expense) !== NO_SUBCATEGORY_KEY
-  );
-}

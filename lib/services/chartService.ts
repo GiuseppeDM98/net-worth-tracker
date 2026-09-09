@@ -14,18 +14,21 @@
 
 import {
   Asset,
+  AssetClass,
   PieChartData,
   MonthlySnapshot,
   DoublingMilestone,
   DoublingTimeSummary,
   DoublingMode
 } from '@/types/assets';
+import { ASSET_CLASS_SEQUENCE } from '@/lib/utils/allocationUtils';
 import { Expense } from '@/types/expenses';
 import { calculateAssetValue, calculateTotalValue } from './assetService';
 import { calculateCurrentAllocation } from './assetAllocationService';
 import { getAssetClassColor, getChartColor } from '@/lib/constants/colors';
 import { getItalyYear, getItalyMonth } from '@/lib/utils/dateHelpers';
 import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
+import { formatNumberIt, formatPercentageIt } from '@/lib/utils/formatters';
 
 /**
  * Prepare data for asset class distribution pie chart
@@ -140,91 +143,117 @@ export function prepareNetWorthHistoryData(snapshots: MonthlySnapshot[]): {
   }));
 }
 
+/** One month of the portfolio's asset-class breakdown, in euro. */
+export interface AssetClassHistoryPoint {
+  /** `MM/YY` — the x-axis key shared by every chart on the Storico page. */
+  date: string;
+  month: number;
+  year: number;
+  /** The snapshot's own total. Authoritative: never re-derive it by summing `byClass`. */
+  totalNetWorth: number;
+  /**
+   * Euro per asset class, with the pension funds carved back out. Typed as an exhaustive
+   * `Record<AssetClass, number>` so widening the union is a compile error here rather than
+   * a class that silently stops being drawn.
+   */
+  byClass: Record<AssetClass, number>;
+  /** Euro held in `pensionFund` assets — the amount subtracted from `byClass`. */
+  pension: number;
+  /**
+   * How that subtraction was obtained, so the surface can say which it is instead of warning
+   * about an approximation that no longer applies to most months.
+   *   `measured`   — the snapshot carried its own split; exact.
+   *   `estimated`  — reconstructed with the fund's CURRENT composition; drifts with re-balances.
+   *   `none`       — no pension value found this month (no funds, or a month predating `byAsset`).
+   */
+  pensionSource: 'measured' | 'estimated' | 'none';
+}
+
 /**
- * Prepare data for asset class history chart.
+ * Prepare the per-month asset-class breakdown behind the Storico composition chart.
  *
- * `pensionAssets` (optional; live `pensionFund`-type assets, e.g. `assets.filter(a => a.type ===
- * 'pensionFund')`) adds a synthetic "Previdenza" series, TYPE-based per decision D2 — the fund
- * appears whole as `pension`, never spread across equity/bonds in
- * the aggregate classes, even though `byAssetClass` itself may already contain the fund's value
- * split by class (via `composition` look-through — see `calculateCurrentAllocation`, the same
- * function `snapshotService` calls to build `byAssetClass`). Each month's fund value comes from
- * `MonthlySnapshot.byAsset` (frozen per-asset totals, independent of the class split), and is
- * subtracted back out of the class buckets it was folded into — using the fund's CURRENT
- * `composition`/`assetClass` as the split key, since composition-at-snapshot-time isn't itself
- * persisted. Composition rarely changes after being set, so this is an accepted approximation for
- * historical months (documented limitation, not a precision guarantee). Omitting `pensionAssets`
- * (default `[]`) reproduces the exact prior behavior for any other caller.
+ * Values are EURO only. Shares are deliberately not computed here: the correct denominator
+ * depends on what the caller actually plots, and the previous version divided by
+ * `snapshot.totalNetWorth` while emitting six of the eight classes — so the shares silently
+ * failed to reach 100 for anyone holding `trendFollowing` or `carry`. `lib/utils/historyComposition.ts`
+ * owns normalization and closes the stack by construction.
+ *
+ * "Previdenza" is a synthetic TYPE-based series: a pension fund appears whole as `pension` and is
+ * subtracted back out of the class buckets `byAssetClass` had folded it into. There are TWO ways
+ * to know how much to subtract, and which one a month gets is a property of the snapshot:
+ *
+ *   MEASURED — `snapshot.pension` is present (written from 2026-08). The split was frozen by the
+ *   same `calculateCurrentAllocation` call that folded the funds in, so the subtraction is exact
+ *   and independent of anything the user does to the fund afterwards. `pensionAssets` is not even
+ *   read on this path.
+ *
+ *   ESTIMATED — `snapshot.pension` is absent (older snapshots, and hand-entered ones, which have
+ *   no pension input). The fund's value still comes from `byAsset` and is therefore exact, but the
+ *   split uses the fund's CURRENT `composition`/`assetClass`, so it is wrong by however much the
+ *   fund has been re-balanced since. The per-class subtraction is clamped at zero, so an
+ *   over-subtraction is swallowed and `Σ byClass + pension` can EXCEED `totalNetWorth` — which is
+ *   why `historyComposition.ts` normalizes over the plotted sum rather than over the total.
+ *
+ * A month older than `byAsset` itself gets neither: `pension` stays 0 and the fund's value remains
+ * inside Azioni/Obbligazioni, with no band at all. That is absence, not an estimate.
+ *
+ * `pensionAssets` (live `pensionFund`-type assets) is therefore needed only for the estimated path.
  */
 export function prepareAssetClassHistoryData(
   snapshots: MonthlySnapshot[],
   pensionAssets: Asset[] = []
-): {
-  date: string;
-  equity: number;
-  bonds: number;
-  crypto: number;
-  realestate: number;
-  cash: number;
-  commodity: number;
-  pension: number;
-  equityPercentage: number;
-  bondsPercentage: number;
-  cryptoPercentage: number;
-  realestatePercentage: number;
-  cashPercentage: number;
-  commodityPercentage: number;
-  pensionPercentage: number;
-  month: number;
-  year: number;
-}[] {
+): AssetClassHistoryPoint[] {
   const pensionById = new Map(pensionAssets.map((asset) => [asset.id, asset]));
 
   return snapshots.map((snapshot) => {
-    const total = snapshot.totalNetWorth;
     const byAssetClass = { ...(snapshot.byAssetClass || {}) };
 
     let pension = 0;
-    for (const entry of snapshot.byAsset || []) {
-      const fund = pensionById.get(entry.assetId);
-      if (!fund) continue;
-      pension += entry.totalValue;
+    let pensionSource: AssetClassHistoryPoint['pensionSource'] = 'none';
+    if (snapshot.pension) {
+      // MEASURED path. The split was frozen by the same function that folded the funds in, so the
+      // subtraction is exact and the clamp below can never bind — it stays only because a hand-
+      // edited document could violate the invariant, and a negative band would break the stack.
+      pension = snapshot.pension.totalValue;
+      if (pension > 0) pensionSource = 'measured';
+      for (const [assetClass, value] of Object.entries(snapshot.pension.byAssetClass)) {
+        byAssetClass[assetClass] = Math.max(0, (byAssetClass[assetClass] ?? 0) - value);
+      }
+    } else {
+      // ESTIMATED path, for snapshots written before `pension` existed and for hand-entered ones.
+      // Applying the fund's CURRENT composition to a past month is wrong by exactly however much
+      // the user has re-balanced the fund since, and the clamp swallows any over-subtraction —
+      // which is why `Σ byClass + pension` can exceed `totalNetWorth` here but not above.
+      for (const entry of snapshot.byAsset || []) {
+        const fund = pensionById.get(entry.assetId);
+        if (!fund) continue;
+        pension += entry.totalValue;
+        pensionSource = 'estimated';
 
-      if (fund.composition && fund.composition.length > 0) {
-        for (const comp of fund.composition) {
-          const compValue = (entry.totalValue * comp.percentage) / 100;
-          byAssetClass[comp.assetClass] = Math.max(0, (byAssetClass[comp.assetClass] ?? 0) - compValue);
+        if (fund.composition && fund.composition.length > 0) {
+          for (const comp of fund.composition) {
+            const compValue = (entry.totalValue * comp.percentage) / 100;
+            byAssetClass[comp.assetClass] = Math.max(0, (byAssetClass[comp.assetClass] ?? 0) - compValue);
+          }
+        } else {
+          byAssetClass[fund.assetClass] = Math.max(0, (byAssetClass[fund.assetClass] ?? 0) - entry.totalValue);
         }
-      } else {
-        byAssetClass[fund.assetClass] = Math.max(0, (byAssetClass[fund.assetClass] ?? 0) - entry.totalValue);
       }
     }
 
-    const equity = byAssetClass.equity || 0;
-    const bonds = byAssetClass.bonds || 0;
-    const crypto = byAssetClass.crypto || 0;
-    const realestate = byAssetClass.realestate || 0;
-    const cash = byAssetClass.cash || 0;
-    const commodity = byAssetClass.commodity || 0;
+    const byClass = ASSET_CLASS_SEQUENCE.reduce((acc, assetClass) => {
+      acc[assetClass] = byAssetClass[assetClass] || 0;
+      return acc;
+    }, {} as Record<AssetClass, number>);
 
     return {
       date: `${String(snapshot.month).padStart(2, '0')}/${String(snapshot.year).slice(-2)}`,
-      equity,
-      bonds,
-      crypto,
-      realestate,
-      cash,
-      commodity,
-      pension,
-      equityPercentage: total > 0 ? (equity / total) * 100 : 0,
-      bondsPercentage: total > 0 ? (bonds / total) * 100 : 0,
-      cryptoPercentage: total > 0 ? (crypto / total) * 100 : 0,
-      realestatePercentage: total > 0 ? (realestate / total) * 100 : 0,
-      cashPercentage: total > 0 ? (cash / total) * 100 : 0,
-      commodityPercentage: total > 0 ? (commodity / total) * 100 : 0,
-      pensionPercentage: total > 0 ? (pension / total) * 100 : 0,
       month: snapshot.month,
       year: snapshot.year,
+      totalNetWorth: snapshot.totalNetWorth,
+      byClass,
+      pension,
+      pensionSource,
     };
   });
 }
@@ -240,6 +269,8 @@ function getAssetClassName(assetClass: string): string {
     realestate: 'Immobili',
     cash: 'Liquidità',
     commodity: 'Materie Prime',
+    trendFollowing: 'Trend Following',
+    carry: 'Carry',
   };
 
   return names[assetClass] || assetClass;
@@ -287,21 +318,17 @@ export function formatCurrencyForSankey(value: number): string {
  * Format percentage in Italian format
  */
 export function formatPercentage(value: number, decimals: number = 2): string {
-  return new Intl.NumberFormat('it-IT', {
-    style: 'percent',
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  }).format(value / 100);
+  // The implementation moved to lib/utils/formatters.ts (SDK-free) so server code can reach it;
+  // this stays as the name every chart and narrative module already imports.
+  return formatPercentageIt(value, decimals);
 }
 
 /**
  * Format number in Italian format
  */
 export function formatNumber(value: number, decimals: number = 2): string {
-  return new Intl.NumberFormat('it-IT', {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  }).format(value);
+  // Implementation in lib/utils/formatters.ts (SDK-free); see formatPercentage above.
+  return formatNumberIt(value, decimals);
 }
 
 /**
@@ -341,6 +368,8 @@ export function prepareYoYVariationData(snapshots: MonthlySnapshot[]): {
   variationPercentage: number;
   startValue: number;
   endValue: number;
+  /** The snapshot the year is measured FROM (December of the previous year, or the year's first snapshot). */
+  baseline: { year: number; month: number };
 }[] {
   if (snapshots.length === 0) {
     return [];
@@ -363,6 +392,7 @@ export function prepareYoYVariationData(snapshots: MonthlySnapshot[]): {
     variationPercentage: number;
     startValue: number;
     endValue: number;
+    baseline: { year: number; month: number };
   }[] = [];
 
   Array.from(snapshotsByYear.entries())
@@ -392,6 +422,7 @@ export function prepareYoYVariationData(snapshots: MonthlySnapshot[]): {
         variationPercentage,
         startValue,
         endValue,
+        baseline: { year: startSnapshot.year, month: startSnapshot.month },
       });
     });
 
@@ -402,16 +433,23 @@ export function prepareYoYVariationData(snapshots: MonthlySnapshot[]): {
  * Prepare yearly data showing breakdown of net worth growth into savings vs investment returns.
  *
  * For each year:
- * - Net Savings = Income - Expenses (cashflows from user)
- * - Net Worth Growth = End NW - Start NW (total portfolio change)
- * - Investment Growth = Net Worth Growth - Net Savings (market performance)
+ * - Net Worth Growth = last snapshot of the year − the baseline (the previous year's last
+ *   snapshot, normally December; the year's first snapshot when there is none)
+ * - Net Savings = income − spending of the cashflow rows dated in the SAME window: from the
+ *   month after the baseline to the month of the last snapshot, inclusive
+ * - Investment Growth = growth − savings (what the recorded cashflow does not explain)
  *
- * Uses December of the previous year as the starting baseline so that January's
- * net worth change is included in the annual totals (contiguous periods, no month lost).
- * Falls back to the first snapshot of the year itself when no prior December exists.
+ * The window is the point: a year still running is measured up to its last snapshot, so the
+ * rows already in the calendar for the months after it (materialised recurring series) must not
+ * count — they deflated the running year's savings and handed the gap to "market". Likewise the
+ * months BEFORE a first-year baseline (a history that starts in March has no January growth to
+ * explain). A closed year with a December baseline and a December snapshot is the calendar year.
+ *
+ * A year with no cashflow row in its window is skipped: without a recorded savings figure the
+ * split would silently read "all market".
  *
  * @param snapshots - Monthly snapshots with net worth data
- * @param expenses - All expense records (income and expenses)
+ * @param expenses - All expense records (income and expenses); transfers are net-zero and skipped
  * @returns Array of yearly data sorted by year
  */
 export function prepareSavingsVsInvestmentData(
@@ -422,13 +460,17 @@ export function prepareSavingsVsInvestmentData(
   netSavings: number;
   investmentGrowth: number;
   netWorthGrowth: number;
+  /** Growth over the baseline's value, in percent; `null` without a positive baseline. */
+  growthPct: number | null;
+  /** The snapshot the year is measured FROM (the previous year's last snapshot, or the year's first). */
+  baseline: { year: number; month: number };
+  /** The last snapshot of the year — where the window closes. */
+  latest: { year: number; month: number };
 }[] {
-  // Return empty array if missing data
   if (snapshots.length === 0 || expenses.length === 0) {
     return [];
   }
 
-  // Group snapshots by year
   const snapshotsByYear = new Map<number, MonthlySnapshot[]>();
   snapshots.forEach((snapshot) => {
     if (!snapshotsByYear.has(snapshot.year)) {
@@ -437,64 +479,55 @@ export function prepareSavingsVsInvestmentData(
     snapshotsByYear.get(snapshot.year)!.push(snapshot);
   });
 
-  // Group expenses by year using Italy timezone for consistency
-  const expensesByYear = new Map<number, { income: number; expenses: number }>();
+  // Cashflow by month (Italy timezone), so a year's window can open and close mid-year.
+  const flowsByMonth = new Map<number, { income: number; expenses: number }>();
   expenses.forEach((expense) => {
-    const year = getItalyYear(expense.date);
-    const current = expensesByYear.get(year) || { income: 0, expenses: 0 };
-
     // Transfers are net-zero — skip entirely
     if (expense.type === 'transfer') return;
+    const key = getItalyYear(expense.date) * 12 + (getItalyMonth(expense.date) - 1);
+    const current = flowsByMonth.get(key) || { income: 0, expenses: 0 };
     // Income is positive, expenses are stored as negative values
     if (expense.type === 'income') {
       current.income += expense.amount;
     } else {
       current.expenses += expense.amount; // Already negative
     }
-
-    expensesByYear.set(year, current);
+    flowsByMonth.set(key, current);
   });
 
-  // Calculate yearly breakdown data
-  const yearlyData: {
-    year: string;
-    netSavings: number;
-    investmentGrowth: number;
-    netWorthGrowth: number;
-  }[] = [];
+  const yearlyData: ReturnType<typeof prepareSavingsVsInvestmentData> = [];
 
   Array.from(snapshotsByYear.entries())
-    .sort((a, b) => a[0] - b[0]) // Sort by year ascending
+    .sort((a, b) => a[0] - b[0])
     .forEach(([year, yearSnapshots]) => {
-      // Skip years with no snapshots (can't determine end value)
       if (yearSnapshots.length < 1) return;
 
-      // Skip years with no expense data (can't calculate net savings)
-      if (!expensesByYear.has(year)) return;
-
-      // Sort snapshots by month to get the last (end) snapshot of this year
       yearSnapshots.sort((a, b) => a.month - b.month);
-
       const lastSnapshot = yearSnapshots[yearSnapshots.length - 1];
 
-      // Use December of previous year as baseline so January is included in the delta.
-      // Falls back to first snapshot of this year when prior December doesn't exist.
+      // The previous year's last snapshot (normally December) so January is included in the
+      // delta; the year's own first snapshot when there is none.
       const prevYearSnapshots = snapshotsByYear.get(year - 1);
-      const decPrevYear = prevYearSnapshots
-        ? [...prevYearSnapshots].sort((a, b) => a.month - b.month).at(-1)
-        : undefined;
-      const startSnapshot = decPrevYear ?? yearSnapshots[0];
+      const prevLast = prevYearSnapshots ? [...prevYearSnapshots].sort((a, b) => a.month - b.month).at(-1) : undefined;
+      const startSnapshot = prevLast ?? yearSnapshots[0];
 
-      const expenseData = expensesByYear.get(year)!;
+      // The window: the month after the baseline through the last snapshot's month.
+      const from = startSnapshot.year * 12 + (startSnapshot.month - 1) + 1;
+      const to = lastSnapshot.year * 12 + (lastSnapshot.month - 1);
+      let income = 0;
+      let spending = 0;
+      let hasRows = false;
+      for (let key = from; key <= to; key++) {
+        const flows = flowsByMonth.get(key);
+        if (!flows) continue;
+        hasRows = true;
+        income += flows.income;
+        spending += flows.expenses;
+      }
+      if (!hasRows) return;
 
-      // Calculate Net Worth Growth (end - start)
       const netWorthGrowth = lastSnapshot.totalNetWorth - startSnapshot.totalNetWorth;
-
-      // Calculate Net Savings (income + expenses, expenses already negative)
-      const netSavings = expenseData.income + expenseData.expenses;
-
-      // Calculate Investment Growth (total growth - savings)
-      // This isolates market performance from cashflow contributions
+      const netSavings = income + spending;
       const investmentGrowth = netWorthGrowth - netSavings;
 
       yearlyData.push({
@@ -502,6 +535,9 @@ export function prepareSavingsVsInvestmentData(
         netSavings,
         investmentGrowth,
         netWorthGrowth,
+        growthPct: startSnapshot.totalNetWorth > 0 ? (netWorthGrowth / startSnapshot.totalNetWorth) * 100 : null,
+        baseline: { year: startSnapshot.year, month: startSnapshot.month },
+        latest: { year: lastSnapshot.year, month: lastSnapshot.month },
       });
     });
 
@@ -509,95 +545,6 @@ export function prepareSavingsVsInvestmentData(
 }
 
 const MONTH_NAMES_IT = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
-
-/**
- * Prepare monthly data showing breakdown of net worth growth into savings vs investment returns.
- *
- * Same logic as prepareSavingsVsInvestmentData but at monthly granularity.
- * Each data point requires a snapshot for the current month AND the previous month
- * as a baseline — months without a prior snapshot are skipped.
- *
- * When a month has no expense transactions, netSavings defaults to 0 and the
- * entire net worth change is attributed to investmentGrowth.
- *
- * @param snapshots - Monthly snapshots with net worth data
- * @param expenses - All expense records (income and expenses)
- * @param year - The year to compute monthly data for
- * @returns Array of monthly data sorted by month (1–12)
- */
-export function prepareSavingsVsInvestmentDataMonthly(
-  snapshots: MonthlySnapshot[],
-  expenses: Expense[],
-  year: number
-): {
-  period: string;
-  month: number;
-  netSavings: number;
-  investmentGrowth: number;
-  netWorthGrowth: number;
-}[] {
-  if (snapshots.length === 0) return [];
-
-  // Build a lookup map keyed by "year-month" for O(1) access
-  const snapshotMap = new Map<string, MonthlySnapshot>();
-  snapshots.forEach((s) => snapshotMap.set(`${s.year}-${s.month}`, s));
-
-  // Group expenses by year-month using Italy timezone
-  const expensesByMonth = new Map<string, { income: number; expenses: number }>();
-  expenses.forEach((expense) => {
-    const ey = getItalyYear(expense.date);
-    const em = getItalyMonth(expense.date);
-    const key = `${ey}-${em}`;
-    const current = expensesByMonth.get(key) || { income: 0, expenses: 0 };
-
-    // Transfers are net-zero — skip entirely
-    if (expense.type === 'transfer') return;
-    // Income is positive, expenses are stored as negative values
-    if (expense.type === 'income') {
-      current.income += expense.amount;
-    } else {
-      current.expenses += expense.amount; // Already negative
-    }
-
-    expensesByMonth.set(key, current);
-  });
-
-  const result: {
-    period: string;
-    month: number;
-    netSavings: number;
-    investmentGrowth: number;
-    netWorthGrowth: number;
-  }[] = [];
-
-  for (let month = 1; month <= 12; month++) {
-    const currentSnapshot = snapshotMap.get(`${year}-${month}`);
-    if (!currentSnapshot) continue;
-
-    // Previous month baseline: December of prior year when month is January
-    const prevYear = month === 1 ? year - 1 : year;
-    const prevMonth = month === 1 ? 12 : month - 1;
-    const prevSnapshot = snapshotMap.get(`${prevYear}-${prevMonth}`);
-    if (!prevSnapshot) continue;
-
-    const netWorthGrowth = currentSnapshot.totalNetWorth - prevSnapshot.totalNetWorth;
-
-    const expenseData = expensesByMonth.get(`${year}-${month}`);
-    // Default to 0 when no transactions exist — entire change is market-driven
-    const netSavings = expenseData ? expenseData.income + expenseData.expenses : 0;
-    const investmentGrowth = netWorthGrowth - netSavings;
-
-    result.push({
-      period: MONTH_NAMES_IT[month - 1],
-      month,
-      netSavings,
-      investmentGrowth,
-      netWorthGrowth,
-    });
-  }
-
-  return result;
-}
 
 /**
  * Prepare monthly data for all available years in chronological order.

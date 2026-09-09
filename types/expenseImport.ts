@@ -36,6 +36,13 @@ export interface PlannedExpenseRow {
   amount: number; // positive magnitude
   type: ImportableExpenseType;
   categoryName: string;
+  /**
+   * Firestore id of the EXISTING category this row attaches to, resolved by the
+   * plan on (name, type) — oldest document wins when two share both. Undefined
+   * when the category is in `categoriesToCreate`: the commit resolves it from
+   * the id returned by createCategory.
+   */
+  categoryId?: string;
   subCategoryName?: string;
   notes?: string;
   currency: string;
@@ -81,6 +88,20 @@ export interface ImportSummary {
 }
 
 /**
+ * A non-blocking disclosure the preview must surface before commit: the plan made
+ * a deterministic choice the user should see (e.g. two same-named same-typed
+ * categories exist and the rows will attach to the oldest one).
+ */
+export interface ImportNotice {
+  categoryName: string;
+  type: ImportableExpenseType;
+  /** How many existing categories share this (name, type) identity. */
+  duplicateCount: number;
+  /** Ready-to-render Italian sentence. */
+  message: string;
+}
+
+/**
  * The complete plan produced by buildImportPlan: what will be written, what
  * categories/subcategories will be created, and what was rejected — all before
  * touching Firestore.
@@ -90,5 +111,6 @@ export interface ImportPlan {
   errors: RowError[];
   categoriesToCreate: CategoryToCreate[];
   subCategoriesToCreate: SubCategoryToCreate[];
+  notices: ImportNotice[];
   summary: ImportSummary;
 }

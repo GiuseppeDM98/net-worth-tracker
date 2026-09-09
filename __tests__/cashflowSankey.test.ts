@@ -2,13 +2,15 @@ import { describe, expect, it } from 'vitest';
 import {
   buildBudgetFlowData,
   buildBudgetFlowDataWithSubcategories,
-  buildDrillDownData,
   buildTypeDrillDownData,
-  categoryHasRealSubCategories,
-  selectExpensesForDrillDown,
   TYPE_COLORS,
   type SankeyView,
 } from '@/lib/utils/cashflowSankey';
+// Row-selection vocabulary from its home module — the cashflowSankey re-export
+// fell with the internal category drill (2026-08-14). Its tests stay in this file
+// for the shared same-named-categories fixtures; production consumers are now
+// expenseEntityStats and AnalisiTab.
+import { selectExpensesForDrillDown } from '@/lib/utils/expenseGrouping';
 import {
   Expense,
   ExpenseType,
@@ -499,58 +501,6 @@ describe('buildTypeDrillDownData', () => {
   });
 });
 
-describe('buildDrillDownData', () => {
-  const casaRows = [
-    makeExpense({
-      type: 'fixed',
-      amount: -200,
-      categoryId: 'cat-casa-fixed',
-      categoryName: 'Casa',
-      subCategoryId: 'sub-luce',
-      subCategoryName: 'Elettricità',
-    }),
-    makeExpense({ type: 'fixed', amount: -40, categoryId: 'cat-casa-fixed', categoryName: 'Casa' }),
-    makeExpense({
-      type: 'variable',
-      amount: -999,
-      categoryId: 'cat-casa-var',
-      categoryName: 'Casa',
-      subCategoryId: 'sub-arredo',
-      subCategoryName: 'Arredamento',
-    }),
-  ];
-
-  it('should aggregate only the drilled category, not its namesake', () => {
-    // Act
-    const view = buildDrillDownData(
-      casaRows,
-      { expenseType: 'fixed', key: 'cat-casa-fixed', label: 'Casa (Spese Fisse)' },
-      TYPE_COLORS.fixed,
-      false
-    );
-
-    // Assert
-    assertLinksResolve(view);
-    expect(view.nodes.map((node) => node.label).sort()).toEqual(
-      ['Casa (Spese Fisse)', 'Elettricità', NO_SUBCATEGORY_LABEL].sort()
-    );
-    expect(view.links.map((link) => link.value).sort((a, b) => a - b)).toEqual([40, 200]);
-  });
-
-  it('should return an empty view when the category has no rows of that type', () => {
-    // Act
-    const view = buildDrillDownData(
-      casaRows,
-      { expenseType: 'debt', key: 'cat-casa-fixed', label: 'Casa' },
-      TYPE_COLORS.debt,
-      false
-    );
-
-    // Assert
-    expect(view.nodes).toHaveLength(0);
-  });
-});
-
 describe('selectExpensesForDrillDown', () => {
   const rows = [
     makeExpense({ id: 'fixed-1', type: 'fixed', amount: -300, categoryId: 'cat-casa-fixed', categoryName: 'Casa' }),
@@ -618,25 +568,5 @@ describe('selectExpensesForDrillDown', () => {
 
     // Assert
     expect(selected.map((e) => e.id)).toEqual(['fixed-1', 'fixed-3']);
-  });
-});
-
-describe('categoryHasRealSubCategories', () => {
-  const rows = [
-    makeExpense({
-      type: 'variable',
-      amount: -100,
-      categoryId: 'cat-casa-var',
-      categoryName: 'Casa',
-      subCategoryId: 'sub-arredo',
-      subCategoryName: 'Arredamento',
-    }),
-    makeExpense({ type: 'fixed', amount: -300, categoryId: 'cat-casa-fixed', categoryName: 'Casa' }),
-  ];
-
-  it('should answer for the asked category, not for its namesake', () => {
-    // Act / Assert — the fixed Casa has none of its own
-    expect(categoryHasRealSubCategories(rows, { expenseType: 'fixed', key: 'cat-casa-fixed' })).toBe(false);
-    expect(categoryHasRealSubCategories(rows, { expenseType: 'variable', key: 'cat-casa-var' })).toBe(true);
   });
 });

@@ -1,17 +1,11 @@
 'use client';
 
-import { CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import {
-  staggerContainer,
-  cardItem,
-  heroMetricSettle,
-  springLayoutTransition,
-} from '@/lib/utils/motionVariants';
+import { cardItem, springLayoutTransition, staggerContainer } from '@/lib/utils/motionVariants';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { updateHallOfFame } from '@/lib/services/hallOfFameService';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -21,61 +15,65 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Camera, Receipt, TrendingDown, TrendingUp, Trophy } from 'lucide-react';
-import { CashflowWidget } from '@/components/cashflow/cashflow-kpi/CashflowWidget';
+import { Camera } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCreateSnapshot } from '@/lib/hooks/useSnapshots';
 import { useDashboardOverview } from '@/lib/hooks/useDashboardOverview';
-import { useExpenseCategories } from '@/lib/hooks/useExpenses';
 import { SavingsRateBadge } from '@/components/ui/SavingsRateBadge';
-import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { getItalyDate, getItalyMonthYear } from '@/lib/utils/dateHelpers';
 import { getGreeting } from '@/lib/utils/getGreeting';
-import { OverviewAnimatedCurrency } from '@/components/dashboard/OverviewAnimatedCurrency';
-import { OverviewChartsSection } from '@/components/dashboard/OverviewChartsSection';
-import { NetWorthSparkline } from '@/components/dashboard/NetWorthSparkline';
-import { PeriodSelector, SparklinePeriod } from '@/components/dashboard/PeriodSelector';
+import { SparklinePeriod } from '@/components/dashboard/PeriodSelector';
 import { useChartColors } from '@/lib/hooks/useChartColors';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
-import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
-import { signChipClass, signTextClass } from '@/lib/utils/metricColors';
 import { ASSET_CLASS_CHART_INDEX } from '@/lib/utils/allocationUtils';
 import { filterSparklineByPeriod } from '@/lib/utils/sparklinePeriod';
+import { buildOverviewVerdict } from '@/lib/utils/overviewNarrative';
 import { cn } from '@/lib/utils';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { OverviewVerdict } from '@/components/dashboard/overview/OverviewVerdict';
+import { PatrimonioTile, resolveHeroValueClass } from '@/components/dashboard/overview/PatrimonioTile';
+import { SintesiTile } from '@/components/dashboard/overview/SintesiTile';
+import { CashflowTile } from '@/components/dashboard/overview/CashflowTile';
+import { ComposizioneTile } from '@/components/dashboard/overview/ComposizioneTile';
+import { CostiTile } from '@/components/dashboard/overview/CostiTile';
+import { ObiettivoTile } from '@/components/dashboard/overview/ObiettivoTile';
+import { CategoryTile } from '@/components/dashboard/overview/CategoryTile';
+import { AssetPrincipaliTile } from '@/components/dashboard/overview/AssetPrincipaliTile';
+import { OverviewTile, TILE_CELL_CLASS } from '@/components/dashboard/overview/OverviewTile';
+import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
+import { ErrorNotice } from '@/components/ui/error-notice';
+import { describeReadFailure, resolveSurfaceState } from '@/lib/utils/statesNarrative';
 
 const MotionButtonShell = motion.div;
 
 /**
- * MAIN DASHBOARD PAGE — "Bento Asimmetrico" redesign (v2)
+ * PANORAMICA — verdict + tile grid (v3, 2026-08-22)
  *
- * Layout:
- *   Mobile:  Hero → Liquid → VariationBlocks → Cashflow → [Costs] → [Fiscal] → Assets → Charts
- *   Desktop: Hero(2/3)+Liquid(1/3) → Cashflow(full) → [Costs 2-col] → [Fiscal] → Assets → Charts
+ * The page answers "come va?" before it shows a number: a rule-generated verdict sentence
+ * (lib/utils/overviewNarrative.ts) sits at the top, and under it a 12-column bento of tiles,
+ * each answering ONE question with a one-line reading above its figures. Dense, but it scrolls:
+ * the third row (categories, top assets) sits below the fold at 1440×900 by design.
  *
- * Changes from v1:
- * - Liquid card: donut replaced by flat 3-row breakdown (Liquidità/Investimenti/Illiquidi)
- * - Fiscal section: no longer collapsible, always visible when hasCostBasisTracking
- * - Asset list card: new "N Asset in Portafoglio" card with value / weight / return columns
- * - Cashflow card: full-width, 4 KPI chips + top-5 category bars; TER/Costo moved to 2-col row below
+ *   Mobile (1 col):  Verdict → Patrimonio → Cashflow → Sintesi → Composizione → Costi →
+ *                    Obiettivo → Spese → Entrate → Asset principali
+ *   Desktop (12 col): Patrimonio(5, 2 rows) | Sintesi(3) | Cashflow(4)
+ *                                           | Composizione(3) | Costi(2) | Obiettivo(2)
+ *                     Spese(4) | Entrate(3) | Asset principali(5)
+ *
+ * Data still flows through the single overview payload (`useDashboardOverview`); the verdict
+ * and every reading are derived from it, nothing is fetched separately.
  */
 
-// Italian month names for the cashflow card header.
-const MONTH_NAMES_IT = [
-  'Gennaio',
-  'Febbraio',
-  'Marzo',
-  'Aprile',
-  'Maggio',
-  'Giugno',
-  'Luglio',
-  'Agosto',
-  'Settembre',
-  'Ottobre',
-  'Novembre',
-  'Dicembre',
-];
+const ITALIAN_LONG_DATE = new Intl.DateTimeFormat('it-IT', {
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+});
+
+/** Grid cell wrapper: the tile stretches to the row height so `mt-auto` footers align. */
+const CELL_CLASS = TILE_CELL_CLASS;
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -83,20 +81,19 @@ export default function DashboardPage() {
   const isDemo = useDemoMode();
   const prefersReducedMotion = useReducedMotion();
 
-  const greeting = useMemo(() => {
-    const italyHour = getItalyDate(new Date()).getHours();
-    const result = getGreeting(italyHour);
+  // ─── Header: greeting + today's date, both in Italian wall-clock time ─────────
+  const header = useMemo(() => {
+    const now = getItalyDate(new Date());
+    const result = getGreeting(now.getHours());
     const firstName = user?.displayName?.split(' ')[0];
-    const label =
+    const title =
       firstName && firstName.length <= 20 ? `${result.greeting} ${firstName}` : result.greeting;
-    return { label, subtitle: result.subtitle };
+    return { title, date: ITALIAN_LONG_DATE.format(now) };
   }, [user?.displayName]);
 
-  const { data: overview, isLoading: loadingOverview } = useDashboardOverview(ownerId);
-  const { data: expenseCategories = [] } = useExpenseCategories(ownerId);
+  const { data: overview, isLoading: loadingOverview, isError: overviewError, refetch: refetchOverview } =
+    useDashboardOverview(ownerId);
   const createSnapshotMutation = useCreateSnapshot(ownerId || '');
-
-  const loading = loadingOverview;
 
   // ─── UI State ─────────────────────────────────────────────────────────────────
   const [creatingSnapshot, setCreatingSnapshot] = useState(false);
@@ -104,31 +101,32 @@ export default function DashboardPage() {
   const [snapshotDialogStyle, setSnapshotDialogStyle] = useState<CSSProperties | undefined>(
     undefined,
   );
-
   const snapshotButtonRef = useRef<HTMLButtonElement | null>(null);
   const snapshotDialogRef = useRef<HTMLDivElement | null>(null);
 
-  const isMobile = useMediaQuery('(max-width: 1439px)');
   const chartColors = useChartColors();
-
-  // heroSettled becomes true when the Patrimonio Totale Lordo count-up completes.
-  const [heroSettled, setHeroSettled] = useState(false);
-  const handleHeroSettled = useCallback(() => setHeroSettled(true), []);
-
-  // Hero sparkline period control — defaults to 1A, matching the previous fixed behaviour.
   const [sparklinePeriod, setSparklinePeriod] = useState<SparklinePeriod>('1A');
 
   // ─── Derived metrics ──────────────────────────────────────────────────────────
   const totalValue = overview?.metrics.totalValue ?? 0;
+  const today = useMemo(() => {
+    const { month, year } = getItalyMonthYear();
+    return {
+      month,
+      year,
+      dayOfMonth: getItalyDate(new Date()).getDate(),
+      daysInMonth: new Date(year, month, 0).getDate(),
+    };
+  }, []);
 
+  // null (not 0) when there is no income: a rate needs a denominator.
   const savingsRate = useMemo(() => {
-    if (!overview?.expenseStats) return 0;
+    if (!overview?.expenseStats) return null;
     const { income, expenses } = overview.expenseStats.currentMonth;
-    if (income <= 0) return 0;
-    return Math.round(((income - expenses) / income) * 100);
-  }, [overview?.expenseStats]);
+    if (income <= 0) return null;
+    return ((income - expenses) / income) * 100;
+  }, [overview]);
 
-  // Coverage ratio (income / expenses) for RAPPORTO KPI chip.
   const coverageRatio = useMemo(() => {
     if (!overview?.expenseStats) return null;
     const { income, expenses } = overview.expenseStats.currentMonth;
@@ -136,72 +134,48 @@ export default function DashboardPage() {
     return income / expenses;
   }, [overview]);
 
-  // ─── Sparkline — displayed range follows the period pill; a fixed last-13-points
-  // (12 months + baseline) copy is kept separately for the "Ultimi 12 mesi" reassurance
-  // line, which stays anchored to a full year regardless of what period is selected. ──
   const sparklineDisplay = useMemo(() => {
     if (!overview?.sparklineData) return [];
     return filterSparklineByPeriod(overview.sparklineData, sparklinePeriod);
   }, [overview, sparklinePeriod]);
 
-  const sparkline12mFixed = useMemo(() => {
-    if (!overview?.sparklineData) return [];
-    return overview.sparklineData.slice(-13);
-  }, [overview]);
+  // Overflow guard for the hero number: a 7-8 figure total at 44/54px would wrap in the tile.
+  const heroValueClass = useMemo(() => resolveHeroValueClass(totalValue), [totalValue]);
 
-  // Long-run (12m) context shown only when the monthly chip is negative, so a red
-  // month always has an offsetting figure in the same glance (DESIGN.md deference —
-  // no copy, just another real number, always available whenever the sparkline is).
-  const longRunChangePercent = useMemo(() => {
-    if (sparkline12mFixed.length < 2) return null;
-    const first = sparkline12mFixed[0].totalNetWorth;
-    const last = sparkline12mFixed[sparkline12mFixed.length - 1].totalNetWorth;
-    if (first === 0) return null;
-    return ((last - first) / Math.abs(first)) * 100;
-  }, [sparkline12mFixed]);
-
-  // Overflow guard for the hero number (P1): a 7-8 figure net worth at 44/54px in a
-  // ~346px mobile card can wrap or clip. Step down to a smaller size once the formatted
-  // string gets long, rather than letting the single most important number on the page overflow.
-  const heroValueClass = useMemo(() => {
-    const formattedLength = cachedFormatCurrencyEUR(totalValue).length;
-    return cn(
-      'font-mono font-bold tracking-[-0.03em] tabular-nums',
-      formattedLength > 13 ? 'text-[32px] desktop:text-[40px]' : 'desktop:text-[54px] text-[44px]',
-    );
-  }, [totalValue]);
-
-  // ─── Chart sections (stable memoized objects for memo isolation) ──────────────
-  // Liquidity chart removed — now shown as the hero donut in the Patrimonio Liquido card.
-  const chartSections = useMemo(
+  // Composition remapped by ASSET_CLASS_CHART_INDEX so a class is the same hue as on
+  // Allocazione/Storico — a positional remap drifts with object key order.
+  const assetClassData = useMemo(
     () =>
-      [
-        {
-          id: 'assetClass',
-          title: 'Distribuzione per Asset Class',
-          // Remap by the shared ASSET_CLASS_CHART_INDEX (not positional index) so a
-          // class renders the same color here as on Allocazione/Storico — a positional
-          // remap drifts whenever object key iteration order changes.
-          data: (overview?.charts.assetClassData ?? []).map((d) => ({
-            ...d,
-            color: chartColors[ASSET_CLASS_CHART_INDEX[d.assetClass ?? ''] ?? 0] ?? d.color,
-          })),
-        },
-        {
-          id: 'asset',
-          title: 'Distribuzione per Asset',
-          data: (overview?.charts.assetData ?? []).map((d, i) => ({
-            ...d,
-            color: chartColors[i] ?? d.color,
-          })),
-        },
-      ] as const,
+      (overview?.charts.assetClassData ?? []).map((d) => ({
+        ...d,
+        color: chartColors[ASSET_CLASS_CHART_INDEX[d.assetClass ?? ''] ?? 0] ?? d.color,
+      })),
     [overview, chartColors],
   );
 
+  // The hero's "Mercato:" digest on this page is per CLASS; Patrimonio passes instruments
+  // instead, which is why the mapping lives at the call site and not inside the tile.
+  const classMovers = useMemo(
+    () => (overview?.topMovers ?? []).map((m) => ({ key: m.assetClass, label: m.label, delta: m.delta })),
+    [overview],
+  );
+
+  const verdict = useMemo(() => {
+    if (!overview) return null;
+    return buildOverviewVerdict({
+      month: today.month,
+      totalValue,
+      monthlyVariation: overview.variations.monthly,
+      yearlyVariation: overview.variations.yearly,
+      isNewATH: overview.ath?.isNewATH ?? false,
+      savingsRate,
+      marketEffect: overview.marketEffect ?? null,
+      topMover: overview.topMovers?.[0] ?? null,
+    });
+  }, [overview, today.month, totalValue, savingsRate]);
+
   // ─── Dialog position animation ────────────────────────────────────────────────
   useEffect(() => {
-    // When closed or with reduced motion we don't compute a transform-origin.
     // The style is cleared by the onOpenChange handler on close, so no synchronous
     // setState is needed here (avoids react-hooks/set-state-in-effect).
     if (!showConfirmDialog || prefersReducedMotion) return;
@@ -220,8 +194,6 @@ export default function DashboardPage() {
     });
     return () => cancelAnimationFrame(frameId);
   }, [showConfirmDialog, prefersReducedMotion]);
-
-  const currentMonthReference = useMemo(() => getItalyMonthYear(), []);
 
   // ─── Snapshot handlers ────────────────────────────────────────────────────────
   const handleCreateSnapshot = async () => {
@@ -261,657 +233,274 @@ export default function DashboardPage() {
     }
   };
 
-  // ─── Loading skeleton ─────────────────────────────────────────────────────────
-  if (loading) {
-    return (
-      <PageContainer className="space-y-4">
-        <div className="border-border border-b pb-4">
-          <div className="bg-muted mb-2 h-3 w-20 animate-pulse rounded" />
-          <div className="bg-muted mb-2 h-8 w-56 animate-pulse rounded" />
-          <div className="bg-muted h-4 w-44 animate-pulse rounded" />
-        </div>
-        {/* Hero + Liquid skeleton — mirrors the desktop:grid-cols-[2fr_1fr] live layout */}
-        <div className="desktop:grid-cols-[2fr_1fr] grid gap-4">
-          <div className="border-border bg-card rounded-2xl border p-[22px]">
-            <div className="bg-muted mb-3 h-3 w-40 animate-pulse rounded" />
-            <div className="bg-muted mb-4 h-12 w-52 animate-pulse rounded" />
-            <div className="mb-3 flex gap-1.5">
-              <div className="bg-muted h-6 w-40 animate-pulse rounded" />
-              <div className="bg-muted h-6 w-28 animate-pulse rounded" />
-            </div>
-            <div className="bg-muted mb-2 h-[68px] animate-pulse rounded" />
-            <div className="bg-muted h-7 animate-pulse rounded" />
-          </div>
-          <div className="border-border bg-card rounded-2xl border p-[22px]">
-            <div className="bg-muted mb-3 h-3 w-32 animate-pulse rounded" />
-            <div className="bg-muted mb-4 h-8 w-36 animate-pulse rounded" />
-            <div className="space-y-2">
-              <div className="bg-muted h-4 animate-pulse rounded" />
-              <div className="bg-muted h-4 animate-pulse rounded" />
-              <div className="bg-muted h-4 animate-pulse rounded" />
-              <div className="bg-muted h-4 animate-pulse rounded" />
-            </div>
-          </div>
-        </div>
-        {/* Cashflow skeleton */}
-        <div className="border-border bg-card rounded-2xl border p-[22px]">
-          <div className="bg-muted mb-4 h-3 w-36 animate-pulse rounded" />
-          <div className="desktop:grid-cols-4 mb-4 grid grid-cols-2 gap-3">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="bg-muted h-16 animate-pulse rounded-xl p-3" />
-            ))}
-          </div>
-          <div className="bg-muted mb-3 h-3 animate-pulse rounded" />
-          <div className="desktop:grid-cols-2 grid gap-4">
-            <div className="space-y-2">
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="bg-muted h-6 animate-pulse rounded" />
-              ))}
-            </div>
-            <div className="space-y-2">
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="bg-muted h-6 animate-pulse rounded" />
-              ))}
-            </div>
-          </div>
-        </div>
+  const snapshotAction = (
+    <MotionButtonShell
+      whileTap={prefersReducedMotion ? undefined : { scale: 0.97 }}
+      transition={springLayoutTransition}
+    >
+      <Button
+        ref={snapshotButtonRef}
+        onClick={handleCreateSnapshot}
+        disabled={isDemo || creatingSnapshot || (overview?.flags.assetCount ?? 0) === 0}
+        title={isDemo ? 'Non disponibile in modalità demo' : undefined}
+        variant="outline"
+        className="h-9"
+        aria-label={creatingSnapshot ? 'Creazione snapshot in corso' : 'Crea snapshot'}
+      >
+        <Camera className="h-4 w-4" aria-hidden="true" />
+        <span className="hidden sm:inline">{creatingSnapshot ? 'Creazione...' : 'Crea snapshot'}</span>
+      </Button>
+    </MotionButtonShell>
+  );
 
-        {/* Charts skeleton — mirrors OverviewChartsSection structure */}
-        <div className="border-border/40 border-t pt-4">
-          <div className="bg-muted mb-4 h-3 w-24 animate-pulse rounded" />
-          <div className="desktop:grid-cols-2 grid gap-4">
-            <div className="bg-muted h-[220px] animate-pulse rounded-2xl" />
-            <div className="bg-muted h-[220px] animate-pulse rounded-2xl" />
-          </div>
-        </div>
+  // ─── Loading, then failure — never the two collapsed into one ─────────────────
+  // `loadingOverview || !overview` used to be ONE branch, so a failed read pulsed forever: the
+  // skeleton is a WAIT, and a wait that cannot end is a lie (lib/utils/statesNarrative.ts).
+  const overviewState = resolveSurfaceState({
+    loading: loadingOverview,
+    failed: overviewError || !overview || !verdict,
+  });
+
+  const pageChrome = (
+    <PageHeader label="Panoramica" title={header.title} description={header.date} />
+  );
+
+  if (overviewState === 'loading') {
+    return (
+      <PageContainer>
+        {pageChrome}
+        <TileGridSkeleton />
       </PageContainer>
     );
   }
 
+  // The `!overview || !verdict` repeat is what narrows the types below; `overviewState` is what
+  // says WHY the page is here.
+  if (overviewState === 'failed' || !overview || !verdict) {
+    return (
+      <PageContainer>
+        {pageChrome}
+        {/* The whole page reads ONE payload, so no tile is left that could answer: the grid is
+            absent rather than filled with six cells repeating the same failure. */}
+        <ErrorNotice
+          className="max-w-[920px]"
+          onRetry={() => void refetchOverview()}
+          notice={describeReadFailure({
+            consequence:
+              'La Panoramica legge un riepilogo solo, e non è stato letto: non c’è nessuna tessera che possa rispondere senza di esso.',
+            canRetry: true,
+          })}
+        />
+      </PageContainer>
+    );
+  }
+
+  const costsVisible = overview.flags.hasTERTracking || overview.flags.hasStampDuty;
+  const expenseStats = overview.expenseStats;
+  // Old cached payloads carry only the featured goal; the list supersedes it when present.
+  const goals = overview.goalProgressList ?? (overview.goalProgress ? [overview.goalProgress] : []);
+
   // ─── Render ───────────────────────────────────────────────────────────────────
   return (
-    <motion.div
-      layout="position"
-      transition={springLayoutTransition}
-      className="max-desktop:portrait:pb-20 mx-auto w-full max-w-[1600px] space-y-4"
-    >
-      <PageHeader
-        label="Panoramica"
-        title={greeting.label}
-        description={greeting.subtitle}
-        actions={
-          <MotionButtonShell
-            whileTap={prefersReducedMotion ? undefined : { scale: 0.97 }}
-            transition={springLayoutTransition}
-          >
-            <Button
-              ref={snapshotButtonRef}
-              onClick={handleCreateSnapshot}
-              disabled={isDemo || creatingSnapshot || (overview?.flags.assetCount ?? 0) === 0}
-              title={isDemo ? 'Non disponibile in modalità demo' : undefined}
-              variant="default"
-              className="w-full sm:w-auto"
-            >
-              <Camera className="mr-2 h-4 w-4" aria-hidden="true" />
-              {creatingSnapshot ? 'Creazione...' : 'Crea Snapshot'}
-            </Button>
-          </MotionButtonShell>
-        }
-      />
+    <PageContainer>
+      <motion.div layout="position" transition={springLayoutTransition} className="space-y-4">
+        <PageHeader
+          label="Panoramica"
+          title={header.title}
+          description={header.date}
+          actions={snapshotAction}
+        />
 
-      {/* ── HERO + LIQUID — desktop: 2/3 + 1/3 grid ── */}
-      <motion.section
-        aria-label="Patrimonio"
-        layout="position"
-        transition={springLayoutTransition}
-        variants={staggerContainer}
-        initial="hidden"
-        animate="visible"
-      >
-        <div className="desktop:grid-cols-[2fr_1fr] grid gap-4">
-          {/* Hero Card */}
-          <motion.div
-            layout="position"
-            transition={springLayoutTransition}
-            variants={heroMetricSettle}
-          >
-            <Card className="h-full overflow-hidden rounded-2xl">
-              <CardContent className="flex h-full flex-col p-[22px]">
-                <p className="text-muted-foreground mb-2 text-[10px] font-semibold tracking-[0.1em] uppercase">
-                  Patrimonio Totale Lordo
-                </p>
+        <motion.div variants={cardItem} initial="hidden" animate="visible" className="pt-1">
+          <OverviewVerdict verdict={verdict} />
+        </motion.div>
 
-                {/* Animated number — heroValueClass steps down for very long formatted values */}
-                <OverviewAnimatedCurrency
-                  value={totalValue}
-                  animateOnMount={true}
-                  onSettled={handleHeroSettled}
-                  className={heroValueClass}
-                />
-
-                {/* Variation chips — grid (not flex-wrap) so every chip shares the same column
-                    width regardless of its own text length: 1 column on mobile (each chip spans
-                    the full card width), 2 columns from tablet up (columns size together across
-                    every row, so a lone 3rd chip still matches the first column's width). */}
-                <div className="mt-2 grid grid-cols-1 gap-2 tablet:grid-cols-2">
-                  {overview?.variations.monthly && (
-                    <span
-                      className={cn(
-                        'inline-flex items-center gap-2 rounded-[9px] px-[13px] py-[6px]',
-                        'font-mono text-[15px] font-semibold tracking-[-0.01em]',
-                        signChipClass(overview.variations.monthly.value),
-                      )}
-                    >
-                      {overview.variations.monthly.value >= 0 ? (
-                        <TrendingUp className="h-[13px] w-[13px]" aria-hidden="true" />
-                      ) : (
-                        <TrendingDown className="h-[13px] w-[13px]" aria-hidden="true" />
-                      )}
-                      {overview.variations.monthly.value >= 0 ? '+' : ''}
-                      {cachedFormatCurrencyEUR(overview.variations.monthly.value)} (
-                      {overview.variations.monthly.percentage >= 0 ? '+' : ''}
-                      {overview.variations.monthly.percentage.toFixed(2)}%) questo mese
-                    </span>
-                  )}
-                  {overview?.variations.yearly && (
-                    <span
-                      className={cn(
-                        'inline-flex items-center gap-2 rounded-[9px] px-[13px] py-[6px]',
-                        'font-mono text-[15px] font-semibold tracking-[-0.01em]',
-                        signChipClass(overview.variations.yearly.value),
-                      )}
-                    >
-                      {overview.variations.yearly.value >= 0 ? (
-                        <TrendingUp className="h-[13px] w-[13px]" aria-hidden="true" />
-                      ) : (
-                        <TrendingDown className="h-[13px] w-[13px]" aria-hidden="true" />
-                      )}
-                      {overview.variations.yearly.value >= 0 ? '+' : ''}
-                      {cachedFormatCurrencyEUR(overview.variations.yearly.value)} (
-                      {overview.variations.yearly.percentage >= 0 ? '+' : ''}
-                      {overview.variations.yearly.percentage.toFixed(2)}%) YTD
-                    </span>
-                  )}
-                  {overview?.ath?.isNewATH && (
-                    <span className="bg-positive/10 text-positive inline-flex items-center gap-2 rounded-[9px] px-[13px] py-[6px] font-mono text-[15px] font-semibold tracking-[-0.01em]">
-                      <Trophy className="h-[13px] w-[13px]" aria-hidden="true" />
-                      Nuovo massimo storico
-                    </span>
-                  )}
-                </div>
-
-                {/* Long-run reassurance — only when the monthly chip is negative, so a red
-                    month always has an offsetting figure in the same glance. */}
-                {overview?.variations.monthly &&
-                  overview.variations.monthly.value < 0 &&
-                  longRunChangePercent !== null && (
-                    <p
-                      className={cn(
-                        'mt-1.5 font-mono text-[12px] tabular-nums',
-                        signTextClass(longRunChangePercent),
-                      )}
-                    >
-                      Ultimi 12 mesi: {longRunChangePercent >= 0 ? '+' : ''}
-                      {longRunChangePercent.toFixed(1)}%
-                    </p>
-                  )}
-
-                {/* Sparkline period control */}
-                {(overview?.sparklineData?.length ?? 0) >= 2 && (
-                  <div className="mt-3">
-                    <PeriodSelector value={sparklinePeriod} onChange={setSparklinePeriod} />
-                  </div>
-                )}
-
-                {/* Area sparkline — displayed range follows the period pill, edge-to-edge via -mx-[22px] */}
-                {sparklineDisplay.length >= 2 && (
-                  <>
-                    <div className="-mx-[22px] mt-3" style={{ height: 68 }}>
-                      <NetWorthSparkline
-                        data={sparklineDisplay}
-                        filled={true}
-                        color="var(--chart-1)"
-                        height={68}
-                      />
-                    </div>
-                    <div className="text-muted-foreground mt-1 mb-3 flex justify-between px-px font-mono text-[10px]">
-                      <span>{cachedFormatCurrencyEUR(sparklineDisplay[0].totalNetWorth, true)}</span>
-                      <span>
-                        {cachedFormatCurrencyEUR(
-                          sparklineDisplay[sparklineDisplay.length - 1].totalNetWorth,
-                          true,
-                        )}
-                      </span>
-                    </div>
-                  </>
-                )}
-
-                {/* "Guidato da" digest — the 1-2 asset classes that moved the most this month. */}
-                {overview?.topMovers && overview.topMovers.length > 0 && (
-                  <p className="text-muted-foreground mt-0.5 text-[11px] truncate">
-                    Guidato da:{' '}
-                    {overview.topMovers.map((mover, i) => (
-                      <span key={mover.assetClass}>
-                        {i > 0 && ' · '}
-                        {mover.label}{' '}
-                        <span className={cn('font-mono tabular-nums', signTextClass(mover.delta))}>
-                          {mover.delta >= 0 ? '+' : ''}
-                          {cachedFormatCurrencyEUR(mover.delta, true)}
-                        </span>
-                      </span>
-                    ))}
-                  </p>
-                )}
-
-                <p className="text-muted-foreground mt-1 text-[11px]">
-                  {(overview?.flags.assetCount ?? 0) === 0
-                    ? 'Aggiungi asset per iniziare'
-                    : `${overview?.flags.assetCount ?? 0} asset in portafoglio`}
-                </p>
-
-                {/* ── TER + Costo Annuale — desktop only, pinned to bottom of hero card ── */}
-                {(overview?.flags.hasTERTracking || overview?.flags.hasStampDuty) &&
-                  (() => {
-                    const annualTotal =
-                      (overview.metrics.annualPortfolioCost ?? 0) +
-                      (overview.metrics.annualStampDuty ?? 0);
-                    const bothPresent =
-                      overview.flags.hasTERTracking && overview.flags.hasStampDuty;
-                    return (
-                      <div className="desktop:grid border-border mt-auto hidden grid-cols-2 gap-4 border-t pt-4">
-                        {overview.flags.hasTERTracking && (
-                          <div>
-                            <p className="text-muted-foreground mb-2 text-[10px] font-semibold tracking-[0.1em] uppercase">
-                              TER Medio Ponderato
-                            </p>
-                            <p className="text-foreground font-mono text-[22px] leading-none font-bold tracking-[-0.025em] tabular-nums">
-                              {overview.metrics.portfolioTER.toFixed(2)}%
-                            </p>
-                          </div>
-                        )}
-                        <div className={cn(!overview.flags.hasTERTracking && 'col-span-2')}>
-                          <p className="text-muted-foreground mb-2 text-[10px] font-semibold tracking-[0.1em] uppercase">
-                            Costo Annuale Stimato
-                          </p>
-                          <p className="text-warning-foreground font-mono text-[22px] leading-none font-bold tracking-[-0.025em] tabular-nums">
-                            {cachedFormatCurrencyEUR(annualTotal)}
-                          </p>
-                          {bothPresent && (
-                            <div className="border-border divide-border mt-2 divide-y border-t pt-2">
-                              <div className="flex justify-between py-[4px] text-[11px]">
-                                <span className="text-muted-foreground">
-                                  Costi di gestione (TER)
-                                </span>
-                                <span className="text-foreground font-mono tabular-nums">
-                                  {cachedFormatCurrencyEUR(overview.metrics.annualPortfolioCost)}
-                                </span>
-                              </div>
-                              <div className="flex justify-between py-[4px] text-[11px]">
-                                <span className="text-muted-foreground">Imposta di bollo</span>
-                                <span className="text-foreground font-mono tabular-nums">
-                                  {cachedFormatCurrencyEUR(overview.metrics.annualStampDuty)}
-                                </span>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })()}
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          {/* ── LIQUID CARD — redesigned: flat 3-row breakdown ── */}
-          <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
-            <Card className="h-full rounded-2xl">
-              <CardContent className="p-[22px]">
-                <p className="text-muted-foreground mb-2 text-[10px] font-semibold tracking-[0.1em] uppercase">
-                  Sintesi Patrimoniale
-                </p>
-
-                {/* Breakdown by class + total footer. Only meaningful once there is value to split. */}
-                {totalValue > 0 ? (
-                <div className="border-border divide-border divide-y border-t pt-3">
-                  {[
-                    {
-                      label: 'Liquidità',
-                      value: overview?.metrics.cashNetWorth ?? 0,
-                      pct:
-                        totalValue > 0
-                          ? ((overview?.metrics.cashNetWorth ?? 0) / totalValue) * 100
-                          : 0,
-                    },
-                    {
-                      label: 'Investimenti Liquidabili',
-                      value: overview?.metrics.liquidInvestmentsNetWorth ?? 0,
-                      pct:
-                        totalValue > 0
-                          ? ((overview?.metrics.liquidInvestmentsNetWorth ?? 0) / totalValue) * 100
-                          : 0,
-                    },
-                    {
-                      label: 'Investimenti Illiquidi',
-                      value: overview?.metrics.illiquidNetWorth ?? 0,
-                      pct:
-                        totalValue > 0
-                          ? ((overview?.metrics.illiquidNetWorth ?? 0) / totalValue) * 100
-                          : 0,
-                    },
-                  ].map((row) => (
-                    <div key={row.label} className="flex items-center justify-between py-[7px]">
-                      <span className="text-muted-foreground text-[14px]">{row.label}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-foreground font-mono text-[14px] tabular-nums">
-                          {cachedFormatCurrencyEUR(row.value)}
-                        </span>
-                        <span className="text-muted-foreground w-[42px] text-right font-mono text-[12px] tabular-nums">
-                          {row.pct.toFixed(1)}%
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-
-                  {/* Bottom row: total (bold). The breakdown above sums to this. */}
-                  <div className="flex items-center justify-between py-[7px]">
-                    <span className="text-foreground text-[14px] font-semibold">Totale</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-foreground font-mono text-[14px] font-bold tabular-nums">
-                        {cachedFormatCurrencyEUR(totalValue)}
-                      </span>
-                      <span className="text-muted-foreground w-[42px] text-right font-mono text-[12px] tabular-nums">
-                        100.0%
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                ) : (
-                  <div className="border-border border-t pt-3">
-                    <p className="text-muted-foreground text-[13px]">
-                      Il riepilogo per classe apparirà dopo il primo asset.
-                    </p>
-                  </div>
-                )}
-
-                {/* ── Fiscal rows — shown only when cost basis tracking is enabled ── */}
-                {overview?.flags.hasCostBasisTracking && overview.metrics && (
-                  <div className="border-border divide-border mt-3 divide-y border-t pt-3">
-                    <p className="text-muted-foreground pb-2 text-[10px] font-semibold tracking-[0.1em] uppercase">
-                      Impatto Fiscale
-                    </p>
-                    {[
-                      {
-                        label: 'Plusvalenze Non Realizzate',
-                        value: overview.metrics.unrealizedGains,
-                        className: signTextClass(overview.metrics.unrealizedGains),
-                        prefix: overview.metrics.unrealizedGains >= 0 ? '+' : '',
-                      },
-                      {
-                        label: 'Tasse Stimate',
-                        value: overview.metrics.estimatedTaxes,
-                        className: 'text-warning-foreground',
-                        prefix: '',
-                      },
-                      {
-                        label: 'Patrimonio Liquidabile Netto',
-                        value: overview.metrics.liquidNetTotal,
-                        className: 'text-foreground',
-                        prefix: '',
-                      },
-                      {
-                        label: 'Patrimonio Illiquido Netto',
-                        value: overview.metrics.netTotal - overview.metrics.liquidNetTotal,
-                        className: 'text-foreground',
-                        prefix: '',
-                      },
-                    ].map((row) => (
-                      <div key={row.label} className="flex items-center justify-between py-[7px]">
-                        <span className="text-muted-foreground text-[14px]">{row.label}</span>
-                        <span
-                          className={cn(
-                            'font-mono text-[14px] font-bold tabular-nums',
-                            row.className,
-                          )}
-                        >
-                          {row.prefix}
-                          {cachedFormatCurrencyEUR(row.value)}
-                        </span>
-                      </div>
-                    ))}
-
-                    {/* Concluding row: Pat. Netto Totale. Kept at the same 14px bold tier as
-                        the subtotal rows above it (not promoted past them) — a subtotal
-                        derived from the ones above, not a second dominant total. */}
-                    <div className="flex items-center justify-between py-[9px]">
-                      <span className="text-foreground text-[14px] font-semibold">
-                        Pat. Netto Totale
-                      </span>
-                      <span className="text-foreground font-mono text-[14px] font-bold tracking-[-0.01em] tabular-nums">
-                        {cachedFormatCurrencyEUR(overview.metrics.netTotal)}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Featured Goal-Based Investing progress — the single most relevant
-                    in-progress goal, thin category bar reusing the goal's own color. */}
-                {overview?.goalProgress && (
-                  <div className="border-border mt-3 border-t pt-3">
-                    <div className="mb-1.5 flex items-center justify-between gap-2">
-                      <span className="text-muted-foreground min-w-0 truncate text-[10px] font-semibold tracking-[0.1em] uppercase">
-                        Obiettivo · {overview.goalProgress.goalName}
-                      </span>
-                      <span className="text-foreground font-mono text-[12px] font-semibold tabular-nums">
-                        {Math.round(overview.goalProgress.progressPercentage)}%
-                      </span>
-                    </div>
-                    <div className="bg-muted h-[3px] overflow-hidden rounded-full">
-                      <div
-                        className="h-full rounded-full"
-                        style={{
-                          width: `${Math.min(100, overview.goalProgress.progressPercentage)}%`,
-                          background: overview.goalProgress.goalColor,
-                        }}
-                      />
-                    </div>
-                    <p className="text-muted-foreground mt-1.5 font-mono text-[11px] tabular-nums">
-                      {cachedFormatCurrencyEUR(overview.goalProgress.currentValue, true)} di{' '}
-                      {cachedFormatCurrencyEUR(overview.goalProgress.targetAmount, true)}
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </motion.div>
-        </div>
-      </motion.section>
-
-      {/* ── TER + COSTO ANNUALE — 2-col row (both platforms) ── */}
-      {(overview?.flags.hasTERTracking || overview?.flags.hasStampDuty) &&
-        (() => {
-          const annualTotal =
-            (overview.metrics.annualPortfolioCost ?? 0) + (overview.metrics.annualStampDuty ?? 0);
-          const bothPresent = overview.flags.hasTERTracking && overview.flags.hasStampDuty;
-          return (
-            <motion.div
-              layout="position"
-              transition={springLayoutTransition}
-              variants={cardItem}
-              initial="hidden"
-              animate="visible"
-              className="desktop:hidden grid grid-cols-2 gap-4"
-            >
-              {/* TER medio */}
-              {overview.flags.hasTERTracking && (
-                <div className="bg-card border-border flex flex-col justify-between rounded-2xl border p-5">
-                  <span className="text-muted-foreground text-[10px] font-semibold tracking-[0.1em] uppercase">
-                    TER Medio Ponderato
-                  </span>
-                  <div>
-                    <p className="text-foreground mt-3 font-mono text-[22px] leading-none font-bold tracking-[-0.025em] tabular-nums">
-                      {overview.metrics.portfolioTER.toFixed(2)}%
-                    </p>
-                    <p className="text-muted-foreground mt-2 text-[10px]">
-                      Total Expense Ratio medio ponderato
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Costo annuale */}
-              <div
-                className={cn(
-                  'bg-card border-border flex flex-col justify-between rounded-2xl border p-5',
-                  !overview.flags.hasTERTracking && 'col-span-2',
-                )}
-              >
-                <span className="text-muted-foreground text-[10px] font-semibold tracking-[0.1em] uppercase">
-                  Costo Annuale Stimato
-                </span>
-                <div>
-                  <p className="text-warning-foreground mt-3 font-mono text-[22px] leading-none font-bold tracking-[-0.025em] tabular-nums">
-                    {cachedFormatCurrencyEUR(annualTotal)}
-                  </p>
-                  {bothPresent && (
-                    <div className="border-border divide-border mt-3 space-y-0 divide-y border-t pt-3">
-                      <div className="flex justify-between py-[5px] text-[11px]">
-                        <span className="text-muted-foreground">Costi di gestione (TER)</span>
-                        <span className="text-foreground font-mono tabular-nums">
-                          {cachedFormatCurrencyEUR(overview.metrics.annualPortfolioCost)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between py-[5px] text-[11px]">
-                        <span className="text-muted-foreground">Imposta di bollo</span>
-                        <span className="text-foreground font-mono tabular-nums">
-                          {cachedFormatCurrencyEUR(overview.metrics.annualStampDuty)}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                  {!bothPresent && (
-                    <p className="text-muted-foreground mt-2 text-[10px]">
-                      {overview.flags.hasTERTracking
-                        ? 'Costi di gestione annuali stimati'
-                        : 'Imposta di bollo annuale stimata'}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-          );
-        })()}
-
-      {/* ── CASHFLOW CARD ── */}
-      {overview?.expenseStats &&
-        (() => {
-          const { income, expenses, net } = overview.expenseStats.currentMonth;
-          const { income: incomeDelta, expenses: expensesDelta } = overview.expenseStats.delta;
-          const { month: italyMonth, year: italyYear } = getItalyMonthYear();
-          const monthLabel = `${MONTH_NAMES_IT[italyMonth - 1].toUpperCase()} ${italyYear}`;
-
-          return (
-            <motion.div
-              layout="position"
-              transition={springLayoutTransition}
-              variants={cardItem}
-              initial="hidden"
-              animate="visible"
-            >
-              <CashflowWidget
-                monthLabel={monthLabel}
-                income={income}
-                expenses={expenses}
-                net={net}
-                ratio={coverageRatio}
-                incomeDelta={incomeDelta}
-                expensesDelta={expensesDelta}
-                savingsRate={savingsRate}
-                expenseCategories={overview.expenseStats.topExpenseCategories}
-                incomeCategories={overview.expenseStats.topIncomeCategories}
-                categories={expenseCategories}
-                className="rounded-2xl"
-              />
-            </motion.div>
-          );
-        })()}
-      {/* No cashflow data fallback */}
-      {!overview?.expenseStats && (
         <motion.div
-          layout="position"
-          transition={springLayoutTransition}
-          variants={cardItem}
+          variants={staggerContainer}
           initial="hidden"
           animate="visible"
+          className="grid grid-cols-1 gap-3 tablet:grid-cols-2 desktop:grid-cols-12"
         >
-          <Card className="rounded-2xl">
-            <CardContent className="p-[22px]">
-              <p className="text-muted-foreground mb-3 text-[10px] font-semibold tracking-[0.1em] uppercase">
-                Cashflow
-              </p>
-              <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                <Receipt className="h-4 w-4" aria-hidden="true" />
-                <span>Nessun dato questo mese</span>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      )}
+          <motion.div
+            variants={cardItem}
+            className={cn(CELL_CLASS, 'tablet:col-span-2 desktop:col-span-5 desktop:row-span-2')}
+          >
+            <PatrimonioTile
+              totalValue={totalValue}
+              heroValueClass={heroValueClass}
+              variations={overview.variations}
+              isNewATH={overview.ath?.isNewATH ?? false}
+              sparklinePeriod={sparklinePeriod}
+              onSparklinePeriodChange={setSparklinePeriod}
+              sparklineDisplay={sparklineDisplay}
+              movers={classMovers}
+              assetCount={overview.flags.assetCount}
+              hasCurrentMonthSnapshot={overview.flags.currentMonthSnapshotExists}
+            />
+          </motion.div>
 
-      {/* ── CHARTS SECTION ── */}
-      <OverviewChartsSection
-        sections={chartSections}
-        heroSettled={heroSettled}
-        isMobile={isMobile}
-        prefersReducedMotion={!!prefersReducedMotion}
-      />
+          {/* Below desktop, Cashflow reads before Sintesi: the month is the more frequent question. */}
+          <motion.div
+            variants={cardItem}
+            className={cn(CELL_CLASS, 'order-2 desktop:order-none desktop:col-span-3')}
+          >
+            <SintesiTile
+              metrics={overview.metrics}
+              hasCostBasisTracking={overview.flags.hasCostBasisTracking}
+            />
+          </motion.div>
 
-      {/* ── SNAPSHOT CONFIRM DIALOG ── */}
-      <Dialog
-        open={showConfirmDialog}
-        onOpenChange={(nextOpen) => {
-          if (!nextOpen) setSnapshotDialogStyle(undefined);
-          setShowConfirmDialog(nextOpen);
-        }}
-      >
-        <DialogContent
-          ref={snapshotDialogRef}
-          style={snapshotDialogStyle}
-          className="data-[state=open]:zoom-in-90 data-[state=closed]:zoom-out-100 data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 duration-300 sm:max-w-md"
-          showCloseButton={false}
-        >
-          <DialogHeader>
-            <p className="text-muted-foreground text-xs font-medium tracking-widest uppercase">
-              Snapshot mensile
-            </p>
-            <DialogTitle>Snapshot già esistente</DialogTitle>
-            <DialogDescription>
-              Esiste già uno snapshot per questo mese (
-              {`${String(currentMonthReference.month).padStart(2, '0')}/${currentMonthReference.year}`}
-              ). Vuoi sovrascriverlo con i dati attuali?
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowConfirmDialog(false)}
-              disabled={creatingSnapshot}
+          <motion.div
+            variants={cardItem}
+            className={cn(CELL_CLASS, 'order-1 desktop:order-none desktop:col-span-4')}
+          >
+            {expenseStats ? (
+              <CashflowTile
+                expenseStats={expenseStats}
+                month={today.month}
+                dayOfMonth={today.dayOfMonth}
+                daysInMonth={today.daysInMonth}
+                savingsRate={savingsRate}
+                coverageRatio={coverageRatio}
+              />
+            ) : (
+              <OverviewTile eyebrow="Cashflow">
+                <p className="mt-3 text-[13px] text-muted-foreground">Nessun dato questo mese.</p>
+              </OverviewTile>
+            )}
+          </motion.div>
+
+          <motion.div
+            variants={cardItem}
+            className={cn(CELL_CLASS, 'order-3 desktop:order-none desktop:col-span-3')}
+          >
+            <ComposizioneTile data={assetClassData} />
+          </motion.div>
+
+          {costsVisible && (
+            <motion.div
+              variants={cardItem}
+              className={cn(
+                CELL_CLASS,
+                'order-4 desktop:order-none',
+                goals.length > 0 ? 'desktop:col-span-2' : 'desktop:col-span-4',
+              )}
             >
-              Annulla
-            </Button>
-            <Button onClick={createSnapshot} disabled={creatingSnapshot}>
-              {creatingSnapshot ? 'Creazione...' : 'Sovrascrivi'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              <CostiTile metrics={overview.metrics} flags={overview.flags} costDrivers={overview.costDrivers ?? []} />
+            </motion.div>
+          )}
 
-      {/* Savings rate celebration badge */}
-      {overview?.expenseStats && (
-        <SavingsRateBadge
-          previousMonthIncome={overview.expenseStats.previousMonth.income}
-          previousMonthExpenses={overview.expenseStats.previousMonth.expenses}
-        />
-      )}
-    </motion.div>
+          {goals.length > 0 && (
+            <motion.div
+              variants={cardItem}
+              className={cn(
+                CELL_CLASS,
+                'order-5 desktop:order-none',
+                costsVisible ? 'desktop:col-span-2' : 'desktop:col-span-4',
+              )}
+            >
+              <ObiettivoTile goals={goals} />
+            </motion.div>
+          )}
+
+          {/* Keeps the second desktop row closed when neither optional tile renders. */}
+          {!costsVisible && goals.length === 0 && (
+            <div className="hidden desktop:block desktop:col-span-4" aria-hidden="true" />
+          )}
+
+          {expenseStats && (
+            <>
+              <motion.div
+                variants={cardItem}
+                className={cn(CELL_CLASS, 'order-6 desktop:order-none desktop:col-span-4')}
+              >
+                <CategoryTile
+                  eyebrow="Spese per categoria"
+                  total={expenseStats.currentMonth.expenses}
+                  categories={expenseStats.topExpenseCategories}
+                  color="var(--chart-1)"
+                  emptyCopy="Nessuna spesa registrata questo mese."
+                />
+              </motion.div>
+              <motion.div
+                variants={cardItem}
+                className={cn(CELL_CLASS, 'order-7 desktop:order-none desktop:col-span-3')}
+              >
+                <CategoryTile
+                  eyebrow="Entrate per categoria"
+                  total={expenseStats.currentMonth.income}
+                  categories={expenseStats.topIncomeCategories}
+                  color="var(--chart-2)"
+                  emptyCopy="Nessuna entrata registrata questo mese."
+                />
+              </motion.div>
+            </>
+          )}
+
+          <motion.div
+            variants={cardItem}
+            className={cn(
+              CELL_CLASS,
+              'order-8 desktop:order-none tablet:col-span-2',
+              expenseStats ? 'desktop:col-span-5' : 'desktop:col-span-12',
+            )}
+          >
+            <AssetPrincipaliTile
+              topAssets={overview.topAssets ?? []}
+              assetCount={overview.flags.assetCount}
+            />
+          </motion.div>
+        </motion.div>
+
+        {/* ── SNAPSHOT CONFIRM DIALOG ── */}
+        <Dialog
+          open={showConfirmDialog}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) setSnapshotDialogStyle(undefined);
+            setShowConfirmDialog(nextOpen);
+          }}
+        >
+          <DialogContent
+            ref={snapshotDialogRef}
+            style={snapshotDialogStyle}
+            className="data-[state=open]:zoom-in-90 data-[state=closed]:zoom-out-100 data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 duration-300 sm:max-w-md"
+            showCloseButton={false}
+          >
+            <DialogHeader>
+              <p className="text-muted-foreground text-xs font-medium tracking-widest uppercase">
+                Snapshot mensile
+              </p>
+              <DialogTitle>Snapshot già esistente</DialogTitle>
+              <DialogDescription>
+                Esiste già uno snapshot per questo mese (
+                {`${String(today.month).padStart(2, '0')}/${today.year}`}
+                ). Vuoi sovrascriverlo con i dati attuali?
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setShowConfirmDialog(false)}
+                disabled={creatingSnapshot}
+              >
+                Annulla
+              </Button>
+              <Button onClick={createSnapshot} disabled={creatingSnapshot}>
+                {creatingSnapshot ? 'Creazione...' : 'Sovrascrivi'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Savings rate celebration badge */}
+        {expenseStats && ownerId && (
+          <SavingsRateBadge
+            ownerId={ownerId}
+            previousMonthIncome={expenseStats.previousMonth.income}
+            previousMonthExpenses={expenseStats.previousMonth.expenses}
+          />
+        )}
+      </motion.div>
+    </PageContainer>
   );
 }

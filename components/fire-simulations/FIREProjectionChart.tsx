@@ -1,24 +1,25 @@
 'use client';
 
 /**
- * FIREProjectionChart Component
+ * FIREProjectionChart Component — the "Scenari" view of the projection.
  *
- * Recharts line chart showing projected net worth under 3 market scenarios
- * (Bear/Base/Bull) plus 3 dashed FIRE Number lines (one per scenario).
- *
- * Design: Uses the same Recharts pattern as FireCalculatorTab's historical chart.
- * Each scenario has its own FIRE Number line because different inflation rates
- * produce different expense targets over time.
+ * Recharts line chart with the 3 scenario net-worth series and ONE dashed FIRE target
+ * line (base scenario). The previous 6-series version drew a target per scenario and was
+ * unreadable; the bear/bull targets did not disappear — they moved into the tooltip,
+ * which lists all six numbers for the hovered year.
  *
  * Color coding follows semantic meaning:
- *   - Bear (red): pessimistic outcome — solid for portfolio, dashed for FIRE target
- *   - Base (indigo): expected outcome — solid for portfolio, dashed for FIRE target
- *   - Bull (green): optimistic outcome — solid for portfolio, dashed for FIRE target
+ *   - Bear (red token), Base (primary token), Bull (green token);
+ *   - vertical reference lines mark the year each scenario reaches FIRE.
+ *
+ * With the pension bridge model active, the unlock year shows a visible step in every
+ * series; the tooltip names it so the step never reads as a data glitch.
  */
 
 import { FIREProjectionYearData } from '@/types/assets';
 import { formatCurrency, formatCurrencyCompact } from '@/lib/services/chartService';
 import { useChartColors } from '@/lib/hooks/useChartColors';
+import { CHART_TICK_STYLE } from '@/components/cashflow/costCenterStyles';
 import {
   LineChart,
   Line,
@@ -36,18 +37,88 @@ interface FIREProjectionChartProps {
   bearYearsToFIRE: number | null;
   baseYearsToFIRE: number | null;
   bullYearsToFIRE: number | null;
-  /** Chart height in pixels — pass responsive value from parent via useMediaQuery */
-  height?: number;
+  /** Chart height: pixels, or "100%" inside an absolutely positioned box (a tile's chart area). */
+  height?: number | `${number}%`;
   /** Left margin for YAxis labels */
   marginLeft?: number;
+  /** Calendar year the pension fund unlocks — the tooltip names the step. */
+  pensionUnlockCalendarYear?: number | null;
 }
 
-export function FIREProjectionChart({ yearlyData, bearYearsToFIRE, baseYearsToFIRE, bullYearsToFIRE, height = 400, marginLeft = 50 }: FIREProjectionChartProps) {
+const LEGEND_WRAPPER_STYLE = { fontSize: 12, paddingTop: 4 } as const;
+
+interface ScenarioTooltipProps {
+  active?: boolean;
+  payload?: { payload?: FIREProjectionYearData; color?: string }[];
+  label?: string | number;
+  pensionUnlockCalendarYear?: number | null;
+  colors: { bear: string; base: string; bull: string };
+}
+
+/**
+ * Module-level custom tooltip: the 3 portfolio values PLUS the 3 FIRE targets (only the base
+ * one is drawn as a line — the other two live here) and, at the unlock year, the pension step.
+ */
+function ScenarioTooltip({
+  active,
+  payload,
+  label,
+  pensionUnlockCalendarYear,
+  colors,
+}: ScenarioTooltipProps) {
+  if (!active || !payload || payload.length === 0) return null;
+  const row = payload[0]?.payload;
+  if (!row) return null;
+
+  const scenarioRows = [
+    { name: 'Orso', netWorth: row.bearNetWorth, fireNumber: row.bearFireNumber, color: colors.bear },
+    { name: 'Base', netWorth: row.baseNetWorth, fireNumber: row.baseFireNumber, color: colors.base },
+    { name: 'Toro', netWorth: row.bullNetWorth, fireNumber: row.bullFireNumber, color: colors.bull },
+  ];
+
+  return (
+    <div className="rounded-lg border border-border bg-card p-3 text-sm shadow-sm">
+      <p className="font-semibold text-foreground">Anno {label}</p>
+      {pensionUnlockCalendarYear !== null &&
+        pensionUnlockCalendarYear !== undefined &&
+        row.calendarYear === pensionUnlockCalendarYear && (
+          <p className="mt-1 text-xs text-muted-foreground">
+            Sblocco del fondo pensione: il capitale bloccato rientra quest&apos;anno (il gradino
+            nelle serie).
+          </p>
+        )}
+      <div className="mt-2 space-y-1.5">
+        {scenarioRows.map((scenario) => (
+          <div key={scenario.name} className="flex items-baseline gap-2 text-xs">
+            <span className="h-2 w-2 shrink-0 self-center rounded-[2px]" style={{ background: scenario.color }} />
+            <span className="text-muted-foreground">{scenario.name}</span>
+            <span className="ml-auto font-mono font-medium tabular-nums text-foreground">
+              {formatCurrency(scenario.netWorth)}
+            </span>
+            <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+              target {formatCurrency(scenario.fireNumber)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function FIREProjectionChart({
+  yearlyData,
+  bearYearsToFIRE,
+  baseYearsToFIRE,
+  bullYearsToFIRE,
+  height = 400,
+  marginLeft = 50,
+  pensionUnlockCalendarYear = null,
+}: FIREProjectionChartProps) {
   const chartColors = useChartColors();
   // Semantic mapping: Orso (bear/pessimistic) → red token [4], Base → primary [0], Toro (bull) → green token [1]
-  const bearColor = chartColors[4];
-  const baseColor = chartColors[0];
-  const bullColor = chartColors[1];
+  const bearColor = chartColors[4] || 'var(--chart-5)';
+  const baseColor = chartColors[0] || 'var(--chart-1)';
+  const bullColor = chartColors[1] || 'var(--chart-2)';
 
   if (yearlyData.length === 0) {
     return (
@@ -59,24 +130,29 @@ export function FIREProjectionChart({ yearlyData, bearYearsToFIRE, baseYearsToFI
 
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <LineChart data={yearlyData} margin={{ left: marginLeft, bottom: 20 }}>
+      <LineChart
+        data={yearlyData}
+        margin={{ left: marginLeft, bottom: 20 }}
+        role="img"
+        aria-label="Grafico proiezione scenari: patrimonio negli scenari Orso (rosso), Base (primario) e Toro (verde) con la linea tratteggiata del FIRE Number dello scenario base; i target Orso e Toro sono nel tooltip"
+        accessibilityLayer={false}
+      >
         <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="calendarYear" />
+        <XAxis dataKey="calendarYear" tick={CHART_TICK_STYLE} tickMargin={6} />
         <YAxis
           width={marginLeft <= 20 ? 70 : 100}
-          tickFormatter={(value) => formatCurrencyCompact(value)}
+          tickFormatter={(value) => formatCurrencyCompact(Number(value))}
+          tick={CHART_TICK_STYLE}
         />
         <Tooltip
-          formatter={(value, name) => [formatCurrency(value as number), name]}
-          labelFormatter={(label) => `Anno ${label}`}
-          contentStyle={{
-            backgroundColor: 'var(--card)',
-            border: '1px solid var(--border)',
-            color: 'var(--card-foreground)',
-          }}
-          labelStyle={{ fontWeight: 600, color: 'var(--card-foreground)' }}
+          content={
+            <ScenarioTooltip
+              pensionUnlockCalendarYear={pensionUnlockCalendarYear}
+              colors={{ bear: bearColor, base: baseColor, bull: bullColor }}
+            />
+          }
         />
-        <Legend />
+        <Legend wrapperStyle={LEGEND_WRAPPER_STYLE} />
         <Line
           type="monotone"
           dataKey="bearNetWorth"
@@ -109,33 +185,11 @@ export function FIREProjectionChart({ yearlyData, bearYearsToFIRE, baseYearsToFI
         />
         <Line
           type="monotone"
-          dataKey="bearFireNumber"
-          stroke={bearColor}
-          strokeWidth={1.5}
-          strokeDasharray="8 4"
-          name="FIRE Nr. Orso"
-          dot={false}
-          animationDuration={800}
-          animationEasing="ease-out"
-        />
-        <Line
-          type="monotone"
           dataKey="baseFireNumber"
           stroke={baseColor}
-          strokeWidth={2}
-          strokeDasharray="8 4"
-          name="FIRE Nr. Base"
-          dot={false}
-          animationDuration={800}
-          animationEasing="ease-out"
-        />
-        <Line
-          type="monotone"
-          dataKey="bullFireNumber"
-          stroke={bullColor}
           strokeWidth={1.5}
           strokeDasharray="8 4"
-          name="FIRE Nr. Toro"
+          name="Target FIRE (base)"
           dot={false}
           animationDuration={800}
           animationEasing="ease-out"

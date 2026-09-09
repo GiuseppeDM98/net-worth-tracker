@@ -31,6 +31,12 @@ interface SegmentedPillProps<T extends string> {
   layoutId: string;
   ariaLabel: string;
   className?: string;
+  /**
+   * Blocks selection changes without removing the tabs from the accessibility
+   * tree (native `disabled` would). Used e.g. by the assistant while a response
+   * is streaming — the period cannot change mid-answer.
+   */
+  disabled?: boolean;
 }
 
 export function SegmentedPill<T extends string>({
@@ -40,10 +46,12 @@ export function SegmentedPill<T extends string>({
   layoutId,
   ariaLabel,
   className,
+  disabled,
 }: SegmentedPillProps<T>) {
   const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   const focusAndSelect = (index: number) => {
+    if (disabled) return;
     const wrapped = (index + options.length) % options.length;
     const option = options[wrapped];
     buttonRefs.current[wrapped]?.focus();
@@ -75,7 +83,11 @@ export function SegmentedPill<T extends string>({
     <div
       role="tablist"
       aria-label={ariaLabel}
-      className={cn('inline-flex items-center gap-1 rounded-full bg-muted p-1', className)}
+      className={cn(
+        'inline-flex items-center gap-1 rounded-full bg-muted p-1',
+        disabled && 'opacity-50',
+        className
+      )}
     >
       {options.map((option, index) => {
         const isSelected = value === option.value;
@@ -86,8 +98,11 @@ export function SegmentedPill<T extends string>({
             type="button"
             role="tab"
             aria-selected={isSelected}
+            aria-disabled={disabled || undefined}
             tabIndex={isSelected ? 0 : -1}
-            onClick={() => onChange(option.value)}
+            onClick={() => {
+              if (!disabled) onChange(option.value);
+            }}
             onKeyDown={(e) => handleKeyDown(e, index)}
             className={cn(
               'relative px-3 py-1.5 text-sm font-medium rounded-full transition-colors',

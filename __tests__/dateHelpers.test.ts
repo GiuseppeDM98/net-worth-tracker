@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import type { Timestamp } from 'firebase/firestore'
 import {
   toDate,
   getItalyDate,
@@ -21,7 +22,7 @@ describe('toDate', () => {
     const mockDate = new Date(2025, 0, 1)
     const timestamp = { toDate: () => mockDate }
     // The function checks for 'toDate' method via duck typing
-    const result = toDate(timestamp as any)
+    const result = toDate(timestamp as unknown as Timestamp)
     expect(result).toEqual(mockDate)
   })
 
@@ -113,7 +114,7 @@ describe('formatItalianDate', () => {
   it('should handle Timestamp-like objects', () => {
     const mockDate = new Date(2025, 0, 1)
     const timestamp = { toDate: () => mockDate }
-    const result = formatItalianDate(timestamp as any)
+    const result = formatItalianDate(timestamp as unknown as Timestamp)
     expect(result).toMatch(/1\/0?1\/2025/)
   })
 })
@@ -140,7 +141,7 @@ describe('isDateOnOrAfter', () => {
   it('should handle Timestamp-like objects', () => {
     const d1 = { toDate: () => new Date(2025, 6, 1) }
     const d2 = { toDate: () => new Date(2025, 5, 1) }
-    expect(isDateOnOrAfter(d1 as any, d2 as any)).toBe(true)
+    expect(isDateOnOrAfter(d1 as unknown as Timestamp, d2 as unknown as Timestamp)).toBe(true)
   })
 })
 

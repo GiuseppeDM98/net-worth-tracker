@@ -66,6 +66,26 @@ export function getItalyDateIso(date: Date | Timestamp | string | undefined | nu
 }
 
 /**
+ * True when `date` falls on an Italian calendar day strictly AFTER `reference`'s.
+ *
+ * The single rule behind every "in calendario" reading in the app. It exists because the domain
+ * says *after today* while the values in hand are instants, and the two are not the same thing:
+ * an expense saved without touching the date input carries its creation time (18:42), the page's
+ * clock is frozen at mount, so a plain `date > now` calls a row recorded an hour ago "scheduled"
+ * until the next reload. A CSV-imported row lands at noon and does the same all morning.
+ *
+ * Comparing the two ISO days as strings is safe and cheap: 'YYYY-MM-DD' sorts lexicographically,
+ * so `>` keeps exactly the meaning it had. In a loop over many rows, hoist the right-hand side
+ * with `getItalyDateIso(now)` and compare against that instead of calling this per row.
+ */
+export function isItalyDayAfter(
+  date: Date | Timestamp | string,
+  reference: Date | Timestamp | string
+): boolean {
+  return getItalyDateIso(date) > getItalyDateIso(reference);
+}
+
+/**
  * Extract month (1-12) from date in Italy timezone
  * Use this instead of date.getMonth() to ensure consistent behavior
  */

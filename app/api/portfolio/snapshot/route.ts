@@ -19,6 +19,7 @@ import {
 } from '@/lib/server/apiAuth';
 import { snapshotRequestSchema, parseOr400 } from '@/lib/server/validation';
 import { invalidateDashboardOverviewSummaryServer } from '@/lib/services/dashboardOverviewInvalidation.server';
+import { preserveUserAuthoredSnapshotFields } from '@/lib/utils/snapshotUserFields';
 
 const SNAPSHOTS_COLLECTION = 'monthly-snapshots';
 
@@ -184,6 +185,18 @@ export async function POST(request: NextRequest) {
     const assetAllocation = buildAllocationPercentages(allocation.byAssetClass, totalNetWorth);
     const byAsset = buildByAssetBreakdown(assets);
 
+    // Freeze what the pension funds contributed to `byAssetClass` above.
+    //
+    // Re-running the SAME function over just the funds is what makes the two agree by
+    // construction: `allocation` folded each fund in through its `composition`, and this folds the
+    // identical funds through the identical composition, so `pension.byAssetClass[c]` is always a
+    // subset of `allocation.byAssetClass[c]` and Storico can subtract it exactly instead of
+    // estimating with today's composition. Written unconditionally — with no funds it stores a
+    // measured zero, which a reader must be able to tell apart from an old snapshot's silence.
+    const pensionAllocation = calculateCurrentAllocation(
+      assets.filter((asset) => asset.type === 'pensionFund')
+    );
+
     const snapshotId = `${userId}-${snapshotYear}-${snapshotMonth}`;
 
     // Check if snapshot already exists
@@ -204,12 +217,27 @@ export async function POST(request: NextRequest) {
       fireNetWorth,
       byAssetClass: allocation.byAssetClass,
       byAsset,
+      pension: {
+        totalValue: pensionAllocation.totalValue,
+        byAssetClass: pensionAllocation.byAssetClass,
+      },
       assetAllocation,
       createdAt: Timestamp.now(),
     };
 
     // Save snapshot
-    await existingSnapshotDocumentRef.set(monthlySnapshotDocument);
+    //
+    // `.set()` without merge REPLACES the document, which is what the recomputed fields
+    // want (a merge would keep the `byAssetClass` key of a class that left the portfolio).
+    // The user's note is not recomputed by anything, so it has to ride across the replace:
+    // this cron runs DAILY on the CURRENT month, so a bare replace erased the note the
+    // evening it was written (Storico, 2026-09-07). See `snapshotUserFields.ts`.
+    await existingSnapshotDocumentRef.set(
+      preserveUserAuthoredSnapshotFields(
+        monthlySnapshotDocument,
+        existingSnapshotDocument.data()
+      )
+    );
     await invalidateDashboardOverviewSummaryServer(
       userId,
       existingSnapshotDocument.exists ? 'snapshot_overwritten' : 'snapshot_created'

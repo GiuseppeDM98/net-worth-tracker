@@ -1,3 +1,21 @@
+/**
+ * Pure evaluation layer for the assistant's structured goals.
+ *
+ * Two rules govern this file and are the reason the previous version never
+ * completed a goal in practice:
+ *
+ * 1. **Structure never comes from text here.** A goal arrives already structured
+ *    from the Haiku extraction tool (`memoryExtraction.ts`). The Italian regex
+ *    cascade that used to live here is gone: it silently produced `undefined`
+ *    for most real phrasings, so the goal was never evaluated at all.
+ * 2. **A goal has a direction.** `at_least` completes on `metric >= target`,
+ *    `at_most` on `metric <= target`. Without it, "porta la liquidità sotto il
+ *    10%" was reported as already achieved the moment it was written down.
+ *
+ * The bundle passed in must be the CURRENT month's — that is the caller's
+ * responsibility (`goalEvaluationService.ts`), not something this file can check.
+ */
+
 import {
   AssistantGoalEvaluationResult,
   AssistantMemoryItem,
@@ -5,167 +23,20 @@ import {
   AssistantMonthContextBundle,
   AssistantStructuredGoal,
 } from '@/types/assistant';
+import { formatCurrency } from '@/lib/utils/formatters';
+import { ASSET_CLASS_LABELS } from '@/lib/utils/allocationUtils';
+import { getItalyDateIso } from '@/lib/utils/dateHelpers';
 
 interface SuggestionIdFactoryArgs {
   itemId: string;
 }
 
-const ASSET_CLASS_PATTERNS: Array<{ pattern: string; assetClass: NonNullable<AssistantStructuredGoal['assetClass']> }> = [
-  { pattern: 'equity|azioni|azionari|azionario|stock', assetClass: 'equity' },
-  { pattern: 'obbligazioni|obbligazionari|obbligazionario|bond|bonds', assetClass: 'bonds' },
-  { pattern: 'crypto|cripto|criptovalute|bitcoin|ethereum', assetClass: 'crypto' },
-  { pattern: 'cash|liquidita|liquidità|cassa', assetClass: 'cash' },
-  { pattern: 'real estate|immobili|immobiliare', assetClass: 'realestate' },
-  { pattern: 'commodity|commodities|materie prime|oro|metalli', assetClass: 'commodity' },
-];
-
-function normalizeGoalText(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/\./g, '')
-    .replace(/,/g, '.')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function parseNumericToken(rawValue: string, suffix?: string): number | null {
-  const normalized = rawValue.replace(/\./g, '').replace(/,/g, '.').trim();
-  const parsed = Number(normalized);
-  if (!Number.isFinite(parsed)) return null;
-  if (suffix === 'k') return parsed * 1_000;
-  if (suffix === 'm') return parsed * 1_000_000;
-  return parsed;
-}
-
-function findAssetClassInText(text: string): AssistantStructuredGoal['assetClass'] | undefined {
-  const normalized = normalizeGoalText(text);
-  for (const { pattern, assetClass } of ASSET_CLASS_PATTERNS) {
-    const regex = new RegExp(`\\b(?:${pattern})\\b`, 'i');
-    if (regex.test(normalized)) {
-      return assetClass;
-    }
-  }
-  return undefined;
-}
-
-/**
- * Parses a free-form goal text into a structured, auto-evaluable goal when the
- * wording matches one of the supported numeric patterns for v1.
- */
-export function parseStructuredGoalFromText(text: string): AssistantStructuredGoal | undefined {
-  const normalized = normalizeGoalText(text);
-
-  const liquidNetWorthMatch =
-    normalized.match(
-      /(\d+(?:\.\d+)?)\s*(k|m)?\s*(?:€|eur)?(?:\s+di)?\s+(?:patrimonio liquido|patrimonio liquidabile|asset liquidi|patrimonio pronto alluso)/
-    ) ??
-    normalized.match(
-      /(?:patrimonio liquido|patrimonio liquidabile|asset liquidi|patrimonio pronto alluso)\D*(\d+(?:\.\d+)?)\s*(k|m)?\s*(?:€|eur)?/
-    );
-  if (liquidNetWorthMatch) {
-    const targetValue = parseNumericToken(liquidNetWorthMatch[1], liquidNetWorthMatch[2]);
-    if (targetValue !== null) {
-      return {
-        kind: 'liquid_net_worth_target',
-        targetValue,
-        unit: 'eur',
-      };
-    }
-  }
-
-  const liquidityMatch =
-    normalized.match(
-      /(\d+(?:\.\d+)?)\s*(k|m)?\s*(?:€|eur)?(?:\s+di)?\s+(?:liquidita|liquidità|cash|cassa)/
-    ) ??
-    normalized.match(
-    /(?:liquidita|liquidità|cash|cassa)\D*(\d+(?:\.\d+)?)\s*(k|m)?\s*(?:€|eur)?/
-    );
-  if (liquidityMatch) {
-    const targetValue = parseNumericToken(liquidityMatch[1], liquidityMatch[2]);
-    if (targetValue !== null) {
-      return {
-        kind: 'cash_target',
-        targetValue,
-        unit: 'eur',
-      };
-    }
-  }
-
-  const netWorthMatch =
-    normalized.match(
-      /(\d+(?:\.\d+)?)\s*(k|m)?\s*(?:€|eur)?(?:\s+di)?\s+(?:patrimonio(?: netto)?|net worth)/
-    ) ??
-    normalized.match(
-    /(?:patrimonio(?: netto)?|net worth)\D*(\d+(?:\.\d+)?)\s*(k|m)?\s*(?:€|eur)?/
-    );
-  if (netWorthMatch) {
-    const targetValue = parseNumericToken(netWorthMatch[1], netWorthMatch[2]);
-    if (targetValue !== null) {
-      return {
-        kind: 'net_worth_target',
-        targetValue,
-        unit: 'eur',
-      };
-    }
-  }
-
-  const assetClassPctMatch = normalized.match(
-    /(?:allocazione|peso|percentuale)\s+([a-z]+)\D*(\d+(?:\.\d+)?)\s*%/
-  );
-  if (assetClassPctMatch) {
-    return {
-      kind: 'asset_class_percentage_target',
-      assetClass: findAssetClassInText(assetClassPctMatch[1]) ?? assetClassPctMatch[1],
-      targetValue: Number(assetClassPctMatch[2]),
-      unit: 'percent',
-    };
-  }
-
-  for (const { pattern, assetClass } of ASSET_CLASS_PATTERNS) {
-    const assetClassValueMatch =
-      normalized.match(
-        new RegExp(`(?:${pattern})\\s*(?:a|da|di|sopra|oltre)?\\s*(\\d+(?:\\.\\d+)?)\\s*(k|m)?\\s*(?:€|eur)?`, 'i')
-      ) ??
-      normalized.match(
-        new RegExp(`(\\d+(?:\\.\\d+)?)\\s*(k|m)?\\s*(?:€|eur)?\\s+(?:investiti\\s+in|in)\\s+(?:${pattern})`, 'i')
-      ) ??
-      normalized.match(
-        new RegExp(`(?:portare|raggiungere|avere)\\s+(?:gli\\s+)?(?:investimenti\\s+)?(?:in\\s+)?(?:${pattern})\\s+(?:a|da|di|sopra|oltre)\\s*(\\d+(?:\\.\\d+)?)\\s*(k|m)?\\s*(?:€|eur)?`, 'i')
-      );
-
-    if (assetClassValueMatch) {
-      const targetValue = parseNumericToken(assetClassValueMatch[1], assetClassValueMatch[2]);
-      if (targetValue !== null) {
-        return {
-          kind: 'asset_class_value_target',
-          assetClass,
-          targetValue,
-          unit: 'eur',
-        };
-      }
-    }
-  }
-
-  const subCategoryValueMatch = normalized.match(
-    /([a-z][a-z0-9 ]{2,})\s+(?:a|da|di|sopra|oltre)\s+(\d+(?:\.\d+)?)\s*(k|m)?\s*(?:€|eur)?/
-  );
-  if (subCategoryValueMatch && /(usa|europa|emergenti|conto|pensione|etf|azioni)/.test(subCategoryValueMatch[1])) {
-    const targetValue = parseNumericToken(subCategoryValueMatch[2], subCategoryValueMatch[3]);
-    if (targetValue !== null) {
-      return {
-        kind: 'sub_category_value_target',
-        subCategory: subCategoryValueMatch[1].trim(),
-        targetValue,
-        unit: 'eur',
-      };
-    }
-  }
-
-  return undefined;
-}
-
-function normalizeAssetClass(input: string): string | undefined {
-  return findAssetClassInText(input);
+/** One metric read off the bundle, ready to be compared with a target. */
+interface GoalMetric {
+  value: number;
+  evaluatedAgainst: AssistantGoalEvaluationResult['evaluatedAgainst'];
+  /** Italian subject of the summary sentence, e.g. "Liquidità", "Classe equity". */
+  label: string;
 }
 
 function roundMetric(value: number): number {
@@ -173,129 +44,206 @@ function roundMetric(value: number): number {
 }
 
 /**
- * Evaluates one structured goal against the authoritative current portfolio bundle.
- * Missing data returns null so callers can skip suggestion generation safely.
+ * Loose comparison key for a subcategory name: the user says "azioni usa", the
+ * asset is filed as "Azioni USA". Case and spacing only — nothing that could
+ * merge two genuinely different subcategories.
  */
-export function evaluateStructuredGoal(
-  goal: AssistantStructuredGoal,
-  bundle: AssistantMonthContextBundle
-): AssistantGoalEvaluationResult | null {
-  const snapshot = bundle.currentSnapshot;
-  if (!snapshot) return null;
-
-  if (goal.kind === 'cash_target') {
-    const metricValue = roundMetric(snapshot.byAssetClass?.cash ?? 0);
-    return {
-      matched: metricValue >= goal.targetValue,
-      metricValue,
-      targetValue: goal.targetValue,
-      unit: 'eur',
-      evaluatedAgainst: 'cash',
-      summary: `Cash attuale ${metricValue.toFixed(0)} EUR su target ${goal.targetValue.toFixed(0)} EUR`,
-    };
-  }
-
-  if (goal.kind === 'liquid_net_worth_target') {
-    const metricValue = roundMetric(snapshot.liquidNetWorth ?? 0);
-    return {
-      matched: metricValue >= goal.targetValue,
-      metricValue,
-      targetValue: goal.targetValue,
-      unit: 'eur',
-      evaluatedAgainst: 'liquid_net_worth',
-      summary: `Patrimonio liquido attuale ${metricValue.toFixed(0)} EUR su target ${goal.targetValue.toFixed(0)} EUR`,
-    };
-  }
-
-  if (goal.kind === 'net_worth_target') {
-    const metricValue = roundMetric(snapshot.totalNetWorth ?? 0);
-    return {
-      matched: metricValue >= goal.targetValue,
-      metricValue,
-      targetValue: goal.targetValue,
-      unit: 'eur',
-      evaluatedAgainst: 'total_net_worth',
-      summary: `Patrimonio attuale ${metricValue.toFixed(0)} EUR su target ${goal.targetValue.toFixed(0)} EUR`,
-    };
-  }
-
-  if (goal.kind === 'asset_class_value_target') {
-    if (!goal.assetClass) return null;
-    const metricValue = roundMetric(snapshot.byAssetClass?.[goal.assetClass] ?? 0);
-    return {
-      matched: metricValue >= goal.targetValue,
-      metricValue,
-      targetValue: goal.targetValue,
-      unit: 'eur',
-      evaluatedAgainst: 'asset_class_value',
-      summary: `Classe ${goal.assetClass} attuale ${metricValue.toFixed(0)} EUR su target ${goal.targetValue.toFixed(0)} EUR`,
-    };
-  }
-
-  if (goal.kind === 'sub_category_value_target') {
-    if (!goal.subCategory) return null;
-    const match = Object.values(bundle.bySubCategoryAllocation ?? {}).reduce((sum, subCats) => {
-      const found = Object.entries(subCats).find(
-        ([name]) => normalizeGoalText(name) === normalizeGoalText(goal.subCategory!)
-      );
-      return sum + (found?.[1] ?? 0);
-    }, 0);
-    const metricValue = roundMetric(match);
-    return {
-      matched: metricValue >= goal.targetValue,
-      metricValue,
-      targetValue: goal.targetValue,
-      unit: 'eur',
-      evaluatedAgainst: 'sub_category_value',
-      summary: `Sottocategoria ${goal.subCategory} attuale ${metricValue.toFixed(0)} EUR su target ${goal.targetValue.toFixed(0)} EUR`,
-    };
-  }
-
-  if (goal.kind === 'asset_class_percentage_target') {
-    if (!goal.assetClass || snapshot.totalNetWorth <= 0) return null;
-    const value = snapshot.byAssetClass?.[goal.assetClass] ?? 0;
-    const metricValue = roundMetric((value / snapshot.totalNetWorth) * 100);
-    return {
-      matched: metricValue >= goal.targetValue,
-      metricValue,
-      targetValue: goal.targetValue,
-      unit: 'percent',
-      evaluatedAgainst: 'asset_class_percentage',
-      summary: `Allocazione ${goal.assetClass} attuale ${metricValue.toFixed(2)}% su target ${goal.targetValue.toFixed(2)}%`,
-    };
-  }
-
-  return null;
+function normalizeSubCategoryName(name: string): string {
+  return name.toLowerCase().replace(/\s+/g, ' ').trim();
 }
 
 /**
- * Builds completion suggestions for all active structured goals that now match
- * the current authoritative bundle. Existing pending suggestions are preserved.
+ * Sums a subcategory's value across every asset class in the bundle. A user
+ * naming a subcategory does not know (or care) which class it sits under.
+ */
+function sumSubCategoryValue(bundle: AssistantMonthContextBundle, subCategory: string): number {
+  const wanted = normalizeSubCategoryName(subCategory);
+
+  return Object.values(bundle.bySubCategoryAllocation ?? {}).reduce((sum, subCategories) => {
+    const found = Object.entries(subCategories).find(
+      ([name]) => normalizeSubCategoryName(name) === wanted
+    );
+    return sum + (found?.[1] ?? 0);
+  }, 0);
+}
+
+/**
+ * Reads the metric a goal is measured on out of the bundle.
+ *
+ * Returns null when the metric cannot be computed at all — no snapshot, a goal
+ * missing the asset class or subcategory it refers to, a percentage goal on a
+ * zero portfolio. Callers must treat null as "not evaluated", never as "not met".
+ */
+function resolveGoalMetric(
+  goal: AssistantStructuredGoal,
+  bundle: AssistantMonthContextBundle
+): GoalMetric | null {
+  const snapshot = bundle.currentSnapshot;
+  if (!snapshot) return null;
+
+  switch (goal.kind) {
+    case 'cash_target':
+      return {
+        value: roundMetric(snapshot.byAssetClass?.cash ?? 0),
+        evaluatedAgainst: 'cash',
+        label: 'Liquidità',
+      };
+
+    case 'liquid_net_worth_target':
+      return {
+        value: roundMetric(snapshot.liquidNetWorth ?? 0),
+        evaluatedAgainst: 'liquid_net_worth',
+        label: 'Patrimonio liquido',
+      };
+
+    case 'net_worth_target':
+      return {
+        value: roundMetric(snapshot.totalNetWorth ?? 0),
+        evaluatedAgainst: 'total_net_worth',
+        label: 'Patrimonio',
+      };
+
+    case 'asset_class_value_target':
+      if (!goal.assetClass) return null;
+      return {
+        value: roundMetric(snapshot.byAssetClass?.[goal.assetClass] ?? 0),
+        evaluatedAgainst: 'asset_class_value',
+        label: `Classe ${ASSET_CLASS_LABELS[goal.assetClass] ?? goal.assetClass}`,
+      };
+
+    case 'asset_class_percentage_target': {
+      if (!goal.assetClass || snapshot.totalNetWorth <= 0) return null;
+      const value = snapshot.byAssetClass?.[goal.assetClass] ?? 0;
+      return {
+        value: roundMetric((value / snapshot.totalNetWorth) * 100),
+        evaluatedAgainst: 'asset_class_percentage',
+        label: `Allocazione ${ASSET_CLASS_LABELS[goal.assetClass] ?? goal.assetClass}`,
+      };
+    }
+
+    case 'sub_category_value_target':
+      if (!goal.subCategory) return null;
+      return {
+        value: roundMetric(sumSubCategoryValue(bundle, goal.subCategory)),
+        evaluatedAgainst: 'sub_category_value',
+        label: `Sottocategoria ${goal.subCategory}`,
+      };
+
+    default:
+      return null;
+  }
+}
+
+function formatGoalValue(value: number, unit: AssistantStructuredGoal['unit']): string {
+  return unit === 'percent' ? `${value.toFixed(2)}%` : formatCurrency(value, 'EUR', 0);
+}
+
+/**
+ * True when the goal carried a deadline and today (Italian wall clock) is past
+ * it. ISO dates compare correctly as strings, which is why the format is fixed.
+ */
+function isDeadlinePassed(deadlineIso: string | undefined, now: Date): boolean {
+  if (!deadlineIso) return false;
+  return getItalyDateIso(now) > deadlineIso;
+}
+
+/**
+ * Evaluates one structured goal against a context bundle.
+ *
+ * The caller must pass the CURRENT month's bundle: evaluating against the period
+ * the user happens to be reading would answer "did you hit this target in March
+ * 2023", which is never the question a goal asks.
+ *
+ * A passed deadline does not change `matched` — an objective reached late is
+ * still reached. It only shows up in the summary, so the banner can say so.
+ *
+ * Returns null when the metric is not computable (missing snapshot or missing
+ * goal operand), so callers can skip suggestion generation safely.
+ */
+export function evaluateStructuredGoal(
+  goal: AssistantStructuredGoal,
+  bundle: AssistantMonthContextBundle,
+  now: Date = new Date()
+): AssistantGoalEvaluationResult | null {
+  const metric = resolveGoalMetric(goal, bundle);
+  if (!metric) return null;
+
+  // Goals stored before the structured-goals rework have no direction: '>=' was the only semantics they had.
+  const direction = goal.direction ?? 'at_least';
+  const matched =
+    direction === 'at_least' ? metric.value >= goal.targetValue : metric.value <= goal.targetValue;
+  const deadlinePassed = isDeadlinePassed(goal.deadlineIso, now);
+
+  const comparison = direction === 'at_least' ? 'target minimo' : 'tetto massimo';
+  const summary =
+    `${metric.label}: ${formatGoalValue(metric.value, goal.unit)} su ${comparison} ` +
+    `${formatGoalValue(goal.targetValue, goal.unit)}` +
+    (deadlinePassed && !matched ? ' — scadenza superata' : '');
+
+  return {
+    matched,
+    metricValue: metric.value,
+    targetValue: goal.targetValue,
+    unit: goal.unit,
+    evaluatedAgainst: metric.evaluatedAgainst,
+    evaluatedPeriod: { year: bundle.selector.year, month: bundle.selector.month },
+    deadlinePassed,
+    summary,
+  };
+}
+
+/**
+ * True when an existing suggestion still speaks for a goal, so a new one must
+ * not be emitted.
+ *
+ * `pending` blocks because the banner is already showing it. `ignored` blocks
+ * because the user said no — previously only `pending` was checked, so every
+ * re-evaluation overwrote the ignored suggestion back to `pending` and the
+ * banner returned forever.
+ *
+ * The block lifts when the goal itself was edited afterwards (`item.updatedAt >
+ * suggestion.updatedAt`): the user changed what they are aiming at, so the old
+ * decision no longer applies. This is why `mergeMemoryItem` keeps `updatedAt` on
+ * the last CONTENT change — if a daily re-evaluation bumped it, every ignore
+ * would expire on the next cron run.
+ */
+function isSuggestionStillBinding(
+  suggestion: AssistantMemorySuggestion,
+  item: AssistantMemoryItem
+): boolean {
+  if (suggestion.status !== 'pending' && suggestion.status !== 'ignored') return false;
+  return item.updatedAt.getTime() <= suggestion.updatedAt.getTime();
+}
+
+/**
+ * Builds completion suggestions for the active structured goals that the bundle
+ * now satisfies. Goals with no `structuredGoal` are skipped entirely: they are
+ * not auto-trackable and the memory panel says so rather than pretending.
  */
 export function buildGoalCompletionSuggestions(
   userId: string,
   items: AssistantMemoryItem[],
   bundle: AssistantMonthContextBundle,
   existingSuggestions: AssistantMemorySuggestion[],
-  createSuggestionId: (args: SuggestionIdFactoryArgs) => string
+  createSuggestionId: (args: SuggestionIdFactoryArgs) => string,
+  now: Date = new Date()
 ): AssistantMemorySuggestion[] {
-  const pendingByItemId = new Map(
-    existingSuggestions
-      .filter((suggestion) => suggestion.status === 'pending')
-      .map((suggestion) => [suggestion.itemId, suggestion])
+  const suggestionsByItemId = new Map(
+    existingSuggestions.map((suggestion) => [suggestion.itemId, suggestion])
   );
 
-  const newSuggestions = items.flatMap((item) => {
+  return items.flatMap((item) => {
     if (item.category !== 'goal' || item.status !== 'active' || !item.structuredGoal) {
       return [];
     }
 
-    const evaluation = evaluateStructuredGoal(item.structuredGoal, bundle);
+    const evaluation = evaluateStructuredGoal(item.structuredGoal, bundle, now);
     if (!evaluation?.matched) {
       return [];
     }
 
-    if (pendingByItemId.has(item.id)) {
+    const existing = suggestionsByItemId.get(item.id);
+    if (existing && isSuggestionStillBinding(existing, item)) {
       return [];
     }
 
@@ -305,12 +253,10 @@ export function buildGoalCompletionSuggestions(
       itemId: item.id,
       type: 'complete_goal' as const,
       status: 'pending' as const,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: now,
+      updatedAt: now,
       evidenceSummary: evaluation.summary,
       evaluation,
     }];
   });
-
-  return newSuggestions;
 }

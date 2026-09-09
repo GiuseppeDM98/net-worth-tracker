@@ -1,118 +1,61 @@
 'use client';
 
-// Recharts line chart showing month-by-month evolution of labor income, savings from
-// work, and gross investment growth — the time-series counterpart to the 4 KPI cards.
-// Follows the same pattern as FireCalculatorTab "Evoluzione Storica" chart.
-// Colors come from useChartColors() so they respect the active theme (no hardcoded hex).
+/**
+ * Month-by-month labor income, savings from work and gross investment growth — the time series
+ * under the «Lavoro e investimenti» rows of Storico's Dettaglio. Recharts, at the house rules:
+ * `CHART_TICK_STYLE` on both axes, the three tooltip styles, `role="img"` with a label that
+ * carries the colour→series mapping (the legend is hidden from assistive tech by that role).
+ */
 
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from 'recharts';
-import { prepareMonthlyLaborMetricsData, formatCurrencyCompact } from '@/lib/services/chartService';
-import { fmtCurrency } from '@/lib/utils/chartUtils';
-import { EmptyState, ChartEmptyIcon } from '@/components/ui/empty-state';
+import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import type { prepareMonthlyLaborMetricsData } from '@/lib/services/chartService';
+import { formatCurrency, formatCurrencyCompact } from '@/lib/services/chartService';
 import { useChartColors } from '@/lib/hooks/useChartColors';
+import { CHART_TICK_STYLE } from '@/components/cashflow/costCenterStyles';
 
 interface LaborMetricsChartProps {
   data: ReturnType<typeof prepareMonthlyLaborMetricsData>;
   isMobile: boolean;
 }
 
-export default function LaborMetricsChart({ data, isMobile }: LaborMetricsChartProps) {
-  // Must be called unconditionally before any early return (rules of hooks)
-  const chartColors = useChartColors();
+const TOOLTIP_CONTENT_STYLE = { backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--card-foreground)', fontSize: 12 } as const;
+const TOOLTIP_LABEL_STYLE = { color: 'var(--card-foreground)', fontWeight: 600 } as const;
+const TOOLTIP_ITEM_STYLE = { color: 'var(--card-foreground)' } as const;
+const LEGEND_STYLE = { fontSize: 11, color: 'var(--muted-foreground)', paddingTop: 8 } as const;
 
-  if (data.length === 0) {
-    return (
-      <EmptyState
-        icon={ChartEmptyIcon}
-        title="Nessun dato disponibile"
-        description="Gli snapshot mensili verranno creati automaticamente."
-      />
-    );
-  }
+export default function LaborMetricsChart({ data, isMobile }: LaborMetricsChartProps) {
+  const chartColors = useChartColors();
+  if (data.length === 0) return null;
+  const first = data[0].period;
+  const last = data[data.length - 1].period;
 
   return (
-    <>
-      <ResponsiveContainer width="100%" height={isMobile ? 280 : 400}>
-        <LineChart data={data} margin={{ left: isMobile ? 10 : 50, bottom: 20 }}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis
-            dataKey="period"
-            tick={{ fontSize: isMobile ? 10 : 12 }}
-          />
-          <YAxis
-            width={isMobile ? 70 : 100}
-            tickFormatter={(value) => formatCurrencyCompact(value)}
-            tick={{ fontSize: isMobile ? 10 : 12 }}
-          />
+    <div className="h-[220px]">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart
+          data={data}
+          margin={{ top: 4, right: 20, left: 0, bottom: 0 }}
+          role="img"
+          aria-label={`Guadagnato da lavoro, risparmiato da lavoro e mercato per mese, da ${first} a ${last}: la prima serie è il primo colore del tema, la seconda il secondo, la terza il quinto.`}
+          accessibilityLayer={false}
+        >
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+          <XAxis dataKey="period" tick={CHART_TICK_STYLE} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={isMobile ? 40 : 24} />
+          <YAxis tickFormatter={(v: number) => formatCurrencyCompact(v)} tick={CHART_TICK_STYLE} axisLine={false} tickLine={false} width={52} />
           <Tooltip
-            formatter={fmtCurrency}
-            contentStyle={{
-              backgroundColor: 'var(--card)',
-              border: '1px solid var(--border)',
-              color: 'var(--card-foreground)',
-            }}
-            labelStyle={{ color: 'var(--foreground)' }}
+            formatter={(value) => (typeof value === 'number' ? formatCurrency(value) : '—')}
+            contentStyle={TOOLTIP_CONTENT_STYLE}
+            labelStyle={TOOLTIP_LABEL_STYLE}
+            itemStyle={TOOLTIP_ITEM_STYLE}
+            cursor={{ stroke: 'var(--foreground)', strokeOpacity: 0.25, strokeWidth: 1 }}
           />
-          {/* Legend labels are long — hidden on mobile and replaced by the inline legend below */}
-          <Legend wrapperStyle={{ display: isMobile ? 'none' : 'block', paddingTop: '20px' }} />
-          <Line
-            type="monotone"
-            dataKey="laborIncome"
-            stroke={chartColors[0]}
-            strokeWidth={2}
-            name="Guadagnato da Lavoro"
-            dot={{ r: 3 }}
-            animationDuration={800}
-            animationEasing="ease-out"
-          />
-          <Line
-            type="monotone"
-            dataKey="savedFromWork"
-            stroke={chartColors[1]}
-            strokeWidth={2}
-            name="Risparmiato da Lavoro"
-            dot={{ r: 3 }}
-            animationDuration={800}
-            animationEasing="ease-out"
-          />
-          <Line
-            type="monotone"
-            dataKey="investmentGrowth"
-            stroke={chartColors[4]}
-            strokeWidth={2}
-            name="Crescita Investimenti (Lordo)"
-            dot={{ r: 3 }}
-            animationDuration={800}
-            animationEasing="ease-out"
-          />
+          <Legend wrapperStyle={LEGEND_STYLE} iconType="square" iconSize={8} />
+          <Line type="monotone" dataKey="laborIncome" stroke={chartColors[0] ?? 'var(--chart-1)'} strokeWidth={2} name="Guadagnato da lavoro" dot={false} animationDuration={600} animationEasing="ease-out" />
+          <Line type="monotone" dataKey="savedFromWork" stroke={chartColors[1] ?? 'var(--chart-2)'} strokeWidth={2} name="Risparmiato da lavoro" dot={false} animationDuration={600} animationEasing="ease-out" />
+          {/* «Mercato», the same word as the row above it (the series is the month's gross market share). */}
+          <Line type="monotone" dataKey="investmentGrowth" stroke={chartColors[4] ?? 'var(--chart-5)'} strokeWidth={2} name="Mercato" dot={false} animationDuration={600} animationEasing="ease-out" />
         </LineChart>
       </ResponsiveContainer>
-
-      {isMobile && (
-        <div className="flex flex-wrap gap-x-3 gap-y-1.5 mt-3 px-1">
-          <div className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full shrink-0" style={{ background: chartColors[0] }} />
-            <span className="text-xs text-muted-foreground">Guadagnato</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full shrink-0" style={{ background: chartColors[1] }} />
-            <span className="text-xs text-muted-foreground">Risparmiato</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full shrink-0" style={{ background: chartColors[4] }} />
-            <span className="text-xs text-muted-foreground">Investimenti</span>
-          </div>
-        </div>
-      )}
-    </>
+    </div>
   );
 }

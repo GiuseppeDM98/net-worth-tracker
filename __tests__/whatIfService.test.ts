@@ -218,3 +218,67 @@ describe('calculateWhatIfImpact', () => {
     expect(impact.fire.fireNumber.before).toBeCloseTo(600_000, 0)
   })
 })
+
+describe('calculateWhatIfImpact — projections and the pension bridge', () => {
+  it('should expose the two base-scenario walks it runs', () => {
+    // Arrange
+    const baseline = makeBaseline()
+    const scenario: WhatIfScenario = { eventType: 'majorPurchase', lumpSumAmount: 50_000 }
+
+    // Act
+    const impact = calculateWhatIfImpact(baseline, scenario)
+
+    // Assert: the walks start from the two net worths and agree with the years reported.
+    expect(impact.projections.before?.initialNetWorth).toBe(200_000)
+    expect(impact.projections.after?.initialNetWorth).toBe(150_000)
+    expect(impact.projections.before?.baseYearsToFIRE).toBe(impact.fire.yearsToFIRE.before)
+    expect(impact.projections.after?.baseYearsToFIRE).toBe(impact.fire.yearsToFIRE.after)
+  })
+
+  it('should still run the walk when a purchase empties the net worth', () => {
+    // Arrange
+    const baseline = makeBaseline()
+    const scenario: WhatIfScenario = { eventType: 'majorPurchase', lumpSumAmount: 200_000 }
+
+    // Act
+    const impact = calculateWhatIfImpact(baseline, scenario)
+
+    // Assert: savings alone still reach FIRE within the horizon.
+    expect(impact.adjusted.netWorth).toBe(0)
+    expect(impact.projections.after).not.toBeNull()
+    expect(impact.fire.yearsToFIRE.after).not.toBeNull()
+  })
+
+  it('should read the bridge FIRE number and step the walk when the baseline carries a locked fund', () => {
+    // Arrange
+    const withoutBridge = makeBaseline()
+    const withBridge = makeBaseline({ pensionBridge: { valueToday: 40_000, yearsToUnlock: 10 } })
+    const scenario: WhatIfScenario = { eventType: 'windfall', lumpSumAmount: 10_000 }
+
+    // Act
+    const plain = calculateWhatIfImpact(withoutBridge, scenario)
+    const bridged = calculateWhatIfImpact(withBridge, scenario)
+
+    // Assert: the fund tops up the requirement at the unlock, so the number today is lower...
+    expect(bridged.fire.fireNumber.before!).toBeLessThan(plain.fire.fireNumber.before!)
+    expect(bridged.fire.progressToFI.before!).toBeGreaterThan(plain.fire.progressToFI.before!)
+    // ...and the walk shows the step: year 10 jumps by more than the plain growth + savings.
+    const rows = bridged.projections.before!.yearlyData
+    const plainRows = plain.projections.before!.yearlyData
+    expect(rows[9].baseNetWorth - rows[8].baseNetWorth).toBeGreaterThan(plainRows[9].baseNetWorth - plainRows[8].baseNetWorth + 30_000)
+    // The bridge never reaches FIRE later than the plain walk.
+    expect(bridged.fire.yearsToFIRE.before!).toBeLessThanOrEqual(plain.fire.yearsToFIRE.before!)
+  })
+
+  it('should ignore a bridge with nothing locked or no years to unlock', () => {
+    // Arrange
+    const plain = calculateWhatIfImpact(makeBaseline(), { eventType: 'windfall', lumpSumAmount: 10_000 })
+    const zeroValue = calculateWhatIfImpact(makeBaseline({ pensionBridge: { valueToday: 0, yearsToUnlock: 10 } }), { eventType: 'windfall', lumpSumAmount: 10_000 })
+    const zeroYears = calculateWhatIfImpact(makeBaseline({ pensionBridge: { valueToday: 40_000, yearsToUnlock: 0 } }), { eventType: 'windfall', lumpSumAmount: 10_000 })
+
+    // Assert
+    expect(zeroValue.fire.fireNumber.before).toBe(plain.fire.fireNumber.before)
+    expect(zeroYears.fire.fireNumber.before).toBe(plain.fire.fireNumber.before)
+    expect(zeroValue.projections.before?.yearlyData).toEqual(plain.projections.before?.yearlyData)
+  })
+})

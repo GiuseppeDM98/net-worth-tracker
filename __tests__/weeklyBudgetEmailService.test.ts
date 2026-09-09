@@ -9,6 +9,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 // Mock state, filled per test (mock-prefixed so it can be referenced in factories).
 let mockBudgetDoc: { exists: boolean; data?: () => unknown } = { exists: false };
 let mockExpenseDocs: Array<{ data: () => unknown }> = [];
+let mockCategoryDocs: Array<{ id: string; data: () => unknown }> = [];
 
 vi.mock('firebase-admin/firestore', () => ({ Timestamp: { fromDate: (d: Date) => d } }));
 vi.mock('resend', () => ({
@@ -18,11 +19,11 @@ vi.mock('resend', () => ({
 }));
 vi.mock('@/lib/firebase/admin', () => ({
   adminDb: {
-    collection: () => {
+    collection: (name: string) => {
       const chain: Record<string, unknown> = {
         doc: () => ({ get: () => Promise.resolve(mockBudgetDoc) }),
         where: () => chain,
-        get: () => Promise.resolve({ docs: mockExpenseDocs }),
+        get: () => Promise.resolve({ docs: name === 'expenseCategories' ? mockCategoryDocs : mockExpenseDocs }),
       };
       return chain;
     },
@@ -60,6 +61,7 @@ describe('buildWeeklyBudgetData', () => {
   beforeEach(() => {
     mockBudgetDoc = { exists: false };
     mockExpenseDocs = [];
+    mockCategoryDocs = [];
   });
 
   it('returns null when the user has no budget document', async () => {
@@ -87,6 +89,22 @@ describe('buildWeeklyBudgetData', () => {
     expect(data!.overall).not.toBeNull();
     expect(data!.overall!.spent).toBeCloseTo(360);
     expect(data!.yearElapsedPct).toBeGreaterThan(0);
+  });
+
+  it('reads the category type for the pace: a fixed category is never projected by the day', async () => {
+    mockBudgetDoc = {
+      exists: true,
+      data: () => ({
+        items: [{ id: 'r', kind: 'expense', scope: 'category', period: 'monthly', categoryId: 'c-home', categoryName: 'Casa', amount: 1300, order: 0 }],
+      }),
+    };
+    // Rent on the 1st: 1150/15×30 = 2300 by pace, but the category is fixed.
+    mockExpenseDocs = [expenseDoc(-1150, new Date(2026, 5, 1), 'c-home')];
+    mockCategoryDocs = [{ id: 'c-home', data: () => ({ type: 'fixed' }) }];
+
+    const data = await buildWeeklyBudgetData('u1', now);
+    expect(data!.rows[0].projected).toBeCloseTo(1150);
+    expect(data!.rows[0].status).toBe('warning'); // 88%, not over
   });
 
   it('attaches the contributing expenses to a category budget that exceeded its limit', async () => {
@@ -168,9 +186,11 @@ describe('buildWeeklyBudgetData', () => {
 
     const data = await buildWeeklyBudgetData('u1', now);
     const html = buildWeeklyBudgetEmailHtml(data!);
-    expect(html).toContain('Riepilogo settimanale budget');
+    expect(html).toContain('Stato dei budget');
     expect(html).toContain('Vacanze');
     expect(html).toContain('Budget annuali');
+    // The email opens on a rule-generated verdict, like every other surface.
+    expect(html).toMatch(/budget (è in linea|su \d+ (è|sono) in linea)|tetto del mese/);
   });
 
   it('states in the email that the amounts are month-to-date, not weekly', async () => {
@@ -182,10 +202,13 @@ describe('buildWeeklyBudgetData', () => {
 
     const data = await buildWeeklyBudgetData('u1', now);
     const html = buildWeeklyBudgetEmailHtml(data!);
-    expect(html).toContain('dal 1° del mese a oggi');
-    expect(html).toContain('non sono settimanali');
+    // Each tile names its own window in its scope, with the month spelled out.
+    expect(html).toMatch(/dal 1° [a-zà-ù]+ a oggi/);
+    expect(html).toContain('nessun importo è settimanale');
     // A bare "proiezione €X" was read as a year-end figure — the horizon must be spelled out.
     expect(html).toContain('proiezione a fine mese');
+    // And the verdict states where in the month we are, which is what makes the ceiling legible.
+    expect(html).toMatch(/Al giorno/);
   });
 });
 

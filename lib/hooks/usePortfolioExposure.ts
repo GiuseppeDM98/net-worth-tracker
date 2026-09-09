@@ -22,8 +22,8 @@ async function fetchPortfolioExposure(
 /**
  * Lazily fetches portfolio exposure breakdown (top holdings, sectors, ETF issuers).
  *
- * Pass enabled=false until the user opens the ExposureSection to avoid
- * unnecessary Yahoo Finance calls on every Allocazione page load.
+ * `enabled` gates the fetch; the Esposizione tile passes true on mount (the server's 24h cache
+ * absorbs the Yahoo Finance cost), a caller that renders on demand can pass false until then.
  *
  * The returned `refresh` callback triggers a server-side cache bypass: useful
  * for the "Aggiorna" button when the portfolio composition hasn't changed but

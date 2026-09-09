@@ -2,7 +2,7 @@
  * CompositionBar — a single stacked bar showing full composition (part-of-whole,
  * many segments) plus an optional inline legend.
  *
- * Extracted from AllocationCompositionBar so the same "one-glance shape" pattern is
+ * Extracted from Allocazione's composition bar so the same "one-glance shape" pattern is
  * reusable outside Allocazione (e.g. the Overview asset-class/per-asset breakdowns,
  * which previously used a compact Recharts pie). Purely presentational: the caller
  * resolves segment colors (useChartColors()) and ordering — this component only

@@ -5,7 +5,7 @@
  *
  * Features:
  * - CRUD operations for expenses (create, read, update, delete)
- * - Recurring expenses (debts with monthly payments)
+ * - Recurring expenses (monthly or yearly series of fixed/variable/debt entries)
  * - Installment expenses (BNPL - Buy Now Pay Later)
  * - Monthly summaries and statistics with month-over-month comparison
  * - Category and subcategory management integration
@@ -34,6 +34,8 @@ import {
 import { db } from '@/lib/firebase/config';
 import { removeUndefinedDeep as removeUndefinedFields } from '@/lib/utils/firestoreData';
 import { invalidateDashboardOverviewSummary } from '@/lib/services/dashboardOverviewInvalidation';
+import { needsSignFlip, crossesTransferBoundary } from '@/lib/utils/expenseTypeTransition';
+import { buildRecurrenceDates, resolveRecurrenceFrequency } from '@/lib/utils/recurrenceDates';
 import {
   Expense,
   ExpenseFormData,
@@ -41,6 +43,22 @@ import {
 } from '@/types/expenses';
 
 const EXPENSES_COLLECTION = 'expenses';
+
+/**
+ * Raised by the batch re-typing paths (moveExpensesToCategory,
+ * moveExpensesFromSubCategory, updateExpensesType) when a move would cross the
+ * transfer boundary with linked expenses: each of those rows touches two cash
+ * accounts, so no batch reconciliation of balances is possible. Carries a
+ * user-facing message the dialogs surface as-is.
+ */
+export class TransferBoundaryError extends Error {
+  constructor() {
+    super(
+      'Impossibile convertire in blocco da o verso Trasferimento: ogni voce tocca due conti e i saldi non sarebbero riconciliabili. Modifica le singole voci dal Cashflow.'
+    );
+    this.name = 'TransferBoundaryError';
+  }
+}
 
 /**
  * Get all expenses for a specific user
@@ -111,7 +129,7 @@ export async function getExpensesByDateRange(
  *
  * Handles three creation modes based on form data:
  * 1. Installment (BNPL): Creates multiple expenses spread over months with defined amounts
- * 2. Recurring (debts): Creates multiple expenses with same amount each month
+ * 2. Recurring: Creates multiple expenses with the same amount, one per month or per year
  * 3. Single: Creates one expense
  *
  * Priority: Installment > Recurring > Single (installments checked first)
@@ -137,8 +155,8 @@ export async function createExpense(
       return await createInstallmentExpenses(userId, expenseData, categoryName, subCategoryName);
     }
 
-    // Priority 2: Recurring expenses (debts with fixed monthly payments)
-    if (expenseData.isRecurring && expenseData.recurringMonths && expenseData.recurringMonths > 0) {
+    // Priority 2: Recurring expenses (a fixed amount repeating monthly or yearly)
+    if (expenseData.isRecurring && expenseData.recurringCount && expenseData.recurringCount > 0) {
       return await createRecurringExpenses(userId, expenseData, categoryName, subCategoryName);
     }
 
@@ -169,6 +187,7 @@ export async function createExpense(
       transferCashAssetId: expenseData.transferCashAssetId,
       costCenterId: expenseData.costCenterId,
       costCenterName: expenseData.costCenterName,
+      personalMemberId: expenseData.personalMemberId,
       createdAt: now,
       updatedAt: now,
     });
@@ -184,7 +203,17 @@ export async function createExpense(
 }
 
 /**
- * Create recurring expenses (for debts)
+ * Create a recurring expense series (fixed, variable or debt).
+ *
+ * The series is MATERIALISED: one real, future-dated document per occurrence, all sharing a
+ * `recurringParentId` so they can be deleted together. Nothing downstream evaluates a rule —
+ * Cashflow, Analisi, Budget and the assistant all read ordinary expense rows.
+ *
+ * The whole batch is committed at once, which is why the occurrence count is capped at
+ * `MAX_RECURRENCE_OCCURRENCES` (see recurrenceDates.ts): a `writeBatch` takes at most 500
+ * operations, and `deleteRecurringExpenses` has the same ceiling on the way out.
+ *
+ * @returns The ids of every created occurrence, in chronological order.
  */
 async function createRecurringExpenses(
   userId: string,
@@ -201,26 +230,21 @@ async function createRecurringExpenses(
     // Create parent expense ID for reference
     const parentId = `recurring-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-    // Ensure amount is negative for debts
+    // Sign convention: only spending types can recur (canTypeRecur), so the amount is always
+    // negative here. Kept as an explicit statement rather than an implicit one — if the set of
+    // recurring types ever widens to income or transfers, this line is the one that breaks.
     const amount = -Math.abs(expenseData.amount);
 
+    const recurringFrequency = resolveRecurrenceFrequency(expenseData.recurringFrequency);
     const recurringDay = expenseData.recurringDay || expenseData.date.getDate();
-    const startDate = new Date(expenseData.date);
+    const dates = buildRecurrenceDates({
+      start: expenseData.date,
+      frequency: recurringFrequency,
+      count: expenseData.recurringCount || 1,
+      dayOfMonth: recurringDay,
+    });
 
-    // Create expense for each month
-    for (let i = 0; i < (expenseData.recurringMonths || 1); i++) {
-      const expenseDate = new Date(
-        startDate.getFullYear(),
-        startDate.getMonth() + i,
-        recurringDay
-      );
-
-      // If the day doesn't exist in the month (e.g., 31st in February), use last day of month
-      if (expenseDate.getDate() !== recurringDay) {
-        expenseDate.setDate(0); // Set to last day of previous month
-        expenseDate.setMonth(expenseDate.getMonth() + 1); // Move to correct month
-      }
-
+    dates.forEach((expenseDate, index) => {
       const docRef = doc(expensesRef);
       const cleanedData = removeUndefinedFields({
         userId,
@@ -235,20 +259,24 @@ async function createRecurringExpenses(
         notes: expenseData.notes,
         link: expenseData.link,
         isRecurring: true,
+        recurringFrequency,
         recurringDay,
         recurringParentId: parentId,
         // Only store on the first entry — balance update applies to current payment only,
         // not to future-dated recurring instances.
-        linkedCashAssetId: i === 0 ? expenseData.linkedCashAssetId : undefined,
+        linkedCashAssetId: index === 0 ? expenseData.linkedCashAssetId : undefined,
         costCenterId: expenseData.costCenterId,
         costCenterName: expenseData.costCenterName,
+        // Every occurrence of a series belongs to the same person: unlike linkedCashAssetId,
+        // which settles only the payment made today, ownership is a property of the expense.
+        personalMemberId: expenseData.personalMemberId,
         createdAt: now,
         updatedAt: now,
       });
 
       batch.set(docRef, cleanedData);
       createdIds.push(docRef.id);
-    }
+    });
 
     await batch.commit();
     await invalidateDashboardOverviewSummary(userId, 'expense_created');
@@ -358,6 +386,9 @@ async function createInstallmentExpenses(
         linkedCashAssetId: i === 0 ? expenseData.linkedCashAssetId : undefined,
         costCenterId: expenseData.costCenterId,
         costCenterName: expenseData.costCenterName,
+        // Every occurrence of a series belongs to the same person: unlike linkedCashAssetId,
+        // which settles only the payment made today, ownership is a property of the expense.
+        personalMemberId: expenseData.personalMemberId,
 
         createdAt: now,
         updatedAt: now,
@@ -380,28 +411,36 @@ async function createInstallmentExpenses(
 
 /**
  * Delete all expenses in an installment series
+ * @param userId - Owner of the series
  * @param installmentParentId - The parent ID linking all installments
+ *
+ * SCOPED BY userId, and it has to be: `firestore.rules` guards `expenses` with
+ * `canAccess(resource.data.userId)`, and Firestore refuses a LIST whose constraints do not
+ * already guarantee the rule holds. A query on the parent id alone comes back
+ * `permission-denied` at any result size (verified on the emulator), so the series would read
+ * as empty and the delete would silently do nothing.
  */
-export async function deleteInstallmentExpenses(installmentParentId: string): Promise<void> {
+export async function deleteInstallmentExpenses(
+  userId: string,
+  installmentParentId: string
+): Promise<void> {
   try {
     const expensesRef = collection(db, EXPENSES_COLLECTION);
     const q = query(
       expensesRef,
+      where('userId', '==', userId),
       where('installmentParentId', '==', installmentParentId)
     );
 
     const querySnapshot = await getDocs(q);
     const batch = writeBatch(db);
-    const userId = querySnapshot.docs[0]?.data()?.userId as string | undefined;
 
     querySnapshot.docs.forEach(docSnapshot => {
       batch.delete(docSnapshot.ref);
     });
 
     await batch.commit();
-    if (userId) {
-      await invalidateDashboardOverviewSummary(userId, 'expense_deleted');
-    }
+    await invalidateDashboardOverviewSummary(userId, 'expense_deleted');
     console.log(`Deleted ${querySnapshot.size} installment expenses with parent ID: ${installmentParentId}`);
   } catch (error) {
     console.error('Error deleting installment expenses:', error);
@@ -473,27 +512,36 @@ export async function deleteExpense(expenseId: string): Promise<void> {
 
 /**
  * Delete all recurring expenses with the same parent ID
+ * @param userId - Owner of the series
+ * @param recurringParentId - The shared parent ID of the recurring series
+ *
+ * SCOPED BY userId, and it has to be: `firestore.rules` guards `expenses` with
+ * `canAccess(resource.data.userId)`, and Firestore refuses a LIST whose constraints do not
+ * already guarantee the rule holds. A query on the parent id alone comes back
+ * `permission-denied` at any result size (verified on the emulator), so the series would read
+ * as empty and the delete would silently do nothing.
  */
-export async function deleteRecurringExpenses(recurringParentId: string): Promise<void> {
+export async function deleteRecurringExpenses(
+  userId: string,
+  recurringParentId: string
+): Promise<void> {
   try {
     const expensesRef = collection(db, EXPENSES_COLLECTION);
     const q = query(
       expensesRef,
+      where('userId', '==', userId),
       where('recurringParentId', '==', recurringParentId)
     );
 
     const querySnapshot = await getDocs(q);
     const batch = writeBatch(db);
-    const userId = querySnapshot.docs[0]?.data()?.userId as string | undefined;
 
     querySnapshot.docs.forEach(docSnapshot => {
       batch.delete(docSnapshot.ref);
     });
 
     await batch.commit();
-    if (userId) {
-      await invalidateDashboardOverviewSummary(userId, 'expense_deleted');
-    }
+    await invalidateDashboardOverviewSummary(userId, 'expense_deleted');
   } catch (error) {
     console.error('Error deleting recurring expenses:', error);
     throw new Error('Failed to delete recurring expenses');
@@ -651,7 +699,7 @@ export async function reassignExpensesCategory(
     let count = 0;
 
     querySnapshot.docs.forEach(docSnapshot => {
-      const updates: any = {
+      const updates: Record<string, unknown> = {
         categoryId: newCategoryId,
         categoryName: newCategoryName,
         updatedAt: new Date(),
@@ -703,7 +751,7 @@ export async function clearExpensesCategoryAssignment(
     let count = 0;
 
     querySnapshot.docs.forEach(docSnapshot => {
-      const updates: any = {
+      const updates: Record<string, unknown> = {
         categoryId: 'uncategorized',
         categoryName: 'Uncategorized',
         subCategoryId: null,
@@ -752,7 +800,7 @@ export async function reassignExpensesSubCategory(
     let count = 0;
 
     querySnapshot.docs.forEach(docSnapshot => {
-      const updates: any = {
+      const updates: Record<string, unknown> = {
         updatedAt: new Date(),
       };
 
@@ -778,24 +826,13 @@ export async function reassignExpensesSubCategory(
 }
 
 /**
- * Check if a cross-type move requires flipping the amount sign.
- *
- * Sign convention: income = positive, expenses (fixed/variable/debt) = negative.
- * When moving between income ↔ expense types, the amount must be flipped.
- */
-function needsSignFlip(oldType: ExpenseType, newType: ExpenseType): boolean {
-  const isOldIncome = oldType === 'income';
-  const isNewIncome = newType === 'income';
-  return isOldIncome !== isNewIncome;
-}
-
-/**
  * Move all expenses from one category to another, updating type for cross-type moves.
  *
  * Unlike reassignExpensesCategory (used during deletion), this preserves the source
  * category and also updates the expense `type` field to match the destination category.
- * When moving between income ↔ expense types, flips the amount sign to maintain
- * the sign convention (income = positive, expenses = negative).
+ * When crossing the positive/negative sign boundary, flips the amount sign to maintain
+ * the sign convention (income/transfer = positive, expenses = negative).
+ * Refuses to cross the transfer boundary when expenses exist (TransferBoundaryError).
  */
 export async function moveExpensesToCategory(
   oldCategoryId: string,
@@ -821,19 +858,23 @@ export async function moveExpensesToCategory(
       return 0;
     }
 
+    if (crossesTransferBoundary(oldType, newType)) {
+      throw new TransferBoundaryError();
+    }
+
     const flipSign = needsSignFlip(oldType, newType);
     const batch = writeBatch(db);
     let count = 0;
 
     querySnapshot.docs.forEach(docSnapshot => {
-      const updates: any = {
+      const updates: Record<string, unknown> = {
         categoryId: newCategoryId,
         categoryName: newCategoryName,
         type: newType,
         updatedAt: new Date(),
       };
 
-      // Flip amount sign when crossing income ↔ expense boundary
+      // Flip amount sign when crossing the positive/negative boundary
       if (flipSign) {
         const currentAmount = docSnapshot.data().amount;
         updates.amount = -currentAmount;
@@ -854,6 +895,7 @@ export async function moveExpensesToCategory(
     await batch.commit();
     return count;
   } catch (error) {
+    if (error instanceof TransferBoundaryError) throw error;
     console.error('Error moving expenses to category:', error);
     throw new Error('Failed to move expenses to category');
   }
@@ -863,7 +905,8 @@ export async function moveExpensesToCategory(
  * Move all expenses from a specific subcategory to another category/subcategory.
  *
  * Supports cross-category and cross-type moves. Source subcategory is preserved.
- * When moving between income ↔ expense types, flips the amount sign.
+ * When crossing the positive/negative sign boundary, flips the amount sign.
+ * Refuses to cross the transfer boundary when expenses exist (TransferBoundaryError).
  */
 export async function moveExpensesFromSubCategory(
   oldCategoryId: string,
@@ -891,19 +934,23 @@ export async function moveExpensesFromSubCategory(
       return 0;
     }
 
+    if (crossesTransferBoundary(oldType, newType)) {
+      throw new TransferBoundaryError();
+    }
+
     const flipSign = needsSignFlip(oldType, newType);
     const batch = writeBatch(db);
     let count = 0;
 
     querySnapshot.docs.forEach(docSnapshot => {
-      const updates: any = {
+      const updates: Record<string, unknown> = {
         categoryId: newCategoryId,
         categoryName: newCategoryName,
         type: newType,
         updatedAt: new Date(),
       };
 
-      // Flip amount sign when crossing income ↔ expense boundary
+      // Flip amount sign when crossing the positive/negative boundary
       if (flipSign) {
         const currentAmount = docSnapshot.data().amount;
         updates.amount = -currentAmount;
@@ -924,6 +971,7 @@ export async function moveExpensesFromSubCategory(
     await batch.commit();
     return count;
   } catch (error) {
+    if (error instanceof TransferBoundaryError) throw error;
     console.error('Error moving expenses from subcategory:', error);
     throw new Error('Failed to move expenses from subcategory');
   }
@@ -933,7 +981,8 @@ export async function moveExpensesFromSubCategory(
  * Batch-update the type of all expenses in a category when the category type changes.
  *
  * Keeps categoryId and categoryName unchanged — only updates the `type` field
- * and flips amount signs when crossing the income ↔ expense boundary.
+ * and flips amount signs when crossing the positive/negative sign boundary.
+ * Refuses to cross the transfer boundary when expenses exist (TransferBoundaryError).
  *
  * @param categoryId - The category whose expenses need updating
  * @param oldType - Previous category type
@@ -961,6 +1010,10 @@ export async function updateExpensesType(
       return 0;
     }
 
+    if (crossesTransferBoundary(oldType, newType)) {
+      throw new TransferBoundaryError();
+    }
+
     const flipSign = needsSignFlip(oldType, newType);
     const batch = writeBatch(db);
     let count = 0;
@@ -983,6 +1036,7 @@ export async function updateExpensesType(
     await batch.commit();
     return count;
   } catch (error) {
+    if (error instanceof TransferBoundaryError) throw error;
     console.error('Error updating expense types in category:', error);
     throw new Error('Failed to update expense types');
   }
@@ -994,12 +1048,26 @@ export async function updateExpensesType(
  * Used before deleting a series to identify which entries had a linked cash asset
  * so the asset balance can be reversed before deletion.
  *
+ * @param userId - Owner of the series
  * @param recurringParentId - The shared parent ID of the recurring series
+ *
+ * SCOPED BY userId, and it has to be: `firestore.rules` guards `expenses` with
+ * `canAccess(resource.data.userId)`, and Firestore refuses a LIST whose constraints do not
+ * already guarantee the rule holds. A query on the parent id alone comes back
+ * `permission-denied` at any result size (verified on the emulator), so the series would read
+ * as empty and the delete would silently do nothing.
  */
-export async function getExpensesByRecurringParentId(recurringParentId: string): Promise<Expense[]> {
+export async function getExpensesByRecurringParentId(
+  userId: string,
+  recurringParentId: string
+): Promise<Expense[]> {
   try {
     const expensesRef = collection(db, EXPENSES_COLLECTION);
-    const q = query(expensesRef, where('recurringParentId', '==', recurringParentId));
+    const q = query(
+      expensesRef,
+      where('userId', '==', userId),
+      where('recurringParentId', '==', recurringParentId)
+    );
     const snapshot = await getDocs(q);
 
     return snapshot.docs.map(doc => ({
@@ -1021,12 +1089,26 @@ export async function getExpensesByRecurringParentId(recurringParentId: string):
  * Used before deleting a series to identify which entries had a linked cash asset
  * so the asset balance can be reversed before deletion.
  *
+ * @param userId - Owner of the series
  * @param installmentParentId - The shared parent ID of the installment series
+ *
+ * SCOPED BY userId, and it has to be: `firestore.rules` guards `expenses` with
+ * `canAccess(resource.data.userId)`, and Firestore refuses a LIST whose constraints do not
+ * already guarantee the rule holds. A query on the parent id alone comes back
+ * `permission-denied` at any result size (verified on the emulator), so the series would read
+ * as empty and the delete would silently do nothing.
  */
-export async function getExpensesByInstallmentParentId(installmentParentId: string): Promise<Expense[]> {
+export async function getExpensesByInstallmentParentId(
+  userId: string,
+  installmentParentId: string
+): Promise<Expense[]> {
   try {
     const expensesRef = collection(db, EXPENSES_COLLECTION);
-    const q = query(expensesRef, where('installmentParentId', '==', installmentParentId));
+    const q = query(
+      expensesRef,
+      where('userId', '==', userId),
+      where('installmentParentId', '==', installmentParentId)
+    );
     const snapshot = await getDocs(q);
 
     return snapshot.docs.map(doc => ({

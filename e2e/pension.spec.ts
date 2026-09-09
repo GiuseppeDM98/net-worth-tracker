@@ -4,10 +4,10 @@
  * Every figure asserted here comes from `scripts/seedPensionE2E.mts`, which the global setup writes
  * before the suite runs; when a number below looks arbitrary, that file explains why it was chosen.
  *
- * Deliberately NOT covered: anything a Vitest file already proves. `derivePensionContributionYears`
- * decides which years exist and `computePensionReturn` decides what the percentages are — those have
- * unit tests. What is tested here is that the page puts them in the right place, at the right size,
- * under the right control.
+ * Deliberately NOT covered: anything a Vitest file already proves. `pensionSummary` decides the
+ * numbers and `pensionNarrative` the words — those have unit tests. What is tested here is that the
+ * page puts them in the right place, at the right size, under the right control: the verdict over
+ * the tile grid, the two-row hero, the year axis beside the verdict, the «Dettaglio» disclosure.
  */
 
 import { test, expect, type Page, type Locator } from '@playwright/test';
@@ -22,23 +22,20 @@ function euro(amount: string): RegExp {
   return new RegExp(`^${amount.replace(/[.]/g, '\\.')}[\\s\\u00a0]*€$`);
 }
 
-/** Contributions with taxYear 2026 in the fixture: 534,88 + 134,11 + 152,02. */
-const TOTAL_2026 = euro('821,01');
-/**
- * The single 2025 contribution. No thousands separator on purpose: CLDR gives Italian
- * `minimumGroupingDigits = 2`, so four-digit amounts are printed ungrouped.
- */
-const TOTAL_2025 = euro('1000,00');
-/** Last point of the fixture's value series. */
+/** Last point of the fixture's value series — the hero figure. */
 const FUND_VALUE = euro('29.800,00');
-/** `valueGrowth (1.800) − contributions recorded in July (821,01)`. */
-const MARKET_GAIN = euro('978,99');
+/** `valueGrowth (1.800) − contributions recorded in July (821,01)`, signed as the Dettaglio prints it. */
+const MARKET_GAIN = /^\+978,99[\s ]*€$/;
+/** The cumulative TWR of the fixture: Italian comma, explicit sign. */
+const TWR = '+3,48%';
 
-/** Il titolo si accorda al numero di fondi tracciati: la fixture ne ha uno, ma il locator no. */
-const RETURN_CARD_HEADING = /^Rendimento (del fondo|dei fondi)$/;
+/** The Rendimento tile's KPI paragraph — the reading above it carries the same figure as a span. */
+function twrKpi(page: Page): Locator {
+  return page.getByRole('region', { name: 'Rendimento del fondo' }).getByRole('paragraph').filter({ hasText: /^\+3,48%$/ });
+}
 
 function heroValue(page: Page): Locator {
-  return page.getByText(FUND_VALUE);
+  return page.getByRole('region', { name: 'Il fondo oggi' }).getByText(FUND_VALUE);
 }
 
 async function gotoPension(page: Page): Promise<void> {
@@ -57,21 +54,9 @@ async function fontSizePx(locator: Locator): Promise<number> {
  * Nessun frame del caricamento afferma qualcosa che la pagina non ha ancora letto.
  *
  * Polling after the fact would race the render. A MutationObserver installed before the first
- * script runs records the offending state even if it flashes for one frame.
- *
- * TRE marcatori, non uno. L'empty state è il primo, ma le quattro query della pagina defaultano
- * tutte a `[]` e ognuna ha un numero che senza i suoi dati vale zero — su una pagina che altrove si
- * rifiuta di stampare «+0,00%» come misura, uno zero è un'affermazione, non un segnaposto.
- *
- * ONESTÀ SULLA PORTATA DI QUESTO TEST: `versato-totale-zero` e `hero-senza-compagno` NON riproducono
- * la corsa fra le query. Il Web SDK di Firestore multiplexa tutti e quattro i target su UN SOLO
- * webchannel (verificato ispezionando le richieste: un `addTarget` per `assets`,
- * `pensionContributions` e `monthly-snapshots` sulla stessa connessione), quindi non sono ritardabili
- * l'uno rispetto all'altro e sull'emulatore atterrano nello stesso batch di React. Misurato, non
- * supposto: riportando lo skeleton alle sole due query originali questo test resta verde, e anche
- * con latenza CDP — che è uniforme, e quindi non apre nessuna finestra. Valgono come guardia sugli
- * stati DETERMINISTICI (un ramo che rende zero perché è sbagliato, non perché è in ritardo); la
- * corsa vera è coperta dal gate a quattro query nel codice.
+ * script runs records the offending state even if it flashes for one frame. Two markers: the empty
+ * state, and the reading a fund gets when the contributions have not been read («nessun versamento
+ * registrato») — on a page that refuses to print «+0,00%» as a measure, a zero is a statement.
  */
 test('never states, at any point in the load, something it has not read', async ({ page }) => {
   await page.addInitScript(() => {
@@ -81,127 +66,148 @@ test('never states, at any point in the load, something it has not read', async 
       if (!seen.includes(violation)) seen.push(violation);
     };
 
-    const headingWithText = (text: string) =>
-      [...document.querySelectorAll('h1, h2, h3, h4')].some((h) => h.textContent?.trim() === text);
-
     const check = () => {
-      // `innerText` restituisce il testo RENDERIZZATO, quindi applica `text-transform`: un marcatore
-      // preso da una label eyebrow (`uppercase`) non matcherebbe mai. Questo va bene su una frase in
-      // caso normale; per i confronti su titoli si usa `textContent` in `headingWithText`.
-      if (document.body?.innerText?.includes('Nessun fondo pensione ancora tracciato')) {
-        record('empty-state');
-      }
-
-      // «Versato totale» e il suo importo sono fratelli nella riga a piè della card hero.
-      const label = [...document.querySelectorAll('span')].find(
-        (el) => el.textContent?.trim() === 'Versato totale'
-      );
-      if (label && /^0,00/.test(label.nextElementSibling?.textContent?.trim() ?? '')) {
-        record('versato-totale-zero');
-      }
-
-      // La colonna 1fr della riga hero non resta mai vuota: o il rendimento, o la spiegazione del
-      // perché non è ancora calcolabile. Con un solo figlio la griglia [2fr_1fr] lascerebbe un terzo
-      // di riga bianco a 1440px, senza che niente spieghi il vuoto.
-      if (headingWithText('Valore attuale') && !headingWithText('Rendimento del fondo')) {
-        record('hero-senza-compagno');
-      }
+      // `innerText` applies `text-transform`; both markers are sentence-case prose, so it is safe.
+      const text = document.body?.innerText ?? '';
+      if (text.includes('Nessun fondo pensione ancora tracciato')) record('empty-state');
+      if (text.includes('nessun versamento registrato')) record('versamenti-non-letti');
     };
 
-    // `document`, NON `document.documentElement`: quando `addInitScript` gira il documento è appena
-    // stato creato e `documentElement` è ancora `null`, quindi `observe()` lancia
-    // «parameter 1 is not of type 'Node'», l'init script muore lì e l'observer non si attacca mai —
-    // il test resta verde perché non ha osservato niente. `document` è già un Node a quel punto e
-    // con `subtree: true` copre esattamente lo stesso albero.
-    new MutationObserver(check).observe(document, {
-      subtree: true,
-      childList: true,
-      characterData: true,
-    });
+    // `document`, NOT `document.documentElement`: when `addInitScript` runs the document has just
+    // been created and `documentElement` is still null — observing it throws and the observer never
+    // attaches, leaving the test green because it observed nothing.
+    new MutationObserver(check).observe(document, { subtree: true, childList: true, characterData: true });
   });
 
   await gotoPension(page);
 
-  const violations = await page.evaluate(
-    () => (window as unknown as { __violations: string[] }).__violations
-  );
+  const violations = await page.evaluate(() => (window as unknown as { __violations: string[] }).__violations);
   expect(violations).toEqual([]);
 });
 
-test('lays the hero and the return card side by side at 1440px', async ({ page }) => {
+test('opens with the verdict: three causes, three numbers, the year axis beside it', async ({ page }) => {
   await gotoPension(page);
 
-  const hero = page.getByRole('heading', { name: 'Valore attuale' }).locator('..');
-  const returnCard = page.getByRole('heading', { name: RETURN_CARD_HEADING }).locator('..');
+  const verdict = page.getByRole('region', { name: 'Verdetto sul fondo pensione' });
+  await expect(verdict.getByRole('heading', { name: 'Il fondo sta lavorando' })).toBeVisible();
+  const sentence = (await verdict.textContent())?.replace(/ /g, ' ') ?? '';
+  expect(sentence).toContain('Il fondo di Marco vale 29.800 €');
+  expect(sentence).toContain(`il mercato ha reso ${TWR} (TWR)`);
+  expect(sentence).toContain('nel 2026 il datore ha aggiunto 134 €');
+  // The deductible 2026 contributions are 152,02 + 134,11 = 286,13 € (the TFR does not count); RAL
+  // 35.000 puts them entirely in the 35% bracket: 100,15 → «circa 100 €».
+  expect(sentence).toContain('il fisco restituisce circa 100 €');
 
-  const heroBox = (await hero.boundingBox())!;
-  const returnBox = (await returnCard.boundingBox())!;
+  // The verdict is the page's headline: 30px on desktop, above every tile.
+  expect(await fontSizePx(verdict.getByRole('heading'))).toBe(30);
+  const verdictBox = (await verdict.boundingBox())!;
+  const heroBox = (await page.getByRole('region', { name: 'Il fondo oggi' }).boundingBox())!;
+  expect(verdictBox.y).toBeLessThan(heroBox.y);
 
-  // Side by side, not stacked: the return card starts to the RIGHT of the hero, on the same row.
-  expect(returnBox.x).toBeGreaterThan(heroBox.x + heroBox.width / 2);
-  expect(Math.abs(returnBox.y - heroBox.y)).toBeLessThan(24);
-
-  // The 2fr_1fr ratio: the hero takes roughly twice the companion's width.
-  expect(heroBox.width / returnBox.width).toBeGreaterThan(1.6);
-
-  // Page hero steps up to 54px on desktop (DESIGN.md §3); section heroes stay at 36px.
-  expect(await fontSizePx(heroValue(page))).toBe(54);
-  expect(await fontSizePx(page.getByText(TOTAL_2026))).toBe(36);
+  // The axis sits on the verdict's row, to the right.
+  const axisBox = (await page.getByRole('tablist', { name: 'Anno fiscale' }).boundingBox())!;
+  expect(axisBox.x).toBeGreaterThan(verdictBox.x + verdictBox.width - 1);
+  expect(Math.abs(axisBox.y - verdictBox.y)).toBeLessThan(40);
 });
 
-test('the year axis governs the tax chapter and leaves the fund value alone', async ({ page }) => {
+test('lays the grid out at 1440px: the hero spans two rows, Versato closes the second', async ({ page }) => {
+  await gotoPension(page);
+
+  const rect = async (name: string) => (await page.getByRole('region', { name, exact: true }).boundingBox())!;
+  const hero = await rect('Il fondo oggi');
+  const rendimento = await rect('Rendimento del fondo');
+  const annoFiscale = await rect('Anno fiscale');
+  const versato = await rect('Versato per natura');
+  const versamenti = await rect('Versamenti');
+
+  // Row 1: hero | Rendimento | Anno fiscale, on one line.
+  expect(rendimento.x).toBeGreaterThan(hero.x + hero.width - 1);
+  expect(annoFiscale.x).toBeGreaterThan(rendimento.x + rendimento.width - 1);
+  expect(Math.abs(rendimento.y - hero.y)).toBeLessThan(2);
+  expect(Math.abs(annoFiscale.y - hero.y)).toBeLessThan(2);
+
+  // Row 2: Versato beside the hero's second row — the hero is as tall as both rows.
+  expect(versato.x).toBeGreaterThan(hero.x + hero.width - 1);
+  expect(versato.y).toBeGreaterThan(rendimento.y + rendimento.height - 1);
+  expect(hero.y + hero.height).toBeGreaterThan(versato.y + versato.height - 2);
+
+  // Row 3: the ledger takes the full width under everything.
+  expect(versamenti.y).toBeGreaterThan(hero.y + hero.height - 1);
+  expect(versamenti.width).toBeGreaterThan(hero.width + versato.width);
+
+  // The hero figure steps up to 54px on desktop (DESIGN.md §3); the TWR is a 22px tile KPI.
+  expect(await fontSizePx(heroValue(page))).toBe(54);
+  expect(await fontSizePx(twrKpi(page))).toBe(22);
+});
+
+test('the year axis governs the annual tiles and the annual clauses, and leaves the fund alone', async ({ page }) => {
   await gotoPension(page);
 
   const yearAxis = page.getByRole('tablist', { name: 'Anno fiscale' });
   await expect(yearAxis.getByRole('tab')).toHaveText(['2026', '2025']);
 
   // Opens on the current year.
-  await expect(page.getByRole('heading', { name: 'Versato nel 2026' })).toBeVisible();
-  await expect(page.getByText(TOTAL_2026)).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Storico versamenti 2026' })).toBeVisible();
+  const annoFiscale = page.getByRole('region', { name: 'Anno fiscale', exact: true });
+  await expect(annoFiscale.getByText('Anno fiscale 2026')).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Versato per natura' }).getByText('Versato nel 2026')).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Versamenti', exact: true }).getByText('Versamenti 2026')).toBeVisible();
 
   await yearAxis.getByRole('tab', { name: '2025' }).click();
 
-  // Scoped to its own card: the same amount also appears in the recap rows and in the history.
-  const versato2025 = page.getByRole('heading', { name: 'Versato nel 2025' }).locator('..');
-  await expect(versato2025).toBeVisible();
-  await expect(versato2025.getByText(TOTAL_2025).first()).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Storico versamenti 2025' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: /Risparmio IRPEF · Marco/ })).toBeVisible();
+  await expect(annoFiscale.getByText('Anno fiscale 2025')).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Versato per natura' }).getByText('Versato nel 2025')).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Versamenti', exact: true }).getByText('Versamenti 2025')).toBeVisible();
+  // The single 2025 contribution: 1000 € voluntary — ungrouped on purpose (CLDR minimumGroupingDigits = 2).
+  await expect(page.getByRole('region', { name: 'Versato per natura' }).getByText(/1000[\s ]*€/).first()).toBeVisible();
 
-  // The fund's value and its market return are not annual quantities — the axis must not touch them.
+  // The verdict follows the axis for its annual clauses only: a closed year is said in the past.
+  const sentence = (await page.getByRole('region', { name: 'Verdetto sul fondo pensione' }).textContent())?.replace(/ /g, ' ') ?? '';
+  expect(sentence).toContain('nel 2025 il fisco ha restituito circa 350 €');
+  expect(sentence).not.toContain('il datore');
+  expect(sentence).toContain(`il mercato ha reso ${TWR} (TWR)`);
+
+  // The fund's value and its return are not annual quantities — the axis must not touch them.
   await expect(heroValue(page)).toBeVisible();
+  await expect(twrKpi(page)).toBeVisible();
 });
 
-test('states the return as a percentage and keeps its decomposition behind a disclosure', async ({
-  page,
-}) => {
+test('states the return as a percentage and keeps its decomposition behind «Dettaglio»', async ({ page }) => {
   await gotoPension(page);
 
   // The fixture's series sits well inside the plausible band, so a percentage is shown rather than
   // the missing-contributions warning or the idle-window note.
-  await expect(page.getByText('+3.48%')).toBeVisible();
-  await expect(page.getByText('non si è ancora mosso')).toBeHidden();
+  const rendimento = page.getByRole('region', { name: 'Rendimento del fondo' });
+  await expect(twrKpi(page)).toBeVisible();
+  await expect(rendimento.getByText('non si è ancora mosso')).toBeHidden();
+  // The Rendimento tile names the window it is measured on (off the axis).
+  await expect(rendimento.getByText('gen 2026 →')).toBeVisible();
 
-  const disclosure = page.getByRole('button', { name: 'Da dove viene la crescita' });
-  await expect(page.getByText('Ritorno sul tuo capitale')).toBeHidden();
+  // The decomposition lives only in the Dettaglio: «Crescita del valore» appears nowhere above it.
+  const disclosure = page.getByRole('button', { name: /^Dettaglio/ });
+  await expect(page.getByText('Crescita del valore')).toBeHidden();
 
   await disclosure.click();
 
-  await expect(page.getByText('Ritorno sul tuo capitale')).toBeVisible();
+  const crescita = page.getByRole('region', { name: 'Da dove viene la crescita' });
+  await expect(crescita.getByText('Crescita del valore')).toBeVisible();
   // July's value jump is exactly the contributions recorded that month, so the market gain must
   // exclude them — the whole point of keeping the three causes apart.
-  await expect(page.getByText(MARKET_GAIN).first()).toBeVisible();
+  await expect(crescita.getByText(MARKET_GAIN)).toBeVisible();
 });
 
-test('keeps the primary action in the page header, above the hero', async ({ page }) => {
+test('keeps the primary action in the page header, above the verdict, and never scrolls sideways', async ({ page }) => {
   await gotoPension(page);
 
   const action = page.getByRole('button', { name: 'Registra versamento' });
   await expect(action).toBeVisible();
-
   const actionBox = (await action.boundingBox())!;
-  const heroBox = (await heroValue(page).boundingBox())!;
+  const verdictBox = (await page.getByRole('region', { name: 'Verdetto sul fondo pensione' }).boundingBox())!;
+  expect(actionBox.y).toBeLessThan(verdictBox.y);
 
-  expect(actionBox.y).toBeLessThan(heroBox.y);
+  // `main` is the horizontal scroll container of the shell, not the document (AGENTS.md).
+  const { scrollWidth, clientWidth } = await page.evaluate(() => {
+    const main = document.querySelector('main')!;
+    return { scrollWidth: main.scrollWidth, clientWidth: main.clientWidth };
+  });
+  expect(scrollWidth).toBe(clientWidth);
 });

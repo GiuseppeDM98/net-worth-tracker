@@ -4,8 +4,11 @@ import { fromZonedTime } from 'date-fns-tz';
 import { Timestamp } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
 import { Asset, AssetAllocationSettings, MonthlySnapshot } from '@/types/assets';
-import { Expense } from '@/types/expenses';
-import { GoalAssetAssignment, GoalBasedInvestingData, InvestmentGoal } from '@/types/goals';
+import { Expense, EXPENSE_TYPE_LABELS } from '@/types/expenses';
+import { splitSpendingAtDate } from '@/lib/utils/tracciamentoSummary';
+import { getCategoryKey, getCategoryName, resolveDisplayLabels } from '@/lib/utils/expenseGrouping';
+import { GoalBasedInvestingData } from '@/types/goals';
+import { getGoalDataAdmin } from '@/lib/server/goalData';
 import {
   DashboardOverviewPayload,
   DashboardOverviewExpenseStats,
@@ -14,9 +17,15 @@ import {
 } from '@/types/dashboardOverview';
 import {
   computeAllTimeHigh,
+  computeMarketEffect,
+  computeTopInstrumentMovers,
   computeTopMovers,
-  pickFeaturedGoalProgress,
+  rankCostDrivers,
+  rankGoalProgress,
+  type PensionMarketInput,
 } from '@/lib/utils/dashboardOverviewUtils';
+import { resolvePensionReturnStart } from '@/lib/utils/pensionReturn';
+import type { PensionContribution } from '@/types/pension';
 import {
   calculateAnnualPortfolioCost,
   calculateAssetValue,
@@ -36,6 +45,8 @@ import {
 } from '@/lib/services/chartService';
 import { calculateMonthlyChange, calculateYearlyChange } from '@/lib/services/snapshotService';
 import { getItalyMonthYear, ITALY_TIMEZONE, toDate } from '@/lib/utils/dateHelpers';
+import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
+import { costBasisPerUnitEur } from '@/lib/utils/costBasisEur';
 import {
   DASHBOARD_OVERVIEW_SOURCE_VERSION,
   DASHBOARD_OVERVIEW_SUMMARY_COLLECTION,
@@ -57,7 +68,7 @@ interface StoredDashboardOverviewSummary {
 }
 
 function normalizeDate(value: unknown): Date {
-  return toDate(value as any);
+  return toDate(value as Parameters<typeof toDate>[0]);
 }
 
 function getMonthDateRangeInItaly(year: number, month: number) {
@@ -105,6 +116,29 @@ async function getSnapshotsForUser(userId: string): Promise<MonthlySnapshot[]> {
   }) as MonthlySnapshot[];
 }
 
+/**
+ * The owner's pension contributions — read only when a pension fund is held, because the digest
+ * needs them to split a fund's growth into contributions and return (see `computeTopMovers`).
+ */
+async function getPensionContributionsForUser(userId: string): Promise<PensionContribution[]> {
+  const snapshot = await adminDb
+    // Literal on purpose: `pensionContributionService` exports the constant but top-level-imports
+    // the CLIENT Firebase SDK (the same trap as goalService — doc/guide/panoramica.md § Panoramica and Dashboard Data Isolation).
+    .collection('pensionContributions')
+    .where('userId', '==', userId)
+    .get();
+
+  return snapshot.docs.map((doc) => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      ...data,
+      date: toDate(data.date),
+      createdAt: data.createdAt ? toDate(data.createdAt) : undefined,
+    };
+  }) as PensionContribution[];
+}
+
 async function getSettingsForUser(userId: string): Promise<AssetAllocationSettings | null> {
   const settingsDoc = await adminDb.collection('assetAllocationTargets').doc(userId).get();
 
@@ -125,6 +159,9 @@ async function getSettingsForUser(userId: string): Promise<AssetAllocationSettin
     plannedAnnualExpenses: data.plannedAnnualExpenses,
     coastFireRetirementAge: data.coastFireRetirementAge,
     includePrimaryResidenceInFIRE: data.includePrimaryResidenceInFIRE,
+    respectPensionLockInFire: data.respectPensionLockInFire,
+    pensionInpsRetirementAge: data.pensionInpsRetirementAge,
+    pensionRitaLongUnemployment: data.pensionRitaLongUnemployment,
     dividendIncomeCategoryId: data.dividendIncomeCategoryId,
     dividendIncomeSubCategoryId: data.dividendIncomeSubCategoryId,
     fireProjectionScenarios: data.fireProjectionScenarios,
@@ -135,33 +172,17 @@ async function getSettingsForUser(userId: string): Promise<AssetAllocationSettin
     defaultCreditCashAssetId: data.defaultCreditCashAssetId,
     stampDutyEnabled: data.stampDutyEnabled,
     stampDutyRate: data.stampDutyRate,
+    pensionReturnStartMonth: data.pensionReturnStartMonth,
     checkingAccountSubCategory: data.checkingAccountSubCategory,
     cashflowHistoryStartYear: data.cashflowHistoryStartYear,
     laborIncomeCategoryIds: data.laborIncomeCategoryIds ?? [],
+    familyMembers: data.familyMembers ?? [],
+    expenseSplitEnabled: data.expenseSplitEnabled,
     assistantResponseStyle: data.assistantResponseStyle,
     assistantMacroContextEnabled: data.assistantMacroContextEnabled,
     assistantMemoryEnabled: data.assistantMemoryEnabled,
     targets: data.targets,
   } as AssetAllocationSettings;
-}
-
-async function getGoalDataForUser(userId: string): Promise<GoalBasedInvestingData | null> {
-  const goalDoc = await adminDb.collection('goalBasedInvesting').doc(userId).get();
-
-  if (!goalDoc.exists) {
-    return null;
-  }
-
-  const data = goalDoc.data();
-
-  if (!data) {
-    return null;
-  }
-
-  return {
-    goals: (data.goals ?? []) as InvestmentGoal[],
-    assignments: (data.assignments ?? []) as GoalAssetAssignment[],
-  };
 }
 
 async function getExpensesForMonth(userId: string, year: number, month: number): Promise<Expense[]> {
@@ -187,32 +208,50 @@ async function getExpensesForMonth(userId: string, year: number, month: number):
   }) as Expense[];
 }
 
+interface CategoryTotal {
+  name: string;
+  // Type label, appended to the name only when two same-named categories collide on screen.
+  qualifier: string;
+  amount: number;
+}
+
 interface ExpenseSummary {
   income: number;
   expenses: number;
   net: number;
-  // Aggregated totals per category name (denormalized on Expense docs).
-  incomeByCategory: Map<string, number>;
-  expensesByCategory: Map<string, number>;
+  // Aggregated totals per category KEY (id, name-fallback — see getCategoryKey):
+  // two same-named categories stay two buckets.
+  incomeByCategory: Map<string, CategoryTotal>;
+  expensesByCategory: Map<string, CategoryTotal>;
 }
 
 function summarizeExpenses(expenses: Expense[]): ExpenseSummary {
   let income = 0;
   let totalExpenses = 0;
-  const incomeByCategory = new Map<string, number>();
-  const expensesByCategory = new Map<string, number>();
+  const incomeByCategory = new Map<string, CategoryTotal>();
+  const expensesByCategory = new Map<string, CategoryTotal>();
+
+  const add = (map: Map<string, CategoryTotal>, expense: Expense, amount: number) => {
+    const key = getCategoryKey(expense);
+    const entry = map.get(key) ?? {
+      name: getCategoryName(expense),
+      qualifier: EXPENSE_TYPE_LABELS[expense.type],
+      amount: 0,
+    };
+    entry.amount += amount;
+    map.set(key, entry);
+  };
 
   for (const expense of expenses) {
-    const category = expense.categoryName ?? 'Altro';
     // Transfers are net-zero — skip entirely
     if (expense.type === 'transfer') continue;
     if (expense.type === 'income') {
       income += expense.amount;
-      incomeByCategory.set(category, (incomeByCategory.get(category) ?? 0) + expense.amount);
+      add(incomeByCategory, expense, expense.amount);
     } else {
       const abs = Math.abs(expense.amount);
       totalExpenses += abs;
-      expensesByCategory.set(category, (expensesByCategory.get(category) ?? 0) + abs);
+      add(expensesByCategory, expense, abs);
     }
   }
 
@@ -225,31 +264,45 @@ function summarizeExpenses(expenses: Expense[]): ExpenseSummary {
   };
 }
 
-// Build a sorted top-5 category list from a category→amount map.
+// Build a sorted top-5 category list from a key→totals map. Labels are resolved over
+// the rendered slice: a name shared by two keys in the top list gets its type qualifier.
 function buildTopCategories(
-  categoryMap: Map<string, number>,
+  categoryMap: Map<string, CategoryTotal>,
   total: number,
   limit = 5
 ): DashboardOverviewCategoryAmount[] {
-  return [...categoryMap.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, limit)
-    .map(([category, amount]) => ({
-      category,
-      amount,
-      percentage: total > 0 ? (amount / total) * 100 : 0,
-    }));
+  const top = [...categoryMap.entries()]
+    .sort((a, b) => b[1].amount - a[1].amount)
+    .slice(0, limit);
+
+  const labels = resolveDisplayLabels(
+    top.map(([key, totals]) => ({ key, name: totals.name, qualifier: totals.qualifier }))
+  );
+
+  return top.map(([key, totals]) => ({
+    category: labels.get(key) ?? totals.name,
+    categoryKey: key,
+    amount: totals.amount,
+    percentage: total > 0 ? (totals.amount / total) * 100 : 0,
+  }));
 }
 
 function buildExpenseStats(
   currentExpenses: Expense[],
-  previousExpenses: Expense[]
+  previousExpenses: Expense[],
+  now: Date
 ): DashboardOverviewExpenseStats {
   const current = summarizeExpenses(currentExpenses);
   const previous = summarizeExpenses(previousExpenses);
 
-  // Expose only the plain totals on currentMonth/previousMonth (no Maps on the wire).
-  const currentMonth = { income: current.income, expenses: current.expenses, net: current.net };
+  // Expose only the plain totals on currentMonth/previousMonth (no Maps on the wire). The
+  // scheduled share lets the Panoramica project the month the way Tracciamento does.
+  const currentMonth = {
+    income: current.income,
+    expenses: current.expenses,
+    net: current.net,
+    expensesScheduled: splitSpendingAtDate(currentExpenses, now).scheduled,
+  };
   const previousMonth = { income: previous.income, expenses: previous.expenses, net: previous.net };
 
   return {
@@ -276,7 +329,8 @@ function buildLiveOverviewPayload(
   snapshots: MonthlySnapshot[],
   settings: AssetAllocationSettings | null,
   expenseStats: DashboardOverviewExpenseStats | null,
-  goalData: GoalBasedInvestingData | null
+  goalData: GoalBasedInvestingData | null,
+  pensionContributions: PensionContribution[]
 ): Omit<DashboardOverviewPayload, 'freshness'> {
   const { month: currentMonth, year: currentYear } = getItalyMonthYear();
   const currentMonthSnapshot = snapshots.find(
@@ -331,26 +385,36 @@ function buildLiveOverviewPayload(
     currentYear,
     totalValue
   );
-  const topMovers = computeTopMovers(assets, previousSnapshot, totalValue);
-  const goalProgress =
+  const pensionMarketInput: PensionMarketInput = {
+    contributions: pensionContributions,
+    startMonth: resolvePensionReturnStart(pensionContributions, settings?.pensionReturnStartMonth),
+  };
+  const topMovers = computeTopMovers(assets, previousSnapshot, totalValue, pensionMarketInput);
+  const marketEffect = computeMarketEffect(assets, previousSnapshot, pensionMarketInput);
+  const topInstrumentMovers = computeTopInstrumentMovers(assets, previousSnapshot, totalValue, pensionMarketInput);
+  const goalProgressList =
     settings?.goalBasedInvestingEnabled && goalData
-      ? pickFeaturedGoalProgress(goalData.goals, goalData.assignments, assets)
-      : null;
+      ? rankGoalProgress(goalData.goals, goalData.assignments, assets)
+      : [];
+  const goalProgress = goalProgressList[0] ?? null;
+  const costDrivers = rankCostDrivers(assets);
 
   // Top assets for the portfolio list card — active assets sorted by value desc, capped at 15.
   const topAssets: DashboardOverviewTopAsset[] = assets
     .filter(a => a.quantity > 0)
     .map(a => {
       const value = calculateAssetValue(a);
-      // Use null instead of undefined — Firestore rejects undefined values.
+      // Use null instead of undefined — Firestore rejects undefined values. Compared in EUR on both
+      // sides (costBasisPerUnitEur), never the native-currency averageCost against the EUR value.
       let returnPercent: number | null = null;
-      if (a.averageCost && a.averageCost > 0) {
-        const costBasis = a.quantity * a.averageCost;
+      const basisPerUnit = costBasisPerUnitEur(a);
+      if (basisPerUnit && basisPerUnit > 0) {
+        const costBasis = a.quantity * basisPerUnit;
         returnPercent = costBasis > 0 ? ((value - costBasis) / costBasis) * 100 : null;
       }
       return {
         id: a.id,
-        name: a.name,
+        name: getAssetDisplayTicker(a),
         assetType: a.type,
         assetClass: a.assetClass,
         totalValue: value,
@@ -402,26 +466,25 @@ function buildLiveOverviewPayload(
     },
     flags: {
       assetCount: assets.filter((asset) => asset.quantity > 0).length,
+      // A foreign asset with only a native PMC has no basis the EUR figures can use (costBasisEur.ts).
       hasCostBasisTracking: assets.some(
-        (asset) => (asset.averageCost && asset.averageCost > 0) || (asset.taxRate && asset.taxRate > 0)
+        (asset) => costBasisPerUnitEur(asset) !== undefined || (asset.taxRate && asset.taxRate > 0)
       ),
       hasTERTracking: assets.some((asset) => !!(asset.totalExpenseRatio && asset.totalExpenseRatio > 0)),
       hasStampDuty: !!(settings?.stampDutyEnabled && annualStampDuty > 0),
       currentMonthSnapshotExists: !!currentMonthSnapshot,
     },
     topAssets,
-    // Up to 40 historical snapshots + current live value for the hero sparkline.
-    // 40 covers the 3A period selector (36 months) plus a baseline point.
+    // EVERY historical snapshot + the current live value for the hero sparkline, so «All»
+    // is all (a 40-point cap used to start the line at the 41st-last month and call it All).
+    // Each point is tiny ({month, year, totalNetWorth}): a decade of months is ~5 KB.
     // The current-month snapshot (if it exists) is excluded because totalValue
     // already reflects the live state and avoids duplicating the last point.
     // Appending totalValue ensures the line always ends at today's actual net worth,
     // not at the previous month's snapshot (which would lag by weeks mid-month).
-    // Each point is tiny ({month, year, totalNetWorth}) so expanding from 11→40 is
-    // negligible on payload size.
     sparklineData: [
       ...snapshots
         .filter((s) => !(s.year === currentYear && s.month === currentMonth))
-        .slice(-40)
         .map((s) => ({ month: s.month, year: s.year, totalNetWorth: s.totalNetWorth })),
       { month: currentMonth, year: currentYear, totalNetWorth: totalValue },
     ],
@@ -430,7 +493,11 @@ function buildLiveOverviewPayload(
       isNewATH,
     },
     topMovers,
+    marketEffect,
+    topInstrumentMovers,
     goalProgress,
+    goalProgressList,
+    costDrivers,
   };
 }
 
@@ -481,8 +548,12 @@ async function recomputeDashboardOverview(userId: string): Promise<DashboardOver
     getAssetsForUser(userId),
     getSnapshotsForUser(userId),
     getSettingsForUser(userId),
-    getGoalDataForUser(userId),
+    getGoalDataAdmin(userId),
   ]);
+  // Only a holder of a pension fund pays for this read; the digest needs it to tell a fund's
+  // return from its contributions.
+  const holdsPensionFund = assets.some((a) => a.type === 'pensionFund' && a.quantity > 0);
+  const pensionContributions = holdsPensionFund ? await getPensionContributionsForUser(userId) : [];
 
   let expenseStats: DashboardOverviewExpenseStats | null = null;
 
@@ -492,7 +563,7 @@ async function recomputeDashboardOverview(userId: string): Promise<DashboardOver
       getExpensesForMonth(userId, previousYear, previousMonth),
     ]);
 
-    expenseStats = buildExpenseStats(currentMonthExpenses, previousMonthExpenses);
+    expenseStats = buildExpenseStats(currentMonthExpenses, previousMonthExpenses, new Date());
   } catch (error) {
     console.warn('[dashboardOverviewService] Failed to compute expense stats, falling back to null:', error);
   }
@@ -502,7 +573,8 @@ async function recomputeDashboardOverview(userId: string): Promise<DashboardOver
     snapshots,
     settings,
     expenseStats,
-    goalData
+    goalData,
+    pensionContributions
   );
   const now = new Date();
 

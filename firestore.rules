@@ -175,6 +175,15 @@ service cloud.firestore {
       allow delete: if canAccess(userId);
     }
 
+    // Collezione budgetHistory - la configurazione del budget mese per mese, scritta SOLO
+    // dal cron giornaliero (Admin SDK): il client la legge per confrontare un mese chiuso
+    // con il tetto che aveva allora, mai la scrive. Percorso annidato sotto lo uid, così la
+    // rule non tocca resource.data e la lettura di un mese mancante risponde null.
+    match /budgetHistory/{userId}/months/{month} {
+      allow read: if canAccess(userId);
+      allow write: if false;
+    }
+
     // Collezione budgets - configurazione budget (doc id = ownerUid)
     match /budgets/{userId} {
       // Read: usa userId (doc id) per consentire la lettura di doc inesistenti (null)

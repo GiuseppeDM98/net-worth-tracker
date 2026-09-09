@@ -21,8 +21,8 @@ import { useMemo, useState } from 'react';
 import { useChartColors } from '@/lib/hooks/useChartColors';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { type Expense } from '@/types/expenses';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { SegmentedPill } from '@/components/ui/segmented-pill';
+import { Tile } from '@/components/ui/tile';
+import { AsideToggle } from '@/components/cashflow/analisi/AsideToggle';
 import {
   ComposedChart,
   LineChart,
@@ -37,7 +37,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { formatCurrency, formatCurrencyCompact } from '@/lib/services/chartService';
+import { formatCurrency, formatCurrencyCompact, formatPercentage } from '@/lib/services/chartService';
 import {
   buildTimeBuckets,
   buildCategoryTimeSeries,
@@ -105,8 +105,9 @@ function FlowComposedChart({
           }
           wrapperStyle={{ fontSize: 12, color: 'var(--muted-foreground)' }}
         />
-        <Bar dataKey="income" fill={colors[0] ?? '#6366f1'} radius={[3, 3, 0, 0]} animationDuration={600} animationEasing="ease-out" />
-        <Bar dataKey="expenses" fill={colors[1] ?? '#8b5cf6'} radius={[3, 3, 0, 0]} animationDuration={600} animationEasing="ease-out" />
+        {/* The page's slots: income is chart-2, spending chart-1 — the same two the category tiles use. */}
+        <Bar dataKey="income" fill={colors[1] ?? 'var(--chart-2)'} radius={[3, 3, 0, 0]} animationDuration={600} animationEasing="ease-out" />
+        <Bar dataKey="expenses" fill={colors[0] ?? 'var(--chart-1)'} radius={[3, 3, 0, 0]} animationDuration={600} animationEasing="ease-out" />
         <Line
           type="monotone"
           dataKey="net"
@@ -213,14 +214,14 @@ function TypeCompositionChart({
           interval="preserveStartEnd"
         />
         <YAxis
-          tickFormatter={(v: number) => `${v.toFixed(0)}%`}
+          tickFormatter={(v: number) => formatPercentage(v, 0)}
           tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
           axisLine={false}
           tickLine={false}
           domain={[0, 100]}
         />
         <Tooltip
-          formatter={(value, name) => [`${Number(value ?? 0).toFixed(1)}%`, String(name)]}
+          formatter={(value, name) => [formatPercentage(Number(value ?? 0), 1), String(name)]}
           itemSorter={(item) => -(item.value as number)}
           contentStyle={TOOLTIP_CONTENT_STYLE}
           labelStyle={TOOLTIP_LABEL_STYLE}
@@ -329,118 +330,89 @@ export function AndamentoStoricoSection({
   const granularityLabel = granularity === 'year' ? 'per anno' : 'per mese';
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="flex flex-col gap-3">
       {/* Chart A — Entrate / Uscite / Risparmio */}
-      <Card className="overflow-hidden">
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <CardTitle className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
-              Entrate, Uscite e Risparmio
-            </CardTitle>
-            <SegmentedPill
+      <Tile
+        eyebrow="Entrate, uscite e risparmio"
+        aside={
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <span>andamento storico {granularityLabel}</span>
+            <AsideToggle
               options={[
                 { value: 'month', label: 'Mese' },
                 { value: 'year', label: 'Anno' },
               ]}
               value={granularity}
               onChange={setGranularity}
-              layoutId="andamento-granularity-pill"
               ariaLabel="Granularità temporale"
             />
           </div>
-          <p className="text-xs text-muted-foreground">Andamento storico {granularityLabel}</p>
-        </CardHeader>
-        <CardContent className="pt-0">
-          {hasFlowTrend ? (
-            <FlowComposedChart data={flowData} colors={chartColors} />
-          ) : (
-            <EmptyState message="Servono almeno due periodi per mostrare l'andamento" />
-          )}
-        </CardContent>
-      </Card>
+        }
+      >
+        <div className="mt-3">
+          {hasFlowTrend ? <FlowComposedChart data={flowData} colors={chartColors} /> : <EmptyState message="Servono almeno due periodi per mostrare l'andamento" />}
+        </div>
+      </Tile>
 
       {/* Chart B — Per categoria (linee multiple) */}
-      <Card className="overflow-hidden">
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <CardTitle className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
-              {categoryType === 'expenses' ? 'Uscite per Categoria' : 'Entrate per Categoria'}
-            </CardTitle>
-            <SegmentedPill
+      <Tile
+        eyebrow={categoryType === 'expenses' ? 'Uscite per categoria' : 'Entrate per categoria'}
+        aside={
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <span>andamento storico {granularityLabel} · prime 6 categorie</span>
+            <AsideToggle
               options={[
                 { value: 'expenses', label: 'Uscite' },
                 { value: 'income', label: 'Entrate' },
               ]}
               value={categoryType}
               onChange={setCategoryType}
-              layoutId="andamento-category-pill"
               ariaLabel="Tipo di flusso"
             />
           </div>
-          <p className="text-xs text-muted-foreground">
-            Andamento storico {granularityLabel} · prime 6 categorie
-          </p>
-        </CardHeader>
-        <CardContent className="pt-0">
+        }
+      >
+        <div className="mt-3">
           {hasCategoryTrend ? (
-            <CategoryLinesChart
-              series={categorySeries.series}
-              rows={categoryRows}
-              colors={chartColors}
-              height={isMobile ? 240 : 300}
-            />
+            <CategoryLinesChart series={categorySeries.series} rows={categoryRows} colors={chartColors} height={isMobile ? 240 : 300} />
           ) : (
             <EmptyState message="Servono almeno due periodi per mostrare l'andamento" />
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </Tile>
 
       {/* Chart C — Per tipo di spesa (assoluto € o composizione 100%) */}
-      <Card className="overflow-hidden">
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <CardTitle className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
-              Uscite per Tipo
-            </CardTitle>
-            <SegmentedPill
+      <Tile
+        eyebrow="Uscite per tipo"
+        aside={
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <span>
+              {typeView === 'percent' ? 'composizione' : 'andamento storico'} {granularityLabel} · fisse / variabili / debiti
+            </span>
+            <AsideToggle
               options={[
                 { value: 'absolute', label: '€' },
                 { value: 'percent', label: '%' },
               ]}
               value={typeView}
               onChange={setTypeView}
-              layoutId="andamento-type-view-pill"
               ariaLabel="Vista valore o composizione"
             />
           </div>
-          <p className="text-xs text-muted-foreground">
-            {typeView === 'percent'
-              ? `Composizione spesa ${granularityLabel} · Fisse / Variabili / Debiti`
-              : `Andamento storico ${granularityLabel} · Fisse / Variabili / Debiti`}
-          </p>
-        </CardHeader>
-        <CardContent className="pt-0">
+        }
+      >
+        <div className="mt-3">
           {hasTypeTrend ? (
             typeView === 'percent' ? (
-              <TypeCompositionChart
-                series={typeSeries.series}
-                rows={typePercentRows}
-                colors={chartColors}
-                height={isMobile ? 240 : 300}
-              />
+              <TypeCompositionChart series={typeSeries.series} rows={typePercentRows} colors={chartColors} height={isMobile ? 240 : 300} />
             ) : (
-              <CategoryLinesChart
-                series={typeSeries.series}
-                rows={typeRows}
-                colors={chartColors}
-                height={isMobile ? 240 : 300}
-              />
+              <CategoryLinesChart series={typeSeries.series} rows={typeRows} colors={chartColors} height={isMobile ? 240 : 300} />
             )
           ) : (
             <EmptyState message="Servono almeno due periodi per mostrare l'andamento" />
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </Tile>
     </div>
   );
 }

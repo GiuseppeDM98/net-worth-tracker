@@ -21,6 +21,7 @@
  */
 
 import { type Expense, type ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
+import { getCategoryKey, getCategoryName, resolveDisplayLabels } from '@/lib/utils/expenseGrouping';
 import { getItalyMonth, getItalyYear, toDate } from '@/lib/utils/dateHelpers';
 import { MONTH_NAMES } from '@/lib/constants/months';
 
@@ -224,38 +225,56 @@ export function buildCategoryTimeSeries(
   const bucketIndex = new Map<string, number>();
   axis.forEach((b, i) => bucketIndex.set(b.key, i));
 
-  // Rank categories by total value over the window.
-  const categoryTotals = new Map<string, number>();
+  // Rank categories by total value over the window — keyed by category id
+  // (name-fallback for legacy rows), so two same-named categories rank and plot
+  // as two distinct lines (see lib/utils/expenseGrouping.ts).
+  const categoryTotals = new Map<string, { name: string; qualifier: string; total: number }>();
   for (const expense of relevant) {
-    const value = Math.abs(expense.amount);
-    categoryTotals.set(expense.categoryName, (categoryTotals.get(expense.categoryName) ?? 0) + value);
+    const categoryKey = getCategoryKey(expense);
+    const entry = categoryTotals.get(categoryKey) ?? {
+      name: getCategoryName(expense),
+      qualifier: EXPENSE_TYPE_LABELS[expense.type],
+      total: 0,
+    };
+    entry.total += Math.abs(expense.amount);
+    categoryTotals.set(categoryKey, entry);
   }
-  const rankedCategories = Array.from(categoryTotals.entries())
-    .sort((a, b) => b[1] - a[1])
-    .map(([name]) => name);
+  const rankedKeys = Array.from(categoryTotals.entries())
+    .sort((a, b) => b[1].total - a[1].total)
+    .map(([categoryKey]) => categoryKey);
 
-  const keptCategories = new Set(rankedCategories.slice(0, topN));
+  const keptKeys = new Set(rankedKeys.slice(0, topN));
 
   // Seed a zero-filled value array for each kept category.
-  const seriesByName = new Map<string, number[]>();
-  for (const name of keptCategories) seriesByName.set(name, new Array(axis.length).fill(0));
+  const seriesByKey = new Map<string, number[]>();
+  for (const categoryKey of keptKeys) seriesByKey.set(categoryKey, new Array(axis.length).fill(0));
 
   for (const expense of relevant) {
     // Categories beyond the top-N are dropped entirely (no "Altro" residual).
-    if (!keptCategories.has(expense.categoryName)) continue;
+    const categoryKey = getCategoryKey(expense);
+    if (!keptKeys.has(categoryKey)) continue;
 
     const date = toDate(expense.date);
     const key = bucketKeyFor(getItalyYear(date), getItalyMonth(date), granularity);
     const index = bucketIndex.get(key);
     if (index === undefined) continue;
 
-    seriesByName.get(expense.categoryName)![index] += Math.abs(expense.amount);
+    seriesByKey.get(categoryKey)![index] += Math.abs(expense.amount);
   }
 
-  // Preserve rank order so the legend reads strongest-first.
-  const series: CategorySeries[] = rankedCategories
-    .filter((name) => keptCategories.has(name))
-    .map((name) => ({ name, values: seriesByName.get(name)! }));
+  // Preserve rank order so the legend reads strongest-first; a name shared by two
+  // kept keys gets its type qualifier appended ("Casa (Spese Fisse)").
+  const keptRanked = rankedKeys.filter((categoryKey) => keptKeys.has(categoryKey));
+  const labels = resolveDisplayLabels(
+    keptRanked.map((categoryKey) => {
+      const { name, qualifier } = categoryTotals.get(categoryKey)!;
+      return { key: categoryKey, name, qualifier };
+    })
+  );
+  const series: CategorySeries[] = keptRanked.map((categoryKey) => ({
+    name: labels.get(categoryKey) ?? categoryTotals.get(categoryKey)!.name,
+    values: seriesByKey.get(categoryKey)!,
+  }));
 
   return {
     buckets: axis.map(({ key, label }) => ({ key, label })),

@@ -9,13 +9,16 @@ import { describe, it, expect } from 'vitest';
 import {
   sortTransactionsForReplay,
   replayTransactions,
+  replayTransactionsWithEffects,
   buildDerivedAssetFields,
   computeCashDelta,
   buildXirrFlows,
   computeAssetXirr,
   computeAssetTotalReturn,
   computeInvestedCapital,
+  aggregateRealizedByYear,
   LedgerValidationError,
+  EPSILON,
   type XirrFlow,
 } from '@/lib/utils/assetTransactionUtils';
 import type { AssetTransaction, AssetTransactionType } from '@/types/assetTransactions';
@@ -40,6 +43,7 @@ interface TxInput {
   isBaseline?: boolean;
   id?: string;
   createdAt?: Date;
+  assetId?: string;
 }
 
 let seq = 0;
@@ -49,7 +53,7 @@ function tx(o: TxInput): AssetTransaction {
   return {
     id: o.id ?? `t${seq}`,
     userId: 'u1',
-    assetId: 'a1',
+    assetId: o.assetId ?? 'a1',
     type: o.type,
     date: o.date,
     quantity: o.quantity,
@@ -274,8 +278,21 @@ describe('replayTransactions — position replay and PMC', () => {
     expect(derived).toEqual({
       quantity: 10,
       averageCost: state.averageCost,
+      averageCostEur: state.averageCostEur,
       holdingStartDate: state.holdingStartDate,
     });
+  });
+
+  it('projects a distinct averageCostEur when the trade FX differs from the native price', () => {
+    // Native price 100 USD/quota, but the trade-date FX made it 90 EUR/quota — the two PMCs must
+    // diverge, otherwise the projection is silently collapsing the EUR side back onto the native one.
+    const state = replayTransactions([
+      tx({ type: 'buy', date: day(0), quantity: 10, pricePerUnit: 100, priceEur: 90 }),
+    ]);
+    const derived = buildDerivedAssetFields(state);
+
+    expect(derived.averageCost).toBe(100);
+    expect(derived.averageCostEur).toBe(90);
   });
 
   it('orders baseline, then buy before sell, then by createdAt, then by id', () => {
@@ -478,3 +495,139 @@ describe('computeInvestedCapital — net capital in a window', () => {
     expect(full.netInvestedEur).toBeCloseTo(336, 6);
   });
 });
+
+// ===========================================================================
+// Per-transaction effects (replayTransactionsWithEffects)
+// ===========================================================================
+
+describe('replayTransactionsWithEffects — per-transaction P&L, sold cost basis and PMC-at-trade', () => {
+  it('sums the per-transaction realized effects to the same total as state.realizedPnlEur', () => {
+    const transactions = [
+      tx({ type: 'buy', date: day(0), quantity: 50, pricePerUnit: 20, isBaseline: true }),
+      tx({ type: 'buy', date: day(5), quantity: 10, pricePerUnit: 30 }),
+      tx({ type: 'sell', date: day(10), quantity: 20, pricePerUnit: 40, fees: 3 }),
+      tx({ type: 'adjustment', date: day(15), quantity: 50, pricePerUnit: 25 }),
+      tx({ type: 'sell', date: day(20), quantity: 15, pricePerUnit: 35, fees: 1 }),
+    ];
+
+    const { state, effects } = replayTransactionsWithEffects(transactions);
+    const sumOfEffects = effects.reduce((sum, e) => sum + (e.realizedPnlEur ?? 0), 0);
+
+    expect(sumOfEffects).toBeCloseTo(state.realizedPnlEur, 6);
+    // Same replay, wrapper agrees with the state half of the pair.
+    expect(replayTransactions(transactions)).toEqual(state);
+  });
+
+  it('reports a partial sell effect matching the existing 4·(150−100)−2 fee fixture', () => {
+    const { effects } = replayTransactionsWithEffects([
+      tx({ type: 'buy', date: day(0), quantity: 10, pricePerUnit: 100, id: 'buy1' }),
+      tx({ type: 'sell', date: day(5), quantity: 4, pricePerUnit: 150, fees: 2, id: 'sell1' }),
+    ]);
+
+    const sellEffect = effects.find((e) => e.transactionId === 'sell1');
+    expect(sellEffect?.realizedPnlEur).toBeCloseTo(198, 6); // 4·(150 − 100) − 2
+    expect(sellEffect?.soldCostBasisEur).toBeCloseTo(400, 6); // 4 × PMC 100
+    expect(sellEffect?.averageCostEurAtTrade).toBeCloseTo(100, 6);
+
+    const buyEffect = effects.find((e) => e.transactionId === 'buy1');
+    expect(buyEffect?.realizedPnlEur).toBeUndefined();
+    expect(buyEffect?.soldCostBasisEur).toBeUndefined();
+    expect(buyEffect?.averageCostEurAtTrade).toBeUndefined();
+  });
+
+  it('closes the position on a full sell with an EPSILON-consistent sold cost basis, and prices a rebuy sell independently', () => {
+    const { effects } = replayTransactionsWithEffects([
+      tx({ type: 'buy', date: day(0), quantity: 10, pricePerUnit: 100, id: 'buy1' }),
+      tx({ type: 'sell', date: day(5), quantity: 10, pricePerUnit: 120, id: 'sell1' }), // full close
+      tx({ type: 'buy', date: day(10), quantity: 5, pricePerUnit: 200, id: 'buy2' }),
+      tx({ type: 'sell', date: day(15), quantity: 5, pricePerUnit: 250, id: 'sell2' }), // second sell on the rebuy
+    ]);
+
+    const firstSell = effects.find((e) => e.transactionId === 'sell1');
+    expect(firstSell?.soldCostBasisEur).toBeCloseTo(1000, 6); // 10 × PMC 100
+    expect(firstSell?.realizedPnlEur).toBeCloseTo(200, 6); // 10·(120 − 100)
+    // Denominator well above EPSILON: the % is well-defined (guarded in the UI, not the engine).
+    expect(firstSell!.soldCostBasisEur!).toBeGreaterThan(EPSILON);
+
+    const secondSell = effects.find((e) => e.transactionId === 'sell2');
+    expect(secondSell?.averageCostEurAtTrade).toBeCloseTo(200, 6); // PMC restarted at the rebuy
+    expect(secondSell?.soldCostBasisEur).toBeCloseTo(1000, 6); // 5 × PMC 200
+    expect(secondSell?.realizedPnlEur).toBeCloseTo(250, 6); // 5·(250 − 200)
+  });
+
+  it('emits an effect with no populated fields for the baseline and for an adjustment', () => {
+    const { effects } = replayTransactionsWithEffects([
+      tx({ type: 'buy', date: day(0), quantity: 10, pricePerUnit: 100, isBaseline: true, id: 'baseline' }),
+      tx({ type: 'adjustment', date: day(5), quantity: 20, pricePerUnit: 50, id: 'adj1' }),
+    ]);
+
+    expect(effects).toHaveLength(2);
+    for (const effect of effects) {
+      expect(effect.realizedPnlEur).toBeUndefined();
+      expect(effect.soldCostBasisEur).toBeUndefined();
+      expect(effect.averageCostEurAtTrade).toBeUndefined();
+    }
+  });
+});
+
+// ===========================================================================
+// aggregateRealizedByYear (moved from RealizedGainsSection.tsx)
+// ===========================================================================
+
+describe('aggregateRealizedByYear — realized P&L by fiscal year, across assets', () => {
+  it('groups by assetId before folding, then sums per fiscal year across assets', () => {
+    const transactions = [
+      // Asset a1: bought at 100, sold half at 150 in 2024.
+      tx({ assetId: 'a1', type: 'buy', date: day(0), quantity: 10, pricePerUnit: 100 }),
+      tx({ assetId: 'a1', type: 'sell', date: day(5), quantity: 5, pricePerUnit: 150 }),
+      // Asset a2: bought at 50, sold all at 40 (a loss) in the same fiscal year.
+      tx({ assetId: 'a2', type: 'buy', date: day(0), quantity: 20, pricePerUnit: 50 }),
+      tx({ assetId: 'a2', type: 'sell', date: day(5), quantity: 20, pricePerUnit: 40 }),
+    ];
+
+    const result = aggregateRealizedByYear(transactions);
+
+    const year = getYearOf(day(5));
+    expect(result.skippedAssets).toBe(0);
+    // a1: 5·(150−100) = 250; a2: 20·(40−50) = −200. Summed across assets: 50.
+    expect(result.byYear[year]).toBeCloseTo(50, 6);
+  });
+
+  it('excludes an asset whose replay throws and reports it via skippedAssets, without corrupting the rest', () => {
+    const transactions = [
+      // Asset a1: valid, realizes 100.
+      tx({ assetId: 'a1', type: 'buy', date: day(0), quantity: 10, pricePerUnit: 100 }),
+      tx({ assetId: 'a1', type: 'sell', date: day(5), quantity: 10, pricePerUnit: 110 }),
+      // Asset a2: invalid — sells more than it holds.
+      tx({ assetId: 'a2', type: 'buy', date: day(0), quantity: 5, pricePerUnit: 50 }),
+      tx({ assetId: 'a2', type: 'sell', date: day(5), quantity: 999, pricePerUnit: 60 }),
+    ];
+
+    const result = aggregateRealizedByYear(transactions);
+
+    expect(result.skippedAssets).toBe(1);
+    const year = getYearOf(day(5));
+    expect(result.byYear[year]).toBeCloseTo(100, 6); // only a1's realized P&L
+  });
+
+  it('buckets realized P&L by Italy fiscal year across a New-Year midnight boundary', () => {
+    const transactions = [
+      tx({ type: 'buy', date: new Date('2025-06-01T00:00:00Z'), quantity: 100, pricePerUnit: 10 }),
+      // 23:30 Rome on 31/12/2025 → 2025
+      tx({ type: 'sell', date: new Date('2025-12-31T22:30:00Z'), quantity: 10, pricePerUnit: 12 }),
+      // 00:30 Rome on 01/01/2026 → 2026
+      tx({ type: 'sell', date: new Date('2025-12-31T23:30:00Z'), quantity: 10, pricePerUnit: 15 }),
+    ];
+
+    const result = aggregateRealizedByYear(transactions);
+
+    expect(result.skippedAssets).toBe(0);
+    expect(result.byYear[2025]).toBeCloseTo(20, 6); // 10·(12 − 10)
+    expect(result.byYear[2026]).toBeCloseTo(50, 6); // 10·(15 − 10)
+  });
+});
+
+/** Italy fiscal year of a date, matching the engine's own bucketing (UTC+1 in winter, no DST). */
+function getYearOf(date: Date): number {
+  return date.getUTCFullYear();
+}

@@ -125,6 +125,12 @@ export interface Asset {
   // ledger is the source of truth. cash/realestate keep direct editing and have no ledger.
   quantity: number;
   averageCost?: number; // Native-currency PMC (weighted avg of trade prices, fees excluded). Derived for ledger types — see note on `quantity`.
+  // EUR-equivalent PMC (costBasisEur / quantity — fees and the trade-date FX rate included), same
+  // derivation and lifecycle as `averageCost`. G/P math MUST compare this against the EUR value
+  // (calculateAssetValue), never `averageCost` against it — that mixes a native-currency PMC with a
+  // EUR value. Absent for cash/realestate (no ledger) and, until their next ledger mutation, for
+  // assets that predate this field.
+  averageCostEur?: number;
   taxRate?: number; // Tax rate percentage for unrealized gains (e.g., 26 for 26%)
   totalExpenseRatio?: number; // Total Expense Ratio (TER) as a percentage (e.g., 0.20 for 0.20%)
   stampDutyExempt?: boolean; // If true, asset is excluded from stamp duty (imposta di bollo) calculation (e.g. pension funds, real estate)
@@ -290,6 +296,11 @@ export interface AssetAllocationSettings {
   assistantMacroContextEnabled?: boolean; // Enables macro/web context in assistant flows when explicitly requested
   assistantMemoryEnabled?: boolean; // Allows the assistant to persist reusable user context
   costCentersEnabled?: boolean; // When true, Centri di Costo tab appears in Cashflow and the cost center selector appears in ExpenseDialog
+  // When true, the Divisione tab appears in Cashflow and every expense/income row can be marked as
+  // one person's instead of the household's. Reads familyMembers (who) and laborIncomeCategoryIds
+  // (which income is a salary) — it adds no configuration of its own. Also read SERVER-side by the
+  // monthly email, so it lives in the settings mapper of dashboardOverviewService.ts too.
+  expenseSplitEnabled?: boolean;
   monthlyEmailEnabled?: boolean; // When true, a summary email is sent on the last day of each month
   quarterlyEmailEnabled?: boolean; // When true, a summary email is sent on the last day of each quarter (Mar/Jun/Sep/Dec)
   semiAnnualEmailEnabled?: boolean; // When true, a summary email is sent on the last day of each half-year (Jun 30 / Dec 31)
@@ -303,6 +314,11 @@ export interface AssetAllocationSettings {
   // When true, FireCalculatorTab subtracts locked pension-fund capital (unlockDate in the future)
   // from the FIRE-eligible net worth — see lib/utils/pensionFire.ts. Off by default (opt-in, MVP).
   respectPensionLockInFire?: boolean;
+  // RITA rule inputs — resolve when a pension fund unlocks in the FIRE bridge model,
+  // single source in lib/utils/pensionUnlock.ts: unlock age = INPS age − 5, or − 10 with the
+  // long-unemployment hypothesis. A per-fund pensionFundDetails.unlockDate overrides the rule.
+  pensionInpsRetirementAge?: number; // Applicative default 67; UI allows 60-75
+  pensionRitaLongUnemployment?: boolean; // Default false (−5); true → unemployed ≥ 24 months after FIRE (−10)
   // Base di calcolo delle metriche Rendimenti (TWR/Sharpe/volatilità/MaxDD/ROI/CAGR).
   // Entrambi OFF di default = base "portafoglio gestito": fuori i fondi pensione (capitale
   // illiquido alimentato da versamenti) e gli asset allocationRole 'excluded' (la casa in cui vivi,
@@ -313,6 +329,12 @@ export interface AssetAllocationSettings {
   // anche la cache metriche (buildCacheKey ne incorpora la firma).
   performanceIncludesPensionFunds?: boolean;
   performanceIncludesExcludedAssets?: boolean;
+  // «Liquidità fuori dalla base» (2026-09-07): i conti di tipo `cash` escono dalle metriche di
+  // Rendimenti senza toccare il loro `allocationRole` (restano nell'Allocazione). Un ETF monetario
+  // ha un prezzo di mercato e resta dentro. Default OFF = il comportamento di sempre. Acceso, ogni
+  // acquisto pagato da un conto è capitale che entra nella base: lo misurano il registro operazioni
+  // e le Δquantità (lib/utils/portfolioFlows.ts), non il cashflow. Stesso fan-out dei due flag sopra.
+  performanceExcludesCash?: boolean;
   // Mese (ISO 'YYYY-MM') da cui il rendimento del fondo pensione è calcolabile: prima di questa
   // data i versamenti non venivano registrati e il valore del fondo veniva solo aggiornato a mano,
   // quindi ogni crescita risulterebbe "rendimento di mercato". Assente = si parte dal primo
@@ -367,7 +389,7 @@ export interface PieChartData {
   color: string;
   /** Raw asset-class key (e.g. 'equity'), set only by asset-class distribution data. */
   assetClass?: string;
-  [key: string]: any; // Index signature for Recharts compatibility
+  [key: string]: unknown; // Index signature for Recharts compatibility
 }
 
 export interface User {
@@ -398,6 +420,25 @@ export interface MonthlySnapshot {
     price: number;
     totalValue: number;
   }>;
+  /**
+   * What the `pensionFund` assets contributed to THIS month's `byAssetClass`, frozen at write time.
+   *
+   * `byAssetClass` folds each fund into its classes through the fund's `composition`, so anything
+   * wanting to show Previdenza as a band of its own has to subtract that contribution back out.
+   * Without this field the only way to do it is to apply the fund's CURRENT composition to a past
+   * month — an estimate that silently drifts the day the user re-balances the fund, and whose
+   * per-class clamp can push the plotted parts above the total. Storing the split at write time
+   * makes the subtraction exact, and freezes it against later edits to the fund.
+   *
+   * OPTIONAL because snapshots written before 2026-08 do not have it, and hand-entered snapshots
+   * (`/api/portfolio/snapshot/manual`) never will — there is no pension input on that form. Absent
+   * means "unknown, fall back to the estimate"; present with `totalValue: 0` means "measured, and
+   * there were no pension funds". Those are different facts and must stay distinguishable.
+   */
+  pension?: {
+    totalValue: number;
+    byAssetClass: { [assetClass: string]: number };
+  };
   assetAllocation: {
     [assetClass: string]: number;
   };
@@ -439,6 +480,16 @@ export interface MonteCarloParams {
 
   // Simulation settings
   numberOfSimulations: number;
+
+  // One-off capital arrivals during the simulated horizon (a pension fund unlocking).
+  // Applied at the START of their year, before that year's market return and withdrawal;
+  // entries with year <= 0 are folded into the initial portfolio.
+  capitalInflows?: MonteCarloCapitalInflow[];
+}
+
+export interface MonteCarloCapitalInflow {
+  year: number; // 1-based simulation year; <= 0 = already available at start
+  amount: number;
 }
 
 interface SimulationPath {
@@ -477,6 +528,9 @@ export interface MonteCarloResults {
     range: string;
     count: number;
     percentage: number;
+    /** Bin bounds in EUR — half-open, the last bin closed on `to`. */
+    from: number;
+    to: number;
   }[];
   simulations: SingleSimulationResult[];
 }

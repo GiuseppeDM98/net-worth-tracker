@@ -8,6 +8,7 @@
  *  - sort a month's assets by value,
  *  - sum a user-selected subset for a given month,
  *  - build the cross-month trend of a selected subset's combined value,
+ *  - read one month instrument by instrument, each with its price/quantity attribution,
  *  - derive each asset's current holding-start date from its quantity gaps (consumed by the
  *    yield-on-cost engine to ignore dividends from a previous, discontinuous holding).
  *
@@ -45,7 +46,7 @@ export interface SelectedAssetTrendPoint {
 }
 
 /** Price/quantity split of a month-over-month value change. */
-interface ChangeAttribution {
+export interface ChangeAttribution {
   priceEffect: number;
   quantityEffect: number;
 }
@@ -143,6 +144,10 @@ export function sumSelectedValues(
  *   - Asset present in only one month (a full open/close): the change is a pure quantity action,
  *     so the whole ΔtotalValue is attributed to quantityEffect (priceEffect = 0). This sidesteps
  *     the undefined unit value of the absent side (u would be 0/0).
+ *   - A row held at quantity 0 counts as ABSENT. The snapshot cron writes every asset, sold ones
+ *     included (`quantity: 0, totalValue: 0`), and read as "present" its unit value is 0: a
+ *     14.830 € sale became a −14.830 € PRICE effect on the real account (2026-08). A sale to zero
+ *     is a full close, all quantity, and so is the rebuy that starts from that row.
  *
  * @param previousByAsset - The earlier month's asset breakdown
  * @param currentByAsset - The later month's asset breakdown
@@ -154,12 +159,9 @@ export function attributeSelectedChange(
   currentByAsset: SnapshotAsset[],
   selectedIds: Set<string>
 ): ChangeAttribution {
-  const previousById = new Map(
-    previousByAsset.filter((a) => selectedIds.has(a.assetId)).map((a) => [a.assetId, a])
-  );
-  const currentById = new Map(
-    currentByAsset.filter((a) => selectedIds.has(a.assetId)).map((a) => [a.assetId, a])
-  );
+  const held = (rows: SnapshotAsset[]) => rows.filter((a) => selectedIds.has(a.assetId) && a.quantity > 0);
+  const previousById = new Map(held(previousByAsset).map((a) => [a.assetId, a]));
+  const currentById = new Map(held(currentByAsset).map((a) => [a.assetId, a]));
 
   let priceEffect = 0;
   let quantityEffect = 0;
@@ -245,6 +247,137 @@ export function buildSelectedAssetTrend(
       previousLabel,
     };
   });
+}
+
+/** One instrument of a month, with its change against the previous month that has a breakdown. */
+export interface MonthAssetRow {
+  assetId: string;
+  name: string;
+  ticker: string;
+  quantity: number;
+  totalValue: number;
+  /** Share of the snapshot's `totalNetWorth`, 0-100 (0 when the total is not positive). */
+  sharePct: number;
+  /** All three `null` on the first month with a breakdown; otherwise `delta = priceEffect + quantityEffect`. */
+  delta: number | null;
+  priceEffect: number | null;
+  quantityEffect: number | null;
+}
+
+export interface MonthAssetBreakdown {
+  month: SnapshotMonthOption;
+  /** The closest earlier month WITH a breakdown (a legacy month in between is skipped), or null. */
+  previous: SnapshotMonthOption | null;
+  /** The snapshot's own total — never a re-derived sum. */
+  total: number;
+  instrumentCount: number;
+  /** The month's instruments, largest first. */
+  rows: MonthAssetRow[];
+  /**
+   * The change over the UNION of both months' instruments — an instrument sold in full has no
+   * row this month but still explains part of the drop. Null on the first month.
+   */
+  change: ChangeAttribution & { delta: number } | null;
+  /** Instruments of the previous month with no row this month (sold in full), with the value they had. */
+  departed: Array<{ assetId: string; previousValue: number }>;
+}
+
+/**
+ * The «Valore per strumento» reading of one month: every instrument frozen in the snapshot,
+ * ranked, with its month-over-month change split into a price effect and a quantity effect
+ * (the same maths as `attributeSelectedChange`, applied one instrument at a time). Values are
+ * read, never recomputed — `totalValue` already went through `calculateAssetValue()`.
+ *
+ * @param snapshots - All user snapshots (any order)
+ * @param monthKey - `${year}-${month}` of the month to read
+ * @returns The breakdown, or null when that month has no per-asset detail
+ */
+export function buildMonthAssetBreakdown(snapshots: MonthlySnapshot[], monthKey: string): MonthAssetBreakdown | null {
+  const ordered = snapshots
+    .filter(hasAssetBreakdown)
+    .slice()
+    .sort((a, b) => (a.year !== b.year ? a.year - b.year : a.month - b.month));
+  const index = ordered.findIndex((s) => buildMonthKey(s.year, s.month) === monthKey);
+  if (index === -1) return null;
+
+  const snapshot = ordered[index];
+  const previous = index > 0 ? ordered[index - 1] : null;
+  const total = snapshot.totalNetWorth;
+
+  const rows: MonthAssetRow[] = sortAssetsByValue(snapshot.byAsset).map((asset) => {
+    const base = {
+      assetId: asset.assetId,
+      name: asset.name,
+      ticker: asset.ticker,
+      quantity: asset.quantity,
+      totalValue: asset.totalValue,
+      sharePct: total > 0 ? (asset.totalValue / total) * 100 : 0,
+    };
+    if (!previous) return { ...base, delta: null, priceEffect: null, quantityEffect: null };
+    const { priceEffect, quantityEffect } = attributeSelectedChange(previous.byAsset, snapshot.byAsset, new Set([asset.assetId]));
+    return { ...base, delta: priceEffect + quantityEffect, priceEffect, quantityEffect };
+  });
+
+  let change: MonthAssetBreakdown['change'] = null;
+  let departed: MonthAssetBreakdown['departed'] = [];
+  if (previous) {
+    const union = new Set([...previous.byAsset.map((a) => a.assetId), ...snapshot.byAsset.map((a) => a.assetId)]);
+    const { priceEffect, quantityEffect } = attributeSelectedChange(previous.byAsset, snapshot.byAsset, union);
+    change = { priceEffect, quantityEffect, delta: priceEffect + quantityEffect };
+    const present = new Set(snapshot.byAsset.map((a) => a.assetId));
+    departed = previous.byAsset.filter((a) => !present.has(a.assetId)).map((a) => ({ assetId: a.assetId, previousValue: a.totalValue }));
+  }
+
+  const toOption = (s: MonthlySnapshot): SnapshotMonthOption => ({
+    key: buildMonthKey(s.year, s.month),
+    year: s.year,
+    month: s.month,
+    label: buildMonthLabel(s.year, s.month),
+  });
+
+  return {
+    month: toOption(snapshot),
+    previous: previous ? toOption(previous) : null,
+    total,
+    instrumentCount: snapshot.byAsset.length,
+    rows,
+    change,
+    departed,
+  };
+}
+
+export interface SelectionSummary {
+  /** Selected instruments present in this month. */
+  count: number;
+  value: number;
+  /** Share of the month's total, 0-100. */
+  sharePct: number;
+  /**
+   * Over the ticked instruments of BOTH months, like `change`: one ticked in an earlier month and
+   * sold in full counts its whole previous value as a quantity effect, so the panel agrees with
+   * the trend line under it. `null` on the first month with a breakdown.
+   */
+  delta: number | null;
+  priceEffect: number | null;
+  quantityEffect: number | null;
+}
+
+/** The ticked instruments of a month, as the selection panel reads them. */
+export function summarizeSelection(breakdown: MonthAssetBreakdown, selectedIds: Set<string>): SelectionSummary {
+  const rows = breakdown.rows.filter((row) => selectedIds.has(row.assetId));
+  const value = rows.reduce((sum, row) => sum + row.totalValue, 0);
+  const hasChange = breakdown.change !== null;
+  const sumOf = (pick: (row: MonthAssetRow) => number | null) => rows.reduce((sum, row) => sum + (pick(row) ?? 0), 0);
+  // A full close is a pure quantity action, the same convention as `attributeSelectedChange`.
+  const departedLoss = breakdown.departed.filter((d) => selectedIds.has(d.assetId)).reduce((sum, d) => sum + d.previousValue, 0);
+  return {
+    count: rows.length,
+    value,
+    sharePct: breakdown.total > 0 ? (value / breakdown.total) * 100 : 0,
+    delta: hasChange ? sumOf((row) => row.delta) - departedLoss : null,
+    priceEffect: hasChange ? sumOf((row) => row.priceEffect) : null,
+    quantityEffect: hasChange ? sumOf((row) => row.quantityEffect) - departedLoss : null,
+  };
 }
 
 /**

@@ -5,8 +5,11 @@
  *   1. parseItalianNumber — IT (`1.234,56`) vs EN (`1234.56`) + thousands heuristic.
  *   2. parseFlexibleDate — ISO and DD/MM/YYYY, with invalid/overflow rejection.
  *   3. parseImportCsv — header aliases, `;` delimiter, missing-column errors.
- *   4. buildImportPlan — variable fallback, transfer skip, type-conflict rejection,
- *      resolve-vs-create categories, subcategory creation, summary totals.
+ *   4. buildImportPlan — (name, type) identity: same-named categories of different
+ *      types resolve/create side by side, untyped rows inherit the single
+ *      namesake's type (ambiguous → rejected), same-name-same-type duplicates
+ *      attach to the oldest with a preview notice; plus transfer skip,
+ *      subcategory creation, summary totals.
  *
  * No React, no Firebase — the module imports only papaparse + types.
  */
@@ -28,7 +31,7 @@ function cat(partial: Partial<ExpenseCategory> & { name: string; type: ExpenseCa
     name: partial.name,
     type: partial.type,
     subCategories: partial.subCategories ?? [],
-    createdAt: new Date(),
+    createdAt: partial.createdAt ?? new Date(),
     updatedAt: new Date(),
   };
 }
@@ -128,23 +131,63 @@ describe('buildImportPlan', () => {
     expect(plan.errors[0].reason).toMatch(/transfer/i);
   });
 
-  it('rejects a category used with conflicting types within the file', () => {
+  it('treats a name used with two types in the file as two distinct categories', () => {
+    // (name, type) is the identity app-wide: "Auto" fissa and "Auto" variabile are
+    // two documents, not a conflict.
     const plan = buildImportPlan(
       rowsCsv('2024-01-15;50,00;fixed;Auto;;;\n2024-02-15;60,00;variable;Auto;;;'),
       []
     );
-    expect(plan.validRows).toHaveLength(0);
-    expect(plan.errors).toHaveLength(2);
-    expect(plan.errors[0].reason).toMatch(/conflitto/i);
+    expect(plan.errors).toHaveLength(0);
+    expect(plan.validRows).toHaveLength(2);
+    expect(plan.categoriesToCreate).toHaveLength(2);
+    expect(plan.categoriesToCreate.map((c) => c.type).sort()).toEqual(['fixed', 'variable']);
   });
 
-  it('rejects a row whose type differs from an existing category type', () => {
+  it('creates a same-named category of a different type beside the existing one', () => {
     const plan = buildImportPlan(
       rowsCsv('2024-01-15;50,00;variable;Casa;;;'),
       [cat({ name: 'Casa', type: 'fixed' })]
     );
+    expect(plan.errors).toHaveLength(0);
+    expect(plan.validRows).toHaveLength(1);
+    expect(plan.validRows[0].categoryId).toBeUndefined(); // the variable Casa does not exist yet
+    expect(plan.categoriesToCreate).toEqual([{ name: 'Casa', type: 'variable', subCategories: [] }]);
+  });
+
+  it('inherits the single existing namesake type when the row has no type', () => {
+    const plan = buildImportPlan(
+      rowsCsv('2024-01-15;50,00;;Casa;;;'),
+      [cat({ name: 'Casa', type: 'fixed' })]
+    );
+    expect(plan.errors).toHaveLength(0);
+    expect(plan.validRows[0]).toMatchObject({ type: 'fixed', categoryId: 'id-Casa' });
+    expect(plan.categoriesToCreate).toHaveLength(0);
+  });
+
+  it('rejects an untyped row when same-named categories of different types exist', () => {
+    const plan = buildImportPlan(
+      rowsCsv('2024-01-15;50,00;;Casa;;;'),
+      [cat({ id: 'c-fix', name: 'Casa', type: 'fixed' }), cat({ id: 'c-var', name: 'Casa', type: 'variable' })]
+    );
     expect(plan.validRows).toHaveLength(0);
-    expect(plan.errors[0].reason).toMatch(/esiste già come "fixed"/i);
+    expect(plan.errors[0].reason).toMatch(/ambiguo/i);
+    expect(plan.errors[0].reason).toMatch(/Spese Fisse/);
+  });
+
+  it('attaches same-name-same-type duplicates to the OLDEST document and says so', () => {
+    const plan = buildImportPlan(
+      rowsCsv('2024-01-15;50,00;fixed;Casa;;;'),
+      [
+        cat({ id: 'c-new', name: 'Casa', type: 'fixed', createdAt: new Date(2026, 0, 1) }),
+        cat({ id: 'c-old', name: 'Casa', type: 'fixed', createdAt: new Date(2024, 0, 1) }),
+      ]
+    );
+    expect(plan.errors).toHaveLength(0);
+    expect(plan.validRows[0].categoryId).toBe('c-old');
+    expect(plan.notices).toHaveLength(1);
+    expect(plan.notices[0]).toMatchObject({ categoryName: 'Casa', type: 'fixed', duplicateCount: 2 });
+    expect(plan.notices[0].message).toMatch(/più vecchia/);
   });
 
   it('resolves existing categories case-insensitively and plans new subcategories', () => {
@@ -153,7 +196,9 @@ describe('buildImportPlan', () => {
       [cat({ name: 'Casa', type: 'fixed', subCategories: [{ id: 's1', name: 'Affitto' }] })]
     );
     expect(plan.validRows).toHaveLength(1);
+    expect(plan.validRows[0].categoryId).toBe('id-Casa');
     expect(plan.categoriesToCreate).toHaveLength(0);
+    expect(plan.notices).toHaveLength(0);
     expect(plan.subCategoriesToCreate).toHaveLength(1);
     expect(plan.subCategoriesToCreate[0]).toMatchObject({ categoryId: 'id-Casa', subCategoryNames: ['Bollette'] });
   });

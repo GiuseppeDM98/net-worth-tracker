@@ -159,19 +159,19 @@ describe('buildThreadTitleFromPrompt (real implementation)', () => {
   it('truncates long prompts to 60 characters', () => {
     // The real buildThreadTitleFromPrompt is exported from the store but mocked above.
     // Test it as a unit inline to avoid un-mocking the entire store module.
-    function buildThreadTitleFromPrompt(prompt: string, _mode: string): string {
+    function buildThreadTitleFromPrompt(prompt: string): string {
       const collapsed = prompt.replace(/\s+/g, ' ').trim();
       if (!collapsed) return 'Nuova conversazione';
       return collapsed.slice(0, 60);
     }
 
     const longPrompt = 'A'.repeat(80);
-    expect(buildThreadTitleFromPrompt(longPrompt, 'chat').length).toBeLessThanOrEqual(60);
+    expect(buildThreadTitleFromPrompt(longPrompt).length).toBeLessThanOrEqual(60);
 
     const readablePrompt = 'Analizza le mie spese di marzo';
-    expect(buildThreadTitleFromPrompt(readablePrompt, 'month_analysis')).toBe(readablePrompt);
+    expect(buildThreadTitleFromPrompt(readablePrompt)).toBe(readablePrompt);
 
     const emptyPrompt = '   ';
-    expect(buildThreadTitleFromPrompt(emptyPrompt, 'chat')).toBe('Nuova conversazione');
+    expect(buildThreadTitleFromPrompt(emptyPrompt)).toBe('Nuova conversazione');
   });
 });

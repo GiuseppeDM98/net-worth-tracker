@@ -24,7 +24,7 @@
  * @param onRefresh - Callback to refresh expense list after deletion
  */
 
-import { useState, useMemo, useEffect, Suspense } from 'react';
+import { useState, useMemo, Suspense } from 'react';
 import { formatCurrency } from '@/lib/utils/formatters';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
@@ -52,6 +52,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Edit, Trash2, TrendingUp, TrendingDown, Calendar, ChevronLeft, ChevronRight, ExternalLink, ArrowUp, ArrowDown, ChevronsUpDown } from 'lucide-react';
@@ -59,6 +60,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { getExpenseDate } from '@/lib/utils/expenseHelpers';
+import { isScheduledRow } from '@/lib/utils/tracciamentoSummary';
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const;
 type PageSizeOption = (typeof PAGE_SIZE_OPTIONS)[number];
@@ -70,9 +72,15 @@ interface ExpenseTableProps {
   isDemo?: boolean;
   hasActiveFilters?: boolean;
   categories?: ExpenseCategory[];
+  /**
+   * The page's clock. Rows dated after it are marked «in calendario» and lose the sign
+   * colour on their amount: the list carries scheduled rows (instalments, recurring
+   * occurrences) that the figures above it do not count. Omitted → nothing is marked.
+   */
+  now?: Date;
 }
 
-export function ExpenseTable({ expenses, onEdit, onRefresh, isDemo = false, hasActiveFilters = false, categories = [] }: ExpenseTableProps) {
+export function ExpenseTable({ expenses, onEdit, onRefresh, isDemo = false, hasActiveFilters = false, categories = [], now }: ExpenseTableProps) {
   const { user } = useAuth();
   const { ownerId } = useActiveAccount();
   const queryClient = useQueryClient();
@@ -170,10 +178,13 @@ export function ExpenseTable({ expenses, onEdit, onRefresh, isDemo = false, hasA
   };
 
   const deleteAllRecurringExpenses = async (recurringParentId: string) => {
+    // The series query is scoped by owner (firestore.rules refuses an unscoped list), so
+    // without an owner there is nothing to delete — and no way to ask for it.
+    if (!ownerId) return;
     try {
       setDeletingId(recurringParentId);
       // Reverse balance effects before bulk-deleting (only the first entry stores linkedCashAssetId)
-      const seriesExpenses = await getExpensesByRecurringParentId(recurringParentId);
+      const seriesExpenses = await getExpensesByRecurringParentId(ownerId, recurringParentId);
       for (const exp of seriesExpenses) {
         if (exp.linkedCashAssetId) {
           await updateCashAssetBalance(exp.linkedCashAssetId, -exp.amount);
@@ -182,7 +193,7 @@ export function ExpenseTable({ expenses, onEdit, onRefresh, isDemo = false, hasA
       if (user && ownerId && seriesExpenses.some(e => e.linkedCashAssetId)) {
         queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
       }
-      await deleteRecurringExpenses(recurringParentId);
+      await deleteRecurringExpenses(ownerId, recurringParentId);
       toast.success('Tutte le voci ricorrenti sono state eliminate');
       onRefresh();
     } catch (error) {
@@ -194,10 +205,13 @@ export function ExpenseTable({ expenses, onEdit, onRefresh, isDemo = false, hasA
   };
 
   const deleteAllInstallmentExpenses = async (installmentParentId: string) => {
+    // The series query is scoped by owner (firestore.rules refuses an unscoped list), so
+    // without an owner there is nothing to delete — and no way to ask for it.
+    if (!ownerId) return;
     try {
       setDeletingId(installmentParentId);
       // Reverse balance effects before bulk-deleting (only the first installment stores linkedCashAssetId)
-      const seriesExpenses = await getExpensesByInstallmentParentId(installmentParentId);
+      const seriesExpenses = await getExpensesByInstallmentParentId(ownerId, installmentParentId);
       for (const exp of seriesExpenses) {
         if (exp.linkedCashAssetId) {
           await updateCashAssetBalance(exp.linkedCashAssetId, -exp.amount);
@@ -206,7 +220,7 @@ export function ExpenseTable({ expenses, onEdit, onRefresh, isDemo = false, hasA
       if (user && ownerId && seriesExpenses.some(e => e.linkedCashAssetId)) {
         queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
       }
-      await deleteInstallmentExpenses(installmentParentId);
+      await deleteInstallmentExpenses(ownerId, installmentParentId);
       toast.success('Tutte le rate sono state eliminate');
       onRefresh();
     } catch (error) {
@@ -305,28 +319,30 @@ export function ExpenseTable({ expenses, onEdit, onRefresh, isDemo = false, hasA
   }, [sortedExpenses, startIndex, endIndex]);
 
   /**
-   * Why reset to page 1 when expenses.length or sortBy changes?
-   *
-   * - If expenses.length changes (add/delete), staying on page 3 might show empty results
-   * - If sort changes, the "page 3" items are now completely different items, confusing UX
-   *
-   * Better to reset to page 1 so user sees the top of the newly sorted/filtered list.
-   */
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [expenses.length, sortCol, sortDir, pageSize]);
-
-  /**
-   * Why reset sort when expenses array changes?
+   * Why reset sort when the expenses array changes, and page 1 when the view changes?
    *
    * The expenses prop is pre-filtered by parent (e.g., by month, type, category).
    * When filters change, user likely wants to see the new filtered data in default
    * date order, not in whatever sort state was previously active. Clearing sort
    * provides a predictable "reset" behavior when switching filters.
+   *
+   * - If expenses.length changes (add/delete), staying on page 3 might show empty results
+   * - If sort or page size changes, the "page 3" items are now completely different items
+   *
+   * Both adjustments happen during render, keyed on the previous values (React's "adjusting
+   * state when a prop changes"): a setter called synchronously in an effect is banned by
+   * `react-hooks/set-state-in-effect`, and this way the reset lands in the same commit.
    */
-  useEffect(() => {
+  const [prevView, setPrevView] = useState({ length: expenses.length, sortCol, sortDir, pageSize });
+  if (prevView.length !== expenses.length) {
+    // A new list clears the sort, and the cleared sort is what the next render will see.
+    setPrevView({ length: expenses.length, sortCol: null, sortDir, pageSize });
     setSortCol(null);
-  }, [expenses.length]);
+    setCurrentPage(1);
+  } else if (prevView.sortCol !== sortCol || prevView.sortDir !== sortDir || prevView.pageSize !== pageSize) {
+    setPrevView({ length: expenses.length, sortCol, sortDir, pageSize });
+    setCurrentPage(1);
+  }
 
   const handlePreviousPage = () => {
     setCurrentPage((prev: number) => Math.max(1, prev - 1));
@@ -361,14 +377,13 @@ export function ExpenseTable({ expenses, onEdit, onRefresh, isDemo = false, hasA
 
   if (expenses.length === 0) {
     return (
-      <div className="rounded-md border border-dashed p-8 text-center">
-        <p className="text-muted-foreground">Nessuna voce trovata</p>
-        <p className="text-sm text-muted-foreground mt-2">
-          {hasActiveFilters
-            ? 'Nessun risultato per i filtri applicati. Prova ad azzerare i filtri.'
-            : 'Clicca su "Nuova Spesa" per aggiungere la prima voce'}
-        </p>
-      </div>
+      <EmptyState
+        message={
+          hasActiveFilters
+            ? 'Nessun movimento passa i filtri applicati: azzerali per rivedere il periodo intero.'
+            : 'Nessun movimento registrato nel periodo: aggiungi la prima voce per iniziare a tracciare.'
+        }
+      />
     );
   }
 
@@ -440,13 +455,20 @@ export function ExpenseTable({ expenses, onEdit, onRefresh, isDemo = false, hasA
 
           {/* ========== Table Body ========== */}
           <TableBody>
-            {paginatedExpenses.map((expense: Expense) => (
+            {paginatedExpenses.map((expense: Expense) => {
+            const scheduled = now ? isScheduledRow(expense, now) : false;
+            return (
             <TableRow key={expense.id}>
               <TableCell className="font-medium text-sm">
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1.5">
                   {formatDate(expense.date)}
                   {expense.isRecurring && (
                     <Calendar className="h-3 w-3 text-muted-foreground" aria-label="Voce ricorrente" />
+                  )}
+                  {scheduled && (
+                    <Badge variant="outline" className="flex-shrink-0 text-[10px] font-normal text-muted-foreground">
+                      In calendario
+                    </Badge>
                   )}
                 </div>
               </TableCell>
@@ -499,11 +521,14 @@ export function ExpenseTable({ expenses, onEdit, onRefresh, isDemo = false, hasA
                 {expense.subCategoryName || '-'}
               </TableCell>
               <TableCell className="text-right font-medium">
+                {/* The sign colour means money gained or lost; a scheduled row is neither yet. */}
                 <div
                   className={`flex items-center justify-end gap-1 ${
-                    expense.type === 'income'
-                      ? 'text-emerald-600 dark:text-emerald-400'
-                      : 'text-destructive'
+                    scheduled
+                      ? 'text-muted-foreground'
+                      : expense.type === 'income'
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : 'text-destructive'
                   }`}
                 >
                   {expense.type === 'income' ? (
@@ -564,7 +589,8 @@ export function ExpenseTable({ expenses, onEdit, onRefresh, isDemo = false, hasA
                 </div>
               </TableCell>
             </TableRow>
-          ))}
+            );
+          })}
         </TableBody>
       </Table>
     </div>

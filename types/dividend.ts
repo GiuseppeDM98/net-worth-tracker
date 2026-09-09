@@ -190,6 +190,28 @@ export interface DividendGrowthData {
   portfolioAvgGrowth?: number;
 }
 
+/**
+ * What GET /api/dividends/stats returns and the Dividendi tab actually reads.
+ *
+ * Every field here is measured on a window of the SERVER'S choosing, never on the tab's
+ * period axis: YOC and current yield are TTM on the current holding, DPS growth and total
+ * return are all-time. That is why the tab fetches this once, without date bounds, and the
+ * Rendimento tile names its own window instead of borrowing the picker's.
+ */
+export interface DividendStatsPayload {
+  /** Portfolio yield on cost, gross, TTM. Absent when no held asset has a cost basis. */
+  portfolioYieldOnCost?: number;
+  /** Same, net of the withholding actually applied to each payment. */
+  portfolioYieldOnCostNet?: number;
+  /** Yield on today's market value, gross / net — the counterpart YOC is read against. */
+  portfolioCurrentYieldGross?: number;
+  portfolioCurrentYieldNet?: number;
+  totalCostBasis?: number;
+  yieldOnCostAssets?: YieldOnCostAsset[];
+  totalReturnAssets?: TotalReturnAsset[];
+  dividendGrowthData?: DividendGrowthData;
+}
+
 export interface ScrapedDividend {
   exDate: Date;
   paymentDate: Date;

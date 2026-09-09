@@ -59,6 +59,22 @@ export interface BudgetConfig {
 
 export const DEFAULT_ALERT_THRESHOLDS = [50, 75, 90, 100];
 
+// The budget configuration as it stood in a given month — budgetHistory/{userId}/months/{YYYY-MM}.
+// Written by the daily cron (lib/server/budgetHistoryService.ts), so the document of a month
+// holds the configuration of its LAST captured day; the ceiling itself is not versioned in
+// `budgets/{userId}`, and without this record a closed month can only be read against
+// today's ceiling. Never written by the client.
+export interface BudgetHistoryRecord {
+  userId: string;
+  // 'YYYY-MM', Italian calendar
+  month: string;
+  overallMonthlyAmount?: number;
+  items: BudgetItem[];
+  alertsEnabled: boolean;
+  alertThresholds: number[];
+  capturedAt: Date;
+}
+
 // Computed comparison object built from allExpenses for display
 export interface BudgetComparison {
   item: BudgetItem;
@@ -79,42 +95,60 @@ export interface BudgetComparison {
 
 // ==================== Spending Forecast ====================
 
-// End-of-month projection for a single budget scope (one item, or the overall budget),
-// derived from the current month's spending pace.
+// How a budget scope's month-end figure is projected (budgetUtils.resolveItemPace):
+//   'variable' → the linear pace on what is booked to date, plus the rows already
+//                dated after today (the app's ONE projection rule, spendingProjection.ts).
+//   'fixed'    → no pace at all: a fixed or debt category is a charge that lands once
+//                (rent on the 1st, an instalment on the 27th), so projecting it by the
+//                day would flag it "at risk" all month. Only booked + scheduled rows count.
+export type BudgetPace = 'variable' | 'fixed';
+
+// What is booked in the month, split at today: the projection extrapolates only the former.
+export interface SpendingSplit {
+  spentToDate: number;
+  scheduled: number;
+}
+
+// End-of-month projection for a single budget scope (one item, or the overall budget).
 export interface SpendingForecast {
-  // EUR already spent (or earned, for income) in the current month so far
+  // Everything booked in the month (spentToDate + scheduled) — what the ratios read.
   spentSoFar: number;
+  spentToDate: number;
+  scheduled: number;
   // Monthly budget amount this forecast is measured against
   budgetAmount: number;
-  // Linear projection of the full-month total at the current daily pace
+  // Month-end total: the pace on spentToDate + scheduled ('variable'), or spentSoFar ('fixed')
   projectedTotal: number;
   // budgetAmount − projectedTotal (negative = projected overspend)
   remainingBudget: number;
   // max(0, projectedTotal − budgetAmount) — how much the projection exceeds the budget
   estimatedOverspend: number;
   // Budget left for the rest of the month spread evenly over remaining days.
-  // 0 when the budget is already exhausted.
+  // 0 when the budget is already exhausted or the month is over.
   dailyAllowance: number;
   daysElapsed: number;
   daysInMonth: number;
 }
 
-// ==================== Budget Insights ====================
+// ==================== Categories at Risk ====================
 
-export interface BudgetInsights {
-  // Expense category with the highest spend in the current month (null if none)
-  topCategory: { label: string; amount: number } | null;
-  // Expense items whose end-of-month projection exceeds their budget
-  categoriesAtRisk: Array<{ label: string; projectedTotal: number; budgetAmount: number }>;
-  // Current-month total expenses vs the trailing average of prior months this year
-  currentMonthExpenses: number;
-  priorMonthsAverage: number;
-  // priorMonthsAverage prorated to the current day of month — the spend you would
-  // typically have reached by today. Used for an apples-to-apples comparison with
-  // the partial current month (instead of comparing against a full month).
-  expectedSpendToDate: number;
-  // Average daily expense spend so far this month
-  averageDailySpend: number;
+// A monthly expense budget whose month-end projection exceeds its amount.
+export interface BudgetAtRisk {
+  key: string;
+  label: string;
+  projectedTotal: number;
+  budgetAmount: number;
+  // projectedTotal − budgetAmount, always > 0
+  overBy: number;
+}
+
+export interface BudgetRiskSummary {
+  // Largest overrun first
+  atRisk: BudgetAtRisk[];
+  // Monthly expense budgets the projection was run on (subcategory slices excluded)
+  evaluated: number;
+  // False in the first days of the month, when a pace is not yet a pace
+  canForecast: boolean;
 }
 
 // ==================== Budget Alerts ====================
@@ -128,11 +162,18 @@ export interface BudgetAlert {
   key: string;
   label: string;
   level: BudgetAlertLevel;
-  // Highest crossed threshold (e.g. 90) — 100+ means the budget is exceeded
+  // Highest crossed threshold (e.g. 90) — 100+ means the budget is exceeded. For a
+  // forecast-only alert (nothing crossed yet) it reads 100 and `thresholdCrossed` is false.
   threshold: number;
+  // True when current spend crossed a configured threshold — the Avvisi tile lists only
+  // these; a forecast-only alert belongs to «Categorie a rischio» instead.
+  thresholdCrossed: boolean;
   spent: number;
   budgetAmount: number;
   usedRatio: number;
   // True when the end-of-month projection (not just current spend) crosses the budget
   forecastedOverrun: boolean;
+  // Day of the month on which the running total first exceeded the budget (monthly
+  // budgets and the ceiling); null while under, and for annual budgets.
+  crossedOn: number | null;
 }

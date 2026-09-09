@@ -1,5 +1,9 @@
 import { AssistantMode, AssistantPreferences } from '@/types/assistant';
 
+// A trailing '*' marks a deliberate word-STEM match: 'geopolit*' must still catch
+// "geopolitica"/"geopolitico"/"geopolitici", so only its leading word boundary is
+// enforced. Every other entry is a whole word/phrase — matched on both boundaries,
+// or 'pil' (PIL, gross domestic product) also fires on "pilastro"/"pilota".
 const MACRO_KEYWORDS = [
   'macro',
   'macroeconomia',
@@ -7,7 +11,7 @@ const MACRO_KEYWORDS = [
   'tassi',
   'bce',
   'fed',
-  'geopolit',
+  'geopolit*',
   'guerra',
   'dazi',
   'tariffe',
@@ -32,6 +36,24 @@ const EXPLICIT_WEB_SEARCH_PATTERNS = [
   'situazione geopolitica',
 ];
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Builds a word-boundary regex for one keyword/phrase. A `.includes()` match let
+ * 'pil' fire on "pilastro"/"pilota" — a false positive that costs a full web-search
+ * turn. `\b` on both ends fixes that for whole words; a trailing '*' opts a pattern
+ * out of the trailing boundary for deliberate stem matches (see MACRO_KEYWORDS).
+ */
+function buildKeywordRegex(pattern: string): RegExp {
+  const isStem = pattern.endsWith('*');
+  const raw = isStem ? pattern.slice(0, -1) : pattern;
+  return new RegExp(`\\b${escapeRegExp(raw)}${isStem ? '' : '\\b'}`);
+}
+
+const WEB_SEARCH_MATCHERS = [...MACRO_KEYWORDS, ...EXPLICIT_WEB_SEARCH_PATTERNS].map(buildKeywordRegex);
+
 export function getDefaultAssistantPreferences(): AssistantPreferences {
   return {
     responseStyle: 'balanced',
@@ -48,9 +70,7 @@ export function shouldUseWebSearch(prompt: string): boolean {
     return false;
   }
 
-  return [...MACRO_KEYWORDS, ...EXPLICIT_WEB_SEARCH_PATTERNS].some((pattern) =>
-    normalizedPrompt.includes(pattern)
-  );
+  return WEB_SEARCH_MATCHERS.some((regex) => regex.test(normalizedPrompt));
 }
 
 const STRUCTURED_ANALYSIS_MODES: AssistantMode[] = [
@@ -58,7 +78,6 @@ const STRUCTURED_ANALYSIS_MODES: AssistantMode[] = [
   'year_analysis',
   'ytd_analysis',
   'history_analysis',
-  'quarter_analysis',
 ];
 
 export function resolveAssistantWebSearchPolicy(

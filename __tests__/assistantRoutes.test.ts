@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import type { AssistantMonthContextBundle } from '@/types/assistant';
+import type { streamAssistantResponse } from '@/lib/server/assistant/anthropicStream';
 
 const {
   verifyIdTokenMock,
@@ -8,18 +9,20 @@ const {
   buildAssistantYearContextMock,
   buildAssistantYtdContextMock,
   buildAssistantHistoryContextMock,
-  buildAssistantQuarterContextMock,
   listAssistantThreadsMock,
   createAssistantThreadMock,
   getAssistantThreadDetailMock,
   getAssistantThreadMock,
   getAssistantMemoryDocumentMock,
   updateAssistantMemoryDocumentMock,
+  applyAssistantMemoryMutationsMock,
   deleteAssistantMemoryDocumentMock,
   setAssistantGoalEvaluationMock,
   appendAssistantMessageMock,
   updateAssistantThreadMetadataMock,
   streamAssistantResponseMock,
+  extractMemoryCandidatesMock,
+  extractStructuredGoalFromTextMock,
   accountAccessDocGetMock,
 } = vi.hoisted(() => ({
   verifyIdTokenMock: vi.fn(),
@@ -27,18 +30,20 @@ const {
   buildAssistantYearContextMock: vi.fn(),
   buildAssistantYtdContextMock: vi.fn(),
   buildAssistantHistoryContextMock: vi.fn(),
-  buildAssistantQuarterContextMock: vi.fn(),
   listAssistantThreadsMock: vi.fn(),
   createAssistantThreadMock: vi.fn(),
   getAssistantThreadDetailMock: vi.fn(),
   getAssistantThreadMock: vi.fn(),
   getAssistantMemoryDocumentMock: vi.fn(),
   updateAssistantMemoryDocumentMock: vi.fn(),
+  applyAssistantMemoryMutationsMock: vi.fn(),
   deleteAssistantMemoryDocumentMock: vi.fn(),
   setAssistantGoalEvaluationMock: vi.fn(),
   appendAssistantMessageMock: vi.fn(),
   updateAssistantThreadMetadataMock: vi.fn(),
   streamAssistantResponseMock: vi.fn(),
+  extractMemoryCandidatesMock: vi.fn(),
+  extractStructuredGoalFromTextMock: vi.fn(),
   accountAccessDocGetMock: vi.fn(),
 }));
 
@@ -70,7 +75,6 @@ vi.mock('@/lib/services/assistantMonthContextService', () => ({
   buildAssistantYearContext: buildAssistantYearContextMock,
   buildAssistantYtdContext: buildAssistantYtdContextMock,
   buildAssistantHistoryContext: buildAssistantHistoryContextMock,
-  buildAssistantQuarterContext: buildAssistantQuarterContextMock,
 }));
 
 vi.mock('@/lib/server/assistant/store', () => ({
@@ -80,6 +84,7 @@ vi.mock('@/lib/server/assistant/store', () => ({
   getAssistantThread: getAssistantThreadMock,
   getAssistantMemoryDocument: getAssistantMemoryDocumentMock,
   updateAssistantMemoryDocument: updateAssistantMemoryDocumentMock,
+  applyAssistantMemoryMutations: applyAssistantMemoryMutationsMock,
   deleteAssistantMemoryDocument: deleteAssistantMemoryDocumentMock,
   setAssistantGoalEvaluation: setAssistantGoalEvaluationMock,
   appendAssistantMessage: appendAssistantMessageMock,
@@ -90,6 +95,14 @@ vi.mock('@/lib/server/assistant/store', () => ({
 
 vi.mock('@/lib/server/assistant/anthropicStream', () => ({
   streamAssistantResponse: streamAssistantResponseMock,
+}));
+
+// Keeps the fire-and-forget memory extraction off the network, and lets the goal
+// structuring path of PATCH be asserted without a real Haiku call.
+vi.mock('@/lib/server/assistant/memoryExtraction', () => ({
+  extractMemoryCandidates: extractMemoryCandidatesMock,
+  extractStructuredGoalFromText: extractStructuredGoalFromTextMock,
+  dedupeMemoryItems: vi.fn((candidates: unknown[]) => candidates),
 }));
 
 import { GET as getThreadsRoute } from '@/app/api/ai/assistant/threads/route';
@@ -159,6 +172,8 @@ describe('Assistant private API routes', () => {
       topIndividualExpenses: [],
       bySubCategoryAllocation: {},
       targetAllocation: null,
+      targetAllocationSource: 'manual',
+      goals: null,
       expenseCategories: [],
       dataQuality: {
         hasSnapshot: false,
@@ -171,7 +186,6 @@ describe('Assistant private API routes', () => {
     buildAssistantYearContextMock.mockResolvedValue(null);
     buildAssistantYtdContextMock.mockResolvedValue(null);
     buildAssistantHistoryContextMock.mockResolvedValue(null);
-    buildAssistantQuarterContextMock.mockResolvedValue(null);
     listAssistantThreadsMock.mockResolvedValue([]);
     createAssistantThreadMock.mockResolvedValue({
       id: 'thread-1',
@@ -243,6 +257,19 @@ describe('Assistant private API routes', () => {
       hasDummySnapshots: false,
     });
     setAssistantGoalEvaluationMock.mockResolvedValue(undefined);
+    applyAssistantMemoryMutationsMock.mockResolvedValue({
+      preferences: {
+        responseStyle: 'balanced',
+        includeMacroContext: false,
+        memoryEnabled: true,
+        includeDummySnapshots: false,
+      },
+      items: [],
+      suggestions: [],
+      updatedAt: new Date(2026, 3, 5),
+    });
+    extractMemoryCandidatesMock.mockResolvedValue([]);
+    extractStructuredGoalFromTextMock.mockResolvedValue(undefined);
     appendAssistantMessageMock
       .mockResolvedValueOnce({
         id: 'user-msg-1',
@@ -267,12 +294,14 @@ describe('Assistant private API routes', () => {
         webSearchUsed: true,
       });
     updateAssistantThreadMetadataMock.mockResolvedValue(undefined);
-    streamAssistantResponseMock.mockImplementation(async ({ onStatus, onText }: any) => {
-      onStatus('writing');
-      onText('Risposta');
-      onStatus('saving');
-      return { text: 'Risposta', webSearchUsed: true };
-    });
+    streamAssistantResponseMock.mockImplementation(
+      async ({ onStatus, onText }: Parameters<typeof streamAssistantResponse>[0]) => {
+        onStatus('writing');
+        onText('Risposta');
+        onStatus('saving');
+        return { text: 'Risposta', webSearchUsed: true };
+      }
+    );
   });
 
   it('returns 401 for threads route without Authorization header', async () => {
@@ -362,6 +391,99 @@ describe('Assistant private API routes', () => {
         includeMacroContext: true,
       },
       item: undefined,
+    });
+  });
+
+  it('structures a goal written by hand in the memory panel', async () => {
+    // The panel sends id/text/category only, so without this the goal would never
+    // be auto-trackable — exactly what the structured-goals rework set out to fix.
+    extractStructuredGoalFromTextMock.mockResolvedValueOnce({
+      kind: 'cash_target',
+      targetValue: 20000,
+      unit: 'eur',
+      direction: 'at_most',
+    });
+
+    const response = await patchMemoryRoute(
+      createJsonRequest('http://localhost/api/ai/assistant/memory', {
+        method: 'PATCH',
+        headers: { Authorization: 'Bearer valid-token' },
+        body: {
+          userId: 'user-1',
+          item: { id: 'goal-1', text: 'Ridurre il cash a 20k', category: 'goal' },
+        },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(extractStructuredGoalFromTextMock).toHaveBeenCalledWith(
+      'Ridurre il cash a 20k',
+      expect.anything()
+    );
+    expect(updateAssistantMemoryDocumentMock).toHaveBeenCalledWith('user-1', {
+      preferences: undefined,
+      item: {
+        id: 'goal-1',
+        text: 'Ridurre il cash a 20k',
+        category: 'goal',
+        structuredGoal: {
+          kind: 'cash_target',
+          targetValue: 20000,
+          unit: 'eur',
+          direction: 'at_most',
+        },
+      },
+      suggestion: undefined,
+    });
+  });
+
+  it('does not spend a model call when only the status of a goal changes', async () => {
+    getAssistantMemoryDocumentMock.mockResolvedValueOnce({
+      preferences: {
+        responseStyle: 'balanced',
+        includeMacroContext: false,
+        memoryEnabled: true,
+        includeDummySnapshots: false,
+      },
+      items: [{
+        id: 'goal-1',
+        userId: 'user-1',
+        category: 'goal',
+        text: 'Ridurre il cash a 20k',
+        structuredGoal: { kind: 'cash_target', targetValue: 20000, unit: 'eur', direction: 'at_most' },
+        createdAt: new Date(2026, 3, 5),
+        updatedAt: new Date(2026, 3, 5),
+        status: 'active',
+      }],
+      suggestions: [],
+      updatedAt: null,
+      hasDummySnapshots: false,
+    });
+
+    const response = await patchMemoryRoute(
+      createJsonRequest('http://localhost/api/ai/assistant/memory', {
+        method: 'PATCH',
+        headers: { Authorization: 'Bearer valid-token' },
+        body: {
+          userId: 'user-1',
+          item: {
+            id: 'goal-1',
+            text: 'Ridurre il cash a 20k',
+            category: 'goal',
+            status: 'archived',
+          },
+        },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(extractStructuredGoalFromTextMock).not.toHaveBeenCalled();
+    // The stored structure survives an archive — it is not re-derived, nor dropped
+    expect(updateAssistantMemoryDocumentMock.mock.calls[0][1].item.structuredGoal).toEqual({
+      kind: 'cash_target',
+      targetValue: 20000,
+      unit: 'eur',
+      direction: 'at_most',
     });
   });
 
@@ -473,28 +595,6 @@ describe('Assistant private API routes', () => {
     expect(streamText).toContain('"type":"text"');
     expect(streamText).toContain('"type":"done"');
     expect(streamAssistantResponseMock).toHaveBeenCalled();
-  });
-
-  it('builds quarter context (not month context) for a quarter_analysis stream request', async () => {
-    const response = await streamRoute(
-      createJsonRequest('http://localhost/api/ai/assistant/stream', {
-        method: 'POST',
-        headers: {
-          Authorization: 'Bearer valid-token',
-        },
-        body: {
-          userId: 'user-1',
-          mode: 'quarter_analysis',
-          prompt: 'Analizza il trimestre',
-          // May 2026 belongs to Q2 — the builder receives the quarter, not the month.
-          month: { year: 2026, month: 5 },
-        },
-      })
-    );
-
-    expect(response.status).toBe(200);
-    expect(buildAssistantQuarterContextMock).toHaveBeenCalledWith('user-1', 2026, 2, false);
-    expect(buildAssistantMonthContextMock).not.toHaveBeenCalled();
   });
 
   it('returns 403 on stream route when token and userId do not match', async () => {

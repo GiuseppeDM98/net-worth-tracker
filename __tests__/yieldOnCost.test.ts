@@ -153,3 +153,48 @@ describe('computeDividendYieldMetrics', () => {
     expect(result.portfolioYocGross).toBeCloseTo(10, 4); // €1 DPS / €10 cost
   });
 });
+
+describe('computeDividendYieldMetrics — EUR denominators (costBasisEur.ts)', () => {
+  it('divides a EUR dividend by the EUR PMC and the EUR price of a foreign asset', () => {
+    // 1 USD/share gross = 0,9 €/share; PMC 100 USD but 90 € (fees included); price 145 USD = 130 €.
+    const div = makeDividend('usd', new Date(2025, 2, 1), 1, 10, { grossAmountEur: 9, netAmountEur: 9 * 0.74 });
+    const asset: AssetInput = {
+      id: 'usd',
+      ticker: 'USD',
+      name: 'usd',
+      quantity: 10,
+      currency: 'USD',
+      averageCost: 100,
+      averageCostEur: 90,
+      currentPrice: 145,
+      currentPriceEur: 130,
+    };
+
+    const result = computeDividendYieldMetrics([div], [asset], START, END, 12);
+
+    expect(result.portfolioYocGross).toBeCloseTo(1, 4); // 0,9 / 90
+    expect(result.portfolioCurrentYieldGross).toBeCloseTo((0.9 / 130) * 100, 4);
+    expect(result.totalCostBasis).toBe(900);
+    expect(result.totalMarketValue).toBe(1300);
+    expect(result.assets[0]).toMatchObject({ averageCost: 90, currentPrice: 130 });
+  });
+
+  it('leaves out a foreign asset without a EUR PMC rather than dividing euros by dollars', () => {
+    const div = makeDividend('usd', new Date(2025, 2, 1), 1, 10, { grossAmountEur: 9, netAmountEur: 6.66 });
+    const asset: AssetInput = { id: 'usd', ticker: 'USD', name: 'usd', quantity: 10, currency: 'USD', averageCost: 100, currentPrice: 145 };
+
+    const result = computeDividendYieldMetrics([div], [asset], START, END, 12);
+
+    expect(result.assetCount).toBe(0);
+    expect(result.portfolioYocGross).toBeNull();
+  });
+
+  it('prefers the EUR PMC with fees on a EUR asset too', () => {
+    const div = makeDividend('eni', new Date(2025, 2, 1), 1, 10);
+    const asset: AssetInput = { ...makeAsset('eni', 10, 10, 20), averageCostEur: 12.5 };
+
+    const result = computeDividendYieldMetrics([div], [asset], START, END, 12);
+
+    expect(result.portfolioYocGross).toBeCloseTo(8, 4); // 1 / 12,5
+  });
+});

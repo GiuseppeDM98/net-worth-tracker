@@ -3,7 +3,7 @@
  *
  * Design note: this rule used to exist in three independent copies (AssetDialog's local
  * `shouldUpdatePrice`, yahooFinanceService's exported `shouldUpdatePrice`, and
- * AssetManagementTab's `requiresManualPricing`). They drifted: only the dialog's copy knew
+ * the asset table's `requiresManualPricing`). They drifted: only the dialog's copy knew
  * about `pensionFund`, so a pension fund was priced correctly in the form, still queued for
  * a Yahoo quote by the price cron, and never got the manual-price row tint in the table.
  *
@@ -56,9 +56,9 @@ export interface PricedAssetFields {
  * turned auto-updates off for it. `autoUpdatePrice === undefined` means "not set" and is
  * treated as opted-in, matching the backwards-compatible default in `priceUpdater.ts`.
  *
- * Drives the manual-price row/card tint on Patrimonio and the `useTotal` heuristic for the
- * Δ columns (a manually valued asset has a fixed unit price of 1 — the quantity carries the
- * signal, so deltas must be computed on total value instead of unit price).
+ * Drives the manual-price row tint on Patrimonio and the «N valutati a mano» count of its
+ * Strumenti reading. It does NOT decide how the Δ columns are measured: a hand-priced asset can
+ * still have a real unit price (see lib/utils/assetPerformanceDeltas.ts).
  */
 export function requiresManualPricing(asset: PricedAssetFields): boolean {
   if (asset.autoUpdatePrice === false) return true;

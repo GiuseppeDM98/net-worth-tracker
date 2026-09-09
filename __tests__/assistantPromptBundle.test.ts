@@ -1,10 +1,10 @@
 /**
  * Tests for the numeric data block the assistant prompt builders emit.
  *
- * `formatBundleForPrompt` is module-private, so everything here goes through
- * `buildMonthAnalysisPrompt(...).userContent` — the path a real request takes.
- * Exporting the formatter purely to test it would widen the module's surface for
- * no gain: the assertions read just as well against the real entry point.
+ * Everything here goes through `buildMonthAnalysisPrompt(...).userContent` — the path a
+ * real request takes — rather than through `formatBundleForPrompt` directly. (The formatter
+ * is exported, but only because the periodic emails send the same block; asserting against
+ * the real entry point still reads just as well and covers the wiring too.)
  */
 
 import { describe, expect, it } from 'vitest';
@@ -39,6 +39,8 @@ function makeBundle(overrides: Partial<AssistantMonthContextBundle> = {}): Assis
     topIndividualExpenses: [],
     bySubCategoryAllocation: {},
     targetAllocation: null,
+    targetAllocationSource: 'manual',
+    goals: null,
     expenseCategories: [],
     dataQuality: {
       hasSnapshot: true,
@@ -229,6 +231,209 @@ describe('assistant prompt data block', () => {
 
       // Assert
       expect(content).toContain('Numero transazioni: 12 (di cui 9 di spesa');
+    });
+  });
+
+  describe('goals section', () => {
+    it('should state that Goal-Based Investing is off rather than omitting the section', () => {
+      // Arrange — a missing section is indistinguishable, to a model, from missing data.
+      const bundle = makeBundle({ goals: null });
+
+      // Act
+      const content = render(bundle);
+
+      // Assert
+      expect(content).toContain('--- OBIETTIVI DI INVESTIMENTO (Goal-Based Investing) ---');
+      expect(content).toContain('Goal-Based Investing non attivo');
+      expect(content).toContain('Non è un dato mancante');
+    });
+
+    it('should distinguish an enabled feature with no goals from a disabled one', () => {
+      // Arrange
+      const bundle = makeBundle({
+        goals: { enabled: true, goalDrivenAllocationEnabled: false, items: [] },
+      });
+
+      // Act
+      const content = render(bundle);
+
+      // Assert
+      expect(content).toContain('Funzionalità attiva ma nessun obiettivo ancora creato');
+      expect(content).not.toContain('Goal-Based Investing non attivo');
+    });
+
+    it('should render each goal with progress, deadline, priority and verdict', () => {
+      // Arrange
+      const bundle = makeBundle({
+        goals: {
+          enabled: true,
+          goalDrivenAllocationEnabled: false,
+          items: [
+            {
+              name: 'Acquisto Casa',
+              targetAmount: 100000,
+              targetDateIso: '2032-06-01',
+              priority: 'alta',
+              currentValue: 25000,
+              monthlyContribution: 500,
+              recommendedAllocation: { bonds: 70, equity: 30 },
+              verdict: 'offTrack',
+            },
+          ],
+        },
+      });
+
+      // Act
+      const content = render(bundle);
+
+      // Assert
+      expect(content).toContain('Elenco completo (1)');
+      expect(content).toContain('Acquisto Casa: valore attuale 25.000 €');
+      expect(content).toContain('target 100.000 € (25,0% raggiunto)');
+      expect(content).toContain('scadenza 2032-06-01');
+      expect(content).toContain('priorità alta');
+      expect(content).toContain('contributo mensile pianificato 500 €');
+      expect(content).toContain('stato: in ritardo');
+      expect(content).toContain('allocazione consigliata per questo obiettivo: Obbligazioni 70%, Azioni 30%');
+    });
+
+    it('should state the required pace as a projection, with the return it assumes', () => {
+      // Arrange
+      const bundle = makeBundle({
+        goals: {
+          enabled: true,
+          goalDrivenAllocationEnabled: false,
+          items: [
+            {
+              name: 'Acquisto Casa',
+              targetAmount: 100000,
+              targetDateIso: '2032-06-01',
+              priority: 'alta',
+              currentValue: 25000,
+              monthlyContribution: 500,
+              verdict: 'offTrack',
+              requiredMonthlyContribution: 780,
+              projectedValueAtDeadline: 62000,
+              assumedAnnualReturn: 3.85,
+            },
+          ],
+        },
+      });
+
+      // Act
+      const content = render(bundle);
+
+      // Assert — the number AND the assumption behind it, or the model presents an
+      // annuity calculation as a measurement.
+      expect(content).toContain('versamento mensile necessario per arrivare al target entro la scadenza: 780 €');
+      expect(content).toContain('proiezione, ipotizzando un rendimento nominale del 3,9% annuo');
+      expect(content).toContain('valore proiettato alla scadenza al ritmo attuale: 62.000 €');
+    });
+
+    it('should say plainly when no further contribution is needed', () => {
+      // Arrange — a zero required pace is a statement, not an amount to print as "0 €".
+      const bundle = makeBundle({
+        goals: {
+          enabled: true,
+          goalDrivenAllocationEnabled: false,
+          items: [
+            {
+              name: 'Quasi fatto',
+              targetAmount: 10000,
+              targetDateIso: '2040-01-01',
+              priority: 'bassa',
+              currentValue: 9500,
+              verdict: 'onTrack',
+              requiredMonthlyContribution: 0,
+              assumedAnnualReturn: 4,
+            },
+          ],
+        },
+      });
+
+      // Act
+      const content = render(bundle);
+
+      // Assert
+      expect(content).toContain('nessun altro versamento necessario');
+      expect(content).not.toContain('necessario per arrivare al target entro la scadenza: 0 €');
+    });
+
+    it('should say an open-ended goal has no target instead of printing a zero', () => {
+      // Arrange
+      const bundle = makeBundle({
+        goals: {
+          enabled: true,
+          goalDrivenAllocationEnabled: false,
+          items: [
+            { name: 'Fondo libero', priority: 'bassa', currentValue: 4000, verdict: 'noTarget' },
+          ],
+        },
+      });
+
+      // Act
+      const content = render(bundle);
+
+      // Assert
+      expect(content).toContain('nessun importo target (obiettivo aperto)');
+      expect(content).toContain('nessuna scadenza');
+    });
+
+    it('should announce that the allocation targets come from the goals', () => {
+      // Arrange
+      const bundle = makeBundle({
+        goals: {
+          enabled: true,
+          goalDrivenAllocationEnabled: true,
+          items: [
+            { name: 'Pensione', priority: 'alta', currentValue: 1000, verdict: 'noDeadline' },
+          ],
+        },
+      });
+
+      // Act
+      const content = render(bundle);
+
+      // Assert
+      expect(content).toContain('Allocazione goal-driven ATTIVA');
+    });
+  });
+
+  describe('target allocation source', () => {
+    const SNAPSHOT = {
+      byAssetClass: { equity: 60000, bonds: 40000 },
+      totalNetWorth: 100000,
+    } as unknown as NonNullable<AssistantMonthContextBundle['currentSnapshot']>;
+
+    it('should name the manual targets as manual', () => {
+      // Arrange
+      const bundle = makeBundle({
+        currentSnapshot: SNAPSHOT,
+        targetAllocation: { equity: { targetPercentage: 60 } },
+        targetAllocationSource: 'manual',
+      });
+
+      // Act
+      const content = render(bundle);
+
+      // Assert
+      expect(content).toContain('Origine dei target: impostati manualmente');
+    });
+
+    it('should warn that goal-derived targets are not the ones in Impostazioni', () => {
+      // Arrange
+      const bundle = makeBundle({
+        currentSnapshot: SNAPSHOT,
+        targetAllocation: { equity: { targetPercentage: 30 } },
+        targetAllocationSource: 'goal_driven',
+      });
+
+      // Act
+      const content = render(bundle);
+
+      // Assert
+      expect(content).toContain('derivati dagli obiettivi di investimento');
+      expect(content).toContain('Non sono i target manuali');
     });
   });
 

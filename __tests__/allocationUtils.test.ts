@@ -344,7 +344,51 @@ describe('computeBalanceScore', () => {
   });
 
   it('should return 100 for an empty portfolio (no drift to penalise)', () => {
-    expect(computeBalanceScore({})).toEqual({ score: 100, misallocationPct: 0 });
+    expect(computeBalanceScore({})).toEqual({ score: 100, misallocationPct: 0, leverageGapPp: 0 });
+  });
+
+  it('should report a zero leverage gap for every zero-sum drift', () => {
+    const result = computeBalanceScore({
+      equity: makeAllocationData({ difference: 8 }),
+      bonds: makeAllocationData({ difference: -8 }),
+    });
+    expect(result.leverageGapPp).toBe(0);
+  });
+
+  it('should charge a not-yet-reached leverage target to the gap, not to misallocation', () => {
+    // Target 90/60 (leverage 1.5×) with a perfectly proportioned unlevered 60/40
+    // portfolio: differences −30/−20. Nothing is in the wrong class — the whole
+    // drift is missing exposure.
+    const result = computeBalanceScore({
+      equity: makeAllocationData({ difference: -30 }),
+      bonds: makeAllocationData({ difference: -20 }),
+    });
+    expect(result.misallocationPct).toBe(0);
+    expect(result.leverageGapPp).toBe(-50);
+    expect(result.score).toBe(50);
+  });
+
+  it('should decompose mixed drift into offsetting misallocation plus leverage gap', () => {
+    // Σ|d| = 70, Σd = −50 → misallocation (70−50)/2 = 10, gap −50 → score 40.
+    const result = computeBalanceScore({
+      equity: makeAllocationData({ difference: -40 }),
+      bonds: makeAllocationData({ difference: 10 }),
+      cash: makeAllocationData({ difference: -20 }),
+    });
+    expect(result.misallocationPct).toBeCloseTo(10, 5);
+    expect(result.leverageGapPp).toBeCloseTo(-50, 5);
+    expect(result.score).toBe(40);
+  });
+
+  it('should report excess exposure as a positive leverage gap', () => {
+    // Levered 1.5× portfolio against a 100%-sum target: Σd = +50.
+    const result = computeBalanceScore({
+      equity: makeAllocationData({ difference: 30 }),
+      bonds: makeAllocationData({ difference: 20 }),
+    });
+    expect(result.misallocationPct).toBe(0);
+    expect(result.leverageGapPp).toBe(50);
+    expect(result.score).toBe(50);
   });
 });
 

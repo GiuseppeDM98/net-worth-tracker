@@ -4,6 +4,7 @@ import { scrapeDividendsByIsin } from '@/lib/services/borsaItalianaScraperServic
 import { createDividend, isDuplicateDividend } from '@/lib/services/dividendService';
 import { createExpenseFromDividend } from '@/lib/services/dividendIncomeService';
 import { DividendFormData } from '@/types/dividend';
+import { ExpenseSubCategory } from '@/types/expenses';
 import { isDateOnOrAfter } from '@/lib/utils/dateHelpers';
 import { Asset, BondDetails } from '@/types/assets';
 import {
@@ -11,7 +12,6 @@ import {
   resolveCoupon,
   buildCouponNote,
 } from '@/lib/utils/couponUtils';
-import { getItalyDayBoundsUtc } from '@/lib/utils/dateHelpers';
 
 /**
  * Lower-bound lookback (days) for the catch-up queries in Phases 2 and 3.
@@ -32,14 +32,30 @@ export const COUPON_CATCHUP_LOOKBACK_DAYS = 370;
 const CATCHUP_DIVIDEND_TYPES = new Set(['coupon', 'finalPremium']);
 
 /**
- * Normalizes a Firestore Timestamp (or any value exposing toDate/toMillis) to
- * epoch milliseconds, so payment dates can be compared regardless of the exact
- * shape Firestore returns.
+ * What a stored date field looks like by the time it reaches this module: a real
+ * Timestamp from the Admin SDK, a `{ toDate }` stand-in from the fixtures, or an
+ * already-converted Date / ISO string / epoch number.
  */
-function toMillis(value: any): number {
-  if (value && typeof value.toMillis === 'function') return value.toMillis();
-  if (value && typeof value.toDate === 'function') return value.toDate().getTime();
-  return new Date(value).getTime();
+type StoredDateValue = Timestamp | { toDate(): Date } | Date | string | number;
+
+/**
+ * Normalizes a stored date to epoch milliseconds, so payment dates can be compared
+ * regardless of the exact shape Firestore returns.
+ */
+function toMillis(value: StoredDateValue): number {
+  if (value instanceof Date || typeof value === 'string' || typeof value === 'number') {
+    return new Date(value).getTime();
+  }
+  if ('toMillis' in value && typeof value.toMillis === 'function') return value.toMillis();
+  return value.toDate().getTime();
+}
+
+/**
+ * The Admin SDK hands back a Timestamp where the domain type says Date, and the
+ * fixtures hand back a Date; the coupon walk below needs a real Date either way.
+ */
+function toJsDate(value: Date | Timestamp): Date {
+  return value instanceof Date ? value : value.toDate();
 }
 
 export interface ScrapingResult {
@@ -228,7 +244,7 @@ export async function runExpenseCreation(
       let subCategoryName: string | undefined;
       if (settings?.dividendIncomeSubCategoryId) {
         const subCategory = (category?.subCategories ?? []).find(
-          (sub: any) => sub.id === settings.dividendIncomeSubCategoryId
+          (sub: ExpenseSubCategory) => sub.id === settings.dividendIncomeSubCategoryId
         );
         if (subCategory) subCategoryName = subCategory.name;
       }
@@ -406,18 +422,14 @@ export async function runNextCouponScheduling(
           }
 
           const bd = asset.bondDetails;
-          const maturityDate: Date = bd.maturityDate instanceof Date
-            ? bd.maturityDate
-            : (bd.maturityDate as any).toDate();
+          const maturityDate = toJsDate(bd.maturityDate);
           const nominalValue = bd.nominalValue ?? 1;
           // Use asset taxRate if set (e.g. 12.5% for BTPs), otherwise default 26%
           const taxRate = asset.taxRate && asset.taxRate > 0 ? asset.taxRate : 26;
 
           // Walk forward one period at a time from the paid coupon, creating any
           // missing coupon until we land on (or confirm) the first future one.
-          let fromDate: Date = coupon.paymentDate instanceof Date
-            ? coupon.paymentDate
-            : (coupon.paymentDate as any).toDate();
+          let fromDate = toJsDate(coupon.paymentDate);
           let createdForBond = 0;
 
           while (true) {

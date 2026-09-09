@@ -25,14 +25,17 @@ import {
   DrawerTitle,
 } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
-import { EmptyState, FilterEmptyIcon } from '@/components/ui/empty-state';
+import { EmptyState } from '@/components/ui/empty-state';
 import { cn } from '@/lib/utils';
+import { TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { getItalyDate } from '@/lib/utils/dateHelpers';
 import { getExpenseDate } from '@/lib/utils/expenseHelpers';
+import { describeRecurrence } from '@/lib/utils/recurrenceDates';
+import { isScheduledRow } from '@/lib/utils/tracciamentoSummary';
 import type { Expense, ExpenseType } from '@/types/expenses';
 import { CompactExpenseRow, TYPE_DOT_CLASS } from '@/components/cashflow/CompactExpenseRow';
-import { getLazyIcon } from '@/components/expenses/IconPickerPopover';
+import { LAZY_CATEGORY_ICONS } from '@/components/expenses/IconPickerPopover';
 
 // ─── Italian type labels ───────────────────────────────────────────────────────
 
@@ -44,9 +47,9 @@ const EXPENSE_TYPE_LABELS: Record<ExpenseType, string> = {
   transfer: 'Trasferimento',
 };
 
-// Module-level component required by the React Compiler — getLazyIcon calls React.lazy()
-// which must never be called inside a render function (it would reset the component each
-// render). Mirrors CategoryBreakdownList's CategoryIconBadge.
+// Module-level component, and the icon is a LOOKUP in the shared map, never a call: a
+// component obtained from a call during render is a new type every render to the React
+// Compiler (`react-hooks/static-components`), which would remount it and reset Suspense.
 function TransactionDetailIcon({
   iconName,
   color,
@@ -56,7 +59,7 @@ function TransactionDetailIcon({
   color?: string;
   type: ExpenseType;
 }) {
-  const Icon = iconName ? getLazyIcon(iconName) : null;
+  const Icon = iconName ? LAZY_CATEGORY_ICONS[iconName] : undefined;
   const dot = (
     <span className={cn('h-2.5 w-2.5 rounded-full', TYPE_DOT_CLASS[type] ?? 'bg-muted-foreground')} />
   );
@@ -84,6 +87,7 @@ function TransactionDetailIcon({
 
 interface TransactionDetailDrawerProps {
   expense: Expense | null;
+  now: Date;
   onOpenChange: (open: boolean) => void;
   onEdit: (expense: Expense) => void;
   onDelete: (expense: Expense) => void;
@@ -93,6 +97,7 @@ interface TransactionDetailDrawerProps {
 
 function TransactionDetailDrawer({
   expense,
+  now,
   onOpenChange,
   onEdit,
   onDelete,
@@ -110,6 +115,7 @@ function TransactionDetailDrawer({
 
   const isIncome = expense.type === 'income';
   const isTransfer = expense.type === 'transfer';
+  const scheduled = isScheduledRow(expense, now);
   const date = getExpenseDate(expense.date);
   const catMeta = categoryMetaMap.get(expense.categoryId);
 
@@ -120,6 +126,11 @@ function TransactionDetailDrawer({
     { label: 'Tipo', value: EXPENSE_TYPE_LABELS[expense.type] },
     { label: 'Categoria', value: expense.categoryName },
   ];
+
+  // The one line that says why this row is in the list and not in the totals above it.
+  if (scheduled) {
+    details.push({ label: 'Stato', value: 'In calendario — non ancora avvenuta' });
+  }
 
   if (expense.subCategoryName) {
     details.push({ label: 'Sottocategoria', value: expense.subCategoryName });
@@ -140,8 +151,13 @@ function TransactionDetailDrawer({
       }`,
     });
   }
-  if (expense.isRecurring && expense.recurringDay) {
-    details.push({ label: 'Ricorrenza', value: `Ogni mese, il giorno ${expense.recurringDay}` });
+  const recurrenceDetail = describeRecurrence(
+    expense.recurringFrequency,
+    expense.recurringDay,
+    expense.date
+  );
+  if (expense.isRecurring && recurrenceDetail) {
+    details.push({ label: 'Ricorrenza', value: recurrenceDetail });
   }
   if (expense.link) {
     details.push({ label: 'Link', value: expense.link });
@@ -170,7 +186,13 @@ function TransactionDetailDrawer({
           <p
             className={cn(
               'mt-4 font-mono text-2xl font-bold tabular-nums',
-              isIncome ? 'text-positive' : isTransfer ? 'text-foreground' : 'text-destructive',
+              scheduled
+                ? 'text-muted-foreground'
+                : isIncome
+                  ? 'text-positive'
+                  : isTransfer
+                    ? 'text-foreground'
+                    : 'text-destructive',
             )}
           >
             {amountLabel}
@@ -267,6 +289,11 @@ function TransactionDetailDrawer({
 export interface TransactionFeedProps {
   /** Full sorted list (not yet sliced). The feed slices to `showCount` internally. */
   transactions: Expense[];
+  /**
+   * The page's clock. A row dated after it is marked «in calendario» — the list carries
+   * scheduled rows (instalments, recurring occurrences) that the figures above do not count.
+   */
+  now: Date;
   /** Total count before slicing, used for the load-more display. */
   totalCount: number;
   showCount: number;
@@ -296,6 +323,7 @@ export interface TransactionFeedProps {
 
 export function TransactionFeed({
   transactions,
+  now,
   totalCount,
   showCount,
   onLoadMore,
@@ -305,7 +333,7 @@ export function TransactionFeed({
   isDemo,
   hasActiveFilters,
   categoryMetaMap,
-  emptyHint = 'Aggiungi la prima voce per iniziare a tracciare.',
+  emptyHint = 'Nessun movimento registrato nel periodo: aggiungi la prima voce per iniziare a tracciare.',
   surface = 'card',
   className,
 }: Readonly<TransactionFeedProps>) {
@@ -349,14 +377,12 @@ export function TransactionFeed({
   if (transactions.length === 0) {
     return (
       <EmptyState
-        icon={FilterEmptyIcon}
-        title="Nessuna voce trovata"
-        description={
+        className={className}
+        message={
           hasActiveFilters
-            ? 'Nessun risultato per i filtri applicati. Prova ad azzerare i filtri.'
+            ? 'Nessun movimento passa i filtri applicati: azzerali per rivedere il periodo intero.'
             : emptyHint
         }
-        className={className}
       />
     );
   }
@@ -367,9 +393,7 @@ export function TransactionFeed({
         <div key={group.label ?? idx}>
           {/* Date group header */}
           {group.label !== null && (
-            <p className="text-muted-foreground/60 mb-2 pl-1 text-[11px] font-medium tracking-widest uppercase">
-              {group.label}
-            </p>
+            <p className={cn(TILE_SUB_EYEBROW_CLASS, 'mb-2 pl-1 font-mono tabular-nums')}>{group.label}</p>
           )}
 
           {/* All rows for this date. On mobile a standalone card; on desktop flat rows,
@@ -389,6 +413,7 @@ export function TransactionFeed({
                     onSelect={setSelectedExpense}
                     categoryIcon={catMeta?.icon}
                     categoryColor={catMeta?.color}
+                    scheduled={isScheduledRow(expense, now)}
                   />
                 </div>
               );
@@ -403,7 +428,7 @@ export function TransactionFeed({
           <Button variant="outline" size="sm" onClick={onLoadMore}>
             Carica altri {Math.min(20, totalCount - showCount)}
           </Button>
-          <p className="text-muted-foreground mt-2 text-xs">
+          <p className="text-muted-foreground mt-2 font-mono text-xs tabular-nums">
             {showCount} di {totalCount} voci
           </p>
         </div>
@@ -412,6 +437,7 @@ export function TransactionFeed({
       {/* Detail drawer — single, consistent edit/delete model for desktop and mobile. */}
       <TransactionDetailDrawer
         expense={selectedExpense}
+        now={now}
         onOpenChange={(open) => {
           if (!open) setSelectedExpense(null);
         }}

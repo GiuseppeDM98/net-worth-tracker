@@ -27,8 +27,8 @@
  * @param onSave - Async callback with year, month, note to save to database
  */
 
-import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { useState } from 'react';
+import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -80,22 +80,24 @@ export function SnapshotSearchDialog({
       return {
         value: `${snapshot.year}-${snapshot.month}`,
         label: `${dateLabel} - ${amountLabel}`,
-        color: snapshot.note ? '#F59E0B' : undefined, // Amber if has note
+        // A month that already carries a note is marked with the theme's caution token — the
+        // literal amber it had stayed the same hue on every theme (The Sign-Color Token Rule).
+        color: snapshot.note ? 'var(--warning-foreground)' : undefined,
       };
     });
 
-  // Load note when snapshot selected
-  useEffect(() => {
-    if (selectedSnapshotId) {
-      const [year, month] = selectedSnapshotId.split('-').map(Number);
-      const snapshot = snapshots.find(
-        (s) => s.year === year && s.month === month
-      );
-      setNoteText(snapshot?.note || '');
-    } else {
+  // The note follows the selection: set together with it, in the handler, not in an effect
+  // (react-hooks/set-state-in-effect).
+  const handleSelectSnapshot = (id: string) => {
+    setSelectedSnapshotId(id);
+    if (!id) {
       setNoteText('');
+      return;
     }
-  }, [selectedSnapshotId, snapshots]);
+    const [year, month] = id.split('-').map(Number);
+    const snapshot = snapshots.find((s) => s.year === year && s.month === month);
+    setNoteText(snapshot?.note || '');
+  };
 
   const selectedSnapshot = (() => {
     if (!selectedSnapshotId) return null;
@@ -141,13 +143,52 @@ export function SnapshotSearchDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
-        <DialogHeader>
-          <DialogTitle>Inserisci o modifica una nota</DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-4 py-4">
+    <ResponsiveModal
+      open={open}
+      onClose={() => onOpenChange(false)}
+      eyebrow="Storico · Note"
+      title="Annota un mese"
+      reading={
+        selectedSnapshot
+          ? 'La nota compare come marcatore sulla curva del patrimonio e nel Dettaglio.'
+          : 'Scegli il mese: la nota comparirà come marcatore sulla sua curva.'
+      }
+      width="md"
+      footer={
+        <>
+          {selectedSnapshot?.note && (
+            <Button
+              type="button"
+              variant="outline"
+              className="text-destructive hover:text-destructive"
+              onClick={handleDelete}
+              disabled={saving || !selectedSnapshot}
+            >
+              Elimina nota
+            </Button>
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              onOpenChange(false);
+              setSelectedSnapshotId('');
+            }}
+            disabled={saving}
+          >
+            Annulla
+          </Button>
+          <Button
+            type="button"
+            onClick={handleSave}
+            disabled={saving || !selectedSnapshot || isOverLimit}
+          >
+            {saving ? 'Salvataggio...' : 'Salva'}
+          </Button>
+        </>
+      }
+    >
+        <div className="space-y-4">
           {/* Snapshot Selection */}
           <div className="space-y-2">
             <Label htmlFor="snapshot-select">Seleziona uno snapshot</Label>
@@ -155,7 +196,7 @@ export function SnapshotSearchDialog({
               id="snapshot-select"
               options={snapshotOptions}
               value={selectedSnapshotId}
-              onValueChange={setSelectedSnapshotId}
+              onValueChange={handleSelectSnapshot}
               placeholder="Cerca per mese/anno..."
               searchPlaceholder="Es: Marzo 2024"
               emptyMessage="Nessuno snapshot trovato"
@@ -189,42 +230,6 @@ export function SnapshotSearchDialog({
             </div>
           )}
         </div>
-
-        <DialogFooter className="flex justify-between sm:justify-between">
-          <div>
-            {selectedSnapshot?.note && (
-              <Button
-                type="button"
-                variant="destructive"
-                onClick={handleDelete}
-                disabled={saving || !selectedSnapshot}
-              >
-                Elimina nota
-              </Button>
-            )}
-          </div>
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                onOpenChange(false);
-                setSelectedSnapshotId('');
-              }}
-              disabled={saving}
-            >
-              Annulla
-            </Button>
-            <Button
-              type="button"
-              onClick={handleSave}
-              disabled={saving || !selectedSnapshot || isOverLimit}
-            >
-              {saving ? 'Salvataggio...' : 'Salva'}
-            </Button>
-          </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    </ResponsiveModal>
   );
 }

@@ -17,15 +17,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useExpenses, useExpenseCategories } from '@/lib/hooks/useExpenses';
 import { getSettings } from '@/lib/services/assetAllocationService';
-import { queryKeys } from '@/lib/query/queryKeys';
 import { AnalisiTab } from '@/components/cashflow/AnalisiTab';
 import { PageContainer } from '@/components/layout/PageContainer';
-import { PageHeader } from '@/components/layout/PageHeader';
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -34,16 +31,21 @@ function getErrorMessage(error: unknown): string {
 export default function AnalisiPage() {
   const { user } = useAuth();
   const { ownerId } = useActiveAccount();
-  const queryClient = useQueryClient();
 
-  const { data: allExpenses = [], isLoading: expensesLoading } = useExpenses(ownerId);
-  // Categories are loaded so AnalisiTab's sibling components (e.g. ExpenseTrackingTab)
-  // share the same RQ cache; we only need the loading flag here.
-  const { isLoading: categoriesLoading } = useExpenseCategories(ownerId);
+  const { data: allExpenses = [], isLoading: expensesLoading, isError: expensesError } =
+    useExpenses(ownerId);
+  // The taxonomy feeds AnalisiTab directly (entity search + URL-focus label
+  // resolution) and shares the RQ cache with the Cashflow page's sibling tabs.
+  const { data: categories = [], isLoading: categoriesLoading, isError: categoriesError } =
+    useExpenseCategories(ownerId);
 
   const [cashflowHistoryStartYear, setCashflowHistoryStartYear] = useState<number>(
     new Date().getFullYear() - 1
   );
+  // The URL-focus restore in AnalisiTab validates against the floored history, so it
+  // must not fire until the DEFINITIVE floor is known — the restore is one-shot and
+  // a wrong provisional floor would silently drop a valid bookmarked focus.
+  const [settingsSettled, setSettingsSettled] = useState(false);
 
   // Load cashflowHistoryStartYear — same pattern as cashflow/page.tsx. Literal copy intentional:
   // avoid a shared hook abstraction for a one-time read used in two places with the same logic.
@@ -62,34 +64,25 @@ export default function AnalisiPage() {
           operation: 'loadAnalisiSettings',
           error: getErrorMessage(error),
         });
+      } finally {
+        setSettingsSettled(true);
       }
     };
     void loadSettings();
   }, [user, ownerId]);
 
-  const handleRefresh = async () => {
-    await queryClient.invalidateQueries({
-      queryKey: queryKeys.expenses.all(ownerId || ''),
-    });
-    await queryClient.invalidateQueries({
-      queryKey: queryKeys.expenses.categories(ownerId || ''),
-    });
-  };
-
-  const loading = expensesLoading || categoriesLoading;
+  const loading = expensesLoading || categoriesLoading || !settingsSettled;
+  // A failed read is not an empty ledger: `= []` above hides the difference, so the flag
+  // travels with the data (lib/utils/statesNarrative.ts).
+  const loadFailed = expensesError || categoriesError;
 
   return (
     <PageContainer>
-      <PageHeader
-        label="Analisi"
-        title="Analisi Cashflow"
-        description="Distribuzione delle spese, pattern e trend nel tempo"
-      />
-
       <AnalisiTab
         allExpenses={allExpenses}
+        categories={categories}
         loading={loading}
-        onRefresh={handleRefresh}
+        loadFailed={loadFailed}
         historyStartYear={cashflowHistoryStartYear}
       />
     </PageContainer>

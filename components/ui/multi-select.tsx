@@ -161,7 +161,6 @@ interface MultiSelectProps
 	 * (a Popover-in-Drawer conflicts with focus trapping and cannot scroll on tablet).
 	 */
 	forceDrawer?: boolean;
-	asChild?: boolean;
 	className?: string;
 	hideSelectAll?: boolean;
 	searchable?: boolean;
@@ -215,7 +214,6 @@ export const MultiSelect = React.forwardRef<MultiSelectRef, MultiSelectProps>(
 			maxCount = 3,
 			modalPopover = false,
 			forceDrawer = false,
-			asChild = false,
 			className,
 			hideSelectAll = false,
 			searchable = true,

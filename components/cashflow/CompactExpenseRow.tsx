@@ -4,14 +4,15 @@ import { Suspense } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
-import { getLazyIcon } from '@/components/expenses/IconPickerPopover';
+import { LAZY_CATEGORY_ICONS } from '@/components/expenses/IconPickerPopover';
 import type { Expense, ExpenseType } from '@/types/expenses';
 
 // Tailwind dot-color classes keyed by expense type.
-// All entries use semantic token references to stay theme-aware across all 6 colour themes.
+// All entries use semantic token references to stay theme-aware across all 6 colour themes;
+// income takes the sign token so it matches every other "gain" on the page.
 export const TYPE_DOT_CLASS: Record<ExpenseType, string> = {
-  income:   'bg-emerald-500 dark:bg-emerald-400',
-  fixed:    'bg-[var(--chart-2)]',
+  income:   'bg-positive',
+  fixed:    'bg-[var(--chart-1)]',
   variable: 'bg-[var(--chart-4)]',
   debt:     'bg-[var(--chart-3)]',
   transfer: 'bg-[var(--chart-5)]',
@@ -22,18 +23,25 @@ export interface CompactExpenseRowProps {
   onSelect: (expense: Expense) => void;
   categoryIcon?: string;
   categoryColor?: string;
+  /** The row is dated after today — listed, not yet happened. */
+  scheduled?: boolean;
 }
 
 /**
  * Flat list row for mobile expense display (Trade Republic divide-y style).
  *
  * Tapping the row opens a detail bottom-sheet managed by the parent.
+ *
+ * A scheduled row (an instalment, a recurring occurrence dated ahead) takes an «In
+ * calendario» chip and drops the sign colour on its amount: the sign tokens mean money
+ * gained and money lost, and neither has happened yet.
  */
 export function CompactExpenseRow({
   expense,
   onSelect,
   categoryIcon,
   categoryColor,
+  scheduled = false,
 }: Readonly<CompactExpenseRowProps>) {
   const isIncome = expense.type === 'income';
   const isTransfer = expense.type === 'transfer';
@@ -53,9 +61,11 @@ export function CompactExpenseRow({
       onClick={() => onSelect(expense)}
       aria-label={`${title}, ${amountLabel}`}
     >
-      {/* Category icon badge or type dot */}
+      {/* Category icon badge or type dot. The icon is a LOOKUP in the shared module-level
+          map, never a call: a component obtained from a call during render is a new type
+          every render to the React Compiler (`react-hooks/static-components`). */}
       {(() => {
-        const CatIcon = categoryIcon ? getLazyIcon(categoryIcon) : null;
+        const CatIcon = categoryIcon ? LAZY_CATEGORY_ICONS[categoryIcon] : undefined;
         if (CatIcon) {
           return (
             <div
@@ -83,7 +93,7 @@ export function CompactExpenseRow({
         <div className="flex items-center gap-1.5 min-w-0">
           <span className="text-[14px] font-medium text-foreground truncate">{title}</span>
           {expense.isInstallment && expense.installmentNumber && expense.installmentTotal && (
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 flex-shrink-0">
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 flex-shrink-0 font-mono tabular-nums">
               {expense.installmentNumber}/{expense.installmentTotal}
             </Badge>
           )}
@@ -92,18 +102,24 @@ export function CompactExpenseRow({
               Ric.
             </Badge>
           )}
+          {scheduled && (
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 flex-shrink-0 text-muted-foreground">
+              In calendario
+            </Badge>
+          )}
         </div>
         <p className="text-[12px] text-muted-foreground truncate mt-0.5">{subtitle}</p>
       </div>
 
-      {/* Amount — emerald for income, destructive for expenses, muted for transfers */}
+      {/* Amount — the sign tokens for income and spending, muted for a net-zero transfer
+          and for anything that has not happened yet */}
       <span
         className={cn(
           'text-[14px] font-bold font-mono tabular-nums flex-shrink-0',
-          isIncome
-            ? 'text-emerald-600 dark:text-emerald-400'
-            : isTransfer
-              ? 'text-muted-foreground'
+          scheduled || isTransfer
+            ? 'text-muted-foreground'
+            : isIncome
+              ? 'text-positive'
               : 'text-destructive',
         )}
       >

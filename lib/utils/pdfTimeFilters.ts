@@ -2,6 +2,7 @@
 // Helper functions for PDF time filtering
 
 import type { MonthlySnapshot } from '@/types/assets';
+import type { Expense } from '@/types/expenses';
 import type { SectionSelection, TimeFilter, TimeFilterValidation } from '@/types/pdf';
 
 /**
@@ -65,13 +66,13 @@ export const DEFAULT_CASHFLOW_HISTORY_START_YEAR = 2025;
  * @param cashflowHistoryStartYear - User's configured floor for 'total' exports (defaults to `DEFAULT_CASHFLOW_HISTORY_START_YEAR` when omitted)
  * @returns Filtered expenses array
  */
-export function filterExpensesByTime(
-  expenses: any[],
+export function filterExpensesByTime<T extends Pick<Expense, 'date'>>(
+  expenses: T[],
   timeFilter: TimeFilter = 'total',
   year?: number,
   month?: number,
   cashflowHistoryStartYear: number = DEFAULT_CASHFLOW_HISTORY_START_YEAR
-): any[] {
+): T[] {
   if (timeFilter === 'total') {
     return expenses.filter(expense => expense.date.getFullYear() >= cashflowHistoryStartYear);
   }

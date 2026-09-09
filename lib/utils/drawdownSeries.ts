@@ -73,7 +73,9 @@ export function buildTwrIndex(
     const startNetWorth = snapshots[i - 1].totalNetWorth;
     const snapshot = snapshots[i];
 
-    if (startNetWorth !== 0) {
+    // A non-positive starting value has no return to chain: a negative one would flip the sign of
+    // the factor and read a whole period as wiped out (the `!== 0` guard let it through, 2026-09-07).
+    if (startNetWorth > 0) {
       const cashFlow = cashFlowMap.get(monthKey(snapshot.year, snapshot.month)) ?? 0;
       index *= (snapshot.totalNetWorth - cashFlow) / startNetWorth;
     }

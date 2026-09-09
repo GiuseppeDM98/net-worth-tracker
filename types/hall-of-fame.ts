@@ -9,10 +9,12 @@ export type HallOfFameSectionKey =
   | 'bestMonthsByIncome'
   | 'worstMonthsByNetWorthDecline'
   | 'worstMonthsByExpenses'
+  | 'bestMonthsBySavings'
   | 'bestYearsByNetWorthGrowth'
   | 'bestYearsByIncome'
   | 'worstYearsByNetWorthDecline'
-  | 'worstYearsByExpenses';
+  | 'worstYearsByExpenses'
+  | 'bestYearsBySavings';
 
 /**
  * Dedicated Hall of Fame note
@@ -65,6 +67,27 @@ export interface YearlyRecord {
 }
 
 /**
+ * Cifre di contorno alle classifiche, calcolate nello stesso passaggio che le costruisce.
+ *
+ * Servono a una lettura onesta: senza la media mensile una frase come «il 62% sopra la tua
+ * media» non sarebbe derivabile dalle sole top-20 salvate, e senza il conteggio dei periodi
+ * l'intestazione non potrebbe dire su quanta storia i record sono stati scelti.
+ */
+export interface HallOfFameStats {
+  /** Mesi con un record (ogni mese tranne il primo dello storico). */
+  monthCount: number;
+  /** Anni con un record. */
+  yearCount: number;
+  /** Media delle entrate mensili su tutti i mesi con un record; 0 quando non ce ne sono. */
+  averageMonthlyIncome: number;
+  /** Media delle spese mensili, stessa base. */
+  averageMonthlyExpenses: number;
+  /** Primo e ultimo mese coperti dai record; null senza record. */
+  firstMonth: { year: number; month: number } | null;
+  lastMonth: { year: number; month: number } | null;
+}
+
+/**
  * Dati completi della Hall of Fame per un utente
  */
 export interface HallOfFameData {
@@ -78,12 +101,23 @@ export interface HallOfFameData {
   bestMonthsByIncome: MonthlyRecord[]; // Migliori mesi per entrate
   worstMonthsByNetWorthDecline: MonthlyRecord[]; // Peggiori mesi per decremento NW
   worstMonthsByExpenses: MonthlyRecord[]; // Peggiori mesi per spese
+  /**
+   * Migliori mesi per risparmio netto (entrate − spese), i soli con entrate registrate.
+   * Opzionale: i documenti scritti prima del ridisegno del 2026-08-25 non lo hanno, e la
+   * pagina preferisce dire che il record non c'è ancora piuttosto che inventarlo.
+   */
+  bestMonthsBySavings?: MonthlyRecord[];
 
   // Rankings Annuali (Top 10 - numero minore per focus sui trend annuali più significativi)
   bestYearsByNetWorthGrowth: YearlyRecord[]; // Migliori anni per crescita NW
   bestYearsByIncome: YearlyRecord[]; // Migliori anni per entrate
   worstYearsByNetWorthDecline: YearlyRecord[]; // Peggiori anni per decremento NW
   worstYearsByExpenses: YearlyRecord[]; // Peggiori anni per spese
+  /** Migliori anni per risparmio netto; opzionale come la controparte mensile. */
+  bestYearsBySavings?: YearlyRecord[];
+
+  /** Cifre di contorno; opzionale come sopra. */
+  stats?: HallOfFameStats;
 
   updatedAt: Date;
 }

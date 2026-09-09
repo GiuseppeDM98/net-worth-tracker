@@ -132,6 +132,7 @@ export async function GET(request: NextRequest) {
       currentPriceEur: doc.data().currentPriceEur as number | undefined,
       currency: doc.data().currency as string | undefined,
       averageCost: doc.data().averageCost,
+      averageCostEur: doc.data().averageCostEur as number | undefined,
       // Prefer the exact start stamped at (re)purchase; fall back to the snapshot-derived value.
       holdingStartDate: doc.data().holdingStartDate?.toDate() ?? holdingStarts.get(doc.id),
     }));
@@ -451,6 +452,11 @@ export async function GET(request: NextRequest) {
     const averageYield = ttmMetrics.portfolioCurrentYieldGross ?? 0;
 
     let portfolioYieldOnCost: number | undefined;
+    // The net counterparts come from the SAME engine call: computeDividendYieldMetrics has
+    // always produced them per asset and portfolio-wide, and dropping them here forced every
+    // consumer that wanted a net figure to re-derive it from an average tax rate.
+    let portfolioYieldOnCostNet: number | undefined;
+    let portfolioCurrentYieldNet: number | undefined;
     let totalCostBasis: number | undefined;
     let yieldOnCostAssets: YieldOnCostAsset[] | undefined;
 
@@ -473,6 +479,8 @@ export async function GET(request: NextRequest) {
         }))
         .sort((a, b) => b.yocPercentage - a.yocPercentage);
       portfolioYieldOnCost = ttmMetrics.portfolioYocGross;
+      portfolioYieldOnCostNet = ttmMetrics.portfolioYocNet ?? undefined;
+      portfolioCurrentYieldNet = ttmMetrics.portfolioCurrentYieldNet ?? undefined;
       totalCostBasis = ttmMetrics.totalCostBasis;
     }
 
@@ -497,6 +505,12 @@ export async function GET(request: NextRequest) {
       // Include YOC data only if available
       ...(portfolioYieldOnCost !== undefined && {
         portfolioYieldOnCost,
+        portfolioYieldOnCostNet,
+        // Named explicitly, unlike the deprecated `averageYield` above: the Dividendi tab reads
+        // YOC against the yield on today's market value, and a field called "average" is not
+        // something a reading can state the base of.
+        portfolioCurrentYieldGross: ttmMetrics.portfolioCurrentYieldGross ?? undefined,
+        portfolioCurrentYieldNet,
         totalCostBasis,
         yieldOnCostAssets,
       }),

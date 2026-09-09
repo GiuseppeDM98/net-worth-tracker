@@ -127,12 +127,21 @@ export async function retryFirestoreOperation<T>(
         );
       }
       return result;
-    } catch (error: any) {
-      // Check for Firebase permission errors in multiple formats
+    } catch (error) {
+      // Firebase reports a permission failure in more than one shape (a FirestoreError
+      // with a code, a plain Error with the rule engine's text), so read both fields
+      // off whatever was thrown before deciding.
+      const code =
+        typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined;
+      const message =
+        typeof error === 'object' && error !== null && 'message' in error
+          ? error.message
+          : undefined;
       const isPermissionDenied =
-        error?.code === 'permission-denied' ||
-        error?.message?.includes('PERMISSION_DENIED') ||
-        error?.message?.includes('Missing or insufficient permissions');
+        code === 'permission-denied' ||
+        (typeof message === 'string' &&
+          (message.includes('PERMISSION_DENIED') ||
+            message.includes('Missing or insufficient permissions')));
 
       // Only retry on permission errors, otherwise re-throw immediately
       if (!isPermissionDenied) {

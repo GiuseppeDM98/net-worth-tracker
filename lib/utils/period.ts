@@ -13,6 +13,15 @@ import { getItalyMonth, getItalyYear } from '@/lib/utils/dateHelpers';
 export type Period =
   | { kind: 'month'; year: number; month: number }
   | { kind: 'year'; year: number }
+  /**
+   * January → the end of `throughMonth`, inclusive. A distinct kind and not a custom range,
+   * because it HAS an honest predecessor (the same months a year earlier) and a name of its
+   * own; a custom range has neither.
+   *
+   * `throughMonth` is stored, never read off a clock: `periodToRange` stays pure and the
+   * period is a fully-described value. The picker fills it from today when it builds one.
+   */
+  | { kind: 'ytd'; year: number; throughMonth: number }
   | { kind: 'custom'; from: Date; to: Date };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -28,6 +37,10 @@ export const MONTH_NAMES_SHORT = [
 export function periodLabel(period: Period): string {
   if (period.kind === 'month') return `${MONTH_NAMES[period.month - 1]} ${period.year}`;
   if (period.kind === 'year') return String(period.year);
+  // «2026 · gen–ago» — never the bare year, which is the WHOLE year and a different period.
+  if (period.kind === 'ytd') {
+    return `${period.year} · ${MONTH_NAMES_SHORT[0].toLowerCase()}–${MONTH_NAMES_SHORT[period.throughMonth - 1].toLowerCase()}`;
+  }
   const from = format(period.from, 'd MMM yyyy', { locale: it });
   const to = format(period.to, 'd MMM yyyy', { locale: it });
   return `${from} – ${to}`;
@@ -43,12 +56,20 @@ export function periodToRange(period: Period): { from: Date; to: Date } {
     const base = new Date(period.year, 0, 1);
     return { from: startOfYear(base), to: endOfYear(base) };
   }
+  if (period.kind === 'ytd') {
+    return { from: startOfYear(new Date(period.year, 0, 1)), to: endOfMonth(new Date(period.year, period.throughMonth - 1, 1)) };
+  }
   return { from: startOfDay(period.from), to: endOfDay(period.to) };
 }
 
 /** Default period: current calendar month. */
 export function currentMonthPeriod(): Period {
   return { kind: 'month', year: getItalyYear(), month: getItalyMonth() };
+}
+
+/** January → the end of today's month, in the Italian calendar. */
+export function currentYtdPeriod(): Period {
+  return { kind: 'ytd', year: getItalyYear(), throughMonth: getItalyMonth() };
 }
 
 // ─── Internal helpers (used by usePeriodPicker) ───────────────────────────────
@@ -66,10 +87,16 @@ export function isPrevMonth(p: Period): boolean {
   return p.year === getItalyYear(prev) && p.month === getItalyMonth(prev);
 }
 
-/** Check if a Period matches the current calendar year. */
+/** Check if a Period matches the current calendar year — the WHOLE year, January to December. */
 export function isCurrentYear(p: Period): boolean {
   if (p.kind !== 'year') return false;
   return p.year === getItalyYear();
+}
+
+/** Check if a Period is this year's year-to-date, up to today's month. */
+export function isCurrentYtd(p: Period): boolean {
+  if (p.kind !== 'ytd') return false;
+  return p.year === getItalyYear() && p.throughMonth === getItalyMonth();
 }
 
 const DATE_RE = /^(\d{2})\/(\d{2})\/(\d{4})$/;

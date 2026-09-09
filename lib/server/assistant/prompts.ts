@@ -15,11 +15,18 @@
  */
 
 import { AssistantMemoryItem, AssistantMonthContextBundle, AssistantPreferences } from '@/types/assistant';
+import { getAssistantPeriodLabel } from '@/lib/utils/assistantPeriodLabel';
+import { GoalVerdict } from '@/lib/utils/goalTrajectory';
+import { ASSET_CLASS_LABELS, ASSET_CLASS_SEQUENCE } from '@/lib/utils/allocationUtils';
 
-const MONTH_NAMES = [
-  'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
-  'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre',
-];
+/**
+ * The class as the app names it on screen. The blocks below are quoted back to the user in
+ * Italian prose, so handing the model 'realestate' or 'trendFollowing' is how a Firestore key
+ * ends up in an answer — and «dell'trendFollowing» is not a sentence in any language.
+ */
+function assetClassLabel(assetClass: string): string {
+  return ASSET_CLASS_LABELS[assetClass] ?? assetClass;
+}
 
 function eur(value: number): string {
   return new Intl.NumberFormat('it-IT', {
@@ -55,6 +62,21 @@ function txn(count: number): string {
 // in the text — a silent cap is precisely the defect this whole section replaces.
 const MAX_SUBCATEGORY_ROWS_IN_PROMPT = 150;
 
+/**
+ * Verdict wording for the goals section.
+ *
+ * Deliberately NOT the chip labels from `goalVerdictMeta.tsx`: a chip has three words
+ * of room and a reader who can see the deadline next to it, while the model reads one
+ * line of prose and needs the reason spelled out.
+ */
+const GOAL_VERDICT_PROMPT_LABELS: Record<GoalVerdict, string> = {
+  reached: 'raggiunto',
+  onTrack: 'in linea con la scadenza al ritmo attuale',
+  offTrack: 'in ritardo: al ritmo attuale non arriva al target entro la scadenza',
+  noDeadline: 'senza scadenza: il ritmo non è giudicabile',
+  noTarget: 'aperto: nessun importo target definito',
+};
+
 const MEMORY_CATEGORY_LABELS: Record<AssistantMemoryItem['category'], string> = {
   goal: 'Obiettivi finanziari',
   preference: 'Preferenze',
@@ -72,28 +94,6 @@ const MEMORY_CATEGORY_LABELS: Record<AssistantMemoryItem['category'], string> = 
 export interface AssistantPromptParts {
   system: string;
   userContent: string;
-}
-
-/**
- * Returns a human-readable label for the period encoded in selector.
- *   selector.quarter set    → "Q1 2025" (check before month > 0 — quarter end-month is positive)
- *   month > 0               → "Marzo 2025"
- *   month === 0              → "Anno 2025"
- *   month === -1             → "YTD 2025"
- *   month === -2             → "Storico da 2020"
- */
-function getPeriodLabel(selector: { year: number; month: number; quarter?: number }): string {
-  // Must check quarter before month > 0: quarterly end-months (3,6,9,12) are positive
-  if (selector.quarter !== undefined) {
-    return `Q${selector.quarter} ${selector.year}`;
-  }
-  if (selector.month > 0) {
-    return `${MONTH_NAMES[selector.month - 1]} ${selector.year}`;
-  }
-  if (selector.month === 0) return `Anno ${selector.year}`;
-  if (selector.month === -1) return `YTD ${selector.year}`;
-  if (selector.month === -2) return `Storico da ${selector.year}`;
-  return `${selector.year}`;
 }
 
 /**
@@ -123,15 +123,122 @@ export function formatMemoryForPrompt(items: AssistantMemoryItem[]): string {
 }
 
 /**
+ * Renders the Goal-Based Investing section, including its two absence cases.
+ *
+ * The section always exists. `goals === null` (feature off, or no goal document)
+ * and an empty goal list are DIFFERENT states and both are said out loud, because
+ * an LLM cannot tell either of them from "this data was not sent to me" — and once
+ * it cannot, the data-integrity rules make it answer "N/D" about a feature the user
+ * may simply not have turned on.
+ *
+ * Returns the lines to append, trailing blank line included.
+ */
+function formatGoalsSection(goals: AssistantMonthContextBundle['goals']): string[] {
+  const lines: string[] = ['--- OBIETTIVI DI INVESTIMENTO (Goal-Based Investing) ---'];
+
+  if (!goals || !goals.enabled) {
+    lines.push(
+      "Goal-Based Investing non attivo: l'utente non usa questa funzionalità, quindi non ha obiettivi di investimento configurati. Non è un dato mancante."
+    );
+    lines.push('');
+    return lines;
+  }
+
+  if (goals.items.length === 0) {
+    lines.push('Funzionalità attiva ma nessun obiettivo ancora creato.');
+    lines.push('');
+    return lines;
+  }
+
+  lines.push(
+    `Elenco completo (${goals.items.length}). Il "valore attuale" è la quota di portafoglio assegnata all'obiettivo, non un conto separato.`
+  );
+
+  for (const goal of goals.items) {
+    const parts: string[] = [`valore attuale ${eur(goal.currentValue)}`];
+
+    if (goal.targetAmount != null) {
+      const progress = goal.targetAmount > 0 ? (goal.currentValue / goal.targetAmount) * 100 : 0;
+      parts.push(`target ${eur(goal.targetAmount)} (${share(progress)} raggiunto)`);
+    } else {
+      parts.push('nessun importo target (obiettivo aperto)');
+    }
+
+    parts.push(goal.targetDateIso ? `scadenza ${goal.targetDateIso}` : 'nessuna scadenza');
+    parts.push(`priorità ${goal.priority}`);
+
+    if (goal.monthlyContribution != null) {
+      parts.push(`contributo mensile pianificato ${eur(goal.monthlyContribution)}`);
+    }
+
+    lines.push(`${goal.name}: ${parts.join(' | ')}`);
+
+    if (goal.verdict) {
+      lines.push(`  › stato: ${GOAL_VERDICT_PROMPT_LABELS[goal.verdict]}`);
+    }
+
+    // The required pace, stated as a projection and never as a measurement — the
+    // assumed return is printed next to it so the model can qualify it instead of
+    // presenting an annuity calculation as an observed fact.
+    if (goal.requiredMonthlyContribution != null) {
+      const assumption =
+        goal.assumedAnnualReturn != null
+          ? ` (proiezione, ipotizzando un rendimento nominale del ${share(goal.assumedAnnualReturn)} annuo)`
+          : ' (proiezione)';
+      lines.push(
+        goal.requiredMonthlyContribution > 0
+          ? `  › versamento mensile necessario per arrivare al target entro la scadenza: ${eur(goal.requiredMonthlyContribution)}${assumption}`
+          : `  › nessun altro versamento necessario: il capitale già assegnato basta a raggiungere il target entro la scadenza${assumption}`
+      );
+    }
+
+    if (goal.projectedValueAtDeadline != null) {
+      lines.push(
+        `  › valore proiettato alla scadenza al ritmo attuale: ${eur(goal.projectedValueAtDeadline)}`
+      );
+    }
+
+    if (goal.recommendedAllocation && Object.keys(goal.recommendedAllocation).length > 0) {
+      const mix = Object.entries(goal.recommendedAllocation)
+        .sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0))
+        .map(([assetClass, percentage]) => `${assetClassLabel(assetClass)} ${percentage}%`)
+        .join(', ');
+      lines.push(`  › allocazione consigliata per questo obiettivo: ${mix}`);
+    }
+  }
+
+  if (goals.goalDrivenAllocationEnabled) {
+    lines.push(
+      "Allocazione goal-driven ATTIVA: i target di allocazione del portafoglio sono derivati da questi obiettivi."
+    );
+  }
+
+  lines.push('');
+  return lines;
+}
+
+/**
  * Serialises the numeric bundle into a readable Italian text block
  * that Claude can reference when writing the analysis.
  *
  * Design: structured prose is clearer than JSON for an LLM operating on
  * financial narrative tasks; the key/value format mimics a briefing note.
+ *
+ * Exported for `buildEmailAiPrompt` (monthlyEmailService.ts): the periodic emails send
+ * this same block, so every future bundle field reaches them for free and the
+ * "questo blocco è ESAUSTIVO" guardrails in ASSISTANT_SYSTEM_CORE stay true there too.
+ *
+ * @param bundle       The period's numeric bundle.
+ * @param periodLabel  Overrides the label derived from `selector`. A quarter or a
+ *                     semester cannot be encoded in a `{year, month}` selector, so the
+ *                     email passes its own window name rather than let the header claim
+ *                     the closing month is the whole period.
  */
-function formatBundleForPrompt(bundle: AssistantMonthContextBundle): string {
-  const { selector, netWorth, cashflow, allocationChanges, dataQuality, currentSnapshot } = bundle;
-  const periodLabel = getPeriodLabel(selector);
+export function formatBundleForPrompt(
+  bundle: AssistantMonthContextBundle,
+  periodLabel: string = getAssistantPeriodLabel(bundle.selector)
+): string {
+  const { netWorth, cashflow, allocationChanges, dataQuality, currentSnapshot } = bundle;
 
   const lines: string[] = [];
 
@@ -239,7 +346,7 @@ function formatBundleForPrompt(bundle: AssistantMonthContextBundle): string {
     for (const [assetClass, value] of entries) {
       const pctOfTotal =
         totalNetWorth > 0 ? ` (${pct((value / totalNetWorth) * 100)})` : '';
-      lines.push(`${assetClass}: ${eur(value)}${pctOfTotal}`);
+      lines.push(`${assetClassLabel(assetClass)}: ${eur(value)}${pctOfTotal}`);
     }
     lines.push('');
   }
@@ -256,7 +363,7 @@ function formatBundleForPrompt(bundle: AssistantMonthContextBundle): string {
       const sorted = Object.entries(subCats).sort((a, b) => b[1] - a[1]);
       for (const [subCat, value] of sorted) {
         const pctOfTotal = totalNetWorth > 0 ? ` (${pct((value / totalNetWorth) * 100)})` : '';
-        lines.push(`  ${assetClass} › ${subCat}: ${eur(value)}${pctOfTotal}`);
+        lines.push(`  ${assetClassLabel(assetClass)} › ${subCat}: ${eur(value)}${pctOfTotal}`);
       }
     }
     lines.push('');
@@ -270,12 +377,20 @@ function formatBundleForPrompt(bundle: AssistantMonthContextBundle): string {
   if (targetAlloc && byAssetClass && Object.keys(byAssetClass).length > 0) {
     const totalNetWorth = currentSnapshot?.totalNetWorth ?? 0;
     lines.push('--- ALLOCAZIONE TARGET vs CORRENTE ---');
+    // Naming the source matters: with goal-driven allocation on, these percentages are
+    // computed from the goals and the manual ones in Impostazioni are no longer what the
+    // app measures against. Quoting the wrong set is indistinguishable from a wrong number.
+    lines.push(
+      bundle.targetAllocationSource === 'goal_driven'
+        ? "Origine dei target: derivati dagli obiettivi di investimento (allocazione goal-driven attiva). Non sono i target manuali delle impostazioni."
+        : 'Origine dei target: impostati manualmente dall\'utente in Impostazioni → Allocazione.'
+    );
     for (const [assetClass, target] of Object.entries(targetAlloc)) {
       const currentValue = byAssetClass[assetClass] ?? 0;
       const currentPct = totalNetWorth > 0 ? (currentValue / totalNetWorth) * 100 : 0;
       const gap = currentPct - target.targetPercentage;
       const gapStr = gap >= 0 ? `+${gap.toFixed(1)} p.p.` : `${gap.toFixed(1)} p.p.`;
-      lines.push(`${assetClass}: attuale ${currentPct.toFixed(1)}% | target ${target.targetPercentage}% | gap ${gapStr}`);
+      lines.push(`${assetClassLabel(assetClass)}: attuale ${currentPct.toFixed(1)}% | target ${target.targetPercentage}% | gap ${gapStr}`);
 
       if (target.subTargets) {
         for (const [sub, subTargetPct] of Object.entries(target.subTargets)) {
@@ -285,12 +400,17 @@ function formatBundleForPrompt(bundle: AssistantMonthContextBundle): string {
           const subCurrentPct = totalNetWorth > 0 ? (subCurrentValue / totalNetWorth) * 100 : 0;
           const subGap = subCurrentPct - subTargetOfPortfolio;
           const subGapStr = subGap >= 0 ? `+${subGap.toFixed(1)} p.p.` : `${subGap.toFixed(1)} p.p.`;
-          lines.push(`  › ${sub}: attuale ${subCurrentPct.toFixed(1)}% | target ${subTargetOfPortfolio.toFixed(1)}% (${subTargetPct}% dell'${assetClass}) | gap ${subGapStr}`);
+          lines.push(`  › ${sub}: attuale ${subCurrentPct.toFixed(1)}% | target ${subTargetOfPortfolio.toFixed(1)}% (${subTargetPct}% della classe ${assetClassLabel(assetClass)}) | gap ${subGapStr}`);
         }
       }
     }
     lines.push('');
   }
+
+  // Goal-Based Investing. Always rendered, absence included: a missing section would
+  // leave the model unable to tell "the feature is off" from "I was not sent the data",
+  // and the data-integrity rules then push it toward an invented "N/D".
+  lines.push(...formatGoalsSection(bundle.goals));
 
   // Top-5 movers section: shows which classes changed most this period.
   // allocationChanges is already capped at 5 by the context builder.
@@ -304,7 +424,7 @@ function formatBundleForPrompt(bundle: AssistantMonthContextBundle): string {
         change.percentagePointsChange !== null
           ? ` (${pct(change.percentagePointsChange)} p.p.)`
           : '';
-      lines.push(`${change.assetClass}: ${prev} → ${curr} | Δ ${abs}${pp}`);
+      lines.push(`${assetClassLabel(change.assetClass)}: ${prev} → ${curr} | Δ ${abs}${pp}`);
     }
     lines.push('');
   }
@@ -393,6 +513,21 @@ export const ASSISTANT_SYSTEM_CORE = [
   "Una sottocategoria che l'utente nomina e che NON compare in quel blocco ha avuto spesa zero nel periodo. Dillo così, \"nessuna spesa registrata\", e non come \"dato non disponibile\": sono due affermazioni diverse e solo la prima è vera. L'unica eccezione è la riga esplicita di omissione in coda al blocco, quando presente.",
   "Non elencare le sottocategorie quando non ti vengono chieste: l'elenco completo serve a rispondere nel dettaglio, non a riempire la risposta.",
   '',
+  '# Obiettivi di investimento (Goal-Based Investing), quando i dati li includono',
+  "Quando il messaggio contiene un blocco OBIETTIVI DI INVESTIMENTO, quello elenca gli obiettivi che l'utente ha configurato nella pagina FIRE e Simulazioni: nome, importo target, scadenza, valore già assegnato, contributo mensile pianificato, allocazione consigliata e stato della traiettoria. Sono una cosa diversa dagli obiettivi della memoria persistente: questi hanno numeri e una quota di portafoglio assegnata, quelli sono frasi che l'utente ti ha detto.",
+  "L'elenco è ESAUSTIVO. Se il blocco dice che la funzionalità non è attiva, dillo come tale — è una funzionalità opzionale che l'utente non usa, non un dato che ti manca.",
+  "Quando un obiettivo è in ritardo, cita il versamento mensile necessario e il valore proiettato alla scadenza che trovi nel blocco: sono già calcolati con la matematica dell'annualità sull'ipotesi di rendimento indicata lì. Non ricavarli moltiplicando contributo per mesi — quel conto ignora i rendimenti e dà un numero più pessimista del vero. Presentali per quello che sono, proiezioni basate su un rendimento ipotizzato, non misure.",
+  "Quando consigli un'allocazione per un obiettivo, ragiona su orizzonte temporale e priorità: più la scadenza è vicina, più la quota di strumenti volatili va ridotta a favore di obbligazioni e liquidità; un obiettivo senza scadenza e a bassa priorità tollera molto più rischio. Motiva sempre la proposta con la scadenza e la priorità di QUELL'obiettivo, non con massime generali.",
+  '',
+  '## Proporre la creazione di un obiettivo',
+  "Non puoi creare, modificare o eliminare obiettivi: puoi solo proporne uno, e la scrittura avviene unicamente quando l'utente preme Conferma sulla card che la tua proposta genera.",
+  "Quando — e SOLO quando — l'utente ti chiede di creare un obiettivo, introducilo con una frase che spiega le scelte fatte e poi emetti UN blocco di codice delimitato con linguaggio `goal-proposal` che contenga SOLO JSON valido, senza commenti e senza testo attorno, con questo schema:",
+  // The allocation keys come from ASSET_CLASS_SEQUENCE, the app-wide enumeration: a hand-written
+  // list is how the model stopped being told trendFollowing and carry exist, while
+  // `goalProposal.ts` had been accepting all eight all along.
+  `{ "name": string, "targetAmount"?: number, "targetDateIso"?: "YYYY-MM-DD", "priority": "alta" | "media" | "bassa", "monthlyContribution"?: number, "recommendedAllocation"?: { ${ASSET_CLASS_SEQUENCE.map((cls) => `"${cls}"?: number`).join(', ')} }, "notes"?: string }`,
+  "Vincoli: `name` e `priority` sono obbligatori; gli importi sono in euro, senza separatori né simbolo di valuta; le percentuali di `recommendedAllocation` devono sommare esattamente a 100. Un solo blocco per risposta. Non emetterlo mai se l'utente non ha chiesto di creare un obiettivo: per discutere un obiettivo esistente o ipotizzarne uno basta il testo.",
+  '',
   '# Casi limite',
   "- Periodo ancora in corso (mese/anno corrente, YTD): i dati sono parziali per definizione — evidenzia le tendenze osservate finora, non presentarle come il risultato finale del periodo",
   '- Asset venduti: sono esclusi dal calcolo di YOC e Current Yield per quell\'asset — non è un dato mancante, è per design',
@@ -448,42 +583,54 @@ const HISTORY_FORMAT_CONTRACT = [
   'Vincoli: massimo 750 parole. Privilegia la visione di lungo periodo rispetto ai dettagli di un singolo mese.',
 ].join('\n');
 
-const QUARTER_FORMAT_CONTRACT = [
-  '# Formato della risposta',
-  'Struttura la risposta in tre sezioni markdown:',
-  '1. **In sintesi** — 2-3 frasi sul risultato complessivo del trimestre',
-  '2. **Cosa ha mosso il patrimonio nel trimestre** — i principali driver (mercato, cashflow, allocazione)',
-  "3. **1-2 azioni o attenzioni** — osservazioni pratiche per l'investitore",
-  '',
-  'Vincoli: massimo 600 parole.',
-].join('\n');
-
 const CHAT_FORMAT_CONTRACT = [
   '# Formato della risposta',
   "Modalità conversazionale: nessuna struttura fissa a sezioni. Rispondi direttamente alla domanda, usando i dati forniti quando disponibili e restando comunque entro le regole sui dati e lo stile definiti sopra.",
 ].join('\n');
+
+// Word ceiling per email period. A quarter carries three months of causes to explain and
+// a year twelve, against the same six sections: one ceiling for all four would either
+// truncate the annual recap or pad the monthly one.
+// WARNING: the keys must stay in step with `EmailPeriodType` in monthlyEmailService.ts —
+// the two unions are structurally identical and nothing but this comment says so
+// (prompts.ts must not import that module, which pulls firebase-admin and Resend).
+export type EmailPeriodicPeriodType = 'monthly' | 'quarterly' | 'semiannual' | 'yearly';
+
+const EMAIL_PERIODIC_WORD_LIMITS: Record<EmailPeriodicPeriodType, number> = {
+  monthly: 500,
+  quarterly: 700,
+  semiannual: 700,
+  yearly: 900,
+};
 
 /**
  * Format contract for the periodic summary email (monthly/quarterly/semiannual/yearly
  * AI comment). Exported so monthlyEmailService.ts can compose it with ASSISTANT_SYSTEM_CORE
  * without duplicating the shared role/domain/guardrail text.
  *
- * Written to cover both possible shapes of point 2/3 without branching on per-request
- * data (baseline label, whether the YoY comparison coincides with the previous-period
- * one for an annual email) — those specifics live in the numeric data block instead,
- * keeping this contract byte-identical across every email sent.
+ * Parametric in the period type ONLY, so the returned string is still byte-identical
+ * across every user and every run of a given period — the same property the mode
+ * contracts have. Everything genuinely per-request (baseline labels, whether the YoY
+ * comparison coincides with the previous-period one, which blocks are present) lives in
+ * the numeric data block instead, which is why the sections below are worded to cover
+ * both shapes without branching.
  */
-export const EMAIL_PERIODIC_FORMAT_CONTRACT = [
-  '# Formato della risposta',
-  'Struttura la risposta in markdown con queste sezioni:',
-  '1. **In sintesi** — 2-3 frasi sul risultato complessivo del periodo; se i dati includono un piazzamento Hall of Fame, citalo (non inventare la posizione)',
-  '2. **Rispetto al periodo precedente** — cosa è cambiato rispetto al periodo precedente, citando i numeri del blocco di confronto fornito',
-  "3. **Confronto con l'anno precedente** — confronto anno su anno citando i numeri forniti; se il periodo è annuale e questo confronto coincide con quello del punto 2 (i dati te lo segnalano esplicitamente), unisci le due sezioni e dillo",
-  "4. **Entrate e spese: di quanto e perché** — quantifica l'aumento o la diminuzione di entrate e spese e ipotizza le cause più probabili basandoti sui dati per categoria; commenta il mix per tipo (Fisse/Variabili/Debiti) quando rilevante; per il patrimonio puoi citare il contesto macro di mercato",
-  "5. **Azioni o attenzioni** — 1-2 osservazioni pratiche per l'investitore",
-  '',
-  'Vincoli: massimo 500 parole.',
-].join('\n');
+export function buildEmailPeriodicFormatContract(periodType: EmailPeriodicPeriodType): string {
+  return [
+    '# Formato della risposta',
+    'Struttura la risposta in markdown con queste sezioni, in questo ordine:',
+    '1. **In sintesi** — 2-3 frasi sul risultato complessivo del periodo; se i dati includono un piazzamento Hall of Fame, citalo (non inventare la posizione)',
+    "2. **Patrimonio e investimenti** — come si è mosso il patrimonio: usa la riga EFFETTO MERCATO già calcolata per separare quanto viene dal risparmio e quanto dalla variazione di mercato, commenta l'allocazione corrente e il suo scostamento dai target quando sono configurati, e cita gli obiettivi di investimento solo se il blocco relativo ne contiene",
+    '3. **Rispetto al periodo precedente** — cosa è cambiato rispetto al periodo precedente, citando i numeri del blocco di confronto fornito',
+    "4. **Confronto con l'anno precedente** — confronto anno su anno citando i numeri forniti; se il periodo è annuale e questo confronto coincide con quello del punto 3 (i dati te lo segnalano esplicitamente), unisci le due sezioni e dillo",
+    "5. **Entrate e spese: di quanto e perché** — quantifica l'aumento o la diminuzione di entrate e spese e ipotizza le cause più probabili basandoti sui dati per categoria e sottocategoria; commenta il mix per tipo (Fisse/Variabili/Debiti) quando rilevante",
+    "6. **Azioni o attenzioni** — 1-2 osservazioni pratiche per l'investitore",
+    '',
+    "I blocchi delle spese per categoria e sottocategoria e delle entrate per categoria sono ESAUSTIVI: una voce che non c'è ha avuto importo zero nel periodo — dillo come \"nessuna spesa registrata\", non come dato mancante. L'unica eccezione sono le righe di omissione dichiarate esplicitamente nel testo dei dati.",
+    '',
+    `Vincoli: massimo ${EMAIL_PERIODIC_WORD_LIMITS[periodType]} parole.`,
+  ].join('\n');
+}
 
 // ─── Prompt builders ──────────────────────────────────────────────────────────
 
@@ -500,7 +647,7 @@ export function buildMonthAnalysisPrompt(
   preferences: AssistantPreferences,
   memoryItems: AssistantMemoryItem[] = []
 ): AssistantPromptParts {
-  const monthLabel = getPeriodLabel(bundle.selector);
+  const monthLabel = getAssistantPeriodLabel(bundle.selector);
   const numericBlock = formatBundleForPrompt(bundle);
 
   const macroInstruction = preferences.includeMacroContext
@@ -647,50 +794,6 @@ export function buildHistoryAnalysisPrompt(
   ].join('\n');
 
   return { system: `${ASSISTANT_SYSTEM_CORE}\n\n${HISTORY_FORMAT_CONTRACT}`, userContent };
-}
-
-/**
- * Builds the prompt for a quarterly analysis.
- *
- * Covers a full calendar quarter (3 months). Baseline is the previous quarter-end
- * snapshot; end is the current quarter-end snapshot. Same 3-section contract as
- * monthly, with quarterly framing.
- *
- * Reached only through `POST /api/ai/assistant/stream` with `mode: 'quarter_analysis'`; the
- * period selector does not offer a quarter tab, so no UI surface sends it today. The periodic
- * quarterly email does NOT use this builder — it has its own (`monthlyEmailService`'s
- * `buildEmailAiPrompt` + `EMAIL_PERIODIC_FORMAT_CONTRACT`).
- */
-export function buildQuarterAnalysisPrompt(
-  bundle: AssistantMonthContextBundle,
-  userPrompt: string,
-  preferences: AssistantPreferences,
-  memoryItems: AssistantMemoryItem[] = []
-): AssistantPromptParts {
-  const quarterLabel = getPeriodLabel(bundle.selector); // e.g. "Q1 2026"
-  const numericBlock = formatBundleForPrompt(bundle);
-
-  const macroInstruction = preferences.includeMacroContext
-    ? `Puoi integrare contesto macro trimestrale (mercati, tassi, geopolitica) rilevante per il ${quarterLabel}.`
-    : 'Non cercare informazioni macro esterne. Concentrati esclusivamente sui dati del portafoglio forniti.';
-
-  const memoryBlock = preferences.memoryEnabled
-    ? formatMemoryForPrompt(memoryItems)
-    : 'Non fare affidamento su memoria persistente. Usa solo il contesto esplicito di questa sessione.';
-
-  const userContent = [
-    buildResponseStyleInstruction(preferences.responseStyle),
-    macroInstruction,
-    memoryBlock,
-    '',
-    `Stai analizzando ${quarterLabel}.`,
-    'Di seguito trovi i dati finanziari del trimestre, estratti in modo affidabile dal sistema:',
-    '',
-    numericBlock,
-    `Domanda dell'utente: ${userPrompt.trim()}`,
-  ].join('\n');
-
-  return { system: `${ASSISTANT_SYSTEM_CORE}\n\n${QUARTER_FORMAT_CONTRACT}`, userContent };
 }
 
 /**

@@ -23,7 +23,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { usePeriodPicker } from '@/lib/hooks/usePeriodPicker';
-import { type Period, currentMonthPeriod, MONTH_NAMES_SHORT } from '@/lib/utils/period';
+import { type Period, currentMonthPeriod, currentYtdPeriod, MONTH_NAMES_SHORT } from '@/lib/utils/period';
 import { cn } from '@/lib/utils';
 import { Chip } from '@/components/ui/chip';
 
@@ -34,11 +34,17 @@ interface PeriodPickerProps {
   readonly onChange: (period: Period) => void;
   readonly availableYears?: number[];
   readonly className?: string;
+  /**
+   * The accessible name's prefix («Periodo selezionato» by default). A page that mounts a SECOND
+   * picker on the same axis (Tracciamento's Movimenti tile) names it differently, or a screen
+   * reader hears two identical controls.
+   */
+  readonly ariaLabelPrefix?: string;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function PeriodPicker({ value, onChange, availableYears = [], className }: PeriodPickerProps) {
+export function PeriodPicker({ value, onChange, availableYears = [], className, ariaLabelPrefix = 'Periodo selezionato' }: PeriodPickerProps) {
   const isMobile = useMediaQuery('(max-width: 639px)');
   // Stable reference: preset labels are relative to «today» and don't change mid-session.
   const now = React.useMemo(() => new Date(), []);
@@ -49,7 +55,7 @@ export function PeriodPicker({ value, onChange, availableYears = [], className }
     fromText, toText,
     canApply, label, isCustom, rangeLabel,
     last3Years, recentMonths,
-    isCurrentMonthActive, isPrevMonthActive, isCurrentYearActive,
+    isCurrentMonthActive, isPrevMonthActive, isCurrentYearActive, isCurrentYtdActive,
     handlePreset, handleRangeSelect, handleApply,
     handleFromTextChange, handleToTextChange,
   } = usePeriodPicker({ value, onChange, availableYears });
@@ -61,7 +67,7 @@ export function PeriodPicker({ value, onChange, availableYears = [], className }
       variant="outline"
       role="combobox"
       aria-expanded={open}
-      aria-label={`Periodo selezionato: ${label}`}
+      aria-label={`${ariaLabelPrefix}: ${label}`}
       className={cn(
         'justify-between gap-2 min-w-[190px] font-normal',
         isCustom && 'text-primary border-primary/40',
@@ -92,6 +98,9 @@ export function PeriodPicker({ value, onChange, availableYears = [], className }
           handlePreset({ kind: 'month', year: prev.getFullYear(), month: prev.getMonth() + 1 });
         }}
       />
+      {/* «Da inizio anno» stops at today's month; «Quest'anno» is January → December and
+          carries what is only scheduled. Two different questions, two shortcuts. */}
+      <PresetButton label="Da inizio anno" active={isCurrentYtdActive} onClick={() => handlePreset(currentYtdPeriod())} />
       <PresetButton label="Quest'anno" active={isCurrentYearActive} onClick={() => handlePreset({ kind: 'year', year: now.getFullYear() })} />
 
       {last3Years.length > 0 && (
@@ -140,6 +149,7 @@ export function PeriodPicker({ value, onChange, availableYears = [], className }
               handlePreset({ kind: 'month', year: prev.getFullYear(), month: prev.getMonth() + 1 });
             }}
           />
+          <Chip label="Da inizio anno" active={isCurrentYtdActive} onClick={() => handlePreset(currentYtdPeriod())} />
           <Chip label="Quest'anno" active={isCurrentYearActive} onClick={() => handlePreset({ kind: 'year', year: now.getFullYear() })} />
         </div>
       </div>

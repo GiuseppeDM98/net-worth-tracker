@@ -24,7 +24,7 @@ import type { AssetTransaction } from '@/types/assetTransactions';
 import { getItalyYear } from '@/lib/utils/dateHelpers';
 
 /** Float-dust tolerance: quantities within this of a boundary are treated as the boundary. */
-const EPSILON = 1e-9;
+export const EPSILON = 1e-9;
 
 /** Milliseconds in one day; used for the day-exact XIRR discounting. */
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -130,7 +130,23 @@ function assertNonNegative(t: AssetTransaction): void {
 }
 
 /**
- * Replay an asset's full transaction list into its current position state.
+ * Per-transaction side effect of a replay. Emitted for EVERY transaction (baseline, buy, sell,
+ * adjustment) so a caller can index by id with no holes; the optional fields are populated ONLY
+ * for a `sell`.
+ */
+export interface LedgerTransactionEffect {
+  transactionId: string;
+  /** Solo sell, netto commissioni. */
+  realizedPnlEur?: number;
+  /** Solo sell: quantity × averageCostEur all'istante della vendita. Denominatore della %. */
+  soldCostBasisEur?: number;
+  /** Solo sell: PMC EUR all'istante della vendita (costBasisEur / quantity pre-vendita). */
+  averageCostEurAtTrade?: number;
+}
+
+/**
+ * Replay an asset's full transaction list into its current position state, alongside the
+ * per-transaction effects (realized P&L, sold cost basis, PMC-at-trade — sell only).
  *
  * Deterministic fold over the sorted sequence. Throws LedgerValidationError on any invalid history
  * (over-sell, negative input, a transaction dated before the baseline) — this is also the route's
@@ -145,7 +161,9 @@ function assertNonNegative(t: AssetTransaction): void {
  * zero out YOC for the whole existing portfolio. `holdingStartDate: undefined` in the result means
  * "leave the asset doc's existing value untouched" — the write path must never deleteField() it.
  */
-export function replayTransactions(transactions: AssetTransaction[]): LedgerPositionState {
+export function replayTransactionsWithEffects(
+  transactions: AssetTransaction[],
+): { state: LedgerPositionState; effects: LedgerTransactionEffect[] } {
   const sorted = sortTransactionsForReplay(transactions);
 
   // A baseline is the opening position: nothing may precede it. After sorting it can only be at
@@ -171,10 +189,12 @@ export function replayTransactions(transactions: AssetTransaction[]): LedgerPosi
     divestedEur: 0,
     holdingStartDate: undefined,
   };
+  const effects: LedgerTransactionEffect[] = [];
 
   for (const t of sorted) {
     assertNonNegative(t);
     const prevQuantity = state.quantity;
+    const effect: LedgerTransactionEffect = { transactionId: t.id };
 
     switch (t.type) {
       case 'buy': {
@@ -217,6 +237,10 @@ export function replayTransactions(transactions: AssetTransaction[]): LedgerPosi
         state.quantity -= t.quantity;
         // Native averageCost is UNCHANGED — selling never moves the PMC (regime amministrato).
 
+        effect.realizedPnlEur = realized;
+        effect.soldCostBasisEur = soldCostBasis;
+        effect.averageCostEurAtTrade = averageCostEur;
+
         // Clamp float dust when the position closes; keep the last native PMC (harmless at qty 0,
         // and every consumer filters on quantity > 0).
         if (state.quantity <= EPSILON) {
@@ -240,10 +264,17 @@ export function replayTransactions(transactions: AssetTransaction[]): LedgerPosi
     if (prevQuantity <= 0 && state.quantity > 0 && t.isBaseline !== true) {
       state.holdingStartDate = t.date;
     }
+
+    effects.push(effect);
   }
 
   state.averageCostEur = state.quantity > 0 ? state.costBasisEur / state.quantity : undefined;
-  return state;
+  return { state, effects };
+}
+
+/** Wrapper kept for the many callers that only need the final position state. */
+export function replayTransactions(transactions: AssetTransaction[]): LedgerPositionState {
+  return replayTransactionsWithEffects(transactions).state;
 }
 
 // ---------------------------------------------------------------------------
@@ -252,18 +283,22 @@ export function replayTransactions(transactions: AssetTransaction[]): LedgerPosi
 
 /**
  * Project the replay result into the exact fields written back to assets/{assetId}. Single tested
- * source of truth for the write path. `averageCost: undefined` can only occur for an empty
- * sequence (the route never writes in that case); `holdingStartDate: undefined` means "do not
+ * source of truth for the write path. `averageCost`/`averageCostEur: undefined` can only occur for
+ * an empty sequence (the route never writes in that case) or, for `averageCostEur` alone, when the
+ * position just closed (quantity 0 — see the clamp in replayTransactionsWithEffects, harmless since
+ * every G/P consumer filters on quantity > 0 first); `holdingStartDate: undefined` means "do not
  * write" (see §holdingStartDate).
  */
 export function buildDerivedAssetFields(state: LedgerPositionState): {
   quantity: number;
   averageCost: number | undefined;
+  averageCostEur: number | undefined;
   holdingStartDate: Date | undefined;
 } {
   return {
     quantity: state.quantity,
     averageCost: state.averageCost,
+    averageCostEur: state.averageCostEur,
     holdingStartDate: state.holdingStartDate,
   };
 }
@@ -518,4 +553,60 @@ export function computeInvestedCapital(
   }
 
   return { investedEur, divestedEur, netInvestedEur: investedEur - divestedEur };
+}
+
+// ---------------------------------------------------------------------------
+// Realized P&L by fiscal year, across assets (Rendimenti)
+// ---------------------------------------------------------------------------
+
+/** Realized P&L per fiscal year, plus how many assets could not be replayed. */
+export interface RealizedGainsAggregate {
+  byYear: Record<number, number>;
+  /**
+   * Assets whose replay threw and were left out of the totals. This is a TAX figure: a total that
+   * is quietly short by one position is worse than no total, so the count reaches the UI instead of
+   * dying in a silent catch.
+   */
+  skippedAssets: number;
+}
+
+/**
+ * Sum of realized P&L (EUR) per fiscal year, across every asset's own replay.
+ *
+ * `replayTransactions` replays ONE asset's position, so the input must be grouped by `assetId`
+ * BEFORE folding — realized P&L is PMC-dependent per position, and folding transactions from
+ * different assets together would silently cross-contaminate their cost bases.
+ */
+export function aggregateRealizedByYear(transactions: AssetTransaction[]): RealizedGainsAggregate {
+  const byAsset = new Map<string, AssetTransaction[]>();
+  transactions.forEach((t) => {
+    const arr = byAsset.get(t.assetId) ?? [];
+    arr.push(t);
+    byAsset.set(t.assetId, arr);
+  });
+
+  const byYear: Record<number, number> = {};
+  let skippedAssets = 0;
+
+  byAsset.forEach((assetTransactions, assetId) => {
+    try {
+      const { realizedByYear } = replayTransactions(assetTransactions);
+      Object.entries(realizedByYear).forEach(([year, amount]) => {
+        byYear[Number(year)] = (byYear[Number(year)] ?? 0) + amount;
+      });
+    } catch (error) {
+      // A per-asset sequence is server-validated at write time, so this should not happen; when it
+      // does, one asset must not take down the whole card — but the total is now incomplete and
+      // both the console and the card have to say so.
+      skippedAssets += 1;
+      console.warn('Realized gains: skipping an asset whose ledger replay failed', {
+        assetId,
+        transactionCount: assetTransactions.length,
+        operation: 'aggregateRealizedByYear',
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  return { byYear, skippedAssets };
 }

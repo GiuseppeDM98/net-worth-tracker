@@ -8,6 +8,7 @@ import {
   getApiAuthErrorResponse,
   requireFirebaseAuth,
 } from '@/lib/server/apiAuth';
+import { preserveUserAuthoredSnapshotFields } from '@/lib/utils/snapshotUserFields';
 
 /**
  * POST /api/portfolio/snapshot/manual
@@ -176,7 +177,16 @@ export async function POST(request: NextRequest) {
     };
 
     // Save to Firestore
-    await adminDb.collection('monthly-snapshots').doc(snapshotId).set(snapshot);
+    //
+    // A manual snapshot can land on ANY month, including one the user has annotated on
+    // Storico. The write stays a full replace of the declared figures, but the note is
+    // carried over — nothing recomputes it (see `snapshotUserFields.ts`).
+    const snapshotRef = adminDb.collection('monthly-snapshots').doc(snapshotId);
+    const existingSnapshotDocument = await snapshotRef.get();
+
+    await snapshotRef.set(
+      preserveUserAuthoredSnapshotFields(snapshot, existingSnapshotDocument.data())
+    );
     await invalidateDashboardOverviewSummaryServer(userId, 'manual_snapshot_created');
 
     // Update Hall of Fame rankings after snapshot creation

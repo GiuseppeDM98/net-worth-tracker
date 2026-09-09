@@ -91,9 +91,29 @@ export function ActiveAccountProvider({
   const { user } = useAuth();
   const viewerId = user?.uid;
 
-  const [sharedAccounts, setSharedAccounts] = useState<AccessibleAccount[]>([]);
-  const [ownerId, setOwnerId] = useState<string | undefined>(undefined);
-  const [loading, setLoading] = useState(true);
+  // Both pieces of state are stored WITH the viewer they belong to and read back only while
+  // that viewer is still the one signed in: a stale entry falls back to the defaults on its
+  // own, so a viewer change needs no effect that resets state (react-hooks/set-state-in-effect).
+  const [discovery, setDiscovery] = useState<{
+    viewerId: string;
+    sharedAccounts: AccessibleAccount[];
+  } | null>(null);
+  const [selection, setSelection] = useState<{ viewerId: string; ownerId: string } | null>(null);
+
+  const sharedAccounts = useMemo<AccessibleAccount[]>(
+    () => (discovery !== null && discovery.viewerId === viewerId ? discovery.sharedAccounts : []),
+    [discovery, viewerId]
+  );
+  // Discovery is in flight until the grant list for THIS viewer has landed (or failed).
+  const loading = !!viewerId && discovery?.viewerId !== viewerId;
+  // Optimistically adopt the stored selection so a delegate lands on the shared account
+  // immediately; discovery re-validates it below.
+  const storedOwnerId = useMemo(
+    () => (viewerId ? readStoredOwner(viewerId) ?? viewerId : undefined),
+    [viewerId]
+  );
+  const ownerId =
+    selection !== null && selection.viewerId === viewerId ? selection.ownerId : storedOwnerId;
 
   // The viewer's own account is always available and always first.
   const ownAccount = useMemo<AccessibleAccount | null>(() => {
@@ -111,42 +131,31 @@ export function ActiveAccountProvider({
     return [ownAccount, ...sharedAccounts];
   }, [ownAccount, sharedAccounts]);
 
-  // Discover shared accounts whenever the viewer changes. Optimistically adopt
-  // the stored selection so a delegate lands on the shared account immediately;
-  // once the grant list loads we re-validate and fall back to self if the stored
-  // account is no longer accessible (e.g. access was revoked).
+  // Discover shared accounts whenever the viewer changes; once the grant list loads we
+  // re-validate the stored selection and fall back to self if the stored account is no
+  // longer accessible (e.g. access was revoked).
   useEffect(() => {
-    if (!viewerId) {
-      setSharedAccounts([]);
-      setOwnerId(undefined);
-      setLoading(false);
-      return;
-    }
+    if (!viewerId) return;
 
     let cancelled = false;
-    setLoading(true);
-    setOwnerId(readStoredOwner(viewerId) ?? viewerId);
 
     getSharedAccounts(viewerId)
       .then((shared) => {
         if (cancelled) return;
-        setSharedAccounts(shared);
+        setDiscovery({ viewerId, sharedAccounts: shared });
 
         const allowedIds = new Set([viewerId, ...shared.map((a) => a.ownerId)]);
         const stored = readStoredOwner(viewerId);
         const resolved = stored && allowedIds.has(stored) ? stored : viewerId;
-        setOwnerId(resolved);
+        setSelection({ viewerId, ownerId: resolved });
         writeStoredOwner(viewerId, resolved);
       })
       .catch((error) => {
         // Discovery failure must never lock the user out of their own account.
         console.error('[ActiveAccount] Failed to load shared accounts:', error);
         if (cancelled) return;
-        setSharedAccounts([]);
-        setOwnerId(viewerId);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+        setDiscovery({ viewerId, sharedAccounts: [] });
+        setSelection({ viewerId, ownerId: viewerId });
       });
 
     return () => {
@@ -161,7 +170,7 @@ export function ActiveAccountProvider({
         (account) => account.ownerId === nextOwnerId
       );
       if (!isAccessible) return;
-      setOwnerId(nextOwnerId);
+      setSelection({ viewerId, ownerId: nextOwnerId });
       writeStoredOwner(viewerId, nextOwnerId);
     },
     [viewerId, accessibleAccounts]

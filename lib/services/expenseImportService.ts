@@ -32,6 +32,7 @@ import { db } from '@/lib/firebase/config';
 import { removeUndefinedDeep as removeUndefinedFields } from '@/lib/utils/firestoreData';
 import { invalidateDashboardOverviewSummary } from '@/lib/services/dashboardOverviewInvalidation';
 import { createCategory, updateCategory } from '@/lib/services/expenseCategoryService';
+import { categoryMatchKey } from '@/lib/utils/expenseImport';
 import { ImportPlan } from '@/types/expenseImport';
 import { ExpenseCategory, ExpenseSubCategory } from '@/types/expenses';
 
@@ -57,13 +58,21 @@ export async function commitImportPlan(
   plan: ImportPlan,
   existingCategories: ExpenseCategory[]
 ): Promise<{ importBatchId: string; created: number }> {
-  const byName = new Map<string, ExpenseCategory>(existingCategories.map((c) => [norm(c.name), c]));
+  // Two lookups over the same objects, mirroring how the plan resolved: by document
+  // id (rows that attached to an existing category) and by the shared (name, type)
+  // key (rows whose category is created below). Same-named same-typed duplicates
+  // keep the OLDEST document, matching buildImportPlan's resolution exactly.
+  const byId = new Map<string, ExpenseCategory>(existingCategories.map((c) => [c.id, c]));
+  const byKey = new Map<string, ExpenseCategory>();
+  for (const c of [...existingCategories].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())) {
+    byKey.set(categoryMatchKey(c.name, c.type), c); // oldest last → oldest wins
+  }
 
   // 1. Create brand-new categories, capturing their Firestore ID directly from createCategory.
   for (const c of plan.categoriesToCreate) {
     const subCategories: ExpenseSubCategory[] = c.subCategories.map((name) => ({ id: genSubId(), name }));
     const categoryId = await createCategory(userId, { name: c.name, type: c.type, subCategories });
-    byName.set(norm(c.name), {
+    const created: ExpenseCategory = {
       id: categoryId,
       userId,
       name: c.name,
@@ -71,13 +80,15 @@ export async function commitImportPlan(
       subCategories,
       createdAt: new Date(),
       updatedAt: new Date(),
-    });
+    };
+    byId.set(categoryId, created);
+    byKey.set(categoryMatchKey(c.name, c.type), created);
   }
 
   // 2. Add missing subcategories to already-existing categories, merging in-memory
   // (no re-read needed — we already hold the category's current subCategories).
   for (const s of plan.subCategoriesToCreate) {
-    const category = byName.get(norm(s.categoryName));
+    const category = byId.get(s.categoryId);
     if (!category) continue;
     const existingNames = new Set(category.subCategories.map((sc) => norm(sc.name)));
     const additions: ExpenseSubCategory[] = s.subCategoryNames
@@ -86,7 +97,9 @@ export async function commitImportPlan(
     if (additions.length === 0) continue;
     const mergedSubCategories = [...category.subCategories, ...additions];
     await updateCategory(s.categoryId, { subCategories: mergedSubCategories });
-    byName.set(norm(category.name), { ...category, subCategories: mergedSubCategories });
+    const merged = { ...category, subCategories: mergedSubCategories };
+    byId.set(category.id, merged);
+    byKey.set(categoryMatchKey(category.name, category.type), merged);
   }
 
   const importBatchId = genImportBatchId();
@@ -99,7 +112,11 @@ export async function commitImportPlan(
   let created = 0;
 
   for (const row of plan.validRows) {
-    const category = byName.get(norm(row.categoryName));
+    // Id resolved by the plan when the category pre-existed; (name, type) key for
+    // the ones created in step 1.
+    const category =
+      (row.categoryId ? byId.get(row.categoryId) : undefined) ??
+      byKey.get(categoryMatchKey(row.categoryName, row.type));
     if (!category) continue; // should not happen — every valid row's category was created/exists
     const sub = row.subCategoryName
       ? category.subCategories.find((sc) => norm(sc.name) === norm(row.subCategoryName!))

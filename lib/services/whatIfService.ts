@@ -7,6 +7,12 @@
  * fireService — this module only perturbs the baseline and diffs the results, so it stays
  * trivially testable and adds no new projection math.
  *
+ * The pension bridge (the Calcolatore's model) rides along on the baseline: when the FIRE
+ * lock-in toggle is on, the locked fund is a compartment that re-enters the walk at its unlock
+ * year and the FIRE number is the bridge number — the same functions the Calcolatore calls, so
+ * the «prima» side of this tab agrees with that tab's year. Without a bridge the walk and the
+ * metrics are byte-identical to the plain model.
+ *
  * See `types/whatIf.ts` for the modelling rationale (events are applied at year 0).
  */
 
@@ -14,7 +20,10 @@ import {
   calculateFIREMetrics,
   calculateFIREProjection,
   calculateCoastFIREMetrics,
+  calculateFireBridgeNumber,
+  type FIREMetrics,
 } from './fireService';
+import type { FIREProjectionResult } from '@/types/assets';
 import type {
   WhatIfAdjustedInputs,
   WhatIfBaseline,
@@ -24,6 +33,9 @@ import type {
   WhatIfMetricImpact,
   WhatIfScenario,
 } from '@/types/whatIf';
+
+/** The deterministic walk's horizon — the Calcolatore's, so the two tabs agree on «oltre N anni». */
+export const WHAT_IF_HORIZON_YEARS = 50;
 
 /** Money and counts can never go below zero after a perturbation. */
 function clampNonNegative(value: number): number {
@@ -91,34 +103,75 @@ export function applyScenarioToBaseline(
   };
 }
 
+/** The bridge as the walk accepts it: undefined unless something is locked for some years. */
+function resolveBridge(baseline: WhatIfBaseline) {
+  const bridge = baseline.pensionBridge;
+  if (!bridge || bridge.valueToday <= 0 || bridge.yearsToUnlock <= 0) return undefined;
+  return bridge;
+}
+
 /**
- * Years until FIRE in the Base scenario for a given input set.
- * Returns 0 when already financially independent, null when not reached within the horizon.
+ * The FIRE metrics for one input set — with the bridge override when the baseline carries a
+ * locked fund: free assets must cover the spending bridge until the unlock, then the fund tops
+ * up the standard requirement (the Calcolatore's `displayedFireMetrics`, same functions).
  */
-function projectBaseYearsToFIRE(
+function resolveFireMetrics(baseline: WhatIfBaseline, netWorth: number, annualExpenses: number): FIREMetrics {
+  const metrics = calculateFIREMetrics(netWorth, annualExpenses, baseline.withdrawalRate);
+  const bridge = resolveBridge(baseline);
+  if (!bridge || annualExpenses <= 0) return metrics;
+
+  const realReturn = baseline.scenarios.base.growthRate - baseline.scenarios.base.inflationRate;
+  const { bridgeFireNumber } = calculateFireBridgeNumber({
+    annualExpenses,
+    withdrawalRate: baseline.withdrawalRate,
+    realReturn,
+    yearsToUnlock: bridge.yearsToUnlock,
+    pensionValueToday: bridge.valueToday,
+    pensionGrowthRate: realReturn,
+  });
+  return {
+    ...metrics,
+    fireNumber: bridgeFireNumber,
+    progressToFI: bridgeFireNumber > 0 ? (netWorth / bridgeFireNumber) * 100 : 0,
+  };
+}
+
+/**
+ * The base-scenario walk for one input set, or null when it cannot run (no expenses, no
+ * withdrawal rate). A net worth of zero still walks: the savings alone may reach the target.
+ */
+function runBaseProjection(
   baseline: WhatIfBaseline,
   netWorth: number,
   annualExpenses: number,
   annualSavings: number
-): number | null {
-  if (netWorth <= 0 || annualExpenses <= 0 || baseline.withdrawalRate <= 0) return null;
-
-  const fireNumber = annualExpenses / (baseline.withdrawalRate / 100);
-  if (fireNumber > 0 && netWorth >= fireNumber) return 0;
-
-  const projection = calculateFIREProjection(
+): FIREProjectionResult | null {
+  if (netWorth < 0 || annualExpenses <= 0 || baseline.withdrawalRate <= 0) return null;
+  return calculateFIREProjection(
     netWorth,
     annualExpenses,
     annualSavings,
     baseline.withdrawalRate,
-    baseline.scenarios
+    baseline.scenarios,
+    WHAT_IF_HORIZON_YEARS,
+    resolveBridge(baseline)
   );
+}
+
+/**
+ * Years until FIRE in the base scenario: 0 when already financially independent today (on the
+ * bridge number when the bridge is on), null when the walk cannot run or never gets there.
+ */
+function resolveYearsToFIRE(metrics: FIREMetrics, projection: FIREProjectionResult | null): number | null {
+  if (!projection) return null;
+  if (metrics.fireNumber > 0 && metrics.currentNetWorth >= metrics.fireNumber) return 0;
   return projection.baseYearsToFIRE;
 }
 
 /**
  * Compute the before/after impact of a scenario on the traditional FIRE plan and, when
- * Coast FIRE is configured, on the Coast FIRE plan.
+ * Coast FIRE is configured, on the Coast FIRE plan. The two walks it runs are returned as
+ * `projections`, so the chart draws the same series the years were read from.
  */
 export function calculateWhatIfImpact(
   baseline: WhatIfBaseline,
@@ -127,34 +180,16 @@ export function calculateWhatIfImpact(
   const adjusted = applyScenarioToBaseline(baseline, scenario);
 
   // --- Traditional FIRE ---
-  const fireBefore = calculateFIREMetrics(
-    baseline.netWorth,
-    baseline.annualExpenses,
-    baseline.withdrawalRate
-  );
-  const fireAfter = calculateFIREMetrics(
-    adjusted.netWorth,
-    adjusted.annualExpenses,
-    baseline.withdrawalRate
-  );
+  const fireBefore = resolveFireMetrics(baseline, baseline.netWorth, baseline.annualExpenses);
+  const fireAfter = resolveFireMetrics(baseline, adjusted.netWorth, adjusted.annualExpenses);
 
-  const yearsBefore = projectBaseYearsToFIRE(
-    baseline,
-    baseline.netWorth,
-    baseline.annualExpenses,
-    baseline.annualSavings
-  );
-  const yearsAfter = projectBaseYearsToFIRE(
-    baseline,
-    adjusted.netWorth,
-    adjusted.annualExpenses,
-    adjusted.annualSavings
-  );
+  const projectionBefore = runBaseProjection(baseline, baseline.netWorth, baseline.annualExpenses, baseline.annualSavings);
+  const projectionAfter = runBaseProjection(baseline, adjusted.netWorth, adjusted.annualExpenses, adjusted.annualSavings);
 
   const fire: WhatIfFireImpact = {
     fireNumber: buildMetricImpact(fireBefore.fireNumber, fireAfter.fireNumber),
     progressToFI: buildMetricImpact(fireBefore.progressToFI, fireAfter.progressToFI),
-    yearsToFIRE: buildMetricImpact(yearsBefore, yearsAfter),
+    yearsToFIRE: buildMetricImpact(resolveYearsToFIRE(fireBefore, projectionBefore), resolveYearsToFIRE(fireAfter, projectionAfter)),
     annualAllowance: buildMetricImpact(fireBefore.annualAllowance, fireAfter.annualAllowance),
   };
 
@@ -162,6 +197,8 @@ export function calculateWhatIfImpact(
   let coast: WhatIfCoastImpact | null = null;
   if (baseline.coast) {
     const c = baseline.coast;
+    // `undefined` currentDate keeps the function's own default; the inflows ride along
+    // unchanged on both sides — a life event perturbs free capital, not the locked fund.
     const coastBefore = calculateCoastFIREMetrics(
       baseline.netWorth,
       c.annualExpenses,
@@ -171,7 +208,9 @@ export function calculateWhatIfImpact(
       c.realReturnRate,
       c.inflationRate,
       c.pensions,
-      c.taxBrackets
+      c.taxBrackets,
+      undefined,
+      c.capitalInflowsToday
     );
     const coastAfter = calculateCoastFIREMetrics(
       adjusted.netWorth,
@@ -182,7 +221,9 @@ export function calculateWhatIfImpact(
       c.realReturnRate,
       c.inflationRate,
       c.pensions,
-      c.taxBrackets
+      c.taxBrackets,
+      undefined,
+      c.capitalInflowsToday
     );
 
     coast = {
@@ -200,5 +241,5 @@ export function calculateWhatIfImpact(
     };
   }
 
-  return { adjusted, fire, coast };
+  return { adjusted, fire, coast, projections: { before: projectionBefore, after: projectionAfter } };
 }

@@ -7,10 +7,11 @@ This guide will walk you through setting up the Portfolio Tracker web app from s
 1. [Prerequisites](#prerequisites)
 2. [Firebase Setup](#firebase-setup)
 3. [Local Development Setup](#local-development-setup)
-4. [Vercel Deployment](#vercel-deployment)
-5. [Price Data Provider Alternatives](#price-data-provider-alternatives)
-6. [Infrastructure Alternatives](#infrastructure-alternatives)
-7. [Troubleshooting](#troubleshooting)
+4. [Local Verification Troubleshooting](#local-verification-troubleshooting)
+5. [Vercel Deployment](#vercel-deployment)
+6. [Price Data Provider Alternatives](#price-data-provider-alternatives)
+7. [Infrastructure Alternatives](#infrastructure-alternatives)
+8. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -174,9 +175,11 @@ CRON_SECRET=your_secure_random_string_here
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 # Registration Control (optional - for restricting signups)
+# NOTE: the whitelist itself is server-only (no NEXT_PUBLIC_ prefix) — the email list
+# must never reach the client bundle. Only the two toggles are public.
 NEXT_PUBLIC_REGISTRATIONS_ENABLED=true
 NEXT_PUBLIC_REGISTRATION_WHITELIST_ENABLED=false
-NEXT_PUBLIC_REGISTRATION_WHITELIST=
+REGISTRATION_WHITELIST=
 
 # Development Features (optional - for testing/demo)
 NEXT_PUBLIC_ENABLE_TEST_SNAPSHOTS=false
@@ -215,13 +218,32 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 2. Create an account with email/password or Google sign-in
 3. Log in and start adding your assets!
 
+### Step 5b (Optional): Shared account — delegated access
+
+A second user can be granted full co-owner read/write on your account (Impostazioni →
+Condivisione account). Three prerequisites, in this order, or the add fails:
+
+1. **The guest must be in the whitelist**: add their email to `REGISTRATION_WHITELIST`
+   (with `NEXT_PUBLIC_REGISTRATION_WHITELIST_ENABLED=true`) so they can register at all.
+2. **The guest must register first**: the add resolves their email to a Firebase UID, and
+   a non-existent user returns a 404 («La persona deve prima registrarsi»). Have them
+   complete `/register` before you add them.
+3. **`firestore.rules` must be deployed** (Step 4 of Firebase Setup): enforcement of the
+   delegated access lives in the rules; without the deploy the grant document exists but
+   reads are denied.
+
+The guest's theme stays their own; everything else (data, mutations) operates on the
+owner's account via the account switcher in the sidebar.
+
 ### Step 6 (Optional but recommended): Local testing with the Firebase Emulator Suite
 
 Run the app against **local** Auth + Firestore emulators instead of the cloud project, so
 development and manual testing never touch production data. The emulator also loads
 `firestore.rules`, so you validate rule changes locally before deploying them.
 
-**Prerequisite — a Java runtime (JDK 11+).** The Firestore emulator runs on Java. On Windows:
+**Prerequisite — a Java runtime, version 21 OR ABOVE.** The Firestore emulator runs on Java,
+and current `firebase-tools` refuses anything older ("no longer supports Java version before 21"
+— an installed JDK 15 that used to work stopped working on 2026-08-14). On Windows:
 
 ```powershell
 winget install Microsoft.OpenJDK.21
@@ -230,6 +252,10 @@ java -version
 ```
 
 (macOS: `brew install temurin` · Debian/Ubuntu: `sudo apt install openjdk-21-jre`.)
+
+If you can't (or don't want to) replace the system Java, a portable JRE works: extract a
+Temurin 21 JRE zip anywhere (e.g. `%USERPROFILE%\.jdk\`) and prepend its `bin` to `PATH`
+just for the emulator terminal — that is how the E2E runs are driven on this machine.
 
 **Usage — three terminals:**
 
@@ -297,11 +323,29 @@ dev:e2e` therefore sets `NEXT_DIST_DIR=.next-e2e` (a conditional line in `next.c
 everywhere else), so the tests can run while your normal dev server stays up on port 3000 — which
 also guarantees they never point at production data.
 
-**What it covers** (`e2e/`): the Previdenza page at 1440px and 390px — layout switch, type scale,
-the year axis, the collapsible, the primary action's position, and that the empty state never
-flashes while data loads. The fixture (`scripts/seedPensionE2E.mts`) writes a pension fund, a family
-member and contributions across two tax years, layered on top of the Step 6 seed without touching
-it. Add `npm run e2e:seed` on its own if you want that data in the browser for manual inspection.
+**What it covers** (`e2e/`), across five projects — `desktop` (1440px), `mobile` (390px),
+`degraded` (1440px, second account), `analisi` (1440px) and `analisi-mobile` (390px):
+
+- **Previdenza** — layout switch, type scale, the year axis, the collapsible, the primary action's
+  position, that the empty state never flashes while data loads, and the three degraded states
+  (`suspicious` / `idle` / `fresh`).
+- **Analisi** — the focus-URL cold load, search → dossier (including a zero-spend entity and the
+  transfer exclusion), the focus surviving a period switch, the KPI pacing rows, the driver ranking
+  with `Cessata`, the per-subcategory breakdown inside a year row, and the mobile truncation caption.
+
+Three fixture accounts, each seeded by the global setup:
+
+| Script | Account | Why it is separate |
+| --- | --- | --- |
+| `npm run e2e:seed` | base + `test-user-degraded` | Pension data layered on the Step 6 seed; the degraded scenarios take an argument (`suspicious` \| `idle` \| `fresh` \| `performance` — the last one is Rendimenti's: an ETF beside a pension fund marked `excluded`, four snapshots, one TFR, for `e2e/performance.degraded.spec.ts`) |
+| `npm run e2e:seed:analisi` | `test-user-analisi` | Every expense dated **January**, so year-to-date windows contain them whatever month the suite runs in and every asserted figure stays exact all year. The base seed's current-month expenses would pollute them |
+
+Run either on its own if you want that data in the browser for manual inspection.
+
+**Area exercise scripts** (emulator, rules enforced, not part of the Playwright run):
+`npm run emulators:pension` drives the pension contribution services end to end;
+`npm run emulators:pension-p3` checks the Rendimenti-exclusion and FIRE lock-in wiring on a
+throwaway synthetic account.
 
 **Notes:**
 - Authentication happens once in `e2e/auth.setup.ts` and is reused by every spec via
@@ -309,9 +353,100 @@ it. Add `npm run e2e:seed` on its own if you want that data in the browser for m
   session there — without that flag the state file looks fine but every spec lands on the login page.
 - The suite runs with `workers: 1`: all specs share one emulator account, so parallel runs would
   race on it.
-- Chromium only, for both projects. The mobile project is a 390px viewport on Chromium rather than
+- Chromium only, for every project. The mobile projects are a 390px viewport on Chromium rather than
   the WebKit-backed iPhone descriptor — one browser to install, and what is under test is the layout
   at a width, not an engine difference.
+
+---
+
+## Local Verification Troubleshooting
+
+Environment traps that look like code defects. If errors cluster in files you never touched, suspect
+this section before the diff.
+
+### `tsc` reports missing modules right after a branch switch
+
+`node_modules` is shared across branches in one working directory and git does not track it. Checking
+out a branch swaps `package.json` back but not what is physically installed, so packages the new
+branch declares can simply be absent. **The tell is WHERE the errors land**: e.g. ~25 errors, all
+inside `e2e/`, `playwright.config.ts` and `lib/utils/expenseImport.ts` — the files owned by the
+missing `@playwright/test` and `papaparse` — and none in the code being changed. Run `npm install`
+before debugging, or `npm install --no-save <pkg>` for a one-off verification run that leaves the
+manifest and lockfile alone.
+
+### All three Playwright auth setups fail with the "npx playwright install" banner
+
+The Chromium build is missing after a Playwright version bump: `npx playwright install chromium`.
+Errors clustered in the *setups* rather than the specs mean environment, not diff.
+
+### A port is still held after stopping a background process
+
+Stopping a process does not kill its children on Windows: the emulator JVM and the dev server survive
+and keep holding 8080 / 9099 / 4000 / 3100, so the next start fails with `EADDRINUSE` *while the
+service still answers*. Find the real owner and stop it by PID:
+
+```powershell
+Get-NetTCPConnection -LocalPort 8080 -State Listen
+```
+
+### The emulator refuses to start for lack of Java 21 (Windows)
+
+Moved here from AGENTS.md on 2026-09-06; on macOS a Homebrew OpenJDK (26 at the time of writing) starts the emulators
+with `JAVA_HOME` unset, and `kill -INT` on the `firebase` CLI process runs the export-on-exit.
+
+**The emulator needs Java ≥ 21; this machine now HAS it, and a shell already running may still not see it.** Temurin
+  21 (`C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot`) was installed on 2026-08-30, the USER `JAVA_HOME`
+  points at it and the user `PATH` carries `%JAVA_HOME%\bin`; the `Oracle\Java\javapath` shim — which resolved `java` to
+  the JDK 15 whatever `JAVA_HOME` said — was removed from BOTH the user and machine scopes (the directory is still on
+  disk, it is only off the PATH). **An environment change never reaches a process that is already running**: a session
+  started before it keeps the old `PATH`, so `java -version` inside it still prints 15 and `(Get-Command java).Source`
+  still names the shim — which is what the pre-2026-08-30 note above recorded as "this machine has no JDK 21". Read the
+  SCOPES, not the process: `[Environment]::GetEnvironmentVariable('Path','Machine')` and `…'User'`, plus
+  `[Environment]::GetEnvironmentVariable('JAVA_HOME','User')`. A new terminal picks the change up. The portable route of
+  SETUP.md → Step 6 remains the fallback where it has not been picked up (`winget` is NOT on this shell's PATH): fetch
+  the zip directly
+  (`https://api.adoptium.net/v3/binary/latest/21/ga/windows/x64/jdk/hotspot/normal/eclipse`), expand it into the session
+  scratchpad and export `JAVA_HOME`/`PATH` for the `npm run emulators` process only — no system change, nothing to undo.
+  **In the Bash tool, `PATH` entries must be MSYS paths (`/c/Users/…`), not `C:/Users/…`**: `PATH` is colon-separated, so a
+  drive letter splits the entry in two, the portable JDK never resolves, `java -version` still prints the system 15 and
+  firebase-tools dies with "no longer supports Java version before 21" — a failure that reads as a missing download
+  (verified 2026-08-30). `JAVA_HOME` itself is fine either way; check with `which java` before starting the emulators. Stopping the npm wrapper does **not** kill
+  the JVM: the ports stay taken and the next start fails with "port taken", naming no stale process. Free them by PID — `netstat -ano | grep LISTENING | grep :8080`, then `taskkill //PID <pid> //F //T`, the same for `next dev` on :3100 — and only AFTER the Hub export.
+
+### `npm run start` refuses to serve the build
+
+`next.config.ts` sets `output: "standalone"`, so Next warns and refuses. Motion and
+perceived-performance work must be judged on a production build (dev exaggerates cost, and its CSS
+arrives via JS — under throttling it shows an unstyled window production does not have). The working
+recipe, including the two copies Next does **not** do for you (skip them and every asset 404s, so the
+page renders with no styles at all — easily mistaken for a rendering defect):
+
+```powershell
+npm run build
+Copy-Item -Recurse -Force .next/static .next/standalone/.next/static
+Copy-Item -Recurse -Force public .next/standalone/public
+node .next/standalone/server.js
+```
+
+### Font-loading changes cannot be verified in dev
+
+`next/font` emits no `<link rel="preload">` in `next dev` (0 on every route). The build filename
+carries the answer instead: `-s.p.` in the hashed woff2 name means preloaded
+(`797e433a….woff2` with `.p.` = preloaded; without `preload: true` the `.p.` is absent).
+
+### Inspecting or cleaning a few emulator documents
+
+An unauthenticated REST call against the Firestore emulator is silently filtered to an empty result
+by the rules engine rather than erroring — which looks exactly like "no documents exist". Use the
+emulator-only admin bypass token:
+
+```bash
+curl -H "Authorization: Bearer owner" \
+  "http://127.0.0.1:8080/v1/projects/demo-net-worth/databases/(default)/documents/expenses"
+```
+
+Same header with `-X DELETE` on a document path removes it, so a handful of leftovers from a manual
+test run do not require wiping `.emulator-data/`.
 
 ---
 

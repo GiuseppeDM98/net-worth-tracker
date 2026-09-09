@@ -57,6 +57,20 @@ interface AuthContextType {
   signOut: () => Promise<void>;
 }
 
+/**
+ * Builds an Error that carries a machine-readable `code`, the way Firebase's own errors do.
+ *
+ * Why it matters: the pages translate a code into an Italian sentence through
+ * `describeAuthError` (lib/utils/authNarrative.ts). A plain `new Error(message)` would
+ * leave them nothing to map, so the reader would get either the provider's English string
+ * or a cause-free fallback.
+ */
+function withCode(message: string, code: string): Error & { code: string } {
+  const failure = new Error(message) as Error & { code: string };
+  failure.code = code;
+  return failure;
+}
+
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
@@ -144,20 +158,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signUp = async (email: string, password: string, displayName?: string) => {
     // Step 1: Check registration permissions (server-side whitelist)
     // Why check before creating user? Prevents orphan Auth users if registration denied.
+    let response: Response;
     try {
-      const response = await fetch('/api/auth/check-registration', {
+      response = await fetch('/api/auth/check-registration', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
+    } catch {
+      // The request never reached the route: report it in the provider's own vocabulary
+      // so describeAuthError() can say "nessuna connessione" rather than falling back to
+      // a cause-free sentence.
+      throw withCode('Unable to verify registration permissions.', 'auth/network-request-failed');
+    }
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Registrations are currently closed.');
-      }
-    } catch (error: any) {
-      // Re-throw the error to be caught by the component
-      throw new Error(error.message || 'Unable to verify registration permissions.');
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw withCode(
+        body.message || 'Registrations are currently closed.',
+        typeof body.code === 'string' ? body.code : 'registration/not-allowed',
+      );
     }
 
     // Step 2: Create Firebase Auth user
@@ -246,8 +266,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             await firebaseSignOut(auth);
           }
 
-          const error = await response.json();
-          throw new Error(error.message || 'Registrations are currently closed.');
+          const body = await response.json().catch(() => ({}));
+          throw withCode(
+            body.message || 'Registrations are currently closed.',
+            typeof body.code === 'string' ? body.code : 'registration/not-allowed',
+          );
         }
 
         // Registration is allowed - wait for token refresh first
@@ -268,9 +291,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             targets: getDefaultTargets(),
           });
         });
-      } catch (error: any) {
-        // Re-throw the error to be caught by the component
-        throw new Error(error.message || 'Unable to verify registration permissions.');
+      } catch (error: unknown) {
+        // Re-throw AS IS: wrapping in a fresh Error would drop the `code` the page needs
+        // to say the failure in words (see withCode above).
+        throw error instanceof Error
+          ? error
+          : new Error('Unable to verify registration permissions.');
       }
     }
   };

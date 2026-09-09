@@ -11,6 +11,11 @@
  *   month === -1 → YTD (Jan 1 → latest month of current year)
  *   month === -2 → total history (cashflowHistoryStartYear → now)
  *
+ * A fifth builder, buildAssistantPeriodRangeContext, covers an arbitrary run of months
+ * inside one year (quarters and semesters, which the four selector codes above cannot
+ * express). It is the periodic emails' entry point — see its own doc comment for why the
+ * window travels as a data-quality note rather than as a new bundle field.
+ *
  * Design decisions:
  * - Never uses Date.getMonth() / getFullYear() for domain grouping — snapshots
  *   are identified by their stored `year`/`month` integer fields.
@@ -30,11 +35,16 @@
 
 import { Timestamp } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
+import { MONTH_NAMES } from '@/lib/constants/months';
 import { getItalyMonthYear, toDate } from '@/lib/utils/dateHelpers';
 import { AssistantMonthContextBundle, AssistantMonthSelectorValue } from '@/types/assistant';
 import { Asset, AssetAllocationSettings, MonthlySnapshot } from '@/types/assets';
 import { CashflowBreakdown, Expense, ExpenseCategory } from '@/types/expenses';
+import { GoalBasedInvestingData } from '@/types/goals';
 import { buildCashflowBreakdown } from '@/lib/utils/expenseBreakdown';
+import { calculateGoalProgress, deriveTargetAllocationFromGoals } from '@/lib/utils/goalMath';
+import { computeGoalTrajectory } from '@/lib/utils/goalTrajectory';
+import { getGoalDataAdmin } from '@/lib/server/goalData';
 
 const MAX_ALLOCATION_CHANGES = 5;
 
@@ -42,7 +52,6 @@ const MAX_ALLOCATION_CHANGES = 5;
 // apply to every period: five transactions out of five years of history is noise, while
 // five out of one month is a real signal.
 const TOP_INDIVIDUAL_EXPENSES_MONTH = 5;
-const TOP_INDIVIDUAL_EXPENSES_QUARTER = 8;
 const TOP_INDIVIDUAL_EXPENSES_YEAR = 10;
 const TOP_INDIVIDUAL_EXPENSES_HISTORY = 15;
 
@@ -56,15 +65,6 @@ const UNCLASSIFIED_SUBCATEGORY_NOTE_THRESHOLD = 0.3;
 function getMonthDateRange(year: number, month: number): { startDate: Date; endDate: Date } {
   const startDate = new Date(year, month - 1, 1, 0, 0, 0);
   const endDate = new Date(year, month, 0, 23, 59, 59);
-  return { startDate, endDate };
-}
-
-/**
- * Returns the first and last moment of the given year as Date objects.
- */
-function getYearDateRange(year: number): { startDate: Date; endDate: Date } {
-  const startDate = new Date(year, 0, 1, 0, 0, 0); // Jan 1
-  const endDate = new Date(year, 11, 31, 23, 59, 59); // Dec 31
   return { startDate, endDate };
 }
 
@@ -175,11 +175,15 @@ async function fetchSettings(userId: string): Promise<AssetAllocationSettings | 
     return null;
   }
   // Only the fields needed for context building — not the full settings shape.
-  // targets is included so the prompt can show allocation target vs current gap.
+  // targets is included so the prompt can show allocation target vs current gap;
+  // the two goal flags decide whether the goals block exists at all and whether
+  // those targets are still the ones the app measures against.
   return {
     dividendIncomeCategoryId: data.dividendIncomeCategoryId,
     cashflowHistoryStartYear: data.cashflowHistoryStartYear,
     targets: data.targets ?? null,
+    goalBasedInvestingEnabled: data.goalBasedInvestingEnabled,
+    goalDrivenAllocationEnabled: data.goalDrivenAllocationEnabled,
   } as AssetAllocationSettings;
 }
 
@@ -279,7 +283,7 @@ function buildSubCategoryAllocation(
  *
  * Returns null when no targets are configured, so the prompt section is silently omitted.
  */
-function buildTargetAllocation(
+function buildManualTargetAllocation(
   settings: AssetAllocationSettings | null
 ): AssistantMonthContextBundle['targetAllocation'] {
   if (!settings?.targets) return null;
@@ -303,6 +307,118 @@ function buildTargetAllocation(
   }
 
   return Object.keys(result).length > 0 ? result : null;
+}
+
+/**
+ * Rebuilds the flat target map from goal-derived asset-class percentages, keeping
+ * whatever sub-category structure the user configured in Settings.
+ *
+ * Mirrors what `buildTargetsFromGoalAllocation` does for the Allocazione page — the
+ * class percentages come from the goals, the sub-targets underneath them are still
+ * the user's. Rebuilt here instead of imported because that function lives in
+ * `assetAllocationService.ts`, which pulls the client Firestore SDK, and because the
+ * bundle only needs this flat shape, not a full AssetAllocationTarget.
+ */
+function buildGoalDrivenTargetAllocation(
+  derived: Partial<Record<string, number>>,
+  manual: AssistantMonthContextBundle['targetAllocation']
+): AssistantMonthContextBundle['targetAllocation'] {
+  const result: NonNullable<AssistantMonthContextBundle['targetAllocation']> = {};
+
+  for (const [assetClass, targetPercentage] of Object.entries(derived)) {
+    if (!targetPercentage) continue;
+    const subTargets = manual?.[assetClass]?.subTargets;
+    result[assetClass] = {
+      targetPercentage,
+      ...(subTargets ? { subTargets } : {}),
+    };
+  }
+
+  return Object.keys(result).length > 0 ? result : null;
+}
+
+/**
+ * Builds the three goal-related bundle fields in one pass.
+ *
+ * They are produced together because they answer ONE question — is the portfolio
+ * being steered by the goals or by the manual targets? Splitting them would let the
+ * `goals` block say "goal-driven allocation on" while `targetAllocation` still
+ * reported the manual numbers the app itself has stopped using.
+ *
+ * `goals` is null when the feature is off or the user has no goal document: a null
+ * the prompt turns into an explicit "Goal-Based Investing non attivo" line, never a
+ * silent absence (a model cannot tell an unused feature from missing data).
+ */
+function buildGoalFields(
+  settings: AssetAllocationSettings | null,
+  goalData: GoalBasedInvestingData | null,
+  assets: Asset[],
+  now: Date
+): Pick<AssistantMonthContextBundle, 'goals' | 'targetAllocation' | 'targetAllocationSource'> {
+  const manualTargets = buildManualTargetAllocation(settings);
+  const isEnabled = settings?.goalBasedInvestingEnabled === true;
+  const isGoalDriven = settings?.goalDrivenAllocationEnabled === true;
+
+  if (!isEnabled || !goalData) {
+    return {
+      goals: null,
+      targetAllocation: manualTargets,
+      targetAllocationSource: 'manual',
+    };
+  }
+
+  const items = goalData.goals.map((goal) => {
+    const progress = calculateGoalProgress(goal, goalData.assignments, assets);
+    const trajectory = computeGoalTrajectory({
+      currentValue: progress.currentValue,
+      targetAmount: goal.targetAmount,
+      targetDate: goal.targetDate,
+      monthlyContribution: goal.monthlyContribution,
+      recommendedAllocation: goal.recommendedAllocation,
+      now,
+    });
+
+    return {
+      name: goal.name,
+      priority: goal.priority,
+      currentValue: progress.currentValue,
+      verdict: trajectory.verdict,
+      // Only dated goals with a target have a trajectory to project. Carrying the
+      // required pace is what lets the assistant answer "di quanto sono in ritardo"
+      // with a number instead of computing one itself — which the data rules forbid.
+      ...(trajectory.requiredMonthlyContribution != null
+        ? {
+            requiredMonthlyContribution: trajectory.requiredMonthlyContribution,
+            assumedAnnualReturn: trajectory.annualReturn,
+          }
+        : {}),
+      ...(trajectory.projectedValueAtDeadline != null
+        ? { projectedValueAtDeadline: trajectory.projectedValueAtDeadline }
+        : {}),
+      ...(goal.targetAmount != null ? { targetAmount: goal.targetAmount } : {}),
+      ...(goal.targetDate != null ? { targetDateIso: goal.targetDate } : {}),
+      ...(goal.monthlyContribution != null ? { monthlyContribution: goal.monthlyContribution } : {}),
+      ...(goal.recommendedAllocation != null ? { recommendedAllocation: goal.recommendedAllocation } : {}),
+    };
+  });
+
+  // The Allocazione page overrides the manual targets only when the derivation
+  // actually produces something; falling back to the manual ones keeps the two
+  // surfaces reporting the same target.
+  const derived = isGoalDriven
+    ? deriveTargetAllocationFromGoals(goalData.goals, goalData.assignments, assets)
+    : null;
+  const goalDrivenTargets = derived ? buildGoalDrivenTargetAllocation(derived, manualTargets) : null;
+
+  return {
+    goals: {
+      enabled: true,
+      goalDrivenAllocationEnabled: isGoalDriven,
+      items,
+    },
+    targetAllocation: goalDrivenTargets ?? manualTargets,
+    targetAllocationSource: goalDrivenTargets ? 'goal_driven' : 'manual',
+  };
 }
 
 /**
@@ -337,6 +453,24 @@ function toBundleCashflowFields(
 function buildUnclassifiedSubCategoryNote(share: number): string | null {
   if (share <= UNCLASSIFIED_SUBCATEGORY_NOTE_THRESHOLD) return null;
   return `Il ${Math.round(share * 100)}% delle spese del periodo non ha una sottocategoria assegnata: il dettaglio per sottocategoria è parziale per costruzione.`;
+}
+
+/**
+ * Point-in-time patrimony over a window: the baseline snapshot vs the closing one.
+ *
+ * Extracted verbatim from the four period builders, which each carried the same eight
+ * lines. `null` propagates on purpose — a missing snapshot at either end makes the delta
+ * unknowable, and a zero baseline would report the whole patrimony as this period's gain.
+ */
+function buildNetWorthFields(
+  previousSnapshot: MonthlySnapshot | null,
+  currentSnapshot: MonthlySnapshot | null
+): AssistantMonthContextBundle['netWorth'] {
+  const start = previousSnapshot?.totalNetWorth ?? null;
+  const end = currentSnapshot?.totalNetWorth ?? null;
+  const delta = start !== null && end !== null ? end - start : null;
+  const deltaPct = delta !== null && start !== null && start !== 0 ? (delta / start) * 100 : null;
+  return { start, end, delta, deltaPct };
 }
 
 /**
@@ -412,12 +546,13 @@ export async function buildAssistantMonthContext(
   const { year: prevYear, month: prevMonth } = getPreviousMonth(year, month);
 
   // Fetch snapshots, transactions, settings, and asset metadata in parallel
-  const [allSnapshots, monthExpenses, settings, assets, categories] = await Promise.all([
+  const [allSnapshots, monthExpenses, settings, assets, categories, goalData] = await Promise.all([
     fetchSnapshots(userId),
     fetchExpenses(userId, startDate, endDate),
     fetchSettings(userId),
     fetchAssets(userId),
     fetchExpenseCategories(userId),
+    getGoalDataAdmin(userId),
   ]);
 
   const currentSnapshot = findSnapshot(allSnapshots, year, month, includeDummySnapshots);
@@ -457,33 +592,19 @@ export async function buildAssistantMonthContext(
   const unclassifiedNote = buildUnclassifiedSubCategoryNote(breakdown.unclassifiedSubCategoryShare);
   if (unclassifiedNote) notes.push(unclassifiedNote);
 
-  // --- Net worth ---
-  const nwStart = previousSnapshot?.totalNetWorth ?? null;
-  const nwEnd = currentSnapshot?.totalNetWorth ?? null;
-  const nwDelta = nwStart !== null && nwEnd !== null ? nwEnd - nwStart : null;
-  const nwDeltaPct =
-    nwDelta !== null && nwStart !== null && nwStart !== 0
-      ? (nwDelta / nwStart) * 100
-      : null;
-
   const allocationChanges = buildAllocationChanges(currentSnapshot, previousSnapshot);
   const bySubCategoryAllocation = buildSubCategoryAllocation(currentSnapshot, assets);
-  const targetAllocation = buildTargetAllocation(settings);
+  const goalFields = buildGoalFields(settings, goalData, assets, now);
 
   return {
     selector,
     currentSnapshot,
     previousSnapshot,
     ...toBundleCashflowFields(breakdown),
-    netWorth: {
-      start: nwStart,
-      end: nwEnd,
-      delta: nwDelta,
-      deltaPct: nwDeltaPct,
-    },
+    netWorth: buildNetWorthFields(previousSnapshot, currentSnapshot),
     allocationChanges,
     bySubCategoryAllocation,
-    targetAllocation,
+    ...goalFields,
     expenseCategories: buildCategoryTaxonomy(categories),
     dataQuality: {
       hasSnapshot,
@@ -522,12 +643,13 @@ export async function buildAssistantYearContext(
   // For current year: cap at end of today's month; for completed years: full Dec 31
   const yearEnd = new Date(year, 11, 31, 23, 59, 59);
 
-  const [allSnapshots, yearExpenses, settings, assets, categories] = await Promise.all([
+  const [allSnapshots, yearExpenses, settings, assets, categories, goalData] = await Promise.all([
     fetchSnapshots(userId),
     fetchExpenses(userId, yearStart, yearEnd),
     fetchSettings(userId),
     fetchAssets(userId),
     fetchExpenseCategories(userId),
+    getGoalDataAdmin(userId),
   ]);
 
   // Baseline = December of previous year
@@ -555,15 +677,6 @@ export async function buildAssistantYearContext(
     notes.push('Anno in corso: i dati sono parziali. Non trarre conclusioni annuali definitive.');
   }
 
-  // Net worth: start of year (Dec prev year) → end of latest month in year
-  const nwStart = previousSnapshot?.totalNetWorth ?? null;
-  const nwEnd = currentSnapshot?.totalNetWorth ?? null;
-  const nwDelta = nwStart !== null && nwEnd !== null ? nwEnd - nwStart : null;
-  const nwDeltaPct =
-    nwDelta !== null && nwStart !== null && nwStart !== 0
-      ? (nwDelta / nwStart) * 100
-      : null;
-
   const breakdown = buildCashflowBreakdown(yearExpenses, {
     dividendCategoryId: settings?.dividendIncomeCategoryId,
     topIndividualLimit: TOP_INDIVIDUAL_EXPENSES_YEAR,
@@ -573,7 +686,7 @@ export async function buildAssistantYearContext(
 
   const allocationChanges = buildAllocationChanges(currentSnapshot, previousSnapshot);
   const bySubCategoryAllocation = buildSubCategoryAllocation(currentSnapshot, assets);
-  const targetAllocation = buildTargetAllocation(settings);
+  const goalFields = buildGoalFields(settings, goalData, assets, now);
 
   // selector.month = 0 signals "year-level" period to prompt builders and the context card
   return {
@@ -581,118 +694,16 @@ export async function buildAssistantYearContext(
     currentSnapshot,
     previousSnapshot,
     ...toBundleCashflowFields(breakdown),
-    netWorth: { start: nwStart, end: nwEnd, delta: nwDelta, deltaPct: nwDeltaPct },
+    netWorth: buildNetWorthFields(previousSnapshot, currentSnapshot),
     allocationChanges,
     bySubCategoryAllocation,
-    targetAllocation,
+    ...goalFields,
     expenseCategories: buildCategoryTaxonomy(categories),
     dataQuality: {
       hasSnapshot,
       hasPreviousBaseline,
       hasCashflowData,
       isPartialMonth: isCurrentYear,
-      notes,
-    },
-  };
-}
-
-// ─── Quarter builder ─────────────────────────────────────────────────────────
-
-/**
- * Builds the context bundle for a completed-quarter analysis.
- *
- * Baseline: end-of-previous-quarter snapshot (Q1 → Dec prev year; Q2/Q3/Q4 → prev quarter-end)
- * End: end-of-quarter snapshot (e.g. March for Q1, June for Q2)
- * Cashflow: all transactions from quarter start month to quarter end month
- *
- * selector.month is set to the last month of the quarter (3, 6, 9, or 12) and
- * selector.quarter is set to 1-4 so getPeriodLabel can render "Q1 2026" instead of "Marzo 2026".
- *
- * @param userId - Firebase UID of the authenticated user
- * @param year - The year of the quarter
- * @param quarter - 1-4 identifying the calendar quarter
- * @param includeDummySnapshots - Include test fixture snapshots (test accounts only)
- */
-export async function buildAssistantQuarterContext(
-  userId: string,
-  year: number,
-  quarter: number,
-  includeDummySnapshots = false
-): Promise<AssistantMonthContextBundle> {
-  const lastMonthOfQuarter = quarter * 3;    // 3, 6, 9, 12
-  const quarterStartMonth = lastMonthOfQuarter - 2; // 1, 4, 7, 10
-
-  // Previous quarter-end: Q1 → Dec of previous year; Q2/Q3/Q4 → 3 months earlier
-  const prevQuarterYear = quarter === 1 ? year - 1 : year;
-  const prevQuarterMonth = quarter === 1 ? 12 : lastMonthOfQuarter - 3;
-
-  const startDate = new Date(year, quarterStartMonth - 1, 1, 0, 0, 0);
-  // Day 0 of next month = last day of quarter-end month
-  const endDate = new Date(year, lastMonthOfQuarter, 0, 23, 59, 59);
-
-  const [allSnapshots, quarterExpenses, settings, assets, categories] = await Promise.all([
-    fetchSnapshots(userId),
-    fetchExpenses(userId, startDate, endDate),
-    fetchSettings(userId),
-    fetchAssets(userId),
-    fetchExpenseCategories(userId),
-  ]);
-
-  // End snapshot = last day of quarter-end month
-  const currentSnapshot = findSnapshot(allSnapshots, year, lastMonthOfQuarter, includeDummySnapshots);
-  // Baseline snapshot = last day of previous quarter
-  const previousSnapshot = findSnapshot(allSnapshots, prevQuarterYear, prevQuarterMonth, includeDummySnapshots);
-
-  const hasSnapshot = currentSnapshot !== null;
-  const hasPreviousBaseline = previousSnapshot !== null;
-  const hasCashflowData = quarterExpenses.length > 0;
-
-  const notes: string[] = [];
-  if (!hasSnapshot && hasCashflowData) {
-    notes.push('Snapshot patrimoniale di fine trimestre non presente: patrimonio finale non consolidato.');
-  }
-  if (!hasSnapshot && !hasCashflowData) {
-    notes.push('Nessun dato disponibile per questo trimestre.');
-  }
-  if (hasSnapshot && !hasPreviousBaseline) {
-    notes.push('Nessun trimestre precedente disponibile: variazione trimestrale non calcolabile.');
-  }
-
-  const nwStart = previousSnapshot?.totalNetWorth ?? null;
-  const nwEnd = currentSnapshot?.totalNetWorth ?? null;
-  const nwDelta = nwStart !== null && nwEnd !== null ? nwEnd - nwStart : null;
-  const nwDeltaPct =
-    nwDelta !== null && nwStart !== null && nwStart !== 0
-      ? (nwDelta / nwStart) * 100
-      : null;
-
-  const breakdown = buildCashflowBreakdown(quarterExpenses, {
-    dividendCategoryId: settings?.dividendIncomeCategoryId,
-    topIndividualLimit: TOP_INDIVIDUAL_EXPENSES_QUARTER,
-  });
-  const unclassifiedNote = buildUnclassifiedSubCategoryNote(breakdown.unclassifiedSubCategoryShare);
-  if (unclassifiedNote) notes.push(unclassifiedNote);
-
-  const allocationChanges = buildAllocationChanges(currentSnapshot, previousSnapshot);
-  const bySubCategoryAllocation = buildSubCategoryAllocation(currentSnapshot, assets);
-  const targetAllocation = buildTargetAllocation(settings);
-
-  // selector.quarter disambiguates from a monthly period with the same end-month value
-  return {
-    selector: { year, month: lastMonthOfQuarter, quarter },
-    currentSnapshot,
-    previousSnapshot,
-    ...toBundleCashflowFields(breakdown),
-    netWorth: { start: nwStart, end: nwEnd, delta: nwDelta, deltaPct: nwDeltaPct },
-    allocationChanges,
-    bySubCategoryAllocation,
-    targetAllocation,
-    expenseCategories: buildCategoryTaxonomy(categories),
-    dataQuality: {
-      hasSnapshot,
-      hasPreviousBaseline,
-      hasCashflowData,
-      isPartialMonth: false, // quarterly emails only fire on completed quarters
       notes,
     },
   };
@@ -721,12 +732,13 @@ export async function buildAssistantYtdContext(
   // Include up to end of today's month so all tracked transactions are captured
   const ytdEnd = new Date(currentYear, currentMonth, 0, 23, 59, 59);
 
-  const [allSnapshots, ytdExpenses, settings, assets, categories] = await Promise.all([
+  const [allSnapshots, ytdExpenses, settings, assets, categories, goalData] = await Promise.all([
     fetchSnapshots(userId),
     fetchExpenses(userId, ytdStart, ytdEnd),
     fetchSettings(userId),
     fetchAssets(userId),
     fetchExpenseCategories(userId),
+    getGoalDataAdmin(userId),
   ]);
 
   // Baseline = December of previous year (same as year builder)
@@ -748,14 +760,6 @@ export async function buildAssistantYtdContext(
     notes.push('Nessun dicembre precedente: variazione YTD non calcolabile.');
   }
 
-  const nwStart = previousSnapshot?.totalNetWorth ?? null;
-  const nwEnd = currentSnapshot?.totalNetWorth ?? null;
-  const nwDelta = nwStart !== null && nwEnd !== null ? nwEnd - nwStart : null;
-  const nwDeltaPct =
-    nwDelta !== null && nwStart !== null && nwStart !== 0
-      ? (nwDelta / nwStart) * 100
-      : null;
-
   const breakdown = buildCashflowBreakdown(ytdExpenses, {
     dividendCategoryId: settings?.dividendIncomeCategoryId,
     topIndividualLimit: TOP_INDIVIDUAL_EXPENSES_YEAR,
@@ -765,7 +769,7 @@ export async function buildAssistantYtdContext(
 
   const allocationChanges = buildAllocationChanges(currentSnapshot, previousSnapshot);
   const bySubCategoryAllocation = buildSubCategoryAllocation(currentSnapshot, assets);
-  const targetAllocation = buildTargetAllocation(settings);
+  const goalFields = buildGoalFields(settings, goalData, assets, now);
 
   // selector.month = -1 signals "YTD" period
   return {
@@ -773,16 +777,179 @@ export async function buildAssistantYtdContext(
     currentSnapshot,
     previousSnapshot,
     ...toBundleCashflowFields(breakdown),
-    netWorth: { start: nwStart, end: nwEnd, delta: nwDelta, deltaPct: nwDeltaPct },
+    netWorth: buildNetWorthFields(previousSnapshot, currentSnapshot),
     allocationChanges,
     bySubCategoryAllocation,
-    targetAllocation,
+    ...goalFields,
     expenseCategories: buildCategoryTaxonomy(categories),
     dataQuality: {
       hasSnapshot,
       hasPreviousBaseline,
       hasCashflowData,
       isPartialMonth: true, // YTD is always partial by definition
+      notes,
+    },
+  };
+}
+
+// ─── Arbitrary month-window builder (quarters, semesters, email periods) ──────
+
+/** A run of consecutive months inside one calendar year, plus the name it goes by. */
+export interface AssistantPeriodRange {
+  year: number;
+  /** First month of the window (1-12, inclusive). */
+  startMonth: number;
+  /** Last month of the window (1-12, inclusive); must not precede startMonth. */
+  endMonth: number;
+  /** What the window is called: "Q3 2026", "2° Semestre 2026", "Luglio 2026", "Anno 2026". */
+  label: string;
+}
+
+/**
+ * Builds the context bundle for an arbitrary run of months inside one year.
+ *
+ * Exists because the four selector codes cannot express a quarter or a semester, which is
+ * exactly what the periodic emails send. The window rules are the other builders' rules:
+ *
+ *   Patrimonio: point-in-time, baseline = snapshot of the month BEFORE `startMonth`
+ *               (year wrap included), closing = snapshot of `endMonth`. That baseline is
+ *               deliberately the same one the email's own `previousNetWorth` uses, so the
+ *               bundle and the email cannot disagree about Δ patrimonio.
+ *   Flussi:     every expense dated inside the window, through the ONE aggregator
+ *               (buildCashflowBreakdown) — never a second cashflow computation.
+ *
+ * WHY THE LABEL IS A NOTE AND NOT A FIELD
+ * `AssistantMonthContextBundle` has no periodLabel, and adding one would be a required
+ * field the four existing builders would all have to fill. The window instead travels the
+ * way the YTD and history builders already declare theirs: as the first data-quality note,
+ * which is text the model reads. Callers that render a header (the prompt builders) pass
+ * the same label to `formatBundleForPrompt`, because `selector` — pinned to the window's
+ * CLOSING month, the month whose snapshot the figures rest on — would otherwise print
+ * "Settembre 2026" over a whole quarter.
+ *
+ * @param userId  Firebase UID of the account being analysed
+ * @param range   The window and its label
+ * @throws When the window is not a valid run of months inside one year
+ */
+export async function buildAssistantPeriodRangeContext(
+  userId: string,
+  range: AssistantPeriodRange,
+  includeDummySnapshots = false
+): Promise<AssistantMonthContextBundle> {
+  const { year, startMonth, endMonth, label } = range;
+
+  // Fail at the boundary: a reversed window would silently query an empty range and
+  // report a period with no data instead of a bug.
+  if (
+    !Number.isInteger(startMonth) ||
+    !Number.isInteger(endMonth) ||
+    startMonth < 1 ||
+    endMonth > 12 ||
+    startMonth > endMonth
+  ) {
+    throw new Error(
+      `buildAssistantPeriodRangeContext: invalid window ${startMonth}-${endMonth} for ${year}`
+    );
+  }
+
+  const windowStart = new Date(year, startMonth - 1, 1, 0, 0, 0);
+  const windowEnd = new Date(year, endMonth, 0, 23, 59, 59);
+  const baseline = getPreviousMonth(year, startMonth);
+
+  const [allSnapshots, windowExpenses, settings, assets, categories, goalData] = await Promise.all([
+    fetchSnapshots(userId),
+    fetchExpenses(userId, windowStart, windowEnd),
+    fetchSettings(userId),
+    fetchAssets(userId),
+    fetchExpenseCategories(userId),
+    getGoalDataAdmin(userId),
+  ]);
+
+  const currentSnapshot = findSnapshot(allSnapshots, year, endMonth, includeDummySnapshots);
+  const previousSnapshot = findSnapshot(
+    allSnapshots,
+    baseline.year,
+    baseline.month,
+    includeDummySnapshots
+  );
+
+  const now = new Date();
+  const { month: italyCurrentMonth, year: italyCurrentYear } = getItalyMonthYear(now);
+  // The window is still open while its closing month has not ended.
+  const isWindowInProgress =
+    year > italyCurrentYear || (year === italyCurrentYear && endMonth >= italyCurrentMonth);
+
+  const hasSnapshot = currentSnapshot !== null;
+  const hasPreviousBaseline = previousSnapshot !== null;
+  const hasCashflowData = windowExpenses.length > 0;
+
+  const monthCount = endMonth - startMonth + 1;
+  const windowMonths = `${MONTH_NAMES[startMonth - 1]}-${MONTH_NAMES[endMonth - 1]} ${year}`;
+  const notes: string[] = [
+    monthCount === 1
+      ? `Finestra di analisi: ${label} (${MONTH_NAMES[startMonth - 1]} ${year}), 1 mese.`
+      : `Finestra di analisi: ${label} (${windowMonths}), ${monthCount} mesi.`,
+  ];
+
+  if (!hasSnapshot && hasCashflowData) {
+    notes.push(
+      `Snapshot patrimoniale di fine ${MONTH_NAMES[endMonth - 1]} non presente: patrimonio finale non consolidato.`
+    );
+  }
+  if (!hasSnapshot && !hasCashflowData) {
+    notes.push(`Nessun dato disponibile per ${label}.`);
+  }
+  if (hasSnapshot && !hasPreviousBaseline) {
+    notes.push(
+      `Nessuno snapshot patrimoniale prima dell'inizio della finestra (${MONTH_NAMES[baseline.month - 1]} ${baseline.year}): variazione del patrimonio non calcolabile.`
+    );
+  }
+
+  // Which months inside the window have no photograph of their own. The window's own
+  // figures survive (they rest on the two ends), but a month-by-month reading of the
+  // patrimony does not — and saying which months are missing is what keeps the model from
+  // treating the gap as a flat stretch.
+  const monthsWithoutSnapshot: string[] = [];
+  for (let month = startMonth; month <= endMonth; month += 1) {
+    if (!findSnapshot(allSnapshots, year, month, includeDummySnapshots)) {
+      monthsWithoutSnapshot.push(MONTH_NAMES[month - 1]);
+    }
+  }
+  if (monthsWithoutSnapshot.length > 0 && monthsWithoutSnapshot.length < monthCount) {
+    notes.push(
+      `Mesi della finestra senza snapshot patrimoniale: ${monthsWithoutSnapshot.join(', ')}. Il patrimonio è misurato solo su inizio e fine finestra.`
+    );
+  }
+  if (isWindowInProgress) {
+    notes.push(`${label} non è ancora concluso: i dati del periodo sono parziali.`);
+  }
+
+  const breakdown = buildCashflowBreakdown(windowExpenses, {
+    dividendCategoryId: settings?.dividendIncomeCategoryId,
+    // One month is one month, whatever the caller calls the window; anything longer gets
+    // the wider list, like the year builder.
+    topIndividualLimit: monthCount === 1 ? TOP_INDIVIDUAL_EXPENSES_MONTH : TOP_INDIVIDUAL_EXPENSES_YEAR,
+  });
+  const unclassifiedNote = buildUnclassifiedSubCategoryNote(breakdown.unclassifiedSubCategoryShare);
+  if (unclassifiedNote) notes.push(unclassifiedNote);
+
+  return {
+    // The closing month, which is where the patrimony figures are photographed. The window
+    // itself is named in the notes and in the label the caller passes to the prompt.
+    selector: { year, month: endMonth },
+    currentSnapshot,
+    previousSnapshot,
+    ...toBundleCashflowFields(breakdown),
+    netWorth: buildNetWorthFields(previousSnapshot, currentSnapshot),
+    allocationChanges: buildAllocationChanges(currentSnapshot, previousSnapshot),
+    bySubCategoryAllocation: buildSubCategoryAllocation(currentSnapshot, assets),
+    ...buildGoalFields(settings, goalData, assets, now),
+    expenseCategories: buildCategoryTaxonomy(categories),
+    dataQuality: {
+      hasSnapshot,
+      hasPreviousBaseline,
+      hasCashflowData,
+      isPartialMonth: isWindowInProgress,
       notes,
     },
   };
@@ -814,12 +981,13 @@ export async function buildAssistantHistoryContext(
   const historyStart = new Date(startYear, 0, 1, 0, 0, 0);
   const historyEnd = new Date(currentYear, currentMonth, 0, 23, 59, 59);
 
-  const [allSnapshots, historyExpenses, settings, assets, categories] = await Promise.all([
+  const [allSnapshots, historyExpenses, settings, assets, categories, goalData] = await Promise.all([
     fetchSnapshots(userId),
     fetchExpenses(userId, historyStart, historyEnd),
     fetchSettings(userId),
     fetchAssets(userId),
     fetchExpenseCategories(userId),
+    getGoalDataAdmin(userId),
   ]);
 
   // Filter to snapshots within the history window
@@ -844,14 +1012,6 @@ export async function buildAssistantHistoryContext(
     notes.push('Nessuno snapshot patrimoniale trovato nel periodo.');
   }
 
-  const nwStart = previousSnapshot?.totalNetWorth ?? null;
-  const nwEnd = currentSnapshot?.totalNetWorth ?? null;
-  const nwDelta = nwStart !== null && nwEnd !== null ? nwEnd - nwStart : null;
-  const nwDeltaPct =
-    nwDelta !== null && nwStart !== null && nwStart !== 0
-      ? (nwDelta / nwStart) * 100
-      : null;
-
   const breakdown = buildCashflowBreakdown(historyExpenses, {
     dividendCategoryId: settings?.dividendIncomeCategoryId,
     topIndividualLimit: TOP_INDIVIDUAL_EXPENSES_HISTORY,
@@ -861,7 +1021,7 @@ export async function buildAssistantHistoryContext(
 
   const allocationChanges = buildAllocationChanges(currentSnapshot, previousSnapshot);
   const bySubCategoryAllocation = buildSubCategoryAllocation(currentSnapshot, assets);
-  const targetAllocation = buildTargetAllocation(settings);
+  const goalFields = buildGoalFields(settings, goalData, assets, now);
 
   // selector.month = -2 signals "total history" period
   return {
@@ -869,10 +1029,10 @@ export async function buildAssistantHistoryContext(
     currentSnapshot,
     previousSnapshot,
     ...toBundleCashflowFields(breakdown),
-    netWorth: { start: nwStart, end: nwEnd, delta: nwDelta, deltaPct: nwDeltaPct },
+    netWorth: buildNetWorthFields(previousSnapshot, currentSnapshot),
     allocationChanges,
     bySubCategoryAllocation,
-    targetAllocation,
+    ...goalFields,
     expenseCategories: buildCategoryTaxonomy(categories),
     dataQuality: {
       hasSnapshot,

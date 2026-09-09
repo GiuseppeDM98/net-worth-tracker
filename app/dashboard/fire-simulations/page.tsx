@@ -13,6 +13,9 @@
  * Mobile/tablet pattern (< 1440px): PageTabBar renders a centered segmented pill (icon-only
  * inactive tabs). Desktop (≥ 1440px): standard TabsList with icons.
  * No lazy loading needed - components load quickly.
+ *
+ * The container is `wide` (1920px, the tile grid's root): every tab is propagated to «Verdict
+ * over Tiles» — Calcolatore, Coast FIRE, What If, Monte Carlo and, since 2026-08-26, Obiettivi.
  */
 
 'use client';
@@ -46,14 +49,9 @@ export default function FireSimulationsPage() {
   return (
     <PageContainer>
       <PageHeader
-        title={
-          <span className="flex items-center gap-2">
-            <Flame className="h-7 w-7 sm:h-8 sm:w-8 text-orange-500" aria-hidden="true" />
-            FIRE e Simulazioni
-          </span>
-        }
-        description="Pianifica la tua libertà finanziaria e valuta la sostenibilità del tuo piano di pensionamento"
-        separator={false}
+        label="Pianificazione"
+        title="FIRE e Simulazioni"
+        description="Libertà finanziaria e sostenibilità del piano"
       />
 
       <PageTabs
@@ -61,6 +59,7 @@ export default function FireSimulationsPage() {
         value={activeTab}
         onValueChange={(v) => setActiveTab(v as TabValue)}
         layoutId="fire-tab-pill"
+        ariaLabel="Sezioni di FIRE e Simulazioni"
       >
         {TABS.map((tab) => (
           <TabsContent key={tab.value} value={tab.value} className="mt-0">

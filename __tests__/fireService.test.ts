@@ -5,10 +5,12 @@ vi.mock('@/lib/services/expenseService', () => ({}))
 vi.mock('@/lib/services/snapshotService', () => ({}))
 
 import {
+  buildCoastFIRERetirementNeeds,
   calculateCoastFireNetRealAnnualPension,
   calculateCoastFIREMetrics,
   calculateCoastFIREProjection,
   calculateProgressiveTax,
+  calculateFireBridgeNumber,
   calculateFIREMetrics,
   calculatePlannedFIREMetrics,
   calculateFIREProjection,
@@ -612,6 +614,375 @@ describe('calculateHistoricalFIRERunway', () => {
 
     expect(result.runwaySummary.currentLiquidYearsOfExpenses).toBeCloseTo(4.4, 2)
     expect(result.runwaySummary.liquidDeltaVs12Months).toBe(0.7)
+  })
+})
+
+describe('buildCoastFIRERetirementNeeds — capitalInflows (bridge invariants)', () => {
+  const defaultTaxBrackets = getDefaultCoastFireTaxBrackets()
+  // A pension starting 3 years after retirement gives the walk a 3-year bridge to exercise.
+  const BRIDGED_PENSION = [
+    {
+      id: 'p1',
+      label: 'INPS',
+      grossMonthlyAmount: 2500,
+      monthsPerYear: 13,
+      startDate: '2059-04-12', // retirement at 65 on FIXED_CURRENT_DATE + 30y = 2056 → 3-year bridge
+    },
+  ]
+
+  function runWalk(capitalInflows?: { yearsFromRetirement: number; amount: number }[]) {
+    return buildCoastFIRERetirementNeeds(
+      40000,
+      4,
+      35,
+      65,
+      5,
+      2.5,
+      BRIDGED_PENSION,
+      defaultTaxBrackets,
+      FIXED_CURRENT_DATE,
+      capitalInflows
+    )
+  }
+
+  it('C1: absent or empty capitalInflows leave the output identical', () => {
+    const baseline = runWalk()
+    const withUndefined = runWalk(undefined)
+    const withEmpty = runWalk([])
+
+    expect(withUndefined.retirementCapitalRequired).toBe(baseline.retirementCapitalRequired)
+    expect(withEmpty.retirementCapitalRequired).toBe(baseline.retirementCapitalRequired)
+    expect(withEmpty.steadyStatePortfolioNeed).toBe(baseline.steadyStatePortfolioNeed)
+  })
+
+  it('C2: an inflow of amount A at yearsFromRetirement 0 reduces the required capital by exactly A', () => {
+    const baseline = runWalk()
+    const withInflow = runWalk([{ yearsFromRetirement: 0, amount: 50000 }])
+
+    expect(baseline.retirementCapitalRequired - withInflow.retirementCapitalRequired).toBeCloseTo(
+      50000,
+      6
+    )
+  })
+
+  it('C2 floor: the required capital never goes below zero', () => {
+    const withHugeInflow = runWalk([{ yearsFromRetirement: 0, amount: 100_000_000 }])
+
+    expect(withHugeInflow.retirementCapitalRequired).toBe(0)
+  })
+
+  it('C3: an inflow of amount A at year y (inside the bridge) reduces by A / (1 + realReturn)^y', () => {
+    const baseline = runWalk()
+    const withInflow = runWalk([{ yearsFromRetirement: 2, amount: 50000 }])
+
+    expect(baseline.retirementCapitalRequired - withInflow.retirementCapitalRequired).toBeCloseTo(
+      50000 / Math.pow(1.05, 2),
+      6
+    )
+  })
+
+  it('extends the walk beyond the pension bridge when an inflow lands later (no pensions case)', () => {
+    // No pensions → bridgeYears = 0 → without the extension the inflow would be silently ignored.
+    // Independent PV check: R(0) = Σ_{s=0..1} E/(1+r)^(s+1) + max(S − A, 0)/(1+r)^2
+    // with E=40000, S=1_000_000, A=200_000, r=5%: (840000/1.05 + 40000)/1.05 = 800000 exactly.
+    const result = buildCoastFIRERetirementNeeds(
+      40000,
+      4,
+      35,
+      65,
+      5,
+      2.5,
+      [],
+      defaultTaxBrackets,
+      FIXED_CURRENT_DATE,
+      [{ yearsFromRetirement: 2, amount: 200000 }]
+    )
+
+    expect(result.steadyStatePortfolioNeed).toBe(1000000)
+    expect(result.retirementCapitalRequired).toBeCloseTo(800000, 6)
+  })
+})
+
+describe('calculateFireBridgeNumber', () => {
+  it('collapses to the standard FIRE number when yearsToUnlock is 0 or negative', () => {
+    const atZero = calculateFireBridgeNumber({
+      annualExpenses: 40000,
+      withdrawalRate: 4,
+      realReturn: 4.5,
+      yearsToUnlock: 0,
+      pensionValueToday: 200000,
+      pensionGrowthRate: 4.5,
+    })
+    const negative = calculateFireBridgeNumber({
+      annualExpenses: 40000,
+      withdrawalRate: 4,
+      realReturn: 4.5,
+      yearsToUnlock: -3,
+      pensionValueToday: 200000,
+      pensionGrowthRate: 4.5,
+    })
+
+    expect(atZero.standardFireNumber).toBe(1000000)
+    expect(atZero.bridgeFireNumber).toBe(atZero.standardFireNumber)
+    expect(atZero.pensionValueAtUnlock).toBe(200000)
+    expect(negative.bridgeFireNumber).toBe(negative.standardFireNumber)
+  })
+
+  it('is below the standard number when the fund covers part of the post-unlock capital', () => {
+    // Independent PV-sum check (r = g = 5%, y = 2, P = 200000):
+    //   P_at_unlock = 200000·1.05² = 220500; terminal = 1_000_000 − 220500 = 779500
+    //   bridge = 40000/1.05 + 40000/1.05² + 779500/1.05² = 781405.895…
+    const result = calculateFireBridgeNumber({
+      annualExpenses: 40000,
+      withdrawalRate: 4,
+      realReturn: 5,
+      yearsToUnlock: 2,
+      pensionValueToday: 200000,
+      pensionGrowthRate: 5,
+    })
+
+    const expected = 40000 / 1.05 + 40000 / Math.pow(1.05, 2) + 779500 / Math.pow(1.05, 2)
+    expect(result.standardFireNumber).toBe(1000000)
+    expect(result.pensionValueAtUnlock).toBeCloseTo(220500, 6)
+    expect(result.bridgeFireNumber).toBeCloseTo(expected, 4)
+    expect(result.bridgeFireNumber).toBeLessThan(result.standardFireNumber)
+  })
+
+  it('floors at the PV of the bridge expenses when the fund alone exceeds the standard number', () => {
+    const result = calculateFireBridgeNumber({
+      annualExpenses: 40000,
+      withdrawalRate: 4,
+      realReturn: 5,
+      yearsToUnlock: 2,
+      pensionValueToday: 2000000,
+      pensionGrowthRate: 5,
+    })
+
+    const bridgeExpensesPV = 40000 / 1.05 + 40000 / Math.pow(1.05, 2)
+    expect(result.bridgeFireNumber).toBeCloseTo(bridgeExpensesPV, 4)
+  })
+})
+
+describe('calculateFIREProjection — pension bridge', () => {
+  const scenarios = getDefaultScenarios()
+
+  it('regression: an undefined pensionBridge produces the same output as omitting it', () => {
+    const withoutArg = calculateFIREProjection(100000, 30000, 20000, 4, scenarios, 10)
+    const withUndefined = calculateFIREProjection(100000, 30000, 20000, 4, scenarios, 10, undefined)
+
+    expect(withUndefined).toEqual(withoutArg)
+  })
+
+  it('keeps the pension compartment out of the series before unlock and merges it at the unlock year', () => {
+    const result = calculateFIREProjection(100000, 30000, 0, 4, scenarios, 3, {
+      valueToday: 50000,
+      yearsToUnlock: 2,
+    })
+
+    // Year 1 (pre-unlock): free portfolio only.
+    expect(result.yearlyData[0].baseNetWorth).toBe(Math.round(100000 * 1.07))
+    // Year 2 (unlock): free portfolio + compartment grown at the scenario growth rate — the step.
+    expect(result.yearlyData[1].baseNetWorth).toBe(
+      Math.round(100000 * Math.pow(1.07, 2) + 50000 * Math.pow(1.07, 2))
+    )
+    // Year 3 (post-unlock): merged total keeps compounding together.
+    expect(result.yearlyData[2].baseNetWorth).toBe(
+      Math.round((100000 + 50000) * Math.pow(1.07, 3))
+    )
+  })
+
+  it('uses the bridge requirement for the FIRE-reached check before unlock', () => {
+    // Free 950k with 40k expenses fails the standard check in year 1 (963k? no: 1_016_500 < 1_025_000)
+    // but passes the bridge check, because a 500k compartment unlocking at year 2 covers most of the
+    // post-unlock requirement.
+    const bridged = calculateFIREProjection(950000, 40000, 0, 4, scenarios, 5, {
+      valueToday: 500000,
+      yearsToUnlock: 2,
+    })
+    const unbridged = calculateFIREProjection(950000, 40000, 0, 4, scenarios, 5)
+
+    expect(unbridged.yearlyData[0].baseFireReached).toBe(false)
+    expect(bridged.yearlyData[0].baseFireReached).toBe(true)
+    expect(bridged.baseYearsToFIRE).toBe(1)
+  })
+
+  it('uses the standard requirement (on the merged portfolio) from the unlock year onward', () => {
+    // Small compartment, so the outcome after unlock must match the standard check on free+fund.
+    const result = calculateFIREProjection(100000, 30000, 0, 4, scenarios, 3, {
+      valueToday: 1000,
+      yearsToUnlock: 1,
+    })
+
+    const year2 = result.yearlyData[1]
+    expect(year2.baseFireReached).toBe(year2.baseNetWorth >= year2.baseFireNumber)
+  })
+})
+
+describe('calculateCoastFIREMetrics — capital inflows from pension unlock', () => {
+  it('reduces the retirement capital by exactly the grown fund value when it unlocks before retirement', () => {
+    // Unlock at 10 years from now, retirement in 30: the fund re-enters at yearsFromRetirement 0,
+    // grown at the scenario real return over the full 30 years (merged capital compounds the same).
+    const baseline = calculateCoastFIREMetrics(300000, 40000, 4, 35, 65, 5, 2.5)
+    const withInflow = calculateCoastFIREMetrics(
+      300000,
+      40000,
+      4,
+      35,
+      65,
+      5,
+      2.5,
+      [],
+      getDefaultCoastFireTaxBrackets(),
+      FIXED_CURRENT_DATE,
+      [{ yearsFromNow: 10, amountToday: 100000 }]
+    )
+
+    expect(
+      baseline.retirementCapitalRequired - withInflow.retirementCapitalRequired
+    ).toBeCloseTo(100000 * Math.pow(1.05, 30), 4)
+    expect(withInflow.coastFireNumberToday).toBeLessThan(baseline.coastFireNumberToday)
+  })
+
+  it('handles an unlock after retirement via the generalized walk (independent PV check)', () => {
+    // Unlock at 35 years from now = 5 after retirement. Independent formula:
+    // terminal = max(S − A·1.05^35, 0); R(0) = Σ_{s=0..4} E/1.05^(s+1) + terminal/1.05^5.
+    const result = calculateCoastFIREMetrics(
+      300000,
+      40000,
+      4,
+      35,
+      65,
+      5,
+      2.5,
+      [],
+      getDefaultCoastFireTaxBrackets(),
+      FIXED_CURRENT_DATE,
+      [{ yearsFromNow: 35, amountToday: 100000 }]
+    )
+
+    const terminal = Math.max(1000000 - 100000 * Math.pow(1.05, 35), 0)
+    let expected = terminal
+    for (let step = 4; step >= 0; step--) {
+      expected = (expected + 40000) / 1.05
+    }
+    expect(result.retirementCapitalRequired).toBeCloseTo(expected, 4)
+    expect(result.coastFireNumberToday).toBeCloseTo(expected / Math.pow(1.05, 30), 4)
+  })
+
+  it('leaves the metrics untouched when the inflow list is empty (regression)', () => {
+    const baseline = calculateCoastFIREMetrics(300000, 40000, 4, 35, 65, 5, 2.5)
+    const withEmpty = calculateCoastFIREMetrics(
+      300000,
+      40000,
+      4,
+      35,
+      65,
+      5,
+      2.5,
+      [],
+      getDefaultCoastFireTaxBrackets(),
+      new Date(),
+      []
+    )
+
+    expect(withEmpty.retirementCapitalRequired).toBe(baseline.retirementCapitalRequired)
+    expect(withEmpty.coastFireNumberToday).toBe(baseline.coastFireNumberToday)
+  })
+})
+
+describe('calculateCoastFIREProjection — pension inflow step', () => {
+  const scenarios = getDefaultScenarios()
+
+  it('adds the unlocked fund to the projection series from the unlock year onward', () => {
+    const result = calculateCoastFIREProjection(
+      250000,
+      30000,
+      4,
+      35,
+      45,
+      scenarios,
+      [],
+      getDefaultCoastFireTaxBrackets(),
+      FIXED_CURRENT_DATE,
+      [{ yearsFromNow: 3, amountToday: 50000 }]
+    )
+
+    const baseRate = 1.045 // base real return 4.5%
+    // Before unlock: free capital only.
+    expect(result.projectionData[2].basePortfolioValue).toBeCloseTo(
+      250000 * Math.pow(baseRate, 2),
+      4
+    )
+    // At unlock: the fund re-enters at its grown value — visible step.
+    expect(result.projectionData[3].basePortfolioValue).toBeCloseTo(
+      (250000 + 50000) * Math.pow(baseRate, 3),
+      4
+    )
+  })
+
+  it('steps the target line with the fund, so the series crosses it only when Coast is reached', () => {
+    // A fund large enough to matter and a free capital that does NOT reach the Coast number.
+    const result = calculateCoastFIREProjection(
+      96400,
+      27600,
+      4,
+      38,
+      60,
+      scenarios,
+      [],
+      getDefaultCoastFireTaxBrackets(),
+      FIXED_CURRENT_DATE,
+      [{ yearsFromNow: 19, amountToday: 31400 }]
+    )
+    const base = result.scenarios.base
+    const fundAtRetirement = 31400 * Math.pow(1.045, 22)
+
+    expect(base.isCoastReached).toBe(false)
+    // Before the unlock the line is what the FREE capital must reach at retirement.
+    expect(result.projectionData[18].fireNumberTarget).toBeCloseTo(base.retirementCapitalRequired, 4)
+    // From the unlock on, the fund is in the series AND in the line: the gross requirement.
+    expect(result.projectionData[19].fireNumberTarget).toBeCloseTo(base.retirementCapitalRequired + fundAtRetirement, 4)
+    // The chart agrees with the verdict: not reached ⇒ the last point sits under the line.
+    const last = result.projectionData[result.projectionData.length - 1]
+    expect(last.basePortfolioValue).toBeLessThan(last.fireNumberTarget)
+  })
+
+  it('leaves the target line flat when the fund unlocks after the target age', () => {
+    const result = calculateCoastFIREProjection(
+      96400,
+      27600,
+      4,
+      38,
+      60,
+      scenarios,
+      [],
+      getDefaultCoastFireTaxBrackets(),
+      FIXED_CURRENT_DATE,
+      [{ yearsFromNow: 24, amountToday: 31400 }]
+    )
+    const targets = new Set(result.projectionData.map((p) => p.fireNumberTarget))
+    expect(targets.size).toBe(1)
+    expect([...targets][0]).toBeCloseTo(result.scenarios.base.retirementCapitalRequired, 4)
+  })
+
+  it('regression: no inflows → projection series identical to the previous behaviour', () => {
+    const baseline = calculateCoastFIREProjection(250000, 30000, 4, 35, 45, scenarios)
+    const withEmpty = calculateCoastFIREProjection(
+      250000,
+      30000,
+      4,
+      35,
+      45,
+      scenarios,
+      [],
+      getDefaultCoastFireTaxBrackets(),
+      new Date(),
+      []
+    )
+
+    expect(withEmpty.projectionData.map((p) => p.basePortfolioValue)).toEqual(
+      baseline.projectionData.map((p) => p.basePortfolioValue)
+    )
   })
 })
 

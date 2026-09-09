@@ -14,12 +14,16 @@
  * exactly the empty-card problem this primitive replaces.
  *
  * Colors arrive pre-resolved from the caller (`useChartColors()` or a shading derivation
- * like `computeShadeOpacities`) — this component never invents a color.
+ * like `computeShadeOpacities`) — this component never invents a color. The share is printed
+ * through chartService's `formatPercentage` (`42,4%`), never `toFixed`: the row sits under a
+ * reading formatted for it-IT, and a dot decimal would make the same tile — and the screen
+ * reader, which reads the row's `aria-label` — announce two different figures.
  */
 'use client';
 
 import { motion, useReducedMotion } from 'framer-motion';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
+import { formatPercentage } from '@/lib/services/chartService';
 import { cn } from '@/lib/utils';
 
 export interface CompositionListItem {
@@ -89,7 +93,7 @@ export function CompositionList({
               {formatValue(item.value)}
             </span>
             <span className="w-14 shrink-0 text-right font-mono text-xs tabular-nums text-muted-foreground">
-              {item.percentage.toFixed(1)}%
+              {formatPercentage(item.percentage, 1)}
             </span>
           </>
         );
@@ -107,7 +111,7 @@ export function CompositionList({
                 rowClassName,
                 '-mx-2 w-[calc(100%+16px)] rounded-md px-2 text-left transition-colors duration-150 hover:bg-muted/40 cursor-pointer'
               )}
-              aria-label={`${item.name}, ${formatValue(item.value)}, ${item.percentage.toFixed(1)}%`}
+              aria-label={`${item.name}, ${formatValue(item.value)}, ${formatPercentage(item.percentage, 1)}`}
             >
               {rowContent}
             </button>

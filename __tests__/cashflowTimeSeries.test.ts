@@ -104,11 +104,13 @@ describe('buildTimeBuckets', () => {
 describe('buildCategoryTimeSeries', () => {
   it('keeps only the top-N categories and drops the rest (no "Altro" residual)', () => {
     // 4 categories with descending totals; topN=2 → keep two, drop the other two.
+    // Distinct ids: grouping is by category id, and distinct categories always
+    // have distinct documents in real data.
     const expenses: Expense[] = [
-      makeExpense({ categoryName: 'A', amount: -400, date: d(2025, 1) }),
-      makeExpense({ categoryName: 'B', amount: -300, date: d(2025, 1) }),
-      makeExpense({ categoryName: 'C', amount: -200, date: d(2025, 1) }),
-      makeExpense({ categoryName: 'D', amount: -100, date: d(2025, 1) }),
+      makeExpense({ categoryId: 'catA', categoryName: 'A', amount: -400, date: d(2025, 1) }),
+      makeExpense({ categoryId: 'catB', categoryName: 'B', amount: -300, date: d(2025, 1) }),
+      makeExpense({ categoryId: 'catC', categoryName: 'C', amount: -200, date: d(2025, 1) }),
+      makeExpense({ categoryId: 'catD', categoryName: 'D', amount: -100, date: d(2025, 1) }),
     ];
 
     const { series } = buildCategoryTimeSeries(expenses, 'year', 'expenses', 2025, 2);
@@ -117,6 +119,20 @@ describe('buildCategoryTimeSeries', () => {
     expect(series.map((s) => s.name)).toEqual(['A', 'B']);
     // Each kept series carries only its own total — never the C+D residual (300).
     expect(series.map((s) => s.values[0])).toEqual([400, 300]);
+  });
+
+  it('keeps two same-named categories apart and qualifies their labels', () => {
+    // "Casa" exists twice (fixed and variable): they must rank and plot as two
+    // lines, each labelled with its type qualifier.
+    const expenses: Expense[] = [
+      makeExpense({ categoryId: 'c-fix', categoryName: 'Casa', type: 'fixed', amount: -300, date: d(2025, 1) }),
+      makeExpense({ categoryId: 'c-var', categoryName: 'Casa', type: 'variable', amount: -100, date: d(2025, 1) }),
+    ];
+
+    const { series } = buildCategoryTimeSeries(expenses, 'year', 'expenses', 2025, 6);
+
+    expect(series.map((s) => s.name)).toEqual(['Casa (Spese Fisse)', 'Casa (Spese Variabili)']);
+    expect(series.map((s) => s.values[0])).toEqual([300, 100]);
   });
 
   it('aligns per-category values to the shared bucket axis', () => {

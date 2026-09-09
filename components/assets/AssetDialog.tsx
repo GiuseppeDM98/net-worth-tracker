@@ -5,13 +5,13 @@
  *
  * Key Features:
  * - Dynamic field visibility based on asset type and class
- * - Intelligent defaults for isLiquid and autoUpdatePrice based on asset characteristics
+ * - Type-aware isLiquid default in create mode (suggestIsLiquid + touched-flag, like allocationRole)
  * - Price fetching: manual entry, Yahoo Finance API, or keep existing price
  * - Composition management for multi-asset portfolios (e.g., funds with multiple holdings)
  * - Inline subcategory creation without leaving the form
  * - Outstanding debt tracking for real estate assets
  * - Cost basis tracking for capital gains calculations
- * - Total Expense Ratio (TER) for ETFs and funds
+ * - Total Expense Ratio (TER) for ETFs, commodities and crypto (ETC wrappers)
  *
  * Form State Management:
  * - 10 useState hooks for UI state (composition, toggles, loading states)
@@ -33,8 +33,9 @@
  */
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import type { Timestamp } from 'firebase/firestore';
 import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -50,19 +51,21 @@ import { useAssets } from '@/lib/hooks/useAssets';
 import { useAssetLedgerMeta, useCreateAssetTransaction } from '@/lib/hooks/useAssetTransactions';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query/queryKeys';
-import { formatCurrency } from '@/lib/utils/formatters';
+import { formatCurrency, formatNumberIt, formatPercentageIt } from '@/lib/utils/formatters';
 import { resolveAllocationRole } from '@/lib/utils/allocationUtils';
+import { suggestIsLiquid } from '@/lib/utils/assetLiquidity';
 import { hasMarketPrice } from '@/lib/utils/assetPricing';
 import { scheduleNextCoupon, scheduleFinalPremium } from '@/lib/services/couponScheduling';
 import { getTargets, addSubCategory, getSettings } from '@/lib/services/assetAllocationService';
 import type { Settings } from '@/types/settings';
+import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  ASSET_TYPE_PICKER_READING,
+  describeAssetIntent,
+  describeModalStatus,
+  describeWriteError,
+  type ModalStatus,
+} from '@/lib/utils/dialogNarrative';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -136,7 +139,7 @@ async function fetchMarketPrice(
       const price = resolveBondPrice(quote.price, bondNominalValue, isBondWithIsin);
       const currency: string | undefined = quote.currency?.trim() || undefined;
       const priceEur: number | undefined = quote.currentPriceEur > 0 ? quote.currentPriceEur : undefined;
-      toast.success(`Prezzo recuperato da ${source}: ${price.toFixed(2)} ${quote.currency}`);
+      toast.success(`Prezzo recuperato da ${source}: ${formatNumberIt(price)} ${quote.currency}`);
       return { price, currency, priceEur };
     }
 
@@ -346,6 +349,17 @@ const TYPE_CARDS: { type: AssetType; label: string; title: string; Icon: React.E
 
 // Zod validation schema for asset form
 // Note: .or(z.nan()) allows undefined values for optional numeric fields
+/**
+ * Radix `Select` reserves the empty string for "no value", so the "Nessuna" item needs a sentinel
+ * of its own; `onValueChange` maps it back to '' before the form ever sees it. The subcategory is
+ * optional on purpose (it used to be blocked at submit): a holding without one is bucketed under
+ * `NO_SUBCATEGORY_LABEL` by the allocation engine, so its euros stay visible in Allocazione.
+ */
+const NO_SUB_CATEGORY_VALUE = '__none__';
+
+/** The form's id, so the footer's submit can live outside the `<form>` in the modal's footer. */
+const ASSET_FORM_ID = 'asset-form';
+
 const assetSchema = z.object({
   ticker: z.string(),
   // User-facing alias for `ticker`. Purely cosmetic — never
@@ -424,7 +438,7 @@ interface AssetDialogProps {
   asset?: Asset | null;
   /**
    * Opens the TransactionDialog for a ledger asset from the edit-mode read-only summary block
-   * ("Registra operazione"). Only wired where a TransactionDialog host exists (AssetManagementTab).
+   * ("Registra operazione"). Only wired where a TransactionDialog host exists (the Patrimonio page).
    */
   onRegisterTrade?: (asset: Asset) => void;
 }
@@ -467,6 +481,11 @@ const ALLOCATION_ROLE_OPTIONS: { value: AllocationRole; label: string; descripti
   },
 ];
 
+/** Today as the `YYYY-MM-DD` an `<input type="date">` wants (UTC calendar day, as before). */
+function isoDateToday(): string {
+  return new Date().toISOString().split('T')[0];
+}
+
 const assetClasses: { value: AssetClass; label: string }[] = [
   { value: 'equity', label: 'Azioni' },
   { value: 'bonds', label: 'Obbligazioni' },
@@ -483,6 +502,8 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
   const { ownerId } = useActiveAccount();
   const queryClient = useQueryClient();
   const [step, setStep] = useState<1 | 2>(1);
+  // The modal's reading IS the status line, so a refusal lands where the reader is looking.
+  const [status, setStatus] = useState<ModalStatus>({ phase: 'idle' });
   const isEdit = !!asset;
 
   // Trade-ledger wiring (Phase C). Ledger assets (stock/etf/bond/crypto/commodity) manage quantity
@@ -505,11 +526,11 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
   const [newSubCategoryName, setNewSubCategoryName] = useState('');
   const [isAddingSubCategory, setIsAddingSubCategory] = useState(false);
   const [composition, setComposition] = useState<AssetComposition[]>([]);
-  const [isComposite, setIsComposite] = useState(false);
   const [hasOutstandingDebt, setHasOutstandingDebt] = useState(false);
   // True once the user has picked an allocation role by hand — from then on the type/sub-category
   // driven suggestion stops overriding their choice.
   const [allocationRoleTouched, setAllocationRoleTouched] = useState(false);
+  const [isLiquidTouched, setIsLiquidTouched] = useState(false);
   const [showCostBasis, setShowCostBasis] = useState(false);
   const [showTER, setShowTER] = useState(false);
   const [showBondDetails, setShowBondDetails] = useState(false);
@@ -572,7 +593,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
   const isLedgerEdit = isEdit && !!asset && isLedgerAssetType(asset.type);
   const isLedgerCreate = !isEdit && !!selectedType && isLedgerAssetType(selectedType);
   const ledgerCreateReady = isLedgerCreate && ledgerMeta != null;
-  const todayIso = new Date().toISOString().split('T')[0];
+  const todayIso = isoDateToday();
   const baselineIso = ledgerMeta ? ledgerMeta.baselineDate.toISOString().split('T')[0] : undefined;
   // True when the bond qualifies for % of par ↔ EUR conversion:
   // must have ISIN (triggers Borsa Italiana pricing) AND nominalValue > 1.
@@ -589,7 +610,11 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
   const newAsset_quantityLabel = selectedType === 'cash' ? 'Saldo' : selectedType === 'realestate' ? 'Valore stimato' : selectedType === 'pensionFund' ? 'Valore attuale' : 'Quantità';
   const newAsset_showAutoUpdate = selectedType !== 'cash' && selectedType !== 'realestate' && selectedType !== 'pensionFund';
   const newAsset_showCostBasis = selectedType !== 'cash' && selectedType !== 'realestate' && selectedType !== 'pensionFund';
-  const newAsset_showTER = selectedType === 'etf' || selectedType === 'stock';
+  // TER applies to funds/ETC (ongoing management fee), never to a single stock. `commodity` and
+  // `crypto` both double as either a direct spot holding (no TER) or an ETC wrapper around that
+  // same underlying (e.g. WisdomTree Agriculture AIGA.MI, WisdomTree Physical Bitcoin) — the toggle
+  // stays opt-in and off by default, so exposing it costs nothing for the spot case.
+  const newAsset_showTER = selectedType === 'etf' || selectedType === 'commodity' || selectedType === 'crypto';
   // Leva: only ETFs can be leveraged/composite instruments.
   const newAsset_showLeverage = selectedType === 'etf';
   const newAsset_showComposition = selectedType === 'etf' || selectedType === 'pensionFund';
@@ -598,12 +623,9 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
   const priceSource = selectedType === 'bond' && selectedAssetClass === 'bonds'
     ? 'Borsa Italiana'
     : 'Yahoo Finance';
-  // NOTE: there is no type-driven "intelligent default" for `isLiquid`/`autoUpdatePrice`. The
-  // effect that tried to derive them was unreachable (both fields are seeded to `true` by
-  // `defaultValues` and by the create-branch reset, so its `=== undefined` guards never fired) and
-  // was removed in the 2026-07-28 dead-code audit. `autoUpdatePrice` is clamped at the boundary
-  // instead — see `buildAssetFormDataFromValues`. `isLiquid` has no such clamp: it stays whatever
-  // the always-visible switch says.
+  // `autoUpdatePrice` has no type-driven default: it is clamped at the boundary instead — see
+  // `buildAssetFormDataFromValues`. `isLiquid` gets a create-mode suggestion below (touched-flag
+  // pattern, same as allocationRole); what the switch says at submit is persisted as-is.
 
   // Suggest an allocation role for the two archetypal untouchable holdings, each getting the role
   // that actually fits it: a property is `excluded` (it is not an investment), private equity is
@@ -631,55 +653,118 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
     setValue,
   ]);
 
+  // Same touched-flag pattern for liquidity: a property, a pension fund or a Private
+  // Equity position created without touching the switch must NOT enter liquid net worth.
+  // FORM default only — visible on the switch before saving, steering stops at the first
+  // manual toggle, and no existing asset changes without the user asking (edit is out).
+  useEffect(() => {
+    if (isEdit || isLiquidTouched) return;
+    const suggested = suggestIsLiquid(selectedType, selectedSubCategory);
+    if (watchIsLiquid !== suggested) {
+      setValue('isLiquid', suggested);
+    }
+  }, [isEdit, isLiquidTouched, selectedType, selectedSubCategory, watchIsLiquid, setValue]);
+
+  // The three blocks below adjust UI state DURING render when the thing it follows changes
+  // (React's "adjusting state when a prop changes"), never from an effect — a setter called
+  // synchronously in an effect body is banned by `react-hooks/set-state-in-effect`. Each keeps
+  // the previous value of its subject in state and acts only on a change; React re-renders
+  // before committing, so the adjustment lands in the same paint. Source order matters: the
+  // open/asset reset comes LAST, so on a reopen it has the final word over the two above it.
+
   // Auto-activate bond detail toggles for new bond assets
   // When type=bond and assetClass=bonds, automatically open the bond details and cost basis sections
   // so the user sees the available fields without needing to manually toggle them.
   // Only applies to new assets (!asset) to avoid overriding the user's existing saved state.
-  useEffect(() => {
-    if (!asset && selectedType === 'bond' && selectedAssetClass === 'bonds') {
+  const isNewBond = !asset && selectedType === 'bond' && selectedAssetClass === 'bonds';
+  const [prevIsNewBond, setPrevIsNewBond] = useState(isNewBond);
+  if (prevIsNewBond !== isNewBond) {
+    setPrevIsNewBond(isNewBond);
+    if (isNewBond) {
       setShowBondDetails(true);
       setShowCostBasis(true);
     }
-  }, [selectedType, selectedAssetClass, asset]);
+  }
 
-  // Gestisci il toggle della composizione
-  useEffect(() => {
-    setIsComposite(watchIsComposite || false);
-    if (!watchIsComposite) {
+  // The composition switch is the form field itself; the entries are cleared when it turns off.
+  const isComposite = !!watchIsComposite;
+  const [prevIsComposite, setPrevIsComposite] = useState(isComposite);
+  if (prevIsComposite !== isComposite) {
+    setPrevIsComposite(isComposite);
+    if (!isComposite) {
       setComposition([]);
     }
-  }, [watchIsComposite]);
+  }
+
+  // Everything a reopen must reset that is NOT a form field: the step, the status line, the
+  // touched flags, the section toggles, the composition and the calculator. Re-running on every
+  // open is what makes a second "new asset" start clean — `asset` stays null between opens.
+  // The form itself is reset in the effect further down: `reset`, `setValue` and `replaceTiers`
+  // are not state setters.
+  const [openSubject, setOpenSubject] = useState<{ open: boolean; asset: Asset | null | undefined } | null>(null);
+  if (!openSubject || openSubject.open !== open || openSubject.asset !== asset) {
+    setOpenSubject({ open, asset });
+    if (open) {
+      setStatus({ phase: 'idle' });
+      setStep(asset ? 2 : 1);
+      setAllocationRoleTouched(false);
+      setIsLiquidTouched(false);
+      // Reset calculator on every open to avoid stale data from previous session
+      setShowCostCalculator(false);
+      setBrokerEntries([{ qty: '', price: '' }]);
+      if (asset) {
+        setComposition(asset.composition && asset.composition.length > 0 ? asset.composition : []);
+        setHasOutstandingDebt(!!(asset.outstandingDebt && asset.outstandingDebt > 0));
+        setShowCostBasis(!!((asset.averageCost && asset.averageCost > 0) || (asset.taxRate && asset.taxRate > 0)));
+        setShowTER(!!(asset.totalExpenseRatio && asset.totalExpenseRatio > 0));
+        setShowBondDetails(!!asset.bondDetails);
+        // The step-up switch follows the saved schedule only when the asset HAS bond details;
+        // without them it keeps its previous value, exactly as before this block existed.
+        if (asset.bondDetails) {
+          const schedule = asset.bondDetails.couponRateSchedule;
+          setShowStepUp(!!(schedule && schedule.length > 0));
+        }
+      } else {
+        setComposition([]);
+        setHasOutstandingDebt(false);
+        setShowCostBasis(false);
+        setShowTER(false);
+        setShowBondDetails(false);
+        setShowStepUp(false);
+      }
+    }
+  }
+
+  // Promise-style on purpose: the setter runs inside `.then`, which the
+  // `react-hooks/set-state-in-effect` rule accepts from an effect — an `await` in an async
+  // function it does not see through.
+  const loadAllocationTargets = useCallback((): Promise<void> => {
+    if (!user || !ownerId) return Promise.resolve();
+
+    return getTargets(ownerId)
+      .then((targets) => setAllocationTargets(targets))
+      .catch((error) => console.error('Error loading allocation targets:', error));
+  }, [user, ownerId]);
 
   // Load allocation targets when dialog opens
   useEffect(() => {
     if (open && user) {
       loadAllocationTargets();
     }
-  }, [open, user]);
-
-  const loadAllocationTargets = async () => {
-    if (!user || !ownerId) return;
-
-    try {
-      const targets = await getTargets(ownerId);
-      setAllocationTargets(targets);
-    } catch (error) {
-      console.error('Error loading allocation targets:', error);
-    }
-  };
+  }, [open, user, loadAllocationTargets]);
 
   useEffect(() => {
     // Re-run on every open so a second "new asset" dialog starts clean.
     // Without `open` in deps, `asset` stays null between opens and the effect never re-fires.
     if (!open) return;
-    setStep(asset ? 2 : 1);
-    setAllocationRoleTouched(false);
+    const todayIso = isoDateToday();
 
     if (asset) {
-      // Determine default for isLiquid if not set
+      // Legacy fallback for documents saved before `isLiquid` existed — the same
+      // predicate as the create-mode suggestion and calculateLiquidNetWorth.
       const defaultIsLiquid = asset.isLiquid !== undefined
         ? asset.isLiquid
-        : (asset.assetClass !== 'realestate' && asset.subCategory !== 'Private Equity' && asset.type !== 'pensionFund');
+        : suggestIsLiquid(asset.type, asset.subCategory);
 
       reset({
         ticker: asset.ticker,
@@ -734,33 +819,12 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
         pensionFamilyMemberId: asset.pensionFundDetails?.familyMemberId || '__none__',
       });
 
-      if (asset.composition && asset.composition.length > 0) {
-        setComposition(asset.composition);
-        setIsComposite(true);
-      } else {
-        setComposition([]);
-        setIsComposite(false);
-      }
-
-      // Set hasOutstandingDebt state based on asset data
-      setHasOutstandingDebt(!!(asset.outstandingDebt && asset.outstandingDebt > 0));
-
-      // Set showCostBasis state based on asset data
-      setShowCostBasis(!!((asset.averageCost && asset.averageCost > 0) || (asset.taxRate && asset.taxRate > 0)));
-
-      // Set showTER state based on asset data
-      setShowTER(!!(asset.totalExpenseRatio && asset.totalExpenseRatio > 0));
-
-      // Reset calculator on every open to avoid stale data from previous session
-      setShowCostCalculator(false);
-      setBrokerEntries([{ qty: '', price: '' }]);
-
-      // Set bond details state and pre-fill form fields
-      setShowBondDetails(!!asset.bondDetails);
+      // Pre-fill the bond detail fields (the toggles were set during render, above)
       if (asset.bondDetails) {
         const bd = asset.bondDetails;
-        // Convert Timestamp or Date to ISO date string for <input type="date">
-        const toDateStr = (d: Date | any): string => {
+        // Convert Timestamp or Date to ISO date string for <input type="date">: the type says
+        // Date, but a document read straight from Firestore still carries a Timestamp.
+        const toDateStr = (d: Date | Timestamp): string => {
           const date = d instanceof Date ? d : d.toDate();
           return date.toISOString().split('T')[0];
         };
@@ -771,13 +835,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
         setValue('bondNominalValue', bd.nominalValue);
         setValue('bondFinalPremiumRate', bd.finalPremiumRate);
         setValue('bondIsInflationLinked', !!bd.isInflationLinked);
-        if (bd.couponRateSchedule && bd.couponRateSchedule.length > 0) {
-          setShowStepUp(true);
-          replaceTiers(bd.couponRateSchedule);
-        } else {
-          setShowStepUp(false);
-          replaceTiers([]);
-        }
+        replaceTiers(bd.couponRateSchedule && bd.couponRateSchedule.length > 0 ? bd.couponRateSchedule : []);
       }
     } else {
       reset({
@@ -817,17 +875,8 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
         pensionFamilyMemberId: '__none__',
       });
       replaceTiers([]);
-      setComposition([]);
-      setIsComposite(false);
-      setHasOutstandingDebt(false);
-      setShowCostBasis(false);
-      setShowTER(false);
-      setShowBondDetails(false);
-      setShowStepUp(false);
-      setShowCostCalculator(false);
-      setBrokerEntries([{ qty: '', price: '' }]);
     }
-  }, [asset, reset, open]);
+  }, [asset, reset, open, setValue, replaceTiers]);
 
   // Selects the asset type in step 1, auto-derives the class, and advances to step 2
   const handleTypeSelect = (type: AssetType) => {
@@ -873,9 +922,9 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
       // Reset
       setNewSubCategoryName('');
       setShowNewSubCategory(false);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error adding subcategory:', error);
-      toast.error(error.message || 'Errore nella creazione della sottocategoria');
+      toast.error(describeWriteError(error));
     } finally {
       setIsAddingSubCategory(false);
     }
@@ -889,7 +938,11 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
     setComposition(composition.filter((_, i) => i !== index));
   };
 
-  const updateCompositionEntry = (index: number, field: 'assetClass' | 'percentage' | 'subCategory', value: any) => {
+  const updateCompositionEntry = <K extends 'assetClass' | 'percentage' | 'subCategory'>(
+    index: number,
+    field: K,
+    value: AssetComposition[K]
+  ) => {
     const updated = [...composition];
     updated[index] = { ...updated[index], [field]: value };
     setComposition(updated);
@@ -926,7 +979,10 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
 
     // Check if total is within 0.01% of 100% to account for floating-point errors
     if (Math.abs(totalPercentage - 100) > 0.01) {
-      toast.error(`La somma delle percentuali deve essere 100% (attuale: ${totalPercentage.toFixed(2)}%)`);
+      setStatus({
+        phase: 'error',
+        message: `Le percentuali della composizione devono sommare al 100%: adesso fanno ${formatPercentageIt(totalPercentage)}.`,
+      });
       return false;
     }
 
@@ -960,11 +1016,6 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
    */
   const onSubmit = async (data: AssetFormValues) => {
     if (!user || !ownerId) return;
-
-    if (isSubCategoryEnabled() && !data.subCategory) {
-      toast.error('La sottocategoria è obbligatoria per questa classe di asset');
-      return;
-    }
 
     if (isComposite && !validateComposition()) {
       return;
@@ -1003,7 +1054,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
             ? resolveBondPrice(data.averageCost, data.bondNominalValue, isBondWithIsin)
             : 0;
         if (ledgerOpeningPrice <= 0) {
-          toast.error('Inserisci un prezzo di acquisto valido');
+          setStatus({ phase: 'error', message: 'Serve un prezzo di acquisto maggiore di zero.' });
           return;
         }
         if (shouldUpdatePrice(data.type, data.subCategory)) {
@@ -1020,7 +1071,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
         }
       } else if (data.manualPrice && !isNaN(data.manualPrice) && data.manualPrice > 0) {
         currentPrice = resolveBondPrice(data.manualPrice, data.bondNominalValue, isBondWithIsin);
-        toast.success(`Prezzo manuale impostato: ${currentPrice.toFixed(2)} ${data.currency}`);
+        toast.success(`Prezzo manuale impostato: ${formatNumberIt(currentPrice)} ${data.currency}`);
       } else if (shouldUpdatePrice(data.type, data.subCategory)) {
         const fetched = await fetchMarketPrice(data.ticker, data.isin, data.bondNominalValue, isBondWithIsin);
         currentPrice = fetched.price;
@@ -1044,7 +1095,9 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
         if (!shouldUpdatePrice(data.type, data.subCategory)) {
           formData.currentPrice = asset.currentPrice;
         }
-        const { quantity: _ledgerQty, averageCost: _ledgerPmc, ...metadata } = formData;
+        const metadata: Partial<AssetFormData> = { ...formData };
+        delete metadata.quantity;
+        delete metadata.averageCost;
         await updateAssetMetadata(asset.id, metadata);
         savedAssetId = asset.id;
         toast.success('Asset aggiornato con successo');
@@ -1077,7 +1130,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
         // retries via «Registra operazione». We accept the two-step gap for a simpler create flow.
         const openingQty = data.quantity;
         if (isNaN(openingQty) || openingQty <= 0) {
-          toast.error('Inserisci una quantità valida');
+          setStatus({ phase: 'error', message: 'Serve una quantità maggiore di zero.' });
           return;
         }
         savedAssetId = await createAsset(ownerId, { ...formData, quantity: 0, averageCost: undefined });
@@ -1125,7 +1178,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
       onClose();
     } catch (error) {
       console.error('Error saving asset:', error);
-      toast.error("Errore nel salvataggio dell'asset");
+      setStatus({ phase: 'error', message: describeWriteError(error) });
     } finally {
       setFetchingPrice(false);
     }
@@ -1149,7 +1202,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
         placeholder="es. 26"
       />
       {errors.taxRate && (
-        <p className="text-sm text-red-500">{errors.taxRate.message}</p>
+        <p className="text-sm text-destructive">{errors.taxRate.message}</p>
       )}
       <p className="text-xs text-muted-foreground">
         Percentuale di tassazione su plusvalenze e proventi (dividendi/cedole) (es. 26 per 26%)
@@ -1166,34 +1219,67 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
     </div>
   );
 
-  return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0">
-        <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
-          <DialogTitle>
-            {isEdit
-              ? 'Modifica Asset'
-              : step === 1
-              ? 'Aggiungi Asset'
-              : TYPE_CARDS.find(c => c.type === selectedType)?.title ?? 'Nuovo Asset'}
-          </DialogTitle>
-          {/* sr-only: visually hidden but accessible to screen readers — silences Radix UI aria-describedby warning */}
-          <DialogDescription className="sr-only">
-            {isEdit
-              ? "Modifica i dettagli dell'asset selezionato."
-              : 'Inserisci i dettagli del nuovo asset da aggiungere al portafoglio.'}
-          </DialogDescription>
-        </DialogHeader>
+  const isTypePicker = !isEdit && step === 1;
 
-        {/* Step 1: type picker — create mode only */}
-        {!isEdit && step === 1 && (
-          <div className="flex-1 overflow-y-auto px-6 py-6">
-            <p className="text-sm text-muted-foreground mb-5">
-              Scegli il tipo di asset da aggiungere al portafoglio
-            </p>
+  // The reading IS the status line: what the form wants, what it is doing, how it went.
+  const reading = describeModalStatus(
+    isSubmitting || fetchingPrice ? { phase: 'submitting' } : status,
+    {
+      idle: isTypePicker
+        ? ASSET_TYPE_PICKER_READING
+        : describeAssetIntent({ isEdit, hasLedger: isLedgerEdit, isLedgerCreate }),
+      submitting: fetchingPrice ? 'Sto recuperando il prezzo di mercato.' : 'Sto salvando lo strumento.',
+    },
+  );
+
+  return (
+    <ResponsiveModal
+      open={open}
+      onClose={onClose}
+      eyebrow={
+        isTypePicker
+          ? 'Patrimonio · Passo 1 di 2'
+          : `Patrimonio · ${isEdit ? 'Modifica strumento' : TYPE_CARDS.find((c) => c.type === selectedType)?.label ?? 'Nuovo strumento'}`
+      }
+      title={
+        isEdit
+          ? asset?.name || 'Modifica strumento'
+          : isTypePicker
+            ? 'Che cosa vuoi aggiungere?'
+            : TYPE_CARDS.find((c) => c.type === selectedType)?.title ?? 'Nuovo strumento'
+      }
+      reading={reading}
+      width="lg"
+      footer={
+        isTypePicker ? (
+          <Button type="button" variant="outline" onClick={onClose}>
+            Annulla
+          </Button>
+        ) : (
+          <>
+            <Button type="button" variant="outline" onClick={onClose}>
+              Annulla
+            </Button>
+            <Button type="submit" form={ASSET_FORM_ID} disabled={isSubmitting || fetchingPrice}>
+              {fetchingPrice
+                ? 'Recupero prezzo...'
+                : isSubmitting
+                  ? 'Salvataggio...'
+                  : asset
+                    ? 'Salva modifiche'
+                    : 'Crea strumento'}
+            </Button>
+          </>
+        )
+      }
+    >
+        {/* Step 1: type picker — create mode only. No introductory paragraph: the reading line
+            above already says what the type decides. */}
+        {isTypePicker && (
+          <div>
             {/* role="radiogroup" + role="radio" exposes mutually exclusive selection to screen readers.
                 aria-checked reflects the form default (etf) until the user makes a choice. */}
-            <div role="radiogroup" aria-label="Tipo di asset" className="grid grid-cols-2 gap-3">
+            <div role="radiogroup" aria-label="Tipo di asset" className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {TYPE_CARDS.map(({ type: t, label, Icon, description }, idx) => (
                 <button
                   key={t}
@@ -1201,9 +1287,9 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                   role="radio"
                   aria-checked={selectedType === t}
                   onClick={() => handleTypeSelect(t)}
-                  className={`flex items-start gap-3 rounded-lg border border-border bg-card p-4 text-left transition-colors duration-150 ease-out hover:bg-muted/50 hover:border-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring${idx === TYPE_CARDS.length - 1 && TYPE_CARDS.length % 2 !== 0 ? ' col-span-2' : ''}`}
+                  className={`flex items-start gap-3 rounded-lg border border-border p-4 text-left transition-colors duration-150 ease-out hover:bg-muted/50 hover:border-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring${idx === TYPE_CARDS.length - 1 && TYPE_CARDS.length % 2 !== 0 ? ' sm:col-span-2' : ''}`}
                 >
-                  <Icon className="h-5 w-5 mt-0.5 text-muted-foreground shrink-0" />
+                  <Icon className="h-5 w-5 mt-0.5 text-muted-foreground shrink-0" aria-hidden="true" />
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-foreground">{label}</p>
                     <p className="text-xs text-muted-foreground leading-snug mt-0.5">{description}</p>
@@ -1216,8 +1302,8 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
 
         {/* Step 2: form — edit mode OR create mode after type selection */}
         {(isEdit || step === 2) && (
-        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col flex-1 min-h-0">
-          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+        <form id={ASSET_FORM_ID} onSubmit={handleSubmit(onSubmit)}>
+          <div className="space-y-4">
 
           {/* Back to type picker — create mode only */}
           {!isEdit && (
@@ -1236,9 +1322,9 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
               a money-market ETF (e.g. XEON) are all `type: 'etf'`, and only the class tells them
               apart — that ambiguity doesn't exist for stock/bond/crypto/etc, so they don't get a
               picker. Defaults to 'equity' (set by `handleTypeSelect` in step 1), editable here
-              before the class-keyed defaults below (isLiquid/autoUpdatePrice/allocationRole) fire
-              off `selectedAssetClass`. Trend Following/Carry have no dedicated color/target yet in
-              Impostazioni (AGENTS.md → Leva L0) — offered anyway since they exist for leveraged ETFs. */}
+              before the suggestion effects below fire (allocationRole off `selectedAssetClass`,
+              isLiquid off type/subCategory). Trend Following/Carry have no dedicated color/target yet in
+              Impostazioni (doc/guide/allocazione.md § Allocation — the two plans and the leverage engine) — offered anyway since they exist for leveraged ETFs. */}
           {!isEdit && selectedType === 'etf' && (
             <div className="space-y-2">
               <Label htmlFor="assetClassEtf">Classe Asset *</Label>
@@ -1258,7 +1344,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                 </SelectContent>
               </Select>
               {errors.assetClass && (
-                <p className="text-sm text-red-500">{errors.assetClass.message}</p>
+                <p className="text-sm text-destructive">{errors.assetClass.message}</p>
               )}
             </div>
           )}
@@ -1274,7 +1360,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                 placeholder="es. VWCE.DE"
               />
               {errors.ticker && (
-                <p className="text-sm text-red-500">{errors.ticker.message}</p>
+                <p className="text-sm text-destructive">{errors.ticker.message}</p>
               )}
             </div>
             )}
@@ -1287,7 +1373,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                 placeholder="es. Vanguard FTSE All-World"
               />
               {errors.name && (
-                <p className="text-sm text-red-500">{errors.name.message}</p>
+                <p className="text-sm text-destructive">{errors.name.message}</p>
               )}
             </div>
           </div>
@@ -1323,7 +1409,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
               }
             />
             {errors.isin && (
-              <p className="text-sm text-red-500">{errors.isin.message}</p>
+              <p className="text-sm text-destructive">{errors.isin.message}</p>
             )}
             <p className="text-xs text-muted-foreground">
               Necessario per dividendi automatici (azioni/ETF) e aggiornamento prezzi obbligazioni MOT
@@ -1361,7 +1447,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                 </SelectContent>
               </Select>
               {errors.type && (
-                <p className="text-sm text-red-500">{errors.type.message}</p>
+                <p className="text-sm text-destructive">{errors.type.message}</p>
               )}
             </div>
 
@@ -1385,7 +1471,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                 </SelectContent>
               </Select>
               {errors.assetClass && (
-                <p className="text-sm text-red-500">
+                <p className="text-sm text-destructive">
                   {errors.assetClass.message}
                 </p>
               )}
@@ -1396,8 +1482,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
           {isSubCategoryEnabled() && (
             <div className="space-y-2">
               <Label htmlFor="subCategory">
-                Sottocategoria
-                {isSubCategoryEnabled() && availableSubCategories().length > 0 && ' *'}
+                Sottocategoria <span className="text-muted-foreground font-normal">(opzionale)</span>
               </Label>
 
               {showNewSubCategory ? (
@@ -1437,12 +1522,12 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                 // __create_new__ is a sentinel value — intercepted in onValueChange
                 // to open the inline creation form instead of setting the field.
                 <Select
-                  value={selectedSubCategory}
+                  value={selectedSubCategory || NO_SUB_CATEGORY_VALUE}
                   onValueChange={(value) => {
                     if (value === '__create_new__') {
                       setShowNewSubCategory(true);
                     } else {
-                      setValue('subCategory', value);
+                      setValue('subCategory', value === NO_SUB_CATEGORY_VALUE ? '' : value);
                     }
                   }}
                 >
@@ -1450,12 +1535,16 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                     <SelectValue placeholder="Seleziona sottocategoria" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value={NO_SUB_CATEGORY_VALUE} className="text-muted-foreground">
+                      Nessuna
+                    </SelectItem>
+                    {availableSubCategories().length > 0 && <SelectSeparator />}
                     {availableSubCategories().map((cat) => (
                       <SelectItem key={cat} value={cat}>
                         {cat}
                       </SelectItem>
                     ))}
-                    {availableSubCategories().length > 0 && <SelectSeparator />}
+                    <SelectSeparator />
                     <SelectItem value="__create_new__" className="text-primary">
                       <Plus className="h-3.5 w-3.5" />
                       Crea nuova sottocategoria
@@ -1475,7 +1564,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                 placeholder="EUR"
               />
               {errors.currency && (
-                <p className="text-sm text-red-500">{errors.currency.message}</p>
+                <p className="text-sm text-destructive">{errors.currency.message}</p>
               )}
             </div>
 
@@ -1492,17 +1581,17 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                 {...register('quantity', { valueAsNumber: true })}
               />
               {errors.quantity && (
-                <p className="text-sm text-red-500">{errors.quantity.message}</p>
+                <p className="text-sm text-destructive">{errors.quantity.message}</p>
               )}
               {/* Show hint only in edit mode — in create mode there's no previous quantity to compare.
                   Quantity changes represent capital flowing in/out of the portfolio. */}
               {isEdit && asset && selectedAssetClass !== 'cash' && (watchQuantity ?? 0) > (asset.quantity ?? 0) && (
-                <p className="text-xs text-amber-600 dark:text-amber-400">
+                <p className="text-xs text-warning-foreground">
                   Hai investito nuovo capitale? Se i fondi provengono dall&apos;esterno del portafoglio tracciato, registra un&apos;entrata nel cashflow per mantenere le metriche di performance accurate.
                 </p>
               )}
               {isEdit && asset && selectedAssetClass !== 'cash' && (watchQuantity ?? 0) < (asset.quantity ?? 0) && (
-                <p className="text-xs text-amber-600 dark:text-amber-400">
+                <p className="text-xs text-warning-foreground">
                   Hai venduto questo asset? Se il ricavato è uscito dal portafoglio tracciato, registra un&apos;uscita nel cashflow per mantenere le metriche di performance accurate.
                 </p>
               )}
@@ -1571,7 +1660,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                     placeholder="es. 5"
                   />
                   {errors.quantity && (
-                    <p className="text-sm text-red-500">{errors.quantity.message}</p>
+                    <p className="text-sm text-destructive">{errors.quantity.message}</p>
                   )}
                 </div>
                 <div className="space-y-2">
@@ -1589,7 +1678,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                     placeholder={isBondPctMode ? 'es. 100' : 'es. 85.1234'}
                   />
                   {errors.averageCost && (
-                    <p className="text-sm text-red-500">{errors.averageCost.message}</p>
+                    <p className="text-sm text-destructive">{errors.averageCost.message}</p>
                   )}
                   {isBondPctMode && (() => {
                     const biPrice = watchAverageCost;
@@ -1736,7 +1825,11 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
               <Switch
                 id="isLiquid"
                 checked={watchIsLiquid}
-                onCheckedChange={(checked) => setValue('isLiquid', checked)}
+                onCheckedChange={(checked) => {
+                  // A manual toggle ends the type-aware steering for this dialog session.
+                  setIsLiquidTouched(true);
+                  setValue('isLiquid', checked);
+                }}
               />
             </div>
           </div>
@@ -1755,12 +1848,22 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
             <Select
               value={watchAllocationRole ?? 'tradable'}
               onValueChange={(value) => {
+                // Radix fires onValueChange('') when the controlled value is set while
+                // the content is unmounted (no item to match — its "selected item
+                // removed" cleanup). A real user pick is never empty: ignoring the
+                // callback keeps the suggested role AND leaves the touched-flag armed.
+                if (!value) return;
                 setAllocationRoleTouched(true);
                 setValue('allocationRole', value as AllocationRole);
               }}
             >
               <SelectTrigger id="allocationRole">
-                <SelectValue />
+                {/* Explicit children: the suggestion effect writes this value while the
+                    content is unmounted, and Radix's SelectValue has no item text to map
+                    it to — it rendered an empty trigger for every suggested role. */}
+                <SelectValue>
+                  {ALLOCATION_ROLE_OPTIONS.find((o) => o.value === (watchAllocationRole ?? 'tradable'))?.label}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {ALLOCATION_ROLE_OPTIONS.map((option) => (
@@ -1906,7 +2009,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
 
                 {composition.length > 0 && (
                   <p className="text-xs text-muted-foreground">
-                    Totale: {composition.reduce((sum, c) => sum + c.percentage, 0).toFixed(2)}% (deve essere 100%)
+                    Totale: {formatPercentageIt(composition.reduce((sum, c) => sum + c.percentage, 0))} (deve essere 100%)
                   </p>
                 )}
               </div>
@@ -1948,7 +2051,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                     placeholder="es. 150000"
                   />
                   {errors.outstandingDebt && (
-                    <p className="text-sm text-red-500">{errors.outstandingDebt.message}</p>
+                    <p className="text-sm text-destructive">{errors.outstandingDebt.message}</p>
                   )}
                   <p className="text-xs text-muted-foreground">
                     Il valore netto dell&apos;immobile sarà calcolato come: valore lordo - debito residuo
@@ -2045,7 +2148,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                         placeholder="es. 4.00"
                       />
                       {errors.bondCouponRate && (
-                        <p className="text-sm text-red-500">{errors.bondCouponRate.message}</p>
+                        <p className="text-sm text-destructive">{errors.bondCouponRate.message}</p>
                       )}
                     </div>
                     <div className="space-y-2">
@@ -2076,7 +2179,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                         {...register('bondIssueDate')}
                       />
                       {errors.bondIssueDate && (
-                        <p className="text-sm text-red-500">{errors.bondIssueDate.message}</p>
+                        <p className="text-sm text-destructive">{errors.bondIssueDate.message}</p>
                       )}
                       <p className="text-xs text-muted-foreground">Ancora del calendario cedolare</p>
                     </div>
@@ -2088,7 +2191,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                         {...register('bondMaturityDate')}
                       />
                       {errors.bondMaturityDate && (
-                        <p className="text-sm text-red-500">{errors.bondMaturityDate.message}</p>
+                        <p className="text-sm text-destructive">{errors.bondMaturityDate.message}</p>
                       )}
                       <p className="text-xs text-muted-foreground">Nessuna cedola oltre questa data</p>
                     </div>
@@ -2108,7 +2211,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                       placeholder="es. 1000"
                     />
                     {errors.bondNominalValue && (
-                      <p className="text-sm text-red-500">{errors.bondNominalValue.message}</p>
+                      <p className="text-sm text-destructive">{errors.bondNominalValue.message}</p>
                     )}
                     {/* Dynamic coupon preview based on current form values */}
                     {(() => {
@@ -2123,7 +2226,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                         const total = perShare * qty;
                         return (
                           <p className="text-xs text-primary font-medium">
-                            → {watchBondIsInflationLinked ? 'Cedola minima (solo fisso)' : 'Cedola stimata'}: {perShare.toFixed(2)} {watchCurrency}/unità × {qty} = {total.toFixed(2)} {watchCurrency} per pagamento
+                            → {watchBondIsInflationLinked ? 'Cedola minima (solo fisso)' : 'Cedola stimata'}: {formatNumberIt(perShare)} {watchCurrency}/unità × {formatNumberIt(qty, 0)} = {formatNumberIt(total)} {watchCurrency} per pagamento
                             {watchBondIsInflationLinked && (
                               <span className="block font-normal text-muted-foreground">La componente inflazione FOI si aggiunge a ogni periodo (inserita dalla tab Dividendi).</span>
                             )}
@@ -2241,7 +2344,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                       placeholder="es. 0.80"
                     />
                     {errors.bondFinalPremiumRate && (
-                      <p className="text-sm text-red-500">{errors.bondFinalPremiumRate.message}</p>
+                      <p className="text-sm text-destructive">{errors.bondFinalPremiumRate.message}</p>
                     )}
                     {(() => {
                       const premRate = watchBondFinalPremiumRate;
@@ -2252,7 +2355,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                         const total = perShare * qty;
                         return (
                           <p className="text-xs text-primary font-medium">
-                            → Premio stimato: {perShare.toFixed(2)} {watchCurrency}/unità × {qty} = {total.toFixed(2)} {watchCurrency} alla scadenza
+                            → Premio stimato: {formatNumberIt(perShare)} {watchCurrency}/unità × {formatNumberIt(qty, 0)} = {formatNumberIt(total)} {watchCurrency} alla scadenza
                           </p>
                         );
                       }
@@ -2326,7 +2429,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                       placeholder={isBondPctMode ? 'es. 100 (acquistato a 100 su Borsa Italiana)' : 'es. 85.1234'}
                     />
                     {errors.averageCost && (
-                      <p className="text-sm text-red-500">{errors.averageCost.message}</p>
+                      <p className="text-sm text-destructive">{errors.averageCost.message}</p>
                     )}
                     <p className="text-xs text-muted-foreground">
                       {isBondPctMode
@@ -2438,7 +2541,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
           </div>
           )}
 
-          {/* TER — only shown for ETF and stock */}
+          {/* TER — only shown for ETF, commodity and crypto (all can be ETC wrappers) */}
           {newAsset_showTER && (
           <div className="space-y-2 rounded-lg border p-4">
             <div className="flex items-center justify-between">
@@ -2473,7 +2576,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                   placeholder="es. 0.20"
                 />
                 {errors.totalExpenseRatio && (
-                  <p className="text-sm text-red-500">{errors.totalExpenseRatio.message}</p>
+                  <p className="text-sm text-destructive">{errors.totalExpenseRatio.message}</p>
                 )}
                 <p className="text-xs text-muted-foreground">
                   Percentuale annuale dei costi di gestione (es. 0.20 per 0.20%)
@@ -2503,7 +2606,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
               </span>
             </div>
             {errors.leverageRatio && (
-              <p className="text-sm text-red-500">{errors.leverageRatio.message}</p>
+              <p className="text-sm text-destructive">{errors.leverageRatio.message}</p>
             )}
             <p className="text-xs text-muted-foreground">
               Solo per ETF a leva (es. 2 = 2×): moltiplica l&apos;esposizione nozionale in
@@ -2542,7 +2645,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                 }
               />
               {errors.manualPrice && (
-                <p className="text-sm text-red-500">{errors.manualPrice.message}</p>
+                <p className="text-sm text-destructive">{errors.manualPrice.message}</p>
               )}
               <p className="text-xs text-muted-foreground">
                 {isBondPctMode
@@ -2566,17 +2669,8 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
           )}
 
           </div>
-          <div className="px-6 pb-6 pt-4 border-t shrink-0 flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={onClose}>
-              Annulla
-            </Button>
-            <Button type="submit" disabled={isSubmitting || fetchingPrice}>
-              {fetchingPrice ? 'Recupero prezzo...' : isSubmitting ? 'Salvataggio...' : asset ? 'Salva Modifiche' : 'Crea'}
-            </Button>
-          </div>
         </form>
         )}
-      </DialogContent>
-    </Dialog>
+    </ResponsiveModal>
   );
 }

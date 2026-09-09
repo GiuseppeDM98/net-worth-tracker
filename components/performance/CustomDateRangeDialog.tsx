@@ -1,16 +1,11 @@
+'use client';
+
 import { useState } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { toast } from 'sonner';
+import { describeModalStatus, type ModalStatus } from '@/lib/utils/dialogNarrative';
 
 interface CustomDateRangeDialogProps {
   open: boolean;
@@ -20,15 +15,13 @@ interface CustomDateRangeDialogProps {
 }
 
 /**
- * Modal dialog for selecting custom date ranges for performance analysis.
+ * The custom measurement window of Rendimenti.
  *
- * Allows users to pick start and end dates with validation to ensure the
- * start date is before the end date. Handles timezone conversion to avoid
- * offset issues with date inputs.
+ * Allows users to pick start and end dates with validation to ensure the start date is before
+ * the end date. Handles timezone conversion to avoid offset issues with date inputs.
  *
- * @param open - Controls dialog visibility
- * @param onOpenChange - Callback to update open state
- * @param onConfirm - Callback fired with validated Date objects when user confirms
+ * A refusal lands on the modal's reading line, not in a toast: the reader is looking at the
+ * two fields that caused it (DESIGN.md → The Status-Is-The-Reading Rule).
  */
 export function CustomDateRangeDialog({
   open,
@@ -36,16 +29,13 @@ export function CustomDateRangeDialog({
   onConfirm,
   triggerOrigin,
 }: CustomDateRangeDialogProps) {
-  // === State Management ===
-
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-
-  // === Event Handlers ===
+  const [status, setStatus] = useState<ModalStatus>({ phase: 'idle' });
 
   const handleConfirm = () => {
     if (!startDate || !endDate) {
-      toast.error('Seleziona entrambe le date');
+      setStatus({ phase: 'error', message: 'Servono entrambe le date per misurare un periodo.' });
       return;
     }
 
@@ -58,9 +48,11 @@ export function CustomDateRangeDialog({
     const [endYear, endMonth, endDay] = endDate.split('-').map(Number);
     const end = new Date(endYear, endMonth - 1, endDay);
 
-    // Ensure start date is before end date for valid date range
     if (start >= end) {
-      toast.error('La data di inizio deve essere precedente alla data di fine');
+      setStatus({
+        phase: 'error',
+        message: 'La data di inizio deve venire prima di quella di fine.',
+      });
       return;
     }
 
@@ -68,49 +60,57 @@ export function CustomDateRangeDialog({
     onOpenChange(false);
   };
 
-  // === Rendering ===
+  const reading = describeModalStatus(status, {
+    idle: [
+      {
+        text: 'Le metriche vengono ricalcolate su questa finestra, e il periodo diventa un chip sotto il verdetto.',
+      },
+    ],
+    submitting: 'Sto ricalcolando le metriche.',
+  });
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="sm:max-w-md"
-        style={triggerOrigin ? { transformOrigin: triggerOrigin } : undefined}
-      >
-        <DialogHeader className="pb-2">
-          <DialogTitle>Seleziona Periodo Personalizzato</DialogTitle>
-          <DialogDescription>
-            Scegli le date di inizio e fine per calcolare le metriche di performance.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="grid gap-4 py-2">
-          <div className="grid gap-2">
-            <Label htmlFor="start-date">Data di Inizio</Label>
-            <Input
-              id="start-date"
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="end-date">Data di Fine</Label>
-            <Input
-              id="end-date"
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-            />
-          </div>
-        </div>
-
-        <DialogFooter>
+    <ResponsiveModal
+      open={open}
+      onClose={() => onOpenChange(false)}
+      eyebrow="Rendimenti · Periodo"
+      title="Periodo personalizzato"
+      reading={reading}
+      width="sm"
+      triggerOrigin={triggerOrigin}
+      footer={
+        <>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Annulla
           </Button>
           <Button onClick={handleConfirm}>Calcola</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </>
+      }
+    >
+      <div className="grid gap-4">
+        <div className="grid gap-1.5">
+          <Label htmlFor="start-date" className="text-xs text-muted-foreground">
+            Data di inizio *
+          </Label>
+          <Input
+            id="start-date"
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+          />
+        </div>
+        <div className="grid gap-1.5">
+          <Label htmlFor="end-date" className="text-xs text-muted-foreground">
+            Data di fine *
+          </Label>
+          <Input
+            id="end-date"
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+          />
+        </div>
+      </div>
+    </ResponsiveModal>
   );
 }

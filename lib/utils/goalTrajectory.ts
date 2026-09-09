@@ -10,7 +10,7 @@
  *   - expectedAnnualReturn() from a goal's recommended allocation (B1),
  *   - buildGoalProjectionSeries() glide-path points for the mini chart (B2),
  *   - allocateContributionAcrossGoals() weighted split of new cash (B3),
- *   - sortGoalRowsByUrgency() + buildGoalsVerdictSummary() for the list order and hero (A1/A4).
+ *   - sortGoalRowsByUrgency() for the list order (the page summary lives in goalsSummary.ts).
  *
  * Everything is pure and time-injectable (`now`) so it can be unit-tested. No Firestore,
  * no React. The component layer only fetches, memoizes, and renders.
@@ -343,7 +343,7 @@ export function allocateContributionAcrossGoals(
     .sort((a, b) => b.add - a.add);
 }
 
-// ==================== List ordering + hero summary (A1/A4) ====================
+// ==================== List ordering ====================
 
 export interface GoalRow {
   goal: InvestmentGoal;
@@ -372,65 +372,4 @@ export function sortGoalRowsByUrgency(rows: GoalRow[]): GoalRow[] {
     if (bm != null) return 1;
     return 0;
   });
-}
-
-export interface GoalsVerdictSummary {
-  total: number;
-  reached: number;
-  onTrack: number;
-  offTrack: number;
-  /** Goals with a target+date that are not yet reached. */
-  withDeadline: number;
-  /** Sum of required monthly contributions across dated, not-reached goals. */
-  totalRequiredMonthly: number;
-  /** Nearest upcoming deadline among not-reached dated goals. */
-  nearest: {
-    goalName: string;
-    color: string;
-    monthsToDeadline: number;
-    verdict: GoalVerdict;
-  } | null;
-}
-
-export function buildGoalsVerdictSummary(rows: GoalRow[]): GoalsVerdictSummary {
-  let reached = 0;
-  let onTrack = 0;
-  let offTrack = 0;
-  let withDeadline = 0;
-  let totalRequiredMonthly = 0;
-  let nearest: GoalsVerdictSummary['nearest'] = null;
-
-  for (const { goal, trajectory } of rows) {
-    if (trajectory.verdict === 'reached') reached++;
-    else if (trajectory.verdict === 'onTrack') onTrack++;
-    else if (trajectory.verdict === 'offTrack') offTrack++;
-
-    const dated =
-      trajectory.verdict !== 'reached' &&
-      trajectory.monthsToDeadline != null &&
-      trajectory.requiredMonthlyContribution != null;
-
-    if (dated) {
-      withDeadline++;
-      totalRequiredMonthly += trajectory.requiredMonthlyContribution ?? 0;
-      if (nearest == null || trajectory.monthsToDeadline! < nearest.monthsToDeadline) {
-        nearest = {
-          goalName: goal.name,
-          color: goal.color,
-          monthsToDeadline: trajectory.monthsToDeadline!,
-          verdict: trajectory.verdict,
-        };
-      }
-    }
-  }
-
-  return {
-    total: rows.length,
-    reached,
-    onTrack,
-    offTrack,
-    withDeadline,
-    totalRequiredMonthly,
-    nearest,
-  };
 }

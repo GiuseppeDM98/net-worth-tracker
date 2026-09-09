@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, lazy, Suspense } from 'react';
+import { useState, useMemo, lazy, Suspense, type ReactNode } from 'react';
 import { Tag, X } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
@@ -9,24 +9,56 @@ import { CATEGORY_ICONS, CATEGORY_ICON_NAMES, CATEGORY_ICONS_BY_TYPE } from '@/l
 import { cn } from '@/lib/utils';
 import type { LucideProps } from 'lucide-react';
 
-/**
- * Dynamically resolve a Lucide icon component by name from the curated set.
- * Uses `React.lazy` with named exports to avoid importing all ~1500 icons.
- * Returns null for unknown icon names.
- */
-const iconCache = new Map<string, React.LazyExoticComponent<React.ComponentType<LucideProps>>>();
+type LazyIconComponent = React.LazyExoticComponent<React.ComponentType<LucideProps>>;
 
-export function getLazyIcon(name: string): React.LazyExoticComponent<React.ComponentType<LucideProps>> | null {
-  if (!CATEGORY_ICONS[name]) return null;
-  if (iconCache.has(name)) return iconCache.get(name)!;
-  const LazyIcon = lazy(() =>
-    import('lucide-react').then((mod) => ({
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      default: (mod as any)[name] as React.ComponentType<LucideProps>,
-    }))
+/**
+ * Every curated category icon as a lazy component, built ONCE at module load and shared by
+ * the picker, the feed, the drawer, the table and Impostazioni: ONE cache, so a name never
+ * maps to two instances. `React.lazy` only registers the import thunk, so the whole set costs
+ * nothing until an icon is first rendered — no chunk is requested before then. It is a map,
+ * not a function, so a render can READ a component by name instead of obtaining it from a
+ * call: to the React Compiler a component returned by a call during render is a new type
+ * every render (`react-hooks/static-components`), even when the callee caches it.
+ */
+export const LAZY_CATEGORY_ICONS: Partial<Record<string, LazyIconComponent>> = Object.fromEntries(
+  CATEGORY_ICON_NAMES.map((name) => [
+    name,
+    lazy(() =>
+      import('lucide-react').then((mod) => ({
+        default: (mod as unknown as Record<string, React.ComponentType<LucideProps>>)[name],
+      }))
+    ),
+  ])
+);
+
+/**
+ * Resolve a Lucide icon component by name from the curated set. Returns null for unknown
+ * icon names. For a lookup INSIDE a component body prefer `CategoryIcon` below or the map
+ * read `LAZY_CATEGORY_ICONS[name]`: both are property reads of a module constant.
+ */
+export function getLazyIcon(name: string): LazyIconComponent | null {
+  return LAZY_CATEGORY_ICONS[name] ?? null;
+}
+
+interface CategoryIconProps extends LucideProps {
+  /** Icon name from `CATEGORY_ICONS`; an unknown name renders the fallback. */
+  name: string;
+  /** Shown while the icon chunk loads, and when the name is unknown. */
+  fallback: ReactNode;
+}
+
+/**
+ * A category icon by name, module-level so the lazy component is read from the map during
+ * render and never created there. The remaining props go to the Lucide icon as-is.
+ */
+export function CategoryIcon({ name, fallback, ...iconProps }: Readonly<CategoryIconProps>) {
+  const Icon = LAZY_CATEGORY_ICONS[name];
+  if (!Icon) return fallback;
+  return (
+    <Suspense fallback={fallback}>
+      <Icon {...iconProps} />
+    </Suspense>
   );
-  iconCache.set(name, LazyIcon);
-  return LazyIcon;
 }
 
 interface IconPickerPopoverProps {
@@ -83,9 +115,6 @@ export function IconPickerPopover({
     });
   }, [search, orderedIconNames]);
 
-  // Resolve the currently selected icon component for the trigger preview.
-  const SelectedIcon = value ? getLazyIcon(value) : null;
-
   const currentLabel = value ? (CATEGORY_ICONS[value] ?? value) : 'Nessuna icona';
   const triggerLabel =
     triggerAriaLabel ?? `Icona categoria: ${currentLabel}. Clicca per cambiare`;
@@ -112,10 +141,14 @@ export function IconPickerPopover({
           aria-label={triggerLabel}
           title={currentLabel}
         >
-          {SelectedIcon ? (
-            <Suspense fallback={<Tag className="h-4 w-4 text-muted-foreground" aria-hidden="true" />}>
-              <SelectedIcon className="h-4 w-4" aria-hidden="true" />
-            </Suspense>
+          {/* Trigger preview of the current selection; an unknown name falls back to the tag. */}
+          {value ? (
+            <CategoryIcon
+              name={value}
+              fallback={<Tag className="h-4 w-4 text-muted-foreground" aria-hidden="true" />}
+              className="h-4 w-4"
+              aria-hidden="true"
+            />
           ) : (
             <Tag className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
           )}

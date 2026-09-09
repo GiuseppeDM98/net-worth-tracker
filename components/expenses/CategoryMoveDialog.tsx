@@ -38,13 +38,8 @@ import {
   ExpenseSubCategory,
   EXPENSE_TYPE_LABELS,
 } from '@/types/expenses';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog';
+import { ResponsiveModal } from '@/components/ui/responsive-modal';
+import { describeCategoryMoveReading, pluralize } from '@/lib/utils/dialogNarrative';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -55,9 +50,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ArrowRightLeft, Plus, Check } from 'lucide-react';
+import { Plus, Check } from 'lucide-react';
 import { CategoryManagementDialog } from './CategoryManagementDialog';
 import { getAllCategories } from '@/lib/services/expenseCategoryService';
+import { crossesTransferBoundary } from '@/lib/utils/expenseTypeTransition';
 import { cn } from '@/lib/utils';
 
 interface CategoryMoveDialogProps {
@@ -93,8 +89,14 @@ export function CategoryMoveDialog({
 
   // Inline category creation dialog state
   const [createCategoryDialogOpen, setCreateCategoryDialogOpen] = useState(false);
-  // Why local categories: track inline creation without forcing parent re-render
-  const [localCategories, setLocalCategories] = useState<ExpenseCategory[]>(allCategories);
+  // Why local categories: track inline creation without forcing parent re-render. The override
+  // is stored WITH the prop it replaces, so a fresh `allCategories` makes it stale and the prop
+  // wins again — no effect, no extra render (AGENTS.md → React Query and Derived State).
+  const [localOverride, setLocalOverride] = useState<{
+    base: ExpenseCategory[];
+    categories: ExpenseCategory[];
+  } | null>(null);
+  const localCategories = localOverride?.base === allCategories ? localOverride.categories : allCategories;
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -104,15 +106,22 @@ export function CategoryMoveDialog({
    * All categories except the source (when moving a whole category).
    * For subcategory moves, we keep the source category available since the user
    * might want to move to a different subcategory within the same category.
+   *
+   * Destinations across the transfer boundary are never offered: the moved rows
+   * touch two cash accounts and cannot be re-typed in batch (the service refuses
+   * with TransferBoundaryError — see crossesTransferBoundary).
    */
   const availableCategories = useMemo(() => {
+    const sameSideOfBoundary = localCategories.filter(
+      cat => !crossesTransferBoundary(sourceCategory.type, cat.type)
+    );
     if (sourceSubCategory) {
-      // Subcategory move: all categories available (including parent)
-      return localCategories;
+      // Subcategory move: all same-side categories available (including parent)
+      return sameSideOfBoundary;
     }
     // Category move: exclude source category
-    return localCategories.filter(cat => cat.id !== sourceCategory.id);
-  }, [localCategories, sourceCategory.id, sourceSubCategory]);
+    return sameSideOfBoundary.filter(cat => cat.id !== sourceCategory.id);
+  }, [localCategories, sourceCategory.id, sourceCategory.type, sourceSubCategory]);
 
   const filteredCategories = useMemo(() => {
     if (!searchQuery.trim()) {
@@ -137,31 +146,29 @@ export function CategoryMoveDialog({
     return subs;
   }, [selectedCategory, selectedCategoryId, sourceCategory.id, sourceSubCategory]);
 
-  // Sync local categories when prop changes
-  useEffect(() => {
-    setLocalCategories(allCategories);
-  }, [allCategories]);
+  // ========== Dialog Lifecycle ==========
 
-  // ========== Dialog Lifecycle Effects ==========
-
-  // Reset selections only when dialog opens, not when availableCategories changes
-  // (otherwise inline category creation triggers a reset that wipes the auto-selection)
-  useEffect(() => {
+  // Reset selections only when the dialog opens, not when availableCategories changes
+  // (otherwise inline category creation triggers a reset that wipes the auto-selection).
+  // Adjusted during render on the `open` transition (React's "adjusting state when a prop
+  // changes"), never from an effect (`react-hooks/set-state-in-effect`).
+  const [prevOpen, setPrevOpen] = useState<boolean | null>(null);
+  if (prevOpen !== open) {
+    setPrevOpen(open);
     if (open) {
       setSelectedCategoryId('');
       setSelectedSubCategoryId('');
       setSearchQuery('');
       setIsDropdownOpen(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }
 
-  // Auto-select when only one category available (runs after initial reset)
-  useEffect(() => {
-    if (open && availableCategories.length === 1 && !selectedCategoryId) {
-      setSelectedCategoryId(availableCategories[0].id);
-    }
-  }, [open, availableCategories, selectedCategoryId]);
+  // Auto-select when only one category is available and nothing is selected yet. On the
+  // opening render the reset above has not landed in `selectedCategoryId` yet, so this fires
+  // on the re-render that follows it — the same two-step the effects used to take.
+  if (open && availableCategories.length === 1 && !selectedCategoryId) {
+    setSelectedCategoryId(availableCategories[0].id);
+  }
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -198,7 +205,7 @@ export function CategoryMoveDialog({
   const handleCategoryCreated = async () => {
     if (user && ownerId) {
       const updatedCategories = await getAllCategories(ownerId);
-      setLocalCategories(updatedCategories);
+      setLocalOverride({ base: allCategories, categories: updatedCategories });
 
       // Auto-select newest category
       const newestCategory = updatedCategories
@@ -232,28 +239,39 @@ export function CategoryMoveDialog({
   // ========== Render ==========
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent
-        className="max-w-md"
-        style={triggerOrigin ? { transformOrigin: triggerOrigin } : undefined}
+    <>
+      <ResponsiveModal
+        open={open}
+        onClose={onClose}
+        eyebrow={`Categorie · ${EXPENSE_TYPE_LABELS[sourceCategory.type]}`}
+        title={`Sposta i movimenti di ${sourceLabel}`}
+        reading={{
+          narrative: describeCategoryMoveReading({ name: sourceLabel, expenseCount }),
+          tone: 'neutral',
+        }}
+        width="md"
+        triggerOrigin={triggerOrigin}
+        footer={
+          <>
+            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+              Annulla
+            </Button>
+            <Button
+              type="button"
+              onClick={handleConfirm}
+              disabled={!selectedCategoryId || isSubmitting || availableCategories.length === 0}
+            >
+              {isSubmitting
+                ? 'Spostamento...'
+                : `Sposta ${pluralize(expenseCount, 'movimento', 'movimenti')}`}
+            </Button>
+          </>
+        }
       >
-        {/* ========== Header Section ========== */}
-        <DialogHeader>
-          <div className="flex items-center gap-2 text-blue-600 mb-2">
-            <ArrowRightLeft className="h-5 w-5" />
-            <DialogTitle>Sposta Transazioni</DialogTitle>
-          </div>
-          <DialogDescription className="text-base">
-            Sposta {expenseCount === 1 ? (
-              <><strong>1</strong> transazione</>
-            ) : (
-              <><strong>{expenseCount}</strong> transazioni</>
-            )} da <strong>&quot;{sourceLabel}&quot;</strong> ({EXPENSE_TYPE_LABELS[sourceCategory.type]}) verso una nuova destinazione.
-          </DialogDescription>
-        </DialogHeader>
+
 
         {/* ========== Destination Selection Section ========== */}
-        <div className="space-y-4 py-4">
+        <div className="space-y-4">
           {/* Category Selection */}
           {availableCategories.length > 1 && (
             <div className="space-y-2">
@@ -278,12 +296,12 @@ export function CategoryMoveDialog({
                 {isDropdownOpen && (
                   <div
                     ref={dropdownRef}
-                    className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg max-h-60 overflow-auto"
+                    className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-[0_4px_24px_rgba(0,0,0,0.28)] max-h-60 overflow-auto"
                   >
                     {filteredCategories.length === 0 && searchQuery.trim() ? (
                       <button
                         type="button"
-                        className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer text-left"
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent cursor-pointer text-left"
                         onClick={handleCreateCategory}
                       >
                         <Plus className="h-4 w-4 text-primary flex-shrink-0" />
@@ -299,8 +317,8 @@ export function CategoryMoveDialog({
                           key={category.id}
                           type="button"
                           className={cn(
-                            "w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer text-left",
-                            selectedCategoryId === category.id && "bg-gray-100 dark:bg-gray-800"
+                            "w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent cursor-pointer text-left",
+                            selectedCategoryId === category.id && "bg-accent"
                           )}
                           onClick={() => handleSelectCategory(category.id)}
                         >
@@ -326,7 +344,7 @@ export function CategoryMoveDialog({
 
               {/* Selected category display */}
               {selectedCategoryId && selectedCategory && (
-                <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700">
+                <div className="flex items-center gap-2 px-3 py-2 bg-muted rounded-md border border-border">
                   {selectedCategory.color && (
                     <div
                       className="w-3 h-3 rounded-full"
@@ -369,7 +387,7 @@ export function CategoryMoveDialog({
 
           {/* Single category case */}
           {availableCategories.length === 1 && (
-            <div className="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-md text-sm text-blue-800 dark:text-blue-200">
+            <div className="p-3 bg-muted border border-border rounded-lg text-sm text-foreground">
               Le transazioni verranno spostate nella categoria{' '}
               <strong>&quot;{availableCategories[0].name}&quot;</strong> ({EXPENSE_TYPE_LABELS[availableCategories[0].type]}).
             </div>
@@ -377,7 +395,7 @@ export function CategoryMoveDialog({
 
           {/* No categories available */}
           {availableCategories.length === 0 && (
-            <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-md text-sm text-amber-800 dark:text-amber-200">
+            <div className="p-3 bg-warning border border-warning-border rounded-lg text-sm text-warning-foreground">
               Non ci sono altre categorie disponibili.
               {' '}Crea prima una nuova categoria digitando il nome nel campo sopra.
             </div>
@@ -385,34 +403,13 @@ export function CategoryMoveDialog({
 
           {/* Cross-type warning */}
           {selectedCategoryId && selectedCategory && selectedCategory.type !== sourceCategory.type && (
-            <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-md text-sm text-amber-800 dark:text-amber-200">
+            <div className="p-3 bg-warning border border-warning-border rounded-lg text-sm text-warning-foreground">
               Le transazioni cambieranno tipo da <strong>{EXPENSE_TYPE_LABELS[sourceCategory.type]}</strong> a{' '}
               <strong>{EXPENSE_TYPE_LABELS[selectedCategory.type]}</strong>.
             </div>
           )}
         </div>
-
-        {/* ========== Action Buttons ========== */}
-        <div className="flex justify-end gap-2 pt-4 border-t">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onClose}
-            disabled={isSubmitting}
-          >
-            Annulla
-          </Button>
-          <Button
-            type="button"
-            onClick={handleConfirm}
-            disabled={!selectedCategoryId || isSubmitting || availableCategories.length === 0}
-          >
-            {isSubmitting
-              ? 'Spostamento...'
-              : `Sposta ${expenseCount} ${expenseCount === 1 ? 'transazione' : 'transazioni'}`}
-          </Button>
-        </div>
-      </DialogContent>
+      </ResponsiveModal>
 
       {/* Inline Category Creation Dialog */}
       <CategoryManagementDialog
@@ -421,6 +418,6 @@ export function CategoryMoveDialog({
         onSuccess={handleCategoryCreated}
         initialName={searchQuery.trim()}
       />
-    </Dialog>
+    </>
   );
 }

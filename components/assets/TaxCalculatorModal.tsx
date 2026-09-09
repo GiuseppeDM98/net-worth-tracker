@@ -37,19 +37,22 @@
 
 import { useState, useEffect } from 'react';
 import { Asset } from '@/types/assets';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog';
+import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { formatCurrency, formatNumber } from '@/lib/services/chartService';
+import { formatCurrency, formatNumber, formatPercentage } from '@/lib/services/chartService';
 import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
-import { Calculator } from 'lucide-react';
+import { costBasisPerUnitEur, isEurNative, unitPriceEur } from '@/lib/utils/costBasisEur';
+import { getMetricValueColor } from '@/lib/utils/metricColors';
+import { TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
+import { cn } from '@/lib/utils';
+
+// The restyle of 2026-08-22 touches presentation only: every figure in the numeric face on the
+// type ramp (22px hero, 13px rows), sign and warning colours through the theme tokens, no
+// literal palette. The arithmetic above is untouched.
+const ROW_LABEL_CLASS = 'text-[13px] text-muted-foreground';
+const ROW_VALUE_CLASS = 'font-mono text-[13px] tabular-nums text-foreground';
 
 interface TaxCalculatorModalProps {
   open: boolean;
@@ -64,13 +67,16 @@ export function TaxCalculatorModal({ open, onClose, asset }: TaxCalculatorModalP
   const [quantityInput, setQuantityInput] = useState<string>('');
   const [targetValueInput, setTargetValueInput] = useState<string>('');
 
-  // Reset inputs when modal opens or closes
+  // Reset the inputs on every open. Deferred with setTimeout(0) (and its cleanup) because a
+  // synchronous setState inside an effect is banned by react-hooks/set-state-in-effect.
   useEffect(() => {
-    if (open) {
+    if (!open) return;
+    const timer = setTimeout(() => {
       setQuantityInput('');
       setTargetValueInput('');
       setInputMode('quantity');
-    }
+    }, 0);
+    return () => clearTimeout(timer);
   }, [open]);
 
   /**
@@ -80,15 +86,22 @@ export function TaxCalculatorModal({ open, onClose, asset }: TaxCalculatorModalP
    * 1. Quantity mode: user enters units → calculate sale value
    * 2. Target value mode: user enters desired amount → calculate required units
    */
+  // Both sides in EUR (costBasisEur.ts): the unit price the value is computed with and the EUR
+  // PMC, purchase fees included — the fiscal cost the gain is taxed on. Before 2026-09-07 a USD
+  // position was simulated in dollars and labelled €.
+  const currentPrice = unitPriceEur(asset);
+  const averageCost = costBasisPerUnitEur(asset) ?? 0;
+  const showsNativeFigures = !isEurNative(asset);
+
   const calculateResults = () => {
     let quantity = 0;
 
     if (inputMode === 'quantity') {
       quantity = parseFloat(quantityInput) || 0;
     } else {
-      // Target value mode: reverse calculate quantity from desired sale amount
+      // Target value mode: reverse calculate quantity from desired sale amount (EUR)
       const targetValue = parseFloat(targetValueInput) || 0;
-      quantity = asset.currentPrice > 0 ? targetValue / asset.currentPrice : 0;
+      quantity = currentPrice > 0 ? targetValue / currentPrice : 0;
     }
 
     // Ensure quantity is not negative
@@ -100,8 +113,6 @@ export function TaxCalculatorModal({ open, onClose, asset }: TaxCalculatorModalP
     const exceedsOwned = quantity > asset.quantity;
     const clampedQuantity = Math.min(quantity, asset.quantity);
 
-    const currentPrice = asset.currentPrice;
-    const averageCost = asset.averageCost || 0;
     const taxRate = asset.taxRate || 0;
 
     // Step 1-2: Calculate sale value and cost basis
@@ -143,70 +154,71 @@ export function TaxCalculatorModal({ open, onClose, asset }: TaxCalculatorModalP
     (inputMode === 'quantity' && parseFloat(quantityInput) > 0) ||
     (inputMode === 'targetValue' && parseFloat(targetValueInput) > 0);
 
-  return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Calculator className="h-5 w-5" />
-            Calcolatore Plusvalenze - {asset.name}
-          </DialogTitle>
-          <DialogDescription>
-            Simula l&apos;impatto fiscale della vendita di una parte delle tue posizioni
-          </DialogDescription>
-        </DialogHeader>
+  const signedCurrency = (value: number) => `${value >= 0 ? '+' : '−'}${formatCurrency(Math.abs(value))}`;
 
-        <div className="space-y-6">
-          {/* Asset Info */}
-          <div className="rounded-lg border bg-gray-50 dark:bg-gray-800 p-4">
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="text-gray-600 dark:text-gray-400">Ticker:</span>{' '}
-                <span className="font-medium">{getAssetDisplayTicker(asset)}</span>
+  return (
+    <ResponsiveModal
+      open={open}
+      onClose={onClose}
+      eyebrow={`Patrimonio · ${asset.name}`}
+      title="Quanto costa vendere"
+      reading="Una simulazione: niente viene registrato. La plusvalenza è calcolata in euro sul PMC del registro operazioni, commissioni d'acquisto incluse, con l'aliquota dello strumento."
+      width="md"
+      footer={
+        <Button type="button" variant="outline" onClick={onClose}>
+          Chiudi
+        </Button>
+      }
+    >
+        <div className="space-y-5">
+          {/* Asset facts — flat rows, no sub-card */}
+          <div className="divide-y divide-border border-y border-border">
+            {[
+              { label: 'Ticker', value: getAssetDisplayTicker(asset) },
+              { label: 'Quantità posseduta', value: formatNumber(asset.quantity, 4) },
+              { label: 'Prezzo corrente', value: formatCurrency(currentPrice, 'EUR', 4) },
+              ...(showsNativeFigures
+                ? [{ label: `Prezzo corrente (${asset.currency})`, value: formatCurrency(asset.currentPrice, asset.currency, 4) }]
+                : []),
+              { label: 'PMC', value: formatCurrency(averageCost, 'EUR', 4) },
+              ...(showsNativeFigures && asset.averageCost
+                ? [{ label: `PMC (${asset.currency})`, value: formatCurrency(asset.averageCost, asset.currency, 4) }]
+                : []),
+              { label: 'Aliquota fiscale', value: formatPercentage(asset.taxRate || 0, 0) },
+            ].map((row) => (
+              <div key={row.label} className="flex items-center justify-between gap-3 py-2">
+                <span className={ROW_LABEL_CLASS}>{row.label}</span>
+                <span className={ROW_VALUE_CLASS}>{row.value}</span>
               </div>
-              <div>
-                <span className="text-gray-600 dark:text-gray-400">Quantità posseduta:</span>{' '}
-                <span className="font-medium">{formatNumber(asset.quantity, 4)}</span>
-              </div>
-              <div>
-                <span className="text-gray-600 dark:text-gray-400">Prezzo corrente:</span>{' '}
-                <span className="font-medium">{formatCurrency(asset.currentPrice, asset.currency, 4)}</span>
-              </div>
-              <div>
-                <span className="text-gray-600 dark:text-gray-400">PMC:</span>{' '}
-                <span className="font-medium">{formatCurrency(asset.averageCost || 0, asset.currency, 4)}</span>
-              </div>
-              <div>
-                <span className="text-gray-600 dark:text-gray-400">Aliquota fiscale:</span>{' '}
-                <span className="font-medium">{asset.taxRate || 0}%</span>
-              </div>
-            </div>
+            ))}
           </div>
 
-          {/* Input Mode Selection */}
+          {/* Input mode */}
           <div className="space-y-2">
             <Label>Modalità di calcolo</Label>
             <div className="flex gap-2">
               <Button
                 type="button"
                 variant={inputMode === 'quantity' ? 'default' : 'outline'}
-                className={`flex-1 ${inputMode === 'quantity' ? 'dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600' : 'dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800'}`}
+                className="flex-1"
                 onClick={() => setInputMode('quantity')}
+                aria-pressed={inputMode === 'quantity'}
               >
-                Per Quantità
+                Per quantità
               </Button>
               <Button
                 type="button"
                 variant={inputMode === 'targetValue' ? 'default' : 'outline'}
-                className={`flex-1 ${inputMode === 'targetValue' ? 'dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600' : 'dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800'}`}
+                className="flex-1"
                 onClick={() => setInputMode('targetValue')}
+                aria-pressed={inputMode === 'targetValue'}
               >
-                Per Valore Target
+                Per valore target
               </Button>
             </div>
           </div>
 
-          {/* Input Fields */}
+          {/* Inputs */}
           {inputMode === 'quantity' ? (
             <div className="space-y-2">
               <Label htmlFor="quantity">Quantità da vendere</Label>
@@ -219,10 +231,12 @@ export function TaxCalculatorModal({ open, onClose, asset }: TaxCalculatorModalP
                 placeholder={`es. ${formatNumber(asset.quantity / 2, 4)}`}
                 value={quantityInput}
                 onChange={(e) => setQuantityInput(e.target.value)}
+                className="font-mono tabular-nums"
               />
               {results.exceedsOwned && hasInput && (
-                <p className="text-sm text-red-500">
-                  ⚠️ La quantità inserita ({formatNumber(results.originalQuantity, 4)}) supera quella posseduta ({formatNumber(asset.quantity, 4)}). Il calcolo è limitato alla quantità disponibile.
+                <p className="text-[13px] text-warning-foreground" role="status">
+                  La quantità inserita ({formatNumber(results.originalQuantity, 4)}) supera quella posseduta (
+                  {formatNumber(asset.quantity, 4)}): il calcolo è limitato alla quantità disponibile.
                 </p>
               )}
             </div>
@@ -237,144 +251,97 @@ export function TaxCalculatorModal({ open, onClose, asset }: TaxCalculatorModalP
                 placeholder="es. 10000"
                 value={targetValueInput}
                 onChange={(e) => setTargetValueInput(e.target.value)}
+                className="font-mono tabular-nums"
               />
               {results.exceedsOwned && hasInput && (
-                <p className="text-sm text-red-500">
-                  ⚠️ Il valore target richiede la vendita di {formatNumber(results.originalQuantity, 4)} unità, ma ne possiedi solo {formatNumber(asset.quantity, 4)}. Il calcolo è limitato alla quantità disponibile.
+                <p className="text-[13px] text-warning-foreground" role="status">
+                  Il valore target richiede la vendita di {formatNumber(results.originalQuantity, 4)} unità, ma ne
+                  possiedi {formatNumber(asset.quantity, 4)}: il calcolo è limitato alla quantità disponibile.
                 </p>
               )}
             </div>
           )}
 
           {/* Results */}
-          {hasInput && (
-            <div className="space-y-4 rounded-lg border-2 border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/20 p-4">
-              <h3 className="font-semibold text-lg text-blue-900 dark:text-blue-200">Riepilogo Calcolo</h3>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Quantità da vendere</p>
-                  <p className="text-lg font-semibold">
-                    {formatNumber(results.quantity, 4)}
-                  </p>
-                </div>
-
-                <div className="space-y-1">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Prezzo per unità</p>
-                  <p className="text-lg font-semibold">
-                    {formatCurrency(results.currentPrice)}
-                  </p>
-                </div>
-
-                <div className="space-y-1">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Prezzo medio di carico (PMC)</p>
-                  <p className="text-lg font-semibold">
-                    {formatCurrency(results.averageCost, asset.currency, 4)}
-                  </p>
-                </div>
-
-                <div className="space-y-1">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Valore lordo vendita</p>
-                  <p className="text-lg font-semibold text-blue-700 dark:text-blue-400">
-                    {formatCurrency(results.saleValue)}
-                  </p>
-                </div>
+          {hasInput ? (
+            <div className="space-y-4 rounded-xl bg-muted/40 p-4">
+              <div className="flex flex-col gap-1.5">
+                <p className={TILE_SUB_EYEBROW_CLASS}>Ricavo netto dopo le tasse</p>
+                <p className="font-mono text-[22px] font-bold leading-none tracking-[-0.03em] tabular-nums text-foreground">
+                  {formatCurrency(results.netProceeds)}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  su{' '}
+                  <span className="font-mono tabular-nums text-foreground">{formatCurrency(results.saleValue)}</span> di
+                  valore lordo, <span className="font-mono tabular-nums">{formatNumber(results.quantity, 4)}</span> unità
+                </p>
               </div>
 
-              <hr className="border-gray-300 dark:border-gray-700" />
-
-              <div className="space-y-3">
-                <div className="space-y-1">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {results.isGain ? 'Plusvalenza' : results.isLoss ? 'Minusvalenza' : 'Nessun guadagno/perdita'}
-                  </p>
-                  <p
-                    className={`text-xl font-bold ${
-                      results.isGain
-                        ? 'text-green-600'
-                        : results.isLoss
-                        ? 'text-red-600'
-                        : 'text-gray-600'
-                    }`}
-                  >
-                    {results.isGain ? '+' : ''}
-                    {formatCurrency(results.gainLoss)}{' '}
-                    <span className="text-base">
-                      ({results.isGain ? '+' : ''}{formatNumber(results.gainLossPercentage, 2)}%)
+              <div className="divide-y divide-border border-t border-border">
+                {[
+                  { label: 'Prezzo per unità', value: formatCurrency(results.currentPrice, 'EUR', 4) },
+                  { label: 'Prezzo medio di carico (PMC)', value: formatCurrency(results.averageCost, 'EUR', 4) },
+                ].map((row) => (
+                  <div key={row.label} className="flex items-center justify-between gap-3 py-2">
+                    <span className={ROW_LABEL_CLASS}>{row.label}</span>
+                    <span className={ROW_VALUE_CLASS}>{row.value}</span>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between gap-3 py-2">
+                  <span className={ROW_LABEL_CLASS}>
+                    {results.isGain ? 'Plusvalenza' : results.isLoss ? 'Minusvalenza' : 'Nessun guadagno o perdita'}
+                  </span>
+                  <span className={cn('font-mono text-[13px] font-semibold tabular-nums', getMetricValueColor(results.gainLoss, 'number'))}>
+                    {signedCurrency(results.gainLoss)}{' '}
+                    <span className="text-[11px] font-normal">
+                      ({results.gainLoss >= 0 ? '+' : '−'}
+                      {formatPercentage(Math.abs(results.gainLossPercentage), 2)})
                     </span>
-                  </p>
+                  </span>
                 </div>
-
-                <div className="space-y-1">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Tasse dovute ({results.taxRate}%)
-                  </p>
-                  <p className="text-xl font-bold text-orange-600">
+                <div className="flex items-center justify-between gap-3 py-2">
+                  <span className={ROW_LABEL_CLASS}>Tasse dovute ({formatPercentage(results.taxRate, 0)})</span>
+                  <span className="font-mono text-[13px] font-semibold tabular-nums text-warning-foreground">
                     {formatCurrency(results.taxes)}
-                  </p>
-                  {results.isLoss && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Nessuna tassa dovuta in caso di minusvalenza
-                    </p>
-                  )}
-                </div>
-
-                <hr className="border-gray-300 dark:border-gray-700" />
-
-                <div className="space-y-1 rounded-lg bg-white dark:bg-gray-800 p-3">
-                  <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">
-                    Ricavo netto (dopo tasse)
-                  </p>
-                  <p className="text-2xl font-bold text-green-700">
-                    {formatCurrency(results.netProceeds)}
-                  </p>
+                  </span>
                 </div>
               </div>
 
-              {/* Additional Info */}
-              {inputMode === 'targetValue' && hasInput && (
-                <div className="rounded-lg bg-blue-100 dark:bg-blue-950/30 p-3 text-sm text-blue-800 dark:text-blue-300">
-                  <p className="font-medium">💡 Informazione utile:</p>
-                  <p>
-                    Per ottenere {formatCurrency(parseFloat(targetValueInput))} di ricavo netto dopo le tasse,
-                    {results.taxes > 0 ? (
-                      <> dovresti vendere un valore lordo di circa{' '}
-                        <strong>{formatCurrency(parseFloat(targetValueInput) + results.taxes)}</strong>
-                      </>
-                    ) : (
-                      <> il valore lordo coincide con quello netto (nessuna tassa da pagare)</>
-                    )}
-                  </p>
-                </div>
+              {inputMode === 'targetValue' && (
+                <p className="text-[12px] leading-relaxed text-muted-foreground">
+                  Per ottenere{' '}
+                  <span className="font-mono tabular-nums text-foreground">{formatCurrency(parseFloat(targetValueInput))}</span> di
+                  ricavo netto dopo le tasse
+                  {results.taxes > 0 ? (
+                    <>
+                      {' '}
+                      dovresti vendere un valore lordo di circa{' '}
+                      <span className="font-mono tabular-nums text-foreground">
+                        {formatCurrency(parseFloat(targetValueInput) + results.taxes)}
+                      </span>
+                      .
+                    </>
+                  ) : (
+                    <> il valore lordo coincide con quello netto: nessuna tassa da pagare.</>
+                  )}
+                </p>
               )}
 
               {results.isLoss && (
-                <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 p-3 text-sm text-amber-800 dark:text-amber-300">
-                  <p className="font-medium">⚠️ Nota sulla minusvalenza:</p>
-                  <p>
-                    Questa vendita genererebbe una minusvalenza di {formatCurrency(Math.abs(results.gainLoss))}.
-                    Le minusvalenze possono essere utilizzate per compensare plusvalenze future,
-                    riducendo il carico fiscale complessivo.
-                  </p>
-                </div>
+                <p className="text-[12px] leading-relaxed text-muted-foreground">
+                  Nessuna tassa in caso di minusvalenza. Questa vendita ne genererebbe una di{' '}
+                  <span className="font-mono tabular-nums text-foreground">{formatCurrency(Math.abs(results.gainLoss))}</span>,
+                  utilizzabile per compensare plusvalenze future.
+                </p>
               )}
             </div>
+          ) : (
+            <p className="py-6 text-center text-[13px] text-muted-foreground">
+              Inserisci una quantità o un valore target per vedere il calcolo.
+            </p>
           )}
 
-          {!hasInput && (
-            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-              Inserisci una quantità o un valore target per vedere il calcolo
-            </div>
-          )}
-
-          {/* Actions */}
-          <div className="flex justify-end gap-2 pt-4">
-            <Button type="button" variant="outline" onClick={onClose} className="dark:border-gray-600 dark:text-gray-200">
-              Chiudi
-            </Button>
-          </div>
         </div>
-      </DialogContent>
-    </Dialog>
+    </ResponsiveModal>
   );
 }

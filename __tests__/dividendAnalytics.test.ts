@@ -9,13 +9,19 @@ import {
   monthsInWindow,
   computePeriodSummary,
   computeNetComparison,
-  computeUpcomingNet,
-  rankPayers,
-  buildMonthlyNetSeries,
   buildYearlySeries,
   computeReliability,
-  periodToDateBounds,
-  MAX_RANKED_PAYERS,
+  rankPayerShares,
+  summarizeYearlyIncome,
+  nextPayments,
+  summarizePayments,
+  resolveMonthlyWindow,
+  buildCoverageMonths,
+  summarizeYield,
+  summarizeDpsGrowth,
+  summarizeTotalReturn,
+  sliceForList,
+  resolvePeriodBounds,
 } from '@/lib/utils/dividendAnalytics';
 
 // --- Fixtures ---------------------------------------------------------------
@@ -169,71 +175,6 @@ describe('computeNetComparison', () => {
   });
 });
 
-describe('computeUpcomingNet', () => {
-  it('sums only future-dated payments', () => {
-    const dividends = [
-      makeDividend({ paymentDate: new Date('2026-06-01T12:00:00'), netAmount: 50, grossAmount: 50, taxAmount: 0 }),
-      makeDividend({ paymentDate: new Date('2026-07-01T12:00:00'), netAmount: 80, grossAmount: 80, taxAmount: 0 }),
-      makeDividend({ paymentDate: new Date('2026-08-01T12:00:00'), netAmount: 20, grossAmount: 20, taxAmount: 0 }),
-    ];
-    expect(computeUpcomingNet(dividends, NOW)).toBe(100);
-  });
-});
-
-describe('rankPayers', () => {
-  it('ranks payers by net income descending and aggregates per asset', () => {
-    const dividends = [
-      makeDividend({ assetId: 'a', assetTicker: 'A', paymentDate: new Date('2026-02-15T12:00:00'), netAmount: 30, grossAmount: 30, taxAmount: 0 }),
-      makeDividend({ assetId: 'a', assetTicker: 'A', paymentDate: new Date('2026-05-15T12:00:00'), netAmount: 30, grossAmount: 30, taxAmount: 0 }),
-      makeDividend({ assetId: 'b', assetTicker: 'B', paymentDate: new Date('2026-05-15T12:00:00'), netAmount: 100, grossAmount: 100, taxAmount: 0 }),
-    ];
-    const ranked = rankPayers(dividends, 'year', NOW);
-    expect(ranked.map((r) => r.assetTicker)).toEqual(['B', 'A']);
-    expect(ranked[1]).toMatchObject({ net: 60, count: 2 });
-  });
-
-  it('collapses payers past the cap into a single "Altri" row', () => {
-    const dividends = Array.from({ length: MAX_RANKED_PAYERS + 3 }, (_, i) =>
-      makeDividend({
-        assetId: `a${i}`,
-        assetTicker: `A${i}`,
-        paymentDate: new Date('2026-05-15T12:00:00'),
-        netAmount: 100 - i, // strictly descending so the tail is the smallest
-        grossAmount: 100 - i,
-        taxAmount: 0,
-      }),
-    );
-    const ranked = rankPayers(dividends, 'year', NOW);
-    expect(ranked).toHaveLength(MAX_RANKED_PAYERS + 1);
-    expect(ranked[ranked.length - 1].assetTicker).toBe('Altri');
-    expect(ranked[ranked.length - 1].count).toBe(3);
-  });
-});
-
-describe('buildMonthlyNetSeries', () => {
-  it('produces a gap-free month axis with zeros for empty months', () => {
-    const dividends = [
-      makeDividend({ paymentDate: new Date('2026-01-15T12:00:00'), netAmount: 10, grossAmount: 10, taxAmount: 0 }),
-      makeDividend({ paymentDate: new Date('2026-04-15T12:00:00'), netAmount: 40, grossAmount: 40, taxAmount: 0 }),
-    ];
-    const series = buildMonthlyNetSeries(dividends, NOW);
-    expect(series.map((p) => p.net)).toEqual([10, 0, 0, 40]); // Jan, Feb, Mar, Apr
-  });
-
-  it('keeps only the most recent N months when maxMonths is given', () => {
-    const dividends = [
-      makeDividend({ paymentDate: new Date('2025-01-15T12:00:00'), netAmount: 10, grossAmount: 10, taxAmount: 0 }),
-      makeDividend({ paymentDate: new Date('2026-05-15T12:00:00'), netAmount: 40, grossAmount: 40, taxAmount: 0 }),
-    ];
-    const series = buildMonthlyNetSeries(dividends, NOW, 3);
-    expect(series).toHaveLength(3);
-    expect(series[series.length - 1].net).toBe(40);
-  });
-
-  it('returns an empty series when there are no paid dividends', () => {
-    expect(buildMonthlyNetSeries([], NOW)).toEqual([]);
-  });
-});
 
 describe('buildYearlySeries', () => {
   it('groups gross/tax/net by payment year, ascending', () => {
@@ -282,24 +223,374 @@ describe('computeReliability', () => {
   });
 });
 
-describe('periodToDateBounds', () => {
-  it('returns no bounds for all', () => {
-    expect(periodToDateBounds('all', NOW)).toEqual({});
+
+// ============================================================================
+// The derivations the redesigned tab's tiles read (2026-08-23).
+// ============================================================================
+
+describe('rankPayerShares', () => {
+  const payers = (n: number) =>
+    Array.from({ length: n }, (_, i) =>
+      makeDividend({
+        paymentDate: new Date(2026, 2, 10, 12),
+        assetId: `a${i}`,
+        assetTicker: `T${i}`,
+        assetName: `Asset ${i}`,
+        grossAmount: (n - i) * 100,
+        taxAmount: 0,
+        netAmount: (n - i) * 100,
+      })
+    );
+
+  it('ranks by net and shapes the rows like the category tiles', () => {
+    const ranking = rankPayerShares(payers(3), 'year', NOW, 5);
+    expect(ranking.total).toBe(600);
+    expect(ranking.rows.map((r) => [r.label, r.amount])).toEqual([
+      ['T0', 300],
+      ['T1', 200],
+      ['T2', 100],
+    ]);
+    expect(ranking.rows[0].percentage).toBeCloseTo(50, 5);
+    expect(ranking.remainder).toBeNull();
+    expect(ranking.payerCount).toBe(3);
+    expect(ranking.top?.assetTicker).toBe('T0');
   });
 
-  it('bounds the current month from the 1st to now', () => {
-    const { startDate, endDate } = periodToDateBounds('month', NOW);
-    expect(startDate).toEqual(new Date(2026, 5, 1, 0, 0, 0));
-    expect(endDate).toBe(NOW);
+  it('closes a cut list with the residual, so the shares add up to the stated total', () => {
+    const ranking = rankPayerShares(payers(7), 'year', NOW, 5);
+    expect(ranking.rows).toHaveLength(5);
+    expect(ranking.remainder).not.toBeNull();
+    expect(ranking.remainder!.label).toBe('Altri 2 strumenti');
+    expect(ranking.remainder!.amount).toBe(300);
+    const shown = ranking.rows.reduce((s, r) => s + r.amount, 0);
+    expect(shown + ranking.remainder!.amount).toBe(ranking.total);
   });
 
-  it('bounds the year from Jan 1 to now', () => {
-    const { startDate } = periodToDateBounds('year', NOW);
-    expect(startDate).toEqual(new Date(2026, 0, 1, 0, 0, 0));
+  it('counts a payer once however many times it paid', () => {
+    const list = [
+      makeDividend({ paymentDate: new Date(2026, 1, 1, 12), assetId: 'x', assetTicker: 'X', grossAmount: 100, taxAmount: 0, netAmount: 100 }),
+      makeDividend({ paymentDate: new Date(2026, 3, 1, 12), assetId: 'x', assetTicker: 'X', grossAmount: 50, taxAmount: 0, netAmount: 50 }),
+    ];
+    const ranking = rankPayerShares(list, 'year', NOW, 5);
+    expect(ranking.payerCount).toBe(1);
+    expect(ranking.top).toEqual(expect.objectContaining({ net: 150, count: 2 }));
   });
 
-  it('bounds rolling12 to 11 months back', () => {
-    const { startDate } = periodToDateBounds('rolling12', NOW);
-    expect(startDate).toEqual(new Date(2025, 6, 1, 0, 0, 0)); // July 2025
+  it('excludes announced payments — a leaderboard of money not yet received is not a leaderboard', () => {
+    const list = [
+      makeDividend({ paymentDate: new Date(2026, 1, 1, 12), assetId: 'x', assetTicker: 'X', netAmount: 100, grossAmount: 100, taxAmount: 0 }),
+      makeDividend({ paymentDate: new Date(2026, 10, 1, 12), assetId: 'y', assetTicker: 'Y', netAmount: 900, grossAmount: 900, taxAmount: 0 }),
+    ];
+    expect(rankPayerShares(list, 'year', NOW, 5).payerCount).toBe(1);
+  });
+
+  it('is empty when nothing was received', () => {
+    expect(rankPayerShares([], 'year', NOW, 5)).toEqual({ rows: [], remainder: null, total: 0, payerCount: 0, top: null });
+  });
+});
+
+describe('summarizeYearlyIncome', () => {
+  const yearly = (year: number, net: number) =>
+    makeDividend({ paymentDate: new Date(year, 5, 1, 12), grossAmount: net, taxAmount: 0, netAmount: net });
+
+  it('averages and ranks the CLOSED years only — a year still running would lose by construction', () => {
+    const list = [yearly(2023, 1000), yearly(2024, 2000), yearly(2025, 3000), yearly(2026, 500)];
+    const summary = summarizeYearlyIncome(list, NOW);
+    expect(summary.closedCount).toBe(3);
+    expect(summary.average).toBe(2000);
+    expect(summary.best?.year).toBe(2025);
+    expect(summary.worst?.year).toBe(2023);
+    expect(summary.ongoing?.year).toBe(2026);
+    expect(summary.ongoing?.net).toBe(500);
+  });
+
+  it('enumerates a gap-free year axis so a silent year reads as a zero, not as a missing bar', () => {
+    const summary = summarizeYearlyIncome([yearly(2023, 1000), yearly(2026, 500)], NOW);
+    expect(summary.years.map((y) => y.year)).toEqual([2023, 2024, 2025, 2026]);
+    expect(summary.years[1].net).toBe(0);
+  });
+
+  it('keeps only the most recent years when the history is longer', () => {
+    const list = [2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026].map((y) => yearly(y, 100));
+    const summary = summarizeYearlyIncome(list, NOW, 5);
+    expect(summary.years.map((y) => y.year)).toEqual([2022, 2023, 2024, 2025, 2026]);
+    expect(summary.closedCount).toBe(4);
+  });
+
+  it('has no average and no ranking when no year has closed', () => {
+    const summary = summarizeYearlyIncome([yearly(2026, 500)], NOW);
+    expect(summary.closedCount).toBe(0);
+    expect(summary.average).toBeNull();
+    expect(summary.best).toBeNull();
+  });
+
+  it('is empty without any received dividend', () => {
+    expect(summarizeYearlyIncome([], NOW).years).toEqual([]);
+  });
+});
+
+describe('nextPayments', () => {
+  it('returns the announced payments in date order, soonest first', () => {
+    const list = [
+      makeDividend({ paymentDate: new Date(2026, 10, 20, 12), assetTicker: 'C', netAmount: 30, grossAmount: 30, taxAmount: 0 }),
+      makeDividend({ paymentDate: new Date(2026, 4, 20, 12), assetTicker: 'PAST', netAmount: 99, grossAmount: 99, taxAmount: 0 }),
+      makeDividend({ paymentDate: new Date(2026, 8, 15, 12), assetTicker: 'A', netAmount: 10, grossAmount: 10, taxAmount: 0 }),
+      makeDividend({ paymentDate: new Date(2026, 9, 28, 12), assetTicker: 'B', netAmount: 20, grossAmount: 20, taxAmount: 0 }),
+    ];
+    expect(nextPayments(list, NOW, 3).map((p) => p.assetTicker)).toEqual(['A', 'B', 'C']);
+  });
+
+  it('carries the provisional flag so the surface can say the figure is not final', () => {
+    const list = [makeDividend({ paymentDate: new Date(2026, 10, 20, 12), isProvisional: true })];
+    expect(nextPayments(list, NOW, 3)[0].isProvisional).toBe(true);
+  });
+
+  it('is empty when nothing is announced', () => {
+    expect(nextPayments([makeDividend({ paymentDate: new Date(2026, 0, 1, 12) })], NOW, 3)).toEqual([]);
+  });
+});
+
+describe('summarizePayments', () => {
+  it('counts received and announced separately and never sums them', () => {
+    const list = [
+      makeDividend({ paymentDate: new Date(2026, 1, 1, 12), grossAmount: 100, taxAmount: 26, netAmount: 74 }),
+      makeDividend({ paymentDate: new Date(2026, 2, 1, 12), grossAmount: 200, taxAmount: 52, netAmount: 148 }),
+      makeDividend({ paymentDate: new Date(2026, 11, 1, 12), grossAmount: 400, taxAmount: 104, netAmount: 296 }),
+    ];
+    const inventory = summarizePayments(list, NOW);
+    expect(inventory.total).toBe(3);
+    expect(inventory.receivedCount).toBe(2);
+    expect(inventory.receivedNet).toBe(222);
+    expect(inventory.announcedCount).toBe(1);
+    expect(inventory.announcedNet).toBe(296);
+  });
+
+  it('names the largest row across received AND announced — it is the inventory, not the income', () => {
+    const list = [
+      makeDividend({ paymentDate: new Date(2026, 1, 1, 12), assetTicker: 'SMALL', netAmount: 10, grossAmount: 10, taxAmount: 0 }),
+      makeDividend({ paymentDate: new Date(2026, 11, 1, 12), assetTicker: 'BIG', netAmount: 900, grossAmount: 900, taxAmount: 0, dividendType: 'coupon' }),
+    ];
+    expect(summarizePayments(list, NOW).largest).toEqual({ label: 'BIG', net: 900, dividendType: 'coupon' });
+  });
+
+  it('is empty for an empty list', () => {
+    expect(summarizePayments([], NOW)).toEqual({
+      total: 0,
+      receivedCount: 0,
+      receivedNet: 0,
+      announcedCount: 0,
+      announcedNet: 0,
+      largest: null,
+    });
+  });
+});
+
+describe('resolveMonthlyWindow', () => {
+  const list = [
+    makeDividend({ paymentDate: new Date(2026, 0, 10, 12), netAmount: 100, grossAmount: 100, taxAmount: 0 }),
+    makeDividend({ paymentDate: new Date(2026, 5, 10, 12), netAmount: 200, grossAmount: 200, taxAmount: 0 }),
+  ];
+
+  it('gives a month the trailing six, and outlines the month itself', () => {
+    const w = resolveMonthlyWindow(list, 'month', NOW, 6);
+    expect(w.points).toHaveLength(6);
+    expect(w.points[5]).toEqual(expect.objectContaining({ year: 2026, month: 6 }));
+    expect(w.highlightKey).toBe('2026-6');
+  });
+
+  it('gives a year its own months, January to the running one, and outlines none', () => {
+    const w = resolveMonthlyWindow(list, 'year', NOW, 6);
+    expect(w.points.map((p) => p.month)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(w.highlightKey).toBeNull();
+  });
+
+  it('gives the trailing window and the whole history twelve months, named as such', () => {
+    expect(resolveMonthlyWindow(list, 'rolling12', NOW, 6).points).toHaveLength(12);
+    expect(resolveMonthlyWindow(list, 'all', NOW, 6).points).toHaveLength(12);
+  });
+
+  it('is gap-free: a month with no payment is a zero, not a missing bar', () => {
+    const w = resolveMonthlyWindow(list, 'year', NOW, 6);
+    expect(w.points.map((p) => p.net)).toEqual([100, 0, 0, 0, 0, 200]);
+  });
+
+  it('never draws an announced payment as income', () => {
+    const w = resolveMonthlyWindow(
+      [...list, makeDividend({ paymentDate: new Date(2026, 5, 30, 12), netAmount: 999, grossAmount: 999, taxAmount: 0 })],
+      'year',
+      new Date(2026, 5, 15, 12),
+      6
+    );
+    expect(w.points[w.points.length - 1].net).toBe(200);
+  });
+});
+
+describe('buildCoverageMonths', () => {
+  const list = [
+    makeDividend({ paymentDate: new Date(2026, 0, 10, 12), netAmount: 100, grossAmount: 100, taxAmount: 0 }),
+    makeDividend({ paymentDate: new Date(2026, 2, 10, 12), netAmount: 200, grossAmount: 200, taxAmount: 0 }),
+  ];
+
+  it('marks each month of the window paid or not', () => {
+    const months = buildCoverageMonths(list, 'year', NOW);
+    expect(months.map((m) => m.month)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(months.map((m) => m.paid)).toEqual([true, false, true, false, false, false]);
+  });
+
+  it('refuses to draw a window it cannot fit, rather than drawing a slice of it', () => {
+    const old = makeDividend({ paymentDate: new Date(2020, 0, 10, 12), netAmount: 10, grossAmount: 10, taxAmount: 0 });
+    expect(buildCoverageMonths([old, ...list], 'all', NOW, 24)).toEqual([]);
+  });
+
+  it('draws the whole history when it fits', () => {
+    expect(buildCoverageMonths(list, 'rolling12', NOW, 24)).toHaveLength(12);
+  });
+});
+
+describe('summarizeYield', () => {
+  const payload = {
+    portfolioYieldOnCost: 4.61,
+    portfolioYieldOnCostNet: 3.59,
+    portfolioCurrentYieldGross: 3.42,
+    totalCostBasis: 124000,
+    yieldOnCostAssets: [{ assetId: 'a', ttmGrossDividends: 5720 }],
+    dividendGrowthData: { byAsset: [], portfolioMedianGrowth: 5.4 },
+  };
+
+  it('derives the spread and carries the base it was measured on', () => {
+    const summary = summarizeYield(payload as never);
+    expect(summary).not.toBeNull();
+    expect(summary!.yocGross).toBe(4.61);
+    expect(summary!.yocNet).toBe(3.59);
+    expect(summary!.currentYieldGross).toBe(3.42);
+    expect(summary!.spread).toBeCloseTo(1.19, 5);
+    expect(summary!.dpsMedianGrowth).toBe(5.4);
+    expect(summary!.ttmGross).toBe(5720);
+    expect(summary!.costBasis).toBe(124000);
+    expect(summary!.coverage).toBe(1);
+  });
+
+  it('has no spread when the market yield is missing — a spread against nothing is not a spread', () => {
+    const summary = summarizeYield({ ...payload, portfolioCurrentYieldGross: undefined } as never);
+    expect(summary!.currentYieldGross).toBeNull();
+    expect(summary!.spread).toBeNull();
+  });
+
+  it('is null when the portfolio has no yield on cost at all', () => {
+    expect(summarizeYield({ dividendGrowthData: { byAsset: [] } } as never)).toBeNull();
+    expect(summarizeYield(null)).toBeNull();
+  });
+});
+
+describe('summarizeDpsGrowth', () => {
+  const payload = {
+    dividendGrowthData: {
+      portfolioMedianGrowth: 5.4,
+      byAsset: [
+        { assetId: 'a', assetTicker: 'ENI', assetName: 'Eni', currency: 'EUR', yearlyDps: [{ year: 2024, totalDps: 1 }, { year: 2025, totalDps: 1.1 }], yoyGrowth: {}, latestYoyGrowth: 7.4 },
+        { assetId: 'b', assetTicker: 'ISP', assetName: 'Intesa', currency: 'EUR', yearlyDps: [{ year: 2025, totalDps: 0.17 }, { year: 2026, totalDps: 0.17 }], yoyGrowth: {}, latestYoyGrowth: 10.3 },
+        { assetId: 'c', assetTicker: 'NEW', assetName: 'New', currency: 'EUR', yearlyDps: [{ year: 2026, totalDps: 0.1 }], yoyGrowth: {} },
+      ],
+    },
+  };
+
+  it('reads the table it sits above: the column set, the coverage and the leader', () => {
+    const summary = summarizeDpsGrowth(payload as never, NOW);
+    expect(summary!.coverage).toBe(3);
+    expect(summary!.median).toBe(5.4);
+    expect(summary!.years).toEqual([2024, 2025, 2026]);
+    expect(summary!.best).toEqual({ assetTicker: 'ISP', latestYoyGrowth: 10.3 });
+  });
+
+  it('flags the running year among the columns, because its DPS is a partial sum', () => {
+    expect(summarizeDpsGrowth(payload as never, NOW)!.ongoingYear).toBe(2026);
+    expect(summarizeDpsGrowth(payload as never, new Date(2030, 0, 1, 12))!.ongoingYear).toBeNull();
+  });
+
+  it('is null without any DPS history', () => {
+    expect(summarizeDpsGrowth({ dividendGrowthData: { byAsset: [] } } as never, NOW)).toBeNull();
+    expect(summarizeDpsGrowth(null, NOW)).toBeNull();
+  });
+});
+
+describe('summarizeTotalReturn', () => {
+  const row = (assetTicker: string, totalReturnPercentage: number) => ({
+    assetId: assetTicker,
+    assetTicker,
+    assetName: assetTicker,
+    quantity: 1,
+    averageCost: 1,
+    currentPrice: 1,
+    costBasis: 1,
+    currentValue: 1,
+    netDividends: 0,
+    capitalGainAbsolute: 0,
+    capitalGainPercentage: 0,
+    dividendReturnPercentage: 0,
+    totalReturnPercentage,
+  });
+
+  it('averages the rows unweighted and names both ends', () => {
+    const summary = summarizeTotalReturn({ totalReturnAssets: [row('A', 60), row('B', 20), row('C', -10)] } as never);
+    expect(summary!.count).toBe(3);
+    expect(summary!.average).toBeCloseTo(23.333, 3);
+    expect(summary!.best.assetTicker).toBe('A');
+    expect(summary!.worst.assetTicker).toBe('C');
+    expect(summary!.negativeCount).toBe(1);
+  });
+
+  it('is null with no rows', () => {
+    expect(summarizeTotalReturn({ totalReturnAssets: [] } as never)).toBeNull();
+    expect(summarizeTotalReturn(null)).toBeNull();
+  });
+});
+
+describe('resolvePeriodBounds', () => {
+  it('bounds a month to itself — the picker IS the month', () => {
+    expect(resolvePeriodBounds('month', NOW)).toEqual({ from: { year: 2026, month: 6 }, to: { year: 2026, month: 6 } });
+  });
+
+  it('bounds a year to its whole calendar, December included', () => {
+    expect(resolvePeriodBounds('year', NOW)).toEqual({ from: { year: 2026, month: 1 }, to: { year: 2026, month: 12 } });
+  });
+
+  it('bounds the trailing window to the twelve months ending on the running one', () => {
+    expect(resolvePeriodBounds('rolling12', NOW)).toEqual({ from: { year: 2025, month: 7 }, to: { year: 2026, month: 6 } });
+  });
+
+  it('leaves the whole history unbounded — that is what «Storico» means', () => {
+    expect(resolvePeriodBounds('all', NOW)).toEqual({ from: null, to: null });
+  });
+});
+
+describe('sliceForList — announced payments are bounded too', () => {
+  const received = makeDividend({ paymentDate: new Date(2026, 1, 1, 12), assetTicker: 'IN' });
+  const laterThisMonth = makeDividend({ paymentDate: new Date(2026, 5, 28, 12), assetTicker: 'SOON' });
+  const nextMonth = makeDividend({ paymentDate: new Date(2026, 6, 10, 12), assetTicker: 'NEXT' });
+  const farFuture = makeDividend({ paymentDate: new Date(2032, 2, 10, 12), assetTicker: 'PREMIO' });
+  const all = [received, laterThisMonth, nextMonth, farFuture];
+  const tickers = (period: 'month' | 'year' | 'rolling12' | 'all') =>
+    sliceForList(all, period, NOW).map((d) => d.assetTicker).sort();
+
+  it('keeps a payment announced for LATER THIS MONTH under «Mese», and nothing beyond it', () => {
+    // The bug this replaces: a final premium dated 2032 was listed under «agosto», because
+    // every announced row was kept whatever the period.
+    expect(tickers('month')).toEqual(['SOON']);
+  });
+
+  it('keeps everything falling inside the calendar YEAR, December included', () => {
+    expect(tickers('year')).toEqual(['IN', 'NEXT', 'SOON']);
+  });
+
+  it('stops the trailing window at the end of the running month', () => {
+    expect(tickers('rolling12')).toEqual(['IN', 'SOON']);
+  });
+
+  it('keeps the whole register under «Storico», the far-future premium included', () => {
+    expect(tickers('all')).toEqual(['IN', 'NEXT', 'PREMIO', 'SOON']);
+  });
+
+  it('never drops a received payment the period covers', () => {
+    expect(sliceForList([received], 'year', NOW)).toHaveLength(1);
   });
 });

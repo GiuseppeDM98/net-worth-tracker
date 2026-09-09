@@ -12,9 +12,15 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    // The alternate dist dirs (`NEXT_DIST_DIR=.next-e2e`, `.next-throwaway`): the same family
+    // .gitignore excludes, or a Playwright run leaves ~170 generated-file findings behind.
+    ".next-*/**",
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendored skill scripts (gitignored, written by the impeccable plugin, not by this repo):
+    // linting them reported ~100 warnings nobody here can act on.
+    ".agents/**",
   ]),
   ...storybook.configs["flat/recommended"]
 ]);

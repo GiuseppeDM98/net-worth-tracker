@@ -6,6 +6,7 @@ import {
 } from '@/lib/services/yahooFinanceService';
 import { getBondPriceByIsin } from '@/lib/services/borsaItalianaBondScraperService';
 import { convertToEur } from '@/lib/services/currencyConversionService';
+import { Asset } from '@/types/assets';
 
 export interface PriceUpdateResult {
   updated: number;
@@ -40,16 +41,15 @@ export async function updateUserAssetPrices(
       };
     }
 
-    const allAssets = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
+    const allAssets = snapshot.docs.map(
+      (doc) => ({ id: doc.id, ...doc.data() }) as Asset
+    );
 
     // Filter assets that need price updates
     // Two-level filtering ensures both capability and user intent:
     // 1. Type capability: Can this asset type be updated? (stocks: yes, cash: no)
     // 2. User preference: Does the user want auto-updates for this specific asset?
-    const updatableAssets = allAssets.filter((asset: any) => {
+    const updatableAssets = allAssets.filter((asset) => {
       // First check if the asset type supports price updates (e.g., not cash, realestate)
       // This is type-level filtering: certain asset classes don't have market prices
       const typeSupportsUpdate = shouldUpdatePrice(asset.type, asset.subCategory);
@@ -71,14 +71,15 @@ export async function updateUserAssetPrices(
     }
 
     // Separate bonds with ISIN for Borsa Italiana scraping
-    const bondsWithIsin = updatableAssets.filter((asset: any) =>
-      asset.type === 'bond' &&
-      asset.assetClass === 'bonds' &&
-      asset.isin &&
-      asset.isin.trim().length > 0
+    const bondsWithIsin = updatableAssets.filter(
+      (asset): asset is Asset & { isin: string } =>
+        asset.type === 'bond' &&
+        asset.assetClass === 'bonds' &&
+        typeof asset.isin === 'string' &&
+        asset.isin.trim().length > 0
     );
 
-    const otherAssets = updatableAssets.filter((asset: any) =>
+    const otherAssets = updatableAssets.filter((asset) =>
       !(asset.type === 'bond' && asset.assetClass === 'bonds' && asset.isin)
     );
 
@@ -92,63 +93,63 @@ export async function updateUserAssetPrices(
     // Process bonds via Borsa Italiana scraper (with Yahoo Finance fallback)
     for (const bond of bondsWithIsin) {
       try {
-        console.log(`[Bond Update] Processing ${(bond as any).ticker} (ISIN: ${(bond as any).isin})`);
+        console.log(`[Bond Update] Processing ${bond.ticker} (ISIN: ${bond.isin})`);
 
         // Try Borsa Italiana scraper first
-        const bondPrice = await getBondPriceByIsin((bond as any).isin);
+        const bondPrice = await getBondPriceByIsin(bond.isin);
 
         if (bondPrice && bondPrice.price && bondPrice.price > 0) {
           // Bond prices from Borsa Italiana are quoted as % of par (e.g. 104.2 = 104.2%).
           // If nominalValue is set, convert to actual EUR per unit so that
           // totalValue = currentPrice × quantity is correct.
           // Example: 104.2% × €1,000 nominalValue = €1,042 per lot
-          const nominalValue = (bond as any).bondDetails?.nominalValue;
+          const nominalValue = bond.bondDetails?.nominalValue;
           const adjustedPrice = nominalValue && nominalValue > 1
             ? bondPrice.price * (nominalValue / 100)
             : bondPrice.price;
 
-          const assetRef = adminDb.collection('assets').doc((bond as any).id);
+          const assetRef = adminDb.collection('assets').doc(bond.id);
           await assetRef.update({
             currentPrice: adjustedPrice,
             lastPriceUpdate: new Date(),
             updatedAt: new Date(),
           });
-          updated.push(`${(bond as any).ticker} (BI-${bondPrice.priceType})`);
-          console.log(`[Bond Update] ${(bond as any).ticker}: Updated from Borsa Italiana (${bondPrice.priceType}): ${bondPrice.price}% → €${adjustedPrice}`);
+          updated.push(`${bond.ticker} (BI-${bondPrice.priceType})`);
+          console.log(`[Bond Update] ${bond.ticker}: Updated from Borsa Italiana (${bondPrice.priceType}): ${bondPrice.price}% → €${adjustedPrice}`);
         } else {
           // Fallback to Yahoo Finance
-          console.log(`[Bond Update] ${(bond as any).ticker}: Borsa Italiana returned null, falling back to Yahoo Finance`);
-          const quote = await getQuote((bond as any).ticker);
+          console.log(`[Bond Update] ${bond.ticker}: Borsa Italiana returned null, falling back to Yahoo Finance`);
+          const quote = await getQuote(bond.ticker);
 
           if (quote && quote.price !== null && quote.price > 0) {
             // Same % → EUR conversion for Yahoo Finance fallback
-            const nominalValue = (bond as any).bondDetails?.nominalValue;
+            const nominalValue = bond.bondDetails?.nominalValue;
             const adjustedPrice = nominalValue && nominalValue > 1
               ? quote.price * (nominalValue / 100)
               : quote.price;
 
-            const assetRef = adminDb.collection('assets').doc((bond as any).id);
+            const assetRef = adminDb.collection('assets').doc(bond.id);
             await assetRef.update({
               currentPrice: adjustedPrice,
               lastPriceUpdate: new Date(),
               updatedAt: new Date(),
             });
-            updated.push(`${(bond as any).ticker} (YF-fallback)`);
-            console.log(`[Bond Update] ${(bond as any).ticker}: Updated from Yahoo Finance fallback: ${quote.price}% → €${adjustedPrice}`);
+            updated.push(`${bond.ticker} (YF-fallback)`);
+            console.log(`[Bond Update] ${bond.ticker}: Updated from Yahoo Finance fallback: ${quote.price}% → €${adjustedPrice}`);
           } else {
-            failed.push((bond as any).ticker);
-            console.warn(`[Bond Update] ${(bond as any).ticker}: Both Borsa Italiana and Yahoo Finance failed`);
+            failed.push(bond.ticker);
+            console.warn(`[Bond Update] ${bond.ticker}: Both Borsa Italiana and Yahoo Finance failed`);
           }
         }
       } catch (error) {
-        console.error(`[Bond Update] Error updating ${(bond as any).ticker}:`, error);
-        failed.push((bond as any).ticker);
+        console.error(`[Bond Update] Error updating ${bond.ticker}:`, error);
+        failed.push(bond.ticker);
       }
     }
 
     // Extract unique tickers for other assets
     const tickers = [
-      ...new Set(otherAssets.map((asset: any) => asset.ticker)),
+      ...new Set(otherAssets.map((asset) => asset.ticker)),
     ];
 
     // Fetch quotes from Yahoo Finance
@@ -156,11 +157,11 @@ export async function updateUserAssetPrices(
 
     // Update asset prices using Admin SDK (for non-bond assets)
     for (const asset of otherAssets) {
-      const quote = quotes.get((asset as any).ticker);
+      const quote = quotes.get(asset.ticker);
 
       if (quote && quote.price !== null && quote.price > 0) {
         try {
-          const assetRef = adminDb.collection('assets').doc((asset as any).id);
+          const assetRef = adminDb.collection('assets').doc(asset.id);
 
           // Build the update payload. Always write price and currency from Yahoo.
           // For non-EUR assets, also convert to EUR so that calculateAssetValue()
@@ -188,18 +189,18 @@ export async function updateUserAssetPrices(
               // The stale or missing currentPriceEur means the portfolio total
               // will fall back to the native price, which is wrong but recoverable
               // on the next successful price update.
-              console.warn(`[Price Update] FX conversion failed for ${(asset as any).ticker} (${normalizedCurrency}→EUR):`, fxError);
+              console.warn(`[Price Update] FX conversion failed for ${asset.ticker} (${normalizedCurrency}→EUR):`, fxError);
             }
           }
 
           await assetRef.update(updatePayload);
-          updated.push((asset as any).ticker);
+          updated.push(asset.ticker);
         } catch (error) {
-          console.error(`Failed to update ${(asset as any).ticker}:`, error);
-          failed.push((asset as any).ticker);
+          console.error(`Failed to update ${asset.ticker}:`, error);
+          failed.push(asset.ticker);
         }
       } else {
-        failed.push((asset as any).ticker);
+        failed.push(asset.ticker);
       }
     }
 

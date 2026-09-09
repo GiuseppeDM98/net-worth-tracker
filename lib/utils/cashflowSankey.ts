@@ -6,7 +6,7 @@
  * `__tests__/**\/*.test.ts`, so logic living inside a `.tsx` has no way to be covered at
  * all. The shapes below are plain objects; @nivo/sankey consumes them structurally.
  *
- * A second, structural reason to keep this file free of React: AGENTS.md records that
+ * A second, structural reason to keep this file free of React: AGENTS.md § Recharts records that
  * `useChartColors()` must never reach a Nivo component (react-spring cannot interpolate
  * oklch and crashes on arity). The palettes live here precisely because a module that
  * cannot import a hook cannot break that rule.
@@ -25,11 +25,12 @@
  * carried separately as `label`. Ids are opaque: nothing parses or splits them. The
  * `index` returned with every view is the only sanctioned way to ask what a node means.
  *
- * THREE VIEWS
+ * TWO VIEWS (the internal category drill-down fell on 2026-08-14: category and
+ * subcategory node clicks now route to the entity dossier in AnalisiTab instead
+ * of a third in-chart navigation level)
  * 1. Budget flow (default): Income categories → Budget → Expense types → Categories
  *    (+ Subcategories in the 5-layer variant) + Savings
  * 2. Type drill-down: one expense type → its categories
- * 3. Category drill-down: one category → its subcategories
  */
 
 import {
@@ -44,11 +45,8 @@ import {
   getSubCategoryKey,
   getSubCategoryLabel,
   resolveDisplayLabels,
-  selectExpensesForDrillDown,
   type LabelledGroup,
 } from '@/lib/utils/expenseGrouping';
-
-export { categoryHasRealSubCategories, selectExpensesForDrillDown } from '@/lib/utils/expenseGrouping';
 
 // ── Palette ──────────────────────────────────────────────────────────────────
 
@@ -130,19 +128,6 @@ export interface SankeyView {
   nodes: SankeyNode[];
   links: SankeyLink[];
   index: Map<string, SankeyNodeDescriptor>;
-}
-
-/** A category as the drill-down navigation refers to it. */
-export interface CategoryRef {
-  /** 'income' for income categories. */
-  expenseType: ExpenseType;
-  key: string;
-  label: string;
-}
-
-export interface SubCategoryRef {
-  key: string;
-  label: string;
 }
 
 // ── Node ids ─────────────────────────────────────────────────────────────────
@@ -527,54 +512,4 @@ export function buildTypeDrillDownData(
   return builder.build();
 }
 
-/**
- * Category drill-down: one category → its subcategories.
- *
- * Scoped by (type, category key), so drilling the fixed "Casa" no longer pulls in the
- * variable "Casa" rows.
- */
-export function buildDrillDownData(
-  expenses: Expense[],
-  category: CategoryRef,
-  categoryColor: string,
-  isMobile: boolean
-): SankeyView {
-  const rows = selectExpensesForDrillDown(expenses, category);
-  if (rows.length === 0) return EMPTY_VIEW;
-
-  const bucket = new Map<string, SubCategoryTotal>();
-  for (const expense of rows) {
-    const key = getSubCategoryKey(expense);
-    const entry = bucket.get(key) ?? { key, name: getSubCategoryLabel(expense), value: 0 };
-    entry.value += Math.abs(expense.amount);
-    bucket.set(key, entry);
-  }
-
-  const subCategories = rank(bucket.values(), isMobile ? MOBILE_MAX_DRILLDOWN_ITEMS : undefined);
-  const colors = deriveSubcategoryColors(categoryColor, subCategories.length);
-
-  const builder = new ViewBuilder();
-  const categoryId = categoryNodeId(category.expenseType, category.key);
-  builder.addNode(categoryId, category.label, categoryColor, {
-    kind: 'category',
-    expenseType: category.expenseType,
-    categoryKey: category.key,
-    categoryLabel: category.label,
-  });
-
-  subCategories.forEach((subCategory, position) => {
-    const subId = subCategoryNodeId(category.expenseType, category.key, subCategory.key);
-    builder.addNode(subId, subCategory.name, colors[position], {
-      kind: 'subCategory',
-      expenseType: category.expenseType,
-      categoryKey: category.key,
-      categoryLabel: category.label,
-      subCategoryKey: subCategory.key,
-      subCategoryLabel: subCategory.name,
-    });
-    builder.addLink(categoryId, subId, subCategory.value);
-  });
-
-  return builder.build();
-}
 

@@ -1,23 +1,19 @@
 'use client';
 
-import { useState } from 'react';
-import { Brain, ChevronDown, Loader2, RotateCcw, Trash2 } from 'lucide-react';
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { useMemo, useRef, useState } from 'react';
+import { ChevronDown, Loader2, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { AssistantMemoryItemRow } from '@/components/assistant/AssistantMemoryItemRow';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { EmptyState } from '@/components/ui/empty-state';
+import { ResponsiveModal } from '@/components/ui/responsive-modal';
+import { useArmedDelete } from '@/lib/hooks/useArmedDelete';
+import { describeWriteError, armedActionLabel } from '@/lib/utils/dialogNarrative';
+import { Tile, TILE_EYEBROW_CLASS, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
+import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
 import { cn } from '@/lib/utils';
+import { formatDate } from '@/lib/utils/formatters';
+import { describeFactsTile, describeGoalsTile } from '@/lib/utils/assistantNarrative';
 import { useDeleteAssistantMemory, useUpdateAssistantMemory } from '@/lib/hooks/useAssistantMemory';
 import { AssistantMemoryDocument, AssistantMemoryItem } from '@/types/assistant';
 
@@ -25,87 +21,82 @@ interface AssistantMemoryPanelProps {
   userId: string;
   memory: AssistantMemoryDocument | undefined;
   isLoading: boolean;
-  /** Controlled open state — when provided, the card header shows a collapse chevron. */
-  isOpen?: boolean;
-  onToggle?: () => void;
 }
 
-type FilterTab = 'active' | 'completed' | 'archived';
+type FactCategory = Exclude<AssistantMemoryItem['category'], 'goal'>;
 
-const CATEGORY_ORDER: AssistantMemoryItem['category'][] = ['goal', 'preference', 'risk', 'fact'];
+const FACT_GROUPS: ReadonlyArray<{ category: FactCategory; label: string }> = [
+  { category: 'risk', label: 'Rischio' },
+  { category: 'preference', label: 'Preferenze' },
+  { category: 'fact', label: 'Fatti utili' },
+];
 
-const CATEGORY_GROUP_LABELS: Record<AssistantMemoryItem['category'], string> = {
-  goal: 'Obiettivi',
-  preference: 'Preferenze',
-  risk: 'Rischio',
-  fact: 'Fatti utili',
-};
-
-// Stagger between each memory item — creates a cascade effect on first load.
-const ITEM_STAGGER_MS = 35;
-
-const EASE_OUT_QUINT = [0.22, 1, 0.36, 1] as const;
+/** The most recent evaluation date across the goals, for the Obiettivi reading. */
+function latestEvaluation(goals: AssistantMemoryItem[]): Date | null {
+  return goals.reduce<Date | null>((latest, goal) => {
+    const at = goal.lastEvaluationAt ?? null;
+    if (!at) return latest;
+    return !latest || at > latest ? at : latest;
+  }, null);
+}
 
 /**
- * Memory panel for Assistente AI — Step 5.
+ * The Memoria sheet's content as two tiles — «Obiettivi» (every active goal with its
+ * structure, its last check and, when the daily evaluation found it reached, the durable
+ * «Ignora» beside «Segna come completato»; the completed ones under a sub-eyebrow with
+ * «Riattiva») and «Fatti» (rischio, preferenze, fatti utili as flat rows) — with the archived
+ * items behind an «Archiviati» disclosure and the reset as its one destructive action.
  *
- * Shows items grouped by category (goal → preference → risk → fact).
- * Lets the user toggle memoryEnabled, edit/archive/delete individual items,
- * and reset all memory with an explicit confirmation dialog.
- *
- * Layout: single-column card, responsive — works in the desktop right panel
- * and also renders correctly in the mobile tab/sheet surfaces.
- *
- * Animation: memory items stagger in on mount and fade out on removal.
- * The collapsible content is handled by Radix (CSS data attributes) — we
- * add a spring-flavoured CSS transition on CollapsibleContent via Tailwind
- * rather than wrapping with motion to avoid fighting Radix's own height animation.
+ * The on/off control of the automatic learning lives in the Preferences popover; this panel
+ * manages stored items only.
  */
-export function AssistantMemoryPanel({ userId, memory, isLoading, isOpen, onToggle }: AssistantMemoryPanelProps) {
-  // When isOpen/onToggle are provided the card header acts as a collapsible trigger.
-  const collapsible = isOpen !== undefined && onToggle !== undefined;
-  const [filterTab, setFilterTab] = useState<FilterTab>('active');
+export function AssistantMemoryPanel({ userId, memory, isLoading }: AssistantMemoryPanelProps) {
   const [showResetDialog, setShowResetDialog] = useState(false);
-  const prefersReducedMotion = useReducedMotion();
+  const [archivedOpen, setArchivedOpen] = useState(false);
 
   const updateMutation = useUpdateAssistantMemory(userId);
   const deleteMutation = useDeleteAssistantMemory(userId);
-
   const isMutating = updateMutation.isPending || deleteMutation.isPending;
   // Read for empty-state copy only — the on/off control itself lives in Preferences.
   const memoryEnabled = memory?.preferences.memoryEnabled ?? true;
 
-  // Group items by category preserving the canonical display order
-  const filteredItems = (memory?.items ?? []).filter((item) => item.status === filterTab);
-  const groupedItems = CATEGORY_ORDER.map((category) => ({
-    category,
-    items: filteredItems.filter((item) => item.category === category),
-  })).filter((group) => group.items.length > 0);
+  const items = useMemo(() => memory?.items ?? [], [memory]);
+  const activeGoals = items.filter((item) => item.category === 'goal' && item.status === 'active');
+  const completedGoals = items.filter((item) => item.category === 'goal' && item.status === 'completed');
+  const activeFacts = items.filter((item) => item.category !== 'goal' && item.status === 'active');
+  const archived = items.filter((item) => item.status === 'archived');
+  const pendingSuggestions = (memory?.suggestions ?? []).filter((s) => s.status === 'pending');
+
+  const goalsReading = describeGoalsTile({
+    tracked: activeGoals.filter((goal) => goal.structuredGoal).length,
+    reached: activeGoals.filter((goal) => goal.lastEvaluationResult?.matched).length,
+    lastEvaluationAt: latestEvaluation(activeGoals),
+  });
+  const factsReading = describeFactsTile({
+    risk: activeFacts.filter((f) => f.category === 'risk').length,
+    preference: activeFacts.filter((f) => f.category === 'preference').length,
+    fact: activeFacts.filter((f) => f.category === 'fact').length,
+  });
 
   const handleEdit = async (id: string, text: string) => {
-    const item = memory?.items.find((i) => i.id === id);
+    const item = items.find((i) => i.id === id);
     if (!item) return;
     try {
-      await updateMutation.mutateAsync({
-        item: { id, text, category: item.category, status: item.status },
-      });
+      await updateMutation.mutateAsync({ item: { id, text, category: item.category, status: item.status } });
     } catch (err) {
-      toast.error((err as Error).message);
+      toast.error(describeWriteError(err));
       throw err; // Re-throw so the row can keep edit mode open
     }
   };
 
   const handleArchive = async (id: string, currentStatus: AssistantMemoryItem['status']) => {
-    const item = memory?.items.find((i) => i.id === id);
+    const item = items.find((i) => i.id === id);
     if (!item) return;
-    const newStatus: AssistantMemoryItem['status'] =
-      currentStatus === 'archived' ? 'active' : 'archived';
+    const newStatus: AssistantMemoryItem['status'] = currentStatus === 'archived' ? 'active' : 'archived';
     try {
-      await updateMutation.mutateAsync({
-        item: { id, text: item.text, category: item.category, status: newStatus },
-      });
+      await updateMutation.mutateAsync({ item: { id, text: item.text, category: item.category, status: newStatus } });
     } catch (err) {
-      toast.error((err as Error).message);
+      toast.error(describeWriteError(err));
     }
   };
 
@@ -113,7 +104,33 @@ export function AssistantMemoryPanel({ userId, memory, isLoading, isOpen, onTogg
     try {
       await deleteMutation.mutateAsync({ itemId: id });
     } catch (err) {
-      toast.error((err as Error).message);
+      toast.error(describeWriteError(err));
+    }
+  };
+
+  const handleReactivateGoal = async (itemId: string) => {
+    try {
+      await updateMutation.mutateAsync({ action: 'reactivateGoal', itemId });
+      toast.success('Obiettivo riattivato');
+    } catch (err) {
+      toast.error(describeWriteError(err));
+    }
+  };
+
+  const handleAcceptSuggestion = async (suggestionId: string, itemId: string) => {
+    try {
+      await updateMutation.mutateAsync({ action: 'acceptSuggestion', suggestionId, itemId });
+      toast.success('Obiettivo segnato come completato');
+    } catch (err) {
+      toast.error(describeWriteError(err));
+    }
+  };
+
+  const handleIgnoreSuggestion = async (suggestionId: string) => {
+    try {
+      await updateMutation.mutateAsync({ action: 'ignoreSuggestion', suggestionId });
+    } catch (err) {
+      toast.error(describeWriteError(err));
     }
   };
 
@@ -123,239 +140,168 @@ export function AssistantMemoryPanel({ userId, memory, isLoading, isOpen, onTogg
       setShowResetDialog(false);
       toast.success('Memoria resettata');
     } catch (err) {
-      toast.error((err as Error).message);
+      toast.error(describeWriteError(err));
     }
   };
 
-  const totalItems = memory?.items.length ?? 0;
-  const activeCount = (memory?.items ?? []).filter((i) => i.status === 'active').length;
+  if (isLoading) {
+    return <TileGridSkeleton verdict={false} cells={[{ span: 12, lines: 5 }, { span: 12, lines: 4 }]} />;
+  }
 
-  const handleReactivateGoal = async (itemId: string) => {
-    try {
-      await updateMutation.mutateAsync({ action: 'reactivateGoal', itemId });
-      toast.success('Obiettivo riattivato');
-    } catch (err) {
-      toast.error((err as Error).message);
-    }
-  };
-
-  // Build a flat index for stagger delays — flattened across all category groups.
-  // Each item gets a delay proportional to its position in the visible list.
-  let globalItemIndex = 0;
+  const rowProps = { isMutating, onEdit: handleEdit, onArchive: handleArchive, onDelete: handleDelete };
 
   return (
-    <>
-      <Collapsible open={collapsible ? isOpen : true} onOpenChange={collapsible ? onToggle : undefined}>
-        <Card>
-          {/* When collapsible, the header is a toggle trigger; otherwise it's static. */}
-          {/* asChild always: CollapsibleTrigger clones CardHeader (a div), so the trash
-              Button inside it is never nested inside a <button>. With asChild={false}
-              Radix would render its own <button> → nested button hydration error. */}
-          <CollapsibleTrigger asChild disabled={!collapsible}>
-            <CardHeader className={collapsible ? 'cursor-pointer select-none' : undefined}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <CardTitle className="flex items-center gap-2">
-                    <Brain className="h-4 w-4 text-muted-foreground" />
-                    Memoria
-                  </CardTitle>
-                  <CardDescription>
-                    {isLoading
-                      ? 'Caricamento…'
-                      : activeCount > 0
-                      ? `${activeCount} ricord${activeCount === 1 ? 'o' : 'i'} attiv${activeCount === 1 ? 'o' : 'i'}`
-                      : 'Nessun ricordo ancora'}
-                  </CardDescription>
-                </div>
-
-                <div className="flex items-center gap-1">
-                  {/* Reset button — only shown when there are items and panel is open */}
-                  {totalItems > 0 && (!collapsible || isOpen) && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
-                      disabled={isMutating}
-                      onClick={(e) => {
-                        // Stop propagation so this click doesn't also toggle the collapsible.
-                        e.stopPropagation();
-                        setShowResetDialog(true);
-                      }}
-                      aria-label="Elimina tutta la memoria"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  )}
-
-                  {/* Collapse chevron — only when controlled from parent */}
-                  {collapsible && (
-                    <ChevronDown
-                      className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
-                    />
-                  )}
-                </div>
+    <div className="flex flex-col gap-3">
+      <Tile
+        eyebrow="Obiettivi"
+        aside={
+          activeGoals.length + completedGoals.length > 0
+            ? [
+                `${activeGoals.length} ${activeGoals.length === 1 ? 'attivo' : 'attivi'}`,
+                completedGoals.length > 0 && `${completedGoals.length} ${completedGoals.length === 1 ? 'completato' : 'completati'}`,
+              ]
+                .filter(Boolean)
+                .join(' · ')
+            : undefined
+        }
+        reading={goalsReading}
+      >
+        {activeGoals.length === 0 && completedGoals.length === 0 ? (
+          <p className="mt-3 text-[13px] text-muted-foreground">
+            {memoryEnabled
+              ? 'Gli obiettivi che dichiari in conversazione compaiono qui, con la loro verifica quotidiana.'
+              : "Attiva l'apprendimento automatico nelle Preferenze per acquisire nuovi obiettivi."}
+          </p>
+        ) : (
+          <>
+            {activeGoals.length > 0 && (
+              <div className="mt-2 divide-y divide-border">
+                {activeGoals.map((goal) => (
+                  <AssistantMemoryItemRow
+                    key={goal.id}
+                    item={goal}
+                    {...rowProps}
+                    pendingSuggestion={pendingSuggestions.find((s) => s.itemId === goal.id)}
+                    onAcceptSuggestion={handleAcceptSuggestion}
+                    onIgnoreSuggestion={handleIgnoreSuggestion}
+                  />
+                ))}
               </div>
-            </CardHeader>
-          </CollapsibleTrigger>
+            )}
+            {completedGoals.length > 0 && (
+              <>
+                <p className={cn(TILE_SUB_EYEBROW_CLASS, 'mt-4')}>Completati</p>
+                <ul className="mt-1 divide-y divide-border">
+                  {completedGoals.map((goal) => (
+                    <li key={goal.id} className="flex items-center justify-between gap-3 py-2">
+                      <span className="min-w-0 flex-1 text-[13px] leading-[1.4] text-muted-foreground">{goal.text}</span>
+                      <span className="flex shrink-0 items-center gap-2 text-[11px] text-muted-foreground">
+                        {goal.completedAt && <span className="font-mono tabular-nums">{formatDate(goal.completedAt)}</span>}
+                        <Button size="sm" variant="ghost" className="h-8" onClick={() => handleReactivateGoal(goal.id)} disabled={isMutating}>
+                          Riattiva
+                        </Button>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </>
+        )}
+      </Tile>
 
-          <CollapsibleContent>
-            <CardContent className="space-y-5">
-          {/* Note: automatic learning (memory on/off) now lives in the unified
-              Preferences popover, and goal-completion suggestions surface as a
-              proactive banner in the main column — both removed from this panel so
-              each control has a single home. This panel manages stored items only. */}
-
-          {/* Loading state */}
-          {isLoading && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Caricamento memoria…
-            </div>
-          )}
-
-          {/* Filter tabs: Attivi / Archiviati */}
-          {!isLoading && totalItems > 0 && (
-            <div
-              role="tablist"
-              aria-label="Filtra ricordi"
-              className="flex gap-1 rounded-lg border border-border bg-muted/30 p-0.5"
-            >
-              {(['active', 'completed', 'archived'] as const).map((tab) => (
-                <button
-                  key={tab}
-                  role="tab"
-                  aria-selected={filterTab === tab}
-                  onClick={() => setFilterTab(tab)}
-                  className={cn(
-                    'flex-1 rounded-md px-2 py-2.5 text-xs font-medium transition-colors min-h-[36px]',
-                    filterTab === tab
-                      ? 'bg-background text-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground'
-                  )}
-                >
-                  {tab === 'active' ? 'Attivi' : tab === 'completed' ? 'Completati' : 'Archiviati'}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Items grouped by category */}
-          {!isLoading && (
-            <>
-              {groupedItems.length === 0 ? (
-                <EmptyState
-                  icon={Brain}
-                  title={
-                    filterTab === 'active'
-                      ? 'Nessun ricordo attivo'
-                      : filterTab === 'completed'
-                      ? 'Nessun obiettivo completato'
-                      : 'Nessun ricordo archiviato'
-                  }
-                  description={
-                    filterTab === 'active' && memoryEnabled
-                      ? 'I fatti stabili che dichiari nelle chat verranno salvati qui.'
-                      : filterTab === 'active'
-                      ? "Attiva l'apprendimento per acquisire nuovi ricordi."
-                      : filterTab === 'completed'
-                      ? 'Gli obiettivi confermati come raggiunti compariranno qui.'
-                      : ''
-                  }
-                  className="py-4"
-                />
-              ) : (
-                <div className="space-y-5">
-                  {groupedItems.map(({ category, items }) => (
-                    <div key={category}>
-                      {/* Category section header */}
-                      <p className="mb-2 text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                        {CATEGORY_GROUP_LABELS[category]}
-                      </p>
-                      <div className="space-y-2">
-                        {/* AnimatePresence lets items fade out when archived/deleted
-                            without the list collapsing abruptly. */}
-                        <AnimatePresence initial={false}>
-                          {items.map((item) => {
-                            // Capture stagger index before incrementing — used in closure.
-                            const itemIndex = globalItemIndex++;
-                            return (
-                              <motion.div
-                                key={item.id}
-                                // Staggered entrance: items cascade in top-to-bottom.
-                                // On filter tab switch (initial={false}) items skip entrance.
-                                initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 5 }}
-                                animate={{
-                                  opacity: 1,
-                                  y: 0,
-                                  transition: {
-                                    duration: prefersReducedMotion ? 0 : 0.25,
-                                    delay: prefersReducedMotion ? 0 : itemIndex * (ITEM_STAGGER_MS / 1000),
-                                    ease: EASE_OUT_QUINT,
-                                  },
-                                }}
-                                exit={{
-                                  opacity: 0,
-                                  // Collapse height to zero on exit so the list doesn't leave a gap.
-                                  // marginBottom collapses simultaneously to avoid a jump.
-                                  height: 0,
-                                  marginBottom: 0,
-                                  transition: {
-                                    duration: prefersReducedMotion ? 0 : 0.20,
-                                    ease: [0.25, 1, 0.5, 1],
-                                  },
-                                }}
-                                style={{ overflow: 'hidden' }}
-                              >
-                                <AssistantMemoryItemRow
-                                  item={item}
-                                  isMutating={isMutating}
-                                  onEdit={handleEdit}
-                                  onArchive={handleArchive}
-                                  onDelete={handleDelete}
-                                />
-                                {item.status === 'completed' && (
-                                  <div className="px-3 pb-2">
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={() => handleReactivateGoal(item.id)}
-                                      disabled={isMutating}
-                                    >
-                                      Riattiva obiettivo
-                                    </Button>
-                                  </div>
-                                )}
-                              </motion.div>
-                            );
-                          })}
-                        </AnimatePresence>
-                      </div>
-                    </div>
+      <Tile
+        eyebrow="Fatti"
+        aside={activeFacts.length > 0 ? `${activeFacts.length} ${activeFacts.length === 1 ? 'fatto' : 'fatti'}` : undefined}
+        reading={factsReading}
+      >
+        {activeFacts.length === 0 ? (
+          <p className="mt-3 text-[13px] text-muted-foreground">
+            {memoryEnabled
+              ? 'Le preferenze e il profilo di rischio che dichiari in conversazione compaiono qui.'
+              : "Attiva l'apprendimento automatico nelle Preferenze per acquisire nuovi fatti."}
+          </p>
+        ) : (
+          FACT_GROUPS.map(({ category, label }) => {
+            const group = activeFacts.filter((item) => item.category === category);
+            if (group.length === 0) return null;
+            return (
+              <div key={category} className="mt-3">
+                <p className={TILE_SUB_EYEBROW_CLASS}>{label}</p>
+                <div className="divide-y divide-border">
+                  {group.map((item) => (
+                    <AssistantMemoryItemRow key={item.id} item={item} {...rowProps} />
                   ))}
                 </div>
-              )}
-            </>
+              </div>
+            );
+          })
+        )}
+      </Tile>
+
+      {/* Archived items and the reset, below the two tiles like a page's «Dettaglio». */}
+      {items.length > 0 && (
+        <div className="flex flex-col">
+          {archived.length > 0 && (
+            <Collapsible open={archivedOpen} onOpenChange={setArchivedOpen}>
+              <CollapsibleTrigger
+                className="flex w-full items-center justify-between gap-3 border-t border-border/40 py-3 text-left"
+                aria-label="Archiviati"
+              >
+                <span className="flex items-baseline gap-3">
+                  <span className={TILE_EYEBROW_CLASS}>Archiviati</span>
+                  <span className="text-[13px] text-muted-foreground">
+                    {archived.length} {archived.length === 1 ? 'ricordo' : 'ricordi'} fuori dalle risposte
+                  </span>
+                </span>
+                <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform', archivedOpen && 'rotate-180')} aria-hidden="true" />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pt-1">
+                <Tile eyebrow="Ricordi archiviati">
+                  <div className="mt-2 divide-y divide-border">
+                    {archived.map((item) => (
+                      <AssistantMemoryItemRow key={item.id} item={item} {...rowProps} />
+                    ))}
+                  </div>
+                </Tile>
+              </CollapsibleContent>
+            </Collapsible>
           )}
-          </CardContent>
-          </CollapsibleContent>
-        </Card>
-      </Collapsible>
+          <div className="flex items-center justify-end border-t border-border/40 py-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9 text-muted-foreground hover:text-destructive"
+              disabled={isMutating}
+              onClick={() => setShowResetDialog(true)}
+            >
+              <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+              Elimina tutta la memoria
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Reset all confirmation dialog */}
-      <Dialog open={showResetDialog} onOpenChange={setShowResetDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <RotateCcw className="h-4 w-4 text-destructive" />
-              Elimina tutta la memoria
-            </DialogTitle>
-            <DialogDescription>
-              Tutti i ricordi ({totalItems} item) verranno eliminati in modo permanente.
-              Le preferenze (stile, contesto macro, memoria on/off) vengono conservate.
-              Questa operazione non è reversibile.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-0">
+      <ResponsiveModal
+        open={showResetDialog}
+        onClose={() => setShowResetDialog(false)}
+        eyebrow="Assistente · Memoria"
+        title="Svuota la memoria"
+        reading={{
+          narrative: [
+            { text: `${items.length}`, mono: true },
+            { text: items.length === 1 ? ' ricordo sparisce' : ' ricordi spariscono' },
+            {
+              text: ' per sempre. Le preferenze — stile, contesto macro, apprendimento — restano dove sono.',
+            },
+          ],
+          tone: 'neutral',
+        }}
+        width="sm"
+        footerNote="Esc annulla la conferma"
+        footer={
+          <>
             <Button
               variant="outline"
               onClick={() => setShowResetDialog(false)}
@@ -363,23 +309,65 @@ export function AssistantMemoryPanel({ userId, memory, isLoading, isOpen, onTogg
             >
               Annulla
             </Button>
-            <Button
-              variant="destructive"
-              onClick={handleResetAll}
+            <ArmedResetAll
+              label={`Elimina ${items.length === 1 ? '1 ricordo' : `${items.length} ricordi`}`}
               disabled={deleteMutation.isPending}
-            >
-              {deleteMutation.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Eliminazione…
-                </>
-              ) : (
-                'Elimina tutto'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              onConfirm={handleResetAll}
+              pending={deleteMutation.isPending}
+            />
+          </>
+        }
+      >
+        <p className="text-sm leading-[1.6] text-muted-foreground">
+          L&apos;assistente ricomincerà a imparare da zero: quello che sa di te oggi non tornerà.
+        </p>
+      </ResponsiveModal>
+    </div>
+  );
+}
+
+/** The memory wipe: two clicks, no timer, Escape disarms. */
+function ArmedResetAll({
+  label,
+  disabled,
+  pending,
+  onConfirm,
+}: {
+  label: string;
+  disabled: boolean;
+  pending: boolean;
+  onConfirm: () => void;
+}) {
+  const ref = useRef<HTMLButtonElement | null>(null);
+  const { armed, onClick, onBlur } = useArmedDelete(ref, onConfirm);
+  const [wasArmed, setWasArmed] = useState(false);
+  if (armed && !wasArmed) setWasArmed(true);
+
+  return (
+    <>
+      <Button
+        ref={ref}
+        type="button"
+        variant="destructive"
+        onClick={onClick}
+        onBlur={onBlur}
+        disabled={disabled}
+        aria-pressed={armed}
+      >
+        {pending ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+            Eliminazione…
+          </>
+        ) : armed ? (
+          armedActionLabel(label)
+        ) : (
+          label
+        )}
+      </Button>
+      <span className="sr-only" role="status" aria-live="polite">
+        {armed ? armedActionLabel(label) : wasArmed ? 'Eliminazione annullata' : ''}
+      </span>
     </>
   );
 }

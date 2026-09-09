@@ -16,6 +16,8 @@ import {
   reconcileSingleEdit,
   reconcileSingleCreate,
   reconcileTransferDelete,
+  reconcileTransferToSingleEdit,
+  reconcileSingleToTransferEdit,
 } from '@/lib/services/cashBalanceReconciliation';
 
 describe('cashBalanceReconciliation', () => {
@@ -104,6 +106,20 @@ describe('cashBalanceReconciliation', () => {
       expect(mockUpdateCashAssetBalancesAtomic).not.toHaveBeenCalled();
     });
 
+    it('should skip the write entirely when old and new sides cancel out', async () => {
+      const result = await reconcileTransferEdit({
+        oldOriginId: 'origin',
+        oldDestId: 'dest',
+        newOriginId: 'origin',
+        newDestId: 'dest',
+        oldAmount: 100,
+        newAmount: 100,
+      });
+
+      expect(result).toBe(false);
+      expect(mockUpdateCashAssetBalancesAtomic).not.toHaveBeenCalled();
+    });
+
     it('should propagate errors from the atomic transaction', async () => {
       mockUpdateCashAssetBalancesAtomic.mockRejectedValueOnce(new Error('Firestore write failed'));
 
@@ -186,6 +202,148 @@ describe('cashBalanceReconciliation', () => {
       expect(result).toBe(true);
       expect(mockUpdateCashAssetBalance).toHaveBeenCalledTimes(1);
       expect(mockUpdateCashAssetBalance).toHaveBeenCalledWith('assetB', -150);
+    });
+  });
+
+  // ─── reconcileTransferToSingleEdit ─────────────────────────────────────────
+
+  describe('reconcileTransferToSingleEdit', () => {
+    it('should reverse the old pair and apply the new signed amount atomically', async () => {
+      // Transfer A→B of 100 re-typed as an expense of 100 on account C
+      const result = await reconcileTransferToSingleEdit({
+        oldOriginId: 'accountA',
+        oldDestId: 'accountB',
+        oldAmount: 100,
+        newLinkedAssetId: 'accountC',
+        newSignedAmount: -100,
+      });
+
+      expect(result).toBe(true);
+      expect(mockUpdateCashAssetBalancesAtomic).toHaveBeenCalledTimes(1);
+      const updates = mockUpdateCashAssetBalancesAtomic.mock.calls[0][0] as { assetId: string; signedDelta: number }[];
+      expect(updates).toEqual(expect.arrayContaining([
+        { assetId: 'accountA', signedDelta: 100 },   // reverse origin debit
+        { assetId: 'accountB', signedDelta: -100 },  // reverse phantom credit
+        { assetId: 'accountC', signedDelta: -100 },  // apply new expense debit
+      ]));
+      expect(updates).toHaveLength(3);
+    });
+
+    it('should net out the origin when it becomes the linked account (same-account re-type)', async () => {
+      // Transfer A→B of 100 re-typed as an expense of 100 still paid from A:
+      // A was already debited 100 as origin, so only B's phantom credit moves.
+      const result = await reconcileTransferToSingleEdit({
+        oldOriginId: 'accountA',
+        oldDestId: 'accountB',
+        oldAmount: 100,
+        newLinkedAssetId: 'accountA',
+        newSignedAmount: -100,
+      });
+
+      expect(result).toBe(true);
+      const updates = mockUpdateCashAssetBalancesAtomic.mock.calls[0][0] as { assetId: string; signedDelta: number }[];
+      expect(updates).toEqual([{ assetId: 'accountB', signedDelta: -100 }]);
+    });
+
+    it('should re-type a transfer into an income crediting the linked account', async () => {
+      const result = await reconcileTransferToSingleEdit({
+        oldOriginId: 'accountA',
+        oldDestId: 'accountB',
+        oldAmount: 50,
+        newLinkedAssetId: 'accountB',
+        newSignedAmount: 50,
+      });
+
+      expect(result).toBe(true);
+      const updates = mockUpdateCashAssetBalancesAtomic.mock.calls[0][0] as { assetId: string; signedDelta: number }[];
+      // B: -50 (reverse credit) + 50 (income credit) nets out; only A moves.
+      expect(updates).toEqual([{ assetId: 'accountA', signedDelta: 50 }]);
+    });
+
+    it('should return false when nothing is linked on either side', async () => {
+      const result = await reconcileTransferToSingleEdit({
+        oldOriginId: undefined,
+        oldDestId: undefined,
+        oldAmount: 100,
+        newLinkedAssetId: undefined,
+        newSignedAmount: -100,
+      });
+
+      expect(result).toBe(false);
+      expect(mockUpdateCashAssetBalancesAtomic).not.toHaveBeenCalled();
+    });
+  });
+
+  // ─── reconcileSingleToTransferEdit ─────────────────────────────────────────
+
+  describe('reconcileSingleToTransferEdit', () => {
+    it('should debit back a former income instead of re-crediting it', async () => {
+      // Income of 100 on A re-typed as a transfer A→B of 100. The correct end
+      // state is A −100 / B +100; from A's current +100 that is a −200 delta.
+      const result = await reconcileSingleToTransferEdit({
+        oldLinkedAssetId: 'accountA',
+        oldSignedAmount: 100,
+        newOriginId: 'accountA',
+        newDestId: 'accountB',
+        newAmount: 100,
+      });
+
+      expect(result).toBe(true);
+      expect(mockUpdateCashAssetBalancesAtomic).toHaveBeenCalledTimes(1);
+      const updates = mockUpdateCashAssetBalancesAtomic.mock.calls[0][0] as { assetId: string; signedDelta: number }[];
+      expect(updates).toEqual(expect.arrayContaining([
+        { assetId: 'accountA', signedDelta: -200 },  // -100 reversal + -100 origin debit
+        { assetId: 'accountB', signedDelta: 100 },
+      ]));
+      expect(updates).toHaveLength(2);
+    });
+
+    it('should net out an expense whose account becomes the transfer origin', async () => {
+      // Expense of 100 on A re-typed as a transfer A→B: A stays debited 100,
+      // only B gains its credit.
+      const result = await reconcileSingleToTransferEdit({
+        oldLinkedAssetId: 'accountA',
+        oldSignedAmount: -100,
+        newOriginId: 'accountA',
+        newDestId: 'accountB',
+        newAmount: 100,
+      });
+
+      expect(result).toBe(true);
+      const updates = mockUpdateCashAssetBalancesAtomic.mock.calls[0][0] as { assetId: string; signedDelta: number }[];
+      expect(updates).toEqual([{ assetId: 'accountB', signedDelta: 100 }]);
+    });
+
+    it('should handle a missing destination like transfer creation does', async () => {
+      const result = await reconcileSingleToTransferEdit({
+        oldLinkedAssetId: 'accountA',
+        oldSignedAmount: -100,
+        newOriginId: 'accountB',
+        newDestId: undefined,
+        newAmount: 100,
+      });
+
+      expect(result).toBe(true);
+      const updates = mockUpdateCashAssetBalancesAtomic.mock.calls[0][0] as { assetId: string; signedDelta: number }[];
+      expect(updates).toEqual(expect.arrayContaining([
+        { assetId: 'accountA', signedDelta: 100 },   // reverse old expense debit
+        { assetId: 'accountB', signedDelta: -100 },  // new origin debit
+      ]));
+      expect(updates).toHaveLength(2);
+    });
+
+    it('should propagate errors from the atomic transaction', async () => {
+      mockUpdateCashAssetBalancesAtomic.mockRejectedValueOnce(new Error('write failed'));
+
+      await expect(
+        reconcileSingleToTransferEdit({
+          oldLinkedAssetId: 'accountA',
+          oldSignedAmount: -100,
+          newOriginId: 'accountA',
+          newDestId: 'accountB',
+          newAmount: 100,
+        })
+      ).rejects.toThrow('write failed');
     });
   });
 

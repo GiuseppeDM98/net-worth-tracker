@@ -24,13 +24,34 @@ import type {
   AllocationRole,
   Asset,
   AssetAllocationTarget,
+  AssetClass,
 } from '@/types/assets';
 import { getAssetDisplayTicker } from './assetDisplay';
 
 export type AllocationAction = 'COMPRA' | 'VENDI' | 'OK';
 
-/** Italian labels for the six asset classes. Local to the feature; other label
+/**
+ * Every member of the `AssetClass` union, in the canonical display order shared by
+ * `ASSET_CLASS_LABELS` and `ASSET_CLASS_CHART_INDEX` below.
+ *
+ * It is typed `AssetClass[]` rather than `string[]` on purpose: widening the union
+ * without extending this array is the failure mode this constant exists to prevent.
+ * A surface that iterates six hard-coded class names instead of this sequence drops
+ * the newer classes silently — which is exactly what the Storico composition chart
+ * did with `trendFollowing` and `carry` until 2026-08-21.
+ */
+export const ASSET_CLASS_SEQUENCE: AssetClass[] = [
+  'equity', 'bonds', 'crypto', 'realestate', 'cash', 'commodity', 'trendFollowing', 'carry',
+];
+
+/** Italian labels for the eight asset classes. Local to the feature; other label
  *  maps exist elsewhere (email, history) but consolidating them is out of scope. */
+/** Position of a class in `ASSET_CLASS_SEQUENCE`; a key the union does not know sorts last. */
+export function assetClassSequenceIndex(assetClass: string): number {
+  const index = (ASSET_CLASS_SEQUENCE as string[]).indexOf(assetClass);
+  return index === -1 ? Number.MAX_SAFE_INTEGER : index;
+}
+
 export const ASSET_CLASS_LABELS: Record<string, string> = {
   equity: 'Azioni',
   bonds: 'Obbligazioni',
@@ -213,10 +234,19 @@ export interface BalanceSummary {
 }
 
 /**
- * Chart-palette slot for each asset class, so the composition bar (and any future
- * per-class viz on this page) draw the SAME hue the History page uses for its
- * "Patrimonio per Asset Class" chart. Resolve the actual color via `useChartColors()`
- * at this index. Mirrors `acColors` in app/dashboard/history/page.tsx — keep them aligned.
+ * Chart-palette slot for each asset class, so the composition bar (and any future per-class viz
+ * on this page) draw the SAME hue the Storico composition chart uses. Resolve the actual color
+ * via `useChartColors()` at this index.
+ *
+ * This map is now the SINGLE source of those slots — `lib/utils/historyComposition.ts` reads it
+ * rather than keeping a parallel literal, which is how Storico and Allocazione drifted apart in
+ * the first place. A synthetic series is not exempt: Storico's "Previdenza" band starts at slot 8,
+ * because 6 and 7 are spoken for below and re-using one puts two different things in the same hue
+ * on the same chart.
+ *
+ * KNOWN LIMIT: `useChartColors()` resolves only indices 0-4 from the active theme and pads 5-9
+ * from the static `CHART_COLORS`, which can repeat a theme hue — slots 1 and 6 measure ΔE ≈ 8
+ * apart on the default theme. CLAUDE.md → Known Issues.
  */
 export const ASSET_CLASS_CHART_INDEX: Record<string, number> = {
   equity: 0,
@@ -230,10 +260,17 @@ export const ASSET_CLASS_CHART_INDEX: Record<string, number> = {
 };
 
 export interface BalanceScore {
-  /** 0–100, where 100 = every class exactly on target. */
+  /** 0–100, where 100 = every class exactly on target (composition AND leverage). */
   score: number;
   /** Share of the portfolio sitting in the wrong class, in percentage points (0–100). */
   misallocationPct: number;
+  /**
+   * Signed p.p. of notional exposure vs the leverage target: negative = current
+   * leverage below the target (Σtarget > Σcurrent), positive = excess exposure.
+   * 0 whenever the targets sum to the current exposure — every unlevered portfolio
+   * with plain 100%-sum targets.
+   */
+  leverageGapPp: number;
 }
 
 /**
@@ -242,18 +279,32 @@ export interface BalanceScore {
  * Deliberately built from each class's raw `difference` (current − target p.p.), NOT from
  * the banded `action`: the gauge measures absolute distance from target and must stay
  * stable when the user widens or tightens the rebalance band — only the COMPRA/VENDI/OK
- * verdict and plan react to the band. Because Σ(current − target) = 0 across classes,
- * Σ|difference| is exactly twice the portfolio fraction that is misallocated; halving it
- * gives the intuitive "X% of the portfolio is in the wrong class". The score is its
- * complement, clamped to [0, 100].
+ * verdict and plan react to the band.
+ *
+ * With leveraged targets the drifts do NOT sum to zero: current weights are notional
+ * exposure over the market base (Σ = current leverage × 100) while targets sum to the
+ * target leverage × 100 (deriveTargetLeverageRatio), so Σ(difference) measures the
+ * leverage gap itself. The drift therefore decomposes exactly into two parts:
+ *   leverageGapPp   = |Σ difference|          — exposure missing/excess vs the target leverage
+ *   misallocationPct = (Σ|d| − |Σd|) / 2      — the genuinely offsetting "wrong class" share
+ * For zero-sum drifts (every unlevered portfolio) this reduces to the classic halving.
+ * Both parts subtract from the score, so "perfectly proportioned but not yet levered"
+ * scores below 100 while the caption can name the real cause instead of claiming a
+ * false "X% fuori posizione".
  */
 export function computeBalanceScore(
   byAssetClass: Record<string, AllocationData>
 ): BalanceScore {
   let sumAbsDrift = 0;
-  for (const data of Object.values(byAssetClass)) sumAbsDrift += Math.abs(data.difference);
-  const misallocationPct = Math.min(100, sumAbsDrift / 2);
-  return { score: Math.round(100 - misallocationPct), misallocationPct };
+  let netDriftPp = 0;
+  for (const data of Object.values(byAssetClass)) {
+    sumAbsDrift += Math.abs(data.difference);
+    netDriftPp += data.difference;
+  }
+  const leverageGapPp = Math.abs(netDriftPp) < 1e-9 ? 0 : netDriftPp;
+  const misallocationPct = Math.min(100, (sumAbsDrift - Math.abs(leverageGapPp)) / 2);
+  const score = Math.max(0, Math.round(100 - misallocationPct - Math.abs(leverageGapPp)));
+  return { score, misallocationPct, leverageGapPp };
 }
 
 /** One-glance verdict for the hero: how many classes are off target and the worst one. */
@@ -456,8 +507,8 @@ export function resolveAllocationRole(asset: Asset): AllocationRole {
  *
  * The DENOMINATOR is `tradable + frozen`: frozen wealth is genuinely invested, so leaving it out
  * would understate your true equity/bond exposure and have you tune the risk of only part of your
- * portfolio. Filtering it out downstream instead would also break the Σ(current − target) = 0
- * invariant that `computeBalanceScore` halves.
+ * portfolio. Filtering it out downstream instead would also skew Σ(current − target), which
+ * `computeBalanceScore` decomposes into misallocation and leverage gap.
  *
  * `excluded` leaves entirely: keeping a house in the denominator pegs the realestate class
  * permanently off-target against a trade nobody can execute.
@@ -705,7 +756,13 @@ export function stripOrphanedSubTargets(
 // Withdrawal ("Preleva") — the mirror image of the contribution split
 // ---------------------------------------------------------------------------
 
-/** Label for holdings that carry no sub-category, so every euro of a class lands in some bucket. */
+/**
+ * Label for holdings that carry no sub-category, so every euro of a class lands in some bucket.
+ *
+ * The subcategory is optional (AssetDialog offers «Nessuna»), so this is a real bucket, not an
+ * edge case: the allocation snapshot files unclassified holdings under it, Allocazione states it
+ * as an untargeted row, and both plans treat it as "no opinion" rather than as a 0% target.
+ */
 export const NO_SUBCATEGORY_LABEL = 'Senza sottocategoria';
 
 /**
@@ -904,7 +961,10 @@ function buildWithdrawalHoldingNodes(
  * class's take across it alone would strand every euro sitting in an untargeted sub-category —
  * the per-instrument takes would no longer sum back to the class take. Grouping the class's own
  * holdings guarantees that every euro of the class is in exactly one bucket. A bucket with a
- * configured target is drained toward it; one without gets a neutral target (pro-rata).
+ * configured target is drained toward it; one without gets a neutral target (pro-rata) — and the
+ * residual `NO_SUBCATEGORY_LABEL` bucket counts as "without", even though `bySubCategory` now
+ * carries a 0 target for it: that zero is a display convention ("no target declared"), and
+ * reading it as a real one would drain the unclassified holdings before anything else.
  */
 function buildWithdrawalSubCategoryNodes(
   assetClass: string,
@@ -937,7 +997,9 @@ function buildWithdrawalSubCategoryNodes(
     currentValue: bucket.currentValue,
     capacity: bucket.capacity,
     targetPercentage:
-      bySubCategory[`${assetClass}:${bucket.key}`]?.targetPercentage ??
+      (bucket.key === NO_SUBCATEGORY_LABEL
+        ? undefined
+        : bySubCategory[`${assetClass}:${bucket.key}`]?.targetPercentage) ??
       (bucketTotal > 0 ? (bucket.currentValue / bucketTotal) * 100 : 0),
   }));
 
@@ -1159,6 +1221,9 @@ export function buildContributionPlan(
     // a frozen asset. An unfunded target (nothing behind it at all) stays: buying into it is
     // exactly what a contribution is for.
     const subEntries = Object.entries(subs).filter(([subCategory]) => {
+      // The residual bucket is a statement about what is unclassified, never a destination: new
+      // money goes into a sleeve you chose, not into the absence of one.
+      if (subCategory === NO_SUBCATEGORY_LABEL) return false;
       const bucket = holdings.filter(
         (holding) => holding.assetClass === slice.assetClass && holding.subCategory === subCategory
       );

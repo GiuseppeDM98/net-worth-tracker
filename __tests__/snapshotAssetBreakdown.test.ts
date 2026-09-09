@@ -13,7 +13,9 @@ import {
   sumSelectedValues,
   buildSelectedAssetTrend,
   attributeSelectedChange,
+  buildMonthAssetBreakdown,
   deriveHoldingStartDates,
+  summarizeSelection,
   type SnapshotAsset,
 } from '@/lib/utils/snapshotAssetBreakdown';
 import type { MonthlySnapshot } from '@/types/assets';
@@ -197,6 +199,19 @@ describe('attributeSelectedChange', () => {
     });
   });
 
+  it('treats a row held at quantity 0 as a closed position, never as a price collapsed to zero', () => {
+    // The snapshot cron writes EVERY asset, sold ones included (quantity 0, totalValue 0). Read as
+    // "present", the unit value 0 turned a 14.830 € sale into a −14.830 € PRICE effect on the real
+    // account (Xtrackers Overnight, 2026-08). A sale to zero is all quantity, like a full close.
+    const prev = [makeAsset({ assetId: 'xeon', quantity: 99, totalValue: 14830 })];
+    const soldOut = [makeAsset({ assetId: 'xeon', quantity: 0, totalValue: 0 })];
+    const rebought = [makeAsset({ assetId: 'xeon', quantity: 93, totalValue: 13960 })];
+
+    expect(attributeSelectedChange(prev, soldOut, new Set(['xeon']))).toEqual({ priceEffect: 0, quantityEffect: -14830 });
+    // The rebuy the month after starts from a 0-quantity row: a pure open, not a price move from 0.
+    expect(attributeSelectedChange(soldOut, rebought, new Set(['xeon']))).toEqual({ priceEffect: 0, quantityEffect: 13960 });
+  });
+
   it('ignores assets that are not selected', () => {
     const prev = [
       makeAsset({ assetId: 'a', quantity: 10, totalValue: 1000 }),
@@ -272,5 +287,112 @@ describe('deriveHoldingStartDates', () => {
     ];
 
     expect(deriveHoldingStartDates(snapshots).has('eni')).toBe(false);
+  });
+});
+
+describe('buildMonthAssetBreakdown', () => {
+  const june = makeSnapshot(2026, 6, [
+    makeAsset({ assetId: 'vwce', name: 'Vanguard FTSE All-World', quantity: 400, totalValue: 48000 }),
+    makeAsset({ assetId: 'cash', name: 'Conto corrente', quantity: 11300, totalValue: 11300 }),
+    makeAsset({ assetId: 'sold', name: 'Venduto', quantity: 10, totalValue: 1000 }),
+  ]);
+  const july = makeSnapshot(2026, 7, [
+    makeAsset({ assetId: 'cash', name: 'Conto corrente', quantity: 10200, totalValue: 10200 }),
+    makeAsset({ assetId: 'vwce', name: 'Vanguard FTSE All-World', quantity: 412, totalValue: 52300 }),
+    makeAsset({ assetId: 'new', name: 'Nuovo', quantity: 5, totalValue: 500 }),
+  ]);
+  const legacy = makeSnapshot(2026, 5, undefined);
+
+  it("should rank the month's instruments by value with their share of the snapshot total", () => {
+    const b = buildMonthAssetBreakdown([legacy, june, july], '2026-7')!;
+    expect(b.month).toMatchObject({ year: 2026, month: 7, label: 'Luglio 2026' });
+    expect(b.total).toBe(63000);
+    expect(b.instrumentCount).toBe(3);
+    expect(b.rows.map((r) => r.assetId)).toEqual(['vwce', 'cash', 'new']);
+    expect(b.rows[0].sharePct).toBeCloseTo((52300 / 63000) * 100, 5);
+  });
+
+  it("should attribute each instrument's change against the previous month WITH a breakdown, price and quantity apart", () => {
+    const b = buildMonthAssetBreakdown([legacy, june, july], '2026-7')!;
+    expect(b.previous).toMatchObject({ year: 2026, month: 6 });
+    const vwce = b.rows.find((r) => r.assetId === 'vwce')!;
+    // u_prev = 120, u_curr = 126.94: price on 400 units + 12 new units at today's price.
+    expect(vwce.delta).toBeCloseTo(4300, 5);
+    expect(vwce.priceEffect).toBeCloseTo(400 * (52300 / 412 - 120), 5);
+    expect(vwce.quantityEffect).toBeCloseTo(12 * (52300 / 412), 5);
+    expect(vwce.priceEffect! + vwce.quantityEffect!).toBeCloseTo(4300, 5);
+    const cash = b.rows.find((r) => r.assetId === 'cash')!;
+    expect(cash.priceEffect).toBe(0);
+    expect(cash.quantityEffect).toBe(-1100);
+    const fresh = b.rows.find((r) => r.assetId === 'new')!;
+    expect(fresh).toMatchObject({ delta: 500, priceEffect: 0, quantityEffect: 500 });
+  });
+
+  it("should include an instrument sold in full in the month's total change, even without a row", () => {
+    const b = buildMonthAssetBreakdown([june, july], '2026-7')!;
+    // 63000 − 60300 = +2700 = vwce +4300, cash −1100, new +500, sold −1000
+    expect(b.change).toBeDefined();
+    expect(b.change!.delta).toBeCloseTo(2700, 5);
+    expect(b.change!.priceEffect).toBeCloseTo(400 * (52300 / 412 - 120), 5);
+    expect(b.change!.quantityEffect).toBeCloseTo(2700 - 400 * (52300 / 412 - 120), 5);
+    expect(b.rows.some((r) => r.assetId === 'sold')).toBe(false);
+  });
+
+  it('should skip a month without a breakdown when looking for the previous one', () => {
+    const april = makeSnapshot(2026, 4, [makeAsset({ assetId: 'vwce', quantity: 400, totalValue: 46000 })]);
+    const b = buildMonthAssetBreakdown([april, legacy, july], '2026-7')!;
+    expect(b.previous).toMatchObject({ year: 2026, month: 4 });
+  });
+
+  it('should leave the change null on the first month with a breakdown, and return null for an unknown month', () => {
+    const b = buildMonthAssetBreakdown([legacy, june], '2026-6')!;
+    expect(b.previous).toBeNull();
+    expect(b.change).toBeNull();
+    expect(b.rows.every((r) => r.delta === null && r.priceEffect === null && r.quantityEffect === null)).toBe(true);
+    expect(buildMonthAssetBreakdown([june], '2026-7')).toBeNull();
+    expect(buildMonthAssetBreakdown([legacy], '2026-5')).toBeNull();
+  });
+});
+
+describe('summarizeSelection', () => {
+  const june = makeSnapshot(2026, 6, [
+    makeAsset({ assetId: 'a', quantity: 10, totalValue: 1000 }),
+    makeAsset({ assetId: 'b', quantity: 10, totalValue: 2000 }),
+  ]);
+  const july = makeSnapshot(2026, 7, [
+    makeAsset({ assetId: 'a', quantity: 10, totalValue: 1100 }),
+    makeAsset({ assetId: 'b', quantity: 12, totalValue: 2400 }),
+    makeAsset({ assetId: 'c', quantity: 1, totalValue: 500 }),
+  ]);
+
+  it('should sum the ticked rows of the month: value, share and the attributed change', () => {
+    const b = buildMonthAssetBreakdown([june, july], '2026-7')!;
+    const s = summarizeSelection(b, new Set(['a', 'b', 'zzz']));
+    expect(s.count).toBe(2);
+    expect(s.value).toBe(3500);
+    expect(s.sharePct).toBeCloseTo((3500 / 4000) * 100, 5);
+    expect(s.delta).toBeCloseTo(500, 5);
+    // a: pure price +100; b: price 10 × (200 − 200) = 0, quantity 2 × 200 = 400.
+    expect(s.priceEffect).toBeCloseTo(100, 5);
+    expect(s.quantityEffect).toBeCloseTo(400, 5);
+  });
+
+  it('should count a ticked instrument sold in full as a quantity loss, like the trend line does', () => {
+    const before = makeSnapshot(2026, 6, [makeAsset({ assetId: 'x', quantity: 10, totalValue: 1000 }), makeAsset({ assetId: 'sold', quantity: 10, totalValue: 2000 })]);
+    const after = makeSnapshot(2026, 7, [makeAsset({ assetId: 'x', quantity: 10, totalValue: 1100 })]);
+    const b = buildMonthAssetBreakdown([before, after], '2026-7')!;
+    expect(b.departed).toEqual([{ assetId: 'sold', previousValue: 2000 }]);
+    const s = summarizeSelection(b, new Set(['x', 'sold']));
+    expect(s).toMatchObject({ count: 1, value: 1100, delta: -1900, priceEffect: 100, quantityEffect: -2000 });
+    const trend = buildSelectedAssetTrend([before, after], new Set(['x', 'sold']));
+    expect(trend[1].delta).toBeCloseTo(s.delta!, 5);
+    expect(trend[1].quantityEffect).toBeCloseTo(s.quantityEffect!, 5);
+  });
+
+  it('should leave the change null on the first month and read zero for an empty selection', () => {
+    const first = summarizeSelection(buildMonthAssetBreakdown([june], '2026-6')!, new Set(['a']));
+    expect(first).toMatchObject({ count: 1, value: 1000, delta: null, priceEffect: null, quantityEffect: null });
+    const none = summarizeSelection(buildMonthAssetBreakdown([june, july], '2026-7')!, new Set());
+    expect(none).toMatchObject({ count: 0, value: 0, sharePct: 0, delta: 0 });
   });
 });

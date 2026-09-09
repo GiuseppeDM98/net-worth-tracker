@@ -15,6 +15,10 @@
 
 # next.js
 /.next/
+# Alternate build dirs: `next dev` refuses a second server for the same dist dir, so the
+# Playwright suite (.next-e2e) and any throwaway verification server pass their own via
+# NEXT_DIST_DIR. Ignored as a family, or every such run shows up as untracked build output.
+/.next-*/
 /out/
 
 # production
@@ -38,6 +42,9 @@ firebase-admin-key.json
 
 # Firebase local emulator (persisted data exports + debug logs)
 /.emulator-data
+# Staging dir the CLI writes export-on-exit into before moving it to .emulator-data —
+# left behind, and possibly half-written, whenever the emulator is killed by a signal.
+/firebase-export-*
 firebase-debug.log
 firestore-debug.log
 database-debug.log
@@ -68,4 +75,3 @@ skills-lock.json
 /test-results/
 /playwright-report/
 /e2e/.auth/
-/.next-e2e/

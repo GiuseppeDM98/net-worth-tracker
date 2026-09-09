@@ -5,17 +5,72 @@ import {
   requireFirebaseAuth,
 } from '@/lib/server/apiAuth';
 import {
+  computeHasDummySnapshots,
   deleteAssistantMemoryDocument,
   getAssistantMemoryDocument,
   isAssistantStoreError,
   setAssistantGoalEvaluation,
   updateAssistantMemoryDocument,
 } from '@/lib/server/assistant/store';
+import { extractStructuredGoalFromText } from '@/lib/server/assistant/memoryExtraction';
 import {
   AssistantMemoryItem,
   AssistantMemorySuggestion,
   AssistantPreferences,
 } from '@/types/assistant';
+
+type AssistantMemoryItemPatch = Partial<AssistantMemoryItem> &
+  Pick<AssistantMemoryItem, 'id' | 'text' | 'category'>;
+
+/**
+ * Gives a hand-written goal the same machine-readable structure a goal learned in
+ * chat gets, using the same Haiku tool call on a single item. Without this, goals
+ * typed into the memory panel were never auto-trackable — the panel sends only
+ * id/text/category/status.
+ *
+ * Runs on creation, on a text edit, and on a goal that has no structure yet (so a
+ * transient API failure repairs itself at the next panel action). It deliberately
+ * does NOT run when only the status changed: archiving a goal must not spend a
+ * model call, nor rewrite a structure the user never touched.
+ *
+ * A failed or unconfigured call leaves an edited goal WITHOUT a structure rather
+ * than keeping the previous one: a stale structure would silently measure a target
+ * the user no longer has, while an unstructured goal announces itself as
+ * "non tracciabile automaticamente" in the panel.
+ */
+async function withStructuredGoal(
+  item: AssistantMemoryItemPatch,
+  existingItems: AssistantMemoryItem[]
+): Promise<AssistantMemoryItemPatch> {
+  if (item.category !== 'goal' || item.structuredGoal) {
+    return item;
+  }
+
+  const existing = existingItems.find((entry) => entry.id === item.id);
+  const needsStructuring = !existing || existing.text !== item.text || !existing.structuredGoal;
+  if (!needsStructuring) {
+    return { ...item, structuredGoal: existing.structuredGoal };
+  }
+
+  // Without a key there is nothing to preserve either: the goal is new, or its
+  // text changed, or it never had a structure.
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return item;
+  }
+
+  try {
+    // Lazy import: a module-level `new Anthropic()` breaks test environments
+    // where ANTHROPIC_API_KEY is absent.
+    const Anthropic = (await import('@anthropic-ai/sdk')).default;
+    const anthropicClient = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const structuredGoal = await extractStructuredGoalFromText(item.text, anthropicClient);
+    return { ...item, structuredGoal };
+  } catch (error) {
+    // Non-fatal: the goal is still saved, just not auto-trackable
+    console.error('[API /ai/assistant/memory] goal structuring failed:', error);
+    return item;
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -24,21 +79,14 @@ export async function GET(request: NextRequest) {
 
     await assertCanAccessAccount(decodedToken, userId);
 
-    const { adminDb } = await import('@/lib/firebase/admin');
-
     // Run memory fetch and dummy-snapshot check in parallel.
     // hasDummySnapshots drives conditional UI — the toggle is only shown when relevant.
-    const [memory, dummySnap] = await Promise.all([
+    const [memory, hasDummySnapshots] = await Promise.all([
       getAssistantMemoryDocument(userId as string),
-      adminDb
-        .collection('monthly-snapshots')
-        .where('userId', '==', userId)
-        .where('isDummy', '==', true)
-        .limit(1)
-        .get(),
+      computeHasDummySnapshots(userId as string),
     ]);
 
-    return NextResponse.json({ ...memory, hasDummySnapshots: !dummySnap.empty });
+    return NextResponse.json({ ...memory, hasDummySnapshots });
   } catch (error) {
     const authErrorResponse = getApiAuthErrorResponse(error);
     if (authErrorResponse) {
@@ -63,7 +111,7 @@ export async function PATCH(request: NextRequest) {
     const body = (await request.json()) as {
       userId: string;
       preferences?: Partial<AssistantPreferences>;
-      item?: Partial<AssistantMemoryItem> & Pick<AssistantMemoryItem, 'id' | 'text' | 'category'>;
+      item?: AssistantMemoryItemPatch;
       suggestion?: Partial<AssistantMemorySuggestion> & Pick<AssistantMemorySuggestion, 'id' | 'itemId' | 'type' | 'status' | 'evidenceSummary' | 'evaluation'>;
       action?: 'acceptSuggestion' | 'ignoreSuggestion' | 'reactivateGoal';
       suggestionId?: string;
@@ -139,9 +187,15 @@ export async function PATCH(request: NextRequest) {
         },
       });
     } else {
+      // The stored items are needed only to decide whether the goal must be
+      // (re)structured — a status-only patch must not spend a model call.
+      const currentItems = body.item?.category === 'goal'
+        ? (await getAssistantMemoryDocument(body.userId)).items
+        : [];
+
       memory = await updateAssistantMemoryDocument(body.userId, {
         preferences: body.preferences,
-        item: body.item,
+        item: body.item ? await withStructuredGoal(body.item, currentItems) : undefined,
         suggestion: body.suggestion,
       });
     }

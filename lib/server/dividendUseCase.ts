@@ -127,7 +127,7 @@ async function createExpenseIfConfigured(
     let subCategoryName: string | undefined;
     if (settings.dividendIncomeSubCategoryId) {
       const subCategory = category.subCategories?.find(
-        (sub: any) => sub.id === settings.dividendIncomeSubCategoryId
+        (sub) => sub.id === settings.dividendIncomeSubCategoryId
       );
       subCategoryName = subCategory?.name;
     }

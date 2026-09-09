@@ -41,11 +41,16 @@ const STORED_SETTINGS = {
   targets: { equity: { targetPercentage: 60 }, bonds: { targetPercentage: 40 } },
   performanceIncludesPensionFunds: true,
   performanceIncludesExcludedAssets: true,
+  performanceExcludesCash: true,
   pensionReturnStartMonth: '2026-07',
   costCentersEnabled: true,
   includePrimaryResidenceInFIRE: true,
+  respectPensionLockInFire: true,
+  pensionInpsRetirementAge: 68,
+  pensionRitaLongUnemployment: true,
   cashflowHistoryStartYear: 2019,
   familyMembers: [{ id: 'm1', name: 'Giuseppe' }],
+  expenseSplitEnabled: true,
 };
 
 const TARGETS = { equity: { targetPercentage: 100 } } as unknown as AssetAllocationTarget;
@@ -74,6 +79,7 @@ describe('getSettings — lettura', () => {
 
     expect(settings?.performanceIncludesPensionFunds).toBe(true);
     expect(settings?.performanceIncludesExcludedAssets).toBe(true);
+    expect(settings?.performanceExcludesCash).toBe(true);
     expect(settings?.pensionReturnStartMonth).toBe('2026-07');
   });
 
@@ -82,8 +88,17 @@ describe('getSettings — lettura', () => {
 
     expect(settings?.costCentersEnabled).toBe(true);
     expect(settings?.includePrimaryResidenceInFIRE).toBe(true);
+    expect(settings?.respectPensionLockInFire).toBe(true);
     expect(settings?.cashflowHistoryStartYear).toBe(2019);
     expect(settings?.familyMembers).toEqual([{ id: 'm1', name: 'Giuseppe' }]);
+    expect(settings?.expenseSplitEnabled).toBe(true);
+  });
+
+  it('returns the RITA rule settings instead of dropping them', async () => {
+    const settings = await getSettings('user-1');
+
+    expect(settings?.pensionInpsRetirementAge).toBe(68);
+    expect(settings?.pensionRitaLongUnemployment).toBe(true);
   });
 
   it('returns null when the user has no settings document yet', async () => {
@@ -99,13 +114,28 @@ describe('setSettings — scrittura, ramo con targets (setDoc senza merge)', () 
       targets: TARGETS,
       performanceIncludesPensionFunds: true,
       performanceIncludesExcludedAssets: true,
+      performanceExcludesCash: true,
       pensionReturnStartMonth: '2026-07',
     } as AssetAllocationSettings);
 
     expect(writtenPayload()).toMatchObject({
       performanceIncludesPensionFunds: true,
       performanceIncludesExcludedAssets: true,
+      performanceExcludesCash: true,
       pensionReturnStartMonth: '2026-07',
+    });
+  });
+
+  it('writes the RITA rule settings', async () => {
+    await setSettings('user-1', {
+      targets: TARGETS,
+      pensionInpsRetirementAge: 68,
+      pensionRitaLongUnemployment: false,
+    } as AssetAllocationSettings);
+
+    expect(writtenPayload()).toMatchObject({
+      pensionInpsRetirementAge: 68,
+      pensionRitaLongUnemployment: false,
     });
   });
 
@@ -134,6 +164,44 @@ describe('setSettings — scrittura, ramo con targets (setDoc senza merge)', () 
 
     expect(writtenPayload().pensionReturnStartMonth).toBe('2026-07');
   });
+
+  // Età, risk-free e le due categorie dividendi si possono SVUOTARE dalla UI. Senza la guardia
+  // `'x' in settings` questo ramo le riportava indietro: parte da `...existingData` e con
+  // `!== undefined` un campo svuotato non sovrascriveva nulla (bug corretto il 2026-08-29).
+  it.each([
+    ['userAge', 34],
+    ['riskFreeRate', 3.5],
+    ['dividendIncomeCategoryId', 'cat-1'],
+    ['dividendIncomeSubCategoryId', 'sub-1'],
+  ])('drops %s from the payload when it is cleared', async (field, stored) => {
+    vi.mocked(getDoc).mockResolvedValue({
+      exists: () => true,
+      data: () => ({ [field]: stored }),
+    } as never);
+
+    await setSettings('user-1', {
+      targets: TARGETS,
+      [field]: undefined,
+    } as AssetAllocationSettings);
+
+    expect(writtenPayload()).not.toHaveProperty(field);
+  });
+
+  it.each([
+    ['userAge', 34],
+    ['riskFreeRate', 3.5],
+    ['dividendIncomeCategoryId', 'cat-1'],
+    ['dividendIncomeSubCategoryId', 'sub-1'],
+  ])('leaves an untouched %s alone when the key is absent from the update', async (field, stored) => {
+    vi.mocked(getDoc).mockResolvedValue({
+      exists: () => true,
+      data: () => ({ [field]: stored }),
+    } as never);
+
+    await setSettings('user-1', { targets: TARGETS } as AssetAllocationSettings);
+
+    expect(writtenPayload()[field]).toBe(stored);
+  });
 });
 
 describe('setSettings — scrittura, ramo senza targets (merge: true)', () => {
@@ -141,13 +209,27 @@ describe('setSettings — scrittura, ramo senza targets (merge: true)', () => {
     await setSettings('user-1', {
       performanceIncludesPensionFunds: true,
       performanceIncludesExcludedAssets: false,
+      performanceExcludesCash: false,
       pensionReturnStartMonth: '2026-07',
     } as AssetAllocationSettings);
 
     expect(writtenPayload()).toMatchObject({
       performanceIncludesPensionFunds: true,
       performanceIncludesExcludedAssets: false,
+      performanceExcludesCash: false,
       pensionReturnStartMonth: '2026-07',
+    });
+  });
+
+  it('writes the RITA rule settings', async () => {
+    await setSettings('user-1', {
+      pensionInpsRetirementAge: 70,
+      pensionRitaLongUnemployment: true,
+    } as AssetAllocationSettings);
+
+    expect(writtenPayload()).toMatchObject({
+      pensionInpsRetirementAge: 70,
+      pensionRitaLongUnemployment: true,
     });
   });
 
@@ -159,9 +241,40 @@ describe('setSettings — scrittura, ramo senza targets (merge: true)', () => {
     expect(writtenPayload().pensionReturnStartMonth).toBe(DELETE_SENTINEL);
   });
 
+  // Un flag di funzionalità deve sopravvivere a ENTRAMBE le catene: il ramo `targets` scrive
+  // con setDoc senza merge, quindi un campo non ricopiato lì sparisce al primo salvataggio
+  // dell'allocazione (doc/guide/impostazioni.md § Settings — the FIVE places).
+  it('writes expenseSplitEnabled through both chains', async () => {
+    await setSettings('user-1', { expenseSplitEnabled: true } as AssetAllocationSettings);
+    expect(writtenPayload().expenseSplitEnabled).toBe(true);
+
+    await setSettings('user-1', { targets: TARGETS, expenseSplitEnabled: true } as AssetAllocationSettings);
+    expect(writtenPayload().expenseSplitEnabled).toBe(true);
+  });
+
   it('does not touch the start month when the key is absent from the update', async () => {
     await setSettings('user-1', { costCentersEnabled: true } as AssetAllocationSettings);
 
     expect(writtenPayload()).not.toHaveProperty('pensionReturnStartMonth');
   });
+
+  // Lo stesso per gli altri quattro campi svuotabili: qui si scrive con merge, quindi omettere
+  // la chiave lascerebbe il valore vecchio — serve un deleteField() esplicito (2026-08-29).
+  it.each(['userAge', 'riskFreeRate', 'dividendIncomeCategoryId', 'dividendIncomeSubCategoryId'])(
+    'uses deleteField to clear %s, since omitting the key would keep it',
+    async (field) => {
+      await setSettings('user-1', { [field]: undefined } as unknown as AssetAllocationSettings);
+
+      expect(writtenPayload()[field]).toBe(DELETE_SENTINEL);
+    }
+  );
+
+  it.each(['userAge', 'riskFreeRate', 'dividendIncomeCategoryId', 'dividendIncomeSubCategoryId'])(
+    'does not touch %s when the key is absent from the update',
+    async (field) => {
+      await setSettings('user-1', { costCentersEnabled: true } as AssetAllocationSettings);
+
+      expect(writtenPayload()).not.toHaveProperty(field);
+    }
+  );
 });

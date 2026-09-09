@@ -1,22 +1,22 @@
 /**
- * Unit tests for goal service pure functions.
- * Tests calculation logic, validation, and orphan cleanup.
- * Firebase-dependent functions (getGoalData, saveGoalData) are NOT tested here.
+ * Unit tests for the goal service's assignment helpers.
+ * Firebase-dependent functions (getGoalData, saveGoalData) are NOT tested here, and
+ * the math this module re-exports from lib/utils/goalMath.ts is covered by goalMath.test.ts.
  */
 
 import { describe, it, expect } from 'vitest';
+import type { Asset } from '@/types/assets';
 
 // Mock Firebase-dependent modules before importing goalService
 vi.mock('@/lib/firebase/config', () => ({ db: {} }));
 vi.mock('@/lib/services/assetService', () => ({
-  calculateAssetValue: (asset: any) => {
+  calculateAssetValue: (asset: Asset) => {
     const base = asset.quantity * asset.currentPrice;
     return asset.outstandingDebt ? Math.max(0, base - asset.outstandingDebt) : base;
   },
 }));
 
 import {
-  calculateGoalProgress,
   getUnassignedValue,
   validateAssignments,
   cleanOrphanedAssignments,
@@ -73,106 +73,6 @@ const mockAssets = [
   },
 ];
 // asset1 = €10,000, asset2 = €10,000, asset3 = €5,000. Total = €25,000
-
-const mockGoal = {
-  id: 'goal1',
-  name: 'Acquisto Casa',
-  targetAmount: 200000,
-  priority: 'alta' as const,
-  color: '#3B82F6',
-  recommendedAllocation: { bonds: 70, equity: 30 },
-  createdAt: now,
-  updatedAt: now,
-};
-
-// ==================== calculateGoalProgress ====================
-
-describe('calculateGoalProgress', () => {
-  it('should calculate zero progress with no assignments', () => {
-    const result = calculateGoalProgress(mockGoal, [], mockAssets);
-
-    expect(result.goalId).toBe('goal1');
-    expect(result.goalName).toBe('Acquisto Casa');
-    expect(result.currentValue).toBe(0);
-    expect(result.progressPercentage).toBeCloseTo(0, 1);
-    expect(result.remainingAmount).toBe(200000);
-  });
-
-  it('should calculate correct progress with assignments', () => {
-    const assignments = [
-      { goalId: 'goal1', assetId: 'asset1', percentage: 50 }, // 50% of €10,000 = €5,000
-      { goalId: 'goal1', assetId: 'asset2', percentage: 100 }, // 100% of €10,000 = €10,000
-    ];
-
-    const result = calculateGoalProgress(mockGoal, assignments, mockAssets);
-
-    expect(result.currentValue).toBe(15000); // €5,000 + €10,000
-    expect(result.progressPercentage).toBeCloseTo(7.5, 1); // 15000/200000 * 100
-    expect(result.remainingAmount).toBe(185000);
-  });
-
-  it('should compute actual allocation by asset class', () => {
-    const assignments = [
-      { goalId: 'goal1', assetId: 'asset1', percentage: 50 }, // equity €5,000
-      { goalId: 'goal1', assetId: 'asset2', percentage: 100 }, // bonds €10,000
-    ];
-
-    const result = calculateGoalProgress(mockGoal, assignments, mockAssets);
-
-    // Total assigned = €15,000. equity = 5000/15000 = 33.3%, bonds = 10000/15000 = 66.7%
-    expect(result.actualAllocation.equity).toBeCloseTo(33.33, 1);
-    expect(result.actualAllocation.bonds).toBeCloseTo(66.67, 1);
-  });
-
-  it('should skip orphaned assignments (deleted assets)', () => {
-    const assignments = [
-      { goalId: 'goal1', assetId: 'asset1', percentage: 50 },
-      { goalId: 'goal1', assetId: 'deleted_asset', percentage: 100 },
-    ];
-
-    const result = calculateGoalProgress(mockGoal, assignments, mockAssets);
-
-    // Only asset1 should be counted
-    expect(result.currentValue).toBe(5000);
-  });
-
-  it('should filter assignments to only this goal', () => {
-    const assignments = [
-      { goalId: 'goal1', assetId: 'asset1', percentage: 50 },
-      { goalId: 'other_goal', assetId: 'asset2', percentage: 100 },
-    ];
-
-    const result = calculateGoalProgress(mockGoal, assignments, mockAssets);
-
-    expect(result.currentValue).toBe(5000); // Only asset1 for goal1
-  });
-
-  it('should handle zero target amount without division by zero', () => {
-    const zeroGoal = { ...mockGoal, targetAmount: 0 };
-    const assignments = [
-      { goalId: 'goal1', assetId: 'asset1', percentage: 50 },
-    ];
-
-    const result = calculateGoalProgress(zeroGoal, assignments, mockAssets);
-
-    expect(result.progressPercentage).toBeUndefined();
-    expect(result.remainingAmount).toBeUndefined();
-  });
-
-  it('should handle undefined target amount (open-ended goal)', () => {
-    const openGoal = { ...mockGoal, targetAmount: undefined };
-    const assignments = [
-      { goalId: 'goal1', assetId: 'asset1', percentage: 50 },
-    ];
-
-    const result = calculateGoalProgress(openGoal, assignments, mockAssets);
-
-    expect(result.currentValue).toBe(5000);
-    expect(result.progressPercentage).toBeUndefined();
-    expect(result.remainingAmount).toBeUndefined();
-    expect(result.targetAmount).toBeUndefined();
-  });
-});
 
 // ==================== getUnassignedValue ====================
 

@@ -1,380 +1,110 @@
 // components/pdf/sections/FireSection.tsx
-// FIRE metrics section
+// FIRE: the target, the distance to it, and what it would pay out.
 
-import { Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import { PDFText } from '../primitives/PDFText';
+import { PDFPage, PDFSection, PDFMetrics, PDFHero, PDFNote, type PDFMetric } from '../primitives/PDFTile';
 import type { FireData } from '@/types/pdf';
-import { formatCurrency, formatPercentage } from '@/lib/services/chartService';
+import { cachedFormatCurrencyEUR, formatPercentageIt, formatNumberIt } from '@/lib/utils/formatters';
+import { describeFireSection, PDF_SECTION_TITLES } from '@/lib/utils/pdfNarrative';
 
 interface FireSectionProps {
   data: FireData;
+  reportScope: string;
 }
 
+const euro = (value: number) => cachedFormatCurrencyEUR(value, true);
+
 /**
- * FIRE (Financial Independence, Retire Early) metrics section for PDF reports.
+ * The FIRE section.
  *
- * Key metrics displayed:
- * 1. FIRE Number: Target portfolio value for financial independence
- * 2. Progress to FI: Percentage of FIRE Number achieved
- * 3. Sustainable allowance: Annual/monthly/daily spending from portfolio
- * 4. Years of expenses covered: How long current portfolio lasts
- * 5. Current withdrawal rate: Actual spending vs safe threshold
- *
- * FIRE Number calculation:
- * FIRE Number = (100 / Safe Withdrawal Rate) × Annual Expenses
- *
- * Examples:
- * - 4% SWR: FIRE Number = 25x annual expenses (industry standard)
- * - 3% SWR: FIRE Number = 33.33x annual expenses (more conservative)
- * - 5% SWR: FIRE Number = 20x annual expenses (more aggressive)
- *
- * Trinity Study & 4% Rule (Teacher Comment):
- * The Trinity Study (1998) analyzed historical portfolio performance to determine
- * safe withdrawal rates for retirement. Key findings:
- * - 4% annual withdrawal (adjusted for inflation) had 95%+ success rate
- * - Based on 30-year retirement period
- * - Tested on 50/50 stock/bond allocation
- * - Success = Portfolio didn't run out of money
- * - Study analyzed US market data from 1926-1995
- * Reference: https://en.wikipedia.org/wiki/Trinity_study
- *
- * The 4% rule became the industry standard for FIRE planning, though individuals
- * may adjust based on risk tolerance, time horizon, and local market conditions.
- *
- * Withdrawal rate warning:
- * If current withdrawal rate exceeds safe withdrawal rate, display in red to
- * alert user they're depleting portfolio faster than sustainable.
- *
- * @param data - FIRE calculation results from parent component
+ * The FIRE number is the page's one dominant figure, so it is the hero and everything else is
+ * subordinate to it — the Trade Republic hierarchy, on paper. The Trinity Study note stays: the
+ * multiple is a modelling assumption, not a fact about the reader's money, and a report that
+ * prints a target without saying what it rests on invites it to be read as a promise.
  */
-export function FireSection({ data }: FireSectionProps) {
-  if (!data) {
+export function FireSection({ data, reportScope }: FireSectionProps) {
+  const title = PDF_SECTION_TITLES.fire;
+  const footerNote = `${title} · ${reportScope}`;
+
+  if (!data || data.fireNumber <= 0) {
     return (
-      <Page size="A4" style={styles.page}>
-        <View style={styles.header}>
-          <Text style={styles.title}>FIRE Calculator</Text>
-          <View style={styles.divider} />
-        </View>
-        <View style={styles.content}>
-          <PDFText variant="body" style={styles.noData}>
-            Dati FIRE non disponibili.
+      <PDFPage eyebrow="Net Worth Tracker" section={title} footerNote={footerNote}>
+        <PDFSection eyebrow={title} reading={describeFireSection(data)} ruled={false}>
+          <PDFText variant="caption">
+            Il numero FIRE poggia sulla spesa annuale: senza spese registrate non c’è un traguardo da calcolare.
           </PDFText>
-        </View>
-        <View style={styles.footer}>
-          <Text style={styles.footerText} render={({ pageNumber, totalPages }) => (
-            `Pagina ${pageNumber} di ${totalPages}`
-          )} fixed />
-        </View>
-      </Page>
+        </PDFSection>
+      </PDFPage>
     );
   }
 
+  const remaining = Math.max(0, data.fireNumber - data.currentNetWorth);
+  const multiple = 100 / data.safeWithdrawalRate;
+
+  const position: PDFMetric[] = [
+    { label: 'Patrimonio attuale', value: euro(data.currentNetWorth), note: `${formatPercentageIt(data.progressToFI, 1)} del traguardo` },
+    {
+      label: remaining > 0 ? 'Ancora da accumulare' : 'Oltre il traguardo',
+      value: euro(remaining > 0 ? remaining : data.currentNetWorth - data.fireNumber),
+      sign: remaining > 0 ? undefined : 'positive',
+    },
+    { label: 'Anni di spese coperti', value: `${formatNumberIt(data.yearsOfExpensesCovered, 1)}`, note: 'al ritmo di spesa attuale' },
+  ];
+
+  const basis: PDFMetric[] = [
+    { label: 'Spese annuali', value: euro(data.annualExpenses), note: 'la base del calcolo' },
+    { label: 'Entrate annuali', value: euro(data.annualIncome) },
+    {
+      label: 'Tasso di prelievo sicuro',
+      value: formatPercentageIt(data.safeWithdrawalRate, 1),
+      note: `il traguardo è ${formatNumberIt(multiple, 1)}× le spese`,
+    },
+  ];
+
+  const allowance: PDFMetric[] = [
+    { label: 'Annuale', value: euro(data.fireNumber * (data.safeWithdrawalRate / 100)) },
+    { label: 'Mensile', value: euro(data.monthlyAllowance) },
+    { label: 'Giornaliera', value: euro(data.dailyAllowance) },
+  ];
+
+  // Only meaningful once there is a portfolio to withdraw from, and worth flagging only when it
+  // exceeds the safe rate — below it, the number says nothing the progress figure does not.
+  const overWithdrawing =
+    data.currentWithdrawalRate !== undefined && data.currentWithdrawalRate > data.safeWithdrawalRate;
+
   return (
-    <Page size="A4" style={styles.page}>
-      <View style={styles.header}>
-        <Text style={styles.title}>FIRE Calculator</Text>
-        <View style={styles.divider} />
-      </View>
+    <PDFPage eyebrow="Net Worth Tracker" section={title} footerNote={footerNote}>
+      <PDFSection
+        eyebrow={title}
+        scope={`prelievo al ${formatPercentageIt(data.safeWithdrawalRate, 1)}`}
+        reading={describeFireSection(data)}
+        ruled={false}
+      >
+        <PDFHero value={euro(data.fireNumber)} />
+        <PDFMetrics items={position} />
+      </PDFSection>
 
-      <View style={styles.content}>
-        {/* FIRE Number */}
-        <View style={styles.fireNumberCard}>
-          <Text style={styles.fireNumberLabel}>FIRE Number</Text>
-          <Text style={styles.fireNumber}>{formatCurrency(data.fireNumber)}</Text>
-          <Text style={styles.fireNumberSubtext}>
-            {(100 / data.safeWithdrawalRate).toFixed(data.safeWithdrawalRate === 4 ? 0 : 2)}x spese annuali ({formatCurrency(data.annualExpenses)})
-          </Text>
-        </View>
+      <PDFSection eyebrow="Su cosa poggia" scope="gli ingressi del calcolo">
+        <PDFMetrics items={basis} />
+        {overWithdrawing ? (
+          <PDFNote>
+            Il tuo tasso di prelievo attuale è {formatPercentageIt(data.currentWithdrawalRate!, 1)}, sopra il{' '}
+            {formatPercentageIt(data.safeWithdrawalRate, 1)} su cui è costruito il traguardo.
+          </PDFNote>
+        ) : null}
+      </PDFSection>
 
-        {/* Progress bar */}
-        <View style={styles.progressSection}>
-          <Text style={styles.progressLabel}>
-            Progresso verso Financial Independence
-          </Text>
-          <View style={styles.progressBar}>
-            <View style={[
-              styles.progressFill,
-              { width: `${Math.min(data.progressToFI, 100)}%` }
-            ]} />
-          </View>
-          <Text style={styles.progressText}>
-            {formatPercentage(data.progressToFI)}
-          </Text>
-        </View>
-
-        {/* Key metrics grid */}
-        <View style={styles.metricsGrid}>
-          <View style={styles.metricCard}>
-            <Text style={styles.metricLabel}>Patrimonio Attuale</Text>
-            <Text style={styles.metricValue}>{formatCurrency(data.currentNetWorth)}</Text>
-          </View>
-
-          <View style={styles.metricCard}>
-            <Text style={styles.metricLabel}>Spese Annuali</Text>
-            <Text style={styles.metricValue}>{formatCurrency(data.annualExpenses)}</Text>
-          </View>
-
-          <View style={styles.metricCard}>
-            <Text style={styles.metricLabel}>Entrate Annuali</Text>
-            <Text style={styles.metricValue}>{formatCurrency(data.annualIncome)}</Text>
-          </View>
-
-          <View style={styles.metricCard}>
-            <Text style={styles.metricLabel}>Safe Withdrawal Rate</Text>
-            <Text style={styles.metricValue}>{data.safeWithdrawalRate}%</Text>
-          </View>
-        </View>
-
-        {/* Allowances */}
-        <View style={styles.allowancesSection}>
-          <PDFText variant="subheading">Indennità Sostenibile</PDFText>
-          <View style={styles.allowancesGrid}>
-            <View style={styles.allowanceCard}>
-              <Text style={styles.allowanceLabel}>Annuale</Text>
-              <Text style={styles.allowanceValue}>{formatCurrency(data.monthlyAllowance * 12)}</Text>
-            </View>
-
-            <View style={styles.allowanceCard}>
-              <Text style={styles.allowanceLabel}>Mensile</Text>
-              <Text style={styles.allowanceValue}>{formatCurrency(data.monthlyAllowance)}</Text>
-            </View>
-
-            <View style={styles.allowanceCard}>
-              <Text style={styles.allowanceLabel}>Giornaliera</Text>
-              <Text style={styles.allowanceValue}>{formatCurrency(data.dailyAllowance)}</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Additional metrics */}
-        <View style={styles.additionalMetrics}>
-          <View style={styles.additionalMetricRow}>
-            <Text style={styles.additionalLabel}>Anni di Spese Coperte:</Text>
-            <Text style={styles.additionalValue}>
-              {data.yearsOfExpensesCovered.toFixed(1)} anni
-            </Text>
-          </View>
-
-          {data.currentWithdrawalRate !== undefined && (
-            <View style={styles.additionalMetricRow}>
-              <Text style={styles.additionalLabel}>Withdrawal Rate Attuale:</Text>
-              <Text style={
-                data.currentWithdrawalRate > data.safeWithdrawalRate
-                  ? [styles.additionalValue, styles.warning]
-                  : styles.additionalValue
-              }>
-                {formatPercentage(data.currentWithdrawalRate)}
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {/* Info box */}
-        <View style={styles.infoBox}>
-          <Text style={styles.infoTitle}>Trinity Study & Safe Withdrawal Rate</Text>
-          <Text style={styles.infoText}>
-            Il FIRE Number è calcolato come {(100 / data.safeWithdrawalRate).toFixed(2)}x le tue spese annuali,
-            basato sul Trinity Study con un Safe Withdrawal Rate del {data.safeWithdrawalRate}%.
-            {data.safeWithdrawalRate === 4 && ' Il tasso del 4% dimostra una probabilità di successo del 95%+ su un portafoglio 50/50 azionario/obbligazionario per 30 anni di pensionamento.'}
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.footer}>
-        <Text style={styles.footerText} render={({ pageNumber, totalPages }) => (
-          `Pagina ${pageNumber} di ${totalPages}`
-        )} fixed />
-      </View>
-    </Page>
+      <PDFSection eyebrow="Quanto pagherebbe" scope="a traguardo raggiunto">
+        <PDFMetrics items={allowance} />
+        <PDFNote>
+          Il numero FIRE è {formatNumberIt(multiple, 1)}× le spese annuali, secondo il Trinity Study a un tasso di
+          prelievo del {formatPercentageIt(data.safeWithdrawalRate, 1)}.
+          {data.safeWithdrawalRate === 4
+            ? ' Al 4% lo studio misura una probabilità di successo superiore al 95% su un portafoglio 50/50 per trent’anni di prelievi.'
+            : ''}{' '}
+          È un modello storico su mercati statunitensi, non una garanzia.
+        </PDFNote>
+      </PDFSection>
+    </PDFPage>
   );
 }
-
-const styles = StyleSheet.create({
-  page: {
-    padding: 40,
-    backgroundColor: '#ffffff',
-    fontFamily: 'Helvetica',
-  },
-  header: {
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 18,
-    fontFamily: 'Helvetica-Bold',
-    color: '#3B82F6',
-    marginBottom: 8,
-  },
-  divider: {
-    height: 2,
-    backgroundColor: '#3B82F6',
-    width: '100%',
-  },
-  content: {
-    flexGrow: 1,
-  },
-  noData: {
-    textAlign: 'center',
-    color: '#6B7280',
-    marginTop: 40,
-  },
-  fireNumberCard: {
-    padding: 20,
-    backgroundColor: '#DBEAFE',
-    borderRadius: 4,
-    alignItems: 'center',
-    marginBottom: 25,
-    borderWidth: 2,
-    borderColor: '#3B82F6',
-  },
-  fireNumberLabel: {
-    fontSize: 12,
-    fontFamily: 'Helvetica-Bold',
-    color: '#1E40AF',
-    marginBottom: 8,
-  },
-  fireNumber: {
-    fontSize: 28,
-    fontFamily: 'Helvetica-Bold',
-    color: '#1E40AF',
-    marginBottom: 4,
-  },
-  fireNumberSubtext: {
-    fontSize: 9,
-    fontFamily: 'Helvetica',
-    color: '#3B82F6',
-  },
-  progressSection: {
-    marginBottom: 25,
-  },
-  progressLabel: {
-    fontSize: 11,
-    fontFamily: 'Helvetica-Bold',
-    color: '#374151',
-    marginBottom: 8,
-  },
-  progressBar: {
-    width: '100%',
-    height: 24,
-    backgroundColor: '#E5E7EB',
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: 6,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#10B981',
-  },
-  progressText: {
-    fontSize: 14,
-    fontFamily: 'Helvetica-Bold',
-    color: '#10B981',
-    textAlign: 'center',
-  },
-  metricsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 25,
-  },
-  metricCard: {
-    width: '48%',
-    marginRight: '2%',
-    marginBottom: 10,
-    padding: 12,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 4,
-  },
-  metricLabel: {
-    fontSize: 9,
-    fontFamily: 'Helvetica',
-    color: '#6B7280',
-    marginBottom: 4,
-  },
-  metricValue: {
-    fontSize: 13,
-    fontFamily: 'Helvetica-Bold',
-    color: '#000000',
-  },
-  allowancesSection: {
-    marginBottom: 25,
-  },
-  allowancesGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 10,
-  },
-  allowanceCard: {
-    width: '31%',
-    padding: 12,
-    backgroundColor: '#D1FAE5',
-    borderRadius: 4,
-    alignItems: 'center',
-  },
-  allowanceLabel: {
-    fontSize: 9,
-    fontFamily: 'Helvetica',
-    color: '#065F46',
-    marginBottom: 4,
-  },
-  allowanceValue: {
-    fontSize: 13,
-    fontFamily: 'Helvetica-Bold',
-    color: '#065F46',
-  },
-  additionalMetrics: {
-    marginBottom: 20,
-  },
-  additionalMetricRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  additionalLabel: {
-    fontSize: 10,
-    fontFamily: 'Helvetica',
-    color: '#6B7280',
-  },
-  additionalValue: {
-    fontSize: 10,
-    fontFamily: 'Helvetica-Bold',
-    color: '#000000',
-  },
-  warning: {
-    color: '#EF4444',
-  },
-  infoBox: {
-    padding: 15,
-    backgroundColor: '#FEF3C7',
-    borderRadius: 4,
-    borderLeftWidth: 4,
-    borderLeftColor: '#F59E0B',
-  },
-  infoTitle: {
-    fontSize: 10,
-    fontFamily: 'Helvetica-Bold',
-    color: '#92400E',
-    marginBottom: 6,
-  },
-  infoText: {
-    fontSize: 9,
-    fontFamily: 'Helvetica',
-    color: '#78350F',
-    lineHeight: 1.4,
-  },
-  footer: {
-    position: 'absolute',
-    bottom: 30,
-    left: 40,
-    right: 40,
-    textAlign: 'center',
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-    paddingTop: 10,
-  },
-  footerText: {
-    fontSize: 8,
-    fontFamily: 'Helvetica',
-    color: '#6B7280',
-  },
-});

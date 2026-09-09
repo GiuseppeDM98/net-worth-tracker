@@ -1,9 +1,14 @@
 /**
  * Shared display constants for dividend types.
  *
- * Single source of truth — previously duplicated across DividendTable,
- * DividendDetailsDialog, and DividendTrackingTab. Centralising here ensures
- * dark-mode badge variants stay in sync across all three surfaces.
+ * Single source of truth for the LABEL — previously duplicated across DividendTable,
+ * DividendDetailsDialog and DividendTrackingTab.
+ *
+ * The per-type badge COLOURS were removed with the 2026-08-23 redesign: a chip painted from a
+ * literal Tailwind palette (blue/purple/yellow/green/amber/emerald) stays that hue on every
+ * theme, and six of them on one row made the type the loudest thing in a list whose subject is
+ * the money. Type is now plain text on a neutral outline badge; only the warning tokens colour
+ * anything there (an announced or provisional payment).
  *
  * WARNING: If you add a DividendType, also update:
  * - types/dividend.ts (DividendType union)
@@ -20,21 +25,4 @@ export const dividendTypeLabels: Record<DividendType, string> = {
   final: 'Finale',
   coupon: 'Cedola',
   finalPremium: 'Premio Finale',
-};
-
-// Tailwind badge classes per dividend type.
-// Low-opacity dark backgrounds keep badges legible on both card and dialog surfaces.
-export const dividendTypeBadgeColor: Record<DividendType, string> = {
-  ordinary:
-    'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800',
-  extraordinary:
-    'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-950/40 dark:text-purple-400 dark:border-purple-800',
-  interim:
-    'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-950/40 dark:text-yellow-400 dark:border-yellow-800',
-  final:
-    'bg-green-100 text-green-800 border-green-200 dark:bg-green-950/40 dark:text-green-400 dark:border-green-800',
-  coupon:
-    'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800',
-  finalPremium:
-    'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800',
 };

@@ -148,6 +148,7 @@ import {
   updateAssetTransaction,
   deleteAssetTransaction,
 } from '@/lib/server/assetTransactionUseCase';
+import { resolveTradePriceEur } from '@/lib/server/tradeFxService';
 
 const OWNER = 'owner-1';
 const BASELINE_DATE = new Date(2024, 0, 1);
@@ -190,13 +191,37 @@ describe('assetTransactionUseCase — atomic write transaction', () => {
       linkedCashAssetId: 'cash-1',
     });
 
-    expect(result.derived).toEqual({ quantity: 10, averageCost: 100 });
+    expect(result.derived).toEqual({ quantity: 10, averageCost: 100, averageCostEur: 100 });
     // 10 units × €100 debited from the cash account.
     expect(store.get(docKey('assets', 'cash-1'))!.quantity).toBe(9000);
     const asset = store.get(docKey('assets', 'asset-1'))!;
     expect(asset.quantity).toBe(10);
     expect(asset.averageCost).toBe(100);
+    expect(asset.averageCostEur).toBe(100);
     expect(invalidateMock).toHaveBeenCalledWith(OWNER, 'asset_transaction_created');
+  });
+
+  it('writes a EUR-side averageCostEur distinct from the native averageCost for a foreign-currency buy', async () => {
+    // A USD trade at 100 USD/quota, but the trade-date rate made it 90 EUR/quota: the native PMC
+    // and the EUR PMC must diverge on the asset doc, otherwise G/P math re-mixes the two currencies
+    // (the bug this write path exists to prevent).
+    vi.mocked(resolveTradePriceEur).mockResolvedValueOnce(90);
+    seedAsset({ quantity: 0, currency: 'USD' });
+    seedCash('cash-1', 10000);
+
+    const result = await createAssetTransaction(OWNER, {
+      assetId: 'asset-1',
+      type: 'buy',
+      date: new Date(),
+      quantity: 10,
+      pricePerUnit: 100,
+      linkedCashAssetId: 'cash-1',
+    });
+
+    expect(result.derived).toEqual({ quantity: 10, averageCost: 100, averageCostEur: 90 });
+    const asset = store.get(docKey('assets', 'asset-1'))!;
+    expect(asset.averageCost).toBe(100); // native PMC, USD
+    expect(asset.averageCostEur).toBe(90); // EUR PMC at the trade-date rate
   });
 
   it('moves the settlement to a different cash account with two aggregated deltas', async () => {

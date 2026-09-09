@@ -3,14 +3,17 @@
 /**
  * HERO SPARKLINE — net worth trend over historical snapshots.
  *
- * Intentionally minimal: no axes, no grid, no tooltip, no legend.
- * The variation chips above already carry the numeric context; this
- * chart adds the visual shape of the trend.
+ * Intentionally minimal: no axes, no grid, no legend. The variation chips above already
+ * carry the numeric context; this chart adds the visual shape of the trend. With
+ * `interactive`, a mouse over the plot names the nearest snapshot (desktop only — see
+ * components/ui/chart-hover.tsx); the overlay positions against the caller's `relative` box,
+ * the same one that holds the absolute SVG.
  *
  * Props:
- *   filled  — renders an area chart with gradient fill (edge-to-edge in hero card via parent -mx)
- *   color   — stroke and gradient color; accepts CSS vars like "var(--chart-1)"
- *   height  — SVG height in px (default 48)
+ *   filled      — renders an area chart with gradient fill (edge-to-edge in hero card via parent -mx)
+ *   color       — stroke and gradient color; accepts CSS vars like "var(--chart-1)"
+ *   height      — SVG height in px (default 48)
+ *   interactive — hover reading of each point (requires a positioned parent, as the hero tile's)
  *
  * When filled=true, start/end labels are NOT rendered internally — the parent
  * is expected to render them outside the component (below the -mx container).
@@ -20,12 +23,15 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { DashboardOverviewSparklinePoint } from '@/types/dashboardOverview';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
+import { MONTH_NAMES_SHORT } from '@/lib/utils/period';
+import { ChartHoverTip, useChartHover } from '@/components/ui/chart-hover';
 
 interface NetWorthSparklineProps {
   data: DashboardOverviewSparklinePoint[];
   filled?: boolean;   // default false — add area gradient when true
   color?: string;     // default "var(--chart-2)"
   height?: number;    // default 48
+  interactive?: boolean; // default false
 }
 
 /**
@@ -54,8 +60,11 @@ export function NetWorthSparkline({
   filled = false,
   color = 'var(--chart-2)',
   height = 48,
+  interactive = false,
 }: NetWorthSparklineProps) {
   const [ready, setReady] = useState(false);
+  // Hooks before the early return: the hover state exists whether or not the chart renders.
+  const hover = useChartHover(data.length, 'nearest');
   const rafRef = useRef<number | null>(null);
   // useId gives a stable per-instance ID so multiple sparklines don't conflict on gradient IDs
   const uid = useId();
@@ -104,6 +113,11 @@ export function NetWorthSparkline({
     ? `${linePath} L ${pts[pts.length - 1][0]},${H} L ${pts[0][0]},${H} Z`
     : null;
 
+  const showHover = interactive && hover.enabled;
+  const hoveredIndex = showHover ? hover.index : null;
+  const hoveredPoint = hoveredIndex !== null ? data[hoveredIndex] : null;
+  const hoveredXY = hoveredIndex !== null ? pts[hoveredIndex] : null;
+
   return (
     <div>
       {/* preserveAspectRatio="none" lets the SVG stretch to fill the container width
@@ -127,7 +141,30 @@ export function NetWorthSparkline({
         )}
         {areaPath && <path d={areaPath} fill={`url(#${gradId})`} />}
         <path d={linePath} stroke={strokeColor} strokeWidth={1.5} fill="none" strokeLinecap="round" />
+        {hoveredXY && (
+          <line x1={hoveredXY[0]} y1={0} x2={hoveredXY[0]} y2={H} stroke="var(--foreground)" strokeOpacity={0.25} vectorEffect="non-scaling-stroke" />
+        )}
       </svg>
+      {showHover && (
+        // The hit area, the dot and the tip are HTML: an SVG circle would stretch with the
+        // plot (preserveAspectRatio="none"); percentages of the positioned parent do not.
+        <div className="absolute inset-0" {...hover.handlers}>
+          {hoveredXY && hoveredPoint && (
+            <>
+              <span
+                className="pointer-events-none absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-card"
+                style={{ left: `${hoveredXY[0]}%`, top: `${(hoveredXY[1] / H) * 100}%`, background: strokeColor }}
+                aria-hidden="true"
+              />
+              <ChartHoverTip x={hoveredXY[0] / W} label={`${MONTH_NAMES_SHORT[hoveredPoint.month - 1]} ${hoveredPoint.year}`}>
+                <span className="font-mono text-[13px] font-semibold tabular-nums text-foreground">
+                  {cachedFormatCurrencyEUR(hoveredPoint.totalNetWorth)}
+                </span>
+              </ChartHoverTip>
+            </>
+          )}
+        </div>
+      )}
       {/* Labels only when not filled — filled mode expects the parent to render labels outside */}
       {!filled && (
         <div className="flex justify-between mt-0.5">

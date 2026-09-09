@@ -13,7 +13,11 @@ interface DashboardOverviewVariation {
 
 // Single category amount used in the cashflow breakdown (top-5 spese/entrate per categoria).
 export interface DashboardOverviewCategoryAmount {
+  // Display label; carries a type qualifier when two same-named categories collide.
   category: string;
+  // Category document id (name-fallback for legacy rows) — the row's identity.
+  // Optional only because payloads cached before source version 5 lack it.
+  categoryKey?: string;
   amount: number;
   // Percentage of the total expenses (or total income) for the current month.
   percentage: number;
@@ -33,11 +37,31 @@ export interface DashboardOverviewTopAsset {
   returnPercent: number | null;
 }
 
-// One asset class that moved the portfolio this month, most-significant first
+// One instrument's share of the annual management cost (value × TER), largest first
+// (see rankCostDrivers in lib/utils/dashboardOverviewUtils.ts).
+export interface DashboardOverviewCostDriver {
+  id: string;
+  name: string;
+  totalExpenseRatio: number;
+  annualCost: number;
+}
+
+// One asset class whose MARKET PRICE moved the portfolio this month, most-significant
+// first — the user's own buys and sells are excluded by construction
 // (see computeTopMovers in lib/utils/dashboardOverviewUtils.ts).
 export interface DashboardOverviewMover {
   assetClass: string;
   label: string;
+  delta: number;
+}
+
+// One INSTRUMENT whose market price moved the portfolio this month, largest absolute
+// effect first — the same attribution as DashboardOverviewMover, before it is folded into
+// classes (see computeTopInstrumentMovers in lib/utils/dashboardOverviewUtils.ts). Patrimonio's
+// verdict names the first one; its hero footer lists the first three.
+export interface DashboardOverviewInstrumentMover {
+  id: string;
+  name: string;
   delta: number;
 }
 
@@ -57,6 +81,12 @@ export interface DashboardOverviewExpenseStats {
     income: number;
     expenses: number;
     net: number;
+    /**
+     * The part of `expenses` dated after the payload was computed (instalments and
+     * recurring rows of the rest of the month): the month-end projection adds it as it is
+     * instead of scaling it by the days left. Absent on payloads older than source v10.
+     */
+    expensesScheduled?: number;
   };
   previousMonth: {
     income: number;
@@ -129,11 +159,25 @@ export interface DashboardOverviewPayload {
     previousAllTimeHigh: number | null;
     isNewATH: boolean;
   };
-  // Top 1-2 asset classes that moved the most this month vs the previous
-  // snapshot — the "Guidato da" digest under the hero sparkline. Optional so
+  // Every asset class whose market price moved this month vs the previous snapshot,
+  // largest effect first — the "Mercato:" digest under the hero sparkline. Optional so
   // old cached docs degrade gracefully (line simply doesn't render).
   topMovers?: DashboardOverviewMover[];
+  // Portfolio-wide market (price) effect this month — the part of the monthly change
+  // that is return rather than the user's own flows. null = not attributable (no prior
+  // snapshot, or one without a per-asset breakdown), distinct from a measured 0.
+  // Optional so old cached docs degrade gracefully.
+  marketEffect?: number | null;
+  // The instruments behind `topMovers`, each by its own price effect (capped at ten). Optional
+  // so old cached docs degrade gracefully (Patrimonio's verdict drops its driver clause).
+  topInstrumentMovers?: DashboardOverviewInstrumentMover[];
   // Single most relevant in-progress goal (Goal-Based Investing), only present
   // when the user has the feature enabled and at least one goal in progress.
   goalProgress?: DashboardOverviewGoalProgress | null;
+  // Every in-progress goal in featured order (head = goalProgress) — the Obiettivi tile
+  // shows the first few. Optional so old cached docs degrade to the single goal.
+  goalProgressList?: DashboardOverviewGoalProgress[];
+  // Held instruments with a TER, by annual cost — the Costi tile names the top few.
+  // Optional so old cached docs degrade gracefully.
+  costDrivers?: DashboardOverviewCostDriver[];
 }

@@ -1,38 +1,29 @@
 /**
- * Pension <-> FIRE — locked-capital helper (MVP).
+ * Pension <-> FIRE — locked-capital helper.
  *
  * A fondo pensione is not freely withdrawable before its unlock date, so a FIRE calculation that
- * assumes "all capital is available now" overstates the runway. When the user turns on the
- * "capitale bloccato" toggle, the value of every pension fund whose `unlockDate` is still in the
- * future is subtracted from the FIRE-eligible net worth (it stays in the TOTAL net worth shown
- * elsewhere in the app — this only affects what FireCalculatorTab treats as spendable now). The
- * unlock date is per-fund, so each is evaluated on its own.
+ * assumes "all capital is available now" overstates the runway. The resolution of WHICH funds are
+ * locked (per-fund `unlockDate` override > RITA rule from `userAge` > not modellable) lives in
+ * `lib/utils/pensionUnlock.ts` — this module is a thin sum wrapper kept for callers that only
+ * need the locked total. With no `settings`, only funds with an explicit future `unlockDate`
+ * count, which is the pre-Spec-3 behaviour.
  *
  * `valueOf` is injected (e.g. `calculateAssetValue`) so this stays a pure, Firestore-free unit,
  * importable by tests without mocking `@/lib/firebase/config`.
  */
 
 import type { Asset } from '@/types/assets';
+import { resolvePensionLockState, type PensionUnlockSettings } from '@/lib/utils/pensionUnlock';
 
 /**
- * Sum the value of the pension funds LOCKED at `atDate`: type `pensionFund` with a parseable
- * `unlockDate` strictly after `atDate`. Funds without an unlock date are treated as NOT locked
- * (the user hasn't declared an access constraint), so they are excluded from the total and left
- * available — same reasoning as a fund with an unparseable date.
+ * Sum the value of the pension funds LOCKED at `atDate`, per the single resolution in
+ * `pensionUnlock.ts`. Funds that resolve to no unlock date are treated as NOT locked.
  */
 export function calculatePensionLockedValue(
   assets: Asset[],
   atDate: Date,
-  valueOf: (asset: Asset) => number
+  valueOf: (asset: Asset) => number,
+  settings: PensionUnlockSettings = {}
 ): number {
-  let locked = 0;
-  for (const asset of assets) {
-    if (asset.type !== 'pensionFund') continue;
-    const unlock = asset.pensionFundDetails?.unlockDate;
-    if (!unlock) continue;
-    const unlockTime = new Date(unlock).getTime();
-    if (Number.isNaN(unlockTime) || unlockTime <= atDate.getTime()) continue;
-    locked += valueOf(asset);
-  }
-  return locked;
+  return resolvePensionLockState(assets, settings, atDate, valueOf).totalLockedToday;
 }

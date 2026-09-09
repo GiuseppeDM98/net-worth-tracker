@@ -3,7 +3,11 @@
  *
  * Three Tabs:
  * 1. General: Year, month, total net worth, liquid/illiquid split
- * 2. Asset Classes: Breakdown by 6 classes (equity, bonds, crypto, etc.)
+ * 2. Asset Classes: one euro field per member of the AssetClass union, generated from
+ *    ASSET_CLASS_SEQUENCE. NEVER hand-list the classes here: the sum of the fields is
+ *    cross-validated against the total, so a class the form does not offer makes an honest
+ *    snapshot impossible to enter, not merely incomplete — which is what six hard-coded
+ *    fields did to Trend Following and Carry until 2026-08-30.
  * 3. Individual Assets: Optional granular detail per asset
  *
  * Validation: Three-stage pipeline ensures data integrity
@@ -14,20 +18,17 @@
 'use client';
 
 import { useState } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { ResponsiveModal } from '@/components/ui/responsive-modal';
+import { describeWriteError, type ModalStatus } from '@/lib/utils/dialogNarrative';
+import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ASSET_CLASS_LABELS, ASSET_CLASS_SEQUENCE } from '@/lib/utils/allocationUtils';
+import { emptyClassAmounts, parseAmount, sumClassAmounts } from '@/lib/utils/manualSnapshotAmounts';
 import { Plus, Trash2 } from 'lucide-react';
 
 interface CreateManualSnapshotModalProps {
@@ -60,17 +61,13 @@ export function CreateManualSnapshotModal({
   const [illiquidNetWorth, setIlliquidNetWorth] = useState<string>('');
 
   // Asset class values
-  const [equity, setEquity] = useState<string>('0');
-  const [bonds, setBonds] = useState<string>('0');
-  const [crypto, setCrypto] = useState<string>('0');
-  const [realestate, setRealestate] = useState<string>('0');
-  const [cash, setCash] = useState<string>('0');
-  const [commodity, setCommodity] = useState<string>('0');
+  const [byClass, setByClass] = useState<Record<string, string>>(emptyClassAmounts);
 
   // Asset entries
   const [assets, setAssets] = useState<AssetEntry[]>([]);
 
   const [isCreating, setIsCreating] = useState(false);
+  const [status, setStatus] = useState<ModalStatus>({ phase: 'idle' });
 
   const addAsset = () => {
     setAssets([
@@ -126,60 +123,53 @@ export function CreateManualSnapshotModal({
     const illiquidNW = parseFloat(illiquidNetWorth);
 
     if (isNaN(yearNum) || yearNum < 1900 || yearNum > 2100) {
-      toast.error('Inserisci un anno valido');
+      setStatus({ phase: 'error', message: 'L’anno non è valido.' });
       return;
     }
 
     if (isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
-      toast.error('Inserisci un mese valido (1-12)');
+      setStatus({ phase: 'error', message: 'Il mese deve essere un numero da 1 a 12.' });
       return;
     }
 
     if (isNaN(totalNW) || totalNW < 0) {
-      toast.error('Inserisci un Patrimonio Totale valido');
+      setStatus({ phase: 'error', message: 'Il patrimonio totale non è un numero valido.' });
       return;
     }
 
     if (isNaN(liquidNW) || liquidNW < 0) {
-      toast.error('Inserisci un Patrimonio Liquido valido');
+      setStatus({ phase: 'error', message: 'Il patrimonio liquido non è un numero valido.' });
       return;
     }
 
     if (isNaN(illiquidNW) || illiquidNW < 0) {
-      toast.error('Inserisci un Patrimonio Illiquido valido');
+      setStatus({ phase: 'error', message: 'Il patrimonio illiquido non è un numero valido.' });
       return;
     }
 
     // Build byAssetClass object
     const byAssetClass: Record<string, number> = {};
-    const equityVal = parseFloat(equity) || 0;
-    const bondsVal = parseFloat(bonds) || 0;
-    const cryptoVal = parseFloat(crypto) || 0;
-    const realestateVal = parseFloat(realestate) || 0;
-    const cashVal = parseFloat(cash) || 0;
-    const commodityVal = parseFloat(commodity) || 0;
-
-    if (equityVal > 0) byAssetClass.equity = equityVal;
-    if (bondsVal > 0) byAssetClass.bonds = bondsVal;
-    if (cryptoVal > 0) byAssetClass.crypto = cryptoVal;
-    if (realestateVal > 0) byAssetClass.realestate = realestateVal;
-    if (cashVal > 0) byAssetClass.cash = cashVal;
-    if (commodityVal > 0) byAssetClass.commodity = commodityVal;
+    // A class left at 0 is absent from the document, not stored as a zero: `byAssetClass` is
+    // read with `?? 0` everywhere, and an explicit zero would claim the user measured it.
+    for (const assetClass of ASSET_CLASS_SEQUENCE) {
+      const value = parseAmount(byClass[assetClass]);
+      if (value > 0) byAssetClass[assetClass] = value;
+    }
 
     // Validate asset class sum
-    const assetClassSum = equityVal + bondsVal + cryptoVal + realestateVal + cashVal + commodityVal;
+    const assetClassSum = sumClassAmounts(byClass);
     if (Math.abs(assetClassSum - totalNW) > 0.01) {
-      toast.error(
-        `La somma delle Asset Class (${assetClassSum.toFixed(2)}) non corrisponde al Patrimonio Totale (${totalNW.toFixed(2)})`
-      );
+      setStatus({ phase: 'error', message:
+        `Le classi sommano a ${cachedFormatCurrencyEUR(assetClassSum)}, il patrimonio totale è ${cachedFormatCurrencyEUR(totalNW)}: i due devono coincidere.`
+      });
       return;
     }
 
     // Validate liquidity sum
     if (Math.abs(liquidNW + illiquidNW - totalNW) > 0.01) {
-      toast.error(
-        `La somma di Liquido e Illiquido (${(liquidNW + illiquidNW).toFixed(2)}) non corrisponde al Patrimonio Totale (${totalNW.toFixed(2)})`
-      );
+      setStatus({ phase: 'error', message:
+        `Liquido e illiquido sommano a ${cachedFormatCurrencyEUR(liquidNW + illiquidNW)}, il patrimonio totale è ${cachedFormatCurrencyEUR(totalNW)}: i due devono coincidere.`
+      });
       return;
     }
 
@@ -225,7 +215,7 @@ export function CreateManualSnapshotModal({
       resetForm();
     } catch (error) {
       console.error('Error creating manual snapshot:', error);
-      toast.error(error instanceof Error ? error.message : 'Errore durante la creazione dello snapshot');
+      setStatus({ phase: 'error', message: describeWriteError(error) });
     } finally {
       setIsCreating(false);
     }
@@ -238,26 +228,33 @@ export function CreateManualSnapshotModal({
     setTotalNetWorth('');
     setLiquidNetWorth('');
     setIlliquidNetWorth('');
-    setEquity('0');
-    setBonds('0');
-    setCrypto('0');
-    setRealestate('0');
-    setCash('0');
-    setCommodity('0');
+    setByClass(emptyClassAmounts());
     setAssets([]);
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Crea Snapshot Manuale</DialogTitle>
-          <DialogDescription>
-            Inserisci i dati storici per creare uno snapshot manuale di un mese passato.
-            Tutti i campi contrassegnati sono obbligatori.
-          </DialogDescription>
-        </DialogHeader>
-
+    <ResponsiveModal
+      open={open}
+      onClose={() => onOpenChange(false)}
+      eyebrow="Storico · Snapshot mensile"
+      title="Crea uno snapshot a mano"
+      reading={
+        status.phase === 'error'
+          ? { narrative: [{ text: status.message ?? '' }], tone: 'negative' }
+          : 'Uno snapshot manuale entra nello Storico come tutti gli altri: le classi devono sommare al patrimonio totale, o il mese risulterebbe incoerente ovunque.'
+      }
+      width="lg"
+      footer={
+        <>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isCreating}>
+            Annulla
+          </Button>
+          <Button onClick={handleCreate} disabled={isCreating}>
+            {isCreating ? 'Creazione...' : 'Crea snapshot'}
+          </Button>
+        </>
+      }
+    >
         <Tabs defaultValue="general" className="w-full">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="general" className="text-xs sm:text-sm">Dati Generali</TabsTrigger>
@@ -338,8 +335,8 @@ export function CreateManualSnapshotModal({
               </div>
             </div>
 
-            <div className="rounded-lg bg-blue-50 dark:bg-blue-950 p-3 border border-blue-200 dark:border-blue-800">
-              <p className="text-xs text-blue-800 dark:text-blue-200">
+            <div className="rounded-lg bg-muted p-3 border border-border">
+              <p className="text-xs text-foreground">
                 <strong>Nota:</strong> La somma di Liquido e Illiquido deve essere uguale al Patrimonio Totale.
               </p>
             </div>
@@ -347,97 +344,29 @@ export function CreateManualSnapshotModal({
 
           <TabsContent value="assetclass" className="space-y-4 py-4">
             <div className="grid gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="equity">Azioni (€)</Label>
-                <Input
-                  id="equity"
-                  type="number"
-                  value={equity}
-                  onChange={(e) => setEquity(e.target.value)}
-                  placeholder="0"
-                  step="0.01"
-                  min="0"
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="bonds">Obbligazioni (€)</Label>
-                <Input
-                  id="bonds"
-                  type="number"
-                  value={bonds}
-                  onChange={(e) => setBonds(e.target.value)}
-                  placeholder="0"
-                  step="0.01"
-                  min="0"
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="crypto">Criptovalute (€)</Label>
-                <Input
-                  id="crypto"
-                  type="number"
-                  value={crypto}
-                  onChange={(e) => setCrypto(e.target.value)}
-                  placeholder="0"
-                  step="0.01"
-                  min="0"
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="realestate">Immobili (€)</Label>
-                <Input
-                  id="realestate"
-                  type="number"
-                  value={realestate}
-                  onChange={(e) => setRealestate(e.target.value)}
-                  placeholder="0"
-                  step="0.01"
-                  min="0"
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="cash">Liquidità (€)</Label>
-                <Input
-                  id="cash"
-                  type="number"
-                  value={cash}
-                  onChange={(e) => setCash(e.target.value)}
-                  placeholder="0"
-                  step="0.01"
-                  min="0"
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="commodity">Materie Prime (€)</Label>
-                <Input
-                  id="commodity"
-                  type="number"
-                  value={commodity}
-                  onChange={(e) => setCommodity(e.target.value)}
-                  placeholder="0"
-                  step="0.01"
-                  min="0"
-                />
-              </div>
+              {ASSET_CLASS_SEQUENCE.map((assetClass) => (
+                <div key={assetClass} className="grid gap-2">
+                  <Label htmlFor={assetClass}>{ASSET_CLASS_LABELS[assetClass] ?? assetClass} (€)</Label>
+                  <Input
+                    id={assetClass}
+                    type="number"
+                    value={byClass[assetClass] ?? '0'}
+                    onChange={(e) =>
+                      setByClass((previous) => ({ ...previous, [assetClass]: e.target.value }))
+                    }
+                    placeholder="0"
+                    step="0.01"
+                    min="0"
+                  />
+                </div>
+              ))}
             </div>
 
-            <div className="rounded-lg bg-amber-50 dark:bg-amber-950 p-3 border border-amber-200 dark:border-amber-800">
-              <p className="text-xs text-amber-800 dark:text-amber-200">
+            <div className="rounded-lg bg-warning p-3 border border-warning-border">
+              <p className="text-xs text-warning-foreground">
                 <strong>Attenzione:</strong> La somma di tutte le Asset Class deve essere uguale al Patrimonio Totale.
-                Somma attuale: €{' '}
-                {(
-                  parseFloat(equity || '0') +
-                  parseFloat(bonds || '0') +
-                  parseFloat(crypto || '0') +
-                  parseFloat(realestate || '0') +
-                  parseFloat(cash || '0') +
-                  parseFloat(commodity || '0')
-                ).toFixed(2)}
+                Somma attuale:{' '}
+                {cachedFormatCurrencyEUR(sumClassAmounts(byClass))}
               </p>
             </div>
           </TabsContent>
@@ -535,7 +464,7 @@ export function CreateManualSnapshotModal({
                           value={asset.totalValue.toFixed(2)}
                           readOnly
                           disabled
-                          className="bg-gray-50"
+                          className="bg-muted"
                         />
                       </div>
                     </div>
@@ -545,21 +474,6 @@ export function CreateManualSnapshotModal({
             )}
           </TabsContent>
         </Tabs>
-
-        <DialogFooter className="flex-col sm:flex-row gap-2">
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={isCreating}
-            className="w-full sm:w-auto"
-          >
-            Annulla
-          </Button>
-          <Button onClick={handleCreate} disabled={isCreating} className="w-full sm:w-auto">
-            {isCreating ? 'Creazione...' : 'Crea Snapshot'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    </ResponsiveModal>
   );
 }

@@ -1,143 +1,106 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { useReducedMotion } from 'framer-motion';
-import { MonthlyReturnHeatmapData } from '@/types/performance';
+import { useState } from 'react';
+import type { MonthlyReturnHeatmapData } from '@/types/performance';
 import { formatPercentage } from '@/lib/services/chartService';
+import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
+import { cn } from '@/lib/utils';
+import { ChartHoverTip } from '@/components/ui/chart-hover';
+import { MONTH_NAMES } from '@/lib/constants/months';
 
 interface MonthlyReturnsHeatmapProps {
   data: MonthlyReturnHeatmapData[];
-  revealKey?: string;
+  className?: string;
 }
 
-const MONTH_NAMES = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
 const MONTH_LETTERS = ['G', 'F', 'M', 'A', 'M', 'G', 'L', 'A', 'S', 'O', 'N', 'D'];
 
 /**
- * Get background color for a return percentage
- * Uses a red-to-green color scale:
- * - Strongly negative (< -5%): Dark red
- * - Negative (-5% to 0%): Light red
- * - Zero/Near-zero: Light gray
- * - Positive (0% to +5%): Light green
- * - Strongly positive (> +5%): Dark green
+ * The cell's fill: the sign token at three intensities, so the heatmap follows the theme like every
+ * other gain and loss on the page (raw `bg-red-*`/`bg-green-*` stayed literal on Cyberpunk, where the
+ * negative colour is orange — CLAUDE.md → Known Issues, closed 2026-08-25). A month out of the
+ * period, or exactly flat, is the muted surface: neither a gain nor a loss.
  */
-function getReturnColor(returnValue: number | null): string {
-  if (returnValue === null) return 'bg-muted'; // No data
+export function heatmapCellClass(value: number | null): string {
+  if (value === null || value === 0) return 'bg-muted';
+  const magnitude = Math.abs(value);
+  const step = magnitude < 1 ? 30 : magnitude < 2.5 ? 55 : 85;
+  if (value < 0) return step === 30 ? 'bg-destructive/30' : step === 55 ? 'bg-destructive/55' : 'bg-destructive/85';
+  return step === 30 ? 'bg-positive/30' : step === 55 ? 'bg-positive/55' : 'bg-positive/85';
+}
 
-  if (returnValue <= -5) return 'bg-red-600 dark:bg-red-700';
-  if (returnValue < -2) return 'bg-red-400 dark:bg-red-500';
-  if (returnValue < 0) return 'bg-red-200 dark:bg-red-400';
-  // bg-muted instead of a hardcoded gray so zero-return cells follow the theme token.
-  if (returnValue === 0) return 'bg-muted';
-  if (returnValue < 2) return 'bg-green-200 dark:bg-green-400';
-  if (returnValue < 5) return 'bg-green-400 dark:bg-green-500';
-  return 'bg-green-600 dark:bg-green-700';
+function signedPercent(value: number): string {
+  return `${value > 0 ? '+' : value < 0 ? '−' : ''}${formatPercentage(Math.abs(value), 1)}`;
+}
+
+interface HoveredCell {
+  x: number;
+  label: string;
+  value: number | null;
 }
 
 /**
- * Get text color based on background intensity
+ * One cell per month, colour by sign and intensity, no figure inside: at a tile's width twelve
+ * columns leave no room for «+1,2%», so the figure lives in the cell's `<title>`, in the
+ * screen-reader text, and — with a mouse — in the reading above the grid. A table, because it IS
+ * one: years are rows, months are columns, and a screen reader walks it that way.
  */
-function getTextColor(returnValue: number | null): string {
-  if (returnValue === null) return 'text-muted-foreground';
-  if (Math.abs(returnValue) >= 5) return 'text-white';
-  if (Math.abs(returnValue) >= 2) return 'text-foreground';
-  return 'text-foreground';
-}
+export function MonthlyReturnsHeatmap({ data, className }: MonthlyReturnsHeatmapProps) {
+  const finePointer = useMediaQuery('(pointer: fine)');
+  const [hovered, setHovered] = useState<HoveredCell | null>(null);
 
-export function MonthlyReturnsHeatmap({ data, revealKey }: MonthlyReturnsHeatmapProps) {
-  const prefersReducedMotion = useReducedMotion();
-  const [revealedRows, setRevealedRows] = useState<number>(0);
-
-  const rowCount = data.length;
-
-  useEffect(() => {
-    if (prefersReducedMotion || rowCount === 0) {
-      setRevealedRows(rowCount);
-      return;
-    }
-
-    setRevealedRows(0);
-
-    const timeouts = data.map((_, index) => (
-      window.setTimeout(() => {
-        setRevealedRows((previous) => Math.max(previous, index + 1));
-      }, index * 90)
-    ));
-
-    return () => {
-      timeouts.forEach((timeoutId) => window.clearTimeout(timeoutId));
-    };
-  }, [data, prefersReducedMotion, revealKey, rowCount]);
-
-  const columnHeaders = useMemo(() => MONTH_NAMES.map((month, i) => ({ month, letter: MONTH_LETTERS[i] })), []);
-
-  if (data.length === 0) {
-    return (
-      <div className="text-center py-8 text-muted-foreground">
-        Dati insufficienti per visualizzare l'heatmap dei rendimenti mensili
-      </div>
-    );
-  }
+  if (data.length === 0) return null;
 
   return (
-    // Always overflow-x-auto: the full table (13 cols + percentages) needs ~850px,
-    // so compact color-only view is shown below desktop:, full view at 1440px+ where it fits.
-    <div className="overflow-x-auto">
-      <table className="w-full border-collapse text-xs desktop:text-sm">
+    <div className={cn('relative', className)} onPointerLeave={() => setHovered(null)}>
+      {hovered && finePointer && (
+        <ChartHoverTip x={hovered.x} label={hovered.label}>
+          <span className={cn('font-mono tabular-nums', hovered.value === null ? 'text-muted-foreground' : hovered.value > 0 ? 'text-positive' : hovered.value < 0 ? 'text-destructive' : 'text-foreground')}>
+            {hovered.value === null ? 'nessun dato' : signedPercent(hovered.value)}
+          </span>
+        </ChartHoverTip>
+      )}
+      <table className="w-full border-separate border-spacing-[3px] -m-[3px]" style={{ width: 'calc(100% + 6px)' }}>
         <thead>
           <tr>
-            <th scope="col" className="border border-border p-1 desktop:p-2 bg-muted font-semibold text-left sticky left-0 z-10">Anno</th>
-            {columnHeaders.map(({ month, letter }) => (
-              <th key={month} scope="col" className="border border-border p-1 desktop:p-2 bg-muted font-semibold text-center">
-                <span className="desktop:hidden">{letter}</span>
-                <span className="hidden desktop:inline">{month}</span>
+            <th scope="col" className="w-8 text-left font-mono text-[10px] font-normal text-muted-foreground">
+              <span className="sr-only">Anno</span>
+            </th>
+            {MONTH_LETTERS.map((letter, i) => (
+              <th key={i} scope="col" className="text-center font-mono text-[10px] font-normal text-muted-foreground" aria-label={MONTH_NAMES[i]}>
+                {letter}
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {data.map((yearData, rowIndex) => (
-            <tr
-              key={yearData.year}
-              className="transition-[opacity,transform] duration-300 ease-out"
-              style={
-                prefersReducedMotion
-                  ? undefined
-                  : {
-                      opacity: revealedRows > rowIndex ? 1 : 0,
-                      transform: revealedRows > rowIndex ? 'translateY(0)' : 'translateY(6px)',
-                    }
-              }
-            >
-              <th scope="row" className="border border-border p-1 desktop:p-2 bg-muted font-semibold sticky left-0 z-10">{yearData.year}</th>
-              {yearData.months.map((monthData, monthIndex) => {
-                const bgColor = getReturnColor(monthData.return);
-                const textColor = getTextColor(monthData.return);
-
+          {data.map((row) => (
+            <tr key={row.year}>
+              <th scope="row" className="pr-1 text-left font-mono text-[11px] font-normal tabular-nums text-muted-foreground">
+                {row.year}
+              </th>
+              {row.months.map((m) => {
+                const title = `${MONTH_NAMES[m.month - 1]} ${row.year}: ${m.return === null ? 'nessun dato' : signedPercent(m.return)}`;
                 return (
                   <td
-                    key={monthData.month}
-                    className={`border border-border p-1 desktop:p-2 text-center transition-[background-color,opacity,transform] duration-300 ease-out ${bgColor} ${textColor}`}
-                    style={
-                      prefersReducedMotion
-                        ? undefined
-                        : {
-                            opacity: revealedRows > rowIndex ? 1 : 0.1,
-                            transform: revealedRows > rowIndex ? 'scale(1)' : 'scale(0.985)',
-                            transitionDelay: `${monthIndex * 14}ms`,
-                          }
-                    }
-                    title={
-                      monthData.return !== null
-                        ? `${MONTH_NAMES[monthData.month - 1]} ${yearData.year}: ${formatPercentage(monthData.return)}`
-                        : 'Nessun dato disponibile'
-                    }
+                    key={m.month}
+                    className={cn('h-[28px] rounded-[3px]', heatmapCellClass(m.return))}
+                    title={title}
+                    onPointerEnter={(event) => {
+                      if (!finePointer) return;
+                      const cell = event.currentTarget;
+                      const table = cell.closest('table');
+                      if (!table) return;
+                      const cellRect = cell.getBoundingClientRect();
+                      const tableRect = table.getBoundingClientRect();
+                      setHovered({
+                        x: (cellRect.left + cellRect.width / 2 - tableRect.left) / tableRect.width,
+                        label: `${MONTH_NAMES[m.month - 1]} ${row.year}`,
+                        value: m.return,
+                      });
+                    }}
                   >
-                    <span className="hidden desktop:inline">
-                      {monthData.return !== null ? formatPercentage(monthData.return) : '-'}
-                    </span>
-                    <span className="desktop:hidden" aria-hidden="true" />
+                    <span className="sr-only">{title}</span>
                   </td>
                 );
               })}
@@ -145,6 +108,28 @@ export function MonthlyReturnsHeatmap({ data, revealKey }: MonthlyReturnsHeatmap
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+/** The legend under the grid: the six steps and the «out of period» surface, swatches as colour keys. */
+export function HeatmapLegend({ className }: { className?: string }) {
+  const steps = [-3, -1.5, -0.5, 0.5, 1.5, 3];
+  return (
+    <div className={cn('flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[11px] text-muted-foreground', className)} aria-hidden="true">
+      <span className="flex items-center gap-1">
+        {steps.slice(0, 3).map((v) => (
+          <span key={v} className={cn('inline-block h-2 w-2 rounded-[2px]', heatmapCellClass(v))} />
+        ))}
+        <span className="mx-1">−5% … 0 … +5%</span>
+        {steps.slice(3).map((v) => (
+          <span key={v} className={cn('inline-block h-2 w-2 rounded-[2px]', heatmapCellClass(v))} />
+        ))}
+      </span>
+      <span className="flex items-center gap-1.5">
+        <span className="inline-block h-2 w-2 rounded-[2px] bg-muted" />
+        fuori periodo
+      </span>
     </div>
   );
 }

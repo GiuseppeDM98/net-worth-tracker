@@ -13,7 +13,7 @@
  */
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useForm, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -23,14 +23,7 @@ import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { Dividend, DividendFormData, DividendType } from '@/types/dividend';
 import { Asset } from '@/types/assets';
 import { getAllAssets } from '@/lib/services/assetService';
-import { Timestamp } from 'firebase/firestore';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -44,10 +37,13 @@ import {
 import { SearchableCombobox } from '@/components/ui/searchable-combobox';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { it } from 'date-fns/locale';
+
 import { formatCurrency } from '@/lib/utils/formatters';
 import { toDate } from '@/lib/utils/dateHelpers';
 import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
+
+/** The form's id, so the footer's submit can live outside the `<form>`. */
+const DIVIDEND_FORM_ID = 'dividend-form';
 
 const dividendSchema = z.object({
   assetId: z.string().min(1, 'Asset è obbligatorio'),
@@ -129,14 +125,9 @@ export function DividendDialog({ open, onClose, dividend, onSuccess }: DividendD
   const totalTax = withholdingTax * sharesHeld;
   const totalNet = netAmountPerShare * sharesHeld;
 
-  // Load assets when dialog opens
-  useEffect(() => {
-    if (open && user) {
-      loadAssets();
-    }
-  }, [open, user]);
-
-  const loadAssets = async () => {
+  // Memoized on what it reads, so the effect below can declare it as a dependency without
+  // re-running on every render.
+  const loadAssets = useCallback(async () => {
     if (!user || !ownerId) return;
 
     try {
@@ -154,7 +145,18 @@ export function DividendDialog({ open, onClose, dividend, onSuccess }: DividendD
     } finally {
       setLoadingAssets(false);
     }
-  };
+  }, [user, ownerId]);
+
+  // Load assets when dialog opens. Deferred so the effect body itself sets no state — the
+  // loader flips `loadingAssets` before its await (react-hooks/set-state-in-effect); the
+  // cleanup drops a load the close beat to it.
+  useEffect(() => {
+    if (!open || !user) return;
+    const timer = setTimeout(() => {
+      loadAssets();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [open, user, loadAssets]);
 
   /**
    * Auto-calculate 26% Italian withholding tax for NEW dividends only
@@ -290,20 +292,25 @@ export function DividendDialog({ open, onClose, dividend, onSuccess }: DividendD
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>
-            {dividend ? 'Modifica Dividendo' : 'Nuovo Dividendo'}
-          </DialogTitle>
-          <DialogDescription>
-            {dividend
-              ? 'Modifica i dati del dividendo registrato.'
-              : 'Registra un nuovo dividendo o cedola ricevuta.'}
-          </DialogDescription>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+    <ResponsiveModal
+      open={open}
+      onClose={onClose}
+      eyebrow={`Dividendi · ${dividend ? 'Modifica' : 'Nuovo pagamento'}`}
+      title={dividend ? 'Modifica il pagamento' : 'Registra un pagamento'}
+      reading="Un pagamento datato in futuro resta «annunciato»: entra nel calendario, non negli incassi, finché la data non arriva."
+      width="lg"
+      footer={
+        <>
+          <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+            Annulla
+          </Button>
+          <Button type="submit" form={DIVIDEND_FORM_ID} disabled={isSubmitting}>
+            {isSubmitting ? 'Salvataggio...' : dividend ? 'Salva modifiche' : 'Registra pagamento'}
+          </Button>
+        </>
+      }
+    >
+        <form id={DIVIDEND_FORM_ID} onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           {/* Asset Selector */}
           <div className="space-y-2">
             <Label htmlFor="assetId">Asset *</Label>
@@ -331,7 +338,7 @@ export function DividendDialog({ open, onClose, dividend, onSuccess }: DividendD
               />
             )}
             {errors.assetId && (
-              <p className="text-sm text-red-500">{errors.assetId.message}</p>
+              <p className="text-sm text-destructive">{errors.assetId.message}</p>
             )}
           </div>
 
@@ -345,10 +352,10 @@ export function DividendDialog({ open, onClose, dividend, onSuccess }: DividendD
                 step="0.0001"
                 min="0"
                 {...register('grossAmountPerShare', { valueAsNumber: true })}
-                className={errors.grossAmountPerShare ? 'border-red-500' : ''}
+                className={errors.grossAmountPerShare ? 'border-destructive' : ''}
               />
               {errors.grossAmountPerShare && (
-                <p className="text-sm text-red-500">{errors.grossAmountPerShare.message}</p>
+                <p className="text-sm text-destructive">{errors.grossAmountPerShare.message}</p>
               )}
             </div>
 
@@ -363,10 +370,10 @@ export function DividendDialog({ open, onClose, dividend, onSuccess }: DividendD
                 step="0.0001"
                 min="0"
                 {...register('withholdingTax', { valueAsNumber: true })}
-                className={errors.withholdingTax ? 'border-red-500' : ''}
+                className={errors.withholdingTax ? 'border-destructive' : ''}
               />
               {errors.withholdingTax && (
-                <p className="text-sm text-red-500">{errors.withholdingTax.message}</p>
+                <p className="text-sm text-destructive">{errors.withholdingTax.message}</p>
               )}
               <p className="text-xs text-muted-foreground">
                 Modificabile per dividendi esteri o regimi speciali
@@ -383,13 +390,13 @@ export function DividendDialog({ open, onClose, dividend, onSuccess }: DividendD
               step="0.0001"
               min="0"
               {...register('sharesHeld', { valueAsNumber: true })}
-              className={errors.sharesHeld ? 'border-red-500' : ''}
+              className={errors.sharesHeld ? 'border-destructive' : ''}
             />
             {errors.sharesHeld && (
-              <p className="text-sm text-red-500">{errors.sharesHeld.message}</p>
+              <p className="text-sm text-destructive">{errors.sharesHeld.message}</p>
             )}
             <p className="text-xs text-muted-foreground">
-              Precompilato con la quantità attuale dell'asset
+              Precompilato con la quantità attuale dell&apos;asset
             </p>
           </div>
 
@@ -407,11 +414,11 @@ export function DividendDialog({ open, onClose, dividend, onSuccess }: DividendD
               </div>
               <div>
                 <span className="text-muted-foreground">Totale Ritenute:</span>
-                <p className="font-medium text-red-600">{formatCurrency(totalTax)}</p>
+                <p className="font-medium text-destructive">{formatCurrency(totalTax)}</p>
               </div>
               <div>
                 <span className="text-muted-foreground">Totale Netto:</span>
-                <p className="font-medium text-green-600">{formatCurrency(totalNet)}</p>
+                <p className="font-medium text-positive">{formatCurrency(totalNet)}</p>
               </div>
             </div>
           </div>
@@ -437,12 +444,12 @@ export function DividendDialog({ open, onClose, dividend, onSuccess }: DividendD
                         }
                       }
                     }}
-                    className={errors.exDate ? 'border-red-500' : ''}
+                    className={errors.exDate ? 'border-destructive' : ''}
                   />
                 )}
               />
               {errors.exDate && (
-                <p className="text-sm text-red-500">{errors.exDate.message}</p>
+                <p className="text-sm text-destructive">{errors.exDate.message}</p>
               )}
             </div>
 
@@ -465,12 +472,12 @@ export function DividendDialog({ open, onClose, dividend, onSuccess }: DividendD
                         }
                       }
                     }}
-                    className={errors.paymentDate ? 'border-red-500' : ''}
+                    className={errors.paymentDate ? 'border-destructive' : ''}
                   />
                 )}
               />
               {errors.paymentDate && (
-                <p className="text-sm text-red-500">{errors.paymentDate.message}</p>
+                <p className="text-sm text-destructive">{errors.paymentDate.message}</p>
               )}
             </div>
           </div>
@@ -498,7 +505,7 @@ export function DividendDialog({ open, onClose, dividend, onSuccess }: DividendD
                 )}
               />
               {errors.dividendType && (
-                <p className="text-sm text-red-500">{errors.dividendType.message}</p>
+                <p className="text-sm text-destructive">{errors.dividendType.message}</p>
               )}
             </div>
 
@@ -522,7 +529,7 @@ export function DividendDialog({ open, onClose, dividend, onSuccess }: DividendD
                 )}
               />
               {errors.currency && (
-                <p className="text-sm text-red-500">{errors.currency.message}</p>
+                <p className="text-sm text-destructive">{errors.currency.message}</p>
               )}
             </div>
           </div>
@@ -546,36 +553,17 @@ export function DividendDialog({ open, onClose, dividend, onSuccess }: DividendD
               type="url"
               {...register('sourceUrl')}
               placeholder="es. https://www.borsaitaliana.it/..."
-              className={errors.sourceUrl ? 'border-red-500' : ''}
+              className={errors.sourceUrl ? 'border-destructive' : ''}
             />
             {errors.sourceUrl && (
-              <p className="text-sm text-red-500">{errors.sourceUrl.message}</p>
+              <p className="text-sm text-destructive">{errors.sourceUrl.message}</p>
             )}
             <p className="text-xs text-muted-foreground">
               Link alla fonte del dividendo per riferimento futuro
             </p>
           </div>
 
-          {/* Buttons */}
-          <div className="flex justify-end gap-2 pt-4 border-t">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={isSubmitting}
-            >
-              Annulla
-            </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting
-                ? 'Salvataggio...'
-                : dividend
-                ? 'Salva Modifiche'
-                : 'Crea Dividendo'}
-            </Button>
-          </div>
         </form>
-      </DialogContent>
-    </Dialog>
+    </ResponsiveModal>
   );
 }

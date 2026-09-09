@@ -6,18 +6,17 @@ import {
   addDoc,
   setDoc,
   updateDoc,
-  deleteDoc,
   query,
   where,
   limit,
-  Timestamp,
-  orderBy,
   deleteField,
   runTransaction,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { removeUndefinedDeep as removeUndefinedFields } from '@/lib/utils/firestoreData';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
+import { suggestIsLiquid } from '@/lib/utils/assetLiquidity';
+import { costBasisPerUnitEur, unitPriceEur } from '@/lib/utils/costBasisEur';
 import { invalidateDashboardOverviewSummary } from '@/lib/services/dashboardOverviewInvalidation';
 import { Asset, AssetFormData, BondDetails } from '@/types/assets';
 
@@ -29,7 +28,10 @@ function getErrorMessage(error: unknown): string {
 
 /**
  * Define asset class ordering priority
- * Order: Azioni → Obbligazioni → Commodities → Real Estate → Cash → Crypto
+ * Order: Azioni → Obbligazioni → Commodities → Real Estate → Cash → Crypto → Trend Following → Carry
+ *
+ * A class absent from this map sorts last (`|| 999` in getAllAssets), which is how trendFollowing
+ * and carry were pushed to the bottom of the Strumenti list regardless of their weight.
  */
 export const ASSET_CLASS_ORDER: Record<string, number> = {
   equity: 1,
@@ -38,6 +40,8 @@ export const ASSET_CLASS_ORDER: Record<string, number> = {
   realestate: 4,
   cash: 5,
   crypto: 6,
+  trendFollowing: 7,
+  carry: 8,
 };
 
 /**
@@ -237,6 +241,11 @@ export async function updateAsset(
     // is AssetDialog with a complete formData, so a bare undefined check is safe here (same
     // reasoning as averageCost/taxRate above, unlike leverageRatio's `in` guard).
     if (updates.displayTicker === undefined) cleanedUpdates.displayTicker = deleteField();
+    // subCategory is optional and user-clearable («Nessuna» in AssetDialog). The `in` guard keeps a
+    // partial caller — a price refresh, a ledger replay — from wiping a classification it never sent.
+    if ('subCategory' in updates && updates.subCategory === undefined) {
+      cleanedUpdates.subCategory = deleteField();
+    }
 
     // Rebuy on the same doc: quantity goes from 0 (sold but kept) back to > 0. Stamp the new
     // holding start so YOC ignores the previous holding's dividends (mirrors the ISIN-reuse path
@@ -276,8 +285,8 @@ export type AssetMetadataFormData = Omit<AssetFormData, 'quantity' | 'averageCos
  * sending quantity/averageCost would wipe the PMC on every metadata save. `updateAsset` is unchanged and still
  * used for cash/realestate.
  *
- * `taxRate`/`displayTicker` keep the same undefined→deleteField() clearing as `updateAsset` (the
- * form always sends the key, undefined when cleared). quantity/averageCost/holdingStartDate are
+ * `taxRate`/`displayTicker`/`subCategory` keep the same undefined→deleteField() clearing as
+ * `updateAsset` (the form always sends the key, undefined when cleared). quantity/averageCost/holdingStartDate are
  * structurally absent from the payload type, so the ledger-derived fields can never be cleared by
  * a metadata edit.
  */
@@ -301,6 +310,11 @@ export async function updateAssetMetadata(
     }
     // displayTicker is a metadata field too — clearable, same rule as updateAsset.
     if (updates.displayTicker === undefined) cleanedUpdates.displayTicker = deleteField();
+    // subCategory too — every ledger type (stock/etf/bond/crypto/commodity) edits through here, and
+    // those are exactly the classes that carry subcategories. Same `in` guard as updateAsset.
+    if ('subCategory' in updates && updates.subCategory === undefined) {
+      cleanedUpdates.subCategory = deleteField();
+    }
 
     await updateDoc(assetRef, cleanedUpdates);
 
@@ -511,29 +525,10 @@ export async function deleteAsset(assetId: string, userId: string): Promise<void
  * @returns Total asset value (quantity × price, minus outstanding debt for real estate)
  */
 export function calculateAssetValue(asset: Asset): number {
-  // For non-EUR assets, prefer the pre-converted EUR price stored during price updates.
-  // This avoids async FX calls at read time while keeping portfolio totals in EUR.
-  // Falls back to currentPrice for EUR assets and pre-migration documents that
-  // were not yet updated after this change was deployed.
-  //
-  // GBp safety guard: Yahoo Finance returns LSE prices in pence (GBp), not pounds.
-  // priceUpdater.ts normalises GBp→GBP (÷100) before writing to Firestore, but
-  // legacy assets or assets whose price was never refreshed may still carry the
-  // raw pence value with currency='GBp'. Dividing by 100 here keeps the fallback
-  // path safe even for those documents.
-  const isGBpFallback = asset.currency === 'GBp'; // lowercase 'p' = pence
-  const normalizedFallbackPrice = isGBpFallback
-    ? asset.currentPrice / 100
-    : asset.currentPrice;
-
-  const priceInEur =
-    asset.currency &&
-    asset.currency.toUpperCase() !== 'EUR' &&
-    asset.currentPriceEur !== undefined
-      ? asset.currentPriceEur
-      : normalizedFallbackPrice;
-
-  const baseValue = asset.quantity * priceInEur;
+  // The unit price in EUR (`unitPriceEur`, costBasisEur.ts): the pre-converted currentPriceEur
+  // stored by the price updater for a foreign asset — no FX call at read time — else the native
+  // price with the GBp guard. Per unit there, so the sale simulation and the yields share it.
+  const baseValue = asset.quantity * unitPriceEur(asset);
 
   // For real estate with outstanding debt, subtract the debt to get net equity.
   // Use Math.max(0, ...) to prevent negative values for underwater mortgages
@@ -557,7 +552,8 @@ export function calculateTotalValue(assets: Asset[]): number {
  *
  * Liquidity determination:
  * - If isLiquid field is explicitly defined, use that value (allows user override)
- * - Otherwise use legacy logic: exclude real estate and private equity (for backwards compatibility)
+ * - Otherwise fall back to suggestIsLiquid (type realestate / pensionFund / Private Equity
+ *   are illiquid) for documents saved before the field existed
  *
  * The isLiquid override takes precedence because users may have unique situations
  * (e.g., illiquid bonds, liquid real estate like REITs).
@@ -572,12 +568,9 @@ export function calculateLiquidNetWorth(assets: Asset[]): number {
       if (asset.isLiquid !== undefined) {
         return asset.isLiquid === true;
       }
-      // Otherwise use legacy logic for backwards compatibility
-      // (assets created before isLiquid field was added)
-      return (
-        asset.assetClass !== 'realestate' &&
-        asset.subCategory !== 'Private Equity'
-      );
+      // Legacy fallback for documents saved before the field existed — the same
+      // predicate as the AssetDialog default (see lib/utils/assetLiquidity.ts).
+      return suggestIsLiquid(asset.type, asset.subCategory);
     })
     .reduce((total, asset) => total + calculateAssetValue(asset), 0);
 }
@@ -597,11 +590,9 @@ export function calculateIlliquidNetWorth(assets: Asset[]): number {
       if (asset.isLiquid !== undefined) {
         return asset.isLiquid === false;
       }
-      // Otherwise use legacy logic for backwards compatibility
-      return (
-        asset.assetClass === 'realestate' ||
-        asset.subCategory === 'Private Equity'
-      );
+      // Legacy fallback — exact complement of calculateLiquidNetWorth's, so the
+      // two totals always partition the whole portfolio.
+      return !suggestIsLiquid(asset.type, asset.subCategory);
     })
     .reduce((total, asset) => total + calculateAssetValue(asset), 0);
 }
@@ -681,28 +672,22 @@ export function calculateIlliquidFIRENetWorth(assets: Asset[], includePrimaryRes
 }
 
 /**
- * Calculate unrealized gains for a single asset
+ * One position's unrealized gain in EUR: the value (EUR) minus quantity × the EUR PMC, purchase
+ * fees included (`costBasisPerUnitEur`) — the same subtraction `computeUnrealizedGain`
+ * (patrimonioSummary) makes for the table, so the overview's total, the estimated taxes and the
+ * PDF print the figure the Patrimonio page shows (pinned by __tests__/assetService.test.ts).
  *
- * Returns 0 if averageCost is not set because gains cannot be calculated
- * without a cost basis (we don't know the purchase price).
- *
- * @param asset - Asset to calculate gains for
- * @returns Unrealized gain/loss (current value - cost basis)
+ * Zero where there is nothing to measure: a cash account (its balance is not invested capital), a
+ * pension fund (a leftover `averageCost` from a type conversion is not a PMC, and its exit
+ * taxation is another regime), a closed position, or a foreign asset the ledger has not projected
+ * a EUR PMC for yet — never a dollar PMC against a euro value.
  */
 export function calculateUnrealizedGains(asset: Asset): number {
-  // Cannot calculate gains without cost basis - return 0 as neutral value
-  if (!asset.averageCost || asset.averageCost <= 0) {
-    return 0;
-  }
-
-  // Use calculateAssetValue() for the current side so the price is always
-  // EUR-normalised (via currentPriceEur when available, or the GBp-safe fallback).
-  // averageCost is stored in the asset's native currency as entered by the user,
-  // so gains for non-EUR assets are expressed in the native currency — a known
-  // display-only limitation that is acceptable and consistent with AssetCard.
-  const currentValue = calculateAssetValue(asset);
-  const costBasis = asset.quantity * asset.averageCost;
-  return currentValue - costBasis;
+  if (asset.quantity <= 0 || asset.type === 'pensionFund') return 0;
+  if (asset.type === 'cash' && asset.assetClass === 'cash') return 0;
+  const basisPerUnit = costBasisPerUnitEur(asset);
+  if (basisPerUnit === undefined) return 0;
+  return calculateAssetValue(asset) - asset.quantity * basisPerUnit;
 }
 
 /**

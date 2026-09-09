@@ -10,7 +10,6 @@ const { resendSendMock } = vi.hoisted(() => ({
 vi.mock('resend', () => {
   class ResendMock {
     emails = { send: resendSendMock };
-    constructor(_apiKey?: string) {}
   }
   return { Resend: ResendMock };
 });
@@ -18,11 +17,18 @@ vi.mock('resend', () => {
 // Per-collection query results — filled per-test. Every query against a collection returns
 // the same docs regardless of the where() filters, which is sufficient: for non-yearly periods
 // the previous-period and YoY queries hit the same mock, so their deltas come out identical.
-const collectionMocks: Record<string, any> = {};
+const collectionMocks: Record<string, unknown> = {};
+
+/** The chainable shape the mocked adminDb query exposes; every node resolves to the same result. */
+interface QueryChainMock {
+  where: () => QueryChainMock;
+  limit: () => { get: () => Promise<unknown> };
+  get: () => Promise<unknown>;
+}
 
 function buildQueryMock(name: string) {
   const result = () => Promise.resolve(collectionMocks[name] ?? { empty: true, docs: [] });
-  function chainNode(): any {
+  function chainNode(): QueryChainMock {
     return {
       where: () => chainNode(),
       limit: () => ({ get: vi.fn().mockImplementation(result) }),
@@ -63,8 +69,8 @@ function makeEmailData(overrides: Partial<MonthlyEmailData> = {}): MonthlyEmailD
     totalIncome: 3500,
     totalExpenses: 2000,
     topExpenseCategories: [
-      { name: 'Alimentari', amount: 800 },
-      { name: 'Trasporti', amount: 600 },
+      { key: 'c1', name: 'Alimentari', amount: 800 },
+      { key: 'c2', name: 'Trasporti', amount: 600 },
     ],
     allIncomeCategories: [],
     topIndividualExpenses: [],
@@ -148,6 +154,35 @@ describe('buildPeriodComparison', () => {
     const alimentari = result.categoryDeltas.find((c) => c.name === 'Alimentari');
     expect(alimentari?.current).toBe(800);
     expect(alimentari?.vsPrevious?.absChange).toBe(100); // 800 - 700
+  });
+
+  it('keeps two same-named categories apart: each row compares against its own baseline', async () => {
+    // Baseline: "Casa" exists twice — fixed (c-fix, 1000) and variable (c-var, 200).
+    collectionMocks['monthly-snapshots'] = { empty: false, docs: [snapshotDoc(145000)] };
+    collectionMocks['expenses'] = {
+      empty: false,
+      docs: [
+        expenseDoc(-1000, 'Casa', 'c-fix', 'fixed'),
+        expenseDoc(-200, 'Casa', 'c-var', 'variable'),
+      ],
+    };
+
+    const result = await buildPeriodComparison(
+      'user1',
+      makeEmailData({
+        totalExpenses: 1500,
+        topExpenseCategories: [
+          { key: 'c-fix', name: 'Casa', amount: 1100 },
+          { key: 'c-var', name: 'Casa', amount: 400 },
+        ],
+      })
+    );
+
+    // Key-based lookup: fixed Casa compares with 1000, variable Casa with 200 —
+    // name-based keying used to REPLACE the fixed baseline with the variable one.
+    const [fixedCasa, variableCasa] = result.categoryDeltas;
+    expect(fixedCasa.vsPrevious?.absChange).toBe(100); // 1100 - 1000
+    expect(variableCasa.vsPrevious?.absChange).toBe(200); // 400 - 200
   });
 
   it('marks previousEqualsYoy for yearly periods and reuses the single baseline', async () => {

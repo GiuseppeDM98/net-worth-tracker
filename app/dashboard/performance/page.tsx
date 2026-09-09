@@ -1,96 +1,208 @@
 'use client';
 
+/**
+ * RENDIMENTI — a verdict over tiles (2026-08-25)
+ *
+ * The page answers «quanto rende il portafoglio, e rispetto a cosa?» before it shows a number:
+ * a rule-generated verdict (lib/utils/performanceNarrative.ts) with the page's ONE axis — the
+ * period — beside it, the measured base named under it, and a 12-column grid of tiles that each
+ * answer one question with a reading line above their figures. Everything deeper lives below
+ * the grid behind the «Dettaglio» disclosure.
+ *
+ *   Desktop (12 col): Rendimento(5, 2 rows) | Rischio(3)    | Consistenza(4)
+ *                                           | Contributi(3) | Benchmark(4)
+ *                     Da dove viene il rendimento(7) | Plusvalenze(5)
+ *                     Capitale e mercato(12)
+ *                     — without a closed sale Plusvalenze is absent: Attribuzione(5) | Capitale e mercato(7)
+ *   Mobile (1 col):   Rendimento → Rischio → Consistenza → Benchmark → Contributi → Attribuzione → Plusvalenze → Capitale e mercato
+ *
+ * CALCULATION ENGINE (unchanged): every metric comes from performanceService.ts — TWR, IRR,
+ * Sharpe, volatility, drawdown, rolling windows — cached in performance-cache/{userId} under
+ * CACHE_MATH_VERSION. The snapshots are fetched once, resolved onto the configurable base
+ * (`resolvePerformanceBase`: which capital, from which month the pension funds count, which
+ * boundary flows) and cached in state, so a period switch and a custom range recompute from
+ * memory. The window is always read back off the payload (`nominalPeriodStart`,
+ * `selectSnapshotsForMetrics`), never re-derived from today's date.
+ *
+ * Every figure a tile shows that the payload does not carry is computed in a pure, tested util
+ * (performanceSummary.ts: the drawdown story, Sortino, growth-of-100, the benchmark ranking) —
+ * never in a component.
+ */
+
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
-import { motion } from 'framer-motion';
-import {
-  staggerContainer,
-  cardItem,
-  chartShellSettle,
-  periodContentSettle,
-} from '@/lib/utils/motionVariants';
 import Link from 'next/link';
+import { CalendarDays, RefreshCw, Sparkles } from 'lucide-react';
+import dynamic from 'next/dynamic';
+import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
-import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
-import { getAllPerformanceData, calculatePerformanceForPeriod, preparePerformanceChartData, selectSnapshotsForMetrics, prepareMonthlyReturnsHeatmap, prepareUnderwaterDrawdownData } from '@/lib/services/performanceService';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  getAllPerformanceData,
+  calculatePerformanceForPeriod,
+  preparePerformanceChartData,
+  selectSnapshotsForMetrics,
+  prepareMonthlyReturnsHeatmap,
+  prepareUnderwaterDrawdownData,
+} from '@/lib/services/performanceService';
 import { getUserSnapshots } from '@/lib/services/snapshotService';
 import { getAllAssets } from '@/lib/services/assetService';
 import { getSettings } from '@/lib/services/assetAllocationService';
-import {
-  resolveHasBaseline,
-  resolvePerformanceBaseOptions,
-  resolvePerformanceExclusions,
-  toPerformanceBaseSnapshots,
-  type PerformanceBaseOptions,
-} from '@/lib/utils/performanceBase';
-import { PerformanceData, PerformanceMetrics, TimePeriod } from '@/types/performance';
-import { MonthlySnapshot } from '@/types/assets';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { getPensionContributions } from '@/lib/services/pensionContributionService';
+import { getAssetTransactions } from '@/lib/services/assetTransactionService';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/query/queryKeys';
+// The Admin-SDK dividendService is server-only: a client page reads the registry through this one.
+import { getDividendReceipts } from '@/lib/services/dividendReceiptsService';
+import { resolveHasBaseline, resolvePerformanceBase, type PerformanceBaseResolution } from '@/lib/utils/performanceBase';
+import { attributePeriodReturn, sumDividendsByAsset, type DividendReceipt } from '@/lib/utils/performanceAttribution';
+import type { PerformanceData, PerformanceMetrics, TimePeriod } from '@/types/performance';
+import type { Asset, MonthlySnapshot } from '@/types/assets';
+import type { PensionContribution } from '@/types/pension';
 import { Button } from '@/components/ui/button';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
-import { RefreshCw, Info, Sparkles, CalendarDays, ChevronDown, X } from 'lucide-react';
-import { toast } from 'sonner';
-import { formatCurrency, formatPercentage, formatCurrencyCompact } from '@/lib/services/chartService';
-import { useChartColors } from '@/lib/hooks/useChartColors';
-import {
-  LineChart,
-  Line,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer
-} from 'recharts';
-import dynamic from 'next/dynamic';
-import { CustomDateRangeDialog } from '@/components/performance/CustomDateRangeDialog';
-import type { AIAnalysisDialogProps } from '@/components/performance/AIAnalysisDialog';
-
-// Lazy-load AIAnalysisDialog to keep react-markdown and remark-gfm (~60KB gzipped)
-// out of the initial Performance page bundle — loaded only on first "Analisi AI" click.
-const AIAnalysisDialog = dynamic<AIAnalysisDialogProps>(
-  () => import('@/components/performance/AIAnalysisDialog').then(m => ({ default: m.AIAnalysisDialog })),
-  { ssr: false }
-);
-import { MetricCard } from '@/components/performance/MetricCard';
-import { MetricSection } from '@/components/performance/MetricSection';
-import { HeroMetricBlock } from '@/components/performance/HeroMetricBlock';
-import { PerformanceHero } from '@/components/performance/PerformanceHero';
-import { PerformanceTooltip } from '@/components/performance/PerformanceTooltip';
-import { MonthlyReturnsHeatmap } from '@/components/performance/MonthlyReturnsHeatmap';
-import { UnderwaterDrawdownChart } from '@/components/performance/UnderwaterDrawdownChart';
-import { PerformancePageSkeleton } from '@/components/performance/PerformancePageSkeleton';
-import { BenchmarkComparisonSection } from '@/components/performance/BenchmarkComparisonSection';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { PageVerdict } from '@/components/ui/page-verdict';
+import { TILE_CELL_CLASS } from '@/components/ui/tile';
+import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
+import { ErrorNotice } from '@/components/ui/error-notice';
+import { describeReadFailure } from '@/lib/utils/statesNarrative';
+import type { TileSkeletonCell } from '@/lib/utils/tileGridSkeleton';
 import { useBenchmarkReturns } from '@/lib/hooks/useBenchmarkReturns';
 import { useFxRates } from '@/lib/hooks/useFxRates';
 import { BENCHMARKS } from '@/lib/constants/benchmarks';
-import { computeBenchmarkAnnualizedReturn, applyFxConversion } from '@/lib/utils/benchmarkPeriodReturn';
+import { applyFxConversion, type MonthlyReturnPoint } from '@/lib/utils/benchmarkPeriodReturn';
 import {
-  summarizePerformance,
-  resolveHeroReturn,
+  buildGrowthOfHundred,
   computeBenchmarkDelta,
-  computeReturnConsistency,
+  computeBenchmarkRanking,
   computeDrawdownStatus,
+  computeReturnConsistency,
+  computeSortinoRatio,
+  resolveDrawdownStory,
+  resolveHeroReturn,
+  resolvePeriodReturnChip,
+  summarizePerformance,
+  summarizeRealizedGains,
 } from '@/lib/utils/performanceSummary';
+import {
+  buildPerformanceVerdict,
+  describeAttribution,
+  describeBenchmarkRanking,
+  describeCapitalAndMarket,
+  describeConsistency,
+  describeContributions,
+  describeGrowthOfHundred,
+  describeMeasurementBase,
+  describePeriodAside,
+  describeRealizedGains,
+  describeRisk,
+  describeWindow,
+} from '@/lib/utils/performanceNarrative';
 import { useAssetLedgerMeta, useAssetTransactions } from '@/lib/hooks/useAssetTransactions';
-import { computeInvestedCapital } from '@/lib/utils/assetTransactionUtils';
-import { aggregateRealizedByYear, RealizedGainsRows } from '@/components/performance/RealizedGainsSection';
+import { computeInvestedCapital, aggregateRealizedByYear } from '@/lib/utils/assetTransactionUtils';
+import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
+import { MONTH_NAMES_SHORT } from '@/lib/utils/period';
+import { CustomDateRangeDialog } from '@/components/performance/CustomDateRangeDialog';
+import type { AIAnalysisDialogProps } from '@/components/performance/AIAnalysisDialog';
+import { CustomPeriodChip, PerformancePeriodPicker, type PickerPeriod } from '@/components/performance/PerformancePeriodPicker';
+import { RendimentoTile } from '@/components/performance/tiles/RendimentoTile';
+import { RischioTile } from '@/components/performance/tiles/RischioTile';
+import { ConsistenzaTile } from '@/components/performance/tiles/ConsistenzaTile';
+import { ContributiTile } from '@/components/performance/tiles/ContributiTile';
+import { BenchmarkTile } from '@/components/performance/tiles/BenchmarkTile';
+import { PlusvalenzeTile } from '@/components/performance/tiles/PlusvalenzeTile';
+import { AttribuzioneTile } from '@/components/performance/tiles/AttribuzioneTile';
+import { CapitaleMercatoTile } from '@/components/performance/tiles/CapitaleMercatoTile';
+import { PerformanceDettaglio } from '@/components/performance/PerformanceDettaglio';
+
+// Lazy-load AIAnalysisDialog to keep react-markdown and remark-gfm (~60KB gzipped)
+// out of the initial Performance page bundle — loaded only on first "Analizza con AI" click.
+const AIAnalysisDialog = dynamic<AIAnalysisDialogProps>(
+  () => import('@/components/performance/AIAnalysisDialog').then((m) => ({ default: m.AIAnalysisDialog })),
+  { ssr: false },
+);
+
+/** The grid's geometry, for the skeleton: the same spans as the tiles below. */
+const SKELETON_CELLS: TileSkeletonCell[] = [
+  { span: 5, rows: 2, lines: 10 },
+  { span: 3, lines: 6 },
+  { span: 4, lines: 6 },
+  { span: 3, lines: 4 },
+  { span: 4, lines: 8 },
+  { span: 5, lines: 5 },
+  { span: 7, lines: 7 },
+  { span: 12, lines: 6 },
+];
+
+/** The base before the first load: the product default, so the caption under the verdict is right on first paint. */
+const DEFAULT_BASE: Pick<PerformanceBaseResolution, 'options' | 'pensionEntryMonth' | 'pensionFundIds'> = {
+  options: { includePensionFunds: false, includeExcludedAssets: false },
+  pensionEntryMonth: null,
+  pensionFundIds: [],
+};
+
+/** The reference model of the verdict: the first definition, the classic balanced allocation. */
+const REFERENCE_BENCHMARK = BENCHMARKS[0];
+
+const EMPTY_YIELDS = {
+  yocGross: null,
+  yocNet: null,
+  yocDividendsGross: 0,
+  yocDividendsNet: 0,
+  yocCostBasis: 0,
+  yocAssetCount: 0,
+  currentYield: null,
+  currentYieldNet: null,
+  currentYieldDividends: 0,
+  currentYieldDividendsNet: 0,
+  currentYieldPortfolioValue: 0,
+  currentYieldAssetCount: 0,
+};
+
+/** YOC and current yield need the Admin SDK, so they come from two routes per period. */
+async function fetchYieldMetrics(ownerId: string, metrics: PerformanceMetrics): Promise<Partial<PerformanceMetrics>> {
+  if (metrics.hasInsufficientData) return EMPTY_YIELDS;
+  try {
+    const params = new URLSearchParams({
+      userId: ownerId,
+      startDate: metrics.startDate.toISOString(),
+      dividendEndDate: metrics.dividendEndDate.toISOString(),
+      numberOfMonths: metrics.numberOfMonths.toString(),
+    });
+    const [yocResponse, currentYieldResponse] = await Promise.all([
+      authenticatedFetch(`/api/performance/yoc?${params.toString()}`),
+      authenticatedFetch(`/api/performance/current-yield?${params.toString()}`),
+    ]);
+    if (!yocResponse.ok) console.warn('Failed to fetch YOC:', yocResponse.statusText);
+    if (!currentYieldResponse.ok) console.warn('Failed to fetch current yield:', currentYieldResponse.statusText);
+    const yoc = yocResponse.ok ? await yocResponse.json() : {};
+    const currentYield = currentYieldResponse.ok ? await currentYieldResponse.json() : {};
+    return { ...EMPTY_YIELDS, ...yoc, ...currentYield };
+  } catch (error) {
+    console.error('Error fetching yield metrics:', error);
+    return EMPTY_YIELDS;
+  }
+}
+
+/** «1 ago 2025» for the compact header's description. */
+function shortDate(date: Date): string {
+  return date.toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+/** The measured window as a compact string: «misurati dal 1 ago 2025 al 31 lug 2026». */
+function describeHeaderWindow(metrics: PerformanceMetrics | null): string | undefined {
+  if (!metrics || metrics.hasInsufficientData) return undefined;
+  return `misurati dal ${shortDate(metrics.startDate)} al ${shortDate(metrics.endDate)}`;
+}
 
 /**
- * Header action buttons (Periodo Personalizzato / Analizza con AI / Aggiorna).
- *
- * Module-level component (React Compiler rule: no component definitions inside render)
- * so it can be rendered twice with different layouts: inline on desktop (in the PageHeader
- * actions slot) and stacked full-width on mobile (a bar below the header). The mobile
- * PageHeader actions slot is a cramped inline row next to a truncating title, which can't
- * fit three text buttons — hence the dedicated mobile bar.
+ * The three actions — a custom range, the AI report, the refresh. Inline in the compact header
+ * from `desktop:`; below it the refresh stays in the sticky navbar's slot and the two text
+ * actions sit under the period picker as 44px buttons (`stacked`).
  */
 function HeaderActions({
   stacked,
@@ -109,180 +221,34 @@ function HeaderActions({
   onAI: (e: React.MouseEvent<HTMLButtonElement>) => void;
   onRefresh: () => void;
 }) {
-  const fw = stacked ? 'w-full justify-center' : '';
+  const size = stacked ? 'h-11 w-full justify-center' : 'h-8 px-2.5 text-xs';
   return (
     <>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={onCustom}
-        disabled={isDemo}
-        title={isDemo ? 'Non disponibile in modalità demo' : 'Periodo Personalizzato'}
-        className={cn('gap-2', fw)}
-      >
-        <CalendarDays className="h-4 w-4" />
-        Periodo Personalizzato
+      <Button variant="outline" onClick={onCustom} disabled={isDemo} className={cn('gap-1.5', size)} aria-label={isDemo ? 'Periodo personalizzato — non disponibile in modalità demo' : 'Periodo personalizzato'}>
+        <CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />
+        Periodo personalizzato
       </Button>
       <Button
         variant="outline"
-        size="sm"
         onClick={onAI}
         disabled={aiDisabled}
-        title={isDemo ? 'Non disponibile in modalità demo' : undefined}
         className={cn(
-          'group gap-2 transition-[border-color,color,box-shadow] duration-200 hover:border-[var(--ai-accent)] hover:text-[var(--ai-accent)] hover:shadow-[0_0_14px_color-mix(in_oklch,var(--ai-accent)_40%,transparent)]',
-          fw
+          'group gap-1.5 transition-[border-color,color,box-shadow] duration-200 hover:border-[var(--ai-accent)] hover:text-[var(--ai-accent)] hover:shadow-[0_0_14px_color-mix(in_oklch,var(--ai-accent)_40%,transparent)]',
+          size,
         )}
+        aria-label={isDemo ? 'Analizza con AI — non disponibile in modalità demo' : 'Analizza con AI'}
       >
-        <Sparkles className="h-4 w-4 transition-transform duration-200 group-hover:rotate-12 group-hover:scale-110" />
+        <Sparkles className="h-3.5 w-3.5 transition-transform duration-200 group-hover:rotate-12 group-hover:scale-110" aria-hidden="true" />
         Analizza con AI
       </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={onRefresh}
-        disabled={isDemo || isRefreshing}
-        title={isDemo ? 'Non disponibile in modalità demo' : undefined}
-        className={cn('text-muted-foreground hover:text-foreground', fw)}
-      >
-        <RefreshCw className={cn('mr-2 h-4 w-4', isRefreshing && 'animate-spin')} />
-        Aggiorna
-      </Button>
+      {!stacked && (
+        <Button variant="ghost" onClick={onRefresh} disabled={isDemo || isRefreshing} className={cn('text-muted-foreground hover:text-foreground', size)} aria-label={isRefreshing ? 'Aggiornamento in corso' : 'Aggiorna'}>
+          <RefreshCw className={cn('h-3.5 w-3.5', isRefreshing && 'animate-spin')} aria-hidden="true" />
+          Aggiorna
+        </Button>
+      )}
     </>
   );
-}
-
-const PERIOD_TABS = [
-  { value: 'YTD' as TimePeriod, label: 'YTD', mobileLabel: 'YTD' },
-  { value: '1Y' as TimePeriod, label: '1 Anno', mobileLabel: '1A' },
-  { value: '3Y' as TimePeriod, label: '3 Anni', mobileLabel: '3A' },
-  { value: '5Y' as TimePeriod, label: '5 Anni', mobileLabel: '5A' },
-  { value: 'ALL' as TimePeriod, label: 'Storico', mobileLabel: 'Stor.' },
-] as const;
-
-function PerformancePeriodSelector({
-  selectedPeriod,
-  onPeriodChange,
-}: {
-  selectedPeriod: TimePeriod;
-  onPeriodChange: (p: TimePeriod) => void;
-}) {
-  // When CUSTOM is active, no standard tab is highlighted (chip overlay handles it)
-  const effective = selectedPeriod === 'CUSTOM' ? null : selectedPeriod;
-
-  return (
-    <>
-      {/* Announce the active period to screen readers.
-          Standard tabs use aria-selected; the CUSTOM period has no tab button so it
-          needs an explicit live region so SR users know which period is selected. */}
-      <div role="status" aria-live="polite" className="sr-only">
-        {effective === null ? 'Periodo personalizzato attivo' : `Periodo ${effective} selezionato`}
-      </div>
-
-      {/* Mobile (<1440px): scrollable pill */}
-      <div className="desktop:hidden">
-        <div role="tablist" aria-label="Periodo di analisi" className="flex rounded-xl bg-muted p-1 gap-1">
-          {PERIOD_TABS.map(({ value, mobileLabel }) => (
-            <button
-              key={value}
-              type="button"
-              role="tab"
-              aria-selected={effective === value}
-              onClick={() => onPeriodChange(value)}
-              className={cn(
-                'relative flex-1 flex items-center justify-center h-9 rounded-lg text-xs font-medium',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1',
-                effective !== value && 'text-muted-foreground hover:text-foreground transition-colors duration-150'
-              )}
-            >
-              {effective === value && (
-                <motion.span
-                  layoutId="performance-mobile-tab"
-                  className="absolute inset-0 rounded-lg bg-background shadow-sm"
-                  transition={{ type: 'spring', stiffness: 400, damping: 35 }}
-                />
-              )}
-              <span className={cn('relative z-10', effective === value ? 'text-foreground' : '')}>
-                {mobileLabel}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Desktop (1440px+): tab bar */}
-      <div className="hidden desktop:flex rounded-lg bg-muted p-1 gap-1" role="tablist" aria-label="Periodo di analisi">
-        {PERIOD_TABS.map(({ value, label }) => (
-          <button
-            key={value}
-            type="button"
-            role="tab"
-            aria-selected={effective === value}
-            onClick={() => onPeriodChange(value)}
-            className={cn(
-              'flex-1 h-9 px-3 text-sm font-medium rounded-md transition-all duration-150',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1',
-              effective === value
-                ? 'bg-background text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
-            )}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-    </>
-  );
-}
-
-/**
- * PERFORMANCE PAGE ARCHITECTURE
- *
- * Calculates and displays portfolio performance metrics using Modern Portfolio Theory.
- *
- * CALCULATION ENGINE:
- * All metrics calculated in performanceService.ts using:
- * - Time-Weighted Return (TWR): Eliminates cash flow timing effects, recommended for portfolio evaluation
- * - Money-Weighted Return (IRR): Shows investor's actual personal return including timing decisions
- * - Risk metrics: Sharpe Ratio, Volatility, Drawdown analysis
- * - Rolling metrics: 12-month rolling CAGR and Sharpe with moving average smoothing
- *
- * DATA CACHING STRATEGY:
- * - Snapshots fetched once at page load and cached (cachedSnapshots state)
- * - Prevents redundant API calls when switching between time periods
- * - Custom date range reuses cache + existing metrics (no additional fetches)
- * - Reduces API calls from ~6 (one per period) to 1, improving performance by ~85%
- *
- * TIME PERIODS:
- * - YTD: January 1 of current year → latest snapshot
- * - 1Y/3Y/5Y: Rolling N years backward from today
- * - ALL: From first snapshot to latest (entire portfolio history)
- * - CUSTOM: User-selected date range via dialog
- *
- * KEY TRADE-OFFS:
- * - Heavy client-side calculations vs server API: Client chosen for real-time period switching
- * - Cached snapshots increase memory (~20KB for 50 snapshots) but reduce latency by 90%
- * - Rolling metrics (12-month windows) pre-calculated for all periods to avoid lazy loading delays
- * - Duplicate chart rendering (heatmap, underwater) vs single unified chart: Separate for clarity and modularity
- */
-
-/**
- * Frase che dichiara su quale capitale girano le metriche della pagina.
- *
- * Esiste perché la domanda ricorrente è "perché il drawdown non torna con il grafico del patrimonio
- * in Storico?": la risposta è che le due pagine misurano capitali diversi, e va detto sulla pagina,
- * non lasciato dedurre.
- */
-function describePerformanceBase(options: PerformanceBaseOptions): string {
-  const excluded = [
-    options.includePensionFunds ? null : 'fondo pensione',
-    options.includeExcludedAssets ? null : 'immobili esclusi dall’allocazione',
-  ].filter(Boolean);
-
-  if (excluded.length === 0) {
-    return 'Base: patrimonio totale, fondo pensione e immobili inclusi.';
-  }
-  return `Base: portafoglio gestito, al netto di ${excluded.join(' e ')}. Il patrimonio completo è in Storico.`;
 }
 
 export default function PerformancePage() {
@@ -292,66 +258,60 @@ export default function PerformancePage() {
   const [isPendingPeriodChange, startPeriodTransition] = useTransition();
   const [performanceData, setPerformanceData] = useState<PerformanceData | null>(null);
   const [loading, setLoading] = useState(true);
+  /** A failed load is not an empty set: it gets an alert, never a verdict about zeros. */
+  const [loadFailed, setLoadFailed] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('YTD');
   const [showCustomDateDialog, setShowCustomDateDialog] = useState(false);
   const [showAIAnalysisDialog, setShowAIAnalysisDialog] = useState(false);
   const [cachedSnapshots, setCachedSnapshots] = useState<MonthlySnapshot[]>([]);
-  // Kept in state only to name the base in the UI — the numbers themselves already carry it via
-  // cachedSnapshots. Defaults match resolvePerformanceBaseOptions so the caption is right on first paint.
-  const [baseOptions, setBaseOptions] = useState<PerformanceBaseOptions>({
-    includePensionFunds: false,
-    includeExcludedAssets: false,
-  });
-  const [isMethodologyOpen, setIsMethodologyOpen] = useState(false);
-  // Detailed metric sections are collapsed by default — the hero now carries the essentials,
-  // so the full 15-metric breakdown is one click away rather than a wall on arrival (A3).
-  const [isAllMetricsOpen, setIsAllMetricsOpen] = useState(false);
+  // The resolved base (which capital, the pension entry month, the boundary flows), the inputs the
+  // attribution reads beside it, and the dividends it adds to each instrument.
+  const [base, setBase] = useState<PerformanceBaseResolution | null>(null);
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [pensionContributions, setPensionContributions] = useState<PensionContribution[]>([]);
+  const [dividends, setDividends] = useState<DividendReceipt[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [customDialogOrigin, setCustomDialogOrigin] = useState<string | undefined>(undefined);
   const [aiDialogOrigin, setAiDialogOrigin] = useState<string | undefined>(undefined);
   const hasLoadedOnceRef = useRef(false);
 
-  const periodLabels: Record<Exclude<TimePeriod, 'ROLLING_12M' | 'ROLLING_36M'>, string> = {
-    YTD: 'YTD',
-    '1Y': '1 Anno',
-    '3Y': '3 Anni',
-    '5Y': '5 Anni',
-    ALL: 'Storico',
-    CUSTOM: 'Personalizzato',
-  };
-
-  const chartColors = useChartColors();
-
-  // Asset trade ledger (Fase D §5): "Capitale investito" + "Plusvalenze realizzate" are gated on
-  // migration having run — degrade to today's page (nothing rendered) while meta is absent, same
-  // as the Patrimonio entry points (Fase C). Trades query only fires once migrated.
+  // Asset trade ledger: «Capitale investito» and «Plusvalenze realizzate» are gated on the migration
+  // having run — the tiles degrade (no ledger figure, no Plusvalenze tile) while meta is absent.
   const { data: ledgerMeta } = useAssetLedgerMeta(ownerId);
   const isLedgerMigrated = !!ledgerMeta;
-  const { data: ledgerTrades = [] } = useAssetTransactions(ownerId, undefined, {
-    enabled: isLedgerMigrated,
-  });
+  const { data: ledgerTrades = [] } = useAssetTransactions(ownerId, undefined, { enabled: isLedgerMigrated });
+  // The base resolution reads the ledger too (the measured flows prefer it): through the SAME query
+  // key as the hook above, so the two share one read instead of two.
+  const queryClient = useQueryClient();
 
-  // Reference benchmark for the hero "vs benchmark" delta — the first model portfolio
-  // (Portafoglio 60/40), the same default the comparison section selects. Fetched lazily
-  // and cached 6h, so the delta pops into the hero shortly after first load.
-  const referenceBenchmark = BENCHMARKS[0];
-  const { data: referenceBenchmarkReturns, isLoading: isBenchmarkLoading } =
-    useBenchmarkReturns(referenceBenchmark.id, true);
-  // The portfolio TWR is EUR-denominated, so the hero must compare it against an
-  // EUR-converted benchmark — otherwise the delta mixes currencies (the benchmark's
-  // USD return vs an EUR portfolio). Always fetch FX so the chip matches the comparison
-  // table's "Converti benchmark in EUR" view, not its USD default.
-  const { data: fxRates, isLoading: isFxLoading } = useFxRates(true);
+  // The six model portfolios, one fixed hook each (React rules: a stable hook count), all enabled:
+  // the Benchmark tile is always on the page. The FX series is what makes them EUR — the portfolio is
+  // EUR-denominated, so a USD return beside it would compare two currencies.
+  const b0 = useBenchmarkReturns(BENCHMARKS[0].id, true);
+  const b1 = useBenchmarkReturns(BENCHMARKS[1].id, true);
+  const b2 = useBenchmarkReturns(BENCHMARKS[2].id, true);
+  const b3 = useBenchmarkReturns(BENCHMARKS[3].id, true);
+  const b4 = useBenchmarkReturns(BENCHMARKS[4].id, true);
+  const b5 = useBenchmarkReturns(BENCHMARKS[5].id, true);
+  const { data: fxRates, isLoading: isFxLoading, isError: isFxError } = useFxRates(true);
+  const benchmarkResults = [b0, b1, b2, b3, b4, b5];
+  const isAnyBenchmarkLoading = benchmarkResults.some((r) => r.isLoading) || isFxLoading;
 
-  // Responsive breakpoints
-  const isMobile = useMediaQuery('(max-width: 767px)');
-  const isLandscape = useMediaQuery('(min-width: 568px) and (max-height: 500px) and (orientation: landscape)');
-
-  useEffect(() => {
-    if (user && ownerId) {
-      loadPerformanceData();
-    }
-  }, [user, ownerId]);
+  // EUR-converted series per model. While FX is still loading nothing is converted yet, so the
+  // ranking waits (an unconverted USD row beside an EUR portfolio would be a wrong number, not a
+  // late one); if FX failed for good the raw series are used and the tiles say USD.
+  const benchmarkCurrency: 'EUR' | 'USD' = isFxError ? 'USD' : 'EUR';
+  const eurReturnsById = useMemo(() => {
+    const map: Record<string, MonthlyReturnPoint[] | undefined> = {};
+    if (isFxLoading) return map;
+    BENCHMARKS.forEach((b, i) => {
+      const raw = benchmarkResults[i].data;
+      if (!raw) return;
+      map[b.id] = fxRates && fxRates.length > 0 ? applyFxConversion(raw, fxRates) : raw;
+    });
+    return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [b0.data, b1.data, b2.data, b3.data, b4.data, b5.data, fxRates, isFxLoading]);
 
   const calculateDialogOrigin = (element: HTMLElement) => {
     const rect = element.getBoundingClientRect();
@@ -362,7 +322,6 @@ export default function PerformancePage() {
 
   const handlePeriodChange = (nextPeriod: TimePeriod) => {
     if (nextPeriod === selectedPeriod) return;
-
     startPeriodTransition(() => {
       setSelectedPeriod(nextPeriod);
     });
@@ -375,147 +334,46 @@ export default function PerformancePage() {
   };
 
   /**
-   * Load all performance data and cache snapshots for period switching.
-   *
-   * CACHING STRATEGY:
-   * 1. Fetch snapshots once and store in component state (cachedSnapshots)
-   * 2. Fetch all pre-calculated metrics from performanceService
-   * 3. Subsequent period switches reuse cached snapshots (no new API calls)
-   *
-   * Performance improvement: Reduces API calls from 6+ to 1 when switching periods.
-   * Cache invalidation: Only on explicit refresh button click or page reload.
+   * Load every period's metrics and cache the base-projected snapshots for period switching:
+   * one fetch of the snapshots, one of the pre-computed metrics, then the two yield routes per
+   * period in parallel. A refresh bypasses the Firestore cache and rewrites it.
    */
   const loadPerformanceData = async () => {
     if (!user || !ownerId) return;
-
     try {
       const isInitialLoad = !hasLoadedOnceRef.current;
-      if (isInitialLoad) {
-        setLoading(true);
-      } else {
-        setIsRefreshing(true);
-      }
+      if (isInitialLoad) setLoading(true);
+      else setIsRefreshing(true);
+      setLoadFailed(false);
 
-      // Fetch snapshots once and cache them in component state.
-      // This cache will be reused for all period switches and custom date ranges,
-      // eliminating redundant API calls and improving performance by ~85%.
-      const [rawSnapshots, assetsForBase, baseSettings] = await Promise.all([
+      const [rawSnapshots, loadedAssets, baseSettings, contributions, loadedDividends, trades] = await Promise.all([
         getUserSnapshots(ownerId),
         getAllAssets(ownerId),
         getSettings(ownerId),
+        getPensionContributions(ownerId),
+        getDividendReceipts(ownerId),
+        queryClient.fetchQuery({ queryKey: queryKeys.assetTransactions.all(ownerId), queryFn: () => getAssetTransactions(ownerId) }),
       ]);
-      // Same portfolio base as getAllPerformanceData (performanceBase.ts): the client-side
-      // chart/heatmap/custom-range helpers below all read cachedSnapshots directly, so they need the
-      // exact same exclusions — and the same user settings driving them — or a custom period would
-      // silently disagree with the pre-computed YTD/1Y/3Y/5Y/ALL metrics.
-      const baseOptions = resolvePerformanceBaseOptions(baseSettings);
-      const snapshots = toPerformanceBaseSnapshots(
-        rawSnapshots,
-        resolvePerformanceExclusions(assetsForBase, baseOptions)
-      );
-      setCachedSnapshots(snapshots);
-      setBaseOptions(baseOptions);
+      // The SAME base resolution as getAllPerformanceData (performanceBase.ts): the client-side chart,
+      // heatmap, custom-range and attribution helpers read cachedSnapshots and the flows directly, so
+      // they need the exact same projection or a custom period would disagree with the pre-computed ones.
+      const resolved = resolvePerformanceBase({ snapshots: rawSnapshots, assets: loadedAssets, contributions, settings: baseSettings, trades });
+      setCachedSnapshots(resolved.snapshots);
+      setBase(resolved);
+      setAssets(loadedAssets);
+      setPensionContributions(contributions);
+      setDividends(loadedDividends);
 
-      // forceRefresh on explicit button click so the cache is bypassed and rewritten
-      const isRefresh = hasLoadedOnceRef.current;
-      const data = await getAllPerformanceData(ownerId, isRefresh);
+      const data = await getAllPerformanceData(ownerId, hasLoadedOnceRef.current);
 
-      // Fetch YOC and Current Yield metrics for all periods in parallel
-      // Both require server-side calculation due to Firebase Admin SDK usage
       const periods = ['ytd', 'oneYear', 'threeYear', 'fiveYear', 'allTime'] as const;
-      const metricsPromises = periods.map(async (periodKey) => {
-        const metrics = data[periodKey];
-        // Only fetch metrics if period has sufficient data
-        if (metrics.hasInsufficientData) {
-          return {
-            yocGross: null,
-            yocNet: null,
-            yocDividendsGross: 0,
-            yocDividendsNet: 0,
-            yocCostBasis: 0,
-            yocAssetCount: 0,
-            currentYield: null,
-            currentYieldNet: null,
-            currentYieldDividends: 0,
-            currentYieldDividendsNet: 0,
-            currentYieldPortfolioValue: 0,
-            currentYieldAssetCount: 0,
-          };
-        }
-
-        try {
-          const params = new URLSearchParams({
-            userId: ownerId,
-            startDate: metrics.startDate.toISOString(),
-            dividendEndDate: metrics.dividendEndDate.toISOString(),
-            numberOfMonths: metrics.numberOfMonths.toString(),
-          });
-
-          // Fetch YOC and Current Yield in parallel for each period
-          const [yocResponse, currentYieldResponse] = await Promise.all([
-            authenticatedFetch(`/api/performance/yoc?${params.toString()}`),
-            authenticatedFetch(`/api/performance/current-yield?${params.toString()}`),
-          ]);
-
-          const yocData = yocResponse.ok
-            ? await yocResponse.json()
-            : {
-                yocGross: null,
-                yocNet: null,
-                yocDividendsGross: 0,
-                yocDividendsNet: 0,
-                yocCostBasis: 0,
-                yocAssetCount: 0,
-              };
-
-          const currentYieldData = currentYieldResponse.ok
-            ? await currentYieldResponse.json()
-            : {
-                currentYield: null,
-                currentYieldNet: null,
-                currentYieldDividends: 0,
-                currentYieldDividendsNet: 0,
-                currentYieldPortfolioValue: 0,
-                currentYieldAssetCount: 0,
-              };
-
-          if (!yocResponse.ok) {
-            console.warn(`Failed to fetch YOC for ${periodKey}:`, yocResponse.statusText);
-          }
-          if (!currentYieldResponse.ok) {
-            console.warn(`Failed to fetch Current Yield for ${periodKey}:`, currentYieldResponse.statusText);
-          }
-
-          return { ...yocData, ...currentYieldData };
-        } catch (error) {
-          console.error(`Error fetching metrics for ${periodKey}:`, error);
-          return {
-            yocGross: null,
-            yocNet: null,
-            yocDividendsGross: 0,
-            yocDividendsNet: 0,
-            yocCostBasis: 0,
-            yocAssetCount: 0,
-            currentYield: null,
-            currentYieldNet: null,
-            currentYieldDividends: 0,
-            currentYieldDividendsNet: 0,
-            currentYieldPortfolioValue: 0,
-            currentYieldAssetCount: 0,
-          };
-        }
-      });
-
-      const metricsResults = await Promise.all(metricsPromises);
-
-      // Merge YOC and Current Yield data into performance data
-      periods.forEach((periodKey, index) => {
-        Object.assign(data[periodKey], metricsResults[index]);
-      });
+      const yields = await Promise.all(periods.map((key) => fetchYieldMetrics(ownerId, data[key])));
+      periods.forEach((key, index) => Object.assign(data[key], yields[index]));
 
       setPerformanceData(data);
       hasLoadedOnceRef.current = true;
     } catch (error) {
+      setLoadFailed(true);
       console.error('Error loading performance data:', error);
       toast.error('Errore nel caricamento delle metriche di performance');
     } finally {
@@ -524,68 +382,35 @@ export default function PerformancePage() {
     }
   };
 
-  /**
-   * Calculate metrics for a custom user-selected date range.
-   *
-   * Uses cached snapshots and existing settings (risk-free rate, dividend category)
-   * to avoid redundant API calls. This enables instant custom period calculations
-   * without re-fetching data from Firebase.
-   *
-   * @param startDate - Custom period start date
-   * @param endDate - Custom period end date
-   */
+  // First load, and again when the viewed account changes; a refresh re-runs the same function.
+  useEffect(() => {
+    if (!user || !ownerId) return;
+    // Deferred so the effect body itself sets no state (react-hooks/set-state-in-effect).
+    const timer = setTimeout(() => {
+      loadPerformanceData();
+    }, 0);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, ownerId]);
+
+  /** A custom range recomputes from the cached snapshots — no round trip but the two yield routes. */
   const handleCustomDateRange = async (startDate: Date, endDate: Date) => {
     if (!user || !ownerId || !performanceData || cachedSnapshots.length === 0) return;
-
     try {
-      // Use cached snapshots instead of fetching again (reuses loadPerformanceData cache)
       const customMetrics = await calculatePerformanceForPeriod(
         ownerId,
-        cachedSnapshots,  // Cached snapshots from initial load
+        cachedSnapshots,
         'CUSTOM',
         performanceData.ytd.riskFreeRate,
         startDate,
         endDate,
-        undefined,  // preFetchedExpenses
-        performanceData.ytd.dividendCategoryId  // Reuse categoryId from settings
+        undefined,
+        performanceData.ytd.dividendCategoryId,
+        base?.pensionFlows ?? [],
+        base?.portfolioFlows ?? [],
       );
-
-      // Fetch YOC and Current Yield for custom period if sufficient data
-      if (!customMetrics.hasInsufficientData) {
-        try {
-          const params = new URLSearchParams({
-            userId: ownerId,
-            startDate: customMetrics.startDate.toISOString(),
-            dividendEndDate: customMetrics.dividendEndDate.toISOString(),
-            numberOfMonths: customMetrics.numberOfMonths.toString(),
-          });
-
-          // Fetch YOC and Current Yield in parallel
-          const [yocResponse, currentYieldResponse] = await Promise.all([
-            authenticatedFetch(`/api/performance/yoc?${params.toString()}`),
-            authenticatedFetch(`/api/performance/current-yield?${params.toString()}`),
-          ]);
-
-          if (yocResponse.ok) {
-            const yocData = await yocResponse.json();
-            Object.assign(customMetrics, yocData);
-          }
-
-          if (currentYieldResponse.ok) {
-            const currentYieldData = await currentYieldResponse.json();
-            Object.assign(customMetrics, currentYieldData);
-          }
-        } catch (error) {
-          console.error('Error fetching metrics for custom period:', error);
-          // Continue without YOC/Current Yield data (will show null values)
-        }
-      }
-
-      setPerformanceData({
-        ...performanceData,
-        custom: customMetrics,
-      });
-
+      Object.assign(customMetrics, await fetchYieldMetrics(ownerId, customMetrics));
+      setPerformanceData({ ...performanceData, custom: customMetrics });
       handlePeriodChange('CUSTOM');
       toast.success('Periodo personalizzato calcolato');
     } catch (error) {
@@ -594,17 +419,9 @@ export default function PerformancePage() {
     }
   };
 
-  /**
-   * Get performance metrics for currently selected time period.
-   *
-   * @returns PerformanceMetrics for active period, or null if not loaded
-   *
-   * Note: Custom period only exists after user creates it via date picker dialog.
-   * All other periods (YTD, 1Y, 3Y, 5Y, ALL) pre-calculated on page load.
-   */
+  // ─── The selected period's metrics and the derived series ──────────────────
   const metrics = useMemo<PerformanceMetrics | null>(() => {
     if (!performanceData) return null;
-
     switch (selectedPeriod) {
       case 'YTD': return performanceData.ytd;
       case '1Y': return performanceData.oneYear;
@@ -617,20 +434,13 @@ export default function PerformancePage() {
   }, [performanceData, selectedPeriod]);
 
   // The same snapshot window the service measured, read back off the payload — never re-derived
-  // from today's date, which is how the charts and the metrics used to disagree (finding A10).
+  // from today's date, which is how the charts and the metrics used to disagree.
   const periodSnapshots = useMemo(() => {
     if (!metrics || cachedSnapshots.length === 0) return [];
     return selectSnapshotsForMetrics(cachedSnapshots, metrics);
   }, [cachedSnapshots, metrics]);
 
-  // Is the first snapshot a month BEFORE the period the user asked for? Then it is only the starting
-  // valuation and must not be drawn as a point of the period. Data-driven and shared with the
-  // service's own definition — a YTD without a December snapshot, or a 3Y on 14 months of history,
-  // legitimately has no baseline and must show its first month.
-  const hasBaseline = useMemo(
-    () => resolveHasBaseline(periodSnapshots, metrics?.nominalPeriodStart),
-    [periodSnapshots, metrics]
-  );
+  const hasBaseline = useMemo(() => resolveHasBaseline(periodSnapshots, metrics?.nominalPeriodStart), [periodSnapshots, metrics]);
 
   const chartData = useMemo(() => {
     if (!metrics || periodSnapshots.length === 0) return [];
@@ -647,1076 +457,417 @@ export default function PerformancePage() {
     return prepareUnderwaterDrawdownData(periodSnapshots, metrics.cashFlows, hasBaseline);
   }, [metrics, periodSnapshots, hasBaseline]);
 
-  // ── Hero-synthesis values (pure layer) ──
-  // Benchmark annualized return over the active period, using the SAME indexing+annualize
-  // math as the comparison table (shared util) so the hero delta matches the table exactly.
-  const benchmarkAnnualized = useMemo(() => {
-    if (!metrics || !referenceBenchmarkReturns) return null;
-    // Convert the benchmark's native (USD) returns to EUR before annualizing, mirroring
-    // the comparison table's FX logic so hero and table report the same number.
-    const eurReturns =
-      fxRates && fxRates.length > 0
-        ? applyFxConversion(referenceBenchmarkReturns, fxRates)
-        : referenceBenchmarkReturns;
-    return computeBenchmarkAnnualizedReturn(
-      eurReturns,
-      metrics.startDate,
-      metrics.endDate,
-      metrics.numberOfMonths
-    );
-  }, [metrics, referenceBenchmarkReturns, fxRates]);
+  // ─── The figures the tiles add (pure layer) ─────────────────────────────────
+  const referenceReturns = eurReturnsById[REFERENCE_BENCHMARK.id] ?? null;
+
+  const growthSeries = useMemo(() => {
+    if (!metrics) return { baseMonth: null, points: [], portfolioEnd: null, benchmarkEnd: null };
+    return buildGrowthOfHundred({ heatmap: heatmapData, benchmarkReturns: referenceReturns, startDate: metrics.startDate, endDate: metrics.endDate });
+  }, [metrics, heatmapData, referenceReturns]);
+
+  const ranking = useMemo(() => {
+    if (!metrics) return { rows: [], beaten: 0, tied: 0, measured: 0 };
+    return computeBenchmarkRanking({
+      portfolioTWR: metrics.timeWeightedReturn,
+      numberOfMonths: metrics.numberOfMonths,
+      startDate: metrics.startDate,
+      endDate: metrics.endDate,
+      benchmarks: BENCHMARKS,
+      returnsById: eurReturnsById,
+    });
+  }, [metrics, eurReturnsById]);
+
+  const referenceRow = ranking.rows.find((r) => r.id === REFERENCE_BENCHMARK.id) ?? null;
+  const benchmarkDelta = computeBenchmarkDelta(metrics?.timeWeightedReturn ?? null, referenceRow?.annualized ?? null);
+  const benchmark = benchmarkDelta === null ? null : { name: REFERENCE_BENCHMARK.name, delta: benchmarkDelta };
+  const referenceModel = referenceRow?.annualized == null ? null : { name: REFERENCE_BENCHMARK.name, annualized: referenceRow.annualized };
 
   // The hero states the period return instead of an annualized one when the window is too short for
-  // the extrapolation to mean anything (A7). Verdict and benchmark delta below deliberately keep the
-  // ANNUALIZED figure: "beats the risk-free rate" and "vs benchmark" are per-year comparisons.
-  const heroReturn = resolveHeroReturn(
-    metrics?.timeWeightedReturn ?? null,
-    metrics?.numberOfMonths ?? 0
+  // the extrapolation to mean anything. Verdict quality and the benchmark delta keep the ANNUALIZED
+  // figure: «beats the risk-free rate» and «vs benchmark» are per-year comparisons.
+  const heroReturn = resolveHeroReturn(metrics?.timeWeightedReturn ?? null, metrics?.numberOfMonths ?? 0);
+  // The second chip: the period's cumulative TWR (the ROI, a gain over the first month's capital, lives in the Dettaglio).
+  const periodReturnChip = resolvePeriodReturnChip(metrics?.timeWeightedReturn ?? null, metrics?.numberOfMonths ?? 0, heroReturn);
+  const quality = metrics
+    ? summarizePerformance({ timeWeightedReturn: metrics.timeWeightedReturn, sharpeRatio: metrics.sharpeRatio, riskFreeRate: metrics.riskFreeRate })
+    : null;
+  const consistency = useMemo(() => computeReturnConsistency(heatmapData), [heatmapData]);
+  const drawdownStatus = useMemo(() => computeDrawdownStatus(underwaterData), [underwaterData]);
+  const drawdownStory = useMemo(() => (metrics ? resolveDrawdownStory(periodSnapshots, metrics.cashFlows) : null), [metrics, periodSnapshots]);
+  const sortinoRatio = useMemo(
+    () => (metrics ? computeSortinoRatio(heatmapData, metrics.timeWeightedReturn, metrics.riskFreeRate) : null),
+    [metrics, heatmapData],
   );
 
-  const benchmarkDelta = computeBenchmarkDelta(metrics?.timeWeightedReturn ?? null, benchmarkAnnualized);
-  const performanceVerdict = metrics
-    ? summarizePerformance({
-        timeWeightedReturn: metrics.timeWeightedReturn,
-        sharpeRatio: metrics.sharpeRatio,
-        riskFreeRate: metrics.riskFreeRate,
-      })
-    : null;
-  const returnConsistency = useMemo(() => computeReturnConsistency(heatmapData), [heatmapData]);
-  const drawdownStatus = useMemo(() => computeDrawdownStatus(underwaterData), [underwaterData]);
+  // Da dove viene il rendimento: the market gain of the SAME window and base, instrument by
+  // instrument, with the dividends received in it (capped at today like every dividend figure).
+  const attribution = useMemo(() => {
+    if (!metrics || !base || periodSnapshots.length === 0) return null;
+    return attributePeriodReturn({
+      snapshots: periodSnapshots,
+      cashFlows: metrics.cashFlows,
+      excludedAssetIds: base.excludedAssetIds,
+      pension: { fundIds: base.pensionFundIds, entryMonth: base.pensionEntryMonth, contributions: pensionContributions },
+      assets,
+      dividendsByAsset: sumDividendsByAsset(dividends, metrics.startDate, metrics.dividendEndDate),
+    });
+  }, [metrics, base, periodSnapshots, pensionContributions, assets, dividends]);
 
-  // Capitale investito (Fase D §5): SAME period bounds as the page — never a recalculated window
-  // (Cross-Component Metric Consistency, AGENTS.md).
+  // Capitale investito: the SAME period bounds as the page, never a recalculated window.
   const investedCapital = useMemo(() => {
-    if (!metrics) return null;
+    if (!metrics || !isLedgerMigrated) return null;
     return computeInvestedCapital(ledgerTrades, metrics.startDate, metrics.endDate);
-  }, [metrics, ledgerTrades]);
+  }, [metrics, ledgerTrades, isLedgerMigrated]);
 
-  // Plusvalenze realizzate (Fase D §5): all-time, independent of the selected period — a realized
-  // sale belongs to its own fiscal year regardless of which period is currently viewed.
+  // Plusvalenze realizzate: all-time, independent of the selected period — a sale belongs to its fiscal year.
   const realizedGains = useMemo(() => aggregateRealizedByYear(ledgerTrades), [ledgerTrades]);
-  const hasRealizedGains = Object.keys(realizedGains.byYear).length > 0;
+  const realizedSummary = useMemo(() => (isLedgerMigrated ? summarizeRealizedGains(realizedGains.byYear) : null), [isLedgerMigrated, realizedGains]);
 
-  // Responsive helper function
-  const getChartHeight = () => {
-    if (isLandscape) return 300;
-    if (isMobile) return 280;
-    return 400;
-  };
-
-  // 3-month moving average smooths short-term volatility while preserving trends.
-  // Shorter window (1-2 months) is too noisy and shows random fluctuations.
-  // Longer window (6+ months) masks recent changes and lags too much behind current performance.
-  // 3 months chosen as optimal balance based on financial analysis best practices.
-  const rollingCagrMaWindowMonths = 3;
-  const rollingSharpeMaWindowMonths = 3;
-
-  /**
-   * Calculate rolling 12-month CAGR with moving average smoothing.
-   *
-   * ROLLING WINDOW EXPLAINED:
-   * Each data point represents the CAGR for a 12-month period ending on that date.
-   * Example: Point at Dec 2024 shows CAGR from Jan 2024 to Dec 2024.
-   *
-   * WHY ROLLING:
-   * Shows if performance is improving/degrading over time. Better than single
-   * point-to-point CAGR which can be skewed by start/end date timing luck.
-   *
-   * MOVING AVERAGE:
-   * 3-month MA smooths out month-to-month noise to reveal underlying trends.
-   * Makes it easier to see if performance is consistently improving or declining.
-   *
-   * @param currentMetrics - If provided, filters rolling data to this period's date range
-   * @returns Array with cagr and cagrMA (moving average) for each month
-   */
-  const getRollingCagrData = (currentMetrics: PerformanceMetrics | null) => {
-    if (!performanceData) {
-      return [];
-    }
-
-    const sourceData = performanceData.rolling12M;
-
-    const filteredData = currentMetrics
-      ? sourceData.filter((entry) => {
-          const entryDate = new Date(entry.periodEndDate);
-          return entryDate >= currentMetrics.startDate && entryDate <= currentMetrics.endDate;
-        })
-      : sourceData;
-
-    return filteredData.map((entry, index) => {
-      const startIndex = Math.max(0, index - rollingCagrMaWindowMonths + 1);
-      const windowValues = filteredData
-        .slice(startIndex, index + 1)
-        .map((item) => item.cagr)
-        .filter((value) => Number.isFinite(value));
-
-      const cagrMA = windowValues.length > 0
-        ? windowValues.reduce((sum, value) => sum + value, 0) / windowValues.length
-        : null;
-
-      return { ...entry, cagrMA };
+  const verdict = useMemo(() => {
+    if (!metrics || !quality) return null;
+    return buildPerformanceVerdict({
+      period: selectedPeriod,
+      nominalPeriodStart: metrics.nominalPeriodStart,
+      startDate: metrics.startDate,
+      endDate: metrics.endDate,
+      numberOfMonths: metrics.numberOfMonths,
+      heroReturn,
+      annualizedReturn: metrics.timeWeightedReturn,
+      quality,
+      sharpeRatio: metrics.sharpeRatio,
+      benchmark: referenceModel,
+      drawdown: drawdownStory,
+      consistency,
     });
-  };
+    // heroReturn/quality/referenceModel are derived from the same inputs as the deps below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [metrics, selectedPeriod, referenceRow?.annualized, drawdownStory, consistency]);
 
-  /**
-   * Calculate rolling 12-month Sharpe Ratio with moving average smoothing.
-   *
-   * Similar to getRollingCagrData but for risk-adjusted returns.
-   * Each point shows Sharpe Ratio for 12 months ending on that date.
-   *
-   * Sharpe Ratio = (Portfolio Return - Risk-Free Rate) / Portfolio Volatility
-   * Higher values = better risk-adjusted performance
-   *
-   * @param currentMetrics - If provided, filters rolling data to this period's date range
-   * @returns Array with sharpeRatio and sharpeRatioMA (moving average) for each month
-   */
-  const getRollingSharpeData = (currentMetrics: PerformanceMetrics | null) => {
-    if (!performanceData) {
-      return [];
-    }
-
-    const sourceData = performanceData.rolling12M;
-
-    const filteredData = currentMetrics
-      ? sourceData.filter((entry) => {
-          const entryDate = new Date(entry.periodEndDate);
-          return entryDate >= currentMetrics.startDate && entryDate <= currentMetrics.endDate;
-        })
-      : sourceData;
-
-    return filteredData.map((entry, index) => {
-      const startIndex = Math.max(0, index - rollingSharpeMaWindowMonths + 1);
-      const windowValues = filteredData
-        .slice(startIndex, index + 1)
-        .map((item) => item.sharpeRatio)
-        .filter((value): value is number => value !== null);
-
-      const sharpeRatioMA = windowValues.length > 0
-        ? windowValues.reduce((sum, value) => sum + value, 0) / windowValues.length
-        : null;
-
-      return { ...entry, sharpeRatioMA };
+  const rollingCagr = useMemo(() => {
+    if (!performanceData || !metrics) return [];
+    const rows = performanceData.rolling12M.filter((e) => {
+      const d = new Date(e.periodEndDate);
+      return d >= metrics.startDate && d <= metrics.endDate;
     });
-  };
+    // A 3-month moving average smooths the month-to-month noise without lagging behind the trend.
+    return rows.map((entry, index) => {
+      const window = rows.slice(Math.max(0, index - 2), index + 1).map((r) => r.cagr).filter((v): v is number => v !== null && Number.isFinite(v));
+      return { ...entry, cagrMA: window.length > 0 ? window.reduce((s, v) => s + v, 0) / window.length : null };
+    });
+  }, [performanceData, metrics]);
 
-  const rollingCagrData = getRollingCagrData(metrics);
-  const rollingSharpeData = getRollingSharpeData(metrics);
-  const periodRenderKey = metrics
-    ? `${selectedPeriod}-${metrics.startDate.toISOString()}-${metrics.endDate.toISOString()}`
-    : selectedPeriod;
-  const periodDateRangeLabel = metrics
-    ? `${metrics.startDate.toLocaleDateString('it-IT')} - ${metrics.endDate.toLocaleDateString('it-IT')}`
-    : '';
+  const rollingSharpe = useMemo(() => {
+    if (!performanceData || !metrics) return [];
+    const rows = performanceData.rolling12M.filter((e) => {
+      const d = new Date(e.periodEndDate);
+      return d >= metrics.startDate && d <= metrics.endDate;
+    });
+    return rows.map((entry, index) => {
+      const window = rows.slice(Math.max(0, index - 2), index + 1).map((r) => r.sharpeRatio).filter((v): v is number => v !== null);
+      return { ...entry, sharpeRatioMA: window.length > 0 ? window.reduce((s, v) => s + v, 0) / window.length : null };
+    });
+  }, [performanceData, metrics]);
 
+  const periodRenderKey = metrics ? `${selectedPeriod}-${metrics.startDate.toISOString()}-${metrics.endDate.toISOString()}` : selectedPeriod;
+  const currentYear = getItalyMonthYear().year;
+
+  const headerActions = (stacked: boolean) => (
+    <HeaderActions
+      stacked={stacked}
+      isDemo={isDemo}
+      aiDisabled={isDemo || !metrics || metrics.hasInsufficientData}
+      isRefreshing={isRefreshing}
+      onCustom={(event) => {
+        setCustomDialogOrigin(calculateDialogOrigin(event.currentTarget));
+        setShowCustomDateDialog(true);
+      }}
+      onAI={(event) => {
+        setAiDialogOrigin(calculateDialogOrigin(event.currentTarget));
+        setShowAIAnalysisDialog(true);
+      }}
+      onRefresh={loadPerformanceData}
+    />
+  );
+
+  const header = (
+    <PageHeader
+      label="Analisi"
+      title="Rendimenti"
+      description={describeHeaderWindow(metrics)}
+      actions={
+        <>
+          <div className="hidden items-center gap-2 desktop:flex">{headerActions(false)}</div>
+          {/* The sticky navbar's slot is cramped: only the refresh fits there on a phone. */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={loadPerformanceData}
+            disabled={isDemo || isRefreshing}
+            className="h-9 w-9 text-muted-foreground desktop:hidden"
+            aria-label={isRefreshing ? 'Aggiornamento in corso' : 'Aggiorna'}
+          >
+            <RefreshCw className={cn('h-4 w-4', isRefreshing && 'animate-spin')} aria-hidden="true" />
+          </Button>
+        </>
+      }
+    />
+  );
+
+  const picker = <PerformancePeriodPicker value={selectedPeriod} onChange={(p: PickerPeriod) => handlePeriodChange(p)} />;
+
+  // ─── Loading and empty states ───────────────────────────────────────────────
   if (loading) {
-    // Skeleton screen mirrors the real page layout so the transition feels seamless.
-    return <PerformancePageSkeleton />;
-  }
-
-  if (!performanceData || !metrics) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <div className="text-center">
-          <Info className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-          <h2 className="text-xl font-semibold mb-2">Dati insufficienti</h2>
-          <p className="text-muted-foreground max-w-md">
-            Servono almeno 2 snapshot mensili per calcolare le metriche di performance.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  if (metrics.hasInsufficientData) {
     return (
       <PageContainer>
-        <PageHeader
-          label="Portafoglio"
-          title="Rendimenti del Portafoglio"
-          description="Analisi dei rendimenti e metriche di rischio-rendimento"
-        />
-
-        <PerformancePeriodSelector
-          selectedPeriod={selectedPeriod}
-          onPeriodChange={handlePeriodChange}
-        />
-
-        <Card className="mt-6">
-          <CardContent className="pt-6">
-            <div className="text-center py-12">
-              <Info className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-              <h3 className="text-lg font-semibold mb-2">Dati insufficienti per questo periodo</h3>
-              <p className="text-muted-foreground">
-                Servono almeno 2 snapshot mensili per calcolare le metriche.
-                {metrics.errorMessage && <><br />{metrics.errorMessage}</>}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        {header}
+        <TileGridSkeleton cells={SKELETON_CELLS} toolbar={<Skeleton className="h-9 w-72 rounded-full" />} />
       </PageContainer>
     );
   }
 
+  // A failed read comes BEFORE the empty branch: `[]` on failure is indistinguishable from `[]`
+  // on a new account, and the empty branch would judge a set that was never read.
+  if (loadFailed) {
+    return (
+      <PageContainer>
+        {header}
+        <ErrorNotice
+          className="max-w-[920px]"
+          onRetry={() => void loadPerformanceData()}
+          notice={describeReadFailure({
+            consequence: 'Le metriche di rendimento non sono state lette: un rendimento non misurato non è uno zero.',
+            untouched: 'Le rilevazioni e le operazioni registrate non sono state toccate.',
+            canRetry: true,
+          })}
+        />
+      </PageContainer>
+    );
+  }
+
+  if (!performanceData || !metrics || metrics.hasInsufficientData) {
+    return (
+      <PageContainer>
+        {header}
+        <div className="flex flex-col gap-3 pt-1 desktop:flex-row desktop:items-start desktop:justify-between desktop:gap-6">
+          <PageVerdict
+            verdict={{
+              headline: 'Servono almeno due snapshot mensili per misurare un rendimento.',
+              tone: 'neutral',
+              sentence: [
+                { text: metrics?.errorMessage ? `${metrics.errorMessage}. ` : '' },
+                { text: 'Ogni snapshot è una fotografia di fine mese del portafoglio; il primo è la valutazione di partenza, dal secondo in poi c’è un mese misurato. Crea uno snapshot dalla Panoramica, o cambia periodo.' },
+              ],
+            }}
+            ariaLabel="Verdetto sui rendimenti"
+          />
+          <div className="shrink-0">{picker}</div>
+        </div>
+        {selectedPeriod === 'CUSTOM' && performanceData?.custom && (
+          <CustomPeriodChip startDate={performanceData.custom.startDate} endDate={performanceData.custom.endDate} onClear={handleResetCustomPeriod} />
+        )}
+        <CustomDateRangeDialog
+          open={showCustomDateDialog}
+          onOpenChange={(open) => {
+            setShowCustomDateDialog(open);
+            if (!open) setCustomDialogOrigin(undefined);
+          }}
+          onConfirm={handleCustomDateRange}
+          triggerOrigin={customDialogOrigin}
+        />
+      </PageContainer>
+    );
+  }
+
+  const lastChartPoint = chartData.length > 0 ? chartData[chartData.length - 1] : null;
+  // «Oggi» only when the window closes on the latest snapshot: a custom range that ends earlier names its month.
+  const latestSnapshot = cachedSnapshots.length > 0 ? cachedSnapshots[cachedSnapshots.length - 1] : null;
+  const lastPeriodSnapshot = periodSnapshots.length > 0 ? periodSnapshots[periodSnapshots.length - 1] : null;
+  const windowEnd = {
+    endMonth: { year: metrics.endDate.getFullYear(), month: metrics.endDate.getMonth() + 1 },
+    endsAtLatest: !!latestSnapshot && !!lastPeriodSnapshot && latestSnapshot.year === lastPeriodSnapshot.year && latestSnapshot.month === lastPeriodSnapshot.month,
+  };
+  const periodAside = describePeriodAside({
+    period: selectedPeriod,
+    nominalPeriodStart: metrics.nominalPeriodStart,
+    startDate: metrics.startDate,
+    endDate: metrics.endDate,
+    numberOfMonths: metrics.numberOfMonths,
+  });
+  const portfolioLastMonth = growthSeries.points.length > 0 ? growthSeries.points[growthSeries.points.length - 1] : null;
+  const baseMonthLabel = growthSeries.baseMonth
+    ? `${MONTH_NAMES_SHORT[growthSeries.baseMonth.month - 1].toLowerCase()} ${growthSeries.baseMonth.year}`
+    : null;
+
+  // ─── Render ─────────────────────────────────────────────────────────────────
   return (
     <PageContainer>
-      {/* Header — unified PageHeader (A5). Actions render inline top-right on desktop;
-          the wrapper is hidden on mobile so the cramped inline slot stays empty (no title
-          truncation), with a dedicated full-width stacked bar below for mobile. */}
-      <PageHeader
-        label="Portafoglio"
-        title="Rendimenti del Portafoglio"
-        description="Analisi dei rendimenti e metriche di rischio-rendimento"
-        actions={
-          <div className="hidden items-center gap-2 desktop:flex">
-            <HeaderActions
-              isDemo={isDemo}
-              aiDisabled={isDemo || !metrics || metrics.hasInsufficientData}
-              isRefreshing={isRefreshing}
-              onCustom={(event) => {
-                setCustomDialogOrigin(calculateDialogOrigin(event.currentTarget));
-                setShowCustomDateDialog(true);
-              }}
-              onAI={(event) => {
-                setAiDialogOrigin(calculateDialogOrigin(event.currentTarget));
-                setShowAIAnalysisDialog(true);
-              }}
-              onRefresh={loadPerformanceData}
-            />
-          </div>
-        }
-      />
+      {header}
 
-      {/* Mobile action bar — full-width stacked buttons (desktop uses the header slot) */}
+      {/* ── Verdict, with the one period axis beside it from desktop ─────────────── */}
+      {verdict && (
+        <div className="flex items-start justify-between gap-6 pt-1">
+          <div className="flex min-w-0 flex-col gap-2">
+            <PageVerdict verdict={verdict} ariaLabel="Verdetto sui rendimenti" />
+            {/* The measured base, named where the numbers are — the recurring question is why the
+                drawdown does not match Storico, and the answer is that they measure different capitals. */}
+            <p className="max-w-[920px] text-[12px] leading-[1.5] text-muted-foreground">
+              {describeMeasurementBase(base ?? DEFAULT_BASE)}{' '}
+              <Link href="/dashboard/settings" className="underline hover:no-underline">
+                Cambia base
+              </Link>
+            </p>
+          </div>
+          <div className="hidden shrink-0 desktop:block">{picker}</div>
+        </div>
+      )}
+
+      {/* Below desktop the axis goes under the verdict, with the two text actions as 44px buttons. */}
       <div className="flex flex-col gap-2 desktop:hidden">
-        <HeaderActions
-          stacked
-          isDemo={isDemo}
-          aiDisabled={isDemo || !metrics || metrics.hasInsufficientData}
-          isRefreshing={isRefreshing}
-          onCustom={(event) => {
-            setCustomDialogOrigin(calculateDialogOrigin(event.currentTarget));
-            setShowCustomDateDialog(true);
-          }}
-          onAI={(event) => {
-            setAiDialogOrigin(calculateDialogOrigin(event.currentTarget));
-            setShowAIAnalysisDialog(true);
-          }}
-          onRefresh={loadPerformanceData}
-        />
+        {picker}
+        <div className="grid grid-cols-2 gap-2">{headerActions(true)}</div>
       </div>
 
-      {/* Period Selector */}
-      <PerformancePeriodSelector
-        selectedPeriod={selectedPeriod}
-        onPeriodChange={handlePeriodChange}
+      {selectedPeriod === 'CUSTOM' && performanceData.custom && (
+        <CustomPeriodChip startDate={metrics.startDate} endDate={metrics.endDate} onClear={handleResetCustomPeriod} />
+      )}
+
+      {/* ── Tile grid ───────────────────────────────────────────────────────────── */}
+      <div
+        key={periodRenderKey}
+        className={cn('grid grid-cols-1 gap-3 transition-opacity duration-200 tablet:grid-cols-2 desktop:grid-cols-12', (isPendingPeriodChange || isRefreshing) && 'opacity-60')}
+        aria-busy={isPendingPeriodChange || isRefreshing}
+      >
+        <div className={cn(TILE_CELL_CLASS, 'order-1 tablet:col-span-2 desktop:order-none desktop:col-span-5 desktop:row-span-2')}>
+          <RendimentoTile
+            aside={periodAside}
+            reading={
+              growthSeries.baseMonth && growthSeries.portfolioEnd !== null
+                ? describeGrowthOfHundred({ baseMonth: growthSeries.baseMonth, end: windowEnd, portfolioEnd: growthSeries.portfolioEnd, benchmarkEnd: growthSeries.benchmarkEnd, benchmarkName: REFERENCE_BENCHMARK.name })
+                : null
+            }
+            heroReturn={heroReturn}
+            numberOfMonths={metrics.numberOfMonths}
+            benchmark={benchmark}
+            benchmarkLoading={benchmark === null && isAnyBenchmarkLoading}
+            benchmarkName={REFERENCE_BENCHMARK.name}
+            periodReturn={periodReturnChip}
+            drawdown={drawdownStatus}
+            series={growthSeries}
+            footer={`${baseMonthLabel ? `Base 100 a fine ${baseMonthLabel} · ` : ''}benchmark in ${benchmarkCurrency === 'EUR' ? 'EUR ai cambi di fine mese' : 'USD (cambi non disponibili)'} · il primo snapshot è la valutazione di partenza, non un mese misurato`}
+          />
+        </div>
+
+        <div className={cn(TILE_CELL_CLASS, 'order-2 desktop:order-none desktop:col-span-3')}>
+          <RischioTile
+            reading={describeRisk({ volatility: metrics.volatility, sharpeRatio: metrics.sharpeRatio, monthsMeasured: consistency.totalMonths })}
+            monthsMeasured={consistency.totalMonths}
+            riskFreeRate={metrics.riskFreeRate}
+            volatility={metrics.volatility}
+            sharpeRatio={metrics.sharpeRatio}
+            sortinoRatio={sortinoRatio}
+            drawdown={drawdownStory}
+          />
+        </div>
+
+        <div className={cn(TILE_CELL_CLASS, 'order-3 desktop:order-none desktop:col-span-4')}>
+          <ConsistenzaTile reading={describeConsistency(consistency)} heatmap={heatmapData} />
+        </div>
+
+        {/* Below desktop the benchmark reads before the contributions: «rispetto a cosa?» is the page's question. */}
+        <div className={cn(TILE_CELL_CLASS, 'order-5 desktop:order-none desktop:col-span-3')}>
+          <ContributiTile
+            reading={describeContributions({
+              invested: investedCapital,
+              netCashFlow: metrics.netCashFlow,
+              pension: { flow: metrics.pensionFlow, entryFlow: metrics.pensionEntryFlow, entryMonth: base?.pensionEntryMonth ?? null, internalFlow: metrics.pensionInternalFlow },
+              portfolio: { flow: metrics.portfolioFlow, source: metrics.flowSource, measuredMonths: metrics.measuredFlowMonths, totalMonths: metrics.numberOfMonths },
+            })}
+            invested={investedCapital}
+            netCashFlow={metrics.netCashFlow}
+            totalIncome={metrics.totalIncome}
+            totalExpenses={metrics.totalExpenses}
+            totalDividendIncome={metrics.totalDividendIncome}
+            pensionFlow={metrics.pensionFlow}
+            pensionEntryFlow={metrics.pensionEntryFlow}
+            pensionInternalFlow={metrics.pensionInternalFlow}
+            portfolioFlow={metrics.portfolioFlow}
+            flowSource={metrics.flowSource}
+            measuredFlowMonths={metrics.measuredFlowMonths}
+            numberOfMonths={metrics.numberOfMonths}
+          />
+        </div>
+
+        <div className={cn(TILE_CELL_CLASS, 'order-4 desktop:order-none desktop:col-span-4')}>
+          <BenchmarkTile
+            reading={describeBenchmarkRanking(ranking)}
+            ranking={ranking}
+            portfolioTWR={metrics.timeWeightedReturn}
+            numberOfMonths={metrics.numberOfMonths}
+            portfolioLastMonth={portfolioLastMonth ? { year: portfolioLastMonth.year, month: portfolioLastMonth.month } : null}
+            isLoading={isAnyBenchmarkLoading}
+            currency={benchmarkCurrency}
+          />
+        </div>
+
+        {/* The attribution sits beside the realized gains — the two «where does the money come from»
+            tiles — and, without a closed sale, beside the capital chart instead. */}
+        {attribution && (
+          <div className={cn(TILE_CELL_CLASS, 'order-6 desktop:order-none', realizedSummary ? 'desktop:col-span-7' : 'desktop:col-span-5')}>
+            <AttribuzioneTile aside={periodAside} reading={describeAttribution(attribution)} attribution={attribution} />
+          </div>
+        )}
+
+        {realizedSummary && (
+          <div className={cn(TILE_CELL_CLASS, 'order-7 desktop:order-none desktop:col-span-5')}>
+            <PlusvalenzeTile reading={describeRealizedGains(realizedSummary, currentYear)} summary={realizedSummary} skippedAssets={realizedGains.skippedAssets} />
+          </div>
+        )}
+
+        {/* With a closed sale the capital chart takes the whole row; without it, the seven columns beside the attribution. */}
+        <div className={cn(TILE_CELL_CLASS, 'order-8 tablet:col-span-2 desktop:order-none', realizedSummary ? 'desktop:col-span-12' : 'desktop:col-span-7')}>
+          <CapitaleMercatoTile
+            aside={`${periodAside} · base misurata`}
+            reading={lastChartPoint ? describeCapitalAndMarket(lastChartPoint, windowEnd) : null}
+            data={chartData}
+            pensionFlow={metrics.pensionFlow}
+          />
+        </div>
+      </div>
+
+      {/* ── Dettaglio, below the fold ───────────────────────────────────────────── */}
+      <PerformanceDettaglio
+        metrics={metrics}
+        periodAside={describeWindow(metrics.startDate, metrics.endDate)}
+        drawdown={drawdownStory}
+        rollingCagr={rollingCagr}
+        rollingSharpe={rollingSharpe}
+        underwater={underwaterData}
+        attribution={attribution}
+        renderKey={periodRenderKey}
       />
 
-      {/* CUSTOM period chip — visible only when a custom date range is active */}
-      {selectedPeriod === 'CUSTOM' && performanceData.custom && (
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2 rounded-full border border-border bg-muted/40 px-3 py-1.5 text-xs font-medium text-foreground">
-            <CalendarDays className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-            <span>
-              Periodo: {metrics.startDate.toLocaleDateString('it-IT')} – {metrics.endDate.toLocaleDateString('it-IT')}
-            </span>
-            <button
-              type="button"
-              aria-label="Rimuovi periodo personalizzato"
-              onClick={handleResetCustomPeriod}
-              className="ml-1 text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <X className="h-3 w-3" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Period context chips */}
-      <motion.div
-        key={periodRenderKey}
-        variants={periodContentSettle}
-        initial="idle"
-        animate="settle"
-        className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"
-      >
-        {selectedPeriod !== 'CUSTOM' && (
-          <span className="rounded-full border border-border bg-muted/40 px-2.5 py-1 font-medium text-foreground">
-            Periodo {periodLabels[selectedPeriod as keyof typeof periodLabels]}
-          </span>
-        )}
-        <span className="rounded-full border border-border bg-background px-2.5 py-1">
-          {periodDateRangeLabel}
-        </span>
-        {(isPendingPeriodChange || isRefreshing) && (
-          <span className="rounded-full border border-border bg-background px-2.5 py-1">
-            Aggiornamento in corso...
-          </span>
-        )}
-      </motion.div>
-
-      {/* ── HERO: one answer — TWR + verdict + benchmark/drawdown + vital signs (A1/A2/B1/B3) ── */}
-      {performanceVerdict && (
-        <PerformanceHero
-          timeWeightedReturn={heroReturn.value}
-          returnQualifier={heroReturn.label}
-          periodLabel={periodLabels[selectedPeriod as keyof typeof periodLabels]}
-          verdict={performanceVerdict}
-          benchmarkLabel={referenceBenchmark.name}
-          benchmarkDelta={benchmarkDelta}
-          benchmarkLoading={isBenchmarkLoading || isFxLoading}
-          drawdown={drawdownStatus}
-          sharpeRatio={metrics.sharpeRatio}
-          maxDrawdown={metrics.maxDrawdown}
-          netCashFlow={metrics.netCashFlow}
-          yocNet={metrics.yocNet}
-        />
-      )}
-
-      {/* Base di calcolo — dichiarata, non implicita. Senza questa riga la divergenza da Storico
-          (che mostra il patrimonio intero) resta un mistero da indovinare. */}
-      <p className="px-1 text-xs text-muted-foreground">
-        {describePerformanceBase(baseOptions)}{' '}
-        <Link href="/dashboard/settings" className="underline hover:no-underline">
-          Cambia base
-        </Link>
-      </p>
-
-      {/* Return consistency strip (B2) — steadiness from the monthly-returns heatmap.
-          NOTE: counts months of investment RETURN (cash-flow-isolated), not net-worth
-          growth months like Storico — a different question, a different number. */}
-      {returnConsistency.totalMonths > 0 && (
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 rounded-xl border border-border bg-muted/30 px-4 py-3 text-xs">
-          <span className="text-muted-foreground">
-            <span className="font-mono font-medium tabular-nums text-foreground">
-              {returnConsistency.positiveMonths}/{returnConsistency.totalMonths}
-            </span>{' '}
-            mesi positivi
-            {/* La percentuale compare solo su un campione che possa esprimerne una: su uno o due
-                mesi darebbe 0/50/100 secchi, che sembra una statistica senza esserlo. */}
-            {returnConsistency.positiveShare !== null && ` (${formatPercentage(returnConsistency.positiveShare)})`}
-          </span>
-          {returnConsistency.best && (
-            <span className="text-muted-foreground">
-              Miglior mese{' '}
-              <span className="font-medium text-foreground">{returnConsistency.best.label}</span>{' '}
-              <span className="font-mono font-medium tabular-nums text-positive">
-                {formatPercentage(returnConsistency.best.return)}
-              </span>
-            </span>
-          )}
-          {/* Con un mese solo, migliore e peggiore SONO lo stesso mese: mostrarlo due volte
-              suggerirebbe un intervallo che non esiste. */}
-          {returnConsistency.worst && returnConsistency.worst.label !== returnConsistency.best?.label && (
-            <span className="text-muted-foreground">
-              Peggior mese{' '}
-              <span className="font-medium text-foreground">{returnConsistency.worst.label}</span>{' '}
-              <span className="font-mono font-medium tabular-nums text-destructive">
-                {formatPercentage(returnConsistency.worst.return)}
-              </span>
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* ── METRICHE DETTAGLIATE — collapsed by default; hero carries the essentials (A3) ── */}
-      <Collapsible open={isAllMetricsOpen} onOpenChange={setIsAllMetricsOpen} className="border-t border-border/60 pt-4">
-        <CollapsibleTrigger asChild>
-          <button
-            type="button"
-            className="group flex w-full items-center justify-between gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 rounded-md"
-          >
-            <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-              {isAllMetricsOpen ? 'Nascondi metriche dettagliate' : 'Mostra tutte le metriche'}
-            </span>
-            <ChevronDown
-              className={cn(
-                'h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none',
-                isAllMetricsOpen && 'rotate-180'
-              )}
-              aria-hidden="true"
-            />
-          </button>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="overflow-hidden data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 duration-200">
-        {/* RENDIMENTO: TWR hero + flat rows */}
-        <MetricSection
-          title="Metriche di Rendimento"
-          description="Quanto il portafoglio è cresciuto nel tempo"
-          sectionIndex={0}
-          hero={
-            <HeroMetricBlock
-              label="Time-Weighted Return"
-              value={metrics.timeWeightedReturn}
-              format="percentage"
-              subtitle="Rendimento annualizzato — eliminato l'effetto dei contributi"
-              tooltip="Metrica raccomandata per valutare la performance. Elimina l'effetto del timing dei contributi/prelievi, mostrando la vera capacità di generare rendimento. Ideale per confrontare con benchmark o altri portafogli. Calcolo: rendimenti mensili collegati geometricamente e annualizzati."
-              badge="Avanzato"
-            />
-          }
-        >
-          <MetricCard
-            title="ROI Totale"
-            value={metrics.roi}
-            format="percentage"
-            description="Rendimento complessivo senza annualizzazione"
-            tooltip="Misura il guadagno/perdita totale del periodo selezionato. Formula: (Valore Finale − Valore Iniziale − Contributi Netti) / Valore Iniziale × 100: i versamenti vengono TOLTI dal guadagno, perché non sono rendimento. Attenzione: CAGR corregge per i flussi in un altro modo (li aggiunge al denominatore), quindi CAGR non è la versione annualizzata di questo numero — le due formule rispondono a domande diverse e non sono convertibili l'una nell'altra. Il valore cambia tra periodi diversi (YTD, 1Y, 3Y) perché copre durate diverse: per confrontare periodi usa TWR."
-          />
-          <MetricCard
-            title="CAGR"
-            value={metrics.cagr}
-            format="percentage"
-            description="Tasso di crescita annuale composto"
-            tooltip="Rendimento medio annuo del portafoglio. Formula: (Valore Finale / (Valore Iniziale + Contributi Netti))^(1/anni) − 1: i versamenti vengono AGGIUNTI al denominatore, cioè trattati come capitale investito fin dall'inizio. È una correzione per i flussi diversa da quella del ROI Totale (che li sottrae dal guadagno), quindi i due numeri non si convertono l'uno nell'altro. Rispetto alla crescita grezza del patrimonio (visibile in Storico) è più basso, perché lì i contributi appaiono come crescita."
-          />
-          <MetricCard
-            title="Money-Weighted Return (IRR)"
-            value={metrics.moneyWeightedReturn}
-            format="percentage"
-            description="Rendimento personale aggiustato per il timing"
-            tooltip="Rendimento personale dell'investitore che tiene conto di QUANDO hai investito o prelevato denaro. Se investi molto prima di una crescita = IRR alto. Se investi prima di un calo = IRR basso. Usa questa metrica per capire quanto hai guadagnato TU con le TUE decisioni di timing."
-            badge="Avanzato"
-          />
-        </MetricSection>
-
-        {/* RISCHIO: Sharpe hero + flat rows */}
-        <MetricSection
-          title="Metriche di Rischio"
-          description="Volatilità e potenziali ribassi del portafoglio"
-          sectionIndex={1}
-          hero={
-            <HeroMetricBlock
-              label="Sharpe Ratio"
-              value={metrics.sharpeRatio}
-              format="number"
-              subtitle={`Rendimento aggiustato per il rischio — RF ${formatPercentage(metrics.riskFreeRate)}`}
-              tooltip={`Misura quanto rendimento extra si ottiene per ogni unità di rischio assunto. Formula: (TWR annualizzato − Tasso Risk-Free ${formatPercentage(metrics.riskFreeRate)}) / Volatilità — resta sempre su base annua, anche quando il periodo è troppo corto perché l'hero annualizzi. Interpretazione: <1 = scarso, 1-2 = buono, 2-3 = molto buono, >3 = eccellente. Senza volatilità (meno di 3 mesi) non è calcolabile.`}
-              badge="Avanzato"
-            />
-          }
-        >
-          <MetricCard
-            title="Volatilità"
-            value={metrics.volatility}
-            format="percentage"
-            description="Deviazione standard annualizzata"
-            tooltip="Misura la variabilità dei rendimenti mensili (quanto 'ballano' i risultati). Valori bassi = investimento più stabile e prevedibile. Valori alti = maggiori oscillazioni e rischio. Calcolata sugli STESSI rendimenti mensili della heatmap e del grafico Underwater, senza filtri, ed espressa in forma annualizzata (× √12). Servono almeno 3 mesi: sotto quella soglia una deviazione standard non direbbe nulla sul portafoglio e la card mostra '—'."
-          />
-          <MetricCard
-            title="Max Drawdown"
-            value={metrics.maxDrawdown}
-            subtitle={metrics.maxDrawdownDate}
-            format="percentage"
-            description="Massima perdita percentuale dal massimo del periodo"
-            tooltip="Misura la peggiore perdita (da picco a valle) che il portafoglio ha subito nel periodo selezionato. Il picco è il massimo RAGGIUNTO IN QUEL PERIODO, non un massimo storico: cambiando periodo cambia il riferimento. Esempio: se il portafoglio valeva €100.000 e scese a €85.000 prima di recuperare, il Max Drawdown è -15%. Calcolato concatenando gli stessi rendimenti mensili della heatmap, quindi indipendente da quanto capitale è entrato. Valori vicini allo 0% = portafoglio stabile, valori molto negativi = alta volatilità al ribasso."
-          />
-          <MetricCard
-            title="Durata Drawdown"
-            value={metrics.drawdownDuration}
-            subtitle={metrics.drawdownPeriod}
-            format="months"
-            description="Tempo di recupero dal Max Drawdown"
-            tooltip="Misura il tempo (in mesi) necessario per recuperare completamente dalla perdita più grande (Max Drawdown). Esempio: se il portafoglio perde il 15% a gennaio e recupera a dicembre, la durata è 11 mesi. Questo indicatore misura la resilienza del portafoglio: durate brevi indicano rapido recupero, durate lunghe segnalano lenta ripresa. Calcolo aggiustato per flussi di cassa per isolare la performance degli investimenti. Se il portafoglio è ancora in drawdown, mostra la durata dall'ultimo picco."
-          />
-          <MetricCard
-            title="Tempo di Recupero"
-            value={metrics.recoveryTime}
-            subtitle={metrics.recoveryPeriod}
-            format="months"
-            description="Tempo di risalita dalla valle"
-            tooltip="Misura il tempo (in mesi) necessario per recuperare dal punto più basso (trough) del Max Drawdown fino al completo recupero. A differenza della Durata Drawdown (che parte dal picco iniziale), questa metrica misura SOLO la fase di risalita. Esempio: se il portafoglio scende per 6 mesi e poi risale per 9 mesi, Recovery Time = 9 mesi (Durata Drawdown = 15 mesi). Utile per valutare la velocità di recupero dopo aver toccato il fondo. Calcolo aggiustato per flussi di cassa per isolare la performance degli investimenti."
-          />
-        </MetricSection>
-
-        {/* CONTESTO: Contributi hero + Durata flat row */}
-        <MetricSection
-          title="Metriche di Contesto"
-          description="Periodo analizzato e flussi di capitale"
-          sectionIndex={2}
-          hero={
-            <HeroMetricBlock
-              label="Contributi Netti"
-              value={metrics.netCashFlow}
-              format="currency"
-              subtitle={`Entrate: ${formatCurrency(metrics.totalIncome)} · Dividendi: ${formatCurrency(metrics.totalDividendIncome)} · Uscite: ${formatCurrency(metrics.totalExpenses)}`}
-              tooltip={`Differenza netta tra entrate esterne (stipendi, bonus) e uscite (spese quotidiane). I dividendi (${formatCurrency(metrics.totalDividendIncome)}) sono mostrati separatamente perché sono rendimento del portafoglio, non contributi esterni. Valore positivo = stai risparmiando, negativo = stai spendendo più di quanto guadagni.`}
-            />
-          }
-        >
-          <MetricCard
-            title="Durata"
-            value={metrics.numberOfMonths}
-            format="months"
-            description={`Da ${metrics.startDate.toLocaleDateString('it-IT')} a ${metrics.endDate.toLocaleDateString('it-IT')}`}
-            tooltip="Periodo di tempo coperto dall'analisi. La data di inizio è il primo giorno del mese del primo snapshot disponibile. La data di fine è l'ultimo giorno del mese dell'ultimo snapshot disponibile. Gli snapshot automatici vengono creati alla fine di ogni mese (28-31) e includono tutti i cash flow fino a quella data."
-          />
-          {isLedgerMigrated && investedCapital && (
-            <MetricCard
-              title="Capitale investito"
-              value={investedCapital.netInvestedEur}
-              format="currency"
-              subtitle={`Acquisti: ${formatCurrency(investedCapital.investedEur)} · Vendite: ${formatCurrency(investedCapital.divestedEur)}`}
-              description="Acquisti meno vendite dal registro operazioni, nel periodo selezionato"
-              tooltip="Capitale investito: acquisti meno vendite registrati nel registro operazioni nel periodo. Contributi netti: risparmio esterno stimato dal tracciamento spese. Misurano cose diverse."
-            />
-          )}
-        </MetricSection>
-
-        {/* PROVENTI FINANZIARI (conditional): YOC Netto hero + flat rows */}
-        {(metrics.yocGross !== null || metrics.yocNet !== null || metrics.currentYield !== null || metrics.currentYieldNet !== null) && (
-          <MetricSection
-            title="Metriche da Proventi Finanziari"
-            description="Rendimento da dividendi e cedole"
-            sectionIndex={3}
-            hero={
-              <HeroMetricBlock
-                label="YOC Netto"
-                value={metrics.yocNet}
-                format="percentage"
-                subtitle={`Cost Basis: ${formatCurrency(metrics.yocCostBasis)} · Asset: ${metrics.yocAssetCount}`}
-                tooltip="Yield on Cost (YOC) Netto misura il rendimento da dividendi netti (dopo tasse) rispetto al costo medio di acquisto. Formula: (Dividendi Netti Annualizzati / Cost Basis) × 100. Questa metrica mostra quanto effettivamente guadagni (al netto delle ritenute fiscali) rispetto al tuo costo medio di acquisto. Più realistica dello YOC Lordo perché considera l'impatto fiscale. Nota: considera solo gli asset attualmente in portafoglio; i dividendi di asset venduti restano nello storico ma non incidono su YOC e rendimento."
-                badge="Avanzato"
-              />
-            }
-          >
-            <MetricCard
-              title="YOC Lordo"
-              value={metrics.yocGross}
-              format="percentage"
-              description={`Dividendi: ${formatCurrency(metrics.yocDividendsGross)} · Cost Basis: ${formatCurrency(metrics.yocCostBasis)}`}
-              tooltip="Yield on Cost (YOC) Lordo misura il rendimento da dividendi lordi rispetto al costo medio di acquisto (cost basis). Formula: (Dividendi Annualizzati / Cost Basis) × 100. Esempio: Se hai comprato 100 azioni a €50 (cost basis €5.000) e ricevi €300/anno di dividendi lordi, YOC = 6%. A differenza del rendimento corrente (dividendi/prezzo attuale), YOC mostra quanto rende il tuo costo medio di acquisto. YOC > Rendimento Corrente indica crescita dei dividendi nel tempo. Valori alti (>5-7%) indicano un buon ritorno sul costo di acquisto. Nota: considera solo gli asset attualmente in portafoglio; i dividendi di asset venduti restano nello storico ma non incidono su YOC e rendimento."
-              badge="Avanzato"
-            />
-            <MetricCard
-              title="Rendimento Corrente Lordo"
-              value={metrics.currentYield}
-              format="percentage"
-              description={`Dividendi: ${formatCurrency(metrics.currentYieldDividends)} · Valore: ${formatCurrency(metrics.currentYieldPortfolioValue)}`}
-              tooltip={`Rendimento Corrente Lordo misura il rendimento da dividendi lordi basato sul valore di mercato ATTUALE del portafoglio. Formula: (Dividendi Lordi Annualizzati / Valore Corrente Portafoglio) × 100. A differenza dello YOC (che usa il costo medio di acquisto), il Rendimento Corrente mostra quanto renderebbe il portafoglio se lo acquistassi oggi ai prezzi correnti. Nota: considera solo gli asset attualmente in portafoglio; i dividendi di asset venduti non incidono su questa metrica.${
-                metrics.yocGross !== null
-                  ? `\n\nConfronto con YOC Lordo (${metrics.yocGross.toFixed(2)}%): ${
-                      metrics.currentYield !== null && metrics.currentYield > metrics.yocGross
-                        ? 'Il prezzo è cresciuto più dei dividendi (buon capital gain ma yield diluito)'
-                        : metrics.currentYield !== null && metrics.currentYield < metrics.yocGross
-                        ? 'I dividendi sono cresciuti o il prezzo è sceso (ottimo per chi ha comprato presto!)'
-                        : 'Crescita proporzionale di prezzo e dividendi'
-                    }`
-                  : '\n\nUtile per confrontare il rendimento del portafoglio con altre opportunità di investimento (bond, ETF, depositi) e valutare se il portafoglio genera reddito passivo sufficiente.'
-              }`}
-            />
-            <MetricCard
-              title="Rendimento Corrente Netto"
-              value={metrics.currentYieldNet}
-              format="percentage"
-              description={`Dividendi: ${formatCurrency(metrics.currentYieldDividendsNet)} · Valore: ${formatCurrency(metrics.currentYieldPortfolioValue)}`}
-              tooltip={`Rendimento Corrente Netto misura il rendimento da dividendi netti (dopo tasse) basato sul valore di mercato ATTUALE del portafoglio. Formula: (Dividendi Netti Annualizzati / Valore Corrente Portafoglio) × 100. Questa è la metrica più realistica perché considera sia il prezzo corrente che l'impatto fiscale sui dividendi. Mostra quanto effettivamente guadagneresti acquistando il portafoglio oggi ai prezzi correnti. Nota: considera solo gli asset attualmente in portafoglio; i dividendi di asset venduti non incidono su questa metrica.${
-                metrics.yocNet !== null
-                  ? `\n\nConfronto con YOC Netto (${metrics.yocNet.toFixed(2)}%): ${
-                      metrics.currentYieldNet !== null && metrics.currentYieldNet > metrics.yocNet
-                        ? 'Il prezzo è cresciuto più dei dividendi netti (buon capital gain)'
-                        : metrics.currentYieldNet !== null && metrics.currentYieldNet < metrics.yocNet
-                        ? 'I dividendi netti sono cresciuti o il prezzo è sceso (ottimo rendimento effettivo per early investors!)'
-                        : 'Crescita proporzionale di prezzo e dividendi netti'
-                    }`
-                  : '\n\nMetrica più accurata per valutare il reddito passivo effettivo rispetto ad altre opportunità (bond, depositi, altri ETF).'
-              }`}
-            />
-          </MetricSection>
-        )}
-
-        {/* PLUSVALENZE REALIZZATE (Fase D §5, conditional): per-fiscal-year realized P&L from the
-            asset trade ledger, aggregated across every asset's own replay. Hidden entirely when
-            empty (progressive disclosure — no empty shells) and until the ledger has migrated. */}
-        {isLedgerMigrated && hasRealizedGains && (
-          <MetricSection
-            title="Plusvalenze Realizzate"
-            description="Utili e perdite chiuse tramite il registro operazioni, per anno fiscale"
-            sectionIndex={4}
-          >
-            <RealizedGainsRows
-              byYear={realizedGains.byYear}
-              skippedAssets={realizedGains.skippedAssets}
-            />
-          </MetricSection>
-        )}
-        </CollapsibleContent>
-      </Collapsible>
-
-      {/* Charts — stagger container propagates hidden→visible to children */}
-      <motion.div
-        key={`charts-${periodRenderKey}`}
-        variants={chartShellSettle}
-        initial="idle"
-        animate="settle"
-      >
-        <motion.div variants={staggerContainer} initial="hidden" animate="visible">
-
-          {/* Cluster divider: Andamento (A4) — growth-over-time charts */}
-          <motion.div variants={cardItem}>
-            <div className="mt-8 flex items-center gap-3">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                Andamento
-              </span>
-              <div className="h-px flex-1 bg-border/60" aria-hidden="true" />
-            </div>
-          </motion.div>
-
-          {/* Evoluzione Patrimonio */}
-          <motion.div variants={cardItem}>
-            <Card className="mt-6">
-              <CardHeader>
-                <CardTitle>Evoluzione Patrimonio</CardTitle>
-                <CardDescription>
-                  Area = capitale immesso, cioè il patrimonio all&apos;inizio del periodo più i
-                  versamenti netti registrati in Cashflow. Linea = quanto vale. La distanza fra le due
-                  è il rendimento generato dal mercato: linea sopra l&apos;area = in guadagno, sotto =
-                  in perdita.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={getChartHeight()}>
-                  <AreaChart data={chartData} margin={{ bottom: 20 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                    <XAxis dataKey="date" tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }} stroke="var(--border)" />
-                    <YAxis tickFormatter={(value) => formatCurrencyCompact(value)} tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }} stroke="var(--border)" />
-                    <Tooltip content={<PerformanceTooltip />} />
-                    <Legend />
-                    {/* One area, not stacked bands: cumulative contributions go negative whenever
-                        tracked spending outpaces tracked income, and a stacked chart draws a
-                        negative band downward — the bands stop meeting the line. The gap between
-                        this area and the net-worth line IS the market's contribution.
-                        The name is "Capitale immesso", NOT "Capitale investito": that one already
-                        belongs to the ledger-based card above (buys − sells from the trade
-                        register), which measures a different thing on the same page. */}
-                    <Area
-                      type="monotone"
-                      dataKey="investedBase"
-                      stroke={chartColors[0]}
-                      fill={chartColors[0]}
-                      fillOpacity={0.55}
-                      name="Capitale immesso"
-                      animationDuration={800}
-                      animationEasing="ease-out"
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="netWorth"
-                      stroke={chartColors[2]}
-                      strokeWidth={2}
-                      name="Patrimonio Totale"
-                      dot={false}
-                      animationDuration={800}
-                      animationEasing="ease-out"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          {/* Confronto Benchmark */}
-          <motion.div variants={cardItem}>
-            <BenchmarkComparisonSection
-              portfolioHeatmapData={heatmapData}
-              startDate={metrics.startDate}
-              endDate={metrics.endDate}
-              selectedPeriod={selectedPeriod}
-              portfolioTWR={metrics.timeWeightedReturn}
-              numberOfMonths={metrics.numberOfMonths}
-              portfolioTotalGrowth={
-                metrics.timeWeightedReturn != null && metrics.numberOfMonths > 0
-                  ? (Math.pow(1 + metrics.timeWeightedReturn / 100, metrics.numberOfMonths / 12) - 1) * 100
-                  : null
-              }
-              portfolioVolatility={metrics.volatility}
-              portfolioSharpe={metrics.sharpeRatio}
-              portfolioMaxDrawdown={metrics.maxDrawdown}
-              riskFreeRate={metrics.riskFreeRate}
-            />
-          </motion.div>
-
-          {/* Metriche Rolling */}
-          <motion.div variants={cardItem}>
-            <Card className="mt-6">
-              <CardHeader>
-                <CardTitle>CAGR Rolling 12 Mesi</CardTitle>
-                <CardDescription>
-                  Ogni punto mostra il CAGR degli ultimi 12 mesi; linea tratteggiata = media mobile a 3M.
-                  Una linea in salita segnala performance in miglioramento nel periodo recente.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {rollingCagrData.length === 0 ? (
-                  <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
-                    Servono almeno 13 snapshot mensili per il grafico rolling.
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height={getChartHeight()}>
-                    <LineChart data={rollingCagrData} margin={{ bottom: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                      <XAxis
-                        dataKey="periodEndDate"
-                        tickFormatter={(date) => new Date(date).toLocaleDateString('it-IT', { month: 'short', year: '2-digit' })}
-                        tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
-                        stroke="var(--border)"
-                      />
-                      <YAxis
-                        tickFormatter={(value) => `${value.toFixed(1)}%`}
-                        tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
-                        stroke="var(--border)"
-                      />
-                      <Tooltip
-                        formatter={(value) => `${(value as number).toFixed(2)}%`}
-                        labelFormatter={(date) => new Date(date).toLocaleDateString('it-IT')}
-                        contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--card-foreground)' }}
-                        labelStyle={{ color: 'var(--card-foreground)' }}
-                      />
-                      <Legend />
-                      <Line
-                        type="monotone"
-                        dataKey="cagr"
-                        stroke={chartColors[0]}
-                        strokeWidth={2}
-                        name="CAGR 12M"
-                        dot={false}
-                        animationDuration={800}
-                        animationEasing="ease-out"
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="cagrMA"
-                        stroke={chartColors[1]}
-                        strokeWidth={2}
-                        name={`Media Mobile ${rollingCagrMaWindowMonths}M`}
-                        strokeDasharray="6 4"
-                        dot={false}
-                        animationDuration={800}
-                        animationEasing="ease-out"
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                )}
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          {/* Cluster divider: Rischio (A4) — drawdown & risk-adjusted charts */}
-          <motion.div variants={cardItem}>
-            <div className="mt-8 flex items-center gap-3">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                Rischio
-              </span>
-              <div className="h-px flex-1 bg-border/60" aria-hidden="true" />
-            </div>
-          </motion.div>
-
-          <motion.div variants={cardItem}>
-            <Card className="mt-6">
-              <CardHeader>
-                <CardTitle>Sharpe Ratio Rolling 12 Mesi</CardTitle>
-                <CardDescription>
-                  Rapporto rischio-rendimento su finestra mobile di 12 mesi (&gt;1 buono, &gt;2 eccellente).
-                  Ampie oscillazioni indicano volatilità elevata nel periodo.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {rollingSharpeData.length === 0 ? (
-                  <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
-                    Servono almeno 13 snapshot mensili per il grafico rolling.
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height={getChartHeight()}>
-                    <LineChart data={rollingSharpeData} margin={{ bottom: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                      <XAxis
-                        dataKey="periodEndDate"
-                        tickFormatter={(date) => new Date(date).toLocaleDateString('it-IT', { month: 'short', year: '2-digit' })}
-                        tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
-                        stroke="var(--border)"
-                      />
-                      <YAxis
-                        tickFormatter={(value) => value.toFixed(2)}
-                        tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
-                        stroke="var(--border)"
-                      />
-                      <Tooltip
-                        formatter={(value) => {
-                          if (typeof value !== 'number' || Number.isNaN(value)) return 'n/d';
-                          return value.toFixed(2);
-                        }}
-                        labelFormatter={(date) => new Date(date).toLocaleDateString('it-IT')}
-                        contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--card-foreground)' }}
-                        labelStyle={{ color: 'var(--card-foreground)' }}
-                      />
-                      <Legend />
-                      <Line
-                        type="monotone"
-                        dataKey="sharpeRatio"
-                        stroke={chartColors[2]}
-                        strokeWidth={2}
-                        name="Sharpe 12M"
-                        dot={false}
-                        animationDuration={800}
-                        animationEasing="ease-out"
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="sharpeRatioMA"
-                        stroke={chartColors[1]}
-                        strokeWidth={2}
-                        name={`Media Mobile ${rollingSharpeMaWindowMonths}M`}
-                        strokeDasharray="6 4"
-                        dot={false}
-                        animationDuration={800}
-                        animationEasing="ease-out"
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                )}
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          {/* Analisi Drawdown */}
-          <motion.div variants={cardItem}>
-            <Card className="mt-6">
-              <CardHeader>
-                <CardTitle>Heatmap Rendimenti Mensili</CardTitle>
-                <CardDescription>
-                  Verde = mese positivo, rosso = negativo; l&apos;intensità cresce con l&apos;ampiezza (±5% soglia).
-                  Utile per identificare mesi storicamente forti o deboli del portafoglio.
-                  <br />
-                  <span className="text-xs">
-                    Ogni mese isola il proprio contributo sottraendo il cashflow di quel mese, così versamenti e prelievi non contano come rendimento. Il Grafico Underwater qui sotto concatena esattamente questi mesi: è la stessa serie, vista come distanza dal massimo storico.
-                  </span>
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <MonthlyReturnsHeatmap data={heatmapData} revealKey={periodRenderKey} />
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          <motion.div variants={cardItem}>
-            <Card className="mt-6">
-              <CardHeader>
-                <CardTitle>Grafico Underwater (Drawdown)</CardTitle>
-                <CardDescription>
-                  L&apos;area rossa mostra quanto il portafoglio è sotto il suo massimo storico in quel momento.
-                  Quando tocca 0% è stato raggiunto un nuovo massimo; si collega a Durata Drawdown e Tempo di Recupero.
-                  <br />
-                  <span className="text-xs">
-                    Ogni punto è il{' '}<strong>cumulato</strong>{' '}dei rendimenti mensili della heatmap qui sopra: la stessa matematica, concatenata invece che mese per mese. Le percentuali non dipendono da quanto capitale hai versato — un versamento sposta il patrimonio, non il drawdown.
-                  </span>
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <UnderwaterDrawdownChart
-                  data={underwaterData}
-                  height={getChartHeight()}
-                  revealKey={periodRenderKey}
-                />
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          {/* Note Metodologiche — collapsed by default */}
-          <motion.div variants={cardItem}>
-            <Collapsible open={isMethodologyOpen} onOpenChange={setIsMethodologyOpen} className="mt-6">
-              <Card>
-                <CollapsibleTrigger asChild>
-                  <CardHeader className="cursor-pointer select-none hover:bg-muted/40 transition-colors rounded-t-lg">
-                    <div className="flex items-center justify-between">
-                      <CardTitle>Note Metodologiche</CardTitle>
-                      <ChevronDown
-                        className={cn(
-                          'h-5 w-5 text-muted-foreground transition-transform duration-200',
-                          isMethodologyOpen && 'rotate-180'
-                        )}
-                      />
-                    </div>
-                    <CardDescription>Formule, grafici e definizioni di tutte le 15 metriche</CardDescription>
-                  </CardHeader>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="overflow-hidden data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 duration-200">
-                  <CardContent className="space-y-4 text-sm">
-                    <div>
-                      <h4 className="font-semibold mb-1">Organizzazione delle Metriche</h4>
-                      <ul className="list-disc list-inside mt-2 space-y-1 text-muted-foreground">
-                        <li><strong>Rendimento</strong>: Quanto il portafoglio è cresciuto nel tempo (ROI, CAGR, TWR, IRR)</li>
-                        <li><strong>Rischio</strong>: Volatilità e potenziali ribassi (Volatilità, Sharpe, Max Drawdown, Durata Drawdown, Recovery Time)</li>
-                        <li><strong>Contesto</strong>: Informazioni sul periodo e flussi di capitale (Contributi Netti, Durata)</li>
-                        <li><strong>Dividendi</strong>: Rendimento da dividendi rispetto al costo di acquisto e al valore corrente (YOC Lordo/Netto, Current Yield Lordo/Netto)</li>
-                      </ul>
-                    </div>
-                    <div>
-                      <h4 className="font-semibold mb-1">Grafico: Evoluzione Patrimonio</h4>
-                      <p className="text-muted-foreground">
-                        <strong>Capitale immesso (area):</strong> Il patrimonio all&apos;inizio del periodo (dallo snapshot mensile) + i versamenti netti cumulati (entrate − uscite da Cashflow, dal primo mese misurato in poi, esclusi trasferimenti e dividendi). È tutto il denaro entrato nel portafoglio, non performance. Da non confondere con la card <strong>Capitale investito</strong> sopra, che conta acquisti meno vendite dal registro operazioni: misurano cose diverse.
-                        <br />
-                        <strong>Patrimonio Totale (linea):</strong> Quanto vale davvero il portafoglio in quel mese.
-                        <br />
-                        <strong>Rendimento del mercato:</strong> La distanza fra la linea e l&apos;area — visibile nel tooltip mese per mese. Linea sopra l&apos;area = guadagno, sotto = perdita.
-                        <br />
-                        <strong>Attenzione:</strong> i versamenti netti possono essere negativi se nel periodo le uscite tracciate superano le entrate tracciate. In quel caso l&apos;area scende sotto il capitale iniziale, ed è un segnale da verificare in Cashflow: gli stessi flussi alimentano ROI, CAGR e TWR.
-                      </p>
-                    </div>
-                    <div>
-                      <h4 className="font-semibold mb-1">Grafico: CAGR Rolling 12 Mesi</h4>
-                      <p className="text-muted-foreground">
-                        <strong>Finestra mobile (Rolling):</strong> Ogni punto mostra il CAGR calcolato sui 12 mesi precedenti — es. aprile 2025 = CAGR maggio 2024–aprile 2025.
-                        <br />
-                        <strong>Media mobile:</strong> La linea tratteggiata è una media a 3 mesi che smussa le oscillazioni.
-                        <br />
-                        <strong>Utilità:</strong> Mostra se la performance migliora o peggiora nel tempo, più stabile del rendimento mensile e più reattivo del rendimento totale.
-                      </p>
-                    </div>
-                    <div>
-                      <h4 className="font-semibold mb-1">Grafico: Sharpe Ratio Rolling</h4>
-                      <p className="text-muted-foreground">
-                        <strong>Finestra mobile (Rolling):</strong> Ogni punto è lo Sharpe calcolato sui 12 mesi precedenti.
-                        <br />
-                        <strong>Calcolo:</strong> (TWR − tasso risk-free) / volatilità. Il tasso risk-free viene dalle impostazioni.
-                        <br />
-                        <strong>Media mobile:</strong> Linea tratteggiata a 3 mesi per leggere il trend.
-                      </p>
-                    </div>
-                    <div>
-                      <h4 className="font-semibold mb-1">Grafico: Heatmap Rendimenti Mensili</h4>
-                      <p className="text-muted-foreground">
-                        <strong>Calcolo:</strong> ((Patrimonio fine mese − Flussi di cassa del mese) / Patrimonio inizio mese − 1) × 100. Si sottrae solo il cashflow del <em>singolo mese</em> — <strong>non</strong> quello cumulativo — per isolare la performance mensile degli investimenti.
-                        <br />
-                        <strong>Colori:</strong> Verde = positivo, rosso = negativo. Intensità più scura oltre ±5%.
-                        <br />
-                        <strong>Rapporto con il Grafico Underwater:</strong> la heatmap mostra i singoli mesi, l&apos;Underwater il loro prodotto cumulato rispetto al massimo raggiunto. Stessa serie, due letture: moltiplicando i mesi della heatmap si ottiene esattamente la curva dell&apos;Underwater.
-                      </p>
-                    </div>
-                    <div>
-                      <h4 className="font-semibold mb-1">Grafico: Underwater (Drawdown)</h4>
-                      <p className="text-muted-foreground">
-                        <strong>Funzionamento:</strong> A ogni nuovo massimo storico il grafico torna a 0%. Quando il portafoglio scende, mostra la perdita percentuale dal picco.
-                        <br />
-                        <strong>Calcolo:</strong> I rendimenti mensili della heatmap vengono concatenati in un indice (base 100 al primo mese del periodo) e il drawdown è la distanza di quell&apos;indice dal proprio massimo. Poiché ogni mese ha già il suo cashflow sottratto, versamenti e prelievi non entrano mai nel drawdown: 100.000 € versati spostano il patrimonio, non la percentuale.
-                        <br />
-                        <strong>Collegamento:</strong> Si integra con le metriche Durata Drawdown e Recovery Time visibili sopra.
-                      </p>
-                    </div>
-                    <div>
-                      <h4 className="font-semibold mb-1">Periodi Temporali e Snapshot</h4>
-                      <p className="text-muted-foreground">
-                        <strong>Snapshot Automatici:</strong> Vengono creati automaticamente alla fine di ogni mese (dal 28 al 31) e catturano lo stato del portafoglio a quella data. I dati di patrimonio e cash flow sono allineati alla fine del mese.
-                        <br /><br />
-                        <strong>YTD (Year-to-Date):</strong> Dall&apos;inizio dell&apos;anno corrente (1° gennaio) fino all&apos;ultimo snapshot disponibile. La durata varia da 1 a 12 mesi a seconda del mese corrente.
-                        <br />
-                        <strong>1Y/3Y/5Y (Ultimi N Anni):</strong> Ultimi 12/36/60 mesi completi dalla data attuale, sempre basati su mesi interi (dal 1° all&apos;ultimo giorno del mese).
-                        <br />
-                        <strong>Storico:</strong> Tutti i dati disponibili dall&apos;inizio del tracciamento.
-                        <br /><br />
-                        <em>Esempio (se oggi è dicembre 2025):</em>
-                        <br />
-                        • YTD = gen-dic 2025 (12 mesi) | 1Y = gen-dic 2025 (12 mesi) → identici
-                        <br />
-                        <em>Esempio (se oggi è luglio 2025):</em>
-                        <br />
-                        • YTD = gen-lug 2025 (7 mesi) | 1Y = ago 2024-lug 2025 (12 mesi) → diversi
-                      </p>
-                    </div>
-                    <div>
-                      <h4 className="font-semibold mb-1">Time-Weighted Return (Raccomandato)</h4>
-                      <p className="text-muted-foreground">
-                        Misura la performance del portafoglio eliminando l&apos;effetto dei flussi di cassa.
-                        Ideale per confrontare la performance con benchmark o altri portafogli.
-                      </p>
-                    </div>
-                    <div>
-                      <h4 className="font-semibold mb-1">Money-Weighted Return (IRR)</h4>
-                      <p className="text-muted-foreground">
-                        Considera il timing dei contributi e prelievi. Mostra il rendimento effettivo
-                        dell&apos;investitore basato sulle sue decisioni di investimento.
-                      </p>
-                    </div>
-                    <div>
-                      <h4 className="font-semibold mb-1">Sharpe Ratio</h4>
-                      <p className="text-muted-foreground">
-                        Rapporto tra eccesso di rendimento (vs tasso risk-free: {formatPercentage(metrics.riskFreeRate)})
-                        e volatilità. Valori &gt; 1 sono considerati buoni, &gt; 2 eccellenti.
-                      </p>
-                    </div>
-                    <div>
-                      <h4 className="font-semibold mb-1">Contributi Netti</h4>
-                      <p className="text-muted-foreground">
-                        Calcolati come differenza mensile tra entrate e uscite registrate nella sezione Cashflow.
-                        Valori positivi sono contributi, negativi sono prelievi.
-                      </p>
-                    </div>
-                    <div>
-                      <h4 className="font-semibold mb-1">Yield on Cost (YOC)</h4>
-                      <p className="text-muted-foreground">
-                        Rendimento da dividendi rispetto al costo medio di acquisto (average cost), non al prezzo attuale.
-                        <br /><br />
-                        <strong>Solo portafoglio attuale:</strong> entrano nel calcolo soltanto gli asset che possiedi adesso (quantity &gt; 0).
-                        I dividendi di asset venduti non rientrano in YOC e Rendimento Corrente, ma restano nello storico dividendi come reddito realmente incassato.
-                        <br /><br />
-                        <strong>Formula:</strong> YOC% = (Dividendi Annualizzati / Cost Basis) × 100
-                        <br />
-                        <strong>Annualizzazione:</strong> periodi &lt;12 mesi → (totale ÷ mesi) × 12 · periodi ≥12 mesi → totale ÷ anni.
-                        <br /><br />
-                        <strong>Interpretazione:</strong> YOC &gt; Current Yield = il prezzo è cresciuto più dei dividendi (comune in bull market).
-                        Valori &gt;5% eccellenti per un portafoglio diversificato. Confronta tra periodi (1Y, 3Y, 5Y) per vedere la traiettoria.
-                        <br /><br />
-                        <strong>Limiti:</strong> Richiede cost basis noto · Esclusi asset con quantity = 0 · Non considera capital gains.
-                      </p>
-                    </div>
-                    <div>
-                      <h4 className="font-semibold mb-1">Current Yield</h4>
-                      <p className="text-muted-foreground">
-                        Rendimento da dividendi rispetto al valore di mercato attuale. Mostra quanto renderebbe l&apos;investimento acquistato oggi.
-                        <br /><br />
-                        <strong>Formula:</strong> Current Yield% = (Dividendi Annualizzati / Valore Corrente) × 100
-                        <br />
-                        <strong>Annualizzazione:</strong> stessa logica dello YOC.
-                        <br /><br />
-                        <strong>YOC vs Current Yield:</strong> Se YOC &gt; CY, il prezzo è cresciuto più dei dividendi (capital appreciation).
-                        Se CY &gt; YOC, i dividendi sono cresciuti più del prezzo (rendimento in crescita).
-                        Le metriche Nette (dopo tasse) sono più realistiche per confronti tra asset.
-                        <br /><br />
-                        <strong>Utile per:</strong> Confrontare il portafoglio con alternative (bond, ETF, depositi) · valutare la sostenibilità del reddito passivo.
-                        <br />
-                        <strong>Limiti:</strong> Solo asset con dividendi · dipende dalla volatilità del prezzo · non include capital gains · esclusi asset con quantity = 0.
-                      </p>
-                    </div>
-                  </CardContent>
-                </CollapsibleContent>
-              </Card>
-            </Collapsible>
-          </motion.div>
-
-        </motion.div>{/* end staggerContainer */}
-      </motion.div>
-
-      {/* Custom Date Range Dialog */}
+      {/* ── Dialogs ─────────────────────────────────────────────────────────────── */}
       <CustomDateRangeDialog
         open={showCustomDateDialog}
         onOpenChange={(open) => {
           setShowCustomDateDialog(open);
-          if (!open) {
-            setCustomDialogOrigin(undefined);
-          }
+          if (!open) setCustomDialogOrigin(undefined);
         }}
         onConfirm={handleCustomDateRange}
         triggerOrigin={customDialogOrigin}
       />
 
-      {/* AI Analysis Dialog */}
-      {user && ownerId && metrics && !metrics.hasInsufficientData && (
+      {user && ownerId && (
         <AIAnalysisDialog
           open={showAIAnalysisDialog}
           onOpenChange={(open) => {
             setShowAIAnalysisDialog(open);
-            if (!open) {
-              setAiDialogOrigin(undefined);
-            }
+            if (!open) setAiDialogOrigin(undefined);
           }}
           metrics={metrics}
+          // The modal's title IS this verdict: one sentence judging these numbers, never a
+          // second phrasing of it inside the dialog (DESIGN.md → The Verdict-First Rule).
+          verdict={verdict}
           timePeriod={selectedPeriod}
           userId={ownerId}
           triggerOrigin={aiDialogOrigin}

@@ -3,14 +3,8 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog';
+import { useState, useMemo } from 'react';
+import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -80,6 +74,11 @@ export interface PDFExportDialogProps {
  * @param assets - Current asset holdings
  * @param allocationTargets - User's asset allocation targets
  */
+/** The thrown error's own message, or the fallback when it has none. */
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
 const ITALIAN_MONTHS = [
   'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
   'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre',
@@ -96,7 +95,8 @@ export function PDFExportDialog({
   const { ownerId } = useActiveAccount();
   const [loading, setLoading] = useState(false);
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('total');
-  const [validation, setValidation] = useState(validateTimeFilterData(snapshots));
+  // Which time filters the data supports — a pure function of the snapshots, so derived.
+  const validation = useMemo(() => validateTimeFilterData(snapshots), [snapshots]);
   const [selectedYear, setSelectedYear] = useState(validation.currentYear);
   const [selectedMonth, setSelectedMonth] = useState(validation.currentMonth);
   // All sections default to selected (true)
@@ -150,26 +150,33 @@ export function PDFExportDialog({
     return disabled;
   }, [timeFilter, isPastPeriod]);
 
-  // Revalidate time filter availability when snapshot data changes
-  useEffect(() => {
-    setValidation(validateTimeFilterData(snapshots));
-  }, [snapshots]);
-
-  // Auto-adjust sections when year selection changes within yearly mode
-  useEffect(() => {
-    if (timeFilter !== 'yearly') return;
-    setSections(prev => {
-      const adjusted = adjustSectionsForTimeFilter(timeFilter, prev, isPastPeriod);
-      if (JSON.stringify(adjusted) !== JSON.stringify(prev)) {
-        return adjusted;
+  // Auto-adjust sections when the year selection changes within yearly mode. Decided during
+  // render (React's adjust-state-during-render) instead of in an effect (react-hooks/set-state-
+  // in-effect), keyed on the same three inputs the effect used to watch.
+  const [adjustedFor, setAdjustedFor] = useState<{
+    selectedYear: number;
+    isPastPeriod: boolean;
+    timeFilter: TimeFilter;
+  } | null>(null);
+  if (
+    adjustedFor?.selectedYear !== selectedYear ||
+    adjustedFor.isPastPeriod !== isPastPeriod ||
+    adjustedFor.timeFilter !== timeFilter
+  ) {
+    setAdjustedFor({ selectedYear, isPastPeriod, timeFilter });
+    if (timeFilter === 'yearly') {
+      const adjusted = adjustSectionsForTimeFilter(timeFilter, sections, isPastPeriod);
+      if (JSON.stringify(adjusted) !== JSON.stringify(sections)) {
+        setSections(adjusted);
+      } else if (
+        // Re-enable sections when switching back to current year
+        !isPastPeriod &&
+        (!sections.portfolio || !sections.allocation || !sections.summary || !sections.fire)
+      ) {
+        setSections({ ...sections, portfolio: true, allocation: true, summary: true, fire: true });
       }
-      // Re-enable sections when switching back to current year
-      if (!isPastPeriod && (!prev.portfolio || !prev.allocation || !prev.summary || !prev.fire)) {
-        return { ...prev, portfolio: true, allocation: true, summary: true, fire: true };
-      }
-      return prev;
-    });
-  }, [selectedYear, isPastPeriod, timeFilter]);
+    }
+  }
 
   const toggleSection = (key: keyof SectionSelection) => {
     setSections(prev => ({ ...prev, [key]: !prev[key] }));
@@ -261,8 +268,8 @@ export function PDFExportDialog({
       // Validate that filtered data meets requirements for selected sections
       try {
         validatePDFGeneration(filteredSnapshots, sections, timeFilter);
-      } catch (validationError: any) {
-        toast.error(validationError.message);
+      } catch (validationError) {
+        toast.error(errorMessage(validationError, 'Dati insufficienti per le sezioni scelte'));
         setLoading(false);
         return;
       }
@@ -289,10 +296,9 @@ export function PDFExportDialog({
       toast.success('PDF generato con successo');
       onOpenChange(false);
 
-    } catch (error: any) {
+    } catch (error) {
       console.error('PDF generation error:', error);
-      const message = error?.message || 'Errore durante la generazione del PDF';
-      toast.error(message);
+      toast.error(errorMessage(error, 'Errore durante la generazione del PDF'));
     } finally {
       setLoading(false);
     }
@@ -311,15 +317,35 @@ export function PDFExportDialog({
   ];
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Esporta Report PDF</DialogTitle>
-          <DialogDescription>
-            Seleziona il periodo e le sezioni da includere nel report portfolio
-          </DialogDescription>
-        </DialogHeader>
-
+    <ResponsiveModal
+      open={open}
+      onClose={() => onOpenChange(false)}
+      eyebrow="Report · PDF"
+      title="Esporta un report"
+      reading={
+        selectedCount === 0
+          ? 'Scegli almeno una sezione: senza, il report non avrebbe nulla da stampare.'
+          : `${selectedCount === 1 ? 'Una sezione' : `${selectedCount} sezioni`} nel report, sul periodo che scegli qui sopra.`
+      }
+      width="md"
+      footer={
+        <>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
+            Annulla
+          </Button>
+          <Button onClick={handleExport} disabled={loading || selectedCount === 0}>
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                Generazione...
+              </>
+            ) : (
+              'Genera PDF'
+            )}
+          </Button>
+        </>
+      }
+    >
         <div className="space-y-4">
           {/* Time filter radio group */}
           <div className="space-y-2 pb-4 border-b">
@@ -495,47 +521,17 @@ export function PDFExportDialog({
 
             {/* Warning for disabled sections based on period selection */}
             {timeFilter === 'monthly' && (
-              <div className="text-xs text-amber-600 dark:text-amber-500">
+              <div className="text-xs text-warning-foreground dark:text-warning-foreground">
                 Solo la sezione Entrate e Uscite è disponibile per export mensile
               </div>
             )}
             {isPastPeriod && timeFilter === 'yearly' && (
-              <div className="text-xs text-amber-600 dark:text-amber-500">
+              <div className="text-xs text-warning-foreground dark:text-warning-foreground">
                 Portfolio, Allocation, FIRE e Riepilogo non sono disponibili per anni passati (dati storici solo aggregati)
               </div>
             )}
 
-            {/* Action buttons */}
-            <div className="flex gap-2 pt-2">
-              <Button
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                disabled={loading}
-              >
-                Annulla
-              </Button>
-              <Button
-                onClick={handleExport}
-                disabled={loading || selectedCount === 0}
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Generazione...
-                  </>
-                ) : (
-                  'Genera PDF'
-                )}
-              </Button>
-            </div>
           </div>
-
-          {/* Warning messages */}
-          {selectedCount === 0 && (
-            <div className="text-xs text-amber-600 dark:text-amber-500">
-              Seleziona almeno una sezione per generare il PDF
-            </div>
-          )}
 
           {loading && (
             <div className="text-xs text-muted-foreground">
@@ -543,7 +539,6 @@ export function PDFExportDialog({
             </div>
           )}
         </div>
-      </DialogContent>
-    </Dialog>
+    </ResponsiveModal>
   );
 }

@@ -15,7 +15,6 @@ import {
   buildGoalProjectionSeries,
   allocateContributionAcrossGoals,
   sortGoalRowsByUrgency,
-  buildGoalsVerdictSummary,
   type GoalRow,
 } from '@/lib/utils/goalTrajectory';
 import { InvestmentGoal, GoalProgress } from '@/types/goals';
@@ -319,28 +318,5 @@ describe('sortGoalRowsByUrgency', () => {
     ];
     const sorted = sortGoalRowsByUrgency(rows).map((r) => r.goal.id);
     expect(sorted).toEqual(['offTrackNear', 'offTrackFar', 'onTrackFar', 'reached']);
-  });
-});
-
-describe('buildGoalsVerdictSummary', () => {
-  it('counts verdicts and sums required monthly across dated not-reached goals', () => {
-    const rows = [
-      mkRow('a', 'offTrack', 6, 500),
-      mkRow('b', 'onTrack', 24, 200),
-      mkRow('c', 'reached', 12, 0),
-    ];
-    const summary = buildGoalsVerdictSummary(rows);
-    expect(summary.total).toBe(3);
-    expect(summary.reached).toBe(1);
-    expect(summary.onTrack).toBe(1);
-    expect(summary.offTrack).toBe(1);
-    expect(summary.withDeadline).toBe(2);
-    expect(summary.totalRequiredMonthly).toBeCloseTo(700, 5);
-    expect(summary.nearest?.goalName).toBe('a'); // nearest deadline (6 mo)
-  });
-
-  it('has no nearest when no dated goals exist', () => {
-    const rows = [mkRow('open', 'noTarget', null, null)];
-    expect(buildGoalsVerdictSummary(rows).nearest).toBeNull();
   });
 });

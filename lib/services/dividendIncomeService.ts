@@ -51,7 +51,7 @@ export async function createExpenseFromDividend(
     // Update dividend with expense reference
     await updateDividend(dividend.id, {
       expenseId: expenseRef.id,
-    } as any);
+    });
 
     console.log(`[dividendIncomeService] Created expense in ${expenseCurrency} (amount: ${expenseAmount.toFixed(2)})`);
     return expenseRef.id;
@@ -112,10 +112,12 @@ export async function deleteExpenseForDividend(
     // Delete the expense using Admin SDK
     await adminDb.collection('expenses').doc(expenseId).delete();
 
-    // Remove expense reference from dividend
+    // Remove expense reference from dividend: the key must be PRESENT with `undefined`,
+    // because `updateDividend` turns exactly that shape into the Firestore delete sentinel
+    // (a plain omission would leave the stale link in place).
     await updateDividend(dividendId, {
       expenseId: undefined,
-    } as any);
+    });
   } catch (error) {
     console.error('Error deleting expense for dividend:', error);
     throw new Error('Failed to delete expense for dividend');

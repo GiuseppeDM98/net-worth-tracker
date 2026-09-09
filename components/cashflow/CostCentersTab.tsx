@@ -1,98 +1,83 @@
 'use client';
 
 /**
- * CostCentersTab — "Panoramica Centri di Costo"
+ * Cashflow › Centri di Costo — a verdict over a tile grid (2026-08-23).
  *
- * Rebuilt around the app's Trade Republic hierarchy: a dominant period total at the
- * top, then a single flat divide-y list of centers ranked by spend — not a grid of
- * identical cards. The list answers "where is the money going across projects?" at a
- * glance, which the old equal-weight card grid could not.
+ * The tab answers «quanto sta costando il progetto?» before any number: the rule-generated
+ * verdict (lib/utils/costCenterNarrative.ts) at the top, and under it a 12-column bento of
+ * tiles, each answering ONE question with a reading line over its figures. There is NO
+ * period axis: a center's cost is its whole cost, and every tile measured on another window
+ * names it («quest'anno», «ultimi 12 mesi», the ceiling's own month or year).
  *
- * IA, top to bottom:
- * 1. Period axis (Mese / Anno / 12 mesi / Storico) — drives every figure below.
- * 2. Hero: total allocated to centers in the period + how many are active.
- * 3. Flat ranked list with per-center number, share bar and budget signal.
- * 4. Cross-center comparison overlay (collapsible).
- * 5. Archived centers, collapsed.
+ *   Mobile (1 col):   Verdict → [Nuovo centro] → Totale → Centri → Dormienti → Archiviati
+ *   Desktop (12 col): Totale (5, 2 rows) | Centri (7)
+ *                                        | Dormienti (7)
+ *                     Archiviati (disclosure, below the fold)
  *
- * WHY client-side aggregation: we fetch all expenses per center once and derive every
- * period view in memory (pure layer in costCenterUtils). For a typical 2-10 centers
- * with a few hundred expenses each this is cheap and avoids N waterfall queries per
- * period change.
+ * Every number is born in costCenterSummary.ts, every sentence in costCenterNarrative.ts.
+ * Opening a center swaps the grid for CostCenterDetail (the same shape on one center).
+ *
+ * WHY client-side aggregation: every center's rows are fetched once and every figure is
+ * derived in memory; for 2-10 centers with a few hundred rows each this is cheap. The query
+ * returns TWO numbers per center — its spending rows (the math) and how many rows are linked
+ * at all, income included (what `deleteCostCenter` unlinks) — so the delete confirmation
+ * counts what the mutation will actually touch.
  */
 
-import { useState, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Plus } from 'lucide-react';
+import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
-import { queryKeys } from '@/lib/query/queryKeys';
-import { CostCenter, CostCenterPeriod } from '@/types/costCenters';
-import { Expense } from '@/types/expenses';
-import {
-  getCostCenters,
-  getExpensesForCostCenter,
-  deleteCostCenter,
-  setCostCenterArchived,
-} from '@/lib/services/costCenterService';
-import {
-  computeCenterStats,
-  evaluateCenterBudget,
-  getLifecycleStatus,
-  buildComparisonSeries,
-  rankCentersBySpend,
-} from '@/lib/utils/costCenterUtils';
-import { formatCurrency } from '@/lib/utils/formatters';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
-import { SegmentedControl } from '@/components/ui/segmented-control';
-import { Plus, Layers, ChevronDown, ChevronRight, TrendingUp } from 'lucide-react';
-import { motion } from 'framer-motion';
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-} from 'recharts';
 import { useChartColors } from '@/lib/hooks/useChartColors';
+import { queryKeys } from '@/lib/query/queryKeys';
+import type { CostCenter } from '@/types/costCenters';
+import type { Expense } from '@/types/expenses';
+import { getCostCenters, getExpensesForCostCenter, deleteCostCenter, setCostCenterArchived } from '@/lib/services/costCenterService';
+import { buildCenterMonthStack, summarizeCostCenters } from '@/lib/utils/costCenterSummary';
+import {
+  CENTRI_FOOTER,
+  DORMIENTI_ASIDE,
+  DORMIENTI_FOOTER,
+  buildCostCentersVerdict,
+  describeArchiviati,
+  describeCentri,
+  describeDormienti,
+  describeLastYearCaption,
+  describeTotale,
+  describeTotaleAside,
+  describeTotaleFooter,
+  describeTrailingCaption,
+} from '@/lib/utils/costCenterNarrative';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { PageVerdict } from '@/components/ui/page-verdict';
+import { TILE_CELL_CLASS } from '@/components/ui/tile';
+import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
+import type { TileSkeletonCell } from '@/lib/utils/tileGridSkeleton';
 import { CostCenterDialog } from './CostCenterDialog';
 import { CostCenterDetail } from './CostCenterDetail';
-import { toast } from 'sonner';
+import { ErrorNotice } from '@/components/ui/error-notice';
+import { describeReadFailure } from '@/lib/utils/statesNarrative';
+import { TotaleTile } from './cost-centers/tiles/TotaleTile';
+import { CentriTile } from './cost-centers/tiles/CentriTile';
+import { DormientiTile } from './cost-centers/tiles/DormientiTile';
+import { ArchiviatiDisclosure } from './cost-centers/ArchiviatiDisclosure';
 
-const TOOLTIP_CONTENT_STYLE = {
-  backgroundColor: 'var(--card)',
-  border: '1px solid var(--border)',
-  color: 'var(--card-foreground)',
-  fontSize: 12,
-  borderRadius: 8,
-} as const;
+const TRAILING_MONTHS = 12;
 
-const PERIOD_OPTIONS: { value: CostCenterPeriod; label: string }[] = [
-  { value: 'month', label: 'Mese' },
-  { value: 'year', label: 'Anno' },
-  { value: 'rolling12', label: '12 mesi' },
-  { value: 'all', label: 'Storico' },
+/** The page's own grid, so the loading state has the proportions of what replaces it. */
+const SKELETON_CELLS: TileSkeletonCell[] = [
+  { span: 5, rows: 2, lines: 8 },
+  { span: 7, lines: 6 },
+  { span: 7, lines: 3 },
 ];
 
-// A center plus everything derived for the current period — assembled once and reused
-// by the hero, the ranked list and the comparison overlay.
-interface CenterRow {
-  center: CostCenter;
-  expenses: Expense[];
-  totalSpent: number;
-  transactionCount: number;
-  lifecycle: ReturnType<typeof getLifecycleStatus>;
-  budgetRatio: number | null;
-  budgetStatus: 'ok' | 'warning' | 'over' | null;
+interface CenterRows {
+  spending: Expense[];
+  linkedCount: number;
 }
 
 export function CostCentersTab() {
@@ -102,101 +87,62 @@ export function CostCentersTab() {
   const queryClient = useQueryClient();
   const chartColors = useChartColors();
 
-  // Fetch centers + every center's raw expenses once. Period views are derived in memory,
-  // so switching period is instant and needs no refetch.
-  const { data, isLoading: loading } = useQuery({
+  // Reads the OWNER's data, not the viewer's: on a shared account they differ.
+  const { data, isLoading: loading, isError } = useQuery({
     queryKey: queryKeys.costCenters.all(ownerId ?? ''),
-    enabled: !!user,
+    enabled: !!user && !!ownerId,
     queryFn: async () => {
-      const userId = user!.uid;
+      const userId = ownerId!;
       const centers = await getCostCenters(userId);
       const entries = await Promise.all(
         centers.map(async (center) => {
           const expenses = await getExpensesForCostCenter(userId, center.id);
-          return [center.id, expenses.filter((e) => e.amount < 0)] as [string, Expense[]];
+          return [center.id, { spending: expenses.filter((e) => e.amount < 0), linkedCount: expenses.length }] as [string, CenterRows];
         }),
       );
-      return { centers, expensesByCenter: Object.fromEntries(entries) as Record<string, Expense[]> };
+      return { centers, byCenter: Object.fromEntries(entries) as Record<string, CenterRows> };
     },
   });
 
   const centers = useMemo(() => data?.centers ?? [], [data]);
-  const expensesByCenter = useMemo(() => data?.expensesByCenter ?? {}, [data]);
+  const byCenter = useMemo(() => data?.byCenter ?? {}, [data]);
 
-  const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: queryKeys.costCenters.all(ownerId ?? '') });
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: queryKeys.costCenters.all(ownerId ?? '') });
 
   // --- UI state ---
-  const [period, setPeriod] = useState<CostCenterPeriod>('year');
   const [selectedCenter, setSelectedCenter] = useState<CostCenter | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCenter, setEditingCenter] = useState<CostCenter | null>(null);
-  const [showArchived, setShowArchived] = useState(false);
-  const [comparisonOpen, setComparisonOpen] = useState(false);
 
-  // --- Derived rows for the selected period ---
-  const rows = useMemo<CenterRow[]>(() => {
-    const now = new Date();
-    return centers.map((center) => {
-      const expenses = expensesByCenter[center.id] ?? [];
-      const stats = computeCenterStats(expenses, period, now);
-      const budget = evaluateCenterBudget(center, expenses, now);
-      return {
-        center,
-        expenses,
-        totalSpent: stats.totalSpent,
-        transactionCount: stats.transactionCount,
-        lifecycle: getLifecycleStatus(center, stats.lastActivityDate, now),
-        budgetRatio: budget?.ratio ?? null,
-        budgetStatus: budget?.status ?? null,
-      };
-    });
-  }, [centers, expensesByCenter, period]);
+  // Evaluated once per mount — the figures read the day the tab was opened.
+  const now = useMemo(() => new Date(), []);
 
-  const activeRows = useMemo(
-    () => rankCentersBySpend(rows.filter((r) => r.lifecycle !== 'archived')),
-    [rows],
+  // --- Every number, from the pure layer ---
+  const summary = useMemo(
+    () => summarizeCostCenters(centers.map((center) => ({ center, expenses: byCenter[center.id]?.spending ?? [] })), now),
+    [centers, byCenter, now],
   );
-  const archivedRows = useMemo(() => rankCentersBySpend(rows.filter((r) => r.lifecycle === 'archived')), [rows]);
-
-  const periodTotal = useMemo(
-    () => activeRows.reduce((sum, r) => sum + r.totalSpent, 0),
-    [activeRows],
-  );
-  const activeWithSpendCount = activeRows.filter((r) => r.totalSpent > 0).length;
-  const maxSpend = activeRows[0]?.totalSpent ?? 0;
-
-  // Comparison overlay: top centers over time for the period.
-  const comparison = useMemo(
-    () =>
-      buildComparisonSeries(
-        rows
-          .filter((r) => r.lifecycle !== 'archived')
-          .map((r) => ({
-            id: r.center.id,
-            name: r.center.name,
-            color: r.center.color,
-            expenses: r.expenses,
-          })),
-        period,
-      ),
-    [rows, period],
-  );
-  const comparisonData = useMemo(
-    () => comparison.buckets.map((b) => ({ label: b.label, ...b.byCenter })),
-    [comparison],
-  );
+  const stack = useMemo(() => buildCenterMonthStack(summary.active, now, TRAILING_MONTHS), [summary, now]);
+  const verdict = useMemo(() => buildCostCentersVerdict(summary, now), [summary, now]);
 
   // --- Handlers ---
-  const handleOpenCreate = () => {
+  const openCreate = useCallback(() => {
     setEditingCenter(null);
     setDialogOpen(true);
-  };
+  }, []);
 
-  const handleOpenEdit = (center: CostCenter) => {
+  const openEdit = (center: CostCenter) => {
     setEditingCenter(center);
     setDialogOpen(true);
   };
+
+  // The page header owns the desktop «Nuovo centro»; the tab owns the dialog, so the two
+  // talk through a window event — the channel Tracciamento, Dividendi and Budget use.
+  useEffect(() => {
+    const onAdd = () => openCreate();
+    window.addEventListener('cashflow:add-cost-center', onAdd);
+    return () => window.removeEventListener('cashflow:add-cost-center', onAdd);
+  }, [openCreate]);
 
   const handleDialogSuccess = (saved: CostCenter) => {
     if (selectedCenter?.id === saved.id) setSelectedCenter(saved);
@@ -205,9 +151,16 @@ export function CostCentersTab() {
 
   const handleDelete = async (center: CostCenter) => {
     if (!user || !ownerId) return;
+    const unlinkedCount = byCenter[center.id]?.linkedCount ?? 0;
     try {
       await deleteCostCenter(ownerId, center.id);
-      toast.success(`"${center.name}" eliminato`);
+      // The cascade is the part the user cannot see: name the outcome and the reassurance —
+      // the expenses survive, they only lose the tag.
+      toast.success(
+        unlinkedCount > 0
+          ? `"${center.name}" eliminato · ${unlinkedCount} ${unlinkedCount === 1 ? 'spesa scollegata resta' : 'spese scollegate restano'} in Cashflow`
+          : `"${center.name}" eliminato`,
+      );
       setSelectedCenter(null);
       invalidate();
     } catch (error) {
@@ -230,297 +183,107 @@ export function CostCentersTab() {
     }
   };
 
+  const addButtonLabel = isDemo ? 'Nuovo centro — non disponibile in modalità demo' : 'Nuovo centro';
+
   // --- Detail view ---
   if (selectedCenter) {
     return (
       <>
         <CostCenterDetail
           costCenter={selectedCenter}
-          period={period}
+          linkedExpenseCount={byCenter[selectedCenter.id]?.linkedCount ?? 0}
+          initialExpenses={byCenter[selectedCenter.id]?.spending}
           onBack={() => setSelectedCenter(null)}
-          onEdit={handleOpenEdit}
+          onEdit={openEdit}
           onDelete={handleDelete}
           onArchiveToggle={handleArchiveToggle}
           isDemo={isDemo}
         />
-        <CostCenterDialog
-          open={dialogOpen}
-          onClose={() => setDialogOpen(false)}
-          costCenter={editingCenter}
-          onSuccess={handleDialogSuccess}
-        />
+        <CostCenterDialog open={dialogOpen} onClose={() => setDialogOpen(false)} costCenter={editingCenter} onSuccess={handleDialogSuccess} />
       </>
     );
   }
 
-  // --- List / Panoramica view ---
+  if (loading) {
+    return <TileGridSkeleton cells={SKELETON_CELLS} className="pt-1" />;
+  }
+
+  // --- List view ---
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold">Centri di Costo</h2>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Raggruppa le spese per oggetto o progetto e confronta dove vanno i soldi
-          </p>
-        </div>
-        <Button
-          onClick={handleOpenCreate}
-          disabled={isDemo}
-          aria-label={isDemo ? 'Nuovo centro — non disponibile in modalità demo' : undefined}
-          className="w-full sm:w-auto sm:shrink-0"
-          size="sm"
-        >
-          <Plus className="h-4 w-4 mr-1" />
-          Nuovo centro
-        </Button>
+    <div className="space-y-4 max-desktop:portrait:pb-20">
+      {/* ── Verdict ─────────────────────────────────────────────────────────────── */}
+      <div className="pt-1">
+        <PageVerdict verdict={verdict} ariaLabel="Verdetto sui centri di costo" />
       </div>
 
-      {loading ? (
-        <PanoramicaSkeleton />
+      {/* ── Below desktop: the only add affordance there is on a phone (the bottom-nav FAB
+          belongs to Tracciamento) ──────────────────────────────────────────────── */}
+      <Button variant="outline" className="h-11 w-full desktop:hidden" onClick={openCreate} disabled={isDemo} aria-label={addButtonLabel}>
+        <Plus className="h-4 w-4" />
+        Nuovo centro
+      </Button>
+
+      {isError ? (
+        /* Before the empty check, never after: `centers` defaults to [] on failure too. */
+        <ErrorNotice
+          className="max-w-[920px]"
+          notice={describeReadFailure({
+            consequence: 'I centri di costo non sono stati letti: senza di essi la pagina direbbe che non ne hai nessuno.',
+            untouched: 'I centri e le spese registrate non sono stati toccati.',
+          })}
+        />
       ) : centers.length === 0 ? (
-        <EmptyState onCreate={handleOpenCreate} isDemo={isDemo} />
+        <div className="hidden desktop:block">
+          <Button onClick={openCreate} disabled={isDemo} variant="outline" size="sm" aria-label={addButtonLabel}>
+            <Plus className="h-4 w-4" />
+            Crea il primo centro
+          </Button>
+        </div>
       ) : (
         <>
-          {/* Period axis */}
-          <SegmentedControl
-            options={PERIOD_OPTIONS}
-            value={period}
-            onChange={setPeriod}
-            aria-label="Periodo"
-            className="max-w-md"
-          />
-
-          {/* HERO — total allocated in the period. */}
-          <section>
-            <p className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
-              Totale nei centri di costo
-            </p>
-            <div className="mt-1 flex flex-wrap items-end gap-3">
-              <span className="text-[40px] desktop:text-[48px] leading-none font-bold font-mono tabular-nums">
-                {formatCurrency(periodTotal)}
-              </span>
-              {activeWithSpendCount > 0 && (
-                <span className="text-xs text-muted-foreground pb-1.5">
-                  su {activeWithSpendCount} {activeWithSpendCount === 1 ? 'centro attivo' : 'centri attivi'}
-                </span>
-              )}
+          {/* ── Tile grid ─────────────────────────────────────────────────────── */}
+          <div className="grid grid-cols-1 gap-3 tablet:grid-cols-2 desktop:grid-cols-12">
+            <div className={cn(TILE_CELL_CLASS, 'order-1 tablet:col-span-2 desktop:order-none desktop:col-span-5 desktop:row-span-2')}>
+              <TotaleTile
+                summary={summary}
+                stack={stack}
+                stackCaption={describeTrailingCaption(stack, now)}
+                aside={describeTotaleAside(summary)}
+                reading={describeTotale(summary)}
+                lastYearCaption={describeLastYearCaption(now)}
+                footer={describeTotaleFooter(summary)}
+                palette={chartColors}
+              />
             </div>
-          </section>
-
-          {/* RANKED LIST — flat divide-y, ordered by spend. */}
-          {activeRows.length > 0 ? (
-            <div className="divide-y divide-border/60 rounded-xl border border-border/60 overflow-hidden">
-              {activeRows.map((row, i) => (
-                <CenterListRow
-                  key={row.center.id}
-                  row={row}
-                  maxSpend={maxSpend}
-                  index={i}
-                  onOpen={() => setSelectedCenter(row.center)}
-                />
-              ))}
+            <div className={cn(TILE_CELL_CLASS, 'order-2 tablet:col-span-2 desktop:order-none desktop:col-span-7')}>
+              <CentriTile
+                rows={summary.active}
+                aside={describeTotaleAside(summary)}
+                reading={describeCentri(summary)}
+                footer={CENTRI_FOOTER}
+                palette={chartColors}
+                now={now}
+                onOpen={setSelectedCenter}
+              />
             </div>
-          ) : (
-            <p className="text-sm text-muted-foreground px-1 py-8 text-center">
-              Nessuna spesa nei centri attivi per questo periodo.
-            </p>
-          )}
+            <div className={cn(TILE_CELL_CLASS, 'order-3 tablet:col-span-2 desktop:order-none desktop:col-span-7')}>
+              <DormientiTile
+                centers={summary.dormant}
+                aside={DORMIENTI_ASIDE}
+                reading={describeDormienti(summary)}
+                footer={DORMIENTI_FOOTER}
+                palette={chartColors}
+                onOpen={setSelectedCenter}
+              />
+            </div>
+          </div>
 
-          {/* COMPARISON overlay (B3) — only meaningful with 2+ spending centers. */}
-          {comparison.centers.length >= 2 && (
-            <Collapsible open={comparisonOpen} onOpenChange={setComparisonOpen}>
-              <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg border border-border/60 px-4 py-3 text-sm font-medium hover:bg-muted/40 transition-colors">
-                <span className="flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                  Confronta l’andamento dei centri
-                </span>
-                <ChevronDown
-                  className={cn('h-4 w-4 text-muted-foreground transition-transform', comparisonOpen && 'rotate-180')}
-                />
-              </CollapsibleTrigger>
-              <CollapsibleContent className="pt-4">
-                <div className="h-56 desktop:h-72 min-w-0">
-                  <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                    <LineChart data={comparisonData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                      <XAxis dataKey="label" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-                      <YAxis
-                        tickFormatter={(v) => `${Math.round(v as number)}€`}
-                        tick={{ fontSize: 11 }}
-                        tickLine={false}
-                        axisLine={false}
-                        width={55}
-                      />
-                      <Tooltip
-                        formatter={(value, name) => [formatCurrency(value as number), name as string]}
-                        contentStyle={TOOLTIP_CONTENT_STYLE}
-                        cursor={{ stroke: 'var(--muted-foreground)', strokeOpacity: 0.3 }}
-                      />
-                      <Legend wrapperStyle={{ fontSize: 12 }} />
-                      {comparison.centers.map((c, i) => (
-                        <Line
-                          key={c.id}
-                          type="monotone"
-                          dataKey={c.id}
-                          name={c.name}
-                          stroke={c.color ?? chartColors[i % Math.max(1, chartColors.length)] ?? 'var(--chart-1)'}
-                          strokeWidth={2}
-                          dot={false}
-                          activeDot={{ r: 4 }}
-                        />
-                      ))}
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-          )}
-
-          {/* ARCHIVED — collapsed lifecycle bucket (B4). */}
-          {archivedRows.length > 0 && (
-            <Collapsible open={showArchived} onOpenChange={setShowArchived}>
-              <CollapsibleTrigger className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
-                <ChevronRight className={cn('h-4 w-4 transition-transform', showArchived && 'rotate-90')} />
-                Centri archiviati ({archivedRows.length})
-              </CollapsibleTrigger>
-              <CollapsibleContent className="pt-3">
-                <div className="divide-y divide-border/60 rounded-xl border border-border/60 overflow-hidden opacity-70">
-                  {archivedRows.map((row, i) => (
-                    <CenterListRow
-                      key={row.center.id}
-                      row={row}
-                      maxSpend={maxSpend}
-                      index={i}
-                      onOpen={() => setSelectedCenter(row.center)}
-                    />
-                  ))}
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-          )}
+          {/* ── Archiviati, below the fold ──────────────────────────────────────── */}
+          <ArchiviatiDisclosure rows={summary.archived} summary={describeArchiviati(summary)} palette={chartColors} onOpen={setSelectedCenter} />
         </>
       )}
 
-      <CostCenterDialog
-        open={dialogOpen}
-        onClose={() => setDialogOpen(false)}
-        costCenter={editingCenter}
-        onSuccess={handleDialogSuccess}
-      />
-    </div>
-  );
-}
-
-// --- Row -------------------------------------------------------------------
-
-/**
- * A single center as a flat list row: name + lifecycle + sub-line on the left,
- * dominant period number + share bar on the right. The share bar encodes the row's
- * weight relative to the largest center, so the ranking reads at a glance.
- */
-function CenterListRow({
-  row,
-  maxSpend,
-  index,
-  onOpen,
-}: {
-  row: CenterRow;
-  maxSpend: number;
-  index: number;
-  onOpen: () => void;
-}) {
-  const { center, totalSpent, transactionCount, lifecycle, budgetStatus, budgetRatio } = row;
-  const sharePct = maxSpend > 0 ? Math.round((totalSpent / maxSpend) * 100) : 0;
-  const barColor = center.color ?? 'var(--chart-1)';
-
-  return (
-    <motion.button
-      type="button"
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: Math.min(index * 0.03, 0.2), duration: 0.18 }}
-      onClick={onOpen}
-      aria-label={`Apri ${center.name}`}
-      className="group flex w-full items-center gap-4 px-4 py-3.5 text-left hover:bg-muted/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
-    >
-      <span
-        className="h-8 w-1 rounded-full flex-shrink-0"
-        style={{ backgroundColor: barColor }}
-        aria-hidden="true"
-      />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="font-medium truncate">{center.name}</span>
-          {lifecycle === 'dormant' && (
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-normal text-muted-foreground">
-              Inattivo
-            </Badge>
-          )}
-          {budgetStatus === 'over' && (
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-normal text-destructive border-destructive/40">
-              Oltre tetto
-            </Badge>
-          )}
-        </div>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          {transactionCount} {transactionCount === 1 ? 'transazione' : 'transazioni'}
-          {budgetRatio !== null && ` · ${Math.round(budgetRatio * 100)}% del tetto`}
-        </p>
-      </div>
-      <div className="flex flex-col items-end gap-1.5 w-32 flex-shrink-0">
-        <span className="font-mono font-semibold tabular-nums">{formatCurrency(totalSpent)}</span>
-        {/* Share bar relative to the top center — functional weight indicator. */}
-        <span className="h-1 w-full overflow-hidden rounded-full bg-muted" aria-hidden="true">
-          <span
-            className="block h-full rounded-full"
-            style={{ width: `${sharePct}%`, backgroundColor: barColor, opacity: 0.7 }}
-          />
-        </span>
-      </div>
-    </motion.button>
-  );
-}
-
-// --- States ----------------------------------------------------------------
-
-function EmptyState({ onCreate, isDemo }: { onCreate: () => void; isDemo: boolean }) {
-  return (
-    <div className="flex flex-col items-center justify-center gap-4 py-16 text-center text-muted-foreground">
-      <Layers className="h-10 w-10 opacity-30" />
-      <div className="space-y-1">
-        <p className="font-medium">Nessun centro di costo</p>
-        <p className="text-sm">
-          Crea il primo centro per raggruppare spese per oggetto o progetto (es. &quot;Automobile Dacia&quot;).
-        </p>
-      </div>
-      <Button onClick={onCreate} disabled={isDemo} variant="outline" size="sm">
-        <Plus className="h-4 w-4 mr-1" />
-        Crea il primo centro
-      </Button>
-    </div>
-  );
-}
-
-function PanoramicaSkeleton() {
-  return (
-    <div className="space-y-6 animate-pulse" aria-hidden="true">
-      <div className="h-9 w-full max-w-md bg-muted rounded-lg" />
-      <div className="space-y-2">
-        <div className="h-3 w-32 bg-muted rounded" />
-        <div className="h-12 w-56 bg-muted rounded" />
-      </div>
-      <div className="rounded-xl border border-border/60 divide-y divide-border/60">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="flex items-center gap-4 px-4 py-3.5">
-            <div className="h-8 w-1 bg-muted rounded-full" />
-            <div className="flex-1 space-y-2">
-              <div className="h-4 w-1/3 bg-muted rounded" />
-              <div className="h-3 w-1/4 bg-muted rounded" />
-            </div>
-            <div className="h-4 w-20 bg-muted rounded" />
-          </div>
-        ))}
-      </div>
+      <CostCenterDialog open={dialogOpen} onClose={() => setDialogOpen(false)} costCenter={editingCenter} onSuccess={handleDialogSuccess} />
     </div>
   );
 }

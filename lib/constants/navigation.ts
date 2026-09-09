@@ -9,6 +9,7 @@ import {
   Trophy,
   Flame,
   PiggyBank,
+  Bot,
 } from 'lucide-react';
 
 export type NavItem = {
@@ -41,10 +42,19 @@ export const planningNav: NavItem[] = [
   { name: 'Previdenza',         href: '/dashboard/pension',          icon: PiggyBank },
 ];
 
+// The AI assistant — a plain route after the planning group in Sidebar and
+// SecondaryMenuDrawer (no banner: the chrome stays achromatic). Gated at render by
+// NEXT_PUBLIC_ASSISTANT_AI_ENABLED, which is why it is not part of a group array.
+export const assistantNavItem: NavItem = {
+  name: 'Assistente AI',
+  href: '/dashboard/assistant',
+  icon: Bot,
+};
+
 // All secondary hrefs — used by BottomNavigation to determine "Altro" active state.
 export const secondaryHrefs: string[] = [
   ...analysisNav.map((i) => i.href),
   ...planningNav.map((i) => i.href),
-  '/dashboard/assistant',
+  assistantNavItem.href,
   '/dashboard/settings',
 ];

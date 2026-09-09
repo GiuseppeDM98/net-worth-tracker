@@ -20,7 +20,7 @@ interface AssetClassLeg {
  * Splits one asset into (assetClass, weight) legs, looking through `composition` when present —
  * weight is the composition percentage, or the asset's own class at full weight when uncomposed.
  * Shared by `resolveDisplayAssetClass` (ranks legs directly, no dollar value needed) and
- * `PensionAllocationCards` (ranks legs after scaling weight by the asset's market VALUE) — the
+ * `buildPensionLookThrough` in allocazioneSummary.ts (ranks legs after scaling weight by the asset's market VALUE) — the
  * third consumer of this exact "split into weighted class legs" shape is what earned the extraction
  * (Rule of Three), the two were duplicated as `assetLegs`/`toClassSlices` before this file existed.
  */

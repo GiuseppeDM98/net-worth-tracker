@@ -26,6 +26,11 @@ export const queryKeys = {
     categories: (userId: string) => ['expense-categories', userId] as const,
   },
 
+  // Budget — the monthly records of the configuration, written only by the cron
+  budgetHistory: {
+    months: (userId: string, monthKeys: string[]) => ['budget-history', userId, ...monthKeys] as const,
+  },
+
   // Assistant
   assistant: {
     threads: (userId: string) => ['assistant', 'threads', userId] as const,

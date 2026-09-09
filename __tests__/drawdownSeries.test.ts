@@ -57,6 +57,15 @@ describe('buildTwrIndex', () => {
     expect(index[1].value).toBeCloseTo(100, 10);
   });
 
+  it('holds the index steady across a month whose starting net worth is NEGATIVE, instead of flipping its sign', () => {
+    // Net debt at the start: the old `!== 0` guard let the division through and a positive month
+    // multiplied the index by a negative factor.
+    const index = buildTwrIndex(monthlySeries([-1000, 500, 550]), []);
+
+    expect(index[1].value).toBe(100);
+    expect(index[2].value).toBeCloseTo(110, 10);
+  });
+
   it('holds the index steady across a month whose starting net worth is zero', () => {
     // Rendimento indefinito (divisione per zero): l'indice non si azzera, resta dov'era.
     const index = buildTwrIndex(monthlySeries([1000, 0, 800]), []);

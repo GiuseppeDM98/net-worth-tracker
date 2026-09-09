@@ -1,10 +1,10 @@
 import { doc, getDoc, setDoc, deleteField } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { invalidateDashboardOverviewSummary } from '@/lib/services/dashboardOverviewInvalidation';
-import { Asset, AssetClass, AssetAllocationTarget, AssetAllocationSettings, AllocationResult, SubCategoryTarget, SpecificAssetAllocation, AllocationData } from '@/types/assets';
+import { Asset, AssetClass, AssetAllocationTarget, AssetAllocationSettings, AllocationResult, SpecificAssetAllocation, AllocationData } from '@/types/assets';
 import { calculateAssetValue, calculateTotalValue } from './assetService';
 import { expandAssetExposure } from '@/lib/utils/assetExposureUtils';
-import { partitionByAllocationRole } from '@/lib/utils/allocationUtils';
+import { partitionByAllocationRole, ASSET_CLASS_SEQUENCE, NO_SUBCATEGORY_LABEL } from '@/lib/utils/allocationUtils';
 import { DEFAULT_SUB_CATEGORIES } from '@/lib/constants/defaultSubCategories';
 
 const ALLOCATION_TARGETS_COLLECTION = 'assetAllocationTargets';
@@ -85,6 +85,9 @@ export async function getSettings(
       coastFirePensions: data.coastFirePensions,
       coastFireTaxBrackets: data.coastFireTaxBrackets,
       includePrimaryResidenceInFIRE: data.includePrimaryResidenceInFIRE,
+      respectPensionLockInFire: data.respectPensionLockInFire,
+      pensionInpsRetirementAge: data.pensionInpsRetirementAge,
+      pensionRitaLongUnemployment: data.pensionRitaLongUnemployment,
       dividendIncomeCategoryId: data.dividendIncomeCategoryId,
       dividendIncomeSubCategoryId: data.dividendIncomeSubCategoryId,
       fireProjectionScenarios: data.fireProjectionScenarios,
@@ -103,6 +106,7 @@ export async function getSettings(
       assistantMacroContextEnabled: data.assistantMacroContextEnabled,
       assistantMemoryEnabled: data.assistantMemoryEnabled,
       costCentersEnabled: data.costCentersEnabled,
+      expenseSplitEnabled: data.expenseSplitEnabled,
       monthlyEmailEnabled: data.monthlyEmailEnabled,
       quarterlyEmailEnabled: data.quarterlyEmailEnabled,
       semiAnnualEmailEnabled: data.semiAnnualEmailEnabled,
@@ -112,6 +116,7 @@ export async function getSettings(
       familyMembers: data.familyMembers,
       performanceIncludesPensionFunds: data.performanceIncludesPensionFunds,
       performanceIncludesExcludedAssets: data.performanceIncludesExcludedAssets,
+      performanceExcludesCash: data.performanceExcludesCash,
       pensionReturnStartMonth: data.pensionReturnStartMonth,
       targets: data.targets as AssetAllocationTarget,
     };
@@ -153,19 +158,30 @@ export async function setSettings(
       const existingData = existingDoc.exists() ? existingDoc.data() : {};
 
       // Build complete document with all fields
-      const docData: any = {
+      const docData: Record<string, unknown> = {
         ...existingData, // Keep all existing fields
         userId,
         targets: settings.targets, // COMPLETELY REPLACE targets (not merge)
         updatedAt: new Date(),
       };
 
-      // Override with new values for defined fields
-      if (settings.userAge !== undefined) {
-        docData.userAge = settings.userAge;
+      // Override with new values for defined fields.
+      // Età and risk-free rate are USER-CLEARABLE (an emptied input sends undefined), so they
+      // take the `'x' in settings` guard: with `!== undefined` the spread of existingData above
+      // kept the old value and the cleared field came back on the next load.
+      if ('userAge' in settings) {
+        if (settings.userAge !== undefined) {
+          docData.userAge = settings.userAge;
+        } else {
+          delete docData.userAge;
+        }
       }
-      if (settings.riskFreeRate !== undefined) {
-        docData.riskFreeRate = settings.riskFreeRate;
+      if ('riskFreeRate' in settings) {
+        if (settings.riskFreeRate !== undefined) {
+          docData.riskFreeRate = settings.riskFreeRate;
+        } else {
+          delete docData.riskFreeRate;
+        }
       }
       if (settings.withdrawalRate !== undefined) {
         docData.withdrawalRate = settings.withdrawalRate;
@@ -194,11 +210,20 @@ export async function setSettings(
       if (settings.includePrimaryResidenceInFIRE !== undefined) {
         docData.includePrimaryResidenceInFIRE = settings.includePrimaryResidenceInFIRE;
       }
-      if (settings.dividendIncomeCategoryId !== undefined) {
-        docData.dividendIncomeCategoryId = settings.dividendIncomeCategoryId;
+      // Also user-clearable, from the «Cancella» buttons of Impostazioni → Dividendi.
+      if ('dividendIncomeCategoryId' in settings) {
+        if (settings.dividendIncomeCategoryId !== undefined) {
+          docData.dividendIncomeCategoryId = settings.dividendIncomeCategoryId;
+        } else {
+          delete docData.dividendIncomeCategoryId;
+        }
       }
-      if (settings.dividendIncomeSubCategoryId !== undefined) {
-        docData.dividendIncomeSubCategoryId = settings.dividendIncomeSubCategoryId;
+      if ('dividendIncomeSubCategoryId' in settings) {
+        if (settings.dividendIncomeSubCategoryId !== undefined) {
+          docData.dividendIncomeSubCategoryId = settings.dividendIncomeSubCategoryId;
+        } else {
+          delete docData.dividendIncomeSubCategoryId;
+        }
       }
       if (settings.fireProjectionScenarios !== undefined) {
         docData.fireProjectionScenarios = settings.fireProjectionScenarios;
@@ -214,6 +239,18 @@ export async function setSettings(
       }
       if (settings.autoCalculateEquityBonds !== undefined) {
         docData.autoCalculateEquityBonds = settings.autoCalculateEquityBonds;
+      }
+      if (settings.respectPensionLockInFire !== undefined) {
+        docData.respectPensionLockInFire = settings.respectPensionLockInFire;
+      }
+      // RITA rule inputs: written only by FireCalculatorTab with a complete form, not
+      // clearable — same reasoning as includePrimaryResidenceInFIRE, so the !== undefined guard
+      // is safe in both branches.
+      if (settings.pensionInpsRetirementAge !== undefined) {
+        docData.pensionInpsRetirementAge = settings.pensionInpsRetirementAge;
+      }
+      if (settings.pensionRitaLongUnemployment !== undefined) {
+        docData.pensionRitaLongUnemployment = settings.pensionRitaLongUnemployment;
       }
       // Default cash accounts are user-clearable: a present-but-undefined value means
       // "Nessun default". setDoc here runs WITHOUT merge, so deleting the key from docData
@@ -260,6 +297,9 @@ export async function setSettings(
       if (settings.costCentersEnabled !== undefined) {
         docData.costCentersEnabled = settings.costCentersEnabled;
       }
+      if (settings.expenseSplitEnabled !== undefined) {
+        docData.expenseSplitEnabled = settings.expenseSplitEnabled;
+      }
       if (settings.monthlyEmailEnabled !== undefined) {
         docData.monthlyEmailEnabled = settings.monthlyEmailEnabled;
       }
@@ -287,6 +327,9 @@ export async function setSettings(
       if (settings.performanceIncludesExcludedAssets !== undefined) {
         docData.performanceIncludesExcludedAssets = settings.performanceIncludesExcludedAssets;
       }
+      if (settings.performanceExcludesCash !== undefined) {
+        docData.performanceExcludesCash = settings.performanceExcludesCash;
+      }
       // Clearable (empty month input = "parti dal primo versamento"). Same shape as the default
       // cash accounts above: this branch writes WITHOUT merge, so dropping the key removes it.
       if ('pensionReturnStartMonth' in settings) {
@@ -301,16 +344,20 @@ export async function setSettings(
       await setDoc(targetRef, docData);
     } else {
       // No targets update, use normal merge behavior
-      const docData: any = {
+      const docData: Record<string, unknown> = {
         userId,
         updatedAt: new Date(),
       };
 
-      if (settings.userAge !== undefined) {
-        docData.userAge = settings.userAge;
+      // Età and risk-free rate are user-clearable (an emptied input sends undefined):
+      // with merge: true, omitting the key would leave the stale value in place.
+      if ('userAge' in settings) {
+        docData.userAge =
+          settings.userAge !== undefined ? settings.userAge : deleteField();
       }
-      if (settings.riskFreeRate !== undefined) {
-        docData.riskFreeRate = settings.riskFreeRate;
+      if ('riskFreeRate' in settings) {
+        docData.riskFreeRate =
+          settings.riskFreeRate !== undefined ? settings.riskFreeRate : deleteField();
       }
       if (settings.withdrawalRate !== undefined) {
         docData.withdrawalRate = settings.withdrawalRate;
@@ -339,11 +386,14 @@ export async function setSettings(
       if (settings.includePrimaryResidenceInFIRE !== undefined) {
         docData.includePrimaryResidenceInFIRE = settings.includePrimaryResidenceInFIRE;
       }
-      if (settings.dividendIncomeCategoryId !== undefined) {
-        docData.dividendIncomeCategoryId = settings.dividendIncomeCategoryId;
+      // Also user-clearable, from the «Cancella» buttons of Impostazioni → Dividendi.
+      if ('dividendIncomeCategoryId' in settings) {
+        docData.dividendIncomeCategoryId =
+          settings.dividendIncomeCategoryId !== undefined ? settings.dividendIncomeCategoryId : deleteField();
       }
-      if (settings.dividendIncomeSubCategoryId !== undefined) {
-        docData.dividendIncomeSubCategoryId = settings.dividendIncomeSubCategoryId;
+      if ('dividendIncomeSubCategoryId' in settings) {
+        docData.dividendIncomeSubCategoryId =
+          settings.dividendIncomeSubCategoryId !== undefined ? settings.dividendIncomeSubCategoryId : deleteField();
       }
       if (settings.fireProjectionScenarios !== undefined) {
         docData.fireProjectionScenarios = settings.fireProjectionScenarios;
@@ -359,6 +409,18 @@ export async function setSettings(
       }
       if (settings.autoCalculateEquityBonds !== undefined) {
         docData.autoCalculateEquityBonds = settings.autoCalculateEquityBonds;
+      }
+      if (settings.respectPensionLockInFire !== undefined) {
+        docData.respectPensionLockInFire = settings.respectPensionLockInFire;
+      }
+      // RITA rule inputs: written only by FireCalculatorTab with a complete form, not
+      // clearable — same reasoning as includePrimaryResidenceInFIRE, so the !== undefined guard
+      // is safe in both branches.
+      if (settings.pensionInpsRetirementAge !== undefined) {
+        docData.pensionInpsRetirementAge = settings.pensionInpsRetirementAge;
+      }
+      if (settings.pensionRitaLongUnemployment !== undefined) {
+        docData.pensionRitaLongUnemployment = settings.pensionRitaLongUnemployment;
       }
       // Default cash accounts are user-clearable. This branch writes with merge: true,
       // so omitting the key would leave the old value untouched — use deleteField() to
@@ -402,6 +464,9 @@ export async function setSettings(
       if (settings.costCentersEnabled !== undefined) {
         docData.costCentersEnabled = settings.costCentersEnabled;
       }
+      if (settings.expenseSplitEnabled !== undefined) {
+        docData.expenseSplitEnabled = settings.expenseSplitEnabled;
+      }
       if (settings.monthlyEmailEnabled !== undefined) {
         docData.monthlyEmailEnabled = settings.monthlyEmailEnabled;
       }
@@ -428,6 +493,9 @@ export async function setSettings(
       }
       if (settings.performanceIncludesExcludedAssets !== undefined) {
         docData.performanceIncludesExcludedAssets = settings.performanceIncludesExcludedAssets;
+      }
+      if (settings.performanceExcludesCash !== undefined) {
+        docData.performanceExcludesCash = settings.performanceExcludesCash;
       }
       // Clearable, and this branch merges — omitting the key would leave the old month in place,
       // so an explicit deleteField() is required (same as the default cash accounts above).
@@ -600,9 +668,7 @@ interface CurrentAllocationSnapshot {
 }
 
 /** Fixed set of top-level asset classes, used to seed a `CurrentAllocationSnapshot`. */
-const ALL_ASSET_CLASSES: AssetClass[] = [
-  'equity', 'bonds', 'crypto', 'realestate', 'cash', 'commodity', 'trendFollowing', 'carry',
-];
+const ALL_ASSET_CLASSES: AssetClass[] = ASSET_CLASS_SEQUENCE;
 
 /**
  * Expand every asset into per-class market AND notional exposure (`expandAssetExposure`, the
@@ -653,10 +719,14 @@ function calculateCurrentAllocationSnapshot(
       add(marketByAssetClass, assetClass, marketValue);
       add(notionalByAssetClass, assetClass, notionalValue);
 
-      if (subCategory) {
-        add(nested(marketBySubCategory, assetClass), subCategory, marketValue);
-        add(nested(notionalBySubCategory, assetClass), subCategory, notionalValue);
-      }
+      // A holding with no subcategory still belongs to the class, so it must land in a bucket:
+      // dropping it made the class total (the denominator of every sleeve) larger than the sum of
+      // the sleeves, and each targeted sleeve read under target by the unclassified share, with
+      // its euros nowhere on screen. `NO_SUBCATEGORY_LABEL` is the residual bucket — it carries no
+      // target and receives no verdict; `toLegacyAllocationResult` emits it as a stated row.
+      const subCategoryKey = subCategory || NO_SUBCATEGORY_LABEL;
+      add(nested(marketBySubCategory, assetClass), subCategoryKey, marketValue);
+      add(nested(notionalBySubCategory, assetClass), subCategoryKey, notionalValue);
 
       if (specificAssetKey) {
         add(nested(marketBySpecificAsset, assetClass), specificAssetKey, marketValue);
@@ -705,7 +775,10 @@ function classifyAction(difference: number): AllocationData['action'] {
 export function deriveTargetLeverageRatio(targets: AssetAllocationTarget | null): number {
   if (!targets) return 1;
   let sum = 0;
-  for (const data of Object.values(targets)) {
+  for (const [assetClass, data] of Object.entries(targets)) {
+    // A fixed-amount cash target keeps a stale `targetPercentage` beside it (Settings sums the
+    // other classes «excl. cash»); counting it read a 100% plan as a 1,05× leverage target.
+    if (assetClass === 'cash' && data.useFixedAmount) continue;
     sum += Math.max(0, data.targetPercentage || 0);
   }
   return sum > 0 ? sum / 100 : 1;
@@ -775,9 +848,12 @@ function toLegacyAllocationResult(
       targetValue = cashFixedAmount;
       targetPercentage = marketBase > 0 ? (targetValue / marketBase) * 100 : 0;
     } else {
-      targetPercentage = targetData.targetPercentage;
-      // % of the (possibly fixed-cash-reduced) market base, expressed as a notional € figure.
-      targetValue = (targetBase * targetPercentage) / 100;
+      // % of the (possibly fixed-cash-reduced) market base, expressed as a notional € figure —
+      // and, as a percentage, re-expressed on the MARKET base like `currentPercentage` is: with
+      // a 25k reserve on 200k, a 70% equity target is 61,25% of the market, and the p.p. drift
+      // must compare the two on one base or every class reads under target by the cash share.
+      targetValue = (targetBase * targetData.targetPercentage) / 100;
+      targetPercentage = marketBase > 0 ? (targetValue / marketBase) * 100 : 0;
     }
 
     const difference = currentPercentage - targetPercentage;
@@ -867,6 +943,23 @@ function toLegacyAllocationResult(
           });
         }
       });
+
+      // The class's own euros that carry no sleeve. They are already inside `currentValue`, so
+      // without this row the sleeves visibly fail to reach 100% and the reader has no way to see
+      // why. It is a STATEMENT, not a verdict: no target, no gap, no action — the answer to
+      // «troppo o troppo poco?» would be «classificalo», which no COMPRA/VENDI chip can say.
+      const unclassified = subCurrentValues[NO_SUBCATEGORY_LABEL] ?? 0;
+      if (unclassified > 0) {
+        bySubCategory[`${assetClass}:${NO_SUBCATEGORY_LABEL}`] = {
+          currentPercentage: assetClassCurrentTotal > 0 ? (unclassified / assetClassCurrentTotal) * 100 : 0,
+          currentValue: unclassified,
+          targetPercentage: 0,
+          targetValue: 0,
+          difference: 0,
+          differenceValue: 0,
+          action: 'OK',
+        };
+      }
     }
   });
 
@@ -1023,9 +1116,10 @@ export function buildTargetsFromGoalAllocation(
   derived: Partial<Record<AssetClass, number>>,
   existingTargets?: AssetAllocationTarget | null
 ): AssetAllocationTarget {
-  const allClasses: AssetClass[] = [
-    'equity', 'bonds', 'crypto', 'realestate', 'cash', 'commodity',
-  ];
+  // The app-wide enumeration, never a literal: a class missing here keeps whatever target it had
+  // while every other class is overwritten, so a goal-derived plan would silently leave a stale
+  // trendFollowing/carry weight in a document that claims to describe the goal.
+  const allClasses: AssetClass[] = ASSET_CLASS_SEQUENCE;
 
   const targets: AssetAllocationTarget = {};
 
@@ -1093,6 +1187,20 @@ export function getDefaultTargets(): AssetAllocationTarget {
       subCategoryConfig: {
         enabled: false,
         categories: DEFAULT_SUB_CATEGORIES.commodity,
+      },
+    },
+    trendFollowing: {
+      targetPercentage: 0,
+      subCategoryConfig: {
+        enabled: false,
+        categories: DEFAULT_SUB_CATEGORIES.trendFollowing,
+      },
+    },
+    carry: {
+      targetPercentage: 0,
+      subCategoryConfig: {
+        enabled: false,
+        categories: DEFAULT_SUB_CATEGORIES.carry,
       },
     },
   };

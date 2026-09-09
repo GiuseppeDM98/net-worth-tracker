@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, Suspense } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -19,10 +19,13 @@ import {
   getAllCategories,
 } from '@/lib/services/expenseCategoryService';
 import {
+  getExpenseCountByCategoryId,
   getExpenseCountBySubCategoryId,
   reassignExpensesSubCategory,
   moveExpensesFromSubCategory,
+  TransferBoundaryError,
 } from '@/lib/services/expenseService';
+import { crossesTransferBoundary } from '@/lib/utils/expenseTypeTransition';
 import { CategoryDeleteConfirmDialog } from './CategoryDeleteConfirmDialog';
 import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import { Button } from '@/components/ui/button';
@@ -38,8 +41,8 @@ import { toast } from 'sonner';
 import { Plus, X, ArrowRightLeft, Check, Tag } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { CategoryMoveDialog } from './CategoryMoveDialog';
-import { IconPickerPopover, getLazyIcon } from './IconPickerPopover';
-import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
+import { IconPickerPopover, CategoryIcon } from './IconPickerPopover';
+import { CATEGORY_ICONS } from '@/lib/constants/categoryIcons';
 import { cn } from '@/lib/utils';
 
 
@@ -70,7 +73,7 @@ const CATEGORY_COLORS: { value: string; label: string }[] = [
   { value: '#64748b', label: 'Grigio' },
 ];
 
-// For screen-reader labels (AGENTS.md: Color Picker Buttons)
+// For screen-reader labels (AGENTS.md § Accessibility — colour-swatch buttons)
 const COLOR_LABELS: Record<string, string> = Object.fromEntries(
   CATEGORY_COLORS.map((c) => [c.value, c.label])
 );
@@ -102,6 +105,8 @@ export interface CategoryManagementDialogProps {
 // ---------------------------------------------------------------------------
 interface FormBodyProps {
   category?: ExpenseCategory | null;
+  /** Expenses linked to the category being edited; null = unknown (still loading). */
+  linkedExpenseCount: number | null;
   subCategories: ExpenseSubCategory[];
   newSubCategoryName: string;
   setNewSubCategoryName: (v: string) => void;
@@ -117,6 +122,7 @@ interface FormBodyProps {
 
 function CategoryFormBody({
   category,
+  linkedExpenseCount,
   subCategories,
   newSubCategoryName,
   setNewSubCategoryName,
@@ -136,8 +142,9 @@ function CategoryFormBody({
   const selectedName  = useWatch({ control, name: 'name' });
   const subInputRef   = useRef<HTMLInputElement>(null);
 
-  // Resolve the icon for the live preview
-  const PreviewIcon = selectedIcon ? getLazyIcon(selectedIcon) : null;
+  // The live preview shows the icon only for a name in the curated set (an unknown name keeps
+  // the coloured tag); the component itself is read from the module-level map by `CategoryIcon`.
+  const hasPreviewIcon = !!selectedIcon && !!CATEGORY_ICONS[selectedIcon];
 
   return (
     <div className="space-y-6">
@@ -148,10 +155,14 @@ function CategoryFormBody({
           style={{ backgroundColor: selectedColor ? `${selectedColor}20` : 'var(--muted)' }}
           aria-label="Anteprima categoria"
         >
-          {PreviewIcon ? (
-            <Suspense fallback={<Tag className="h-6 w-6 text-muted-foreground" aria-hidden="true" />}>
-              <PreviewIcon className="h-6 w-6" style={{ color: selectedColor ?? 'var(--muted-foreground)' }} aria-hidden="true" />
-            </Suspense>
+          {hasPreviewIcon ? (
+            <CategoryIcon
+              name={selectedIcon}
+              fallback={<Tag className="h-6 w-6 text-muted-foreground" aria-hidden="true" />}
+              className="h-6 w-6"
+              style={{ color: selectedColor ?? 'var(--muted-foreground)' }}
+              aria-hidden="true"
+            />
           ) : (
             <Tag className="h-6 w-6" style={{ color: selectedColor ?? 'var(--muted-foreground)' }} aria-hidden="true" />
           )}
@@ -194,23 +205,37 @@ function CategoryFormBody({
             </span>
           </SelectTrigger>
           <SelectContent>
-            {TYPE_OPTIONS.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>
-                <div className="flex flex-col gap-0.5 py-0.5">
-                  <span className="font-medium">{opt.label}</span>
-                  <span className="text-xs text-muted-foreground font-normal">{opt.description}</span>
-                </div>
-              </SelectItem>
-            ))}
+            {TYPE_OPTIONS.map((opt) => {
+              // Crossing the transfer boundary is blocked while expenses are linked
+              // (or their count is still unknown): those rows touch two cash accounts
+              // and cannot be re-typed in batch — see crossesTransferBoundary.
+              const blocked =
+                !!category &&
+                crossesTransferBoundary(category.type, opt.value) &&
+                (linkedExpenseCount === null || linkedExpenseCount > 0);
+              return (
+                <SelectItem key={opt.value} value={opt.value} disabled={blocked}>
+                  <div className="flex flex-col gap-0.5 py-0.5">
+                    <span className="font-medium">{opt.label}</span>
+                    <span className="text-xs text-muted-foreground font-normal">
+                      {blocked
+                        ? 'Non disponibile: le voci collegate toccano due conti e non sono convertibili in blocco'
+                        : opt.description}
+                    </span>
+                  </div>
+                </SelectItem>
+              );
+            })}
           </SelectContent>
         </Select>
         {errors.type && (
           <p className="text-xs text-destructive">{errors.type.message}</p>
         )}
         {category && selectedType !== category.type && (() => {
-          const crossesBoundary = (category.type === 'income') !== (selectedType === 'income');
-          return crossesBoundary ? (
-            <p className="text-xs text-amber-600 dark:text-amber-400">
+          const flipsSign = (category.type === 'income') !== (selectedType === 'income') &&
+            !crossesTransferBoundary(category.type, selectedType);
+          return flipsSign ? (
+            <p className="text-xs text-warning-foreground">
               Attenzione: tutti gli importi cambieranno segno (da {EXPENSE_TYPE_LABELS[category.type]} a {EXPENSE_TYPE_LABELS[selectedType]}).
             </p>
           ) : (
@@ -315,7 +340,7 @@ function CategoryFormBody({
                       onClick={() => handleMoveSubCategory(sub.id)}
                       aria-label={`Sposta transazioni di ${sub.name}`}
                     >
-                      <ArrowRightLeft className="h-3.5 w-3.5 text-blue-500" />
+                      <ArrowRightLeft className="h-3.5 w-3.5 text-muted-foreground" />
                     </Button>
                   )}
                   <Button
@@ -392,7 +417,6 @@ export function CategoryManagementDialog({
 }: Readonly<CategoryManagementDialogProps>) {
   const { user } = useAuth();
   const { ownerId } = useActiveAccount();
-  const isMobile = useMediaQuery('(max-width: 768px)');
 
   const [subCategories, setSubCategories] = useState<ExpenseSubCategory[]>([]);
   const [newSubCategoryName, setNewSubCategoryName] = useState('');
@@ -409,24 +433,71 @@ export function CategoryManagementDialog({
   const [subCategoryMoveExpenseCount, setSubCategoryMoveExpenseCount] = useState(0);
   const [allCategoriesForMove, setAllCategoriesForMove] = useState<ExpenseCategory[]>([]);
 
+  // A category with linked expenses must not cross the transfer boundary (each such
+  // row touches two cash accounts — see crossesTransferBoundary). null = count not
+  // known yet: the boundary options stay disabled until the fetch resolves, so a
+  // slow or failed count can never let a corrupting conversion through.
+  const [linkedExpenseCount, setLinkedExpenseCount] = useState<number | null>(null);
+  // The count belongs to ONE (open, category, owner) triple: it goes back to "not known" the
+  // moment any of them changes, during render (React's "adjusting state when a prop changes")
+  // rather than in the effect, which only issues the fetch — a setter called synchronously in
+  // an effect body is banned by `react-hooks/set-state-in-effect`.
+  const [countSubject, setCountSubject] = useState<{
+    open: boolean;
+    category: ExpenseCategory | null | undefined;
+    ownerId: string | null | undefined;
+  } | null>(null);
+  if (!countSubject || countSubject.open !== open || countSubject.category !== category || countSubject.ownerId !== ownerId) {
+    setCountSubject({ open, category, ownerId });
+    setLinkedExpenseCount(null);
+  }
+  useEffect(() => {
+    if (!open || !category || !ownerId) return;
+    getExpenseCountByCategoryId(category.id, ownerId)
+      .then(setLinkedExpenseCount)
+      .catch((error) => console.error('Error counting category expenses:', error));
+  }, [open, category, ownerId]);
+
   const form = useForm<CategoryFormValues>({
     resolver: zodResolver(categorySchema),
     defaultValues: { type: 'variable', color: '#3b82f6' },
   });
   const { handleSubmit, reset, formState: { isSubmitting } } = form;
 
+  // The subcategory list and the new-subcategory draft follow the opened record: they are
+  // adjusted during render when the record (or one of the initial values) changes, and the
+  // form itself is reset in the effect below — `reset` is not a state setter.
+  const [resetSubject, setResetSubject] = useState<{
+    open: boolean;
+    category: ExpenseCategory | null | undefined;
+    initialType: ExpenseType | undefined;
+    initialName: string | undefined;
+    initialSubCategoryName: string | undefined;
+  } | null>(null);
+  if (
+    !resetSubject ||
+    resetSubject.open !== open ||
+    resetSubject.category !== category ||
+    resetSubject.initialType !== initialType ||
+    resetSubject.initialName !== initialName ||
+    resetSubject.initialSubCategoryName !== initialSubCategoryName
+  ) {
+    setResetSubject({ open, category, initialType, initialName, initialSubCategoryName });
+    if (open) {
+      setSubCategories(category ? category.subCategories || [] : []);
+      setNewSubCategoryName(initialSubCategoryName || '');
+      setNewSubCategoryIcon(undefined);
+    }
+  }
+
   // Reset form whenever open/category changes
   useEffect(() => {
     if (!open) return;
     if (category) {
       reset({ name: category.name, type: category.type, color: category.color || '#3b82f6', icon: category.icon });
-      setSubCategories(category.subCategories || []);
     } else {
       reset({ name: initialName || '', type: initialType || 'variable', color: '#3b82f6', icon: undefined });
-      setSubCategories([]);
     }
-    setNewSubCategoryName(initialSubCategoryName || '');
-    setNewSubCategoryIcon(undefined);
   }, [open, category, reset, initialType, initialName, initialSubCategoryName]);
 
   // ---- Subcategory handlers ----
@@ -546,7 +617,9 @@ export function CategoryManagementDialog({
       setSubCategoryMoveExpenseCount(0);
     } catch (error) {
       console.error('Error moving subcategory expenses:', error);
-      toast.error('Errore nello spostamento delle transazioni');
+      toast.error(
+        error instanceof TransferBoundaryError ? error.message : 'Errore nello spostamento delle transazioni'
+      );
     }
   };
 
@@ -571,16 +644,20 @@ export function CategoryManagementDialog({
       onClose();
     } catch (error) {
       console.error('Error saving category:', error);
-      toast.error('Errore nel salvataggio della categoria');
+      toast.error(
+        error instanceof TransferBoundaryError ? error.message : 'Errore nel salvataggio della categoria'
+      );
     }
   };
 
-  const title = category ? 'Modifica Categoria' : 'Nuova Categoria';
+  const title = category ? 'Modifica categoria' : 'Nuova categoria';
+  const eyebrow = `Categorie · ${category ? 'Modifica' : 'Nuova'}`;
   const baseLabel = category ? 'Salva Modifiche' : 'Crea Categoria';
   const submitLabel = isSubmitting ? 'Salvataggio…' : baseLabel;
 
   const formBodyProps: FormBodyProps = {
     category,
+    linkedExpenseCount,
     subCategories,
     newSubCategoryName,
     setNewSubCategoryName,
@@ -636,28 +713,19 @@ export function CategoryManagementDialog({
       <ResponsiveModal
         open={open}
         onClose={onClose}
+        eyebrow={eyebrow}
         title={title}
-        dialogClassName="max-w-3xl"
+        reading="Una categoria appartiene a un tipo solo: quel tipo decide in quali totali e in quali budget finiscono le sue voci."
+        width="lg"
         footer={
-          isMobile ? (
-            <>
-              <Button type="submit" form="category-form" disabled={isSubmitting} className="w-full">
-                {submitLabel}
-              </Button>
-              <Button type="button" variant="outline" className="w-full" disabled={isSubmitting} onClick={onClose}>
-                Annulla
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
-                Annulla
-              </Button>
-              <Button type="submit" form="category-form" disabled={isSubmitting}>
-                {submitLabel}
-              </Button>
-            </>
-          )
+          <>
+            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+              Annulla
+            </Button>
+            <Button type="submit" form="category-form" disabled={isSubmitting}>
+              {submitLabel}
+            </Button>
+          </>
         }
       >
         <form id="category-form" onSubmit={handleSubmit(onSubmit)}>

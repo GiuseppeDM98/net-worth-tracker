@@ -5,7 +5,8 @@
 // - assistantMonthContextService.ts (context builder)
 // - webSearchPolicy.ts (STRUCTURED_ANALYSIS_MODES)
 // - store.ts (getDefaultThreadTitle)
-export type AssistantMode = 'month_analysis' | 'year_analysis' | 'ytd_analysis' | 'history_analysis' | 'quarter_analysis' | 'chat';
+// - assistantFollowUps.ts (CURATED_FOLLOW_UPS, a Record<AssistantMode, ...>)
+export type AssistantMode = 'month_analysis' | 'year_analysis' | 'ytd_analysis' | 'history_analysis' | 'chat';
 
 export interface AssistantPromptChip {
   id: string;
@@ -75,13 +76,35 @@ export interface AssistantMemoryItem {
   status: 'active' | 'completed' | 'archived';
 }
 
+export type AssistantStructuredGoalKind =
+  | 'cash_target'
+  | 'liquid_net_worth_target'
+  | 'net_worth_target'
+  | 'asset_class_value_target'
+  | 'sub_category_value_target'
+  | 'asset_class_percentage_target';
+
+/**
+ * The machine-evaluable half of a memory goal. Produced by the Haiku extraction
+ * tool (never parsed from free text) and evaluated against the CURRENT month.
+ *
+ * A goal without this object is legitimate — it is simply not auto-trackable,
+ * and the memory panel says so rather than leaving it indistinguishable from a
+ * goal that is one euro short.
+ */
 export interface AssistantStructuredGoal {
-  kind: 'cash_target' | 'liquid_net_worth_target' | 'net_worth_target' | 'asset_class_value_target' | 'sub_category_value_target' | 'asset_class_percentage_target';
+  kind: AssistantStructuredGoalKind;
   targetValue: number;
+  // Derived from `kind`, never asked of the model: only the percentage kind is 'percent'.
   unit: 'eur' | 'percent';
-  assetClass?: string;
+  // Which side of the target satisfies the goal. Optional for backwards compatibility:
+  // legacy goals stored without one read as 'at_least', the only semantics the old >= had.
+  direction?: 'at_least' | 'at_most';
+  assetClass?: import('@/types/assets').AssetClass;
   subCategory?: string;
-  periodLabel?: string;
+  // YYYY-MM-DD. A passed deadline never changes whether the goal is matched —
+  // it only makes the evaluation summary say so.
+  deadlineIso?: string;
 }
 
 export interface AssistantGoalEvaluationResult {
@@ -90,6 +113,10 @@ export interface AssistantGoalEvaluationResult {
   targetValue: number;
   unit: 'eur' | 'percent';
   evaluatedAgainst: 'cash' | 'liquid_net_worth' | 'total_net_worth' | 'asset_class_value' | 'sub_category_value' | 'asset_class_percentage';
+  // Which period the metric was read from — the evaluation is always run against
+  // the current month, never the period the user happened to be looking at.
+  evaluatedPeriod?: { year: number; month: number };
+  deadlinePassed?: boolean;
   summary: string;
 }
 
@@ -115,9 +142,11 @@ export interface AssistantMemoryDocument {
   items: AssistantMemoryItem[];
   suggestions: AssistantMemorySuggestion[];
   updatedAt: Date | null;
-  // Computed server-side: true when the user has at least one dummy snapshot.
-  // Used to conditionally show the "Snapshot di test" toggle in the UI.
-  hasDummySnapshots: boolean;
+  // Computed server-side, GET only (queries monthly-snapshots — store.ts's write
+  // helpers have no way to know this). Absent, never fabricated as `false`, on
+  // documents returned from PATCH/DELETE. Used to conditionally show the
+  // "Snapshot di test" toggle in the UI.
+  hasDummySnapshots?: boolean;
 }
 
 export interface AssistantThreadsResponse {
@@ -130,7 +159,8 @@ export interface AssistantMemoryResponse extends AssistantMemoryDocument {
   hasDummySnapshots: boolean;
 }
 
-export interface AssistantThreadResponse extends AssistantThreadDetail {}
+// The GET endpoint returns the thread detail as-is; the alias keeps the wire type nameable.
+export type AssistantThreadResponse = AssistantThreadDetail;
 
 export interface AssistantCreateThreadInput {
   userId: string;
@@ -144,15 +174,12 @@ export interface AssistantCreateThreadInput {
 // Client sends the period selector; server regenerates this from Firestore — never trust client-supplied numbers.
 //
 // The `selector.month` field encodes the period type:
-//   month > 0  → monthly analysis (standard); NOTE: for quarterly, month is the quarter-end month
-//               but selector.quarter is set — always check selector.quarter first before month > 0
+//   month > 0  → monthly analysis (standard)
 //   month === 0 → full-year analysis (pinnedYear = selector.year)
 //   month === -1 → YTD (Jan 1 → latest month of current year)
 //   month === -2 → total history (from cashflowHistoryStartYear → now)
-// The `selector.quarter` field is set only for quarterly analysis (quarter_analysis mode):
-//   quarter: 1-4 identifies the quarter; month = quarter * 3 (3, 6, 9, 12)
 export interface AssistantMonthContextBundle {
-  selector: { year: number; month: number; quarter?: number };
+  selector: { year: number; month: number };
   currentSnapshot: import('@/types/assets').MonthlySnapshot | null;
   previousSnapshot: import('@/types/assets').MonthlySnapshot | null;
   // Shape matches CashflowBreakdown['totals'] exactly — the service spreads it across.
@@ -202,7 +229,7 @@ export interface AssistantMonthContextBundle {
       [subCategory: string]: number; // EUR value from snapshot
     };
   };
-  // Target allocation from user settings (Settings → Allocazione).
+  // Target allocation the app itself is measuring against.
   // null when the user has not configured any targets.
   // subTargets percentages are relative to the asset class (not total portfolio):
   //   e.g. equity 60% total, US Stocks 70% of equity → 42% of portfolio.
@@ -211,6 +238,37 @@ export interface AssistantMonthContextBundle {
       targetPercentage: number; // % of total portfolio
       subTargets?: { [subCategory: string]: number }; // % relative to this asset class
     };
+  } | null;
+  // Where targetAllocation came from. With goalDrivenAllocationEnabled on, the
+  // Allocazione page overrides the manual targets with ones derived from the goals,
+  // so reporting the manual numbers would have the assistant reasoning about targets
+  // the app stopped using. Stated in the prompt so Claude can name the source.
+  targetAllocationSource: 'manual' | 'goal_driven';
+  // Goal-Based Investing (goalBasedInvesting/{userId}) — a DIFFERENT thing from the
+  // assistant's own memory goals (AssistantMemoryItem.category === 'goal').
+  // null when the feature is off or the user has no goal document at all.
+  goals: {
+    enabled: boolean; // settings.goalBasedInvestingEnabled
+    goalDrivenAllocationEnabled: boolean;
+    // EXHAUSTIVE: every configured goal, never a top-N.
+    items: {
+      name: string;
+      targetAmount?: number;
+      targetDateIso?: string;
+      priority: import('@/types/goals').GoalPriority;
+      currentValue: number; // assigned portfolio value, composite assets included
+      monthlyContribution?: number;
+      recommendedAllocation?: Partial<Record<import('@/types/assets').AssetClass, number>>;
+      // Trajectory verdict; absent when it is not computable for that goal.
+      verdict?: import('@/lib/utils/goalTrajectory').GoalVerdict;
+      // The three trajectory numbers, present only for a goal that has BOTH a target
+      // and a deadline — there is nothing to project otherwise. They are projections,
+      // not measurements: assumedAnnualReturn travels with them precisely so the prompt
+      // can say what they rest on. Without it the other two are unfalsifiable.
+      requiredMonthlyContribution?: number;
+      projectedValueAtDeadline?: number;
+      assumedAnnualReturn?: number; // % nominal, derived from recommendedAllocation
+    }[];
   } | null;
   // Full category/subcategory taxonomy configured by the user (Settings → Categorie),
   // independent of the analysis period. Lets Claude suggest where to file a new

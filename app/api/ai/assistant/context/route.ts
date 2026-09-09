@@ -37,12 +37,15 @@ export async function GET(request: NextRequest) {
     const userId = searchParams.get('userId');
     const mode = searchParams.get('mode') ?? 'month_analysis';
 
-    const authError = getApiAuthErrorResponse(await assertCanAccessAccount(decodedToken, userId));
-    if (authError) return authError;
-
     if (!userId) {
       return NextResponse.json({ error: 'userId is required' }, { status: 400 });
     }
+
+    // Canonical pattern: a plain call that throws ApiAuthError on failure, caught by
+    // the outer catch below — the previous getApiAuthErrorResponse(await ...) wrapper
+    // always evaluated on undefined (assertCanAccessAccount returns Promise<void>), so
+    // enforcement only ever worked via the throw propagating past this dead wrapper.
+    await assertCanAccessAccount(decodedToken, userId);
 
     // Load user preferences to honour includeDummySnapshots for test accounts.
     // Errors are non-fatal — fall back to safe defaults.

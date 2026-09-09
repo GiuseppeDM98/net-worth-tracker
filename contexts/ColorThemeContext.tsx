@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useSyncExternalStore, ReactNode } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   getUserPreferences,
@@ -30,37 +30,67 @@ function applyThemeAttribute(theme: ColorTheme) {
   }
 }
 
+// ─── The theme as an external store ──────────────────────────────────────────
+//
+// localStorage is the source of truth on the client and does not exist on the server, so the
+// theme is read through `useSyncExternalStore`: the server snapshot is 'default', the client
+// snapshot the stored value, and the hydration split is declared in the signature instead of
+// being restored by an effect that sets state (react-hooks/set-state-in-effect).
+
+const listeners = new Set<() => void>();
+
+function subscribe(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+function readStoredTheme(): ColorTheme {
+  try {
+    return (localStorage.getItem(STORAGE_KEY) ?? 'default') as ColorTheme;
+  } catch {
+    return 'default';
+  }
+}
+
+function readServerTheme(): ColorTheme {
+  return 'default';
+}
+
+/** Persists the theme and applies it to the document at once — before React re-renders. */
+function writeStoredTheme(theme: ColorTheme) {
+  localStorage.setItem(STORAGE_KEY, theme);
+  applyThemeAttribute(theme);
+  listeners.forEach((listener) => listener());
+}
+
 export function ColorThemeProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const [colorTheme, setColorThemeState] = useState<ColorTheme>('default');
+  const uid = user?.uid;
+  const colorTheme = useSyncExternalStore(subscribe, readStoredTheme, readServerTheme);
   // Tracks the uid whose prefs have already been loaded — avoids re-fetching on rerender
   const syncedUid = useRef<string | null>(null);
 
-  // Restore from localStorage on first client render
+  // Keep the document attribute in step with the store — this is what restores the stored
+  // theme on the first client render, when no write has happened yet.
   useEffect(() => {
-    const stored = (localStorage.getItem(STORAGE_KEY) ?? 'default') as ColorTheme;
-    setColorThemeState(stored);
-    applyThemeAttribute(stored);
-  }, []);
+    applyThemeAttribute(colorTheme);
+  }, [colorTheme]);
 
   // Sync from Firestore when user authenticates (once per uid)
   useEffect(() => {
-    if (!user || syncedUid.current === user.uid) return;
-    syncedUid.current = user.uid;
+    if (!uid || syncedUid.current === uid) return;
+    syncedUid.current = uid;
 
-    getUserPreferences(user.uid).then((prefs) => {
-      if (prefs.colorTheme && prefs.colorTheme !== colorTheme) {
-        setColorThemeState(prefs.colorTheme);
-        localStorage.setItem(STORAGE_KEY, prefs.colorTheme);
-        applyThemeAttribute(prefs.colorTheme);
-      }
+    getUserPreferences(uid).then((prefs) => {
+      // Writing the same value again is a no-op in every sink (storage, attribute, snapshot).
+      if (prefs.colorTheme) writeStoredTheme(prefs.colorTheme);
     });
-  }, [user?.uid]);
+  }, [uid]);
 
   function setColorTheme(theme: ColorTheme) {
-    setColorThemeState(theme);
-    localStorage.setItem(STORAGE_KEY, theme);
-    applyThemeAttribute(theme);
+    writeStoredTheme(theme);
     if (user) {
       setUserPreferences(user.uid, { colorTheme: theme });
     }

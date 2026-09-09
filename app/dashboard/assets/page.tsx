@@ -1,236 +1,120 @@
 /**
- * ASSETS PAGE
+ * PATRIMONIO — verdict + tile grid (2026-08-22, the first page propagated after the Panoramica)
  *
- * HERO CARDS:
- * Replicated from Panoramica page — data comes from useDashboardOverview (shared RQ cache).
+ * The page answers "cosa possiedo, e cosa si è mosso?" before it shows a number: a rule-generated
+ * verdict (lib/utils/patrimonioNarrative.ts) whose driver is an INSTRUMENT, then a 12-column
+ * bento, each tile one question with a one-line reading above its figures:
  *
- * CONTI CORRENTI:
- * Assets with type=cash AND assetClass=cash are shown above the table as clickable cards.
- * Clicking opens a read-only detail dialog with Modifica/Elimina actions.
- * These assets are excluded from the Gestione Asset table.
+ *   Mobile (1 col):   Verdict → Patrimonio → Movimenti → Liquidità → Classi → Rendimento → Strumenti
+ *   Desktop (12 col): Patrimonio(5, 2 rows) | Liquidità(3) | Movimenti(4)
+ *                                           | Classi(3)    | Rendimento(4)
+ *                     Strumenti(12)
  *
- * PERFORMANCE METRICS:
- * Each asset row/card shows Δ Mese, Δ YTD, Δ Inizio — computed from monthly snapshots.
- * Desktop: the three Δ columns are hidden by default and revealed via the "Andamento"
- * toggle in the table action bar (keeps the default table narrow enough to avoid
- * horizontal scroll). Mobile: the AssetCard renders them as a divide-y row block.
+ * Data: the overview payload (`useDashboardOverview`, shared with the Panoramica — hero,
+ * variations, sparkline, composition, top assets, per-instrument market effect), the assets
+ * (rows, cash accounts, unrealized gains), the snapshots (Δ columns) and the trade ledger
+ * (the month's movements). Every derived number is a tested pure function in
+ * lib/utils/{patrimonioSummary,assetPerformanceDeltas}.ts; the page only wires them.
+ *
+ * The page owns every dialog — one AssetDialog serves the header's "Aggiungi asset", the
+ * Liquidità tile's "Aggiungi conto" and the table's Modifica — so a mutation invalidates the
+ * assets AND the overview in one place (doc/guide/patrimonio.md § Patrimonio).
  */
 
 'use client';
 
-import { motion, AnimatePresence } from 'framer-motion';
-import { useRef, useMemo, useState, useEffect } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
+import { Plus, RefreshCw } from 'lucide-react';
+import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useAssets, useDeleteAsset } from '@/lib/hooks/useAssets';
-import { useAssetLedgerMeta } from '@/lib/hooks/useAssetTransactions';
-import { migrateAssetLedger } from '@/lib/services/assetTransactionService';
+import { calculateTotalValue } from '@/lib/services/assetService';
+import { useAssetLedgerMeta, useAssetTransactions } from '@/lib/hooks/useAssetTransactions';
+import { migrateAssetLedger, backfillAverageCostEur } from '@/lib/services/assetTransactionService';
 import { useSnapshots } from '@/lib/hooks/useSnapshots';
 import { useDashboardOverview } from '@/lib/hooks/useDashboardOverview';
-import { useQueryClient } from '@tanstack/react-query';
+import { useChartColors } from '@/lib/hooks/useChartColors';
+import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { queryKeys } from '@/lib/query/queryKeys';
-import { Card, CardContent } from '@/components/ui/card';
-import { EmptyState } from '@/components/ui/empty-state';
+import { authenticatedFetch } from '@/lib/utils/authFetch';
+import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
+import { ASSET_CLASS_CHART_INDEX } from '@/lib/utils/allocationUtils';
+import { filterSparklineByPeriod } from '@/lib/utils/sparklinePeriod';
+import { cardItem, springLayoutTransition, staggerContainer } from '@/lib/utils/motionVariants';
+import { buildPatrimonioVerdict, describeLastPriceUpdate, formatHoldingCounts } from '@/lib/utils/patrimonioNarrative';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  isCashAccount,
+  isHeld,
+  rankInstrumentReturns,
+  resolveLastPriceUpdate,
+  summarizeCashAccounts,
+  summarizeMonthTrades,
+  summarizeUnrealizedGains,
+} from '@/lib/utils/patrimonioSummary';
+import { computeAssetPerformanceDeltas, computeAssetUnitPriceSeries } from '@/lib/utils/assetPerformanceDeltas';
+import type { Asset } from '@/types/assets';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Wallet, TrendingUp, TrendingDown, Trophy, Pencil, Trash2, ChevronDown } from 'lucide-react';
-import { AssetManagementTab } from '@/components/assets/AssetManagementTab';
-import { AssetDialog } from '@/components/assets/AssetDialog';
-import { OverviewAnimatedCurrency } from '@/components/dashboard/OverviewAnimatedCurrency';
-import { NetWorthSparkline } from '@/components/dashboard/NetWorthSparkline';
-import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
-import { signChipClass } from '@/lib/utils/metricColors';
-import { formatCurrency } from '@/lib/services/chartService';
-import { calculateAssetValue, calculateUnrealizedGains } from '@/lib/services/assetService';
-import { formatNumber } from '@/lib/services/chartService';
-import {
-  staggerContainer,
-  cardItem,
-  heroMetricSettle,
-  springLayoutTransition,
-} from '@/lib/utils/motionVariants';
-import { toast } from 'sonner';
-import type { Asset } from '@/types/assets';
-import { Timestamp } from 'firebase/firestore';
+import { ErrorNotice } from '@/components/ui/error-notice';
+import { describeReadFailure } from '@/lib/utils/statesNarrative';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { PageVerdict } from '@/components/ui/page-verdict';
+import { TILE_CELL_CLASS } from '@/components/ui/tile';
+import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
+import { PatrimonioTile, resolveHeroValueClass } from '@/components/dashboard/overview/PatrimonioTile';
+import { ComposizioneTile } from '@/components/dashboard/overview/ComposizioneTile';
+import type { SparklinePeriod } from '@/components/dashboard/PeriodSelector';
+import { LiquiditaTile } from '@/components/assets/tiles/LiquiditaTile';
+import { MovimentiTile } from '@/components/assets/tiles/MovimentiTile';
+import { RendimentoTile } from '@/components/assets/tiles/RendimentoTile';
+import { StrumentiTile } from '@/components/assets/StrumentiTile';
+import { AssetDialog } from '@/components/assets/AssetDialog';
+import { TransactionDialog } from '@/components/assets/TransactionDialog';
+import { AssetMovementsDialog } from '@/components/assets/AssetMovementsDialog';
+import { TaxCalculatorModal } from '@/components/assets/TaxCalculatorModal';
+import { CashAccountDialog } from '@/components/assets/CashAccountDialog';
+import Link from 'next/link';
 
-// Format a Firebase Timestamp or JS Date as dd/MM/yyyy for display.
-function formatAssetDate(ts: Date | Timestamp | null | undefined): string {
-  if (!ts) return '—';
-  const d = ts instanceof Timestamp ? ts.toDate() : (ts as Date);
-  return new Intl.DateTimeFormat('it-IT', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  }).format(d);
-}
+/** The page's own skeleton spans — the grid above, no numbers. */
+const SKELETON_CELLS = [
+  { span: 5, rows: 2, lines: 8 },
+  { span: 3, lines: 4 },
+  { span: 4, lines: 4 },
+  { span: 3, lines: 5 },
+  { span: 4, lines: 5 },
+  { span: 12, lines: 8 },
+];
 
-// Grid of cash account cards — module-level for stable reference.
-function CashAccountsSection({
-  assets,
-  onSelect,
-  onAdd,
-}: {
-  assets: Asset[];
-  onSelect: (asset: Asset) => void;
-  onAdd: () => void;
-}) {
-  return (
-    <div className="space-y-3">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-        Conti Correnti
-      </p>
-      {assets.length === 0 ? (
-        <EmptyState
-          icon={Wallet}
-          title="Nessun conto corrente"
-          description="Aggiungi il tuo primo conto corrente per tracciare la liquidità."
-          action={
-            <Button size="sm" onClick={onAdd}>
-              Aggiungi conto
-            </Button>
-          }
-        />
-      ) : (
-        <div className="grid grid-cols-2 desktop:grid-cols-4 gap-3">
-          {assets.map((asset) => (
-            <button
-              key={asset.id}
-              type="button"
-              onClick={() => onSelect(asset)}
-              className={cn(
-                'cursor-pointer rounded-xl bg-muted/40 p-5 text-left',
-                'hover:bg-muted/60 active:bg-muted/70 transition-colors duration-150',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1'
-              )}
-            >
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-muted mb-3">
-                <Wallet className="h-3.5 w-3.5 text-muted-foreground" />
-              </div>
-              <p className="text-xs text-muted-foreground truncate mb-0.5">{asset.name}</p>
-              <p className="text-lg font-bold font-mono tabular-nums tracking-tight text-foreground">
-                {formatCurrency(calculateAssetValue(asset), asset.currency)}
-              </p>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// Read-only detail dialog for a single cash account asset.
-// Shows value, currency, name, last-updated date.
-// Modifica → opens AssetDialog; Elimina → 2-click disarm (same pattern as the rest of the app).
-function CashAccountDetailDialog({
-  asset,
-  open,
-  onClose,
-  onEdit,
-  pendingDeleteId,
-  onDeleteClick,
-}: {
-  asset: Asset | null;
-  open: boolean;
-  onClose: () => void;
-  onEdit: (asset: Asset) => void;
-  pendingDeleteId: string | undefined;
-  onDeleteClick: (assetId: string) => void;
-}) {
-  if (!asset) return null;
-  const value = calculateAssetValue(asset);
-  const isPending = pendingDeleteId === asset.id;
-
-  return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="sm:max-w-[360px]">
-        <DialogHeader>
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
-              <Wallet className="h-4 w-4 text-muted-foreground" />
-            </div>
-            <DialogTitle className="text-base">{asset.name}</DialogTitle>
-          </div>
-          <DialogDescription className="sr-only">
-            Dettagli del conto corrente {asset.name}
-          </DialogDescription>
-        </DialogHeader>
-
-        {/* Main value */}
-        <p className="text-3xl font-bold font-mono tabular-nums tracking-tight text-foreground">
-          {formatCurrency(value, asset.currency)}
-        </p>
-
-        {/* Detail rows */}
-        <div className="divide-y divide-border border-t border-border">
-          {[
-            { label: 'Valuta', value: asset.currency },
-            { label: 'Nome', value: asset.name },
-            { label: 'Aggiornato', value: formatAssetDate(asset.updatedAt) },
-          ].map((row) => (
-            <div key={row.label} className="flex items-center justify-between py-2.5">
-              <span className="text-sm text-muted-foreground">{row.label}</span>
-              <span className="text-sm font-mono text-foreground">{row.value}</span>
-            </div>
-          ))}
-        </div>
-
-        <DialogFooter className="flex gap-2 pt-1">
-          <Button
-            type="button"
-            variant="outline"
-            className="flex-1"
-            onClick={() => onEdit(asset)}
-          >
-            <Pencil className="mr-2 h-4 w-4" />
-            Modifica
-          </Button>
-          <Button
-            type="button"
-            variant={isPending ? 'destructive' : 'outline'}
-            className={cn('flex-1', !isPending && 'text-destructive hover:text-destructive')}
-            onClick={() => onDeleteClick(asset.id)}
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            {isPending ? 'Conferma?' : 'Elimina'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
+/** How many instruments the hero footer names in its "Mercato:" digest. */
+const DIGEST_INSTRUMENTS = 3;
 
 export default function AssetsPage() {
   const { user } = useAuth();
   const { ownerId } = useActiveAccount();
-
-  const { data: assets = [], isLoading: loading, refetch: refetchAssets } = useAssets(ownerId);
-  const { data: snapshots = [], refetch: refetchSnapshots } = useSnapshots(ownerId);
-  const { data: overview, isLoading: loadingOverview } = useDashboardOverview(ownerId);
-
-  const deleteAssetMutation = useDeleteAsset(ownerId || '');
+  const isDemo = useDemoMode();
   const queryClient = useQueryClient();
+  const chartColors = useChartColors();
+
+  const { data: assets = [], isLoading: loadingAssets, isError: assetsError } = useAssets(ownerId);
+  const { data: snapshots = [], isLoading: loadingSnapshots } = useSnapshots(ownerId);
+  const { data: overview, isLoading: loadingOverview, isError: overviewError } = useDashboardOverview(ownerId);
+  const deleteAssetMutation = useDeleteAsset(ownerId || '');
 
   // ─── Trade-ledger migration trigger ───────────────────────────────────────────
-  // The first time an owner has no ledger meta doc, fire the idempotent one-shot migration. Silent:
-  // no modal, no success toast; on failure it degrades to today's behavior (trade affordances stay
-  // hidden while meta is absent). The useRef guard (keyed by ownerId so switching accounts re-arms)
-  // makes it fire at most once per owner per mount.
+  // The first time an owner has no ledger meta doc, fire the idempotent one-shot migration.
+  // Silent: on failure the page degrades to no ledger (trade affordances stay hidden). The ref
+  // is keyed by ownerId so switching accounts re-arms it.
   const { data: ledgerMeta, isLoading: isLedgerMetaLoading } = useAssetLedgerMeta(ownerId);
+  const ledgerReady = !!ledgerMeta;
   const ledgerMigrationAttemptedRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!ownerId || isLedgerMetaLoading) return;
-    if (ledgerMeta !== null) return; // already migrated (or query not yet resolved)
+    if (ledgerMeta !== null) return;
     if (ledgerMigrationAttemptedRef.current === ownerId) return;
     ledgerMigrationAttemptedRef.current = ownerId;
 
@@ -244,69 +128,160 @@ export default function AssetsPage() {
       });
   }, [ownerId, isLedgerMetaLoading, ledgerMeta, queryClient]);
 
-  // ─── Cash detail dialog state ─────────────────────────────────────────────────
-  const [cashDetailOpen, setCashDetailOpen] = useState(false);
-  const [selectedCashAsset, setSelectedCashAsset] = useState<Asset | null>(null);
-  const [cashEditOpen, setCashEditOpen] = useState(false);
+  // ─── averageCostEur backfill trigger ──────────────────────────────────────────
+  // One-shot, post-migration: projects the EUR-side PMC onto ledger assets written before the
+  // field existed, so G/P on a foreign-currency position stops comparing a native-currency PMC
+  // against a EUR value. Silent, same posture as the migration above. Gated on the demo like every
+  // other write (useDemoMode): the demo account's docs stay as seeded.
+  const averageCostEurBackfillAttemptedRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!ownerId || isDemo || isLedgerMetaLoading || !ledgerMeta) return;
+    if (ledgerMeta.averageCostEurBackfilledAt) return;
+    if (averageCostEurBackfillAttemptedRef.current === ownerId) return;
+    averageCostEurBackfillAttemptedRef.current = ownerId;
+
+    backfillAverageCostEur(ownerId)
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: queryKeys.assetTransactions.meta(ownerId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.overview(ownerId) });
+      })
+      .catch((error) => {
+        console.error('[AssetsPage] averageCostEur backfill failed:', error);
+      });
+  }, [ownerId, isDemo, isLedgerMetaLoading, ledgerMeta, queryClient]);
+
+  // The whole ledger of the owner, filtered to the month in memory: a month query would need a
+  // (userId, date) composite index that does not exist, and every trade mutation already
+  // invalidates this cache (doc/guide/registro-operazioni.md § Asset Trade Ledger).
+  const { data: trades = [], isLoading: loadingTrades } = useAssetTransactions(ownerId, undefined, { enabled: ledgerReady });
+
+  // ─── Dialog state ─────────────────────────────────────────────────────────────
+  const [assetDialog, setAssetDialog] = useState<{ open: boolean; asset: Asset | null }>({ open: false, asset: null });
+  const [cashDetail, setCashDetail] = useState<Asset | null>(null);
   const [cashPendingDeleteId, setCashPendingDeleteId] = useState<string | undefined>();
   const cashPendingDeleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [tradeAsset, setTradeAsset] = useState<Asset | null>(null);
+  const [movementsAsset, setMovementsAsset] = useState<Asset | null>(null);
+  const [taxAsset, setTaxAsset] = useState<Asset | null>(null);
+  const [updatingPrices, setUpdatingPrices] = useState(false);
+  const [sparklinePeriod, setSparklinePeriod] = useState<SparklinePeriod>('1A');
 
-  // Fiscal-impact block is collapsed by default — secondary detail that shouldn't
-  // weigh down the 1fr companion card at a glance.
-  const [fiscalOpen, setFiscalOpen] = useState(false);
+  // ─── Derived data (pure, tested) ──────────────────────────────────────────────
+  const today = useMemo(() => getItalyMonthYear(), []);
+  // The overview's gross total; when the overview failed, the same sum over the live assets so
+  // the management tiles keep their shares.
+  const totalValue = useMemo(() => overview?.metrics.totalValue ?? calculateTotalValue(assets), [overview, assets]);
 
-  // ─── Derived metrics for hero cards ──────────────────────────────────────────
-  const totalValue = overview?.metrics.totalValue ?? 0;
-  const liquidNetTotal = overview?.metrics.liquidNetTotal ?? 0;
-  const sparkline12m = useMemo(() => {
+  const cashAccounts = useMemo(() => assets.filter(isCashAccount), [assets]);
+  const instruments = useMemo(() => assets.filter((a) => !isCashAccount(a)), [assets]);
+  // Sold-out positions stay in the table («Azzerato») but are not owned: every count runs on these.
+  const heldInstruments = useMemo(() => instruments.filter(isHeld), [instruments]);
+  const assetsById = useMemo(() => new Map(assets.map((a) => [a.id, a])), [assets]);
+
+  const cashSummary = useMemo(() => summarizeCashAccounts(cashAccounts, totalValue), [cashAccounts, totalValue]);
+  const tradesSummary = useMemo(() => summarizeMonthTrades(trades, today), [trades, today]);
+  const gains = useMemo(() => summarizeUnrealizedGains(instruments), [instruments]);
+  const ranking = useMemo(() => rankInstrumentReturns(overview?.topAssets ?? []), [overview]);
+  const performance = useMemo(() => computeAssetPerformanceDeltas(instruments, snapshots, today), [instruments, snapshots, today]);
+  const unitPriceSeries = useMemo(() => computeAssetUnitPriceSeries(instruments, snapshots), [instruments, snapshots]);
+  const lastPriceUpdate = useMemo(() => describeLastPriceUpdate(resolveLastPriceUpdate(assets), new Date()), [assets]);
+
+  const sparklineDisplay = useMemo(() => {
     if (!overview?.sparklineData) return [];
-    return overview.sparklineData.slice(-13);
+    return filterSparklineByPeriod(overview.sparklineData, sparklinePeriod);
+  }, [overview, sparklinePeriod]);
+
+  const heroValueClass = useMemo(() => resolveHeroValueClass(totalValue), [totalValue]);
+
+  // Composition remapped by ASSET_CLASS_CHART_INDEX so a class is the same hue as everywhere.
+  const assetClassData = useMemo(
+    () =>
+      (overview?.charts.assetClassData ?? []).map((d) => ({
+        ...d,
+        color: chartColors[ASSET_CLASS_CHART_INDEX[d.assetClass ?? ''] ?? 0] ?? d.color,
+      })),
+    [overview, chartColors],
+  );
+
+  // The three instruments that moved the most, closed by the rest of the measured market effect
+  // so the digest visibly adds up to it (a list that is a subset of a total states its residual).
+  const instrumentMovers = useMemo(() => {
+    const top = (overview?.topInstrumentMovers ?? []).slice(0, DIGEST_INSTRUMENTS);
+    const shown = top.map((m) => ({ key: m.id, label: m.name, delta: m.delta }));
+    const marketEffect = overview?.marketEffect ?? null;
+    if (marketEffect === null || top.length === 0) return shown;
+    const residual = marketEffect - top.reduce((sum, m) => sum + m.delta, 0);
+    return Math.abs(residual) >= 1 ? [...shown, { key: 'others', label: 'altri', delta: residual }] : shown;
   }, [overview]);
 
-  // Total unrealized G/P across invested assets with cost basis.
-  // Exclude pure cash accounts (type=cash && assetClass=cash): they don't represent
-  // invested capital, so including their cost basis in the denominator would dilute G/P %
-  // without contributing any unrealized gain to the numerator.
-  const { totalGainLoss, totalGainPct } = useMemo(() => {
-    const withCost = assets.filter(
-      (a) => a.averageCost && a.averageCost > 0 && !(a.type === 'cash' && a.assetClass === 'cash')
-    );
-    if (withCost.length === 0) return { totalGainLoss: 0, totalGainPct: 0 };
-    const gainLoss = withCost.reduce((sum, a) => sum + calculateUnrealizedGains(a), 0);
-    const costBasis = withCost.reduce((sum, a) => sum + a.quantity * a.averageCost!, 0);
-    return { totalGainLoss: gainLoss, totalGainPct: costBasis > 0 ? (gainLoss / costBasis) * 100 : 0 };
-  }, [assets]);
+  const verdict = useMemo(() => {
+    if (!overview) return null;
+    return buildPatrimonioVerdict({
+      month: today.month,
+      totalValue,
+      monthlyVariation: overview.variations.monthly,
+      isNewATH: overview.ath?.isNewATH ?? false,
+      instrumentCount: heldInstruments.length,
+      accountCount: cashAccounts.length,
+      marketEffect: overview.marketEffect ?? null,
+      topMover: overview.topInstrumentMovers?.[0] ?? null,
+    });
+  }, [overview, today.month, totalValue, heldInstruments.length, cashAccounts.length]);
 
-  const handleRefresh = async () => {
-    await Promise.all([refetchAssets(), refetchSnapshots()]);
+  // ─── Handlers ─────────────────────────────────────────────────────────────────
+  const invalidatePortfolio = () => {
+    if (!ownerId) return;
+    queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.overview(ownerId) });
   };
 
-  // ─── Cash / non-cash asset split ──────────────────────────────────────────────
-  // Cash accounts (type=cash AND assetClass=cash, active quantity) are shown in
-  // the dedicated "Conti Correnti" section above the table, not in the table.
-  const cashAssets = useMemo(
-    () => assets.filter((a) => a.type === 'cash' && a.assetClass === 'cash'),
-    [assets]
-  );
-  const nonCashAssets = useMemo(
-    () => assets.filter((a) => !(a.type === 'cash' && a.assetClass === 'cash')),
-    [assets]
-  );
-
-  // ─── Cash asset handlers ──────────────────────────────────────────────────────
-  const handleCashDelete = async (assetId: string) => {
+  // Batch price update through the server (Yahoo rate limits, retries, FX) — never client-side.
+  const handleUpdatePrices = async () => {
+    if (!user || !ownerId) return;
     try {
-      await deleteAssetMutation.mutateAsync(assetId);
-      toast.success('Asset eliminato con successo');
-      setCashDetailOpen(false);
-      setSelectedCashAsset(null);
+      setUpdatingPrices(true);
+      const response = await authenticatedFetch('/api/prices/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: ownerId }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        toast.success(`Aggiornati ${data.updated} prezzi${data.failed.length > 0 ? `, ${data.failed.length} falliti` : ''}`);
+        invalidatePortfolio();
+        queryClient.invalidateQueries({ queryKey: queryKeys.snapshots.all(ownerId) });
+      } else {
+        toast.error("Errore nell'aggiornamento dei prezzi");
+      }
     } catch (error) {
-      console.error('Error deleting cash asset:', error);
-      toast.error("Errore nell'eliminazione dell'asset");
+      console.error('Error updating prices:', error);
+      toast.error("Errore nell'aggiornamento dei prezzi");
+    } finally {
+      setUpdatingPrices(false);
     }
   };
 
-  // 2-click disarm pattern — consistent with AssetManagementTab and other pages.
+  const openCreate = () => setAssetDialog({ open: true, asset: null });
+  const openEdit = (asset: Asset) => setAssetDialog({ open: true, asset });
+  const handleAssetDialogClose = () => {
+    setAssetDialog({ open: false, asset: null });
+    invalidatePortfolio();
+  };
+
+  const handleCashDelete = async (assetId: string) => {
+    try {
+      await deleteAssetMutation.mutateAsync(assetId);
+      toast.success('Conto eliminato');
+      setCashDetail(null);
+    } catch (error) {
+      console.error('Error deleting cash account:', error);
+      toast.error("Errore nell'eliminazione del conto");
+    }
+  };
+
+  // 2-click disarm — the same pattern as the table rows.
   const handleCashDeleteClick = (assetId: string) => {
     if (cashPendingDeleteId === assetId) {
       if (cashPendingDeleteTimerRef.current) clearTimeout(cashPendingDeleteTimerRef.current);
@@ -319,366 +294,208 @@ export default function AssetsPage() {
     }
   };
 
-  const handleCashEdit = (asset: Asset) => {
-    setCashDetailOpen(false);
-    setSelectedCashAsset(asset);
-    setCashEditOpen(true);
-  };
+  const headerActions = (
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        className="h-9"
+        onClick={handleUpdatePrices}
+        disabled={isDemo || updatingPrices || instruments.length === 0}
+        title={isDemo ? 'Non disponibile in modalità demo' : undefined}
+        aria-label={updatingPrices ? 'Aggiornamento prezzi in corso' : 'Aggiorna prezzi'}
+      >
+        <RefreshCw className={cn('h-4 w-4', updatingPrices && 'animate-spin')} aria-hidden="true" />
+        <span className="hidden sm:inline">{updatingPrices ? 'Aggiornamento...' : 'Aggiorna prezzi'}</span>
+      </Button>
+      <Button
+        type="button"
+        className="h-9"
+        onClick={openCreate}
+        disabled={isDemo}
+        title={isDemo ? 'Non disponibile in modalità demo' : undefined}
+        aria-label="Aggiungi asset"
+      >
+        <Plus className="h-4 w-4" aria-hidden="true" />
+        <span className="hidden sm:inline">Aggiungi asset</span>
+      </Button>
+    </>
+  );
 
-  const handleCashDialogClose = () => {
-    setCashEditOpen(false);
-    setSelectedCashAsset(null);
-    // Invalidate assets + overview so the card grid, table, and hero block reflect any changes.
-    if (ownerId) {
-      queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.overview(ownerId) });
-    }
-  };
-
-  // ─── Loading skeleton ─────────────────────────────────────────────────────────
-  if (loading || loadingOverview) {
+  // ─── Loading and errors ───────────────────────────────────────────────────────
+  // The skeleton waits for EVERY query the tiles read (a cold ledger meta or snapshot read would
+  // otherwise flash "registro non attivo" or empty Δ columns); a failed fetch is not an empty
+  // set, so an error is an alert, never a skeleton that never lifts.
+  if (loadingAssets || loadingOverview || loadingSnapshots || isLedgerMetaLoading) {
     return (
       <PageContainer>
-        <div className="space-y-2">
-          <div className="h-8 w-40 rounded-lg bg-muted animate-pulse" />
-          <div className="h-4 w-56 rounded bg-muted animate-pulse" />
-        </div>
-        {/* Hero + Liquid skeleton */}
-        <div className="grid gap-4 desktop:grid-cols-[2fr_1fr]">
-          <div className="rounded-2xl border border-border bg-card p-[22px]">
-            <div className="h-3 w-40 bg-muted rounded animate-pulse mb-3" />
-            <div className="h-12 w-52 bg-muted rounded animate-pulse mb-4" />
-            <div className="flex gap-1.5 mb-3">
-              <div className="h-6 w-40 bg-muted rounded animate-pulse" />
-              <div className="h-6 w-28 bg-muted rounded animate-pulse" />
-            </div>
-            <div className="h-[68px] bg-muted rounded animate-pulse mb-2" />
-            <div className="h-3 bg-muted rounded animate-pulse" />
-          </div>
-          <div className="rounded-2xl border border-border bg-card p-[22px]">
-            <div className="h-3 w-32 bg-muted rounded animate-pulse mb-3" />
-            <div className="h-8 w-36 bg-muted rounded animate-pulse mb-4" />
-            <div className="space-y-2">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="h-4 bg-muted rounded animate-pulse" />
-              ))}
-            </div>
-          </div>
-        </div>
-        <div className="h-10 w-64 rounded-xl bg-muted animate-pulse" />
-        <div className="h-64 rounded-xl bg-muted animate-pulse" />
+        <PageHeader label="Patrimonio" title="Strumenti e conti" />
+        <TileGridSkeleton cells={SKELETON_CELLS} />
       </PageContainer>
     );
   }
 
+  if (assetsError) {
+    return (
+      <PageContainer>
+        <PageHeader label="Patrimonio" title="Strumenti e conti" />
+        <ErrorNotice
+          className="max-w-[920px]"
+          notice={describeReadFailure({
+            consequence:
+              'I tuoi strumenti e conti non sono stati letti: senza di essi la pagina non ha nulla da misurare.',
+            untouched: 'Niente di registrato è stato toccato; se il problema resta, controlla la connessione.',
+          })}
+        />
+      </PageContainer>
+    );
+  }
+
+  // The overview failed (or has not arrived): the management tiles still work on the live assets,
+  // the verdict and the payload-fed tiles are replaced by one notice.
+  const overviewUnavailable = overviewError || !overview || !verdict;
+
+  // ─── Render ───────────────────────────────────────────────────────────────────
   return (
     <PageContainer>
-      <PageHeader
-        label="Portfolio"
-        title="Patrimonio"
-        description="Gestisci e monitora il tuo patrimonio"
-      />
+      <motion.div layout="position" transition={springLayoutTransition} className="space-y-4">
+        <PageHeader
+          label="Patrimonio"
+          title="Strumenti e conti"
+          description={lastPriceUpdate ?? undefined}
+          actions={headerActions}
+        />
 
-      {/* ── HERO + LIQUID — same as Panoramica, data from shared RQ cache ── */}
-      <motion.section
-        layout="position"
-        transition={springLayoutTransition}
-        variants={staggerContainer}
-        initial="hidden"
-        animate="visible"
-      >
-        <div className="grid gap-4 desktop:grid-cols-[2fr_1fr]">
+        <motion.div variants={cardItem} initial="hidden" animate="visible" className="pt-1">
+          {overviewUnavailable ? (
+            <ErrorNotice
+              className="max-w-[920px]"
+              notice={describeReadFailure({
+                consequence:
+                  'Il riepilogo del patrimonio non è stato letto: verdetto, andamento, classi e rendimento tornano al prossimo caricamento.',
+                untouched: 'Conti, movimenti e strumenti sono aggiornati.',
+              })}
+            />
+          ) : (
+            <PageVerdict verdict={verdict} ariaLabel="Verdetto del portafoglio" />
+          )}
+        </motion.div>
 
-          {/* Hero Card */}
-          <motion.div layout="position" transition={springLayoutTransition} variants={heroMetricSettle}>
-            <Card className="rounded-2xl overflow-hidden h-full">
-              <CardContent className="p-[22px]">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground mb-2">
-                  Patrimonio Totale Lordo
-                </p>
+        <motion.div
+          variants={staggerContainer}
+          initial="hidden"
+          animate="visible"
+          className="grid grid-cols-1 gap-3 tablet:grid-cols-2 desktop:grid-cols-12"
+        >
+          {!overviewUnavailable && (
+            <motion.div variants={cardItem} className={cn(TILE_CELL_CLASS, 'tablet:col-span-2 desktop:col-span-5 desktop:row-span-2')}>
+              <PatrimonioTile
+                totalValue={totalValue}
+                heroValueClass={heroValueClass}
+                variations={overview.variations}
+                isNewATH={overview.ath?.isNewATH ?? false}
+                hasCurrentMonthSnapshot={overview.flags.currentMonthSnapshotExists}
+                sparklinePeriod={sparklinePeriod}
+                onSparklinePeriodChange={setSparklinePeriod}
+                sparklineDisplay={sparklineDisplay}
+                movers={instrumentMovers}
+                countLine={formatHoldingCounts(heldInstruments.length, cashAccounts.length) || 'Aggiungi asset per iniziare'}
+              />
+            </motion.div>
+          )}
 
-                <OverviewAnimatedCurrency
-                  value={totalValue}
-                  animateOnMount={true}
-                  className="text-[44px] font-bold font-mono tracking-[-0.03em] desktop:text-[54px]"
-                />
-
-                {/* Variation chips — grid (not flex-wrap) so every chip shares the same column
-                    width regardless of its own text length: 1 column on mobile (each chip spans
-                    the full card width), 2 columns from tablet up (columns size together across
-                    every row, so a lone 3rd chip still matches the first column's width).
-                    Kept identical to Panoramica's hero — same data, same treatment. */}
-                <div className="mt-2 grid grid-cols-1 gap-2 tablet:grid-cols-2">
-                  {overview?.variations.monthly && (
-                    <span className={cn(
-                      'inline-flex items-center gap-2 rounded-[9px] px-[13px] py-[6px]',
-                      'text-[15px] font-semibold font-mono tracking-[-0.01em]',
-                      signChipClass(overview.variations.monthly.value)
-                    )}>
-                      {overview.variations.monthly.value >= 0
-                        ? <TrendingUp className="h-[13px] w-[13px]" aria-hidden="true" />
-                        : <TrendingDown className="h-[13px] w-[13px]" aria-hidden="true" />
-                      }
-                      {overview.variations.monthly.value >= 0 ? '+' : ''}
-                      {cachedFormatCurrencyEUR(overview.variations.monthly.value)}{' '}
-                      ({overview.variations.monthly.percentage >= 0 ? '+' : ''}
-                      {overview.variations.monthly.percentage.toFixed(2)}%) questo mese
-                    </span>
-                  )}
-                  {overview?.variations.yearly && (
-                    <span className={cn(
-                      'inline-flex items-center gap-2 rounded-[9px] px-[13px] py-[6px]',
-                      'text-[15px] font-semibold font-mono tracking-[-0.01em]',
-                      signChipClass(overview.variations.yearly.value)
-                    )}>
-                      {overview.variations.yearly.value >= 0
-                        ? <TrendingUp className="h-[13px] w-[13px]" aria-hidden="true" />
-                        : <TrendingDown className="h-[13px] w-[13px]" aria-hidden="true" />
-                      }
-                      {overview.variations.yearly.value >= 0 ? '+' : ''}
-                      {cachedFormatCurrencyEUR(overview.variations.yearly.value)}{' '}
-                      ({overview.variations.yearly.percentage >= 0 ? '+' : ''}
-                      {overview.variations.yearly.percentage.toFixed(2)}%) YTD
-                    </span>
-                  )}
-                  {overview?.ath?.isNewATH && (
-                    <span className="bg-positive/10 text-positive inline-flex items-center gap-2 rounded-[9px] px-[13px] py-[6px] font-mono text-[15px] font-semibold tracking-[-0.01em]">
-                      <Trophy className="h-[13px] w-[13px]" aria-hidden="true" />
-                      Nuovo massimo storico
-                    </span>
-                  )}
-                </div>
-
-                {/* G/P non realizzato — shown only when at least one asset has cost basis */}
-                {totalGainLoss !== 0 && (
-                  <div className="mt-3 pt-3 border-t border-border flex items-center justify-between">
-                    <span className="text-[11px] text-muted-foreground">G/P non realizzato</span>
-                    <span className={cn(
-                      'text-[13px] font-semibold font-mono tabular-nums',
-                      totalGainLoss > 0 ? 'text-positive' : 'text-destructive'
-                    )}>
-                      {totalGainLoss > 0 ? '+' : ''}{cachedFormatCurrencyEUR(totalGainLoss)}
-                      <span className="ml-1.5 text-[11px] opacity-80">
-                        ({totalGainLoss > 0 ? '+' : ''}{formatNumber(totalGainPct, 2)}%)
-                      </span>
-                    </span>
-                  </div>
-                )}
-
-                {/* Area sparkline — last 12 months, edge-to-edge via -mx-[22px] */}
-                {sparkline12m.length >= 2 && (
-                  <>
-                    <div className="-mx-[22px] mt-3" style={{ height: 68 }}>
-                      <NetWorthSparkline
-                        data={sparkline12m}
-                        filled={true}
-                        color="var(--chart-1)"
-                        height={68}
-                      />
-                    </div>
-                    <div className="flex justify-between mt-1 mb-3 px-px text-[10px] text-muted-foreground font-mono">
-                      <span>{cachedFormatCurrencyEUR(sparkline12m[0].totalNetWorth, true)}</span>
-                      <span>{cachedFormatCurrencyEUR(sparkline12m[sparkline12m.length - 1].totalNetWorth, true)}</span>
-                    </div>
-                  </>
-                )}
-
-                <p className="text-[11px] text-muted-foreground mt-2.5">
-                  {(overview?.flags.assetCount ?? 0) === 0
-                    ? 'Aggiungi asset per iniziare'
-                    : `${overview?.flags.assetCount ?? 0} asset in portafoglio`}
-                </p>
-              </CardContent>
-            </Card>
+          {/* Below desktop, the month's movements read right after the hero: "cosa si è mosso?" */}
+          <motion.div variants={cardItem} className={cn(TILE_CELL_CLASS, 'order-2 desktop:order-none desktop:col-span-3')}>
+            <LiquiditaTile
+              summary={cashSummary}
+              accountsById={assetsById}
+              onSelect={(asset) => {
+                setCashPendingDeleteId(undefined);
+                setCashDetail(asset);
+              }}
+              onAdd={openCreate}
+              isDemo={isDemo}
+            />
           </motion.div>
 
-          {/* Liquid Card */}
-          <motion.div layout="position" transition={springLayoutTransition} variants={cardItem}>
-            <Card className="rounded-2xl h-full">
-              <CardContent className="p-[22px]">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground mb-2">
-                  Patrimonio Liquidabile Netto
-                </p>
-
-                <OverviewAnimatedCurrency
-                  value={liquidNetTotal}
-                  animateOnMount={true}
-                  startDelay={105}
-                  duration={390}
-                  className="text-[36px] font-bold font-mono tracking-[-0.025em]"
-                />
-
-                {/* 3-row breakdown + Patrimonio Totale Lordo footer */}
-                <div className="mt-3 pt-3 border-t border-border divide-y divide-border">
-                  {[
-                    {
-                      label: 'Liquidità',
-                      value: overview?.metrics.cashNetWorth ?? 0,
-                      pct: totalValue > 0 ? ((overview?.metrics.cashNetWorth ?? 0) / totalValue) * 100 : 0,
-                    },
-                    {
-                      label: 'Investimenti Liquidabili',
-                      value: overview?.metrics.liquidInvestmentsNetWorth ?? 0,
-                      pct: totalValue > 0 ? ((overview?.metrics.liquidInvestmentsNetWorth ?? 0) / totalValue) * 100 : 0,
-                    },
-                    {
-                      label: 'Investimenti Illiquidi',
-                      value: overview?.metrics.illiquidNetWorth ?? 0,
-                      pct: totalValue > 0 ? ((overview?.metrics.illiquidNetWorth ?? 0) / totalValue) * 100 : 0,
-                    },
-                  ].map((row) => (
-                    <div key={row.label} className="flex items-center justify-between py-[7px]">
-                      <span className="text-[14px] text-muted-foreground">{row.label}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[14px] font-mono tabular-nums text-foreground">
-                          {cachedFormatCurrencyEUR(row.value)}
-                        </span>
-                        <span className="text-[12px] font-mono tabular-nums text-muted-foreground w-[42px] text-right">
-                          {row.pct.toFixed(1)}%
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-
-                  {/* Footer: Patrimonio Totale Lordo */}
-                  <div className="flex items-center justify-between py-[7px]">
-                    <span className="text-[14px] font-semibold text-foreground">Patrimonio Totale Lordo</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[14px] font-bold font-mono tabular-nums text-foreground">
-                        {cachedFormatCurrencyEUR(totalValue)}
-                      </span>
-                      <span className="text-[12px] font-mono tabular-nums text-muted-foreground w-[42px] text-right">
-                        100.0%
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* ── Fiscal rows — collapsed by default (secondary detail) ── */}
-                {overview?.flags.hasCostBasisTracking && overview.metrics && (
-                  <div className="mt-3 pt-3 border-t border-border">
-                    <button
-                      type="button"
-                      onClick={() => setFiscalOpen((v) => !v)}
-                      aria-expanded={fiscalOpen}
-                      className="flex w-full items-center justify-between text-left"
-                    >
-                      <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                        Impatto Fiscale
-                      </span>
-                      <ChevronDown
-                        className={cn(
-                          'h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none',
-                          fiscalOpen && 'rotate-180'
-                        )}
-                      />
-                    </button>
-                    <AnimatePresence initial={false}>
-                      {fiscalOpen && (
-                        <motion.div
-                          key="fiscal"
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-                          style={{ overflow: 'hidden' }}
-                        >
-                          <div className="mt-2 divide-y divide-border">
-                            {[
-                              {
-                                label: 'Plusvalenze Non Realizzate',
-                                value: overview.metrics.unrealizedGains,
-                                className: overview.metrics.unrealizedGains >= 0
-                                  ? 'text-positive'
-                                  : 'text-destructive',
-                                prefix: overview.metrics.unrealizedGains >= 0 ? '+' : '',
-                              },
-                              {
-                                label: 'Tasse Stimate',
-                                value: overview.metrics.estimatedTaxes,
-                                className: 'text-[var(--chart-3)]',
-                                prefix: '',
-                              },
-                              {
-                                label: 'Patrimonio Liquidabile Netto',
-                                value: overview.metrics.liquidNetTotal,
-                                className: 'text-foreground',
-                                prefix: '',
-                              },
-                              {
-                                label: 'Patrimonio Illiquido Netto',
-                                value: overview.metrics.netTotal - overview.metrics.liquidNetTotal,
-                                className: 'text-foreground',
-                                prefix: '',
-                              },
-                              {
-                                label: 'Pat. Netto Totale',
-                                value: overview.metrics.netTotal,
-                                className: 'text-foreground',
-                                prefix: '',
-                              },
-                            ].map((row) => (
-                              <div key={row.label} className="flex items-center justify-between py-[7px]">
-                                <span className="text-[14px] text-muted-foreground">{row.label}</span>
-                                <span className={cn('text-[14px] font-bold font-mono tabular-nums', row.className)}>
-                                  {row.prefix}{cachedFormatCurrencyEUR(row.value)}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+          <motion.div variants={cardItem} className={cn(TILE_CELL_CLASS, 'order-1 desktop:order-none desktop:col-span-4')}>
+            <MovimentiTile
+              summary={tradesSummary}
+              month={today.month}
+              ledgerReady={ledgerReady}
+              loading={ledgerReady && loadingTrades}
+              assetsById={assetsById}
+              onOpenMovements={setMovementsAsset}
+            />
           </motion.div>
 
-        </div>
-      </motion.section>
+          {!overviewUnavailable && (
+            <>
+              <motion.div variants={cardItem} className={cn(TILE_CELL_CLASS, 'order-3 desktop:order-none desktop:col-span-3')}>
+                <ComposizioneTile
+                  eyebrow="Classi"
+                  data={assetClassData}
+                  footer={
+                    <>
+                      Target e ribilanciamento in{' '}
+                      <Link href="/dashboard/allocation" className="text-foreground underline-offset-2 hover:underline">
+                        Allocazione
+                      </Link>
+                      .
+                    </>
+                  }
+                />
+              </motion.div>
 
-      {/* ── CONTI CORRENTI — cash accounts shown as clickable cards ── */}
-      <CashAccountsSection
-        assets={cashAssets}
-        onSelect={(asset) => {
-          setSelectedCashAsset(asset);
-          setCashDetailOpen(true);
-        }}
-        onAdd={() => {
-          setSelectedCashAsset(null);
-          setCashEditOpen(true);
-        }}
-      />
+              <motion.div variants={cardItem} className={cn(TILE_CELL_CLASS, 'order-4 desktop:order-none desktop:col-span-4')}>
+                <RendimentoTile gains={gains} ranking={ranking} rankedFrom={ranking.rankedFrom} />
+              </motion.div>
+            </>
+          )}
 
-      {/* Cash account detail dialog */}
-      <CashAccountDetailDialog
-        asset={selectedCashAsset}
-        open={cashDetailOpen}
+          <motion.div variants={cardItem} className={cn(TILE_CELL_CLASS, 'order-5 desktop:order-none tablet:col-span-2 desktop:col-span-12')}>
+            <StrumentiTile
+              assets={instruments}
+              totalValue={totalValue}
+              performance={performance}
+              unitPriceSeries={unitPriceSeries}
+              ledgerReady={ledgerReady}
+              isDemo={isDemo}
+              ownerId={ownerId}
+              onAdd={openCreate}
+              onEdit={openEdit}
+              onRegisterTrade={setTradeAsset}
+              onMovements={setMovementsAsset}
+              onCalculateTaxes={setTaxAsset}
+            />
+          </motion.div>
+        </motion.div>
+      </motion.div>
+
+      {/* ── Dialogs — one instance each, shared by the header and every tile ── */}
+      <AssetDialog open={assetDialog.open} asset={assetDialog.asset} onClose={handleAssetDialogClose} onRegisterTrade={setTradeAsset} />
+
+      <CashAccountDialog
+        asset={cashDetail}
+        open={cashDetail !== null}
         onClose={() => {
-          setCashDetailOpen(false);
+          setCashDetail(null);
           setCashPendingDeleteId(undefined);
         }}
-        onEdit={handleCashEdit}
+        onEdit={(asset) => {
+          setCashDetail(null);
+          openEdit(asset);
+        }}
         pendingDeleteId={cashPendingDeleteId}
         onDeleteClick={handleCashDeleteClick}
+        isDemo={isDemo}
       />
 
-      {/* AssetDialog for editing a cash account (opened from the detail dialog) */}
-      <AssetDialog
-        open={cashEditOpen}
-        asset={selectedCashAsset}
-        onClose={handleCashDialogClose}
-      />
+      {tradeAsset && <TransactionDialog open onClose={() => setTradeAsset(null)} asset={tradeAsset} />}
 
-      {/* ── ASSET TABLE — cash assets excluded, performance metrics inline ── */}
-      <AssetManagementTab
-        assets={nonCashAssets}
-        allAssets={assets}
-        loading={loading}
-        onRefresh={handleRefresh}
-        snapshots={snapshots}
-      />
+      {movementsAsset && <AssetMovementsDialog open onClose={() => setMovementsAsset(null)} asset={movementsAsset} />}
+
+      {taxAsset && <TaxCalculatorModal open onClose={() => setTaxAsset(null)} asset={taxAsset} />}
     </PageContainer>
   );
 }

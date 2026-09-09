@@ -23,7 +23,15 @@ import {
   reconcileBudgetItems,
   validateBudgetAllocation,
   buildSpendingForecast,
-  buildBudgetInsights,
+  collectMonthItemSpending,
+  collectMonthSpending,
+  findCrossingDay,
+  projectCrossingDay,
+  resolveBudgetCalendar,
+  rankCategoriesAtRisk,
+  resolveItemPace,
+  splitMonthActualForItem,
+  splitMonthlyTotalExpenses,
   evaluateBudgetAlerts,
   OVERALL_BUDGET_KEY,
 } from '@/lib/utils/budgetUtils';
@@ -361,44 +369,142 @@ describe('validateBudgetAllocation', () => {
 });
 
 // ---------------------------------------------------------------------------
+describe('splitMonthlyTotalExpenses and splitMonthActualForItem', () => {
+  // March 15th 2026 at noon: rows up to today are booked, a row on the 27th is scheduled.
+  const now = new Date(2026, 2, 15, 12);
+  const groceries = makeItem({ id: 'g', categoryId: 'c1', categoryName: 'Spesa', amount: 400 });
+  const expenses: Expense[] = [
+    makeExpense({ categoryId: 'c1', amount: -300, date: new Date(2026, 2, 10) }),
+    makeExpense({ categoryId: 'c1', amount: -50, date: new Date(2026, 2, 27) }), // recurring, still ahead
+    makeExpense({ categoryId: 'c2', amount: -90, date: new Date(2026, 2, 8) }),
+    makeExpense({ type: 'income', categoryId: 'inc', amount: 2000, date: new Date(2026, 2, 3) }),
+    makeExpense({ type: 'transfer', categoryId: 'c1', amount: -500, date: new Date(2026, 2, 9) }),
+  ];
+
+  it('splits the month total at today, income and transfers out', () => {
+    expect(splitMonthlyTotalExpenses(expenses, 2026, 3, now)).toEqual({ spentToDate: 390, scheduled: 50 });
+  });
+
+  it('splits one item the same way', () => {
+    expect(splitMonthActualForItem(groceries, expenses, 2026, 3, now)).toEqual({ spentToDate: 300, scheduled: 50 });
+  });
+
+  it('a midnight row dated today is booked, not scheduled', () => {
+    const today = [makeExpense({ categoryId: 'c1', amount: -20, date: new Date(2026, 2, 15) })];
+    expect(splitMonthActualForItem(groceries, today, 2026, 3, now).spentToDate).toBe(20);
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('findCrossingDay and projectCrossingDay', () => {
+  it('names the first day the running total exceeds the limit, rows summed by day', () => {
+    const entries = [
+      { day: 1, amount: 1150 },
+      { day: 13, amount: 900 },
+      { day: 13, amount: 1000 }, // the two of the 13th cross together
+      { day: 20, amount: 50 },
+    ];
+    expect(findCrossingDay(entries, 3000)).toBe(13);
+    expect(findCrossingDay(entries, 2050)).toBe(13); // 1150 + 1900 = 3050 > 2050 on the 13th
+    expect(findCrossingDay(entries, 3100)).toBeNull();
+    expect(findCrossingDay(entries, 0)).toBeNull();
+  });
+
+  it('crosses only when the total goes PAST the limit', () => {
+    expect(findCrossingDay([{ day: 5, amount: 100 }], 100)).toBeNull();
+    expect(findCrossingDay([{ day: 5, amount: 100.01 }], 100)).toBe(5);
+  });
+
+  it('collects the month spending rows by Italian calendar day, income and transfers out', () => {
+    const expenses: Expense[] = [
+      makeExpense({ categoryId: 'c1', amount: -300, date: new Date(2026, 2, 10) }),
+      makeExpense({ categoryId: 'c2', amount: -90, date: new Date(2026, 2, 10, 23, 30) }),
+      makeExpense({ type: 'income', categoryId: 'inc', amount: 2000, date: new Date(2026, 2, 3) }),
+      makeExpense({ type: 'transfer', categoryId: 'c1', amount: -500, date: new Date(2026, 2, 9) }),
+      makeExpense({ categoryId: 'c1', amount: -10, date: new Date(2026, 3, 1) }),
+    ];
+    expect(collectMonthSpending(expenses, 2026, 3)).toEqual([
+      { day: 10, amount: 300 },
+      { day: 10, amount: 90 },
+    ]);
+    const groceries = makeItem({ id: 'g', categoryId: 'c1', amount: 400 });
+    expect(collectMonthItemSpending(groceries, expenses, 2026, 3)).toEqual([{ day: 10, amount: 300 }]);
+  });
+
+  it('projects the day the pace crosses the limit, scheduled rows landing on their own day', () => {
+    const calendar = resolveBudgetCalendar(new Date(2026, 2, 15, 12)); // day 15 of 31
+    // 1500 by the 15th → 100/day: 2000 is crossed on the 21st (2100 > 2000).
+    expect(projectCrossingDay(1500, [], 2000, calendar)).toBe(21);
+    // A 300 € instalment on the 18th brings the crossing forward to the 18th (1800 + 300).
+    expect(projectCrossingDay(1500, [{ day: 18, amount: 300 }], 2000, calendar)).toBe(18);
+    // A limit the pace never reaches this month: null.
+    expect(projectCrossingDay(1500, [], 5000, calendar)).toBeNull();
+  });
+
+  it('has no projected crossing before the fourth day or on the last day', () => {
+    expect(projectCrossingDay(900, [], 1000, resolveBudgetCalendar(new Date(2026, 2, 2, 12)))).toBeNull();
+    expect(projectCrossingDay(900, [], 1000, resolveBudgetCalendar(new Date(2026, 2, 31, 12)))).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('resolveItemPace', () => {
+  const fixedCat = makeCategory({ id: 'c-home', name: 'Casa', type: 'fixed' });
+  const variableCat = makeCategory({ id: 'c1', name: 'Spesa', type: 'variable' });
+
+  it('a fixed or debt category does not follow the pace; a variable one does', () => {
+    expect(resolveItemPace(makeItem({ id: 'h', categoryId: 'c-home' }), [fixedCat, variableCat])).toBe('fixed');
+    expect(resolveItemPace(makeItem({ id: 'g', categoryId: 'c1' }), [fixedCat, variableCat])).toBe('variable');
+    expect(resolveItemPace(makeItem({ id: 't', scope: 'type', expenseType: 'debt' }), [])).toBe('fixed');
+    expect(resolveItemPace(makeItem({ id: 'v', scope: 'type', expenseType: 'variable' }), [])).toBe('variable');
+  });
+
+  it('an unknown category reads as variable — the conservative pace', () => {
+    expect(resolveItemPace(makeItem({ id: 'x', categoryId: 'gone' }), [fixedCat])).toBe('variable');
+  });
+});
+
+// ---------------------------------------------------------------------------
 describe('buildSpendingForecast', () => {
   // March 2026 has 31 days; mid-day on the 15th avoids timezone day-boundary drift.
   const now = new Date(2026, 2, 15, 12);
 
-  it('projects end-of-month total at the current daily pace', () => {
-    const forecast = buildSpendingForecast(1500, 2000, now);
+  it('projects end-of-month total at the current daily pace on what is booked to date', () => {
+    const forecast = buildSpendingForecast({ spentToDate: 1500, scheduled: 0 }, 2000, now);
     expect(forecast.daysInMonth).toBe(31);
     expect(forecast.daysElapsed).toBe(15);
+    expect(forecast.spentSoFar).toBe(1500);
     expect(forecast.projectedTotal).toBeCloseTo((1500 / 15) * 31); // 3100
     expect(forecast.remainingBudget).toBeCloseTo(2000 - 3100); // -1100
     expect(forecast.estimatedOverspend).toBeCloseTo(1100);
   });
 
+  it('adds a scheduled row as it is, never scaled by the days left (the app rule)', () => {
+    const forecast = buildSpendingForecast({ spentToDate: 1500, scheduled: 200 }, 2000, now);
+    expect(forecast.spentSoFar).toBe(1700);
+    expect(forecast.projectedTotal).toBeCloseTo((1500 / 15) * 31 + 200);
+  });
+
+  it('a fixed pace projects nothing beyond what is booked', () => {
+    const forecast = buildSpendingForecast({ spentToDate: 1150, scheduled: 100 }, 1300, now, 'fixed');
+    expect(forecast.projectedTotal).toBe(1250);
+    expect(forecast.estimatedOverspend).toBe(0);
+  });
+
   it('computes a daily allowance from the budget left over remaining days', () => {
-    const forecast = buildSpendingForecast(1500, 2000, now);
+    const forecast = buildSpendingForecast({ spentToDate: 1500, scheduled: 0 }, 2000, now);
     expect(forecast.dailyAllowance).toBeCloseTo(500 / 16);
   });
 
   it('reports zero daily allowance when the budget is already exhausted', () => {
-    const forecast = buildSpendingForecast(2500, 2000, now);
+    const forecast = buildSpendingForecast({ spentToDate: 2500, scheduled: 0 }, 2000, now);
     expect(forecast.dailyAllowance).toBe(0);
     expect(forecast.estimatedOverspend).toBeGreaterThan(0);
-  });
-
-  it('shrinks the projection toward the historical pace early in the month', () => {
-    const early = new Date(2026, 2, 5, 12); // day 5 of 31
-    const naive = buildSpendingForecast(500, 2000, early).projectedTotal; // 100/day × 31 = 3100
-    const blended = buildSpendingForecast(500, 2000, early, 1200).projectedTotal;
-    expect(naive).toBeCloseTo(3100);
-    expect(blended).toBeLessThan(naive);
-    expect(blended).toBeGreaterThan(500);
-    // confidence = 5/31; blended daily = 5/31·100 + 26/31·(1200/31)
-    expect(blended).toBeCloseTo(500 + ((5 / 31) * 100 + (26 / 31) * (1200 / 31)) * 26, 0);
   });
 });
 
 // ---------------------------------------------------------------------------
-describe('buildBudgetInsights and evaluateBudgetAlerts', () => {
+describe('rankCategoriesAtRisk and evaluateBudgetAlerts', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 2, 15, 12)); // March 15 2026
@@ -409,68 +515,95 @@ describe('buildBudgetInsights and evaluateBudgetAlerts', () => {
 
   const groceries = makeItem({ id: 'g', categoryId: 'c1', categoryName: 'Spesa', amount: 400 });
   const dining = makeItem({ id: 'd', categoryId: 'c2', categoryName: 'Ristoranti', amount: 300, order: 1 });
+  const rent = makeItem({ id: 'r', categoryId: 'c-home', categoryName: 'Casa', amount: 1300, order: 2 });
+  const categories = [
+    makeCategory({ id: 'c1', name: 'Spesa', type: 'variable' }),
+    makeCategory({ id: 'c2', name: 'Ristoranti', type: 'variable' }),
+    makeCategory({ id: 'c-home', name: 'Casa', type: 'fixed' }),
+  ];
 
-  // March 2026: groceries 600 (over pace), dining 90 (on track), 110 in a NON-budgeted
-  // category and 2000 income (must be excluded from the overall total).
+  // March 2026: groceries 600 (over pace), dining 90 (on track), rent 1150 paid on the 1st
+  // (a fixed charge), 110 in a NON-budgeted category and 2000 income (excluded from the total).
   const marchExpenses: Expense[] = [
     makeExpense({ categoryId: 'c1', amount: -600, date: new Date(2026, 2, 10) }),
     makeExpense({ categoryId: 'c2', amount: -90, date: new Date(2026, 2, 8) }),
+    makeExpense({ categoryId: 'c-home', type: 'fixed', amount: -1150, date: new Date(2026, 2, 1) }),
     makeExpense({ categoryId: 'c3', amount: -110, date: new Date(2026, 2, 12) }),
     makeExpense({ type: 'income', categoryId: 'inc', amount: 2000, date: new Date(2026, 2, 3) }),
-    // prior month (Feb) spending for the trailing average
-    makeExpense({ categoryId: 'c1', amount: -300, date: new Date(2026, 1, 5) }),
-    makeExpense({ categoryId: 'c2', amount: -100, date: new Date(2026, 1, 5) }),
   ];
 
-  it('identifies the top spending category this month', () => {
-    const insights = buildBudgetInsights([groceries, dining], marchExpenses);
-    expect(insights.topCategory?.label).toBe('Spesa');
-    expect(insights.topCategory?.amount).toBeCloseTo(600);
+  it('flags categories whose projection exceeds their budget, largest overrun first', () => {
+    // 600 spent on a 700 budget: not over yet, but 600/15×31 = 1240 by month end.
+    const wideGroceries = { ...groceries, amount: 700 };
+    const risk = rankCategoriesAtRisk([wideGroceries, dining, rent], marchExpenses, undefined, categories);
+    expect(risk.atRisk.map((c) => c.label)).toEqual(['Spesa']);
+    expect(risk.atRisk[0].overBy).toBeCloseTo((600 / 15) * 31 - 700);
+    expect(risk.evaluated).toBe(3);
+    expect(risk.canForecast).toBe(true);
   });
 
-  it('flags categories whose projection exceeds their budget', () => {
-    const insights = buildBudgetInsights([groceries, dining], marchExpenses);
-    const labels = insights.categoriesAtRisk.map((c) => c.label);
-    expect(labels).toContain('Spesa');
-    expect(labels).not.toContain('Ristoranti');
+  it('never flags a fixed category by pace: rent paid on the 1st is not "at risk" all month', () => {
+    const withPace = rankCategoriesAtRisk([rent], marchExpenses, undefined, []); // unknown category → variable
+    expect(withPace.atRisk.map((c) => c.label)).toEqual(['Casa']);
+    const fixed = rankCategoriesAtRisk([rent], marchExpenses, undefined, categories);
+    expect(fixed.atRisk).toHaveLength(0);
   });
 
-  it('computes the trailing prior-months average', () => {
-    const insights = buildBudgetInsights([groceries, dining], marchExpenses);
-    expect(insights.priorMonthsAverage).toBeCloseTo(200); // Jan 0 + Feb 400 over 2 months
-  });
-
-  it('prorates the prior-months average to the current day for the comparison', () => {
-    const insights = buildBudgetInsights([groceries, dining], marchExpenses);
-    expect(insights.expectedSpendToDate).toBeCloseTo(200 * (15 / 31), 1);
+  it('a budget already exceeded is a fact for the alerts, not a risk', () => {
+    const subs = makeItem({ id: 'a', categoryId: 'c2', categoryName: 'Abbonamenti', amount: 50 });
+    const over: Expense[] = [makeExpense({ categoryId: 'c2', amount: -58, date: new Date(2026, 2, 2) })];
+    const risk = rankCategoriesAtRisk([subs], over, undefined, categories);
+    expect(risk.atRisk).toHaveLength(0);
+    expect(evaluateBudgetAlerts([subs], undefined, over, [90, 100]).find((a) => a.label === 'Abbonamenti')?.level).toBe('exceeded');
   });
 
   it('does not flag categories at risk in the first few days of the month', () => {
     const day3 = new Date(2026, 2, 3, 12); // before MIN_FORECAST_DAYS
     const expenses: Expense[] = [makeExpense({ categoryId: 'c1', amount: -600, date: new Date(2026, 2, 1) })];
-    const insights = buildBudgetInsights([groceries], expenses, day3);
-    expect(insights.categoriesAtRisk).toHaveLength(0);
+    const risk = rankCategoriesAtRisk([groceries], expenses, day3, categories);
+    expect(risk.atRisk).toHaveLength(0);
+    expect(risk.canForecast).toBe(false);
+    expect(risk.evaluated).toBe(1);
   });
 
-  it('fires an exceeded alert for an over-budget monthly category', () => {
+  it('skips subcategory slices and annual budgets', () => {
+    const slice = makeItem({ id: 's', scope: 'subcategory', categoryId: 'c1', subCategoryId: 'x', amount: 10 });
+    const annual = makeItem({ id: 'a', categoryId: 'c1', amount: 100, period: 'annual' });
+    const risk = rankCategoriesAtRisk([slice, annual], marchExpenses, undefined, categories);
+    expect(risk.evaluated).toBe(0);
+    expect(risk.atRisk).toHaveLength(0);
+  });
+
+  it('fires an exceeded alert for an over-budget monthly category, with the day it went over', () => {
     const alerts = evaluateBudgetAlerts([groceries, dining], undefined, marchExpenses);
     const grocery = alerts.find((a) => a.label === 'Spesa');
     expect(grocery?.level).toBe('exceeded');
     expect(grocery?.threshold).toBe(100);
+    expect(grocery?.thresholdCrossed).toBe(true);
+    expect(grocery?.crossedOn).toBe(10);
   });
 
   it('fires a forecasted-overrun alert before a monthly budget is actually exceeded', () => {
     const fast: Expense[] = [makeExpense({ categoryId: 'c2', amount: -200, date: new Date(2026, 2, 14) })];
-    const alerts = evaluateBudgetAlerts([dining], undefined, fast);
+    const alerts = evaluateBudgetAlerts([dining], undefined, fast, [90, 100]);
     const dinner = alerts.find((a) => a.label === 'Ristoranti');
     expect(dinner?.forecastedOverrun).toBe(true);
     expect(dinner?.level).toBe('warning');
+    expect(dinner?.thresholdCrossed).toBe(false);
+  });
+
+  it('a fixed category fires on its threshold, never on a pace', () => {
+    const alerts = evaluateBudgetAlerts([rent], undefined, marchExpenses, [50, 75, 90, 100], undefined, categories);
+    const casa = alerts.find((a) => a.label === 'Casa');
+    expect(casa?.threshold).toBe(75); // 1150/1300 = 88%
+    expect(casa?.forecastedOverrun).toBe(false);
   });
 
   it('evaluates an annual budget against year-to-date spend without a linear forecast', () => {
     // Annual Spesa budget 1000; YTD 2026 c1 = 600 (Mar) + 300 (Feb) = 900 → 90% warning
     const annualGroceries = makeItem({ id: 'ga', categoryId: 'c1', categoryName: 'Spesa', amount: 1000, period: 'annual' });
-    const alerts = evaluateBudgetAlerts([annualGroceries], undefined, marchExpenses);
+    const withFeb = [...marchExpenses, makeExpense({ categoryId: 'c1', amount: -300, date: new Date(2026, 1, 5) })];
+    const alerts = evaluateBudgetAlerts([annualGroceries], undefined, withFeb);
     const alert = alerts.find((a) => a.label === 'Spesa');
     expect(alert?.level).toBe('warning');
     expect(alert?.threshold).toBe(90);
@@ -479,9 +612,10 @@ describe('buildBudgetInsights and evaluateBudgetAlerts', () => {
   });
 
   it('measures the overall budget against ALL month spending, not just budgeted categories', () => {
-    const alerts = evaluateBudgetAlerts([groceries, dining], 500, marchExpenses);
+    const alerts = evaluateBudgetAlerts([groceries, dining], 1500, marchExpenses);
     const overall = alerts.find((a) => a.key === OVERALL_BUDGET_KEY);
-    expect(overall?.spent).toBeCloseTo(800); // 600 + 90 + 110; income excluded
+    expect(overall?.spent).toBeCloseTo(1950); // 600 + 90 + 1150 + 110; income excluded
     expect(overall?.level).toBe('exceeded');
+    expect(overall?.crossedOn).toBe(10); // 1150 (1st) + 90 (8th) + 600 (10th) = 1840 > 1500
   });
 });

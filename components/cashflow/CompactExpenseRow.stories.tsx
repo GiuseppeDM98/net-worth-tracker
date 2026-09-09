@@ -68,7 +68,7 @@ export const FixedExpense: Story = {
   },
 };
 
-/** Income row — positive amount, emerald accent. */
+/** Income row — positive amount, the positive sign token. */
 export const Income: Story = {
   args: {
     expense: {
@@ -182,7 +182,7 @@ export const NoNotes: Story = {
 /** Multiple rows rendered together to show divide-y styling. */
 export const MultipleRows: Story = {
   decorators: [
-    (Story) => (
+    () => (
       <div className="divide-border border-border bg-card max-w-[400px] divide-y overflow-hidden rounded-xl border px-2">
         <CompactExpenseRow
           expense={{ ...BASE_EXPENSE, id: 'r1', notes: 'Spesa Esselunga', amount: -85.5 }}

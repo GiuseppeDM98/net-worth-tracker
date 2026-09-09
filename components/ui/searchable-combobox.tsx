@@ -1,10 +1,9 @@
 'use client';
 
 import { useState, useRef, useEffect, type ReactNode, type ChangeEvent } from 'react';
-import { Check, X, Plus } from 'lucide-react';
+import { Check, X, Plus, SearchX } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { FilterEmptyIcon } from '@/components/ui/empty-state';
 
 export interface ComboboxOption {
   value: string;
@@ -178,9 +177,9 @@ export function SearchableCombobox({
           // Use bg-popover + border-border to match the shadcn Select dropdown appearance
           <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-60 overflow-auto text-popover-foreground">
             {filteredOptions.length === 0 && !onCreateOption ? (
-              // Compact empty state — full EmptyState would be too tall inside a max-h-60 dropdown
+              // A dropdown is not a tile: the absence is one centred line, no eyebrow above it.
               <div className="p-3 flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                <FilterEmptyIcon className="w-4 h-4 shrink-0" />
+                <SearchX className="w-4 h-4 shrink-0" aria-hidden="true" />
                 {emptyMessage}
               </div>
             ) : (
