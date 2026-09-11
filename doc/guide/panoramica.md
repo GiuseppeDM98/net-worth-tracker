@@ -35,6 +35,26 @@
   **a falling month is blamed on the market only when `marketEffect < 0`** — when the market gained and the total
   still fell, the cause is the user's own flows and the headline says "nonostante il mercato". A missing input drops
   its clause (no prior snapshot → no monthly clause, no income → no savings clause), never a placeholder.
+- **And never on the market ALONE when something else weighed more** (2026-09-11). Why: on the real account
+  settembre 2026 fell by 4.938 € with the market at −1.079 € — the rest was the capital-gains tax the broker withheld
+  on a Vanguard sale (4.092,50 € by the snapshot note), which in regime amministrato leaves the account the day of
+  the sale with no cashflow row — and the headline said «il mercato ha pesato». The cause of a falling month is ONE
+  decision for three verdicts, `resolveDeclineCause` in `lib/utils/periodSales.ts` (Panoramica, Patrimonio, the
+  periodic email): `despite-market` (market ≥ 0) · `taxes-over-market` (the estimated tax on the month's sales ≥ the
+  market loss: «il mercato ha pesato, le tasse sulle vendite di più») · `market-and-taxes` («e con lui le tasse sulle
+  vendite») · `flows-over-market` (no taxed sale, but Δ − market outweighs the market: «più per le uscite che per il
+  mercato») · `market` · `unknown`. The sentence closes on the split, always when both halves exist
+  (`describeOwnFlowsSplit`: «Di quel movimento, −1079 € viene dal mercato e −3859 € dai tuoi movimenti», exact by
+  construction), then on the sale (`describeSales`: «Hai venduto Vanguard per 39.052 € con una plusvalenza di
+  15.726 € e pagato circa 4089 € di tasse» — «pagato», never «pagherai»: the withholding is already gone; «circa»
+  because it is ESTIMATED). The words live in `lib/utils/salesNarrative.ts`, SDK-free, shared by the three.
+- **`monthSales` is the month's sells from the trade ledger** (`summarizePeriodSales`, payload version 16): each sold
+  instrument's ledger is replayed WHOLE (`replayTransactionsWithEffects`, so the realized P&L stands against the PMC
+  at the sale), the sells inside the Italian month are summed (proceeds net of fees, realized gain) and the tax is
+  `max(gain, 0) × taxRate / 100` — `null` for an instrument with no `taxRate`, and then `null` for the total too
+  (a missing input is never printed as «0 € di tasse»); a loss carries no tax; no loss compensation. A ledger that
+  fails to replay is counted (`brokenLedgers`) and skipped, a failed read costs the sales clause and never the page.
+  The service reads the ledger through `getAssetTransactionsAdmin` (its writes already invalidate the overview).
 - **Testing Italian copy: `Intl('it-IT')` puts a no-break space before `€` and leaves four-digit amounts
   ungrouped** (`4120,18 €`, not `4.120,18 €`). `__tests__/overviewNarrative.test.ts` flattens the nbsp through a
   `plain()` helper and writes expectations the way the screen prints them — do not "fix" the formatter.

@@ -13,54 +13,35 @@ Next.js app for Italian investors: net worth, assets, cashflow, dividends, perfo
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic.
-- `tsc` clean; **159 files / 3592 tests** green + **41 Playwright E2E specs** (44 green in one run incl. 3 auth setups). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, which structurally hides timezone bugs.
-- Latest (2026-09-07): **I flussi seguono la base, il ROI smette di chiamarsi «del periodo», lo Storico chiude la finestra.**
-  Tre lavori nati dal triage delle PR #319/#323/#326/#332 e delle issue #320/#324/#327 di un contributor esterno
-  (verdetti e misure sull'account reale nel SESSION_NOTES del giorno, poi nelle guide). (1) **Rendimenti — i flussi
-  seguono la base** (#319 rifatta sopra 3a77b09, non mergiata): quando qualcosa è fuori dalla base, i mesi con
-  `byAsset` su entrambi gli snapshot neutralizzano il capitale MISURATO sul confine — registro operazioni per lo
-  strumento coperto, Δquantità come rete, baseline e rettifiche non muovono denaro, strumenti valutati a mano opachi
-  (`lib/utils/portfolioFlows.ts`) — sul terzo canale `CashFlowData.portfolioFlow`, risolto UNA volta dentro
-  `resolvePerformanceBase` per service, pagina e PDF; `externalFlowOf` = `(portfolioFlow ?? netCashFlow) + pensionFlow`.
-  Nuovo interruttore **«Liquidità fuori dalla base»** (`performanceExcludesCash`, default OFF: i conti `cash` escono per
-  tipo, un ETF monetario resta dentro; `classifyContribution` guarda il conto d'origine). Con esso le tre correzioni
-  collaterali: basi ≤ 0 senza segno ribaltato, CAGR rolling `null` invece di 0, `rolling36M` rimosso; `CACHE_MATH_VERSION`
-  v7. (2) **ROI e PDF** (#324): la chip della tessera Rendimento è il TWR cumulato del periodo (`resolvePeriodReturnChip`,
-  `deannualizeReturn` = l'unica de-annualizzazione), il ROI resta nel Dettaglio/AI/PDF «sul capitale iniziale»; il PDF
-  misura la base della pagina (terzo chiamante di `resolvePerformanceBase`) e la dichiara (`baseLabel`); la nota «sul
-  capitale versato» era falsa. (3) **Storico › Lavoro e investimenti** (#327): `summarizeLaborMetrics` prende le finestre
-  del Driver (`laborWindowsOf`, mese dopo la baseline → ultimo snapshot) e restituisce tre cause che sommano alla crescita
-  (Risparmiato da lavoro · Altre entrate · Mercato) più copertura e Select per anno; sull'account reale contava 208 righe
-  fino al 2043 (risparmio 7.215 € invece di 15.447 €). Collaudo: 157 file / 3538 test sotto `TZ=Europe/Rome`
-  (falsificazioni: bordo destro dello Storico, baseline del registro, versamento da conto in mese misurato), `tsc`,
-  lint 0, Playwright 42/42, poi i dati reali di produzione seminati su un account specchio dell'emulatore (script usa e
-  getta, cancellati): pipeline vera via client SDK tutto OK (10 mesi misurati dal 2025-12, luglio 2026 = −415 € e non il
-  baseline da 139k; YTD TWR 14,73% contro 11,47% con i flussi del cashflow, perché i saldi dicono −650 € netti entrati
-  nella base nel 2026 contro 3.956 € di risparmio; recap Lavoro = Driver «Dal 2025» al centesimo, copertura 121%), spec
-  Playwright 4/4 (interruttore acceso → letto da Rendimenti → rispento dall'app, verificato sul documento), PDF
-  renderizzato 10/10, giro guidato del 2026-09-07 con cinque schermate confermate dal proprietario.
-  **Stessa sessione, seconda parte — le tre PR idonee mergiate con le modifiche, e la guardia del residuo al posto della
-  #320.** (4) **Patrimonio — G/P in euro, commissioni incluse** (#326): `lib/utils/costBasisEur.ts` è l'UNICA lettura
-  della coppia di PMC (`costBasisPerUnitEur` = l'`averageCostEur` del registro, costo fiscale con le commissioni; il
-  PMC nativo solo per uno strumento in euro; `undefined` per uno in valuta senza PMC in euro — si stampa niente, mai
-  dollari contro euro) e `unitPriceEur` il gemello per unità di `calculateAssetValue`; tabella, riga mobile, Sintesi,
-  tasse stimate, `netTotal`, Panoramica (payload v15), PDF, simulazione di vendita e YOC leggono lo stesso numero
-  (`assetService.test.ts` inchioda totale overview = somma della tabella); la cella PMC stampa l'euro e, su una riga in
-  valuta, il nativo sotto; `backfillAverageCostEur` (rotta + trigger one-shot della pagina, gated sulla demo) proietta
-  il campo sui documenti vecchi scrivendo SOLO quello, un registro rotto è contato e non fatale. (5) **Previdenza — un
-  TWR contraddittorio non è una misura** (#323): `isCoverageContradictory` (mese ≤ 0 al netto dei versamenti, perdita
-  oltre il 100%, crescita con TWR sotto −75% — il terzo è plausibilità, il secondo è già coperto dal primo), stato
-  `contradictory` letto PRIMA di `suspicious` perché i due flag convivono e il consiglio è opposto, `annualizedTwr` NaN
-  → null. (6) **Tracciamento — la ricerca è un aggregato** (#332): la lettura di Movimenti totalizza ogni tipo delle
-  righe che riceve (una ricerca su una nota è il suo totale, «meno di 1 €» sotto l'euro, «di cui N in calendario» prima
-  dei due punti), e sotto `desktop:` la barra della tessera ripete il selettore del periodo accanto ai filtri — una
-  seconda MANIGLIA sullo stesso `period`, nome accessibile proprio, `min-w-0` perché il selettore ceda prima dei
-  bottoni (`e2e/cashflow.mobile.spec.ts` misura `main` a 390 e 360 — verde anche senza l'override, è una guardia — e
-  guida il periodo dalla tessera); DESIGN.md aggiornato,
-  `.impeccable/design.json` senza regola da toccare. (7) **La guardia del residuo** (issue #320, chiusa così):
-  `attributePeriodReturn` legge il non attribuito anche mese per mese e nomina in `residualMonths` quelli oltre il 2%
-  della base di partenza (`RESIDUAL_ALERT_SHARE`); la tessera li mette tra parentesi, il Dettaglio con cifre e le tre
-  cause — dove guardare, mai cosa è successo.
+- `tsc` clean; **162 files / 3631 tests** green + **42 Playwright E2E specs** (45 green in one run incl. 3 auth setups). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, which structurally hides timezone bugs.
+- Latest (2026-09-11): **Un mese in calo non è più «colpa del mercato» e basta, e i Movimenti si filtrano per persona.**
+  Due note del proprietario. (1) **Le vendite e le loro tasse entrano nel verdetto** — sull'account reale settembre
+  2026 è sceso di 4.938 € con il mercato a −1.079 €: il resto era la ritenuta del broker sulla vendita di un ETF
+  (4.092,50 € per la nota dello snapshot; in regime amministrato esce il giorno della vendita, senza riga di cashflow)
+  e i tre verdetti dicevano «il mercato ha pesato». Ora `lib/utils/periodSales.ts` legge le vendite del mese dal
+  registro (`summarizePeriodSales`: replay intero per strumento, ricavo netto commissioni, plusvalenza, tassa =
+  `max(plusvalenza, 0) × taxRate` — `null` senza aliquota, mai zero; minusvalenza senza tasse; registro rotto contato
+  e saltato) e `resolveDeclineCause` è l'UNICA decisione sulla causa di un mese in calo per Panoramica, Patrimonio ed
+  email (`despite-market · taxes-over-market · market-and-taxes · flows-over-market · market · unknown`);
+  `salesNarrative.ts` le parole condivise: «Settembre è in calo: il mercato ha pesato, le tasse sulle vendite di
+  più.», «Di quel movimento, −1079 € viene dal mercato e −3859 € dai tuoi movimenti.», «Hai venduto VWCE per
+  39.052 € con una plusvalenza di 15.726 € e pagato circa 4089 € di tasse.» — «pagato», mai «pagherai» (scelta del
+  proprietario: la ritenuta è già uscita), «circa» perché stimata (3,64 € sotto la ritenuta reale). Payload
+  `monthSales` (`DASHBOARD_OVERVIEW_SOURCE_VERSION` 16, lettura via `getAssetTransactionsAdmin`, fallita → clausola
+  assente); nell'email il residuo «mercato» diventa `Δ − risparmio + tasse stimate` e lo split ha tre parti che
+  sommano ancora a Δ, il footer di Patrimonio nomina la tassa. (2) **Tracciamento › «Intestatario»**
+  (`lib/utils/movementsOwnerFilter.ts`): con Divisione accesa la lista Movimenti filtra per «Tutti · In comune ·
+  {membri}» (+ «Senza intestatario» solo con righe orfane nel periodo), toolbar desktop e drawer del telefono,
+  `effectiveOwnerId` derivato, conta nel badge e in «Ripristina»; le righe intestate stampano il nome come chip
+  (feed, tabella, drawer di dettaglio), le condivise niente, feature spenta = niente da nessuna parte. Collaudo: 162
+  file / 3631 test sotto `TZ=Europe/Rome` (falsificazioni: tassa su minusvalenza, «Senza intestatario» che passa ogni
+  intestata — rossi, poi ripristinati), `tsc`, lint 0, poi il mirror di produzione negli emulatori: payload
+  `monthSales` = VWCE 39.052,45 / 15.726,38 / 4.088,86, i tre verdetti con le parole attese, filtro «6 di 28 voci»
+  con i conteggi letti dal Firestore dell'emulatore (Admin SDK, non dalla pagina), drawer a 390 senza overflow,
+  email di settembre renderizzata dal data path reale (preheader con le tasse, split a tre parti, footer «circa»);
+  spec permanente `e2e/cashflow.owner.spec.ts` (pianta la famiglia sull'account base via Admin SDK e la ripristina
+  in `finally`; flag spenta = niente Select, niente chip), Playwright 45/45, giro guidato del 2026-09-11 con cinque
+  schermate confermate dal proprietario; mirror rimosso, script usa e getta cancellati.
 
 ## Architecture Snapshot
 - App Router; protected pages under `app/dashboard/*`.
@@ -134,6 +115,7 @@ Firestore client + admin · Yahoo Finance (prices, benchmark history) · Borsa I
 - **Otto superfici stanno ancora fuori dal vocabolario delle modali** (2026-09-06): `app/dashboard/page.tsx`, `dividends/{DividendiDettaglio,DividendTrackingTab}`, `expenses/ExpenseTable`, `cashflow/{ExpenseTrackingTab,TransactionFeed,MobileFiltersDrawer}`, `assistant/AssistantSheets` montano `Dialog`/`AlertDialog`/`Drawer`/`Sheet` grezzi (titolo 18/16px, quinta larghezza 512px). Elenco in DESIGN.md → §5 Modal, Coverage.
 - **Tre tinte del chrome violano la Zero-Chroma Rule** (`switch.tsx` ON blu in dark, `ProtectedRoute` spinner, mask-icon smeraldo) più `ExpenseTable.tsx` `text-emerald-*`; gli altri ~100 hex DOM-side sono eccezioni dichiarate in DESIGN.md → The DOM-side hex inventory.
 - **The market digest's blind spots**: a position opened this month contributes 0 until next month; a pension fund counts only from `pensionReturnStartMonth`; hand-valued assets other than funds and real estate never show a market effect; real estate is gross of debt.
+- **The sales clause is an ESTIMATE from the ledger** (2026-09-11): the tax is `plusvalenza × taxRate` per instrument — no compensation of prior losses, no rate → «non stimate» (never zero); a sale recorded outside the ledger (a hand-edited quantity) is invisible; the AI email prompt still prints the old `Δ − risparmio` residual; and a tax the owner ALSO records as a cashflow expense is counted twice in the email's split. On the real account the estimate landed 3,64 € under the broker's withholding (4.088,86 € vs 4.092,50 €).
 
 ## Key Files
 Entry points only: each `doc/guide/<tema>.md` opens with the full file list of its area, and every pure module has
@@ -144,13 +126,13 @@ Entry points only: each `doc/guide/<tema>.md` opens with the full file list of i
 - **Dialog e form trasversali**: `components/ui/{responsive-modal,modal-status-line}.tsx` (`ModalWidth` sm/md/lg/xl), `lib/utils/dialogNarrative.ts`, `lib/hooks/useArmedDelete.ts`, `lib/constants/aiModels.ts`; `components/layout/LogoutDialog.tsx` stays an `AlertDialog` — doc/guide/dialog.md
 - **Shared account · Demo**: `contexts/ActiveAccountContext.tsx`, `lib/services/accountAccessService.ts`, `app/api/account/members/route.ts`, `lib/server/apiAuth.ts`, `firestore.rules`, `lib/hooks/useDemoMode.ts`; collection `account-access/{ownerUid}` — doc/guide/account-condiviso-demo.md
 - **Temi**: `app/globals.css` (twelve theme blocks), `contexts/ColorThemeContext.tsx`, `lib/hooks/{useChartColors,useActionColors}.ts`, `lib/utils/costCenterColors.ts` — doc/guide/temi.md
-- **Overview**: `app/dashboard/page.tsx`, `app/api/dashboard/overview/route.ts`, `lib/services/dashboardOverviewService.ts`, `lib/hooks/useDashboardOverview.ts`, `components/dashboard/overview/*` (`PatrimonioTile` exports `resolveHeroValueClass`), pure `lib/utils/{overviewNarrative,dashboardOverviewUtils,sparklinePeriod,savingsRateBadge}.ts`
+- **Overview**: `app/dashboard/page.tsx`, `app/api/dashboard/overview/route.ts`, `lib/services/dashboardOverviewService.ts`, `lib/hooks/useDashboardOverview.ts`, `components/dashboard/overview/*` (`PatrimonioTile` exports `resolveHeroValueClass`), pure `lib/utils/{overviewNarrative,dashboardOverviewUtils,sparklinePeriod,savingsRateBadge}.ts`; `lib/utils/periodSales.ts` (`summarizePeriodSales` = the month's sells from the ledger with the estimated tax, `resolveDeclineCause` = the ONE cause of a falling month for Panoramica, Patrimonio and the email) + `lib/utils/salesNarrative.ts` (the shared words)
 - **Patrimonio**: `app/dashboard/assets/page.tsx` (owns every dialog), `components/assets/*` (+ `PatrimonioTile`/`ComposizioneTile` reused from the overview), pure `lib/utils/{patrimonioNarrative,patrimonioSummary,assetPerformanceDeltas,costBasisEur}.ts` (`costBasisPerUnitEur`/`unitPriceEur` = EUR against EUR, fees included); `lib/services/assetService.ts`, `types/assets.ts`
 - **Asset trade ledger**: engine `lib/utils/assetTransactionUtils.ts` + `types/assetTransactions.ts`; server `lib/server/{assetTransactionUseCase,tradeFxService}.ts` (+ `backfillAverageCostEur`) + `app/api/asset-transactions/*` (incl. `backfill-average-cost-eur`); client `lib/services/assetTransactionService.ts`, UI `components/assets/{TransactionDialog,AssetMovementsDialog}.tsx`; collections `assetTransactions`/`assetTransactionsMeta`
 - **Rendimenti**: `app/dashboard/performance/page.tsx`, `components/performance/*` (+ `tiles/*`, `AttribuzioneTile`), pure `lib/utils/{performanceNarrative,performanceSummary,performanceBase,portfolioFlows,performanceAttribution,drawdownSeries,cashFlowMap,benchmarkPeriodReturn}.ts` (`resolvePerformanceBase` = the ONE base for service, page and PDF; `externalFlowOf`/`mergePensionFlows`/`mergePortfolioFlows` = the two flow channels; `buildPortfolioBoundaryFlows` = the measured boundary; `resolvePeriodReturnChip`/`deannualizeReturn`; `attributePeriodReturn` + `RESIDUAL_ALERT_SHARE` = the residual guard), `lib/services/performanceService.ts` (`CACHE_MATH_VERSION`); cache `performance-cache/{userId}`; spec `e2e/performance.degraded.spec.ts` on `npm run e2e:seed -- performance`. Yields: `lib/utils/yieldOnCost.ts` (`computeDividendYieldMetrics`, also behind `app/api/dividends/stats/route.ts`)
 - **Allocazione / exposure**: `app/dashboard/allocation/page.tsx`, `components/allocation/*` (+ `tiles/*`), pure `lib/utils/{allocazioneSummary,allocazioneNarrative}.ts` over `lib/utils/{allocationUtils,leverageAwareAllocationUtils,assetExposureUtils}.ts` (`allocationUtils` owns `ASSET_CLASS_SEQUENCE`, `ASSET_CLASS_LABELS`, `ASSET_CLASS_CHART_INDEX`), `lib/services/assetAllocationService.ts`, `lib/server/portfolioExposureService.ts`; `exposure-cache/{userId}`
 - **Previdenza**: `types/pension.ts`, pure `lib/utils/{pensionSummary,pensionNarrative}.ts` over `lib/utils/{pensionDeduction,pensionContributions,pensionReturn,pensionFire,pensionFamilyMembers}.ts`, `lib/services/pensionContributionService.ts` (`assertFundValueLivesInQuantity`), `app/dashboard/pension/page.tsx`, `components/pension/*`; collection `pensionContributions`
-- **Cashflow**: `app/dashboard/cashflow/page.tsx`; Tracciamento `components/cashflow/ExpenseTrackingTab.tsx` + `components/cashflow/{TransactionFeed,CompactExpenseRow,MobileFiltersDrawer}.tsx`, pure `lib/utils/{tracciamentoSummary,cashflowNarrative}.ts`, spec `e2e/cashflow.mobile.spec.ts`; Budget `components/cashflow/BudgetTab.tsx` + `components/cashflow/budget/*`, pure `lib/utils/{budgetSummary,budgetNarrative,budgetUtils,budgetHistory}.ts`, `lib/hooks/{useBudgetConfig,useBudgetHistory}.ts`, `lib/server/budgetHistoryService.ts` (cron phase 8), collections `budgets/{userId}`, `budgetHistory/{userId}/months/{YYYY-MM}`; Divisione `components/cashflow/ExpenseSplitTab.tsx`, pure `lib/utils/{expenseSplitSummary,expenseSplitNarrative}.ts` (`resolveSplitBasis`, `allocateByShare`); Centri di Costo `components/cashflow/{CostCentersTab,CostCenterDetail,CostCenterDialog}.tsx` + `cost-centers/*`, pure `lib/utils/{costCenterSummary,costCenterNarrative,costCenterUtils}.ts`, `costCenterStyles.ts` (`CHART_TICK_STYLE`); services `lib/services/{budgetService,costCenterService,cashBalanceReconciliation,expenseImportService}.ts`, `lib/utils/expenseImport.ts`
+- **Cashflow**: `app/dashboard/cashflow/page.tsx`; Tracciamento `components/cashflow/ExpenseTrackingTab.tsx` + `components/cashflow/{TransactionFeed,CompactExpenseRow,MobileFiltersDrawer}.tsx`, pure `lib/utils/{tracciamentoSummary,cashflowNarrative,movementsOwnerFilter}.ts` (the «Intestatario» filter and the owner chip), spec `e2e/cashflow.mobile.spec.ts`; Budget `components/cashflow/BudgetTab.tsx` + `components/cashflow/budget/*`, pure `lib/utils/{budgetSummary,budgetNarrative,budgetUtils,budgetHistory}.ts`, `lib/hooks/{useBudgetConfig,useBudgetHistory}.ts`, `lib/server/budgetHistoryService.ts` (cron phase 8), collections `budgets/{userId}`, `budgetHistory/{userId}/months/{YYYY-MM}`; Divisione `components/cashflow/ExpenseSplitTab.tsx`, pure `lib/utils/{expenseSplitSummary,expenseSplitNarrative}.ts` (`resolveSplitBasis`, `allocateByShare`); Centri di Costo `components/cashflow/{CostCentersTab,CostCenterDetail,CostCenterDialog}.tsx` + `cost-centers/*`, pure `lib/utils/{costCenterSummary,costCenterNarrative,costCenterUtils}.ts`, `costCenterStyles.ts` (`CHART_TICK_STYLE`); services `lib/services/{budgetService,costCenterService,cashBalanceReconciliation,expenseImportService}.ts`, `lib/utils/expenseImport.ts`
 - **Analisi**: `components/cashflow/AnalisiTab.tsx` (`handleEntitySelect`) + `components/cashflow/analisi/*`, `components/cashflow/{EntityDossier,EntitySearch,ConfrontoAnnualeSection,CashflowSankeyChart,SavingsRateTrendSection,AndamentoStoricoSection}.tsx`; pure `lib/utils/{analisiSummary,analisiNarrative,expenseGrouping,cashflowSankey,cashflowComposition,expenseCategoryMatching,comparisonDeltas,expenseEntityStats,entitySearch}.ts`
 - **Dividendi**: `components/dividends/DividendTrackingTab.tsx` + `tiles/*` + `DividendiDettaglio.tsx`, pure `lib/utils/{dividendAnalytics,dividendiNarrative}.ts`, `lib/hooks/useDividendStats.ts` → `app/api/dividends/stats/route.ts`; registry and coupons `components/dividends/{DividendTable,DividendCalendar,DividendDialog,DividendDetailsDialog,DividendRecordDetailsDialog,InflationRateDialog,ProvisionalCouponBanner}.tsx`, `lib/utils/couponUtils.ts`, `lib/services/couponScheduling.ts`, `types/dividend.ts`
 - **Storico / snapshots**: `app/dashboard/history/page.tsx`, `components/history/*` (+ `tiles/*`), pure `lib/utils/{storicoSummary,storicoNarrative,snapshotAssetBreakdown,historyComposition,snapshotUserFields}.ts` (`preserveUserAuthoredSnapshotFields` = i campi che nessuna pipeline ricalcola, portati attraverso la sostituzione; `summarizeLaborMetrics` + `laborWindowsOf` = il recap Lavoro sulle finestre del Driver), `lib/services/{chartService,snapshotService}.ts`, `components/CreateManualSnapshotModal.tsx` over `lib/utils/manualSnapshotAmounts.ts`; collection `monthly-snapshots`

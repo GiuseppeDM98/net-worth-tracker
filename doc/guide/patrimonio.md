@@ -74,7 +74,10 @@
 - **The verdict's driver is an INSTRUMENT** (`topInstrumentMovers`, `computeTopInstrumentMovers` — the same
   `computePriceEffectsByAsset` as the class digest, an instrument never split by its `composition`, capped at ten),
   named only when `marketEffect !== null`. Patrimonio's hero footer lists the top three instruments; the
-  Panoramica's lists classes — the two pages never print the same «Mercato:» line.
+  Panoramica's lists classes — the two pages never print the same «Mercato:» line. **The cause of a falling month is
+  the Panoramica's decision** (`resolveDeclineCause`, 2026-09-11): a taxed sale from the ledger (`monthSales`) or the
+  own flows outweighing the market change the headline («il mercato ha pesato, le tasse sulle vendite di più»), and
+  the sentence closes on the market-vs-flows split and the sale — doc/guide/panoramica.md.
 - **«Movimenti del mese» reads the owner's whole ledger** (`useAssetTransactions(ownerId, undefined, { enabled:
   ledgerReady })`) and filters the Italian calendar month in memory: a month query would need a `(userId, date)`
   composite index that does not exist. Baselines and adjustments are not trades; a buy's amount is gross + fees,

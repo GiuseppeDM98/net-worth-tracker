@@ -24,6 +24,8 @@ import { cachedFormatCurrencyEUR, formatPercentageIt as formatPercentage } from 
 import { MONTH_NAMES } from '@/lib/constants/months';
 import { ASSET_CLASS_LABELS } from '@/lib/utils/allocationUtils';
 import { atThePercent, pluralArticleFor } from '@/lib/utils/patrimonioNarrative';
+import { resolveDeclineCause, type PeriodSalesSummary } from '@/lib/utils/periodSales';
+import { declineHeadlineTail, describeSales } from '@/lib/utils/salesNarrative';
 import type { Narrative, NarrativeSegment, PageVerdictModel, VerdictTone } from '@/lib/utils/narrative';
 
 export type { Narrative, PageVerdictModel, VerdictTone } from '@/lib/utils/narrative';
@@ -227,11 +229,19 @@ export interface PeriodEmailVerdictInput {
   /** Always a positive magnitude, following `calculateTotalExpenses`. */
   totalExpenses: number;
   /**
-   * `Δ patrimonio − risparmio netto`, or null when no earlier snapshot makes it attributable.
-   * A STRUCTURAL residual: it also absorbs movements the app never saw, which is why the tile
-   * that prints it says so and the verdict never calls it "performance".
+   * `Δ patrimonio − risparmio netto + tasse stimate sulle vendite`, or null when no earlier
+   * snapshot makes it attributable. A STRUCTURAL residual: it also absorbs movements the app never
+   * saw, which is why the tile that prints it says so and the verdict never calls it
+   * "performance". The tax is taken OUT of it because the ledger knows it (`sales`): the broker's
+   * withholding leaves the account with no cashflow row, and read as «mercato» it turned a
+   * 4.000 € tax into a market loss on the real account (settembre 2026).
    */
   marketEffect: number | null;
+  /**
+   * The period's sells from the trade ledger, with the estimated tax withheld on them; null when
+   * nothing was sold, absent on data built before the field existed.
+   */
+  sales?: PeriodSalesSummary | null;
   /**
    * Hall of Fame standing of this period's net-worth change; absent when not computable.
    * `trend` matters: a period can rank because it grew the most OR because it fell the most,
@@ -270,13 +280,17 @@ function resolveHeadline(input: PeriodEmailVerdictInput): { headline: string; to
     return { headline: `${subject} è cresciuto.`, tone: 'positive' };
   }
 
-  if (input.marketEffect !== null && input.marketEffect >= 0) {
-    return { headline: `${subject} è in calo, nonostante il mercato.`, tone: 'warning' };
-  }
-  if (input.marketEffect !== null) {
-    return { headline: `${subject} è in calo: il mercato ha pesato.`, tone: 'negative' };
-  }
-  return { headline: `${subject} è in calo.`, tone: 'negative' };
+  // A falling period: the same decision the Panoramica makes (`resolveDeclineCause`). The email's
+  // residual is already net of savings, so there is no «own flows» half to weigh against it.
+  const cause = resolveDeclineCause({
+    marketEffect: input.marketEffect,
+    ownFlows: null,
+    salesTax: input.sales?.estimatedTax ?? null,
+  });
+  return {
+    headline: `${subject} è in calo${declineHeadlineTail(cause)}`,
+    tone: cause === 'despite-market' ? 'warning' : 'negative',
+  };
 }
 
 /**
@@ -304,16 +318,23 @@ export function buildPeriodEmailVerdict(input: PeriodEmailVerdictInput): PageVer
   }
   sentence.push(prose('.'));
 
-  // The split is exact by construction — `marketEffect` is DEFINED as Δ minus net savings — so
-  // it is stated only when both halves exist, and never inferred from one of them.
+  // The split is exact by construction — `marketEffect` is DEFINED as Δ minus net savings (plus
+  // the tax the ledger knows) — so it is stated only when both halves exist, and never inferred
+  // from one of them. With a taxed sale the split has three parts, and they still sum to Δ.
+  const salesTax = input.sales?.estimatedTax ?? null;
   if (hasBaseline && input.marketEffect !== null) {
-    sentence.push(
-      prose(' Di quel movimento, '),
-      signedEuro(input.marketEffect),
-      prose(' viene dal mercato e '),
-      signedEuro(savings),
-      prose(' da quanto hai risparmiato.'),
-    );
+    sentence.push(prose(' Di quel movimento, '), signedEuro(input.marketEffect), prose(' viene dal mercato'));
+    if (salesTax !== null && salesTax > 0) {
+      sentence.push(
+        prose(', '),
+        signedEuro(savings),
+        prose(' da quanto hai risparmiato e '),
+        signedEuro(-salesTax),
+        prose(' dalle tasse sulle vendite.'),
+      );
+    } else {
+      sentence.push(prose(' e '), signedEuro(savings), prose(' da quanto hai risparmiato.'));
+    }
   } else if (input.totalIncome > 0) {
     sentence.push(
       prose(' Hai messo da parte '),
@@ -334,6 +355,11 @@ export function buildPeriodEmailVerdict(input: PeriodEmailVerdictInput): PageVer
       figure(`${input.rank.total}`),
       prose(` ${pluralise(input.rank.total, 'registrato', 'registrati')}.`),
     );
+  }
+
+  // The sale behind the tax, in the same words the Panoramica prints.
+  if (input.sales) {
+    sentence.push(prose(' '), ...describeSales(input.sales));
   }
 
   return { headline, tone, sentence };
@@ -365,16 +391,22 @@ export function describeNetWorthTile(input: {
   ];
 }
 
-/** The market split, as the Patrimonio tile's footer. Absent when not attributable. */
-export function describeMarketSplit(marketEffect: number | null, savings: number): Narrative | null {
+/**
+ * The market split, as the Patrimonio tile's footer. Absent when not attributable. The tax on the
+ * period's sales is its own part when the ledger knows one (estimated, so «circa»).
+ */
+export function describeMarketSplit(
+  marketEffect: number | null,
+  savings: number,
+  salesTax: number | null = null,
+): Narrative | null {
   if (marketEffect === null) return null;
-  return [
-    prose('Mercato '),
-    signedEuro(marketEffect),
-    prose(', risparmio '),
-    signedEuro(savings),
-    prose('. È un residuo strutturale: assorbe anche i movimenti non tracciati.'),
-  ];
+  const narrative: Narrative = [prose('Mercato '), signedEuro(marketEffect), prose(', risparmio '), signedEuro(savings)];
+  if (salesTax !== null && salesTax > 0) {
+    narrative.push(prose(', tasse sulle vendite circa '), signedEuro(-salesTax));
+  }
+  narrative.push(prose('. È un residuo strutturale: assorbe anche i movimenti non tracciati.'));
+  return narrative;
 }
 
 /**

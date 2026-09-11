@@ -119,6 +119,18 @@
   counts a non-current month as a filter. The landscape «Aggiungi» button lives beside the period
   (`max-desktop:portrait:hidden`): in portrait the bottom-nav FAB (`cashflow:add-expense`) is the only add
   affordance, in landscape the FAB is gone.
+- **«Intestatario» is a list filter that exists only with Divisione on** (2026-09-11,
+  `lib/utils/movementsOwnerFilter.ts`): the page hands the tab `splitEnabled` and `familyMembers`, and the Select —
+  desktop toolbar and the phone drawer alike — offers «Tutti · In comune · {members}», plus «Senza intestatario» only
+  when the PERIOD holds rows of a deleted member (`listOwnerFilterOptions`). Absent or blank `personalMemberId` is
+  «in comune», the same contract as `expenseSplitSummary`. A selection the options no longer offer (the feature
+  switched off, a member removed) is no filter — `effectiveOwnerId`, derived like `effectiveAccountId`, never reset in
+  an effect. It counts in `hasActiveFilters`, the drawer badge, the feed's `filterKey` and «Ripristina»; it narrows
+  ONLY the Movimenti list, and since the tile's reading totals the rows it is handed, «Spese di Giuseppe: 522 € su
+  12 voci» comes for free. **With the feature on, an attributed row also prints its owner as a chip** (feed, table,
+  detail drawer: `resolveOwnerLabel` — the name, or «Senza intestatario»); a shared row prints nothing, so the default
+  case stays clean. `memberNames` is `null` when the feature is off, so no row is ever labelled by a feature the
+  account does not use.
 - **Hover readings are one primitive** (`components/ui/chart-hover.tsx`): `useChartHover(count, 'slot' | 'nearest')`
   returns `enabled` (`(pointer: fine)` via `useMediaQuery`), the index and the pointer handlers; spread the handlers on
   the `relative` plot box only when `enabled`, so a touch device never mounts the overlay. The tip is HTML, never an

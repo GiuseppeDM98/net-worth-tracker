@@ -881,6 +881,28 @@ describe('generateEmailHtml', () => {
     ).toContain('nonostante il mercato');
   });
 
+  it('takes the estimated tax on a sale out of the «mercato» residual and names it', () => {
+    // Δ −3.000 € with +1.500 € saved and 4.000 € withheld on a sale: the residual net of the tax
+    // is −500 € (−3.000 − 1.500 + 4.000), so the market lost a little and the tax a lot more.
+    const html = generateEmailHtml(
+      makeMonthlyData({
+        netWorthDelta: -3000,
+        netWorthDeltaPct: -2,
+        periodSales: {
+          proceeds: 20000,
+          realizedGain: 15384.62,
+          estimatedTax: 4000,
+          instruments: [{ id: 'vwce', name: 'VWCE', proceeds: 20000, realizedGain: 15384.62, estimatedTax: 4000 }],
+          brokenLedgers: 0,
+        },
+      }),
+    );
+    expect(html).toContain('Marzo è in calo: il mercato ha pesato, le tasse sulle vendite di più');
+    expect(html).toContain('dalle tasse sulle vendite');
+    expect(html).toContain('Hai venduto VWCE per');
+    expect(html).toContain('tasse sulle vendite circa');
+  });
+
   it('carries no arrow glyphs: the sign is the colour and the sign of the figure', () => {
     const html = generateEmailHtml(makeMonthlyData());
     expect(html).not.toContain('▲');
