@@ -13,35 +13,42 @@ Next.js app for Italian investors: net worth, assets, cashflow, dividends, perfo
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic.
-- `tsc` clean; **162 files / 3631 tests** green + **42 Playwright E2E specs** (45 green in one run incl. 3 auth setups). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, which structurally hides timezone bugs.
-- Latest (2026-09-11): **Un mese in calo non è più «colpa del mercato» e basta, e i Movimenti si filtrano per persona.**
-  Due note del proprietario. (1) **Le vendite e le loro tasse entrano nel verdetto** — sull'account reale settembre
-  2026 è sceso di 4.938 € con il mercato a −1.079 €: il resto era la ritenuta del broker sulla vendita di un ETF
-  (4.092,50 € per la nota dello snapshot; in regime amministrato esce il giorno della vendita, senza riga di cashflow)
-  e i tre verdetti dicevano «il mercato ha pesato». Ora `lib/utils/periodSales.ts` legge le vendite del mese dal
-  registro (`summarizePeriodSales`: replay intero per strumento, ricavo netto commissioni, plusvalenza, tassa =
-  `max(plusvalenza, 0) × taxRate` — `null` senza aliquota, mai zero; minusvalenza senza tasse; registro rotto contato
-  e saltato) e `resolveDeclineCause` è l'UNICA decisione sulla causa di un mese in calo per Panoramica, Patrimonio ed
-  email (`despite-market · taxes-over-market · market-and-taxes · flows-over-market · market · unknown`);
-  `salesNarrative.ts` le parole condivise: «Settembre è in calo: il mercato ha pesato, le tasse sulle vendite di
-  più.», «Di quel movimento, −1079 € viene dal mercato e −3859 € dai tuoi movimenti.», «Hai venduto VWCE per
-  39.052 € con una plusvalenza di 15.726 € e pagato circa 4089 € di tasse.» — «pagato», mai «pagherai» (scelta del
-  proprietario: la ritenuta è già uscita), «circa» perché stimata (3,64 € sotto la ritenuta reale). Payload
-  `monthSales` (`DASHBOARD_OVERVIEW_SOURCE_VERSION` 16, lettura via `getAssetTransactionsAdmin`, fallita → clausola
-  assente); nell'email il residuo «mercato» diventa `Δ − risparmio + tasse stimate` e lo split ha tre parti che
-  sommano ancora a Δ, il footer di Patrimonio nomina la tassa. (2) **Tracciamento › «Intestatario»**
-  (`lib/utils/movementsOwnerFilter.ts`): con Divisione accesa la lista Movimenti filtra per «Tutti · In comune ·
-  {membri}» (+ «Senza intestatario» solo con righe orfane nel periodo), toolbar desktop e drawer del telefono,
-  `effectiveOwnerId` derivato, conta nel badge e in «Ripristina»; le righe intestate stampano il nome come chip
-  (feed, tabella, drawer di dettaglio), le condivise niente, feature spenta = niente da nessuna parte. Collaudo: 162
-  file / 3631 test sotto `TZ=Europe/Rome` (falsificazioni: tassa su minusvalenza, «Senza intestatario» che passa ogni
-  intestata — rossi, poi ripristinati), `tsc`, lint 0, poi il mirror di produzione negli emulatori: payload
-  `monthSales` = VWCE 39.052,45 / 15.726,38 / 4.088,86, i tre verdetti con le parole attese, filtro «6 di 28 voci»
-  con i conteggi letti dal Firestore dell'emulatore (Admin SDK, non dalla pagina), drawer a 390 senza overflow,
-  email di settembre renderizzata dal data path reale (preheader con le tasse, split a tre parti, footer «circa»);
-  spec permanente `e2e/cashflow.owner.spec.ts` (pianta la famiglia sull'account base via Admin SDK e la ripristina
-  in `finally`; flag spenta = niente Select, niente chip), Playwright 45/45, giro guidato del 2026-09-11 con cinque
-  schermate confermate dal proprietario; mirror rimosso, script usa e getta cancellati.
+- `tsc` clean; **164 files / 3666 tests** green + **43 Playwright E2E specs** (46 green in one run incl. 3 auth setups). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, which structurally hides timezone bugs.
+- Latest (2026-09-11, sessione serale): **Un'obbligazione senza nominale vale quello che vale, lo zero coupon si salva,
+  e i BTP€i esistono (issue #340 e #341).** (1) **Il prezzo** — una quotazione di Borsa Italiana è SEMPRE % del
+  nominale e `lib/utils/bondPricing.ts` è l'UNICA conversione (`quota / 100 × nominale × coefficiente`): il nominale
+  vale **1 €** se vuoto (la quantità è il nominale in euro, come sull'estratto del broker: 1.000 € di BTP a 93 → 930 €,
+  non 93.000 €), 1000 se si ragiona a lotti (il BTP Valore del proprietario: 10 lotti da 967,48 €, invariato). Prima
+  la conversione saltava con nominale vuoto o ≤ 1 e nessuna quantità rimediava, perché cedole, premio e cron assumevano
+  già l'unità da 1 €. Scelta del proprietario: **nessuna migrazione** dei documenti salvati male — il prezzo corrente si
+  auto-ripara al cron, PMC e operazione di apertura si correggono dal Registro (il form mostra 9900 per un 99 salvato
+  come euro). `isBondQuotedInPercent` decide SE è una quota, `toBorsaItalianaQuote` è l'inverso dei form, i quattro
+  chiamanti (AssetDialog ×3 prezzi, TransactionDialog, priceUpdater ×2) importano e non reimplementano. (2) **Lo zero
+  coupon** — `buildBondDetailsFromForm` (ora `lib/utils/bondDetailsForm.ts`, puro, testato sulla funzione vera e non
+  su una copia) tratta solo un tasso VUOTO come mancante, `hasCouponPayments` fa tornare `scheduleNextCoupon` senza
+  POST. (3) **BTP€i** — `BondDetails.inflationIndexation: 'italia' | 'euro'` (UN campo, letto via
+  `resolveInflationIndexation`; il vecchio `isInflationLinked` è `italia` in lettura, mai più scritto),
+  `indexationCoefficients: { date, coefficient }[]` per giorno; cedola = tasso reale/periodi × coefficiente alla data
+  di stacco × nominale, provvisoria all'ULTIMO coefficiente noto (par se nessuno, la nota lo dice); valore = quota
+  reale × ultimo coefficiente (cron e form; Borsa Italiana NON lo pubblica: si copia dal MEF o dal contratto);
+  l'operazione chiede il coefficiente alla SUA data e lo ricorda (`AssetTransaction.indexationCoefficient`, mai letto
+  dal replay); `InflationRateDialog` è UNA dialog per i due meccanismi (`MECHANISM_COPY`), banner e bottone dicono
+  «dato d'inflazione». Il rimborso a scadenza resta un'operazione dell'utente. (4) Trovato dal browser: i campi
+  prezzo con `step="0.0001"` rifiutavano il proprio valore riconvertito a 5 decimali (96,74843 del BTP Valore) →
+  `step="any"`. Collaudo: 164 file / 3666 test sotto `TZ=Europe/Rome` (falsificazioni: guardia `> 1` ripristinata,
+  `!bondCouponRate`, gate zero coupon tolto — 6 rossi, poi ripristinati), `tsc`, lint 0; mirror di produzione negli
+  emulatori (un solo BTP reale, nominale 1000 esplicito: invariante), decoy «Fenicottero» (il caso della issue:
+  qty 1000, prezzo 93 grezzo → il cron VERO lo porta a 0,9674843 = quota/100, posizione 93.000 → 967,48 €, PMC 99
+  dichiarato) e «Ornitorinco» (BTP€i, quota 97,38726 × 1,25 = 1,21734075, letto dal Firestore dell'emulatore);
+  spec permanente `e2e/assets.bond.spec.ts` (pianta il BTP€i sull'account base via Admin SDK: modifica → cedola
+  provvisoria a 1,25; operazione a 97 con coefficiente 1,26 → 1,2222 salvato; Dividendi «Imposta inflazione» a
+  1,27 → cedola definitiva 0,00254/unità; zero coupon creato dal dialog → `couponRate: 0`, PMC 0,96, nessuna cedola;
+  tutto asserito su Firestore, ripristino in `finally`), Playwright 46/46 dopo aver corretto
+  `e2e/cashflow.owner.spec.ts` (nel `finally` cancellava `familyMembers` e faceva fallire le spec di Previdenza —
+  AGENTS → *Browser-Driven E2E*); giro guidato con il proprietario, cinque schermate confermate e due correzioni
+  nate lì: il campo coefficiente non si svuota più cambiando meccanismo e tornando indietro, e con il campo VUOTO
+  il prezzo salvato dal form usa l'ultimo coefficiente noto (prima salvava la quota senza, in disaccordo con il
+  cron); «di oggi» = ultimo coefficiente a oggi o prima, pinnato nella spec. Mirror rimosso, script cancellati.
 
 ## Architecture Snapshot
 - App Router; protected pages under `app/dashboard/*`.
@@ -65,7 +72,7 @@ One line per feature: what it is, then where it is described. *What the user see
 - **Cashflow › Divisione**: optional tab; «quanto è costato in comune, e quanto resta a ciascuno?» on Tracciamento's axis — one field (`personalMemberId`, absent = in comune), shares from the period's attributed salaries, a tile per person, and a section in the monthly email. doc/guide/cashflow-divisione.md.
 - **Expense CSV Import**: preview-first, one-tap undo by `importBatchId`. doc/guide/cashflow.md.
 - **Analisi**: «dove vanno i soldi, e cosa è cambiato?» on the four-mode axis; a running year is compared full year against full year; the focused entity is a tile; the app's only Sankey. README → *Cashflow*; doc/guide/cashflow-analisi.md; doc/guide/cashflow.md (grouping, Sankey, drill-down).
-- **Dividendi**: «quanto rendono i miei flussi?»; received and announced are never one figure; BTP Italia coupons. README → *Dividends*; doc/guide/cashflow-dividendi.md.
+- **Dividendi**: «quanto rendono i miei flussi?»; received and announced are never one figure; BTP Italia (FOI added) and BTP€i (coefficient multiplied) coupons, provisional until the period's datum is entered; a zero coupon generates nothing. README → *Dividends*; doc/guide/cashflow-dividendi.md.
 - **Rendimenti**: «quanto rende il portafoglio, e rispetto a cosa?» on one axis, a configurable base (the pension funds enter it honestly: from the tracked month, their entry and every later contribution a FLOW on `CashFlowData.pensionFlow`), six benchmarks in EUR, and «Da dove viene il rendimento» — the market gain per instrument in euro, reconciled to the TWR numerator with the residual declared and its outsized months named. README → *Performance Analytics*; doc/guide/rendimenti.md.
 - **Storico**: «come sono arrivato qui?» with no axis — wealth growth (contributions included), ONE pace for the verdict and the next doubling, per-instrument price/quantity attribution. README → *Historical Analysis*; doc/guide/storico.md.
 - **Allocazione**: «sono allineato al piano, e cosa faccio con i prossimi soldi?» with no axis — five tiles + Dettaglio; `allocationRole` partitioned BEFORE `compareAllocations`; an unclassified holding is a row without a target; leverage as notional exposure. doc/guide/allocazione.md.
@@ -115,6 +122,15 @@ Firestore client + admin · Yahoo Finance (prices, benchmark history) · Borsa I
 - **Otto superfici stanno ancora fuori dal vocabolario delle modali** (2026-09-06): `app/dashboard/page.tsx`, `dividends/{DividendiDettaglio,DividendTrackingTab}`, `expenses/ExpenseTable`, `cashflow/{ExpenseTrackingTab,TransactionFeed,MobileFiltersDrawer}`, `assistant/AssistantSheets` montano `Dialog`/`AlertDialog`/`Drawer`/`Sheet` grezzi (titolo 18/16px, quinta larghezza 512px). Elenco in DESIGN.md → §5 Modal, Coverage.
 - **Tre tinte del chrome violano la Zero-Chroma Rule** (`switch.tsx` ON blu in dark, `ProtectedRoute` spinner, mask-icon smeraldo) più `ExpenseTable.tsx` `text-emerald-*`; gli altri ~100 hex DOM-side sono eccezioni dichiarate in DESIGN.md → The DOM-side hex inventory.
 - **The market digest's blind spots**: a position opened this month contributes 0 until next month; a pension fund counts only from `pensionReturnStartMonth`; hand-valued assets other than funds and real estate never show a market effect; real estate is gross of debt.
+- **Bonds saved before 2026-09-11 with the nominal empty or 1 keep a wrong PMC and opening trade** (the raw quote as
+  euro: 99 for 0,99); the current price heals at the next cron, the PMC does not — corrected by the user from the
+  Registro, no backfill by the owner's decision. **A BTP€i is only as current as its coefficient**: Borsa Italiana does
+  not publish it, so the value lags the last coefficient entered (~6 months between coupons unless refreshed from the
+  form), a coupon is provisional until the payment-date coefficient is typed, the PMC entered in the asset form uses
+  TODAY's coefficient (the Registro's trade carries the right one), and redemption at maturity (nominal × coefficient)
+  is not an event for any bond. **`createAsset` re-links a new asset onto an existing one with the same ISIN whenever
+  that ISIN already has dividends** (ISIN continuity, by design): creating a second bond with an already-held ISIN
+  merges it into the first.
 - **The sales clause is an ESTIMATE from the ledger** (2026-09-11): the tax is `plusvalenza × taxRate` per instrument — no compensation of prior losses, no rate → «non stimate» (never zero); a sale recorded outside the ledger (a hand-edited quantity) is invisible; the AI email prompt still prints the old `Δ − risparmio` residual; and a tax the owner ALSO records as a cashflow expense is counted twice in the email's split. On the real account the estimate landed 3,64 € under the broker's withholding (4.088,86 € vs 4.092,50 €).
 
 ## Key Files
@@ -127,14 +143,14 @@ Entry points only: each `doc/guide/<tema>.md` opens with the full file list of i
 - **Shared account · Demo**: `contexts/ActiveAccountContext.tsx`, `lib/services/accountAccessService.ts`, `app/api/account/members/route.ts`, `lib/server/apiAuth.ts`, `firestore.rules`, `lib/hooks/useDemoMode.ts`; collection `account-access/{ownerUid}` — doc/guide/account-condiviso-demo.md
 - **Temi**: `app/globals.css` (twelve theme blocks), `contexts/ColorThemeContext.tsx`, `lib/hooks/{useChartColors,useActionColors}.ts`, `lib/utils/costCenterColors.ts` — doc/guide/temi.md
 - **Overview**: `app/dashboard/page.tsx`, `app/api/dashboard/overview/route.ts`, `lib/services/dashboardOverviewService.ts`, `lib/hooks/useDashboardOverview.ts`, `components/dashboard/overview/*` (`PatrimonioTile` exports `resolveHeroValueClass`), pure `lib/utils/{overviewNarrative,dashboardOverviewUtils,sparklinePeriod,savingsRateBadge}.ts`; `lib/utils/periodSales.ts` (`summarizePeriodSales` = the month's sells from the ledger with the estimated tax, `resolveDeclineCause` = the ONE cause of a falling month for Panoramica, Patrimonio and the email) + `lib/utils/salesNarrative.ts` (the shared words)
-- **Patrimonio**: `app/dashboard/assets/page.tsx` (owns every dialog), `components/assets/*` (+ `PatrimonioTile`/`ComposizioneTile` reused from the overview), pure `lib/utils/{patrimonioNarrative,patrimonioSummary,assetPerformanceDeltas,costBasisEur}.ts` (`costBasisPerUnitEur`/`unitPriceEur` = EUR against EUR, fees included); `lib/services/assetService.ts`, `types/assets.ts`
+- **Patrimonio**: `app/dashboard/assets/page.tsx` (owns every dialog), `components/assets/*` (+ `PatrimonioTile`/`ComposizioneTile` reused from the overview), pure `lib/utils/{patrimonioNarrative,patrimonioSummary,assetPerformanceDeltas,costBasisEur}.ts` (`costBasisPerUnitEur`/`unitPriceEur` = EUR against EUR, fees included), `lib/utils/bondPricing.ts` (`resolveBondPrice` = the ONE Borsa Italiana quote → euro per unit, nominal 1 € by default, BTP€i coefficient; `toBorsaItalianaQuote` the inverse; shared with `lib/helpers/priceUpdater.ts`), `lib/utils/bondDetailsForm.ts` (`buildBondDetailsFromForm`, a rate of 0 is a zero coupon); `lib/services/assetService.ts`, `types/assets.ts`; spec `e2e/assets.bond.spec.ts`
 - **Asset trade ledger**: engine `lib/utils/assetTransactionUtils.ts` + `types/assetTransactions.ts`; server `lib/server/{assetTransactionUseCase,tradeFxService}.ts` (+ `backfillAverageCostEur`) + `app/api/asset-transactions/*` (incl. `backfill-average-cost-eur`); client `lib/services/assetTransactionService.ts`, UI `components/assets/{TransactionDialog,AssetMovementsDialog}.tsx`; collections `assetTransactions`/`assetTransactionsMeta`
 - **Rendimenti**: `app/dashboard/performance/page.tsx`, `components/performance/*` (+ `tiles/*`, `AttribuzioneTile`), pure `lib/utils/{performanceNarrative,performanceSummary,performanceBase,portfolioFlows,performanceAttribution,drawdownSeries,cashFlowMap,benchmarkPeriodReturn}.ts` (`resolvePerformanceBase` = the ONE base for service, page and PDF; `externalFlowOf`/`mergePensionFlows`/`mergePortfolioFlows` = the two flow channels; `buildPortfolioBoundaryFlows` = the measured boundary; `resolvePeriodReturnChip`/`deannualizeReturn`; `attributePeriodReturn` + `RESIDUAL_ALERT_SHARE` = the residual guard), `lib/services/performanceService.ts` (`CACHE_MATH_VERSION`); cache `performance-cache/{userId}`; spec `e2e/performance.degraded.spec.ts` on `npm run e2e:seed -- performance`. Yields: `lib/utils/yieldOnCost.ts` (`computeDividendYieldMetrics`, also behind `app/api/dividends/stats/route.ts`)
 - **Allocazione / exposure**: `app/dashboard/allocation/page.tsx`, `components/allocation/*` (+ `tiles/*`), pure `lib/utils/{allocazioneSummary,allocazioneNarrative}.ts` over `lib/utils/{allocationUtils,leverageAwareAllocationUtils,assetExposureUtils}.ts` (`allocationUtils` owns `ASSET_CLASS_SEQUENCE`, `ASSET_CLASS_LABELS`, `ASSET_CLASS_CHART_INDEX`), `lib/services/assetAllocationService.ts`, `lib/server/portfolioExposureService.ts`; `exposure-cache/{userId}`
 - **Previdenza**: `types/pension.ts`, pure `lib/utils/{pensionSummary,pensionNarrative}.ts` over `lib/utils/{pensionDeduction,pensionContributions,pensionReturn,pensionFire,pensionFamilyMembers}.ts`, `lib/services/pensionContributionService.ts` (`assertFundValueLivesInQuantity`), `app/dashboard/pension/page.tsx`, `components/pension/*`; collection `pensionContributions`
 - **Cashflow**: `app/dashboard/cashflow/page.tsx`; Tracciamento `components/cashflow/ExpenseTrackingTab.tsx` + `components/cashflow/{TransactionFeed,CompactExpenseRow,MobileFiltersDrawer}.tsx`, pure `lib/utils/{tracciamentoSummary,cashflowNarrative,movementsOwnerFilter}.ts` (the «Intestatario» filter and the owner chip), spec `e2e/cashflow.mobile.spec.ts`; Budget `components/cashflow/BudgetTab.tsx` + `components/cashflow/budget/*`, pure `lib/utils/{budgetSummary,budgetNarrative,budgetUtils,budgetHistory}.ts`, `lib/hooks/{useBudgetConfig,useBudgetHistory}.ts`, `lib/server/budgetHistoryService.ts` (cron phase 8), collections `budgets/{userId}`, `budgetHistory/{userId}/months/{YYYY-MM}`; Divisione `components/cashflow/ExpenseSplitTab.tsx`, pure `lib/utils/{expenseSplitSummary,expenseSplitNarrative}.ts` (`resolveSplitBasis`, `allocateByShare`); Centri di Costo `components/cashflow/{CostCentersTab,CostCenterDetail,CostCenterDialog}.tsx` + `cost-centers/*`, pure `lib/utils/{costCenterSummary,costCenterNarrative,costCenterUtils}.ts`, `costCenterStyles.ts` (`CHART_TICK_STYLE`); services `lib/services/{budgetService,costCenterService,cashBalanceReconciliation,expenseImportService}.ts`, `lib/utils/expenseImport.ts`
 - **Analisi**: `components/cashflow/AnalisiTab.tsx` (`handleEntitySelect`) + `components/cashflow/analisi/*`, `components/cashflow/{EntityDossier,EntitySearch,ConfrontoAnnualeSection,CashflowSankeyChart,SavingsRateTrendSection,AndamentoStoricoSection}.tsx`; pure `lib/utils/{analisiSummary,analisiNarrative,expenseGrouping,cashflowSankey,cashflowComposition,expenseCategoryMatching,comparisonDeltas,expenseEntityStats,entitySearch}.ts`
-- **Dividendi**: `components/dividends/DividendTrackingTab.tsx` + `tiles/*` + `DividendiDettaglio.tsx`, pure `lib/utils/{dividendAnalytics,dividendiNarrative}.ts`, `lib/hooks/useDividendStats.ts` → `app/api/dividends/stats/route.ts`; registry and coupons `components/dividends/{DividendTable,DividendCalendar,DividendDialog,DividendDetailsDialog,DividendRecordDetailsDialog,InflationRateDialog,ProvisionalCouponBanner}.tsx`, `lib/utils/couponUtils.ts`, `lib/services/couponScheduling.ts`, `types/dividend.ts`
+- **Dividendi**: `components/dividends/DividendTrackingTab.tsx` + `tiles/*` + `DividendiDettaglio.tsx`, pure `lib/utils/{dividendAnalytics,dividendiNarrative}.ts`, `lib/hooks/useDividendStats.ts` → `app/api/dividends/stats/route.ts`; registry and coupons `components/dividends/{DividendTable,DividendCalendar,DividendDialog,DividendDetailsDialog,DividendRecordDetailsDialog,InflationRateDialog,ProvisionalCouponBanner}.tsx`, `lib/utils/couponUtils.ts` (`resolveCoupon` for both mechanisms, `resolveInflationIndexation`, `hasCouponPayments`, the coefficient lookups), `lib/services/couponScheduling.ts`, `types/dividend.ts`
 - **Storico / snapshots**: `app/dashboard/history/page.tsx`, `components/history/*` (+ `tiles/*`), pure `lib/utils/{storicoSummary,storicoNarrative,snapshotAssetBreakdown,historyComposition,snapshotUserFields}.ts` (`preserveUserAuthoredSnapshotFields` = i campi che nessuna pipeline ricalcola, portati attraverso la sostituzione; `summarizeLaborMetrics` + `laborWindowsOf` = il recap Lavoro sulle finestre del Driver), `lib/services/{chartService,snapshotService}.ts`, `components/CreateManualSnapshotModal.tsx` over `lib/utils/manualSnapshotAmounts.ts`; collection `monthly-snapshots`
 - **Hall of Fame**: `app/dashboard/hall-of-fame/page.tsx`, `components/hall-of-fame/*` (+ `tiles/*`), pure `lib/utils/{hallOfFameSummary,hallOfFameNarrative}.ts` over `lib/utils/hallOfFameRecords.ts` (the ONE definition of record and ranking, shared with the email), `lib/constants/hallOfFame.ts`, `lib/services/hallOfFameService{,.server}.ts`, `app/api/hall-of-fame/recalculate/route.ts`; collection `hall-of-fame/{userId}`
 - **Benchmark**: `lib/constants/benchmarks.ts`, `app/api/benchmarks/*`, `lib/server/ecbRatesService.ts`; caches `benchmark-cache/*`, `fx-rate-cache/usd-eur`, `ecb-rate-cache/deposit-rate`

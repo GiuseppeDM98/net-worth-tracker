@@ -85,9 +85,26 @@
   deliberately NOT scoped** — it is a security-level payout history.
 - **Received metrics filter on `paymentDate`, not `exDate`**; use `setHours(23,59,59,999)` for the upper bound, or a
   `…T00:00:00Z` dividend reads as future.
-- **Inflation-linked coupons (BTP Italia) are additive**, resolved by `resolveCoupon`/`buildCouponNote` for both the
-  client scheduler and cron Phase 3: the FOI rate is already per-period, deflation is floored to 0, and an unannounced
-  coupon is stored **provisional**.
+- **Two inflation mechanisms, ONE field** (`BondDetails.inflationIndexation`, read only through
+  `resolveInflationIndexation`, which maps the legacy `isInflationLinked: true` to `italia`; the flag is never written
+  any more). **`italia` (BTP Italia) is additive**: the FOI rate is already per-period, deflation is floored to 0, the
+  capital redeems at par. **`euro` (BTP€i, issue #341, 2026-09-11) is multiplicative**: coupon = real rate per period ×
+  the HICP indexation coefficient at the payment date × nominal; the revaluation accrues in the coefficient and is
+  cashed at maturity, never with the coupon — no minimum coupon, no loyalty premium. Both are resolved by
+  `resolveCoupon`/`buildCouponNote` for the client scheduler (`scheduleNextCoupon`), `InflationRateDialog` and cron
+  Phase 3. An unannounced coupon is stored **provisional**: at the fixed floor for `italia`, at the LATEST KNOWN
+  coefficient for `euro` (par when none — the note says which). The coefficients live in
+  `bondDetails.indexationCoefficients` (`{ date, coefficient }[]`, keyed by calendar DAY: `findIndexationCoefficient`
+  takes the coupon's day, else the latest of its month; `latestIndexationCoefficient(entries, asOf)` feeds the
+  valuation and the provisional estimate; `upsertIndexationCoefficient` replaces the same day only). The dialog that
+  finalises a provisional coupon is ONE component for both mechanisms (`InflationRateDialog`: FOI % or coefficient,
+  copy from `MECHANISM_COPY`), and the banner/button say «dato d'inflazione», never «tasso FOI».
+- **A zero-coupon bond (rate 0) saves its details and materialises nothing** (issue #340): `buildBondDetailsFromForm`
+  (`lib/utils/bondDetailsForm.ts`, pure, tested against the real function) treats only an EMPTY rate as missing, and
+  `scheduleNextCoupon` returns `{ scheduled: false }` through `hasCouponPayments` (rate 0 and no positive tier). Cron
+  Phase 3 never sees such a bond: it walks from an existing coupon.
+- **Redemption at maturity is not an event, for any bond**: a matured bond keeps its last price until the user sells it
+  in the Registro; for a BTP€i the final `nominal × coefficient` is therefore recorded as that sale, never generated.
 - **`/api/dividends/stats` returns the NET yields too** (`portfolioYieldOnCostNet`,
   `portfolioCurrentYieldGross/Net`): `computeDividendYieldMetrics` has always produced them and the
   route used to drop them, which forced every consumer wanting a net figure to re-derive it from an

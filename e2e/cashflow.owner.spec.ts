@@ -56,6 +56,12 @@ test('with Divisione on, the Intestatario filter narrows the list and the rows c
   const { db, FieldValue } = await admin();
   const settings = db.collection('assetAllocationTargets').doc(UID);
   const row = await pickCurrentMonthRow(db);
+  // The Previdenza fixture (global-setup) keeps its family member in the SAME settings document:
+  // remember the two fields as they are and put them back, never delete them — deleting wiped
+  // «Marco» and failed every pension spec that ran after this one (2026-09-11).
+  const before = (await settings.get()).data() ?? {};
+  const restoreField = (key: 'expenseSplitEnabled' | 'familyMembers') =>
+    key in before ? before[key] : FieldValue.delete();
 
   await settings.set({ userId: UID, expenseSplitEnabled: true, familyMembers: [ORNITORINCO, FENICOTTERO] }, { merge: true });
   await row.update({ personalMemberId: ORNITORINCO.id });
@@ -98,6 +104,6 @@ test('with Divisione on, the Intestatario filter narrows the list and the rows c
     await expect(rowsWithChip(page, again, ORNITORINCO.name)).toHaveCount(0);
   } finally {
     await row.update({ personalMemberId: FieldValue.delete() });
-    await settings.update({ expenseSplitEnabled: FieldValue.delete(), familyMembers: FieldValue.delete() });
+    await settings.update({ expenseSplitEnabled: restoreField('expenseSplitEnabled'), familyMembers: restoreField('familyMembers') });
   }
 });

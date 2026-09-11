@@ -45,8 +45,12 @@
   `vi.hoisted(...)` state, never a plain const.
 
 ### UI and Rendimenti/Dividendi surfaces
-- `resolveBondPrice` is exported from `AssetDialog.tsx` and REUSED — a trade's `pricePerUnit` must mean exactly what
-  `averageCost` means. **"Capitale investito" uses the page's OWN period bounds** and is deliberately a DIFFERENT number
+- `resolveBondPrice` lives in `lib/utils/bondPricing.ts` (since 2026-09-11; it used to be exported from
+  `AssetDialog.tsx`) and is REUSED by the dialog, the trade form and the price cron — a trade's `pricePerUnit` must mean
+  exactly what `averageCost` means: euro per unit, the nominal defaulting to 1 € (doc/guide/patrimonio.md § Asset
+  Pricing). For a BTP€i the trade form asks the indexation coefficient at the trade date and stores it beside the price
+  (`indexationCoefficient`, optional, validated `> 0`, carried through `prepareEdit` only together with a new price);
+  the edit form divides by it to show the quote again. **"Capitale investito" uses the page's OWN period bounds** and is deliberately a DIFFERENT number
   from "Contributi Netti"; "Plusvalenze Realizzate" is NOT period-scoped — a realized sale belongs to its fiscal year.
 - **`totalReturnAssets` has two paths**: LEDGER (≥1 trade doc, the only one that can represent a closed or partially sold
   position) and a STATIC price-vs-PMC fallback. **`capitalGainAbsolute` means something different on each** (static =
