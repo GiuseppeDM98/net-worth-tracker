@@ -1,6 +1,6 @@
 {
  "schemaVersion": 2,
- "generatedAt": "2026-09-06T19:14:47.336Z",
+ "generatedAt": "2026-09-11T19:25:03.029Z",
  "title": "Design System: Net Worth Tracker",
  "extensions": {
   "colorMeta": {
@@ -626,7 +626,7 @@
    },
    "row": {
     "displayName": "Row",
-    "purpose": "13px — list/composition row text"
+    "purpose": "13px — list/composition row text, and the Reading Line: the one-line answer under a tile's eyebrow at 13px/1.45, figures as mono semibold spans coloured by sign, rendered by NarrativeText from a Narrative and never assembled in JSX"
    },
    "body-px": {
     "displayName": "Body Px",
@@ -683,10 +683,6 @@
    "page-hero-desktop": {
     "displayName": "Page Hero Desktop",
     "purpose": "54px — the single dominant number, desktop"
-   },
-   "reading": {
-    "displayName": "Reading Line",
-    "purpose": "The one-line answer under a tile's eyebrow, 13px/1.45, figures as mono semibold spans coloured by sign. Rendered by NarrativeText from a Narrative, never assembled in JSX."
    }
   },
   "shadows": [
@@ -755,7 +751,7 @@
   {
    "name": "Page Verdict",
    "kind": "custom",
-   "description": "The opening of every redesigned page (The Verdict-First Rule): a rule-generated headline whose full stop alone carries the tone, then the facts as a sentence with mono sign-coloured figures. Sits on the page background, never in a card; max-w 920px; 24px/30px from desktop:.",
+   "description": "The opening of every redesigned page (The Verdict-First Rule): a rule-generated headline whose full stop alone carries the tone, then the facts as a sentence with mono sign-coloured figures. Sits on the page background, never in a card; max-w 920px; 24px/30px from desktop:. A page whose question has an axis renders that control beside the verdict from desktop: (flex items-start justify-between gap-6) and under it below that width; a toolbar elsewhere may repeat the same control as a second handle on the SAME state, never a second axis (2026-09-07, Movimenti).",
    "html": "<section class=\"ds-verdict\" aria-label=\"Verdetto del mese\"><h2 class=\"ds-verdict-headline\">Agosto sta andando bene<span class=\"ds-verdict-dot is-positive\" aria-hidden=\"true\">.</span></h2><p class=\"ds-verdict-sentence\">Il patrimonio vale <span class=\"ds-fig\">412.380,52 &euro;</span>: <span class=\"ds-fig is-positive\">+4120,18 &euro; (+1,01%)</span> su luglio, <span class=\"ds-fig is-positive\">+8,29%</span> da inizio anno, nuovo massimo storico. Hai messo da parte il <span class=\"ds-fig\">40%</span> delle entrate e le azioni hanno fatto il grosso del lavoro (<span class=\"ds-fig is-positive\">+3480 &euro;</span>).</p></section>",
    "css": ".ds-verdict { display: flex; flex-direction: column; gap: 8px; max-width: 920px; font-family: 'Geist Sans', system-ui, sans-serif; } .ds-verdict-headline { font-size: 24px; font-weight: 600; line-height: 1.15; letter-spacing: -0.025em; color: var(--foreground, oklch(0.985 0 0)); margin: 0; } .ds-verdict-dot.is-positive { color: var(--positive, oklch(0.740 0.156 148.655)); } .ds-verdict-dot.is-neutral { color: var(--muted-foreground, oklch(0.708 0 0)); } .ds-verdict-dot.is-warning { color: var(--warning-foreground, oklch(0.854 0.090 82)); } .ds-verdict-dot.is-negative { color: var(--destructive, oklch(0.704 0.191 22.216)); } .ds-verdict-sentence { font-size: 14px; line-height: 1.6; color: var(--muted-foreground, oklch(0.708 0 0)); margin: 0; } .ds-fig { font-family: 'Geist Mono', ui-monospace, monospace; font-feature-settings: 'tnum' 1; font-variant-numeric: tabular-nums; font-weight: 600; color: var(--foreground, oklch(0.985 0 0)); } .ds-fig.is-positive { color: var(--positive, oklch(0.740 0.156 148.655)); } .ds-fig.is-negative { color: var(--destructive, oklch(0.704 0.191 22.216)); } @media (min-width: 1440px) { .ds-verdict-headline { font-size: 30px; } .ds-verdict-sentence { font-size: 15px; } }"
   },
