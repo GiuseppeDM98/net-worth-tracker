@@ -54,6 +54,10 @@ export interface AssetTransaction {
                              // sell: subtracted from proceeds; adjustment: not allowed
   linkedCashAssetId?: string; // optional settlement cash asset (buy debits, sell credits)
   isBaseline?: boolean;      // migration-created opening position; always type 'buy'
+  // BTP€i only: the indexation coefficient the Borsa Italiana quote was multiplied by to reach
+  // pricePerUnit (quote/100 × nominal × coefficient). Metadata for the edit form's back-conversion;
+  // the replay never reads it.
+  indexationCoefficient?: number;
   note?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -68,6 +72,7 @@ export interface AssetTransactionFormData {
   pricePerUnit: number;
   fees?: number;
   linkedCashAssetId?: string;
+  indexationCoefficient?: number;
   note?: string;
   // priceEur is NOT part of the form: the server resolves it, so the client
   // can never write an inconsistent FX value.

@@ -19,7 +19,7 @@
 
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { toDate } from '@/lib/utils/dateHelpers';
-import { buildCouponNote, getNextCouponDate, resolveCoupon } from '@/lib/utils/couponUtils';
+import { buildCouponNote, getNextCouponDate, hasCouponPayments, resolveCoupon } from '@/lib/utils/couponUtils';
 import { BondDetails } from '@/types/assets';
 
 export interface ScheduleCouponParams {
@@ -52,10 +52,13 @@ function resolveCouponTaxRate(taxRate?: number): number {
  * announced, the coupon is provisional (fixed floor) — see resolveCoupon.
  *
  * @returns the scheduled date and whether the coupon is provisional, or
- *          { scheduled: false } when the bond has no further coupon (matured).
+ *          { scheduled: false } when the bond has no further coupon (matured) or none at all
+ *          (a zero-coupon bond — its details are saved, nothing is materialised).
  */
 export async function scheduleNextCoupon(params: ScheduleCouponParams): Promise<ScheduleNextCouponResult> {
   const { assetId, bondDetails, quantity, currency, taxRate, userId } = params;
+
+  if (!hasCouponPayments(bondDetails)) return { scheduled: false };
 
   const issueDate = toDate(bondDetails.issueDate);
   const maturityDate = toDate(bondDetails.maturityDate);

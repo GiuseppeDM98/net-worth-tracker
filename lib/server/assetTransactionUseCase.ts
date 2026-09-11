@@ -91,6 +91,7 @@ function docToAssetTransaction(id: string, data: DocumentData): AssetTransaction
     fees: data.fees,
     linkedCashAssetId: data.linkedCashAssetId,
     isBaseline: data.isBaseline,
+    indexationCoefficient: data.indexationCoefficient,
     note: data.note,
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt),
@@ -110,6 +111,7 @@ function buildTradeSetDocData(t: AssetTransaction): Record<string, unknown> {
     fees: t.fees,
     linkedCashAssetId: t.linkedCashAssetId,
     isBaseline: t.isBaseline,
+    indexationCoefficient: t.indexationCoefficient,
     note: t.note,
     createdAt: t.createdAt,
     updatedAt: t.updatedAt,
@@ -130,6 +132,7 @@ function buildTradeUpdateDocData(t: AssetTransaction): Record<string, unknown> {
     priceEur: t.priceEur,
     fees: t.fees ?? FieldValue.delete(),
     linkedCashAssetId: t.linkedCashAssetId ?? FieldValue.delete(),
+    indexationCoefficient: t.indexationCoefficient ?? FieldValue.delete(),
     note: t.note ?? FieldValue.delete(),
     updatedAt: t.updatedAt,
   };
@@ -257,6 +260,7 @@ async function prepareCreate(
     priceEur,
     fees: data.fees,
     linkedCashAssetId: data.linkedCashAssetId,
+    indexationCoefficient: data.indexationCoefficient,
     note: data.note,
     createdAt: now,
     updatedAt: now,
@@ -303,6 +307,9 @@ async function prepareEdit(
       ? updates.linkedCashAssetId
       : oldTrade.linkedCashAssetId;
   const mergedNote = updates.note !== undefined ? updates.note : oldTrade.note;
+  // The coefficient travels with the price it scaled: a price update carries its own (or none).
+  const mergedIndexationCoefficient =
+    updates.pricePerUnit !== undefined ? updates.indexationCoefficient : oldTrade.indexationCoefficient;
 
   assertDateWithinBounds(mergedDate, baselineDate);
   if (updates.linkedCashAssetId !== undefined && mergedLinkedCash) {
@@ -324,6 +331,7 @@ async function prepareEdit(
     priceEur,
     fees: mergedFees,
     linkedCashAssetId: mergedLinkedCash,
+    indexationCoefficient: mergedIndexationCoefficient,
     note: mergedNote,
     updatedAt: new Date(),
   };

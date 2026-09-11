@@ -14,7 +14,31 @@
   the only defense — never remove it.**
 - **GBp (pence) ≠ GBP**: normalize `price / 100` before any FX call or values inflate 100×. **Never call Frankfurter from
   the browser** — all FX is server-side via `/api/prices/quote`. `quantity = 0` marks a sold asset, cash balance lives
-  in `quantity`, and Borsa Italiana bond prices are `% of par` (`rawPrice * nominalValue / 100`).
+  in `quantity`.
+- **A Borsa Italiana bond quote is `% of par`, ALWAYS, and ONE rule turns it into euro per unit** —
+  `lib/utils/bondPricing.ts` (2026-09-11, issue #340): `eurPerUnit = quote / 100 × nominalValue × indexationCoefficient`,
+  with the nominal defaulting to **1 €** (`effectiveBondNominal`) — the quantity is then the nominal in euro, as on a
+  broker statement (5.000 € of BTP → quantity 5000, quote 99,5 → 4.975 €) — and 1000 meaning the quantity counts
+  1.000 € lots (the owner's BTP Valore: quantity 10, 967,48 € per lot). Before the fix the conversion was skipped unless
+  the nominal was set and > 1, so a bond saved with the field empty kept the raw quote as euro (93 % → 93 € per unit,
+  93.000 € on quantity 1000) — and NO quantity made that right, because coupons, the final premium and the cron
+  already assumed a 1 € unit. `isBondQuotedInPercent` (bond + bonds + ISIN) decides WHETHER a price is a quote;
+  `toBorsaItalianaQuote` is the inverse the edit forms use. The four callers — `AssetDialog` (fetched, manual and
+  purchase price), `TransactionDialog`, `priceUpdater` (both scraper and Yahoo fallback) — import it; none re-implements
+  it. **No migration for documents saved wrong before the fix** (owner's call): the current price self-heals at the next
+  cron, the PMC and the opening trade are corrected by the user from the Registro (the form shows 9900 for a 99 stored
+  as euro; typing 99 saves 0,99).
+- **A BTP€i's quote is REAL** (`inflationIndexation: 'euro'`, issue #341): the euro value carries the HICP indexation
+  coefficient, so the price cron multiplies the quote by the latest coefficient the user has entered
+  (`latestIndexationCoefficient`, never scraped — Borsa Italiana does not publish it), the asset form takes «il
+  coefficiente di oggi» (stored as today's entry when it differs from the latest known), and a trade asks for the
+  coefficient at ITS date and remembers it (`AssetTransaction.indexationCoefficient`, metadata for the back-conversion,
+  never read by the replay). A BTP€i without any coefficient is valued at par of the real price: understated by the
+  accrued inflation, and declared in the form. The coupon side is in doc/guide/cashflow-dividendi.md.
+- **Inputs that receive a back-converted quote carry `step="any"`** (`manualPrice`, both `averageCost` fields, the
+  trade's price): a stored 967,4843 € per lot comes back as 96,74843 — five decimals — and a fixed `step="0.0001"` made
+  the browser's native validation refuse the form's OWN value on every edit of the owner's BTP Valore (found in the
+  browser, 2026-09-11).
 - **Every G/P stands EUR against EUR, fees included — ONE rule in `lib/utils/costBasisEur.ts`** (2026-09-07, PR #326
   merged with changes). `costBasisPerUnitEur` is the ledger's `averageCostEur` (the position's cost at trade-date
   rates, purchase fees INCLUDED — the fiscal cost a capital gain is taxed on) when the ledger has projected it, the

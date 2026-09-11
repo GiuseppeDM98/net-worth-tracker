@@ -56,7 +56,7 @@ export function DividendRecordDetailsDialog({
       title={dividend.assetTicker}
       reading={
         dividend.isProvisional
-          ? 'La cedola è provvisoria: manca la componente d’inflazione, quindi il netto qui sotto è un minimo, non l’incasso finale.'
+          ? 'La cedola è provvisoria: manca il dato d’inflazione del periodo, quindi il netto qui sotto è una stima, non l’incasso finale.'
           : `${dividend.assetName}. Il netto è già al netto della ritenuta e, per una valuta estera, convertito al cambio del pagamento.`
       }
       width="md"
@@ -81,7 +81,7 @@ export function DividendRecordDetailsDialog({
                 onSetInflationRate(dividend);
               }}
             >
-              Imposta tasso inflazione
+              Imposta inflazione
             </Button>
           )}
         </>
