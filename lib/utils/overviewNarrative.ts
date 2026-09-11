@@ -17,6 +17,8 @@ import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { formatPercentage } from '@/lib/services/chartService';
 import { MONTH_NAMES } from '@/lib/constants/months';
 import { atThePercent } from '@/lib/utils/patrimonioNarrative';
+import { resolveDeclineCause, type PeriodSalesSummary } from '@/lib/utils/periodSales';
+import { declineHeadlineTail, describeOwnFlowsSplit, describeSales } from '@/lib/utils/salesNarrative';
 
 import type { Narrative, NarrativeSegment, VerdictTone } from '@/lib/utils/narrative';
 
@@ -38,6 +40,11 @@ export interface OverviewVerdictInput {
   marketEffect: number | null;
   /** The asset class whose market price moved the most; null when none. */
   topMover: { assetClass: string; delta: number } | null;
+  /**
+   * The month's sells from the trade ledger, with the estimated tax withheld on them; null when
+   * nothing was sold, absent on a payload computed before the field existed.
+   */
+  sales?: PeriodSalesSummary | null;
 }
 
 export interface OverviewVerdict {
@@ -138,15 +145,18 @@ function resolveHeadline(input: OverviewVerdictInput): { headline: string; tone:
     return { headline: `${month} sta andando bene.`, tone: 'positive' };
   }
 
-  // A falling month: name the market only when the market actually lost money. When the
-  // market gained and the total still fell, the cause is the user's own flows.
-  if (input.marketEffect !== null && input.marketEffect >= 0) {
-    return { headline: `${month} è in calo, nonostante il mercato.`, tone: 'warning' };
-  }
-  if (input.marketEffect !== null) {
-    return { headline: `${month} è in calo: il mercato ha pesato.`, tone: 'negative' };
-  }
-  return { headline: `${month} è in calo.`, tone: 'negative' };
+  // A falling month: name the market only when the market actually lost money, and never the
+  // market ALONE when the ledger says the tax on a sale (or the user's own flows) weighed more —
+  // ONE decision for the three verdicts (`resolveDeclineCause`).
+  const cause = resolveDeclineCause({
+    marketEffect: input.marketEffect,
+    ownFlows: input.marketEffect === null ? null : input.monthlyVariation.value - input.marketEffect,
+    salesTax: input.sales?.estimatedTax ?? null,
+  });
+  return {
+    headline: `${month} è in calo${declineHeadlineTail(cause)}`,
+    tone: cause === 'despite-market' ? 'warning' : 'negative',
+  };
 }
 
 function buildDriverClause(topMover: { assetClass: string; delta: number }, leading: boolean): Narrative {
@@ -200,6 +210,15 @@ export function buildOverviewVerdict(input: OverviewVerdictInput): OverviewVerdi
 
   if (hasSavingsClause || (input.topMover && input.marketEffect !== null)) {
     sentence.push(prose('.'));
+  }
+
+  // The split between the market and everything the user did, then the sale that explains it:
+  // a month that fell by 4.900 € with the market at −1.100 € must not read as a market month.
+  if (input.monthlyVariation && input.marketEffect !== null) {
+    sentence.push(prose(' '), ...describeOwnFlowsSplit(input.monthlyVariation.value, input.marketEffect));
+  }
+  if (input.sales) {
+    sentence.push(prose(' '), ...describeSales(input.sales));
   }
 
   return { headline, tone, sentence };

@@ -16,6 +16,7 @@ const {
   settingsDocGetMock,
   expensesGetMock,
   goalDocGetMock,
+  assetTransactionsGetMock,
 } = vi.hoisted(() => ({
   overviewSummaryDocGetMock: vi.fn(),
   overviewSummaryDocSetMock: vi.fn(),
@@ -24,6 +25,8 @@ const {
   settingsDocGetMock: vi.fn(),
   expensesGetMock: vi.fn(),
   goalDocGetMock: vi.fn(),
+  // An empty ledger by default (clearAllMocks keeps the implementation); one test fills it.
+  assetTransactionsGetMock: vi.fn(async () => ({ docs: [] as unknown[] })),
 }));
 
 vi.mock('@/lib/firebase/admin', () => ({
@@ -92,6 +95,14 @@ vi.mock('@/lib/firebase/admin', () => ({
         return {
           where: vi.fn(() => ({
             get: vi.fn(async () => ({ docs: [] })),
+          })),
+        };
+      }
+
+      if (name === 'assetTransactions') {
+        return {
+          where: vi.fn(() => ({
+            get: assetTransactionsGetMock,
           })),
         };
       }
@@ -317,6 +328,19 @@ describe('dashboardOverviewService', () => {
       }),
     });
 
+    // The ledger of etf-1: an opening position and a sell inside the mocked month (April 2026),
+    // so the payload can name what left the portfolio besides the market.
+    const ledgerRow = (id: string, fields: Record<string, unknown>) => ({
+      id,
+      data: () => ({ userId: 'user-1', assetId: 'etf-1', priceEur: fields.pricePerUnit, createdAt: new Date('2026-01-10T10:00:00.000Z'), updatedAt: new Date('2026-01-10T10:00:00.000Z'), ...fields }),
+    });
+    assetTransactionsGetMock.mockResolvedValueOnce({
+      docs: [
+        ledgerRow('t-open', { type: 'buy', isBaseline: true, date: new Date('2026-01-10T10:00:00.000Z'), quantity: 60, pricePerUnit: 150 }),
+        ledgerRow('t-sell', { type: 'sell', date: new Date('2026-04-05T10:00:00.000Z'), quantity: 10, pricePerUnit: 200, fees: 5 }),
+      ],
+    });
+
     expensesGetMock
       .mockResolvedValueOnce({
         docs: [
@@ -412,7 +436,31 @@ describe('dashboardOverviewService', () => {
     expect(result.expenseStats?.currentMonth.expensesScheduled).toBe(250);
     expect(result.variations.monthly?.value).toBe(1000);
     expect(result.variations.monthly?.percentage).toBeCloseTo(5.2631578947, 6);
+    // 10 × 200 − 5 fees = 1.995 € of proceeds against a 150 € PMC: 495 € realized, 26% of it estimated.
+    expect(result.monthSales).toMatchObject({ proceeds: 1995, realizedGain: 495, brokenLedgers: 0 });
+    expect(result.monthSales?.estimatedTax).toBeCloseTo(128.7, 6);
+    expect(result.monthSales?.instruments).toEqual([
+      { id: 'etf-1', name: 'VWCE', proceeds: 1995, realizedGain: 495, estimatedTax: expect.closeTo(128.7, 6) },
+    ]);
     expect(overviewSummaryDocSetMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('publishes no sale when the month holds none, and survives a ledger read that fails', async () => {
+    overviewSummaryDocGetMock.mockResolvedValue({ exists: false });
+    assetsGetMock.mockResolvedValue({ docs: [] });
+    snapshotsGetMock.mockResolvedValue({ docs: [] });
+    settingsDocGetMock.mockResolvedValue({ exists: false });
+    expensesGetMock.mockResolvedValue({ docs: [] });
+
+    expect((await getDashboardOverview('user-1')).monthSales).toBeNull();
+
+    assetTransactionsGetMock.mockRejectedValueOnce(new Error('ledger down'));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect((await getDashboardOverview('user-1')).monthSales).toBeNull();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('trade ledger'), expect.anything());
+    warn.mockRestore();
+    errorLog.mockRestore();
   });
 });
 

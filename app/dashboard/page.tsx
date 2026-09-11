@@ -171,6 +171,7 @@ export default function DashboardPage() {
       savingsRate,
       marketEffect: overview.marketEffect ?? null,
       topMover: overview.topMovers?.[0] ?? null,
+      sales: overview.monthSales ?? null,
     });
   }, [overview, today.month, totalValue, savingsRate]);
 

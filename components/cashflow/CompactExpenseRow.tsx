@@ -25,6 +25,11 @@ export interface CompactExpenseRowProps {
   categoryColor?: string;
   /** The row is dated after today — listed, not yet happened. */
   scheduled?: boolean;
+  /**
+   * Whose row it is («Giuseppe», «Senza intestatario»), or null for a shared one — resolved by
+   * the parent through `resolveOwnerLabel`, only with Divisione on.
+   */
+  ownerLabel?: string | null;
 }
 
 /**
@@ -34,7 +39,8 @@ export interface CompactExpenseRowProps {
  *
  * A scheduled row (an instalment, a recurring occurrence dated ahead) takes an «In
  * calendario» chip and drops the sign colour on its amount: the sign tokens mean money
- * gained and money lost, and neither has happened yet.
+ * gained and money lost, and neither has happened yet. A row attributed to one person takes
+ * that person's name as a chip; the shared default stays clean.
  */
 export function CompactExpenseRow({
   expense,
@@ -42,6 +48,7 @@ export function CompactExpenseRow({
   categoryIcon,
   categoryColor,
   scheduled = false,
+  ownerLabel = null,
 }: Readonly<CompactExpenseRowProps>) {
   const isIncome = expense.type === 'income';
   const isTransfer = expense.type === 'transfer';
@@ -105,6 +112,11 @@ export function CompactExpenseRow({
           {scheduled && (
             <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 flex-shrink-0 text-muted-foreground">
               In calendario
+            </Badge>
+          )}
+          {ownerLabel && (
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 flex-shrink-0 text-muted-foreground">
+              {ownerLabel}
             </Badge>
           )}
         </div>

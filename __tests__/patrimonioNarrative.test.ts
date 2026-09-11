@@ -100,7 +100,29 @@ describe('buildPatrimonioVerdict — sentence', () => {
   it('should state value, monthly change, the counts and the instrument that drove the month', () => {
     expect(plain(buildPatrimonioVerdict(AUGUST).sentence)).toBe(
       'Il portafoglio vale 412.425,85 €: +3214,20 € (+0,79%) su luglio, 16 strumenti e 3 conti; ' +
-        'Vanguard FTSE All-World ha fatto il grosso (+2140 €).',
+        'Vanguard FTSE All-World ha fatto il grosso (+2140 €). ' +
+        'Di quel movimento, +2000 € viene dal mercato e +1214 € dai tuoi movimenti.',
+    );
+  });
+
+  it('should name the tax over the market and tell the sale, like the Panoramica', () => {
+    const verdict = buildPatrimonioVerdict({
+      ...AUGUST,
+      month: 9,
+      monthlyVariation: { value: -4937.74, percentage: -1.66 },
+      marketEffect: -1078.73,
+      topMover: { id: 'vwce', name: 'Vanguard FTSE All-World', delta: -600 },
+      sales: {
+        proceeds: 39052.45,
+        realizedGain: 15726.38,
+        estimatedTax: 4088.86,
+        instruments: [{ id: 'vwce', name: 'Vanguard FTSE All-World', proceeds: 39052.45, realizedGain: 15726.38, estimatedTax: 4088.86 }],
+        brokenLedgers: 0,
+      },
+    });
+    expect(verdict.headline).toBe('Il portafoglio è in calo: il mercato ha pesato, le tasse sulle vendite di più.');
+    expect(plain(verdict.sentence)).toContain(
+      'Di quel movimento, −1079 € viene dal mercato e −3859 € dai tuoi movimenti. Hai venduto Vanguard FTSE All-World per 39.052 €',
     );
   });
 
@@ -112,7 +134,8 @@ describe('buildPatrimonioVerdict — sentence', () => {
       topMover: { id: 'btc', name: 'Bitcoin', delta: -1800 },
     }).sentence;
     expect(plain(sentence)).toBe(
-      'Il portafoglio vale 412.425,85 €: −2100,00 € (−0,50%) su luglio, 16 strumenti e 3 conti; Bitcoin ha pesato (−1800 €).',
+      'Il portafoglio vale 412.425,85 €: −2100,00 € (−0,50%) su luglio, 16 strumenti e 3 conti; Bitcoin ha pesato (−1800 €). ' +
+        'Di quel movimento, −1500 € viene dal mercato e −600 € dai tuoi movimenti.',
     );
   });
 

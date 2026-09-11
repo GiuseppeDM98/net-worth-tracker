@@ -85,6 +85,47 @@ describe('buildOverviewVerdict — headline and tone', () => {
     expect(verdict.tone).toBe('warning');
   });
 
+  // September 2026 on the real account: −4.937,74 € with the market at −1.078,73 € and 4.088,86 €
+  // of estimated tax on a Vanguard sale — a fifth of the drop was the market's.
+  const SEPTEMBER_SALE = {
+    proceeds: 39052.45,
+    realizedGain: 15726.38,
+    estimatedTax: 4088.86,
+    instruments: [{ id: 'vwce', name: 'Vanguard FTSE All-World', proceeds: 39052.45, realizedGain: 15726.38, estimatedTax: 4088.86 }],
+    brokenLedgers: 0,
+  };
+  const SEPTEMBER: OverviewVerdictInput = {
+    ...AUGUST,
+    month: 9,
+    monthlyVariation: { value: -4937.74, percentage: -1.66 },
+    marketEffect: -1078.73,
+    topMover: { assetClass: 'equity', delta: -815.94 },
+    sales: SEPTEMBER_SALE,
+  };
+
+  it('should name the tax over the market when the estimated tax on a sale outweighs the market loss', () => {
+    const verdict = buildOverviewVerdict(SEPTEMBER);
+    expect(verdict.headline).toBe('Settembre è in calo: il mercato ha pesato, le tasse sulle vendite di più.');
+    expect(verdict.tone).toBe('negative');
+  });
+
+  it('should name both when the market lost more than the tax', () => {
+    const verdict = buildOverviewVerdict({ ...SEPTEMBER, marketEffect: -5000 });
+    expect(verdict.headline).toBe('Settembre è in calo: il mercato ha pesato, e con lui le tasse sulle vendite.');
+  });
+
+  it('should name the flows over the market when no sale explains them', () => {
+    const verdict = buildOverviewVerdict({ ...SEPTEMBER, sales: null });
+    expect(verdict.headline).toBe('Settembre è in calo: più per le uscite che per il mercato.');
+    expect(verdict.tone).toBe('negative');
+  });
+
+  it('should not let a taxed sale override «nonostante il mercato» when the market gained', () => {
+    const verdict = buildOverviewVerdict({ ...SEPTEMBER, marketEffect: 900, topMover: { assetClass: 'equity', delta: 900 } });
+    expect(verdict.headline).toBe('Settembre è in calo, nonostante il mercato.');
+    expect(verdict.tone).toBe('warning');
+  });
+
   it('should stay neutral and factual without a prior snapshot to compare against', () => {
     const verdict = buildOverviewVerdict({
       ...AUGUST,
@@ -116,7 +157,32 @@ describe('buildOverviewVerdict — sentence', () => {
     const text = plain(buildOverviewVerdict(AUGUST).sentence);
     expect(text).toBe(
       'Il patrimonio vale 412.380,52 €: +4120,18 € (+1,01%) su luglio, +8,29% da inizio anno, nuovo massimo storico. ' +
-        'Hai messo da parte il 40% delle entrate e le azioni hanno fatto il grosso del lavoro (+3480 €).',
+        'Hai messo da parte il 40% delle entrate e le azioni hanno fatto il grosso del lavoro (+3480 €). ' +
+        'Di quel movimento, +3980 € viene dal mercato e +140 € dai tuoi movimenti.',
+    );
+  });
+
+  it('should close on the split and the sale that explains it, in the same words as the email', () => {
+    const text = plain(
+      buildOverviewVerdict({
+        ...AUGUST,
+        month: 9,
+        isNewATH: false,
+        monthlyVariation: { value: -4937.74, percentage: -1.66 },
+        marketEffect: -1078.73,
+        topMover: { assetClass: 'equity', delta: -815.94 },
+        sales: {
+          proceeds: 39052.45,
+          realizedGain: 15726.38,
+          estimatedTax: 4088.86,
+          instruments: [{ id: 'vwce', name: 'Vanguard FTSE All-World', proceeds: 39052.45, realizedGain: 15726.38, estimatedTax: 4088.86 }],
+          brokenLedgers: 0,
+        },
+      }).sentence,
+    );
+    expect(text).toContain(
+      'le azioni hanno pesato (−816 €). Di quel movimento, −1079 € viene dal mercato e −3859 € dai tuoi movimenti. ' +
+        'Hai venduto Vanguard FTSE All-World per 39.052 € con una plusvalenza di 15.726 € e pagato circa 4089 € di tasse.',
     );
   });
 

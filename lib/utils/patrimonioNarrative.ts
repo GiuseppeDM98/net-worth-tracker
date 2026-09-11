@@ -20,6 +20,8 @@ import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { formatPercentageIt as formatPercentage } from '@/lib/utils/formatters';
 import { MONTH_NAMES } from '@/lib/constants/months';
 import { getItalyDate } from '@/lib/utils/dateHelpers';
+import { resolveDeclineCause, type PeriodSalesSummary } from '@/lib/utils/periodSales';
+import { declineHeadlineTail, describeOwnFlowsSplit, describeSales } from '@/lib/utils/salesNarrative';
 import type { Narrative, NarrativeSegment, PageVerdictModel, VerdictTone } from '@/lib/utils/narrative';
 
 export interface PatrimonioVerdictInput {
@@ -36,6 +38,11 @@ export interface PatrimonioVerdictInput {
   marketEffect: number | null;
   /** The instrument whose market price moved the most; null when none. */
   topMover: { id: string; name: string; delta: number } | null;
+  /**
+   * The month's sells from the trade ledger, with the estimated tax withheld on them; null when
+   * nothing was sold, absent on a payload computed before the field existed.
+   */
+  sales?: PeriodSalesSummary | null;
 }
 
 export type PatrimonioVerdict = PageVerdictModel;
@@ -144,7 +151,6 @@ function resolveHeadline(input: PatrimonioVerdictInput): { headline: string; ton
   }
 
   const marketLost = input.marketEffect !== null && input.marketEffect < 0;
-  const marketGained = input.marketEffect !== null && input.marketEffect >= 0;
 
   if (input.monthlyVariation.value >= 0) {
     // Grown while the market lost: the user's own flows did it, and the sentence must not
@@ -153,10 +159,18 @@ function resolveHeadline(input: PatrimonioVerdictInput): { headline: string; ton
     return { headline: 'Il portafoglio cresce.', tone: 'positive' };
   }
 
-  // A falling month is blamed on the market only when the market actually lost money.
-  if (marketGained) return { headline: 'Il portafoglio è in calo, nonostante il mercato.', tone: 'warning' };
-  if (marketLost) return { headline: 'Il portafoglio è in calo: il mercato ha pesato.', tone: 'negative' };
-  return { headline: 'Il portafoglio è in calo.', tone: 'negative' };
+  // A falling month is blamed on the market only when the market actually lost money — and never
+  // on the market alone when the tax on a sale or the user's own flows weighed more: the same
+  // decision the Panoramica and the email make (`resolveDeclineCause`).
+  const cause = resolveDeclineCause({
+    marketEffect: input.marketEffect,
+    ownFlows: input.marketEffect === null ? null : input.monthlyVariation.value - input.marketEffect,
+    salesTax: input.sales?.estimatedTax ?? null,
+  });
+  return {
+    headline: `Il portafoglio è in calo${declineHeadlineTail(cause)}`,
+    tone: cause === 'despite-market' ? 'warning' : 'negative',
+  };
 }
 
 /** ", 16 strumenti e 3 conti" — whichever counts are non-zero, in the singular when one. */
@@ -212,6 +226,14 @@ export function buildPatrimonioVerdict(input: PatrimonioVerdictInput): Patrimoni
   }
 
   sentence.push(prose('.'));
+
+  // The market-vs-flows split and the sale behind it, the same words the Panoramica prints.
+  if (input.monthlyVariation && input.marketEffect !== null) {
+    sentence.push(prose(' '), ...describeOwnFlowsSplit(input.monthlyVariation.value, input.marketEffect));
+  }
+  if (input.sales) {
+    sentence.push(prose(' '), ...describeSales(input.sales));
+  }
   return { headline, tone, sentence };
 }
 

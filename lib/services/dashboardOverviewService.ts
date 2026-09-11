@@ -25,6 +25,8 @@ import {
   type PensionMarketInput,
 } from '@/lib/utils/dashboardOverviewUtils';
 import { resolvePensionReturnStart } from '@/lib/utils/pensionReturn';
+import { summarizePeriodSales } from '@/lib/utils/periodSales';
+import { getAssetTransactionsAdmin } from '@/lib/server/assetAdminRepository';
 import type { PensionContribution } from '@/types/pension';
 import {
   calculateAnnualPortfolioCost,
@@ -555,6 +557,16 @@ async function recomputeDashboardOverview(userId: string): Promise<DashboardOver
   const holdsPensionFund = assets.some((a) => a.type === 'pensionFund' && a.quantity > 0);
   const pensionContributions = holdsPensionFund ? await getPensionContributionsForUser(userId) : [];
 
+  // The month's sells, so the verdict can name the tax that left with them; a failed read
+  // costs the sales clause, never the page.
+  let monthSales: DashboardOverviewPayload['monthSales'] = null;
+  try {
+    const transactions = await getAssetTransactionsAdmin(userId);
+    monthSales = summarizePeriodSales(assets, transactions, getMonthDateRangeInItaly(currentYear, currentMonth));
+  } catch (error) {
+    console.warn('[dashboardOverviewService] Failed to read the trade ledger, no sales clause:', error);
+  }
+
   let expenseStats: DashboardOverviewExpenseStats | null = null;
 
   try {
@@ -568,14 +580,10 @@ async function recomputeDashboardOverview(userId: string): Promise<DashboardOver
     console.warn('[dashboardOverviewService] Failed to compute expense stats, falling back to null:', error);
   }
 
-  const payloadWithoutFreshness = buildLiveOverviewPayload(
-    assets,
-    snapshots,
-    settings,
-    expenseStats,
-    goalData,
-    pensionContributions
-  );
+  const payloadWithoutFreshness = {
+    ...buildLiveOverviewPayload(assets, snapshots, settings, expenseStats, goalData, pensionContributions),
+    monthSales,
+  };
   const now = new Date();
 
   const summaryDoc: StoredDashboardOverviewSummary = {

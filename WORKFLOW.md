@@ -31,6 +31,13 @@
 4. **Always answer in Italian** when working on this repo. This applies to the conversational
    channel; code, identifiers and comments stay in English.
 
+5. **Questions and proposals are asked interactively** (2026-09-11). When a decision is the owner's —
+   which layers to build, on which surfaces, a wording — put it through the agent's interactive
+   question tool, one batch per topic, multi-select where the options are not exclusive and the
+   recommended option first; never a numbered list of questions in prose. The owner refines the
+   wording through the free-text answer («hai pagato», not «pagherai», for a tax the broker
+   withholds at the sale).
+
 ---
 
 ## 2. Guided verification (*collaudo guidato*)

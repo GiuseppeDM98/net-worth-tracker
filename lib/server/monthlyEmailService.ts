@@ -84,6 +84,8 @@ import { DEFAULT_ALERT_THRESHOLDS } from '@/types/budget';
 import type { BudgetAlert, BudgetItem } from '@/types/budget';
 import { type Expense, type ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
 import { summarizeExpenseSplit, type ExpenseSplitSummary } from '@/lib/utils/expenseSplitSummary';
+import { summarizePeriodSales, type PeriodSalesSummary } from '@/lib/utils/periodSales';
+import { getAssetTransactionsAdmin, getUserAssetsAdmin } from '@/lib/server/assetAdminRepository';
 import { describeMemberBalance, describeSplitBasis } from '@/lib/utils/expenseSplitNarrative';
 import { narrativeToText } from '@/lib/utils/narrative';
 import { getUserSnapshotsAdmin } from '@/lib/server/assetAdminRepository';
@@ -150,6 +152,10 @@ export interface MonthlyEmailData {
   // than rendering an empty box. Built from the SAME pure modules as Cashflow › Divisione, so
   // the email and the page can never print two different splits.
   expenseSplit?: ExpenseSplitSummary;
+  // The period's sells from the trade ledger, with the estimated tax withheld on them, so the
+  // verdict can name a taxed sale instead of calling it a market loss (lib/utils/periodSales.ts).
+  // null = nothing sold; undefined on data built before the field existed.
+  periodSales?: PeriodSalesSummary | null;
 }
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
@@ -1232,6 +1238,7 @@ export async function buildPeriodEmailData(
   const hallOfFameRank = await computeHallOfFameRank(userId, periodType, year, month);
 
   const expenseSplit = await buildExpenseSplitForPeriod(userId, expensesSnap.docs, new Date());
+  const periodSales = await buildPeriodSales(userId, windowStart, windowEnd);
 
   return {
     periodType,
@@ -1259,7 +1266,22 @@ export async function buildPeriodEmailData(
     hallOfFameRank,
     budgetAlerts,
     expenseSplit,
+    periodSales,
   };
+}
+
+/**
+ * The period's sells from the trade ledger, or null when nothing was sold — never blocks the
+ * email: a failed read costs the sales clause and the verdict falls back to the market rule.
+ */
+async function buildPeriodSales(userId: string, windowStart: Date, windowEnd: Date): Promise<PeriodSalesSummary | null> {
+  try {
+    const [assets, transactions] = await Promise.all([getUserAssetsAdmin(userId), getAssetTransactionsAdmin(userId)]);
+    return summarizePeriodSales(assets, transactions, { start: windowStart, end: windowEnd });
+  } catch (error) {
+    console.error(`[periodSales] Ledger read failed for user ${userId}:`, error);
+    return null;
+  }
 }
 
 /**
@@ -1330,9 +1352,14 @@ const RANKED_ROWS_SHOWN = 6;
  * `generateEmailHtml` does not receive). Null when there is no earlier snapshot: without a
  * baseline the movement itself is unknown, and an unattributable effect is not a zero one.
  */
+/**
+ * `Δ − risparmio netto + tasse stimate sulle vendite`: the residual the email calls «mercato». The
+ * tax is added BACK because it left the account without a cashflow row — inside the residual it
+ * read as a market loss (`PeriodEmailVerdictInput.marketEffect`).
+ */
 function marketEffectOf(data: MonthlyEmailData): number | null {
   if (data.previousNetWorth <= 0) return null;
-  return data.netWorthDelta - (data.totalIncome - data.totalExpenses);
+  return data.netWorthDelta - (data.totalIncome - data.totalExpenses) + (data.periodSales?.estimatedTax ?? 0);
 }
 
 /** The Hall of Fame standing, in the shape the verdict expects. */
@@ -1572,6 +1599,7 @@ export function generateEmailHtml(data: MonthlyEmailData, comparisonData?: Perio
     totalIncome: data.totalIncome,
     totalExpenses: data.totalExpenses,
     marketEffect,
+    sales: data.periodSales ?? null,
     rank: verdictRank(data),
   });
 
@@ -1617,7 +1645,7 @@ export function generateEmailHtml(data: MonthlyEmailData, comparisonData?: Perio
         netWorthDeltaPct: data.netWorthDeltaPct,
       }),
       body: emailHero(formatEur(data.currentNetWorth)) + emailKeyFigures(netWorthFigures),
-      footer: describeMarketSplit(marketEffect, savings),
+      footer: describeMarketSplit(marketEffect, savings, data.periodSales?.estimatedTax ?? null),
     }),
   );
 
