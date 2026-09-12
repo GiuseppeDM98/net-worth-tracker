@@ -42,7 +42,7 @@ import * as z from 'zod';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
-import { Asset, AssetFormData, AssetType, AssetClass, AllocationRole, AssetAllocationTarget, AssetComposition, CouponFrequency, BondDetails, CouponRateTier, AnnouncedInflationRate } from '@/types/assets';
+import { Asset, AssetFormData, AssetType, AssetClass, AllocationRole, AssetAllocationTarget, AssetComposition, CouponFrequency, BondDetails, BondInflationIndexation } from '@/types/assets';
 import type { PensionFundDetails } from '@/types/pension';
 import { createAsset, updateAsset, updateAssetMetadata } from '@/lib/services/assetService';
 import { isLedgerAssetType, type AssetTransactionFormData } from '@/types/assetTransactions';
@@ -55,6 +55,15 @@ import { formatCurrency, formatNumberIt, formatPercentageIt } from '@/lib/utils/
 import { resolveAllocationRole } from '@/lib/utils/allocationUtils';
 import { suggestIsLiquid } from '@/lib/utils/assetLiquidity';
 import { hasMarketPrice } from '@/lib/utils/assetPricing';
+import {
+  effectiveBondNominal,
+  isBondQuotedInPercent,
+  resolveBondPrice,
+  toBorsaItalianaQuote,
+  type BondQuoteBasis,
+} from '@/lib/utils/bondPricing';
+import { buildBondDetailsFromForm, NO_INFLATION_INDEXATION } from '@/lib/utils/bondDetailsForm';
+import { latestIndexationCoefficient, resolveInflationIndexation } from '@/lib/utils/couponUtils';
 import { scheduleNextCoupon, scheduleFinalPremium } from '@/lib/services/couponScheduling';
 import { getTargets, addSubCategory, getSettings } from '@/lib/services/assetAllocationService';
 import type { Settings } from '@/types/settings';
@@ -92,22 +101,24 @@ import { Switch } from '@/components/ui/switch';
 const shouldUpdatePrice = hasMarketPrice;
 
 /**
- * Converts a raw price to EUR for bonds using Borsa Italiana's % of par convention.
- * Example: rawPrice=104.2, nominalValue=1000 → 1042€
- * Passthrough for all other asset types or bonds without a qualifying nominal value.
- *
- * Exported so `TransactionDialog` reuses the SAME conversion (reuse, never
- * re-implement) — the trade ledger's `pricePerUnit` must mean exactly what `averageCost` means here.
+ * The scaling a bond's Borsa Italiana quote needs to become euro per unit
+ * (`lib/utils/bondPricing.ts`): the nominal per unit and, for a BTP€i only, the indexation
+ * coefficient the form carries. Used on every price the form resolves — the fetched quote, the
+ * manual price, the purchase price — so the three can never disagree about what a unit is worth.
  */
-export function resolveBondPrice(
-  rawPrice: number,
-  nominalValue: number | undefined,
-  isBondWithIsin: boolean
-): number {
-  if (isBondWithIsin && nominalValue && !isNaN(nominalValue) && nominalValue > 1) {
-    return rawPrice * (nominalValue / 100);
-  }
-  return rawPrice;
+function bondQuoteBasisOf(
+  data: Pick<AssetFormValues, 'bondNominalValue' | 'bondInflationIndexation' | 'bondIndexationCoefficient'>,
+  knownCoefficient: number | undefined
+): BondQuoteBasis {
+  const typed = data.bondIndexationCoefficient;
+  const hasTyped = typed !== undefined && !isNaN(typed) && typed > 0;
+  return {
+    nominalValue: data.bondNominalValue,
+    // An empty field falls back to the latest coefficient the bond already knows: the price this
+    // save stores must agree with what the nightly cron will store from the same list (owner's
+    // tour, 2026-09-11: an emptied field saved a quote without its coefficient).
+    indexationCoefficient: data.bondInflationIndexation === 'euro' ? (hasTyped ? typed : knownCoefficient) : undefined,
+  };
 }
 
 /**
@@ -118,7 +129,7 @@ export function resolveBondPrice(
 async function fetchMarketPrice(
   ticker: string,
   isin: string | undefined,
-  bondNominalValue: number | undefined,
+  bondQuoteBasis: BondQuoteBasis,
   isBondWithIsin: boolean
 ): Promise<{ price: number; currency?: string; priceEur?: number }> {
   try {
@@ -136,7 +147,7 @@ async function fetchMarketPrice(
     const quote = await response.json();
 
     if (quote.price && quote.price > 0) {
-      const price = resolveBondPrice(quote.price, bondNominalValue, isBondWithIsin);
+      const price = resolveBondPrice(quote.price, bondQuoteBasis, isBondWithIsin);
       const currency: string | undefined = quote.currency?.trim() || undefined;
       const priceEur: number | undefined = quote.currentPriceEur > 0 ? quote.currentPriceEur : undefined;
       toast.success(`Prezzo recuperato da ${source}: ${formatNumberIt(price)} ${quote.currency}`);
@@ -154,49 +165,6 @@ async function fetchMarketPrice(
     toast.error('Errore nel recupero del prezzo. Puoi inserire manualmente il prezzo nel campo apposito.');
     return { price: 0 };
   }
-}
-
-/**
- * Assembles a BondDetails object from validated form values.
- * Returns undefined when the bond details section is hidden or required fields are missing.
- */
-function buildBondDetailsFromForm(
-  data: AssetFormValues,
-  showBondDetails: boolean,
-  showStepUp: boolean,
-  existingInflationRates?: AnnouncedInflationRate[]
-): BondDetails | undefined {
-  if (
-    !showBondDetails ||
-    !data.bondCouponRate || isNaN(data.bondCouponRate) ||
-    !data.bondCouponFrequency ||
-    !data.bondIssueDate ||
-    !data.bondMaturityDate
-  ) {
-    return undefined;
-  }
-
-  const isInflationLinked = !!data.bondIsInflationLinked;
-
-  return {
-    couponRate: data.bondCouponRate,
-    couponFrequency: data.bondCouponFrequency,
-    issueDate: new Date(data.bondIssueDate),
-    maturityDate: new Date(data.bondMaturityDate),
-    ...(data.bondNominalValue && !isNaN(data.bondNominalValue) ? { nominalValue: data.bondNominalValue } : {}),
-    ...(showStepUp && data.bondCouponRateSchedule && data.bondCouponRateSchedule.length > 0
-      ? { couponRateSchedule: data.bondCouponRateSchedule as CouponRateTier[] }
-      : {}),
-    ...(data.bondFinalPremiumRate && !isNaN(data.bondFinalPremiumRate)
-      ? { finalPremiumRate: data.bondFinalPremiumRate }
-      : {}),
-    ...(isInflationLinked ? { isInflationLinked: true } : {}),
-    // Preserve announced FOI rates across asset edits — they are managed from the
-    // Dividendi tab, not this form. Dropped when the bond is no longer inflation-linked.
-    ...(isInflationLinked && existingInflationRates && existingInflationRates.length > 0
-      ? { announcedInflationRates: existingInflationRates }
-      : {}),
-  };
 }
 
 /**
@@ -226,7 +194,8 @@ function buildPensionFundDetailsFromForm(data: AssetFormValues): PensionFundDeta
 /**
  * Builds the AssetFormData payload from resolved form values and price data.
  * averageCost uses the same Borsa Italiana % of par convention as currentPrice:
- * entered as BI price, stored in EUR (e.g. user enters 100 → stored as nominalValue€).
+ * entered as BI price, stored in EUR (e.g. user enters 100 → stored as nominalValue€ per unit,
+ * 1 € per unit when the nominal is left empty).
  */
 function buildAssetFormDataFromValues(
   data: AssetFormValues,
@@ -234,7 +203,8 @@ function buildAssetFormDataFromValues(
   fetchedCurrentPriceEur: number | undefined,
   isComposite: boolean,
   composition: AssetComposition[],
-  isBondWithIsin: boolean
+  isBondWithIsin: boolean,
+  knownCoefficient: number | undefined
 ): AssetFormData {
   return {
     ticker: data.ticker,
@@ -248,7 +218,7 @@ function buildAssetFormDataFromValues(
     quantity: data.quantity,
     averageCost:
       data.averageCost && !isNaN(data.averageCost) && data.averageCost > 0
-        ? resolveBondPrice(data.averageCost, data.bondNominalValue, isBondWithIsin)
+        ? resolveBondPrice(data.averageCost, bondQuoteBasisOf(data, knownCoefficient), isBondWithIsin)
         : undefined,
     // `data.taxRate &&` would treat an explicit 0 as falsy and drop it like an empty field;
     // `!== undefined` + `!isNaN` together already exclude the empty-input case (valueAsNumber → NaN).
@@ -412,9 +382,12 @@ const assetSchema = z.object({
   })).optional(),
   // Final premium at maturity (optional, e.g. BTP Valore 0.8%)
   bondFinalPremiumRate: z.number().min(0).max(100).optional().or(z.nan()),
-  // Inflation-linked (BTP Italia Sì): coupon = fixed minimum + announced FOI inflation.
-  // The announced rates themselves are managed from the Dividendi tab, not this form.
-  bondIsInflationLinked: z.boolean().optional(),
+  // Inflation mechanism: `italia` (BTP Italia: coupon = fixed minimum + announced FOI inflation),
+  // `euro` (BTP€i: coupon = real rate × indexation coefficient), `none`. The announced figures
+  // themselves are managed from the Dividendi tab, not this form — except the BTP€i's coefficient
+  // read today, which the form takes so the price it saves carries the accrued revaluation.
+  bondInflationIndexation: z.enum([NO_INFLATION_INDEXATION, 'italia', 'euro']).optional(),
+  bondIndexationCoefficient: z.number().positive('Il coefficiente deve essere positivo').optional().or(z.nan()),
   // Fondo pensione details (type 'pensionFund' only) — dates as ISO strings (types/pension.ts).
   // enrollmentDate/firstEmploymentDate/isFirstEmploymentPost2007 were removed from this form: they
   // were never read by any calculation (only unlockDate is, for the FIRE lock-in), and now that RAL
@@ -577,7 +550,8 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
   const watchBondCouponRate = useWatch({ control, name: 'bondCouponRate' });
   const watchBondCouponFrequency = useWatch({ control, name: 'bondCouponFrequency' });
   const watchBondFinalPremiumRate = useWatch({ control, name: 'bondFinalPremiumRate' });
-  const watchBondIsInflationLinked = useWatch({ control, name: 'bondIsInflationLinked' });
+  const watchBondInflationIndexation = useWatch({ control, name: 'bondInflationIndexation' });
+  const watchBondIndexationCoefficient = useWatch({ control, name: 'bondIndexationCoefficient' });
   const watchAverageCost = useWatch({ control, name: 'averageCost' });
   const watchIsPrimaryResidence = useWatch({ control, name: 'isPrimaryResidence' });
   const watchAllocationRole = useWatch({ control, name: 'allocationRole' });
@@ -595,14 +569,29 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
   const ledgerCreateReady = isLedgerCreate && ledgerMeta != null;
   const todayIso = isoDateToday();
   const baselineIso = ledgerMeta ? ledgerMeta.baselineDate.toISOString().split('T')[0] : undefined;
-  // True when the bond qualifies for % of par ↔ EUR conversion:
-  // must have ISIN (triggers Borsa Italiana pricing) AND nominalValue > 1.
-  // Used to conditionally show % labels and apply the conversion on save.
-  const isBondPctMode =
-    selectedType === 'bond' &&
-    selectedAssetClass === 'bonds' &&
-    !!(watchIsin ?? '').trim() &&
-    (watchBondNominalValue ?? 0) > 1;
+  // True when the bond's prices are Borsa Italiana quotes (% of par ↔ EUR conversion): a bond with
+  // an ISIN, whatever its nominal — with the field empty one unit is 1 € of nominal
+  // (`lib/utils/bondPricing.ts`). Used to show the % labels and apply the conversion on save.
+  const isBondPctMode = isBondQuotedInPercent({
+    type: selectedType,
+    assetClass: selectedAssetClass,
+    isin: watchIsin,
+  });
+  const isEuroIndexed = watchBondInflationIndexation === 'euro';
+  // The latest coefficient the saved bond already knows (today or earlier) — the fallback of every
+  // price the form resolves when the coefficient field is left empty.
+  const knownCoefficient =
+    asset?.bondDetails && resolveInflationIndexation(asset.bondDetails) === 'euro'
+      ? (latestIndexationCoefficient(asset.bondDetails.indexationCoefficients, new Date()) ?? undefined)
+      : undefined;
+  const bondQuoteBasis = bondQuoteBasisOf(
+    {
+      bondNominalValue: watchBondNominalValue,
+      bondInflationIndexation: watchBondInflationIndexation,
+      bondIndexationCoefficient: watchBondIndexationCoefficient,
+    },
+    knownCoefficient
+  );
 
   // Field visibility based on asset type — applies to both create and edit modes.
   const newAsset_showTicker = selectedType !== 'cash' && selectedType !== 'realestate' && selectedType !== 'pensionFund';
@@ -775,21 +764,23 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
         subCategory: asset.subCategory || '',
         currency: asset.currency,
         quantity: asset.quantity,
-        // For bonds with ISIN and nominalValue > 1, both currentPrice and averageCost are
-        // stored in EUR but both form fields use the Borsa Italiana convention (price
-        // per 100€ of nominal, same as what the user sees on BI). Back-convert so the
-        // round-trip is consistent: Firestore (EUR) → form (BI price) → onSubmit → Firestore (EUR).
-        // Example: currentPrice=1042€, nominalValue=1000 → show 104.2 in form.
-        //          averageCost=1000€, nominalValue=1000 → show 100 in form.
+        // For bonds with ISIN, both currentPrice and averageCost are stored in EUR per unit but
+        // both form fields use the Borsa Italiana convention (price per 100€ of nominal, same as
+        // what the user sees on BI). Back-convert so the round-trip is consistent:
+        // Firestore (EUR) → form (BI price) → onSubmit → Firestore (EUR).
+        // Example: currentPrice=1042€, nominalValue=1000 → show 104.2 in form;
+        //          currentPrice=0.93€, no nominal → show 93. A BTP€i divides by its latest
+        //          coefficient too (the PMC by today's, an approximation the field says).
         ...((): { manualPrice: number | undefined; averageCost: number | undefined } => {
-          const bondNominal = asset.bondDetails?.nominalValue;
-          const isBondPct =
-            asset.type === 'bond' &&
-            asset.assetClass === 'bonds' &&
-            !!asset.isin &&
-            !!bondNominal &&
-            bondNominal > 1;
-          const toBI = (eurVal: number) => eurVal / (bondNominal! / 100);
+          const isBondPct = isBondQuotedInPercent(asset);
+          const basis: BondQuoteBasis = {
+            nominalValue: asset.bondDetails?.nominalValue,
+            indexationCoefficient:
+              asset.bondDetails && resolveInflationIndexation(asset.bondDetails) === 'euro'
+                ? (latestIndexationCoefficient(asset.bondDetails.indexationCoefficients, new Date()) ?? undefined)
+                : undefined,
+          };
+          const toBI = (eurVal: number) => toBorsaItalianaQuote(eurVal, basis);
           return {
             manualPrice: asset.currentPrice > 0
               ? (isBondPct ? toBI(asset.currentPrice) : asset.currentPrice)
@@ -834,7 +825,8 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
         setValue('bondMaturityDate', toDateStr(bd.maturityDate));
         setValue('bondNominalValue', bd.nominalValue);
         setValue('bondFinalPremiumRate', bd.finalPremiumRate);
-        setValue('bondIsInflationLinked', !!bd.isInflationLinked);
+        setValue('bondInflationIndexation', resolveInflationIndexation(bd) ?? NO_INFLATION_INDEXATION);
+        setValue('bondIndexationCoefficient', latestIndexationCoefficient(bd.indexationCoefficients, new Date()) ?? undefined);
         replaceTiers(bd.couponRateSchedule && bd.couponRateSchedule.length > 0 ? bd.couponRateSchedule : []);
       }
     } else {
@@ -869,7 +861,8 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
         bondNominalValue: undefined,
         bondCouponRateSchedule: [],
         bondFinalPremiumRate: undefined,
-        bondIsInflationLinked: false,
+        bondInflationIndexation: NO_INFLATION_INDEXATION,
+        bondIndexationCoefficient: undefined,
         pensionProvider: undefined,
         pensionUnlockDate: undefined,
         pensionFamilyMemberId: '__none__',
@@ -1051,14 +1044,14 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
       if (ledgerCreateFlow) {
         ledgerOpeningPrice =
           data.averageCost && !isNaN(data.averageCost) && data.averageCost > 0
-            ? resolveBondPrice(data.averageCost, data.bondNominalValue, isBondWithIsin)
+            ? resolveBondPrice(data.averageCost, bondQuoteBasisOf(data, knownCoefficient), isBondWithIsin)
             : 0;
         if (ledgerOpeningPrice <= 0) {
           setStatus({ phase: 'error', message: 'Serve un prezzo di acquisto maggiore di zero.' });
           return;
         }
         if (shouldUpdatePrice(data.type, data.subCategory)) {
-          const fetched = await fetchMarketPrice(data.ticker, data.isin, data.bondNominalValue, isBondWithIsin);
+          const fetched = await fetchMarketPrice(data.ticker, data.isin, bondQuoteBasisOf(data, knownCoefficient), isBondWithIsin);
           if (fetched.price > 0) {
             currentPrice = fetched.price;
             if (fetched.currency) data.currency = fetched.currency;
@@ -1070,19 +1063,19 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
           currentPrice = ledgerOpeningPrice;
         }
       } else if (data.manualPrice && !isNaN(data.manualPrice) && data.manualPrice > 0) {
-        currentPrice = resolveBondPrice(data.manualPrice, data.bondNominalValue, isBondWithIsin);
+        currentPrice = resolveBondPrice(data.manualPrice, bondQuoteBasisOf(data, knownCoefficient), isBondWithIsin);
         toast.success(`Prezzo manuale impostato: ${formatNumberIt(currentPrice)} ${data.currency}`);
       } else if (shouldUpdatePrice(data.type, data.subCategory)) {
-        const fetched = await fetchMarketPrice(data.ticker, data.isin, data.bondNominalValue, isBondWithIsin);
+        const fetched = await fetchMarketPrice(data.ticker, data.isin, bondQuoteBasisOf(data, knownCoefficient), isBondWithIsin);
         currentPrice = fetched.price;
         if (fetched.currency) data.currency = fetched.currency;
         fetchedCurrentPriceEur = fetched.priceEur;
       }
 
       // Step 2: Assemble bond details and full form payload
-      const bondDetailsValue = buildBondDetailsFromForm(data, showBondDetails, showStepUp, asset?.bondDetails?.announcedInflationRates);
+      const bondDetailsValue = buildBondDetailsFromForm(data, showBondDetails, showStepUp, asset?.bondDetails, new Date());
       const formData: AssetFormData = {
-        ...buildAssetFormDataFromValues(data, currentPrice, fetchedCurrentPriceEur, isComposite, composition, isBondWithIsin),
+        ...buildAssetFormDataFromValues(data, currentPrice, fetchedCurrentPriceEur, isComposite, composition, isBondWithIsin, knownCoefficient),
         bondDetails: bondDetailsValue,
       };
 
@@ -1145,6 +1138,8 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
           quantity: openingQty,
           pricePerUnit: ledgerOpeningPrice, // the historical purchase price (bond/GBp-resolved in Step 1)
           linkedCashAssetId: settlement,
+          // A BTP€i's opening price was scaled by the form's coefficient: the trade remembers it.
+          indexationCoefficient: isBondWithIsin ? bondQuoteBasisOf(data, knownCoefficient).indexationCoefficient : undefined,
         };
         try {
           await createTradeMutation.mutateAsync(firstBuy);
@@ -1672,7 +1667,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                   <Input
                     id="averageCost"
                     type="number"
-                    step="0.0001"
+                    step="any"
                     min="0"
                     {...register('averageCost', { valueAsNumber: true })}
                     placeholder={isBondPctMode ? 'es. 100' : 'es. 85.1234'}
@@ -1682,12 +1677,12 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                   )}
                   {isBondPctMode && (() => {
                     const biPrice = watchAverageCost;
-                    const nominal = watchBondNominalValue;
-                    if (!biPrice || isNaN(biPrice) || !nominal) return null;
-                    const eurVal = biPrice * (nominal / 100);
+                    if (!biPrice || isNaN(biPrice)) return null;
+                    const eurVal = resolveBondPrice(biPrice, bondQuoteBasis, true);
                     return (
                       <p className="text-xs font-medium text-primary">
-                        ≈ {eurVal.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€ per unità
+                        ≈ {formatNumberIt(eurVal, 4)} € per unità
+                        {isEuroIndexed ? ' (al coefficiente di indicizzazione inserito sotto)' : ''}
                       </p>
                     );
                   })()}
@@ -2105,7 +2100,8 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                       setValue('bondNominalValue', undefined);
                       setValue('bondCouponRateSchedule', []);
                       setValue('bondFinalPremiumRate', undefined);
-                      setValue('bondIsInflationLinked', false);
+                      setValue('bondInflationIndexation', NO_INFLATION_INDEXATION);
+                      setValue('bondIndexationCoefficient', undefined);
                       setShowStepUp(false);
                     }
                   }}
@@ -2114,29 +2110,69 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
 
               {showBondDetails && (
                 <div className="mt-4 space-y-4">
-                  {/* Inflation-linked toggle (BTP Italia Sì): changes the coupon-rate semantics below */}
-                  <div className="flex items-start gap-2 rounded-md border border-dashed p-3">
-                    <input
-                      type="checkbox"
-                      id="bondIsInflationLinked"
-                      checked={!!watchBondIsInflationLinked}
-                      onChange={(e) => setValue('bondIsInflationLinked', e.target.checked)}
-                      className="mt-0.5 h-4 w-4 rounded"
-                    />
-                    <div className="space-y-0.5">
-                      <Label htmlFor="bondIsInflationLinked" className="cursor-pointer font-normal">
-                        Indicizzata all&apos;inflazione (FOI)
-                      </Label>
+                  {/* Inflation mechanism (BTP Italia vs BTP€i): changes the coupon-rate semantics below
+                      and, for a BTP€i, the euro value of every Borsa Italiana quote (issue #341). */}
+                  <div className="space-y-3 rounded-md border border-dashed p-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="bondInflationIndexation">Indicizzazione all&apos;inflazione</Label>
+                      <Select
+                        value={watchBondInflationIndexation ?? NO_INFLATION_INDEXATION}
+                        // The coefficient field is left alone on a switch: the builder and the price
+                        // basis ignore it unless the mechanism is `euro`, and clearing it lost the
+                        // value on a switch-and-back (owner's tour, 2026-09-11).
+                        onValueChange={(value) =>
+                          setValue('bondInflationIndexation', value as BondInflationIndexation | typeof NO_INFLATION_INDEXATION)
+                        }
+                      >
+                        <SelectTrigger id="bondInflationIndexation" aria-label="Indicizzazione all'inflazione">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={NO_INFLATION_INDEXATION}>Nessuna (tasso fisso o step-up)</SelectItem>
+                          <SelectItem value="italia">BTP Italia — inflazione italiana FOI, pagata con la cedola</SelectItem>
+                          <SelectItem value="euro">BTP€i — inflazione europea HICP, accumulata nel coefficiente</SelectItem>
+                        </SelectContent>
+                      </Select>
                       <p className="text-xs text-muted-foreground">
-                        Cedola = tasso fisso minimo garantito + inflazione FOI del periodo (es. BTP Italia Sì).
-                        Il tasso d&apos;inflazione annunciato si inserisce dalla tab Dividendi prima di ogni stacco.
+                        {watchBondInflationIndexation === 'italia'
+                          ? "Cedola = tasso fisso minimo garantito + inflazione FOI del periodo, capitale rimborsato alla pari. Il tasso d'inflazione annunciato si inserisce dalla tab Dividendi prima di ogni stacco."
+                          : isEuroIndexed
+                            ? 'Cedola = tasso reale × coefficiente di indicizzazione alla data di stacco; la rivalutazione del capitale si accumula nel coefficiente e si incassa a scadenza. Il coefficiente alla data di stacco si inserisce dalla tab Dividendi.'
+                            : 'Per un BTP Italia o un BTP€i scegli il meccanismo: cambia come si calcola la cedola e, per il BTP€i, quanto vale in euro la quotazione.'}
                       </p>
                     </div>
+                    {isEuroIndexed && (
+                      <div className="space-y-2">
+                        <Label htmlFor="bondIndexationCoefficient">Coefficiente di indicizzazione di oggi</Label>
+                        <Input
+                          id="bondIndexationCoefficient"
+                          type="number"
+                          step="0.00001"
+                          min="0"
+                          inputMode="decimal"
+                          {...register('bondIndexationCoefficient', { valueAsNumber: true })}
+                          placeholder="es. 1.23456"
+                        />
+                        {errors.bondIndexationCoefficient && (
+                          <p className="text-sm text-destructive">{errors.bondIndexationCoefficient.message}</p>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          Dalla tabella giornaliera del MEF o dal contratto della banca. Moltiplica la quotazione di Borsa
+                          Italiana (che è reale) per dare il valore in euro; vale anche per il prezzo di acquisto inserito
+                          qui — se il coefficiente del giorno d&apos;acquisto era diverso, correggi l&apos;operazione dal
+                          Registro. Senza coefficiente il valore resta al nominale reale (coefficiente 1).
+                        </p>
+                      </div>
+                    )}
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="bondCouponRate">
-                        {watchBondIsInflationLinked ? 'Tasso Fisso Minimo Garantito (% annuo)' : 'Tasso Cedolare Annuo (%)'}
+                        {watchBondInflationIndexation === 'italia'
+                          ? 'Tasso Fisso Minimo Garantito (% annuo)'
+                          : isEuroIndexed
+                            ? 'Tasso Reale Annuo (%)'
+                            : 'Tasso Cedolare Annuo (%) — 0 per uno zero coupon'}
                       </Label>
                       <Input
                         id="bondCouponRate"
@@ -2200,7 +2236,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                   <div className="space-y-2">
                     <Label htmlFor="bondNominalValue">
                       Valore Nominale per Unità ({watchCurrency}){' '}
-                      <span className="text-muted-foreground/70 font-normal">(opzionale)</span>
+                      <span className="text-muted-foreground/70 font-normal">(opzionale, 1 se vuoto)</span>
                     </Label>
                     <Input
                       id="bondNominalValue"
@@ -2213,31 +2249,44 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                     {errors.bondNominalValue && (
                       <p className="text-sm text-destructive">{errors.bondNominalValue.message}</p>
                     )}
-                    {/* Dynamic coupon preview based on current form values */}
+                    {/* Dynamic coupon preview based on current form values. The nominal defaults to 1 €
+                        exactly as the saved bond will (effectiveBondNominal), so the preview and the
+                        first materialised coupon agree. A rate of 0 is a zero coupon: no preview. */}
                     {(() => {
                       const rate = watchBondCouponRate;
                       const freq = watchBondCouponFrequency;
-                      const nominal = watchBondNominalValue;
+                      const nominal = effectiveBondNominal(watchBondNominalValue);
                       const qty = watchQuantity;
                       const periodsMap: Record<string, number> = { monthly: 12, quarterly: 4, semiannual: 2, annual: 1 };
                       const periods = freq ? periodsMap[freq] : null;
-                      if (rate && !isNaN(rate) && periods && nominal && !isNaN(nominal) && nominal > 0 && qty > 0) {
-                        const perShare = (rate / 100 / periods) * nominal;
+                      if (rate && !isNaN(rate) && periods && qty > 0) {
+                        const coefficient = isEuroIndexed && watchBondIndexationCoefficient && !isNaN(watchBondIndexationCoefficient) && watchBondIndexationCoefficient > 0
+                          ? watchBondIndexationCoefficient
+                          : 1;
+                        const perShare = (rate / 100 / periods) * nominal * coefficient;
                         const total = perShare * qty;
+                        const label = watchBondInflationIndexation === 'italia'
+                          ? 'Cedola minima (solo fisso)'
+                          : isEuroIndexed
+                            ? `Cedola stimata (al coefficiente ${formatNumberIt(coefficient, 5)})`
+                            : 'Cedola stimata';
                         return (
                           <p className="text-xs text-primary font-medium">
-                            → {watchBondIsInflationLinked ? 'Cedola minima (solo fisso)' : 'Cedola stimata'}: {formatNumberIt(perShare)} {watchCurrency}/unità × {formatNumberIt(qty, 0)} = {formatNumberIt(total)} {watchCurrency} per pagamento
-                            {watchBondIsInflationLinked && (
+                            → {label}: {formatNumberIt(perShare, 4)} {watchCurrency}/unità × {formatNumberIt(qty, 0)} = {formatNumberIt(total)} {watchCurrency} per pagamento
+                            {watchBondInflationIndexation === 'italia' && (
                               <span className="block font-normal text-muted-foreground">La componente inflazione FOI si aggiunge a ogni periodo (inserita dalla tab Dividendi).</span>
+                            )}
+                            {isEuroIndexed && (
+                              <span className="block font-normal text-muted-foreground">Ogni cedola usa il coefficiente alla sua data di stacco (inserito dalla tab Dividendi).</span>
                             )}
                           </p>
                         );
                       }
                       return (
                         <div className="text-xs text-muted-foreground space-y-1">
-                          <p>Valore faccia per singola unità nella tua valuta.</p>
-                          <p>• Hai 5 lotti da €1000 (qty=5) → inserisci <strong>1000</strong></p>
-                          <p>• Hai qty=5000 e ogni unità vale €1 → inserisci <strong>1</strong></p>
+                          <p>Valore facciale di una unità nella tua valuta: decide cosa conta la quantità.</p>
+                          <p>• Quantità = nominale in euro, come sull&apos;estratto del broker (5.000 € di BTP → quantità 5000) → <strong>lascia vuoto</strong></p>
+                          <p>• Quantità = lotti da 1.000 € (5 lotti → quantità 5) → inserisci <strong>1000</strong></p>
                         </div>
                       );
                     })()}
@@ -2348,14 +2397,14 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                     )}
                     {(() => {
                       const premRate = watchBondFinalPremiumRate;
-                      const nominal = watchBondNominalValue;
+                      const nominal = effectiveBondNominal(watchBondNominalValue);
                       const qty = watchQuantity;
-                      if (premRate && !isNaN(premRate) && nominal && !isNaN(nominal) && nominal > 0 && qty > 0) {
+                      if (premRate && !isNaN(premRate) && qty > 0) {
                         const perShare = (premRate / 100) * nominal;
                         const total = perShare * qty;
                         return (
                           <p className="text-xs text-primary font-medium">
-                            → Premio stimato: {formatNumberIt(perShare)} {watchCurrency}/unità × {formatNumberIt(qty, 0)} = {formatNumberIt(total)} {watchCurrency} alla scadenza
+                            → Premio stimato: {formatNumberIt(perShare, 4)} {watchCurrency}/unità × {formatNumberIt(qty, 0)} = {formatNumberIt(total)} {watchCurrency} alla scadenza
                           </p>
                         );
                       }
@@ -2423,7 +2472,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                     <Input
                       id="averageCost"
                       type="number"
-                      step="0.0001"
+                      step="any"
                       min="0"
                       {...register('averageCost', { valueAsNumber: true })}
                       placeholder={isBondPctMode ? 'es. 100 (acquistato a 100 su Borsa Italiana)' : 'es. 85.1234'}
@@ -2438,12 +2487,12 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
                     </p>
                     {isBondPctMode && (() => {
                       const biPrice = watchAverageCost;
-                      const nominal = watchBondNominalValue;
-                      if (!biPrice || isNaN(biPrice) || !nominal) return null;
-                      const eurVal = biPrice * (nominal / 100);
+                      if (!biPrice || isNaN(biPrice)) return null;
+                      const eurVal = resolveBondPrice(biPrice, bondQuoteBasis, true);
                       return (
                         <p className="text-xs font-medium text-primary">
-                          ≈ {eurVal.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€ per unità
+                          ≈ {formatNumberIt(eurVal, 4)} € per unità
+                          {isEuroIndexed ? ' (al coefficiente di indicizzazione inserito sotto)' : ''}
                         </p>
                       );
                     })()}
@@ -2633,10 +2682,13 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
           {shouldUpdatePrice(selectedType, selectedSubCategory) && !isLedgerCreate && (
             <div className="space-y-2">
               <Label htmlFor="manualPrice">Prezzo Manuale (opzionale)</Label>
+              {/* `step="any"`: on edit the field is prefilled with the stored price back-converted to a
+                  Borsa Italiana quote, which carries five decimals (97,38726) — a fixed step made the
+                  browser's native validation refuse the form's own value (found 2026-09-11). */}
               <Input
                 id="manualPrice"
                 type="number"
-                step="0.0001"
+                step="any"
                 {...register('manualPrice', { valueAsNumber: true })}
                 placeholder={
                   isBondPctMode
@@ -2649,7 +2701,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade }: AssetDial
               )}
               <p className="text-xs text-muted-foreground">
                 {isBondPctMode
-                  ? `Inserire come % del nominale (es. 104.20 per un BTP quotato a 104.20% di 1000€ → prezzo salvato come 1042€/unità). Lascia vuoto per recupero automatico da ${priceSource}.`
+                  ? `Inserire come % del nominale, come su Borsa Italiana (es. 104.20 → ${formatNumberIt(resolveBondPrice(104.2, bondQuoteBasis, true), 4)} € per unità con il nominale indicato sotto${isEuroIndexed ? ' e il coefficiente di indicizzazione' : ''}). Lascia vuoto per recupero automatico da ${priceSource}.`
                   : `Se inserisci un prezzo manuale, questo verrà utilizzato al posto del recupero automatico da ${priceSource}.`}
               </p>
             </div>

@@ -61,6 +61,7 @@ import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { getExpenseDate } from '@/lib/utils/expenseHelpers';
 import { isScheduledRow } from '@/lib/utils/tracciamentoSummary';
+import { resolveOwnerLabel } from '@/lib/utils/movementsOwnerFilter';
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const;
 type PageSizeOption = (typeof PAGE_SIZE_OPTIONS)[number];
@@ -78,9 +79,14 @@ interface ExpenseTableProps {
    * occurrences) that the figures above it do not count. Omitted → nothing is marked.
    */
   now?: Date;
+  /**
+   * memberId → name for the owner chip (Cashflow › Divisione); null or omitted when the feature
+   * is off, so no row is labelled by a feature the account does not use.
+   */
+  memberNames?: Map<string, string> | null;
 }
 
-export function ExpenseTable({ expenses, onEdit, onRefresh, isDemo = false, hasActiveFilters = false, categories = [], now }: ExpenseTableProps) {
+export function ExpenseTable({ expenses, onEdit, onRefresh, isDemo = false, hasActiveFilters = false, categories = [], now, memberNames = null }: ExpenseTableProps) {
   const { user } = useAuth();
   const { ownerId } = useActiveAccount();
   const queryClient = useQueryClient();
@@ -457,6 +463,7 @@ export function ExpenseTable({ expenses, onEdit, onRefresh, isDemo = false, hasA
           <TableBody>
             {paginatedExpenses.map((expense: Expense) => {
             const scheduled = now ? isScheduledRow(expense, now) : false;
+            const ownerLabel = memberNames ? resolveOwnerLabel(expense, memberNames) : null;
             return (
             <TableRow key={expense.id}>
               <TableCell className="font-medium text-sm">
@@ -515,6 +522,11 @@ export function ExpenseTable({ expenses, onEdit, onRefresh, isDemo = false, hasA
                     return null;
                   })()}
                   {expense.categoryName}
+                  {ownerLabel && (
+                    <Badge variant="outline" className="flex-shrink-0 text-[10px] font-normal text-muted-foreground">
+                      {ownerLabel}
+                    </Badge>
+                  )}
                 </div>
               </TableCell>
               <TableCell className="text-sm text-muted-foreground">

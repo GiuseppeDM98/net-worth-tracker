@@ -31,6 +31,13 @@
 4. **Always answer in Italian** when working on this repo. This applies to the conversational
    channel; code, identifiers and comments stay in English.
 
+5. **Questions and proposals are asked interactively** (2026-09-11). When a decision is the owner's —
+   which layers to build, on which surfaces, a wording — put it through the agent's interactive
+   question tool, one batch per topic, multi-select where the options are not exclusive and the
+   recommended option first; never a numbered list of questions in prose. The owner refines the
+   wording through the free-text answer («hai pagato», not «pagherai», for a tax the broker
+   withholds at the sale).
+
 ---
 
 ## 2. Guided verification (*collaudo guidato*)
@@ -208,6 +215,11 @@ The app **is** locally runnable; there is no fallback to declare.
 - **The outcome of a verification**: `SESSION_NOTES.md` during the session (untracked — delete it
   before the commit); it is folded into `CLAUDE.md` (the "Latest" entry) and `Draft Release Temp.md`
   before the PR.
+- **Impeccable critiques are committed** (since 2026-09-12): `.impeccable/critique/*.md` is tracked,
+  so the snapshot `polish` reads as its backlog is the same on every machine. A critique is
+  committed in the session that produces it; one that describes a surface since rebuilt is
+  deleted, not kept as history (the eleven pre-«Verdict over Tiles» ones were removed that day).
+  `.impeccable/hook.cache.json` stays local (`.git/info/exclude`).
 - **Do not duplicate project conventions here.** Code and comment conventions live in
   `DEVELOPMENT_GUIDELINES.md` and `COMMENTS.md`, repo-wide patterns and traps in `AGENTS.md`, the
   per-area rules in `doc/guide/<tema>.md`, the aesthetic in `DESIGN.md`, environment and emulators

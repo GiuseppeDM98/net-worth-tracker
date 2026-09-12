@@ -92,6 +92,15 @@
 - **The market effect is precomputed, never left to the model** (`Δ patrimonio − risparmio netto`, both from the
   bundle). It is a STRUCTURAL residual — it also absorbs untracked movements — and the block must keep saying so, or
   the comment presents it as pure market performance.
+- **The email's «mercato» nets out the tax on the period's sales** (2026-09-11): `marketEffectOf` = `Δ − risparmio
+  netto + tasse stimate` (`MonthlyEmailData.periodSales`, read from the ledger by `summarizePeriodSales` over the
+  email's own window, `null` without a sale, never blocking). Why: the broker's withholding leaves the account with no
+  cashflow row, so inside the residual a 4.089 € tax read as a market loss on the real account (settembre 2026). The
+  verdict then follows the Panoramica's `resolveDeclineCause` («il mercato ha pesato, le tasse sulle vendite di più»),
+  the split has THREE parts that still sum to Δ («… viene dal mercato, +988 € da quanto hai risparmiato e −4089 €
+  dalle tasse sulle vendite»), the sale is told by `describeSales` and the Patrimonio tile's footer names the tax
+  «circa». The AI prompt's market block is unchanged (it still prints `Δ − risparmio`): a known asymmetry, and a
+  tax the owner ALSO records as a cashflow expense would be counted twice in the split (CLAUDE.md → Known Issues).
 - **Every email cap is stated in the prompt**: `MAX_CATEGORY_DELTAS` (12) is named in the section header together with
   how many categories were left out. The selection is by SPEND, not by size of variation — describe it as it is.
 - **`max_tokens` and the word ceiling scale together** per period (6000/8000/8000/10000 against 500/700/700/900 words):

@@ -10,13 +10,18 @@
  * `lib/utils/historyComposition.ts` — the stack is pre-normalised (no `stackOffset`), the
  * residual is a named band, the Previdenza carve-out is measured or estimated per month.
  * This file only renders.
+ *
+ * While the pointer scrubs the Evoluzione series (`scrub`, the month the page is reading), the
+ * breakdown list is that month's — the same `buildBreakdownForRow` the series ran on its latest
+ * row — and the rows re-rank under a spring instead of being redrawn; a marker on the plot names
+ * the month. The plot itself does not move: the reading is a list, never a jump on the chart.
  */
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useReducedMotion } from 'framer-motion';
+import { LayoutGroup, motion, useReducedMotion } from 'framer-motion';
 import { Info } from 'lucide-react';
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tile } from '@/components/ui/tile';
 import { AsideToggle } from '@/components/ui/aside-toggle';
@@ -26,10 +31,13 @@ import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { formatCurrency, formatPercentage } from '@/lib/services/chartService';
 import type { AssetClassHistoryPoint } from '@/lib/services/chartService';
 import { describeComposition } from '@/lib/utils/storicoNarrative';
+import type { PeriodMonth } from '@/lib/utils/storicoSummary';
 import {
   buildAssetClassComposition,
+  buildBreakdownForRow,
   buildChartAriaLabel,
   buildLiquidityComposition,
+  findCompositionRow,
   formatPeriodLabel,
   shareKey,
   valueKey,
@@ -42,6 +50,9 @@ import {
   type CompositionSeries,
   type LiquidityHistoryPoint,
 } from '@/lib/utils/historyComposition';
+
+/** The one spring of the app (DESIGN.md → Segmented Pill Control): the rows re-rank on it. */
+const RERANK_SPRING = { type: 'spring', stiffness: 400, damping: 35 } as const;
 
 /** The toggle's options, typed to the domain rather than to its own labels. */
 const COMPOSITION_CUTS: ReadonlyArray<{ value: CompositionCut; label: string }> = [
@@ -163,10 +174,12 @@ interface ComposizioneTileProps {
   liquidityHistory: LiquidityHistoryPoint[];
   /** True when the user holds at least one `pensionFund` asset — gates the method note. */
   hasPensionFunds: boolean;
+  /** The month the page is reading under the pointer; null = the latest. */
+  scrub?: PeriodMonth | null;
   className?: string;
 }
 
-export function ComposizioneTile({ assetClassHistory, liquidityHistory, hasPensionFunds, className }: ComposizioneTileProps) {
+export function ComposizioneTile({ assetClassHistory, liquidityHistory, hasPensionFunds, scrub = null, className }: ComposizioneTileProps) {
   const [cut, setCut] = useState<CompositionCut>('assetClass');
   const chartColors = useChartColors();
   const prefersReducedMotion = useReducedMotion();
@@ -175,6 +188,11 @@ export function ComposizioneTile({ assetClassHistory, liquidityHistory, hasPensi
   const assetClassSeries = useMemo(() => buildAssetClassComposition(assetClassHistory), [assetClassHistory]);
   const liquiditySeries = useMemo(() => buildLiquidityComposition(liquidityHistory), [liquidityHistory]);
   const series: CompositionSeries = cut === 'assetClass' ? assetClassSeries : liquiditySeries;
+
+  // The month in reading: the scrubbed row when the series has it, otherwise the latest.
+  const scrubRow = useMemo(() => findCompositionRow(series, scrub), [series, scrub]);
+  const breakdown = useMemo(() => (scrubRow ? buildBreakdownForRow(series, scrubRow) : series.breakdown), [series, scrubRow]);
+  const periodLabel = scrubRow ? formatPeriodLabel(scrubRow.month as number, scrubRow.year as number) : series.latestPeriodLabel;
 
   const hasData = series.rows.length > 0;
   const showsPensionBand = hasPensionFunds && series.bands.some((band) => band.key === PENSION_BAND_KEY);
@@ -243,6 +261,7 @@ export function ComposizioneTile({ assetClassHistory, liquidityHistory, hasPensi
                 <XAxis dataKey="date" tick={CHART_TICK_STYLE} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={isMobile ? 40 : 24} />
                 <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tickFormatter={(value: number) => `${value}%`} tick={CHART_TICK_STYLE} axisLine={false} tickLine={false} width={isMobile ? 44 : 48} />
                 <Tooltip cursor={{ stroke: 'var(--border)', strokeWidth: 1 }} content={<CompositionTooltip bands={series.bands} chartColors={chartColors} />} />
+                {scrubRow && <ReferenceLine x={scrubRow.date} stroke="var(--foreground)" strokeOpacity={0.5} strokeWidth={1} ifOverflow="visible" />}
                 {series.bands.map((band) => {
                   const color = resolveBandColor(band, chartColors);
                   return (
@@ -267,19 +286,25 @@ export function ComposizioneTile({ assetClassHistory, liquidityHistory, hasPensi
             </ResponsiveContainer>
           </div>
 
-          {/* The legend, carrying the numbers the chart cannot. Same words at every breakpoint. */}
-          <div className="mt-3 divide-y divide-border border-t border-border">
-            {series.breakdown.map((entry) => (
-              <BreakdownRow key={entry.key} entry={entry} chartColors={chartColors} />
-            ))}
-          </div>
+          {/* The legend, carrying the numbers the chart cannot. Same words at every breakpoint.
+              Under the scrub the rows re-rank in place (`layout`), so a band climbing the list is
+              seen climbing rather than replaced. */}
+          <LayoutGroup id={`composizione-${cut}`}>
+            <div className="mt-3 divide-y divide-border border-t border-border">
+              {breakdown.map((entry) => (
+                <motion.div key={entry.key} layout="position" transition={RERANK_SPRING}>
+                  <BreakdownRow entry={entry} chartColors={chartColors} />
+                </motion.div>
+              ))}
+            </div>
+          </LayoutGroup>
         </>
       )}
 
       <p className="mt-auto border-t border-border pt-3.5 text-[11px] leading-[1.45] text-muted-foreground">
         {hasData && (
           <>
-            Valori e quote di {series.latestPeriodLabel?.toLowerCase()}; l&apos;ultima colonna è la variazione della quota in un anno, in punti.
+            Valori e quote di {periodLabel?.toLowerCase()}; l&apos;ultima colonna è la variazione della quota in un anno, in punti.
             {showsResidualBand && (
               <>
                 {' '}

@@ -14,13 +14,15 @@
  *                     Movimenti (12)
  *
  * ONE period axis governs the verdict and every tile. The toolbar filters (search, categories,
- * subcategory, account, sort) narrow ONLY the Movimenti list: a verdict computed on the
+ * subcategory, account, owner, sort) narrow ONLY the Movimenti list: a verdict computed on the
  * «Alimentari» filter would read «speso più di quanto è entrato» over a slice that has no
  * income by construction.
  *
  * FILTER ARCHITECTURE (unchanged): period → type/category → subcategory, with the cascading
- * reset (changing the category selection resets the subcategory). Every number the tiles
- * show is born in lib/utils/tracciamentoSummary.ts; the words in cashflowNarrative.ts.
+ * reset (changing the category selection resets the subcategory). The owner filter
+ * («Intestatario», lib/utils/movementsOwnerFilter.ts) exists only with Divisione on. Every
+ * number the tiles show is born in lib/utils/tracciamentoSummary.ts; the words in
+ * cashflowNarrative.ts.
  */
 'use client';
 
@@ -31,6 +33,12 @@ import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Expense, ExpenseCategory, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
+import type { FamilyMember } from '@/types/assets';
+import {
+  OWNER_FILTER_ALL,
+  listOwnerFilterOptions,
+  matchesOwnerFilter,
+} from '@/lib/utils/movementsOwnerFilter';
 import {
   getExpensesByRecurringParentId,
   getExpensesByInstallmentParentId,
@@ -146,6 +154,10 @@ interface ExpenseTrackingTabProps {
   onRefresh: () => Promise<void>;
   /** id→name map for cash assets; built in the parent to avoid a cross-domain subscription here. */
   assetNameMap: Map<string, string>;
+  /** Cashflow › Divisione is on: the owner filter and the owner chips exist. */
+  splitEnabled: boolean;
+  /** The household, from the settings — the people a row can be attributed to. */
+  familyMembers: FamilyMember[];
 }
 
 interface ListFilters {
@@ -156,12 +168,16 @@ interface ListFilters {
   searchQuery: string;
   /** 'all', or an account id present in the period. */
   accountId: string;
+  /** 'all', 'common', 'unassigned' or a member id (movementsOwnerFilter.ts). */
+  ownerId: string;
+  /** The members that still exist, for the «unassigned» case. */
+  knownMemberIds: Set<string>;
 }
 
 /**
  * Cumulative AND filtering (progressive narrowing): every active filter must match —
- * type/category, then subcategory, then the free-text search, then the account. OR would
- * widen the list (Type="income" OR Category="groceries"); AND narrows it.
+ * type/category, then subcategory, then the free-text search, then the account, then the
+ * owner. OR would widen the list (Type="income" OR Category="groceries"); AND narrows it.
  */
 function applyListFilters(expenses: Expense[], filters: ListFilters): Expense[] {
   let filtered = expenses;
@@ -200,6 +216,10 @@ function applyListFilters(expenses: Expense[], filters: ListFilters): Expense[] 
     filtered = filtered.filter((e) => e.linkedCashAssetId === filters.accountId);
   }
 
+  if (filters.ownerId !== OWNER_FILTER_ALL) {
+    filtered = filtered.filter((e) => matchesOwnerFilter(e, filters.ownerId, filters.knownMemberIds));
+  }
+
   return filtered;
 }
 
@@ -217,6 +237,8 @@ export function ExpenseTrackingTab({
   loadFailed,
   onRefresh,
   assetNameMap,
+  splitEnabled,
+  familyMembers,
 }: ExpenseTrackingTabProps) {
   const { user } = useAuth();
   const { ownerId } = useActiveAccount();
@@ -269,6 +291,9 @@ export function ExpenseTrackingTab({
   // Conto corrente filter — 'all' means no account filter applied.
   const [selectedAccountId, setSelectedAccountId] = useState<string>('all');
 
+  // Intestatario filter (Divisione only) — 'all' means no owner filter applied.
+  const [selectedOwnerId, setSelectedOwnerId] = useState<string>(OWNER_FILTER_ALL);
+
   // Generate available years from ALL expenses (not filtered)
   const availableYears = useMemo(() => {
     if (allExpenses.length === 0) return [];
@@ -303,6 +328,7 @@ export function ExpenseTrackingTab({
     setSelectedSubCategoryId('all');
     setSearchQuery('');
     setSelectedAccountId('all');
+    setSelectedOwnerId(OWNER_FILTER_ALL);
     setMobileSortKey('date-desc');
   };
 
@@ -548,13 +574,30 @@ export function ExpenseTrackingTab({
   // no movement on it) is no filter at all: derived, never reset through an effect.
   const effectiveAccountId = accountOptions.some((a) => a.id === selectedAccountId) ? selectedAccountId : 'all';
 
+  // Owner options exist only with Divisione on: «Tutti · In comune · {members}», plus «Senza
+  // intestatario» when the period holds rows of a deleted member. A selection the options no
+  // longer offer (the feature switched off, a member removed) is no filter — derived, never reset.
+  const ownerOptions = useMemo(
+    () => (splitEnabled ? listOwnerFilterOptions(expenses, familyMembers) : []),
+    [splitEnabled, expenses, familyMembers],
+  );
+  const knownMemberIds = useMemo(() => new Set(familyMembers.map((member) => member.id)), [familyMembers]);
+  const memberNames = useMemo(
+    () => (splitEnabled ? new Map(familyMembers.map((member) => [member.id, member.name])) : null),
+    [splitEnabled, familyMembers],
+  );
+  const effectiveOwnerId = ownerOptions.some((option) => option.value === selectedOwnerId)
+    ? selectedOwnerId
+    : OWNER_FILTER_ALL;
+
   // A list filter is active when the toolbar narrows the inventory — the period is not a filter.
   const hasActiveFilters =
     selectedTypes.length > 0 ||
     selectedCatIds.length > 0 ||
     selectedSubCategoryId !== 'all' ||
     searchQuery !== '' ||
-    effectiveAccountId !== 'all';
+    effectiveAccountId !== 'all' ||
+    effectiveOwnerId !== OWNER_FILTER_ALL;
 
   // Count of active drawer-internal filters shown on the mobile "Filtri" badge.
   // Period and search are excluded — they are always visible inline on mobile.
@@ -564,8 +607,9 @@ export function ExpenseTrackingTab({
     if (selectedTypes.length > 0 || selectedCatIds.length > 0) count++;
     if (selectedSubCategoryId !== 'all') count++;
     if (effectiveAccountId !== 'all') count++;
+    if (effectiveOwnerId !== OWNER_FILTER_ALL) count++;
     return count;
-  }, [searchQuery, selectedTypes, selectedCatIds, selectedSubCategoryId, effectiveAccountId]);
+  }, [searchQuery, selectedTypes, selectedCatIds, selectedSubCategoryId, effectiveAccountId, effectiveOwnerId]);
 
   // Left to the React Compiler: a manual useMemo here could not be preserved (its inputs are
   // themselves derived) and the skip would have un-memoized the whole component.
@@ -575,11 +619,13 @@ export function ExpenseTrackingTab({
     subCategoryId: soloSelectedCategory ? selectedSubCategoryId : 'all',
     searchQuery,
     accountId: effectiveAccountId,
+    ownerId: effectiveOwnerId,
+    knownMemberIds,
   });
 
   // The feed shows the first page again whenever the filters change (the stored window
   // belongs to the filters it was opened under).
-  const filterKey = JSON.stringify([period, selectedTypes, selectedCatIds, selectedSubCategoryId, searchQuery, effectiveAccountId]);
+  const filterKey = JSON.stringify([period, selectedTypes, selectedCatIds, selectedSubCategoryId, searchQuery, effectiveAccountId, effectiveOwnerId]);
   const mobileShowCount = feedWindow?.filterKey === filterKey ? feedWindow.count : FEED_PAGE_SIZE;
   const showMore = () => setFeedWindow({ filterKey, count: mobileShowCount + FEED_PAGE_SIZE });
 
@@ -707,6 +753,7 @@ export function ExpenseTrackingTab({
       isDemo={isDemo}
       hasActiveFilters={hasActiveFilters}
       categoryMetaMap={categoryMetaMap}
+      memberNames={memberNames}
       emptyHint="Nessun movimento registrato nel periodo: aggiungi la prima voce per iniziare a tracciare."
       surface="flat"
     />
@@ -741,6 +788,9 @@ export function ExpenseTrackingTab({
       accountOptions={accountOptions}
       selectedAccountId={effectiveAccountId}
       onAccountChange={setSelectedAccountId}
+      ownerOptions={ownerOptions}
+      selectedOwnerId={effectiveOwnerId}
+      onOwnerChange={setSelectedOwnerId}
       activeFilterCount={mobileActiveFilterCount}
       onReset={handleResetFilters}
       mobileSortKey={mobileSortKey}
@@ -828,6 +878,24 @@ export function ExpenseTrackingTab({
               {accountOptions.map((acc) => (
                 <SelectItem key={acc.id} value={acc.id}>
                   {acc.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {/* Intestatario — only with Divisione on (the options are empty otherwise) */}
+      {ownerOptions.length > 0 && (
+        <div className="w-[160px] shrink-0">
+          <Select value={effectiveOwnerId} onValueChange={setSelectedOwnerId}>
+            <SelectTrigger id="filter-owner" aria-label="Filtra per intestatario" className="w-full">
+              <SelectValue placeholder="Tutti" />
+            </SelectTrigger>
+            <SelectContent>
+              {ownerOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -999,6 +1067,7 @@ export function ExpenseTrackingTab({
                     isDemo={isDemo}
                     hasActiveFilters={hasActiveFilters}
                     categories={categories}
+                    memberNames={memberNames}
                   />
                 </div>
                 <div className="desktop:hidden">{feed}</div>

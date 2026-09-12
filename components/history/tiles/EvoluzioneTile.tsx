@@ -9,22 +9,32 @@
  * Every figure comes from `storicoSummary.ts` (growth, pace, the per-month deltas); the words
  * from `storicoNarrative.ts`. The chart is Recharts (the app's rule for a plotted series with a
  * tooltip): ticks in `CHART_TICK_STYLE`, the three tooltip styles, `role="img"` on the chart.
+ *
+ * THE SCRUB (2026-09-12). With a fine pointer the series is also the page's month axis: the
+ * month under the pointer is lifted to the page (`onScrub`), which resolves what every tile
+ * shows for it (`lib/utils/storicoScrub.ts`) and hands this tile back the point — the value in
+ * the head settles onto that month's figure and the caption under it names the month and its
+ * change. Leaving the plot or pressing Escape returns to today. A coarse pointer never scrubs
+ * (DESIGN.md → The Hover Reading Rule): the chart stays a shape there, the tooltip its reading.
  */
 
-import { useId } from 'react';
+import { useEffect, useId } from 'react';
 import { useReducedMotion } from 'framer-motion';
 import { MessageSquare, TrendingDown, TrendingUp } from 'lucide-react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { Narrative } from '@/lib/utils/narrative';
-import type { EvolutionPoint, GrowthPace, GrowthSummary } from '@/lib/utils/storicoSummary';
+import type { EvolutionPoint, GrowthPace, GrowthSummary, PeriodMonth } from '@/lib/utils/storicoSummary';
+import { isSamePeriod, type ScrubView } from '@/lib/utils/storicoScrub';
 import { formatPeriodMonth } from '@/lib/utils/storicoNarrative';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
+import { useCountUp } from '@/lib/utils/useCountUp';
+import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { formatCurrencyCompact, formatPercentage } from '@/lib/services/chartService';
 import { signChipClass, signTextClass } from '@/lib/utils/metricColors';
 import { cn } from '@/lib/utils';
 import { Tile, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
-import { OverviewAnimatedCurrency } from '@/components/dashboard/OverviewAnimatedCurrency';
 import { CHART_TICK_STYLE } from '@/components/cashflow/costCenterStyles';
+import type { MouseHandlerDataParam } from 'recharts/types/synchronisation/types';
 
 interface EvoluzioneTileProps {
   aside: string;
@@ -37,8 +47,15 @@ interface EvoluzioneTileProps {
   onAddNote: () => void;
   /** Demo mode: the note dialog would write into the shared demo snapshots. */
   disabled?: boolean;
+  /** The month under the pointer, resolved by the page; null = today. */
+  scrub: ScrubView | null;
+  /** Lifts the month under the pointer to the page (null when the pointer leaves the plot). */
+  onScrub: (period: PeriodMonth | null) => void;
   className?: string;
 }
+
+/** How long the head value takes to settle onto a scrubbed month: a glide, never a count-up. */
+const SCRUB_SETTLE_MS = 220;
 
 // ─── Chips ────────────────────────────────────────────────────────────────────
 
@@ -92,22 +109,33 @@ const TOOLTIP_STYLE = {
 interface EvolutionTooltipProps {
   active?: boolean;
   payload?: Array<{ payload?: EvolutionPoint }>;
+  /** True while the tile's head follows the pointer: the figures are already there, only a note is worth a card. */
+  headFollows?: boolean;
 }
 
-/** The month, its value, its change against the previous month and — when there is one — its note. */
-function EvolutionTooltip({ active, payload }: EvolutionTooltipProps) {
+/**
+ * The month, its value, its change against the previous month and — when there is one — its
+ * note. When the head of the tile is already reading the month under the pointer (the scrub),
+ * the card would repeat it line for line, so it carries the note alone and nothing without one.
+ */
+function EvolutionTooltip({ active, payload, headFollows = false }: EvolutionTooltipProps) {
   const point = payload?.[0]?.payload;
   if (!active || !point) return null;
+  if (headFollows && !point.note) return null;
   return (
     <div style={TOOLTIP_STYLE} className="flex flex-col gap-1 text-[11px]">
       <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{formatPeriodMonth(point)}</span>
-      <span className="font-mono text-[13px] font-semibold tabular-nums text-card-foreground">{cachedFormatCurrencyEUR(point.totalNetWorth)}</span>
-      {point.delta !== null && (
-        <span className="text-muted-foreground">
-          sul mese prima <span className={cn('font-mono font-semibold tabular-nums', signTextClass(point.delta))}>{signed(point.delta)}</span>
-        </span>
+      {!headFollows && (
+        <>
+          <span className="font-mono text-[13px] font-semibold tabular-nums text-card-foreground">{cachedFormatCurrencyEUR(point.totalNetWorth)}</span>
+          {point.delta !== null && (
+            <span className="text-muted-foreground">
+              sul mese prima <span className={cn('font-mono font-semibold tabular-nums', signTextClass(point.delta))}>{signed(point.delta)}</span>
+            </span>
+          )}
+        </>
       )}
-      {point.note && <span className="whitespace-pre-line border-t border-border pt-1 text-card-foreground">{point.note}</span>}
+      {point.note && <span className={cn('whitespace-pre-line text-card-foreground', !headFollows && 'border-t border-border pt-1')}>{point.note}</span>}
     </div>
   );
 }
@@ -115,11 +143,54 @@ function EvolutionTooltip({ active, payload }: EvolutionTooltipProps) {
 /** `MM/YY` → the year, for the axis. */
 const yearOfTick = (date: string) => `20${date.slice(3)}`;
 
+/** Recharts reports the active index as a number or a numeric string; a chart with no active point reports neither. */
+function activeIndexOf(state: MouseHandlerDataParam): number | null {
+  const raw = state.activeTooltipIndex;
+  const index = typeof raw === 'string' ? Number(raw) : raw;
+  return typeof index === 'number' && Number.isFinite(index) ? index : null;
+}
+
+/**
+ * The value in the tile's head. It counts up once on mount and, while the pointer scrubs the
+ * series, glides from the month it showed to the month under the pointer — a leaf, so the rAF
+ * ticks re-render this span and nothing else (the count-up isolation rule).
+ */
+function HeadValue({ value }: { value: number }) {
+  const animated = useCountUp(value, { fromPrevious: true, duration: SCRUB_SETTLE_MS, startDelay: 0 });
+  return (
+    <span className="mt-2.5 block font-mono text-[32px] font-bold leading-none tracking-[-0.03em] tabular-nums desktop:text-[36px]">
+      {cachedFormatCurrencyEUR(animated ?? value)}
+    </span>
+  );
+}
+
 // ─── Tile ─────────────────────────────────────────────────────────────────────
 
-export function EvoluzioneTile({ aside, reading, growth, pace, points, noteCount, onAddNote, disabled = false, className }: EvoluzioneTileProps) {
+export function EvoluzioneTile({ aside, reading, growth, pace, points, noteCount, onAddNote, disabled = false, scrub, onScrub, className }: EvoluzioneTileProps) {
   const prefersReducedMotion = useReducedMotion();
+  const canScrub = useMediaQuery('(pointer: fine)');
   const gradientId = `evo-${useId().replace(/:/g, '')}`;
+
+  // Escape ends the reading while one is on: the plot's own leave event cannot see a keyboard.
+  const isScrubbing = scrub !== null;
+  useEffect(() => {
+    if (!isScrubbing) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onScrub(null);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [isScrubbing, onScrub]);
+
+  const handleMouseMove = (state: MouseHandlerDataParam) => {
+    const index = activeIndexOf(state);
+    const point = index === null ? undefined : points[index];
+    if (!point) return;
+    if (!isSamePeriod(point, scrub?.period ?? null)) onScrub({ year: point.year, month: point.month });
+  };
+  const handleMouseLeave = () => onScrub(null);
+
+  const headValue = scrub ? scrub.point.totalNetWorth : growth.latest.value;
 
   // One tick per January; with fewer than two years of history Recharts picks its own.
   const januaryTicks = points.filter((p) => p.month === 1).map((p) => p.date);
@@ -134,11 +205,27 @@ export function EvoluzioneTile({ aside, reading, growth, pace, points, noteCount
 
   return (
     <Tile eyebrow="Evoluzione" aside={aside} reading={reading} className={className} ariaLabel="Evoluzione del patrimonio">
-      <OverviewAnimatedCurrency
-        value={growth.latest.value}
-        animateOnMount={true}
-        className="mt-2.5 block font-mono text-[32px] font-bold leading-none tracking-[-0.03em] tabular-nums desktop:text-[36px]"
-      />
+      <HeadValue value={headValue} />
+      {/* One line of fixed height under the value: today's month, or the scrubbed month and its
+          change. Fixed so the plot under the pointer never moves while the pointer reads it. */}
+      <p className="mt-2 h-4 text-[11px] leading-4 text-muted-foreground" aria-live="off">
+        {scrub ? (
+          <>
+            <span className="text-foreground">{formatPeriodMonth(scrub.period)}</span>
+            {scrub.point.delta === null ? (
+              ' · prima rilevazione'
+            ) : (
+              <>
+                {' '}· sul mese prima <span className={cn('font-mono font-semibold tabular-nums', signTextClass(scrub.point.delta))}>{signed(scrub.point.delta)}</span>
+              </>
+            )}
+          </>
+        ) : (
+          <>
+            {formatPeriodMonth(growth.latest)} · ultima rilevazione
+          </>
+        )}
+      </p>
 
       {/* The three chips, one grouped row from tablet up (The Grouped Chip Rule). */}
       <div className="mt-4 flex flex-col gap-2.5 tablet:flex-row tablet:flex-wrap tablet:items-start tablet:gap-x-2.5 tablet:gap-y-2">
@@ -187,6 +274,8 @@ export function EvoluzioneTile({ aside, reading, growth, pace, points, noteCount
                   role="img"
                   aria-label={`Evoluzione del patrimonio da ${formatPeriodMonth(growth.first)} a ${formatPeriodMonth(growth.latest)}: da ${cachedFormatCurrencyEUR(growth.first.value, true)} a ${cachedFormatCurrencyEUR(growth.latest.value, true)}, ${growth.snapshotCount} rilevazioni.`}
                   accessibilityLayer={false}
+                  onMouseMove={canScrub ? handleMouseMove : undefined}
+                  onMouseLeave={canScrub ? handleMouseLeave : undefined}
                 >
                   <defs>
                     <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
@@ -197,7 +286,7 @@ export function EvoluzioneTile({ aside, reading, growth, pace, points, noteCount
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                   <XAxis dataKey="date" ticks={ticks} tickFormatter={ticks ? yearOfTick : undefined} tick={CHART_TICK_STYLE} axisLine={false} tickLine={false} minTickGap={24} />
                   <YAxis tickFormatter={formatTick} tick={CHART_TICK_STYLE} axisLine={false} tickLine={false} width={isNarrowRange ? 72 : 56} domain={['auto', 'auto']} />
-                  <Tooltip content={<EvolutionTooltip />} cursor={{ stroke: 'var(--foreground)', strokeOpacity: 0.25, strokeWidth: 1 }} />
+                  <Tooltip content={<EvolutionTooltip headFollows={canScrub} />} cursor={{ stroke: 'var(--foreground)', strokeOpacity: 0.25, strokeWidth: 1 }} />
                   <Area
                     type="monotone"
                     dataKey="totalNetWorth"

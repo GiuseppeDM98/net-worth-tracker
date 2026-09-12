@@ -37,6 +37,8 @@ interface DriverTileProps {
   /** The rows inside the last `windowMonths` calendar months, chronological (a missing month stays a gap). */
   months: MonthlyDriverRow[];
   windowMonths: number;
+  /** The slot of the month the page is reading under the pointer (Evoluzione's scrub); null = none. */
+  scrubIndex?: number | null;
   className?: string;
 }
 
@@ -102,7 +104,7 @@ const BAR_GAP = 0.06;
  * savings colour under the baseline (the position carries the sign, and the legend has one loss
  * entry: the market's); the last month is outlined, never the others dimmed.
  */
-function DriverBars({ months, className }: { months: MonthlyDriverRow[]; className?: string }) {
+function DriverBars({ months, scrubIndex = null, className }: { months: MonthlyDriverRow[]; scrubIndex?: number | null; className?: string }) {
   const maxPositive = Math.max(...months.flatMap((m) => [m.netSavings, m.investmentGrowth, 0]), 1);
   const maxNegative = Math.max(...months.map((m) => Math.max(-m.investmentGrowth, -m.netSavings, 0)), 0);
   const scale = (VIEW_H - HEAD_ROOM * 2) / (maxPositive + maxNegative);
@@ -112,6 +114,9 @@ function DriverBars({ months, className }: { months: MonthlyDriverRow[]; classNa
 
   const hover = useChartHover(months.length, 'slot');
   const hovered = hover.index !== null ? months[hover.index] : null;
+  // The plot's own hover wins; otherwise the page's scrub lights the same slot, tip-less: the
+  // figures of that month are already in the Evoluzione head, this only says WHICH bars it is.
+  const litIndex = hover.index ?? scrubIndex;
 
   const caption = (m: MonthlyDriverRow) => `${MONTH_NAMES[m.month - 1].toLowerCase()} ${m.year}`;
   const label = months.map((m) => `${caption(m)}: risparmio ${signed(m.netSavings)}, mercato ${signed(m.investmentGrowth)}`).join('; ');
@@ -126,7 +131,7 @@ function DriverBars({ months, className }: { months: MonthlyDriverRow[]; classNa
     <div className={cn('flex flex-col', className)}>
       <div className="relative flex-1" style={{ minHeight: 110 }} {...(hover.enabled ? hover.handlers : {})}>
         <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full" role="img" aria-label={`Risparmio e mercato per mese, ultimi ${months.length} mesi. ${label}.`}>
-          {hover.index !== null && <rect x={hover.index * slot} y={0} width={slot} height={VIEW_H} fill="var(--foreground)" opacity={0.06} />}
+          {litIndex !== null && <rect x={litIndex * slot} y={0} width={slot} height={VIEW_H} fill="var(--foreground)" opacity={0.06} />}
           {months.map((m, i) => {
             const x0 = i * slot + (slot - barWidth * 2 - slot * BAR_GAP) / 2;
             const isLast = i === months.length - 1;
@@ -158,7 +163,7 @@ function DriverBars({ months, className }: { months: MonthlyDriverRow[]; classNa
       </div>
       <div className="mt-1.5 grid" style={{ gridTemplateColumns: `repeat(${months.length}, minmax(0, 1fr))` }} aria-hidden="true">
         {months.map((m, i) => (
-          <span key={`${m.year}-${m.month}`} className={cn('text-center font-mono text-[10px] tabular-nums', i === months.length - 1 ? 'font-semibold text-foreground' : 'text-muted-foreground')}>
+          <span key={`${m.year}-${m.month}`} className={cn('text-center font-mono text-[10px] tabular-nums', i === months.length - 1 || i === litIndex ? 'font-semibold text-foreground' : 'text-muted-foreground')}>
             {MONTH_NAMES_SHORT[m.month - 1].toLowerCase()}
           </span>
         ))}
@@ -185,7 +190,7 @@ function Legend() {
   );
 }
 
-export function DriverTile({ reading, years, featured, total, startYear, months, windowMonths, className }: DriverTileProps) {
+export function DriverTile({ reading, years, featured, total, startYear, months, windowMonths, scrubIndex = null, className }: DriverTileProps) {
   const hasYears = years.length > 0;
   return (
     <Tile eyebrow="Driver della crescita" aside={hasYears ? `dal ${startYear} · cashflow` : undefined} reading={reading} className={className} ariaLabel="Driver della crescita">
@@ -210,7 +215,7 @@ export function DriverTile({ reading, years, featured, total, startYear, months,
                 Ultimi {windowMonths} mesi
                 {months.length < windowMonths && <> · {months.length} con dati</>}
               </p>
-              <DriverBars months={months} className="mt-2 flex-1" />
+              <DriverBars months={months} scrubIndex={scrubIndex} className="mt-2 flex-1" />
             </>
           )}
         </>

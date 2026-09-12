@@ -227,6 +227,7 @@ export default function AssetsPage() {
       accountCount: cashAccounts.length,
       marketEffect: overview.marketEffect ?? null,
       topMover: overview.topInstrumentMovers?.[0] ?? null,
+      sales: overview.monthSales ?? null,
     });
   }, [overview, today.month, totalValue, heldInstruments.length, cashAccounts.length]);
 

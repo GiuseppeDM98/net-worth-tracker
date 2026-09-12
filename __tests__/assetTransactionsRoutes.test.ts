@@ -238,6 +238,33 @@ describe('Asset trade-ledger routes', () => {
     await expect(response.json()).resolves.toMatchObject({ derived: { quantity: 5 } });
   });
 
+  it('stores a BTP€i trade’s indexation coefficient beside its price, and refuses a non-positive one', async () => {
+    seedMeta('user-1');
+    seedLedgerAsset('asset-1', 'user-1');
+
+    const ok = await createRoute(
+      createJsonRequest('http://localhost/api/asset-transactions', {
+        method: 'POST',
+        body: { userId: 'user-1', transaction: validTransaction({ indexationCoefficient: 1.25 }) },
+        headers: AUTH,
+      })
+    );
+    expect(ok.status).toBe(200);
+    const stored = [...store.entries()].find(([key]) => key.startsWith('assetTransactions/'))?.[1] as
+      | { indexationCoefficient?: number }
+      | undefined;
+    expect(stored?.indexationCoefficient).toBe(1.25);
+
+    const refused = await createRoute(
+      createJsonRequest('http://localhost/api/asset-transactions', {
+        method: 'POST',
+        body: { userId: 'user-1', transaction: validTransaction({ indexationCoefficient: 0 }) },
+        headers: AUTH,
+      })
+    );
+    expect(refused.status).toBe(400);
+  });
+
   it('returns 400 for a negative quantity', async () => {
     seedMeta('user-1');
     seedLedgerAsset('asset-1', 'user-1');

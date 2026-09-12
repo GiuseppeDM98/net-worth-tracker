@@ -361,6 +361,8 @@ export default function CashflowPage() {
                 loadFailed={loadFailed}
               onRefresh={handleRefresh}
               assetNameMap={assetNameMap}
+              splitEnabled={expenseSplitEnabled === true}
+              familyMembers={familyMembers}
             />
           </motion.div>
         </TabsContent>

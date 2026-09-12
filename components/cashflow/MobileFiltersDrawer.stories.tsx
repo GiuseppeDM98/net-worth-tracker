@@ -76,6 +76,9 @@ const meta = {
     accountOptions: [],
     selectedAccountId: 'all',
     onAccountChange: fn(),
+    ownerOptions: [],
+    selectedOwnerId: 'all',
+    onOwnerChange: fn(),
     activeFilterCount: 0,
     onReset: fn(),
     mobileSortKey: 'date-desc',
@@ -120,6 +123,20 @@ export const WithAccounts: Story = {
   args: {
     accountOptions: ACCOUNT_OPTIONS,
     selectedAccountId: 'acc-1',
+    activeFilterCount: 1,
+  },
+};
+
+/** Divisione on: the «Intestatario» section exists, filtered on one person. */
+export const WithOwnerFilter: Story = {
+  args: {
+    ownerOptions: [
+      { value: 'all', label: 'Tutti' },
+      { value: 'common', label: 'In comune' },
+      { value: 'member-1', label: 'Giuseppe' },
+      { value: 'member-2', label: 'Marcella' },
+    ],
+    selectedOwnerId: 'member-1',
     activeFilterCount: 1,
   },
 };

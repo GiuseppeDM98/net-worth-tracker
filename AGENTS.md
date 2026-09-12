@@ -272,12 +272,13 @@ file used to carry.
 ### Panoramica → `doc/guide/panoramica.md`
 - Overview data flows through `GET /api/dashboard/overview` + `useDashboardOverview()` only — no page-level fan-out, no full-history expense queries; `dashboardOverviewSummaries/{userId}` is server-owned and every overview-relevant mutation invalidates it. Both endpoints owner-scoped.
 - `topMovers`/`marketEffect` are MARKET return (`q_prev × (u_curr − u_prev)`), never the user's flows; `[]` when the previous snapshot has no `byAsset`, `null` when not attributable (≠ measured 0). Pension funds are their own "Previdenza" line; real estate is measured gross of debt.
-- Every sentence from `overviewNarrative.ts` — a falling month blames the market only when `marketEffect < 0`.
+- Every sentence from `overviewNarrative.ts` — a falling month blames the market only when `marketEffect < 0`, and never the market ALONE when the estimated tax on the month's sales (`monthSales`, from the ledger) or the own flows weighed more: `resolveDeclineCause` (`lib/utils/periodSales.ts`) is the ONE decision for Panoramica, Patrimonio and the email, `salesNarrative.ts` the shared words («pagato circa …», never «pagherai»).
 - Il resto — the hero step-down, the tile grid, the superseded-pattern rule, the Italian-copy test trap — in `doc/guide/panoramica.md`.
 
 ### Patrimonio · Asset Pricing, FX and Assets → `doc/guide/patrimonio.md`
 - "Does this asset have a market price?" is ONE rule in `assetPricing.ts` (`hasMarketPrice`/`requiresManualPricing`); a new hand-valued type goes in `MANUALLY_VALUED_TYPES` and nowhere else.
-- GBp (pence) ≠ GBP — normalize `price / 100` before any FX; never call Frankfurter from the browser; `quantity = 0` marks a sold asset; bond prices are `% of par`.
+- GBp (pence) ≠ GBP — normalize `price / 100` before any FX; never call Frankfurter from the browser; `quantity = 0` marks a sold asset.
+- A Borsa Italiana bond quote is `% of par`, always, and `lib/utils/bondPricing.ts` is the ONE conversion (`quote / 100 × nominal × coefficient`): the nominal defaults to **1 €** (quantity = nominal in euro), a BTP€i's quote is real and gets the latest coefficient the user entered. Never re-implement it in a component or the cron; never guard it on `nominal > 1` again (issue #340).
 - Patrimonio Δ columns are UNIT-PRICE variations, not P&L; `isHeld` (`quantity > 0`) gates every count/share/sum; the page owns every dialog for one dual invalidation.
 - Every number not in the payload is born in `patrimonioSummary.ts`; the verdict's driver is an INSTRUMENT.
 - Every G/P, tax estimate, YOC and PMC cell stands EUR against EUR through `lib/utils/costBasisEur.ts` (`costBasisPerUnitEur` = the ledger's `averageCostEur`, fees included; the native PMC only for a EUR asset; `undefined` for a foreign asset without one — print nothing, never dollars against euros).
@@ -289,7 +290,7 @@ file used to carry.
 - The migration baseline (`isBaseline` BUY) NEVER stamps `holdingStartDate`; `replayTransactions` returning `holdingStartDate: undefined` means leave the doc untouched (never `deleteField()`).
 - Per-transaction derived data comes from `replayTransactionsWithEffects` (one pass), never re-running replay on every prefix.
 - `buildDerivedAssetFields` projects `quantity`, the native `averageCost` AND `averageCostEur` (fees included) onto the asset doc; `backfillAverageCostEur` adds the third to pre-existing docs once, writing only that field.
-- Il resto — `resolveBondPrice` reuse, the two `totalReturnAssets` paths, the static-copy audit rule — in `doc/guide/registro-operazioni.md`.
+- Il resto — `resolveBondPrice` reuse (from `bondPricing.ts`, a BTP€i trade storing its coefficient), the two `totalReturnAssets` paths, the static-copy audit rule — in `doc/guide/registro-operazioni.md`.
 
 ### Cashflow — expense mechanics → `doc/guide/cashflow.md`
 - Category names are NOT unique: group by `getCategoryKey`/`getSubCategoryKey`, display via `resolveDisplayLabels`.
@@ -304,6 +305,7 @@ file used to carry.
 - «Da inizio anno» (`Period.kind = 'ytd'`) and «Anno corrente» (`'current'`, full-year delta since 2026-08-30) are different windows and must never be treated as one.
 - Every number from `tracciamentoSummary.ts`, every sentence from `cashflowNarrative.ts`. The previous period is honest or absent (a running year → the SAME months of the year before).
 - Below `desktop:` the Movimenti tile's bar repeats the period picker beside the filters — a second HANDLE on the same `period`, never a second axis (its own accessible name, `min-w-0`; `e2e/cashflow.mobile.spec.ts`). The tile's reading totals each type of the rows it is handed (a search on a note is its own total).
+- «Intestatario» (`lib/utils/movementsOwnerFilter.ts`) is a list filter that exists only with Divisione on — «Tutti · In comune · {members}», «Senza intestatario» only when the period holds an orphaned row — and with the feature on an attributed row prints its owner as a chip (feed, table, drawer); `memberNames` null = feature off = no chip anywhere.
 - Il resto — the two windows anchored to today, the month-end projection, the feed, the mobile filters — in `doc/guide/cashflow-tracciamento.md`.
 
 ### Analisi — a verdict over tiles → `doc/guide/cashflow-analisi.md`
@@ -331,7 +333,7 @@ file used to carry.
 - Opt-in, on Tracciamento's period axis. ONE field carries the feature: `Expense.personalMemberId`; absent (or `null`) MEANS «in comune» (so no migration). Members are Previdenza's `FamilyMember`s, never a second list. NOT denormalized to a name.
 - The share is NEVER invented: `resolveSplitBasis` returns `unavailable` (with `missingNames`) below two people, with no labor category, or when one person has no salary in the period; every split figure is then `null`.
 - The base is the PERIOD's attributed labor income (owner's decision, 2026-08-31) — the most faithful and most volatile reading; do not «stabilise» it silently.
-- `allocateByShare` charges the rounding residual to the LARGEST share and re-rounds — untestable on two shares (they cancel), test on three. Writing it is a FOUR-place fan-out.
+- `allocateByShare` charges the rounding residual to the LARGEST share and re-rounds — untestable on two shares (they cancel), test on three. Writing it is a FOUR-place fan-out; the readers outside the tab are Tracciamento's «Intestatario» filter and the owner chip (`movementsOwnerFilter.ts`, same contract).
 - Il resto — the deleted-member bucket, the dialog control, `effectiveTab` — in `doc/guide/cashflow-divisione.md`.
 
 ### Cashflow › Dividendi · Dividends and Coupons → `doc/guide/cashflow-dividendi.md`
@@ -339,7 +341,8 @@ file used to carry.
 - ONE period axis (`resolvePeriodBounds`, upper bound = end of the period's own unit, NOT today); the announced money is ON it; instrument/type filters narrow only the list. The Rendimento tile does NOT follow the axis and says so.
 - `useDividendStats` carries NO date bounds (they only narrowed `periodStats`, now derived in memory). Every number from `dividendAnalytics.ts`.
 - A coupon's cashflow expense is created only by the daily cron on payment date (`!isAutoGenerated`, idempotent via `expenseId`); adding a `DividendType` is a six-file fan-out; YOC/Current Yield share `computeDividendYieldMetrics`, scoped to the current holding.
-- Il resto — the calendar, BTP Italia additivity, the running-window rule, `couponUtils` — in `doc/guide/cashflow-dividendi.md`.
+- Two inflation mechanisms, ONE field (`inflationIndexation`, read via `resolveInflationIndexation`; the legacy `isInflationLinked` is `italia`): BTP Italia ADDS the FOI rate, a BTP€i MULTIPLIES by the coefficient at the payment date (provisional at the latest known one). A rate of 0 is a zero coupon: details saved, nothing materialised (`hasCouponPayments`).
+- Il resto — the calendar, BTP Italia additivity and the BTP€i coefficient, the running-window rule, `couponUtils` — in `doc/guide/cashflow-dividendi.md`.
 
 ### Storico · History and Snapshot Baselines → `doc/guide/storico.md`
 - The snapshot cron runs DAILY (the name lies); a snapshot is a frozen photo (adding an asset never updates an old one). Annual deltas use December of the previous year as baseline.
@@ -396,7 +399,7 @@ file used to carry.
 
 ### Periodic Emails · PDF Export → `doc/guide/email-pdf.md`
 - Both render OUTSIDE the DOM: every hex comes from `lib/constants/printTokens.ts` and nothing else; every email layout is a nested table (Outlook = Word). Verify by RENDERING — no check is in the suite.
-- A verdict over tiles: the email opens on a RULE-generated verdict (also the preheader), the AI comment is a tile in SECOND position and non-blocking. ONE template for the four periods; «Rispetto a un anno fa» is ABSENT on a yearly email (`previousEqualsYoy`).
+- A verdict over tiles: the email opens on a RULE-generated verdict (also the preheader), the AI comment is a tile in SECOND position and non-blocking. ONE template for the four periods; «Rispetto a un anno fa» is ABSENT on a yearly email (`previousEqualsYoy`). The «mercato» residual is `Δ − risparmio + tasse stimate sulle vendite` (`periodSales` from the ledger): a broker's withholding has no cashflow row and used to read as a market loss.
 - PDF: the cover IS the verdict; on Cashflow, Export Totale applies `cashflowHistoryStartYear` as a floor and DECLARES it; the Rendimenti section measures the page's base (`resolvePerformanceBase`, `baseLabel` on its scope line), never the raw snapshots. No monospace, no typographic minus — `pdfSafeText` converts U+2212 at the boundary (react-pdf drops unencodable chars silently).
 - The weekly budget email is a SEPARATE module and nothing in it is weekly (month-to-date + year-to-date); name every figure's window.
 - Il resto — `PDF_RAMP`, the class labels, `signedPct`/`signedEur` it-IT, the deterministic-comparison rule, the AI-prompt body — in `doc/guide/email-pdf.md`.
@@ -490,7 +493,21 @@ file used to carry.
 - Shared variants live in `lib/utils/motionVariants.ts`; `useReducedMotion()` is called once per component and used
   inline, with `<MotionConfig reducedMotion="user">` at the layout root — no separate CSS media queries.
 - **Page transitions use `template.tsx`, NOT `layout.tsx` + `AnimatePresence`** (it re-mounts on every navigation);
-  remove page-level `motion.div variants` wrappers once it is in place (compounded opacity: t²).
+  remove page-level `motion.div variants` wrappers once it is in place (compounded opacity: t²). **Since 2026-09-12 a
+  click on a shell link is a page SCENE** — a native view transition (`lib/hooks/useSceneNavigation.ts` →
+  `runViewTransition('page', …)`, whose DOM update resolves when `usePathname()` changes, with a 700 ms guard for a route
+  the dev server is still compiling) — and `template.tsx` stands down for that mount (`<html data-vt="page">` read once in
+  a `useState` initializer): two fades on one page compound. React 19.2 stable exports no `ViewTransition` and
+  `next.config` enables no experimental flag; the native API is the whole mechanism, and a browser without it (Firefox)
+  or a reader with reduced motion gets a plain `router.push` and the template's fade.
+- **`lib/utils/viewTransition.ts` is the ONE entry to `document.startViewTransition`**, and it stamps `data-vt="theme"` or
+  `data-vt="page"` on `<html>` for the length of the transition: every `::view-transition-*` rule in `globals.css` is
+  scoped by that attribute. An unscoped `::view-transition-new(root)` rule runs on EVERY transition — the theme's
+  circle-clip used to be global and would have clipped every navigation. **A `view-transition-name` must be unique among
+  the RENDERED elements of a page**, or the browser skips the whole transition (the update still applies, silently):
+  `page-verdict` lives on `PageVerdict` and on the skeleton's verdict block (never both mounted), `page-header` on
+  `PageHeader`, `page-main` on the layout's `<main>`; a `forceMount` tab panel is `display: none` and does not count.
+  Do not name the tile grid — several pages render more than one.
 - `useCountUp` always with `once: true`, called **before** any conditional early return and unconditionally for both
   branches of a mode switch; it has **no `enabled` option**, so gate the display in JSX. **`layout="position"`, not bare
   `layout`, when a Framer parent wraps a Radix `CollapsibleContent`** — bare `layout` stretches the trigger text.
@@ -529,6 +546,12 @@ file used to carry.
 
 ### Recharts
 - **`useChartColors()` is mandatory for every series** — read CSS vars after paint and pass `chartColors[0..4]` as props.
+- **A Recharts series can drive the PAGE, not just its tooltip**: `onMouseMove` hands `activeTooltipIndex` (a number OR
+  a numeric string in 3.x — coerce, `activeIndexOf` in `EvoluzioneTile`) and `onMouseLeave` the end; lift the index's
+  PERIOD, never the index (the tiles that follow have their own arrays), attach the handlers only under `(pointer:
+  fine)`, and let a pure module resolve what every follower shows (`lib/utils/storicoScrub.ts` is the worked example).
+  A hand-written SVG that must glide between windows resamples the OLD series onto the new length and tweens per
+  index (`lib/hooks/useMorphingSeries.ts`); the hover reads the landed data, never the frame.
 - **Never pass `useChartColors()` to a Nivo/react-spring component**: `@react-spring/web` cannot interpolate hex→oklch
   and throws on load. Sankey node colors stay hardcoded hex; only Recharts is react-spring-free.
 - **Three separate tooltip style props, none inherited**: `contentStyle`, `labelStyle`, `itemStyle` — omitting
@@ -570,7 +593,9 @@ file used to carry.
 
 ### Navigation
 - **Single source for nav arrays**: `lib/constants/navigation.ts` — Sidebar, BottomNavigation and SecondaryMenuDrawer all
-  import from it, never redeclare inline. **The assistant is `assistantNavItem`**, a route rendered by the same `NavItems`
+  import from it, never redeclare inline. **A route link in the shell is a `SceneLink`** (`components/layout/SceneLink.tsx`,
+  a `next/link` whose plain left click runs the page scene — prefetch, modifier clicks, `target` and the caller's own
+  `onClick` are untouched); a bare `<Link>` there navigates without the scene. **The assistant is `assistantNavItem`**, a route rendered by the same `NavItems`
   as the groups (gated by `NEXT_PUBLIC_ASSISTANT_AI_ENABLED` at render); there is no banner component to restyle.
 - **The shell's label is the tiles' eyebrow**: sidebar group labels, the drawer's section labels and the compact
   `PageHeader` all use `TILE_EYEBROW_CLASS` (`components/ui/tile.tsx`) — on the sidebar surface with
@@ -871,6 +896,13 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   category — the client Firestore rejects `undefined`) with a browser `console.warn` as the only trace; the E2E
   assertion on `performance-cache/{uid}` found it (2026-09-06, `e2e/performance.degraded.spec.ts`). `removeUndefinedDeep`
   before every `setDoc`, like every other write.
+- **A spec that edits a document another fixture also writes RESTORES what it read, never deletes** (2026-09-11):
+  `cashflow.owner.spec.ts` cleared `familyMembers` on `assetAllocationTargets/test-user-1` in its `finally`, the
+  Previdenza seed keeps «Marco» in that same field, and the two pension specs that ran after it failed with a verdict
+  missing the name. Read the fields before mutating, put back the value (or `FieldValue.delete()` only if it was
+  absent). A fixture ISIN must be one the account never held: `createAsset` re-links onto an existing asset whose
+  ISIN already has dividends. And a date planted at LOCAL midnight is 23:00 UTC of the day before — the form stores
+  `new Date('YYYY-MM-DD')`, UTC midnight, so every coupon derived from a local-midnight fixture reads the 14th.
 - **An assertion of ABSENCE needs a positive anchor first**: `toHaveCount(0)` passes against a page that has not
   rendered. Wait for something expected in both states (a `forceMount` panel: attached, not necessarily visible), then
   assert the absence; a browser check that never saw the feature ON proves nothing about it OFF.

@@ -13,6 +13,9 @@
   It applies to `income` too, and that is where the shares come from.
 - **Deliberately NOT denormalized to a name**, unlike `costCenterName`: the members live in the settings document every
   consumer already loads, so a rename costs no bulk update. The price is that every reader resolves the label itself.
+  The readers outside this tab are two, both in `lib/utils/movementsOwnerFilter.ts` (2026-09-11): Tracciamento's
+  «Intestatario» list filter and the owner chip on an attributed row (feed, table, detail drawer) — same contract,
+  blank = in comune, a lost owner = `SPLIT_UNASSIGNED_LABEL`. doc/guide/cashflow-tracciamento.md.
 - **The share is NEVER invented.** `resolveSplitBasis` returns `unavailable` — with `missingNames` — when fewer than two
   people exist, when no labor category is configured, or when **one person has no salary in the period**; every
   split-dependent figure (`share`, `commonShare`, `remaining`) is then `null` and the sentences name the missing input.
@@ -50,4 +53,4 @@
 
 ## Per-page blind spots
 
-- **Divisione**: no Playwright spec, and **the feature has never been exercised end-to-end with the flag ON** (the 2026-08-31 collaudo stopped after phase A by the owner's decision) — the pure layer, the flag-off invariance and the build are proven, the writes of `personalMemberId` and the rendering are not; the shares follow the PERIOD's salaries, so a thirteenth month moves them and a month without one recorded has no shares at all (said by name); income attributed to a person outside `laborIncomeCategoryIds` is in neither the pool nor the residual; a running year's pool carries scheduled rows (declared, like Tracciamento); a member deleted after the fact leaves rows in «Senza intestatario»; there is no bulk attribution, so history stays «all in comune» until edited row by row; the per-person tile spans 6 columns at two people and 4 at three or more.
+- **Divisione**: no Playwright spec, and **the feature has never been exercised end-to-end with the flag ON** (the 2026-08-31 collaudo stopped after phase A by the owner's decision) — the pure layer, the flag-off invariance and the build are proven, the writes of `personalMemberId` and the rendering are not; the shares follow the PERIOD's salaries, so a thirteenth month moves them and a month without one recorded has no shares at all (said by name); income attributed to a person outside `laborIncomeCategoryIds` is in neither the pool nor the residual; a running year's pool carries scheduled rows (declared, like Tracciamento); a member deleted after the fact leaves rows in «Senza intestatario»; there is no bulk attribution, so history stays «all in comune» until edited row by row; the per-person tile spans 6 columns at two people and 4 at three or more; Tracciamento's «Intestatario» filter and the owner chips exist only with the flag on, and the filter's «Senza intestatario» option appears only when the PERIOD holds an orphaned row.

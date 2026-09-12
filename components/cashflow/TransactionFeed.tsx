@@ -33,6 +33,7 @@ import { getItalyDate } from '@/lib/utils/dateHelpers';
 import { getExpenseDate } from '@/lib/utils/expenseHelpers';
 import { describeRecurrence } from '@/lib/utils/recurrenceDates';
 import { isScheduledRow } from '@/lib/utils/tracciamentoSummary';
+import { resolveOwnerLabel } from '@/lib/utils/movementsOwnerFilter';
 import type { Expense, ExpenseType } from '@/types/expenses';
 import { CompactExpenseRow, TYPE_DOT_CLASS } from '@/components/cashflow/CompactExpenseRow';
 import { LAZY_CATEGORY_ICONS } from '@/components/expenses/IconPickerPopover';
@@ -93,6 +94,7 @@ interface TransactionDetailDrawerProps {
   onDelete: (expense: Expense) => void;
   isDemo: boolean;
   categoryMetaMap: Map<string, { icon?: string; color?: string }>;
+  memberNames: Map<string, string> | null;
 }
 
 function TransactionDetailDrawer({
@@ -103,6 +105,7 @@ function TransactionDetailDrawer({
   onDelete,
   isDemo,
   categoryMetaMap,
+  memberNames,
 }: Readonly<TransactionDetailDrawerProps>) {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -140,6 +143,11 @@ function TransactionDetailDrawer({
   }
   if (expense.costCenterName) {
     details.push({ label: 'Centro di costo', value: expense.costCenterName });
+  }
+  // Only with Divisione on, and only for an attributed row: «in comune» is the silent default.
+  const ownerLabel = memberNames ? resolveOwnerLabel(expense, memberNames) : null;
+  if (ownerLabel) {
+    details.push({ label: 'Intestatario', value: ownerLabel });
   }
   if (expense.isInstallment && expense.installmentNumber && expense.installmentTotal) {
     details.push({
@@ -306,6 +314,11 @@ export interface TransactionFeedProps {
   hasActiveFilters: boolean;
   /** Map of categoryId → { icon?, color? } for row icon badges. */
   categoryMetaMap: Map<string, { icon?: string; color?: string }>;
+  /**
+   * memberId → name for the owner chip and the detail row; null when Divisione is off, so no
+   * row is ever labelled by a feature the account does not use.
+   */
+  memberNames?: Map<string, string> | null;
   /** Hint shown in the empty state when no filters are active. */
   emptyHint?: string;
   /**
@@ -333,6 +346,7 @@ export function TransactionFeed({
   isDemo,
   hasActiveFilters,
   categoryMetaMap,
+  memberNames = null,
   emptyHint = 'Nessun movimento registrato nel periodo: aggiungi la prima voce per iniziare a tracciare.',
   surface = 'card',
   className,
@@ -414,6 +428,7 @@ export function TransactionFeed({
                     categoryIcon={catMeta?.icon}
                     categoryColor={catMeta?.color}
                     scheduled={isScheduledRow(expense, now)}
+                    ownerLabel={memberNames ? resolveOwnerLabel(expense, memberNames) : null}
                   />
                 </div>
               );
@@ -451,6 +466,7 @@ export function TransactionFeed({
         }}
         isDemo={isDemo}
         categoryMetaMap={categoryMetaMap}
+        memberNames={memberNames}
       />
     </div>
   );

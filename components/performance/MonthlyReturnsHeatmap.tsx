@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import type { MonthlyReturnHeatmapData } from '@/types/performance';
 import { formatPercentage } from '@/lib/services/chartService';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
@@ -28,6 +29,22 @@ export function heatmapCellClass(value: number | null): string {
   if (value < 0) return step === 30 ? 'bg-destructive/30' : step === 55 ? 'bg-destructive/55' : 'bg-destructive/85';
   return step === 30 ? 'bg-positive/30' : step === 55 ? 'bg-positive/55' : 'bg-positive/85';
 }
+
+/**
+ * The same three steps as an inline fill, for the cells: a CSS class cannot cross-fade from one
+ * utility to another, an inline `color-mix` can — so on a period switch a cell that changes
+ * intensity or sign fades to its new colour instead of flipping (`transition-colors` below).
+ */
+export function heatmapCellStyle(value: number | null): CSSProperties {
+  if (value === null || value === 0) return { backgroundColor: 'var(--muted)' };
+  const magnitude = Math.abs(value);
+  const step = magnitude < 1 ? 30 : magnitude < 2.5 ? 55 : 85;
+  const token = value < 0 ? 'var(--destructive)' : 'var(--positive)';
+  return { backgroundColor: `color-mix(in oklab, ${token} ${step}%, transparent)` };
+}
+
+/** A year that enters the window fades in; one that leaves it fades out — never a jump of the grid. */
+const ROW_FADE = { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: { duration: 0.22 } } as const;
 
 function signedPercent(value: number): string {
   return `${value > 0 ? '+' : value < 0 ? '−' : ''}${formatPercentage(Math.abs(value), 1)}`;
@@ -74,8 +91,9 @@ export function MonthlyReturnsHeatmap({ data, className }: MonthlyReturnsHeatmap
           </tr>
         </thead>
         <tbody>
+          <AnimatePresence initial={false}>
           {data.map((row) => (
-            <tr key={row.year}>
+            <motion.tr key={row.year} {...ROW_FADE}>
               <th scope="row" className="pr-1 text-left font-mono text-[11px] font-normal tabular-nums text-muted-foreground">
                 {row.year}
               </th>
@@ -84,7 +102,8 @@ export function MonthlyReturnsHeatmap({ data, className }: MonthlyReturnsHeatmap
                 return (
                   <td
                     key={m.month}
-                    className={cn('h-[28px] rounded-[3px]', heatmapCellClass(m.return))}
+                    className="h-[28px] rounded-[3px] motion-safe:transition-colors motion-safe:duration-300"
+                    style={heatmapCellStyle(m.return)}
                     title={title}
                     onPointerEnter={(event) => {
                       if (!finePointer) return;
@@ -104,8 +123,9 @@ export function MonthlyReturnsHeatmap({ data, className }: MonthlyReturnsHeatmap
                   </td>
                 );
               })}
-            </tr>
+            </motion.tr>
           ))}
+          </AnimatePresence>
         </tbody>
       </table>
     </div>

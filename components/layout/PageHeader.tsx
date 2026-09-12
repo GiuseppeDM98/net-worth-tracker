@@ -19,7 +19,8 @@ interface PageHeaderProps {
  */
 export function PageHeader({ title, label, description, actions, className }: PageHeaderProps) {
   return (
-    <div className={className}>
+    // `page-header`: the page scene morphs this line into the next page's (globals.css → Page scene).
+    <div className={className} style={{ viewTransitionName: 'page-header' }}>
       {/* Mobile sticky navbar — title + description in one block so the header
           feels like a unified navbar. */}
       <div className="sticky top-0 z-20 -mx-4 px-4 pt-1 pb-2 flex flex-col bg-background/95 backdrop-blur-sm desktop:hidden">

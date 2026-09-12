@@ -6,7 +6,24 @@ import {
 } from '@/lib/services/yahooFinanceService';
 import { getBondPriceByIsin } from '@/lib/services/borsaItalianaBondScraperService';
 import { convertToEur } from '@/lib/services/currencyConversionService';
+import { resolveBondPrice } from '@/lib/utils/bondPricing';
+import { latestIndexationCoefficient, resolveInflationIndexation } from '@/lib/utils/couponUtils';
 import { Asset } from '@/types/assets';
+
+/**
+ * A Borsa Italiana quote (% of par) as euro per unit for this bond: the ONE pricing rule of
+ * `lib/utils/bondPricing.ts`, with the nominal per unit (1 € when unset — the quantity is then the
+ * nominal in euro) and, for a BTP€i, the latest indexation coefficient the user has entered.
+ * Example: 104.2 % × 1.000 € nominal = 1.042 € per lot; 93 % with no nominal = 0,93 € per unit.
+ */
+function bondQuoteToEurPerUnit(bond: Asset, quote: number, now: Date): number {
+  const bondDetails = bond.bondDetails;
+  const indexationCoefficient =
+    bondDetails && resolveInflationIndexation(bondDetails) === 'euro'
+      ? (latestIndexationCoefficient(bondDetails.indexationCoefficients, now) ?? undefined)
+      : undefined;
+  return resolveBondPrice(quote, { nominalValue: bondDetails?.nominalValue, indexationCoefficient }, true);
+}
 
 export interface PriceUpdateResult {
   updated: number;
@@ -99,14 +116,9 @@ export async function updateUserAssetPrices(
         const bondPrice = await getBondPriceByIsin(bond.isin);
 
         if (bondPrice && bondPrice.price && bondPrice.price > 0) {
-          // Bond prices from Borsa Italiana are quoted as % of par (e.g. 104.2 = 104.2%).
-          // If nominalValue is set, convert to actual EUR per unit so that
-          // totalValue = currentPrice × quantity is correct.
-          // Example: 104.2% × €1,000 nominalValue = €1,042 per lot
-          const nominalValue = bond.bondDetails?.nominalValue;
-          const adjustedPrice = nominalValue && nominalValue > 1
-            ? bondPrice.price * (nominalValue / 100)
-            : bondPrice.price;
+          // Bond prices from Borsa Italiana are quoted as % of par (e.g. 104.2 = 104.2%): convert
+          // to EUR per unit so that totalValue = currentPrice × quantity is correct.
+          const adjustedPrice = bondQuoteToEurPerUnit(bond, bondPrice.price, new Date());
 
           const assetRef = adminDb.collection('assets').doc(bond.id);
           await assetRef.update({
@@ -123,10 +135,7 @@ export async function updateUserAssetPrices(
 
           if (quote && quote.price !== null && quote.price > 0) {
             // Same % → EUR conversion for Yahoo Finance fallback
-            const nominalValue = bond.bondDetails?.nominalValue;
-            const adjustedPrice = nominalValue && nominalValue > 1
-              ? quote.price * (nominalValue / 100)
-              : quote.price;
+            const adjustedPrice = bondQuoteToEurPerUnit(bond, quote.price, new Date());
 
             const assetRef = adminDb.collection('assets').doc(bond.id);
             await assetRef.update({

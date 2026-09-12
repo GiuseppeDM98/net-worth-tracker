@@ -10,7 +10,6 @@ import { chartShellSettle } from '@/lib/utils/motionVariants';
 interface UnderwaterDrawdownChartProps {
   data: UnderwaterDrawdownData[];
   height?: number;
-  revealKey?: string;
 }
 
 interface CustomTooltipProps {
@@ -64,7 +63,6 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
 export function UnderwaterDrawdownChart({
   data,
   height = 400,
-  revealKey,
 }: UnderwaterDrawdownChartProps) {
   const prefersReducedMotion = useReducedMotion();
   const gradientId = useId();
@@ -89,7 +87,6 @@ export function UnderwaterDrawdownChart({
 
   return (
     <motion.div
-      key={revealKey}
       variants={chartShellSettle}
       initial={prefersReducedMotion ? false : 'idle'}
       animate={prefersReducedMotion ? 'idle' : 'settle'}

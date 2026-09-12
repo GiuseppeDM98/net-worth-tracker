@@ -2,8 +2,10 @@ import { describe, it, expect } from 'vitest'
 
 import {
   buildAssetClassComposition,
+  buildBreakdownForRow,
   buildLiquidityComposition,
   buildChartAriaLabel,
+  findCompositionRow,
   formatPeriodLabel,
   shareKey,
   valueKey,
@@ -350,5 +352,35 @@ describe('buildChartAriaLabel', () => {
 
     // Assert
     expect(label).toContain('nessun dato')
+  })
+})
+
+describe('buildBreakdownForRow / findCompositionRow (the scrubbed month)', () => {
+  it('should rank a past row like the latest one and measure its drift against its own year earlier', () => {
+    const series = buildLiquidityComposition([
+      makeLiquidityPoint(3, 2025, 60, 40),
+      makeLiquidityPoint(3, 2026, 80, 20),
+      makeLiquidityPoint(4, 2026, 50, 50),
+    ])
+    const march = findCompositionRow(series, { year: 2026, month: 3 })!
+    const breakdown = buildBreakdownForRow(series, march)
+    expect(breakdown.map((e) => e.key)).toEqual(['liquid', 'illiquid'])
+    expect(breakdown[0].sharePct).toBeCloseTo(80, 5)
+    // March 2026 against March 2025: 80 − 60.
+    expect(breakdown[0].deltaPp).toBeCloseTo(20, 5)
+    // The latest row (April 2026) has no April 2025: unknowable, never 0.
+    expect(series.breakdown[0].deltaPp).toBeNull()
+  })
+
+  it('should be the same function the series ran on its latest row', () => {
+    const series = buildLiquidityComposition([makeLiquidityPoint(1, 2026, 70, 30), makeLiquidityPoint(2, 2026, 30, 70)])
+    const latest = series.rows[series.rows.length - 1]
+    expect(buildBreakdownForRow(series, latest)).toEqual(series.breakdown)
+  })
+
+  it('should find no row for a month the series does not cover, nor for no month at all', () => {
+    const series = buildLiquidityComposition([makeLiquidityPoint(1, 2026, 70, 30)])
+    expect(findCompositionRow(series, { year: 2025, month: 12 })).toBeNull()
+    expect(findCompositionRow(series, null)).toBeNull()
   })
 })

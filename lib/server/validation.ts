@@ -87,6 +87,8 @@ const assetTransactionBaseSchema = z.object({
   pricePerUnit: z.number().finite().min(0),
   fees: z.number().finite().min(0).optional(),
   linkedCashAssetId: z.string().min(1).optional(),
+  // BTP€i: the indexation coefficient behind pricePerUnit (metadata for the edit form; > 0).
+  indexationCoefficient: z.number().finite().positive().optional(),
   note: z.string().max(500).optional(),
 });
 
