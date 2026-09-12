@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import Link from 'next/link';
+import { SceneLink } from '@/components/layout/SceneLink';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -189,7 +189,7 @@ export function SecondaryMenuDrawer({ open, onOpenChange }: SecondaryMenuDrawerP
                   <ul className="m-0 list-none p-0">
                     {analysisNav.map((nav) => (
                       <motion.li key={nav.href} variants={drawerItem}>
-                        <Link
+                        <SceneLink
                           href={nav.href}
                           aria-current={isActive(nav.href) ? 'page' : undefined}
                           onClick={() => onOpenChange(false)}
@@ -197,7 +197,7 @@ export function SecondaryMenuDrawer({ open, onOpenChange }: SecondaryMenuDrawerP
                         >
                           <nav.icon className="size-5 shrink-0" />
                           {nav.name}
-                        </Link>
+                        </SceneLink>
                       </motion.li>
                     ))}
                   </ul>
@@ -211,7 +211,7 @@ export function SecondaryMenuDrawer({ open, onOpenChange }: SecondaryMenuDrawerP
                   <ul className="m-0 list-none p-0">
                     {planningNav.map((nav) => (
                       <motion.li key={nav.href} variants={drawerItem}>
-                        <Link
+                        <SceneLink
                           href={nav.href}
                           aria-current={isActive(nav.href) ? 'page' : undefined}
                           onClick={() => onOpenChange(false)}
@@ -219,7 +219,7 @@ export function SecondaryMenuDrawer({ open, onOpenChange }: SecondaryMenuDrawerP
                         >
                           <nav.icon className="size-5 shrink-0" />
                           {nav.name}
-                        </Link>
+                        </SceneLink>
                       </motion.li>
                     ))}
                   </ul>
@@ -229,7 +229,7 @@ export function SecondaryMenuDrawer({ open, onOpenChange }: SecondaryMenuDrawerP
                 {process.env.NEXT_PUBLIC_ASSISTANT_AI_ENABLED !== 'false' && (
                   <ul className="m-0 list-none border-t border-sidebar-border p-0 pt-1 mx-1 mt-1">
                     <motion.li variants={drawerItem}>
-                      <Link
+                      <SceneLink
                         href={assistantNavItem.href}
                         aria-current={isActive(assistantNavItem.href) ? 'page' : undefined}
                         onClick={() => onOpenChange(false)}
@@ -237,7 +237,7 @@ export function SecondaryMenuDrawer({ open, onOpenChange }: SecondaryMenuDrawerP
                       >
                         <assistantNavItem.icon className="size-5 shrink-0" />
                         {assistantNavItem.name}
-                      </Link>
+                      </SceneLink>
                     </motion.li>
                   </ul>
                 )}
@@ -298,10 +298,10 @@ export function SecondaryMenuDrawer({ open, onOpenChange }: SecondaryMenuDrawerP
                       )}
                       <DropdownMenuGroup>
                         <DropdownMenuItem asChild>
-                          <Link href="/dashboard/settings" onClick={() => onOpenChange(false)}>
+                          <SceneLink href="/dashboard/settings" onClick={() => onOpenChange(false)}>
                             <Settings className="size-4" />
                             Impostazioni
-                          </Link>
+                          </SceneLink>
                         </DropdownMenuItem>
                       </DropdownMenuGroup>
                       <DropdownMenuSeparator />

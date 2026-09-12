@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { SceneLink } from '@/components/layout/SceneLink';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { MoreHorizontal, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -86,7 +86,7 @@ export function BottomNavigation() {
               {primaryNav.map((item) => {
                 const isActive = isNavItemActive(item.href, pathname);
                 return (
-                  <Link
+                  <SceneLink
                     key={item.name}
                     href={item.href}
                     aria-current={isActive ? 'page' : undefined}
@@ -106,7 +106,7 @@ export function BottomNavigation() {
                     )}
                     <item.icon className="relative z-10 h-5 w-5" aria-hidden="true" />
                     <span className="relative z-10 text-[11px] font-medium leading-none">{item.name}</span>
-                  </Link>
+                  </SceneLink>
                 );
               })}
 

@@ -215,6 +215,11 @@ The app **is** locally runnable; there is no fallback to declare.
 - **The outcome of a verification**: `SESSION_NOTES.md` during the session (untracked — delete it
   before the commit); it is folded into `CLAUDE.md` (the "Latest" entry) and `Draft Release Temp.md`
   before the PR.
+- **Impeccable critiques are committed** (since 2026-09-12): `.impeccable/critique/*.md` is tracked,
+  so the snapshot `polish` reads as its backlog is the same on every machine. A critique is
+  committed in the session that produces it; one that describes a surface since rebuilt is
+  deleted, not kept as history (the eleven pre-«Verdict over Tiles» ones were removed that day).
+  `.impeccable/hook.cache.json` stays local (`.git/info/exclude`).
 - **Do not duplicate project conventions here.** Code and comment conventions live in
   `DEVELOPMENT_GUIDELINES.md` and `COMMENTS.md`, repo-wide patterns and traps in `AGENTS.md`, the
   per-area rules in `doc/guide/<tema>.md`, the aesthetic in `DESIGN.md`, environment and emulators

@@ -1,10 +1,12 @@
 'use client';
 
+import { useMemo } from 'react';
 import type { GrowthOfHundredSeries } from '@/lib/utils/performanceSummary';
 import { formatNumber } from '@/lib/services/chartService';
 import { MONTH_NAMES_SHORT } from '@/lib/utils/period';
 import { cn } from '@/lib/utils';
 import { ChartHoverTip, useChartHover } from '@/components/ui/chart-hover';
+import { useMorphingSeries } from '@/lib/hooks/useMorphingSeries';
 
 interface GrowthOfHundredChartProps {
   series: GrowthOfHundredSeries;
@@ -38,28 +40,40 @@ export function pickAxisIndices(count: number, max = MAX_AXIS_LABELS): number[] 
  * free height, the labels live outside the SVG, and a mouse reads the month under it. The
  * benchmark is a baseline, so it takes the neutral `--muted-foreground`, never a series colour:
  * a coloured benchmark would compete with the one line the tile is about.
+ *
+ * A period switch does not redraw the plot: both lines glide from the window they showed to the
+ * new one (`useMorphingSeries`), scale included, and the hover reads the landed figures only.
  */
 export function GrowthOfHundredChart({ series, benchmarkName, minHeight = 160, className }: GrowthOfHundredChartProps) {
   const { points } = series;
-  const values = points.flatMap((p) => (p.benchmark === null ? [p.portfolio] : [p.portfolio, p.benchmark]));
+  // The drawn series: the landed points, or a frame of the glide towards them.
+  const portfolioTarget = useMemo(() => points.map((p) => p.portfolio), [points]);
+  const benchmarkTarget = useMemo(() => points.map((p) => p.benchmark), [points]);
+  const portfolio = useMorphingSeries(portfolioTarget);
+  const benchmark = useMorphingSeries(benchmarkTarget);
+
+  const values = portfolio.flatMap((v, i) => {
+    const b = benchmark[i];
+    return v === null ? [] : b === null || b === undefined ? [v] : [v, b];
+  });
   const min = Math.min(...values);
   const max = Math.max(...values);
   const span = max - min || 1;
   const sx = (i: number) => (points.length > 1 ? (i / (points.length - 1)) * VIEW_W : 0);
   const sy = (v: number) => PAD + (1 - (v - min) / span) * (VIEW_H - PAD * 2);
 
-  const portfolioPath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${sx(i).toFixed(1)},${sy(p.portfolio).toFixed(1)}`).join(' ');
+  const portfolioPath = portfolio.map((v, i) => `${i === 0 ? 'M' : 'L'}${sx(i).toFixed(1)},${sy(v ?? 100).toFixed(1)}`).join(' ');
   const areaPath = `${portfolioPath} L${VIEW_W},${VIEW_H} L0,${VIEW_H} Z`;
   // The benchmark may have gaps (a month not yet published): each run of months is its own path.
   const benchmarkPaths: string[] = [];
   let run: string[] = [];
-  points.forEach((p, i) => {
-    if (p.benchmark === null) {
+  benchmark.forEach((v, i) => {
+    if (v === null || v === undefined) {
       if (run.length > 1) benchmarkPaths.push(run.join(' '));
       run = [];
       return;
     }
-    run.push(`${run.length === 0 ? 'M' : 'L'}${sx(i).toFixed(1)},${sy(p.benchmark).toFixed(1)}`);
+    run.push(`${run.length === 0 ? 'M' : 'L'}${sx(i).toFixed(1)},${sy(v).toFixed(1)}`);
   });
   if (run.length > 1) benchmarkPaths.push(run.join(' '));
 

@@ -493,7 +493,21 @@ file used to carry.
 - Shared variants live in `lib/utils/motionVariants.ts`; `useReducedMotion()` is called once per component and used
   inline, with `<MotionConfig reducedMotion="user">` at the layout root — no separate CSS media queries.
 - **Page transitions use `template.tsx`, NOT `layout.tsx` + `AnimatePresence`** (it re-mounts on every navigation);
-  remove page-level `motion.div variants` wrappers once it is in place (compounded opacity: t²).
+  remove page-level `motion.div variants` wrappers once it is in place (compounded opacity: t²). **Since 2026-09-12 a
+  click on a shell link is a page SCENE** — a native view transition (`lib/hooks/useSceneNavigation.ts` →
+  `runViewTransition('page', …)`, whose DOM update resolves when `usePathname()` changes, with a 700 ms guard for a route
+  the dev server is still compiling) — and `template.tsx` stands down for that mount (`<html data-vt="page">` read once in
+  a `useState` initializer): two fades on one page compound. React 19.2 stable exports no `ViewTransition` and
+  `next.config` enables no experimental flag; the native API is the whole mechanism, and a browser without it (Firefox)
+  or a reader with reduced motion gets a plain `router.push` and the template's fade.
+- **`lib/utils/viewTransition.ts` is the ONE entry to `document.startViewTransition`**, and it stamps `data-vt="theme"` or
+  `data-vt="page"` on `<html>` for the length of the transition: every `::view-transition-*` rule in `globals.css` is
+  scoped by that attribute. An unscoped `::view-transition-new(root)` rule runs on EVERY transition — the theme's
+  circle-clip used to be global and would have clipped every navigation. **A `view-transition-name` must be unique among
+  the RENDERED elements of a page**, or the browser skips the whole transition (the update still applies, silently):
+  `page-verdict` lives on `PageVerdict` and on the skeleton's verdict block (never both mounted), `page-header` on
+  `PageHeader`, `page-main` on the layout's `<main>`; a `forceMount` tab panel is `display: none` and does not count.
+  Do not name the tile grid — several pages render more than one.
 - `useCountUp` always with `once: true`, called **before** any conditional early return and unconditionally for both
   branches of a mode switch; it has **no `enabled` option**, so gate the display in JSX. **`layout="position"`, not bare
   `layout`, when a Framer parent wraps a Radix `CollapsibleContent`** — bare `layout` stretches the trigger text.
@@ -532,6 +546,12 @@ file used to carry.
 
 ### Recharts
 - **`useChartColors()` is mandatory for every series** — read CSS vars after paint and pass `chartColors[0..4]` as props.
+- **A Recharts series can drive the PAGE, not just its tooltip**: `onMouseMove` hands `activeTooltipIndex` (a number OR
+  a numeric string in 3.x — coerce, `activeIndexOf` in `EvoluzioneTile`) and `onMouseLeave` the end; lift the index's
+  PERIOD, never the index (the tiles that follow have their own arrays), attach the handlers only under `(pointer:
+  fine)`, and let a pure module resolve what every follower shows (`lib/utils/storicoScrub.ts` is the worked example).
+  A hand-written SVG that must glide between windows resamples the OLD series onto the new length and tweens per
+  index (`lib/hooks/useMorphingSeries.ts`); the hover reads the landed data, never the frame.
 - **Never pass `useChartColors()` to a Nivo/react-spring component**: `@react-spring/web` cannot interpolate hex→oklch
   and throws on load. Sankey node colors stay hardcoded hex; only Recharts is react-spring-free.
 - **Three separate tooltip style props, none inherited**: `contentStyle`, `labelStyle`, `itemStyle` — omitting
@@ -573,7 +593,9 @@ file used to carry.
 
 ### Navigation
 - **Single source for nav arrays**: `lib/constants/navigation.ts` — Sidebar, BottomNavigation and SecondaryMenuDrawer all
-  import from it, never redeclare inline. **The assistant is `assistantNavItem`**, a route rendered by the same `NavItems`
+  import from it, never redeclare inline. **A route link in the shell is a `SceneLink`** (`components/layout/SceneLink.tsx`,
+  a `next/link` whose plain left click runs the page scene — prefetch, modifier clicks, `target` and the caller's own
+  `onClick` are untouched); a bare `<Link>` there navigates without the scene. **The assistant is `assistantNavItem`**, a route rendered by the same `NavItems`
   as the groups (gated by `NEXT_PUBLIC_ASSISTANT_AI_ENABLED` at render); there is no banner component to restyle.
 - **The shell's label is the tiles' eyebrow**: sidebar group labels, the drawer's section labels and the compact
   `PageHeader` all use `TILE_EYEBROW_CLASS` (`components/ui/tile.tsx`) — on the sidebar surface with
