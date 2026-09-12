@@ -10,6 +10,14 @@
  * period axis: its question is the whole history, and the one tile on a window (Driver, from
  * the cashflow floor) names it. Everything deeper lives below the grid behind «Dettaglio».
  *
+ * THE SCRUB (2026-09-12): with a fine pointer the Evoluzione series is the page's month axis
+ * for as long as the pointer is on it. The tile lifts the month under the pointer here, ONE pure
+ * resolution (`resolveScrubView`) decides what every tile shows for it, and each tile receives
+ * its own slice: the point (Evoluzione), the month (Composizione), the breakdown key (Valore per
+ * strumento, only when the snapshot carries `byAsset`), the slot (Driver). Leaving the plot or
+ * pressing Escape ends the reading; nothing is committed — the Select of Valore per strumento
+ * keeps the month the user chose.
+ *
  *   Desktop (12 col): Evoluzione(8, 2 rows) | Raddoppi(4, 2 rows)
  *                     Composizione(8)       | Driver(4)
  *                     Valore per strumento(12)
@@ -70,6 +78,8 @@ import {
 } from '@/lib/utils/storicoNarrative';
 import { buildMonthAssetBreakdown, buildSelectedAssetTrend, getAvailableSnapshotMonths, summarizeSelection } from '@/lib/utils/snapshotAssetBreakdown';
 import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
+import { resolveScrubView } from '@/lib/utils/storicoScrub';
+import type { PeriodMonth } from '@/lib/utils/storicoSummary';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { PageContainer } from '@/components/layout/PageContainer';
@@ -122,6 +132,8 @@ export default function HistoryPage() {
   // Valore per strumento: the month (null = the latest with a breakdown) and the ticked instruments.
   const [selectedMonthKey, setSelectedMonthKey] = useState<string | null>(null);
   const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(new Set());
+  /** The month under the pointer on Evoluzione (the scrub); null = today. */
+  const [scrubPeriod, setScrubPeriod] = useState<PeriodMonth | null>(null);
 
   /** Snapshots, assets, targets, expenses and settings, in parallel. */
   const loadData = async () => {
@@ -262,7 +274,13 @@ export default function HistoryPage() {
     if (selectedMonthKey && breakdownMonths.some((m) => m.key === selectedMonthKey)) return selectedMonthKey;
     return breakdownMonths[0]?.key ?? null;
   }, [selectedMonthKey, breakdownMonths]);
-  const breakdown = useMemo(() => (activeMonthKey ? buildMonthAssetBreakdown(ordered, activeMonthKey) : null), [ordered, activeMonthKey]);
+  // The scrub, resolved once for every tile; Valore per strumento follows it only when the month has a breakdown.
+  const scrub = useMemo(
+    () => resolveScrubView({ period: scrubPeriod, points: evolutionPoints, breakdownMonths, driverMonths: trailingDriverMonths }),
+    [scrubPeriod, evolutionPoints, breakdownMonths, trailingDriverMonths],
+  );
+  const readMonthKey = scrub?.breakdownMonthKey ?? activeMonthKey;
+  const breakdown = useMemo(() => (readMonthKey ? buildMonthAssetBreakdown(ordered, readMonthKey) : null), [ordered, readMonthKey]);
   const selection = useMemo(() => (breakdown ? summarizeSelection(breakdown, selectedAssetIds) : null), [breakdown, selectedAssetIds]);
   const selectionTrend = useMemo(() => buildSelectedAssetTrend(ordered, selectedAssetIds), [ordered, selectedAssetIds]);
 
@@ -401,6 +419,8 @@ export default function HistoryPage() {
             noteCount={notes.length}
             onAddNote={() => !isDemo && setNoteDialogOpen(true)}
             disabled={isDemo}
+            scrub={scrub}
+            onScrub={setScrubPeriod}
           />
         </div>
 
@@ -417,7 +437,7 @@ export default function HistoryPage() {
         </div>
 
         <div className={cn(TILE_CELL_CLASS, 'order-3 tablet:order-4 tablet:col-span-2 desktop:order-none desktop:col-span-8')}>
-          <ComposizioneTile assetClassHistory={assetClassHistory} liquidityHistory={netWorthHistory} hasPensionFunds={pensionAssets.length > 0} />
+          <ComposizioneTile assetClassHistory={assetClassHistory} liquidityHistory={netWorthHistory} hasPensionFunds={pensionAssets.length > 0} scrub={scrub?.period ?? null} />
         </div>
 
         <div className={cn(TILE_CELL_CLASS, 'order-4 tablet:order-3 desktop:order-none desktop:col-span-4')}>
@@ -429,6 +449,7 @@ export default function HistoryPage() {
             startYear={startYear}
             months={trailingDriverMonths}
             windowMonths={DRIVER_TRAILING_MONTHS}
+            scrubIndex={scrub?.driverIndex ?? null}
           />
         </div>
 
@@ -436,7 +457,7 @@ export default function HistoryPage() {
           <ValoreStrumentoTile
             reading={describeMonthBreakdown(breakdown)}
             months={breakdownMonths}
-            activeMonthKey={activeMonthKey}
+            activeMonthKey={readMonthKey}
             onMonthChange={setSelectedMonthKey}
             breakdown={breakdown}
             displayTickerByAssetId={displayTickerByAssetId}

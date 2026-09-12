@@ -153,10 +153,14 @@
   }
 }
 
-/* ─── Theme Toggle — View Transition circle reveal ─────────────────────────── */
-/* Triggered when toggling dark/light mode. The origin (--vt-cx, --vt-cy) is   */
-/* set inline by the toggle button to the click coordinates. Falls back to      */
-/* centre of viewport on browsers without View Transitions API support.         */
+/* ─── View Transitions — two scenes, scoped by html[data-vt] ────────────────── */
+/* `lib/utils/viewTransition.ts` stamps `data-vt="theme"` or `data-vt="page"` on  */
+/* <html> for the length of a transition, so each scene's rules apply only to    */
+/* its own transition: the theme's circle never clips a navigation, and the       */
+/* navigation's fade never runs on a theme change. Both scenes skip entirely     */
+/* under prefers-reduced-motion (the helper never starts them).                  */
+
+/* Theme toggle — circle reveal from the button (--vt-cx/--vt-cy set inline).   */
 
 @keyframes vt-reveal {
   from { clip-path: circle(0px at var(--vt-cx, 50%) var(--vt-cy, 50%)); }
@@ -168,14 +172,59 @@
   to   { clip-path: circle(0px at var(--vt-cx, 50%) var(--vt-cy, 50%)); }
 }
 
-::view-transition-new(root) {
+html[data-vt="theme"]::view-transition-new(root) {
   animation: vt-reveal 0.45s cubic-bezier(0.4, 0, 0.2, 1) forwards;
   z-index: 9999;
 }
 
-::view-transition-old(root) {
+html[data-vt="theme"]::view-transition-old(root) {
   animation: none;
   z-index: -1;
+}
+
+/* Page scene — a navigation between two dashboard pages (DESIGN.md → The Page Scene).      */
+/* The shell (sidebar, bottom pill) is not part of the scene: the root swaps at once and   */
+/* only the named regions animate. The main region cross-fades with a 6px settle; the     */
+/* header and the verdict keep their names across pages, so the browser morphs each from   */
+/* its old box to its new one — the sentence that answers the page's question is seen      */
+/* changing in place, never redrawn. ease-out-quart, the app's single easing.              */
+
+@keyframes vt-page-out {
+  to { opacity: 0; }
+}
+
+@keyframes vt-page-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+html[data-vt="page"]::view-transition-old(root),
+html[data-vt="page"]::view-transition-new(root) {
+  animation: none;
+}
+
+html[data-vt="page"]::view-transition-old(page-main),
+html[data-vt="page"]::view-transition-old(page-header),
+html[data-vt="page"]::view-transition-old(page-verdict) {
+  animation: vt-page-out 0.14s ease-in forwards;
+}
+
+html[data-vt="page"]::view-transition-new(page-main),
+html[data-vt="page"]::view-transition-new(page-header),
+html[data-vt="page"]::view-transition-new(page-verdict) {
+  animation: vt-page-in 0.32s cubic-bezier(0.25, 1, 0.5, 1) both;
+}
+
+html[data-vt="page"]::view-transition-group(page-header),
+html[data-vt="page"]::view-transition-group(page-verdict) {
+  animation-duration: 0.32s;
+  animation-timing-function: cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+/* The two snapshots of a morphing region overlap while one fades out and the other in. */
+html[data-vt="page"]::view-transition-image-pair(page-header),
+html[data-vt="page"]::view-transition-image-pair(page-verdict) {
+  isolation: isolate;
 }
 
 /* ─── Color Themes ─────────────────────────────────────────────────────────── */

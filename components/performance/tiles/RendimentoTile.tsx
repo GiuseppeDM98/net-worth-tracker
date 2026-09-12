@@ -30,9 +30,13 @@ interface RendimentoTileProps {
   className?: string;
 }
 
-/** Leaf so the rAF count-up re-renders only this span, not the whole tile (DESIGN.md → count-up isolation). */
+/**
+ * Leaf so the rAF count-up re-renders only this span, not the whole tile (DESIGN.md → count-up
+ * isolation). It counts up once on mount and, on a period switch, glides from the figure it showed
+ * to the new one — the tile is not remounted any more, so the number is seen changing.
+ */
 function HeroValue({ value }: { value: number }) {
-  const animated = useCountUp(value, { duration: 620, once: true });
+  const animated = useCountUp(value, { duration: 620, fromPrevious: true });
   const shown = animated ?? value;
   return <>{`${shown > 0 ? '+' : shown < 0 ? '−' : ''}${formatPercentage(Math.abs(shown), 1)}`}</>;
 }

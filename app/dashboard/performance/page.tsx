@@ -568,7 +568,6 @@ export default function PerformancePage() {
     });
   }, [performanceData, metrics]);
 
-  const periodRenderKey = metrics ? `${selectedPeriod}-${metrics.startDate.toISOString()}-${metrics.endDate.toISOString()}` : selectedPeriod;
   const currentYear = getItalyMonthYear().year;
 
   const headerActions = (stacked: boolean) => (
@@ -732,9 +731,11 @@ export default function PerformancePage() {
       )}
 
       {/* ── Tile grid ───────────────────────────────────────────────────────────── */}
+      {/* No `key` on the grid (2026-09-12): a period switch TRANSFORMS every tile — the hero glides,
+          the plots morph, the heatmap fades cell by cell, the bars slide — so the tiles must survive
+          it. Only a refresh, which re-reads the data, dims the grid while it waits. */}
       <div
-        key={periodRenderKey}
-        className={cn('grid grid-cols-1 gap-3 transition-opacity duration-200 tablet:grid-cols-2 desktop:grid-cols-12', (isPendingPeriodChange || isRefreshing) && 'opacity-60')}
+        className={cn('grid grid-cols-1 gap-3 transition-opacity duration-200 tablet:grid-cols-2 desktop:grid-cols-12', isRefreshing && 'opacity-60')}
         aria-busy={isPendingPeriodChange || isRefreshing}
       >
         <div className={cn(TILE_CELL_CLASS, 'order-1 tablet:col-span-2 desktop:order-none desktop:col-span-5 desktop:row-span-2')}>
@@ -843,7 +844,6 @@ export default function PerformancePage() {
         rollingSharpe={rollingSharpe}
         underwater={underwaterData}
         attribution={attribution}
-        renderKey={periodRenderKey}
       />
 
       {/* ── Dialogs ─────────────────────────────────────────────────────────────── */}

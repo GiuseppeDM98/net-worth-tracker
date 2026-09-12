@@ -11,10 +11,23 @@
  * Why not layout.tsx + AnimatePresence: Next.js App Router wraps navigations in
  * startTransition (React 18 concurrent), which can cause AnimatePresence to inherit
  * the previous variant context ("visible") and skip initial="hidden" on the new child.
+ *
+ * Since 2026-09-12 a click on the shell's links runs the navigation as a page SCENE — a
+ * native view transition (`useSceneNavigation`, globals.css → Page scene). While one is in
+ * flight `<html data-vt="page">` is set and this fade stands down: two fades on one page
+ * would compound (t²). It stays the transition for everything else — a browser without the
+ * API, a `router.push` from a page, the back button.
  */
 
+import { useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { pageVariants } from '@/lib/utils/motionVariants';
+import { VIEW_TRANSITION_ATTRIBUTE } from '@/lib/utils/viewTransition';
+
+/** True when this mount is the landing of a page scene: the view transition is the entrance. */
+function isInsidePageScene(): boolean {
+  return typeof document !== 'undefined' && document.documentElement.getAttribute(VIEW_TRANSITION_ATTRIBUTE) === 'page';
+}
 
 export default function DashboardTemplate({
   children,
@@ -22,6 +35,10 @@ export default function DashboardTemplate({
   children: React.ReactNode;
 }) {
   const prefersReducedMotion = useReducedMotion();
+  // Read once, on the render that mounts the page: the attribute is gone by the time it lands.
+  const [sceneEntrance] = useState(isInsidePageScene);
+
+  if (sceneEntrance) return <>{children}</>;
 
   return (
     <motion.div

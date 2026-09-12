@@ -89,6 +89,7 @@ export interface CompositionBreakdownEntry {
 export interface CompositionSeries {
   /** Bands actually present in the data, in stack order (first = bottom of the stack). */
   bands: CompositionBand[];
+  /** Chronological, one per snapshot month. */
   rows: CompositionRow[];
   /** Latest month, ranked by value descending. Empty when there is no data. */
   breakdown: CompositionBreakdownEntry[];
@@ -192,32 +193,53 @@ function buildSeries(candidateBands: CompositionBand[], points: RawPoint[]): Com
     return { bands, rows, breakdown: [], latestTotalEur: null, latestPeriodLabel: null };
   }
 
-  const yearEarlier = rows.find(
-    (row) => row.year === (latest.year as number) - 1 && row.month === latest.month
+  return {
+    bands,
+    rows,
+    breakdown: buildBreakdownForRow({ bands, rows }, latest),
+    latestTotalEur: latest.totalNetWorth as number,
+    latestPeriodLabel: formatPeriodLabel(latest.month as number, latest.year as number),
+  };
+}
+
+/**
+ * One month's breakdown list: every band's euro and share on that row, ranked by value, with the
+ * drift against the same month one year earlier (`null` when that month is not in the series —
+ * unknowable, never 0). The series' own `breakdown` is this function on the latest row; a scrubbed
+ * month on Storico is the same function on the row under the pointer, so the two can never
+ * disagree on what a row means.
+ */
+export function buildBreakdownForRow(
+  series: Pick<CompositionSeries, 'bands' | 'rows'>,
+  row: CompositionRow
+): CompositionBreakdownEntry[] {
+  const yearEarlier = series.rows.find(
+    (candidate) => candidate.year === (row.year as number) - 1 && candidate.month === row.month
   );
 
-  const breakdown: CompositionBreakdownEntry[] = bands
+  return series.bands
     .map((band) => {
-      const sharePct = latest[shareKey(band.key)] as number;
+      const sharePct = row[shareKey(band.key)] as number;
       const priorShare = yearEarlier?.[shareKey(band.key)] as number | undefined;
       return {
         key: band.key,
         label: band.label,
         colorIndex: band.colorIndex,
-        valueEur: latest[valueKey(band.key)] as number,
+        valueEur: row[valueKey(band.key)] as number,
         sharePct,
         deltaPp: priorShare === undefined ? null : sharePct - priorShare,
       };
     })
     .sort((a, b) => b.valueEur - a.valueEur);
+}
 
-  return {
-    bands,
-    rows,
-    breakdown,
-    latestTotalEur: latest.totalNetWorth as number,
-    latestPeriodLabel: formatPeriodLabel(latest.month as number, latest.year as number),
-  };
+/** The row of a calendar month, or `null` when the series has no snapshot for it. */
+export function findCompositionRow(
+  series: Pick<CompositionSeries, 'rows'>,
+  period: { year: number; month: number } | null
+): CompositionRow | null {
+  if (!period) return null;
+  return series.rows.find((row) => row.year === period.year && row.month === period.month) ?? null;
 }
 
 /**
