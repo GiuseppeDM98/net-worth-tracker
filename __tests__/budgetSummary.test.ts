@@ -61,6 +61,7 @@ describe('summarizeCeiling', () => {
     const s = summarizeCeiling(4000, august, NOW)!;
     expect(s.spent).toBe(2910);
     expect(s.usedPct).toBeCloseTo(72.75);
+    expect(s.spentToDatePct).toBeCloseTo(72.75);
     expect(s.calendarPct).toBeCloseTo((22 / 31) * 100);
     expect(s.calendar.daysLeft).toBe(9);
     expect(s.remaining).toBe(1090);
@@ -74,6 +75,8 @@ describe('summarizeCeiling', () => {
     expect(s.spent).toBe(3060); // the instalment is booked in the month
     expect(s.spentToDate).toBe(2910);
     expect(s.scheduled).toBe(150);
+    expect(s.spentToDatePct).toBeCloseTo(72.75);
+    expect(s.usedPct).toBeCloseTo((3060 / 4000) * 100);
     expect(s.projection).toBeCloseTo((2910 / 22) * 31 + 150);
   });
 
@@ -290,6 +293,9 @@ describe('summarizeAlerts', () => {
     key: 'k',
     label: 'X',
     level: 'warning',
+    period: 'monthly',
+    calendarPct: 50,
+    aheadOfCalendar: true,
     threshold: 90,
     thresholdCrossed: true,
     spent: 90,

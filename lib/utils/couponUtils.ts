@@ -12,7 +12,14 @@
  * We advance the issueDate by N months (3 for quarterly) per period.
  */
 
-import { AnnouncedInflationRate, BondDetails, CouponFrequency, CouponRateTier } from '@/types/assets';
+import {
+  AnnouncedInflationRate,
+  BondDetails,
+  BondInflationIndexation,
+  CouponFrequency,
+  CouponRateTier,
+  IndexationCoefficientEntry,
+} from '@/types/assets';
 
 /**
  * Returns the number of coupon payments per year for the given frequency.
@@ -166,11 +173,22 @@ export function calculateCouponPerShare(
   return (couponRate / 100 / getPeriodsPerYear(frequency)) * nominalValue;
 }
 
+/**
+ * Whether the bond pays coupons at all. A zero-coupon bond (BOT, CTZ, a zero-coupon BTP) has a
+ * legitimate rate of 0 and no step-up tier above it: its details are still worth saving (maturity,
+ * nominal, indexation), but nothing must be materialised as a dividend (issue #340).
+ */
+export function hasCouponPayments(bondDetails: Pick<BondDetails, 'couponRate' | 'couponRateSchedule'>): boolean {
+  if (bondDetails.couponRate > 0) return true;
+  return (bondDetails.couponRateSchedule ?? []).some((tier) => tier.rate > 0);
+}
+
 // ---------------------------------------------------------------------------
-// Inflation-linked bonds (BTP Italia Sì)
+// Inflation-linked bonds
 //
-// Teacher Note:
-// These bonds pay an ADDITIVE coupon: a guaranteed minimum fixed rate (annual,
+// Teacher Note — two mechanisms, one field (`inflationIndexation`):
+//
+// `italia` (BTP Italia): an ADDITIVE coupon — a guaranteed minimum fixed rate (annual,
 // like a normal coupon) PLUS the national FOI inflation rate measured over the
 // coupon period (e.g. the semester). The two are applied to the nominal capital
 // (the capital is NOT revalued; the bond redeems at par). Official formula:
@@ -179,10 +197,29 @@ export function calculateCouponPerShare(
 // by the frequency — only the fixed annual rate is. In deflation the inflation
 // component is floored at 0 and the fixed rate stays guaranteed.
 //
-// The inflation rate for a period is published shortly before the coupon is paid,
-// so when the cron materializes the next coupon ~6 months ahead it is not yet
-// known: that coupon is marked provisional (fixed-only) until the user announces it.
+// `euro` (BTP€i): a MULTIPLICATIVE coupon — the real rate per period times the Eurostat HICP
+// (ex tobacco) indexation coefficient at the payment date:
+//   coupon_period = (realAnnualRate / periodsPerYear) / 100 * coefficient(paymentDate) * nominal
+// The revaluation is never paid with the coupon: it accrues in the coefficient and is cashed at
+// maturity (nominal × coefficient, floored at par). No minimum coupon, no loyalty premium. The MEF
+// publishes the coefficient daily per bond; the user copies it (MEF table or contract note).
+//
+// In both cases the figure for a period is published shortly before the coupon is paid,
+// so when the cron materializes the next coupon ~6 months ahead it is not yet known: that
+// coupon is marked provisional — at the fixed floor for `italia`, at the latest known
+// coefficient for `euro` (a better estimate than par) — until the user announces it.
 // ---------------------------------------------------------------------------
+
+/**
+ * The ONE reader of a bond's inflation mechanism: the `inflationIndexation` field, with the legacy
+ * `isInflationLinked` flag (written before 2026-09-11) read as `italia`.
+ */
+export function resolveInflationIndexation(
+  bondDetails: Pick<BondDetails, 'inflationIndexation' | 'isInflationLinked'>
+): BondInflationIndexation | null {
+  if (bondDetails.inflationIndexation) return bondDetails.inflationIndexation;
+  return bondDetails.isInflationLinked ? 'italia' : null;
+}
 
 /**
  * Returns the Italian adjective for a coupon frequency (for human-readable notes).
@@ -212,11 +249,74 @@ function coerceDate(value: Date | { toDate: () => Date } | string | number): Dat
 }
 
 /**
- * Formats a rate for a coupon note: up to 2 decimals, trailing zeros trimmed,
- * Italian decimal comma (e.g. 2.05 → "2,05", 1.5 → "1,5", 2 → "2").
+ * Formats a rate for a coupon note: up to `decimals` decimals (2 by default), trailing zeros
+ * trimmed, Italian decimal comma (e.g. 2.05 → "2,05", 1.5 → "1,5", 2 → "2").
  */
-function formatRate(value: number): string {
-  return (Math.round(value * 100) / 100).toString().replace('.', ',');
+function formatRate(value: number, decimals = 2): string {
+  const factor = 10 ** decimals;
+  return (Math.round(value * factor) / factor).toString().replace('.', ',');
+}
+
+/** Same calendar day, in the local calendar the dates were built in. */
+function isSameDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+/** Same year and month — the drift-tolerant match a coupon date needs (see findAnnouncedInflationRate). */
+function isSameMonth(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
+}
+
+/**
+ * Finds the indexation coefficient (BTP€i) for a coupon date: the entry of that very day first,
+ * else the latest entry of the same year+month (a coupon and a refresh can share a month, and the
+ * stored day may drift from the recomputed payment date, as with the FOI rates).
+ *
+ * @returns the coefficient, or null when nothing was announced for that period.
+ */
+export function findIndexationCoefficient(
+  entries: IndexationCoefficientEntry[] | undefined,
+  couponDate: Date
+): number | null {
+  if (!entries || entries.length === 0) return null;
+  const withDates = entries.map((entry) => ({ date: coerceDate(entry.date), coefficient: entry.coefficient }));
+  const exact = withDates.find((entry) => isSameDay(entry.date, couponDate));
+  if (exact) return exact.coefficient;
+  const sameMonth = withDates
+    .filter((entry) => isSameMonth(entry.date, couponDate))
+    .sort((a, b) => b.date.getTime() - a.date.getTime());
+  return sameMonth.length > 0 ? sameMonth[0].coefficient : null;
+}
+
+/**
+ * The latest coefficient known at `asOf` (entry date ≤ asOf) — what the valuation and a
+ * provisional coupon use. Null when nothing is known yet at that date.
+ */
+export function latestIndexationCoefficient(
+  entries: IndexationCoefficientEntry[] | undefined,
+  asOf: Date
+): number | null {
+  if (!entries || entries.length === 0) return null;
+  const known = entries
+    .map((entry) => ({ date: coerceDate(entry.date), coefficient: entry.coefficient }))
+    .filter((entry) => entry.date.getTime() <= asOf.getTime())
+    .sort((a, b) => b.date.getTime() - a.date.getTime());
+  return known.length > 0 ? known[0].coefficient : null;
+}
+
+/**
+ * Upserts a coefficient for a date, replacing any entry of the same calendar DAY (a coupon's
+ * entry and a same-month refresh both survive). Returns a new array, sorted by date (pure).
+ */
+export function upsertIndexationCoefficient(
+  entries: IndexationCoefficientEntry[] | undefined,
+  date: Date,
+  coefficient: number
+): IndexationCoefficientEntry[] {
+  const others = (entries ?? []).filter((entry) => !isSameDay(coerceDate(entry.date), date));
+  return [...others, { date, coefficient }].sort(
+    (a, b) => coerceDate(a.date).getTime() - coerceDate(b.date).getTime()
+  );
 }
 
 /**
@@ -269,23 +369,27 @@ export function upsertAnnouncedInflationRate(
  * The resolved coupon for one payment, including its inflation provisional state.
  */
 export interface ResolvedCoupon {
-  perShare: number;                   // Gross coupon per unit: fixed (+ inflation if announced)
-  fixedAnnualRate: number;            // Fixed annual rate applied (step-up tier or base)
-  inflationPeriodRate: number | null; // Announced per-period inflation % (floored at 0), or null if not announced
-  isProvisional: boolean;             // True when inflation-linked AND the period's inflation is not yet announced
+  perShare: number;                   // Gross coupon per unit: fixed (+ inflation / × coefficient when announced)
+  fixedAnnualRate: number;            // Fixed (or real) annual rate applied (step-up tier or base)
+  indexation: BondInflationIndexation | null; // The mechanism applied, null for a plain/step-up bond
+  inflationPeriodRate: number | null; // `italia`: announced per-period inflation % (floored at 0), or null if not announced
+  indexationCoefficient: number | null; // `euro`: the coefficient applied (the announced one, or the latest known when provisional)
+  isProvisional: boolean;             // True when inflation-linked AND the period's figure is not yet announced
 }
 
 /**
  * Resolves the gross coupon per unit for a payment date, composing the existing
- * step-up logic with the inflation-linked additive component.
+ * step-up logic with the inflation-linked component of the bond's mechanism.
  *
  * For a plain or step-up bond this is just calculateCouponPerShare at the
- * applicable rate. For an inflation-linked bond it adds the announced per-period
- * inflation (deflation-floored at 0); when the rate is not yet announced the
- * coupon is the fixed floor and isProvisional is true.
+ * applicable rate. `italia` adds the announced per-period inflation (deflation-floored
+ * at 0); when the rate is not yet announced the coupon is the fixed floor and
+ * isProvisional is true. `euro` multiplies by the coefficient announced for the
+ * payment date; when it is not yet known the coupon uses the latest known coefficient
+ * (par when none) and isProvisional is true.
  *
  * @param paymentDate  - Date the coupon will be paid (already coerced to Date by the caller)
- * @param bondDetails  - The bond configuration (couponRate is the fixed/guaranteed minimum)
+ * @param bondDetails  - The bond configuration (couponRate is the fixed/guaranteed minimum or the real rate)
  * @param nominalValue - Face value per unit (default 1 is the caller's responsibility)
  */
 export function resolveCoupon(
@@ -301,24 +405,39 @@ export function resolveCoupon(
     bondDetails.couponRateSchedule
   );
   const fixedPerShare = calculateCouponPerShare(fixedAnnualRate, nominalValue, bondDetails.couponFrequency);
+  const indexation = resolveInflationIndexation(bondDetails);
+  const base = { fixedAnnualRate, indexation, inflationPeriodRate: null, indexationCoefficient: null };
 
   // Plain / step-up bond: no inflation component.
-  if (!bondDetails.isInflationLinked) {
-    return { perShare: fixedPerShare, fixedAnnualRate, inflationPeriodRate: null, isProvisional: false };
+  if (indexation === null) {
+    return { ...base, perShare: fixedPerShare, isProvisional: false };
+  }
+
+  if (indexation === 'euro') {
+    const announced = findIndexationCoefficient(bondDetails.indexationCoefficients, paymentDate);
+    // Provisional: the coefficient at the payment date is not known yet — the latest known one
+    // is a closer estimate than par, and the note says which it is.
+    const coefficient = announced ?? latestIndexationCoefficient(bondDetails.indexationCoefficients, paymentDate) ?? 1;
+    return {
+      ...base,
+      perShare: fixedPerShare * coefficient,
+      indexationCoefficient: coefficient,
+      isProvisional: announced === null,
+    };
   }
 
   const announced = findAnnouncedInflationRate(bondDetails.announcedInflationRates, paymentDate);
   if (announced === null) {
     // Provisional: the FOI inflation for this period has not been announced yet.
-    return { perShare: fixedPerShare, fixedAnnualRate, inflationPeriodRate: null, isProvisional: true };
+    return { ...base, perShare: fixedPerShare, isProvisional: true };
   }
 
   // Deflation guarantee: a negative announced rate contributes 0; the fixed rate stays guaranteed.
   const flooredInflation = Math.max(0, announced);
   const inflationPerShare = (flooredInflation / 100) * nominalValue;
   return {
+    ...base,
     perShare: fixedPerShare + inflationPerShare,
-    fixedAnnualRate,
     inflationPeriodRate: flooredInflation,
     isProvisional: false,
   };
@@ -327,19 +446,32 @@ export function resolveCoupon(
 /**
  * Builds the human-readable Italian note stored on a coupon dividend.
  *
- * - plain/step-up:   "Cedola semestrale — tasso annuo 2,8%"
- * - inflation final: "Cedola semestrale — fisso 0,75% + inflazione FOI 1,3% = 2,05% del nominale"
- * - provisional:     "Cedola provvisoria semestrale — solo tasso fisso 0,75% (in attesa del tasso d'inflazione FOI del periodo)"
+ * - plain/step-up:      "Cedola semestrale — tasso annuo 2,8%"
+ * - italia final:       "Cedola semestrale — fisso 0,75% + inflazione FOI 1,3% = 2,05% del nominale"
+ * - italia provisional: "Cedola provvisoria semestrale — solo tasso fisso 0,75% (in attesa del tasso d'inflazione FOI del periodo)"
+ * - euro final:         "Cedola semestrale — tasso reale 0,2% × coefficiente di indicizzazione 1,25 = 0,25% del nominale"
+ * - euro provisional:   "Cedola provvisoria semestrale — tasso reale 0,2% all'ultimo coefficiente noto 1,2 (in attesa del coefficiente di indicizzazione alla data di stacco)"
  */
 export function buildCouponNote(resolved: ResolvedCoupon, frequency: CouponFrequency): string {
   const freqLabel = couponFrequencyLabel(frequency);
 
   // Non-inflation-linked: keep the historical annual-rate phrasing.
-  if (resolved.inflationPeriodRate === null && !resolved.isProvisional) {
+  if (resolved.indexation === null) {
     return `Cedola ${freqLabel} — tasso annuo ${formatRate(resolved.fixedAnnualRate)}%`;
   }
 
   const fixedPerPeriod = resolved.fixedAnnualRate / getPeriodsPerYear(frequency);
+
+  if (resolved.indexation === 'euro') {
+    const coefficient = resolved.indexationCoefficient ?? 1;
+    if (resolved.isProvisional) {
+      const basis = coefficient === 1
+        ? 'al coefficiente 1 (nessun coefficiente inserito)'
+        : `all'ultimo coefficiente noto ${formatRate(coefficient, 5)}`;
+      return `Cedola provvisoria ${freqLabel} — tasso reale ${formatRate(fixedPerPeriod, 4)}% ${basis} (in attesa del coefficiente di indicizzazione alla data di stacco)`;
+    }
+    return `Cedola ${freqLabel} — tasso reale ${formatRate(fixedPerPeriod, 4)}% × coefficiente di indicizzazione ${formatRate(coefficient, 5)} = ${formatRate(fixedPerPeriod * coefficient, 4)}% del nominale`;
+  }
 
   if (resolved.isProvisional) {
     return `Cedola provvisoria ${freqLabel} — solo tasso fisso ${formatRate(fixedPerPeriod)}% (in attesa del tasso d'inflazione FOI del periodo)`;

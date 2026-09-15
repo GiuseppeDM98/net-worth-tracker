@@ -49,9 +49,11 @@ const PERFORMANCE_CACHE_COLLECTION = 'performance-cache';
  * (`resolvePerformanceBase`, `CashFlowData.pensionFlow`); v7 = the flows follow the base — a
  * subset base measures what crosses its boundary from the ledger and the quantities
  * (`CashFlowData.portfolioFlow`), a non-positive starting value yields no return instead of a
- * flipped sign, a rolling CAGR that cannot be measured is null, the unread 36-month series is gone.
+ * flipped sign, a rolling CAGR that cannot be measured is null, the unread 36-month series is gone;
+ * v8 = an instrument the snapshots meet for the first time enters at its value even when the
+ * ledger covers it from an older trade date (`portfolioFlows.ts` § THE ENTRY MONTH).
  */
-const CACHE_MATH_VERSION = 'v7';
+const CACHE_MATH_VERSION = 'v8';
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);

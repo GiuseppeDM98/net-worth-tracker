@@ -14,7 +14,33 @@ import type { DashboardOverviewTopAsset } from '@/types/dashboardOverview';
 import { calculateAssetValue } from '@/lib/services/assetService';
 import { costBasisPerUnitEur } from '@/lib/utils/costBasisEur';
 import { hasMarketPrice } from '@/lib/utils/assetPricing';
-import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
+import { getItalyMonthYear, toDate } from '@/lib/utils/dateHelpers';
+import { getNextCouponDate, hasCouponPayments } from '@/lib/utils/couponUtils';
+
+// ─── Bond row facts ───────────────────────────────────────────────────────────
+
+export interface BondRowFacts {
+  maturityDate: Date;
+  hasCoupons: boolean;
+  /** The next coupon date from the schedule; null for a zero coupon or a matured bond. */
+  nextCoupon: Date | null;
+}
+
+/**
+ * What a bond row says under its name (maturity, next coupon) — the dates the coupon scheduler
+ * already knows, read once for the table. Null for anything that is not a bond with details.
+ * The dates come through `toDate` because a Firestore `Timestamp` survives in `bondDetails`.
+ */
+export function resolveBondRowFacts(asset: Asset): BondRowFacts | null {
+  if (asset.type !== 'bond' || !asset.bondDetails) return null;
+  const maturityDate = toDate(asset.bondDetails.maturityDate);
+  if (Number.isNaN(maturityDate.getTime())) return null;
+  const hasCoupons = hasCouponPayments(asset.bondDetails);
+  const nextCoupon = hasCoupons
+    ? getNextCouponDate(toDate(asset.bondDetails.issueDate), asset.bondDetails.couponFrequency, maturityDate)
+    : null;
+  return { maturityDate, hasCoupons, nextCoupon };
+}
 
 // ─── Cash accounts ────────────────────────────────────────────────────────────
 
@@ -142,6 +168,11 @@ export { costBasisPerUnitEur };
  */
 export function hasCostBasis(asset: Asset): boolean {
   if (isCashAccount(asset) || asset.type === 'pensionFund' || !isHeld(asset)) return false;
+  // A hand-valued holding (a property, a private-equity commitment) keeps its VALUE in
+  // `quantity` at price 1, so any PMC it carries equals the price and the G/P is a structural
+  // «+0,00 €» — a zero nothing measured, which the table must not print as one
+  // (DESIGN.md → The Absence-Has-Three-Names Rule). Found live on the owner's account, 2026-09-14.
+  if (!hasMarketPrice(asset.type, asset.subCategory)) return false;
   const basis = costBasisPerUnitEur(asset);
   return basis !== undefined && basis > 0;
 }

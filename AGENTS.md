@@ -85,6 +85,14 @@ about a domain goes in that domain's guide, never here.
   the culpable node is the fix. Reference guard: `e2e/fire.mobile.spec.ts`.
 - **One scroll container per region**: a nested scrollable captures the wheel and content below becomes unreachable
   (desktop-only symptom). `overflow-x-hidden` on an ancestor also CLIPS a descendant's `overflow-x:auto`.
+- **A `sticky` offset is measured from the scroller's CONTENT edge, padding excluded** (2026-09-14, Strumenti's actions
+  column): `sticky right-5` meant to mirror a `-mx-5 px-5` wrapper shifted the column 20px over the last cell of a table
+  that did not scroll at all. `right-0`; and draw the edge rule only while `scrollWidth > clientWidth`, measured.
+- **An overflow INSIDE a tile never reaches `main`** (2026-09-14, «Entrate per categoria»): neither `Tile` nor a list
+  clips, so three percentages painted 37px past the tile's border measured 0 on `main`. Measure a list against its own
+  `section` (`e2e/cashflow.tracciamento.spec.ts`), and let a column yield under a container query, not a viewport one.
+- **`max-w` on a `td` does not bind an auto-layout table** (2026-09-14, the armed row of the Movimenti table): a long
+  sentence in the cell widened the column and the table ran 40px past the tile. Constrain the BLOCK inside the cell.
 
 ### shadcn Card and Dialog Surface
 - **`CardHeader` is `flex flex-col`**, so a `flex justify-between` row inside it makes a `flex-1` grandchild act
@@ -97,14 +105,24 @@ about a domain goes in that domain's guide, never here.
 - **`DialogDescription`/`DrawerDescription` is required** in every `DialogContent`/`DrawerContent` (`sr-only` if it
   should not show); never silence the warning with `aria-describedby={undefined}`. `ResponsiveModal` handles it: the
   `reading` becomes the Description through `asChild`, and without one the `description` prop is rendered `sr-only`.
+- **A shadcn wrapper's own classes ride through `asChild` and win the merge** (2026-09-14): `DialogDescription`
+  hands `text-sm text-muted-foreground` down to the child, and a child that runs `cn(own…, className)` lets
+  `tailwind-merge` keep the wrapper's — `ModalStatusLine` was 14px muted in both tones on every modal for two weeks,
+  and a font-size utility also drops a `leading-*`. Put the incoming `className` BEFORE the classes that must win,
+  and read the result with `getComputedStyle` (a screenshot showed a grey refusal that nobody flagged).
 
 ### Layout and Color Tokens
 - Never hardcode structural colors in shell components — `bg-background`, `text-foreground`, `border-border`.
 - **Sign colors are tokens: `text-positive`/`text-destructive`**, chips `bg-positive/10`, resolved via
   `getMetricValueColor()`. Two gotchas: **drop `dark:` variants** (the token swaps itself) and the function returns
-  neutral for the `currency` format by design — signed currency uses `signChipClass`/`signTextClass`. Legacy
-  `text-emerald-*` survives in `ExpenseTable`, the dividend dialogs/table and `budgetProgressStyle` (the Tracciamento
-  feed retired its own on 2026-08-22).
+  neutral for the `currency` format by design — signed currency uses `signChipClass`/`signTextClass`. No legacy
+  `text-emerald-*` is left in the DOM (the Tracciamento feed retired its own on 2026-08-22, `ExpenseTable` on
+  2026-09-14; the dividend dialogs and table were measured at 0 the same day; `budgetProgressStyle` speaks tokens).
+- **An expense type has ONE colour map** (`lib/constants/expenseTypeColors.ts`, 2026-09-14): the feed's dot, the
+  table's badge and the hero's legend read it. A row's `income` is the sign token `positive`, each outflow a chart
+  slot, `fixed` on the slot the flow series paints spending with; the SERIES (bars) take chart slots, never the sign
+  token. Three files kept their own map until then and the table's inverted the legend's (`--chart-2` was
+  «Entrate» above and «Spese Fisse» below, measured on the mirror).
 - **Sign tokens mean gain and loss, and nothing else.** A neutral delta — a class gaining share of a composition — must
   stay `text-muted-foreground`: colouring it asserts a verdict the surface has no target to justify.
 - **`--warning` is near-white in light mode**, so text on a `bg-warning` fill MUST be `text-warning-foreground`;
@@ -272,13 +290,15 @@ file used to carry.
 ### Panoramica → `doc/guide/panoramica.md`
 - Overview data flows through `GET /api/dashboard/overview` + `useDashboardOverview()` only — no page-level fan-out, no full-history expense queries; `dashboardOverviewSummaries/{userId}` is server-owned and every overview-relevant mutation invalidates it. Both endpoints owner-scoped.
 - `topMovers`/`marketEffect` are MARKET return (`q_prev × (u_curr − u_prev)`), never the user's flows; `[]` when the previous snapshot has no `byAsset`, `null` when not attributable (≠ measured 0). Pension funds are their own "Previdenza" line; real estate is measured gross of debt.
-- Every sentence from `overviewNarrative.ts` — a falling month blames the market only when `marketEffect < 0`.
+- Every sentence from `overviewNarrative.ts` — a falling month blames the market only when `marketEffect < 0`, and never the market ALONE when the estimated tax on the month's sales (`monthSales`, from the ledger) or the own flows weighed more: `resolveDeclineCause` (`lib/utils/periodSales.ts`) is the ONE decision for Panoramica, Patrimonio and the email, `salesNarrative.ts` the shared words («pagato circa …», never «pagherai»). When the market gained and the tax is at least half of the drop, the HEADLINE names it (`taxes-despite-market`: «per le tasse sulla vendita di VWCE, non per il mercato», 2026-09-13). Every subject the driver clause can name is in `CLASS_SUBJECTS`, `PENSION_BAND_KEY` included; an unknown key drops the clause, never prints itself.
+- A category row deep-links to its Scheda on Analisi (`?focusType&focusCat`, `expenseType` in the payload since source version 17); the Panoramica links to the page that owns the depth and has no «Dettaglio» of its own.
 - Il resto — the hero step-down, the tile grid, the superseded-pattern rule, the Italian-copy test trap — in `doc/guide/panoramica.md`.
 
 ### Patrimonio · Asset Pricing, FX and Assets → `doc/guide/patrimonio.md`
 - "Does this asset have a market price?" is ONE rule in `assetPricing.ts` (`hasMarketPrice`/`requiresManualPricing`); a new hand-valued type goes in `MANUALLY_VALUED_TYPES` and nowhere else.
-- GBp (pence) ≠ GBP — normalize `price / 100` before any FX; never call Frankfurter from the browser; `quantity = 0` marks a sold asset; bond prices are `% of par`.
-- Patrimonio Δ columns are UNIT-PRICE variations, not P&L; `isHeld` (`quantity > 0`) gates every count/share/sum; the page owns every dialog for one dual invalidation.
+- GBp (pence) ≠ GBP — normalize `price / 100` before any FX; never call Frankfurter from the browser; `quantity = 0` marks a sold asset.
+- A Borsa Italiana bond quote is `% of par`, always, and `lib/utils/bondPricing.ts` is the ONE conversion (`quote / 100 × nominal × coefficient`): the nominal defaults to **1 €** (quantity = nominal in euro), a BTP€i's quote is real and gets the latest coefficient the user entered. Never re-implement it in a component or the cron; never guard it on `nominal > 1` again (issue #340).
+- Patrimonio Δ columns are UNIT-PRICE variations, not P&L; `isHeld` (`quantity > 0`) gates every count/share/sum; the page owns every dialog for one dual invalidation. «Andamento» is a VIEW (the Δ windows replace Quantità · Prezzo · PMC · TER); a hand-valued holding has no PMC-based G/P (`hasCostBasis`) and prints «—» there; a ledger's return is annualised only past `MIN_ANNUALIZABLE_DAYS` (180).
 - Every number not in the payload is born in `patrimonioSummary.ts`; the verdict's driver is an INSTRUMENT.
 - Every G/P, tax estimate, YOC and PMC cell stands EUR against EUR through `lib/utils/costBasisEur.ts` (`costBasisPerUnitEur` = the ledger's `averageCostEur`, fees included; the native PMC only for a EUR asset; `undefined` for a foreign asset without one — print nothing, never dollars against euros).
 - Il resto — `suggestIsLiquid`, the cash-account picker rule, the article helpers, the failed-overview branch, the `averageCostEur` backfill — in `doc/guide/patrimonio.md`.
@@ -287,36 +307,38 @@ file used to carry.
 - ALL trade money-math (replay, PMC, realized P&L, XIRR, invested capital) lives in `assetTransactionUtils.ts`, pure; the service/route layer is a thin atomic writer. A new `AssetTransactionType` updates the replay switch, the zod schema AND `TransactionDialog`.
 - Writes are Admin-API-only, all reads before any writes, derived fields written in-tx (never via `updateAsset`); ledger-type edits go through `updateAssetMetadata`.
 - The migration baseline (`isBaseline` BUY) NEVER stamps `holdingStartDate`; `replayTransactions` returning `holdingStartDate: undefined` means leave the doc untouched (never `deleteField()`).
+- A trade date has ONE floor — the asset's OWN baseline, enforced by the replay's `BASELINE_NOT_FIRST` (its message names the day) and mirrored by the dialog's `min` from `existingTransactions` — and the future as its only ceiling (2026-09-13): `assetTransactionsMeta.baselineDate` is the baselines' date, NOT a floor, so an asset without a baseline records a purchase made years before the ledger existed with its real date. A settlement account is debited TODAY whatever the date (`describeSettlementTiming` warns on a past month).
 - Per-transaction derived data comes from `replayTransactionsWithEffects` (one pass), never re-running replay on every prefix.
 - `buildDerivedAssetFields` projects `quantity`, the native `averageCost` AND `averageCostEur` (fees included) onto the asset doc; `backfillAverageCostEur` adds the third to pre-existing docs once, writing only that field.
-- Il resto — `resolveBondPrice` reuse, the two `totalReturnAssets` paths, the static-copy audit rule — in `doc/guide/registro-operazioni.md`.
+- Il resto — `resolveBondPrice` reuse (from `bondPricing.ts`, a BTP€i trade storing its coefficient), the two `totalReturnAssets` paths, the static-copy audit rule — in `doc/guide/registro-operazioni.md`.
 
 ### Cashflow — expense mechanics → `doc/guide/cashflow.md`
 - Category names are NOT unique: group by `getCategoryKey`/`getSubCategoryKey`, display via `resolveDisplayLabels`.
 - Income positive, expenses negative, `net = sum(income) + sum(expenses)`; classification ALWAYS by `type`, never by the sign of `amount`; crossing the transfer boundary flips the sign and the BATCH paths refuse it.
-- A recurring expense is N real future-dated rows sharing `recurringParentId`, not a rule; `canTypeRecur` = `fixed`/`variable`/`debt` only; both `MAX_RECURRENCE_OCCURRENCES` ceilings keep the batch under 500.
+- A recurring expense is N real future-dated rows sharing `recurringParentId`, not a rule; `canTypeRecur` = `fixed`/`variable`/`debt` only; both `MAX_RECURRENCE_OCCURRENCES` ceilings keep the batch under 500. Only the FIRST row carries `linkedCashAssetId` and moves the account, with the sign of its type (the three `firstSignedAmount` branches share the rule, 2026-09-13). A `transfer` IS its two accounts: the schema refuses one without origin and destination, or with the same account twice (`e2e/cashflow.accounts.spec.ts`).
 - CSV import (`Impostazioni → Spese`): parse→validate→plan, MANDATORY preview, one-tap undo by `importBatchId`; category identity is (name, type). One drill destination (`handleEntitySelect`); Sankey ids are built from ids, the type lives inside the category id.
 - Il resto — le sei regole per esteso — in `doc/guide/cashflow.md`.
 
 ### Cashflow › Tracciamento → `doc/guide/cashflow-tracciamento.md`
 - ONE period axis, two slices: `expenses` feeds the verdict and every tile; `filteredExpenses` feeds ONLY the Movimenti list. Never route a tile through `filteredExpenses`.
-- A period is its WHOLE calendar span; what has not happened is DECLARED (`scheduledSentence`, chip «In calendario», sign colour dropped). `isScheduledRow` = after today by Italian calendar DAY (`isItalyDayAfter`), shared with `budgetUtils` and `costCenterSummary`.
+- A period is its WHOLE calendar span; what has not happened is DECLARED (chip «In calendario», sign colour dropped). `isScheduledRow` = after today by Italian calendar DAY (`isItalyDayAfter`), shared with `budgetUtils` and `costCenterSummary`. **The verdict judges what has HAPPENED** (`settleTotals`, 2026-09-14): headline, tone and first sentence from the lived part («A settembre finora …»), then «Con … già in calendario da qui a fine mese, il mese chiude a +805 € (il 29%)» — both sides always named, an empty one as «nessuna entrata attesa». Analisi still closes with `scheduledSentence`.
 - «Da inizio anno» (`Period.kind = 'ytd'`) and «Anno corrente» (`'current'`, full-year delta since 2026-08-30) are different windows and must never be treated as one.
-- Every number from `tracciamentoSummary.ts`, every sentence from `cashflowNarrative.ts`. The previous period is honest or absent (a running year → the SAME months of the year before).
+- Every number from `tracciamentoSummary.ts`, every sentence from `cashflowNarrative.ts`. The previous period is honest or absent (a running year → the SAME months of the year before; **the month in progress → the SAME DAYS of the previous month**, `currentComparisonWindow`/`previousComparisonWindow`, named «sui primi 14 giorni di agosto» — the projection's reference stays last month WHOLE through `previousPeriod`).
 - Below `desktop:` the Movimenti tile's bar repeats the period picker beside the filters — a second HANDLE on the same `period`, never a second axis (its own accessible name, `min-w-0`; `e2e/cashflow.mobile.spec.ts`). The tile's reading totals each type of the rows it is handed (a search on a note is its own total).
+- «Intestatario» (`lib/utils/movementsOwnerFilter.ts`) is a list filter that exists only with Divisione on — «Tutti · In comune · {members}», «Senza intestatario» only when the period holds an orphaned row — and with the feature on an attributed row prints its owner as a chip (feed, table, drawer); `memberNames` null = feature off = no chip anywhere.
 - Il resto — the two windows anchored to today, the month-end projection, the feed, the mobile filters — in `doc/guide/cashflow-tracciamento.md`.
 
 ### Analisi — a verdict over tiles → `doc/guide/cashflow-analisi.md`
 - FOUR axis modes (`Da inizio anno | Anno corrente | Anno | Storico`); `ytd` and `current` are not the same window.
-- A running year is NOT clipped (`periodExpenses` takes the whole calendar year); the pacing always compares year vs year−1 under `sameMonths` off `allExpenses` — the one honest comparison, plus the shared `scheduledSentence`.
-- The Scheda is a tile of the grid; every entry point lands through `handleEntitySelect`; URL focus is three FLAT params (`?focusType&focusCat&focusSub`).
+- A running year is NOT clipped (`periodExpenses` takes the whole calendar year); the pacing compares year vs year−1 on the period's own span (`resolveComparisonScope`), the running MONTH on the same days of its baseline (`throughDay`, rows through `dayOf`), plus the shared `scheduledSentence`. The history CLOSES on the current year (`availableYears`, the Storico slice, the two charts' `BucketCeiling`): a plan's rows in 2043 are a calendar, not years.
+- The Scheda is a tile of the grid; every entry point lands through `handleEntitySelect`; URL focus is three FLAT params (`?focusType&focusCat&focusSub`); closing it returns the focus to its opener. Its pace divides the LIVED total by the months lived (`computeEntityRunRate`: `livedTotal`/`livedMonths`), the projection takes the calendar as a FLOOR under the pace, and its period carries the page's `throughMonth` cut.
 - Every number has one source (`analisiSummary.ts`, `comparisonDeltas.ts`); every sentence from `analisiNarrative.ts`/`cashflowNarrative.ts`, never a component.
 - Il resto — «Fuori scala», the Periodo pacing, `EntityDossier`, the Sankey rules, Playwright — in `doc/guide/cashflow-analisi.md`.
 
 ### Cashflow › Budget → `doc/guide/cashflow-budget.md`
 - Opt-in (`reconcileBudgetItems` never auto-creates); NO period axis (always the current Italian month; annual budgets are year-to-date on their own Off-Axis tile).
 - ONE projection rule, the app's: `buildSpendingForecast` over the month's spending SPLIT at today (`spendingProjection.ts`, shared with Panoramica/Tracciamento); a FIXED category never follows the pace; `MIN_FORECAST_DAYS` (4).
-- Risk vs fact: «Categorie a rischio» = projection over amount AND not over yet; a budget already over is a fact for «Avvisi». No row in two tiles.
+- Risk vs fact: «Categorie a rischio» = projection over amount AND not over yet; a budget already over is a fact for «Avvisi». No row in two tiles. A threshold is a fact of what is BOOKED (`BudgetAlert.spent` = up to today), read against the calendar of its own window (`calendarPct`, `aheadOfCalendar`): the amber is for the rows ahead of it only. «Speso» is `spentToDate`; the scheduled rows are their own clause in every sentence (2026-09-14).
 - The ceiling IS historicised by the cron (phase 8, one doc per month, `budgetHistory/{uid}/months/{YYYY-MM}`, `allow write: if false`). The crossing day is a fact of the EXPENSE DATES, never a cron's memory.
 - Il resto — `summarizeCeiling`, the two-face KPIs on `exceeded`, `BudgetTrack`, the `cashflow:add-budget` event — in `doc/guide/cashflow-budget.md`.
 
@@ -331,7 +353,7 @@ file used to carry.
 - Opt-in, on Tracciamento's period axis. ONE field carries the feature: `Expense.personalMemberId`; absent (or `null`) MEANS «in comune» (so no migration). Members are Previdenza's `FamilyMember`s, never a second list. NOT denormalized to a name.
 - The share is NEVER invented: `resolveSplitBasis` returns `unavailable` (with `missingNames`) below two people, with no labor category, or when one person has no salary in the period; every split figure is then `null`.
 - The base is the PERIOD's attributed labor income (owner's decision, 2026-08-31) — the most faithful and most volatile reading; do not «stabilise» it silently.
-- `allocateByShare` charges the rounding residual to the LARGEST share and re-rounds — untestable on two shares (they cancel), test on three. Writing it is a FOUR-place fan-out.
+- `allocateByShare` charges the rounding residual to the LARGEST share and re-rounds — untestable on two shares (they cancel), test on three. Writing it is a FOUR-place fan-out; the readers outside the tab are Tracciamento's «Intestatario» filter and the owner chip (`movementsOwnerFilter.ts`, same contract).
 - Il resto — the deleted-member bucket, the dialog control, `effectiveTab` — in `doc/guide/cashflow-divisione.md`.
 
 ### Cashflow › Dividendi · Dividends and Coupons → `doc/guide/cashflow-dividendi.md`
@@ -339,7 +361,10 @@ file used to carry.
 - ONE period axis (`resolvePeriodBounds`, upper bound = end of the period's own unit, NOT today); the announced money is ON it; instrument/type filters narrow only the list. The Rendimento tile does NOT follow the axis and says so.
 - `useDividendStats` carries NO date bounds (they only narrowed `periodStats`, now derived in memory). Every number from `dividendAnalytics.ts`.
 - A coupon's cashflow expense is created only by the daily cron on payment date (`!isAutoGenerated`, idempotent via `expenseId`); adding a `DividendType` is a six-file fan-out; YOC/Current Yield share `computeDividendYieldMetrics`, scoped to the current holding.
-- Il resto — the calendar, BTP Italia additivity, the running-window rule, `couponUtils` — in `doc/guide/cashflow-dividendi.md`.
+- A scraped dividend has ONE floor (`lib/utils/dividendEligibility.ts`: `holdingStartDate` from the ledger, else `createdAt`), shared by `/api/dividends/scrape` and cron Phase 1 — and never silent: the route returns `filtered`/`floorDate`/`floorSource` and the tab toasts `describeFilteredDividends` with the recovery (2026-09-13).
+- TWO POPULATIONS, BOTH NAMED (2026-09-14): the verdict and the inventory read the REGISTRY (sold instruments included); Affidabilità and Chi paga di più measure the HELD portfolio (`computeReliability`/`rankPayerShares` take `heldAssetIds` from the page's assets) and name what the sold ones paid in their own clause and residual row — never rank a sold payer, never drop its money from the total. The form's withholding proposal is the instrument's own `taxRate` (never a constant), its picker lists equities AND bonds, held or sold; the row's delete is `useArmedDelete` (no timer).
+- Two inflation mechanisms, ONE field (`inflationIndexation`, read via `resolveInflationIndexation`; the legacy `isInflationLinked` is `italia`): BTP Italia ADDS the FOI rate, a BTP€i MULTIPLIES by the coefficient at the payment date (provisional at the latest known one). A rate of 0 is a zero coupon: details saved, nothing materialised (`hasCouponPayments`).
+- Il resto — the calendar, BTP Italia additivity and the BTP€i coefficient, the running-window rule, `couponUtils` — in `doc/guide/cashflow-dividendi.md`.
 
 ### Storico · History and Snapshot Baselines → `doc/guide/storico.md`
 - The snapshot cron runs DAILY (the name lies); a snapshot is a frozen photo (adding an asset never updates an old one). Annual deltas use December of the previous year as baseline.
@@ -359,7 +384,7 @@ file used to carry.
 ### Rendimenti → `doc/guide/rendimenti.md`
 - Any exclusion read from `byAsset` MUST be backfilled across pre-`byAsset` months (subtract a constant `E₀`) or it becomes a phantom crash — this fixes the DENOMINATOR, not the numerator. The base is resolved ONCE by `resolvePerformanceBase` for its THREE call sites (service, page, PDF); `buildCacheKey` fingerprints its options, entry month and both flow channels.
 - The pension toggle WINS over a fund's `allocationRole` (it was an OR, and a no-op on every fund marked `excluded`). ON, the funds enter the base from the tracked month as a FLOW and every later outside contribution is a flow (`CashFlowData.pensionFlow`); `netCashFlow` stays the cashflow's savings. A contribution is a flow iff it crosses the base's boundary.
-- **The flows follow the base** (2026-09-07): with anything out of the base, the months with `byAsset` on both snapshots neutralise the MEASURED boundary flows (`lib/utils/portfolioFlows.ts`: ledger first per instrument, quantities as the net, baseline/adjustment move no money, hand-valued instruments opaque) on the third channel `CashFlowData.portfolioFlow`; `externalFlowOf` = `(portfolioFlow ?? netCashFlow) + pensionFlow`. «Liquidità fuori dalla base» (`performanceExcludesCash`) takes the `cash` accounts out by type. The Rendimento tile's second chip is the cumulative TWR (`resolvePeriodReturnChip`), never the ROI.
+- **The flows follow the base** (2026-09-07): with anything out of the base, the months with `byAsset` on both snapshots neutralise the MEASURED boundary flows (`lib/utils/portfolioFlows.ts`: ledger first per instrument, quantities as the net, baseline/adjustment move no money, hand-valued instruments opaque) on the third channel `CashFlowData.portfolioFlow`; `externalFlowOf` = `(portfolioFlow ?? netCashFlow) + pensionFlow`. **The ledger speaks for an instrument only once the base has SEEN it** (2026-09-13): held in the previous snapshot or bought in the month; otherwise the month is the instrument's ENTRY and its value is the flow — a backdated purchase must never read as the entry month's return. «Liquidità fuori dalla base» (`performanceExcludesCash`) takes the `cash` accounts out by type. The Rendimento tile's second chip is the cumulative TWR (`resolvePeriodReturnChip`), never the ROI.
 - The first snapshot of a period is the starting valuation, never a measured month — the window opens on the 1st of the month AFTER it. The page must NEVER re-derive the window from `new Date()` (`metrics.nominalPeriodStart` travels in the payload).
 - No silent filters inside a single metric — volatility/Sharpe floor at ≥ 3 monthly returns, else `null` with a reason. Below 6 months the hero is the PERIOD return, not annualized.
 - The per-instrument attribution (`performanceAttribution.ts`) is EURO and reconciled: Σ rows + «Non attribuito» = the TWR numerator over the months with `byAsset`; a row at quantity 0 is a closed position (`attributeSelectedChange`). The residual is also read month by month: a month whose unattributed part exceeds `RESIDUAL_ALERT_SHARE` (2%) of its starting base is NAMED in the reading (`residualMonths`) — where to look, never what happened.
@@ -373,7 +398,8 @@ file used to carry.
 - Il resto — the Bull's formula, the leverage engine, the five label maps, the verdict-over-tiles rules — in `doc/guide/allocazione.md`.
 
 ### Previdenza · Fondo Pensione → `doc/guide/previdenza.md`
-- `pensionFund` is an `AssetType`, never an `AssetClass`, never a ledger type; value is statement-driven, held in `quantity` at price 1 (`assertFundValueLivesInQuantity`).
+- `pensionFund` is an `AssetType`, never an `AssetClass`, never a ledger type; value is statement-driven, held in `quantity` at price 1 (`assertFundValueLivesInQuantity`). The statement overwrite is «Aggiorna valore» ON the page (`updatePensionFundValue`, 2026-09-13): the asset only, never a contribution; the hero's footer judges a value left in a closed month («valore fermo dal …») — ONE rule, `isPensionValueStale` in `pensionSummary.ts`, read by the footer AND the modal's reading; never re-derive it in a component.
+- The snapshots are reduced ONCE per page (`indexPensionSnapshots` → `PensionSummaryInput.snapshotIndex`, memoized on the snapshots alone); «Il fondo oggi» reads an off-axis input, so the year pill never recomputes it. Deliberately not bounded: the `monthly-snapshots` query (shared cache) and the four-query skeleton (the verdict needs the snapshots) — doc/guide/previdenza.md says why.
 - Contributions run on the CLIENT SDK (not an Admin route); `taxYear` (validated ±1 year from `date`) groups every roll-up, never `date.getFullYear()`; contributions never touch spending or savings.
 - Three causes of growth, three numbers — never one blended percentage: employer share leaves the TWR (returns in `personalReturn`), TFR is deferred salary (denominator only), the IRPEF saving is its own per-taxpayer card. `isFirstEmploymentPost2007` ON without a full history inflates the plafond.
 - The window starts where data is trustworthy (`resolvePensionReturnStart`); a contribution is attributed to the month its VALUE MOVED (`createdAt`). `MonthlySnapshot.pension` is FROZEN at write time.
@@ -396,7 +422,7 @@ file used to carry.
 
 ### Periodic Emails · PDF Export → `doc/guide/email-pdf.md`
 - Both render OUTSIDE the DOM: every hex comes from `lib/constants/printTokens.ts` and nothing else; every email layout is a nested table (Outlook = Word). Verify by RENDERING — no check is in the suite.
-- A verdict over tiles: the email opens on a RULE-generated verdict (also the preheader), the AI comment is a tile in SECOND position and non-blocking. ONE template for the four periods; «Rispetto a un anno fa» is ABSENT on a yearly email (`previousEqualsYoy`).
+- A verdict over tiles: the email opens on a RULE-generated verdict (also the preheader), the AI comment is a tile in SECOND position and non-blocking. ONE template for the four periods; «Rispetto a un anno fa» is ABSENT on a yearly email (`previousEqualsYoy`). The «mercato» residual is `Δ − risparmio + tasse stimate sulle vendite` (`periodSales` from the ledger): a broker's withholding has no cashflow row and used to read as a market loss.
 - PDF: the cover IS the verdict; on Cashflow, Export Totale applies `cashflowHistoryStartYear` as a floor and DECLARES it; the Rendimenti section measures the page's base (`resolvePerformanceBase`, `baseLabel` on its scope line), never the raw snapshots. No monospace, no typographic minus — `pdfSafeText` converts U+2212 at the boundary (react-pdf drops unencodable chars silently).
 - The weekly budget email is a SEPARATE module and nothing in it is weekly (month-to-date + year-to-date); name every figure's window.
 - Il resto — `PDF_RAMP`, the class labels, `signedPct`/`signedEur` it-IT, the deterministic-comparison rule, the AI-prompt body — in `doc/guide/email-pdf.md`.
@@ -490,7 +516,21 @@ file used to carry.
 - Shared variants live in `lib/utils/motionVariants.ts`; `useReducedMotion()` is called once per component and used
   inline, with `<MotionConfig reducedMotion="user">` at the layout root — no separate CSS media queries.
 - **Page transitions use `template.tsx`, NOT `layout.tsx` + `AnimatePresence`** (it re-mounts on every navigation);
-  remove page-level `motion.div variants` wrappers once it is in place (compounded opacity: t²).
+  remove page-level `motion.div variants` wrappers once it is in place (compounded opacity: t²). **Since 2026-09-12 a
+  click on a shell link is a page SCENE** — a native view transition (`lib/hooks/useSceneNavigation.ts` →
+  `runViewTransition('page', …)`, whose DOM update resolves when `usePathname()` changes, with a 700 ms guard for a route
+  the dev server is still compiling) — and `template.tsx` stands down for that mount (`<html data-vt="page">` read once in
+  a `useState` initializer): two fades on one page compound. React 19.2 stable exports no `ViewTransition` and
+  `next.config` enables no experimental flag; the native API is the whole mechanism, and a browser without it (Firefox)
+  or a reader with reduced motion gets a plain `router.push` and the template's fade.
+- **`lib/utils/viewTransition.ts` is the ONE entry to `document.startViewTransition`**, and it stamps `data-vt="theme"` or
+  `data-vt="page"` on `<html>` for the length of the transition: every `::view-transition-*` rule in `globals.css` is
+  scoped by that attribute. An unscoped `::view-transition-new(root)` rule runs on EVERY transition — the theme's
+  circle-clip used to be global and would have clipped every navigation. **A `view-transition-name` must be unique among
+  the RENDERED elements of a page**, or the browser skips the whole transition (the update still applies, silently):
+  `page-verdict` lives on `PageVerdict` and on the skeleton's verdict block (never both mounted), `page-header` on
+  `PageHeader`, `page-main` on the layout's `<main>`; a `forceMount` tab panel is `display: none` and does not count.
+  Do not name the tile grid — several pages render more than one.
 - `useCountUp` always with `once: true`, called **before** any conditional early return and unconditionally for both
   branches of a mode switch; it has **no `enabled` option**, so gate the display in JSX. **`layout="position"`, not bare
   `layout`, when a Framer parent wraps a Radix `CollapsibleContent`** — bare `layout` stretches the trigger text.
@@ -529,6 +569,13 @@ file used to carry.
 
 ### Recharts
 - **`useChartColors()` is mandatory for every series** — read CSS vars after paint and pass `chartColors[0..4]` as props.
+- **A Recharts series CAN drive the page, not just its tooltip — but no page does today**: `onMouseMove` hands
+  `activeTooltipIndex` (a number OR a numeric string in 3.x — coerce it) and `onMouseLeave` the end; lift the index's
+  PERIOD, never the index (the tiles that follow have their own arrays), attach the handlers only under `(pointer:
+  fine)`, and let a pure module resolve what every follower shows. Storico did this for one day (4b0a2dd,
+  `storicoScrub.ts`) and the owner retired it on 2026-09-13 (DESIGN.md → The Scrub Rule, retired): the worked example
+  lives in `git show 4b0a2dd`, not in the tree. A hand-written SVG that must glide between windows resamples the OLD series onto the new length and tweens per
+  index (`lib/hooks/useMorphingSeries.ts`); the hover reads the landed data, never the frame.
 - **Never pass `useChartColors()` to a Nivo/react-spring component**: `@react-spring/web` cannot interpolate hex→oklch
   and throws on load. Sankey node colors stay hardcoded hex; only Recharts is react-spring-free.
 - **Three separate tooltip style props, none inherited**: `contentStyle`, `labelStyle`, `itemStyle` — omitting
@@ -570,7 +617,9 @@ file used to carry.
 
 ### Navigation
 - **Single source for nav arrays**: `lib/constants/navigation.ts` — Sidebar, BottomNavigation and SecondaryMenuDrawer all
-  import from it, never redeclare inline. **The assistant is `assistantNavItem`**, a route rendered by the same `NavItems`
+  import from it, never redeclare inline. **A route link in the shell is a `SceneLink`** (`components/layout/SceneLink.tsx`,
+  a `next/link` whose plain left click runs the page scene — prefetch, modifier clicks, `target` and the caller's own
+  `onClick` are untouched); a bare `<Link>` there navigates without the scene. **The assistant is `assistantNavItem`**, a route rendered by the same `NavItems`
   as the groups (gated by `NEXT_PUBLIC_ASSISTANT_AI_ENABLED` at render); there is no banner component to restyle.
 - **The shell's label is the tiles' eyebrow**: sidebar group labels, the drawer's section labels and the compact
   `PageHeader` all use `TILE_EYEBROW_CLASS` (`components/ui/tile.tsx`) — on the sidebar surface with
@@ -601,6 +650,10 @@ file used to carry.
   so split the help copy (`hidden desktop:block` / `desktop:hidden`) and label each card's axes explicitly.
 - **Prefer rendering large local subtrees as pure render helpers or top-level components** — a nested JSX definition
   inside a page component means a simple row selection remounts the whole table. `cn` is NOT auto-imported in pages.
+- **A row's caption WRAPS, it is never truncated, and the label column never grows to make room for it** (2026-09-14,
+  `RankedRows`): «30 set · Asilo nido · in calendario» is the row's second fact, and a cut fact is no fact. The column
+  cannot grow — at 4 grid columns 46% is the most it can take beside the bar's 40px floor, the amount and the share
+  (58% painted the share outside the tile, measured) — so the caption takes a second line (`line-clamp-2`) instead.
 
 ### Accessibility
 - **`title` is not an accessible name** — VoiceOver on iOS ignores it and it never fires on touch. Use `aria-label` for
@@ -612,7 +665,15 @@ file used to carry.
 - **A non-interactive element with `onClick` needs `role="button"`, `tabIndex={0}`, `aria-label`, an Enter/Space
   `onKeyDown` and a focus ring — better still, use a native `<button>`.**
 - **Tabs**: `role="tab"` + `aria-selected` inside a `role="tablist"` with an `aria-label`; for a real tab/panel
-  relationship also wire `id` + `aria-controls`. An active state with no tab in the tablist (a CUSTOM range) needs a
+  relationship also wire `id` + `aria-controls`. **A `SegmentedPill` that picks a VALUE the whole page reads (an axis
+  year, a period) is `semantics="radio"`** — a tablist with no tabpanel is a promise the DOM cannot keep; `tabs` only
+  where the pill switches a panel (2026-09-13, Previdenza and the Panoramica's sparkline period; 2026-09-14 the
+  Dividendi axis, which was a `SegmentedControl` with no arrows and 4,35:1 in light; the other pills stay `tabs`
+  until each is reviewed). The primitive's inactive label is `text-foreground/70`, not `text-muted-foreground`,
+  which is tuned against `--background` and measured 4,34:1 on the pill's `bg-muted` in light.
+  **A tile's `ariaLabel` is its visible eyebrow, year included** (`Anno fiscale 2026`, never `Anno fiscale`): a name
+  shorter than the label is what a screen reader hears while a sighted reader sees more (WCAG 2.5.3) — Playwright
+  locates it with a regex, never by shaping the name around `exact: true`. An active state with no tab in the tablist (a CUSTOM range) needs a
   `role="status" aria-live="polite"` `sr-only` description instead. **A toggle that shows a panel needs `aria-expanded`
   and `aria-haspopup`**, plus a document-level Escape handler added and removed inside `useEffect([isOpen])`.
 - **`aria-live` regions**: streaming content needs `aria-live="polite" aria-atomic="false"` and an `aria-label`.
@@ -630,7 +691,14 @@ file used to carry.
   intercepted from the button**: Radix's dismiss layer registers its document listener when the dialog MOUNTS, so it
   runs before any listener added at arm time — capture phase included, and `stopPropagation` never reaches it. The
   hook exports `hasArmedConfirm()` and `ResponsiveModal` calls `preventDefault()` in `onEscapeKeyDown`; without it
-  Escape closes the dialog with the row still armed (seen in a browser, 2026-08-31).
+  Escape closes the dialog with the row still armed (seen in a browser, 2026-08-31). **The armed button stays a
+  compact «Conferma» and the ROW prints the consequence** («eliminando, il conto verrà riaccreditato», in the hint
+  cell, `text-destructive`): a sentence inside the button wraps in a 90px action column (owner's tour, 2026-09-13,
+  `VersamentiTile`). **One live region per list, not per row** — a `role="status"` per `DeleteButton` made a
+  keyboard reader hear «Eliminazione annullata» on every Tab away from an armed button.
+- **`desktop:h-7` is 28px — never for a target.** The `h-11 → desktop:h-8` idiom (44 → 32, the dense-list floor
+  above) is the one to copy; four Previdenza sites shipped 28px until 2026-09-13, and a 1440px tablet in landscape
+  reads the desktop layout by touch (CLAUDE.md → Known Issues).
 - **Form error text needs the sign token too**: `text-red-500` fails AA in both modes on a dialog surface AND diverges
   from `--destructive` on the non-default themes. The dialog sweep of 2026-08-31 retired the last 76 of them; a
   FORM-level failure now belongs to the modal's reading line, not to a paragraph of its own.
@@ -776,7 +844,9 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   `firebase` CLI process itself: on macOS `kill -INT <cli pid>` does it (2026-09-06); on Windows, where only the wrapper
   can be killed, POST `http://127.0.0.1:4400/_admin/export` with `{"path": "<abs>/.emulator-data"}` (forward slashes —
   a backslashed path 400s; `/emulators/export` 404s), then terminate. **Verify the directory's mtime moved**: a 200 with
-  an unchanged mtime is the failure that looks like success.
+  an unchanged mtime is the failure that looks like success — and a path that lost its slashes (`C:UsersGiuseppe…`,
+  2026-09-13) still answers 200 and writes a full export into a directory of THAT name in the repo root, which `git
+  status` then shows as untracked: delete it.
 
 ### Browser-Driven E2E (Playwright)
 - **What belongs here**: only what needs a real layout — the `desktop:` switch at 1440px, a collapsible, a state flash,
@@ -803,7 +873,10 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   never during an animation); responsive DOM duplicates make `.first()` the HIDDEN mobile copy (`.filter({ visible:
   true })`); a collapsed CSS-grid region is still "visible" (scope through the toggle's `aria-controls` and measure
   height); a `fill()` right after `goto(…, { waitUntil: 'domcontentloaded' })` is wiped by hydration (`waitUntil:
-  'load'`, then `.inputValue()`).
+  'load'`, then `.inputValue()`); `addInitScript` runs on EVERY navigation, reloads included, so a `localStorage.removeItem`
+  placed there to start clean also wipes the persistence the spec is about to verify — guard it with a `sessionStorage`
+  flag (2026-09-14). **Renaming an `aria-label` breaks every spec that matched its old substring** («Modifica asset» →
+  «Modifica {name}», `assets.bond.spec.ts` on 2026-09-14): grep `e2e/` for the old name in the same commit.
 - **Locators — the controls are not buttons** (2026-08-28: read the failure's page snapshot before guessing a second
   selector): the Cashflow picker is a `combobox` named «Periodo selezionato: {label}», `SegmentedPill` options are
   `tab`, the instalment toggle sits behind the «Impostazioni avanzate» disclosure, the two-step create dialog capitalises
@@ -827,6 +900,12 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
 - **A settings change is only verified by a RELOAD** (2026-08-29: four fields wrote fine and came back old on the next
   load — the form is rebuilt by `getSettings`, the half where the bugs live): drive the UI, save,
   `page.reload({waitUntil: 'load'})`, assert on the INPUTS, and test setting and CLEARING separately.
+- **A two-click confirm in a spec waits for the ARMED label before the second click** (2026-09-13): on a cold dev server the
+  second `click()` on «Elimina operazione» landed on a button not yet re-rendered as armed and the row stayed, with no
+  error anywhere; `await expect(row.getByRole('button', { name: /Premi di nuovo per/ })).toBeVisible()` between the two
+  clicks, and `page.waitForResponse` on the DELETE to read its status, made the same step green. A first run against a
+  cold server also logs an overview «Lettura fallita» and a failed backfill that a warm server does not reproduce — read
+  the API bodies (`page.on('response')` on `/api/` ≥ 400) before calling either a defect.
 - **A throwaway spec: own config, right filename, removed by the app, deleted.** The broad `desktop` project collects any
   `*.spec.ts`, so a spec written for its own fixture account fails under the base account in a full run — give it
   `playwright.<name>.config.ts` with its own setup project and a narrow `testMatch`, run with `--config=`, delete it
@@ -871,6 +950,13 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   category — the client Firestore rejects `undefined`) with a browser `console.warn` as the only trace; the E2E
   assertion on `performance-cache/{uid}` found it (2026-09-06, `e2e/performance.degraded.spec.ts`). `removeUndefinedDeep`
   before every `setDoc`, like every other write.
+- **A spec that edits a document another fixture also writes RESTORES what it read, never deletes** (2026-09-11):
+  `cashflow.owner.spec.ts` cleared `familyMembers` on `assetAllocationTargets/test-user-1` in its `finally`, the
+  Previdenza seed keeps «Marco» in that same field, and the two pension specs that ran after it failed with a verdict
+  missing the name. Read the fields before mutating, put back the value (or `FieldValue.delete()` only if it was
+  absent). A fixture ISIN must be one the account never held: `createAsset` re-links onto an existing asset whose
+  ISIN already has dividends. And a date planted at LOCAL midnight is 23:00 UTC of the day before — the form stores
+  `new Date('YYYY-MM-DD')`, UTC midnight, so every coupon derived from a local-midnight fixture reads the 14th.
 - **An assertion of ABSENCE needs a positive anchor first**: `toHaveCount(0)` passes against a page that has not
   rendered. Wait for something expected in both states (a `forceMount` panel: attached, not necessarily visible), then
   assert the absence; a browser check that never saw the feature ON proves nothing about it OFF.

@@ -8,17 +8,15 @@
  *
  * The milestones come from `prepareDoublingTimeData` (chartService, unchanged); the projection
  * from `projectNextDoubling` (storicoSummary.ts) on the SAME pace the verdict uses; the words
- * from `describeDoublings`. The confetti of the old timeline survives: a completed milestone is
- * celebrated once, and `celebrationUtils` remembers it.
+ * from `describeDoublings`. A completed milestone is a row, not an event: the confetti of the old
+ * timeline was removed on 2026-09-13 (motion carrying nothing — DESIGN.md → Anti-Patterns).
  */
 
-import { useEffect } from 'react';
 import type { DoublingMilestone, DoublingMode, DoublingTimeSummary } from '@/types/assets';
 import type { Narrative } from '@/lib/utils/narrative';
 import type { DoublingProjection, GrowthPace } from '@/lib/utils/storicoSummary';
 import { formatDurationLong, formatDurationShort, formatPeriodMonthShort } from '@/lib/utils/storicoNarrative';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
-import { hasCelebrated, markCelebrated, shouldReduceMotion } from '@/lib/utils/celebrationUtils';
 import { cn } from '@/lib/utils';
 import { Tile, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { AsideToggle } from '@/components/ui/aside-toggle';
@@ -107,25 +105,6 @@ function InProgressRow({ milestone, latestValue }: { milestone: DoublingMileston
 export function RaddoppiTile({ reading, summary, mode, onModeChange, projection, pace, latestValue, className }: RaddoppiTileProps) {
   const completed = summary.milestones.filter((m) => m.isComplete);
   const current = summary.currentDoublingInProgress;
-
-  // Celebrate each newly completed milestone once; canvas-confetti stays out of the main bundle.
-  // The delay lets the tile settle before the burst; the key is marked before the animation runs.
-  useEffect(() => {
-    if (shouldReduceMotion() || completed.length === 0) return;
-    const uncelebrated = completed.filter((m) => !hasCelebrated(`milestone_${m.milestoneType}_${m.milestoneNumber}`));
-    if (uncelebrated.length === 0) return;
-    const timer = setTimeout(async () => {
-      const confetti = (await import('canvas-confetti')).default;
-      for (const milestone of uncelebrated) {
-        markCelebrated(`milestone_${milestone.milestoneType}_${milestone.milestoneNumber}`);
-        // canvas-confetti draws on a canvas, where a CSS variable cannot be read: literal colours.
-        confetti({ colors: ['#10B981', '#F59E0B', '#ffffff', '#6EE7B7'], particleCount: 60, spread: 70, origin: { y: 0.6 }, gravity: 1.2, scalar: 0.8 });
-      }
-    }, 800);
-    return () => clearTimeout(timer);
-    // The milestone list is derived from `summary`; re-running on it is the intent.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [summary]);
 
   const nextLabel = mode === 'threshold' ? 'Prossimo traguardo' : 'Prossimo raddoppio';
 

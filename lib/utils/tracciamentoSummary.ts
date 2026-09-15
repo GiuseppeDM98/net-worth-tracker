@@ -39,6 +39,19 @@ function isSpending(expense: Expense): boolean {
   return expense.type !== 'income' && expense.type !== 'transfer';
 }
 
+/** The derived half of the totals — net, rate, coverage — from the two sums and the transfer count. */
+function buildTotals(income: number, spending: number, transferCount: number): PeriodCashflowTotals {
+  return {
+    income,
+    expenses: spending,
+    net: income - spending,
+    savingsRate: income > 0 ? ((income - spending) / income) * 100 : null,
+    // A ratio with a zero numerator says nothing the "nessuna entrata" verdict has not.
+    coverageRatio: spending > 0 && income > 0 ? income / spending : null,
+    transferCount,
+  };
+}
+
 /** Totals of a list of rows, classified by type. Amount signs are ignored on purpose. */
 export function summarizePeriodCashflow(expenses: Expense[]): PeriodCashflowTotals {
   let income = 0;
@@ -56,15 +69,19 @@ export function summarizePeriodCashflow(expenses: Expense[]): PeriodCashflowTota
       spending += Math.abs(expense.amount);
     }
   }
-  return {
-    income,
-    expenses: spending,
-    net: income - spending,
-    savingsRate: income > 0 ? ((income - spending) / income) * 100 : null,
-    // A ratio with a zero numerator says nothing the "nessuna entrata" verdict has not.
-    coverageRatio: spending > 0 && income > 0 ? income / spending : null,
-    transferCount,
-  };
+  return buildTotals(income, spending, transferCount);
+}
+
+/**
+ * The totals of what has ALREADY happened: the period's totals minus its scheduled slice.
+ *
+ * The period's figures include the calendar by the owner's decision (`filterExpensesByPeriod`),
+ * and the verdict judges this part, not them — on the 14th, a salary dated the 15th is not yet a
+ * reason to say the month is going well (2026-09-14). Same input as the totals, so the two can
+ * never disagree on what is «già in calendario».
+ */
+export function settleTotals(totals: PeriodCashflowTotals, scheduled: ScheduledSlice): PeriodCashflowTotals {
+  return buildTotals(totals.income - scheduled.income, totals.expenses - scheduled.expenses, totals.transferCount);
 }
 
 function sliceBetween(expenses: Expense[], from: Date, to: Date): Expense[] {
@@ -165,14 +182,24 @@ export function isYearToDate(period: Period, now: Date): boolean {
   return period.kind === 'year' && period.year === getItalyMonthYear(now).year;
 }
 
+/** Where a month period stands against today's Italian calendar month. */
+function relateMonthToToday(period: Extract<Period, { kind: 'month' }>, now: Date): 'past' | 'current' | 'future' {
+  const today = getItalyMonthYear(now);
+  if (period.year === today.year && period.month === today.month) return 'current';
+  return period.year > today.year || (period.year === today.year && period.month > today.month) ? 'future' : 'past';
+}
+
 /**
- * The window of the CURRENT period that `previousPeriod` can honestly be compared with: the
- * period itself, except for a year still running, where it is January → the end of today's
- * month. The period's own totals span the whole year; a delta may not, because the previous
- * year has no months to match December against — twelve against eight is a rise by
- * construction, the mirror of the drop `previousPeriod` already refuses.
+ * The window of the CURRENT period that its predecessor can honestly be compared with: the
+ * period itself for a closed one; for a year still running, January → the end of today's
+ * month; for the month in progress, the 1st → today. The period's own totals span the whole
+ * calendar unit; a delta may not, because the other side has nothing to match the days not yet
+ * lived against — twelve months against eight, or a whole August against fourteen days of
+ * September, is a change by construction. The month case was left out until 2026-09-14, and the
+ * default view printed «in calo del 59,8% su agosto» on the 14th of the month.
  *
- * Null exactly when `previousPeriod` is null: with no predecessor there is nothing to scope.
+ * Null when there is nothing to compare: a custom range (no honest predecessor) and a period
+ * that has not started (nothing lived on this side yet).
  */
 export function currentComparisonWindow(period: Period, now: Date): Period | null {
   if (period.kind === 'custom') return null;
@@ -182,7 +209,50 @@ export function currentComparisonWindow(period: Period, now: Date): Period | nul
     const anchor = resolveAnchorMonth(period, now);
     return { kind: 'custom', from: new Date(period.year, 0, 1), to: endOfMonthBound(period.year, anchor.month) };
   }
+  if (period.kind === 'month') {
+    const relation = relateMonthToToday(period, now);
+    if (relation === 'future') return null;
+    if (relation === 'current') {
+      const today = getItalyDate(now);
+      return { kind: 'custom', from: new Date(period.year, period.month - 1, 1), to: new Date(period.year, period.month - 1, today.getDate()) };
+    }
+  }
   return period;
+}
+
+/**
+ * The other side of the delta: `previousPeriod`, except for the month in progress, where it is
+ * the same days of the previous month (the 1st → the 14th of August against the 1st → the 14th
+ * of September; a day the previous month does not have — the 31st — clamps to its last day, and
+ * the label says which days were compared). Kept apart from `previousPeriod` because the
+ * projection still reads LAST MONTH WHOLE («Ad agosto 4854 €»): a reference for where the month
+ * lands is the whole previous month, a delta on what has been lived is not.
+ *
+ * Null exactly when `currentComparisonWindow` is null.
+ */
+export function previousComparisonWindow(period: Period, now: Date): Period | null {
+  if (period.kind === 'month') {
+    const relation = relateMonthToToday(period, now);
+    if (relation === 'future') return null;
+    if (relation === 'current') {
+      const previous = period.month === 1 ? { year: period.year - 1, month: 12 } : { year: period.year, month: period.month - 1 };
+      const daysInPrevious = new Date(previous.year, previous.month, 0).getDate();
+      const day = Math.min(getItalyDate(now).getDate(), daysInPrevious);
+      return { kind: 'custom', from: new Date(previous.year, previous.month - 1, 1), to: new Date(previous.year, previous.month - 1, day) };
+    }
+  }
+  return previousPeriod(period, now);
+}
+
+/**
+ * For the month in progress, how many days of the previous month the delta compares — today's
+ * day, clamped to the previous month's length (`previousComparisonWindow`); null for any other
+ * period. The narrative names them («sui primi 14 giorni di agosto», «1–14 ago»).
+ */
+export function comparedDaysOfPreviousMonth(period: Period, now: Date): number | null {
+  if (period.kind !== 'month' || relateMonthToToday(period, now) !== 'current') return null;
+  const previous = period.month === 1 ? { year: period.year - 1, month: 12 } : { year: period.year, month: period.month - 1 };
+  return Math.min(getItalyDate(now).getDate(), new Date(previous.year, previous.month, 0).getDate());
 }
 
 /**

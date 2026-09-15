@@ -52,7 +52,12 @@ export type DayResolver = (expense: Expense) => MonthRef & { day: number };
  */
 export function resolveSingleMonth(period: AnalisiPeriod, today: MonthRef): MonthRef | null {
   if (period.mode === 'history' || period.year === null) return null;
-  if (period.month !== null) return { year: period.year, month: period.month };
+  if (period.month !== null) {
+    // A month that has not started holds only its calendar: nothing to run hot against a
+    // six-month average, so no month is meant and the tile stays absent (2026-09-14).
+    const notStarted = period.year > today.year || (period.year === today.year && period.month > today.month);
+    return notStarted ? null : { year: period.year, month: period.month };
+  }
   // Both windows on the running year mean today's month; a past year means no month at all.
   return period.mode === 'current' || period.mode === 'ytd' ? { year: today.year, month: today.month } : null;
 }
@@ -81,8 +86,10 @@ export interface TopExpenseRow {
   label: string;
   /** The subcategory, when the row carries one. */
   subCategoryLabel: string | null;
-  /** «12 ago · Volo» — the day and the subcategory, under the label. */
+  /** «12 ago · Volo» — the day and the subcategory, under the label; «· in calendario» when the row is still ahead. */
   caption: string;
+  /** Dated after today: in the period's total, not spent yet (The Scheduled-Is-Not-Spent Rule). */
+  scheduled: boolean;
   amount: number;
   /** Share of the period's spending, 0-100. */
   percentage: number;
@@ -106,7 +113,7 @@ export interface TopExpenses {
  * the share is measured on the whole spending of the period, so the reading can say what
  * the top rows weigh.
  */
-export function rankTopExpenses(expenses: Expense[], dayOf: DayResolver, limit = 5): TopExpenses {
+export function rankTopExpenses(expenses: Expense[], dayOf: DayResolver, limit = 5, isScheduled: (expense: Expense) => boolean = () => false): TopExpenses {
   const spending = expenses.filter(isSpending);
   const total = spending.reduce((sum, expense) => sum + Math.abs(expense.amount), 0);
   if (spending.length === 0 || total <= 0) return { rows: [], shownTotal: 0, total: 0, count: 0 };
@@ -122,11 +129,14 @@ export function rankTopExpenses(expenses: Expense[], dayOf: DayResolver, limit =
       const hasSubCategory = subCategoryKey !== NO_SUBCATEGORY_KEY;
       const subCategoryLabel = hasSubCategory ? getSubCategoryLabel(expense) : null;
       const day = `${when.day} ${MONTH_NAMES_SHORT[when.month - 1].toLowerCase()}`;
+      const scheduled = isScheduled(expense);
+      const captionParts = [day, subCategoryLabel, scheduled ? 'in calendario' : null].filter((part): part is string => part !== null);
       return {
         key: expense.id,
         label: getCategoryName(expense),
         subCategoryLabel,
-        caption: subCategoryLabel ? `${day} · ${subCategoryLabel}` : day,
+        caption: captionParts.join(' · '),
+        scheduled,
         amount: Math.abs(expense.amount),
         percentage: (Math.abs(expense.amount) / total) * 100,
         expenseType: expense.type,

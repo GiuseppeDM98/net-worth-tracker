@@ -13,11 +13,14 @@
  *   Mobile (1 col):   Periodo → Fuori scala → Spese per categoria → Entrate → Spese maggiori →
  *                     Scheda → Flusso
  *
- * THREE PERIOD MODES: "Anno corrente" (current year, optional month), "Anno" (a past year,
- * optional month), "Storico" (everything at or after the history floor). Every figure but two
- * follows the axis: the anomalies run on ONE month (the picked one, or today's for the bare
- * running year — the Fuori scala tile names it, and is absent when no month can be meant),
- * and the Scheda's per-year table and trend ignore the period on purpose.
+ * FOUR PERIOD MODES: "Da inizio anno" (January → the end of today's month), "Anno corrente"
+ * (the whole current year, optional month), "Anno" (a past year, optional month), "Storico"
+ * (from the history floor to the CURRENT year, calendar included — never to the last row a
+ * plan wrote). Every figure but two follows the axis: the anomalies run on ONE month (the
+ * picked one, or today's for the bare running year — the Fuori scala tile names it, and is
+ * absent when no month can be meant, a month not started included), and the Scheda's per-year
+ * table and trend ignore the period on purpose. The running month is compared with the SAME
+ * DAYS of its baseline month (Tracciamento's rule), so its verdict can carry a tone.
  *
  * ENTITY FOCUS = the Scheda tile. Level 'subcategory' (a category) → 'expenseList' (one of its
  * subcategories). Every entry point — a category row, an anomaly, a top expense, a Sankey
@@ -63,7 +66,7 @@ import { getCategoryKey, getSubCategoryKey, getSubCategoryLabel, selectExpensesF
 import { buildCategoryComparison, computeTotalsPacing, resolveComparisonScope } from '@/lib/utils/comparisonDeltas';
 import { buildEntityYearRows, computeEntityRunRate, type EntityScope } from '@/lib/utils/expenseEntityStats';
 import { type EntitySearchTarget } from '@/lib/utils/entitySearch';
-import { summarizePeriodCashflow, summarizeScheduled } from '@/lib/utils/tracciamentoSummary';
+import { isScheduledRow, summarizePeriodCashflow, summarizeScheduled } from '@/lib/utils/tracciamentoSummary';
 import {
   buildMonthlySpending,
   buildYearlySpending,
@@ -84,6 +87,7 @@ import {
   describeBaseline,
   describeEntityFocus,
   describeFlow,
+  describeMissingBaseline,
   describePeriodScope,
   describeSpendingChart,
   describeSpendingChartFooter,
@@ -270,6 +274,9 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
   const [drillDown, setDrillDown] = useState<DrillDownState>(NO_FOCUS);
 
   const schedaRef = useRef<HTMLDivElement>(null);
+  // The element that opened the Scheda (a row, a node's tile, the search's trigger): where the
+  // keyboard focus returns when the Scheda closes. Closing left it on `body` until 2026-09-14.
+  const focusTriggerRef = useRef<HTMLElement | null>(null);
 
   // The ONE scroll on entity focus — owned by the landing path (handleEntitySelect and the URL
   // restore), never by a parallel effect. Deferred one tick so the Scheda cell exists.
@@ -281,6 +288,14 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
       // Keyboard and screen-reader focus follow the visual jump.
       cell.focus({ preventScroll: true });
     }, 50);
+  }, []);
+
+  // Closing the Scheda hands the focus back to what opened it (if it is still on the page),
+  // so a keyboard reader lands where it left instead of at the top of the document.
+  const restoreFocusToTrigger = useCallback(() => {
+    const trigger = focusTriggerRef.current;
+    focusTriggerRef.current = null;
+    if (trigger && trigger.isConnected) trigger.focus();
   }, []);
 
   // Keep the URL in sync with the period AND the focus — replace (not push) so filter changes
@@ -333,12 +348,30 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
 
   const baseExpenses = useMemo(() => allExpenses.filter((e) => getItalyYear(toDate(e.date)) >= historyStartYear), [allExpenses, historyStartYear]);
 
+  // The years the page can be about: from the floor to the CURRENT year. A materialised
+  // instalment plan writes rows into 2043, and until 2026-09-14 those years counted («19 anni»)
+  // and drew — the calendar ahead belongs to the running year, not to years of their own.
   const availableYears = useMemo(() => {
     const years = new Set<number>();
-    baseExpenses.forEach((e) => years.add(getItalyYear(toDate(e.date))));
+    baseExpenses.forEach((e) => {
+      const year = getItalyYear(toDate(e.date));
+      if (year <= currentYear) years.add(year);
+    });
     return Array.from(years).sort((a, b) => b - a);
-  }, [baseExpenses]);
+  }, [baseExpenses, currentYear]);
   const pastYears = useMemo(() => availableYears.filter((y) => y < currentYear), [availableYears, currentYear]);
+
+  // A bookmarked `?year=` below the floor names a year the page cannot show (the KPIs are
+  // floored, the Select has no such option): settled during render on the loaded floor, it
+  // degrades to the newest past year — the same stance as readPeriodFromSearchParams.
+  const [settledFloor, setSettledFloor] = useState<number | null>(null);
+  if (!loading && settledFloor !== historyStartYear) {
+    setSettledFloor(historyStartYear);
+    if (periodMode === 'year' && selectedYear !== null && selectedYear < historyStartYear) {
+      setSelectedYear(pastYears[0] ?? currentYear - 1);
+      setSelectedMonth(null);
+    }
+  }
 
   // Period changes deliberately do NOT reset the focus: the focused entity is an object of
   // study (its Scheda spans every year regardless of the window), not a filter of the period.
@@ -366,7 +399,8 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
   // them rather than hiding them. What has not happened yet is never passed off as done —
   // `scheduled` below carries it, and the verdict closes by naming it.
   const periodExpenses = useMemo(() => {
-    if (selectedYear === null) return baseExpenses;
+    // The history closes on the current year, calendar included — not on the last row written.
+    if (selectedYear === null) return baseExpenses.filter((e) => getItalyYear(toDate(e.date)) <= today.year);
     // «Da inizio anno» stops at the end of today's month; every other window takes its months whole.
     const throughMonth = resolvePeriodThroughMonth({ mode: periodMode, year: selectedYear, month: selectedMonth }, today);
     return baseExpenses.filter((e) => {
@@ -384,7 +418,8 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
   // ─── Figures (pure modules) ──────────────────────────────────────────────────
 
   const totals = useMemo(() => summarizePeriodCashflow(periodExpenses), [periodExpenses]);
-  const topExpenses = useMemo(() => rankTopExpenses(periodExpenses, dayOf, 5), [periodExpenses]);
+  // A row still ahead ranks with the others (it is in the total) and says so in its caption.
+  const topExpenses = useMemo(() => rankTopExpenses(periodExpenses, dayOf, 5, (expense) => isScheduledRow(expense, nowDate)), [periodExpenses, nowDate]);
   const expenseSlices = useMemo(() => buildExpenseComposition(periodExpenses), [periodExpenses]);
   const incomeSlices = useMemo(() => buildIncomeComposition(periodExpenses), [periodExpenses]);
   const flow = useMemo(() => summarizeFlow(periodExpenses), [periodExpenses]);
@@ -402,27 +437,37 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
   // Null in Storico, for a month that has not started, or when the previous year predates the
   // tracked history.
   const comparisonYear = selectedYear !== null && selectedYear - 1 >= historyStartYear ? selectedYear - 1 : null;
-  const scope = useMemo(() => resolveComparisonScope(periodMode, selectedMonth, today.month), [periodMode, selectedMonth, today.month]);
+  // The running month is cut at today's DAY on both sides (Tracciamento's «stessi giorni»), so
+  // the rows go in with their day: `dayOf` is `monthOf` plus the day the cut reads.
+  const scope = useMemo(() => resolveComparisonScope(periodMode, selectedMonth, today.month, calendar.dayOfMonth), [periodMode, selectedMonth, today.month, calendar.dayOfMonth]);
   const pacing = useMemo(() => {
     if (selectedYear === null || comparisonYear === null || !scope) return null;
-    return computeTotalsPacing(allExpenses, selectedYear, comparisonYear, scope, monthOf);
+    return computeTotalsPacing(allExpenses, selectedYear, comparisonYear, scope, dayOf);
   }, [allExpenses, selectedYear, comparisonYear, scope]);
   const baseline = scope && comparisonYear !== null && pacing ? describeBaseline(scope, comparisonYear) : null;
+  // A baseline window inside the history with no row at all: the Periodo says so, never nothing.
+  const missingBaseline = scope && comparisonYear !== null && !pacing ? describeMissingBaseline(scope, comparisonYear) : null;
   const movers = useMemo(() => {
     if (selectedYear === null || comparisonYear === null || !scope || !pacing) return { grown: null, shrunk: null };
-    return resolveCategoryMovers(buildCategoryComparison(allExpenses, selectedYear, comparisonYear, scope, monthOf));
+    return resolveCategoryMovers(buildCategoryComparison(allExpenses, selectedYear, comparisonYear, scope, dayOf));
   }, [allExpenses, selectedYear, comparisonYear, scope, pacing]);
+  // «Anno corrente» compares twelve months against twelve while some of them are still only in
+  // the calendar (the owner's Same-Basis call, 2026-08-30): the delta's caption says how many,
+  // right where the red is printed — a −32% on income with three salaries still to come.
+  const monthsAhead = periodMode === 'current' && selectedMonth === null && selectedYear === today.year ? 12 - today.month : 0;
+  const comparisonPhrase = baseline ? (monthsAhead > 0 ? `su ${baseline} (${monthsAhead} ${monthsAhead === 1 ? 'mese' : 'mesi'} ancora in calendario)` : `su ${baseline}`) : null;
 
   // The spending series of the Periodo tile: the year's months beside the previous year's, or
   // the years of the history.
   const chartKind: 'month' | 'year' = selectedYear === null ? 'year' : 'month';
+  // Floored rows only: a `?year=` below the floor must not draw bars the KPIs refuse.
   const spendingPoints = useMemo(() => {
-    if (selectedYear === null) return buildYearlySpending(allExpenses, historyStartYear, monthOf, today);
+    if (selectedYear === null) return buildYearlySpending(baseExpenses, historyStartYear, monthOf, today);
     // The chart draws the period: twelve months for a year, up to today's month for «Da
     // inizio anno». The months still ahead are marked, never dropped.
     const throughMonth = resolvePeriodThroughMonth({ mode: periodMode, year: selectedYear, month: null }, today) ?? 12;
-    return buildMonthlySpending(allExpenses, selectedYear, throughMonth, historyStartYear, monthOf, today);
-  }, [allExpenses, periodMode, selectedYear, historyStartYear, today]);
+    return buildMonthlySpending(baseExpenses, selectedYear, throughMonth, historyStartYear, monthOf, today);
+  }, [baseExpenses, periodMode, selectedYear, historyStartYear, today]);
 
   // ─── Words (analisiNarrative / cashflowNarrative) ────────────────────────────
 
@@ -450,7 +495,7 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
   const periodoReading = describePeriodCashflow(
     totals,
     pacing ? { income: pacing.income.previous > 0 ? pacing.income.deltaPercent : null, expenses: pacing.expenses.previous > 0 ? pacing.expenses.deltaPercent : null } : null,
-    baseline ? `su ${baseline}` : null,
+    comparisonPhrase,
   );
   const hasBaselineSeries = spendingPoints.some((point) => point.prevYearValue !== null);
 
@@ -470,6 +515,10 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
     (target: EntitySearchTarget) => {
       const resolved = resolveFocusLabels({ expenseType: target.expenseType, categoryKey: target.categoryKey, subCategoryKey: target.subCategoryKey ?? null }, baseExpenses, categories);
       if (!resolved) return;
+      // Remember the opener only when it is a real control on the page (the search's modal has
+      // its own trigger, and a click on the Sankey lands on the svg — neither is a stop to return to).
+      const active = document.activeElement;
+      focusTriggerRef.current = active instanceof HTMLElement && active !== document.body && !active.closest('[role="dialog"]') && !active.closest('svg') ? active : focusTriggerRef.current;
       setDrillDown({
         level: resolved.subCategory ? 'expenseList' : 'subcategory',
         chartType: target.expenseType === 'income' ? 'income' : 'expenses',
@@ -481,9 +530,18 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
     [baseExpenses, categories, scrollToScheda],
   );
 
-  const resetFocus = () => setDrillDown(NO_FOCUS);
+  const resetFocus = () => {
+    setDrillDown(NO_FOCUS);
+    restoreFocusToTrigger();
+  };
   const backToCategory = () => setDrillDown((prev) => ({ ...prev, level: 'subcategory', selectedSubCategory: null }));
   const handleBack = () => (drillDown.level === 'expenseList' ? backToCategory() : resetFocus());
+  // Escape inside the Scheda closes it, like a modal — the tile is the page's one lifted surface.
+  const handleSchedaKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Escape' || event.defaultPrevented) return;
+    event.preventDefault();
+    resetFocus();
+  };
 
   const handleCategorySelect = (slice: CategorySlice) => handleEntitySelect({ expenseType: slice.expenseType, categoryKey: slice.categoryKey });
   const handleAnomalySelect = (anomaly: SpendingAnomaly) => handleEntitySelect({ expenseType: anomaly.expenseType, categoryKey: anomaly.categoryKey });
@@ -509,7 +567,12 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
     return { category: { expenseType: focus.category.expenseType, key: focus.category.key }, subCategory: focus.subCategory ? { key: focus.subCategory.key } : undefined };
   }, [focus]);
 
-  const focusPeriod = useMemo(() => ({ year: selectedYear, month: selectedMonth }), [selectedYear, selectedMonth]);
+  // The Scheda's period is the page's, cut where the page cuts it: «Da inizio anno» stops at
+  // today's month here too, or the reading said «finora» over a twelve-month total.
+  const focusPeriod = useMemo(
+    () => ({ year: selectedYear, month: selectedMonth, throughMonth: resolvePeriodThroughMonth(period, today) }),
+    [selectedYear, selectedMonth, period, today],
+  );
 
   // The Scheda's reading: the period total and its shares, the newest year's delta, the pace.
   const focusReading = useMemo(() => {
@@ -532,7 +595,15 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
       shareOfParent: parentTotal !== null && parentTotal > 0 ? runRate.periodTotal / parentTotal : null,
       delta:
         yearRow && yearRow.delta !== null
-          ? { amount: yearRow.delta, percent: yearRow.deltaPercent, sameMonths: yearRow.isPartial, comparisonYear: yearRow.year - 1 }
+          ? {
+              amount: yearRow.delta,
+              percent: yearRow.deltaPercent,
+              sameMonths: yearRow.isPartial,
+              comparisonYear: yearRow.year - 1,
+              // The partial row's own window (its total is the same-months total), so the
+              // sentence can name it when the period total spans the whole calendar year.
+              ...(yearRow.isPartial ? { livedTotal: yearRow.total, livedMonths: today.month } : {}),
+            }
           : null,
       monthlyAverage: period.month === null ? runRate.periodMonthlyAverage : null,
       hasHistory: yearRows.some((row) => row.total > 0),
@@ -638,6 +709,7 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
               reading={periodoReading}
               totals={totals}
               pacing={pacing}
+              missingBaseline={missingBaseline}
               points={spendingPoints}
               chartKind={chartKind}
               chartLabel={describeSpendingChart(chartKind, selectedYear, hasBaselineSeries, historyStartYear)}
@@ -685,7 +757,7 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
               activeKey={focus?.kind === 'income' ? activeSliceKey : null}
               onSelect={handleCategorySelect}
               emptyCopy="Nessuna entrata registrata nel periodo."
-              labelClassName="w-[72px]"
+              labelClassName="min-w-[72px]"
             />
           </div>
 
@@ -693,6 +765,7 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
             <div
               ref={schedaRef}
               tabIndex={-1}
+              onKeyDown={handleSchedaKeyDown}
               className={cn(TILE_CELL_CLASS, 'order-6 scroll-mt-20 outline-none desktop:order-none desktop:scroll-mt-4 tablet:col-span-2 desktop:col-span-12')}
             >
               <SchedaTile
@@ -728,6 +801,7 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
             allExpenses={allExpenses}
             period={period}
             today={today}
+            todayDay={calendar.dayOfMonth}
             historyStartYear={historyStartYear}
             availableDataYears={availableYears}
             onCategoryFocus={handleEntitySelect}

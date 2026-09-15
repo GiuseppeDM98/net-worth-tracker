@@ -33,8 +33,10 @@ import {
   computeAssetTotalReturn,
   computeAssetXirr,
   buildXirrFlows,
+  ledgerSpanDays,
   sortTransactionsForReplay,
   EPSILON,
+  MIN_ANNUALIZABLE_DAYS,
   type LedgerPositionState,
   type LedgerTransactionEffect,
 } from '@/lib/utils/assetTransactionUtils';
@@ -46,7 +48,7 @@ import {
   formatPercentageIt,
 } from '@/lib/utils/formatters';
 import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
-import { describeMovementsReading, describeWriteError } from '@/lib/utils/dialogNarrative';
+import { describeLedgerReturnVital, describeMovementsReading, describeWriteError } from '@/lib/utils/dialogNarrative';
 import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import { TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { Button } from '@/components/ui/button';
@@ -97,15 +99,22 @@ export function AssetMovementsDialog({ open, onClose, asset }: AssetMovementsDia
     try {
       const state: LedgerPositionState = replayTransactions(transactions);
       const totalReturn = computeAssetTotalReturn(state, currentValueEur, 0);
-      const xirr = computeAssetXirr(
-        buildXirrFlows({ transactions, dividendsNetEur: [], currentValueEur, now: new Date() })
-      );
+      const now = new Date();
+      const xirr = computeAssetXirr(buildXirrFlows({ transactions, dividendsNetEur: [], currentValueEur, now }));
+      // The third vital is the XIRR only once the ledger spans six months; before that it is the
+      // plain return over the ledger's own window, named (`describeLedgerReturnVital`).
+      const returnVital = describeLedgerReturnVital({
+        xirr,
+        totalReturnPct: totalReturn.totalReturnPct,
+        spanDays: ledgerSpanDays(transactions, now),
+        minAnnualizableDays: MIN_ANNUALIZABLE_DAYS,
+      });
       return {
         realizedPnlEur: state.realizedPnlEur,
         totalReturnEur: totalReturn.totalReturnEur,
         totalReturnPct: totalReturn.totalReturnPct,
         averageCostEur: state.averageCostEur,
-        xirr,
+        returnVital,
       };
     } catch {
       return null;
@@ -182,15 +191,16 @@ export function AssetMovementsDialog({ open, onClose, asset }: AssetMovementsDia
                 tone={signTone(vitals.totalReturnEur)}
                 info="Plusvalenze realizzate + non realizzate dal registro operazioni. I dividendi incassati sono conteggiati a parte in Rendimenti e Dividendi."
               />
-              {/* No XIRR row when it cannot be computed: a "–" beside two real figures reads as a
-                  measured zero (the Narrative Honesty Rule). */}
-              {vitals.xirr !== null && (
+              {/* No third row when nothing can be measured: a "–" beside two real figures reads as a
+                  measured zero (the Narrative Honesty Rule). Under six months it is the period
+                  return, never an XIRR (+4388,68% on a 47-day position, seen 2026-09-14). */}
+              {vitals.returnVital && (
                 <Vital
-                  label="XIRR"
-                  value={formatSignedPct(vitals.xirr * 100)}
-                  sub="annualizzato"
-                  tone={signTone(vitals.xirr)}
-                  info="Rendimento annualizzato ponderato per i flussi (XIRR), dalle date reali delle operazioni."
+                  label={vitals.returnVital.label}
+                  value={formatSignedPct(vitals.returnVital.percent)}
+                  sub={vitals.returnVital.sub}
+                  tone={signTone(vitals.returnVital.percent)}
+                  info={vitals.returnVital.info}
                 />
               )}
             </div>
@@ -520,9 +530,12 @@ function Vital({
         {info && (
           <Popover>
             <PopoverTrigger asChild>
+              {/* The icon stays 12px; the TARGET is 32px (the dense-list floor), folded into the
+                  label row by a negative margin — a naked 12×12 button was the smallest target
+                  on the page (2026-09-14). */}
               <button
                 type="button"
-                className="text-muted-foreground transition-colors hover:text-foreground"
+                className="-my-2.5 inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 aria-label={`Informazioni su ${label}`}
               >
                 <Info className="h-3 w-3" aria-hidden="true" />

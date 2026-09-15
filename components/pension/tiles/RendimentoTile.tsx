@@ -74,7 +74,9 @@ function Row({
     <div className={ROW_CLASS}>
       <span className={cn('min-w-0', muted ? 'text-muted-foreground' : 'text-foreground')}>
         {label}
-        {hint && <span className="ml-1.5 text-[11px] text-muted-foreground">{hint}</span>}
+        {/* The hint takes its own line: this is the page's 3-column tile, and inline the label
+            broke mid-word first («Contributo / datoriale retribuzione, non / rendimento», 2026-09-13). */}
+        {hint && <span className="block text-[11px] text-muted-foreground">{hint}</span>}
       </span>
       {children}
     </div>

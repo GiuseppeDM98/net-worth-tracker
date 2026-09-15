@@ -46,7 +46,8 @@ export interface AssetTransaction {
   userId: string;            // data owner (ownerId), same scoping as every data collection
   assetId: string;
   type: AssetTransactionType;
-  date: Date;                // execution date; baselineDate <= date <= today (Italy)
+  date: Date;                // execution date; any past date up to today (Italy) — a migrated asset's
+                             // trades cannot precede its baseline (replay: BASELINE_NOT_FIRST)
   quantity: number;
   pricePerUnit: number;      // native currency per unit (>= 0)
   priceEur: number;          // EUR per unit at trade date (>= 0); == pricePerUnit for EUR assets
@@ -54,6 +55,10 @@ export interface AssetTransaction {
                              // sell: subtracted from proceeds; adjustment: not allowed
   linkedCashAssetId?: string; // optional settlement cash asset (buy debits, sell credits)
   isBaseline?: boolean;      // migration-created opening position; always type 'buy'
+  // BTP€i only: the indexation coefficient the Borsa Italiana quote was multiplied by to reach
+  // pricePerUnit (quote/100 × nominal × coefficient). Metadata for the edit form's back-conversion;
+  // the replay never reads it.
+  indexationCoefficient?: number;
   note?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -68,6 +73,7 @@ export interface AssetTransactionFormData {
   pricePerUnit: number;
   fees?: number;
   linkedCashAssetId?: string;
+  indexationCoefficient?: number;
   note?: string;
   // priceEur is NOT part of the form: the server resolves it, so the client
   // can never write an inconsistent FX value.
@@ -77,7 +83,9 @@ export interface AssetTransactionFormData {
 export interface AssetTransactionsMeta {
   userId: string;
   migratedAt: Date;
-  baselineDate: Date;        // start-of-day (Italy) of migration day; global floor for trade dates
+  baselineDate: Date;        // start-of-day (Italy) of migration day: the date of every baseline BUY.
+                             // NOT a floor for trade dates since 2026-09-13 (an asset without a
+                             // baseline accepts any past date)
   migratedAssetCount: number;
   // One-shot signal for backfillAverageCostEur (assetTransactionUseCase.ts): every ledger asset's
   // averageCostEur is derivable from trades that already carry a correct per-trade priceEur, so the

@@ -61,17 +61,18 @@ export const PRINT_COLORS = {
 /**
  * `--chart-1` … `--chart-8` of the default theme, in order.
  *
- * These are the LIGHT values, which differ from the dark ones by more than lightness: read
- * `getAssetClassColor` in `lib/constants/colors.ts` for the legacy fallback palette, which is
- * a different set of hues entirely and must not be used here — an email that painted Azioni
- * `#3B82F6` would disagree with every chart the app draws for the same class.
+ * These are the LIGHT values (the mail and the PDF render on a white card); since 2026-09-13
+ * they hold the dark slots' hue bands, re-pitched for white. Read `getAssetClassColor` in
+ * `lib/constants/colors.ts` for the legacy fallback palette, which is a different set of hues
+ * entirely and must not be used here — an email that painted Azioni `#3B82F6` would disagree
+ * with every chart the app draws for the same class.
  */
 export const PRINT_CHART_HEX: readonly string[] = [
-  '#f54900', // --chart-1 · oklch(0.646 0.222 41.116)
-  '#009689', // --chart-2 · oklch(0.6 0.118 184.704)
-  '#104e64', // --chart-3 · oklch(0.398 0.07 227.392)
-  '#ffb900', // --chart-4 · oklch(0.828 0.189 84.429)
-  '#fe9a00', // --chart-5 · oklch(0.769 0.188 70.08)
+  '#1957d2', // --chart-1 · oklch(0.500 0.200 262)
+  '#009878', // --chart-2 · oklch(0.600 0.125 172)
+  '#da8b00', // --chart-3 · oklch(0.700 0.160 72)
+  '#7030c1', // --chart-4 · oklch(0.480 0.210 298)
+  '#e5405c', // --chart-5 · oklch(0.620 0.200 16)
   '#918117', // --chart-6 · oklch(0.600 0.118 100)
   '#167f93', // --chart-7 · oklch(0.550 0.092 215)
   '#bc3099', // --chart-8 · oklch(0.560 0.205 340)
@@ -93,10 +94,11 @@ export function printChartHexForAssetClass(assetClass: string): string {
 
 /**
  * A ranked list uses ONE hue for every row — the rank is carried by the bar's length, not by
- * colour, so a list of eleven expense categories does not become a rainbow. Slot 3 (the deep
- * petrol) is the quietest of the eight against white.
+ * colour, so a list of eleven expense categories does not become a rainbow. Slot 7 (the petrol
+ * of Trend Following, C 0.092) is the quietest of the eight against white — slot 3 was, until
+ * it became crypto's amber on 2026-09-13.
  */
-export const PRINT_RANK_HEX = PRINT_CHART_HEX[2];
+export const PRINT_RANK_HEX = PRINT_CHART_HEX[6];
 
 // ─── Type faces ───────────────────────────────────────────────────────────────
 

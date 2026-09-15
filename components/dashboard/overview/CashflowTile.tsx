@@ -1,7 +1,7 @@
 import type { DashboardOverviewExpenseStats } from '@/types/dashboardOverview';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { formatPercentage } from '@/lib/services/chartService';
-import { describeCashflow, projectMonthEndSpending } from '@/lib/utils/overviewNarrative';
+import { atPreviousMonth, describeCashflow, projectMonthEndSpending } from '@/lib/utils/overviewNarrative';
 import { MONTH_NAMES } from '@/lib/constants/months';
 import { cn } from '@/lib/utils';
 import { OverviewTile, TILE_SUB_EYEBROW_CLASS } from './OverviewTile';
@@ -30,7 +30,7 @@ function deltaClass(delta: number, positiveGood: boolean): string {
 
 function DeltaLine({ delta, positiveGood, month }: { delta: number; positiveGood: boolean; month: number }) {
   const previousMonth = MONTH_NAMES[(month + 10) % 12].toLowerCase();
-  if (delta === 0) return <p className="text-[11px] text-muted-foreground">come a {previousMonth}</p>;
+  if (delta === 0) return <p className="text-[11px] text-muted-foreground">come {atPreviousMonth(month)}</p>;
   return (
     <p className="text-[11px] text-muted-foreground">
       <span className={cn('font-mono tabular-nums', deltaClass(delta, positiveGood))}>
@@ -56,7 +56,6 @@ export function CashflowTile({
   className,
 }: CashflowTileProps) {
   const { income, expenses, net, expensesScheduled = 0 } = expenseStats.currentMonth;
-  const previousMonth = MONTH_NAMES[(month + 10) % 12].toLowerCase();
   // The same rule as Tracciamento: pace what is booked to date, add what is already scheduled.
   const pacedExpenses = projectMonthEndSpending(expenses - expensesScheduled, dayOfMonth, daysInMonth);
   const projectedExpenses = pacedExpenses === null ? null : pacedExpenses + expensesScheduled;
@@ -126,7 +125,7 @@ export function CashflowTile({
               </span>
             </div>
             <div className="flex items-center justify-between gap-3 py-[8px]">
-              <span className="text-[13px] text-muted-foreground">A {previousMonth}</span>
+              <span className="text-[13px] text-muted-foreground">{atPreviousMonth(month, true)}</span>
               <span className="font-mono text-[13px] tabular-nums text-foreground">
                 {previousExpenses > 0 ? cachedFormatCurrencyEUR(previousExpenses, true) : '–'}
               </span>

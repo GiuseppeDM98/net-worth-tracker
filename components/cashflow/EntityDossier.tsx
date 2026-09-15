@@ -51,11 +51,12 @@ import {
   buildEntityYearRows,
   computeEntityRunRate,
   resolveYearRowWindows,
+  type EntityRunRatePeriod,
   type EntityScope,
   type EntitySubCategoryDeltaRow,
   type EntityYearRow,
 } from '@/lib/utils/expenseEntityStats';
-import { formatCurrency, formatCurrencyCompact, formatPercentage } from '@/lib/services/chartService';
+import { formatPercentage } from '@/lib/services/chartService';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { getItalyMonth, getItalyYear, toDate } from '@/lib/utils/dateHelpers';
 import { CHART_TICK_STYLE } from '@/components/cashflow/costCenterStyles';
@@ -97,8 +98,14 @@ const deltaSignClass = (delta: number | null, isIncome: boolean): string => {
   return (isIncome ? delta > 0 : delta < 0) ? 'text-positive' : 'text-destructive';
 };
 
-/** «+50,00 €» / «−10,00 €» — Intl prints a hyphen for a negative amount; the Comma Rule wants the true minus (U+2212). */
-const signedCurrency = (value: number): string => (value > 0 ? `+${formatCurrency(value)}` : formatCurrency(value).replace(/^-/, '−'));
+/**
+ * Whole euros, like every aggregate on the page: the Scheda printed «6709,68 €» beside a verdict
+ * saying «6710 €» (2026-09-14). Cents stay on the transaction rows, which are facts, not sums.
+ */
+const formatCurrency = (value: number): string => cachedFormatCurrencyEUR(value, true);
+
+/** «+50 €» / «−10 €» — the typographic minus (U+2212), never Intl's hyphen. */
+const signedCurrency = (value: number): string => `${value < 0 ? '−' : '+'}${cachedFormatCurrencyEUR(Math.abs(value), true)}`;
 
 /** «(+11,8%)» / «(−11,1%)» — the Comma Rule: it-IT decimals, never `toFixed`. */
 const signedPercent = (value: number, delta: number): string => `${delta > 0 ? '+' : ''}${formatPercentage(value, 1)}`.replace(/^-/, '−');
@@ -218,7 +225,8 @@ function YearRow({
     if (row.isPartial && row.prevSameMonthsTotal === null) {
       return <span className="text-muted-foreground">storico dal {historyStartYear}</span>;
     }
-    if (row.delta === null) return <span className="text-muted-foreground">—</span>;
+    // The oldest tracked year has nothing before it to compare with: said, not dashed.
+    if (row.delta === null) return <span className="text-muted-foreground">primo anno registrato</span>;
     const pct = row.deltaPercent !== null ? ` (${signedPercent(row.deltaPercent, row.delta)})` : '';
     const context = row.isPartial ? ` vs ${row.year - 1} stessi mesi` : ` vs ${row.year - 1}`;
     return (
@@ -292,8 +300,8 @@ interface EntityDossierProps {
   scope: EntityScope;
   /** Series colour for the trend (theme-aware, resolved by the caller through useChartColors). */
   color: string;
-  /** The page's period state — scopes ONLY the hero total and its share. */
-  period: { year: number | null; month: number | null };
+  /** The page's period state (with its month cut) — scopes ONLY the hero total, its share and the pace. */
+  period: EntityRunRatePeriod;
   periodLabel: string;
   historyStartYear: number;
   /** Inverts delta sign semantics: income up = good, spending up = bad. */
@@ -365,6 +373,11 @@ export function EntityDossier({ allExpenses, scope, color, period, periodLabel, 
 
   // A single-month period's "monthly average" IS the hero total — hide the chip.
   const showPeriodAverage = runRate.periodMonthlyAverage !== null && period.month === null;
+  // The pace is measured on the months lived, and its chip says how many when the period
+  // spans more (a running year): «sui primi 9 mesi», never a twelve-month total over nine.
+  const paceCaption = runRate.livedMonths !== null && runRate.livedMonths > 0 && runRate.livedMonths < 12 ? `sui primi ${runRate.livedMonths} mesi` : undefined;
+  // A projection that only restates the calendar total says nothing the hero has not.
+  const showProjection = runRate.currentYearProjection !== null && Math.round(runRate.currentYearProjection) !== Math.round(runRate.periodTotal);
 
   // Hero: the period-scoped total (the ONLY period-scoped figure with the share)
   const hero = (
@@ -397,7 +410,7 @@ export function EntityDossier({ allExpenses, scope, color, period, periodLabel, 
   // Run-rate — period-independent except the first chip; a grid so the chips share widths.
   const chips = (
     <div className="grid grid-cols-3 gap-3.5">
-      {showPeriodAverage && <DossierChip label="Media mensile (periodo)" value={runRate.periodMonthlyAverage ?? 0} />}
+      {showPeriodAverage && <DossierChip label="Media mensile" value={runRate.periodMonthlyAverage ?? 0} caption={paceCaption ?? periodLabel} />}
       {/* "ultimi" declares the anchor (today) — under a past-year or Storico period this is
           NOT the selected period's monthly average. */}
       <DossierChip
@@ -405,7 +418,9 @@ export function EntityDossier({ allExpenses, scope, color, period, periodLabel, 
         value={runRate.trailing12MonthlyAverage}
         caption={runRate.observedMonths < 12 ? `ultimi ${runRate.observedMonths} mesi` : undefined}
       />
-      {runRate.currentYearProjection !== null && <DossierChip label={`Proiezione ${now.year}`} value={runRate.currentYearProjection} caption="al ritmo attuale" />}
+      {showProjection && runRate.currentYearProjection !== null && (
+        <DossierChip label={`Proiezione ${now.year}`} value={runRate.currentYearProjection} caption="al ritmo attuale, calendario incluso" />
+      )}
     </div>
   );
 
@@ -450,7 +465,8 @@ export function EntityDossier({ allExpenses, scope, color, period, periodLabel, 
             >
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
               <XAxis dataKey="label" tick={CHART_TICK_STYLE} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-              <YAxis tickFormatter={formatCurrencyCompact} tick={CHART_TICK_STYLE} axisLine={false} tickLine={false} />
+              {/* «150 €», the page's own format — not «€150» with the symbol in front. */}
+              <YAxis tickFormatter={(value: number) => formatCurrency(value)} tick={CHART_TICK_STYLE} axisLine={false} tickLine={false} width={56} />
               <Tooltip
                 // A null baseline (pre-floor month) is a gap, not a zero — the tooltip must
                 // not resurrect the fabricated 0 the series refused.

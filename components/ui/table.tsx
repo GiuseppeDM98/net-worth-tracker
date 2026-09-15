@@ -67,7 +67,10 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
 
 function TableHead({ className, ...props }: React.ComponentProps<"th">) {
   return (
+    // A header cell names a column unless the caller says otherwise: the eight of Movimenti's
+    // table carried no `scope` at all (AGENTS.md → Accessibility → Data tables, 2026-09-14).
     <th
+      scope="col"
       data-slot="table-head"
       className={cn(
         "text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",

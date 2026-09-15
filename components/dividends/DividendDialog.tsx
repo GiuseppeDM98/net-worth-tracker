@@ -1,20 +1,29 @@
 /**
- * Dividend record creation/editing with automatic calculations
+ * Register or edit a dividend / coupon payment — the one manual form of Cashflow › Dividendi,
+ * in the modal vocabulary (doc/guide/dialog.md): the reading line IS the status line (what the
+ * form wants, what it is doing, how it went), a refused submit lands there in Italian with
+ * `aria-invalid` and the focus on the first refused field, and the submit is never `disabled`.
  *
- * Auto-Calculations:
- * - 26% Italian withholding tax (only for new dividends)
- * - Pre-fill shares from asset quantity (only for new dividends)
- * - Total amounts (gross/tax/net) computed from per-share values
+ * Three decisions the 2026-09-14 critique forced, each measured on the owner's mirror:
  *
- * Guard Pattern: Auto-calculations disabled in edit mode to preserve user edits.
- * Without guards, editing gross amount would overwrite custom tax values.
+ *   - The picker lists every instrument that can pay — equities AND bonds, held or sold. It
+ *     used to keep `assetClass === 'equity' && quantity > 0`: the only instrument still paying
+ *     on the real account (a BTP) could not be selected, and editing a dividend of a sold stock
+ *     opened a form with the Asset field blank and «Asset non trovato» on save. A sold
+ *     instrument is labelled as such; a record whose instrument is gone keeps its own option.
+ *   - The withholding proposal is the instrument's OWN `taxRate` (12,5% on a BTP, 26% on a
+ *     stock), never a constant — doc/guide/cashflow-dividendi.md says «never a constant» and the
+ *     form typed 26% on every coupon. It is proposed only while the user has not touched the
+ *     field, and only on a new record.
+ *   - A bond's payment defaults to «Cedola»; the type follows the instrument until it is chosen.
  *
- * Form Validation: Zod schema with cross-field refinement (paymentDate >= exDate)
+ * Auto-fill is a convenience, never enforcement: on an edit nothing is recomputed, because the
+ * saved figures may carry a foreign tax credit or a quantity that differs from today's.
  */
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { useForm, Controller, useWatch } from 'react-hook-form';
+import { useCallback, useEffect, useMemo, useState, type RefObject } from 'react';
+import { useForm, Controller, useWatch, type FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useAuth } from '@/contexts/AuthContext';
@@ -27,90 +36,138 @@ import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SearchableCombobox } from '@/components/ui/searchable-combobox';
+import { TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-
-import { formatCurrency } from '@/lib/utils/formatters';
+import { cn } from '@/lib/utils';
+import { formatCurrency, formatNumberIt } from '@/lib/utils/formatters';
 import { toDate } from '@/lib/utils/dateHelpers';
 import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
+import { dividendTypeLabels } from '@/lib/constants/dividendTypes';
+import {
+  describeDividendIntent,
+  describeFormRefusal,
+  describeModalStatus,
+  describeWriteError,
+  type ModalStatus,
+} from '@/lib/utils/dialogNarrative';
 
 /** The form's id, so the footer's submit can live outside the `<form>`. */
 const DIVIDEND_FORM_ID = 'dividend-form';
 
-const dividendSchema = z.object({
-  assetId: z.string().min(1, 'Asset è obbligatorio'),
-  grossAmountPerShare: z.number().positive('L\'importo lordo deve essere positivo'),
-  withholdingTax: z.number().min(0, 'La ritenuta non può essere negativa'),
-  sharesHeld: z.number().positive('Il numero di azioni deve essere positivo'),
-  exDate: z.date(),
-  paymentDate: z.date(),
-  dividendType: z.enum(['ordinary', 'extraordinary', 'interim', 'final', 'coupon', 'finalPremium']),
-  currency: z.string().min(1, 'Valuta è obbligatoria'),
-  notes: z.string().optional(),
-  sourceUrl: z.string().url('Inserisci un URL valido').optional().or(z.literal('')),
+/** The withholding proposed when an instrument declares no rate of its own. */
+const DEFAULT_TAX_RATE = 26;
+
+/** The classes whose instruments pay something the registry records — the page's own filter. */
+const PAYING_ASSET_CLASSES = new Set(['equity', 'bonds']);
+/** A pension fund, an account or a house sits in an equity/bonds class and pays nothing here. */
+const NON_PAYING_ASSET_TYPES = new Set(['pensionFund', 'cash', 'realestate']);
+
 /**
- * Zod refinement for cross-field validation
- *
- * Pattern: .refine() validates multiple fields together
- * Use case: Ensure payment date is after (or same as) ex-dividend date
- *
- * Why separate from field validators? Payment date is valid in isolation,
- * only invalid relative to ex-date. Refinement checks this relationship.
+ * Every number the form can leave empty carries its own sentence: `valueAsNumber` hands zod a
+ * `NaN`, which without `error` reads as «Invalid input» (AGENTS.md → Dialog e form trasversali).
  */
-}).refine((data) => data.paymentDate >= data.exDate, {
-  message: 'La data di pagamento deve essere successiva o uguale alla data ex-dividendo',
-  path: ['paymentDate'],
-});
+const dividendSchema = z
+  .object({
+    assetId: z.string().min(1, 'Scegli lo strumento'),
+    grossAmountPerShare: z.number({ error: 'Inserisci l’importo lordo per unità' }).positive('L’importo lordo deve essere maggiore di zero'),
+    withholdingTax: z.number({ error: 'Inserisci la ritenuta per unità, anche 0' }).min(0, 'La ritenuta non può essere negativa'),
+    sharesHeld: z.number({ error: 'Inserisci le unità possedute' }).positive('Le unità devono essere più di zero'),
+    exDate: z.date({ error: 'Inserisci la data ex-dividendo' }),
+    paymentDate: z.date({ error: 'Inserisci la data di pagamento' }),
+    dividendType: z.enum(['ordinary', 'extraordinary', 'interim', 'final', 'coupon', 'finalPremium']),
+    currency: z.string().min(1, 'Scegli la valuta'),
+    notes: z.string().optional(),
+    sourceUrl: z.string().url('Inserisci un indirizzo valido').optional().or(z.literal('')),
+  })
+  // Cross-field: a payment date is valid on its own and only wrong relative to the ex-date.
+  .refine((data) => data.paymentDate >= data.exDate, {
+    message: 'La data di pagamento deve essere uguale o successiva alla data ex-dividendo',
+    path: ['paymentDate'],
+  });
 
 type DividendFormValues = z.infer<typeof dividendSchema>;
+
+/** The field names as the refusal sentence prints them, in the order the reader meets them. */
+const FIELD_LABELS: Partial<Record<keyof DividendFormValues, string>> = {
+  assetId: 'Strumento',
+  grossAmountPerShare: 'Importo lordo',
+  withholdingTax: 'Ritenuta',
+  sharesHeld: 'Unità',
+  exDate: 'Data ex-dividendo',
+  paymentDate: 'Data di pagamento',
+  dividendType: 'Tipo',
+  currency: 'Valuta',
+  sourceUrl: 'Link della fonte',
+};
 
 interface DividendDialogProps {
   open: boolean;
   onClose: () => void;
   dividend?: Dividend | null;
   onSuccess?: () => void;
+  /** The control that opened the form, so the focus goes back to it on close. */
+  returnFocusTo?: RefObject<HTMLElement | null>;
 }
 
-const dividendTypeLabels: Record<DividendType, string> = {
-  ordinary: 'Ordinario',
-  extraordinary: 'Straordinario',
-  interim: 'Interim',
-  final: 'Finale',
-  coupon: 'Cedola',
-  finalPremium: 'Premio Finale',
-};
+const round4 = (value: number) => parseFloat(value.toFixed(4));
 
-export function DividendDialog({ open, onClose, dividend, onSuccess }: DividendDialogProps) {
+/** A field is a 44px target on a phone (the modal is a drawer there) and the dense 36px from `desktop:`. */
+const FIELD_CLASS = 'h-11 desktop:h-9';
+/** A `SelectTrigger` sizes itself through `data-[size]`, which outranks a bare `h-*`. */
+const SELECT_CLASS = 'h-11 data-[size=default]:h-11 desktop:h-9 desktop:data-[size=default]:h-9';
+
+function isBond(asset: Asset | undefined): boolean {
+  return asset?.assetClass === 'bonds';
+}
+
+/** «VWCE - Vanguard FTSE All-World», with «· venduto» when the position is closed. */
+function optionLabel(asset: Asset): string {
+  const base = `${getAssetDisplayTicker(asset)} - ${asset.name}`;
+  return asset.quantity > 0 ? base : `${base} · venduto`;
+}
+
+export function DividendDialog({ open, onClose, dividend, onSuccess, returnFocusTo }: DividendDialogProps) {
   const { user } = useAuth();
   const { ownerId } = useActiveAccount();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loadingAssets, setLoadingAssets] = useState(false);
+  const [status, setStatus] = useState<ModalStatus>({ phase: 'idle' });
+  // What the user has typed over: a proposal never overwrites a value the user touched. State,
+  // not refs — a ref read inside `register`'s handler trips `react-hooks/refs` during render.
+  const [taxEdited, setTaxEdited] = useState(false);
+  const [typeEdited, setTypeEdited] = useState(false);
+
+  // Settled during render on the `open` subject (AGENTS.md → react-hooks/set-state-in-effect):
+  // a reopened form starts idle and untouched, whatever the last attempt said.
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (prevOpen !== open) {
+    setPrevOpen(open);
+    setStatus({ phase: 'idle' });
+    setTaxEdited(false);
+    setTypeEdited(false);
+  }
 
   const {
     register,
     handleSubmit,
     reset,
     setValue,
+    getValues,
     control,
     formState: { errors, isSubmitting },
   } = useForm<DividendFormValues>({
     resolver: zodResolver(dividendSchema),
+    // `onInvalid` focuses the first refused field in READING order; react-hook-form's own focus
+    // would then move it to the first registered one, which skips the combobox (a Controller).
+    shouldFocusError: false,
     defaultValues: {
       currency: 'EUR',
       dividendType: 'ordinary',
       exDate: new Date(),
       paymentDate: new Date(),
-      grossAmountPerShare: 0,
-      withholdingTax: 0,
-      sharesHeld: 0,
     },
   });
 
@@ -119,29 +176,38 @@ export function DividendDialog({ open, onClose, dividend, onSuccess }: DividendD
   const withholdingTax = useWatch({ control, name: 'withholdingTax' }) || 0;
   const sharesHeld = useWatch({ control, name: 'sharesHeld' }) || 0;
 
+  const selectedAsset = useMemo(() => assets.find((a) => a.id === selectedAssetId), [assets, selectedAssetId]);
+  const proposedRate = selectedAsset?.taxRate ?? DEFAULT_TAX_RATE;
+
   // Calculated fields (read-only)
   const netAmountPerShare = grossAmountPerShare - withholdingTax;
   const totalGross = grossAmountPerShare * sharesHeld;
   const totalTax = withholdingTax * sharesHeld;
   const totalNet = netAmountPerShare * sharesHeld;
 
+  // Every instrument that can pay, held first; a sold one stays selectable because a registry
+  // is full of them, and the record of a deleted instrument keeps its own option on an edit.
+  const options = useMemo(() => {
+    const paying = assets.filter((a) => PAYING_ASSET_CLASSES.has(a.assetClass) && !NON_PAYING_ASSET_TYPES.has(a.type));
+    const held = paying.filter((a) => a.quantity > 0).sort((a, b) => a.name.localeCompare(b.name, 'it'));
+    const sold = paying.filter((a) => a.quantity <= 0).sort((a, b) => a.name.localeCompare(b.name, 'it'));
+    const list = [...held, ...sold].map((asset) => ({ value: asset.id, label: optionLabel(asset) }));
+    if (dividend && !list.some((o) => o.value === dividend.assetId)) {
+      list.unshift({ value: dividend.assetId, label: `${dividend.assetTicker} - ${dividend.assetName} · non più tra gli strumenti` });
+    }
+    return list;
+  }, [assets, dividend]);
+
   // Memoized on what it reads, so the effect below can declare it as a dependency without
   // re-running on every render.
   const loadAssets = useCallback(async () => {
     if (!user || !ownerId) return;
-
     try {
       setLoadingAssets(true);
-      const allAssets = await getAllAssets(ownerId);
-
-      // Filter only assets that can have dividends (stocks, ETFs)
-      const dividendAssets = allAssets.filter(
-        (asset) => asset.assetClass === 'equity' && asset.quantity > 0
-      );
-      setAssets(dividendAssets);
+      setAssets(await getAllAssets(ownerId));
     } catch (error) {
       console.error('Error loading assets:', error);
-      toast.error('Errore nel caricamento degli asset');
+      setStatus({ phase: 'error', message: 'Gli strumenti non sono stati letti: chiudi e riapri il modulo.' });
     } finally {
       setLoadingAssets(false);
     }
@@ -158,51 +224,36 @@ export function DividendDialog({ open, onClose, dividend, onSuccess }: DividendD
     return () => clearTimeout(timer);
   }, [open, user, loadAssets]);
 
-  /**
-   * Auto-calculate 26% Italian withholding tax for NEW dividends only
-   *
-   * Guard: !dividend check prevents overwriting tax in edit mode.
-   * Why? User may have manually adjusted tax (e.g., foreign tax credit).
-   * Auto-calc is a convenience feature, not enforcement.
-   */
+  // The withholding proposal, for a NEW record and an untouched field only: the instrument's
+  // own rate over the gross per unit. On an edit the saved figure is the user's (a foreign tax
+  // credit, a special regime) and is never recomputed.
   useEffect(() => {
-    if (!dividend && grossAmountPerShare > 0) {
-      // 26% Italian withholding tax on dividends
-      const calculatedTax = grossAmountPerShare * 0.26;
-      setValue('withholdingTax', parseFloat(calculatedTax.toFixed(4)));
-    }
-  }, [grossAmountPerShare, dividend, setValue]);
+    if (dividend || taxEdited || !(grossAmountPerShare > 0)) return;
+    setValue('withholdingTax', round4((grossAmountPerShare * proposedRate) / 100));
+  }, [grossAmountPerShare, proposedRate, dividend, taxEdited, setValue]);
 
-  /**
-   * Pre-fill shares from asset quantity for NEW dividends only
-   *
-   * Guard: !dividend check prevents overwriting in edit mode.
-   * Why? User may be editing a dividend for fewer shares than currently held
-   * (e.g., past dividend when quantity was different).
-   */
+  // A chosen instrument fills what it knows for a NEW record: today's quantity as the units,
+  // and «Cedola» as the type of a bond's payment — until the user picks a type by hand.
   useEffect(() => {
-    if (selectedAssetId && !dividend) {
-      const selectedAsset = assets.find((a) => a.id === selectedAssetId);
-      if (selectedAsset) {
-        setValue('sharesHeld', selectedAsset.quantity);
-      }
-    }
-  }, [selectedAssetId, assets, dividend, setValue]);
+    if (!selectedAssetId || dividend) return;
+    const asset = assets.find((a) => a.id === selectedAssetId);
+    if (!asset) return;
+    if (asset.quantity > 0) setValue('sharesHeld', asset.quantity);
+    if (!typeEdited) setValue('dividendType', isBond(asset) ? 'coupon' : 'ordinary');
+  }, [selectedAssetId, assets, dividend, typeEdited, setValue]);
 
-  // Reset form when dividend changes or dialog opens
+  // Reset form when dividend changes or dialog opens. Only react-hook-form calls live here
+  // (AGENTS.md → Dialog Form Reset).
   useEffect(() => {
+    if (!open) return;
     if (dividend) {
-      // Use toDate helper to handle Date, Timestamp, or string formats
-      const exDate = toDate(dividend.exDate);
-      const paymentDate = toDate(dividend.paymentDate);
-
       reset({
         assetId: dividend.assetId,
         grossAmountPerShare: dividend.dividendPerShare,
-        withholdingTax: dividend.taxAmount / dividend.quantity,
+        withholdingTax: dividend.quantity > 0 ? round4(dividend.taxAmount / dividend.quantity) : 0,
         sharesHeld: dividend.quantity,
-        exDate,
-        paymentDate,
+        exDate: toDate(dividend.exDate),
+        paymentDate: toDate(dividend.paymentDate),
         dividendType: dividend.dividendType,
         currency: dividend.currency,
         notes: dividend.notes || '',
@@ -215,25 +266,54 @@ export function DividendDialog({ open, onClose, dividend, onSuccess }: DividendD
         dividendType: 'ordinary',
         exDate: new Date(),
         paymentDate: new Date(),
-        grossAmountPerShare: 0,
-        withholdingTax: 0,
-        sharesHeld: 0,
+        grossAmountPerShare: undefined,
+        withholdingTax: undefined,
+        sharesHeld: undefined,
         notes: '',
         sourceUrl: '',
       });
     }
   }, [dividend, reset, open]);
 
-  const onSubmit = async (data: DividendFormValues) => {
-    if (!user || !ownerId) {
-      toast.error('Devi essere autenticato');
-      return;
+  /**
+   * A refused submit is said in the reading line, in Italian, and the first refused field
+   * comes into view with `aria-invalid` and the focus (DESIGN.md → The Status-Is-The-Reading
+   * Rule). Named in the order the reader meets the fields, not in zod's.
+   */
+  const onInvalid = (fieldErrors: FieldErrors<DividendFormValues>) => {
+    const values = getValues();
+    const form = document.getElementById(DIVIDEND_FORM_ID);
+    const fieldOf = (key: string) => form?.querySelector<HTMLElement>(`[name="${key}"], #${key}`) ?? null;
+    const keys = (Object.keys(fieldErrors) as (keyof DividendFormValues)[]).sort((a, b) => {
+      const ea = fieldOf(a);
+      const eb = fieldOf(b);
+      if (!ea || !eb) return ea ? -1 : eb ? 1 : 0;
+      return ea.compareDocumentPosition(eb) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
+    });
+    const missing: string[] = [];
+    const invalid: string[] = [];
+    for (const key of keys) {
+      const label = FIELD_LABELS[key] ?? key;
+      const value = values[key];
+      const isEmpty = value === undefined || value === '' || (typeof value === 'number' && Number.isNaN(value));
+      (isEmpty ? missing : invalid).push(label);
     }
+    setStatus({ phase: 'error', message: describeFormRefusal(missing, invalid) });
 
-    // Get selected asset details
-    const selectedAsset = assets.find((a) => a.id === data.assetId);
-    if (!selectedAsset) {
-      toast.error('Asset non trovato');
+    const target = keys.length > 0 ? fieldOf(keys[0]) : null;
+    if (target) {
+      target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      target.focus({ preventScroll: true });
+    }
+  };
+
+  const onSubmit = async (data: DividendFormValues) => {
+    if (!user || !ownerId || isSubmitting) return;
+
+    // The route resolves the instrument itself (ticker, name, ISIN, ownership); the client only
+    // refuses to send an id it cannot account for — a record's own instrument always can.
+    if (!assets.some((a) => a.id === data.assetId) && dividend?.assetId !== data.assetId) {
+      setStatus({ phase: 'error', message: 'Lo strumento scelto non è tra i tuoi: riapri il modulo e scegline uno.' });
       return;
     }
 
@@ -253,42 +333,53 @@ export function DividendDialog({ open, onClose, dividend, onSuccess }: DividendD
         isAutoGenerated: false,
       };
 
-      const endpoint = dividend
-        ? `/api/dividends/${dividend.id}`
-        : '/api/dividends';
-
+      const endpoint = dividend ? `/api/dividends/${dividend.id}` : '/api/dividends';
       const method = dividend ? 'PUT' : 'POST';
-
-      // Prepara il body in base al metodo
-      const requestBody = dividend
-        ? { updates: dividendData } // PUT usa "updates"
-        : { userId: ownerId, dividendData }; // POST usa wrapper
+      // PUT takes `updates`, POST the owner and the record.
+      const requestBody = dividend ? { updates: dividendData } : { userId: ownerId, dividendData };
 
       const response = await authenticatedFetch(endpoint, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Errore nel salvataggio del dividendo');
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.message || error.error || 'Errore nel salvataggio del dividendo');
       }
 
-      toast.success(
-        dividend
-          ? 'Dividendo aggiornato con successo'
-          : 'Dividendo creato con successo'
-      );
+      // The route answers 200 with `skipped` when the same payment is already in the registry:
+      // that is not a save, and the form says so instead of closing on a success it did not have.
+      const result = (await response.json().catch(() => ({}))) as { skipped?: boolean };
+      if (result.skipped) {
+        setStatus({ phase: 'error', message: 'Questo pagamento è già nel registro: non è stato registrato di nuovo.' });
+        return;
+      }
 
+      toast.success(dividend ? 'Pagamento aggiornato' : 'Pagamento registrato');
       onSuccess?.();
       onClose();
     } catch (error) {
       console.error('Error saving dividend:', error);
-      toast.error(error instanceof Error ? error.message : 'Errore nel salvataggio del dividendo');
+      setStatus({ phase: 'error', message: describeWriteError(error) });
     }
+  };
+
+  const editingBond = dividend ? dividend.dividendType === 'coupon' || dividend.dividendType === 'finalPremium' : false;
+  const reading = describeModalStatus(isSubmitting ? { phase: 'submitting' } : status, {
+    idle: describeDividendIntent({ isEdit: !!dividend, ticker: dividend?.assetTicker, isBond: editingBond }),
+    submitting: 'Sto salvando il pagamento.',
+  });
+
+  const fieldError = (key: keyof DividendFormValues) => {
+    const message = errors[key]?.message;
+    if (!message) return null;
+    return (
+      <p id={`${key}-error`} className="text-[12px] leading-[1.45] text-destructive">
+        {String(message)}
+      </p>
+    );
   };
 
   return (
@@ -297,273 +388,271 @@ export function DividendDialog({ open, onClose, dividend, onSuccess }: DividendD
       onClose={onClose}
       eyebrow={`Dividendi · ${dividend ? 'Modifica' : 'Nuovo pagamento'}`}
       title={dividend ? 'Modifica il pagamento' : 'Registra un pagamento'}
-      reading="Un pagamento datato in futuro resta «annunciato»: entra nel calendario, non negli incassi, finché la data non arriva."
+      reading={reading}
       width="lg"
+      returnFocusTo={returnFocusTo}
       footer={
         <>
-          <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+          <Button type="button" variant="outline" onClick={onClose}>
             Annulla
           </Button>
-          <Button type="submit" form={DIVIDEND_FORM_ID} disabled={isSubmitting}>
-            {isSubmitting ? 'Salvataggio...' : dividend ? 'Salva modifiche' : 'Registra pagamento'}
+          {/* Never `disabled`: a refused submit has to be able to say why (doc/guide/dialog.md). */}
+          <Button type="submit" form={DIVIDEND_FORM_ID}>
+            {isSubmitting ? 'Salvataggio…' : dividend ? 'Salva modifiche' : 'Registra pagamento'}
           </Button>
         </>
       }
     >
-        <form id={DIVIDEND_FORM_ID} onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {/* Asset Selector */}
-          <div className="space-y-2">
-            <Label htmlFor="assetId">Asset *</Label>
-            {loadingAssets ? (
-              <p className="text-sm text-muted-foreground">Caricamento...</p>
-            ) : (
-              <Controller
-                control={control}
-                name="assetId"
-                render={({ field }) => (
-                  <SearchableCombobox
-                    id="assetId"
-                    options={assets.map((asset) => ({
-                      value: asset.id,
-                      label: `${getAssetDisplayTicker(asset)} - ${asset.name}`,
-                    }))}
-                    value={field.value || ''}
-                    onValueChange={field.onChange}
-                    placeholder="Seleziona asset"
-                    searchPlaceholder="Cerca asset..."
-                    emptyMessage="Nessun asset con dividendi disponibile"
-                    showBadge={false}
-                  />
-                )}
+      <form
+        id={DIVIDEND_FORM_ID}
+        onSubmit={handleSubmit(onSubmit, onInvalid)}
+        // An edit after a refusal clears it: the next submit names only what is still missing.
+        onChange={() => status.phase === 'error' && setStatus({ phase: 'idle' })}
+        className="space-y-6"
+      >
+        <div className="space-y-2">
+          <Label htmlFor="assetId">Strumento *</Label>
+          {/* The field stays mounted while the instruments load (disabled, saying so): a field
+              that unmounts and comes back drops the focus and whatever was being typed. */}
+          <Controller
+            control={control}
+            name="assetId"
+            render={({ field }) => (
+              <SearchableCombobox
+                id="assetId"
+                options={options}
+                value={field.value || ''}
+                onValueChange={(value) => {
+                  field.onChange(value);
+                  if (status.phase === 'error') setStatus({ phase: 'idle' });
+                }}
+                disabled={loadingAssets}
+                placeholder={loadingAssets ? 'Caricamento degli strumenti…' : 'Scegli lo strumento'}
+                searchPlaceholder="Cerca per nome o ticker…"
+                emptyMessage="Nessuno strumento azionario o obbligazionario: aggiungilo dal Patrimonio."
+                showBadge={false}
+                aria-invalid={!!errors.assetId}
+                className={FIELD_CLASS}
               />
             )}
-            {errors.assetId && (
-              <p className="text-sm text-destructive">{errors.assetId.message}</p>
-            )}
-          </div>
+          />
+          {fieldError('assetId')}
+        </div>
 
-          {/* Gross Amount Per Share and Withholding Tax */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="grossAmountPerShare">Importo Lordo per Azione (€) *</Label>
-              <Input
-                id="grossAmountPerShare"
-                type="number"
-                step="0.0001"
-                min="0"
-                {...register('grossAmountPerShare', { valueAsNumber: true })}
-                className={errors.grossAmountPerShare ? 'border-destructive' : ''}
-              />
-              {errors.grossAmountPerShare && (
-                <p className="text-sm text-destructive">{errors.grossAmountPerShare.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="withholdingTax">
-                Ritenuta per Azione (€) *
-                <span className="text-xs text-muted-foreground ml-2">(auto-calcolata 26%)</span>
-              </Label>
-              <Input
-                id="withholdingTax"
-                type="number"
-                step="0.0001"
-                min="0"
-                {...register('withholdingTax', { valueAsNumber: true })}
-                className={errors.withholdingTax ? 'border-destructive' : ''}
-              />
-              {errors.withholdingTax && (
-                <p className="text-sm text-destructive">{errors.withholdingTax.message}</p>
-              )}
-              <p className="text-xs text-muted-foreground">
-                Modificabile per dividendi esteri o regimi speciali
-              </p>
-            </div>
-          </div>
-
-          {/* Shares Held */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="sharesHeld">Azioni Possedute *</Label>
+            <Label htmlFor="grossAmountPerShare">Importo lordo per unità (€) *</Label>
             <Input
-              id="sharesHeld"
+              id="grossAmountPerShare"
+              className={FIELD_CLASS}
               type="number"
+              inputMode="decimal"
               step="0.0001"
               min="0"
-              {...register('sharesHeld', { valueAsNumber: true })}
-              className={errors.sharesHeld ? 'border-destructive' : ''}
+              aria-invalid={!!errors.grossAmountPerShare}
+              aria-describedby={errors.grossAmountPerShare ? 'grossAmountPerShare-error' : undefined}
+              {...register('grossAmountPerShare', { valueAsNumber: true })}
             />
-            {errors.sharesHeld && (
-              <p className="text-sm text-destructive">{errors.sharesHeld.message}</p>
-            )}
-            <p className="text-xs text-muted-foreground">
-              Precompilato con la quantità attuale dell&apos;asset
-            </p>
+            {fieldError('grossAmountPerShare')}
           </div>
 
-          {/* Calculated Fields (Read-only Display) */}
-          <div className="rounded-md border p-4 bg-muted/50 space-y-3">
-            <h3 className="font-semibold text-sm">Calcoli Automatici</h3>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="text-muted-foreground">Importo Netto per Azione:</span>
-                <p className="font-medium">{formatCurrency(netAmountPerShare)}</p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Totale Lordo:</span>
-                <p className="font-medium">{formatCurrency(totalGross)}</p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Totale Ritenute:</span>
-                <p className="font-medium text-destructive">{formatCurrency(totalTax)}</p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Totale Netto:</span>
-                <p className="font-medium text-positive">{formatCurrency(totalNet)}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Ex-Date and Payment Date */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="exDate">Data Ex-Dividendo *</Label>
-              <Controller
-                control={control}
-                name="exDate"
-                render={({ field }) => (
-                  <Input
-                    id="exDate"
-                    type="date"
-                    value={field.value ? format(field.value, 'yyyy-MM-dd') : ''}
-                    onChange={(e) => {
-                      const dateString = e.target.value;
-                      if (dateString) {
-                        const date = new Date(dateString + 'T00:00:00');
-                        if (!isNaN(date.getTime())) {
-                          field.onChange(date);
-                        }
-                      }
-                    }}
-                    className={errors.exDate ? 'border-destructive' : ''}
-                  />
-                )}
-              />
-              {errors.exDate && (
-                <p className="text-sm text-destructive">{errors.exDate.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="paymentDate">Data di Pagamento *</Label>
-              <Controller
-                control={control}
-                name="paymentDate"
-                render={({ field }) => (
-                  <Input
-                    id="paymentDate"
-                    type="date"
-                    value={field.value ? format(field.value, 'yyyy-MM-dd') : ''}
-                    onChange={(e) => {
-                      const dateString = e.target.value;
-                      if (dateString) {
-                        const date = new Date(dateString + 'T00:00:00');
-                        if (!isNaN(date.getTime())) {
-                          field.onChange(date);
-                        }
-                      }
-                    }}
-                    className={errors.paymentDate ? 'border-destructive' : ''}
-                  />
-                )}
-              />
-              {errors.paymentDate && (
-                <p className="text-sm text-destructive">{errors.paymentDate.message}</p>
-              )}
-            </div>
-          </div>
-
-          {/* Dividend Type and Currency */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="dividendType">Tipo di Dividendo *</Label>
-              <Controller
-                control={control}
-                name="dividendType"
-                render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger id="dividendType">
-                      <SelectValue placeholder="Seleziona tipo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(dividendTypeLabels).map(([value, label]) => (
-                        <SelectItem key={value} value={value}>
-                          {label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              {errors.dividendType && (
-                <p className="text-sm text-destructive">{errors.dividendType.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="currency">Valuta *</Label>
-              <Controller
-                control={control}
-                name="currency"
-                render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger id="currency">
-                      <SelectValue placeholder="Seleziona valuta" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="EUR">EUR (€)</SelectItem>
-                      <SelectItem value="USD">USD ($)</SelectItem>
-                      <SelectItem value="GBP">GBP (£)</SelectItem>
-                      <SelectItem value="CHF">CHF (Fr)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              {errors.currency && (
-                <p className="text-sm text-destructive">{errors.currency.message}</p>
-              )}
-            </div>
-          </div>
-
-          {/* Notes */}
           <div className="space-y-2">
-            <Label htmlFor="notes">Note (opzionale)</Label>
-            <textarea
-              id="notes"
-              {...register('notes')}
-              placeholder="es. Dividendo Q4 2024"
-              className="w-full min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            />
-          </div>
-
-          {/* Source URL */}
-          <div className="space-y-2">
-            <Label htmlFor="sourceUrl">Link Fonte (opzionale)</Label>
+            <Label htmlFor="withholdingTax">
+              Ritenuta per unità (€) *
+              {!dividend && selectedAsset && (
+                <span className="ml-2 text-xs font-normal text-muted-foreground">
+                  proposta al <span className="font-mono tabular-nums">{formatNumberIt(proposedRate, Number.isInteger(proposedRate) ? 0 : 1)}%</span>
+                </span>
+              )}
+            </Label>
             <Input
-              id="sourceUrl"
-              type="url"
-              {...register('sourceUrl')}
-              placeholder="es. https://www.borsaitaliana.it/..."
-              className={errors.sourceUrl ? 'border-destructive' : ''}
+              id="withholdingTax"
+              className={FIELD_CLASS}
+              type="number"
+              inputMode="decimal"
+              step="0.0001"
+              min="0"
+              aria-invalid={!!errors.withholdingTax}
+              aria-describedby={errors.withholdingTax ? 'withholdingTax-error' : 'withholdingTax-help'}
+              {...register('withholdingTax', { valueAsNumber: true, onChange: () => setTaxEdited(true) })}
             />
-            {errors.sourceUrl && (
-              <p className="text-sm text-destructive">{errors.sourceUrl.message}</p>
-            )}
-            <p className="text-xs text-muted-foreground">
-              Link alla fonte del dividendo per riferimento futuro
+            {fieldError('withholdingTax')}
+            <p id="withholdingTax-help" className="text-xs text-muted-foreground">
+              Modificabile per un dividendo estero o un regime speciale.
             </p>
           </div>
+        </div>
 
-        </form>
+        <div className="space-y-2">
+          <Label htmlFor="sharesHeld">Unità possedute *</Label>
+          <Input
+            id="sharesHeld"
+            className={FIELD_CLASS}
+              type="number"
+            inputMode="decimal"
+            step="0.0001"
+            min="0"
+            aria-invalid={!!errors.sharesHeld}
+            aria-describedby={errors.sharesHeld ? 'sharesHeld-error' : 'sharesHeld-help'}
+            {...register('sharesHeld', { valueAsNumber: true })}
+          />
+          {fieldError('sharesHeld')}
+          <p id="sharesHeld-help" className="text-xs text-muted-foreground">
+            Azioni, quote o titoli al giorno dello stacco; precompilato con la quantità attuale.
+          </p>
+        </div>
+
+        {/* The summary: a `bg-muted` block, never a bordered card inside the modal (dialog.md);
+            figures in the mono face; no sign colour, because a total is not a gain or a loss. */}
+        <div className="space-y-3 rounded-lg bg-muted p-4">
+          <p className={TILE_SUB_EYEBROW_CLASS}>Riepilogo</p>
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+            {[
+              ['Netto per unità', netAmountPerShare],
+              ['Lordo totale', totalGross],
+              ['Ritenute totali', totalTax],
+              ['Netto totale', totalNet],
+            ].map(([label, value]) => (
+              <div key={label as string}>
+                <dt className="text-[12px] text-muted-foreground">{label}</dt>
+                <dd className={cn('font-mono text-[13px] font-semibold tabular-nums', label === 'Netto totale' ? 'text-foreground' : 'text-foreground/90')}>
+                  {formatCurrency(value as number)}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="exDate">Data ex-dividendo *</Label>
+            <Controller
+              control={control}
+              name="exDate"
+              render={({ field }) => (
+                <Input
+                  id="exDate"
+                  className={FIELD_CLASS}
+              type="date"
+                  value={field.value ? format(field.value, 'yyyy-MM-dd') : ''}
+                  onChange={(e) => {
+                    const dateString = e.target.value;
+                    if (!dateString) return;
+                    const date = new Date(dateString + 'T00:00:00');
+                    if (!isNaN(date.getTime())) field.onChange(date);
+                  }}
+                  aria-invalid={!!errors.exDate}
+                />
+              )}
+            />
+            {fieldError('exDate')}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="paymentDate">Data di pagamento *</Label>
+            <Controller
+              control={control}
+              name="paymentDate"
+              render={({ field }) => (
+                <Input
+                  id="paymentDate"
+                  className={FIELD_CLASS}
+              type="date"
+                  value={field.value ? format(field.value, 'yyyy-MM-dd') : ''}
+                  onChange={(e) => {
+                    const dateString = e.target.value;
+                    if (!dateString) return;
+                    const date = new Date(dateString + 'T00:00:00');
+                    if (!isNaN(date.getTime())) field.onChange(date);
+                  }}
+                  aria-invalid={!!errors.paymentDate}
+                />
+              )}
+            />
+            {fieldError('paymentDate')}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="dividendType">Tipo *</Label>
+            <Controller
+              control={control}
+              name="dividendType"
+              render={({ field }) => (
+                <Select
+                  value={field.value}
+                  onValueChange={(value) => {
+                    setTypeEdited(true);
+                    field.onChange(value as DividendType);
+                  }}
+                >
+                  <SelectTrigger id="dividendType" className={SELECT_CLASS} aria-invalid={!!errors.dividendType}>
+                    <SelectValue placeholder="Scegli il tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(dividendTypeLabels).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+            {fieldError('dividendType')}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="currency">Valuta *</Label>
+            <Controller
+              control={control}
+              name="currency"
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger id="currency" className={SELECT_CLASS} aria-invalid={!!errors.currency}>
+                    <SelectValue placeholder="Scegli la valuta" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="EUR">EUR (€)</SelectItem>
+                    <SelectItem value="USD">USD ($)</SelectItem>
+                    <SelectItem value="GBP">GBP (£)</SelectItem>
+                    <SelectItem value="CHF">CHF (Fr)</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            />
+            {fieldError('currency')}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="notes">
+            Note <span className="font-normal text-muted-foreground">(opzionale)</span>
+          </Label>
+          <textarea
+            id="notes"
+            {...register('notes')}
+            placeholder="es. dividendo del quarto trimestre"
+            className="min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:text-sm"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="sourceUrl">
+            Link della fonte <span className="font-normal text-muted-foreground">(opzionale)</span>
+          </Label>
+          <Input
+            id="sourceUrl"
+            className={FIELD_CLASS}
+              type="url"
+            {...register('sourceUrl')}
+            placeholder="es. https://www.borsaitaliana.it/…"
+            aria-invalid={!!errors.sourceUrl}
+          />
+          {fieldError('sourceUrl')}
+        </div>
+      </form>
     </ResponsiveModal>
   );
 }

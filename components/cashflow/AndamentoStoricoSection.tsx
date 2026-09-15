@@ -44,6 +44,8 @@ import {
   buildTypeTimeSeries,
   type TimeGranularity,
 } from '@/lib/utils/cashflowTimeSeries';
+import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
+import { CHART_TICK_STYLE } from '@/components/cashflow/costCenterStyles';
 
 // ── Shared tooltip style ──────────────────────────────────────────────────────
 // Defined once (mirrors ConfrontoAnnualeSection) so all sub-charts stay consistent.
@@ -76,14 +78,14 @@ function FlowComposedChart({
         <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
         <XAxis
           dataKey="label"
-          tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
+          tick={CHART_TICK_STYLE}
           axisLine={false}
           tickLine={false}
           interval="preserveStartEnd"
         />
         <YAxis
           tickFormatter={formatCurrencyCompact}
-          tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
+          tick={CHART_TICK_STYLE}
           axisLine={false}
           tickLine={false}
           // Keep the 0 baseline for the bars but extend below it when net savings
@@ -144,14 +146,14 @@ function CategoryLinesChart({
         <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
         <XAxis
           dataKey="label"
-          tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
+          tick={CHART_TICK_STYLE}
           axisLine={false}
           tickLine={false}
           interval="preserveStartEnd"
         />
         <YAxis
           tickFormatter={formatCurrencyCompact}
-          tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
+          tick={CHART_TICK_STYLE}
           axisLine={false}
           tickLine={false}
           domain={['auto', 'auto']}
@@ -208,14 +210,14 @@ function TypeCompositionChart({
         <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
         <XAxis
           dataKey="label"
-          tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
+          tick={CHART_TICK_STYLE}
           axisLine={false}
           tickLine={false}
           interval="preserveStartEnd"
         />
         <YAxis
           tickFormatter={(v: number) => formatPercentage(v, 0)}
-          tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
+          tick={CHART_TICK_STYLE}
           axisLine={false}
           tickLine={false}
           domain={[0, 100]}
@@ -275,14 +277,19 @@ export function AndamentoStoricoSection({
   const [categoryType, setCategoryType] = useState<CategoryChartType>('expenses');
   const [typeView, setTypeView] = useState<TypeChartView>('absolute');
 
+  // The axis closes on today's month: a materialised plan reaching 2043 is a calendar, not
+  // history, and drew seventeen empty years here (2026-09-14). Read once — today is stable
+  // within a render session.
+  const ceiling = useMemo(() => getItalyMonthYear(), []);
+
   const flowData = useMemo(
-    () => buildTimeBuckets(allExpenses, granularity, historyStartYear),
-    [allExpenses, granularity, historyStartYear],
+    () => buildTimeBuckets(allExpenses, granularity, historyStartYear, ceiling),
+    [allExpenses, granularity, historyStartYear, ceiling],
   );
 
   const categorySeries = useMemo(
-    () => buildCategoryTimeSeries(allExpenses, granularity, categoryType, historyStartYear),
-    [allExpenses, granularity, categoryType, historyStartYear],
+    () => buildCategoryTimeSeries(allExpenses, granularity, categoryType, historyStartYear, 6, ceiling),
+    [allExpenses, granularity, categoryType, historyStartYear, ceiling],
   );
 
   // Pivot the per-series value arrays into Recharts row objects keyed by category name.
@@ -296,8 +303,8 @@ export function AndamentoStoricoSection({
   }, [categorySeries]);
 
   const typeSeries = useMemo(
-    () => buildTypeTimeSeries(allExpenses, granularity, historyStartYear),
-    [allExpenses, granularity, historyStartYear],
+    () => buildTypeTimeSeries(allExpenses, granularity, historyStartYear, ceiling),
+    [allExpenses, granularity, historyStartYear, ceiling],
   );
 
   // Absolute-€ rows: one numeric field per spending type, aligned to the bucket axis.

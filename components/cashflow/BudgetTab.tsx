@@ -26,7 +26,7 @@
  */
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, SlidersHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Expense, ExpenseCategory } from '@/types/expenses';
@@ -48,6 +48,7 @@ import {
 import {
   ANNUAL_FOOTER,
   CATEGORY_FOOTER,
+  RISK_ASIDE,
   RISK_FOOTER,
   buildBudgetVerdict,
   describeAlerts,
@@ -101,6 +102,9 @@ const SAVE_STATUS_LABEL: Record<BudgetSaveStatus, string | null> = {
 /** Months of the hero's bars. */
 const HISTORY_MONTHS = 6;
 
+/** How long «Salvato» stays in the aside: a confirmation, not a permanent state. */
+const SAVED_LABEL_MS = 4000;
+
 /** The page's own grid, so the loading state has the proportions of what replaces it. */
 const SKELETON_CELLS: TileSkeletonCell[] = [
   { span: 5, rows: 2, lines: 8 },
@@ -119,6 +123,24 @@ export function BudgetTab({ allExpenses, categories, loading, loadFailed, histor
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<BudgetItem | null>(null);
+  // The control that opened the dialog: the dialog is mounted only while open, so Radix has
+  // nothing to return the focus to and it landed on `body` (measured 2026-09-14).
+  const openerRef = useRef<HTMLElement | null>(null);
+
+  // «Salvato» is a confirmation and fades after a moment; the next save shows it again. The
+  // dismissal is settled during render on the status it belongs to (AGENTS.md → Motion,
+  // `react-hooks/set-state-in-effect`), and the timer lives in its own effect.
+  const [savedDismissed, setSavedDismissed] = useState(false);
+  const [prevSaveStatus, setPrevSaveStatus] = useState<BudgetSaveStatus>(budget.saveStatus);
+  if (prevSaveStatus !== budget.saveStatus) {
+    setPrevSaveStatus(budget.saveStatus);
+    setSavedDismissed(false);
+  }
+  useEffect(() => {
+    if (budget.saveStatus !== 'saved') return;
+    const timer = setTimeout(() => setSavedDismissed(true), SAVED_LABEL_MS);
+    return () => clearTimeout(timer);
+  }, [budget.saveStatus]);
 
   // Evaluated once per mount — the budget month is the current Italy month.
   const now = useMemo(() => new Date(), []);
@@ -155,12 +177,21 @@ export function BudgetTab({ allExpenses, categories, loading, loadFailed, histor
 
   // --- Handlers ---
   const openCreate = useCallback(() => {
+    openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setEditingItem(null);
     setDialogOpen(true);
   }, []);
   const openEdit = (item: BudgetItem) => {
+    openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setEditingItem(item);
     setDialogOpen(true);
+  };
+  const closeDialog = () => {
+    setDialogOpen(false);
+    const opener = openerRef.current;
+    openerRef.current = null;
+    // After the dialog has unmounted: a synchronous focus lands in the frame Radix is still tearing down.
+    if (opener?.isConnected) requestAnimationFrame(() => opener.focus());
   };
 
   // The page header owns the desktop «Aggiungi budget»; the tab owns the dialog, so the two
@@ -191,7 +222,7 @@ export function BudgetTab({ allExpenses, categories, loading, loadFailed, histor
     return <TileGridSkeleton cells={SKELETON_CELLS} className="pt-1" />;
   }
 
-  const saveLabel = SAVE_STATUS_LABEL[budget.saveStatus];
+  const saveLabel = budget.saveStatus === 'saved' && savedDismissed ? null : SAVE_STATUS_LABEL[budget.saveStatus];
   const saveFailed = budget.saveStatus === 'invalid' || budget.saveStatus === 'error';
   const monthlyExpenseCount = rows.expense.length;
 
@@ -237,7 +268,7 @@ export function BudgetTab({ allExpenses, categories, loading, loadFailed, histor
         )}
 
         <div className={cn(TILE_CELL_CLASS, 'order-2 desktop:order-none desktop:col-span-4')}>
-          <RischioTile risk={risk} reading={describeRisk(risk)} footer={RISK_FOOTER} />
+          <RischioTile risk={risk} aside={RISK_ASIDE} reading={describeRisk(risk)} footer={RISK_FOOTER} />
         </div>
 
         <div className={cn(TILE_CELL_CLASS, 'order-3 desktop:order-none desktop:col-span-3')}>
@@ -273,8 +304,10 @@ export function BudgetTab({ allExpenses, categories, loading, loadFailed, histor
             aside={
               <span className="flex items-center gap-1.5">
                 <NarrativeText segments={describeBudgetCounts(monthlyExpenseCount, rows.income.length, now)} figureClassName="font-medium" />
+                {/* The separator stays outside the live region: a reader hears «Salvato», not «punto mediano Salvato». */}
+                {saveLabel && <span aria-hidden="true">·</span>}
                 <span role="status" aria-live="polite" className={cn(saveFailed ? 'text-destructive' : budget.saveStatus === 'saved' ? 'text-positive' : '')}>
-                  {saveLabel ? `· ${saveLabel}` : ''}
+                  {saveLabel ?? ''}
                 </span>
               </span>
             }
@@ -286,7 +319,7 @@ export function BudgetTab({ allExpenses, categories, loading, loadFailed, histor
             empty={
               <div className="flex flex-col items-start gap-3">
                 <p className="text-[13px] text-muted-foreground">Crea il tuo primo budget per categoria o un obiettivo di entrata.</p>
-                <Button size="sm" onClick={openCreate} disabled={isDemo} aria-label={addButtonLabel}>
+                <Button className="h-11 desktop:h-9" onClick={openCreate} disabled={isDemo} aria-label={addButtonLabel}>
                   <Plus className="h-4 w-4" />
                   Aggiungi budget
                 </Button>
@@ -313,7 +346,7 @@ export function BudgetTab({ allExpenses, categories, loading, loadFailed, histor
       {dialogOpen && (
         <BudgetItemDialog
           open={dialogOpen}
-          onClose={() => setDialogOpen(false)}
+          onClose={closeDialog}
           categories={categories}
           allExpenses={allExpenses}
           historyStartYear={historyStartYear}

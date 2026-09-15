@@ -56,7 +56,7 @@ export function RecordPatrimonioTile({
               notes={notes}
               sectionKey={board.sectionKey}
               onNoteClick={onNoteClick}
-              labelClassName="w-[78px]"
+              labelClassName="min-w-[78px]"
               ariaLabel="I mesi con la crescita di patrimonio più alta"
             />
           </div>

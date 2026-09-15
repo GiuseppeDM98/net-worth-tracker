@@ -16,6 +16,7 @@ import { MultiSelect, type MultiSelectGroup } from '@/components/ui/multi-select
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PeriodPicker } from '@/components/ui/period-picker';
 import { type Period } from '@/lib/utils/period';
+import type { OwnerFilterOption } from '@/lib/utils/movementsOwnerFilter';
 import type { ExpenseCategory } from '@/types/expenses';
 
 interface SubCategoryOption {
@@ -56,7 +57,12 @@ export interface MobileFiltersDrawerProps {
   selectedAccountId: string;
   onAccountChange: (value: string) => void;
 
-  // Count of active drawer-internal filters (search, categories, subcategory, account).
+  // Owner filter (Divisione only — empty options = no section)
+  ownerOptions: OwnerFilterOption[];
+  selectedOwnerId: string;
+  onOwnerChange: (value: string) => void;
+
+  // Count of active drawer-internal filters (search, categories, subcategory, account, owner).
   // Period is always visible inline — not counted.
   activeFilterCount: number;
 
@@ -82,6 +88,7 @@ export interface MobileFiltersDrawerProps {
  *   • Category multi-select
  *   • Subcategory select (conditional)
  *   • Account select (conditional)
+ *   • Owner select (conditional — Divisione on)
  *
  * All filter state lives in the parent — this component is purely presentational.
  */
@@ -101,6 +108,9 @@ export function MobileFiltersDrawer({
   accountOptions,
   selectedAccountId,
   onAccountChange,
+  ownerOptions,
+  selectedOwnerId,
+  onOwnerChange,
   activeFilterCount,
   onReset,
   mobileSortKey,
@@ -178,7 +188,7 @@ export function MobileFiltersDrawer({
           <DrawerHeader className="flex-row items-center justify-between border-b border-border pb-3">
             <DrawerTitle>Filtri avanzati</DrawerTitle>
             <DrawerDescription className="sr-only">
-              Filtra le voci per categoria, conto e ordina i risultati
+              Filtra le voci per categoria, conto, intestatario e ordina i risultati
             </DrawerDescription>
             {activeFilterCount > 0 && (
               <Button
@@ -280,6 +290,25 @@ export function MobileFiltersDrawer({
                     <SelectItem value="all">Tutti i conti</SelectItem>
                     {accountOptions.map(acc => (
                       <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Intestatario — only with Divisione on (the parent hands no options otherwise) */}
+            {ownerOptions.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Intestatario
+                </p>
+                <Select value={selectedOwnerId} onValueChange={onOwnerChange}>
+                  <SelectTrigger className="w-full" aria-label="Filtra per intestatario">
+                    <SelectValue placeholder="Tutti" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ownerOptions.map(option => (
+                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

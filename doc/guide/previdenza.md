@@ -133,13 +133,51 @@
   `pensionContributions` query hides the hero's reading and chips (a `[]` would say «nessun versamento registrato»)
   and replaces Rendimento, Anno fiscale, Versato and Versamenti with an `ErrorNotice`; a failed snapshots query
   drops the series and the Rendimento tile. `assets`/`settings` errors stay blocking.
-- The ledger's delete is `useArmedDelete` (two clicks, no timer, announced on arm and disarm); the 3 s auto-disarm of
-  the old chapter is gone. Playwright locates the tiles by `role=region` + `aria-label` («Il fondo oggi»,
-  «Rendimento del fondo», «Anno fiscale» with `exact: true` — it is a prefix of «Anno fiscale 2026» nowhere, but
-  «Versamenti» IS a prefix of the delete buttons' names), the verdict by «Verdetto sul fondo pensione», the axis by
-  the tablist «Anno fiscale», the disclosure by `/^Dettaglio/`. The base fixture (`scripts/seedPensionE2E.mts`) runs
-  in whatever month: assert the cumulative TWR («+3,48%») and the structure, never the annualised figure.
+- The ledger's delete is `useArmedDelete` (two clicks, no timer); the armed button reads «Conferma» and the ROW says
+  the consequence in VISIBLE words («eliminando, il conto verrà riaccreditato», in the hint cell, `text-destructive`;
+  inside the button it wrapped in the 90px action column — found on the owner's tour) and the tile owns ONE live region
+  for arm and disarm — one per row made a keyboard reader hear «Eliminazione annullata» on every Tab away. Only one
+  of the two ledger layouts is mounted (`useMediaQuery('(min-width: 1440px)')`, the `desktop:` query), never both
+  hidden by class. Playwright locates the tiles by `role=region` + `aria-label`, which since 2026-09-13 is the
+  visible eyebrow, year included (`/^Anno fiscale 20\d\d$/`, `/^Versato nel 20\d\d$/`, `/^Versamenti 20\d\d$/`,
+  a regex because the name changes with the axis; «Il fondo oggi», «Rendimento del fondo»), the verdict by «Verdetto
+  sul fondo pensione», the axis by the **radiogroup** «Anno fiscale» (`SegmentedPill semantics="radio"`: a
+  tablist with no tabpanel was a promise the DOM could not keep; the pill also scrolls inside itself past five
+  years), the disclosure by `/^Dettaglio/` — which is OPEN by itself when no block is measured (a first run's one
+  orienting text), so the degraded specs assert `aria-expanded`, they do not click. The base fixture
+  (`scripts/seedPensionE2E.mts`) runs in whatever month: assert the cumulative TWR («+3,48%») and the structure,
+  never the annualised figure.
+- **«Aggiorna valore» lives on the page** (2026-09-13, from the first Impeccable critique — P0): the monthly overwrite
+  of the fund's value from the statement is the persona's one recurring job and the page taught it three times
+  without offering it. `PensionValueDialog` (header, outline beside «Registra versamento»; and the hero's footer)
+  calls `updatePensionFundValue` — NOT a contribution: `quantity` at price 1 through the same
+  `assertFundValueLivesInQuantity` guard, `lastPriceUpdate` stamped, no record, no transfer. Its reading states the
+  trap (the month's paid-in figure «sono già dentro l'estratto: non aggiungerli»), the contribution toast offers it
+  as the next step, and `describeFondoOggiFooter` judges the value's age («valore fermo dal 12 ago 2026»,
+  `valueIsStale` = last update in a closed month) instead of printing a neutral date. **That age is ONE rule**,
+  `isPensionValueStale(resolveLastFundUpdate(funds), now)` in `pensionSummary.ts`, read by the hero's footer AND by the
+  modal's reading («da un mese chiuso») — the modal re-derived it by hand until the polish pass of 2026-09-13. «Anno fiscale» in the
+  contribution form is a Select derived from the date (year −1 · year · year +1, the ±1 rule of the service now named
+  beside the field by a `superRefine`); every error is wired to its field (`aria-invalid`, `aria-describedby`,
+  `role="alert"`); the dialog's words are `PENSION_CONTRIBUTION_COPY` / `describePensionValueCopy` in
+  `dialogNarrative.ts`. In the Rendimento tile — the page's 3-column tile — a row's hint («retribuzione, non
+  rendimento») takes its own line under the label: inline, «Contributo datoriale» broke mid-word into three lines at
+  1440 (the critique's last minor observation, measured by Playwright, closed by the polish pass). Anno fiscale and the
+  Dettaglio keep the inline hint: at 4 and 6 columns it fits.
+- **The snapshots are reduced ONCE** (`indexPensionSnapshots(snapshots, fundIds)` → `PensionSnapshotIndex`, memoized
+  by the page on the snapshots alone and passed as `PensionSummaryInput.snapshotIndex`): `buildPensionValueSeries`
+  used to re-read every `byAsset` of every month for the total, per contributor and per fund, and `computeMonthEffect`
+  looked the previous month up by rebuilding the whole series once per fund. «Il fondo oggi» reads an off-axis
+  input (`offAxisInput`, no `taxYear`), so the year pill recomputes only the tax half. Deliberately NOT done: bounding
+  the `monthly-snapshots` query to the return window — the sparkline starts where the snapshots first carry the
+  fund, which can predate the first contribution, and `queryKeys.snapshots.all` is the cache Storico and Rendimenti
+  share (a second key would be a second fetch); and painting the tax tiles before the snapshots resolve — the
+  verdict's market clause needs them, and a page that shows tiles under a verdict it cannot yet say is worse than the
+  skeleton. Both are recorded here so the next audit does not re-propose them as bugs.
 
 ## Per-page blind spots
 
-- **Previdenza**: a contribution the fund credits late reads as a temporary market loss in the month it is recorded (the window's total heals once credited and the value updated — by design, → *Fondo Pensione*); the sparkline starts where the snapshots carry `byAsset`; the month chip needs the previous month's snapshot; two contributors stack one block per person; the IRPEF saving uses the default brackets; the dialog keeps its old chrome; **the contradictory guard covers the WINDOW's return only** (2026-09-07): the month chip of «Il fondo oggi» (`monthEffect`), the Panoramica's market digest and Rendimenti's per-instrument attribution all read `Δvalue − contributions moved that month` for a single month without it, so the same backfilled contributions print a −2.250 € «market» effect for that month on those three surfaces — a month, not a return, and said as such nowhere yet.
+- **Previdenza**: a contribution can be deleted but not edited — a wrong amount is a delete (which reverses the cash
+  transfer) plus a re-entry, because the service has no update path and an in-place edit of a voluntary row would
+  have to re-reconcile the transfer (left open on 2026-09-13, from the critique's P2); «Aggiorna valore» in demo is
+  disabled like every write; a contribution the fund credits late reads as a temporary market loss in the month it is recorded (the window's total heals once credited and the value updated — by design, → *Fondo Pensione*); the sparkline starts where the snapshots carry `byAsset`; the month chip needs the previous month's snapshot; two contributors stack one block per person; the IRPEF saving uses the default brackets; the dialog keeps its old chrome; **the contradictory guard covers the WINDOW's return only** (2026-09-07): the month chip of «Il fondo oggi» (`monthEffect`), the Panoramica's market digest and Rendimenti's per-instrument attribution all read `Δvalue − contributions moved that month` for a single month without it, so the same backfilled contributions print a −2.250 € «market» effect for that month on those three surfaces — a month, not a return, and said as such nowhere yet.

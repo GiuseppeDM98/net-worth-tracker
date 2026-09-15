@@ -12,9 +12,20 @@ interface TileProps {
   reading?: Narrative | null;
   /** Optional accessible label for the section; defaults to the eyebrow. */
   ariaLabel?: string;
+  /** An anchor id, so a line elsewhere on the page can jump to this tile («18 strumenti» → the table). */
+  id?: string;
   className?: string;
   children: ReactNode;
 }
+
+/**
+ * A text action inside a tile's 11px footer («Aggiungi conto», «Mostra tutte», a link to the
+ * page that owns the depth): the words stay 11px, the TARGET does not — 32px on a pointer (the
+ * dense-list floor), 44px on touch — through vertical padding folded back by a negative margin,
+ * so the footer's rhythm is unchanged (measured 75×17 and 60×17 on 2026-09-14).
+ */
+export const TILE_FOOTER_ACTION_CLASS =
+  'inline-flex min-h-8 -my-2 items-center text-foreground underline-offset-2 hover:underline [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:-my-3.5';
 
 /** The eyebrow every tile, every hero and the compact page header share. */
 export const TILE_EYEBROW_CLASS =
@@ -36,9 +47,10 @@ export const TILE_CELL_CLASS = 'flex min-w-0 [&>section]:flex-1';
  * shell is the app's card (bg-card, 1px border, 16px radius, the Lift shadow) written as a
  * naked `section` so the tile controls its own flex column — `mt-auto` footers rely on it.
  */
-export function Tile({ eyebrow, aside, reading, ariaLabel, className, children }: TileProps) {
+export function Tile({ eyebrow, aside, reading, ariaLabel, id, className, children }: TileProps) {
   return (
     <section
+      id={id}
       aria-label={ariaLabel ?? eyebrow}
       className={cn(
         'flex min-w-0 flex-col rounded-2xl border border-border bg-card p-5 shadow-sm',

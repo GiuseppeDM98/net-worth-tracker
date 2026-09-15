@@ -3,6 +3,10 @@ import {
   buildBudgetFlowData,
   buildBudgetFlowDataWithSubcategories,
   buildTypeDrillDownData,
+  countSankeyLayers,
+  resolveSankeyHeight,
+  MAX_SUBCATEGORIES,
+  MAX_SUBCATEGORY_CATEGORIES,
   TYPE_COLORS,
   type SankeyView,
 } from '@/lib/utils/cashflowSankey';
@@ -302,8 +306,9 @@ describe('buildBudgetFlowDataWithSubcategories — same category name under two 
     expect(labels).toContain('Arredamento');
   });
 
-  it('should drop a category whose rows carry no subcategory at all', () => {
-    // Arrange — a subcategory layer that just repeats the category is not a breakdown
+  it('should keep a category whose rows carry no subcategory as a leaf, with its money', () => {
+    // Arrange — a subcategory layer that just repeats the category is not a breakdown, but
+    // dropping the category hid 200 € of the flow (until 2026-09-14)
     const expenses = [
       makeExpense({ type: 'fixed', amount: -200, categoryId: 'cat-bare', categoryName: 'Assicurazione' }),
       makeExpense({ type: 'income', amount: 2000, categoryId: 'cat-stip', categoryName: 'Stipendio' }),
@@ -313,9 +318,63 @@ describe('buildBudgetFlowDataWithSubcategories — same category name under two 
     const view = buildBudgetFlowDataWithSubcategories(expenses, false);
 
     // Assert
-    expect(view.nodes.some((node) => node.label === 'Assicurazione')).toBe(false);
+    const leaf = idOf(view, 'Assicurazione');
+    expect(outgoingFrom(view, leaf)).toEqual([]);
+    expect(view.links.find((link) => link.target === leaf)?.value).toBe(200);
     assertLinksResolve(view);
     assertAcyclic(view);
+  });
+
+  it('should open only the largest categories, cap their subcategories and fold the rest into one node that adds up', () => {
+    // Arrange — eight categories with a breakdown; the smallest two must stay leaves, and the
+    // biggest one has six subcategories, so two fold into «Altre 2»
+    const expenses = [
+      ...Array.from({ length: 8 }, (_, index) =>
+        makeExpense({ type: 'variable', amount: -(index + 1) * 100, categoryId: `cat-${index}`, categoryName: `Categoria ${index}`, subCategoryId: `sub-${index}-a`, subCategoryName: `Sotto ${index} A` }),
+      ),
+      ...Array.from({ length: 8 }, (_, index) =>
+        makeExpense({ type: 'variable', amount: -10, categoryId: `cat-${index}`, categoryName: `Categoria ${index}`, subCategoryId: `sub-${index}-b`, subCategoryName: `Sotto ${index} B` }),
+      ),
+      ...Array.from({ length: 4 }, (_, index) =>
+        makeExpense({ type: 'variable', amount: -(index + 1), categoryId: 'cat-7', categoryName: 'Categoria 7', subCategoryId: `sub-7-extra-${index}`, subCategoryName: `Extra ${index}` }),
+      ),
+      makeExpense({ type: 'income', amount: 9000, categoryId: 'cat-stip', categoryName: 'Stipendio' }),
+    ];
+
+    // Act
+    const view = buildBudgetFlowDataWithSubcategories(expenses, false);
+
+    // Assert — the two smallest categories are leaves, the six largest open
+    expect(outgoingFrom(view, idOf(view, 'Categoria 0'))).toEqual([]);
+    expect(outgoingFrom(view, idOf(view, 'Categoria 1'))).toEqual([]);
+    expect(outgoingFrom(view, idOf(view, 'Categoria 2')).length).toBeGreaterThan(0);
+    const opened = view.nodes.filter((node) => view.index.get(node.id)?.kind === 'subCategory' || node.id.startsWith('subrest:'));
+    const openedCategories = new Set(opened.map((node) => node.id.split(':')[2]));
+    expect(openedCategories.size).toBe(MAX_SUBCATEGORY_CATEGORIES);
+    // Categoria 7: 800 + 10 + 1 + 2 + 3 + 4 across six subcategories → the four largest and «Altre 2» = 10 + 1 + ... wait: the fold takes the two smallest (1 and 2)
+    const big = idOf(view, 'Categoria 7');
+    const out = outgoingFrom(view, big);
+    expect(out).toHaveLength(MAX_SUBCATEGORIES + 1);
+    const rest = view.nodes.find((node) => node.id === 'subrest:variable:cat-7');
+    expect(rest?.label).toBe('Altre 2');
+    expect(out.find(([target]) => target === rest!.id)?.[1]).toBe(1 + 2);
+    expect(out.reduce((sum, [, value]) => sum + value, 0)).toBeCloseTo(820);
+    // The residual opens the category's Scheda.
+    expect(view.index.get(rest!.id)).toMatchObject({ kind: 'category', categoryKey: 'cat-7' });
+    assertLinksResolve(view);
+    assertAcyclic(view);
+  });
+
+  it('should count its columns and size the plot on the widest one', () => {
+    const view = buildBudgetFlowData(twoCasa, false);
+    const counts = countSankeyLayers(view);
+    expect(counts).toEqual({ incomeCategories: 1, expenseTypes: 2, categories: 2, subCategories: 0, hasSavings: true });
+    // Two types and the savings beside them: three nodes wide at most → the base height.
+    expect(resolveSankeyHeight(counts, false)).toBe(500);
+    expect(resolveSankeyHeight(counts, true)).toBe(400);
+    // Thirty categories: a row each, capped so a pathological taxonomy scrolls the page instead.
+    expect(resolveSankeyHeight({ ...counts, categories: 30 }, false)).toBe(30 * 26 + 80);
+    expect(resolveSankeyHeight({ ...counts, subCategories: 200 }, false)).toBe(1100);
   });
 
   it('should give the rows without a subcategory their own labelled bucket', () => {

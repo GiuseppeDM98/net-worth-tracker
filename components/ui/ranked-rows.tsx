@@ -11,6 +11,28 @@ export interface RankedRow {
   percentage: number;
 }
 
+/**
+ * The label column is a SHARE of the row (38%, floored), never a fixed pixel width: the rows of
+ * one list must share one track for the bar's width to encode rank, and a 92px column that fit
+ * «Automobili» cut «Stipendio Giuseppe» — the user's own category name — to «Stipendio Giu…» at
+ * every width while the bar beside it grew to 210px. At 42% a 4-column tile at 1440 gives the
+ * label 139px and a phone column 133px; the bar takes what is left, down to its 40px floor.
+ * `labelClassName` raises the floor (a wider tile, a longer vocabulary), it does not fix the width.
+ */
+const LABEL_COLUMN_CLASS = 'w-[42%] min-w-[72px] shrink-0';
+const BAR_TRACK_CLASS = 'min-w-[40px] flex-1';
+
+/**
+ * The share column yields when the list is narrower than its floors add up to. The row's floors
+ * — label 72 + bar 40 + amount 64 + share 34 + three 12px gaps — are 246px; a `col-span-3` tile
+ * at 1440 gives the list 235px, and until 2026-09-14 the three percentages of «Entrate per
+ * categoria» were painted 37px outside the tile (neither the tile nor the list clips). The bar
+ * already encodes rank and the reading names the top share, so below 250px the figure is the
+ * one column that can go; the row's accessible name keeps it. A container query, not a
+ * viewport one: the same list sits in a 3-column tile, a 4-column tile and a phone column.
+ */
+const SHARE_COLUMN_CLASS = 'w-[34px] shrink-0 text-right font-mono text-[11px] tabular-nums text-muted-foreground @max-[250px]:hidden';
+
 interface RankedRowsProps {
   rows: RankedRow[];
   /** Bar colour, a theme chart slot (`var(--chart-1)`), never a literal hex. */
@@ -40,20 +62,21 @@ interface RankedRowsProps {
  * a real `<ul>`: a clickable row keeps its button semantics instead of borrowing `listitem`.
  */
 export function RankedRows({ rows, color, remainder, labelClassName, onRowClick, activeKey, ariaLabel }: RankedRowsProps) {
-  // The label column yields before the bar does: the bar is the row's only visual, so it
-  // keeps a track even in a 3-column tile with the sidebar open.
-  const labelWidth = labelClassName ?? 'w-[92px]';
+  const labelWidth = cn(LABEL_COLUMN_CLASS, labelClassName);
   const maxAmount = Math.max(...rows.map((r) => r.amount), 0);
 
   const rowContent = (row: RankedRow, active: boolean) => (
     <>
       {/* The caption yields before the label: a long «12 ago · Manutenzione straordinaria» must
-          never push the category name out of its own column. */}
-      <span className={cn('flex min-w-0 shrink-0 items-baseline gap-1.5 text-[13px] text-foreground', labelWidth, active && 'font-semibold')}>
+          never push the category name out of its own column — and it WRAPS to a second line
+          instead of truncating, because «30 set · Asilo nido · in calendario» is the row's
+          second fact (the day, the subcategory, the calendar) and a cut fact is no fact
+          (2026-09-14; the accessible name always carried it whole). */}
+      <span className={cn('flex min-w-0 items-baseline gap-1.5 text-[13px] text-foreground', labelWidth, active && 'font-semibold')}>
         <span className={cn('truncate', row.caption && 'max-w-[65%] shrink-0')}>{row.label}</span>
-        {row.caption && <span className="min-w-0 truncate font-mono text-[11px] tabular-nums text-muted-foreground">{row.caption}</span>}
+        {row.caption && <span className="line-clamp-2 min-w-0 break-words font-mono text-[11px] leading-[1.35] tabular-nums text-muted-foreground">{row.caption}</span>}
       </span>
-      <div className="h-[3px] min-w-[40px] flex-1 overflow-hidden rounded-full bg-muted" role="presentation">
+      <div className={cn('h-[3px] overflow-hidden rounded-full bg-muted', BAR_TRACK_CLASS)} role="presentation">
         <div
           className="h-full rounded-full"
           style={{
@@ -65,14 +88,14 @@ export function RankedRows({ rows, color, remainder, labelClassName, onRowClick,
       <span className="w-[64px] shrink-0 text-right font-mono text-[13px] tabular-nums text-foreground">
         {cachedFormatCurrencyEUR(row.amount, true)}
       </span>
-      <span className="w-[34px] shrink-0 text-right font-mono text-[11px] tabular-nums text-muted-foreground">
+      <span className={SHARE_COLUMN_CLASS}>
         {Math.round(row.percentage)}%
       </span>
     </>
   );
 
   return (
-    <ul className="flex flex-col divide-y divide-border" aria-label={ariaLabel}>
+    <ul className="@container flex flex-col divide-y divide-border" aria-label={ariaLabel}>
       {rows.map((row) => {
         const active = activeKey === row.key;
         return (
@@ -98,14 +121,14 @@ export function RankedRows({ rows, color, remainder, labelClassName, onRowClick,
       })}
       {remainder && remainder.amount > 0 && (
         <li className="flex items-center gap-3 py-[9px]">
-          <span className={cn('shrink-0 truncate text-[13px] text-muted-foreground', labelWidth)}>
+          <span className={cn('min-w-0 truncate text-[13px] text-muted-foreground', labelWidth)}>
             {remainder.label}
           </span>
-          <div className="flex-1" />
+          <div className={BAR_TRACK_CLASS} aria-hidden="true" />
           <span className="w-[64px] shrink-0 text-right font-mono text-[13px] tabular-nums text-muted-foreground">
             {cachedFormatCurrencyEUR(remainder.amount, true)}
           </span>
-          <span className="w-[34px] shrink-0 text-right font-mono text-[11px] tabular-nums text-muted-foreground">
+          <span className={SHARE_COLUMN_CLASS}>
             {Math.round(remainder.percentage)}%
           </span>
         </li>

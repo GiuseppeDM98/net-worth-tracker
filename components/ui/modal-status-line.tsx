@@ -20,6 +20,14 @@ interface ModalStatusLineProps extends React.ComponentProps<'p'> {
  * on the themes whose destructive is not red). And it takes the props Radix's
  * `Dialog.Description` hands down through `asChild`, so the live region and the modal's
  * accessible description are the same element rather than two paragraphs saying one thing.
+ *
+ * The incoming `className` comes BEFORE the line's size and tone in the merge (after `m-0`, so
+ * the modal's `mt-1` survives), the line's own classes last: shadcn's
+ * `DialogDescription`/`DrawerDescription` hand down `text-sm text-muted-foreground` through the
+ * slot, and with them last `tailwind-merge` dropped this line's `text-[13px]`, its
+ * `leading-[1.45]` (a size utility conflicts with a leading one) and — on a refusal — its
+ * `text-destructive`: every modal's reading was 14px muted and no refusal was ever red
+ * (measured 2026-09-14 on the budget dialog, in place since 2026-08-31).
  */
 export function ModalStatusLine({ reading, className, ...rest }: ModalStatusLineProps) {
   return (
@@ -28,9 +36,10 @@ export function ModalStatusLine({ reading, className, ...rest }: ModalStatusLine
       aria-live="polite"
       aria-atomic="true"
       className={cn(
-        'm-0 text-[13px] leading-[1.45]',
-        reading.tone === 'negative' ? 'text-destructive' : 'text-foreground',
+        'm-0',
         className,
+        'text-[13px] leading-[1.45]',
+        reading.tone === 'negative' ? 'text-destructive' : 'text-foreground',
       )}
       {...rest}
     >

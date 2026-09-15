@@ -10,6 +10,10 @@
  *                                           | Classi(3)    | Rendimento(4)
  *                     Strumenti(12)
  *
+ * The DOM order IS the mobile order (Movimenti before Liquidità); the desktop row is placed by
+ * `col-start`, never by a CSS `order` swap, so a screen reader and the eye meet the tiles in
+ * the same sequence. The hero's count line links to the Strumenti tile (`#strumenti`).
+ *
  * Data: the overview payload (`useDashboardOverview`, shared with the Panoramica — hero,
  * variations, sparkline, composition, top assets, per-instrument market effect), the assets
  * (rows, cash accounts, unrealized gains), the snapshots (Δ columns) and the trade ledger
@@ -60,10 +64,11 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ErrorNotice } from '@/components/ui/error-notice';
 import { describeReadFailure } from '@/lib/utils/statesNarrative';
+import { describeWriteError } from '@/lib/utils/dialogNarrative';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PageVerdict } from '@/components/ui/page-verdict';
-import { TILE_CELL_CLASS } from '@/components/ui/tile';
+import { TILE_CELL_CLASS, TILE_FOOTER_ACTION_CLASS } from '@/components/ui/tile';
 import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
 import { PatrimonioTile, resolveHeroValueClass } from '@/components/dashboard/overview/PatrimonioTile';
 import { ComposizioneTile } from '@/components/dashboard/overview/ComposizioneTile';
@@ -158,10 +163,12 @@ export default function AssetsPage() {
   const { data: trades = [], isLoading: loadingTrades } = useAssetTransactions(ownerId, undefined, { enabled: ledgerReady });
 
   // ─── Dialog state ─────────────────────────────────────────────────────────────
-  const [assetDialog, setAssetDialog] = useState<{ open: boolean; asset: Asset | null }>({ open: false, asset: null });
+  // `initialType` skips the type picker: «Aggiungi conto» already knows it wants a cash account.
+  const [assetDialog, setAssetDialog] = useState<{ open: boolean; asset: Asset | null; initialType?: Asset['type'] }>({
+    open: false,
+    asset: null,
+  });
   const [cashDetail, setCashDetail] = useState<Asset | null>(null);
-  const [cashPendingDeleteId, setCashPendingDeleteId] = useState<string | undefined>();
-  const cashPendingDeleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [tradeAsset, setTradeAsset] = useState<Asset | null>(null);
   const [movementsAsset, setMovementsAsset] = useState<Asset | null>(null);
   const [taxAsset, setTaxAsset] = useState<Asset | null>(null);
@@ -194,6 +201,7 @@ export default function AssetsPage() {
   }, [overview, sparklinePeriod]);
 
   const heroValueClass = useMemo(() => resolveHeroValueClass(totalValue), [totalValue]);
+  const holdingCounts = formatHoldingCounts(heldInstruments.length, cashAccounts.length);
 
   // Composition remapped by ASSET_CLASS_CHART_INDEX so a class is the same hue as everywhere.
   const assetClassData = useMemo(
@@ -227,6 +235,7 @@ export default function AssetsPage() {
       accountCount: cashAccounts.length,
       marketEffect: overview.marketEffect ?? null,
       topMover: overview.topInstrumentMovers?.[0] ?? null,
+      sales: overview.monthSales ?? null,
     });
   }, [overview, today.month, totalValue, heldInstruments.length, cashAccounts.length]);
 
@@ -264,12 +273,14 @@ export default function AssetsPage() {
   };
 
   const openCreate = () => setAssetDialog({ open: true, asset: null });
+  const openCreateCashAccount = () => setAssetDialog({ open: true, asset: null, initialType: 'cash' });
   const openEdit = (asset: Asset) => setAssetDialog({ open: true, asset });
   const handleAssetDialogClose = () => {
     setAssetDialog({ open: false, asset: null });
     invalidatePortfolio();
   };
 
+  // The two-click arm lives in the dialog (`useArmedDelete`, no timer); the page only deletes.
   const handleCashDelete = async (assetId: string) => {
     try {
       await deleteAssetMutation.mutateAsync(assetId);
@@ -277,20 +288,7 @@ export default function AssetsPage() {
       setCashDetail(null);
     } catch (error) {
       console.error('Error deleting cash account:', error);
-      toast.error("Errore nell'eliminazione del conto");
-    }
-  };
-
-  // 2-click disarm — the same pattern as the table rows.
-  const handleCashDeleteClick = (assetId: string) => {
-    if (cashPendingDeleteId === assetId) {
-      if (cashPendingDeleteTimerRef.current) clearTimeout(cashPendingDeleteTimerRef.current);
-      setCashPendingDeleteId(undefined);
-      handleCashDelete(assetId);
-    } else {
-      if (cashPendingDeleteTimerRef.current) clearTimeout(cashPendingDeleteTimerRef.current);
-      setCashPendingDeleteId(assetId);
-      cashPendingDeleteTimerRef.current = setTimeout(() => setCashPendingDeleteId(undefined), 3000);
+      toast.error(describeWriteError(error));
     }
   };
 
@@ -399,26 +397,26 @@ export default function AssetsPage() {
                 onSparklinePeriodChange={setSparklinePeriod}
                 sparklineDisplay={sparklineDisplay}
                 movers={instrumentMovers}
-                countLine={formatHoldingCounts(heldInstruments.length, cashAccounts.length) || 'Aggiungi asset per iniziare'}
+                countLine={
+                  // The count is the way to the table: on a phone Strumenti starts three
+                  // screens down, and «18 strumenti» is the line a reader looks for it under.
+                  holdingCounts ? (
+                    <a href="#strumenti" className="underline-offset-2 hover:underline">
+                      {holdingCounts}
+                    </a>
+                  ) : (
+                    'Aggiungi asset per iniziare'
+                  )
+                }
               />
             </motion.div>
           )}
 
-          {/* Below desktop, the month's movements read right after the hero: "cosa si è mosso?" */}
-          <motion.div variants={cardItem} className={cn(TILE_CELL_CLASS, 'order-2 desktop:order-none desktop:col-span-3')}>
-            <LiquiditaTile
-              summary={cashSummary}
-              accountsById={assetsById}
-              onSelect={(asset) => {
-                setCashPendingDeleteId(undefined);
-                setCashDetail(asset);
-              }}
-              onAdd={openCreate}
-              isDemo={isDemo}
-            />
-          </motion.div>
-
-          <motion.div variants={cardItem} className={cn(TILE_CELL_CLASS, 'order-1 desktop:order-none desktop:col-span-4')}>
+          {/* DOM order = reading order on every width: the month's movements right after the hero
+              («cosa si è mosso?»), then the accounts. On desktop the two are placed by column so
+              the row still reads hero · Liquidità · Movimenti; a CSS `order` swap used to make a
+              screen reader meet Liquidità first while the eye met Movimenti. */}
+          <motion.div variants={cardItem} className={cn(TILE_CELL_CLASS, 'desktop:col-span-4 desktop:col-start-9 desktop:row-start-1')}>
             <MovimentiTile
               summary={tradesSummary}
               month={today.month}
@@ -429,16 +427,26 @@ export default function AssetsPage() {
             />
           </motion.div>
 
+          <motion.div variants={cardItem} className={cn(TILE_CELL_CLASS, 'desktop:col-span-3 desktop:col-start-6 desktop:row-start-1')}>
+            <LiquiditaTile
+              summary={cashSummary}
+              accountsById={assetsById}
+              onSelect={setCashDetail}
+              onAdd={openCreateCashAccount}
+              isDemo={isDemo}
+            />
+          </motion.div>
+
           {!overviewUnavailable && (
             <>
-              <motion.div variants={cardItem} className={cn(TILE_CELL_CLASS, 'order-3 desktop:order-none desktop:col-span-3')}>
+              <motion.div variants={cardItem} className={cn(TILE_CELL_CLASS, 'desktop:col-span-3')}>
                 <ComposizioneTile
                   eyebrow="Classi"
                   data={assetClassData}
                   footer={
                     <>
                       Target e ribilanciamento in{' '}
-                      <Link href="/dashboard/allocation" className="text-foreground underline-offset-2 hover:underline">
+                      <Link href="/dashboard/allocation" className={TILE_FOOTER_ACTION_CLASS}>
                         Allocazione
                       </Link>
                       .
@@ -447,13 +455,13 @@ export default function AssetsPage() {
                 />
               </motion.div>
 
-              <motion.div variants={cardItem} className={cn(TILE_CELL_CLASS, 'order-4 desktop:order-none desktop:col-span-4')}>
+              <motion.div variants={cardItem} className={cn(TILE_CELL_CLASS, 'desktop:col-span-4')}>
                 <RendimentoTile gains={gains} ranking={ranking} rankedFrom={ranking.rankedFrom} />
               </motion.div>
             </>
           )}
 
-          <motion.div variants={cardItem} className={cn(TILE_CELL_CLASS, 'order-5 desktop:order-none tablet:col-span-2 desktop:col-span-12')}>
+          <motion.div variants={cardItem} className={cn(TILE_CELL_CLASS, 'tablet:col-span-2 desktop:col-span-12')}>
             <StrumentiTile
               assets={instruments}
               totalValue={totalValue}
@@ -473,21 +481,23 @@ export default function AssetsPage() {
       </motion.div>
 
       {/* ── Dialogs — one instance each, shared by the header and every tile ── */}
-      <AssetDialog open={assetDialog.open} asset={assetDialog.asset} onClose={handleAssetDialogClose} onRegisterTrade={setTradeAsset} />
+      <AssetDialog
+        open={assetDialog.open}
+        asset={assetDialog.asset}
+        initialType={assetDialog.initialType}
+        onClose={handleAssetDialogClose}
+        onRegisterTrade={setTradeAsset}
+      />
 
       <CashAccountDialog
         asset={cashDetail}
         open={cashDetail !== null}
-        onClose={() => {
-          setCashDetail(null);
-          setCashPendingDeleteId(undefined);
-        }}
+        onClose={() => setCashDetail(null)}
         onEdit={(asset) => {
           setCashDetail(null);
           openEdit(asset);
         }}
-        pendingDeleteId={cashPendingDeleteId}
-        onDeleteClick={handleCashDeleteClick}
+        onDelete={handleCashDelete}
         isDemo={isDemo}
       />
 

@@ -17,11 +17,13 @@ import type { PensionContribution, PensionContributionNature } from '@/types/pen
 import {
   buildPensionValueSeries,
   computePensionReturn,
+  indexPensionSnapshots,
   isPensionReturnMeasurable,
   overlayLivePensionValue,
   resolvePensionReturnStart,
   valueEffectMonth,
   type PensionReturnResult,
+  type PensionSnapshotIndex,
   type PensionValuePoint,
 } from '@/lib/utils/pensionReturn';
 import { computePensionTaxRecap } from '@/lib/utils/pensionDeduction';
@@ -42,6 +44,11 @@ export interface PensionSummaryInput {
   familyMembers: FamilyMember[];
   contributions: PensionContribution[];
   snapshots: MonthlySnapshot[];
+  /**
+   * `indexPensionSnapshots(snapshots, fundIds)`, memoized by the page on the snapshots alone so
+   * a change of the fiscal year never re-reads them; built here from `snapshots` when absent.
+   */
+  snapshotIndex?: PensionSnapshotIndex;
   /** ONE `now` per mount: the live overlay's month and the digest's window depend on it. */
   now: Date;
   /** `settings.pensionReturnStartMonth` — the user's override of where the data is trustworthy. */
@@ -79,6 +86,11 @@ export interface FundTodaySummary {
   series: PensionValuePoint[];
   /** The latest manual update of any fund; null without funds. */
   lastUpdated: Date | null;
+  /**
+   * The value is hand-kept, so its age is a judgement, not a fact: true when `lastUpdated`
+   * belongs to a month before `now`'s — the statement of a closed month has not been entered.
+   */
+  valueIsStale: boolean;
 }
 
 function monthKey(year: number, month: number): string {
@@ -109,7 +121,7 @@ function sumAmounts(contributions: PensionContribution[]): number {
  */
 function computeMonthEffect(
   funds: Asset[],
-  snapshots: MonthlySnapshot[],
+  index: PensionSnapshotIndex,
   contributions: PensionContribution[],
   startMonth: string | null,
   previousKey: string,
@@ -117,16 +129,17 @@ function computeMonthEffect(
 ): { effect: number | null; base: number; paidIn: number } {
   if (startMonth === null || startMonth > previousKey) return { effect: null, base: 0, paidIn: 0 };
 
+  // The previous month is looked up ONCE in the index; each fund then reads its own value from it.
+  const previousMonth = index.find((month) => month.key === previousKey);
+  if (!previousMonth) return { effect: null, base: 0, paidIn: 0 };
+
   let effect = 0;
   let base = 0;
   let paidIn = 0;
   let attributed = false;
   for (const fund of funds) {
-    const previousSeries = buildPensionValueSeries(snapshots, [fund.id]).filter(
-      (point) => monthKey(point.year, point.month) === previousKey
-    );
-    if (previousSeries.length === 0 || !(fund.quantity > 0)) continue;
-    const previousValue = previousSeries[0].value;
+    const previousValue = previousMonth.values.get(fund.id) ?? 0;
+    if (!(previousValue > 0) || !(fund.quantity > 0)) continue;
     const fundPaidIn = sumAmounts(
       contributions.filter((c) => c.assetId === fund.id && valueEffectMonth(c) > previousKey)
     );
@@ -141,30 +154,27 @@ function computeMonthEffect(
 
 /** The whole account's funds today: value, series, digest, what was ever paid in. */
 export function summarizeFundToday(input: PensionSummaryInput): FundTodaySummary {
-  const { funds, contributions, snapshots, now, configuredStartMonth, valueOf } = input;
+  const { funds, contributions, now, configuredStartMonth, valueOf } = input;
   const { current, previousKey } = resolveMonths(now);
+  const index = resolveSnapshotIndex(input);
 
   const value = funds.reduce((sum, fund) => sum + valueOf(fund), 0);
   const fundIds = funds.map((fund) => fund.id);
   const fundContributions = contributions.filter((c) => fundIds.includes(c.assetId));
   const startMonth = resolvePensionReturnStart(fundContributions, configuredStartMonth);
 
-  const series = overlayLivePensionValue(buildPensionValueSeries(snapshots, fundIds), {
+  const series = overlayLivePensionValue(buildPensionValueSeries(index, fundIds), {
     year: current.year,
     month: current.month,
     value,
   });
 
-  const { effect, base, paidIn } = computeMonthEffect(funds, snapshots, fundContributions, startMonth, previousKey, valueOf);
+  const { effect, base, paidIn } = computeMonthEffect(funds, index, fundContributions, startMonth, previousKey, valueOf);
 
   const firstContributionMonth =
     fundContributions.length > 0 ? fundContributions.map(accountingMonthKey).sort()[0] : null;
 
-  const lastUpdated = funds.reduce<Date | null>((latest, fund) => {
-    const candidate = fund.lastPriceUpdate ?? fund.updatedAt;
-    if (!candidate) return latest;
-    return latest === null || candidate > latest ? candidate : latest;
-  }, null);
+  const lastUpdated = resolveLastFundUpdate(funds);
 
   return {
     value,
@@ -177,7 +187,33 @@ export function summarizeFundToday(input: PensionSummaryInput): FundTodaySummary
     monthPaidIn: paidIn,
     series,
     lastUpdated,
+    valueIsStale: isPensionValueStale(lastUpdated, now),
   };
+}
+
+/** The latest manual update across the funds (`lastPriceUpdate`, else `updatedAt`); null without one. */
+export function resolveLastFundUpdate(funds: Asset[]): Date | null {
+  return funds.reduce<Date | null>((latest, fund) => {
+    const candidate = fund.lastPriceUpdate ?? fund.updatedAt;
+    if (!candidate) return latest;
+    return latest === null || candidate > latest ? candidate : latest;
+  }, null);
+}
+
+/**
+ * The ONE judgement on a hand-kept value's age, shared by the hero's footer («valore fermo
+ * dal …») and the «Aggiorna valore» modal's reading («da un mese chiuso»): stale when the last
+ * update belongs to an Italian calendar month before `now`'s — the statement of a closed month
+ * has not been entered yet. A value never updated has no age to judge.
+ */
+export function isPensionValueStale(lastUpdated: Date | null, now: Date): boolean {
+  if (lastUpdated === null) return false;
+  return monthKey(getItalyYear(lastUpdated), getItalyMonth(lastUpdated)) < resolveMonths(now).currentKey;
+}
+
+/** The page's memoized index, or one built here for a caller that passed only the snapshots. */
+function resolveSnapshotIndex(input: PensionSummaryInput): PensionSnapshotIndex {
+  return input.snapshotIndex ?? indexPensionSnapshots(input.snapshots, input.funds.map((fund) => fund.id));
 }
 
 // ─── Per contributor: return and tax recap ────────────────────────────────────
@@ -324,7 +360,7 @@ function summarizeBlock(
   tax: PensionMemberTax | null,
   input: PensionSummaryInput
 ): PensionMemberBlock {
-  const { contributions, snapshots, now, configuredStartMonth, valueOf } = input;
+  const { contributions, now, configuredStartMonth, valueOf } = input;
   const { current } = resolveMonths(now);
   const fundIds = blockFunds.map((fund) => fund.id);
   const blockContributions = contributions.filter((c) => fundIds.includes(c.assetId));
@@ -332,7 +368,7 @@ function summarizeBlock(
 
   // The window starts where THIS block's data is trustworthy; the configured month still wins.
   const startMonth = resolvePensionReturnStart(blockContributions, configuredStartMonth);
-  const series = overlayLivePensionValue(buildPensionValueSeries(snapshots, fundIds), {
+  const series = overlayLivePensionValue(buildPensionValueSeries(resolveSnapshotIndex(input), fundIds), {
     year: current.year,
     month: current.month,
     value,

@@ -3207,11 +3207,11 @@ export default function SettingsPage() {
                                           style={{ backgroundColor: category.color ? `${category.color}20` : 'var(--muted)' }}
                                         >
                                           {CatIcon ? (
-                                            <Suspense fallback={<div className="h-3.5 w-3.5 rounded-full" style={{ backgroundColor: category.color || '#3b82f6' }} />}>
+                                            <Suspense fallback={<div className="h-3.5 w-3.5 rounded-full" style={{ backgroundColor: category.color || 'var(--chart-1)' }} />}>
                                               <CatIcon className="h-3.5 w-3.5" style={{ color: category.color || 'var(--muted-foreground)' }} aria-hidden="true" />
                                             </Suspense>
                                           ) : (
-                                            <div className="h-3 w-3 rounded-full" style={{ backgroundColor: category.color || '#3b82f6' }} />
+                                            <div className="h-3 w-3 rounded-full" style={{ backgroundColor: category.color || 'var(--chart-1)' }} />
                                           )}
                                         </div>
                                       );

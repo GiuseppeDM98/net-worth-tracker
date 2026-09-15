@@ -216,10 +216,19 @@ export function describeFondoOggiAside(today: FundTodaySummary): string {
   return today.fundCount === 1 ? `${today.fundNames[0]} · oggi` : `${today.fundCount} fondi · oggi`;
 }
 
-/** «1 fondo · valore aggiornato a mano dall’estratto conto · ultimo aggiornamento 12 ago 2026». */
+/**
+ * «1 fondo · valore aggiornato a mano dall’estratto conto · ultimo aggiornamento 12 ago 2026».
+ *
+ * A hand-kept value has an age, and the footer judges it instead of printing a neutral date:
+ * once the last update belongs to a closed month the clause becomes «valore fermo dal 12 ago
+ * 2026», because the statement of that month has not been entered yet and the hero above may
+ * be reading last month's figure as today's.
+ */
 export function describeFondoOggiFooter(today: FundTodaySummary): string {
   const parts = [`${today.fundCount} ${today.fundCount === 1 ? 'fondo' : 'fondi'}`, 'valore aggiornato a mano dall’estratto conto'];
-  if (today.lastUpdated) parts.push(`ultimo aggiornamento ${formatDayShort(today.lastUpdated)}`);
+  if (today.lastUpdated) {
+    parts.push(today.valueIsStale ? `valore fermo dal ${formatDayShort(today.lastUpdated)}` : `ultimo aggiornamento ${formatDayShort(today.lastUpdated)}`);
+  }
   return parts.join(' · ');
 }
 
@@ -296,7 +305,7 @@ function rendimentoClause(block: PensionMemberBlock, named: boolean): Narrative 
       break;
     }
     case 'idle':
-      body = [prose(`da ${start} il valore ${many ? 'dei fondi' : 'del fondo'} non si è ancora mosso e non risultano versamenti registrati dopo quel mese: non c’è ancora niente da misurare. La prima misura arriva quando aggiorni «Valore attuale» col prossimo estratto conto.`)];
+      body = [prose(`da ${start} il valore ${many ? 'dei fondi' : 'del fondo'} non si è ancora mosso e non risultano versamenti registrati dopo quel mese: non c’è ancora niente da misurare. La prima misura arriva quando aggiorni il valore col prossimo estratto conto («Aggiorna valore», in alto).`)];
       break;
     case 'no-contributions':
       body = [prose(`registra il primo versamento per iniziare a misurare il rendimento: prima di quello la crescita ${many ? 'dei fondi' : 'del fondo'} e i versamenti sono indistinguibili.`)];
@@ -359,7 +368,7 @@ function annoFiscaleClause(block: PensionMemberBlock, taxYear: number): Narrativ
   if (tax.taxSaving !== null) {
     out.push(prose(': circa '), amount(tax.taxSaving), prose(' di IRPEF in meno'));
     if (tail.length) out.push(prose('; '), ...tail[0]);
-    if (tfr.length) out.push(prose(tail.length ? ', e ' : ', e '), ...tfr);
+    if (tfr.length) out.push(prose(', e '), ...tfr);
     out.push(prose('.'));
     return out;
   }
@@ -384,11 +393,13 @@ export function describeAnnoFiscale(blocks: PensionMemberBlock[], taxYear: numbe
   return out;
 }
 
-/** «Mario · RAL 38.000 €» / «Mario · senza RAL» / «fondo non assegnato» / «per contribuente». */
+/** «Mario · RAL 38.000 €» / «Mario · senza RAL» / «fondo non assegnato» / «nessun fondo» / «per contribuente». */
 export function describeAnnoFiscaleAside(blocks: PensionMemberBlock[]): string {
   if (blocks.length > 1) return 'per contribuente';
   const block = blocks[0];
-  if (!block || block.kind === 'unassigned' || !block.tax) return 'fondo non assegnato';
+  // A missing block and an unassigned fund are two states: without a fund there is nothing to link.
+  if (!block) return 'nessun fondo';
+  if (block.kind === 'unassigned' || !block.tax) return 'fondo non assegnato';
   return block.tax.ral !== null ? `${block.name} · RAL ${cachedFormatCurrencyEUR(block.tax.ral, true)}` : `${block.name} · senza RAL`;
 }
 
@@ -399,9 +410,10 @@ export const ANNO_FISCALE_FOOTER: Narrative = [
 // ─── Versato per natura ───────────────────────────────────────────────────────
 
 /** «Nel 2026 il fondo ha ricevuto 1321 €: 652 € volontari, 535 € di TFR e 134 € dal datore.» */
-export function describeVersato(versato: VersatoSummary): Narrative {
+export function describeVersato(versato: VersatoSummary, fundCount = 1): Narrative {
   if (versato.rows.length === 0) return [prose(`Nessun versamento con competenza ${versato.year}.`)];
-  const out: Narrative = [prose(`Nel ${versato.year} il fondo ha ricevuto `), amount(versato.total)];
+  const subject = fundCount > 1 ? 'i fondi hanno' : 'il fondo ha';
+  const out: Narrative = [prose(`Nel ${versato.year} ${subject} ricevuto `), amount(versato.total)];
   if (versato.rows.length === 1) {
     out.push(prose(`, tutti ${NATURE_AFTER_AMOUNT[versato.rows[0].nature]}.`));
     return out;
@@ -485,6 +497,6 @@ export const CRESCITA_FOOTER: Narrative = [
 
 /** How the fund's value is kept current — the paragraphs of the «Come aggiornare il valore» tile. */
 export const COME_AGGIORNARE: readonly string[] = [
-  'Il valore del fondo (versato + rendimento) si aggiorna a mano dal tuo asset «Fondo Pensione» in Patrimonio quando arriva l’estratto conto. Ordine corretto: registra prima tutti i versamenti del mese, poi aggiorna «Valore attuale» — l’estratto conto li include già, quindi aggiornarlo prima li farebbe contare due volte.',
+  'Il valore del fondo (versato + rendimento) si aggiorna a mano con «Aggiorna valore», qui in alto, quando arriva l’estratto conto. Ordine corretto: registra prima tutti i versamenti del mese, poi il valore — l’estratto conto li include già, quindi aggiornarlo prima li farebbe contare due volte.',
   'Fallo entro la fine del mese di competenza: lo storico salva una fotografia del patrimonio a fine mese e quella dei mesi passati non si riscrive più, quindi un versamento di giugno registrato a luglio compare nel valore di luglio. Il rendimento resta corretto — viene attribuito al mese in cui il valore si è mosso — ma il confronto mese per mese si legge meglio se le due cose coincidono.',
 ];

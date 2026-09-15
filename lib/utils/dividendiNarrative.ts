@@ -276,8 +276,23 @@ export function buildDividendiVerdict(input: DividendiVerdictInput): PageVerdict
       prose(` ${pluralize(input.payerCount, 'strumento', 'strumenti')}`),
     );
   }
+  // The yield is NOT on the period axis: it is TTM on the instruments still held that have a
+  // cost basis (the Rendimento tile's window). Until 2026-09-14 the clause read «; rendono
+  // l'1,3% lordo sul costo» right after «da 3 strumenti» — the same figure in all four periods,
+  // on a different population, with nothing saying so. It now names both.
   if (input.yieldSummary?.yocGross != null) {
-    sentence.push(prose('; rendono '), ...percentWithArticle(input.yieldSummary.yocGross, 1), prose(' lordo sul costo'));
+    const coverage = input.yieldSummary.coverage;
+    if (coverage === 1) {
+      sentence.push(prose('; l’unico strumento con costo medio rende '));
+    } else {
+      sentence.push(prose(`; ${pluralArticleFor(coverage)} `), figure(String(coverage)), prose(' strumenti con costo medio rendono '));
+    }
+    sentence.push(
+      ...percentWithArticle(input.yieldSummary.yocGross, 1),
+      prose(' lordo sul costo negli ultimi '),
+      figure(String(TRAILING_MONTHS)),
+      prose(' mesi'),
+    );
   }
   sentence.push(...nextPaymentClause(input.next, input.now), prose('.'));
 
@@ -315,6 +330,11 @@ export function describeReliability(reliability: DividendReliability, dryMonthNa
   const { monthsWithIncome, monthsInWindow } = reliability;
   if (reliability.payerCount === 0 || monthsInWindow === 0) return null;
 
+  // A one-month window has no plural to agree with: «in tutti i 1 mesi» was on screen under
+  // «Mese» until 2026-09-14 (no test covered the window of one).
+  if (monthsInWindow === 1) {
+    return [prose('Hai incassato nell’unico mese del periodo.')];
+  }
   if (monthsWithIncome >= monthsInWindow) {
     return [
       prose(`Hai incassato in tutti ${pluralArticleFor(monthsInWindow)} `),
@@ -338,6 +358,22 @@ export function describeReliability(reliability: DividendReliability, dryMonthNa
       ? `solo ${withPreposition[0]}`
       : `${withPreposition.slice(0, -1).join(', ')} e ${withPreposition[withPreposition.length - 1]}`;
   return [...opening, prose(`: ${list} non è arrivato niente.`)];
+}
+
+/**
+ * The toast after «Scarica dividendi storici» when the route dropped payments older than an
+ * asset's floor (lib/utils/dividendEligibility.ts): says HOW MANY, WHY and the recovery. The
+ * recovery — record the purchase in the Registro operazioni with its real date — is offered
+ * only when at least one floor was the asset's creation date: a floor that already comes from
+ * the ledger cannot be moved by recording the purchase again.
+ */
+export function describeFilteredDividends(filteredCount: number, assetsFlooredByCreation: number): string {
+  const head =
+    filteredCount === 1
+      ? '1 dividendo non importato perché precedente alla data in cui possiedi il titolo'
+      : `${filteredCount} dividendi non importati perché precedenti alla data in cui possiedi il titolo`;
+  if (assetsFlooredByCreation === 0) return `${head}.`;
+  return `${head}: per un titolo creato nell’app dopo l’acquisto, registra l’acquisto nel Registro operazioni con la sua data reale e scarica di nuovo.`;
 }
 
 /** The Affidabilità aside: the window, with the noun agreeing with the number in front of it. */
@@ -386,11 +422,13 @@ export function describeYield(summary: YieldSummary): Narrative | null {
   ];
 
   if (summary.currentYieldGross != null) {
-    narrative.push(prose(', contro '), ...percentWithArticle(summary.currentYieldGross, 1), prose(' sul valore di mercato'));
     // Decided on the PRINTED figure, like every other delta on the page: two yields that round
-    // to the same tenth have no spread to state, and «0,0 punti in più» is not a fact.
+    // to the same tenth have no spread to state, and «0,0 punti in più» is not a fact — nor is
+    // «rendi l'1,3%, contro l'1,3%», a comparison that compares nothing (on screen until
+    // 2026-09-14). The same-basis rule of Rendimenti applies: that is «in linea».
     const points = summary.spread == null ? 0 : Math.round(Math.abs(summary.spread) * 10) / 10;
     if (summary.spread != null && points > 0) {
+      narrative.push(prose(', contro '), ...percentWithArticle(summary.currentYieldGross, 1), prose(' sul valore di mercato'));
       // A spread only reads as a fact once it is stated as one: the entry price is worth
       // something, or today's price would be the better entry. Never "il tuo YOC batte".
       narrative.push(
@@ -400,6 +438,8 @@ export function describeYield(summary: YieldSummary): Narrative | null {
         figure(formatNumber(points, 1)),
         prose(summary.spread >= 0 ? ' punti' : ' punti in più'),
       );
+    } else {
+      narrative.push(prose(', in linea con il valore di mercato'));
     }
   }
   narrative.push(prose('.'));
@@ -417,30 +457,91 @@ export function describeYieldFooter(summary: YieldSummary): Narrative {
   ];
 }
 
+/** ", altri 186 € da 2 strumenti venduti" — what the rows leave out, or nothing. */
+function soldPayersClause(ranking: PayerRanking): Narrative {
+  if (ranking.soldPayerCount === 0) return [];
+  return [
+    prose('; altri '),
+    figure(euro(ranking.soldNet)),
+    prose(` da ${ranking.soldPayerCount} ${pluralize(ranking.soldPayerCount, 'strumento venduto', 'strumenti venduti')}`),
+  ];
+}
+
 /**
- * "7 strumenti hanno pagato nel 2026; ENI ha pagato di più, 1.062 € in 4 stacchi." — the count
- * and the leader, which the rows show but do not say. A lone payer is not ranked against itself.
+ * "2 strumenti in portafoglio hanno pagato nel 2026; BTP ha pagato di più, 114 € in 2 stacchi;
+ * altri 186 € da 2 strumenti venduti." — the count and the leader, which the rows show but do
+ * not say. A lone payer is not ranked against itself. The rows rank the instruments STILL
+ * HELD; what a sold one paid is named in its own clause, never ranked (2026-09-14).
  */
 export function describePayerRanking(ranking: PayerRanking, inPeriod: string): Narrative | null {
-  const { top, payerCount } = ranking;
-  if (!top || payerCount === 0) return null;
+  const { top, payerCount, heldPayerCount, soldPayerCount } = ranking;
+  if (payerCount === 0) return null;
+
+  // Every payer of the period has been sold: the income was real, the leaderboard is empty.
+  if (!top) {
+    return [
+      prose(`Nessuno strumento ancora in portafoglio ha pagato ${inPeriod}: `),
+      figure(euro(ranking.soldNet)),
+      prose(
+        soldPayerCount === 1
+          ? ' viene da uno strumento venduto.'
+          : ` vengono da ${soldPayerCount} strumenti venduti.`,
+      ),
+    ];
+  }
 
   const leader = top.assetTicker || top.assetName;
   const stacchi: Narrative = [
     figure(euro(top.net)),
     prose(' in '),
     figure(String(top.count)),
-    prose(` ${pluralize(top.count, 'stacco', 'stacchi')}.`),
+    prose(` ${pluralize(top.count, 'stacco', 'stacchi')}`),
   ];
+  const inPortfolio = soldPayerCount > 0 ? ' in portafoglio' : '';
 
-  if (payerCount === 1) {
-    return [prose(`Ha pagato un solo strumento ${inPeriod}: ${leader}, `), ...stacchi];
+  if (heldPayerCount === 1) {
+    return [
+      prose(`Ha pagato un solo strumento${soldPayerCount > 0 ? ' ancora' : ''}${inPortfolio} ${inPeriod}: ${leader}, `),
+      ...stacchi,
+      ...soldPayersClause(ranking),
+      prose('.'),
+    ];
   }
   return [
-    figure(String(payerCount)),
-    prose(` strumenti hanno pagato ${inPeriod}; ${leader} ha pagato di più, `),
+    figure(String(heldPayerCount)),
+    prose(` strumenti${inPortfolio} hanno pagato ${inPeriod}; ${leader} ha pagato di più, `),
     ...stacchi,
+    ...soldPayersClause(ranking),
+    prose('.'),
   ];
+}
+
+/**
+ * "I 186 € da 2 strumenti venduti restano fuori: non sono reddito su cui contare." — the
+ * Affidabilità footer's second sentence when the period's income includes sold positions.
+ * The tile measures the portfolio of today; the money was real and this says where it went.
+ */
+export function describeSoldIncomeNote(soldNet: number, soldPayerCount: number): Narrative | null {
+  if (soldPayerCount === 0 || soldNet <= 0) return null;
+  return [
+    prose(soldPayerCount === 1 ? 'I ' : 'I '),
+    figure(euro(soldNet)),
+    prose(
+      ` da ${soldPayerCount === 1 ? 'uno strumento venduto restano' : `${soldPayerCount} strumenti venduti restano`} fuori: non sono reddito su cui contare.`,
+    ),
+  ];
+}
+
+/**
+ * "10 dic", or "10 mar 2032" when the payment lands outside the current year — the date of a
+ * row in «Prossimi pagamenti». The BTP's final premium read «10 mar · 70 €» beside this year's
+ * coupons until 2026-09-14: a promise six years away printed like next month's.
+ */
+export function describeUpcomingDate(date: Date, now: Date): string {
+  const { year: currentYear } = getItalyMonthYear(now);
+  const { year, month } = getItalyMonthYear(date);
+  const base = `${date.getDate()} ${MONTH_NAMES[month - 1].slice(0, 3).toLowerCase()}`;
+  return year === currentYear ? base : `${base} ${year}`;
 }
 
 /**
@@ -516,6 +617,16 @@ const LARGEST_TYPE_PREFIX: Record<DividendType, string> = {
   coupon: 'la cedola ',
   finalPremium: 'il premio finale ',
 };
+
+/**
+ * «la cedola», «il dividendo», «l'acconto» — a payment named by its type WITH its article, for a
+ * sentence about one row («Elimina la cedola di BTP Valore del 10/12/2026»). The ordinary type,
+ * which the inventory's reading leaves unnamed, is «il dividendo» here: a row needs a noun.
+ */
+export function dividendTypeNoun(type: DividendType): string {
+  const prefix = LARGEST_TYPE_PREFIX[type].trim();
+  return prefix || 'il dividendo';
+}
 
 /**
  * "15 voci: 12 incassate (3.116 €) e 3 annunciate (712 €); la più grande è la cedola BTP Italia
@@ -668,7 +779,7 @@ export function describePayersFooter(upcomingNet: number): Narrative | null {
 export function describePaymentsFooter(): Narrative {
   return [
     prose(
-      'I dividendi recenti si scaricano da soli ogni giorno. Un importo in grigio è annunciato, non ancora incassato: i due totali restano separati.',
+      'I dividendi recenti si scaricano da soli ogni giorno. Un pagamento con il chip «Attesa» è annunciato, non ancora incassato: i due totali restano separati.',
     ),
   ];
 }

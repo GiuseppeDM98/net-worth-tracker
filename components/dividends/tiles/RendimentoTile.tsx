@@ -9,6 +9,7 @@ import { getMetricValueColor } from '@/lib/utils/metricColors';
 import { cn } from '@/lib/utils';
 import { Tile, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { NarrativeText } from '@/components/ui/narrative-text';
+import { READ_FAILURE_EYEBROW } from '@/lib/utils/statesNarrative';
 
 interface RendimentoTileProps {
   /** null while the server block is loading, or when no held instrument has a cost basis. */
@@ -65,9 +66,14 @@ export function RendimentoTile({ summary, reading, footer, isLoading, isError, c
       className={className}
     >
       {isError ? (
-        <p role="alert" className="mt-3 text-[13px] leading-[1.45] text-muted-foreground">
-          Le metriche di rendimento non sono disponibili in questo momento. Gli incassi qui sopra sono aggiornati.
-        </p>
+        // The third name of an absence (doc/guide/stati.md): it carries its own eyebrow so it
+        // never reads like «nothing recorded», whose sentence sits in the same place below.
+        <div role="alert" className="mt-3">
+          <p className={cn(TILE_SUB_EYEBROW_CLASS, 'mb-1.5')}>{READ_FAILURE_EYEBROW}</p>
+          <p className="text-[13px] leading-[1.45] text-foreground">
+            Le metriche di rendimento non sono state lette. Gli incassi qui sopra sono aggiornati.
+          </p>
+        </div>
       ) : isLoading ? (
         <div className="mt-4 space-y-3" aria-hidden="true">
           <Skeleton className="h-[22px] w-2/3" />

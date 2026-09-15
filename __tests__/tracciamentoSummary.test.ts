@@ -15,15 +15,18 @@ import type { Period } from '@/lib/utils/period';
 import { endOfMonthBound } from '@/lib/utils/dateHelpers';
 import {
   buildTrailingMonthFlows,
+  comparedDaysOfPreviousMonth,
   computePeriodDelta,
   currentComparisonWindow,
   filterExpensesByPeriod,
   isScheduledRow,
+  previousComparisonWindow,
   previousPeriod,
   rankCategories,
   resolveAnchorMonth,
   resolveFlowWindow,
   resolvePeriodCalendar,
+  settleTotals,
   splitSpendingAtDate,
   summarizeMovements,
   summarizePeriodCashflow,
@@ -472,13 +475,73 @@ describe('currentComparisonWindow', () => {
     expect(previous).toEqual({ kind: 'custom', from: new Date(2025, 0, 1), to: new Date(2025, 8, 0) });
   });
 
-  it('should be the period itself for a month and a closed year, and null for a custom range', () => {
-    expect(currentComparisonWindow(AUGUST, NOW)).toEqual(AUGUST);
+  it('should be the period itself for a closed month and a closed year, and null for a custom range', () => {
+    const july: Period = { kind: 'month', year: 2026, month: 7 };
+    expect(currentComparisonWindow(july, NOW)).toEqual(july);
+    expect(previousComparisonWindow(july, NOW)).toEqual({ kind: 'month', year: 2026, month: 6 });
     expect(currentComparisonWindow({ kind: 'year', year: 2024 }, NOW)).toEqual({ kind: 'year', year: 2024 });
     // Null exactly where previousPeriod is null: nothing to scope against.
     const custom: Period = { kind: 'custom', from: d(2026, 2), to: d(2026, 5) };
     expect(currentComparisonWindow(custom, NOW)).toBeNull();
+    expect(previousComparisonWindow(custom, NOW)).toBeNull();
     expect(previousPeriod(custom, NOW)).toBeNull();
+  });
+
+  it('should compare the month in progress with the same days of the previous month', () => {
+    // NOW is 22 August: 1–22 August against 1–22 July, never against the whole of July.
+    expect(currentComparisonWindow(AUGUST, NOW)).toEqual({ kind: 'custom', from: new Date(2026, 7, 1), to: new Date(2026, 7, 22) });
+    expect(previousComparisonWindow(AUGUST, NOW)).toEqual({ kind: 'custom', from: new Date(2026, 6, 1), to: new Date(2026, 6, 22) });
+    expect(comparedDaysOfPreviousMonth(AUGUST, NOW)).toBe(22);
+    // The projection's reference is untouched: last month WHOLE.
+    expect(previousPeriod(AUGUST, NOW)).toEqual({ kind: 'month', year: 2026, month: 7 });
+
+    // The 31st of October has no 31st of September to match: the previous window clamps to the 30th.
+    const october: Period = { kind: 'month', year: 2026, month: 10 };
+    const halloween = d(2026, 10, 31);
+    expect(previousComparisonWindow(october, halloween)).toEqual({ kind: 'custom', from: new Date(2026, 8, 1), to: new Date(2026, 8, 30) });
+    expect(comparedDaysOfPreviousMonth(october, halloween)).toBe(30);
+    // January in progress reaches back into the previous year.
+    expect(previousComparisonWindow({ kind: 'month', year: 2027, month: 1 }, d(2027, 1, 9))).toEqual({ kind: 'custom', from: new Date(2026, 11, 1), to: new Date(2026, 11, 9) });
+
+    // A month not yet begun has nothing lived to compare.
+    const november: Period = { kind: 'month', year: 2026, month: 11 };
+    expect(currentComparisonWindow(november, NOW)).toBeNull();
+    expect(previousComparisonWindow(november, NOW)).toBeNull();
+    expect(comparedDaysOfPreviousMonth(november, NOW)).toBeNull();
+    expect(comparedDaysOfPreviousMonth({ kind: 'year', year: 2026 }, NOW)).toBeNull();
+  });
+
+  it('should slice the two windows to the same days, both ends inclusive', () => {
+    const rows = [
+      makeExpense({ amount: -10, date: d(2026, 7, 5) }),
+      makeExpense({ amount: -20, date: new Date(2026, 6, 22, 23, 30) }), // the 22nd of July, late evening: in
+      makeExpense({ amount: -40, date: d(2026, 7, 28) }), // after the 22nd: out
+      makeExpense({ amount: -100, date: d(2026, 8, 3) }),
+      makeExpense({ amount: -200, date: d(2026, 8, 22) }),
+      makeExpense({ amount: -400, date: d(2026, 8, 29) }), // a scheduled instalment: out of the lived window
+    ];
+    const current = summarizePeriodCashflow(filterExpensesByPeriod(rows, currentComparisonWindow(AUGUST, NOW)!));
+    const previous = summarizePeriodCashflow(filterExpensesByPeriod(rows, previousComparisonWindow(AUGUST, NOW)!));
+    expect(current.expenses).toBe(300);
+    expect(previous.expenses).toBe(30);
+  });
+});
+
+describe('settleTotals', () => {
+  it('should take the scheduled slice out of the totals and re-derive rate and coverage', () => {
+    const totals = summarizePeriodCashflow([
+      makeExpense({ type: 'income', amount: 2758, date: d(2026, 9, 15) }),
+      makeExpense({ type: 'income', amount: 302, date: d(2026, 9, 2) }),
+      makeExpense({ amount: -656, date: d(2026, 9, 10) }),
+      makeExpense({ amount: -1297, date: d(2026, 9, 30) }),
+      makeExpense({ type: 'transfer', amount: 100, date: d(2026, 9, 3) }),
+    ]);
+    const settled = settleTotals(totals, { count: 3, expenses: 1297, income: 2758, throughMonth: 9 });
+    expect(settled).toEqual({ income: 302, expenses: 656, net: -354, savingsRate: ((302 - 656) / 302) * 100, coverageRatio: 302 / 656, transferCount: 1 });
+    // Nothing scheduled → the totals themselves.
+    expect(settleTotals(totals, { count: 0, expenses: 0, income: 0, throughMonth: null })).toEqual(totals);
+    // The lived part can be empty while the period is not: null rate, no coverage.
+    expect(settleTotals(totals, { count: 5, expenses: 1953, income: 3060, throughMonth: 9 })).toMatchObject({ income: 0, expenses: 0, savingsRate: null, coverageRatio: null });
   });
 });
 

@@ -1,6 +1,8 @@
 'use client';
 
-import { CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
+import { CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { motion, useReducedMotion } from 'framer-motion';
 import { cardItem, springLayoutTransition, staggerContainer } from '@/lib/utils/motionVariants';
 import { useAuth } from '@/contexts/AuthContext';
@@ -27,7 +29,9 @@ import { useChartColors } from '@/lib/hooks/useChartColors';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { ASSET_CLASS_CHART_INDEX } from '@/lib/utils/allocationUtils';
 import { filterSparklineByPeriod } from '@/lib/utils/sparklinePeriod';
-import { buildOverviewVerdict } from '@/lib/utils/overviewNarrative';
+import { buildOverviewVerdict, rankingFromOverview } from '@/lib/utils/overviewNarrative';
+import { describeCategoryShare } from '@/lib/utils/cashflowNarrative';
+import type { DashboardOverviewCategoryAmount } from '@/types/dashboardOverview';
 import { cn } from '@/lib/utils';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -59,7 +63,7 @@ const MotionButtonShell = motion.div;
  *                    Obiettivo → Spese → Entrate → Asset principali
  *   Desktop (12 col): Patrimonio(5, 2 rows) | Sintesi(3) | Cashflow(4)
  *                                           | Composizione(3) | Costi(2) | Obiettivo(2)
- *                     Spese(4) | Entrate(3) | Asset principali(5)
+ *                     Spese(4) | Entrate(4) | Asset principali(4)
  *
  * Data still flows through the single overview payload (`useDashboardOverview`); the verdict
  * and every reading are derived from it, nothing is fetched separately.
@@ -80,6 +84,19 @@ export default function DashboardPage() {
   const { ownerId } = useActiveAccount();
   const isDemo = useDemoMode();
   const prefersReducedMotion = useReducedMotion();
+  const router = useRouter();
+
+  // A category row opens its Scheda on Analisi — the same three flat params the Scheda writes
+  // to the URL itself (doc/guide/cashflow-analisi.md). A payload from before source version 17
+  // carries no type: the row stays a row, never a link to nowhere.
+  const openCategoryInAnalisi = useCallback(
+    (category: DashboardOverviewCategoryAmount) => {
+      if (!category.categoryKey || !category.expenseType) return;
+      const params = new URLSearchParams({ focusType: category.expenseType, focusCat: category.categoryKey });
+      router.push(`/dashboard/analisi?${params.toString()}`);
+    },
+    [router],
+  );
 
   // ─── Header: greeting + today's date, both in Italian wall-clock time ─────────
   const header = useMemo(() => {
@@ -171,6 +188,7 @@ export default function DashboardPage() {
       savingsRate,
       marketEffect: overview.marketEffect ?? null,
       topMover: overview.topMovers?.[0] ?? null,
+      sales: overview.monthSales ?? null,
     });
   }, [overview, today.month, totalValue, savingsRate]);
 
@@ -297,6 +315,32 @@ export default function DashboardPage() {
 
   const costsVisible = overview.flags.hasTERTracking || overview.flags.hasStampDuty;
   const expenseStats = overview.expenseStats;
+  // The two category tiles read the concentration the way Tracciamento does («Il 29% va in
+  // Mutuo; le prime tre fanno il 68%»), and each closes on the page that owns the depth.
+  const expenseReading = expenseStats
+    ? describeCategoryShare(rankingFromOverview(expenseStats.topExpenseCategories, expenseStats.currentMonth.expenses), 'expenses')
+    : null;
+  const incomeReading = expenseStats
+    ? describeCategoryShare(rankingFromOverview(expenseStats.topIncomeCategories, expenseStats.currentMonth.income), 'income')
+    : null;
+  const analisiFooter = (
+    <>
+      Tutte le categorie in{' '}
+      <Link href="/dashboard/analisi" className="text-foreground underline-offset-2 hover:underline">
+        Analisi
+      </Link>
+      .
+    </>
+  );
+  const allocazioneFooter = (
+    <>
+      Il piano in{' '}
+      <Link href="/dashboard/allocation" className="text-foreground underline-offset-2 hover:underline">
+        Allocazione
+      </Link>
+      .
+    </>
+  );
   // Old cached payloads carry only the featured goal; the list supersedes it when present.
   const goals = overview.goalProgressList ?? (overview.goalProgress ? [overview.goalProgress] : []);
 
@@ -374,7 +418,7 @@ export default function DashboardPage() {
             variants={cardItem}
             className={cn(CELL_CLASS, 'order-3 desktop:order-none desktop:col-span-3')}
           >
-            <ComposizioneTile data={assetClassData} />
+            <ComposizioneTile data={assetClassData} footer={allocazioneFooter} />
           </motion.div>
 
           {costsVisible && (
@@ -418,20 +462,26 @@ export default function DashboardPage() {
                   eyebrow="Spese per categoria"
                   total={expenseStats.currentMonth.expenses}
                   categories={expenseStats.topExpenseCategories}
+                  reading={expenseReading}
                   color="var(--chart-1)"
                   emptyCopy="Nessuna spesa registrata questo mese."
+                  onSelectCategory={openCategoryInAnalisi}
+                  footer={analisiFooter}
                 />
               </motion.div>
               <motion.div
                 variants={cardItem}
-                className={cn(CELL_CLASS, 'order-7 desktop:order-none desktop:col-span-3')}
+                className={cn(CELL_CLASS, 'order-7 desktop:order-none desktop:col-span-4')}
               >
                 <CategoryTile
                   eyebrow="Entrate per categoria"
                   total={expenseStats.currentMonth.income}
                   categories={expenseStats.topIncomeCategories}
+                  reading={incomeReading}
                   color="var(--chart-2)"
                   emptyCopy="Nessuna entrata registrata questo mese."
+                  onSelectCategory={openCategoryInAnalisi}
+                  footer={analisiFooter}
                 />
               </motion.div>
             </>
@@ -442,7 +492,9 @@ export default function DashboardPage() {
             className={cn(
               CELL_CLASS,
               'order-8 desktop:order-none tablet:col-span-2',
-              expenseStats ? 'desktop:col-span-5' : 'desktop:col-span-12',
+              // Three equal tiles on the third row (4 · 4 · 4): at 3 columns the income tile
+              // could not hold a label, a 40px bar and two figures without overflowing its row.
+              expenseStats ? 'desktop:col-span-4' : 'desktop:col-span-12',
             )}
           >
             <AssetPrincipaliTile

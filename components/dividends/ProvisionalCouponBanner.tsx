@@ -1,7 +1,7 @@
 /**
- * ProvisionalCouponBanner — inflation-linked coupons materialized at the guaranteed fixed
- * floor, still waiting for their announced FOI rate, so the recurring (≈ semestral) update is
- * never forgotten.
+ * ProvisionalCouponBanner — inflation-linked coupons materialized before their period's datum
+ * is known (a BTP Italia at the guaranteed fixed floor, a BTP€i at the latest known coefficient),
+ * so the recurring (≈ semestral) update is never forgotten.
  *
  * Since the 2026-08-23 redesign it lives INSIDE the Pagamenti tile, above the toolbar, and it
  * is painted with the warning TOKENS (`--warning`, `--warning-border`, `--warning-foreground`)
@@ -34,11 +34,12 @@ export function ProvisionalCouponBanner({ coupons, isDemo, onSelect }: Provision
         <div className="space-y-0.5 text-warning-foreground">
           <p className="text-[13px] font-semibold">
             {coupons.length === 1
-              ? 'Una cedola in attesa del tasso di inflazione.'
-              : `${coupons.length} cedole in attesa del tasso di inflazione.`}
+              ? "Una cedola in attesa del dato d'inflazione."
+              : `${coupons.length} cedole in attesa del dato d'inflazione.`}
           </p>
           <p className="text-[12px] leading-[1.45] opacity-90">
-            Calcolata al solo tasso fisso garantito. Inserisci il tasso FOI del periodo annunciato per ricalcolarla.
+            Calcolata senza il dato del periodo: il solo tasso fisso per un BTP Italia, l&apos;ultimo coefficiente
+            noto per un BTP€i. Inserisci il tasso FOI o il coefficiente annunciato per ricalcolarla.
           </p>
         </div>
         <ul className="flex flex-col divide-y divide-warning-border">
@@ -60,11 +61,11 @@ export function ProvisionalCouponBanner({ coupons, isDemo, onSelect }: Provision
                 className="h-8 shrink-0 border-warning-border bg-transparent text-warning-foreground hover:bg-warning-border/30"
                 aria-label={
                   isDemo
-                    ? 'Imposta tasso — non disponibile in modalità demo'
-                    : `Imposta il tasso FOI per ${coupon.assetTicker || coupon.assetName}`
+                    ? 'Imposta inflazione — non disponibile in modalità demo'
+                    : `Imposta il dato d'inflazione per ${coupon.assetTicker || coupon.assetName}`
                 }
               >
-                Imposta tasso
+                Imposta inflazione
               </Button>
             </li>
           ))}

@@ -21,6 +21,11 @@ import {
   upsertAnnouncedInflationRate,
   resolveCoupon,
   buildCouponNote,
+  hasCouponPayments,
+  resolveInflationIndexation,
+  findIndexationCoefficient,
+  latestIndexationCoefficient,
+  upsertIndexationCoefficient,
 } from '@/lib/utils/couponUtils';
 import type { CouponRateTier, BondDetails } from '@/types/assets';
 
@@ -345,5 +350,175 @@ describe('buildCouponNote', () => {
     };
     const note = buildCouponNote(resolveCoupon(FIRST_COUPON, withRate, 1000), 'semiannual');
     expect(note).toBe('Cedola semestrale — fisso 0,75% + inflazione FOI 1,3% = 2,05% del nominale');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Zero-coupon bonds (issue #340) and the mechanism reader
+// ---------------------------------------------------------------------------
+
+describe('hasCouponPayments', () => {
+  it('is false for a zero-coupon bond (rate 0, no tiers)', () => {
+    expect(hasCouponPayments({ couponRate: 0 })).toBe(false);
+    expect(hasCouponPayments({ couponRate: 0, couponRateSchedule: [] })).toBe(false);
+  });
+
+  it('is true for any positive base rate or any positive tier', () => {
+    expect(hasCouponPayments({ couponRate: 2.6 })).toBe(true);
+    expect(hasCouponPayments({ couponRate: 0, couponRateSchedule: [{ yearFrom: 1, yearTo: 2, rate: 0 }, { yearFrom: 3, yearTo: 4, rate: 1 }] })).toBe(true);
+  });
+});
+
+describe('resolveInflationIndexation', () => {
+  it('reads the new field first, the legacy flag as italia, and nothing as null', () => {
+    expect(resolveInflationIndexation({ inflationIndexation: 'euro' })).toBe('euro');
+    expect(resolveInflationIndexation({ inflationIndexation: 'italia' })).toBe('italia');
+    expect(resolveInflationIndexation({ isInflationLinked: true })).toBe('italia');
+    expect(resolveInflationIndexation({ inflationIndexation: 'euro', isInflationLinked: true })).toBe('euro');
+    expect(resolveInflationIndexation({})).toBeNull();
+    expect(resolveInflationIndexation({ isInflationLinked: false })).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// BTP€i (issue #341): coefficient lookups and the multiplicative coupon
+// ---------------------------------------------------------------------------
+
+// BTP€i 0,40% 15/05/2030 (IT0005387052): real 0.40% annual, semiannual, nominal 1 € per unit.
+const EURO_BOND: BondDetails = {
+  couponRate: 0.4,
+  couponFrequency: 'semiannual',
+  issueDate: new Date(2019, 10, 15),  // 15/11/2019
+  maturityDate: new Date(2030, 4, 15), // 15/05/2030
+  inflationIndexation: 'euro',
+};
+const MAY_COUPON = new Date(2026, 4, 15);  // 15/05/2026
+const NOV_COUPON = new Date(2026, 10, 15); // 15/11/2026
+
+describe('findIndexationCoefficient', () => {
+  it('returns null for undefined or empty lists', () => {
+    expect(findIndexationCoefficient(undefined, MAY_COUPON)).toBeNull();
+    expect(findIndexationCoefficient([], MAY_COUPON)).toBeNull();
+  });
+
+  it('prefers the entry of the exact day over a same-month refresh', () => {
+    const entries = [
+      { date: new Date(2026, 4, 15), coefficient: 1.2 },
+      { date: new Date(2026, 4, 20), coefficient: 1.21 },
+    ];
+    expect(findIndexationCoefficient(entries, MAY_COUPON)).toBe(1.2);
+  });
+
+  it('falls back to the latest entry of the same month when the day drifts', () => {
+    const entries = [
+      { date: new Date(2026, 4, 3), coefficient: 1.19 },
+      { date: new Date(2026, 4, 20), coefficient: 1.21 },
+    ];
+    expect(findIndexationCoefficient(entries, MAY_COUPON)).toBe(1.21);
+  });
+
+  it('returns null when no entry shares the coupon month', () => {
+    expect(findIndexationCoefficient([{ date: new Date(2026, 10, 15), coefficient: 1.25 }], MAY_COUPON)).toBeNull();
+  });
+});
+
+describe('latestIndexationCoefficient', () => {
+  const entries = [
+    { date: new Date(2026, 10, 15), coefficient: 1.25 },
+    { date: new Date(2026, 4, 15), coefficient: 1.2 },
+  ];
+
+  it('returns the latest entry at or before the date, whatever the array order', () => {
+    expect(latestIndexationCoefficient(entries, new Date(2026, 8, 11))).toBe(1.2);
+    expect(latestIndexationCoefficient(entries, new Date(2026, 10, 15))).toBe(1.25);
+    expect(latestIndexationCoefficient(entries, new Date(2027, 0, 1))).toBe(1.25);
+  });
+
+  it('returns null before the first known entry', () => {
+    expect(latestIndexationCoefficient(entries, new Date(2026, 0, 1))).toBeNull();
+    expect(latestIndexationCoefficient(undefined, new Date(2026, 8, 11))).toBeNull();
+  });
+});
+
+describe('upsertIndexationCoefficient', () => {
+  it('replaces the entry of the same day and keeps the list sorted', () => {
+    const existing = [
+      { date: new Date(2026, 10, 15), coefficient: 1.25 },
+      { date: new Date(2026, 4, 15), coefficient: 1.2 },
+    ];
+    const result = upsertIndexationCoefficient(existing, new Date(2026, 4, 15), 1.201);
+    expect(result).toEqual([
+      { date: new Date(2026, 4, 15), coefficient: 1.201 },
+      { date: new Date(2026, 10, 15), coefficient: 1.25 },
+    ]);
+  });
+
+  it('keeps a same-month entry of another day (a coupon and a refresh both survive)', () => {
+    const result = upsertIndexationCoefficient([{ date: new Date(2026, 4, 15), coefficient: 1.2 }], new Date(2026, 4, 20), 1.21);
+    expect(result).toHaveLength(2);
+  });
+});
+
+describe('resolveCoupon — euro indexation (BTP€i)', () => {
+  it('multiplies the real per-period rate by the coefficient announced for the payment date', () => {
+    // 0.4 % / 2 = 0.2 % of 1 € × 1.25 = 0,0025 € per unit → 12,50 € on 5.000 € nominal
+    const withCoefficient: BondDetails = { ...EURO_BOND, indexationCoefficients: [{ date: MAY_COUPON, coefficient: 1.25 }] };
+    const resolved = resolveCoupon(MAY_COUPON, withCoefficient, 1);
+    expect(resolved.indexation).toBe('euro');
+    expect(resolved.perShare).toBeCloseTo(0.0025, 10);
+    expect(resolved.perShare * 5000).toBeCloseTo(12.5, 8);
+    expect(resolved.indexationCoefficient).toBe(1.25);
+    expect(resolved.inflationPeriodRate).toBeNull();
+    expect(resolved.isProvisional).toBe(false);
+  });
+
+  it('is provisional at the LATEST KNOWN coefficient when the payment date has none yet', () => {
+    const known: BondDetails = { ...EURO_BOND, indexationCoefficients: [{ date: MAY_COUPON, coefficient: 1.25 }] };
+    const resolved = resolveCoupon(NOV_COUPON, known, 1000);
+    expect(resolved.isProvisional).toBe(true);
+    expect(resolved.indexationCoefficient).toBe(1.25);
+    expect(resolved.perShare).toBeCloseTo(2.5, 8); // 0.2 % × 1000 × 1.25
+  });
+
+  it('is provisional at par when no coefficient was ever entered', () => {
+    const resolved = resolveCoupon(MAY_COUPON, EURO_BOND, 1000);
+    expect(resolved.isProvisional).toBe(true);
+    expect(resolved.indexationCoefficient).toBe(1);
+    expect(resolved.perShare).toBeCloseTo(2, 8);
+  });
+
+  it('never adds a FOI rate to a euro-indexed bond even if one is present', () => {
+    const mixed: BondDetails = {
+      ...EURO_BOND,
+      indexationCoefficients: [{ date: MAY_COUPON, coefficient: 1.25 }],
+      announcedInflationRates: [{ couponDate: MAY_COUPON, periodRate: 5 }],
+    };
+    expect(resolveCoupon(MAY_COUPON, mixed, 1).perShare).toBeCloseTo(0.0025, 10);
+  });
+
+  it('still resolves a legacy BTP Italia document (isInflationLinked, no inflationIndexation) additively', () => {
+    const legacy: BondDetails = { ...INFLATION_BOND, announcedInflationRates: [{ couponDate: FIRST_COUPON, periodRate: 1.3 }] };
+    const resolved = resolveCoupon(FIRST_COUPON, legacy, 1000);
+    expect(resolved.indexation).toBe('italia');
+    expect(resolved.perShare).toBeCloseTo(20.5, 6);
+  });
+});
+
+describe('buildCouponNote — euro indexation', () => {
+  it('names the real rate, the coefficient and the product for a finalized coupon', () => {
+    const withCoefficient: BondDetails = { ...EURO_BOND, indexationCoefficients: [{ date: MAY_COUPON, coefficient: 1.25 }] };
+    const note = buildCouponNote(resolveCoupon(MAY_COUPON, withCoefficient, 1), 'semiannual');
+    expect(note).toBe('Cedola semestrale — tasso reale 0,2% × coefficiente di indicizzazione 1,25 = 0,25% del nominale');
+  });
+
+  it('says which coefficient a provisional coupon is estimated at', () => {
+    const known: BondDetails = { ...EURO_BOND, indexationCoefficients: [{ date: MAY_COUPON, coefficient: 1.23456 }] };
+    const note = buildCouponNote(resolveCoupon(NOV_COUPON, known, 1), 'semiannual');
+    expect(note).toBe("Cedola provvisoria semestrale — tasso reale 0,2% all'ultimo coefficiente noto 1,23456 (in attesa del coefficiente di indicizzazione alla data di stacco)");
+  });
+
+  it('says that no coefficient was entered when the estimate is at par', () => {
+    const note = buildCouponNote(resolveCoupon(MAY_COUPON, EURO_BOND, 1), 'semiannual');
+    expect(note).toContain('al coefficiente 1 (nessun coefficiente inserito)');
   });
 });

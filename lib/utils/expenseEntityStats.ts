@@ -321,10 +321,34 @@ export function buildEntitySubCategoryDeltas(
     );
 }
 
+/**
+ * The page period as the run-rate reads it. `throughMonth` cuts a year at a month («Da inizio
+ * anno» stops at the end of today's month); absent or null, the year runs to December.
+ */
+export interface EntityRunRatePeriod {
+  year: number | null;
+  month: number | null;
+  throughMonth?: number | null;
+}
+
 export interface EntityRunRate {
-  /** Entity magnitude over the page period. */
+  /** Entity magnitude over the page period — the calendar included, like every period total. */
   periodTotal: number;
-  /** periodTotal / elapsed months in the period; null for the all-history period. */
+  /**
+   * The part of `periodTotal` that has happened: months at or before `now`. Equal to the total
+   * for a closed period; smaller for a running year that carries materialised future rows.
+   */
+  livedTotal: number;
+  /**
+   * Months of the period at or before `now` — what `livedTotal` is spread over (12 for a closed
+   * year, today's month for the running one, 1 for a month); null for the all-history period.
+   */
+  livedMonths: number | null;
+  /**
+   * livedTotal / livedMonths — the pace actually held, never a calendar total divided by the
+   * months lived (on the real account that printed «746 € al mese» for a 559 € mortgage:
+   * twelve months of instalments over nine months, 2026-09-14). Null for the all-history period.
+   */
   periodMonthlyAverage: number | null;
   /** Entity magnitude over the trailing 12-month window ending at now (inclusive). */
   trailing12Total: number;
@@ -335,7 +359,13 @@ export interface EntityRunRate {
    * UI so a short window is never silently presented as a full year.
    */
   observedMonths: number;
-  /** (periodTotal / now.month) × 12, only when the period is the current year with no month; else null. */
+  /**
+   * Where the running year lands: the lived total plus, for the months still ahead, the larger
+   * of what the calendar already holds and the lived pace. The calendar is a FLOOR (a fixed
+   * charge writes its future rows, so the pace would only restate them), the pace the estimate
+   * for what is not written yet — never both, which double-counted every instalment. Only for
+   * the current year without a month or a cut; null otherwise.
+   */
   currentYearProjection: number | null;
   /**
    * periodTotal as a share (0-1) of the same-side period total: all income magnitude
@@ -349,13 +379,17 @@ export interface EntityRunRate {
  * The run-rate strip: what the entity costs (or yields) per period, per month, and on a
  * trailing-12 basis.
  *
- * Elapsed months in the period: 1 for a single month, now.month for the current year,
- * 12 for a completed year. The all-history period ({null, null}) is floored at
- * historyStartYear and has no meaningful monthly average or projection.
+ * A period is its whole calendar span (the Tracciamento rule: a running year holds its
+ * materialised instalments to December), so the total is split at `now` into what has happened
+ * and what is still in the calendar, and the pace divides the FIRST by the months lived: 1 for
+ * a single month, today's month for the running year (or `throughMonth` when the period is cut
+ * there), 12 for a completed year. The all-history period ({null, null}) is floored at
+ * historyStartYear, CLOSES on the current year (a plan reaching 2043 is not history) and has no
+ * monthly average or projection.
  *
  * @param expenses         Every row available — also the pool for the same-side denominator.
  * @param scope            The entity (category, optional subcategory) — keyed by id.
- * @param period           Page period state: {y, m} single month · {y, null} year · {null, null} all history.
+ * @param period           Page period state: {y, m} single month · {y, null} year · {null, null} all history, with an optional month cut.
  * @param historyStartYear Global data floor; rows before January of this year are ignored.
  * @param now              Current Italy-timezone year/month (month 1-12), resolved by the caller.
  * @param monthOf          Injected month resolver for a row (month 1-12).
@@ -363,31 +397,44 @@ export interface EntityRunRate {
 export function computeEntityRunRate(
   expenses: Expense[],
   scope: EntityScope,
-  period: { year: number | null; month: number | null },
+  period: EntityRunRatePeriod,
   historyStartYear: number,
   now: { year: number; month: number },
   monthOf: (expense: Expense) => { year: number; month: number }
 ): EntityRunRate {
   const entityRows = selectExpensesForDrillDown(expenses, scope.category, scope.subCategory);
   const entityByMonth = sumEntityByMonth(entityRows, historyStartYear, monthOf);
+  const throughMonth = period.throughMonth ?? null;
 
   const isInPeriod = (when: { year: number; month: number }): boolean => {
     if (when.year < historyStartYear) return false;
-    if (period.year === null) return true;
+    // The history has a start and an end: the current year, calendar included.
+    if (period.year === null) return when.year <= now.year;
     if (when.year !== period.year) return false;
-    return period.month === null || when.month === period.month;
+    if (period.month !== null) return when.month === period.month;
+    return throughMonth === null || when.month <= throughMonth;
   };
+  const isLived = (when: { year: number; month: number }): boolean => toMonthIndex(when) <= toMonthIndex(now);
 
   let periodTotal = 0;
+  let livedTotal = 0;
   for (const row of entityRows) {
-    if (isInPeriod(monthOf(row))) periodTotal += magnitude(row);
+    const when = monthOf(row);
+    if (!isInPeriod(when)) continue;
+    const amount = magnitude(row);
+    periodTotal += amount;
+    if (isLived(when)) livedTotal += amount;
   }
 
-  let periodMonthlyAverage: number | null = null;
+  // Guide comment: the months the lived total is spread over — a future period has none.
+  let livedMonths: number | null = null;
   if (period.year !== null) {
-    const elapsedMonths = period.month !== null ? 1 : period.year === now.year ? now.month : 12;
-    periodMonthlyAverage = periodTotal / elapsedMonths;
+    if (period.month !== null) livedMonths = isLived({ year: period.year, month: period.month }) ? 1 : 0;
+    else if (period.year < now.year) livedMonths = 12;
+    else if (period.year > now.year) livedMonths = 0;
+    else livedMonths = Math.min(now.month, throughMonth ?? 12);
   }
+  const periodMonthlyAverage = livedMonths !== null && livedMonths > 0 ? livedTotal / livedMonths : null;
 
   // Trailing window: walk 12 calendar months back from now; months below the floor are
   // not observed, so they shrink the average's denominator instead of diluting it.
@@ -402,8 +449,13 @@ export function computeEntityRunRate(
   }
   const trailing12MonthlyAverage = observedMonths > 0 ? trailing12Total / observedMonths : 0;
 
-  const currentYearProjection =
-    period.year === now.year && period.month === null ? (periodTotal / now.month) * 12 : null;
+  // The calendar ahead is a floor under the pace, not an addition to it (see EntityRunRate).
+  let currentYearProjection: number | null = null;
+  if (period.year === now.year && period.month === null && throughMonth === null && periodMonthlyAverage !== null) {
+    const monthsAhead = 12 - now.month;
+    const scheduledAhead = periodTotal - livedTotal;
+    currentYearProjection = livedTotal + Math.max(scheduledAhead, periodMonthlyAverage * monthsAhead);
+  }
 
   // Same-side denominator: income entities are compared to all income, everything else
   // to all spending — sign never enters the classification, only `type` does.
@@ -419,6 +471,8 @@ export function computeEntityRunRate(
 
   return {
     periodTotal,
+    livedTotal,
+    livedMonths,
     periodMonthlyAverage,
     trailing12Total,
     trailing12MonthlyAverage,

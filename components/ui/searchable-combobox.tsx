@@ -28,6 +28,10 @@ interface SearchableComboboxProps {
   onCreateOption?: (searchQuery: string) => void;
   /** Label for the create item when no search query is typed (default: "Aggiungi"). */
   createOptionLabel?: string;
+  /** A refused field: the input takes `aria-invalid`, so a form's refusal can mark and focus it. */
+  'aria-invalid'?: boolean;
+  /** Extra classes on the input — a 44px height on a phone, where the modal is a drawer. */
+  className?: string;
 }
 
 /**
@@ -60,6 +64,8 @@ export function SearchableCombobox({
   id,
   onCreateOption,
   createOptionLabel = 'Aggiungi',
+  'aria-invalid': ariaInvalid,
+  className,
 }: Readonly<SearchableComboboxProps>) {
   // === State Management ===
 
@@ -165,13 +171,14 @@ export function SearchableCombobox({
         )}
         <Input
           id={id}
+          aria-invalid={ariaInvalid || undefined}
           placeholder={isFocused ? searchPlaceholder : placeholder}
           value={displayValue}
           onChange={handleSearchChange}
           onFocus={handleFocus}
           onBlur={handleBlur}
           disabled={disabled}
-          className={selectedIcon ? 'pl-9' : undefined}
+          className={cn(selectedIcon && 'pl-9', className)}
         />
         {isFocused && isDropdownOpen && !disabled && (
           // Use bg-popover + border-border to match the shadcn Select dropdown appearance

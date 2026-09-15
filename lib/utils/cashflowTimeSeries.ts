@@ -61,6 +61,15 @@ function isExpenseRecord(expense: Expense): boolean {
   return expense.type !== 'income' && expense.type !== 'transfer';
 }
 
+/**
+ * The last bucket an axis may reach — today's month (the running year, calendar included, is
+ * still drawn: a year bucket closes on December). Absent, the axis runs to the last row.
+ */
+export interface BucketCeiling {
+  year: number;
+  month: number;
+}
+
 /** Bucket key for a date at the requested granularity. Month is zero-padded to sort lexically. */
 function bucketKeyFor(year: number, month: number, granularity: TimeGranularity): string {
   return granularity === 'year' ? `${year}` : `${year}-${String(month).padStart(2, '0')}`;
@@ -85,6 +94,7 @@ function buildBucketAxis(
   relevant: Expense[],
   granularity: TimeGranularity,
   historyStartYear: number,
+  ceiling?: BucketCeiling,
 ): Array<{ key: string; label: string; year: number; month: number }> {
   if (relevant.length === 0) return [];
 
@@ -114,6 +124,13 @@ function buildBucketAxis(
     minYear = historyStartYear;
     minMonth = 1;
   }
+  // Clamp the upper bound to the ceiling: a materialised instalment plan reaching 2043 is a
+  // calendar, not history, and drew seventeen empty years on the real account (2026-09-14).
+  if (ceiling && (maxYear > ceiling.year || (maxYear === ceiling.year && maxMonth > ceiling.month))) {
+    maxYear = ceiling.year;
+    maxMonth = granularity === 'year' ? 12 : ceiling.month;
+  }
+  if (maxYear < minYear || (maxYear === minYear && maxMonth < minMonth)) return [];
 
   const axis: Array<{ key: string; label: string; year: number; month: number }> = [];
 
@@ -152,13 +169,14 @@ export function buildTimeBuckets(
   expenses: Expense[],
   granularity: TimeGranularity,
   historyStartYear: number,
+  ceiling?: BucketCeiling,
 ): TimeBucket[] {
   // Exclude transfers (net-zero) and anything before the history floor.
   const relevant = expenses.filter(
     (e) => e.type !== 'transfer' && getItalyYear(toDate(e.date)) >= historyStartYear,
   );
 
-  const axis = buildBucketAxis(relevant, granularity, historyStartYear);
+  const axis = buildBucketAxis(relevant, granularity, historyStartYear, ceiling);
   if (axis.length === 0) return [];
 
   // Seed an accumulator per bucket key so empty buckets stay at zero.
@@ -212,13 +230,14 @@ export function buildCategoryTimeSeries(
   chartType: 'income' | 'expenses',
   historyStartYear: number,
   topN = 6,
+  ceiling?: BucketCeiling,
 ): CategoryTimeSeries {
   const relevant = expenses.filter((e) => {
     if (getItalyYear(toDate(e.date)) < historyStartYear) return false;
     return chartType === 'income' ? e.type === 'income' : isExpenseRecord(e);
   });
 
-  const axis = buildBucketAxis(relevant, granularity, historyStartYear);
+  const axis = buildBucketAxis(relevant, granularity, historyStartYear, ceiling);
   if (axis.length === 0) return { buckets: [], series: [] };
 
   // Index each bucket key to its position so we can scatter values into arrays.
@@ -352,12 +371,13 @@ export function buildTypeTimeSeries(
   expenses: Expense[],
   granularity: TimeGranularity,
   historyStartYear: number,
+  ceiling?: BucketCeiling,
 ): CategoryTimeSeries {
   const relevant = expenses.filter(
     (e) => isExpenseRecord(e) && getItalyYear(toDate(e.date)) >= historyStartYear,
   );
 
-  const axis = buildBucketAxis(relevant, granularity, historyStartYear);
+  const axis = buildBucketAxis(relevant, granularity, historyStartYear, ceiling);
   if (axis.length === 0) return { buckets: [], series: [] };
 
   const bucketIndex = new Map<string, number>();

@@ -7,6 +7,7 @@ import { formatPercentage } from '@/lib/services/chartService';
 import { cn } from '@/lib/utils';
 import { Tile, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { NarrativeText } from '@/components/ui/narrative-text';
+import { EmptyState } from '@/components/ui/empty-state';
 import { describeReliabilityWindow } from '@/lib/utils/dividendiNarrative';
 import { MONTH_NAMES } from '@/lib/constants/months';
 
@@ -16,6 +17,8 @@ interface AffidabilitaTileProps {
   /** How many of the window's months paid; empty when the window is too long to draw. */
   months: CoverageMonth[];
   footer: Narrative | null;
+  /** The absence in one sentence when nothing was measured — never «Copertura 0%». */
+  emptyCopy: string;
   className?: string;
 }
 
@@ -31,14 +34,26 @@ const KPI_VALUE_CLASS = 'font-mono text-[22px] font-bold leading-none tracking-[
  * draw, and then the KPIs answer alone: a slice of the window under a KPI measured on all of
  * it would put two windows in one tile.
  */
-export function AffidabilitaTile({ reliability, reading, months, footer, className }: AffidabilitaTileProps) {
+export function AffidabilitaTile({ reliability, reading, months, footer, emptyCopy, className }: AffidabilitaTileProps) {
   const coverage = reliability.coveragePct * 100;
   const topShare = reliability.topPayerSharePct * 100;
+  const measured = reliability.payerCount > 0;
+
+  // The tile's question is in the present tense, so its aside says whose income it measures.
+  const aside: Narrative = [...describeReliabilityWindow(reliability.monthsInWindow), { text: ' · in portafoglio' }];
+
+  if (!measured) {
+    return (
+      <Tile eyebrow="Affidabilità" aside={<NarrativeText segments={aside} figureClassName="font-medium" />} className={className}>
+        <EmptyState className="mt-3" message={emptyCopy} />
+      </Tile>
+    );
+  }
 
   return (
     <Tile
       eyebrow="Affidabilità"
-      aside={<NarrativeText segments={describeReliabilityWindow(reliability.monthsInWindow)} figureClassName="font-medium" />}
+      aside={<NarrativeText segments={aside} figureClassName="font-medium" />}
       reading={reading}
       className={className}
     >
@@ -57,10 +72,12 @@ export function AffidabilitaTile({ reliability, reading, months, footer, classNa
 
       {months.length >= 2 && (
         <div className="mt-4">
+          {/* The amounts live in the accessible name, not in a `title` (AGENTS.md → Accessibility:
+              a tooltip is not a name and never opens on touch). */}
           <div
             role="img"
-            aria-label={`Mesi con almeno un incasso: ${months
-              .map((m) => `${MONTH_NAMES[m.month - 1].toLowerCase()} ${m.paid ? 'sì' : 'no'}`)
+            aria-label={`Incasso per mese: ${months
+              .map((m) => `${MONTH_NAMES[m.month - 1].toLowerCase()} ${m.year} ${m.paid ? cachedFormatCurrencyEUR(m.net, true) : 'niente'}`)
               .join(', ')}.`}
             className="grid gap-1"
             style={{ gridTemplateColumns: `repeat(${months.length}, minmax(0, 1fr))` }}
@@ -68,9 +85,6 @@ export function AffidabilitaTile({ reliability, reading, months, footer, classNa
             {months.map((month) => (
               <span
                 key={month.key}
-                title={`${MONTH_NAMES[month.month - 1]} ${month.year}: ${
-                  month.paid ? cachedFormatCurrencyEUR(month.net, true) : 'nessun incasso'
-                }`}
                 className="h-[22px] rounded-[3px]"
                 style={{ background: month.paid ? 'var(--chart-2)' : 'var(--muted)' }}
               />
@@ -82,9 +96,10 @@ export function AffidabilitaTile({ reliability, reading, months, footer, classNa
             aria-hidden="true"
           >
             {months.map((month) => (
-              <span key={month.key} className="text-center font-mono text-[10px] tabular-nums text-muted-foreground">
-                {/* One letter per month: twelve three-letter labels do not fit a 3-column tile. */}
-                {month.label.charAt(0)}
+              <span key={month.key} className="truncate text-center font-mono text-[10px] tabular-nums text-muted-foreground">
+                {/* Three letters up to a year (twelve fit a 3-column tile at 10px mono); past
+                    that one letter per month, and the accessible name above carries the rest. */}
+                {months.length <= 12 ? month.label : month.label.charAt(0)}
               </span>
             ))}
           </div>

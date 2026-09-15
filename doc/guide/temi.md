@@ -31,6 +31,15 @@
   **derive the no-colour fallback from the document id** (FNV-1a), never from the row's rank, which repaints half the
   list on every period switch; **indices 0-7 are theme-aware** (`--chart-1..8` exist in all twelve blocks since
   2026-08-30), 8-9 still pad from the static `CHART_COLORS`.
+- **The default theme's light slots hold the dark hue bands** (2026-09-13): `:root --chart-1..5` were re-pitched from
+  the shadcn preset (three oranges and two teals — Liquidità measured ΔE00 10.1 from Immobili on the real account's
+  Composizione bar, and the hero's rising curve wore the hue of `--destructive`) onto blue · green · amber · violet ·
+  coral with L and C set for white. **The floor is a test**, `__tests__/chartPaletteDistinctness.test.ts`: it reads
+  `globals.css` itself, ΔE00 ≥ 14 between any two slots of a mode, every slot inside the `useChartColors` luminance
+  guard, each slot ≤ 30° of hue from its twin in the other mode. Default theme only: the five named themes are not
+  measured (retro-arcade declares two identical slots, elegant-luxury three reds — CLAUDE.md → Known Issues). A slot
+  change re-derives `PRINT_CHART_HEX` (`__tests__/printTokens.test.ts` says the new hex); `PRINT_RANK_HEX` moved to
+  slot 7 the same day because slot 3 became crypto's amber.
 - **`--chart-6/7/8` carry a meaning across every theme** (2026-08-30): 6 = Materie Prime (gold/olive), 7 = Trend
   Following (teal/cyan), 8 = Carry (rose/magenta) — the hue band is held per theme across light AND dark so a slot does
   not change identity when the mode flips, and only L and C are re-pitched to the block's surface. Before this the tail

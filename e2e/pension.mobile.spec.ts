@@ -17,13 +17,13 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('stacks the tiles in the phone order and steps the type down', async ({ page }) => {
-  const rect = async (name: string) => (await page.getByRole('region', { name, exact: true }).boundingBox())!;
+  const rect = async (name: string | RegExp) => (await page.getByRole('region', { name, exact: true }).boundingBox())!;
   const verdict = await rect('Verdetto sul fondo pensione');
   const hero = await rect('Il fondo oggi');
   const rendimento = await rect('Rendimento del fondo');
-  const annoFiscale = await rect('Anno fiscale');
-  const versato = await rect('Versato per natura');
-  const versamenti = await rect('Versamenti');
+  const annoFiscale = await rect(/^Anno fiscale 20[0-9][0-9]$/);
+  const versato = await rect(/^Versato nel 20[0-9][0-9]$/);
+  const versamenti = await rect(/^Versamenti 20[0-9][0-9]$/);
 
   // One column: each tile starts where the previous one ends, at the same x.
   expect(hero.y).toBeGreaterThan(verdict.y + verdict.height - 1);
@@ -34,7 +34,7 @@ test('stacks the tiles in the phone order and steps the type down', async ({ pag
   expect(Math.abs(rendimento.x - hero.x)).toBeLessThan(2);
 
   // The axis moves under the verdict below `desktop:`.
-  const axis = (await page.getByRole('tablist', { name: 'Anno fiscale' }).boundingBox())!;
+  const axis = (await page.getByRole('radiogroup', { name: 'Anno fiscale' }).boundingBox())!;
   expect(axis.y).toBeGreaterThan(verdict.y + verdict.height - 1);
   expect(axis.y).toBeLessThan(hero.y);
 
@@ -65,7 +65,7 @@ test('never lets the page scroll sideways, measured on the elements', async ({ p
 });
 
 test('keeps the ledger rows and their delete targets at 44px', async ({ page }) => {
-  const versamenti = page.getByRole('region', { name: 'Versamenti', exact: true });
+  const versamenti = page.getByRole('region', { name: /^Versamenti 20[0-9][0-9]$/ });
   const deletes = versamenti.getByRole('button', { name: /^Elimina versamento/ }).filter({ visible: true });
   await expect(deletes).toHaveCount(3);
   const box = (await deletes.first().boundingBox())!;

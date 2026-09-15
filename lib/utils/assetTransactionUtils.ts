@@ -21,10 +21,20 @@
  */
 
 import type { AssetTransaction } from '@/types/assetTransactions';
-import { getItalyYear } from '@/lib/utils/dateHelpers';
+import { getItalyDateIso, getItalyYear } from '@/lib/utils/dateHelpers';
 
 /** Float-dust tolerance: quantities within this of a boundary are treated as the boundary. */
 export const EPSILON = 1e-9;
+
+/**
+ * `DD/MM/YYYY` of the Italian calendar day, for a user-facing message. A baseline is dated to
+ * start-of-day Italy, which is the previous evening in UTC: formatting it in the server's zone
+ * would name the wrong day on Vercel.
+ */
+function formatItalyDay(date: Date): string {
+  const [year, month, day] = getItalyDateIso(date).split('-');
+  return `${day}/${month}/${year}`;
+}
 
 /** Milliseconds in one day; used for the day-exact XIRR discounting. */
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -167,13 +177,14 @@ export function replayTransactionsWithEffects(
   const sorted = sortTransactionsForReplay(transactions);
 
   // A baseline is the opening position: nothing may precede it. After sorting it can only be at
-  // index 0 (baselineDate is the global floor and baseline outranks same-day trades); anywhere
-  // else means an earlier-dated trade slipped in.
+  // index 0 (the baseline outranks same-day trades); anywhere else means an earlier-dated trade
+  // slipped in. Since 2026-09-13 this is the ONLY floor a trade date has — an asset without a
+  // baseline accepts any past date — so the message names the day the user has to respect.
   const baselineIndex = sorted.findIndex((t) => t.isBaseline === true);
   if (baselineIndex > 0) {
     throw new LedgerValidationError(
       'BASELINE_NOT_FIRST',
-      'La transazione di apertura (baseline) deve precedere ogni altra operazione.',
+      `Su questo asset le operazioni partono dalla posizione iniziale del ${formatItalyDay(sorted[baselineIndex].date)}: una data precedente non è registrabile.`,
       sorted[baselineIndex].id,
     );
   }
@@ -373,6 +384,23 @@ export function buildXirrFlows(input: {
 
   flows.sort((a, b) => a.date.getTime() - b.date.getTime());
   return flows;
+}
+
+/**
+ * The shortest holding a money-weighted return may be ANNUALISED over, in days. The same floor
+ * Rendimenti applies to the portfolio (below six months the hero is the period return): a
+ * position opened 47 days ago compounded to a year reads «+4388%», a figure nobody can use.
+ */
+export const MIN_ANNUALIZABLE_DAYS = 180;
+
+/**
+ * How many days the ledger covers — the earliest real flow (a buy or a sell, the baseline
+ * included since it opens the position) to `now`. Null with no flow at all.
+ */
+export function ledgerSpanDays(transactions: AssetTransaction[], now: Date): number | null {
+  const times = transactions.filter((t) => t.type !== 'adjustment').map((t) => t.date.getTime());
+  if (times.length === 0) return null;
+  return (now.getTime() - Math.min(...times)) / MS_PER_DAY;
 }
 
 /**

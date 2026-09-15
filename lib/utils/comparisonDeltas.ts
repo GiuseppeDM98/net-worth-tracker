@@ -28,15 +28,24 @@ import { MONTH_NAMES } from '@/lib/constants/months';
  * Which months of the two years are compared. Months are 1-12.
  * - sameMonths: YTD pacing — months 1..upToMonth in BOTH years.
  * - singleMonth: one month against the same month of the comparison year.
- *   `inProgress` marks the running calendar month: the figures still compare a
- *   partial month against a complete one — a fact the module cannot detect on
- *   its own — so the baseline caption declares it.
+ *   `inProgress` marks the running calendar month, and `throughDay` cuts BOTH sides at
+ *   today's day (the 1st → the 14th of September against the 1st → the 14th of September a
+ *   year earlier — Tracciamento's «stessi giorni» rule, 2026-09-14): fourteen days against a
+ *   whole month printed «−58,2%» with a green verdict on the 14th. Without a day the module
+ *   cannot cut, so the caption declares the partial window instead.
  * - fullYear: all 12 months on both sides.
  */
 export type ComparisonMonthScope =
   | { kind: 'sameMonths'; upToMonth: number }
-  | { kind: 'singleMonth'; month: number; inProgress?: boolean }
+  | { kind: 'singleMonth'; month: number; inProgress?: boolean; throughDay?: number }
   | { kind: 'fullYear' };
+
+/** A row's calendar bucket; the day is needed only to cut a running month at today. */
+export interface ExpenseCalendarRef {
+  year: number;
+  month: number;
+  day?: number;
+}
 
 /**
  * Map the Analisi page's period state to the comparison scope — THE single source
@@ -64,15 +73,19 @@ export function resolveComparisonScope(
   periodMode: 'ytd' | 'current' | 'year' | 'history',
   selectedMonth: number | null,
   todayMonth: number,
+  /** Today's day of the month (1-31): the running month is cut here on both sides. */
+  todayDay?: number,
 ): ComparisonMonthScope | null {
   if (periodMode === 'history') return null;
   const isRunningYear = periodMode === 'current' || periodMode === 'ytd';
   if (selectedMonth !== null) {
     if (isRunningYear && selectedMonth > todayMonth) return null;
+    const inProgress = isRunningYear && selectedMonth === todayMonth;
     return {
       kind: 'singleMonth',
       month: selectedMonth,
-      inProgress: isRunningYear && selectedMonth === todayMonth,
+      inProgress,
+      ...(inProgress && todayDay !== undefined ? { throughDay: todayDay } : {}),
     };
   }
   // A whole-window comparison takes the window the PERIOD covers, so the delta describes the
@@ -108,12 +121,14 @@ const magnitude = (expense: Expense): number => Math.abs(expense.amount);
 
 const isSpending = (expense: Expense): boolean => expense.type !== 'income' && expense.type !== 'transfer';
 
-function isMonthInScope(month: number, scope: ComparisonMonthScope): boolean {
+function isMonthInScope(when: ExpenseCalendarRef, scope: ComparisonMonthScope): boolean {
   switch (scope.kind) {
     case 'sameMonths':
-      return month <= scope.upToMonth;
+      return when.month <= scope.upToMonth;
     case 'singleMonth':
-      return month === scope.month;
+      if (when.month !== scope.month) return false;
+      // A resolver without a day cannot be cut; the caption then says the window is partial.
+      return scope.throughDay === undefined || when.day === undefined || when.day <= scope.throughDay;
     case 'fullYear':
       return true;
   }
@@ -145,22 +160,23 @@ interface ComparisonAccumulator {
  * @param currentYear    Calendar year under review.
  * @param comparisonYear Calendar year used as baseline.
  * @param scope          Which months count, applied identically to both years.
- * @param monthOf        Resolves a row to its calendar bucket (month 1-12).
+ * @param monthOf        Resolves a row to its calendar bucket (month 1-12, the day for a running month).
  */
 export function buildCategoryComparison(
   expenses: Expense[],
   currentYear: number,
   comparisonYear: number,
   scope: ComparisonMonthScope,
-  monthOf: (expense: Expense) => { year: number; month: number },
+  monthOf: (expense: Expense) => ExpenseCalendarRef,
 ): CategoryDeltaRow[] {
   const buckets = new Map<string, ComparisonAccumulator>();
 
   for (const expense of expenses) {
     if (!isSpending(expense)) continue;
 
-    const { year, month } = monthOf(expense);
-    if (!isMonthInScope(month, scope)) continue;
+    const when = monthOf(expense);
+    if (!isMonthInScope(when, scope)) continue;
+    const { year } = when;
     const side = year === currentYear ? 'current' : year === comparisonYear ? 'previous' : null;
     if (side === null) continue;
 
@@ -241,10 +257,14 @@ function buildBaselineLabel(comparisonYear: number, scope: ComparisonMonthScope)
       const lastMonthAbbrev = MONTH_NAMES[scope.upToMonth - 1].slice(0, 3).toLowerCase();
       return `vs ${comparisonYear} (stessi mesi, gen–${lastMonthAbbrev})`;
     }
-    case 'singleMonth':
-      // The running month compares a partial window against a complete one —
-      // declared, so "−54% vs Agosto 2025" cannot read as a final verdict.
-      return `vs ${MONTH_NAMES[scope.month - 1]} ${comparisonYear}${scope.inProgress ? ' (mese in corso)' : ''}`;
+    case 'singleMonth': {
+      // The running month is compared on the same days of the baseline month («1–14 set»);
+      // without a day to cut at, the caption declares the partial window instead, so
+      // "−54% vs Agosto 2025" cannot read as a final verdict.
+      const month = MONTH_NAMES[scope.month - 1];
+      if (scope.inProgress && scope.throughDay !== undefined) return `vs ${month} ${comparisonYear} (1–${scope.throughDay} ${month.slice(0, 3).toLowerCase()})`;
+      return `vs ${month} ${comparisonYear}${scope.inProgress ? ' (mese in corso)' : ''}`;
+    }
     case 'fullYear':
       return `vs ${comparisonYear}`;
   }
@@ -271,7 +291,7 @@ export function computeTotalsPacing(
   currentYear: number,
   comparisonYear: number,
   scope: ComparisonMonthScope,
-  monthOf: (expense: Expense) => { year: number; month: number },
+  monthOf: (expense: Expense) => ExpenseCalendarRef,
 ): TotalsPacing | null {
   let spendingCurrent = 0;
   let spendingPrevious = 0;
@@ -282,8 +302,9 @@ export function computeTotalsPacing(
   for (const expense of expenses) {
     if (expense.type === 'transfer') continue;
 
-    const { year, month } = monthOf(expense);
-    if (!isMonthInScope(month, scope)) continue;
+    const when = monthOf(expense);
+    if (!isMonthInScope(when, scope)) continue;
+    const { year } = when;
     const isCurrent = year === currentYear;
     if (!isCurrent && year !== comparisonYear) continue;
 

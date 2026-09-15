@@ -238,6 +238,100 @@ describe('Asset trade-ledger routes', () => {
     await expect(response.json()).resolves.toMatchObject({ derived: { quantity: 5 } });
   });
 
+  it('accepts a date before the ledger opened, for an asset without a baseline (200)', async () => {
+    // A new account opens the ledger on its first visit to Patrimonio, so until 2026-09-13
+    // «today» was the floor and no past purchase could be recorded (a user's report: ENI shares
+    // bought in 2024 and 2025). The meta's baselineDate is the baselines' date, not a floor.
+    seedMeta('user-1');
+    seedLedgerAsset('asset-1', 'user-1');
+
+    const response = await createRoute(
+      createJsonRequest('http://localhost/api/asset-transactions', {
+        method: 'POST',
+        body: { userId: 'user-1', transaction: validTransaction({ date: new Date(2023, 5, 15, 12).toISOString() }) },
+        headers: AUTH,
+      })
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ derived: { quantity: 5, averageCost: 100 } });
+  });
+
+  it('refuses a date before the baseline of a migrated asset (422), naming the day', async () => {
+    seedMeta('user-1');
+    seedLedgerAsset('asset-1', 'user-1');
+    store.set(docKey('assetTransactions', 'baseline-asset-1'), {
+      userId: 'user-1',
+      assetId: 'asset-1',
+      type: 'buy',
+      isBaseline: true,
+      date: PAST_BASELINE,
+      quantity: 10,
+      pricePerUnit: 100,
+      priceEur: 100,
+      createdAt: PAST_BASELINE,
+      updatedAt: PAST_BASELINE,
+    });
+
+    const response = await createRoute(
+      createJsonRequest('http://localhost/api/asset-transactions', {
+        method: 'POST',
+        body: { userId: 'user-1', transaction: validTransaction({ date: new Date(2023, 5, 15, 12).toISOString() }) },
+        headers: AUTH,
+      })
+    );
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Su questo asset le operazioni partono dalla posizione iniziale del 01/01/2024: una data precedente non è registrabile.',
+    });
+  });
+
+  it('refuses a date in the future (422)', async () => {
+    seedMeta('user-1');
+    seedLedgerAsset('asset-1', 'user-1');
+    // Two days ahead: clear of the Italian day bound whatever the runner's zone.
+    const future = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
+
+    const response = await createRoute(
+      createJsonRequest('http://localhost/api/asset-transactions', {
+        method: 'POST',
+        body: { userId: 'user-1', transaction: validTransaction({ date: future }) },
+        headers: AUTH,
+      })
+    );
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({ error: 'La data non può essere nel futuro.' });
+  });
+
+  it('stores a BTP€i trade’s indexation coefficient beside its price, and refuses a non-positive one', async () => {
+    seedMeta('user-1');
+    seedLedgerAsset('asset-1', 'user-1');
+
+    const ok = await createRoute(
+      createJsonRequest('http://localhost/api/asset-transactions', {
+        method: 'POST',
+        body: { userId: 'user-1', transaction: validTransaction({ indexationCoefficient: 1.25 }) },
+        headers: AUTH,
+      })
+    );
+    expect(ok.status).toBe(200);
+    const stored = [...store.entries()].find(([key]) => key.startsWith('assetTransactions/'))?.[1] as
+      | { indexationCoefficient?: number }
+      | undefined;
+    expect(stored?.indexationCoefficient).toBe(1.25);
+
+    const refused = await createRoute(
+      createJsonRequest('http://localhost/api/asset-transactions', {
+        method: 'POST',
+        body: { userId: 'user-1', transaction: validTransaction({ indexationCoefficient: 0 }) },
+        headers: AUTH,
+      })
+    );
+    expect(refused.status).toBe(400);
+  });
+
   it('returns 400 for a negative quantity', async () => {
     seedMeta('user-1');
     seedLedgerAsset('asset-1', 'user-1');

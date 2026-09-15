@@ -57,11 +57,11 @@ const GLOBALS_ROOT: Record<string, [number, number, number]> = {
   positive: [0.482, 0.194, 149.214],
   destructive: [0.577, 0.245, 27.325],
   'warning-foreground': [0.468, 0.098, 75],
-  'chart-1': [0.646, 0.222, 41.116],
-  'chart-2': [0.6, 0.118, 184.704],
-  'chart-3': [0.398, 0.07, 227.392],
-  'chart-4': [0.828, 0.189, 84.429],
-  'chart-5': [0.769, 0.188, 70.08],
+  'chart-1': [0.5, 0.2, 262],
+  'chart-2': [0.6, 0.125, 172],
+  'chart-3': [0.7, 0.16, 72],
+  'chart-4': [0.48, 0.21, 298],
+  'chart-5': [0.62, 0.2, 16],
   'chart-6': [0.6, 0.118, 100],
   'chart-7': [0.55, 0.092, 215],
   'chart-8': [0.56, 0.205, 340],
@@ -138,8 +138,9 @@ describe('PRINT_CHART_HEX', () => {
     expect(printChartHexForAssetClass('fenicottero')).toBe(PRINT_COLORS.mutedForeground);
   });
 
-  it('draws a ranked list in one hue', () => {
-    expect(PRINT_RANK_HEX).toBe(PRINT_CHART_HEX[2]);
+  it('draws a ranked list in one hue — the quietest slot against white', () => {
+    // Slot 7 (Trend Following's petrol, C 0.092) since 2026-09-13; slot 3 became crypto's amber.
+    expect(PRINT_RANK_HEX).toBe(PRINT_CHART_HEX[6]);
   });
 });
 

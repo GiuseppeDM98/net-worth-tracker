@@ -20,6 +20,8 @@ import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { formatPercentageIt as formatPercentage } from '@/lib/utils/formatters';
 import { MONTH_NAMES } from '@/lib/constants/months';
 import { getItalyDate } from '@/lib/utils/dateHelpers';
+import { resolveDeclineCause, type DeclineCause, type PeriodSalesSummary } from '@/lib/utils/periodSales';
+import { declineHeadlineTail, describeOwnFlowsSplit, describeSales } from '@/lib/utils/salesNarrative';
 import type { Narrative, NarrativeSegment, PageVerdictModel, VerdictTone } from '@/lib/utils/narrative';
 
 export interface PatrimonioVerdictInput {
@@ -36,6 +38,11 @@ export interface PatrimonioVerdictInput {
   marketEffect: number | null;
   /** The instrument whose market price moved the most; null when none. */
   topMover: { id: string; name: string; delta: number } | null;
+  /**
+   * The month's sells from the trade ledger, with the estimated tax withheld on them; null when
+   * nothing was sold, absent on a payload computed before the field existed.
+   */
+  sales?: PeriodSalesSummary | null;
 }
 
 export type PatrimonioVerdict = PageVerdictModel;
@@ -133,30 +140,46 @@ export function pluralArticleFor(count: number): string {
 
 // ─── Verdict ──────────────────────────────────────────────────────────────────
 
-function resolveHeadline(input: PatrimonioVerdictInput): { headline: string; tone: VerdictTone } {
+interface ResolvedHeadline {
+  headline: string;
+  tone: VerdictTone;
+  /** The cause of a falling month; null when the month did not fall. */
+  declineCause: DeclineCause | null;
+}
+
+function resolveHeadline(input: PatrimonioVerdictInput): ResolvedHeadline {
   if (!input.monthlyVariation) {
-    return { headline: `Il tuo portafoglio ${withPrepositionA(monthInSentence(input.month))}.`, tone: 'neutral' };
+    return { headline: `Il tuo portafoglio ${withPrepositionA(monthInSentence(input.month))}.`, tone: 'neutral', declineCause: null };
   }
   // The record is measured on the live total, the monthly change on the month's snapshot: the
   // two can disagree intraday, and the headline must never contradict the sign the sentence prints.
   if (input.isNewATH && input.monthlyVariation.value >= 0) {
-    return { headline: 'Il portafoglio è al massimo storico.', tone: 'positive' };
+    return { headline: 'Il portafoglio è al massimo storico.', tone: 'positive', declineCause: null };
   }
 
   const marketLost = input.marketEffect !== null && input.marketEffect < 0;
-  const marketGained = input.marketEffect !== null && input.marketEffect >= 0;
 
   if (input.monthlyVariation.value >= 0) {
     // Grown while the market lost: the user's own flows did it, and the sentence must not
     // credit the market.
-    if (marketLost) return { headline: 'Il portafoglio cresce, nonostante il mercato.', tone: 'positive' };
-    return { headline: 'Il portafoglio cresce.', tone: 'positive' };
+    if (marketLost) return { headline: 'Il portafoglio cresce, nonostante il mercato.', tone: 'positive', declineCause: null };
+    return { headline: 'Il portafoglio cresce.', tone: 'positive', declineCause: null };
   }
 
-  // A falling month is blamed on the market only when the market actually lost money.
-  if (marketGained) return { headline: 'Il portafoglio è in calo, nonostante il mercato.', tone: 'warning' };
-  if (marketLost) return { headline: 'Il portafoglio è in calo: il mercato ha pesato.', tone: 'negative' };
-  return { headline: 'Il portafoglio è in calo.', tone: 'negative' };
+  // A falling month is blamed on the market only when the market actually lost money — and never
+  // on the market alone when the tax on a sale or the user's own flows weighed more: the same
+  // decision the Panoramica and the email make (`resolveDeclineCause`).
+  const cause = resolveDeclineCause({
+    marketEffect: input.marketEffect,
+    ownFlows: input.marketEffect === null ? null : input.monthlyVariation.value - input.marketEffect,
+    salesTax: input.sales?.estimatedTax ?? null,
+  });
+  return {
+    headline: `Il portafoglio è in calo${declineHeadlineTail(cause, input.sales)}`,
+    // The market did not lose: a tax withheld on a gain is worth attention, not alarm.
+    tone: cause === 'despite-market' || cause === 'taxes-despite-market' ? 'warning' : 'negative',
+    declineCause: cause,
+  };
 }
 
 /** ", 16 strumenti e 3 conti" — whichever counts are non-zero, in the singular when one. */
@@ -191,7 +214,7 @@ export function formatHoldingCounts(instrumentCount: number, accountCount: numbe
  * driver, even if a top mover was handed in.
  */
 export function buildPatrimonioVerdict(input: PatrimonioVerdictInput): PatrimonioVerdict {
-  const { headline, tone } = resolveHeadline(input);
+  const { headline, tone, declineCause } = resolveHeadline(input);
   const sentence: Narrative = [prose('Il portafoglio vale '), figure(cachedFormatCurrencyEUR(input.totalValue))];
 
   if (input.monthlyVariation) {
@@ -212,6 +235,15 @@ export function buildPatrimonioVerdict(input: PatrimonioVerdictInput): Patrimoni
   }
 
   sentence.push(prose('.'));
+
+  // The market-vs-flows split and the sale behind it, the same words the Panoramica prints. When
+  // the headline already blames the tax on the sale, the split is redundant and only the sale stays.
+  if (declineCause !== 'taxes-despite-market' && input.monthlyVariation && input.marketEffect !== null) {
+    sentence.push(prose(' '), ...describeOwnFlowsSplit(input.monthlyVariation.value, input.marketEffect));
+  }
+  if (input.sales) {
+    sentence.push(prose(' '), ...describeSales(input.sales));
+  }
   return { headline, tone, sentence };
 }
 
@@ -311,6 +343,43 @@ export function describeInstruments(
 
   narrative.push(prose('.'));
   return narrative;
+}
+
+/** «04/03» in the same year as `now`, «04/03/2032» otherwise — the compact date a row's sub-line uses. */
+function shortDate(date: Date, now: Date): string {
+  const d = getItalyDate(date);
+  const sameYear = d.getFullYear() === getItalyDate(now).getFullYear();
+  const dayMonth = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+  return sameYear ? dayMonth : `${dayMonth}/${d.getFullYear()}`;
+}
+
+/**
+ * «scade il 04/03/2032 · prossima cedola 04/09» — the sub-line of a bond row, so a BTP is not
+ * typographically a crypto row (TER and PMC say nothing about a bond; its maturity and its next
+ * coupon do). The coupon clause drops for a zero coupon or once the bond has matured; the whole
+ * line drops without a maturity. `nextCoupon` is the caller's (couponUtils knows the schedule).
+ */
+export function describeBondRow(
+  bond: { maturityDate: Date; hasCoupons: boolean },
+  nextCoupon: Date | null,
+  now: Date,
+): string | null {
+  if (!(bond.maturityDate instanceof Date) || Number.isNaN(bond.maturityDate.getTime())) return null;
+  const parts = [`scade il ${shortDate(bond.maturityDate, now)}`];
+  if (bond.hasCoupons && nextCoupon && nextCoupon <= bond.maturityDate) {
+    parts.push(`prossima cedola ${shortDate(nextCoupon, now)}`);
+  }
+  return parts.join(' · ');
+}
+
+/**
+ * «valore a mano dal 12/08» — the sub-line of a hand-valued row (a property, a fund, a
+ * private-equity stake): the table prints its value and WHEN the owner last typed it, instead
+ * of a quantity and a price of 1,0000 € that describe the storage, not the holding.
+ */
+export function describeManualValuation(lastUpdate: Date | null | undefined, now: Date): string | null {
+  if (!(lastUpdate instanceof Date) || Number.isNaN(lastUpdate.getTime())) return null;
+  return `valore a mano dal ${shortDate(lastUpdate, now)}`;
 }
 
 /**

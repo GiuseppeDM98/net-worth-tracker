@@ -14,13 +14,15 @@
  *                     Movimenti (12)
  *
  * ONE period axis governs the verdict and every tile. The toolbar filters (search, categories,
- * subcategory, account, sort) narrow ONLY the Movimenti list: a verdict computed on the
+ * subcategory, account, owner, sort) narrow ONLY the Movimenti list: a verdict computed on the
  * «Alimentari» filter would read «speso più di quanto è entrato» over a slice that has no
  * income by construction.
  *
  * FILTER ARCHITECTURE (unchanged): period → type/category → subcategory, with the cascading
- * reset (changing the category selection resets the subcategory). Every number the tiles
- * show is born in lib/utils/tracciamentoSummary.ts; the words in cashflowNarrative.ts.
+ * reset (changing the category selection resets the subcategory). The owner filter
+ * («Intestatario», lib/utils/movementsOwnerFilter.ts) exists only with Divisione on. Every
+ * number the tiles show is born in lib/utils/tracciamentoSummary.ts; the words in
+ * cashflowNarrative.ts.
  */
 'use client';
 
@@ -31,6 +33,12 @@ import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Expense, ExpenseCategory, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
+import type { FamilyMember } from '@/types/assets';
+import {
+  OWNER_FILTER_ALL,
+  listOwnerFilterOptions,
+  matchesOwnerFilter,
+} from '@/lib/utils/movementsOwnerFilter';
 import {
   getExpensesByRecurringParentId,
   getExpensesByInstallmentParentId,
@@ -48,26 +56,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { X, Search, Download, Plus, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 
 import { ExpenseDialog } from '@/components/expenses/ExpenseDialog';
 import { ExpenseTable } from '@/components/expenses/ExpenseTable';
+import { SeriesDeleteDialog, resolveSeriesDeleteMode, type SeriesDeleteRequest } from '@/components/expenses/SeriesDeleteDialog';
 import { TransactionFeed } from '@/components/cashflow/TransactionFeed';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { MobileFiltersDrawer } from '@/components/cashflow/MobileFiltersDrawer';
 import { PageVerdict } from '@/components/ui/page-verdict';
-import { TILE_CELL_CLASS } from '@/components/ui/tile';
+import { TILE_CELL_CLASS, TILE_FOOTER_ACTION_CLASS } from '@/components/ui/tile';
 import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
 import { ErrorNotice } from '@/components/ui/error-notice';
 import { describeReadFailure, resolveSurfaceState } from '@/lib/utils/statesNarrative';
@@ -93,6 +92,7 @@ import {
   computePeriodDelta,
   currentComparisonWindow,
   filterExpensesByPeriod,
+  previousComparisonWindow,
   previousPeriod,
   rankCategories,
   resolveAnchorMonth,
@@ -146,6 +146,10 @@ interface ExpenseTrackingTabProps {
   onRefresh: () => Promise<void>;
   /** id→name map for cash assets; built in the parent to avoid a cross-domain subscription here. */
   assetNameMap: Map<string, string>;
+  /** Cashflow › Divisione is on: the owner filter and the owner chips exist. */
+  splitEnabled: boolean;
+  /** The household, from the settings — the people a row can be attributed to. */
+  familyMembers: FamilyMember[];
 }
 
 interface ListFilters {
@@ -156,12 +160,16 @@ interface ListFilters {
   searchQuery: string;
   /** 'all', or an account id present in the period. */
   accountId: string;
+  /** 'all', 'common', 'unassigned' or a member id (movementsOwnerFilter.ts). */
+  ownerId: string;
+  /** The members that still exist, for the «unassigned» case. */
+  knownMemberIds: Set<string>;
 }
 
 /**
  * Cumulative AND filtering (progressive narrowing): every active filter must match —
- * type/category, then subcategory, then the free-text search, then the account. OR would
- * widen the list (Type="income" OR Category="groceries"); AND narrows it.
+ * type/category, then subcategory, then the free-text search, then the account, then the
+ * owner. OR would widen the list (Type="income" OR Category="groceries"); AND narrows it.
  */
 function applyListFilters(expenses: Expense[], filters: ListFilters): Expense[] {
   let filtered = expenses;
@@ -200,13 +208,36 @@ function applyListFilters(expenses: Expense[], filters: ListFilters): Expense[] 
     filtered = filtered.filter((e) => e.linkedCashAssetId === filters.accountId);
   }
 
+  if (filters.ownerId !== OWNER_FILTER_ALL) {
+    filtered = filtered.filter((e) => matchesOwnerFilter(e, filters.ownerId, filters.knownMemberIds));
+  }
+
   return filtered;
+}
+
+/** Where the desktop list view is remembered; read once at mount, written on every switch. */
+const LIST_VIEW_STORAGE_KEY = 'cashflow.movimenti.vista';
+
+function readStoredListView(): 'feed' | 'table' {
+  try {
+    return typeof window !== 'undefined' && window.localStorage.getItem(LIST_VIEW_STORAGE_KEY) === 'table' ? 'table' : 'feed';
+  } catch {
+    return 'feed';
+  }
+}
+
+function writeStoredListView(view: 'feed' | 'table'): void {
+  try {
+    window.localStorage.setItem(LIST_VIEW_STORAGE_KEY, view);
+  } catch {
+    // A blocked storage loses only the memory of the switch, never the switch.
+  }
 }
 
 /**
  * CHECKLIST: When adding new ExpenseType values:
  * 1. Update EXPENSE_TYPE_LABELS in types/expenses.ts
- * 2. Add color mapping in CompactExpenseRow.tsx dot-color classes (TYPE_DOT_CLASS)
+ * 2. Add the dot, badge (and series, if it is a flow) colour in lib/constants/expenseTypeColors.ts
  * 3. Update the ORDER arrays in this file
  * 4. Add type validation in ExpenseDialog schema
  */
@@ -217,6 +248,8 @@ export function ExpenseTrackingTab({
   loadFailed,
   onRefresh,
   assetNameMap,
+  splitEnabled,
+  familyMembers,
 }: ExpenseTrackingTabProps) {
   const { user } = useAuth();
   const { ownerId } = useActiveAccount();
@@ -237,15 +270,17 @@ export function ExpenseTrackingTab({
   // Unified period filter (replaces separate selectedYear + selectedMonth)
   const [period, setPeriod] = useState<Period>(() => currentMonthPeriod());
 
-  // AlertDialog for bulk delete (installments / recurring)
-  const [bulkDeleteDialog, setBulkDeleteDialog] = useState<{
-    open: boolean;
-    expense: Expense | null;
-    mode: 'installment' | 'recurring' | null;
-  }>({ open: false, expense: null, mode: null });
+  // The one question a series adds to a delete from the feed: «solo questa o tutte?»
+  const [seriesRequest, setSeriesRequest] = useState<SeriesDeleteRequest | null>(null);
 
   // Desktop list view: the day-grouped feed (default, shared with mobile) or the dense table.
-  const [desktopListView, setDesktopListView] = useState<'feed' | 'table'>('feed');
+  // Remembered (localStorage), like Patrimonio's toggles: a reader who works in the table
+  // should not re-pick it on every visit (it reset to «Feed» until 2026-09-14).
+  const [desktopListView, setDesktopListView] = useState<'feed' | 'table'>(() => readStoredListView());
+  const changeListView = (view: 'feed' | 'table') => {
+    setDesktopListView(view);
+    writeStoredListView(view);
+  };
 
   // The feed's visible window, stored WITH the filters it belongs to: when the filters change
   // the key no longer matches and the window falls back to the first page, with no effect
@@ -268,6 +303,9 @@ export function ExpenseTrackingTab({
 
   // Conto corrente filter — 'all' means no account filter applied.
   const [selectedAccountId, setSelectedAccountId] = useState<string>('all');
+
+  // Intestatario filter (Divisione only) — 'all' means no owner filter applied.
+  const [selectedOwnerId, setSelectedOwnerId] = useState<string>(OWNER_FILTER_ALL);
 
   // Generate available years from ALL expenses (not filtered)
   const availableYears = useMemo(() => {
@@ -303,6 +341,7 @@ export function ExpenseTrackingTab({
     setSelectedSubCategoryId('all');
     setSearchQuery('');
     setSelectedAccountId('all');
+    setSelectedOwnerId(OWNER_FILTER_ALL);
     setMobileSortKey('date-desc');
   };
 
@@ -417,22 +456,17 @@ export function ExpenseTrackingTab({
 
   /**
    * Delete a transaction from the feed's detail drawer. The drawer already showed an
-   * explicit destructive confirmation, so a simple expense is deleted immediately. For
-   * installments/recurring, open the AlertDialog so the user can choose single vs. the
-   * whole series.
+   * explicit destructive confirmation, so a simple expense is deleted immediately. A row of an
+   * instalment plan or a recurring series opens `SeriesDeleteDialog` — the one question the
+   * series adds, «solo questa o tutte?» (the same modal the table uses).
    */
   const handleDeleteExpense = useCallback(
     (expense: Expense) => {
-      const isComplex =
-        (expense.isInstallment && expense.installmentParentId) ||
-        (expense.isRecurring && expense.recurringParentId);
-
-      if (isComplex) {
-        const mode = expense.isInstallment ? 'installment' : 'recurring';
-        setBulkDeleteDialog({ open: true, expense, mode });
+      const mode = resolveSeriesDeleteMode(expense);
+      if (mode) {
+        setSeriesRequest({ expense, mode });
         return;
       }
-
       void deleteSingleExpense(expense);
     },
     [deleteSingleExpense],
@@ -548,13 +582,30 @@ export function ExpenseTrackingTab({
   // no movement on it) is no filter at all: derived, never reset through an effect.
   const effectiveAccountId = accountOptions.some((a) => a.id === selectedAccountId) ? selectedAccountId : 'all';
 
+  // Owner options exist only with Divisione on: «Tutti · In comune · {members}», plus «Senza
+  // intestatario» when the period holds rows of a deleted member. A selection the options no
+  // longer offer (the feature switched off, a member removed) is no filter — derived, never reset.
+  const ownerOptions = useMemo(
+    () => (splitEnabled ? listOwnerFilterOptions(expenses, familyMembers) : []),
+    [splitEnabled, expenses, familyMembers],
+  );
+  const knownMemberIds = useMemo(() => new Set(familyMembers.map((member) => member.id)), [familyMembers]);
+  const memberNames = useMemo(
+    () => (splitEnabled ? new Map(familyMembers.map((member) => [member.id, member.name])) : null),
+    [splitEnabled, familyMembers],
+  );
+  const effectiveOwnerId = ownerOptions.some((option) => option.value === selectedOwnerId)
+    ? selectedOwnerId
+    : OWNER_FILTER_ALL;
+
   // A list filter is active when the toolbar narrows the inventory — the period is not a filter.
   const hasActiveFilters =
     selectedTypes.length > 0 ||
     selectedCatIds.length > 0 ||
     selectedSubCategoryId !== 'all' ||
     searchQuery !== '' ||
-    effectiveAccountId !== 'all';
+    effectiveAccountId !== 'all' ||
+    effectiveOwnerId !== OWNER_FILTER_ALL;
 
   // Count of active drawer-internal filters shown on the mobile "Filtri" badge.
   // Period and search are excluded — they are always visible inline on mobile.
@@ -564,8 +615,9 @@ export function ExpenseTrackingTab({
     if (selectedTypes.length > 0 || selectedCatIds.length > 0) count++;
     if (selectedSubCategoryId !== 'all') count++;
     if (effectiveAccountId !== 'all') count++;
+    if (effectiveOwnerId !== OWNER_FILTER_ALL) count++;
     return count;
-  }, [searchQuery, selectedTypes, selectedCatIds, selectedSubCategoryId, effectiveAccountId]);
+  }, [searchQuery, selectedTypes, selectedCatIds, selectedSubCategoryId, effectiveAccountId, effectiveOwnerId]);
 
   // Left to the React Compiler: a manual useMemo here could not be preserved (its inputs are
   // themselves derived) and the skip would have un-memoized the whole component.
@@ -575,11 +627,13 @@ export function ExpenseTrackingTab({
     subCategoryId: soloSelectedCategory ? selectedSubCategoryId : 'all',
     searchQuery,
     accountId: effectiveAccountId,
+    ownerId: effectiveOwnerId,
+    knownMemberIds,
   });
 
   // The feed shows the first page again whenever the filters change (the stored window
   // belongs to the filters it was opened under).
-  const filterKey = JSON.stringify([period, selectedTypes, selectedCatIds, selectedSubCategoryId, searchQuery, effectiveAccountId]);
+  const filterKey = JSON.stringify([period, selectedTypes, selectedCatIds, selectedSubCategoryId, searchQuery, effectiveAccountId, effectiveOwnerId]);
   const mobileShowCount = feedWindow?.filterKey === filterKey ? feedWindow.count : FEED_PAGE_SIZE;
   const showMore = () => setFeedWindow({ filterKey, count: mobileShowCount + FEED_PAGE_SIZE });
 
@@ -622,17 +676,20 @@ export function ExpenseTrackingTab({
   }, [allExpenses, period, now]);
 
   // The delta compares like with like. `totals` spans the whole period — for a year still
-  // running that includes months the previous year cannot match — so the percentages are
-  // computed on the shared window instead (`describeComparisonPhrase` names it: «su gen–ago
-  // 2025»). Only the delta is scoped; every figure the tiles print stays the period's own.
-  const comparableTotals = useMemo(() => {
-    const window = currentComparisonWindow(period, now);
-    return window ? summarizePeriodCashflow(filterExpensesByPeriod(allExpenses, window)) : totals;
-  }, [allExpenses, period, now, totals]);
-  const delta = useMemo(
-    () => (previousTotals ? computePeriodDelta(comparableTotals, previousTotals) : null),
-    [comparableTotals, previousTotals],
-  );
+  // running that includes months the previous year cannot match, for the month in progress the
+  // days not yet lived — so the percentages are computed on the two comparable windows instead
+  // (`describeComparisonPhrase` names them: «su gen–ago 2025», «sui primi 14 giorni di agosto»).
+  // Only the delta is scoped; every figure the tiles print stays the period's own, and the
+  // projection's reference above stays LAST MONTH WHOLE.
+  const delta = useMemo(() => {
+    const current = currentComparisonWindow(period, now);
+    const previous = previousComparisonWindow(period, now);
+    if (!current || !previous) return null;
+    return computePeriodDelta(
+      summarizePeriodCashflow(filterExpensesByPeriod(allExpenses, current)),
+      summarizePeriodCashflow(filterExpensesByPeriod(allExpenses, previous)),
+    );
+  }, [allExpenses, period, now]);
 
   const verdict = useMemo(() => buildCashflowVerdict({ period, now, totals, delta, scheduled }), [period, now, totals, delta, scheduled]);
   const comparisonPhrase = describeComparisonPhrase(period, now);
@@ -707,14 +764,17 @@ export function ExpenseTrackingTab({
       isDemo={isDemo}
       hasActiveFilters={hasActiveFilters}
       categoryMetaMap={categoryMetaMap}
+      memberNames={memberNames}
       emptyHint="Nessun movimento registrato nel periodo: aggiungi la prima voce per iniziare a tracciare."
       surface="flat"
     />
   );
 
-  // The full breakdown lives on Analisi: the tiles carry the top five and the residual.
+  // The full breakdown lives on Analisi: the tiles carry the top five and the residual. The
+  // words stay 11px, the target does not (`TILE_FOOTER_ACTION_CLASS`: 32px on a pointer, 44 on
+  // touch — it measured 147×17 until 2026-09-14).
   const analisiLink = (
-    <Link href="/dashboard/analisi" className="inline-flex items-center gap-1 hover:text-foreground">
+    <Link href="/dashboard/analisi" className={cn(TILE_FOOTER_ACTION_CLASS, 'gap-1 text-muted-foreground hover:text-foreground')}>
       Tutte le categorie in Analisi
       <ArrowRight className="h-3 w-3" aria-hidden="true" />
     </Link>
@@ -741,6 +801,9 @@ export function ExpenseTrackingTab({
       accountOptions={accountOptions}
       selectedAccountId={effectiveAccountId}
       onAccountChange={setSelectedAccountId}
+      ownerOptions={ownerOptions}
+      selectedOwnerId={effectiveOwnerId}
+      onOwnerChange={setSelectedOwnerId}
       activeFilterCount={mobileActiveFilterCount}
       onReset={handleResetFilters}
       mobileSortKey={mobileSortKey}
@@ -835,6 +898,24 @@ export function ExpenseTrackingTab({
         </div>
       )}
 
+      {/* Intestatario — only with Divisione on (the options are empty otherwise) */}
+      {ownerOptions.length > 0 && (
+        <div className="w-[160px] shrink-0">
+          <Select value={effectiveOwnerId} onValueChange={setSelectedOwnerId}>
+            <SelectTrigger id="filter-owner" aria-label="Filtra per intestatario" className="w-full">
+              <SelectValue placeholder="Tutti" />
+            </SelectTrigger>
+            <SelectContent>
+              {ownerOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
       {/* Ordina — feed only; the table sorts via its own column headers. */}
       {desktopListView === 'feed' && (
         <div className="w-[150px] shrink-0">
@@ -874,7 +955,7 @@ export function ExpenseTrackingTab({
             { value: 'table', label: 'Tabella' },
           ]}
           value={desktopListView}
-          onChange={setDesktopListView}
+          onChange={changeListView}
           aria-label="Vista elenco movimenti"
           className="w-[150px]"
         />
@@ -963,7 +1044,7 @@ export function ExpenseTrackingTab({
             reading={describeCategoryShare(incomeRanking, 'income')}
             color="var(--chart-2)"
             emptyCopy="Nessuna entrata registrata nel periodo."
-            labelClassName="w-[72px]"
+            labelClassName="min-w-[72px]"
             footer={analisiLink}
           />
         </div>
@@ -999,6 +1080,7 @@ export function ExpenseTrackingTab({
                     isDemo={isDemo}
                     hasActiveFilters={hasActiveFilters}
                     categories={categories}
+                    memberNames={memberNames}
                   />
                 </div>
                 <div className="desktop:hidden">{feed}</div>
@@ -1016,55 +1098,23 @@ export function ExpenseTrackingTab({
         onSuccess={handleSuccess}
       />
 
-      {/* Bulk delete AlertDialog — for installments and recurring expenses */}
-      <AlertDialog
-        open={bulkDeleteDialog.open}
-        onOpenChange={(open) => {
-          if (!open) setBulkDeleteDialog({ open: false, expense: null, mode: null });
+      {/* «Solo questa o tutte?» — for a row of an instalment plan or a recurring series deleted from the feed */}
+      <SeriesDeleteDialog
+        request={seriesRequest}
+        onClose={() => setSeriesRequest(null)}
+        onDeleteOne={(expense) => {
+          setSeriesRequest(null);
+          void deleteSingleExpense(expense);
         }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {bulkDeleteDialog.mode === 'installment' ? 'Elimina rata' : 'Elimina voce ricorrente'}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {bulkDeleteDialog.mode === 'installment' && bulkDeleteDialog.expense
-                ? `Questa è la rata ${bulkDeleteDialog.expense.installmentNumber}/${bulkDeleteDialog.expense.installmentTotal}. Vuoi eliminare solo questa rata o tutte le ${bulkDeleteDialog.expense.installmentTotal} rate?`
-                : 'Questa è una voce ricorrente. Vuoi eliminare solo questa voce o tutte le occorrenze correlate?'}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col gap-2 sm:flex-row">
-            <AlertDialogCancel>Annulla</AlertDialogCancel>
-            <Button
-              variant="outline"
-              onClick={() => {
-                if (bulkDeleteDialog.expense) void deleteSingleExpense(bulkDeleteDialog.expense);
-                setBulkDeleteDialog({ open: false, expense: null, mode: null });
-              }}
-            >
-              Solo questa
-            </Button>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => {
-                const exp = bulkDeleteDialog.expense;
-                if (!exp) return;
-                if (bulkDeleteDialog.mode === 'installment' && exp.installmentParentId) {
-                  void deleteAllInstallmentExpenses(exp.installmentParentId);
-                } else if (bulkDeleteDialog.mode === 'recurring' && exp.recurringParentId) {
-                  void deleteAllRecurringExpenses(exp.recurringParentId);
-                }
-                setBulkDeleteDialog({ open: false, expense: null, mode: null });
-              }}
-            >
-              {bulkDeleteDialog.mode === 'installment'
-                ? `Tutte le ${bulkDeleteDialog.expense?.installmentTotal ?? ''} rate`
-                : 'Tutte le ricorrenti'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        onDeleteAll={(expense) => {
+          setSeriesRequest(null);
+          if (expense.isInstallment && expense.installmentParentId) {
+            void deleteAllInstallmentExpenses(expense.installmentParentId);
+          } else if (expense.isRecurring && expense.recurringParentId) {
+            void deleteAllRecurringExpenses(expense.recurringParentId);
+          }
+        }}
+      />
     </div>
   );
 }

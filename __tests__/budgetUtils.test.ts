@@ -619,3 +619,49 @@ describe('rankCategoriesAtRisk and evaluateBudgetAlerts', () => {
     expect(overall?.crossedOn).toBe(10); // 1150 (1st) + 90 (8th) + 600 (10th) = 1840 > 1500
   });
 });
+
+describe('evaluateBudgetAlerts — a threshold is a fact of what is BOOKED, read against its calendar (2026-09-14)', () => {
+  const SEPT_14 = new Date(2026, 8, 14, 12);
+  const categories = [makeCategory({ id: 'c-food', name: 'Cibo', type: 'variable' }), makeCategory({ id: 'c-tech', name: 'Tecnologia', type: 'variable' })];
+  const food = makeItem({ id: 'f', categoryId: 'c-food', categoryName: 'Cibo', amount: 500 });
+  const tech = makeItem({ id: 't', categoryId: 'c-tech', categoryName: 'Tecnologia', amount: 1200, period: 'annual' });
+  // September on the 14th: 656 booked, a 1297 mortgage dated the 27th; Tecnologia 643 since March.
+  const expenses: Expense[] = [
+    makeExpense({ categoryId: 'c-food', amount: -656, date: new Date(2026, 8, 10) }),
+    makeExpense({ categoryId: 'c-home', type: 'fixed', amount: -1297, date: new Date(2026, 8, 27) }),
+    makeExpense({ categoryId: 'c-tech', amount: -643, date: new Date(2026, 2, 3) }),
+    makeExpense({ categoryId: 'c-tech', amount: -900, date: new Date(2026, 11, 20) }),
+  ];
+
+  it('the ceiling counts only what is booked: a row dated after today crosses nothing yet', () => {
+    const alerts = evaluateBudgetAlerts([], 3000, expenses, [50, 75, 90, 100], SEPT_14, categories);
+    // 656 of 3000 is 22%: no threshold crossed, and no forecast overrun (656/14×30 + 1297 = 2703)
+    expect(alerts.find((a) => a.key === OVERALL_BUDGET_KEY)).toBeUndefined();
+    const tight = evaluateBudgetAlerts([], 1200, expenses, [50, 75, 90, 100], SEPT_14, categories);
+    const overall = tight.find((a) => a.key === OVERALL_BUDGET_KEY)!;
+    expect(overall.spent).toBe(656);
+    expect(overall.threshold).toBe(50);
+    expect(overall.period).toBe('monthly');
+    expect(overall.calendarPct).toBeCloseTo((14 / 30) * 100);
+    expect(overall.aheadOfCalendar).toBe(true); // 55% against 47% of the month
+  });
+
+  it('a monthly category carries the month’s share and is behind it when its quota is lower', () => {
+    const [alert] = evaluateBudgetAlerts([{ ...food, amount: 1400 }], undefined, expenses, [25, 50], SEPT_14, categories);
+    expect(alert.label).toBe('Cibo');
+    expect(alert.threshold).toBe(25); // 656/1400 = 47% rounds to 47, the calendar to 47: not ahead
+    expect(alert.aheadOfCalendar).toBe(false);
+    const ahead = evaluateBudgetAlerts([food], undefined, expenses, [25, 50], SEPT_14, categories)[0];
+    expect(ahead.aheadOfCalendar).toBe(true); // 131%, exceeded
+    expect(ahead.level).toBe('exceeded');
+  });
+
+  it('an annual budget reads the YEAR’s share and leaves a December row out of «spent»', () => {
+    const [alert] = evaluateBudgetAlerts([tech], undefined, expenses, [50, 75, 90, 100], SEPT_14, categories);
+    expect(alert.period).toBe('annual');
+    expect(alert.spent).toBe(643); // the 900 of December is in the calendar, not spent
+    expect(alert.threshold).toBe(50);
+    expect(alert.calendarPct).toBeCloseTo((257 / 365) * 100);
+    expect(alert.aheadOfCalendar).toBe(false); // 54% with the year at 70%
+  });
+});

@@ -42,8 +42,6 @@ interface PerformanceDettaglioProps {
   underwater: UnderwaterDrawdownData[];
   /** Every instrument's contribution to the period's market gain; null before the base is resolved. */
   attribution: ReturnAttribution | null;
-  /** Changes with the period, so the charts replay their entrance once per window. */
-  renderKey: string;
 }
 
 /** «+16.569 €» / «−877 €» / «0 €» — the tile's euro figure, typographic minus. */
@@ -239,7 +237,7 @@ function describeRolling(values: number[], format: (v: number) => string, name: 
 
 // ─── The disclosure ───────────────────────────────────────────────────────────
 
-export function PerformanceDettaglio({ metrics, periodAside, drawdown, rollingCagr, rollingSharpe, underwater, attribution, renderKey }: PerformanceDettaglioProps) {
+export function PerformanceDettaglio({ metrics, periodAside, drawdown, rollingCagr, rollingSharpe, underwater, attribution }: PerformanceDettaglioProps) {
   const [open, setOpen] = useState(false);
 
   const yields = describeYields({ yocNet: metrics.yocNet, currentYieldNet: metrics.currentYieldNet });
@@ -413,7 +411,7 @@ export function PerformanceDettaglio({ metrics, periodAside, drawdown, rollingCa
               ]}
             >
               <div className="mt-3">
-                <UnderwaterDrawdownChart data={underwater} height={220} revealKey={renderKey} />
+                <UnderwaterDrawdownChart data={underwater} height={220} />
               </div>
               <p className="mt-auto border-t border-border pt-3.5 text-[11px] leading-[1.45] text-muted-foreground">
                 La stessa serie della heatmap, concatenata: ogni punto è la distanza dell&apos;indice TWR dal suo massimo. Un versamento

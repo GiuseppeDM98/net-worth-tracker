@@ -5,7 +5,7 @@ import { createDividend, isDuplicateDividend } from '@/lib/services/dividendServ
 import { createExpenseFromDividend } from '@/lib/services/dividendIncomeService';
 import { DividendFormData } from '@/types/dividend';
 import { ExpenseSubCategory } from '@/types/expenses';
-import { isDateOnOrAfter } from '@/lib/utils/dateHelpers';
+import { isDividendEligible } from '@/lib/utils/dividendEligibility';
 import { Asset, BondDetails } from '@/types/assets';
 import {
   getFollowingCouponDate,
@@ -127,9 +127,11 @@ export async function runDividendScraping(
           const scrapedDividends = await scrapeDividendsByIsin(asset.isin!, asset.type);
           if (scrapedDividends.length === 0) continue;
 
-          // Two-part eligibility: 60-day recency AND asset owned before ex-date
+          // Two-part eligibility: 60-day recency AND on or after the asset's dividend floor
+          // (the holding start when the ledger knows it, else the creation date — the ONE
+          // rule in lib/utils/dividendEligibility.ts, shared with the scrape route).
           const relevantDividends = scrapedDividends.filter(div =>
-            div.exDate >= sixtyDaysAgo && isDateOnOrAfter(div.exDate, asset.createdAt)
+            div.exDate >= sixtyDaysAgo && isDividendEligible(div.exDate, asset)
           );
 
           console.log(`Found ${scrapedDividends.length} total, ${relevantDividends.length} relevant dividends for ${asset.ticker}`);

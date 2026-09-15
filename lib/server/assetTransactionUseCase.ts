@@ -45,7 +45,7 @@ import type { AssetType } from '@/types/assets';
 const ASSETS_COLLECTION = 'assets';
 
 /**
- * A semantic failure that needs Firestore context (meta missing, wrong asset type, out-of-bounds
+ * A semantic failure that needs Firestore context (meta missing, wrong asset type, a future
  * date, baseline protection). Carries the HTTP status and an Italian, user-displayable message the
  * route forwards verbatim — mirrors the engine's LedgerValidationError for the pure-math failures.
  */
@@ -91,6 +91,7 @@ function docToAssetTransaction(id: string, data: DocumentData): AssetTransaction
     fees: data.fees,
     linkedCashAssetId: data.linkedCashAssetId,
     isBaseline: data.isBaseline,
+    indexationCoefficient: data.indexationCoefficient,
     note: data.note,
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt),
@@ -110,6 +111,7 @@ function buildTradeSetDocData(t: AssetTransaction): Record<string, unknown> {
     fees: t.fees,
     linkedCashAssetId: t.linkedCashAssetId,
     isBaseline: t.isBaseline,
+    indexationCoefficient: t.indexationCoefficient,
     note: t.note,
     createdAt: t.createdAt,
     updatedAt: t.updatedAt,
@@ -130,6 +132,7 @@ function buildTradeUpdateDocData(t: AssetTransaction): Record<string, unknown> {
     priceEur: t.priceEur,
     fees: t.fees ?? FieldValue.delete(),
     linkedCashAssetId: t.linkedCashAssetId ?? FieldValue.delete(),
+    indexationCoefficient: t.indexationCoefficient ?? FieldValue.delete(),
     note: t.note ?? FieldValue.delete(),
     updatedAt: t.updatedAt,
   };
@@ -139,13 +142,12 @@ function buildTradeUpdateDocData(t: AssetTransaction): Record<string, unknown> {
 // Semantic validation (needs Firestore data — kept out of zod)
 // ---------------------------------------------------------------------------
 
-async function getMetaOrThrow(ownerId: string): Promise<{ baselineDate: Date }> {
+async function assertLedgerInitialized(ownerId: string): Promise<void> {
   const snap = await adminDb.collection(ASSET_TRANSACTIONS_META_COLLECTION).doc(ownerId).get();
   if (!snap.exists) {
     // The UI triggers migration before showing any trade affordance, so this is a safety net.
     throw new TradeUseCaseError(409, 'Registro operazioni non ancora inizializzato.');
   }
-  return { baselineDate: toDate(snap.data()?.baselineDate) };
 }
 
 async function getLedgerAssetCurrencyOrThrow(ownerId: string, assetId: string): Promise<string> {
@@ -176,12 +178,15 @@ async function assertCashSettlementAsset(ownerId: string, cashAssetId: string): 
   }
 }
 
-/** meta.baselineDate <= date <= end of today (Italy day bounds — never setHours on Vercel). */
-function assertDateWithinBounds(date: Date, baselineDate: Date): void {
+/**
+ * date <= end of today (Italy day bounds — never setHours on Vercel). The future is the ONLY
+ * global bound: a trade may carry any past date, so a user records today the shares bought two
+ * years ago with their real date (2026-09-13). The one floor left is per asset — a migrated
+ * asset's baseline, enforced by the replay's `BASELINE_NOT_FIRST` — and the Rendimenti flows read
+ * an instrument's first appearance as its entry (`portfolioFlows.ts` § THE ENTRY MONTH).
+ */
+function assertDateNotInFuture(date: Date): void {
   const { end } = getItalyDayBoundsUtc();
-  if (date.getTime() < baselineDate.getTime()) {
-    throw new TradeUseCaseError(422, "La data non può precedere l'apertura del registro operazioni.");
-  }
   if (date.getTime() > end.getTime()) {
     throw new TradeUseCaseError(422, 'La data non può essere nel futuro.');
   }
@@ -236,9 +241,9 @@ async function prepareCreate(
   ownerId: string,
   data: AssetTransactionFormData
 ): Promise<PreparedMutation> {
-  const { baselineDate } = await getMetaOrThrow(ownerId);
+  await assertLedgerInitialized(ownerId);
   const currency = await getLedgerAssetCurrencyOrThrow(ownerId, data.assetId);
-  assertDateWithinBounds(data.date, baselineDate);
+  assertDateNotInFuture(data.date);
   if (data.linkedCashAssetId) await assertCashSettlementAsset(ownerId, data.linkedCashAssetId);
 
   // priceEur resolved here (network) — never inside the Firestore transaction.
@@ -257,6 +262,7 @@ async function prepareCreate(
     priceEur,
     fees: data.fees,
     linkedCashAssetId: data.linkedCashAssetId,
+    indexationCoefficient: data.indexationCoefficient,
     note: data.note,
     createdAt: now,
     updatedAt: now,
@@ -284,7 +290,7 @@ async function prepareEdit(
   updates: Partial<AssetTransactionFormData>
 ): Promise<PreparedMutation> {
   const oldTrade = await getOwnedTradeOrThrow(ownerId, transactionId);
-  const { baselineDate } = await getMetaOrThrow(ownerId);
+  await assertLedgerInitialized(ownerId);
   const currency = await getLedgerAssetCurrencyOrThrow(ownerId, oldTrade.assetId);
 
   if (oldTrade.isBaseline) assertBaselineEditableFields(updates);
@@ -303,8 +309,11 @@ async function prepareEdit(
       ? updates.linkedCashAssetId
       : oldTrade.linkedCashAssetId;
   const mergedNote = updates.note !== undefined ? updates.note : oldTrade.note;
+  // The coefficient travels with the price it scaled: a price update carries its own (or none).
+  const mergedIndexationCoefficient =
+    updates.pricePerUnit !== undefined ? updates.indexationCoefficient : oldTrade.indexationCoefficient;
 
-  assertDateWithinBounds(mergedDate, baselineDate);
+  assertDateNotInFuture(mergedDate);
   if (updates.linkedCashAssetId !== undefined && mergedLinkedCash) {
     await assertCashSettlementAsset(ownerId, mergedLinkedCash);
   }
@@ -324,6 +333,7 @@ async function prepareEdit(
     priceEur,
     fees: mergedFees,
     linkedCashAssetId: mergedLinkedCash,
+    indexationCoefficient: mergedIndexationCoefficient,
     note: mergedNote,
     updatedAt: new Date(),
   };
@@ -585,7 +595,9 @@ export async function migrateAssetLedger(ownerId: string): Promise<MigrationResu
   const assets = await getUserAssetsAdmin(ownerId);
   const ledgerAssets = assets.filter((a) => isLedgerAssetType(a.type) && a.quantity > 0);
 
-  // Start-of-day Italy of migration day: the global floor for every future trade date.
+  // Start-of-day Italy of migration day: the date of every baseline BUY (and, through the replay,
+  // the floor of the migrated assets' trades only — an asset without a baseline accepts any past
+  // date since 2026-09-13).
   const { start: baselineDate } = getItalyDayBoundsUtc();
   const now = new Date();
 

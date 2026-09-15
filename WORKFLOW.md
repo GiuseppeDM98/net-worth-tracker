@@ -31,6 +31,13 @@
 4. **Always answer in Italian** when working on this repo. This applies to the conversational
    channel; code, identifiers and comments stay in English.
 
+5. **Questions and proposals are asked interactively** (2026-09-11). When a decision is the owner's —
+   which layers to build, on which surfaces, a wording — put it through the agent's interactive
+   question tool, one batch per topic, multi-select where the options are not exclusive and the
+   recommended option first; never a numbered list of questions in prose. The owner refines the
+   wording through the free-text answer («hai pagato», not «pagherai», for a tax the broker
+   withholds at the sale).
+
 ---
 
 ## 2. Guided verification (*collaudo guidato*)
@@ -173,6 +180,15 @@ The app **is** locally runnable; there is no fallback to declare.
 
 ### Obligation 4 — automate it here
 
+- **When the Claude-in-Chrome extension is not connected** («Browser extension is not connected» from
+  `tabs_context_mcp`, 2026-09-13 — for the session and its sub-agents alike), do not retry it: the live
+  evidence an Impeccable critique or audit needs (screenshots at 1440 and 390, `main` overflow, sub-44px
+  targets, console, the `detect.js` overlay) comes from a throwaway Playwright script on the emulator
+  dev server — copied into the repo root as `.tmp-*.mjs` so `import 'playwright'` resolves, deleted
+  after — that logs in for real and waits on the page's `h1`, never on `networkidle` (Firestore keeps
+  its sockets open). Say in the report that the evidence is Playwright's. And the tour still goes on
+  the MIRROR (below), not on the fixture: the fixture proves the mechanism, the mirror shows what the
+  owner will see — on 2026-09-13 the mirror surfaced a stale-value reading the fixture cannot produce. **A restart of the Claude Code session kills its background tasks** (emulators and dev server alike, 2026-09-14) and an emulator killed that way exports nothing: before the tour, check the ports and re-seed the mirror. **And the session's memory watchdog kills them too** (2026-09-14 evening, three times in a row on the 8 GB Mac right after a full Playwright run, with 37–67% of memory free): for the owner's tour, the emulators and the dev server are started from the OWNER's terminals, which the watchdog does not touch; the agent only re-seeds the mirror and reports the URLs.
 - **Throwaway fixtures** follow the existing seed pattern (`scripts/seedEmulator.ts`,
   `scripts/seedAnalisiE2E.mts`, `scripts/seedPensionE2E.mts`, `scripts/seedCoastFireE2E.mts`) or
   live as a throwaway `.mts` in the session scratchpad. `.mts`, never `.ts`: a `.ts` script is CJS
@@ -207,7 +223,23 @@ The app **is** locally runnable; there is no fallback to declare.
   whatever is active (usually `develop`) and merges into it by PR.
 - **The outcome of a verification**: `SESSION_NOTES.md` during the session (untracked — delete it
   before the commit); it is folded into `CLAUDE.md` (the "Latest" entry) and `Draft Release Temp.md`
-  before the PR.
+  before the PR. **The draft ACCUMULATES until a release is tagged**: a session PREPENDS its entries to the
+  existing sections and never rewrites the file from scratch — on 2026-09-11 a session replaced 534 lines with 5
+  and 308 commits of draft had to be recovered from git two days later. It is emptied only when the owner cuts
+  the tag, and `git log -1 --format=%ad <last tag>` says whether that has happened.
+- **Impeccable critiques are committed** (since 2026-09-12): `.impeccable/critique/*.md` is tracked,
+  so the snapshot `polish` reads as its backlog is the same on every machine. A critique is
+  committed in the session that produces it; one that describes a surface since rebuilt is
+  deleted, not kept as history (the eleven pre-«Verdict over Tiles» ones were removed that day).
+  `.impeccable/hook.cache.json` stays local (`.git/info/exclude`). **A snapshot closes only through
+  `polish`, never by fixing the code** (2026-09-13): `critique-storage latest` judges it current from the
+  fingerprint of the ONE target file (`page.tsx`, a 32-line wrapper), so corrections made in the
+  components leave it open — the polish pass verifies each Priority Issue against the code and runs
+  `critique-storage close`, which stamps `closed: true` in the tracked file. **A snapshot's `target_path` and
+  `target_fingerprint` are those of the machine that wrote it** (2026-09-14): `latest` accepts only the local
+  absolute path and the local bytes (a Windows checkout is CRLF under `* text=auto`, so its fingerprint never
+  matches a Mac's), while `trend` and `signals` match by slug. The four snapshots written on Windows were
+  rewritten to this Mac's path and LF fingerprint; the owner works from the Mac only.
 - **Do not duplicate project conventions here.** Code and comment conventions live in
   `DEVELOPMENT_GUIDELINES.md` and `COMMENTS.md`, repo-wide patterns and traps in `AGENTS.md`, the
   per-area rules in `doc/guide/<tema>.md`, the aesthetic in `DESIGN.md`, environment and emulators

@@ -93,6 +93,29 @@ describe('buildTimeBuckets', () => {
     expect(buckets[0].income).toBe(1000);
   });
 
+  it('closes the axis on the ceiling, so a materialised plan does not draw the years ahead', () => {
+    // A 2027 instalment is a calendar row, not a history bucket (seventeen empty years on the
+    // real account, 2026-09-14). The running year keeps its own bucket, calendar included.
+    const expenses: Expense[] = [
+      makeExpense({ type: 'income', amount: 1000, date: d(2025, 3) }),
+      makeExpense({ type: 'fixed', amount: -100, date: d(2026, 10) }),
+      makeExpense({ type: 'fixed', amount: -100, date: d(2027, 2) }),
+    ];
+
+    expect(buildTimeBuckets(expenses, 'year', 2025, { year: 2026, month: 9 }).map((b) => b.label)).toEqual(['2025', '2026']);
+    expect(buildTimeBuckets(expenses, 'year', 2025, { year: 2026, month: 9 })[1]).toMatchObject({ expenses: 100 });
+    // Monthly: the axis stops at the ceiling's month, and the October row falls outside it.
+    const months = buildTimeBuckets(expenses, 'month', 2025, { year: 2026, month: 9 });
+    expect(months[months.length - 1].key).toBe('2026-09');
+    expect(months.every((b) => b.expenses === 0)).toBe(true);
+    // Without a ceiling the axis still runs to the last row.
+    expect(buildTimeBuckets(expenses, 'year', 2025).map((b) => b.label)).toEqual(['2025', '2026', '2027']);
+    // The series builders take the same ceiling (their axis starts at the first spending row).
+    expect(buildCategoryTimeSeries(expenses, 'year', 'expenses', 2025, 6, { year: 2026, month: 9 }).buckets.map((b) => b.label)).toEqual(['2026']);
+    expect(buildTypeTimeSeries(expenses, 'year', 2025, { year: 2026, month: 9 }).buckets.map((b) => b.label)).toEqual(['2026']);
+    expect(buildTypeTimeSeries(expenses, 'year', 2025).buckets.map((b) => b.label)).toEqual(['2026', '2027']);
+  });
+
   it('returns an empty array when there is no non-transfer data', () => {
     expect(buildTimeBuckets([], 'month', 2025)).toEqual([]);
     expect(

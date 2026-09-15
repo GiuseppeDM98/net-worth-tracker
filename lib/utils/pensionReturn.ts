@@ -224,24 +224,62 @@ export function valueEffectMonth(contribution: PensionContribution): string {
  * @returns Punti ordinati cronologicamente
  */
 export function buildPensionValueSeries(
-  snapshots: MonthlySnapshot[],
+  snapshots: MonthlySnapshot[] | PensionSnapshotIndex,
   fundIds: string[]
 ): PensionValuePoint[] {
   if (fundIds.length === 0) return [];
-  const ids = new Set(fundIds);
+  const index = isSnapshotIndex(snapshots) ? snapshots : indexPensionSnapshots(snapshots, fundIds);
 
+  return index
+    .map((month) => ({
+      year: month.year,
+      month: month.month,
+      value: fundIds.reduce((sum, id) => sum + (month.values.get(id) ?? 0), 0),
+    }))
+    .filter((point) => point.value > 0);
+}
+
+/** Un mese di snapshot ridotto ai soli fondi che interessano: `assetId → totalValue`. */
+export interface PensionSnapshotMonth {
+  year: number;
+  /** 1-12 */
+  month: number;
+  /** 'YYYY-MM' */
+  key: string;
+  values: ReadonlyMap<string, number>;
+}
+
+/** Gli snapshot con breakdown, in ordine cronologico, ridotti ai fondi pensione — da `indexPensionSnapshots`. */
+export type PensionSnapshotIndex = ReadonlyArray<PensionSnapshotMonth>;
+
+/**
+ * Riduce gli snapshot UNA volta ai soli fondi pensione, in ordine cronologico.
+ *
+ * `buildPensionValueSeries` veniva chiamata per il totale, per ogni contribuente e per ogni
+ * fondo (il digest del mese), e ognuna rileggeva ogni `byAsset` di ogni mese — l'array più
+ * pesante che la pagina tiene — e lo riordinava. L'indice lo fa una volta sola; i consumatori
+ * ricevono `PensionSnapshotIndex` e ogni serie diventa una lettura di mappa. La pagina lo
+ * memoizza sugli snapshot, così il cambio dell'anno fiscale non li rilegge.
+ *
+ * @param snapshots - Snapshot dell'account, in qualsiasi ordine
+ * @param fundIds - Gli `assetId` dei fondi pensione da tenere nell'indice
+ */
+export function indexPensionSnapshots(snapshots: MonthlySnapshot[], fundIds: string[]): PensionSnapshotIndex {
+  const ids = new Set(fundIds);
   return snapshots
     .filter(hasAssetBreakdown)
-    .map((snapshot) => ({
-      year: snapshot.year,
-      month: snapshot.month,
-      value: snapshot.byAsset.reduce(
-        (sum, entry) => (ids.has(entry.assetId) ? sum + entry.totalValue : sum),
-        0
-      ),
-    }))
-    .filter((point) => point.value > 0)
+    .map((snapshot) => {
+      const values = new Map<string, number>();
+      for (const entry of snapshot.byAsset) {
+        if (ids.has(entry.assetId)) values.set(entry.assetId, (values.get(entry.assetId) ?? 0) + entry.totalValue);
+      }
+      return { year: snapshot.year, month: snapshot.month, key: monthKey(snapshot.year, snapshot.month), values };
+    })
     .sort((a, b) => (a.year !== b.year ? a.year - b.year : a.month - b.month));
+}
+
+function isSnapshotIndex(source: MonthlySnapshot[] | PensionSnapshotIndex): source is PensionSnapshotIndex {
+  return source.length > 0 && 'values' in source[0];
 }
 
 /**

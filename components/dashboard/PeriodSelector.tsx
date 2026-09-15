@@ -1,9 +1,11 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import { SegmentedPill, type SegmentedPillOption } from '@/components/ui/segmented-pill';
 
 const PERIODS = ['3M', '6M', 'YTD', '1A', '3A', 'All'] as const;
-export type SparklinePeriod = typeof PERIODS[number];
+export type SparklinePeriod = (typeof PERIODS)[number];
+
+const OPTIONS: ReadonlyArray<SegmentedPillOption<SparklinePeriod>> = PERIODS.map((value) => ({ value, label: value }));
 
 interface PeriodSelectorProps {
   value: SparklinePeriod;
@@ -11,32 +13,23 @@ interface PeriodSelectorProps {
 }
 
 /**
- * Period selector pill for the hero sparkline.
- * Framer Motion layoutId="period-pill" produces a spring-animated
- * sliding background pill (spring 400/35 — same as all other tab pickers in the app).
+ * The period of the hero sparkline — the ONE control on the Panoramica, so it is the shared
+ * `SegmentedPill` and not a hand-rolled pill: `radio` semantics (it picks a VALUE the chart
+ * reads, there is no tabpanel — AGENTS.md → Accessibility), roving tabindex, the 14px label of
+ * every other pill instead of a 10,5px one nowhere on the ramp, 44px of height under `desktop:`
+ * for the thumb. The spring (400/35) is the primitive's, the same as every other tab picker.
  */
 export function PeriodSelector({ value, onChange }: PeriodSelectorProps) {
   return (
-    <div role="tablist" className="flex bg-muted rounded-lg p-[3px] gap-px">
-      {PERIODS.map(p => (
-        <button
-          key={p}
-          role="tab"
-          aria-selected={value === p}
-          onClick={() => onChange(p)}
-          className="relative flex-1 py-[5px] rounded-md text-[10.5px] font-medium
-            text-muted-foreground aria-selected:text-foreground transition-colors duration-150"
-        >
-          {value === p && (
-            <motion.div
-              layoutId="period-pill"
-              className="absolute inset-0 bg-card rounded-md shadow-sm"
-              transition={{ type: 'spring', stiffness: 400, damping: 35 }}
-            />
-          )}
-          <span className="relative z-10">{p}</span>
-        </button>
-      ))}
-    </div>
+    <SegmentedPill
+      options={OPTIONS}
+      value={value}
+      onChange={onChange}
+      layoutId="period-pill"
+      ariaLabel="Periodo del grafico"
+      semantics="radio"
+      optionClassName="min-h-11 flex-1 desktop:min-h-0 desktop:flex-none"
+      className="w-full tablet:w-fit"
+    />
   );
 }

@@ -84,8 +84,83 @@ export const EXPENSE_FLOW_TYPES: ExpenseType[] = ['fixed', 'variable', 'debt'];
 // Mobile keeps the chart legible by showing only the largest slices at each level.
 const MOBILE_MAX_INCOME_CATEGORIES = 5;
 const MOBILE_MAX_CATEGORIES_PER_TYPE = 3;
-const MOBILE_MAX_SUBCATEGORIES = 4;
 const MOBILE_MAX_DRILLDOWN_ITEMS = 8;
+
+/**
+ * The subcategory layer is a detail of the biggest categories, not a fifth column for every
+ * one of them: on the real account (29 categories) it drew 98 nodes in 500px and no label was
+ * readable (2026-09-14). Only the `MAX_SUBCATEGORY_CATEGORIES` largest categories, across the
+ * types, open into their `MAX_SUBCATEGORIES` largest subcategories; what those leave out is
+ * ONE «Altre N» node per category (it still adds up), and every other category stays a leaf.
+ * The tile's aside says so («prime 6 categorie»).
+ */
+export const MAX_SUBCATEGORY_CATEGORIES = 6;
+export const MAX_SUBCATEGORIES = 4;
+
+/**
+ * Label text, one neutral per mode — the labels used to take each node's colour brightened
+ * 1.5×, which put rgb(255,255,19) yellow beside the type's violet. Hex because the chart is
+ * Nivo on react-spring (AGENTS.md → Recharts: never a CSS token here); the values are the
+ * sRGB of DESIGN.md's off-blanc and charcoal, declared in the DOM-side hex inventory.
+ */
+export const LABEL_TEXT_COLORS = { dark: '#e5e5e5', light: '#262626' } as const;
+
+/** Nodes per column, the input of `resolveSankeyHeight` — exported for the tile's aside and its tests. */
+export interface SankeyLayerCounts {
+  incomeCategories: number;
+  expenseTypes: number;
+  categories: number;
+  subCategories: number;
+  hasSavings: boolean;
+}
+
+/**
+ * How many nodes stand in each column of a view. With `align="left"` a node sits at its
+ * depth from the sources, so the savings node shares the types' column and a category
+ * without a subcategory layer stays in the categories' column — the widest column is what
+ * decides the height.
+ */
+export function countSankeyLayers(view: SankeyView): SankeyLayerCounts {
+  const counts: SankeyLayerCounts = { incomeCategories: 0, expenseTypes: 0, categories: 0, subCategories: 0, hasSavings: false };
+  for (const descriptor of view.index.values()) {
+    switch (descriptor.kind) {
+      case 'category':
+        if (descriptor.expenseType === 'income') counts.incomeCategories++;
+        else counts.categories++;
+        break;
+      case 'expenseType':
+        counts.expenseTypes++;
+        break;
+      case 'subCategory':
+        counts.subCategories++;
+        break;
+      case 'savings':
+        counts.hasSavings = true;
+        break;
+      case 'budget':
+        break;
+    }
+  }
+  return counts;
+}
+
+/** Vertical room per node of the widest column: the spacing plus an 11px label with its leading. */
+const ROW_PX = { desktop: 26, mobile: 22 } as const;
+const BASE_HEIGHT = { desktop: 500, mobile: 400 } as const;
+const MAX_HEIGHT = 1100;
+
+/**
+ * The plot's height from its widest column: a fixed 500px packed 30 category nodes at 10px
+ * of spacing, so the smallest nodes' labels overlapped (16 pairs measured at 1440 on the real
+ * account, 2026-09-14). Each node of the widest column gets a row; the height never drops
+ * below the base and never exceeds the cap, so a pathological taxonomy scrolls the page rather
+ * than the label pitch.
+ */
+export function resolveSankeyHeight(counts: SankeyLayerCounts, isMobile: boolean): number {
+  const widest = Math.max(counts.incomeCategories, counts.expenseTypes + (counts.hasSavings ? 1 : 0), counts.categories, counts.subCategories, 1);
+  const variant = isMobile ? 'mobile' : 'desktop';
+  return Math.min(MAX_HEIGHT, Math.max(BASE_HEIGHT[variant], widest * ROW_PX[variant] + 80));
+}
 
 // ── Public shapes ────────────────────────────────────────────────────────────
 
@@ -150,6 +225,9 @@ const categoryNodeId = (expenseType: ExpenseType, categoryKey: string): string =
 
 const subCategoryNodeId = (expenseType: ExpenseType, categoryKey: string, subCategoryKey: string): string =>
   `sub:${expenseType}:${categoryKey}:${subCategoryKey}`;
+
+/** The «Altre N» residual of a category's subcategory layer — one per category, namespaced like the rest. */
+const subCategoryRestNodeId = (expenseType: ExpenseType, categoryKey: string): string => `subrest:${expenseType}:${categoryKey}`;
 
 // ── Color derivation ─────────────────────────────────────────────────────────
 
@@ -373,6 +451,19 @@ function buildBudgetFlow(expenses: Expense[], options: BudgetFlowOptions): Sanke
     ),
   ]);
 
+  // The categories that open into a subcategory layer: the largest with a real breakdown,
+  // across the types (see MAX_SUBCATEGORY_CATEGORIES). Mobile keeps its own tighter cuts.
+  const openCategories = new Set<string>(
+    withSubcategories
+      ? rank(
+          EXPENSE_FLOW_TYPES.flatMap((type) =>
+            (categoriesByType.get(type) ?? []).filter(hasRealBreakdown).map((category) => ({ nodeId: categoryNodeId(type, category.key), value: category.value })),
+          ),
+          isMobile ? MOBILE_MAX_CATEGORIES_PER_TYPE : MAX_SUBCATEGORY_CATEGORIES,
+        ).map((entry) => entry.nodeId)
+      : [],
+  );
+
   const builder = new ViewBuilder();
 
   // Layer 1: income categories → Budget
@@ -404,10 +495,6 @@ function buildBudgetFlow(expenses: Expense[], options: BudgetFlowOptions): Sanke
     const categoryColors = deriveSubcategoryColors(TYPE_COLORS[type], categories.length);
 
     categories.forEach((category, position) => {
-      // In the 5-layer view a category without a real breakdown is dropped along with
-      // its link, so the layer below never has a parent that emits nothing.
-      if (withSubcategories && !hasRealBreakdown(category)) return;
-
       const categoryId = categoryNodeId(type, category.key);
       const categoryLabel = labels.get(categoryId) ?? category.name;
       const categoryColor = categoryColors[position];
@@ -422,8 +509,14 @@ function buildBudgetFlow(expenses: Expense[], options: BudgetFlowOptions): Sanke
 
       if (!withSubcategories) return;
 
-      const subCategories = rank(category.subCategories.values(), isMobile ? MOBILE_MAX_SUBCATEGORIES : undefined);
-      const subColors = deriveSubcategoryColors(categoryColor, subCategories.length);
+          // A category outside the largest ones, or without a real breakdown, is a leaf: it keeps
+      // its node and its money, it just does not open (dropping it hid the category entirely).
+      if (!openCategories.has(categoryNodeId(type, category.key))) return;
+
+      const rankedSubCategories = rank(category.subCategories.values());
+      const subCategories = rankedSubCategories.slice(0, MAX_SUBCATEGORIES);
+      const rest = rankedSubCategories.slice(MAX_SUBCATEGORIES);
+      const subColors = deriveSubcategoryColors(categoryColor, subCategories.length + (rest.length > 0 ? 1 : 0));
 
       subCategories.forEach((subCategory, subPosition) => {
         const subId = subCategoryNodeId(type, category.key, subCategory.key);
@@ -437,6 +530,20 @@ function buildBudgetFlow(expenses: Expense[], options: BudgetFlowOptions): Sanke
         });
         builder.addLink(categoryId, subId, subCategory.value);
       });
+
+      // The residual is a node of its own so the category still adds up; it opens the
+      // category's Scheda, where every subcategory is listed.
+      if (rest.length > 0) {
+        const restId = subCategoryRestNodeId(type, category.key);
+        const restValue = rest.reduce((sum, subCategory) => sum + subCategory.value, 0);
+        builder.addNode(restId, rest.length === 1 ? "Un'altra" : `Altre ${rest.length}`, subColors[subCategories.length], {
+          kind: 'category',
+          expenseType: type,
+          categoryKey: category.key,
+          categoryLabel,
+        });
+        builder.addLink(categoryId, restId, restValue);
+      }
     });
   }
 
@@ -458,10 +565,9 @@ export function buildBudgetFlowData(expenses: Expense[], isMobile: boolean): San
 }
 
 /**
- * 5-layer budget flow, adding a subcategory layer under each category.
- *
- * Categories whose rows carry no subcategory at all are dropped from both layers —
- * see hasRealBreakdown.
+ * 5-layer budget flow, adding a subcategory layer under the largest categories
+ * (MAX_SUBCATEGORY_CATEGORIES, MAX_SUBCATEGORIES + one «Altre N» node each); every other
+ * category, and one whose rows carry no subcategory at all (hasRealBreakdown), stays a leaf.
  */
 export function buildBudgetFlowDataWithSubcategories(expenses: Expense[], isMobile: boolean): SankeyView {
   return buildBudgetFlow(expenses, { withSubcategories: true, isMobile });

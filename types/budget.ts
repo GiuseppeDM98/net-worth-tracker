@@ -162,15 +162,27 @@ export interface BudgetAlert {
   key: string;
   label: string;
   level: BudgetAlertLevel;
+  // The window the budget is measured over: the month for a monthly budget (and the
+  // ceiling), the year for an annual one. A row says which, because «3463 € su 1500 €»
+  // without its window reads as a month.
+  period: BudgetPeriod;
   // Highest crossed threshold (e.g. 90) — 100+ means the budget is exceeded. For a
   // forecast-only alert (nothing crossed yet) it reads 100 and `thresholdCrossed` is false.
   threshold: number;
-  // True when current spend crossed a configured threshold — the Avvisi tile lists only
-  // these; a forecast-only alert belongs to «Categorie a rischio» instead.
+  // True when the spend BOOKED TO DATE crossed a configured threshold — the Avvisi tile
+  // lists only these; a forecast-only alert belongs to «Categorie a rischio» instead.
   thresholdCrossed: boolean;
+  // Booked up to today, in the alert's window: a threshold is a fact, and a row dated after
+  // today is not one yet (2026-09-14; before, the month's scheduled rows counted as spent).
   spent: number;
   budgetAmount: number;
   usedRatio: number;
+  // Share of the window elapsed today, 0-100 — the calendar the used share is read against
+  // (the month's for a monthly budget, the year's for an annual one).
+  calendarPct: number;
+  // usedRatio above the calendar's share. A crossed threshold behind the calendar is a
+  // number, not a warning: Tecnologia at 54% with the year at 70% is not in trouble.
+  aheadOfCalendar: boolean;
   // True when the end-of-month projection (not just current spend) crosses the budget
   forecastedOverrun: boolean;
   // Day of the month on which the running total first exceeded the budget (monthly

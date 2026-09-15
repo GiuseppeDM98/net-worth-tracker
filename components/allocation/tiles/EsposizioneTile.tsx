@@ -220,7 +220,7 @@ export function EsposizioneTile({ userId, className }: EsposizioneTileProps) {
               onRowClick={handleRowClick}
               activeKey={openRow?.key ?? null}
               ariaLabel={LIST_LABELS[view]}
-              labelClassName="w-[128px]"
+              labelClassName="min-w-[128px]"
             />
           )}
           {/* The live region is rendered with the list, before any row is opened, so a screen

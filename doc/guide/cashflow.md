@@ -28,6 +28,15 @@
   `updateExpense` re-derives the sign from the incoming type and nulls `transferCashAssetId` when it leaves transfer.
   **That control lives in EDIT mode only** — creation picks the type in step 1 (AGENTS.md § Two-Step Create Dialogs), so the
   reconciliation paths above are reachable exclusively from a saved row.
+- **A transfer IS its two accounts** (2026-09-13): `expenseSchema`'s last `superRefine` refuses a `transfer` without
+  origin and destination or with the same account twice, with the error under each Select (the `__none__` sentinel
+  counts as empty); the two labels carried an asterisk the schema did not honour, so a transfer saved without accounts
+  moved no money and said nothing. Without any cash account the dialog says so in place of the pickers.
+- **The first occurrence of a series moves the account WITH THE SIGN OF ITS TYPE** (2026-09-13): the recurring branch
+  of `firstSignedAmount` in `ExpenseDialog.onSubmit` was hard-coded negative — latent, not a bug: `canTypeRecur` keeps
+  incomes out of recurrence, so the branch never met a salary — and now shares the `income → +, else −` rule of the
+  instalment and single branches, so widening `RECURRING_EXPENSE_TYPES` cannot debit an income. Pinned by
+  `e2e/cashflow.accounts.spec.ts` (a recurring expense debits the account once, for its first row).
 - **The BATCH paths refuse to cross the transfer boundary** (`crossesTransferBoundary`): `updateExpensesType`,
   `moveExpensesToCategory`, `moveExpensesFromSubCategory` throw `TransferBoundaryError` when expenses exist, since each
   row would need its own destination account.

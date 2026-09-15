@@ -44,7 +44,7 @@ test('opens the Scheda from a category row under touch', async ({ page }) => {
   await page.getByRole('region', { name: 'Spese per categoria' }).getByRole('button', { name: /^Casa, / }).click();
 
   await expect(page.getByText(`Totale · ${CURRENT_YEAR}`)).toBeVisible();
-  await expect(page.getByText(`Totale · ${CURRENT_YEAR}`).locator('..').getByText(/^380,00[\s ]*€$/)).toBeVisible();
+  await expect(page.getByText(`Totale · ${CURRENT_YEAR}`).locator('..').getByText(/^380[\s ]*€$/)).toBeVisible();
   // The per-year table renders as a flat list readable at 390px.
   await expect(page.getByText('Per anno', { exact: true })).toBeVisible();
 });

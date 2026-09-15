@@ -29,11 +29,19 @@ const MODE_OPTIONS = [
   { value: 'history' as const, label: 'Storico' },
 ];
 
+/** The axis picks a VALUE the whole page reads: a radiogroup, never a tablist with no panel (AGENTS.md → Accessibility). 44px on touch, the dense floor at 1440. */
+const PILL_OPTION_CLASS = 'min-h-11 desktop:min-h-0';
+/** The month and year pickers and «Ripristina»: 44px below `desktop:`, the 36px control at 1440. */
+const CONTROL_CLASS = 'h-11 desktop:h-9';
+const SELECT_CLASS = 'h-11 data-[size=default]:h-11 desktop:h-9 desktop:data-[size=default]:h-9';
+
 /**
  * The page's ONE axis — the four-mode pill (Da inizio anno | Anno corrente | Anno | Storico) with the month
  * picker (and the year picker in «Anno») beside it. Deep-linked as `?period&year&month` by the
  * tab; rendered beside the verdict from `desktop:` and under it below. «Ripristina» clears the
- * month only: the mode and the year are the axis, not a filter.
+ * month only: the mode and the year are the axis, not a filter. Below `sm` the four options
+ * stand in two rows: four Italian labels do not fit a 358px pill, and a pill that scrolls
+ * inside itself clipped «Storico» to «Storic» with nothing to say so (measured at 390, 2026-09-14).
  */
 export function AnalisiPeriodControls({
   periodMode,
@@ -47,7 +55,7 @@ export function AnalisiPeriodControls({
 }: AnalisiPeriodControlsProps) {
   const monthSelect = (
     <Select value={selectedMonth?.toString() ?? '__all__'} onValueChange={(value) => onMonthChange(value === '__all__' ? null : parseInt(value, 10))} disabled={periodMode === 'year' && selectedYear === null}>
-      <SelectTrigger className="h-9 w-full sm:w-[150px]" aria-label="Mese">
+      <SelectTrigger className={cn(SELECT_CLASS, 'w-full sm:w-[150px]')} aria-label="Mese">
         <SelectValue placeholder="Tutto l'anno" />
       </SelectTrigger>
       <SelectContent>
@@ -63,7 +71,16 @@ export function AnalisiPeriodControls({
 
   return (
     <div className={cn('flex flex-wrap items-center justify-center gap-2 desktop:justify-end', className)}>
-      <SegmentedPill ariaLabel="Periodo di analisi" layoutId="analisi-period-pill" value={periodMode} onChange={onModeChange} options={MODE_OPTIONS} />
+      <SegmentedPill
+        ariaLabel="Periodo di analisi"
+        layoutId="analisi-period-pill"
+        value={periodMode}
+        onChange={onModeChange}
+        options={MODE_OPTIONS}
+        semantics="radio"
+        optionClassName={PILL_OPTION_CLASS}
+        className="max-sm:grid max-sm:w-full max-sm:grid-cols-2 max-sm:rounded-2xl"
+      />
       <AnimatePresence mode="wait">
         {periodMode !== 'history' && (
           <motion.div
@@ -75,7 +92,7 @@ export function AnalisiPeriodControls({
           >
             {periodMode === 'year' && (
               <Select value={selectedYear?.toString() ?? pastYears[0]?.toString()} onValueChange={(value) => onYearChange(parseInt(value, 10))}>
-                <SelectTrigger className="h-9 w-[110px] font-mono tabular-nums" aria-label="Anno">
+                <SelectTrigger className={cn(SELECT_CLASS, 'w-[110px] font-mono tabular-nums')} aria-label="Anno">
                   <SelectValue placeholder="Anno" />
                 </SelectTrigger>
                 <SelectContent>
@@ -89,7 +106,7 @@ export function AnalisiPeriodControls({
             )}
             {monthSelect}
             {selectedMonth !== null && (
-              <Button variant="ghost" size="sm" onClick={() => onMonthChange(null)} className="h-9 whitespace-nowrap text-muted-foreground hover:text-foreground">
+              <Button variant="ghost" size="sm" onClick={() => onMonthChange(null)} className={cn(CONTROL_CLASS, 'whitespace-nowrap text-muted-foreground hover:text-foreground')}>
                 Ripristina
               </Button>
             )}

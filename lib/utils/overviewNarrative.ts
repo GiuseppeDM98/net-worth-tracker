@@ -17,8 +17,13 @@ import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { formatPercentage } from '@/lib/services/chartService';
 import { MONTH_NAMES } from '@/lib/constants/months';
 import { atThePercent } from '@/lib/utils/patrimonioNarrative';
+import { PENSION_BAND_KEY } from '@/lib/utils/historyComposition';
+import { resolveDeclineCause, type DeclineCause, type PeriodSalesSummary } from '@/lib/utils/periodSales';
+import { declineHeadlineTail, describeOwnFlowsSplit, describeSales } from '@/lib/utils/salesNarrative';
 
 import type { Narrative, NarrativeSegment, VerdictTone } from '@/lib/utils/narrative';
+import type { CategoryRanking } from '@/lib/utils/tracciamentoSummary';
+import type { DashboardOverviewCategoryAmount } from '@/types/dashboardOverview';
 
 // The segment shape and its plain-text rendering live in `narrative.ts` so every page's
 // narrative module shares them; re-exported here for the Panoramica's existing importers.
@@ -38,6 +43,11 @@ export interface OverviewVerdictInput {
   marketEffect: number | null;
   /** The asset class whose market price moved the most; null when none. */
   topMover: { assetClass: string; delta: number } | null;
+  /**
+   * The month's sells from the trade ledger, with the estimated tax withheld on them; null when
+   * nothing was sold, absent on a payload computed before the field existed.
+   */
+  sales?: PeriodSalesSummary | null;
 }
 
 export interface OverviewVerdict {
@@ -85,6 +95,16 @@ function previousMonthIndex(month: number): number {
   return month === 1 ? 12 : month - 1;
 }
 
+/**
+ * «ad agosto» / «a luglio» for the month BEFORE `month` — the Cashflow tile's row label and its
+ * flat-delta line read it from here so no component types the preposition (a tile printed
+ * «A agosto» on the real account until 2026-09-13). `capitalised` for the start of a label.
+ */
+export function atPreviousMonth(month: number, capitalised = false): string {
+  const phrase = withPrepositionA(monthInSentence(previousMonthIndex(month)));
+  return capitalised ? capitalise(phrase) : phrase;
+}
+
 // ─── Asset classes as grammatical subjects ────────────────────────────────────
 
 interface ClassSubject {
@@ -94,9 +114,12 @@ interface ClassSubject {
 
 /**
  * How each class reads as the subject of a sentence. Gender and number decide the verb, so
- * they are stored with the noun rather than guessed from the label. A class missing here
- * (a future widening of the union) falls back to its label with a plural verb — wrong grammar
- * beats a crash, and the test on ASSET_CLASS_SEQUENCE is where the gap would surface.
+ * they are stored with the noun rather than guessed from the label. The keys are the eight
+ * asset classes AND the pension band: the market digest lists the pension funds as their own
+ * «Previdenza» line (`PENSION_BAND_KEY`), so the top mover can be that key — on the real
+ * account it was, and the verdict printed «e pension hanno fatto il grosso del lavoro» until
+ * 2026-09-13. A key missing here is a missing input: the driver clause is DROPPED (the
+ * Narrative Honesty Rule), never printed as a database key with a guessed verb.
  */
 const CLASS_SUBJECTS: Record<string, ClassSubject> = {
   equity: { subject: 'le azioni', plural: true },
@@ -107,15 +130,20 @@ const CLASS_SUBJECTS: Record<string, ClassSubject> = {
   commodity: { subject: 'le materie prime', plural: true },
   trendFollowing: { subject: 'il trend following', plural: false },
   carry: { subject: 'il carry', plural: false },
+  [PENSION_BAND_KEY]: { subject: 'i fondi pensione', plural: true },
 };
 
-function classSubject(assetClass: string): ClassSubject {
-  return CLASS_SUBJECTS[assetClass] ?? { subject: assetClass.toLowerCase(), plural: true };
+function classSubject(assetClass: string): ClassSubject | null {
+  return CLASS_SUBJECTS[assetClass] ?? null;
 }
 
-/** The class name without its article, for "in azioni" / "criptovalute al 2,7%". */
+/**
+ * The class name without its article, for "in azioni" / "criptovalute al 2,7%". A class the
+ * map does not know keeps its label here: a composition reading names what the bar shows.
+ */
 function classNoun(assetClass: string): string {
-  return classSubject(assetClass).subject.replace(/^(le|gli|la|il|lo|l') /, '');
+  const subject = classSubject(assetClass)?.subject ?? assetClass.toLowerCase();
+  return subject.replace(/^(le|gli|la|il|lo|l') /, '');
 }
 
 function capitalise(text: string): string {
@@ -124,33 +152,49 @@ function capitalise(text: string): string {
 
 // ─── Verdict ──────────────────────────────────────────────────────────────────
 
-function resolveHeadline(input: OverviewVerdictInput): { headline: string; tone: VerdictTone } {
+interface ResolvedHeadline {
+  headline: string;
+  tone: VerdictTone;
+  /** The cause of a falling month; null when the month did not fall. */
+  declineCause: DeclineCause | null;
+}
+
+function resolveHeadline(input: OverviewVerdictInput): ResolvedHeadline {
   const month = MONTH_NAMES[input.month - 1];
 
   if (!input.monthlyVariation) {
-    return { headline: `Il tuo patrimonio ${withPrepositionA(month.toLowerCase())}.`, tone: 'neutral' };
+    return { headline: `Il tuo patrimonio ${withPrepositionA(month.toLowerCase())}.`, tone: 'neutral', declineCause: null };
   }
 
   if (input.monthlyVariation.value >= 0) {
     if (input.savingsRate !== null && input.savingsRate < 0) {
-      return { headline: `${month} cresce, ma le spese superano le entrate.`, tone: 'warning' };
+      return { headline: `${month} cresce, ma le spese superano le entrate.`, tone: 'warning', declineCause: null };
     }
-    return { headline: `${month} sta andando bene.`, tone: 'positive' };
+    return { headline: `${month} sta andando bene.`, tone: 'positive', declineCause: null };
   }
 
-  // A falling month: name the market only when the market actually lost money. When the
-  // market gained and the total still fell, the cause is the user's own flows.
-  if (input.marketEffect !== null && input.marketEffect >= 0) {
-    return { headline: `${month} è in calo, nonostante il mercato.`, tone: 'warning' };
-  }
-  if (input.marketEffect !== null) {
-    return { headline: `${month} è in calo: il mercato ha pesato.`, tone: 'negative' };
-  }
-  return { headline: `${month} è in calo.`, tone: 'negative' };
+  // A falling month: name the market only when the market actually lost money, and never the
+  // market ALONE when the ledger says the tax on a sale (or the user's own flows) weighed more —
+  // ONE decision for the three verdicts (`resolveDeclineCause`). A tax that explains the drop
+  // while the market gained is named in the headline, instrument included.
+  const cause = resolveDeclineCause({
+    marketEffect: input.marketEffect,
+    ownFlows: input.marketEffect === null ? null : input.monthlyVariation.value - input.marketEffect,
+    salesTax: input.sales?.estimatedTax ?? null,
+  });
+  return {
+    headline: `${month} è in calo${declineHeadlineTail(cause, input.sales)}`,
+    // The market did not lose: a tax withheld on a gain is worth attention, not alarm.
+    tone: cause === 'despite-market' || cause === 'taxes-despite-market' ? 'warning' : 'negative',
+    declineCause: cause,
+  };
 }
 
-function buildDriverClause(topMover: { assetClass: string; delta: number }, leading: boolean): Narrative {
-  const { subject, plural } = classSubject(topMover.assetClass);
+/** Null when the class has no subject in the map — the clause is dropped, never guessed. */
+function buildDriverClause(topMover: { assetClass: string; delta: number }, leading: boolean): Narrative | null {
+  const resolved = classSubject(topMover.assetClass);
+  if (!resolved) return null;
+  const { subject, plural } = resolved;
   const verb = plural ? 'hanno' : 'ha';
   const action = topMover.delta >= 0 ? 'fatto il grosso del lavoro' : 'pesato';
   const opening = leading ? capitalise(subject) : subject;
@@ -163,7 +207,7 @@ function buildDriverClause(topMover: { assetClass: string; delta: number }, lead
  * monthly clause; no income → no savings clause; nothing attributable → no market driver.
  */
 export function buildOverviewVerdict(input: OverviewVerdictInput): OverviewVerdict {
-  const { headline, tone } = resolveHeadline(input);
+  const { headline, tone, declineCause } = resolveHeadline(input);
   const sentence: Narrative = [prose('Il patrimonio vale '), figure(cachedFormatCurrencyEUR(input.totalValue))];
 
   if (input.monthlyVariation) {
@@ -183,6 +227,14 @@ export function buildOverviewVerdict(input: OverviewVerdictInput): OverviewVerdi
   }
   sentence.push(prose('.'));
 
+  // When the headline blames the tax on a sale, the sale is the month's story and comes right
+  // after the variation — before the savings rate, which is the pleasantry — and the
+  // market-vs-flows split is redundant (the headline already said the market did not lose).
+  const taxIsTheStory = declineCause === 'taxes-despite-market';
+  if (taxIsTheStory && input.sales) {
+    sentence.push(prose(' '), ...describeSales(input.sales));
+  }
+
   const hasSavingsClause = input.savingsRate !== null;
   if (input.savingsRate !== null) {
     sentence.push(
@@ -192,14 +244,26 @@ export function buildOverviewVerdict(input: OverviewVerdictInput): OverviewVerdi
     );
   }
 
-  // The driver is only stated when a market effect was actually measured this month.
-  if (input.topMover && input.marketEffect !== null) {
+  // The driver is only stated when a market effect was actually measured this month, and only
+  // for a class the map can name as a subject.
+  const driverClause =
+    input.topMover && input.marketEffect !== null ? buildDriverClause(input.topMover, !hasSavingsClause) : null;
+  if (driverClause) {
     sentence.push(prose(hasSavingsClause ? ' e ' : ' '));
-    sentence.push(...buildDriverClause(input.topMover, !hasSavingsClause));
+    sentence.push(...driverClause);
   }
 
-  if (hasSavingsClause || (input.topMover && input.marketEffect !== null)) {
+  if (hasSavingsClause || driverClause) {
     sentence.push(prose('.'));
+  }
+
+  // The split between the market and everything the user did, then the sale that explains it:
+  // a month that fell by 4.900 € with the market at −1.100 € must not read as a market month.
+  if (!taxIsTheStory && input.monthlyVariation && input.marketEffect !== null) {
+    sentence.push(prose(' '), ...describeOwnFlowsSplit(input.monthlyVariation.value, input.marketEffect));
+  }
+  if (!taxIsTheStory && input.sales) {
+    sentence.push(prose(' '), ...describeSales(input.sales));
   }
 
   return { headline, tone, sentence };
@@ -303,6 +367,28 @@ export function describeCosts(annualCost: number, totalValue = 0): Narrative | n
   }
   narrative.push(prose('.'));
   return narrative;
+}
+
+/**
+ * The overview payload's top categories as the ranking Tracciamento's reading understands
+ * (`describeCategoryShare`): the same five rows, the period total, and the residual when the
+ * five do not add up to it — so the Panoramica's two category tiles read «Il 29% va in Mutuo;
+ * le prime tre fanno il 68%» with the words Tracciamento uses, never a second phrasing.
+ */
+export function rankingFromOverview(rows: DashboardOverviewCategoryAmount[], total: number): CategoryRanking {
+  const shown = rows.reduce((sum, row) => sum + row.amount, 0);
+  const remainderAmount = Math.max(0, total - shown);
+  return {
+    rows: rows.map((row) => ({
+      category: row.category,
+      categoryKey: row.categoryKey ?? row.category,
+      amount: row.amount,
+      percentage: row.percentage,
+    })),
+    total,
+    remainder:
+      remainderAmount >= 1 ? { amount: remainderAmount, percentage: total > 0 ? (remainderAmount / total) * 100 : 0 } : null,
+  };
 }
 
 /** "Mancano 62.000 €." — the distance to the goal, or the fact that it is reached. */

@@ -4,6 +4,7 @@ import type { MonthFlow, PeriodCashflowTotals, PeriodDelta } from '@/lib/utils/t
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { cn } from '@/lib/utils';
 import { Tile, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
+import { CASHFLOW_SERIES_COLOR } from '@/lib/constants/expenseTypeColors';
 import { NarrativeText } from '@/components/ui/narrative-text';
 import { CashflowKpiTrio, deltaClass } from './CashflowKpiTrio';
 import { FlowBarsChart } from './FlowBarsChart';
@@ -79,11 +80,11 @@ export function CashflowPeriodoTile({
             <NarrativeText segments={windowLabel} className={TILE_SUB_EYEBROW_CLASS} figureClassName="font-semibold" />
             <div className="flex gap-3 text-[11px] text-muted-foreground" aria-hidden="true">
               <span className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-[2px]" style={{ background: 'var(--chart-2)' }} />
+                <span className="h-2 w-2 rounded-[2px]" style={{ background: CASHFLOW_SERIES_COLOR.income }} />
                 Entrate
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-[2px]" style={{ background: 'var(--chart-1)' }} />
+                <span className="h-2 w-2 rounded-[2px]" style={{ background: CASHFLOW_SERIES_COLOR.expenses }} />
                 Spese
               </span>
             </div>

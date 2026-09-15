@@ -20,6 +20,7 @@ import {
   getPensionContributions,
   recordPensionContribution,
   deletePensionContribution,
+  updatePensionFundValue,
   type PensionContributionInput,
 } from '@/lib/services/pensionContributionService';
 import type { PensionContribution } from '@/types/pension';
@@ -75,6 +76,19 @@ export function useDeletePensionContribution(ownerId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (contribution: PensionContribution) => deletePensionContribution(contribution),
+    onSuccess: () => invalidatePensionCaches(queryClient, ownerId),
+  });
+}
+
+/**
+ * Overwrite a fund's value from the statement («Aggiorna valore»). Not a contribution: only the
+ * asset changes, so the asset table and the overview hero go stale — the same caches as a
+ * contribution minus nothing, because one invalidation set is easier to keep right than two.
+ */
+export function useUpdatePensionFundValue(ownerId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ assetId, value }: { assetId: string; value: number }) => updatePensionFundValue(assetId, value),
     onSuccess: () => invalidatePensionCaches(queryClient, ownerId),
   });
 }

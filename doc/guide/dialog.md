@@ -32,16 +32,41 @@
 - **A summary block inside a modal is `bg-muted`**, never `bg-card` — on this surface that is a card inside a card.
 - **The eyebrow's scope is the SINGULAR of one row's type.** `EXPENSE_TYPE_LABELS` is the plural of a category group
   («Spese Variabili»); the picker's own label is the one a modal about ONE row wants («Spesa variabile»).
+- **A refused submit lands in the reading line, in Italian, and scrolls to the field** (`describeFormRefusal` →
+  «Mancano 2 campi: Importo e Categoria.»; `handleSubmit(onSubmit, onInvalid)`, `aria-invalid` on the field,
+  `scrollIntoView` + focus on the first): `AssetDialog` since 2026-09-14 morning, `ExpenseDialog` since the afternoon,
+  `BudgetItemDialog` since the evening (its submit was `disabled` until the form was valid, so a keyboard reader
+  pressed Enter on a dead button and nothing said why; the two rule refusals — the allocation ceiling and the
+  duplicate — are `describeBudgetAmountRefusal` / `describeBudgetDuplicateRefusal` in `budgetNarrative.ts`).
+  **And the refusal is red only since that evening, on EVERY modal**: `ModalStatusLine` merged its classes BEFORE
+  the ones Radix's `Description` hands down through `asChild` (`text-sm text-muted-foreground` from shadcn's
+  wrapper), and `tailwind-merge` kept the last — so the reading was 14px muted in both tones and a refusal never
+  took `text-destructive` (a size utility also drops `leading-[1.45]`). The incoming `className` now comes first.
+  A refusal's colour is asserted by `e2e/cashflow.budget.spec.ts` against a `text-destructive` probe; the two
+  Tracciamento and Patrimonio specs check the words only.
+  A zod `z.number()` fed `NaN` by `valueAsNumber` says «Invalid input» unless the schema carries `{ error: '…' }` —
+  every number the expense form can leave empty now does. Step 2 keeps the counter in the eyebrow («Passo 2 di 2 ·
+  Spesa variabile»).
+- **A delete on a ROW of a table arms in the row; a delete that needs a CHOICE is a modal** (2026-09-14, the Movimenti
+  table): `useArmedDelete` on a plain row with the consequence printed in the row (`describeExpenseDeleteConsequence`)
+  and one live region per table; `SeriesDeleteDialog` («solo questa o tutte le 12?», `describeSeriesDeleteReading`,
+  `sm`, a `bg-muted` summary block for the row's facts) for a row of an instalment plan or a recurring series —
+  shared by the table and the feed's detail drawer, which each used to mount an `AlertDialog` for it.
 - **In light mode `--card` and `--background` are both `oklch(1 0 0)`**, so a test that proves a modal is «lifted» by
   comparing it with the page background passes only in dark mode. What separates it there is the border and the Float
   shadow; assert the modal's surface equals a TILE's instead.
 
 ## Per-page blind spots
 
-- **Blind spot** (looks like a bug, is not): no Playwright spec (the session's throwaway ones were deleted). Four
-  two-click deletes still auto-disarm on a 3 s timer BY DESIGN, because they live on rows and not in modals and the
-  owner kept them (`AssetRow`, `StrumentiTile`, `DividendTable`, `AssistantThreadList`); the ones that moved into the
-  modal vocabulary lost theirs. `describeWriteError` maps 11 Firestore codes and anything else takes the generic
+- **Blind spot** (looks like a bug, is not): no Playwright spec of its own (the session's throwaway ones were
+  deleted; the refusal vocabulary is pinned by `e2e/cashflow.budget.spec.ts` and `e2e/cashflow.dividendi.spec.ts`).
+  ONE two-click delete still auto-disarms on a 3 s timer BY DESIGN, because it lives on rows and not in a modal and
+  the owner kept it (`AssistantThreadList`); the ones that moved into the modal vocabulary lost theirs, on 2026-09-14
+  Patrimonio's three (`AssetRow`, `StrumentiTile`, `CashAccountDialog` — the last one a MODAL whose armed state the
+  page held on a timer, so Escape closed it with the row armed) went to `useArmedDelete` by the owner's call
+  (doc/guide/patrimonio.md), and `DividendTable` followed the same evening (its «Conferma» kept the accessible name
+  «Elimina» and no live region until then). `ResponsiveModal.returnFocusTo` names the control the focus goes back
+  to: Radix restores it to whatever was focused at open, which is `body` after a window event or a non-focusable row. `describeWriteError` maps 11 Firestore codes and anything else takes the generic
   sentence, so a NEW cause is invisible until it is added — and a server message survives only if the thrower marks it
   `userFacingError`, which today only `assetTransactionService` does. The status line is FORM-level: per-field zod
   errors keep their own line under the field, and the two can both be visible at once. `dialogClassName` still exists as

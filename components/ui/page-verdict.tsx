@@ -25,7 +25,9 @@ export function PageVerdict({ verdict, ariaLabel }: PageVerdictProps) {
   const headline = verdict.headline.endsWith('.') ? verdict.headline.slice(0, -1) : verdict.headline;
 
   return (
-    <section aria-label={ariaLabel} className="flex max-w-[920px] flex-col gap-2">
+    // `page-verdict` is the region a page scene morphs into the next page's verdict (globals.css →
+    // Page scene); the loading skeleton reserves the same name so the morph has a target on landing.
+    <section aria-label={ariaLabel} className="flex max-w-[920px] flex-col gap-2" style={{ viewTransitionName: 'page-verdict' }}>
       <h2 className="text-[24px] font-semibold leading-[1.15] tracking-[-0.025em] text-foreground desktop:text-[30px]">
         {headline}
         <span className={TONE_DOT_CLASS[verdict.tone]} aria-hidden="true">

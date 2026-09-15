@@ -1,5 +1,6 @@
 'use client';
 
+import { LayoutGroup, motion } from 'framer-motion';
 import type { Narrative } from '@/lib/utils/narrative';
 import type { ReturnAttribution } from '@/lib/utils/performanceAttribution';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
@@ -17,6 +18,9 @@ interface AttribuzioneTileProps {
 /** How many instruments the tile lists before folding the rest into «Altri strumenti». */
 const MAX_ROWS = 6;
 
+/** The one spring of the app (DESIGN.md → Segmented Pill Control): the rows re-rank on it. */
+const RERANK_SPRING = { type: 'spring', stiffness: 400, damping: 35 } as const;
+
 function signedEuro(value: number): string {
   return `${value > 0 ? '+' : value < 0 ? '−' : ''}${cachedFormatCurrencyEUR(Math.abs(value), true)}`;
 }
@@ -33,6 +37,9 @@ function isPrintedZero(value: number): boolean {
  * debt). The bar is the instrument's magnitude against the largest, signed by colour; the list
  * closes on what no instrument explains, so the rows visibly add up to the market's figure
  * (DESIGN.md → Ranked Rows with Residual, The Narrative Honesty Rule).
+ *
+ * On a period switch the rows re-rank in place and every bar slides to its new length: an
+ * instrument that climbs the list is seen climbing, not replaced by a stranger in its slot.
  */
 export function AttribuzioneTile({ aside, reading, attribution, className }: AttribuzioneTileProps) {
   const shown = attribution.rows.slice(0, MAX_ROWS);
@@ -43,9 +50,10 @@ export function AttribuzioneTile({ aside, reading, attribution, className }: Att
   return (
     <Tile eyebrow="Da dove viene il rendimento" aside={aside} reading={reading} className={className}>
       {hasRows && (
+        <LayoutGroup id="attribuzione">
         <ul className="mt-3 flex flex-col divide-y divide-border" aria-label="Contributo di ogni strumento al rendimento del periodo">
           {shown.map((row) => (
-            <li key={row.assetId} className="grid grid-cols-[minmax(0,1fr)_72px_96px] items-center gap-3 py-[9px]">
+            <motion.li key={row.assetId} layout="position" transition={RERANK_SPRING} className="grid grid-cols-[minmax(0,1fr)_72px_96px] items-center gap-3 py-[9px]">
               <span className="flex min-w-0 items-baseline gap-1.5">
                 <span className="truncate text-[13px] text-foreground">{row.name}</span>
                 {row.isPensionFund && <span className="shrink-0 text-[11px] text-muted-foreground">al netto dei versamenti</span>}
@@ -55,14 +63,14 @@ export function AttribuzioneTile({ aside, reading, attribution, className }: Att
               </span>
               <span className="h-[3px] overflow-hidden rounded-full bg-muted" aria-hidden="true">
                 <span
-                  className="block h-full rounded-full"
+                  className="block h-full rounded-full motion-safe:transition-[width,background-color] motion-safe:duration-300 motion-safe:ease-out"
                   style={{ width: `${(Math.abs(row.total) / maxAbs) * 100}%`, background: row.total < 0 ? 'var(--destructive)' : 'var(--positive)' }}
                 />
               </span>
               <span className={cn('text-right font-mono text-[13px] font-semibold tabular-nums', isPrintedZero(row.total) ? 'text-foreground' : signTextClass(row.total))}>
                 {signedEuro(row.total)}
               </span>
-            </li>
+            </motion.li>
           ))}
           {attribution.rows.length > MAX_ROWS && (
             <li className="grid grid-cols-[minmax(0,1fr)_72px_96px] items-center gap-3 py-[9px]">
@@ -86,6 +94,7 @@ export function AttribuzioneTile({ aside, reading, attribution, className }: Att
             </span>
           </li>
         </ul>
+        </LayoutGroup>
       )}
       <p className="mt-auto border-t border-border pt-3.5 text-[11px] leading-[1.45] text-muted-foreground">
         Effetto prezzo sulla quantità detenuta a inizio mese, sommato sui mesi con il dettaglio per strumento; i dividendi

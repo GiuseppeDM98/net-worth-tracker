@@ -5,18 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { LAZY_CATEGORY_ICONS } from '@/components/expenses/IconPickerPopover';
-import type { Expense, ExpenseType } from '@/types/expenses';
-
-// Tailwind dot-color classes keyed by expense type.
-// All entries use semantic token references to stay theme-aware across all 6 colour themes;
-// income takes the sign token so it matches every other "gain" on the page.
-export const TYPE_DOT_CLASS: Record<ExpenseType, string> = {
-  income:   'bg-positive',
-  fixed:    'bg-[var(--chart-1)]',
-  variable: 'bg-[var(--chart-4)]',
-  debt:     'bg-[var(--chart-3)]',
-  transfer: 'bg-[var(--chart-5)]',
-};
+import type { Expense } from '@/types/expenses';
+import { EXPENSE_TYPE_DOT_CLASS as TYPE_DOT_CLASS } from '@/lib/constants/expenseTypeColors';
 
 export interface CompactExpenseRowProps {
   expense: Expense;
@@ -25,6 +15,11 @@ export interface CompactExpenseRowProps {
   categoryColor?: string;
   /** The row is dated after today — listed, not yet happened. */
   scheduled?: boolean;
+  /**
+   * Whose row it is («Giuseppe», «Senza intestatario»), or null for a shared one — resolved by
+   * the parent through `resolveOwnerLabel`, only with Divisione on.
+   */
+  ownerLabel?: string | null;
 }
 
 /**
@@ -34,7 +29,8 @@ export interface CompactExpenseRowProps {
  *
  * A scheduled row (an instalment, a recurring occurrence dated ahead) takes an «In
  * calendario» chip and drops the sign colour on its amount: the sign tokens mean money
- * gained and money lost, and neither has happened yet.
+ * gained and money lost, and neither has happened yet. A row attributed to one person takes
+ * that person's name as a chip; the shared default stays clean.
  */
 export function CompactExpenseRow({
   expense,
@@ -42,6 +38,7 @@ export function CompactExpenseRow({
   categoryIcon,
   categoryColor,
   scheduled = false,
+  ownerLabel = null,
 }: Readonly<CompactExpenseRowProps>) {
   const isIncome = expense.type === 'income';
   const isTransfer = expense.type === 'transfer';
@@ -105,6 +102,11 @@ export function CompactExpenseRow({
           {scheduled && (
             <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 flex-shrink-0 text-muted-foreground">
               In calendario
+            </Badge>
+          )}
+          {ownerLabel && (
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 flex-shrink-0 text-muted-foreground">
+              {ownerLabel}
             </Badge>
           )}
         </div>

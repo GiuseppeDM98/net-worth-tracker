@@ -60,9 +60,6 @@ next-env.d.ts
 
 # Draft\ Release\ Temp.md
 
-# Impeccable: critiques are run-specific, design.json is a committed design artifact
-.impeccable/critique/
-
 # Local tool directories (Claude Code, Antigravity CLI)
 .agents/
 .antigravitycli/

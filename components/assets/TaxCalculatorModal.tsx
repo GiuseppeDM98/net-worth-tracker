@@ -307,22 +307,22 @@ export function TaxCalculatorModal({ open, onClose, asset }: TaxCalculatorModalP
                 </div>
               </div>
 
+              {/* The input IS the gross sale value (the quantity is derived from it above), so the
+                  note reads it as gross: until 2026-09-14 it re-read the same figure as the NET
+                  proceeds and added the tax on top, contradicting the label two fields up. */}
               {inputMode === 'targetValue' && (
                 <p className="text-[12px] leading-relaxed text-muted-foreground">
-                  Per ottenere{' '}
-                  <span className="font-mono tabular-nums text-foreground">{formatCurrency(parseFloat(targetValueInput))}</span> di
-                  ricavo netto dopo le tasse
+                  Vendendo un valore lordo di{' '}
+                  <span className="font-mono tabular-nums text-foreground">{formatCurrency(results.saleValue)}</span>
                   {results.taxes > 0 ? (
                     <>
                       {' '}
-                      dovresti vendere un valore lordo di circa{' '}
-                      <span className="font-mono tabular-nums text-foreground">
-                        {formatCurrency(parseFloat(targetValueInput) + results.taxes)}
-                      </span>
-                      .
+                      ti restano circa{' '}
+                      <span className="font-mono tabular-nums text-foreground">{formatCurrency(results.netProceeds)}</span> netti
+                      dopo le tasse.
                     </>
                   ) : (
-                    <> il valore lordo coincide con quello netto: nessuna tassa da pagare.</>
+                    <> non paghi tasse: il netto coincide con il lordo.</>
                   )}
                 </p>
               )}

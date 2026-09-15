@@ -29,6 +29,7 @@ import {
   isCashAccount,
   isHeld,
   rankInstrumentReturns,
+  resolveBondRowFacts,
   resolveLastPriceUpdate,
   summarizeCashAccounts,
   summarizeMonthTrades,
@@ -362,5 +363,44 @@ describe('resolveLastPriceUpdate', () => {
   it('should be null when no asset is market-priced', () => {
     expect(resolveLastPriceUpdate([makeAsset({ type: 'cash', assetClass: 'cash' })])).toBeNull();
     expect(resolveLastPriceUpdate([])).toBeNull();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// hasCostBasis on hand-valued holdings / resolveBondRowFacts (2026-09-14)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('hasCostBasis — a PMC on a hand-valued holding is not a PMC', () => {
+  it('refuses the structural «+0,00 €» of a private-equity stake and of a property kept at price 1', () => {
+    // Academia Private Equity on the owner's account: value 4.000 in quantity, price 1, averageCost 1.
+    const privateEquity = makeAsset({ type: 'stock', assetClass: 'equity', subCategory: 'Private Equity', quantity: 4000, currentPrice: 1, averageCost: 1 });
+    expect(hasCostBasis(privateEquity)).toBe(false);
+    expect(computeUnrealizedGain(privateEquity)).toBeNull();
+    expect(hasCostBasis(makeAsset({ type: 'realestate', assetClass: 'realestate', quantity: 130000, currentPrice: 1, averageCost: 1 }))).toBe(false);
+    // A quoted instrument the owner prices by hand keeps its real PMC.
+    expect(hasCostBasis(makeAsset({ autoUpdatePrice: false, averageCost: 90 }))).toBe(true);
+  });
+});
+
+describe('resolveBondRowFacts — the dates under a bond row', () => {
+  it('reads maturity, whether coupons exist and the next coupon from the bond details', () => {
+    const facts = resolveBondRowFacts(
+      makeAsset({
+        type: 'bond',
+        assetClass: 'bonds',
+        bondDetails: { couponRate: 3, couponFrequency: 'semiannual', issueDate: new Date(2024, 2, 4), maturityDate: new Date(2099, 2, 4) },
+      }),
+    );
+    expect(facts?.maturityDate).toEqual(new Date(2099, 2, 4));
+    expect(facts?.hasCoupons).toBe(true);
+    expect(facts?.nextCoupon).not.toBeNull();
+  });
+
+  it('has no coupon for a zero coupon and nothing for a non-bond', () => {
+    const zero = resolveBondRowFacts(
+      makeAsset({ type: 'bond', assetClass: 'bonds', bondDetails: { couponRate: 0, couponFrequency: 'annual', issueDate: new Date(2026, 0, 15), maturityDate: new Date(2027, 0, 15) } }),
+    );
+    expect(zero).toMatchObject({ hasCoupons: false, nextCoupon: null });
+    expect(resolveBondRowFacts(makeAsset())).toBeNull();
   });
 });

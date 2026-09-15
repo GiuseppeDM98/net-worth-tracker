@@ -20,10 +20,12 @@ vi.mock('firebase/firestore', () => ({
 
 import {
   buildPatrimonioVerdict,
+  describeBondRow,
   describeCashAccounts,
   describeInstrumentReturns,
   describeInstruments,
   describeLastPriceUpdate,
+  describeManualValuation,
   describeMonthTrades,
   formatHoldingCounts,
   pluralArticleFor,
@@ -100,7 +102,29 @@ describe('buildPatrimonioVerdict — sentence', () => {
   it('should state value, monthly change, the counts and the instrument that drove the month', () => {
     expect(plain(buildPatrimonioVerdict(AUGUST).sentence)).toBe(
       'Il portafoglio vale 412.425,85 €: +3214,20 € (+0,79%) su luglio, 16 strumenti e 3 conti; ' +
-        'Vanguard FTSE All-World ha fatto il grosso (+2140 €).',
+        'Vanguard FTSE All-World ha fatto il grosso (+2140 €). ' +
+        'Di quel movimento, +2000 € viene dal mercato e +1214 € dai tuoi movimenti.',
+    );
+  });
+
+  it('should name the tax over the market and tell the sale, like the Panoramica', () => {
+    const verdict = buildPatrimonioVerdict({
+      ...AUGUST,
+      month: 9,
+      monthlyVariation: { value: -4937.74, percentage: -1.66 },
+      marketEffect: -1078.73,
+      topMover: { id: 'vwce', name: 'Vanguard FTSE All-World', delta: -600 },
+      sales: {
+        proceeds: 39052.45,
+        realizedGain: 15726.38,
+        estimatedTax: 4088.86,
+        instruments: [{ id: 'vwce', name: 'Vanguard FTSE All-World', proceeds: 39052.45, realizedGain: 15726.38, estimatedTax: 4088.86 }],
+        brokenLedgers: 0,
+      },
+    });
+    expect(verdict.headline).toBe('Il portafoglio è in calo: il mercato ha pesato, le tasse sulle vendite di più.');
+    expect(plain(verdict.sentence)).toContain(
+      'Di quel movimento, −1079 € viene dal mercato e −3859 € dai tuoi movimenti. Hai venduto Vanguard FTSE All-World per 39.052 €',
     );
   });
 
@@ -112,7 +136,8 @@ describe('buildPatrimonioVerdict — sentence', () => {
       topMover: { id: 'btc', name: 'Bitcoin', delta: -1800 },
     }).sentence;
     expect(plain(sentence)).toBe(
-      'Il portafoglio vale 412.425,85 €: −2100,00 € (−0,50%) su luglio, 16 strumenti e 3 conti; Bitcoin ha pesato (−1800 €).',
+      'Il portafoglio vale 412.425,85 €: −2100,00 € (−0,50%) su luglio, 16 strumenti e 3 conti; Bitcoin ha pesato (−1800 €). ' +
+        'Di quel movimento, −1500 € viene dal mercato e −600 € dai tuoi movimenti.',
     );
   });
 
@@ -230,5 +255,32 @@ describe('tile readings', () => {
     // A quote older than the calendar year names its year, or a stale ticker reads as three weeks ago.
     expect(describeLastPriceUpdate(new Date(Date.UTC(2025, 8, 14, 16, 0)), now)).toBe('prezzi aggiornati il 14/09/2025 alle 18:00');
     expect(describeLastPriceUpdate(null, now)).toBeNull();
+  });
+});
+
+describe('describeBondRow / describeManualValuation — the sub-line under a row', () => {
+  const now = new Date(Date.UTC(2026, 8, 14, 10, 0)); // 14/09/2026 12:00 in Rome
+
+  it('names the maturity and the next coupon, the year only when it is not the current one', () => {
+    expect(describeBondRow({ maturityDate: new Date(Date.UTC(2032, 2, 4, 11)), hasCoupons: true }, new Date(Date.UTC(2026, 8, 4, 11)), now)).toBe(
+      'scade il 04/03/2032 · prossima cedola 04/09',
+    );
+    expect(describeBondRow({ maturityDate: new Date(Date.UTC(2027, 0, 15, 11)), hasCoupons: true }, new Date(Date.UTC(2027, 0, 15, 11)), now)).toBe(
+      'scade il 15/01/2027 · prossima cedola 15/01/2027',
+    );
+  });
+
+  it('drops the coupon clause for a zero coupon, a matured bond or an unknown next date', () => {
+    expect(describeBondRow({ maturityDate: new Date(Date.UTC(2027, 0, 15, 11)), hasCoupons: false }, null, now)).toBe('scade il 15/01/2027');
+    expect(describeBondRow({ maturityDate: new Date(Date.UTC(2027, 0, 15, 11)), hasCoupons: true }, null, now)).toBe('scade il 15/01/2027');
+    expect(describeBondRow({ maturityDate: new Date(Date.UTC(2027, 0, 15, 11)), hasCoupons: true }, new Date(Date.UTC(2027, 6, 15, 11)), now)).toBe('scade il 15/01/2027');
+    expect(describeBondRow({ maturityDate: new Date('x'), hasCoupons: true }, null, now)).toBeNull();
+  });
+
+  it('dates a hand-typed value, and says nothing without a date', () => {
+    expect(describeManualValuation(new Date(Date.UTC(2026, 7, 12, 11)), now)).toBe('valore a mano dal 12/08');
+    expect(describeManualValuation(new Date(Date.UTC(2025, 11, 30, 11)), now)).toBe('valore a mano dal 30/12/2025');
+    expect(describeManualValuation(null, now)).toBeNull();
+    expect(describeManualValuation(new Date('x'), now)).toBeNull();
   });
 });

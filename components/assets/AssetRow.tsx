@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ChevronDown, Pencil, Trash2, Calculator, ArrowLeftRight, ScrollText, PiggyBank, Info } from 'lucide-react';
 import type { Asset } from '@/types/assets';
@@ -8,8 +8,12 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatCurrency, formatNumber, formatPercentage } from '@/lib/services/chartService';
 import { calculateAssetValue } from '@/lib/services/assetService';
-import { computeUnrealizedGain } from '@/lib/utils/patrimonioSummary';
+import { computeUnrealizedGain, resolveBondRowFacts } from '@/lib/utils/patrimonioSummary';
+import { describeBondRow, describeManualValuation } from '@/lib/utils/patrimonioNarrative';
 import { costBasisPerUnitEur, isEurNative } from '@/lib/utils/costBasisEur';
+import { hasMarketPrice } from '@/lib/utils/assetPricing';
+import { toDate } from '@/lib/utils/dateHelpers';
+import { useArmedDelete } from '@/lib/hooks/useArmedDelete';
 import { getAssetClassCssVar } from '@/lib/constants/colors';
 import { ASSET_CLASS_LABELS } from '@/lib/utils/allocationUtils';
 import { resolveDisplayAssetClass } from '@/lib/utils/assetDisplayClass';
@@ -23,6 +27,18 @@ import { AssetSparkline } from '@/components/assets/AssetSparkline';
 export function formatDeltaPercent(delta: number | null): string {
   if (delta === null) return '—';
   return `${delta >= 0 ? '+' : '−'}${formatPercentage(Math.abs(delta), 1)}`;
+}
+
+/**
+ * The sub-line under an instrument's name, shared by the desktop table and the mobile row:
+ * a bond says when it matures and when its next coupon falls; a hand-valued holding says when
+ * its value was last typed. Null for a quoted instrument, whose ticker is enough.
+ */
+export function describeAssetRowSubLine(asset: Asset, now: Date): string | null {
+  const bond = resolveBondRowFacts(asset);
+  if (bond) return describeBondRow(bond, bond.nextCoupon, now);
+  if (!hasMarketPrice(asset.type, asset.subCategory)) return describeManualValuation(toDate(asset.lastPriceUpdate), now);
+  return null;
 }
 
 /**
@@ -79,8 +95,12 @@ interface AssetRowProps {
   asset: Asset;
   /** The gross portfolio total the weight is measured against. */
   totalValue: number;
+  /** The clock the dated sub-line is read against (one per tile). */
+  now: Date;
   onEdit: (asset: Asset) => void;
   onDelete: (assetId: string) => void;
+  /** The tile's one live region: the arm and the disarm of Elimina are spoken there. */
+  announce: (text: string) => void;
   onCalculateTaxes?: (asset: Asset) => void;
   isManualPrice: boolean;
   isDemo?: boolean;
@@ -97,13 +117,16 @@ interface AssetRowProps {
  * on the details, the unit-price sparkline, the three Δ windows and the actions. Flat on purpose:
  * the rows live inside the Strumenti tile, and a card per row would be a card inside a card.
  * Expansion is the CSS `grid-rows-[0fr] → [1fr]` technique (AGENTS.md → Motion), with `inert`
- * on the closed panel so its buttons leave the tab order.
+ * on the closed panel so its buttons leave the tab order. Elimina is a two-click confirm without
+ * a timer (`useArmedDelete`, since 2026-09-14).
  */
 export function AssetRow({
   asset,
   totalValue,
+  now,
   onEdit,
   onDelete,
+  announce,
   onCalculateTaxes,
   isManualPrice,
   isDemo = false,
@@ -114,11 +137,24 @@ export function AssetRow({
   onMovements,
 }: AssetRowProps) {
   const [open, setOpen] = useState(false);
-  const [isPendingDelete, setIsPendingDelete] = useState(false);
-  const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const deleteRef = useRef<HTMLButtonElement | null>(null);
+  const { armed, onClick: onDeleteClick, onBlur: onDeleteBlur } = useArmedDelete(deleteRef, () => onDelete(asset.id));
+  const wasArmed = useRef(false);
+  useEffect(() => {
+    if (armed) {
+      wasArmed.current = true;
+      announce(`Premi di nuovo per eliminare ${asset.name}`);
+    } else if (wasArmed.current) {
+      wasArmed.current = false;
+      announce('Eliminazione annullata');
+    }
+  }, [armed, announce, asset.name]);
 
   const value = calculateAssetValue(asset);
   const displayAssetClass = resolveDisplayAssetClass(asset);
+  // A hand-VALUED holding keeps its value in `quantity` at price 1: those cells describe the
+  // storage, so the details say the value and when it was typed instead.
+  const isHandValued = !hasMarketPrice(asset.type, asset.subCategory);
   // One rule for "this row has a G/P" — the same the desktop table and the Rendimento KPI use.
   const gain = computeUnrealizedGain(asset);
   const hasGainLoss = gain !== null;
@@ -127,30 +163,23 @@ export function AssetRow({
   const weight = totalValue > 0 ? (value / totalValue) * 100 : null;
   const isMortgaged = asset.assetClass === 'realestate' && !!asset.outstandingDebt && asset.outstandingDebt > 0;
   const panelId = `asset-row-${asset.id}`;
+  const subLine = describeAssetRowSubLine(asset, now);
+  const showTicker = !!asset.ticker && asset.type !== 'pensionFund';
   // The actions sit in a two-column grid; with an odd count the last one (Elimina) would be
   // alone in its row, so it takes the whole row instead of leaving a hole beside it.
   const actionCount = 2 + (onCalculateTaxes ? 1 : 0) + (showLedgerActions ? 2 : 0) + (asset.type === 'pensionFund' ? 1 : 0);
   const deleteSpansRow = actionCount % 2 === 1;
 
-  // 2-click disarm (unchanged from the card): same pattern as the desktop table.
-  const handleDeleteClick = () => {
-    if (isPendingDelete) {
-      if (pendingTimerRef.current) clearTimeout(pendingTimerRef.current);
-      setIsPendingDelete(false);
-      onDelete(asset.id);
-    } else {
-      if (pendingTimerRef.current) clearTimeout(pendingTimerRef.current);
-      setIsPendingDelete(true);
-      pendingTimerRef.current = setTimeout(() => setIsPendingDelete(false), 3000);
-    }
-  };
-
   // The EUR PMC (fees included, the G/P's basis) and, on a foreign row, the native one beside it.
-  const pmcEur = costBasisPerUnitEur(asset);
-  const nativePmc = !isEurNative(asset) && asset.averageCost ? asset.averageCost : undefined;
+  const pmcEur = isHandValued ? undefined : costBasisPerUnitEur(asset);
+  const nativePmc = !isHandValued && !isEurNative(asset) && asset.averageCost ? asset.averageCost : undefined;
   const details: Array<{ label: string; value: string; className?: string }> = [
-    { label: 'Quantità', value: formatNumber(asset.quantity, 2) },
-    { label: 'Prezzo', value: formatCurrency(asset.currentPrice, asset.currency, 4) },
+    ...(isHandValued
+      ? []
+      : [
+          { label: 'Quantità', value: formatNumber(asset.quantity, 2) },
+          { label: 'Prezzo', value: formatCurrency(asset.currentPrice, asset.currency, 4) },
+        ]),
     ...(pmcEur !== undefined ? [{ label: 'PMC', value: formatCurrency(pmcEur, 'EUR', 4) }] : []),
     ...(nativePmc !== undefined ? [{ label: `PMC (${asset.currency})`, value: formatCurrency(nativePmc, asset.currency, 4) }] : []),
     ...(asset.totalExpenseRatio ? [{ label: 'TER', value: formatPercentage(asset.totalExpenseRatio, 2) }] : []),
@@ -190,13 +219,12 @@ export function AssetRow({
               </span>
             )}
           </span>
-          <span className="flex items-center gap-1.5">
+          <span className="flex min-w-0 items-center gap-1.5">
             {/* pensionFund has no ticker input — a leftover raw value must not resurface here. */}
-            {asset.ticker && asset.type !== 'pensionFund' && (
-              <span className="font-mono text-[11px] text-muted-foreground">{getAssetDisplayTicker(asset)}</span>
-            )}
+            {showTicker && <span className="font-mono text-[11px] text-muted-foreground">{getAssetDisplayTicker(asset)}</span>}
             <AssetClassChip assetClass={displayAssetClass} />
           </span>
+          {subLine && <span className="truncate text-[11px] text-muted-foreground">{subLine}</span>}
         </div>
         <div className="flex shrink-0 flex-col items-end gap-0.5">
           <span className="font-mono text-[13px] font-semibold tabular-nums text-foreground">
@@ -233,7 +261,9 @@ export function AssetRow({
               ))}
             </div>
 
-            {sparklineData && sparklineData.length >= 2 && <AssetSparkline data={sparklineData} />}
+            {sparklineData && sparklineData.length >= 2 && (
+              <AssetSparkline data={sparklineData} label={`Prezzo unitario di ${asset.name}`} />
+            )}
 
             {performance && (
               <div className="flex flex-col divide-y divide-border border-t border-border">
@@ -302,16 +332,19 @@ export function AssetRow({
                 Modifica
               </Button>
               <Button
+                ref={deleteRef}
                 type="button"
-                variant={isPendingDelete ? 'destructive' : 'outline'}
-                className={cn('h-11', deleteSpansRow && 'col-span-2', !isPendingDelete && 'text-destructive hover:text-destructive')}
-                onClick={handleDeleteClick}
+                variant={armed ? 'destructive' : 'outline'}
+                className={cn('h-11', deleteSpansRow && 'col-span-2', !armed && 'text-destructive hover:text-destructive')}
+                onClick={onDeleteClick}
+                onBlur={onDeleteBlur}
                 disabled={isDemo}
                 title={isDemo ? 'Non disponibile in modalità demo' : undefined}
-                aria-label={isPendingDelete ? 'Conferma eliminazione' : 'Elimina asset'}
+                aria-pressed={armed}
+                aria-label={armed ? `Premi di nuovo per eliminare ${asset.name}` : `Elimina ${asset.name}`}
               >
                 <Trash2 className="h-4 w-4" aria-hidden="true" />
-                {isPendingDelete ? 'Conferma?' : 'Elimina'}
+                {armed ? 'Premi di nuovo' : 'Elimina'}
               </Button>
             </div>
           </div>

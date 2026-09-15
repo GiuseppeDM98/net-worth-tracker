@@ -114,7 +114,8 @@ describe('describePeriodSubject', () => {
 
 describe('describeComparisonPhrase', () => {
   it('should name the previous month, the previous year, and nothing for a custom range', () => {
-    expect(describeComparisonPhrase(AUGUST, NOW)).toBe('su luglio');
+    // A closed month against the whole previous month.
+    expect(describeComparisonPhrase({ kind: 'month', year: 2026, month: 7 }, NOW)).toBe('su giugno');
     expect(describeComparisonPhrase({ kind: 'month', year: 2026, month: 1 }, NOW)).toBe('su dicembre');
     expect(describeComparisonPhrase({ kind: 'year', year: 2025 }, NOW)).toBe('sul 2024');
     expect(describeComparisonPhrase({ kind: 'custom', from: NOW, to: NOW }, NOW)).toBeNull();
@@ -125,8 +126,21 @@ describe('describeComparisonPhrase', () => {
     expect(describePreviousPeriodLabel({ kind: 'year', year: 2026 }, NOW)).toBe('gen–ago 2025');
   });
 
+  it('should compare the month in progress with the same days of the previous month, and say so', () => {
+    // NOW is the 22nd: the delta covers 1–22 August against 1–22 July, never a whole July.
+    expect(describeComparisonPhrase(AUGUST, NOW)).toBe('sui primi 22 giorni di luglio');
+    expect(describePreviousPeriodLabel(AUGUST, NOW)).toBe('1–22 lug');
+    // The 1st compares one day; the 31st of a month after a 30-day one clamps to that month's length.
+    expect(describeComparisonPhrase(AUGUST, new Date(2026, 7, 1, 12))).toBe('sul primo giorno di luglio');
+    expect(describePreviousPeriodLabel(AUGUST, new Date(2026, 7, 1, 12))).toBe('1 lug');
+    expect(describeComparisonPhrase({ kind: 'month', year: 2026, month: 10 }, new Date(2026, 9, 31, 12))).toBe('sui primi 30 giorni di settembre');
+    // A month not yet begun has nothing lived to compare: no phrase, no caption.
+    expect(describeComparisonPhrase({ kind: 'month', year: 2026, month: 11 }, NOW)).toBeNull();
+    expect(describePreviousPeriodLabel({ kind: 'month', year: 2026, month: 11 }, NOW)).toBeNull();
+  });
+
   it('should give the bare previous label for a delta caption and the capitalised row label for a projection', () => {
-    expect(describePreviousPeriodLabel(AUGUST, NOW)).toBe('luglio');
+    expect(describePreviousPeriodLabel({ kind: 'month', year: 2026, month: 7 }, NOW)).toBe('giugno');
     expect(describePreviousPeriodLabel({ kind: 'year', year: 2025 }, NOW)).toBe('2024');
     expect(describePreviousPeriodLabel({ kind: 'custom', from: NOW, to: NOW }, NOW)).toBeNull();
     expect(describeProjectionReference(AUGUST)).toBe('A luglio');
@@ -142,32 +156,100 @@ describe('buildCashflowVerdict', () => {
     expect(verdict.headline).toBe('Agosto sta andando bene.');
     expect(verdict.tone).toBe('positive');
     expect(plain(verdict.sentence)).toBe(
-      'Ad agosto hai messo da parte il 40% (1940 €): entrate 4850 €, spese 2910 €, in calo del 6,4% su luglio.',
+      'Ad agosto hai messo da parte il 40% (1940 €): entrate 4850 €, spese 2910 €, in calo del 6,4% sui primi 22 giorni di luglio.',
     );
   });
 
-  it('should close by naming the scheduled part AS PART OF the totals, never beside them', () => {
+  it('should judge what has HAPPENED and let a second sentence say where the calendar takes it', () => {
+    // 4850/2910 for the month, of which 500 € of income and 1850 € of spending are still ahead:
+    // the lived part is 4350/1060, and that is what the first sentence and the tone judge.
     const both = buildCashflowVerdict({ ...INPUT, scheduled: { count: 3, expenses: 1850, income: 500, throughMonth: 12 } });
+    expect(both.headline).toBe('Agosto sta andando bene.');
     expect(plain(both.sentence)).toBe(
-      'Ad agosto hai messo da parte il 40% (1940 €): entrate 4850 €, spese 2910 €, in calo del 6,4% su luglio. Nel totale ci sono ancora 1850 € di spese e 500 € di entrate già in calendario da qui a fine mese.',
+      'Ad agosto finora hai messo da parte il 76% (3290 €): entrate 4350 €, spese 1060 €, in calo del 6,4% sui primi 22 giorni di luglio. Con 1850 € di spese e 500 € di entrate già in calendario da qui a fine mese, il mese chiude a +1940 € (il 40%).',
     );
 
-    // The verb agrees with the AMOUNT, not with the number of clauses: 406 € is plural.
-    const spendingOnly = buildCashflowVerdict({ ...INPUT, scheduled: { count: 2, expenses: 406, income: 0, throughMonth: 10 } });
-    expect(plain(spendingOnly.sentence)).toContain('Nel totale ci sono ancora 406 € di spese già in calendario da qui a fine mese.');
-
-    // Only a lone «1 €» is singular — and «1 €» is the figure AS PRINTED, so 1,40 € counts.
-    const oneEuro = buildCashflowVerdict({ ...INPUT, scheduled: { count: 1, expenses: 1, income: 0, throughMonth: 9 } });
-    expect(plain(oneEuro.sentence)).toContain("Nel totale c'è ancora 1 € di spese già in calendario da qui a fine mese.");
-    const roundsToOne = buildCashflowVerdict({ ...INPUT, scheduled: { count: 1, expenses: 1.4, income: 0, throughMonth: 9 } });
-    expect(plain(roundsToOne.sentence)).toContain("Nel totale c'è ancora 1 € di spese già in calendario da qui a fine mese.");
-    // One euro of spending BESIDE income is plural again: two amounts, one verb.
-    const oneEuroPlusIncome = buildCashflowVerdict({ ...INPUT, scheduled: { count: 2, expenses: 1, income: 500, throughMonth: 9 } });
-    expect(plain(oneEuroPlusIncome.sentence)).toContain('Nel totale ci sono ancora 1 € di spese e 500 € di entrate già in calendario da qui a fine mese.');
-
-    // A slice with a count but no amounts (transfers only) adds no sentence.
+    // A slice with a count but no amounts (transfers only) is no calendar: one sentence.
     const transfersOnly = buildCashflowVerdict({ ...INPUT, scheduled: { count: 1, expenses: 0, income: 0, throughMonth: 9 } });
     expect(plain(transfersOnly.sentence)).not.toContain('in calendario');
+    expect(plain(transfersOnly.sentence)).not.toContain('finora');
+  });
+
+  it('should take its tone from the lived part, not from a salary dated tomorrow', () => {
+    // The mirror on 2026-09-14: 2758 € of income of which 2456 € dated the 15th; 1953 € of
+    // spending of which 1297 € ahead. Lived: 302 € in, 656 € out — a deficit, whatever the month closes at.
+    const september: Period = { kind: 'month', year: 2026, month: 9 };
+    const now = new Date(2026, 8, 14, 12);
+    const verdict = buildCashflowVerdict({
+      period: september,
+      now,
+      totals: { income: 2758, expenses: 1953, net: 805, savingsRate: 29.19, coverageRatio: 1.41, transferCount: 0 },
+      delta: null,
+      scheduled: { count: 7, expenses: 1297, income: 2456, throughMonth: 9 },
+    });
+    expect(verdict.headline).toBe('A settembre hai speso più di quanto è entrato.');
+    expect(verdict.tone).toBe('negative');
+    expect(plain(verdict.sentence)).toBe(
+      'A settembre finora le spese superano le entrate di 354 €: entrate 302 €, spese 656 €. Con 1297 € di spese e 2456 € di entrate già in calendario da qui a fine mese, il mese chiude a +805 € (il 29%).',
+    );
+  });
+
+  it('should name the EMPTY side of the calendar — instalments are materialised, salaries are not', () => {
+    // «Quest'anno» on the mirror: 2510 € of instalments from October to December and no income
+    // scheduled, which took the year's rate from 10% to 4%. The sentence must say why.
+    const year: Period = { kind: 'year', year: 2026 };
+    const now = new Date(2026, 8, 14, 12);
+    const verdict = buildCashflowVerdict({
+      period: year,
+      now,
+      totals: { income: 41531, expenses: 39868, net: 1663, savingsRate: 4.0, coverageRatio: 1.04, transferCount: 0 },
+      delta: { income: -4.1, expenses: 34.4 },
+      scheduled: { count: 12, expenses: 3806, income: 2456, throughMonth: 12 },
+    });
+    // The lived part: 41.531 − 2456 in, 39.868 − 3806 out.
+    expect(plain(verdict.sentence)).toContain("Nel 2026 finora hai messo da parte l'8% (3013 €): entrate 39.075 €, spese 36.062 €, in aumento del 34,4% su gen–set 2025.");
+    expect(plain(verdict.sentence)).toContain("Con 3806 € di spese e 2456 € di entrate già in calendario da qui a fine anno, l'anno chiude a +1663 € (il 4%).");
+
+    const noIncomeAhead = buildCashflowVerdict({
+      period: year,
+      now,
+      totals: { income: 41531, expenses: 39868, net: 1663, savingsRate: 4.0, coverageRatio: 1.04, transferCount: 0 },
+      delta: null,
+      scheduled: { count: 9, expenses: 3806, income: 0, throughMonth: 12 },
+    });
+    expect(plain(noIncomeAhead.sentence)).toContain("Con 3806 € di spese già in calendario da qui a fine anno e nessuna entrata attesa, l'anno chiude a +1663 € (il 4%).");
+    const noSpendingAhead = buildCashflowVerdict({ ...INPUT, scheduled: { count: 1, expenses: 0, income: 500, throughMonth: 8 } });
+    expect(plain(noSpendingAhead.sentence)).toContain('Con 500 € di entrate già in calendario da qui a fine mese e nessuna spesa attesa, il mese chiude a +1940 € (il 40%).');
+  });
+
+  it('should say «not yet» for a period nothing has happened in, and close on what the calendar holds', () => {
+    // A year the picker offers only because an instalment plan reaches it.
+    const verdict = buildCashflowVerdict({
+      period: { kind: 'year', year: 2043 },
+      now: NOW,
+      totals: { income: 0, expenses: 229, net: -229, savingsRate: null, coverageRatio: null, transferCount: 0 },
+      delta: null,
+      scheduled: { count: 2, expenses: 229, income: 0, throughMonth: 3 },
+    });
+    expect(verdict.headline).toBe('Nessun movimento ancora nel 2043.');
+    expect(verdict.tone).toBe('neutral');
+    expect(plain(verdict.sentence)).toBe("Con 229 € di spese già in calendario da qui a fine 2043 e nessuna entrata attesa, l'anno chiude con 229 € di spese e nessuna entrata.");
+
+    // A deficit the calendar does not repair keeps its sign.
+    const deficit = buildCashflowVerdict({
+      ...INPUT,
+      totals: { income: 1000, expenses: 1300, net: -300, savingsRate: -30, coverageRatio: 0.77, transferCount: 0 },
+      delta: null,
+      scheduled: { count: 1, expenses: 200, income: 0, throughMonth: 8 },
+    });
+    expect(plain(deficit.sentence)).toContain('il mese chiude a −300 €.');
+  });
+
+  it('should conjugate a future period as not yet happened, never as gone', () => {
+    expect(describePeriodSubject({ kind: 'year', year: 2043 }, NOW).ongoing).toBe(true);
+    expect(describePeriodSubject({ kind: 'month', year: 2026, month: 11 }, NOW).ongoing).toBe(true);
+    expect(describePeriodSubject({ kind: 'month', year: 2027, month: 1 }, NOW).ongoing).toBe(true);
+    expect(buildCashflowVerdict({ ...INPUT, period: { kind: 'month', year: 2026, month: 11 }, delta: null }).headline).toBe('Novembre sta andando bene.');
   });
 
   it('should use the past tense for a closed month and a year', () => {
@@ -191,7 +273,7 @@ describe('buildCashflowVerdict', () => {
     expect(verdict.headline).toBe('Ad agosto hai speso più di quanto è entrato.');
     expect(verdict.tone).toBe('negative');
     expect(plain(verdict.sentence)).toBe(
-      'Ad agosto le spese superano le entrate di 350 €: entrate 4850 €, spese 5200 €, in aumento del 12,5% su luglio.',
+      'Ad agosto le spese superano le entrate di 350 €: entrate 4850 €, spese 5200 €, in aumento del 12,5% sui primi 22 giorni di luglio.',
     );
     // A closed period takes the past tense, like the headline does.
     expect(plain(buildCashflowVerdict({ ...INPUT, period: { kind: 'month', year: 2026, month: 5 }, totals: deficit, delta: null }).sentence)).toBe(
@@ -207,10 +289,10 @@ describe('buildCashflowVerdict', () => {
       'Ad agosto hai messo da parte il 40% (1940 €): entrate 4850 €, spese 2910 €.',
     );
     expect(plain(buildCashflowVerdict({ ...INPUT, delta: { income: 3, expenses: 0 } }).sentence)).toBe(
-      'Ad agosto hai messo da parte il 40% (1940 €): entrate 4850 €, spese 2910 €, invariate su luglio.',
+      'Ad agosto hai messo da parte il 40% (1940 €): entrate 4850 €, spese 2910 €, invariate sui primi 22 giorni di luglio.',
     );
     // A change that prints as 0,0% is no change: the direction follows the printed figure.
-    expect(plain(buildCashflowVerdict({ ...INPUT, delta: { income: 3, expenses: 0.04 } }).sentence)).toContain('spese 2910 €, invariate su luglio.');
+    expect(plain(buildCashflowVerdict({ ...INPUT, delta: { income: 3, expenses: 0.04 } }).sentence)).toContain('spese 2910 €, invariate sui primi 22 giorni di luglio.');
   });
 
   it('should not invent a rate without income', () => {
@@ -222,7 +304,7 @@ describe('buildCashflowVerdict', () => {
 
     expect(verdict.headline).toBe('Ad agosto hai speso senza entrate.');
     expect(verdict.tone).toBe('negative');
-    expect(plain(verdict.sentence)).toBe('Ad agosto nessuna entrata: spese 2910 €, in calo del 6,4% su luglio.');
+    expect(plain(verdict.sentence)).toBe('Ad agosto nessuna entrata: spese 2910 €, in calo del 6,4% sui primi 22 giorni di luglio.');
   });
 
   it('should say when there is nothing to judge, without denying the transfers', () => {
@@ -417,6 +499,19 @@ describe('describeScheduledHorizon', () => {
 
   it('should name the day of a custom range, which ends on no calendar unit', () => {
     expect(describeScheduledHorizon({ kind: 'custom', from: new Date(2026, 0, 1), to: new Date(2026, 2, 20) }, NOW)).toBe('al 20 marzo');
+  });
+
+  it('should agree the verb with the AMOUNT, not with the number of clauses (Analisi still reads it)', () => {
+    const say = (scheduled: ScheduledSlice) => plain(scheduledSentence(scheduled, 'a fine mese'));
+    // 406 € is plural however few clauses follow it.
+    expect(say({ count: 2, expenses: 406, income: 0, throughMonth: 10 })).toBe(' Nel totale ci sono ancora 406 € di spese già in calendario da qui a fine mese.');
+    // Only a lone «1 €» is singular — and «1 €» is the figure AS PRINTED, so 1,40 € counts.
+    expect(say({ count: 1, expenses: 1, income: 0, throughMonth: 9 })).toBe(" Nel totale c'è ancora 1 € di spese già in calendario da qui a fine mese.");
+    expect(say({ count: 1, expenses: 1.4, income: 0, throughMonth: 9 })).toBe(" Nel totale c'è ancora 1 € di spese già in calendario da qui a fine mese.");
+    // One euro of spending BESIDE income is plural again: two amounts, one verb.
+    expect(say({ count: 2, expenses: 1, income: 500, throughMonth: 9 })).toBe(' Nel totale ci sono ancora 1 € di spese e 500 € di entrate già in calendario da qui a fine mese.');
+    // A slice with a count but no amounts (transfers only) is no sentence.
+    expect(scheduledSentence({ count: 1, expenses: 0, income: 0, throughMonth: 9 }, 'a fine mese')).toBeNull();
   });
 
   it('should let the sentence stand without a horizon', () => {

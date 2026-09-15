@@ -5,7 +5,9 @@
  * TWR (6, only for the blocks whose return IS a measure — printing «Guadagno di mercato» under a
  * reading that says the difference is NOT market gain would contradict it) and how the fund's
  * value is kept current (6, or 12 when nothing is measured). Closed by default: the verdict and
- * the five tiles already answer «il fondo sta lavorando?».
+ * the five tiles already answer «il fondo sta lavorando?» — except on a first run, when no block
+ * is measured and «Come aggiornare il valore» is the one orienting text on the page: then it
+ * opens by itself, the way Budget's Impostazioni open without a ceiling (DESIGN.md → Tile Grid).
  */
 
 import { useState } from 'react';
@@ -86,9 +88,10 @@ function CrescitaBlock({ block, named }: { block: PensionMemberBlock; named: boo
 }
 
 export function PensionDettaglio({ description, blocks, crescitaFooter, comeAggiornare }: PensionDettaglioProps) {
-  const [open, setOpen] = useState(false);
   const measured = blocks.filter((block) => block.returnState === 'measured' && block.return);
   const hasCrescita = measured.length > 0;
+  // First run (a fund, nothing measured yet): the disclosure opens on its own; afterwards it is closed.
+  const [open, setOpen] = useState(blocks.length > 0 && !hasCrescita);
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>

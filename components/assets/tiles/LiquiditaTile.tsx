@@ -4,7 +4,8 @@ import type { Asset } from '@/types/assets';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { describeCashAccounts } from '@/lib/utils/patrimonioNarrative';
 import type { CashAccountsSummary } from '@/lib/utils/patrimonioSummary';
-import { Tile, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
+import { cn } from '@/lib/utils';
+import { Tile, TILE_FOOTER_ACTION_CLASS, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 
 interface LiquiditaTileProps {
   summary: CashAccountsSummary;
@@ -73,7 +74,7 @@ export function LiquiditaTile({ summary, accountsById, onSelect, onAdd, isDemo, 
           onClick={onAdd}
           disabled={isDemo}
           title={isDemo ? 'Non disponibile in modalità demo' : undefined}
-          className="text-foreground underline-offset-2 hover:underline disabled:opacity-50"
+          className={cn(TILE_FOOTER_ACTION_CLASS, 'disabled:opacity-50')}
         >
           Aggiungi conto
         </button>

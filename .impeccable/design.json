@@ -1,6 +1,6 @@
 {
  "schemaVersion": 2,
- "generatedAt": "2026-09-06T19:14:47.336Z",
+ "generatedAt": "2026-09-14T15:14:00.000Z",
  "title": "Design System: Net Worth Tracker",
  "extensions": {
   "colorMeta": {
@@ -292,76 +292,76 @@
    "chart-1-light": {
     "role": "data",
     "displayName": "Chart 1 (light)",
-    "canonical": "oklch(0.646 0.222 41.116)",
+    "canonical": "oklch(0.500 0.200 262)",
     "tonalRamp": [
-     "oklch(0.15 0.067 41.116)",
-     "oklch(0.25 0.111 41.116)",
-     "oklch(0.35 0.155 41.116)",
-     "oklch(0.45 0.2 41.116)",
-     "oklch(0.55 0.222 41.116)",
-     "oklch(0.646 0.222 41.116)",
-     "oklch(0.8 0.127 41.116)",
-     "oklch(0.95 0.033 41.116)"
+     "oklch(0.15 0.06 262)",
+     "oklch(0.25 0.1 262)",
+     "oklch(0.35 0.14 262)",
+     "oklch(0.45 0.18 262)",
+     "oklch(0.55 0.2 262)",
+     "oklch(0.5 0.2 262)",
+     "oklch(0.8 0.114 262)",
+     "oklch(0.95 0.03 262)"
     ]
    },
    "chart-2-light": {
     "role": "data",
     "displayName": "Chart 2 (light)",
-    "canonical": "oklch(0.6 0.118 184.704)",
+    "canonical": "oklch(0.600 0.125 172)",
     "tonalRamp": [
-     "oklch(0.15 0.035 184.704)",
-     "oklch(0.25 0.059 184.704)",
-     "oklch(0.35 0.083 184.704)",
-     "oklch(0.45 0.106 184.704)",
-     "oklch(0.6 0.118 184.704)",
-     "oklch(0.65 0.118 184.704)",
-     "oklch(0.8 0.067 184.704)",
-     "oklch(0.95 0.018 184.704)"
+     "oklch(0.15 0.037 172)",
+     "oklch(0.25 0.062 172)",
+     "oklch(0.35 0.087 172)",
+     "oklch(0.45 0.113 172)",
+     "oklch(0.55 0.125 172)",
+     "oklch(0.6 0.125 172)",
+     "oklch(0.8 0.071 172)",
+     "oklch(0.95 0.019 172)"
     ]
    },
    "chart-3-light": {
     "role": "data",
     "displayName": "Chart 3 (light)",
-    "canonical": "oklch(0.398 0.07 227.392)",
+    "canonical": "oklch(0.700 0.160 72)",
     "tonalRamp": [
-     "oklch(0.15 0.021 227.392)",
-     "oklch(0.25 0.035 227.392)",
-     "oklch(0.398 0.07 227.392)",
-     "oklch(0.45 0.063 227.392)",
-     "oklch(0.55 0.07 227.392)",
-     "oklch(0.65 0.07 227.392)",
-     "oklch(0.8 0.04 227.392)",
-     "oklch(0.95 0.011 227.392)"
+     "oklch(0.15 0.048 72)",
+     "oklch(0.25 0.08 72)",
+     "oklch(0.35 0.112 72)",
+     "oklch(0.45 0.144 72)",
+     "oklch(0.55 0.16 72)",
+     "oklch(0.7 0.16 72)",
+     "oklch(0.8 0.091 72)",
+     "oklch(0.95 0.024 72)"
     ]
    },
    "chart-4-light": {
     "role": "data",
     "displayName": "Chart 4 (light)",
-    "canonical": "oklch(0.828 0.189 84.429)",
+    "canonical": "oklch(0.480 0.210 298)",
     "tonalRamp": [
-     "oklch(0.15 0.057 84.429)",
-     "oklch(0.25 0.095 84.429)",
-     "oklch(0.35 0.132 84.429)",
-     "oklch(0.45 0.17 84.429)",
-     "oklch(0.55 0.189 84.429)",
-     "oklch(0.65 0.189 84.429)",
-     "oklch(0.828 0.189 84.429)",
-     "oklch(0.95 0.028 84.429)"
+     "oklch(0.15 0.063 298)",
+     "oklch(0.25 0.105 298)",
+     "oklch(0.35 0.147 298)",
+     "oklch(0.45 0.189 298)",
+     "oklch(0.55 0.21 298)",
+     "oklch(0.48 0.21 298)",
+     "oklch(0.8 0.12 298)",
+     "oklch(0.95 0.032 298)"
     ]
    },
    "chart-5-light": {
     "role": "data",
     "displayName": "Chart 5 (light)",
-    "canonical": "oklch(0.769 0.188 70.08)",
+    "canonical": "oklch(0.620 0.200 16)",
     "tonalRamp": [
-     "oklch(0.15 0.056 70.08)",
-     "oklch(0.25 0.094 70.08)",
-     "oklch(0.35 0.132 70.08)",
-     "oklch(0.45 0.169 70.08)",
-     "oklch(0.55 0.188 70.08)",
-     "oklch(0.65 0.188 70.08)",
-     "oklch(0.769 0.188 70.08)",
-     "oklch(0.95 0.028 70.08)"
+     "oklch(0.15 0.06 16)",
+     "oklch(0.25 0.1 16)",
+     "oklch(0.35 0.14 16)",
+     "oklch(0.45 0.18 16)",
+     "oklch(0.55 0.2 16)",
+     "oklch(0.62 0.2 16)",
+     "oklch(0.8 0.114 16)",
+     "oklch(0.95 0.03 16)"
     ]
    },
    "chart-6-light": {
@@ -626,7 +626,7 @@
    },
    "row": {
     "displayName": "Row",
-    "purpose": "13px — list/composition row text"
+    "purpose": "13px — list/composition row text, and the Reading Line: the one-line answer under a tile's eyebrow at 13px/1.45, figures as mono semibold spans coloured by sign, rendered by NarrativeText from a Narrative and never assembled in JSX"
    },
    "body-px": {
     "displayName": "Body Px",
@@ -683,10 +683,6 @@
    "page-hero-desktop": {
     "displayName": "Page Hero Desktop",
     "purpose": "54px — the single dominant number, desktop"
-   },
-   "reading": {
-    "displayName": "Reading Line",
-    "purpose": "The one-line answer under a tile's eyebrow, 13px/1.45, figures as mono semibold spans coloured by sign. Rendered by NarrativeText from a Narrative, never assembled in JSX."
    }
   },
   "shadows": [
@@ -755,7 +751,7 @@
   {
    "name": "Page Verdict",
    "kind": "custom",
-   "description": "The opening of every redesigned page (The Verdict-First Rule): a rule-generated headline whose full stop alone carries the tone, then the facts as a sentence with mono sign-coloured figures. Sits on the page background, never in a card; max-w 920px; 24px/30px from desktop:.",
+   "description": "The opening of every redesigned page (The Verdict-First Rule): a rule-generated headline whose full stop alone carries the tone, then the facts as a sentence with mono sign-coloured figures. Sits on the page background, never in a card; max-w 920px; 24px/30px from desktop:. A page whose question has an axis renders that control beside the verdict from desktop: (flex items-start justify-between gap-6) and under it below that width; a toolbar elsewhere may repeat the same control as a second handle on the SAME state, never a second axis (2026-09-07, Movimenti).",
    "html": "<section class=\"ds-verdict\" aria-label=\"Verdetto del mese\"><h2 class=\"ds-verdict-headline\">Agosto sta andando bene<span class=\"ds-verdict-dot is-positive\" aria-hidden=\"true\">.</span></h2><p class=\"ds-verdict-sentence\">Il patrimonio vale <span class=\"ds-fig\">412.380,52 &euro;</span>: <span class=\"ds-fig is-positive\">+4120,18 &euro; (+1,01%)</span> su luglio, <span class=\"ds-fig is-positive\">+8,29%</span> da inizio anno, nuovo massimo storico. Hai messo da parte il <span class=\"ds-fig\">40%</span> delle entrate e le azioni hanno fatto il grosso del lavoro (<span class=\"ds-fig is-positive\">+3480 &euro;</span>).</p></section>",
    "css": ".ds-verdict { display: flex; flex-direction: column; gap: 8px; max-width: 920px; font-family: 'Geist Sans', system-ui, sans-serif; } .ds-verdict-headline { font-size: 24px; font-weight: 600; line-height: 1.15; letter-spacing: -0.025em; color: var(--foreground, oklch(0.985 0 0)); margin: 0; } .ds-verdict-dot.is-positive { color: var(--positive, oklch(0.740 0.156 148.655)); } .ds-verdict-dot.is-neutral { color: var(--muted-foreground, oklch(0.708 0 0)); } .ds-verdict-dot.is-warning { color: var(--warning-foreground, oklch(0.854 0.090 82)); } .ds-verdict-dot.is-negative { color: var(--destructive, oklch(0.704 0.191 22.216)); } .ds-verdict-sentence { font-size: 14px; line-height: 1.6; color: var(--muted-foreground, oklch(0.708 0 0)); margin: 0; } .ds-fig { font-family: 'Geist Mono', ui-monospace, monospace; font-feature-settings: 'tnum' 1; font-variant-numeric: tabular-nums; font-weight: 600; color: var(--foreground, oklch(0.985 0 0)); } .ds-fig.is-positive { color: var(--positive, oklch(0.740 0.156 148.655)); } .ds-fig.is-negative { color: var(--destructive, oklch(0.704 0.191 22.216)); } @media (min-width: 1440px) { .ds-verdict-headline { font-size: 30px; } .ds-verdict-sentence { font-size: 15px; } }"
   },
@@ -839,7 +835,7 @@
    "Geist Sans for interface text, Geist Mono for every number that matters",
    "Radius is refined: 8px (`rounded-md` — inputs, buttons, badges, on the default theme), 16px (tiles, modals, the email card; fixed on every theme) — premium curve without losing authority",
    "Elevation is ambient: surfaces layer through background steps, shadows are atmospheric whispers",
-   "Motion is physics-native: spring dialogs, ease-out-quart state transitions, circle-reveal theme toggle",
+   "Motion is physics-native: spring dialogs, ease-out-quart state transitions, circle-reveal theme toggle — and, since 2026-09-12, two authored moments that reveal a relationship rather than decorate: a navigation is one scene, a period transforms instead of being replaced (The Page Scene, The Period-Transforms Rule). Storico's scrub was the third and was retired on 2026-09-13, with the milestone confetti: the owner judged the page better still",
    "Hierarchy is Trade Republic-style: one dominant value per section, everything else is context",
    "Chrome reduction is deliberate: flat lists over nested cards, divide-y over borders-on-boxes",
    "Mobile-first: layouts are designed at 390px first; desktop adds columns, never simplifies",
@@ -1054,6 +1050,16 @@
     "name": "The Equal-Column Chip Rule",
     "body": "A row of same-purpose chips whose labels are different lengths is laid out as a grid — `grid grid-cols-1 gap-2 tablet:grid-cols-2` — never `flex-wrap`. Chips that say the same *kind* of thing should be the same size; under `flex-wrap` each one shrinks to its own content, so \"questo mese\" and \"da inizio anno\" end up different widths and a wrapped third chip lands at a width unrelated to the two above it. Grid columns size together across every row, so a lone third chip still matches the first column — the alignment is a consequence of the layout, with no JS measurement and no fixed width. One column on mobile (each chip takes the full card width), two from `tablet:` up. `flex-wrap` remains correct where chips are genuinely heterogeneous and are meant to flow, such as filter tags. Superseded inside tiles by The Grouped Chip Rule (2026-08-22).",
     "section": "components"
+   },
+   {
+    "name": "The Period-Transforms Rule (2026-09-12)",
+    "body": "When the axis of a page moves, the tiles TRANSFORM into the new window; they are never unmounted and redrawn. A figure glides from the one it showed (`useCountUp({ fromPrevious })`, 620 ms ease-out-quart), a hand-written series glides index by index after the old one is resampled onto the new length (`lib/utils/seriesMorph.ts` + `useMorphingSeries`, 420 ms, the y-scale travelling with it), a heatmap fades cell by cell (300 ms on an inline fill) and its rows enter or leave on a 220 ms fade, ranked rows re-rank in place on the 400/35 spring and their bars slide to the new width. The glide is the ONLY frame that is not a measurement, and it says so by construction: the hover, the `aria-label` and every printed figure read the landed data, never the frame. A refresh that re-reads the data still dims the grid while it waits — that is a wait, not a change of window. Reduced motion jumps. First on Rendimenti: `key={periodRenderKey}` on the grid, which remounted every tile on a period switch, went with the rule.",
+    "section": "components"
+   },
+   {
+    "name": "The Page Scene (2026-09-12)",
+    "body": "A navigation between two dashboard pages is ONE scene, not a page that vanishes and another that fades in: a click on a route link in the sidebar, the bottom pill or the «Altro» drawer (`SceneLink`) wraps `router.push` in a native view transition (`lib/utils/viewTransition.ts`, `useSceneNavigation`), and only the named regions move — the content region (`page-main`, the layout's `<main>`) cross-fades with a 6px settle in 320 ms ease-out-quart while the shell around it stays still, and the header line (`page-header`) and the verdict (`page-verdict`, a name the loading skeleton's verdict block shares) morph from their old box to their new one, so the sentence that answers the page's question is seen changing in place. The scene lands on the next page's skeleton — the tiles arrive as the data does, as before — and `template.tsx`'s fade stands down for that mount. The theme toggle's circle reveal is the other scene; the two are scoped by `data-vt` on `<html>` and never share a rule. Firefox has no view transitions and keeps the template's fade; reduced motion skips the scene. One scene per navigation, and no other shared element than these three: a tile morphing into a tile of another page would claim a relationship the pages do not have.",
+    "section": "components"
    }
   ],
   "dos": [
@@ -1063,6 +1069,8 @@
    "**Do** close a ranked list with its residual (\"Altre categorie · 912 € · 21%\") whenever the rows are a share of a stated total. A list that does not add up reads as missing data.",
    "**Do** put a projection next to its reference and name it as a projection (\"Al ritmo attuale ~6.161 €\" beside \"A luglio 4.109 €\"). Extrapolate spending only — a salary lands once, so a linear projection of income is nonsense.",
    "**Do** give a hand-written chart a hover reading through `components/ui/chart-hover.tsx`, under `(pointer: fine)` only (The Hover Reading Rule) — the figures it shows must already exist for touch and screen readers in the reading line, the `<title>`s and the `aria-label`.",
+   "**Do** let a period switch transform the tiles instead of remounting them (The Period-Transforms Rule): no `key` on a grid that changes with an axis, the figure glides, the series resamples and glides, the heatmap cross-fades, the ranked rows re-rank; the hover and every printed figure read the landed data.",
+   "**Do** run a route change as a page scene (`SceneLink`, The Page Scene) with exactly three named regions — `page-main`, `page-header`, `page-verdict` — and keep every `::view-transition-*` rule scoped by `html[data-vt=…]`.",
    "**Do** stretch an edge-to-edge chart with the SVG positioned `absolute inset-0` inside a `relative flex-1 min-h-[…]` box (`preserveAspectRatio=\"none\"`). An in-flow `<svg>` with `height: 100%` in an auto-height parent takes its height from its own viewBox ratio — hundreds of pixels — and explodes the grid row.",
    "**Do** let `PageHeader` be the compact header on every page: eyebrow · title · description on one line, actions right, no separator, the verdict as the real headline (the `legacy` variant was deleted on 2026-08-26 with the last page that used it). The mobile sticky navbar is unchanged.",
    "**Do** use one eyebrow for the frame and the content (The One-Eyebrow Rule): `TILE_EYEBROW_CLASS` names a tile's question, the compact header's section and a navigation group alike.",
@@ -1103,6 +1111,7 @@
    "**Do** generate the email's opening sentence from rules and put the AI comment under it. The comment's generation is non-blocking by design, so a message that opens on it opens on nothing whenever the model is unavailable."
   ],
   "donts": [
+   "**Don't** let a plotted series drive the other tiles of an axis-less page under the pointer (the retired Scrub Rule): a hover reads the chart it is on, and the page's figures stay today's.",
    "**Don't** let a generated sentence blame or credit something the data does not show (The Narrative Honesty Rule). A falling month with a positive market effect is \"nonostante il mercato\", never \"il mercato ha pesato\"; a missing input drops its clause rather than printing a placeholder.",
    "**Don't** put a made-up figure on a tile that could show none, and don't type a fact about the tool into copy when a module already owns it (**The Sample-Data Rule**). The landing's «6 classi di asset» stayed on screen for the ten days after the union grew to eight, and the product document cited that very line as an example of an honest surface.",
    "**Don't** repeat a tile's rows in another tile. The Cashflow tile lost its top-3 categories the moment \"Spese per categoria\" existed.",

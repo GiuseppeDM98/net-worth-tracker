@@ -61,6 +61,7 @@ function docToAssetTransaction(id: string, data: Record<string, unknown>): Asset
     fees: data.fees as number | undefined,
     linkedCashAssetId: data.linkedCashAssetId as string | undefined,
     isBaseline: data.isBaseline as boolean | undefined,
+    indexationCoefficient: data.indexationCoefficient as number | undefined,
     note: data.note as string | undefined,
     createdAt: toDate(data.createdAt as never),
     updatedAt: toDate(data.updatedAt as never),

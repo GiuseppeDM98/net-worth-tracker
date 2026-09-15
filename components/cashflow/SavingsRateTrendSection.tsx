@@ -18,6 +18,7 @@ import { Expense } from '@/types/expenses';
 import { AsideToggle } from '@/components/cashflow/analisi/AsideToggle';
 import { formatPercentage } from '@/lib/services/chartService';
 import { Tile } from '@/components/ui/tile';
+import { CHART_TICK_STYLE } from '@/components/cashflow/costCenterStyles';
 import {
   LineChart,
   Line,
@@ -58,19 +59,21 @@ function SavingsRateLineChart({
 }) {
   return (
     <ResponsiveContainer width="100%" height={200}>
-      <LineChart data={data} margin={{ top: 4, right: 16, left: -16, bottom: 0 }}>
+      <LineChart
+        data={data}
+        margin={{ top: 4, right: 16, left: -16, bottom: 0 }}
+        role="img"
+        accessibilityLayer={false}
+        aria-label={`Tasso di risparmio per mese, obiettivo ${SAVINGS_TARGET}%. ${data.map((point) => `${point.label}: ${point.rate === null ? 'nessuna entrata' : formatPercentage(point.rate, 1)}`).join('; ')}`}
+      >
         <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
 
-        <XAxis
-          dataKey="label"
-          tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }}
-          axisLine={false}
-          tickLine={false}
-          interval="preserveStartEnd"
-        />
+        {/* Axis ticks are figures: the Mono Mandate reaches them only through `tick` (AGENTS.md → Recharts). */}
+        <XAxis dataKey="label" tick={CHART_TICK_STYLE} axisLine={false} tickLine={false} interval="preserveStartEnd" />
         <YAxis
-          tickFormatter={(v: number) => formatPercentage(v, 0)}
-          tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }}
+          // Intl prints a hyphen; the page's minus is U+2212 everywhere else.
+          tickFormatter={(v: number) => formatPercentage(v, 0).replace(/^-/, '−')}
+          tick={CHART_TICK_STYLE}
           axisLine={false}
           tickLine={false}
           domain={['auto', 'auto']}

@@ -105,7 +105,7 @@ test('opens with the verdict: three causes, three numbers, the year axis beside 
   expect(verdictBox.y).toBeLessThan(heroBox.y);
 
   // The axis sits on the verdict's row, to the right.
-  const axisBox = (await page.getByRole('tablist', { name: 'Anno fiscale' }).boundingBox())!;
+  const axisBox = (await page.getByRole('radiogroup', { name: 'Anno fiscale' }).boundingBox())!;
   expect(axisBox.x).toBeGreaterThan(verdictBox.x + verdictBox.width - 1);
   expect(Math.abs(axisBox.y - verdictBox.y)).toBeLessThan(40);
 });
@@ -113,12 +113,12 @@ test('opens with the verdict: three causes, three numbers, the year axis beside 
 test('lays the grid out at 1440px: the hero spans two rows, Versato closes the second', async ({ page }) => {
   await gotoPension(page);
 
-  const rect = async (name: string) => (await page.getByRole('region', { name, exact: true }).boundingBox())!;
+  const rect = async (name: string | RegExp) => (await page.getByRole('region', { name, exact: true }).boundingBox())!;
   const hero = await rect('Il fondo oggi');
   const rendimento = await rect('Rendimento del fondo');
-  const annoFiscale = await rect('Anno fiscale');
-  const versato = await rect('Versato per natura');
-  const versamenti = await rect('Versamenti');
+  const annoFiscale = await rect(/^Anno fiscale 20[0-9][0-9]$/);
+  const versato = await rect(/^Versato nel 20[0-9][0-9]$/);
+  const versamenti = await rect(/^Versamenti 20[0-9][0-9]$/);
 
   // Row 1: hero | Rendimento | Anno fiscale, on one line.
   expect(rendimento.x).toBeGreaterThan(hero.x + hero.width - 1);
@@ -143,22 +143,22 @@ test('lays the grid out at 1440px: the hero spans two rows, Versato closes the s
 test('the year axis governs the annual tiles and the annual clauses, and leaves the fund alone', async ({ page }) => {
   await gotoPension(page);
 
-  const yearAxis = page.getByRole('tablist', { name: 'Anno fiscale' });
-  await expect(yearAxis.getByRole('tab')).toHaveText(['2026', '2025']);
+  const yearAxis = page.getByRole('radiogroup', { name: 'Anno fiscale' });
+  await expect(yearAxis.getByRole('radio')).toHaveText(['2026', '2025']);
 
   // Opens on the current year.
-  const annoFiscale = page.getByRole('region', { name: 'Anno fiscale', exact: true });
+  const annoFiscale = page.getByRole('region', { name: /^Anno fiscale 20[0-9][0-9]$/ });
   await expect(annoFiscale.getByText('Anno fiscale 2026')).toBeVisible();
-  await expect(page.getByRole('region', { name: 'Versato per natura' }).getByText('Versato nel 2026')).toBeVisible();
-  await expect(page.getByRole('region', { name: 'Versamenti', exact: true }).getByText('Versamenti 2026')).toBeVisible();
+  await expect(page.getByRole('region', { name: /^Versato nel 20[0-9][0-9]$/ }).getByText('Versato nel 2026')).toBeVisible();
+  await expect(page.getByRole('region', { name: /^Versamenti 20[0-9][0-9]$/ }).getByText('Versamenti 2026')).toBeVisible();
 
-  await yearAxis.getByRole('tab', { name: '2025' }).click();
+  await yearAxis.getByRole('radio', { name: '2025' }).click();
 
   await expect(annoFiscale.getByText('Anno fiscale 2025')).toBeVisible();
-  await expect(page.getByRole('region', { name: 'Versato per natura' }).getByText('Versato nel 2025')).toBeVisible();
-  await expect(page.getByRole('region', { name: 'Versamenti', exact: true }).getByText('Versamenti 2025')).toBeVisible();
+  await expect(page.getByRole('region', { name: /^Versato nel 20[0-9][0-9]$/ }).getByText('Versato nel 2025')).toBeVisible();
+  await expect(page.getByRole('region', { name: /^Versamenti 20[0-9][0-9]$/ }).getByText('Versamenti 2025')).toBeVisible();
   // The single 2025 contribution: 1000 € voluntary — ungrouped on purpose (CLDR minimumGroupingDigits = 2).
-  await expect(page.getByRole('region', { name: 'Versato per natura' }).getByText(/1000[\s ]*€/).first()).toBeVisible();
+  await expect(page.getByRole('region', { name: /^Versato nel 20[0-9][0-9]$/ }).getByText(/1000[\s ]*€/).first()).toBeVisible();
 
   // The verdict follows the axis for its annual clauses only: a closed year is said in the past.
   const sentence = (await page.getByRole('region', { name: 'Verdetto sul fondo pensione' }).textContent())?.replace(/ /g, ' ') ?? '';
@@ -210,4 +210,36 @@ test('keeps the primary action in the page header, above the verdict, and never 
     return { scrollWidth: main.scrollWidth, clientWidth: main.clientWidth };
   });
   expect(scrollWidth).toBe(clientWidth);
+});
+
+test('«Aggiorna valore» overwrites the fund from the statement, on the page, and says the trap first', async ({ page }) => {
+  await gotoPension(page);
+
+  // Two actions in the header: the overwrite is the outline one, beside the filled «Registra versamento».
+  const action = page.getByRole('button', { name: 'Aggiorna valore del fondo' });
+  await expect(action).toBeVisible();
+  await action.click();
+
+  const dialog = page.getByRole('dialog', { name: 'Aggiorna il valore del fondo' });
+  await expect(dialog).toBeVisible();
+  // The reading states the act and the trap before the field: the statement already holds the month.
+  await expect(dialog).toContainText('scrivi il valore');
+  await expect(dialog).toContainText('estratto');
+  const field = dialog.getByLabel('Valore dall’estratto conto (€)');
+  await expect(field).toHaveValue('29800');
+
+  // Overwrite, then restore in the same test: the fixture's hero figure is what every other spec waits on.
+  await field.fill('29900');
+  await dialog.getByRole('button', { name: 'Aggiorna' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole('region', { name: 'Il fondo oggi' }).getByText(euro('29.900,00'))).toBeVisible({ timeout: 15_000 });
+  // It is a value change, never a contribution: the ledger keeps its three rows.
+  await expect(page.getByRole('region', { name: /^Versamenti 20[0-9][0-9]$/ }).getByRole('button', { name: /^Elimina versamento/ })).toHaveCount(3);
+
+  await page.getByRole('region', { name: 'Il fondo oggi' }).getByRole('button', { name: 'Aggiorna valore' }).click();
+  const again = page.getByRole('dialog', { name: 'Aggiorna il valore del fondo' });
+  await again.getByLabel('Valore dall’estratto conto (€)').fill('29800');
+  await again.getByRole('button', { name: 'Aggiorna' }).click();
+  await expect(again).toBeHidden();
+  await expect(heroValue(page)).toBeVisible({ timeout: 15_000 });
 });

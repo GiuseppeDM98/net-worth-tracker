@@ -15,10 +15,14 @@
  *     current conversion ratio (`currentPriceEur / currentPrice`) — hence "stimato" on the preview.
  *     The authoritative realized figure comes back in the mutation response.
  *   - The success toast fires AFTER the request resolves (toast-after-reconcile rule).
- *   - Bond quotes reuse the SAME `resolveBondPrice` helper AssetDialog uses — never a
- *     re-implementation.
+ *   - Bond quotes go through the SAME `resolveBondPrice` rule AssetDialog and the price cron use
+ *     (`lib/utils/bondPricing.ts`) — never a re-implementation. A BTP€i's quote is real, so the
+ *     form asks for the indexation coefficient at the trade date and the trade remembers it.
  *   - Baseline trades are locked to quantity/PMC/note edits; the type selector is
  *     disabled in edit mode (changing a trade's type is a delete+recreate, kept out of v1).
+ *   - The date has ONE floor, the asset's own baseline (a migrated asset), and the future as the
+ *     only ceiling: any past purchase is recorded with its real date (2026-09-13). A date in a
+ *     past month turns the settlement clause into a warning — the balance moves today, not then.
  */
 
 import { useEffect, useId, useMemo, useState } from 'react';
@@ -31,7 +35,6 @@ import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { useAssets } from '@/lib/hooks/useAssets';
 import {
-  useAssetLedgerMeta,
   useAssetTransactions,
   useCreateAssetTransaction,
   useUpdateAssetTransaction,
@@ -40,11 +43,19 @@ import {
   replayTransactions,
   LedgerValidationError,
 } from '@/lib/utils/assetTransactionUtils';
-import { resolveBondPrice } from '@/components/assets/AssetDialog';
+import {
+  isBondQuotedInPercent,
+  resolveBondPrice,
+  toBorsaItalianaQuote,
+  type BondQuoteBasis,
+} from '@/lib/utils/bondPricing';
+import { latestIndexationCoefficient, resolveInflationIndexation } from '@/lib/utils/couponUtils';
+import { getItalyDateIso } from '@/lib/utils/dateHelpers';
 
 import { cachedFormatCurrencyEUR, formatCurrency } from '@/lib/utils/formatters';
 import {
   describeModalStatus,
+  describeSettlementTiming,
   describeTradeIntent,
   describeWriteError,
   type ModalStatus,
@@ -89,6 +100,8 @@ const transactionSchema = z.object({
   pricePerUnit: z.number().optional().or(z.nan()),
   fees: z.number().min(0, 'Le commissioni non possono essere negative').optional().or(z.nan()),
   linkedCashAssetId: z.string(),
+  // BTP€i only: the indexation coefficient at the trade date (the quote is real, the euro is not).
+  indexationCoefficient: z.number().positive('Il coefficiente deve essere positivo').optional().or(z.nan()),
   note: z.string().max(500, 'Massimo 500 caratteri').optional(),
 });
 
@@ -129,7 +142,6 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
   const isEdit = !!transaction;
   const isBaseline = transaction?.isBaseline === true;
 
-  const { data: ledgerMeta } = useAssetLedgerMeta(ownerId);
   const { data: allAssets = [] } = useAssets(ownerId);
   const { data: existingTransactions = [] } = useAssetTransactions(ownerId, asset.id, {
     enabled: open,
@@ -147,17 +159,30 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
     [allAssets]
   );
 
-  // Bond % of par ↔ EUR conversion (same conditions as AssetDialog): ISIN present AND nominal > 1.
-  const isBondWithIsin =
-    asset.type === 'bond' && asset.assetClass === 'bonds' && !!asset.isin?.trim();
+  // Bond % of par ↔ EUR conversion (same rule as AssetDialog and the price cron): a bond with an
+  // ISIN, the nominal defaulting to 1 € per unit. A BTP€i also scales by its coefficient.
+  const isBondWithIsin = isBondQuotedInPercent(asset);
   const bondNominal = asset.bondDetails?.nominalValue;
-  const isBondPctMode = isBondWithIsin && (bondNominal ?? 0) > 1;
+  const isBondPctMode = isBondWithIsin;
+  const isEuroIndexed = !!asset.bondDetails && resolveInflationIndexation(asset.bondDetails) === 'euro';
+  // The coefficient the form proposes: the trade's own on edit, else the latest one known today.
+  const knownCoefficient = useMemo(
+    () =>
+      isEuroIndexed
+        ? (transaction?.indexationCoefficient ?? latestIndexationCoefficient(asset.bondDetails?.indexationCoefficients, new Date()) ?? undefined)
+        : undefined,
+    [isEuroIndexed, transaction, asset.bondDetails]
+  );
 
   const todayIso = useMemo(() => new Date().toISOString().split('T')[0], []);
-  const baselineIso = useMemo(
-    () => (ledgerMeta ? ledgerMeta.baselineDate.toISOString().split('T')[0] : undefined),
-    [ledgerMeta]
+  // The only floor a trade date has is the asset's OWN opening position (a migrated asset; the
+  // replay refuses anything before it). An asset without a baseline accepts any past date, so a
+  // purchase made years before the ledger existed is recorded with its real date (2026-09-13).
+  const ownBaseline = useMemo(
+    () => existingTransactions.find((t) => t.isBaseline === true),
+    [existingTransactions]
   );
+  const minDateIso = ownBaseline ? getItalyDateIso(ownBaseline.date) : undefined;
 
   const {
     register,
@@ -175,15 +200,29 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
       pricePerUnit: undefined,
       fees: undefined,
       linkedCashAssetId: NO_SETTLEMENT,
+      indexationCoefficient: undefined,
       note: '',
     },
   });
 
   const type = useWatch({ control, name: 'type' });
+  const date = useWatch({ control, name: 'date' });
   const quantity = useWatch({ control, name: 'quantity' });
   const pricePerUnit = useWatch({ control, name: 'pricePerUnit' });
   const fees = useWatch({ control, name: 'fees' });
   const linkedCashAssetId = useWatch({ control, name: 'linkedCashAssetId' });
+  const indexationCoefficient = useWatch({ control, name: 'indexationCoefficient' });
+  // The scaling of the typed quote, live: nominal per unit and (BTP€i) the typed coefficient.
+  const quoteBasis = useMemo<BondQuoteBasis>(
+    () => ({
+      nominalValue: bondNominal,
+      indexationCoefficient:
+        isEuroIndexed && indexationCoefficient !== undefined && !isNaN(indexationCoefficient)
+          ? indexationCoefficient
+          : undefined,
+    }),
+    [bondNominal, isEuroIndexed, indexationCoefficient]
+  );
 
   // The status line belongs to one opening over one trade: it goes back to idle during render
   // when that subject changes (React's "adjusting state when a prop changes") — the same
@@ -211,8 +250,12 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
   useEffect(() => {
     if (!open) return;
     if (transaction) {
+      // Back-convert the stored euro to the quote the user typed, with the coefficient the trade
+      // remembers (or the latest known, for a trade saved before the field existed).
       const toBI = (eurVal: number) =>
-        isBondPctMode && bondNominal ? eurVal / (bondNominal / 100) : eurVal;
+        isBondPctMode
+          ? toBorsaItalianaQuote(eurVal, { nominalValue: bondNominal, indexationCoefficient: knownCoefficient })
+          : eurVal;
       reset({
         type: transaction.type,
         date: transaction.date.toISOString().split('T')[0],
@@ -220,6 +263,7 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
         pricePerUnit: toBI(transaction.pricePerUnit),
         fees: transaction.fees,
         linkedCashAssetId: transaction.linkedCashAssetId ?? NO_SETTLEMENT,
+        indexationCoefficient: knownCoefficient,
         note: transaction.note ?? '',
       });
     } else {
@@ -230,10 +274,11 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
         pricePerUnit: undefined,
         fees: undefined,
         linkedCashAssetId: NO_SETTLEMENT,
+        indexationCoefficient: knownCoefficient,
         note: '',
       });
     }
-  }, [open, transaction, reset, todayIso, isBondPctMode, bondNominal]);
+  }, [open, transaction, reset, todayIso, isBondPctMode, bondNominal, knownCoefficient]);
 
   const isAdjustment = type === 'adjustment';
   const heldQuantity = asset.quantity;
@@ -241,8 +286,8 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
   // Native price the engine sees (bond BI quote → EUR-per-unit; everything else passthrough).
   const resolvedPricePerUnit = useMemo(() => {
     if (pricePerUnit === undefined || isNaN(pricePerUnit)) return undefined;
-    return resolveBondPrice(pricePerUnit, bondNominal, isBondWithIsin);
-  }, [pricePerUnit, bondNominal, isBondWithIsin]);
+    return resolveBondPrice(pricePerUnit, quoteBasis, isBondWithIsin);
+  }, [pricePerUnit, quoteBasis, isBondWithIsin]);
 
   // Live EUR figures for the summary (estimated for non-EUR assets — server resolves the real FX).
   const currency = asset.currency || 'EUR';
@@ -317,8 +362,18 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
       return;
     }
 
+    if (isEuroIndexed && (data.indexationCoefficient === undefined || isNaN(data.indexationCoefficient) || data.indexationCoefficient <= 0)) {
+      setStatus({ phase: 'error', message: 'Serve il coefficiente di indicizzazione alla data dell’operazione.' });
+      return;
+    }
+
     setStatus({ phase: 'submitting' });
-    const price = resolveBondPrice(rawPrice, bondNominal, isBondWithIsin);
+    const submitBasis: BondQuoteBasis = {
+      nominalValue: bondNominal,
+      indexationCoefficient: isEuroIndexed ? data.indexationCoefficient : undefined,
+    };
+    const price = resolveBondPrice(rawPrice, submitBasis, isBondWithIsin);
+    const coefficientValue = isEuroIndexed ? data.indexationCoefficient : undefined;
     const settlement =
       data.linkedCashAssetId && data.linkedCashAssetId !== NO_SETTLEMENT
         ? data.linkedCashAssetId
@@ -330,11 +385,12 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
       if (transaction) {
         // Edit. Baseline trades accept only quantity/pricePerUnit/note (server enforces it too).
         const updates: Partial<AssetTransactionFormData> = isBaseline
-          ? { quantity: qty, pricePerUnit: price, note: noteValue }
+          ? { quantity: qty, pricePerUnit: price, indexationCoefficient: coefficientValue, note: noteValue }
           : {
               date: new Date(data.date),
               quantity: qty,
               pricePerUnit: price,
+              indexationCoefficient: coefficientValue,
               ...(data.type === 'adjustment' ? {} : { fees: feeValue, linkedCashAssetId: settlement }),
               note: noteValue,
             };
@@ -351,6 +407,7 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
           date: new Date(data.date),
           quantity: qty,
           pricePerUnit: price,
+          indexationCoefficient: coefficientValue,
           ...(data.type === 'adjustment' ? {} : { fees: feeValue, linkedCashAssetId: settlement }),
           note: noteValue,
         };
@@ -472,14 +529,14 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
             <Input
               id="trade-date"
               type="date"
-              min={baselineIso}
+              min={minDateIso}
               max={todayIso}
               {...register('date')}
             />
-            {baselineIso && (
+            {ownBaseline && (
               <p className="text-xs text-muted-foreground">
-                Le operazioni partono dal {ledgerMeta ? formatItDate(ledgerMeta.baselineDate) : ''}{' '}
-                (inizio del registro).
+                Le operazioni di questo asset partono dalla posizione iniziale del{' '}
+                {formatItDate(ownBaseline.date)}.
               </p>
             )}
           </div>
@@ -520,10 +577,12 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
         {/* Prezzo / Nuovo PMC */}
         <div className="space-y-2">
           <Label htmlFor="trade-price">{priceLabel}</Label>
+          {/* `step="any"`: an edit prefills the stored euro back-converted to a quote (five decimals,
+              more after a BTP€i's coefficient); a fixed step would refuse the form's own value. */}
           <Input
             id="trade-price"
             type="number"
-            step="0.0001"
+            step="any"
             min="0"
             placeholder={isBondPctMode ? 'es. 100 (quotazione Borsa Italiana)' : 'es. 85.1234'}
             {...register('pricePerUnit', { valueAsNumber: true })}
@@ -537,6 +596,28 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
             <p className="text-sm text-destructive">{errors.pricePerUnit.message}</p>
           )}
         </div>
+
+        {/* BTP€i: the quote is real — the euro paid is quote × coefficient at the trade date. */}
+        {isEuroIndexed && (
+          <div className="space-y-2">
+            <Label htmlFor="trade-indexation-coefficient">Coefficiente di indicizzazione alla data</Label>
+            <Input
+              id="trade-indexation-coefficient"
+              type="number"
+              step="0.00001"
+              min="0"
+              inputMode="decimal"
+              placeholder="es. 1.23456"
+              {...register('indexationCoefficient', { valueAsNumber: true })}
+            />
+            <p className="text-xs text-muted-foreground">
+              Dal contratto della banca o dalla tabella giornaliera del MEF per il giorno dell&apos;operazione.
+            </p>
+            {errors.indexationCoefficient && (
+              <p className="text-sm text-destructive">{errors.indexationCoefficient.message}</p>
+            )}
+          </div>
+        )}
 
         {/* Commissioni + Conto di regolamento — buy/sell only, and never for a baseline (its editable
             fields are limited to quantity/PMC/note). */}
@@ -574,7 +655,7 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Se selezionato, il saldo del conto viene aggiornato automaticamente.
+                {describeSettlementTiming(date ?? '', todayIso)}
               </p>
             </div>
           </>
@@ -651,11 +732,12 @@ function formatQty(value: number): string {
   return value.toLocaleString('it-IT', { maximumFractionDigits: 8 });
 }
 
-/** DD/MM/YYYY without pulling date-fns into this module. */
+/** DD/MM/YYYY of the Italian calendar day (a baseline is dated to start-of-day Italy), without pulling date-fns into this module. */
 function formatItDate(date: Date): string {
   return new Intl.DateTimeFormat('it-IT', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
+    timeZone: 'Europe/Rome',
   }).format(date);
 }

@@ -12,7 +12,7 @@
  */
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Dividend } from '@/types/dividend';
 import { CalendarDayCell } from './CalendarDayCell';
@@ -47,11 +47,30 @@ interface DividendCalendarProps {
   bounds: PeriodBounds;
 }
 
+/** The window as a key, so the month on screen belongs to the period that is on screen. */
+function boundsKey(bounds: PeriodBounds): string {
+  const edge = (b: PeriodBounds['from']) => (b ? `${b.year}-${b.month}` : 'open');
+  return `${edge(bounds.from)}|${edge(bounds.to)}`;
+}
+
 export function DividendCalendar({ dividends, now, bounds }: DividendCalendarProps) {
-  const [currentMonth, setCurrentMonth] = useState(getItalyMonth());
-  const [currentYear, setCurrentYear] = useState(getItalyYear());
+  // The month on screen is stored WITH the window it was browsed under: when the period
+  // changes, the key stops matching and the calendar falls back to today's month with no
+  // effect and no extra render (AGENTS.md → React Query and Derived State). Until 2026-09-14
+  // a month browsed under «Storico» survived a switch to «Mese» — January under a September
+  // verdict, with «Nessun pagamento in questo mese» presented as a fact.
+  const key = boundsKey(bounds);
+  const [view, setView] = useState<{ key: string; month: number; year: number }>({ key, month: getItalyMonth(), year: getItalyYear() });
+  const currentMonth = view.key === key ? view.month : getItalyMonth();
+  const currentYear = view.key === key ? view.year : getItalyYear();
+  const setMonthYear = (month: number, year: number) => setView({ key, month, year });
   const [detailDate, setDetailDate] = useState<Date | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+
+  // Roving tabindex over the 42 cells: one cell in the Tab order, the arrows move it. Stored
+  // with the month it belongs to, so a new month starts on its first day.
+  const [focus, setFocus] = useState<{ month: number; year: number; index: number } | null>(null);
+  const cellRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   /**
    * 42-day grid (6 weeks × 7 days) starting on Monday. Always 6 rows so the calendar height
@@ -142,18 +161,44 @@ export function DividendCalendar({ dividends, now, bounds }: DividendCalendarPro
   // consequence the click already knows about.
   const handlePreviousMonth = () => {
     setDialogOpen(false);
-    if (currentMonth === 1) {
-      setCurrentMonth(12);
-      setCurrentYear(currentYear - 1);
-    } else setCurrentMonth(currentMonth - 1);
+    if (currentMonth === 1) setMonthYear(12, currentYear - 1);
+    else setMonthYear(currentMonth - 1, currentYear);
   };
 
   const handleNextMonth = () => {
     setDialogOpen(false);
-    if (currentMonth === 12) {
-      setCurrentMonth(1);
-      setCurrentYear(currentYear + 1);
-    } else setCurrentMonth(currentMonth + 1);
+    if (currentMonth === 12) setMonthYear(1, currentYear + 1);
+    else setMonthYear(currentMonth + 1, currentYear);
+  };
+
+  // Which cell is in the Tab order: the remembered one for this month, else today when the
+  // grid holds it, else the first day of the month.
+  const focusedIndex = useMemo(() => {
+    if (focus && focus.month === currentMonth && focus.year === currentYear) return focus.index;
+    const todayIndex = calendarGrid.findIndex((date) => isToday(date));
+    if (todayIndex >= 0) return todayIndex;
+    return Math.max(0, calendarGrid.findIndex((date) => isCurrentMonth(date)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus, currentMonth, currentYear, calendarGrid]);
+
+  const moveFocus = (index: number) => {
+    const clamped = Math.max(0, Math.min(41, index));
+    setFocus({ month: currentMonth, year: currentYear, index: clamped });
+    cellRefs.current[clamped]?.focus();
+  };
+
+  const handleGridKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const steps: Record<string, number> = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: 7, ArrowUp: -7 };
+    if (event.key in steps) {
+      event.preventDefault();
+      moveFocus(focusedIndex + steps[event.key]);
+    } else if (event.key === 'Home') {
+      event.preventDefault();
+      moveFocus(focusedIndex - (focusedIndex % 7));
+    } else if (event.key === 'End') {
+      event.preventDefault();
+      moveFocus(focusedIndex - (focusedIndex % 7) + 6);
+    }
   };
 
   const handleDateClick = (date: Date) => {
@@ -212,7 +257,7 @@ export function DividendCalendar({ dividends, now, bounds }: DividendCalendarPro
             <Button
               variant="outline"
               size="icon"
-              className="h-8 w-8"
+              className="h-11 w-11 desktop:h-8 desktop:w-8"
               onClick={handlePreviousMonth}
               disabled={atLowerBound}
               aria-label="Mese precedente"
@@ -222,7 +267,7 @@ export function DividendCalendar({ dividends, now, bounds }: DividendCalendarPro
             <Button
               variant="outline"
               size="icon"
-              className="h-8 w-8"
+              className="h-11 w-11 desktop:h-8 desktop:w-8"
               onClick={handleNextMonth}
               disabled={atUpperBound}
               aria-label="Mese successivo"
@@ -238,7 +283,7 @@ export function DividendCalendar({ dividends, now, bounds }: DividendCalendarPro
         role="columnheader" and each week is a role="row", so AT can announce position.
         The frame is the cells' own hairlines — no card inside the tile.
       */}
-      <div role="grid" aria-label="Calendario pagamenti dividendi" className="border-l border-t border-border">
+      <div role="grid" aria-label="Calendario pagamenti dividendi" className="border-l border-t border-border" onKeyDown={handleGridKeyDown}>
         <div role="row" className="grid grid-cols-7">
           {ITALIAN_DAY_ABBR.map((day, idx) => (
             <div
@@ -256,19 +301,20 @@ export function DividendCalendar({ dividends, now, bounds }: DividendCalendarPro
         {Array.from({ length: 6 }, (_, weekIdx) => (
           <div key={weekIdx} role="row" className="grid grid-cols-7">
             {calendarGrid.slice(weekIdx * 7, weekIdx * 7 + 7).map((date, dayIdx) => {
+              const index = weekIdx * 7 + dayIdx;
               const dateDividends = getDividendsForDate(date);
               const announced = dateDividends.length > 0 && dateDividends.every((d) => !isPaid(d, now));
               const { month, year } = getItalyMonthYear(date);
               const ariaLabel = `${date.getDate()} ${MONTH_NAMES[month - 1]} ${year}${
                 dateDividends.length > 0
                   ? ` — ${dateDividends.length} ${dateDividends.length === 1 ? 'pagamento' : 'pagamenti'}${
-                      announced ? ' annunciato' : ''
+                      announced ? (dateDividends.length === 1 ? ' in attesa' : ' in attesa') : ''
                     }`
-                  : ''
+                  : ' — nessun pagamento'
               }`;
               return (
                 <CalendarDayCell
-                  key={weekIdx * 7 + dayIdx}
+                  key={index}
                   date={date}
                   isCurrentMonth={isCurrentMonth(date)}
                   isToday={isToday(date)}
@@ -276,6 +322,11 @@ export function DividendCalendar({ dividends, now, bounds }: DividendCalendarPro
                   onClick={handleDateClick}
                   ariaLabel={ariaLabel}
                   announced={announced}
+                  tabIndex={index === focusedIndex ? 0 : -1}
+                  onFocus={() => setFocus({ month: currentMonth, year: currentYear, index })}
+                  cellRef={(el) => {
+                    cellRefs.current[index] = el;
+                  }}
                 />
               );
             })}

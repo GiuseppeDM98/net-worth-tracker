@@ -7,9 +7,17 @@ import { useChartColors } from '@/lib/hooks/useChartColors';
 
 interface AssetSparklineProps {
   data: { value: number }[];
+  /** What the line is («Prezzo unitario di VWCE»): the chart's accessible name, since it has no axes. */
+  label: string;
 }
 
-export function AssetSparkline({ data }: AssetSparklineProps) {
+/**
+ * The unit-price line inside an expanded `AssetRow`. Recharts 3 puts `tabIndex=0` and
+ * `role="application"` on its own `<svg>`, which made every expanded row a mute tab stop on a
+ * phone (13 of them, measured 2026-09-14): the chart is an image with a name, not a widget
+ * (AGENTS.md → Recharts, accessibility goes on the chart).
+ */
+export function AssetSparkline({ data, label }: AssetSparklineProps) {
   const prefersReducedMotion = useReducedMotion();
   const [ready, setReady] = useState(false);
   const rafRef = useRef<number | null>(null);
@@ -33,7 +41,14 @@ export function AssetSparkline({ data }: AssetSparklineProps) {
 
   return (
     <ResponsiveContainer width="100%" height={32} minWidth={0}>
-      <LineChart data={data} margin={{ top: 2, right: 0, left: 0, bottom: 2 }}>
+      <LineChart
+        data={data}
+        margin={{ top: 2, right: 0, left: 0, bottom: 2 }}
+        role="img"
+        aria-label={`${label}: ${isPositive ? 'in salita' : 'in calo'} nel periodo`}
+        accessibilityLayer={false}
+        tabIndex={-1}
+      >
         {/* Hidden YAxis scales line to data range, not from zero */}
         <YAxis hide domain={['auto', 'auto']} />
         <Line

@@ -1,11 +1,13 @@
 'use client';
 
+import { useMemo } from 'react';
 import type { PerformanceChartData } from '@/types/performance';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { MONTH_NAMES_SHORT } from '@/lib/utils/period';
 import { cn } from '@/lib/utils';
 import { ChartHoverTip, useChartHover } from '@/components/ui/chart-hover';
 import { pickAxisIndices } from './GrowthOfHundredChart';
+import { useMorphingSeries } from '@/lib/hooks/useMorphingSeries';
 
 interface CapitalMarketChartProps {
   /** From `preparePerformanceChartData`: the invested base under the net worth, month by month. */
@@ -36,9 +38,15 @@ function shortLabel(date: string, withYear: boolean): string {
  * One area under one line, never two stacked bands: cumulative contributions go negative whenever
  * tracked spending outpaces tracked income, and a stacked band drawn downward stops meeting the
  * total (AGENTS.md → Recharts). Hand-written, so it stretches with the tile and reads on hover.
+ * On a period switch the area and the line glide into the new window (`useMorphingSeries`).
  */
 export function CapitalMarketChart({ data, minHeight = 150, className }: CapitalMarketChartProps) {
-  const values = data.flatMap((d) => [d.netWorth, d.investedBase]);
+  const netWorthTarget = useMemo(() => data.map((d) => d.netWorth), [data]);
+  const baseTarget = useMemo(() => data.map((d) => d.investedBase), [data]);
+  const netWorth = useMorphingSeries(netWorthTarget);
+  const base = useMorphingSeries(baseTarget);
+
+  const values = [...netWorth, ...base].filter((v): v is number => v !== null);
   const rawMin = Math.min(...values);
   const rawMax = Math.max(...values);
   // A little air above and below so neither line touches the frame; the area still reaches the floor.
@@ -48,9 +56,9 @@ export function CapitalMarketChart({ data, minHeight = 150, className }: Capital
   const sx = (i: number) => (data.length > 1 ? (i / (data.length - 1)) * VIEW_W : 0);
   const sy = (v: number) => PAD + (1 - (v - min) / span) * (VIEW_H - PAD * 2);
 
-  const basePath = data.map((d, i) => `${i === 0 ? 'M' : 'L'}${sx(i).toFixed(1)},${sy(d.investedBase).toFixed(1)}`).join(' ');
+  const basePath = base.map((v, i) => `${i === 0 ? 'M' : 'L'}${sx(i).toFixed(1)},${sy(v ?? 0).toFixed(1)}`).join(' ');
   const areaPath = `${basePath} L${VIEW_W},${VIEW_H} L0,${VIEW_H} Z`;
-  const netWorthPath = data.map((d, i) => `${i === 0 ? 'M' : 'L'}${sx(i).toFixed(1)},${sy(d.netWorth).toFixed(1)}`).join(' ');
+  const netWorthPath = netWorth.map((v, i) => `${i === 0 ? 'M' : 'L'}${sx(i).toFixed(1)},${sy(v ?? 0).toFixed(1)}`).join(' ');
 
   const spansYears = data.length > 0 && parseDate(data[0].date).year !== parseDate(data[data.length - 1].date).year;
   const hover = useChartHover(data.length, 'nearest');

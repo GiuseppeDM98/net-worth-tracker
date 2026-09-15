@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { SceneLink } from '@/components/layout/SceneLink';
 import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
@@ -73,10 +73,10 @@ function NavItems({ items }: { items: NavItem[] }) {
               className="relative z-10 data-[active=true]:bg-transparent"
             >
               {/* aria-current="page" is on the <a> so screen readers announce the active route */}
-              <Link href={item.href} onClick={handleClick} aria-current={isActive ? 'page' : undefined}>
+              <SceneLink href={item.href} onClick={handleClick} aria-current={isActive ? 'page' : undefined}>
                 <item.icon />
                 <span>{item.name}</span>
-              </Link>
+              </SceneLink>
             </SidebarMenuButton>
           </SidebarMenuItem>
         );
@@ -119,13 +119,13 @@ export function AppSidebar() {
         */}
         <SidebarHeader>
           <div className="flex items-center gap-1">
-            <Link
+            <SceneLink
               href="/dashboard"
               onClick={closeMobile}
               className="flex h-8 flex-1 min-w-0 items-center rounded-md px-2 text-[13px] font-semibold tracking-[-0.01em] hover:bg-sidebar-accent transition-colors group-data-[state=collapsed]:hidden"
             >
               <span className="truncate">Portfolio Tracker</span>
-            </Link>
+            </SceneLink>
             <TooltipProvider delayDuration={300}>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -249,10 +249,10 @@ export function AppSidebar() {
                   )}
                   <DropdownMenuGroup>
                     <DropdownMenuItem asChild>
-                      <Link href="/dashboard/settings" onClick={closeMobile}>
+                      <SceneLink href="/dashboard/settings" onClick={closeMobile}>
                         <Settings className="size-4" />
                         Impostazioni
-                      </Link>
+                      </SceneLink>
                     </DropdownMenuItem>
                   </DropdownMenuGroup>
                   <DropdownMenuSeparator />

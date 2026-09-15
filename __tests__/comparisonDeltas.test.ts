@@ -396,6 +396,16 @@ describe('resolveComparisonScope', () => {
     });
   });
 
+  it('should cut the running month at today\'s day when the day is known — and only the running one', () => {
+    // Tracciamento's «stessi giorni»: the 1st → the 14th on both sides, never a half month
+    // against a whole one.
+    expect(resolveComparisonScope('current', 8, 8, 14)).toEqual({ kind: 'singleMonth', month: 8, inProgress: true, throughDay: 14 });
+    expect(resolveComparisonScope('ytd', 8, 8, 14)).toEqual({ kind: 'singleMonth', month: 8, inProgress: true, throughDay: 14 });
+    // A closed month keeps its whole span; the day means nothing there.
+    expect(resolveComparisonScope('current', 3, 8, 14)).toEqual({ kind: 'singleMonth', month: 3, inProgress: false });
+    expect(resolveComparisonScope('year', 8, 8, 14)).toEqual({ kind: 'singleMonth', month: 8, inProgress: false });
+  });
+
   it('should return null for a month that has not started yet', () => {
     // Comparing a month of zeros against a full baseline would print "-100%"
     // for a month that simply has not happened.
@@ -423,5 +433,35 @@ describe('resolveComparisonScope', () => {
 
     // Assert
     expect(pacing?.baselineLabel).toBe('vs Agosto 2025 (mese in corso)');
+  });
+
+  it('should compare the running month on the same days of its baseline, on both sides', () => {
+    // Arrange — the 14th of August: rows after the 14th are ahead on the current side and
+    // out of the window on the baseline side alike.
+    const dayOf = (expense: Expense) => {
+      const date = expense.date as Date;
+      return { year: date.getFullYear(), month: date.getMonth() + 1, day: date.getDate() };
+    };
+    const expenses = [
+      makeExpense({ type: 'variable', amount: -100, date: new Date(2026, 7, 3) }),
+      makeExpense({ type: 'variable', amount: -900, date: new Date(2026, 7, 28) }),
+      makeExpense({ type: 'variable', amount: -120, date: new Date(2025, 7, 10) }),
+      makeExpense({ type: 'variable', amount: -500, date: new Date(2025, 7, 20) }),
+      makeExpense({ type: 'income', amount: 2000, date: new Date(2025, 7, 27) }),
+    ];
+    const scope = resolveComparisonScope('current', 8, 8, 14)!;
+
+    // Act
+    const pacing = computeTotalsPacing(expenses, 2026, 2025, scope, dayOf);
+    const rows = buildCategoryComparison(expenses, 2026, 2025, scope, dayOf);
+
+    // Assert — 100 against 120: the 28th, the 20th and the salary of the 27th stay out.
+    expect(pacing?.expenses).toMatchObject({ current: 100, previous: 120, delta: -20 });
+    expect(pacing?.income).toMatchObject({ current: 0, previous: 0 });
+    expect(pacing?.baselineLabel).toBe('vs Agosto 2025 (1–14 ago)');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ current: 100, previous: 120, delta: -20 });
+    // Without a day on the row, nothing is cut — the resolver decides what the cut can see.
+    expect(computeTotalsPacing(expenses, 2026, 2025, scope, monthOf)?.expenses).toMatchObject({ current: 1000, previous: 620 });
   });
 });

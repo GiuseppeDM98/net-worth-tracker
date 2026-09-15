@@ -112,7 +112,10 @@ export function SpendingBarsChart({ points, kind, minHeight = 150, className }: 
         {points.map((point) => (
           <span
             key={point.key}
-            className={cn('truncate text-center font-mono text-[10px] tabular-nums', point.ongoing ? 'font-semibold text-foreground' : 'text-muted-foreground', point.scheduled && 'opacity-60')}
+            // A month still in the calendar is told by its bar (lighter, never outlined) and by the
+            // svg's label; its month name keeps the full muted token — an opacity over it measured
+            // 3,30:1 in dark and 2,30:1 in light on the real account (2026-09-14).
+            className={cn('truncate text-center font-mono text-[10px] tabular-nums', point.ongoing ? 'font-semibold text-foreground' : 'text-muted-foreground')}
           >
             {point.label}
           </span>

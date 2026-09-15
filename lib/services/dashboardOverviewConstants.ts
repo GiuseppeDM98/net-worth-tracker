@@ -34,5 +34,10 @@ export const DASHBOARD_OVERVIEW_SUMMARY_COLLECTION = 'dashboardOverviewSummaries
 // Bumped from 14→15: every G/P figure (metrics.unrealizedGains, estimatedTaxes, netTotal,
 // topAssets[].returnPercent, flags.hasCostBasisTracking) now stands against the EUR PMC with
 // purchase fees included (lib/utils/costBasisEur.ts), never the native averageCost.
-export const DASHBOARD_OVERVIEW_SOURCE_VERSION = 15;
+// Bumped from 15→16: monthSales (the current month's sells from the trade ledger, with the
+// estimated capital-gains tax) added, so the verdict can name what left the portfolio besides
+// the market (lib/utils/periodSales.ts).
+// Bumped from 16→17: topExpenseCategories[] / topIncomeCategories[] carry `expenseType`, so a
+// row of the Panoramica's category tiles can open its Scheda on Analisi (?focusType&focusCat).
+export const DASHBOARD_OVERVIEW_SOURCE_VERSION = 17;
 export const DASHBOARD_OVERVIEW_SUMMARY_TTL_MS = 5 * 60 * 1000;

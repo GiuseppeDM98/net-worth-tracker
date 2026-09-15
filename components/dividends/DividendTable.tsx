@@ -11,13 +11,22 @@
  * table itself carries the totals and not the derivations.
  *
  * Announced payments (payment date in the future) are never summed with received ones: the
- * footer prints two totals, and an announced row's net is muted instead of sign-coloured.
+ * footer prints two totals, and an announced row's net is muted AND chipped «Attesa» — on the
+ * phone too, where until 2026-09-14 the colour of a number was the only difference between a
+ * coupon in the account and one promised for December (WCAG 1.4.1).
+ *
+ * Keyboard and delete (2026-09-14): the instrument's name is a real `<button>` that opens the
+ * record — a `<tr onClick>` was never in the Tab order, so the record was mouse-only on desktop;
+ * the row's two actions name their record; and the delete is a two-click confirm ON the row
+ * through `useArmedDelete` (no timer: the 3 s auto-disarm was a WCAG 2.2.1 time limit), the
+ * button reading «Conferma» in words AND in its accessible name, the consequence printed in the
+ * row and one live region per table speaking arm and disarm.
  */
 'use client';
 
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Dividend } from '@/types/dividend';
+import { Dividend, DividendType } from '@/types/dividend';
 import { Timestamp } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -35,6 +44,9 @@ import { cn } from '@/lib/utils';
 import { TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { dividendTypeLabels } from '@/lib/constants/dividendTypes';
 import { isPaid } from '@/lib/utils/dividendAnalytics';
+import { dividendTypeNoun } from '@/lib/utils/dividendiNarrative';
+import { describeDividendDeleteConsequence, describeWriteError } from '@/lib/utils/dialogNarrative';
+import { useArmedDelete } from '@/lib/hooks/useArmedDelete';
 
 const ITEMS_PER_PAGE = 50;
 
@@ -55,6 +67,14 @@ type SortColumn = 'exDate' | 'paymentDate' | 'totalNet';
 
 const CELL = 'py-2.5 text-[13px]';
 const NUM = 'text-right font-mono tabular-nums';
+const STATE_BADGE_CLASS = 'h-4 shrink-0 border-warning-border px-1.5 py-0 text-[10px] font-normal text-warning-foreground';
+
+const formatDay = (date: Date | string | Timestamp): string => format(toDate(date), 'dd/MM/yyyy', { locale: it });
+
+/** «la cedola di BTP Valore del 10/09/2026» — how a row names itself to an action. */
+function rowName(dividend: Dividend): string {
+  return `${dividendTypeNoun(dividend.dividendType as DividendType)} di ${dividend.assetTicker || dividend.assetName} del ${formatDay(dividend.paymentDate)}`;
+}
 
 /**
  * An amount with an optional EUR-conversion tooltip. Module level so it is not re-created on
@@ -98,6 +118,24 @@ function AmountWithConversion({
   );
 }
 
+/** The state of a payment as words: «Attesa» for an announced one, «Provvisoria» for a coupon at its floor. */
+function PaymentStateBadges({ announced, provisional }: { announced: boolean; provisional: boolean }) {
+  return (
+    <>
+      {announced && (
+        <Badge variant="outline" className={STATE_BADGE_CLASS}>
+          Attesa
+        </Badge>
+      )}
+      {provisional && (
+        <Badge variant="outline" className={STATE_BADGE_CLASS}>
+          Provvisoria
+        </Badge>
+      )}
+    </>
+  );
+}
+
 /**
  * A sortable column header. Module level on purpose: a component defined inside a render body
  * is a new type on every render, so React remounts it and the header loses focus mid-sort.
@@ -127,13 +165,137 @@ function SortHeader({
       <button
         type="button"
         onClick={() => onSort(column)}
-        className="inline-flex w-full items-center justify-end gap-1 transition-colors hover:text-foreground"
+        className="inline-flex w-full min-h-8 -my-1.5 items-center justify-end gap-1 transition-colors hover:text-foreground"
         aria-label={`Ordina per ${label}`}
       >
         <span>{label}</span>
         {active && (sortDirection === 'desc' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />)}
       </button>
     </th>
+  );
+}
+
+interface RowProps {
+  dividend: Dividend;
+  now: Date;
+  active: boolean;
+  isDemo: boolean;
+  busy: boolean;
+  onEdit: (dividend: Dividend) => void;
+  onOpenDetails: (dividend: Dividend, triggerElement: HTMLElement) => void;
+  onDelete: (dividend: Dividend) => void;
+  announce: (text: string) => void;
+}
+
+/**
+ * A desktop row, module-level because the armed state of its delete lives here. The name cell
+ * holds the button that opens the record (the row's click is a convenience for the mouse; the
+ * button is what the keyboard reaches and what the focus comes back to). While armed the pencil
+ * gives its room to «Conferma» and the row prints what the second press does.
+ */
+function DesktopRow({ dividend, now, active, isDemo, busy, onEdit, onOpenDetails, onDelete, announce }: RowProps) {
+  const announced = !isPaid(dividend, now);
+  const name = rowName(dividend);
+  const openRef = useRef<HTMLButtonElement | null>(null);
+  const deleteRef = useRef<HTMLButtonElement | null>(null);
+  const { armed, onClick: onArmedClick, onBlur } = useArmedDelete(deleteRef, () => onDelete(dividend));
+  const wasArmed = useRef(false);
+  useEffect(() => {
+    if (armed) {
+      wasArmed.current = true;
+      announce(`Premi di nuovo per eliminare ${name}`);
+    } else if (wasArmed.current) {
+      wasArmed.current = false;
+      announce('Eliminazione annullata');
+    }
+  }, [armed, announce, name]);
+
+  const consequence = armed
+    ? describeDividendDeleteConsequence({
+        what: dividendTypeNoun(dividend.dividendType as DividendType),
+        paymentDate: formatDay(dividend.paymentDate),
+        hasExpense: !!dividend.expenseId,
+      })
+    : null;
+  const disabled = isDemo || busy;
+
+  return (
+    <tr
+      onClick={() => onOpenDetails(dividend, openRef.current ?? document.body)}
+      className={cn(
+        'cursor-pointer border-t border-border transition-colors motion-reduce:transition-none hover:bg-muted/30',
+        active && 'bg-muted/40',
+        armed && 'bg-destructive/5',
+      )}
+    >
+      <th scope="row" className={cn(CELL, 'pr-3 text-left font-medium')}>
+        <span className="flex items-center gap-1.5">
+          <button
+            ref={openRef}
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpenDetails(dividend, event.currentTarget);
+            }}
+            aria-label={`Dettagli: ${name}`}
+            className="truncate rounded-sm text-left underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {dividend.assetTicker || dividend.assetName}
+          </button>
+          <PaymentStateBadges announced={announced} provisional={!!dividend.isProvisional} />
+        </span>
+        {consequence && <span className="mt-1 block text-[11px] font-normal leading-[1.4] text-destructive">{consequence}</span>}
+      </th>
+      <td className={cn(CELL, 'pl-3 text-muted-foreground')}>{dividendTypeLabels[dividend.dividendType]}</td>
+      <td className={cn(CELL, NUM, 'pl-3 text-muted-foreground')}>{formatDay(dividend.exDate)}</td>
+      <td className={cn(CELL, NUM, 'pl-3')}>{formatDay(dividend.paymentDate)}</td>
+      <td className={cn(CELL, NUM, 'pl-3 text-muted-foreground')}>
+        {dividend.dividendPerShare > 0 ? formatNumber(dividend.dividendPerShare, 4) : '—'}
+      </td>
+      <td className={cn(CELL, NUM, 'pl-3 text-muted-foreground')}>{formatNumber(dividend.quantity, 0)}</td>
+      <td className={cn(CELL, NUM, 'pl-3')}>
+        <AmountWithConversion originalAmount={dividend.grossAmount} eurAmount={dividend.grossAmountEur} currency={dividend.currency} />
+      </td>
+      <td className={cn(CELL, NUM, 'pl-3 text-muted-foreground')}>
+        <AmountWithConversion originalAmount={dividend.taxAmount} eurAmount={dividend.taxAmountEur} currency={dividend.currency} />
+      </td>
+      <td className={cn(CELL, NUM, 'pl-3 font-semibold', announced ? 'text-muted-foreground' : 'text-positive')}>
+        <AmountWithConversion originalAmount={dividend.netAmount} eurAmount={dividend.netAmountEur} currency={dividend.currency} />
+      </td>
+      <td className={cn(CELL, 'pl-3')}>
+        <div className="flex items-center justify-end gap-1">
+          {!armed && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit(dividend);
+              }}
+              disabled={disabled}
+              aria-label={isDemo ? 'Modifica — non disponibile in modalità demo' : `Modifica ${name}`}
+            >
+              <Edit className="h-3.5 w-3.5" aria-hidden="true" />
+            </Button>
+          )}
+          <Button
+            ref={deleteRef}
+            variant={armed ? 'destructive' : 'ghost'}
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              onArmedClick();
+            }}
+            onBlur={onBlur}
+            disabled={disabled}
+            aria-pressed={armed}
+            aria-label={isDemo ? 'Elimina — non disponibile in modalità demo' : armed ? `Premi di nuovo per eliminare ${name}` : `Elimina ${name}`}
+          >
+            {armed ? <span className="px-1 text-xs">Conferma</span> : <Trash2 className="h-3.5 w-3.5 text-destructive" aria-hidden="true" />}
+          </Button>
+        </div>
+      </td>
+    </tr>
   );
 }
 
@@ -148,20 +310,15 @@ export function DividendTable({
   now,
 }: DividendTableProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
-  const pendingDeleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The table's one live region: arm and disarm are sentences, spoken here, never per row.
+  const [announcement, setAnnouncement] = useState('');
+  const announce = useCallback((text: string) => setAnnouncement(text), []);
 
   // Stored WITH the list length it was opened under: when the filters change the length, the
   // key stops matching and the page falls back to the first one with no effect and no extra render.
   const [pageState, setPageState] = useState<{ key: number; page: number }>({ key: 0, page: 1 });
   const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
-
-  useEffect(() => {
-    return () => {
-      if (pendingDeleteTimerRef.current) clearTimeout(pendingDeleteTimerRef.current);
-    };
-  }, []);
 
   // Received and announced are totalled apart: one is money in the account, the other a promise.
   const totals = useMemo(() => {
@@ -184,39 +341,19 @@ export function DividendTable({
     );
   }, [dividends, now]);
 
-  const formatDay = (date: Date | string | Timestamp): string => format(toDate(date), 'dd/MM/yyyy', { locale: it });
-
-  /**
-   * 2-click inline delete — first click arms (3s auto-disarm), second executes. Unchanged from
-   * before the redesign, including the timer: the WCAG 2.2.1 debt it carries is shared with the
-   * assets table and is tracked in CLAUDE.md → Known Issues.
-   */
-  const handleDeleteClick = (dividend: Dividend, e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    if (pendingDeleteId === dividend.id) {
-      if (pendingDeleteTimerRef.current) clearTimeout(pendingDeleteTimerRef.current);
-      setPendingDeleteId(null);
-      void executeDelete(dividend);
-    } else {
-      if (pendingDeleteTimerRef.current) clearTimeout(pendingDeleteTimerRef.current);
-      setPendingDeleteId(dividend.id);
-      pendingDeleteTimerRef.current = setTimeout(() => setPendingDeleteId(null), 3000);
-    }
-  };
-
   const executeDelete = async (dividend: Dividend) => {
     try {
       setDeletingId(dividend.id);
       const response = await authenticatedFetch(`/api/dividends/${dividend.id}`, { method: 'DELETE' });
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Errore nell'eliminazione del dividendo");
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.message || error.error || "Errore nell'eliminazione del dividendo");
       }
-      toast.success('Dividendo eliminato con successo');
+      toast.success('Pagamento eliminato');
       onRefresh();
     } catch (error) {
       console.error('Error deleting dividend:', error);
-      toast.error(error instanceof Error ? error.message : "Errore nell'eliminazione del dividendo");
+      toast.error(describeWriteError(error));
     } finally {
       setDeletingId(null);
     }
@@ -265,7 +402,8 @@ export function DividendTable({
 
   return (
     <motion.div className="space-y-4" variants={tableShellSettle} initial="inactive" animate="visible">
-      {/* Below desktop: flat rows, no cards. Tapping one opens the record dialog. */}
+      {/* Below desktop: flat rows, no cards. Tapping one opens the record dialog. The state is
+          a chip here too, never the colour of the number alone. */}
       <div className="flex flex-col divide-y divide-border desktop:hidden">
         {paginatedDividends.map((dividend) => {
           const announced = !isPaid(dividend, now);
@@ -274,17 +412,20 @@ export function DividendTable({
               key={dividend.id}
               type="button"
               onClick={(event) => onOpenDetails(dividend, event.currentTarget)}
+              aria-label={`Dettagli: ${rowName(dividend)}${announced ? ', attesa' : ''}`}
               className={cn(
                 'flex min-h-11 w-full items-center gap-3 py-2.5 text-left transition-colors motion-reduce:transition-none',
                 'hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                 activeDividendId === dividend.id && 'bg-muted/40'
               )}
             >
-              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="truncate text-[13px] font-medium">{dividend.assetTicker || dividend.assetName}</span>
+              <span className="flex min-w-0 flex-1 flex-col gap-1">
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <span className="truncate text-[13px] font-medium">{dividend.assetTicker || dividend.assetName}</span>
+                  <PaymentStateBadges announced={announced} provisional={!!dividend.isProvisional} />
+                </span>
                 <span className="truncate text-[11px] text-muted-foreground">
                   {dividendTypeLabels[dividend.dividendType]} · {formatDay(dividend.paymentDate)}
-                  {dividend.isProvisional && ' · provvisoria'}
                 </span>
               </span>
               <span
@@ -298,6 +439,27 @@ export function DividendTable({
             </button>
           );
         })}
+        {/* The two totals the desktop `tfoot` prints, so a phone never has to add them by eye. */}
+        {showTotals && (totals.received.count > 0 || totals.announced.count > 0) && (
+          <dl className="flex flex-col gap-1.5 pt-3">
+            {totals.received.count > 0 && (
+              <div className="flex items-center justify-between gap-3">
+                <dt className="text-[12px] text-muted-foreground">
+                  Incassate · {totals.received.count} {totals.received.count === 1 ? 'voce' : 'voci'}
+                </dt>
+                <dd className="font-mono text-[13px] font-semibold tabular-nums text-positive">{formatCurrency(totals.received.net)}</dd>
+              </div>
+            )}
+            {totals.announced.count > 0 && (
+              <div className="flex items-center justify-between gap-3">
+                <dt className="text-[12px] text-muted-foreground">
+                  Annunciate · {totals.announced.count} {totals.announced.count === 1 ? 'voce' : 'voci'}
+                </dt>
+                <dd className="font-mono text-[13px] font-semibold tabular-nums text-muted-foreground">{formatCurrency(totals.announced.net)}</dd>
+              </div>
+            )}
+          </dl>
+        )}
       </div>
 
       {/* Desktop: the table, scrolling inside the tile and never taking the page with it. */}
@@ -327,101 +489,26 @@ export function DividendTable({
               </th>
               <SortHeader column="totalNet" label="Netto" className="pl-3" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
               <th scope="col" className={cn(TILE_SUB_EYEBROW_CLASS, 'py-2 pl-3 text-right')}>
-                <span className="sr-only">Azioni</span>
+                {/* Not «Azioni»: in a dividends table the word means shares. */}
+                <span className="sr-only">Modifica o elimina</span>
               </th>
             </tr>
           </thead>
           <tbody>
-            {paginatedDividends.map((dividend) => {
-              const announced = !isPaid(dividend, now);
-              return (
-                <tr
-                  key={dividend.id}
-                  onClick={(event) => onOpenDetails(dividend, event.currentTarget as HTMLElement)}
-                  className={cn(
-                    'cursor-pointer border-t border-border transition-colors motion-reduce:transition-none hover:bg-muted/30',
-                    activeDividendId === dividend.id && 'bg-muted/40'
-                  )}
-                >
-                  <th scope="row" className={cn(CELL, 'pr-3 text-left font-medium')}>
-                    <span className="flex items-center gap-1.5">
-                      <span className="truncate">{dividend.assetTicker || dividend.assetName}</span>
-                      {announced && (
-                        <Badge
-                          variant="outline"
-                          className="h-4 shrink-0 border-warning-border px-1.5 py-0 text-[10px] font-normal text-warning-foreground"
-                        >
-                          Attesa
-                        </Badge>
-                      )}
-                      {dividend.isProvisional && (
-                        <Badge
-                          variant="outline"
-                          className="h-4 shrink-0 border-warning-border px-1.5 py-0 text-[10px] font-normal text-warning-foreground"
-                        >
-                          Provvisoria
-                        </Badge>
-                      )}
-                    </span>
-                  </th>
-                  <td className={cn(CELL, 'pl-3 text-muted-foreground')}>
-                    {dividendTypeLabels[dividend.dividendType]}
-                  </td>
-                  <td className={cn(CELL, NUM, 'pl-3 text-muted-foreground')}>{formatDay(dividend.exDate)}</td>
-                  <td className={cn(CELL, NUM, 'pl-3')}>{formatDay(dividend.paymentDate)}</td>
-                  <td className={cn(CELL, NUM, 'pl-3 text-muted-foreground')}>
-                    {dividend.dividendPerShare > 0 ? formatNumber(dividend.dividendPerShare, 4) : '—'}
-                  </td>
-                  <td className={cn(CELL, NUM, 'pl-3 text-muted-foreground')}>{formatNumber(dividend.quantity, 0)}</td>
-                  <td className={cn(CELL, NUM, 'pl-3')}>
-                    <AmountWithConversion
-                      originalAmount={dividend.grossAmount}
-                      eurAmount={dividend.grossAmountEur}
-                      currency={dividend.currency}
-                    />
-                  </td>
-                  <td className={cn(CELL, NUM, 'pl-3 text-muted-foreground')}>
-                    <AmountWithConversion
-                      originalAmount={dividend.taxAmount}
-                      eurAmount={dividend.taxAmountEur}
-                      currency={dividend.currency}
-                    />
-                  </td>
-                  <td className={cn(CELL, NUM, 'pl-3 font-semibold', announced ? 'text-muted-foreground' : 'text-positive')}>
-                    <AmountWithConversion
-                      originalAmount={dividend.netAmount}
-                      eurAmount={dividend.netAmountEur}
-                      currency={dividend.currency}
-                    />
-                  </td>
-                  <td className={cn(CELL, 'pl-3')}>
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onEdit(dividend);
-                        }}
-                        disabled={isDemo || deletingId === dividend.id}
-                        aria-label={isDemo ? 'Modifica — non disponibile in modalità demo' : 'Modifica'}
-                      >
-                        <Edit className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant={pendingDeleteId === dividend.id ? 'destructive' : 'ghost'}
-                        size="sm"
-                        onClick={(e) => handleDeleteClick(dividend, e)}
-                        disabled={isDemo || deletingId === dividend.id}
-                        aria-label={isDemo ? 'Elimina — non disponibile in modalità demo' : 'Elimina'}
-                      >
-                        {pendingDeleteId === dividend.id ? 'Conferma' : <Trash2 className="h-3.5 w-3.5 text-destructive" />}
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
+            {paginatedDividends.map((dividend) => (
+              <DesktopRow
+                key={dividend.id}
+                dividend={dividend}
+                now={now}
+                active={activeDividendId === dividend.id}
+                isDemo={isDemo}
+                busy={deletingId === dividend.id}
+                onEdit={onEdit}
+                onOpenDetails={onOpenDetails}
+                onDelete={executeDelete}
+                announce={announce}
+              />
+            ))}
           </tbody>
 
           {showTotals && (
@@ -432,12 +519,8 @@ export function DividendTable({
                     Incassate · {totals.received.count} {totals.received.count === 1 ? 'voce' : 'voci'}
                   </th>
                   <td className={cn(NUM, 'py-3 pl-3 text-[13px] font-semibold')}>{formatCurrency(totals.received.gross)}</td>
-                  <td className={cn(NUM, 'py-3 pl-3 text-[13px] text-muted-foreground')}>
-                    {formatCurrency(totals.received.tax)}
-                  </td>
-                  <td className={cn(NUM, 'py-3 pl-3 text-[13px] font-semibold text-positive')}>
-                    {formatCurrency(totals.received.net)}
-                  </td>
+                  <td className={cn(NUM, 'py-3 pl-3 text-[13px] text-muted-foreground')}>{formatCurrency(totals.received.tax)}</td>
+                  <td className={cn(NUM, 'py-3 pl-3 text-[13px] font-semibold text-positive')}>{formatCurrency(totals.received.net)}</td>
                   <td />
                 </tr>
               )}
@@ -447,15 +530,9 @@ export function DividendTable({
                   <th scope="row" colSpan={6} className="pb-3 text-left text-[12px] font-medium text-muted-foreground">
                     Annunciate · {totals.announced.count} {totals.announced.count === 1 ? 'voce' : 'voci'}
                   </th>
-                  <td className={cn(NUM, 'pb-3 pl-3 text-[13px] text-muted-foreground')}>
-                    {formatCurrency(totals.announced.gross)}
-                  </td>
-                  <td className={cn(NUM, 'pb-3 pl-3 text-[13px] text-muted-foreground')}>
-                    {formatCurrency(totals.announced.tax)}
-                  </td>
-                  <td className={cn(NUM, 'pb-3 pl-3 text-[13px] font-semibold text-muted-foreground')}>
-                    {formatCurrency(totals.announced.net)}
-                  </td>
+                  <td className={cn(NUM, 'pb-3 pl-3 text-[13px] text-muted-foreground')}>{formatCurrency(totals.announced.gross)}</td>
+                  <td className={cn(NUM, 'pb-3 pl-3 text-[13px] text-muted-foreground')}>{formatCurrency(totals.announced.tax)}</td>
+                  <td className={cn(NUM, 'pb-3 pl-3 text-[13px] font-semibold text-muted-foreground')}>{formatCurrency(totals.announced.net)}</td>
                   <td />
                 </tr>
               )}
@@ -473,7 +550,7 @@ export function DividendTable({
             <Button
               variant="outline"
               size="icon"
-              className="h-8 w-8"
+              className="h-11 w-11 desktop:h-8 desktop:w-8"
               onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
               disabled={currentPage === 1}
               aria-label="Pagina precedente"
@@ -486,7 +563,7 @@ export function DividendTable({
             <Button
               variant="outline"
               size="icon"
-              className="h-8 w-8"
+              className="h-11 w-11 desktop:h-8 desktop:w-8"
               onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
               disabled={currentPage === totalPages}
               aria-label="Pagina successiva"
@@ -496,6 +573,11 @@ export function DividendTable({
           </div>
         </div>
       )}
+
+      {/* The table's one live region: arm and disarm are sentences, spoken here. */}
+      <span className="sr-only" role="status" aria-live="polite">
+        {announcement}
+      </span>
     </motion.div>
   );
 }

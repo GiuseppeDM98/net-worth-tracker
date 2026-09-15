@@ -31,6 +31,20 @@
   monthly budgets whose projection exceeds their amount AND that are not over yet; a budget already over is a fact for
   «Avvisi» («Superato»). The evaluator still emits forecast-only alerts for the email, flagged `thresholdCrossed: false`;
   the tile filters them out and its footer counts them. No row in two tiles (DESIGN.md → The Risk-vs-Fact Rule).
+  **A threshold is a fact of what is BOOKED, read against its own calendar** (2026-09-14): `BudgetAlert.spent` is the
+  spend up to today (`splitMonthActualForItem` / `splitYearActualForItem`, the ceiling on `split.spentToDate`), so a
+  mortgage dated the 27th crosses nothing on the 14th; every alert carries `period`, `calendarPct` (the month's or the
+  year's elapsed share, `yearElapsedPctAt`) and `aheadOfCalendar` (judged on the printed integers), and the tile paints
+  `text-warning-foreground` only on the rows that are ahead — «Tecnologia 54% · soglia 50% · anno al 70%» is muted.
+  `describeAlertRowCaption` is the row's second line: the threshold against the window while under, the day (monthly)
+  or «da gennaio» (annual) once over. The aside says «soglie di quota»: they are not thresholds of pace.
+- **«Speso» is the booked part, «in calendario» its own clause** (DESIGN.md → The Scheduled-Is-Not-Spent Rule,
+  2026-09-14): `CeilingSummary.spent` still includes the scheduled rows — the ratios, `remaining`, `exceeded` and the
+  fill colour read it — but no sentence prints it as spending. The verdict names both sides («hai speso 656 € e hai altri
+  1297 € già in calendario (1953 € su 3000 €, il 65% del tetto)»), the hero prints `spentToDate` with «+ 1297 € in
+  calendario» beside it, `describeCeiling` compares `spentToDatePct` with the calendar and closes with «con le spese in
+  calendario sei al 65%», `describeRemainingCaption` says «tolte le spese in calendario». With `scheduled === 0` every
+  sentence is the old one with «speso» in place of «usato».
 - **Every number is born in `lib/utils/budgetSummary.ts`** (`summarizeCeiling`, `summarizeIncomeTargets`,
   `summarizeAnnualBudgets`, `buildCategoryRows`, `buildSpendingHistory`, `summarizeAlerts`), every sentence in
   `budgetNarrative.ts` (`buildBudgetVerdict` and the `describe*` readings; the settings' copy too —
@@ -40,7 +54,9 @@
 - **The calendar mark is the reading** (`BudgetTrack`): every expense track carries today's share of its window
   (month or year) as a 1px mark; an income target carries none. Fill colour is the budget's, not the sign's
   (`budgetProgressStyle.ts`: `--foreground` under the limit, `--warning-foreground` from 90%, `--destructive` over;
-  income `--positive` only once reached).
+  income `--positive` only once reached). The ceiling's track takes a second fill (`scheduledRatio`, same colour at
+  40%) for the rows still to come, and every track speaks its real share through `valueText` → `aria-valuetext`
+  («231%, oltre di 1963 €»): `aria-valuenow` clamps at 100 and used to announce an exceeded budget as full.
 - **Settings live below the grid** (`BudgetImpostazioni`, a Radix `Collapsible` open only while no ceiling is set);
   the phone's 44px shortcut under the verdict scrolls to `#budget-impostazioni`. Without a ceiling the hero's cell is a
   hidden spacer, never a faked tile, and the verdict passes the question to the category budgets.
@@ -67,9 +83,21 @@
   when recorded, today's otherwise, with `ceilingSource` so `describeHistory` can say «il loro tetto» / «il tetto
   attuale» / «il tetto (il loro da lug, prima quello attuale)». The chart draws one dashed segment per month at its
   ceiling — a step where it changed. Months before the first capture read against today's, and the caption says so.
-- **Two-click delete without a timer** (`useArmedDelete` in `PerCategoriaTile`): pointerdown outside, Escape or blur
-  disarm; the hook takes the button's ref as an argument — returning the ref inside an object trips
-  `react-hooks/refs` on every read of that object.
+- **Two-click delete without a timer** (`useArmedDelete` inside `BudgetDeleteButton`, used by `PerCategoriaTile`'s
+  table and phone rows and by `AnnualiTile`): pointerdown outside, Escape or blur disarm; the hook takes the button's
+  ref as an argument — returning the ref inside an object trips `react-hooks/refs` on every read of that object. The
+  armed button reads «Conferma» in words at every width (a desktop row used to change only the icon's tint), the ROW
+  prints `describeBudgetDeleteConsequence` («Eliminando, il budget di Cibo sparisce; le spese restano.») — under the
+  label in the table, in the expanded panel on a phone, in place of «restano …» in the annual row — and each tile has
+  ONE `sr-only role="status"` that says «Premi di nuovo per eliminare …» / «Eliminazione annullata». The pencil hides
+  while its row is armed, so an armed row has one action.
+- **The dialog speaks through its reading line** (`BudgetItemDialog`, dialog.md → The Status-Is-The-Reading Rule):
+  idle it says what the form wants (`describeBudgetItemCopy`: kind, period, edit), the submit is never `disabled`, and a
+  refusal lands in the reading in Italian — `describeFormRefusal` for the missing fields («Mancano 2 campi: Categoria e
+  Importo.»), `describeBudgetDuplicateRefusal`, `describeBudgetAmountRefusal` («L'importo supera i 2330 € disponibili
+  sotto il tetto.») — with `aria-invalid` on the field and the focus on it; any edit clears it. The two choices are
+  `RadioChoice`, a radio group with ONE tab stop (roving `tabIndex`, arrows move). The dialog is mounted only while
+  open, so `BudgetTab` remembers the opener (`openerRef`) and gives it the focus back on close.
 - **GOTCHA**: never reconcile items against `categories` while `categories.length === 0` (they load async) — every
   category budget is dropped as an orphan and a later edit can persist the empty set.
 
@@ -81,4 +109,7 @@
   category refetch retries silently while the status still says «error»; and `loading` turns true again on an account
   switch. An error never retries by itself: `lastWrite` is not a dependency of the autosave.
 
-- **Budget**: `BudgetItemDialog` stays for create/edit (no inline editing); **the ceiling history starts with the first cron run after the deploy** (earlier months read against today's ceiling, «prima quello attuale»), a month's record is its LAST captured configuration; the crossing day comes from the EXPENSE DATES (a backdated row moves it), an annual budget has no crossing sentence; a budget with every threshold off and already exceeded shows only in Per categoria; `app/dashboard/cashflow/page.tsx` carries two pre-existing `react-hooks` findings.
+- **Budget**: «Salvato» in the Per categoria aside fades after 4 s (`SAVED_LABEL_MS`) and comes back on the next save —
+  a confirmation, not a state; the ceiling's fill colour and «Restano» still read the total INCLUDING the calendar (a
+  ceiling exceeded only by a row dated the 28th is red today, and the verdict says «Lo superi il 28»); the phone's
+  switch is 20px and its 44px target is the label; `BudgetItemDialog` stays for create/edit (no inline editing); **the ceiling history starts with the first cron run after the deploy** (earlier months read against today's ceiling, «prima quello attuale»), a month's record is its LAST captured configuration; the crossing day comes from the EXPENSE DATES (a backdated row moves it), an annual budget has no crossing sentence; a budget with every threshold off and already exceeded shows only in Per categoria; `app/dashboard/cashflow/page.tsx` carries two pre-existing `react-hooks` findings.

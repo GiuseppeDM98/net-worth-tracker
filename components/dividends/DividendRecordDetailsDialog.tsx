@@ -11,16 +11,12 @@ import { Button } from '@/components/ui/button';
 import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
 import { toDate } from '@/lib/utils/dateHelpers';
-import { Dividend, DividendType } from '@/types/dividend';
+import { Dividend } from '@/types/dividend';
+import { dividendTypeLabels } from '@/lib/constants/dividendTypes';
+import { TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
+import { cn } from '@/lib/utils';
 
-const dividendTypeLabels: Record<DividendType, string> = {
-  ordinary: 'Ordinario',
-  extraordinary: 'Straordinario',
-  interim: 'Interim',
-  final: 'Finale',
-  coupon: 'Cedola',
-  finalPremium: 'Premio Finale',
-};
+const FIGURE_CLASS = 'font-mono text-[13px] font-medium tabular-nums';
 
 interface DividendRecordDetailsDialogProps {
   open: boolean;
@@ -31,6 +27,8 @@ interface DividendRecordDetailsDialogProps {
   onSetInflationRate?: (dividend: Dividend) => void;
   dialogRef?: RefObject<HTMLDivElement | null>;
   style?: CSSProperties;
+  /** The row's button that opened the record, so the focus goes back to it on close. */
+  returnFocusTo?: RefObject<HTMLElement | null>;
 }
 
 export function DividendRecordDetailsDialog({
@@ -41,6 +39,7 @@ export function DividendRecordDetailsDialog({
   onSetInflationRate,
   dialogRef,
   style,
+  returnFocusTo,
 }: DividendRecordDetailsDialogProps) {
   if (!dividend) return null;
 
@@ -56,13 +55,13 @@ export function DividendRecordDetailsDialog({
       title={dividend.assetTicker}
       reading={
         dividend.isProvisional
-          ? 'La cedola è provvisoria: manca la componente d’inflazione, quindi il netto qui sotto è un minimo, non l’incasso finale.'
+          ? 'La cedola è provvisoria: manca il dato d’inflazione del periodo, quindi il netto qui sotto è una stima, non l’incasso finale.'
           : `${dividend.assetName}. Il netto è già al netto della ritenuta e, per una valuta estera, convertito al cambio del pagamento.`
       }
       width="md"
       contentRef={dialogRef}
       triggerOrigin={style?.transformOrigin as string | undefined}
-      footerNote="Dettaglio del pagamento selezionato"
+      returnFocusTo={returnFocusTo}
       footer={
         <>
           <Button
@@ -81,87 +80,82 @@ export function DividendRecordDetailsDialog({
                 onSetInflationRate(dividend);
               }}
             >
-              Imposta tasso inflazione
+              Imposta inflazione
             </Button>
           )}
         </>
       }
     >
+        {/* Two `bg-muted` blocks, never bordered cards inside a modal (doc/guide/dialog.md); the
+            labels inside are the tile's sub-eyebrow, the figures the mono face. The withholding
+            is muted like the table's: a tax is not a loss. */}
         <div className="grid gap-4 desktop:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-          <div className="space-y-4 rounded-lg border border-border/70 bg-muted/30 p-4">
-            <div className="space-y-1">
-              <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                Timeline
-              </p>
-              <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-4 rounded-lg bg-muted p-4">
+            <div className="space-y-1.5">
+              <p className={TILE_SUB_EYEBROW_CLASS}>Date</p>
+              <dl className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <p className="text-xs text-muted-foreground">Ex-Date</p>
-                  <p className="font-medium">{formatDate(toDate(dividend.exDate))}</p>
+                  <dt className="text-[12px] text-muted-foreground">Ex-date</dt>
+                  <dd className={FIGURE_CLASS}>{formatDate(toDate(dividend.exDate))}</dd>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Pagamento</p>
-                  <p className="font-medium">{formatDate(toDate(dividend.paymentDate))}</p>
+                  <dt className="text-[12px] text-muted-foreground">Pagamento</dt>
+                  <dd className={FIGURE_CLASS}>{formatDate(toDate(dividend.paymentDate))}</dd>
                 </div>
-              </div>
+              </dl>
             </div>
 
-            <div className="space-y-1 border-t border-border/60 pt-4">
-              <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                Quantita&apos; e base
-              </p>
-              <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5 border-t border-border pt-4">
+              <p className={TILE_SUB_EYEBROW_CLASS}>Quantità e base</p>
+              <dl className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <p className="text-xs text-muted-foreground">Azioni al pagamento</p>
-                  <p className="font-medium">{dividend.quantity}</p>
+                  <dt className="text-[12px] text-muted-foreground">Unità al pagamento</dt>
+                  <dd className={FIGURE_CLASS}>{dividend.quantity}</dd>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Costo storico / azione</p>
-                  <p className="font-medium">
+                  <dt className="text-[12px] text-muted-foreground">Costo storico per unità</dt>
+                  <dd className={cn(FIGURE_CLASS, dividend.costPerShare === undefined && 'text-muted-foreground')}>
                     {dividend.costPerShare !== undefined ? formatCurrency(dividend.costPerShare) : '—'}
-                  </p>
+                  </dd>
                 </div>
-              </div>
+              </dl>
             </div>
           </div>
 
-          <div className="space-y-4 rounded-lg border border-border/70 p-4">
+          <div className="space-y-4 rounded-lg bg-muted p-4">
             <div>
-              <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                Netto
-              </p>
-              <p className="text-2xl font-semibold text-positive desktop:text-3xl">
+              <p className={TILE_SUB_EYEBROW_CLASS}>Netto</p>
+              <p className="mt-1.5 font-mono text-[22px] font-bold leading-none tracking-[-0.03em] tabular-nums text-positive">
                 {formatCurrency(netAmount)}
               </p>
               {dividend.currency.toUpperCase() !== 'EUR' && dividend.netAmountEur !== undefined && (
-                <p className="text-xs text-muted-foreground">
-                  Originale {formatCurrency(dividend.netAmount, dividend.currency)}
+                <p className="mt-1.5 text-[12px] text-muted-foreground">
+                  Originale <span className="font-mono tabular-nums">{formatCurrency(dividend.netAmount, dividend.currency)}</span>
                 </p>
               )}
             </div>
 
-            <div className="space-y-2 border-t border-border/60 pt-4 text-sm">
+            <dl className="space-y-2 border-t border-border pt-4">
               <div className="flex items-center justify-between gap-4">
-                <span className="text-muted-foreground">Lordo / azione</span>
-                <span className="font-medium">{formatCurrency(dividend.dividendPerShare, dividend.currency, 4)}</span>
+                <dt className="text-[13px] text-muted-foreground">Lordo per unità</dt>
+                <dd className={FIGURE_CLASS}>{formatCurrency(dividend.dividendPerShare, dividend.currency, 4)}</dd>
               </div>
               <div className="flex items-center justify-between gap-4">
-                <span className="text-muted-foreground">Lordo totale</span>
-                <span className="font-medium">{formatCurrency(grossAmount)}</span>
+                <dt className="text-[13px] text-muted-foreground">Lordo totale</dt>
+                <dd className={FIGURE_CLASS}>{formatCurrency(grossAmount)}</dd>
               </div>
               <div className="flex items-center justify-between gap-4">
-                <span className="text-muted-foreground">Tasse</span>
-                <span className="font-medium text-destructive">{formatCurrency(taxAmount)}</span>
+                <dt className="text-[13px] text-muted-foreground">Ritenute</dt>
+                <dd className={cn(FIGURE_CLASS, 'text-muted-foreground')}>{formatCurrency(taxAmount)}</dd>
               </div>
-            </div>
+            </dl>
           </div>
         </div>
 
         {dividend.notes && (
-          <div className="rounded-lg border border-border/70 bg-muted/20 p-4">
-            <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-              Note
-            </p>
-            <p className="mt-2 text-sm">{dividend.notes}</p>
+          <div className="mt-4 rounded-lg bg-muted p-4">
+            <p className={TILE_SUB_EYEBROW_CLASS}>Note</p>
+            <p className="mt-1.5 text-[13px] leading-[1.45]">{dividend.notes}</p>
           </div>
         )}
 

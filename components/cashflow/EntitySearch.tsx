@@ -10,7 +10,7 @@
  * drill-down is the caller's job via onSelect(target).
  */
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -44,6 +44,9 @@ export function EntitySearch({
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  // Where the focus goes back when the modal closes — Radix restores it to `body` when the
+  // opener was tapped on Safari or the search was reached through the page (measured 2026-09-14).
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   const index = useMemo(() => buildEntitySearchIndex(categories, expenses), [categories, expenses]);
   const results = searchEntities(index, query);
@@ -58,8 +61,10 @@ export function EntitySearch({
   return (
     <>
       <Button
+        ref={triggerRef}
         variant="outline"
-        className={cn('text-muted-foreground', className)}
+        // 44px on touch (below `desktop:` the header is thumbed), the 36px control at 1440.
+        className={cn('h-11 min-w-11 text-muted-foreground desktop:h-9 desktop:min-w-0', className)}
         onClick={() => setOpen(true)}
         aria-label="Vai a categoria"
       >
@@ -74,6 +79,7 @@ export function EntitySearch({
         title="Vai a categoria"
         reading="Scegliendo una voce, la Scheda si apre sotto le tessere con il totale del periodo, la quota sul padre e l'andamento."
         width="md"
+        returnFocusTo={triggerRef}
       >
         {/* shouldFilter={false}: matching and ranking live in searchEntities
             (accent-folded, label-prefix first); cmdk's own substring filter
@@ -85,7 +91,8 @@ export function EntitySearch({
             value={query}
             onValueChange={setQuery}
           />
-          <CommandList>
+          {/* cmdk names the listbox «Suggestions» by default — the one English word a screen reader would hear on this page. */}
+          <CommandList label="Categorie e sottocategorie trovate">
             <CommandEmpty>Nessuna voce trovata</CommandEmpty>
             {results.map((item) => (
               <CommandItem

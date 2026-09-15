@@ -38,7 +38,10 @@ export function DrillBreadcrumb({ steps, ariaLabel }: DrillBreadcrumbProps) {
             {step.onClick ? (
               <button
                 type="button"
-                className="hover:text-foreground transition-colors"
+                // The words stay 14px; the TARGET is 24px with a mouse and 44px on touch, folded
+                // back by a negative margin so the crumb row keeps its rhythm (a «Spese» crumb
+                // measured 40×20 at 1440, 2026-09-14).
+                className="-my-1 inline-flex min-h-6 items-center rounded-sm transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:-my-3 [@media(pointer:coarse)]:min-h-11"
                 onClick={step.onClick}
               >
                 {step.label}

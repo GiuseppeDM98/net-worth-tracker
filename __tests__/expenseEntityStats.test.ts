@@ -191,8 +191,63 @@ describe('computeEntityRunRate', () => {
 
     // Assert
     expect(runRate.periodTotal).toBeCloseTo(400);
+    expect(runRate.livedTotal).toBeCloseTo(400);
+    expect(runRate.livedMonths).toBe(4);
     expect(runRate.periodMonthlyAverage).toBeCloseTo(100);
     expect(runRate.currentYearProjection).toBeCloseTo(1200);
+  });
+
+  it('should pace a running year on its lived months only, with the calendar as the floor of the projection', () => {
+    // Arrange — a 100 € fixed charge materialised for all twelve months; today is April.
+    // The old rule printed 1200/4 = «300 € al mese» and projected 3600 (2026-09-14).
+    const expenses = Array.from({ length: 12 }, (_, index) => casaFixed(2026, index + 1, -100));
+
+    // Act
+    const runRate = computeEntityRunRate(expenses, casaFixedScope, { year: 2026, month: null }, 2025, { year: 2026, month: 4 }, monthOf);
+
+    // Assert — the total carries the calendar, the pace does not, the projection IS the calendar
+    expect(runRate.periodTotal).toBeCloseTo(1200);
+    expect(runRate.livedTotal).toBeCloseTo(400);
+    expect(runRate.livedMonths).toBe(4);
+    expect(runRate.periodMonthlyAverage).toBeCloseTo(100);
+    expect(runRate.currentYearProjection).toBeCloseTo(1200);
+  });
+
+  it('should let the pace win over a calendar that holds less than it', () => {
+    // Arrange — 100 € a month lived, one 50 € instalment ahead in October; today is April.
+    const expenses = [casaFixed(2026, 1, -100), casaFixed(2026, 2, -100), casaFixed(2026, 3, -100), casaFixed(2026, 4, -100), casaFixed(2026, 10, -50)];
+
+    // Act
+    const runRate = computeEntityRunRate(expenses, casaFixedScope, { year: 2026, month: null }, 2025, { year: 2026, month: 4 }, monthOf);
+
+    // Assert — 400 lived + max(50 scheduled, 100 × 8 months) = 1200, never 400 + 800 + 50
+    expect(runRate.periodTotal).toBeCloseTo(450);
+    expect(runRate.currentYearProjection).toBeCloseTo(1200);
+  });
+
+  it('should cut the period at throughMonth, so «da inizio anno» has no calendar in it and no projection', () => {
+    // Arrange
+    const expenses = Array.from({ length: 12 }, (_, index) => casaFixed(2026, index + 1, -100));
+
+    // Act
+    const runRate = computeEntityRunRate(expenses, casaFixedScope, { year: 2026, month: null, throughMonth: 4 }, 2025, { year: 2026, month: 4 }, monthOf);
+
+    // Assert
+    expect(runRate.periodTotal).toBeCloseTo(400);
+    expect(runRate.livedTotal).toBeCloseTo(400);
+    expect(runRate.periodMonthlyAverage).toBeCloseTo(100);
+    expect(runRate.currentYearProjection).toBeNull();
+  });
+
+  it('should close the all-history period on the current year', () => {
+    // Arrange — a plan writes rows into next year; they are a calendar, not history
+    const expenses = [casaFixed(2025, 6, -100), casaFixed(2026, 1, -200), casaFixed(2027, 1, -999)];
+
+    // Act
+    const runRate = computeEntityRunRate(expenses, casaFixedScope, { year: null, month: null }, 2025, { year: 2026, month: 4 }, monthOf);
+
+    // Assert
+    expect(runRate.periodTotal).toBeCloseTo(300);
   });
 
   it('should divide a completed year by twelve months and skip the projection', () => {
@@ -204,6 +259,7 @@ describe('computeEntityRunRate', () => {
 
     // Assert — a full trailing window also reports all twelve months observed
     expect(runRate.periodTotal).toBeCloseTo(1200);
+    expect(runRate.livedMonths).toBe(12);
     expect(runRate.periodMonthlyAverage).toBeCloseTo(100);
     expect(runRate.currentYearProjection).toBeNull();
     expect(runRate.observedMonths).toBe(12);

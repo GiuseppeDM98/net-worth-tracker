@@ -39,6 +39,8 @@ interface BudgetImpostazioniProps {
  *
  * The two blocks take the tile's cadence (eyebrow, aside, reading, then the controls); the
  * allocation feedback here is a reading, while the Per categoria tile's is the inventory's.
+ * Every control is 44px on touch and the dense size from `desktop:` (AGENTS.md →
+ * Accessibility): the threshold chips were 32px under a thumb until 2026-09-14.
  */
 export function BudgetImpostazioni({
   overallMonthlyAmount,
@@ -79,7 +81,7 @@ export function BudgetImpostazioni({
             )}
           </span>
         </span>
-        <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform', open && 'rotate-180')} aria-hidden="true" />
+        <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground motion-safe:transition-transform', open && 'rotate-180')} aria-hidden="true" />
       </CollapsibleTrigger>
       <CollapsibleContent className="pt-1">
         <div className="grid grid-cols-1 gap-3 tablet:grid-cols-2 desktop:grid-cols-12">
@@ -100,8 +102,8 @@ export function BudgetImpostazioni({
                     const v = e.target.value;
                     onOverallChange(v === '' ? undefined : parseFloat(v) || 0);
                   }}
-                  placeholder="Nessun limite complessivo"
-                  className="w-[200px] font-mono tabular-nums"
+                  placeholder="Nessun tetto"
+                  className="h-11 w-full max-w-[240px] font-mono tabular-nums desktop:h-9"
                   aria-invalid={!validation.valid}
                 />
               </div>
@@ -118,8 +120,9 @@ export function BudgetImpostazioni({
               aside={<span>qui e nell&apos;email mensile</span>}
               reading={ALERTS_SETTING_READING}
             >
-              <div className="mt-3.5 flex items-center justify-between gap-3">
-                <Label htmlFor="alerts-enabled" className="cursor-pointer text-[13px]">
+              {/* The label is the switch's 44px target on touch: it toggles through `htmlFor`. */}
+              <div className="mt-2 flex min-h-11 items-center justify-between gap-3 desktop:mt-3.5 desktop:min-h-0">
+                <Label htmlFor="alerts-enabled" className="flex min-h-11 flex-1 cursor-pointer items-center text-[13px] desktop:min-h-0">
                   Avvisi attivi
                 </Label>
                 <Switch id="alerts-enabled" checked={alertsEnabled} disabled={isDemo} onCheckedChange={onAlertsEnabledChange} />
@@ -135,7 +138,7 @@ export function BudgetImpostazioni({
                       disabled={isDemo || !alertsEnabled}
                       onClick={() => toggleThreshold(t)}
                       className={cn(
-                        'h-8 rounded-full border px-3 font-mono text-[12px] tabular-nums transition-colors disabled:opacity-50',
+                        'h-11 min-w-11 rounded-full border px-3.5 font-mono text-[12px] tabular-nums transition-colors disabled:opacity-50 desktop:h-8 desktop:min-w-0 desktop:px-3',
                         active ? 'border-primary bg-primary/10 text-foreground' : 'border-border text-muted-foreground',
                       )}
                     >

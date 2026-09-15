@@ -28,7 +28,7 @@ export function PagatoriTile({ ranking, reading, footer, emptyCopy, className }:
   return (
     <Tile
       eyebrow="Chi paga di più"
-      aside={<span className="font-mono tabular-nums">{cachedFormatCurrencyEUR(ranking.total, true)}</span>}
+      aside={ranking.total > 0 ? <span className="font-mono tabular-nums">{cachedFormatCurrencyEUR(ranking.total, true)}</span> : undefined}
       reading={reading}
       className={className}
     >
@@ -36,7 +36,8 @@ export function PagatoriTile({ ranking, reading, footer, emptyCopy, className }:
         <p className="mt-3 text-[13px] text-muted-foreground">{emptyCopy}</p>
       ) : (
         <div className="mt-2">
-          <RankedRows rows={ranking.rows} color="var(--chart-2)" remainder={ranking.remainder} labelClassName="w-[108px]" />
+          {/* 144px: «BTP Valore Marzo 2032» at 13px, whole; the bar keeps its 40px floor at 390. */}
+          <RankedRows rows={ranking.rows} color="var(--chart-2)" remainder={ranking.remainder} labelClassName="min-w-[144px]" />
         </div>
       )}
       {footer && (

@@ -1112,8 +1112,8 @@ describe('buildCacheKey', () => {
     // l'utente continua a leggere numeri pre-fix per 6 ore. Il test è qui perché il bump è manuale
     // e va ricordato — se questa asserzione fallisce dopo un cambio di matematica, è corretto
     // aggiornarla; se fallisce senza, qualcuno ha rotto il prefisso.
-    expect(buildCacheKey(baseline).startsWith('v7-')).toBe(true)
-    expect(buildCacheKey({ ...baseline, snapshots: [] }).startsWith('v7-')).toBe(true)
+    expect(buildCacheKey(baseline).startsWith('v8-')).toBe(true)
+    expect(buildCacheKey({ ...baseline, snapshots: [] }).startsWith('v8-')).toBe(true)
   })
 
   it('ignores the order snapshots arrive in', () => {

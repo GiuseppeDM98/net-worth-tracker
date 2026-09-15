@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   buildPensionValueSeries,
   computePensionReturn,
+  indexPensionSnapshots,
   isPensionReturnMeasurable,
   overlayLivePensionValue,
   resolvePensionReturnStart,
@@ -85,6 +86,16 @@ describe('buildPensionValueSeries', () => {
     );
 
     expect(series).toEqual([{ year: 2026, month: 1, value: 10_000 }]);
+  });
+
+  it('reads the same series from a prebuilt index, which keeps only the funds it was given', () => {
+    const snapshots = [snapshotWithFund(2026, 2, 11_000), snapshotWithFund(2026, 1, 10_000), snapshotWithFund(2025, 12, null)];
+    const index = indexPensionSnapshots(snapshots, ['fund-1']);
+
+    expect(index.map((month) => month.key)).toEqual(['2025-12', '2026-01', '2026-02']);
+    expect(index[1].values.get('fund-1')).toBe(10_000);
+    expect(index[1].values.has('etf-1')).toBe(false);
+    expect(buildPensionValueSeries(index, ['fund-1'])).toEqual(buildPensionValueSeries(snapshots, ['fund-1']));
   });
 
   it('returns nothing when there are no funds', () => {

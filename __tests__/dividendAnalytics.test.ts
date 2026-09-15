@@ -221,6 +221,28 @@ describe('computeReliability', () => {
     expect(r.concentrationHhi).toBe(0);
     expect(r.topPayerTicker).toBeNull();
   });
+
+  it('measures only the instruments still held when given the set, on the period’s own window', () => {
+    // Saipem (sold) paid the most in May; the BTP (held) paid in June. With the held set the
+    // top payer is the BTP at 100% of the HELD income, over one month — but the window stays
+    // the year’s six months, so the coverage is 1/6, not 1/1.
+    const dividends = [
+      makeDividend({ assetId: 'spm', assetTicker: 'SPM', paymentDate: new Date('2026-05-20T12:00:00'), netAmount: 142, grossAmount: 142, taxAmount: 0 }),
+      makeDividend({ assetId: 'btp', assetTicker: 'BTP', paymentDate: new Date('2026-06-10T12:00:00'), netAmount: 57, grossAmount: 57, taxAmount: 0 }),
+    ];
+    const held = computeReliability(dividends, 'year', NOW, new Set(['btp']));
+    expect(held.topPayerTicker).toBe('BTP');
+    expect(held.topPayerSharePct).toBeCloseTo(1);
+    expect(held.payerCount).toBe(1);
+    expect(held.monthsWithIncome).toBe(1);
+    expect(held.monthsInWindow).toBe(6);
+    // Without the set the registry speaks: Saipem leads.
+    expect(computeReliability(dividends, 'year', NOW).topPayerTicker).toBe('SPM');
+    // An empty held set: nothing to count on, and the window is still the year’s.
+    const none = computeReliability(dividends, 'year', NOW, new Set());
+    expect(none.payerCount).toBe(0);
+    expect(none.monthsInWindow).toBe(6);
+  });
 });
 
 
@@ -285,7 +307,43 @@ describe('rankPayerShares', () => {
   });
 
   it('is empty when nothing was received', () => {
-    expect(rankPayerShares([], 'year', NOW, 5)).toEqual({ rows: [], remainder: null, total: 0, payerCount: 0, top: null });
+    expect(rankPayerShares([], 'year', NOW, 5)).toEqual({
+      rows: [],
+      remainder: null,
+      total: 0,
+      payerCount: 0,
+      heldPayerCount: 0,
+      soldPayerCount: 0,
+      soldNet: 0,
+      top: null,
+    });
+  });
+
+  it('ranks only the held payers and folds the sold ones into a named remainder, shares on the whole total', () => {
+    // T0 (300) and T1 (200) sold, T2 (100) held: the one row is T2 at 100/600, the remainder
+    // is «2 strumenti venduti» at 500 — the total still adds up and the top is the held one.
+    const ranking = rankPayerShares(payers(3), 'year', NOW, 5, new Set(['a2']));
+    expect(ranking.total).toBe(600);
+    expect(ranking.rows.map((r) => [r.label, r.amount])).toEqual([['T2', 100]]);
+    expect(ranking.rows[0].percentage).toBeCloseTo(100 / 6, 5);
+    expect(ranking.remainder).toEqual({ label: '2 strumenti venduti', amount: 500, percentage: expect.closeTo(500 / 6, 5) });
+    expect(ranking.payerCount).toBe(3);
+    expect(ranking.heldPayerCount).toBe(1);
+    expect(ranking.soldPayerCount).toBe(2);
+    expect(ranking.soldNet).toBe(500);
+    expect(ranking.top?.assetTicker).toBe('T2');
+  });
+
+  it('names a mixed remainder — beyond the cut AND sold — and has no top when everything was sold', () => {
+    const mixed = rankPayerShares(payers(7), 'year', NOW, 2, new Set(['a0', 'a1', 'a2', 'a3']));
+    expect(mixed.rows).toHaveLength(2);
+    expect(mixed.remainder!.label).toBe('Altri 5 strumenti, 3 venduti');
+    expect(mixed.remainder!.amount + mixed.rows.reduce((s, r) => s + r.amount, 0)).toBe(mixed.total);
+
+    const allSold = rankPayerShares(payers(1), 'year', NOW, 5, new Set());
+    expect(allSold.rows).toEqual([]);
+    expect(allSold.top).toBeNull();
+    expect(allSold.remainder).toEqual({ label: '1 strumento venduto', amount: 100, percentage: 100 });
   });
 });
 

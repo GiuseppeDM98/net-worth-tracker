@@ -14,6 +14,8 @@ interface PeriodoTileProps {
   totals: PeriodCashflowTotals;
   /** Against the same window of the previous year; null when there is none. */
   pacing: TotalsPacing | null;
+  /** Why there is no pacing although the baseline window exists («Nessun movimento nei primi 14 giorni di settembre 2025: nessun confronto.»); null with a pacing or without a window. */
+  missingBaseline?: string | null;
   points: SpendingPoint[];
   chartKind: 'month' | 'year';
   /** The chart's sub-eyebrow («Spese per mese · 2026 e 2025»). */
@@ -32,7 +34,7 @@ const pacedDelta = (side: TotalsPacing['expenses'] | undefined): number | null =
  * page cannot disagree with the Confronto on what the baseline is), then the spending bars —
  * the element that stretches when the tile spans two rows.
  */
-export function PeriodoTile({ eyebrow, aside, reading, totals, pacing, points, chartKind, chartLabel, chartFooter, className }: PeriodoTileProps) {
+export function PeriodoTile({ eyebrow, aside, reading, totals, pacing, missingBaseline = null, points, chartKind, chartLabel, chartFooter, className }: PeriodoTileProps) {
   const hasBaseline = points.some((point) => point.prevYearValue !== null);
   const currentYear = points[0]?.key.slice(0, 4);
 
@@ -54,6 +56,8 @@ export function PeriodoTile({ eyebrow, aside, reading, totals, pacing, points, c
       {pacing && (pacing.income.previous > 0 || pacing.expenses.previous > 0) && (
         <p className="mt-1.5 font-mono text-[11px] tabular-nums text-muted-foreground">{pacing.baselineLabel}</p>
       )}
+      {/* The baseline window exists but is empty: said in the caption's place, never a silent gap. */}
+      {!pacing && missingBaseline && <p className="mt-1.5 text-[11px] text-muted-foreground">{missingBaseline}</p>}
 
       {points.length >= 2 && (
         <>

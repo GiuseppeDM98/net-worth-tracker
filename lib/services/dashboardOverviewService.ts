@@ -25,6 +25,8 @@ import {
   type PensionMarketInput,
 } from '@/lib/utils/dashboardOverviewUtils';
 import { resolvePensionReturnStart } from '@/lib/utils/pensionReturn';
+import { summarizePeriodSales } from '@/lib/utils/periodSales';
+import { getAssetTransactionsAdmin } from '@/lib/server/assetAdminRepository';
 import type { PensionContribution } from '@/types/pension';
 import {
   calculateAnnualPortfolioCost,
@@ -212,6 +214,9 @@ interface CategoryTotal {
   name: string;
   // Type label, appended to the name only when two same-named categories collide on screen.
   qualifier: string;
+  // The category's expense type — a category has ONE type, so the first row's is the bucket's.
+  // Travels to the Panoramica so a row can deep-link to its Scheda on Analisi (?focusType&focusCat).
+  expenseType: Expense['type'];
   amount: number;
 }
 
@@ -236,6 +241,7 @@ function summarizeExpenses(expenses: Expense[]): ExpenseSummary {
     const entry = map.get(key) ?? {
       name: getCategoryName(expense),
       qualifier: EXPENSE_TYPE_LABELS[expense.type],
+      expenseType: expense.type,
       amount: 0,
     };
     entry.amount += amount;
@@ -282,6 +288,7 @@ function buildTopCategories(
   return top.map(([key, totals]) => ({
     category: labels.get(key) ?? totals.name,
     categoryKey: key,
+    expenseType: totals.expenseType,
     amount: totals.amount,
     percentage: total > 0 ? (totals.amount / total) * 100 : 0,
   }));
@@ -555,6 +562,16 @@ async function recomputeDashboardOverview(userId: string): Promise<DashboardOver
   const holdsPensionFund = assets.some((a) => a.type === 'pensionFund' && a.quantity > 0);
   const pensionContributions = holdsPensionFund ? await getPensionContributionsForUser(userId) : [];
 
+  // The month's sells, so the verdict can name the tax that left with them; a failed read
+  // costs the sales clause, never the page.
+  let monthSales: DashboardOverviewPayload['monthSales'] = null;
+  try {
+    const transactions = await getAssetTransactionsAdmin(userId);
+    monthSales = summarizePeriodSales(assets, transactions, getMonthDateRangeInItaly(currentYear, currentMonth));
+  } catch (error) {
+    console.warn('[dashboardOverviewService] Failed to read the trade ledger, no sales clause:', error);
+  }
+
   let expenseStats: DashboardOverviewExpenseStats | null = null;
 
   try {
@@ -568,14 +585,10 @@ async function recomputeDashboardOverview(userId: string): Promise<DashboardOver
     console.warn('[dashboardOverviewService] Failed to compute expense stats, falling back to null:', error);
   }
 
-  const payloadWithoutFreshness = buildLiveOverviewPayload(
-    assets,
-    snapshots,
-    settings,
-    expenseStats,
-    goalData,
-    pensionContributions
-  );
+  const payloadWithoutFreshness = {
+    ...buildLiveOverviewPayload(assets, snapshots, settings, expenseStats, goalData, pensionContributions),
+    monthSales,
+  };
   const now = new Date();
 
   const summaryDoc: StoredDashboardOverviewSummary = {

@@ -45,31 +45,65 @@ export interface AnnouncedInflationRate {
   periodRate: number; // FOI inflation % for that period (negative values are floored to 0 — deflation guarantee)
 }
 
+/**
+ * How an inflation-linked bond's coupon follows the index — ONE field, two mechanisms that must
+ * never be confused (issue #341):
+ *  - `italia`: BTP Italia. The per-period FOI inflation is ADDED to the fixed rate and paid out with
+ *    every coupon; the capital is never revalued and redeems at par.
+ *  - `euro`: BTP€i. The coupon is the real rate MULTIPLIED by the Eurostat HICP indexation
+ *    coefficient at the payment date; the revaluation accrues silently in that coefficient and is
+ *    cashed only at maturity (nominal × coefficient, never below par).
+ * `undefined` = a plain or step-up bond.
+ */
+export type BondInflationIndexation = 'italia' | 'euro';
+
+/**
+ * One indexation coefficient (BTP€i) known at a date: the MEF publishes it daily per bond, the
+ * user copies it from the MEF table or from the broker's contract note. A coupon reads the entry
+ * of its payment day (or its month); the valuation reads the latest entry at or before today.
+ */
+export interface IndexationCoefficientEntry {
+  date: Date;          // The day the coefficient refers to
+  coefficient: number; // HICP ex-tobacco coefficient (e.g. 1.23456), > 0
+}
+
 // Bond-specific details stored alongside the asset.
 // Used to auto-generate the next coupon as a dividend entry.
 //
 // Teacher Note - Coupon Calculation:
 // Plain/step-up bond: gross per payment = (couponRate / 100 / periodsPerYear) * nominalValue * quantity
 //   Example: 4% annual, quarterly, nominalValue=1000, quantity=5 → (4/100/4) * 1000 * 5 = €50 per quarter
-// Inflation-linked bond (isInflationLinked): the announced per-period inflation is ADDED to the
+//   A zero-coupon bond (BOT, CTZ, a zero-coupon BTP) has couponRate 0 and generates NO coupon: 0 is
+//   a legitimate rate, not a missing one (issue #340).
+// Inflation-linked bond, `italia` (BTP Italia): the announced per-period inflation is ADDED to the
 //   already-per-period fixed rate, and is NOT divided by frequency:
 //   ((couponRate / 100 / periodsPerYear) + max(0, periodRate) / 100) * nominalValue * quantity
 //   Example: fixed 1.5% annual + FOI 1.3% semester, nominalValue=1000 → (0.75% + 1.3%) * 1000 = €20.50 per unit
+// Inflation-linked bond, `euro` (BTP€i): the per-period real rate is MULTIPLIED by the coefficient:
+//   (couponRate / 100 / periodsPerYear) * coefficient(paymentDate) * nominalValue * quantity
+//   Example: real 0.4% annual, semiannual, coefficient 1.25, nominalValue=1000 → 0.2% × 1.25 × 1000 = €2.50 per unit
 //
 // For step-up bonds: couponRateSchedule overrides couponRate when present (couponRate is the fallback).
 //
-// WARNING: adding a field here also requires updating buildBondDetailsFromForm, the reset effect
-// (BOTH the edit branch and the new-record branch), and the edit round-trip in components/assets/AssetDialog.tsx.
+// The nominal per unit defaults to 1 € (`lib/utils/bondPricing.ts`): the quantity is then the
+// nominal in euro, as on a broker statement, and a Borsa Italiana quote (% of par) becomes
+// quote / 100 € per unit. A nominal of 1000 means the quantity counts 1.000 € lots.
+//
+// WARNING: adding a field here also requires updating buildBondDetailsFromForm
+// (lib/utils/bondDetailsForm.ts), the reset effect (BOTH the edit branch and the new-record branch)
+// and the edit round-trip in components/assets/AssetDialog.tsx.
 export interface BondDetails {
-  couponRate: number;          // Annual coupon rate %. For inflation-linked bonds: the guaranteed minimum (fixed) annual rate.
+  couponRate: number;          // Annual coupon rate % (0 = zero coupon). `italia`: the guaranteed minimum; `euro`: the real rate.
   couponFrequency: CouponFrequency;
   issueDate: Date; // Reference date for coupon schedule (first coupon = issueDate + 1 period)
   maturityDate: Date; // Bond redemption date (no coupons generated after this)
-  nominalValue?: number;       // Face value per unit in currency (e.g. 1000 for a €1000 bond). Default: 1
+  nominalValue?: number;       // Face value per unit in currency (e.g. 1000 for a €1000 lot). Default: 1 (quantity = nominal in EUR)
   couponRateSchedule?: CouponRateTier[]; // Step-up tiers; overrides couponRate when present
   finalPremiumRate?: number;   // Bonus % of nominalValue paid at maturity (e.g. 0.8 for BTP Valore, 0.6 for BTP Italia Sì loyalty premium)
-  isInflationLinked?: boolean; // True for additive inflation-linked bonds (BTP Italia Sì): coupon = fixed + announced FOI inflation
-  announcedInflationRates?: AnnouncedInflationRate[]; // User-announced per-period inflation rates, keyed by coupon date
+  inflationIndexation?: BondInflationIndexation; // Which inflation mechanism, if any — read through `resolveInflationIndexation`
+  isInflationLinked?: boolean; // LEGACY (docs before 2026-09-11): true meant `inflationIndexation: 'italia'`. Read-only fallback, never written any more.
+  announcedInflationRates?: AnnouncedInflationRate[]; // `italia`: user-announced per-period FOI rates, keyed by coupon date
+  indexationCoefficients?: IndexationCoefficientEntry[]; // `euro`: the coefficients known so far, keyed by date
 }
 
 /**

@@ -23,7 +23,7 @@
  */
 
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useForm, Controller, useWatch, type UseFormReturn } from 'react-hook-form';
+import { useForm, Controller, useWatch, type FieldErrors, type UseFormReturn } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useQueryClient } from '@tanstack/react-query';
@@ -104,6 +104,7 @@ import {
 } from '@/lib/utils/recurrenceDates';
 import {
   describeExpenseIntent,
+  describeFormRefusal,
   describeModalStatus,
   describeWriteError,
   EXPENSE_TYPE_PICKER_READING,
@@ -123,20 +124,20 @@ const expenseSchema = z
     subCategoryId: z.string().optional(),
     // Optional here, required by the superRefine below — an instalment plan states its cost in
     // its own fields («Importo totale»), and this one is neither read nor saved for it.
-    amount: z.number().positive("L'importo deve essere positivo").optional(),
+    amount: z.number({ error: "L'importo è obbligatorio" }).positive("L'importo deve essere positivo").optional(),
     currency: z.string().min(1, "Valuta è obbligatoria"),
     date: z.date(),
     notes: z.string().optional(),
     link: z.string().url({ message: 'Inserisci un URL valido' }).optional().or(z.literal('')),
     isRecurring: z.boolean().optional(),
     recurringFrequency: z.enum(['monthly', 'yearly']).optional(),
-    recurringDay: z.number().min(1).max(31).optional(),
-    recurringCount: z.number().min(1, 'Inserisci almeno 1').optional(),
+    recurringDay: z.number({ error: 'Inserisci il giorno del mese' }).min(1, 'Un giorno tra 1 e 31').max(31, 'Un giorno tra 1 e 31').optional(),
+    recurringCount: z.number({ error: 'Inserisci quante volte si ripete' }).min(1, 'Inserisci almeno 1').optional(),
     isInstallment: z.boolean().optional(),
     installmentMode: z.enum(['auto', 'manual']).optional(),
-    installmentCount: z.number().min(2).max(60).optional(),
-    installmentTotalAmount: z.number().positive().optional(),
-    installmentAmounts: z.array(z.number()).optional(),
+    installmentCount: z.number({ error: 'Inserisci il numero di rate' }).min(2, 'Almeno 2 rate').max(60, 'Al massimo 60 rate').optional(),
+    installmentTotalAmount: z.number({ error: "L'importo totale è obbligatorio" }).positive("L'importo totale deve essere positivo").optional(),
+    installmentAmounts: z.array(z.number({ error: 'Inserisci ogni rata' })).optional(),
     installmentStartDate: z.date().optional(),
     linkedCashAssetId: z.string().optional(),
     transferCashAssetId: z.string().optional(),
@@ -162,6 +163,20 @@ const expenseSchema = z
     // and ignored (it used to be required and then overwritten by the plan).
     if (!data.isInstallment && (data.amount === undefined || Number.isNaN(data.amount))) {
       ctx.addIssue({ code: 'custom', path: ['amount'], message: "L'importo è obbligatorio" });
+    }
+  })
+  .superRefine((data, ctx) => {
+    // A transfer IS the pair of accounts: the two labels carried an asterisk the schema did
+    // not honour (AGENTS.md → «a marker on a label is a claim the validation has to honour»),
+    // so a transfer saved without them moved no money and nothing said so (2026-09-13). The
+    // Select stores the `__none__` sentinel, which counts as empty here.
+    if (data.type !== 'transfer') return;
+    const origin = data.linkedCashAssetId && data.linkedCashAssetId !== '__none__' ? data.linkedCashAssetId : null;
+    const destination = data.transferCashAssetId && data.transferCashAssetId !== '__none__' ? data.transferCashAssetId : null;
+    if (!origin) ctx.addIssue({ code: 'custom', path: ['linkedCashAssetId'], message: 'Scegli il conto di origine' });
+    if (!destination) ctx.addIssue({ code: 'custom', path: ['transferCashAssetId'], message: 'Scegli il conto di destinazione' });
+    if (origin && destination && origin === destination) {
+      ctx.addIssue({ code: 'custom', path: ['transferCashAssetId'], message: 'Origine e destinazione devono essere due conti diversi' });
     }
   })
   .superRefine((data, ctx) => {
@@ -347,6 +362,8 @@ interface ExpenseDialogProps {
 interface FormBodyProps {
   form: UseFormReturn<ExpenseFormValues>;
   onSubmit: (data: ExpenseFormValues) => Promise<void>;
+  /** The refusal: names the fields in the reading line and brings the first into view. */
+  onInvalid: (errors: FieldErrors<ExpenseFormValues>) => void;
   selectedType: ExpenseType;
   selectedCategoryId: string | undefined;
   watchedSubCategoryId: string | undefined;
@@ -398,6 +415,7 @@ interface FormBodyProps {
 function ExpenseFormBody({
   form,
   onSubmit,
+  onInvalid,
   selectedType,
   selectedCategoryId,
   watchedSubCategoryId,
@@ -435,7 +453,7 @@ function ExpenseFormBody({
   const { register, control, handleSubmit, setValue, getValues, formState: { errors } } = form;
   const recurringFrequency = selectedRecurringFrequency ?? DEFAULT_RECURRENCE_FREQUENCY;
   return (
-    <form id="expense-form" onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+    <form id="expense-form" onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-5">
 
       {/* ---- Tipo di voce ----
            Create mode reached this form through the step-1 picker, so the type is already
@@ -514,6 +532,7 @@ function ExpenseFormBody({
               min="0"
               placeholder="0,00"
               {...register('amount', { valueAsNumber: true })}
+              aria-invalid={errors.amount ? true : undefined}
               className={errors.amount ? 'border-destructive' : ''}
             />
             {selectedType !== 'income' && selectedType !== 'transfer' && (
@@ -622,7 +641,11 @@ function ExpenseFormBody({
               value={watchedLinkedCashAssetId || '__none__'}
               onValueChange={(value) => setValue('linkedCashAssetId', value)}
             >
-              <SelectTrigger id="linkedCashAssetId">
+              <SelectTrigger
+                id="linkedCashAssetId"
+                aria-invalid={!!errors.linkedCashAssetId}
+                aria-describedby={errors.linkedCashAssetId ? 'linkedCashAssetId-error' : undefined}
+              >
                 <SelectValue placeholder="Seleziona conto" />
               </SelectTrigger>
               <SelectContent>
@@ -634,6 +657,11 @@ function ExpenseFormBody({
                 ))}
               </SelectContent>
             </Select>
+            {errors.linkedCashAssetId && (
+              <p id="linkedCashAssetId-error" role="alert" className="text-sm text-destructive">
+                {errors.linkedCashAssetId.message}
+              </p>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="transferCashAssetId">
@@ -643,7 +671,11 @@ function ExpenseFormBody({
               value={watchedTransferCashAssetId || '__none__'}
               onValueChange={(value) => setValue('transferCashAssetId', value)}
             >
-              <SelectTrigger id="transferCashAssetId">
+              <SelectTrigger
+                id="transferCashAssetId"
+                aria-invalid={!!errors.transferCashAssetId}
+                aria-describedby={errors.transferCashAssetId ? 'transferCashAssetId-error' : undefined}
+              >
                 <SelectValue placeholder="Seleziona conto" />
               </SelectTrigger>
               <SelectContent>
@@ -657,11 +689,21 @@ function ExpenseFormBody({
                   ))}
               </SelectContent>
             </Select>
+            {errors.transferCashAssetId && (
+              <p id="transferCashAssetId-error" role="alert" className="text-sm text-destructive">
+                {errors.transferCashAssetId.message}
+              </p>
+            )}
           </div>
           <p className="text-xs text-muted-foreground">
             Il saldo di entrambi i conti viene aggiornato automaticamente.
           </p>
         </div>
+      ) : selectedType === 'transfer' ? (
+        /* No cash account at all: the schema refuses the transfer, so say why before the click. */
+        <p role="alert" className="text-sm text-destructive">
+          Un trasferimento sposta soldi tra due conti correnti: crea prima i conti in Patrimonio.
+        </p>
       ) : cashAssets.length > 0 ? (
         <div className="space-y-2">
           <Label htmlFor="linkedCashAssetId">
@@ -801,6 +843,7 @@ function ExpenseFormBody({
               id="link"
               type="url"
               {...register('link')}
+              aria-invalid={errors.link ? true : undefined}
               placeholder="https://www.amazon.it/ordini/..."
               className={errors.link ? 'border-destructive' : ''}
             />
@@ -865,6 +908,7 @@ function ExpenseFormBody({
                           min="0.01"
                           placeholder="333.41"
                           {...register('installmentTotalAmount', { valueAsNumber: true })}
+                          aria-invalid={errors.installmentTotalAmount ? true : undefined}
                         />
                       </div>
                       <div className="space-y-2">
@@ -876,6 +920,7 @@ function ExpenseFormBody({
                           max="60"
                           placeholder="5"
                           {...register('installmentCount', { valueAsNumber: true })}
+                          aria-invalid={errors.installmentCount ? true : undefined}
                         />
                       </div>
                     </div>
@@ -928,6 +973,7 @@ function ExpenseFormBody({
                         min="0.01"
                         placeholder="333.41"
                         {...register('installmentTotalAmount', { valueAsNumber: true })}
+                        aria-invalid={errors.installmentTotalAmount ? true : undefined}
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
@@ -940,6 +986,7 @@ function ExpenseFormBody({
                           max="60"
                           placeholder="5"
                           {...register('installmentCount', { valueAsNumber: true })}
+                          aria-invalid={errors.installmentCount ? true : undefined}
                         />
                       </div>
                       <div className="space-y-2">
@@ -1101,6 +1148,7 @@ function ExpenseFormBody({
                         min="1"
                         max={MAX_RECURRENCE_OCCURRENCES[recurringFrequency]}
                         {...register('recurringCount', { valueAsNumber: true })}
+                        aria-invalid={errors.recurringCount ? true : undefined}
                         className={errors.recurringCount ? 'border-destructive' : ''}
                       />
                       {errors.recurringCount && (
@@ -1117,6 +1165,7 @@ function ExpenseFormBody({
                         min="1"
                         max="31"
                         {...register('recurringDay', { valueAsNumber: true })}
+                        aria-invalid={errors.recurringDay ? true : undefined}
                         className={errors.recurringDay ? 'border-destructive' : ''}
                       />
                       {errors.recurringDay && (
@@ -1501,6 +1550,62 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
     setCategoryDialogOpen(true);
   };
 
+  /**
+   * Field labels for the refusal sentence, in the words the form shows; a zod key that has no
+   * control of its own (the instalment refine lands on the root) names the block.
+   */
+  const FIELD_LABELS: Partial<Record<string, string>> = {
+    amount: 'Importo',
+    date: 'Data',
+    categoryId: 'Categoria',
+    subCategoryId: 'Sottocategoria',
+    notes: 'Note',
+    link: 'Link',
+    linkedCashAssetId: selectedType === 'transfer' ? 'Conto di origine' : 'Conto',
+    transferCashAssetId: 'Conto di destinazione',
+    installmentTotalAmount: 'Importo totale',
+    installmentCount: 'Numero di rate',
+    installmentStartDate: 'Prima rata',
+    installmentAmounts: 'Importi delle rate',
+    recurringCount: 'Occorrenze',
+    recurringDay: 'Giorno del mese',
+    '': 'Rate',
+  };
+
+  /**
+   * A refused submit is a status of the form, so it lands in the reading line («Mancano 2 campi:
+   * Importo e Categoria.», the Status-Is-The-Reading Rule) and the first refused field comes into
+   * view — until 2026-09-14 the reading kept its idle sentence, zod said «Invalid input» in
+   * English under the amount, and nothing scrolled.
+   */
+  const onInvalid = (fieldErrors: FieldErrors<ExpenseFormValues>) => {
+    const values = getValues();
+    const formEl = document.getElementById('expense-form');
+    const fieldOf = (key: string) => (key ? formEl?.querySelector<HTMLElement>(`[name="${key}"], #${key}`) ?? null : null);
+    // Named in the order the reader meets the fields, not in zod's.
+    const keys = Object.keys(fieldErrors).sort((a, b) => {
+      const ea = fieldOf(a);
+      const eb = fieldOf(b);
+      if (!ea || !eb) return ea ? -1 : eb ? 1 : 0;
+      return ea.compareDocumentPosition(eb) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
+    });
+    const missing: string[] = [];
+    const invalid: string[] = [];
+    for (const key of keys) {
+      const label = FIELD_LABELS[key] ?? key;
+      const value = (values as Record<string, unknown>)[key];
+      const isEmpty = value === undefined || value === '' || value === '__none__' || (typeof value === 'number' && Number.isNaN(value));
+      (isEmpty ? missing : invalid).push(label);
+    }
+    setStatus({ phase: 'error', message: describeFormRefusal(missing, invalid) });
+
+    const target = keys.length > 0 ? fieldOf(keys[0]) : null;
+    if (target) {
+      target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      target.focus({ preventScroll: true });
+    }
+  };
+
   const onSubmit = async (data: ExpenseFormValues) => {
     // Every refusal lands on the modal's reading line, where the reader is already looking —
     // a toast in the corner asks them to look away from the form that caused it.
@@ -1702,7 +1807,12 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
             expenseData.recurringCount &&
             expenseData.recurringCount > 0
           ) {
-            firstSignedAmount = -Math.abs(expenseData.amount);
+            // The first occurrence is the only one that moves the account, with the SIGN of its
+            // type — the same rule as the two branches beside it. It was hard-coded negative until
+            // 2026-09-13: harmless only because `canTypeRecur` keeps incomes out of recurrence, a
+            // guard this branch must not rely on.
+            firstSignedAmount =
+              data.type === 'income' ? Math.abs(expenseData.amount) : -Math.abs(expenseData.amount);
           } else {
             firstSignedAmount =
               data.type === 'income' ? Math.abs(expenseData.amount) : -Math.abs(expenseData.amount);
@@ -1765,7 +1875,8 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
   // and not `EXPENSE_TYPE_LABELS`, which is the plural of a category group («Spese Variabili»).
   const dialogEyebrow = isTypePicker
     ? 'Nuova voce · Passo 1 di 2'
-    : `${isEdit ? 'Modifica voce' : 'Nuova voce'} · ${TYPE_OPTIONS.find((o) => o.value === selectedType)?.label ?? ''}`;
+    // Step 2 keeps the counter: the eyebrow used to drop from «Passo 1 di 2» to the type alone.
+    : `${isEdit ? 'Modifica voce' : 'Nuova voce · Passo 2 di 2'} · ${TYPE_OPTIONS.find((o) => o.value === selectedType)?.label ?? ''}`;
 
   const reading = describeModalStatus(isSubmitting ? { phase: 'submitting' } : status, {
     idle: isTypePicker ? EXPENSE_TYPE_PICKER_READING : describeExpenseIntent(selectedType),
@@ -1859,6 +1970,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
   const formBodyProps: FormBodyProps = {
     form,
     onSubmit,
+    onInvalid,
     selectedType,
     selectedCategoryId,
     watchedSubCategoryId,

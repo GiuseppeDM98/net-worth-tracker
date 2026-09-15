@@ -33,8 +33,9 @@
  * reasoning as `getAssetTransactions` / `getUserSnapshotsAdmin`.
  */
 
-import { collection, doc, getDocs, addDoc, deleteDoc, query, where, Timestamp } from 'firebase/firestore';
+import { collection, doc, getDocs, addDoc, deleteDoc, updateDoc, query, where, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
+import { invalidateDashboardOverviewSummary } from '@/lib/services/dashboardOverviewInvalidation';
 import { removeUndefinedDeep as removeUndefinedFields } from '@/lib/utils/firestoreData';
 import { toDate } from '@/lib/utils/dateHelpers';
 import { getAssetById, updateCashAssetBalance } from '@/lib/services/assetService';
@@ -51,6 +52,8 @@ import {
 } from '@/types/pension';
 
 export const PENSION_CONTRIBUTIONS_COLLECTION = 'pensionContributions';
+/** The fund's own document: the statement overwrite writes `quantity` there (price 1). */
+const ASSETS_COLLECTION = 'assets';
 
 /** Fallback label for the transfer entry when the category document cannot be re-read. */
 const DEFAULT_TRANSFER_CATEGORY_NAME = 'Trasferimenti';
@@ -386,6 +389,28 @@ export async function deletePensionContribution(contribution: PensionContributio
   }
 
   await deleteDoc(doc(db, PENSION_CONTRIBUTIONS_COLLECTION, contribution.id));
+}
+
+/**
+ * Overwrite a fund's value from the statement — the «Aggiorna valore» action of Previdenza.
+ *
+ * NOT a contribution: no record, no transfer, no cash movement (doc/guide/previdenza.md → «the
+ * periodic statement is not a contribution»). The value lives in `quantity` at price 1, so the
+ * same guard as a contribution refuses a fund whose value would not all be in that field, and
+ * `lastPriceUpdate` is stamped so «Il fondo oggi» reads the update's date. The Panoramica's
+ * summary is invalidated like any asset update; the caller invalidates the React Query caches.
+ *
+ * @throws When the asset is not a `pensionFund` priced at 1, or the value is not a finite number ≥ 0
+ */
+export async function updatePensionFundValue(assetId: string, value: number): Promise<void> {
+  if (!Number.isFinite(value) || value < 0) {
+    throw new Error('Il valore del fondo deve essere un numero maggiore o uguale a zero');
+  }
+  await assertFundValueLivesInQuantity(assetId);
+  const fund = await getAssetById(assetId);
+  const now = new Date();
+  await updateDoc(doc(db, ASSETS_COLLECTION, assetId), { quantity: value, lastPriceUpdate: now, updatedAt: now });
+  if (fund?.userId) await invalidateDashboardOverviewSummary(fund.userId, 'pension_value_updated');
 }
 
 /**

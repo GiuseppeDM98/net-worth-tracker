@@ -298,6 +298,7 @@ export function toNoContextVerdictInput(overview: DashboardOverviewPayload, mont
     savingsRate,
     marketEffect: overview.marketEffect ?? null,
     topMover: overview.topMovers?.[0] ?? null,
+    sales: overview.monthSales ?? null,
   };
 }
 

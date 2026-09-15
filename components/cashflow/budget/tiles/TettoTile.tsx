@@ -5,7 +5,7 @@ import type { CeilingSummary, IncomeTargetSummary, SpendingHistory } from '@/lib
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { formatPercentage } from '@/lib/services/chartService';
 import { cn } from '@/lib/utils';
-import { describeDailyCaption, describeOverCaption, describeProjectionCaption } from '@/lib/utils/budgetNarrative';
+import { describeDailyCaption, describeOverCaption, describeProjectionCaption, describeRemainingCaption } from '@/lib/utils/budgetNarrative';
 import { Tile, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { NarrativeText } from '@/components/ui/narrative-text';
 import { BudgetTrack } from '@/components/cashflow/budget/BudgetTrack';
@@ -38,17 +38,26 @@ function Kpi({ label, value, valueClass, caption }: { label: string; value: stri
 }
 
 /**
- * "Sto dentro il tetto?" in figures — the dominant tile of Budget: what is used against the
- * ceiling (the hero), the same two shares on one 3px track with today's mark, the three KPIs
- * (where the month lands at the current pace, what is left, what that is per day), the
- * trailing months against today's ceiling (the element that stretches when the tile spans
- * two rows), and the month's income targets as the footer. Every figure is the
- * `CeilingSummary`'s; the tile computes nothing.
+ * "Sto dentro il tetto?" in figures — the dominant tile of Budget: what is SPENT against the
+ * ceiling (the hero), the rows still in the calendar beside it as their own figure, the two
+ * on one 3px track with today's mark (booked full, scheduled lighter), the three KPIs (where
+ * the month lands at the current pace, what is left, what that is per day), the trailing
+ * months against today's ceiling (the element that stretches when the tile spans two rows),
+ * and the month's income targets as the footer. Every figure is the `CeilingSummary`'s; the
+ * tile computes nothing. The hero used to print `spent` (scheduled rows included) over the
+ * word «speso» — 1953 € for 656 € spent, on the owner's account (2026-09-14).
  */
 export function TettoTile({ summary, aside, reading, history, historyCaption, income, incomeReading, className }: TettoTileProps) {
-  const ratio = summary.spent / summary.ceiling;
+  const totalRatio = summary.spent / summary.ceiling;
+  const bookedRatio = summary.spentToDate / summary.ceiling;
+  const scheduledRatio = summary.scheduled / summary.ceiling;
   const projectionOver = summary.projection !== null && Math.round(summary.projection) > summary.ceiling;
   const calendarPct = Math.round(summary.calendarPct);
+  const trackValueText = summary.exceeded
+    ? `${formatPercentage(summary.usedPct, 0)}, oltre di ${cachedFormatCurrencyEUR(summary.overBy, true)}`
+    : summary.scheduled > 0
+      ? `${formatPercentage(summary.spentToDatePct, 0)} speso, ${formatPercentage(summary.usedPct, 0)} con le spese in calendario`
+      : `${formatPercentage(summary.usedPct, 0)} speso`;
 
   return (
     <Tile
@@ -66,15 +75,27 @@ export function TettoTile({ summary, aside, reading, history, historyCaption, in
               summary.exceeded ? 'text-destructive' : 'text-foreground',
             )}
           >
-            {cachedFormatCurrencyEUR(summary.spent, true)}
+            {cachedFormatCurrencyEUR(summary.spentToDate, true)}
           </p>
           <p className="text-[13px] text-muted-foreground">
             su <span className="font-mono tabular-nums text-foreground">{cachedFormatCurrencyEUR(summary.ceiling, true)}</span>
           </p>
+          {summary.scheduled > 0 && (
+            <p className="text-[13px] text-muted-foreground">
+              + <span className="font-mono tabular-nums text-foreground">{cachedFormatCurrencyEUR(summary.scheduled, true)}</span> in calendario
+            </p>
+          )}
         </div>
-        <BudgetTrack ratio={ratio} calendarPct={summary.calendarPct} color={progressFillColor(ratio)} label="Tetto del mese usato" />
+        <BudgetTrack
+          ratio={bookedRatio}
+          scheduledRatio={scheduledRatio}
+          calendarPct={summary.calendarPct}
+          color={progressFillColor(totalRatio)}
+          label="Tetto del mese usato"
+          valueText={trackValueText}
+        />
         <div className="flex justify-between text-[11px] text-muted-foreground">
-          <span>speso</span>
+          <span>{summary.scheduled > 0 ? 'speso · in calendario' : 'speso'}</span>
           <span>
             <span aria-hidden="true">│ </span>oggi, <span className="font-mono tabular-nums">{formatPercentage(calendarPct, 0)}</span> del mese
           </span>
@@ -99,15 +120,7 @@ export function TettoTile({ summary, aside, reading, history, historyCaption, in
         {summary.exceeded ? (
           <Kpi label="Oltre" value={cachedFormatCurrencyEUR(summary.overBy, true)} valueClass="text-destructive" caption={describeOverCaption(summary)} />
         ) : (
-          <Kpi
-            label="Restano"
-            value={cachedFormatCurrencyEUR(summary.remaining, true)}
-            caption={
-              summary.calendar.daysLeft > 0
-                ? [{ text: 'per ' }, { text: String(summary.calendar.daysLeft), mono: true }, { text: summary.calendar.daysLeft === 1 ? ' giorno' : ' giorni' }]
-                : [{ text: 'ultimo giorno' }]
-            }
-          />
+          <Kpi label="Restano" value={cachedFormatCurrencyEUR(summary.remaining, true)} caption={describeRemainingCaption(summary)} />
         )}
         {summary.exceeded ? (
           <Kpi

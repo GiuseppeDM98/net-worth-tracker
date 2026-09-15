@@ -51,6 +51,28 @@
   the sign colour (the sign tokens mean gained and lost, and it is neither yet). The two month charts draw the months not started at reduced opacity, never outlined — the
   outline stays the month in progress. **The figures of a running year therefore contain a forecast; that is the
   owner's decision, and the page says so.**
+- **The verdict judges what has HAPPENED, and a second sentence says where the calendar takes it** (2026-09-14, the
+  owner's call after the critique). With nothing in the calendar the totals ARE what happened: one sentence, as before.
+  With something ahead, `buildCashflowVerdict` takes headline, tone and the first sentence from `settleTotals(totals,
+  scheduled)` — the period's totals minus the scheduled slice, «A settembre finora le spese superano le entrate di 355
+  €: entrate 302 €, spese 656 €» — and closes with `calendarSentence`: «Con 1297 € di spese e 2456 € di entrate già in
+  calendario da qui a fine mese, il mese chiude a +805 € (il 29%).» On the 14th the mirror printed «Settembre sta
+  andando bene · 29%» on a salary dated the 15th. **Both sides of the calendar are ALWAYS named**, an empty one as
+  «nessuna entrata attesa» / «nessuna spesa attesa»: an instalment plan writes its future rows and a salary is not
+  recurring (`canTypeRecur`), so «Quest'anno» holds three months of instalments and no income — the 4% it produces
+  against the 10% of «Da inizio anno» is the calendar's asymmetry, and the sentence has to say so. The closing figure
+  is the PERIOD's total, the one the tiles print, so the two sentences meet on the same number; a period nothing has
+  happened in yet reads «Nessun movimento ancora nel 2043.» and only the calendar sentence. `scheduledSentence` («Nel
+  totale ci sono ancora …») is no longer Tracciamento's — Analisi still closes with it. A future period is `ongoing`
+  (`describePeriodSubject`: `>=`, not `===`): «nel 2043 hai speso» was the past tense on a year of instalments.
+- **The month in progress is compared with the SAME DAYS of the previous month** (2026-09-14): `currentComparisonWindow`
+  returns the 1st → today and `previousComparisonWindow` the 1st → the same day of the previous month (clamped to its
+  length: the 31st of October against the 30 days of September), `describeComparisonPhrase` says «sui primi 14 giorni
+  di agosto» and the KPI caption «vs 1–14 ago». The default view printed «in calo del 59,8% su agosto» on the 14th —
+  fourteen days plus the calendar against thirty-one — while the same function refused that asymmetry for a running
+  year. **`previousPeriod` still returns the whole previous month** for the projection's reference («Ad agosto 4854
+  €»): a reference for where the month lands is the whole month, a delta on what has been lived is not. A month not
+  yet begun has no comparison at all (both windows null, phrase and caption dropped).
 - **«Da inizio anno» is a period of its own** (`Period` gained `{ kind: 'ytd'; year; throughMonth }`, and Analisi's
   `PeriodMode` gained `'ytd'`): January → the end of today's month, the window the whole-year rule above deliberately
   no longer is. `throughMonth` is STORED, never read off a clock, so `periodToRange` stays pure and the period is a
@@ -97,7 +119,21 @@
 - **Feed delete = drawer-confirm, not 2-click**, and `deleteSingleExpense` MUST branch on `type === 'transfer'` to call
   `reconcileTransferDelete` (both legs), like `ExpenseTable` does. The feed keeps `surface="flat"` on every width (a
   card per day inside the Movimenti tile would be a card inside a card); `ExpenseTable` is desktop-only, so with the
-  «Tabella» view selected the tile renders the table `hidden desktop:block` and the feed `desktop:hidden`.
+  «Tabella» view selected the tile renders the table `hidden desktop:block` and the feed `desktop:hidden`. **The
+  «Feed | Tabella» choice is remembered** (`localStorage`, `cashflow.movimenti.vista`, 2026-09-14), like Patrimonio's
+  toggles.
+- **The table's delete is the row's, and a series is a modal** (2026-09-14, both surfaces off the raw `AlertDialog`): a
+  plain row arms in place (`useArmedDelete`, no timer, «Conferma» on the button, the consequence printed in the Note
+  cell — `describeExpenseDeleteConsequence`: «Eliminando, il conto viene riaccreditato di 373,81 €» — and ONE live
+  region per table); a row of an instalment plan or a recurring series opens `SeriesDeleteDialog` («solo questa o tutte
+  le 12?», a `ResponsiveModal` `sm`), the same modal the feed's detail drawer reaches through `handleDeleteExpense`
+  (`resolveSeriesDeleteMode` is the one rule). Every `<th>` names its column (`scope="col"` is now `TableHead`'s
+  default), the sorted header carries `aria-sort`, and Data and Importo are mono (`FIGURE_CLASS`).
+- **An expense type has ONE colour map** — `lib/constants/expenseTypeColors.ts` (dot, badge, the two flow series);
+  see AGENTS.md → Layout and Color Tokens. The «Tutte le categorie in Analisi» footer link is a
+  `TILE_FOOTER_ACTION_CLASS` target (32/44px), and `RankedRows` hides its share column under a 250px container
+  (`@max-[250px]:hidden`): the three percentages of «Entrate per categoria» were painted outside the `col-span-3`
+  tile at 1440, and `e2e/cashflow.tracciamento.spec.ts` measures every list against its tile.
 - **Two pieces of state are derived, not reset**: the feed's visible window is stored WITH the filter key it was
   opened under (`feedWindow`, falls back to the first page when the key changes) and the account filter is read
   through `effectiveAccountId` (an account absent from the period is no filter) — both were `setState` in an
@@ -119,6 +155,18 @@
   counts a non-current month as a filter. The landscape «Aggiungi» button lives beside the period
   (`max-desktop:portrait:hidden`): in portrait the bottom-nav FAB (`cashflow:add-expense`) is the only add
   affordance, in landscape the FAB is gone.
+- **«Intestatario» is a list filter that exists only with Divisione on** (2026-09-11,
+  `lib/utils/movementsOwnerFilter.ts`): the page hands the tab `splitEnabled` and `familyMembers`, and the Select —
+  desktop toolbar and the phone drawer alike — offers «Tutti · In comune · {members}», plus «Senza intestatario» only
+  when the PERIOD holds rows of a deleted member (`listOwnerFilterOptions`). Absent or blank `personalMemberId` is
+  «in comune», the same contract as `expenseSplitSummary`. A selection the options no longer offer (the feature
+  switched off, a member removed) is no filter — `effectiveOwnerId`, derived like `effectiveAccountId`, never reset in
+  an effect. It counts in `hasActiveFilters`, the drawer badge, the feed's `filterKey` and «Ripristina»; it narrows
+  ONLY the Movimenti list, and since the tile's reading totals the rows it is handed, «Spese di Giuseppe: 522 € su
+  12 voci» comes for free. **With the feature on, an attributed row also prints its owner as a chip** (feed, table,
+  detail drawer: `resolveOwnerLabel` — the name, or «Senza intestatario»); a shared row prints nothing, so the default
+  case stays clean. `memberNames` is `null` when the feature is off, so no row is ever labelled by a feature the
+  account does not use.
 - **Hover readings are one primitive** (`components/ui/chart-hover.tsx`): `useChartHover(count, 'slot' | 'nearest')`
   returns `enabled` (`(pointer: fine)` via `useMediaQuery`), the index and the pointer handlers; spread the handlers on
   the `relative` plot box only when `enabled`, so a touch device never mounts the overlay. The tip is HTML, never an
@@ -130,4 +178,4 @@
 
 ## Per-page blind spots
 
-- **Tracciamento**: «Tabella» renders `ExpenseTable` unchanged inside Movimenti; the period slice uses `periodToRange` (browser local time) while the month buckets use the Italian calendar; the phone bar's controls are 36px; `TransactionFeed`/`CompactExpenseRow` carry two pre-existing `react-hooks` errors; a custom range has no previous period; the month-end projection exists only in the current month; `components/dashboard/overview/NarrativeText.tsx` is an unused re-export (knip).
+- **Tracciamento**: the period slice uses `periodToRange` (browser local time) while the month buckets use the Italian calendar; the phone bar's controls are 36px; `TransactionFeed`/`CompactExpenseRow` carry two pre-existing `react-hooks` errors; a custom range has no previous period; the month-end projection exists only in the current month; `components/dashboard/overview/NarrativeText.tsx` is an unused re-export (knip). The hero's KPIs print the PERIOD's totals (calendar included) beside a delta measured on the lived window («↓ 70,1% vs 1–14 ago» under a whole-month 1953 €) — the verdict's second sentence is what reconciles the two, by design. The feed's detail drawer and its nested confirm are still raw `Drawer`s (DESIGN.md → §5 Modal, Coverage); the Movimenti reading still sums scheduled spending and income into one figure («7 in calendario (3753 €)»). The `describePeriodCashflow` reading and `expenseEntityStats` keep their own windows (AGENTS → the two conventions).

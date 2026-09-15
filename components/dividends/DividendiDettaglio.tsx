@@ -17,7 +17,7 @@
 import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import { Badge } from '@/components/ui/badge';
 import { Tile, TILE_CELL_CLASS, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { getMetricValueColor } from '@/lib/utils/metricColors';
@@ -33,13 +33,19 @@ interface DividendiDettaglioProps {
   now: Date;
 }
 
-/** A signed percentage with the typographic minus and the it-IT comma, coloured by sign. */
+/**
+ * A signed percentage with the typographic minus and the it-IT comma, coloured by sign. A value
+ * that PRINTS as zero carries no sign and no colour: thirteen «+0,00%» in a column read as
+ * thirteen small gains, and a dividend of nothing is not a gain.
+ */
 function SignedPercent({ value, className }: { value: number | undefined; className?: string }) {
   if (value === undefined) return <span className={cn('text-muted-foreground', className)}>—</span>;
+  const printed = Math.round(Math.abs(value) * 100) / 100;
+  if (printed === 0) return <span className={cn('font-mono tabular-nums text-muted-foreground', className)}>{formatPercentage(0, 2)}</span>;
   return (
     <span className={cn('font-mono tabular-nums', getMetricValueColor(value, 'percentage'), className)}>
       {value >= 0 ? '+' : '−'}
-      {formatPercentage(Math.abs(value), 2)}
+      {formatPercentage(printed, 2)}
     </span>
   );
 }
@@ -220,12 +226,15 @@ export function DividendiDettaglio({ stats, now }: DividendiDettaglioProps) {
         </CollapsibleContent>
       </Collapsible>
 
-      <Dialog open={selectedAsset !== null} onOpenChange={(next) => { if (!next) setSelectedAsset(null); }}>
-        <DialogContent className="max-w-xs">
-          <DialogHeader>
-            <DialogTitle className="text-base">{selectedAsset?.assetTicker || selectedAsset?.assetName}</DialogTitle>
-            <DialogDescription>Dividendo per azione lordo, anno per anno.</DialogDescription>
-          </DialogHeader>
+      {/* The per-year figures of one row, in the app's one modal (a drawer on a phone). */}
+      <ResponsiveModal
+        open={selectedAsset !== null}
+        onClose={() => setSelectedAsset(null)}
+        width="sm"
+        eyebrow="Dividendi · Crescita del dividendo"
+        title={selectedAsset?.assetTicker || selectedAsset?.assetName || ''}
+        reading="Dividendo per azione lordo, anno per anno; YoY e CAGR si fermano all’ultimo anno chiuso."
+      >
           {selectedAsset && (
             <div className="flex flex-col divide-y divide-border">
               {years.map((year) => {
@@ -252,8 +261,7 @@ export function DividendiDettaglio({ stats, now }: DividendiDettaglioProps) {
               </div>
             </div>
           )}
-        </DialogContent>
-      </Dialog>
+      </ResponsiveModal>
     </>
   );
 }

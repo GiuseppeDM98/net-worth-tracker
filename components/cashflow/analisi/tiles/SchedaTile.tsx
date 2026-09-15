@@ -40,8 +40,9 @@ interface SchedaTileProps {
   className?: string;
 }
 
+/** 44px below `desktop:`, the 32px dense floor at 1440 — `h-7` (28px) is never a target (AGENTS.md → Accessibility). */
 const ACTION_CLASS =
-  'inline-flex h-11 items-center justify-center gap-1 rounded-md border border-border px-3 text-[12px] text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring desktop:h-7 desktop:border-0 desktop:px-2';
+  'inline-flex h-11 items-center justify-center gap-1 rounded-md border border-border px-3 text-[12px] text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring desktop:h-8 desktop:border-0 desktop:px-2';
 
 /**
  * «Cosa succede in questa voce?» — the one place every entity entry point lands (the
@@ -64,7 +65,7 @@ export function SchedaTile({ focus, scope, reading, allExpenses, color, period, 
             <span>
               {EXPENSE_TYPE_LABELS[focus.category.expenseType]} · storico dal <span className="font-mono tabular-nums">{historyStartYear}</span>
             </span>
-            {/* Below desktop the two exits take a full-width row of 44px targets; from desktop they are the aside's ghost buttons. */}
+            {/* Below desktop the two exits take a full-width row of 44px targets; from desktop they are the aside's 32px ghost buttons. */}
             <div className="flex w-full gap-2 [&>button]:flex-1 desktop:w-auto desktop:[&>button]:flex-none">
               <button type="button" onClick={onBack} className={ACTION_CLASS}>
                 <ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" />

@@ -107,6 +107,9 @@ async function seedAssets(): Promise<void> {
         quantity: 5,
         averageCost: 98,
         currentPrice: 101,
+        // The government-bond rate, so the dividend form's withholding proposal can be pinned
+        // to the instrument's own rate (e2e/cashflow.dividendi.spec.ts).
+        taxRate: 12.5,
         isin: 'IT0005547408',
       },
     },

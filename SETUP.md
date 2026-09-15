@@ -448,6 +448,15 @@ curl -H "Authorization: Bearer owner" \
 Same header with `-X DELETE` on a document path removes it, so a handful of leftovers from a manual
 test run do not require wiping `.emulator-data/`.
 
+### A `frame-src` CSP violation in the console on the emulator dev server
+
+`Framing 'http://127.0.0.1:9099/' violates the following report-only Content Security Policy
+directive: "frame-src 'self' https://*.firebaseapp.com"` (seen 2026-09-13, phone-width tour on
+`dev:emulator`). The Firebase Auth SDK frames the auth domain, which on the emulators is
+`127.0.0.1:9099`; `next.config.ts` ships that policy as `Content-Security-Policy-Report-Only`, so it
+logs and blocks nothing, and in production the auth domain is `*.firebaseapp.com`, which the directive
+allows. Not a defect of the page under test.
+
 ---
 
 ## Vercel Deployment

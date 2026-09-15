@@ -102,6 +102,7 @@ const TODAY: FundTodaySummary = {
     { year: 2026, month: 8, value: 31_450 },
   ],
   lastUpdated: new Date(2026, 7, 12),
+  valueIsStale: false,
 };
 
 describe('formatMonthKey', () => {
@@ -235,6 +236,11 @@ describe('Il fondo oggi', () => {
     expect(plain(describeFondoOggiFooter(TODAY))).toBe('1 fondo · valore aggiornato a mano dall’estratto conto · ultimo aggiornamento 12 ago 2026');
   });
 
+  it('judges a value left in a closed month instead of printing its date as a fact', () => {
+    expect(plain(describeFondoOggiFooter({ ...TODAY, valueIsStale: true }))).toBe('1 fondo · valore aggiornato a mano dall’estratto conto · valore fermo dal 12 ago 2026');
+    expect(plain(describeFondoOggiFooter({ ...TODAY, lastUpdated: null, valueIsStale: false }))).toBe('1 fondo · valore aggiornato a mano dall’estratto conto');
+  });
+
   it('drops the clauses it cannot support', () => {
     expect(plain(describeFondoOggi({ ...TODAY, monthEffect: null, monthEffectPct: null }))).toBe(
       'Il fondo vale 31.450 €, con 2321 € di versamenti registrati da novembre 2025.'
@@ -300,7 +306,7 @@ describe('Rendimento', () => {
 
     const idle = { ...MARIO, returnState: 'idle' as const, return: { ...RETURN, hasNoMovement: true } };
     expect(plain(describeRendimento([idle]))).toBe(
-      'Da novembre 2025 il valore del fondo non si è ancora mosso e non risultano versamenti registrati dopo quel mese: non c’è ancora niente da misurare. La prima misura arriva quando aggiorni «Valore attuale» col prossimo estratto conto.'
+      'Da novembre 2025 il valore del fondo non si è ancora mosso e non risultano versamenti registrati dopo quel mese: non c’è ancora niente da misurare. La prima misura arriva quando aggiorni il valore col prossimo estratto conto («Aggiorna valore», in alto).'
     );
 
     const fresh = { ...MARIO, returnState: 'no-contributions' as const, return: null, windowStart: null };
@@ -378,6 +384,7 @@ describe('Versato', () => {
 
   it('reads the year total by nature, largest first', () => {
     expect(plain(describeVersato(VERSATO))).toBe('Nel 2026 il fondo ha ricevuto 1321 €: 652 € volontari, 535 € di TFR e 134 € dal datore.');
+    expect(plain(describeVersato(VERSATO, 2))).toMatch(/^Nel 2026 i fondi hanno ricevuto 1321 €/);
     expect(plain(describeVersatoFooter(VERSATO))).toBe('Nel 2025 aveva ricevuto 1000 €, tutti volontari. Versamenti per anno d’imposta, non per data.');
   });
 

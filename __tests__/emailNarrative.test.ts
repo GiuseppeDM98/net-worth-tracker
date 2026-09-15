@@ -173,6 +173,48 @@ describe('buildPeriodEmailVerdict', () => {
     );
   });
 
+  it('takes the tax on a sale out of the market and names it, in the headline and in the split', () => {
+    // September 2026 on the real account, as the email would see it: Δ −4.938 €, +988 € saved,
+    // 4.089 € of estimated tax on the Vanguard sale — the service hands a residual already net
+    // of that tax (−4.938 − 988 + 4.089 = −1.837), and the tax is its own third part.
+    const verdict = buildPeriodEmailVerdict({
+      ...GROWING,
+      period: { kind: 'monthly', year: 2026, month: 9 },
+      netWorthDelta: -4937.74,
+      netWorthDeltaPct: -1.66,
+      totalIncome: 2758,
+      totalExpenses: 1770,
+      marketEffect: -1837,
+      sales: {
+        proceeds: 39052.45,
+        realizedGain: 15726.38,
+        estimatedTax: 4088.86,
+        instruments: [{ id: 'vwce', name: 'Vanguard FTSE All-World', proceeds: 39052.45, realizedGain: 15726.38, estimatedTax: 4088.86 }],
+        brokenLedgers: 0,
+      },
+      rank: null,
+    });
+    expect(verdict.headline).toBe('Settembre è in calo: il mercato ha pesato, le tasse sulle vendite di più.');
+    expect(plain(verdict.sentence)).toBe(
+      'Il patrimonio vale 312.480 €: −4938 € (−1,66%) su agosto. ' +
+        'Di quel movimento, −1837 € viene dal mercato, +988 € da quanto hai risparmiato e −4089 € dalle tasse sulle vendite. ' +
+        'Hai venduto Vanguard FTSE All-World per 39.052 € con una plusvalenza di 15.726 € e pagato circa 4089 € di tasse.',
+    );
+  });
+
+  it('keeps the two-part split when the sale carried no tax', () => {
+    const verdict = buildPeriodEmailVerdict({
+      ...GROWING,
+      sales: { proceeds: 1000, realizedGain: -200, estimatedTax: 0, instruments: [{ id: 'a', name: 'A', proceeds: 1000, realizedGain: -200, estimatedTax: 0 }], brokenLedgers: 0 },
+      rank: null,
+    });
+    expect(plain(verdict.sentence)).toBe(
+      'Il patrimonio vale 312.480 €: +4310 € (+1,40%) su luglio. ' +
+        'Di quel movimento, +3130 € viene dal mercato e +1180 € da quanto hai risparmiato. ' +
+        'Hai venduto A per 1000 € con una minusvalenza di 200 €, senza tasse.',
+    );
+  });
+
   it('never calls a record decline "il mese migliore"', () => {
     const verdict = buildPeriodEmailVerdict({
       ...GROWING,
@@ -239,6 +281,13 @@ describe('describeMarketSplit', () => {
 
   it('is absent when the effect is not attributable', () => {
     expect(describeMarketSplit(null, 1180)).toBeNull();
+  });
+
+  it('names the tax on the sales as its own part, as an estimate', () => {
+    expect(plain(describeMarketSplit(-1837, 988, 4088.86))).toBe(
+      'Mercato −1837 €, risparmio +988 €, tasse sulle vendite circa −4089 €. È un residuo strutturale: assorbe anche i movimenti non tracciati.',
+    );
+    expect(plain(describeMarketSplit(3130, 1180, 0))).not.toContain('tasse');
   });
 });
 

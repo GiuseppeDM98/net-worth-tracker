@@ -15,10 +15,16 @@ interface CategoryTileProps {
   /** Bar colour, a theme chart slot. */
   color: string;
   emptyCopy: string;
-  /** Width of the label column; a 3-column tile passes a narrower one so the bar keeps a track. */
+  /** Minimum width of the label column (`RankedRows` lets it grow before the bar does). */
   labelClassName?: string;
   /** Pinned under the rows (a link to the full breakdown). */
   footer?: ReactNode;
+  /**
+   * Makes every category row a button that hands back its category — on the Panoramica the row
+   * opens the category's Scheda on Analisi. The residual row («Altre categorie») is never a
+   * button: it is not a category.
+   */
+  onSelectCategory?: (category: DashboardOverviewCategoryAmount) => void;
   className?: string;
 }
 
@@ -28,9 +34,27 @@ interface CategoryTileProps {
  * the top 5 are carried, so the list closes with the residual ("Altre categorie") — a list
  * titled "per categoria" that does not add up to the total reads as missing data.
  */
-export function CategoryTile({ eyebrow, total, categories, reading, color, emptyCopy, labelClassName, footer, className }: CategoryTileProps) {
+export function CategoryTile({
+  eyebrow,
+  total,
+  categories,
+  reading,
+  color,
+  emptyCopy,
+  labelClassName,
+  footer,
+  onSelectCategory,
+  className,
+}: CategoryTileProps) {
   const shown = categories.reduce((sum, c) => sum + c.amount, 0);
   const remainderAmount = Math.max(0, total - shown);
+  const rowKey = (c: DashboardOverviewCategoryAmount) => c.categoryKey ?? c.category;
+  const handleRowClick = onSelectCategory
+    ? (row: { key: string }) => {
+        const category = categories.find((c) => rowKey(c) === row.key);
+        if (category) onSelectCategory(category);
+      }
+    : undefined;
 
   return (
     <OverviewTile
@@ -45,13 +69,15 @@ export function CategoryTile({ eyebrow, total, categories, reading, color, empty
         <div className="mt-2">
           <RankedRows
             rows={categories.map((c) => ({
-              key: c.categoryKey ?? c.category,
+              key: rowKey(c),
               label: c.category,
               amount: c.amount,
               percentage: c.percentage,
             }))}
             color={color}
             labelClassName={labelClassName}
+            onRowClick={handleRowClick}
+            ariaLabel={eyebrow}
             remainder={
               remainderAmount >= 1
                 ? {

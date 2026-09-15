@@ -11,14 +11,20 @@
  * category budgets, no budgets → the page says so. Italian grammar is data: articles follow
  * the percentage AS PRINTED (`articleForPercent`, `atThePercent`), «ad» before a vowel month.
  *
+ * «Speso» is what is booked up to today, and nothing else (The Scheduled-Is-Not-Spent Rule,
+ * 2026-09-14): a mortgage due on the 27th is «in calendario», named as its own clause with its
+ * amount, never folded into «hai speso». The calendar comparison («18 punti avanti») reads the
+ * booked share only — the calendar cannot be «ahead» because of a row dated after today.
+ *
  * Percentages go through chartService's it-IT formatter (comma decimals); currency through
  * `cachedFormatCurrencyEUR` (nbsp before €, four-digit amounts ungrouped).
  */
 
 import type { Narrative, NarrativeSegment, PageVerdictModel } from '@/lib/utils/narrative';
-import type { BudgetAlert, BudgetRiskSummary } from '@/types/budget';
+import type { BudgetAlert, BudgetKind, BudgetPeriod, BudgetRiskSummary } from '@/types/budget';
 import type { BudgetAllocationValidation } from '@/lib/utils/budgetUtils';
 import type { AnnualBudgetSummary, CeilingSummary, IncomeTargetSummary, SpendingHistory } from '@/lib/utils/budgetSummary';
+import type { ModalStatusCopy } from '@/lib/utils/dialogNarrative';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { formatPercentage } from '@/lib/services/chartService';
 import { articleForPercent, atThePercent } from '@/lib/utils/patrimonioNarrative';
@@ -107,13 +113,26 @@ function ceilingVerdict(c: CeilingSummary, now: Date): PageVerdictModel {
         : c.crossedOn === calendar.dayOfMonth
           ? [prose('Lo hai superato oggi; ')]
           : [prose('Lo hai superato '), ...dayRef('il', c.crossedOn), prose('; ')];
+    // «hai speso» stands for the booked part only; the rows still in the calendar are their
+    // own clause, so the total the overrun is measured on is printed beside them.
+    const spentClause: Narrative =
+      c.scheduled > 0
+        ? [
+            prose('hai speso '),
+            signed(euro(c.spentToDate), 'negative'),
+            prose(' e hai altri '),
+            figure(euro(c.scheduled)),
+            prose(' in calendario ('),
+            figure(euro(c.spent)),
+            prose(' su '),
+            figure(euro(c.ceiling)),
+            prose(')'),
+          ]
+        : [prose('hai speso '), signed(euro(c.spent), 'negative'), prose(' su '), figure(euro(c.ceiling))];
     const sentence: Narrative = [
       ...opening,
       ...daysLeftClause(calendar, opening.length > 0),
-      prose(ahead ? 'hai impegnato ' : 'hai speso '),
-      signed(euro(c.spent), 'negative'),
-      prose(' su '),
-      figure(euro(c.ceiling)),
+      ...spentClause,
       prose(', '),
       signed(euro(c.overBy), 'negative'),
       prose(' oltre'),
@@ -131,16 +150,34 @@ function ceilingVerdict(c: CeilingSummary, now: Date): PageVerdictModel {
     };
   }
 
-  const used: Narrative = [
-    ...daysLeftClause(calendar),
-    prose('hai usato '),
-    ...percentWithArticle(c.usedPct),
-    prose(' del tetto ('),
-    figure(euro(c.spent)),
-    prose(' su '),
-    figure(euro(c.ceiling)),
-    prose(')'),
-  ];
+  // Both sides always named when there is a calendar: what is spent, what is still to come,
+  // and the total against the ceiling — so «il 65% del tetto» never passes for spending.
+  const used: Narrative =
+    c.scheduled > 0
+      ? [
+          ...daysLeftClause(calendar),
+          prose('hai speso '),
+          figure(euro(c.spentToDate)),
+          prose(' e hai altri '),
+          figure(euro(c.scheduled)),
+          prose(' già in calendario ('),
+          figure(euro(c.spent)),
+          prose(' su '),
+          figure(euro(c.ceiling)),
+          prose(', '),
+          ...percentWithArticle(c.usedPct),
+          prose(' del tetto)'),
+        ]
+      : [
+          ...daysLeftClause(calendar),
+          prose('hai speso '),
+          ...percentWithArticle(c.usedPct),
+          prose(' del tetto ('),
+          figure(euro(c.spent)),
+          prose(' su '),
+          figure(euro(c.ceiling)),
+          prose(')'),
+        ];
 
   if (c.projection === null) {
     return {
@@ -255,7 +292,11 @@ export function buildBudgetVerdict(input: BudgetVerdictInput): PageVerdictModel 
 
 // ─── Tetto del mese ───────────────────────────────────────────────────────────
 
-/** "Hai usato il 73% del tetto al 71% del mese: 2 punti avanti rispetto al calendario." */
+/**
+ * "Hai speso il 73% del tetto al 71% del mese: 2 punti avanti rispetto al calendario." — the
+ * BOOKED share against the calendar; with rows still to come, «con le spese in calendario sei
+ * al 65%» closes the sentence, so the two figures the hero prints are both read.
+ */
 export function describeCeiling(c: CeilingSummary): Narrative {
   if (c.exceeded) {
     const over: Narrative = [signed(euro(c.overBy), 'negative'), prose(' oltre.')];
@@ -267,11 +308,23 @@ export function describeCeiling(c: CeilingSummary): Narrative {
     return [prose('Hai superato il tetto '), ...when, prose(', '), ...percentWithAt(crossingPct), prose(' del mese: '), ...over];
   }
   // Judged on the printed figures: 72,75% and 70,97% read as 73 and 71, so the gap is 2.
-  const gap = Math.round(c.usedPct) - Math.round(c.calendarPct);
-  const head: Narrative = [prose('Hai usato '), ...percentWithArticle(c.usedPct), prose(' del tetto '), ...percentWithAt(c.calendarPct), prose(' del mese: ')];
-  if (gap === 0) return [...head, prose('in linea con il calendario.')];
+  const gap = Math.round(c.spentToDatePct) - Math.round(c.calendarPct);
+  const head: Narrative = [prose('Hai speso '), ...percentWithArticle(c.spentToDatePct), prose(' del tetto '), ...percentWithAt(c.calendarPct), prose(' del mese: ')];
   const points = Math.abs(gap);
-  return [...head, count(points), prose(` ${pluralize(points, 'punto', 'punti')} ${gap > 0 ? 'avanti' : 'indietro'} rispetto al calendario.`)];
+  const comparison: Narrative =
+    gap === 0
+      ? [prose('in linea con il calendario')]
+      : [count(points), prose(` ${pluralize(points, 'punto', 'punti')} ${gap > 0 ? 'avanti' : 'indietro'} rispetto al calendario`)];
+  if (c.scheduled <= 0) return [...head, ...comparison, prose('.')];
+  return [...head, ...comparison, prose('; con le spese in calendario sei '), ...percentWithAt(c.usedPct), prose('.')];
+}
+
+/** The caption of the «Restano» KPI: the days, and that the calendar is already taken out of the figure. */
+export function describeRemainingCaption(c: CeilingSummary): Narrative {
+  const { daysLeft } = c.calendar;
+  if (daysLeft === 0) return [prose('ultimo giorno')];
+  const days: Narrative = [prose('per '), count(daysLeft), prose(` ${pluralize(daysLeft, 'giorno', 'giorni')}`)];
+  return c.scheduled > 0 ? [...days, prose(', tolte le spese in calendario')] : days;
 }
 
 /** The caption of the «Al giorno» KPI: the allowance while under, the real pace against the ceiling's once over. */
@@ -323,10 +376,14 @@ export function describeRisk(risk: BudgetRiskSummary): Narrative {
   ];
 }
 
-/** The tile's footer: horizon and scope, stated because neither is guessable from the rows. */
-export const RISK_FOOTER: Narrative = [
-  prose('Proiezione al ritmo attuale, solo sulle categorie con un budget mensile; le categorie fisse contano le rate in calendario, non il ritmo.'),
-];
+/** The tile's aside: the horizon, because the rows are projections and not money spent. */
+export const RISK_ASIDE: Narrative = [prose('a fine mese')];
+
+/**
+ * The tile's footer: the scope, stated because it is not guessable from the rows. The fixed
+ * rule is told once per page, in Per categoria — the tile that shows the «fissa» chip.
+ */
+export const RISK_FOOTER: Narrative = [prose('Proiezione al ritmo attuale, solo sulle categorie con un budget mensile.')];
 
 // ─── Avvisi ───────────────────────────────────────────────────────────────────
 
@@ -363,15 +420,30 @@ export function describeAlertsFooter(enabled: boolean, forecastOnlyCount: number
   return [prose("Gli stessi avvisi arrivano nell'email mensile.")];
 }
 
-/** "soglie 90 · 100" or "disattivati". */
+/** "soglie di quota 90 · 100" or "disattivati" — of QUOTA, because they are not thresholds of pace. */
 export function describeAlertsAside(thresholds: number[], enabled: boolean): Narrative {
   if (!enabled) return [prose('disattivati')];
-  const out: Narrative = [prose('soglie ')];
+  const out: Narrative = [prose('soglie di quota ')];
   [...thresholds].sort((a, b) => a - b).forEach((t, i) => {
     if (i > 0) out.push(prose(' · '));
     out.push(count(t));
   });
   return out;
+}
+
+/**
+ * The second line of an alert row — the crossed threshold read against the calendar of the
+ * row's OWN window: «soglia 50% · mese al 47%», «soglia 50% · anno al 70%». An exceeded row
+ * says when instead: the day for a monthly budget, «da gennaio» for an annual one, because
+ * «soglia 100%» under «Superato» said the same thing twice and named no window.
+ */
+export function describeAlertRowCaption(alert: BudgetAlert): Narrative {
+  const window = alert.period === 'annual' ? 'anno' : 'mese';
+  if (alert.level === 'exceeded') {
+    if (alert.period === 'annual') return [prose('da gennaio')];
+    return alert.crossedOn === null ? [prose('questo mese')] : dayRef('il', alert.crossedOn);
+  }
+  return [prose('soglia '), figure(`${alert.threshold}%`), prose(` · ${window} `), ...percentWithAt(alert.calendarPct)];
 }
 
 // ─── Budget annuali ───────────────────────────────────────────────────────────
@@ -455,8 +527,59 @@ export function describeBudgetCounts(expenseCount: number, incomeCount: number, 
 }
 
 export const CATEGORY_FOOTER: Narrative = [
-  prose('Il tetto è su tutte le spese del mese; «assegnato» somma solo i budget mensili di spesa per categoria — annuali, entrate e sottocategorie restano fuori. Il segno │ è oggi sul mese. Una categoria fissa non segue il ritmo: «Fine mese» conta solo le rate in calendario.'),
+  prose('Il tetto è su tutte le spese del mese; «assegnato» somma solo i budget mensili di spesa per categoria — annuali, entrate e sottocategorie restano fuori. Una categoria è «fissa» per il tipo della sua categoria (Spese Fisse o Debiti) e non segue il ritmo: «Fine mese» conta solo le rate in calendario.'),
 ];
+
+// ─── Nuovo budget / Modifica budget ───────────────────────────────────────────
+
+export interface BudgetItemDialogFacts {
+  kind: BudgetKind;
+  period: BudgetPeriod;
+  /** The locked label while editing; null on create. */
+  editingLabel: string | null;
+}
+
+/**
+ * The idle reading of the budget dialog — what the form wants, in the words the form shows,
+ * so the same line can turn into the refusal without changing register (dialog.md → The
+ * Status-Is-The-Reading Rule). An income target says what reaching it means, because its
+ * track has no calendar mark.
+ */
+export function describeBudgetItemCopy(facts: BudgetItemDialogFacts): ModalStatusCopy {
+  const horizon = facts.period === 'annual' ? "sull'anno" : 'sul mese';
+  const amountWord = facts.period === 'annual' ? 'annuale' : 'mensile';
+  let idle: Narrative;
+  if (facts.editingLabel) {
+    idle = [prose(`Cambia l'importo ${amountWord} di ${facts.editingLabel}; la categoria non si sposta.`)];
+  } else if (facts.kind === 'income') {
+    idle = [prose(`Scegli la categoria di entrata e l'importo atteso ${horizon}: un obiettivo si raggiunge, non si consuma.`)];
+  } else {
+    idle = [prose(`Scegli una categoria e il suo importo ${amountWord}: la traccia lo legge contro il giorno di oggi.`)];
+  }
+  return { idle, submitting: 'Salvataggio…' };
+}
+
+/** «L'importo supera i 2330 € disponibili sotto il tetto.» — the allocation rule, refused in the reading. */
+export function describeBudgetAmountRefusal(available: number): string {
+  return `L'importo supera i ${euro(Math.max(0, available))} disponibili sotto il tetto.`;
+}
+
+/** «Esiste già un budget per Abbonamenti.» */
+export function describeBudgetDuplicateRefusal(label: string): string {
+  return `Esiste già un budget per ${label}.`;
+}
+
+// ─── Elimina budget ───────────────────────────────────────────────────────────
+
+/**
+ * What the second press of an armed delete does, printed IN the row while it is armed
+ * (AGENTS.md → Accessibility): a budget is a limit, not money — the expenses stay.
+ */
+export function describeBudgetDeleteConsequence(kind: BudgetKind, label: string): string {
+  return kind === 'income'
+    ? `Eliminando, l'obiettivo di ${label} sparisce; le entrate restano.`
+    : `Eliminando, il budget di ${label} sparisce; le spese restano.`;
+}
 
 // ─── Impostazioni ─────────────────────────────────────────────────────────────
 

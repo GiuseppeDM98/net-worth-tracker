@@ -10,7 +10,8 @@ import {
 import { scrapeDividendsByIsin } from '@/lib/services/borsaItalianaScraperService';
 import { createExpenseFromDividend } from '@/lib/services/dividendIncomeService';
 import { DividendFormData } from '@/types/dividend';
-import { isDateOnOrAfter, toDate } from '@/lib/utils/dateHelpers';
+import { toDate } from '@/lib/utils/dateHelpers';
+import { isDividendEligible, resolveDividendFloor } from '@/lib/utils/dividendEligibility';
 import {
   assertCanAccessAccount,
   getApiAuthErrorResponse,
@@ -58,6 +59,8 @@ export async function POST(request: NextRequest) {
       lastPriceUpdate: assetData?.lastPriceUpdate?.toDate() || new Date(),
       createdAt: assetData?.createdAt?.toDate() || new Date(),
       updatedAt: assetData?.updatedAt?.toDate() || new Date(),
+      // The ledger's first real BUY, when there is one: the floor under a scraped dividend.
+      holdingStartDate: assetData?.holdingStartDate?.toDate(),
     } as Asset;
 
     // Verify asset belongs to user
@@ -91,16 +94,18 @@ export async function POST(request: NextRequest) {
 
     console.log(`Found ${scrapedDividends.length} dividends from Borsa Italiana`);
 
-    // Filter dividends: only import if ex-date >= asset.createdAt
-    // This ensures we only track dividends for assets owned before/on the ex-date
-    const relevantDividends = scrapedDividends.filter((div) =>
-      isDateOnOrAfter(div.exDate, asset.createdAt)
-    );
+    // Only the dividends the user could have received: ex-date on or after the asset's floor
+    // (holding start from the ledger, else the creation date — lib/utils/dividendEligibility.ts).
+    // What falls under it is COUNTED and returned with the floor, so the tab can say why a
+    // history-rich instrument produced nothing and how to recover (record the purchase with
+    // its real date); a silent filter read as «no dividends exist» until 2026-09-13.
+    const floor = resolveDividendFloor(asset);
+    const relevantDividends = scrapedDividends.filter((div) => isDividendEligible(div.exDate, asset));
 
     const filteredOut = scrapedDividends.length - relevantDividends.length;
     if (filteredOut > 0) {
       console.log(
-        `Filtered out ${filteredOut} dividends with ex-date before asset creation (${toDate(asset.createdAt).toLocaleDateString('it-IT')})`
+        `Filtered out ${filteredOut} dividends with ex-date before the asset's floor (${floor.source}: ${toDate(floor.date).toLocaleDateString('it-IT')})`
       );
     }
 
@@ -219,6 +224,8 @@ export async function POST(request: NextRequest) {
       message: `Successfully scraped and imported dividends for ${asset.ticker}`,
       scraped: scrapedDividends.length,
       filtered: filteredOut,
+      floorDate: toDate(floor.date).toISOString(),
+      floorSource: floor.source,
       created,
       skipped,
       createdIds,

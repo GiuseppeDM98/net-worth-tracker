@@ -33,7 +33,7 @@ import { articleForPercent, ofThePercent, pluralArticleFor } from '@/lib/utils/p
 import { getItalyDate, getItalyMonthYear } from '@/lib/utils/dateHelpers';
 import { MONTH_NAMES } from '@/lib/constants/months';
 import { MONTH_NAMES_SHORT } from '@/lib/utils/period';
-import { isYearToDate, resolveAnchorMonth } from '@/lib/utils/tracciamentoSummary';
+import { comparedDaysOfPreviousMonth, isYearToDate, resolveAnchorMonth, settleTotals } from '@/lib/utils/tracciamentoSummary';
 
 /** A month saving this share of its income or more is going well (the Panoramica's bar). */
 export const GOOD_SAVINGS_RATE = 20;
@@ -100,6 +100,9 @@ export interface PeriodSubject {
 
 export function describePeriodSubject(period: Period, now: Date): PeriodSubject {
   const today = getItalyMonthYear(now);
+  // A period that has not ENDED is ongoing — the current unit and every future one alike: a
+  // month of instalments dated next year is not «andato», it has not happened (2026-09-14; the
+  // picker offers 2043 because a plan reaches it, and the verdict said «nel 2043 hai speso»).
   if (period.kind === 'month') {
     const sameYear = period.year === today.year;
     const yearSuffix = sameYear ? '' : ` ${period.year}`;
@@ -107,11 +110,11 @@ export function describePeriodSubject(period: Period, now: Date): PeriodSubject 
     return {
       subject: `${MONTH_NAMES[period.month - 1]}${yearSuffix}`,
       inPeriod: `${withPrepositionA(name)}${yearSuffix}`,
-      ongoing: sameYear && period.month === today.month,
+      ongoing: period.year > today.year || (sameYear && period.month >= today.month),
     };
   }
   if (period.kind === 'year') {
-    return { subject: `Il ${period.year}`, inPeriod: `nel ${period.year}`, ongoing: period.year === today.year };
+    return { subject: `Il ${period.year}`, inPeriod: `nel ${period.year}`, ongoing: period.year >= today.year };
   }
   // «Il 2026 finora» — never the bare year, which names the whole twelve months.
   if (period.kind === 'ytd') {
@@ -132,21 +135,42 @@ function previousMonthIndex(month: number): number {
 
 /**
  * "su luglio", "sul 2025", "su gen–ago 2025" (a year still running is compared with the same
- * months of the previous year) — how the previous period is named; null for a custom range.
+ * months of the previous year), "sui primi 14 giorni di agosto" (the month in progress is
+ * compared with the same days of the previous month, `previousComparisonWindow`) — how the
+ * previous period is named; null for a custom range and for a month not yet begun.
  */
 export function describeComparisonPhrase(period: Period, now: Date): string | null {
-  if (period.kind === 'month') return `su ${monthInSentence(previousMonthIndex(period.month))}`;
+  if (period.kind === 'month') {
+    const previous = monthInSentence(previousMonthIndex(period.month));
+    const days = comparedDaysOfPreviousMonth(period, now);
+    if (days === null) return isFutureMonth(period, now) ? null : `su ${previous}`;
+    return days === 1 ? `sul primo giorno di ${previous}` : `sui primi ${days} giorni di ${previous}`;
+  }
   if (period.kind === 'ytd') return `su ${sameMonthsLastYear(period, now)}`;
   if (period.kind === 'year') return isYearToDate(period, now) ? `su ${sameMonthsLastYear(period, now)}` : `sul ${period.year - 1}`;
   return null;
 }
 
-/** "luglio", "2025", "gen–ago 2025" — the previous period as the caption of a delta ("vs luglio"); null for a custom range. */
+/**
+ * "luglio", "2025", "gen–ago 2025", "1–14 ago" — the previous period as the caption of a delta
+ * ("vs luglio"); null for a custom range and for a month not yet begun.
+ */
 export function describePreviousPeriodLabel(period: Period, now: Date): string | null {
-  if (period.kind === 'month') return monthInSentence(previousMonthIndex(period.month));
+  if (period.kind === 'month') {
+    const days = comparedDaysOfPreviousMonth(period, now);
+    if (days === null) return isFutureMonth(period, now) ? null : monthInSentence(previousMonthIndex(period.month));
+    const short = MONTH_NAMES_SHORT[previousMonthIndex(period.month) - 1].toLowerCase();
+    return days === 1 ? `1 ${short}` : `1–${days} ${short}`;
+  }
   if (period.kind === 'ytd') return sameMonthsLastYear(period, now);
   if (period.kind === 'year') return isYearToDate(period, now) ? sameMonthsLastYear(period, now) : String(period.year - 1);
   return null;
+}
+
+/** A month that starts after today's — nothing lived on its side of a comparison yet. */
+function isFutureMonth(period: Extract<Period, { kind: 'month' }>, now: Date): boolean {
+  const today = getItalyMonthYear(now);
+  return period.year > today.year || (period.year === today.year && period.month > today.month);
 }
 
 /** "A luglio", "Ad agosto" — the row label of last month's figure beside a projection; months only. */
@@ -245,9 +269,10 @@ function resolveTone(savingsRate: number | null, expenses: number): VerdictTone 
   return savingsRate >= GOOD_SAVINGS_RATE ? 'positive' : 'neutral';
 }
 
-function resolveHeadline(subject: PeriodSubject, totals: PeriodCashflowTotals): string {
+function resolveHeadline(subject: PeriodSubject, totals: PeriodCashflowTotals, settled = false): string {
   const { savingsRate, income, expenses } = totals;
-  if (income <= 0 && expenses <= 0) return `Nessuna entrata né spesa ${subject.inPeriod}.`;
+  // Judging the lived part with a calendar still ahead: an empty lived part is «not yet», not «none».
+  if (income <= 0 && expenses <= 0) return settled ? `Nessun movimento ancora ${subject.inPeriod}.` : `Nessuna entrata né spesa ${subject.inPeriod}.`;
   if (savingsRate === null) return `${capitalise(subject.inPeriod)} hai speso senza entrate.`;
   if (savingsRate < 0) return `${capitalise(subject.inPeriod)} hai speso più di quanto è entrato.`;
   if (savingsRate >= GOOD_SAVINGS_RATE) return `${subject.subject} ${subject.ongoing ? 'sta andando' : 'è andato'} bene.`;
@@ -268,26 +293,12 @@ function expensesDeltaClause(delta: PeriodDelta | null, comparison: string | nul
 }
 
 /**
- * The headline + the sentence under it. The sentence opens with the savings (or the
- * deficit), then the two totals, then the spending delta — each clause present only when
- * its input is: no income → no rate, no previous period → no comparison.
+ * The first sentence: the savings (or the deficit), then the two totals, then the spending
+ * delta — each clause present only when its input is: no income → no rate, no previous period →
+ * no comparison. `opening` is the period as the sentence's subject («Ad agosto», «Nel 2026
+ * finora»); the tense follows `subject.ongoing`.
  */
-export function buildCashflowVerdict(input: CashflowVerdictInput): PageVerdictModel {
-  const subject = describePeriodSubject(input.period, input.now);
-  const { totals } = input;
-  const headline = resolveHeadline(subject, totals);
-  const tone = resolveTone(totals.savingsRate, totals.expenses);
-
-  if (totals.income <= 0 && totals.expenses <= 0) {
-    // A transfer is a movement, not a flow: the inventory counts it, the verdict must not deny it.
-    const sentence =
-      totals.transferCount > 0
-        ? [prose(`Solo ${totals.transferCount} ${pluralize(totals.transferCount, 'trasferimento', 'trasferimenti')} tra i tuoi conti.`)]
-        : [prose('Nessun movimento registrato.')];
-    return { headline, tone, sentence: [...sentence, ...(scheduledSentence(input.scheduled, describeScheduledHorizon(input.period, input.now)) ?? [])] };
-  }
-
-  const opening = capitalise(subject.inPeriod);
+function figuresSentence(opening: string, subject: PeriodSubject, totals: PeriodCashflowTotals, delta: PeriodDelta | null, comparison: string | null): Narrative {
   const sentence: Narrative = [];
   if (totals.savingsRate === null) {
     sentence.push(prose(`${opening} nessuna entrata: spese `), figure(euro(totals.expenses)));
@@ -308,10 +319,102 @@ export function buildCashflowVerdict(input: CashflowVerdictInput): PageVerdictMo
     }
     sentence.push(prose(': entrate '), figure(euro(totals.income)), prose(', spese '), figure(euro(totals.expenses)));
   }
-  sentence.push(...expensesDeltaClause(input.delta, describeComparisonPhrase(input.period, input.now)), prose('.'));
-  sentence.push(...(scheduledSentence(input.scheduled, describeScheduledHorizon(input.period, input.now)) ?? []));
+  sentence.push(...expensesDeltaClause(delta, comparison), prose('.'));
+  return sentence;
+}
 
-  return { headline, tone, sentence };
+/** «il mese», «l'anno», «il periodo» — what «chiude» in the calendar sentence. */
+function closingSubject(period: Period): string {
+  if (period.kind === 'month') return 'il mese';
+  if (period.kind === 'year') return "l'anno";
+  return 'il periodo';
+}
+
+/**
+ * "Con 1297 € di spese e 2456 € di entrate già in calendario da qui a fine mese, il mese chiude
+ * a +805 € (il 29%)." — the second sentence of a verdict whose period reaches past today: where
+ * the calendar takes the figures the first sentence has just judged.
+ *
+ * Both sides are ALWAYS named, an empty one as «nessuna entrata attesa» / «nessuna spesa
+ * attesa»: the two are materialised differently (an instalment plan writes its future rows, a
+ * salary is not recurring — `canTypeRecur`), so a running year holds three months of instalments
+ * and no income, and a sentence naming only the side that exists would let the 4% it produces
+ * pass for a measure. The outcome is the PERIOD's total, the figure the tiles print, so the two
+ * sentences meet on the same number.
+ */
+function calendarSentence(period: Period, now: Date, totals: PeriodCashflowTotals, scheduled: ScheduledSlice): Narrative {
+  const horizon = describeScheduledHorizon(period, now);
+  const sides: Narrative[] = [];
+  if (scheduled.expenses > 0) sides.push([figure(euro(scheduled.expenses)), prose(' di spese')]);
+  if (scheduled.income > 0) sides.push([figure(euro(scheduled.income)), prose(' di entrate')]);
+  const missing = scheduled.expenses > 0 && scheduled.income <= 0 ? 'nessuna entrata attesa' : scheduled.income > 0 && scheduled.expenses <= 0 ? 'nessuna spesa attesa' : null;
+
+  const sentence: Narrative = [prose(' Con ')];
+  sides.forEach((side, index) => {
+    if (index > 0) sentence.push(prose(' e '));
+    sentence.push(...side);
+  });
+  sentence.push(prose(' già in calendario'));
+  if (horizon) sentence.push(prose(` da qui ${horizon}`));
+  if (missing) sentence.push(prose(` e ${missing}`));
+  sentence.push(prose(`, ${closingSubject(period)} chiude `));
+
+  if (totals.income <= 0) {
+    sentence.push(prose('con '), figure(euro(totals.expenses)), prose(' di spese e nessuna entrata.'));
+  } else if (totals.net < 0) {
+    sentence.push(prose('a '), signed(`−${euro(totals.net)}`, 'negative'), prose('.'));
+  } else {
+    sentence.push(prose('a '), signed(`+${euro(totals.net)}`, 'positive'));
+    if (totals.savingsRate !== null) sentence.push(prose(' ('), ...percentWithArticle(totals.savingsRate), prose(')'));
+    sentence.push(prose('.'));
+  }
+  return sentence;
+}
+
+/**
+ * The headline + the sentence under it.
+ *
+ * With nothing in the calendar, the period's totals ARE what happened: one sentence, headline
+ * and tone from the totals. With something still ahead — the month in progress, a running year,
+ * a period not yet begun — the totals include a forecast (the owner's decision, declared on the
+ * page), and the verdict judges what has HAPPENED (`settleTotals`): headline, tone and the first
+ * sentence come from the lived part («A settembre finora …»), and a second sentence says where
+ * the calendar takes it. Until 2026-09-14 the tone came from the whole span, so on the 14th a
+ * salary dated the 15th made the month «andare bene».
+ */
+export function buildCashflowVerdict(input: CashflowVerdictInput): PageVerdictModel {
+  const subject = describePeriodSubject(input.period, input.now);
+  const { totals, scheduled } = input;
+  const comparison = describeComparisonPhrase(input.period, input.now);
+  const hasCalendar = scheduled.expenses > 0 || scheduled.income > 0;
+
+  if (!hasCalendar) {
+    const headline = resolveHeadline(subject, totals);
+    const tone = resolveTone(totals.savingsRate, totals.expenses);
+    if (totals.income <= 0 && totals.expenses <= 0) {
+      // A transfer is a movement, not a flow: the inventory counts it, the verdict must not deny it.
+      const sentence =
+        totals.transferCount > 0
+          ? [prose(`Solo ${totals.transferCount} ${pluralize(totals.transferCount, 'trasferimento', 'trasferimenti')} tra i tuoi conti.`)]
+          : [prose('Nessun movimento registrato.')];
+      return { headline, tone, sentence };
+    }
+    return { headline, tone, sentence: figuresSentence(capitalise(subject.inPeriod), subject, totals, input.delta, comparison) };
+  }
+
+  const settled = settleTotals(totals, scheduled);
+  const headline = resolveHeadline(subject, settled, true);
+  const tone = resolveTone(settled.savingsRate, settled.expenses);
+  const calendar = calendarSentence(input.period, input.now, totals, scheduled);
+
+  if (settled.income <= 0 && settled.expenses <= 0) {
+    // Nothing lived yet: the calendar sentence stands alone (its leading space trimmed).
+    return { headline, tone, sentence: [{ ...calendar[0], text: calendar[0].text.trimStart() }, ...calendar.slice(1)] };
+  }
+
+  // «finora» marks the lived part; the ytd subject already says it.
+  const opening = `${capitalise(subject.inPeriod)}${input.period.kind === 'ytd' ? '' : ' finora'}`;
+  return { headline, tone, sentence: [...figuresSentence(opening, subject, settled, input.delta, comparison), ...calendar] };
 }
 
 // ─── Tile readings ────────────────────────────────────────────────────────────

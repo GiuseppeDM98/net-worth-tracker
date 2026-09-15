@@ -28,6 +28,7 @@ import {
   describeAlerts,
   describeAlertsAside,
   describeAlertsFooter,
+  describeAlertRowCaption,
   describeAllocation,
   describeAnnualAside,
   describeAnnualBudgets,
@@ -35,10 +36,15 @@ import {
   describeCeiling,
   describeCeilingAside,
   describeCeilingSetting,
+  describeBudgetAmountRefusal,
+  describeBudgetDeleteConsequence,
+  describeBudgetDuplicateRefusal,
+  describeBudgetItemCopy,
   describeDailyCaption,
   describeHistory,
   describeOverCaption,
   describeProjectionCaption,
+  describeRemainingCaption,
   describeIncomeTargets,
   describeRisk,
   dayRef,
@@ -55,6 +61,7 @@ function ceiling(overrides: Partial<CeilingSummary> = {}): CeilingSummary {
     spentToDate: 2910,
     scheduled: 0,
     usedPct: 72.75,
+    spentToDatePct: 72.75,
     calendarPct: (22 / 31) * 100,
     calendar: { dayOfMonth: 22, daysInMonth: 31, daysLeft: 9, canForecast: true },
     projection: 4100.45,
@@ -89,7 +96,7 @@ describe('buildBudgetVerdict', () => {
     expect(v.headline).toBe('Agosto rischia di sforare il tetto.');
     expect(v.tone).toBe('warning');
     expect(plain(v.sentence)).toBe(
-      'A 9 giorni dalla fine del mese hai usato il 73% del tetto (2910 € su 4000 €): al ritmo attuale chiudi a 4100 €, 100 € oltre.',
+      'A 9 giorni dalla fine del mese hai speso il 73% del tetto (2910 € su 4000 €): al ritmo attuale chiudi a 4100 €, 100 € oltre.',
     );
   });
 
@@ -98,7 +105,7 @@ describe('buildBudgetVerdict', () => {
     expect(v.headline).toBe('Il budget di agosto tiene.');
     expect(v.tone).toBe('positive');
     expect(plain(v.sentence)).toBe(
-      'A 9 giorni dalla fine del mese hai usato il 62% del tetto (2480 € su 4000 €): al ritmo attuale chiudi a 3495 €, 505 € sotto.',
+      'A 9 giorni dalla fine del mese hai speso il 62% del tetto (2480 € su 4000 €): al ritmo attuale chiudi a 3495 €, 505 € sotto.',
     );
   });
 
@@ -120,14 +127,14 @@ describe('buildBudgetVerdict', () => {
     expect(v.headline).toBe('Ad agosto supererai il tetto.');
     expect(v.tone).toBe('negative');
     expect(plain(v.sentence)).toBe(
-      'Lo superi il 28 con le spese già in calendario; a 9 giorni dalla fine del mese hai impegnato 4110 € su 4000 €, 110 € oltre.',
+      'Lo superi il 28 con le spese già in calendario; a 9 giorni dalla fine del mese hai speso 2910 € e hai altri 1200 € in calendario (4110 € su 4000 €), 110 € oltre.',
     );
   });
 
   it('a warning names the day the pace crosses the ceiling', () => {
     const v = buildBudgetVerdict({ ceiling: ceiling({ projectedCrossingDay: 29 }), risk: risk(), hasItems: true, now: NOW });
     expect(plain(v.sentence)).toBe(
-      'A 9 giorni dalla fine del mese hai usato il 73% del tetto (2910 € su 4000 €): al ritmo attuale chiudi a 4100 €, 100 € oltre, superando il tetto il 29.',
+      'A 9 giorni dalla fine del mese hai speso il 73% del tetto (2910 € su 4000 €): al ritmo attuale chiudi a 4100 €, 100 € oltre, superando il tetto il 29.',
     );
   });
 
@@ -137,7 +144,7 @@ describe('buildBudgetVerdict', () => {
     expect(v.headline).toBe('Agosto è appena iniziato.');
     expect(v.tone).toBe('neutral');
     expect(plain(v.sentence)).toBe(
-      'A 29 giorni dalla fine del mese hai usato il 5% del tetto (210 € su 4000 €); una proiezione arriva dal quarto giorno.',
+      'A 29 giorni dalla fine del mese hai speso il 5% del tetto (210 € su 4000 €); una proiezione arriva dal quarto giorno.',
     );
   });
 
@@ -145,7 +152,7 @@ describe('buildBudgetVerdict', () => {
     const last = ceiling({ spent: 3900, spentToDate: 3900, usedPct: 97.5, projection: 3900, remaining: 100, dailyAllowance: null, calendar: { dayOfMonth: 31, daysInMonth: 31, daysLeft: 0, canForecast: true }, calendarPct: 100 });
     const v = buildBudgetVerdict({ ceiling: last, risk: risk({ atRisk: [] }), hasItems: true, now: new Date(2026, 7, 31, 12) });
     expect(v.headline).toBe('Il budget di agosto tiene.');
-    expect(plain(v.sentence)).toBe("All'ultimo giorno del mese hai usato il 98% del tetto (3900 € su 4000 €): 100 € sotto.");
+    expect(plain(v.sentence)).toBe("All'ultimo giorno del mese hai speso il 98% del tetto (3900 € su 4000 €): 100 € sotto.");
   });
 
   it('a projection that prints as the ceiling is neither over nor under', () => {
@@ -204,15 +211,15 @@ describe('buildBudgetVerdict', () => {
 
 describe('describeCeiling', () => {
   it('reads the spent share against the calendar share, in points', () => {
-    expect(plain(describeCeiling(ceiling()))).toBe('Hai usato il 73% del tetto al 71% del mese: 2 punti avanti rispetto al calendario.');
-    expect(plain(describeCeiling(ceiling({ usedPct: 68 })))).toBe('Hai usato il 68% del tetto al 71% del mese: 3 punti indietro rispetto al calendario.');
-    expect(plain(describeCeiling(ceiling({ usedPct: 70.6 })))).toBe('Hai usato il 71% del tetto al 71% del mese: in linea con il calendario.');
-    expect(plain(describeCeiling(ceiling({ usedPct: 72 })))).toBe('Hai usato il 72% del tetto al 71% del mese: 1 punto avanti rispetto al calendario.');
+    expect(plain(describeCeiling(ceiling()))).toBe('Hai speso il 73% del tetto al 71% del mese: 2 punti avanti rispetto al calendario.');
+    expect(plain(describeCeiling(ceiling({ spentToDatePct: 68 })))).toBe('Hai speso il 68% del tetto al 71% del mese: 3 punti indietro rispetto al calendario.');
+    expect(plain(describeCeiling(ceiling({ spentToDatePct: 70.6 })))).toBe('Hai speso il 71% del tetto al 71% del mese: in linea con il calendario.');
+    expect(plain(describeCeiling(ceiling({ spentToDatePct: 72 })))).toBe('Hai speso il 72% del tetto al 71% del mese: 1 punto avanti rispetto al calendario.');
   });
 
   it('uses the article the printed figure takes', () => {
-    expect(plain(describeCeiling(ceiling({ usedPct: 8, calendarPct: 8 })))).toBe("Hai usato l'8% del tetto all'8% del mese: in linea con il calendario.");
-    expect(plain(describeCeiling(ceiling({ usedPct: 0.2, calendarPct: 3 })))).toBe('Hai usato lo 0% del tetto al 3% del mese: 3 punti indietro rispetto al calendario.');
+    expect(plain(describeCeiling(ceiling({ spentToDatePct: 8, calendarPct: 8 })))).toBe("Hai speso l'8% del tetto all'8% del mese: in linea con il calendario.");
+    expect(plain(describeCeiling(ceiling({ spentToDatePct: 0.2, calendarPct: 3 })))).toBe('Hai speso lo 0% del tetto al 3% del mese: 3 punti indietro rispetto al calendario.');
   });
 
   it('states an exceeded ceiling by the day it happened and the amount over', () => {
@@ -256,6 +263,9 @@ describe('describeAlerts', () => {
     key: 'k',
     label: 'Casa',
     level: 'warning',
+    period: 'monthly',
+    calendarPct: (22 / 31) * 100,
+    aheadOfCalendar: true,
     threshold: 90,
     thresholdCrossed: true,
     spent: 1150,
@@ -285,7 +295,7 @@ describe('describeAlerts', () => {
     expect(plain(describeAlertsFooter(true, 3))).toBe('Gli sforamenti previsti (3) stanno in Categorie a rischio. Gli stessi avvisi arrivano nell\'email mensile.');
     expect(plain(describeAlertsFooter(true, 0))).toBe("Gli stessi avvisi arrivano nell'email mensile.");
     expect(plain(describeAlertsFooter(false, 3))).toBe("Riattivali nelle impostazioni per vedere qui le soglie superate e riceverle nell'email mensile.");
-    expect(plain(describeAlertsAside([90, 100], true))).toBe('soglie 90 · 100');
+    expect(plain(describeAlertsAside([90, 100], true))).toBe('soglie di quota 90 · 100');
     expect(plain(describeAlertsAside([90, 100], false))).toBe('disattivati');
   });
 });
@@ -362,5 +372,104 @@ describe('dayRef', () => {
     expect(text(dayRef('il', 1))).toBe('il 1°');
     expect(text(dayRef('dal', 8))).toBe("dall'8");
     expect(text(dayRef('dal', 21))).toBe('dal 21');
+  });
+});
+
+describe('speso and in calendario are two figures (The Scheduled-Is-Not-Spent Rule, 2026-09-14)', () => {
+  // The owner's September on the 14th: 656 € booked, 1297 € still dated after today.
+  const september = ceiling({
+    ceiling: 3000,
+    spent: 1953,
+    spentToDate: 656,
+    scheduled: 1297,
+    usedPct: 65.1,
+    spentToDatePct: 21.87,
+    calendarPct: (14 / 30) * 100,
+    calendar: { dayOfMonth: 14, daysInMonth: 30, daysLeft: 16, canForecast: true },
+    projection: 2703,
+    remaining: 1047,
+    dailyAllowance: 1047 / 16,
+    dailyPace: 656 / 14,
+    sustainablePace: 100,
+  });
+  const SEPT = new Date(2026, 8, 14, 12);
+
+  it('the verdict names both sides and the total they make against the ceiling', () => {
+    const v = buildBudgetVerdict({ ceiling: september, risk: risk({ atRisk: [] }), hasItems: true, now: SEPT });
+    expect(v.headline).toBe('Il budget di settembre tiene.');
+    expect(plain(v.sentence)).toBe(
+      'A 16 giorni dalla fine del mese hai speso 656 € e hai altri 1297 € già in calendario (1953 € su 3000 €, il 65% del tetto): al ritmo attuale chiudi a 2703 €, 297 € sotto.',
+    );
+  });
+
+  it('an exceeded ceiling keeps the two sides apart too', () => {
+    const over = { ...september, spent: 3153, scheduled: 2497, usedPct: 105.1, exceeded: true, overBy: 153, crossedOn: 12, projection: 3903 };
+    const v = buildBudgetVerdict({ ceiling: over, risk: risk(), hasItems: true, now: SEPT });
+    expect(plain(v.sentence)).toBe(
+      'Lo hai superato il 12; a 16 giorni dalla fine del mese hai speso 656 € e hai altri 2497 € in calendario (3153 € su 3000 €), 153 € oltre, e al ritmo attuale chiudi a 3903 €.',
+    );
+  });
+
+  it('the reading compares the BOOKED share with the calendar, then says where the calendar takes it', () => {
+    expect(plain(describeCeiling(september))).toBe('Hai speso il 22% del tetto al 47% del mese: 25 punti indietro rispetto al calendario; con le spese in calendario sei al 65%.');
+    expect(plain(describeCeiling({ ...september, spentToDatePct: 47, usedPct: 60 }))).toBe('Hai speso il 47% del tetto al 47% del mese: in linea con il calendario; con le spese in calendario sei al 60%.');
+  });
+
+  it('«Restano» says the calendar is already taken out', () => {
+    expect(plain(describeRemainingCaption(september))).toBe('per 16 giorni, tolte le spese in calendario');
+    expect(plain(describeRemainingCaption(ceiling()))).toBe('per 9 giorni');
+    expect(plain(describeRemainingCaption(ceiling({ calendar: { dayOfMonth: 30, daysInMonth: 31, daysLeft: 1, canForecast: true } })))).toBe('per 1 giorno');
+    expect(plain(describeRemainingCaption(ceiling({ calendar: { dayOfMonth: 31, daysInMonth: 31, daysLeft: 0, canForecast: true } })))).toBe('ultimo giorno');
+  });
+});
+
+describe('describeAlertRowCaption — a threshold read against the calendar of its own window', () => {
+  const base: BudgetAlert = {
+    key: 'k',
+    label: 'Tecnologia',
+    level: 'warning',
+    period: 'annual',
+    threshold: 50,
+    thresholdCrossed: true,
+    spent: 643,
+    budgetAmount: 1200,
+    usedRatio: 0.536,
+    calendarPct: 70.4,
+    aheadOfCalendar: false,
+    forecastedOverrun: false,
+    crossedOn: null,
+  };
+
+  it('names the window and its share: «soglia 50% · anno al 70%», «· mese al 47%»', () => {
+    expect(plain(describeAlertRowCaption(base))).toBe('soglia 50% · anno al 70%');
+    expect(plain(describeAlertRowCaption({ ...base, period: 'monthly', calendarPct: (14 / 30) * 100 }))).toBe('soglia 50% · mese al 47%');
+    expect(plain(describeAlertRowCaption({ ...base, period: 'monthly', calendarPct: 8 }))).toBe("soglia 50% · mese all'8%");
+  });
+
+  it('an exceeded row says when instead: the day for a month, «da gennaio» for a year', () => {
+    expect(plain(describeAlertRowCaption({ ...base, level: 'exceeded', period: 'monthly', crossedOn: 12 }))).toBe('il 12');
+    expect(plain(describeAlertRowCaption({ ...base, level: 'exceeded', period: 'monthly', crossedOn: null }))).toBe('questo mese');
+    expect(plain(describeAlertRowCaption({ ...base, level: 'exceeded', threshold: 100 }))).toBe('da gennaio');
+  });
+});
+
+describe('the budget dialog speaks through its reading line', () => {
+  it('idle: what the form wants, per kind, period and mode', () => {
+    expect(plain(describeBudgetItemCopy({ kind: 'expense', period: 'monthly', editingLabel: null }).idle)).toBe('Scegli una categoria e il suo importo mensile: la traccia lo legge contro il giorno di oggi.');
+    expect(plain(describeBudgetItemCopy({ kind: 'expense', period: 'annual', editingLabel: null }).idle)).toBe('Scegli una categoria e il suo importo annuale: la traccia lo legge contro il giorno di oggi.');
+    expect(plain(describeBudgetItemCopy({ kind: 'income', period: 'monthly', editingLabel: null }).idle)).toBe("Scegli la categoria di entrata e l'importo atteso sul mese: un obiettivo si raggiunge, non si consuma.");
+    expect(plain(describeBudgetItemCopy({ kind: 'expense', period: 'annual', editingLabel: 'Vacanze' }).idle)).toBe("Cambia l'importo annuale di Vacanze; la categoria non si sposta.");
+    expect(describeBudgetItemCopy({ kind: 'expense', period: 'monthly', editingLabel: null }).submitting).toBe('Salvataggio…');
+  });
+
+  it('refusals: the allocation rule and the duplicate, in Italian, with the figure', () => {
+    expect(describeBudgetAmountRefusal(2330)).toMatch(/^L'importo supera i 2330[\s\u00a0\u202f]€ disponibili sotto il tetto\.$/);
+    expect(describeBudgetAmountRefusal(-40)).toMatch(/^L'importo supera i 0[\s\u00a0\u202f]€ disponibili sotto il tetto\.$/);
+    expect(describeBudgetDuplicateRefusal('Abbonamenti')).toBe('Esiste già un budget per Abbonamenti.');
+  });
+
+  it('the armed delete prints what the second press does: the limit goes, the rows stay', () => {
+    expect(describeBudgetDeleteConsequence('expense', 'Cibo')).toBe('Eliminando, il budget di Cibo sparisce; le spese restano.');
+    expect(describeBudgetDeleteConsequence('income', 'Stipendio')).toBe("Eliminando, l'obiettivo di Stipendio sparisce; le entrate restano.");
   });
 });

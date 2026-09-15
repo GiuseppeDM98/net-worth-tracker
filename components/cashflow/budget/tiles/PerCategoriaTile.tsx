@@ -1,7 +1,7 @@
 'use client';
 
-import { useRef, useState, type ReactNode } from 'react';
-import { ChevronDown, Pencil, Trash2 } from 'lucide-react';
+import { useCallback, useState, type ReactNode } from 'react';
+import { ChevronDown, Pencil } from 'lucide-react';
 import type { Narrative } from '@/lib/utils/narrative';
 import type { BudgetItem } from '@/types/budget';
 import type { CategoryBudgetRow, CategoryBudgetRows } from '@/lib/utils/budgetSummary';
@@ -12,8 +12,9 @@ import { Button } from '@/components/ui/button';
 import { Tile, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { NarrativeText } from '@/components/ui/narrative-text';
 import { BudgetTrack } from '@/components/cashflow/budget/BudgetTrack';
+import { BudgetDeleteButton } from '@/components/cashflow/budget/BudgetDeleteButton';
 import { progressFillColor, progressTextClass } from '@/components/cashflow/budget/budgetProgressStyle';
-import { useArmedDelete } from '@/lib/hooks/useArmedDelete';
+import { describeBudgetDeleteConsequence } from '@/lib/utils/budgetNarrative';
 
 interface PerCategoriaTileProps {
   rows: CategoryBudgetRows;
@@ -30,12 +31,26 @@ interface PerCategoriaTileProps {
   className?: string;
 }
 
+/** What the row's delete button and the live region both need from the tile. */
+interface RowDeleteProps {
+  armed: boolean;
+  announce: (text: string) => void;
+  onArmedChange: (key: string, armed: boolean) => void;
+}
+
 function projectionCell(row: CategoryBudgetRow): { text: string; className: string } {
   if (row.projection === null) return { text: '—', className: 'text-muted-foreground' };
   const over = Math.round(row.projection) > row.budget;
   // A fixed category's figure is what is booked, not an estimate: no tilde.
   const text = row.pace === 'fixed' ? cachedFormatCurrencyEUR(row.projection, true) : `~${cachedFormatCurrencyEUR(row.projection, true)}`;
   return { text, className: over ? 'text-destructive' : 'text-muted-foreground' };
+}
+
+/** What a screen reader hears for the track: the used share, and «oltre» when it is past the budget. */
+function trackValueText(row: CategoryBudgetRow): string {
+  const share = formatPercentage(row.usedPct, 0);
+  if (row.kind === 'income') return row.spent >= row.budget ? `${share}, obiettivo raggiunto` : share;
+  return row.spent > row.budget ? `${share}, oltre di ${cachedFormatCurrencyEUR(row.spent - row.budget, true)}` : share;
 }
 
 // ─── Desktop: the table ───────────────────────────────────────────────────────
@@ -52,6 +67,9 @@ function TableRow({
   row,
   calendarPct,
   isDemo,
+  armed,
+  announce,
+  onArmedChange,
   onEdit,
   onDelete,
 }: {
@@ -60,12 +78,11 @@ function TableRow({
   isDemo: boolean;
   onEdit: (item: BudgetItem) => void;
   onDelete: (id: string) => void;
-}) {
+} & RowDeleteProps) {
   const inverted = row.kind === 'income';
   const ratio = row.budget > 0 ? row.spent / row.budget : 0;
   const projection = inverted ? null : projectionCell(row);
-  const deleteRef = useRef<HTMLButtonElement | null>(null);
-  const del = useArmedDelete(deleteRef, () => onDelete(row.item.id));
+  const setArmed = useCallback((value: boolean) => onArmedChange(row.key, value), [onArmedChange, row.key]);
 
   return (
     <tr className="border-t border-border">
@@ -76,11 +93,19 @@ function TableRow({
             <span className="shrink-0 rounded-md border border-border px-1.5 text-[10px] font-semibold leading-4 text-muted-foreground">fissa</span>
           )}
         </span>
+        {/* While the delete is armed the row says what the second press does (the 72px column cannot). */}
+        {armed && <span className="mt-0.5 block text-[11px] leading-[1.35] text-destructive">{describeBudgetDeleteConsequence(row.kind, row.label)}</span>}
       </th>
       <td className="py-2 pr-3 text-right font-mono text-[13px] tabular-nums text-foreground">{cachedFormatCurrencyEUR(row.budget, true)}</td>
       <td className="py-2 pr-3 text-right font-mono text-[13px] tabular-nums text-foreground">{cachedFormatCurrencyEUR(row.spent, true)}</td>
       <td className="min-w-[80px] py-2 pr-3">
-        <BudgetTrack ratio={ratio} calendarPct={inverted ? null : calendarPct} color={progressFillColor(ratio, inverted)} label={`Avanzamento ${row.label}`} />
+        <BudgetTrack
+          ratio={ratio}
+          calendarPct={inverted ? null : calendarPct}
+          color={progressFillColor(ratio, inverted)}
+          label={`Avanzamento ${row.label}`}
+          valueText={trackValueText(row)}
+        />
       </td>
       <td className={cn('py-2 pr-3 text-right font-mono text-[12px] tabular-nums', progressTextClass(ratio, inverted))}>
         {formatPercentage(row.usedPct, 0)}
@@ -90,28 +115,29 @@ function TableRow({
       </td>
       <td className="py-1">
         <div className="flex justify-end gap-0.5">
-          <Button
-            size="icon"
-            variant="ghost"
+          {/* The pencil gives its room to «Conferma» while the delete is armed: one action per armed row. */}
+          {!armed && (
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8"
+              disabled={isDemo}
+              aria-label={`Modifica budget ${row.label}`}
+              onClick={() => onEdit(row.item)}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+          )}
+          <BudgetDeleteButton
+            variant="icon"
             className="h-8 w-8"
+            label={row.label}
+            kind={row.kind}
             disabled={isDemo}
-            aria-label={`Modifica budget ${row.label}`}
-            onClick={() => onEdit(row.item)}
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            ref={deleteRef}
-            size="icon"
-            variant="ghost"
-            className={cn('h-8 w-8', del.armed && 'text-destructive')}
-            disabled={isDemo}
-            aria-label={del.armed ? `Conferma eliminazione budget ${row.label}` : `Elimina budget ${row.label}`}
-            onClick={del.onClick}
-            onBlur={del.onBlur}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
+            onDelete={() => onDelete(row.item.id)}
+            announce={announce}
+            onArmedChange={setArmed}
+          />
         </div>
       </td>
     </tr>
@@ -122,6 +148,9 @@ function BudgetTable({
   rows,
   calendarPct,
   isDemo,
+  armedKey,
+  announce,
+  onArmedChange,
   onEdit,
   onDelete,
   caption,
@@ -129,6 +158,9 @@ function BudgetTable({
   rows: CategoryBudgetRow[];
   calendarPct: number | null;
   isDemo: boolean;
+  armedKey: string | null;
+  announce: (text: string) => void;
+  onArmedChange: (key: string, armed: boolean) => void;
   onEdit: (item: BudgetItem) => void;
   onDelete: (id: string) => void;
   caption: string;
@@ -143,7 +175,7 @@ function BudgetTable({
         <col />
         <col className="w-[8%]" />
         <col className="w-[13%]" />
-        <col className="w-[72px]" />
+        <col className="w-[84px]" />
       </colgroup>
       <thead>
         <tr>
@@ -158,7 +190,17 @@ function BudgetTable({
       </thead>
       <tbody>
         {rows.map((row) => (
-          <TableRow key={row.key} row={row} calendarPct={calendarPct} isDemo={isDemo} onEdit={onEdit} onDelete={onDelete} />
+          <TableRow
+            key={row.key}
+            row={row}
+            calendarPct={calendarPct}
+            isDemo={isDemo}
+            armed={armedKey === row.key}
+            announce={announce}
+            onArmedChange={onArmedChange}
+            onEdit={onEdit}
+            onDelete={onDelete}
+          />
         ))}
       </tbody>
     </table>
@@ -171,6 +213,9 @@ function MobileRow({
   row,
   calendarPct,
   isDemo,
+  armed,
+  announce,
+  onArmedChange,
   onEdit,
   onDelete,
 }: {
@@ -179,13 +224,12 @@ function MobileRow({
   isDemo: boolean;
   onEdit: (item: BudgetItem) => void;
   onDelete: (id: string) => void;
-}) {
+} & RowDeleteProps) {
   const [open, setOpen] = useState(false);
   const inverted = row.kind === 'income';
   const ratio = row.budget > 0 ? row.spent / row.budget : 0;
   const projection = inverted ? null : projectionCell(row);
-  const deleteRef = useRef<HTMLButtonElement | null>(null);
-  const del = useArmedDelete(deleteRef, () => onDelete(row.item.id));
+  const setArmed = useCallback((value: boolean) => onArmedChange(row.key, value), [onArmedChange, row.key]);
   const panelId = `budget-row-${row.key}`;
 
   return (
@@ -209,10 +253,16 @@ function MobileRow({
               {cachedFormatCurrencyEUR(row.spent, true)}
               <span className="text-muted-foreground"> / {cachedFormatCurrencyEUR(row.budget, true)}</span>
             </span>
-            <ChevronDown className={cn('h-3.5 w-3.5 text-muted-foreground transition-transform', open && 'rotate-180')} aria-hidden="true" />
+            <ChevronDown className={cn('h-3.5 w-3.5 text-muted-foreground motion-safe:transition-transform', open && 'rotate-180')} aria-hidden="true" />
           </span>
         </span>
-        <BudgetTrack ratio={ratio} calendarPct={inverted ? null : calendarPct} color={progressFillColor(ratio, inverted)} label={`Avanzamento ${row.label}`} />
+        <BudgetTrack
+          ratio={ratio}
+          calendarPct={inverted ? null : calendarPct}
+          color={progressFillColor(ratio, inverted)}
+          label={`Avanzamento ${row.label}`}
+          valueText={trackValueText(row)}
+        />
         <span className="flex justify-between text-[11px] text-muted-foreground">
           <span className={cn('font-mono tabular-nums', progressTextClass(ratio, inverted))}>{formatPercentage(row.usedPct, 0)}</span>
           {projection && (
@@ -232,27 +282,25 @@ function MobileRow({
       {/* The CSS grid-rows technique: no Framer height animation, `inert` while closed. */}
       <div
         id={panelId}
-        className={cn('grid transition-[grid-template-rows] duration-200', open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]')}
+        className={cn('grid motion-safe:transition-[grid-template-rows] motion-safe:duration-200', open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]')}
         inert={!open ? true : undefined}
       >
         <div className="overflow-hidden">
+          {armed && <p className="pb-2 text-[11px] leading-[1.35] text-destructive">{describeBudgetDeleteConsequence(row.kind, row.label)}</p>}
           <div className="grid grid-cols-2 gap-2 pb-3">
             <Button variant="outline" className="h-11" disabled={isDemo} onClick={() => onEdit(row.item)}>
               <Pencil className="h-4 w-4" />
               Modifica
             </Button>
-            <Button
-              ref={deleteRef}
-              variant="outline"
-              className={cn('h-11', del.armed && 'border-destructive text-destructive')}
+            <BudgetDeleteButton
+              variant="wide"
+              label={row.label}
+              kind={row.kind}
               disabled={isDemo}
-              aria-label={del.armed ? `Conferma eliminazione budget ${row.label}` : `Elimina budget ${row.label}`}
-              onClick={del.onClick}
-              onBlur={del.onBlur}
-            >
-              <Trash2 className="h-4 w-4" />
-              {del.armed ? 'Conferma' : 'Elimina'}
-            </Button>
+              onDelete={() => onDelete(row.item.id)}
+              announce={announce}
+              onArmedChange={setArmed}
+            />
           </div>
         </div>
       </div>
@@ -269,10 +317,23 @@ function MobileRow({
  * spent, the 3px track with today's mark, used share, month-end — and flat expandable rows
  * below it, with 44px actions (a card per row inside a tile would be a card inside a card).
  * Income targets are a second group with their own sub-eyebrow; annual budgets are not
- * here — they live in their own tile, on their own axis.
+ * here — they live in their own tile, on their own axis. One live region for the whole
+ * inventory announces an armed delete and its cancellation; the armed row prints what the
+ * second press does.
  */
 export function PerCategoriaTile({ rows, calendarPct, aside, reading, footer, isDemo, onEdit, onDelete, empty, className }: PerCategoriaTileProps) {
   const hasRows = rows.expense.length + rows.income.length > 0;
+  const [announcement, setAnnouncement] = useState('');
+  const [armedKey, setArmedKey] = useState<string | null>(null);
+  const announce = useCallback((text: string) => setAnnouncement(text), []);
+  const onArmedChange = useCallback((key: string, armed: boolean) => {
+    setArmedKey((current) => (armed ? key : current === key ? null : current));
+  }, []);
+  const handleDelete = (id: string) => {
+    setArmedKey(null);
+    onDelete(id);
+  };
+  const listProps = { isDemo, armedKey, announce, onArmedChange, onEdit, onDelete: handleDelete };
 
   return (
     <Tile eyebrow="Per categoria" aside={aside} reading={reading} className={className}>
@@ -282,13 +343,11 @@ export function PerCategoriaTile({ rows, calendarPct, aside, reading, footer, is
         <>
           {/* Desktop */}
           <div className="mt-3.5 hidden desktop:block">
-            {rows.expense.length > 0 && (
-              <BudgetTable rows={rows.expense} calendarPct={calendarPct} isDemo={isDemo} onEdit={onEdit} onDelete={onDelete} caption="Budget mensili di spesa" />
-            )}
+            {rows.expense.length > 0 && <BudgetTable rows={rows.expense} calendarPct={calendarPct} caption="Budget mensili di spesa" {...listProps} />}
             {rows.income.length > 0 && (
               <div className={cn(rows.expense.length > 0 && 'mt-[18px]')}>
                 <p className={cn(TILE_SUB_EYEBROW_CLASS, 'mb-1.5')}>Entrate previste</p>
-                <BudgetTable rows={rows.income} calendarPct={null} isDemo={isDemo} onEdit={onEdit} onDelete={onDelete} caption="Obiettivi di entrata del mese" />
+                <BudgetTable rows={rows.income} calendarPct={null} caption="Obiettivi di entrata del mese" {...listProps} />
               </div>
             )}
           </div>
@@ -298,7 +357,7 @@ export function PerCategoriaTile({ rows, calendarPct, aside, reading, footer, is
             {rows.expense.length > 0 && (
               <ul className="flex flex-col divide-y divide-border">
                 {rows.expense.map((row) => (
-                  <MobileRow key={row.key} row={row} calendarPct={calendarPct} isDemo={isDemo} onEdit={onEdit} onDelete={onDelete} />
+                  <MobileRow key={row.key} row={row} calendarPct={calendarPct} armed={armedKey === row.key} {...listProps} />
                 ))}
               </ul>
             )}
@@ -307,12 +366,16 @@ export function PerCategoriaTile({ rows, calendarPct, aside, reading, footer, is
                 <p className={cn(TILE_SUB_EYEBROW_CLASS, 'border-b border-border pb-1.5')}>Entrate previste</p>
                 <ul className="flex flex-col divide-y divide-border">
                   {rows.income.map((row) => (
-                    <MobileRow key={row.key} row={row} calendarPct={null} isDemo={isDemo} onEdit={onEdit} onDelete={onDelete} />
+                    <MobileRow key={row.key} row={row} calendarPct={null} armed={armedKey === row.key} {...listProps} />
                   ))}
                 </ul>
               </div>
             )}
           </div>
+
+          <span className="sr-only" role="status" aria-live="polite">
+            {announcement}
+          </span>
         </>
       )}
 

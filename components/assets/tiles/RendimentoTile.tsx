@@ -8,7 +8,7 @@ import { describeInstrumentReturns, pluralArticleFor } from '@/lib/utils/patrimo
 import type { InstrumentReturnRanking, UnrealizedGainsSummary } from '@/lib/utils/patrimonioSummary';
 import { signTextClass } from '@/lib/utils/metricColors';
 import { cn } from '@/lib/utils';
-import { Tile, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
+import { Tile, TILE_FOOTER_ACTION_CLASS, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 
 interface RendimentoTileProps {
   gains: UnrealizedGainsSummary;
@@ -114,7 +114,7 @@ export function RendimentoTile({ gains, ranking, rankedFrom, className }: Rendim
       <p className="mt-auto border-t border-border pt-3.5 text-[11px] text-muted-foreground">
         {ranking.measuredCount > 0 && `Tra ${pluralArticleFor(rankedFrom)} ${rankedFrom} strumenti maggiori · `}
         TWR e benchmark in{' '}
-        <Link href="/dashboard/performance" className="text-foreground underline-offset-2 hover:underline">
+        <Link href="/dashboard/performance" className={TILE_FOOTER_ACTION_CLASS}>
           Rendimenti
         </Link>
         .

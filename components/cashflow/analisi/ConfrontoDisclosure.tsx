@@ -7,7 +7,7 @@ import type { Narrative } from '@/lib/utils/narrative';
 import { buildCategoryComparison, computeTotalsPacing, resolveComparisonScope, type ComparisonMonthScope } from '@/lib/utils/comparisonDeltas';
 import { describeAnalisiSubject, describeComparison, describeComparisonSummary } from '@/lib/utils/analisiNarrative';
 import type { AnalisiPeriod, MonthRef } from '@/lib/utils/analisiSummary';
-import { getItalyMonth, getItalyYear, toDate } from '@/lib/utils/dateHelpers';
+import { getItalyDate, toDate } from '@/lib/utils/dateHelpers';
 import { cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { TILE_EYEBROW_CLASS } from '@/components/ui/tile';
@@ -18,16 +18,18 @@ interface ConfrontoDisclosureProps {
   allExpenses: Expense[];
   period: AnalisiPeriod;
   today: MonthRef;
+  /** Today's day of the month — the running month is compared on its first N days (both sides). */
+  todayDay: number;
   historyStartYear: number;
   /** Years with data at or after the floor, newest first. */
   availableDataYears: number[];
   onCategoryFocus: (target: { expenseType: ExpenseType; categoryKey: string }) => void;
 }
 
-/** Resolves an expense's Italy-calendar bucket for the pure comparison layer. */
-const monthOf = (expense: Expense): MonthRef => {
-  const date = toDate(expense.date);
-  return { year: getItalyYear(date), month: getItalyMonth(date) };
+/** Resolves an expense's Italy-calendar bucket, day included, for the pure comparison layer (the running month is cut at today). */
+const dayOf = (expense: Expense): MonthRef & { day: number } => {
+  const date = getItalyDate(toDate(expense.date));
+  return { year: date.getFullYear(), month: date.getMonth() + 1, day: date.getDate() };
 };
 
 /**
@@ -37,7 +39,7 @@ const monthOf = (expense: Expense): MonthRef => {
  * this component owns that choice and computes the pacing and the delta rows ONCE — the row,
  * the reading and the list cannot disagree.
  */
-export function ConfrontoDisclosure({ allExpenses, period, today, historyStartYear, availableDataYears, onCategoryFocus }: ConfrontoDisclosureProps) {
+export function ConfrontoDisclosure({ allExpenses, period, today, todayDay, historyStartYear, availableDataYears, onCategoryFocus }: ConfrontoDisclosureProps) {
   const [open, setOpen] = useState(false);
   const [comparisonYearChoice, setComparisonYearChoice] = useState<number | null>(null);
 
@@ -54,16 +56,16 @@ export function ConfrontoDisclosure({ allExpenses, period, today, historyStartYe
     return comparisonOptions[0] ?? null;
   }, [comparisonYearChoice, comparisonOptions, currentYear]);
 
-  const scope = useMemo((): ComparisonMonthScope | null => resolveComparisonScope(period.mode, period.month, today.month), [period.mode, period.month, today.month]);
+  const scope = useMemo((): ComparisonMonthScope | null => resolveComparisonScope(period.mode, period.month, today.month, todayDay), [period.mode, period.month, today.month, todayDay]);
 
   const pacing = useMemo(() => {
     if (currentYear === null || comparisonYear === null || scope === null) return null;
-    return computeTotalsPacing(allExpenses, currentYear, comparisonYear, scope, monthOf);
+    return computeTotalsPacing(allExpenses, currentYear, comparisonYear, scope, dayOf);
   }, [allExpenses, currentYear, comparisonYear, scope]);
 
   const deltaRows = useMemo(() => {
     if (currentYear === null || comparisonYear === null || scope === null) return [];
-    return buildCategoryComparison(allExpenses, currentYear, comparisonYear, scope, monthOf);
+    return buildCategoryComparison(allExpenses, currentYear, comparisonYear, scope, dayOf);
   }, [allExpenses, currentYear, comparisonYear, scope]);
 
   const subject = describeAnalisiSubject(period, today, historyStartYear);
@@ -92,6 +94,7 @@ export function ConfrontoDisclosure({ allExpenses, period, today, historyStartYe
         <ConfrontoAnnualeSection
           allExpenses={allExpenses}
           periodMode={period.mode}
+          ceilingYear={today.year}
           currentYear={currentYear}
           comparisonYear={comparisonYear}
           comparisonOptions={comparisonOptions}

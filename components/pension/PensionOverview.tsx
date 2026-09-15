@@ -91,6 +91,9 @@ import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
 import { ErrorNotice } from '@/components/ui/error-notice';
 import { describeReadFailure } from '@/lib/utils/statesNarrative';
 import { PensionDettaglio } from '@/components/pension/PensionDettaglio';
+import { PensionValueDialog } from '@/components/pension/PensionValueDialog';
+import { ASIDE_LINK_CLASS } from '@/components/pension/pensionStyles';
+import { indexPensionSnapshots } from '@/lib/utils/pensionReturn';
 import { FondoOggiTile } from '@/components/pension/tiles/FondoOggiTile';
 import { RendimentoTile } from '@/components/pension/tiles/RendimentoTile';
 import { AnnoFiscaleTile } from '@/components/pension/tiles/AnnoFiscaleTile';
@@ -107,9 +110,6 @@ const SKELETON_CELLS: TileSkeletonCell[] = [
 ];
 
 const VERDICT_LABEL = 'Verdetto sul fondo pensione';
-
-const ASIDE_LINK_CLASS =
-  'inline-flex h-11 w-fit items-center gap-1 rounded-md border border-border px-3 text-[12px] font-medium text-foreground transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring desktop:h-7 desktop:px-2.5 desktop:text-[11px]';
 
 export function PensionOverview() {
   const { ownerId } = useActiveAccount();
@@ -134,8 +134,13 @@ export function PensionOverview() {
   const now = useMemo(() => new Date(), []);
   const currentYear = getItalyYear(now);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
+  // «Aggiorna valore» from the hero's footer (the header hosts its own instance for the top of the page).
+  const [valueDialogOpen, setValueDialogOpen] = useState(false);
 
   const funds = useMemo(() => assets.filter((asset) => asset.type === 'pensionFund'), [assets]);
+  // The snapshots reduced ONCE to the funds: memoized on them alone, so the fiscal-year axis
+  // never re-reads the heaviest array the page holds (`indexPensionSnapshots`).
+  const snapshotIndex = useMemo(() => indexPensionSnapshots(snapshots, funds.map((fund) => fund.id)), [snapshots, funds]);
 
   // The year axis is derived, so it survives a refetch that adds or removes a year.
   const availableYears = useMemo(() => derivePensionContributionYears(contributions, currentYear), [contributions, currentYear]);
@@ -147,23 +152,26 @@ export function PensionOverview() {
     return (income: number) => calculateProgressiveTax(income, brackets);
   }, []);
 
-  const summaryInput = useMemo<PensionSummaryInput>(
+  // Everything but the axis: «Il fondo oggi» reads THIS input, so the year pill never recomputes it.
+  const offAxisInput = useMemo<Omit<PensionSummaryInput, 'taxYear'>>(
     () => ({
       funds,
       assets,
       familyMembers: settings?.familyMembers ?? [],
       contributions,
       snapshots,
+      snapshotIndex,
       now,
       configuredStartMonth: settings?.pensionReturnStartMonth,
-      taxYear: activeYear,
       taxOf,
       valueOf: calculateAssetValue,
     }),
-    [funds, assets, settings, contributions, snapshots, now, activeYear, taxOf],
+    [funds, assets, settings, contributions, snapshots, snapshotIndex, now, taxOf],
   );
+  const summaryInput = useMemo<PensionSummaryInput>(() => ({ ...offAxisInput, taxYear: activeYear }), [offAxisInput, activeYear]);
 
-  const today = useMemo(() => summarizeFundToday(summaryInput), [summaryInput]);
+  // `summarizeFundToday` never reads `taxYear`; the placeholder keeps the input type honest.
+  const today = useMemo(() => summarizeFundToday({ ...offAxisInput, taxYear: 0 }), [offAxisInput]);
   const blocks = useMemo(() => summarizePensionMembers(summaryInput), [summaryInput]);
   const versato = useMemo(() => summarizeVersato(contributions, activeYear), [contributions, activeYear]);
   const ledger = useMemo(() => summarizeLedger(contributions, funds, assets, activeYear), [contributions, funds, assets, activeYear]);
@@ -236,6 +244,8 @@ export function PensionOverview() {
         onChange={(value) => setSelectedYear(Number(value))}
         layoutId="pension-year-axis"
         ariaLabel="Anno fiscale"
+        semantics="radio"
+        optionClassName="min-h-11 desktop:min-h-0"
         className="w-fit"
       />
     ) : null;
@@ -259,6 +269,7 @@ export function PensionOverview() {
             chips={contributionsError ? [] : buildFondoOggiChips(today)}
             series={snapshotsError ? [] : today.series}
             seriesAside={describeFondoOggiSeriesAside(today)}
+            onUpdateValue={isDemo ? undefined : () => setValueDialogOpen(true)}
           />
         </div>
 
@@ -300,7 +311,7 @@ export function PensionOverview() {
               })}
             />
           ) : (
-            <VersatoTile taxYear={activeYear} reading={describeVersato(versato)} aside="per natura" footer={describeVersatoFooter(versato)} rows={versato.rows} />
+            <VersatoTile taxYear={activeYear} reading={describeVersato(versato, funds.length)} aside="per natura" footer={describeVersatoFooter(versato)} rows={versato.rows} />
           )}
         </div>
 
@@ -329,6 +340,7 @@ export function PensionOverview() {
       </div>
 
       <PensionDettaglio description={DETTAGLIO_DESCRIPTION} blocks={contributionsError || snapshotsError ? [] : blocks} crescitaFooter={CRESCITA_FOOTER} comeAggiornare={COME_AGGIORNARE} />
+      <PensionValueDialog open={valueDialogOpen} onClose={() => setValueDialogOpen(false)} />
     </div>
   );
 }

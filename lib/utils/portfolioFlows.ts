@@ -14,11 +14,12 @@
  * Base = the whole net worth → the flows stay the cashflow's: only outside money moves the capital.
  * Base = a subset → for every month whose two snapshots both carry `byAsset`, the flow is measured
  * on the instruments INSIDE the base, one instrument at a time, from the best source available:
- *   - the trade ledger, from the month of the instrument's first recorded trade on: dated to the
- *     OPERATION (a snapshot is dated to the observation — 722 units bought on the 20th sit in the
- *     ledger this month and in the snapshot the next), buys plus fees in, sells minus fees out. A
- *     covered instrument with no trade in a month contributes 0: no trade = no flow, an
- *     information, not a gap to fill from the quantities;
+ *   - the trade ledger, from the month of the instrument's first recorded trade on and once the
+ *     base has seen the instrument (§ THE ENTRY MONTH): dated to the OPERATION (a snapshot is
+ *     dated to the observation — 722 units bought on the 20th sit in the ledger this month and
+ *     in the snapshot the next), buys plus fees in, sells minus fees out. A covered instrument
+ *     with no trade in a month contributes 0: no trade = no flow, an information, not a gap to
+ *     fill from the quantities;
  *   - the quantity change of the `byAsset` breakdown otherwise, `(q₁ − q₀) × p₁`: a quantity that
  *     grew is capital that came in, one that shrank is capital that left, and the price plays no
  *     part — which is exactly the flow a TWR wants at its numerator. A cash account is an
@@ -35,6 +36,19 @@
  * collapse its return to about −100% on every account migrated from the UI (the blocking defect of
  * the original PR). An `adjustment` is a quantity reset with no cash. Both mark the instrument as
  * COVERED from their month (the ledger is its source from then on) and move no money.
+ *
+ * THE ENTRY MONTH (2026-09-13, the trade date floor lifted)
+ * A trade can be dated before the app ever saw the instrument: a user records today the ENI
+ * shares bought in 2024, with their real date. The ledger then covers the instrument from 2024,
+ * but no snapshot pair of 2024 holds it (it is not in the union of the two months' positions), so
+ * that purchase produces no entry anywhere — and in the month the instrument first appears the
+ * ledger would say «no trade = 0», reading the whole position as that month's return. So the
+ * ledger speaks for an instrument in a month only if the base had already SEEN it — held in the
+ * previous snapshot, or bought in the month itself; otherwise the month is the instrument's
+ * ENTRY, and its value at the end-of-month price is the flow, the quantity branch. The history
+ * before the app saw it is not measured, which is the honest reading: a TWR cannot attribute two
+ * years of a price move to the month the position was typed in. A purchase dated in the month
+ * the instrument first appears keeps the ledger's precision (the trade price, fees in).
  *
  * WHEN THE FLOW IS NOT MEASURABLE
  * Both snapshots of a pair must carry `byAsset`; without it there is no way to tell a purchase
@@ -142,9 +156,16 @@ export function computeMonthlyPortfolioFlow(
   let fromQuantities = false;
   for (const assetId of new Set([...before.keys(), ...after.keys()])) {
     const coveredFrom = ledger?.coveredFrom.get(assetId);
-    if (coveredFrom !== undefined && month >= coveredFrom) {
+    const ledgerKey = `${assetId}|${month}`;
+    // The ledger speaks for an instrument only once the base has SEEN it: held at the start of the
+    // month, or bought inside it. An instrument the snapshots meet for the first time with no
+    // trade this month (a purchase recorded with its real, older date) enters at its value —
+    // the quantity branch — because the ledger's "no trade = no flow" would read that whole
+    // value as this month's return (§ THE ENTRY MONTH).
+    const seenByTheBase = before.has(assetId) || ledger?.flows.has(ledgerKey) === true;
+    if (coveredFrom !== undefined && month >= coveredFrom && seenByTheBase) {
       fromLedger = true;
-      amount += ledger!.flows.get(`${assetId}|${month}`) ?? 0;
+      amount += ledger!.flows.get(ledgerKey) ?? 0;
       continue;
     }
     if (opaqueIds.has(assetId)) continue;

@@ -45,7 +45,9 @@ export function TileGridSkeleton({ verdict = true, cells = DEFAULT_SKELETON_CELL
   return (
     <div className={cn('space-y-4', className)} role="status" aria-label="Caricamento">
       {verdict && (
-        <div className="flex max-w-[920px] flex-col gap-2.5 pt-1">
+        // The same `page-verdict` name as `PageVerdict`: the page scene lands on these two lines
+        // and the verdict arrives in place when the data does.
+        <div className="flex max-w-[920px] flex-col gap-2.5 pt-1" style={{ viewTransitionName: 'page-verdict' }}>
           <Skeleton className="h-8 w-72" />
           <Skeleton className="h-4 w-full" />
           <Skeleton className="h-4 w-3/4" />

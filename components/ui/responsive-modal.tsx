@@ -102,6 +102,13 @@ export interface ResponsiveModalProps {
   contentRef?: React.RefObject<HTMLDivElement | null>;
   /** Escape hatch for a width the four steps genuinely cannot express. */
   dialogClassName?: string;
+  /**
+   * Where the focus goes when the modal closes. Radix restores it to the element that was
+   * focused when the modal opened, which is `body` whenever the opener was a window event, a
+   * table row that is not focusable or a button Safari never focused on tap — measured on all
+   * four Dividendi modals on 2026-09-14. A caller that knows its trigger names it here.
+   */
+  returnFocusTo?: React.RefObject<HTMLElement | null>;
 }
 
 /**
@@ -126,8 +133,16 @@ export function ResponsiveModal({
   triggerOrigin,
   contentRef,
   dialogClassName,
+  returnFocusTo,
 }: Readonly<ResponsiveModalProps>) {
   const isMobile = useMediaQuery('(max-width: 768px)');
+
+  const restoreFocus = (event: Event) => {
+    const target = returnFocusTo?.current;
+    if (!target) return;
+    event.preventDefault();
+    target.focus();
+  };
 
   const resolvedReading: ModalReading | null =
     typeof reading === 'string' ? { narrative: [{ text: reading }], tone: 'neutral' } : (reading ?? null);
@@ -143,7 +158,7 @@ export function ResponsiveModal({
       // when the keyboard opens and doesn't fully restore when it closes,
       // leaving the footer buttons stuck away from the bottom edge.
       <Drawer open={open} onOpenChange={(v) => !v && onClose()} noBodyStyles repositionInputs={false}>
-        <DrawerContent onEscapeKeyDown={refuseEscapeWhileArmed}>
+        <DrawerContent onEscapeKeyDown={refuseEscapeWhileArmed} onCloseAutoFocus={restoreFocus}>
           <DrawerHeader className="border-b px-4 pb-3 pt-2 text-left">
             {eyebrow && <p className={TILE_EYEBROW_CLASS}>{eyebrow}</p>}
             <DrawerTitle className="text-[20px] font-semibold leading-[1.25] tracking-[-0.01em]">
@@ -179,6 +194,7 @@ export function ResponsiveModal({
       <DialogContent
         ref={contentRef}
         onEscapeKeyDown={refuseEscapeWhileArmed}
+        onCloseAutoFocus={restoreFocus}
         className={cn(
           'flex max-h-[90vh] w-full flex-col overflow-hidden p-0',
           WIDTH_CLASS[width],

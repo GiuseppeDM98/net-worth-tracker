@@ -37,6 +37,15 @@ interface SegmentedPillProps<T extends string> {
    * is streaming — the period cannot change mid-answer.
    */
   disabled?: boolean;
+  /**
+   * `tabs` (default) exposes `tablist`/`tab` — right where the pill switches the content of a
+   * panel. `radio` exposes `radiogroup`/`radio` for a pill that picks a VALUE the whole page
+   * reads (an axis year, a period): a tablist with no tabpanel is a promise the DOM cannot keep.
+   * Keyboard behaviour is the same in both (roving tabindex, arrows select).
+   */
+  semantics?: 'tabs' | 'radio';
+  /** Extra classes on every option — e.g. a 44px height below `desktop:` for a pill on a phone. */
+  optionClassName?: string;
 }
 
 export function SegmentedPill<T extends string>({
@@ -47,6 +56,8 @@ export function SegmentedPill<T extends string>({
   ariaLabel,
   className,
   disabled,
+  semantics = 'tabs',
+  optionClassName,
 }: SegmentedPillProps<T>) {
   const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
@@ -80,11 +91,14 @@ export function SegmentedPill<T extends string>({
   };
 
   return (
+    // `max-w-full overflow-x-auto`: an unbounded option list (one per fiscal year, one per
+    // decade of a pension) scrolls inside the pill instead of pushing the page sideways; the
+    // scrollbar is hidden because the pill is a control, not a region.
     <div
-      role="tablist"
+      role={semantics === 'radio' ? 'radiogroup' : 'tablist'}
       aria-label={ariaLabel}
       className={cn(
-        'inline-flex items-center gap-1 rounded-full bg-muted p-1',
+        'inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-full bg-muted p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
         disabled && 'opacity-50',
         className
       )}
@@ -96,8 +110,9 @@ export function SegmentedPill<T extends string>({
             key={option.value}
             ref={(el) => { buttonRefs.current[index] = el; }}
             type="button"
-            role="tab"
-            aria-selected={isSelected}
+            role={semantics === 'radio' ? 'radio' : 'tab'}
+            aria-selected={semantics === 'radio' ? undefined : isSelected}
+            aria-checked={semantics === 'radio' ? isSelected : undefined}
             aria-disabled={disabled || undefined}
             tabIndex={isSelected ? 0 : -1}
             onClick={() => {
@@ -105,8 +120,12 @@ export function SegmentedPill<T extends string>({
             }}
             onKeyDown={(e) => handleKeyDown(e, index)}
             className={cn(
-              'relative px-3 py-1.5 text-sm font-medium rounded-full transition-colors',
-              isSelected ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
+              'relative shrink-0 px-3 py-1.5 text-sm font-medium rounded-full transition-colors',
+              // The inactive label is the foreground at 70%, not `text-muted-foreground`: that
+              // token is tuned against `--background`, and on the pill's `bg-muted` surface it
+              // measured 4,34:1 in light (below AA) on the Panoramica's period pill, 2026-09-13.
+              isSelected ? 'text-foreground' : 'text-foreground/70 hover:text-foreground',
+              optionClassName
             )}
           >
             {isSelected && (

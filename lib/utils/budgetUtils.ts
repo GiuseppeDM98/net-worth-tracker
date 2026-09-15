@@ -14,6 +14,7 @@ import {
   BudgetComparison,
   BudgetItem,
   BudgetPace,
+  BudgetPeriod,
   BudgetRiskSummary,
   DEFAULT_ALERT_THRESHOLDS,
   SpendingForecast,
@@ -188,6 +189,25 @@ export function splitMonthlyTotalExpenses(
     const date = toDate(expense.date);
     const { month: expMonth, year: expYear } = getItalyMonthYear(date);
     if (expYear !== year || expMonth !== month) continue;
+    if (getItalyDateIso(date) > todayIso) scheduled += Math.abs(expense.amount);
+    else spentToDate += Math.abs(expense.amount);
+  }
+  return { spentToDate, scheduled };
+}
+
+/**
+ * A budget item's YEAR spending split at `now`: booked up to today versus dated after it. The
+ * annual alerts read the former — a December row already in the calendar is not a threshold
+ * crossed in September.
+ */
+export function splitYearActualForItem(item: BudgetItem, expenses: Expense[], year: number, now: Date): SpendingSplit {
+  let spentToDate = 0;
+  let scheduled = 0;
+  const todayIso = getItalyDateIso(now);
+  for (const expense of expenses) {
+    const date = toDate(expense.date);
+    if (getItalyYear(date) !== year) continue;
+    if (!expenseMatchesItem(expense, item)) continue;
     if (getItalyDateIso(date) > todayIso) scheduled += Math.abs(expense.amount);
     else spentToDate += Math.abs(expense.amount);
   }
@@ -460,6 +480,21 @@ export function resolveBudgetCalendar(now: Date): BudgetCalendar {
   return { dayOfMonth, daysInMonth, daysLeft: Math.max(0, daysInMonth - dayOfMonth), canForecast: dayOfMonth >= MIN_FORECAST_DAYS };
 }
 
+export function daysInYear(year: number): number {
+  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0 ? 366 : 365;
+}
+
+/** Day of year from calendar fields, so DST never shifts it (AGENTS.md § Commands, `TZ=Europe/Rome`). */
+export function dayOfYear(date: Date): number {
+  return Math.round((Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) - Date.UTC(date.getFullYear(), 0, 0)) / 86_400_000);
+}
+
+/** Share of the year elapsed at `now`, 0-100, on the Italian calendar — the annual budgets' mark. */
+export function yearElapsedPctAt(now: Date): number {
+  const italy = getItalyDate(now);
+  return (dayOfYear(italy) / daysInYear(italy.getFullYear())) * 100;
+}
+
 const FIXED_TYPES: ReadonlySet<string> = new Set(['fixed', 'debt']);
 
 /** The category fields the pace rule needs — the server can pass a slimmer record. */
@@ -656,11 +691,18 @@ function highestCrossedThreshold(ratioPct: number, thresholds: number[]): number
 /**
  * Evaluates threshold alerts across expense budgets and the overall budget.
  * Each budget is measured over its own period (monthly → current month, annual →
- * year-to-date). An alert fires when current spend crosses a configured threshold
- * OR — for monthly budgets only — the end-of-month projection is set to exceed
- * the budget (forecastedOverrun, `thresholdCrossed: false`). Annual budgets are
- * spiky, so no forecast; and the projection follows the item's pace (a fixed
- * category never extrapolates).
+ * year-to-date), on what is BOOKED UP TO TODAY: a threshold is a fact, and a row dated
+ * after today has not crossed anything yet (until 2026-09-14 the ceiling counted the
+ * month's scheduled rows, so a mortgage due on the 27th put the ceiling «at 65%» on the
+ * 14th). An alert fires when that spend crosses a configured threshold OR — for monthly
+ * budgets only — the end-of-month projection is set to exceed the budget
+ * (forecastedOverrun, `thresholdCrossed: false`). Annual budgets are spiky, so no
+ * forecast; and the projection follows the item's pace (a fixed category never
+ * extrapolates).
+ *
+ * Every alert carries the share of ITS window elapsed today (`calendarPct`) and whether the
+ * used share is ahead of it: the tile paints the warning colour only on the rows that are,
+ * because a quota read without its calendar says nothing (the Budget Track rule).
  *
  * Sorted by used ratio descending so the most urgent alert is first.
  */
@@ -675,21 +717,37 @@ export function evaluateBudgetAlerts(
   const year = getItalyYear(now);
   const month = getItalyMonth(now);
   const alerts: BudgetAlert[] = [];
+  const calendar = resolveBudgetCalendar(now);
+  const monthCalendarPct = (calendar.dayOfMonth / calendar.daysInMonth) * 100;
+  const yearCalendarPct = yearElapsedPctAt(now);
 
-  const evaluate = (key: string, label: string, spent: number, budgetAmount: number, forecastedOverrun: boolean, crossedOn: number | null) => {
+  const evaluate = (
+    key: string,
+    label: string,
+    period: BudgetPeriod,
+    spent: number,
+    budgetAmount: number,
+    forecastedOverrun: boolean,
+    crossedOn: number | null,
+  ) => {
     if (budgetAmount <= 0) return;
     const usedRatio = spent / budgetAmount;
     const crossed = highestCrossedThreshold(usedRatio * 100, thresholds);
     if (crossed === null && !forecastedOverrun) return;
+    const calendarPct = period === 'annual' ? yearCalendarPct : monthCalendarPct;
     alerts.push({
       key,
       label,
       level: usedRatio >= 1 ? 'exceeded' : 'warning',
+      period,
       threshold: crossed ?? 100,
       thresholdCrossed: crossed !== null,
       spent,
       budgetAmount,
       usedRatio,
+      calendarPct,
+      // Judged on the printed figures, like the ceiling's reading: 54% against «anno al 70%».
+      aheadOfCalendar: Math.round(usedRatio * 100) > Math.round(calendarPct),
       forecastedOverrun,
       crossedOn,
     });
@@ -697,18 +755,21 @@ export function evaluateBudgetAlerts(
 
   // Forecast-overrun only fires once enough days have passed to trust the pace;
   // threshold alerts on actual spend fire regardless.
-  const { canForecast } = resolveBudgetCalendar(now);
+  const { canForecast } = calendar;
 
   // Per-category expense budgets (skip subcategory to avoid double alerts)
   for (const item of expenseItems) {
     if (item.scope === 'subcategory') continue;
-    const spent = getPeriodActual(item, expenses, now);
+    const spent =
+      item.period === 'annual'
+        ? splitYearActualForItem(item, expenses, year, now).spentToDate
+        : splitMonthActualForItem(item, expenses, year, month, now).spentToDate;
     const forecastedOverrun =
       item.period === 'monthly' && canForecast && forecastMonthlyItem(item, expenses, now, categories).projectedTotal > item.amount;
     // The day the budget went over — monthly budgets only: an annual one crosses on a date of
     // the year, which is a different sentence the alerts do not tell yet.
     const crossedOn = item.period === 'monthly' ? findCrossingDay(collectMonthItemSpending(item, expenses, year, month), item.amount) : null;
-    evaluate(budgetItemKey(item), budgetItemLabel(item), spent, item.amount, forecastedOverrun, crossedOn);
+    evaluate(budgetItemKey(item), budgetItemLabel(item), item.period, spent, item.amount, forecastedOverrun, crossedOn);
   }
 
   // Overall spending ceiling — measured against ALL month spending, not just
@@ -718,7 +779,7 @@ export function evaluateBudgetAlerts(
     const forecast = buildSpendingForecast(split, overallMonthlyAmount, now);
     const overrun = canForecast && forecast.projectedTotal > overallMonthlyAmount;
     const crossedOn = findCrossingDay(collectMonthSpending(expenses, year, month), overallMonthlyAmount);
-    evaluate(OVERALL_BUDGET_KEY, 'Budget complessivo', forecast.spentSoFar, overallMonthlyAmount, overrun, crossedOn);
+    evaluate(OVERALL_BUDGET_KEY, 'Budget complessivo', 'monthly', split.spentToDate, overallMonthlyAmount, overrun, crossedOn);
   }
 
   return alerts.sort((a, b) => b.usedRatio - a.usedRatio);

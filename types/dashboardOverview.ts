@@ -1,4 +1,6 @@
 import { PieChartData } from '@/types/assets';
+import type { ExpenseType } from '@/types/expenses';
+import type { PeriodSalesSummary } from '@/lib/utils/periodSales';
 
 export interface DashboardOverviewSparklinePoint {
   month: number;
@@ -18,6 +20,9 @@ export interface DashboardOverviewCategoryAmount {
   // Category document id (name-fallback for legacy rows) — the row's identity.
   // Optional only because payloads cached before source version 5 lack it.
   categoryKey?: string;
+  // The category's type ('income' for the income list) — the second half of the Scheda's
+  // address on Analisi (?focusType&focusCat). Optional: payloads before source version 17 lack it.
+  expenseType?: ExpenseType;
   amount: number;
   // Percentage of the total expenses (or total income) for the current month.
   percentage: number;
@@ -171,6 +176,11 @@ export interface DashboardOverviewPayload {
   // The instruments behind `topMovers`, each by its own price effect (capped at ten). Optional
   // so old cached docs degrade gracefully (Patrimonio's verdict drops its driver clause).
   topInstrumentMovers?: DashboardOverviewInstrumentMover[];
+  // The current month's sales from the trade ledger — proceeds, realized gain and the ESTIMATED
+  // tax withheld on it (lib/utils/periodSales.ts) — so a falling month can name what left the
+  // portfolio besides the market. null = nothing sold this month; optional so old cached docs
+  // degrade gracefully (the verdicts drop the sales clause).
+  monthSales?: PeriodSalesSummary | null;
   // Single most relevant in-progress goal (Goal-Based Investing), only present
   // when the user has the feature enabled and at least one goal in progress.
   goalProgress?: DashboardOverviewGoalProgress | null;

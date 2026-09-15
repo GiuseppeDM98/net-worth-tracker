@@ -354,14 +354,23 @@ export interface DividendReliability {
  * Derives two risk signals for the income stream over the period (B2):
  * smoothness (how many months actually paid) and concentration (how dependent the
  * income is on one or two payers). Both are latent in the data but never surfaced today.
+ *
+ * The tile's question is in the present tense — «posso contare su questo reddito?» — so with
+ * `heldAssetIds` the signals are measured on the instruments STILL IN THE PORTFOLIO: a payer
+ * sold since is history, and «Concentrazione alta: SPM.MI vale il 47%» on a sold stock was a
+ * risk warning about money nobody can lose (2026-09-14, the owner's call). The window's
+ * length is still the period's, never the subset's. Without the set every payer counts,
+ * which is what the registry-only surfaces (the verdict's «da 3 strumenti») still read.
  */
 export function computeReliability(
   dividends: Dividend[],
   period: DividendPeriod,
   now: Date = new Date(),
+  heldAssetIds?: ReadonlySet<string>,
 ): DividendReliability {
-  const scoped = filterPaidByPeriod(dividends, period, now);
-  const totalMonths = monthsInWindow(period, scoped, now);
+  const paid = filterPaidByPeriod(dividends, period, now);
+  const totalMonths = monthsInWindow(period, paid, now);
+  const scoped = heldAssetIds ? paid.filter((d) => heldAssetIds.has(d.assetId)) : paid;
 
   // Distinct paid months in the window.
   const paidMonths = new Set<string>();
@@ -425,8 +434,14 @@ export interface PayerRanking {
   remainder: { label: string; amount: number; percentage: number } | null;
   /** The period's whole net income — the denominator every share is measured against. */
   total: number;
-  /** Distinct payers in the period, cut or not. */
+  /** Distinct payers in the period, cut or not, sold or not. */
   payerCount: number;
+  /** Payers still in the portfolio — the ones the rows rank. Equal to `payerCount` without a held set. */
+  heldPayerCount: number;
+  /** Payers no longer held, and what they paid: in the total and in the remainder, never in a row. */
+  soldPayerCount: number;
+  soldNet: number;
+  /** The largest payer STILL HELD; null when every payer of the period has been sold. */
   top: PayerRow | null;
 }
 
@@ -434,32 +449,63 @@ export interface PayerRanking {
  * The period's payers as ranked rows plus a residual — the same shape the category tiles use,
  * so one primitive renders both. Only RECEIVED payments count: a leaderboard that credits an
  * announced coupon would rank money nobody has.
+ *
+ * With `heldAssetIds` only the instruments still in the portfolio are ranked; what a sold
+ * instrument paid stays in `total` (it was income) and in the remainder row, named as sold,
+ * so the shares still add up and the reader sees at once how much of the period's income
+ * came from positions that no longer exist (2026-09-14).
  */
 export function rankPayerShares(
   dividends: Dividend[],
   period: DividendPeriod,
   now: Date = new Date(),
   limit = 5,
+  heldAssetIds?: ReadonlySet<string>,
 ): PayerRanking {
   // rankPayers already folds by asset, sorts by net and scopes to the period's PAID rows;
   // asking it for the raw list (no "Altri" collapse) keeps the two functions in step.
   const payers = rankPayersRaw(dividends, period, now);
   const total = payers.reduce((sum, p) => sum + p.net, 0);
-  if (payers.length === 0) return { rows: [], remainder: null, total: 0, payerCount: 0, top: null };
+  const empty: PayerRanking = {
+    rows: [],
+    remainder: null,
+    total: 0,
+    payerCount: 0,
+    heldPayerCount: 0,
+    soldPayerCount: 0,
+    soldNet: 0,
+    top: null,
+  };
+  if (payers.length === 0) return empty;
 
-  const shown = payers.slice(0, limit);
-  const cut = payers.slice(limit);
+  const held = heldAssetIds ? payers.filter((p) => heldAssetIds.has(p.assetId)) : payers;
+  const sold = heldAssetIds ? payers.filter((p) => !heldAssetIds.has(p.assetId)) : [];
+  const shown = held.slice(0, limit);
+  const cut = held.slice(limit);
   const share = (value: number) => (total > 0 ? (value / total) * 100 : 0);
+  const soldNet = sold.reduce((sum, p) => sum + p.net, 0);
+  const remainderAmount = cut.reduce((sum, p) => sum + p.net, 0) + soldNet;
 
-  const remainderAmount = cut.reduce((sum, p) => sum + p.net, 0);
+  const strumenti = (n: number) => (n === 1 ? 'strumento' : 'strumenti');
+  const venduti = (n: number) => (n === 1 ? 'venduto' : 'venduti');
+  let remainderLabel: string | null = null;
+  if (cut.length > 0 && sold.length > 0) {
+    remainderLabel = `Altri ${cut.length + sold.length} strumenti, ${sold.length} ${venduti(sold.length)}`;
+  } else if (cut.length > 0) {
+    remainderLabel = `Altri ${cut.length} ${strumenti(cut.length)}`;
+  } else if (sold.length > 0) {
+    remainderLabel = `${sold.length} ${strumenti(sold.length)} ${venduti(sold.length)}`;
+  }
+
   return {
     rows: shown.map((p) => ({ key: p.assetId, label: p.assetTicker || p.assetName, amount: p.net, percentage: share(p.net) })),
-    remainder: cut.length > 0
-      ? { label: `Altri ${cut.length} ${cut.length === 1 ? 'strumento' : 'strumenti'}`, amount: remainderAmount, percentage: share(remainderAmount) }
-      : null,
+    remainder: remainderLabel ? { label: remainderLabel, amount: remainderAmount, percentage: share(remainderAmount) } : null,
     total,
     payerCount: payers.length,
-    top: payers[0],
+    heldPayerCount: held.length,
+    soldPayerCount: sold.length,
+    soldNet,
+    top: held[0] ?? null,
   };
 }
 

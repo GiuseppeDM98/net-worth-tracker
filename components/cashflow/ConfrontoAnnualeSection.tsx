@@ -26,8 +26,9 @@ import type { Narrative } from '@/lib/utils/narrative';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { formatCurrency, formatCurrencyCompact, formatPercentage } from '@/lib/services/chartService';
-import { getItalyMonth, getItalyYear, toDate } from '@/lib/utils/dateHelpers';
+import { formatCurrency as formatCurrencyWithCents, formatCurrencyCompact, formatPercentage } from '@/lib/services/chartService';
+import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
+import { getItalyDate, getItalyYear, toDate } from '@/lib/utils/dateHelpers';
 import { MONTH_NAMES } from '@/lib/constants/months';
 import { AsideToggle } from '@/components/cashflow/analisi/AsideToggle';
 import { Tile } from '@/components/ui/tile';
@@ -55,14 +56,17 @@ const TOOLTIP_ITEM_STYLE = {
 
 // ── Module-level helpers ──────────────────────────────────────────────────────
 
-/** Resolves an expense's Italy-calendar bucket for the pure comparison layer. */
-const monthOf = (expense: Expense): { year: number; month: number } => {
-  const date = toDate(expense.date);
-  return { year: getItalyYear(date), month: getItalyMonth(date) };
+/** Resolves an expense's Italy-calendar bucket, day included (the running month is cut at today on both sides). */
+const dayOf = (expense: Expense): { year: number; month: number; day: number } => {
+  const date = getItalyDate(toDate(expense.date));
+  return { year: date.getFullYear(), month: date.getMonth() + 1, day: date.getDate() };
 };
 
-/** «+320,00 €» / «−400,00 €» — the Comma Rule: Intl prints a hyphen, the true minus is U+2212. */
-const formatSignedCurrency = (value: number): string => (value > 0 ? `+${formatCurrency(value)}` : formatCurrency(value).replace(/^-/, '−'));
+/** Whole euros, like every aggregate on the page; the tooltips keep the cents of a plotted sum. */
+const formatCurrency = (value: number): string => cachedFormatCurrencyEUR(value, true);
+
+/** «+320 €» / «−400 €» — the Comma Rule: Intl prints a hyphen, the true minus is U+2212. */
+const formatSignedCurrency = (value: number): string => `${value < 0 ? '−' : '+'}${cachedFormatCurrencyEUR(Math.abs(value), true)}`;
 
 /** «+4,2%» / «−6,3%» — the same typographic sign. */
 const formatSignedPercent = (value: number): string => (value > 0 ? `+${formatPercentage(value, 1)}` : formatPercentage(value, 1).replace(/^-/, '−'));
@@ -112,7 +116,7 @@ function MensileBarChart({
         <XAxis dataKey="month" tick={CHART_TICK_STYLE} axisLine={false} tickLine={false} />
         <YAxis tickFormatter={formatCurrencyCompact} tick={CHART_TICK_STYLE} axisLine={false} tickLine={false} />
         <Tooltip
-          formatter={(value, name) => [formatCurrency(Number(value ?? 0)), name === 'current' ? currentYear.toString() : comparisonYear.toString()]}
+          formatter={(value, name) => [formatCurrencyWithCents(Number(value ?? 0)), name === 'current' ? currentYear.toString() : comparisonYear.toString()]}
           contentStyle={TOOLTIP_CONTENT_STYLE}
           labelStyle={TOOLTIP_LABEL_STYLE}
           itemStyle={TOOLTIP_ITEM_STYLE}
@@ -187,7 +191,8 @@ function CategoryDeltaList({
               </span>
               <span className="text-right">
                 <span className={cn('block font-mono text-[13px] tabular-nums', deltaTextClass(row.delta))}>{formatSignedCurrency(row.delta)}</span>
-                <span className="block font-mono text-[11px] tabular-nums text-muted-foreground">{row.deltaPercent === null ? '—' : formatSignedPercent(row.deltaPercent)}</span>
+                {/* A new category has no baseline to divide by: the «Nuova» badge already says it; no dash. */}
+                {row.deltaPercent !== null && <span className="block font-mono text-[11px] tabular-nums text-muted-foreground">{formatSignedPercent(row.deltaPercent)}</span>}
               </span>
             </button>
           </li>
@@ -220,7 +225,7 @@ function HistoryBarChart({ data, colors }: { data: Array<{ year: string; spese: 
         <XAxis dataKey="year" tick={CHART_TICK_STYLE} axisLine={false} tickLine={false} />
         <YAxis tickFormatter={formatCurrencyCompact} tick={CHART_TICK_STYLE} axisLine={false} tickLine={false} />
         <Tooltip
-          formatter={(value) => [formatCurrency(Number(value ?? 0)), 'Spese']}
+          formatter={(value) => [formatCurrencyWithCents(Number(value ?? 0)), 'Spese']}
           contentStyle={TOOLTIP_CONTENT_STYLE}
           labelStyle={TOOLTIP_LABEL_STYLE}
           itemStyle={TOOLTIP_ITEM_STYLE}
@@ -237,6 +242,8 @@ function HistoryBarChart({ data, colors }: { data: Array<{ year: string; spese: 
 interface ConfrontoAnnualeSectionProps {
   allExpenses: Expense[];
   periodMode: PeriodMode;
+  /** The current year: the last one the history draws (its calendar included). */
+  ceilingYear: number;
   /** The year under review; null in history mode. */
   currentYear: number | null;
   /** The baseline year (the user's pick, else the year before); null when none exists. */
@@ -257,6 +264,7 @@ interface ConfrontoAnnualeSectionProps {
 export function ConfrontoAnnualeSection({
   allExpenses,
   periodMode,
+  ceilingYear,
   currentYear,
   comparisonYear,
   comparisonOptions,
@@ -277,11 +285,11 @@ export function ConfrontoAnnualeSection({
   // history mode needs ≥2 distinct years; current/year needs a comparison year AND a comparable window.
   const hasComparisonData = useMemo(() => {
     if (periodMode === 'history') {
-      const years = new Set(allExpenses.map((e) => getItalyYear(toDate(e.date))));
+      const years = new Set(allExpenses.map((e) => getItalyYear(toDate(e.date))).filter((y) => y >= historyStartYear && y <= ceilingYear));
       return years.size >= 2;
     }
     return comparisonYear !== null && scope !== null;
-  }, [allExpenses, periodMode, comparisonYear, scope]);
+  }, [allExpenses, periodMode, comparisonYear, scope, historyStartYear, ceilingYear]);
 
   // Spending per month for both years, months from the scope. Future months in 'current' mode stay 0.
   const mensileData = useMemo(() => {
@@ -291,7 +299,9 @@ export function ConfrontoAnnualeSection({
     const comparisonTotals = new Map<number, number>();
     for (const expense of allExpenses) {
       if (expense.type === 'income' || expense.type === 'transfer') continue;
-      const { year, month } = monthOf(expense);
+      const { year, month, day } = dayOf(expense);
+      // The running month is compared on its first N days, on both sides (the scope's cut).
+      if (scope.kind === 'singleMonth' && scope.throughDay !== undefined && day > scope.throughDay) continue;
       const target = year === currentYear ? currentTotals : year === comparisonYear ? comparisonTotals : null;
       if (!target) continue;
       target.set(month, (target.get(month) ?? 0) + Math.abs(expense.amount));
@@ -303,12 +313,13 @@ export function ConfrontoAnnualeSection({
     }));
   }, [allExpenses, periodMode, currentYear, comparisonYear, scope]);
 
-  // Annual spending totals from historyStartYear forward — history mode only, oldest first.
+  // Annual spending totals from historyStartYear to the CURRENT year — history mode only,
+  // oldest first. A plan's rows beyond this year are its calendar, not years of history.
   const multiYearData = useMemo(() => {
     if (periodMode !== 'history') return [];
     const years = new Set(allExpenses.map((e) => getItalyYear(toDate(e.date))));
     return Array.from(years)
-      .filter((y) => y >= historyStartYear)
+      .filter((y) => y >= historyStartYear && y <= ceilingYear)
       .sort((a, b) => a - b)
       .map((year) => ({
         year: year.toString(),
@@ -316,14 +327,14 @@ export function ConfrontoAnnualeSection({
           .filter((e) => e.type !== 'income' && e.type !== 'transfer' && getItalyYear(toDate(e.date)) === year)
           .reduce((s, e) => s + Math.abs(e.amount), 0),
       }));
-  }, [allExpenses, periodMode, historyStartYear]);
+  }, [allExpenses, periodMode, historyStartYear, ceilingYear]);
 
   const controls =
     periodMode !== 'history' && comparisonYear !== null ? (
       <div className="flex flex-wrap items-center justify-end gap-2">
         <span>vs</span>
         <Select value={String(comparisonYear)} onValueChange={(value) => onComparisonYearChange(Number(value))}>
-          <SelectTrigger size="sm" aria-label="Anno di confronto" className="h-7 w-[84px] font-mono text-[11px] tabular-nums">
+          <SelectTrigger size="sm" aria-label="Anno di confronto" className="h-11 w-[84px] font-mono text-[11px] tabular-nums data-[size=sm]:h-11 desktop:h-8 desktop:data-[size=sm]:h-8">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

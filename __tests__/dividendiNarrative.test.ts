@@ -41,6 +41,7 @@ import {
   describeComparisonLabel,
   describeConcentration,
   describeDpsGrowth,
+  describeFilteredDividends,
   describeTotalReturn,
   describeMonthlyWindow,
   describeNetIncome,
@@ -54,6 +55,9 @@ import {
   describeYearlyIncome,
   describeYield,
   describeYieldFooter,
+  describeSoldIncomeNote,
+  describeUpcomingDate,
+  describePaymentsFooter,
   type DividendiVerdictInput,
 } from '@/lib/utils/dividendiNarrative';
 
@@ -162,7 +166,24 @@ describe('buildDividendiVerdict', () => {
     expect(verdict.headline).toBe('Il flusso di dividendi cresce.');
     expect(verdict.tone).toBe('positive');
     expect(plain(verdict.sentence)).toBe(
-      'Nel 2026 hai incassato 3116 € netti, +18,0% su gen–ago 2025, da 7 strumenti; rendono il 4,6% lordo sul costo. Il prossimo stacco è ENI il 15 settembre.'
+      'Nel 2026 hai incassato 3116 € netti, +18,0% su gen–ago 2025, da 7 strumenti; i 7 strumenti con costo medio rendono il 4,6% lordo sul costo negli ultimi 12 mesi. Il prossimo stacco è ENI il 15 settembre.'
+    );
+  });
+
+  it('names the yield clause’s own window and population — one held instrument, twelve months', () => {
+    // The clause is off the period axis (TTM on the held instruments with a cost basis): until
+    // 2026-09-14 it read «; rendono l'1,3% lordo sul costo» after «da 3 strumenti», identical in
+    // all four periods, as if the three payers of the year yielded it.
+    const verdict = buildDividendiVerdict({
+      ...VERDICT_INPUT,
+      period: 'month',
+      summary: { ...SUMMARY, net: 57, count: 1 },
+      comparison: { current: 57, previous: 0, deltaPct: null },
+      payerCount: 1,
+      yieldSummary: { ...YIELD, yocGross: 1.3, coverage: 1 },
+    });
+    expect(plain(verdict.sentence)).toBe(
+      "Ad agosto hai incassato 57 € netti da 1 strumento; l’unico strumento con costo medio rende l'1,3% lordo sul costo negli ultimi 12 mesi. Il prossimo stacco è ENI il 15 settembre."
     );
   });
 
@@ -317,6 +338,12 @@ describe('describeReliability', () => {
   it('says nothing when nothing was measured', () => {
     expect(describeReliability({ ...RELIABILITY, payerCount: 0, monthsWithIncome: 0 }, [])).toBeNull();
   });
+
+  it('has an «unico mese» for the one-month window, never «i 1 mesi»', () => {
+    expect(plain(describeReliability({ ...RELIABILITY, monthsWithIncome: 1, monthsInWindow: 1, coveragePct: 1 }, []))).toBe(
+      'Hai incassato nell’unico mese del periodo.'
+    );
+  });
 });
 
 describe('describeConcentration', () => {
@@ -390,6 +417,9 @@ describe('describePayerRanking', () => {
     remainder: { label: 'Altri 5 strumenti', amount: 1436, percentage: 46.1 },
     total: 3116,
     payerCount: 7,
+    heldPayerCount: 7,
+    soldPayerCount: 0,
+    soldNet: 0,
     top: { assetId: 'a-eni', assetTicker: 'ENI', assetName: 'Eni SpA', net: 1062, count: 4 },
   };
 
@@ -409,7 +439,7 @@ describe('describePayerRanking', () => {
     expect(
       plain(
         describePayerRanking(
-          { ...RANKING, rows: [RANKING.rows[0]], remainder: null, payerCount: 1, total: 1062 },
+          { ...RANKING, rows: [RANKING.rows[0]], remainder: null, payerCount: 1, heldPayerCount: 1, total: 1062 },
           'nel 2026'
         )
       )
@@ -417,7 +447,78 @@ describe('describePayerRanking', () => {
   });
 
   it('says nothing when nobody paid', () => {
-    expect(describePayerRanking({ rows: [], remainder: null, total: 0, payerCount: 0, top: null }, 'nel 2026')).toBeNull();
+    expect(
+      describePayerRanking(
+        { rows: [], remainder: null, total: 0, payerCount: 0, heldPayerCount: 0, soldPayerCount: 0, soldNet: 0, top: null },
+        'nel 2026'
+      )
+    ).toBeNull();
+  });
+
+  // The mirror of the real account on 2026-09-14: Eni and Saipem paid in May and were sold since,
+  // the BTP is the only payer still held. The rows rank what is held; the sold money is named.
+  it('ranks the held payers and names what the sold ones paid, in its own clause', () => {
+    const ranking: PayerRanking = {
+      rows: [{ key: 'a-btp', label: 'BTP Valore', amount: 114, percentage: 37.9 }],
+      remainder: { label: '2 strumenti venduti', amount: 186, percentage: 62.1 },
+      total: 300,
+      payerCount: 3,
+      heldPayerCount: 1,
+      soldPayerCount: 2,
+      soldNet: 186,
+      top: { assetId: 'a-btp', assetTicker: 'BTP Valore', assetName: 'BTP Valore Marzo 2032', net: 114, count: 2 },
+    };
+    expect(plain(describePayerRanking(ranking, 'nel 2026'))).toBe(
+      'Ha pagato un solo strumento ancora in portafoglio nel 2026: BTP Valore, 114 € in 2 stacchi; altri 186 € da 2 strumenti venduti.'
+    );
+    expect(plain(describePayerRanking({ ...ranking, heldPayerCount: 2 }, 'nel 2026'))).toBe(
+      '2 strumenti in portafoglio hanno pagato nel 2026; BTP Valore ha pagato di più, 114 € in 2 stacchi; altri 186 € da 2 strumenti venduti.'
+    );
+  });
+
+  it('says so when every payer of the period has been sold', () => {
+    const ranking: PayerRanking = {
+      rows: [],
+      remainder: { label: '2 strumenti venduti', amount: 186, percentage: 100 },
+      total: 186,
+      payerCount: 2,
+      heldPayerCount: 0,
+      soldPayerCount: 2,
+      soldNet: 186,
+      top: null,
+    };
+    expect(plain(describePayerRanking(ranking, 'nel 2026'))).toBe(
+      'Nessuno strumento ancora in portafoglio ha pagato nel 2026: 186 € vengono da 2 strumenti venduti.'
+    );
+    expect(plain(describePayerRanking({ ...ranking, payerCount: 1, soldPayerCount: 1, soldNet: 44, total: 44 }, 'nel 2026'))).toBe(
+      'Nessuno strumento ancora in portafoglio ha pagato nel 2026: 44 € viene da uno strumento venduto.'
+    );
+  });
+});
+
+describe('describeSoldIncomeNote', () => {
+  it('says where the sold income went, and that it is not income to count on', () => {
+    expect(plain(describeSoldIncomeNote(186, 2))).toBe('I 186 € da 2 strumenti venduti restano fuori: non sono reddito su cui contare.');
+    expect(plain(describeSoldIncomeNote(44, 1))).toBe('I 44 € da uno strumento venduto restano fuori: non sono reddito su cui contare.');
+  });
+
+  it('is absent without sold payers', () => {
+    expect(describeSoldIncomeNote(0, 0)).toBeNull();
+  });
+});
+
+describe('describeUpcomingDate', () => {
+  it('drops the year inside the current year and prints it outside', () => {
+    expect(describeUpcomingDate(new Date(2026, 11, 10, 12), NOW)).toBe('10 dic');
+    // The BTP's final premium: «10 mar · 70 €» beside this year's coupons read like next spring.
+    expect(describeUpcomingDate(new Date(2032, 2, 10, 12), NOW)).toBe('10 mar 2032');
+  });
+});
+
+describe('describePaymentsFooter', () => {
+  it('names the announced state by its chip, not by a shade of grey', () => {
+    expect(plain(describePaymentsFooter())).toContain('chip «Attesa»');
+    expect(plain(describePaymentsFooter())).not.toContain('grigio');
   });
 });
 
@@ -651,7 +752,8 @@ describe('describeYield — a spread that prints as zero is not a spread', () =>
   it('drops the clause when the two yields round to the same figure', () => {
     const flat = plain(describeYield({ ...YIELD, yocGross: 0.65, currentYieldGross: 0.66, spread: -0.01 }));
     expect(flat).not.toContain('punti');
-    expect(flat).toBe('Sul costo di quanto detieni oggi rendi lo 0,7% lordo, contro lo 0,7% sul valore di mercato.');
+    // «contro lo 0,7%» compared nothing: two yields that print the same are «in linea».
+    expect(flat).toBe('Sul costo di quanto detieni oggi rendi lo 0,7% lordo, in linea con il valore di mercato.');
   });
 
   it('still states a spread that survives rounding', () => {
@@ -679,5 +781,14 @@ describe('describeYearlyIncome — a first year with nothing to compare it to', 
     expect(
       describeYearlyIncome({ years: [], closedCount: 0, average: null, best: null, worst: null, ongoing: null })
     ).toBeNull();
+  });
+});
+
+describe('describeFilteredDividends', () => {
+  it('counts what the scrape dropped and offers the recovery only when a floor was the creation date', () => {
+    expect(describeFilteredDividends(7, 1)).toBe(
+      '7 dividendi non importati perché precedenti alla data in cui possiedi il titolo: per un titolo creato nell’app dopo l’acquisto, registra l’acquisto nel Registro operazioni con la sua data reale e scarica di nuovo.'
+    );
+    expect(describeFilteredDividends(1, 0)).toBe('1 dividendo non importato perché precedente alla data in cui possiedi il titolo.');
   });
 });

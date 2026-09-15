@@ -57,8 +57,10 @@
   caught «il ordinario» exactly because the prefix was once built with string concatenation.
 - **The two page-level actions talk through window events** (`cashflow:add-dividend`,
   `cashflow:scrape-dividends`), like Tracciamento's `cashflow:add-expense`: the header dispatches, the
-  tab owns the dialogs. Both are desktop-only — on a phone the add button sits beside the period axis
-  and is the ONLY add affordance there, since the bottom-nav FAB belongs to Tracciamento.
+  tab owns the dialogs. The header's buttons are desktop-only — on a phone the add button sits beside
+  the period axis and is the ONLY add affordance there, since the bottom-nav FAB belongs to
+  Tracciamento, and «Scarica storico» sits in the Pagamenti toolbar beside «Esporta CSV» (2026-09-14;
+  four period labels and two 44px squares did not fit 390).
 - **The list is a table where a table is right, and flat rows elsewhere.** `DividendTable` keeps the
   sortable grid from `desktop:` inside the tile (sub-eyebrow headers with `scope`, `th scope="row"`,
   13px mono cells, `-mx-5 px-5` scroll so it never takes the page with it) and becomes a `divide-y`
@@ -66,7 +68,55 @@
   WITH the list length it was opened under, never reset in an effect.
 - **The calendar has no card of its own**: the cell hairlines are the frame, and clicking a day opens
   its dialog. It no longer cross-filters the list (`focusedDate` is gone): with the calendar on screen
-  the narrowed list it produced was invisible.
+  the narrowed list it produced was invisible. Its month is stored WITH the period window it was
+  browsed under (`boundsKey`), so a switch of the axis lands on today's month, and the 42 cells are a
+  roving tabindex the arrows walk (2026-09-14).
+- **TWO POPULATIONS, BOTH NAMED (2026-09-14, the owner's call).** The verdict, the hero and the
+  inventory read the REGISTRY: every payment of the period, sold instruments included, because the
+  income was real («Nel 2026 hai incassato 300 € netti da 3 strumenti»). Affidabilità and Chi paga di
+  più answer in the present tense («posso contare su questo reddito?»), so they measure the
+  instruments STILL HELD — `computeReliability` and `rankPayerShares` take `heldAssetIds` (the page's
+  assets with `quantity > 0`) — and name what the sold ones paid in their own clause: the reading
+  («altri 186 € da 2 strumenti venduti»), the residual row («2 strumenti venduti», so the shares still
+  add up to the aside's total, which stays the period's), the footer (`describeSoldIncomeNote`) and,
+  when every payer was sold, the empty copy of Affidabilità. On the owner's mirror «Concentrazione
+  alta: SPM.MI vale il 47% del netto» was a risk warning on a stock already sold. The window's length
+  never follows the subset: two months paid out of nine is «2 su 9», not «2 su 2».
+- **The verdict's yield clause names its window and its population.** «; l'unico strumento con costo
+  medio rende l'1,3% lordo sul costo negli ultimi 12 mesi» (or «; i 7 strumenti con costo medio
+  rendono …»): the figure is TTM on the held instruments with a cost basis, off the period axis, and
+  until 2026-09-14 it read «; rendono l'1,3%» right after «da 3 strumenti» — identical in all four
+  periods. In `describeYield` two yields that print the same are «in linea con il valore di mercato»,
+  never «contro l'1,3%». A one-month window says «nell'unico mese del periodo» (no «i 1 mesi»), and a
+  «Prossimi pagamenti» row outside the current year prints its year (`describeUpcomingDate`).
+- **The form (`DividendDialog`) is in the modal vocabulary** (doc/guide/dialog.md): the reading is the
+  status line (`describeDividendIntent` idle, `describeFormRefusal` on a refused submit with
+  `aria-invalid` and the focus on the first refused field in READING order — `shouldFocusError: false`,
+  or react-hook-form moves it to the first registered one and skips the combobox), the submit is never
+  `disabled`, a failed write speaks `describeWriteError` there, a duplicate (`skipped`) says so instead of
+  closing. The picker lists every instrument of an equity or bonds class that is not a pension fund,
+  an account or a house, held or sold («· venduto»), plus the record's own instrument on an edit; it
+  stays mounted while the assets load (disabled). The withholding proposal is the instrument's own
+  `taxRate` over the gross per unit, on a new record and an untouched field only; a bond's payment
+  defaults to «Cedola». The summary is a `bg-muted` block in the mono face with no sign colour.
+- **The row is reachable and its delete arms in place.** The instrument's name in the desktop table
+  is a `<button>` («Dettagli: la cedola di BTP del 10/09/2026») that opens the record and receives the
+  focus back (`returnFocusTo`); the two actions name their record; the delete is `useArmedDelete`
+  (no timer): «Conferma» in words AND in the accessible name («Premi di nuovo per eliminare …»),
+  `describeDividendDeleteConsequence` printed in the row (it says «e dal Cashflow» when a booked
+  expense goes with it), one live region per table. A phone has NO delete for a payment (the record
+  drawer edits; a spec that plants a row on the `mobile` project removes it through the REST API).
+- **«Annunciato» is a word on every surface**: the «Attesa»/«Provvisoria» chips are on the desktop
+  `<th>` AND the phone's row; the phone's list closes on the two totals; the calendar's announced day
+  carries a `--warning-border` hairline and the word «attesa» under its amount. Its name to a reader is
+  «10 dicembre 2026 — 1 pagamento in attesa».
+- **Nothing recorded is one tile, not five zeros**: with `dividends.length === 0` the grid is a single
+  «Pagamenti» tile with the `EmptyState` sentence and the two actions (add, scrape); the axis is not
+  rendered. A failed `useDividendStats` read is said in place of the Dettaglio (`ErrorNotice compact`)
+  and inside Rendimento with the «Lettura fallita» eyebrow, never an empty space.
+- **The type labels are the readings' words**: «Acconto» and «Saldo» (`dividendTypeLabels`), the one
+  map the select, the table and the two detail dialogs read — the article map `LARGEST_TYPE_PREFIX`
+  and `dividendTypeNoun` («la cedola», «il dividendo») live in `dividendiNarrative.ts`.
 
 ## Dividends and Coupons
 - **A coupon's cashflow expense is created only by the daily cron on payment date, never at asset-save time**
@@ -83,11 +133,34 @@
 - **YOC, Current Yield and per-asset Total Return are scoped to the CURRENT holding** (`createAsset` re-links by ISIN, so
   dividends before `holdingStartDate` are dropped, with `deriveHoldingStartDates` for legacy rebuys). **DPS growth is
   deliberately NOT scoped** — it is a security-level payout history.
+- **A scraped dividend has ONE floor** (`lib/utils/dividendEligibility.ts`, 2026-09-13): the holding start from the
+  ledger when there is one, else the asset's creation date — shared by `/api/dividends/scrape` and cron Phase 1. A
+  floor is never silent: the route returns `filtered`, `floorDate` and `floorSource`, and «Scarica dividendi storici»
+  toasts `describeFilteredDividends` — how many were dropped and, when a floor was the creation date, the recovery
+  (record the purchase in the Registro operazioni with its real date and scrape again). Until then the button said
+  «Nessun nuovo dividendo trovato» for every stock added to the app after its dividends, which read as «none exist».
 - **Received metrics filter on `paymentDate`, not `exDate`**; use `setHours(23,59,59,999)` for the upper bound, or a
   `…T00:00:00Z` dividend reads as future.
-- **Inflation-linked coupons (BTP Italia) are additive**, resolved by `resolveCoupon`/`buildCouponNote` for both the
-  client scheduler and cron Phase 3: the FOI rate is already per-period, deflation is floored to 0, and an unannounced
-  coupon is stored **provisional**.
+- **Two inflation mechanisms, ONE field** (`BondDetails.inflationIndexation`, read only through
+  `resolveInflationIndexation`, which maps the legacy `isInflationLinked: true` to `italia`; the flag is never written
+  any more). **`italia` (BTP Italia) is additive**: the FOI rate is already per-period, deflation is floored to 0, the
+  capital redeems at par. **`euro` (BTP€i, issue #341, 2026-09-11) is multiplicative**: coupon = real rate per period ×
+  the HICP indexation coefficient at the payment date × nominal; the revaluation accrues in the coefficient and is
+  cashed at maturity, never with the coupon — no minimum coupon, no loyalty premium. Both are resolved by
+  `resolveCoupon`/`buildCouponNote` for the client scheduler (`scheduleNextCoupon`), `InflationRateDialog` and cron
+  Phase 3. An unannounced coupon is stored **provisional**: at the fixed floor for `italia`, at the LATEST KNOWN
+  coefficient for `euro` (par when none — the note says which). The coefficients live in
+  `bondDetails.indexationCoefficients` (`{ date, coefficient }[]`, keyed by calendar DAY: `findIndexationCoefficient`
+  takes the coupon's day, else the latest of its month; `latestIndexationCoefficient(entries, asOf)` feeds the
+  valuation and the provisional estimate; `upsertIndexationCoefficient` replaces the same day only). The dialog that
+  finalises a provisional coupon is ONE component for both mechanisms (`InflationRateDialog`: FOI % or coefficient,
+  copy from `MECHANISM_COPY`), and the banner/button say «dato d'inflazione», never «tasso FOI».
+- **A zero-coupon bond (rate 0) saves its details and materialises nothing** (issue #340): `buildBondDetailsFromForm`
+  (`lib/utils/bondDetailsForm.ts`, pure, tested against the real function) treats only an EMPTY rate as missing, and
+  `scheduleNextCoupon` returns `{ scheduled: false }` through `hasCouponPayments` (rate 0 and no positive tier). Cron
+  Phase 3 never sees such a bond: it walks from an existing coupon.
+- **Redemption at maturity is not an event, for any bond**: a matured bond keeps its last price until the user sells it
+  in the Registro; for a BTP€i the final `nominal × coefficient` is therefore recorded as that sale, never generated.
 - **`/api/dividends/stats` returns the NET yields too** (`portfolioYieldOnCostNet`,
   `portfolioCurrentYieldGross/Net`): `computeDividendYieldMetrics` has always produced them and the
   route used to drop them, which forced every consumer wanting a net figure to re-derive it from an
@@ -103,4 +176,4 @@
 
 ## Per-page blind spots
 
-- **Dividendi**: the payments table dropped *Tax/Netto/Costo per azione*; the calendar day opens the day dialog instead of filtering; under «Mese» no month arrows, under «Anno» they stop at January/December; the 2-click delete keeps its 3 s auto-disarm; the list toolbar is rendered twice. The yield never follows the period (TTM on the current holding); the DPS running-year column is a partial sum; no `averageCost` → the tile becomes an explanation.
+- **Dividendi**: the payments table dropped *Tax/Netto/Costo per azione*; the calendar day opens the day dialog instead of filtering; under «Mese» no month arrows, under «Anno» they stop at January/December; the list toolbar is rendered twice (desktop and phone, one hidden). The yield never follows the period (TTM on the current holding); the DPS running-year column is a partial sum; no `averageCost` → the tile becomes an explanation. Since 2026-09-14: Chi paga di più ranks only the HELD payers while its aside's total is the whole period's (the «venduti» row closes the gap); the verdict's «da 3 strumenti» counts sold payers too, on purpose; an edit form opens with the picker focused and its list open (Radix focuses the first field); a phone has no delete for a payment; the Dividendi axis options are `radio`, not `tab`, in a spec.

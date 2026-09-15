@@ -69,6 +69,12 @@ describe('resolveSingleMonth', () => {
     expect(resolveSingleMonth(PAST_YEAR, TODAY)).toBeNull();
     expect(resolveSingleMonth(HISTORY, TODAY)).toBeNull();
   });
+
+  it('should mean no month for a month that has not started — its calendar has no average to run hot against', () => {
+    expect(resolveSingleMonth({ mode: 'current', year: 2026, month: 12 }, TODAY)).toBeNull();
+    expect(resolveSingleMonth({ mode: 'year', year: 2027, month: 1 }, TODAY)).toBeNull();
+    expect(resolveSingleMonth(CURRENT_MONTH, TODAY)).toEqual({ year: 2026, month: 8 });
+  });
 });
 
 describe('resolvePeriodThroughMonth', () => {
@@ -130,6 +136,15 @@ describe('rankTopExpenses', () => {
     expect(top.rows[0].percentage).toBeCloseTo((1180 / 4400) * 100, 5);
     expect(top.rows[2]).toMatchObject({ label: 'Casa', caption: '15 lug', subCategoryLabel: null, subCategoryKey: null });
     expect(top.shownTotal).toBe(4350);
+  });
+
+  it('should say in the caption when a ranked row is still in the calendar', () => {
+    // The Scheduled-Is-Not-Spent Rule: a row dated ahead ranks (it is in the total) and says so.
+    const top = rankTopExpenses(rows, dayOf, 5, (expense) => monthOf(expense).month >= 8);
+    expect(top.rows[0]).toMatchObject({ caption: '12 ago · Volo · in calendario', scheduled: true });
+    expect(top.rows[2]).toMatchObject({ caption: '15 lug', scheduled: false });
+    // The default is nothing scheduled.
+    expect(rankTopExpenses(rows, dayOf, 5).rows.every((row) => !row.scheduled)).toBe(true);
   });
 
   it('should treat a subcategory name without an id as no subcategory', () => {

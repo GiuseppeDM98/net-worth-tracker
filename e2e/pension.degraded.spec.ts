@@ -59,7 +59,8 @@ test('copertura sospetta: verdetto e tessera dichiarano il rendimento inattendib
 
   // IL PUNTO DI QUESTO TEST: nessun «Guadagno di mercato» sotto un avviso che dice che quella
   // differenza NON è guadagno di mercato — la scomposizione sparisce con la percentuale.
-  await page.getByRole('button', { name: /^Dettaglio/ }).click();
+  // Nulla è misurato: il Dettaglio è già aperto da solo (la guida «Come aggiornare» è l'unico testo che orienta).
+  await expect(page.getByRole('button', { name: /^Dettaglio/ })).toHaveAttribute('aria-expanded', 'true');
   await expect(page.getByRole('region', { name: 'Da dove viene la crescita' })).toHaveCount(0);
   await expect(page.getByText('Guadagno di mercato')).toHaveCount(0);
   await expect(page.getByRole('region', { name: 'Come aggiornare il valore del fondo' })).toBeVisible();
@@ -73,7 +74,8 @@ test('finestra ferma: spiega invece di stampare +0,00% e NON scompone la crescit
   await expect(rendimento(page)).toContainText('non si è ancora mosso');
   await expect(rendimento(page).getByText(SIGNED_PCT)).toHaveCount(0);
 
-  await page.getByRole('button', { name: /^Dettaglio/ }).click();
+  // Nulla è misurato: il Dettaglio è già aperto da solo (la guida «Come aggiornare» è l'unico testo che orienta).
+  await expect(page.getByRole('button', { name: /^Dettaglio/ })).toHaveAttribute('aria-expanded', 'true');
   await expect(page.getByRole('region', { name: 'Da dove viene la crescita' })).toHaveCount(0);
 });
 
@@ -93,6 +95,7 @@ test('fondo appena creato: la tessera Rendimento spiega, e la riga non resta vuo
   expect(returnBox.x).toBeGreaterThan(hero.x + hero.width - 1);
   expect(Math.abs(returnBox.y - hero.y)).toBeLessThan(2);
 
-  await page.getByRole('button', { name: /^Dettaglio/ }).click();
+  // Nulla è misurato: il Dettaglio è già aperto da solo (la guida «Come aggiornare» è l'unico testo che orienta).
+  await expect(page.getByRole('button', { name: /^Dettaglio/ })).toHaveAttribute('aria-expanded', 'true');
   await expect(page.getByRole('region', { name: 'Da dove viene la crescita' })).toHaveCount(0);
 });

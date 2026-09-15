@@ -19,7 +19,10 @@ vi.mock('firebase/firestore', () => ({
   deleteField: vi.fn(),
 }));
 
+import { ASSET_CLASS_SEQUENCE } from '@/lib/utils/allocationUtils';
+import { PENSION_BAND_KEY } from '@/lib/utils/historyComposition';
 import {
+  atPreviousMonth,
   buildOverviewVerdict,
   describeCashflow,
   describeComposition,
@@ -85,6 +88,74 @@ describe('buildOverviewVerdict — headline and tone', () => {
     expect(verdict.tone).toBe('warning');
   });
 
+  // September 2026 on the real account: −4.937,74 € with the market at −1.078,73 € and 4.088,86 €
+  // of estimated tax on a Vanguard sale — a fifth of the drop was the market's.
+  const SEPTEMBER_SALE = {
+    proceeds: 39052.45,
+    realizedGain: 15726.38,
+    estimatedTax: 4088.86,
+    instruments: [{ id: 'vwce', name: 'Vanguard FTSE All-World', proceeds: 39052.45, realizedGain: 15726.38, estimatedTax: 4088.86 }],
+    brokenLedgers: 0,
+  };
+  const SEPTEMBER: OverviewVerdictInput = {
+    ...AUGUST,
+    month: 9,
+    monthlyVariation: { value: -4937.74, percentage: -1.66 },
+    marketEffect: -1078.73,
+    topMover: { assetClass: 'equity', delta: -815.94 },
+    sales: SEPTEMBER_SALE,
+  };
+
+  it('should name the tax over the market when the estimated tax on a sale outweighs the market loss', () => {
+    const verdict = buildOverviewVerdict(SEPTEMBER);
+    expect(verdict.headline).toBe('Settembre è in calo: il mercato ha pesato, le tasse sulle vendite di più.');
+    expect(verdict.tone).toBe('negative');
+  });
+
+  it('should name both when the market lost more than the tax', () => {
+    const verdict = buildOverviewVerdict({ ...SEPTEMBER, marketEffect: -5000 });
+    expect(verdict.headline).toBe('Settembre è in calo: il mercato ha pesato, e con lui le tasse sulle vendite.');
+  });
+
+  it('should name the flows over the market when no sale explains them', () => {
+    const verdict = buildOverviewVerdict({ ...SEPTEMBER, sales: null });
+    expect(verdict.headline).toBe('Settembre è in calo: più per le uscite che per il mercato.');
+    expect(verdict.tone).toBe('negative');
+  });
+
+  it('should name the tax on the sale in the headline when the market gained and the tax explains the drop', () => {
+    // The real account, settembre 2026: −4155,63 € with the market at +153 € and 4.089 € withheld
+    // by the broker — «nonostante il mercato» stopped one step short of the cause (owner, 2026-09-13).
+    const verdict = buildOverviewVerdict({
+      ...SEPTEMBER,
+      isNewATH: false,
+      monthlyVariation: { value: -4155.63, percentage: -1.4 },
+      marketEffect: 153,
+      topMover: { assetClass: 'pension', delta: 256 },
+    });
+    expect(verdict.headline).toBe('Settembre è in calo per le tasse sulla vendita di Vanguard FTSE All-World, non per il mercato.');
+    expect(verdict.tone).toBe('warning');
+    // The sale comes right after the variation, the split is gone (the headline said it), and
+    // the pension band reads as a subject, not as its database key.
+    expect(plain(verdict.sentence)).toBe(
+      'Il patrimonio vale 412.380,52 €: −4155,63 € (−1,40%) su agosto, +8,29% da inizio anno. ' +
+        'Hai venduto Vanguard FTSE All-World per 39.052 € con una plusvalenza di 15.726 € e pagato circa 4089 € di tasse. ' +
+        'Hai messo da parte il 40% delle entrate e i fondi pensione hanno fatto il grosso del lavoro (+256 €).',
+    );
+  });
+
+  it('should keep «nonostante il mercato» when the market gained and the tax is a minority of the drop', () => {
+    const verdict = buildOverviewVerdict({
+      ...SEPTEMBER,
+      monthlyVariation: { value: -12000, percentage: -3 },
+      marketEffect: 900,
+      topMover: { assetClass: 'equity', delta: 900 },
+    });
+    expect(verdict.headline).toBe('Settembre è in calo, nonostante il mercato.');
+    expect(verdict.tone).toBe('warning');
+    expect(plain(verdict.sentence)).toContain('Di quel movimento, +900 € viene dal mercato e −12.900 € dai tuoi movimenti.');
+  });
+
   it('should stay neutral and factual without a prior snapshot to compare against', () => {
     const verdict = buildOverviewVerdict({
       ...AUGUST,
@@ -116,7 +187,32 @@ describe('buildOverviewVerdict — sentence', () => {
     const text = plain(buildOverviewVerdict(AUGUST).sentence);
     expect(text).toBe(
       'Il patrimonio vale 412.380,52 €: +4120,18 € (+1,01%) su luglio, +8,29% da inizio anno, nuovo massimo storico. ' +
-        'Hai messo da parte il 40% delle entrate e le azioni hanno fatto il grosso del lavoro (+3480 €).',
+        'Hai messo da parte il 40% delle entrate e le azioni hanno fatto il grosso del lavoro (+3480 €). ' +
+        'Di quel movimento, +3980 € viene dal mercato e +140 € dai tuoi movimenti.',
+    );
+  });
+
+  it('should close on the split and the sale that explains it, in the same words as the email', () => {
+    const text = plain(
+      buildOverviewVerdict({
+        ...AUGUST,
+        month: 9,
+        isNewATH: false,
+        monthlyVariation: { value: -4937.74, percentage: -1.66 },
+        marketEffect: -1078.73,
+        topMover: { assetClass: 'equity', delta: -815.94 },
+        sales: {
+          proceeds: 39052.45,
+          realizedGain: 15726.38,
+          estimatedTax: 4088.86,
+          instruments: [{ id: 'vwce', name: 'Vanguard FTSE All-World', proceeds: 39052.45, realizedGain: 15726.38, estimatedTax: 4088.86 }],
+          brokenLedgers: 0,
+        },
+      }).sentence,
+    );
+    expect(text).toContain(
+      'le azioni hanno pesato (−816 €). Di quel movimento, −1079 € viene dal mercato e −3859 € dai tuoi movimenti. ' +
+        'Hai venduto Vanguard FTSE All-World per 39.052 € con una plusvalenza di 15.726 € e pagato circa 4089 € di tasse.',
     );
   });
 
@@ -168,6 +264,34 @@ describe('buildOverviewVerdict — sentence', () => {
   it('should capitalise the driver when there is no savings clause before it', () => {
     const text = plain(buildOverviewVerdict({ ...AUGUST, savingsRate: null }).sentence);
     expect(text).toContain('. Le azioni hanno fatto il grosso del lavoro (+3480 €).');
+  });
+
+  it('should give every asset class and the pension band a subject, so no key ever reaches the sentence', () => {
+    for (const assetClass of [...ASSET_CLASS_SEQUENCE, PENSION_BAND_KEY]) {
+      const text = plain(buildOverviewVerdict({ ...AUGUST, topMover: { assetClass, delta: 500 } }).sentence);
+      // The subject is an Italian noun phrase with its article — never the bare key («e pension
+      // hanno», «e equity hanno»); «il carry» is the one key that is also its own Italian word.
+      expect(text).toMatch(/ e (le|gli|la|il|i) [a-zà-ù ]+ (hanno|ha) fatto il grosso del lavoro \(\+500 €\)\./);
+      expect(text).not.toContain(` e ${assetClass} `);
+    }
+  });
+
+  it('should drop the driver clause for a class it cannot name, instead of printing the key', () => {
+    const text = plain(buildOverviewVerdict({ ...AUGUST, topMover: { assetClass: 'structuredNotes', delta: 500 } }).sentence);
+    expect(text).toContain('Hai messo da parte il 40% delle entrate.');
+    expect(text).not.toContain('structuredNotes');
+    expect(text).not.toContain('grosso del lavoro');
+  });
+});
+
+describe('atPreviousMonth', () => {
+  it('should put the euphonic d before a vowel month and capitalise on request', () => {
+    expect(atPreviousMonth(9)).toBe('ad agosto');
+    expect(atPreviousMonth(9, true)).toBe('Ad agosto');
+    expect(atPreviousMonth(5)).toBe('ad aprile');
+    expect(atPreviousMonth(11)).toBe('ad ottobre');
+    expect(atPreviousMonth(8)).toBe('a luglio');
+    expect(atPreviousMonth(1)).toBe('a dicembre');
   });
 });
 

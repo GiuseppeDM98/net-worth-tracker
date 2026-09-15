@@ -8,6 +8,7 @@ import { NarrativeText } from '@/components/ui/narrative-text';
 
 interface RischioTileProps {
   risk: BudgetRiskSummary;
+  aside: Narrative;
   reading: Narrative;
   footer: Narrative;
   className?: string;
@@ -20,9 +21,9 @@ interface RischioTileProps {
  * projections, not money spent, and only over the categories the user gave a budget to.
  * The crossed thresholds live in the Avvisi tile — no row appears in both.
  */
-export function RischioTile({ risk, reading, footer, className }: RischioTileProps) {
+export function RischioTile({ risk, aside, reading, footer, className }: RischioTileProps) {
   return (
-    <Tile eyebrow="Categorie a rischio" aside={<span>a fine mese</span>} reading={reading} className={className}>
+    <Tile eyebrow="Categorie a rischio" aside={<NarrativeText segments={aside} figureClassName="font-medium" />} reading={reading} className={className}>
       {risk.atRisk.length > 0 && (
         <ul className="mt-2 flex flex-col divide-y divide-border">
           {risk.atRisk.map((row) => (

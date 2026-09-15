@@ -33,6 +33,7 @@ import {
   describeComparisonSummary,
   describeEntityFocus,
   describeFlow,
+  describeMissingBaseline,
   describePeriodScope,
   describeSpendingChart,
   describeSpendingChartFooter,
@@ -107,13 +108,17 @@ describe('describeAnalisiSubject', () => {
   });
 
   it('should name a month with the euphonic "ad", the year only when it differs from today', () => {
-    expect(describeAnalisiSubject(CURRENT_MONTH, TODAY, 2024)).toMatchObject({ subject: 'Ad agosto', inPeriod: 'ad agosto', ongoing: true, comparisonOf: 'di agosto 2025', comparisonPlain: 'agosto 2025' });
+    // The running month is judged on its lived days, and says so — like «Nel 2026 finora».
+    expect(describeAnalisiSubject(CURRENT_MONTH, TODAY, 2024)).toMatchObject({ subject: 'Ad agosto finora', inPeriod: 'ad agosto finora', ongoing: true, comparisonOf: 'di agosto 2025', comparisonPlain: 'agosto 2025' });
     expect(describeAnalisiSubject(PAST_MONTH, TODAY, 2024)).toMatchObject({ subject: 'A marzo', ongoing: false, comparisonOf: 'di marzo 2025' });
     expect(describeAnalisiSubject(PAST_YEAR_MONTH, TODAY, 2024)).toMatchObject({ subject: 'A novembre 2025', ongoing: false, comparisonOf: 'di novembre 2024' });
   });
 
-  it('should open the history on its floor year, with no comparison', () => {
-    expect(describeAnalisiSubject(HISTORY, TODAY, 2024)).toEqual({ subject: 'Dal 2024', inPeriod: 'dal 2024', ongoing: true, comparisonOf: null, comparisonPlain: null, future: false });
+  it('should span the history from its floor year to the current one, with no comparison', () => {
+    // Two ends: a materialised plan reaching 2043 must not stretch «Dal 2024» into the future.
+    expect(describeAnalisiSubject(HISTORY, TODAY, 2024)).toEqual({ subject: 'Dal 2024 al 2026', inPeriod: 'dal 2024 al 2026', ongoing: true, comparisonOf: null, comparisonPlain: null, future: false });
+    // A history that starts this year is just this year.
+    expect(describeAnalisiSubject(HISTORY, TODAY, 2026)).toMatchObject({ subject: 'Nel 2026', inPeriod: 'nel 2026' });
   });
 });
 
@@ -125,8 +130,8 @@ describe('describeAnalisiScheduledHorizon', () => {
     expect(describeAnalisiScheduledHorizon({ mode: 'current', year: 2026, month: 10 }, TODAY)).toBe('a fine ottobre');
   });
 
-  it('should have no horizon for the history — an end nobody can name is not guessed', () => {
-    expect(describeAnalisiScheduledHorizon(HISTORY, TODAY)).toBeNull();
+  it('should close the history on the current year, like the running year', () => {
+    expect(describeAnalisiScheduledHorizon(HISTORY, TODAY)).toBe('a fine anno');
   });
 });
 
@@ -153,7 +158,19 @@ describe('describeBaseline', () => {
     expect(describeBaseline({ kind: 'sameMonths', upToMonth: 12 }, 2025)).toBe('2025');
     expect(describeBaseline({ kind: 'fullYear' }, 2024)).toBe('2024');
     expect(describeBaseline({ kind: 'singleMonth', month: 8, inProgress: true }, 2025)).toBe('agosto 2025 (mese in corso)');
+    // Cut at today's day on both sides: the baseline names the days, not a partial window.
+    expect(describeBaseline({ kind: 'singleMonth', month: 8, inProgress: true, throughDay: 14 }, 2025)).toBe('agosto 2025 (primi 14 giorni)');
     expect(describeBaseline({ kind: 'singleMonth', month: 3 }, 2025)).toBe('marzo 2025');
+  });
+});
+
+describe('describeMissingBaseline', () => {
+  it('should say which baseline window is empty, so a dropped comparison is never silent', () => {
+    expect(describeMissingBaseline({ kind: 'singleMonth', month: 9, inProgress: true, throughDay: 14 }, 2025)).toBe('Nessun movimento nei primi 14 giorni di settembre 2025: nessun confronto.');
+    expect(describeMissingBaseline({ kind: 'singleMonth', month: 8 }, 2025)).toBe('Nessun movimento ad agosto 2025: nessun confronto.');
+    expect(describeMissingBaseline({ kind: 'sameMonths', upToMonth: 8 }, 2025)).toBe('Nessun movimento in gen–ago 2025: nessun confronto.');
+    expect(describeMissingBaseline({ kind: 'sameMonths', upToMonth: 12 }, 2025)).toBe('Nessun movimento nel 2025: nessun confronto.');
+    expect(describeMissingBaseline({ kind: 'fullYear' }, 2024)).toBe('Nessun movimento nel 2024: nessun confronto.');
   });
 });
 
@@ -214,15 +231,15 @@ describe('buildAnalisiVerdict', () => {
 
   it('should drop the month count clause for a month and name the anomalies without repeating the month', () => {
     const verdict = buildAnalisiVerdict({ ...INPUT, period: CURRENT_MONTH, baseline: 'agosto 2025', grown: null, shrunk: null });
-    expect(verdict.headline).toBe('Ad agosto spendi più di agosto 2025.');
-    expect(plain(verdict.sentence)).toBe('Ad agosto hai speso 31.200 €, +4,2% su agosto 2025; Casa pesa un terzo; 2 categorie sono fuori scala: Ristoranti e Auto.');
+    expect(verdict.headline).toBe('Ad agosto finora spendi più di agosto 2025.');
+    expect(plain(verdict.sentence)).toBe('Ad agosto finora hai speso 31.200 €, +4,2% su agosto 2025; Casa pesa un terzo; 2 categorie sono fuori scala: Ristoranti e Auto.');
   });
 
   it('should fall back to the heaviest category when there is nothing to compare', () => {
     const history = buildAnalisiVerdict({ ...INPUT, period: HISTORY, pacing: null, baseline: null, grown: null, shrunk: null, anomalies: [], anomalyMonth: null });
     expect(history.headline).toBe('Casa è la voce più pesante.');
     expect(history.tone).toBe('neutral');
-    expect(plain(history.sentence)).toBe('Dal 2024 hai speso 31.200 €; Casa pesa un terzo.');
+    expect(plain(history.sentence)).toBe('Dal 2024 al 2026 hai speso 31.200 €; Casa pesa un terzo.');
   });
 
   it('should say «ed è anche» when the heaviest category is the one that moved the most', () => {
@@ -297,7 +314,8 @@ describe('describePeriodScope', () => {
     expect(plain(describePeriodScope(PAST_YEAR, TODAY, null, 2024))).toBe('12 mesi');
     expect(plain(describePeriodScope(CURRENT_MONTH, TODAY, { dayOfMonth: 25, daysInMonth: 31 }, 2024))).toBe('giorno 25 di 31');
     expect(describePeriodScope(PAST_MONTH, TODAY, null, 2024)).toBeNull();
-    expect(plain(describePeriodScope(HISTORY, TODAY, null, 2024))).toBe('dal 2024');
+    expect(plain(describePeriodScope(HISTORY, TODAY, null, 2024))).toBe('dal 2024 al 2026');
+    expect(plain(describePeriodScope(HISTORY, TODAY, null, 2026))).toBe('dal 2026');
   });
 });
 
@@ -335,6 +353,7 @@ describe('describeTopExpenses', () => {
     label,
     subCategoryLabel: sub,
     caption: '1 gen',
+    scheduled: false,
     amount,
     percentage: 1,
     expenseType: 'variable' as const,
@@ -429,6 +448,28 @@ describe('describeEntityFocus', () => {
     expect(plain(fresh)).toBe('Nel 2026 hai speso 70 € in Regali, lo 0,2% delle spese; +70 € sugli stessi mesi del 2025, dove non c\'era.');
   });
 
+  it('should name the delta\'s own window when the period total spans the whole calendar year', () => {
+    // «Anno corrente» prints twelve months of a mortgage (6710 €) while the year row compares
+    // nine against nine (5032 €): one sentence, two windows, each with its figure (2026-09-14).
+    const reading = describeEntityFocus({
+      label: 'Mutuo',
+      parentLabel: null,
+      isIncome: false,
+      subject,
+      periodTotal: 6710,
+      shareOfPeriod: 0.168,
+      shareOfParent: null,
+      delta: { amount: 0, percent: 0, sameMonths: true, comparisonYear: 2025, livedTotal: 5032, livedMonths: 8 },
+      monthlyAverage: 559,
+      hasHistory: true,
+      historyStartYear: 2024,
+    });
+    expect(plain(reading)).toBe("Nel 2026 hai speso 6710 € in Mutuo, il 16,8% delle spese; nei primi 8 mesi 5032 €, in linea con gli stessi mesi del 2025, al ritmo di 559 € al mese.");
+    // When the two figures coincide (a «Da inizio anno» cut), the window is not repeated.
+    const cut = describeEntityFocus({ label: 'Mutuo', parentLabel: null, isIncome: false, subject, periodTotal: 5032, shareOfPeriod: 0.168, shareOfParent: null, delta: { amount: 0, percent: 0, sameMonths: true, comparisonYear: 2025, livedTotal: 5032, livedMonths: 8 }, monthlyAverage: 559, hasHistory: true, historyStartYear: 2024 });
+    expect(plain(cut)).toBe('Nel 2026 hai speso 5032 € in Mutuo, il 16,8% delle spese; in linea con gli stessi mesi del 2025, al ritmo di 559 € al mese.');
+  });
+
   it('should say when the entity has nothing in the period, or nothing at all', () => {
     const empty = describeEntityFocus({ label: 'Skipass', parentLabel: 'Viaggi', isIncome: false, subject, periodTotal: 0, shareOfPeriod: null, shareOfParent: null, delta: null, monthlyAverage: null, hasHistory: true, historyStartYear: 2024 });
     expect(plain(empty)).toBe('Nessuna spesa in Skipass nel 2026; la storia sotto copre tutti gli anni.');
@@ -467,7 +508,10 @@ describe('describeComparison', () => {
     expect(plain(flat)).toBe('Nel 2026 (gen–ago) hai speso come nel 2025 (29.950 €).');
 
     const month = describeComparison({ subject: describeAnalisiSubject(CURRENT_MONTH, TODAY, 2024), scope: { kind: 'singleMonth', month: 8, inProgress: true }, comparisonYear: 2025, expenses: { current: 3600, previous: 3543, delta: 57, deltaPercent: 1.6 }, rows: [row('Auto', 57)] });
-    expect(plain(month)).toBe('Ad agosto hai speso 57 € in più di agosto 2025 (+1,6%), a mese in corso; a crescere di più è stata Auto (+57 €).');
+    expect(plain(month)).toBe('Ad agosto finora hai speso 57 € in più di agosto 2025 (+1,6%), a mese in corso; a crescere di più è stata Auto (+57 €).');
+
+    const sameDays = describeComparison({ subject: describeAnalisiSubject(CURRENT_MONTH, TODAY, 2024), scope: { kind: 'singleMonth', month: 8, inProgress: true, throughDay: 14 }, comparisonYear: 2025, expenses: { current: 3600, previous: 3543, delta: 57, deltaPercent: 1.6 }, rows: [row('Auto', 57)] });
+    expect(plain(sameDays)).toBe('Ad agosto finora hai speso 57 € in più di agosto 2025 (+1,6%), sui primi 14 giorni; a crescere di più è stata Auto (+57 €).');
   });
 
   it('should return null without a baseline', () => {

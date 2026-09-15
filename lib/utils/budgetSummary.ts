@@ -24,6 +24,7 @@ import {
   resolveItemPace,
   sectionWeight,
   splitMonthlyTotalExpenses,
+  yearElapsedPctAt,
   type BudgetCalendar,
 } from '@/lib/utils/budgetUtils';
 import { getItalyDate, getItalyMonth, getItalyYear } from '@/lib/utils/dateHelpers';
@@ -34,12 +35,20 @@ import { resolveMonthCeilings, type MonthCeiling } from '@/lib/utils/budgetHisto
 
 export interface CeilingSummary {
   ceiling: number;
-  /** Everything booked in the month, scheduled rows included — what «usato» reads. */
+  /**
+   * Everything booked in the month, scheduled rows included — what the ratios (`usedPct`,
+   * `remaining`, `exceeded`) read. Never printed as «speso»: the words and the hero say
+   * `spentToDate`, and name `scheduled` as its own clause (The Scheduled-Is-Not-Spent Rule).
+   */
   spent: number;
+  /** Booked up to today — the only figure «hai speso» may stand for. */
   spentToDate: number;
+  /** Dated after today, inside the month: an instalment, a recurring charge — declared, not spent. */
   scheduled: number;
   /** spent / ceiling, 0-100 (can exceed 100). */
   usedPct: number;
+  /** spentToDate / ceiling, 0-100 — the share the reading compares with the calendar. */
+  spentToDatePct: number;
   /** dayOfMonth / daysInMonth, 0-100 — where the calendar stands today. */
   calendarPct: number;
   calendar: BudgetCalendar;
@@ -84,6 +93,7 @@ export function summarizeCeiling(ceiling: number | undefined, expenses: Expense[
     spentToDate: split.spentToDate,
     scheduled: split.scheduled,
     usedPct: (forecast.spentSoFar / ceiling) * 100,
+    spentToDatePct: (split.spentToDate / ceiling) * 100,
     calendarPct: (calendar.dayOfMonth / calendar.daysInMonth) * 100,
     calendar,
     projection: calendar.canForecast ? forecast.projectedTotal : null,
@@ -147,15 +157,6 @@ export interface AnnualBudgetSummary {
   aheadCount: number;
 }
 
-function daysInYear(year: number): number {
-  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0 ? 366 : 365;
-}
-
-/** Day of year from calendar fields, so DST never shifts it (AGENTS.md § Commands, `TZ=Europe/Rome`). */
-function dayOfYear(date: Date): number {
-  return Math.round((Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) - Date.UTC(date.getFullYear(), 0, 0)) / 86_400_000);
-}
-
 /**
  * The annual spending budgets on their own axis: year-to-date against the year elapsed.
  * Income targets are out (annual income is not a spending budget), monthly items are the
@@ -164,7 +165,7 @@ function dayOfYear(date: Date): number {
 export function summarizeAnnualBudgets(items: BudgetItem[], expenses: Expense[], now: Date): AnnualBudgetSummary {
   const italy = getItalyDate(now);
   const year = italy.getFullYear();
-  const yearElapsedPct = (dayOfYear(italy) / daysInYear(year)) * 100;
+  const yearElapsedPct = yearElapsedPctAt(now);
   const rows = items
     .filter((item) => item.kind === 'expense' && item.period === 'annual' && item.amount > 0)
     .sort((a, b) => a.order - b.order)

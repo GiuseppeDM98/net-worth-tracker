@@ -1,7 +1,7 @@
 'use client';
 
-import { useRef } from 'react';
-import { Pencil, Trash2 } from 'lucide-react';
+import { useCallback, useState } from 'react';
+import { Pencil } from 'lucide-react';
 import type { Narrative } from '@/lib/utils/narrative';
 import type { BudgetItem } from '@/types/budget';
 import type { AnnualBudgetRow, AnnualBudgetSummary } from '@/lib/utils/budgetSummary';
@@ -12,8 +12,9 @@ import { Button } from '@/components/ui/button';
 import { Tile } from '@/components/ui/tile';
 import { NarrativeText } from '@/components/ui/narrative-text';
 import { BudgetTrack } from '@/components/cashflow/budget/BudgetTrack';
+import { BudgetDeleteButton } from '@/components/cashflow/budget/BudgetDeleteButton';
 import { progressFillColor, progressTextClass } from '@/components/cashflow/budget/budgetProgressStyle';
-import { useArmedDelete } from '@/lib/hooks/useArmedDelete';
+import { describeBudgetDeleteConsequence } from '@/lib/utils/budgetNarrative';
 
 interface AnnualiTileProps {
   summary: AnnualBudgetSummary;
@@ -30,18 +31,24 @@ function AnnualRow({
   row,
   yearElapsedPct,
   isDemo,
+  armed,
+  announce,
+  onArmedChange,
   onEdit,
   onDelete,
 }: {
   row: AnnualBudgetRow;
   yearElapsedPct: number;
   isDemo: boolean;
+  armed: boolean;
+  announce: (text: string) => void;
+  onArmedChange: (key: string, armed: boolean) => void;
   onEdit: (item: BudgetItem) => void;
   onDelete: (id: string) => void;
 }) {
   const ratio = row.spent / row.budget;
-  const deleteRef = useRef<HTMLButtonElement | null>(null);
-  const del = useArmedDelete(deleteRef, () => onDelete(row.item.id));
+  const setArmed = useCallback((value: boolean) => onArmedChange(row.key, value), [onArmedChange, row.key]);
+  const overBy = cachedFormatCurrencyEUR(row.spent - row.budget, true);
 
   return (
     <li className="flex flex-col gap-2 py-[10px]">
@@ -63,34 +70,42 @@ function AnnualRow({
           >
             <Pencil className="h-3.5 w-3.5" />
           </Button>
-          <Button
-            ref={deleteRef}
-            size="icon"
-            variant="ghost"
-            className={cn('h-11 w-11 desktop:h-8 desktop:w-8', del.armed && 'text-destructive')}
+          <BudgetDeleteButton
+            variant="icon"
+            label={row.label}
+            kind="expense"
             disabled={isDemo}
-            aria-label={del.armed ? `Conferma eliminazione budget ${row.label}` : `Elimina budget ${row.label}`}
-            onClick={del.onClick}
-            onBlur={del.onBlur}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
+            onDelete={() => onDelete(row.item.id)}
+            announce={announce}
+            onArmedChange={setArmed}
+          />
         </span>
       </div>
-      <BudgetTrack ratio={ratio} calendarPct={yearElapsedPct} color={progressFillColor(ratio)} label={`Avanzamento ${row.label}`} />
-      <div className="flex justify-between text-[11px] text-muted-foreground">
-        <span className={cn('font-mono tabular-nums', progressTextClass(ratio))}>{formatPercentage(row.usedPct, 0)}</span>
-        <span>
-          {row.exceeded ? (
-            <>
-              oltre di <span className="font-mono tabular-nums text-destructive">{cachedFormatCurrencyEUR(row.spent - row.budget, true)}</span>
-            </>
-          ) : (
-            <>
-              restano <span className="font-mono tabular-nums">{cachedFormatCurrencyEUR(row.remaining, true)}</span>
-            </>
-          )}
-        </span>
+      <BudgetTrack
+        ratio={ratio}
+        calendarPct={yearElapsedPct}
+        color={progressFillColor(ratio)}
+        label={`Avanzamento ${row.label}`}
+        valueText={row.exceeded ? `${formatPercentage(row.usedPct, 0)}, oltre di ${overBy}` : `${formatPercentage(row.usedPct, 0)}, restano ${cachedFormatCurrencyEUR(row.remaining, true)}`}
+      />
+      <div className="flex justify-between gap-3 text-[11px] text-muted-foreground">
+        <span className={cn('shrink-0 font-mono tabular-nums', progressTextClass(ratio))}>{formatPercentage(row.usedPct, 0)}</span>
+        {/* While the delete is armed the row's hint is the consequence of the second press. */}
+        {armed ? (
+          <span className="text-right text-destructive">{describeBudgetDeleteConsequence('expense', row.label)}</span>
+        ) : (
+          <span>
+            {row.exceeded ? (
+              <>
+                oltre di <span className="font-mono tabular-nums text-destructive">{overBy}</span>
+              </>
+            ) : (
+              <>
+                restano <span className="font-mono tabular-nums">{cachedFormatCurrencyEUR(row.remaining, true)}</span>
+              </>
+            )}
+          </span>
+        )}
       </div>
     </li>
   );
@@ -102,15 +117,40 @@ function AnnualRow({
  * anno al 64%») and every row carries the year's mark on its track, so «56% used» is read
  * against «64% of the year gone» without leaving the row. Each row keeps the pencil and the
  * 2-click bin of the monthly list: an annual budget is set and removed here, not elsewhere.
+ * One live region for the whole list announces arm and disarm.
  */
 export function AnnualiTile({ summary, aside, reading, footer, isDemo, onEdit, onDelete, className }: AnnualiTileProps) {
+  const [announcement, setAnnouncement] = useState('');
+  const [armedKey, setArmedKey] = useState<string | null>(null);
+  const announce = useCallback((text: string) => setAnnouncement(text), []);
+  const onArmedChange = useCallback((key: string, armed: boolean) => {
+    setArmedKey((current) => (armed ? key : current === key ? null : current));
+  }, []);
+  const handleDelete = (id: string) => {
+    setArmedKey(null);
+    onDelete(id);
+  };
+
   return (
     <Tile eyebrow="Budget annuali" aside={<NarrativeText segments={aside} figureClassName="font-medium" />} reading={reading} className={className}>
       <ul className="mt-2 flex flex-col divide-y divide-border">
         {summary.rows.map((row) => (
-          <AnnualRow key={row.key} row={row} yearElapsedPct={summary.yearElapsedPct} isDemo={isDemo} onEdit={onEdit} onDelete={onDelete} />
+          <AnnualRow
+            key={row.key}
+            row={row}
+            yearElapsedPct={summary.yearElapsedPct}
+            isDemo={isDemo}
+            armed={armedKey === row.key}
+            announce={announce}
+            onArmedChange={onArmedChange}
+            onEdit={onEdit}
+            onDelete={handleDelete}
+          />
         ))}
       </ul>
+      <span className="sr-only" role="status" aria-live="polite">
+        {announcement}
+      </span>
       <NarrativeText
         segments={footer}
         className="mt-auto border-t border-border pt-3.5 text-[11px] leading-[1.45] text-muted-foreground"

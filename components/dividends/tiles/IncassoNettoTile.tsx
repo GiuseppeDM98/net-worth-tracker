@@ -3,7 +3,7 @@
 import { TrendingDown, TrendingUp } from 'lucide-react';
 import type { Narrative } from '@/lib/utils/narrative';
 import type { DividendNetComparison, MonthlyNetPoint, UpcomingPayment } from '@/lib/utils/dividendAnalytics';
-import { printedDelta } from '@/lib/utils/dividendiNarrative';
+import { describeUpcomingDate, printedDelta } from '@/lib/utils/dividendiNarrative';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { formatPercentage } from '@/lib/services/chartService';
 import { signChipClass } from '@/lib/utils/metricColors';
@@ -30,6 +30,8 @@ interface IncassoNettoTileProps {
   /** The announced payments, soonest first; empty when nothing is announced. */
   upcoming: UpcomingPayment[];
   upcomingNet: number;
+  /** "Now", so a payment outside the current year prints its year («10 mar 2032»). */
+  now: Date;
   className?: string;
 }
 
@@ -54,6 +56,7 @@ export function IncassoNettoTile({
   windowLabel,
   upcoming,
   upcomingNet,
+  now,
   className,
 }: IncassoNettoTileProps) {
   const deltaPct = comparison.deltaPct;
@@ -156,7 +159,7 @@ export function IncassoNettoTile({
                   {payment.isProvisional && <span className="ml-1.5 text-[11px] text-muted-foreground">provvisorio</span>}
                 </span>
                 <span className="shrink-0 font-mono text-[12px] tabular-nums text-muted-foreground">
-                  {payment.paymentDate.getDate()} {MONTH_NAMES[payment.paymentDate.getMonth()].slice(0, 3).toLowerCase()}
+                  {describeUpcomingDate(payment.paymentDate, now)}
                 </span>
                 <span className="w-[68px] shrink-0 text-right font-mono text-[13px] tabular-nums text-foreground">
                   {cachedFormatCurrencyEUR(payment.net, true)}

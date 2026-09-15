@@ -115,6 +115,44 @@ describe('computeMonthlyPortfolioFlow — the ledger first, per instrument', () 
   });
 });
 
+describe('computeMonthlyPortfolioFlow — the entry month (a trade dated before the base saw the instrument)', () => {
+  // The user records in September the shares bought in March 2024, with their real date: the
+  // snapshots meet the instrument for the first time in September (10 × 100 €).
+  const august = makeSnapshot(2026, 8, [{ assetId: 'conto', quantity: 5000, price: 1 }]);
+  const september = makeSnapshot(2026, 9, [{ assetId: 'conto', quantity: 5000, price: 1 }, { assetId: 'eni', quantity: 10, price: 100 }]);
+  const backdated = indexLedger([trade('eni', 'buy', new Date(2024, 2, 15), 10, 80, { fees: 5 })]);
+
+  it('reads the entry at its end-of-month value, not as a zero the ledger would swallow into the return', () => {
+    // Before 2026-09-13 this was 0 (`ledger`): the whole 1.000 € read as September's return.
+    expect(computeMonthlyPortfolioFlow(august, september, new Set(['conto']), backdated)).toEqual({ amount: 1000, source: 'quantities' });
+    // With the account inside the base the instrument still enters at its value: the money that
+    // bought it left the account in 2024, not this month.
+    expect(amountOf(august, september, [], backdated)).toBe(1000);
+  });
+
+  it('keeps the ledger precision for a purchase dated in the entry month itself', () => {
+    const sameMonth = indexLedger([trade('eni', 'buy', new Date(2026, 8, 10), 10, 80, { fees: 5 })]);
+    expect(computeMonthlyPortfolioFlow(august, september, new Set(['conto']), sameMonth)).toEqual({ amount: 805, source: 'ledger' });
+  });
+
+  it('produces nothing for the backdated month itself: no snapshot pair holds the instrument', () => {
+    const flows = buildPortfolioBoundaryFlows([makeSnapshot(2024, 2, [{ assetId: 'conto', quantity: 5000, price: 1 }]), makeSnapshot(2024, 3, [{ assetId: 'conto', quantity: 5000, price: 1 }]), august, september], ['conto'], [trade('eni', 'buy', new Date(2024, 2, 15), 10, 80, { fees: 5 })]);
+    expect(flows.find((f) => f.month === '2024-03')).toEqual({ month: '2024-03', amount: 0, source: 'quantities' });
+    expect(flows.find((f) => f.month === '2026-09')).toEqual({ month: '2026-09', amount: 1000, source: 'quantities' });
+  });
+
+  it('once the instrument is held, the ledger speaks again: a later month without a trade is a zero', () => {
+    const october = makeSnapshot(2026, 10, [{ assetId: 'conto', quantity: 5000, price: 1 }, { assetId: 'eni', quantity: 10, price: 120 }]);
+    expect(computeMonthlyPortfolioFlow(september, october, new Set(['conto']), backdated)).toEqual({ amount: 0, source: 'ledger' });
+  });
+
+  it('reads a baseline or an adjustment on an instrument the previous snapshot lacks as an entry too', () => {
+    // An asset created in the migration month: the baseline covers it, but the base meets it now.
+    const migrated = indexLedger([trade('eni', 'buy', new Date(2026, 8, 3), 10, 100, { isBaseline: true })]);
+    expect(amountOf(august, september, ['conto'], migrated)).toBe(1000);
+  });
+});
+
 describe('buildPortfolioBoundaryFlows', () => {
   it('emits one entry per MEASURABLE month, zeros included, and none for a pair missing a breakdown', () => {
     const flows = buildPortfolioBoundaryFlows([
