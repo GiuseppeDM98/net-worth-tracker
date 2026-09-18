@@ -186,6 +186,7 @@ export interface Asset {
   // independent of it.
   leverageRatio?: number;
   isin?: string; // ISIN code for dividend scraping (optional)
+  exchange?: string; // Exchange/market label (e.g. «Borsa Italiana»), purely informational (optional)
   bondDetails?: BondDetails; // Optional bond-specific details for coupon scheduling
   pensionFundDetails?: PensionFundDetails; // Optional fondo pensione details (type 'pensionFund'); see types/pension.ts
   // Start of the CURRENT continuous holding, stamped on (re)purchase — createAsset on ISIN reuse,
@@ -222,6 +223,7 @@ export interface AssetFormData {
   allocationRole?: AllocationRole; // How the Allocazione page treats this asset. See AllocationRole.
   leverageRatio?: number; // For a leveraged/composite ETF: 2 = 2x, 3 = 3x, 1 or absent = no leverage.
   isin?: string; // ISIN code for dividend scraping (optional)
+  exchange?: string; // Exchange/market label (optional, informational only)
   bondDetails?: BondDetails; // Optional bond-specific details for coupon scheduling
   pensionFundDetails?: PensionFundDetails; // Optional fondo pensione details (type 'pensionFund'); see types/pension.ts
 }

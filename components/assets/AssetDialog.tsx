@@ -33,7 +33,7 @@
  */
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { Timestamp } from 'firebase/firestore';
 import { useForm, useFieldArray, useWatch, type FieldErrors } from 'react-hook-form';
@@ -91,6 +91,7 @@ import {
 import { toast } from 'sonner';
 import { Calculator, Plus, X, BarChart3, Landmark, Bitcoin, Wallet, Home, Package, TrendingUp, ChevronLeft, PiggyBank } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
+import { SearchableCombobox } from '@/components/ui/searchable-combobox';
 
 /**
  * Determines if an asset type should fetch automatic price updates.
@@ -213,6 +214,7 @@ function buildAssetFormDataFromValues(
     displayTicker: data.displayTicker && data.displayTicker.trim() !== '' ? data.displayTicker.trim() : undefined,
     name: data.name,
     isin: data.isin && data.isin.trim() !== '' ? data.isin.trim().toUpperCase() : undefined,
+    exchange: data.exchange && data.exchange.trim() !== '' ? data.exchange.trim() : undefined,
     type: data.type,
     assetClass: data.assetClass,
     subCategory: data.subCategory || undefined,
@@ -339,6 +341,8 @@ const assetSchema = z.object({
   displayTicker: z.string().optional(),
   name: z.string().min(1, 'Serve il nome'),
   isin: z.string().regex(/^[A-Z]{2}[A-Z0-9]{9}[0-9]$/, 'ISIN non valido (esempio: IT0003128367)').optional().or(z.literal('')),
+  // Exchange/market label, purely informational (no validation beyond length).
+  exchange: z.string().max(60, 'Nome borsa troppo lungo').optional(),
   // Mirrors the AssetType union in types/assets.ts — keep the two in lock-step (tsc catches drift
   // where the form value is passed back as an AssetType). 'pensionFund' is accepted here from P0 on;
   // its type card and its dedicated fields land with the pension UI phase.
@@ -423,6 +427,12 @@ interface AssetDialogProps {
    * (2026-09-14). Ignored in edit mode.
    */
   initialType?: AssetType;
+  /**
+   * Distinct exchange labels already used by the owner's assets, for the Exchange combobox.
+   * A value typed for the first time is saved on the asset and joins this list on the next
+   * open — the list is derived, never stored anywhere of its own.
+   */
+  existingExchanges?: string[];
 }
 
 /**
@@ -434,6 +444,7 @@ const FIELD_LABELS: Partial<Record<keyof AssetFormValues, string>> = {
   displayTicker: 'Alias',
   name: 'Nome',
   isin: 'ISIN',
+  exchange: 'Borsa',
   type: 'Tipo',
   assetClass: 'Classe',
   subCategory: 'Sottocategoria',
@@ -507,7 +518,7 @@ const assetClasses: { value: AssetClass; label: string }[] = [
   { value: 'carry', label: 'Carry' },
 ];
 
-export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType }: AssetDialogProps) {
+export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType, existingExchanges }: AssetDialogProps) {
   const { user } = useAuth();
   const { ownerId } = useActiveAccount();
   const queryClient = useQueryClient();
@@ -584,6 +595,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
   const watchQuantity = useWatch({ control, name: 'quantity' });
   const watchCurrency = useWatch({ control, name: 'currency' });
   const watchIsin = useWatch({ control, name: 'isin' });
+  const watchExchange = useWatch({ control, name: 'exchange' });
   const watchBondNominalValue = useWatch({ control, name: 'bondNominalValue' });
   const watchBondCouponRate = useWatch({ control, name: 'bondCouponRate' });
   const watchBondCouponFrequency = useWatch({ control, name: 'bondCouponFrequency' });
@@ -636,6 +648,17 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
   // Field visibility based on asset type — applies to both create and edit modes.
   const newAsset_showTicker = selectedType !== 'cash' && selectedType !== 'realestate' && selectedType !== 'pensionFund';
   const newAsset_showISIN = selectedType === 'stock' || selectedType === 'etf' || selectedType === 'bond';
+  // Exchange options for the combobox: the owner's already-used labels, plus whatever the form
+  // currently holds (a value typed for the first time is not in the list yet). A newly typed
+  // value is saved on the asset and joins the list on the next open — derived, never stored.
+  const exchangeOptions = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const label of [...(existingExchanges ?? []), watchExchange ?? '']) {
+      const trimmed = label.trim();
+      if (trimmed && !seen.has(trimmed.toLowerCase())) seen.set(trimmed.toLowerCase(), trimmed);
+    }
+    return [...seen.values()].sort((a, b) => a.localeCompare(b, 'it')).map((label) => ({ value: label, label }));
+  }, [existingExchanges, watchExchange]);
   const newAsset_quantityLabel = selectedType === 'cash' ? 'Saldo' : selectedType === 'realestate' ? 'Valore stimato' : selectedType === 'pensionFund' ? 'Valore attuale' : 'Quantità';
   const newAsset_showAutoUpdate = selectedType !== 'cash' && selectedType !== 'realestate' && selectedType !== 'pensionFund';
   const newAsset_showCostBasis = selectedType !== 'cash' && selectedType !== 'realestate' && selectedType !== 'pensionFund';
@@ -845,6 +868,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
         isPrimaryResidence: asset.isPrimaryResidence || false,
         allocationRole: resolveAllocationRole(asset),
         isin: asset.isin || undefined,
+        exchange: asset.exchange || undefined,
         openingDate: todayIso,
         openingCashAssetId: '__none__',
         pensionProvider: asset.pensionFundDetails?.provider || undefined,
@@ -877,6 +901,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
         displayTicker: undefined,
         name: '',
         isin: undefined,
+        exchange: undefined,
         type: initialType ?? 'etf',
         assetClass: TYPE_TO_CLASS[initialType ?? 'etf'],
         subCategory: '',
@@ -1491,6 +1516,27 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
             </p>
           </div>
           )}
+
+          {/* Borsa — tutti i tipi, solo informativo: dropdown dalle borse già usate + voce libera */}
+          <div className="space-y-2">
+            <Label htmlFor="exchange">Borsa <span className="text-muted-foreground font-normal">(opzionale)</span></Label>
+            <SearchableCombobox
+              id="exchange"
+              options={exchangeOptions}
+              value={watchExchange ?? ''}
+              onValueChange={(value) => setValue('exchange', value)}
+              onCreateOption={(name) => setValue('exchange', name)}
+              onClear={() => setValue('exchange', '')}
+              placeholder="es. Borsa Italiana"
+              searchPlaceholder="Cerca o digita una borsa…"
+              emptyMessage="Nessuna borsa trovata"
+              createOptionLabel="Usa"
+              aria-invalid={!!errors.exchange}
+            />
+            {errors.exchange && (
+              <p className="text-sm text-destructive">{errors.exchange.message}</p>
+            )}
+          </div>
 
           {/* Type + AssetClass selects — edit mode only; in create mode these are set in step 1 */}
           {isEdit && (

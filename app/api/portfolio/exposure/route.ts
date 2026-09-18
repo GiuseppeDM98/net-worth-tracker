@@ -64,7 +64,9 @@ export async function GET(request: NextRequest) {
         const cachedAt: Timestamp = cached.cachedAt;
         const ageMs = Date.now() - cachedAt.toMillis();
 
-        if (ageMs < CACHE_TTL_MS && cached.cacheKey === expectedCacheKey) {
+        // `etfHoldings`/`directStocks` joined the payload after the first cached docs:
+        // a hit without them would starve the Sovrapposizioni tile, so it is a miss.
+        if (ageMs < CACHE_TTL_MS && cached.cacheKey === expectedCacheKey && cached.exposure?.etfHoldings != null) {
           const response: PortfolioExposureResponse = {
             exposure: cached.exposure as PortfolioExposureData,
             cached: true,

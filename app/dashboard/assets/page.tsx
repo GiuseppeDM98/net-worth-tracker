@@ -186,6 +186,11 @@ export default function AssetsPage() {
   // Sold-out positions stay in the table («Azzerato») but are not owned: every count runs on these.
   const heldInstruments = useMemo(() => instruments.filter(isHeld), [instruments]);
   const assetsById = useMemo(() => new Map(assets.map((a) => [a.id, a])), [assets]);
+  // Distinct exchange labels for the AssetDialog combobox — a newly typed value joins on next open.
+  const existingExchanges = useMemo(
+    () => [...new Set(assets.map((a) => a.exchange?.trim()).filter((e): e is string => !!e))],
+    [assets],
+  );
 
   const cashSummary = useMemo(() => summarizeCashAccounts(cashAccounts, totalValue), [cashAccounts, totalValue]);
   const tradesSummary = useMemo(() => summarizeMonthTrades(trades, today), [trades, today]);
@@ -487,6 +492,7 @@ export default function AssetsPage() {
         initialType={assetDialog.initialType}
         onClose={handleAssetDialogClose}
         onRegisterTrade={setTradeAsset}
+        existingExchanges={existingExchanges}
       />
 
       <CashAccountDialog

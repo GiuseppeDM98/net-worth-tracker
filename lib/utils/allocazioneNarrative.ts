@@ -33,6 +33,7 @@ import type {
   PlanMode,
   PlanView,
 } from '@/lib/utils/allocazioneSummary';
+import type { OverlapHighlights } from '@/lib/utils/overlapUtils';
 
 // ─── Formatting helpers ───────────────────────────────────────────────────────
 
@@ -516,6 +517,60 @@ export function describeExposureFooter(computedAt: string | null): string {
   if (Number.isNaN(date.getTime())) return EXPOSURE_METHOD;
   const day = new Intl.DateTimeFormat('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Europe/Rome' }).format(date);
   return `${EXPOSURE_METHOD} Aggiornato il ${day}.`;
+}
+
+// ─── Sovrapposizioni ──────────────────────────────────────────────────────────
+
+/**
+ * «La coppia più sovrapposta è VWCE × SWDA (64,2%, 8 titoli in comune); Apple è in
+ * 3 strumenti, anche diretto.» Null when no pair overlaps and no stock is duplicated.
+ */
+export function describeOverlap(highlights: OverlapHighlights): Narrative | null {
+  const clauses: Narrative[] = [];
+  if (highlights.topPair) {
+    const { tickerA, tickerB, overlapPct, sharedCount } = highlights.topPair;
+    clauses.push([
+      prose(`La coppia più sovrapposta è ${tickerA} × ${tickerB} (`),
+      percent(overlapPct, 1),
+      prose(`, ${sharedCount} ${sharedCount === 1 ? 'titolo in comune' : 'titoli in comune'})`),
+    ]);
+  }
+  if (highlights.topDuplicated) {
+    const { name, instrumentCount } = highlights.topDuplicated;
+    clauses.push([prose(`${name} è in ${instrumentCount} strumenti, anche diretto`)]);
+  }
+  if (clauses.length === 0) return null;
+  const [first, ...rest] = clauses;
+  const sentence: Narrative = first[0].text.startsWith('La ') ? [...first] : [prose(capitalize(first[0].text)), ...first.slice(1)];
+  if (rest.length > 0) sentence.push(prose('; '), ...joinList(rest));
+  sentence.push(prose('.'));
+  return sentence;
+}
+
+/** What an empty overlap view means — the rule each list encoded, one line, no figure. */
+export function describeOverlapEmpty(view: 'pairs' | 'duplicates'): string {
+  switch (view) {
+    case 'pairs':
+      return 'Meno di due ETF con dati Yahoo: nessuna coppia da confrontare.';
+    default:
+      return 'Nessuna azione detenuta anche via ETF.';
+  }
+}
+
+/** «3 ETF · 2 coppie» — the tile's aside. */
+export function describeOverlapAside(input: { etfCount: number; pairCount: number }): string {
+  return `${input.etfCount} ETF · ${input.pairCount} ${input.pairCount === 1 ? 'coppia' : 'coppie'}`;
+}
+
+const OVERLAP_METHOD = 'Sovrapposizione sulle prime ~10 posizioni per ETF (Yahoo Finance): il valore vero è almeno questo.';
+
+/** The tile's footer: the method, then the day of the last computation when known. */
+export function describeOverlapFooter(computedAt: string | null): string {
+  if (!computedAt) return OVERLAP_METHOD;
+  const date = new Date(computedAt);
+  if (Number.isNaN(date.getTime())) return OVERLAP_METHOD;
+  const day = new Intl.DateTimeFormat('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Europe/Rome' }).format(date);
+  return `${OVERLAP_METHOD} Aggiornato il ${day}.`;
 }
 
 // ─── Previdenza ───────────────────────────────────────────────────────────────

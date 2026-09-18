@@ -246,6 +246,11 @@ export async function updateAsset(
     if ('subCategory' in updates && updates.subCategory === undefined) {
       cleanedUpdates.subCategory = deleteField();
     }
+    // exchange is optional and user-clearable (the combobox's clear button). Same `in` guard:
+    // a partial caller must not wipe a label it never sent.
+    if ('exchange' in updates && updates.exchange === undefined) {
+      cleanedUpdates.exchange = deleteField();
+    }
 
     // Rebuy on the same doc: quantity goes from 0 (sold but kept) back to > 0. Stamp the new
     // holding start so YOC ignores the previous holding's dividends (mirrors the ISIN-reuse path
@@ -285,7 +290,7 @@ export type AssetMetadataFormData = Omit<AssetFormData, 'quantity' | 'averageCos
  * sending quantity/averageCost would wipe the PMC on every metadata save. `updateAsset` is unchanged and still
  * used for cash/realestate.
  *
- * `taxRate`/`displayTicker`/`subCategory` keep the same undefined→deleteField() clearing as
+ * `taxRate`/`displayTicker`/`subCategory`/`exchange` keep the same undefined→deleteField() clearing as
  * `updateAsset` (the form always sends the key, undefined when cleared). quantity/averageCost/holdingStartDate are
  * structurally absent from the payload type, so the ledger-derived fields can never be cleared by
  * a metadata edit.
@@ -314,6 +319,10 @@ export async function updateAssetMetadata(
     // those are exactly the classes that carry subcategories. Same `in` guard as updateAsset.
     if ('subCategory' in updates && updates.subCategory === undefined) {
       cleanedUpdates.subCategory = deleteField();
+    }
+    // exchange too — user-clearable from the dialog, same `in` guard.
+    if ('exchange' in updates && updates.exchange === undefined) {
+      cleanedUpdates.exchange = deleteField();
     }
 
     await updateDoc(assetRef, cleanedUpdates);
