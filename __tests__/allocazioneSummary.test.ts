@@ -203,6 +203,8 @@ describe('summarizeExposure', () => {
       { family: 'iShares', exposureEur: 100000, exposurePct: 0.408, assets: [] },
       { family: 'Vanguard', exposureEur: 64000, exposurePct: 0.261, assets: [] },
     ],
+    etfHoldings: [],
+    directStocks: [],
     totalAnalyzedValue: 164000,
     totalPortfolioValue: 245000,
     analyzedAssets: 12,

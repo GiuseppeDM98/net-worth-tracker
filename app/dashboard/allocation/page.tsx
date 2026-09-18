@@ -106,6 +106,7 @@ import { BilanciamentoTile } from '@/components/allocation/tiles/BilanciamentoTi
 import { PianoTile } from '@/components/allocation/tiles/PianoTile';
 import { PerClasseTile } from '@/components/allocation/tiles/PerClasseTile';
 import { EsposizioneTile } from '@/components/allocation/tiles/EsposizioneTile';
+import { SovrapposizioniTile } from '@/components/allocation/tiles/SovrapposizioniTile';
 import { PrevidenzaTile } from '@/components/allocation/tiles/PrevidenzaTile';
 import { AllocazioneDettaglio } from '@/components/allocation/AllocazioneDettaglio';
 
@@ -115,6 +116,7 @@ const SKELETON_CELLS: TileSkeletonCell[] = [
   { span: 7, lines: 8 },
   { span: 6, lines: 7 },
   { span: 6, lines: 7 },
+  { span: 12, lines: 6 },
   { span: 12, lines: 4 },
 ];
 
@@ -481,8 +483,12 @@ export default function AllocationPage() {
           {user && ownerId && <EsposizioneTile userId={ownerId} />}
         </div>
 
+        <div className={cn(TILE_CELL_CLASS, 'order-5 desktop:order-none desktop:col-span-12')}>
+          {user && ownerId && <SovrapposizioniTile userId={ownerId} />}
+        </div>
+
         {pension && (
-          <div className={cn(TILE_CELL_CLASS, 'order-5 tablet:col-span-2 desktop:order-none desktop:col-span-12')}>
+          <div className={cn(TILE_CELL_CLASS, 'order-6 tablet:col-span-2 desktop:order-none desktop:col-span-12')}>
             <PrevidenzaTile
               reading={describePension(pension)}
               aside={describePensionAside({ fundNames: pensionFundNames, fundValue: pension.fundValue, allFrozen: pension.allFrozen })}

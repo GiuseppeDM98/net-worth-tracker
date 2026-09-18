@@ -35,6 +35,10 @@ import {
   describePensionAside,
   describePlan,
   describePlanFooter,
+  describeOverlap,
+  describeOverlapAside,
+  describeOverlapEmpty,
+  describeOverlapFooter,
   formatLeverage,
   type AllocazioneVerdictInput,
 } from '@/lib/utils/allocazioneNarrative';
@@ -466,6 +470,51 @@ describe('describeExposure', () => {
       'Prime ~10 posizioni per ETF da Yahoo Finance: approssimato per i fondi molto diversificati. Nessuna copertura geografica. Aggiornato il 24/08/2026.',
     );
     expect(describeExposureFooter(null)).toBe('Prime ~10 posizioni per ETF da Yahoo Finance: approssimato per i fondi molto diversificati. Nessuna copertura geografica.');
+  });
+});
+
+describe('describeOverlap', () => {
+  it('names the most overlapped pair and the top duplicated stock', () => {
+    expect(
+      plain(
+        describeOverlap({
+          topPair: { tickerA: 'VWCE', tickerB: 'SWDA', overlapPct: 64.2, sharedCount: 8 },
+          topDuplicated: { name: 'Apple', ticker: 'AAPL', instrumentCount: 3 },
+          etfCount: 3,
+          pairCount: 2,
+        }),
+      ),
+    ).toBe('La coppia più sovrapposta è VWCE × SWDA (64,2%, 8 titoli in comune); Apple è in 3 strumenti, anche diretto.');
+  });
+
+  it('drops what is missing and is null with nothing', () => {
+    expect(
+      plain(
+        describeOverlap({
+          topPair: { tickerA: 'VWCE', tickerB: 'SWDA', overlapPct: 7.5, sharedCount: 1 },
+          topDuplicated: null,
+          etfCount: 2,
+          pairCount: 1,
+        }),
+      ),
+    ).toBe('La coppia più sovrapposta è VWCE × SWDA (7,5%, 1 titolo in comune).');
+    expect(describeOverlap({ topPair: null, topDuplicated: null, etfCount: 0, pairCount: 0 })).toBeNull();
+  });
+
+  it('names what an empty view means', () => {
+    expect(describeOverlapEmpty('pairs')).toBe('Meno di due ETF con dati Yahoo: nessuna coppia da confrontare.');
+    expect(describeOverlapEmpty('duplicates')).toBe('Nessuna azione detenuta anche via ETF.');
+  });
+
+  it('has an aside and a footer', () => {
+    expect(describeOverlapAside({ etfCount: 3, pairCount: 2 })).toBe('3 ETF · 2 coppie');
+    expect(describeOverlapAside({ etfCount: 2, pairCount: 1 })).toBe('2 ETF · 1 coppia');
+    expect(describeOverlapFooter('2026-08-24T06:15:00.000Z')).toBe(
+      'Sovrapposizione sulle prime ~10 posizioni per ETF (Yahoo Finance): il valore vero è almeno questo. Aggiornato il 24/08/2026.',
+    );
+    expect(describeOverlapFooter(null)).toBe(
+      'Sovrapposizione sulle prime ~10 posizioni per ETF (Yahoo Finance): il valore vero è almeno questo.',
+    );
   });
 });
 

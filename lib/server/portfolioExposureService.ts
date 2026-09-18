@@ -12,6 +12,8 @@
 import YahooFinance from 'yahoo-finance2';
 import { Asset } from '@/types/assets';
 import {
+  EtfHoldingsVector,
+  ExposureDirectStock,
   ExposureHolding,
   ExposureSector,
   ExposureIssuer,
@@ -330,12 +332,31 @@ export async function computePortfolioExposure(
     etfAssets.reduce((s, a) => s + (assetValues.get(a.id) ?? 0), 0) +
     stockAssets.reduce((s, a) => s + (assetValues.get(a.id) ?? 0), 0);
 
+  // Per-ETF holding vectors for the overlap analysis (same Yahoo data, no new fetch).
+  // An ETF without Yahoo data carries an empty vector and simply pairs with nothing.
+  const etfHoldings: EtfHoldingsVector[] = etfData.map(({ asset, topHoldings: th }) => ({
+    ticker: asset.ticker,
+    assetName: asset.name,
+    assetValueEur: assetValues.get(asset.id) ?? 0,
+    holdings: (th?.holdings ?? [])
+      .filter((h) => !!h.symbol && typeof h.holdingPercent === 'number' && Number.isFinite(h.holdingPercent) && h.holdingPercent > 0)
+      .map((h) => ({ symbol: h.symbol, name: h.holdingName || h.symbol, weight: h.holdingPercent })),
+  }));
+
+  const directStocks: ExposureDirectStock[] = stockAssets.map((asset) => ({
+    ticker: asset.ticker,
+    name: asset.name,
+    valueEur: assetValues.get(asset.id) ?? 0,
+  }));
+
   const cacheKey = `${etfAssets.length}-${etfAssets.map((a) => a.ticker).sort().join(',')}-${stockAssets.map((a) => a.ticker).sort().join(',')}-${Math.round(totalPortfolioValue)}`;
 
   return {
     topHoldings,
     sectors,
     issuers,
+    etfHoldings,
+    directStocks,
     totalAnalyzedValue,
     totalPortfolioValue,
     analyzedAssets,

@@ -48,11 +48,29 @@ export interface ExposureIssuer {
   }>;
 }
 
+// One ETF's top-holdings vector, kept per instrument (not aggregated) so the overlap
+// analysis can compare funds pair by pair. Weights are 0..1 fractions of the ETF.
+export interface EtfHoldingsVector {
+  ticker: string;
+  assetName: string;
+  assetValueEur: number;
+  holdings: Array<{ symbol: string; name: string; weight: number }>;
+}
+
+// A directly-held equity stock, for the «held directly and via ETF» check.
+export interface ExposureDirectStock {
+  ticker: string;
+  name: string;
+  valueEur: number;
+}
+
 // Full computed result returned by /api/portfolio/exposure.
 export interface PortfolioExposureData {
   topHoldings: ExposureHolding[];  // top 15 companies by exposureEur
   sectors: ExposureSector[];       // all sectors, sorted by exposureEur desc
   issuers: ExposureIssuer[];       // all ETF issuers, sorted by exposureEur desc
+  etfHoldings: EtfHoldingsVector[]; // per-ETF vectors for the overlap analysis
+  directStocks: ExposureDirectStock[]; // direct equity stocks for the duplication check
   totalAnalyzedValue: number;      // EUR value of ETFs + stocks analyzed
   totalPortfolioValue: number;     // EUR value of the full portfolio
   analyzedAssets: number;          // count of assets included in the analysis

@@ -412,10 +412,12 @@ export function StrumentiTile({
                 </Tooltip>
               </TooltipProvider>
               {/* pensionFund has no ticker input — a leftover raw value must not resurface. */}
-              {(asset.ticker && asset.type !== 'pensionFund') || subLine ? (
+              {(asset.ticker && asset.type !== 'pensionFund') || asset.exchange || subLine ? (
                 <span className="block truncate text-[11px] text-muted-foreground">
                   {asset.ticker && asset.type !== 'pensionFund' && <span className="font-mono">{getAssetDisplayTicker(asset)}</span>}
-                  {asset.ticker && asset.type !== 'pensionFund' && subLine && ' · '}
+                  {asset.ticker && asset.type !== 'pensionFund' && (asset.exchange || subLine) && ' · '}
+                  {asset.exchange && <span>{asset.exchange}</span>}
+                  {asset.exchange && subLine && ' · '}
                   {subLine}
                 </span>
               ) : null}

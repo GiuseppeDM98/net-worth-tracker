@@ -222,6 +222,8 @@ export function AssetRow({
           <span className="flex min-w-0 items-center gap-1.5">
             {/* pensionFund has no ticker input — a leftover raw value must not resurface here. */}
             {showTicker && <span className="font-mono text-[11px] text-muted-foreground">{getAssetDisplayTicker(asset)}</span>}
+            {showTicker && asset.exchange && <span className="truncate text-[11px] text-muted-foreground">· {asset.exchange}</span>}
+            {!showTicker && asset.exchange && <span className="truncate text-[11px] text-muted-foreground">{asset.exchange}</span>}
             <AssetClassChip assetClass={displayAssetClass} />
           </span>
           {subLine && <span className="truncate text-[11px] text-muted-foreground">{subLine}</span>}
