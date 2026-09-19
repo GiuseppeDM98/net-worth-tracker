@@ -14,6 +14,7 @@ import {
   describeMonthSplit,
   describePurchases,
   describeSales,
+  isMaterialOtherChange,
   taxedGrowthHeadline,
 } from '@/lib/utils/salesNarrative';
 import type { PeriodSalesSummary } from '@/lib/utils/periodSales';
@@ -97,6 +98,26 @@ describe('describeMonthSplit', () => {
   });
 });
 
+describe('isMaterialOtherChange', () => {
+  it('should say «altre variazioni» only from max(100 €, 5% of the change)', () => {
+    expect(isMaterialOtherChange(99.99, 500)).toBe(false);
+    expect(isMaterialOtherChange(100, 500)).toBe(true);
+    expect(isMaterialOtherChange(-100, 500)).toBe(true);
+    // 5% of 4213 = 210,65: the share wins over the floor.
+    expect(isMaterialOtherChange(150, 4213)).toBe(false);
+    expect(isMaterialOtherChange(211, -4213)).toBe(true);
+  });
+
+  it('should keep the clause when the residual is material, and drop it when it is not', () => {
+    expect(plain(describeMonthSplit({ delta: 4700, marketEffect: 2000, savings: 2100 }))).toBe(
+      'Di quel movimento: +2000 € dal mercato, +2100 € risparmiati, +600 € di altre variazioni.',
+    );
+    expect(plain(describeMonthSplit({ delta: 4250, marketEffect: 2000, savings: 2100 }))).toBe(
+      'Di quel movimento: +2000 € dal mercato e +2100 € risparmiati.',
+    );
+  });
+});
+
 describe('declineHeadlineTail', () => {
   it('should give every cause its own tail, and a bare full stop to the unknown one', () => {
     expect(declineHeadlineTail('despite-market')).toBe(', nonostante il mercato.');
@@ -121,13 +142,14 @@ describe('declineHeadlineTail', () => {
 });
 
 describe('describeSales — the month without the tax', () => {
-  it('should close on the counterfactual in parts that add up to Δ + tax', () => {
+  it('should close on the counterfactual and leave an immaterial «altre variazioni» unsaid', () => {
     // The real account, settembre 2026: Δ +124,32 €, market +2018,47 € (the month's traded quotes
-    // included), 2094,62 € saved so far, tax 4088,86 € — +100,09 € left for the other changes.
+    // included), 2094,62 € saved so far, tax 4088,86 € — +100,09 € left for the other changes,
+    // under max(100 €, 5% of 4213 €): card spending not yet debited, not a cause (owner, 2026-09-19).
     const segments = describeSales(SEPTEMBER_SALE, { delta: 124.32, marketEffect: 2018.47, savings: 2094.62 });
     expect(plain(segments)).toBe(
       'Hai venduto Vanguard FTSE All-World per 39.052 € con una plusvalenza di 15.726 € e pagato circa 4089 € di tasse: ' +
-        'senza, il mese avrebbe fatto +4213 € (+2018 € dal mercato, +2095 € risparmiati, +100 € di altre variazioni).',
+        'senza, il mese avrebbe fatto +4213 € (+2018 € dal mercato e +2095 € risparmiati).',
     );
     expect(segments.find((s) => text(s) === '+2095 €')).toMatchObject({ mono: true, sign: 'positive' });
   });

@@ -25,6 +25,8 @@ import type { DoublingMode, DoublingTimeSummary } from '@/types/assets';
 import type { CompositionCut, CompositionSeries } from '@/lib/utils/historyComposition';
 import { resolveDriverShares, runningSinceMonth, type AllTimeHigh, type DoublingProjection, type DriverYear, type GrowthPace, type GrowthSummary, type LaborMetrics, type MonthlyMoves, type OtherIncomeCategory, type PeriodMonth } from '@/lib/utils/storicoSummary';
 import type { MonthAssetBreakdown } from '@/lib/utils/snapshotAssetBreakdown';
+import type { GrowthDrivers, MonthlyGrowthDrivers } from '@/lib/utils/growthDrivers';
+import { isMaterialOtherChange } from '@/lib/utils/salesNarrative';
 
 // ─── Formatting helpers ───────────────────────────────────────────────────────
 
@@ -365,7 +367,8 @@ export function describeComposition(series: CompositionSeries, cut: CompositionC
  * 21.288 € dal mercato (47%).» A running year names its window — «Da gennaio ad agosto 2026»
  * — because its savings are counted on the same months as its growth. A negative half is said
  * in words («mentre il mercato ha tolto», «hai speso … più di quanto hai incassato»), never as
- * a share of a mixed-sign total.
+ * a share of a mixed-sign total. The shares are of the two ENGINES; what else moved the growth
+ * follows in euro (`describeDriverRest`).
  */
 export function describeDrivers(input: { row: DriverYear; isRunning: boolean } | null): Narrative | null {
   if (!input) return null;
@@ -377,21 +380,42 @@ export function describeDrivers(input: { row: DriverYear; isRunning: boolean } |
   const head: Narrative = total === 0 ? [prose(`${opening}${verb}`)] : [prose(`${opening}${verb}`), currencyWithSign(total), ...pct];
 
   const savingsPositive = row.netSavings >= 0;
-  const marketPositive = row.investmentGrowth >= 0;
+  const marketPositive = row.market >= 0;
   const shares = resolveDriverShares(row);
   let tail: Narrative;
   if (savingsPositive && marketPositive) {
     tail = shares
-      ? [amount(row.netSavings), prose(' dal risparmio ('), figure(`${shares.savings}%`), prose(') e '), amount(row.investmentGrowth), prose(' dal mercato ('), figure(`${shares.market}%`), prose(')')]
-      : [amount(row.netSavings), prose(' dal risparmio e '), amount(row.investmentGrowth), prose(' dal mercato')];
+      ? [amount(row.netSavings), prose(' dal risparmio ('), figure(`${shares.savings}%`), prose(') e '), amount(row.market), prose(' dal mercato ('), figure(`${shares.market}%`), prose(')')]
+      : [amount(row.netSavings), prose(' dal risparmio e '), amount(row.market), prose(' dal mercato')];
   } else if (savingsPositive) {
-    tail = [amount(row.netSavings), prose(' dal risparmio, mentre il mercato ha tolto '), amount(row.investmentGrowth)];
+    tail = [amount(row.netSavings), prose(' dal risparmio, mentre il mercato ha tolto '), amount(row.market)];
   } else if (marketPositive) {
-    tail = [amount(row.investmentGrowth), prose(' dal mercato, ma hai speso '), amount(row.netSavings), prose(' più di quanto hai incassato')];
+    tail = [amount(row.market), prose(' dal mercato, ma hai speso '), amount(row.netSavings), prose(' più di quanto hai incassato')];
   } else {
-    tail = [prose('il mercato ha tolto '), amount(row.investmentGrowth), prose(' e hai speso '), amount(row.netSavings), prose(' più di quanto hai incassato')];
+    tail = [prose('il mercato ha tolto '), amount(row.market), prose(' e hai speso '), amount(row.netSavings), prose(' più di quanto hai incassato')];
   }
-  return [...head, prose(': '), ...tail, prose('.')];
+  return [...head, prose(': '), ...tail, prose('.'), ...describeDriverRest(row)];
+}
+
+/**
+ * « Il resto: −4091 € di tasse stimate sulle vendite, +4655 € di mutuo rimborsato e +7454 € di
+ * altre variazioni.» — every other part of the growth, in euro, so the sentence adds up. The tax
+ * is a loss (signed and coloured); the mortgage, the contributions and the other changes are
+ * FLOWS (signed, uncoloured). A part printed as zero is dropped, and «altre variazioni» is said
+ * only when material (`isMaterialOtherChange`: mostly timing — a card debited next month).
+ */
+export function describeDriverRest(row: Omit<GrowthDrivers, 'isMarketMeasured'>): Narrative {
+  const parts: Narrative[] = [];
+  const add = (segment: NarrativeSegment, label: string) => {
+    if (!isPrintedZero(segment.text)) parts.push([segment, prose(` ${label}`)]);
+  };
+  add(signedCurrency(-row.taxes), 'di tasse stimate sulle vendite');
+  add(signedFlow(row.debtRepaid), 'di mutuo rimborsato');
+  add(signedFlow(row.pensionContributions), 'di versamenti al fondo pensione');
+  if (isMaterialOtherChange(row.other, row.netWorthGrowth)) add(signedFlow(row.other), 'di altre variazioni');
+  if (parts.length === 0) return [];
+  const list = parts.length === 1 ? parts[0] : [...joinClauses(parts.slice(0, -1), ', '), prose(' e '), ...parts[parts.length - 1]];
+  return [prose(' Il resto: '), ...list, prose('.')];
 }
 
 /**
@@ -493,23 +517,21 @@ export function describeYearlyVariation(rows: YearlyVariationRow[], currentYear:
   return [...joinClauses(parts, '; '), prose('.')];
 }
 
-export interface MonthlyDriverRow extends PeriodMonth {
-  netSavings: number;
-  investmentGrowth: number;
-}
+/** A month of the Driver: every part of its growth (`buildMonthlyGrowthDrivers`). */
+export type MonthlyDriverRow = MonthlyGrowthDrivers;
 
 /** «Il risparmio non è mai mancato (12 mesi su 12); il mercato ha tolto in 4 mesi, al massimo −1400 € a febbraio 2026.» */
-export function describeMonthlyDrivers(rows: MonthlyDriverRow[]): Narrative | null {
+export function describeMonthlyDrivers(rows: Array<Pick<MonthlyDriverRow, 'year' | 'month' | 'netSavings' | 'market'>>): Narrative | null {
   if (rows.length === 0) return null;
   const saved = rows.filter((r) => r.netSavings > 0).length;
-  const negative = rows.filter((r) => r.investmentGrowth < 0);
+  const negative = rows.filter((r) => r.market < 0);
   const savings: Narrative =
     saved === rows.length
       ? [prose('Il risparmio non è mai mancato ('), figure(String(saved)), prose(' mesi su '), figure(String(rows.length)), prose(')')]
       : [prose('Hai risparmiato in '), figure(String(saved)), prose(' mesi su '), figure(String(rows.length))];
   if (negative.length === 0) return [...savings, prose('; il mercato non ha mai tolto.')];
-  const worst = negative.reduce((a, b) => (b.investmentGrowth < a.investmentGrowth ? b : a));
-  return [...savings, prose('; il mercato ha tolto in '), figure(String(negative.length)), prose(negative.length === 1 ? ' mese, ' : ' mesi, al massimo '), signedCurrency(worst.investmentGrowth), prose(` ${atPeriodMonth(worst)}.`)];
+  const worst = negative.reduce((a, b) => (b.market < a.market ? b : a));
+  return [...savings, prose('; il mercato ha tolto in '), figure(String(negative.length)), prose(negative.length === 1 ? ' mese, ' : ' mesi, al massimo '), signedCurrency(worst.market), prose(` ${atPeriodMonth(worst)}.`)];
 }
 
 export type LaborMetricsInput = LaborMetrics;

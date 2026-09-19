@@ -13,17 +13,16 @@ Next.js app for Italian investors: net worth, assets, cashflow, dividends, perfo
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic.
-- `tsc` clean; **169 files / 3857 tests** green + **55 Playwright E2E specs** (73 tests green in one full run on 2026-09-18, 2,7 min, incl. 4 auth setups). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, which structurally hides timezone bugs.
-- Latest (2026-09-19, second session): **the market counts the month's traded quotes; the split reads «dal mercato ·
-  risparmiati · di altre variazioni».** «+2733 € dai tuoi movimenti» was read as income − expenses (it held +538 € of
-  quotes bought in the month). `tradeAwarePriceEffect`: Δvalue − net money in − unexplained quantity × today's price
-  (source version 19); `describeMonthSplit` everywhere; the verdict's savings rate is the lived one
-  (`resolveLivedCashflow`, «il 45% delle entrate finora»). **Verification**: `tsc`, lint 0, Vitest 3857 under
-  `TZ=Europe/Rome`, two falsifications red, the mirror's market +2018,47 € equal to a read-only script to the cent,
-  Playwright 1440/390, owner's tour OK. **Then CLAUDE.md became an index again** (38.862 → ~12.000 characters): each
-  area's Key Files moved verbatim to its guide's new § Files, each single-area Known Issue to its guide's § Per-page
-  blind spots, Key Features to one line each; a script found no date and no backticked symbol lost, and rewrote 11
-  citations (7 were already broken).
+- `tsc` clean; **170 files / 3869 tests** green + **55 Playwright E2E specs** (73 tests green in one full run on 2026-09-18, 2,7 min, incl. 4 auth setups). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, which structurally hides timezone bugs.
+- Latest (2026-09-19, third session): **Storico's Driver measures the market instead of guessing it.** «Mercato −557 €»
+  in settembre 2026 was the broker's withheld tax on a VWCE sale (4089 € estimated, 4092,50 € on the statement) plus
+  1297 € of instalments in calendar, read as «Δ − risparmio». `lib/utils/growthDrivers.ts`: risparmio (rows already
+  happened) · mercato per instrument (`marketEffect.ts`, moved out of `dashboardOverviewUtils` — Panoramica and Storico
+  now print the same +2086 €) · tasse · mutuo rimborsato · fondo pensione · altre; «Lavoro e investimenti» takes the
+  same parts; «altre variazioni» is said in a sentence only above max(100 €, 5%) (`isMaterialOtherChange`, Panoramica
+  too). **Verification**: `tsc`, lint 0, Vitest 3869 under `TZ=Europe/Rome` and without, three falsifications red, the
+  mirror's settembre split equal to an independent read-only script (2086 € market), Playwright 1440/390 on the mirror
+  (Driver reading word for word, `main` overflow 0, Lavoro's rows summing to the 80.323 € growth).
 
 ## Architecture Snapshot
 - App Router; protected pages under `app/dashboard/*`.
@@ -48,7 +47,7 @@ One line per area: the question it answers, then where it is described. *What th
 - **Analisi**: «dove vanno i soldi, e cosa è cambiato?» on a four-mode axis; the app's only Sankey. doc/guide/cashflow-analisi.md.
 - **Dividendi**: «quanto rendono i miei flussi?»; received and announced never one figure; BTP Italia and BTP€i coupons. doc/guide/cashflow-dividendi.md.
 - **Rendimenti**: «quanto rende il portafoglio, e rispetto a cosa?» — configurable base, six EUR benchmarks, per-instrument attribution. doc/guide/rendimenti.md.
-- **Storico**: «come sono arrivato qui?» — wealth growth, contributions included. doc/guide/storico.md.
+- **Storico**: «come sono arrivato qui?» — wealth growth, contributions included; the Driver splits it into savings, measured market, sale taxes, mortgage, pension contributions and the rest. doc/guide/storico.md.
 - **Allocazione**: «sono allineato al piano, e cosa faccio con i prossimi soldi?». doc/guide/allocazione.md.
 - **Previdenza**: «il fondo sta lavorando?» per contributor, the value typed from the statement ON the page. doc/guide/previdenza.md.
 - **FIRE**: Calcolatore, Coast FIRE, What If, Monte Carlo and Obiettivi, one verdict each. doc/guide/fire.md (+ fire-coast, fire-what-if, fire-monte-carlo, fire-obiettivi).

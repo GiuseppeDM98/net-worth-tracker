@@ -83,15 +83,31 @@ export interface MonthSplit {
   savings: number | null;
 }
 
-/** Below this, «altre variazioni» is rounding, not a part worth a figure. */
-const OTHER_CHANGES_FLOOR = 1;
+/** «Altre variazioni» is said only from this many euro… */
+const OTHER_CHANGES_MIN_EUR = 100;
+/** …and from this share of the change being split, whichever is larger. */
+const OTHER_CHANGES_MIN_SHARE = 0.05;
+
+/**
+ * Whether «altre variazioni» is worth a clause in a sentence. The residual is the gap between the
+ * balances typed by hand and the cashflow rows — mostly TIMING: a credit-card expense is in the
+ * cashflow the day it is made and leaves the account the month after, so the residual swings one
+ * month and gives it back the next (owner, 2026-09-19: settembre 2026's +150 € was card spending
+ * not yet debited, a debt balance corrected by hand and a 3,64 € gap on the estimated tax). Under
+ * max(100 €, 5% of the change) it is noise, not a cause: the sentence drops it, the figure stays
+ * in the rows and tooltips that list every part. Shared by the Panoramica, Patrimonio and Storico.
+ */
+export function isMaterialOtherChange(other: number, total: number): boolean {
+  return Math.abs(other) >= Math.max(OTHER_CHANGES_MIN_EUR, Math.abs(total) * OTHER_CHANGES_MIN_SHARE);
+}
 
 /**
  * «+2018 € dal mercato, +2095 € risparmiati, +100 € di altre variazioni» — `total` split into the
  * market, the savings and the exact residual (interest, balances corrected by hand, hand-valued
  * holdings, expenses not recorded). The residual has its own NAME because «dai tuoi movimenti»,
  * the one bucket it used to share with the savings, was read as income − expenses (owner,
- * 2026-09-19); it is dropped under 1 €. Without the savings the second part says what it holds.
+ * 2026-09-19); it is dropped below `isMaterialOtherChange`, so the two named parts may not add up
+ * to `total` by a few euro. Without the savings the second part says what it holds.
  */
 function monthSplitParts(total: number, marketEffect: number, savings: number | null): Narrative {
   const market: Narrative = [signedCompactEuro(marketEffect), prose(' dal mercato')];
@@ -101,7 +117,7 @@ function monthSplitParts(total: number, marketEffect: number, savings: number | 
   }
   const saved: Narrative = [signedCompactEuro(savings), prose(savings >= 0 ? ' risparmiati' : ' spesi oltre le entrate')];
   const other = rest - savings;
-  if (Math.abs(other) < OTHER_CHANGES_FLOOR) return [...market, prose(' e '), ...saved];
+  if (!isMaterialOtherChange(other, total)) return [...market, prose(' e '), ...saved];
   return [...market, prose(', '), ...saved, prose(', '), signedCompactEuro(other), prose(' di altre variazioni')];
 }
 
@@ -126,10 +142,10 @@ function salesSubject(sales: PeriodSalesSummary): NarrativeSegment[] {
  * instrument's rate. A loss carries no tax; a missing rate says so instead of printing zero.
  *
  * With `split` and a tax, the sentence closes on the month WITHOUT it — «: senza, il mese avrebbe
- * fatto +4213 € (+2018 € dal mercato, +2095 € risparmiati, +100 € di altre variazioni).» — and
+ * fatto +4213 € (+2018 € dal mercato, +2095 € risparmiati, +400 € di altre variazioni).» — and
  * replaces `describeMonthSplit`, whose parts would mix the tax back in (−1356 € «dai tuoi
  * movimenti» on the real account's settembre 2026, a figure nobody could read). The parts sum to
- * Δ + tax by construction.
+ * Δ + tax by construction, but for an immaterial «altre variazioni» (`isMaterialOtherChange`).
  */
 export function describeSales(sales: PeriodSalesSummary, split?: MonthSplit): Narrative {
   const narrative: Narrative = [

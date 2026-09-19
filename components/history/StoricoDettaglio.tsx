@@ -7,7 +7,7 @@
  * notes — at the tile's cadence. Closed by default: the verdict and the five tiles already
  * answer the page's question; this is the reference material.
  *
- * Nothing is fetched here: the rows come from chartService through the page, the words from
+ * Nothing is fetched here: the rows come from chartService and growthDrivers through the page, the words from
  * `storicoNarrative.ts`, so no figure can disagree with the grid.
  */
 
@@ -21,7 +21,7 @@ import type { PeriodMonth } from '@/lib/utils/storicoSummary';
 import { describeLabor, describeLaborTaxes, describeLaborWindow, describeMonthlyDrivers, describeNotes, describeOtherIncome, describeYearlyVariation, DIVIDENDS_OUTSIDE_CASHFLOW, formatPeriodMonth, type LaborMetricsInput, type MonthlyDriverRow, type YearlyVariationRow } from '@/lib/utils/storicoNarrative';
 import { NarrativeText } from '@/components/ui/narrative-text';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
-import { formatCurrency, formatCurrencyCompact, formatPercentage, type prepareMonthlyLaborMetricsData } from '@/lib/services/chartService';
+import { formatCurrencyCompact, formatPercentage, type prepareMonthlyLaborMetricsData } from '@/lib/services/chartService';
 import { signTextClass } from '@/lib/utils/metricColors';
 import { useChartColors } from '@/lib/hooks/useChartColors';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
@@ -134,13 +134,45 @@ function YearlyVariationTile({ rows, currentYear }: { rows: YearlyVariationRow[]
 
 // ─── Risparmio e mercato per mese ─────────────────────────────────────────────
 
+type MonthlyDriverDatum = MonthlyDriverRow & { period: string; taxBar: number };
+
+/**
+ * Every part of the hovered month — the three drawn as bars and the three that are not (mortgage,
+ * pension contributions, other changes: owner, 2026-09-19, «riga + tooltip, niente barra»). A
+ * module-level component, cloned by Recharts with its props (an inline arrow would remount it).
+ */
+function DriverMonthTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload?: MonthlyDriverDatum }> }) {
+  const row = active ? payload?.[0]?.payload : undefined;
+  if (!row) return null;
+  const parts: Array<{ label: string; value: number }> = [
+    { label: 'Risparmio', value: row.netSavings },
+    { label: 'Mercato', value: row.market },
+    { label: 'Tasse sulle vendite', value: -row.taxes },
+    { label: 'Mutuo rimborsato', value: row.debtRepaid },
+    { label: 'Versamenti al fondo pensione', value: row.pensionContributions },
+    { label: 'Altre variazioni', value: row.other },
+  ].filter((part, i) => i < 2 || Math.abs(Math.round(part.value)) >= 1);
+  return (
+    <div style={TOOLTIP_CONTENT_STYLE} className="px-2.5 py-2">
+      <p style={TOOLTIP_LABEL_STYLE} className="m-0 mb-1">{formatPeriodMonth(row)}</p>
+      {parts.map((part) => (
+        <p key={part.label} style={TOOLTIP_ITEM_STYLE} className="m-0 flex justify-between gap-4">
+          <span>{part.label}</span>
+          <span className="font-mono tabular-nums">{signed(part.value)}</span>
+        </p>
+      ))}
+    </div>
+  );
+}
+
 function MonthlyDriversTile({ rows, years, startYear }: { rows: MonthlyDriverRow[]; years: number[]; startYear: number }) {
   const [year, setYear] = useState<'all' | number>('all');
   const chartColors = useChartColors();
   const prefersReducedMotion = useReducedMotion();
   const isMobile = useMediaQuery('(max-width: 767px)');
   const shown = useMemo(() => (year === 'all' ? rows : rows.filter((r) => r.year === year)), [rows, year]);
-  const data = useMemo(() => shown.map((r) => ({ ...r, period: `${formatPeriodMonth(r).slice(0, 3)} ${String(r.year).slice(2)}` })), [shown]);
+  const data = useMemo<MonthlyDriverDatum[]>(() => shown.map((r) => ({ ...r, period: `${formatPeriodMonth(r).slice(0, 3)} ${String(r.year).slice(2)}`, taxBar: -r.taxes })), [shown]);
+  const hasTaxes = data.some((r) => r.taxes > 0);
   const reading = useMemo(() => describeMonthlyDrivers(shown), [shown]);
 
   const aside =
@@ -171,32 +203,27 @@ function MonthlyDriversTile({ rows, years, startYear }: { rows: MonthlyDriverRow
               data={data}
               margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
               role="img"
-              aria-label={`Risparmio e mercato per mese. ${data.map((r) => `${formatPeriodMonth(r)}: risparmio ${signed(r.netSavings)}, mercato ${signed(r.investmentGrowth)}`).join('; ')}.`}
+              aria-label={`Risparmio, mercato e tasse sulle vendite per mese. ${data.map((r) => `${formatPeriodMonth(r)}: risparmio ${signed(r.netSavings)}, mercato ${signed(r.market)}${r.taxes > 0 ? `, tasse ${signed(-r.taxes)}` : ''}`).join('; ')}.`}
               accessibilityLayer={false}
               barGap={2}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
               <XAxis dataKey="period" tick={CHART_TICK_STYLE} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={isMobile ? 40 : 24} />
               <YAxis tickFormatter={(v: number) => formatCurrencyCompact(v)} tick={CHART_TICK_STYLE} axisLine={false} tickLine={false} width={52} />
-              <Tooltip
-                formatter={(value, name) => [typeof value === 'number' ? formatCurrency(value) : '—', name]}
-                contentStyle={TOOLTIP_CONTENT_STYLE}
-                labelStyle={TOOLTIP_LABEL_STYLE}
-                itemStyle={TOOLTIP_ITEM_STYLE}
-                cursor={CURSOR_FILL}
-              />
+              <Tooltip content={<DriverMonthTooltip />} cursor={CURSOR_FILL} />
               <Bar dataKey="netSavings" name="Risparmio" fill={chartColors[1] ?? 'var(--chart-2)'} isAnimationActive={!prefersReducedMotion} animationDuration={600} animationEasing="ease-out" />
-              <Bar dataKey="investmentGrowth" name="Mercato" fill={chartColors[0] ?? 'var(--chart-1)'} isAnimationActive={!prefersReducedMotion} animationDuration={600} animationEasing="ease-out">
+              <Bar dataKey="market" name="Mercato" fill={chartColors[0] ?? 'var(--chart-1)'} isAnimationActive={!prefersReducedMotion} animationDuration={600} animationEasing="ease-out">
                 {data.map((row) => (
-                  <Cell key={`${row.year}-${row.month}`} fill={row.investmentGrowth >= 0 ? (chartColors[0] ?? 'var(--chart-1)') : 'var(--destructive)'} />
+                  <Cell key={`${row.year}-${row.month}`} fill={row.market >= 0 ? (chartColors[0] ?? 'var(--chart-1)') : 'var(--destructive)'} />
                 ))}
               </Bar>
+              {hasTaxes && <Bar dataKey="taxBar" name="Tasse sulle vendite" fill={chartColors[3] ?? 'var(--chart-4)'} isAnimationActive={!prefersReducedMotion} animationDuration={600} animationEasing="ease-out" />}
             </BarChart>
           </ResponsiveContainer>
         </div>
       )}
       <div className="mt-auto flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-t border-border pt-3.5 text-[11px] leading-[1.45] text-muted-foreground">
-        <span>Stessa scomposizione del Driver, mese per mese, dal {startYear} (l&apos;anno da cui il cashflow è completo); un mese senza il cashflow conta tutto come mercato.</span>
+        <span>Stessa scomposizione del Driver, mese per mese, dal {startYear} (l&apos;anno da cui il cashflow è completo); mutuo, versamenti al fondo pensione e altre variazioni sono nel dettaglio del mese.</span>
         <span className="flex gap-3" aria-hidden="true">
           <span className="flex items-center gap-1.5">
             <span className="inline-block h-2 w-2 rounded-[2px]" style={{ background: 'var(--chart-2)' }} />
@@ -206,6 +233,12 @@ function MonthlyDriversTile({ rows, years, startYear }: { rows: MonthlyDriverRow
             <span className="inline-block h-2 w-2 rounded-[2px]" style={{ background: 'var(--chart-1)' }} />
             Mercato
           </span>
+          {hasTaxes && (
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-2 w-2 rounded-[2px]" style={{ background: 'var(--chart-4)' }} />
+              Tasse
+            </span>
+          )}
         </span>
       </div>
     </Tile>
@@ -241,13 +274,13 @@ function LaborRow({ label, caption, value, tone = 'cause' }: { label: string; ca
 const lowerFirst = (text: string) => text.charAt(0).toLowerCase() + text.slice(1);
 
 /**
- * «Lavoro e investimenti»: three causes that add up to the growth of the same window —
- * what was saved from work, what the other income categories brought in, what the market
- * added — closed by the total, so nothing is left to the eye to attribute (the old four rows
- * named two causes of three, and the reader handed the dividends to the market). The window
- * is the Driver's (baseline → last snapshot), selectable per year like the tile beside it; the
- * taxes are a footer on the cumulative recap only, since an estimate on today's latent gains
- * belongs to no year.
+ * «Lavoro e investimenti»: the causes that add up to the growth of the same window — what was
+ * saved from work, what the other income categories brought in, then the Driver's own parts
+ * (market, sale taxes, mortgage, pension contributions, other changes; a part printed as zero
+ * has no row) — closed by the total, so nothing is left to the eye to attribute and the page
+ * never prints two «mercato» (owner, 2026-09-19). The window is the Driver's (baseline → last
+ * snapshot), selectable per year like the tile beside it; the tax on today's LATENT gains is a
+ * footer on the cumulative recap only, since an estimate on today's gains belongs to no year.
  */
 function LaborTile({ labor, startYear }: { labor: LaborTileData | null; startYear: number }) {
   const [year, setYear] = useState<'all' | number>('all');
@@ -307,7 +340,11 @@ function LaborTile({ labor, startYear }: { labor: LaborTileData | null; startYea
           value={metrics.totalSavedFromWork}
         />
         <LaborRow label="Altre entrate" caption={describeOtherIncome(metrics.otherIncomeByCategory)} value={metrics.otherIncome} />
-        <LaborRow label="Mercato" caption="la crescita che nessuna entrata spiega" value={metrics.totalInvestmentGrowthGross} />
+        <LaborRow label="Mercato" caption="la variazione di prezzo di ogni strumento, come nel Driver" value={metrics.totalInvestmentGrowthGross} />
+        {!isPrintedZero(metrics.saleTaxes) && <LaborRow label="Tasse sulle vendite" caption="stimate sulle plusvalenze realizzate" value={-metrics.saleTaxes} />}
+        {!isPrintedZero(metrics.debtRepaid) && <LaborRow label="Mutuo rimborsato" caption="la quota capitale delle rate, che resta nel patrimonio" value={metrics.debtRepaid} />}
+        {!isPrintedZero(metrics.pensionContributions) && <LaborRow label="Versamenti al fondo pensione" caption="TFR, datore e volontari registrati in Previdenza" value={metrics.pensionContributions} />}
+        {!isPrintedZero(metrics.otherChanges) && <LaborRow label="Altre variazioni" caption="ciò che nessuna voce spiega: saldi aggiornati in giorni diversi dalle spese" value={metrics.otherChanges} />}
         <LaborRow label="Crescita del patrimonio" caption={lowerFirst(describeLaborWindow(metrics))} value={metrics.netWorthGrowth} tone="total" />
       </div>
       {chartData.length > 0 && (
@@ -318,7 +355,7 @@ function LaborTile({ labor, startYear }: { labor: LaborTileData | null; startYea
       <div className="mt-auto flex flex-col gap-1 border-t border-border pt-3.5 text-[11px] leading-[1.45] text-muted-foreground">
         {taxes && <NarrativeText segments={taxes} figureClassName="font-medium" />}
         {!labor.hasDividendCategory && <p className="m-0">{DIVIDENDS_OUTSIDE_CASHFLOW}</p>}
-        <p className="m-0">Le tre cause sommano alla crescita della stessa finestra, chiusa sull&apos;ultimo snapshot come il Driver: le righe già in calendario per i mesi a venire non contano.</p>
+        <p className="m-0">Le voci sommano alla crescita della stessa finestra, chiusa sull&apos;ultimo snapshot come il Driver: le righe ancora in calendario non contano.</p>
       </div>
     </Tile>
   );

@@ -164,8 +164,11 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   `lib/utils/salesNarrative.ts` — «Di quel movimento: +3980 € dal mercato, +1180 € risparmiati, −1040 € di altre
   variazioni.», the same three parts inside the taxed sale's counterfactual. «Risparmiati» is income − expenses ALREADY
   happened (negative: «spesi oltre le entrate»); «altre variazioni» is the exact residual (interest, balances corrected
-  by hand, hand-valued holdings, expenses not recorded), dropped under 1 €. Without the cashflow the second part says
-  what it holds: «tra risparmio e altre variazioni». Patrimonio takes the same `savings` from the same payload.
+  by hand, hand-valued holdings, expenses not recorded), said only when MATERIAL — `isMaterialOtherChange`: at least
+  max(100 €, 5% of the change being split) (owner, 2026-09-19). Below that it is timing, not a cause: settembre 2026's
+  +150 € was card spending not yet debited (a credit card leaves the account the month after its rows), a debt balance
+  corrected by hand and 3,64 € between the estimated and the withheld tax — so the two named parts may not add up to
+  the total by a few euro. Without the cashflow the second part says what it holds: «tra risparmio e altre variazioni». Patrimonio takes the same `savings` from the same payload.
 - **The verdict's savings rate is what has already happened** (owner's call): `resolveLivedCashflow` in
   `overviewNarrative.ts` subtracts `expensesScheduled` and the new `incomeScheduled` — Tracciamento's `settleTotals` —
   and names the calendar beside it: «Hai messo da parte il 45% delle entrate finora (altri 1297 € di spese in

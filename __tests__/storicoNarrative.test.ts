@@ -26,6 +26,7 @@ import {
   buildStoricoVerdict,
   describeComposition,
   describeDoublings,
+  describeDriverRest,
   describeDrivers,
   describeEvolution,
   describeEvolutionAside,
@@ -336,7 +337,7 @@ describe('describeComposition', () => {
 });
 
 describe('describeDrivers', () => {
-  const row = (year: string, netSavings: number, investmentGrowth: number, growthPct: number | null = null) => ({ year, netSavings, investmentGrowth, netWorthGrowth: netSavings + investmentGrowth, growthPct, latest: { year: Number(year), month: 12 } });
+  const row = (year: string, netSavings: number, market: number, growthPct: number | null = null) => ({ year, netSavings, market, taxes: 0, debtRepaid: 0, pensionContributions: 0, other: 0, isMarketMeasured: true, netWorthGrowth: netSavings + market, growthPct, latest: { year: Number(year), month: 12 } });
 
   it("should split the year's growth between savings and the market, with the shares and the growth in percent", () => {
     expect(plain(describeDrivers({ row: { ...row('2026', 14100, 7300), latest: { year: 2026, month: 8 } }, isRunning: true }))).toBe('Da gennaio ad agosto 2026 il patrimonio è cresciuto di 21.400 €: 14.100 € dal risparmio (66%) e 7300 € dal mercato (34%).');
@@ -360,6 +361,27 @@ describe('describeDrivers', () => {
 
   it('should give no reading without a year', () => {
     expect(describeDrivers(null)).toBeNull();
+  });
+
+  it('should close on every other part in euro, the shares being of the two engines only', () => {
+    // The real account, gennaio–settembre 2026 (owner, 2026-09-19).
+    const year = { ...row('2026', 5413, 21916, 13.5), baseline: { year: 2025, month: 12 }, latest: { year: 2026, month: 9 }, taxes: 4091, debtRepaid: 4655, pensionContributions: 10, other: 7454, netWorthGrowth: 35356 };
+    expect(plain(describeDrivers({ row: year, isRunning: true }))).toBe(
+      'Da gennaio a settembre 2026 il patrimonio è cresciuto di 35.356 € (+13,5%): 5413 € dal risparmio (20%) e 21.916 € dal mercato (80%). ' +
+        'Il resto: −4091 € di tasse stimate sulle vendite, +4655 € di mutuo rimborsato, +10 € di versamenti al fondo pensione e +7454 € di altre variazioni.',
+    );
+    const segments = describeDriverRest(year);
+    expect(segments.find((s) => s.text.replace(/\s/g, ' ') === '−4091 €')).toMatchObject({ mono: true, sign: 'negative' });
+    // A flow is signed but never coloured: repaying a mortgage is neither a gain nor a loss.
+    const mortgage = segments.find((s) => s.text.replace(/\s/g, ' ') === '+4655 €');
+    expect(mortgage).toMatchObject({ mono: true });
+    expect(mortgage?.sign).toBeUndefined();
+  });
+
+  it('should leave an immaterial «altre variazioni» unsaid, and say nothing when only the engines moved', () => {
+    const year = { ...row('2026', 5413, 21916), netWorthGrowth: 27379, other: 50 };
+    expect(plain(describeDriverRest(year))).toBe('');
+    expect(plain(describeDriverRest({ ...year, other: 1400 }))).toBe(' Il resto: +1400 € di altre variazioni.');
   });
 });
 
@@ -424,13 +446,13 @@ describe('Dettaglio readings', () => {
 
   it('should count the months with savings and the months the market took from', () => {
     const rows = [
-      { year: 2026, month: 1, netSavings: 2200, investmentGrowth: 1100 },
-      { year: 2026, month: 2, netSavings: 1900, investmentGrowth: -1400 },
-      { year: 2026, month: 3, netSavings: 0, investmentGrowth: 2600 },
-      { year: 2026, month: 4, netSavings: 2100, investmentGrowth: -800 },
+      { year: 2026, month: 1, netSavings: 2200, market: 1100 },
+      { year: 2026, month: 2, netSavings: 1900, market: -1400 },
+      { year: 2026, month: 3, netSavings: 0, market: 2600 },
+      { year: 2026, month: 4, netSavings: 2100, market: -800 },
     ];
     expect(plain(describeMonthlyDrivers(rows))).toBe('Hai risparmiato in 3 mesi su 4; il mercato ha tolto in 2 mesi, al massimo −1400 € a febbraio 2026.');
-    expect(plain(describeMonthlyDrivers(rows.map((r) => ({ ...r, netSavings: 100, investmentGrowth: 5 }))))).toBe('Il risparmio non è mai mancato (4 mesi su 4); il mercato non ha mai tolto.');
+    expect(plain(describeMonthlyDrivers(rows.map((r) => ({ ...r, netSavings: 100, market: 5 }))))).toBe('Il risparmio non è mai mancato (4 mesi su 4); il mercato non ha mai tolto.');
     expect(describeMonthlyDrivers([])).toBeNull();
   });
 
@@ -449,6 +471,10 @@ describe('Dettaglio readings', () => {
     netWorthGrowth: 57600,
     totalInvestmentGrowthGross: 14200,
     totalInvestmentGrowthNet: 11900,
+    saleTaxes: 0,
+    debtRepaid: 0,
+    pensionContributions: 0,
+    otherChanges: 0,
     coverage: 78400 / 41500,
   };
 

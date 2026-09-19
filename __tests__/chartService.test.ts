@@ -9,7 +9,7 @@ vi.mock('@/lib/services/assetAllocationService', () => ({
   calculateCurrentAllocation: vi.fn(),
 }))
 
-import { prepareMonthlyLaborMetricsData, prepareAssetClassHistoryData, prepareSavingsVsInvestmentData } from '@/lib/services/chartService'
+import { prepareMonthlyLaborMetricsData, prepareAssetClassHistoryData } from '@/lib/services/chartService'
 import { Asset, MonthlySnapshot } from '@/types/assets'
 import { Expense } from '@/types/expenses'
 
@@ -304,47 +304,5 @@ describe('prepareAssetClassHistoryData — pension carve-out paths', () => {
     expect(point.pension).toBe(1000)
     expect(point.byClass.equity).toBe(1700)
     expect(point.byClass.bonds).toBe(300)
-  })
-})
-
-describe('prepareSavingsVsInvestmentData — the savings window is the growth window', () => {
-  const snap = (year: number, month: number, totalNetWorth: number): MonthlySnapshot =>
-    ({ userId: 'u', year, month, totalNetWorth, liquidNetWorth: totalNetWorth, illiquidNetWorth: 0, byAssetClass: {}, byAsset: [], assetAllocation: {}, createdAt: new Date(year, month - 1, 28, 12) }) as MonthlySnapshot
-  const flow = (id: string, type: Expense['type'], amount: number, year: number, month: number): Expense =>
-    ({ id, userId: 'u', type, categoryId: 'c', categoryName: 'c', amount, currency: 'EUR', date: new Date(year, month - 1, 5, 12), createdAt: new Date(), updatedAt: new Date() }) as Expense
-
-  it('should count a closed year on the full calendar year and give the growth in percent of the baseline', () => {
-    const rows = prepareSavingsVsInvestmentData(
-      [snap(2024, 12, 100000), snap(2025, 6, 120000), snap(2025, 12, 144966)],
-      [flow('a', 'income', 30000, 2025, 1), flow('b', 'fixed', -6322, 2025, 12), flow('t', 'transfer', 5000, 2025, 3)],
-    )
-    expect(rows).toEqual([
-      { year: '2025', netSavings: 23678, investmentGrowth: 21288, netWorthGrowth: 44966, growthPct: 44.966, baseline: { year: 2024, month: 12 }, latest: { year: 2025, month: 12 } },
-    ])
-  })
-
-  it('should stop a running year at its last snapshot: rows already in the calendar after it do not count', () => {
-    const rows = prepareSavingsVsInvestmentData(
-      [snap(2025, 12, 200000), snap(2026, 8, 234436)],
-      [flow('a', 'income', 3000, 2026, 3), flow('b', 'fixed', -800, 2026, 8), flow('future', 'fixed', -800, 2026, 11), flow('future2', 'fixed', -800, 2026, 12)],
-    )
-    expect(rows).toHaveLength(1)
-    expect(rows[0]).toMatchObject({ year: '2026', netSavings: 2200, investmentGrowth: 32236, netWorthGrowth: 34436, latest: { year: 2026, month: 8 } })
-  })
-
-  it('should open a first year the month after its baseline: rows before it explain no growth', () => {
-    const rows = prepareSavingsVsInvestmentData(
-      [snap(2026, 3, 100000), snap(2026, 8, 110000)],
-      [flow('jan', 'income', 5000, 2026, 1), flow('mar', 'income', 5000, 2026, 3), flow('apr', 'income', 4000, 2026, 4)],
-    )
-    expect(rows[0]).toMatchObject({ year: '2026', netSavings: 4000, investmentGrowth: 6000, baseline: { year: 2026, month: 3 } })
-  })
-
-  it('should skip a year with no cashflow row in its window instead of reading it as all market', () => {
-    const rows = prepareSavingsVsInvestmentData(
-      [snap(2024, 12, 100000), snap(2025, 12, 110000), snap(2026, 6, 115000)],
-      [flow('a', 'income', 1000, 2026, 2)],
-    )
-    expect(rows.map((r) => r.year)).toEqual(['2026'])
   })
 })

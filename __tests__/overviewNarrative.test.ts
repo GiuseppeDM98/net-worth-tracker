@@ -179,7 +179,7 @@ describe('buildOverviewVerdict — headline and tone', () => {
     expect(plain(verdict.sentence)).toBe(
       'Il patrimonio vale 297.209,77 €: +124,32 € (+0,04%) su agosto, +13,47% da inizio anno, nuovo massimo storico. ' +
         'Hai venduto VWCE per 39.052 € con una plusvalenza di 15.726 € e pagato circa 4089 € di tasse: ' +
-        'senza, il mese avrebbe fatto +4213 € (+2018 € dal mercato, +2095 € risparmiati, +100 € di altre variazioni). ' +
+        'senza, il mese avrebbe fatto +4213 € (+2018 € dal mercato e +2095 € risparmiati). ' +
         'Nello stesso mese hai comprato 6 strumenti per 34.305 €. ' +
         'Hai messo da parte il 45% delle entrate finora (altri 1297 € di spese in calendario); ' +
         'sul mercato hanno spinto soprattutto le criptovalute (+726 €).',

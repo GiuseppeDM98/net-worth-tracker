@@ -152,7 +152,7 @@ describe('buildPatrimonioVerdict — sentence', () => {
     expect(verdict.headline).toBe('Il portafoglio è in pari: le tasse sulla vendita di VWCE si sono prese la crescita.');
     expect(verdict.tone).toBe('warning');
     expect(plain(verdict.sentence)).toContain(
-      'senza, il mese avrebbe fatto +4213 € (+2018 € dal mercato, +2095 € risparmiati, +100 € di altre variazioni). ' +
+      'senza, il mese avrebbe fatto +4213 € (+2018 € dal mercato e +2095 € risparmiati). ' +
         'Nello stesso mese hai comprato 6 strumenti per 34.305 €.',
     );
   });
