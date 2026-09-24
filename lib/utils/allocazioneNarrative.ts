@@ -441,17 +441,19 @@ export function describePlan(
       prose('.'),
     ]);
   }
-  if (view.trades) {
-    if (view.trades.length === 0) return [prose('Per prelevare '), amount(view.amount), prose(' nessuna vendita avvicina il portafoglio al target.')];
-    const { sells } = tradeItems(view.trades);
-    return withTax([prose('Per prelevare '), amount(view.amount), prose(': vendi '), ...joinList(sells), prose('.')]);
-  }
-  if (view.nodes.length === 0) return [prose('Per prelevare '), amount(view.amount), prose(' nessuna vendita avvicina il portafoglio al target.')];
   // «Prelevare 1000 €» means 1000 € IN HAND, so the head names the net first and the gross second:
   // the rows below add up to the gross, and a reader who checks them must find the figure named.
+  // The leverage engine is grossed up by the same fixed point, so it takes the same head.
   const head: Narrative = view.grossedUp
     ? [prose('Per prelevare '), amount(view.amount), prose(' netti vendi '), amount(view.grossAmount), prose(': ')]
     : [prose('Per prelevare '), amount(view.amount), prose(': ')];
+  if (view.trades) {
+    if (view.trades.length === 0) return [prose('Per prelevare '), amount(view.amount), prose(' nessuna vendita avvicina il portafoglio al target.')];
+    const { sells } = tradeItems(view.trades);
+    // «netti vendi 1080 €: vendi 648 € di…» would say the verb twice; the grossed head already has it.
+    return withTax([...head, ...(view.grossedUp ? [] : [prose('vendi ')]), ...joinList(sells), prose('.')], view.grossedUp);
+  }
+  if (view.nodes.length === 0) return [prose('Per prelevare '), amount(view.amount), prose(' nessuna vendita avvicina il portafoglio al target.')];
   if (view.nodes.length === 1) {
     const subject = subjectFor(view.nodes[0]);
     const over = view.overTarget.includes(view.nodes[0].label);
@@ -508,7 +510,7 @@ export function describePlanFooter(mode: PlanMode, leveraged: boolean, taxEstima
     : 'Le tasse sulla plusvalenza non sono considerate.';
   if (mode === 'rebalance') {
     return leveraged
-      ? `Operazioni sugli strumenti reali che detieni, a saldo cassa nullo, per riportare l'esposizione nozionale di ogni classe verso il target. ${disclaimer}`
+      ? `Operazioni sugli strumenti reali che detieni, a saldo cassa nullo, per riportare l'esposizione nozionale di ogni classe verso il target. ${taxNote} ${disclaimer}`
       : `Le vendite sono limitate a ciò che puoi negoziare. ${taxNote} ${disclaimer}`;
   }
   if (mode === 'contribute') {
@@ -517,7 +519,7 @@ export function describePlanFooter(mode: PlanMode, leveraged: boolean, taxEstima
       : `Colma prima le classi e le sottocategorie sotto target, senza vendere nulla. Sul singolo strumento segue i tuoi asset specifici, se configurati; altrimenti ripartisce in proporzione a quanto detieni. ${disclaimer}`;
   }
   return leveraged
-    ? `Raccoglie la cifra vendendo gli strumenti reali che detieni (solo vendite), riportando l'esposizione nozionale verso il target. Le tasse sulla plusvalenza non sono considerate. ${disclaimer}`
+    ? `Raccoglie la cifra vendendo gli strumenti reali che detieni (solo vendite), riportando l'esposizione nozionale verso il target. ${taxNote} ${disclaimer}`
     : `Attinge prima da classi e sottocategorie sopra target, così il prelievo ti riavvicina all'obiettivo. Dove non c'è un target, ripartisce in proporzione a quanto detieni. ${taxNote} ${disclaimer}`;
 }
 

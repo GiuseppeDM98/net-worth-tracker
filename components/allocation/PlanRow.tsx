@@ -68,9 +68,22 @@ export function PlanRow({ node, depth, color, direction }: PlanRowProps) {
   return (
     <div>
       <div className="flex items-center justify-between gap-3">
-        <span className={nameClass} title={node.label}>
-          {node.label}
-        </span>
+        {/* A sleeve of a composite instrument the leverage engine traded as ONE order: the order
+            itself is named under it, or the reader has to add the sleeves up to place it. */}
+        {node.order ? (
+          <div className="min-w-0">
+            <p className={nameClass} title={node.label}>
+              {node.label}
+            </p>
+            <p className="font-mono text-[10px] tabular-nums text-muted-foreground">
+              parte di un ordine da {cachedFormatCurrencyEUR(node.order.amount, true)} di {node.order.label}
+            </p>
+          </div>
+        ) : (
+          <span className={nameClass} title={node.label}>
+            {node.label}
+          </span>
+        )}
         <div className="shrink-0 text-right">
           <p className={amountClass} style={{ color }}>
             {sign}

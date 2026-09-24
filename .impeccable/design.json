@@ -634,7 +634,7 @@
    },
    "chip": {
     "displayName": "Chip",
-    "purpose": "15px — a secondary MONO figure in a dialog or a list (DividendDetailsDialog, StoricoDettaglio, InstrumentTradeList, the goal card's title) and the verdict sentence from desktop:; the 15px hero chip retired with Patrimonio, tiles use 12px"
+    "purpose": "15px — a secondary MONO figure in a dialog or a list (DividendDetailsDialog, StoricoDettaglio, the goal card's title) and the verdict sentence from desktop:; the 15px hero chip retired with Patrimonio, tiles use 12px"
    },
    "title-px": {
     "displayName": "Title Px",

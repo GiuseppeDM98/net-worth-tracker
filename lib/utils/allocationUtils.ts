@@ -638,6 +638,13 @@ export function partitionByAllocationRole(assets: Asset[]): {
 export interface AllocatableHolding {
   /** `asset.id`, suffixed with the component index for the sleeves of a composite asset. */
   id: string;
+  /**
+   * The asset the holding belongs to — equal to `id` on a plain holding, shared by every sleeve of
+   * a composite one. The leverage engine trades whole ASSETS, and this is how one of its trades
+   * finds the sleeves it has to be split across. Optional so a hand-built holding (a test) may
+   * omit it; a reader falls back to `id`.
+   */
+  assetId?: string;
   label: string;
   ticker?: string;
   assetClass: string;
@@ -704,6 +711,7 @@ export function buildHoldings(
       asset.composition.forEach((component, index) => {
         holdings.push({
           id: `${asset.id}:${index}`,
+          assetId: asset.id,
           label: `${asset.name} · ${ASSET_CLASS_LABELS[component.assetClass] ?? component.assetClass}`,
           ticker,
           assetClass: component.assetClass,
@@ -720,6 +728,7 @@ export function buildHoldings(
     } else {
       holdings.push({
         id: asset.id,
+        assetId: asset.id,
         label: asset.name,
         ticker,
         assetClass: asset.assetClass,
@@ -1043,10 +1052,18 @@ export interface PlanNode {
    * node, not to its position.
    */
   isInstrument?: boolean;
+  /**
+   * The whole order this row is a slice of, set only on a sleeve of a composite instrument that
+   * the leverage engine traded as ONE asset: «NTSG · Azioni +1200 €» is 60% of a single 2000 €
+   * buy, and the reader must be able to put the order back together for the broker. `label` is
+   * the ticker the broker knows, carried apart from the row's name because that name truncates
+   * on a phone — at 390px «WisdomTree Global Efficient Co…» had lost it.
+   */
+  order?: { amount: number; label: string };
 }
 
 /** Label a holding the way the plan shows it: name plus ticker when there is one. */
-function holdingLabel(holding: AllocatableHolding): string {
+export function holdingLabel(holding: AllocatableHolding): string {
   return holding.ticker ? `${holding.label} (${holding.ticker})` : holding.label;
 }
 

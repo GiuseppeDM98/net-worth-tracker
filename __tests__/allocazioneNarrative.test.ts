@@ -435,6 +435,25 @@ describe('describePlan', () => {
     );
   });
 
+  it('names the orders of a leveraged withdrawal under the same net-then-gross head', () => {
+    const trades = [
+      { assetId: 'cl2', ticker: 'CL2', displayTicker: 'CL2', name: 'Amundi MSCI USA 2x', amount: -760 },
+      { assetId: 'ntsg', ticker: 'NTSG', displayTicker: 'NTSG', name: 'WisdomTree Efficient Core', amount: -327 },
+    ];
+    const view: PlanView = {
+      mode: 'withdraw', amount: 1000, grossAmount: 1087, grossedUp: true, nodes: [], trades,
+      tradableTotal: 100000, exceedsPortfolio: false, overTarget: [],
+    };
+    // The grossed head already carries the verb: «netti vendi 1087 €: vendi 760 €…» would say it twice.
+    expect(plain(describePlan(view, band, { gross: 1087, tax: 87, net: 1000, unknownReason: null }))).toBe(
+      'Per prelevare 1000 € netti vendi 1087 €: 760 € di CL2 e 327 € di NTSG; la ritenuta stimata è 87 €.',
+    );
+    // Not estimable: no net is promised, the verb comes back and no tax clause is printed.
+    expect(plain(describePlan({ ...view, grossAmount: 1000, grossedUp: false }, band, { gross: 1000, tax: null, net: null, unknownReason: 'cost-basis' }))).toBe(
+      'Per prelevare 1000 €: vendi 760 € di CL2 e 327 € di NTSG.',
+    );
+  });
+
   it('says the net will fall short when even the gross does not fit', () => {
     const view: PlanView = {
       mode: 'withdraw',
@@ -471,6 +490,14 @@ describe('describePlan', () => {
     expect(withEstimate).not.toContain('Le tasse sulla plusvalenza non sono considerate.');
     expect(withEstimate).toContain('La ritenuta è stimata sulla plusvalenza della quota venduta');
     expect(describePlanFooter('withdraw', false, true)).toContain('minusvalenze pregresse');
+  });
+
+  it('follows the same tax rule under leverage, whose sells are now priced too', () => {
+    for (const mode of ['rebalance', 'withdraw'] as const) {
+      expect(describePlanFooter(mode, true, true)).toContain('La ritenuta è stimata sulla plusvalenza della quota venduta');
+      expect(describePlanFooter(mode, true, true)).not.toContain('Le tasse sulla plusvalenza non sono considerate.');
+      expect(describePlanFooter(mode, true, false)).toContain('Le tasse sulla plusvalenza non sono considerate.');
+    }
   });
 
   describe('the sale tax clause', () => {

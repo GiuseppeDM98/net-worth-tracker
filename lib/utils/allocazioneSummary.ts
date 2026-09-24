@@ -19,6 +19,7 @@ import {
   buildContributionPlan,
   buildRebalancePlan,
   buildWithdrawalPlan,
+  holdingLabel,
   resolveAllocationRole,
   type AllocatableHolding,
   type AllocationAction,
@@ -30,6 +31,7 @@ import {
   planInstrumentRebalance,
   planInstrumentWithdrawal,
   type InstrumentTrade,
+  type LeverageAwarePlan,
   type LeveragePlanInputs,
 } from '@/lib/utils/leverageAwareAllocationUtils';
 import { assetClassLegs } from '@/lib/utils/assetDisplayClass';
@@ -253,15 +255,25 @@ export interface PlanInputs {
 export type PlanView =
   | {
       mode: 'rebalance';
+      /**
+       * What the tile draws, class → instrument, with or without leverage. Under leverage a class
+       * the engine both sells and buys in (a 1× ETF swapped for a 2× one) is TWO moves, one per
+       * action, so every row stays one action with one chip.
+       */
       moves: RebalanceMove[];
-      /** The instrument trades under leverage; null on the class-level plan. */
+      /**
+       * The leverage engine's own orders, one per instrument, which the reading names; null on the
+       * class-level plan. The tile never draws them flat: `moves` is the same trades grouped.
+       */
       trades: InstrumentTrade[] | null;
       resultingLeverageRatio: number | null;
     }
   | {
       mode: 'contribute';
       amount: number;
+      /** Class → instrument, with or without leverage (under leverage, the engine's trades grouped). */
       nodes: PlanNode[];
+      /** The leverage engine's orders, for the reading and the verdict; null without leverage. */
       trades: InstrumentTrade[] | null;
       /** Labels of the classes over target that receive nothing. */
       overTarget: string[];
@@ -342,41 +354,185 @@ const GROSS_UP_TOLERANCE = 1;
  * amount. So it is a fixed point — `gross = requestedNet + tax(plan(gross))` — solved by
  * iteration, which converges because the tax grows far more slowly than the gross.
  *
+ * `planFor` is the planner — the class split or the leverage engine — capped at the tradable
+ * total. The fixed point is the same whichever of the two decides what is sold, because both hand
+ * back the sold instruments as `nodes` whose leaves are keyed by holding id.
+ *
  * Three honest exits. When the tax is not estimable (a leg without an EUR cost basis or a rate)
  * the plan sells the requested figure unchanged and nothing promises a net. When the gross the
  * request needs exceeds the tradable total, the plan sells everything it can and the caller says
  * the request cannot be met. When nothing being sold carries a gain, gross equals net.
  */
-function solveWithdrawalGross(
+function solveWithdrawalGross<P extends { nodes: PlanNode[] }>(
   requestedNet: number,
-  inputs: PlanInputs,
-  labels: Record<string, string>,
+  holdings: AllocatableHolding[],
   tradableTotal: number,
-): { grossAmount: number; requiredGross: number; nodes: PlanNode[] } {
-  const planFor = (gross: number): PlanNode[] =>
-    visible(buildWithdrawalPlan(inputs.byAssetClass, inputs.bySubCategory, inputs.holdings, Math.min(gross, tradableTotal), labels)).map(
-      (node) => ({ ...node, children: collapseRepeatedLevels(node.children) }),
-    );
+  planFor: (gross: number) => P,
+): { grossAmount: number; requiredGross: number; plan: P } {
+  let gross = Math.max(0, requestedNet);
+  let plan = planFor(gross);
+  if (gross === 0) return { grossAmount: 0, requiredGross: 0, plan };
 
-  if (requestedNet <= 0) return { grossAmount: 0, requiredGross: 0, nodes: [] };
-
-  let gross = requestedNet;
-  let nodes = planFor(gross);
-  let tax = estimatePlanSaleTax(nodes, inputs.holdings)?.tax ?? null;
+  let tax = estimatePlanSaleTax(plan.nodes, holdings)?.tax ?? null;
   // Not estimable: sell what was asked, exactly as before the gross-up existed.
-  if (tax === null) return { grossAmount: Math.min(requestedNet, tradableTotal), requiredGross: requestedNet, nodes };
+  if (tax === null) return { grossAmount: Math.min(requestedNet, tradableTotal), requiredGross: requestedNet, plan };
 
   for (let pass = 0; pass < GROSS_UP_MAX_PASSES; pass += 1) {
     const next = requestedNet + tax;
     if (Math.abs(next - gross) < GROSS_UP_TOLERANCE) break;
     gross = next;
-    nodes = planFor(gross);
-    const estimate = estimatePlanSaleTax(nodes, inputs.holdings)?.tax ?? null;
+    plan = planFor(gross);
+    const estimate = estimatePlanSaleTax(plan.nodes, holdings)?.tax ?? null;
     if (estimate === null) break;
     tax = estimate;
   }
 
-  return { grossAmount: Math.min(gross, tradableTotal), requiredGross: gross, nodes };
+  return { grossAmount: Math.min(gross, tradableTotal), requiredGross: gross, plan };
+}
+
+// ─── The leverage engine's trades, as the Piano's tree ────────────────────────
+
+/** The bucket of a trade no holding matches — not expected, since both come from one asset list. */
+const UNMATCHED_CLASS = 'unmatched';
+const UNMATCHED_LABEL = 'Altri strumenti';
+
+interface TradeLeg {
+  assetClass: string;
+  /** Always positive; the direction is the trade's sign. */
+  amount: number;
+  node: PlanNode;
+}
+
+/**
+ * One engine trade cut into the sleeves it moves, one per class.
+ *
+ * The engine trades whole ASSETS, but a composite leveraged ETF sits in several classes at once
+ * (60% Azioni, 40% Obbligazioni) and the tree is read by class. Each sleeve takes the share of the
+ * order its value holds in the asset — the composition percentage, the weight `buildHoldings`
+ * splits value and cost basis by — so the legs sum to the order and each is keyed by its holding
+ * id, which is what `estimatePlanSaleTax` prices. A sleeve carries the whole order in
+ * `order` (amount and ticker), so the reader can put «NTSG · Azioni» and «NTSG · Obbligazioni» back together.
+ */
+function splitTradeIntoLegs(trade: InstrumentTrade, sleeves: AllocatableHolding[]): TradeLeg[] {
+  const size = Math.abs(trade.amount);
+  const isBuy = trade.amount > 0;
+  const total = sleeves.reduce((sum, sleeve) => sum + sleeve.value, 0);
+
+  if (total <= 0) {
+    // Unpriceable on purpose: `estimatePlanSaleTax` reports a leaf with no holding as unknown
+    // rather than guessing a zero, and the euros stay in the tree instead of vanishing from it.
+    const ticker = trade.displayTicker || trade.ticker;
+    const label = ticker && ticker !== trade.name ? `${trade.name} (${ticker})` : trade.name;
+    return [{
+      assetClass: UNMATCHED_CLASS,
+      amount: size,
+      node: { key: trade.assetId, label, amount: size, currentValue: 0, newValue: 0, newPercentage: 0, targetPercentage: 0, children: [], isInstrument: true },
+    }];
+  }
+
+  return sleeves.map((sleeve) => {
+    const amount = (size * sleeve.value) / total;
+    return {
+      assetClass: sleeve.assetClass,
+      amount,
+      node: {
+        key: sleeve.id,
+        label: holdingLabel(sleeve),
+        amount,
+        currentValue: sleeve.value,
+        newValue: isBuy ? sleeve.value + amount : Math.max(0, sleeve.value - amount),
+        newPercentage: 0,
+        targetPercentage: 0,
+        children: [],
+        isInstrument: true,
+        ...(sleeves.length > 1 ? { order: { amount: size, label: trade.displayTicker || trade.ticker || trade.name } } : {}),
+      },
+    };
+  });
+}
+
+/** Every visible leg of `trades`, bucketed by class; a trade finds its sleeves through `assetId`. */
+function legsByClass(trades: InstrumentTrade[], holdings: AllocatableHolding[]): Map<string, TradeLeg[]> {
+  const sleevesByAsset = new Map<string, AllocatableHolding[]>();
+  for (const holding of holdings) {
+    const assetId = holding.assetId ?? holding.id;
+    sleevesByAsset.set(assetId, [...(sleevesByAsset.get(assetId) ?? []), holding]);
+  }
+  const byClass = new Map<string, TradeLeg[]>();
+  for (const trade of trades) {
+    for (const leg of splitTradeIntoLegs(trade, sleevesByAsset.get(trade.assetId) ?? [])) {
+      if (leg.amount < MIN_VISIBLE_AMOUNT) continue;
+      byClass.set(leg.assetClass, [...(byClass.get(leg.assetClass) ?? []), leg]);
+    }
+  }
+  return byClass;
+}
+
+const byAmountDesc = (a: { amount: number }, b: { amount: number }): number => b.amount - a.amount;
+
+const classLabel = (assetClass: string, labels: Record<string, string>): string =>
+  assetClass === UNMATCHED_CLASS ? UNMATCHED_LABEL : (labels[assetClass] ?? assetClass);
+
+/**
+ * A Versa or Preleva of the leverage engine as the class → instrument tree the plan without
+ * leverage draws, so the two engines read the same and the withholding can be priced on the sold
+ * legs. The class row's «→ %» is where the ENGINE leaves the class — notional over the post-trade
+ * market base, the measure Per classe prints — not a re-derivation from the legs' market euros,
+ * which would drop the leverage each of those euros carries.
+ */
+function groupFlowTrades(plan: LeverageAwarePlan, inputs: PlanInputs, labels: Record<string, string>): PlanNode[] {
+  const nodes: PlanNode[] = [];
+  for (const [assetClass, legs] of legsByClass(plan.trades, inputs.holdings)) {
+    const notionalAfter = plan.resultingNotionalByAssetClass[assetClass] ?? 0;
+    nodes.push({
+      key: assetClass,
+      label: classLabel(assetClass, labels),
+      amount: legs.reduce((sum, leg) => sum + leg.amount, 0),
+      currentValue: inputs.byAssetClass[assetClass]?.currentValue ?? 0,
+      newValue: notionalAfter,
+      newPercentage: plan.resultingMarketTotal > 0 ? (notionalAfter / plan.resultingMarketTotal) * 100 : 0,
+      targetPercentage: inputs.byAssetClass[assetClass]?.targetPercentage ?? 0,
+      children: legs.map((leg) => leg.node).sort(byAmountDesc),
+    });
+  }
+  return visible(nodes).sort(byAmountDesc);
+}
+
+/**
+ * A Ribilancia of the leverage engine as class moves with their instruments under them.
+ *
+ * Unlike the class plan, the engine may sell AND buy inside one class — swapping a 1× ETF for a
+ * 2× one is how it moves the leverage without moving the mix — so a class yields up to two moves,
+ * one per action: a row is one order direction with one chip, never a net no broker fills. Moves
+ * sort by size like `buildRebalancePlan`'s, and nothing is capped by frozen wealth, because the
+ * engine's candidates are the tradable assets only.
+ */
+function groupRebalanceTrades(plan: LeverageAwarePlan, inputs: PlanInputs, labels: Record<string, string>): RebalanceMove[] {
+  const sides = [
+    ['VENDI', legsByClass(plan.trades.filter((trade) => trade.amount < 0), inputs.holdings)],
+    ['COMPRA', legsByClass(plan.trades.filter((trade) => trade.amount > 0), inputs.holdings)],
+  ] as const;
+  const moves: RebalanceMove[] = [];
+  for (const [action, byClass] of sides) {
+    for (const [assetClass, legs] of byClass) {
+      const amount = legs.reduce((sum, leg) => sum + leg.amount, 0);
+      const currentPercentage = inputs.byAssetClass[assetClass]?.currentPercentage ?? 0;
+      const targetPercentage = inputs.byAssetClass[assetClass]?.targetPercentage ?? 0;
+      moves.push({
+        assetClass,
+        label: classLabel(assetClass, labels),
+        action,
+        amount,
+        requestedAmount: amount,
+        limitedByFrozen: false,
+        differencePp: currentPercentage - targetPercentage,
+        currentPercentage,
+        targetPercentage,
+        children: legs.map((leg) => leg.node).sort(byAmountDesc),
+      });
+    }
+  }
+  return moves.filter((move) => move.amount >= MIN_VISIBLE_AMOUNT).sort(byAmountDesc);
 }
 
 /** The plan the Piano tile shows for a mode and an amount, from the same inputs the page holds. */
@@ -395,7 +551,7 @@ export function buildPlanView(mode: PlanMode, amount: number, inputs: PlanInputs
         leverage.targetPercentageByAssetClass,
         leverage.targetLeverageRatio,
       );
-      return { mode, moves: [], trades: plan.trades, resultingLeverageRatio: plan.resultingLeverageRatio };
+      return { mode, moves: groupRebalanceTrades(plan, inputs, labels), trades: plan.trades, resultingLeverageRatio: plan.resultingLeverageRatio };
     }
     return {
       mode,
@@ -413,19 +569,17 @@ export function buildPlanView(mode: PlanMode, amount: number, inputs: PlanInputs
 
   if (mode === 'contribute') {
     if (leverage) {
-      const trades =
-        safeAmount > 0
-          ? planInstrumentContribution(
-              leverage.tradableAssets,
-              leverage.currentNotionalByAssetClass,
-              leverage.currentNotionalTotal,
-              leverage.currentMarketTotal,
-              leverage.targetPercentageByAssetClass,
-              safeAmount,
-              leverage.targetLeverageRatio,
-            ).trades
-          : [];
-      return { mode, amount: safeAmount, nodes: [], trades, overTarget: [] };
+      if (safeAmount <= 0) return { mode, amount: safeAmount, nodes: [], trades: [], overTarget: [] };
+      const plan = planInstrumentContribution(
+        leverage.tradableAssets,
+        leverage.currentNotionalByAssetClass,
+        leverage.currentNotionalTotal,
+        leverage.currentMarketTotal,
+        leverage.targetPercentageByAssetClass,
+        safeAmount,
+        leverage.targetLeverageRatio,
+      );
+      return { mode, amount: safeAmount, nodes: groupFlowTrades(plan, inputs, labels), trades: plan.trades, overTarget: [] };
     }
     const nodes =
       safeAmount > 0
@@ -442,40 +596,45 @@ export function buildPlanView(mode: PlanMode, amount: number, inputs: PlanInputs
 
   const tradableTotal = Object.values(inputs.tradableByClass).reduce((sum, value) => sum + value, 0);
   if (leverage) {
-    const trades =
-      safeAmount > 0
-        ? planInstrumentWithdrawal(
-            leverage.tradableAssets,
-            leverage.currentNotionalByAssetClass,
-            leverage.currentNotionalTotal,
-            leverage.currentMarketTotal,
-            leverage.targetPercentageByAssetClass,
-            safeAmount,
-            leverage.targetLeverageRatio,
-          ).trades
-        : [];
-    // The leveraged engine plans on instruments the tax estimate does not read, so a withdrawal
-    // there is still a GROSS one: `grossedUp` false says so rather than implying a net.
+    // The same fixed point as the class plan: the engine is asked for the GROSS, and the tax is
+    // priced on the legs it sells — the sleeves of the assets it drains, keyed by holding id.
+    const solved = solveWithdrawalGross(safeAmount, inputs.holdings, tradableTotal, (gross) => {
+      if (gross <= 0) return { nodes: [] as PlanNode[], trades: [] as InstrumentTrade[] };
+      const plan = planInstrumentWithdrawal(
+        leverage.tradableAssets,
+        leverage.currentNotionalByAssetClass,
+        leverage.currentNotionalTotal,
+        leverage.currentMarketTotal,
+        leverage.targetPercentageByAssetClass,
+        Math.min(gross, tradableTotal),
+        leverage.targetLeverageRatio,
+      );
+      return { nodes: groupFlowTrades(plan, inputs, labels), trades: plan.trades };
+    });
     return {
       mode,
       amount: safeAmount,
-      grossAmount: safeAmount,
-      grossedUp: false,
-      nodes: [],
-      trades,
+      grossAmount: solved.grossAmount,
+      grossedUp: solved.grossAmount - safeAmount >= GROSS_UP_TOLERANCE,
+      nodes: solved.plan.nodes,
+      trades: solved.plan.trades,
       tradableTotal,
-      exceedsPortfolio: safeAmount > 0 && safeAmount >= tradableTotal,
+      exceedsPortfolio: solved.requiredGross > 0 && solved.requiredGross >= tradableTotal,
       overTarget: [],
     };
   }
 
-  const solved = solveWithdrawalGross(safeAmount, inputs, labels, tradableTotal);
+  const solved = solveWithdrawalGross(safeAmount, inputs.holdings, tradableTotal, (gross) => ({
+    nodes: visible(buildWithdrawalPlan(inputs.byAssetClass, inputs.bySubCategory, inputs.holdings, Math.min(gross, tradableTotal), labels)).map(
+      (node) => ({ ...node, children: collapseRepeatedLevels(node.children) }),
+    ),
+  }));
   return {
     mode,
     amount: safeAmount,
     grossAmount: solved.grossAmount,
     grossedUp: solved.grossAmount - safeAmount >= GROSS_UP_TOLERANCE,
-    nodes: solved.nodes,
+    nodes: solved.plan.nodes,
     trades: null,
     tradableTotal,
     exceedsPortfolio: solved.requiredGross > 0 && solved.requiredGross >= tradableTotal,

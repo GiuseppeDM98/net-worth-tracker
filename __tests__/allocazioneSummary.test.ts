@@ -32,7 +32,7 @@ import {
 } from '@/lib/utils/allocazioneSummary';
 import type { AllocationData, Asset } from '@/types/assets';
 import type { PortfolioExposureData } from '@/types/exposure';
-import type { AllocatableHolding, PlanNode } from '@/lib/utils/allocationUtils';
+import { buildHoldings, sumTradableByClass, type AllocatableHolding, type PlanNode } from '@/lib/utils/allocationUtils';
 
 function data({ currentValue, targetPercentage, ...rest }: Partial<AllocationData> & { currentValue: number; targetPercentage: number }): AllocationData {
   const total = 245000;
@@ -342,6 +342,166 @@ describe('il prelievo si lorda: «prelevare 1000 €» vuol dire 1000 € in man
     const view = buildPlanView('contribute', 1000, inputs);
     if (view.mode !== 'contribute') throw new Error('mode');
     expect(view.nodes.reduce((sum, node) => sum + node.amount, 0)).toBeCloseTo(1000, 2);
+  });
+});
+
+describe('buildPlanView under leverage: the engine trades as the class → instrument tree', () => {
+  // A real leveraged portfolio through the REAL engine and the REAL `buildHoldings`, because what
+  // is under test is the wiring: engine trade → sleeves → class tree → withholding.
+  //   VWCE  40.000 € equity 1×, bought for 30.000 (25% of its value is gain)
+  //   CL2   10.000 € equity 2×
+  //   NTSG  30.000 € 60% equity / 40% bonds at 1,5× — ONE order, two classes
+  //   IBGL  20.000 € bonds 1×, at a loss
+  // Market 100.000 €; notional equity 40 + 20 + 27 = 87.000, bonds 20 + 18 = 38.000 (1,25×).
+  const leveragedAsset = (overrides: Partial<Asset>): Asset => ({
+    id: 'x', userId: 'u1', ticker: 'X', name: 'X', type: 'etf', assetClass: 'equity', currency: 'EUR',
+    quantity: 1, currentPrice: 1000, taxRate: 26,
+    lastPriceUpdate: new Date(0), createdAt: new Date(0), updatedAt: new Date(0),
+    ...overrides,
+  });
+  const vwce = leveragedAsset({ id: 'vwce', ticker: 'VWCE', name: 'Vanguard All-World', currentPrice: 40000, averageCost: 30000 });
+  const cl2 = leveragedAsset({ id: 'cl2', ticker: 'CL2', name: 'Amundi MSCI USA 2x', currentPrice: 10000, averageCost: 8000, leverageRatio: 2 });
+  const ntsg = leveragedAsset({
+    id: 'ntsg', ticker: 'NTSG', name: 'WisdomTree Efficient Core', currentPrice: 30000, averageCost: 20000, leverageRatio: 1.5,
+    composition: [{ assetClass: 'equity', percentage: 60 }, { assetClass: 'bonds', percentage: 40 }],
+  });
+  const ibgl = leveragedAsset({ id: 'ibgl', ticker: 'IBGL', name: 'iShares Euro Govt', assetClass: 'bonds', currentPrice: 20000, averageCost: 21000, taxRate: 12.5 });
+
+  const leveragedInputs = (assets: Asset[], targets: Record<string, number>) => {
+    const notional: Record<string, number> = {};
+    for (const asset of assets) {
+      const legs = asset.composition ?? [{ assetClass: asset.assetClass, percentage: 100 }];
+      for (const leg of legs) notional[leg.assetClass] = (notional[leg.assetClass] ?? 0) + (asset.currentPrice * leg.percentage * (asset.leverageRatio ?? 1)) / 100;
+    }
+    const market = assets.reduce((sum, asset) => sum + asset.currentPrice, 0);
+    const notionalTotal = Object.values(notional).reduce((sum, value) => sum + value, 0);
+    const byAssetClass: Record<string, AllocationData> = {};
+    for (const [assetClass, targetPercentage] of Object.entries(targets)) {
+      const currentValue = notional[assetClass] ?? 0;
+      const currentPercentage = (currentValue / market) * 100;
+      byAssetClass[assetClass] = {
+        currentValue, currentPercentage, targetPercentage, targetValue: (targetPercentage / 100) * market,
+        difference: currentPercentage - targetPercentage, differenceValue: currentValue - (targetPercentage / 100) * market,
+        action: Math.abs(currentPercentage - targetPercentage) > 2 ? (currentPercentage > targetPercentage ? 'VENDI' : 'COMPRA') : 'OK',
+      };
+    }
+    const holdings = buildHoldings(assets, (asset) => asset.quantity * asset.currentPrice);
+    return {
+      byAssetClass,
+      bySubCategory: {},
+      bySpecificAsset: {},
+      holdings,
+      tradableByClass: sumTradableByClass(holdings),
+      leverage: {
+        tradableAssets: assets,
+        currentNotionalByAssetClass: notional,
+        currentNotionalTotal: notionalTotal,
+        currentMarketTotal: market,
+        targetPercentageByAssetClass: targets,
+        targetLeverageRatio: Object.values(targets).reduce((sum, value) => sum + value, 0) / 100,
+      },
+    };
+  };
+  const portfolio = [vwce, cl2, ntsg, ibgl];
+  const leaves = (nodes: PlanNode[]): PlanNode[] => nodes.flatMap((node) => (node.children.length > 0 ? leaves(node.children) : [node]));
+  const sum = (items: { amount: number }[]) => items.reduce((total, item) => total + Math.abs(item.amount), 0);
+
+  it('draws a contribution as classes with their sleeves, adding up to the engine orders', () => {
+    const inputs = leveragedInputs(portfolio, { equity: 95, bonds: 45 });
+    const view = buildPlanView('contribute', 10000, inputs);
+    if (view.mode !== 'contribute') throw new Error('mode');
+
+    expect(view.trades!.length).toBeGreaterThan(0); // the reading and the verdict still name the orders
+    expect(view.nodes.length).toBeGreaterThan(0);
+    for (const node of view.nodes) {
+      expect(Object.keys(inputs.byAssetClass)).toContain(node.key);
+      expect(sum(node.children)).toBeCloseTo(node.amount, 6);
+      expect(node.children.every((child) => child.isInstrument)).toBe(true);
+    }
+    // Every euro of every order lands in exactly one sleeve.
+    expect(sum(view.nodes)).toBeCloseTo(sum(view.trades!), 6);
+  });
+
+  it('splits a composite order across its classes by composition, naming the whole order on each sleeve', () => {
+    // Bonds far under target and equity over it: the engine can only buy, and NTSG is the one
+    // instrument that moves bonds by more than a euro per euro.
+    const view = buildPlanView('contribute', 10000, leveragedInputs(portfolio, { equity: 87, bonds: 60 }));
+    if (view.mode !== 'contribute') throw new Error('mode');
+    const order = view.trades!.find((trade) => trade.assetId === 'ntsg');
+    expect(order).toBeDefined();
+
+    const sleeves = leaves(view.nodes).filter((leaf) => leaf.key.startsWith('ntsg:'));
+    expect(sleeves.map((sleeve) => sleeve.key).sort()).toEqual(['ntsg:0', 'ntsg:1']);
+    const equitySleeve = view.nodes.find((node) => node.key === 'equity')!.children.find((child) => child.key === 'ntsg:0')!;
+    const bondSleeve = view.nodes.find((node) => node.key === 'bonds')!.children.find((child) => child.key === 'ntsg:1')!;
+    expect(equitySleeve.amount).toBeCloseTo(order!.amount * 0.6, 6);
+    expect(bondSleeve.amount).toBeCloseTo(order!.amount * 0.4, 6);
+    expect(equitySleeve.order!.amount).toBeCloseTo(order!.amount, 6);
+    expect(bondSleeve.order).toEqual({ amount: equitySleeve.order!.amount, label: 'NTSG' });
+    // A plain instrument is its own order: no «parte di un ordine» under it.
+    expect(leaves(view.nodes).filter((leaf) => !leaf.key.includes(':')).every((leaf) => leaf.order === undefined)).toBe(true);
+  });
+
+  it("prints a class's resulting share where the ENGINE leaves it, notional on the post-trade market", () => {
+    const view = buildPlanView('contribute', 10000, leveragedInputs(portfolio, { equity: 87, bonds: 60 }));
+    if (view.mode !== 'contribute') throw new Error('mode');
+    const bonds = view.nodes.find((node) => node.key === 'bonds')!;
+    // Rebuild it from the orders: bonds move by 1× per IBGL euro and 0,4 × 1,5 per NTSG euro.
+    const bought = (id: string) => view.trades!.find((trade) => trade.assetId === id)?.amount ?? 0;
+    const notionalAfter = 38000 + bought('ibgl') + bought('ntsg') * 0.4 * 1.5;
+    expect(bonds.newPercentage).toBeCloseTo((notionalAfter / 110000) * 100, 6);
+  });
+
+  it('grosses a withdrawal up like the class plan: what is left after the withholding is the request', () => {
+    const inputs = leveragedInputs(portfolio, { equity: 80, bonds: 45 });
+    const view = buildPlanView('withdraw', 5000, inputs);
+    if (view.mode !== 'withdraw') throw new Error('mode');
+
+    expect(view.grossedUp).toBe(true);
+    const tax = estimatePlanSaleTax(planSaleNodes(view), inputs.holdings)!.tax!;
+    expect(tax).toBeGreaterThan(0);
+    // Within the fixed point's own stop (`GROSS_UP_TOLERANCE`, a euro), as on the class plan.
+    expect(Math.abs(view.grossAmount - tax - 5000)).toBeLessThan(1);
+    // The rows and the engine's orders both add up to the GROSS, the figure the head names.
+    expect(sum(view.nodes)).toBeCloseTo(view.grossAmount, 0);
+    expect(sum(view.trades!)).toBeCloseTo(view.grossAmount, 0);
+  });
+
+  it('does not gross up, and promises no net, when a sold instrument has no cost basis', () => {
+    // No equity instrument carries a basis, so whichever the engine drains (it prefers CL2, which
+    // takes two euros of equity exposure out per euro sold) the estimate cannot stand.
+    const noBasis = [vwce, cl2, ntsg].map((asset) => ({ ...asset, averageCost: undefined }));
+    const inputs = leveragedInputs([...noBasis, ibgl], { equity: 80, bonds: 45 });
+    const view = buildPlanView('withdraw', 5000, inputs);
+    if (view.mode !== 'withdraw') throw new Error('mode');
+    const estimate = estimatePlanSaleTax(planSaleNodes(view), inputs.holdings)!;
+    expect(leaves(view.nodes).some((leaf) => ['vwce', 'cl2', 'ntsg:0', 'ntsg:1'].includes(leaf.key))).toBe(true);
+    expect(estimate.unknownReason).toBe('cost-basis');
+    expect(view.grossedUp).toBe(false);
+    expect(view.grossAmount).toBeCloseTo(5000, 2);
+  });
+
+  it('gives a rebalance that swaps inside one class TWO moves, one per action, and prices the sell', () => {
+    // Same mix, more leverage: equity notional must rise by ~20.000 € at zero net cash — the only
+    // way is to sell the 1× equity and buy the 2× one.
+    const vwce50 = { ...vwce, currentPrice: 50000, averageCost: 40000 };
+    const ibgl40 = { ...ibgl, currentPrice: 40000, averageCost: 40000 };
+    const inputs = leveragedInputs([vwce50, cl2, ibgl40], { equity: 90, bonds: 40 });
+    const view = buildPlanView('rebalance', 0, inputs);
+    if (view.mode !== 'rebalance') throw new Error('mode');
+
+    const sellEquity = view.moves.find((move) => move.assetClass === 'equity' && move.action === 'VENDI');
+    const buyEquity = view.moves.find((move) => move.assetClass === 'equity' && move.action === 'COMPRA');
+    expect(sellEquity?.children.map((child) => child.key)).toEqual(['vwce']);
+    expect(buyEquity?.children.map((child) => child.key)).toEqual(['cl2']);
+    // The moves partition the orders: no euro is netted away between the two rows of a class.
+    const sells = view.trades!.filter((trade) => trade.amount < 0);
+    const buys = view.trades!.filter((trade) => trade.amount > 0);
+    expect(sum(view.moves.filter((move) => move.action === 'VENDI'))).toBeCloseTo(sum(sells), 6);
+    expect(sum(view.moves.filter((move) => move.action === 'COMPRA'))).toBeCloseTo(sum(buys), 6);
+    // The sell leg is now something the withholding can read: 20% of VWCE's value is gain.
+    const estimate = estimatePlanSaleTax(planSaleNodes(view), inputs.holdings)!;
+    expect(estimate.tax).toBeCloseTo(sellEquity!.amount * 0.2 * 0.26, 6);
   });
 });
 

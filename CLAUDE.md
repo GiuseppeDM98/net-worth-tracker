@@ -13,7 +13,17 @@ Next.js app for Italian investors: net worth, assets, cashflow, dividends, perfo
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic.
-- `tsc` clean; **180 files / 4241 tests** green in both timezones + **35 Playwright spec files** (120 tests, incl. 6 auth setups; last full run 2026-09-24 evening, 4,1 min: 120 green, `modal.origin` included). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, which structurally hides timezone bugs.
+- `tsc` clean; **180 files / 4249 tests** green in both timezones + **35 Playwright spec files** (120 tests, incl. 6 auth setups; last full run 2026-09-24 evening, 4,1 min: 120 green, `modal.origin` included). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, which structurally hides timezone bugs.
+- Latest (2026-09-24, notte): **Allocazione — il Piano con leva prende il ridisegno del 21/09.** Il motore con leva
+  pianificava su strumenti che l'albero e la ritenuta non leggevano: lista piatta, niente ritenuta, Preleva lordo.
+  Ora `groupFlowTrades`/`groupRebalanceTrades` (`allocazioneSummary.ts`) fanno dei suoi ordini lo stesso albero classe →
+  strumento: un composito si divide per composizione nelle sue classi (le gambe di `buildHoldings`, trovate per
+  `AllocatableHolding.assetId`, con `PlanNode.order` «parte di un ordine da X € di TICKER»), uno scambio dentro una
+  classe sono DUE mosse (una per azione), il «→ %» di classe è quello del motore. `solveWithdrawalGross` prende il
+  pianificatore: anche il Preleva con leva si lorda. `InstrumentTradeList` rimosso. Collaudo: `tsc` 0, ESLint 0, Vitest
+  180 file / 4249 nei due fusi (8 test nuovi, quattro falsificazioni viste rosse), `e2e/allocation.spec.ts` 7/7, sonda
+  Playwright sullo specchio a 1440 e 390 (trovato e corretto: il ticker perso nel nome troncato a 390) e giro guidato
+  confermato dal proprietario. doc/guide/allocazione.md.
 - Latest (2026-09-24, sera): **Hall of Fame — critique Impeccable (26/40) chiusa nella stessa sessione, tutto il backlog.**
   Due P1: «2026 · ORA» troncato in «20…» nella tessera Anni a OGNI larghezza (la colonna del periodo era
   `w-[58px]` + `truncate`: ora è un `min-w-`, mai un tetto, `whitespace-nowrap`, e le chip «ORA» / «2 mesi»

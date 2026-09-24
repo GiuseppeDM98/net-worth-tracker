@@ -85,7 +85,7 @@ typography:
     delta: "12px"               # Delta Annotation under a KPI value; Variation Chip inside a tile
     row: "13px"                 # list/composition row text
     body-px: "14px"             # the verdict sentence below desktop: (page-verdict.tsx) and the caption/row prose of the FIRE tiles — typography.body as a px step, added 2026-09-06
-    chip: "15px"                # a secondary MONO figure in a dialog or a list (DividendDetailsDialog, StoricoDettaglio, InstrumentTradeList, the goal card's title) and the verdict sentence from desktop:; the 15px hero chip retired with Patrimonio, tiles use 12px
+    chip: "15px"                # a secondary MONO figure in a dialog or a list (DividendDetailsDialog, StoricoDettaglio, the goal card's title) and the verdict sentence from desktop:; the 15px hero chip retired with Patrimonio, tiles use 12px
     title-px: "16px"            # typography.title as a px step (Monte Carlo's percentile figure below desktop:) — added 2026-09-06
     navbar-title: "17px"        # the mobile sticky navbar's title (Compact Page Header, below 1440px) — added 2026-08-26, it was documented in prose only
     compact-hero: "18px"        # secondary row value inside a tile that has its own hero

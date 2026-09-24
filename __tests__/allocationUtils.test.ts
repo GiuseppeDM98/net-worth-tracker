@@ -693,6 +693,7 @@ describe('buildHoldings', () => {
     expect(buildHoldings([asset], valueOf)).toEqual([
       {
         id: 'a1',
+        assetId: 'a1',
         label: 'Vanguard All-World',
         ticker: 'VWCE',
         assetClass: 'equity',
@@ -763,8 +764,10 @@ describe('buildHoldings', () => {
     const holdings = buildHoldings([pensionFund], valueOf);
 
     expect(holdings).toHaveLength(2);
-    expect(holdings[0]).toMatchObject({ id: 'pf:0', assetClass: 'equity', value: 60000 });
-    expect(holdings[1]).toMatchObject({ id: 'pf:1', assetClass: 'bonds', value: 40000 });
+    // Both sleeves name the asset they belong to: the leverage engine trades the asset whole and
+    // finds the sleeves to split its order across through `assetId`.
+    expect(holdings[0]).toMatchObject({ id: 'pf:0', assetId: 'pf', assetClass: 'equity', value: 60000 });
+    expect(holdings[1]).toMatchObject({ id: 'pf:1', assetId: 'pf', assetClass: 'bonds', value: 40000 });
     // The components sum back to the asset's value, so class totals still reconcile.
     expect(holdings[0].value + holdings[1].value).toBeCloseTo(100000, 2);
   });

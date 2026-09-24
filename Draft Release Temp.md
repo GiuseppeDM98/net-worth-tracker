@@ -80,6 +80,7 @@
 
 ## 🐛 Bug Fixes
 
+- Fixed the Piano of Allocazione on a leveraged portfolio, which had missed the 09-21 redesign: it was a flat list of instruments with no class rows, no withholding and a gross Preleva. It now reads like the plan without leverage — each class with the instruments under it, «Per prelevare 1000 € netti vendi 1040 €… la ritenuta stimata è 40 €», and the withholding on Ribilancia too. A composite leveraged ETF (60% azioni, 40% obbligazioni) appears under both classes with its share, each saying «parte di un ordine da 2000 € di» its ticker so the single order can be placed; a Ribilancia that sells a 1× ETF to buy a 2× one in the same class shows two rows, one per action.
 - Fixed the running year cut to «20…» in the Anni tile of the Hall of Fame at every width: the period column is a floor now and the bar yields, on every ranked row.
 - Fixed «il 88,5%», «Gli 10 anni» and «dal migliore» over a ranking of costs on the Hall of Fame: «l'88,5%», «i 10 anni», and Spese and Calo ordered «dal più alto» and «dal più forte».
 - Fixed the Hall of Fame printing the record month's figures three times in 200 px and the running year's rank twice: the Record tile now says what the podium is worth and where it ends («I tre mesi migliori valgono insieme +45.500 €; l'ultimo in tessera, ottobre 2025, è a +2195 €»), the Anni tile the distance from the place above («è a 8610 € dal secondo posto»).

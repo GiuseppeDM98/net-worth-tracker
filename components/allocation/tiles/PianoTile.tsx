@@ -34,7 +34,6 @@ import { Input } from '@/components/ui/input';
 import { Tile, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { AsideToggle, type AsideToggleOption } from '@/components/ui/aside-toggle';
 import { ActionChip } from '@/components/allocation/ActionChip';
-import { InstrumentTradeList } from '@/components/allocation/InstrumentTradeList';
 import { PlanRow } from '@/components/allocation/PlanRow';
 
 interface PianoTileProps {
@@ -115,29 +114,28 @@ function MoveRow({ move, actionColors }: { move: RebalanceMove; actionColors: Re
   );
 }
 
+/**
+ * The same class → instrument moves with or without leverage. Under leverage one class can carry
+ * a sell AND a buy (the engine swaps a 1× ETF for a 2× one), so a move's key is its class AND its
+ * action.
+ */
 function RebalanceBody({ view, actionColors }: { view: Extract<PlanView, { mode: 'rebalance' }>; actionColors: Record<AllocationAction, string> }) {
-  if (view.trades) {
-    if (view.trades.length === 0) return null;
-    return (
-      <div className="mt-3">
-        <InstrumentTradeList trades={view.trades} actionColors={actionColors} ariaLabel="Operazioni del ribilanciamento" />
-        {/* The resulting leverage belongs to the trades: with none, it is the current one and the
-            Bilanciamento tile already prints it. */}
-        {view.resultingLeverageRatio !== null && (
-          <p className="mt-2.5 font-mono text-[11px] tabular-nums text-muted-foreground">
-            Leva risultante {formatLeverage(view.resultingLeverageRatio)}
-          </p>
-        )}
-      </div>
-    );
-  }
   if (view.moves.length === 0) return null;
   return (
-    <ul className="mt-3 divide-y divide-border" aria-label="Operazioni del ribilanciamento">
-      {view.moves.map((move) => (
-        <MoveRow key={move.assetClass} move={move} actionColors={actionColors} />
-      ))}
-    </ul>
+    <div className="mt-3">
+      <ul className="divide-y divide-border" aria-label="Operazioni del ribilanciamento">
+        {view.moves.map((move) => (
+          <MoveRow key={`${move.assetClass}:${move.action}`} move={move} actionColors={actionColors} />
+        ))}
+      </ul>
+      {/* The resulting leverage belongs to the trades: with none, it is the current one and the
+          Bilanciamento tile already prints it. */}
+      {view.resultingLeverageRatio !== null && (
+        <p className="mt-2.5 font-mono text-[11px] tabular-nums text-muted-foreground">
+          Leva risultante {formatLeverage(view.resultingLeverageRatio)}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -188,22 +186,14 @@ function FlowBody({
         </div>
       </div>
 
-      {view.trades ? (
-        view.trades.length > 0 && (
-          <div className="mt-3">
-            <InstrumentTradeList trades={view.trades} actionColors={actionColors} ariaLabel={listLabel} />
-          </div>
-        )
-      ) : (
-        view.nodes.length > 0 && (
-          <ul className="mt-3 divide-y divide-border" aria-label={listLabel}>
-            {view.nodes.map((node) => (
-              <li key={node.key} className="py-2.5">
-                <PlanRow node={node} depth={0} color={color} direction={view.mode} />
-              </li>
-            ))}
-          </ul>
-        )
+      {view.nodes.length > 0 && (
+        <ul className="mt-3 divide-y divide-border" aria-label={listLabel}>
+          {view.nodes.map((node) => (
+            <li key={node.key} className="py-2.5">
+              <PlanRow node={node} depth={0} color={color} direction={view.mode} />
+            </li>
+          ))}
+        </ul>
       )}
     </>
   );
@@ -224,7 +214,7 @@ export function PianoTile({ mode, onModeChange, amountInput, onAmountInputChange
           view's mode is what narrows the union. A Ribilancia with nothing to do draws no body at
           all — the reading already said «Tutto in linea» — so the footer sits right under it. */}
       {view.mode === 'rebalance' ? (
-        (view.trades ? view.trades.length > 0 : view.moves.length > 0) && (
+        view.moves.length > 0 && (
           <div className="mb-3.5">
             <RebalanceBody view={view} actionColors={actionColors} />
           </div>
