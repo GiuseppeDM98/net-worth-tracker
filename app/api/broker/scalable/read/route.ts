@@ -26,7 +26,7 @@ import {
   buildScalableImportPlan,
   ScalableParseError,
 } from '@/lib/utils/scalableImport';
-import { getAllAssets } from '@/lib/services/assetService';
+import { getUserAssetsAdmin } from '@/lib/server/assetAdminRepository';
 
 const bodySchema = z.object({
   ownerId: z.string().min(1),
@@ -58,12 +58,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const stdout = await runScalableReadCommand(validated.data.command);
     if (validated.data.command === 'holdings') {
       const { holdings, skipped } = parseScalableHoldingsJson(stdout);
-      const assets = await getAllAssets(validated.data.ownerId);
+      const assets = await getUserAssetsAdmin(validated.data.ownerId);
       const plan = buildScalableImportPlan(holdings, null, assets);
       return NextResponse.json({ plan, skipped });
     }
     const overview = parseScalableOverviewJson(stdout);
-    const assets = await getAllAssets(validated.data.ownerId);
+    const assets = await getUserAssetsAdmin(validated.data.ownerId);
     const plan = buildScalableImportPlan([], overview, assets);
     return NextResponse.json({ plan });
   } catch (error) {
