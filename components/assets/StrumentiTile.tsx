@@ -52,6 +52,8 @@ import { calculateAssetValue } from '@/lib/services/assetService';
 import { formatCurrency, formatNumber, formatPercentage } from '@/lib/services/chartService';
 import { useDeleteAsset } from '@/lib/hooks/useAssets';
 import { useArmedDelete } from '@/lib/hooks/useArmedDelete';
+import { useRovingFocus } from '@/lib/hooks/useRovingFocus';
+import { Checkbox } from '@/components/ui/checkbox';
 import { resolveDisplayAssetClass } from '@/lib/utils/assetDisplayClass';
 import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
 import { hasMarketPrice, requiresManualPricing } from '@/lib/utils/assetPricing';
@@ -208,6 +210,58 @@ function DeleteButton({ asset, onDelete, disabled, announce }: DeleteButtonProps
   );
 }
 
+interface BulkDeleteButtonProps {
+  count: number;
+  onDelete: () => void;
+  disabled: boolean;
+  /** The tile's one live region: arm and disarm are sentences, spoken there. */
+  announce: (text: string) => void;
+}
+
+/**
+ * The bulk delete beside «N selezionati»: the same two-click vocabulary as the row delete
+ * (`useArmedDelete`, no timer), armed «Conferma» naming the count it is about to lose.
+ */
+function BulkDeleteButton({ count, onDelete, disabled, announce }: BulkDeleteButtonProps) {
+  const ref = useRef<HTMLButtonElement | null>(null);
+  const { armed, onClick, onBlur } = useArmedDelete(ref, onDelete);
+  const wasArmed = useRef(false);
+  useEffect(() => {
+    if (armed) {
+      wasArmed.current = true;
+      announce(`Premi di nuovo per eliminare ${count} ${count === 1 ? 'strumento' : 'strumenti'}`);
+    } else if (wasArmed.current) {
+      wasArmed.current = false;
+      announce('Eliminazione annullata');
+    }
+  }, [armed, announce, count]);
+
+  return (
+    <Button
+      ref={ref}
+      type="button"
+      variant={armed ? 'destructive' : 'outline'}
+      size="sm"
+      className="h-8 px-2.5 text-[11px]"
+      onClick={onClick}
+      onBlur={onBlur}
+      disabled={disabled}
+      aria-pressed={armed}
+      aria-label={armed ? `Premi di nuovo per eliminare ${count} ${count === 1 ? 'strumento' : 'strumenti'}` : `Elimina i ${count} strumenti selezionati`}
+      title={disabled ? 'Non disponibile in modalità demo' : undefined}
+    >
+      {armed ? (
+        'Conferma'
+      ) : (
+        <>
+          <Trash2 className="h-3 w-3" aria-hidden="true" />
+          Elimina {count}
+        </>
+      )}
+    </Button>
+  );
+}
+
 interface StrumentiTileProps {
   /** The instruments — every asset that is not a cash account. */
   assets: Asset[];
@@ -250,6 +304,11 @@ export function StrumentiTile({
   const [groupByClass, setGroupByClass] = useState(() => readStoredToggle(STORAGE_KEYS.groupByClass));
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [announcement, setAnnouncement] = useState('');
+  // Bulk selection: ids the reader ticked for the armed «Elimina N». Pruned against the
+  // instruments on every render, so a deleted row leaves the selection with no effect.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const assetIds = useMemo(() => new Set(assets.map((a) => a.id)), [assets]);
+  const validSelected = useMemo(() => new Set([...selectedIds].filter((id) => assetIds.has(id))), [selectedIds, assetIds]);
   // The dates under a row («scade il…», «valore a mano dal…») are read against one clock per mount.
   const now = useMemo(() => new Date(), []);
 
@@ -289,6 +348,49 @@ export function StrumentiTile({
     },
     [ownerId, deleteAssetMutation],
   );
+
+  const toggleSelect = useCallback((assetId: string, selected: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (selected) next.add(assetId);
+      else next.delete(assetId);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback(
+    (selected: boolean) => {
+      setSelectedIds(selected ? new Set(assetIds) : new Set());
+    },
+    [assetIds],
+  );
+
+  // The bulk delete runs the same single-asset mutation once per row (each one also clears
+  // that instrument's future dividends) and reports one sentence: a partial failure names how
+  // many went through, so the selection left standing is no surprise.
+  const handleDeleteSelected = useCallback(async () => {
+    if (!ownerId || validSelected.size === 0) return;
+    const ids = [...validSelected];
+    const results = await Promise.allSettled(ids.map((id) => deleteAssetMutation.mutateAsync(id)));
+    const deleted = results.filter((r) => r.status === 'fulfilled').length;
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      ids.forEach((id) => next.delete(id));
+      return next;
+    });
+    if (deleted === ids.length) {
+      toast.success(deleted === 1 ? 'Asset eliminato' : `${deleted} strumenti eliminati`);
+      setAnnouncement(deleted === 1 ? 'Strumento eliminato' : `${deleted} strumenti eliminati`);
+    } else if (deleted > 0) {
+      toast.error(`Eliminati ${deleted} di ${ids.length}: riprova per i restanti.`);
+      setAnnouncement(`Eliminati ${deleted} di ${ids.length} strumenti`);
+    } else {
+      const reason = results.find((r) => r.status === 'rejected');
+      const error = reason && reason.status === 'rejected' ? reason.reason : undefined;
+      console.error('Error deleting assets:', error);
+      toast.error(describeWriteError(error));
+    }
+  }, [ownerId, validSelected, deleteAssetMutation]);
 
   const toggleShowDeltas = () => {
     setShowDeltas((prev) => {
@@ -370,12 +472,28 @@ export function StrumentiTile({
     });
   };
 
+  // The desktop rows actually on screen, in the order they RENDER: grouped mode reorders by
+  // class, so the roving index must follow the DOM (a collapsed group hides its rows). The
+  // mobile list has no grouping and always shows the whole sort. Each checkbox list is one Tab stop.
+  const visibleDesktopAssets = useMemo(() => {
+    if (!groupByClass) return sortedAssets;
+    const out: Asset[] = [];
+    for (const [cls, group] of groupedAssets ?? []) {
+      if (collapsedGroups.has(cls)) continue;
+      out.push(...group);
+    }
+    return out;
+  }, [groupByClass, sortedAssets, groupedAssets, collapsedGroups]);
+  const desktopRoving = useRovingFocus(visibleDesktopAssets.length);
+  const flatRoving = useRovingFocus(sortedAssets.length);
+  const desktopIndex = useMemo(() => new Map(visibleDesktopAssets.map((a, i) => [a.id, i] as const)), [visibleDesktopAssets]);
+
   // «Andamento» is a VIEW, not four more columns: the price columns (Quantità · Prezzo · PMC ·
   // TER) leave the table and the three Δ windows take their place, so at 1440 nothing scrolls
   // and the actions never leave the reader's sight. With the Δ columns simply appended, the
   // sticky actions column covered them at rest — hiding what the toggle exists to show.
   const showPriceColumns = !showDeltas;
-  const columnCount = 5 + (showPriceColumns ? 4 : 0) + (showDeltas ? DELTA_WINDOWS.length : 0) + 1;
+  const columnCount = 6 + (showPriceColumns ? 4 : 0) + (showDeltas ? DELTA_WINDOWS.length : 0) + 1;
   const stickyCellClass = cn(STICKY_ACTIONS_CLASS, tableScrolls && 'border-l border-border');
 
   const renderRow = (asset: Asset) => {
@@ -399,7 +517,18 @@ export function StrumentiTile({
     const dash = <span className="text-muted-foreground">—</span>;
 
     return (
-      <tr key={asset.id} className={cn('border-t border-border', isManualPrice && MANUAL_ROW_TINT)}>
+      <tr key={asset.id} className={cn('border-t border-border', isManualPrice && MANUAL_ROW_TINT, validSelected.has(asset.id) && 'bg-muted/30')}>
+        <td className="w-8 align-middle">
+          {/* The label is the target (32px, the dense-list floor): a 16px square was the only way to tick. */}
+          <label className="-ml-2 flex h-8 w-8 cursor-pointer items-center justify-center">
+            <Checkbox
+              checked={validSelected.has(asset.id)}
+              onCheckedChange={(v) => toggleSelect(asset.id, v === true)}
+              aria-label={`Seleziona ${asset.name}`}
+              {...desktopRoving.itemProps(desktopIndex.get(asset.id) ?? 0)}
+            />
+          </label>
+        </td>
         <th scope="row" className={cn(CELL_CLASS, 'max-w-[260px] text-left font-normal')}>
           <div className="flex min-w-0 items-center gap-2">
             <div className="min-w-0">
@@ -619,9 +748,22 @@ export function StrumentiTile({
             {announcement}
           </span>
 
+          {/* The bulk bar: only while something is ticked — the count, the armed delete, the way out. */}
+          {validSelected.size > 0 && (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <span className="text-[13px] text-muted-foreground">
+                {validSelected.size} {validSelected.size === 1 ? 'selezionato' : 'selezionati'}
+              </span>
+              <BulkDeleteButton count={validSelected.size} onDelete={handleDeleteSelected} disabled={isDemo} announce={setAnnouncement} />
+              <Button type="button" variant="ghost" size="sm" className="h-8 px-2.5 text-[11px]" onClick={() => setSelectedIds(new Set())}>
+                Deseleziona
+              </Button>
+            </div>
+          )}
+
           {/* Below desktop: flat expandable rows (the Δ windows and actions live inside each). */}
-          <div className="mt-2 flex flex-col divide-y divide-border desktop:hidden">
-            {sortedAssets.map((asset) => (
+          <div className="mt-2 flex flex-col divide-y divide-border desktop:hidden" {...flatRoving.containerProps}>
+            {sortedAssets.map((asset, index) => (
               <AssetRow
                 key={asset.id}
                 asset={asset}
@@ -638,16 +780,28 @@ export function StrumentiTile({
                 showLedgerActions={showLedgerActions(asset)}
                 onRegisterTrade={onRegisterTrade}
                 onMovements={onMovements}
+                selected={validSelected.has(asset.id)}
+                onToggleSelect={(v) => toggleSelect(asset.id, v)}
+                roving={flatRoving.itemProps(index)}
               />
             ))}
           </div>
 
           {/* Desktop: the table. Scrolls inside the tile when the Δ columns are on; the actions
               column stays put. */}
-          <div ref={scrollerRef} className="-mx-5 mt-2 hidden overflow-x-auto px-5 desktop:block">
+          <div ref={scrollerRef} className="-mx-5 mt-2 hidden overflow-x-auto px-5 desktop:block" {...desktopRoving.containerProps}>
             <table className="w-full border-collapse">
               <thead>
                 <tr>
+                  <th scope="col" className="w-8 text-left">
+                    <label className="-ml-2 flex h-8 w-8 cursor-pointer items-center justify-center">
+                      <Checkbox
+                        checked={validSelected.size > 0 && validSelected.size === assets.length ? true : validSelected.size > 0 ? 'indeterminate' : false}
+                        onCheckedChange={(v) => toggleSelectAll(v === true)}
+                        aria-label="Seleziona tutti gli strumenti"
+                      />
+                    </label>
+                  </th>
                   <SortHead column="name" align="left" sortState={sortState} onSort={handleSort}>Nome</SortHead>
                   <SortHead column="class" align="left" sortState={sortState} onSort={handleSort}>Classe</SortHead>
                   {showPriceColumns && (

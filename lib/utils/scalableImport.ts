@@ -51,6 +51,25 @@ export interface ScalableOverviewInput {
   currency: string;
 }
 
+/**
+ * The interest-bearing overnight account («Deposito non vincolato»), from `sc overnight --json`.
+ * A SEPARATE balance from the broker cash residual: Scalable's broker valuation excludes it, so
+ * `valuation − securities − crypto` is the broker's cash alone and this is its own account.
+ */
+export interface ScalableOvernightInput {
+  balance: number;
+  /** Annual rate as a fraction (the CLI prints `0.026` for 2,6%). */
+  interestRate?: number;
+  /** ISO date of the next payout, when the CLI reports one. */
+  nextPayoutDate?: string;
+  currentAccruedAmount?: number;
+  estimatedNextPayoutAmount?: number;
+  /** The account's own name, e.g. «Deposito non vincolato». */
+  displayName?: string;
+  isActive: boolean;
+  currency: string;
+}
+
 // ─── Tolerant readers ─────────────────────────────────────────────────────────
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -250,6 +269,48 @@ export function parseScalableOverviewJson(raw: string): ScalableOverviewInput {
   };
 }
 
+/**
+ * Parse `sc overnight --json` — the interest-bearing account, a balance the broker's own
+ * valuation does NOT contain (verified: broker cash 120,00 € against a 59.201,61 € deposit).
+ * `data.result.balance` is the current amount; `current_interest_bearing_amount` is the fallback
+ * for a CLI version that only prints the accrual base. No currency field is printed: Scalable
+ * is a euro account, so the rate is declared rather than inferred from a missing key.
+ */
+export function parseScalableOvernightJson(raw: string): ScalableOvernightInput {
+  const doc = parseJsonDocument(raw, '`sc overnight --json`');
+  if (!isRecord(doc)) {
+    throw new ScalableParseError('Formato overnight non riconosciuto: usa `sc overnight --json`.');
+  }
+  const data = doc['data'];
+  const account = isRecord(data) ? data['account'] : undefined;
+  const result = isRecord(data) ? data['result'] : undefined;
+  const node = isRecord(result) ? result : doc;
+
+  const balance = toNumber(
+    pickPath(node, ['balance', 'current_interest_bearing_amount', 'amount', 'value'])
+  );
+  if (balance === undefined || isNaN(balance)) {
+    throw new ScalableParseError(
+      'Saldo del deposito non trovato: incolla per intero l’output di `sc overnight --json`.'
+    );
+  }
+  const nextPayout = toText(pickPath(node, ['next_payout_date', 'nextPayoutDate']));
+  return {
+    balance,
+    interestRate: toNumber(pickPath(node, ['interest_rate', 'interestRate'])),
+    nextPayoutDate: nextPayout !== undefined && !Number.isNaN(Date.parse(nextPayout))
+      ? new Date(nextPayout).toISOString()
+      : undefined,
+    currentAccruedAmount: toNumber(pickPath(node, ['current_accrued_amount', 'currentAccruedAmount'])),
+    estimatedNextPayoutAmount: toNumber(
+      pickPath(node, ['estimated_next_payout_amount', 'estimatedNextPayoutAmount'])
+    ),
+    displayName: toText(pickPath(isRecord(account) ? account : {}, ['display_name', 'displayName'])),
+    isActive: (isRecord(account) ? account['is_active'] ?? account['isActive'] : undefined) !== false,
+    currency: 'EUR',
+  };
+}
+
 // ─── Broker type → AssetType/AssetClass ───────────────────────────────────────
 
 /**
@@ -347,6 +408,37 @@ export interface CashPlan {
   currency: string;
 }
 
+/**
+ * The overnight deposit as its OWN cash account, never folded into the broker residual: the
+ * two are different balances at the broker and earn differently (the deposit pays interest on
+ * a monthly schedule). Kept apart so the preview's two numbers are the two real ones.
+ */
+export interface DepositPlan {
+  balance: number;
+  currency: string;
+  /** Annual rate as a fraction; DECLARED in the preview, never written (no Asset field holds it). */
+  interestRate?: number;
+  /** ISO date of the next payout, declared in the preview. */
+  nextPayoutDate?: string;
+  estimatedNextPayoutAmount?: number;
+  displayName?: string;
+  isActive: boolean;
+}
+
+/** A zero deposit is a real reading (the account was emptied), not an absent one: it still syncs. */
+function resolveScalableDepositPlan(overnight: ScalableOvernightInput | null): DepositPlan | null {
+  if (!overnight) return null;
+  return {
+    balance: overnight.balance,
+    currency: overnight.currency,
+    interestRate: overnight.interestRate,
+    nextPayoutDate: overnight.nextPayoutDate,
+    estimatedNextPayoutAmount: overnight.estimatedNextPayoutAmount,
+    displayName: overnight.displayName,
+    isActive: overnight.isActive,
+  };
+}
+
 /** Cash is whatever the totals cannot attribute to securities or crypto. */
 export function resolveScalableCashBalance(overview: ScalableOverviewInput): CashPlan {
   return {
@@ -362,6 +454,8 @@ export interface ScalableImportPlan {
   holdings: HoldingDiff[];
   /** Null when no overview was pasted: positions sync without the cash residual. */
   cash: CashPlan | null;
+  /** Null when the overnight account was not read: the broker balance is unaffected by it. */
+  deposit: DepositPlan | null;
   warnings: string[];
   stats: {
     holdingCount: number;
@@ -381,7 +475,8 @@ export interface ScalableImportPlan {
 export function buildScalableImportPlan(
   holdings: ScalableHoldingInput[],
   overview: ScalableOverviewInput | null,
-  existingAssets: Pick<Asset, 'id' | 'name' | 'isin' | 'type' | 'assetClass' | 'quantity' | 'currentPrice'>[]
+  existingAssets: Pick<Asset, 'id' | 'name' | 'isin' | 'type' | 'assetClass' | 'quantity' | 'currentPrice'>[],
+  overnight: ScalableOvernightInput | null = null
 ): ScalableImportPlan {
   const byIsin = new Map<string, (typeof existingAssets)[number]>();
   for (const asset of existingAssets) {
@@ -452,6 +547,7 @@ export function buildScalableImportPlan(
   return {
     holdings: diffs,
     cash: overview ? resolveScalableCashBalance(overview) : null,
+    deposit: resolveScalableDepositPlan(overnight),
     warnings,
     stats,
   };
@@ -459,3 +555,17 @@ export function buildScalableImportPlan(
 
 /** Suggested cash-account name for the residual liquidity of an account without one yet. */
 export const SCALABLE_CASH_ACCOUNT_NAME = 'Scalable — Liquidità';
+
+/**
+ * Suggested name for the overnight deposit's own account. Distinct from the liquidity account
+ * on purpose: Scalable reports the two separately and they are not the same money.
+ */
+export const SCALABLE_DEPOSIT_ACCOUNT_NAME = 'Scalable — Deposito';
+
+/**
+ * The tickers the sync WRITES on the two Scalable cash accounts. They are the stable identity
+ * a re-sync matches on — the user may rename either account, and matching by name (or by the
+ * shared `exchange: 'Scalable Capital'`) would then create a duplicate on the next sync.
+ */
+export const SCALABLE_CASH_TICKER = 'SCALABLE-EUR';
+export const SCALABLE_DEPOSIT_TICKER = 'SCALABLE-DEP';

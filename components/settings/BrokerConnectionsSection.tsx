@@ -2,7 +2,7 @@
  * Broker connections — the «Collegamenti» tile: read-only sync from Scalable Capital.
  *
  * Two ways in, one plan out. When the app runs on the same machine as the `sc` CLI,
- * «Sincronizza» calls POST /api/broker/scalable/read (the server runs ONLY the two
+ * «Sincronizza» calls POST /api/broker/scalable/read (the server runs ONLY the three
  * whitelisted read commands, no credentials involved). Otherwise — hosted run, missing
  * binary — the same plan is built from pasted `--json` output. Either way the preview
  * is explicit and saving writes through the standard asset services:
@@ -10,6 +10,8 @@
  *   - price moves → updateAssetMetadata (currentPrice only)
  *   - quantity mismatches on ledger types → drift warning, never a write
  *   - cash residual → a cash account (create or quantity update; cash is not a ledger type)
+ *   - the overnight «Deposito non vincolato» → ITS OWN cash account, never merged into the
+ *     residual: a different balance at the broker, paying interest on its own schedule
  *
  * Only sync metadata is persisted (brokerConnections/{ownerId}): never tokens, never raw output.
  */
@@ -33,13 +35,19 @@ import {
 import { Tile } from '@/components/ui/tile';
 import { describeBrokerConnections } from '@/lib/utils/settingsNarrative';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
+import { formatCurrency, formatDate, formatNumberIt } from '@/lib/utils/formatters';
 import { queryKeys } from '@/lib/query/queryKeys';
 import {
   buildScalableImportPlan,
   parseScalableHoldingsJson,
   parseScalableOverviewJson,
+  parseScalableOvernightJson,
   SCALABLE_CASH_ACCOUNT_NAME,
+  SCALABLE_CASH_TICKER,
+  SCALABLE_DEPOSIT_ACCOUNT_NAME,
+  SCALABLE_DEPOSIT_TICKER,
   ScalableHoldingInput,
+  ScalableOvernightInput,
   ScalableOverviewInput,
   ScalableParseError,
   type HoldingDiffKind,
@@ -76,10 +84,23 @@ const SCALABLE_LOGIN_MESSAGE =
 
 const NEW_CASH_VALUE = '__new__';
 
+/**
+ * The two Scalable cash accounts are told apart by the ticker the sync WRITES, never by the
+ * name the user may have edited. The overnight deposit is a separate balance at the broker, so
+ * it gets its own account; matching both by the shared `exchange` would cross-wire them.
+ */
+function findScalableCash(assets: Asset[], ticker: string): Asset | undefined {
+  return assets.find((a) => a.type === 'cash' && a.assetClass === 'cash' && a.ticker === ticker);
+}
+
 async function postReadCommand(
   ownerId: string,
-  command: 'holdings' | 'overview'
-): Promise<{ holdings?: ScalableHoldingInput[]; overview?: ScalableOverviewInput }> {
+  command: 'holdings' | 'overview' | 'overnight'
+): Promise<{
+  holdings?: ScalableHoldingInput[];
+  overview?: ScalableOverviewInput;
+  overnight?: ScalableOvernightInput;
+}> {
   const response = await authenticatedFetch('/api/broker/scalable/read', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -104,8 +125,16 @@ export function BrokerConnectionsSection({ ownerId, disabled = false }: BrokerCo
   const [error, setError] = useState<string | null>(null);
   const [holdingsText, setHoldingsText] = useState('');
   const [overviewText, setOverviewText] = useState('');
+  const [overnightText, setOvernightText] = useState('');
   const [plan, setPlan] = useState<ReturnType<typeof buildScalableImportPlan> | null>(null);
   const [cashTarget, setCashTarget] = useState<string>(NEW_CASH_VALUE);
+  const [depositTarget, setDepositTarget] = useState<string>(NEW_CASH_VALUE);
+  /**
+   * A failed OVERNIGHT read is declared, not swallowed: positions and the broker cash still
+   * sync, and the preview says the deposit was left out and why (a read that silently returned
+   * nothing would look like an emptied account).
+   */
+  const [overnightWarning, setOvernightWarning] = useState<string | null>(null);
 
   const loadAll = useCallback(async () => {
     try {
@@ -132,11 +161,18 @@ export function BrokerConnectionsSection({ ownerId, disabled = false }: BrokerCo
   }, [loadAll]);
 
   const buildPlan = useCallback(
-    (holdings: ScalableHoldingInput[], overview: ScalableOverviewInput | null) => {
-      setPlan(buildScalableImportPlan(holdings, overview, assets));
-      const cashAssets = assets.filter((a) => a.type === 'cash' && a.assetClass === 'cash');
-      const existingScalableCash = cashAssets.find((a) => a.exchange === 'Scalable Capital');
-      setCashTarget(existingScalableCash ? existingScalableCash.id : NEW_CASH_VALUE);
+    (
+      holdings: ScalableHoldingInput[],
+      overview: ScalableOverviewInput | null,
+      overnight: ScalableOvernightInput | null,
+      overnightWarningText: string | null
+    ) => {
+      setPlan(buildScalableImportPlan(holdings, overview, assets, overnight));
+      const existingCash = findScalableCash(assets, SCALABLE_CASH_TICKER);
+      const existingDeposit = findScalableCash(assets, SCALABLE_DEPOSIT_TICKER);
+      setCashTarget(existingCash ? existingCash.id : NEW_CASH_VALUE);
+      setDepositTarget(existingDeposit ? existingDeposit.id : NEW_CASH_VALUE);
+      setOvernightWarning(overnightWarningText);
       setError(null);
     },
     [assets]
@@ -147,11 +183,23 @@ export function BrokerConnectionsSection({ ownerId, disabled = false }: BrokerCo
     setSyncing(true);
     setError(null);
     try {
-      const [holdingsRes, overviewRes] = await Promise.all([
+      // The overnight read is deliberately NOT in this Promise.all: a user with no overnight
+      // account (or a CLI that refuses it) still syncs their positions and broker cash.
+      const [holdingsRes, overviewRes, overnightRes] = await Promise.all([
         postReadCommand(ownerId, 'holdings'),
         postReadCommand(ownerId, 'overview'),
+        postReadCommand(ownerId, 'overnight').then(
+          (r) => ({ overnight: r.overnight ?? null, warning: null as string | null }),
+          (err: unknown) => ({
+            overnight: null,
+            warning:
+              err instanceof Error
+                ? `Deposito non vincolato non letto: ${err.message}`
+                : 'Deposito non vincolato non letto.',
+          })
+        ),
       ]);
-      buildPlan(holdingsRes.holdings ?? [], overviewRes.overview ?? null);
+      buildPlan(holdingsRes.holdings ?? [], overviewRes.overview ?? null, overnightRes.overnight, overnightRes.warning);
       // Auto-import when the sc CLI succeeds (running locally):
       await handleSave();
       toast.success('Sincronizzazione completata e asset importati.');
@@ -168,7 +216,20 @@ export function BrokerConnectionsSection({ ownerId, disabled = false }: BrokerCo
     try {
       const { holdings } = parseScalableHoldingsJson(holdingsText);
       const overview = overviewText.trim() !== '' ? parseScalableOverviewJson(overviewText) : null;
-      buildPlan(holdings, overview);
+      // The overnight paste is OPTIONAL: an empty box is a declared absence, not a failure.
+      let overnight: ScalableOvernightInput | null = null;
+      let overnightWarningText: string | null = null;
+      if (overnightText.trim() !== '') {
+        try {
+          overnight = parseScalableOvernightJson(overnightText);
+        } catch (err) {
+          overnightWarningText =
+            err instanceof ScalableParseError
+              ? `Deposito non vincolato non letto: ${err.message}`
+              : 'Deposito non vincolato non letto: testo non valido.';
+        }
+      }
+      buildPlan(holdings, overview, overnight, overnightWarningText);
       toast.success('Anteprima pronta: controlla le righe prima di salvare.');
     } catch (err) {
       setError(
@@ -201,7 +262,7 @@ export function BrokerConnectionsSection({ ownerId, disabled = false }: BrokerCo
         cashBalance = Math.round(plan.cash.balance * 100) / 100;
         if (cashTarget === NEW_CASH_VALUE) {
           cashAssetId = await createAsset(ownerId, {
-            ticker: 'SCALABLE-EUR',
+            ticker: SCALABLE_CASH_TICKER,
             displayTicker: SCALABLE_CASH_ACCOUNT_NAME,
             name: SCALABLE_CASH_ACCOUNT_NAME,
             type: 'cash',
@@ -218,11 +279,42 @@ export function BrokerConnectionsSection({ ownerId, disabled = false }: BrokerCo
           cashAssetId = cashTarget;
         }
       }
+
+      // The deposit is its OWN account: a different balance at the broker, paying interest on
+      // its own schedule. Its rate has no Asset field, so it is declared in the preview, not stored.
+      let depositAssetId: string | undefined;
+      let depositBalance: number | undefined;
+      if (plan.deposit) {
+        depositBalance = Math.round(plan.deposit.balance * 100) / 100;
+        if (depositTarget === NEW_CASH_VALUE) {
+          depositAssetId = await createAsset(ownerId, {
+            ticker: SCALABLE_DEPOSIT_TICKER,
+            displayTicker: SCALABLE_DEPOSIT_ACCOUNT_NAME,
+            name: SCALABLE_DEPOSIT_ACCOUNT_NAME,
+            type: 'cash',
+            assetClass: 'cash',
+            currency: plan.deposit.currency,
+            quantity: depositBalance,
+            currentPrice: 1,
+            isLiquid: true,
+            autoUpdatePrice: false,
+            exchange: 'Scalable Capital',
+          });
+        } else {
+          await updateAsset(depositTarget, { quantity: depositBalance });
+          depositAssetId = depositTarget;
+        }
+      }
       await saveBrokerConnection(ownerId, {
         holdingsCount: plan.stats.holdingCount,
         skippedCount: plan.stats.skippedCount,
         ...(cashBalance !== undefined ? { cashBalance } : {}),
         ...(cashAssetId ? { cashAssetId } : {}),
+        ...(depositBalance !== undefined ? { depositBalance } : {}),
+        ...(depositAssetId ? { depositAssetId } : {}),
+        ...(plan.deposit?.interestRate !== undefined
+          ? { depositInterestRate: plan.deposit.interestRate }
+          : {}),
         createdAssets,
         updatedPrices,
       });
@@ -235,7 +327,13 @@ export function BrokerConnectionsSection({ ownerId, disabled = false }: BrokerCo
       );
     } catch (err) {
       console.error('[BrokerConnections] save failed:', err);
-      toast.error('Salvataggio non riuscito: riprova.');
+      // A partial save can have ALREADY created the cash/deposit accounts, so the in-memory
+      // `assets` (and the plan's «create new» targets) are stale: keeping them would make the
+      // retry create duplicates. Re-read and drop the preview — the next «Sincronizza» resolves
+      // the targets again, this time against what actually exists.
+      await loadAll();
+      setPlan(null);
+      toast.error('Salvataggio non riuscito: riprova con Sincronizza.');
     } finally {
       setSaving(false);
     }
@@ -319,7 +417,8 @@ export function BrokerConnectionsSection({ ownerId, disabled = false }: BrokerCo
               {plan.cash && (
                 <div className="flex flex-col gap-2 rounded-lg bg-muted p-3">
                   <Label htmlFor="scalable-cash-target" className="text-[13px]">
-                    Liquidità rilevata: {plan.cash.balance} {plan.cash.currency} — conto di destinazione
+                    Liquidità rilevata: {formatCurrency(plan.cash.balance, plan.cash.currency)} — conto di
+                    destinazione
                   </Label>
                   <Select value={cashTarget} onValueChange={setCashTarget} disabled={disabled}>
                     <SelectTrigger id="scalable-cash-target" className="h-10">
@@ -335,6 +434,46 @@ export function BrokerConnectionsSection({ ownerId, disabled = false }: BrokerCo
                     </SelectContent>
                   </Select>
                 </div>
+              )}
+
+              {plan.deposit && (
+                <div className="flex flex-col gap-2 rounded-lg bg-muted p-3">
+                  <Label htmlFor="scalable-deposit-target" className="text-[13px]">
+                    Deposito non vincolato: {formatCurrency(plan.deposit.balance, plan.deposit.currency)} —
+                    conto di destinazione
+                  </Label>
+                  {/* The rate and the payout are DECLARED here, not written: no Asset field holds
+                      an interest rate, and a cash account cannot accrue it on its own. */}
+                  <p className="text-[12px] leading-[1.45] text-muted-foreground">
+                    {plan.deposit.displayName ?? 'Deposito'}
+                    {plan.deposit.interestRate !== undefined &&
+                      ` · rendimento annuo ${formatNumberIt(plan.deposit.interestRate * 100, 2)}%`}
+                    {plan.deposit.nextPayoutDate &&
+                      ` · prossimo pagamento ${formatDate(new Date(plan.deposit.nextPayoutDate))}`}
+                    {plan.deposit.estimatedNextPayoutAmount !== undefined &&
+                      ` (${formatCurrency(plan.deposit.estimatedNextPayoutAmount, plan.deposit.currency)})`}
+                    . Il rendimento e la data sono dichiarati qui: restano nel broker.
+                  </p>
+                  <Select value={depositTarget} onValueChange={setDepositTarget} disabled={disabled}>
+                    <SelectTrigger id="scalable-deposit-target" className="h-10">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NEW_CASH_VALUE}>Crea «{SCALABLE_DEPOSIT_ACCOUNT_NAME}»</SelectItem>
+                      {cashAssets.map((asset) => (
+                        <SelectItem key={asset.id} value={asset.id}>
+                          {asset.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {overnightWarning && (
+                <p role="status" className="text-[12px] leading-[1.45] text-warning-foreground">
+                  {overnightWarning} Gli altri dati sono stati sincronizzati.
+                </p>
               )}
 
               {plan.warnings.length > 0 && (
@@ -362,8 +501,9 @@ export function BrokerConnectionsSection({ ownerId, disabled = false }: BrokerCo
           <div className="flex flex-col gap-2 border-t border-border pt-3">
             <p className="text-[12px] leading-[1.45] text-muted-foreground">
               Senza server locale (o se «Sincronizza» fallisce): esegui sul tuo PC{' '}
-              <span className="font-mono">sc broker holdings --json</span> e{' '}
-              <span className="font-mono">sc broker overview --json</span>, poi incolla qui gli output.
+              <span className="font-mono">sc broker holdings --json</span>,{' '}
+              <span className="font-mono">sc broker overview --json</span> e{' '}
+              <span className="font-mono">sc overnight --json</span>, poi incolla qui gli output.
             </p>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="scalable-holdings-json">Output di holdings</Label>
@@ -389,6 +529,20 @@ export function BrokerConnectionsSection({ ownerId, disabled = false }: BrokerCo
                 disabled={disabled}
               />
             </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="scalable-overnight-json">
+                Output di overnight (opzionale, per il deposito non vincolato)
+              </Label>
+              <Textarea
+                id="scalable-overnight-json"
+                value={overnightText}
+                onChange={(e) => setOvernightText(e.target.value)}
+                placeholder="Incolla l'output di sc overnight --json"
+                rows={3}
+                className="font-mono text-[12px]"
+                disabled={disabled}
+              />
+            </div>
             <div>
               <Button variant="outline" onClick={handlePreviewFromText} disabled={disabled} className="h-10">
                 Anteprima dal testo
@@ -407,7 +561,7 @@ export function BrokerConnectionsSection({ ownerId, disabled = false }: BrokerCo
             'Abilita la CLI nel profilo Scalable (web): Profilo › Sicurezza › Agentic Investing.',
             'Accedi dal terminale: sc login — consigliato sc login --local-read-only, che blocca gli ordini e lascia attive le letture.',
             'Verifica con sc whoami e, se hai più portafogli, scegli con sc broker context select.',
-            'Torna qui e premi Sincronizza: vengono letti solo posizioni e totali.',
+            'Torna qui e premi Sincronizza: vengono letti solo posizioni, totali e il deposito non vincolato.',
           ].map((step, index) => (
             <div key={index} className="flex items-start gap-3 py-3">
               <span className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-muted font-mono text-[11px] font-semibold">

@@ -1,10 +1,14 @@
 /**
  * Local `sc` CLI runner — the server side of the Scalable read-only bridge.
  *
- * Runs ONLY the two whitelisted read commands (`broker holdings/overview --json`) through
+ * Runs ONLY the three whitelisted read commands (`broker holdings/overview --json` and
+ * `overnight --json`) through
  * `execFile` (no shell, fixed argv — no caller input ever reaches the command line) on the
  * machine hosting the app. That is why this works on a local run and degrades on Vercel:
  * `sc login` lives in the OS keyring of the machine the user sits at, and only there.
+ *
+ * `overnight` is the interest-bearing «Deposito non vincolato»: a SEPARATE balance from the
+ * broker's cash residual, so the two never collapse into one figure.
  *
  * No tokens are handled here: the CLI owns its own session (`sc login`, ideally with
  * `--local-read-only`). This module only collects stdout and translates failures into
@@ -16,12 +20,13 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
-export type ScalableReadCommand = 'holdings' | 'overview';
+export type ScalableReadCommand = 'holdings' | 'overview' | 'overnight';
 
-/** The complete read surface: nothing outside these two argv arrays can ever run. */
+/** The complete read surface: nothing outside these three argv arrays can ever run. */
 const READ_COMMAND_ARGS: Record<ScalableReadCommand, string[]> = {
   holdings: ['broker', 'holdings', '--json'],
   overview: ['broker', 'overview', '--json'],
+  overnight: ['overnight', '--json'],
 };
 
 export class ScalableCliError extends Error {

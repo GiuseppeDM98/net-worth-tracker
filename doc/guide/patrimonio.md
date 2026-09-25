@@ -155,6 +155,13 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   READING carries the consequence while armed («Elimini Conto BNL e il suo saldo di 6044,37 €: i movimenti
   collegati restano nel cashflow senza conto. Non è reversibile.», `describeCashAccountReading`) — before, the page
   held the armed state on a timer, `hasArmedConfirm()` was false and Escape CLOSED the modal with the row armed.
+- **Bulk delete is the same single-asset mutation, run per tick** (2026-09-25): the table header and every
+  `AssetRow` carry a checkbox (one Tab stop per list via `useRovingFocus`), a bar appears while something is
+  selected («N selezionati», an armed `BulkDeleteButton`, «Deseleziona»), and confirming runs
+  `deleteAssetMutation.mutateAsync` once per id through `Promise.allSettled` — a partial failure names how many
+  went through (`Eliminati X di N`), so the selection left standing is no surprise. The master checkbox selects
+  EVERY instrument (collapsed groups included); the roving index follows the RENDERED order, which in grouped
+  mode is class order, not the sort order.
 - **The ledger's third vital is annualised only past six months** (`MIN_ANNUALIZABLE_DAYS` = 180,
   `ledgerSpanDays`, both in `assetTransactionUtils.ts`; the words in `describeLedgerReturnVital`): under the floor
   it is «Rendimento sul periodo · +66,92% · in 53 giorni, non annualizzato», never an XIRR — VWCE's ledger, opened

@@ -14,6 +14,8 @@ import { costBasisPerUnitEur, isEurNative } from '@/lib/utils/costBasisEur';
 import { hasMarketPrice } from '@/lib/utils/assetPricing';
 import { toDate } from '@/lib/utils/dateHelpers';
 import { useArmedDelete } from '@/lib/hooks/useArmedDelete';
+import type { useRovingFocus } from '@/lib/hooks/useRovingFocus';
+import { Checkbox } from '@/components/ui/checkbox';
 import { getAssetClassCssVar } from '@/lib/constants/colors';
 import { ASSET_CLASS_LABELS } from '@/lib/utils/allocationUtils';
 import { resolveDisplayAssetClass } from '@/lib/utils/assetDisplayClass';
@@ -110,6 +112,10 @@ interface AssetRowProps {
   showLedgerActions?: boolean;
   onRegisterTrade?: (asset: Asset) => void;
   onMovements?: (asset: Asset) => void;
+  /** Bulk selection: when present the row carries a leading checkbox (one Tab stop per list). */
+  selected?: boolean;
+  onToggleSelect?: (selected: boolean) => void;
+  roving?: ReturnType<ReturnType<typeof useRovingFocus>['itemProps']>;
 }
 
 /**
@@ -135,6 +141,9 @@ export function AssetRow({
   showLedgerActions = false,
   onRegisterTrade,
   onMovements,
+  selected = false,
+  onToggleSelect,
+  roving,
 }: AssetRowProps) {
   const [open, setOpen] = useState(false);
   const deleteRef = useRef<HTMLButtonElement | null>(null);
@@ -203,13 +212,25 @@ export function AssetRow({
         isManualPrice && '-mx-2 rounded-md bg-[color-mix(in_oklch,var(--chart-3)_6%,transparent)] px-2',
       )}
     >
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        aria-controls={panelId}
-        className="flex min-h-[56px] w-full items-center gap-3 py-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
+      <div className="flex items-center gap-1">
+        {onToggleSelect && (
+          /* The label is the target (44px tall, the touch floor): a 16px square was never the only way to tick. */
+          <label className="flex h-11 w-8 shrink-0 cursor-pointer items-center justify-center">
+            <Checkbox
+              checked={selected}
+              onCheckedChange={(v) => onToggleSelect(v === true)}
+              aria-label={`Seleziona ${asset.name}`}
+              {...roving}
+            />
+          </label>
+        )}
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          aria-controls={panelId}
+          className="flex min-h-[56px] min-w-0 flex-1 items-center gap-3 py-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="flex min-w-0 items-center gap-2">
             <span className="truncate text-[13px] font-medium text-foreground">{asset.name}</span>
@@ -245,7 +266,8 @@ export function AssetRow({
           className={cn('h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none', open && 'rotate-180')}
           aria-hidden="true"
         />
-      </button>
+        </button>
+      </div>
 
       <div
         id={panelId}

@@ -20,6 +20,11 @@ export interface BrokerConnection {
   skippedCount?: number;
   cashBalance?: number;
   cashAssetId?: string;
+  /** The overnight «Deposito non vincolato» — a SEPARATE balance from `cashBalance`. */
+  depositBalance?: number;
+  depositAssetId?: string;
+  /** Annual rate as a fraction (0.026 = 2,6%), as last read. Declared, never accrued locally. */
+  depositInterestRate?: number;
   createdAssets?: number;
   updatedPrices?: number;
   createdAt: Date;
@@ -28,7 +33,7 @@ export interface BrokerConnection {
 
 export type BrokerConnectionSave = Pick<
   BrokerConnection,
-  'holdingsCount' | 'cashBalance' | 'cashAssetId' | 'createdAssets' | 'updatedPrices'
+  'holdingsCount' | 'cashBalance' | 'cashAssetId' | 'depositBalance' | 'depositAssetId' | 'depositInterestRate' | 'createdAssets' | 'updatedPrices'
 > &
   Partial<Pick<BrokerConnection, 'skippedCount' | 'lastSyncAt'>>;
 
@@ -49,6 +54,10 @@ function toBrokerConnection(userId: string, data: Record<string, unknown>): Brok
     skippedCount: typeof data['skippedCount'] === 'number' ? data['skippedCount'] : undefined,
     cashBalance: typeof data['cashBalance'] === 'number' ? data['cashBalance'] : undefined,
     cashAssetId: typeof data['cashAssetId'] === 'string' ? data['cashAssetId'] : undefined,
+    depositBalance: typeof data['depositBalance'] === 'number' ? data['depositBalance'] : undefined,
+    depositAssetId: typeof data['depositAssetId'] === 'string' ? data['depositAssetId'] : undefined,
+    depositInterestRate:
+      typeof data['depositInterestRate'] === 'number' ? data['depositInterestRate'] : undefined,
     createdAt: toDate(data['createdAt'], now),
     updatedAt: toDate(data['updatedAt'], now),
   };

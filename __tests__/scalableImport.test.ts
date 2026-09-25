@@ -14,8 +14,12 @@ import {
   mapScalableType,
   parseScalableHoldingsJson,
   parseScalableOverviewJson,
+  parseScalableOvernightJson,
   resolveScalableCashBalance,
   SCALABLE_CASH_ACCOUNT_NAME,
+  SCALABLE_CASH_TICKER,
+  SCALABLE_DEPOSIT_ACCOUNT_NAME,
+  SCALABLE_DEPOSIT_TICKER,
   ScalableHoldingInput,
   ScalableParseError,
 } from '@/lib/utils/scalableImport';
@@ -308,5 +312,93 @@ describe('buildScalableImportPlan', () => {
 
   it('names the suggested cash account', () => {
     expect(SCALABLE_CASH_ACCOUNT_NAME).toContain('Scalable');
+  });
+
+  it('gives the deposit its own account name, distinct from the liquidity one', () => {
+    expect(SCALABLE_DEPOSIT_ACCOUNT_NAME).toContain('Scalable');
+    expect(SCALABLE_DEPOSIT_ACCOUNT_NAME).not.toBe(SCALABLE_CASH_ACCOUNT_NAME);
+    // A re-sync matches on the WRITTEN ticker, so a renamed account never duplicates.
+    expect(SCALABLE_DEPOSIT_TICKER).not.toBe(SCALABLE_CASH_TICKER);
+  });
+});
+
+/** Captured verbatim from `sc overnight --json` on a logged-in account. */
+const SC_CLI_OVERNIGHT = JSON.stringify({
+  ok: true,
+  command: 'overnight',
+  data: {
+    account: { display_name: 'Deposito non vincolato', is_active: true, owner_kind: 'personal' },
+    result: {
+      balance: 59201.61,
+      current_accrued_amount: 103.4,
+      // Deliberately NOT equal to `balance` (the live payload happened to print them equal, which
+      // let a wrong key pass): the assertion below then pins `balance` specifically.
+      current_interest_bearing_amount: 59098.21,
+      deposit_accrued_lifetime_amount: 709.87,
+      estimated_next_payout_amount: 128.7,
+      interest_rate: 0.026,
+      next_payout_date: '2026-10-01T00:00:00+00:00',
+    },
+    savings_account_id: 'wQxM2oE1NR8mjbaoN9FE3n',
+    selection: { account: 'auto_resolve' },
+  },
+});
+
+describe('parseScalableOvernightJson', () => {
+  it('reads the live overnight envelope', () => {
+    expect(parseScalableOvernightJson(SC_CLI_OVERNIGHT)).toMatchObject({
+      balance: 59201.61,
+      interestRate: 0.026,
+      estimatedNextPayoutAmount: 128.7,
+      displayName: 'Deposito non vincolato',
+      isActive: true,
+      currency: 'EUR',
+    });
+  });
+
+  it('normalises the payout date to an ISO string', () => {
+    const parsed = parseScalableOvernightJson(SC_CLI_OVERNIGHT);
+    expect(parsed.nextPayoutDate).toBe(new Date('2026-10-01T00:00:00+00:00').toISOString());
+  });
+
+  it('drops a rate and a payout date the CLI did not report', () => {
+    const parsed = parseScalableOvernightJson(
+      JSON.stringify({ ok: true, data: { result: { balance: 10 } } })
+    );
+    expect(parsed.interestRate).toBeUndefined();
+    expect(parsed.nextPayoutDate).toBeUndefined();
+    expect(parsed.balance).toBe(10);
+  });
+
+  it('keeps a zero balance (an emptied account is a reading, not an absence)', () => {
+    const parsed = parseScalableOvernightJson(
+      JSON.stringify({ ok: true, data: { result: { balance: 0 } } })
+    );
+    expect(parsed.balance).toBe(0);
+  });
+
+  it('throws when the balance is missing', () => {
+    expect(() => parseScalableOvernightJson(JSON.stringify({ ok: true, data: { result: {} } }))).toThrow(
+      ScalableParseError
+    );
+  });
+});
+
+describe('the deposit is a separate balance from the broker residual', () => {
+  // The measured pair: broker cash 120,00 € against a 59.201,61 € overnight deposit. The broker
+  // valuation does NOT contain the deposit, so the residual must not absorb it.
+  const overview = { valuation: 138746.79, securitiesValuation: 138626.79, cryptoValuation: 0, currency: 'EUR' };
+
+  it('keeps the two cash figures apart', () => {
+    const plan = buildScalableImportPlan([], overview, [], parseScalableOvernightJson(SC_CLI_OVERNIGHT));
+    expect(plan.cash).toMatchObject({ balance: 120 });
+    expect(plan.deposit).toMatchObject({ balance: 59201.61, interestRate: 0.026 });
+    expect(plan.deposit?.balance).not.toBe(plan.cash?.balance);
+  });
+
+  it('leaves the deposit null when the account was not read', () => {
+    const plan = buildScalableImportPlan([], overview, []);
+    expect(plan.deposit).toBeNull();
+    expect(plan.cash).toMatchObject({ balance: 120 });
   });
 });

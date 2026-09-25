@@ -6,7 +6,7 @@
  * a grant over it. No credentials cross this route — the CLI session lives in the OS keyring
  * (`sc login`), and no request field ever reaches a command line.
  *
- * Body: { ownerId: string, command: 'holdings' | 'overview' }
+ * Body: { ownerId: string, command: 'holdings' | 'overview' | 'overnight' }
  */
 
 export const runtime = 'nodejs';
@@ -23,6 +23,7 @@ import { runScalableReadCommand, ScalableCliError } from '@/lib/server/scalableC
 import {
   parseScalableHoldingsJson,
   parseScalableOverviewJson,
+  parseScalableOvernightJson,
   buildScalableImportPlan,
   ScalableParseError,
 } from '@/lib/utils/scalableImport';
@@ -30,7 +31,7 @@ import { getUserAssetsAdmin } from '@/lib/server/assetAdminRepository';
 
 const bodySchema = z.object({
   ownerId: z.string().min(1),
-  command: z.enum(['holdings', 'overview']),
+  command: z.enum(['holdings', 'overview', 'overnight']),
 });
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -61,6 +62,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       const assets = await getUserAssetsAdmin(validated.data.ownerId);
       const plan = buildScalableImportPlan(holdings, null, assets);
       return NextResponse.json({ plan, skipped });
+    }
+    if (validated.data.command === 'overnight') {
+      const overnight = parseScalableOvernightJson(stdout);
+      return NextResponse.json({ overnight });
     }
     const overview = parseScalableOverviewJson(stdout);
     const assets = await getUserAssetsAdmin(validated.data.ownerId);
