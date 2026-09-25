@@ -1,0 +1,79 @@
+/**
+ * Scalable read-only proxy — POST /api/broker/scalable/read.
+ *
+ * Runs one of the two whitelisted `sc` read commands on the hosting machine and returns the
+ * parsed payload (positions or totals). Owner-scoped: the caller must own the account or hold
+ * a grant over it. No credentials cross this route — the CLI session lives in the OS keyring
+ * (`sc login`), and no request field ever reaches a command line.
+ *
+ * Body: { ownerId: string, command: 'holdings' | 'overview' }
+ */
+
+export const runtime = 'nodejs';
+
+import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+import {
+  assertCanAccessAccount,
+  getApiAuthErrorResponse,
+  requireFirebaseAuth,
+} from '@/lib/server/apiAuth';
+import { parseOr400 } from '@/lib/server/validation';
+import { runScalableReadCommand, ScalableCliError } from '@/lib/server/scalableCli';
+import {
+  parseScalableHoldingsJson,
+  parseScalableOverviewJson,
+  buildScalableImportPlan,
+  ScalableParseError,
+} from '@/lib/utils/scalableImport';
+import { getAllAssets } from '@/lib/services/assetService';
+
+const bodySchema = z.object({
+  ownerId: z.string().min(1),
+  command: z.enum(['holdings', 'overview']),
+});
+
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  let decoded;
+  try {
+    decoded = await requireFirebaseAuth(request);
+  } catch (error) {
+    return getApiAuthErrorResponse(error) ?? NextResponse.json({ error: 'Non autenticato.' }, { status: 401 });
+  }
+
+  const body: unknown = await request.json().catch(() => null);
+  const validated = parseOr400(bodySchema, body);
+  if (!validated.ok) return validated.response;
+
+  try {
+    await assertCanAccessAccount(decoded, validated.data.ownerId);
+  } catch (error) {
+    return (
+      getApiAuthErrorResponse(error) ??
+      NextResponse.json({ error: 'Accesso negato.' }, { status: 403 })
+    );
+  }
+
+  try {
+    const stdout = await runScalableReadCommand(validated.data.command);
+    if (validated.data.command === 'holdings') {
+      const { holdings, skipped } = parseScalableHoldingsJson(stdout);
+      const assets = await getAllAssets(validated.data.ownerId);
+      const plan = buildScalableImportPlan(holdings, null, assets);
+      return NextResponse.json({ plan, skipped });
+    }
+    const overview = parseScalableOverviewJson(stdout);
+    const assets = await getAllAssets(validated.data.ownerId);
+    const plan = buildScalableImportPlan([], overview, assets);
+    return NextResponse.json({ plan });
+  } catch (error) {
+    if (error instanceof ScalableCliError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    if (error instanceof ScalableParseError) {
+      return NextResponse.json({ error: error.message }, { status: 502 });
+    }
+    console.error('[scalable/read] unexpected failure', error);
+    return NextResponse.json({ error: 'Lettura non riuscita: riprova.' }, { status: 500 });
+  }
+}
