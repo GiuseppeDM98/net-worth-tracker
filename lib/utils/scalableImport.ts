@@ -225,7 +225,9 @@ function extractOverviewNode(doc: unknown): Record<string, unknown> {
 /** Parse the pasted `sc broker overview --json` output (optional second input). */
 export function parseScalableOverviewJson(raw: string): ScalableOverviewInput {
   const node = extractOverviewNode(parseJsonDocument(raw, '`sc broker overview --json`'));
-  const valuationObj = pickPath(node, ['valuation', 'totalValuation', 'totalValue']);
+  // `extractOverviewNode` merges a found `valuation` object into the node, so its fields may
+  // sit top-level (`total`, `securities`, `crypto` — the live `broker.overview` shape) or nested.
+  const valuationObj = pickPath(node, ['valuation', 'totalValuation', 'totalValue', 'total']);
   let valuation: number | undefined;
   if (typeof valuationObj === 'number') {
     valuation = valuationObj;
@@ -233,8 +235,8 @@ export function parseScalableOverviewJson(raw: string): ScalableOverviewInput {
     valuation = toNumber(valuationObj['total']);
   }
   const securitiesValuation =
-    toNumber(pickPath(node, ['securitiesValuation', 'securitiesValue'])) ?? 0;
-  const cryptoValuation = toNumber(pickPath(node, ['cryptoValuation', 'cryptoValue'])) ?? 0;
+    toNumber(pickPath(node, ['securitiesValuation', 'securitiesValue', 'securities'])) ?? 0;
+  const cryptoValuation = toNumber(pickPath(node, ['cryptoValuation', 'cryptoValue', 'crypto'])) ?? 0;
   if (valuation === undefined || isNaN(valuation)) {
     throw new ScalableParseError(
       'Totale non trovato: incolla per intero l’output di `sc broker overview --json`.'

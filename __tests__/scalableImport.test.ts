@@ -186,6 +186,25 @@ describe('parseScalableOverviewJson', () => {
   it('throws when the total is missing', () => {
     expect(() => parseScalableOverviewJson(JSON.stringify({ foo: 1 }))).toThrow(ScalableParseError);
   });
+
+  it('reads the live broker.overview envelope (data.result.valuation)', () => {
+    const overview = parseScalableOverviewJson(
+      JSON.stringify({
+        ok: true,
+        command: 'broker.overview',
+        data: {
+          result: { valuation: { crypto: 0, securities: 138626.79, total: 138746.79 } },
+        },
+      })
+    );
+    expect(overview).toMatchObject({
+      valuation: 138746.79,
+      securitiesValuation: 138626.79,
+      cryptoValuation: 0,
+      currency: 'EUR',
+    });
+    expect(resolveScalableCashBalance(overview)).toMatchObject({ balance: 120, currency: 'EUR' });
+  });
 });
 
 describe('mapScalableType / mapHoldingToAssetFormData', () => {

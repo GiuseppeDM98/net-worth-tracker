@@ -44,6 +44,29 @@ function isLoginFailure(stderr: string): boolean {
 }
 
 /**
+ * The CLI exits 0 even when the broker call failed (`{"ok":false,...}`) — without this,
+ * a dead session surfaces as a generic 502 parse error instead of the login prompt.
+ */
+function assertBrokerOk(stdout: string): void {
+  let doc: unknown;
+  try {
+    doc = JSON.parse(stdout);
+  } catch {
+    return; // Not JSON — leave it to the row/overview parser to report.
+  }
+  if (
+    typeof doc === 'object' &&
+    doc !== null &&
+    (doc as Record<string, unknown>)['ok'] === false
+  ) {
+    throw new ScalableCliError(
+      401,
+      'Sessione Scalable scaduta o assente: esegui `sc login` nel terminale (consigliato: `sc login --local-read-only`) e riprova.'
+    );
+  }
+}
+
+/**
  * Run one whitelisted READ command and return its stdout.
  *
  * @throws ScalableCliError 503 when the binary is missing, 401 when the CLI session is
@@ -56,6 +79,7 @@ export async function runScalableReadCommand(command: ScalableReadCommand): Prom
       timeout: 60_000,
       maxBuffer: 10 * 1024 * 1024,
     });
+    assertBrokerOk(stdout);
     return stdout;
   } catch (error) {
     const err = error as NodeJS.ErrnoException & { stdout?: string; stderr?: string; killed?: boolean };
