@@ -17,6 +17,14 @@
   (`READ_COMMAND_ARGS` in `lib/server/scalableCli.ts`): aggiungere un comando di scrittura
   lì dentro è il cambio che questa guida vieta. `sc login --local-read-only` è la modalità
   raccomandata nel tile Refresh login — blocca gli ordini lato CLI, le letture restano attive.
+- **Un comando, un payload, nella sua chiave** (`{ holdings, skipped }` · `{ overview }` ·
+  `{ overnight }`), mai un `plan`: il piano lo compone il client, che ha già gli asset
+  tracciati. La route ha risposto `{ plan }` per `holdings`/`overview` mentre il client leggeva
+  `res.holdings`/`res.overview`: due chiavi `undefined`, silenziosamente diventate `[]`/`null`
+  dal `??` del client, e l'anteprima mostrava ZERO posizioni e NESSUNA liquidità dichiarando
+  sincronizzazione riuscita. La forma della risposta è bloccata da
+  `__tests__/scalableReadRoute.test.ts`, e il client rifiuta una chiave mancante invece di
+  defaultedarla a zero.
 - **La quantità dei tipi ledger non si scrive mai.** `quantity`/`averageCost` di
   stock/etf/bond/crypto/commodity sono del Registro (replay): la sync aggiorna solo
   `currentPrice` via `updateAssetMetadata` e riporta lo scostamento come avviso da

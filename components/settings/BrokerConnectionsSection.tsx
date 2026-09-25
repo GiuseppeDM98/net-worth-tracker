@@ -112,6 +112,17 @@ async function postReadCommand(
       typeof data?.error === 'string' ? data.error : 'Lettura non riuscita: riprova.'
     );
   }
+  // A missing key is a CONTRACT break, not an empty reading: defaulting it to `[]`/`null` made a
+  // mismatched response read as «zero posizioni» and «nessuna liquidità» instead of failing.
+  if (command === 'holdings' && !Array.isArray(data?.holdings)) {
+    throw new Error('Lettura delle posizioni non riuscita: riprova.');
+  }
+  if (command === 'overview' && !data?.overview) {
+    throw new Error('Lettura dei totali non riuscita: riprova.');
+  }
+  if (command === 'overnight' && !data?.overnight) {
+    throw new Error('Lettura del deposito non riuscita: riprova.');
+  }
   return data;
 }
 
@@ -200,9 +211,12 @@ export function BrokerConnectionsSection({ ownerId, disabled = false }: BrokerCo
         ),
       ]);
       buildPlan(holdingsRes.holdings ?? [], overviewRes.overview ?? null, overnightRes.overnight, overnightRes.warning);
-      // Auto-import when the sc CLI succeeds (running locally):
-      await handleSave();
-      toast.success('Sincronizzazione completata e asset importati.');
+      // No auto-import: `handleSave` closes over the `plan` of the render it was created in, so
+      // calling it right after `setPlan` read the PREVIOUS plan (null on a fresh load) and bailed
+      // on its own guard — the write never ran while the toast below claimed it had. The preview
+      // is the confirmation step («Salva nel patrimonio»), which is also what the tile's own
+      // docstring describes.
+      toast.success('Anteprima pronta: controlla le righe e salva.');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Lettura non riuscita: riprova.';
       setError(message);

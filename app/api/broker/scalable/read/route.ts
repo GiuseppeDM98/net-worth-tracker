@@ -7,6 +7,9 @@
  * (`sc login`), and no request field ever reaches a command line.
  *
  * Body: { ownerId: string, command: 'holdings' | 'overview' | 'overnight' }
+ *
+ * Each command answers with its own parsed payload under its own key (`{ holdings, skipped }`,
+ * `{ overview }`, `{ overnight }`); the client composes the plan from the three.
  */
 
 export const runtime = 'nodejs';
@@ -24,10 +27,8 @@ import {
   parseScalableHoldingsJson,
   parseScalableOverviewJson,
   parseScalableOvernightJson,
-  buildScalableImportPlan,
   ScalableParseError,
 } from '@/lib/utils/scalableImport';
-import { getUserAssetsAdmin } from '@/lib/server/assetAdminRepository';
 
 const bodySchema = z.object({
   ownerId: z.string().min(1),
@@ -57,20 +58,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   try {
     const stdout = await runScalableReadCommand(validated.data.command);
+    // One command, one PARSED PAYLOAD — never a plan. The plan is built once in the client, which
+    // already holds the tracked assets; a per-command plan also read the user's assets per call
+    // and the client silently read `res.holdings`/`res.overview` off a `{ plan }` envelope as
+    // undefined, so positions arrived empty and the cash block never rendered.
     if (validated.data.command === 'holdings') {
       const { holdings, skipped } = parseScalableHoldingsJson(stdout);
-      const assets = await getUserAssetsAdmin(validated.data.ownerId);
-      const plan = buildScalableImportPlan(holdings, null, assets);
-      return NextResponse.json({ plan, skipped });
+      return NextResponse.json({ holdings, skipped });
     }
     if (validated.data.command === 'overnight') {
       const overnight = parseScalableOvernightJson(stdout);
       return NextResponse.json({ overnight });
     }
     const overview = parseScalableOverviewJson(stdout);
-    const assets = await getUserAssetsAdmin(validated.data.ownerId);
-    const plan = buildScalableImportPlan([], overview, assets);
-    return NextResponse.json({ plan });
+    return NextResponse.json({ overview });
   } catch (error) {
     if (error instanceof ScalableCliError) {
       return NextResponse.json({ error: error.message }, { status: error.status });
