@@ -3,14 +3,16 @@
 import type { HallOfFameNote } from '@/types/hall-of-fame';
 import type { RecordBoard, TimelinePoint } from '@/lib/utils/hallOfFameSummary';
 import type { Narrative } from '@/lib/utils/narrative';
+import { describeTimelineCaption } from '@/lib/utils/hallOfFameNarrative';
 import { Tile, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { NarrativeText } from '@/components/ui/narrative-text';
 import { RecordRows } from '@/components/hall-of-fame/RecordRows';
 import { RecordBars } from '@/components/hall-of-fame/RecordBars';
+import type { NotePrefill } from '@/components/hall-of-fame/NoteTrigger';
 
 interface RecordPatrimonioTileProps {
   reading: Narrative;
-  /** «46 mesi confrontati»; absent until the stored stats exist. */
+  /** «da dic 2022 a set 2026»; absent until the stored stats exist. */
   aside?: string;
   board: RecordBoard | null;
   timeline: TimelinePoint[];
@@ -18,6 +20,7 @@ interface RecordPatrimonioTileProps {
   footer: Narrative | null;
   notes: HallOfFameNote[];
   onNoteClick: (note: HallOfFameNote, trigger: HTMLElement | null) => void;
+  onAddNote: (prefill: NotePrefill, trigger: HTMLElement | null) => void;
 }
 
 /**
@@ -25,7 +28,7 @@ interface RecordPatrimonioTileProps {
  * other board on the page: the tile spans two grid rows, and three rows plus a capped chart left
  * a hole above the footer.
  */
-const PODIUM_SIZE = 5;
+export const PODIUM_SIZE = 5;
 
 /**
  * «Qual è stato il mese migliore?» — the dominant tile: the podium of growth months, then the
@@ -43,6 +46,7 @@ export function RecordPatrimonioTile({
   footer,
   notes,
   onNoteClick,
+  onAddNote,
 }: RecordPatrimonioTileProps) {
   return (
     <Tile eyebrow="Record del patrimonio" aside={aside} reading={reading} ariaLabel="Record del patrimonio">
@@ -56,6 +60,7 @@ export function RecordPatrimonioTile({
               notes={notes}
               sectionKey={board.sectionKey}
               onNoteClick={onNoteClick}
+              onAddNote={onAddNote}
               labelClassName="min-w-[78px]"
               ariaLabel="I mesi con la crescita di patrimonio più alta"
             />
@@ -64,7 +69,8 @@ export function RecordPatrimonioTile({
           {timeline.length > 1 && (
             <>
               <div className="mt-[18px] flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                <p className={TILE_SUB_EYEBROW_CLASS}>I {timeline.length} record nel tempo</p>
+                {/* «I 12 record più grandi» says that the chart is a cut of the twenty, not all of them. */}
+                <p className={TILE_SUB_EYEBROW_CLASS}>{describeTimelineCaption(timeline.length, board.total)} nel tempo</p>
                 <span className="text-[10px] text-muted-foreground">in ordine cronologico</span>
               </div>
               {/* It stretches with the tile's free height, but not past a ceiling: with three

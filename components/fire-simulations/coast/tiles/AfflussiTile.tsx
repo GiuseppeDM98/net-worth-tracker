@@ -10,19 +10,26 @@
  * own year, so nothing here implies a proportional time axis it does not have. Without an event
  * the tile keeps its place: the reading says what «nessun afflusso» means for the number, which
  * is the fact the reader needs, not an empty cell.
+ *
+ * The footer is ONE line; the method (net real, deflated, the fund at today's value, the equal
+ * segments) sits behind «Come si calcola» (`TileMethodNote`, 2026-09-23).
  */
 
 import { Landmark, LockOpen } from 'lucide-react';
 import type { Narrative } from '@/lib/utils/narrative';
 import type { CoastInflowEvent } from '@/lib/utils/coastFireView';
 import { Tile } from '@/components/ui/tile';
-import { NarrativeText } from '@/components/ui/narrative-text';
+import { NarrativeSegments } from '@/components/ui/narrative-text';
+import { TileMethodNote } from '@/components/ui/tile-method-note';
 
 interface AfflussiTileProps {
   /** `describeCoastInflows(...)`. */
   reading: Narrative;
   events: CoastInflowEvent[];
+  /** The one line that stays on the tile. */
   footer: Narrative;
+  /** The method, one paragraph per entry, behind «Come si calcola». */
+  method: readonly string[];
   className?: string;
 }
 
@@ -31,7 +38,7 @@ const EVENT_ICON = {
   pensionFund: LockOpen,
 } as const;
 
-export function AfflussiTile({ reading, events, footer, className }: AfflussiTileProps) {
+export function AfflussiTile({ reading, events, footer, method, className }: AfflussiTileProps) {
   return (
     <Tile eyebrow="Afflussi" aside="in euro di oggi" reading={reading} ariaLabel="Afflussi già considerati" className={className}>
       {events.length > 0 && (
@@ -65,7 +72,11 @@ export function AfflussiTile({ reading, events, footer, className }: AfflussiTil
         </ol>
       )}
 
-      <NarrativeText segments={footer} className="mt-auto border-t border-border pt-3.5 text-[11px] leading-[1.45] text-muted-foreground" />
+      <TileMethodNote subject="Afflussi già considerati" summary={<NarrativeSegments segments={footer} figureClassName="font-medium" />}>
+        {method.map((paragraph) => (
+          <span key={paragraph}>{paragraph}</span>
+        ))}
+      </TileMethodNote>
     </Tile>
   );
 }

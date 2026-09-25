@@ -13,12 +13,12 @@
 
 import { useState, type ReactNode } from 'react';
 import { ChevronDown, HelpCircle } from 'lucide-react';
-import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { PerformanceMetrics, RollingPeriodPerformance, UnderwaterDrawdownData } from '@/types/performance';
 import type { Narrative } from '@/lib/utils/narrative';
 import type { DrawdownStory } from '@/lib/utils/performanceSummary';
 import type { ReturnAttribution } from '@/lib/utils/performanceAttribution';
-import { describeAttributionCoverage, describeDrawdownDetail, describeReturnMetrics, describeYields } from '@/lib/utils/performanceNarrative';
+import { describeAttributionCoverage, describeDrawdownDetail, describeReturnMetrics, describeYields, type WindowEnd } from '@/lib/utils/performanceNarrative';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { formatNumber, formatPercentage } from '@/lib/services/chartService';
 import { getMetricValueColor, signTextClass } from '@/lib/utils/metricColors';
@@ -27,6 +27,8 @@ import { cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tile, TILE_CELL_CLASS, TILE_EYEBROW_CLASS, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
+import { TileMethodNote } from '@/components/ui/tile-method-note';
+import { SeriesLegend } from '@/components/ui/series-legend';
 import { CHART_TICK_STYLE } from '@/components/cashflow/costCenterStyles';
 import { UnderwaterDrawdownChart } from '@/components/performance/UnderwaterDrawdownChart';
 
@@ -42,6 +44,8 @@ interface PerformanceDettaglioProps {
   underwater: UnderwaterDrawdownData[];
   /** Every instrument's contribution to the period's market gain; null before the base is resolved. */
   attribution: ReturnAttribution | null;
+  /** The month the window closes on: an open drawdown runs to «oggi» only when that is the latest snapshot. */
+  windowEnd: WindowEnd;
 }
 
 /** «+16.569 €» / «−877 €» / «0 €» — the tile's euro figure, typographic minus. */
@@ -54,53 +58,68 @@ function euroClass(value: number): string {
   return Math.abs(Math.round(value)) < 1 ? 'text-foreground' : signTextClass(value);
 }
 
-const ATTRIBUTION_CELL_CLASS = 'py-[9px] text-right font-mono text-[13px] tabular-nums';
+const ATTRIBUTION_CELL_CLASS = 'py-[9px] pl-3 text-right font-mono text-[13px] tabular-nums';
+const ATTRIBUTION_HEAD_CLASS = cn(TILE_SUB_EYEBROW_CLASS, 'py-2 pl-3 text-right font-semibold');
+// `@[560px]` is the container width from which Prezzo and Dividendi are columns of their own; below
+// it they fold under the instrument's name. Class names written out in full: Tailwind reads them as text.
+const FOLDED_COLUMN_CLASS = 'hidden @[560px]:table-cell';
 
 /**
  * The full attribution table: every instrument, its months, the price effect and the dividends
  * apart, then the residual and the market's own figure as the two closing rows — a table inside a
- * tile (DESIGN.md → Table inside a Tile), scrolling inside its own wrapper below 1440.
+ * tile (DESIGN.md → Table inside a Tile).
+ *
+ * It fits its container by construction (2026-09-20, Storico's «Valore per strumento» idiom): with
+ * `min-w-[560px]` the five columns were 586px in a 356px scroller on a phone, 270px hidden with no
+ * cue. Below 560px of CONTAINER the two addends fold into a caption under the name — and only where
+ * there is a dividend, since without one the price effect IS the total — while Mesi and Totale stay:
+ * the column that must add up to «Mercato» is always on screen. The name wraps, never truncates.
  */
 function AttributionTable({ attribution }: { attribution: ReturnAttribution }) {
   return (
-    <div className="-mx-5 mt-3 overflow-x-auto px-5">
-      <table className="w-full min-w-[560px] border-collapse">
+    <div className="@container -mx-5 mt-3 overflow-x-auto px-5">
+      <table className="w-full border-collapse">
         <thead>
           <tr className="border-b border-border">
             <th scope="col" className={cn(TILE_SUB_EYEBROW_CLASS, 'py-2 text-left font-semibold')}>Strumento</th>
-            <th scope="col" className={cn(TILE_SUB_EYEBROW_CLASS, 'py-2 text-right font-semibold')}>Mesi</th>
-            <th scope="col" className={cn(TILE_SUB_EYEBROW_CLASS, 'py-2 text-right font-semibold')}>Prezzo</th>
-            <th scope="col" className={cn(TILE_SUB_EYEBROW_CLASS, 'py-2 text-right font-semibold')}>Dividendi</th>
-            <th scope="col" className={cn(TILE_SUB_EYEBROW_CLASS, 'py-2 text-right font-semibold')}>Totale</th>
+            <th scope="col" className={ATTRIBUTION_HEAD_CLASS}>Mesi</th>
+            <th scope="col" className={cn(ATTRIBUTION_HEAD_CLASS, FOLDED_COLUMN_CLASS)}>Prezzo</th>
+            <th scope="col" className={cn(ATTRIBUTION_HEAD_CLASS, FOLDED_COLUMN_CLASS)}>Dividendi</th>
+            <th scope="col" className={ATTRIBUTION_HEAD_CLASS}>Totale</th>
           </tr>
         </thead>
         <tbody>
           {attribution.rows.map((row) => (
             <tr key={row.assetId} className="border-b border-border">
-              <th scope="row" className="py-[9px] pr-3 text-left text-[13px] font-normal text-foreground">
-                <span className="block truncate">{row.name}</span>
+              <th scope="row" className="py-[9px] text-left text-[13px] font-normal text-foreground">
+                <span className="line-clamp-2 break-words leading-[1.35]">{row.name}</span>
                 {row.isPensionFund && <span className="block text-[11px] text-muted-foreground">fondo pensione, al netto dei versamenti</span>}
+                {row.dividends !== 0 && (
+                  <span className="block font-mono text-[11px] tabular-nums text-muted-foreground @[560px]:hidden">
+                    prezzo {signedEuro(row.marketEffect)} · dividendi {signedEuro(row.dividends)}
+                  </span>
+                )}
               </th>
               <td className={cn(ATTRIBUTION_CELL_CLASS, 'text-muted-foreground')}>{row.monthsAttributed}</td>
-              <td className={cn(ATTRIBUTION_CELL_CLASS, euroClass(row.marketEffect))}>{signedEuro(row.marketEffect)}</td>
-              <td className={cn(ATTRIBUTION_CELL_CLASS, row.dividends ? 'text-foreground' : 'text-muted-foreground')}>{row.dividends ? signedEuro(row.dividends) : '—'}</td>
+              <td className={cn(ATTRIBUTION_CELL_CLASS, FOLDED_COLUMN_CLASS, euroClass(row.marketEffect))}>{signedEuro(row.marketEffect)}</td>
+              <td className={cn(ATTRIBUTION_CELL_CLASS, FOLDED_COLUMN_CLASS, row.dividends ? 'text-foreground' : 'text-muted-foreground')}>{row.dividends ? signedEuro(row.dividends) : '—'}</td>
               <td className={cn(ATTRIBUTION_CELL_CLASS, 'font-semibold', euroClass(row.total))}>{signedEuro(row.total)}</td>
             </tr>
           ))}
         </tbody>
         <tfoot>
           <tr className="border-b border-border">
-            <th scope="row" className="py-[9px] pr-3 text-left text-[13px] font-normal text-muted-foreground">Non attribuito</th>
+            <th scope="row" className="py-[9px] text-left text-[13px] font-normal text-muted-foreground">Non attribuito</th>
             <td className={ATTRIBUTION_CELL_CLASS} />
-            <td className={ATTRIBUTION_CELL_CLASS} />
-            <td className={ATTRIBUTION_CELL_CLASS} />
+            <td className={cn(ATTRIBUTION_CELL_CLASS, FOLDED_COLUMN_CLASS)} />
+            <td className={cn(ATTRIBUTION_CELL_CLASS, FOLDED_COLUMN_CLASS)} />
             <td className={cn(ATTRIBUTION_CELL_CLASS, 'text-muted-foreground')}>{signedEuro(attribution.unattributed)}</td>
           </tr>
           <tr>
-            <th scope="row" className="py-[9px] pr-3 text-left text-[13px] font-semibold text-foreground">Mercato</th>
+            <th scope="row" className="py-[9px] text-left text-[13px] font-semibold text-foreground">Mercato</th>
             <td className={cn(ATTRIBUTION_CELL_CLASS, 'text-muted-foreground')}>{attribution.coverage.attributedMonths}</td>
-            <td className={ATTRIBUTION_CELL_CLASS} />
-            <td className={ATTRIBUTION_CELL_CLASS} />
+            <td className={cn(ATTRIBUTION_CELL_CLASS, FOLDED_COLUMN_CLASS)} />
+            <td className={cn(ATTRIBUTION_CELL_CLASS, FOLDED_COLUMN_CLASS)} />
             <td className={cn(ATTRIBUTION_CELL_CLASS, 'font-bold', euroClass(attribution.gain))}>{signedEuro(attribution.gain)}</td>
           </tr>
         </tfoot>
@@ -111,13 +130,18 @@ function AttributionTable({ attribution }: { attribution: ReturnAttribution }) {
 
 // ─── Rows ─────────────────────────────────────────────────────────────────────
 
+/**
+ * The «?» beside a metric. The glyph is 14px as before; the TARGET is 44px (32px from `desktop:`),
+ * folded back by negative margins so neither the row nor the label's spacing grows — it was a 20px
+ * target at 2,3:1 (`text-muted-foreground/60`, critique of 2026-09-20). The full muted ink clears 4,5:1.
+ */
 function Help({ label, children }: { label: string; children: ReactNode }) {
   return (
     <Popover>
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="ml-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-muted-foreground/60 transition-colors hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="-my-3 -ml-2 -mr-3 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring desktop:-my-1.5 desktop:-ml-0.5 desktop:-mr-1.5 desktop:h-8 desktop:w-8"
           aria-label={`Mostra definizione: ${label}`}
         >
           <HelpCircle className="h-3.5 w-3.5" aria-hidden="true" />
@@ -161,7 +185,6 @@ const monthYear = (m: { year: number; month: number }) => `${MONTH_LONG[m.month 
 const TOOLTIP_CONTENT_STYLE = { backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--card-foreground)', fontSize: 12 } as const;
 const TOOLTIP_LABEL_STYLE = { color: 'var(--card-foreground)', fontWeight: 600 } as const;
 const TOOLTIP_ITEM_STYLE = { color: 'var(--card-foreground)' } as const;
-const LEGEND_STYLE = { fontSize: 11, color: 'var(--muted-foreground)' } as const;
 
 const shortDate = (date: Date | string) => new Date(date).toLocaleDateString('it-IT', { month: 'short', year: '2-digit' });
 
@@ -189,13 +212,16 @@ function RollingTile({
   ariaLabel: string;
 }) {
   const chartColors = useChartColors();
+  const primaryColor = chartColors[colorIndex] ?? `var(--chart-${colorIndex + 1})`;
+  const averageColor = chartColors[1] ?? 'var(--chart-2)';
   return (
     <Tile eyebrow={eyebrow} aside={aside} reading={reading}>
       {data.length === 0 ? (
         <p className="mt-3 text-[13px] leading-[1.45] text-muted-foreground">Servono almeno 13 snapshot mensili per il primo punto rolling.</p>
       ) : (
         <div className="mt-3 h-[220px]">
-          <ResponsiveContainer width="100%" height="100%">
+          {/* A numeric height: with "100%" the first render measures -1 x -1 and Recharts warns twice per chart. */}
+          <ResponsiveContainer width="100%" height={220}>
             <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -12 }} role="img" aria-label={ariaLabel} accessibilityLayer={false}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
               <XAxis dataKey="periodEndDate" tickFormatter={shortDate} tick={CHART_TICK_STYLE} stroke="var(--border)" interval="preserveStartEnd" />
@@ -207,16 +233,27 @@ function RollingTile({
                 labelStyle={TOOLTIP_LABEL_STYLE}
                 itemStyle={TOOLTIP_ITEM_STYLE}
               />
-              <Legend wrapperStyle={LEGEND_STYLE} />
-              <Line type="monotone" dataKey={primaryKey} stroke={chartColors[colorIndex] ?? `var(--chart-${colorIndex + 1})`} strokeWidth={2} name={primaryName} dot={false} animationDuration={800} animationEasing="ease-out" />
-              <Line type="monotone" dataKey={averageKey} stroke={chartColors[1] ?? 'var(--chart-2)'} strokeWidth={1.5} name="Media mobile 3M" strokeDasharray="6 4" dot={false} animationDuration={800} animationEasing="ease-out" />
+              <Line type="monotone" dataKey={primaryKey} stroke={primaryColor} strokeWidth={2} name={primaryName} dot={false} animationDuration={800} animationEasing="ease-out" />
+              <Line type="monotone" dataKey={averageKey} stroke={averageColor} strokeWidth={1.5} name="Media mobile 3M" strokeDasharray="6 4" dot={false} animationDuration={800} animationEasing="ease-out" />
             </LineChart>
           </ResponsiveContainer>
         </div>
       )}
-      <p className="mt-auto border-t border-border pt-3.5 text-[11px] leading-[1.45] text-muted-foreground">
-        Ogni punto è la misura sui 12 mesi che finiscono lì; la linea tratteggiata è la media mobile a 3 mesi.
-      </p>
+      {/* `SeriesLegend`, never Recharts' `<Legend>`: that one set each 11px label in its series colour — 2,74:1
+          («Sharpe 12M») and 3,64:1 in light, 2,62:1 («CAGR 12M») in dark, measured 2026-09-20. */}
+      {data.length > 0 && (
+        <SeriesLegend
+          className="mt-2"
+          items={[
+            { label: primaryName, colors: [primaryColor] },
+            { label: 'Media mobile 3M (tratteggiata)', colors: [averageColor] },
+          ]}
+        />
+      )}
+      <TileMethodNote subject={eyebrow} summary="Ogni punto misura i 12 mesi che finiscono lì.">
+        <span className="block">Ogni punto è la misura sui 12 mesi che finiscono in quel mese: il primo punto chiede 13 snapshot mensili.</span>
+        <span className="block">La linea tratteggiata è la media mobile a 3 mesi della stessa misura.</span>
+      </TileMethodNote>
     </Tile>
   );
 }
@@ -237,21 +274,28 @@ function describeRolling(values: number[], format: (v: number) => string, name: 
 
 // ─── The disclosure ───────────────────────────────────────────────────────────
 
-export function PerformanceDettaglio({ metrics, periodAside, drawdown, rollingCagr, rollingSharpe, underwater, attribution }: PerformanceDettaglioProps) {
+export function PerformanceDettaglio({ metrics, periodAside, drawdown, rollingCagr, rollingSharpe, underwater, attribution, windowEnd }: PerformanceDettaglioProps) {
   const [open, setOpen] = useState(false);
 
   const yields = describeYields({ yocNet: metrics.yocNet, currentYieldNet: metrics.currentYieldNet });
   const hasYields = yields !== null;
   const underwaterMonths = underwater.filter((p) => p.drawdown < 0).length;
+  // An unrecovered drawdown runs to the window's end, and that is «oggi» only when the window closes on the
+  // latest snapshot: a custom range ended in 2024 printed «agosto 2024 – oggi» (2026-09-20).
+  const openDrawdownEnd = windowEnd.endsAtLatest ? 'oggi' : `${monthYear(windowEnd.endMonth)}, fine periodo`;
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 border-t border-border/40 py-3 text-left" aria-label="Dettaglio">
+      {/* No `aria-label`, as on Storico: «Dettaglio» alone overrode the visible description, the list a sighted
+          reader uses to decide whether to open it (WCAG 2.5.3). The name is the visible text, contents included. */}
+      <CollapsibleTrigger className="flex min-h-11 w-full items-center justify-between gap-3 rounded-sm border-t border-border/40 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <span className={TILE_EYEBROW_CLASS}>Dettaglio</span>
+          {/* A flex item drops a leading space on screen, but the accessible name keeps it: without it a screen reader says «DettaglioTutte». */}
+          <span className="sr-only">: </span>
           <span className="text-[13px] text-muted-foreground">Tutte le metriche, il contributo di ogni strumento, i grafici rolling, il drawdown nel tempo e il metodo</span>
         </span>
-        <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform', open && 'rotate-180')} aria-hidden="true" />
+        <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground motion-safe:transition-transform', open && 'rotate-180')} aria-hidden="true" />
       </CollapsibleTrigger>
       <CollapsibleContent className="pt-1">
         <div className="grid grid-cols-1 gap-3 tablet:grid-cols-2 desktop:grid-cols-12">
@@ -296,10 +340,10 @@ export function PerformanceDettaglio({ metrics, periodAside, drawdown, rollingCa
                 />
                 <Row
                   label="Durata drawdown"
-                  sub={drawdown ? `${monthYear(drawdown.peak)} – ${drawdown.recovery ? monthYear(drawdown.recovery) : 'oggi'}` : undefined}
+                  sub={drawdown ? `${monthYear(drawdown.peak)} – ${drawdown.recovery ? monthYear(drawdown.recovery) : openDrawdownEnd}` : undefined}
                   value={drawdown ? months(drawdown.durationMonths) : null}
                   valueClass="text-foreground"
-                  help="Mesi dal picco al pieno recupero (o all'ultimo snapshot, se il recupero non è ancora arrivato). Misura la resilienza: durate brevi = rapido recupero."
+                  help="Mesi dal picco al pieno recupero (o all'ultimo mese del periodo, se il recupero non è ancora arrivato). Misura la resilienza: durate brevi = rapido recupero."
                 />
                 <Row
                   label="Tempo di recupero"
@@ -358,12 +402,12 @@ export function PerformanceDettaglio({ metrics, periodAside, drawdown, rollingCa
             <div className={cn(TILE_CELL_CLASS, 'tablet:col-span-2 desktop:col-span-12')}>
               <Tile eyebrow="Contributo per strumento" aside={periodAside} reading={describeAttributionCoverage(attribution)}>
                 {attribution.rows.length > 0 && <AttributionTable attribution={attribution} />}
-                <p className="mt-auto border-t border-border pt-3.5 text-[11px] leading-[1.45] text-muted-foreground">
-                  Prezzo = effetto prezzo sulla quantità detenuta a inizio mese, in euro, sommato sui mesi con il dettaglio per
-                  strumento; un fondo pensione vale la sua variazione al netto dei versamenti, un immobile è al lordo del debito.
-                  Dividendi = incassati nel periodo dal registro dividendi. La somma delle righe più «Non attribuito» è il guadagno di
-                  mercato che il TWR misura sugli stessi mesi.
-                </p>
+                <TileMethodNote subject="Contributo per strumento" summary="Le righe più «Non attribuito» danno il guadagno di mercato.">
+                  <span className="block">Prezzo = effetto prezzo sulla quantità detenuta a inizio mese, in euro, sommato sui mesi con il dettaglio per strumento.</span>
+                  <span className="block">Un fondo pensione vale la sua variazione al netto dei versamenti; un immobile è al lordo del debito.</span>
+                  <span className="block">Dividendi = incassati nel periodo, dal registro dividendi.</span>
+                  <span className="block">La somma delle righe più «Non attribuito» è il guadagno di mercato che il TWR misura sugli stessi mesi.</span>
+                </TileMethodNote>
               </Tile>
             </div>
           )}
@@ -413,10 +457,10 @@ export function PerformanceDettaglio({ metrics, periodAside, drawdown, rollingCa
               <div className="mt-3">
                 <UnderwaterDrawdownChart data={underwater} height={220} />
               </div>
-              <p className="mt-auto border-t border-border pt-3.5 text-[11px] leading-[1.45] text-muted-foreground">
-                La stessa serie della heatmap, concatenata: ogni punto è la distanza dell&apos;indice TWR dal suo massimo. Un versamento
-                sposta il patrimonio, non la distanza dal massimo.
-              </p>
+              <TileMethodNote subject="Sotto il massimo (underwater)" summary="Ogni punto è la distanza dell&apos;indice TWR dal suo massimo.">
+                <span className="block">È la stessa serie della heatmap, concatenata: il massimo è quello raggiunto nel periodo, non un massimo storico.</span>
+                <span className="block">Un versamento sposta il patrimonio, non la distanza dal massimo.</span>
+              </TileMethodNote>
             </Tile>
           </div>
 
@@ -445,8 +489,9 @@ export function PerformanceDettaglio({ metrics, periodAside, drawdown, rollingCa
                 <div>
                   <p className="mb-1 font-semibold text-foreground">Contributi e capitale</p>
                   I contributi netti sono entrate meno uscite registrate in Cashflow, trasferimenti esclusi; i dividendi sono rendimento, non
-                  contributo. Il capitale investito conta acquisti meno vendite dal registro operazioni. «Capitale immesso» è il patrimonio
-                  iniziale più i contributi netti cumulati: la distanza dal patrimonio è il mercato.
+                  contributo. Il capitale investito conta acquisti meno vendite dal registro operazioni. «Capitale immesso» è il valore a
+                  inizio periodo più il capitale entrato da allora: i contributi netti, oppure — quando la base è una parte del patrimonio —
+                  i flussi misurati al suo confine (registro operazioni e variazioni di quantità). La distanza dal patrimonio è il mercato.
                 </div>
                 <div>
                   <p className="mb-1 font-semibold text-foreground">Contributo per strumento</p>

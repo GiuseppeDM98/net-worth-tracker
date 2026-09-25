@@ -5,13 +5,17 @@
  * parameter) changes the figures instantly, so they settle from their previous value rather than
  * replaying a count from zero. Leaf components isolate the per-frame re-renders from the tiles
  * around them (doc/guide/panoramica.md § Panoramica and Dashboard Data Isolation).
+ *
+ * The FIRST value lands (`landFirstValue`, 2026-09-23): a count from zero on mount painted
+ * «0 €» and «0,0%» under a track already filled to 40,8% — two readings of one figure that
+ * disagreed for half a second (Coast FIRE critique).
  */
 
 import { formatCurrency, formatPercentage } from '@/lib/services/chartService';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { useCountUp } from '@/lib/utils/useCountUp';
 
-const SETTLE = { fromPrevious: true, duration: 520, startDelay: 0 } as const;
+const SETTLE = { fromPrevious: true, landFirstValue: true, duration: 520, startDelay: 0 } as const;
 
 export function SettledCurrencyValue({ value, className, compact = false }: { value: number | null; className?: string; compact?: boolean }) {
   const animated = useCountUp(value, SETTLE);

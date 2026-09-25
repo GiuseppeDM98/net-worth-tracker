@@ -28,7 +28,7 @@
 
 import type { Expense } from '@/types/expenses';
 import type { FamilyMember } from '@/types/assets';
-import { summarizeScheduled, type ScheduledSlice } from '@/lib/utils/tracciamentoSummary';
+import { isScheduledRow, summarizeScheduled, type ScheduledSlice } from '@/lib/utils/tracciamentoSummary';
 
 /**
  * A row whose `personalMemberId` names nobody the settings still know — the member was deleted
@@ -66,8 +66,13 @@ export type SplitUnavailableReason =
   | 'missing-salary';
 
 export type SplitBasis =
-  | { kind: 'computed'; members: MemberShare[]; totalSalary: number }
-  | { kind: 'unavailable'; reason: SplitUnavailableReason; missingNames: string[] };
+  | { kind: 'computed'; members: MemberShare[]; totalSalary: number; unattributedSalary: number }
+  | {
+      kind: 'unavailable';
+      reason: SplitUnavailableReason;
+      missingNames: string[];
+      unattributedSalary: number;
+    };
 
 /** The household's shared spending over the period. */
 export interface CommonSpending {
@@ -90,10 +95,28 @@ export interface MemberBalance {
   /** Their own spending, positive. Known whatever the basis does. */
   personalSpending: number;
   /**
-   * salary − commonShare − personalSpending. Null when the basis is unavailable: a residual
-   * computed without a share would be the whole pool charged to nobody.
+   * What is left once EVERY row of the period is counted, the ones still in the calendar
+   * included: salary − commonShare − personalSpending. Null when the basis is unavailable — a
+   * residual computed without a share would be the whole pool charged to nobody.
+   *
+   * This is where the period ENDS, not where it stands. The figure a surface prints is
+   * `remainingBooked`.
    */
   remaining: number | null;
+  /**
+   * The same residual counting only what has already HAPPENED by `now` — the figure the page
+   * prints and colours, and the one the verdict says «mancano» about.
+   *
+   * The two differ by the money the period still has ahead of it: this person's share of the
+   * common rows dated after today, their own rows dated after today, and any salary of theirs
+   * not yet received. Before this existed the page charged an unpaid bill to a person as if it
+   * had left their account — the whole of a deficit could be money still in the bank — which is
+   * the same claim `resolveSplitBasis` refuses to make about a share (2026-09-21, Impeccable
+   * critique). Tracciamento's verdict draws the line in the same place (`settleTotals`), and
+   * Centri di Costo separates the fact (`exceeded`) from the calendar (`atRisk`) for the same
+   * reason.
+   */
+  remainingBooked: number | null;
 }
 
 export interface ExpenseSplitSummary {
@@ -134,6 +157,13 @@ function isSpending(expense: Expense): boolean {
  * but it is not what the household agreed to divide on, and every sentence built on this basis
  * says «stipendio» out loud.
  *
+ * `unattributedSalary` rides on BOTH outcomes because it is a fact about the window, not about
+ * the split: labor income nobody is named on — a salary row left «in comune», or one whose owner
+ * has since left Famiglia — cannot earn anybody a share, and used to vanish here behind two mute
+ * `continue`s. The spending side has always declared its orphans out loud; the income side, the
+ * one that DECIDES the percentages, declared nothing, so a 60/40 computed on 80% of the month's
+ * salaries was printed with full confidence (2026-09-21, Impeccable critique).
+ *
  * @param incomeRows Income-type rows already narrowed to the period.
  */
 export function resolveSplitBasis(
@@ -141,23 +171,27 @@ export function resolveSplitBasis(
   members: FamilyMember[],
   laborIncomeCategoryIds: string[]
 ): SplitBasis {
-  if (members.length < 2) {
-    return { kind: 'unavailable', reason: 'not-enough-members', missingNames: [] };
-  }
-  if (laborIncomeCategoryIds.length === 0) {
-    return { kind: 'unavailable', reason: 'no-labor-categories', missingNames: [] };
-  }
-
   const laborCategories = new Set(laborIncomeCategoryIds);
+  const knownIds = new Set(members.map((member) => member.id));
   const salaryByMember = new Map<string, number>(members.map((member) => [member.id, 0]));
+  let unattributedSalary = 0;
 
   for (const row of incomeRows) {
     if (row.type !== 'income') continue;
-    if (!row.personalMemberId) continue;
     if (!laborCategories.has(row.categoryId)) continue;
-    const current = salaryByMember.get(row.personalMemberId);
-    if (current === undefined) continue; // an orphan id earns nobody a share
-    salaryByMember.set(row.personalMemberId, current + row.amount);
+    // Labor income that belongs to nobody the settings still know: named, never counted.
+    if (!row.personalMemberId || !knownIds.has(row.personalMemberId)) {
+      unattributedSalary += row.amount;
+      continue;
+    }
+    salaryByMember.set(row.personalMemberId, (salaryByMember.get(row.personalMemberId) ?? 0) + row.amount);
+  }
+
+  if (members.length < 2) {
+    return { kind: 'unavailable', reason: 'not-enough-members', missingNames: [], unattributedSalary };
+  }
+  if (laborIncomeCategoryIds.length === 0) {
+    return { kind: 'unavailable', reason: 'no-labor-categories', missingNames: [], unattributedSalary };
   }
 
   // A person with nothing recorded cannot be given a share of 0: that would silently hand the
@@ -166,7 +200,7 @@ export function resolveSplitBasis(
     .filter((member) => (salaryByMember.get(member.id) ?? 0) <= 0)
     .map((member) => member.name);
   if (missingNames.length > 0) {
-    return { kind: 'unavailable', reason: 'missing-salary', missingNames };
+    return { kind: 'unavailable', reason: 'missing-salary', missingNames, unattributedSalary };
   }
 
   const totalSalary = members.reduce((sum, member) => sum + (salaryByMember.get(member.id) ?? 0), 0);
@@ -175,7 +209,7 @@ export function resolveSplitBasis(
     return { member: { id: member.id, name: member.name }, salary, share: salary / totalSalary };
   });
 
-  return { kind: 'computed', members: shares, totalSalary };
+  return { kind: 'computed', members: shares, totalSalary, unattributedSalary };
 }
 
 /**
@@ -228,16 +262,27 @@ export function summarizeExpenseSplit({
   const knownIds = new Set(members.map((member) => member.id));
 
   const commonExpenses: Expense[] = [];
-  const personalByMember = new Map<string, { total: number; rowCount: number }>(
-    members.map((member) => [member.id, { total: 0, rowCount: 0 }])
+  /** `total` is the whole period; `booked` is the part of it dated today or earlier. */
+  const personalByMember = new Map<string, { total: number; booked: number; rowCount: number }>(
+    members.map((member) => [member.id, { total: 0, booked: 0, rowCount: 0 }])
   );
+  const bookedSalaryByMember = new Map<string, number>(members.map((member) => [member.id, 0]));
   const unassigned = { total: 0, rowCount: 0 };
   const incomeRows: Expense[] = [];
+  const laborCategories = new Set(laborIncomeCategoryIds);
 
   for (const expense of expenses) {
     if (expense.type === 'transfer') continue;
+    const scheduled = isScheduledRow(expense, now);
     if (expense.type === 'income') {
       incomeRows.push(expense);
+      // A salary still to be paid props up a residual exactly as an unpaid bill deflates one.
+      if (!scheduled && expense.personalMemberId && knownIds.has(expense.personalMemberId) && laborCategories.has(expense.categoryId)) {
+        bookedSalaryByMember.set(
+          expense.personalMemberId,
+          (bookedSalaryByMember.get(expense.personalMemberId) ?? 0) + expense.amount
+        );
+      }
       continue;
     }
     if (!isSpending(expense)) continue;
@@ -252,6 +297,7 @@ export function summarizeExpenseSplit({
     } else {
       const bucket = personalByMember.get(owner)!;
       bucket.total += magnitude;
+      if (!scheduled) bucket.booked += magnitude;
       bucket.rowCount += 1;
     }
   }
@@ -262,18 +308,23 @@ export function summarizeExpenseSplit({
     rowCount: commonExpenses.length,
     scheduled: summarizeScheduled(commonExpenses, now),
   };
+  const commonBooked = commonTotal - common.scheduled.expenses;
 
   const basis = resolveSplitBasis(incomeRows, members, laborIncomeCategoryIds);
-  const allocation =
-    basis.kind === 'computed' ? allocateByShare(commonTotal, basis.members) : new Map<string, number>();
   const shareByMember = new Map<string, MemberShare>(
     basis.kind === 'computed' ? basis.members.map((entry) => [entry.member.id, entry]) : []
   );
+  const computedShares = basis.kind === 'computed' ? basis.members : [];
+  const allocation = allocateByShare(commonTotal, computedShares);
+  // The booked pool is allocated through the SAME rule, so Σ(booked shares) is the booked pool to
+  // the cent — a residual derived by subtracting one allocation from another would not close.
+  const bookedAllocation = allocateByShare(commonBooked, computedShares);
 
   const balances: MemberBalance[] = members.map((member) => {
-    const personal = personalByMember.get(member.id) ?? { total: 0, rowCount: 0 };
+    const personal = personalByMember.get(member.id) ?? { total: 0, booked: 0, rowCount: 0 };
     const entry = shareByMember.get(member.id);
     const commonShare = entry ? (allocation.get(member.id) ?? 0) : null;
+    const bookedShare = entry ? (bookedAllocation.get(member.id) ?? 0) : null;
     return {
       member: { id: member.id, name: member.name },
       salary: entry?.salary ?? 0,
@@ -281,6 +332,10 @@ export function summarizeExpenseSplit({
       commonShare,
       personalSpending: personal.total,
       remaining: entry && commonShare !== null ? entry.salary - commonShare - personal.total : null,
+      remainingBooked:
+        entry && bookedShare !== null
+          ? (bookedSalaryByMember.get(member.id) ?? 0) - bookedShare - personal.booked
+          : null,
     };
   });
 

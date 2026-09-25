@@ -22,6 +22,7 @@
 
 import type { AssetTransaction } from '@/types/assetTransactions';
 import { getItalyDateIso, getItalyYear } from '@/lib/utils/dateHelpers';
+import { roundToCents } from '@/lib/utils/cents';
 
 /** Float-dust tolerance: quantities within this of a boundary are treated as the boundary. */
 export const EPSILON = 1e-9;
@@ -152,6 +153,15 @@ export interface LedgerTransactionEffect {
   soldCostBasisEur?: number;
   /** Solo sell: PMC EUR all'istante della vendita (costBasisEur / quantity pre-vendita). */
   averageCostEurAtTrade?: number;
+  /**
+   * Sell only: the gain the BROKER taxes — quantity × (sale price − the EUR average price paid),
+   * with NO commission on either side. The realized P&L above is net of the sale's fees and
+   * stands on a cost basis that includes the purchase fees; the owner's Directa statements
+   * (2026-09-20) show the fiscal side ignores both: a purchase of 48 units at 123,48 € with 5 € of
+   * fees is carried at 123,48 €, not 123,58 €, and four sells with 14 € of fees were taxed on
+   * their gain plus those 14 €. It feeds the tax ESTIMATE only (lib/utils/saleTax.ts).
+   */
+  taxableGainEur?: number;
 }
 
 /**
@@ -201,6 +211,9 @@ export function replayTransactionsWithEffects(
     holdingStartDate: undefined,
   };
   const effects: LedgerTransactionEffect[] = [];
+  // The open position's EUR cost with NO purchase fees in it: the broker's fiscal carrying value,
+  // kept beside `costBasisEur` only to price `taxableGainEur`. Not part of the public state.
+  let feeFreeCostBasisEur = 0;
 
   for (const t of sorted) {
     assertNonNegative(t);
@@ -223,6 +236,7 @@ export function replayTransactionsWithEffects(
         const addedCostEur = t.quantity * t.priceEur + (t.fees ?? 0);
         state.costBasisEur += addedCostEur;
         state.investedEur += addedCostEur;
+        feeFreeCostBasisEur += t.quantity * t.priceEur;
         break;
       }
 
@@ -239,6 +253,7 @@ export function replayTransactionsWithEffects(
         const proceeds = t.quantity * t.priceEur - (t.fees ?? 0);
         const soldCostBasis = t.quantity * averageCostEur;
         const realized = proceeds - soldCostBasis;
+        const soldFeeFreeCost = state.quantity > 0 ? (t.quantity * feeFreeCostBasisEur) / state.quantity : 0;
 
         state.realizedPnlEur += realized;
         const year = getItalyYear(t.date);
@@ -251,12 +266,15 @@ export function replayTransactionsWithEffects(
         effect.realizedPnlEur = realized;
         effect.soldCostBasisEur = soldCostBasis;
         effect.averageCostEurAtTrade = averageCostEur;
+        effect.taxableGainEur = t.quantity * t.priceEur - soldFeeFreeCost;
+        feeFreeCostBasisEur -= soldFeeFreeCost;
 
         // Clamp float dust when the position closes; keep the last native PMC (harmless at qty 0,
         // and every consumer filters on quantity > 0).
         if (state.quantity <= EPSILON) {
           state.quantity = 0;
           state.costBasisEur = 0;
+          feeFreeCostBasisEur = 0;
         }
         break;
       }
@@ -267,6 +285,7 @@ export function replayTransactionsWithEffects(
         state.quantity = t.quantity;
         state.averageCost = t.pricePerUnit;
         state.costBasisEur = t.quantity * t.priceEur;
+        feeFreeCostBasisEur = t.quantity * t.priceEur;
         break;
       }
     }
@@ -320,9 +339,15 @@ export function buildDerivedAssetFields(state: LedgerPositionState): {
 
 /**
  * Signed EUR delta to apply to the linked cash asset's balance for ONE transaction.
- *   buy  → −(quantity·priceEur + fees)   (cash debited)
- *   sell → +(quantity·priceEur − fees)   (cash credited)
+ *   buy  → −(quantity·priceEur + fees)                    (cash debited)
+ *   sell → +(quantity·priceEur − fees − withheldTaxEur)   (cash credited)
  *   adjustment, or no linkedCashAssetId → 0
+ *
+ * A sell credits what the broker actually paid out: in regime amministrato the capital-gains tax
+ * leaves the proceeds the day of the sale, and crediting the gross left the owner to lower the
+ * account by hand — a movement every verdict then read as «altre variazioni» (2026-09-20).
+ * Rounded to the cent, because that is what reaches a bank account (lib/utils/cents.ts); the
+ * rounding is sign-symmetric, so a reversal cancels its application exactly.
  *
  * Pure so edit/delete flows can net reversal = −computeCashDelta(old) with
  * application = computeCashDelta(new) into a single per-cash-asset delta.
@@ -330,8 +355,8 @@ export function buildDerivedAssetFields(state: LedgerPositionState): {
 export function computeCashDelta(t: AssetTransaction): number {
   if (!t.linkedCashAssetId || t.type === 'adjustment') return 0;
   const fees = t.fees ?? 0;
-  if (t.type === 'buy') return -(t.quantity * t.priceEur + fees);
-  return t.quantity * t.priceEur - fees; // sell
+  if (t.type === 'buy') return roundToCents(-(t.quantity * t.priceEur + fees));
+  return roundToCents(t.quantity * t.priceEur - fees - (t.withheldTaxEur ?? 0)); // sell
 }
 
 // ---------------------------------------------------------------------------
@@ -556,8 +581,11 @@ export function computeAssetTotalReturn(
  *   divestedEur = Σ sell (quantity·priceEur − fees)
  *   netInvestedEur = investedEur − divestedEur
  *
- * Baselines COUNT as buys: for a window starting before migration day, the baseline correctly
- * represents "capital in play". Adjustments never move money and are ignored.
+ * Baselines and adjustments move no money and are ignored. Until 2026-09-20 a baseline counted
+ * as a buy («capital in play»), and the one surface that reads this function printed it as money
+ * spent: a migration run in July put 174.106 € of opening positions inside a year-to-date window
+ * and Rendimenti said «Hai investito 134.988 € dal registro» on an account that had bought
+ * 49.089 € and sold 53.436 €. The boundary flows (lib/utils/portfolioFlows.ts) never counted it.
  */
 export function computeInvestedCapital(
   transactions: AssetTransaction[],
@@ -573,6 +601,8 @@ export function computeInvestedCapital(
     const ms = t.date.getTime();
     if (ms < startMs || ms > endMs) continue;
     if (t.type === 'buy') {
+      // A migration baseline is an opening position, not a purchase.
+      if (t.isBaseline) continue;
       investedEur += t.quantity * t.priceEur + (t.fees ?? 0);
     } else if (t.type === 'sell') {
       divestedEur += t.quantity * t.priceEur - (t.fees ?? 0);

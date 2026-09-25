@@ -90,6 +90,7 @@ function docToAssetTransaction(id: string, data: DocumentData): AssetTransaction
     priceEur: data.priceEur,
     fees: data.fees,
     linkedCashAssetId: data.linkedCashAssetId,
+    withheldTaxEur: data.withheldTaxEur,
     isBaseline: data.isBaseline,
     indexationCoefficient: data.indexationCoefficient,
     note: data.note,
@@ -110,6 +111,7 @@ function buildTradeSetDocData(t: AssetTransaction): Record<string, unknown> {
     priceEur: t.priceEur,
     fees: t.fees,
     linkedCashAssetId: t.linkedCashAssetId,
+    withheldTaxEur: t.withheldTaxEur,
     isBaseline: t.isBaseline,
     indexationCoefficient: t.indexationCoefficient,
     note: t.note,
@@ -132,6 +134,7 @@ function buildTradeUpdateDocData(t: AssetTransaction): Record<string, unknown> {
     priceEur: t.priceEur,
     fees: t.fees ?? FieldValue.delete(),
     linkedCashAssetId: t.linkedCashAssetId ?? FieldValue.delete(),
+    withheldTaxEur: t.withheldTaxEur ?? FieldValue.delete(),
     indexationCoefficient: t.indexationCoefficient ?? FieldValue.delete(),
     note: t.note ?? FieldValue.delete(),
     updatedAt: t.updatedAt,
@@ -198,7 +201,8 @@ function assertBaselineEditableFields(updates: Partial<AssetTransactionFormData>
     updates.type !== undefined ||
     updates.date !== undefined ||
     updates.fees !== undefined ||
-    updates.linkedCashAssetId !== undefined
+    updates.linkedCashAssetId !== undefined ||
+    updates.withheldTaxEur !== undefined
   ) {
     throw new TradeUseCaseError(
       400,
@@ -262,6 +266,7 @@ async function prepareCreate(
     priceEur,
     fees: data.fees,
     linkedCashAssetId: data.linkedCashAssetId,
+    withheldTaxEur: data.type === 'sell' ? data.withheldTaxEur : undefined,
     indexationCoefficient: data.indexationCoefficient,
     note: data.note,
     createdAt: now,
@@ -308,6 +313,14 @@ async function prepareEdit(
     : updates.linkedCashAssetId !== undefined
       ? updates.linkedCashAssetId
       : oldTrade.linkedCashAssetId;
+  // The withheld tax belongs to a sale: a trade that stops being one drops it. A typed 0 is a
+  // value (a gain offset by past losses), not an absence — it must not fall back to the old one.
+  const mergedWithheldTax =
+    mergedType !== 'sell'
+      ? undefined
+      : updates.withheldTaxEur !== undefined
+        ? updates.withheldTaxEur
+        : oldTrade.withheldTaxEur;
   const mergedNote = updates.note !== undefined ? updates.note : oldTrade.note;
   // The coefficient travels with the price it scaled: a price update carries its own (or none).
   const mergedIndexationCoefficient =
@@ -333,6 +346,7 @@ async function prepareEdit(
     priceEur,
     fees: mergedFees,
     linkedCashAssetId: mergedLinkedCash,
+    withheldTaxEur: mergedWithheldTax,
     indexationCoefficient: mergedIndexationCoefficient,
     note: mergedNote,
     updatedAt: new Date(),

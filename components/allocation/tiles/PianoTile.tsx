@@ -65,37 +65,52 @@ const MINUS = '−';
  * One class-level move: chip + class on the left with the drift as «58,3% → 55,0%», the
  * signed euro figure on the right. A move that the frozen slice reduces to nothing has no
  * amount to print, so its right side says why instead of «−0 €».
+ *
+ * Under it, the instruments the move would actually trade (`move.children`, since 2026-09-21):
+ * a rebalance that stops at «vendi 25.000 € di azioni» is not an order anyone can take to a
+ * broker, and the sub-category → instrument tree is the one Versa and Preleva already build.
  */
 function MoveRow({ move, actionColors }: { move: RebalanceMove; actionColors: Record<AllocationAction, string> }) {
   const isBuy = move.action === 'COMPRA';
   const isUntradable = move.limitedByFrozen && move.amount < MIN_VISIBLE_AMOUNT;
   const drift = `${formatPercentage(move.currentPercentage, 1)} → ${formatPercentage(move.targetPercentage, 1)}`;
   const caption = move.limitedByFrozen && !isUntradable ? `${drift} · max vendibile · gap ${cachedFormatCurrencyEUR(move.requestedAmount, true)}` : drift;
+  const legs = move.children.filter((child) => child.amount >= MIN_VISIBLE_AMOUNT);
 
   return (
-    <li className="flex items-center justify-between gap-3 py-2.5">
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <ActionChip action={move.action} color={actionColors[move.action]} />
-          <span className="truncate text-[13px] font-medium text-foreground" title={move.label}>
-            {move.label}
-          </span>
+    <li className="py-2.5">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <ActionChip action={move.action} color={actionColors[move.action]} />
+            <span className="truncate text-[13px] font-medium text-foreground" title={move.label}>
+              {move.label}
+            </span>
+          </div>
+          <p className="mt-0.5 font-mono text-[11px] tabular-nums text-muted-foreground">{caption}</p>
         </div>
-        <p className="mt-0.5 font-mono text-[11px] tabular-nums text-muted-foreground">{caption}</p>
-      </div>
-      <div className="shrink-0 text-right">
-        {isUntradable ? (
-          <p className="text-[13px] text-muted-foreground">Non negoziabile</p>
-        ) : (
-          <p className="font-mono text-[18px] font-semibold tabular-nums leading-none" style={{ color: actionColors[move.action] }}>
-            {isBuy ? '+' : MINUS}
-            {cachedFormatCurrencyEUR(move.amount, true)}
+        <div className="shrink-0 text-right">
+          {isUntradable ? (
+            <p className="text-[13px] text-muted-foreground">Non negoziabile</p>
+          ) : (
+            <p className="font-mono text-[18px] font-semibold tabular-nums leading-none" style={{ color: actionColors[move.action] }}>
+              {isBuy ? '+' : MINUS}
+              {cachedFormatCurrencyEUR(move.amount, true)}
+            </p>
+          )}
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            {isUntradable ? 'tutto in asset non negoziabili' : isBuy ? 'da aggiungere' : 'da ridurre'}
           </p>
-        )}
-        <p className="mt-1 text-[11px] text-muted-foreground">
-          {isUntradable ? 'tutto in asset non negoziabili' : isBuy ? 'da aggiungere' : 'da ridurre'}
-        </p>
+        </div>
       </div>
+
+      {legs.length > 0 && (
+        <div className="mt-2 space-y-1.5 pl-4">
+          {legs.map((leg) => (
+            <PlanRow key={leg.key} node={leg} depth={1} color={actionColors[move.action]} direction={isBuy ? 'contribute' : 'withdraw'} />
+          ))}
+        </div>
+      )}
     </li>
   );
 }

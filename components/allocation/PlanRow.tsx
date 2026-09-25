@@ -15,6 +15,10 @@
  * exists — at class and sub-category level. An instrument's percentage would be its share of its
  * own sub-category, which reads "100%" whenever it is the only instrument there: it looks like
  * "you keep everything". What you want at the instrument level is the resulting position.
+ *
+ * Which row is an instrument is the NODE's own fact (`isInstrument`), not its depth: since
+ * `collapseRepeatedLevels` lifts an only child out of a level that repeated it, an ETF can sit at
+ * depth 1 — and reading depth alone put «→ 100,0%» under every collapsed one.
  */
 'use client';
 
@@ -41,7 +45,7 @@ const MINUS = '−';
 
 export function PlanRow({ node, depth, color, direction }: PlanRowProps) {
   const children = node.children.filter((child) => child.amount >= MIN_VISIBLE_AMOUNT);
-  const isInstrument = depth === 2;
+  const isInstrument = node.isInstrument ?? depth === 2;
   const sign = direction === 'contribute' ? '+' : MINUS;
 
   const nameClass =

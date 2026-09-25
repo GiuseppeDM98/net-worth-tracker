@@ -69,7 +69,10 @@ export function PeriodPicker({ value, onChange, availableYears = [], className, 
       aria-expanded={open}
       aria-label={`${ariaLabelPrefix}: ${label}`}
       className={cn(
-        'justify-between gap-2 min-w-[190px] font-normal',
+        // 44px under a coarse pointer, the dense 36 from `desktop:` — the `h-11 → desktop:h-*`
+        // idiom. It shipped at the Button default of 36px everywhere, and on this surface it is
+        // the ONLY control a phone has (measured 190×36 at 390 on 2026-09-21).
+        'h-11 desktop:h-9 justify-between gap-2 min-w-[190px] font-normal',
         isCustom && 'text-primary border-primary/40',
         className,
       )}
@@ -225,7 +228,7 @@ export function PeriodPicker({ value, onChange, availableYears = [], className, 
               type="button"
               aria-label="Mese precedente"
               onClick={() => setCalendarMonth(subMonths(calendarMonth, 1))}
-              className={cn(buttonVariants({ variant: 'outline' }), 'h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100')}
+              className={cn(buttonVariants({ variant: 'outline' }), 'h-11 w-11 bg-transparent p-0 opacity-50 hover:opacity-100')}
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
@@ -236,7 +239,7 @@ export function PeriodPicker({ value, onChange, availableYears = [], className, 
               type="button"
               aria-label="Mese successivo"
               onClick={() => setCalendarMonth(addMonths(calendarMonth, 1))}
-              className={cn(buttonVariants({ variant: 'outline' }), 'h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100')}
+              className={cn(buttonVariants({ variant: 'outline' }), 'h-11 w-11 bg-transparent p-0 opacity-50 hover:opacity-100')}
             >
               <ChevronRight className="h-4 w-4" />
             </button>

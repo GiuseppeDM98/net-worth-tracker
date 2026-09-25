@@ -92,6 +92,11 @@ export interface DashboardOverviewExpenseStats {
      * instead of scaling it by the days left. Absent on payloads older than source v10.
      */
     expensesScheduled?: number;
+    /**
+     * The part of `income` dated after the payload was computed, so the verdict can judge what
+     * was saved SO FAR (income − expenses already happened). Absent on payloads older than v19.
+     */
+    incomeScheduled?: number;
   };
   previousMonth: {
     income: number;

@@ -1,6 +1,12 @@
 # Dialog e form trasversali
 
-> **When to open this guide** — anyone touching `components/ui/responsive-modal.tsx` (the modal, `ModalWidth` sm/md/lg/xl), `components/ui/modal-status-line.tsx`, `lib/utils/dialogNarrative.ts` (every sentence a modal speaks), `lib/hooks/useArmedDelete.ts` (two-click confirms, `hasArmedConfirm`), or adding a modal or a form to any surface. `AGENTS.md` keeps the stub with the essentials plus the two form rules that stay there — `AGENTS.md § Dialog Form Reset` and `AGENTS.md § Two-Step Create Dialogs`; here is the full rule. File: `CLAUDE.md` → *Key Files* → *Dialog e form trasversali*.
+> **When to open this guide** — anyone touching `components/ui/responsive-modal.tsx` (the modal, `ModalWidth` sm/md/lg/xl), `components/ui/modal-status-line.tsx`, `lib/utils/dialogNarrative.ts` (every sentence a modal speaks), `lib/hooks/useArmedDelete.ts` (two-click confirms, `hasArmedConfirm`), or adding a modal or a form to any surface. `AGENTS.md` keeps the stub with the essentials plus the two form rules that stay there — `AGENTS.md § Dialog Form Reset` and `AGENTS.md § Two-Step Create Dialogs`; here is the full rule. File: § *Files* below.
+
+## Files
+
+Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
+
+- **Dialog e form trasversali**: `components/ui/{responsive-modal,modal-status-line}.tsx` (`ModalWidth` sm/md/lg/xl), `lib/utils/modalOrigin.ts` (`resolveCenteredModalOrigin`), `lib/utils/dialogNarrative.ts` (`describeFormRefusal`, `describeExpenseDeleteConsequence`, `describeSeriesDeleteReading`, `describeMovementDetailReading`, `describeMovementsFilterReading`, `describeSnapshotOverwrite`), `lib/hooks/useArmedDelete.ts`, `components/expenses/SeriesDeleteDialog.tsx` (`resolveSeriesDeleteMode` = the ONE rule for «solo questa o tutte?»), `lib/constants/aiModels.ts`; `components/layout/LogoutDialog.tsx` stays an `AlertDialog` — doc/guide/dialog.md
 
 ## Dialog e form trasversali
 - **A modal is a tile lifted off the page** (DESIGN.md → The Modal-Is-A-Tile Rule): eyebrow · title 20px · reading ·
@@ -52,6 +58,32 @@
   and one live region per table; `SeriesDeleteDialog` («solo questa o tutte le 12?», `describeSeriesDeleteReading`,
   `sm`, a `bg-muted` summary block for the row's facts) for a row of an instalment plan or a recurring series —
   shared by the table and the feed's detail drawer, which each used to mount an `AlertDialog` for it.
+- **The vocabulary is total since 2026-09-18** (the owner's four calls, that session): the Panoramica's snapshot
+  confirm, the feed's detail, the Movimenti filters and the assistant's Conversazioni and Memoria are
+  `ResponsiveModal` — the only raw primitive left is `LogoutDialog`. Three patterns came out of it. **A detail whose
+  delete arms puts the consequence in its READING** (`describeMovementDetailReading`: idle → the day, armed → the
+  consequence in the negative tone, disarmed → «Eliminazione annullata. …»): the reading is the modal's one live
+  region, so no second `role="status"` is mounted, and a region that silently returned to its idle sentence would
+  announce the date, not that nothing was deleted. **A row of a series never arms in the detail** — its first press
+  hands over to `SeriesDeleteDialog`, which IS its confirmation (it used to confirm twice). **A modal that holds a
+  list, not a decision, has no footer** (Conversazioni, Memoria), **and a `Tile` inside a modal is a sub-tile**:
+  `border-transparent bg-muted shadow-none`, the cadence kept and the chrome dropped (`AssistantMemoryPanel`).
+  The row that opened a detail stays WITH it after the close (`useState<{ expense, open }>`), so the modal animates
+  out on its content instead of unmounting on an empty shell.
+- **`triggerOrigin` is resolved AT THE CLICK, from the trigger alone** (`resolveCenteredModalOrigin`,
+  `lib/utils/modalOrigin.ts`, 2026-09-18): a centred dialog's centre is (50vw, 50vh) whatever its size, so a point
+  of the viewport in the dialog's own box is `calc(50% + Xpx - 50vw)` — nothing to measure (the `contentRef` prop that
+  existed for it is gone), and the origin is on the panel from its FIRST frame. Setting it later is not a jump but a GLIDE: `DialogContent`
+  carries `duration-200` with `transition-property` at its default `all`, so a changed `transform-origin` is
+  tweened across the zoom and the panel scales around a moving pivot. **Never clear it on close**: the exit animates
+  too, and `setOrigin(undefined)` in `onOpenChange` makes it glide back (12 values, measured) — every opener sets a
+  fresh origin, so nothing stale survives. Take the rect from `event.currentTarget`, since a header action is mounted
+  twice and a ref lands on either copy. **All five pages are on it** (Panoramica, Hall of Fame, Dividendi, Rendimenti,
+  Impostazioni): until that day Hall of Fame and Dividendi set the origin in a `requestAnimationFrame` after mount
+  (the glide) and Rendimenti and Impostazioni used the trigger's VIEWPORT percentage on the dialog's BOX (no glide, a
+  pivot 253px from the button). Pinned by `e2e/modal.origin.spec.ts` and `e2e/panoramica.snapshot.spec.ts`, open AND
+  close; read the geometry on an OPEN settled frame — a closing panel at scale 0.95 is displaced by 0.05 × its
+  distance from the pivot, which reads as an 18px error that is not one.
 - **In light mode `--card` and `--background` are both `oklch(1 0 0)`**, so a test that proves a modal is «lifted» by
   comparing it with the page background passes only in dark mode. What separates it there is the border and the Float
   shadow; assert the modal's surface equals a TILE's instead.
@@ -59,9 +91,19 @@
 ## Per-page blind spots
 
 - **Blind spot** (looks like a bug, is not): no Playwright spec of its own (the session's throwaway ones were
-  deleted; the refusal vocabulary is pinned by `e2e/cashflow.budget.spec.ts` and `e2e/cashflow.dividendi.spec.ts`).
-  ONE two-click delete still auto-disarms on a 3 s timer BY DESIGN, because it lives on rows and not in a modal and
-  the owner kept it (`AssistantThreadList`); the ones that moved into the modal vocabulary lost theirs, on 2026-09-14
+  deleted; the refusal vocabulary is pinned by `e2e/cashflow.budget.spec.ts` and `e2e/cashflow.dividendi.spec.ts`,
+  the feed's armed detail by `e2e/cashflow.tracciamento.spec.ts`, the counting filters by
+  `e2e/cashflow.mobile.spec.ts`; the assistant's two modals have none). **Below 769px NO modal takes the focus when
+  it opens** (measured 2026-09-18, with and without touch): vaul's `Drawer` defaults to `autoFocus = false`, so the
+  focus stays on the opener behind the sheet, and after a hand-over between two drawers (a detail → its edit form)
+  it lands on `body` because the opener has unmounted. A dialog above 768 focuses itself as Radix does. Not
+  changed: `autoFocus` on a phone opens the keyboard on every form's first field, which is why vaul ships it off —
+  it is a decision for all 40 mounts at once, not a polish.
+  NO two-click confirm auto-disarms on a timer any more — that was not true until 2026-09-22, when Impostazioni's two
+  (the category delete and the dividend sync, 3 s each) went to `useArmedDelete` with its revoke of an access. Before
+  them the last one (`AssistantThreadList`, kept BY DESIGN while
+  it lived on the rows of a side sheet) went to `useArmedDelete` on 2026-09-18, the day the sheet became a modal —
+  inside a modal that timer was also a trap, Escape closing it with the row armed. The others lost theirs on 2026-09-14:
   Patrimonio's three (`AssetRow`, `StrumentiTile`, `CashAccountDialog` — the last one a MODAL whose armed state the
   page held on a timer, so Escape closed it with the row armed) went to `useArmedDelete` by the owner's call
   (doc/guide/patrimonio.md), and `DividendTable` followed the same evening (its «Conferma» kept the accessible name
@@ -72,3 +114,10 @@
   errors keep their own line under the field, and the two can both be visible at once. `dialogClassName` still exists as
   a width escape hatch and has no user — reach for a `width` name. `PDFExportDialog`'s «Genera PDF» moved from the body
   into the footer, so a spec that located it inside the scrollable area needs updating.
+- **A controlled modal with no Radix `Trigger` hands focus to `body` on close** (2026-09-20, Rendimenti's two header dialogs,
+  measured 2/2): `@radix-ui/react-dialog`'s modal content handles `onCloseAutoFocus` with `preventDefault()` +
+  `triggerRef.current?.focus()`, and with no Trigger that ref is null — the FocusScope's own restore is cancelled and nothing
+  replaces it. `returnFocusTo` is the cure, fed from `event.currentTarget` at the click (a `PageHeader` action is mounted
+  twice; only `currentTarget` is the copy that was pressed). Every modal opened from a plain button without it has the same
+  defect: pass the opener when you touch one. Pinned by `e2e/performance.degraded.spec.ts`.
+- **Sotto i 769px nessuna modale prende il fuoco quando si apre** (2026-09-18): `vaul` nasce con `autoFocus = false`, il fuoco resta sull'opener e dopo un passaggio tra due drawer finisce su `body`. Non cambiato: `autoFocus` su un telefono apre la tastiera su ogni form — una decisione per 40 mount. doc/guide/dialog.md. (moved from `CLAUDE.md` → Known Issues on 2026-09-19)

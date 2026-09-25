@@ -13,7 +13,7 @@
  */
 
 import { MonthlySnapshot } from '@/types/assets';
-import { HallOfFameData, HallOfFameStats, MonthlyRecord, YearlyRecord } from '@/types/hall-of-fame';
+import { HallOfFameData, HallOfFameStats, MonthlyRecord, SinceWorstMonth, YearlyRecord } from '@/types/hall-of-fame';
 import { Expense } from '@/types/expenses';
 import { calculateTotalIncome, calculateTotalExpenses } from '@/lib/services/expenseService';
 import { getItalyMonthYear, getItalyYear, toDate } from '@/lib/utils/dateHelpers';
@@ -122,6 +122,9 @@ export function calculateYearlyRecords(
       startOfYearNetWorth,
       totalIncome,
       totalExpenses,
+      // A first year that starts in December is ranked beside whole years: the page needs to
+      // know how much of the year the record actually covers.
+      monthsCovered: sorted.length,
     });
   }
 
@@ -236,7 +239,30 @@ export function summarizeRecordStats(
     averageMonthlyExpenses: monthCount > 0 ? totalExpenses / monthCount : 0,
     firstMonth: sorted[0] ? { year: sorted[0].year, month: sorted[0].month } : null,
     lastMonth: sorted.at(-1) ? { year: sorted.at(-1)!.year, month: sorted.at(-1)!.month } : null,
+    sinceWorstMonth: summarizeSinceWorstMonth(sorted),
   };
+}
+
+/**
+ * The months that followed the worst one, and how many of them grew.
+ *
+ * The worst month is the most negative `netWorthDiff`; a history with no decline has no
+ * "since" and returns null (the footer then names no worst month either). A flat month after it
+ * counts as a month, not as growth — the same rule the rankings apply.
+ *
+ * @param chronological Every month with a record, oldest first.
+ */
+export function summarizeSinceWorstMonth(chronological: MonthlyRecord[]): SinceWorstMonth | null {
+  let worstIndex = -1;
+  chronological.forEach((record, index) => {
+    if (record.netWorthDiff < 0 && (worstIndex === -1 || record.netWorthDiff < chronological[worstIndex].netWorthDiff)) {
+      worstIndex = index;
+    }
+  });
+  if (worstIndex === -1) return null;
+
+  const after = chronological.slice(worstIndex + 1);
+  return { months: after.length, growing: after.filter((record) => record.netWorthDiff > 0).length };
 }
 
 // ─── Rankings ─────────────────────────────────────────────────────────────────

@@ -31,6 +31,7 @@ import { GoalBasedInvestingTab } from '@/components/fire-simulations/GoalBasedIn
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PageTabs } from '@/components/layout/PageTabs';
+import { pageTabPanelId } from '@/components/layout/PageTabBar';
 import type { TabDef } from '@/components/layout/PageTabs';
 
 type TabValue = 'fire' | 'coast' | 'whatif' | 'montecarlo' | 'goals';
@@ -62,7 +63,16 @@ export default function FireSimulationsPage() {
         ariaLabel="Sezioni di FIRE e Simulazioni"
       >
         {TABS.map((tab) => (
-          <TabsContent key={tab.value} value={tab.value} className="mt-0">
+          <TabsContent
+            key={tab.value}
+            value={tab.value}
+            id={pageTabPanelId('fire-tab-pill', tab.value)}
+            aria-label={tab.label}
+            // Radix names a Content after ITS trigger; these triggers are plain buttons, so the
+            // generated reference points at nothing. The name is the label above.
+            aria-labelledby={undefined}
+            className="mt-0"
+          >
             {tab.value === 'fire'       && <FireCalculatorTab />}
             {tab.value === 'coast'      && <CoastFireTab />}
             {tab.value === 'whatif'     && <WhatIfAnalysisTab />}

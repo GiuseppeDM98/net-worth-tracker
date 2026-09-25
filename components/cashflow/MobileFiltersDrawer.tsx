@@ -4,19 +4,14 @@ import { useState } from 'react';
 import { SlidersHorizontal, X, Search, ArrowUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerDescription,
-  DrawerFooter,
-} from '@/components/ui/drawer';
+import { Label } from '@/components/ui/label';
+import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import { MultiSelect, type MultiSelectGroup } from '@/components/ui/multi-select';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PeriodPicker } from '@/components/ui/period-picker';
 import { type Period } from '@/lib/utils/period';
 import type { OwnerFilterOption } from '@/lib/utils/movementsOwnerFilter';
+import { describeMovementsFilterAction, describeMovementsFilterReading } from '@/lib/utils/dialogNarrative';
 import type { ExpenseCategory } from '@/types/expenses';
 
 interface SubCategoryOption {
@@ -66,6 +61,11 @@ export interface MobileFiltersDrawerProps {
   // Period is always visible inline — not counted.
   activeFilterCount: number;
 
+  // The two lists the Movimenti tile draws from, counted by the parent: the period's rows that
+  // pass the filters, and the period's rows. The reading and the primary are built on them.
+  shownCount: number;
+  totalCount: number;
+
   onReset: () => void;
 
   // Sort (rendered in the filter bar row next to Filtri)
@@ -83,7 +83,9 @@ export interface MobileFiltersDrawerProps {
  * The period is the page's axis, repeated here so the window can be changed from beside the
  * list it slices — a search («caffè») is always read over one.
  *
- * Tapping "Filtri" opens a vaul bottom drawer with:
+ * Tapping "Filtri" opens a `ResponsiveModal` `sm` — a bottom sheet on a phone, a centred dialog
+ * on the tablet widths this bar also serves (it is hidden only from `desktop:`) — whose reading
+ * counts the movements left and whose primary names them («Mostra 27 movimenti»), with:
  *   • Free-text search
  *   • Category multi-select
  *   • Subcategory select (conditional)
@@ -112,6 +114,8 @@ export function MobileFiltersDrawer({
   selectedOwnerId,
   onOwnerChange,
   activeFilterCount,
+  shownCount,
+  totalCount,
   onReset,
   mobileSortKey,
   onSortChange,
@@ -181,39 +185,37 @@ export function MobileFiltersDrawer({
         </Select>
       )}
 
-      {/* Bottom drawer with advanced filters */}
-      <Drawer open={open} onOpenChange={setOpen}>
-        <DrawerContent>
-          {/* Header: title left, optional reset right */}
-          <DrawerHeader className="flex-row items-center justify-between border-b border-border pb-3">
-            <DrawerTitle>Filtri avanzati</DrawerTitle>
-            <DrawerDescription className="sr-only">
-              Filtra le voci per categoria, conto, intestatario e ordina i risultati
-            </DrawerDescription>
-            {activeFilterCount > 0 && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={onReset}
-                className="h-8 gap-1 text-muted-foreground hover:text-foreground"
-              >
-                <X className="h-3.5 w-3.5" />
-                Ripristina
-              </Button>
-            )}
-          </DrawerHeader>
-
-          {/* Scrollable filter sections */}
-          <div className="overflow-y-auto p-4 space-y-5">
+      {/* The filters. «Ripristina» is the footer's secondary and stays in place when nothing is
+          set (disabled), so the primary never jumps under the thumb between two states. */}
+      <ResponsiveModal
+        open={open}
+        onClose={() => setOpen(false)}
+        width="sm"
+        eyebrow="Movimenti"
+        title="Filtra i movimenti"
+        reading={{
+          narrative: describeMovementsFilterReading({ activeFilters: activeFilterCount, shown: shownCount, total: totalCount }),
+          tone: 'neutral',
+        }}
+        footer={
+          <>
+            <Button type="button" variant="outline" onClick={onReset} disabled={activeFilterCount === 0}>
+              Ripristina
+            </Button>
+            <Button type="button" onClick={() => setOpen(false)}>
+              {describeMovementsFilterAction(shownCount)}
+            </Button>
+          </>
+        }
+      >
+          <div className="space-y-5">
             {/* Search */}
             <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Cerca
-              </p>
+              <Label htmlFor="movements-filter-search">Cerca</Label>
               <div className="relative">
                 <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                 <Input
+                  id="movements-filter-search"
                   value={searchQuery}
                   onChange={e => onSearchChange(e.target.value)}
                   placeholder="Note, categorie, importo..."
@@ -235,9 +237,7 @@ export function MobileFiltersDrawer({
 
             {/* Categories */}
             <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Categorie
-              </p>
+              <p className="text-sm font-medium leading-none">Categorie</p>
               <MultiSelect
                 options={categoryMultiSelectOptions}
                 defaultValue={multiSelectValue}
@@ -259,11 +259,9 @@ export function MobileFiltersDrawer({
             {/* Subcategory — only when a single category is selected */}
             {soloSelectedCategory && subCategoryOptions.length > 0 && (
               <div className="space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Sottocategoria
-                </p>
+                <Label htmlFor="movements-filter-subcategory">Sottocategoria</Label>
                 <Select value={selectedSubCategoryId} onValueChange={onSubCategoryChange}>
-                  <SelectTrigger className="w-full" aria-label="Filtra per sottocategoria">
+                  <SelectTrigger id="movements-filter-subcategory" className="w-full" aria-label="Filtra per sottocategoria">
                     <SelectValue placeholder="Tutte" />
                   </SelectTrigger>
                   <SelectContent>
@@ -279,11 +277,9 @@ export function MobileFiltersDrawer({
             {/* Account — only when 2+ distinct accounts appear in the current period */}
             {accountOptions.length >= 2 && (
               <div className="space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Conto
-                </p>
+                <Label htmlFor="movements-filter-account">Conto</Label>
                 <Select value={selectedAccountId} onValueChange={onAccountChange}>
-                  <SelectTrigger className="w-full" aria-label="Filtra per conto corrente">
+                  <SelectTrigger id="movements-filter-account" className="w-full" aria-label="Filtra per conto corrente">
                     <SelectValue placeholder="Tutti i conti" />
                   </SelectTrigger>
                   <SelectContent>
@@ -299,11 +295,9 @@ export function MobileFiltersDrawer({
             {/* Intestatario — only with Divisione on (the parent hands no options otherwise) */}
             {ownerOptions.length > 0 && (
               <div className="space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Intestatario
-                </p>
+                <Label htmlFor="movements-filter-owner">Intestatario</Label>
                 <Select value={selectedOwnerId} onValueChange={onOwnerChange}>
-                  <SelectTrigger className="w-full" aria-label="Filtra per intestatario">
+                  <SelectTrigger id="movements-filter-owner" className="w-full" aria-label="Filtra per intestatario">
                     <SelectValue placeholder="Tutti" />
                   </SelectTrigger>
                   <SelectContent>
@@ -316,15 +310,7 @@ export function MobileFiltersDrawer({
             )}
 
           </div>
-
-          {/* Footer with iOS safe-area-aware padding */}
-          <DrawerFooter>
-            <Button className="w-full" onClick={() => setOpen(false)}>
-              Mostra risultati
-            </Button>
-          </DrawerFooter>
-        </DrawerContent>
-      </Drawer>
+      </ResponsiveModal>
     </div>
   );
 }

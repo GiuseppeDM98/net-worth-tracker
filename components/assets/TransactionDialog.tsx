@@ -41,6 +41,7 @@ import {
 } from '@/lib/hooks/useAssetTransactions';
 import {
   replayTransactions,
+  replayTransactionsWithEffects,
   LedgerValidationError,
 } from '@/lib/utils/assetTransactionUtils';
 import {
@@ -57,9 +58,12 @@ import {
   describeModalStatus,
   describeSettlementTiming,
   describeTradeIntent,
+  describeWithheldTaxField,
   describeWriteError,
   type ModalStatus,
 } from '@/lib/utils/dialogNarrative';
+import { prefillWithheldTax, resolveWithheldTaxToSend } from '@/lib/utils/saleTax';
+import { roundToCents } from '@/lib/utils/cents';
 import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import { TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { Button } from '@/components/ui/button';
@@ -100,6 +104,8 @@ const transactionSchema = z.object({
   pricePerUnit: z.number().optional().or(z.nan()),
   fees: z.number().min(0, 'Le commissioni non possono essere negative').optional().or(z.nan()),
   linkedCashAssetId: z.string(),
+  // Sell only: the tax the broker withheld, prefilled with the estimate (lib/utils/saleTax.ts).
+  withheldTaxEur: z.number().min(0, 'Le tasse non possono essere negative').optional().or(z.nan()),
   // BTP€i only: the indexation coefficient at the trade date (the quote is real, the euro is not).
   indexationCoefficient: z.number().positive('Il coefficiente deve essere positivo').optional().or(z.nan()),
   note: z.string().max(500, 'Massimo 500 caratteri').optional(),
@@ -152,6 +158,8 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
   // The modal's reading IS the status line, so a failure lands there and not in a paragraph of
   // its own at the bottom of the form (DESIGN.md → The Status-Is-The-Reading Rule).
   const [status, setStatus] = useState<ModalStatus>({ phase: 'idle' });
+  // True once the owner has typed in «Tasse trattenute»: from then on the estimate stops driving it.
+  const [isTaxTyped, setIsTaxTyped] = useState(false);
 
   // Cash accounts eligible as a settlement target.
   const cashAssets = useMemo(
@@ -200,6 +208,7 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
       pricePerUnit: undefined,
       fees: undefined,
       linkedCashAssetId: NO_SETTLEMENT,
+      withheldTaxEur: undefined,
       indexationCoefficient: undefined,
       note: '',
     },
@@ -211,6 +220,7 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
   const pricePerUnit = useWatch({ control, name: 'pricePerUnit' });
   const fees = useWatch({ control, name: 'fees' });
   const linkedCashAssetId = useWatch({ control, name: 'linkedCashAssetId' });
+  const withheldTaxEur = useWatch({ control, name: 'withheldTaxEur' });
   const indexationCoefficient = useWatch({ control, name: 'indexationCoefficient' });
   // The scaling of the typed quote, live: nominal per unit and (BTP€i) the typed coefficient.
   const quoteBasis = useMemo<BondQuoteBasis>(
@@ -242,7 +252,10 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
     statusSubject.bondNominal !== bondNominal
   ) {
     setStatusSubject({ open, transaction, isBondPctMode, bondNominal });
-    if (open) setStatus({ phase: 'idle' });
+    if (open) {
+      setStatus({ phase: 'idle' });
+      setIsTaxTyped(false);
+    }
   }
 
   // Reset on open (Dialog Form Reset Pattern): include `open` in deps + `if (!open) return`, and
@@ -263,6 +276,7 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
         pricePerUnit: toBI(transaction.pricePerUnit),
         fees: transaction.fees,
         linkedCashAssetId: transaction.linkedCashAssetId ?? NO_SETTLEMENT,
+        withheldTaxEur: transaction.withheldTaxEur,
         indexationCoefficient: knownCoefficient,
         note: transaction.note ?? '',
       });
@@ -274,6 +288,7 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
         pricePerUnit: undefined,
         fees: undefined,
         linkedCashAssetId: NO_SETTLEMENT,
+        withheldTaxEur: undefined,
         indexationCoefficient: knownCoefficient,
         note: '',
       });
@@ -308,7 +323,7 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
   // Estimated realized P&L for a sell: replay the SAME engine on the prospective sequence and take
   // the marginal realized versus the current sequence (delta of cumulative realized). Reuses the one
   // engine so the preview always agrees with the server figure (up to the estimated FX).
-  const realizedPreview = useMemo((): { value: number } | { error: string } | null => {
+  const realizedPreview = useMemo((): { value: number; taxableGain: number } | { error: string } | null => {
     if (type !== 'sell') return null;
     if (resolvedPricePerUnit === undefined || quantity === undefined || isNaN(quantity) || quantity <= 0) {
       return null;
@@ -331,14 +346,34 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
     // Exclude the edited trade so an edit re-prices against the rest of the history.
     const base = existingTransactions.filter((t) => t.id !== transaction?.id);
     try {
-      const withDraft = replayTransactions([...base, draft]).realizedPnlEur;
+      const replayed = replayTransactionsWithEffects([...base, draft]);
       const without = replayTransactions(base).realizedPnlEur;
-      return { value: withDraft - without };
+      // The tax base is the draft's own effect: the price difference, no commission on either side.
+      const taxableGain = replayed.effects.find((effect) => effect.transactionId === draft.id)?.taxableGainEur ?? 0;
+      return { value: replayed.state.realizedPnlEur - without, taxableGain };
     } catch (error) {
       if (error instanceof LedgerValidationError) return { error: error.userMessage };
       return { error: 'Sequenza non valida.' };
     }
   }, [type, resolvedPricePerUnit, quantity, feesEur, asset, existingTransactions, transaction, ownerId]);
+
+  // «Tasse trattenute» on a NEW sale follows the estimate until the owner types in it: the gain
+  // moves with quantity, price and fees, and a prefill frozen at the first keystroke would be the
+  // estimate of another trade. An edit never prefills — it shows what the trade stores, and an old
+  // sale with no tax stays empty, or re-saving it would lower its account today.
+  const estimatedTax = prefillWithheldTax(
+    realizedPreview && 'value' in realizedPreview ? realizedPreview.taxableGain : null,
+    asset.taxRate
+  );
+  useEffect(() => {
+    if (!open || isEdit || type !== 'sell' || isTaxTyped) return;
+    setValue('withheldTaxEur', estimatedTax);
+  }, [open, isEdit, type, isTaxTyped, estimatedTax, setValue]);
+
+  const taxEur = type === 'sell' && withheldTaxEur !== undefined && !isNaN(withheldTaxEur) && withheldTaxEur > 0 ? withheldTaxEur : 0;
+  const hasSettlement = linkedCashAssetId !== NO_SETTLEMENT;
+  // An old sale credited its account gross: typing a tax now takes it out of the account TODAY.
+  const isLegacySettledSell = isEdit && transaction?.type === 'sell' && !!transaction.linkedCashAssetId && transaction.withheldTaxEur === undefined;
 
   const onSubmit = async (data: TransactionFormValues) => {
     if (isDemo || !ownerId) return;
@@ -367,6 +402,15 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
       return;
     }
 
+    const taxValue =
+      data.type === 'sell' && !isBaseline
+        ? resolveWithheldTaxToSend({ fieldValue: data.withheldTaxEur, storedTax: transaction?.withheldTaxEur })
+        : undefined;
+    if (taxValue !== undefined && summary && taxValue > summary.totalEur) {
+      setStatus({ phase: 'error', message: 'Le tasse trattenute superano il ricavato della vendita.' });
+      return;
+    }
+
     setStatus({ phase: 'submitting' });
     const submitBasis: BondQuoteBasis = {
       nominalValue: bondNominal,
@@ -392,6 +436,7 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
               pricePerUnit: price,
               indexationCoefficient: coefficientValue,
               ...(data.type === 'adjustment' ? {} : { fees: feeValue, linkedCashAssetId: settlement }),
+              ...(taxValue !== undefined ? { withheldTaxEur: taxValue } : {}),
               note: noteValue,
             };
         const result = await updateMutation.mutateAsync({ transactionId: transaction.id, updates });
@@ -409,6 +454,7 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
           pricePerUnit: price,
           indexationCoefficient: coefficientValue,
           ...(data.type === 'adjustment' ? {} : { fees: feeValue, linkedCashAssetId: settlement }),
+          ...(taxValue !== undefined ? { withheldTaxEur: taxValue } : {}),
           note: noteValue,
         };
         const result = await createMutation.mutateAsync(formData);
@@ -441,7 +487,7 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
     idle: describeTradeIntent({
       type,
       isBaseline,
-      hasSettlement: linkedCashAssetId !== NO_SETTLEMENT,
+      hasSettlement,
       isDemo,
     }),
     submitting:
@@ -636,6 +682,30 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
               {errors.fees && <p className="text-sm text-destructive">{errors.fees.message}</p>}
             </div>
 
+            {type === 'sell' && (
+              <div className="space-y-2">
+                <Label htmlFor="trade-withheld-tax">
+                  Tasse trattenute (€){' '}
+                  <span className="font-normal text-muted-foreground">(opzionale)</span>
+                </Label>
+                <Input
+                  id="trade-withheld-tax"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  inputMode="decimal"
+                  placeholder="es. 26.00"
+                  {...register('withheldTaxEur', { valueAsNumber: true, onChange: () => setIsTaxTyped(true) })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {describeWithheldTaxField({ isEdit, isLegacySettledSell, hasEstimate: estimatedTax !== undefined, isTyped: isTaxTyped })}
+                </p>
+                {errors.withheldTaxEur && (
+                  <p className="text-sm text-destructive">{errors.withheldTaxEur.message}</p>
+                )}
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="trade-settlement">Conto di regolamento</Label>
               <Select
@@ -706,6 +776,24 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
                   )}
                 >
                   {formatSignedEur(realizedPreview.value)}
+                </span>
+              </div>
+            )}
+            {type === 'sell' && taxEur > 0 && (
+              <div className="flex items-baseline justify-between gap-3 text-sm">
+                <span className="text-muted-foreground">Tasse trattenute</span>
+                <span className="font-mono font-semibold tabular-nums text-foreground">
+                  {cachedFormatCurrencyEUR(-taxEur)}
+                </span>
+              </div>
+            )}
+            {type === 'sell' && hasSettlement && (
+              <div className="flex items-baseline justify-between gap-3 text-sm">
+                <span className="text-muted-foreground">
+                  {isEur ? 'Accredito sul conto' : 'Accredito sul conto stimato'}
+                </span>
+                <span className="font-mono font-semibold tabular-nums text-foreground">
+                  {cachedFormatCurrencyEUR(roundToCents(summary.totalEur - taxEur))}
                 </span>
               </div>
             )}

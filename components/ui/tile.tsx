@@ -60,7 +60,10 @@ export function Tile({ eyebrow, aside, reading, ariaLabel, id, className, childr
       {/* The head wraps: an aside that carries controls (a pill, a select, two actions) drops under the
           eyebrow on a phone instead of pushing the tile past the viewport. */}
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1.5">
-        <p className={TILE_EYEBROW_CLASS}>{eyebrow}</p>
+        {/* A heading, not a paragraph: a page of nine tiles listed two headings (the title and the
+            verdict) to a screen reader, which navigates a long page by them. `h3` under the verdict's
+            `h2`; the class carries every metric, so nothing changes on screen. */}
+        <h3 className={TILE_EYEBROW_CLASS}>{eyebrow}</h3>
         {aside && <div className="min-w-0 max-w-full shrink-0 text-[10px] text-muted-foreground">{aside}</div>}
       </div>
       {reading && (

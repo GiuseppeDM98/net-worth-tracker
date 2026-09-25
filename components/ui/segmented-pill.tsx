@@ -1,5 +1,5 @@
 /**
- * Generic segmented pill control (role="tablist") with roving-tabindex keyboard
+ * Generic segmented pill control (`tablist` or `radiogroup`) with roving-tabindex keyboard
  * navigation, shared by every period/view/range toggle in the Analisi page.
  *
  * Extracted from five near-identical inline implementations (AnalisiTab's period
@@ -9,7 +9,8 @@
  * implemented arrow-key navigation, which a `role="tab"` implies per WAI-ARIA APG.
  *
  * Roving tabindex: only the selected tab is in the Tab order (tabIndex 0); the
- * others are -1. ArrowLeft/ArrowRight move focus AND selection (automatic
+ * others are -1 — and when NO option matches the value, the first one is the Tab stop, as the
+ * APG asks of a radiogroup with nothing checked. ArrowLeft/ArrowRight move focus AND selection (automatic
  * activation — appropriate for a small, always-visible segmented control where
  * the cost of activating on arrow is low, unlike a lazy-loaded tab panel).
  */
@@ -90,6 +91,8 @@ export function SegmentedPill<T extends string>({
     }
   };
 
+  const hasSelection = options.some((option) => option.value === value);
+
   return (
     // `max-w-full overflow-x-auto`: an unbounded option list (one per fiscal year, one per
     // decade of a pension) scrolls inside the pill instead of pushing the page sideways; the
@@ -105,6 +108,10 @@ export function SegmentedPill<T extends string>({
     >
       {options.map((option, index) => {
         const isSelected = value === option.value;
+        // With no match every option used to be `tabIndex=-1` and the whole control left the Tab
+        // order — on Rendimenti a custom range took the page's one axis away from the keyboard
+        // (2026-09-20). Identical to before whenever a value matches, which is every other caller.
+        const isTabStop = hasSelection ? isSelected : index === 0;
         return (
           <button
             key={option.value}
@@ -114,7 +121,7 @@ export function SegmentedPill<T extends string>({
             aria-selected={semantics === 'radio' ? undefined : isSelected}
             aria-checked={semantics === 'radio' ? isSelected : undefined}
             aria-disabled={disabled || undefined}
-            tabIndex={isSelected ? 0 : -1}
+            tabIndex={isTabStop ? 0 : -1}
             onClick={() => {
               if (!disabled) onChange(option.value);
             }}

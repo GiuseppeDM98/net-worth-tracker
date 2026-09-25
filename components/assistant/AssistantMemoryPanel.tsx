@@ -41,7 +41,14 @@ function latestEvaluation(goals: AssistantMemoryItem[]): Date | null {
 }
 
 /**
- * The Memoria sheet's content as two tiles — «Obiettivi» (every active goal with its
+ * A tile INSIDE a modal is a sub-tile: the modal is already the `bg-card` surface with the
+ * border and the shadow, so a second one on top is a card inside a card (DESIGN.md → The
+ * Modal-Is-A-Tile Rule). The cadence — eyebrow, reading, rows — is kept; the chrome is not.
+ */
+const MODAL_SUB_TILE_CLASS = 'border-transparent bg-muted shadow-none';
+
+/**
+ * The Memoria modal's content as two sub-tiles — «Obiettivi» (every active goal with its
  * structure, its last check and, when the daily evaluation found it reached, the durable
  * «Ignora» beside «Segna come completato»; the completed ones under a sub-eyebrow with
  * «Riattiva») and «Fatti» (rischio, preferenze, fatti utili as flat rows) — with the archived
@@ -153,6 +160,7 @@ export function AssistantMemoryPanel({ userId, memory, isLoading }: AssistantMem
   return (
     <div className="flex flex-col gap-3">
       <Tile
+        className={MODAL_SUB_TILE_CLASS}
         eyebrow="Obiettivi"
         aside={
           activeGoals.length + completedGoals.length > 0
@@ -211,6 +219,7 @@ export function AssistantMemoryPanel({ userId, memory, isLoading }: AssistantMem
       </Tile>
 
       <Tile
+        className={MODAL_SUB_TILE_CLASS}
         eyebrow="Fatti"
         aside={activeFacts.length > 0 ? `${activeFacts.length} ${activeFacts.length === 1 ? 'fatto' : 'fatti'}` : undefined}
         reading={factsReading}
@@ -257,7 +266,7 @@ export function AssistantMemoryPanel({ userId, memory, isLoading }: AssistantMem
                 <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform', archivedOpen && 'rotate-180')} aria-hidden="true" />
               </CollapsibleTrigger>
               <CollapsibleContent className="pt-1">
-                <Tile eyebrow="Ricordi archiviati">
+                <Tile className={MODAL_SUB_TILE_CLASS} eyebrow="Ricordi archiviati">
                   <div className="mt-2 divide-y divide-border">
                     {archived.map((item) => (
                       <AssistantMemoryItemRow key={item.id} item={item} {...rowProps} />

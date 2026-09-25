@@ -4,10 +4,10 @@ import type { ReactNode } from 'react';
 import type { Narrative } from '@/lib/utils/narrative';
 import type { DrawdownStory } from '@/lib/utils/performanceSummary';
 import { formatNumber, formatPercentage } from '@/lib/services/chartService';
-import { getMetricValueColor } from '@/lib/utils/metricColors';
 import { MONTH_NAMES_SHORT } from '@/lib/utils/period';
 import { cn } from '@/lib/utils';
 import { Tile } from '@/components/ui/tile';
+import { TileMethodNote } from '@/components/ui/tile-method-note';
 
 interface RischioTileProps {
   reading: Narrative;
@@ -49,6 +49,10 @@ function Value({ value, className }: { value: string | null; className?: string 
  * «Quanto rischio?» — volatility, Sharpe, Sortino and the deepest drawdown with its months, as
  * flat rows. Below three measured months the ratios are `—` and the reading says why: a
  * deviation on two points is noise, not a statistic (doc/guide/rendimenti.md § Rendimenti — the measurement window).
+ *
+ * Sharpe and Sortino are printed in the neutral ink (2026-09-20): a ratio is not a gain. With the
+ * sign colour a Sharpe of 0,20 was green under a reading that said the risk is poorly paid — the
+ * judgement belongs to the reading, which knows the thresholds. Max drawdown IS a loss and stays red.
  */
 export function RischioTile({ reading, monthsMeasured, riskFreeRate, volatility, sharpeRatio, sortinoRatio, drawdown, className }: RischioTileProps) {
   const duration = drawdown
@@ -74,10 +78,10 @@ export function RischioTile({ reading, monthsMeasured, riskFreeRate, volatility,
           <Value value={volatility === null ? null : formatPercentage(volatility, 1)} className="text-foreground" />
         </Row>
         <Row label="Sharpe">
-          <Value value={sharpeRatio === null ? null : ratio(sharpeRatio)} className={getMetricValueColor(sharpeRatio, 'number')} />
+          <Value value={sharpeRatio === null ? null : ratio(sharpeRatio)} className="text-foreground" />
         </Row>
         <Row label="Sortino">
-          <Value value={sortinoRatio === null ? null : ratio(sortinoRatio)} className={getMetricValueColor(sortinoRatio, 'number')} />
+          <Value value={sortinoRatio === null ? null : ratio(sortinoRatio)} className="text-foreground" />
         </Row>
         <Row label="Max drawdown" sub={drawdown ? monthShort(drawdown.trough) : undefined}>
           <Value value={drawdown ? `−${formatPercentage(Math.abs(drawdown.value), 1)}` : null} className="text-destructive" />
@@ -86,10 +90,12 @@ export function RischioTile({ reading, monthsMeasured, riskFreeRate, volatility,
           <Value value={drawdown ? `${drawdown.durationMonths} ${drawdown.durationMonths === 1 ? 'mese' : 'mesi'}` : null} className="text-foreground" />
         </Row>
       </div>
-      <p className="mt-auto border-t border-border pt-3.5 text-[11px] leading-[1.45] text-muted-foreground">
-        Pavimento di 3 mesi per volatilità, Sharpe e Sortino, senza filtri sugli estremi; il drawdown è sull&apos;indice TWR,
-        indipendente dai versamenti.
-      </p>
+      <TileMethodNote subject="Rischio" summary="Misurato sui rendimenti mensili.">
+        <span className="block">Volatilità = deviazione standard dei rendimenti mensili × √12, senza filtri sugli estremi.</span>
+        <span className="block">Volatilità, Sharpe e Sortino chiedono almeno 3 mesi misurati: sotto, la riga resta vuota.</span>
+        <span className="block">Sharpe e Sortino usano il tasso privo di rischio (RF) delle Impostazioni; il Sortino conta solo i mesi negativi.</span>
+        <span className="block">Il drawdown è misurato sull&apos;indice TWR: un versamento non lo sposta.</span>
+      </TileMethodNote>
     </Tile>
   );
 }

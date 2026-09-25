@@ -19,6 +19,12 @@ export interface UseCountUpOptions {
    * Default: false.
    */
   fromPrevious?: boolean;
+  /**
+   * With `fromPrevious`, land the FIRST value without counting: there is no previous value to
+   * settle from, and a count from zero paints a figure the surface's other readings (a track,
+   * a chip) contradict for half a second. Later targets still settle. Default: false.
+   */
+  landFirstValue?: boolean;
 }
 
 /**
@@ -51,11 +57,17 @@ function settleTarget(
   previous: CountUpState,
   target: number | null,
   once: boolean,
-  fromPrevious: boolean
+  fromPrevious: boolean,
+  landFirstValue: boolean
 ): CountUpState {
   // No value to show; the next target starts from zero again (the seeds reset with it).
   if (target === null) {
     return { target: null, value: null, from: null, hasAnimated: previous.hasAnimated };
+  }
+
+  // Nothing was ever shown: the first value lands, the next ones settle from it.
+  if (fromPrevious && landFirstValue && previous.value === null) {
+    return { target, value: target, from: null, hasAnimated: previous.hasAnimated };
   }
 
   // Already animated once — update silently without re-animating. Handles cases like a
@@ -94,14 +106,14 @@ export function useCountUp(
   target: number | null,
   options: UseCountUpOptions = {}
 ): number | null {
-  const { startDelay = 60, duration = 500, once = false, fromPrevious = false } = options;
+  const { startDelay = 60, duration = 500, once = false, fromPrevious = false, landFirstValue = false } = options;
 
   const [state, setState] = useState<CountUpState>(INITIAL_STATE);
 
   // A new target is settled on the render that brings it: React re-renders at once with the
   // new state, so the old number is never painted under the new target.
   if (!Object.is(state.target, target)) {
-    setState(settleTarget(state, target, once, fromPrevious));
+    setState(settleTarget(state, target, once, fromPrevious, landFirstValue));
   }
 
   const { from, target: animatingTo } = state;

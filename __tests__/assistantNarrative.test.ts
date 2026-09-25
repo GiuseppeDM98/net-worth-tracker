@@ -29,6 +29,7 @@ import {
   buildNoContextVerdict,
   describeAssistantCashflow,
   describeAssistantHeader,
+  describeThreadsReading,
   describeConversation,
   describeFactsTile,
   describeGoalProgress,
@@ -303,8 +304,8 @@ describe('buildNoContextVerdict', () => {
 
     expect(verdict.headline).toBe('Agosto sta andando bene.');
     expect(plain(verdict.sentence)).toBe(
-      'Il patrimonio vale 312.450,00 €: +3210,00 € (+1,04%) su luglio, +4,85% da inizio anno. Hai messo da parte il 31% delle entrate e le azioni hanno fatto il grosso del lavoro (+2890 €). ' +
-        'Di quel movimento, +2890 € viene dal mercato e +320 € dai tuoi movimenti.',
+      'Il patrimonio vale 312.450,00 €: +3210,00 € (+1,04%) su luglio, +4,85% da inizio anno. Hai messo da parte il 31% delle entrate; sul mercato hanno spinto soprattutto le azioni (+2890 €). ' +
+        'Di quel movimento: +2890 € dal mercato e +320 € tra risparmio e altre variazioni.',
     );
   });
 
@@ -553,5 +554,20 @@ describe('describeAssistantHeader', () => {
     expect(describeAssistantHeader({ threads: 1, goals: 0, facts: 0 })).toBe('1 conversazione · memoria vuota');
     expect(describeAssistantHeader({ threads: 0, goals: 1, facts: 0 })).toBe('Nessuna conversazione · 1 obiettivo in memoria');
     expect(describeAssistantHeader({ threads: 0, goals: 0, facts: 2 })).toBe('Nessuna conversazione · 2 fatti in memoria');
+  });
+});
+
+describe('describeThreadsReading — the Conversazioni modal', () => {
+  const text = (input: { count: number; loading: boolean }) => describeThreadsReading(input).map((segment) => segment.text).join('');
+
+  it('counts the saved threads and says what pressing one does', () => {
+    expect(text({ count: 12, loading: false })).toBe('12 conversazioni salvate: premine una per riprenderla da dove era rimasta.');
+    expect(text({ count: 1, loading: false })).toBe('1 conversazione salvata: premila per riprenderla da dove era rimasta.');
+    expect(text({ count: 0, loading: false })).toBe('Nessuna conversazione salvata: il primo messaggio ne apre una.');
+  });
+
+  it('claims no count while the list is still being read', () => {
+    // `threads` defaults to [] before the query lands: «Nessuna conversazione» there would be a lie.
+    expect(text({ count: 0, loading: true })).toBe('Sto leggendo le conversazioni salvate.');
   });
 });

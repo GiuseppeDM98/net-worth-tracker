@@ -73,7 +73,10 @@ import {
   buildCompositionPair,
   buildPensionLookThrough,
   buildPlanView,
+  activeClassGaps,
+  estimatePlanSaleTax,
   offTargetGaps,
+  planSaleNodes,
   summarizeClassGaps,
   summarizeHoldings,
   summarizeNextMoney,
@@ -86,6 +89,7 @@ import {
   describeAllocazioneHeader,
   describeBalance,
   describeBalanceFooter,
+  describeBandChange,
   describeClasses,
   describePension,
   describePensionAside,
@@ -274,7 +278,12 @@ export default function AllocationPage() {
   );
 
   const gaps = useMemo(() => (bandedAllocation ? summarizeClassGaps(bandedAllocation.byAssetClass) : []), [bandedAllocation]);
-  const offTarget = useMemo(() => offTargetGaps(gaps), [gaps]);
+  // A class with neither allocated value nor a target cannot be off target, so it never counts in
+  // «N classi su M» and is never named «in linea» — «Immobili · OK · 0 €» was a verdict on a void
+  // while the Previdenza tile printed the same class at 60.000 € (`isDormantClass`).
+  const activeGaps = useMemo(() => activeClassGaps(gaps), [gaps]);
+  const offTarget = useMemo(() => offTargetGaps(activeGaps), [activeGaps]);
+  const excludedByClass = useMemo(() => sumHoldingsByClass(excludedHoldings), [excludedHoldings]);
   const composition = useMemo(
     () =>
       bandedAllocation
@@ -306,13 +315,20 @@ export default function AllocationPage() {
     () => (planInputs ? summarizeNextMoney(planInputs, planAmount) : null),
     [planInputs, planAmount],
   );
+  // What the plan's SELL legs would actually deliver. The broker withholds on the day of the sale,
+  // so «vendi 25.000 €» is gross; `null` (a missing EUR cost basis or rate on some leg) keeps the
+  // reading silent and the footer's «non sono considerate» — never a flattering zero.
+  const saleTax = useMemo(
+    () => (planView ? estimatePlanSaleTax(planSaleNodes(planView), holdings) : null),
+    [planView, holdings],
+  );
   const pension = useMemo(() => buildPensionLookThrough(allAssets, calculateAssetValue), [allAssets]);
   const pensionFundNames = useMemo(
     () => allAssets.filter((asset) => asset.type === 'pensionFund').map((asset) => asset.name),
     [allAssets],
   );
 
-  const classCount = gaps.length;
+  const classCount = activeGaps.length;
   const hasAssets = classCount > 0;
   const leverageInPlay = !!bandedAllocation && (bandedAllocation.hasLeveragedExposure || targetLeverageRatio > 1.01);
   const leverageReading = useMemo(
@@ -355,24 +371,26 @@ export default function AllocationPage() {
       title="Allocazione"
       description={headerDescription}
       actions={
-        <Link href="/dashboard/settings" className="hidden desktop:block">
-          <Button variant="outline" className="h-8 gap-1.5 px-2.5 text-xs">
+        <Button asChild variant="outline" className="hidden h-8 gap-1.5 px-2.5 text-xs desktop:inline-flex">
+          <Link href="/dashboard/settings">
             <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
             Modifica target
-          </Button>
-        </Link>
+          </Link>
+        </Button>
       }
     />
   );
 
-  // Below desktop the header action sits under the verdict as a 44px button.
+  // Below desktop the header action sits AFTER the tiles as a 44px button: «Modifica target» is
+  // what you do once you have read the plan, and above the grid it outranked reading it. It is
+  // `asChild` so the DOM is one <a>, never the <a><button> pair that costs two Tab stops.
   const mobileAction = (
-    <Link href="/dashboard/settings" className="desktop:hidden">
-      <Button variant="outline" className="h-11 w-full gap-1.5">
+    <Button asChild variant="outline" className="h-11 w-full gap-1.5 desktop:hidden">
+      <Link href="/dashboard/settings">
         <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
         Modifica target
-      </Button>
-    </Link>
+      </Link>
+    </Button>
   );
 
   // ─── Loading and empty states ───────────────────────────────────────────────
@@ -424,11 +442,26 @@ export default function AllocationPage() {
       <div className="pt-1">
         <PageVerdict verdict={verdict} ariaLabel="Verdetto sull'allocazione" />
       </div>
-      {mobileAction}
 
-      {/* Tablet (768-1439): Bilanciamento and Piano full width, Per classe beside Esposizione, Previdenza full. */}
+      {/* The band re-classifies the verdict, this page's plan and every chip at once. The region is
+          mounted with the page, before anything changes, so a reader is already watching it when the
+          text is rewritten — one created together with its content announces nothing. */}
+      <p className="sr-only" role="status" aria-live="polite">
+        {describeBandChange({ band, offTargetCount: balanceSummary.offTargetCount, classCount })}
+      </p>
+
+      {/* Two columns at NATURAL height from `desktop:`, because the Piano is no longer a tile of
+          Bilanciamento's size: naming the instruments of a rebalance makes it ~1060px beside a
+          ~380px neighbour, and a tile inflated to fill that is an empty card, not a layout
+          (AGENTS.md → a tile stretched beside a taller neighbour is cured in the GRID). Per classe
+          rises under Bilanciamento, which closes the void to ~110px, and Esposizione takes the full
+          width below. Below `desktop:` both wrappers are `contents`, so the tiles are items of the
+          grid again in their own `order-*` — the phone keeps reading Bilanciamento → Piano → Per
+          classe → Esposizione.
+          Tablet (768-1439): Bilanciamento and Piano full width, Per classe beside Esposizione. */}
       <div className="grid grid-cols-1 gap-3 tablet:grid-cols-2 desktop:grid-cols-12">
-        <div className={cn(TILE_CELL_CLASS, 'order-1 tablet:col-span-2 desktop:order-none desktop:col-span-5')}>
+        <div className="contents desktop:col-span-5 desktop:flex desktop:min-w-0 desktop:flex-col desktop:gap-3 desktop:self-start">
+        <div className={cn(TILE_CELL_CLASS, 'order-1 tablet:col-span-2 desktop:order-none')}>
           <BilanciamentoTile
             reading={describeBalance({
               marketValue: bandedAllocation.marketValue,
@@ -457,29 +490,31 @@ export default function AllocationPage() {
           />
         </div>
 
-        <div className={cn(TILE_CELL_CLASS, 'order-2 tablet:col-span-2 desktop:order-none desktop:col-span-7')}>
+        <div className={cn(TILE_CELL_CLASS, 'order-3 desktop:order-none')}>
+          <PerClasseTile
+            reading={describeClasses(activeGaps, band)}
+            aside="corrente · target · gap"
+            allocation={{ ...bandedAllocation, bySubCategory: actionableSubCategories }}
+            targets={targets}
+            orphans={orphanedTargets}
+            excludedByClass={excludedByClass}
+          />
+        </div>
+        </div>
+
+        <div className={cn(TILE_CELL_CLASS, 'order-2 tablet:col-span-2 desktop:order-none desktop:col-span-7 desktop:self-start')}>
           <PianoTile
             mode={planMode}
             onModeChange={setPlanMode}
             amountInput={amountInput}
             onAmountInputChange={setAmountInput}
-            reading={describePlan(planView, band)}
+            reading={describePlan(planView, band, saleTax)}
             view={planView}
-            footer={describePlanFooter(planMode, !!leverageInputs)}
+            footer={describePlanFooter(planMode, !!leverageInputs, saleTax?.tax !== null && saleTax?.tax !== undefined)}
           />
         </div>
 
-        <div className={cn(TILE_CELL_CLASS, 'order-3 desktop:order-none desktop:col-span-6')}>
-          <PerClasseTile
-            reading={describeClasses(gaps, band)}
-            aside="corrente · target · gap"
-            allocation={{ ...bandedAllocation, bySubCategory: actionableSubCategories }}
-            targets={targets}
-            orphans={orphanedTargets}
-          />
-        </div>
-
-        <div className={cn(TILE_CELL_CLASS, 'order-4 desktop:order-none desktop:col-span-6')}>
+        <div className={cn(TILE_CELL_CLASS, 'order-4 desktop:order-none desktop:col-span-12')}>
           {user && ownerId && <EsposizioneTile userId={ownerId} />}
         </div>
 
@@ -497,6 +532,8 @@ export default function AllocationPage() {
           </div>
         )}
       </div>
+
+      {mobileAction}
 
       <AllocazioneDettaglio frozen={frozenGroup} excluded={excludedGroup} />
     </PageContainer>

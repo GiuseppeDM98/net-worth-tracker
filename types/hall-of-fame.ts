@@ -64,6 +64,23 @@ export interface YearlyRecord {
   startOfYearNetWorth: number; // Valore NW a inizio anno (per calcolo %)
   totalIncome: number; // Entrate totali dell'anno
   totalExpenses: number; // Spese totali dell'anno
+  /**
+   * Quanti mesi con uno snapshot l'anno contiene (1-12). Un primo anno che parte a dicembre
+   * è classificato accanto ad anni interi: la pagina lo dichiara invece di tacerlo (2026-09-24).
+   * Opzionale: i documenti scritti prima non lo hanno, e la clausola cade.
+   */
+  monthsCovered?: number;
+}
+
+/**
+ * Cosa è successo DOPO il mese peggiore: quanti mesi sono seguiti e quanti sono cresciuti.
+ * Il footer della tessera Record chiude sul peggiore; questa è la ripresa che gli sta accanto.
+ */
+export interface SinceWorstMonth {
+  /** Mesi con un record successivi al peggiore. */
+  months: number;
+  /** Quanti di quei mesi hanno chiuso in crescita. */
+  growing: number;
 }
 
 /**
@@ -85,6 +102,12 @@ export interface HallOfFameStats {
   /** Primo e ultimo mese coperti dai record; null senza record. */
   firstMonth: { year: number; month: number } | null;
   lastMonth: { year: number; month: number } | null;
+  /**
+   * La ripresa dopo il mese peggiore; null senza un calo. Non ricavabile dalle classifiche
+   * salvate (che tengono solo le prime venti righe), quindi conservata qui. Opzionale: i
+   * documenti scritti prima del 2026-09-24 non la portano, e il footer tace la clausola.
+   */
+  sinceWorstMonth?: SinceWorstMonth | null;
 }
 
 /**
@@ -118,6 +141,14 @@ export interface HallOfFameData {
 
   /** Cifre di contorno; opzionale come sopra. */
   stats?: HallOfFameStats;
+
+  /**
+   * Quando le CLASSIFICHE sono state ricostruite l'ultima volta. `updatedAt` non basta: lo
+   * riscrive anche chi salva una nota, e la pagina deve poter dire da quando i record sono
+   * fermi (il cron non sana un account senza asset). Scritto dai due writer di `updateHallOfFame`,
+   * mai da chi tocca le note; assente sui documenti più vecchi.
+   */
+  rankingsUpdatedAt?: Date;
 
   updatedAt: Date;
 }

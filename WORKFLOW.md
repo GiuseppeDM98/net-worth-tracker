@@ -154,7 +154,10 @@ The app **is** locally runnable; there is no fallback to declare.
   | --- | --- | --- |
   | `test@example.com` | `test-user-1` | The base seed: assets, expenses, snapshots — the account most tours use |
   | `analisi@example.com` | `test-user-analisi` | Everything dated to January, so year-to-date windows contain it whatever month it is |
+  | `centri@example.com` | `test-user-centri` | Centri di Costo ON: «Fenicottero» (annual ceiling the calendar will cross) and «Ornitorinco» (dormant, 27 movements) — `npm run e2e:seed:centri` |
   | `degraded@example.com` | `test-user-degraded` | The states in which a return is *not* a measure — empty/degraded readings |
+  | `split@example.com` | `test-user-split` | Cashflow › Divisione ON: Ghiandaia and Tarsio at 60/40, with one row dated 31 December that stays «in calendario» all year — `npm run e2e:seed:split` |
+  | `hof@example.com` | `hof-user` | Hall of Fame: 47 monthly snapshots from novembre 2022 with a story (best month marzo 2024, worst ottobre 2023, a two-month first year); NO rankings document — the specs press «Aggiorna i record» — `npm run e2e:seed:hof` |
 
 - **So the screen is not empty**: `npm run emulators:seed` for the base account, plus the fixture the
   page needs — `npm run e2e:seed` (Previdenza), `npm run e2e:seed:analisi` (Analisi),
@@ -188,11 +191,18 @@ The app **is** locally runnable; there is no fallback to declare.
   after — that logs in for real and waits on the page's `h1`, never on `networkidle` (Firestore keeps
   its sockets open). Say in the report that the evidence is Playwright's. And the tour still goes on
   the MIRROR (below), not on the fixture: the fixture proves the mechanism, the mirror shows what the
-  owner will see — on 2026-09-13 the mirror surfaced a stale-value reading the fixture cannot produce. **A restart of the Claude Code session kills its background tasks** (emulators and dev server alike, 2026-09-14) and an emulator killed that way exports nothing: before the tour, check the ports and re-seed the mirror. **And the session's memory watchdog kills them too** (2026-09-14 evening, three times in a row on the 8 GB Mac right after a full Playwright run, with 37–67% of memory free): for the owner's tour, the emulators and the dev server are started from the OWNER's terminals, which the watchdog does not touch; the agent only re-seeds the mirror and reports the URLs.
+  owner will see — on 2026-09-13 the mirror surfaced a stale-value reading the fixture cannot produce. **Read the
+  in-page detector's count before quoting it** (2026-09-18, Centri di Costo: 71 and 110 findings, the CLI on the same
+  files 0): every Cashflow tab stays mounted and hidden (`forceMount`), so ~36 hits per scan were Tracciamento's; the
+  9–11px «undersized text» is the enumerated ramp; the shell, the sidebar and the overlay's own yellow (`dark-glow
+  #ffba00` on a second injection) are in there too. Count what belongs to the surface, say the rest is not its. **A probe never opens a control that SPENDS** (2026-09-20): «Analizza con AI» starts its analysis on open, and an evidence pass told to «open and press Escape» made five real Anthropic calls. Read what a control does before scripting a click on it; on Rendimenti that dialog is opened once, to check the abort, or not at all. **A restart of the Claude Code session kills its background tasks** (emulators and dev server alike, 2026-09-14) and an emulator killed that way exports nothing: before the tour, check the ports and re-seed the mirror. **And the session's memory watchdog kills them too** (2026-09-14 evening, three times in a row on the 8 GB Mac right after a full Playwright run, with 37–67% of memory free): for the owner's tour, the emulators and the dev server are started from the OWNER's terminals, which the watchdog does not touch; the agent only re-seeds the mirror and reports the URLs. On 2026-09-20 the owner asked the agent to start them anyway, and both survived the session —
+  ~4 hours, two full Playwright runs, three restarts of the dev server: the watchdog is not a certainty. The rule stays (the
+  owner's terminals are the safe default); when the owner asks, start them, say they hang on the session, and check the
+  ports before every hand-over.
 - **Throwaway fixtures** follow the existing seed pattern (`scripts/seedEmulator.ts`,
   `scripts/seedAnalisiE2E.mts`, `scripts/seedPensionE2E.mts`, `scripts/seedCoastFireE2E.mts`) or
   live as a throwaway `.mts` in the session scratchpad. `.mts`, never `.ts`: a `.ts` script is CJS
-  under tsx and has no top-level await (AGENTS.md → *Emulator Exercise Scripts*).
+  under tsx and has no top-level await (doc/guide/e2e-emulatori.md § Emulator Exercise Scripts).
 - **The authenticated browser already exists.** The Playwright projects park an authenticated
   `storageState` per fixture account (`e2e/.auth/{user,analisi,degraded}.json`, minted by the three
   `auth*.setup.ts` projects), so a script does not have to reproduce the login:
@@ -205,7 +215,7 @@ The app **is** locally runnable; there is no fallback to declare.
   without that header the call is silently filtered to an empty result, which looks exactly like
   "there are no documents" — or from the API route's own response, or from the emulator UI on
   `http://127.0.0.1:4000`. Arithmetic belongs to Vitest; the browser is for what only a browser
-  knows (AGENTS.md → *Browser-Driven E2E*).
+  knows (doc/guide/e2e-emulatori.md § Browser-Driven E2E (Playwright)).
 - **Prove the check can fail.** Break the thing under test on purpose once and watch the assertion
   go red. A green check that has never been seen red is indistinguishable from one asserting
   nothing. **When it stays green, the sentence that motivated the test was wrong, not the test**
@@ -226,7 +236,10 @@ The app **is** locally runnable; there is no fallback to declare.
   before the PR. **The draft ACCUMULATES until a release is tagged**: a session PREPENDS its entries to the
   existing sections and never rewrites the file from scratch — on 2026-09-11 a session replaced 534 lines with 5
   and 308 commits of draft had to be recovered from git two days later. It is emptied only when the owner cuts
-  the tag, and `git log -1 --format=%ad <last tag>` says whether that has happened.
+  the tag, and `git log -1 --format=%ad <last tag>` says whether that has happened. **The draft carries no private
+  data** (owner, 2026-09-20): it becomes public release notes, so an example sentence takes round invented figures and
+  generic names («Conto corrente», «un ETF») — never an amount, an instrument, a bank or a family detail of the real
+  account, which the mirror makes easy to paste. That day 33 entries had to be rewritten.
 - **Impeccable critiques are committed** (since 2026-09-12): `.impeccable/critique/*.md` is tracked,
   so the snapshot `polish` reads as its backlog is the same on every machine. A critique is
   committed in the session that produces it; one that describes a surface since rebuilt is
@@ -235,7 +248,15 @@ The app **is** locally runnable; there is no fallback to declare.
   `polish`, never by fixing the code** (2026-09-13): `critique-storage latest` judges it current from the
   fingerprint of the ONE target file (`page.tsx`, a 32-line wrapper), so corrections made in the
   components leave it open — the polish pass verifies each Priority Issue against the code and runs
-  `critique-storage close`, which stamps `closed: true` in the tracked file. **A snapshot's `target_path` and
+  `critique-storage close`, which stamps `closed: true` in the tracked file. Once the target file has changed,
+  `critique-storage latest` exits 2 with NO output (a JSON parser on its pipe dies on an empty stdin, 2026-09-18): keep
+  the snapshot's FILE NAME from the `write` step and hand it to `close` directly — the bare name
+  (`2026-09-20T09-25-18Z__app-dashboard-history-page-tsx.md`): the absolute path `write` prints, and the
+  repo-relative one, both exit 2 with no output (2026-09-20). **`close` takes TWO arguments**, the resolved target AND
+  that file name (`close <target> <snapshot-file>`); with the file alone it prints its usage and exits 1 (2026-09-21).
+  **`close` itself can answer exit 2 and still stamp the file**
+  (2026-09-20, Rendimenti: the target had changed, so `latest` had already closed the backlog): read `closed: true` in the
+  snapshot, not the exit code. **A snapshot's `target_path` and
   `target_fingerprint` are those of the machine that wrote it** (2026-09-14): `latest` accepts only the local
   absolute path and the local bytes (a Windows checkout is CRLF under `* text=auto`, so its fingerprint never
   matches a Mac's), while `trend` and `signals` match by slug. The four snapshots written on Windows were

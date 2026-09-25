@@ -434,13 +434,15 @@ describe('dashboardOverviewService', () => {
     expect(result.sparklineData?.[0]).toMatchObject({ year: 2022, month: 1, totalNetWorth: 10000 });
     expect(result.expenseStats?.currentMonth.net).toBe(1750);
     expect(result.expenseStats?.currentMonth.expensesScheduled).toBe(250);
+    // No income dated after today: the verdict's savings so far are the whole month's income.
+    expect(result.expenseStats?.currentMonth.incomeScheduled).toBe(0);
     expect(result.variations.monthly?.value).toBe(1000);
     expect(result.variations.monthly?.percentage).toBeCloseTo(5.2631578947, 6);
     // 10 × 200 − 5 fees = 1.995 € of proceeds against a 150 € PMC: 495 € realized, 26% of it estimated.
     expect(result.monthSales).toMatchObject({ proceeds: 1995, realizedGain: 495, brokenLedgers: 0 });
-    expect(result.monthSales?.estimatedTax).toBeCloseTo(128.7, 6);
+    expect(result.monthSales?.estimatedTax).toBeCloseTo(130, 6); // 26% of 495 + the 5 € of sale fees
     expect(result.monthSales?.instruments).toEqual([
-      { id: 'etf-1', name: 'VWCE', proceeds: 1995, realizedGain: 495, estimatedTax: expect.closeTo(128.7, 6) },
+      { id: 'etf-1', name: 'VWCE', proceeds: 1995, realizedGain: 495, estimatedTax: expect.closeTo(130, 6), taxIsWithheld: false },
     ]);
     expect(overviewSummaryDocSetMock).toHaveBeenCalledTimes(1);
   });

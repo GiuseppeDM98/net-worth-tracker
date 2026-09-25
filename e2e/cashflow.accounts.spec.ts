@@ -3,10 +3,11 @@
  *
  * What only a browser can prove here: that `ExpenseDialog`'s zod refine reaches the screen (a
  * transfer without its two accounts is refused, the reason under each field, nothing written)
- * and that a recurring series moves the linked account ONCE, for its first row, with the sign
- * of its type. The arithmetic of the reconciliation belongs to Vitest
- * (`cashBalanceReconciliation`, `updateCashAssetBalancesAtomic`); this file asserts on
- * Firestore, never on the look of the page.
+ * and that a recurring series moves the linked account ON EACH ROW'S DATE (2026-09-19): every
+ * occurrence carries the account, today's moves it at save with the sign of its type, the one to
+ * come waits (`balancePending`) for the server to settle it on the day. The arithmetic belongs to
+ * Vitest (`cashSettlement`, `cashBalanceReconciliation`); this file asserts on Firestore, never on
+ * the look of the page.
  *
  * Runs on the base seed (`test@example.com`, one cash account «Conto Corrente», category
  * «Alimentari»); every write is removed and the account's balance restored in `finally`, so a
@@ -15,8 +16,7 @@
  * reverse the balance the test restores.
  *
  * An income cannot recur (`canTypeRecur` = fixed · variable · debt), which is why the recurring
- * case is a variable expense: the sign rule the three `firstSignedAmount` branches now share
- * is pinned on the type that can actually reach it.
+ * case is a variable expense: the sign rule is pinned on the type that can actually reach it.
  */
 import { test, expect, type Page } from '@playwright/test';
 
@@ -65,7 +65,7 @@ test('a transfer without its two accounts is refused, the reason under each fiel
   expect(transfers.docs.filter((d) => Math.abs(d.data().amount) === DECOY_AMOUNT)).toHaveLength(0);
 });
 
-test('a recurring expense debits the linked account once, for its first row only', async ({ page }) => {
+test('a recurring expense links every row, debits today\'s at save and leaves the next one waiting for its date', async ({ page }) => {
   test.setTimeout(90_000);
   const db = await admin();
   const before = await cashQuantity(db);
@@ -86,10 +86,11 @@ test('a recurring expense debits the linked account once, for its first row only
   const planted = rows.docs.filter((d) => Math.abs(d.data().amount) === DECOY_AMOUNT);
   try {
     expect(planted).toHaveLength(2);
-    // Only the first row carries the account: the future one must not move any balance later.
-    expect(planted.filter((d) => d.data().linkedCashAssetId === CASH_ID)).toHaveLength(1);
-    // Falsifiable: with the sign rule inverted this reads before + 137,29; with both rows
-    // reconciled, before − 274,58.
+    // Every occurrence carries the account; only the one dated next month waits for its date.
+    expect(planted.filter((d) => d.data().linkedCashAssetId === CASH_ID)).toHaveLength(2);
+    expect(planted.filter((d) => d.data().balancePending === true)).toHaveLength(1);
+    // Falsifiable: with the sign rule inverted this reads before + 137,29; with the future row
+    // moved at save too, before − 274,58.
     expect(await cashQuantity(db)).toBeCloseTo(before - DECOY_AMOUNT, 2);
   } finally {
     for (const d of planted) await d.ref.delete();

@@ -31,6 +31,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { CostCenter, CostCenterFormData } from '@/types/costCenters';
+import type { CenterAssignment } from '@/lib/utils/costCenterLinking';
 import { Expense } from '@/types/expenses';
 import { toDate } from '@/lib/utils/dateHelpers';
 
@@ -91,7 +92,10 @@ export async function getExpensesForCostCenter(
   const snap = await getDocs(q);
   return snap.docs.map(d => {
     const data = d.data() as Omit<Expense, 'id'>;
-    return { ...data, id: d.id } as Expense;
+    // Dates as `Date`, like `getAllExpenses`: the rows used to leave here as raw Timestamps,
+    // which the page never noticed (it reads every date through `toDate()`) and the expense
+    // form does — opened from a center's row it threw «Invalid time value» on its date field.
+    return { ...data, id: d.id, date: toDate(data.date as never), createdAt: toDate(data.createdAt as never), updatedAt: toDate(data.updatedAt as never) } as Expense;
   });
 }
 
@@ -209,6 +213,33 @@ export async function deleteCostCenter(
 
   await Promise.all(batches.map(b => b.commit()));
   await deleteDoc(doc(db, COST_CENTERS, costCenterId));
+}
+
+// --- Bulk link / unlink ---
+
+/** Firestore caps a batch at 500 writes; the module's other bulk paths stop at 400 too. */
+const ASSIGNMENT_BATCH_SIZE = 400;
+
+/**
+ * Writes the center fields of many expenses — «Collega spese…», «Scollega» and their undo.
+ *
+ * The plan comes from lib/utils/costCenterLinking.ts and always carries BOTH fields: the name
+ * is denormalised on the row, and an id without its name prints a blank chip in Tracciamento.
+ * `null` clears them, like `deleteCostCenter` does. Only these fields are touched — never the
+ * amount, the date or the account — so no balance needs reconciling.
+ *
+ * Chunks are committed IN ORDER and the first failure stops the run: up to 400 rows the write
+ * is one atomic batch; past that, a failure leaves the earlier chunks written, which is why
+ * the caller refetches before saying anything about the outcome.
+ */
+export async function assignExpensesToCostCenter(assignments: ReadonlyArray<CenterAssignment>): Promise<void> {
+  for (let start = 0; start < assignments.length; start += ASSIGNMENT_BATCH_SIZE) {
+    const batch = writeBatch(db);
+    for (const { expenseId, costCenterId, costCenterName } of assignments.slice(start, start + ASSIGNMENT_BATCH_SIZE)) {
+      batch.update(doc(db, EXPENSES, expenseId), { costCenterId, costCenterName, updatedAt: serverTimestamp() });
+    }
+    await batch.commit();
+  }
 }
 
 // --- Internal helpers ---

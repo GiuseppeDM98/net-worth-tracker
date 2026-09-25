@@ -1,6 +1,6 @@
 # FIRE › Monte Carlo
 
-> **When to open this guide** — you are touching `components/fire-simulations/MonteCarloTab.tsx`, `components/monte-carlo/*` (`tiles/*`, `MonteCarloFanChart`, `FinalValueBars`, `ScenarioOverlayChart`, `MonteCarloDettaglio`), `lib/utils/{monteCarloSummary,monteCarloNarrative}.ts` or `lib/services/monteCarloService.ts`. The page-wide rules — the pension unlock, `respectPensionLockInFire`, the bridge model, the config-first collapse, the Ventaglio engine, `deriveMonteCarloAllocation`, the goal math — live in `doc/guide/fire.md § FIRE, What If and Goals` and are not repeated here. In `AGENTS.md` only the stub with the essentials remains (§ FIRE, What If and Goals); modules and files: `CLAUDE.md` → *Key Files* → the **FIRE › Monte Carlo** entry. No Playwright spec covers this tab.
+> **When to open this guide** — you are touching `components/fire-simulations/MonteCarloTab.tsx`, `components/monte-carlo/*` (`tiles/*`, `MonteCarloFanChart`, `FinalValueBars`, `ScenarioOverlayChart`, `MonteCarloDettaglio`), `lib/utils/{monteCarloSummary,monteCarloNarrative}.ts` or `lib/services/monteCarloService.ts`. The page-wide rules — the pension unlock, `respectPensionLockInFire`, the bridge model, the config-first collapse, the Ventaglio engine, `deriveMonteCarloAllocation`, the goal math — live in `doc/guide/fire.md § FIRE, What If and Goals` and are not repeated here. In `AGENTS.md` only the stub with the essentials remains (§ FIRE, What If and Goals); modules and files: `doc/guide/fire.md` § *Files*. No Playwright spec covers this tab.
 
 ## FIRE › Monte Carlo — a verdict over tiles (`components/fire-simulations/MonteCarloTab.tsx`, `components/monte-carlo/*`, `lib/utils/{monteCarloSummary,monteCarloNarrative}.ts`)
 
@@ -27,10 +27,26 @@
 - **The pension lock rides as inflows at today's value** (`resolvePensionLockState` → `capitalInflows`; order inflow → return → withdrawal in the
   service): the starting capital is net of the locked total, the read-only row under the amount field names each inflow, the fan draws a dashed
   muted guide at the unlock year when it is on the plot and the Probabilità footer names the step.
+- **The withdrawal is net of the state pensions and gross of the tax** (2026-09-24, `MonteCarloParams.annualInflows` and `withdrawalTax`,
+  doc/guide/fire.md § the tax rule): the tab dates the Coast pensions by the saved age (`calculateCoastFireNetRealAnnualPension`, base-scenario
+  inflation) and reads the tax profile of everything but the locked funds, carrying its gain share onto whatever capital is typed
+  (`basisToday = capital × (1 − gainShare)`). Per year: `max(0, W_t − P_t)`, both indexed on an inflation-indexed plan, then `withdrawGross` —
+  the basis grows with the lump inflows and shrinks with the sales. Two read-only rows under the plan say what is in («Pensione statale: −13.000 €
+  l'anno tolti dal prelievo dall'anno 34 (2060)…», «Tasse sui prelievi: ogni prelievo vende quanto serve a pagare il 26% sulla plusvalenza (40% del
+  capitale oggi)») or why not («nessuna datata in Coast FIRE › Ipotesi (serve l'età)», «non stimate, nessun PMC in euro»). `haveRunInputsChanged`
+  compares them too: a saved age or a new PMC is a new plan, flagged until «Esegui».
 - **`createDistribution` caps the equal-width bins at the 95th percentile** (2026-08-26) and the last bin takes the tail to the maximum
   (`from`/`to` on every bin, the last one closed on `to`): bins stretched to a ten-times-the-median outlier left nine of ten empty on the first
-  screenshot. The Distribuzione footer names both bounds; the bars are hand-written SVG (`FinalValueBars`, the In-tile Bars rule: labels outside
-  the SVG, the median's bin outlined, hover reading under `(pointer: fine)`).
+  screenshot. The Distribuzione footer names both bounds; the bars are hand-written SVG (`FinalValueBars` over the shared `HistogramBars`
+  primitive since 2026-09-24, the In-tile Bars rule: labels outside the SVG, the median's bin outlined, hover reading under `(pointer: fine)`).
+- **The Distribuzione tile has a second view, «Esaurimento»** (2026-09-24): the failed simulations by the calendar year their capital ran out —
+  they used to vanish into the first bin of the final values, 0 € beside the low survivors. `summarizeMonteCarloRun` reads
+  `results.simulations[].failureYear` (kept in full, read by no screen until then) into `failureYearBins` through `binYears`
+  (`lib/utils/yearHistogram.ts`, the binning shared with the Calcolatore's Distribuzione), the median failure year's bin as the reference,
+  shares of ALL simulations like the final-value bins'; `describeEsaurimento` dates first, last and median. The view exists only while
+  something fails: with `failureCount === 0` the aside stays the plain window label and the tab forces «Valori finali». The `AsideToggle`
+  is «Vista della distribuzione»; the tile's `aria-label` stays «Distribuzione dei valori finali» in both views (the locator every spec
+  would use). The footer of «Valori finali» now closes on «scenario base», which the aside carried before the toggle took its place.
 - **No figure on the page wears a sign token** — a probability is not a gain, a projected value not a loss; the headline's tone
   (`resolveSuccessTone`: ≥ 90 positive, 80–89 warning, below negative — the old hero's thresholds) is the one judgement, and the fan's dashed
   zero line is the one `--destructive` stroke (the capital exhausted is a fact with a sign). Scenario colours are ONE map, `SCENARIO_SLOT`
@@ -46,4 +62,4 @@
 
 ## Per-page blind spots
 
-- **FIRE › Monte Carlo**: no Playwright spec; the paths are unseeded draws (two runs differ by tenths of a point) and the figures are the last run's until «Esegui» (an edited parameter only flags the Parametri footer); the plan is ephemeral, seeded once per mount; the withdrawal is always inflation-indexed; «fino a 81 anni» needs the Coast FIRE age; the histogram's last bin takes the tail past the 95th percentile (said in the footer); `results.medianFinalValue` has no surface.
+- **FIRE › Monte Carlo**: no Playwright spec; the paths are unseeded draws (two runs differ by tenths of a point — unlike the Calcolatore's fan, seeded since 2026-09-24) and the figures are the last run's until «Esegui» (an edited parameter only flags the Parametri footer); the plan is ephemeral, seeded once per mount; the withdrawal is always inflation-indexed; «fino a 81 anni» needs the Coast FIRE age; the histogram's last bin takes the tail past the 95th percentile (said in the footer); the «Esaurimento» view disappears with the toggle when a re-run fails nothing, and its shares are of all simulations, so its bars are short by construction on a plan that holds; `results.medianFinalValue` has no surface.

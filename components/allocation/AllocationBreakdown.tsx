@@ -31,6 +31,9 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { useActionColors } from '@/lib/hooks/useActionColors';
+import { useRovingFocus } from '@/lib/hooks/useRovingFocus';
+import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
+import { isDormantClass } from '@/lib/utils/allocazioneSummary';
 import {
   ASSET_CLASS_LABELS,
   NO_SUBCATEGORY_LABEL,
@@ -46,7 +49,18 @@ interface AllocationBreakdownProps {
   /** Banded, with `bySubCategory` ALREADY stripped of orphaned sub-targets (the page does it). */
   allocation: AllocationResult;
   targets: AssetAllocationTarget | null;
+  /** Euro of each class sitting in EXCLUDED assets — what a dormant class's note names. */
+  excludedByClass?: Record<string, number>;
   className?: string;
+}
+
+/**
+ * Where a dormant class's money actually is. «esclusa dall'allocazione · 60.000 €» is the whole
+ * point of keeping the row: without it the reader is told a class they own is «in linea» at zero.
+ */
+function dormantNote(excludedValue: number | undefined): string {
+  if (!excludedValue || excludedValue <= 0) return 'senza target e senza valore';
+  return `esclusa dall'allocazione · ${cachedFormatCurrencyEUR(excludedValue, true)}`;
 }
 
 /**
@@ -76,13 +90,31 @@ const toggleKey = (set: Set<string>, key: string): Set<string> => {
   return next;
 };
 
-export function AllocationBreakdown({ allocation, targets, className }: AllocationBreakdownProps) {
+export function AllocationBreakdown({ allocation, targets, excludedByClass, className }: AllocationBreakdownProps) {
   const actionColors = useActionColors();
   const [expandedClasses, setExpandedClasses] = useState<Set<string>>(new Set());
   const [expandedSubs, setExpandedSubs] = useState<Set<string>>(new Set());
 
   const subCategoriesByClass = groupSubCategoriesByAssetClass(allocation.bySubCategory);
-  const assetClasses = Object.entries(allocation.byAssetClass).sort(([a], [b]) => assetClassSequenceIndex(a) - assetClassSequenceIndex(b));
+  // A dormant class closes the list, for the reason the residual sleeve does: it is what is LEFT
+  // of the plan, so reading it between two verdicts would put a non-verdict in the middle of a
+  // column of them.
+  const assetClasses = Object.entries(allocation.byAssetClass).sort(([a, dataA], [b, dataB]) => {
+    const dormancy = Number(isDormantClass(dataA)) - Number(isDormantClass(dataB));
+    return dormancy !== 0 ? dormancy : assetClassSequenceIndex(a) - assetClassSequenceIndex(b);
+  });
+  // Only the classes that OPEN are focusable, so the roving positions are theirs alone. Built as a
+  // map up front: a counter incremented inside the JSX is a reassignment after render, which the
+  // React Compiler refuses (`react-hooks/immutability`).
+  const rovingIndexByClass = new Map(
+    assetClasses
+      .filter(([assetClass]) => {
+        const subs = subCategoriesByClass[assetClass];
+        return !!subs && Object.keys(subs).length > 0;
+      })
+      .map(([assetClass], index) => [assetClass, index] as const),
+  );
+  const roving = useRovingFocus(rovingIndexByClass.size);
 
   if (assetClasses.length === 0) {
     return (
@@ -96,11 +128,13 @@ export function AllocationBreakdown({ allocation, targets, className }: Allocati
   }
 
   return (
-    <div className={cn('flex flex-col divide-y divide-border', className)}>
+    <div className={cn('flex flex-col divide-y divide-border', className)} {...roving.containerProps}>
       {assetClasses.map(([assetClass, data]) => {
         const subs = subCategoriesByClass[assetClass];
         const hasSubs = !!subs && Object.keys(subs).length > 0;
         const isClassOpen = expandedClasses.has(assetClass);
+        const dormant = isDormantClass(data);
+        const rovingIndex = rovingIndexByClass.get(assetClass);
 
         return (
           <div key={assetClass}>
@@ -112,11 +146,18 @@ export function AllocationBreakdown({ allocation, targets, className }: Allocati
               expandable={hasSubs}
               expanded={isClassOpen}
               onToggle={hasSubs ? () => setExpandedClasses((s) => toggleKey(s, assetClass)) : undefined}
+              dormant={dormant}
+              note={dormant ? dormantNote(excludedByClass?.[assetClass]) : undefined}
+              rovingProps={rovingIndex === undefined ? undefined : roving.itemProps(rovingIndex)}
             />
 
             {hasSubs && (
               <CollapseRegion open={isClassOpen}>
                 <div className="divide-y divide-border border-t border-border">
+                  {/* The sub-rows' «corrente» is a share of THEIR CLASS, not of the portfolio: the
+                      column is the same 52px mono one, so the base has to be said or «All World
+                      100,0%» under «Azioni 55,1%» reads as "the whole portfolio is All World". */}
+                  <p className={cn(TILE_SUB_EYEBROW_CLASS, 'pl-4 pt-2')}>% della classe · target · gap</p>
                   {Object.entries(subs)
                     // Alphabetical, except the residual sleeve, which closes the list: it is what
                     // is LEFT of the class, so reading it between two targeted sleeves would put a

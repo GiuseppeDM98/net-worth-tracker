@@ -1,5 +1,8 @@
+'use client';
+
 import { cn } from '@/lib/utils';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
+import { useRovingFocus } from '@/lib/hooks/useRovingFocus';
 
 export interface RankedRow {
   key: string;
@@ -64,6 +67,9 @@ interface RankedRowsProps {
 export function RankedRows({ rows, color, remainder, labelClassName, onRowClick, activeKey, ariaLabel }: RankedRowsProps) {
   const labelWidth = cn(LABEL_COLUMN_CLASS, labelClassName);
   const maxAmount = Math.max(...rows.map((r) => r.amount), 0);
+  // ONE Tab stop for the whole list, the arrows moving inside it: six clickable rows put whatever
+  // follows six presses further away, on every surface this primitive serves (2026-09-21).
+  const roving = useRovingFocus(onRowClick ? rows.length : 0);
 
   const rowContent = (row: RankedRow, active: boolean) => (
     <>
@@ -95,8 +101,8 @@ export function RankedRows({ rows, color, remainder, labelClassName, onRowClick,
   );
 
   return (
-    <ul className="@container flex flex-col divide-y divide-border" aria-label={ariaLabel}>
-      {rows.map((row) => {
+    <ul className="@container flex flex-col divide-y divide-border" aria-label={ariaLabel} {...roving.containerProps}>
+      {rows.map((row, index) => {
         const active = activeKey === row.key;
         return (
           <li key={row.key}>
@@ -104,6 +110,7 @@ export function RankedRows({ rows, color, remainder, labelClassName, onRowClick,
               <button
                 type="button"
                 onClick={() => onRowClick(row)}
+                {...roving.itemProps(index)}
                 aria-label={`${row.label}${row.caption ? ` · ${row.caption}` : ''}, ${cachedFormatCurrencyEUR(row.amount, true)}, ${Math.round(row.percentage)}%`}
                 aria-current={active ? 'true' : undefined}
                 className={cn(

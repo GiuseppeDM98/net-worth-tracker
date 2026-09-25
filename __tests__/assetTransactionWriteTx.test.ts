@@ -250,6 +250,70 @@ describe('assetTransactionUseCase — atomic write transaction', () => {
     expect(store.get(docKey('assetTransactions', 't1'))!.linkedCashAssetId).toBe('cash-2');
   });
 
+  it('credits a sell net of fees and of the tax the broker withheld, and stores the tax on the trade', async () => {
+    seedAsset({ quantity: 10, averageCost: 100 });
+    seedCash('cash-1', 1000);
+    store.set(docKey('assetTransactions', 'buy-1'), {
+      userId: OWNER,
+      assetId: 'asset-1',
+      type: 'buy',
+      date: new Date(2024, 5, 1),
+      quantity: 10,
+      pricePerUnit: 100,
+      priceEur: 100,
+      createdAt: new Date(2024, 5, 1),
+      updatedAt: new Date(2024, 5, 1),
+    });
+
+    const result = await createAssetTransaction(OWNER, {
+      assetId: 'asset-1',
+      type: 'sell',
+      date: new Date(),
+      quantity: 10,
+      pricePerUnit: 150,
+      fees: 5,
+      linkedCashAssetId: 'cash-1',
+      withheldTaxEur: 128.7,
+    });
+
+    // 1500 − 5 − 128,70 reach the account; the realized P&L stays gross of the tax.
+    expect(store.get(docKey('assets', 'cash-1'))!.quantity).toBeCloseTo(2366.3, 9);
+    expect(result.realizedPnlEur).toBeCloseTo(495, 9);
+    const sell = [...store.entries()].find(([k, v]) => k.startsWith('assetTransactions/') && v.type === 'sell')![1];
+    expect(sell.withheldTaxEur).toBe(128.7);
+  });
+
+  it('moves the account by the tax alone when a sell already settled is given one, and gives it back when cleared to 0', async () => {
+    seedAsset({ quantity: 10, averageCost: 100 });
+    seedCash('cash-1', 1000);
+    store.set(docKey('assetTransactions', 'buy-1'), {
+      userId: OWNER,
+      assetId: 'asset-1',
+      type: 'buy',
+      date: new Date(2024, 5, 1),
+      quantity: 10,
+      pricePerUnit: 100,
+      priceEur: 100,
+      createdAt: new Date(2024, 5, 1),
+      updatedAt: new Date(2024, 5, 1),
+    });
+    const created = await createAssetTransaction(OWNER, {
+      assetId: 'asset-1',
+      type: 'sell',
+      date: new Date(),
+      quantity: 10,
+      pricePerUnit: 150,
+      linkedCashAssetId: 'cash-1',
+    });
+    expect(store.get(docKey('assets', 'cash-1'))!.quantity).toBe(2500);
+
+    await updateAssetTransaction(OWNER, created.transactionId, { withheldTaxEur: 130 });
+    expect(store.get(docKey('assets', 'cash-1'))!.quantity).toBe(2370);
+
+    await updateAssetTransaction(OWNER, created.transactionId, { withheldTaxEur: 0 });
+    expect(store.get(docKey('assets', 'cash-1'))!.quantity).toBe(2500);
+  });
+
   it('deletes a trade and reverses its cash settlement', async () => {
     seedAsset({ quantity: 10, averageCost: 100 });
     seedCash('cash-1', 9000);

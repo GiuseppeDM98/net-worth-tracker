@@ -16,8 +16,10 @@ vi.mock('firebase/firestore', () => ({
 
 import {
   buildSplitVerdict,
+  describeBasisRemedy,
   describeCommonSpending,
   describeMemberBalance,
+  describeMemberCalendar,
   describeMissingBasis,
   describeSalaryConsumed,
   describeSplitAside,
@@ -41,17 +43,23 @@ const NOW = new Date(2026, 7, 15, 12, 0, 0);
 
 const NO_SCHEDULED = { expenses: 0, income: 0, count: 0, throughMonth: null };
 
+/**
+ * `remainingBooked` defaults to `remaining`, which is what a period with nothing in the calendar
+ * looks like — the ordinary case. A fixture that wants the two apart says both out loud.
+ */
 function balance(overrides: Partial<MemberBalance> & { name: string }): MemberBalance {
   const { name, ...rest } = overrides;
-  return {
+  const merged: MemberBalance = {
     member: { id: `m-${name.toLowerCase()}`, name },
     salary: 0,
     share: null,
     commonShare: null,
     personalSpending: 0,
     remaining: null,
+    remainingBooked: null,
     ...rest,
   };
+  return rest.remainingBooked === undefined ? { ...merged, remainingBooked: merged.remaining } : merged;
 }
 
 const GIUSEPPE = balance({
@@ -75,6 +83,7 @@ const MARCELLA = balance({
 const COMPUTED_BASIS: SplitBasis = {
   kind: 'computed',
   totalSalary: 4000,
+  unattributedSalary: 0,
   members: [
     { member: GIUSEPPE.member, salary: 2400, share: 0.6 },
     { member: MARCELLA.member, salary: 1600, share: 0.4 },
@@ -98,12 +107,21 @@ describe('describeSplitBasis', () => {
       'Le quote vengono dagli stipendi del periodo: Giuseppe 2400 € (60%) e Marcella 1600 € (40%).'
     );
   });
+
+  // A percentage computed on part of the month's salaries must not be printed like one computed
+  // on all of them: the spending side has always declared its orphans, the income side did not.
+  it('declares the labor income the shares could not use', () => {
+    expect(plain(describeSplitBasis({ ...COMPUTED_BASIS, unattributedSalary: 1100 }))).toBe(
+      'Le quote vengono dagli stipendi del periodo: Giuseppe 2400 € (60%) e Marcella 1600 € (40%). ' +
+        'Altri 1100 € di reddito da lavoro non sono intestati a nessuno e non entrano nelle quote.'
+    );
+  });
 });
 
 describe('describeMissingBasis', () => {
   it('names the person whose salary is missing, in the singular', () => {
     expect(
-      plain(describeMissingBasis({ kind: 'unavailable', reason: 'missing-salary', missingNames: ['Marcella'] }))
+      plain(describeMissingBasis({ kind: 'unavailable', reason: 'missing-salary', missingNames: ['Marcella'], unattributedSalary: 0 }))
     ).toBe('In questo periodo non risulta lo stipendio di Marcella: finché manca, le quote non si calcolano.');
   });
 
@@ -113,19 +131,62 @@ describe('describeMissingBasis', () => {
         describeMissingBasis({
           kind: 'unavailable',
           reason: 'missing-salary',
-          missingNames: ['Giuseppe', 'Marcella'],
-        })
+          missingNames: ['Giuseppe', 'Marcella'], unattributedSalary: 0 })
       )
     ).toBe('In questo periodo non risultano stipendi di Giuseppe e Marcella: finché mancano, le quote non si calcolano.');
   });
 
+  // Labor income nobody is named on cannot earn a share. Declaring it is what stops a split
+  // computed on part of the month's salaries from being printed like one computed on all of them.
+  it('declares labor income that is attributed to nobody', () => {
+    expect(
+      plain(
+        describeMissingBasis({ kind: 'unavailable', reason: 'missing-salary', missingNames: ['Marcella'], unattributedSalary: 1100 })
+      )
+    ).toContain('Altri 1100 € di reddito da lavoro non sono intestati a nessuno e non entrano nelle quote.');
+  });
+});
+
+describe('describeBasisRemedy', () => {
+  // The explanation belongs to the verdict; the instruction belongs to the tile that owns the
+  // absence. Each branch must name the exact screen — the one a household actually hits
+  // (`missing-salary`) named none until 2026-09-21.
   it('points at the screen that fixes each missing input', () => {
     expect(
-      plain(describeMissingBasis({ kind: 'unavailable', reason: 'not-enough-members', missingNames: [] }))
+      plain(describeBasisRemedy({ kind: 'unavailable', reason: 'not-enough-members', missingNames: [], unattributedSalary: 0 }))
     ).toContain('Famiglia');
     expect(
-      plain(describeMissingBasis({ kind: 'unavailable', reason: 'no-labor-categories', missingNames: [] }))
+      plain(describeBasisRemedy({ kind: 'unavailable', reason: 'no-labor-categories', missingNames: [], unattributedSalary: 0 }))
     ).toContain('Cashflow');
+    expect(
+      plain(describeBasisRemedy({ kind: 'unavailable', reason: 'missing-salary', missingNames: ['Marcella'], unattributedSalary: 0 }))
+    ).toBe('Registra lo stipendio di Marcella in Tracciamento e intestaglielo.');
+  });
+
+  it('agrees in number with more than one missing salary', () => {
+    expect(
+      plain(
+        describeBasisRemedy({
+          kind: 'unavailable',
+          reason: 'missing-salary',
+          missingNames: ['Giuseppe', 'Marcella'],
+          unattributedSalary: 0,
+        })
+      )
+    ).toBe('Registra gli stipendi di Giuseppe e Marcella in Tracciamento e intestali a chi li ha ricevuti.');
+  });
+
+  // The Quota tile must not reprint the verdict's own sentence: on a month with no shares the two
+  // were the same 18 words, 180px apart (DESIGN.md → The One-Tile-One-Question Rule).
+  it('is what the tile reads, and it is not the verdict sentence', () => {
+    const basis: Extract<SplitBasis, { kind: 'unavailable' }> = {
+      kind: 'unavailable',
+      reason: 'missing-salary',
+      missingNames: ['Marcella'],
+      unattributedSalary: 0,
+    };
+    expect(plain(describeSplitBasis(basis))).toBe(plain(describeBasisRemedy(basis)));
+    expect(plain(describeSplitBasis(basis))).not.toBe(plain(describeMissingBasis(basis)));
   });
 });
 
@@ -150,7 +211,7 @@ describe('buildSplitVerdict', () => {
 
   // The tone is the page's only claim about whether the month went well.
   it('turns negative and names who is short', () => {
-    const short = balance({ ...MARCELLA, name: 'Marcella', remaining: -220 });
+    const short = balance({ ...MARCELLA, name: 'Marcella', remaining: -220, remainingBooked: -220 });
     const verdict = buildSplitVerdict({
       summary: summary({ members: [GIUSEPPE, short] }),
       period: AUGUST,
@@ -165,7 +226,7 @@ describe('buildSplitVerdict', () => {
   it('says so when nobody makes it', () => {
     const verdict = buildSplitVerdict({
       summary: summary({
-        members: [balance({ ...GIUSEPPE, name: 'Giuseppe', remaining: -50 }), balance({ ...MARCELLA, name: 'Marcella', remaining: -220 })],
+        members: [balance({ ...GIUSEPPE, name: 'Giuseppe', remaining: -50, remainingBooked: -50 }), balance({ ...MARCELLA, name: 'Marcella', remaining: -220, remainingBooked: -220 })],
       }),
       period: AUGUST,
       now: NOW,
@@ -178,7 +239,7 @@ describe('buildSplitVerdict', () => {
   it('never guesses a share: it states the pool and names the missing input', () => {
     const verdict = buildSplitVerdict({
       summary: summary({
-        basis: { kind: 'unavailable', reason: 'missing-salary', missingNames: ['Marcella'] },
+        basis: { kind: 'unavailable', reason: 'missing-salary', missingNames: ['Marcella'], unattributedSalary: 0 },
         members: [balance({ name: 'Giuseppe', personalSpending: 300 }), balance({ name: 'Marcella' })],
       }),
       period: AUGUST,
@@ -206,7 +267,10 @@ describe('buildSplitVerdict', () => {
     expect(plain(verdict.sentence)).toContain('Nel totale ci sono ancora 300 € di spese già in calendario');
   });
 
-  it('says there is nothing to divide rather than printing zeros', () => {
+  // An empty period is not a period whose shares failed. The headline used to say «le quote non
+  // si possono calcolare» over a sentence saying there was nothing to divide: two explanations of
+  // one screen, the first of them sending the reader to look for data to fix.
+  it('says there is nothing to divide rather than printing zeros, and the headline agrees', () => {
     const verdict = buildSplitVerdict({
       summary: summary({
         common: { total: 0, rowCount: 0, scheduled: NO_SCHEDULED },
@@ -216,7 +280,56 @@ describe('buildSplitVerdict', () => {
       now: NOW,
     });
 
-    expect(plain(verdict.sentence)).toBe("Ad agosto non c'è nessuna spesa da dividere.");
+    expect(verdict.headline).toBe("Ad agosto non c'è niente da dividere.");
+    expect(plain(verdict.sentence)).toBe('Ad agosto non risulta nessuna spesa, né in comune né personale.');
+  });
+
+  it('keeps the empty headline even when the basis could not be computed either', () => {
+    const verdict = buildSplitVerdict({
+      summary: summary({
+        basis: { kind: 'unavailable', reason: 'missing-salary', missingNames: ['Marcella'], unattributedSalary: 0 },
+        common: { total: 0, rowCount: 0, scheduled: NO_SCHEDULED },
+        members: [balance({ name: 'Giuseppe' }), balance({ name: 'Marcella' })],
+      }),
+      period: AUGUST,
+      now: NOW,
+    });
+
+    expect(verdict.headline).toBe("Ad agosto non c'è niente da dividere.");
+  });
+
+  // THE POINT OF `remainingBooked`. A deficit made entirely of bills that have not been paid is
+  // not a deficit: the page said «mancano 83 €» over money still in the account.
+  it('judges on what has happened, then says where the calendar takes it', () => {
+    const giuseppe = balance({ ...GIUSEPPE, name: 'Giuseppe', remaining: 1173, remainingBooked: 1300 });
+    const tarsio = balance({
+      name: 'Tarsio',
+      salary: 1700,
+      share: 0.4,
+      commonShare: 803,
+      personalSpending: 980,
+      remaining: -83,
+      remainingBooked: 0,
+    });
+    const verdict = buildSplitVerdict({
+      summary: summary({
+        members: [giuseppe, tarsio],
+        common: { total: 2030, rowCount: 8, scheduled: { expenses: 210, income: 0, count: 1, throughMonth: null } },
+      }),
+      period: AUGUST,
+      now: NOW,
+    });
+
+    // Nobody is short TODAY, so the month is not called short.
+    expect(verdict.headline).toBe('Ad agosto resta qualcosa a tutti.');
+    expect(verdict.tone).toBe('positive');
+    expect(plain(verdict.sentence)).toContain('A Giuseppe restano 1300 € dei 2400 € di stipendio; a Tarsio restano 0 € dei 1700 €.');
+    expect(plain(verdict.sentence)).toContain('Con quelle, a fine periodo a Giuseppe restano 1173 € e a Tarsio mancano 83 €.');
+  });
+
+  it('adds no calendar clause when nothing is scheduled', () => {
+    const verdict = buildSplitVerdict({ summary: summary(), period: AUGUST, now: NOW });
+    expect(plain(verdict.sentence)).not.toContain('a fine periodo');
   });
 });
 
@@ -229,7 +342,7 @@ describe('describeMemberBalance', () => {
   });
 
   it('says «mancano» when the salary did not cover it', () => {
-    expect(plain(describeMemberBalance(balance({ ...MARCELLA, name: 'Marcella', remaining: -220 })))).toContain(
+    expect(plain(describeMemberBalance(balance({ ...MARCELLA, name: 'Marcella', remaining: -220, remainingBooked: -220 })))).toContain(
       'dai 1600 € di stipendio mancano 220 €.'
     );
   });
@@ -238,6 +351,36 @@ describe('describeMemberBalance', () => {
     expect(plain(describeMemberBalance(balance({ name: 'Marcella', personalSpending: 120 })))).toBe(
       'Spese personali 120 €. Senza le quote non si sa quanto resta.'
     );
+  });
+
+  it('reads the BOOKED residual, not the period one', () => {
+    const tarsio = balance({
+      name: 'Tarsio',
+      salary: 1700,
+      share: 0.4,
+      commonShare: 803,
+      personalSpending: 980,
+      remaining: -83,
+      remainingBooked: 0,
+    });
+    expect(plain(describeMemberBalance(tarsio))).toContain('dai 1700 € di stipendio restano 0 €.');
+    expect(plain(describeMemberBalance(tarsio))).not.toContain('mancano');
+  });
+});
+
+describe('describeMemberCalendar', () => {
+  it('says where the rows still in the calendar take the residual', () => {
+    expect(
+      plain(describeMemberCalendar(balance({ name: 'Tarsio', remaining: -83, remainingBooked: 0 })))
+    ).toBe('Con le spese ancora in calendario mancano 83 €.');
+  });
+
+  it('is absent when the two residuals coincide', () => {
+    expect(describeMemberCalendar(GIUSEPPE)).toBeNull();
+  });
+
+  it('is absent without a basis, where there is no residual at all', () => {
+    expect(describeMemberCalendar(balance({ name: 'Marcella', personalSpending: 120 }))).toBeNull();
   });
 });
 
@@ -279,7 +422,7 @@ describe('describeSplitAside', () => {
 
   it('is absent when there is no split to show', () => {
     expect(
-      describeSplitAside(summary({ basis: { kind: 'unavailable', reason: 'missing-salary', missingNames: ['x'] } }))
+      describeSplitAside(summary({ basis: { kind: 'unavailable', reason: 'missing-salary', missingNames: ['x'], unattributedSalary: 0 } }))
     ).toBeNull();
   });
 });

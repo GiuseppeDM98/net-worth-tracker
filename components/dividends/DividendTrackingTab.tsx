@@ -37,8 +37,8 @@
  */
 'use client';
 
-import type { CSSProperties } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { resolveCenteredModalOrigin } from '@/lib/utils/modalOrigin';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
@@ -192,12 +192,13 @@ export function DividendTrackingTab({ dividends, assets, loading, loadFailed, on
   const [selectedDividend, setSelectedDividend] = useState<Dividend | null>(null);
   const [detailDividend, setDetailDividend] = useState<Dividend | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
-  const [detailDialogStyle, setDetailDialogStyle] = useState<CSSProperties | undefined>(undefined);
+  // Where the record's window grows from: the row that opened it, resolved at the click
+  // (lib/utils/modalOrigin.ts). Never cleared on close — the exit animates too.
+  const [detailOrigin, setDetailOrigin] = useState<string | undefined>(undefined);
   const [inflationCoupon, setInflationCoupon] = useState<Dividend | null>(null);
   const [inflationDialogOpen, setInflationDialogOpen] = useState(false);
   const [scrapeDialogOpen, setScrapeDialogOpen] = useState(false);
   const [scraping, setScraping] = useState(false);
-  const detailDialogRef = useRef<HTMLDivElement | null>(null);
   // Where the focus goes back to when each modal closes: Radix restores it to whatever was
   // focused at open, which is `body` for a window event or a table row (measured 2026-09-14).
   const detailTriggerRef = useRef<HTMLElement | null>(null);
@@ -333,6 +334,7 @@ export function DividendTrackingTab({ dividends, assets, loading, loadFailed, on
 
   const handleOpenDetails = (dividend: Dividend, triggerElement: HTMLElement) => {
     detailTriggerRef.current = triggerElement;
+    setDetailOrigin(resolveCenteredModalOrigin(triggerElement.getBoundingClientRect()));
     setDetailDividend(dividend);
     setDetailDialogOpen(true);
   };
@@ -357,30 +359,6 @@ export function DividendTrackingTab({ dividends, assets, loading, loadFailed, on
       window.removeEventListener('cashflow:scrape-dividends', onScrape);
     };
   }, [handleCreate, handleScrapeAll]);
-
-  // The dialog grows out of the row that opened it. Only the measuring branch lives here: the
-  // clear belongs to `onOpenChange`, which is where closing actually happens — an effect that
-  // also cleared would be a setState in an effect for a state change already handled.
-  useEffect(() => {
-    if (!detailDialogOpen) return;
-    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    const frameId = requestAnimationFrame(() => {
-      const trigger = detailTriggerRef.current;
-      const dialog = detailDialogRef.current;
-      if (!trigger || !dialog) {
-        setDetailDialogStyle(undefined);
-        return;
-      }
-      const triggerRect = trigger.getBoundingClientRect();
-      const dialogRect = dialog.getBoundingClientRect();
-      setDetailDialogStyle({
-        transformOrigin: `${triggerRect.left + triggerRect.width / 2 - dialogRect.left}px ${
-          triggerRect.top + triggerRect.height / 2 - dialogRect.top
-        }px`,
-      });
-    });
-    return () => cancelAnimationFrame(frameId);
-  }, [detailDialogOpen]);
 
   /**
    * One request per instrument with an ISIN, the modal open and its reading saying «Sto
@@ -838,17 +816,13 @@ export function DividendTrackingTab({ dividends, assets, loading, loadFailed, on
       <DividendRecordDetailsDialog
         open={detailDialogOpen}
         dividend={detailDividend}
-        onOpenChange={(open) => {
-          setDetailDialogOpen(open);
-          if (!open) setDetailDialogStyle(undefined);
-        }}
+        onOpenChange={setDetailDialogOpen}
         onEdit={handleEdit}
         onSetInflationRate={(d) => {
           setInflationCoupon(d);
           setInflationDialogOpen(true);
         }}
-        dialogRef={detailDialogRef}
-        style={detailDialogStyle}
+        triggerOrigin={detailOrigin}
         returnFocusTo={detailTriggerRef}
       />
 

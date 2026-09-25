@@ -23,7 +23,6 @@ import {
   Area,
   CartesianGrid,
   ComposedChart,
-  Legend,
   Line,
   ResponsiveContainer,
   Tooltip,
@@ -35,6 +34,7 @@ import type { FanVerdict } from '@/lib/utils/fireSummary';
 import { formatCurrency, formatCurrencyCompact } from '@/lib/services/chartService';
 import { useChartColors } from '@/lib/hooks/useChartColors';
 import { CHART_TICK_STYLE } from '@/components/cashflow/costCenterStyles';
+import { SeriesLegend } from '@/components/ui/series-legend';
 
 interface FireFanChartProps {
   result: AccumulationSimulationResult;
@@ -117,40 +117,13 @@ function FanChartTooltip({ active, payload, label }: FanChartTooltipProps) {
   );
 }
 
-/**
- * Custom legend: only the four named series (the spaghetti carry `legendType="none"` but a
- * custom content also guards against ordering surprises). Square rounded-[2px] swatches per
- * DESIGN.md — a color KEY, not a status dot. Module-level, so the legend never flickers.
- */
-function FanChartLegend(props: unknown) {
-  const payload = (props as { payload?: { value?: string; color?: string }[] }).payload ?? [];
-  const entries = payload.filter((entry) => entry.value && entry.value !== 'spaghetti');
-  if (entries.length === 0) return null;
-
-  return (
-    <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
-      {entries.map((entry) => (
-        <span key={entry.value} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-          <span
-            className="h-2 w-2 shrink-0 rounded-[2px]"
-            style={{ background: entry.color }}
-            aria-hidden="true"
-          />
-          {entry.value}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-const LEGEND_WRAPPER_STYLE = { paddingTop: 4 } as const;
 
 export function FireFanChart({ result, startCalendarYear, verdict, height }: FireFanChartProps) {
   const chartColors = useChartColors();
-  // Fan + median share the primary series hue (the same one the Scenari view gives the base
-  // scenario); the moving target keeps the amber the runway chart already uses for targets.
+  // Fan + median share the base scenario's slot (the same one the Scenari view gives it); the
+  // moving target is a reference series, so it takes the neutral ink, dashed (AGENTS → Recharts).
   const fanColor = chartColors[0] || 'var(--chart-1)';
-  const targetColor = chartColors[2] || 'var(--chart-3)';
+  const targetColor = 'var(--muted-foreground)';
 
   const { rows, spaghettiKeys } = useMemo(() => {
     // Deterministic sample: every k-th path. No randomness at render time.
@@ -181,16 +154,19 @@ export function FireFanChart({ result, startCalendarYear, verdict, height }: Fir
   }, [result, startCalendarYear]);
 
   return (
-    <ResponsiveContainer width="100%" height={height}>
+    <div className="flex h-full min-h-0 flex-col" style={typeof height === 'number' ? { height } : undefined}>
+      <div className="min-h-0 flex-1">
+      <ResponsiveContainer width="100%" height="100%">
       <ComposedChart
         data={rows}
         margin={{ left: 10, bottom: 4 }}
         role="img"
         aria-label={
-          `Ventaglio Monte Carlo del patrimonio: bande dei percentili 10–90 e 25–75 e mediana ` +
-          `nel colore primario del grafico, ${spaghettiKeys.length} percorsi campione in trasparenza, ` +
-          `linea tratteggiata ambra del target FIRE. Probabilità di FIRE entro il ` +
-          `${verdict.calendarYear}: ${verdict.probabilityPct}%.`
+          `Ventaglio Monte Carlo del patrimonio: bande dei percentili 10–90 e 25–75 e mediana, ` +
+          `${spaghettiKeys.length} percorsi campione in trasparenza, linea tratteggiata del target FIRE. ` +
+          (verdict.atStart
+            ? 'FIRE già raggiunto oggi in tutti i percorsi.'
+            : `Probabilità di FIRE entro il ${verdict.calendarYear}: ${verdict.probabilityPct}%.`)
         }
         accessibilityLayer={false}
       >
@@ -202,7 +178,6 @@ export function FireFanChart({ result, startCalendarYear, verdict, height }: Fir
           tick={CHART_TICK_STYLE}
         />
         <Tooltip content={FanChartTooltip} />
-        <Legend content={FanChartLegend} wrapperStyle={LEGEND_WRAPPER_STYLE} />
         <Area
           dataKey="band1090"
           name="10°–90° percentile"
@@ -255,6 +230,18 @@ export function FireFanChart({ result, startCalendarYear, verdict, height }: Fir
           animationEasing="ease-out"
         />
       </ComposedChart>
-    </ResponsiveContainer>
+      </ResponsiveContainer>
+      </div>
+      {/* The band swatches carry the band's own transparency, so the key matches the plot. */}
+      <SeriesLegend
+        className="mt-1.5 justify-center"
+        items={[
+          { label: '10°–90° percentile', colors: [`color-mix(in oklab, ${fanColor} 22%, transparent)`] },
+          { label: '25°–75° percentile', colors: [`color-mix(in oklab, ${fanColor} 40%, transparent)`] },
+          { label: 'Mediana', colors: [fanColor] },
+          { label: 'Target FIRE', colors: [targetColor] },
+        ]}
+      />
+    </div>
   );
 }

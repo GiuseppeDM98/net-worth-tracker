@@ -156,6 +156,39 @@ describe('summarizeMonteCarloRun', () => {
     expect(run.failureMedianCalendarYear).toBeNull();
   });
 
+  it('bins the failed simulations by the calendar year they ran out, the median failure year outlined', () => {
+    const simulation = (id: number, failureYear?: number) => ({
+      simulationId: id,
+      success: failureYear === undefined,
+      failureYear,
+      finalValue: failureYear === undefined ? 900000 : 0,
+      path: [{ year: 0, value: 488600 }],
+    });
+    const results = makeResults({
+      simulations: [simulation(0), simulation(1), simulation(2, 20), simulation(3, 22), simulation(4, 26), simulation(5, 30)],
+      failureAnalysis: { averageFailureYear: 24.5, medianFailureYear: 26 },
+    });
+    const run = summarizeMonteCarloRun(results, makeParams({ numberOfSimulations: 6 }), CTX);
+
+    // 2046..2056 is an eleven-year span: one bin per year, counts adding up to the four failures.
+    expect(run.failureYearBinWidth).toBe(1);
+    expect(run.failureYearBins).toHaveLength(11);
+    expect(run.failureYearBins.reduce((sum, bin) => sum + bin.count, 0)).toBe(4);
+    expect(run.failureYearBins[0]).toMatchObject({ fromYear: 2046, toYear: 2046, count: 1, isReference: false });
+    expect(run.failureYearBins[6]).toMatchObject({ fromYear: 2052, toYear: 2052, count: 1, isReference: true });
+    // Shares are of ALL simulations, like the final-value bins'.
+    expect(run.failureYearBins[0].sharePct).toBeCloseTo(100 / 6);
+    expect(run.failureFirstCalendarYear).toBe(2046);
+    expect(run.failureLastCalendarYear).toBe(2056);
+  });
+
+  it('has no failure bins when nothing fails', () => {
+    const run = summarizeMonteCarloRun(makeResults({ failureAnalysis: null, failureCount: 0 }), makeParams(), CTX);
+    expect(run.failureYearBins).toEqual([]);
+    expect(run.failureFirstCalendarYear).toBeNull();
+    expect(run.failureLastCalendarYear).toBeNull();
+  });
+
   it('builds the histogram with each bin share and marks the bin holding the median', () => {
     const run = summarizeMonteCarloRun(makeResults(), makeParams(), CTX);
     expect(run.histogram).toHaveLength(3);
@@ -238,7 +271,22 @@ describe('summarizeMonteCarloPlan', () => {
   });
 
   it('drops the classes at 0% and reads a fixed withdrawal', () => {
+    const honest = summarizeMonteCarloPlan(
+      makeParams({ annualInflows: [{ fromYear: 34, annualNetToday: 13000 }, { fromYear: 30, annualNetToday: 5000 }], withdrawalTax: { basisToday: 293160, rate: 26 } }),
+      [],
+      0,
+      CTX,
+    );
+    // The pensions in start order, dated; the gain share read on the starting capital (40%).
+    expect(honest.statePensions).toEqual([
+      { yearOffset: 30, calendarYear: 2056, annualNetToday: 5000 },
+      { yearOffset: 34, calendarYear: 2060, annualNetToday: 13000 },
+    ]);
+    expect(honest.withdrawalTax?.rate).toBe(26);
+    expect(honest.withdrawalTax?.gainSharePct).toBeCloseTo(40);
     const plan = summarizeMonteCarloPlan(makeParams({ realEstatePercentage: 0, commoditiesPercentage: 0, equityPercentage: 60, bondsPercentage: 40, withdrawalAdjustment: 'fixed' }), [], 0, CTX);
+    expect(plan.statePensions).toEqual([]);
+    expect(plan.withdrawalTax).toBeNull();
     expect(plan.allocation.map((a) => a.key)).toEqual(['equity', 'bonds']);
     expect(plan.isIndexed).toBe(false);
     expect(plan.lockedValue).toBe(0);
@@ -260,6 +308,11 @@ describe('haveRunInputsChanged', () => {
     scenarios.bear.equityReturn = 3;
     expect(haveRunInputsChanged(a, { ...inputs(), scenarios })).toBe(true);
     expect(haveRunInputsChanged(a, { ...inputs(), inflows: [] })).toBe(true);
+    // The pensions and the tax ride on the params (2026-09-24): a change is a new plan.
+    expect(haveRunInputsChanged(a, { ...inputs(), params: makeParams({ annualInflows: [{ fromYear: 34, annualNetToday: 13000 }] }) })).toBe(true);
+    expect(haveRunInputsChanged(a, { ...inputs(), params: makeParams({ withdrawalTax: { basisToday: 300000, rate: 26 } }) })).toBe(true);
+    const withTax = { ...inputs(), params: makeParams({ withdrawalTax: { basisToday: 300000, rate: 26 } }) };
+    expect(haveRunInputsChanged(withTax, { ...inputs(), params: makeParams({ withdrawalTax: { basisToday: 300000, rate: 26 } }) })).toBe(false);
   });
 
   it('ignores the market fields of the single form (the scenarios carry them)', () => {

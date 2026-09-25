@@ -26,6 +26,9 @@ import {
   buildStoricoVerdict,
   describeComposition,
   describeDoublings,
+  buildDriverLedger,
+  reconcileRemainder,
+  describeDriverRest,
   describeDrivers,
   describeEvolution,
   describeEvolutionAside,
@@ -336,17 +339,18 @@ describe('describeComposition', () => {
 });
 
 describe('describeDrivers', () => {
-  const row = (year: string, netSavings: number, investmentGrowth: number, growthPct: number | null = null) => ({ year, netSavings, investmentGrowth, netWorthGrowth: netSavings + investmentGrowth, growthPct, latest: { year: Number(year), month: 12 } });
+  const row = (year: string, netSavings: number, market: number, growthPct: number | null = null) => ({ year, netSavings, market, taxes: 0, debtRepaid: 0, pensionContributions: 0, other: 0, isMarketMeasured: true, netWorthGrowth: netSavings + market, growthPct, latest: { year: Number(year), month: 12 } });
 
-  it("should split the year's growth between savings and the market, with the shares and the growth in percent", () => {
-    expect(plain(describeDrivers({ row: { ...row('2026', 14100, 7300), latest: { year: 2026, month: 8 } }, isRunning: true }))).toBe('Da gennaio ad agosto 2026 il patrimonio è cresciuto di 21.400 €: 14.100 € dal risparmio (66%) e 7300 € dal mercato (34%).');
-    expect(plain(describeDrivers({ row: row('2025', 22800, 6900), isRunning: false }))).toBe('Nel 2025 il patrimonio è cresciuto di 29.700 €: 22.800 € dal risparmio (77%) e 6900 € dal mercato (23%).');
-    // The growth in percent of the baseline when the baseline is positive; the shares always sum to 100.
-    expect(plain(describeDrivers({ row: row('2025', 23678, 21288, 18.2), isRunning: false }))).toBe('Nel 2025 il patrimonio è cresciuto di 44.966 € (+18,2%): 23.678 € dal risparmio (53%) e 21.288 € dal mercato (47%).');
+  it("should split the year's growth between the two engines, the heavier first, with the growth in percent and no share", () => {
+    expect(plain(describeDrivers({ row: { ...row('2026', 14100, 7300), latest: { year: 2026, month: 8 } }, isRunning: true }))).toBe('Da gennaio ad agosto 2026 il patrimonio è cresciuto di 21.400 €: 14.100 € dal risparmio e 7300 € dal mercato.');
+    expect(plain(describeDrivers({ row: row('2025', 23678, 21288, 18.2), isRunning: false }))).toBe('Nel 2025 il patrimonio è cresciuto di 44.966 € (+18,2%): 23.678 € dal risparmio e 21.288 € dal mercato.');
+    // The market leads when it weighs more; a tie keeps the savings first.
+    expect(plain(describeDrivers({ row: row('2025', 6900, 22800), isRunning: false }))).toBe('Nel 2025 il patrimonio è cresciuto di 29.700 €: 22.800 € dal mercato e 6900 € dal risparmio.');
+    expect(plain(describeDrivers({ row: row('2025', 5000, 5000), isRunning: false }))).toContain('5000 € dal risparmio e 5000 € dal mercato.');
   });
 
   it('should name the window a running year is measured on (The Same-Basis Rule)', () => {
-    expect(plain(describeDrivers({ row: { ...row('2026', 14100, 7300), baseline: { year: 2026, month: 3 }, latest: { year: 2026, month: 7 } }, isRunning: true }))).toBe('Da aprile a luglio 2026 il patrimonio è cresciuto di 21.400 €: 14.100 € dal risparmio (66%) e 7300 € dal mercato (34%).');
+    expect(plain(describeDrivers({ row: { ...row('2026', 14100, 7300), baseline: { year: 2026, month: 3 }, latest: { year: 2026, month: 7 } }, isRunning: true }))).toBe('Da aprile a luglio 2026 il patrimonio è cresciuto di 21.400 €: 14.100 € dal risparmio e 7300 € dal mercato.');
     expect(plain(describeDrivers({ row: { ...row('2026', 14100, 7300), baseline: { year: 2025, month: 12 }, latest: { year: 2026, month: 8 } }, isRunning: true }))).toContain('Da gennaio ad agosto 2026');
     expect(plain(describeDrivers({ row: { ...row('2026', 1400, 730), baseline: { year: 2026, month: 7 }, latest: { year: 2026, month: 8 } }, isRunning: true }))).toContain('Ad agosto 2026 il patrimonio');
   });
@@ -360,6 +364,71 @@ describe('describeDrivers', () => {
 
   it('should give no reading without a year', () => {
     expect(describeDrivers(null)).toBeNull();
+  });
+
+  it('should close on the rest as ONE netted flow, so the sentence adds up without listing the parts', () => {
+    // The real account, gennaio–settembre 2026 (owner, 2026-09-19): 5413 + 21.916 + 8028 = 35.357, a euro of rounding.
+    const year = { ...row('2026', 5413, 21916, 13.5), baseline: { year: 2025, month: 12 }, latest: { year: 2026, month: 9 }, taxes: 4091, debtRepaid: 4655, pensionContributions: 10, other: 7454, netWorthGrowth: 35356 };
+    expect(plain(describeDrivers({ row: year, isRunning: true }))).toBe(
+      'Da gennaio a settembre 2026 il patrimonio è cresciuto di 35.356 € (+13,5%): 21.916 € dal mercato e 5413 € dal risparmio. Il resto, voce per voce qui sotto, vale +8028 €.',
+    );
+    // The net mixes a loss with flows: signed, never coloured.
+    const net = describeDriverRest(year).find((s) => s.mono);
+    expect(net?.text.replace(/\s/g, ' ')).toBe('+8028 €');
+    expect(net?.sign).toBeUndefined();
+    expect(plain(describeDriverRest({ ...year, taxes: 4655, pensionContributions: 0, other: 0 }))).toBe(' Il resto, voce per voce qui sotto, si compensa.');
+  });
+
+  it('should name a single part, the tax as a loss and a flow uncoloured', () => {
+    const year = { ...row('2026', 5413, 21916), netWorthGrowth: 23238, taxes: 4091 };
+    expect(plain(describeDriverRest(year))).toBe(' Il resto: −4091 € di tasse stimate sulle vendite.');
+    expect(describeDriverRest(year).find((s) => s.mono)).toMatchObject({ sign: 'negative' });
+    const mortgage = describeDriverRest({ ...year, taxes: 0, debtRepaid: 4655 });
+    expect(plain(mortgage)).toBe(' Il resto: +4655 € di mutuo rimborsato.');
+    expect(mortgage.find((s) => s.mono)?.sign).toBeUndefined();
+  });
+
+  it('should leave an immaterial «altre variazioni» unsaid, and say nothing when only the engines moved', () => {
+    const year = { ...row('2026', 5413, 21916), netWorthGrowth: 27379, other: 50 };
+    expect(plain(describeDriverRest(year))).toBe('');
+    expect(plain(describeDriverRest({ ...year, other: 1400 }))).toBe(' Il resto: +1400 € di altre variazioni.');
+    expect(plain(describeDriverRest({ ...year, other: 0 }))).toBe('');
+  });
+});
+
+describe('buildDriverLedger', () => {
+  const year = { netSavings: 5413, market: 21916, taxes: 4091, debtRepaid: 4655, pensionContributions: 10, other: 7453, netWorthGrowth: 35356 };
+
+  it('should list every part with its sign and close on the growth the rows add up to', () => {
+    const rows = buildDriverLedger(year);
+    expect(rows.map((r) => r.key)).toEqual(['savings', 'market', 'taxes', 'debtRepaid', 'pensionContributions', 'other', 'total']);
+    const total = rows.at(-1)!;
+    expect(rows.slice(0, -1).reduce((sum, r) => sum + r.value, 0)).toBe(total.value);
+    // The tax is a magnitude in the model and a loss in the ledger.
+    expect(rows.find((r) => r.key === 'taxes')).toMatchObject({ value: -4091, kind: 'loss' });
+    expect(rows.find((r) => r.key === 'debtRepaid')?.kind).toBe('flow');
+    expect(rows.find((r) => r.key === 'market')?.kind).toBe('market');
+  });
+
+  it('should add up to the euro on the PRINTED figures, the rounding landing in the remainder', () => {
+    // Each part rounds up by half a euro: rounded one by one they would overshoot the total by two.
+    const rows = buildDriverLedger({ netSavings: 1000.5, market: 2000.5, taxes: 0, debtRepaid: 300.5, pensionContributions: 0, other: 99.5, netWorthGrowth: 3401 });
+    const total = rows.at(-1)!;
+    expect(total.value).toBe(3401);
+    expect(rows.slice(0, -1).reduce((sum, r) => sum + r.value, 0)).toBe(3401);
+    expect(rows.find((r) => r.key === 'other')?.value).toBe(98);
+    expect(rows.every((r) => Number.isInteger(r.value))).toBe(true);
+  });
+
+  it('should hand the same remainder to any list that closes on a printed total', () => {
+    // «Lavoro e investimenti» on the real account: the six rounded rows summed to 76.886 € over a 76.885 € total.
+    expect(reconcileRemainder(76885.2, [16327.4, 12715.4, 44116.3, -4091.2, 4655.3, 10.4])).toBe(3153);
+    expect(reconcileRemainder(1200, [700, 500])).toBe(0);
+  });
+
+  it('should always print the two engines and drop any other part printed as zero', () => {
+    const rows = buildDriverLedger({ netSavings: 1200, market: 0, taxes: 0.3, debtRepaid: 0, pensionContributions: 0, other: -0.3, netWorthGrowth: 1200 });
+    expect(rows.map((r) => r.key)).toEqual(['savings', 'market', 'total']);
   });
 });
 
@@ -424,13 +493,13 @@ describe('Dettaglio readings', () => {
 
   it('should count the months with savings and the months the market took from', () => {
     const rows = [
-      { year: 2026, month: 1, netSavings: 2200, investmentGrowth: 1100 },
-      { year: 2026, month: 2, netSavings: 1900, investmentGrowth: -1400 },
-      { year: 2026, month: 3, netSavings: 0, investmentGrowth: 2600 },
-      { year: 2026, month: 4, netSavings: 2100, investmentGrowth: -800 },
+      { year: 2026, month: 1, netSavings: 2200, market: 1100 },
+      { year: 2026, month: 2, netSavings: 1900, market: -1400 },
+      { year: 2026, month: 3, netSavings: 0, market: 2600 },
+      { year: 2026, month: 4, netSavings: 2100, market: -800 },
     ];
     expect(plain(describeMonthlyDrivers(rows))).toBe('Hai risparmiato in 3 mesi su 4; il mercato ha tolto in 2 mesi, al massimo −1400 € a febbraio 2026.');
-    expect(plain(describeMonthlyDrivers(rows.map((r) => ({ ...r, netSavings: 100, investmentGrowth: 5 }))))).toBe('Il risparmio non è mai mancato (4 mesi su 4); il mercato non ha mai tolto.');
+    expect(plain(describeMonthlyDrivers(rows.map((r) => ({ ...r, netSavings: 100, market: 5 }))))).toBe('Il risparmio non è mai mancato (4 mesi su 4); il mercato non ha mai tolto.');
     expect(describeMonthlyDrivers([])).toBeNull();
   });
 
@@ -449,6 +518,10 @@ describe('Dettaglio readings', () => {
     netWorthGrowth: 57600,
     totalInvestmentGrowthGross: 14200,
     totalInvestmentGrowthNet: 11900,
+    saleTaxes: 0,
+    debtRepaid: 0,
+    pensionContributions: 0,
+    otherChanges: 0,
     coverage: 78400 / 41500,
   };
 
@@ -510,5 +583,13 @@ describe('formatting helpers', () => {
     expect(describeStoricoHeader({ ...GROWTH, snapshotCount: 1 })).toBe('set 2019 · 1 rilevazione');
     expect(describeStoricoHeader(null)).toBeUndefined();
     expect(describeEvolutionAside(GROWTH)).toBe('set 2019 → lug 2026');
+  });
+});
+
+describe('buildStoricoVerdict without a snapshot', () => {
+  it('should say how the first snapshot arrives in plain words, never naming the cron', () => {
+    const verdict = buildStoricoVerdict({ growth: null, moves: { best: null, worst: null, risingMonths: 0, measuredMonths: 0 }, pace: { verdict: null, trailingDelta: null, trailingPct: null, trailingMonthly: null, lifetimeMonthly: null }, lastDoubling: null });
+    expect(plain(verdict.sentence)).toContain('ne viene salvato uno da solo ogni sera');
+    expect(plain(verdict.sentence)).not.toMatch(/cron/i);
   });
 });

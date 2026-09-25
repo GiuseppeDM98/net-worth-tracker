@@ -10,22 +10,24 @@
  *
  * Nothing is fetched here: the two charts read the `fireData` the tab already holds, so opening
  * it costs no round trip and no figure can disagree with the grid. The two Recharts charts keep
- * their tooltips and their chart slots; the runway's target line stays the amber slot the old
- * chart used for targets.
+ * their tooltips and their chart slots; a legend is `SeriesLegend` under the plot and a target
+ * line is neutral ink, dashed (AGENTS.md → Recharts, since 2026-09-22 here too).
  */
 
 import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
-import { CartesianGrid, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { HistoricalFIRERunwayPoint, HistoricalFIRERunwaySummary, MonthlyFIREData } from '@/lib/services/fireService';
 import type { Narrative } from '@/lib/utils/narrative';
 import { CASHFLOW_CHART_READING, EXPLAINER_READING } from '@/lib/utils/fireNarrative';
-import { formatCurrency, formatCurrencyCompact, formatPercentage } from '@/lib/services/chartService';
+import { formatCurrencyCompact, formatPercentage } from '@/lib/services/chartService';
+import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { fmtCurrency } from '@/lib/utils/chartUtils';
 import { useChartColors } from '@/lib/hooks/useChartColors';
 import { cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Tile, TILE_CELL_CLASS, TILE_EYEBROW_CLASS, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
+import { SeriesLegend } from '@/components/ui/series-legend';
 import { CHART_TICK_STYLE } from '@/components/cashflow/costCenterStyles';
 import { SettledYearsValue } from '@/components/fire-simulations/SettledValue';
 
@@ -44,7 +46,6 @@ interface FireDettaglioProps {
 const TOOLTIP_CONTENT_STYLE = { backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--card-foreground)', fontSize: 12 } as const;
 const TOOLTIP_LABEL_STYLE = { color: 'var(--card-foreground)', fontWeight: 600 } as const;
 const TOOLTIP_ITEM_STYLE = { color: 'var(--card-foreground)' } as const;
-const LEGEND_STYLE = { fontSize: 11, color: 'var(--muted-foreground)' } as const;
 
 const oneDecimal = (value: number) => value.toLocaleString('it-IT', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
@@ -77,8 +78,8 @@ function RunwayTooltip({ active, payload, label }: { active?: boolean; payload?:
   const rows: [string, string][] = [
     ['Runway totale', point.yearsOfExpenses !== null ? `${oneDecimal(point.yearsOfExpenses)} anni` : '—'],
     ['Runway liquida', point.liquidYearsOfExpenses !== null ? `${oneDecimal(point.liquidYearsOfExpenses)} anni` : '—'],
-    ['Spese rolling 12M', formatCurrency(point.trailing12mExpenses)],
-    ['Patrimonio FIRE', formatCurrency(point.fireNetWorthUsed)],
+    ['Spese rolling 12M', cachedFormatCurrencyEUR(point.trailing12mExpenses, true)],
+    ['Patrimonio FIRE', cachedFormatCurrencyEUR(point.fireNetWorthUsed, true)],
     ['Progresso FIRE', point.fireProgressToFI !== null ? formatPercentage(point.fireProgressToFI) : '—'],
   ];
   return (
@@ -136,14 +137,14 @@ export function FireDettaglio({ description, runwayData, runwaySummary, runwayRe
                           <XAxis dataKey="monthLabel" tick={CHART_TICK_STYLE} tickMargin={6} />
                           <YAxis width={44} tickFormatter={(value) => `${Number(value).toFixed(0)}a`} tick={CHART_TICK_STYLE} />
                           <Tooltip content={RunwayTooltip} />
-                          <Legend wrapperStyle={LEGEND_STYLE} />
+                          {/* A reference line, not a series: neutral ink, dashed (AGENTS → Recharts). */}
                           {runwaySummary.targetYearsOfExpenses !== null && (
                             <ReferenceLine
                               y={runwaySummary.targetYearsOfExpenses}
-                              stroke={chartColors[2]}
+                              stroke="var(--muted-foreground)"
                               strokeWidth={1.5}
                               strokeDasharray="6 4"
-                              label={{ value: `Obiettivo ${oneDecimal(runwaySummary.targetYearsOfExpenses)} anni`, position: 'insideTopRight', fill: chartColors[2], fontSize: 11 }}
+                              label={{ value: `Obiettivo ${oneDecimal(runwaySummary.targetYearsOfExpenses)} anni`, position: 'insideTopRight', fill: 'var(--muted-foreground)', fontSize: 10 }}
                             />
                           )}
                           <Line type="monotone" dataKey="yearsOfExpenses" stroke={chartColors[0]} strokeWidth={2} name="Totale" dot={false} connectNulls={false} animationDuration={800} animationEasing="ease-out" />
@@ -152,6 +153,7 @@ export function FireDettaglio({ description, runwayData, runwaySummary, runwayRe
                       </ResponsiveContainer>
                     </div>
                   </div>
+                  <SeriesLegend className="mt-1.5 justify-center" items={[{ label: 'Totale', colors: [chartColors[0]] }, { label: 'Solo liquidi', colors: [chartColors[1]] }, { label: 'Obiettivo', colors: ['var(--muted-foreground)'] }]} />
                 </>
               ) : null}
             </Tile>
@@ -174,7 +176,6 @@ export function FireDettaglio({ description, runwayData, runwaySummary, runwayRe
                         <XAxis dataKey="monthLabel" tick={CHART_TICK_STYLE} tickMargin={6} />
                         <YAxis width={56} tickFormatter={(value) => formatCurrencyCompact(Number(value))} tick={CHART_TICK_STYLE} />
                         <Tooltip formatter={fmtCurrency} contentStyle={TOOLTIP_CONTENT_STYLE} labelStyle={TOOLTIP_LABEL_STYLE} itemStyle={TOOLTIP_ITEM_STYLE} />
-                        <Legend wrapperStyle={LEGEND_STYLE} />
                         <Line type="monotone" dataKey="income" stroke={chartColors[1]} strokeWidth={2} name="Entrate" dot={false} animationDuration={800} animationEasing="ease-out" />
                         <Line type="monotone" dataKey="expenses" stroke={chartColors[4]} strokeWidth={2} name="Uscite" dot={false} animationDuration={800} animationEasing="ease-out" />
                         <Line type="monotone" dataKey="monthlyAllowance" stroke={chartColors[3]} strokeWidth={2} name="Reddito passivo" dot={false} animationDuration={800} animationEasing="ease-out" />
@@ -182,6 +183,9 @@ export function FireDettaglio({ description, runwayData, runwaySummary, runwayRe
                     </ResponsiveContainer>
                   </div>
                 </div>
+              ) : null}
+              {chartData.length > 0 ? (
+                <SeriesLegend className="mt-1.5 justify-center" items={[{ label: 'Entrate', colors: [chartColors[1]] }, { label: 'Uscite', colors: [chartColors[4]] }, { label: 'Reddito passivo', colors: [chartColors[3]] }]} />
               ) : (
                 <p className="mt-3 text-[13px] text-muted-foreground">Nessuno storico disponibile: gli snapshot mensili verranno creati automaticamente.</p>
               )}

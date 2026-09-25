@@ -43,8 +43,9 @@ import {
   getExpensesByRecurringParentId,
   getExpensesByInstallmentParentId,
 } from '@/lib/services/expenseService';
-import { updateCashAssetBalance } from '@/lib/services/assetService';
-import { reconcileTransferDelete } from '@/lib/services/cashBalanceReconciliation';
+import { reverseAppliedBalances } from '@/lib/services/cashBalanceReconciliation';
+import { rowsDeletedWith } from '@/lib/utils/transferFee';
+import { isRepayableProperty } from '@/lib/utils/mortgageRepayment';
 import { queryKeys } from '@/lib/query/queryKeys';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -62,6 +63,8 @@ import Link from 'next/link';
 import { ExpenseDialog } from '@/components/expenses/ExpenseDialog';
 import { ExpenseTable } from '@/components/expenses/ExpenseTable';
 import { SeriesDeleteDialog, resolveSeriesDeleteMode, type SeriesDeleteRequest } from '@/components/expenses/SeriesDeleteDialog';
+import { LinkSeriesDialog, type LinkSeriesRequest } from '@/components/expenses/LinkSeriesDialog';
+import { useAssets } from '@/lib/hooks/useAssets';
 import { TransactionFeed } from '@/components/cashflow/TransactionFeed';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { MobileFiltersDrawer } from '@/components/cashflow/MobileFiltersDrawer';
@@ -150,6 +153,12 @@ interface ExpenseTrackingTabProps {
   splitEnabled: boolean;
   /** The household, from the settings — the people a row can be attributed to. */
   familyMembers: FamilyMember[];
+  /**
+   * The «Intestatario» filter this tab should open on, from `?owner=` — how «Attribuisci spese»
+   * on Divisione hands over the rows to work through. Null on every other entry, which leaves
+   * the filter where the reader left it.
+   */
+  initialOwnerId?: string | null;
 }
 
 interface ListFilters {
@@ -250,6 +259,7 @@ export function ExpenseTrackingTab({
   assetNameMap,
   splitEnabled,
   familyMembers,
+  initialOwnerId = null,
 }: ExpenseTrackingTabProps) {
   const { user } = useAuth();
   const { ownerId } = useActiveAccount();
@@ -272,6 +282,16 @@ export function ExpenseTrackingTab({
 
   // The one question a series adds to a delete from the feed: «solo questa o tutte?»
   const [seriesRequest, setSeriesRequest] = useState<SeriesDeleteRequest | null>(null);
+  // «Collega la serie…» from a series row's detail (LinkSeriesDialog).
+  const [linkRequest, setLinkRequest] = useState<LinkSeriesRequest | null>(null);
+  // The cash accounts: the detail names the account a row moves, and a series is linked to one.
+  const { data: allAssets } = useAssets(ownerId ?? undefined);
+  const cashAccounts = useMemo(() => (allAssets ?? []).filter((a) => a.type === 'cash' && a.assetClass === 'cash'), [allAssets]);
+  const accountNames = useMemo(() => new Map((allAssets ?? []).filter((a) => a.type === 'cash').map((a) => [a.id, a.name.trim()])), [allAssets]);
+  // Properties a mortgage instalment can repay (lib/utils/mortgageRepayment.ts); the names cover
+  // every property, so a row whose debt was repaid in full still names its house.
+  const repayableProperties = useMemo(() => (allAssets ?? []).filter(isRepayableProperty), [allAssets]);
+  const propertyNames = useMemo(() => new Map((allAssets ?? []).filter((a) => a.type === 'realestate').map((a) => [a.id, a.name.trim()])), [allAssets]);
 
   // Desktop list view: the day-grouped feed (default, shared with mobile) or the dense table.
   // Remembered (localStorage), like Patrimonio's toggles: a reader who works in the table
@@ -305,7 +325,16 @@ export function ExpenseTrackingTab({
   const [selectedAccountId, setSelectedAccountId] = useState<string>('all');
 
   // Intestatario filter (Divisione only) — 'all' means no owner filter applied.
-  const [selectedOwnerId, setSelectedOwnerId] = useState<string>(OWNER_FILTER_ALL);
+  const [selectedOwnerId, setSelectedOwnerId] = useState<string>(initialOwnerId ?? OWNER_FILTER_ALL);
+  // A link arriving from Divisione changes `?owner=` without remounting this tab (it is
+  // `forceMount`), so the initializer above would never run again. Settled DURING render on the
+  // param as its subject — never `useEffect + setState`, which would paint one frame of the old
+  // filter (AGENTS.md → react-hooks/set-state-in-effect, answer 3).
+  const [ownerParamSeen, setOwnerParamSeen] = useState<string | null | undefined>(initialOwnerId);
+  if (ownerParamSeen !== initialOwnerId) {
+    setOwnerParamSeen(initialOwnerId);
+    setSelectedOwnerId(initialOwnerId ?? OWNER_FILTER_ALL);
+  }
 
   // Generate available years from ALL expenses (not filtered)
   const availableYears = useMemo(() => {
@@ -426,23 +455,15 @@ export function ExpenseTrackingTab({
   const deleteSingleExpense = useCallback(
     async (expense: Expense) => {
       try {
-        // Reverse the balance effect before deleting. Transfers move money between two
-        // accounts, so both sides must be reconciled (mirror of ExpenseTable's delete) —
-        // a plain origin-only reversal would leave the destination balance wrong.
-        if (expense.type === 'transfer') {
-          await reconcileTransferDelete({
-            originId: expense.linkedCashAssetId,
-            destId: expense.transferCashAssetId,
-            amount: Math.abs(expense.amount),
-          });
-        } else if (expense.linkedCashAssetId) {
-          await updateCashAssetBalance(expense.linkedCashAssetId, -expense.amount);
-        }
-        if (user && ownerId && (expense.linkedCashAssetId || expense.transferCashAssetId)) {
+        // Give back what the row has applied — both accounts of a transfer — before deleting
+        // it; a row still waiting for its date moved nothing (mirror of ExpenseTable's delete).
+        // A transfer's fee row goes with it (lib/utils/transferFee.ts), its balance given back too.
+        const { deleteExpenseRows, getTransferFeeOf } = await import('@/lib/services/expenseService');
+        const rows = rowsDeletedWith(expense, await getTransferFeeOf(expense));
+        if ((await reverseAppliedBalances(rows)) && user && ownerId) {
           queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
         }
-        const { deleteExpense } = await import('@/lib/services/expenseService');
-        await deleteExpense(expense.id);
+        await deleteExpenseRows(expense.userId, rows);
         if (user && ownerId) queryClient.invalidateQueries({ queryKey: queryKeys.costCenters.all(ownerId) });
         toast.success('Voce eliminata con successo');
         await onRefresh();
@@ -455,10 +476,11 @@ export function ExpenseTrackingTab({
   );
 
   /**
-   * Delete a transaction from the feed's detail drawer. The drawer already showed an
-   * explicit destructive confirmation, so a simple expense is deleted immediately. A row of an
-   * instalment plan or a recurring series opens `SeriesDeleteDialog` — the one question the
-   * series adds, «solo questa o tutte?» (the same modal the table uses).
+   * Delete a transaction from the feed's detail. A plain row reaches here on the SECOND press
+   * of the detail's armed «Elimina» (the reading printed the consequence in between), so it is
+   * deleted immediately. A row of an instalment plan or a recurring series reaches here on the
+   * first press, unarmed, and opens `SeriesDeleteDialog` — the one question the series adds,
+   * «solo questa o tutte?» (the same modal the table uses) — which is its confirmation.
    */
   const handleDeleteExpense = useCallback(
     (expense: Expense) => {
@@ -477,14 +499,9 @@ export function ExpenseTrackingTab({
     // without an owner there is nothing to delete — and no way to ask for it.
     if (!ownerId) return;
     try {
-      // Reverse balance effects before bulk-deleting (only the first entry stores linkedCashAssetId)
+      // Give back what the occurrences already happened have applied, in one transaction.
       const seriesExpenses = await getExpensesByRecurringParentId(ownerId, recurringParentId);
-      for (const exp of seriesExpenses) {
-        if (exp.linkedCashAssetId) {
-          await updateCashAssetBalance(exp.linkedCashAssetId, -exp.amount);
-        }
-      }
-      if (user && ownerId && seriesExpenses.some((e) => e.linkedCashAssetId)) {
+      if ((await reverseAppliedBalances(seriesExpenses)) && user && ownerId) {
         queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
       }
       const { deleteRecurringExpenses } = await import('@/lib/services/expenseService');
@@ -503,14 +520,9 @@ export function ExpenseTrackingTab({
     // without an owner there is nothing to delete — and no way to ask for it.
     if (!ownerId) return;
     try {
-      // Reverse balance effects before bulk-deleting (only the first installment stores linkedCashAssetId)
+      // Give back what the instalments already due have applied, in one transaction.
       const seriesExpenses = await getExpensesByInstallmentParentId(ownerId, installmentParentId);
-      for (const exp of seriesExpenses) {
-        if (exp.linkedCashAssetId) {
-          await updateCashAssetBalance(exp.linkedCashAssetId, -exp.amount);
-        }
-      }
-      if (user && ownerId && seriesExpenses.some((e) => e.linkedCashAssetId)) {
+      if ((await reverseAppliedBalances(seriesExpenses)) && user && ownerId) {
         queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
       }
       const { deleteInstallmentExpenses } = await import('@/lib/services/expenseService');
@@ -761,6 +773,12 @@ export function ExpenseTrackingTab({
       grouped={mobileSortKey === 'date-desc' || mobileSortKey === 'date-asc'}
       onEdit={handleEditExpense}
       onDelete={handleDeleteExpense}
+      onLinkSeries={(expense, target) => {
+        const mode = resolveSeriesDeleteMode(expense);
+        if (mode) setLinkRequest({ expense, mode, target });
+      }}
+      accountNames={accountNames}
+      propertyNames={repayableProperties.length > 0 ? propertyNames : undefined}
       isDemo={isDemo}
       hasActiveFilters={hasActiveFilters}
       categoryMetaMap={categoryMetaMap}
@@ -805,6 +823,8 @@ export function ExpenseTrackingTab({
       selectedOwnerId={effectiveOwnerId}
       onOwnerChange={setSelectedOwnerId}
       activeFilterCount={mobileActiveFilterCount}
+      shownCount={filteredExpenses.length}
+      totalCount={expenses.length}
       onReset={handleResetFilters}
       mobileSortKey={mobileSortKey}
       onSortChange={(v) => setMobileSortKey(v as typeof mobileSortKey)}
@@ -1115,6 +1135,19 @@ export function ExpenseTrackingTab({
           }
         }}
       />
+
+      {/* «Collega la serie a un conto» — the occurrences still to come move the account on their date */}
+      {ownerId && (
+        <LinkSeriesDialog
+          request={linkRequest}
+          ownerId={ownerId}
+          cashAccounts={cashAccounts}
+          properties={repayableProperties}
+          now={now}
+          onClose={() => setLinkRequest(null)}
+          onLinked={() => void onRefresh()}
+        />
+      )}
     </div>
   );
 }

@@ -1,6 +1,12 @@
 # Landing pubblica
 
-> **Quando aprire questa guida** — chi tocca `app/page.tsx`, `components/landing/LandingPromiseTile.tsx`, `lib/utils/{landingNarrative,landingSampleData}.ts`. In `AGENTS.md` resta lo stub con l'essenziale; qui c'è la regola completa. File: `CLAUDE.md` → *Key Files* → *Landing pubblica*.
+> **Quando aprire questa guida** — chi tocca `app/page.tsx`, `components/landing/LandingPromiseTile.tsx`, `lib/utils/{landingNarrative,landingSampleData}.ts`. In `AGENTS.md` resta lo stub con l'essenziale; qui c'è la regola completa. File: § *Files*, sotto.
+
+## Files
+
+Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
+
+- **Landing**: `app/page.tsx`, `components/landing/LandingPromiseTile.tsx`, pure `lib/utils/{landingNarrative,landingSampleData}.ts`
 
 ## Landing pubblica (`app/page.tsx`, `components/landing/LandingPromiseTile.tsx`, `lib/utils/{landingNarrative,landingSampleData}.ts`)
 

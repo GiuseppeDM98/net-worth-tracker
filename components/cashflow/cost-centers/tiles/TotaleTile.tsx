@@ -56,9 +56,12 @@ export function TotaleTile({ summary, stack, stackCaption, aside, reading, lastY
         <Kpi label="Quest'anno" value={cachedFormatCurrencyEUR(summary.ytd, true)} caption={[{ text: 'da gennaio' }]} />
         <Kpi label="Anno scorso" value={cachedFormatCurrencyEUR(summary.lastYear, true)} caption={lastYearCaption} />
         <Kpi
-          label="Al mese"
+          // NOT «Al mese»: the detail's «Al mese» divides a center's WHOLE cost by the months
+          // since its first expense; this one is the trailing year over twelve. Two magnitudes
+          // under one label read as one figure that changed between two screens.
+          label="Media 12 mesi"
           value={cachedFormatCurrencyEUR(summary.trailingAverage, true)}
-          caption={[{ text: 'media ultimi ' }, { text: '12', mono: true }, { text: ' mesi' }]}
+          caption={[{ text: 'al mese, ultimi ' }, { text: '12', mono: true }]}
         />
       </div>
 

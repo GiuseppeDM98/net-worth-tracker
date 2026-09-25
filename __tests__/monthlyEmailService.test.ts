@@ -90,6 +90,7 @@ import {
   buildPeriodEmailData,
   generateEmailHtml,
   sendMonthlyEmail,
+  buildExpenseSplitTile,
   type MonthlyEmailData,
 } from '@/lib/server/monthlyEmailService';
 import { MAX_CATEGORY_DELTAS, type PeriodComparison } from '@/lib/server/emailPeriodComparison';
@@ -1414,5 +1415,89 @@ describe('sendMonthlyEmail', () => {
   it('throws when Resend returns an error', async () => {
     resendSendMock.mockResolvedValue({ data: null, error: { message: 'rate limited' } });
     await expect(sendMonthlyEmail(['a@b.com'], makeMonthlyData())).rejects.toThrow('Resend error');
+  });
+});
+
+describe('buildExpenseSplitTile', () => {
+  /**
+   * The email and Cashflow › Divisione read the same two modules precisely so they can never
+   * print two different splits. The trap is subtler than a different total: the row's AMOUNT and
+   * the caption under it come from different calls, so an amount taken from the period's residual
+   * beside a caption built on the booked one would contradict itself two lines apart.
+   */
+  const member = (
+    name: string,
+    remaining: number,
+    remainingBooked: number
+  ) => ({
+    member: { id: `m-${name.toLowerCase()}`, name },
+    salary: 2000,
+    share: 0.5,
+    commonShare: 500,
+    personalSpending: 100,
+    remaining,
+    remainingBooked,
+  });
+
+  /** Only `expenseSplit` and the period fields are read; the rest of the payload is not. */
+  const dataWith = (members: ReturnType<typeof member>[]) =>
+    ({
+      periodType: 'monthly',
+      year: 2026,
+      month: 8,
+      expenseSplit: {
+        basis: {
+          kind: 'computed',
+          totalSalary: 4000,
+          unattributedSalary: 0,
+          members: members.map((entry) => ({ member: entry.member, salary: entry.salary, share: entry.share! })),
+        },
+        common: { total: 1000, rowCount: 4, scheduled: { expenses: 400, income: 0, count: 1, throughMonth: null } },
+        members,
+        unassigned: { total: 0, rowCount: 0 },
+        commonExpenses: [],
+      },
+    }) as unknown as MonthlyEmailData;
+
+  /**
+   * Read the AMOUNT CELLS, not the whole tile. A `toContain('1400')` over the HTML is green
+   * whatever the amount is, because the caption prints the same figure two lines below — the
+   * first version of this test passed with the amount reverted to the period residual, which is
+   * the defect it was written to catch.
+   */
+  const amountCells = (html: string) =>
+    [...html.matchAll(/<td align="right"[^>]*>([^<]*)<\/td>/g)]
+      .map((match) => match[1].replace(/\u00a0/g, ' '))
+      // The first right-aligned cell is the tile's scope label, not a figure.
+      .filter((text) => /[+−]/.test(text));
+
+  it('leads with the booked residual and carries the calendar in the caption', () => {
+    const html = buildExpenseSplitTile(dataWith([member('Ghiandaia', 1200, 1400), member('Tarsio', -100, 100)]));
+
+    // Both amounts are the BOOKED ones: Tarsio is +100 today, not the −100 the month ends on.
+    expect(amountCells(html)).toEqual(['+1400 €', '+100 €']);
+    // Where the month takes them is said, not printed as a second figure.
+    expect(html).toContain('Con le spese ancora in calendario');
+  });
+
+  /**
+   * Seen in a render on 2026-09-22: the amounts came out in the plain foreground whatever the sign,
+   * because the row's `trailingSign` colours the optional THIRD column and this list has none. A
+   * person who came up short printed the same ink as one who did not.
+   */
+  it('colours the amount by the sign of the booked residual', () => {
+    const short = buildExpenseSplitTile(dataWith([member('Ghiandaia', 1400, 1400), member('Tarsio', -400, -200)]));
+    expect(short).toContain(PRINT_COLORS.negative);
+    expect(short).toContain(PRINT_COLORS.positive);
+
+    // And a row that is short only on the CALENDAR keeps the positive ink: the colour follows what
+    // has happened, exactly as the tile on the page does.
+    const calendarOnly = buildExpenseSplitTile(dataWith([member('Ghiandaia', 1400, 1400), member('Tarsio', -100, 100)]));
+    expect(calendarOnly).not.toContain(PRINT_COLORS.negative);
+  });
+
+  it('adds no calendar sentence when nothing is scheduled', () => {
+    const html = buildExpenseSplitTile(dataWith([member('Ghiandaia', 1400, 1400), member('Tarsio', 100, 100)]));
+    expect(html).not.toContain('Con le spese ancora in calendario');
   });
 });

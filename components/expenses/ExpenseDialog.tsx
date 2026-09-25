@@ -14,7 +14,10 @@
  * Step 2 — the form itself:
  *   - Type: a "Cambia tipo" back link in create mode; the Select in edit mode (all five types are
  *     selectable there — onSubmit reconciles balances from BOTH the old and the new type's shape)
- *   - Primary fields: Importo + Data, Categoria, Sottocategoria, Note, Conto Collegato
+ *   - Primary fields: Importo + Data, Categoria, Sottocategoria, Note, Conto Collegato — and, on a
+ *     transfer, «Commissione»: a fee typed there becomes a spending row of its own, linked to the
+ *     transfer (lib/utils/transferFee.ts); on a debt, «Riduce il debito di»: the property whose
+ *     mortgage the instalment repays, by its principal, on its date (lib/utils/mortgageRepayment.ts)
  *   - "Impostazioni avanzate" Collapsible: Centro di Costo, Link, Acquisto Rateale, Ricorrenza Mensile
  *
  * Advanced section auto-expands when editing a record with advanced data set.
@@ -38,19 +41,26 @@ import {
   RecurrenceFrequency,
 } from '@/types/expenses';
 import { CostCenter } from '@/types/costCenters';
+import { resolveCostCenterColor } from '@/lib/utils/costCenterColors';
+import { useChartColors } from '@/lib/hooks/useChartColors';
 import { getCostCenters } from '@/lib/services/costCenterService';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Asset, FamilyMember } from '@/types/assets';
-import { createExpense, updateExpense } from '@/lib/services/expenseService';
+import { createExpenseSettledOnDate, createTransferWithFee, getTransferFeeOf, saveTransferFee, updateExpense } from '@/lib/services/expenseService';
+import { applyDebtRepaymentEdit, applyDebtRepayments } from '@/lib/services/debtRepaymentService';
+import { isRepayableProperty, splitInstalment } from '@/lib/utils/mortgageRepayment';
 import { getAllAssets } from '@/lib/services/assetService';
+import { applyBalanceEffects } from '@/lib/services/cashBalanceReconciliation';
+import { editBalanceEffects } from '@/lib/utils/cashSettlement';
 import {
-  reconcileTransferEdit,
-  reconcileTransferCreate,
-  reconcileSingleEdit,
-  reconcileSingleCreate,
-  reconcileTransferToSingleEdit,
-  reconcileSingleToTransferEdit,
-} from '@/lib/services/cashBalanceReconciliation';
+  describeTransferFeeNote,
+  normalizeTransferFee,
+  transferFeeCategoryLabel,
+  planTransferFee,
+  resolveTransferFeeCategory,
+  type TransferFeeSettings,
+} from '@/lib/utils/transferFee';
+import Link from 'next/link';
 import { getSettings } from '@/lib/services/assetAllocationService';
 import { getAllCategories, ensureTransferCategory } from '@/lib/services/expenseCategoryService';
 import { resolveEquivalentCategory } from '@/lib/utils/expenseCategoryMatching';
@@ -105,9 +115,14 @@ import {
 import {
   describeExpenseIntent,
   describeFormRefusal,
+  describeDebtRepaymentField,
   describeModalStatus,
+  describeTransferFeeField,
   describeWriteError,
   EXPENSE_TYPE_PICKER_READING,
+  TRANSFER_FEE_NEEDS_CATEGORY,
+  TRANSFER_FEE_READING,
+  TRANSFER_FEE_UNREAD,
   type ModalStatus,
 } from '@/lib/utils/dialogNarrative';
 import { cn } from '@/lib/utils';
@@ -141,6 +156,11 @@ const expenseSchema = z
     installmentStartDate: z.date().optional(),
     linkedCashAssetId: z.string().optional(),
     transferCashAssetId: z.string().optional(),
+    // A transfer's fee (lib/utils/transferFee.ts). Empty reads as NaN through `valueAsNumber`,
+    // which means «no fee», like zero — `normalizeTransferFee` decides.
+    transferFee: z.number().nonnegative('La commissione non può essere negativa').optional().or(z.nan()),
+    // A debt row's property (lib/utils/mortgageRepayment.ts); '__none__' = none, like the accounts.
+    debtAssetId: z.string().optional(),
   })
   .refine(
     (data) => {
@@ -404,6 +424,15 @@ interface FormBodyProps {
   onBackToTypePicker?: () => void;
   /** What changing the type will do to this row, or null when it has not changed. */
   typeChangeNotice: string | null;
+  /** A transfer's «Commissione» can be typed: a category to land in, and the saved fee was read. */
+  transferFeeEnabled: boolean;
+  /** The line under «Commissione»; null when no category is chosen (the link to Impostazioni shows). */
+  transferFeeHint: string | null;
+  /** Properties a debt row can repay: real estate with a debt (plus the one the row already names). */
+  properties: Asset[];
+  watchedDebtAssetId: string | undefined;
+  /** The line under «Riduce il debito di»: principal vs interest of this instalment, on today's debt. */
+  debtRepaymentHint: string;
   advancedOpen: boolean;
   setAdvancedOpen: (v: boolean) => void;
 }
@@ -447,10 +476,19 @@ function ExpenseFormBody({
   onTypeChange,
   onBackToTypePicker,
   typeChangeNotice,
+  transferFeeEnabled,
+  transferFeeHint,
+  properties,
+  watchedDebtAssetId,
+  debtRepaymentHint,
   advancedOpen,
   setAdvancedOpen,
 }: Readonly<FormBodyProps>) {
   const { register, control, handleSubmit, setValue, getValues, formState: { errors } } = form;
+  const chartColors = useChartColors();
+  // An archived center is closed: it takes no new expense. The one this expense is ALREADY
+  // linked to stays listed, or opening an old row would show «Nessun centro» and unlink it on save.
+  const linkableCostCenters = costCenters.filter((center) => !center.archivedAt || center.id === selectedCostCenterId);
   const recurringFrequency = selectedRecurringFrequency ?? DEFAULT_RECURRENCE_FREQUENCY;
   return (
     <form id="expense-form" onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-5">
@@ -696,8 +734,41 @@ function ExpenseFormBody({
             )}
           </div>
           <p className="text-xs text-muted-foreground">
-            Il saldo di entrambi i conti viene aggiornato automaticamente.
+            I due saldi si muovono alla data del trasferimento: subito se è oggi o passata, quel giorno se è futura.
           </p>
+          {/* The fee is a spending row of its own, linked to this transfer (lib/utils/transferFee.ts):
+              the transfer is net-zero and belongs to no total, the bank's charge for it does. */}
+          <div className="space-y-2">
+            <Label htmlFor="transferFee">
+              Commissione <span className="text-muted-foreground font-normal">(opzionale)</span>
+            </Label>
+            <Input
+              id="transferFee"
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="0,00"
+              disabled={!transferFeeEnabled}
+              aria-describedby="transferFee-hint"
+              {...register('transferFee', { valueAsNumber: true })}
+              aria-invalid={errors.transferFee ? true : undefined}
+              className={errors.transferFee ? 'border-destructive' : ''}
+            />
+            {errors.transferFee && (
+              <p role="alert" className="text-sm text-destructive">{errors.transferFee.message}</p>
+            )}
+            <p id="transferFee-hint" className="text-xs text-muted-foreground">
+              {transferFeeHint ?? (
+                <>
+                  {TRANSFER_FEE_NEEDS_CATEGORY}{' '}
+                  <Link href="/dashboard/settings?tab=spese" className="underline underline-offset-2 hover:text-foreground">
+                    Impostazioni › Spese
+                  </Link>
+                  .
+                </>
+              )}
+            </p>
+          </div>
         </div>
       ) : selectedType === 'transfer' ? (
         /* No cash account at all: the schema refuses the transfer, so say why before the click. */
@@ -727,10 +798,37 @@ function ExpenseFormBody({
             </SelectContent>
           </Select>
           <p className="text-xs text-muted-foreground">
-            Il saldo viene aggiornato automaticamente al salvataggio.
+            Il saldo si muove alla data della voce: subito se è oggi o passata, quel giorno se è futura; in una serie, ogni voce alla sua data.
           </p>
         </div>
       ) : null}
+
+      {/* ---- Mutuo: the property whose debt this instalment repays ----
+          Only on a debt row, and only when a property carries a debt: the principal of each
+          occurrence lowers it on the row's own date (lib/utils/mortgageRepayment.ts). */}
+      {selectedType === 'debt' && properties.length > 0 && (
+        <div className="space-y-2">
+          <Label htmlFor="debtAssetId">
+            Riduce il debito di <span className="text-muted-foreground font-normal">(opzionale)</span>
+          </Label>
+          <Select value={watchedDebtAssetId || '__none__'} onValueChange={(value) => setValue('debtAssetId', value)}>
+            <SelectTrigger id="debtAssetId" aria-describedby="debtAssetId-hint">
+              <SelectValue placeholder="Nessun immobile" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">Nessun immobile</SelectItem>
+              {properties.map((asset) => (
+                <SelectItem key={asset.id} value={asset.id}>
+                  {asset.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p id="debtAssetId-hint" className="text-xs text-muted-foreground">
+            {debtRepaymentHint}
+          </p>
+        </div>
+      )}
 
       {/* ---- Divisione: di chi è questa voce (feature-gated) ----
           In the MAIN body and not behind «Impostazioni avanzate», unlike the cost centre: in a
@@ -806,7 +904,7 @@ function ExpenseFormBody({
         <CollapsibleContent className="space-y-5 pt-4">
 
           {/* ---- Centro di costo (feature-gated) ---- */}
-          {costCentersEnabled && costCenters.length > 0 && (
+          {costCentersEnabled && linkableCostCenters.length > 0 && (
             <div className="space-y-2">
               <Label htmlFor="costCenter">Centro di Costo</Label>
               <Select value={selectedCostCenterId} onValueChange={setSelectedCostCenterId}>
@@ -815,16 +913,18 @@ function ExpenseFormBody({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">Nessun centro di costo</SelectItem>
-                  {costCenters.map((center) => (
+                  {linkableCostCenters.map((center) => (
                     <SelectItem key={center.id} value={center.id}>
                       <span className="flex items-center gap-2">
-                        {center.color && (
-                          <span
-                            className="inline-block h-2.5 w-2.5 rounded-full shrink-0"
-                            style={{ backgroundColor: center.color }}
-                          />
-                        )}
+                        {/* The stored colour is a SLOT («chart-1»), not a CSS colour: painted as it
+                            is, the dot was invisible. Same resolver, same swatch as the Centri tile. */}
+                        <span
+                          className="inline-block h-2 w-2 shrink-0 rounded-[2px]"
+                          style={{ background: resolveCostCenterColor(center.color, center.id, chartColors) }}
+                          aria-hidden="true"
+                        />
                         {center.name}
+                        {center.archivedAt && <span className="text-muted-foreground">· archiviato</span>}
                       </span>
                     </SelectItem>
                   ))}
@@ -1223,6 +1323,13 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
   const [splitEnabled, setSplitEnabled] = useState(false);
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
   const [personalMemberId, setPersonalMemberId] = useState<string>('');
+  // Where a new transfer fee lands (Impostazioni › Spese), read with the other settings.
+  const [transferFeeSettings, setTransferFeeSettings] = useState<TransferFeeSettings | null>(null);
+  // Properties a debt row can repay (read with the accounts).
+  const [properties, setProperties] = useState<Asset[]>([]);
+  // The fee row the edited transfer already carries, stored WITH the transfer it was read for
+  // (AGENTS.md → state belonging to a subject): a stale read falls back to «loading».
+  const [savedFeeRead, setSavedFeeRead] = useState<{ expenseId: string; failed: boolean; fee: Expense | null } | null>(null);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [categoryInitialName, setCategoryInitialName] = useState('');
   const [categoryEditTarget, setCategoryEditTarget] = useState<ExpenseCategory | null>(null);
@@ -1246,6 +1353,8 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
       installmentAmounts: [],
       linkedCashAssetId: '__none__',
       transferCashAssetId: '__none__',
+      transferFee: Number.NaN,
+      debtAssetId: '__none__',
     },
   });
   const { reset, setValue, getValues, control, formState: { isSubmitting } } = form;
@@ -1265,6 +1374,9 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
   const watchedLinkedCashAssetId = useWatch({ control, name: 'linkedCashAssetId' });
   const watchedTransferCashAssetId = useWatch({ control, name: 'transferCashAssetId' });
   const watchedSubCategoryId = useWatch({ control, name: 'subCategoryId' });
+  const watchedTransferFee = useWatch({ control, name: 'transferFee' });
+  const watchedDebtAssetId = useWatch({ control, name: 'debtAssetId' });
+  const watchedAmount = useWatch({ control, name: 'amount' });
 
   const isEdit = !!expense;
 
@@ -1329,6 +1441,8 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
     return Promise.all([getAllAssets(ownerId), getSettings(ownerId), getCostCenters(ownerId)])
       .then(([allAssets, settings, centers]) => {
         setCashAssets(allAssets.filter((a) => a.type === 'cash' && a.assetClass === 'cash'));
+        // A property already named by the row stays listed even once its debt is repaid.
+        setProperties(allAssets.filter((a) => isRepayableProperty(a) || a.id === expense?.debtAssetId));
         const debitId = settings?.defaultDebitCashAssetId || '__none__';
         const creditId = settings?.defaultCreditCashAssetId || '__none__';
         setDefaultDebitCashAssetId(debitId);
@@ -1337,6 +1451,10 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
         setCostCenters(centers);
         setSplitEnabled(settings?.expenseSplitEnabled ?? false);
         setFamilyMembers(settings?.familyMembers ?? []);
+        setTransferFeeSettings({
+          transferFeeCategoryId: settings?.transferFeeCategoryId,
+          transferFeeSubCategoryId: settings?.transferFeeSubCategoryId,
+        });
         if (!expense) {
           const currentType = getValues('type');
           const defaultId = currentType === 'income' ? creditId : debitId;
@@ -1447,6 +1565,9 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
         recurringCount: 1,
         linkedCashAssetId: expense.linkedCashAssetId || '__none__',
         transferCashAssetId: expense.transferCashAssetId || '__none__',
+        // Filled in when the fee row has been read (the effect below).
+        transferFee: Number.NaN,
+        debtAssetId: expense.debtAssetId || '__none__',
       });
     } else {
       reset({
@@ -1464,9 +1585,32 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
         recurringCount: DEFAULT_RECURRENCE_COUNT[DEFAULT_RECURRENCE_FREQUENCY],
         linkedCashAssetId: '__none__',
         transferCashAssetId: '__none__',
+        transferFee: Number.NaN,
+        debtAssetId: '__none__',
       });
     }
   }, [expense, reset, open]);
+
+  // The fee row of an edited transfer is read at each opening and its amount put in the field:
+  // the fee is edited FROM the transfer (lib/utils/transferFee.ts). Promise-style, so the setters
+  // run inside `.then` (see `loadCashAssets`), and after the reset above has cleared the field.
+  useEffect(() => {
+    if (!open || !expense || expense.type !== 'transfer' || !expense.transferFeeExpenseId) return;
+    let cancelled = false;
+    getTransferFeeOf(expense)
+      .then((fee) => {
+        if (cancelled) return;
+        setSavedFeeRead({ expenseId: expense.id, failed: false, fee });
+        if (fee) setValue('transferFee', Math.abs(fee.amount));
+      })
+      .catch((error) => {
+        console.error('Error loading the transfer fee:', error);
+        if (!cancelled) setSavedFeeRead({ expenseId: expense.id, failed: true, fee: null });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, expense, setValue]);
 
   useEffect(() => {
     if (!expense && open) {
@@ -1529,6 +1673,50 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
     [selectedCategory]
   );
 
+  // The saved fee of an edited transfer: `ready` (read, or nothing to read), `loading` or `failed`.
+  const savedFee = useMemo((): { state: 'ready' | 'loading' | 'failed'; fee: Expense | null } => {
+    if (!expense || expense.type !== 'transfer' || !expense.transferFeeExpenseId) return { state: 'ready', fee: null };
+    if (savedFeeRead?.expenseId !== expense.id) return { state: 'loading', fee: null };
+    return savedFeeRead.failed ? { state: 'failed', fee: null } : { state: 'ready', fee: savedFeeRead.fee };
+  }, [expense, savedFeeRead]);
+
+  const transferFeeCategory = useMemo(
+    () => resolveTransferFeeCategory(categories, transferFeeSettings),
+    [categories, transferFeeSettings]
+  );
+
+  // A saved fee keeps its own category, so it stays editable (and clearable) even after the
+  // setting is removed; a new one needs the setting.
+  const transferFeeEnabled = savedFee.state === 'ready' && (savedFee.fee !== null || transferFeeCategory !== null);
+  const transferFeeHint =
+    savedFee.state === 'loading'
+      ? TRANSFER_FEE_READING
+      : savedFee.state === 'failed'
+        ? TRANSFER_FEE_UNREAD
+        : describeTransferFeeField({
+            amount: normalizeTransferFee(watchedTransferFee),
+            categoryLabel: savedFee.fee
+              ? transferFeeCategoryLabel(savedFee.fee)
+              : transferFeeCategory
+                ? transferFeeCategoryLabel(transferFeeCategory)
+                : null,
+            savedAmount: savedFee.fee ? Math.abs(savedFee.fee.amount) : null,
+          });
+
+  const debtRepaymentHint = useMemo(() => {
+    const property = properties.find((asset) => asset.id === watchedDebtAssetId);
+    if (!property) return describeDebtRepaymentField({ propertyName: null, debt: 0, instalment: null, split: null });
+    const debt = property.outstandingDebt ?? 0;
+    const instalment = typeof watchedAmount === 'number' && Number.isFinite(watchedAmount) && watchedAmount > 0 ? watchedAmount : null;
+    return describeDebtRepaymentField({
+      propertyName: property.name,
+      debt,
+      annualRatePct: property.debtInterestRate,
+      instalment,
+      split: instalment === null ? null : splitInstalment(instalment, debt, property.debtInterestRate),
+    });
+  }, [properties, watchedDebtAssetId, watchedAmount]);
+
   const handleCategoryCreated = async () => {
     await loadCategories();
     setCategoryEditTarget(null);
@@ -1563,6 +1751,8 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
     link: 'Link',
     linkedCashAssetId: selectedType === 'transfer' ? 'Conto di origine' : 'Conto',
     transferCashAssetId: 'Conto di destinazione',
+    transferFee: 'Commissione',
+    debtAssetId: 'Immobile',
     installmentTotalAmount: 'Importo totale',
     installmentCount: 'Numero di rate',
     installmentStartDate: 'Prima rata',
@@ -1620,6 +1810,12 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
       return;
     }
 
+    // Saving over a fee that was never read could only guess: a second fee, or an orphan.
+    if (savedFee.state !== 'ready') {
+      setStatus({ phase: 'error', message: TRANSFER_FEE_UNREAD });
+      return;
+    }
+
     setStatus({ phase: 'submitting' });
 
     let subCategoryName: string | undefined;
@@ -1643,6 +1839,11 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
     const resolvedCostCenterName = resolvedCostCenterId
       ? costCenters.find((c) => c.id === resolvedCostCenterId)?.name
       : undefined;
+    // The property only exists on a debt row: re-typed away from one, the link goes.
+    const resolvedDebtAssetId = data.type === 'debt' && data.debtAssetId && data.debtAssetId !== '__none__' ? data.debtAssetId : undefined;
+    // The fee only exists on a transfer: re-typed away from one, the field is gone and so is the fee.
+    const requestedFee = data.type === 'transfer' ? normalizeTransferFee(data.transferFee) : null;
+    const feeNote = describeTransferFeeNote(cashAssets.find((asset) => asset.id === transferCashAssetId)?.name);
 
     try {
       const expenseData: ExpenseFormData = {
@@ -1676,12 +1877,43 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
         installmentStartDate: data.isInstallment ? data.installmentStartDate : undefined,
         linkedCashAssetId,
         transferCashAssetId,
+        debtAssetId: resolvedDebtAssetId,
         costCenterId: resolvedCostCenterId,
         costCenterName: resolvedCostCenterName,
         personalMemberId: resolvedPersonalMemberId,
       };
 
+      // One «now» for the whole save: whether a row moves its account today or on its date
+      // (lib/utils/cashSettlement.ts) must not change between the write and the balances.
+      const now = new Date();
+
       if (expense) {
+        // Editing always has an amount: the instalment toggle is creation-only, so the field is
+        // never hidden here. A transfer is stored positive, every other row by the sign of its type.
+        const editedAmount = Math.abs(data.amount ?? 0);
+        const settlement = editBalanceEffects(
+          expense,
+          {
+            type: data.type,
+            amount: data.type === 'income' || data.type === 'transfer' ? editedAmount : -editedAmount,
+            date: data.date,
+            linkedCashAssetId,
+            transferCashAssetId: data.type === 'transfer' ? transferCashAssetId : undefined,
+            debtAssetId: resolvedDebtAssetId,
+          },
+          now,
+        );
+        // The fee row follows the transfer (created, updated or deleted), BEFORE the transfer is
+        // written: the transfer's pointer is the fee's id, or nothing.
+        const fee = await saveTransferFee(
+          ownerId,
+          { id: expense.id, date: data.date, currency: data.currency, linkedCashAssetId },
+          savedFee.fee,
+          planTransferFee(savedFee.fee, requestedFee, data.type === 'transfer'),
+          transferFeeCategory,
+          feeNote,
+          now,
+        );
         const updatesWithLink = {
           ...expenseData,
           linkedCashAssetId: linkedCashAssetId ?? null,
@@ -1702,6 +1934,11 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
           // Form-only, and `updateExpense` spreads whatever it is handed: the number of
           // occurrences describes a creation, not a row, and must never reach the document.
           recurringCount: undefined,
+          // The row's new date decides: still to come → it waits (the server settles it on the
+          // day), today or past → it has moved its account(s) with the effects below.
+          balancePending: settlement.pending,
+          transferFeeExpenseId: fee.feeExpenseId ?? deleteField(),
+          debtAssetId: resolvedDebtAssetId ?? deleteField(),
         };
         await updateExpense(
           expense.id,
@@ -1710,53 +1947,20 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
           subCategoryName
         );
 
-        let assetUpdated = false;
-
-        // Reconcile cash balances BEFORE confirming success — a failed transaction
-        // must not show a success toast while balances are left inconsistent.
-        // The branch is chosen from BOTH the old and the new type: a transfer touches
-        // two accounts, so crossing that boundary needs the cross-shape reconcilers.
-        const wasTransfer = expense.type === 'transfer';
-        const isTransfer = data.type === 'transfer';
-        // Editing always has an amount: the instalment toggle is creation-only, so the
-        // field is never hidden here.
-        const editedAmount = data.amount ?? 0;
-        const newSignedAmount =
-          data.type === 'income' ? Math.abs(editedAmount) : -Math.abs(editedAmount);
-
-        if (wasTransfer && isTransfer) {
-          assetUpdated = await reconcileTransferEdit({
-            oldOriginId: expense.linkedCashAssetId,
-            oldDestId: expense.transferCashAssetId,
-            newOriginId: linkedCashAssetId,
-            newDestId: transferCashAssetId,
-            oldAmount: Math.abs(expense.amount),
-            newAmount: Math.abs(editedAmount),
-          });
-        } else if (wasTransfer) {
-          assetUpdated = await reconcileTransferToSingleEdit({
-            oldOriginId: expense.linkedCashAssetId,
-            oldDestId: expense.transferCashAssetId,
-            oldAmount: Math.abs(expense.amount),
-            newLinkedAssetId: linkedCashAssetId,
-            newSignedAmount,
-          });
-        } else if (isTransfer) {
-          assetUpdated = await reconcileSingleToTransferEdit({
-            oldLinkedAssetId: expense.linkedCashAssetId,
-            oldSignedAmount: expense.amount,
-            newOriginId: linkedCashAssetId,
-            newDestId: transferCashAssetId,
-            newAmount: Math.abs(editedAmount),
-          });
-        } else {
-          assetUpdated = await reconcileSingleEdit({
-            oldLinkedAssetId: expense.linkedCashAssetId,
-            newLinkedAssetId: linkedCashAssetId,
-            oldSignedAmount: expense.amount,
-            newSignedAmount,
-          });
-        }
+        // Reconcile cash balances BEFORE confirming success — a failed transaction must not show
+        // a success toast while balances are left inconsistent. One set of effects covers every
+        // edit: the old row's APPLIED effect given back, the new one applied unless it waits for
+        // its date — amount, account, type across the transfer boundary and date alike.
+        const balancesMoved = await applyBalanceEffects([...settlement.effects, ...fee.effects]);
+        // The property's debt: what the row had repaid given back, the edited row split again on
+        // today's debt if it has happened (lib/utils/mortgageRepayment.ts → planDebtEdit).
+        const debtMoved = await applyDebtRepaymentEdit(
+          expense.id,
+          expense,
+          { type: data.type, amount: -editedAmount, debtAssetId: resolvedDebtAssetId, date: data.date },
+          now,
+        );
+        const assetUpdated = balancesMoved || debtMoved;
 
         if (assetUpdated) {
           queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
@@ -1765,67 +1969,31 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
 
         toast.success(data.type === 'transfer' ? 'Trasferimento aggiornato con successo' : 'Spesa aggiornata con successo');
       } else {
-        const result = await createExpense(
-          ownerId,
-          expenseData,
-          category.name,
-          subCategoryName
-        );
-
-        if (data.type === 'transfer') {
-          // Reconcile balances BEFORE confirming success (see edit branch).
-          const transferUpdated = await reconcileTransferCreate({
-            originId: linkedCashAssetId,
-            destId: transferCashAssetId,
-            amount: Math.abs(expenseData.amount),
-          });
-          if (transferUpdated) {
-            queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
-            queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.overview(ownerId) });
-          }
-          toast.success('Trasferimento creato con successo');
-        } else if (linkedCashAssetId) {
-          let firstSignedAmount: number;
-          if (
-            expenseData.isInstallment &&
-            expenseData.installmentCount &&
-            expenseData.installmentCount > 1
-          ) {
-            let firstAmt: number;
-            if (expenseData.installmentMode === 'auto') {
-              firstAmt =
-                Math.floor(
-                  (expenseData.installmentTotalAmount! / expenseData.installmentCount) * 100
-                ) / 100;
-            } else {
-              firstAmt = expenseData.installmentAmounts![0];
-            }
-            firstSignedAmount =
-              data.type === 'income' ? Math.abs(firstAmt) : -Math.abs(firstAmt);
-          } else if (
-            expenseData.isRecurring &&
-            expenseData.recurringCount &&
-            expenseData.recurringCount > 0
-          ) {
-            // The first occurrence is the only one that moves the account, with the SIGN of its
-            // type — the same rule as the two branches beside it. It was hard-coded negative until
-            // 2026-09-13: harmless only because `canTypeRecur` keeps incomes out of recurrence, a
-            // guard this branch must not rely on.
-            firstSignedAmount =
-              data.type === 'income' ? Math.abs(expenseData.amount) : -Math.abs(expenseData.amount);
-          } else {
-            firstSignedAmount =
-              data.type === 'income' ? Math.abs(expenseData.amount) : -Math.abs(expenseData.amount);
-          }
-
-          await reconcileSingleCreate({ linkedAssetId: linkedCashAssetId, signedAmount: firstSignedAmount });
+        // Every row of the shape carries its account; the rows already happened move it now
+        // (in one transaction, BEFORE the success toast), the ones to come on their own date.
+        // A transfer with a fee writes the pair in one batch (lib/utils/transferFee.ts).
+        const { ids: result, appliedEffects, appliedDebtRows } =
+          data.type === 'transfer' && requestedFee !== null && transferFeeCategory
+            ? await createTransferWithFee(
+                ownerId,
+                expenseData,
+                category.name,
+                subCategoryName,
+                { amount: requestedFee, category: transferFeeCategory, notes: feeNote },
+                now
+              )
+            : await createExpenseSettledOnDate(ownerId, expenseData, category.name, subCategoryName, now);
+        // The instalments already happened repay their property now, in date order.
+        const debtMoved = await applyDebtRepayments(appliedDebtRows);
+        if ((await applyBalanceEffects(appliedEffects)) || debtMoved) {
           queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
           queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.overview(ownerId) });
         }
 
-        // Non-transfer success toast — after balances are reconciled.
-        if (data.type !== 'transfer') {
-          if (Array.isArray(result)) {
+        if (data.type === 'transfer') {
+          toast.success(requestedFee !== null ? 'Trasferimento e commissione creati con successo' : 'Trasferimento creato con successo');
+        } else {
+          if (expenseData.isInstallment || expenseData.isRecurring) {
             if (expenseData.isInstallment) {
               const total =
                 expenseData.installmentMode === 'auto'
@@ -1948,6 +2116,9 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
         'Era un trasferimento: il movimento verrà stornato da entrambi i conti e il nuovo importo applicato al conto selezionato.'
       );
       notices.push('La voce entrerà nei totali di spesa/entrata e nei budget per tipo, se configurati.');
+      if (savedFee.fee) {
+        notices.push('La sua commissione verrà eliminata e il conto di origine riaccreditato di quanto aveva pagato.');
+      }
     } else if (!wasTransfer && isTransfer) {
       notices.push(
         "Diventerà un trasferimento: l'effetto sul conto attuale verrà stornato e verranno aggiornati i saldi di origine e destinazione."
@@ -1961,11 +2132,14 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
       }
       notices.push('La voce passerà sotto un altro budget per tipo, se ne hai configurati.');
     }
+    if (expense.type === 'debt' && expense.debtAssetId) {
+      notices.push('Non sarà più una rata del mutuo: la quota capitale che aveva ridotto il debito dell’immobile torna sul debito.');
+    }
     if (expense.recurringParentId || expense.installmentParentId) {
       notices.push('Fa parte di una serie: il cambio riguarda solo questa voce.');
     }
     return notices.join(' ');
-  }, [expense, selectedType]);
+  }, [expense, selectedType, savedFee.fee]);
 
   const formBodyProps: FormBodyProps = {
     form,
@@ -2002,6 +2176,11 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
     onTypeChange: handleTypeChange,
     onBackToTypePicker: isEdit ? undefined : () => setStep(1),
     typeChangeNotice,
+    transferFeeEnabled,
+    transferFeeHint,
+    properties,
+    watchedDebtAssetId,
+    debtRepaymentHint,
     advancedOpen,
     setAdvancedOpen,
   };

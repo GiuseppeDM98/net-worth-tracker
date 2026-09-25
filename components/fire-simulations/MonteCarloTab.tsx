@@ -39,7 +39,9 @@ import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { calculateAssetValue, calculateLiquidNetWorth, calculateTotalValue, getAllAssets } from '@/lib/services/assetService';
 import { calculateCurrentAllocation, getDefaultTargets, getSettings, setSettings } from '@/lib/services/assetAllocationService';
-import { buildParamsFromScenario, getDefaultMarketParameters, getDefaultMonteCarloScenarios, runMonteCarloSimulation } from '@/lib/services/monteCarloService';
+import { buildParamsFromScenario, getDefaultMarketParameters, getDefaultMonteCarloScenarios, runMonteCarloSimulation, type AnnualInflow } from '@/lib/services/monteCarloService';
+import { calculateCoastFireNetRealAnnualPension, normalizeCoastFirePensions, normalizeCoastFireTaxBrackets } from '@/lib/services/fireService';
+import { resolvePortfolioTaxProfile } from '@/lib/utils/withdrawalTax';
 import { resolvePensionLockState, resolveRitaUnlockAge } from '@/lib/utils/pensionUnlock';
 import { DEFAULT_MONTE_CARLO_SIMULATIONS, deriveMonteCarloAllocation } from '@/lib/utils/monteCarloParams';
 import { getItalyYear } from '@/lib/utils/dateHelpers';
@@ -61,6 +63,9 @@ import {
   describeDistribuzione,
   describeDistribuzioneAside,
   describeDistribuzioneFooter,
+  describeEsaurimento,
+  describeEsaurimentoFooter,
+  type DistributionView,
   describeParametri,
   describeParametriFooter,
   describePercentili,
@@ -167,6 +172,17 @@ export function MonteCarloTab() {
   const liquidNetWorth = assets ? calculateLiquidNetWorth(assets) : 0;
   const totalNetWorth = Math.max(0, grossTotalNetWorth - pensionLockedValue);
 
+  // What makes the plan honest (2026-09-24): the state pensions saved in Coast FIRE, dated by the
+  // saved age and netted through the IRPEF brackets, taken off the withdrawal from their start;
+  // and the tax on withdrawals, from the portfolio's cost basis — the capital the plan starts
+  // from (everything but the locked funds), its gain share carried onto whatever amount is typed.
+  const now = useMemo(() => new Date(), []);
+  const taxProfile = useMemo(() => {
+    if (!assets) return null;
+    const lockedIds = new Set((pensionLockState?.funds ?? []).filter((info) => info.isLocked).map((info) => info.fund.id));
+    return resolvePortfolioTaxProfile(assets.filter((asset) => !lockedIds.has(asset.id)), calculateAssetValue);
+  }, [assets, pensionLockState]);
+
   const currentYear = getItalyYear();
   const currentAge = settings?.userAge ?? null;
   const ctx = useMemo(() => ({ startCalendarYear: currentYear, currentAge }), [currentYear, currentAge]);
@@ -177,6 +193,22 @@ export function MonteCarloTab() {
   const [form, setForm] = useState<MonteCarloForm | null>(null);
   const onFormChange = useCallback((patch: Partial<MonteCarloForm>) => setForm((prev) => (prev ? { ...prev, ...patch } : prev)), []);
   const [scenarios, setScenarios] = useState<MonteCarloScenarios>(getDefaultMonteCarloScenarios());
+
+  // The state pensions, net through the IRPEF brackets and deflated with the base scenario's
+  // inflation (the same figure Coast FIRE prints), dated by the saved age: without an age there
+  // is nothing to date, and the Parametri tile says so.
+  const savedPensions = settings?.coastFirePensions;
+  const savedTaxBrackets = settings?.coastFireTaxBrackets;
+  const userAge = settings?.userAge;
+  const baseInflationRate = scenarios.base.inflationRate;
+  const statePensionInflows = useMemo<AnnualInflow[]>(() => {
+    if (userAge === undefined || !Number.isFinite(userAge)) return [];
+    const brackets = normalizeCoastFireTaxBrackets(savedTaxBrackets);
+    return normalizeCoastFirePensions(savedPensions).map((pension) => {
+      const breakdown = calculateCoastFireNetRealAnnualPension(pension, userAge, baseInflationRate, brackets, now);
+      return { fromYear: Math.max(0, Math.ceil(breakdown.yearsUntilStart)), annualNetToday: breakdown.netAnnualRealAtStart };
+    });
+  }, [userAge, savedPensions, savedTaxBrackets, baseInflationRate, now]);
 
   // Seed the form ONCE from the portfolio, after the data has loaded — the starting capital net of
   // the locked funds, the planned expenses, the allocation normalized onto the four MC classes
@@ -212,9 +244,10 @@ export function MonteCarloTab() {
   const params = useMemo<MonteCarloParams | null>(() => {
     if (!form) return null;
     const market = getDefaultMarketParameters();
+    const initialPortfolio = Math.round(parseItalianNumber(form.initialPortfolio) ?? 0);
     return {
       portfolioSource: 'total',
-      initialPortfolio: Math.round(parseItalianNumber(form.initialPortfolio) ?? 0),
+      initialPortfolio,
       retirementYears: parseIntField(form.retirementYears, DEFAULT_RETIREMENT_YEARS),
       equityPercentage: parseFloatField(form.equityPercentage),
       bondsPercentage: parseFloatField(form.bondsPercentage),
@@ -227,8 +260,11 @@ export function MonteCarloTab() {
       ...market,
       numberOfSimulations: Math.min(50000, Math.max(1000, parseIntField(form.numberOfSimulations, DEFAULT_SIMULATIONS))),
       capitalInflows: pensionInflows.length > 0 ? pensionInflows : undefined,
+      annualInflows: statePensionInflows.length > 0 ? statePensionInflows : undefined,
+      // The typed capital keeps the portfolio's gain share: basis = capital × (1 − gain share).
+      withdrawalTax: taxProfile ? { basisToday: initialPortfolio * (1 - taxProfile.gainShare), rate: taxProfile.rate } : undefined,
     };
-  }, [form, pensionInflows]);
+  }, [form, pensionInflows, statePensionInflows, taxProfile]);
 
   const allocationSum = params ? params.equityPercentage + params.bondsPercentage + params.realEstatePercentage + params.commoditiesPercentage : 0;
   const runnable = !!params && params.initialPortfolio > 0 && params.annualWithdrawal > 0;
@@ -239,6 +275,8 @@ export function MonteCarloTab() {
   // ─── The run: the three scenarios in one go ──────────────────────────────────
   const [lastRun, setLastRun] = useState<MonteCarloRunState | null>(null);
   const [isRunning, setIsRunning] = useState(false);
+  // The Distribuzione tile's view (final values | the year the money runs out): the tile's scope.
+  const [distributionView, setDistributionView] = useState<DistributionView>('finali');
 
   const runScenarios = useCallback((inputs: MonteCarloRunInputs) => {
     setIsRunning(true);
@@ -354,7 +392,14 @@ export function MonteCarloTab() {
 
         {run && (
           <div className={cn(TILE_CELL_CLASS, 'order-2 tablet:col-span-2 desktop:order-none desktop:col-span-4')}>
-            <DistribuzioneTile reading={describeDistribuzione(run)} aside={describeDistribuzioneAside(run)} run={run} footer={describeDistribuzioneFooter(run)} />
+            <DistribuzioneTile
+              reading={distributionView === 'esaurimento' && run.failureCount > 0 ? describeEsaurimento(run) : describeDistribuzione(run)}
+              aside={describeDistribuzioneAside(run)}
+              run={run}
+              view={distributionView}
+              onViewChange={setDistributionView}
+              footer={distributionView === 'esaurimento' && run.failureCount > 0 ? describeEsaurimentoFooter(run) : describeDistribuzioneFooter(run)}
+            />
           </div>
         )}
 

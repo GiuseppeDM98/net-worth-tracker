@@ -2,17 +2,24 @@
  * Every number of Cashflow › Centri di Costo (the list and the detail), free of React and
  * Firestore. The page has NO period axis: a center's cost is its whole cost, so every figure
  * here is lifetime unless it says otherwise — and the ones that use another window carry it
- * in their name (`ytd`, `lastYear`, `trailing…`, the budget's own `period`, `yearProjection`).
+ * in their name (`ytd`, `lastYear`, `trailing…`, the budget's own `period`, `yearScheduled`).
  *
- * Two rules this module shares with the rest of the app rather than re-deriving:
- * - the projection is the app's ONE rule (`projectWindowEndWithScheduled`: the pace on what
- *   is booked up to today plus the rows already dated after today), on the month and on the
- *   year alike; the blended year model that weighed last year in is gone;
- * - a monthly ceiling is read exactly like the Budget page's (`summarizeCeiling`), today's
- *   mark on the track included, so a center's tetto and the overall tetto never disagree.
+ * A CENTER HAS NO PACE (2026-09-18, the owner's call). A window's end is what is booked plus
+ * what is already in the calendar, and nothing else. The linear pace this module used until
+ * then was wrong twice over on a project: a recurring series is N real future rows, so its
+ * future already sits in `scheduled` and pacing its booked part counted it twice (50 €/month
+ * of insurance read 779 € at year end instead of 600); and a project spends in blocks — a
+ * repair, August's holiday — that a daily rate extrapolates into a figure nobody can defend
+ * (a 1650 € repair on the 17th read «~2942 € a fine mese»). What the rule gives up is said in
+ * the guide: habitual spending typed by hand (fuel) is not foreseen. Budget keeps its pace:
+ * a category of groceries is smooth, a project is not.
+ *
+ * A monthly ceiling still reads the month through the Budget page's `summarizeCeiling`
+ * (today's mark on the track, the crossing day), so the two tracks never disagree on what
+ * was spent; only the risk is the center's own — see `CenterBudgetSummary`.
  *
  * "Booked" means dated up to `now`: a row dated after today (an instalment, a recurring
- * charge) is never counted as spent — it lives in `scheduled` and in the projections.
+ * charge) is never counted as spent — it lives in `scheduled`.
  *
  * SIGN CONVENTION: callers pass the center's outgoing rows (amount < 0); every figure returned
  * here is a positive cost.
@@ -22,24 +29,15 @@ import type { Expense } from '@/types/expenses';
 import type { CostCenter, CostCenterBudgetPeriod, CostCenterLifecycle, CostCenterRecurringSplit } from '@/types/costCenters';
 import { getLifecycleStatus, resolveLastActivityDate, splitRecurringVsOneOff } from '@/lib/utils/costCenterUtils';
 import { summarizeCeiling } from '@/lib/utils/budgetSummary';
-import { projectWindowEndWithScheduled } from '@/lib/utils/spendingProjection';
-import { resolveBudgetCalendar } from '@/lib/utils/budgetUtils';
 import { getItalyDate, getItalyMonth, getItalyYear, isItalyDayAfter, toDate } from '@/lib/utils/dateHelpers';
 import { MONTH_NAMES_SHORT } from '@/lib/utils/period';
 
 // ─── Calendar ─────────────────────────────────────────────────────────────────
 
-/**
- * Below this many elapsed days of the year a yearly pace is one purchase extrapolated over
- * twelve months; the projection waits, like the month's waits for its fourth day.
- */
-export const MIN_YEAR_FORECAST_DAYS = 28;
-
 export interface YearCalendar {
   dayOfYear: number;
   daysInYear: number;
   daysLeft: number;
-  canForecast: boolean;
 }
 
 function daysInYearOf(year: number): number {
@@ -58,11 +56,11 @@ function dayOfYearOf(date: Date): number {
   return Math.round((current - start) / 86_400_000);
 }
 
-/** The year as the projection reads it: day, length, days left, whether a pace is a pace yet. */
+/** The year as an annual ceiling reads it: today's day, the year's length, the days left. */
 export function resolveYearCalendar(now: Date): YearCalendar {
   const daysInYear = daysInYearOf(getItalyYear(now));
   const dayOfYear = Math.min(dayOfYearOf(now), daysInYear);
-  return { dayOfYear, daysInYear, daysLeft: Math.max(0, daysInYear - dayOfYear), canForecast: dayOfYear >= MIN_YEAR_FORECAST_DAYS };
+  return { dayOfYear, daysInYear, daysLeft: Math.max(0, daysInYear - dayOfYear) };
 }
 
 // ─── Row helpers ──────────────────────────────────────────────────────────────
@@ -103,18 +101,19 @@ export interface CenterBudgetSummary {
   usedPct: number;
   /** Today on the window (day / days in month, or day / days in year), 0-100. */
   calendarPct: number;
-  /** Window-end total at the app's projection rule; null before the window has a pace. */
-  projection: number | null;
+  /** The FACT: what is booked up to today is already past the ceiling. */
   exceeded: boolean;
-  /** Not over yet, but the projection lands past the ceiling (The Risk-vs-Fact Rule). */
+  /**
+   * The RISK (The Risk-vs-Fact Rule): still under on what is booked, past the ceiling once
+   * the rows already in the calendar land. Never a pace — see the module header.
+   */
   atRisk: boolean;
+  /** max(0, spent − amount): how far past the ceiling the window ends on what is known today. */
   overBy: number;
   remaining: number;
   daysLeft: number;
-  /** Monthly only: the day the running total went (or, with a scheduled row, will go) past the ceiling. */
+  /** Monthly only: the day the running total went past the ceiling — after today when it is the calendar that crosses it (`atRisk`). */
   crossedOn: number | null;
-  /** Monthly only: the day the pace crosses a ceiling still holding. */
-  projectedCrossingDay: number | null;
   status: 'ok' | 'warning' | 'over';
 }
 
@@ -125,7 +124,9 @@ function budgetStatus(usedPct: number): CenterBudgetSummary['status'] {
 function summarizeMonthlyBudget(amount: number, expenses: Expense[], now: Date): CenterBudgetSummary | null {
   const ceiling = summarizeCeiling(amount, expenses, now);
   if (!ceiling) return null;
-  const projection = ceiling.projection;
+  // Budget's `exceeded` counts the scheduled rows too; here the fact is what is booked, and
+  // a crossing the calendar has yet to deliver is the risk.
+  const exceeded = ceiling.spentToDate > amount;
   return {
     period: 'monthly',
     amount,
@@ -134,14 +135,12 @@ function summarizeMonthlyBudget(amount: number, expenses: Expense[], now: Date):
     scheduled: ceiling.scheduled,
     usedPct: ceiling.usedPct,
     calendarPct: ceiling.calendarPct,
-    projection,
-    exceeded: ceiling.exceeded,
-    atRisk: !ceiling.exceeded && projection !== null && Math.round(projection) > amount,
+    exceeded,
+    atRisk: !exceeded && ceiling.spent > amount,
     overBy: ceiling.overBy,
     remaining: ceiling.remaining,
     daysLeft: ceiling.calendar.daysLeft,
     crossedOn: ceiling.crossedOn,
-    projectedCrossingDay: ceiling.projectedCrossingDay,
     status: budgetStatus(ceiling.usedPct),
   };
 }
@@ -164,11 +163,10 @@ function splitYearSpending(expenses: Expense[], now: Date): YearSplit {
   return { spentToDate, scheduled };
 }
 
-function summarizeAnnualBudget(amount: number, split: YearSplit, calendar: YearCalendar, canProject: boolean): CenterBudgetSummary {
+function summarizeAnnualBudget(amount: number, split: YearSplit, calendar: YearCalendar): CenterBudgetSummary {
   const spent = split.spentToDate + split.scheduled;
   const usedPct = (spent / amount) * 100;
-  const exceeded = spent > amount;
-  const projection = canProject && calendar.canForecast ? projectWindowEndWithScheduled(split.spentToDate, split.scheduled, calendar.dayOfYear, calendar.daysInYear) : null;
+  const exceeded = split.spentToDate > amount;
   return {
     period: 'annual',
     amount,
@@ -177,14 +175,12 @@ function summarizeAnnualBudget(amount: number, split: YearSplit, calendar: YearC
     scheduled: split.scheduled,
     usedPct,
     calendarPct: (calendar.dayOfYear / calendar.daysInYear) * 100,
-    projection,
     exceeded,
-    atRisk: !exceeded && projection !== null && Math.round(projection) > amount,
+    atRisk: !exceeded && spent > amount,
     overBy: Math.max(0, spent - amount),
     remaining: Math.max(0, amount - spent),
     daysLeft: calendar.daysLeft,
     crossedOn: null,
-    projectedCrossingDay: null,
     status: budgetStatus(usedPct),
   };
 }
@@ -214,12 +210,12 @@ export interface CenterSummary {
   /** ytd / total, 0-100. */
   ytdPct: number;
   lastYear: number;
-  /** Year-end cost at the app rule; null when dormant/archived, before the threshold, or with nothing booked this year. */
-  yearProjection: number | null;
-  /** Month-end cost at the same rule; null under the same conditions on the month. */
-  monthProjection: number | null;
+  /** This year's rows dated after today: what the calendar adds to `ytd` by year end. */
+  yearScheduled: number;
   /** Booked in the running month up to today. */
   monthSpentToDate: number;
+  /** The running month's rows dated after today: what the calendar adds by month end. */
+  monthScheduled: number;
   budget: CenterBudgetSummary | null;
   lifecycle: CostCenterLifecycle;
   recurring: CostCenterRecurringSplit;
@@ -239,23 +235,12 @@ export function summarizeCenter(center: CostCenter, expenses: Expense[], now: Da
   const yearSplit = splitYearSpending(expenses, now);
   const lastYear = sum(booked.filter((row) => getItalyYear(toDate(row.date)) === year - 1));
   const yearCalendar = resolveYearCalendar(now);
-  // A pace belongs to a center that is alive: a dormant or archived one gets no projection.
-  const canProject = lifecycle === 'active';
-  const yearProjection =
-    canProject && yearCalendar.canForecast && yearSplit.spentToDate > 0
-      ? projectWindowEndWithScheduled(yearSplit.spentToDate, yearSplit.scheduled, yearCalendar.dayOfYear, yearCalendar.daysInYear)
-      : null;
 
-  const monthCalendar = resolveBudgetCalendar(now);
   const month = getItalyMonth(now);
   const monthRows = expenses.filter((row) => getItalyYear(toDate(row.date)) === year && getItalyMonth(toDate(row.date)) === month);
   const monthSplit = { spentToDate: sum(monthRows.filter((row) => isBooked(row, now))), scheduled: sum(monthRows.filter((row) => !isBooked(row, now))) };
-  const monthProjection =
-    canProject && monthCalendar.canForecast && monthSplit.spentToDate > 0
-      ? projectWindowEndWithScheduled(monthSplit.spentToDate, monthSplit.scheduled, monthCalendar.dayOfMonth, monthCalendar.daysInMonth)
-      : null;
 
-  const budget = resolveBudget(center, expenses, now, yearSplit, yearCalendar, canProject);
+  const budget = resolveBudget(center, expenses, now, yearSplit, yearCalendar);
 
   return {
     center,
@@ -272,9 +257,9 @@ export function summarizeCenter(center: CostCenter, expenses: Expense[], now: Da
     ytd: yearSplit.spentToDate,
     ytdPct: total > 0 ? (yearSplit.spentToDate / total) * 100 : 0,
     lastYear,
-    yearProjection,
-    monthProjection,
+    yearScheduled: yearSplit.scheduled,
     monthSpentToDate: monthSplit.spentToDate,
+    monthScheduled: monthSplit.scheduled,
     budget,
     lifecycle,
     recurring: splitRecurringVsOneOff(booked),
@@ -287,16 +272,11 @@ function resolveBudget(
   now: Date,
   yearSplit: YearSplit,
   yearCalendar: YearCalendar,
-  canProject: boolean,
 ): CenterBudgetSummary | null {
   const { budgetAmount, budgetPeriod } = center;
   if (!budgetAmount || budgetAmount <= 0 || !budgetPeriod) return null;
-  if (budgetPeriod === 'monthly') {
-    const monthly = summarizeMonthlyBudget(budgetAmount, expenses, now);
-    // A dormant center has no pace, so its projection says nothing — and nothing is «a rischio».
-    return monthly && !canProject ? { ...monthly, projection: null, atRisk: false, projectedCrossingDay: null } : monthly;
-  }
-  return summarizeAnnualBudget(budgetAmount, yearSplit, yearCalendar, canProject);
+  if (budgetPeriod === 'monthly') return summarizeMonthlyBudget(budgetAmount, expenses, now);
+  return summarizeAnnualBudget(budgetAmount, yearSplit, yearCalendar);
 }
 
 // ─── The list ─────────────────────────────────────────────────────────────────
@@ -327,7 +307,7 @@ export interface CostCentersSummary {
   dormant: CenterSummary[];
   /** Active centers whose ceiling is already over. */
   over: CenterSummary[];
-  /** Active centers whose projection lands past a ceiling still holding. */
+  /** Active centers still under their ceiling that the rows in the calendar carry past it. */
   atRisk: CenterSummary[];
   /** Active centers with a ceiling. */
   withBudget: number;

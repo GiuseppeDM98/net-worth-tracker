@@ -20,7 +20,7 @@ import type { MonteCarloScenarioParams, MonteCarloScenarios } from '@/types/asse
 import type { Narrative } from '@/lib/utils/narrative';
 import type { MonteCarloPlan, ScenarioKey } from '@/lib/utils/monteCarloSummary';
 import { formatInputAmount } from '@/lib/utils/monteCarloSummary';
-import { describePensionInflowRow } from '@/lib/utils/monteCarloNarrative';
+import { describePensionInflowRow, describeStatePensionRow, describeWithdrawalTaxRow } from '@/lib/utils/monteCarloNarrative';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { useChartColors } from '@/lib/hooks/useChartColors';
 import { cn } from '@/lib/utils';
@@ -177,6 +177,19 @@ export function ParametriTile({
               <Input id="mc-numberOfSimulations" type="number" inputMode="numeric" min="1000" max="50000" step="1000" value={form.numberOfSimulations} onChange={(e) => onFormChange({ numberOfSimulations: e.target.value })} className={CONTROL_CLASS} />
               <p className="mt-1 text-[11px] leading-[1.4] text-muted-foreground">1.000 – 50.000 per scenario</p>
             </div>
+          </div>
+
+          {/* What the withdrawal is net of and what it pays (2026-09-24): read-only rows, each
+              either in the run or declared out with its reason — the same rule as the
+              Calcolatore's Base di calcolo. */}
+          <div className="flex flex-col gap-1.5">
+            {plan.statePensions.map((pension) => (
+              <NarrativeText key={`${pension.yearOffset}-${pension.annualNetToday}`} segments={describeStatePensionRow(pension)} className="text-[11px] leading-[1.4] text-muted-foreground" figureClassName="font-medium" />
+            ))}
+            {plan.statePensions.length === 0 && (
+              <p className="text-[11px] leading-[1.4] text-muted-foreground">Pensioni statali: nessuna datata in Coast FIRE › Ipotesi (serve l&apos;età), il prelievo resta intero.</p>
+            )}
+            <NarrativeText segments={describeWithdrawalTaxRow(plan.withdrawalTax)} className="text-[11px] leading-[1.4] text-muted-foreground" figureClassName="font-medium" />
           </div>
 
           <div>

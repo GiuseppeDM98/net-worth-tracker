@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 
 interface MemoriaTileProps {
   memory: AssistantMemoryDocument | undefined;
-  /** Opens the Memoria sheet — the one place where items are managed. */
+  /** Opens the Memoria modal — the one place where items are managed. */
   onOpenMemory: () => void;
 }
 
@@ -37,7 +37,7 @@ function GoalRow({ goal }: { goal: AssistantMemoryItem }) {
 /**
  * «Cosa sa di te» — the companion's extract of the memory: every active goal with its last
  * evaluation (computed server-side against the current month; the row recomputes nothing) and
- * a preview of the other facts. Read-only by design: managing items stays in the sheet.
+ * a preview of the other facts. Read-only by design: managing items stays in the modal.
  */
 export function MemoriaTile({ memory, onOpenMemory }: MemoriaTileProps) {
   const activeItems = (memory?.items ?? []).filter((item) => item.status === 'active');

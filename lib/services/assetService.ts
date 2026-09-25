@@ -17,6 +17,7 @@ import { removeUndefinedDeep as removeUndefinedFields } from '@/lib/utils/firest
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { suggestIsLiquid } from '@/lib/utils/assetLiquidity';
 import { costBasisPerUnitEur, unitPriceEur } from '@/lib/utils/costBasisEur';
+import { CHECKING_ACCOUNT_STAMP_DUTY_EUR, CHECKING_ACCOUNT_STAMP_DUTY_THRESHOLD_EUR } from '@/lib/constants/stampDuty';
 import { invalidateDashboardOverviewSummary } from '@/lib/services/dashboardOverviewInvalidation';
 import { Asset, AssetFormData, BondDetails } from '@/types/assets';
 
@@ -252,6 +253,22 @@ export async function updateAsset(
       cleanedUpdates.exchange = deleteField();
     }
 
+    // The debt and its TAN are user-clearable (the «Debito residuo» switch off, an emptied TAN).
+    // The `in` guard keeps a partial caller — a price refresh — from wiping a debt it never sent;
+    // the linked instalments move the debt through their own transaction (debtRepaymentService).
+    if ('outstandingDebt' in updates && updates.outstandingDebt === undefined) {
+      cleanedUpdates.outstandingDebt = deleteField();
+    }
+    if ('debtInterestRate' in updates && updates.debtInterestRate === undefined) {
+      cleanedUpdates.debtInterestRate = deleteField();
+    }
+
+    // dividendCashAssetId is user-clearable («Predefinito» in AssetDialog). The `in` guard keeps a
+    // partial caller — a price refresh — from wiping an account it never sent.
+    if ('dividendCashAssetId' in updates && updates.dividendCashAssetId === undefined) {
+      cleanedUpdates.dividendCashAssetId = deleteField();
+    }
+
     // Rebuy on the same doc: quantity goes from 0 (sold but kept) back to > 0. Stamp the new
     // holding start so YOC ignores the previous holding's dividends (mirrors the ISIN-reuse path
     // in createAsset). Adding to an existing position (DCA, previous quantity > 0) is NOT a restart.
@@ -323,6 +340,11 @@ export async function updateAssetMetadata(
     // exchange too — user-clearable from the dialog, same `in` guard.
     if ('exchange' in updates && updates.exchange === undefined) {
       cleanedUpdates.exchange = deleteField();
+    }
+    // dividendCashAssetId is user-clearable («Predefinito» in AssetDialog). The `in` guard keeps a
+    // partial caller — a price refresh — from wiping an account it never sent.
+    if ('dividendCashAssetId' in updates && updates.dividendCashAssetId === undefined) {
+      cleanedUpdates.dividendCashAssetId = deleteField();
     }
 
     await updateDoc(assetRef, cleanedUpdates);
@@ -626,16 +648,23 @@ export function calculateIlliquidNetWorth(assets: Asset[]): number {
  * @param includePrimaryResidence - If true, include primary residences; if false, exclude them (default: false)
  * @returns Total value of FIRE-eligible assets
  */
+/**
+ * The assets the FIRE number runs on: everything but a primary residence, when the setting
+ * keeps it out. ONE filter, shared by the net worth below and by the tax profile of the
+ * withdrawals (`resolvePortfolioTaxProfile`), so the basis and the value are read on the same set.
+ */
+export function filterFireEligibleAssets(assets: Asset[], includePrimaryResidence: boolean = false): Asset[] {
+  return assets.filter(asset => {
+    // Exclude real estate marked as primary residence (if user setting is disabled)
+    if (!includePrimaryResidence && asset.assetClass === 'realestate' && asset.isPrimaryResidence === true) {
+      return false;
+    }
+    return true;
+  });
+}
+
 export function calculateFIRENetWorth(assets: Asset[], includePrimaryResidence: boolean = false): number {
-  return assets
-    .filter(asset => {
-      // Exclude real estate marked as primary residence (if user setting is disabled)
-      if (!includePrimaryResidence && asset.assetClass === 'realestate' && asset.isPrimaryResidence === true) {
-        return false;
-      }
-      return true;
-    })
-    .reduce((total, asset) => total + calculateAssetValue(asset), 0);
+  return filterFireEligibleAssets(assets, includePrimaryResidence).reduce((total, asset) => total + calculateAssetValue(asset), 0);
 }
 
 /**
@@ -820,7 +849,11 @@ export function calculateAnnualPortfolioCost(assets: Asset[]): number {
 /**
  * Calculate annual stamp duty (imposta di bollo) on the portfolio.
  * Excluded: sold assets (quantity=0) and assets with stampDutyExempt=true.
- * For checking accounts (cash with the specified subCategory): applies only if value strictly > 5000€.
+ * For checking accounts (cash with the specified subCategory): a FLAT 34,20 € a year, only when
+ * the balance is strictly above 5.000 € (`lib/constants/stampDuty.ts`) — never the proportional
+ * rate, which is the securities' rule. Until 2026-09-24 the account paid `balance × rate`, the
+ * comment above it said the flat rule, and the test pinned the wrong figure. The threshold is
+ * read on today's balance; the law reads the year's average balance, which the app does not keep.
  */
 export function calculateStampDuty(
   assets: Asset[],
@@ -844,7 +877,7 @@ export function calculateStampDuty(
         checkingAccountSubCategory &&
         asset.subCategory === checkingAccountSubCategory
       ) {
-        return value > 5000 ? total + value * (stampDutyRate / 100) : total;
+        return value > CHECKING_ACCOUNT_STAMP_DUTY_THRESHOLD_EUR ? total + CHECKING_ACCOUNT_STAMP_DUTY_EUR : total;
       }
       return total + value * (stampDutyRate / 100);
     }, 0);

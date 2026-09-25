@@ -4,6 +4,8 @@
  * The rule under test: the checking-account flat fee (34,20€ above 5.000€)
  * applies only to a TRUE conto corrente (`type === 'cash' && assetClass === 'cash'`),
  * never to a money-market ETF that merely carries `assetClass: 'cash'` for allocation purposes.
+ * Until 2026-09-24 the first case pinned `6000 × 0,2%` — the account paid the securities' rate
+ * on its balance — so the test now reads the fee on two balances that the rate would price apart.
  *
  * assetService.ts imports the client Firebase SDK at module load time — mock it out so the suite
  * doesn't need real Firebase env vars (same convention as __tests__/assetExposure.test.ts).
@@ -76,8 +78,21 @@ describe('calculateStampDuty', () => {
       currentPrice: 1,
     });
 
+    const large = makeAsset({
+      id: 'large',
+      type: 'cash',
+      assetClass: 'cash',
+      subCategory: CHECKING_SUBCATEGORY,
+      quantity: 1_000_000,
+      currentPrice: 1,
+    });
+
     expect(calculateStampDuty([below], 0.2, CHECKING_SUBCATEGORY)).toBe(0);
-    expect(calculateStampDuty([above], 0.2, CHECKING_SUBCATEGORY)).toBeCloseTo(6000 * 0.002, 5);
+    // A flat fee: 6.000 € and 1.000.000 € pay the same 34,20 € (the rate would say 12 € and 2.000 €).
+    expect(calculateStampDuty([above], 0.2, CHECKING_SUBCATEGORY)).toBeCloseTo(34.2, 5);
+    expect(calculateStampDuty([large], 0.2, CHECKING_SUBCATEGORY)).toBeCloseTo(34.2, 5);
+    // One fee per account, not one per portfolio.
+    expect(calculateStampDuty([above, large], 0.2, CHECKING_SUBCATEGORY)).toBeCloseTo(68.4, 5);
   });
 
   it('taxes a money-market ETF (type etf, assetClass cash) at 0,2% even under 5.000€, never the flat rule', () => {

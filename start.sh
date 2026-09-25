@@ -22,6 +22,13 @@ if [ "${1:-}" = "--production" ]; then
   cp -r .next/static "$STANDALONE/.next/static"
   cp -r public "$STANDALONE/public"
   echo "Serving production build on http://localhost:3000 ..."
+  # The standalone server chdir's into .next/standalone and never loads the
+  # repo-root .env.local, so export server-side secrets (Admin SDK, cron, ...)
+  # explicitly. NEXT_PUBLIC_* are already baked in at build time.
+  set -a
+  # shellcheck disable=SC1091
+  . ./.env.local
+  set +a
   node "$STANDALONE/server.js"
   exit 0
 fi

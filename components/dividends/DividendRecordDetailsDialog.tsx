@@ -1,12 +1,12 @@
 /**
  * Read-only dividend details opened from a table row or mobile card.
  *
- * The dialog accepts an inline style so callers can set a contextual
- * transform-origin derived from the clicked trigger.
+ * It grows from the row that opened it: the caller resolves `triggerOrigin` at the click
+ * (`resolveCenteredModalOrigin`), so the origin is on the window from its first frame.
  */
 'use client';
 
-import type { CSSProperties, RefObject } from 'react';
+import type { RefObject } from 'react';
 import { Button } from '@/components/ui/button';
 import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import { formatCurrency, formatDate } from '@/lib/utils/formatters';
@@ -25,8 +25,7 @@ interface DividendRecordDetailsDialogProps {
   onEdit: (dividend: Dividend) => void;
   /** Provisional inflation-linked coupons: opens the FOI-rate dialog from here. */
   onSetInflationRate?: (dividend: Dividend) => void;
-  dialogRef?: RefObject<HTMLDivElement | null>;
-  style?: CSSProperties;
+  triggerOrigin?: string;
   /** The row's button that opened the record, so the focus goes back to it on close. */
   returnFocusTo?: RefObject<HTMLElement | null>;
 }
@@ -37,8 +36,7 @@ export function DividendRecordDetailsDialog({
   onOpenChange,
   onEdit,
   onSetInflationRate,
-  dialogRef,
-  style,
+  triggerOrigin,
   returnFocusTo,
 }: DividendRecordDetailsDialogProps) {
   if (!dividend) return null;
@@ -59,8 +57,7 @@ export function DividendRecordDetailsDialog({
           : `${dividend.assetName}. Il netto è già al netto della ritenuta e, per una valuta estera, convertito al cambio del pagamento.`
       }
       width="md"
-      contentRef={dialogRef}
-      triggerOrigin={style?.transformOrigin as string | undefined}
+      triggerOrigin={triggerOrigin}
       returnFocusTo={returnFocusTo}
       footer={
         <>

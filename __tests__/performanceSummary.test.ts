@@ -16,7 +16,8 @@ import {
   computeDrawdownStatus,
   deannualizeReturn,
   resolveHeroReturn,
-  resolvePeriodReturnChip,
+  resolveCompanionReturnChip,
+  summarizeCapitalEntered,
 } from '@/lib/utils/performanceSummary';
 
 // ---------------------------------------------------------------------------
@@ -174,15 +175,26 @@ describe('computeDrawdownStatus', () => {
 });
 
 describe('resolveHeroReturn', () => {
-  // A7: annualizzare su due mesi trasforma una misura in una previsione. Sotto i 6 mesi l'hero
-  // mostra il rendimento del periodo, con l'etichetta che dice quale dei due sta guardando.
+  // A7: annualizzare su pochi mesi trasforma una misura in una previsione. Sotto l'anno l'hero
+  // mostra il rendimento del periodo, con l'etichetta che dice quale dei due sta guardando
+  // (la soglia era 6 mesi fino al 2026-09-20: un YTD di nove mesi stampava «+16,0%» a 54px).
 
-  it('keeps the annualized figure from 6 months on', () => {
-    const result = resolveHeroReturn(12.68, 6);
+  it('keeps the annualized figure from a year on', () => {
+    const result = resolveHeroReturn(12.68, 12);
 
     expect(result.value).toBe(12.68);
     expect(result.isPeriodReturn).toBe(false);
     expect(result.label).toBe('annualizzato');
+  });
+
+  it('states the period return on the year-to-date of nine months, the real account\'s case', () => {
+    const result = resolveHeroReturn(16.0, 9);
+
+    expect(result.isPeriodReturn).toBe(true);
+    expect(result.value!).toBeCloseTo(11.77, 1);
+    expect(result.label).toBe('nei 9 mesi');
+    // One month short of a year is still a period; the year itself is not.
+    expect(resolveHeroReturn(16.0, 11).isPeriodReturn).toBe(true);
   });
 
   it('de-annualizes below the threshold and says so', () => {
@@ -225,22 +237,76 @@ describe('resolveHeroReturn', () => {
   });
 });
 
-describe('deannualizeReturn / resolvePeriodReturnChip', () => {
-  it('is the exact inverse of the annualisation, and the step the hero takes below six months', () => {
+describe('deannualizeReturn / resolveCompanionReturnChip', () => {
+  it('is the exact inverse of the annualisation, and the step the hero takes below a year', () => {
     // +26,05% a year over 44 months is +133,7% cumulative (the real account's «Storico» window).
     expect(deannualizeReturn(26.05, 44)).toBeCloseTo(133.72, 1);
     expect(deannualizeReturn(12, 12)).toBeCloseTo(12, 9);
     expect(deannualizeReturn(26.5319, 2)).toBeCloseTo(resolveHeroReturn(26.5319, 2).value!, 9);
   });
 
-  it('offers the cumulative TWR as the second chip when the hero is annualised, and nothing when the hero already is the period return', () => {
+  it('offers the OTHER basis: cumulative beside an annualised hero, annualised beside a period hero', () => {
     const annualised = resolveHeroReturn(26.05, 44);
-    expect(resolvePeriodReturnChip(26.05, 44, annualised)).toEqual({ value: expect.closeTo(133.72, 1), label: 'cumulato in 44 mesi' });
-    // Below six months the hero IS the period return: a second copy would answer the same question twice.
-    expect(resolvePeriodReturnChip(26.5319, 2, resolveHeroReturn(26.5319, 2))).toBeNull();
+    expect(resolveCompanionReturnChip(26.05, 44, annualised)).toEqual({ value: expect.closeTo(133.72, 1), label: 'cumulato in 44 mesi' });
+    // Nine months: the hero is what happened, the chip is the rate per year.
+    expect(resolveCompanionReturnChip(16.0, 9, resolveHeroReturn(16.0, 9))).toEqual({ value: 16.0, label: 'annualizzato' });
+    expect(resolveCompanionReturnChip(16.0, 6, resolveHeroReturn(16.0, 6))).toEqual({ value: 16.0, label: 'annualizzato' });
+  });
+
+  it('prints no chip where it would extrapolate or repeat the hero', () => {
+    // Below six months not even a 12px chip annualises.
+    expect(resolveCompanionReturnChip(26.5319, 2, resolveHeroReturn(26.5319, 2))).toBeNull();
+    expect(resolveCompanionReturnChip(26.5319, 5, resolveHeroReturn(26.5319, 5))).toBeNull();
     // Over exactly twelve months the two figures coincide.
-    expect(resolvePeriodReturnChip(12.63, 12, resolveHeroReturn(12.63, 12))).toBeNull();
-    expect(resolvePeriodReturnChip(null, 9, resolveHeroReturn(null, 9))).toBeNull();
-    expect(resolvePeriodReturnChip(11.47, 0, annualised)).toBeNull();
+    expect(resolveCompanionReturnChip(12.63, 12, resolveHeroReturn(12.63, 12))).toBeNull();
+    expect(resolveCompanionReturnChip(null, 9, resolveHeroReturn(null, 9))).toBeNull();
+    expect(resolveCompanionReturnChip(11.47, 0, resolveHeroReturn(11.47, 44))).toBeNull();
+  });
+});
+
+describe('summarizeCapitalEntered', () => {
+  const month = (m: number, flows: { net?: number; portfolio?: number | null; pension?: number }) => ({
+    date: new Date(2026, m - 1, 1),
+    income: 0,
+    expenses: 0,
+    dividendIncome: 0,
+    netCashFlow: flows.net ?? 0,
+    ...(flows.portfolio !== undefined ? { portfolioFlow: flows.portfolio } : {}),
+    ...(flows.pension !== undefined ? { pensionFlow: flows.pension } : {}),
+  });
+
+  it('splits what the formulas neutralised by channel, and a measured month never adds the savings too', () => {
+    const summary = summarizeCapitalEntered(
+      [month(1, { net: 900 }), month(2, { net: 500, portfolio: 1200 }), month(3, { net: 400, portfolio: 0, pension: 31852 })],
+      3,
+    );
+
+    expect(summary.channels).toEqual([
+      { key: 'measured', amount: 1200, months: 2 },
+      { key: 'cashflow', amount: 900, months: 1 },
+      { key: 'pension', amount: 31852, months: 1 },
+    ]);
+    expect(summary.total).toBe(33952);
+  });
+
+  it('adds up ON SCREEN: the total is the sum of the rounded channels, not the rounded sum', () => {
+    // 100,4 + 200,4 + 300,4 = 601,2 → 601; the printed rows give 100 + 200 + 300 = 600.
+    const summary = summarizeCapitalEntered([month(1, { net: 100.4 }), month(2, { portfolio: 200.4, pension: 300.4 })], 2);
+
+    expect(summary.total).toBe(summary.channels.reduce((sum, channel) => sum + channel.amount, 0));
+    expect(summary.total).toBe(600);
+  });
+
+  it('with the whole net worth as the base there is one channel, the cashflow, over every month — quiet months included', () => {
+    // March has no row in the series (nothing moved): it is still a month the cashflow covered.
+    const summary = summarizeCapitalEntered([month(1, { net: 900 }), month(2, { net: -300 })], 3);
+
+    expect(summary.channels).toEqual([{ key: 'cashflow', amount: 600, months: 3 }]);
+  });
+
+  it('drops a channel that carried no month, and a null portfolio flow is NOT a measured month', () => {
+    const summary = summarizeCapitalEntered([month(1, { net: 250, portfolio: null })], 1);
+
+    expect(summary.channels).toEqual([{ key: 'cashflow', amount: 250, months: 1 }]);
   });
 });

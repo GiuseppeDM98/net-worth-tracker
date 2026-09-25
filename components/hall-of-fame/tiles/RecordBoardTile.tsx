@@ -6,7 +6,9 @@ import type { RecordBoard } from '@/lib/utils/hallOfFameSummary';
 import type { Narrative } from '@/lib/utils/narrative';
 import { Tile } from '@/components/ui/tile';
 import { NarrativeText } from '@/components/ui/narrative-text';
+import { TileMethodNote } from '@/components/ui/tile-method-note';
 import { RecordRows } from '@/components/hall-of-fame/RecordRows';
+import type { NotePrefill } from '@/components/hall-of-fame/NoteTrigger';
 
 interface RecordBoardTileProps {
   eyebrow: string;
@@ -16,7 +18,7 @@ interface RecordBoardTileProps {
   board: RecordBoard | null;
   /** How many positions to draw; the rest live in the Dettaglio's table. */
   limit: number;
-  /** Width of the period column — a 3-column tile needs a narrower one than a 7-column one. */
+  /** Minimum width of the period column — the bars of a board start on one line; never a ceiling. */
   labelClassName?: string;
   /** Shown when the ranking is empty, or when the document does not carry it at all. */
   emptyCopy: string;
@@ -24,10 +26,15 @@ interface RecordBoardTileProps {
   emptyAction?: ReactNode;
   /** A generated footer; a page never types copy that carries a number. */
   footer?: Narrative | null;
-  /** A literal footer, for an explanation that carries no figure. */
+  /**
+   * A literal footer: the ONE line that says what the rows are, with the method behind
+   * «Come si calcola» (`TileMethodNote`) when `method` is given — never a second line on the tile.
+   */
   footerCopy?: string;
+  method?: ReactNode;
   notes: HallOfFameNote[];
   onNoteClick: (note: HallOfFameNote, trigger: HTMLElement | null) => void;
+  onAddNote: (prefill: NotePrefill, trigger: HTMLElement | null) => void;
   ariaLabel: string;
 }
 
@@ -50,8 +57,10 @@ export function RecordBoardTile({
   emptyAction,
   footer,
   footerCopy,
+  method,
   notes,
   onNoteClick,
+  onAddNote,
   ariaLabel,
 }: RecordBoardTileProps) {
   const hasRows = !!board && board.total > 0;
@@ -67,6 +76,7 @@ export function RecordBoardTile({
             notes={notes}
             sectionKey={board.sectionKey}
             onNoteClick={onNoteClick}
+            onAddNote={onAddNote}
             labelClassName={labelClassName}
             ariaLabel={ariaLabel}
           />
@@ -78,17 +88,23 @@ export function RecordBoardTile({
         </div>
       )}
 
-      {(footer || footerCopy) && (
+      {footer && (
         <div className="mt-auto border-t border-border pt-3.5">
-          {footer ? (
-            <NarrativeText
-              segments={footer}
-              className="text-[11px] leading-[1.5] text-muted-foreground"
-              figureClassName="font-medium"
-            />
-          ) : (
-            <p className="text-[11px] leading-[1.5] text-muted-foreground">{footerCopy}</p>
-          )}
+          <NarrativeText
+            segments={footer}
+            className="text-[11px] leading-[1.5] text-muted-foreground"
+            figureClassName="font-medium"
+          />
+        </div>
+      )}
+      {!footer && footerCopy && method && (
+        <TileMethodNote summary={footerCopy} subject={eyebrow}>
+          {method}
+        </TileMethodNote>
+      )}
+      {!footer && footerCopy && !method && (
+        <div className="mt-auto border-t border-border pt-3.5">
+          <p className="text-[11px] leading-[1.5] text-muted-foreground">{footerCopy}</p>
         </div>
       )}
     </Tile>

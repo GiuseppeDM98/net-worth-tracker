@@ -18,6 +18,9 @@ import {
   calculateFIRESensitivityMatrix,
   getDefaultCoastFireTaxBrackets,
   getDefaultScenarios,
+  resolveFanFireTargets,
+  resolveFireRequirement,
+  type FireHonestInputs,
 } from '@/lib/services/fireService'
 import type { MonthlySnapshot } from '@/types/assets'
 
@@ -467,20 +470,45 @@ describe('calculateFIREProjection', () => {
   })
 
   it('should stop adding savings after FIRE is reached', () => {
-    // High NW + modest savings → FIRE reached quickly
+    // 600k against a 750k target with 50k a year: the bull reaches FIRE within a few years, NOT
+    // at year 0 — the identity below needs a FIRE year with a row before it.
+    const result = calculateFIREProjection(600000, 30000, 50000, 4, scenarios, 50)
+
+    expect(result.bullYearsToFIRE).not.toBeNull()
+    expect(result.bullYearsToFIRE).toBeGreaterThan(0)
+    const fireYear = result.bullYearsToFIRE as number
+    expect(fireYear).toBeLessThan(result.yearlyData.length)
+    const yearAtFIRE = result.yearlyData[fireYear - 1]
+    const yearAfterFIRE = result.yearlyData[fireYear]
+
+    // After FIRE, portfolio grows only by market return (no savings added)
+    // Growth should be roughly bullGrowthRate%, not bullGrowthRate% + savings
+    const growthAfterFIRE = yearAfterFIRE.bullNetWorth / yearAtFIRE.bullNetWorth - 1
+    const expectedGrowth = scenarios.bull.growthRate / 100
+
+    expect(growthAfterFIRE).toBeCloseTo(expectedGrowth, 1)
+  })
+
+  it('reports year 0 when the starting portfolio already clears the target, and saves nothing after', () => {
+    // 2M against a 750k target: FIRE today in every scenario, never «in one year» (the Scenari
+    // tile printed «tra 1 anno» under «Sei già FIRE.» until 2026-09-22).
     const result = calculateFIREProjection(2000000, 30000, 50000, 4, scenarios, 50)
+    expect(result.bearYearsToFIRE).toBe(0)
+    expect(result.baseYearsToFIRE).toBe(0)
+    expect(result.bullYearsToFIRE).toBe(0)
+    // A reached scenario receives no savings: year 1 is pure market growth.
+    expect(result.yearlyData[0].baseNetWorth).toBeCloseTo(2000000 * (1 + scenarios.base.growthRate / 100), -2)
+    // The walk still stops five years after the last reached scenario.
+    expect(result.yearlyData.length).toBe(5)
+  })
 
-    if (result.bullYearsToFIRE !== null && result.bullYearsToFIRE < result.yearlyData.length - 1) {
-      const yearAtFIRE = result.yearlyData[result.bullYearsToFIRE - 1]
-      const yearAfterFIRE = result.yearlyData[result.bullYearsToFIRE]
-
-      // After FIRE, portfolio grows only by market return (no savings added)
-      // Growth should be roughly bullGrowthRate%, not bullGrowthRate% + savings
-      const growthAfterFIRE = yearAfterFIRE.bullNetWorth / yearAtFIRE.bullNetWorth - 1
-      const expectedGrowth = scenarios.bull.growthRate / 100
-
-      expect(growthAfterFIRE).toBeCloseTo(expectedGrowth, 1)
-    }
+  it('tests year 0 on the bridge requirement when the pension bridge is on', () => {
+    // Free assets 300k, 30k expenses, fund 600k unlocking in 10 years: the bridge number is far
+    // below the 750k standard one, so the base is FIRE today on the bridge — and NOT without it.
+    const bridged = calculateFIREProjection(300000, 30000, 0, 4, scenarios, 20, { valueToday: 600000, yearsToUnlock: 10 })
+    const unbridged = calculateFIREProjection(300000, 30000, 0, 4, scenarios, 20)
+    expect(bridged.baseYearsToFIRE).toBe(0)
+    expect(unbridged.baseYearsToFIRE).not.toBe(0)
   })
 
   it('should stop early when all scenarios reached FIRE + 5 years', () => {
@@ -803,7 +831,11 @@ describe('calculateFIREProjection — pension bridge', () => {
 
     expect(unbridged.yearlyData[0].baseFireReached).toBe(false)
     expect(bridged.yearlyData[0].baseFireReached).toBe(true)
-    expect(bridged.baseYearsToFIRE).toBe(1)
+    // 950k already covers two years of expenses plus the post-unlock remainder TODAY, so the
+    // bridge says year 0 (it said 1 until the walk tested year 0, 2026-09-22); the standard
+    // check is not met at the start.
+    expect(bridged.baseYearsToFIRE).toBe(0)
+    expect(unbridged.baseYearsToFIRE).not.toBe(0)
   })
 
   it('uses the standard requirement (on the merged portfolio) from the unlock year onward', () => {
@@ -1023,5 +1055,113 @@ describe('calculateFIRESensitivityMatrix', () => {
         expect(current).toBeGreaterThanOrEqual(previous)
       }
     }
+  })
+})
+
+/**
+ * The honest requirement (2026-09-24): ONE rule per year — expenses less the state pensions
+ * from their start, the tax on what the portfolio funds, the fund at its unlock — and the walk
+ * that reads it row by row.
+ */
+describe('resolveFireRequirement', () => {
+  const base = getDefaultScenarios().base
+  const brackets = getDefaultCoastFireTaxBrackets()
+  const honestWith = (overrides: Partial<FireHonestInputs> = {}): FireHonestInputs => ({
+    userAge: 40,
+    pensions: [{ id: 'inps', label: 'INPS', grossMonthlyAmount: 1000, monthsPerYear: 13, startAge: 40 }],
+    taxBrackets: brackets,
+    now: FIXED_CURRENT_DATE,
+    ...overrides,
+  })
+
+  it('is expenses ÷ SWR with nothing in, and the bridge number with the fund alone', () => {
+    const bare = resolveFireRequirement({ annualExpenses: 30000, withdrawalRate: 4, scenario: base, yearsElapsed: 0 })
+    expect(bare.requirement).toBe(750000)
+    expect(bare.pensionsConsidered).toBe(false)
+    expect(bare.taxMultiplier).toBe(1)
+    const bridged = resolveFireRequirement({ annualExpenses: 40000, withdrawalRate: 4, scenario: { growthRate: 7.5, inflationRate: 2.5 }, yearsElapsed: 0, bridge: { compartmentValue: 200000, yearsToUnlock: 2 } })
+    const reference = calculateFireBridgeNumber({ annualExpenses: 40000, withdrawalRate: 4, realReturn: 5, yearsToUnlock: 2, pensionValueToday: 200000, pensionGrowthRate: 5 })
+    expect(bridged.requirement).toBeCloseTo(reference.bridgeFireNumber, 6)
+  })
+
+  it('grosses up what the portfolio funds by the tax on the gain share', () => {
+    const taxed = resolveFireRequirement({ annualExpenses: 30000, withdrawalRate: 4, scenario: base, yearsElapsed: 0, honest: honestWith({ pensions: [], withdrawalTax: { basisToday: 0, rate: 26 } }), gainShare: 0.5 })
+    expect(taxed.taxMultiplier).toBeCloseTo(1 / (1 - 0.13))
+    expect(taxed.requirement).toBeCloseTo(750000 / 0.87)
+    // A gain share without a tax profile changes nothing.
+    expect(resolveFireRequirement({ annualExpenses: 30000, withdrawalRate: 4, scenario: base, yearsElapsed: 0, honest: honestWith({ pensions: [] }), gainShare: 0.5 }).requirement).toBe(750000)
+  })
+
+  it('takes the net pension off from its start — today, later, or not at all without an age', () => {
+    // Starts today (age 40, inflation 0 → nominal is real): 13.000 € gross, 23% IRPEF → 10.010 € net.
+    const startsNow = resolveFireRequirement({ annualExpenses: 30000, withdrawalRate: 4, scenario: { growthRate: 5, inflationRate: 0 }, yearsElapsed: 0, honest: honestWith() })
+    expect(startsNow.pensionsConsidered).toBe(true)
+    expect(startsNow.pensionNetAnnual).toBeCloseTo(10010, 6)
+    expect(startsNow.requirement).toBeCloseTo((30000 - 10010) / 0.04, 4)
+    expect(startsNow.pensionLatestStartAge).toBe(40)
+    // Starts in ten years: between the full number and the steady-state one.
+    const later = resolveFireRequirement({ annualExpenses: 30000, withdrawalRate: 4, scenario: { growthRate: 5, inflationRate: 0 }, yearsElapsed: 0, honest: honestWith({ userAge: 30 }) })
+    expect(later.requirement).toBeGreaterThan(startsNow.requirement)
+    expect(later.requirement).toBeLessThan(750000)
+    expect(later.pensionLatestStartAge).toBe(40)
+    // Read five years on, the bridge is five years shorter: the requirement falls towards the steady state.
+    const fiveYearsOn = resolveFireRequirement({ annualExpenses: 30000, withdrawalRate: 4, scenario: { growthRate: 5, inflationRate: 0 }, yearsElapsed: 5, honest: honestWith({ userAge: 30 }) })
+    expect(fiveYearsOn.requirement).toBeLessThan(later.requirement)
+    // No age: the pension cannot be dated, the number is the full one and says so.
+    const noAge = resolveFireRequirement({ annualExpenses: 30000, withdrawalRate: 4, scenario: { growthRate: 5, inflationRate: 0 }, yearsElapsed: 0, honest: honestWith({ userAge: undefined }) })
+    expect(noAge.pensionsConsidered).toBe(false)
+    expect(noAge.requirement).toBe(750000)
+  })
+})
+
+describe('calculateFIREProjection — honest inputs', () => {
+  const scenarios = getDefaultScenarios()
+  const brackets = getDefaultCoastFireTaxBrackets()
+
+  it('is byte-identical without pensions and tax, whether `honest` is passed or not', () => {
+    const plain = calculateFIREProjection(100000, 30000, 20000, 4, scenarios, 50)
+    const emptyHonest = calculateFIREProjection(100000, 30000, 20000, 4, scenarios, 50, undefined, { pensions: [], taxBrackets: brackets, now: FIXED_CURRENT_DATE })
+    expect(emptyHonest).toEqual(plain)
+  })
+
+  it('with a pension the rows carry the lower requirement and the base reaches FIRE earlier', () => {
+    const honest: FireHonestInputs = { userAge: 40, pensions: [{ id: 'inps', label: 'INPS', grossMonthlyAmount: 1500, monthsPerYear: 13, startAge: 55 }], taxBrackets: brackets, now: FIXED_CURRENT_DATE }
+    const plain = calculateFIREProjection(100000, 30000, 20000, 4, scenarios, 50)
+    const withPension = calculateFIREProjection(100000, 30000, 20000, 4, scenarios, 50, undefined, honest)
+    expect(withPension.baseYearsToFIRE as number).toBeLessThan(plain.baseYearsToFIRE as number)
+    // Every row's FIRE number is below the bare chain, and it is what the row was tested on.
+    for (const row of withPension.yearlyData) {
+      expect(row.baseFireNumber).toBeLessThan(plain.yearlyData[row.year - 1].baseFireNumber)
+      expect(row.baseFireReached).toBe(row.baseNetWorth >= row.baseFireNumber)
+    }
+    // The fan's targets are those rows, today's requirement first.
+    const targets = resolveFanFireTargets(500000, withPension)
+    expect(targets[0]).toBe(500000)
+    expect(targets[3]).toBe(withPension.yearlyData[2].baseFireNumber)
+  })
+
+  it('with the tax the rows carry the grossed chain and the base reaches FIRE later', () => {
+    const honest: FireHonestInputs = { pensions: [], taxBrackets: brackets, withdrawalTax: { basisToday: 100000, rate: 26 }, now: FIXED_CURRENT_DATE }
+    const plain = calculateFIREProjection(100000, 30000, 20000, 4, scenarios, 50)
+    const taxed = calculateFIREProjection(100000, 30000, 20000, 4, scenarios, 50, undefined, honest)
+    expect(taxed.baseYearsToFIRE as number).toBeGreaterThan(plain.baseYearsToFIRE as number)
+    // At year 1 the gain is one year of 7% on 100k over a basis of 120k (100k + 20k saved):
+    // the row is the chain × 1 / (1 − share × 0,26), on the walk's own rounding.
+    const row = taxed.yearlyData[0]
+    const share = 1 - 120000 / row.baseNetWorth
+    expect(row.baseFireNumber).toBeCloseTo(plain.yearlyData[0].baseFireNumber / (1 - share * 0.26), -1)
+  })
+})
+
+describe('calculateCoastFIREMetrics — tax on withdrawals', () => {
+  it('requires more at the target when the sales are taxed, and nothing changes without gains', () => {
+    const bare = calculateCoastFIREMetrics(200000, 30000, 4, 35, 60, 4.5, 2.5)
+    const taxed = calculateCoastFIREMetrics(200000, 30000, 4, 35, 60, 4.5, 2.5, [], getDefaultCoastFireTaxBrackets(), FIXED_CURRENT_DATE, undefined, { basisToday: 200000, rate: 26 })
+    expect(taxed.retirementCapitalRequired).toBeGreaterThan(bare.retirementCapitalRequired)
+    expect(taxed.coastFireNumberToday).toBeGreaterThan(bare.coastFireNumberToday)
+    // Independent: the capital grown 25 years at 4,5% on a basis of 200k gives the gain share.
+    const grown = 200000 * Math.pow(1.045, 25)
+    const share = 1 - 200000 / grown
+    expect(taxed.retirementCapitalRequired).toBeCloseTo(bare.retirementCapitalRequired / (1 - share * 0.26), 4)
   })
 })

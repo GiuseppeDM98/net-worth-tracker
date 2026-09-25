@@ -40,6 +40,7 @@ import {
   rankCostDrivers,
   rankGoalProgress,
 } from '@/lib/utils/dashboardOverviewUtils';
+import type { AssetTransaction } from '@/types/assetTransactions';
 
 function makeAsset(overrides: Partial<Asset> = {}): Asset {
   return {
@@ -358,6 +359,56 @@ describe('computeMarketEffect', () => {
     });
     // crypto −1.000 + equity +500 + cash 0
     expect(computeMarketEffect(assets, previous)).toBe(-500);
+  });
+});
+
+describe("computeMarketEffect — the month's trades, read from the ledger", () => {
+  // The owner read «+2733 € dai tuoi movimenti» as income − expenses; +538 € of it was the price
+  // move of the quotes traded in the month, which `q_prev × Δu` gave 0 (2026-09-19).
+  let seq = 0;
+  function trade(assetId: string, type: 'buy' | 'sell', quantity: number, priceEur: number, fees?: number, isBaseline?: boolean): AssetTransaction {
+    seq += 1;
+    const date = new Date(2026, 6, 10, 12);
+    return { id: `t${seq}`, userId: 'u1', assetId, type, date, quantity, pricePerUnit: priceEur, priceEur, fees, isBaseline, createdAt: date, updatedAt: date };
+  }
+  const previous = (rows: SnapshotAssetRow[]) => makeSnapshot({ byAsset: rows });
+
+  it('should count the quotes bought in the month from their trade price, fees included', () => {
+    const assets = [makeAsset({ id: 'btc', assetClass: 'crypto', quantity: 1, currentPrice: 28000 })];
+    const before = previous([makeSnapshotAsset({ assetId: 'btc', quantity: 0.5, totalValue: 15000 })]);
+    // held 0,5 × (28000 − 30000) = −1000; bought 0,5 × (28000 − 29000) − 10 = −510
+    expect(computeMarketEffect(assets, before, undefined, [trade('btc', 'buy', 0.5, 29000, 10)])).toBeCloseTo(-1510, 6);
+    // Without the ledger the bought half is invisible, as it was.
+    expect(computeMarketEffect(assets, before)).toBeCloseTo(-1000, 6);
+  });
+
+  it('should count a position opened in the month, which used to contribute 0', () => {
+    const assets = [makeAsset({ id: 'dbmf', quantity: 10, currentPrice: 110 })];
+    expect(computeMarketEffect(assets, previous([makeSnapshotAsset({ assetId: 'other' })]), undefined, [trade('dbmf', 'buy', 10, 100, 2)])).toBeCloseTo(98, 6);
+  });
+
+  it("should count a sold quote at its sale price, not at today's, and a position closed in the month", () => {
+    const before = previous([makeSnapshotAsset({ assetId: 'a1', quantity: 10, totalValue: 1000 })]);
+    // 6 held × +10 + 4 sold × (120 − 100) − 1 fee = 139 (q_prev × Δu said 100)
+    expect(computeMarketEffect([makeAsset({ quantity: 6, currentPrice: 110 })], before, undefined, [trade('a1', 'sell', 4, 120, 1)])).toBeCloseTo(139, 6);
+    // Sold out: no longer held, still 10 × (130 − 100) − 1.
+    expect(computeMarketEffect([makeAsset({ quantity: 0, currentPrice: 130 })], before, undefined, [trade('a1', 'sell', 10, 130, 1)])).toBeCloseTo(299, 6);
+  });
+
+  it('should keep out of the market a quantity no BUY/SELL explains — a baseline, a hand edit', () => {
+    // Baseline of 10 written this month plus a real buy of 5 at 100: only the 5 are market.
+    const assets = [makeAsset({ quantity: 15, currentPrice: 110 })];
+    const noPrior = previous([makeSnapshotAsset({ assetId: 'other' })]);
+    expect(computeMarketEffect(assets, noPrior, undefined, [trade('a1', 'buy', 10, 100, undefined, true), trade('a1', 'buy', 5, 100)])).toBeCloseTo(50, 6);
+    // 10 held, 5 bought, 5 more typed by hand: 10 × 10 + 5 × 10, the typed 5 stay out.
+    const before = previous([makeSnapshotAsset({ assetId: 'a1', quantity: 10, totalValue: 1000 })]);
+    expect(computeMarketEffect([makeAsset({ quantity: 20, currentPrice: 110 })], before, undefined, [trade('a1', 'buy', 5, 100)])).toBeCloseTo(150, 6);
+  });
+
+  it('should leave pension funds and hand-valued property to their own rules', () => {
+    const house = makeAsset({ id: 'house', type: 'realestate', assetClass: 'realestate', quantity: 1, currentPrice: 300000 });
+    const before = previous([makeSnapshotAsset({ assetId: 'house', quantity: 1, price: 300000, totalValue: 300000 })]);
+    expect(computeMarketEffect([house], before, undefined, [trade('house', 'buy', 1, 250000)])).toBe(0);
   });
 });
 

@@ -31,9 +31,11 @@ import {
   describeLiquidity,
   narrativeToText,
   projectMonthEndSpending,
+  resolveLivedCashflow,
   type Narrative,
   type OverviewVerdictInput,
 } from '@/lib/utils/overviewNarrative';
+import type { DashboardOverviewExpenseStats } from '@/types/dashboardOverview';
 
 // Intl 'it-IT' separates the amount from "€" with a no-break space and leaves four-digit
 // amounts ungrouped (CLDR minimumGroupingDigits = 2, see AGENTS.md → Italian Localization):
@@ -135,13 +137,67 @@ describe('buildOverviewVerdict — headline and tone', () => {
     });
     expect(verdict.headline).toBe('Settembre è in calo per le tasse sulla vendita di Vanguard FTSE All-World, non per il mercato.');
     expect(verdict.tone).toBe('warning');
-    // The sale comes right after the variation, the split is gone (the headline said it), and
-    // the pension band reads as a subject, not as its database key.
+    // The sale comes right after the variation and carries the month without the tax, and the
+    // pension band reads as a subject, not as its database key.
     expect(plain(verdict.sentence)).toBe(
       'Il patrimonio vale 412.380,52 €: −4155,63 € (−1,40%) su agosto, +8,29% da inizio anno. ' +
-        'Hai venduto Vanguard FTSE All-World per 39.052 € con una plusvalenza di 15.726 € e pagato circa 4089 € di tasse. ' +
-        'Hai messo da parte il 40% delle entrate e i fondi pensione hanno fatto il grosso del lavoro (+256 €).',
+        'Hai venduto Vanguard FTSE All-World per 39.052 € con una plusvalenza di 15.726 € e pagato circa 4089 € di tasse: ' +
+        'senza, il mese avrebbe fatto −67 € (+153 € dal mercato e −220 € tra risparmio e altre variazioni). ' +
+        'Hai messo da parte il 40% delle entrate; sul mercato hanno spinto soprattutto i fondi pensione (+256 €).',
     );
+  });
+
+  // The real account, settembre 2026 on the 19th: +124,32 € (+0,04%) with 4088,86 € withheld on a
+  // VWCE sale and six instruments bought. The market counts the month's traded quotes too
+  // (+1480,59 held + 537,88 traded), the savings are the ones already made (4662,73 − 2568,11), and
+  // 1296,75 € of expenses are still in the calendar. The headline read «Settembre sta andando
+  // bene», the split «+2733 € dai tuoi movimenti» (owner, 2026-09-19).
+  const SEPTEMBER_FLAT: OverviewVerdictInput = {
+    month: 9,
+    totalValue: 297209.77,
+    monthlyVariation: { value: 124.32, percentage: 0.04 },
+    yearlyVariation: { value: 35288.88, percentage: 13.47 },
+    isNewATH: true,
+    savingsRate: 44.92,
+    cashflow: { savings: 2094.62, savingsRate: 44.92, scheduledExpenses: 1296.75, scheduledIncome: 0 },
+    marketEffect: 2018.47,
+    topMover: { assetClass: 'crypto', delta: 725.63 },
+    sales: {
+      proceeds: 39052.45,
+      realizedGain: 15726.38,
+      estimatedTax: 4088.86,
+      instruments: [{ id: 'vwce', name: 'VWCE', proceeds: 39052.45, realizedGain: 15726.38, estimatedTax: 4088.86 }],
+      brokenLedgers: 0,
+      purchases: { amount: 34305.1, instrumentCount: 6 },
+    },
+  };
+
+  it('should name the tax in the headline when a flat month is flat only because of it', () => {
+    const verdict = buildOverviewVerdict(SEPTEMBER_FLAT);
+    expect(verdict.headline).toBe('Settembre è in pari: le tasse sulla vendita di VWCE si sono prese la crescita.');
+    expect(verdict.tone).toBe('warning');
+    expect(plain(verdict.sentence)).toBe(
+      'Il patrimonio vale 297.209,77 €: +124,32 € (+0,04%) su agosto, +13,47% da inizio anno, nuovo massimo storico. ' +
+        'Hai venduto VWCE per 39.052 € con una plusvalenza di 15.726 € e pagato circa 4089 € di tasse: ' +
+        'senza, il mese avrebbe fatto +4213 € (+2018 € dal mercato e +2095 € risparmiati). ' +
+        'Nello stesso mese hai comprato 6 strumenti per 34.305 €. ' +
+        'Hai messo da parte il 45% delle entrate finora (altri 1297 € di spese in calendario); ' +
+        'sul mercato hanno spinto soprattutto le criptovalute (+726 €).',
+    );
+  });
+
+  it('should say the tax took most of a growth that is still visible', () => {
+    const verdict = buildOverviewVerdict({ ...SEPTEMBER_FLAT, monthlyVariation: { value: 3000, percentage: 1.02 } });
+    expect(verdict.headline).toBe('Settembre cresce, ma le tasse sulla vendita di VWCE si sono prese più di metà della crescita.');
+    expect(verdict.tone).toBe('warning');
+  });
+
+  it('should keep a good month good when the tax took less than half of the growth', () => {
+    const verdict = buildOverviewVerdict({ ...SEPTEMBER_FLAT, monthlyVariation: { value: 4100, percentage: 1.4 } });
+    expect(verdict.headline).toBe('Settembre sta andando bene.');
+    expect(verdict.tone).toBe('positive');
+    // The sale keeps its place at the end, still with the month without the tax.
+    expect(plain(verdict.sentence)).toMatch(/\(\+726 €\)\. Hai venduto VWCE .* senza, il mese avrebbe fatto \+8189 €/);
   });
 
   it('should keep «nonostante il mercato» when the market gained and the tax is a minority of the drop', () => {
@@ -153,7 +209,9 @@ describe('buildOverviewVerdict — headline and tone', () => {
     });
     expect(verdict.headline).toBe('Settembre è in calo, nonostante il mercato.');
     expect(verdict.tone).toBe('warning');
-    expect(plain(verdict.sentence)).toContain('Di quel movimento, +900 € viene dal mercato e −12.900 € dai tuoi movimenti.');
+    // The taxed sale carries the split in three parts; the two-part one would mix the tax back in.
+    expect(plain(verdict.sentence)).toContain('senza, il mese avrebbe fatto −7911 € (+900 € dal mercato e −8811 € tra risparmio e altre variazioni).');
+    expect(plain(verdict.sentence)).not.toContain('Di quel movimento');
   });
 
   it('should stay neutral and factual without a prior snapshot to compare against', () => {
@@ -187,12 +245,12 @@ describe('buildOverviewVerdict — sentence', () => {
     const text = plain(buildOverviewVerdict(AUGUST).sentence);
     expect(text).toBe(
       'Il patrimonio vale 412.380,52 €: +4120,18 € (+1,01%) su luglio, +8,29% da inizio anno, nuovo massimo storico. ' +
-        'Hai messo da parte il 40% delle entrate e le azioni hanno fatto il grosso del lavoro (+3480 €). ' +
-        'Di quel movimento, +3980 € viene dal mercato e +140 € dai tuoi movimenti.',
+        'Hai messo da parte il 40% delle entrate; sul mercato hanno spinto soprattutto le azioni (+3480 €). ' +
+        'Di quel movimento: +3980 € dal mercato e +140 € tra risparmio e altre variazioni.',
     );
   });
 
-  it('should close on the split and the sale that explains it, in the same words as the email', () => {
+  it('should close on the sale and the month without its tax, in three parts that add up', () => {
     const text = plain(
       buildOverviewVerdict({
         ...AUGUST,
@@ -210,9 +268,34 @@ describe('buildOverviewVerdict — sentence', () => {
         },
       }).sentence,
     );
+    // −4937,74 + 4088,86 = −848,88 = −1078,73 (market) + 229,85 (own flows net of the tax).
     expect(text).toContain(
-      'le azioni hanno pesato (−816 €). Di quel movimento, −1079 € viene dal mercato e −3859 € dai tuoi movimenti. ' +
-        'Hai venduto Vanguard FTSE All-World per 39.052 € con una plusvalenza di 15.726 € e pagato circa 4089 € di tasse.',
+      'sul mercato hanno pesato soprattutto le azioni (−816 €). ' +
+        'Hai venduto Vanguard FTSE All-World per 39.052 € con una plusvalenza di 15.726 € e pagato circa 4089 € di tasse: ' +
+        'senza, il mese avrebbe fatto −849 € (−1079 € dal mercato e +230 € tra risparmio e altre variazioni).',
+    );
+    expect(text).not.toContain('Di quel movimento');
+    // A payload computed before `purchases` existed says nothing about purchases.
+    expect(text).not.toContain('hai comprato');
+  });
+
+  it('should keep the two-part split when the sale carries no tax to take out', () => {
+    const text = plain(
+      buildOverviewVerdict({
+        ...AUGUST,
+        sales: {
+          proceeds: 1000,
+          realizedGain: -200,
+          estimatedTax: 0,
+          instruments: [{ id: 'a', name: 'A', proceeds: 1000, realizedGain: -200, estimatedTax: 0 }],
+          brokenLedgers: 0,
+          purchases: null,
+        },
+      }).sentence,
+    );
+    expect(text).toContain(
+      'Di quel movimento: +3980 € dal mercato e +140 € tra risparmio e altre variazioni. ' +
+        'Hai venduto A per 1000 € con una minusvalenza di 200 €, senza tasse.',
     );
   });
 
@@ -235,14 +318,14 @@ describe('buildOverviewVerdict — sentence', () => {
       }).sentence,
     );
     expect(text).toContain('−2100,00 € (−0,50%) su luglio');
-    expect(text).toContain('le criptovalute hanno pesato (−2400 €)');
+    expect(text).toContain('sul mercato hanno pesato soprattutto le criptovalute (−2400 €)');
   });
 
   it('should conjugate singular classes', () => {
     const text = plain(
       buildOverviewVerdict({ ...AUGUST, topMover: { assetClass: 'trendFollowing', delta: 800 } }).sentence,
     );
-    expect(text).toContain('il trend following ha fatto il grosso del lavoro (+800 €)');
+    expect(text).toContain('sul mercato ha spinto soprattutto il trend following (+800 €)');
   });
 
   it('should drop the record and the driver when they do not apply, and roll December back to the previous year', () => {
@@ -263,16 +346,16 @@ describe('buildOverviewVerdict — sentence', () => {
 
   it('should capitalise the driver when there is no savings clause before it', () => {
     const text = plain(buildOverviewVerdict({ ...AUGUST, savingsRate: null }).sentence);
-    expect(text).toContain('. Le azioni hanno fatto il grosso del lavoro (+3480 €).');
+    expect(text).toContain('. Sul mercato hanno spinto soprattutto le azioni (+3480 €).');
   });
 
   it('should give every asset class and the pension band a subject, so no key ever reaches the sentence', () => {
     for (const assetClass of [...ASSET_CLASS_SEQUENCE, PENSION_BAND_KEY]) {
       const text = plain(buildOverviewVerdict({ ...AUGUST, topMover: { assetClass, delta: 500 } }).sentence);
-      // The subject is an Italian noun phrase with its article — never the bare key («e pension
-      // hanno», «e equity hanno»); «il carry» is the one key that is also its own Italian word.
-      expect(text).toMatch(/ e (le|gli|la|il|i) [a-zà-ù ]+ (hanno|ha) fatto il grosso del lavoro \(\+500 €\)\./);
-      expect(text).not.toContain(` e ${assetClass} `);
+      // The subject is an Italian noun phrase with its article — never the bare key («soprattutto
+      // pension», «soprattutto equity»); «il carry» is the one key that is also its own Italian word.
+      expect(text).toMatch(/; sul mercato (hanno|ha) spinto soprattutto (le|gli|la|il|i) [a-zà-ù ]+ \(\+500 €\)\./);
+      expect(text).not.toContain(`soprattutto ${assetClass} `);
     }
   });
 
@@ -280,7 +363,60 @@ describe('buildOverviewVerdict — sentence', () => {
     const text = plain(buildOverviewVerdict({ ...AUGUST, topMover: { assetClass: 'structuredNotes', delta: 500 } }).sentence);
     expect(text).toContain('Hai messo da parte il 40% delle entrate.');
     expect(text).not.toContain('structuredNotes');
-    expect(text).not.toContain('grosso del lavoro');
+    expect(text).not.toContain('sul mercato');
+  });
+});
+
+describe('buildOverviewVerdict — the month split and the savings already made', () => {
+  const WITH_CASHFLOW: OverviewVerdictInput = {
+    ...AUGUST,
+    savingsRate: 28.2,
+    cashflow: { savings: 1180, savingsRate: 28.2, scheduledExpenses: 0, scheduledIncome: 0 },
+  };
+
+  it('should split the month into market, savings and the other changes, exactly', () => {
+    // 4120,18 = 3980 (market) + 1180 (saved) − 1039,82 (other).
+    const text = plain(buildOverviewVerdict(WITH_CASHFLOW).sentence);
+    expect(text).toContain('Hai messo da parte il 28% delle entrate finora; sul mercato');
+    expect(text).toContain('Di quel movimento: +3980 € dal mercato, +1180 € risparmiati, −1040 € di altre variazioni.');
+  });
+
+  it('should drop the other changes under 1 €, and say «spesi oltre le entrate» for negative savings', () => {
+    const exact = { ...WITH_CASHFLOW, cashflow: { ...WITH_CASHFLOW.cashflow!, savings: 140.5 } };
+    expect(plain(buildOverviewVerdict(exact).sentence)).toContain('Di quel movimento: +3980 € dal mercato e +141 € risparmiati.');
+    const overspent = { ...WITH_CASHFLOW, savingsRate: -10, cashflow: { ...WITH_CASHFLOW.cashflow!, savings: -300, savingsRate: -10 } };
+    expect(plain(buildOverviewVerdict(overspent).sentence)).toContain('−300 € spesi oltre le entrate, +440 € di altre variazioni.');
+  });
+
+  it('should name the calendar beside the rate, both sides when both are scheduled', () => {
+    const both = { ...WITH_CASHFLOW, cashflow: { ...WITH_CASHFLOW.cashflow!, scheduledExpenses: 1296.75, scheduledIncome: 2456.41 } };
+    expect(plain(buildOverviewVerdict(both).sentence)).toContain(
+      'Hai messo da parte il 28% delle entrate finora (in calendario altri 1297 € di spese e 2456 € di entrate); sul mercato',
+    );
+    const income = { ...WITH_CASHFLOW, cashflow: { ...WITH_CASHFLOW.cashflow!, scheduledIncome: 2456.41 } };
+    expect(plain(buildOverviewVerdict(income).sentence)).toContain('finora (altri 2456 € di entrate in calendario);');
+  });
+});
+
+describe('resolveLivedCashflow', () => {
+  it('should take the scheduled slice out of both sides, like Tracciamento', () => {
+    // The real account on 19 settembre 2026: the whole month said 17%, what had happened 45%.
+    const lived = resolveLivedCashflow({
+      currentMonth: { income: 4662.73, expenses: 3864.86, net: 797.87, expensesScheduled: 1296.75, incomeScheduled: 0 },
+    } as DashboardOverviewExpenseStats)!;
+    expect(lived.savings).toBeCloseTo(2094.62, 2);
+    expect(lived.savingsRate).toBeCloseTo(44.92, 2);
+    expect(lived.scheduledExpenses).toBe(1296.75);
+  });
+
+  it('should refuse a payload that predates incomeScheduled, and have no rate without income', () => {
+    expect(resolveLivedCashflow({ currentMonth: { income: 100, expenses: 50, net: 50, expensesScheduled: 0 } } as DashboardOverviewExpenseStats)).toBeNull();
+    expect(resolveLivedCashflow(null)).toBeNull();
+    const salaryTomorrow = resolveLivedCashflow({
+      currentMonth: { income: 2456, expenses: 300, net: 2156, expensesScheduled: 0, incomeScheduled: 2456 },
+    } as DashboardOverviewExpenseStats)!;
+    expect(salaryTomorrow.savingsRate).toBeNull();
+    expect(salaryTomorrow.savings).toBe(-300);
   });
 });
 

@@ -89,7 +89,9 @@ export function RecordBars({ points, ariaLabel, minHeight = 130, className }: Re
           </ChartHoverTip>
         )}
       </div>
-      {/* Outside the SVG: a label inside a `preserveAspectRatio="none"` plot stretches with it. */}
+      {/* Outside the SVG: a label inside a `preserveAspectRatio="none"` plot stretches with it.
+          Two rows: the month under every bar, the year under the first bar of each year — twelve
+          months alone read «mar … mar, set … set» and could not date the records. */}
       <div className="mt-1.5 grid" style={{ gridTemplateColumns: `repeat(${points.length}, minmax(0, 1fr))` }}>
         {points.map((point) => (
           <span
@@ -100,6 +102,18 @@ export function RecordBars({ points, ariaLabel, minHeight = 130, className }: Re
             )}
           >
             {point.label}
+          </span>
+        ))}
+        {points.map((point) => (
+          <span
+            key={`${point.key}-year`}
+            className={cn(
+              'overflow-visible whitespace-nowrap text-left font-mono text-[10px] tabular-nums',
+              point.yearLabel ? 'text-foreground' : 'invisible',
+            )}
+            aria-hidden={point.yearLabel ? undefined : true}
+          >
+            {point.yearLabel ?? '·'}
           </span>
         ))}
       </div>

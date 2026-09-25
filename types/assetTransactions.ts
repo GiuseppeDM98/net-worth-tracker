@@ -54,7 +54,12 @@ export interface AssetTransaction {
   fees?: number;             // total EUR commissions (>= 0). buy: added to EUR cost basis;
                              // sell: subtracted from proceeds; adjustment: not allowed
   linkedCashAssetId?: string; // optional settlement cash asset (buy debits, sell credits)
-  isBaseline?: boolean;      // migration-created opening position; always type 'buy'
+  // SELL only: the capital-gains tax the broker withheld at the sale, EUR (>= 0), typed from the
+  // statement over a prefilled estimate. It lowers what the settlement account receives and
+  // replaces the estimate in the period readings (periodSales); realized P&L and XIRR stay
+  // gross of it. Absent on every sell recorded before 2026-09-20 — those read the estimate.
+  withheldTaxEur?: number;
+  isBaseline?: boolean;     // migration-created opening position; always type 'buy'
   // BTP€i only: the indexation coefficient the Borsa Italiana quote was multiplied by to reach
   // pricePerUnit (quote/100 × nominal × coefficient). Metadata for the edit form's back-conversion;
   // the replay never reads it.
@@ -73,6 +78,7 @@ export interface AssetTransactionFormData {
   pricePerUnit: number;
   fees?: number;
   linkedCashAssetId?: string;
+  withheldTaxEur?: number;
   indexationCoefficient?: number;
   note?: string;
   // priceEur is NOT part of the form: the server resolves it, so the client

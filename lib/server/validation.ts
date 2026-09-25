@@ -87,6 +87,8 @@ const assetTransactionBaseSchema = z.object({
   pricePerUnit: z.number().finite().min(0),
   fees: z.number().finite().min(0).optional(),
   linkedCashAssetId: z.string().min(1).optional(),
+  // SELL only: the capital-gains tax the broker withheld, EUR. 0 is a value (no tax due).
+  withheldTaxEur: z.number().finite().min(0).optional(),
   // BTP€i: the indexation coefficient behind pricePerUnit (metadata for the edit form; > 0).
   indexationCoefficient: z.number().finite().positive().optional(),
   note: z.string().max(500).optional(),
@@ -94,7 +96,13 @@ const assetTransactionBaseSchema = z.object({
 
 /** Cross-field rules shared by create and update. `type`/`quantity` may be absent on an update. */
 function refineAssetTransaction(
-  data: { type?: 'buy' | 'sell' | 'adjustment'; quantity?: number; fees?: number; linkedCashAssetId?: string },
+  data: {
+    type?: 'buy' | 'sell' | 'adjustment';
+    quantity?: number;
+    fees?: number;
+    linkedCashAssetId?: string;
+    withheldTaxEur?: number;
+  },
   ctx: z.RefinementCtx
 ): void {
   // buy/sell need a strictly positive quantity; adjustment allows 0 (position-close correction).
@@ -118,6 +126,15 @@ function refineAssetTransaction(
       code: z.ZodIssueCode.custom,
       path: ['linkedCashAssetId'],
       message: 'Una rettifica non movimenta liquidità.',
+    });
+  }
+  // A withheld tax exists only on a sale. `type` absent (a partial update) is judged by the use
+  // case, which knows the stored type and drops the field from a trade that is not a sell.
+  if (data.type !== undefined && data.type !== 'sell' && data.withheldTaxEur !== undefined) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['withheldTaxEur'],
+      message: 'Le tasse trattenute si indicano solo su una vendita.',
     });
   }
 }

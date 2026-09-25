@@ -264,6 +264,16 @@ export interface MonthAssetRow {
   quantityEffect: number | null;
 }
 
+/**
+ * True when a change is mostly a FLOW: what was bought, sold or deposited moved the value more
+ * than the prices did. Such a Δ is printed signed but never in a sign colour — a 38.596 € sale
+ * read as the page's largest LOSS while its price effect was +348 € (critique of 2026-09-20).
+ * The price effect keeps its colour in its own column: that is the part that is a gain or a loss.
+ */
+export function isFlowDominated(change: Pick<MonthAssetRow, 'priceEffect' | 'quantityEffect'>): boolean {
+  return Math.abs(change.quantityEffect ?? 0) > Math.abs(change.priceEffect ?? 0);
+}
+
 export interface MonthAssetBreakdown {
   month: SnapshotMonthOption;
   /** The closest earlier month WITH a breakdown (a legacy month in between is skipped), or null. */

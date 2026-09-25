@@ -15,6 +15,7 @@ import {
   buildPensionDraftIssues,
   buildPensionSnapshotKey,
   describeCoastDettaglio,
+  describeCoastEmptyTiles,
   describeCoastInflows,
   describeCoastScenarios,
   describeCoastTarget,
@@ -28,7 +29,9 @@ import {
   getPensionConfigurationState,
   parsePensionDrafts,
   resolveCoastBridgeYears,
+  resolveCoastEmptyKind,
   resolveCoastIncompleteReason,
+  resolveCoastPace,
   summarizeCoastPensions,
   summarizeCoastScenarios,
   summarizeCoastTarget,
@@ -133,7 +136,7 @@ describe('coastFireView — the numbers', () => {
 
   it('should list the scenarios as rows in Orso · Base · Toro order with their own Coast numbers', () => {
     const projection = buildProjection();
-    const rows = summarizeCoastScenarios(projection.scenarios, NET_WORTH);
+    const rows = summarizeCoastScenarios(projection.scenarios, getDefaultScenarios(), NET_WORTH);
 
     expect(rows.map((row) => row.key)).toEqual(['bear', 'base', 'bull']);
     expect(rows[0].coastNumberToday).toBe(projection.scenarios.bear.coastFireNumberToday);
@@ -165,23 +168,106 @@ function base0() {
   return buildProjection().scenarios.base;
 }
 
+/** The Calcolatore's savings on the fixture: enough to cross the Coast curve well before 60. */
+const ANNUAL_SAVINGS = 12_000;
+
+function buildPace(annualSavings: number | undefined = ANNUAL_SAVINGS, currentNetWorth = NET_WORTH) {
+  const projection = buildProjection(currentNetWorth);
+  const base = projection.scenarios.base;
+  return resolveCoastPace(projection.projectionData, annualSavings, base.realReturnRate, base.isCoastReached);
+}
+
+describe('coastFireView — the savings pace', () => {
+  it('should name the first year the savings-fed capital clears the Coast number of that year, and no earlier', () => {
+    const projection = buildProjection();
+    const base = projection.scenarios.base;
+    const pace = buildPace();
+    expect(pace).not.toBeNull();
+    expect(pace!.reached).not.toBeNull();
+    const { yearOffset, calendarYear, age } = pace!.reached!;
+    expect(yearOffset).toBeGreaterThan(0);
+    expect(calendarYear).toBe(projection.projectionData[yearOffset].calendarYear);
+    expect(age).toBe(35 + yearOffset);
+
+    // The property the year is defined by: at that offset the capital clears the moving Coast
+    // number, one year earlier it did not. Recomputed here from the projection's own series.
+    const rate = base.realReturnRate / 100;
+    const last = projection.projectionData.length - 1;
+    const annuity = (years: number) => (ANNUAL_SAVINGS * (Math.pow(1 + rate, years) - 1)) / rate;
+    const coastAt = (offset: number) => projection.projectionData[offset].fireNumberTarget / Math.pow(1 + rate, last - offset);
+    const capitalAt = (offset: number) => projection.projectionData[offset].basePortfolioValue + annuity(offset);
+    expect(capitalAt(yearOffset)).toBeGreaterThanOrEqual(coastAt(yearOffset));
+    expect(capitalAt(yearOffset - 1)).toBeLessThan(coastAt(yearOffset - 1));
+  });
+
+  it('should coast from the reached year and land on the requirement at the target age', () => {
+    const projection = buildProjection();
+    const base = projection.scenarios.base;
+    const pace = buildPace()!;
+    const last = projection.projectionData.length - 1;
+    expect(pace.series).toHaveLength(projection.projectionData.length);
+    // Every point carries the base capital plus something saved: never below the base series.
+    pace.series.forEach((value, index) => expect(value).toBeGreaterThanOrEqual(projection.projectionData[index].basePortfolioValue));
+    // Coasting from the reached year, the capital clears the dashed line at the target age.
+    expect(pace.series[last]).toBeGreaterThanOrEqual(projection.projectionData[last].fireNumberTarget);
+    // COASTING is the point: past the reached year the series grows by the rate alone. The
+    // landing assertion above stays green if the savings run to the end (falsified 2026-09-23),
+    // so this is the line that holds the property — the last step is one year of growth, no
+    // savings added (the fund's step is at offset 22, well before it).
+    expect(pace.reached!.yearOffset).toBeLessThan(last - 1);
+    expect(Math.abs(pace.series[last] - pace.series[last - 1] * (1 + base.realReturnRate / 100))).toBeLessThan(1);
+    // And before it the savings are in: the step is growth PLUS a year of savings.
+    const first = pace.reached!.yearOffset;
+    expect(pace.series[first] - pace.series[first - 1] * (1 + base.realReturnRate / 100)).toBeCloseTo(ANNUAL_SAVINGS, 0);
+  });
+
+  it('should say when the pace does not get there before the target, and still draw the savings to the end', () => {
+    const projection = buildProjection();
+    const pace = buildPace(100)!;
+    expect(pace.reached).toBeNull();
+    expect(pace.series[projection.projectionData.length - 1]).toBeLessThan(projection.projectionData[projection.projectionData.length - 1].fireNumberTarget);
+    expect(pace.series[1]).toBeGreaterThan(projection.projectionData[1].basePortfolioValue);
+  });
+
+  it('should be absent without savings, with a target already reached, or with nothing to plot', () => {
+    const projection = buildProjection();
+    expect(resolveCoastPace(projection.projectionData, undefined, projection.scenarios.base.realReturnRate, false)).toBeNull();
+    expect(buildPace(0)).toBeNull();
+    expect(buildPace(ANNUAL_SAVINGS, base0().coastFireNumberToday + 10_000)).toBeNull();
+    expect(resolveCoastPace([], ANNUAL_SAVINGS, 4.5, false)).toBeNull();
+  });
+});
+
 describe('coastFireView — the verdict', () => {
-  it('should answer «non ancora» with the gap, the walk and the pensions, all from the scenario', () => {
+  it('should answer «non ancora» with the gap, the walk, the pace and the lock, all from the scenario', () => {
     const { target, base } = buildTarget();
-    const verdict = buildCoastVerdict({ target, incompleteReason: null, pensions: summarizeCoastPensions(base, 2026), lock: LOCK });
+    const pace = buildPace()!;
+    const verdict = buildCoastVerdict({ target, incompleteReason: null, pace, lock: LOCK });
 
     expect(verdict.headline).toBe('Non ancora: continua a versare.');
     expect(verdict.tone).toBe('neutral');
     expect(plain(verdict.sentence)).toBe(
-      `Ti mancano ${euro(base.gapToCoastFI)} al numero Coast FIRE di oggi (${euro(base.coastFireNumberToday)}): smettendo di versare a 35 anni arriveresti a 60 anni con ${euro(base.futureValueAtRetirementWithoutNewContributions)} di oggi, contro i ${euro(base.retirementCapitalRequired)} richiesti; dal 2052 la Pensione estera e dal 2058 la Pensione INPS coprono insieme ${euro(base.totalNetAnnualPensionAtSteadyState / 12)} al mese. I ${euro(29_800)} nel fondo pensione sono esclusi da queste cifre perché restano bloccati fino al 2048; il calcolo li conta da quell'anno in poi.`
+      `Ti mancano ${euro(base.gapToCoastFI)} al numero Coast FIRE di oggi (${euro(base.coastFireNumberToday)}): smettendo di versare a 35 anni arriveresti a 60 anni con ${euro(base.futureValueAtRetirementWithoutNewContributions)} di oggi, contro i ${euro(base.retirementCapitalRequired)} richiesti. Al ritmo attuale, ${euro(ANNUAL_SAVINGS)} l'anno di risparmio, lo raggiungi nel ${pace.reached!.calendarYear}, a ${pace.reached!.age} anni. I ${euro(29_800)} nel fondo pensione sono esclusi da queste cifre perché restano bloccati fino al 2048; il calcolo li conta da quell'anno in poi.`
     );
     // A projection is neither a gain nor a loss: no segment wears a sign colour.
     expect(verdict.sentence.every((segment) => segment.sign === undefined)).toBe(true);
+    // The state pensions are the Afflussi tile's (2026-09-23), not the verdict's.
+    expect(plain(verdict.sentence)).not.toContain('Pensione');
+  });
+
+  it('should say the pace does not get there in time, and drop the clause without savings', () => {
+    const { target } = buildTarget();
+    const slow = buildCoastVerdict({ target, incompleteReason: null, pace: buildPace(100), lock: INACTIVE_LOCK });
+    expect(plain(slow.sentence)).toMatch(/richiesti\. Al ritmo attuale, 100 € l'anno di risparmio, non lo raggiungi prima dei 60 anni\.$/);
+
+    const none = buildCoastVerdict({ target, incompleteReason: null, pace: null, lock: INACTIVE_LOCK });
+    expect(plain(none.sentence)).toMatch(/richiesti\.$/);
+    expect(plain(none.sentence)).not.toContain('ritmo');
   });
 
   it('should answer «sì» with the surplus and «oltre i richiesti» once the target is behind', () => {
     const { target, base } = buildTarget(base0().coastFireNumberToday + 10_000);
-    const verdict = buildCoastVerdict({ target, incompleteReason: null, pensions: summarizeCoastPensions(base, 2026), lock: INACTIVE_LOCK });
+    const verdict = buildCoastVerdict({ target, incompleteReason: null, pace: null, lock: INACTIVE_LOCK });
 
     expect(verdict.headline).toBe('Sì, puoi smettere di versare.');
     expect(verdict.tone).toBe('positive');
@@ -192,32 +278,42 @@ describe('coastFireView — the verdict', () => {
     expect(text).not.toContain('fondo pensione');
   });
 
-  it('should drop the pension clause without a pension, and list every pension — a name reads «la pensione di»', () => {
-    const { target, base } = buildTarget();
-    const none = buildCoastVerdict({ target, incompleteReason: null, pensions: summarizeCoastPensions({ ...base, pensionBreakdown: [], totalNetAnnualPensionAtSteadyState: 0 }, 2026), lock: INACTIVE_LOCK });
-    expect(plain(none.sentence)).toBe(
-      `Ti mancano ${euro(base.gapToCoastFI)} al numero Coast FIRE di oggi (${euro(base.coastFireNumberToday)}): smettendo di versare a 35 anni arriveresti a 60 anni con ${euro(base.futureValueAtRetirementWithoutNewContributions)} di oggi, contro i ${euro(base.retirementCapitalRequired)} richiesti.`
-    );
-
-    const three = summarizeCoastPensions(
-      { ...base, pensionBreakdown: [...base.pensionBreakdown, { ...base.pensionBreakdown[0], id: 'terza', label: 'Marco', startAge: 70, startDate: '2061-01-01' }] },
-      2026
-    );
-    const many = buildCoastVerdict({ target, incompleteReason: null, pensions: three, lock: INACTIVE_LOCK });
-    expect(plain(many.sentence)).toContain('; dal 2052 la Pensione estera, dal 2058 la Pensione INPS e dal 2061 la pensione di Marco coprono insieme ');
-  });
-
   it('should name only the missing input when the projection cannot run', () => {
-    const verdict = buildCoastVerdict({ target: null, incompleteReason: 'Serve un patrimonio FIRE positivo.', pensions: { count: 0, entries: [], annualNetReal: 0, monthlyNetReal: 0, annualNetRealAtRetirement: 0 }, lock: INACTIVE_LOCK });
+    const verdict = buildCoastVerdict({ target: null, incompleteReason: 'Serve un patrimonio FIRE positivo.', pace: null, lock: INACTIVE_LOCK });
     expect(verdict.headline).toBe('Coast FIRE non calcolabile.');
     expect(verdict.tone).toBe('neutral');
     expect(plain(verdict.sentence)).toBe('Serve un patrimonio FIRE positivo.');
   });
 
   it('should say «sei già all\'età target» instead of a walk of zero years', () => {
-    const { target, base } = buildTarget();
-    const verdict = buildCoastVerdict({ target: { ...target, yearsToRetirement: 0, retirementAge: 35 }, incompleteReason: null, pensions: summarizeCoastPensions(base, 2026), lock: INACTIVE_LOCK });
-    expect(plain(verdict.sentence)).toContain("), e sei già all'età target di 35 anni; dal 2052");
+    const { target } = buildTarget();
+    const verdict = buildCoastVerdict({ target: { ...target, yearsToRetirement: 0, retirementAge: 35 }, incompleteReason: null, pace: null, lock: INACTIVE_LOCK });
+    expect(plain(verdict.sentence)).toContain("), e sei già all'età target di 35 anni.");
+  });
+});
+
+describe('coastFireView — nothing recorded', () => {
+  it('should name the first missing input and give the action to the Traguardo only', () => {
+    expect(resolveCoastEmptyKind(0, 30_000, 35, 60)).toBe('no-net-worth');
+    expect(resolveCoastEmptyKind(50_000, undefined, 35, 60)).toBe('no-expenses');
+    expect(resolveCoastEmptyKind(50_000, 30_000, null, 60)).toBe('no-age');
+    expect(resolveCoastEmptyKind(50_000, 30_000, 35, null)).toBe('no-retirement-age');
+    expect(resolveCoastEmptyKind(50_000, 30_000, 35, 60)).toBeNull();
+
+    const noNetWorth = describeCoastEmptyTiles('no-net-worth');
+    expect(noNetWorth.action).toEqual({ label: 'Aggiungi il primo asset', href: '/dashboard/assets' });
+    // What the form owns is reached in the form: the action names the field's own id.
+    expect(describeCoastEmptyTiles('no-expenses').action).toEqual({ label: 'Indica le spese nelle Ipotesi', fieldId: 'coastUseCustomExpenses' });
+    expect(describeCoastEmptyTiles('no-age').action).toEqual({ label: "Inserisci l'età nelle Ipotesi", fieldId: 'coastCurrentAge' });
+    expect(describeCoastEmptyTiles('no-retirement-age').action).toEqual({ label: "Inserisci l'età target nelle Ipotesi", fieldId: 'coastRetirementAge' });
+    // Every tile says why it cannot answer, and none prints a figure.
+    for (const kind of ['no-net-worth', 'no-expenses', 'no-age', 'no-retirement-age'] as const) {
+      const tiles = describeCoastEmptyTiles(kind);
+      for (const sentence of [tiles.traguardo, tiles.afflussi, tiles.scenari]) {
+        expect(sentence.length).toBeGreaterThan(40);
+        expect(sentence).not.toMatch(/\d/);
+      }
+    }
   });
 });
 
@@ -239,14 +335,23 @@ describe('coastFireView — the Traguardo tile', () => {
 
   it('should name the step in the footer only when the unlock is on the plot', () => {
     const { base } = buildTarget();
-    const onPlot = describeCoastTargetFooter({ retirementAge: 60, requiredNet: base.retirementCapitalRequired, lastTargetOnPlot: 400_000, lock: LOCK, lastProjectedYear: 2051 });
+    const onPlot = describeCoastTargetFooter({ retirementAge: 60, requiredNet: base.retirementCapitalRequired, lastTargetOnPlot: 400_000, lock: LOCK, lastProjectedYear: 2051, pace: null });
     expect(plain(onPlot)).toBe(
       `Linea tratteggiata: i ${euro(base.retirementCapitalRequired)} richiesti a 60 anni nello scenario base, in euro di oggi — ${euro(400_000)} con il fondo pensione dentro. Il gradino nel 2048 è il fondo che rientra, nelle serie e nella linea.`
     );
-    const beyond = describeCoastTargetFooter({ retirementAge: 60, requiredNet: base.retirementCapitalRequired, lastTargetOnPlot: base.retirementCapitalRequired, lock: { ...LOCK, unlockCalendarYear: 2053 }, lastProjectedYear: 2051 });
+    const beyond = describeCoastTargetFooter({ retirementAge: 60, requiredNet: base.retirementCapitalRequired, lastTargetOnPlot: base.retirementCapitalRequired, lock: { ...LOCK, unlockCalendarYear: 2053 }, lastProjectedYear: 2051, pace: null });
     expect(plain(beyond)).toContain("Il fondo pensione rientra nel 2053, oltre l'età target: la linea è già al netto.");
-    const unlocked = describeCoastTargetFooter({ retirementAge: 60, requiredNet: base.retirementCapitalRequired, lastTargetOnPlot: base.retirementCapitalRequired, lock: INACTIVE_LOCK, lastProjectedYear: 2051 });
+    const unlocked = describeCoastTargetFooter({ retirementAge: 60, requiredNet: base.retirementCapitalRequired, lastTargetOnPlot: base.retirementCapitalRequired, lock: INACTIVE_LOCK, lastProjectedYear: 2051, pace: null });
     expect(plain(unlocked)).toMatch(/in euro di oggi\.$/);
+  });
+
+  it('should name the dotted series when the pace is drawn, with its year or up to the target', () => {
+    const { base } = buildTarget();
+    const pace = buildPace()!;
+    const drawn = describeCoastTargetFooter({ retirementAge: 60, requiredNet: base.retirementCapitalRequired, lastTargetOnPlot: base.retirementCapitalRequired, lock: INACTIVE_LOCK, lastProjectedYear: 2051, pace });
+    expect(plain(drawn)).toMatch(new RegExp(`in euro di oggi\\. Linea punteggiata: il base con il risparmio attuale fino al ${pace.reached!.calendarYear}, poi da solo\\.$`));
+    const slow = describeCoastTargetFooter({ retirementAge: 60, requiredNet: base.retirementCapitalRequired, lastTargetOnPlot: base.retirementCapitalRequired, lock: INACTIVE_LOCK, lastProjectedYear: 2051, pace: buildPace(100) });
+    expect(plain(slow)).toMatch(/Linea punteggiata: il base con il risparmio attuale fino al target\.$/);
   });
 });
 
@@ -284,24 +389,24 @@ describe('coastFireView — the Afflussi tile', () => {
 describe('coastFireView — the Scenari tile', () => {
   it('should compare each scenario with the base number, verb by comparison', () => {
     const projection = buildProjection();
-    const rows = summarizeCoastScenarios(projection.scenarios, NET_WORTH);
+    const rows = summarizeCoastScenarios(projection.scenarios, getDefaultScenarios(), NET_WORTH);
     const { bear, base, bull } = projection.scenarios;
     expect(plain(describeCoastScenarios(rows))).toBe(
       // On this fixture the Toro number is already behind the net worth: the suffix says so.
-      `Nel base ti mancano ${euro(base.gapToCoastFI)}; l'orso alza il numero Coast a ${euro(bear.coastFireNumberToday)}, il toro lo abbassa a ${euro(bull.coastFireNumberToday)} e lo hai già superato.`
+      `Nel base ti mancano ${euro(base.gapToCoastFI)}; l'orso alza il numero Coast FIRE a ${euro(bear.coastFireNumberToday)}, il toro lo abbassa a ${euro(bull.coastFireNumberToday)} e lo hai già superato.`
     );
   });
 
   it('should say when a scenario is already past while the base is not, and the reverse', () => {
     const projection = buildProjection();
     const netWorth = projection.scenarios.bull.coastFireNumberToday + 1;
-    const rows = summarizeCoastScenarios(buildProjection(netWorth).scenarios, netWorth);
+    const rows = summarizeCoastScenarios(buildProjection(netWorth).scenarios, getDefaultScenarios(), netWorth);
     expect(plain(describeCoastScenarios(rows))).toMatch(/il toro lo abbassa a .* e lo hai già superato\.$/);
 
-    const reachedBase = summarizeCoastScenarios(buildProjection(projection.scenarios.base.coastFireNumberToday + 1).scenarios, projection.scenarios.base.coastFireNumberToday + 1);
+    const reachedBase = summarizeCoastScenarios(buildProjection(projection.scenarios.base.coastFireNumberToday + 1).scenarios, getDefaultScenarios(), projection.scenarios.base.coastFireNumberToday + 1);
     const text = plain(describeCoastScenarios(reachedBase));
-    expect(text).toMatch(/^Nel base hai superato il numero Coast \(/);
-    expect(text).toContain("l'orso alza il numero Coast a");
+    expect(text).toMatch(/^Nel base hai superato il numero Coast FIRE \(/);
+    expect(text).toContain("l'orso alza il numero Coast FIRE a");
     expect(text).toContain('e non ci sei ancora');
   });
 });
@@ -329,6 +434,14 @@ describe('coastFireView — the Ipotesi disclosure', () => {
       '2 pensioni statali',
     ]);
     expect(describeIpotesi({ currentAge: 35, retirementAge: 60, annualExpenses: 30_000, usesCustomExpenses: true, withdrawalRate: 4, baseRealReturn: 4.5, respectPensionLockIn: true, pensionUnlockCalendarYear: 2048, pensionCount: 2 })).toBe(parts.join(' · '));
+  });
+
+  it('declares the tax on withdrawals, in the number or out with its reason (2026-09-24)', () => {
+    const common = { currentAge: 35, retirementAge: 60, annualExpenses: 30_000, usesCustomExpenses: false, withdrawalRate: 4, baseRealReturn: 4.5, respectPensionLockIn: false, pensionUnlockCalendarYear: null, pensionCount: 0 };
+    expect(buildCoastBasisParts({ ...common, withdrawalTaxRate: 26 }).at(-1)).toBe('tasse sui prelievi comprese (26% sulla plusvalenza)');
+    expect(buildCoastBasisParts({ ...common, withdrawalTaxRate: null }).at(-1)).toBe('tasse sui prelievi non stimate (nessun PMC in euro)');
+    // Absent altogether (a caller that does not know): no part, the line of before.
+    expect(buildCoastBasisParts(common).at(-1)).toBe('nessuna pensione statale');
   });
 
   it('should distinguish "toggle on but nothing locked" from "toggle off", and count zero or one pension', () => {
@@ -522,9 +635,9 @@ describe('coastFireView — parity with the projection', () => {
     const base = projection.scenarios.base;
     const target = summarizeCoastTarget(base, { currentNetWorth: projection.currentNetWorth, liquidNetWorth: 30_000, currentAge: 35, retirementAge: 60, isBridge: true });
     const pensions = summarizeCoastPensions(base, 2026);
-    const verdict = buildCoastVerdict({ target, incompleteReason: null, pensions, lock: LOCK });
+    const verdict = buildCoastVerdict({ target, incompleteReason: null, pace: buildPace(), lock: LOCK });
     const events = buildCoastInflowEvents(base.pensionBreakdown, PENSION_FUND_INFLOWS, 2026);
-    const rows = summarizeCoastScenarios(projection.scenarios, projection.currentNetWorth);
+    const rows = summarizeCoastScenarios(projection.scenarios, getDefaultScenarios(), projection.currentNetWorth);
 
     const rendered = [
       plain(verdict.sentence),
@@ -544,6 +657,8 @@ describe('coastFireView — parity with the projection', () => {
       projection.scenarios.bull.coastFireNumberToday,
       projection.currentNetWorth,
       29_800,
+      // The savings pace: the Calcolatore's figure, named as the pace's basis.
+      ANNUAL_SAVINGS,
       ...base.pensionBreakdown.map((pension) => pension.netAnnualRealAtStart),
     ].map(euro);
 

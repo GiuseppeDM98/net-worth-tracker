@@ -1,6 +1,12 @@
 # Account condiviso e Demo Mode
 
-> **When to open this guide** — whoever touches `contexts/ActiveAccountContext.tsx`, `lib/services/accountAccessService.ts`, `app/api/account/members/route.ts`, `lib/server/apiAuth.ts` (`assertCanAccessAccount`), `firestore.rules`, `components/settings/AccountSharingSection.tsx`, `lib/hooks/useDemoMode.ts`, `app/page.tsx` or `app/dashboard/layout.tsx` (the demo banner). The prerequisites of a shared account (whitelist, guest registers first, rules deployed) are in `SETUP.md` → *Step 5b*. In `AGENTS.md` the stub with the essentials stays; here is the full rule. Files: `CLAUDE.md` → *Key Files* → *Shared account*.
+> **When to open this guide** — whoever touches `contexts/ActiveAccountContext.tsx`, `lib/services/accountAccessService.ts`, `app/api/account/members/route.ts`, `lib/server/apiAuth.ts` (`assertCanAccessAccount`), `firestore.rules`, `components/settings/AccountSharingSection.tsx`, `lib/hooks/useDemoMode.ts`, `app/page.tsx` or `app/dashboard/layout.tsx` (the demo banner). The prerequisites of a shared account (whitelist, guest registers first, rules deployed) are in `SETUP.md` → *Step 5b*. In `AGENTS.md` the stub with the essentials stays; here is the full rule. Files: § *Files* below.
+
+## Files
+
+Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
+
+- **Shared account · Demo**: `contexts/ActiveAccountContext.tsx`, `lib/services/accountAccessService.ts`, `app/api/account/members/route.ts`, `lib/server/apiAuth.ts`, `firestore.rules`, `lib/hooks/useDemoMode.ts`; collection `account-access/{ownerUid}` — doc/guide/account-condiviso-demo.md
 
 ## Demo Mode
 - The public landing (`app/page.tsx`) auto-logs into the demo account; `useDemoMode()` compares `user.uid` with

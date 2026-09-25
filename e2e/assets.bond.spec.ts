@@ -11,7 +11,7 @@
  *
  * The base seed has no inflation-linked bond, so the test plants one (a decoy name absent from the
  * seed) with the Admin SDK and removes everything it and the app created in `finally` — data-only,
- * never a re-seed (AGENTS.md → Browser-Driven E2E). The zero-coupon ISIN is a real BTP the seed's
+ * never a re-seed (doc/guide/e2e-emulatori.md § Browser-Driven E2E (Playwright)). The zero-coupon ISIN is a real BTP the seed's
  * dividends do not reference: `createAsset` re-links a new asset onto an existing one whose ISIN
  * already has dividends, which would merge the new bond into the seed's.
  */

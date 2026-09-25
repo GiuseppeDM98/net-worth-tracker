@@ -100,3 +100,50 @@ export function resolveCostCenterColor(
   const slot = resolveCostCenterColorSlot(stored, id);
   return palette[slot % Math.max(1, palette.length)] ?? `var(--chart-${(slot % 5) + 1})`;
 }
+
+// ─── Who holds which slot ─────────────────────────────────────────────────────
+
+/** What the occupancy rules read of a center: enough to know its slot and whether it is live. */
+export interface ColoredCenter {
+  id: string;
+  name: string;
+  color?: string | null;
+  archivedAt?: unknown;
+}
+
+/**
+ * Slot → the names of the ACTIVE centers painted with it, in the order given.
+ *
+ * An archived center is out of the list, the stack and the legend, so its colour is free to
+ * reuse. `exceptId` leaves out the center being edited: its own slot is not «taken by another».
+ */
+export function mapColorSlotUsage(centers: ReadonlyArray<ColoredCenter>, exceptId?: string): Map<number, string[]> {
+  const usage = new Map<number, string[]>();
+  for (const center of centers) {
+    if (center.archivedAt || center.id === exceptId) continue;
+    const slot = resolveCostCenterColorSlot(center.color, center.id);
+    usage.set(slot, [...(usage.get(slot) ?? []), center.name]);
+  }
+  return usage;
+}
+
+/**
+ * A NEW center's colour: the first slot no active center holds.
+ *
+ * Until 2026-09-18 every new center was born on `chart-1`, so two centers created without
+ * touching the picker were the same colour by construction — on the owner's account two cars
+ * shared one blue in the swatch, the rank bar, the legend and two ADJACENT bands of the stack.
+ * With all eight taken a collision is unavoidable: the least crowded slot, the lowest on a tie.
+ * Existing documents are NOT re-coloured (the owner's call): a saved colour is a choice, and
+ * a default never touched cannot be told from one.
+ */
+export function firstFreeColorKey(centers: ReadonlyArray<ColoredCenter>): CostCenterColorKey {
+  const usage = mapColorSlotUsage(centers);
+  let best = 0;
+  for (let slot = 0; slot < COST_CENTER_COLOR_SLOT_COUNT; slot++) {
+    const holders = usage.get(slot)?.length ?? 0;
+    if (holders === 0) return COST_CENTER_COLOR_KEYS[slot];
+    if (holders < (usage.get(best)?.length ?? 0)) best = slot;
+  }
+  return COST_CENTER_COLOR_KEYS[best];
+}

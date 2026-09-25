@@ -25,6 +25,7 @@ import { narrativeToText, type Narrative } from '@/lib/utils/narrative';
 import type { PerformanceBaseOptions } from '@/lib/utils/performanceBase';
 import type {
   BenchmarkRanking,
+  CapitalEnteredSummary,
   DrawdownStory,
   RealizedGainsSummary,
   ReturnConsistency,
@@ -295,15 +296,19 @@ describe('describeGrowthOfHundred', () => {
 });
 
 describe('describeRisk', () => {
-  it('reads volatility and the Sharpe band', () => {
-    expect(plain(describeRisk({ volatility: 4.9, sharpeRatio: 1.08, monthsMeasured: 12 }))).toBe('Volatilità del 4,9% annua e Sharpe di 1,08: il rischio è pagato.');
-    expect(plain(describeRisk({ volatility: 11.2, sharpeRatio: 0.4, monthsMeasured: 12 }))).toBe("Volatilità dell'11,2% annua e Sharpe di 0,40: il rendimento paga poco il rischio.");
-    expect(plain(describeRisk({ volatility: 8.0, sharpeRatio: -0.3, monthsMeasured: 12 }))).toBe("Volatilità dell'8,0% annua e Sharpe di −0,30: sotto il tasso privo di rischio.");
-    expect(plain(describeRisk({ volatility: 18.2, sharpeRatio: -0.3, monthsMeasured: 12 }))).toBe('Volatilità del 18,2% annua e Sharpe di −0,30: sotto il tasso privo di rischio.');
+  it('reads the CONSEQUENCE of the Sharpe band — the two figures are the tile\'s first rows, not the sentence', () => {
+    const paid = describeRisk({ volatility: 4.9, sharpeRatio: 1.08, monthsMeasured: 12 });
+    expect(plain(paid)).toBe('Il rischio è pagato: il rendimento oltre il tasso privo di rischio supera la volatilità.');
+    // Printed twice 40px apart until 2026-09-20: the reading repeats neither figure.
+    expect(plain(paid)).not.toMatch(/4,9|1,08/);
+    expect(plain(describeRisk({ volatility: 11.2, sharpeRatio: 0.4, monthsMeasured: 12 }))).toBe('Il rendimento paga poco il rischio: oltre il tasso privo di rischio resta meno della volatilità.');
+    expect(plain(describeRisk({ volatility: 8.0, sharpeRatio: -0.3, monthsMeasured: 12 }))).toBe('Il rischio non è pagato: il portafoglio rende meno del tasso privo di rischio.');
   });
 
-  it('reads the volatility alone when the Sharpe is missing', () => {
-    expect(plain(describeRisk({ volatility: 4.9, sharpeRatio: null, monthsMeasured: 12 }))).toBe('Volatilità del 4,9% annua.');
+  it('without a Sharpe there is no consequence to state: the volatility is the sentence, article included', () => {
+    expect(plain(describeRisk({ volatility: 4.9, sharpeRatio: null, monthsMeasured: 12 }))).toBe('Volatilità del 4,9% annua; lo Sharpe non è ancora misurabile.');
+    expect(plain(describeRisk({ volatility: 11.2, sharpeRatio: null, monthsMeasured: 12 }))).toBe("Volatilità dell'11,2% annua; lo Sharpe non è ancora misurabile.");
+    expect(plain(describeRisk({ volatility: 18.2, sharpeRatio: null, monthsMeasured: 12 }))).toBe('Volatilità del 18,2% annua; lo Sharpe non è ancora misurabile.');
   });
 
   it('states the three-month floor instead of a number', () => {
@@ -335,39 +340,36 @@ describe('describeConsistency', () => {
 });
 
 describe('describeContributions', () => {
-  it('sets the ledger beside the cashflow', () => {
-    const r = describeContributions({ invested: { investedEur: 16700, divestedEur: 2500, netInvestedEur: 14200 }, netCashFlow: 11850 });
-    expect(plain(r)).toBe('Hai investito 14.200 € dal registro, a fronte di 11.850 € messi da parte.');
+  const capital = (channels: CapitalEnteredSummary['channels']): CapitalEnteredSummary => ({ channels, total: channels.reduce((sum, c) => sum + c.amount, 0) });
+
+  it('gives ONE answer — what entered the base — and qualifies it when a single channel carried it', () => {
+    const measured = describeContributions({ capital: capital([{ key: 'measured', amount: 5058, months: 9 }]), totalMonths: 9 });
+    expect(plain(measured)).toBe('Nella base sono entrati 5058 €, misurati sugli strumenti in tutti i 9 mesi.');
+    // A flow is never sign-coloured: capital coming in is not a gain.
+    expect(measured.every((segment) => segment.sign === undefined)).toBe(true);
+
+    expect(plain(describeContributions({ capital: capital([{ key: 'cashflow', amount: 11850, months: 9 }]), totalMonths: 9 }))).toBe(
+      'Nella base sono entrati 11.850 €, dal risparmio del cashflow.'
+    );
+    expect(plain(describeContributions({ capital: capital([{ key: 'measured', amount: 420, months: 1 }]), totalMonths: 1 }))).toBe(
+      'Nella base sono entrati 420 €, misurati sugli strumenti nel mese.'
+    );
   });
 
-  it('says when the cashflow is negative and when the ledger sold more than it bought', () => {
-    expect(plain(describeContributions({ invested: { investedEur: 1000, divestedEur: 4000, netInvestedEur: -3000 }, netCashFlow: -2300 }))).toBe('Hai disinvestito 3000 € dal registro, mentre dal cashflow sono usciti 2300 € più di quanto è entrato.');
-    expect(plain(describeContributions({ invested: { investedEur: 5000, divestedEur: 0, netInvestedEur: 5000 }, netCashFlow: -900 }))).toBe('Hai investito 5000 € dal registro, mentre dal cashflow sono usciti 900 € più di quanto è entrato.');
+  it('says capital LEFT when the total is negative, and never that negative savings «entered»', () => {
+    expect(plain(describeContributions({ capital: capital([{ key: 'measured', amount: -300, months: 9 }]), totalMonths: 9 }))).toBe(
+      'Dalla base sono usciti 300 €, misurati sugli strumenti in tutti i 9 mesi.'
+    );
+    expect(plain(describeContributions({ capital: capital([{ key: 'cashflow', amount: -2300, months: 9 }]), totalMonths: 9 }))).toBe(
+      'Dalla base sono usciti 2300 €: il cashflow ha speso più di quanto è entrato.'
+    );
   });
 
-  it('without a ledger it reads the cashflow alone', () => {
-    expect(plain(describeContributions({ invested: null, netCashFlow: 11850 }))).toBe('Dal cashflow hai messo da parte 11.850 € nel periodo; il registro operazioni non è attivo.');
-    expect(plain(describeContributions({ invested: null, netCashFlow: -2300 }))).toBe('Dal cashflow sono usciti 2300 € più di quanto è entrato nel periodo; il registro operazioni non è attivo.');
-  });
-
-  it('names the measured boundary flows, their direction and their coverage, and nothing when the cashflow was the source', () => {
-    const invested = { investedEur: 16700, divestedEur: 2500, netInvestedEur: 14200 };
-    expect(plain(describeContributions({ invested, netCashFlow: 11850, portfolio: { flow: 4200, source: 'mixed', measuredMonths: 8, totalMonths: 9 } }))).toBe(
-      'Hai investito 14.200 € dal registro, a fronte di 11.850 € messi da parte. Nella base sono entrati 4200 € misurati sul confine (registro e quantità) in 8 mesi su 9; negli altri vale il risparmio del cashflow.'
-    );
-    expect(plain(describeContributions({ invested, netCashFlow: 11850, portfolio: { flow: -300, source: 'portfolio', measuredMonths: 9, totalMonths: 9 } }))).toBe(
-      'Hai investito 14.200 € dal registro, a fronte di 11.850 € messi da parte. Dalla base sono usciti 300 € misurati sul confine (registro e quantità) in tutti i 9 mesi.'
-    );
-    expect(plain(describeContributions({ invested, netCashFlow: 11850, portfolio: { flow: 0, source: 'cashflow', measuredMonths: 0, totalMonths: 9 } }))).toBe('Hai investito 14.200 € dal registro, a fronte di 11.850 € messi da parte.');
-  });
-
-  it('names a transfer from an account inside the base as capital moved, never as money from outside', () => {
-    expect(plain(describeContributions({ invested: null, netCashFlow: 500, pension: { flow: 200, entryFlow: 0, entryMonth: null, internalFlow: 200 } }))).toBe(
-      'Dal cashflow hai messo da parte 500 € nel periodo; il registro operazioni non è attivo. Nei fondi pensione sono passati 200 € da un conto già nella base: capitale spostato, non entrato.'
-    );
-    expect(plain(describeContributions({ invested: null, netCashFlow: 500, pension: { flow: 1410, entryFlow: 0, entryMonth: null, internalFlow: 200 } }))).toBe(
-      'Dal cashflow hai messo da parte 500 € nel periodo; il registro operazioni non è attivo. Nei fondi pensione sono entrati 1210 € da fuori (TFR, datoriale, busta paga); altri 200 € sono passati da un conto già nella base.'
-    );
+  it('with several channels it names the ONE that explains the size — the rows under it carry the figures', () => {
+    const split = describeContributions({ capital: capital([{ key: 'measured', amount: 4200, months: 8 }, { key: 'cashflow', amount: -650, months: 1 }]), totalMonths: 9 });
+    expect(plain(split)).toBe('Nella base sono entrati 3550 €, per la maggior parte misurati sugli strumenti in 8 mesi su 9.');
+    // The channels' own figures are rows of the tile: printed once, not twice.
+    expect(plain(split)).not.toMatch(/4200|650/);
   });
 });
 
@@ -422,6 +424,13 @@ describe('describeRealizedGains', () => {
 
   it('states the total and the running year', () => {
     expect(plain(describeRealizedGains(summary, 2026))).toBe('Dal registro operazioni hai realizzato +3745 € in totale; il 2026 chiude per ora in perdita (−412 €).');
+  });
+
+  it('one fiscal year is one sentence: the total IS that year, and the running year says «per ora»', () => {
+    expect(plain(describeRealizedGains({ total: 15743, years: [{ year: 2026, amount: 15743 }] }, 2026))).toBe('Nel 2026 hai realizzato per ora +15.743 € dal registro operazioni.');
+    expect(plain(describeRealizedGains({ total: -412, years: [{ year: 2026, amount: -412 }] }, 2026))).toBe('Nel 2026 hai realizzato per ora −412 € dal registro operazioni.');
+    // A single CLOSED year keeps the total and names it.
+    expect(plain(describeRealizedGains({ total: 2845, years: [{ year: 2025, amount: 2845 }] }, 2026))).toBe('Dal registro operazioni hai realizzato +2845 € in totale, tutto nel 2025.');
   });
 
   it('names the best closed year when the running year has no sells', () => {
@@ -496,26 +505,23 @@ describe('describeMeasurementBase', () => {
 });
 
 describe('describeContributions — the pension channel', () => {
-  const invested = { investedEur: 16700, divestedEur: 2500, netInvestedEur: 14200 };
+  const capital = (channels: CapitalEnteredSummary['channels']): CapitalEnteredSummary => ({ channels, total: channels.reduce((sum, c) => sum + c.amount, 0) });
+  const realAccount: CapitalEnteredSummary['channels'] = [{ key: 'measured', amount: 5058, months: 9 }, { key: 'pension', amount: 31863, months: 3 }];
 
-  it('adds the funds\' entry as its own sentence, with its month, after the cashflow', () => {
-    expect(plain(describeContributions({ invested, netCashFlow: 11850, pension: { flow: 31862, entryFlow: 31852, entryMonth: '2026-07' } }))).toBe(
-      "Hai investito 14.200 € dal registro, a fronte di 11.850 € messi da parte. Nei fondi pensione sono entrati 31.862 €, di cui 31.852 € per l'ingresso del fondo nella base a luglio 2026."
+  it('names the funds\' entry and its month when that is what makes the total — the real account\'s year-to-date', () => {
+    expect(plain(describeContributions({ capital: capital(realAccount), totalMonths: 9, pensionEntry: { flow: 31852, month: '2026-07' } }))).toBe(
+      "Nella base sono entrati 36.921 €, per la maggior parte con l'ingresso del fondo pensione nella base a luglio 2026."
     );
   });
 
-  it('names outside money when there is no entry, and money leaving the base when the funds are out', () => {
-    expect(plain(describeContributions({ invested: null, netCashFlow: 500, pension: { flow: 1214, entryFlow: 0, entryMonth: '2026-07' } }))).toBe(
-      'Dal cashflow hai messo da parte 500 € nel periodo; il registro operazioni non è attivo. Nei fondi pensione sono entrati 1214 € da fuori (TFR, datoriale, busta paga).'
+  it('without an entry in the period the funds are a channel like the others', () => {
+    expect(plain(describeContributions({ capital: capital(realAccount), totalMonths: 9, pensionEntry: { flow: 0, month: '2026-07' } }))).toBe(
+      'Nella base sono entrati 36.921 €, per la maggior parte attraverso i fondi pensione.'
     );
-    expect(plain(describeContributions({ invested: null, netCashFlow: 500, pension: { flow: -152, entryFlow: 0, entryMonth: null } }))).toBe(
-      'Dal cashflow hai messo da parte 500 € nel periodo; il registro operazioni non è attivo. Dai conti sono passati 152 € ai fondi pensione, fuori dalla base.'
-    );
-  });
-
-  it('says nothing about the channel when it is empty', () => {
-    expect(plain(describeContributions({ invested: null, netCashFlow: 500, pension: { flow: 0, entryFlow: 0, entryMonth: null } }))).toBe(
-      'Dal cashflow hai messo da parte 500 € nel periodo; il registro operazioni non è attivo.'
+    // The entry is named only when the pension channel IS the largest.
+    const small: CapitalEnteredSummary['channels'] = [{ key: 'cashflow', amount: 9000, months: 9 }, { key: 'pension', amount: 1200, months: 9 }];
+    expect(plain(describeContributions({ capital: capital(small), totalMonths: 9, pensionEntry: { flow: 1100, month: '2026-07' } }))).toBe(
+      'Nella base sono entrati 10.200 €, per la maggior parte dal risparmio del cashflow.'
     );
   });
 });
@@ -530,7 +536,9 @@ describe('describeAttribution', () => {
     expect(plain(r)).toBe('Il mercato ha reso +16.836 €: Vanguard All-World ne ha portati +16.569 €, MSCI World +2977 €; −1833 € non sono attribuibili a uno strumento.');
     const segment = (text: string) => r.find((seg) => seg.text.replace(/\u00a0/g, ' ') === text);
     expect(segment('+16.836 €')?.sign).toBe('positive');
-    expect(segment('−1833 €')?.sign).toBe('negative');
+    // The residual is a measurement, not a loss of anything: uncoloured, like its row in the tile.
+    expect(segment('−1833 €')?.mono).toBe(true);
+    expect(segment('−1833 €')?.sign).toBeUndefined();
   });
 
   it('reads a losing period with «tolto» and a losing instrument with «tolti», and drops a residual under a euro', () => {
@@ -618,13 +626,13 @@ describe('describeReturnMetrics / describeDrawdownDetail / describeYields', () =
 describe('describeAnalysisBase', () => {
   it('names the window and what was paid into it', () => {
     expect(plain(describeAnalysisBase({ monthsMeasured: 31, netCashFlow: 18400 }))).toBe(
-      '31 mesi di storico, con 18.400 € versati nel periodo.',
+      '31 mesi di storico, con 18.400 € messi da parte nel periodo.',
     );
   });
 
-  it('says «prelevati» when the flows went the other way', () => {
+  it('says the cashflow overspent when the savings went the other way', () => {
     expect(plain(describeAnalysisBase({ monthsMeasured: 12, netCashFlow: -5000 }))).toBe(
-      '12 mesi di storico, con 5000 € prelevati nel periodo.',
+      '12 mesi di storico, con 5000 € spesi oltre le entrate nel periodo.',
     );
   });
 

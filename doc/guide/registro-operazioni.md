@@ -1,6 +1,12 @@
 # Registro operazioni (Asset Trade Ledger)
 
-> **Quando aprire questa guida** — chi tocca `lib/utils/assetTransactionUtils.ts`, `lib/server/{assetTransactionUseCase,tradeFxService}.ts`, `app/api/asset-transactions/*`, `components/assets/{TransactionDialog,AssetMovementsDialog}.tsx`. Esercizio: `__tests__/assetTransactionWriteTx.test.ts`. In `AGENTS.md` resta lo stub con l'essenziale; qui c'è la regola completa. File: `CLAUDE.md` → *Key Files* → *Asset trade ledger*.
+> **Quando aprire questa guida** — chi tocca `lib/utils/assetTransactionUtils.ts`, `lib/server/{assetTransactionUseCase,tradeFxService}.ts`, `app/api/asset-transactions/*`, `components/assets/{TransactionDialog,AssetMovementsDialog}.tsx`. Esercizio: `__tests__/assetTransactionWriteTx.test.ts`. In `AGENTS.md` resta lo stub con l'essenziale; qui c'è la regola completa. File: § *Files*, sotto.
+
+## Files
+
+Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
+
+- **Asset trade ledger**: engine `lib/utils/assetTransactionUtils.ts` + `types/assetTransactions.ts`; server `lib/server/{assetTransactionUseCase,tradeFxService}.ts` (+ `backfillAverageCostEur`) + `app/api/asset-transactions/*` (incl. `backfill-average-cost-eur`); client `lib/services/assetTransactionService.ts`, UI `components/assets/{TransactionDialog,AssetMovementsDialog}.tsx`; collections `assetTransactions`/`assetTransactionsMeta`
 
 ## Asset Trade Ledger
 
@@ -46,6 +52,32 @@
   from re-running `replayTransactions` on every prefix (O(n²)). One pass emits one `LedgerTransactionEffect` per
   transaction, with the optional fields populated ONLY for `sell`, so a caller indexes by id with no holes.
   `replayTransactions(txs)` is just `.state` of the same call.
+
+- **A sell credits its account NET of the tax the broker withheld** (2026-09-20, `AssetTransaction.withheldTaxEur`,
+  SELL only, `>= 0`). In regime amministrato the tax leaves the proceeds the day of the sale; crediting the gross left
+  the owner to lower the account by hand, and every verdict read that as «altre variazioni». `computeCashDelta` =
+  `quantity·priceEur − fees − withheldTaxEur`, **to the cent** (`lib/utils/cents.ts` — a bank moves cents, the record
+  keeps its exact value; the rounding is sign-symmetric so a reversal cancels its application). Realized P&L, XIRR and
+  invested capital stay GROSS of the tax: it is a fact of the settlement and of the period readings, never of the
+  return. **The estimate stands on the gain the BROKER taxes — the price difference, no commission on either side**
+  (`LedgerTransactionEffect.taxableGainEur`, from a fee-free cost basis the replay keeps beside `costBasisEur`; an
+  adjustment resets it like the PMC). Two statements of the owner settle it (2026-09-20): settembre's four sells were
+  taxed on 15.740,38 € — the app's net 15.726,38 € plus their 14 € of sale fees — which is the 4.092,50 € withheld to the
+  cent (the net base said 4.088,86 €); and a purchase of 48 units at 123,48 € with 5 € of fees is carried by Directa at
+  123,48 €, not at 5.932,04 / 48 = 123,58 €. Directa's «Gain/Loss lordo» is that base; the app's realized P&L stays NET
+  of every fee (what the sale earned), so the two differ by the commissions and both are right. Never estimate a tax
+  from `realizedPnlEur`.
+  `lib/utils/saleTax.ts` owns the estimate (`estimateSaleTax`, shared with `periodSales`), the prefill and what
+  the form sends: **a typed 0 is a value** (a gain offset by past losses), an empty field on a sale that stores no tax
+  sends nothing, an emptied field on one that stores a tax sends 0 (an absent key means «keep» to the API). Where the
+  tax is stored `summarizePeriodSales` reads it INSTEAD of the estimate, sell by sell, and `taxIsWithheld` lets
+  `describeSales` drop «circa»; the field keeps the name `estimatedTax` because stored overview payloads carry it.
+  Storico's Driver keeps «tasse stimate»: a multi-year window mixes facts and estimates.
+- **«Tasse trattenute» follows the estimate until the owner types** (`TransactionDialog`): the gain moves with
+  quantity, price and fees, so the prefill is an effect on the RHF value gated by `isTaxTyped` (settled during render
+  on `(open, transaction)`); an EDIT never prefills. On a sell that credited its account gross (recorded before the
+  field) the clause under the field is a warning (`describeWithheldTaxField`): typing a tax lowers the account TODAY,
+  and a balance already aligned to the bank would lose it twice. Pinned by `e2e/assets.sale-tax.spec.ts`.
 
 ### Service, API, migration (`lib/server/assetTransactionUseCase.ts`)
 - **Writes are Admin-API-only**: a trade atomically rewrites the asset's derived fields from a full replay, and only the

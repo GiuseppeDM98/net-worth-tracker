@@ -41,6 +41,7 @@ function CenterRow({ row, palette, now, onOpen }: { row: CenterRankedRow; palett
       <button
         type="button"
         onClick={() => onOpen(summary.center)}
+        data-center-row={summary.center.id}
         className="group flex min-h-[44px] w-full items-center gap-3 py-2.5 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset desktop:-mx-2 desktop:w-[calc(100%+16px)] desktop:rounded-md desktop:px-2"
       >
         <span className="sr-only">Apri </span>

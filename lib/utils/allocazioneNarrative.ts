@@ -20,7 +20,7 @@
 
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { formatPercentage } from '@/lib/services/chartService';
-import { articleForPercent } from '@/lib/utils/patrimonioNarrative';
+import { articleForPercent, atThePercent } from '@/lib/utils/patrimonioNarrative';
 import type { Narrative, NarrativeSegment, PageVerdictModel, VerdictTone } from '@/lib/utils/narrative';
 import type { OrphanedTarget, RebalanceBand, RebalanceMove } from '@/lib/utils/allocationUtils';
 import type { InstrumentTrade } from '@/lib/utils/leverageAwareAllocationUtils';
@@ -28,10 +28,12 @@ import type {
   ClassGap,
   ClassSlice,
   ExposureHighlights,
+  ExposureViewKey,
   HoldingsGroup,
   NextMoney,
   PlanMode,
   PlanView,
+  SaleTaxEstimate,
 } from '@/lib/utils/allocazioneSummary';
 import type { OverlapHighlights } from '@/lib/utils/overlapUtils';
 
@@ -191,7 +193,10 @@ export function buildAllocazioneVerdict(input: AllocazioneVerdictInput): PageVer
   }
 
   const tone: VerdictTone = input.isBalanced ? 'positive' : input.score >= 80 ? 'warning' : 'negative';
-  const headline = `Allineato al ${Math.round(input.score)}%.`;
+  // «all'85%», not «al 85%»: the articulated preposition follows the number NAME, and 1, 8, 11 and
+  // 80-89 start with a vowel — thirteen of the hundred-and-one scores this headline can print.
+  const score = Math.round(input.score);
+  const headline = `Allineato ${atThePercent(score, 0)}${score}%.`;
 
   const clauses: Narrative[] = [];
   if (input.isBalanced || input.offTarget.length === 0) {
@@ -261,6 +266,20 @@ export function describeBalance(input: BalanceInput): Narrative {
       ? [prose('nessuna classe è fuori target')]
       : [prose(input.offTargetCount === 1 ? 'è ' : 'sono '), figure(String(input.offTargetCount)), prose(input.offTargetCount === 1 ? ' classe su ' : ' classi su '), figure(String(input.classCount)), prose(' fuori target')];
   return [...head, prose(`; ${bandClause(input.band)} `), ...count, prose('.')];
+}
+
+/**
+ * What changing the band just did, for a screen reader — «Soglia ±5%: 3 classi su 6 fuori target.»
+ *
+ * The band silently rewrites four regions at once (the verdict, this reading, the Piano's whole
+ * body and every chip in Per classe). A sighted reader sees them move; without a live region a
+ * keyboard reader pressed a button and nothing was announced at all.
+ */
+export function describeBandChange(input: { band: RebalanceBand; offTargetCount: number; classCount: number }): string {
+  const scope = input.band.type === 'rule525' ? 'Regola 5/25' : `Soglia ${describeBand(input.band)}`;
+  if (input.offTargetCount === 0) return `${scope}: nessuna classe fuori target.`;
+  const noun = input.offTargetCount === 1 ? 'classe' : 'classi';
+  return `${scope}: ${input.offTargetCount} ${noun} su ${input.classCount} fuori target.`;
 }
 
 /**
@@ -366,13 +385,29 @@ const LABELS_TO_KEYS: Record<string, string> = Object.fromEntries(
   Object.entries(CLASS_SUBJECTS).map(([key]) => [key, key]),
 );
 
-/** The reading of the Piano tile for its mode, from the `PlanView` the page built. */
-export function describePlan(view: PlanView, band: RebalanceBand, labels: Record<string, string> = DEFAULT_LABELS): Narrative {
+/**
+ * The reading of the Piano tile for its mode, from the `PlanView` the page built.
+ *
+ * `saleTax` is appended to the modes that SELL — a rebalance and a withdrawal — because the figure
+ * they name is gross and the money that reaches the account is not. A contribution never sells, so
+ * it never carries the clause.
+ */
+export function describePlan(
+  view: PlanView,
+  band: RebalanceBand,
+  saleTax: SaleTaxEstimate | null = null,
+  labels: Record<string, string> = DEFAULT_LABELS,
+): Narrative {
   const byLabel = subjectsByLabel(labels);
   const subjectFor = (node: { key: string; label: string }) => byLabel.get(node.label) ?? classSubject(LABELS_TO_KEYS[node.key] ?? node.key, node.label);
+  /** The tax clause sits INSIDE the full stop the sentence already ends with. */
+  const withTax = (sentence: Narrative, netIsTheSubject = false): Narrative => {
+    const clause = describeSaleTaxClause(saleTax, netIsTheSubject);
+    return clause.length === 0 ? sentence : [...sentence.slice(0, -1), ...clause, prose('.')];
+  };
 
   if (view.mode === 'rebalance') {
-    return view.trades ? describeTrades(view.trades, view.resultingLeverageRatio) : describeMoves(view.moves, band);
+    return withTax(view.trades ? describeTrades(view.trades, view.resultingLeverageRatio) : describeMoves(view.moves, band));
   }
 
   if (view.mode === 'contribute') {
@@ -389,22 +424,45 @@ export function describePlan(view: PlanView, band: RebalanceBand, labels: Record
 
   if (view.amount <= 0) return [prose('Inserisci un importo per vedere da dove conviene prelevare.')];
   if (view.exceedsPortfolio) {
-    return [amount(view.amount), prose(' superano i '), amount(view.tradableTotal), prose(' negoziabili: il piano liquida tutto.')];
+    // Two different failures. Below the tradable total the request simply does not fit, and the
+    // old sentence is still the right one. Above it, the request fits but its GROSS does not: the
+    // reader asked for a net, so the sentence has to say the net will fall short — the tax clause
+    // then names what actually arrives.
+    if (!view.grossedUp) {
+      return [amount(view.amount), prose(' superano i '), amount(view.tradableTotal), prose(' negoziabili: il piano liquida tutto.')];
+    }
+    // The full stop is its OWN segment: `withTax` inserts the clause before it, and a stop glued to
+    // the prose would be sliced away with the words it sits on.
+    return withTax([
+      prose('Per prelevare '),
+      amount(view.amount),
+      prose(' netti servirebbe vendere più dei '),
+      amount(view.tradableTotal),
+      prose(' negoziabili: il piano liquida tutto'),
+      prose('.'),
+    ]);
   }
   if (view.trades) {
     if (view.trades.length === 0) return [prose('Per prelevare '), amount(view.amount), prose(' nessuna vendita avvicina il portafoglio al target.')];
     const { sells } = tradeItems(view.trades);
-    return [prose('Per prelevare '), amount(view.amount), prose(': vendi '), ...joinList(sells), prose('.')];
+    return withTax([prose('Per prelevare '), amount(view.amount), prose(': vendi '), ...joinList(sells), prose('.')]);
   }
   if (view.nodes.length === 0) return [prose('Per prelevare '), amount(view.amount), prose(' nessuna vendita avvicina il portafoglio al target.')];
-  const head: Narrative = [prose('Per prelevare '), amount(view.amount), prose(': ')];
+  // «Prelevare 1000 €» means 1000 € IN HAND, so the head names the net first and the gross second:
+  // the rows below add up to the gross, and a reader who checks them must find the figure named.
+  const head: Narrative = view.grossedUp
+    ? [prose('Per prelevare '), amount(view.amount), prose(' netti vendi '), amount(view.grossAmount), prose(': ')]
+    : [prose('Per prelevare '), amount(view.amount), prose(': ')];
   if (view.nodes.length === 1) {
     const subject = subjectFor(view.nodes[0]);
     const over = view.overTarget.includes(view.nodes[0].label);
-    return [...head, prose(`tutto ${subject.from}`), ...(over ? [prose(`, che ${subject.plural ? 'sono' : 'è'} sopra target`)] : []), prose('.')];
+    return withTax([...head, prose(`tutto ${subject.from}`), ...(over ? [prose(`, che ${subject.plural ? 'sono' : 'è'} sopra target`)] : []), prose('.')], view.grossedUp);
   }
   const items = view.nodes.map((node) => [amount(node.amount), prose(` ${subjectFor(node).from}`)]);
-  return [...head, ...joinList(items), ...(view.overTarget.length > 0 ? [prose(', partendo da ciò che è sopra target')] : []), prose('.')];
+  return withTax(
+    [...head, ...joinList(items), ...(view.overTarget.length > 0 ? [prose(', partendo da ciò che è sopra target')] : []), prose('.')],
+    view.grossedUp,
+  );
 }
 
 const DEFAULT_LABELS: Record<string, string> = {
@@ -418,13 +476,41 @@ const DEFAULT_LABELS: Record<string, string> = {
   carry: 'Carry',
 };
 
-/** The disclaimer under the plan, per mode and per engine — the same words the panels carried. */
-export function describePlanFooter(mode: PlanMode, leveraged: boolean): string {
+/**
+ * «; incassi 19.000 € netti, dopo circa 3000 € di ritenuta» — what a plan's sells actually deliver.
+ *
+ * In regime amministrato the broker withholds on the day of the sale, so a bare «vendi 22.000 €» is
+ * a gross figure the reader never sees whole. When the estimate is not available the clause is
+ * DROPPED, not softened (The Narrative Honesty Rule) — and the footer then keeps saying the tax is
+ * not counted, so the surface never both hides a figure and implies it was included.
+ */
+export function describeSaleTaxClause(estimate: SaleTaxEstimate | null, netIsTheSubject = false): Narrative {
+  if (!estimate || estimate.tax === null || estimate.net === null) return [];
+  if (estimate.tax < 1) {
+    return [prose('; nessuna ritenuta, le posizioni da vendere non sono in guadagno')];
+  }
+  // On a withdrawal the headline already opens on the net («Per prelevare 1000 € netti…»), so the
+  // clause names only what the broker keeps: repeating the net would print it twice in one sentence.
+  if (netIsTheSubject) return [prose('; la ritenuta stimata è '), amount(estimate.tax)];
+  return [prose('; incassi '), amount(estimate.net), prose(' netti, dopo circa '), amount(estimate.tax), prose(' di ritenuta')];
+}
+
+/**
+ * The disclaimer under the plan, per mode and per engine — the same words the panels carried.
+ *
+ * `taxEstimated` swaps the «le tasse sulla plusvalenza non sono considerate» admission for the
+ * method behind the figure the reading now prints. The two must never both appear: a footer that
+ * disclaims a tax the sentence above just quoted contradicts its own tile.
+ */
+export function describePlanFooter(mode: PlanMode, leveraged: boolean, taxEstimated = false): string {
   const disclaimer = 'Stima indicativa, non un consiglio finanziario.';
+  const taxNote = taxEstimated
+    ? 'La ritenuta è stimata sulla plusvalenza della quota venduta, al netto di eventuali minusvalenze pregresse che non sono considerate.'
+    : 'Le tasse sulla plusvalenza non sono considerate.';
   if (mode === 'rebalance') {
     return leveraged
       ? `Operazioni sugli strumenti reali che detieni, a saldo cassa nullo, per riportare l'esposizione nozionale di ogni classe verso il target. ${disclaimer}`
-      : `Le vendite sono limitate a ciò che puoi negoziare; le tasse sulla plusvalenza non sono considerate. ${disclaimer}`;
+      : `Le vendite sono limitate a ciò che puoi negoziare. ${taxNote} ${disclaimer}`;
   }
   if (mode === 'contribute') {
     return leveraged
@@ -433,7 +519,7 @@ export function describePlanFooter(mode: PlanMode, leveraged: boolean): string {
   }
   return leveraged
     ? `Raccoglie la cifra vendendo gli strumenti reali che detieni (solo vendite), riportando l'esposizione nozionale verso il target. Le tasse sulla plusvalenza non sono considerate. ${disclaimer}`
-    : `Attinge prima da classi e sottocategorie sopra target, così il prelievo ti riavvicina all'obiettivo. Dove non c'è un target, ripartisce in proporzione a quanto detieni. Le tasse sulla plusvalenza non sono considerate. ${disclaimer}`;
+    : `Attinge prima da classi e sottocategorie sopra target, così il prelievo ti riavvicina all'obiettivo. Dove non c'è un target, ripartisce in proporzione a quanto detieni. ${taxNote} ${disclaimer}`;
 }
 
 // ─── Per classe ───────────────────────────────────────────────────────────────
@@ -469,24 +555,58 @@ export function describeClasses(gaps: ClassGap[], band: RebalanceBand): Narrativ
 /**
  * «Il titolo più pesante è Apple (4,1% del portafoglio, in 3 strumenti); il primo settore è
  * Tecnologia (24,3%) e iShares emette il 61% degli ETF.» Null when nothing was analysed.
+ *
+ * The clause of the view the reader is IN comes first. The tile shows one list at a time, and a
+ * reading that opened on the heaviest holding while the list ranked issuers answered a question
+ * nobody had asked — it was the only reading on the page that did not answer the state it was in.
+ * All three facts stay: the tile is one question («cosa possiedo davvero?») and the other two are
+ * the context that makes the first one worth reading.
  */
-export function describeExposure(highlights: ExposureHighlights): Narrative | null {
-  const clauses: Narrative[] = [];
-  if (highlights.topHolding) {
+export function describeExposure(highlights: ExposureHighlights, view: ExposureViewKey = 'holdings'): Narrative | null {
+  /**
+   * A clause that OPENS on a proper name is never capitalised: the issuer's own spelling is the
+   * fact, and «iShares» turned into «IShares» is the app correcting a brand.
+   */
+  type Clause = { narrative: Narrative; opensOnProperName: boolean };
+
+  const holdingClause = (): Clause | null => {
+    if (!highlights.topHolding) return null;
     const { name, pct, sourceCount } = highlights.topHolding;
-    clauses.push([prose(`Il titolo più pesante è ${name} (`), percent(pct, 1), prose(` del portafoglio, in ${sourceCount} strument${sourceCount === 1 ? 'o' : 'i'})`)]);
-  }
-  if (highlights.topSector) {
-    clauses.push([prose(`il primo settore è ${highlights.topSector.label} (`), percent(highlights.topSector.pct, 1), prose(')')]);
-  }
-  if (highlights.topIssuer) {
+    return {
+      narrative: [prose(`il titolo più pesante è ${name} (`), percent(pct, 1), prose(` del portafoglio, in ${sourceCount} strument${sourceCount === 1 ? 'o' : 'i'})`)],
+      opensOnProperName: false,
+    };
+  };
+  const sectorClause = (): Clause | null =>
+    highlights.topSector
+      ? {
+          narrative: [prose(`il primo settore è ${highlights.topSector.label} (`), percent(highlights.topSector.pct, 1), prose(')')],
+          opensOnProperName: false,
+        }
+      : null;
+  const issuerClause = (): Clause | null => {
+    if (!highlights.topIssuer) return null;
     const share = highlights.topIssuer.etfShare;
-    clauses.push([prose(`${highlights.topIssuer.family} emette ${articleForPercent(share, 0)}`), figure(`${share}%`), prose(' degli ETF')]);
-  }
+    return {
+      narrative: [prose(`${highlights.topIssuer.family} emette ${articleForPercent(share, 0)}`), figure(`${share}%`), prose(' degli ETF')],
+      opensOnProperName: true,
+    };
+  };
+
+  const order: Array<Clause | null> =
+    view === 'sectors'
+      ? [sectorClause(), holdingClause(), issuerClause()]
+      : view === 'issuers'
+        ? [issuerClause(), holdingClause(), sectorClause()]
+        : [holdingClause(), sectorClause(), issuerClause()];
+
+  const clauses = order.filter((clause): clause is Clause => clause !== null);
   if (clauses.length === 0) return null;
   const [first, ...rest] = clauses;
-  const sentence: Narrative = first[0].text.startsWith('Il ') ? [...first] : [prose(capitalize(first[0].text)), ...first.slice(1)];
-  if (rest.length > 0) sentence.push(prose('; '), ...joinList(rest));
+  const sentence: Narrative = first.opensOnProperName
+    ? [...first.narrative]
+    : [prose(capitalize(first.narrative[0].text)), ...first.narrative.slice(1)];
+  if (rest.length > 0) sentence.push(prose('; '), ...joinList(rest.map((clause) => clause.narrative)));
   sentence.push(prose('.'));
   return sentence;
 }
@@ -503,9 +623,15 @@ export function describeExposureEmpty(view: 'holdings' | 'sectors' | 'issuers'):
   }
 }
 
-/** «12 asset su 16 analizzati» — the tile's aside. */
+/**
+ * «12 asset su 16 analizzati · % del portafoglio» — the tile's aside.
+ *
+ * The second half names the base of the percentage column, which is the WHOLE portfolio: the
+ * reading beside it says an issuer emits «il 46% degli ETF» and the row under it printed «29%» for
+ * the same issuer, two true figures on two bases with only one of them declared.
+ */
 export function describeExposureAside(input: { analyzedAssets: number; totalAssets: number }): string {
-  return `${input.analyzedAssets} asset su ${input.totalAssets} analizzati`;
+  return `${input.analyzedAssets} asset su ${input.totalAssets} analizzati · % del portafoglio`;
 }
 
 const EXPOSURE_METHOD = 'Prime ~10 posizioni per ETF da Yahoo Finance: approssimato per i fondi molto diversificati. Nessuna copertura geografica.';

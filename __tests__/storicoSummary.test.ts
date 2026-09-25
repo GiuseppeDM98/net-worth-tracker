@@ -24,7 +24,6 @@ import {
   summarizeGrowth,
   summarizeGrowthPace,
   summarizeMonthlyMoves,
-  sumDriverYears,
   summarizeLaborMetrics,
   withMonthDeltas,
 } from '@/lib/utils/storicoSummary';
@@ -268,28 +267,23 @@ describe('projectNextDoubling', () => {
 
 describe('driver helpers', () => {
   const rows = [
-    { year: '2023', netSavings: 9000, investmentGrowth: 3000, netWorthGrowth: 12000, growthPct: 12, latest: { year: 2023, month: 12 } },
-    { year: '2024', netSavings: 12000, investmentGrowth: -1000, netWorthGrowth: 11000, growthPct: 9.8, latest: { year: 2024, month: 12 } },
-    { year: '2025', netSavings: 22800, investmentGrowth: 6900, netWorthGrowth: 29700, growthPct: 24.1, latest: { year: 2025, month: 12 } },
-    { year: '2026', netSavings: 14100, investmentGrowth: 7300, netWorthGrowth: 21400, growthPct: 14, latest: { year: 2026, month: 8 } },
+    { year: '2023', netSavings: 9000, market: 3000, taxes: 0, debtRepaid: 0, pensionContributions: 0, other: 0, isMarketMeasured: true, netWorthGrowth: 12000, growthPct: 12, latest: { year: 2023, month: 12 } },
+    { year: '2024', netSavings: 12000, market: -1000, taxes: 0, debtRepaid: 0, pensionContributions: 0, other: 0, isMarketMeasured: true, netWorthGrowth: 11000, growthPct: 9.8, latest: { year: 2024, month: 12 } },
+    { year: '2025', netSavings: 22800, market: 6900, taxes: 0, debtRepaid: 0, pensionContributions: 0, other: 0, isMarketMeasured: true, netWorthGrowth: 29700, growthPct: 24.1, latest: { year: 2025, month: 12 } },
+    { year: '2026', netSavings: 14100, market: 7300, taxes: 0, debtRepaid: 0, pensionContributions: 0, other: 0, isMarketMeasured: true, netWorthGrowth: 21400, growthPct: 14, latest: { year: 2026, month: 8 } },
   ];
 
   it('should split a year between its drivers as shares that sum to 100, or refuse a mixed-sign split', () => {
     expect(resolveDriverShares(rows[2])).toEqual({ savings: 77, market: 23 });
-    expect(resolveDriverShares({ netSavings: 23678, investmentGrowth: 21288 })).toEqual({ savings: 53, market: 47 });
+    expect(resolveDriverShares({ netSavings: 23678, market: 21288 })).toEqual({ savings: 53, market: 47 });
     expect(resolveDriverShares(rows[1])).toBeNull();
-    expect(resolveDriverShares({ netSavings: 0, investmentGrowth: 0 })).toBeNull();
-    expect(resolveDriverShares({ netSavings: 0, investmentGrowth: 500 })).toEqual({ savings: 0, market: 100 });
+    expect(resolveDriverShares({ netSavings: 0, market: 0 })).toBeNull();
+    expect(resolveDriverShares({ netSavings: 0, market: 500 })).toEqual({ savings: 0, market: 100 });
   });
 
   it('should keep only the years from the cashflow floor, newest first', () => {
     expect(selectDriverYears(rows, 2025).map((r) => r.year)).toEqual(['2026', '2025']);
     expect(selectDriverYears(rows, 2030)).toEqual([]);
-  });
-
-  it('should sum the selected years, and give null for none', () => {
-    expect(sumDriverYears(selectDriverYears(rows, 2025))).toEqual({ netSavings: 36900, investmentGrowth: 14200, netWorthGrowth: 51100 });
-    expect(sumDriverYears([])).toBeNull();
   });
 
   it('should feature the running year when present, else the newest closed one', () => {
@@ -358,6 +352,10 @@ describe('summarizeLaborMetrics', () => {
       // 51100 − (78400 + 1000 − 41600) = 13300: the transfer, the future instalment and the baseline-month salary change nothing.
       totalInvestmentGrowthGross: 13300,
       totalInvestmentGrowthNet: 11000,
+      saleTaxes: 0,
+      debtRepaid: 0,
+      pensionContributions: 0,
+      otherChanges: 0,
       coverage: 78400 / 41600,
     });
     expect(m.totalSavedFromWork + m.otherIncome + m.totalInvestmentGrowthGross).toBeCloseTo(m.netWorthGrowth, 6);
@@ -372,6 +370,17 @@ describe('summarizeLaborMetrics', () => {
     const all = summarizeLaborMetrics(snapshots, expenses, ['stipendio'], 2025, windows, 0)!;
     expect(all.netWorthGrowth).toBe(y2025.netWorthGrowth + y2026.netWorthGrowth);
     expect(all.totalInvestmentGrowthGross).toBe(y2025.totalInvestmentGrowthGross + y2026.totalInvestmentGrowthGross);
+  });
+
+  it('should take the market and the other parts from the Driver, closing the identity on its own rows', () => {
+    // The Driver measured 9000 of market, 700 of sale taxes, 1500 of mortgage and 400 of
+    // contributions over the same windows: the rest of the 13300 residual is «altre variazioni».
+    const drivers = { market: 9000, taxes: 700, debtRepaid: 1500, pensionContributions: 400 };
+    const m = summarizeLaborMetrics(snapshots, expenses, ['stipendio'], 2025, windows, 2300, drivers)!;
+    expect(m).toMatchObject({ totalInvestmentGrowthGross: 9000, totalInvestmentGrowthNet: 6700, saleTaxes: 700, debtRepaid: 1500, pensionContributions: 400 });
+    // 13300 − 9000 + 700 − 1500 − 400 = 3100.
+    expect(m.otherChanges).toBeCloseTo(3100, 6);
+    expect(m.totalSavedFromWork + m.otherIncome + m.totalInvestmentGrowthGross - m.saleTaxes + m.debtRepaid + m.pensionContributions + m.otherChanges).toBeCloseTo(m.netWorthGrowth, 6);
   });
 
   it('should rank the other income categories by weight and drop the coverage without spending or without labor income', () => {

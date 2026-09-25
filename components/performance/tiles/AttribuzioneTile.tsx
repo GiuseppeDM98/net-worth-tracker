@@ -7,6 +7,7 @@ import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { signTextClass } from '@/lib/utils/metricColors';
 import { cn } from '@/lib/utils';
 import { Tile } from '@/components/ui/tile';
+import { TileMethodNote } from '@/components/ui/tile-method-note';
 
 interface AttribuzioneTileProps {
   aside: string;
@@ -20,6 +21,17 @@ const MAX_ROWS = 6;
 
 /** The one spring of the app (DESIGN.md → Segmented Pill Control): the rows re-rank on it. */
 const RERANK_SPRING = { type: 'spring', stiffness: 400, damping: 35 } as const;
+
+/**
+ * One row of the list. The bar column exists only from a 420px list (`@container` on the `ul`):
+ * on a phone the fixed bar (72px) and amount (96px) left the name 124px and it was truncated — two
+ * rows both read «WisdomTree Physi…» (2026-09-20). Below that width the signed, coloured amount
+ * already carries direction and size, so the bar leaves and the name takes its room; the name
+ * wraps on two lines and is never cut short of that (AGENTS.md → Hierarchy, Density and Disclosure).
+ */
+const ROW_GRID_CLASS = 'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 py-[9px] @[420px]:grid-cols-[minmax(0,1fr)_72px_96px]';
+/** The bar's cell, and the empty cell the closing rows keep in its place. */
+const BAR_CELL_CLASS = 'hidden @[420px]:block';
 
 function signedEuro(value: number): string {
   return `${value > 0 ? '+' : value < 0 ? '−' : ''}${cachedFormatCurrencyEUR(Math.abs(value), true)}`;
@@ -51,17 +63,18 @@ export function AttribuzioneTile({ aside, reading, attribution, className }: Att
     <Tile eyebrow="Da dove viene il rendimento" aside={aside} reading={reading} className={className}>
       {hasRows && (
         <LayoutGroup id="attribuzione">
-        <ul className="mt-3 flex flex-col divide-y divide-border" aria-label="Contributo di ogni strumento al rendimento del periodo">
+        <ul className="@container mt-3 flex flex-col divide-y divide-border" aria-label="Contributo di ogni strumento al rendimento del periodo">
           {shown.map((row) => (
-            <motion.li key={row.assetId} layout="position" transition={RERANK_SPRING} className="grid grid-cols-[minmax(0,1fr)_72px_96px] items-center gap-3 py-[9px]">
-              <span className="flex min-w-0 items-baseline gap-1.5">
-                <span className="truncate text-[13px] text-foreground">{row.name}</span>
-                {row.isPensionFund && <span className="shrink-0 text-[11px] text-muted-foreground">al netto dei versamenti</span>}
+            <motion.li key={row.assetId} layout="position" transition={RERANK_SPRING} className={ROW_GRID_CLASS}>
+              {/* The caption sits UNDER the name, not beside it: as a `shrink-0` sibling it took its width first and the name paid for it. */}
+              <span className="min-w-0">
+                <span className="line-clamp-2 break-words text-[13px] leading-[1.35] text-foreground">{row.name}</span>
+                {row.isPensionFund && <span className="block text-[11px] text-muted-foreground">al netto dei versamenti</span>}
                 {!row.isPensionFund && row.dividends !== 0 && (
-                  <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">{signedEuro(row.dividends)} dividendi</span>
+                  <span className="block font-mono text-[11px] tabular-nums text-muted-foreground">{signedEuro(row.dividends)} dividendi</span>
                 )}
               </span>
-              <span className="h-[3px] overflow-hidden rounded-full bg-muted" aria-hidden="true">
+              <span className={cn(BAR_CELL_CLASS, 'h-[3px] overflow-hidden rounded-full bg-muted')} aria-hidden="true">
                 <span
                   className="block h-full rounded-full motion-safe:transition-[width,background-color] motion-safe:duration-300 motion-safe:ease-out"
                   style={{ width: `${(Math.abs(row.total) / maxAbs) * 100}%`, background: row.total < 0 ? 'var(--destructive)' : 'var(--positive)' }}
@@ -73,22 +86,22 @@ export function AttribuzioneTile({ aside, reading, attribution, className }: Att
             </motion.li>
           ))}
           {attribution.rows.length > MAX_ROWS && (
-            <li className="grid grid-cols-[minmax(0,1fr)_72px_96px] items-center gap-3 py-[9px]">
+            <li className={ROW_GRID_CLASS}>
               <span className="text-[13px] text-muted-foreground">Altri {attribution.rows.length - MAX_ROWS} strumenti</span>
-              <span />
+              <span className={BAR_CELL_CLASS} />
               <span className="text-right font-mono text-[13px] tabular-nums text-muted-foreground">{signedEuro(others)}</span>
             </li>
           )}
           {!isPrintedZero(attribution.unattributed) && (
-            <li className="grid grid-cols-[minmax(0,1fr)_72px_96px] items-center gap-3 py-[9px]">
+            <li className={ROW_GRID_CLASS}>
               <span className="text-[13px] text-muted-foreground">Non attribuito</span>
-              <span />
+              <span className={BAR_CELL_CLASS} />
               <span className="text-right font-mono text-[13px] tabular-nums text-muted-foreground">{signedEuro(attribution.unattributed)}</span>
             </li>
           )}
-          <li className="grid grid-cols-[minmax(0,1fr)_72px_96px] items-center gap-3 py-[9px]">
+          <li className={ROW_GRID_CLASS}>
             <span className="text-[13px] font-semibold text-foreground">Mercato</span>
-            <span />
+            <span className={BAR_CELL_CLASS} />
             <span className={cn('text-right font-mono text-[13px] font-bold tabular-nums', isPrintedZero(attribution.gain) ? 'text-foreground' : signTextClass(attribution.gain))}>
               {signedEuro(attribution.gain)}
             </span>
@@ -96,11 +109,12 @@ export function AttribuzioneTile({ aside, reading, attribution, className }: Att
         </ul>
         </LayoutGroup>
       )}
-      <p className="mt-auto border-t border-border pt-3.5 text-[11px] leading-[1.45] text-muted-foreground">
-        Effetto prezzo sulla quantità detenuta a inizio mese, sommato sui mesi con il dettaglio per strumento; i dividendi
-        incassati sono aggiunti al loro strumento. «Non attribuito» sono interessi, dividendi non registrati e movimenti che
-        nessuna spesa spiega. La lista completa è nel Dettaglio.
-      </p>
+      <TileMethodNote subject="Da dove viene il rendimento" summary="Guadagno di mercato in euro, strumento per strumento.">
+        <span className="block">Per ogni mese con il dettaglio per strumento: effetto prezzo sulla quantità detenuta a inizio mese, sommato sul periodo. I dividendi incassati sono aggiunti al loro strumento.</span>
+        <span className="block">Un fondo pensione vale la sua variazione al netto dei versamenti.</span>
+        <span className="block">«Non attribuito» è ciò che nessuno strumento spiega: interessi, dividendi non registrati, movimenti che nessuna spesa spiega. Con questa riga la lista chiude sul guadagno di mercato.</span>
+        <span className="block">La lista completa è nel Dettaglio, in fondo alla pagina.</span>
+      </TileMethodNote>
     </Tile>
   );
 }

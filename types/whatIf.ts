@@ -4,7 +4,7 @@ import type {
   CoastFireTaxBracket,
 } from '@/types/assets';
 import type { FIREProjectionResult } from '@/types/assets';
-import type { FireProjectionPensionBridge, PensionCapitalInflowToday } from '@/lib/services/fireService';
+import type { FireHonestInputs, FireProjectionPensionBridge, PensionCapitalInflowToday } from '@/lib/services/fireService';
 
 /**
  * What If Analysis — life-event scenarios applied to the user's FIRE plan.
@@ -74,6 +74,9 @@ export interface WhatIfBaseline {
   // re-enters the FIRE walk at its unlock year, present only when the FIRE lock-in toggle is on
   // (netWorth then excludes it). Absent or null → the plain walk, byte-identical to before.
   pensionBridge?: FireProjectionPensionBridge | null;
+  // The honest inputs of the Calcolatore (2026-09-24): the state pensions placed by the age and
+  // the tax on withdrawals. Absent or null → the walk and the number of before.
+  honest?: FireHonestInputs | null;
 }
 
 /** Inputs after applying a scenario. Only the values the impact metrics depend on are tracked. */

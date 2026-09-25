@@ -1,6 +1,6 @@
 # FIRE › What If
 
-> **When to open this guide** — you are touching `components/fire-simulations/WhatIfAnalysisTab.tsx`, `components/fire-simulations/whatif/*` (`tiles/*`, `WhatIfProjectionChart`, `incomeSelection.ts`), `lib/utils/{whatIfSummary,whatIfNarrative}.ts`, `lib/services/whatIfService.ts` or `types/whatIf.ts`. The page-wide rules — the pension unlock, `respectPensionLockInFire`, the bridge model, the config-first collapse, the Ventaglio engine, `deriveMonteCarloAllocation`, the goal math — live in `doc/guide/fire.md § FIRE, What If and Goals` and are not repeated here. In `AGENTS.md` only the stub with the essentials remains (§ FIRE, What If and Goals); modules and files: `CLAUDE.md` → *Key Files* → the **FIRE › What If** entry. No Playwright spec covers this tab.
+> **When to open this guide** — you are touching `components/fire-simulations/WhatIfAnalysisTab.tsx`, `components/fire-simulations/whatif/*` (`tiles/*`, `WhatIfProjectionChart`, `incomeSelection.ts`), `lib/utils/{whatIfSummary,whatIfNarrative}.ts`, `lib/services/whatIfService.ts` or `types/whatIf.ts`. The page-wide rules — the pension unlock, `respectPensionLockInFire`, the bridge model, the config-first collapse, the Ventaglio engine, `deriveMonteCarloAllocation`, the goal math — live in `doc/guide/fire.md § FIRE, What If and Goals` and are not repeated here. In `AGENTS.md` only the stub with the essentials remains (§ FIRE, What If and Goals); modules and files: `doc/guide/fire.md` § *Files*. No Playwright spec covers this tab.
 
 ## FIRE › What If — a verdict over tiles (`components/fire-simulations/WhatIfAnalysisTab.tsx`, `components/fire-simulations/whatif/*`, `lib/utils/{whatIfSummary,whatIfNarrative}.ts`)
 
@@ -15,6 +15,12 @@
   that is good for the row (`buildDeltaRows`: net worth and income higherBetter, FIRE number, Coast number and gap lowerBetter);
   a change under half a unit is «invariato», never «+0 €». **An empty perturbation** (`WhatIfEvent.isEmpty`: no months or no lost
   income, a lump sum of 0, both cashflow deltas 0) gets «Nessun evento da simulare.» with today's plan, not a zero delta.
+- **The baseline carries the honest inputs** (2026-09-24, `WhatIfBaseline.honest`, built like the Calcolatore's: the tax profile of the
+  FIRE-eligible assets minus the locked funds, the Coast pensions dated by the saved age): both sides of every event read
+  `resolveFireRequirement` and the walk with `honest`, so «prima» agrees with the Calcolatore's number. The basis MOVES with the event
+  (`honestFor`): money that arrives — a windfall — is basis, money that leaves — a purchase, the months without income — is sold at the
+  portfolio's own gain share, so the basis shrinks in proportion. Pinned: a 50k windfall on 200k/100k lowers the number (1/(1−0,104)), a 50k
+  purchase keeps it (still half gain).
 - **The event clause is household-agnostic**: months, the lost amount and its share of expenses + savings (`lostShareOfIncomePct`,
   null when the household earns nothing, and the clause drops). The names of the sources live only in the Evento tile's picker.
 - **The Prima e dopo tile has no hero on purpose** (the canvas's proposal): the year is the verdict's headline and the Delta's first

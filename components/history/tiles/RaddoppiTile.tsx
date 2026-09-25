@@ -3,8 +3,11 @@
 /**
  * RADDOPPI — «quante volte è raddoppiato, e quando arriva il prossimo?»: the mode toggle
  * (Geometrico | Traguardi) as the aside, two KPIs (the page's one pace and the projected date),
- * the completed milestones as flat rows and the one in progress with a 3px track, then the
- * footer that says what the pace is and that the estimate is linear.
+ * the completed milestones as flat rows and the one in progress with a 3px track whose current
+ * value rides the END of the fill, then the one-line footer with the method behind it.
+ *
+ * The tile takes its natural height: until 2026-09-20 it spanned Evoluzione's two rows and, with
+ * no doubling completed yet, held ~150px of nothing between the track and the footer.
  *
  * The milestones come from `prepareDoublingTimeData` (chartService, unchanged); the projection
  * from `projectNextDoubling` (storicoSummary.ts) on the SAME pace the verdict uses; the words
@@ -17,8 +20,8 @@ import type { Narrative } from '@/lib/utils/narrative';
 import type { DoublingProjection, GrowthPace } from '@/lib/utils/storicoSummary';
 import { formatDurationLong, formatDurationShort, formatPeriodMonthShort } from '@/lib/utils/storicoNarrative';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
-import { cn } from '@/lib/utils';
 import { Tile, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
+import { TileMethodNote } from '@/components/ui/tile-method-note';
 import { AsideToggle } from '@/components/ui/aside-toggle';
 
 const MODE_OPTIONS: ReadonlyArray<{ value: DoublingMode; label: string }> = [
@@ -83,19 +86,25 @@ function InProgressRow({ milestone, latestValue }: { milestone: DoublingMileston
       <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
         da {formatPeriodMonthShort(milestone.startDate)} · {formatDurationShort(milestone.durationMonths)} finora
       </span>
+      {/* The value stands where the fill ends (it sat at the centre with the track at 79%), clamped so it never leaves the row. */}
+      <div className="relative mt-1 h-[15px] font-mono text-[11px] tabular-nums text-foreground" aria-hidden="true">
+        <span className="absolute top-0 -translate-x-1/2 whitespace-nowrap" style={{ left: `clamp(2.25rem, ${progress}%, calc(100% - 2.25rem))` }}>
+          {cachedFormatCurrencyEUR(latestValue, true)}
+        </span>
+      </div>
       <div
-        className="mt-1 h-[3px] overflow-hidden rounded-full bg-muted"
+        className="h-[3px] overflow-hidden rounded-full bg-muted"
         role="progressbar"
         aria-valuenow={progress}
         aria-valuemin={0}
         aria-valuemax={100}
         aria-label={`Avanzamento verso ${cachedFormatCurrencyEUR(milestone.endValue, true)}`}
+        aria-valuetext={`${cachedFormatCurrencyEUR(latestValue, true)}, il ${progress}%`}
       >
         <div className="h-full rounded-full bg-foreground" style={{ width: `${progress}%` }} />
       </div>
       <div className="flex justify-between font-mono text-[11px] tabular-nums text-muted-foreground">
         <span>{cachedFormatCurrencyEUR(milestone.startValue, true)}</span>
-        <span className="text-foreground">{cachedFormatCurrencyEUR(latestValue, true)}</span>
         <span>{cachedFormatCurrencyEUR(milestone.endValue, true)}</span>
       </div>
     </div>
@@ -148,12 +157,16 @@ export function RaddoppiTile({ reading, summary, mode, onModeChange, projection,
         </div>
       )}
 
-      <p className={cn('mt-auto border-t border-border pt-3.5 text-[11px] leading-[1.45] text-muted-foreground', completed.length === 0 && !current && 'pt-4')}>
-        {mode === 'threshold'
-          ? 'I traguardi sono 100.000, 200.000 e 500.000 €, poi 1 e 2 milioni; quelli già superati dal primo snapshot non contano. '
-          : 'Ogni raddoppio parte dal valore raggiunto dal precedente. '}
-        Il ritmo è l&apos;aumento medio mensile degli ultimi 12 mesi, versamenti inclusi; la data è una proiezione lineare, non una previsione.
-      </p>
+      {/* The tile has its natural height on desktop and stretches beside the Driver on a tablet: the gap is a floor, `mt-auto` takes the rest. */}
+      <div className="h-4 shrink-0" aria-hidden="true" />
+      <TileMethodNote subject="Raddoppi" summary="La data è una proiezione lineare, non una previsione.">
+        <span>
+          {mode === 'threshold'
+            ? 'I traguardi sono 100.000, 200.000 e 500.000 €, poi 1 e 2 milioni; quelli già superati dal primo snapshot non contano.'
+            : 'Ogni raddoppio parte dal valore raggiunto dal precedente.'}
+        </span>
+        <span>Il ritmo è l&apos;aumento medio mensile degli ultimi 12 mesi, versamenti inclusi: i versamenti non si capitalizzano, quindi la proiezione resta lineare.</span>
+      </TileMethodNote>
     </Tile>
   );
 }

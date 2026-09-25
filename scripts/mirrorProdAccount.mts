@@ -14,7 +14,7 @@
  * the dump through its stdin — nothing is written to disk, and the child refuses to run unless it
  * is pointed at the emulators. Every row is re-keyed to the mirror uid (`userId`, the snapshot ids
  * `{uid}-{y}-{m}`, the per-user docs); `performance-cache` is not copied, so the page recomputes
- * with the current math. AGENTS.md → *Emulator Exercise Scripts* → «Reading PRODUCTION».
+ * with the current math. doc/guide/e2e-emulatori.md § Emulator Exercise Scripts → «Reading PRODUCTION».
  */
 import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';

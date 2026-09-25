@@ -1,13 +1,19 @@
 # Impostazioni
 
-> **Quando aprire questa guida** — chi tocca `app/dashboard/settings/page.tsx`, `components/settings/*`, `lib/utils/settingsNarrative.ts`. Il fan-out di scrittura di un setting (le CINQUE/SEI/SETTE sedi) vive QUI, in § Settings — the FIVE places. In `AGENTS.md` resta lo stub con l'essenziale; qui c'è la regola completa. File: `CLAUDE.md` → *Key Files* → *Impostazioni / layout*.
+> **Quando aprire questa guida** — chi tocca `app/dashboard/settings/page.tsx`, `components/settings/*`, `lib/utils/settingsNarrative.ts`. Il fan-out di scrittura di un setting (le CINQUE/SEI/SETTE sedi) vive QUI, in § Settings — the FIVE places. In `AGENTS.md` resta lo stub con l'essenziale; qui c'è la regola completa. File: § *Files*, sotto.
+
+## Files
+
+Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
+
+- **Impostazioni**: `app/dashboard/settings/page.tsx` (`COLOR_THEME_SWATCHES`, `THEME_MODES`, `DeclarationRow`, `CategoryRow`, `SyncDividendsButton`, `targetFieldId`), `components/settings/{ExpenseImportSection,AccountSharingSection}.tsx`, pure `lib/utils/{settingsNarrative,equityBondsAutoTargets,allocationTargetValidation}.ts`, `lib/services/assetAllocationService.ts` (`getSettings`/`setSettings`, the FIVE places); browser `e2e/settings{,.mobile}.spec.ts`
 
 ## Impostazioni — tessere senza verdetto (`app/dashboard/settings/page.tsx`, `lib/utils/settingsNarrative.ts`)
 
 - **The page has NO verdict and must not grow one.** A configuration page measures nothing, so there is no question for
   a sentence to answer; what it keeps is the CADENCE — compact header + `PageTabBar`, then a 12-column grid where every
   group of settings is a `Tile`: eyebrow = the group, ONE reading line stating the current state in words, controls
-  below. `settingsNarrative.ts` therefore exports 22 `describe*` functions and NO `build*Verdict`.
+  below. `settingsNarrative.ts` therefore exports 21 `describe*` functions and NO `build*Verdict`.
 - **A reading declares the effect DOWNSTREAM, not the control under it.** «Base gestita: fondi pensione e asset esclusi
   restano fuori» beats «due interruttori»: the reader is deciding, and a setting they cannot place is one they will not
   trust. The Narrative Honesty Rule holds — a missing input drops its clause and says what stalls without it («senza il
@@ -26,6 +32,31 @@
   Modalità pill through next-themes, both outside `handleSave` — say so in the tile's footer, or the page promises a
   save that never happens. The Modalità reading is `null` before hydration (`useSyncExternalStore`, the ThemePicker
   guard): the mode genuinely does not exist server-side, and guessing it is a hydration mismatch.
+- **One «Salva», so the SAVE STATE is per tab** (critique of 2026-09-22). Each tab «Salva» writes has its own dirty
+  snapshot (`allocazione`, `generale`, `spese`, `dividendi`); a tab holding edits carries a dot (`TabDef.unsaved` in
+  `PageTabBar`, also in its accessible name) and a bar sticky to the bottom of `<main>` names them
+  (`describeUnsavedChanges`) with «Annulla modifiche» beside «Salva». «Annulla» RE-READS the saved settings
+  (`loadTargets({ quiet: true })`) instead of keeping a second copy, so a co-owner's save comes back too. A reload or a
+  closed tab asks first (`beforeunload`); an in-app link does not — the App Router has no guard, the bar is the
+  reminder. «Ripristina default» is the FACTORY targets, a different act; the header chip «Anteprima attiva» is gone.
+- **The target rules live in `lib/utils/allocationTargetValidation.ts`, and they say WHERE they failed.**
+  `findTargetProblem` returns the first broken rule (total, then each class top to bottom, subcategories before
+  their assets) with its class/row indices; `describeTargetProblem` is its sentence, in the Target per classe
+  reading live and in the toast «Salva» raises; `revealTargetProblem` switches to Allocazione, opens the group and
+  focuses the field (`targetFieldId`). A group that does not add up prints its sum ON THE CLASS ROW, closed or open.
+  Unnamed subcategory rows are dropped before validating (`dropUnnamedSubTargets`) — the tree validated is the tree
+  written. `validateSpecificAssets` (English messages, straight into a toast) was deleted from the service.
+- **Età and risk-free rate live in the Auto-calcolo tile** (Allocazione, since 2026-09-22), beside the switch they
+  unlock; the risk-free rate also feeds Sharpe/Sortino and the tile says so, and Calcolo dei rendimenti points back
+  to it. Their dirty snapshot is therefore the allocation one.
+- **A failed read on this page is never an empty list.** The members (`AccountSharingSection`), the categories and
+  the cash accounts each keep `loading`/`failed` and branch through `resolveSurfaceState`: Condivisione, Categorie,
+  Conti di default and Entrate da dividendi give way to an `ErrorNotice` with «Riprova», and the Cashflow reading
+  takes `categoriesUnread`. «Nessun accesso condiviso» about a list nobody read was the worst of them.
+- **Every two-press confirm is `useArmedDelete`** — category delete (`CategoryRow`: with movements the reassignment
+  dialog IS the confirmation, without them the row arms), dividend sync (`SyncDividendsButton`, armed in the primary
+  tint: it writes, it does not destroy) and the revoke of an access (`MemberRow`, the row says what is taken away).
+  One live region per list.
 - **`ExpenseImportSection` and `AccountSharingSection` render their own `Tile`** — the page places them in a grid cell
   and passes nothing but their props. Their reading lines come from the same pure module, so the wizard's phase
   («142 voci da importare, 6 righe scartate, 3 categorie da creare») and the grant list are stated in words before the
@@ -68,11 +99,18 @@
   Dividendi one was deleted on 2026-08-29 because `handleSave` already persisted its two fields, so the tab's own button
   was a second write path for the same data (it also re-read the doc first, and could therefore clobber a concurrent edit).
 - **A field's dirty-snapshot must follow the TAB THAT EDITS IT, not the tab that consumes it**: `userAge`/`riskFreeRate`
-  moved from `allocationSnapshotKey` to `generalSnapshotKey` when the Profilo tile moved to Preferenze, while the
-  auto-calculated `equity`/`bonds` targets they FEED stayed in the allocation snapshot. Get this wrong and the header's
-  chip says "salvato" over an edited field.
+  moved to `generalSnapshotKey` when the Profilo tile moved to Preferenze, and BACK to the allocation snapshot on
+  2026-09-22 when they moved into the Auto-calcolo tile; the default debit/credit accounts sit in `speseSnapshotKey`
+  because Spese edits them. Get this wrong and the dot lands on the wrong tab, or on none, over an edited field.
 - `cashflowHistoryStartYear` is shared (Cashflow / Storico / Assistant / overview) — never rename it page-specifically.
+- **«Commissioni sui trasferimenti»** (Spese, 2026-09-25): `transferFeeCategoryId` / `transferFeeSubCategoryId`, both
+  user-clearable (`'x' in settings` in both `setSettings` branches), in the `spese` snapshot, read ONLY by the expense
+  form (no server mapper). The Select lists the spending categories grouped by type — the fee row takes the category's
+  type. `e2e/cashflow.transfer-fee.spec.ts` is the one spec that WRITES this page's settings: it picks the category,
+  presses «Salva», reloads, and restores the WHOLE settings document in `afterAll`: «Salva» rewrites every field the page
+  holds, and on the base seed it drops the allocation sub-targets (the seed's shape is not the page's), so restoring the
+  two fee fields alone left `e2e/allocation.spec.ts` with no class row to open (seen red in the full run, 2026-09-25).
 
 ## Per-page blind spots
 
-- **Impostazioni**: no Playwright spec (the throwaway ones were deleted); the dialogs opened from here take the 2026-08-31 modal vocabulary; «Parametri del piano» and «Assistente» are READ-ONLY and list only the fields already saved — the assistant's mirror loses on read, so a never-synced preference makes the tile say where the truth lives instead of printing a default; the colour theme and the light/dark mode save themselves, outside the page's Salva; the header chip no longer says WHICH tab has unsaved changes (one sentence for the whole page); the Costi tile shows the rate and the checking subcategory only with the duty on; the category count ignores types outside the four listed (transfers); `settings/page.tsx` carries 7 pre-existing `react-hooks` errors and `AccountSharingSection` 1.
+- **Impostazioni**: `e2e/settings{,.mobile}.spec.ts` since 2026-09-22 — none of their tests WRITES (they edit and «Annulla», or press «Salva» on a tree the validation refuses, and compare the settings document's `updateTime`); the dialogs opened from here take the 2026-08-31 modal vocabulary; «Parametri del piano» and «Assistente» are READ-ONLY and list only the fields already saved — the assistant's mirror loses on read, so a never-synced preference makes the tile say where the truth lives instead of printing a default; the colour theme and the light/dark mode save themselves, outside the page's Salva, and mark no tab; the Costi tile shows the rate and the checking subcategory only with the duty on; the category count ignores types outside the four listed (transfers); the Allocazione panel's CONTENT unmounts on another tab (Radix keeps only the panel `div`), which is why an Auto-calcolo field is not in the DOM while Preferenze is open; the page never says WHOSE settings «Salva» writes when a co-owner is viewing another account (the readings no longer say «Hai …», but the header does not name the account); the tab pill (38×32) and the switches (36×20) stay below 44px on touch — both are shared primitives (CLAUDE.md → Known Issues).

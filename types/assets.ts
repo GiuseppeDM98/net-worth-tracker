@@ -175,6 +175,9 @@ export interface Asset {
   autoUpdatePrice?: boolean; // Default: true - indicates whether price should be automatically updated via Yahoo Finance
   composition?: AssetComposition[]; // For composite assets (e.g., pension funds with mixed allocation: 60% equity, 40% bonds)
   outstandingDebt?: number; // Outstanding mortgage/loan for real estate. Net value calculation: value - outstandingDebt
+  // The mortgage's TAN in percent (3.2 = 3,2%): splits each linked instalment into interest and the
+  // principal that lowers `outstandingDebt` (lib/utils/mortgageRepayment.ts). Absent = a 0% loan.
+  debtInterestRate?: number;
   isPrimaryResidence?: boolean; // Indicates if this real estate is the primary residence (excluded from FIRE calculations based on user setting)
   allocationRole?: AllocationRole; // How the Allocazione page treats this asset. See AllocationRole. Absent → legacy excludeFromAllocation, else 'tradable'.
   /** @deprecated Superseded by `allocationRole`. Read-only legacy fallback: true → 'excluded'. Never write it. */
@@ -187,6 +190,9 @@ export interface Asset {
   leverageRatio?: number;
   isin?: string; // ISIN code for dividend scraping (optional)
   exchange?: string; // Exchange/market label (e.g. «Borsa Italiana»), purely informational (optional)
+  // The cash account this instrument's dividends and coupons credit (lib/utils/dividendAccount.ts).
+  // Absent → the default in Impostazioni › Dividendi; neither → the income row moves no account.
+  dividendCashAssetId?: string;
   bondDetails?: BondDetails; // Optional bond-specific details for coupon scheduling
   pensionFundDetails?: PensionFundDetails; // Optional fondo pensione details (type 'pensionFund'); see types/pension.ts
   // Start of the CURRENT continuous holding, stamped on (re)purchase — createAsset on ISIN reuse,
@@ -219,11 +225,15 @@ export interface AssetFormData {
   autoUpdatePrice?: boolean;
   composition?: AssetComposition[];
   outstandingDebt?: number;
+  debtInterestRate?: number; // TAN % of the mortgage (see Asset)
   isPrimaryResidence?: boolean;
   allocationRole?: AllocationRole; // How the Allocazione page treats this asset. See AllocationRole.
   leverageRatio?: number; // For a leveraged/composite ETF: 2 = 2x, 3 = 3x, 1 or absent = no leverage.
   isin?: string; // ISIN code for dividend scraping (optional)
   exchange?: string; // Exchange/market label (optional, informational only)
+  // The cash account this instrument's dividends and coupons credit (lib/utils/dividendAccount.ts).
+  // Absent → the default in Impostazioni › Dividendi; neither → the income row moves no account.
+  dividendCashAssetId?: string;
   bondDetails?: BondDetails; // Optional bond-specific details for coupon scheduling
   pensionFundDetails?: PensionFundDetails; // Optional fondo pensione details (type 'pensionFund'); see types/pension.ts
 }
@@ -316,6 +326,14 @@ export interface AssetAllocationSettings {
   includePrimaryResidenceInFIRE?: boolean; // If true, include primary residences in FIRE calculations; if false, exclude them (FIRE standard)
   dividendIncomeCategoryId?: string; // Category ID for automatic dividend income entries
   dividendIncomeSubCategoryId?: string; // Subcategory ID for automatic dividend income entries
+  // Where the fee of a transfer lands (lib/utils/transferFee.ts): a spending category, its type
+  // decides the fee row's. Absent → the form's «Commissione» field is disabled, with a pointer here.
+  transferFeeCategoryId?: string;
+  transferFeeSubCategoryId?: string;
+  // Default cash account credited by dividends and coupons; an instrument's own
+  // `Asset.dividendCashAssetId` wins over it (lib/utils/dividendAccount.ts). Read server-side
+  // straight from the settings doc by `dividendIncomeService`.
+  dividendCashAssetId?: string;
   fireProjectionScenarios?: FIREProjectionScenarios; // Custom scenario parameters for FIRE projections (Bear/Base/Bull)
   monteCarloScenarios?: MonteCarloScenarios; // Custom scenario parameters for Monte Carlo simulations (Bear/Base/Bull)
   goalBasedInvestingEnabled?: boolean; // Toggle to enable goal-based investing feature (mental allocation of portfolio to financial goals)
@@ -521,6 +539,13 @@ export interface MonteCarloParams {
   // Applied at the START of their year, before that year's market return and withdrawal;
   // entries with year <= 0 are folded into the initial portfolio.
   capitalInflows?: MonteCarloCapitalInflow[];
+
+  // The state pensions (2026-09-24): a net annual amount at today's value from `fromYear` on,
+  // indexed like the withdrawal, taken off the withdrawal before the sale.
+  annualInflows?: { fromYear: number; annualNetToday: number }[];
+  // The tax on withdrawals (lib/utils/withdrawalTax.ts): today's cost basis and the rate, in
+  // percent. Absent = every withdrawn euro is a euro sold.
+  withdrawalTax?: { basisToday: number; rate: number };
 }
 
 export interface MonteCarloCapitalInflow {

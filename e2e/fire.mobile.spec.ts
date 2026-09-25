@@ -47,6 +47,14 @@ test('il tab Calcolatore FIRE non scorre in orizzontale a 390px', async ({ page 
     await expect(page.locator('[role="img"][aria-label*="Ventaglio Monte Carlo"]')).toBeVisible({ timeout: 15_000 });
   }
 
+  // E la Distribuzione (2026-09-24): tre KPI, l'istogramma SVG e due frasi lunghe in una tessera
+  // a colonna singola — è la vista con più testo, quindi quella da misurare.
+  const distribuzione = page.getByRole('button', { name: 'Distribuzione' });
+  if ((await distribuzione.count()) > 0) {
+    await distribuzione.click();
+    await expect(page.locator('[role="img"][aria-label*="Distribuzione dell\'anno FIRE"]')).toBeVisible({ timeout: 15_000 });
+  }
+
   // I grafici e i count-up si assestano tardi: una misura presa prima leggerebbe larghezze
   // intermedie.
   await page.waitForTimeout(2000);

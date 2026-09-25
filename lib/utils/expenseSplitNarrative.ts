@@ -61,15 +61,36 @@ function joinNames(names: string[]): string {
 // ─── The basis ────────────────────────────────────────────────────────────────
 
 /**
- * Why there is no split, in words the reader can act on. Each branch names the screen that fixes
- * it, because a reading the user cannot place is one they will not trust.
+ * Labor income the shares could not use, because nobody the settings still know is named on it.
+ * Empty when there is none.
+ *
+ * The spending side has always declared its orphans; until 2026-09-21 the income side — the one
+ * that decides the percentages — declared nothing, so a split computed on part of the month's
+ * salaries was printed with the confidence of one computed on all of them.
+ */
+function unattributedSalaryClause(unattributedSalary: number): Narrative {
+  if (unattributedSalary <= 0) return [];
+  return [
+    prose(' Altri '),
+    figure(euro(unattributedSalary)),
+    prose(' di reddito da lavoro non sono intestati a nessuno e non entrano nelle quote.'),
+  ];
+}
+
+/**
+ * Why there is no split — the EXPLANATION, which belongs to the page verdict.
+ *
+ * Its imperative twin is `describeBasisRemedy`, which the Quota tile prints: the tile owns the
+ * absence, so it owns the instruction, and the two never say the same words in two places
+ * (DESIGN.md → **The One-Tile-One-Question Rule**).
  */
 export function describeMissingBasis(basis: Extract<SplitBasis, { kind: 'unavailable' }>): Narrative {
+  const tail = unattributedSalaryClause(basis.unattributedSalary);
   if (basis.reason === 'not-enough-members') {
-    return [prose('Per dividere le spese servono almeno due persone: aggiungile in Impostazioni → Preferenze → Famiglia.')];
+    return [prose('Per dividere le spese servono almeno due persone.'), ...tail];
   }
   if (basis.reason === 'no-labor-categories') {
-    return [prose('Nessuna categoria conta come reddito da lavoro, quindi non si sa quali entrate siano stipendi: scegliile in Impostazioni → Preferenze → Cashflow.')];
+    return [prose('Nessuna categoria conta come reddito da lavoro, quindi non si sa quali entrate siano stipendi.'), ...tail];
   }
   const names = joinNames(basis.missingNames);
   const plural = basis.missingNames.length > 1;
@@ -79,16 +100,41 @@ export function describeMissingBasis(basis: Extract<SplitBasis, { kind: 'unavail
         ? `In questo periodo non risultano stipendi di ${names}: finché mancano, le quote non si calcolano.`
         : `In questo periodo non risulta lo stipendio di ${names}: finché manca, le quote non si calcolano.`
     ),
+    ...tail,
   ];
 }
 
 /**
- * "60% Giuseppe · 40% Marcella, sugli stipendi del periodo: 2600 € e 1700 €." — the Quota tile's
- * reading. It states the base out loud, because a percentage whose origin is invisible is a
- * number the reader has to take on faith.
+ * What to DO about a missing basis, in the imperative — the Quota tile's reading, because that
+ * tile is the one that would have held the shares. Each branch names the exact screen: a reading
+ * that states an absence without a destination leaves the reader with nothing to do, and the
+ * branch a real household actually hits (`missing-salary`) was the one naming none.
+ */
+export function describeBasisRemedy(basis: Extract<SplitBasis, { kind: 'unavailable' }>): Narrative {
+  if (basis.reason === 'not-enough-members') {
+    return [prose('Aggiungi le persone che dividono le spese in Impostazioni → Preferenze → Famiglia.')];
+  }
+  if (basis.reason === 'no-labor-categories') {
+    return [prose('Scegli quali categorie sono reddito da lavoro in Impostazioni → Preferenze → Cashflow.')];
+  }
+  const names = joinNames(basis.missingNames);
+  const plural = basis.missingNames.length > 1;
+  return [
+    prose(
+      plural
+        ? `Registra gli stipendi di ${names} in Tracciamento e intestali a chi li ha ricevuti.`
+        : `Registra lo stipendio di ${names} in Tracciamento e intestaglielo.`
+    ),
+  ];
+}
+
+/**
+ * "Le quote vengono dagli stipendi del periodo: Giuseppe 2600 € (60%) e Marcella 1700 € (40%)."
+ * — the Quota tile's reading. It states the base out loud, because a percentage whose origin is
+ * invisible is a number the reader has to take on faith.
  */
 export function describeSplitBasis(basis: SplitBasis): Narrative {
-  if (basis.kind === 'unavailable') return describeMissingBasis(basis);
+  if (basis.kind === 'unavailable') return describeBasisRemedy(basis);
 
   const segments: Narrative = [prose('Le quote vengono dagli stipendi del periodo: ')];
   basis.members.forEach((entry, index) => {
@@ -101,7 +147,7 @@ export function describeSplitBasis(basis: SplitBasis): Narrative {
       prose(')')
     );
   });
-  segments.push(prose('.'));
+  segments.push(prose('.'), ...unattributedSalaryClause(basis.unattributedSalary));
   return segments;
 }
 
@@ -113,20 +159,42 @@ export interface SplitVerdictInput {
   now: Date;
 }
 
+/**
+ * Every judgement on this page reads the BOOKED residual, never the whole-period one: a month is
+ * called short only on money that has actually left the account. See `MemberBalance.remainingBooked`.
+ */
+function bookedResiduals(summary: ExpenseSplitSummary): number[] {
+  return summary.members
+    .map((member) => member.remainingBooked)
+    .filter((value): value is number => value !== null);
+}
+
+/** True when the period holds no spending at all — neither shared nor anybody's own. */
+function hasNothingToSplit(summary: ExpenseSplitSummary): boolean {
+  return summary.common.total <= 0 && summary.members.every((member) => member.personalSpending <= 0);
+}
+
 function resolveTone(summary: ExpenseSplitSummary): VerdictTone {
   if (summary.basis.kind === 'unavailable') return 'neutral';
-  const residuals = summary.members.map((member) => member.remaining).filter((value): value is number => value !== null);
+  const residuals = bookedResiduals(summary);
   if (residuals.length === 0) return 'neutral';
   if (residuals.some((value) => value < 0)) return 'negative';
   return 'positive';
 }
 
 function resolveHeadline(summary: ExpenseSplitSummary, inPeriod: string, ongoing: boolean): string {
+  // A period with nothing in it is not a period whose shares failed: it has nothing to share.
+  // Until 2026-09-21 the headline said «le quote non si possono calcolare» over a sentence that
+  // said «non c'è nessuna spesa da dividere» — two different explanations of one empty screen,
+  // and the first of them sent the reader looking for data to fix.
+  if (hasNothingToSplit(summary)) {
+    return `${capitalise(inPeriod)} non c'è niente da dividere.`;
+  }
   if (summary.basis.kind === 'unavailable') {
     return `${capitalise(inPeriod)} le quote non si possono calcolare.`;
   }
   const shortNames = summary.members
-    .filter((member) => member.remaining !== null && member.remaining < 0)
+    .filter((member) => member.remainingBooked !== null && member.remainingBooked < 0)
     .map((member) => member.member.name);
   if (shortNames.length === summary.members.length) {
     return `${capitalise(inPeriod)} lo stipendio non ${ongoing ? 'basta' : 'è bastato'} a nessuno.`;
@@ -151,8 +219,8 @@ export function buildSplitVerdict({ summary, period, now }: SplitVerdictInput): 
   const headline = resolveHeadline(summary, subject.inPeriod, subject.ongoing);
   const opening = capitalise(subject.inPeriod);
 
-  if (summary.common.total <= 0 && summary.members.every((member) => member.personalSpending <= 0)) {
-    return { headline, tone, sentence: [prose(`${opening} non c'è nessuna spesa da dividere.`)] };
+  if (hasNothingToSplit(summary)) {
+    return { headline, tone, sentence: [prose(`${opening} non risulta nessuna spesa, né in comune né personale.`)] };
   }
 
   const sentence: Narrative = [
@@ -177,17 +245,23 @@ export function buildSplitVerdict({ summary, period, now }: SplitVerdictInput): 
   }
 
   sentence.push(...(scheduledSentence(summary.common.scheduled, describeScheduledHorizon(period, now)) ?? []));
+  sentence.push(...calendarClause(summary.members));
   return { headline, tone, sentence };
 }
 
-/** " A Giuseppe restano 754 € dei 2600 € di stipendio; a Marcella 436 € dei 1700 €." */
+/**
+ * " A Giuseppe restano 754 € dei 2600 € di stipendio; a Marcella 436 € dei 1700 €."
+ *
+ * On the BOOKED residual — what has already happened. Where the calendar takes it is
+ * `calendarClause`, a separate sentence, because the two are different facts.
+ */
 function remainingClause(members: MemberBalance[]): Narrative {
-  const withResidual = members.filter((member) => member.remaining !== null);
+  const withResidual = members.filter((member) => member.remainingBooked !== null);
   if (withResidual.length === 0) return [];
 
   const segments: Narrative = [prose(' ')];
   withResidual.forEach((member, index) => {
-    const remaining = member.remaining!;
+    const remaining = member.remainingBooked!;
     const short = remaining < 0;
     segments.push(
       prose(index === 0 ? `A ${member.member.name} ` : `; a ${member.member.name} `),
@@ -200,6 +274,34 @@ function remainingClause(members: MemberBalance[]): Narrative {
     } else {
       segments.push(prose(' dei '), figure(euro(member.salary)));
     }
+  });
+  segments.push(prose('.'));
+  return segments;
+}
+
+/**
+ * " Con quelle, a fine periodo a Giuseppe restano 1173 € e a Marcella mancano 83 €." — where the
+ * rows still in the calendar take each residual, once `scheduledSentence` has named them.
+ *
+ * Absent when nothing is scheduled, which is every closed period: then the booked residual IS the
+ * period's, and a second sentence repeating it would be a form.
+ */
+function calendarClause(members: MemberBalance[]): Narrative {
+  const moved = members.filter(
+    (member) => member.remaining !== null && member.remainingBooked !== null && member.remaining !== member.remainingBooked
+  );
+  if (moved.length === 0) return [];
+
+  const segments: Narrative = [prose(' Con quelle, a fine periodo ')];
+  moved.forEach((member, index) => {
+    const remaining = member.remaining!;
+    const short = remaining < 0;
+    if (index > 0) segments.push(prose(index === moved.length - 1 ? ' e ' : ', '));
+    segments.push(
+      prose(`a ${member.member.name} `),
+      prose(short ? 'mancano ' : 'restano '),
+      signed(euro(remaining), short ? 'negative' : 'positive')
+    );
   });
   segments.push(prose('.'));
   return segments;
@@ -234,7 +336,7 @@ export function describeCommonSpending(summary: ExpenseSplitSummary): Narrative 
  * — one person's tile, in the owner's own phrasing. This is the sentence the page exists for.
  */
 export function describeMemberBalance(balance: MemberBalance): Narrative {
-  if (balance.share === null || balance.commonShare === null || balance.remaining === null) {
+  if (balance.share === null || balance.commonShare === null || balance.remainingBooked === null) {
     const segments: Narrative = [
       prose('Spese personali '),
       figure(euro(balance.personalSpending)),
@@ -243,7 +345,7 @@ export function describeMemberBalance(balance: MemberBalance): Narrative {
     return segments;
   }
 
-  const short = balance.remaining < 0;
+  const short = balance.remainingBooked < 0;
   return [
     figure(euro(balance.commonShare)),
     prose(' di spese in comune ('),
@@ -253,6 +355,26 @@ export function describeMemberBalance(balance: MemberBalance): Narrative {
     prose(' di spese personali: dai '),
     figure(euro(balance.salary)),
     prose(' di stipendio '),
+    prose(short ? 'mancano ' : 'restano '),
+    signed(euro(balance.remainingBooked), short ? 'negative' : 'positive'),
+    prose('.'),
+  ];
+}
+
+/**
+ * "Con le spese ancora in calendario resta 1173 €." — under a person's figure, where the month
+ * takes their residual once what is only scheduled is paid.
+ *
+ * Null when nothing of theirs is scheduled, because then the figure above already is the whole
+ * period's. This is the clause that stops a deficit made entirely of unpaid bills from reading
+ * as money already gone (2026-09-21).
+ */
+export function describeMemberCalendar(balance: MemberBalance): Narrative | null {
+  if (balance.remaining === null || balance.remainingBooked === null) return null;
+  if (balance.remaining === balance.remainingBooked) return null;
+  const short = balance.remaining < 0;
+  return [
+    prose('Con le spese ancora in calendario '),
     prose(short ? 'mancano ' : 'restano '),
     signed(euro(balance.remaining), short ? 'negative' : 'positive'),
     prose('.'),

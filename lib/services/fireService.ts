@@ -3,12 +3,14 @@ import {
   CoastFireTaxBracket,
   MonthlySnapshot,
   FIREProjectionScenarios,
+  FIREScenarioParams,
   FIREProjectionYearData,
   FIREProjectionResult,
 } from '@/types/assets';
 import { Expense } from '@/types/expenses';
 import { MONTH_NAMES } from '@/lib/constants/months';
 import { getItalyMonth, getItalyMonthYear, getItalyYear } from '@/lib/utils/dateHelpers';
+import { resolveGainShare, resolveTaxMultiplier } from '@/lib/utils/withdrawalTax';
 import { calculateTotalExpenses, calculateTotalIncome, getExpensesByDateRange } from './expenseService';
 import { getUserSnapshots } from './snapshotService';
 
@@ -1012,7 +1014,11 @@ export function buildCoastFIRERetirementNeeds(
   pensions: CoastFirePensionInput[],
   taxBrackets: CoastFireTaxBracket[],
   currentDate: Date,
-  capitalInflows?: CapitalInflow[]
+  capitalInflows?: CapitalInflow[],
+  // The gross-up every euro the PORTFOLIO funds carries (tax on withdrawals,
+  // `lib/utils/withdrawalTax.ts`): applied to expenses − pensions, never to the pensions
+  // themselves, which arrive net. 1 leaves the walk byte-identical.
+  portfolioNeedMultiplier = 1
 ): CoastFIRERetirementNeeds {
   const normalizedPensions = normalizeCoastFirePensions(pensions);
   const normalizedTaxBrackets = normalizeCoastFireTaxBrackets(taxBrackets);
@@ -1048,8 +1054,9 @@ export function buildCoastFIRERetirementNeeds(
     (sum, pension) => sum + pension.netAnnualRealAtStart,
     0
   );
-  const annualPortfolioNeedAtRetirement = Math.max(annualExpenses - totalNetAnnualPensionAtRetirement, 0);
-  const annualPortfolioNeedAtSteadyState = Math.max(annualExpenses - totalNetAnnualPensionAtSteadyState, 0);
+  const multiplier = Number.isFinite(portfolioNeedMultiplier) && portfolioNeedMultiplier > 0 ? portfolioNeedMultiplier : 1;
+  const annualPortfolioNeedAtRetirement = Math.max(annualExpenses - totalNetAnnualPensionAtRetirement, 0) * multiplier;
+  const annualPortfolioNeedAtSteadyState = Math.max(annualExpenses - totalNetAnnualPensionAtSteadyState, 0) * multiplier;
   const withdrawalRateDecimal = withdrawalRate / 100;
   const steadyStatePortfolioNeed =
     withdrawalRateDecimal > 0 ? annualPortfolioNeedAtSteadyState / withdrawalRateDecimal : 0;
@@ -1094,7 +1101,7 @@ export function buildCoastFIRERetirementNeeds(
         return pensionStartDate ? pensionStartDate <= bridgeDate : pension.startAge <= age;
       })
       .reduce((sum, pension) => sum + pension.netAnnualRealAtStart, 0);
-    const annualPortfolioNeedAtAge = Math.max(annualExpenses - activePensionsAtAge, 0);
+    const annualPortfolioNeedAtAge = Math.max(annualExpenses - activePensionsAtAge, 0) * multiplier;
 
     retirementCapitalRequired =
       yearlyGrowthFactor > 0
@@ -1140,9 +1147,14 @@ export function calculateCoastFIREMetrics(
   currentDate: Date = new Date(),
   // Bridge model: locked pension funds re-entering the walk at their unlock year. When used,
   // `currentNetWorth` must be the FREE capital (fund already subtracted by the caller).
-  capitalInflowsToday?: PensionCapitalInflowToday[]
+  capitalInflowsToday?: PensionCapitalInflowToday[],
+  // The tax on withdrawals (2026-09-24): the gross-up of the portfolio-funded need at the target
+  // age, read on the capital grown there with no new contributions (a coaster adds no basis).
+  withdrawalTax?: { basisToday: number; rate: number }
 ): CoastFIREMetrics {
   const yearsToRetirement = Math.max(retirementAge - currentAge, 0);
+  const capitalAtRetirement = growValueByRealReturn(currentNetWorth, realReturnRate, yearsToRetirement);
+  const portfolioNeedMultiplier = withdrawalTax ? resolveTaxMultiplier(resolveGainShare(capitalAtRetirement, withdrawalTax.basisToday), withdrawalTax.rate) : 1;
   const retirementNeeds = buildCoastFIRERetirementNeeds(
     annualExpenses,
     withdrawalRate,
@@ -1153,7 +1165,8 @@ export function calculateCoastFIREMetrics(
     pensions,
     taxBrackets,
     currentDate,
-    toRetirementWalkInflows(capitalInflowsToday, yearsToRetirement, realReturnRate)
+    toRetirementWalkInflows(capitalInflowsToday, yearsToRetirement, realReturnRate),
+    portfolioNeedMultiplier
   );
   const fireNumberAtRetirement = retirementNeeds.retirementCapitalRequired;
   const coastFireNumberToday =
@@ -1270,7 +1283,10 @@ export function calculateCoastFIREProjection(
   currentDate: Date = new Date(),
   // Bridge model: locked pension funds (today's value). Each scenario grows them with its own real
   // return; `currentNetWorth` must then be the FREE capital, fund already subtracted.
-  capitalInflowsToday?: PensionCapitalInflowToday[]
+  capitalInflowsToday?: PensionCapitalInflowToday[],
+  // The tax on withdrawals (2026-09-24), the Calcolatore's: each scenario reads the gain share
+  // on the capital grown to the target at its own real return (a coaster adds no basis).
+  withdrawalTax?: { basisToday: number; rate: number }
 ): CoastFIREProjectionResult {
   const currentYear = getItalyYear();
   const bearRealReturn = scenarios.bear.growthRate - scenarios.bear.inflationRate;
@@ -1279,6 +1295,10 @@ export function calculateCoastFIREProjection(
   const normalizedPensions = normalizeCoastFirePensions(pensions);
   const normalizedTaxBrackets = normalizeCoastFireTaxBrackets(taxBrackets);
   const yearsToRetirement = Math.max(retirementAge - currentAge, 0);
+  const multiplierFor = (realReturnRate: number): number =>
+    withdrawalTax
+      ? resolveTaxMultiplier(resolveGainShare(growValueByRealReturn(currentNetWorth, realReturnRate, yearsToRetirement), withdrawalTax.basisToday), withdrawalTax.rate)
+      : 1;
 
   const bearNeeds = buildCoastFIRERetirementNeeds(
     annualExpenses,
@@ -1290,7 +1310,8 @@ export function calculateCoastFIREProjection(
     normalizedPensions,
     normalizedTaxBrackets,
     currentDate,
-    toRetirementWalkInflows(capitalInflowsToday, yearsToRetirement, bearRealReturn)
+    toRetirementWalkInflows(capitalInflowsToday, yearsToRetirement, bearRealReturn),
+    multiplierFor(bearRealReturn)
   );
   const baseNeeds = buildCoastFIRERetirementNeeds(
     annualExpenses,
@@ -1302,7 +1323,8 @@ export function calculateCoastFIREProjection(
     normalizedPensions,
     normalizedTaxBrackets,
     currentDate,
-    toRetirementWalkInflows(capitalInflowsToday, yearsToRetirement, baseRealReturn)
+    toRetirementWalkInflows(capitalInflowsToday, yearsToRetirement, baseRealReturn),
+    multiplierFor(baseRealReturn)
   );
   const bullNeeds = buildCoastFIRERetirementNeeds(
     annualExpenses,
@@ -1314,7 +1336,8 @@ export function calculateCoastFIREProjection(
     normalizedPensions,
     normalizedTaxBrackets,
     currentDate,
-    toRetirementWalkInflows(capitalInflowsToday, yearsToRetirement, bullRealReturn)
+    toRetirementWalkInflows(capitalInflowsToday, yearsToRetirement, bullRealReturn),
+    multiplierFor(bullRealReturn)
   );
 
   const result = {
@@ -1333,7 +1356,8 @@ export function calculateCoastFIREProjection(
         normalizedPensions,
         normalizedTaxBrackets,
         currentDate,
-        capitalInflowsToday
+        capitalInflowsToday,
+        withdrawalTax
       ),
       pensionBreakdown: bearNeeds.pensionBreakdown,
     },
@@ -1352,7 +1376,8 @@ export function calculateCoastFIREProjection(
         normalizedPensions,
         normalizedTaxBrackets,
         currentDate,
-        capitalInflowsToday
+        capitalInflowsToday,
+        withdrawalTax
       ),
       pensionBreakdown: baseNeeds.pensionBreakdown,
     },
@@ -1371,7 +1396,8 @@ export function calculateCoastFIREProjection(
         normalizedPensions,
         normalizedTaxBrackets,
         currentDate,
-        capitalInflowsToday
+        capitalInflowsToday,
+        withdrawalTax
       ),
       pensionBreakdown: bullNeeds.pensionBreakdown,
     },
@@ -1440,6 +1466,8 @@ export function calculateCoastFIREProjection(
  *
  * All 3 scenarios' FIRE Numbers are tracked and displayed in chart/table.
  * Savings stop for a scenario once it reaches FIRE (retirement = no more income).
+ * `*YearsToFIRE` is 0 when the starting portfolio already clears the target: the walk tests
+ * year 0 before stepping, so «reached today» never reads as «in one year».
  *
  * `pensionBridge`: the locked pension fund is a SEPARATE compartment that compounds at
  * each scenario's growth rate and merges into the portfolio at the unlock year (a visible step
@@ -1453,6 +1481,110 @@ export interface FireProjectionPensionBridge {
   yearsToUnlock: number;
 }
 
+/**
+ * What makes a FIRE number honest (2026-09-24): the state pensions the Coast tab already saves,
+ * placed by the user's age, and the tax the withdrawals will pay. Both are optional and both are
+ * DECLARED when absent — no age places no pension, no cost basis estimates no tax — never
+ * silently assumed (The Narrative Honesty Rule).
+ */
+export interface FireHonestInputs {
+  /** The user's age today; without it the pensions cannot be dated and are left out, said so. */
+  userAge?: number;
+  /** As saved in Coast FIRE › Ipotesi (gross monthly, months per year, start date or age). */
+  pensions: CoastFirePensionInput[];
+  taxBrackets: CoastFireTaxBracket[];
+  /** Today's basis and rate of the portfolio the plan withdraws from; absent = tax not modelled. */
+  withdrawalTax?: { basisToday: number; rate: number };
+  /** The reference date the pensions are placed from. */
+  now: Date;
+}
+
+export interface FireRequirementInput {
+  /** The expenses of the year the requirement is read at, in that year's euro. */
+  annualExpenses: number;
+  withdrawalRate: number;
+  scenario: FIREScenarioParams;
+  /** Years from today the requirement is read at (0 = today). */
+  yearsElapsed: number;
+  honest?: FireHonestInputs;
+  /** The locked fund at that year: its value and the years still to its unlock (≤ 0 = merged). */
+  bridge?: { compartmentValue: number; yearsToUnlock: number };
+  /** The share of the portfolio that is unrealised gain at that year (0..1); read only with `honest.withdrawalTax`. */
+  gainShare?: number;
+}
+
+export interface FireRequirement {
+  /** The capital the portfolio must hold at that year. */
+  requirement: number;
+  /** Expenses ÷ SWR, with nothing else in: the figure the caption compares against. */
+  standardRequirement: number;
+  /** The net state pension at steady state, in that year's euro (0 when none is considered). */
+  pensionNetAnnual: number;
+  /** The gross-up the portfolio-funded need carries (1 without tax). */
+  taxMultiplier: number;
+  pensionsConsidered: boolean;
+  /** The age the LATEST considered pension starts at; null when none is considered. */
+  pensionLatestStartAge: number | null;
+  pensionCount: number;
+}
+
+/**
+ * THE ONE RULE of the FIRE requirement: what the free capital must hold at a given year so
+ * that, retiring then, the expenses are covered — the pensions taken off from their start, the
+ * tax on withdrawals added on what the portfolio funds, the locked fund arriving at its unlock.
+ * It is the Coast walk (`buildCoastFIRERetirementNeeds`) run from that year as the retirement
+ * day: with no pension considered and no fund it is expenses × gross-up ÷ SWR, and with the fund
+ * alone it is `calculateFireBridgeNumber`'s figure — one formula, never a second one per case.
+ */
+export function resolveFireRequirement(input: FireRequirementInput): FireRequirement {
+  const wrDecimal = input.withdrawalRate / 100;
+  const standardRequirement = wrDecimal > 0 ? input.annualExpenses / wrDecimal : 0;
+  const realReturn = input.scenario.growthRate - input.scenario.inflationRate;
+  const tax = input.honest?.withdrawalTax;
+  const taxMultiplier = tax ? resolveTaxMultiplier(input.gainShare ?? 0, tax.rate) : 1;
+  const pensions = input.honest ? normalizeCoastFirePensions(input.honest.pensions) : [];
+  const age = input.honest?.userAge;
+  const pensionsConsidered = pensions.length > 0 && age !== undefined && Number.isFinite(age);
+
+  const inflows: CapitalInflow[] = [];
+  if (input.bridge && input.bridge.compartmentValue > 0 && input.bridge.yearsToUnlock > 0) {
+    const yearsToUnlock = Math.round(input.bridge.yearsToUnlock);
+    if (yearsToUnlock > 0) {
+      inflows.push({ yearsFromRetirement: yearsToUnlock, amount: input.bridge.compartmentValue * Math.pow(1 + realReturn / 100, yearsToUnlock) });
+    }
+  }
+
+  const bare = { standardRequirement, pensionNetAnnual: 0, taxMultiplier, pensionsConsidered, pensionLatestStartAge: null, pensionCount: 0 };
+  if (wrDecimal <= 0) return { requirement: 0, ...bare };
+  if (!pensionsConsidered && inflows.length === 0) return { requirement: standardRequirement * taxMultiplier, ...bare };
+
+  const ageAtYear = pensionsConsidered ? (age as number) + input.yearsElapsed : 0;
+  const dateAtYear = input.honest ? addYearsToDate(input.honest.now, input.yearsElapsed) : FIRE_BRIDGE_REFERENCE_DATE;
+  const needs = buildCoastFIRERetirementNeeds(
+    input.annualExpenses,
+    input.withdrawalRate,
+    ageAtYear,
+    ageAtYear,
+    realReturn,
+    input.scenario.inflationRate,
+    pensionsConsidered ? pensions : [],
+    input.honest ? normalizeCoastFireTaxBrackets(input.honest.taxBrackets) : DEFAULT_COAST_FIRE_TAX_BRACKETS,
+    dateAtYear,
+    inflows,
+    taxMultiplier
+  );
+  return {
+    requirement: needs.retirementCapitalRequired,
+    standardRequirement,
+    pensionNetAnnual: pensionsConsidered ? needs.totalNetAnnualPensionAtSteadyState : 0,
+    taxMultiplier,
+    pensionsConsidered,
+    // The walk reports the start as an age at the year read; back to today's age scale.
+    pensionLatestStartAge: pensionsConsidered ? needs.latestPensionStartAge - input.yearsElapsed : null,
+    pensionCount: pensionsConsidered ? pensions.length : 0,
+  };
+}
+
 export function calculateFIREProjection(
   initialNetWorth: number,
   annualExpenses: number,
@@ -1460,7 +1592,9 @@ export function calculateFIREProjection(
   withdrawalRate: number,
   scenarios: FIREProjectionScenarios,
   maxYears: number = 50,
-  pensionBridge?: FireProjectionPensionBridge
+  pensionBridge?: FireProjectionPensionBridge,
+  // The pensions and the withdrawal tax (2026-09-24): absent → the walk of before, byte-identical.
+  honest?: FireHonestInputs
 ): FIREProjectionResult {
   const wrDecimal = withdrawalRate / 100;
   const currentYear = getItalyYear();
@@ -1484,27 +1618,45 @@ export function calculateFIREProjection(
   let basePension = bridgeActive ? pensionBridge.valueToday : 0;
   let bullPension = bridgeActive ? pensionBridge.valueToday : 0;
 
-  // Free capital must clear the bridge requirement for that year: cover expenses until unlock
-  // and land there with max(0, standard − compartment at unlock). Real terms anchored at the
-  // current year's (inflated) expenses and compartment value.
-  const isBridgeFireReached = (
-    netWorth: number,
+  // The cost basis behind each scenario's portfolio, for the tax on withdrawals: today's basis,
+  // plus every euro saved (a contribution is basis) and the fund when it merges. The value moves
+  // with the market, the basis does not — that is the gain share the gross-up reads.
+  const taxModelled = honest?.withdrawalTax !== undefined;
+  const basisToday = honest?.withdrawalTax?.basisToday ?? 0;
+  let bearBasis = basisToday;
+  let baseBasis = basisToday;
+  let bullBasis = basisToday;
+
+  // ONE requirement per scenario per year (`resolveFireRequirement`): the bridge while the
+  // unlock is ahead, the pensions from their start, the tax on what the portfolio funds.
+  const requirementOf = (
+    scenario: FIREScenarioParams,
     inflatedExpenses: number,
     compartmentValue: number,
     year: number,
-    scenario: { growthRate: number; inflationRate: number }
-  ): boolean => {
-    const realReturn = scenario.growthRate - scenario.inflationRate;
-    const { bridgeFireNumber } = calculateFireBridgeNumber({
+    netWorth: number,
+    basis: number
+  ): number =>
+    resolveFireRequirement({
       annualExpenses: inflatedExpenses,
       withdrawalRate,
-      realReturn,
-      yearsToUnlock: unlockYear - year,
-      pensionValueToday: compartmentValue,
-      pensionGrowthRate: realReturn,
-    });
-    return netWorth >= bridgeFireNumber;
-  };
+      scenario,
+      yearsElapsed: year,
+      honest,
+      bridge: bridgeActive && year < unlockYear ? { compartmentValue, yearsToUnlock: unlockYear - year } : undefined,
+      gainShare: taxModelled ? resolveGainShare(netWorth, basis) : 0,
+    }).requirement;
+
+  // Year 0 is a year too: a portfolio already past its target today is FIRE NOW, not «in one
+  // year». Until 2026-09-22 the walk tested the condition only from year 1, so the Scenari tile
+  // printed «tra 1 anno» three times under a verdict that said «Sei già FIRE.». The test is the
+  // same one the loop runs, on the starting values; a scenario reached here receives no savings
+  // from year 1 on, like any other reached scenario.
+  if (wrDecimal > 0) {
+    if (initialNetWorth >= requirementOf(scenarios.bear, annualExpenses, bearPension, 0, initialNetWorth, bearBasis)) bearYearsToFIRE = 0;
+    if (initialNetWorth >= requirementOf(scenarios.base, annualExpenses, basePension, 0, initialNetWorth, baseBasis)) baseYearsToFIRE = 0;
+    if (initialNetWorth >= requirementOf(scenarios.bull, annualExpenses, bullPension, 0, initialNetWorth, bullBasis)) bullYearsToFIRE = 0;
+  }
 
   for (let year = 1; year <= maxYears; year++) {
     bearNW *= (1 + scenarios.bear.growthRate / 100);
@@ -1515,36 +1667,43 @@ export function calculateFIREProjection(
       bearPension *= (1 + scenarios.bear.growthRate / 100);
       basePension *= (1 + scenarios.base.growthRate / 100);
       bullPension *= (1 + scenarios.bull.growthRate / 100);
-      // The step: at the unlock year the compartment merges into the portfolio.
+      // The step: at the unlock year the compartment merges into the portfolio — as basis too.
       if (year === unlockYear) {
         bearNW += bearPension;
         baseNW += basePension;
         bullNW += bullPension;
+        bearBasis += bearPension;
+        baseBasis += basePension;
+        bullBasis += bullPension;
       }
     }
 
-    if (bearYearsToFIRE === null) bearNW += annualSavings;
-    if (baseYearsToFIRE === null) baseNW += annualSavings;
-    if (bullYearsToFIRE === null) bullNW += annualSavings;
+    if (bearYearsToFIRE === null) {
+      bearNW += annualSavings;
+      bearBasis += annualSavings;
+    }
+    if (baseYearsToFIRE === null) {
+      baseNW += annualSavings;
+      baseBasis += annualSavings;
+    }
+    if (bullYearsToFIRE === null) {
+      bullNW += annualSavings;
+      bullBasis += annualSavings;
+    }
 
     bearExpenses *= (1 + scenarios.bear.inflationRate / 100);
     baseExpenses *= (1 + scenarios.base.inflationRate / 100);
     bullExpenses *= (1 + scenarios.bull.inflationRate / 100);
 
-    const bearFireNumber = wrDecimal > 0 ? bearExpenses / wrDecimal : 0;
-    const baseFireNumber = wrDecimal > 0 ? baseExpenses / wrDecimal : 0;
-    const bullFireNumber = wrDecimal > 0 ? bullExpenses / wrDecimal : 0;
+    // The requirement of the year IS the FIRE number the row carries (the chart's dashed line):
+    // until 2026-09-24 the row printed expenses ÷ SWR while the test ran on the bridge figure.
+    const bearFireNumber = wrDecimal > 0 ? requirementOf(scenarios.bear, bearExpenses, bearPension, year, bearNW, bearBasis) : 0;
+    const baseFireNumber = wrDecimal > 0 ? requirementOf(scenarios.base, baseExpenses, basePension, year, baseNW, baseBasis) : 0;
+    const bullFireNumber = wrDecimal > 0 ? requirementOf(scenarios.bull, bullExpenses, bullPension, year, bullNW, bullBasis) : 0;
 
-    const useBridgeCheck = bridgeActive && year < unlockYear && wrDecimal > 0;
-    const bearReached = useBridgeCheck
-      ? isBridgeFireReached(bearNW, bearExpenses, bearPension, year, scenarios.bear)
-      : bearNW >= bearFireNumber;
-    const baseReached = useBridgeCheck
-      ? isBridgeFireReached(baseNW, baseExpenses, basePension, year, scenarios.base)
-      : baseNW >= baseFireNumber;
-    const bullReached = useBridgeCheck
-      ? isBridgeFireReached(bullNW, bullExpenses, bullPension, year, scenarios.bull)
-      : bullNW >= bullFireNumber;
+    const bearReached = wrDecimal > 0 && bearNW >= bearFireNumber;
+    const baseReached = wrDecimal > 0 && baseNW >= baseFireNumber;
+    const bullReached = wrDecimal > 0 && bullNW >= bullFireNumber;
 
     if (bearReached && bearYearsToFIRE === null) bearYearsToFIRE = year;
     if (baseReached && baseYearsToFIRE === null) baseYearsToFIRE = year;
@@ -1582,6 +1741,17 @@ export function calculateFIREProjection(
     initialExpenses: annualExpenses,
     scenarios,
   };
+}
+
+/**
+ * The FIRE targets the Ventaglio aims its paths at, year by year: today's requirement, then
+ * the base scenario's requirement of every projected year — the SAME figures the walk tested
+ * (`baseFireNumber` is the honest requirement since 2026-09-24: bridge, pensions and tax in).
+ * Until then the fan aimed at expenses ÷ SWR while the verdict named the bridge number, and on
+ * the owner's mirror that read «meno di metà dei percorsi entro il 2066» under «FIRE nel 2049».
+ */
+export function resolveFanFireTargets(todayRequirement: number, projection: FIREProjectionResult): number[] {
+  return [todayRequirement, ...projection.yearlyData.map((row) => row.baseFireNumber)];
 }
 
 export function calculateFIRESensitivityMatrix(

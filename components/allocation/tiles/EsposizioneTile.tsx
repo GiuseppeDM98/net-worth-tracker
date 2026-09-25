@@ -144,7 +144,9 @@ export function EsposizioneTile({ userId, className }: EsposizioneTileProps) {
   const isLoading = !exposure && !isError;
   const isEmpty = !!exposure && exposure.analyzedAssets === 0;
 
-  const reading = useMemo(() => (exposure ? describeExposure(summarizeExposureHighlights(exposure)) : null), [exposure]);
+  // The reading follows the VIEW: opening on the heaviest holding while the list ranks issuers
+  // answered a question nobody asked — the only reading on the page that ignored its own state.
+  const reading = useMemo(() => (exposure ? describeExposure(summarizeExposureHighlights(exposure), view) : null), [exposure, view]);
   const exposureView = useMemo(() => (exposure ? summarizeExposure(exposure, view, VISIBLE_ROWS) : null), [exposure, view]);
   const rows = useMemo<RankedRow[]>(
     () =>
@@ -200,7 +202,7 @@ export function EsposizioneTile({ userId, className }: EsposizioneTileProps) {
       {isError && (
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5" role="alert">
           <p className="text-[13px] leading-[1.45] text-destructive">Errore nel caricamento dell&apos;esposizione.</p>
-          <Button type="button" variant="outline" className="h-11 px-2.5 text-[11px] desktop:h-7" disabled={isFetching} onClick={() => refetch()}>
+          <Button type="button" variant="outline" className="h-11 px-2.5 text-[11px] desktop:h-8" disabled={isFetching} onClick={() => refetch()}>
             Riprova
           </Button>
         </div>
@@ -238,7 +240,7 @@ export function EsposizioneTile({ userId, className }: EsposizioneTileProps) {
         <Button
           type="button"
           variant="ghost"
-          className="h-11 shrink-0 px-2 text-[11px] desktop:h-7"
+          className="h-11 shrink-0 px-2 text-[11px] desktop:h-8"
           aria-label="Aggiorna l'esposizione"
           disabled={isFetching}
           onClick={() => refresh()}

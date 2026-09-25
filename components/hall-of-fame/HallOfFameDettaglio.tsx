@@ -16,7 +16,7 @@
  * words from `hallOfFameNarrative.ts`, so no figure can disagree with the grid above.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import type { HallOfFameNote } from '@/types/hall-of-fame';
 import {
@@ -26,7 +26,7 @@ import {
   type RecordCategory,
   type RecordPeriod,
 } from '@/lib/utils/hallOfFameSummary';
-import { describeFullRanking } from '@/lib/utils/hallOfFameNarrative';
+import { describeFullRanking, describePartialYearChip } from '@/lib/utils/hallOfFameNarrative';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { formatPercentage } from '@/lib/services/chartService';
 import { signTextClass } from '@/lib/utils/metricColors';
@@ -34,12 +34,14 @@ import { cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { SegmentedPill } from '@/components/ui/segmented-pill';
 import { Tile, TILE_CELL_CLASS, TILE_EYEBROW_CLASS, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
-import { NoteTrigger } from '@/components/hall-of-fame/NoteTrigger';
+import { TileMethodNote } from '@/components/ui/tile-method-note';
+import { NoteTrigger, type NotePrefill } from '@/components/hall-of-fame/NoteTrigger';
 
 interface HallOfFameDettaglioProps {
   summary: HallOfFameSummary;
   notes: HallOfFameNote[];
   onNoteClick: (note: HallOfFameNote, trigger: HTMLElement | null) => void;
+  onAddNote: (prefill: NotePrefill, trigger: HTMLElement | null) => void;
 }
 
 const PERIOD_OPTIONS: ReadonlyArray<{ value: RecordPeriod; label: string }> = [
@@ -64,9 +66,17 @@ const VALUE_HEADER: Record<RecordCategory, string> = {
   savings: 'Risparmio',
 };
 
+/**
+ * The two pills pick a VALUE the tile reads, and no `tabpanel` exists for them: `radio`
+ * semantics (AGENTS.md → Accessibility). Options keep the tile's 12px, at the dense-list floor
+ * of 32px on a pointer (they measured 25px with `py-1`, 2026-09-24) and 44px below `desktop:`.
+ */
+const PILL_CLASS =
+  '[&>button]:min-h-8 [&>button]:text-[12px] max-desktop:[&>button]:min-h-11 max-desktop:[&>button]:text-[13px]';
+
 const MINUS = '−';
 
-export function HallOfFameDettaglio({ summary, notes, onNoteClick }: HallOfFameDettaglioProps) {
+export function HallOfFameDettaglio({ summary, notes, onNoteClick, onAddNote }: HallOfFameDettaglioProps) {
   const [open, setOpen] = useState(false);
   const [period, setPeriod] = useState<RecordPeriod>('monthly');
   const [category, setCategory] = useState<RecordCategory>('growth');
@@ -80,15 +90,32 @@ export function HallOfFameDettaglio({ summary, notes, onNoteClick }: HallOfFameD
   const signedPercentage = category === 'growth' || category === 'decline';
   // Only a net-worth ranking prints the base it was measured against.
   const showBase = category === 'growth' || category === 'decline';
+  const showPercentage = !!board && board.rows.some((row) => row.percentage !== null);
+
+  // Whether the table actually scrolls inside its strip: only then the right edge fades, so
+  // the columns cut off at 390 («Variazione», «Patrimonio prima», «Nota») read as continuing
+  // instead of as missing. Measured, never assumed (AGENTS.md → the Strumenti precedent).
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+  const [tableScrolls, setTableScrolls] = useState(false);
+  useEffect(() => {
+    const measure = () => {
+      const el = scrollerRef.current;
+      setTableScrolls(!!el && el.scrollWidth > el.clientWidth + 1);
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [open, period, category, showBase, showPercentage]);
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger
-        className="flex w-full items-center justify-between gap-3 border-t border-border/40 py-3 text-left"
-        aria-label="Dettaglio"
-      >
+      {/* No `aria-label`: the name is the visible text, contents included — a one-word label hid from a
+          screen reader the sentence a sighted reader uses to decide whether to open it (WCAG 2.5.3). */}
+      <CollapsibleTrigger className="flex min-h-11 w-full items-center justify-between gap-3 rounded-sm border-t border-border/40 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <span className={TILE_EYEBROW_CLASS}>Dettaglio</span>
+          {/* A flex item drops a leading space on screen, but the accessible name keeps it. */}
+          <span className="sr-only">: </span>
           <span className="text-[13px] text-muted-foreground">
             La classifica completa — 20 mesi e 10 anni, per crescita, calo, entrate, spese e risparmio
           </span>
@@ -117,7 +144,8 @@ export function HallOfFameDettaglio({ summary, notes, onNoteClick }: HallOfFameD
                       onChange={setPeriod}
                       layoutId="hof-detail-period"
                       ariaLabel="Periodo della classifica"
-                      className="[&>button]:text-[12px] [&>button]:py-1 max-desktop:[&>button]:min-h-11 max-desktop:[&>button]:text-[13px]"
+                      semantics="radio"
+                      className={PILL_CLASS}
                     />
                   </div>
                   <div className="max-w-full overflow-x-auto max-desktop:-mx-5 max-desktop:px-5">
@@ -127,7 +155,8 @@ export function HallOfFameDettaglio({ summary, notes, onNoteClick }: HallOfFameD
                       onChange={setCategory}
                       layoutId="hof-detail-category"
                       ariaLabel="Categoria della classifica"
-                      className="[&>button]:text-[12px] [&>button]:py-1 max-desktop:[&>button]:min-h-11 max-desktop:[&>button]:text-[13px]"
+                      semantics="radio"
+                      className={PILL_CLASS}
                     />
                   </div>
                 </div>
@@ -135,16 +164,17 @@ export function HallOfFameDettaglio({ summary, notes, onNoteClick }: HallOfFameD
               reading={reading}
               ariaLabel="Classifica completa"
             >
-              {!board || board.total === 0 ? (
-                <p className="mt-3 text-[13px] text-muted-foreground">
-                  {board
-                    ? 'Nessun periodo è entrato in questa classifica.'
-                    : 'Questa classifica arriva con il prossimo aggiornamento dei record.'}
-                </p>
-              ) : (
+              {/* An absence is the reading's ONE sentence: nothing repeats it in the body. */}
+              {board && board.total > 0 && (
                 /* The table scrolls inside its own wrapper, never the page; the -mx/px pair lets
-                   the scroll reach the tile's edge. */
-                <div className="-mx-5 mt-3 overflow-x-auto px-5">
+                   the scroll reach the tile's edge, and the fade says the columns go on. */
+                <div
+                  ref={scrollerRef}
+                  className={cn(
+                    '-mx-5 mt-3 overflow-x-auto px-5',
+                    tableScrolls && '[mask-image:linear-gradient(to_right,black_calc(100%-40px),transparent)]',
+                  )}
+                >
                   <table className="w-full min-w-[520px] border-collapse">
                     <thead>
                       <tr>
@@ -157,7 +187,7 @@ export function HallOfFameDettaglio({ summary, notes, onNoteClick }: HallOfFameD
                         <th scope="col" className={cn(TILE_SUB_EYEBROW_CLASS, 'w-[130px] pb-2 text-right')}>
                           {VALUE_HEADER[category]}
                         </th>
-                        {board.rows.some((row) => row.percentage !== null) && (
+                        {showPercentage && (
                           <th scope="col" className={cn(TILE_SUB_EYEBROW_CLASS, 'w-[100px] pb-2 text-right')}>
                             {category === 'savings' ? 'Quota' : 'Variazione'}
                           </th>
@@ -173,69 +203,82 @@ export function HallOfFameDettaglio({ summary, notes, onNoteClick }: HallOfFameD
                       </tr>
                     </thead>
                     <tbody>
-                      {board.rows.map((row, index) => (
-                        <tr key={row.key} className="group border-t border-border">
-                          <th
-                            scope="row"
-                            className="py-[9px] text-left font-mono text-[13px] font-normal tabular-nums text-muted-foreground"
-                          >
-                            {index + 1}
-                          </th>
-                          <td className="py-[9px] text-[13px] text-foreground">
-                            <span className="flex items-center gap-2">
-                              {row.longLabel}
-                              {row.isCurrent && <span className={TILE_SUB_EYEBROW_CLASS}>ora</span>}
-                            </span>
-                          </td>
-                          <td
-                            className={cn(
-                              'py-[9px] text-right font-mono text-[13px] tabular-nums',
-                              signedValue ? signTextClass(row.value) : 'text-foreground',
-                            )}
-                          >
-                            {signedValue && (row.value >= 0 ? '+' : MINUS)}
-                            {cachedFormatCurrencyEUR(Math.abs(row.value), true)}
-                          </td>
-                          {board.rows.some((candidate) => candidate.percentage !== null) && (
-                            <td className="py-[9px] text-right font-mono text-[13px] tabular-nums text-muted-foreground">
-                              {row.percentage === null ? (
-                                '—'
-                              ) : (
-                                <>
-                                  {signedPercentage && (row.percentage >= 0 ? '+' : MINUS)}
-                                  {formatPercentage(Math.abs(row.percentage), 1)}
-                                </>
+                      {board.rows.map((row, index) => {
+                        const partial = describePartialYearChip(row);
+                        return (
+                          <tr key={row.key} className="group border-t border-border">
+                            <th
+                              scope="row"
+                              className="py-[9px] text-left font-mono text-[13px] font-normal tabular-nums text-muted-foreground"
+                            >
+                              {index + 1}
+                            </th>
+                            <td className="py-[9px] text-[13px] text-foreground">
+                              <span className="flex items-center gap-2 whitespace-nowrap">
+                                {row.longLabel}
+                                {row.isCurrent && <span className={TILE_SUB_EYEBROW_CLASS}>ora</span>}
+                                {partial && (
+                                  <span className={cn(TILE_SUB_EYEBROW_CLASS, 'normal-case tracking-normal')}>{partial}</span>
+                                )}
+                              </span>
+                            </td>
+                            <td
+                              className={cn(
+                                'py-[9px] text-right font-mono text-[13px] tabular-nums',
+                                signedValue ? signTextClass(row.value) : 'text-foreground',
                               )}
+                            >
+                              {signedValue && (row.value >= 0 ? '+' : MINUS)}
+                              {cachedFormatCurrencyEUR(Math.abs(row.value), true)}
                             </td>
-                          )}
-                          {showBase && (
-                            <td className="py-[9px] text-right font-mono text-[13px] tabular-nums text-muted-foreground">
-                              {row.base === null ? '—' : cachedFormatCurrencyEUR(row.base, true)}
+                            {showPercentage && (
+                              <td className="py-[9px] text-right font-mono text-[13px] tabular-nums text-muted-foreground">
+                                {row.percentage === null ? (
+                                  '—'
+                                ) : (
+                                  <>
+                                    {signedPercentage && (row.percentage >= 0 ? '+' : MINUS)}
+                                    {formatPercentage(Math.abs(row.percentage), 1)}
+                                  </>
+                                )}
+                              </td>
+                            )}
+                            {showBase && (
+                              <td className="py-[9px] text-right font-mono text-[13px] tabular-nums text-muted-foreground">
+                                {row.base === null ? '—' : cachedFormatCurrencyEUR(row.base, true)}
+                              </td>
+                            )}
+                            <td className="py-[5px] text-right">
+                              <span className="flex justify-end">
+                                <NoteTrigger
+                                  notes={notes}
+                                  sectionKey={board.sectionKey}
+                                  year={row.year}
+                                  month={row.month}
+                                  onNoteClick={onNoteClick}
+                                  onAddNote={onAddNote}
+                                  alwaysVisible
+                                />
+                              </span>
                             </td>
-                          )}
-                          <td className="py-[9px] text-right">
-                            <span className="flex justify-end">
-                              <NoteTrigger
-                                notes={notes}
-                                sectionKey={board.sectionKey}
-                                year={row.year}
-                                month={row.month}
-                                onNoteClick={onNoteClick}
-                                alwaysVisible
-                              />
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
               )}
 
-              <p className="mt-auto border-t border-border pt-3.5 text-[11px] leading-[1.5] text-muted-foreground">
-                Il primo mese dello storico non entra in nessuna classifica: non ha un mese prima con cui confrontarsi.
-                Un periodo chiuso esattamente dov{"'"}era non è né una crescita né un calo.
-              </p>
+              <TileMethodNote
+                summary="Il primo mese dello storico non entra in nessuna classifica."
+                subject="Classifica completa"
+              >
+                <span>
+                  Ogni record confronta un periodo con quello prima: il primo mese non ha un mese prima
+                  con cui confrontarsi, e un anno che parte a dicembre è misurato su quel solo mese.
+                </span>
+                <span>Un periodo chiuso esattamente dov{"'"}era non è né una crescita né un calo.</span>
+              </TileMethodNote>
             </Tile>
           </div>
         </div>

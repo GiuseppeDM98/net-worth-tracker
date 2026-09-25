@@ -10,6 +10,10 @@
  * 3. The «Tabella» view: every header names its column, the figures are mono, a plain row's
  *    delete arms in the row (no timer) and Escape disarms it — nothing is deleted — and the
  *    view is remembered across a reload.
+ * 4. The feed's detail is a modal of the vocabulary (2026-09-18, it was three raw `Drawer`s with
+ *    a confirm NESTED in the detail): title at 20px, the delete arms in the footer, the reading
+ *    gives way to the consequence in `text-destructive`, ONE dialog the whole time, and Escape
+ *    disarms without closing and without deleting.
  *
  * Runs on the base account (`desktop` project): the assertions are structural, never amounts.
  */
@@ -105,4 +109,45 @@ test('the Tabella view names its columns, sets its figures in mono, arms a delet
   await expect(page.getByRole('region', { name: 'Movimenti' })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole('region', { name: 'Movimenti' }).getByRole('tab', { name: 'Tabella' })).toHaveAttribute('aria-selected', 'true');
   await page.getByRole('region', { name: 'Movimenti' }).getByRole('tab', { name: 'Feed' }).click();
+});
+
+test('the feed’s detail arms its delete in the footer: one dialog, the consequence in the reading, Escape disarms', async ({ page }) => {
+  const movimenti = page.getByRole('region', { name: 'Movimenti' });
+  await movimenti.getByRole('tab', { name: 'Feed' }).click();
+  // The seed's plain row: no series, no account — so the consequence is the unlinked sentence.
+  const row = movimenti.getByRole('button', { name: /Alimentari/ }).filter({ visible: true }).first();
+  await expect(row).toBeVisible();
+  const rowsBefore = await movimenti.getByRole('button', { name: /Alimentari/ }).filter({ visible: true }).count();
+  await row.click();
+
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  expect(await dialog.getByRole('heading').first().evaluate((el) => getComputedStyle(el).fontSize)).toBe('20px');
+  const reading = dialog.getByRole('status').first();
+  await expect(reading).toHaveText(/^(Movimento del|In calendario per il) \d{1,2} \p{Ll}+ \d{4}/u);
+
+  await dialog.getByRole('button', { name: /^Elimina (?!.*o la sua serie$)/ }).click();
+  await expect(dialog.getByRole('button', { name: /^Premi di nuovo per eliminare / })).toBeVisible();
+  await expect(reading).toHaveText(/^Eliminando, /);
+  // The colour is read against a probe of the token, never a literal: the themes differ.
+  const [readingColour, destructive] = await reading.evaluate((el) => {
+    const probe = document.createElement('span');
+    probe.className = 'text-destructive';
+    document.body.appendChild(probe);
+    const colours = [getComputedStyle(el).color, getComputedStyle(probe).color];
+    probe.remove();
+    return colours;
+  });
+  expect(readingColour).toBe(destructive);
+  // The confirm is not a second surface: the raw drawer used to nest one here.
+  await expect(page.getByRole('dialog')).toHaveCount(1);
+
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('button', { name: /^Premi di nuovo per eliminare / })).toHaveCount(0);
+  await expect(reading).toHaveText(/^Eliminazione annullata\. /);
+
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(movimenti.getByRole('button', { name: /Alimentari/ }).filter({ visible: true })).toHaveCount(rowsBefore);
 });

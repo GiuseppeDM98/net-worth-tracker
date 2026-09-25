@@ -61,13 +61,16 @@ export function SottocategorieTile({ slices, excludedKeys, netTotal, aside, read
             <li key={slice.key}>
               <button
                 type="button"
-                aria-pressed={excluded}
+                // Pressed = the row COUNTS. It was `aria-pressed={excluded}`, so a screen reader
+                // heard «premuto» on the very rows the user had taken out of the total.
+                aria-pressed={!excluded}
                 onClick={() => onToggle(slice.key)}
                 className={cn(
                   'flex min-h-[44px] w-full items-center gap-3 py-2 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset desktop:-mx-2 desktop:w-[calc(100%+16px)] desktop:rounded-md desktop:px-2',
                   excluded && 'text-muted-foreground',
                 )}
               >
+                <span className="sr-only">Conta nel totale: </span>
                 <span className="flex w-[150px] shrink-0 flex-col desktop:w-[170px]">
                   <span className={cn('truncate text-[13px]', excluded ? 'line-through' : 'text-foreground')}>{slice.subCategoryName}</span>
                   {hasMultipleCategories && <span className="truncate text-[11px] text-muted-foreground">{slice.categoryName}</span>}

@@ -22,11 +22,13 @@ Companion documents — do not duplicate their content into this file:
 **This file is every rule that holds repo-wide** — conventions, data/state patterns, UI
 patterns, testing, workflow. Read it every session. **A rule about one area's behaviour lives
 in `doc/guide/<tema>.md`** (one file per page, tab, integration or subsystem — since 2026-09-06 also the
-cross-cutting subsystems: `stati`, `dialog`, `temi`, `account-condiviso-demo`, and Settings inside `impostazioni`):
+cross-cutting subsystems: `stati`, `dialog`, `temi`, `account-condiviso-demo`, Settings inside `impostazioni`, and
+since 2026-09-20 the test harness, `e2e-emulatori`, whose two stubs sit in section 5 under their old names):
 open the guide for the area you are about to touch. Each guide opens with a scope line and ends with its
 *Per-page blind spots* — behaviours that look like bugs and are not. Section 3 is the index:
-the 3–4 things to know before opening each guide, then the pointer. A session-closing lesson
-about a domain goes in that domain's guide, never here.
+the 3–4 things to know before opening each guide, then the pointer — a stub that grows past that is a guide
+leaking back (2026-09-20: ten had, up to 2700 characters each). A session-closing lesson about a domain goes in
+that domain's guide, never here.
 
 ## 1. Conventions
 
@@ -36,17 +38,15 @@ about a domain goes in that domain's guide, never here.
   `Assistente AI` and the standard metric names; `Current Yield` → `Rendimento Corrente`.
 - **`formatPercentage` exists TWICE and the two disagree**: the it-IT one is `Intl('it-IT')` (`40,71%`),
   `lib/utils/formatters`' `formatPercentage` is `toFixed` (`40.71%`); `formatCurrency` matches in both. Import it from
-  the same module the surrounding component uses, or one surface prints both separators.
-  **The it-IT implementations now live in `lib/utils/formatters.ts` as `formatPercentageIt`/`formatNumberIt`, and
-  `chartService` DELEGATES to them** (2026-08-31), so there is still exactly one implementation and no call site
-  changed. The reason is reach: `chartService` top-level-imports the client Firebase SDK, so a narrative module that
-  took its formatter from there could never be read by SERVER code — the periodic emails would initialise
-  `firebase/auth` inside a Lambda to print a percent sign. **A narrative module the server reads imports from
-  `formatters`, never from `chartService`**; `cashflowNarrative`, `patrimonioNarrative` and `expenseSplitNarrative`
-  are verified SDK-free. `formatNumberIt` is NOT `formatters`' own `formatNumber`: the former takes a `decimals`
-  argument and pins the width, the latter does not. A pure module feeding a screen through `chartService` still mocks
-  the Firebase chain in its tests. Same rule for any hand-rolled `toFixed` next to an `Intl`
-  number — including `aria-label` text, where a dot makes a screen reader announce a different figure from the screen.
+  the same module the surrounding component uses, or one surface prints both separators. The it-IT implementations
+  live in `lib/utils/formatters.ts` as `formatPercentageIt`/`formatNumberIt` and `chartService` DELEGATES to them
+  (2026-08-31): `chartService` top-level-imports the client Firebase SDK — the periodic emails would initialise
+  `firebase/auth` inside a Lambda to print a percent sign — so **a narrative module the server reads imports from
+  `formatters`, never from `chartService`** (`cashflowNarrative`, `patrimonioNarrative` and
+  `expenseSplitNarrative` are verified SDK-free; a pure module feeding a screen through `chartService` still mocks the
+  Firebase chain in its tests). `formatNumberIt` takes a `decimals` argument and pins the width, `formatters`' own
+  `formatNumber` does not. Same rule for any hand-rolled `toFixed` next to an `Intl` number — `aria-label` text
+  included, where a dot makes a screen reader announce a different figure from the screen.
 - **Curly apostrophes break `.tsx`** (`TS1127`) — delimit with double quotes. **JSX eats the space next to an inline tag
   or wrapped expression** once Prettier breaks the line: write `{' '}` on both sides of `<strong>`/`{expr}`. **An
   `inline-flex` chip drops the leading space of a text-node child too** (each child is a flex item): «69,7%verso FI»
@@ -57,11 +57,16 @@ about a domain goes in that domain's guide, never here.
 ### Firebase Dates and Timezone
 - `toDate()` to convert; `getItalyMonth()`/`getItalyYear()`/`getItalyMonthYear()` for domain grouping, never
   `Date.getMonth()`/`getFullYear()`. Server "today" window (cron): `getItalyDayBoundsUtc()`.
+- **A reader typed `Expense[]` may still hand out raw Timestamps** (2026-09-18: `getExpensesForCostCenter` did, and
+  only `getAllExpenses` converted). A page that reads dates through `toDate()` never notices; a row passed on to a
+  component fed by the OTHER reader does (`ExpenseDialog` threw «Invalid time value»). Convert in the service.
 - Inclusive month upper bound: `endOfMonthBound(year, month)` — the 1st at midnight drops the whole closing month.
   `<input type="date">` defaults take `getItalyDateIso()`, since `toISOString()` proposes yesterday from 22:00.
 
 ### Tailwind Breakpoints and Responsive Layout
 - `desktop:` = 1440px, never `lg:`. Dialog-internal layouts use `sm:`; portrait wrappers `max-desktop:portrait:pb-20`.
+  **`min-width` is inclusive**, so `h-11 desktop:h-9` measures 36px at exactly 1440 — the width the Playwright
+  desktop projects run at (2026-09-21).
 - **NEVER mix arbitrary `min-[px]:` with named breakpoints on the same property** — named ones compile to rem and v4
   emits them last, so `sm:grid-cols-2 min-[960px]:grid-cols-3` renders 2 columns at every width ≥ 640px. Between
   `tablet:`(768) and `desktop:`(1440) use a container query (`@container` + `@[640px]:`, all px).
@@ -69,6 +74,10 @@ about a domain goes in that domain's guide, never here.
   viewport. Per-cell `@container` scales a monetary value to the CELL width, or large amounts overflow.
 - **A grid item stretches to the row height, but a normal-flow child does not inherit it without its own `h-full`** —
   side-by-side cards of different content length need `h-full` on BOTH the grid-item wrapper and the card `div`.
+- **`sticky` travels only inside its containing block** (2026-09-22): the compact `PageHeader`'s mobile navbar was
+  `sticky top-0` INSIDE a wrapper exactly as tall as itself, so it never stuck — on every page, for months, «Salva»
+  scrolled away. Put `sticky` on the box whose parent is the tall one, and prove it by scrolling `main` in a spec
+  (`e2e/settings.mobile.spec.ts`).
 - **`sticky` on a grid item needs `self-start`** — the default stretch makes the item as tall as the row, so a
   `sticky top-6` companion column has no room to travel and silently behaves as static.
 - **Horizontal page scroll on mobile**: an implicit-`auto`-track grid expands to its widest child — add explicit
@@ -82,7 +91,9 @@ about a domain goes in that domain's guide, never here.
   main.getBoundingClientRect().left + main.clientWidth`. `rect.right` is viewport-relative and at 1440 `main` starts
   256px in, so comparing against `clientWidth` alone flags every full-width child as an overflow (the mobile guard
   got away with it only because `main` sits at x=0 there). A total in pixels forces the measurement to be redone;
-  the culpable node is the fix. Reference guard: `e2e/fire.mobile.spec.ts`.
+  the culpable node is the fix. Reference guard: `e2e/fire.mobile.spec.ts`. **Exclude `.sr-only` descendants from the
+  walk** (2026-09-20): a visually hidden TABLE is clipped to 1px, but its cells keep their geometric rectangles — 69
+  «offenders» on Storico with `main.scrollWidth === clientWidth` (`e2e/history.mobile.spec.ts`).
 - **One scroll container per region**: a nested scrollable captures the wheel and content below becomes unreachable
   (desktop-only symptom). `overflow-x-hidden` on an ancestor also CLIPS a descendant's `overflow-x:auto`.
 - **A `sticky` offset is measured from the scroller's CONTENT edge, padding excluded** (2026-09-14, Strumenti's actions
@@ -129,13 +140,26 @@ about a domain goes in that domain's guide, never here.
   standalone amber text is a different case (a caution reading uses `text-warning-foreground`, the verdict's dot too).
 - **A chart slot is not a text colour** — `--chart-1..8` target ~3:1 against a plot area (`text-[var(--chart-3)]`
   measured 1.02:1 on one theme). The 2026-08-30 tail was audited to the same floor across all twelve blocks (worst case
-  3.38:1), so the range is 1..8 and not 1..5. The semantic amber is `--warning-foreground`; only `ExpenseTable`'s chips
+  3.38:1 — but on 2026-09-18 `--chart-3` light measured 2,74:1 and `--chart-1` dark 2,62:1 ON A CARD: re-measure before
+  leaning on that floor, doc/guide/temi.md § Per-page blind spots), so the range is 1..8 and not 1..5. The semantic amber is `--warning-foreground`; only `ExpenseTable`'s chips
   are exempt.
+- **A computed custom property comes back as `lab()`, never as the `oklch()` you authored**:
+  `getComputedStyle(root).getPropertyValue('--chart-3')` answers `lab(64.8793% 25.0679 78.4211)`.
+  `useChartColors` knows this (never assert `/^oklch\(/`); `useActionColors` did not, and its
+  legibility clamp matched `/oklch\(/` — so it returned its input on every render and was DEAD
+  CODE from the day it was written (2026-09-21, measured in the browser: the page shipped raw chart
+  slots as 10-18px text at 2,39-4,02:1 while the docstring promised AA). **Anything that READS a
+  colour token parses `lab()` too** — `lib/utils/actionColor.ts` is the worked example, and its
+  test feeds it the browser's own serialisation.
+- **A chart slot used as TEXT is held to 4,5:1, not to the ~3:1 it was pitched for.**
+  `__tests__/actionColorContrast.test.ts` measures COMPRA/VENDI/OK across all twelve theme blocks,
+  on `--card` and on the chip's own `color-mix` fill — which is the HARDER surface, because a fill
+  mixed from the text's own hue always pulls the background towards the text.
 - **Sidebar tokens**: `--sidebar-accent` is a background, `--sidebar-accent-foreground` text ON it; hover on inactive
   items uses `hover:text-sidebar-foreground`. **Inline `style` blocks Tailwind hover variants**, so migrate to classes
   before adding `hover:`/`focus:`.
 - **CSS custom properties never reach emails or the PDF** (both render outside the DOM) — the sign hexes there are
-  permanently out of sync (CLAUDE.md → Known Issues).
+  permanently out of sync (doc/guide/email-pdf.md § Per-page blind spots).
 
 ---
 
@@ -171,16 +195,14 @@ about a domain goes in that domain's guide, never here.
 - `AssetDialog`: step 1 picks the type, step 2 shows only that type's fields; edit reuses the same visibility logic and
   shows a ledger asset's quantity/PMC read-only (the ledger owns them). Class select for ETFs, optional `displayTicker`,
   `leverageRatio`, and an opt-in TER only for `etf`/`commodity`/`crypto`.
-- **A marker on a label is a claim the validation has to honour.** The asterisk convention here is: `*` = required,
-  `(opzionale)` in `text-muted-foreground font-normal` = explicitly optional. Sottocategoria carried BOTH problems at
-  once until 2026-08-30 — a zod schema saying `.optional()`, an imperative guard in `onSubmit` that blocked the save,
-  and an asterisk whose condition (`availableSubCategories().length > 0`) was NARROWER than the guard's, so a class with
-  subcategories enabled and an empty list blocked the save with no marker at all. It is now genuinely optional: the
-  guard is gone, the label says `(opzionale)`, the Select carries a «Nessuna» item (`NO_SUB_CATEGORY_VALUE`, since Radix
-  reserves `''`), and BOTH write paths clear the field — `updateAsset` for cash/realestate/pensionFund and
-  `updateAssetMetadata` for every ledger type, each with the `'subCategory' in updates` guard so a partial caller does
-  not wipe a classification it never sent. The allocation consequence is not optional either: see
-  *Allocation — `allocationRole`* → the `NO_SUBCATEGORY_LABEL` bucket.
+- **A marker on a label is a claim the validation has to honour.** `*` = required, `(opzionale)` in
+  `text-muted-foreground font-normal` = explicitly optional; the zod schema, any imperative guard in `onSubmit` and the
+  marker's own condition must agree (2026-08-30: Sottocategoria was `.optional()` in zod, blocked by a guard, and
+  starred on a condition — `availableSubCategories().length > 0` — NARROWER than the guard's). It is genuinely optional
+  now: the Select carries a «Nessuna» item (`NO_SUB_CATEGORY_VALUE`, since Radix reserves `''`) and BOTH write paths
+  clear the field — `updateAsset` for cash/realestate/pensionFund, `updateAssetMetadata` for every ledger type, each
+  with the `'subCategory' in updates` guard so a partial caller does not wipe a classification it never sent. The
+  allocation consequence is the `NO_SUBCATEGORY_LABEL` bucket: doc/guide/allocazione.md § Allocation — `allocationRole`.
 > The default for a form whose fields depend on a discriminant. Keep the two implementations in step.
 - **The picker exists because the type is not one field among many** — it decides which categories/classes exist, which
   accounts are asked for, and how many balances move. Step 1 turns *one form with N conditional shapes* into *N plain
@@ -209,13 +231,11 @@ about a domain goes in that domain's guide, never here.
 - Firestore rejects `undefined` inside an array element, and `assetAllocationService.ts` builds `docData` by hand, so its
   array fields need a whitelisting serializer with conditional spreads.
 - **A bare `.set()` on a server-owned doc DELETES every field its object omits, and the daily cron re-runs them all.**
-  So when a saved value disappears "sometimes", the first question is *which periodic write targets this document, and
-  over which window* — never a TTL. The window is what makes it look intermittent: the snapshot cron rewrites only the
-  CURRENT month, so a Storico note on the month in progress died that night while one on a past month lived forever
-  (2026-09-07, `preserveUserAuthoredSnapshotFields`, pinned by `__tests__/apiAuthRoutes.test.ts` → *keeps the Storico
-  note of the snapshot it overwrites*). Keep the replace and carry the hand-written fields across it; `merge: true` is
-  the wrong fix whenever the doc holds a MAP the pipeline recomputes, since merging resurrects keys that should have
-  disappeared.
+  When a saved value disappears "sometimes", ask *which periodic write targets this document, and over which window* —
+  never a TTL: the snapshot cron rewrites only the CURRENT month, which is what made it look intermittent (2026-09-07,
+  `preserveUserAuthoredSnapshotFields`, pinned by `__tests__/apiAuthRoutes.test.ts` → *keeps the Storico note of the
+  snapshot it overwrites*). Keep the replace and carry the hand-written fields across it; `merge: true` is the wrong
+  fix whenever the doc holds a MAP the pipeline recomputes, since merging resurrects keys that should have disappeared.
 
 ### Firestore Queries and the Rules
 - **A `list` must carry the constraint the rule needs, or it is refused entirely.** Every collection guarded by
@@ -289,44 +309,42 @@ file used to carry.
 
 ### Panoramica → `doc/guide/panoramica.md`
 - Overview data flows through `GET /api/dashboard/overview` + `useDashboardOverview()` only — no page-level fan-out, no full-history expense queries; `dashboardOverviewSummaries/{userId}` is server-owned and every overview-relevant mutation invalidates it. Both endpoints owner-scoped.
-- `topMovers`/`marketEffect` are MARKET return (`q_prev × (u_curr − u_prev)`), never the user's flows; `[]` when the previous snapshot has no `byAsset`, `null` when not attributable (≠ measured 0). Pension funds are their own "Previdenza" line; real estate is measured gross of debt.
-- Every sentence from `overviewNarrative.ts` — a falling month blames the market only when `marketEffect < 0`, and never the market ALONE when the estimated tax on the month's sales (`monthSales`, from the ledger) or the own flows weighed more: `resolveDeclineCause` (`lib/utils/periodSales.ts`) is the ONE decision for Panoramica, Patrimonio and the email, `salesNarrative.ts` the shared words («pagato circa …», never «pagherai»). When the market gained and the tax is at least half of the drop, the HEADLINE names it (`taxes-despite-market`: «per le tasse sulla vendita di VWCE, non per il mercato», 2026-09-13). Every subject the driver clause can name is in `CLASS_SUBJECTS`, `PENSION_BAND_KEY` included; an unknown key drops the clause, never prints itself.
-- A category row deep-links to its Scheda on Analisi (`?focusType&focusCat`, `expenseType` in the payload since source version 17); the Panoramica links to the page that owns the depth and has no «Dettaglio» of its own.
-- Il resto — the hero step-down, the tile grid, the superseded-pattern rule, the Italian-copy test trap — in `doc/guide/panoramica.md`.
+- `topMovers`/`marketEffect` are MARKET return, never the user's flows: `[]` when the previous snapshot has no `byAsset`, `null` when not attributable (≠ measured 0).
+- Every sentence comes from `overviewNarrative.ts`; a falling month blames the market only when `marketEffect < 0`. `resolveDeclineCause` (`lib/utils/periodSales.ts`) is the ONE decision for Panoramica, Patrimonio and the email (the tax in the headline, 2026-09-13), `resolveTaxedGrowth` its twin for a month that did NOT fall (2026-09-19).
+- A driver subject missing from `CLASS_SUBJECTS` drops the clause, never prints itself; the page has no «Dettaglio» of its own.
+- Il resto — `salesNarrative.ts` (the shared words), the tax headlines, the month's split, the trade-aware market, the lived savings rate, the category deep link, the hero step-down, the tile grid, the superseded-pattern rule, the Italian-copy test trap — in `doc/guide/panoramica.md`.
 
 ### Patrimonio · Asset Pricing, FX and Assets → `doc/guide/patrimonio.md`
 - "Does this asset have a market price?" is ONE rule in `assetPricing.ts` (`hasMarketPrice`/`requiresManualPricing`); a new hand-valued type goes in `MANUALLY_VALUED_TYPES` and nowhere else.
 - GBp (pence) ≠ GBP — normalize `price / 100` before any FX; never call Frankfurter from the browser; `quantity = 0` marks a sold asset.
-- A Borsa Italiana bond quote is `% of par`, always, and `lib/utils/bondPricing.ts` is the ONE conversion (`quote / 100 × nominal × coefficient`): the nominal defaults to **1 €** (quantity = nominal in euro), a BTP€i's quote is real and gets the latest coefficient the user entered. Never re-implement it in a component or the cron; never guard it on `nominal > 1` again (issue #340).
-- Patrimonio Δ columns are UNIT-PRICE variations, not P&L; `isHeld` (`quantity > 0`) gates every count/share/sum; the page owns every dialog for one dual invalidation. «Andamento» is a VIEW (the Δ windows replace Quantità · Prezzo · PMC · TER); a hand-valued holding has no PMC-based G/P (`hasCostBasis`) and prints «—» there; a ledger's return is annualised only past `MIN_ANNUALIZABLE_DAYS` (180).
-- Every number not in the payload is born in `patrimonioSummary.ts`; the verdict's driver is an INSTRUMENT.
-- Every G/P, tax estimate, YOC and PMC cell stands EUR against EUR through `lib/utils/costBasisEur.ts` (`costBasisPerUnitEur` = the ledger's `averageCostEur`, fees included; the native PMC only for a EUR asset; `undefined` for a foreign asset without one — print nothing, never dollars against euros).
-- Il resto — `suggestIsLiquid`, the cash-account picker rule, the article helpers, the failed-overview branch, the `averageCostEur` backfill — in `doc/guide/patrimonio.md`.
+- A Borsa Italiana bond quote is `% of par`, always, and `lib/utils/bondPricing.ts` is the ONE conversion (`quote / 100 × nominal × coefficient`, nominal **1 €** by default). Never re-implement it; never guard it on `nominal > 1` again (issue #340).
+- Every G/P, tax estimate, YOC and PMC cell stands EUR against EUR through `lib/utils/costBasisEur.ts` (`costBasisPerUnitEur`, fees included); `undefined` without a EUR PMC — print nothing, never dollars against euros.
+- Δ columns are UNIT-PRICE variations, not P&L; `isHeld` (`quantity > 0`) gates every count/share/sum; numbers not in the payload are born in `patrimonioSummary.ts`; the page owns every dialog.
+- Il resto — the «Mutuo» tile (interest measured only from the settled instalments, `mortgageSummary.ts`), BTP€i, the «Andamento» view, `hasCostBasis`, `MIN_ANNUALIZABLE_DAYS`, the instrument driver, `suggestIsLiquid`, the cash-account picker rule, the article helpers, the failed-overview branch, the `averageCostEur` backfill — in `doc/guide/patrimonio.md`.
 
 ### Asset Trade Ledger → `doc/guide/registro-operazioni.md`
 - ALL trade money-math (replay, PMC, realized P&L, XIRR, invested capital) lives in `assetTransactionUtils.ts`, pure; the service/route layer is a thin atomic writer. A new `AssetTransactionType` updates the replay switch, the zod schema AND `TransactionDialog`.
-- Writes are Admin-API-only, all reads before any writes, derived fields written in-tx (never via `updateAsset`); ledger-type edits go through `updateAssetMetadata`.
-- The migration baseline (`isBaseline` BUY) NEVER stamps `holdingStartDate`; `replayTransactions` returning `holdingStartDate: undefined` means leave the doc untouched (never `deleteField()`).
-- A trade date has ONE floor — the asset's OWN baseline, enforced by the replay's `BASELINE_NOT_FIRST` (its message names the day) and mirrored by the dialog's `min` from `existingTransactions` — and the future as its only ceiling (2026-09-13): `assetTransactionsMeta.baselineDate` is the baselines' date, NOT a floor, so an asset without a baseline records a purchase made years before the ledger existed with its real date. A settlement account is debited TODAY whatever the date (`describeSettlementTiming` warns on a past month).
-- Per-transaction derived data comes from `replayTransactionsWithEffects` (one pass), never re-running replay on every prefix.
-- `buildDerivedAssetFields` projects `quantity`, the native `averageCost` AND `averageCostEur` (fees included) onto the asset doc; `backfillAverageCostEur` adds the third to pre-existing docs once, writing only that field.
-- Il resto — `resolveBondPrice` reuse (from `bondPricing.ts`, a BTP€i trade storing its coefficient), the two `totalReturnAssets` paths, the static-copy audit rule — in `doc/guide/registro-operazioni.md`.
+- Writes are Admin-API-only, all reads before any writes, derived fields written in-tx (never via `updateAsset`); ledger-type edits go through `updateAssetMetadata`. A settlement moves CENTS (`lib/utils/cents.ts`), and a sell credits proceeds − fees − `withheldTaxEur` (`lib/utils/saleTax.ts`, 2026-09-20); realized P&L and XIRR stay gross of the tax.
+- The migration baseline (`isBaseline` BUY) NEVER stamps `holdingStartDate`; a replay returning `holdingStartDate: undefined` means leave the doc untouched (never `deleteField()`).
+- A trade date has ONE floor — the asset's OWN baseline (`BASELINE_NOT_FIRST`) — and the future as its only ceiling (2026-09-13); `assetTransactionsMeta.baselineDate` is NOT a floor.
+- Per-transaction derived data comes from `replayTransactionsWithEffects` (one pass), never a replay per prefix.
+- Il resto — settlement timing, `buildDerivedAssetFields` and the `averageCostEur` backfill, `resolveBondPrice` reuse, the two `totalReturnAssets` paths, the static-copy audit rule — in `doc/guide/registro-operazioni.md`.
 
 ### Cashflow — expense mechanics → `doc/guide/cashflow.md`
 - Category names are NOT unique: group by `getCategoryKey`/`getSubCategoryKey`, display via `resolveDisplayLabels`.
-- Income positive, expenses negative, `net = sum(income) + sum(expenses)`; classification ALWAYS by `type`, never by the sign of `amount`; crossing the transfer boundary flips the sign and the BATCH paths refuse it.
-- A recurring expense is N real future-dated rows sharing `recurringParentId`, not a rule; `canTypeRecur` = `fixed`/`variable`/`debt` only; both `MAX_RECURRENCE_OCCURRENCES` ceilings keep the batch under 500. Only the FIRST row carries `linkedCashAssetId` and moves the account, with the sign of its type (the three `firstSignedAmount` branches share the rule, 2026-09-13). A `transfer` IS its two accounts: the schema refuses one without origin and destination, or with the same account twice (`e2e/cashflow.accounts.spec.ts`).
-- CSV import (`Impostazioni → Spese`): parse→validate→plan, MANDATORY preview, one-tap undo by `importBatchId`; category identity is (name, type). One drill destination (`handleEntitySelect`); Sankey ids are built from ids, the type lives inside the category id.
-- Il resto — le sei regole per esteso — in `doc/guide/cashflow.md`.
+- Income positive, expenses negative, `net = sum(income) + sum(expenses)`; classification ALWAYS by `type`, never by the sign of `amount`. Crossing the transfer boundary flips the sign and the BATCH paths refuse it; a `transfer` IS its two accounts (the schema refuses it otherwise).
+- A recurring expense is N real future-dated rows sharing `recurringParentId`, not a rule; `canTypeRecur` = `fixed`/`variable`/`debt` only; `MAX_RECURRENCE_OCCURRENCES` keeps the batch under 500.
+- A linked row moves its account ON ITS OWN DATE (`lib/utils/cashSettlement.ts`, 2026-09-19): `balancePending` until `settleDueBalances` runs in `/api/portfolio/snapshot`; the flag ABSENT means applied; edits and deletes move only what was applied.
+- CSV import: MANDATORY preview, undo by `importBatchId`, category identity is (name, type). ONE drill destination (`handleEntitySelect`); Sankey ids are built from ids.
+- Il resto — le sei regole per esteso, `linkedCashAssetId` su ogni occorrenza, «Collega la serie», lo schema del transfer e la sua spec, la commissione come riga propria (`transferFee.ts`), la rata che riduce il debito per la QUOTA CAPITALE (`mortgageRepayment.ts`) — in `doc/guide/cashflow.md`.
 
 ### Cashflow › Tracciamento → `doc/guide/cashflow-tracciamento.md`
-- ONE period axis, two slices: `expenses` feeds the verdict and every tile; `filteredExpenses` feeds ONLY the Movimenti list. Never route a tile through `filteredExpenses`.
-- A period is its WHOLE calendar span; what has not happened is DECLARED (chip «In calendario», sign colour dropped). `isScheduledRow` = after today by Italian calendar DAY (`isItalyDayAfter`), shared with `budgetUtils` and `costCenterSummary`. **The verdict judges what has HAPPENED** (`settleTotals`, 2026-09-14): headline, tone and first sentence from the lived part («A settembre finora …»), then «Con … già in calendario da qui a fine mese, il mese chiude a +805 € (il 29%)» — both sides always named, an empty one as «nessuna entrata attesa». Analisi still closes with `scheduledSentence`.
-- «Da inizio anno» (`Period.kind = 'ytd'`) and «Anno corrente» (`'current'`, full-year delta since 2026-08-30) are different windows and must never be treated as one.
-- Every number from `tracciamentoSummary.ts`, every sentence from `cashflowNarrative.ts`. The previous period is honest or absent (a running year → the SAME months of the year before; **the month in progress → the SAME DAYS of the previous month**, `currentComparisonWindow`/`previousComparisonWindow`, named «sui primi 14 giorni di agosto» — the projection's reference stays last month WHOLE through `previousPeriod`).
-- Below `desktop:` the Movimenti tile's bar repeats the period picker beside the filters — a second HANDLE on the same `period`, never a second axis (its own accessible name, `min-w-0`; `e2e/cashflow.mobile.spec.ts`). The tile's reading totals each type of the rows it is handed (a search on a note is its own total).
-- «Intestatario» (`lib/utils/movementsOwnerFilter.ts`) is a list filter that exists only with Divisione on — «Tutti · In comune · {members}», «Senza intestatario» only when the period holds an orphaned row — and with the feature on an attributed row prints its owner as a chip (feed, table, drawer); `memberNames` null = feature off = no chip anywhere.
-- Il resto — the two windows anchored to today, the month-end projection, the feed, the mobile filters — in `doc/guide/cashflow-tracciamento.md`.
+- ONE period axis, two slices: `expenses` feeds the verdict and every tile; `filteredExpenses` feeds ONLY the Movimenti list. Never route a tile through `filteredExpenses`; the phone bar's picker is a second HANDLE on the same `period`, never a second axis.
+- A period is its WHOLE calendar span; what has not happened is DECLARED (chip «In calendario», sign colour dropped). `isScheduledRow` = after today by Italian calendar DAY (`isItalyDayAfter`), shared with `budgetUtils` and `costCenterSummary`.
+- The verdict judges what has HAPPENED (`settleTotals`, 2026-09-14), then says where the calendar takes it. The month in progress is compared with the SAME DAYS of the previous month (`currentComparisonWindow`/`previousComparisonWindow`); a previous period is honest or absent.
+- «Da inizio anno» (`Period.kind = 'ytd'`) and «Anno corrente» (`'current'`, full-year delta since 2026-08-30) are different windows, never one.
+- Every number from `tracciamentoSummary.ts`, every sentence from `cashflowNarrative.ts`.
+- Il resto — the verdict's two sentences, `previousPeriod`, the two windows anchored to today, the month-end projection, the feed, the mobile filters, the Movimenti reading, «Intestatario» (`lib/utils/movementsOwnerFilter.ts`, `memberNames`) — in `doc/guide/cashflow-tracciamento.md`.
 
 ### Analisi — a verdict over tiles → `doc/guide/cashflow-analisi.md`
 - FOUR axis modes (`Da inizio anno | Anno corrente | Anno | Storico`); `ytd` and `current` are not the same window.
@@ -343,73 +361,75 @@ file used to carry.
 - Il resto — `summarizeCeiling`, the two-face KPIs on `exceeded`, `BudgetTrack`, the `cashflow:add-budget` event — in `doc/guide/cashflow-budget.md`.
 
 ### Centri di Costo → `doc/guide/centri-di-costo.md`
-- NO period axis, by decision (2026-08-23): a project's cost is its whole cost; every figure is lifetime («in totale») unless the tile names its window. The old `Mese|Anno|12 mesi|Sempre` picker and its helpers are gone.
-- `summarizeCenter` splits rows at today: booked ones are the cost, scheduled ones get an «in calendario» chip, feed every projection and a ceiling's `spent`, and are NEVER summed into the total; a backdated row moves the total AND the crossing day.
-- The projection is `projectWindowEndWithScheduled` (`spendingProjection.ts`); a dormant/archived center (`lifecycle !== 'active'`) gets NO projection. A monthly ceiling reuses Budget's `summarizeCeiling`.
+- NO period axis, by decision (2026-08-23): a project's cost is its whole cost; every figure is lifetime («in totale») unless the tile names its window.
+- `summarizeCenter` splits rows at today: booked ones are the cost; scheduled ones get an «in calendario» chip, feed a window's end and a ceiling's `spent`, and are NEVER summed into the total.
+- A CENTER HAS NO PACE (2026-09-18): a window's end is booked + calendar (`ytd + yearScheduled`), never `projectWindowEndWithScheduled`. Budget keeps its pace — do not unify; a monthly ceiling reads Budget's `summarizeCeiling` but re-derives `exceeded`.
+- The open center lives in the URL (`?tab=cost-centers&center=<id>`); a new center opens on `firstFreeColorKey`, and existing documents are never re-coloured.
 - Every number from `costCenterSummary.ts`, every sentence from `costCenterNarrative.ts`. Any count next to a destructive action comes from the same query the mutation runs.
-- Il resto — the risk-vs-fact ranking, `CenterStackBars`, session-only lenses — in `doc/guide/centri-di-costo.md`.
+- Il resto — risk vs fact (`exceeded`/`atRisk`) and the detail's ranking, the retired picker, the backdated row, how the detail lands and refocuses (`data-center-row`), `CenterStackBars`, «Collega spese…», session-only lenses — in `doc/guide/centri-di-costo.md`.
 
 ### Cashflow › Divisione → `doc/guide/cashflow-divisione.md`
 - Opt-in, on Tracciamento's period axis. ONE field carries the feature: `Expense.personalMemberId`; absent (or `null`) MEANS «in comune» (so no migration). Members are Previdenza's `FamilyMember`s, never a second list. NOT denormalized to a name.
-- The share is NEVER invented: `resolveSplitBasis` returns `unavailable` (with `missingNames`) below two people, with no labor category, or when one person has no salary in the period; every split figure is then `null`.
+- The share is NEVER invented: `resolveSplitBasis` returns `unavailable` (with `missingNames`) below two people, with no labor category, or when one person has no salary in the period; every split figure is then `null`. Labor income nobody owns is DECLARED (`unattributedSalary`), never dropped.
+- A residual is of money that has MOVED: the page prints and colours `remainingBooked`, and where the calendar takes it is a separate clause (2026-09-21). `remaining` is the whole period's.
 - The base is the PERIOD's attributed labor income (owner's decision, 2026-08-31) — the most faithful and most volatile reading; do not «stabilise» it silently.
 - `allocateByShare` charges the rounding residual to the LARGEST share and re-rounds — untestable on two shares (they cancel), test on three. Writing it is a FOUR-place fan-out; the readers outside the tab are Tracciamento's «Intestatario» filter and the owner chip (`movementsOwnerFilter.ts`, same contract).
-- Il resto — the deleted-member bucket, the dialog control, `effectiveTab` — in `doc/guide/cashflow-divisione.md`.
+- Il resto — the deleted-member bucket, the dialog control, `effectiveTab`, the one-cell people row, the verdict-explains/tile-instructs split, «Attribuisci spese» — in `doc/guide/cashflow-divisione.md`.
 
 ### Cashflow › Dividendi · Dividends and Coupons → `doc/guide/cashflow-dividendi.md`
 - RECEIVED AND ANNOUNCED ARE NEVER ONE FIGURE — counted, totalled and coloured apart on every surface; `summarizePayments` returns two halves and no sum.
-- ONE period axis (`resolvePeriodBounds`, upper bound = end of the period's own unit, NOT today); the announced money is ON it; instrument/type filters narrow only the list. The Rendimento tile does NOT follow the axis and says so.
-- `useDividendStats` carries NO date bounds (they only narrowed `periodStats`, now derived in memory). Every number from `dividendAnalytics.ts`.
-- A coupon's cashflow expense is created only by the daily cron on payment date (`!isAutoGenerated`, idempotent via `expenseId`); adding a `DividendType` is a six-file fan-out; YOC/Current Yield share `computeDividendYieldMetrics`, scoped to the current holding.
-- A scraped dividend has ONE floor (`lib/utils/dividendEligibility.ts`: `holdingStartDate` from the ledger, else `createdAt`), shared by `/api/dividends/scrape` and cron Phase 1 — and never silent: the route returns `filtered`/`floorDate`/`floorSource` and the tab toasts `describeFilteredDividends` with the recovery (2026-09-13).
-- TWO POPULATIONS, BOTH NAMED (2026-09-14): the verdict and the inventory read the REGISTRY (sold instruments included); Affidabilità and Chi paga di più measure the HELD portfolio (`computeReliability`/`rankPayerShares` take `heldAssetIds` from the page's assets) and name what the sold ones paid in their own clause and residual row — never rank a sold payer, never drop its money from the total. The form's withholding proposal is the instrument's own `taxRate` (never a constant), its picker lists equities AND bonds, held or sold; the row's delete is `useArmedDelete` (no timer).
-- Two inflation mechanisms, ONE field (`inflationIndexation`, read via `resolveInflationIndexation`; the legacy `isInflationLinked` is `italia`): BTP Italia ADDS the FOI rate, a BTP€i MULTIPLIES by the coefficient at the payment date (provisional at the latest known one). A rate of 0 is a zero coupon: details saved, nothing materialised (`hasCouponPayments`).
-- Il resto — the calendar, BTP Italia additivity and the BTP€i coefficient, the running-window rule, `couponUtils` — in `doc/guide/cashflow-dividendi.md`.
+- ONE period axis (`resolvePeriodBounds`, upper bound = end of the period's own unit, NOT today), the announced money ON it; filters narrow only the list; the Rendimento tile does NOT follow the axis and says so. `useDividendStats` carries NO date bounds; every number from `dividendAnalytics.ts`.
+- TWO POPULATIONS, BOTH NAMED (2026-09-14): verdict and inventory read the REGISTRY (sold included); Affidabilità and Chi paga di più measure the HELD portfolio (`heldAssetIds`) — never rank a sold payer, never drop its money.
+- A coupon's cashflow expense is created only by the daily cron on payment date (`!isAutoGenerated`, idempotent via `expenseId`), and it credits the instrument's account, else the default, ONLY when the payment is not an arrear (`lib/utils/dividendAccount.ts`, 2026-09-20) — row, balance and `expenseId` in one transaction. A scraped dividend has ONE floor (`lib/utils/dividendEligibility.ts`, 2026-09-13), never silent. Adding a `DividendType` is a six-file fan-out.
+- Two inflation mechanisms, ONE field (`inflationIndexation`, read via `resolveInflationIndexation`): BTP Italia ADDS the FOI rate, a BTP€i MULTIPLIES by the coefficient. A rate of 0 is a zero coupon (`hasCouponPayments`).
+- Il resto — the calendar, the floor's sources and toast, the form (`taxRate` proposal, picker) and the armed row delete, `computeDividendYieldMetrics`, the legacy `isInflationLinked`, provisional coupons, the running-window rule, `couponUtils` — in `doc/guide/cashflow-dividendi.md`.
 
 ### Storico · History and Snapshot Baselines → `doc/guide/storico.md`
-- The snapshot cron runs DAILY (the name lies); a snapshot is a frozen photo (adding an asset never updates an old one). Annual deltas use December of the previous year as baseline.
-- Reuse `byAsset.totalValue` for historical per-instrument value (never recompute); `byAsset.price` is RAW NATIVE currency, so attribution is `priceEffect = q_prev·(u_curr−u_prev)` + `quantityEffect` (sum = Δ exactly).
-- Both snapshot writers REPLACE the document, so a new `MonthlySnapshot` field the pipeline does not recompute goes in `SNAPSHOT_USER_AUTHORED_FIELDS` or the daily cron erases it (§ *Firestore Writes*).
-- Two CAGR formulas, intentionally different: Storico's verdict = `(endNW/startNW)^(12/months)−1` (wealth growth, «versamenti inclusi»); Rendimenti = investment return. ONE pace for the page (`summarizeGrowthPace`, trailing 12 months, linear); do not compound it.
-- The Driver is floored at `cashflowHistoryStartYear`; a running year never counts materialised future rows. «Lavoro e investimenti» measures the Driver's own windows (`laborWindowsOf(driverYears)`, month after the baseline → last snapshot) and returns three causes that add up to the growth — savings from work, other income, market — never a window of its own (it had no right edge until 2026-09-07).
-- Il resto — `buildMonthAssetBreakdown`, the manual-snapshot cross-validation, the Recharts-in-a-flex-tile technique — in `doc/guide/storico.md`.
+- The snapshot cron runs DAILY (the name lies) and both writers REPLACE the document: a new `MonthlySnapshot` field no pipeline recomputes goes in `SNAPSHOT_USER_AUTHORED_FIELDS` or the cron erases it (§ *Firestore Writes*).
+- Reuse `byAsset.totalValue` for per-instrument history, never recompute; `byAsset.price` is RAW NATIVE currency (EUR unit value = `totalValue / quantity`).
+- The page's CAGR is WEALTH growth (`(endNW/startNW)^(12/months)−1`, «versamenti inclusi»), never Rendimenti's return; ONE linear pace (`summarizeGrowthPace`), do not compound it.
+- The Driver is SIX parts (`lib/utils/growthDrivers.ts`, 2026-09-19), its market MEASURED per instrument (`marketEffect.ts`) — never «Δ − risparmio»; Lavoro takes the Driver's windows AND parts.
+- The parts are a LEDGER (`buildDriverLedger`, 2026-09-20) that closes TO THE EURO (`reconcileRemainder`); a flow is signed and uncoloured (`isFlowDominated`).
+- Il resto — baselines, attribution (`buildMonthAssetBreakdown`), each Driver part, `summarizeLaborMetrics`/`laborWindowsOf`, the manual-snapshot cross-validation, Recharts in a flex tile, the container-query table, the two-column grid — in `doc/guide/storico.md`.
 
 ### Hall of Fame — a verdict over tiles → `doc/guide/hall-of-fame.md`
 - The page has NO axis and re-derives nothing: `hall-of-fame/{userId}` holds the rankings; "today" is a PARAMETER, never `new Date()` inside the module.
 - `hallOfFameRecords.ts` is the ONE definition of a record AND a ranking — both writers and the periodic email call `buildHallOfFameRankings`; never re-implement a ranking.
 - A stale document heals only from the page's «Aggiorna» button when the account has no assets (the cron gates on `snapshotResult.success`); disabled in demo. Never document a field as "the cron will fill it in".
-- A savings record needs income (`totalIncome > 0` guard); `stats` and the two savings rankings are OPTIONAL on pre-2026-08-25 documents — `getBoard` returns `null` (≠ empty board), never `?? []`.
-- Il resto — the podium-vs-chronology split, `NoteTrigger`, the section-key fan-out — in `doc/guide/hall-of-fame.md`.
+- A savings record needs income (`totalIncome > 0` guard); `stats` and the two savings rankings are OPTIONAL on pre-2026-08-25 documents — `getBoard` returns `null` (≠ empty board), never `?? []`. Same for `rankingsUpdatedAt`, `stats.sinceWorstMonth` and `YearlyRecord.monthsCovered` (2026-09-24): stored by `updateHallOfFame`, never derived, their clause dropped when absent.
+- Il resto — the podium-vs-chronology split, the tile-never-repeats-the-verdict rule, `NoteTrigger` and the prefilled note, the section-key fan-out, the Playwright locators — in `doc/guide/hall-of-fame.md`.
 
 ### Rendimenti → `doc/guide/rendimenti.md`
-- Any exclusion read from `byAsset` MUST be backfilled across pre-`byAsset` months (subtract a constant `E₀`) or it becomes a phantom crash — this fixes the DENOMINATOR, not the numerator. The base is resolved ONCE by `resolvePerformanceBase` for its THREE call sites (service, page, PDF); `buildCacheKey` fingerprints its options, entry month and both flow channels.
-- The pension toggle WINS over a fund's `allocationRole` (it was an OR, and a no-op on every fund marked `excluded`). ON, the funds enter the base from the tracked month as a FLOW and every later outside contribution is a flow (`CashFlowData.pensionFlow`); `netCashFlow` stays the cashflow's savings. A contribution is a flow iff it crosses the base's boundary.
-- **The flows follow the base** (2026-09-07): with anything out of the base, the months with `byAsset` on both snapshots neutralise the MEASURED boundary flows (`lib/utils/portfolioFlows.ts`: ledger first per instrument, quantities as the net, baseline/adjustment move no money, hand-valued instruments opaque) on the third channel `CashFlowData.portfolioFlow`; `externalFlowOf` = `(portfolioFlow ?? netCashFlow) + pensionFlow`. **The ledger speaks for an instrument only once the base has SEEN it** (2026-09-13): held in the previous snapshot or bought in the month; otherwise the month is the instrument's ENTRY and its value is the flow — a backdated purchase must never read as the entry month's return. «Liquidità fuori dalla base» (`performanceExcludesCash`) takes the `cash` accounts out by type. The Rendimento tile's second chip is the cumulative TWR (`resolvePeriodReturnChip`), never the ROI.
-- The first snapshot of a period is the starting valuation, never a measured month — the window opens on the 1st of the month AFTER it. The page must NEVER re-derive the window from `new Date()` (`metrics.nominalPeriodStart` travels in the payload).
-- No silent filters inside a single metric — volatility/Sharpe floor at ≥ 3 monthly returns, else `null` with a reason. Below 6 months the hero is the PERIOD return, not annualized.
-- The per-instrument attribution (`performanceAttribution.ts`) is EURO and reconciled: Σ rows + «Non attribuito» = the TWR numerator over the months with `byAsset`; a row at quantity 0 is a closed position (`attributeSelectedChange`). The residual is also read month by month: a month whose unattributed part exceeds `RESIDUAL_ALERT_SHARE` (2%) of its starting base is NAMED in the reading (`residualMonths`) — where to look, never what happened.
-- Il resto — EUR-converted benchmarks, drawdown on a geometric TWR index, IRR sign convention, the verdict-over-tiles rules, the heatmap — in `doc/guide/rendimenti.md`.
+- The base is resolved ONCE by `resolvePerformanceBase` for its THREE call sites (service, page, PDF). An exclusion read from `byAsset` MUST be backfilled across the pre-`byAsset` months (constant `E₀`) or it becomes a phantom crash.
+- The pension toggle WINS over a fund's `allocationRole`. A contribution is a flow iff it crosses the base's boundary; flows ride their own channels (`externalFlowOf`), `netCashFlow` stays the cashflow's savings.
+- **The flows follow the base** (2026-09-07): with anything out of it, the months with `byAsset` on both snapshots neutralise the MEASURED boundary flows (`lib/utils/portfolioFlows.ts`); the ledger speaks for an instrument only once the base has SEEN it (2026-09-13).
+- The first snapshot of a period is the starting valuation, never a measured month; the page must NEVER re-derive the window from `new Date()` (`metrics.nominalPeriodStart`).
+- No silent filters inside a metric (`null` with a reason); the attribution (`performanceAttribution.ts`) is EURO and reconciled to the TWR numerator.
+- Il resto — `buildCacheKey`, the flow channels and the entry month, `performanceExcludesCash`, the hero below a YEAR and `resolveCompanionReturnChip`, Contributi's ONE answer (`summarizeCapitalEntered`; a migration baseline is never a purchase), the heatmap read by keyboard and tap, the residual guard (`RESIDUAL_ALERT_SHARE`), EUR benchmarks, drawdown, IRR signs, the verdict-over-tiles rules, the heatmap — in `doc/guide/rendimenti.md`.
 
 ### Allocazione → `doc/guide/allocazione.md`
 - `Asset.allocationRole` is ONE field, THREE values: `tradable` (default), `frozen` (in the denominator, never in the plans), `excluded` (out of the page entirely). No role is ever inferred at read time.
 - THE RULE: partition upstream of `compareAllocations`, never downstream (filtering the output breaks `targetValue = target% × totalValue` and the Σ(current − target) = 0 invariant). Do NOT push the filter into `calculateCurrentAllocation` (it also serves `/api/portfolio/snapshot`).
 - "Versa" and "Preleva" are ONE tree with the sign flipped; THE ASYMMETRY is the design (buy what you do not own, never sell it). The balance score is band-INDEPENDENT.
 - The subcategory is OPTIONAL, so every euro lands in a bucket (`NO_SUBCATEGORY_LABEL`); the orphaned target (`findOrphanedTargets`/`stripOrphanedSubTargets`) is the trap. `ASSET_CLASS_SEQUENCE` is the ONE enumeration of the union — a hand-listed class drops its EUROS, not just its label.
-- Il resto — the Bull's formula, the leverage engine, the five label maps, the verdict-over-tiles rules — in `doc/guide/allocazione.md`.
+- Ribilancia descends to the INSTRUMENT through the flow plans' own splits (`RebalanceDescent`, 2026-09-21) — a sell through the withdrawal nodes, a buy through the contribution ones, Σchildren === the class amount; never a second algorithm. A plan that sells prices the withholding (`estimatePlanSaleTax`), `null` WITH a reason when a leg has no EUR basis or rate.
+- «Prelevare 1000 €» means 1000 € IN HAND: the withdrawal sells the GROSS that leaves the request after the withholding (`solveWithdrawalGross`), a FIXED POINT and never a division by (1 − rate) — the tax follows which instruments the plan drains, and those follow the amount.
+- A DORMANT class (`isDormantClass`: neither value nor target) keeps its row, loses its verdict and leaves every count — the page reads `activeClassGaps`, never the raw `summarizeClassGaps`.
+- A level that repeats the one above it is dropped (`collapseRepeatedLevels`), and which row is an INSTRUMENT is the node's own `isInstrument`, never its depth — a lifted ETF at depth 1 read «→ 100,0%» otherwise.
+- Il resto — the Bull's formula, the leverage engine, the five label maps, the action colours' measured lightness band and the `lab()` trap that made the old clamp dead code, the verdict-over-tiles rules — in `doc/guide/allocazione.md`.
 
 ### Previdenza · Fondo Pensione → `doc/guide/previdenza.md`
-- `pensionFund` is an `AssetType`, never an `AssetClass`, never a ledger type; value is statement-driven, held in `quantity` at price 1 (`assertFundValueLivesInQuantity`). The statement overwrite is «Aggiorna valore» ON the page (`updatePensionFundValue`, 2026-09-13): the asset only, never a contribution; the hero's footer judges a value left in a closed month («valore fermo dal …») — ONE rule, `isPensionValueStale` in `pensionSummary.ts`, read by the footer AND the modal's reading; never re-derive it in a component.
-- The snapshots are reduced ONCE per page (`indexPensionSnapshots` → `PensionSummaryInput.snapshotIndex`, memoized on the snapshots alone); «Il fondo oggi» reads an off-axis input, so the year pill never recomputes it. Deliberately not bounded: the `monthly-snapshots` query (shared cache) and the four-query skeleton (the verdict needs the snapshots) — doc/guide/previdenza.md says why.
-- Contributions run on the CLIENT SDK (not an Admin route); `taxYear` (validated ±1 year from `date`) groups every roll-up, never `date.getFullYear()`; contributions never touch spending or savings.
-- Three causes of growth, three numbers — never one blended percentage: employer share leaves the TWR (returns in `personalReturn`), TFR is deferred salary (denominator only), the IRPEF saving is its own per-taxpayer card. `isFirstEmploymentPost2007` ON without a full history inflates the plafond.
-- The window starts where data is trustworthy (`resolvePensionReturnStart`); a contribution is attributed to the month its VALUE MOVED (`createdAt`). `MonthlySnapshot.pension` is FROZEN at write time.
-- A return is a measure only through `isPensionReturnMeasurable`: too high (`isCoverageSuspicious`, missing contributions) OR out of the real (`isCoverageContradictory`: a month at or below zero net of its contributions, a loss beyond 100%, growth with a TWR below −75%) — and `resolveReturnState` reads the contradiction FIRST, because its advice is the opposite of the suspicious one's.
-- Il resto — the two tax mechanisms, `overlayLivePensionValue`, the per-contributor return, the verdict-over-tiles rules — in `doc/guide/previdenza.md`.
+- `pensionFund` is an `AssetType`, never an `AssetClass`, never a ledger type; its value is statement-driven, held in `quantity` at price 1 (`assertFundValueLivesInQuantity`).
+- «Aggiorna valore» (`updatePensionFundValue`, 2026-09-13) overwrites the asset only, never a contribution; the value's age is ONE rule, `isPensionValueStale` — never re-derive it in a component.
+- Contributions run on the CLIENT SDK; `taxYear` groups every roll-up, never `date.getFullYear()`; contributions never touch spending or savings.
+- Three causes of growth, three numbers — never one blended percentage. A contribution belongs to the month its VALUE MOVED (`createdAt`); `MonthlySnapshot.pension` is FROZEN at write time.
+- A return is a measure only through `isPensionReturnMeasurable`; `resolveReturnState` reads the contradiction BEFORE the suspicion.
+- Il resto — the return's formulas and window (`resolvePensionReturnStart`), the `isFirstEmploymentPost2007` trap, the two coverage guards, `indexPensionSnapshots` and what is deliberately not bounded, the two tax mechanisms, `overlayLivePensionValue`, the per-contributor return, the verdict-over-tiles rules — in `doc/guide/previdenza.md`.
 
 ### FIRE, What If and Goals → `doc/guide/fire.md`
 - What If = perturbation + diff, no new projection math; keep the pure layer category-agnostic. Pension unlock is ONE rule in `pensionUnlock.ts` (explicit `now`).
 - `respectPensionLockInFire` governs the WHOLE FIRE page: each tab subtracts the locked total AND passes the inflows (subtraction alone reintroduces "sottratto per sempre"). The bridge model reuses the Coast walk, never a second formula.
-- The Ventaglio engine mirrors the deterministic walk BY CONSTRUCTION — at zero volatility every path collapses onto the base scenario (the coherence test pins that WITHOUT inflows). `deriveMonteCarloAllocation` is the ONE allocation→4-class normalizer.
+- The Ventaglio engine mirrors the deterministic walk BY CONSTRUCTION — at zero volatility every path collapses onto the base scenario (the coherence test pins that WITHOUT inflows). `deriveMonteCarloAllocation` is the ONE allocation→4-class normalizer. **Year 0 is a year in both walks** (2026-09-22): a target already cleared today is `yearsToFIRE = 0`, rendered as a word («già raggiunto»), never «tra 1 anno». **The fan is seeded and keeps a second ledger** (2026-09-24): `createSeededRandom` gives every lever comparison the same shocks, `retirements` withdraws from each path's own FIRE year without touching `paths`; the Distribuzione view reads `fireYears` by NEAREST-RANK percentiles (`fireDistribution.ts`), never the fan's `floor`. **The requirement is ONE rule, `resolveFireRequirement`** (2026-09-24): expenses less the Coast pensions from their start (dated by the saved age, else OUT and said), × the tax gross-up of `lib/utils/withdrawalTax.ts` (basis from the PMC, cash and funds as basis, `null` without any PMC and said), the fund at its unlock — the walk's `*FireNumber` rows ARE it, the fan's targets are those rows, What If and Coast read the same inputs.
 - Goal math the server needs lives in `goalMath.ts` (imports `calculateAssetValue` directly); `serializeGoalForFirestore` IS the persistence allowlist; the goal document is rewritten WHOLE, never patched.
 - Il resto — each tab computes nothing (numbers from `*Summary`, words from `*Narrative`); config-first collapse; the five verdict-over-tiles sections; Playwright locators — in `doc/guide/fire.md` (pagina e Calcolatore), `fire-coast.md`, `fire-what-if.md`, `fire-monte-carlo.md`, `fire-obiettivi.md`.
 
@@ -428,7 +448,8 @@ file used to carry.
 - Il resto — `PDF_RAMP`, the class labels, `signedPct`/`signedEur` it-IT, the deterministic-comparison rule, the AI-prompt body — in `doc/guide/email-pdf.md`.
 
 ### Impostazioni — tessere senza verdetto → `doc/guide/impostazioni.md`
-- The page has NO verdict and must not grow one (a configuration page measures nothing) — it keeps the CADENCE: 22 `describe*` functions in `settingsNarrative.ts`, NO `build*Verdict`.
+- The page has NO verdict and must not grow one (a configuration page measures nothing) — it keeps the CADENCE: 21 `describe*` functions in `settingsNarrative.ts`, NO `build*Verdict`.
+- ONE «Salva», so the save state is PER TAB (2026-09-22): a dot on each tab holding edits, a bottom bar naming them with «Annulla modifiche» (a re-read, not a copy); the target rules are `allocationTargetValidation.ts`, which says WHERE they failed so «Salva» opens the group and focuses the field. A failed read here is never an empty list (members, categories, accounts).
 - A reading declares the effect DOWNSTREAM, not the control under it; the Narrative Honesty Rule holds (a missing input drops its clause).
 - A field another page OWNS is DECLARED, never edited here («Parametri del piano» from FIRE, «Assistente» a mirror that loses on read). The colour theme and light/dark mode save themselves, outside `handleSave`.
 - The write fan-out for any setting (the FIVE/SIX/SEVEN places) is `doc/guide/impostazioni.md § Settings — the FIVE places` (stub below).
@@ -450,63 +471,56 @@ file used to carry.
 
 ### Stati: caricamento, vuoto, zero, errore → `doc/guide/stati.md`
 - An absence has three names — `missing` · `zero` · `failed` (`AbsenceKind`, `lib/utils/statesNarrative.ts`) — and a
-  failed read is checked BEFORE the empty branch, always: every query defaults to `[]`/`undefined`, so a dropped
-  connection is byte-identical to a new account.
-- `resolveSurfaceState({ loading, failed })` is the ONE decision on which state a surface is in; `loading` wins over
-  `failed` (a React Query retry is an attempt, not a verdict). Never `loading || !data`.
-- `describeReadFailure` requires its `consequence` (the caller knows what it lost); `canRetry`/`onRetry` travel together.
-  A service must not swallow its failure into zeros — an `isError` branch above a service that never rejects is decoration.
-- `Skeleton` is the only muted placeholder (`motion-safe:animate-pulse`, `aria-hidden`); a toast's severity is the icon
-  and a 2px rule, never a `bg-*/10` surface; a failed WRITE speaks `describeWriteError`, never `(err as Error).message`.
-- Il resto — the `compact` reassurance rule, reduced motion vs content, the 20 surfaces and how to add the twenty-first — in `doc/guide/stati.md`.
+  failed read is checked BEFORE the empty branch, always: every query defaults to `[]`/`undefined`.
+- `resolveSurfaceState({ loading, failed })` is the ONE decision on a surface's state; never `loading || !data`.
+- `describeReadFailure` requires its `consequence`; a service must not swallow its failure into zeros.
+- `Skeleton` is the only muted placeholder; a toast's severity is the icon and a 2px rule, never a `bg-*/10` surface;
+  a failed WRITE speaks `describeWriteError`, never `(err as Error).message`.
+- Il resto — why `loading` wins over `failed`, `canRetry`/`onRetry`, the decorative `isError` branch, the `compact`
+  reassurance rule, reduced motion vs content, the 20 surfaces and the twenty-first — in `doc/guide/stati.md`.
 
 ### Dialog e form trasversali → `doc/guide/dialog.md`
-- A modal is a tile lifted off the page (DESIGN.md → The Modal-Is-A-Tile Rule): eyebrow · title 20px · reading · body ·
-  footer, all owned by `ResponsiveModal` — a caller passes content, never chrome, and never orders the footer with
-  `useMediaQuery`. Four widths and no others: `sm` 420 · `md` 560 · `lg` 720 · `xl` 960.
-- The reading IS the status line: `describeModalStatus` + `ModalStatusLine`, ONE stable `role="status"` node that is
-  also Radix's `Description` — never swap it for `alert`.
-- `describeWriteError` (`lib/utils/dialogNarrative.ts`) is the ONE translation of a failed write; a server sentence
-  survives only if the thrower marks it `userFacingError`.
-- Two-click confirms live in `lib/hooks/useArmedDelete.ts`: no timer, ever; Escape while armed means DISARM, enforced
-  through `hasArmedConfirm()` in `ResponsiveModal`'s `onEscapeKeyDown`. The two form rules stay here: § Dialog Form Reset, § Two-Step Create Dialogs.
-- Il resto — the status-line a11y traps, the `bg-muted` summary block, the singular eyebrow, the light-mode «lifted» test trap, the blind spots — in `doc/guide/dialog.md`.
+- A modal is a tile lifted off the page (DESIGN.md → The Modal-Is-A-Tile Rule): `ResponsiveModal` owns the shell, a
+  caller passes content, never chrome. Four widths and no others: `sm` 420 · `md` 560 · `lg` 720 · `xl` 960.
+- The reading IS the status line (`describeModalStatus` + `ModalStatusLine`, ONE stable `role="status"` node, never
+  `alert`); `describeWriteError` (`lib/utils/dialogNarrative.ts`) is the ONE translation of a failed write.
+- Two-click confirms live in `lib/hooks/useArmedDelete.ts`: no timer, ever; Escape while armed means DISARM
+  (`hasArmedConfirm()`). The two form rules stay here: § Dialog Form Reset, § Two-Step Create Dialogs.
+- A controlled modal with no Radix `Trigger` drops focus on `body` when it closes unless the caller passes
+  `returnFocusTo`, taken from `event.currentTarget` at the click (2026-09-20, pinned by `e2e/performance.degraded.spec.ts`).
+- Il resto — the footer order, the status-line a11y traps, `userFacingError`, the `bg-muted` block, the singular
+  eyebrow, the armed detail's READING, `triggerOrigin` at the click, no focus below 769px — in `doc/guide/dialog.md`.
 
 ### Settings — the FIVE places → `doc/guide/impostazioni.md`
-- A new setting must land in all five or it silently disappears: the type (`types/assets.ts`), the read mapping in
-  `assetAllocationService.getSettings`, BOTH write chains in `setSettings` (the `targets` branch is `setDoc` with no
-  merge), and the state/load/save/dirty-snapshot wiring wherever the field's own Save button lives. `settingsRoundTrip`'s
-  `STORED_SETTINGS` fixture must carry it.
-- A user-clearable field has a different shape per branch — `delete docData.x` (no-merge) vs `deleteField()` (merge) —
-  guarded by `'x' in settings`, never `x !== undefined`; safe only because `getSettings` returns EVERY key.
-- SIXTH place for anything the SERVER reads (`lib/services/dashboardOverviewService.ts`), SEVENTH for the periodic emails
-  (`getSettingsAdmin`, `lib/server/monthlyEmailService.ts`); neither is covered by the round-trip.
-- Only a hard refresh proves a setting was saved; one Save per page; booleans stored, never derived; a dirty snapshot
-  follows the tab that EDITS a field.
-- Il resto — la storia dei quattro campi senza guardia, il secondo Salva dei Dividendi, `cashflowHistoryStartYear` condiviso — in `doc/guide/impostazioni.md`.
+- A new setting lands in all five or it silently disappears: the type (`types/assets.ts`), `getSettings`, BOTH write
+  chains in `setSettings`, the wiring where its own Save lives — and `settingsRoundTrip`'s `STORED_SETTINGS` fixture.
+- SIXTH place for anything the SERVER reads (`lib/services/dashboardOverviewService.ts`), SEVENTH for the periodic
+  emails (`getSettingsAdmin`); neither is covered by the round-trip.
+- A user-clearable field is guarded by `'x' in settings`, never `x !== undefined`. Only a hard refresh proves a
+  setting was saved; one Save per page; booleans stored, never derived.
+- Il resto — il ramo `targets` senza merge, `deleteField()`, lo snapshot dirty che segue il tab che MODIFICA, i quattro
+  campi senza guardia, il secondo Salva dei Dividendi, `cashflowHistoryStartYear` — in `doc/guide/impostazioni.md`.
 
 ### Demo Mode · Shared Account / Delegated Access → `doc/guide/account-condiviso-demo.md`
-- **Demo**: the landing (`app/page.tsx`) auto-logs into the demo account; `useDemoMode()` (`lib/hooks/useDemoMode.ts`)
-  compares `user.uid` with `NEXT_PUBLIC_DEMO_USER_ID` and **gates every mutation** — the account's data is shared by
-  every visitor, and the assistant is blocked outright.
+- **Demo**: `useDemoMode()` (`lib/hooks/useDemoMode.ts`) **gates every mutation** — the demo account's data is shared
+  by every visitor, and the assistant is blocked outright.
 - **Viewer vs owner**: `useAuth().user` is the viewer and never changes; `useActiveAccount().ownerId` is whose data is
-  displayed. Data-scoped hooks and pages take `ownerId`; `user.uid` stays only for theme, profile, PDF author,
-  `useDemoMode` and the sharing UI. Manual `useEffect` loaders include `ownerId` in their deps.
-- **Grant model**: `account-access/{ownerUid}` with `memberUids`, read by the rules and the `array-contains` discovery
-  query. **Three enforcement layers, kept in sync**: `firestore.rules` (`canAccess(ownerUid)`, `account-access` is
-  write:false), `assertCanAccessAccount` on Admin routes, the client substituting `ownerId`. Rules changes are inert until deployed.
-- Il resto — il banner demo, il dettaglio per collezione delle rules, lo switcher in Sidebar E `SecondaryMenuDrawer` — in `doc/guide/account-condiviso-demo.md`.
+  displayed. Data-scoped hooks and pages take `ownerId`; manual `useEffect` loaders include it in their deps.
+- **Three enforcement layers, kept in sync** over the grant `account-access/{ownerUid}`: `firestore.rules`,
+  `assertCanAccessAccount` on Admin routes, the client substituting `ownerId`. Rules changes are inert until deployed.
+- Il resto — l'auto-login dalla landing, dove resta `user.uid`, `memberUids` e la discovery, il banner demo, le rules
+  per collezione, lo switcher in Sidebar E `SecondaryMenuDrawer` — in `doc/guide/account-condiviso-demo.md`.
 
 ### Color Theme System → `doc/guide/temi.md`
-- **Parallel theming**: next-themes owns `.dark`, the custom system owns `data-theme` (`[data-theme="name"]` light,
-  `.dark[data-theme="name"]` dark; `ColorThemeContext` inside `AuthProvider`). **The theme is an external store**
-  (`useSyncExternalStore` over localStorage, `'default'` as the server snapshot, 2026-09-06).
-- **`useChartColors` timing**: `useEffect + useState + requestAnimationFrame`, NOT `useMemo`. **The token you AUTHOR is
-  not the token the browser RETURNS**: Turbopack transpiles `oklch()` to `lab(…)`, so never assert `/^oklch\(/` and know
-  the luminance fallback is inert there (2026-08-30).
-- **A user-chosen identity colour is a SLOT, not a hex** (`'chart-1'..'chart-8'`, `resolveCostCenterColor`): migrate
-  without a backfill, derive the no-colour fallback from the document id; indices 0-7 theme-aware, 8-9 static.
-- Il resto — il filtro di luminanza oklch, `useActionColors`, i sign token contati per tema, il significato fisso di `--chart-6/7/8`, `getAssetClassCssVar`, la checklist «Adding a theme» — in `doc/guide/temi.md`.
+- **Parallel theming**: next-themes owns `.dark`, the custom system owns `data-theme` (an external store, 2026-09-06).
+- **`useChartColors` timing**: `useEffect + useState + requestAnimationFrame`, NOT `useMemo`. The browser RETURNS
+  `lab(…)`, not the `oklch()` you authored: never assert `/^oklch\(/` (2026-08-30).
+- **A user-chosen identity colour is a SLOT, not a hex** (`'chart-1'..'chart-8'`, `resolveCostCenterColor`); indices
+  0-8 theme-aware (`--chart-9` is Storico's «Previdenza» band), 9 static.
+- **Every theme block is held to the distinctness floor** (`__tests__/chartPaletteDistinctness.test.ts`, all twelve
+  since 2026-09-20): nine slots, ΔE00 ≥ 14 between any two. A new theme or a moved slot runs it first.
+- Il resto — il filtro di luminanza oklch, gli slot senza backfill, la tinta tenuta tra i due modi, `useActionColors`,
+  i sign token per tema, `--chart-6/7/8`, `getAssetClassCssVar`, «Adding a theme» — in `doc/guide/temi.md`.
 
 ---
 
@@ -532,7 +546,9 @@ file used to carry.
   `PageHeader`, `page-main` on the layout's `<main>`; a `forceMount` tab panel is `display: none` and does not count.
   Do not name the tile grid — several pages render more than one.
 - `useCountUp` always with `once: true`, called **before** any conditional early return and unconditionally for both
-  branches of a mode switch; it has **no `enabled` option**, so gate the display in JSX. **`layout="position"`, not bare
+  branches of a mode switch; it has **no `enabled` option**, so gate the display in JSX. **A `fromPrevious` count-up
+  passes `landFirstValue`** (2026-09-23): a figure that settles between previews has no previous value on mount, and a
+  count from zero there paints «0 €» under a track or a chip already at its share — two readings of one figure. **`layout="position"`, not bare
   `layout`, when a Framer parent wraps a Radix `CollapsibleContent`** — bare `layout` stretches the trigger text.
 - **Collapsible technique, by content shape:** nested rows expanding into sub-rows → pure CSS `grid-rows-[0fr] →
   grid-rows-[1fr]` with an `overflow-hidden` child and `inert` on the closed wrapper (Framer + `height:'auto'` left
@@ -587,6 +603,7 @@ file used to carry.
 - **`<Legend content=>` needs a module-level component** — an inline arrow makes a new ref every render and the legend
   flickers on unrelated state. `Legend` reads `<Bar fill>`, not `<Cell>`: always set `fill` on the `<Bar>`.
   **`formatter`'s first param is `ValueType | undefined`** — never type it `number`.
+- **The legend is `SeriesLegend`, never Recharts' `<Legend>`** (`components/ui/series-legend.tsx`, 2026-09-20): `<Legend>` prints each label in its series colour — a chart slot as 11px TEXT measured 3,64 · 4,02 · 2,62:1 — and names its icons in English («… legend icon»). One entry per SERIES: a bar that turns red under the baseline is one entry with two swatches, not a fourth series. **One word, one colour per page**: a series named «Mercato» takes the slot «Mercato» has everywhere else on that page, whatever its position in the chart (`LaborMetricsChart` gave it `--chart-5` beside a Driver that paints it `--chart-1`); a reference series that is not a part of the total takes the neutral ink, dashed.
 - **Accessibility goes on the chart, not a wrapper**: Recharts 3.x already puts `tabIndex=0` + `role="application"` on its
   `<svg>`, so pass `role="img"` + `aria-label` + `accessibilityLayer={false}` to the chart itself — and `role="img"` also
   hides the `<Legend>`, so the label must carry the colour→name mapping.
@@ -616,6 +633,16 @@ file used to carry.
 - A sticky `<thead>` needs a fully opaque token, never an alpha background.
 
 ### Navigation
+- **A `PageTabs` panel names ITSELF** (2026-09-21): `PageTabBar` renders plain buttons, not Radix
+  `TabsTrigger`s, so every `TabsContent` was born with an `aria-labelledby` naming a trigger id that
+  does not exist and had an EMPTY accessible name. A panel takes `id={pageTabPanelId(layoutId,
+  value)}`, an `aria-label`, and `aria-labelledby={undefined}` to drop Radix's own; the tabs take
+  `aria-controls` through `renderedPanels`, which a page with lazily mounted panels must pass — an
+  `aria-controls` naming a panel that was never opened is the same dangling reference from the other
+  end. Pinned by `e2e/cashflow.split.spec.ts`.
+- **An inactive `PageTabs` panel keeps its `div`, not its CONTENT** (2026-09-22): Radix renders the panel (so its id
+  and `aria-controls` survive) but unmounts the children, so a field of another tab is not in the DOM and a spec
+  anchors on the OPENED panel (`#<layoutId>-panel-<tab> section`), never on a tile of a tab that is not showing.
 - **Single source for nav arrays**: `lib/constants/navigation.ts` — Sidebar, BottomNavigation and SecondaryMenuDrawer all
   import from it, never redeclare inline. **A route link in the shell is a `SceneLink`** (`components/layout/SceneLink.tsx`,
   a `next/link` whose plain left click runs the page scene — prefetch, modifier clicks, `target` and the caller's own
@@ -632,6 +659,9 @@ file used to carry.
   size on `sidebarMenuButtonVariants` (`size-11!`, `p-3.5!`, `justify-center`) are what make every collapsed target
   44×44; `SidebarGroup`/`SidebarHeader`/`SidebarFooter` drop to `p-1.5` in icon mode for the same reason. A custom
   button in the rail (the collapse toggle) needs its own `group-data-[state=collapsed]:size-11`.
+- **`PageHeader` mounts its `actions` TWICE** (desktop row, phone navbar): a `ref` on an action lands on whichever
+  copy mounted last and `querySelector` finds the HIDDEN one first (width 0, 2026-09-18). Take the pressed node from
+  `event.currentTarget` (`app/dashboard/page.tsx`, «Crea snapshot»); measure the copy with `offsetWidth > 0`.
 - **`PageContainer`** is the 1920px root of a tile page (its only width since 2026-09-06); the loading state must use the same width or
   the page jumps when data lands (the Panoramica's skeleton was 1600 while the page was 1920). The loading state of a
   tile page is `TileGridSkeleton` with the page's own `cells` — never a per-page skeleton component.
@@ -650,6 +680,10 @@ file used to carry.
   so split the help copy (`hidden desktop:block` / `desktop:hidden`) and label each card's axes explicitly.
 - **Prefer rendering large local subtrees as pure render helpers or top-level components** — a nested JSX definition
   inside a page component means a simple row selection remounts the whole table. `cn` is NOT auto-imported in pages.
+- **A radius on the element that carries a `divide-y` hairline bends the ends of the rule** (2026-09-18,
+  `AssistantThreadList`): the `li` stays square, the hover/selected wash goes on an inner box.
+- **A tile's footer is ONE line; the method goes behind «Come si calcola»** (`components/ui/tile-method-note.tsx`, 2026-09-20): help printed on every tile at all times stops being read, and an 11px footnote at full tile width runs to 95–130 characters a line (the detector's `line-length`). The line that stays says what the figures ARE; name the trigger after its subject — a page carries several. **A list that must add up adds up ON SCREEN**: round every row to the printed unit and give the drift to the row that is a remainder by definition, or the reader who checks it finds a euro missing.
+- **A tile stretched beside a taller neighbour is cured in the GRID, never in the tile** (2026-09-20, Rendimenti): moving eight method footers behind «Come si calcola» made the voids BIGGER (Benchmark ~170 → ~215px, Plusvalenze ~280 → ~380px). Tiles share a row only with tiles of their own height; below that row use two columns at natural height — wrappers `contents` below `desktop:`, `desktop:flex desktop:flex-col` from it — and let the ONE element that can be any height (a chart, `desktop:flex-1`) take the slack. Keep the DOM in the desktop order so Tab follows the eye; the phone re-orders with `order-*` (Storico and Rendimenti are the worked examples).
 - **A row's caption WRAPS, it is never truncated, and the label column never grows to make room for it** (2026-09-14,
   `RankedRows`): «30 set · Asilo nido · in calendario» is the row's second fact, and a cut fact is no fact. The column
   cannot grow — at 4 grid columns 46% is the most it can take beside the bar's 40px floor, the amount and the share
@@ -663,7 +697,12 @@ file used to carry.
   `size="icon"` defaults to 36px). **Actions hidden with `opacity-0` are unreachable on keyboard AND invisible on
   touch** — gate them behind `[@media(pointer:fine)]:` variants.
 - **A non-interactive element with `onClick` needs `role="button"`, `tabIndex={0}`, `aria-label`, an Enter/Space
-  `onKeyDown` and a focus ring — better still, use a native `<button>`.**
+  `onKeyDown` and a focus ring — better still, use a native `<button>`.** **But an `aria-label` on a
+  `role="button"` REPLACES its contents**: the row of Allocazione's Per classe carried «Espandi Azioni» and a screen
+  reader therefore heard eight class names and not one percentage, on the tile that IS that page's data table
+  (2026-09-21). When the element's own text is the information, it must BE the accessible name — the
+  expand/collapse wording moves onto the chevron as `sr-only` text. An `aria-label` is for a control whose content
+  says nothing (an icon), never for one whose content is the point.
 - **Tabs**: `role="tab"` + `aria-selected` inside a `role="tablist"` with an `aria-label`; for a real tab/panel
   relationship also wire `id` + `aria-controls`. **A `SegmentedPill` that picks a VALUE the whole page reads (an axis
   year, a period) is `semantics="radio"`** — a tablist with no tabpanel is a promise the DOM cannot keep; `tabs` only
@@ -696,7 +735,8 @@ file used to carry.
   cell, `text-destructive`): a sentence inside the button wraps in a 90px action column (owner's tour, 2026-09-13,
   `VersamentiTile`). **One live region per list, not per row** — a `role="status"` per `DeleteButton` made a
   keyboard reader hear «Eliminazione annullata» on every Tab away from an armed button.
-- **`desktop:h-7` is 28px — never for a target.** The `h-11 → desktop:h-8` idiom (44 → 32, the dense-list floor
+- **A list of same-kind controls is ONE Tab stop** (`lib/hooks/useRovingFocus.ts`, 2026-09-20): 24 row checkboxes put «Dettaglio» ~55 Tabs from the top of Storico. Spread `containerProps` on the wrapper and `itemProps(i)` on each control (arrows, Home/End; the hook finds its items through `data-roving-item` and hands out no ref), and say it once in an `sr-only` hint the table is `aria-describedby`. **The dashboard's first Tab stop is «Vai al contenuto principale»** (`app/dashboard/layout.tsx` → `#page-main`, `tabIndex={-1}` on `<main>`), and **a tile's eyebrow is an `<h3>`** under the verdict's `<h2>` (`components/ui/tile.tsx`): a page of nine tiles listed two headings. A spec that starts a keyboard walk presses Tab right after the load — a click on `body` moves the sequential-focus start past the skip link.
+- **`desktop:h-7` is 28px — never for a target.** `AsideToggle` is `desktop:h-8` since 2026-09-20. The `h-11 → desktop:h-8` idiom (44 → 32, the dense-list floor
   above) is the one to copy; four Previdenza sites shipped 28px until 2026-09-13, and a 1440px tablet in landscape
   reads the desktop layout by touch (CLAUDE.md → Known Issues).
 - **Form error text needs the sign token too**: `text-red-500` fails AA in both modes on a dialog surface AND diverges
@@ -718,6 +758,10 @@ file used to carry.
   than in what you touched. Run `npm install` first.
 - `npm test -- <file>` / `npx vitest run <file>` for targeted tests; **`npx tsc --noEmit` before any PR**, re-run AFTER
   writing the tests, not only after the code.
+- **Never `git checkout <file>` to undo ONE edit on uncommitted work** (2026-09-24): it restores the COMMITTED file and
+  silently throws away the whole session's rewrite of it — the dev server then failed to build and a full Vitest run
+  had 17 reds before anyone noticed. A falsification is undone with the same tool that made it (the one line back),
+  and `tsc` runs again before the next suite.
 - **`npm run lint` is at zero since 2026-09-06 and stays there**: a new `any` gets its real type, a new `eslint-disable`
   is not written. The config ignores `.agents/**` (the plugin's vendored scripts) and the `.next-*/**` dist dirs — a
   Playwright run used to leave ~170 generated-file findings behind.
@@ -726,17 +770,14 @@ file used to carry.
   one-time cost lands on whichever case runs first, so the failure moves with the run order and reads as flakiness.
 - **A `tsc` that fails only inside `.next/dev/types/validator.ts` (TS1109 "Expression expected") is a half-written
   generated file** left by a dev server killed mid-write: delete that one file, never the whole `.next` of a server
-  someone else may be running.
+  someone else may be running. The Playwright server leaves the same in `.next-e2e/dev/types/` (2026-09-20:
+  `routes.d.ts` TS1434, then `validator.ts` missing `./routes.js` once it is gone) — there the `types` directory goes
+  whole: it is generated, and that server is the suite's alone.
 - **A surface with no DOM is verified by RENDERING it** — `tsc` and Vitest see neither a dropped glyph nor an off-token
-  colour. PDF: `renderToFile` from `@react-pdf/renderer` under Vitest, inflate the content streams with `zlib`, collect
-  every `scn` operand (no colour outside `printTokens`), read the hex text runs (silently dropped characters). Emails:
-  open the rendered HTML in Chromium (`chromium.launch()`, `file://`) at 390 / 600 / 1440 and assert
-  `documentElement.scrollWidth === clientWidth`. Both are throwaway scripts run from INSIDE the repo (or `playwright`
-  and the `@/` alias do not resolve); neither check lives in the suite. **A render with hand-built data proves the
-  WORDS, not the data path** (2026-09-07: the Rendimenti section rendered 10/10 with typed-in metrics while the real
-  export still ran the base without the ledger — 26,05% against the page's 27,08%): run `fetchPDFData` itself through
-  the client SDK on the emulators, with `globalThis.fetch` prefixing the tour server's origin to the relative `/api/…`
-  routes the services call, and compare with the page's payload.
+  colour: the PDF through `renderToFile` under Vitest (every `scn` operand, the hex text runs), the emails in Chromium
+  at 390 / 600 / 1440; throwaway scripts run from INSIDE the repo, neither in the suite. **A render with hand-built
+  data proves the WORDS, not the data path** (2026-09-07): run `fetchPDFData` itself on the emulators. The recipe is
+  doc/guide/email-pdf.md § Verifying a surface with no DOM.
 - **A trial merge of an open PR runs in a worktree, never in the main checkout** (2026-09-07): fetch the head as
   `refs/pr/<N>`, `git merge --no-commit --no-ff refs/pr/<N>`, then `tsc`, the area suites and eslint, then `git merge
   --abort`. A worktree has no `node_modules`: a directory junction to the main one (`New-Item -ItemType Junction` in
@@ -755,21 +796,21 @@ file used to carry.
 | --- | --- |
 | Overview / materialized summary | `apiAuthRoutes`, `dashboardOverviewService`, `dashboardOverviewUtils` · **Verdetto e letture** `overviewNarrative` · **Badge** `savingsRateBadge` |
 | Rendimenti | `performanceService` (+ `performanceBase`, `drawdownSeries`, `cashFlowMap`) · **Attribuzione** `performanceAttribution`, `snapshotAssetBreakdown` · **Verdetto e letture** `performanceNarrative`, `performanceSummaryTiles`, `performanceSummary` (+ `patrimonioNarrative` for the articles) · **Browser** `e2e/performance.degraded.spec.ts` |
-| Storico | `storicoSummary`, `storicoNarrative`, `snapshotAssetBreakdown`, `chartService`, `historyComposition` · **FIRE/Goals** `fireService`, `monteCarloService`, `monteCarloSummary`, `monteCarloNarrative`, `goalService`, `goalMath`, `goalProposal`, `coastFireView`, `whatIfService`, `whatIfSummary`, `whatIfNarrative` |
+| Storico | `storicoSummary`, `storicoNarrative`, `snapshotAssetBreakdown`, `chartService`, `historyComposition`, `growthDrivers` · **Browser** `e2e/history{,.mobile}.spec.ts` · **FIRE/Goals** `fireService`, `monteCarloService`, `monteCarloSummary`, `monteCarloNarrative`, `goalService`, `goalMath`, `goalProposal`, `coastFireView`, `whatIfService`, `whatIfSummary`, `whatIfNarrative` |
 | Assistant | `assistantRoutes`, `assistantWebSearchPolicy`, `assistantMonthContextService` · **Verdetto e letture** `assistantNarrative` (+ `overviewNarrative` for the no-context verdict) · **Obiettivi** `assistantGoalEvaluation`, `assistantGoalEvaluationService`, `assistantMemoryExtraction`, `assistantMemoryStore` · **Goal-Based** `goalMath`, `goalProposal`, `apiAuthRoutes` |
-| Dividendi / cron | `dividendUseCase`, `dividendProcessor` · **Email** `monthlyEmailService` |
+| Dividendi / cron | `dividendUseCase`, `dividendProcessor`, `dividendAccount`, `dividendIncomeService` · **Email** `monthlyEmailService` |
 | Asset / bond | `assetDialogHelpers`, `couponUtils` |
 | Cashflow › Budget | `budgetUtils`, `budgetSummary`, `budgetNarrative` (+ `patrimonioNarrative` for the articles, `weeklyBudgetEmailService`, `monthlyEmailService`) |
-| Centri di costo | `costCenterSummary`, `costCenterNarrative` (+ `patrimonioNarrative` for the articles, `budgetNarrative` for `dayRef`), `costCenterUtils`, `costCenterColors` |
-| Cashflow › Divisione | `expenseSplitSummary`, `expenseSplitNarrative` (+ `cashflowNarrative` for the scheduled clause, `settingsRoundTrip` for the flag) |
+| Centri di costo | `costCenterSummary`, `costCenterNarrative` (+ `patrimonioNarrative` for the articles, `budgetNarrative` for `dayRef`), `costCenterUtils`, `costCenterColors` · **Browser** `e2e/cashflow.centri{,.mobile}.spec.ts` (own account, `npm run e2e:seed:centri`) |
+| Cashflow › Divisione | `expenseSplitSummary`, `expenseSplitNarrative` (+ `cashflowNarrative` for the scheduled clause, `settingsRoundTrip` for the flag) · **Browser** `e2e/cashflow.split{,.mobile}.spec.ts` (own account, `npm run e2e:seed:split`) |
 | Cashflow › Tracciamento | `tracciamentoSummary`, `cashflowNarrative` (+ `overviewNarrative` for `projectMonthEndSpending`, `patrimonioNarrative` for the articles) |
 | Impostazioni | **Letture** `settingsNarrative` · **Round-trip** `settingsRoundTrip` · **Formula** `equityBondsAutoTargets` · **Sblocco** `pensionUnlock` |
 | Accesso / Registrazione | **Verdetti, letture ed errori** `authNarrative` · **Policy** `registrationPolicy` (i due devono restare d'accordo sulla precedenza whitelist/flag) |
 | Landing pubblica | **Parole** `landingNarrative` · **Invarianti del profilo** `landingSampleData` (+ `authNarrative` per la promessa condivisa e la precedenza registrazioni) |
 | Cashflow › Dividendi | `dividendAnalytics`, `dividendiNarrative` (+ `patrimonioNarrative` for the articles) |
 | Analisi | `analisiSummary`, `analisiNarrative` (+ `cashflowNarrative` for the shared readings, `patrimonioNarrative` for the articles), `expenseGrouping`, `cashflowSankey`, `cashflowComposition`, `comparisonDeltas`, `expenseEntityStats`, `entitySearch` |
-| Transfers / cash | `cashBalanceReconciliation`, `updateCashAssetBalancesAtomic`, `transferFeature` · **Ricorrenze** `recurrenceDates` |
-| Allocazione | `allocationUtils` · **Ledger** `assetTransactionUtils`, `assetTransactionsRoutes`, `assetTransactionWriteTx` |
+| Transfers / cash | `cashBalanceReconciliation`, `updateCashAssetBalancesAtomic`, `transferFeature`, `cashSettlement`, `serverCashSettlement` · **Commissione** `transferFee` (+ `settingsRoundTrip`) · **Mutuo** `mortgageRepayment`, `mortgageSummary`, `updateAssetDebtFields` (+ `patrimonioNarrative` for the tile's words) · **Ricorrenze** `recurrenceDates` · **Browser** `e2e/cashflow.{accounts,transfer-fee,mortgage}.spec.ts` |
+| Allocazione | `allocationUtils`, `allocazioneSummary`, `allocazioneNarrative` · **Tinte d'azione** `actionColorContrast` (dodici blocchi tema) · **Browser** `e2e/allocation.spec.ts` · **Ledger** `assetTransactionUtils`, `assetTransactionsRoutes`, `assetTransactionWriteTx`, `saleTax`, `cents`, `periodSales` · **Browser** `e2e/assets.sale-tax.spec.ts` |
 | Fondo pensione | `pensionDeduction`, `pensionContributions`, `pensionReturn`, `pensionContributionService`, `performanceBase`, `pensionFire`, `pensionUnlock`, `pensionFamilyMembers` + the transfer trio · **Verdetto e letture** `pensionSummary`, `pensionNarrative` |
 
 Touching `types/assets.ts`'s `AssetType` also means `assetDialogHelpers` + `allocationUtils` + the three ledger suites;
@@ -782,146 +823,51 @@ widening `AssetClass` also means `ASSET_CLASS_SEQUENCE` and everything reading i
   dependency, `ignoreExportsUsedInFile: true` — remaining EXPORT_ONLY findings are deliberate prop surface.
 - Emulators, Playwright, production-build verification and their environment traps: **SETUP.md → Steps 6-7**.
 
-### Proving a refactor changed no number
-- **Measure the noise floor BEFORE interpreting a diff**: anything downstream of `new Date()` drifts (cents at two
-  minutes, ~0,25 € at forty), so two dumps of unchanged code come first and whatever they disagree on is not your change.
-  **The valid comparison is old-vs-new MINUTES apart**: `git checkout --` the modified files, delete the new ones, dump,
-  restore from a patch (`git diff > …` + `git apply --include=…`, a whole-tree patch fails on files never reverted).
-- **Compare the SET of rendered values, not the page text** (a redesign moves everything): every euro amount and
-  percentage of the old dump must match one of the new within the noise floor — new values are the feature, missing
-  old values the bug. Drive it from a throwaway Playwright spec that opens every collapsible and samples charts by
-  hovering at fixed fractions of their width, so figures behind a disclosure or inside a tooltip are captured too.
-
-### Emulator Exercise Scripts
-A collection whose value is in the *wiring* gets one: the unit suites mock Firestore away, so only an exercise covers
-the rules permitting the writes, real `Timestamp` values surviving `removeUndefinedDeep` and the real atomic transaction.
+### Emulator Exercise Scripts → `doc/guide/e2e-emulatori.md`
+- A collection whose value is in the *wiring* gets an exercise: the unit suites mock Firestore away, so only an exercise
+  covers the rules, real `Timestamp` values through `removeUndefinedDeep` and the real atomic transaction.
 - **A throwaway is an `.mts` FILE run from INSIDE the repo** (`scripts/*.tmp.mts`, untracked, deleted in phase F): a
-  `.ts` script is CJS under tsx with no top-level await (nor has `npx tsx -e`); a bash heredoc with an apostrophe or a
-  backtick dies with «unexpected EOF» before running a line (2026-08-25) — and the tracked files are CRLF on a Windows
-  clone, so an exact-match patch from a script must normalise `\r\n` before comparing and restore it on write
-  (2026-09-07); from the session scratchpad `firebase-admin`
-  fails with `ERR_MODULE_NOT_FOUND` and the seed dies silently before the login it was meant to enable. A throwaway
-  Playwright spec likewise lives in `e2e/` (it must match a project's `testMatch`), may override the session with
-  `test.use({ storageState: { cookies: [], origins: [] }, viewport, deviceScaleFactor, colorScheme })` and log in
-  through the form; a README capture hides the Next dev badge first (`page.addStyleTag({ content: 'nextjs-portal {
-  display: none !important; }' })`).
-- **Drive the mutations through the app's services** (client SDK, rule-evaluated) and the script's own reads and fixture
-  edits with the Admin SDK — from an `.mts` file a `doc()` imported there rejects a `db` built here while sign-in still
-  works, which makes the failure look unrelated. Verify by **two independent paths** (the expected figure computed in
-  the script from the same real snapshots; a same-code-path comparison is circular).
-- **On a shared account an exercise cannot pin ABSOLUTE values** (a pension exercise expecting 10.000 read 39.800 —
-  another seed's fund was still there): derive the expectation from what is ACTUALLY in the collection, then assert the
-  planted record is contained in it. **A throwaway fixture must not share document ids with the seed**
-  (`{uid}-{year}-{month}` is the trap): deleting it would delete the seed's rows — re-seed if it happens.
-- **A stale `.next-e2e` serves stale CSS as readily as stale routes**: a 404 on a route that exists, or a BRAND-NEW CSS
-  custom property reading `''` in the browser while it is in `app/globals.css` (2026-08-30, `--chart-6/7/8`), is that
-  cache. Delete the dist dir and restart before doubting your edit; prefer a fresh `NEXT_DIST_DIR=.next-throwaway`
-  (keep the `.next-` prefix, what `.gitignore` matches) over someone else's; `next dev` rewrites `tsconfig.json`
-  (check it out again) and keeps writing briefly after it is stopped (delete the dir after the process is gone).
-- **A Firestore `DELETE` on a missing document answers 200**, so a phase-F cleanup aimed at the wrong collection reports
-  success. Know where each write lands: a registration plants `users/{uid}` AND `assetAllocationTargets/{uid}`
-  (`setSettings` writes there, NOT to a `settings` collection — verified 2026-08-30); a throwaway account that logs in
-  also leaves `dashboardOverviewSummaries/{uid}` (written on the first dashboard visit). Confirm with
-  `listCollectionIds` and a `GET` per candidate, then grep the exported `output-0` for the uid before calling the
-  restore done.
-- **Reading PRODUCTION for a realistic test — read-only, and only this way** (2026-09-06): a throwaway `.mts` inside
-  the repo with the Admin SDK initialised from `.env.local` (`import nextEnv from '@next/env'` — it is CJS, the named
-  `loadEnvConfig` import fails) that calls nothing but `.get()`; a guard that refuses to run with
-  `FIRESTORE_EMULATOR_HOST` set; the dump written to the session scratchpad, never into the repo, and deleted with the
-  script. The analysis then runs the REAL pipeline functions over the dump with the client SDK routed to the (down)
-  emulators (`NEXT_PUBLIC_USE_FIREBASE_EMULATOR=true` + the demo `NEXT_PUBLIC_FIREBASE_*` vars), so nothing it does
-  can reach production. Production data has names with a leading space and rows at quantity 0: `trim()` and
-  `quantity > 0` are not hygiene, they are correctness.
-- **A production MIRROR in the emulators, for a tour on real data** (2026-09-07): `npm run mirror:seed -- <email>` and
-  `npm run mirror:remove` (`scripts/mirrorProdAccount.mts`). Two PROCESSES in one command, never one — the parent reads
-  production (the dump rules above: `.get()` only, refuses `FIRESTORE_EMULATOR_HOST`) and spawns itself as a child WITH
-  the emulator variables, the dump on its stdin, because the env var is per process and one Admin SDK cannot see both;
-  nothing touches the disk. The child re-keys everything to `prod-mirror` (`userId` on every row, the snapshot ids
-  `{uid}-{y}-{m}`, the per-user docs), creates `mirror@example.com` / `test1234`, and leaves the caches out so the app
-  recomputes with the current math. The account is a standard; the data is removed at the end of the session
-  (`MIRROR_UID=… npm run mirror:remove` clears one seeded under another id).
-- **Stopping the emulators: export FIRST, then kill.** `--export-on-exit` runs only on a SIGINT delivered to the
-  `firebase` CLI process itself: on macOS `kill -INT <cli pid>` does it (2026-09-06); on Windows, where only the wrapper
-  can be killed, POST `http://127.0.0.1:4400/_admin/export` with `{"path": "<abs>/.emulator-data"}` (forward slashes —
-  a backslashed path 400s; `/emulators/export` 404s), then terminate. **Verify the directory's mtime moved**: a 200 with
-  an unchanged mtime is the failure that looks like success — and a path that lost its slashes (`C:UsersGiuseppe…`,
-  2026-09-13) still answers 200 and writes a full export into a directory of THAT name in the repo root, which `git
-  status` then shows as untracked: delete it.
+  `.ts` script is CJS under tsx with no top-level await, a bash heredoc dies on an apostrophe (2026-08-25), and from the
+  session scratchpad `firebase-admin` fails with `ERR_MODULE_NOT_FOUND`. A throwaway Playwright spec lives in `e2e/`.
+- **Drive the mutations through the app's services** (client SDK, rule-evaluated), reads and fixture edits with the
+  Admin SDK; verify by **two independent paths** — a same-code-path comparison is circular. On a shared account never
+  pin ABSOLUTE values, and never share document ids with the seed.
+- **A Firestore `DELETE` on a missing document answers 200**: know where each write lands
+  (`assetAllocationTargets/{uid}`, not `settings` — 2026-08-30) and confirm with a `GET` before calling a cleanup done.
+- **Reading PRODUCTION is read-only and only one way** (2026-09-06): an in-repo `.mts` calling nothing but `.get()`,
+  refusing to run with `FIRESTORE_EMULATOR_HOST` set, the dump in the scratchpad. A tour on real data is the mirror:
+  `npm run mirror:seed -- <email>` / `npm run mirror:remove` (2026-09-07).
+- **Stopping the emulators: export FIRST, then kill, then verify the directory's mtime moved** — a 200 with an
+  unchanged mtime is the failure that looks like success. **`TaskStop` kills only the npm wrapper** (2026-09-19):
+  `next dev`, the `firebase` CLI and the Firestore `java` stay listening.
+- Il resto — the CRLF trap on a Windows clone, the stale `.next-e2e` / `NEXT_DIST_DIR=.next-throwaway` rule, the
+  two-process anatomy of the mirror, the Windows `_admin/export` call and its slash trap, a port 3000 held by another
+  app — in `doc/guide/e2e-emulatori.md`.
 
-### Browser-Driven E2E (Playwright)
-- **What belongs here**: only what needs a real layout — the `desktop:` switch at 1440px, a collapsible, a state flash,
-  computed font sizes, bounding boxes, overflow; the arithmetic stays with Vitest. **Two limits**: a race between
-  concurrent queries is not reproducible locally (the Firestore Web SDK multiplexes every target onto ONE webchannel),
-  and an error branch is not reachable by cutting the network (the SDK treats an unreachable backend as offline).
-- **`workers: 1`, non-negotiable** (the specs share emulator accounts). **Give the suite its OWN fixture**, tuned so the
-  thing under test is on screen at all (Analisi dates every expense to January so its figures are exact in any month;
-  Coast picks the RITA long-unemployment variant because the ordinary unlock falls past the projection) and say so in
-  the file. `e2e/global-setup.ts` runs every seed, in order Previdenza → Coast → degraded → Analisi, on EVERY
-  invocation: a new fixture is an `npm run e2e:seed:*` script plus one `spawnSync` there, and a test that patches
-  Firestore does it inside the test. **Re-seeding an account mid-suite logs it out** (`auth.updateUser(uid, { password })`
-  revokes the refresh tokens and the parked `storageState`): creation once from `global-setup`, data-only per test.
-- **`storageState` does NOT capture IndexedDB unless asked** (`{ path, indexedDB: true }`) — the Firebase session lives
-  there, the file looks valid and every spec lands on `/login`. **Drive the dev server on `localhost`, never
-  `127.0.0.1`**: Next blocks cross-origin dev resources from the bare IP, the page never hydrates and the login form
-  submits natively — indistinguishable from a wrong password.
-- **Prove the test can fail before trusting it** (the 1440px assertions were re-run at 1200px, where they must fail).
-- **Reading the page — the traps, each seen once**: `page.addInitScript` runs BEFORE `document.documentElement` exists
-  (observe `document` with `subtree: true`, or the script dies and the spec passes having observed nothing);
-  `innerText` applies `text-transform` and is `''` for anything not rendered (an uppercase eyebrow marker or an open
-  Recharts tooltip need `textContent`); `boundingBox()` is viewport-relative (`scrollIntoViewIfNeeded()` before hovering
-  a chart below the fold) and two calls sample two FRAMES (read every rect one assertion compares in ONE `evaluate()`,
-  never during an animation); responsive DOM duplicates make `.first()` the HIDDEN mobile copy (`.filter({ visible:
-  true })`); a collapsed CSS-grid region is still "visible" (scope through the toggle's `aria-controls` and measure
-  height); a `fill()` right after `goto(…, { waitUntil: 'domcontentloaded' })` is wiped by hydration (`waitUntil:
-  'load'`, then `.inputValue()`); `addInitScript` runs on EVERY navigation, reloads included, so a `localStorage.removeItem`
-  placed there to start clean also wipes the persistence the spec is about to verify — guard it with a `sessionStorage`
-  flag (2026-09-14). **Renaming an `aria-label` breaks every spec that matched its old substring** («Modifica asset» →
-  «Modifica {name}», `assets.bond.spec.ts` on 2026-09-14): grep `e2e/` for the old name in the same commit.
-- **Locators — the controls are not buttons** (2026-08-28: read the failure's page snapshot before guessing a second
-  selector): the Cashflow picker is a `combobox` named «Periodo selezionato: {label}», `SegmentedPill` options are
-  `tab`, the instalment toggle sits behind the «Impostazioni avanzate» disclosure, the two-step create dialog capitalises
-  its types («Spesa Variabile»), `CompositionList` rows are `<button role="listitem">` named `"{name}, {value},
-  {share}%"`, `PageTabBar` tabs are named at every width but icon-only below 1440px (`getByRole('tab', { name })`, not
-  `getByText`). `getByRole(…, { name })` matches SUBSTRINGS («Avvisi» resolves «Avvisi soglia») and `getByLabel` matches
-  substrings case-insensitively («Azioni (€)» resolves «Obbligazioni (€)» — a strict-mode violation naming two inputs
-  that reads as the field missing, 2026-08-30): pass `exact: true` on every generated field.
-- **Numbers on the page**: on the BASE account FIRE figures depend on the RUN MONTH, so a spec there asserts STRUCTURE
-  and FORMAT, never amounts; the euro regex must accept ungrouped four-digit amounts,
-  `(\d{1,3}(\.\d{3})+|\d{1,4}),\d{2}` (CLDR `minimumGroupingDigits = 2`, the *Italian Localization* trap); Node's
-  `Intl` puts a NARROW no-break space (U+202F) before `€`, the browser a plain one (U+00A0) — flatten both sides. A
-  decoy-absence check on Cashflow must scope to `[role="tabpanel"][data-state="active"]` — every tab stays mounted
-  (`forceMount`) and hidden.
-- **Three traps of a tour spec, each seen once (2026-09-07)**: `/dashboard/settings` opens on `?tab=allocazione`, so a
-  control of the Generale tile needs `?tab=generale` in the URL or it is never in the DOM; a Recharts legend repeats
-  the labels of the rows above it, so `getByText(label, { exact: true })` inside the tile is a strict-mode violation
-  (`.first()` — the rows come first); a dev server compiles a route on its first hit and the settings page takes more
-  than Playwright's 30s default (`test.setTimeout`), which reads as «element not found» on a page that is still
-  compiling.
-- **A settings change is only verified by a RELOAD** (2026-08-29: four fields wrote fine and came back old on the next
-  load — the form is rebuilt by `getSettings`, the half where the bugs live): drive the UI, save,
-  `page.reload({waitUntil: 'load'})`, assert on the INPUTS, and test setting and CLEARING separately.
-- **A two-click confirm in a spec waits for the ARMED label before the second click** (2026-09-13): on a cold dev server the
-  second `click()` on «Elimina operazione» landed on a button not yet re-rendered as armed and the row stayed, with no
-  error anywhere; `await expect(row.getByRole('button', { name: /Premi di nuovo per/ })).toBeVisible()` between the two
-  clicks, and `page.waitForResponse` on the DELETE to read its status, made the same step green. A first run against a
-  cold server also logs an overview «Lettura fallita» and a failed backfill that a warm server does not reproduce — read
-  the API bodies (`page.on('response')` on `/api/` ≥ 400) before calling either a defect.
-- **A throwaway spec: own config, right filename, removed by the app, deleted.** The broad `desktop` project collects any
-  `*.spec.ts`, so a spec written for its own fixture account fails under the base account in a full run — give it
-  `playwright.<name>.config.ts` with its own setup project and a narrow `testMatch`, run with `--config=`, delete it
-  before the full suite (2026-08-28). The FILENAME chooses the account: `*.spec.ts` → `desktop`, `*.mobile.spec.ts` →
-  `mobile`, `*.degraded.spec.ts` → degraded, and only a name containing `analisi.spec.ts` reaches the Analisi fixture
-  (`desktop` carries `testIgnore: /analisi\./`) — a name after what it verifies is not collected, or collected against
-  the WRONG fixture. It asserts on Firestore, plants a decoy word absent from the seed, and removes its fixture BY THE
-  APP, not by `curl -X DELETE` (2026-08-31: deleting a trade through the ledger's button re-ran the replay a REST delete
-  skips), looping the deletion because an earlier failed run may have left its own.
-- **Java for the emulators**: a JDK ≥ 21; on macOS the Homebrew OpenJDK is enough with `JAVA_HOME` unset (verified
-  2026-09-06); the Windows ritual (Temurin 21, the `javapath` shim, MSYS `PATH`, freeing a held port by PID) is
-  SETUP.md → *Local Verification Troubleshooting*. **Ports 8080/9099 answering is not proof that OUR emulators are up**
-  (2026-08-27: another repo's suite, `chronostep-9ab39`, took every seed into its own `demo-net-worth` namespace and
-  `auth.setup.ts` died on `auth/user-not-found`): read the owner's command line (`Get-CimInstance Win32_Process -Filter
-  "ProcessId=<pid>" | select CommandLine`), never kill a foreign suite, and wipe what the seeds left there with
-  `DELETE /emulator/v1/projects/demo-net-worth/databases/(default)/documents` and `…/projects/demo-net-worth/accounts`.
+### Browser-Driven E2E (Playwright) → `doc/guide/e2e-emulatori.md`
+- **What belongs in a browser test**: only what needs a real layout (the `desktop:` switch at 1440px, a collapsible, a
+  state flash, computed sizes, bounding boxes, overflow); the arithmetic stays with Vitest. A query race and an error
+  branch reached by cutting the network are NOT reproducible locally.
+- **`workers: 1`, non-negotiable**, and **each suite its OWN fixture** (an `npm run e2e:seed:*` script plus one
+  `spawnSync` in `e2e/global-setup.ts`). Re-seeding an account mid-suite logs it out: creation once, data-only per test.
+- **The FILENAME chooses the account**: `*.spec.ts` → `desktop`, `*.mobile.spec.ts` → `mobile`, `*.degraded.spec.ts` →
+  degraded, only `analisi.spec.ts` / `centri.spec.ts` / `split.spec.ts` reach those fixtures — and each of those three is
+  ALSO excluded from `desktop`/`mobile` by `testIgnore`, or it would run a second time on the base account. A throwaway spec gets its own
+  `playwright.<name>.config.ts` and is deleted before the full suite (2026-08-28).
+- **`localhost`, never `127.0.0.1`** (the page never hydrates and the login submits natively), and `storageState`
+  captures the Firebase session only with `{ path, indexedDB: true }`.
+- **Prove the test can fail before trusting it**, breaking ONE behaviour at a time (2026-09-18). **Assert on Firestore,
+  not on pixels**: plant a decoy word absent from the seed, and remove the fixture BY THE APP, not by `curl -X DELETE`
+  (2026-08-31). On the BASE account FIRE figures depend on the run month: assert STRUCTURE and FORMAT, never amounts.
+- **Proving a refactor changed no number**: measure the noise floor first (two dumps of unchanged code), compare
+  old-vs-new MINUTES apart, and compare the SET of rendered values, not the page text.
+- **In the cloud container** (2026-09-25) the pinned Chromium is missing (a throwaway `playwright.local.config.ts` sets
+  `executablePath`), its own Chromium groups «1.100 €» (four base specs read red there only), and no spec can import
+  `lib/` (no `@/` alias): doc/guide/e2e-emulatori.md.
+- Il resto — the page-reading traps (`addInitScript`, `innerText`, `boundingBox`, hidden mobile duplicates, hydration
+  wiping a `fill()`), the vaul drawer after Escape, locators that are not buttons and substring matching (`exact: true`),
+  the euro regex and U+202F, forcing a server flag on the response, the settings reload rule, the armed two-click
+  confirm, the three tour-spec traps, Java ≥ 21 and foreign emulators on 8080/9099 — in `doc/guide/e2e-emulatori.md`.
 
 ---
 
@@ -939,7 +885,17 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   intermediate links "live"** (the orphan still imports them) and **a function that always returns `[]` keeps its
   downstream pipeline "live"**: trace inward, verify each link, delete the chain in ONE commit.
 - **A green check that has never been seen red asserts nothing** — including the check's own arithmetic (a magnitude
-  filter meant for axis ticks also drops a legitimate reading). Break the thing under test once. **The fixture can make
+  filter meant for axis ticks also drops a legitimate reading). Break the thing under test once.
+  **And when a falsification stays GREEN, find which line actually holds the property and say so in the test**
+  (2026-09-21, three cases in one session): a sell that descends on the uncapped gap reconciles anyway because
+  `splitFromSurplus` re-caps at the capacity; a plan's `Math.max(0, gainFraction)` is inert because `estimateSaleTax`
+  already floors a loss; removing `itemProps` from `AsideToggle` does not add Tab stops because the explicit
+  `tabIndex` beside it holds them. Naming the load-bearing line is the point: otherwise the next reader deletes it as
+  dead code and the test stays green through the regression. **And the ASSERTION can be
+  the inert one** (2026-09-21, the monthly email's split tile): `expect(html).toContain('1400')` passes whatever the
+  amount cell says, because the caption two lines below prints the same figure — the test only went red once it read
+  the `<td align="right">` cells. When a falsification stays green, suspect the assertion's ANCHOR before the code.
+  **The fixture can make
   a branch unreachable**: `allocateByShare`'s rounding correction cannot fire on two shares, so a two-person fixture
   stayed green with the branch disabled — when falsification does NOT turn a test red, the test is the bug. **And a test
   can PIN the defect**: `summarizeLaborMetrics` counted the baseline's own month and had no right edge, and both
@@ -950,13 +906,12 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   category — the client Firestore rejects `undefined`) with a browser `console.warn` as the only trace; the E2E
   assertion on `performance-cache/{uid}` found it (2026-09-06, `e2e/performance.degraded.spec.ts`). `removeUndefinedDeep`
   before every `setDoc`, like every other write.
-- **A spec that edits a document another fixture also writes RESTORES what it read, never deletes** (2026-09-11):
-  `cashflow.owner.spec.ts` cleared `familyMembers` on `assetAllocationTargets/test-user-1` in its `finally`, the
-  Previdenza seed keeps «Marco» in that same field, and the two pension specs that ran after it failed with a verdict
-  missing the name. Read the fields before mutating, put back the value (or `FieldValue.delete()` only if it was
-  absent). A fixture ISIN must be one the account never held: `createAsset` re-links onto an existing asset whose
-  ISIN already has dividends. And a date planted at LOCAL midnight is 23:00 UTC of the day before — the form stores
-  `new Date('YYYY-MM-DD')`, UTC midnight, so every coupon derived from a local-midnight fixture reads the 14th.
+- **A spec that edits a document another fixture also writes RESTORES what it read, never deletes** (2026-09-11,
+  `cashflow.owner.spec.ts` against the Previdenza seed's `familyMembers`) — the WHOLE document when a page save rewrites
+  it (2026-09-25: Impostazioni's «Salva» dropped the seed's sub-targets and Allocazione's spec went red a file later;
+  `e2e/cashflow.transfer-fee.spec.ts` restores it with `set()`); a fixture ISIN is one the account never
+  held, and a fixture date is UTC midnight like the form's, never local midnight. The three cases:
+  doc/guide/e2e-emulatori.md § Browser-Driven E2E (Playwright).
 - **An assertion of ABSENCE needs a positive anchor first**: `toHaveCount(0)` passes against a page that has not
   rendered. Wait for something expected in both states (a `forceMount` panel: attached, not necessarily visible), then
   assert the absence; a browser check that never saw the feature ON proves nothing about it OFF.

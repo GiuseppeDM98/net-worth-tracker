@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tile, TILE_CELL_CLASS, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorNotice } from '@/components/ui/error-notice';
 import { describeReadFailure, resolveSurfaceState } from '@/lib/utils/statesNarrative';
 import { PageVerdict } from '@/components/ui/page-verdict';
@@ -38,6 +39,7 @@ import {
   buildSplitVerdict,
   describeCommonSpending,
   describeMemberBalance,
+  describeMemberCalendar,
   describeSalaryConsumed,
   describeSplitAside,
   describeSplitBasis,
@@ -46,10 +48,12 @@ import type { Expense } from '@/types/expenses';
 import type { FamilyMember } from '@/types/assets';
 
 // The desktop geometry of the grid below, so the skeleton has its proportions and nothing
-// jumps when the data lands.
+// jumps when the data lands. THREE cells, because the people share one: «In comune» over two
+// rows, «Quota» beside it, and the row of person tiles under that. It declared 5/7/7 against a
+// grid that landed 5/7/6/6 until 2026-09-21, and the page jumped every time the data arrived.
 const SKELETON_CELLS = [
   { span: 5, rows: 2, lines: 6 },
-  { span: 7, lines: 4 },
+  { span: 7, lines: 3 },
   { span: 7, lines: 4 },
 ];
 
@@ -122,9 +126,16 @@ export function ExpenseSplitTab({
     );
   }
 
-  // A person's tile spans half the row at two people and a third at three; past that the grid
-  // wraps rather than shrinking a tile past readability.
-  const memberSpan = summary.members.length >= 3 ? 'desktop:col-span-4' : 'desktop:col-span-6';
+  // THE PEOPLE SHARE ONE GRID CELL, and that is what makes the row close.
+  //
+  // They used to be two `desktop:col-span-6` cells of the page grid, beside an «In comune» that
+  // spans 5 over two rows: 5 + 6 = 11 of 12, so the second person did not fit, wrapped to a row
+  // of their own, and left 578×181 px of void beside them — measured at 1440 on 2026-09-21. The
+  // one comparison this page exists to make was a diagonal saccade across an empty corner.
+  // Inside a single 7-column cell the row is 5 + 7 = 12 exactly and the people stand side by
+  // side, at equal height, whatever their number.
+  const memberColumns =
+    summary.members.length >= 3 ? 'desktop:grid-cols-3' : 'desktop:grid-cols-2';
 
   return (
     <div className="space-y-4">
@@ -144,12 +155,26 @@ export function ExpenseSplitTab({
         {/* In comune — the pool, and what it is made of */}
         <div className={cn(TILE_CELL_CLASS, 'tablet:col-span-2 desktop:col-span-5 desktop:row-span-2')}>
           <Tile eyebrow="In comune" reading={describeCommonSpending(summary)}>
-            <p className="mt-3 font-mono text-[32px] leading-none tracking-tight desktop:text-[40px]">
-              {cachedFormatCurrencyEUR(summary.common.total, true)}
-            </p>
-            {commonRows.length > 0 ? (
+            {/* Nothing recorded is not a measured zero (DESIGN.md → The Absence-Has-Three-Names
+                Rule): with no shared row at all the tile carries NO figure, because a 40px `0 €`
+                asserts a measurement nobody took. A pool that really adds up to zero has rows,
+                and keeps its hero. */}
+            {summary.common.rowCount === 0 ? (
+              <EmptyState
+                className="mt-3"
+                message="Nessuna spesa in comune in questo periodo: ogni voce registrata è intestata a una persona."
+              />
+            ) : (
+              <p className="mt-3 font-mono text-[32px] leading-none tracking-tight desktop:text-[40px]">
+                {cachedFormatCurrencyEUR(summary.common.total, true)}
+              </p>
+            )}
+            {commonRows.length > 0 && (
               <div className="mt-5">
-                <p className={TILE_SUB_EYEBROW_CLASS}>Per categoria</p>
+                {/* The scope belongs on screen, not only in the list's accessible name: the same
+                    category prints a different figure and a different rank on Tracciamento, which
+                    ranks every row of the period and not just the shared ones. */}
+                <p className={TILE_SUB_EYEBROW_CLASS}>Per categoria · solo in comune</p>
                 <div className="mt-2">
                   <RankedRows
                     rows={commonRows}
@@ -163,10 +188,6 @@ export function ExpenseSplitTab({
                   />
                 </div>
               </div>
-            ) : (
-              <p className="mt-5 text-[11px] leading-[1.4] text-muted-foreground">
-                Nessuna spesa in comune in questo periodo.
-              </p>
             )}
           </Tile>
         </div>
@@ -193,41 +214,64 @@ export function ExpenseSplitTab({
           </Tile>
         </div>
 
-        {/* One tile per person: the sentence this page exists for */}
-        {summary.members.map((balance) => {
-          const consumed = describeSalaryConsumed(balance);
-          return (
-            <div key={balance.member.id} className={cn(TILE_CELL_CLASS, 'tablet:col-span-1', memberSpan)}>
-              <Tile
-                eyebrow={balance.member.name}
-                ariaLabel={`Quanto resta a ${balance.member.name}`}
-                reading={describeMemberBalance(balance)}
-              >
-                <p
-                  className={cn(
-                    'mt-3 font-mono text-[32px] leading-none tracking-tight',
-                    // The sign tokens mean money gained and lost, and a residual is exactly that.
-                    // With no basis there is no residual to colour — and no figure to print.
-                    balance.remaining === null
-                      ? 'text-muted-foreground'
-                      : balance.remaining < 0
-                        ? 'text-destructive'
-                        : 'text-positive'
-                  )}
+        {/* One tile per person — the sentence this page exists for — inside ONE grid cell, so the
+            people stand beside each other and the 12 columns close (see `memberColumns`). */}
+        <div className={cn('tablet:col-span-2 desktop:col-span-7', 'grid grid-cols-1 gap-3 tablet:grid-cols-2', memberColumns)}>
+          {summary.members.map((balance) => {
+            const consumed = describeSalaryConsumed(balance);
+            const calendar = describeMemberCalendar(balance);
+            return (
+              <div key={balance.member.id} className={TILE_CELL_CLASS}>
+                <Tile
+                  eyebrow={balance.member.name}
+                  ariaLabel={`Quanto resta a ${balance.member.name}`}
+                  reading={describeMemberBalance(balance)}
                 >
-                  {balance.remaining === null ? '—' : cachedFormatCurrencyEUR(balance.remaining, true)}
-                </p>
-                {consumed && (
-                  <NarrativeText
-                    segments={consumed}
-                    className="mt-auto pt-4 text-[11px] leading-[1.4] text-muted-foreground"
-                    figureClassName="font-medium"
-                  />
-                )}
-              </Tile>
-            </div>
-          );
-        })}
+                  <p
+                    className={cn(
+                      'mt-3 font-mono text-[32px] leading-none tracking-tight',
+                      // The sign tokens mean money gained and lost, and a residual is exactly
+                      // that — but only of money that has MOVED, so the colour follows the
+                      // booked figure. With no basis there is no residual to colour, and no
+                      // figure to print.
+                      balance.remainingBooked === null
+                        ? 'text-muted-foreground'
+                        : balance.remainingBooked < 0
+                          ? 'text-destructive'
+                          : 'text-positive'
+                    )}
+                  >
+                    {balance.remainingBooked === null ? (
+                      // The reading above already says why there is no figure; announcing the
+                      // dash as «Trattino» adds a word and no fact.
+                      <span aria-hidden="true">—</span>
+                    ) : (
+                      cachedFormatCurrencyEUR(balance.remainingBooked, true)
+                    )}
+                  </p>
+                  {(calendar || consumed) && (
+                    <div className="mt-auto pt-4 space-y-1">
+                      {calendar && (
+                        <NarrativeText
+                          segments={calendar}
+                          className="text-[11px] leading-[1.4] text-muted-foreground"
+                          figureClassName="font-medium"
+                        />
+                      )}
+                      {consumed && (
+                        <NarrativeText
+                          segments={consumed}
+                          className="text-[11px] leading-[1.4] text-muted-foreground"
+                          figureClassName="font-medium"
+                        />
+                      )}
+                    </div>
+                  )}
+                </Tile>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

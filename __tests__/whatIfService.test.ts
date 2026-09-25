@@ -30,6 +30,34 @@ function makeBaseline(overrides: Partial<WhatIfBaseline> = {}): WhatIfBaseline {
   }
 }
 
+describe('calculateWhatIfImpact — honest baseline (2026-09-24)', () => {
+  it('reads the FIRE number with the tax and the pensions in, on both sides of the event', () => {
+    const plain = calculateWhatIfImpact(makeBaseline(), { eventType: 'windfall', lumpSumAmount: 50_000 })
+    const taxed = calculateWhatIfImpact(
+      makeBaseline({ honest: { pensions: [], taxBrackets: [], withdrawalTax: { basisToday: 100_000, rate: 26 }, now: new Date('2026-04-12T00:00:00') } }),
+      { eventType: 'windfall', lumpSumAmount: 50_000 },
+    )
+    // 200k on a basis of 100k: half is gain, the number grosses up by 1 / (1 − 0,5 × 0,26).
+    expect(plain.fire.fireNumber.before).toBe(600_000)
+    expect(taxed.fire.fireNumber.before).toBeCloseTo(600_000 / 0.87, 4)
+    // The windfall lands as basis: 250k on 150k of basis is a 40% gain share, 1 / (1 − 0,104).
+    expect(taxed.fire.fireNumber.after).toBeCloseTo(600_000 / 0.896, 4)
+    expect(taxed.fire.fireNumber.after as number).toBeLessThan(taxed.fire.fireNumber.before as number)
+    // A purchase sells at the portfolio's gain share: 150k left on 75k of basis, still 50%.
+    const purchase = calculateWhatIfImpact(
+      makeBaseline({ honest: { pensions: [], taxBrackets: [], withdrawalTax: { basisToday: 100_000, rate: 26 }, now: new Date('2026-04-12T00:00:00') } }),
+      { eventType: 'majorPurchase', lumpSumAmount: 50_000 },
+    )
+    expect(purchase.fire.fireNumber.after).toBeCloseTo(600_000 / 0.87, 4)
+
+    const withPension = calculateWhatIfImpact(
+      makeBaseline({ honest: { userAge: 40, pensions: [{ id: 'p', label: 'INPS', grossMonthlyAmount: 1000, monthsPerYear: 13, startAge: 40 }], taxBrackets: [], now: new Date('2026-04-12T00:00:00') } }),
+      { eventType: 'windfall', lumpSumAmount: 0 },
+    )
+    expect(withPension.fire.fireNumber.before as number).toBeLessThan(600_000)
+  })
+})
+
 describe('applyScenarioToBaseline', () => {
   it('should reduce net worth by the lost-income window on job loss', () => {
     // Arrange

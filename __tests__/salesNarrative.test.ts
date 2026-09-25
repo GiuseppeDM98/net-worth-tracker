@@ -9,7 +9,14 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { declineHeadlineTail, describeOwnFlowsSplit, describeSales } from '@/lib/utils/salesNarrative';
+import {
+  declineHeadlineTail,
+  describeMonthSplit,
+  describePurchases,
+  describeSales,
+  isMaterialOtherChange,
+  taxedGrowthHeadline,
+} from '@/lib/utils/salesNarrative';
 import type { PeriodSalesSummary } from '@/lib/utils/periodSales';
 import { narrativeToText, type Narrative } from '@/lib/utils/narrative';
 
@@ -30,6 +37,13 @@ describe('describeSales', () => {
     // «circa» because the figure comes from the instrument's rate, not from the broker's statement.
     expect(plain(describeSales(SEPTEMBER_SALE))).toBe(
       'Hai venduto Vanguard FTSE All-World per 39.052 € con una plusvalenza di 15.726 € e pagato circa 4089 € di tasse.',
+    );
+  });
+
+  it('should drop «circa» when the whole tax is what the broker withheld', () => {
+    const withheld: PeriodSalesSummary = { ...SEPTEMBER_SALE, estimatedTax: 4092.5, taxIsWithheld: true };
+    expect(plain(describeSales(withheld))).toBe(
+      'Hai venduto Vanguard FTSE All-World per 39.052 € con una plusvalenza di 15.726 € e pagato 4093 € di tasse.',
     );
   });
 
@@ -68,18 +82,46 @@ describe('describeSales', () => {
   });
 });
 
-describe('describeOwnFlowsSplit', () => {
-  it('should split the change into the market and the own flows, exactly', () => {
-    // September 2026 on the real account: −4.937,74 € with the market at −1.078,73 €.
-    expect(plain(describeOwnFlowsSplit(-4937.74, -1078.73))).toBe(
-      'Di quel movimento, −1079 € viene dal mercato e −3859 € dai tuoi movimenti.',
+describe('describeMonthSplit', () => {
+  it('should split the change into the market, the savings and the other changes, exactly', () => {
+    // 4120,18 = 3980 + 1180 − 1039,82: «tuoi movimenti» was read as income − expenses, so the savings
+    // are named and what is left has its own name (owner, 2026-09-19).
+    expect(plain(describeMonthSplit({ delta: 4120.18, marketEffect: 3980, savings: 1180 }))).toBe(
+      'Di quel movimento: +3980 € dal mercato, +1180 € risparmiati, −1040 € di altre variazioni.',
     );
   });
 
-  it('should colour each half by its own sign', () => {
-    const segments = describeOwnFlowsSplit(4120.18, 3980);
+  it('should say what the second part holds when the savings are not known', () => {
+    expect(plain(describeMonthSplit({ delta: -4937.74, marketEffect: -1078.73, savings: null }))).toBe(
+      'Di quel movimento: −1079 € dal mercato e −3859 € tra risparmio e altre variazioni.',
+    );
+  });
+
+  it('should colour each part by its own sign', () => {
+    const segments = describeMonthSplit({ delta: 4120.18, marketEffect: 3980, savings: 1180 });
     expect(segments.find((segment) => text(segment) === '+3980 €')).toMatchObject({ mono: true, sign: 'positive' });
-    expect(segments.find((segment) => text(segment) === '+140 €')).toMatchObject({ mono: true, sign: 'positive' });
+    expect(segments.find((segment) => text(segment) === '+1180 €')).toMatchObject({ mono: true, sign: 'positive' });
+    expect(segments.find((segment) => text(segment) === '−1040 €')).toMatchObject({ mono: true, sign: 'negative' });
+  });
+});
+
+describe('isMaterialOtherChange', () => {
+  it('should say «altre variazioni» only from max(100 €, 5% of the change)', () => {
+    expect(isMaterialOtherChange(99.99, 500)).toBe(false);
+    expect(isMaterialOtherChange(100, 500)).toBe(true);
+    expect(isMaterialOtherChange(-100, 500)).toBe(true);
+    // 5% of 4213 = 210,65: the share wins over the floor.
+    expect(isMaterialOtherChange(150, 4213)).toBe(false);
+    expect(isMaterialOtherChange(211, -4213)).toBe(true);
+  });
+
+  it('should keep the clause when the residual is material, and drop it when it is not', () => {
+    expect(plain(describeMonthSplit({ delta: 4700, marketEffect: 2000, savings: 2100 }))).toBe(
+      'Di quel movimento: +2000 € dal mercato, +2100 € risparmiati, +600 € di altre variazioni.',
+    );
+    expect(plain(describeMonthSplit({ delta: 4250, marketEffect: 2000, savings: 2100 }))).toBe(
+      'Di quel movimento: +2000 € dal mercato e +2100 € risparmiati.',
+    );
   });
 });
 
@@ -103,5 +145,51 @@ describe('declineHeadlineTail', () => {
     };
     expect(declineHeadlineTail('taxes-despite-market', twoSales)).toBe(' per le tasse sulle vendite, non per il mercato.');
     expect(declineHeadlineTail('taxes-despite-market')).toBe(' per le tasse sulle vendite, non per il mercato.');
+  });
+});
+
+describe('describeSales — the month without the tax', () => {
+  it('should close on the counterfactual and leave an immaterial «altre variazioni» unsaid', () => {
+    // The real account, settembre 2026: Δ +124,32 €, market +2018,47 € (the month's traded quotes
+    // included), 2094,62 € saved so far, tax 4088,86 € — +100,09 € left for the other changes,
+    // under max(100 €, 5% of 4213 €): card spending not yet debited, not a cause (owner, 2026-09-19).
+    const segments = describeSales(SEPTEMBER_SALE, { delta: 124.32, marketEffect: 2018.47, savings: 2094.62 });
+    expect(plain(segments)).toBe(
+      'Hai venduto Vanguard FTSE All-World per 39.052 € con una plusvalenza di 15.726 € e pagato circa 4089 € di tasse: ' +
+        'senza, il mese avrebbe fatto +4213 € (+2018 € dal mercato e +2095 € risparmiati).',
+    );
+    expect(segments.find((s) => text(s) === '+2095 €')).toMatchObject({ mono: true, sign: 'positive' });
+  });
+
+  it('should not add a counterfactual when there is no tax to take out', () => {
+    const loss = { ...SEPTEMBER_SALE, realizedGain: -200, estimatedTax: 0 };
+    expect(plain(describeSales(loss, { delta: 124.32, marketEffect: 1480.59, savings: null }))).not.toContain('senza,');
+    const noRate = { ...SEPTEMBER_SALE, estimatedTax: null };
+    expect(plain(describeSales(noRate, { delta: 124.32, marketEffect: 1480.59, savings: null }))).not.toContain('senza,');
+  });
+});
+
+describe('describePurchases', () => {
+  it('should state what was bought beside the sale, as a fact', () => {
+    const withBuys = { ...SEPTEMBER_SALE, purchases: { amount: 34305.1, instrumentCount: 6 } };
+    expect(plain(describePurchases(withBuys))).toBe('Nello stesso mese hai comprato 6 strumenti per 34.305 €.');
+    const one = { ...SEPTEMBER_SALE, purchases: { amount: 1996.29, instrumentCount: 1 } };
+    expect(plain(describePurchases(one, 'anno'))).toBe('Nello stesso anno hai comprato 1 strumento per 1996 €.');
+  });
+
+  it('should say nothing without purchases, or on a payload that predates them', () => {
+    expect(describePurchases({ ...SEPTEMBER_SALE, purchases: null })).toEqual([]);
+    expect(describePurchases(SEPTEMBER_SALE)).toEqual([]);
+  });
+});
+
+describe('taxedGrowthHeadline', () => {
+  it('should name the instrument when one was sold, and the verb the caller speaks with', () => {
+    expect(taxedGrowthHeadline('Settembre', 'flat', SEPTEMBER_SALE)).toBe(
+      'Settembre è in pari: le tasse sulla vendita di Vanguard FTSE All-World si sono prese la crescita.',
+    );
+    expect(taxedGrowthHeadline('Il 2026', 'eroded', null, 'è cresciuto')).toBe(
+      'Il 2026 è cresciuto, ma le tasse sulle vendite si sono prese più di metà della crescita.',
+    );
   });
 });

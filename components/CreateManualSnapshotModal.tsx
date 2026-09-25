@@ -30,6 +30,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ASSET_CLASS_LABELS, ASSET_CLASS_SEQUENCE } from '@/lib/utils/allocationUtils';
 import { emptyClassAmounts, parseAmount, sumClassAmounts } from '@/lib/utils/manualSnapshotAmounts';
 import { Plus, Trash2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { MONTH_NAMES } from '@/lib/constants/months';
 
 interface CreateManualSnapshotModalProps {
   open: boolean;
@@ -207,7 +209,7 @@ export function CreateManualSnapshotModal({
         throw new Error(error.error || 'Errore durante la creazione dello snapshot');
       }
 
-      toast.success('Snapshot creato con successo!');
+      toast.success('Snapshot creato');
       onOpenChange(false);
       onSuccess?.();
 
@@ -257,9 +259,9 @@ export function CreateManualSnapshotModal({
     >
         <Tabs defaultValue="general" className="w-full">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="general" className="text-xs sm:text-sm">Dati Generali</TabsTrigger>
-            <TabsTrigger value="assetclass" className="text-xs sm:text-sm">Asset Class</TabsTrigger>
-            <TabsTrigger value="assets" className="text-xs sm:text-sm">Asset (Opzionale)</TabsTrigger>
+            <TabsTrigger value="general" className="text-xs sm:text-sm">Dati generali</TabsTrigger>
+            <TabsTrigger value="assetclass" className="text-xs sm:text-sm">Asset class</TabsTrigger>
+            <TabsTrigger value="assets" className="text-xs sm:text-sm">Strumenti (opzionale)</TabsTrigger>
           </TabsList>
 
           <TabsContent value="general" className="space-y-4 py-4">
@@ -278,21 +280,25 @@ export function CreateManualSnapshotModal({
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="month">Mese * (1-12)</Label>
-                <Input
-                  id="month"
-                  type="number"
-                  value={month}
-                  onChange={(e) => setMonth(e.target.value)}
-                  placeholder="1"
-                  min="1"
-                  max="12"
-                />
+                <Label htmlFor="month">Mese *</Label>
+                {/* Twelve names, not a number from 1 to 12: a constraint the control enforces needs no validation message. */}
+                <Select value={month} onValueChange={setMonth}>
+                  <SelectTrigger id="month" className="w-full">
+                    <SelectValue placeholder="Scegli il mese" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MONTH_NAMES.map((name, index) => (
+                      <SelectItem key={name} value={String(index + 1)}>
+                        {name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="total-net-worth">Patrimonio Totale (€) *</Label>
+              <Label htmlFor="total-net-worth">Patrimonio totale (€) *</Label>
               <Input
                 id="total-net-worth"
                 type="number"
@@ -309,7 +315,7 @@ export function CreateManualSnapshotModal({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="liquid-net-worth">Patrimonio Liquido (€) *</Label>
+                <Label htmlFor="liquid-net-worth">Patrimonio liquido (€) *</Label>
                 <Input
                   id="liquid-net-worth"
                   type="number"
@@ -322,7 +328,7 @@ export function CreateManualSnapshotModal({
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="illiquid-net-worth">Patrimonio Illiquido (€) *</Label>
+                <Label htmlFor="illiquid-net-worth">Patrimonio illiquido (€) *</Label>
                 <Input
                   id="illiquid-net-worth"
                   type="number"
@@ -457,7 +463,7 @@ export function CreateManualSnapshotModal({
                       </div>
 
                       <div className="grid gap-2">
-                        <Label htmlFor={`total-${index}`}>Valore Totale</Label>
+                        <Label htmlFor={`total-${index}`}>Valore totale</Label>
                         <Input
                           id={`total-${index}`}
                           type="number"

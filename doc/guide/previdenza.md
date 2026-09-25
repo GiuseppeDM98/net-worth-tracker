@@ -1,6 +1,12 @@
 # Previdenza (Fondo Pensione)
 
-> **Quando aprire questa guida** — chi tocca `app/dashboard/pension/page.tsx`, `components/pension/*`, `types/pension.ts`, `lib/utils/pension*.ts`, `lib/services/pensionContributionService.ts`. Esercizio emulatore `scripts/seedPensionE2E.mts`; specs `e2e/pension*.spec.ts`. In `AGENTS.md` resta lo stub con l'essenziale; qui c'è la regola completa. File: `CLAUDE.md` → *Key Files* → *Previdenza*.
+> **Quando aprire questa guida** — chi tocca `app/dashboard/pension/page.tsx`, `components/pension/*`, `types/pension.ts`, `lib/utils/pension*.ts`, `lib/services/pensionContributionService.ts`. Esercizio emulatore `scripts/seedPensionE2E.mts`; specs `e2e/pension*.spec.ts`. In `AGENTS.md` resta lo stub con l'essenziale; qui c'è la regola completa. File: § *Files*, sotto.
+
+## Files
+
+Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
+
+- **Previdenza**: `types/pension.ts`, pure `lib/utils/{pensionSummary,pensionNarrative}.ts` over `lib/utils/{pensionDeduction,pensionContributions,pensionReturn,pensionFire,pensionFamilyMembers}.ts` (`indexPensionSnapshots` = the snapshots reduced ONCE to the funds; `isPensionValueStale` = the ONE age of a hand-kept value), `lib/services/pensionContributionService.ts` (`assertFundValueLivesInQuantity`, `updatePensionFundValue`), `app/dashboard/pension/page.tsx`, `components/pension/*` (`PensionValueDialog`, `pensionStyles.ts`); the two modals' words in `lib/utils/dialogNarrative.ts`; collection `pensionContributions`
 
 ## Fondo Pensione
 
@@ -156,7 +162,8 @@
   as the next step, and `describeFondoOggiFooter` judges the value's age («valore fermo dal 12 ago 2026»,
   `valueIsStale` = last update in a closed month) instead of printing a neutral date. **That age is ONE rule**,
   `isPensionValueStale(resolveLastFundUpdate(funds), now)` in `pensionSummary.ts`, read by the hero's footer AND by the
-  modal's reading («da un mese chiuso») — the modal re-derived it by hand until the polish pass of 2026-09-13. «Anno fiscale» in the
+  modal's reading («da un mese chiuso») — the modal re-derived it by hand until the polish pass of 2026-09-13. Never
+  re-derive it in a component. «Anno fiscale» in the
   contribution form is a Select derived from the date (year −1 · year · year +1, the ±1 rule of the service now named
   beside the field by a `superRefine`); every error is wired to its field (`aria-invalid`, `aria-describedby`,
   `role="alert"`); the dialog's words are `PENSION_CONTRIBUTION_COPY` / `describePensionValueCopy` in
@@ -173,7 +180,8 @@
   fund, which can predate the first contribution, and `queryKeys.snapshots.all` is the cache Storico and Rendimenti
   share (a second key would be a second fetch); and painting the tax tiles before the snapshots resolve — the
   verdict's market clause needs them, and a page that shows tiles under a verdict it cannot yet say is worse than the
-  skeleton. Both are recorded here so the next audit does not re-propose them as bugs.
+  skeleton. Both are recorded here so the next audit does not re-propose them as bugs. In short — deliberately not
+  bounded: the `monthly-snapshots` query (shared cache) and the four-query skeleton (the verdict needs the snapshots).
 
 ## Per-page blind spots
 

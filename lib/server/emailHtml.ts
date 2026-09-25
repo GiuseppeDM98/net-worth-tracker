@@ -250,6 +250,12 @@ export interface EmailRankedRow {
   /** A second line under the label — a date, a subcategory. */
   caption?: string;
   amount: string;
+  /**
+   * Colours the AMOUNT by sign, for the lists whose amount is a gain or a loss rather than a size
+   * — a household residual, not a category total. Omitted everywhere else, where a ranked amount
+   * is a magnitude and a green one would assert a verdict the list has no baseline for.
+   */
+  amountSign?: 'positive' | 'negative';
   /** The right-hand column: a share, a percentage change. Omitted for a bare list. */
   trailing?: string;
   trailingSign?: 'positive' | 'negative';
@@ -280,6 +286,8 @@ export function emailRankedRows(rows: EmailRankedRow[]): string {
         : '';
       const bar = row.fill === undefined ? '' : barHtml(row.fill, row.fillHex ?? PRINT_RANK_HEX);
 
+      // The amount keeps the label's ink unless the row asks for a sign: a ranked total is a size.
+      const amountColour = signColor(row.amountSign) ?? labelColour;
       const trailingColour = signColor(row.trailingSign) ?? PRINT_COLORS.mutedForeground;
       const trailing =
         row.trailing === undefined
@@ -288,7 +296,7 @@ export function emailRankedRows(rows: EmailRankedRow[]): string {
 
       return `                <tr>
                   <td valign="top" style="padding:7px 0;${rule}font-size:13px;color:${labelColour};">${escapeHtml(row.label)}${caption}${bar}</td>
-                  <td align="right" valign="top" width="96" style="padding:7px 0 7px 12px;${rule}${MONO}font-size:13px;color:${labelColour};white-space:nowrap;">${escapeHtml(row.amount)}</td>
+                  <td align="right" valign="top" width="96" style="padding:7px 0 7px 12px;${rule}${MONO}font-size:13px;color:${amountColour};white-space:nowrap;">${escapeHtml(row.amount)}</td>
                   ${trailing}
                 </tr>`;
     })

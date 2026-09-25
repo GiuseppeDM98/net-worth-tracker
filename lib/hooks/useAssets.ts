@@ -42,6 +42,7 @@ export function useDeleteAsset(userId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
+    mutationKey: ['deleteAsset', userId],
     mutationFn: (assetId: string) => deleteAsset(assetId, userId),
     onSuccess: () => {
       // Invalidate to remove deleted asset from UI

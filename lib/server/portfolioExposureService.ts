@@ -308,7 +308,10 @@ export async function computePortfolioExposure(
 
   for (const { asset, fundFamily } of etfData) {
     const assetValue = assetValues.get(asset.id) ?? 0;
-    const family = fundFamily ?? 'Altro';
+    // «Emittente non riconosciuto», not «Altro»: the tile already closes its list with «Resto del
+    // portafoglio», and two rows both called some flavour of "other" — one a ranked issuer, one
+    // the residual — read as the same bucket counted twice (2026-09-21).
+    const family = fundFamily ?? 'Emittente non riconosciuto';
     const existing = issuerMap.get(family);
     const entry = { name: asset.name, ticker: asset.ticker, valueEur: assetValue };
     if (existing) {

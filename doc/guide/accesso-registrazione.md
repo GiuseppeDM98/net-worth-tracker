@@ -1,6 +1,12 @@
 # Accesso e Registrazione
 
-> **Quando aprire questa guida** — chi tocca `app/login/page.tsx`, `app/register/page.tsx`, `components/auth/*`, `lib/utils/authNarrative.ts`, `lib/server/registrationPolicy.ts`, `contexts/AuthContext.tsx`. In `AGENTS.md` resta lo stub con l'essenziale; qui c'è la regola completa. File: `CLAUDE.md` → *Key Files* → *Accesso e Registrazione*.
+> **Quando aprire questa guida** — chi tocca `app/login/page.tsx`, `app/register/page.tsx`, `components/auth/*`, `lib/utils/authNarrative.ts`, `lib/server/registrationPolicy.ts`, `contexts/AuthContext.tsx`. In `AGENTS.md` resta lo stub con l'essenziale; qui c'è la regola completa. File: § *Files*, sotto.
+
+## Files
+
+Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
+
+- **Accesso e Registrazione**: `app/{login`app/{login,register}/page.tsx`, `components/auth/*`, pure `lib/utils/authNarrative.ts`, `lib/server/registrationPolicy.ts` + `app/api/auth/check-registration/route.ts`, `contexts/AuthContext.tsx`, `components/ProtectedRoute.tsx`
 
 ## Accesso e Registrazione (`app/login/page.tsx`, `app/register/page.tsx`, `components/auth/*`, `lib/utils/authNarrative.ts`)
 

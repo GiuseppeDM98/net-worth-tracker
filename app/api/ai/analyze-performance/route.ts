@@ -54,26 +54,32 @@ const anthropic = new Anthropic({
  * - PERFORMANCE_ANALYSIS_MODEL (lib/constants/aiModels.ts) for optimal cost/quality balance
  * - Extended Thinking (10k budget) for deeper financial reasoning
  * - web_search_20250305: Claude autonomously searches for market events (max 3 uses)
+ *
+ * `signal` is the SDK's own request option: aborting it closes the upstream HTTP stream, which is
+ * what stops the generation (and its billing) when the reader walks away.
  */
-async function callAnthropicForPerformanceAnalysis(prompt: string) {
-  return anthropic.messages.create({
-    model: PERFORMANCE_ANALYSIS_MODEL,
-    max_tokens: 16000, // thinking 10k + output ~6k max
-    thinking: {
-      type: 'enabled',
-      budget_tokens: 10000,
-    },
-    tools: [
-      {
-        // Native web search — no external API key needed; billed at $10/1000 searches + token costs.
-        type: 'web_search_20250305',
-        name: 'web_search',
-        max_uses: 3, // limit to keep latency reasonable
+async function callAnthropicForPerformanceAnalysis(prompt: string, signal: AbortSignal) {
+  return anthropic.messages.create(
+    {
+      model: PERFORMANCE_ANALYSIS_MODEL,
+      max_tokens: 16000, // thinking 10k + output ~6k max
+      thinking: {
+        type: 'enabled',
+        budget_tokens: 10000,
       },
-    ],
-    messages: [{ role: 'user', content: prompt }],
-    stream: true,
-  });
+      tools: [
+        {
+          // Native web search — no external API key needed; billed at $10/1000 searches + token costs.
+          type: 'web_search_20250305',
+          name: 'web_search',
+          max_uses: 3, // limit to keep latency reasonable
+        },
+      ],
+      messages: [{ role: 'user', content: prompt }],
+      stream: true,
+    },
+    { signal }
+  );
 }
 
 interface AnthropicFailure {
@@ -129,22 +135,37 @@ function readAnthropicFailure(error: unknown): AnthropicFailure {
  * SSE FORMAT: `data: {JSON}\n\n` chunks, terminated by `data: [DONE]\n\n`.
  * Tool use and thinking blocks are silently skipped — only text_delta chunks
  * (Claude's written response) are forwarded to the client.
+ *
+ * CANCELLATION (2026-09-20): the reader closing the dialog is not a failure. Until this date the
+ * upstream generation ran to its end after the client had gone (8–14 s, paid for) and the next
+ * `enqueue` threw «Invalid state: Controller is already closed» into the log. `upstream` is the
+ * one abort switch: the request's own signal and this stream's `cancel()` both flip it, the SDK
+ * iterator then ends WITHOUT throwing, and nothing is written to a consumer that is no longer
+ * there — no SSE line, no log line.
  */
-function buildPerformanceSseStream(anthropicStream: AsyncIterable<Anthropic.MessageStreamEvent>): ReadableStream {
+function buildPerformanceSseStream(
+  anthropicStream: AsyncIterable<Anthropic.MessageStreamEvent>,
+  upstream: AbortController
+): ReadableStream {
   const encoder = new TextEncoder();
   return new ReadableStream({
     async start(controller) {
       try {
         for await (const chunk of anthropicStream) {
+          if (upstream.signal.aborted) return;
           if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
             controller.enqueue(
               encoder.encode(`data: ${JSON.stringify({ text: chunk.delta.text })}\n\n`)
             );
           }
         }
+        if (upstream.signal.aborted) return;
         controller.enqueue(encoder.encode('data: [DONE]\n\n'));
         controller.close();
       } catch (streamError: unknown) {
+        // An abort can also surface as a throw (an `enqueue` racing the cancel, or the SDK's
+        // APIUserAbortError): the consumer is gone either way, so there is no one to tell.
+        if (upstream.signal.aborted) return;
         console.error('[API /ai/analyze-performance] Stream error:', streamError);
         const failure = readAnthropicFailure(streamError);
         const errorMsg =
@@ -155,6 +176,9 @@ function buildPerformanceSseStream(anthropicStream: AsyncIterable<Anthropic.Mess
         controller.enqueue(encoder.encode('data: [DONE]\n\n'));
         controller.close();
       }
+    },
+    cancel() {
+      upstream.abort();
     },
   });
 }
@@ -207,10 +231,19 @@ export async function POST(request: NextRequest) {
 
     const prompt = buildAnalysisPrompt(performanceMetrics, timePeriod);
 
+    // One switch for «the reader left»: `request.signal` fires when the client aborts its fetch,
+    // the SSE stream's `cancel()` when the response body is dropped. Either stops the generation.
+    const upstream = new AbortController();
+    if (request.signal.aborted) upstream.abort();
+    else request.signal.addEventListener('abort', () => upstream.abort(), { once: true });
+
     let anthropicStream;
     try {
-      anthropicStream = await callAnthropicForPerformanceAnalysis(prompt);
+      anthropicStream = await callAnthropicForPerformanceAnalysis(prompt, upstream.signal);
     } catch (apiError: unknown) {
+      // Closed before the first byte: nobody reads this response, and it is not an error to log.
+      // 499 is the de-facto «client closed request» status.
+      if (upstream.signal.aborted) return new NextResponse(null, { status: 499 });
       console.error('[API /ai/analyze-performance] Anthropic API error:', apiError);
       const failure = readAnthropicFailure(apiError);
       if (failure.bodyType === 'overloaded_error') {
@@ -225,7 +258,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return new NextResponse(buildPerformanceSseStream(anthropicStream), {
+    return new NextResponse(buildPerformanceSseStream(anthropicStream, upstream), {
       headers: {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',

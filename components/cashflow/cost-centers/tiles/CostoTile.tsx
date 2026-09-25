@@ -21,7 +21,7 @@ interface CostoTileProps {
   aside: Narrative;
   reading: Narrative;
   footer: Narrative;
-  kpis: { monthEnd: KpiReading; yearEnd: KpiReading; average: KpiReading };
+  kpis: { month: KpiReading; year: KpiReading; average: KpiReading };
   palette: string[];
   now: Date;
   className?: string;
@@ -82,8 +82,8 @@ export function CostoTile({ summary, stack, stackCaption, aside, reading, footer
       )}
 
       <div className="mt-[18px] grid grid-cols-3 gap-3.5">
-        <Kpi label="Fine mese" reading={kpis.monthEnd} />
-        <Kpi label="Fine anno" reading={kpis.yearEnd} />
+        <Kpi label="Questo mese" reading={kpis.month} />
+        <Kpi label="Quest'anno" reading={kpis.year} />
         <Kpi label="Al mese" reading={kpis.average} />
       </div>
 

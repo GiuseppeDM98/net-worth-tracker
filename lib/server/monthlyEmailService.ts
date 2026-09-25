@@ -86,8 +86,9 @@ import { type Expense, type ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/exp
 import { summarizeExpenseSplit, type ExpenseSplitSummary } from '@/lib/utils/expenseSplitSummary';
 import { summarizePeriodSales, type PeriodSalesSummary } from '@/lib/utils/periodSales';
 import { getAssetTransactionsAdmin, getUserAssetsAdmin } from '@/lib/server/assetAdminRepository';
-import { describeMemberBalance, describeSplitBasis } from '@/lib/utils/expenseSplitNarrative';
+import { describeMemberBalance, describeMemberCalendar, describeSplitBasis } from '@/lib/utils/expenseSplitNarrative';
 import { narrativeToText } from '@/lib/utils/narrative';
+import type { Narrative } from '@/lib/utils/narrative';
 import { getUserSnapshotsAdmin } from '@/lib/server/assetAdminRepository';
 import {
   calculateMonthlyRecords,
@@ -1554,18 +1555,33 @@ function buildBudgetTile(data: MonthlyEmailData): string {
  * saying «the shares are unavailable» would be a notification the reader cannot act on from
  * where they are reading it. The page is where that explanation belongs.
  */
-function buildExpenseSplitTile(data: MonthlyEmailData): string {
+export function buildExpenseSplitTile(data: MonthlyEmailData): string {
   const summary = data.expenseSplit;
   if (!summary || summary.basis.kind !== 'computed') return '';
 
+  // The BOOKED residual, exactly as the page prints it: an email that led with the period's
+  // figure would call somebody short over a bill still in their account, and its own caption —
+  // which comes from the same function the page reads — would say otherwise two lines below.
+  // Where the calendar takes them rides in the caption, never as a second amount.
   const rows: EmailRankedRow[] = summary.members
-    .filter((balance) => balance.remaining !== null)
-    .map((balance) => ({
-      label: balance.member.name,
-      caption: narrativeToText(describeMemberBalance(balance)),
-      amount: signedEur(balance.remaining as number),
-      trailingSign: (balance.remaining as number) >= 0 ? 'positive' : 'negative',
-    }));
+    .filter((balance) => balance.remainingBooked !== null)
+    .map((balance) => {
+      const calendar = describeMemberCalendar(balance);
+      const caption = [describeMemberBalance(balance), calendar]
+        .filter((narrative): narrative is Narrative => narrative !== null)
+        .map(narrativeToText)
+        .join(' ');
+      return {
+        label: balance.member.name,
+        caption,
+        amount: signedEur(balance.remainingBooked as number),
+        // On the SIGN of the booked figure, like the tile on the page. `trailingSign` alone never
+        // painted anything here: it colours the optional third column, which this list has no use
+        // for, so a person who came up short printed the same ink as one who did not (seen in a
+        // render, 2026-09-22).
+        amountSign: ((balance.remainingBooked as number) >= 0 ? 'positive' : 'negative') as 'positive' | 'negative',
+      };
+    });
   if (rows.length === 0) return '';
 
   return emailTile({

@@ -19,6 +19,7 @@ import {
 } from '@/lib/server/apiAuth';
 import { snapshotRequestSchema, parseOr400 } from '@/lib/server/validation';
 import { invalidateDashboardOverviewSummaryServer } from '@/lib/services/dashboardOverviewInvalidation.server';
+import { settleDueBalances } from '@/lib/server/cashSettlement';
 import { preserveUserAuthoredSnapshotFields } from '@/lib/utils/snapshotUserFields';
 
 const SNAPSHOTS_COLLECTION = 'monthly-snapshots';
@@ -111,6 +112,17 @@ export async function POST(request: NextRequest) {
         { error: 'User ID is required' },
         { status: 400 }
       );
+    }
+
+    // Settle the rows whose date has come (lib/server/cashSettlement.ts) BEFORE the assets are
+    // read: the photo of the month must see today's instalments already out of the account,
+    // whichever of the two daily crons runs first. A failure is logged and the snapshot goes on
+    // — the rows stay pending and the next run settles them.
+    try {
+      const { settled } = await settleDueBalances(userId, new Date());
+      if (settled > 0) console.log(`Settled ${settled} scheduled cashflow rows for user ${userId}`);
+    } catch (error) {
+      console.error('Error settling scheduled cashflow rows:', error);
     }
 
     // Attempt fresh price updates before snapshot

@@ -1,6 +1,6 @@
 {
  "schemaVersion": 2,
- "generatedAt": "2026-09-14T15:14:00.000Z",
+ "generatedAt": "2026-09-24T18:42:06Z",
  "title": "Design System: Net Worth Tracker",
  "extensions": {
   "colorMeta": {
@@ -721,7 +721,22 @@
    {
     "name": "spring-fab",
     "value": "type: spring, stiffness: 400, damping: 28",
-    "purpose": "The bottom pill's «add expense» button entering scale 0.6 -> 1 (components/layout/BottomNavigation.tsx:41): the ONE spring in the app that is not 400/35 — a touch of overshoot on the one element that pops in from nothing rather than sliding between two states."
+    "purpose": "The bottom pill's «add expense» button entering scale 0.6 -> 1 (components/layout/BottomNavigation.tsx:41): a touch of overshoot on the one element that pops in from nothing rather than sliding between two states."
+   },
+   {
+    "name": "spring-layout",
+    "value": "type: spring, stiffness: 280, damping: 30, mass: 0.9",
+    "purpose": "`springLayoutTransition` (lib/utils/motionVariants.ts): layout reflow when a conditional section appears or resizes — the `layout=\"position\"` wrappers of Panoramica and Patrimonio. Softer than the standard because it moves whole regions, not a control."
+   },
+   {
+    "name": "spring-metric-settle",
+    "value": "type: spring, stiffness: 320, damping: 34, mass: 0.8",
+    "purpose": "`metricSettleTransition` (lib/utils/motionVariants.ts): a KPI value that must land precisely, never bounce — today only the Dividendi calendar."
+   },
+   {
+    "name": "spring-badge",
+    "value": "type: spring, stiffness: 300, damping: 20",
+    "purpose": "The savings-rate badge entering (components/ui/SavingsRateBadge.tsx:112), collapsed to duration 0 under reduced motion. Inline, not shared."
    },
    {
     "name": "stagger-children",
@@ -917,6 +932,11 @@
     "section": "colors"
    },
    {
+    "name": "The DOM-side hex inventory",
+    "body": "(declared 2026-09-06). «A hex lives only in `printTokens.ts`» is true out of the DOM. Inside it, a literal hex is legitimate in exactly these places, each for a reason a CSS variable cannot serve, and nowhere else: - `lib/utils/cashflowSankey.ts` — the Sankey's node palette (twenty-one Tailwind-500 hexes): its hues are SEMANTIC (blue = fixed, violet = variable, amber = debt) and must not follow the chart slots, which would re-colour the meaning per theme. Since 2026-09-14 also its two label neutrals (`LABEL_TEXT_COLORS`, `#e5e5e5` dark / `#262626` light — the sRGB of the off-blanc and charcoal steps): a label is read, not coloured, and Nivo on react-spring cannot take a CSS token. - `lib/constants/benchmarks.ts` — one hex per model portfolio (six): a benchmark's identity across Rendimenti and the email, not a series slot. - `lib/constants/colors.ts` — `ASSET_CLASS_COLORS` (above) and `CHART_COLORS`, the static pad `useChartColors()` takes slots 9-10 from; both are the Recharts fallback and the last theme-independent hues a chart can reach. - The Recharts `?? '#…'` fallbacks of Analisi's Dettaglio (`SavingsRateTrendSection.tsx`, `AndamentoStoricoSection.tsx`) and `AssetSparkline.tsx` (`#16a34a` / `#dc2626` — the retired out-of-DOM sign hexes, surviving as a pre-hydration fallback): read once, before the theme's slots have resolved. - `lib/utils/costCenterColors.ts` — `LEGACY_HEX_SLOTS`, the legacy hex → slot migration map for documents that still hold a hex; and `components/expenses/CategoryManagementDialog.tsx`, whose hexes are the user's own category colours (a user-chosen colour is an identity, not a slot — see **The Selected-Row Rule**). - Three payload hexes built server-side, where no cascade exists to read: `lib/services/dashboardOverviewService.ts:454,460` (the liquidity split) and `lib/services/chartService.ts:116` (the «altri» grey) — waived by name in `.impeccable/config.json`'s `ignoreValues`. Everything else is debt, recorded here as fact and not as a fix. Two chrome hues of the default theme violate **The Zero-Chroma Rule** today: `components/ui/switch.tsx:14` paints the dark ON state `bg-blue-600` (because `--primary` is near-white there and a white pill on a white track is invisible — the reason is real, the hue is still wrong), and `components/ProtectedRoute.tsx:43` draws the auth spinner `border-gray-300 border-t-blue-600`. The third — an emerald Safari `mask-icon` (`#10B981`) in `app/layout.tsx` for a brand that has no brand colour — was removed on 2026-09-13: the tag is legacy (Safari reads the ordinary favicon since 2018) and the icon is multicolour, so it never worked as a monochrome mask either. One sign-colour literal sits beside them: `AssetSparkline.tsx:32`, listed above only because it is a fallback — the hexes it falls back to are the ones the emails retired (the other, `ExpenseTable.tsx`'s `text-emerald-*` on an income amount, went to `text-positive` on 2026-09-14, when the table's type badges also joined the feed's dots and the hero's legend on ONE map, `lib/constants/expenseTypeColors.ts` — until then the table said `income → --chart-1`, `fixed → --chart-2` while the legend 400px above said the opposite, and the same green meant «Entrate» in one place and «Spese Fisse» in the other). None is declared; a linter that flags them is right.",
+    "section": "colors"
+   },
+   {
     "name": "The Mono Mandate",
     "body": "Every number in a financial context uses Geist Mono with `tnum` features. No exceptions: KPI cards, table cells, chart axis labels, percentage badges. A number set in Geist Sans loses its financial authority. The ONE declared exception is the PDF export, which has no Geist to set it in — see **PDF Page and PDF Section**, where the column replaces the face.",
     "section": "typography"
@@ -998,17 +1018,17 @@
    },
    {
     "name": "The Whole-Cost Corollary",
-    "body": "(Centri di Costo, 2026-08-23). A page may have NO axis at all when its question has none: a project's cost is its whole cost, so Centri di Costo dropped its Mese|Anno|12 mesi|Sempre picker and reads everything «in totale». The rule then inverts — every figure is lifetime unless it says otherwise, and the ones that use a window carry it in their own words: «quest'anno», «anno scorso», «ultimi 12 mesi», «Tetto mensile · agosto» with today's mark, «Fine mese» and «Fine anno» «al ritmo attuale». A delta against \"the previous period\" has no honest predecessor without an axis, so it is gone rather than faked.",
+    "body": "(Centri di Costo, 2026-08-23). A page may have NO axis at all when its question has none: a project's cost is its whole cost, so Centri di Costo dropped its Mese|Anno|12 mesi|Sempre picker and reads everything «in totale». The rule then inverts — every figure is lifetime unless it says otherwise, and the ones that use a window carry it in their own words: «quest'anno», «anno scorso», «ultimi 12 mesi», «Tetto mensile · agosto» with today's mark, «Questo mese» and «Quest'anno» with the calendar in their caption («con il calendario chiude a 1100 €»). A delta against \"the previous period\" has no honest predecessor without an axis, so it is gone rather than faked. **A center has no pace** (2026-09-18): until then the two cells were «Fine mese» / «Fine anno» «al ritmo attuale», and a 1650 € repair on the 17th read «~2942 € a fine mese». A project spends in blocks, and its recurring series are already real future rows, so a window's end is what is booked plus what is in the calendar — a sum, printed without «~».",
     "section": "components"
    },
    {
     "name": "The Risk-vs-Fact Rule",
-    "body": "A projected overrun and a crossed threshold are two different things and never sit in the same tile. «Categorie a rischio» lists the monthly budgets whose month-end projection exceeds their amount — money not yet spent, named as a projection («a fine mese», «al ritmo attuale») — and a budget ALREADY over is not there: it is a fact, and facts belong to «Avvisi» («Superato», with the threshold it crossed). The alert evaluator still fires a forecast-only alert for the email, but the tile filters it out (`thresholdCrossed`), so no row appears twice. Corollary on the projection itself: it is the app's ONE rule (the pace on what is booked to date plus the rows already in the calendar — Tracciamento's and the Panoramica's), and a FIXED or debt category never follows the pace: rent paid on the 1st, extrapolated by the day, would read «at risk» all month. First applied on Budget, 2026-08-23.",
+    "body": "A projected overrun and a crossed threshold are two different things and never sit in the same tile. «Categorie a rischio» lists the monthly budgets whose month-end projection exceeds their amount — money not yet spent, named as a projection («a fine mese», «al ritmo attuale») — and a budget ALREADY over is not there: it is a fact, and facts belong to «Avvisi» («Superato», with the threshold it crossed). The alert evaluator still fires a forecast-only alert for the email, but the tile filters it out (`thresholdCrossed`), so no row appears twice. On Centri di Costo the same two names stand on the CALENDAR, not on a pace (2026-09-18): a ceiling crossed by what is booked is the fact, one still holding that the rows already dated ahead carry past it is the risk («supererà il tetto», «con le spese già in calendario») — and the risk outranks dormancy in a center's verdict, or the list and the detail answer differently about one center. Corollary on the projection itself: it is the app's ONE rule (the pace on what is booked to date plus the rows already in the calendar — Tracciamento's and the Panoramica's), and a FIXED or debt category never follows the pace: rent paid on the 1st, extrapolated by the day, would read «at risk» all month. First applied on Budget, 2026-08-23.",
     "section": "components"
    },
    {
     "name": "The Same-Basis Rule",
-    "body": "(Rendimenti, 2026-08-25). A gap printed beside a figure is on that figure's basis. Below six months the hero states the PERIOD return («+2,1% nei 4 mesi»), so the «0,4 punti sopra il Portafoglio 60/40» next to it de-annualises both rates to the same four months — the annualised gap (1,2 points) beside a period figure told the reader the model made a third of what it made. Corollaries: the subject of the verdict names the window actually MEASURED («Negli ultimi 11 mesi» on eleven snapshots, «Da aprile» on a year-to-date that starts there), never the picker's label; «oggi» is said only when the window closes on the latest snapshot, otherwise the closing month is named («a fine dicembre 2024»); and two sentences on one page decide a tie the same way — a gap under a tenth of a point is «in linea» in the verdict and «alla pari» in the Benchmark tile, counted neither as beaten nor as above.",
+    "body": "(Rendimenti, 2026-08-25). A gap printed beside a figure is on that figure's basis. Below a YEAR the hero states the PERIOD return («+2,1% nei 4 mesi» — six months until 2026-09-20, when a nine-month year-to-date still printed «+16,0%» at 54px over a measured +11,8%; the rate per year is the companion chip from six months on), so the «0,4 punti sopra il Portafoglio 60/40» next to it — in the verdict AND in the tile's chip, one function — de-annualises both rates to the same four months — the annualised gap (1,2 points) beside a period figure told the reader the model made a third of what it made. Corollaries: the subject of the verdict names the window actually MEASURED («Negli ultimi 11 mesi» on eleven snapshots, «Da aprile» on a year-to-date that starts there), never the picker's label; «oggi» is said only when the window closes on the latest snapshot, otherwise the closing month is named («a fine dicembre 2024»); and two sentences on one page decide a tie the same way — a gap under a tenth of a point is «in linea» in the verdict and «alla pari» in the Benchmark tile, counted neither as beaten nor as above.",
     "section": "components"
    },
    {

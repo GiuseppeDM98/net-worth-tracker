@@ -14,6 +14,7 @@
 
 import type { Narrative } from '@/lib/utils/narrative';
 import type { ScenarioRow } from '@/lib/utils/fireSummary';
+import { formatRate } from '@/lib/utils/fireNarrative';
 import { useChartColors } from '@/lib/hooks/useChartColors';
 import { cn } from '@/lib/utils';
 import { Tile } from '@/components/ui/tile';
@@ -31,10 +32,10 @@ interface ScenariTileProps {
 /** The chart slot of each scenario — the same mapping `FIREProjectionChart` draws with. */
 const SCENARIO_SLOT: Record<ScenarioRow['key'], number> = { bear: 4, base: 0, bull: 1 };
 
-const formatRate = (value: number) => `${value.toLocaleString('it-IT', { maximumFractionDigits: 2 })}%`;
-
+/** «tra 6 anni» / «tra 1 anno» / «già raggiunto» (year 0: the walk tests today before stepping). */
 function distance(years: number | null, horizonYears: number): string {
   if (years === null) return `oltre ${horizonYears} anni`;
+  if (years === 0) return 'già raggiunto';
   return years === 1 ? 'tra 1 anno' : `tra ${years} anni`;
 }
 
@@ -52,16 +53,18 @@ export function ScenariTile({ reading, rows, horizonYears, footer, className }: 
                 <span className="h-2 w-2 shrink-0 rounded-[2px]" style={{ background: chartColors[SCENARIO_SLOT[row.key]] }} aria-hidden="true" />
                 <span className="min-w-0">
                   <span className={cn('block text-[13px] text-foreground', isBase && 'font-semibold')}>{row.label}</span>
-                  <span className="block font-mono text-[11px] tabular-nums text-muted-foreground/70">
+                  <span className="block font-mono text-[11px] tabular-nums text-muted-foreground">
                     {formatRate(row.growthRate)} · {formatRate(row.inflationRate)}
                   </span>
                 </span>
               </span>
               <span className="shrink-0 text-right">
+                {/* A year cell prints the year; a scenario reached today prints «oggi» — the year
+                    it would print is this one, and «2026 · già raggiunto» reads as a date. */}
                 <span className={cn('block font-mono text-[14px] tabular-nums text-foreground', isBase && 'font-semibold')}>
-                  {row.calendarYear ?? '—'}
+                  {row.yearsToFire === 0 ? 'oggi' : (row.calendarYear ?? '—')}
                 </span>
-                <span className="block font-mono text-[11px] tabular-nums text-muted-foreground/70">{distance(row.yearsToFire, horizonYears)}</span>
+                <span className="block font-mono text-[11px] tabular-nums text-muted-foreground">{distance(row.yearsToFire, horizonYears)}</span>
               </span>
             </li>
           );

@@ -1,11 +1,12 @@
 import type { HallOfFameNote } from '@/types/hall-of-fame';
 import type { RecordCategory, RecordEntry } from '@/lib/utils/hallOfFameSummary';
+import { describePartialYearChip } from '@/lib/utils/hallOfFameNarrative';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { formatPercentage } from '@/lib/services/chartService';
 import { signTextClass } from '@/lib/utils/metricColors';
 import { cn } from '@/lib/utils';
 import { TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
-import { NoteTrigger } from '@/components/hall-of-fame/NoteTrigger';
+import { NoteTrigger, type NotePrefill } from '@/components/hall-of-fame/NoteTrigger';
 
 interface RecordRowsProps {
   rows: RecordEntry[];
@@ -17,7 +18,13 @@ interface RecordRowsProps {
   notes?: HallOfFameNote[];
   sectionKey?: HallOfFameNote['sections'][number];
   onNoteClick?: (note: HallOfFameNote, trigger: HTMLElement | null) => void;
-  /** Width of the period column; a narrow tile passes a smaller one so the bar keeps a track. */
+  /** Lets a row without a note open the form with its period and ranking already written. */
+  onAddNote?: (prefill: NotePrefill, trigger: HTMLElement | null) => void;
+  /**
+   * MINIMUM width of the period column, so the bars of a board start on one vertical line. It
+   * is a floor and never a ceiling: «2026 · ORA» used to be cut to «20…» inside a fixed 58px
+   * (critique of 2026-09-24) — a cut year reads as no year, and the bar yields instead.
+   */
   labelClassName?: string;
   ariaLabel: string;
 }
@@ -60,6 +67,9 @@ const MINUS = '−';
  * dominates still reads at a glance, the same rule `RankedRows` follows for compositions. It is
  * a separate component because a record is not a share of a total: it carries a position, its
  * value can be negative, and its percentage is a variation rather than a slice.
+ *
+ * The period never wraps and never truncates: a period is the row's identity, and the chips
+ * beside it («ORA» on the running period, «1 mese» on a partial year) are part of it.
  */
 export function RecordRows({
   rows,
@@ -68,6 +78,7 @@ export function RecordRows({
   notes,
   sectionKey,
   onNoteClick,
+  onAddNote,
   labelClassName,
   ariaLabel,
 }: RecordRowsProps) {
@@ -77,59 +88,64 @@ export function RecordRows({
   const { signedValue, signedPercentage } = readingOf(category);
   const barColor = barColorOf(category);
   const maxValue = Math.max(...shown.map((row) => Math.abs(row.value)), 0);
-  const labelWidth = labelClassName ?? 'w-[72px]';
+  const labelWidth = labelClassName ?? 'min-w-[72px]';
 
   return (
     <ul className="flex flex-col divide-y divide-border" aria-label={ariaLabel}>
-      {shown.map((row, index) => (
-        <li key={row.key} className="group flex items-center gap-2.5 py-[9px]">
-          <span className="w-[14px] shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">
-            {index + 1}
-          </span>
-
-          <span className={cn('flex shrink-0 items-center gap-1.5 text-[13px] text-foreground', labelWidth)}>
-            <span className="truncate">{row.label}</span>
-            {row.isCurrent && <span className={cn(TILE_SUB_EYEBROW_CLASS, 'shrink-0')}>ora</span>}
-          </span>
-
-          <div className="h-[3px] min-w-[28px] flex-1 overflow-hidden rounded-full bg-muted" role="presentation">
-            <div
-              className="h-full rounded-full"
-              style={{
-                width: `${maxValue > 0 ? (Math.abs(row.value) / maxValue) * 100 : 0}%`,
-                background: barColor,
-              }}
-            />
-          </div>
-
-          <span
-            className={cn(
-              'shrink-0 text-right font-mono text-[13px] tabular-nums',
-              signedValue ? signTextClass(row.value) : 'text-foreground',
-            )}
-          >
-            {signedValue && (row.value >= 0 ? '+' : MINUS)}
-            {cachedFormatCurrencyEUR(Math.abs(row.value), true)}
-          </span>
-
-          {row.percentage !== null && (
-            <span className="w-[46px] shrink-0 text-right font-mono text-[11px] tabular-nums text-muted-foreground">
-              {signedPercentage && (row.percentage >= 0 ? '+' : MINUS)}
-              {formatPercentage(Math.abs(row.percentage), 1)}
+      {shown.map((row, index) => {
+        const partial = describePartialYearChip(row);
+        return (
+          <li key={row.key} className="group flex items-center gap-2.5 py-[9px]">
+            <span className="w-[14px] shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">
+              {index + 1}
             </span>
-          )}
 
-          {notes && sectionKey && onNoteClick && (
-            <NoteTrigger
-              notes={notes}
-              sectionKey={sectionKey}
-              year={row.year}
-              month={row.month}
-              onNoteClick={onNoteClick}
-            />
-          )}
-        </li>
-      ))}
+            <span className={cn('flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[13px] text-foreground', labelWidth)}>
+              <span>{row.label}</span>
+              {row.isCurrent && <span className={cn(TILE_SUB_EYEBROW_CLASS, 'shrink-0')}>ora</span>}
+              {partial && <span className={cn(TILE_SUB_EYEBROW_CLASS, 'shrink-0 normal-case tracking-normal')}>{partial}</span>}
+            </span>
+
+            <div className="h-[3px] min-w-[28px] flex-1 overflow-hidden rounded-full bg-muted" role="presentation">
+              <div
+                className="h-full rounded-full"
+                style={{
+                  width: `${maxValue > 0 ? (Math.abs(row.value) / maxValue) * 100 : 0}%`,
+                  background: barColor,
+                }}
+              />
+            </div>
+
+            <span
+              className={cn(
+                'shrink-0 text-right font-mono text-[13px] tabular-nums',
+                signedValue ? signTextClass(row.value) : 'text-foreground',
+              )}
+            >
+              {signedValue && (row.value >= 0 ? '+' : MINUS)}
+              {cachedFormatCurrencyEUR(Math.abs(row.value), true)}
+            </span>
+
+            {row.percentage !== null && (
+              <span className="w-[46px] shrink-0 text-right font-mono text-[11px] tabular-nums text-muted-foreground">
+                {signedPercentage && (row.percentage >= 0 ? '+' : MINUS)}
+                {formatPercentage(Math.abs(row.percentage), 1)}
+              </span>
+            )}
+
+            {notes && sectionKey && onNoteClick && (
+              <NoteTrigger
+                notes={notes}
+                sectionKey={sectionKey}
+                year={row.year}
+                month={row.month}
+                onNoteClick={onNoteClick}
+                onAddNote={onAddNote}
+              />
+            )}
+          </li>
+        );
+      })}
     </ul>
   );
 }

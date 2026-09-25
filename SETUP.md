@@ -323,8 +323,9 @@ dev:e2e` therefore sets `NEXT_DIST_DIR=.next-e2e` (a conditional line in `next.c
 everywhere else), so the tests can run while your normal dev server stays up on port 3000 — which
 also guarantees they never point at production data.
 
-**What it covers** (`e2e/`), across five projects — `desktop` (1440px), `mobile` (390px),
-`degraded` (1440px, second account), `analisi` (1440px) and `analisi-mobile` (390px):
+**What it covers** (`e2e/`), across seven projects — `desktop` (1440px), `mobile` (390px),
+`degraded` (1440px, second account), `analisi` (1440px), `analisi-mobile` (390px), `centri`
+(1440px) and `centri-mobile` (390px):
 
 - **Previdenza** — layout switch, type scale, the year axis, the collapsible, the primary action's
   position, that the empty state never flashes while data loads, and the three degraded states
@@ -333,12 +334,23 @@ also guarantees they never point at production data.
   transfer exclusion), the focus surviving a period switch, the KPI pacing rows, the driver ranking
   with `Cessata`, the per-subcategory breakdown inside a year row, and the mobile truncation caption.
 
-Three fixture accounts, each seeded by the global setup:
+- **Centri di Costo** — opening a center as a navigation (URL, reload, the browser's Back, the
+  focus handed back to the row), the ceiling the calendar will cross read as a risk with no «ritmo»
+  anywhere, a new center's free colour and the worn swatches' names, the dialog's refusal in its
+  reading line with nothing written, the armed delete that moves nothing, «Collega spese…» (several rows and a whole
+  instalment plan in one confirm, the move from another center named before it, «Annulla» restoring
+  every row — all read back from the emulator), «Scollega» in place and through «solo questa o tutta
+  la serie?», a row opening its expense form, and on a phone the detail landing at the top with
+  every target at 44px.
+
+Four fixture accounts, each seeded by the global setup:
 
 | Script | Account | Why it is separate |
 | --- | --- | --- |
 | `npm run e2e:seed` | base + `test-user-degraded` | Pension data layered on the Step 6 seed; the degraded scenarios take an argument (`suspicious` \| `idle` \| `fresh` \| `performance` — the last one is Rendimenti's: an ETF beside a pension fund marked `excluded`, four snapshots, one TFR, for `e2e/performance.degraded.spec.ts`) |
 | `npm run e2e:seed:analisi` | `test-user-analisi` | Every expense dated **January**, so year-to-date windows contain them whatever month the suite runs in and every asserted figure stays exact all year. The base seed's current-month expenses would pollute them |
+| `npm run e2e:seed:centri` | `test-user-centri` (`centri@example.com`) | The tab is opt-in: the flag on the base account would add a fifth tab to every Cashflow spec, and a linked expense is an ordinary expense (it would move Analisi's figures). «Fenicottero» (800 € in January, a 300 € instalment on December 31st, annual ceiling 1000 → the RISK) and «Ornitorinco» (27 rows a year old → dormant, and «Mostra altre» on screen; three of them one recurring series), plus six rows linked to NO center for «Collega spese…» (decoy «Casuario»: three plain ones and an instalment plan of three). The seed `set`s every row whole and removes strays, so a run that died half-way is healed by the next. A spec reaches it by FILENAME: `*centri.spec.ts` / `*centri.mobile.spec.ts` |
+| `npm run e2e:seed:hof` | `hof-user` (`hof@example.com`) | A ranking is worth a browser only with a history behind it: 47 monthly snapshots (novembre 2022 → settembre 2026) and one income + one expense row per month, a story the specs can name (best month marzo 2024 +18.400 €, income record dicembre 2025, a first year of two months). The seed writes NO `hall-of-fame` document: the desktop spec builds it through «Aggiorna i record», the real route. A spec reaches it by FILENAME: `*hof.spec.ts` / `*hof.mobile.spec.ts` |
 
 Run either on its own if you want that data in the browser for manual inspection.
 

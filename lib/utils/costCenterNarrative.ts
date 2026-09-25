@@ -6,10 +6,11 @@
  * the component sets figures in Geist Mono and colours them by sign while the prose stays
  * prose; no component writes copy, and each phrasing is pinned by a test. The Narrative
  * Honesty Rule throughout: the page has no period axis, so every figure is «in totale» unless
- * its window is named («ad agosto», «nel 2026», «quest'anno», «al ritmo attuale»); a crossed
- * ceiling is a fact and a projected one a risk (the verdict ranks over > risk > most
- * expensive); a dormant or archived center gets no projection; a missing input drops its
- * clause (no ceiling → no ceiling clause, nothing dormant → no dormant clause), never a
+ * its window is named («ad agosto», «nel 2026», «quest'anno»); a ceiling crossed by what is
+ * booked is a fact, one that the rows already in the calendar will cross is a risk (the
+ * verdict ranks over > risk > most expensive); NO sentence speaks of a pace — a center's
+ * future is its calendar and nothing else (costCenterSummary.ts, header); a missing input
+ * drops its clause (no ceiling → no ceiling clause, nothing dormant → no dormant clause), never a
  * placeholder. Italian grammar is data: articles follow the percentage AS PRINTED
  * (`articleForPercent`, `atThePercent`), «ad» before a vowel month, «impegnato» when a row
  * dated after today is counted, «speso» otherwise.
@@ -21,6 +22,9 @@
 import type { Narrative, NarrativeSegment, PageVerdictModel } from '@/lib/utils/narrative';
 import type { CostCenterCategorySlice, CostCenterSubCategorySlice } from '@/types/costCenters';
 import type { CenterBudgetSummary, CenterMonthStack, CenterSummary, CostCentersSummary } from '@/lib/utils/costCenterSummary';
+import type { ModalStatusCopy } from '@/lib/utils/dialogNarrative';
+import type { LinkCandidate, LinkSelectionSummary } from '@/lib/utils/costCenterLinking';
+import type { CostCenterBudgetPeriod } from '@/types/costCenters';
 import { DORMANT_THRESHOLD_DAYS } from '@/lib/utils/costCenterUtils';
 import { cachedFormatCurrencyEUR, formatDate } from '@/lib/utils/formatters';
 import { formatPercentage } from '@/lib/services/chartService';
@@ -42,6 +46,10 @@ const DOT = ' · ';
 
 function pluralize(n: number, singular: string, plural: string): string {
   return n === 1 ? singular : plural;
+}
+
+function capitalize(text: string): string {
+  return `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
 }
 
 function monthName(now: Date): string {
@@ -97,10 +105,18 @@ function spentVerb(budget: CenterBudgetSummary): string {
   return budget.scheduled > 0 ? 'impegnato' : 'speso';
 }
 
-/** The gap of a projection past its ceiling, measured on the figure AS PRINTED. */
-function projectedGap(projection: number, amount: number): number {
-  return Math.round(projection) - amount;
-}
+/** «con le spese già in calendario» — the ONE way a risk names its cause. */
+const BY_CALENDAR = 'con le spese già in calendario';
+
+// ─── Where an expense is linked ───────────────────────────────────────────────
+
+/**
+ * The feature's one entry point lives OUTSIDE this page — a field of the expense form, behind
+ * a disclosure — and until 2026-09-18 every sentence that sent the reader there said only
+ * «da Tracciamento». The field's name and its place, in the words the form prints.
+ */
+const LINK_FIELD = 'campo «Centro di Costo», sotto «Impostazioni avanzate»';
+const HOW_TO_LINK = `Una spesa si collega dal suo form, in Tracciamento: ${LINK_FIELD}.`;
 
 // ─── The list's verdict ───────────────────────────────────────────────────────
 
@@ -146,19 +162,18 @@ function overClause(center: CenterSummary, now: Date): Narrative {
 function riskClause(center: CenterSummary, now: Date, withSubject: boolean): Narrative {
   const budget = center.budget!;
   return [
-    prose(withSubject ? `${center.center.name} ${windowIn(budget, now)} è ` : `${windowIn(budget, now)} è `),
-    ...percentWithAt(budget.usedPct),
-    prose(' del tetto, al ritmo attuale chiude a '),
-    signed(`~${euro(budget.projection!)}`, 'negative'),
+    prose(withSubject ? `${center.center.name} ${windowIn(budget, now)} arriva a ` : `${windowIn(budget, now)} arriva a `),
+    signed(euro(budget.spent), 'negative'),
     prose(' su '),
     figure(euro(budget.amount)),
+    prose(` ${BY_CALENDAR}`),
   ];
 }
 
 export function buildCostCentersVerdict(summary: CostCentersSummary, now: Date): PageVerdictModel {
   const active = summary.active;
   if (active.length === 0 && summary.archived.length === 0) {
-    return { headline: 'Nessun centro di costo.', tone: 'neutral', sentence: [prose('Crea il primo centro per raggruppare le spese di un oggetto o di un progetto.')] };
+    return { headline: 'Nessun centro di costo.', tone: 'neutral', sentence: [prose('Crea il primo centro per raggruppare le spese di un oggetto o di un progetto: il suo costo è il costo di sempre, senza periodo.')] };
   }
   if (active.length === 0) {
     const n = summary.archived.length;
@@ -178,7 +193,7 @@ export function buildCostCentersVerdict(summary: CostCentersSummary, now: Date):
     return {
       headline: 'Nessuna spesa nei centri di costo.',
       tone: 'neutral',
-      sentence: [...centersCount(n), prose(` ${pluralize(n, 'creato', 'creati')}, ancora senza movimenti: collega una spesa da Tracciamento per vederla qui.`)],
+      sentence: [...centersCount(n), prose(` ${pluralize(n, 'creato', 'creati')}, ancora senza movimenti. ${HOW_TO_LINK}`)],
     };
   }
 
@@ -193,7 +208,7 @@ export function buildCostCentersVerdict(summary: CostCentersSummary, now: Date):
     headline = `${over.length} centri hanno superato il tetto.`;
     tone = 'negative';
     body = [...topClause(summary, 'è il più caro'), prose(`; ${joinNames(over.map((c) => c.center.name))} hanno superato il tetto`)];
-    if (atRisk.length > 0) body.push(prose(`, ${joinNames(atRisk.map((c) => c.center.name))} ${pluralize(atRisk.length, 'rischia', 'rischiano')} di sforarlo`));
+    if (atRisk.length > 0) body.push(prose(`, ${joinNames(atRisk.map((c) => c.center.name))} lo ${pluralize(atRisk.length, 'supererà', 'supereranno')} ${BY_CALENDAR}`));
   } else if (over.length === 1) {
     const center = over[0];
     headline = `${center.center.name} ha superato il tetto ${windowOf(center.budget!, now)}.`;
@@ -202,14 +217,14 @@ export function buildCostCentersVerdict(summary: CostCentersSummary, now: Date):
       center === top
         ? [...overClause(center, now), prose(', '), ...topClause(summary, 'ed è anche il più caro')]
         : [...overClause(center, now), prose('; '), ...topClause(summary, 'è il più caro')];
-    if (atRisk.length > 0) body.push(prose(`; ${joinNames(atRisk.map((c) => c.center.name))} ${pluralize(atRisk.length, 'rischia', 'rischiano')} di sforarlo`));
+    if (atRisk.length > 0) body.push(prose(`; ${joinNames(atRisk.map((c) => c.center.name))} lo ${pluralize(atRisk.length, 'supererà', 'supereranno')} ${BY_CALENDAR}`));
   } else if (atRisk.length >= 2) {
-    headline = `${atRisk.length} centri rischiano di sforare il tetto.`;
+    headline = `${atRisk.length} centri supereranno il tetto.`;
     tone = 'warning';
-    body = [...topClause(summary, 'è il più caro'), prose(`; ${joinNames(atRisk.map((c) => c.center.name))} rischiano di sforare il tetto al ritmo attuale`)];
+    body = [...topClause(summary, 'è il più caro'), prose(`; ${joinNames(atRisk.map((c) => c.center.name))} supereranno il tetto ${BY_CALENDAR}`)];
   } else if (atRisk.length === 1) {
     const center = atRisk[0];
-    headline = `${center.center.name} rischia di sforare il tetto ${windowOf(center.budget!, now)}.`;
+    headline = `${center.center.name} supererà il tetto ${windowOf(center.budget!, now)}.`;
     tone = 'warning';
     body =
       center === top
@@ -247,16 +262,14 @@ function exceededVerdict(center: CenterSummary, now: Date): PageVerdictModel {
   const budget = center.budget!;
   const name = center.center.name;
   const calendar = resolveBudgetCalendar(now);
-  const ahead = budget.crossedOn !== null && budget.crossedOn > calendar.dayOfMonth;
-  const opening: Narrative = ahead
-    ? [prose('Lo superi '), ...dayRef('il', budget.crossedOn!), prose(' con le spese già in calendario; ')]
-    : budget.crossedOn === null
+  const opening: Narrative =
+    budget.crossedOn === null
       ? []
       : budget.crossedOn === calendar.dayOfMonth
         ? [prose('Lo hai superato oggi; ')]
         : [prose('Lo hai superato '), ...dayRef('il', budget.crossedOn), prose('; ')];
   return {
-    headline: ahead ? `${name} supererà il tetto ${windowOf(budget, now)}.` : `${name} ha superato il tetto ${windowOf(budget, now)}.`,
+    headline: `${name} ha superato il tetto ${windowOf(budget, now)}.`,
     tone: 'negative',
     sentence: [
       ...opening,
@@ -274,26 +287,58 @@ function exceededVerdict(center: CenterSummary, now: Date): PageVerdictModel {
   };
 }
 
+/**
+ * The RISK: what is booked still holds, the rows already in the calendar carry it past the
+ * ceiling. A month names the day it happens; a year has no crossing day (the guide's blind spot).
+ */
+function riskVerdict(center: CenterSummary, now: Date): PageVerdictModel {
+  const budget = center.budget!;
+  const opening: Narrative =
+    budget.crossedOn !== null ? [prose('Lo superi '), ...dayRef('il', budget.crossedOn), prose(` ${BY_CALENDAR}; `)] : [prose(`Lo superi ${BY_CALENDAR}; `)];
+  return {
+    headline: `${center.center.name} supererà il tetto ${windowOf(budget, now)}.`,
+    tone: 'warning',
+    sentence: [
+      ...opening,
+      ...windowOpening(budget, now, true),
+      prose('hai speso '),
+      figure(euro(budget.spentToDate)),
+      prose(' e ne hai in calendario '),
+      figure(euro(budget.scheduled)),
+      prose(': '),
+      signed(euro(budget.spent), 'negative'),
+      prose(' su '),
+      figure(euro(budget.amount)),
+      prose(', '),
+      signed(euro(budget.overBy), 'negative'),
+      prose(' oltre'),
+      ...lifetimeClause(center),
+      prose('.'),
+    ],
+  };
+}
+
 function holdingVerdict(center: CenterSummary, now: Date): PageVerdictModel {
   const budget = center.budget!;
-  const name = center.center.name;
-  const sentence: Narrative = [...windowOpening(budget, now, false), prose(`hai ${spentVerb(budget)} `), figure(euro(budget.spent)), prose(' su '), figure(euro(budget.amount))];
-  // The share against the calendar («il 32% al 64% dell'anno») is the reading of a holding
-  // ceiling; on the year it stays even at risk, because «da gennaio» names no calendar the
-  // way «a 9 giorni dalla fine del mese» does.
-  if (!budget.atRisk || budget.period === 'annual') {
-    sentence.push(prose(', '), ...percentWithArticle(budget.usedPct), prose(' '), ...percentWithAt(budget.calendarPct), prose(budget.period === 'monthly' ? ' del mese' : " dell'anno"));
-  }
-  if (budget.atRisk) {
-    sentence.push(prose(', e al ritmo attuale chiudi a '), signed(`~${euro(budget.projection!)}`, 'negative'), prose(', '), signed(euro(projectedGap(budget.projection!, budget.amount)), 'negative'), prose(' oltre'));
-  } else if (budget.projection !== null) {
-    sentence.push(prose(', e al ritmo attuale chiudi a '), figure(`~${euro(budget.projection)}`));
-  }
-  sentence.push(...lifetimeClause(center), prose('.'));
+  // The share against the calendar («il 32% al 64% dell'anno») is the whole reading of a
+  // ceiling that holds: no pace stands behind it, so nothing is said about where it «closes».
   return {
-    headline: budget.atRisk ? `${name} rischia di sforare il tetto ${windowOf(budget, now)}.` : `${name} resta nel tetto ${windowOf(budget, now)}.`,
-    tone: budget.atRisk ? 'warning' : 'positive',
-    sentence,
+    headline: `${center.center.name} resta nel tetto ${windowOf(budget, now)}.`,
+    tone: 'positive',
+    sentence: [
+      ...windowOpening(budget, now, false),
+      prose(`hai ${spentVerb(budget)} `),
+      figure(euro(budget.spent)),
+      prose(' su '),
+      figure(euro(budget.amount)),
+      prose(', '),
+      ...percentWithArticle(budget.usedPct),
+      prose(' '),
+      ...percentWithAt(budget.calendarPct),
+      prose(budget.period === 'monthly' ? ' del mese' : " dell'anno"),
+      ...lifetimeClause(center),
+      prose('.'),
+    ],
   };
 }
 
@@ -306,9 +351,14 @@ export function buildCostCenterVerdict(center: CenterSummary, now: Date): PageVe
     return { headline: `${name} è archiviato.`, tone: 'neutral', sentence };
   }
   if (center.count === 0) {
-    return { headline: `${name} non ha ancora spese.`, tone: 'neutral', sentence: [prose('Collega una spesa da Tracciamento per vederla qui.')] };
+    return { headline: `${name} non ha ancora spese.`, tone: 'neutral', sentence: [prose(HOW_TO_LINK)] };
   }
   if (center.budget?.exceeded) return exceededVerdict(center, now);
+  // The risk outranks dormancy. While a pace stood behind it a dormant center could have none;
+  // now it is a fact of the calendar, and an idle center with an instalment to come that
+  // crosses its ceiling is exactly the one the list's verdict names — the detail used to
+  // answer «è fermo da 246 giorni» to the same center (found by the page's first spec).
+  if (center.budget?.atRisk) return riskVerdict(center, now);
   if (center.lifecycle === 'dormant') {
     return {
       headline: `${name} è fermo da ${center.idleDays} giorni.`,
@@ -319,24 +369,38 @@ export function buildCostCenterVerdict(center: CenterSummary, now: Date): PageVe
   if (center.budget) return holdingVerdict(center, now);
 
   const sentence: Narrative = [figure(euro(center.total)), prose(' in '), ...movementsCount(center.count), prose(` da ${monthYear(center.firstDate!)}`)];
-  if (center.ytd > 0) sentence.push(prose(', '), figure(euro(center.ytd)), prose(" quest'anno"));
-  if (center.yearProjection !== null) sentence.push(prose("; al ritmo attuale l'anno chiude a "), figure(`~${euro(center.yearProjection)}`));
+  // A center born this year IS this year: «3711 € … da gennaio 2026, 3711 € quest'anno» said it twice.
+  if (center.ytd > 0 && getItalyYear(center.firstDate!) < getItalyYear(now)) sentence.push(prose(', '), figure(euro(center.ytd)), prose(" quest'anno"));
+  if (center.yearScheduled > 0) sentence.push(prose("; con le spese in calendario l'anno chiude a "), figure(euro(center.ytd + center.yearScheduled)));
   sentence.push(prose('.'));
   return { headline: `${name} costa ${euro(center.averageMonthly)} al mese.`, tone: 'neutral', sentence };
 }
 
 // ─── The list's tiles ─────────────────────────────────────────────────────────
 
-export function describeTotale(summary: CostCentersSummary): Narrative {
+export function describeTotale(summary: CostCentersSummary, stack: CenterMonthStack, now: Date): Narrative {
   const spenders = summary.active.filter((row) => row.summary.total > 0);
   if (spenders.length === 0 || !summary.firstDate) return [prose('Nessuna spesa registrata nei centri attivi.')];
-  const opening: Narrative = [figure(euro(summary.total)), prose(` dal ${monthYear(summary.firstDate)}: `)];
-  const [first, second] = spenders;
-  if (spenders.length === 1) return [...opening, prose(`${first.summary.center.name} è l'unico centro con spese.`)];
-  if (spenders.length === 2) {
-    return [...opening, prose(`${first.summary.center.name} pesa `), ...percentWithArticle(first.share), prose(`, ${second.summary.center.name} `), ...percentWithArticle(second.share), prose('.')];
+  // The verdict already says who weighs what, and Centri how concentrated the list is: this
+  // tile holds the years and the twelve bars, so its reading is about TIME — since when, how
+  // much of it is this year's, and which of the bars below is the tallest.
+  const out: Narrative = [prose(`Da ${monthYear(summary.firstDate)}`)];
+  if (summary.ytd > 0 && getItalyYear(summary.firstDate) < getItalyYear(now)) {
+    out.push(prose("; quest'anno "), figure(euro(summary.ytd)), prose(', '), ...percentWithArticle((summary.ytd / summary.total) * 100), prose(' del totale'));
   }
-  return [...opening, prose(`${first.summary.center.name} pesa `), ...percentWithArticle(first.share), prose(', i primi '), count(2), prose(' '), ...percentWithArticle(first.share + second.share), prose('.')];
+  const peak = stack.months.reduce((max, month) => (month.total > max.total ? month : max), stack.months[0]);
+  if (peak && peak.total > 0) {
+    const name = MONTH_NAMES[peak.month - 1].toLowerCase();
+    out.push(
+      prose(peak.ongoing ? `. ${capitalize(name)}, ancora in corso, è già il mese più caro degli ultimi ` : `. Il mese più caro degli ultimi `),
+      count(stack.months.length),
+      prose(peak.ongoing ? ' (' : ` è ${name}${peak.year === getItalyYear(now) ? '' : ` ${peak.year}`} (`),
+      figure(euro(peak.total)),
+      prose(')'),
+    );
+  }
+  out.push(prose('.'));
+  return out;
 }
 
 export function describeTotaleAside(summary: CostCentersSummary): Narrative {
@@ -352,10 +416,22 @@ export function describeTotaleFooter(summary: CostCentersSummary): Narrative | n
     : [prose('Esclusi '), count(n), prose(' centri archiviati ('), figure(euro(summary.archivedTotal)), prose('): sono sotto la griglia.')];
 }
 
-/** «2025, intero» — the KPI caption that names last year. */
-export function describeLastYearCaption(now: Date): Narrative {
-  return [figure(String(getItalyYear(now) - 1)), prose(', intero')];
+/**
+ * «2025, intero» — the KPI caption that names last year; «2025, da settembre» when the
+ * history BEGAN in it. Four months read as a whole year beside «Quest'anno» print a growth
+ * nobody had (327 € against 7022 € on the owner's account: a false ×21).
+ */
+export function describeLastYearCaption(now: Date, firstDate: Date | null): Narrative {
+  const lastYear = getItalyYear(now) - 1;
+  const startedInIt = firstDate !== null && getItalyYear(firstDate) === lastYear && getItalyMonth(firstDate) > 1;
+  return [figure(String(lastYear)), prose(startedInIt ? `, da ${MONTH_NAMES[getItalyMonth(firstDate) - 1].toLowerCase()}` : ', intero')];
 }
+
+/** The Centri tile with no center at all: what is missing, and what fills one once it exists. */
+export const EMPTY_CENTRI = `Nessun centro ancora. Dopo averne creato uno, ${HOW_TO_LINK.charAt(0).toLowerCase()}${HOW_TO_LINK.slice(1)}`;
+
+/** «In ordine di costo» — Centri's own scope; Totale keeps «N centri attivi · in totale». */
+export const CENTRI_ASIDE: Narrative = [prose('in ordine di costo')];
 
 export function describeTrailingCaption(stack: CenterMonthStack, now: Date): Narrative {
   if (stack.centers.length === 0) return [prose('nessuna spesa negli ultimi '), count(stack.months.length), prose(' mesi')];
@@ -390,7 +466,7 @@ export function describeCenterRow(center: CenterSummary, now: Date): Narrative {
   if (budget?.exceeded) {
     out.push(prose(DOT), signed(euro(budget.spent), 'negative'), prose(' su '), figure(euro(budget.amount)), prose(` ${windowIn(budget, now)}, `), signed(euro(budget.overBy), 'negative'), prose(' oltre'));
   } else if (budget?.atRisk) {
-    out.push(prose(`${DOT}al ritmo attuale `), signed(`~${euro(budget.projection!)}`, 'negative'), prose(' su '), figure(euro(budget.amount)), prose(` ${windowIn(budget, now)}`));
+    out.push(prose(`${DOT}con il calendario `), signed(euro(budget.spent), 'negative'), prose(' su '), figure(euro(budget.amount)), prose(` ${windowIn(budget, now)}`));
   } else if (budget) {
     out.push(prose(DOT), ...percentWithAt(budget.usedPct), prose(` del tetto ${budget.period === 'monthly' ? 'mensile' : 'annuale'}`));
   } else if (center.lifecycle === 'active' && center.ytd > 0) {
@@ -416,7 +492,7 @@ export function describeCenterChip(center: CenterSummary): CenterChip | null {
   return { label, tone: budget.atRisk ? 'warning' : 'neutral' };
 }
 
-export const CENTRI_FOOTER: Narrative = [prose('Ordinati per costo totale; la barra è il rango, la percentuale la quota. Tocca un centro per aprirlo.')];
+export const CENTRI_FOOTER: Narrative = [prose('La barra è il rango, la percentuale la quota del totale. Ogni riga apre il suo centro.')];
 
 export function describeDormienti(summary: CostCentersSummary): Narrative {
   if (summary.active.length === 0) return [prose('Nessun centro attivo.')];
@@ -455,16 +531,19 @@ export function describeArchivedRow(center: CenterSummary): Narrative {
 
 // ─── The detail's tiles ───────────────────────────────────────────────────────
 
-export function describeCosto(center: CenterSummary): Narrative {
+export function describeCosto(center: CenterSummary, now: Date): Narrative {
   if (center.count === 0) return [prose('Nessuna spesa registrata.')];
+  const year = getItalyYear(now);
   const out: Narrative = [figure(euro(center.total)), prose(' in '), ...movementsCount(center.count), prose(', '), figure(euro(center.averageMonthly)), prose(' al mese in media; ')];
-  if (center.ytd > 0) out.push(prose("quest'anno "), figure(euro(center.ytd)), prose(', '), ...percentWithArticle(center.ytdPct), prose('.'));
+  // A center born this year IS this year: «quest'anno 3711 €, il 100%» would repeat the total.
+  if (center.firstDate && getItalyYear(center.firstDate) === year) out.push(prose("tutto quest'anno."));
+  else if (center.ytd > 0) out.push(prose("quest'anno "), figure(euro(center.ytd)), prose(', '), ...percentWithArticle(center.ytdPct), prose('.'));
   else out.push(prose("nessuna spesa quest'anno."));
   return out;
 }
 
 export function describeCostoAside(center: CenterSummary): Narrative {
-  return center.firstDate ? [prose(`dal ${monthYear(center.firstDate)} · in totale`)] : [prose('in totale')];
+  return center.firstDate ? [prose(`da ${monthYear(center.firstDate)} · in totale`)] : [prose('in totale')];
 }
 
 export function describeCostoFooter(center: CenterSummary): Narrative {
@@ -495,35 +574,30 @@ export interface KpiReading {
   tone: 'neutral' | 'negative' | 'muted';
 }
 
-export function describeMonthEndKpi(center: CenterSummary, now: Date): KpiReading {
-  if (center.monthProjection === null) {
-    if (center.monthSpentToDate === 0) return { value: '—', caption: [prose(`nessuna spesa ${withPrepositionA(monthName(now))}`)], tone: 'muted' };
-    if (!resolveBudgetCalendar(now).canForecast) return { value: '—', caption: [prose('dal quarto giorno')], tone: 'muted' };
-    return { value: '—', caption: [prose('centro fermo')], tone: 'muted' };
-  }
-  const budget = center.budget;
-  const over = budget?.period === 'monthly' && projectedGap(center.monthProjection, budget.amount) > 0;
-  return {
-    value: `~${euro(center.monthProjection)}`,
-    caption: over ? [prose('al ritmo attuale, '), signed(euro(projectedGap(center.monthProjection, budget!.amount)), 'negative'), prose(' oltre')] : [prose('al ritmo attuale')],
-    tone: over ? 'negative' : 'neutral',
-  };
+/**
+ * A window of the center — «Questo mese», «Quest'anno»: the figure is what is BOOKED in it,
+ * and the caption adds the calendar when there is one («con il calendario chiude a 260 €»).
+ * The cells were «Fine mese» / «Fine anno» while a pace stood behind them; without one a
+ * window's end is a sum, and on a center with nothing scheduled it had nothing to print —
+ * two cells out of three read «—» on the owner's account. The end is a SUM, so no «~».
+ */
+function describeWindowKpi(spentToDate: number, scheduled: number, empty: string, ceiling: number | null): KpiReading {
+  if (spentToDate === 0 && scheduled === 0) return { value: '—', caption: [prose(empty)], tone: 'muted' };
+  const end = spentToDate + scheduled;
+  const gap = ceiling === null ? 0 : Math.round(end) - ceiling;
+  const caption: Narrative = scheduled > 0 ? [prose('con il calendario chiude a '), figure(euro(end))] : [prose('speso finora')];
+  if (gap > 0) caption.push(prose(', '), signed(euro(gap), 'negative'), prose(' oltre'));
+  return { value: euro(spentToDate), caption, tone: gap > 0 ? 'negative' : 'neutral' };
 }
 
-export function describeYearEndKpi(center: CenterSummary): KpiReading {
-  if (center.yearProjection === null) {
-    if (center.lifecycle === 'archived') return { value: '—', caption: [prose('archiviato')], tone: 'muted' };
-    if (center.lifecycle === 'dormant') return { value: '—', caption: [prose('centro fermo')], tone: 'muted' };
-    if (center.ytd === 0) return { value: '—', caption: [prose("nessuna spesa quest'anno")], tone: 'muted' };
-    return { value: '—', caption: [prose('da febbraio')], tone: 'muted' };
-  }
-  const budget = center.budget;
-  const over = budget?.period === 'annual' && projectedGap(center.yearProjection, budget.amount) > 0;
-  return {
-    value: `~${euro(center.yearProjection)}`,
-    caption: over ? [prose("al ritmo di quest'anno, "), signed(euro(projectedGap(center.yearProjection, budget!.amount)), 'negative'), prose(' oltre')] : [prose("al ritmo di quest'anno")],
-    tone: over ? 'negative' : 'neutral',
-  };
+export function describeMonthKpi(center: CenterSummary, now: Date): KpiReading {
+  const ceiling = center.budget?.period === 'monthly' ? center.budget.amount : null;
+  return describeWindowKpi(center.monthSpentToDate, center.monthScheduled, `nessuna spesa ${withPrepositionA(monthName(now))}`, ceiling);
+}
+
+export function describeYearKpi(center: CenterSummary): KpiReading {
+  const ceiling = center.budget?.period === 'annual' ? center.budget.amount : null;
+  return describeWindowKpi(center.ytd, center.yearScheduled, "nessuna spesa quest'anno", ceiling);
 }
 
 export function describeAverageKpi(center: CenterSummary): KpiReading {
@@ -560,7 +634,7 @@ export function describeSottocategorieAside(excludedCount: number): Narrative | 
   return [count(excludedCount), prose(` ${pluralize(excludedCount, 'esclusa', 'escluse')}`)];
 }
 
-export const SOTTOCATEGORIE_FOOTER: Narrative = [prose('Tocca una voce per escluderla dal totale — solo qui: le altre tessere non cambiano.')];
+export const SOTTOCATEGORIE_FOOTER: Narrative = [prose('Ogni riga toglie o rimette la sua voce nel totale — solo qui: le altre tessere non cambiano.')];
 
 export function describeCiclo(center: CenterSummary): Narrative {
   if (center.lifecycle === 'archived') return [prose('Archiviato il '), figure(formatDate(toDate(center.center.archivedAt!))), prose('.')];
@@ -611,4 +685,114 @@ export function describeMovimenti(center: CenterSummary): Narrative {
 export function describeMovimentiAside(center: CenterSummary): Narrative {
   const n = center.count + center.scheduled.count;
   return [count(n), prose(` ${pluralize(n, 'voce', 'voci')}`)];
+}
+
+// ─── The form ─────────────────────────────────────────────────────────────────
+
+/**
+ * The create/edit modal's reading, which is also its status line. A NEW center's reading is
+ * where the feature's entry point is taught: the modal closes on an empty center, and the
+ * next thing the user needs is the field that fills it.
+ */
+export function describeCostCenterDialogCopy(isEdit: boolean): ModalStatusCopy {
+  return {
+    idle: [
+      prose(
+        isEdit
+          ? 'Il nome e il colore seguono il centro ovunque compaia; le spese già collegate restano dove sono.'
+          : `Un centro misura il costo di sempre di un progetto, senza periodo. Le spese si collegano poi una a una dal loro form: ${LINK_FIELD}.`,
+      ),
+    ],
+    submitting: 'Salvataggio in corso…',
+  };
+}
+
+/** A swatch's accessible name: its POSITION (a hue name lies on another theme), who wears it, whether it is the choice. */
+export function describeColorSwatch(index: number, total: number, usedBy: readonly string[], selected: boolean): string {
+  const holders = usedBy.length > 0 ? `, in uso da ${joinNames([...usedBy])}` : '';
+  return `Colore ${index + 1} di ${total}${holders}${selected ? ' (selezionato)' : ''}`;
+}
+
+/** Under the picker, only when the chosen colour is another active center's: what it costs. */
+export function describeColorClash(usedBy: readonly string[]): string | null {
+  if (usedBy.length === 0) return null;
+  return `È già il colore di ${joinNames([...usedBy])}: nei grafici ${usedBy.length === 1 ? 'i due centri' : 'questi centri'} non si distinguono.`;
+}
+
+/**
+ * What a ceiling DOES. It used to promise «ricevere un avviso»: nothing in the app sends one —
+ * the ceiling is read on this page, as a fact or as a risk the calendar carries.
+ */
+export function describeCeilingHint(period: CostCenterBudgetPeriod): string {
+  return `Con un tetto ${period === 'monthly' ? 'mensile' : 'annuale'} il centro dice quando lo hai superato, o quando lo supereranno le spese già in calendario. Non arriva nessuna notifica: si legge qui.`;
+}
+
+// ─── Linking many expenses at once («Collega spese…») ─────────────────────────
+
+const spese = (n: number) => pluralize(n, 'spesa', 'spese');
+
+/**
+ * The reading of the link window — its status line while idle. It counts what the confirm
+ * will write and, above all, names what it takes AWAY: an expense has one center, so linking
+ * a row of another center moves it, and that is said before the button is pressed.
+ */
+export function describeLinkSelection(summary: LinkSelectionSummary, centerName: string): Narrative {
+  if (summary.rowCount === 0) return [prose(`Nessuna spesa selezionata: spunta quelle che appartengono a ${centerName}.`)];
+  const out: Narrative = [count(summary.rowCount), prose(` ${spese(summary.rowCount)}, `), figure(euro(summary.total))];
+  if (summary.moves.length > 0) {
+    const moved = summary.moves.reduce((total, move) => total + move.count, 0);
+    const from = joinNames(summary.moves.map((move) => move.centerName));
+    out.push(prose(DOT), count(moved), prose(` ${pluralize(moved, 'passa', 'passano')} da ${from} a ${centerName}`));
+  }
+  out.push(prose('.'));
+  return out;
+}
+
+export function describeLinkDialogCopy(summary: LinkSelectionSummary, centerName: string): ModalStatusCopy {
+  return { idle: describeLinkSelection(summary, centerName), submitting: 'Collegamento in corso…' };
+}
+
+/** «serie di 12 · 4 in calendario», «12 rate · 4 in calendario» — a tick on it links them all. */
+export function describeLinkSeries(series: NonNullable<LinkCandidate['series']>): string {
+  const head = series.kind === 'installment' ? `${series.count} ${pluralize(series.count, 'rata', 'rate')}` : `serie di ${series.count}`;
+  return series.scheduledCount > 0 ? `${head}${DOT}${series.scheduledCount} in calendario` : head;
+}
+
+/** «di Vacanze» — the chip of a row that belongs to another center. */
+export function describeLinkLeaves(leaves: LinkCandidate['leaves']): string {
+  return `di ${joinNames(leaves.map((leave) => leave.centerName))}`;
+}
+
+/**
+ * Why the list is empty — three different facts, never one «nessun risultato»: nothing to
+ * link at all, everything already has a center (and the switch that shows them), or the
+ * filters hide what there is.
+ */
+export function describeLinkEmpty(state: { anyCandidate: boolean; anyHiddenByOtherCenters: boolean; filtered: boolean }): string {
+  if (!state.anyCandidate) return 'Nessuna uscita da collegare: quelle registrate sono già tutte in questo centro.';
+  if (state.filtered) return 'Nessuna uscita corrisponde ai filtri.';
+  if (state.anyHiddenByOtherCenters) return 'Tutte le altre uscite hanno già un centro: «Mostra anche quelle di altri centri» le elenca, per spostarle qui.';
+  return 'Nessuna uscita da collegare.';
+}
+
+export function describeLinkOutcome(rowCount: number, centerName: string): string {
+  return `${rowCount} ${pluralize(rowCount, 'spesa collegata', 'spese collegate')} a ${centerName}`;
+}
+
+export function describeUnlinkOutcome(rowCount: number, centerName: string): string {
+  return `${rowCount} ${pluralize(rowCount, 'spesa scollegata', 'spese scollegate')} da ${centerName}`;
+}
+
+/** After «Annulla»: every row is back where it was, its previous center included. */
+export function describeLinkUndone(rowCount: number): string {
+  return rowCount === 1 ? 'Annullato: la spesa è tornata com\'era.' : `Annullato: ${rowCount} spese sono tornate com\'erano.`;
+}
+
+/** Printed IN the row while «Scollega» is armed: what the second press does, and what it does not. */
+export const UNLINK_CONSEQUENCE = 'Scollegando, la spesa resta in Cashflow ed esce dal centro.';
+
+/** The «solo questa o tutta la serie?» window of a row that belongs to a series. */
+export function describeUnlinkSeriesReading(kind: 'recurring' | 'installment', seriesCount: number, centerName: string): string {
+  const what = kind === 'installment' ? `un piano di ${seriesCount} rate` : `una serie di ${seriesCount} occorrenze`;
+  return `Questa spesa fa parte di ${what} collegate a ${centerName}. Scollegarle le lascia in Cashflow: escono solo dal centro.`;
 }

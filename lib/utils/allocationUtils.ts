@@ -27,8 +27,23 @@ import type {
   AssetClass,
 } from '@/types/assets';
 import { getAssetDisplayTicker } from './assetDisplay';
+import { costBasisPerUnitEur } from './costBasisEur';
 
 export type AllocationAction = 'COMPRA' | 'VENDI' | 'OK';
+
+/**
+ * Whether selling this asset can produce a taxable capital gain.
+ *
+ * The same two exemptions `calculateUnrealizedGains` (assetService) applies: a cash account holds
+ * no gain to tax, and a fondo pensione complementare is taxed on its own schedule at redemption,
+ * not as a capital gain — modelling either as a 26% withholding would invent a number. Kept here
+ * because `buildHoldings` must stay Firebase-free.
+ */
+function isTaxableOnSale(asset: Asset): boolean {
+  if (asset.type === 'pensionFund') return false;
+  if (asset.type === 'cash' && asset.assetClass === 'cash') return false;
+  return true;
+}
 
 /**
  * Every member of the `AssetClass` union, in the canonical display order shared by
@@ -161,6 +176,33 @@ export const ACTION_CHART_NUMBER: Record<AllocationAction, 1 | 2 | 3 | 4 | 5> = 
   OK: 2,
 };
 
+/**
+ * The lightness band those three slots must be clamped into to clear WCAG AA (4.5:1) as TEXT on
+ * `--card` and on the chip's own tinted fill, in every theme.
+ *
+ * They are not chart slots where this page prints them: a slot is pitched at ~3:1 against a plot
+ * area, while an `ActionChip` label (10px/600), a Piano amount (18px/600) and the Per classe gap
+ * column (13px) are all text, and none of them is WCAG «large». The default LIGHT palette failed
+ * it everywhere until 2026-09-21 — COMPRA 2,74:1 on the card, 2,39:1 on its chip — because the
+ * old clamp only fired above L 0.72, above every value the palette holds.
+ *
+ * Here rather than in `useActionColors` so `__tests__/actionColorContrast.test.ts` can hold all
+ * twelve theme blocks to the same numbers without importing the hook, which reaches the Firebase
+ * SDK through the theme context.
+ */
+export const ACTION_LIGHT_MAX_L = 0.46;
+export const ACTION_DARK_MIN_L = 0.8;
+
+/**
+ * How much of its own colour an `ActionChip` washes into its background.
+ *
+ * It was 14%, which is what made the chip the HARDER surface of the two: a fill mixed from the
+ * text's own hue always pulls the background towards the text. At 8% the chip is still visibly
+ * tinted and the label clears 4.5:1 with headroom (worst block 4,64:1 against 5,25:1 on the flat
+ * card); at 14% the same bounds gave 4,06:1. Measured, not chosen.
+ */
+export const ACTION_CHIP_FILL_PCT = 8;
+
 // ---------------------------------------------------------------------------
 // Key parsing (the bySubCategory / bySpecificAsset maps use composite keys)
 // ---------------------------------------------------------------------------
@@ -244,9 +286,8 @@ export interface BalanceSummary {
  * because 6 and 7 are spoken for below and re-using one puts two different things in the same hue
  * on the same chart.
  *
- * KNOWN LIMIT: `useChartColors()` resolves only indices 0-4 from the active theme and pads 5-9
- * from the static `CHART_COLORS`, which can repeat a theme hue — slots 1 and 6 measure ΔE ≈ 8
- * apart on the default theme. CLAUDE.md → Known Issues.
+ * KNOWN LIMIT: `useChartColors()` resolves indices 0-7 from the active theme (since 2026-08-30) and
+ * pads 8-9 from the static `CHART_COLORS` — doc/guide/temi.md § Per-page blind spots.
  */
 export const ASSET_CLASS_CHART_INDEX: Record<string, number> = {
   equity: 0,
@@ -347,12 +388,33 @@ export interface RebalanceMove {
   differencePp: number;
   currentPercentage: number;
   targetPercentage: number;
+  /**
+   * The move broken down to sub-category and instrument, empty when the caller asked for no
+   * descent. A SELL descends through the withdrawal split, a BUY through the contribution one —
+   * the class amount is the same either way, so the children always sum back to `amount`.
+   */
+  children: PlanNode[];
 }
 
 /**
- * The consolidated rebalancing plan at asset-class level: every off-target class as
- * a signed move, largest euro amount first. This is the page's single most useful
- * output — the scattered chips turned into "what to actually do".
+ * What `buildRebalancePlan` needs to break a class-level move down to the instruments.
+ *
+ * Optional on purpose: the class-level plan answers "how far is each class from its target", which
+ * is a complete answer on its own and the one the tests and the leveraged engine compare against.
+ * With this, the plan also answers "and which instrument do I trade" — the question a reader has to
+ * take to a broker.
+ */
+export interface RebalanceDescent {
+  /** MUST already have orphaned sub-targets stripped (`stripOrphanedSubTargets`). */
+  bySubCategory: Record<string, AllocationData>;
+  bySpecificAsset: Record<string, AllocationData>;
+  holdings: AllocatableHolding[];
+}
+
+/**
+ * The consolidated rebalancing plan: every off-target class as a signed move, largest euro amount
+ * first, optionally broken down to the instruments you would actually trade. This is the page's
+ * single most useful output — the scattered chips turned into "what to actually do".
  *
  * `tradableByClass` caps the SELL side. A class can sit far above target *because* of a frozen
  * pension fund and still have almost nothing you may sell; printing the raw drift as a euro
@@ -360,12 +422,27 @@ export interface RebalanceMove {
  * `differencePp` and the current/target percentages still tell the truth, and `limitedByFrozen`
  * lets the panel explain why the euro figure is smaller than the gap. A COMPRA is never capped:
  * you can always buy more. Passing no map at all leaves every class uncapped.
+ *
+ * `descent` adds the two lower levels by reusing the flow plans' own splits — a sell drains what
+ * sits above target inside the class (`buildWithdrawalSubCategoryNodes`), a buy fills what sits
+ * below it (`buildContributionSubCategoryNodes`). No second algorithm: the rebalance IS a
+ * withdrawal and a contribution happening at once, and its legs must be the ones Preleva and Versa
+ * would name for the same euros.
  */
 export function buildRebalancePlan(
   byAssetClass: Record<string, AllocationData>,
   tradableByClass: Record<string, number> | null = null,
-  labels: Record<string, string> = ASSET_CLASS_LABELS
+  labels: Record<string, string> = ASSET_CLASS_LABELS,
+  descent: RebalanceDescent | null = null
 ): RebalanceMove[] {
+  const holdingsByClass: Record<string, AllocatableHolding[]> = {};
+  if (descent) {
+    for (const holding of descent.holdings) {
+      (holdingsByClass[holding.assetClass] ??= []).push(holding);
+    }
+  }
+  const subsByClass = descent ? groupSubCategoriesByAssetClass(descent.bySubCategory) : {};
+
   return Object.entries(byAssetClass)
     .filter(([, data]) => data.action !== 'OK')
     .map(([assetClass, data]) => {
@@ -373,6 +450,27 @@ export function buildRebalancePlan(
       const requestedAmount = Math.abs(data.differenceValue);
       const sellable = tradableByClass ? (tradableByClass[assetClass] ?? 0) : requestedAmount;
       const amount = action === 'VENDI' ? Math.min(requestedAmount, sellable) : requestedAmount;
+
+      let children: PlanNode[] = [];
+      if (descent && amount > 0) {
+        children =
+          action === 'VENDI'
+            ? buildWithdrawalSubCategoryNodes(
+                assetClass,
+                holdingsByClass[assetClass] ?? [],
+                descent.bySubCategory,
+                amount,
+                data.currentValue - amount
+              )
+            : buildContributionSubCategoryNodes(
+                assetClass,
+                subsByClass[assetClass],
+                descent.bySpecificAsset,
+                descent.holdings,
+                amount,
+                data.currentValue + amount
+              );
+      }
 
       return {
         assetClass,
@@ -384,6 +482,7 @@ export function buildRebalancePlan(
         differencePp: data.difference,
         currentPercentage: data.currentPercentage,
         targetPercentage: data.targetPercentage,
+        children,
       };
     })
     .sort((a, b) => b.requestedAmount - a.requestedAmount);
@@ -552,6 +651,21 @@ export interface AllocatableHolding {
    * instruction being executable — the page owes the user both.
    */
   tradable: boolean;
+  /**
+   * The holding's EUR cost basis, purchase fees included (`costBasisPerUnitEur × quantity`, the
+   * component's share of it for a sleeve of a composite asset). `undefined` when the asset has no
+   * comparable EUR basis — a foreign position the ledger has not projected yet — and the tax of a
+   * proposed sale is then not estimable rather than zero.
+   */
+  costBasisEur?: number;
+  /** The instrument's capital-gains rate in percent; `undefined` when the asset does not carry one. */
+  taxRate?: number;
+  /**
+   * Whether selling this holding can generate a taxable capital gain at all. A cash account and a
+   * pension fund cannot, so they contribute no tax AND do not make the plan's estimate unknown —
+   * the same two exemptions `calculateUnrealizedGains` applies.
+   */
+  taxableOnSale: boolean;
 }
 
 /**
@@ -582,6 +696,9 @@ export function buildHoldings(
     // duplicate it (e.g. "Conto Corrente (Conto Corrente)" for a tickerless asset).
     const resolvedTicker = getAssetDisplayTicker(asset);
     const ticker = resolvedTicker && resolvedTicker !== asset.name ? resolvedTicker : undefined;
+    const basisPerUnit = costBasisPerUnitEur(asset);
+    const costBasisEur = basisPerUnit !== undefined ? basisPerUnit * asset.quantity : undefined;
+    const taxableOnSale = isTaxableOnSale(asset);
 
     if (asset.composition && asset.composition.length > 0) {
       asset.composition.forEach((component, index) => {
@@ -593,6 +710,11 @@ export function buildHoldings(
           subCategory: component.subCategory,
           value: (value * component.percentage) / 100,
           tradable,
+          // A sleeve carries its share of the whole position's basis, so the gain fraction of the
+          // sleeve equals the asset's: the composition splits value and cost by the same weight.
+          costBasisEur: costBasisEur !== undefined ? (costBasisEur * component.percentage) / 100 : undefined,
+          taxRate: asset.taxRate,
+          taxableOnSale,
         });
       });
     } else {
@@ -604,6 +726,9 @@ export function buildHoldings(
         subCategory: asset.subCategory,
         value,
         tradable,
+        costBasisEur,
+        taxRate: asset.taxRate,
+        taxableOnSale,
       });
     }
   }
@@ -908,6 +1033,16 @@ export interface PlanNode {
   targetPercentage: number;
   /** Empty at the instrument level and whenever nothing moves through this node. */
   children: PlanNode[];
+  /**
+   * True on a real instrument, false (absent) on a class or a sub-category.
+   *
+   * Depth used to carry this — an instrument was whatever sat at depth 2 — until
+   * `collapseRepeatedLevels` started lifting an only child up a level: a collapsed ETF then took
+   * the sub-category caption and printed «→ 100,0%», which is the exact reading `PlanRow`'s
+   * docstring exists to forbid («it looks like you keep everything»). The fact belongs to the
+   * node, not to its position.
+   */
+  isInstrument?: boolean;
 }
 
 /** Label a holding the way the plan shows it: name plus ticker when there is one. */
@@ -948,6 +1083,7 @@ function buildWithdrawalHoldingNodes(
         newPercentage: bucketNewTotal > 0 ? (newValue / bucketNewTotal) * 100 : 0,
         targetPercentage: items.find((item) => item.key === holding.id)?.targetPercentage ?? 0,
         children: [],
+        isInstrument: true,
       };
     })
     .sort((a, b) => b.amount - a.amount);
@@ -1141,6 +1277,7 @@ function buildContributionHoldingNodes(
           newPercentage: bucketNewTotal > 0 ? (newValue / bucketNewTotal) * 100 : 0,
           targetPercentage: data.targetPercentage,
           children: [],
+          isInstrument: true,
         };
       })
       .sort((a, b) => b.amount - a.amount);
@@ -1166,6 +1303,81 @@ function buildContributionHoldingNodes(
         newPercentage: bucketNewTotal > 0 ? (newValue / bucketNewTotal) * 100 : 0,
         targetPercentage: items.find((item) => item.key === holding.id)?.targetPercentage ?? 0,
         children: [],
+        isInstrument: true,
+      };
+    })
+    .sort((a, b) => b.amount - a.amount);
+}
+
+/**
+ * Sub-category level for a CONTRIBUTION into one class: the buckets are the configured TARGETS
+ * (`bySubCategory`), not the holdings, because new money is exactly how a sleeve you have not
+ * bought into yet gets funded.
+ *
+ * Extracted from `buildContributionPlan` so the BUY legs of a rebalance descend through the very
+ * same split (`buildRebalancePlan`'s `descent`): a rebalance is a withdrawal from the classes above
+ * target and a contribution into the ones below it, and a second algorithm for the same question
+ * would drift from this one (doc/guide/allocazione.md → "ONE tree with the sign flipped").
+ */
+function buildContributionSubCategoryNodes(
+  assetClass: string,
+  subs: Record<string, AllocationData> | undefined,
+  bySpecificAsset: Record<string, AllocationData>,
+  holdings: AllocatableHolding[],
+  add: number,
+  classNewTotal: number
+): PlanNode[] {
+  if (add <= 0 || !subs || Object.keys(subs).length === 0) return [];
+
+  // Drop the sub-categories that are not valid DESTINATIONS: those whose value is entirely
+  // frozen (e.g. "equity:Fondo Pensione" — real money, real weight, but you cannot decide to put
+  // this month's €1.000 into it). Their target weight leaves the split, so the class's allotment
+  // renormalizes onto the sleeves you CAN buy — which is precisely how the plan compensates for
+  // a frozen asset. An unfunded target (nothing behind it at all) stays: buying into it is
+  // exactly what a contribution is for.
+  const subEntries = Object.entries(subs).filter(([subCategory]) => {
+    // The residual bucket is a statement about what is unclassified, never a destination: new
+    // money goes into a sleeve you chose, not into the absence of one.
+    if (subCategory === NO_SUBCATEGORY_LABEL) return false;
+    const bucket = holdings.filter(
+      (holding) => holding.assetClass === assetClass && holding.subCategory === subCategory
+    );
+    if (bucket.length === 0) return true;
+    return bucket.some((holding) => holding.tradable && holding.value > 0);
+  });
+  if (subEntries.length === 0) return [];
+
+  const adds = splitTowardTarget(
+    subEntries.map(([name, data]) => ({
+      key: name,
+      currentValue: data.currentValue,
+      targetPercentage: data.targetPercentage,
+    })),
+    add,
+    classNewTotal
+  );
+
+  return subEntries
+    .map(([subCategory, data]) => {
+      const subAdd = adds[subCategory] ?? 0;
+      const subNewTotal = data.currentValue + subAdd;
+      return {
+        key: subCategory,
+        label: subCategory,
+        amount: subAdd,
+        currentValue: data.currentValue,
+        newValue: subNewTotal,
+        // Sub-targets are class-relative, so the weight is against the class's new total.
+        newPercentage: classNewTotal > 0 ? (subNewTotal / classNewTotal) * 100 : 0,
+        targetPercentage: data.targetPercentage,
+        children: buildContributionHoldingNodes(
+          holdings.filter(
+            (holding) => holding.assetClass === assetClass && holding.subCategory === subCategory
+          ),
+          filterSpecificAssets(bySpecificAsset, assetClass, subCategory),
+          subAdd,
+          subNewTotal
+        ),
       };
     })
     .sort((a, b) => b.amount - a.amount);
@@ -1198,10 +1410,8 @@ export function buildContributionPlan(
   const subsByClass = groupSubCategoriesByAssetClass(bySubCategory);
 
   return classSlices.map((slice) => {
-    const subs = subsByClass[slice.assetClass];
     const classNewTotal = slice.currentValue + slice.add;
-
-    const classNode: PlanNode = {
+    return {
       key: slice.assetClass,
       label: slice.label,
       amount: slice.add,
@@ -1209,65 +1419,14 @@ export function buildContributionPlan(
       newValue: classNewTotal,
       newPercentage: slice.newPercentage,
       targetPercentage: slice.targetPercentage,
-      children: [],
+      children: buildContributionSubCategoryNodes(
+        slice.assetClass,
+        subsByClass[slice.assetClass],
+        bySpecificAsset,
+        holdings,
+        slice.add,
+        classNewTotal
+      ),
     };
-
-    if (slice.add <= 0 || !subs || Object.keys(subs).length === 0) return classNode;
-
-    // Drop the sub-categories that are not valid DESTINATIONS: those whose value is entirely
-    // frozen (e.g. "equity:Fondo Pensione" — real money, real weight, but you cannot decide to put
-    // this month's €1.000 into it). Their target weight leaves the split, so the class's allotment
-    // renormalizes onto the sleeves you CAN buy — which is precisely how the plan compensates for
-    // a frozen asset. An unfunded target (nothing behind it at all) stays: buying into it is
-    // exactly what a contribution is for.
-    const subEntries = Object.entries(subs).filter(([subCategory]) => {
-      // The residual bucket is a statement about what is unclassified, never a destination: new
-      // money goes into a sleeve you chose, not into the absence of one.
-      if (subCategory === NO_SUBCATEGORY_LABEL) return false;
-      const bucket = holdings.filter(
-        (holding) => holding.assetClass === slice.assetClass && holding.subCategory === subCategory
-      );
-      if (bucket.length === 0) return true;
-      return bucket.some((holding) => holding.tradable && holding.value > 0);
-    });
-    if (subEntries.length === 0) return classNode;
-
-    const adds = splitTowardTarget(
-      subEntries.map(([name, data]) => ({
-        key: name,
-        currentValue: data.currentValue,
-        targetPercentage: data.targetPercentage,
-      })),
-      slice.add,
-      classNewTotal
-    );
-
-    classNode.children = subEntries
-      .map(([subCategory, data]) => {
-        const subAdd = adds[subCategory] ?? 0;
-        const subNewTotal = data.currentValue + subAdd;
-        return {
-          key: subCategory,
-          label: subCategory,
-          amount: subAdd,
-          currentValue: data.currentValue,
-          newValue: subNewTotal,
-          // Sub-targets are class-relative, so the weight is against the class's new total.
-          newPercentage: classNewTotal > 0 ? (subNewTotal / classNewTotal) * 100 : 0,
-          targetPercentage: data.targetPercentage,
-          children: buildContributionHoldingNodes(
-            holdings.filter(
-              (holding) =>
-                holding.assetClass === slice.assetClass && holding.subCategory === subCategory
-            ),
-            filterSpecificAssets(bySpecificAsset, slice.assetClass, subCategory),
-            subAdd,
-            subNewTotal
-          ),
-        };
-      })
-      .sort((a, b) => b.amount - a.amount);
-
-    return classNode;
   });
 }

@@ -1,39 +1,29 @@
 'use client';
 
 /**
- * SnapshotSearchDialog Component
+ * «Annota un mese» — pick a snapshot, write what happened in it (up to 500 characters). The note
+ * becomes a marker on the Evoluzione curve and a row in the Dettaglio's Note tile.
  *
- * Dialog for searching snapshots and adding/editing notes for financial events.
+ * A modal at the app's vocabulary (doc/guide/dialog.md): the reading is the status line, so a
+ * failed save speaks THERE (`describeWriteError`), never in a toast that names no cause; «Elimina
+ * nota» arms itself (`useArmedDelete`: two presses, no timer, Escape disarms) — until 2026-09-20
+ * it erased the note on one click, with no undo. A month that already carries a note is marked in
+ * the dropdown with the theme's caution token.
  *
- * Features:
- * - Searchable Snapshot Dropdown: Find snapshots by date/amount
- * - Note Management: Add/edit notes up to 500 characters with visual feedback
- * - Character Counter: Color-coded remaining characters (warning at 50 remaining)
- * - Amber Highlighting: Snapshots with existing notes highlighted in dropdown
- * - Formatted Display: Italian date format (MMMM yyyy) with currency formatting
- *
- * Note Use Cases:
- * - Document significant financial events (bonus received, large purchase)
- * - Explain anomalies in net worth (market crash, inheritance)
- * - Track milestones (reached savings goal, paid off debt)
- *
- * Teacher Comment: Snapshot ID Format
- * Snapshot IDs use format "YYYY-MM" (e.g., "2024-01" for January 2024).
- * To extract year/month: const [year, month] = id.split('-').map(Number);
- *
- * @param open - Controls dialog visibility
- * @param onOpenChange - Callback when dialog open state changes
- * @param snapshots - Array of snapshots to choose from
- * @param onSave - Async callback with year, month, note to save to database
+ * Snapshot ids in the combobox are `YYYY-M` (`2024-1`): `id.split('-').map(Number)` gives back
+ * the year and the month.
  */
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { SearchableCombobox, ComboboxOption } from '@/components/ui/searchable-combobox';
 import { MonthlySnapshot } from '@/types/assets';
+import { armedActionLabel, describeWriteError, type ModalReading } from '@/lib/utils/dialogNarrative';
+import { useArmedDelete } from '@/lib/hooks/useArmedDelete';
+import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -47,6 +37,29 @@ interface SnapshotSearchDialogProps {
   onSave: (year: number, month: number, note: string) => Promise<void>;
 }
 
+/**
+ * The destructive action of the footer: the first press arms, the second deletes; the armed label
+ * repeats the consequence. One live region announces the arm AND the disarm — emptying a region
+ * announces nothing (AGENTS.md → Accessibility).
+ */
+function ArmedDeleteNoteButton({ disabled, onConfirm }: { disabled: boolean; onConfirm: () => void }) {
+  const ref = useRef<HTMLButtonElement | null>(null);
+  const { armed, onClick, onBlur } = useArmedDelete(ref, onConfirm);
+  const [wasArmed, setWasArmed] = useState(false);
+  if (armed && !wasArmed) setWasArmed(true);
+  const label = 'Elimina nota';
+  return (
+    <>
+      <Button ref={ref} type="button" variant="outline" className="text-destructive hover:text-destructive" onClick={onClick} onBlur={onBlur} disabled={disabled} aria-pressed={armed}>
+        {armed ? armedActionLabel(label) : label}
+      </Button>
+      <span className="sr-only" role="status" aria-live="polite">
+        {armed ? armedActionLabel(label) : wasArmed ? 'Eliminazione annullata' : ''}
+      </span>
+    </>
+  );
+}
+
 export function SnapshotSearchDialog({
   open,
   onOpenChange,
@@ -56,6 +69,8 @@ export function SnapshotSearchDialog({
   const [selectedSnapshotId, setSelectedSnapshotId] = useState('');
   const [noteText, setNoteText] = useState('');
   const [saving, setSaving] = useState(false);
+  /** The last failed write, in the reader's words; cleared by the next attempt and by a new selection. */
+  const [failure, setFailure] = useState<string | null>(null);
 
   // Convert snapshots to combobox options
   const snapshotOptions: ComboboxOption[] = [...snapshots]
@@ -90,6 +105,7 @@ export function SnapshotSearchDialog({
   // (react-hooks/set-state-in-effect).
   const handleSelectSnapshot = (id: string) => {
     setSelectedSnapshotId(id);
+    setFailure(null);
     if (!id) {
       setNoteText('');
       return;
@@ -112,6 +128,7 @@ export function SnapshotSearchDialog({
     if (!selectedSnapshot || isOverLimit) return;
 
     setSaving(true);
+    setFailure(null);
     try {
       await onSave(selectedSnapshot.year, selectedSnapshot.month, noteText);
       toast.success(noteText.trim() ? 'Nota salvata' : 'Nota eliminata');
@@ -119,7 +136,7 @@ export function SnapshotSearchDialog({
       setSelectedSnapshotId('');
     } catch (error) {
       console.error('Error saving note:', error);
-      toast.error('Errore nel salvataggio della nota');
+      setFailure(describeWriteError(error));
     } finally {
       setSaving(false);
     }
@@ -129,6 +146,7 @@ export function SnapshotSearchDialog({
     if (!selectedSnapshot) return;
 
     setSaving(true);
+    setFailure(null);
     try {
       await onSave(selectedSnapshot.year, selectedSnapshot.month, '');
       toast.success('Nota eliminata');
@@ -136,11 +154,18 @@ export function SnapshotSearchDialog({
       setSelectedSnapshotId('');
     } catch (error) {
       console.error('Error deleting note:', error);
-      toast.error("Errore nell'eliminazione della nota");
+      setFailure(describeWriteError(error));
     } finally {
       setSaving(false);
     }
   };
+
+  // The reading IS the status line: a refusal takes its place and its negative tone.
+  const reading: ModalReading | string = failure
+    ? { narrative: [{ text: failure }], tone: 'negative' }
+    : selectedSnapshot
+      ? 'La nota compare come marcatore sulla curva del patrimonio e nel Dettaglio.'
+      : 'Scegli il mese: la nota comparirà come marcatore sulla sua curva.';
 
   return (
     <ResponsiveModal
@@ -148,25 +173,11 @@ export function SnapshotSearchDialog({
       onClose={() => onOpenChange(false)}
       eyebrow="Storico · Note"
       title="Annota un mese"
-      reading={
-        selectedSnapshot
-          ? 'La nota compare come marcatore sulla curva del patrimonio e nel Dettaglio.'
-          : 'Scegli il mese: la nota comparirà come marcatore sulla sua curva.'
-      }
+      reading={reading}
       width="md"
       footer={
         <>
-          {selectedSnapshot?.note && (
-            <Button
-              type="button"
-              variant="outline"
-              className="text-destructive hover:text-destructive"
-              onClick={handleDelete}
-              disabled={saving || !selectedSnapshot}
-            >
-              Elimina nota
-            </Button>
-          )}
+          {selectedSnapshot?.note && <ArmedDeleteNoteButton disabled={saving} onConfirm={handleDelete} />}
           <Button
             type="button"
             variant="outline"
@@ -183,7 +194,7 @@ export function SnapshotSearchDialog({
             onClick={handleSave}
             disabled={saving || !selectedSnapshot || isOverLimit}
           >
-            {saving ? 'Salvataggio...' : 'Salva'}
+            {saving ? 'Salvataggio…' : 'Salva'}
           </Button>
         </>
       }
@@ -191,14 +202,14 @@ export function SnapshotSearchDialog({
         <div className="space-y-4">
           {/* Snapshot Selection */}
           <div className="space-y-2">
-            <Label htmlFor="snapshot-select">Seleziona uno snapshot</Label>
+            <Label htmlFor="snapshot-select">Mese</Label>
             <SearchableCombobox
               id="snapshot-select"
               options={snapshotOptions}
               value={selectedSnapshotId}
               onValueChange={handleSelectSnapshot}
-              placeholder="Cerca per mese/anno..."
-              searchPlaceholder="Es: Marzo 2024"
+              placeholder="Cerca per mese o anno"
+              searchPlaceholder="Es. marzo 2024"
               emptyMessage="Nessuno snapshot trovato"
               showBadge={false}
             />
@@ -207,25 +218,20 @@ export function SnapshotSearchDialog({
           {/* Note Textarea (only if snapshot selected) */}
           {selectedSnapshot && (
             <div className="space-y-2">
-              <Label htmlFor="note">Nota evento finanziario</Label>
+              <Label htmlFor="note">Nota</Label>
               <Textarea
                 id="note"
                 value={noteText}
                 onChange={(e) => setNoteText(e.target.value)}
-                placeholder="Es: Acquisto auto - €22.000, Bonus lavorativo, Eredità ricevuta..."
+                placeholder="Es. acquisto dell'auto, bonus, eredità ricevuta"
                 rows={4}
+                aria-describedby="note-remaining"
+                aria-invalid={isOverLimit}
                 className={isOverLimit ? 'border-destructive' : ''}
               />
-              <p
-                className={`text-xs text-right ${
-                  isOverLimit
-                    ? 'text-destructive'
-                    : remainingChars < 50
-                    ? 'text-orange-500'
-                    : 'text-muted-foreground'
-                }`}
-              >
-                {remainingChars} caratteri rimanenti
+              {/* The caution is the theme's token (`text-orange-500` kept one hue on twelve themes), the count in mono. */}
+              <p id="note-remaining" className={cn('text-right text-xs', isOverLimit ? 'text-destructive' : remainingChars < 50 ? 'text-warning-foreground' : 'text-muted-foreground')}>
+                <span className="font-mono tabular-nums">{remainingChars}</span> caratteri rimanenti
               </p>
             </div>
           )}

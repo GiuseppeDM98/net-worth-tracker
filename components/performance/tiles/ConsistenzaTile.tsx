@@ -3,6 +3,7 @@
 import type { Narrative } from '@/lib/utils/narrative';
 import type { MonthlyReturnHeatmapData } from '@/types/performance';
 import { Tile } from '@/components/ui/tile';
+import { TileMethodNote } from '@/components/ui/tile-method-note';
 import { HeatmapLegend, MonthlyReturnsHeatmap } from '@/components/performance/MonthlyReturnsHeatmap';
 
 interface ConsistenzaTileProps {
@@ -13,9 +14,10 @@ interface ConsistenzaTileProps {
 
 /**
  * «Quanto è regolare?» — the positive months over the measured ones, the best and the worst, and
- * the heatmap of every month in the period, colour only: the figures are in the reading, in each
- * cell's title and in the hover reading. Months of investment RETURN (cash-flow isolated), not
- * net-worth growth months like Storico's — a different question, a different number.
+ * the heatmap of every month in the period, colour only: the figures are in the reading and in the
+ * line under the grid, which reads the month that is tapped, focused or under the pointer. Months
+ * of investment RETURN (cash-flow isolated), not net-worth growth months like Storico's — a
+ * different question, a different number.
  */
 export function ConsistenzaTile({ reading, heatmap, className }: ConsistenzaTileProps) {
   return (
@@ -23,14 +25,21 @@ export function ConsistenzaTile({ reading, heatmap, className }: ConsistenzaTile
       {heatmap.length > 0 && (
         <>
           <MonthlyReturnsHeatmap data={heatmap} className="mt-4" />
-          {/* Pinned above the footer: the row's height is the neighbours', the slack sits between grid and legend. */}
-          <HeatmapLegend className="mt-auto pt-3" />
+          {/* Directly under the grid it keys. ONE `mt-auto` in the tile, the footer's: two of them
+              split the row's slack and left the legend floating mid-void (2026-09-20). */}
+          <HeatmapLegend className="pb-3.5 pt-2" />
         </>
       )}
-      <p className="mt-auto border-t border-border pt-3.5 text-[11px] leading-[1.45] text-muted-foreground">
-        Ogni mese isola il proprio rendimento sottraendo il cashflow di quel mese: versamenti e prelievi non contano come
-        rendimento. Con il mouse il mese sotto il puntatore si legge.
-      </p>
+      <TileMethodNote summary="Ogni cella è il rendimento di un mese." subject="Consistenza">
+        <span className="block">
+          Ogni mese isola il proprio rendimento sottraendo il cashflow di quel mese: versamenti e prelievi non contano come
+          rendimento.
+        </span>
+        <span className="block">
+          Il colore dice il segno, l&apos;intensità la misura: tre gradini, gli stessi della legenda. Un mese fuori dal periodo
+          resta neutro.
+        </span>
+      </TileMethodNote>
     </Tile>
   );
 }

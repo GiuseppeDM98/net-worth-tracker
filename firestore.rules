@@ -272,6 +272,20 @@ service cloud.firestore {
       allow write: if false;
     }
 
+// Collezione brokerConnections - metadati sync broker in sola lettura (doc id = ownerUid)
+    // Solo metadati (quando, quante posizioni): mai token o credenziali. Stessa postura di budgets.
+    match /brokerConnections/{userId} {
+      // Read: usa userId (doc id) per consentire la lettura di doc inesistenti (null)
+      allow read: if canAccess(userId);
+
+      // Write: proprietario o membro; il campo userId deve coincidere col doc id
+      allow create, update: if canAccess(userId) &&
+                               request.resource.data.userId == userId;
+
+      // Delete: proprietario o membro delegato
+      allow delete: if canAccess(userId);
+    }
+
     // Collezione account-access - concessioni di accesso delegato (doc id = ownerUid)
     // Lettura: il proprietario, o un membro elencato (abilita sia get() delle rules
     //   sopra sia la query array-contains con cui il viewer scopre gli account condivisi).
@@ -279,7 +293,7 @@ service cloud.firestore {
     //   membro richiede la risoluzione email->uid lato server.
     match /account-access/{ownerUid} {
       allow read: if isOwner(ownerUid) ||
-                     (isAuthenticated() && request.auth.uid in resource.data.memberUids);
+                       (isAuthenticated() && request.auth.uid in resource.data.memberUids);
       allow write: if false;
     }
 

@@ -38,9 +38,9 @@ export function projectMonthEndWithScheduled(
 /**
  * The same rule on ANY calendar window — a month (`dayOfMonth` / `daysInMonth`) or a year
  * (`dayOfYear` / `daysInYear`): the pace on what is booked up to today, times the window,
- * plus the rows already dated after today as they are. Centri di Costo projects a center's
- * year-end cost with it; before it, the center used a blended model (this year's pace weighted
- * with last year's), which printed a figure «al ritmo attuale» that was not the current pace.
+ * plus the rows already dated after today as they are. It fits SMOOTH spending only: Centri
+ * di Costo used it until 2026-09-18 and gave it up, because a project spends in blocks and
+ * its recurring series are already in the calendar (lib/utils/costCenterSummary.ts, header).
  * Null on a window that has not started or on a malformed calendar.
  */
 export function projectWindowEndWithScheduled(

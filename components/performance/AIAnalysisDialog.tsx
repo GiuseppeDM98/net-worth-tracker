@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import { TILE_EYEBROW_CLASS, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { NarrativeText } from '@/components/ui/narrative-text';
@@ -48,6 +48,15 @@ export interface AIAnalysisDialogProps {
   timePeriod: TimePeriod;
   userId: string;
   triggerOrigin?: string;
+  /**
+   * The button that opened the dialog — the page writes `event.currentTarget` into this ref at the
+   * click, where it already reads the rect for `triggerOrigin`. Without it the focus lands on
+   * `body` after Escape (measured 2026-09-20, mouse and keyboard): a controlled Radix modal with
+   * no `Dialog.Trigger` cancels the focus scope's own restore and focuses a trigger ref that is
+   * null. The clicked element, not a lookup: `PageHeader` renders its actions twice and only one
+   * copy is visible at a given width.
+   */
+  returnFocusTo?: React.RefObject<HTMLElement | null>;
 }
 
 const TONE_DOT_CLASS: Record<VerdictTone, string> = {
@@ -65,18 +74,28 @@ export function AIAnalysisDialog({
   timePeriod,
   userId,
   triggerOrigin,
+  returnFocusTo,
 }: AIAnalysisDialogProps) {
   const [analysis, setAnalysis] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [status, setStatus] = useState<ModalStatus>({ phase: 'idle' });
   const [copied, setCopied] = useState(false);
   const [generatedAt, setGeneratedAt] = useState<Date | null>(null);
+  // The request in flight, if any. Closing the dialog aborts it (2026-09-20): until then the
+  // stream ran to its end behind a closed modal — 8–14 s of paid generation nobody would read.
+  // Only touched in handlers and effects, never during render.
+  const requestRef = useRef<AbortController | null>(null);
 
   /**
    * Fetch AI analysis with streaming support (Server-Sent Events): `data: {JSON}\n\n` chunks
    * appended progressively, closed by `data: [DONE]`.
    */
   const fetchAnalysis = async () => {
+    // A regenerate supersedes the request it replaces.
+    requestRef.current?.abort();
+    const request = new AbortController();
+    requestRef.current = request;
+
     setLoading(true);
     setAnalysis('');
     setStatus({ phase: 'submitting' });
@@ -86,6 +105,7 @@ export function AIAnalysisDialog({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, metrics, timePeriod }),
+        signal: request.signal,
       });
 
       if (!response.ok) {
@@ -140,18 +160,39 @@ export function AIAnalysisDialog({
       setLoading(false);
       setStatus({ phase: 'success' });
     } catch (err) {
+      if (request.signal.aborted) {
+        // An abort is the reader's own choice, not a failure: no error reading, no toast. A newer
+        // request owns the state by now if this one was superseded; otherwise the dialog was
+        // closed, and a half-written report is dropped so the next opening starts a fresh one
+        // instead of presenting a truncated text as the finished report.
+        if (requestRef.current === request) {
+          requestRef.current = null;
+          setAnalysis('');
+          setLoading(false);
+          setStatus({ phase: 'idle' });
+        }
+        return;
+      }
       setStatus({ phase: 'error', message: describeWriteError(err) });
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (!open || analysis || loading) return;
+    if (!open) return;
+    // The cleanup runs on close AND on unmount: both abort the stream, client and server side
+    // (the route forwards the abort to the Anthropic request). Aborting a settled request is a
+    // no-op, so a finished report survives a close and is still there on reopen.
+    const abortInFlight = () => requestRef.current?.abort();
+    if (analysis || loading) return abortInFlight;
     // Deferred so the effect body itself sets no state (react-hooks/set-state-in-effect).
     const timer = setTimeout(() => {
       fetchAnalysis();
     }, 0);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      abortInFlight();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -225,6 +266,7 @@ export function AIAnalysisDialog({
       description={verdict ? verdict.headline : 'Analisi AI del portafoglio.'}
       width="xl"
       triggerOrigin={triggerOrigin}
+      returnFocusTo={returnFocusTo}
       footer={footer}
     >
       <div className="space-y-4">
@@ -262,11 +304,7 @@ export function AIAnalysisDialog({
             }
             kpi={metrics.maxDrawdown}
             kpiFormat="percent"
-            kpiCaption={
-              metrics.maxDrawdownDate
-                ? `massimo drawdown, ${metrics.maxDrawdownDate}`
-                : 'massimo drawdown'
-            }
+            kpiCaption="massimo drawdown"
           />
 
           <ReadingTile

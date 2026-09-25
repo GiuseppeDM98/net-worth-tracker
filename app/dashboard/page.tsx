@@ -1,6 +1,6 @@
 'use client';
 
-import { CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type MouseEvent, useCallback, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion, useReducedMotion } from 'framer-motion';
@@ -9,14 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { updateHallOfFame } from '@/lib/services/hallOfFameService';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import { Camera } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCreateSnapshot } from '@/lib/hooks/useSnapshots';
@@ -29,8 +22,10 @@ import { useChartColors } from '@/lib/hooks/useChartColors';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { ASSET_CLASS_CHART_INDEX } from '@/lib/utils/allocationUtils';
 import { filterSparklineByPeriod } from '@/lib/utils/sparklinePeriod';
-import { buildOverviewVerdict, rankingFromOverview } from '@/lib/utils/overviewNarrative';
+import { buildOverviewVerdict, rankingFromOverview, resolveLivedCashflow } from '@/lib/utils/overviewNarrative';
 import { describeCategoryShare } from '@/lib/utils/cashflowNarrative';
+import { describeSnapshotOverwrite } from '@/lib/utils/dialogNarrative';
+import { resolveCenteredModalOrigin } from '@/lib/utils/modalOrigin';
 import type { DashboardOverviewCategoryAmount } from '@/types/dashboardOverview';
 import { cn } from '@/lib/utils';
 import { PageContainer } from '@/components/layout/PageContainer';
@@ -48,8 +43,6 @@ import { OverviewTile, TILE_CELL_CLASS } from '@/components/dashboard/overview/O
 import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
 import { ErrorNotice } from '@/components/ui/error-notice';
 import { describeReadFailure, resolveSurfaceState } from '@/lib/utils/statesNarrative';
-
-const MotionButtonShell = motion.div;
 
 /**
  * PANORAMICA — verdict + tile grid (v3, 2026-08-22)
@@ -115,11 +108,12 @@ export default function DashboardPage() {
   // ─── UI State ─────────────────────────────────────────────────────────────────
   const [creatingSnapshot, setCreatingSnapshot] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [snapshotDialogStyle, setSnapshotDialogStyle] = useState<CSSProperties | undefined>(
-    undefined,
-  );
-  const snapshotButtonRef = useRef<HTMLButtonElement | null>(null);
-  const snapshotDialogRef = useRef<HTMLDivElement | null>(null);
+  // Where the confirm grows from, resolved at the click (lib/utils/modalOrigin.ts) and kept
+  // through the close, so the panel also leaves toward the button.
+  const [snapshotOrigin, setSnapshotOrigin] = useState<string | undefined>(undefined);
+  // The button that was PRESSED: the header mounts its actions twice (the desktop row and the
+  // phone navbar), so a ref on the element itself would be whichever copy mounted last.
+  const snapshotOpenerRef = useRef<HTMLButtonElement | null>(null);
 
   const chartColors = useChartColors();
   const [sparklinePeriod, setSparklinePeriod] = useState<SparklinePeriod>('1A');
@@ -179,45 +173,38 @@ export default function DashboardPage() {
 
   const verdict = useMemo(() => {
     if (!overview) return null;
+    // The verdict judges the cashflow already happened; the Cashflow tile keeps the whole month.
+    const cashflow = resolveLivedCashflow(overview.expenseStats);
     return buildOverviewVerdict({
       month: today.month,
       totalValue,
       monthlyVariation: overview.variations.monthly,
       yearlyVariation: overview.variations.yearly,
       isNewATH: overview.ath?.isNewATH ?? false,
-      savingsRate,
+      savingsRate: cashflow ? cashflow.savingsRate : savingsRate,
+      cashflow,
       marketEffect: overview.marketEffect ?? null,
       topMover: overview.topMovers?.[0] ?? null,
       sales: overview.monthSales ?? null,
     });
   }, [overview, today.month, totalValue, savingsRate]);
 
-  // ─── Dialog position animation ────────────────────────────────────────────────
-  useEffect(() => {
-    // The style is cleared by the onOpenChange handler on close, so no synchronous
-    // setState is needed here (avoids react-hooks/set-state-in-effect).
-    if (!showConfirmDialog || prefersReducedMotion) return;
-    const frameId = requestAnimationFrame(() => {
-      const trigger = snapshotButtonRef.current;
-      const dialog = snapshotDialogRef.current;
-      if (!trigger || !dialog) {
-        setSnapshotDialogStyle(undefined);
-        return;
-      }
-      const triggerRect = trigger.getBoundingClientRect();
-      const dialogRect = dialog.getBoundingClientRect();
-      const originX = triggerRect.left + triggerRect.width / 2 - dialogRect.left;
-      const originY = triggerRect.top + triggerRect.height / 2 - dialogRect.top;
-      setSnapshotDialogStyle({ transformOrigin: `${originX}px ${originY}px` });
-    });
-    return () => cancelAnimationFrame(frameId);
-  }, [showConfirmDialog, prefersReducedMotion]);
-
   // ─── Snapshot handlers ────────────────────────────────────────────────────────
-  const handleCreateSnapshot = async () => {
+  const snapshotOverwrite = useMemo(
+    () => describeSnapshotOverwrite({ month: today.month, year: today.year }),
+    [today.month, today.year],
+  );
+
+  const closeSnapshotConfirm = () => setShowConfirmDialog(false);
+
+  const handleCreateSnapshot = async (event: MouseEvent<HTMLButtonElement>) => {
     if (!user || !ownerId) return;
     try {
       if (overview?.flags.currentMonthSnapshotExists) {
+        snapshotOpenerRef.current = event.currentTarget;
+        setSnapshotOrigin(
+          prefersReducedMotion ? undefined : resolveCenteredModalOrigin(event.currentTarget.getBoundingClientRect()),
+        );
         setShowConfirmDialog(true);
       } else {
         await createSnapshot();
@@ -251,24 +238,22 @@ export default function DashboardPage() {
     }
   };
 
+  // A plain button: it used to sit in a `motion.div` with the app's ONLY `whileTap` (scale 0.97)
+  // on `springLayoutTransition`, the soft spring DESIGN.md keeps for whole regions — ~300 ms to
+  // shrink and ~500 ms to come back, so a normal click was still «breathing» while the confirm
+  // opened over it.
   const snapshotAction = (
-    <MotionButtonShell
-      whileTap={prefersReducedMotion ? undefined : { scale: 0.97 }}
-      transition={springLayoutTransition}
+    <Button
+      onClick={handleCreateSnapshot}
+      disabled={isDemo || creatingSnapshot || (overview?.flags.assetCount ?? 0) === 0}
+      title={isDemo ? 'Non disponibile in modalità demo' : undefined}
+      variant="outline"
+      className="h-9"
+      aria-label={creatingSnapshot ? 'Creazione snapshot in corso' : 'Crea snapshot'}
     >
-      <Button
-        ref={snapshotButtonRef}
-        onClick={handleCreateSnapshot}
-        disabled={isDemo || creatingSnapshot || (overview?.flags.assetCount ?? 0) === 0}
-        title={isDemo ? 'Non disponibile in modalità demo' : undefined}
-        variant="outline"
-        className="h-9"
-        aria-label={creatingSnapshot ? 'Creazione snapshot in corso' : 'Crea snapshot'}
-      >
-        <Camera className="h-4 w-4" aria-hidden="true" />
-        <span className="hidden sm:inline">{creatingSnapshot ? 'Creazione...' : 'Crea snapshot'}</span>
-      </Button>
-    </MotionButtonShell>
+      <Camera className="h-4 w-4" aria-hidden="true" />
+      <span className="hidden sm:inline">{creatingSnapshot ? 'Creazione...' : 'Crea snapshot'}</span>
+    </Button>
   );
 
   // ─── Loading, then failure — never the two collapsed into one ─────────────────
@@ -504,45 +489,33 @@ export default function DashboardPage() {
           </motion.div>
         </motion.div>
 
-        {/* ── SNAPSHOT CONFIRM DIALOG ── */}
-        <Dialog
+        {/* ── SNAPSHOT OVERWRITE CONFIRM ──
+            `sm`: one question. The primary is NOT armed — the daily cron rewrites the running
+            month's snapshot every night, so nothing here is lost that tonight would have kept. */}
+        <ResponsiveModal
           open={showConfirmDialog}
-          onOpenChange={(nextOpen) => {
-            if (!nextOpen) setSnapshotDialogStyle(undefined);
-            setShowConfirmDialog(nextOpen);
-          }}
-        >
-          <DialogContent
-            ref={snapshotDialogRef}
-            style={snapshotDialogStyle}
-            className="data-[state=open]:zoom-in-90 data-[state=closed]:zoom-out-100 data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 duration-300 sm:max-w-md"
-            showCloseButton={false}
-          >
-            <DialogHeader>
-              <p className="text-muted-foreground text-xs font-medium tracking-widest uppercase">
-                Snapshot mensile
-              </p>
-              <DialogTitle>Snapshot già esistente</DialogTitle>
-              <DialogDescription>
-                Esiste già uno snapshot per questo mese (
-                {`${String(today.month).padStart(2, '0')}/${today.year}`}
-                ). Vuoi sovrascriverlo con i dati attuali?
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setShowConfirmDialog(false)}
-                disabled={creatingSnapshot}
-              >
+          onClose={closeSnapshotConfirm}
+          width="sm"
+          eyebrow="Snapshot mensile"
+          title={snapshotOverwrite.title}
+          reading={{ narrative: snapshotOverwrite.reading, tone: 'neutral' }}
+          triggerOrigin={snapshotOrigin}
+          returnFocusTo={snapshotOpenerRef}
+          footer={
+            <>
+              <Button type="button" variant="outline" onClick={closeSnapshotConfirm} disabled={creatingSnapshot}>
                 Annulla
               </Button>
-              <Button onClick={createSnapshot} disabled={creatingSnapshot}>
-                {creatingSnapshot ? 'Creazione...' : 'Sovrascrivi'}
+              <Button type="button" onClick={createSnapshot} disabled={creatingSnapshot}>
+                Sovrascrivi
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </>
+          }
+        >
+          <p className="text-[13px] leading-[1.45] text-muted-foreground">
+            Prima aggiorno i prezzi, poi riscrivo il mese: può richiedere qualche secondo.
+          </p>
+        </ResponsiveModal>
 
         {/* Savings rate celebration badge */}
         {expenseStats && ownerId && (

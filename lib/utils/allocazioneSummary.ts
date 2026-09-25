@@ -33,6 +33,7 @@ import {
   type LeveragePlanInputs,
 } from '@/lib/utils/leverageAwareAllocationUtils';
 import { assetClassLegs } from '@/lib/utils/assetDisplayClass';
+import { estimateSaleTax } from '@/lib/utils/saleTax';
 
 /** Rows below this amount are noise, not a plan (shared with `PlanRow`). */
 export const MIN_VISIBLE_AMOUNT = 0.5;
@@ -50,6 +51,32 @@ export interface ClassGap {
   differenceValue: number;
   currentValue: number;
   action: AllocationAction;
+  /** Neither allocated value nor a target — see `isDormantClass`. */
+  dormant: boolean;
+}
+
+/** Below this, a euro figure is a rounding artefact rather than an allocation. */
+const DORMANT_VALUE_EUR = 0.5;
+/** Below this, a target percentage is «none declared» rather than a real instruction. */
+const DORMANT_TARGET_PCT = 0.05;
+
+/**
+ * A class that holds nothing inside the allocated total AND targets nothing.
+ *
+ * It exists in `byAssetClass` only because the target document carries a 0% entry for it, and it
+ * cannot be off target by construction — so an `OK` chip on it is a verdict on a void. The owner's
+ * real estate is the case that made this necessary: the house is `excluded`, so Per classe printed
+ * «Immobili · OK · 0,0% · 0% · 0 €» while the Previdenza tile, two tiles below on the same screen,
+ * printed «Immobili 60.000 € · 20%». The row stays — a target entry the reader configured must
+ * not vanish — but it drops the verdict, leaves the «N classi su M» denominator and is never named
+ * among the classes «in linea».
+ *
+ * This is NOT the orphaned target (`findOrphanedTargets`), which is a POSITIVE target stranded
+ * behind excluded value: that one is a setting to fix and gets a warning. A dormant class asks for
+ * nothing.
+ */
+export function isDormantClass(data: Pick<AllocationData, 'currentValue' | 'targetPercentage'>): boolean {
+  return Math.abs(data.currentValue) < DORMANT_VALUE_EUR && Math.abs(data.targetPercentage) < DORMANT_TARGET_PCT;
 }
 
 /** One row per class, in the app-wide class order, so a class sits where Storico puts it. */
@@ -67,8 +94,20 @@ export function summarizeClassGaps(
       differenceValue: data.differenceValue,
       currentValue: data.currentValue,
       action: data.action,
+      dormant: isDormantClass(data),
     }))
     .sort((a, b) => assetClassSequenceIndex(a.assetClass) - assetClassSequenceIndex(b.assetClass));
+}
+
+/**
+ * The classes a verdict may speak about: everything the reader has money in or a plan for.
+ *
+ * The page counts, ranks and names classes through this, never through the raw `summarizeClassGaps`
+ * — «4 classi su 8» counted two classes that can never be off target, which made the page report
+ * 50% where the honest reading is 4 of 6 funded classes.
+ */
+export function activeClassGaps(gaps: ClassGap[]): ClassGap[] {
+  return gaps.filter((gap) => !gap.dormant);
 }
 
 /** The class farthest from its target in EURO — what the Per classe reading names. */
@@ -84,7 +123,7 @@ export function offTargetGaps(gaps: ClassGap[]): ClassGap[] {
 
 /**
  * The classes the account HOLDS but the targets do not name: they never enter `byAssetClass`, so
- * the score's Σdrift reads them as a negative «leverage gap» (CLAUDE.md → Known Issues). The page
+ * the score's Σdrift reads them as a negative «leverage gap» (doc/guide/allocazione.md). The page
  * names them instead of calling a house «esposizione sotto il target di leva».
  */
 export function untargetedClassLabels(
@@ -229,11 +268,20 @@ export type PlanView =
     }
   | {
       mode: 'withdraw';
+      /** What the reader asked to RECEIVE. «Prelevare 1000 €» means 1000 € in hand. */
       amount: number;
+      /**
+       * What the plan actually sells so that `amount` reaches the account — the requested figure
+       * grossed up by the withholding. Equals `amount` when the tax is not estimable or is zero.
+       */
+      grossAmount: number;
+      /** Whether `grossAmount` is a grossed-up figure, i.e. worth naming beside the request. */
+      grossedUp: boolean;
       nodes: PlanNode[];
       trades: InstrumentTrade[] | null;
       /** Everything a withdrawal may sell (the tradable slice, never the frozen one). */
       tradableTotal: number;
+      /** True when the GROSS the request needs is more than the tradable total can give. */
       exceedsPortfolio: boolean;
       /** Labels of the classes over target — the ones a withdrawal drains first. */
       overTarget: string[];
@@ -241,10 +289,94 @@ export type PlanView =
 
 const visible = (nodes: PlanNode[]): PlanNode[] => nodes.filter((node) => node.amount >= MIN_VISIBLE_AMOUNT);
 
+/**
+ * Drop a level that repeats the one above it.
+ *
+ * A plan is class → sub-category → instrument, and a sub-category that receives the whole of its
+ * class's move and holds exactly ONE instrument prints the same euro figure twice under two
+ * different names: «ETF Obbligazionari a Breve Termine +3000 €» over «iShares … (CSBGE3) +3000 €»,
+ * «DBMFE +5000 €» over «iMGP DBi Managed Futures (DBMFE) +5000 €», «Bitcoin −2000 €» over
+ * «WisdomTree Physical Bitcoin (WBIT) −2000 €». A third of the leg rows were that on a real
+ * account, and they made the Piano tile ~1060px tall beside a ~380px neighbour.
+ *
+ * The CHILD survives, not the parent: the instrument is the row you can act on, and its
+ * sub-category is still named in Per classe. A node with two children keeps its level — «All
+ * World» over VWCE and SWDA is a real split, not a repetition.
+ *
+ * It takes the list whose OWN level may disappear, so the caller decides how deep the rule starts:
+ * a rebalance hands it `move.children` (the sub-categories may go), the flow plans hand it each
+ * class's children and keep the class, which carries the chip, the drift and the action.
+ */
+export function collapseRepeatedLevels(nodes: PlanNode[]): PlanNode[] {
+  return nodes.map((node) => {
+    const children = collapseRepeatedLevels(node.children.filter((child) => child.amount >= MIN_VISIBLE_AMOUNT));
+    const [only] = children;
+    // «Carries the whole move» is measured at the app's own noise floor: below half a euro the two
+    // rows print the same figure, whatever the split's residual.
+    if (children.length === 1 && Math.abs(only.amount - node.amount) < MIN_VISIBLE_AMOUNT) return { ...only };
+    return { ...node, children };
+  });
+}
+
 function overTargetLabels(byAssetClass: Record<string, AllocationData>, labels: Record<string, string>): string[] {
   return Object.entries(byAssetClass)
     .filter(([, data]) => data.action === 'VENDI')
     .map(([key]) => labels[key] ?? key);
+}
+
+/**
+ * The withholding is a small fraction of the gross, so the fixed point settles in two or three
+ * passes; the cap is there for the case where the tradable total stalls it.
+ */
+const GROSS_UP_MAX_PASSES = 6;
+/** Below a euro the two gross figures print the same, so the loop has converged. */
+const GROSS_UP_TOLERANCE = 1;
+
+/**
+ * How much a withdrawal must SELL so that `requestedNet` reaches the account.
+ *
+ * «Prelevare 1000 €» means 1000 € in hand — that is what the word means to a reader, and until
+ * 2026-09-21 the plan sold exactly 1000 € and the sentence admitted that 920 € arrived. Grossing
+ * up is not a division by (1 − rate): the withholding depends on WHICH instruments the plan
+ * drains and on how much gain each of them carries, and which instruments it drains depends on the
+ * amount. So it is a fixed point — `gross = requestedNet + tax(plan(gross))` — solved by
+ * iteration, which converges because the tax grows far more slowly than the gross.
+ *
+ * Three honest exits. When the tax is not estimable (a leg without an EUR cost basis or a rate)
+ * the plan sells the requested figure unchanged and nothing promises a net. When the gross the
+ * request needs exceeds the tradable total, the plan sells everything it can and the caller says
+ * the request cannot be met. When nothing being sold carries a gain, gross equals net.
+ */
+function solveWithdrawalGross(
+  requestedNet: number,
+  inputs: PlanInputs,
+  labels: Record<string, string>,
+  tradableTotal: number,
+): { grossAmount: number; requiredGross: number; nodes: PlanNode[] } {
+  const planFor = (gross: number): PlanNode[] =>
+    visible(buildWithdrawalPlan(inputs.byAssetClass, inputs.bySubCategory, inputs.holdings, Math.min(gross, tradableTotal), labels)).map(
+      (node) => ({ ...node, children: collapseRepeatedLevels(node.children) }),
+    );
+
+  if (requestedNet <= 0) return { grossAmount: 0, requiredGross: 0, nodes: [] };
+
+  let gross = requestedNet;
+  let nodes = planFor(gross);
+  let tax = estimatePlanSaleTax(nodes, inputs.holdings)?.tax ?? null;
+  // Not estimable: sell what was asked, exactly as before the gross-up existed.
+  if (tax === null) return { grossAmount: Math.min(requestedNet, tradableTotal), requiredGross: requestedNet, nodes };
+
+  for (let pass = 0; pass < GROSS_UP_MAX_PASSES; pass += 1) {
+    const next = requestedNet + tax;
+    if (Math.abs(next - gross) < GROSS_UP_TOLERANCE) break;
+    gross = next;
+    nodes = planFor(gross);
+    const estimate = estimatePlanSaleTax(nodes, inputs.holdings)?.tax ?? null;
+    if (estimate === null) break;
+    tax = estimate;
+  }
+
+  return { grossAmount: Math.min(gross, tradableTotal), requiredGross: gross, nodes };
 }
 
 /** The plan the Piano tile shows for a mode and an amount, from the same inputs the page holds. */
@@ -267,7 +399,13 @@ export function buildPlanView(mode: PlanMode, amount: number, inputs: PlanInputs
     }
     return {
       mode,
-      moves: buildRebalancePlan(inputs.byAssetClass, inputs.tradableByClass, labels),
+      // With the descent every move names the instruments to trade, like Versa and Preleva do: a
+      // class-level «vendi 25.000 € di azioni» is not an order anyone can take to a broker.
+      moves: buildRebalancePlan(inputs.byAssetClass, inputs.tradableByClass, labels, {
+        bySubCategory: inputs.bySubCategory,
+        bySpecificAsset: inputs.bySpecificAsset,
+        holdings: inputs.holdings,
+      }).map((move) => ({ ...move, children: collapseRepeatedLevels(move.children) })),
       trades: null,
       resultingLeverageRatio: null,
     };
@@ -291,7 +429,9 @@ export function buildPlanView(mode: PlanMode, amount: number, inputs: PlanInputs
     }
     const nodes =
       safeAmount > 0
-        ? visible(buildContributionPlan(inputs.byAssetClass, inputs.bySubCategory, inputs.bySpecificAsset, inputs.holdings, safeAmount, labels))
+        ? visible(buildContributionPlan(inputs.byAssetClass, inputs.bySubCategory, inputs.bySpecificAsset, inputs.holdings, safeAmount, labels)).map(
+            (node) => ({ ...node, children: collapseRepeatedLevels(node.children) }),
+          )
         : [];
     const funded = new Set(nodes.map((node) => node.key));
     const overTarget = Object.entries(inputs.byAssetClass)
@@ -301,7 +441,6 @@ export function buildPlanView(mode: PlanMode, amount: number, inputs: PlanInputs
   }
 
   const tradableTotal = Object.values(inputs.tradableByClass).reduce((sum, value) => sum + value, 0);
-  const exceedsPortfolio = safeAmount > 0 && safeAmount >= tradableTotal;
   if (leverage) {
     const trades =
       safeAmount > 0
@@ -315,19 +454,110 @@ export function buildPlanView(mode: PlanMode, amount: number, inputs: PlanInputs
             leverage.targetLeverageRatio,
           ).trades
         : [];
-    return { mode, amount: safeAmount, nodes: [], trades, tradableTotal, exceedsPortfolio, overTarget: [] };
+    // The leveraged engine plans on instruments the tax estimate does not read, so a withdrawal
+    // there is still a GROSS one: `grossedUp` false says so rather than implying a net.
+    return {
+      mode,
+      amount: safeAmount,
+      grossAmount: safeAmount,
+      grossedUp: false,
+      nodes: [],
+      trades,
+      tradableTotal,
+      exceedsPortfolio: safeAmount > 0 && safeAmount >= tradableTotal,
+      overTarget: [],
+    };
   }
-  const nodes =
-    safeAmount > 0 ? visible(buildWithdrawalPlan(inputs.byAssetClass, inputs.bySubCategory, inputs.holdings, safeAmount, labels)) : [];
+
+  const solved = solveWithdrawalGross(safeAmount, inputs, labels, tradableTotal);
   return {
     mode,
     amount: safeAmount,
-    nodes,
+    grossAmount: solved.grossAmount,
+    grossedUp: solved.grossAmount - safeAmount >= GROSS_UP_TOLERANCE,
+    nodes: solved.nodes,
     trades: null,
     tradableTotal,
-    exceedsPortfolio,
+    exceedsPortfolio: solved.requiredGross > 0 && solved.requiredGross >= tradableTotal,
     overTarget: overTargetLabels(inputs.byAssetClass, labels),
   };
+}
+
+// ─── The tax a proposed sale would pay ────────────────────────────────────────
+
+export interface SaleTaxEstimate {
+  /** Gross euro the plan sells. */
+  gross: number;
+  /** What the broker would withhold, or null when a leg cannot be estimated. */
+  tax: number | null;
+  /** `gross − tax`; null whenever `tax` is. */
+  net: number | null;
+  /** What is missing, so the reading can say it instead of printing a figure it cannot stand behind. */
+  unknownReason: 'cost-basis' | 'rate' | null;
+}
+
+/** Every node with no children: on a sell tree these are the instruments, keyed by holding id. */
+function planLeaves(nodes: PlanNode[]): PlanNode[] {
+  return nodes.flatMap((node) => (node.children.length > 0 ? planLeaves(node.children) : [node]));
+}
+
+/**
+ * The capital-gains tax a plan's SELL legs would pay, and the net that reaches the account.
+ *
+ * In regime amministrato the broker withholds on the day of the sale, so «vendi 25.000 €» is a
+ * gross figure and the reader receives less — on a product whose defensible claim is Italian
+ * fiscal fidelity, quoting only the gross is the one number it declines to finish. The estimate
+ * reuses `estimateSaleTax`, the app's ONE tax rule, on the same basis the sale ledger taxes: the
+ * price difference of the slice being sold, fees excluded.
+ *
+ * Selling a fraction f of a position realizes the fraction f of its unrealized gain, so the
+ * taxable gain of a leg is `amount × (value − costBasisEur) / value`, floored at zero — a position
+ * at a loss pays nothing, and no loss compensation (minusvalenze pregresse) is modelled.
+ *
+ * Returns `null` when the plan sells nothing. When ANY taxable leg lacks its inputs the tax is
+ * `null` WITH a reason, never a silent zero: a missing cost basis would otherwise read as «no gain,
+ * no tax», which is the most flattering possible lie.
+ */
+export function estimatePlanSaleTax(nodes: PlanNode[], holdings: AllocatableHolding[]): SaleTaxEstimate | null {
+  const byId = new Map(holdings.map((holding) => [holding.id, holding]));
+  const leaves = planLeaves(nodes).filter((leaf) => leaf.amount >= MIN_VISIBLE_AMOUNT);
+  const gross = leaves.reduce((sum, leaf) => sum + leaf.amount, 0);
+  if (gross < MIN_VISIBLE_AMOUNT) return null;
+
+  let tax = 0;
+  let unknownReason: SaleTaxEstimate['unknownReason'] = null;
+
+  for (const leaf of leaves) {
+    const holding = byId.get(leaf.key);
+    // A leaf that is not a holding cannot be priced; on a sell tree it should not happen, and
+    // reporting it as unknown is the honest branch if it ever does.
+    if (!holding) {
+      unknownReason ??= 'cost-basis';
+      continue;
+    }
+    if (!holding.taxableOnSale || holding.value <= 0) continue;
+    if (holding.costBasisEur === undefined) {
+      unknownReason ??= 'cost-basis';
+      continue;
+    }
+    if (holding.taxRate === undefined) {
+      unknownReason ??= 'rate';
+      continue;
+    }
+    const gainFraction = (holding.value - holding.costBasisEur) / holding.value;
+    const taxableGain = leaf.amount * Math.max(0, gainFraction);
+    tax += estimateSaleTax(taxableGain, holding.taxRate) ?? 0;
+  }
+
+  if (unknownReason) return { gross, tax: null, net: null, unknownReason };
+  return { gross, tax, net: gross - tax, unknownReason: null };
+}
+
+/** The sell legs of a plan, per mode: a rebalance sells only where it is over target. */
+export function planSaleNodes(view: PlanView): PlanNode[] {
+  if (view.mode === 'rebalance') return view.moves.filter((move) => move.action === 'VENDI').flatMap((move) => move.children);
+  if (view.mode === 'withdraw') return view.nodes;
+  return [];
 }
 
 export interface MoneySlice {

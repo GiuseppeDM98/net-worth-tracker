@@ -80,6 +80,8 @@ const meta = {
     selectedOwnerId: 'all',
     onOwnerChange: fn(),
     activeFilterCount: 0,
+    shownCount: 112,
+    totalCount: 112,
     onReset: fn(),
     mobileSortKey: 'date-desc',
     onSortChange: fn(),
@@ -99,6 +101,7 @@ export const NoFilters: Story = {};
 export const WithActiveFilters: Story = {
   args: {
     activeFilterCount: 2,
+    shownCount: 27,
     searchQuery: 'Esselunga',
     multiSelectValue: ['cat-4', 'cat-6'],
   },
@@ -124,6 +127,7 @@ export const WithAccounts: Story = {
     accountOptions: ACCOUNT_OPTIONS,
     selectedAccountId: 'acc-1',
     activeFilterCount: 1,
+    shownCount: 41,
   },
 };
 
@@ -138,6 +142,7 @@ export const WithOwnerFilter: Story = {
     ],
     selectedOwnerId: 'member-1',
     activeFilterCount: 1,
+    shownCount: 41,
   },
 };
 
@@ -157,6 +162,7 @@ export const WithSubcategory: Story = {
     subCategoryOptions: SUB_CATEGORY_OPTIONS,
     multiSelectValue: ['cat-4'],
     activeFilterCount: 1,
+    shownCount: 41,
   },
 };
 

@@ -42,9 +42,14 @@ interface EvoluzioneTileProps {
 
 // ─── Chips ────────────────────────────────────────────────────────────────────
 
+/**
+ * A chip and its caption, as wide as the CHIP (`w-min` against the chip's `nowrap`): a caption
+ * longer than its figure wraps under it instead of pushing the next chip away — at 1440 it opened
+ * an uneven gap, on a phone it forced one chip per line.
+ */
 function Chip({ value, caption, children }: { value: number | null; caption: string; children: React.ReactNode }) {
   return (
-    <div className="flex min-w-0 flex-col gap-1.5">
+    <div className="flex w-min min-w-0 flex-col gap-1.5">
       <span
         className={cn(
           'inline-flex w-fit max-w-full items-center gap-1.5 whitespace-nowrap rounded-[9px] px-[11px] py-[6px] font-mono text-[12px] font-semibold leading-none tracking-[-0.01em] tabular-nums',
@@ -53,7 +58,7 @@ function Chip({ value, caption, children }: { value: number | null; caption: str
       >
         {children}
       </span>
-      <span className="text-[11px] text-muted-foreground">{caption}</span>
+      <span className="text-[11px] leading-[1.35] text-muted-foreground">{caption}</span>
     </div>
   );
 }
@@ -140,8 +145,9 @@ export function EvoluzioneTile({ aside, reading, growth, pace, points, noteCount
         className="mt-2.5 block font-mono text-[32px] font-bold leading-none tracking-[-0.03em] tabular-nums desktop:text-[36px]"
       />
 
-      {/* The three chips, one grouped row from tablet up (The Grouped Chip Rule). */}
-      <div className="mt-4 flex flex-col gap-2.5 tablet:flex-row tablet:flex-wrap tablet:items-start tablet:gap-x-2.5 tablet:gap-y-2">
+      {/* The three chips, one grouped row that wraps (The Grouped Chip Rule) — on a phone too: stacked one
+          per line they held the curve under the fold. */}
+      <div className="mt-4 flex flex-row flex-wrap items-start gap-x-2.5 gap-y-2.5">
         {growth.snapshotCount > 1 && (
           <Chip value={growth.delta} caption="dal primo snapshot">
             <GrowthIcon className="h-[13px] w-[13px] shrink-0" aria-hidden="true" />
@@ -227,7 +233,7 @@ export function EvoluzioneTile({ aside, reading, growth, pace, points, noteCount
           onClick={onAddNote}
           disabled={disabled}
           aria-label={disabled ? 'Aggiungi una nota — non disponibile in modalità demo' : undefined}
-          className="inline-flex min-h-11 items-center gap-1 text-[11px] text-foreground underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 desktop:min-h-[28px]"
+          className="inline-flex min-h-11 items-center gap-1 text-[11px] text-foreground underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 desktop:min-h-8"
         >
           <MessageSquare className="h-3 w-3" aria-hidden="true" />
           <span className="font-mono tabular-nums">{noteCount}</span> {noteCount === 1 ? 'nota' : 'note'} · aggiungi una nota

@@ -16,6 +16,7 @@ import type { Narrative } from '@/lib/utils/narrative';
 import type { PassiveIncome } from '@/lib/utils/fireSummary';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { formatCurrency, formatPercentage } from '@/lib/services/chartService';
+import { formatRate } from '@/lib/utils/fireNarrative';
 import { cn } from '@/lib/utils';
 import { Tile } from '@/components/ui/tile';
 import { SettledCurrencyValue } from '@/components/fire-simulations/SettledValue';
@@ -31,7 +32,7 @@ function Row({ label, caption, value, valueClass }: { label: string; caption?: s
     <div className="flex items-start justify-between gap-3 py-[9px]">
       <span className="min-w-0">
         <span className="block text-[13px] text-muted-foreground">{label}</span>
-        {caption && <span className="block text-[11px] leading-[1.4] text-muted-foreground/70">{caption}</span>}
+        {caption && <span className="block text-[11px] leading-[1.4] text-muted-foreground">{caption}</span>}
       </span>
       <span className={cn('shrink-0 text-right font-mono text-[14px] tabular-nums text-foreground', valueClass)}>{value}</span>
     </div>
@@ -39,10 +40,6 @@ function Row({ label, caption, value, valueClass }: { label: string; caption?: s
 }
 
 const oneDecimal = (value: number) => value.toLocaleString('it-IT', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-
-function formatRate(value: number): string {
-  return `${value.toLocaleString('it-IT', { maximumFractionDigits: 2 })}%`;
-}
 
 export function RedditoPassivoTile({ reading, income, className }: RedditoPassivoTileProps) {
   const split = [
@@ -60,18 +57,12 @@ export function RedditoPassivoTile({ reading, income, className }: RedditoPassiv
       <div className="mt-2.5 flex flex-col divide-y divide-border">
         <Row label="Al mese" value={cachedFormatCurrencyEUR(income.monthly, true)} />
         <Row label="Al giorno" value={formatCurrency(income.daily)} />
+        {/* The liquid/illiquid split is the row's caption, not part of the value: inline it widened
+            the value cell until the label wrapped under it («Anni di spesa / coperti», 2026-09-22). */}
         <Row
           label="Anni di spesa coperti"
-          value={
-            income.yearsOfExpenses > 0 ? (
-              <>
-                {oneDecimal(income.yearsOfExpenses)}
-                {split.length > 0 && <span className="text-[11px] text-muted-foreground"> · {split.join(' · ')}</span>}
-              </>
-            ) : (
-              '—'
-            )
-          }
+          caption={split.length > 0 ? split.join(' · ') : undefined}
+          value={income.yearsOfExpenses > 0 ? oneDecimal(income.yearsOfExpenses) : '—'}
         />
         <Row
           label="Prelievo attuale"

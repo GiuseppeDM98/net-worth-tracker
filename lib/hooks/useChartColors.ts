@@ -19,8 +19,12 @@ function parseOklchL(value: string): number | null {
 /**
  * Returns a 10-color palette that respects the active color theme.
  *
- * Indices 0–7 resolve --chart-1 through --chart-8 from the current theme's
- * CSS variables; 8–9 still fall back to the static CHART_COLORS palette.
+ * Indices 0–8 resolve --chart-1 through --chart-9 from the current theme's
+ * CSS variables; 9 still falls back to the static CHART_COLORS palette.
+ *
+ * Slot 9 (index 8) is Storico's «Previdenza» band. Until 2026-09-20 it was the static indigo
+ * `#6366F1`, which no theme knew about: ΔE00 3.8 from midnight-bloom's Azioni, 10.3 from the
+ * default theme's — a ninth colour nobody had measured against the other eight.
  *
  * It used to stop at 5, which is how the eight asset classes ended up with two
  * theme-independent tails: `ASSET_CLASS_CHART_INDEX` gives commodity slot 5,
@@ -42,7 +46,7 @@ export function useChartColors(): string[] {
       const style = getComputedStyle(document.documentElement);
       const isDark = resolvedTheme === 'dark';
 
-      const themePalette = [1, 2, 3, 4, 5, 6, 7, 8].map((n) =>
+      const themePalette = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) =>
         style.getPropertyValue(`--chart-${n}`).trim()
       );
 
@@ -61,7 +65,7 @@ export function useChartColors(): string[] {
         return color;
       });
 
-      setColors([...resolved, ...CHART_COLORS.slice(8, 10)]);
+      setColors([...resolved, ...CHART_COLORS.slice(9, 10)]);
     });
     return () => cancelAnimationFrame(frame);
   }, [colorTheme, resolvedTheme]);

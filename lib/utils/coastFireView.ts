@@ -15,15 +15,19 @@
  * Every figure the tiles render must be the SAME figure the service computed, and the only way
  * to make that testable is to choose it in one place, outside React.
  *
- * NO MATH LIVES HERE beyond a ratio (liquid progress) and a difference (surplus). A sentence
- * never claims what the data cannot support — a missing input drops its clause, never a
- * placeholder (DESIGN.md → The Narrative Honesty Rule); a Coast figure is a projection, so no
+ * NO MATH LIVES HERE beyond a ratio (liquid progress), a difference (surplus) and — since
+ * 2026-09-23 — the savings pace (`resolveCoastPace`): the year the CURRENT savings, added on top of
+ * the projection's own base series, cross the Coast number of that year. It is the one figure the
+ * projection does not carry and the one the verdict owed the reader («non ancora» had no «quando»).
+ * A sentence never claims what the data cannot support — a missing input drops its clause, never
+ * a placeholder (DESIGN.md → The Narrative Honesty Rule); a Coast figure is a projection, so no
  * segment carries a sign colour.
  */
 
-import type { CoastFirePensionInput, CoastFireTaxBracket } from '@/types/assets';
+import type { CoastFirePensionInput, CoastFireTaxBracket, FIREProjectionScenarios } from '@/types/assets';
 import type {
   CoastFIREPensionBreakdown,
+  CoastFIREProjectionPoint,
   CoastFIREProjectionResult,
 } from '@/lib/services/fireService';
 import {
@@ -444,6 +448,9 @@ export interface CoastScenarioRow {
   key: 'bear' | 'base' | 'bull';
   label: string;
   realReturnRate: number;
+  /** The two parameters the real rate is the difference of — the Calcolatore prints them, so does this row. */
+  growthRate: number;
+  inflationRate: number;
   coastNumberToday: number;
   progressPct: number;
   gap: number;
@@ -454,6 +461,7 @@ export interface CoastScenarioRow {
 /** Orso · Base · Toro as rows, in that order — the Scenari tile's list. */
 export function summarizeCoastScenarios(
   scenarios: CoastFIREProjectionResult['scenarios'],
+  params: FIREProjectionScenarios,
   currentNetWorth: number
 ): CoastScenarioRow[] {
   return (['bear', 'base', 'bull'] as const).map((key) => {
@@ -462,6 +470,8 @@ export function summarizeCoastScenarios(
       key,
       label: scenario.label,
       realReturnRate: scenario.realReturnRate,
+      growthRate: params[key].growthRate,
+      inflationRate: params[key].inflationRate,
       coastNumberToday: scenario.coastFireNumberToday,
       progressPct: scenario.progressToCoastFI,
       gap: scenario.gapToCoastFI,
@@ -469,6 +479,80 @@ export function summarizeCoastScenarios(
       reached: scenario.isCoastReached,
     };
   });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The savings pace — «quando», on the projection's own series
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface CoastPaceReached {
+  yearOffset: number;
+  calendarYear: number;
+  age: number;
+}
+
+export interface CoastPace {
+  /** The Calcolatore's savings (`getAnnualCashflowData().annualSavings`), kept constant in today's euro. */
+  annualSavings: number;
+  /** The first year the savings-fed capital clears the Coast number of THAT year; null when it does not before the target age. */
+  reached: CoastPaceReached | null;
+  /** The base series with the savings added until `reached` (else until the target), then coasting — one value per projection point. */
+  series: number[];
+}
+
+/** The savings' compounded value after `years` at a real rate (an annuity due of one payment a year). */
+function compoundedSavings(annualSavings: number, realReturnRate: number, years: number): number {
+  const rate = realReturnRate / 100;
+  if (years <= 0) return 0;
+  if (Math.abs(rate) < 1e-9) return annualSavings * years;
+  return (annualSavings * (Math.pow(1 + rate, years) - 1)) / rate;
+}
+
+/**
+ * The year the current savings pace crosses the Coast curve, and the series that shows it.
+ *
+ * The Coast number is a MOVING target: the number of year t is the requirement of that year on
+ * the plot (`fireNumberTarget`, which already steps with the fund) discounted over the years that
+ * remain to the target age. The capital of year t is the projection's own base series (free
+ * capital compounding, the fund re-entering at its unlock) plus the savings compounded at the
+ * same real rate — nothing here re-runs the walk. The first year the second clears the first is
+ * the «quando» the verdict names; from that year the series coasts, and by construction it lands
+ * on the requirement at the target age — which is what the reader sees on the chart.
+ *
+ * Null with no savings recorded, no series or a target already reached today: a missing input
+ * drops its clause (The Narrative Honesty Rule), and a reached target has nothing to pace.
+ */
+export function resolveCoastPace(
+  projectionData: CoastFIREProjectionPoint[],
+  annualSavings: number | undefined,
+  realReturnRate: number,
+  reachedToday: boolean
+): CoastPace | null {
+  if (annualSavings === undefined || annualSavings <= 0 || projectionData.length < 2 || reachedToday) return null;
+  const lastOffset = projectionData.length - 1;
+  const rate = realReturnRate / 100;
+
+  let reached: CoastPaceReached | null = null;
+  for (const point of projectionData) {
+    if (point.yearOffset === 0) continue;
+    const capital = point.basePortfolioValue + compoundedSavings(annualSavings, realReturnRate, point.yearOffset);
+    const coastNumberThatYear = point.fireNumberTarget / Math.pow(1 + rate, lastOffset - point.yearOffset);
+    if (capital >= coastNumberThatYear) {
+      reached = { yearOffset: point.yearOffset, calendarYear: point.calendarYear, age: point.age };
+      break;
+    }
+  }
+
+  const savingsUntil = reached?.yearOffset ?? lastOffset;
+  const series = projectionData.map((point) => {
+    if (point.yearOffset <= savingsUntil) {
+      return point.basePortfolioValue + compoundedSavings(annualSavings, realReturnRate, point.yearOffset);
+    }
+    const savedAtStop = compoundedSavings(annualSavings, realReturnRate, savingsUntil);
+    return point.basePortfolioValue + savedAtStop * Math.pow(1 + rate, point.yearOffset - savingsUntil);
+  });
+
+  return { annualSavings, reached, series };
 }
 
 export interface CoastPensionEntry {
@@ -531,24 +615,24 @@ export interface CoastVerdictInput {
   /** Null when the projection cannot run; `incompleteReason` then says why. */
   target: CoastTarget | null;
   incompleteReason: string | null;
-  pensions: CoastPensionCoverage;
+  /** `resolveCoastPace(...)` — null without savings, and the clause is then absent. */
+  pace: CoastPace | null;
   lock: FireLock;
 }
 
 /**
- * «; dal 2052 la Pensione estera e dal 2055 la Pensione INPS coprono insieme 1120 € al mese» —
- * the state pensions' share of the expenses, net and real, EVERY pension listed with its start.
- * Without a pension the clause is absent, never «nessuna pensione».
+ * « Al ritmo attuale, 12.000 € l'anno di risparmio, lo raggiungi nel 2031, a 40 anni.» — or, when
+ * the pace does not get there in time, « … non lo raggiungi prima dei 60 anni.» The state
+ * pensions are no longer listed here (2026-09-23): the Afflussi tile names every one with its
+ * year and its annual figure, and the verdict said the same money per month 100 px above it.
  */
-function pensionClause(pensions: CoastPensionCoverage): Narrative {
-  if (pensions.count === 0 || pensions.monthlyNetReal <= 0) return [];
-  return [
-    prose('; '),
-    ...pensionList(pensions.entries),
-    prose(pensions.count === 1 ? ' copre ' : ' coprono insieme '),
-    amount(pensions.monthlyNetReal),
-    prose(' al mese'),
-  ];
+function paceClause(target: CoastTarget, pace: CoastPace | null): Narrative {
+  if (!pace) return [];
+  const head: Narrative = [prose(' Al ritmo attuale, '), amount(pace.annualSavings), prose(" l'anno di risparmio, ")];
+  if (!pace.reached) {
+    return [...head, prose('non lo raggiungi prima dei '), age(target.retirementAge), prose('.')];
+  }
+  return [...head, prose('lo raggiungi nel '), year(pace.reached.calendarYear), prose(', a '), age(pace.reached.age), prose('.')];
 }
 
 /**
@@ -616,7 +700,7 @@ export function buildCoastVerdict(input: CoastVerdictInput): PageVerdictModel {
     return {
       headline: 'Sì, puoi smettere di versare.',
       tone: 'positive',
-      sentence: [...opening, ...capitalClause(target, 'oltre'), ...pensionClause(input.pensions), prose('.'), ...lockSentence(input.lock)],
+      sentence: [...opening, ...capitalClause(target, 'oltre'), prose('.'), ...lockSentence(input.lock)],
     };
   }
 
@@ -630,8 +714,8 @@ export function buildCoastVerdict(input: CoastVerdictInput): PageVerdictModel {
       amount(target.coastNumberToday),
       prose(')'),
       ...capitalClause(target, 'contro'),
-      ...pensionClause(input.pensions),
       prose('.'),
+      ...paceClause(target, input.pace),
       ...lockSentence(input.lock),
     ],
   };
@@ -692,25 +776,35 @@ export interface CoastTargetFooterInput {
   lock: FireLock;
   /** The last calendar year the chart draws. */
   lastProjectedYear: number;
+  /** The savings pace, when the chart draws its dotted series. */
+  pace: CoastPace | null;
 }
 
-/** The Traguardo footer: the dashed line in words, and the step when the fund re-enters on the plot. */
+/**
+ * The Traguardo footer: the dashed line in words, the step when the fund re-enters on the plot,
+ * and the dotted series when the savings pace is drawn.
+ */
 export function describeCoastTargetFooter(input: CoastTargetFooterInput): Narrative {
   const head: Narrative = [prose('Linea tratteggiata: i '), amount(input.requiredNet), prose(' richiesti a '), age(input.retirementAge), prose(' nello scenario base, in euro di oggi')];
   const locked = input.lock.active && input.lock.lockedValue > 0 && input.lock.unlockCalendarYear !== null;
-  if (!locked) return [...head, prose('.')];
   const unlockYear = input.lock.unlockCalendarYear as number;
-  if (unlockYear > input.lastProjectedYear) {
-    return [...head, prose('. Il fondo pensione rientra nel '), year(unlockYear), prose(", oltre l'età target: la linea è già al netto.")];
-  }
-  return [
-    ...head,
-    prose(' — '),
-    amount(input.lastTargetOnPlot),
-    prose(' con il fondo pensione dentro. Il gradino nel '),
-    year(unlockYear),
-    prose(' è il fondo che rientra, nelle serie e nella linea.'),
-  ];
+  const lockPart: Narrative = !locked
+    ? [prose('.')]
+    : unlockYear > input.lastProjectedYear
+      ? [prose('. Il fondo pensione rientra nel '), year(unlockYear), prose(", oltre l'età target: la linea è già al netto.")]
+      : [
+          prose(' — '),
+          amount(input.lastTargetOnPlot),
+          prose(' con il fondo pensione dentro. Il gradino nel '),
+          year(unlockYear),
+          prose(' è il fondo che rientra, nelle serie e nella linea.'),
+        ];
+  const pacePart: Narrative = !input.pace
+    ? []
+    : input.pace.reached
+      ? [prose(' Linea punteggiata: il base con il risparmio attuale fino al '), year(input.pace.reached.calendarYear), prose(', poi da solo.')]
+      : [prose(' Linea punteggiata: il base con il risparmio attuale fino al target.')];
+  return [...head, ...lockPart, ...pacePart];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -805,10 +899,14 @@ export function describeCoastInflows(events: CoastInflowEvent[], pensions: Coast
   return out;
 }
 
-export const COAST_INFLOWS_FOOTER: Narrative = [
-  prose(
-    'Il calcolo li sconta già: per questo il numero Coast FIRE è più basso di un numero FIRE pieno. Le pensioni sono al netto IRPEF e deflazionate con lo scenario base; i segmenti sono un ordine, non una scala.'
-  ),
+/** The ONE line that stays on the Afflussi tile; the method goes behind «Come si calcola». */
+export const COAST_INFLOWS_FOOTER: Narrative = [prose('Già scontati: per questo il numero Coast FIRE è più basso di un numero FIRE pieno.')];
+
+/** The method behind «Come si calcola» on the Afflussi tile, one paragraph each. */
+export const COAST_INFLOWS_METHOD: readonly string[] = [
+  'Ogni pensione statale entra dalla sua decorrenza, al netto IRPEF e deflazionata con lo scenario base: è la cifra netta reale che riduce il fabbisogno del portafoglio da quell\'anno.',
+  'Il fondo pensione rientra al valore di oggi: il calcolo lo fa crescere da solo, quindi qui non è già cresciuto.',
+  'L\'ordine è cronologico; i segmenti sono uguali per scelta, non una scala del tempo.',
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -823,7 +921,7 @@ export function describeCoastScenarios(rows: CoastScenarioRow[]): Narrative {
   if (!bear || !base || !bull) return [];
 
   const opening: Narrative = base.reached
-    ? [prose('Nel base hai superato il numero Coast ('), amount(base.coastNumberToday), prose(')')]
+    ? [prose('Nel base hai superato il numero Coast FIRE ('), amount(base.coastNumberToday), prose(')')]
     : [prose('Nel base ti mancano '), amount(base.gap)];
 
   // The verb follows the COMPARISON with the base number, never the scenario's name: the
@@ -838,11 +936,16 @@ export function describeCoastScenarios(rows: CoastScenarioRow[]): Narrative {
     return out;
   };
 
-  return [...opening, prose('; '), ...relative(bear, "l'orso", 'il numero Coast'), prose(', '), ...relative(bull, 'il toro', 'lo'), prose('.')];
+  return [...opening, prose('; '), ...relative(bear, "l'orso", 'il numero Coast FIRE'), prose(', '), ...relative(bull, 'il toro', 'lo'), prose('.')];
 }
 
-export const COAST_SCENARIOS_FOOTER: Narrative = [
-  prose('Il numero Coast scende quando il rendimento reale sale: al capitale serve meno spinta iniziale. I tre scenari sono quelli del Calcolatore FIRE.'),
+/** The ONE line that stays on the Scenari tile; the method goes behind «Come si calcola». */
+export const COAST_SCENARIOS_FOOTER: Narrative = [prose('I tre scenari sono quelli del Calcolatore FIRE.')];
+
+/** The method behind «Come si calcola» on the Scenari tile. */
+export const COAST_SCENARIOS_METHOD: readonly string[] = [
+  'Il rendimento reale di uno scenario è la sua crescita meno la sua inflazione: il numero Coast FIRE scende quando sale, perché al capitale serve meno spinta iniziale.',
+  'Ogni riga sconta lo stesso capitale richiesto al target al proprio rendimento reale; il verdetto e il Traguardo leggono la riga base.',
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -860,6 +963,8 @@ export interface CoastBasisInput {
   /** Calendar year the locked pension capital re-enters, or null when nothing is locked. */
   pensionUnlockCalendarYear: number | null;
   pensionCount: number;
+  /** The capital-gains rate the withdrawals pay (percent), null when no cost basis estimates it. */
+  withdrawalTaxRate?: number | null;
 }
 
 export function buildCoastBasisParts(input: CoastBasisInput): string[] {
@@ -892,6 +997,11 @@ export function buildCoastBasisParts(input: CoastBasisInput): string[] {
   );
 
   parts.push(input.pensionCount === 0 ? 'nessuna pensione statale' : input.pensionCount === 1 ? '1 pensione statale' : `${input.pensionCount} pensioni statali`);
+
+  // The tax on withdrawals (2026-09-24): in the number, or declared out with its reason.
+  if (input.withdrawalTaxRate !== undefined) {
+    parts.push(input.withdrawalTaxRate === null ? 'tasse sui prelievi non stimate (nessun PMC in euro)' : `tasse sui prelievi comprese (${formatRate(input.withdrawalTaxRate)} sulla plusvalenza)`);
+  }
 
   return parts;
 }
@@ -1091,27 +1201,93 @@ export function buildBaseScenarioInterpretation(
   ];
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Nothing recorded — the ONE missing input, and what each tile says about it
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** The one input the projection is missing, in the order the calculation needs them. */
+export type CoastEmptyKind = 'no-net-worth' | 'no-expenses' | 'no-age' | 'no-retirement-age';
+
 /**
- * Names the ONE missing input, in the order the calculation needs them — an empty state that
- * says "manca qualcosa" is a dead end, one that names the field is an instruction.
+ * Which input is missing — the first one, in the order the calculation needs them. An empty
+ * state that says "manca qualcosa" is a dead end, one that names the field is an instruction.
  */
+export function resolveCoastEmptyKind(
+  currentNetWorth: number,
+  effectiveAnnualExpenses: number | undefined,
+  currentAge: number | null,
+  retirementAge: number | null
+): CoastEmptyKind | null {
+  if (currentNetWorth <= 0) return 'no-net-worth';
+  if (effectiveAnnualExpenses === undefined || effectiveAnnualExpenses <= 0) return 'no-expenses';
+  if (currentAge === null) return 'no-age';
+  if (retirementAge === null) return 'no-retirement-age';
+  return null;
+}
+
+const INCOMPLETE_REASON: Record<CoastEmptyKind, string> = {
+  'no-net-worth': 'Serve un patrimonio FIRE positivo per calcolare il Coast FIRE.',
+  'no-expenses': 'Servono le spese annue per stimare il target Coast FIRE.',
+  'no-age': 'Inserisci la tua età attuale: serve a calcolare quanti anni ha il capitale per crescere fino al target.',
+  'no-retirement-age': "Inserisci l'età target Coast FIRE: è il momento in cui il capitale deve essere sufficiente.",
+};
+
+/** The verdict's sentence when the projection cannot run: the missing input, named. */
 export function resolveCoastIncompleteReason(
   currentNetWorth: number,
   effectiveAnnualExpenses: number | undefined,
   currentAge: number | null,
   retirementAge: number | null
 ): string | null {
-  if (currentNetWorth <= 0) {
-    return 'Serve un patrimonio FIRE positivo per calcolare il Coast FIRE.';
+  const kind = resolveCoastEmptyKind(currentNetWorth, effectiveAnnualExpenses, currentAge, retirementAge);
+  return kind ? INCOMPLETE_REASON[kind] : null;
+}
+
+/** The ONE action of the empty state: a page that records the missing thing, or a field of the Ipotesi. */
+export type CoastEmptyAction = { label: string; href: string } | { label: string; fieldId: string };
+
+export interface CoastEmptyTiles {
+  traguardo: string;
+  afflussi: string;
+  scenari: string;
+  /** On the Traguardo only: the tile that owns the missing thing (DESIGN.md → The Absence-Has-Three-Names Rule). */
+  action: CoastEmptyAction;
+}
+
+/**
+ * What each tile says when the projection cannot run: every tile keeps its eyebrow and says
+ * why it cannot answer, and ONLY the Traguardo offers the action — a page for the patrimonio,
+ * the Ipotesi field for everything the form owns (the ids are the form's own).
+ */
+export function describeCoastEmptyTiles(kind: CoastEmptyKind): CoastEmptyTiles {
+  switch (kind) {
+    case 'no-net-worth':
+      return {
+        traguardo: 'Il numero Coast FIRE si misura contro il patrimonio: senza asset con un valore positivo non c\'è un traguardo.',
+        afflussi: 'Gli afflussi scontano un fabbisogno del portafoglio: senza patrimonio non c\'è un numero da cui scontarli.',
+        scenari: 'Ogni scenario ha il suo numero Coast FIRE: senza patrimonio non c\'è nulla da confrontare.',
+        action: { label: 'Aggiungi il primo asset', href: '/dashboard/assets' },
+      };
+    case 'no-expenses':
+      return {
+        traguardo: 'Il numero Coast FIRE parte dalle spese annue: nell\'ultimo anno completo non ce ne sono, e nessuna cifra personalizzata le sostituisce.',
+        afflussi: 'Gli afflussi riducono le spese che il portafoglio deve coprire: senza spese non c\'è un fabbisogno da ridurre.',
+        scenari: 'Ogni scenario sconta le spese al suo rendimento reale: senza spese non c\'è un numero Coast FIRE.',
+        action: { label: 'Indica le spese nelle Ipotesi', fieldId: 'coastUseCustomExpenses' },
+      };
+    case 'no-age':
+      return {
+        traguardo: 'Serve la tua età attuale: dice quanti anni ha il capitale per crescere da solo fino al target.',
+        afflussi: 'Gli afflussi si collocano negli anni tra oggi e il target: senza la tua età non hanno un calendario.',
+        scenari: 'Ogni scenario sconta il capitale richiesto sugli anni che restano: senza la tua età non ci sono anni da contare.',
+        action: { label: 'Inserisci l\'età nelle Ipotesi', fieldId: 'coastCurrentAge' },
+      };
+    case 'no-retirement-age':
+      return {
+        traguardo: 'Serve l\'età target Coast FIRE: è il momento in cui il capitale deve bastare.',
+        afflussi: 'Gli afflussi si leggono rispetto al target: senza un\'età target non si sa cosa viene dopo.',
+        scenari: 'Ogni scenario sconta il capitale richiesto fino al target: senza un\'età target non c\'è un orizzonte.',
+        action: { label: 'Inserisci l\'età target nelle Ipotesi', fieldId: 'coastRetirementAge' },
+      };
   }
-  if (effectiveAnnualExpenses === undefined || effectiveAnnualExpenses <= 0) {
-    return 'Servono le spese annue per stimare il target Coast FIRE.';
-  }
-  if (currentAge === null) {
-    return 'Inserisci la tua età attuale: serve a calcolare quanti anni ha il capitale per crescere fino al target.';
-  }
-  if (retirementAge === null) {
-    return "Inserisci l'età target Coast FIRE: è il momento in cui il capitale deve essere sufficiente.";
-  }
-  return null;
 }

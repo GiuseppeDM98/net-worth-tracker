@@ -15,7 +15,10 @@
  *                     Archiviati (disclosure, below the fold)
  *
  * Every number is born in costCenterSummary.ts, every sentence in costCenterNarrative.ts.
- * Opening a center swaps the grid for CostCenterDetail (the same shape on one center).
+ * Opening a center swaps the grid for CostCenterDetail (the same shape on one center) — and
+ * it is a NAVIGATION (2026-09-18): the open center lives in the URL (`?tab=cost-centers&
+ * center=<id>`, pushed), so a reload keeps it, the browser's Back returns to the list instead
+ * of leaving Cashflow, and a co-owner can be sent the link. Until then it was a `useState`.
  *
  * WHY client-side aggregation: every center's rows are fetched once and every figure is
  * derived in memory; for 2-10 centers with a few hundred rows each this is cheap. The query
@@ -24,7 +27,8 @@
  * counts what the mutation will actually touch.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
@@ -38,9 +42,11 @@ import type { Expense } from '@/types/expenses';
 import { getCostCenters, getExpensesForCostCenter, deleteCostCenter, setCostCenterArchived } from '@/lib/services/costCenterService';
 import { buildCenterMonthStack, summarizeCostCenters } from '@/lib/utils/costCenterSummary';
 import {
+  CENTRI_ASIDE,
   CENTRI_FOOTER,
   DORMIENTI_ASIDE,
   DORMIENTI_FOOTER,
+  EMPTY_CENTRI,
   buildCostCentersVerdict,
   describeArchiviati,
   describeCentri,
@@ -60,13 +66,18 @@ import type { TileSkeletonCell } from '@/lib/utils/tileGridSkeleton';
 import { CostCenterDialog } from './CostCenterDialog';
 import { CostCenterDetail } from './CostCenterDetail';
 import { ErrorNotice } from '@/components/ui/error-notice';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Tile } from '@/components/ui/tile';
 import { describeReadFailure } from '@/lib/utils/statesNarrative';
+import { describeWriteError } from '@/lib/utils/dialogNarrative';
 import { TotaleTile } from './cost-centers/tiles/TotaleTile';
 import { CentriTile } from './cost-centers/tiles/CentriTile';
 import { DormientiTile } from './cost-centers/tiles/DormientiTile';
 import { ArchiviatiDisclosure } from './cost-centers/ArchiviatiDisclosure';
 
 const TRAILING_MONTHS = 12;
+/** The URL parameter that holds the open center's id. */
+const CENTER_PARAM = 'center';
 
 /** The page's own grid, so the loading state has the proportions of what replaces it. */
 const SKELETON_CELLS: TileSkeletonCell[] = [
@@ -109,8 +120,35 @@ export function CostCentersTab() {
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: queryKeys.costCenters.all(ownerId ?? '') });
 
+  // --- The open center is the URL's, never local state (see the header) ---
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const selectedCenterId = searchParams.get(CENTER_PARAM);
+  // An id the account does not hold (a stale link, a deleted center) falls back to the list.
+  const selectedCenter = useMemo(() => centers.find((center) => center.id === selectedCenterId) ?? null, [centers, selectedCenterId]);
+
+  const openCenter = useCallback(
+    (center: CostCenter) => router.push(`${pathname}?tab=cost-centers&${CENTER_PARAM}=${encodeURIComponent(center.id)}`, { scroll: false }),
+    [router, pathname],
+  );
+  const backToList = useCallback(() => router.push(`${pathname}?tab=cost-centers`, { scroll: false }), [router, pathname]);
+
+  // Coming back, the focus returns to the row that opened the detail (it was dropped on
+  // `body`, measured 2026-09-18). The row is found by id: a center sits in Centri AND in
+  // Dormienti when idle, and the first match in DOM order is the one the eye meets first.
+  const lastOpenedId = useRef<string | null>(null);
+  useEffect(() => {
+    if (selectedCenterId) {
+      lastOpenedId.current = selectedCenterId;
+      return;
+    }
+    const opener = lastOpenedId.current;
+    lastOpenedId.current = null;
+    if (opener) document.querySelector<HTMLElement>(`[data-center-row="${CSS.escape(opener)}"]`)?.focus();
+  }, [selectedCenterId]);
+
   // --- UI state ---
-  const [selectedCenter, setSelectedCenter] = useState<CostCenter | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCenter, setEditingCenter] = useState<CostCenter | null>(null);
 
@@ -126,12 +164,22 @@ export function CostCentersTab() {
   const verdict = useMemo(() => buildCostCentersVerdict(summary, now), [summary, now]);
 
   // --- Handlers ---
+  // Whatever had the focus when the dialog was asked for — the header's button (it reaches
+  // this tab through a window event), the phone's bar, the detail's «Modifica» — gets it back
+  // on close. Radix has no trigger to return to on a controlled dialog: it fell to `body`.
+  const dialogOpenerRef = useRef<HTMLElement | null>(null);
+  const rememberOpener = () => {
+    dialogOpenerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  };
+
   const openCreate = useCallback(() => {
+    rememberOpener();
     setEditingCenter(null);
     setDialogOpen(true);
   }, []);
 
   const openEdit = (center: CostCenter) => {
+    rememberOpener();
     setEditingCenter(center);
     setDialogOpen(true);
   };
@@ -144,8 +192,8 @@ export function CostCentersTab() {
     return () => window.removeEventListener('cashflow:add-cost-center', onAdd);
   }, [openCreate]);
 
-  const handleDialogSuccess = (saved: CostCenter) => {
-    if (selectedCenter?.id === saved.id) setSelectedCenter(saved);
+  // The detail reads its center from `centers`, so a saved edit reaches it with the refetch.
+  const handleDialogSuccess = () => {
     invalidate();
   };
 
@@ -161,25 +209,25 @@ export function CostCentersTab() {
           ? `"${center.name}" eliminato · ${unlinkedCount} ${unlinkedCount === 1 ? 'spesa scollegata resta' : 'spese scollegate restano'} in Cashflow`
           : `"${center.name}" eliminato`,
       );
-      setSelectedCenter(null);
+      // replace, not push: Back must not land on the detail of a center that no longer exists.
+      router.replace(`${pathname}?tab=cost-centers`, { scroll: false });
       invalidate();
     } catch (error) {
       console.error('Error deleting cost center:', error);
-      toast.error("Errore durante l'eliminazione");
+      // What did NOT happen first (the user's doubt after a failed delete), then the cause.
+      toast.error(`"${center.name}" non è stato eliminato, e nessuna spesa è stata scollegata. ${describeWriteError(error)}`);
     }
   };
 
   const handleArchiveToggle = async (center: CostCenter) => {
     const archiving = !center.archivedAt;
     try {
-      const archivedAt = await setCostCenterArchived(center.id, archiving);
-      const updated = { ...center, archivedAt };
-      if (selectedCenter?.id === center.id) setSelectedCenter(updated);
+      await setCostCenterArchived(center.id, archiving);
       toast.success(archiving ? `"${center.name}" archiviato` : `"${center.name}" ripristinato`);
       invalidate();
     } catch (error) {
       console.error('Error archiving cost center:', error);
-      toast.error("Errore durante l'archiviazione");
+      toast.error(`"${center.name}" non è stato ${archiving ? 'archiviato' : 'ripristinato'}. ${describeWriteError(error)}`);
     }
   };
 
@@ -193,13 +241,13 @@ export function CostCentersTab() {
           costCenter={selectedCenter}
           linkedExpenseCount={byCenter[selectedCenter.id]?.linkedCount ?? 0}
           initialExpenses={byCenter[selectedCenter.id]?.spending}
-          onBack={() => setSelectedCenter(null)}
+          onBack={backToList}
           onEdit={openEdit}
           onDelete={handleDelete}
           onArchiveToggle={handleArchiveToggle}
           isDemo={isDemo}
         />
-        <CostCenterDialog open={dialogOpen} onClose={() => setDialogOpen(false)} costCenter={editingCenter} onSuccess={handleDialogSuccess} />
+        <CostCenterDialog open={dialogOpen} onClose={() => setDialogOpen(false)} costCenter={editingCenter} centers={centers} returnFocusTo={dialogOpenerRef} onSuccess={handleDialogSuccess} />
       </>
     );
   }
@@ -233,12 +281,13 @@ export function CostCentersTab() {
           })}
         />
       ) : centers.length === 0 ? (
-        <div className="hidden desktop:block">
-          <Button onClick={openCreate} disabled={isDemo} variant="outline" size="sm" aria-label={addButtonLabel}>
-            <Plus className="h-4 w-4" />
-            Crea il primo centro
-          </Button>
-        </div>
+        /* «Nothing recorded» keeps the tile and its eyebrow (The Absence-Has-Three-Names Rule),
+           and says the ONE thing a first visit cannot guess: a center fills from the expense
+           form, not from here. No second button — the header (desktop) and the bar above
+           (phone) already create one, and a page does not ask twice for one thing. */
+        <Tile eyebrow="Centri" className="max-w-[920px]">
+          <EmptyState message={EMPTY_CENTRI} />
+        </Tile>
       ) : (
         <>
           {/* ── Tile grid ─────────────────────────────────────────────────────── */}
@@ -249,8 +298,8 @@ export function CostCentersTab() {
                 stack={stack}
                 stackCaption={describeTrailingCaption(stack, now)}
                 aside={describeTotaleAside(summary)}
-                reading={describeTotale(summary)}
-                lastYearCaption={describeLastYearCaption(now)}
+                reading={describeTotale(summary, stack, now)}
+                lastYearCaption={describeLastYearCaption(now, summary.firstDate)}
                 footer={describeTotaleFooter(summary)}
                 palette={chartColors}
               />
@@ -258,12 +307,12 @@ export function CostCentersTab() {
             <div className={cn(TILE_CELL_CLASS, 'order-2 tablet:col-span-2 desktop:order-none desktop:col-span-7')}>
               <CentriTile
                 rows={summary.active}
-                aside={describeTotaleAside(summary)}
+                aside={CENTRI_ASIDE}
                 reading={describeCentri(summary)}
                 footer={CENTRI_FOOTER}
                 palette={chartColors}
                 now={now}
-                onOpen={setSelectedCenter}
+                onOpen={openCenter}
               />
             </div>
             <div className={cn(TILE_CELL_CLASS, 'order-3 tablet:col-span-2 desktop:order-none desktop:col-span-7')}>
@@ -273,17 +322,17 @@ export function CostCentersTab() {
                 reading={describeDormienti(summary)}
                 footer={DORMIENTI_FOOTER}
                 palette={chartColors}
-                onOpen={setSelectedCenter}
+                onOpen={openCenter}
               />
             </div>
           </div>
 
           {/* ── Archiviati, below the fold ──────────────────────────────────────── */}
-          <ArchiviatiDisclosure rows={summary.archived} summary={describeArchiviati(summary)} palette={chartColors} onOpen={setSelectedCenter} />
+          <ArchiviatiDisclosure rows={summary.archived} summary={describeArchiviati(summary)} palette={chartColors} onOpen={openCenter} />
         </>
       )}
 
-      <CostCenterDialog open={dialogOpen} onClose={() => setDialogOpen(false)} costCenter={editingCenter} onSuccess={handleDialogSuccess} />
+      <CostCenterDialog open={dialogOpen} onClose={() => setDialogOpen(false)} costCenter={editingCenter} centers={centers} returnFocusTo={dialogOpenerRef} onSuccess={handleDialogSuccess} />
     </div>
   );
 }

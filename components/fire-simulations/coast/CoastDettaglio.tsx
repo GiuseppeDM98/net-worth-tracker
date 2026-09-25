@@ -136,7 +136,8 @@ export function CoastDettaglio({
                     <li key={pension.id} className="py-3">
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                         <span className="text-[13px] font-medium text-foreground">{pension.label}</span>
-                        <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                        {/* The chip's ink is the foreground: `text-muted-foreground` on `bg-muted` measured 3,98:1 (2026-09-23). */}
+                        <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-foreground">
                           {pension.isActiveAtRetirement ? 'Già attiva al target' : `Parte a ${formatAgeYears(pension.startAge)}`}
                         </span>
                       </div>
@@ -176,7 +177,7 @@ export function CoastDettaglio({
                         <tr key={pension.id} className="border-b border-border last:border-b-0">
                           <th scope="row" className="py-[9px] pr-3 text-left font-medium text-foreground">
                             {pension.label}
-                            <span className="ml-2 rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                            <span className="ml-2 rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-foreground">
                               {pension.isActiveAtRetirement ? 'Già attiva al target' : `Parte a ${formatAgeYears(pension.startAge)}`}
                             </span>
                           </th>

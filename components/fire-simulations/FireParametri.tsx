@@ -34,8 +34,9 @@ import { Switch } from '@/components/ui/switch';
 import { Tile, TILE_CELL_CLASS, TILE_EYEBROW_CLASS } from '@/components/ui/tile';
 import { NarrativeText } from '@/components/ui/narrative-text';
 
+/** 44px on touch, the 36px control from desktop: (`h-11 desktop:h-9`, AGENTS → Accessibility). */
 const CONTROL_CLASS =
-  'mt-1 h-9 font-mono tabular-nums transition-[border-color,background-color,box-shadow] duration-200 focus-visible:ring-2 focus-visible:ring-primary/25 motion-reduce:transition-none';
+  'mt-1 h-11 desktop:h-9 font-mono tabular-nums transition-[border-color,background-color,box-shadow] duration-200 focus-visible:ring-2 focus-visible:ring-primary/25 motion-reduce:transition-none';
 
 export interface FireSettingsForm {
   withdrawalRate: string;
@@ -93,6 +94,13 @@ export function FireParametri({
 }: FireParametriProps) {
   const chartColors = useChartColors();
 
+  // The same bounds `handleSaveSettings` enforces, said AT the field while typing: a toast on
+  // «Salva» names the problem after the fact, `aria-invalid` names it where it is (2026-09-22).
+  const parsedSwr = Number.parseFloat(form.withdrawalRate);
+  const swrInvalid = form.withdrawalRate.trim() !== '' && !(Number.isFinite(parsedSwr) && parsedSwr > 0 && parsedSwr <= 100);
+  const parsedInpsAge = Number.parseInt(form.inpsRetirementAge, 10);
+  const inpsAgeInvalid = form.inpsRetirementAge.trim() !== '' && !(Number.isFinite(parsedInpsAge) && parsedInpsAge >= 60 && parsedInpsAge <= 75);
+
   const updateScenario = (key: ScenarioKey, field: keyof FIREScenarioParams, value: string) => {
     const numValue = parseFloat(value);
     if (Number.isNaN(numValue)) return;
@@ -132,9 +140,11 @@ export function FireParametri({
                     </Label>
                     <Popover>
                       <PopoverTrigger asChild>
+                        {/* A 14px glyph on a 32px target (44 on touch), the padding folded back by
+                            negative margins so the label's line height is unchanged. */}
                         <button
                           type="button"
-                          className="inline-flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground/60 transition-colors hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          className="-my-2 inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground/60 transition-colors hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:-my-3.5 [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11"
                           aria-label="Informazioni sul Safe Withdrawal Rate"
                         >
                           <HelpCircle className="h-3.5 w-3.5" aria-hidden="true" />
@@ -155,9 +165,13 @@ export function FireParametri({
                     max="100"
                     value={form.withdrawalRate}
                     onChange={(e) => onFormChange({ withdrawalRate: e.target.value })}
+                    aria-invalid={swrInvalid || undefined}
+                    aria-describedby="withdrawalRate-help"
                     className={cn(CONTROL_CLASS, 'w-[160px]')}
                   />
-                  <p className="mt-1 text-[11px] leading-[1.4] text-muted-foreground">Tipicamente 4% secondo la regola del 4% (Trinity Study).</p>
+                  <p id="withdrawalRate-help" className={cn('mt-1 text-[11px] leading-[1.4]', swrInvalid ? 'text-destructive' : 'text-muted-foreground')}>
+                    {swrInvalid ? 'Serve un valore sopra 0 e fino a 100.' : 'Tipicamente 4% secondo la regola del 4% (Trinity Study).'}
+                  </p>
                 </div>
 
                 <div className="flex items-start justify-between gap-4 border-t border-border pt-3.5">
@@ -199,9 +213,13 @@ export function FireParametri({
                         step="1"
                         value={form.inpsRetirementAge}
                         onChange={(e) => onFormChange({ inpsRetirementAge: e.target.value })}
+                        aria-invalid={inpsAgeInvalid || undefined}
+                        aria-describedby="pensionInpsRetirementAge-help"
                         className={CONTROL_CLASS}
                       />
-                      <p className="mt-1 text-[11px] leading-[1.4] text-muted-foreground">RITA anticipa lo sblocco di 5 anni rispetto a questa età.</p>
+                      <p id="pensionInpsRetirementAge-help" className={cn('mt-1 text-[11px] leading-[1.4]', inpsAgeInvalid ? 'text-destructive' : 'text-muted-foreground')}>
+                        {inpsAgeInvalid ? 'Serve un\'età tra 60 e 75 anni.' : 'RITA anticipa lo sblocco di 5 anni rispetto a questa età.'}
+                      </p>
                     </div>
                     <div className="flex items-start justify-between gap-3 sm:pt-6">
                       <div className="min-w-0">
@@ -223,11 +241,11 @@ export function FireParametri({
               </div>
 
               <div className="mt-auto flex items-center gap-3 pt-4">
-                <Button onClick={onSave} disabled={isDemo || isSaving} className="h-9">
+                <Button onClick={onSave} disabled={isDemo || isSaving} className="h-11 desktop:h-9">
                   {isSaving ? 'Salvataggio…' : hasUnsavedChanges ? 'Salva anteprima' : 'Salva impostazioni'}
                 </Button>
                 {hasUnsavedChanges && (
-                  <Button variant="ghost" size="sm" onClick={onReset} disabled={isSaving} className="h-9">
+                  <Button variant="ghost" size="sm" onClick={onReset} disabled={isSaving} className="h-11 desktop:h-9">
                     Annulla
                   </Button>
                 )}
@@ -262,7 +280,7 @@ export function FireParametri({
                           max="30"
                           value={scenarios[key].growthRate}
                           onChange={(e) => updateScenario(key, 'growthRate', e.target.value)}
-                          className={cn(CONTROL_CLASS, 'h-8')}
+                          className={cn(CONTROL_CLASS, 'desktop:h-8')}
                         />
                       </div>
                       <div>
@@ -278,7 +296,7 @@ export function FireParametri({
                           max="15"
                           value={scenarios[key].inflationRate}
                           onChange={(e) => updateScenario(key, 'inflationRate', e.target.value)}
-                          className={cn(CONTROL_CLASS, 'h-8')}
+                          className={cn(CONTROL_CLASS, 'desktop:h-8')}
                         />
                       </div>
                     </div>
@@ -287,11 +305,11 @@ export function FireParametri({
               </div>
 
               <div className="mt-auto flex flex-col gap-2 pt-4 sm:flex-row sm:gap-3">
-                <Button variant="outline" size="sm" onClick={onResetScenarios} className="h-9 w-full sm:w-auto">
+                <Button variant="outline" size="sm" onClick={onResetScenarios} className="h-11 w-full desktop:h-9 sm:w-auto">
                   <RotateCcw className="mr-2 h-4 w-4" aria-hidden="true" />
                   Ripristina default
                 </Button>
-                <Button variant="outline" size="sm" onClick={onSaveScenarios} disabled={isDemo || isSavingScenarios} className="h-9 w-full sm:w-auto">
+                <Button variant="outline" size="sm" onClick={onSaveScenarios} disabled={isDemo || isSavingScenarios} className="h-11 w-full desktop:h-9 sm:w-auto">
                   <Save className="mr-2 h-4 w-4" aria-hidden="true" />
                   {isSavingScenarios ? 'Salvataggio…' : 'Salva parametri'}
                 </Button>

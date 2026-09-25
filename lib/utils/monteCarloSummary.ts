@@ -15,6 +15,7 @@
 
 import type { MonteCarloCapitalInflow, MonteCarloParams, MonteCarloResults, MonteCarloScenarios, PercentilesData } from '@/types/assets';
 import type { VerdictTone } from '@/lib/utils/narrative';
+import { binYears, type YearHistogramBin } from '@/lib/utils/yearHistogram';
 
 // ─── Context ──────────────────────────────────────────────────────────────────
 
@@ -69,6 +70,16 @@ export interface MonteCarloRun {
   histogramCap: number;
   /** Upper bound of the last bin — the largest final value simulated. */
   histogramMax: number;
+  /**
+   * The failed simulations by the calendar year their capital ran out (2026-09-24): the tile's
+   * second view. Shares are of ALL simulations, like the final-value bins'; the median failure
+   * year's bin is the reference. Empty when nothing fails.
+   */
+  failureYearBins: YearHistogramBin[];
+  failureYearBinWidth: number;
+  /** The first and the last calendar year a simulation ran out; null when none did. */
+  failureFirstCalendarYear: number | null;
+  failureLastCalendarYear: number | null;
 }
 
 /**
@@ -110,6 +121,14 @@ export function summarizeMonteCarloRun(results: MonteCarloResults, params: Monte
   const failureAverageYear = results.failureAnalysis ? Math.round(results.failureAnalysis.averageFailureYear) : null;
   const failureMedianYear = results.failureAnalysis ? Math.round(results.failureAnalysis.medianFailureYear) : null;
   const histogram = buildHistogram(results, finalPercentiles.p50);
+  const failureCalendarYears = results.simulations
+    .filter((simulation) => !simulation.success && simulation.failureYear !== undefined)
+    .map((simulation) => ctx.startCalendarYear + (simulation.failureYear as number));
+  const failureYears = binYears(failureCalendarYears, {
+    total: params.numberOfSimulations,
+    referenceYear: calendarOf(failureMedianYear, ctx),
+    ceilingYear: ctx.startCalendarYear + years,
+  });
 
   return {
     successRate: results.successRate,
@@ -131,6 +150,10 @@ export function summarizeMonteCarloRun(results: MonteCarloResults, params: Monte
     histogram,
     histogramCap: histogram.length > 1 ? histogram[histogram.length - 2].to : histogram.length === 1 ? histogram[0].to : 0,
     histogramMax: histogram.length > 0 ? histogram[histogram.length - 1].to : 0,
+    failureYearBins: failureYears.bins,
+    failureYearBinWidth: failureYears.binWidthYears,
+    failureFirstCalendarYear: failureCalendarYears.length > 0 ? Math.min(...failureCalendarYears) : null,
+    failureLastCalendarYear: failureCalendarYears.length > 0 ? Math.max(...failureCalendarYears) : null,
   };
 }
 
@@ -229,6 +252,22 @@ export interface PlanInflow {
   amount: number;
 }
 
+/** A state pension the withdrawal is net of, from its start year (2026-09-24). */
+export interface PlanStatePension {
+  yearOffset: number;
+  calendarYear: number;
+  /** Net, at today's value. */
+  annualNetToday: number;
+}
+
+/** The tax on withdrawals as the plan states it. */
+export interface PlanWithdrawalTax {
+  /** Percent. */
+  rate: number;
+  /** The gain share of the starting capital, percent. */
+  gainSharePct: number;
+}
+
 export interface MonteCarloPlan {
   initialPortfolio: number;
   /** The pension capital the lock keeps out of the starting portfolio (0 without the lock). */
@@ -242,6 +281,10 @@ export interface MonteCarloPlan {
   /** Only the classes above 0%, in the model's order. */
   allocation: PlanAllocationEntry[];
   inflows: PlanInflow[];
+  /** The state pensions taken off the withdrawal, in start order; empty when none is dated. */
+  statePensions: PlanStatePension[];
+  /** Null when the tax is not modelled (no cost basis in the portfolio). */
+  withdrawalTax: PlanWithdrawalTax | null;
 }
 
 const ALLOCATION_LABELS: { key: AllocationKey; label: string; field: keyof MonteCarloParams }[] = [
@@ -263,6 +306,12 @@ export function summarizeMonteCarloPlan(params: MonteCarloParams, inflows: Monte
     simulations: params.numberOfSimulations,
     allocation: ALLOCATION_LABELS.map(({ key, label, field }) => ({ key, label, pct: params[field] as number })).filter((entry) => entry.pct > 0),
     inflows: inflows.map((inflow) => ({ yearOffset: inflow.year, calendarYear: ctx.startCalendarYear + inflow.year, amount: inflow.amount })),
+    statePensions: (params.annualInflows ?? [])
+      .map((pension) => ({ yearOffset: pension.fromYear, calendarYear: ctx.startCalendarYear + pension.fromYear, annualNetToday: pension.annualNetToday }))
+      .sort((a, b) => a.yearOffset - b.yearOffset),
+    withdrawalTax: params.withdrawalTax
+      ? { rate: params.withdrawalTax.rate, gainSharePct: params.initialPortfolio > 0 ? Math.max(0, 1 - params.withdrawalTax.basisToday / params.initialPortfolio) * 100 : 0 }
+      : null,
   };
 }
 
@@ -301,7 +350,16 @@ export function haveRunInputsChanged(last: MonteCarloRunInputs, current: MonteCa
     }
   }
   if (last.inflows.length !== current.inflows.length) return true;
-  return last.inflows.some((inflow, index) => inflow.year !== current.inflows[index].year || inflow.amount !== current.inflows[index].amount);
+  if (last.inflows.some((inflow, index) => inflow.year !== current.inflows[index].year || inflow.amount !== current.inflows[index].amount)) return true;
+  // The pensions and the tax ride on the params (settings-derived): a change is a new plan too.
+  const lastPensions = last.params.annualInflows ?? [];
+  const currentPensions = current.params.annualInflows ?? [];
+  if (lastPensions.length !== currentPensions.length) return true;
+  if (lastPensions.some((pension, index) => pension.fromYear !== currentPensions[index].fromYear || pension.annualNetToday !== currentPensions[index].annualNetToday)) return true;
+  const lastTax = last.params.withdrawalTax;
+  const currentTax = current.params.withdrawalTax;
+  if (!!lastTax !== !!currentTax) return true;
+  return !!lastTax && !!currentTax && (lastTax.basisToday !== currentTax.basisToday || lastTax.rate !== currentTax.rate);
 }
 
 // ─── Tone ─────────────────────────────────────────────────────────────────────

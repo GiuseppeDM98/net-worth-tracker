@@ -12,6 +12,15 @@ interface CustomDateRangeDialogProps {
   onOpenChange: (open: boolean) => void;
   onConfirm: (startDate: Date, endDate: Date) => void;
   triggerOrigin?: string;
+  /**
+   * The button that opened the dialog — the page writes `event.currentTarget` into this ref at the
+   * click, where it already reads the rect for `triggerOrigin`. Without it the focus lands on
+   * `body` after Escape (measured 2026-09-20, mouse and keyboard): a controlled Radix modal with
+   * no `Dialog.Trigger` cancels the focus scope's own restore and focuses a trigger ref that is
+   * null. The clicked element, not a lookup: `PageHeader` renders its actions twice and only one
+   * copy is visible at a given width.
+   */
+  returnFocusTo?: React.RefObject<HTMLElement | null>;
 }
 
 /**
@@ -28,6 +37,7 @@ export function CustomDateRangeDialog({
   onOpenChange,
   onConfirm,
   triggerOrigin,
+  returnFocusTo,
 }: CustomDateRangeDialogProps) {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -78,6 +88,7 @@ export function CustomDateRangeDialog({
       reading={reading}
       width="sm"
       triggerOrigin={triggerOrigin}
+      returnFocusTo={returnFocusTo}
       footer={
         <>
           <Button variant="outline" onClick={() => onOpenChange(false)}>

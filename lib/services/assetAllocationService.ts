@@ -1,7 +1,7 @@
 import { doc, getDoc, setDoc, deleteField } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { invalidateDashboardOverviewSummary } from '@/lib/services/dashboardOverviewInvalidation';
-import { Asset, AssetClass, AssetAllocationTarget, AssetAllocationSettings, AllocationResult, SpecificAssetAllocation, AllocationData } from '@/types/assets';
+import { Asset, AssetClass, AssetAllocationTarget, AssetAllocationSettings, AllocationResult, AllocationData } from '@/types/assets';
 import { calculateAssetValue, calculateTotalValue } from './assetService';
 import { expandAssetExposure } from '@/lib/utils/assetExposureUtils';
 import { partitionByAllocationRole, ASSET_CLASS_SEQUENCE, NO_SUBCATEGORY_LABEL } from '@/lib/utils/allocationUtils';
@@ -53,7 +53,8 @@ function serializeFamilyMembers(
  *
  * Includes: targets, userAge, riskFreeRate, withdrawalRate, plannedAnnualExpenses,
  * coastFireRetirementAge, coastFirePensions, coastFireTaxBrackets,
- * includePrimaryResidenceInFIRE, dividendIncomeCategoryId, dividendIncomeSubCategoryId
+ * includePrimaryResidenceInFIRE, dividendIncomeCategoryId, dividendIncomeSubCategoryId,
+ * transferFeeCategoryId, transferFeeSubCategoryId
  *
  * WARNING (checklist comment): the mapping below is an EXPLICIT FIELD WHITELIST, not a spread of
  * `data`. A new field on `AssetAllocationSettings` that is not added here is written to Firestore
@@ -90,6 +91,9 @@ export async function getSettings(
       pensionRitaLongUnemployment: data.pensionRitaLongUnemployment,
       dividendIncomeCategoryId: data.dividendIncomeCategoryId,
       dividendIncomeSubCategoryId: data.dividendIncomeSubCategoryId,
+      dividendCashAssetId: data.dividendCashAssetId,
+      transferFeeCategoryId: data.transferFeeCategoryId,
+      transferFeeSubCategoryId: data.transferFeeSubCategoryId,
       fireProjectionScenarios: data.fireProjectionScenarios,
       monteCarloScenarios: data.monteCarloScenarios,
       goalBasedInvestingEnabled: data.goalBasedInvestingEnabled,
@@ -223,6 +227,28 @@ export async function setSettings(
           docData.dividendIncomeSubCategoryId = settings.dividendIncomeSubCategoryId;
         } else {
           delete docData.dividendIncomeSubCategoryId;
+        }
+      }
+      if ('dividendCashAssetId' in settings) {
+        if (settings.dividendCashAssetId !== undefined) {
+          docData.dividendCashAssetId = settings.dividendCashAssetId;
+        } else {
+          delete docData.dividendCashAssetId;
+        }
+      }
+      // User-clearable from Impostazioni → Spese (the transfer fee's category).
+      if ('transferFeeCategoryId' in settings) {
+        if (settings.transferFeeCategoryId !== undefined) {
+          docData.transferFeeCategoryId = settings.transferFeeCategoryId;
+        } else {
+          delete docData.transferFeeCategoryId;
+        }
+      }
+      if ('transferFeeSubCategoryId' in settings) {
+        if (settings.transferFeeSubCategoryId !== undefined) {
+          docData.transferFeeSubCategoryId = settings.transferFeeSubCategoryId;
+        } else {
+          delete docData.transferFeeSubCategoryId;
         }
       }
       if (settings.fireProjectionScenarios !== undefined) {
@@ -394,6 +420,19 @@ export async function setSettings(
       if ('dividendIncomeSubCategoryId' in settings) {
         docData.dividendIncomeSubCategoryId =
           settings.dividendIncomeSubCategoryId !== undefined ? settings.dividendIncomeSubCategoryId : deleteField();
+      }
+      if ('dividendCashAssetId' in settings) {
+        docData.dividendCashAssetId =
+          settings.dividendCashAssetId !== undefined ? settings.dividendCashAssetId : deleteField();
+      }
+      // User-clearable from Impostazioni → Spese (the transfer fee's category).
+      if ('transferFeeCategoryId' in settings) {
+        docData.transferFeeCategoryId =
+          settings.transferFeeCategoryId !== undefined ? settings.transferFeeCategoryId : deleteField();
+      }
+      if ('transferFeeSubCategoryId' in settings) {
+        docData.transferFeeSubCategoryId =
+          settings.transferFeeSubCategoryId !== undefined ? settings.transferFeeSubCategoryId : deleteField();
       }
       if (settings.fireProjectionScenarios !== undefined) {
         docData.fireProjectionScenarios = settings.fireProjectionScenarios;
@@ -1000,45 +1039,6 @@ export function calculateEquityPercentage(
   const percentage = 125 - userAge - (riskFreeRate * 5);
   // Ensure percentage is between 0 and 100
   return Math.max(0, Math.min(100, percentage));
-}
-
-/**
- * Validate specific assets allocation
- * Returns error message if validation fails, null if valid
- */
-export function validateSpecificAssets(
-  specificAssets: SpecificAssetAllocation[]
-): string | null {
-  if (!specificAssets || specificAssets.length === 0) {
-    return 'At least one specific asset is required';
-  }
-
-  // Check for empty names
-  for (const asset of specificAssets) {
-    if (!asset.name || asset.name.trim() === '') {
-      return 'All specific assets must have a name';
-    }
-    if (asset.targetPercentage < 0 || asset.targetPercentage > 100) {
-      return 'Specific asset percentages must be between 0 and 100';
-    }
-  }
-
-  // Check for duplicate names
-  const names = specificAssets.map(a => a.name.trim().toLowerCase());
-  const uniqueNames = new Set(names);
-  if (names.length !== uniqueNames.size) {
-    return 'Duplicate specific asset names are not allowed';
-  }
-
-  // Check if sum equals 100%
-  const sum = specificAssets.reduce((acc, asset) => acc + asset.targetPercentage, 0);
-  const tolerance = 0.01; // Allow 0.01% tolerance for floating point arithmetic
-
-  if (Math.abs(sum - 100) > tolerance) {
-    return `Specific asset percentages must sum to exactly 100% (current: ${sum.toFixed(2)}%)`;
-  }
-
-  return null; // Valid
 }
 
 /**

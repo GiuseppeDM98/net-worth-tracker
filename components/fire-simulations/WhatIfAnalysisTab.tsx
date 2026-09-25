@@ -37,8 +37,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
-import { calculateAssetValue, calculateFIRENetWorth, calculateIlliquidFIRENetWorth, calculateLiquidFIRENetWorth, getAllAssets } from '@/lib/services/assetService';
+import { calculateAssetValue, calculateFIRENetWorth, calculateIlliquidFIRENetWorth, calculateLiquidFIRENetWorth, filterFireEligibleAssets, getAllAssets } from '@/lib/services/assetService';
 import { resolvePensionLockState, resolveRitaUnlockAge } from '@/lib/utils/pensionUnlock';
+import { resolvePortfolioTaxProfile } from '@/lib/utils/withdrawalTax';
 import { getSettings } from '@/lib/services/assetAllocationService';
 import {
   calculateFIRESensitivityMatrix,
@@ -46,6 +47,7 @@ import {
   getDefaultScenarios,
   normalizeCoastFirePensions,
   normalizeCoastFireTaxBrackets,
+  type FireHonestInputs,
   type IncomeSourceCategory,
   type PensionCapitalInflowToday,
 } from '@/lib/services/fireService';
@@ -183,6 +185,28 @@ export function WhatIfAnalysisTab() {
 
   const netWorth = assets ? calculateFIRENetWorth(assets, includePrimaryResidence) - pensionLockedValue : 0;
   const liquidNetWorth = assets ? calculateLiquidFIRENetWorth(assets, includePrimaryResidence) : 0;
+
+  // The honest inputs of the Calcolatore (2026-09-24), built the same way: the tax profile of
+  // the FIRE-eligible assets minus the locked funds, the state pensions dated by the saved age.
+  const now = useMemo(() => new Date(), []);
+  const taxProfile = useMemo(() => {
+    if (!assets) return null;
+    const lockedIds = new Set((pensionLockState?.funds ?? []).filter((info) => info.isLocked).map((info) => info.fund.id));
+    return resolvePortfolioTaxProfile(
+      filterFireEligibleAssets(assets, includePrimaryResidence).filter((asset) => !lockedIds.has(asset.id)),
+      calculateAssetValue,
+    );
+  }, [assets, includePrimaryResidence, pensionLockState]);
+  const honest = useMemo<FireHonestInputs>(
+    () => ({
+      userAge: settings?.userAge,
+      pensions: normalizeCoastFirePensions(settings?.coastFirePensions),
+      taxBrackets: normalizeCoastFireTaxBrackets(settings?.coastFireTaxBrackets),
+      withdrawalTax: taxProfile ? { basisToday: taxProfile.basisToday, rate: taxProfile.rate } : undefined,
+      now,
+    }),
+    [settings?.userAge, settings?.coastFirePensions, settings?.coastFireTaxBrackets, taxProfile, now],
+  );
   const illiquidNetWorth = assets ? Math.max(0, calculateIlliquidFIRENetWorth(assets, includePrimaryResidence) - pensionLockedValue) : 0;
   const withdrawalRate = settings?.withdrawalRate ?? 4;
   const annualExpenses = cashflowData?.annualExpensesFromCashflow ?? 0;
@@ -252,6 +276,7 @@ export function WhatIfAnalysisTab() {
       withdrawalRate,
       scenarios,
       pensionBridge,
+      honest,
       coast:
         currentAge !== null
           ? {
@@ -276,6 +301,7 @@ export function WhatIfAnalysisTab() {
     withdrawalRate,
     scenarios,
     pensionBridge,
+    honest,
     currentAge,
     retirementAge,
     coastCustomExpenses,

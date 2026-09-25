@@ -16,6 +16,7 @@ import {
   buildMonthAssetBreakdown,
   deriveHoldingStartDates,
   summarizeSelection,
+  isFlowDominated,
   type SnapshotAsset,
 } from '@/lib/utils/snapshotAssetBreakdown';
 import type { MonthlySnapshot } from '@/types/assets';
@@ -351,6 +352,22 @@ describe('buildMonthAssetBreakdown', () => {
     expect(b.rows.every((r) => r.delta === null && r.priceEffect === null && r.quantityEffect === null)).toBe(true);
     expect(buildMonthAssetBreakdown([june], '2026-7')).toBeNull();
     expect(buildMonthAssetBreakdown([legacy], '2026-5')).toBeNull();
+  });
+});
+
+describe('isFlowDominated', () => {
+  it('should call a change a flow when the quantities moved it more than the prices', () => {
+    // The real row: a VWCE sale, +348 € from the price and −38.944 € from the quantity.
+    expect(isFlowDominated({ priceEffect: 348, quantityEffect: -38944 })).toBe(true);
+    expect(isFlowDominated({ priceEffect: -2600, quantityEffect: 120 })).toBe(false);
+    // A deposit on a cash account is all quantity; a month with no trade is all price.
+    expect(isFlowDominated({ priceEffect: 0, quantityEffect: 256 })).toBe(true);
+    expect(isFlowDominated({ priceEffect: 52, quantityEffect: 0 })).toBe(false);
+  });
+
+  it('should not call a flow what did not move, nor the first month with a breakdown', () => {
+    expect(isFlowDominated({ priceEffect: 100, quantityEffect: -100 })).toBe(false);
+    expect(isFlowDominated({ priceEffect: null, quantityEffect: null })).toBe(false);
   });
 });
 

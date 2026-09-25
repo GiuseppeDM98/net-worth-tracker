@@ -54,6 +54,7 @@ import { toast } from 'sonner';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PageTabs } from '@/components/layout/PageTabs';
+import { pageTabPanelId } from '@/components/layout/PageTabBar';
 import type { TabDef } from '@/components/layout/PageTabs';
 
 function getErrorMessage(error: unknown): string {
@@ -84,7 +85,12 @@ export default function CashflowPage() {
   const pathname = usePathname();
 
   const initialTab = getInitialTab(searchParams.get('tab'));
-  const [mountedTabs, setMountedTabs] = useState<Set<string>>(new Set([initialTab]));
+  // «Attribuisci spese» on the Divisione tab lands here: the row filter Tracciamento would
+  // otherwise have to be found by hand. Null when absent, which is every other entry.
+  const ownerParam = searchParams.get('owner');
+  // Tracciamento's panel is rendered unconditionally, so it is mounted whatever the URL said:
+  // leaving it out would deny its tab the `aria-controls` its panel can honour.
+  const [mountedTabs, setMountedTabs] = useState<Set<string>>(new Set([initialTab, 'tracking']));
   const [activeTab, setActiveTab] = useState<string>(initialTab);
   // null = settings not yet loaded (avoids the tab appearing late after an async flip from false → true)
   const [costCentersEnabled, setCostCentersEnabled] = useState<boolean | null>(null);
@@ -211,10 +217,16 @@ export default function CashflowPage() {
     await loadOtherData();
   };
 
-  const handleTabChange = (value: string) => {
+  /**
+   * @param extraSearch Additional query the destination tab reads, already `&`-prefixed. A plain
+   *   `<Link>` cannot do this job: the route does not change, so Next does not remount the page
+   *   and `activeTab` — seeded from the URL at mount — would stay where it was while the address
+   *   bar said otherwise (caught by `e2e/cashflow.split.spec.ts`).
+   */
+  const handleTabChange = (value: string, extraSearch = '') => {
     setActiveTab(value);
     setMountedTabs(prev => new Set(prev).add(value));
-    router.replace(`${pathname}?tab=${value}`, { scroll: false });
+    router.replace(`${pathname}?tab=${value}${extraSearch}`, { scroll: false });
   };
 
   // Canonicalize the URL on mount only when the tab param is absent or invalid
@@ -295,6 +307,21 @@ export default function CashflowPage() {
                 Nuovo centro
               </Button>
             )}
+            {/* Divisione's page-level action. It is the ONE verb the tab had none of: every
+                figure on it was inert, and the route that changes who a row belongs to lives one
+                tab away, in Tracciamento's «Intestatario» filter. A link, not a dispatch, because
+                the work happens on another tab and not in a dialog of this one. */}
+            {effectiveTab === 'split' && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleTabChange('tracking', '&owner=common')}
+                className="hidden desktop:flex"
+              >
+                <Users className="h-4 w-4" />
+                Attribuisci spese
+              </Button>
+            )}
             {effectiveTab === 'dividends' && (
               <>
                 <Button
@@ -345,10 +372,19 @@ export default function CashflowPage() {
         onValueChange={handleTabChange}
         layoutId="cashflow-tab"
         ariaLabel="Sezioni di Cashflow"
+        renderedPanels={mountedTabs}
         loading={costCentersEnabled === null || expenseSplitEnabled === null}
       >
 
-        <TabsContent value="tracking" forceMount>
+        <TabsContent
+            value="tracking"
+            forceMount
+            id={pageTabPanelId('cashflow-tab', 'tracking')}
+            aria-label="Tracciamento"
+            // Radix names a Content after ITS trigger; these triggers are plain buttons, so the
+            // generated reference points at nothing. The name is the label above.
+            aria-labelledby={undefined}
+          >
           <motion.div
             initial={false}
             animate={effectiveTab === 'tracking' ? 'visible' : 'hidden'}
@@ -357,6 +393,7 @@ export default function CashflowPage() {
             <ExpenseTrackingTab
               allExpenses={allExpenses}
               categories={categories}
+              initialOwnerId={ownerParam}
               loading={loading}
                 loadFailed={loadFailed}
               onRefresh={handleRefresh}
@@ -368,7 +405,15 @@ export default function CashflowPage() {
         </TabsContent>
 
         {mountedTabs.has('dividends') && (
-          <TabsContent value="dividends" forceMount>
+          <TabsContent
+            value="dividends"
+            forceMount
+            id={pageTabPanelId('cashflow-tab', 'dividends')}
+            aria-label="Dividendi"
+            // Radix names a Content after ITS trigger; these triggers are plain buttons, so the
+            // generated reference points at nothing. The name is the label above.
+            aria-labelledby={undefined}
+          >
             <motion.div
               initial={false}
               animate={effectiveTab === 'dividends' ? 'visible' : 'hidden'}
@@ -386,7 +431,15 @@ export default function CashflowPage() {
         )}
 
         {mountedTabs.has('budget') && (
-          <TabsContent value="budget" forceMount>
+          <TabsContent
+            value="budget"
+            forceMount
+            id={pageTabPanelId('cashflow-tab', 'budget')}
+            aria-label="Budget"
+            // Radix names a Content after ITS trigger; these triggers are plain buttons, so the
+            // generated reference points at nothing. The name is the label above.
+            aria-labelledby={undefined}
+          >
             <motion.div
               initial={false}
               animate={effectiveTab === 'budget' ? 'visible' : 'hidden'}
@@ -404,7 +457,15 @@ export default function CashflowPage() {
           </TabsContent>
         )}
         {expenseSplitEnabled && mountedTabs.has('split') && (
-          <TabsContent value="split" forceMount>
+          <TabsContent
+            value="split"
+            forceMount
+            id={pageTabPanelId('cashflow-tab', 'split')}
+            aria-label="Divisione"
+            // Radix names a Content after ITS trigger; these triggers are plain buttons, so the
+            // generated reference points at nothing. The name is the label above.
+            aria-labelledby={undefined}
+          >
             <motion.div
               initial={false}
               animate={effectiveTab === 'split' ? 'visible' : 'hidden'}
@@ -421,7 +482,15 @@ export default function CashflowPage() {
           </TabsContent>
         )}
         {costCentersEnabled && mountedTabs.has('cost-centers') && (
-          <TabsContent value="cost-centers" forceMount>
+          <TabsContent
+            value="cost-centers"
+            forceMount
+            id={pageTabPanelId('cashflow-tab', 'cost-centers')}
+            aria-label="Centri di Costo"
+            // Radix names a Content after ITS trigger; these triggers are plain buttons, so the
+            // generated reference points at nothing. The name is the label above.
+            aria-labelledby={undefined}
+          >
             <motion.div
               initial={false}
               animate={effectiveTab === 'cost-centers' ? 'visible' : 'hidden'}

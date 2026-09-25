@@ -20,7 +20,7 @@ import { formatPercentage } from '@/lib/services/chartService';
 import { articleForPercent, startsWithVowel } from '@/lib/utils/patrimonioNarrative';
 import type { FireLock } from '@/lib/utils/fireSummary';
 import type { Narrative, NarrativeSegment, PageVerdictModel } from '@/lib/utils/narrative';
-import { resolveSuccessTone, type MonteCarloPlan, type MonteCarloRun, type PlanInflow, type ScenarioComparison, type ScenarioRunSummary } from '@/lib/utils/monteCarloSummary';
+import { resolveSuccessTone, type MonteCarloPlan, type MonteCarloRun, type PlanInflow, type PlanStatePension, type PlanWithdrawalTax, type ScenarioComparison, type ScenarioRunSummary } from '@/lib/utils/monteCarloSummary';
 
 // ─── Formatting helpers ───────────────────────────────────────────────────────
 
@@ -220,7 +220,44 @@ export function describeDistribuzioneFooter(run: MonteCarloRun): Narrative {
     amount(run.histogramMax),
     prose(', la prima le simulazioni finite a zero; la classe con il bordo contiene la mediana. Valori nominali del '),
     year(run.endCalendarYear),
-    prose('.'),
+    prose(', scenario base.'),
+  ];
+}
+
+// ─── Distribuzione › Esaurimento: when the money runs out ─────────────────────
+
+export type DistributionView = 'finali' | 'esaurimento';
+
+/**
+ * «Le 1579 simulazioni che falliscono esauriscono il capitale tra il 2041 e il 2060, la metà
+ * entro il 2052.» The failed paths used to vanish into the first bin of the final values; here
+ * they are the whole population, dated. With none failing the sentence says so, and the tile
+ * does not offer the view.
+ */
+export function describeEsaurimento(run: MonteCarloRun): Narrative {
+  if (run.failureCount === 0 || run.failureFirstCalendarYear === null || run.failureLastCalendarYear === null) {
+    return [prose('Nessuna simulazione esaurisce il capitale entro il '), year(run.endCalendarYear), prose('.')];
+  }
+  if (run.failureCount === 1) {
+    return [prose("L'unica simulazione che fallisce esaurisce il capitale nel "), year(run.failureFirstCalendarYear), prose('.')];
+  }
+  const out: Narrative = [prose('Le '), count(run.failureCount), prose(' simulazioni che falliscono esauriscono il capitale ')];
+  if (run.failureFirstCalendarYear === run.failureLastCalendarYear) {
+    out.push(prose('tutte nel '), year(run.failureFirstCalendarYear));
+  } else {
+    out.push(prose('tra il '), year(run.failureFirstCalendarYear), prose(' e il '), year(run.failureLastCalendarYear));
+    if (run.failureMedianCalendarYear !== null) out.push(prose(', la metà entro il '), year(run.failureMedianCalendarYear));
+  }
+  out.push(prose('.'));
+  return out;
+}
+
+export function describeEsaurimentoFooter(run: MonteCarloRun): Narrative {
+  const perBin = run.failureYearBinWidth === 1 ? 'Una classe per anno' : `Una classe ogni ${run.failureYearBinWidth} anni`;
+  return [
+    prose(`${perBin} tra il primo e l'ultimo esaurimento; la classe con il bordo contiene la mediana dei fallimenti, le quote sono sul totale delle `),
+    count(run.simulations),
+    prose(' simulazioni. Scenario base.'),
   ];
 }
 
@@ -280,6 +317,18 @@ export function describeParametri(plan: MonteCarloPlan): Narrative {
 /** «Fondo pensione: +31.400 € aggiunti da soli nell'anno 19 (2045), al valore di oggi.» */
 export function describePensionInflowRow(inflow: PlanInflow): Narrative {
   return [prose('Fondo pensione: '), figure(`+${formatAmount(inflow.amount)}`), prose(" aggiunti da soli nell'anno "), figure(String(inflow.yearOffset)), prose(' ('), year(inflow.calendarYear), prose('), al valore di oggi.')];
+}
+
+/** «Pensione statale: −13.000 € l'anno tolti dal prelievo dall'anno 34 (2060), netti, al valore di oggi.» */
+export function describeStatePensionRow(pension: PlanStatePension): Narrative {
+  const from: Narrative = pension.yearOffset <= 0 ? [prose(' tolti dal prelievo da subito')] : [prose(" tolti dal prelievo dall'anno "), figure(String(pension.yearOffset)), prose(' ('), year(pension.calendarYear), prose(')')];
+  return [prose('Pensione statale: '), figure(`−${formatAmount(pension.annualNetToday)}`), prose(" l'anno"), ...from, prose(', netti, al valore di oggi.')];
+}
+
+/** «Tasse sui prelievi: ogni prelievo vende quanto serve a pagare il 26% sulla plusvalenza (40% del capitale oggi).» */
+export function describeWithdrawalTaxRow(tax: PlanWithdrawalTax | null): Narrative {
+  if (!tax) return [prose('Tasse sui prelievi: non stimate, nessun PMC in euro nel portafoglio.')];
+  return [prose('Tasse sui prelievi: ogni prelievo vende quanto serve a pagare il '), figure(ratePct(tax.rate)), prose(' sulla plusvalenza ('), figure(ratePct(tax.gainSharePct)), prose(' del capitale oggi).')];
 }
 
 export interface ParametriFooterInput {

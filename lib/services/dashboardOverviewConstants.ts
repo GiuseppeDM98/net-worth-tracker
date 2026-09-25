@@ -39,5 +39,14 @@ export const DASHBOARD_OVERVIEW_SUMMARY_COLLECTION = 'dashboardOverviewSummaries
 // the market (lib/utils/periodSales.ts).
 // Bumped from 16→17: topExpenseCategories[] / topIncomeCategories[] carry `expenseType`, so a
 // row of the Panoramica's category tiles can open its Scheda on Analisi (?focusType&focusCat).
-export const DASHBOARD_OVERVIEW_SOURCE_VERSION = 17;
+// Bumped from 17→18: monthSales.purchases (the month's buys from the ledger), so a sale reads as a
+// rebalancing when the proceeds were put back to work («Nello stesso mese hai comprato …»).
+// Bumped from 18→19: marketEffect / topMovers / topInstrumentMovers read the month's traded quotes
+// from the ledger (trade price → today), and expenseStats.currentMonth.incomeScheduled lets the
+// verdict judge the savings already made.
+// Bumped from 19→20: monthSales.estimatedTax is the tax WITHHELD where a sell carries it
+// (`withheldTaxEur`, `taxIsWithheld`), and the estimate stands on the gain the broker taxes —
+// the price difference, no commission on either side (`taxableGainEur`, lib/utils/saleTax.ts):
+// a stored settembre would keep 4089 €.
+export const DASHBOARD_OVERVIEW_SOURCE_VERSION = 20;
 export const DASHBOARD_OVERVIEW_SUMMARY_TTL_MS = 5 * 60 * 1000;

@@ -26,6 +26,7 @@ import type {
 import type { MonthlySnapshot } from '@/types/assets';
 import { buildTwrIndex, findMaxDrawdown, type TwrIndexPoint } from '@/lib/utils/drawdownSeries';
 import { annualizeTWR, buildIndexedSeries, type MonthlyReturnPoint } from '@/lib/utils/benchmarkPeriodReturn';
+import { externalFlowOf } from '@/lib/utils/cashFlowMap';
 
 // ---------------------------------------------------------------------------
 // B1 — performance verdict
@@ -132,16 +133,25 @@ export function summarizePerformance(params: {
  * Below this many months the hero shows the PERIOD return instead of the annualized one.
  *
  * Annualizing extrapolates: +4% over two months becomes "+26% a year", a forecast dressed as a
- * measurement, and two months of a portfolio say nothing about a year of it. Six months is where
- * the extrapolation stops dominating the number. Above it, annualized stays — it is what makes
- * periods and benchmarks comparable.
+ * measurement. Until 2026-09-20 the floor was six months, and the page's most used window showed
+ * what it did to a reader: a year-to-date of nine months printed «+16,0%» at 54px under a headline
+ * that says «Da inizio anno … rende», while the +11,8% the portfolio had actually produced was a
+ * 12px chip — the owner would repeat «quest'anno faccio il 16%». A year is the first window on
+ * which the annualized rate IS the measured one, so that is the floor: below it the hero is what
+ * happened, and the rate per year moves to the companion chip (`resolveCompanionReturnChip`).
  */
-const MIN_MONTHS_FOR_ANNUALIZATION = 6;
+const MIN_MONTHS_FOR_ANNUALIZATION = 12;
+
+/**
+ * Below this many months not even the companion chip annualizes: two months say nothing about a
+ * year of the portfolio, whatever the size of the type it is printed in.
+ */
+const MIN_MONTHS_FOR_ANNUALIZED_CHIP = 6;
 
 export interface HeroReturn {
   /** The figure to display, already in percent. */
   value: number | null;
-  /** true when `value` is the plain period return because the window is too short to annualize. */
+  /** true when `value` is the plain period return because the window is shorter than a year. */
   isPeriodReturn: boolean;
   /** Qualifier to print next to the number, so it is never ambiguous which one it is. */
   label: string;
@@ -150,9 +160,9 @@ export interface HeroReturn {
 /**
  * The ONE de-annualisation of the page: `(1 + annual)^(months/12) − 1`, the exact inverse of the
  * annualisation the TWR already applied, so no information is invented — the cumulative return
- * the portfolio actually produced over the period is recovered. The hero below six months, the
- * period-return chip and the narrative's benchmark gap all take this step; a second copy of the
- * formula is how two figures of the same page drift apart.
+ * the portfolio actually produced over the period is recovered. The hero below a year, the
+ * companion chip and the benchmark gap all take this step; a second copy of the formula is how
+ * two figures of the same page drift apart.
  */
 export function deannualizeReturn(annualizedPct: number, numberOfMonths: number): number {
   return (Math.pow(1 + annualizedPct / 100, numberOfMonths / 12) - 1) * 100;
@@ -161,8 +171,9 @@ export function deannualizeReturn(annualizedPct: number, numberOfMonths: number)
 /**
  * Decide whether the hero states an annualized rate or the return of the period itself.
  *
- * Only the DISPLAYED number changes. The verdict and the benchmark delta keep using the annualized
- * TWR, because comparing to a risk-free rate or to a benchmark is only meaningful per year.
+ * Only the DISPLAYED number changes. The verdict's quality keeps using the annualized TWR, because
+ * comparing to a risk-free rate is only meaningful per year; the gap against the model follows the
+ * hero's basis (`resolveBenchmarkGap`).
  *
  * @param annualizedReturn - TWR as computed by the service (annualized), or null
  * @param numberOfMonths - Length of the measured period
@@ -187,28 +198,35 @@ export function resolveHeroReturn(
   };
 }
 
-export interface PeriodReturnChip {
-  /** The cumulative TWR of the period, in percent. */
+export interface CompanionReturnChip {
+  /** The same TWR on the basis the hero does NOT state, in percent. */
   value: number;
-  /** «cumulato in 9 mesi» — the qualifier under the chip. */
+  /** «cumulato in 44 mesi» or «annualizzato» — the qualifier under the chip. */
   label: string;
 }
 
 /**
- * The second chip of the Rendimento tile: the return the portfolio produced over the WHOLE period,
- * cumulative, beside the annualised hero. Until 2026-09-07 that chip printed the ROI under the
- * caption «ROI del periodo» — a gain divided by the FIRST month's capital, which is not the
- * period's return and grows with the window on a saver's account (+126% against a +134%
- * cumulative TWR on the real account, +73% against +30% on another). `null` when the hero is
- * already the period return (below six months, One-Tile-One-Question), when there is nothing to
- * de-annualise, or over exactly twelve months, where the two figures coincide.
+ * The second chip of the Rendimento tile: the SAME return on the other basis, so the reader who
+ * wants to compare years and the one who wants to know what happened both find their figure.
+ *
+ *   hero annualized (a year or more)   → the period's cumulative return, «cumulato in N mesi»
+ *   hero = period return, 6–11 months  → the rate per year, «annualizzato»
+ *   below six months, or exactly twelve → no chip: an extrapolation, or a repeat of the hero
+ *
+ * Until 2026-09-07 this chip printed the ROI under «ROI del periodo» — a gain divided by the FIRST
+ * month's capital, which is not the period's return and grows with the window on a saver's
+ * account (+126% against a +134% cumulative TWR on the real account).
  */
-export function resolvePeriodReturnChip(
+export function resolveCompanionReturnChip(
   annualizedReturn: number | null,
   numberOfMonths: number,
   heroReturn: Pick<HeroReturn, 'isPeriodReturn'>
-): PeriodReturnChip | null {
-  if (annualizedReturn === null || heroReturn.isPeriodReturn || numberOfMonths <= 0 || numberOfMonths === 12) return null;
+): CompanionReturnChip | null {
+  if (annualizedReturn === null || numberOfMonths <= 0 || numberOfMonths === 12) return null;
+  if (heroReturn.isPeriodReturn) {
+    if (numberOfMonths < MIN_MONTHS_FOR_ANNUALIZED_CHIP || !isFinite(annualizedReturn)) return null;
+    return { value: annualizedReturn, label: 'annualizzato' };
+  }
   const value = deannualizeReturn(annualizedReturn, numberOfMonths);
   if (!isFinite(value)) return null;
   return { value, label: `cumulato in ${numberOfMonths} mesi` };
@@ -581,4 +599,78 @@ export function summarizeRealizedGains(byYear: Record<number, number>): Realized
     .map((year) => ({ year, amount: byYear[year] }));
   if (years.length === 0) return null;
   return { total: years.reduce((sum, y) => sum + y.amount, 0), years };
+}
+
+// ---------------------------------------------------------------------------
+// Contributi — the capital that entered the measured base, channel by channel
+// ---------------------------------------------------------------------------
+
+/** One channel of the capital that crossed the base's boundary in the period, in whole euros. */
+export interface CapitalEnteredChannel {
+  key: 'measured' | 'cashflow' | 'pension';
+  /** Whole euros, signed (+ into the base): the figure the tile prints. */
+  amount: number;
+  /** How many months of the period rode this channel (the pension channel: months with a flow). */
+  months: number;
+}
+
+export interface CapitalEnteredSummary {
+  /** Σ of the printed channels, so the rows add up to the figure above them ON SCREEN. */
+  total: number;
+  /** Only the channels that carried a month; `measured` first, then `cashflow`, then `pension`. */
+  channels: CapitalEnteredChannel[];
+}
+
+/**
+ * «Quanto capitale è entrato nella base?» — the ONE figure every return formula neutralises
+ * (`externalFlowOf` summed over the period's series, exactly what the service hands to ROI, CAGR,
+ * TWR and IRR), split by the channel each month rode:
+ *
+ *   measured  the months whose boundary could be measured (registro operazioni and quantities)
+ *   cashflow  the months that fell back to the cashflow's savings
+ *   pension   the pension funds' channel, on top of either
+ *
+ * Until 2026-09-20 the Contributi tile opened on the ledger's buys minus sells instead, which
+ * counted the migration's opening positions as purchases («Hai investito 134.988 €» on an account
+ * whose real buys were 49.089 € against 53.436 € of sells) — and on the cashflow's savings, neither
+ * of which a formula reads when the base is a subset. They stay on the tile, as terms of comparison.
+ *
+ * Each channel is rounded to the euro BEFORE the total, so a reader who adds the rows finds the
+ * total to the euro; no channel is a remainder by definition, so the drift (at most a euro per
+ * channel against the unrounded sum) goes to the total rather than to a row.
+ *
+ * @param cashFlows - The period's merged series (`metrics.cashFlows`): one entry per month that
+ *   had a flow, so a quiet month is absent — which is why the months come from `numberOfMonths`
+ * @param numberOfMonths - Months measured in the period; what is not measured rode the cashflow
+ */
+export function summarizeCapitalEntered(cashFlows: CashFlowData[], numberOfMonths: number): CapitalEnteredSummary {
+  let measured = 0;
+  let measuredMonths = 0;
+  let cashflow = 0;
+  let pension = 0;
+  let pensionMonths = 0;
+
+  for (const cf of cashFlows) {
+    const pensionFlow = cf.pensionFlow ?? 0;
+    // The same precedence as `externalFlowOf`: a measured month never adds the savings too.
+    const own = externalFlowOf(cf) - pensionFlow;
+    if (cf.portfolioFlow !== undefined && cf.portfolioFlow !== null) {
+      measured += own;
+      measuredMonths += 1;
+    } else {
+      cashflow += own;
+    }
+    if (pensionFlow !== 0) {
+      pension += pensionFlow;
+      pensionMonths += 1;
+    }
+  }
+
+  const candidates: CapitalEnteredChannel[] = [
+    { key: 'measured', amount: Math.round(measured), months: measuredMonths },
+    { key: 'cashflow', amount: Math.round(cashflow), months: Math.max(0, numberOfMonths - measuredMonths) },
+    { key: 'pension', amount: Math.round(pension), months: pensionMonths },
+  ];
+  const channels = candidates.filter((channel) => channel.months > 0);
+  return { total: channels.reduce((sum, channel) => sum + channel.amount, 0), channels };
 }

@@ -11,7 +11,7 @@
  *   «Conferma»); a row of an instalment plan or a recurring series opens `SeriesDeleteDialog`,
  *   the one question a series adds («solo questa o tutte?»). Until 2026-09-14 every delete went
  *   through a raw `AlertDialog` that asked «Sei sicuro?» and named neither the row nor the balance
- *   it moved back (one of the eight surfaces outside the modal vocabulary, CLAUDE.md → Known Issues).
+ *   it moved back (one of the eight surfaces then outside the modal vocabulary — DESIGN.md → §5 Modal, Coverage).
  * - Every figure is mono (the Mono Mandate): dates and amounts share one tabular column each.
  *
  * Pagination behaviour: page 1 again when the list changes (add/delete/filter) or the sort or
@@ -26,14 +26,15 @@ import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { Expense, ExpenseCategory, EXPENSE_TYPE_LABELS } from '@/types/expenses';
 import { LAZY_CATEGORY_ICONS } from '@/components/expenses/IconPickerPopover';
 import {
-  deleteExpense,
+  deleteExpenseRows,
+  getTransferFeeOf,
   deleteRecurringExpenses,
   deleteInstallmentExpenses,
   getExpensesByRecurringParentId,
   getExpensesByInstallmentParentId,
 } from '@/lib/services/expenseService';
-import { updateCashAssetBalance } from '@/lib/services/assetService';
-import { reconcileTransferDelete } from '@/lib/services/cashBalanceReconciliation';
+import { reverseAppliedBalances } from '@/lib/services/cashBalanceReconciliation';
+import { rowsDeletedWith } from '@/lib/utils/transferFee';
 import { queryKeys } from '@/lib/query/queryKeys';
 import {
   Table,
@@ -128,7 +129,7 @@ function ExpenseTableRow({ expense, scheduled, ownerLabel, singleType, categoryM
   }, [armed, announce, rowName]);
 
   const consequence = armed
-    ? describeExpenseDeleteConsequence({ type: expense.type, amount: expense.amount, hasAccount: !!expense.linkedCashAssetId })
+    ? describeExpenseDeleteConsequence({ type: expense.type, amount: expense.amount, hasAccount: !!expense.linkedCashAssetId, hasFee: !!expense.transferFeeExpenseId })
     : null;
   const disabled = isDemo || busy;
   // A LOOKUP in the module-level map, never a call: a component obtained from a call during
@@ -295,21 +296,14 @@ export function ExpenseTable({ expenses, onEdit, onRefresh, isDemo = false, hasA
   const deleteSingleExpense = async (expense: Expense) => {
     try {
       setDeletingId(expense.id);
-      // Reverse the balance effect before deleting. A transfer moved TWO accounts, so both
-      // sides are reconciled; an origin-only reversal would leave the destination wrong.
-      if (expense.type === 'transfer') {
-        await reconcileTransferDelete({
-          originId: expense.linkedCashAssetId,
-          destId: expense.transferCashAssetId,
-          amount: Math.abs(expense.amount),
-        });
-      } else if (expense.linkedCashAssetId) {
-        await updateCashAssetBalance(expense.linkedCashAssetId, -expense.amount);
-      }
-      if (user && ownerId && (expense.linkedCashAssetId || expense.transferCashAssetId)) {
+      // Give back what the row has applied — both accounts of a transfer — before deleting it;
+      // a row still waiting for its date moved nothing (lib/utils/cashSettlement.ts).
+      // A transfer's fee row goes with it (lib/utils/transferFee.ts), its balance given back too.
+      const rows = rowsDeletedWith(expense, await getTransferFeeOf(expense));
+      if ((await reverseAppliedBalances(rows)) && user && ownerId) {
         queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
       }
-      await deleteExpense(expense.id);
+      await deleteExpenseRows(expense.userId, rows);
       toast.success('Voce eliminata con successo');
       onRefresh();
     } catch (error) {
@@ -326,14 +320,10 @@ export function ExpenseTable({ expenses, onEdit, onRefresh, isDemo = false, hasA
     if (!ownerId) return;
     try {
       setDeletingId(recurringParentId);
-      // Reverse balance effects before bulk-deleting (only the first entry stores linkedCashAssetId)
+      // Give back what the occurrences already happened have applied, in one transaction; the
+      // ones still waiting for their date moved nothing.
       const seriesExpenses = await getExpensesByRecurringParentId(ownerId, recurringParentId);
-      for (const exp of seriesExpenses) {
-        if (exp.linkedCashAssetId) {
-          await updateCashAssetBalance(exp.linkedCashAssetId, -exp.amount);
-        }
-      }
-      if (user && ownerId && seriesExpenses.some(e => e.linkedCashAssetId)) {
+      if ((await reverseAppliedBalances(seriesExpenses)) && user && ownerId) {
         queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
       }
       await deleteRecurringExpenses(ownerId, recurringParentId);
@@ -353,14 +343,10 @@ export function ExpenseTable({ expenses, onEdit, onRefresh, isDemo = false, hasA
     if (!ownerId) return;
     try {
       setDeletingId(installmentParentId);
-      // Reverse balance effects before bulk-deleting (only the first installment stores linkedCashAssetId)
+      // Give back what the instalments already due have applied, in one transaction; the ones
+      // still waiting for their date moved nothing.
       const seriesExpenses = await getExpensesByInstallmentParentId(ownerId, installmentParentId);
-      for (const exp of seriesExpenses) {
-        if (exp.linkedCashAssetId) {
-          await updateCashAssetBalance(exp.linkedCashAssetId, -exp.amount);
-        }
-      }
-      if (user && ownerId && seriesExpenses.some(e => e.linkedCashAssetId)) {
+      if ((await reverseAppliedBalances(seriesExpenses)) && user && ownerId) {
         queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
       }
       await deleteInstallmentExpenses(ownerId, installmentParentId);

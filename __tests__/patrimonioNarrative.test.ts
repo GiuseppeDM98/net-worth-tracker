@@ -27,11 +27,15 @@ import {
   describeLastPriceUpdate,
   describeManualValuation,
   describeMonthTrades,
+  describeMortgage,
+  describeMortgageScope,
+  describeMortgageYearScope,
   formatHoldingCounts,
   pluralArticleFor,
   type PatrimonioVerdictInput,
 } from '@/lib/utils/patrimonioNarrative';
 import { narrativeToText, type Narrative } from '@/lib/utils/narrative';
+import type { MortgageSummary } from '@/lib/utils/mortgageSummary';
 
 // Intl 'it-IT' puts a no-break space before "€" (see AGENTS.md → Italian Localization); the
 // expectations below are written the way the screen prints them, with the nbsp flattened.
@@ -102,8 +106,8 @@ describe('buildPatrimonioVerdict — sentence', () => {
   it('should state value, monthly change, the counts and the instrument that drove the month', () => {
     expect(plain(buildPatrimonioVerdict(AUGUST).sentence)).toBe(
       'Il portafoglio vale 412.425,85 €: +3214,20 € (+0,79%) su luglio, 16 strumenti e 3 conti; ' +
-        'Vanguard FTSE All-World ha fatto il grosso (+2140 €). ' +
-        'Di quel movimento, +2000 € viene dal mercato e +1214 € dai tuoi movimenti.',
+        'sul mercato ha spinto soprattutto Vanguard FTSE All-World (+2140 €). ' +
+        'Di quel movimento: +2000 € dal mercato e +1214 € tra risparmio e altre variazioni.',
     );
   });
 
@@ -124,7 +128,36 @@ describe('buildPatrimonioVerdict — sentence', () => {
     });
     expect(verdict.headline).toBe('Il portafoglio è in calo: il mercato ha pesato, le tasse sulle vendite di più.');
     expect(plain(verdict.sentence)).toContain(
-      'Di quel movimento, −1079 € viene dal mercato e −3859 € dai tuoi movimenti. Hai venduto Vanguard FTSE All-World per 39.052 €',
+      'Hai venduto Vanguard FTSE All-World per 39.052 € con una plusvalenza di 15.726 € e pagato circa 4089 € di tasse: ' +
+        'senza, il mese avrebbe fatto −849 € (−1079 € dal mercato e +230 € tra risparmio e altre variazioni).',
+    );
+    expect(plain(verdict.sentence)).not.toContain('Di quel movimento');
+  });
+
+  it('should name the tax before the record when the tax took the growth', () => {
+    // The real account, settembre 2026: a new high at +0,04% with 4.089 € withheld on VWCE.
+    const verdict = buildPatrimonioVerdict({
+      ...AUGUST,
+      month: 9,
+      isNewATH: true,
+      monthlyVariation: { value: 124.32, percentage: 0.04 },
+      marketEffect: 2018.47,
+      savings: 2094.62,
+      topMover: { id: 'wbit', name: 'WBIT', delta: 534.67 },
+      sales: {
+        proceeds: 39052.45,
+        realizedGain: 15726.38,
+        estimatedTax: 4088.86,
+        instruments: [{ id: 'vwce', name: 'VWCE', proceeds: 39052.45, realizedGain: 15726.38, estimatedTax: 4088.86 }],
+        brokenLedgers: 0,
+        purchases: { amount: 34305.1, instrumentCount: 6 },
+      },
+    });
+    expect(verdict.headline).toBe('Il portafoglio è in pari: le tasse sulla vendita di VWCE si sono prese la crescita.');
+    expect(verdict.tone).toBe('warning');
+    expect(plain(verdict.sentence)).toContain(
+      'senza, il mese avrebbe fatto +4213 € (+2018 € dal mercato e +2095 € risparmiati). ' +
+        'Nello stesso mese hai comprato 6 strumenti per 34.305 €.',
     );
   });
 
@@ -136,8 +169,8 @@ describe('buildPatrimonioVerdict — sentence', () => {
       topMover: { id: 'btc', name: 'Bitcoin', delta: -1800 },
     }).sentence;
     expect(plain(sentence)).toBe(
-      'Il portafoglio vale 412.425,85 €: −2100,00 € (−0,50%) su luglio, 16 strumenti e 3 conti; Bitcoin ha pesato (−1800 €). ' +
-        'Di quel movimento, −1500 € viene dal mercato e −600 € dai tuoi movimenti.',
+      'Il portafoglio vale 412.425,85 €: −2100,00 € (−0,50%) su luglio, 16 strumenti e 3 conti; sul mercato ha pesato soprattutto Bitcoin (−1800 €). ' +
+        'Di quel movimento: −1500 € dal mercato e −600 € tra risparmio e altre variazioni.',
     );
   });
 
@@ -282,5 +315,61 @@ describe('describeBondRow / describeManualValuation — the sub-line under a row
     expect(describeManualValuation(new Date(Date.UTC(2025, 11, 30, 11)), now)).toBe('valore a mano dal 30/12/2025');
     expect(describeManualValuation(null, now)).toBeNull();
     expect(describeManualValuation(new Date('x'), now)).toBeNull();
+  });
+});
+
+describe('describeMortgage — the «Mutuo» tile\'s reading', () => {
+  const BASE: MortgageSummary = {
+    propertyId: 'casa',
+    propertyName: 'Casa',
+    debt: 65_608.36,
+    annualRatePct: 0.7,
+    year: 2026,
+    yearPrincipal: 518.73,
+    yearInterest: 38.57,
+    yearInstalments: 1,
+    totalInterest: 38.57,
+    trackedSince: new Date(2026, 8, 28, 12),
+    byYear: [{ year: 2026, interest: 38.57, principal: 518.73, instalments: 1, partialFrom: new Date(2026, 8, 28, 12) }],
+    next: { date: new Date(2026, 9, 28, 12), amount: 557.3, principal: 519.03, interest: 38.27 },
+    payoff: { kind: 'date', months: 122, date: new Date(2036, 10, 28, 12) },
+  };
+
+  it('should say what the year\'s instalments paid in interest and repaid, then where the plan ends', () => {
+    expect(plain(describeMortgage(BASE))).toBe(
+      'Nel 2026 hai pagato 38,57 € di interessi e rimborsato 518,73 € di capitale, in 1 rata; al ritmo di oggi il mutuo si chiude a novembre 2036.'
+    );
+  });
+
+  it('should speak of the first linked instalment before any has been paid', () => {
+    const summary = { ...BASE, yearInstalments: 0, yearInterest: 0, yearPrincipal: 0, totalInterest: 0, trackedSince: null };
+    expect(plain(describeMortgage(summary))).toBe(
+      'La prima rata collegata, il 28 ottobre, rimborserà 519,03 € di capitale; 38,27 € saranno interessi; al ritmo di oggi il mutuo si chiude a novembre 2036.'
+    );
+  });
+
+  it('should say the instalment cannot end a debt whose interest it barely covers', () => {
+    expect(plain(describeMortgage({ ...BASE, payoff: { kind: 'never' } }))).toContain('con questa rata il debito non scende: copre appena gli interessi.');
+  });
+
+  it('should name from when the interest is measured, and the TAN — or its absence', () => {
+    expect(describeMortgageScope(BASE)).toBe('Interessi dalle rate collegate, da settembre 2026 · TAN 0,7%.');
+    expect(describeMortgageScope({ ...BASE, annualRatePct: undefined, trackedSince: null })).toBe(
+      'Interessi dalle rate collegate, dalla prima pagata · senza TAN: ogni rata va tutta in capitale.'
+    );
+  });
+});
+
+describe('describeMortgageYearScope — a partial year says so', () => {
+  const year = (y: number, partialFrom: Date | null) => ({ year: y, interest: 1, principal: 1, instalments: 1, partialFrom });
+
+  it('should mark the first measured year from the link, and the running year as not over', () => {
+    expect(describeMortgageYearScope(year(2026, new Date(2026, 8, 28, 12)), 2027)).toBe('da settembre');
+    expect(describeMortgageYearScope(year(2027, null), 2027)).toBe('finora');
+    expect(describeMortgageYearScope(year(2026, new Date(2026, 8, 28, 12)), 2026)).toBe('da settembre, finora');
+  });
+
+  it('should leave a whole past year bare', () => {
+    expect(describeMortgageYearScope(year(2027, null), 2028)).toBeNull();
   });
 });

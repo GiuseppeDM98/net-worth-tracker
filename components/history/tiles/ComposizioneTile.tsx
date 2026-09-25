@@ -18,7 +18,8 @@ import { useReducedMotion } from 'framer-motion';
 import { Info } from 'lucide-react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Tile } from '@/components/ui/tile';
+import { cn } from '@/lib/utils';
+import { Tile, TILE_FOOTER_ACTION_CLASS } from '@/components/ui/tile';
 import { AsideToggle } from '@/components/ui/aside-toggle';
 import { CHART_TICK_STYLE } from '@/components/cashflow/costCenterStyles';
 import { useChartColors } from '@/lib/hooks/useChartColors';
@@ -195,7 +196,7 @@ export function ComposizioneTile({ assetClassHistory, liquidityHistory, hasPensi
         <Popover>
           <PopoverTrigger
             aria-label="Come viene calcolata la banda Previdenza"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring desktop:h-7 desktop:w-7"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring desktop:h-8 desktop:w-8"
           >
             <Info className="h-3.5 w-3.5" aria-hidden="true" />
           </PopoverTrigger>
@@ -288,7 +289,9 @@ export function ComposizioneTile({ assetClassHistory, liquidityHistory, hasPensi
             )}{' '}
           </>
         )}
-        <Link href="/dashboard/allocation" className="text-foreground underline-offset-2 hover:underline">
+        {/* The footer action's target (32px on a pointer, 44px on touch) and `inline-flex`: as a bare inline
+            link it wrapped over two 13px fragments on a phone, and the centre of its box was not clickable. */}
+        <Link href="/dashboard/allocation" className={cn(TILE_FOOTER_ACTION_CLASS, 'whitespace-nowrap')}>
           Vai all&apos;Allocazione
         </Link>
       </p>

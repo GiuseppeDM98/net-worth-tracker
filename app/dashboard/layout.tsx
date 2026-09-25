@@ -20,6 +20,14 @@ export default function DashboardLayout({
   return (
     <MotionConfig reducedMotion="user">
       <ProtectedRoute>
+        {/* The first Tab stop of every dashboard page: the sidebar is fourteen stops (measured on Storico,
+            2026-09-20) between a keyboard reader and the page. The landing has the same link. */}
+        <a
+          href="#page-main"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-background focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:ring-2 focus:ring-ring"
+        >
+          Vai al contenuto principale
+        </a>
         <SidebarProvider className="h-screen overflow-hidden">
           <AppSidebar />
 
@@ -59,8 +67,11 @@ export default function DashboardLayout({
                 Page scene); the shell around it stays still. template.tsx carries the fallback
                 fade for browsers without view transitions. */}
             <main
+              id="page-main"
+              // Focusable by script only: the skip link lands here, and the next Tab enters the page.
+              tabIndex={-1}
               aria-label="Contenuto della pagina"
-              className="flex-1 overflow-y-auto bg-background p-4 desktop:p-5 max-desktop:portrait:[padding-bottom:calc(env(safe-area-inset-bottom,0px)+88px)] max-desktop:landscape:pb-6"
+              className="flex-1 overflow-y-auto bg-background p-4 focus:outline-none desktop:p-5 max-desktop:portrait:[padding-bottom:calc(env(safe-area-inset-bottom,0px)+88px)] max-desktop:landscape:pb-6"
               style={{ viewTransitionName: 'page-main' }}
             >
               {children}

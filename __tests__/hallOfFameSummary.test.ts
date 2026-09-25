@@ -16,6 +16,9 @@ vi.mock('@/lib/firebase/config', () => ({ auth: { currentUser: null }, db: {} })
 import {
   buildRecordTimeline,
   getBoard,
+  isPartialYear,
+  isPeriodRanked,
+  rowAboveCurrent,
   summarizeHallOfFame,
   summarizeNotes,
   TIMELINE_LIMIT,
@@ -206,6 +209,57 @@ describe('summarizeHallOfFame', () => {
     delete data.stats;
     expect(summarizeHallOfFame(data, TODAY).stats).toBeNull();
   });
+
+  it('carries the rankings\' own stamp, and none for a document written before it existed', () => {
+    const stamped = new Date('2026-09-24T10:00:00Z');
+    expect(summarizeHallOfFame(makeData({ rankingsUpdatedAt: stamped }), TODAY).rankingsUpdatedAt).toBe(stamped);
+    expect(summarizeHallOfFame(makeData(), TODAY).rankingsUpdatedAt).toBeNull();
+    expect(summarizeHallOfFame(null, TODAY).rankingsUpdatedAt).toBeNull();
+  });
+
+  /** A first year that starts in December is ranked beside whole years, and must say so. */
+  it('carries how many months a year covers, and tells a partial closed year from a running one', () => {
+    const data = makeData({
+      bestYearsByNetWorthGrowth: [
+        { ...yearRecord(2024, 48_900, 156_700), monthsCovered: 12 },
+        { ...yearRecord(2026, 41_300, 212_900), monthsCovered: 8 },
+        { ...yearRecord(2022, 937, 120_000), monthsCovered: 1 },
+        yearRecord(2025, 37_150, 171_900),
+      ],
+    });
+    const rows = getBoard(summarizeHallOfFame(data, TODAY), 'annual', 'growth')!.rows;
+
+    expect(rows.map((row) => row.monthsCovered)).toEqual([12, 8, 1, null]);
+    expect(rows.map(isPartialYear)).toEqual([false, false, true, false]);
+    // A month never is.
+    expect(getBoard(summarizeHallOfFame(data, TODAY), 'monthly', 'growth')!.rows.every((row) => row.monthsCovered === null)).toBe(true);
+  });
+
+  it('finds the row one place above the running period', () => {
+    const board = getBoard(summarizeHallOfFame(makeData(), TODAY), 'annual', 'growth');
+
+    // 2026 is second: the row above is 2024.
+    expect(rowAboveCurrent(board)?.label).toBe('2024');
+    // The running month is third in the growth ranking: the row above is January 2026.
+    expect(rowAboveCurrent(getBoard(summarizeHallOfFame(makeData(), TODAY), 'monthly', 'growth'))?.key).toBe('2026-01');
+    // Leading, unranked, or no board at all: nothing above.
+    expect(rowAboveCurrent(getBoard(summarizeHallOfFame(makeData(), TODAY), 'monthly', 'decline'))).toBeNull();
+    expect(rowAboveCurrent(getBoard(summarizeHallOfFame(makeData(), { year: 2024, month: 1 }), 'annual', 'growth'))).toBeNull();
+    expect(rowAboveCurrent(null)).toBeNull();
+  });
+
+  it('knows whether a ranking holds a period, so a note can be told it will hang on nothing', () => {
+    const summary = summarizeHallOfFame(makeData(), TODAY);
+
+    expect(isPeriodRanked(summary, 'bestMonthsByNetWorthGrowth', 2025, 10)).toBe(true);
+    expect(isPeriodRanked(summary, 'bestMonthsByNetWorthGrowth', 2025, 11)).toBe(false);
+    expect(isPeriodRanked(summary, 'bestYearsByNetWorthGrowth', 2024)).toBe(true);
+    // A month against a yearly ranking never matches, and a ranking the document lacks holds nothing.
+    expect(isPeriodRanked(summary, 'bestYearsByNetWorthGrowth', 2024, 3)).toBe(false);
+    const data = makeData();
+    delete data.bestMonthsBySavings;
+    expect(isPeriodRanked(summarizeHallOfFame(data, TODAY), 'bestMonthsBySavings', 2026, 3)).toBe(false);
+  });
 });
 
 describe('buildRecordTimeline', () => {
@@ -217,6 +271,13 @@ describe('buildRecordTimeline', () => {
     expect(timeline.map((point) => point.key)).toEqual(['2024-03', '2025-10', '2026-01', '2026-08']);
     expect(timeline.map((point) => point.label)).toEqual(['mar', 'ott', 'gen', 'ago']);
     expect(timeline.at(-1)?.isCurrent).toBe(true);
+  });
+
+  /** Twelve months from four years printed as months alone could not say WHEN (2026-09-24). */
+  it('prints the year once, under the first bar of each year', () => {
+    const board = getBoard(summarizeHallOfFame(makeData(), TODAY), 'monthly', 'growth')!;
+
+    expect(buildRecordTimeline(board.rows).map((point) => point.yearLabel)).toEqual(['2024', '2025', '2026', null]);
   });
 
   it('keeps the highest records when there are more than the limit', () => {
@@ -274,8 +335,8 @@ describe('summarizeNotes', () => {
     const summary = summarizeNotes(NOTES);
 
     expect(summary.rows[2].sectionLabels).toEqual([
-      'Peggior Mese: Calo Patrimonio',
-      'Peggior Mese: Spese',
+      'Calo del patrimonio · mese',
+      'Spese · mese',
     ]);
   });
 

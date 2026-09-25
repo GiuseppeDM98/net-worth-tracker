@@ -42,6 +42,7 @@ interface TxInput {
   priceEur?: number; // defaults to pricePerUnit (EUR-denominated asset)
   fees?: number;
   linkedCashAssetId?: string;
+  withheldTaxEur?: number;
   isBaseline?: boolean;
   id?: string;
   createdAt?: Date;
@@ -63,6 +64,7 @@ function tx(o: TxInput): AssetTransaction {
     priceEur: o.priceEur ?? o.pricePerUnit,
     fees: o.fees,
     linkedCashAssetId: o.linkedCashAssetId,
+    withheldTaxEur: o.withheldTaxEur,
     isBaseline: o.isBaseline,
     createdAt,
     updatedAt: createdAt,
@@ -336,6 +338,35 @@ describe('replayTransactions — position replay and PMC', () => {
 // Cash delta (case 14)
 // ===========================================================================
 
+describe('taxableGainEur — the gain the broker taxes', () => {
+  it('should be the price difference with no commission on either side', () => {
+    // The owner's Directa order of 01/09/2026: 48 units at 123,48 € with 5 € of fees are carried
+    // at 123,48 €, not at 5.932,04 / 48 = 123,58 €.
+    const buy = tx({ type: 'buy', date: day(0), quantity: 48, pricePerUnit: 123.48, fees: 5 });
+    const sell = tx({ type: 'sell', date: day(1), quantity: 48, pricePerUnit: 130, fees: 5 });
+    const { effects } = replayTransactionsWithEffects([buy, sell]);
+    const effect = effects.find((e) => e.transactionId === sell.id)!;
+
+    expect(effect.realizedPnlEur).toBeCloseTo(302.96, 9); // 6240 − 5 − 5932,04
+    expect(effect.taxableGainEur).toBeCloseTo(312.96, 9); // 48 × (130 − 123,48)
+  });
+
+  it('should follow the average price across buys, partial sells and an adjustment', () => {
+    const txs = [
+      tx({ type: 'buy', date: day(0), quantity: 10, pricePerUnit: 100, fees: 5 }),
+      tx({ type: 'buy', date: day(1), quantity: 10, pricePerUnit: 120, fees: 5 }), // average 110
+      tx({ type: 'sell', date: day(2), quantity: 5, pricePerUnit: 130, fees: 2, id: 'first-sell' }), // 5 × 20
+      tx({ type: 'adjustment', date: day(3), quantity: 15, pricePerUnit: 90 }), // carried at 90 from here
+      tx({ type: 'sell', date: day(4), quantity: 15, pricePerUnit: 100, id: 'second-sell' }), // 15 × 10
+    ];
+    const { effects } = replayTransactionsWithEffects(txs);
+
+    expect(effects.find((e) => e.transactionId === 'first-sell')!.taxableGainEur).toBeCloseTo(100, 9);
+    expect(effects.find((e) => e.transactionId === 'second-sell')!.taxableGainEur).toBeCloseTo(150, 9);
+    expect(effects[0].taxableGainEur).toBeUndefined(); // a sell's fact only
+  });
+});
+
 describe('computeCashDelta — signed settlement delta', () => {
   // Case 14
   it('debits on buy, credits on sell (net of fees), and returns 0 without a linked cash asset', () => {
@@ -348,6 +379,26 @@ describe('computeCashDelta — signed settlement delta', () => {
     expect(computeCashDelta(sell)).toBeCloseTo(1197, 6); // 10·120 − 3
     expect(computeCashDelta(adjustment)).toBe(0); // absolute reset never settles cash
     expect(computeCashDelta(buyNoLink)).toBe(0);
+  });
+
+  it('should credit a sell net of the tax the broker withheld, and leave a buy alone', () => {
+    // The owner's September: 53 units at 168,25 € less 5 € of fees and the tax on the statement.
+    const sell = tx({ type: 'sell', date: day(1), quantity: 53, pricePerUnit: 168.25, fees: 5, linkedCashAssetId: 'c1', withheldTaxEur: 937.4 });
+    const buy = tx({ type: 'buy', date: day(0), quantity: 10, pricePerUnit: 100, linkedCashAssetId: 'c1', withheldTaxEur: 50 });
+
+    expect(computeCashDelta(sell)).toBe(7974.85); // 8917,25 − 5 − 937,40
+    expect(computeCashDelta(buy)).toBe(-1000); // a tax is a fact of a sale only
+  });
+
+  it('should move the account by cents, never by the float of quantity × price', () => {
+    // 3,1415 × 87,123 = 273,6969…: the bank credits 273,70.
+    const sell = tx({ type: 'sell', date: day(1), quantity: 3.1415, pricePerUnit: 87.123, linkedCashAssetId: 'c1' });
+    const buy = tx({ type: 'buy', date: day(0), quantity: 3.1415, pricePerUnit: 87.123, linkedCashAssetId: 'c1' });
+
+    expect(computeCashDelta(sell)).toBe(273.7);
+    expect(computeCashDelta(buy)).toBe(-273.7);
+    // An edit nets reversal + application: the same trade must cancel to the cent.
+    expect(computeCashDelta(sell) - computeCashDelta(sell)).toBe(0);
   });
 });
 
@@ -496,7 +547,7 @@ describe('computeAssetTotalReturn — per-asset total return', () => {
 
 describe('computeInvestedCapital — net capital in a window', () => {
   // Case 23
-  it('counts inclusive window edges and the baseline, and nets sells out', () => {
+  it('counts inclusive window edges, nets sells out, and never reads an opening position as a purchase', () => {
     const transactions = [
       tx({ type: 'buy', date: day(0), quantity: 10, pricePerUnit: 20, isBaseline: true }),
       tx({ type: 'buy', date: day(10), quantity: 5, pricePerUnit: 30, fees: 4 }),
@@ -511,11 +562,12 @@ describe('computeInvestedCapital — net capital in a window', () => {
     expect(windowed.divestedEur).toBeCloseTo(118, 6); // 3·40 − 2
     expect(windowed.netInvestedEur).toBeCloseTo(36, 6);
 
-    // Full window: the baseline counts as a buy.
+    // Full window: the baseline is INSIDE it and still moves no money (2026-09-20 — a migration run
+    // inside a year-to-date made Rendimenti print the opening positions as «Hai investito»).
     const full = computeInvestedCapital(transactions, day(0), day(50));
-    expect(full.investedEur).toBeCloseTo(454, 6); // 200 baseline + 154 + 100
+    expect(full.investedEur).toBeCloseTo(254, 6); // 154 + 100, the 200 of the baseline left out
     expect(full.divestedEur).toBeCloseTo(118, 6);
-    expect(full.netInvestedEur).toBeCloseTo(336, 6);
+    expect(full.netInvestedEur).toBeCloseTo(136, 6);
   });
 });
 

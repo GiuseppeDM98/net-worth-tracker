@@ -25,6 +25,7 @@ import {
   describeAllocationTotal,
   describeAssistantPreferences,
   describeAutoCalc,
+  describeBrokerConnections,
   describeBtpItalia,
   describeCashflowSettings,
   describeClassTargets,
@@ -39,9 +40,11 @@ import {
   describeImport,
   describePerformanceBase,
   describePlanParameters,
-  describeProfile,
   describeSharing,
+  describeTargetProblem,
   describeThemeMode,
+  describeTransferFeeCategory,
+  describeUnsavedChanges,
   summarizeExpenseCategories,
 } from '@/lib/utils/settingsNarrative';
 
@@ -49,28 +52,18 @@ const plain = (n: Narrative | null) => (n ? narrativeToText(n).replace(/ /g, ' 
 
 // ─── Preferenze ───────────────────────────────────────────────────────────────
 
-describe('describeProfile', () => {
-  it('names age and rate and their downstream effect', () => {
-    expect(plain(describeProfile({ userAge: 34, riskFreeRate: 3.5 }))).toBe(
-      "Hai 34 anni e un risk-free al 3,5%: guidano l'auto-calcolo dei target e le metriche di rischio di Rendimenti."
-    );
+describe('describeUnsavedChanges', () => {
+  it('says nothing when every tab is saved', () => {
+    expect(describeUnsavedChanges([])).toBeNull();
   });
 
-  it('drops the rate clause and says what stalls without it', () => {
-    expect(plain(describeProfile({ userAge: 34 }))).toBe(
-      "Hai 34 anni; senza il risk-free rate l'auto-calcolo dei target non parte."
-    );
+  it('names the one tab with pending edits', () => {
+    expect(describeUnsavedChanges(['Allocazione'])).toBe('Modifiche non salvate in Allocazione');
   });
 
-  it('drops the age clause and says what stalls without it', () => {
-    expect(plain(describeProfile({ riskFreeRate: 3.5 }))).toBe(
-      "Risk-free al 3,5%; senza l'età l'auto-calcolo dei target non parte."
-    );
-  });
-
-  it('states the empty state without placeholders', () => {
-    expect(plain(describeProfile({}))).toBe(
-      "Età e risk-free rate non sono impostati: servono all'auto-calcolo dei target e alle metriche di rischio di Rendimenti."
+  it('joins several tabs the Italian way, in the order it is handed', () => {
+    expect(describeUnsavedChanges(['Allocazione', 'Preferenze', 'Dividendi'])).toBe(
+      'Modifiche non salvate in Allocazione, Preferenze e Dividendi'
     );
   });
 });
@@ -157,7 +150,7 @@ describe('describeCosts', () => {
         describeCosts({ stampDutyEnabled: true, stampDutyRate: 0.2, checkingAccountSubCategory: 'Conto Corrente' })
       )
     ).toBe(
-      'Bollo allo 0,2% attivo: entra nel costo annuo del portafoglio; per i conti in Conto Corrente vale solo oltre 5000 €.'
+      "Bollo allo 0,2% attivo: entra nel costo annuo del portafoglio; per i conti in Conto Corrente è fisso, 34,20 € l'anno solo oltre 5000 €."
     );
   });
 
@@ -165,7 +158,7 @@ describe('describeCosts', () => {
     expect(
       plain(describeCosts({ stampDutyEnabled: true, stampDutyRate: 0.2, checkingAccountSubCategory: '__none__' }))
     ).toBe(
-      'Bollo allo 0,2% attivo: entra nel costo annuo del portafoglio; senza la sottocategoria dei conti correnti, la soglia dei 5000 € non si applica.'
+      'Bollo allo 0,2% attivo: entra nel costo annuo del portafoglio; senza la sottocategoria dei conti correnti, la soglia dei 5000 € e il bollo fisso non si applicano.'
     );
   });
 
@@ -342,6 +335,22 @@ describe('describeCashflowSettings', () => {
       )
     ).toBe(
       'Nessuna categoria conta come reddito da lavoro; lo storico parte dal 2025; Centri di Costo spenti; Divisione spenta.'
+    );
+  });
+
+  it('does not read a failed category fetch as «no labor category»', () => {
+    expect(
+      plain(
+        describeCashflowSettings({
+          laborCategoryNames: [],
+          historyStartYear: 2025,
+          costCentersEnabled: false,
+          categoriesUnread: true,
+          ...SPLIT_OFF,
+        })
+      )
+    ).toBe(
+      'Le categorie non sono state lette: il reddito da lavoro scelto non si può mostrare; lo storico parte dal 2025; Centri di Costo spenti; Divisione spenta.'
     );
   });
 
@@ -579,23 +588,77 @@ describe('describeAutoCalc', () => {
     ).toBe('Spento: i target sono manuali; con la formula su 34 anni e 3,5% le Azioni andrebbero al 46%.');
   });
 
-  it('reads the off state without inputs', () => {
+  it('names both missing inputs, which live in the same tile', () => {
     expect(plain(describeAutoCalc({ enabled: false }))).toBe(
-      'Spento: i target sono manuali; per usare la formula servono età e risk-free rate nel Profilo.'
+      "Spento: i target sono manuali; per usare la formula manca l'età e il risk-free rate, qui sotto."
+    );
+  });
+
+  it('names only the missing input', () => {
+    expect(plain(describeAutoCalc({ enabled: false, userAge: 34 }))).toBe(
+      'Spento: i target sono manuali; per usare la formula manca il risk-free rate, qui sotto.'
+    );
+    expect(plain(describeAutoCalc({ enabled: false, riskFreeRate: 3.5 }))).toBe(
+      "Spento: i target sono manuali; per usare la formula manca l'età, qui sotto."
+    );
+  });
+
+  it('does not call a switched-on formula «spento» when an input was cleared', () => {
+    expect(plain(describeAutoCalc({ enabled: true, userAge: 34 }))).toBe(
+      "Attivo, ma manca il risk-free rate, qui sotto: finché non c'è, i target restano quelli scritti a mano."
     );
   });
 });
 
 describe('describeClassTargets', () => {
   it('counts the classes and reads leverage as legitimate', () => {
-    expect(plain(describeClassTargets({ classCount: 8, withSubcategories: 1, isValid: true }))).toBe(
-      '8 classi, 1 con sotto-categorie; un totale sopra il 100% è la leva target.'
+    expect(plain(describeClassTargets({ classCount: 8, withSubcategories: 1, problem: null }))).toBe(
+      '8 classi, 1 con sottocategorie; un totale sopra il 100% è la leva target.'
     );
   });
 
-  it('reads the invalid total as blocking', () => {
-    expect(plain(describeClassTargets({ classCount: 8, withSubcategories: 0, isValid: false }))).toBe(
-      '8 classi, nessuna con sotto-categorie; il totale è sotto il 100% e il salvataggio è bloccato.'
+  it('replaces the inventory with the one problem blocking the save', () => {
+    expect(
+      plain(
+        describeClassTargets({
+          classCount: 8,
+          withSubcategories: 1,
+          problem: { kind: 'sub-total', assetClass: 'equity', total: 95 },
+        })
+      )
+    ).toBe('Le sottocategorie di Azioni sommano 95% invece del 100%. «Salva» ti porta lì e non scrive nulla finché non è corretto.');
+  });
+});
+
+describe('describeTargetProblem', () => {
+  it('reads a total below 100 with the missing points', () => {
+    expect(plain(describeTargetProblem({ kind: 'total-below-100', total: 90 }))).toBe(
+      'Le classi sommano 90%: mancano 10 punti al 100%.'
+    );
+  });
+
+  it('names the class of a duplicated subcategory', () => {
+    expect(
+      plain(describeTargetProblem({ kind: 'sub-name-duplicate', assetClass: 'bonds', subIndex: 1, name: 'Governativi' }))
+    ).toBe('Due sottocategorie di Obbligazioni si chiamano «Governativi»: i nomi devono essere diversi.');
+  });
+
+  it('speaks Italian for every specific-asset rule the service used to print in English', () => {
+    const where = { assetClass: 'equity' as const, subIndex: 0, subName: 'ETF' };
+    expect(plain(describeTargetProblem({ kind: 'specific-empty', ...where }))).toBe(
+      '«ETF» (Azioni) traccia asset specifici ma non ne ha nessuno: aggiungine uno o spegni il tracciamento.'
+    );
+    expect(plain(describeTargetProblem({ kind: 'specific-name-missing', ...where, assetIndex: 1 }))).toBe(
+      'Un asset specifico di «ETF» (Azioni) non ha nome.'
+    );
+    expect(plain(describeTargetProblem({ kind: 'specific-out-of-range', ...where, assetIndex: 0 }))).toBe(
+      "Un asset specifico di «ETF» (Azioni) è fuori dall'intervallo 0–100%."
+    );
+    expect(plain(describeTargetProblem({ kind: 'specific-name-duplicate', ...where, assetIndex: 1, name: 'VWCE' }))).toBe(
+      'Due asset specifici di «ETF» (Azioni) si chiamano «VWCE».'
+    );
+    expect(plain(describeTargetProblem({ kind: 'specific-total', ...where, total: 99.5 }))).toBe(
+      'Gli asset specifici di «ETF» (Azioni) sommano 99,5% invece del 100%.'
     );
   });
 });
@@ -626,7 +689,7 @@ describe('describeDefaultAccounts', () => {
 
   it('states the empty state', () => {
     expect(plain(describeDefaultAccounts({}))).toBe(
-      'Nessun conto predefinito: il dialog delle spese parte senza conto.'
+      'Nessun conto predefinito: il modulo delle spese parte senza conto.'
     );
   });
 });
@@ -688,6 +751,20 @@ describe('describeImport', () => {
   });
 });
 
+// ─── Commissioni sui trasferimenti ────────────────────────────────────────────
+
+describe('describeTransferFeeCategory', () => {
+  it('says where a typed fee lands, subcategory included, and which account pays it', () => {
+    expect(plain(describeTransferFeeCategory({ categoryName: 'Commissioni', subCategoryName: 'Bonifici' }))).toBe(
+      'La commissione scritta su un trasferimento diventa una spesa in Commissioni › Bonifici, addebitata sul conto di origine.'
+    );
+  });
+
+  it('says what stalls without a category: the form field stays off', () => {
+    expect(plain(describeTransferFeeCategory({}))).toBe('Senza una categoria, il campo «Commissione» dei trasferimenti resta spento.');
+  });
+});
+
 // ─── Dividendi ────────────────────────────────────────────────────────────────
 
 describe('describeDividendCategory', () => {
@@ -700,6 +777,12 @@ describe('describeDividendCategory', () => {
   it('works without a subcategory', () => {
     expect(plain(describeDividendCategory({ categoryName: 'Dividendi' }))).toBe(
       "Ogni incasso registrato diventa un'entrata in Dividendi, senza doppioni."
+    );
+  });
+
+  it('names the default account and says an instrument can override it', () => {
+    expect(plain(describeDividendCategory({ categoryName: 'Dividendi', accountName: 'Directa' }))).toBe(
+      "Ogni incasso registrato diventa un'entrata in Dividendi, senza doppioni; dal giorno del pagamento accredita Directa, salvo un conto scelto sullo strumento."
     );
   });
 
@@ -735,7 +818,37 @@ describe('describeSharing', () => {
 
   it('states the empty state', () => {
     expect(plain(describeSharing({ memberNames: [] }))).toBe(
-      'Nessun accesso condiviso: questi dati li vedi solo tu.'
+      'Nessun accesso condiviso: il tuo account lo vedi solo tu.'
+    );
+  });
+});
+
+describe('describeBrokerConnections', () => {
+  it('states the never-connected state', () => {
+    expect(plain(describeBrokerConnections({}))).toBe(
+      'Nessun broker collegato: la sincronizzazione legge posizioni e liquidità da Scalable, in sola lettura.'
+    );
+  });
+
+  it('names the last sync, the positions and the cash', () => {
+    expect(
+      plain(
+        describeBrokerConnections({
+          lastSyncAt: '2026-09-18T10:00:00.000Z',
+          holdingsCount: 3,
+          cashBalance: 1000,
+        })
+      )
+    ).toBe(
+      'Ultima lettura 18/09/2026: 3 posizioni e liquidità 1000 € — i prezzi si aggiornano, le quantità restano del Registro.'
+    );
+  });
+
+  it('uses the singular for one position and drops the cash clause when absent', () => {
+    expect(
+      plain(describeBrokerConnections({ lastSyncAt: '2026-09-18T10:00:00.000Z', holdingsCount: 1 }))
+    ).toBe(
+      'Ultima lettura 18/09/2026: 1 posizione — i prezzi si aggiornano, le quantità restano del Registro.'
     );
   });
 });

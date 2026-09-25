@@ -3,7 +3,13 @@
 > **When to open this guide** — you are editing `components/cashflow/BudgetTab.tsx`, `components/cashflow/budget/*`,
 > `lib/utils/{budgetUtils,budgetSummary,budgetNarrative}.ts`, or `lib/hooks/useBudgetConfig.ts` (the ceiling, the
 > per-category budgets, the projection, the historicised ceiling). In `AGENTS.md` only the short stub remains; the
-> full rule is here. Modules and files: `CLAUDE.md` → *Key Files* → the **Cashflow › Budget** entry.
+> full rule is here. Modules and files: § *Files* below.
+
+## Files
+
+Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
+
+- **Cashflow › Budget**: Budget `components/cashflow/BudgetTab.tsx` + `components/cashflow/budget/*` (`BudgetTrack`, `BudgetDeleteButton`, `BudgetItemDialog`), pure `lib/utils/{budgetSummary,budgetNarrative,budgetUtils,budgetHistory}.ts`, specs `e2e/cashflow.budget{,.mobile}.spec.ts`, `lib/hooks/{useBudgetConfig,useBudgetHistory}.ts`, `lib/server/budgetHistoryService.ts` (cron phase 8), collections `budgets/{userId}`, `budgetHistory/{userId}/months/{YYYY-MM}`
 
 ## Cashflow › Budget (`components/cashflow/BudgetTab.tsx`, `components/cashflow/budget/*`, `lib/utils/{budgetUtils,budgetSummary,budgetNarrative}.ts`, `lib/hooks/useBudgetConfig.ts`)
 - **Opt-in**: `reconcileBudgetItems` only refreshes denormalized names and drops orphans, never auto-creates.

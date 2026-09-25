@@ -1,19 +1,25 @@
 /**
- * The eight chart slots of the default theme must be tellable apart in BOTH modes — a rule
- * DESIGN.md stated in prose since 2026-08-30 (when the static teal at index 6 measured ΔE00 0.87
- * from `--chart-2`) and nothing enforced: the light palette shipped with Liquidità 10.1 ΔE00
+ * The nine chart slots of EVERY theme must be tellable apart in both modes — a rule DESIGN.md
+ * stated in prose since 2026-08-30 (when the static teal at index 6 measured ΔE00 0.87 from
+ * `--chart-2`) and nothing enforced: the default light palette shipped with Liquidità 10.1 ΔE00
  * from Immobili until the Panoramica critique of 2026-09-13 measured it on the real account.
  *
- * The suite reads `app/globals.css` itself (the `:root` and `.dark` blocks), so a token edited
- * in the stylesheet is what gets measured — never a transcription that can drift. Two floors:
+ * Until 2026-09-20 the suite held the default theme only, and the named themes were a declared
+ * blind spot. The owner's tour on solar-dusk showed what that costs: Obbligazioni and Immobili
+ * were the SAME grey (ΔE00 0.0), Azioni and Criptovalute two browns at 9.5; elegant-luxury had
+ * six pairs under the floor (three reds), retro-arcade and midnight-bloom Immobili ~ Liquidità at
+ * 10. Four palettes were re-pitched that day, and the twelve blocks are measured here.
  *
- *   - ΔE00 ≥ 14 between any two slots of one mode (the dark set, designed by hand, sits at 18.8;
- *     the re-pitched light set at 16.0). A composition bar is 8px of colour and nothing else.
+ * The suite reads `app/globals.css` itself, so a token edited in the stylesheet is what gets
+ * measured — never a transcription that can drift. Three floors per theme:
+ *
+ *   - ΔE00 ≥ 14 between any two slots of one mode. A composition bar is 8px of colour and nothing else.
  *   - the luminance guard of `useChartColors` must not trip: L ≤ 0.82 in light and L ≥ 0.30 in
- *     dark, or the slot silently falls back to the static palette (doc/guide/temi.md).
- *
- * Scope: the default theme only. The five named themes are not measured here — retro-arcade
- * declares two identical slots and elegant-luxury three reds (CLAUDE.md → Known Issues).
+ *     dark, or the slot silently falls back to the static palette (doc/guide/temi.md) — cyberpunk's
+ *     light slots 3-5 sat at L 0.84–0.92 until the same day.
+ *   - a slot keeps its hue across the two modes (≤ 30°), so a class does not change identity when
+ *     the mode flips. A NEUTRAL slot (chroma < 0.03: solar-dusk's Immobili is a warm grey on
+ *     purpose) has no hue to hold and is exempt.
  */
 
 import { readFileSync } from 'node:fs';
@@ -103,20 +109,21 @@ const labOf = (oklch: Oklch) => linearSrgbToLab(oklchToLinearSrgb(oklch));
 
 const GLOBALS = readFileSync(resolve(__dirname, '../app/globals.css'), 'utf8');
 
-/** The `--chart-1..8` declarations of one selector block (`:root` or `.dark`), as OKLCH triples. */
+/** The `--chart-1..9` declarations of one selector block (`:root` or `.dark`), as OKLCH triples. */
 function chartSlotsOf(selector: string): Oklch[] {
   const start = GLOBALS.indexOf(`\n${selector} {`);
   expect(start, `block "${selector}" in app/globals.css`).toBeGreaterThan(-1);
   const end = GLOBALS.indexOf('\n}', start);
   const block = GLOBALS.slice(start, end);
-  return Array.from({ length: 8 }, (_, i) => {
+  return Array.from({ length: SLOT_NAMES.length }, (_, i) => {
     const match = block.match(new RegExp(`--chart-${i + 1}:\\s*oklch\\(([\\d.]+)\\s+([\\d.]+)\\s+([\\d.]+)\\)`));
     expect(match, `--chart-${i + 1} in "${selector}"`).not.toBeNull();
     return [Number(match![1]), Number(match![2]), Number(match![3])] as const;
   });
 }
 
-const SLOT_NAMES = ['Azioni', 'Obbligazioni', 'Criptovalute', 'Immobili', 'Liquidità', 'Materie Prime', 'Trend Following', 'Carry'];
+// Slot 9 is Storico's «Previdenza» band: theme-aware since 2026-09-20, measured like the class slots.
+const SLOT_NAMES = ['Azioni', 'Obbligazioni', 'Criptovalute', 'Immobili', 'Liquidità', 'Materie Prime', 'Trend Following', 'Carry', 'Previdenza'];
 const MIN_DELTA_E = 14;
 
 function closestPair(slots: Oklch[]): { a: string; b: string; deltaE: number } {
@@ -130,17 +137,26 @@ function closestPair(slots: Oklch[]): { a: string; b: string; deltaE: number } {
   return closest;
 }
 
-describe.each([
-  ['light', ':root', { maxL: 0.82, minL: 0 }],
-  ['dark', '.dark', { maxL: 1, minL: 0.3 }],
-])('the default theme\'s chart slots in %s mode', (_mode, selector, guard) => {
+/** `null` = the default theme (`:root` / `.dark`); the named ones are `[data-theme]` blocks. */
+const THEMES = [null, 'retro-arcade', 'cyberpunk', 'solar-dusk', 'elegant-luxury', 'midnight-bloom'] as const;
+type ThemeName = (typeof THEMES)[number];
+
+const lightSelector = (theme: ThemeName) => (theme ? `[data-theme="${theme}"]` : ':root');
+const darkSelector = (theme: ThemeName) => (theme ? `.dark[data-theme="${theme}"]` : '.dark');
+
+/** Below this chroma a slot is a neutral: it has no hue to keep across the modes. */
+const NEUTRAL_CHROMA = 0.03;
+
+const BLOCKS = THEMES.flatMap((theme) => [
+  { label: `${theme ?? 'default'} · light`, selector: lightSelector(theme), guard: { maxL: 0.82, minL: 0 } },
+  { label: `${theme ?? 'default'} · dark`, selector: darkSelector(theme), guard: { maxL: 1, minL: 0.3 } },
+]);
+
+describe.each(BLOCKS)('the chart slots of $label', ({ selector, guard }) => {
   const slots = chartSlotsOf(selector);
 
   it(`keeps every pair of slots at least ΔE00 ${MIN_DELTA_E} apart`, () => {
     const { a, b, deltaE } = closestPair(slots);
-    expect({ closest: `${a} ↔ ${b}`, deltaE: Number(deltaE.toFixed(1)) }).toMatchObject({
-      deltaE: expect.any(Number),
-    });
     expect(deltaE, `${a} ↔ ${b} measure ΔE00 ${deltaE.toFixed(1)} — the same colour to a reader`).toBeGreaterThanOrEqual(MIN_DELTA_E);
   });
 
@@ -152,14 +168,15 @@ describe.each([
   });
 });
 
-describe('the two modes agree on what a slot looks like', () => {
+describe.each(THEMES.map((theme) => ({ theme, label: theme ?? 'default' })))('the two modes of $label agree on what a slot looks like', ({ theme }) => {
   it('holds each slot inside the same hue band in light and dark (≤ 30° apart)', () => {
     // The identity of a slot is its hue: a class that is blue in dark and orange in light is
-    // two identities, which is what the light palette was until 2026-09-13.
-    const light = chartSlotsOf(':root');
-    const dark = chartSlotsOf('.dark');
-    light.forEach(([, , hueLight], i) => {
-      const hueDark = dark[i][2];
+    // two identities, which is what the default light palette was until 2026-09-13.
+    const light = chartSlotsOf(lightSelector(theme));
+    const dark = chartSlotsOf(darkSelector(theme));
+    light.forEach(([, chromaLight, hueLight], i) => {
+      const [, chromaDark, hueDark] = dark[i];
+      if (chromaLight < NEUTRAL_CHROMA && chromaDark < NEUTRAL_CHROMA) return;
       const distance = Math.min(Math.abs(hueLight - hueDark), 360 - Math.abs(hueLight - hueDark));
       expect(distance, `${SLOT_NAMES[i]}: light ${hueLight}°, dark ${hueDark}°`).toBeLessThanOrEqual(30);
     });

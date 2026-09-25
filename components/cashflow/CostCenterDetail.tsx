@@ -14,9 +14,20 @@
  *                     Costo → Per categoria → Ciclo di vita → Per sottocategoria → Movimenti
  *
  * NO period axis: every figure is the center's whole cost, and the ones on another window
- * name it (the ceiling's own month or year with today's mark, «Fine mese», «Fine anno»,
+ * name it (the ceiling's own month or year with today's mark, «Questo mese», «Quest'anno»,
  * «Ultimi 12 mesi»). Every number is born in costCenterSummary.ts, every sentence in
  * costCenterNarrative.ts; this component fetches, memoizes and renders.
+ *
+ * Opening is a navigation (CostCentersTab keeps the center in the URL), so the view lands
+ * like a page: `main` scrolled to the top and the focus on the back link. On a phone the row
+ * that opens it sits below the fold, and the detail used to mount 530px down its own length
+ * with the title, the verdict and the actions out of sight (measured 2026-09-18).
+ *
+ * A center is filled AND corrected from here (2026-09-18): «Collega spese…» links many
+ * expenses in one confirm (cost-centers/LinkExpensesDialog), a row of Movimenti opens its
+ * expense in the form Tracciamento uses, and «Scollega» takes it out of the center in place
+ * — a row of a series through «solo questa o tutta?». Every write is a two-sided plan
+ * (lib/utils/costCenterLinking.ts), so the outcome toast carries a real «Annulla».
  *
  * The subcategory exclusions are session-only and stored WITH the center they were made
  * for (a stale key falls back to none, no effect, no extra render), like the movements'
@@ -24,14 +35,17 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Archive, ArchiveRestore, Pencil, Trash2 } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft, Archive, ArchiveRestore, Link2, Pencil, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { queryKeys } from '@/lib/query/queryKeys';
 import type { CostCenter } from '@/types/costCenters';
 import type { Expense } from '@/types/expenses';
-import { getExpensesForCostCenter } from '@/lib/services/costCenterService';
+import { assignExpensesToCostCenter, getExpensesForCostCenter } from '@/lib/services/costCenterService';
+import { buildUnlinkPlan, seriesKeyOf, seriesRowsOf, type LinkPlan } from '@/lib/utils/costCenterLinking';
+import { describeWriteError } from '@/lib/utils/dialogNarrative';
 import { buildCategoryComposition, buildSubCategoryComposition } from '@/lib/utils/costCenterUtils';
 import { buildCenterMonthStack, summarizeCenter } from '@/lib/utils/costCenterSummary';
 import {
@@ -47,17 +61,21 @@ import {
   describeCosto,
   describeCostoAside,
   describeCostoFooter,
-  describeMonthEndKpi,
+  describeMonthKpi,
   describeMovimenti,
   describeMovimentiAside,
+  describeLinkOutcome,
+  describeLinkUndone,
+  describeUnlinkOutcome,
   describeSottocategorie,
   describeSottocategorieAside,
-  describeYearEndKpi,
+  describeYearKpi,
 } from '@/lib/utils/costCenterNarrative';
 import { resolveCostCenterColor } from '@/lib/utils/costCenterColors';
 import { isItalyDayAfter, toDate } from '@/lib/utils/dateHelpers';
 import { useChartColors } from '@/lib/hooks/useChartColors';
 import { cn } from '@/lib/utils';
+import { useArmedDelete } from '@/lib/hooks/useArmedDelete';
 import { Button } from '@/components/ui/button';
 import { PageVerdict } from '@/components/ui/page-verdict';
 import { TILE_CELL_CLASS } from '@/components/ui/tile';
@@ -70,6 +88,9 @@ import { CategorieTile } from './cost-centers/tiles/CategorieTile';
 import { CicloTile } from './cost-centers/tiles/CicloTile';
 import { SottocategorieTile } from './cost-centers/tiles/SottocategorieTile';
 import { MovimentiTile, MOVEMENTS_PAGE_SIZE } from './cost-centers/tiles/MovimentiTile';
+import { LinkExpensesDialog } from './cost-centers/LinkExpensesDialog';
+import { UnlinkSeriesDialog, type UnlinkSeriesRequest } from './cost-centers/UnlinkSeriesDialog';
+import { ExpenseDialog } from '@/components/expenses/ExpenseDialog';
 
 /** Stable identity for the empty case: a `= []` default would defeat every memo below. */
 const EMPTY_EXPENSES: Expense[] = [];
@@ -111,6 +132,7 @@ export function CostCenterDetail({
   const { user } = useAuth();
   const { ownerId } = useActiveAccount();
   const chartColors = useChartColors();
+  const queryClient = useQueryClient();
 
   // Shares the ['cost-centers', userId] prefix invalidated by ExpenseDialog, so the detail
   // stays in sync with expense mutations elsewhere. placeholderData, NOT initialData: the
@@ -129,50 +151,88 @@ export function CostCenterDetail({
   // Evaluated once per mount — the figures read the day the view was opened.
   const now = useMemo(() => new Date(), []);
 
-  // --- Two-click delete: the arm is announced, and so is the disarm (emptying a live region
-  // announces nothing). Escape or a pointer outside the button releases it; not a timer (a
-  // WCAG 2.2.1 time limit) and not onBlur alone (Safari never focuses a tapped button). ---
-  const [deleteArmed, setDeleteArmed] = useState(false);
-  const [deleteAnnouncement, setDeleteAnnouncement] = useState('');
-  const deleteButtonRef = useRef<HTMLButtonElement | null>(null);
-
+  // --- Landing: the top of the page and the focus on the way back (see the header) ---
+  const backLinkRef = useRef<HTMLButtonElement | null>(null);
   useEffect(() => {
-    if (!deleteArmed) return;
-    const disarm = () => {
-      setDeleteArmed(false);
-      setDeleteAnnouncement('Eliminazione annullata.');
-    };
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') disarm();
-    };
-    const onPointerDown = (e: PointerEvent) => {
-      const target = e.target as Node | null;
-      if (target && deleteButtonRef.current?.contains(target)) return;
-      disarm();
-    };
-    document.addEventListener('keydown', onKeyDown);
-    document.addEventListener('pointerdown', onPointerDown);
-    return () => {
-      document.removeEventListener('keydown', onKeyDown);
-      document.removeEventListener('pointerdown', onPointerDown);
-    };
-  }, [deleteArmed]);
+    document.querySelector('main')?.scrollTo({ top: 0 });
+    backLinkRef.current?.focus({ preventScroll: true });
+  }, [costCenter.id]);
 
-  const handleDeleteClick = () => {
-    if (deleteArmed) {
-      // Disarm BEFORE delegating: on failure the parent only raises a toast and the view stays
-      // mounted, and an armed button would delete on the next single click.
-      setDeleteArmed(false);
-      setDeleteAnnouncement('');
-      onDelete(costCenter);
-      return;
+  // --- Two-click delete, the app's one mechanism (`useArmedDelete`: no timer, Escape / a
+  // pointer elsewhere / blur disarm, disarm BEFORE delegating). Until 2026-09-18 this view
+  // kept its own copy of it. Arm and disarm are both sentences for the live region, because
+  // emptying one announces nothing; «disarmed» is only said once something was armed. ---
+  const deleteButtonRef = useRef<HTMLButtonElement | null>(null);
+  const deletion = useArmedDelete(deleteButtonRef, () => onDelete(costCenter));
+  const [wasArmed, setWasArmed] = useState(false);
+  if (deletion.armed && !wasArmed) setWasArmed(true);
+  const deleteAnnouncement = deletion.armed
+    ? linkedExpenseCount > 0
+      ? `Eliminazione armata. Premi di nuovo per eliminare "${costCenter.name}" e scollegare ${linkedExpenseCount} spese.`
+      : `Eliminazione armata. Premi di nuovo per eliminare "${costCenter.name}".`
+    : wasArmed
+      ? 'Eliminazione annullata.'
+      : '';
+
+  // --- Linking, unlinking, opening an expense ---
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [unlinkSeries, setUnlinkSeries] = useState<UnlinkSeriesRequest | null>(null);
+  const [unlinking, setUnlinking] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const linkButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  // A link changes which rows belong to which center — every center's figures — and the
+  // `costCenterName` Tracciamento prints on the row; no amount moves, so nothing else is stale.
+  const refreshAfterLinkChange = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.costCenters.all(ownerId ?? '') }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all(ownerId ?? '') }),
+    ]);
+
+  /** Writes a plan and offers its undo in the outcome toast: «Annulla» is the plan's other side, not a guess. */
+  const applyPlan = async (plan: LinkPlan, outcome: string) => {
+    try {
+      await assignExpensesToCostCenter(plan.writes);
+    } finally {
+      // Also on failure: past one batch a run can stop half-way, and the lists must show what IS.
+      await refreshAfterLinkChange();
     }
-    setDeleteArmed(true);
-    setDeleteAnnouncement(
-      linkedExpenseCount > 0
-        ? `Eliminazione armata. Premi di nuovo per eliminare "${costCenter.name}" e scollegare ${linkedExpenseCount} spese.`
-        : `Eliminazione armata. Premi di nuovo per eliminare "${costCenter.name}".`,
-    );
+    toast.success(outcome, {
+      action: {
+        label: 'Annulla',
+        onClick: async () => {
+          try {
+            await assignExpensesToCostCenter(plan.undo);
+            toast.success(describeLinkUndone(plan.undo.length));
+          } catch (error) {
+            console.error('Error undoing a cost center link change:', error);
+            toast.error(`L'annullamento non è riuscito. ${describeWriteError(error)}`);
+          } finally {
+            await refreshAfterLinkChange();
+          }
+        },
+      },
+    });
+  };
+
+  const handleLink = (plan: LinkPlan) => applyPlan(plan, describeLinkOutcome(plan.writes.length, costCenter.name));
+
+  const handleUnlink = async (rows: Expense[]) => {
+    setUnlinking(true);
+    try {
+      await applyPlan(buildUnlinkPlan(rows), describeUnlinkOutcome(rows.length, costCenter.name));
+      setUnlinkSeries(null);
+    } catch (error) {
+      console.error('Error unlinking expenses from cost center:', error);
+      toast.error(`${rows.length === 1 ? 'La spesa non è stata scollegata' : 'Le spese non sono state scollegate'}. ${describeWriteError(error)}`);
+    } finally {
+      setUnlinking(false);
+    }
+  };
+
+  const askUnlinkSeries = (expense: Expense) => {
+    const series = seriesKeyOf(expense);
+    if (series) setUnlinkSeries({ expense, kind: series.kind, seriesRows: seriesRowsOf(expense, allExpenses) });
   };
 
   // --- Session-only lenses, stored with the center they belong to ---
@@ -193,6 +253,7 @@ export function CostCenterDetail({
   const stack = useMemo(() => buildCenterMonthStack([{ summary, share: 100, rank: 100 }], now, TRAILING_MONTHS), [summary, now]);
   const booked = useMemo(() => allExpenses.filter((e) => !isItalyDayAfter(toDate(e.date), now)), [allExpenses, now]);
   const composition = useMemo(() => buildCategoryComposition(booked), [booked]);
+  const hasCategorySplit = composition.length > 1;
   const subComposition = useMemo(() => buildSubCategoryComposition(booked), [booked]);
   const netSubTotal = useMemo(
     () => subComposition.filter((s) => !excludedKeys.has(s.key)).reduce((sum, s) => sum + s.total, 0),
@@ -206,7 +267,7 @@ export function CostCenterDetail({
 
   const deleteLabel = isDemo
     ? 'Elimina — non disponibile in modalità demo'
-    : deleteArmed
+    : deletion.armed
       ? linkedExpenseCount > 0
         ? `Conferma eliminazione — ${linkedExpenseCount} spese perderanno il collegamento`
         : 'Conferma eliminazione del centro di costo'
@@ -217,6 +278,7 @@ export function CostCenterDetail({
       {/* ── Back link, verdict and the actions beside it ─────────────────────────── */}
       <div className="flex flex-col gap-1 pt-1">
         <button
+          ref={backLinkRef}
           type="button"
           onClick={onBack}
           className="-ml-1 inline-flex min-h-[44px] w-fit items-center gap-1.5 rounded-md px-1 text-[13px] text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -226,53 +288,72 @@ export function CostCenterDetail({
         </button>
         <div className="flex flex-col gap-4 desktop:flex-row desktop:items-start desktop:justify-between desktop:gap-6">
           <PageVerdict verdict={verdict} ariaLabel={`Verdetto su ${costCenter.name}`} />
-          <div className="flex shrink-0 gap-2 [&>button]:h-11 [&>button]:flex-1 desktop:[&>button]:h-8 desktop:[&>button]:flex-none">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onEdit(costCenter)}
-              disabled={isDemo}
-              aria-label={isDemo ? 'Modifica — non disponibile in modalità demo' : 'Modifica centro di costo'}
-            >
-              <Pencil className="h-3.5 w-3.5" />
-              Modifica
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onArchiveToggle(costCenter)}
-              disabled={isDemo}
-              aria-label={isDemo ? 'Archivia — non disponibile in modalità demo' : isArchived ? 'Ripristina il centro di costo' : 'Archivia il centro di costo'}
-            >
-              {isArchived ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
-              {isArchived ? 'Ripristina' : 'Archivia'}
-            </Button>
-            <Button
-              ref={deleteButtonRef}
-              variant={deleteArmed ? 'destructive' : 'outline'}
-              size="sm"
-              disabled={isDemo}
-              aria-label={deleteLabel}
-              onClick={handleDeleteClick}
-              onBlur={() => {
-                if (!deleteArmed) return;
-                setDeleteArmed(false);
-                setDeleteAnnouncement('Eliminazione annullata.');
-              }}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              {deleteArmed ? 'Conferma' : 'Elimina'}
-            </Button>
+          {/* The actions and, under them, what the armed one does: the consequence sits where
+              the eye already is (it used to open at the far left of the row, 11px muted) and
+              its line is reserved from `desktop:`, so arming no longer pushes the grid down. */}
+          <div className="flex shrink-0 flex-col gap-1.5 desktop:items-end">
+            <div className="flex flex-wrap gap-2 [&>button]:h-11 [&>button]:flex-1 desktop:flex-nowrap desktop:[&>button]:h-8 desktop:[&>button]:flex-none">
+              {/* On a phone it takes a row of its own above the three: four labels do not fit 390px. */}
+              <Button
+                ref={linkButtonRef}
+                variant="outline"
+                size="sm"
+                className="basis-full desktop:basis-auto"
+                onClick={() => setLinkOpen(true)}
+                disabled={isDemo || isArchived}
+                aria-label={isDemo ? 'Collega spese — non disponibile in modalità demo' : isArchived ? 'Collega spese — il centro è archiviato' : 'Collega spese'}
+              >
+                <Link2 className="h-3.5 w-3.5" />
+                Collega spese…
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onEdit(costCenter)}
+                disabled={isDemo}
+                aria-label={isDemo ? 'Modifica — non disponibile in modalità demo' : 'Modifica centro di costo'}
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                Modifica
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onArchiveToggle(costCenter)}
+                disabled={isDemo}
+                aria-label={isDemo ? 'Archivia — non disponibile in modalità demo' : isArchived ? 'Ripristina il centro di costo' : 'Archivia il centro di costo'}
+              >
+                {isArchived ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
+                {isArchived ? 'Ripristina' : 'Archivia'}
+              </Button>
+              <Button
+                ref={deleteButtonRef}
+                variant="outline"
+                size="sm"
+                className={cn(deletion.armed && 'border-destructive text-destructive hover:text-destructive')}
+                disabled={isDemo}
+                aria-pressed={deletion.armed}
+                aria-label={deleteLabel}
+                onClick={deletion.onClick}
+                onBlur={deletion.onBlur}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                {deletion.armed ? 'Conferma' : 'Elimina'}
+              </Button>
+            </div>
+            <p className="text-[12px] leading-4 text-destructive desktop:min-h-4 desktop:text-right">
+              {deletion.armed &&
+                (linkedExpenseCount > 0 ? (
+                  <>
+                    <span className="font-mono tabular-nums">{linkedExpenseCount}</span>{' '}
+                    {linkedExpenseCount === 1 ? 'spesa resta in Cashflow e perde solo il collegamento.' : 'spese restano in Cashflow e perdono solo il collegamento.'}
+                  </>
+                ) : (
+                  'Nessuna spesa è collegata: si elimina solo il centro.'
+                ))}
+            </p>
           </div>
         </div>
-        {/* The arm reveals the consequence — what the click does is the user's real doubt. */}
-        {deleteArmed && linkedExpenseCount > 0 && (
-          <p className="text-[11px] text-muted-foreground">
-            <span className="font-mono tabular-nums">{linkedExpenseCount}</span>{' '}
-            {linkedExpenseCount === 1 ? 'spesa collegata non viene cancellata: perde il collegamento e resta' : 'spese collegate non vengono cancellate: perdono il collegamento e restano'} in
-            Cashflow.
-          </p>
-        )}
         <p className="sr-only" role="status" aria-live="polite">
           {deleteAnnouncement}
         </p>
@@ -297,17 +378,21 @@ export function CostCenterDetail({
               stack={stack}
               stackCaption={describeCenterTrailingCaption(stack, now)}
               aside={describeCostoAside(summary)}
-              reading={describeCosto(summary)}
+              reading={describeCosto(summary, now)}
               footer={describeCostoFooter(summary)}
-              kpis={{ monthEnd: describeMonthEndKpi(summary, now), yearEnd: describeYearEndKpi(summary), average: describeAverageKpi(summary) }}
+              kpis={{ month: describeMonthKpi(summary, now), year: describeYearKpi(summary), average: describeAverageKpi(summary) }}
               palette={chartColors}
               now={now}
             />
           </div>
-          <div className={cn(TILE_CELL_CLASS, 'order-2 desktop:order-none desktop:col-span-4')}>
-            <CategorieTile slices={composition} reading={describeCategorie(composition)} footer={CATEGORIE_FOOTER} color={accentColor} />
-          </div>
-          <div className={cn(TILE_CELL_CLASS, 'order-3 desktop:order-none desktop:col-span-3')}>
+          {/* One category at 100% is the hero said again: the tile is not rendered and Ciclo
+              di vita takes its columns (a tile with nothing to say is not a tile). */}
+          {hasCategorySplit && (
+            <div className={cn(TILE_CELL_CLASS, 'order-2 desktop:order-none desktop:col-span-4')}>
+              <CategorieTile slices={composition} reading={describeCategorie(composition)} footer={CATEGORIE_FOOTER} color={accentColor} />
+            </div>
+          )}
+          <div className={cn(TILE_CELL_CLASS, 'order-3 desktop:order-none', hasCategorySplit ? 'desktop:col-span-3' : 'tablet:col-span-2 desktop:col-span-7')}>
             <CicloTile summary={summary} aside={describeCicloAside(summary)} reading={describeCiclo(summary)} footer={describeCicloFooter(summary)} />
           </div>
           <div className={cn(TILE_CELL_CLASS, 'order-4 tablet:col-span-2 desktop:order-none desktop:col-span-7')}>
@@ -331,10 +416,20 @@ export function CostCenterDetail({
               reading={describeMovimenti(summary)}
               visibleCount={visibleCount}
               onShowMore={() => setListWindow({ id: costCenter.id, count: visibleCount + MOVEMENTS_PAGE_SIZE })}
+              onOpen={setEditingExpense}
+              onUnlink={(expense) => handleUnlink([expense])}
+              onUnlinkSeries={askUnlinkSeries}
+              disabled={isDemo}
             />
           </div>
         </div>
       )}
+
+      <LinkExpensesDialog open={linkOpen} onClose={() => setLinkOpen(false)} costCenter={costCenter} onLink={handleLink} returnFocusTo={linkButtonRef} />
+      <UnlinkSeriesDialog request={unlinkSeries} centerName={costCenter.name} onClose={() => setUnlinkSeries(null)} onUnlink={handleUnlink} busy={unlinking} />
+      {/* The form Tracciamento uses, with its own save, reconciliation and invalidations
+          (it already refreshes the centers); unlinking from inside it works too. */}
+      <ExpenseDialog open={editingExpense !== null} expense={editingExpense} onClose={() => setEditingExpense(null)} onSuccess={refreshAfterLinkChange} />
     </div>
   );
 }

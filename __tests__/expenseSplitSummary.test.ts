@@ -98,7 +98,45 @@ describe('resolveSplitBasis', () => {
   it('refuses to compute when one person has no salary yet, and names them', () => {
     const basis = resolveSplitBasis([salary(GIUSEPPE, 2400)], MEMBERS, SALARY_CATEGORIES);
 
-    expect(basis).toEqual({ kind: 'unavailable', reason: 'missing-salary', missingNames: ['Marcella'] });
+    expect(basis).toEqual({
+      kind: 'unavailable',
+      reason: 'missing-salary',
+      missingNames: ['Marcella'],
+      unattributedSalary: 0,
+    });
+  });
+
+  // The income side used to swallow these two rows behind a mute `continue`, so a split computed
+  // on part of the month's salaries was indistinguishable from one computed on all of them.
+  it('counts labor income nobody owns as unattributed, and never as somebody else s share', () => {
+    const basis = resolveSplitBasis(
+      [
+        salary(GIUSEPPE, 2400),
+        salary(MARCELLA, 1600),
+        // Left «in comune» by mistake, and one belonging to a member since deleted.
+        makeRow('income', 1100),
+        makeRow('income', 500, { personalMemberId: 'm-deleted' }),
+      ],
+      MEMBERS,
+      SALARY_CATEGORIES
+    );
+
+    expect(basis.kind).toBe('computed');
+    if (basis.kind !== 'computed') return;
+    expect(basis.unattributedSalary).toBe(1600);
+    // The shares are still the two real salaries' — the orphan money buys nobody a percentage.
+    expect(basis.totalSalary).toBe(4000);
+    expect(basis.members.map((entry) => entry.share)).toEqual([0.6, 0.4]);
+  });
+
+  it('counts no unattributed salary outside the labor categories', () => {
+    const basis = resolveSplitBasis(
+      [salary(GIUSEPPE, 2400), salary(MARCELLA, 1600), makeRow('income', 300, { categoryId: 'cat-rimborso' })],
+      MEMBERS,
+      SALARY_CATEGORIES
+    );
+
+    expect(basis.kind === 'computed' && basis.unattributedSalary).toBe(0);
   });
 
   it('refuses with fewer than two people, and before any labor category is chosen', () => {
@@ -241,5 +279,80 @@ describe('summarizeExpenseSplit', () => {
 
     expect(summary.common.total).toBe(1000);
     expect(summary.common.scheduled.expenses).toBe(300);
+  });
+
+  // THE POINT OF `remainingBooked`. A bill that has not been paid cannot make a person short:
+  // before this, the whole of a deficit could be money still sitting in the account.
+  it('keeps a residual of money that has MOVED apart from the period s', () => {
+    const summary = summarizeExpenseSplit(
+      input([
+        salary(GIUSEPPE, 2400),
+        salary(MARCELLA, 1600),
+        makeRow('fixed', 700, { date: new Date(2026, 7, 10, 12, 0, 0) }),
+        makeRow('fixed', 300, { date: new Date(2026, 7, 28, 12, 0, 0) }),
+      ])
+    );
+
+    const [giuseppe, marcella] = summary.members;
+    // 60% / 40% of 1000 booked+scheduled, and of the 700 already paid.
+    expect(giuseppe.commonShare).toBe(600);
+    expect(giuseppe.remaining).toBe(1800);
+    expect(giuseppe.remainingBooked).toBe(1980);
+    expect(marcella.remaining).toBe(1200);
+    expect(marcella.remainingBooked).toBe(1320);
+  });
+
+  it('counts a person s OWN scheduled row out of their booked residual too', () => {
+    const summary = summarizeExpenseSplit(
+      input([
+        salary(GIUSEPPE, 2400),
+        salary(MARCELLA, 1600),
+        makeRow('variable', 200, { personalMemberId: GIUSEPPE.id, date: new Date(2026, 7, 28, 12, 0, 0) }),
+      ])
+    );
+
+    const [giuseppe] = summary.members;
+    expect(giuseppe.personalSpending).toBe(200);
+    expect(giuseppe.remaining).toBe(2200);
+    expect(giuseppe.remainingBooked).toBe(2400);
+  });
+
+  // A salary not yet paid props a residual up exactly as an unpaid bill deflates one.
+  it('leaves a salary still to come out of the booked residual', () => {
+    const summary = summarizeExpenseSplit(
+      input([
+        salary(GIUSEPPE, 2400, { date: new Date(2026, 7, 28, 12, 0, 0) }),
+        salary(MARCELLA, 1600),
+        makeRow('fixed', 1000, { date: new Date(2026, 7, 10, 12, 0, 0) }),
+      ])
+    );
+
+    const [giuseppe] = summary.members;
+    expect(giuseppe.salary).toBe(2400);
+    expect(giuseppe.remaining).toBe(1800);
+    // Nothing of that salary has arrived: 0 − 600 of the pool already paid.
+    expect(giuseppe.remainingBooked).toBe(-600);
+  });
+
+  // The booked shares are allocated through `allocateByShare` for the same reason the pool is:
+  // subtracting one allocation from another would leave the parts short of the whole by a cent.
+  it('closes the booked shares on the booked pool, to the cent', () => {
+    const THREE = [GIUSEPPE, MARCELLA, { id: 'm-luca', name: 'Luca' }];
+    const summary = summarizeExpenseSplit({
+      expenses: [
+        salary(GIUSEPPE, 1000),
+        salary(MARCELLA, 1000),
+        makeRow('income', 1000, { personalMemberId: 'm-luca' }),
+        makeRow('fixed', 100.01, { date: new Date(2026, 7, 10, 12, 0, 0) }),
+        makeRow('fixed', 50, { date: new Date(2026, 7, 28, 12, 0, 0) }),
+      ],
+      members: THREE,
+      laborIncomeCategoryIds: SALARY_CATEGORIES,
+      now: NOW,
+    });
+
+    const bookedShares = summary.members.map((member) => member.salary - member.remainingBooked! - 0);
+    const bookedPool = Math.round(bookedShares.reduce((total, value) => total + value, 0) * 100) / 100;
+    expect(bookedPool).toBe(100.01);
   });
 });

@@ -42,6 +42,23 @@ export const DEGRADED_STORAGE_STATE = 'e2e/.auth/degraded.json';
  * finestra year-to-date la contiene in qualunque mese giri la suite.
  */
 export const ANALISI_STORAGE_STATE = 'e2e/.auth/analisi.json';
+/**
+ * Session of the Centri di Costo fixture account (scripts/seedCostCentersE2E.mts): the tab is
+ * opt-in and a linked expense is an ordinary expense, so its data lives on an account of its own.
+ */
+export const CENTRI_STORAGE_STATE = 'e2e/.auth/centri.json';
+/**
+ * Session of the Divisione fixture account (scripts/seedSplitE2E.mts). Its own account for the
+ * same reason as Centri di Costo: the tab is opt-in, and a row carrying `personalMemberId` is an
+ * ordinary row that would move every figure the other Cashflow specs assert.
+ */
+export const SPLIT_STORAGE_STATE = 'e2e/.auth/split.json';
+/**
+ * Session of the Hall of Fame fixture account (scripts/seedHallOfFameE2E.mts): 47 monthly
+ * snapshots since 2022, because a ranking needs a history behind it — and a history on the base
+ * account would move every figure the other specs assert.
+ */
+export const HOF_STORAGE_STATE = 'e2e/.auth/hof.json';
 
 export default defineConfig({
   testDir: './e2e',
@@ -63,13 +80,73 @@ export default defineConfig({
     { name: 'setup', testMatch: /auth\.setup\.ts/ },
     { name: 'setup-degraded', testMatch: /auth\.degraded\.setup\.ts/ },
     { name: 'setup-analisi', testMatch: /auth\.analisi\.setup\.ts/ },
+    { name: 'setup-centri', testMatch: /auth\.centri\.setup\.ts/ },
+    { name: 'setup-split', testMatch: /auth\.split\.setup\.ts/ },
+    { name: 'setup-hof', testMatch: /auth\.hof\.setup\.ts/ },
     {
       name: 'desktop',
       // 1440px is the project's `desktop:` breakpoint — the width where the layout switches.
       use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 }, storageState: STORAGE_STATE },
       dependencies: ['setup'],
       // analisi.* runs in its own projects on the dedicated fixture account.
-      testIgnore: [/\.(mobile|degraded)\.spec\.ts/, /analisi\./],
+      testIgnore: [/\.(mobile|degraded)\.spec\.ts/, /analisi\./, /centri\./, /split\./, /hof\./],
+    },
+    {
+      // Hall of Fame on its own fixture account. Listed BEFORE its mobile twin: with `workers: 1`
+      // the projects run in this order, and the desktop spec is the one that presses «Aggiorna i
+      // record» to build the document the phone spec then reads.
+      name: 'hof',
+      use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 }, storageState: HOF_STORAGE_STATE },
+      dependencies: ['setup-hof'],
+      testMatch: /hof\.spec\.ts/,
+    },
+    {
+      name: 'hof-mobile',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 390, height: 844 },
+        hasTouch: true,
+        isMobile: true,
+        storageState: HOF_STORAGE_STATE,
+      },
+      dependencies: ['setup-hof'],
+      testMatch: /hof\.mobile\.spec\.ts/,
+    },
+    {
+      name: 'centri',
+      use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 }, storageState: CENTRI_STORAGE_STATE },
+      dependencies: ['setup-centri'],
+      testMatch: /centri\.spec\.ts/,
+    },
+    {
+      name: 'split',
+      use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 }, storageState: SPLIT_STORAGE_STATE },
+      dependencies: ['setup-split'],
+      testMatch: /split\.spec\.ts/,
+    },
+    {
+      name: 'split-mobile',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 390, height: 844 },
+        hasTouch: true,
+        isMobile: true,
+        storageState: SPLIT_STORAGE_STATE,
+      },
+      dependencies: ['setup-split'],
+      testMatch: /split\.mobile\.spec\.ts/,
+    },
+    {
+      name: 'centri-mobile',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 390, height: 844 },
+        hasTouch: true,
+        isMobile: true,
+        storageState: CENTRI_STORAGE_STATE,
+      },
+      dependencies: ['setup-centri'],
+      testMatch: /centri\.mobile\.spec\.ts/,
     },
     {
       // Analisi on its own fixture account — same desktop width as the main project.
@@ -120,7 +197,7 @@ export default defineConfig({
       },
       dependencies: ['setup'],
       testMatch: /\.mobile\.spec\.ts/,
-      testIgnore: /analisi\./,
+      testIgnore: [/analisi\./, /centri\./, /split\./, /hof\./],
     },
   ],
 

@@ -332,26 +332,30 @@ export function formatNumber(value: number, decimals: number = 2): string {
 }
 
 /**
- * Format currency value in compact format for chart axes
- * Examples: €1,5 Mln, €850k, €250
+ * Format currency value in compact format for chart axes.
+ * Examples: 1,5 Mln €, 850k €, 250 €
+ *
+ * The euro follows the figure with a no-break space, as every other amount in the app
+ * (AGENTS.md → Italian Localization). Until 2026-09-22 the ticks read «€850k» — the one place
+ * the currency came first, so a chart axis spoke a different dialect from the tile above it.
  */
 export function formatCurrencyCompact(value: number): string {
   const absValue = Math.abs(value);
 
   if (absValue >= 1_000_000) {
-    // Millions: €1,5 Mln
+    // Millions: 1,5 Mln €
     const millions = value / 1_000_000;
-    return `€${millions.toLocaleString('it-IT', {
+    return `${millions.toLocaleString('it-IT', {
       minimumFractionDigits: 1,
       maximumFractionDigits: 1
-    })} Mln`;
+    })} Mln\u00A0€`;
   } else if (absValue >= 1_000) {
-    // Thousands: €850k
+    // Thousands: 850k €
     const thousands = value / 1_000;
-    return `€${Math.round(thousands)}k`;
+    return `${Math.round(thousands)}k\u00A0€`;
   } else {
-    // Below 1000: €250
-    return `€${Math.round(value)}`;
+    // Below 1000: 250 €
+    return `${Math.round(value)}\u00A0€`;
   }
 }
 
@@ -429,213 +433,7 @@ export function prepareYoYVariationData(snapshots: MonthlySnapshot[]): {
   return yoyData;
 }
 
-/**
- * Prepare yearly data showing breakdown of net worth growth into savings vs investment returns.
- *
- * For each year:
- * - Net Worth Growth = last snapshot of the year − the baseline (the previous year's last
- *   snapshot, normally December; the year's first snapshot when there is none)
- * - Net Savings = income − spending of the cashflow rows dated in the SAME window: from the
- *   month after the baseline to the month of the last snapshot, inclusive
- * - Investment Growth = growth − savings (what the recorded cashflow does not explain)
- *
- * The window is the point: a year still running is measured up to its last snapshot, so the
- * rows already in the calendar for the months after it (materialised recurring series) must not
- * count — they deflated the running year's savings and handed the gap to "market". Likewise the
- * months BEFORE a first-year baseline (a history that starts in March has no January growth to
- * explain). A closed year with a December baseline and a December snapshot is the calendar year.
- *
- * A year with no cashflow row in its window is skipped: without a recorded savings figure the
- * split would silently read "all market".
- *
- * @param snapshots - Monthly snapshots with net worth data
- * @param expenses - All expense records (income and expenses); transfers are net-zero and skipped
- * @returns Array of yearly data sorted by year
- */
-export function prepareSavingsVsInvestmentData(
-  snapshots: MonthlySnapshot[],
-  expenses: Expense[]
-): {
-  year: string;
-  netSavings: number;
-  investmentGrowth: number;
-  netWorthGrowth: number;
-  /** Growth over the baseline's value, in percent; `null` without a positive baseline. */
-  growthPct: number | null;
-  /** The snapshot the year is measured FROM (the previous year's last snapshot, or the year's first). */
-  baseline: { year: number; month: number };
-  /** The last snapshot of the year — where the window closes. */
-  latest: { year: number; month: number };
-}[] {
-  if (snapshots.length === 0 || expenses.length === 0) {
-    return [];
-  }
-
-  const snapshotsByYear = new Map<number, MonthlySnapshot[]>();
-  snapshots.forEach((snapshot) => {
-    if (!snapshotsByYear.has(snapshot.year)) {
-      snapshotsByYear.set(snapshot.year, []);
-    }
-    snapshotsByYear.get(snapshot.year)!.push(snapshot);
-  });
-
-  // Cashflow by month (Italy timezone), so a year's window can open and close mid-year.
-  const flowsByMonth = new Map<number, { income: number; expenses: number }>();
-  expenses.forEach((expense) => {
-    // Transfers are net-zero — skip entirely
-    if (expense.type === 'transfer') return;
-    const key = getItalyYear(expense.date) * 12 + (getItalyMonth(expense.date) - 1);
-    const current = flowsByMonth.get(key) || { income: 0, expenses: 0 };
-    // Income is positive, expenses are stored as negative values
-    if (expense.type === 'income') {
-      current.income += expense.amount;
-    } else {
-      current.expenses += expense.amount; // Already negative
-    }
-    flowsByMonth.set(key, current);
-  });
-
-  const yearlyData: ReturnType<typeof prepareSavingsVsInvestmentData> = [];
-
-  Array.from(snapshotsByYear.entries())
-    .sort((a, b) => a[0] - b[0])
-    .forEach(([year, yearSnapshots]) => {
-      if (yearSnapshots.length < 1) return;
-
-      yearSnapshots.sort((a, b) => a.month - b.month);
-      const lastSnapshot = yearSnapshots[yearSnapshots.length - 1];
-
-      // The previous year's last snapshot (normally December) so January is included in the
-      // delta; the year's own first snapshot when there is none.
-      const prevYearSnapshots = snapshotsByYear.get(year - 1);
-      const prevLast = prevYearSnapshots ? [...prevYearSnapshots].sort((a, b) => a.month - b.month).at(-1) : undefined;
-      const startSnapshot = prevLast ?? yearSnapshots[0];
-
-      // The window: the month after the baseline through the last snapshot's month.
-      const from = startSnapshot.year * 12 + (startSnapshot.month - 1) + 1;
-      const to = lastSnapshot.year * 12 + (lastSnapshot.month - 1);
-      let income = 0;
-      let spending = 0;
-      let hasRows = false;
-      for (let key = from; key <= to; key++) {
-        const flows = flowsByMonth.get(key);
-        if (!flows) continue;
-        hasRows = true;
-        income += flows.income;
-        spending += flows.expenses;
-      }
-      if (!hasRows) return;
-
-      const netWorthGrowth = lastSnapshot.totalNetWorth - startSnapshot.totalNetWorth;
-      const netSavings = income + spending;
-      const investmentGrowth = netWorthGrowth - netSavings;
-
-      yearlyData.push({
-        year: year.toString(),
-        netSavings,
-        investmentGrowth,
-        netWorthGrowth,
-        growthPct: startSnapshot.totalNetWorth > 0 ? (netWorthGrowth / startSnapshot.totalNetWorth) * 100 : null,
-        baseline: { year: startSnapshot.year, month: startSnapshot.month },
-        latest: { year: lastSnapshot.year, month: lastSnapshot.month },
-      });
-    });
-
-  return yearlyData;
-}
-
 const MONTH_NAMES_IT = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
-
-/**
- * Prepare monthly data for all available years in chronological order.
- *
- * Same logic as prepareSavingsVsInvestmentDataMonthly but covers every snapshot
- * across all years — useful for a continuous multi-year timeline view.
- * Period label includes the year ("Gen 2023") to disambiguate months across years.
- *
- * @param snapshots - Monthly snapshots with net worth data
- * @param expenses - All expense records (income and expenses)
- * @returns Array of monthly data sorted chronologically across all years
- */
-export function prepareSavingsVsInvestmentDataAllMonths(
-  snapshots: MonthlySnapshot[],
-  expenses: Expense[]
-): {
-  period: string;
-  month: number;
-  year: number;
-  netSavings: number;
-  investmentGrowth: number;
-  netWorthGrowth: number;
-}[] {
-  if (snapshots.length === 0) return [];
-
-  // Build a lookup map keyed by "year-month" for O(1) access
-  const snapshotMap = new Map<string, MonthlySnapshot>();
-  snapshots.forEach((s) => snapshotMap.set(`${s.year}-${s.month}`, s));
-
-  // Group expenses by year-month using Italy timezone
-  const expensesByMonth = new Map<string, { income: number; expenses: number }>();
-  expenses.forEach((expense) => {
-    const ey = getItalyYear(expense.date);
-    const em = getItalyMonth(expense.date);
-    const key = `${ey}-${em}`;
-    const current = expensesByMonth.get(key) || { income: 0, expenses: 0 };
-
-    // Transfers are net-zero — skip entirely
-    if (expense.type === 'transfer') return;
-    // Income is positive, expenses are stored as negative values
-    if (expense.type === 'income') {
-      current.income += expense.amount;
-    } else {
-      current.expenses += expense.amount; // Already negative
-    }
-
-    expensesByMonth.set(key, current);
-  });
-
-  // Sort all snapshots chronologically and iterate
-  const sorted = [...snapshots].sort((a, b) =>
-    a.year !== b.year ? a.year - b.year : a.month - b.month
-  );
-
-  const result: {
-    period: string;
-    month: number;
-    year: number;
-    netSavings: number;
-    investmentGrowth: number;
-    netWorthGrowth: number;
-  }[] = [];
-
-  for (const currentSnapshot of sorted) {
-    const { year, month } = currentSnapshot;
-
-    // Previous month baseline: December of prior year when month is January
-    const prevYear = month === 1 ? year - 1 : year;
-    const prevMonth = month === 1 ? 12 : month - 1;
-    const prevSnapshot = snapshotMap.get(`${prevYear}-${prevMonth}`);
-    if (!prevSnapshot) continue;
-
-    const netWorthGrowth = currentSnapshot.totalNetWorth - prevSnapshot.totalNetWorth;
-
-    const expenseData = expensesByMonth.get(`${year}-${month}`);
-    // Default to 0 when no transactions exist — entire change is market-driven
-    const netSavings = expenseData ? expenseData.income + expenseData.expenses : 0;
-    const investmentGrowth = netWorthGrowth - netSavings;
-
-    result.push({
-      period: `${MONTH_NAMES_IT[month - 1]} ${year}`,
-      month,
-      year,
-      netSavings,
-      investmentGrowth,
-      netWorthGrowth,
-    });
-  }
-
-  return result;
-}
 
 /**
  * Doubling Time Calculation Functions
@@ -1014,7 +812,7 @@ export function prepareDoublingTimeData(
  * investment growth — the same three figures shown in the dashboard KPI cards, but
  * decomposed per calendar month rather than as lifetime aggregates.
  *
- * Algorithm mirrors prepareSavingsVsInvestmentDataAllMonths with two additions:
+ * One row per snapshot whose previous calendar month has one, with two particulars:
  * 1. Labor income is isolated by filtering against laborCategoryIds.
  * 2. Results are clamped to months on or after startYear (matching the KPI card scope).
  *

@@ -4,10 +4,15 @@
 > `lib/server/assistant/*`, `lib/services/assistantMonthContextService.ts`,
 > `lib/utils/{assistantNarrative,assistantPeriodOptions,expenseBreakdown,goalProposal}.ts`,
 > `lib/hooks/useAssistantStreaming.ts`, `app/api/ai/assistant/*`, `app/api/goals/route.ts`. In
-> `AGENTS.md` resta lo stub con l'essenziale; qui c'è la regola completa. Moduli e file: `CLAUDE.md`
-> → *Key Files* → le voci *Assistant*, *Assistant — obiettivi*, *Assistant — Goal-Based Investing*.
+> `AGENTS.md` resta lo stub con l'essenziale; qui c'è la regola completa. Moduli e file: § *Files*, sotto.
 > Nessuna spec E2E permanente: entrambi i blocchi dichiarano «no Playwright spec» (le prove
 > usa-e-getta sono state cancellate — vedi *Per-page blind spots*).
+
+## Files
+
+Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
+
+- **Assistant**: `app/dashboard/assistant/page.tsx`, `components/assistant/AssistantPageClient.tsx` + `tiles/*`, pure `lib/utils/{assistantNarrative,assistantPeriodOptions}.ts`; `app/api/ai/assistant/*`, `lib/server/assistant/*` (`goalEvaluation.ts` pure, `goalEvaluationService.ts` I/O, `memoryExtraction.ts`, `store.ts` → `mergeMemoryItem`), `components/assistant/AssistantModals.tsx` (Conversazioni · Memoria), `lib/hooks/useAssistantStreaming.ts`, `lib/services/assistantMonthContextService.ts` over `lib/utils/expenseBreakdown.ts` (`buildCashflowBreakdown`); goals `lib/server/goalData.ts`, `lib/utils/goalProposal.ts` (ONE zod schema), `app/api/goals/route.ts`, `components/assistant/GoalProposalCard.tsx`
 
 ## Assistant
 
@@ -55,7 +60,7 @@
   bundle lives in React state and is never persisted. `MARKDOWN_COMPONENTS` must be module-level or ReactMarkdown
   re-mounts on every chunk.
 - **Do not use `DropdownMenu` for panels containing `Select` or `Switch`** — it closes on any click inside; use
-  `Popover`. The mobile thread `Sheet` is controlled and must be closed explicitly in `onSelect`.
+  `Popover`. The Conversazioni modal is controlled and must be closed explicitly in `onSelect`.
 - **Merging a partial patch onto existing state: build the merge object with ONLY the fields present in the input**
   (conditional spread), never assign every field unconditionally from a `Partial<T>` — an absent field becomes an
   explicit `undefined` that wins `{...existing, ...patch}` and silently wipes it. `store.ts`'s `mergeMemoryItem`/
@@ -135,7 +140,14 @@
 - **Messages are flat** (`AssistantStreamingResponse`): the user's in a `bg-muted/40` sub-tile, the assistant's full-width prose;
   `GoalProposalCard` is a `not-prose` muted sub-tile (never a card in the tile); `MARKDOWN_COMPONENTS` stays module-level. The
   streaming badge lives in the tile's aside (`role="status"`); the interruption notice is a muted row with «Rigenera».
-- **The memory sheet is two tiles + an «Archiviati» disclosure**: the Attivi/Completati/Archiviati tabs are gone; a pending «goal
+- **Conversazioni and Memoria are `ResponsiveModal`s** (`AssistantModals.tsx`, 2026-09-18 — two right-side `Sheet`s
+  until then): `md` and `lg`, eyebrow «Assistente · …», the title the act («Riprendi una conversazione») or the
+  companion tile's own name («Cosa sa di te», opening on the SAME `describeMemory` sentence the tile shows), no
+  footer. The thread rows are flat and divided, the active one `aria-current` on `bg-muted`; their delete is
+  `useArmedDelete` with `THREAD_DELETE_CONSEQUENCE` printed in the row in place of the preview and ONE live region
+  for the list. They stay overlays for the reason the sheets were: the companion column must never become a second
+  nested-scroll box.
+- **The memory modal is two sub-tiles + an «Archiviati» disclosure**: the Attivi/Completati/Archiviati tabs are gone; a pending «goal
   reached» suggestion shows on its goal's row (the durable «Ignora» is `ignoreSuggestion`, the same mutation the tile above the
   conversation uses — two surfaces of ONE suggestion); the item delete is `useArmedDelete` (two clicks, no timer).
   `AssistantMemoryPanel` lost its collapsible variant (only the sheet renders it).
@@ -148,4 +160,6 @@
 
 ## Per-page blind spots
 
-- **Assistente**: no Playwright spec (the throwaway specs were deleted); the Cashflow tile is absent for a period without cashflow rows; the savings rate is `netCashFlow / (income + dividends)`; «Patrimonio oggi» prints the GROSS total (the verdict's figure), the old card printed the net; the Conversazione count includes the user's messages; starter rows prefill the composer, follow-up rows submit; the thread sheet keeps its 3 s auto-disarm delete (on request) while the memory rows use `useArmedDelete`; a companion taller than the viewport is reachable only at the end of the scroll (sticky, by design); the «goal reached» tile and the sheet's row are two surfaces of ONE suggestion.
+- **Assistente**: no Playwright spec (the throwaway specs were deleted); the Cashflow tile is absent for a period without cashflow rows; the savings rate is `netCashFlow / (income + dividends)`; «Patrimonio oggi» prints the GROSS total (the verdict's figure), the old card printed the net; the Conversazione count includes the user's messages; starter rows prefill the composer, follow-up rows submit; the thread rows and the memory rows both use `useArmedDelete` (the threads' 3 s auto-disarm went on 2026-09-18, with the sheet); a companion taller than the viewport is reachable only at the end of the scroll (sticky, by design); the «goal reached» tile and the sheet's row are two surfaces of ONE suggestion.
+- **The Assistant's cashflow figures changed on 2026-07-29**; saved threads are prose and are not regenerated (moved here from CLAUDE.md → Known Issues on 2026-09-18: it is this page's blind spot, not a cross-cutting one).
+- **A confirmed goal proposal can be confirmed again after a reload** (accepted for v1): reopening the thread re-parses the fenced block and a second press creates a SECOND goal. (moved from `CLAUDE.md` → Known Issues on 2026-09-19)

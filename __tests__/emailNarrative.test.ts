@@ -202,6 +202,43 @@ describe('buildPeriodEmailVerdict', () => {
     );
   });
 
+  it('names the tax in the headline when it took the growth, and tells what was bought beside the sale', () => {
+    // Settembre 2026 on the real account as a monthly email would see it: +124 € (+0,04%) with
+    // 4.089 € withheld on VWCE and six instruments bought in the month.
+    const sales = {
+      proceeds: 39052.45,
+      realizedGain: 15726.38,
+      estimatedTax: 4088.86,
+      instruments: [{ id: 'vwce', name: 'VWCE', proceeds: 39052.45, realizedGain: 15726.38, estimatedTax: 4088.86 }],
+      brokenLedgers: 0,
+      purchases: { amount: 34305.1, instrumentCount: 6 },
+    };
+    const flat = buildPeriodEmailVerdict({
+      ...GROWING,
+      period: { kind: 'monthly', year: 2026, month: 9 },
+      netWorthDelta: 124.32,
+      netWorthDeltaPct: 0.04,
+      sales,
+      rank: null,
+    });
+    expect(flat.headline).toBe('Settembre è in pari: le tasse sulla vendita di VWCE si sono prese la crescita.');
+    expect(flat.tone).toBe('warning');
+    expect(plain(flat.sentence)).toContain('pagato circa 4089 € di tasse. Nello stesso mese hai comprato 6 strumenti per 34.305 €.');
+
+    const quarter = buildPeriodEmailVerdict({
+      ...GROWING,
+      period: { kind: 'quarterly', year: 2026, month: 9, quarter: 3 },
+      netWorthDelta: 3000,
+      netWorthDeltaPct: 1.2,
+      sales,
+      rank: null,
+    });
+    expect(quarter.headline).toBe(
+      'Il terzo trimestre è cresciuto, ma le tasse sulla vendita di VWCE si sono prese più di metà della crescita.',
+    );
+    expect(plain(quarter.sentence)).toContain('Nello stesso trimestre hai comprato 6 strumenti');
+  });
+
   it('keeps the two-part split when the sale carried no tax', () => {
     const verdict = buildPeriodEmailVerdict({
       ...GROWING,

@@ -5,7 +5,7 @@ import { Timestamp } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
 import { Asset, AssetAllocationSettings, MonthlySnapshot } from '@/types/assets';
 import { Expense, EXPENSE_TYPE_LABELS } from '@/types/expenses';
-import { splitSpendingAtDate } from '@/lib/utils/tracciamentoSummary';
+import { splitSpendingAtDate, summarizeScheduled } from '@/lib/utils/tracciamentoSummary';
 import { getCategoryKey, getCategoryName, resolveDisplayLabels } from '@/lib/utils/expenseGrouping';
 import { GoalBasedInvestingData } from '@/types/goals';
 import { getGoalDataAdmin } from '@/lib/server/goalData';
@@ -28,6 +28,7 @@ import { resolvePensionReturnStart } from '@/lib/utils/pensionReturn';
 import { summarizePeriodSales } from '@/lib/utils/periodSales';
 import { getAssetTransactionsAdmin } from '@/lib/server/assetAdminRepository';
 import type { PensionContribution } from '@/types/pension';
+import type { AssetTransaction } from '@/types/assetTransactions';
 import {
   calculateAnnualPortfolioCost,
   calculateAssetValue,
@@ -309,6 +310,7 @@ function buildExpenseStats(
     expenses: current.expenses,
     net: current.net,
     expensesScheduled: splitSpendingAtDate(currentExpenses, now).scheduled,
+    incomeScheduled: summarizeScheduled(currentExpenses, now).income,
   };
   const previousMonth = { income: previous.income, expenses: previous.expenses, net: previous.net };
 
@@ -331,13 +333,24 @@ function buildExpenseStats(
   };
 }
 
+/** Trades dated in an Italian month after the snapshot's own; none without a snapshot. */
+function tradesAfterSnapshot(transactions: AssetTransaction[], snapshot: MonthlySnapshot | null): AssetTransaction[] {
+  if (!snapshot) return [];
+  const snapshotKey = snapshot.year * 12 + snapshot.month;
+  return transactions.filter((t) => {
+    const { year, month } = getItalyMonthYear(t.date);
+    return year * 12 + month > snapshotKey;
+  });
+}
+
 function buildLiveOverviewPayload(
   assets: Asset[],
   snapshots: MonthlySnapshot[],
   settings: AssetAllocationSettings | null,
   expenseStats: DashboardOverviewExpenseStats | null,
   goalData: GoalBasedInvestingData | null,
-  pensionContributions: PensionContribution[]
+  pensionContributions: PensionContribution[],
+  transactions: AssetTransaction[] = []
 ): Omit<DashboardOverviewPayload, 'freshness'> {
   const { month: currentMonth, year: currentYear } = getItalyMonthYear();
   const currentMonthSnapshot = snapshots.find(
@@ -351,9 +364,11 @@ function buildLiveOverviewPayload(
   const liquidEstimatedTaxes = calculateLiquidEstimatedTaxes(assets);
 
   // Cash sub-breakdown: pure cash accounts vs investable liquid assets.
-  // This splits liquidNetWorth into two sub-buckets shown on the Liquid card.
+  // This splits liquidNetWorth into two sub-buckets shown on the Liquid card. No `quantity > 0`
+  // filter: a credit card is a cash account in the red, and dropping it here moved its debt into
+  // «investimenti liquidi» (a sold asset at 0 adds nothing either way).
   const cashNetWorth = assets
-    .filter(a => a.quantity > 0 && a.assetClass === 'cash')
+    .filter(a => a.assetClass === 'cash')
     .reduce((sum, a) => sum + calculateAssetValue(a), 0);
   const liquidInvestmentsNetWorth = liquidNetWorth - cashNetWorth;
   const annualStampDuty = (settings?.stampDutyEnabled && settings?.stampDutyRate)
@@ -396,9 +411,12 @@ function buildLiveOverviewPayload(
     contributions: pensionContributions,
     startMonth: resolvePensionReturnStart(pensionContributions, settings?.pensionReturnStartMonth),
   };
-  const topMovers = computeTopMovers(assets, previousSnapshot, totalValue, pensionMarketInput);
-  const marketEffect = computeMarketEffect(assets, previousSnapshot, pensionMarketInput);
-  const topInstrumentMovers = computeTopInstrumentMovers(assets, previousSnapshot, totalValue, pensionMarketInput);
+  // The trades after the previous snapshot's month: the market reads their quotes from the trade
+  // price, so a position bought this month is return from the day it was bought, not «movimenti».
+  const monthTrades = tradesAfterSnapshot(transactions, previousSnapshot);
+  const topMovers = computeTopMovers(assets, previousSnapshot, totalValue, pensionMarketInput, monthTrades);
+  const marketEffect = computeMarketEffect(assets, previousSnapshot, pensionMarketInput, monthTrades);
+  const topInstrumentMovers = computeTopInstrumentMovers(assets, previousSnapshot, totalValue, pensionMarketInput, monthTrades);
   const goalProgressList =
     settings?.goalBasedInvestingEnabled && goalData
       ? rankGoalProgress(goalData.goals, goalData.assignments, assets)
@@ -562,11 +580,13 @@ async function recomputeDashboardOverview(userId: string): Promise<DashboardOver
   const holdsPensionFund = assets.some((a) => a.type === 'pensionFund' && a.quantity > 0);
   const pensionContributions = holdsPensionFund ? await getPensionContributionsForUser(userId) : [];
 
-  // The month's sells, so the verdict can name the tax that left with them; a failed read
-  // costs the sales clause, never the page.
+  // The ledger: the month's sells, so the verdict can name the tax that left with them, and the
+  // trades the market digest reads its new quotes from. A failed read costs the sales clause and
+  // leaves the digest on `q_prev × Δu` (the month's new quotes back at 0), never the page.
   let monthSales: DashboardOverviewPayload['monthSales'] = null;
+  let transactions: AssetTransaction[] = [];
   try {
-    const transactions = await getAssetTransactionsAdmin(userId);
+    transactions = await getAssetTransactionsAdmin(userId);
     monthSales = summarizePeriodSales(assets, transactions, getMonthDateRangeInItaly(currentYear, currentMonth));
   } catch (error) {
     console.warn('[dashboardOverviewService] Failed to read the trade ledger, no sales clause:', error);
@@ -586,7 +606,7 @@ async function recomputeDashboardOverview(userId: string): Promise<DashboardOver
   }
 
   const payloadWithoutFreshness = {
-    ...buildLiveOverviewPayload(assets, snapshots, settings, expenseStats, goalData, pensionContributions),
+    ...buildLiveOverviewPayload(assets, snapshots, settings, expenseStats, goalData, pensionContributions, transactions),
     monthSales,
   };
   const now = new Date();

@@ -9,12 +9,15 @@
  * answer one question with a reading line above their figures. Everything deeper lives below
  * the grid behind the «Dettaglio» disclosure.
  *
- *   Desktop (12 col): Rendimento(5, 2 rows) | Rischio(3)    | Consistenza(4)
- *                                           | Contributi(3) | Benchmark(4)
- *                     Da dove viene il rendimento(7) | Plusvalenze(5)
- *                     Capitale e mercato(12)
- *                     — without a closed sale Plusvalenze is absent: Attribuzione(5) | Capitale e mercato(7)
+ *   Desktop (12 col): Rendimento(5) | Benchmark(4) | Contributi(3)      — one row, the three tall tiles
+ *                     then two columns, every tile at its natural height:
+ *                       left (7)  Da dove viene il rendimento · Capitale e mercato (takes the slack)
+ *                       right (5) Rischio · Consistenza · Plusvalenze (absent without a closed sale)
  *   Mobile (1 col):   Rendimento → Rischio → Consistenza → Benchmark → Contributi → Attribuzione → Plusvalenze → Capitale e mercato
+ *
+ * Tiles share a row only with tiles of their own height (2026-09-20): Rendimento used to span two
+ * rows beside four short tiles, so its plot stretched to 669px and three neighbours were half void.
+ * The DOM follows the DESKTOP order, so the Tab order is the visual one there; the phone re-orders.
  *
  * CALCULATION ENGINE (unchanged): every metric comes from performanceService.ts — TWR, IRR,
  * Sharpe, volatility, drawdown, rolling windows — cached in performance-cache/{userId} under
@@ -56,6 +59,7 @@ import { queryKeys } from '@/lib/query/queryKeys';
 // The Admin-SDK dividendService is server-only: a client page reads the registry through this one.
 import { getDividendReceipts } from '@/lib/services/dividendReceiptsService';
 import { resolveHasBaseline, resolvePerformanceBase, type PerformanceBaseResolution } from '@/lib/utils/performanceBase';
+import { resolveCenteredModalOrigin } from '@/lib/utils/modalOrigin';
 import { attributePeriodReturn, sumDividendsByAsset, type DividendReceipt } from '@/lib/utils/performanceAttribution';
 import type { PerformanceData, PerformanceMetrics, TimePeriod } from '@/types/performance';
 import type { Asset, MonthlySnapshot } from '@/types/assets';
@@ -77,14 +81,14 @@ import { BENCHMARKS } from '@/lib/constants/benchmarks';
 import { applyFxConversion, type MonthlyReturnPoint } from '@/lib/utils/benchmarkPeriodReturn';
 import {
   buildGrowthOfHundred,
-  computeBenchmarkDelta,
   computeBenchmarkRanking,
   computeDrawdownStatus,
   computeReturnConsistency,
   computeSortinoRatio,
   resolveDrawdownStory,
   resolveHeroReturn,
-  resolvePeriodReturnChip,
+  resolveCompanionReturnChip,
+  summarizeCapitalEntered,
   summarizePerformance,
   summarizeRealizedGains,
 } from '@/lib/utils/performanceSummary';
@@ -101,6 +105,7 @@ import {
   describeRealizedGains,
   describeRisk,
   describeWindow,
+  resolveBenchmarkGap,
 } from '@/lib/utils/performanceNarrative';
 import { useAssetLedgerMeta, useAssetTransactions } from '@/lib/hooks/useAssetTransactions';
 import { computeInvestedCapital, aggregateRealizedByYear } from '@/lib/utils/assetTransactionUtils';
@@ -128,14 +133,13 @@ const AIAnalysisDialog = dynamic<AIAnalysisDialogProps>(
 
 /** The grid's geometry, for the skeleton: the same spans as the tiles below. */
 const SKELETON_CELLS: TileSkeletonCell[] = [
-  { span: 5, rows: 2, lines: 10 },
-  { span: 3, lines: 6 },
-  { span: 4, lines: 6 },
-  { span: 3, lines: 4 },
+  { span: 5, lines: 10 },
   { span: 4, lines: 8 },
-  { span: 5, lines: 5 },
-  { span: 7, lines: 7 },
-  { span: 12, lines: 6 },
+  { span: 3, lines: 8 },
+  { span: 7, rows: 3, lines: 12 },
+  { span: 5, lines: 6 },
+  { span: 5, lines: 4 },
+  { span: 5, lines: 2 },
 ];
 
 /** The base before the first load: the product default, so the caption under the verdict is right on first paint. */
@@ -271,9 +275,17 @@ export default function PerformancePage() {
   const [pensionContributions, setPensionContributions] = useState<PensionContribution[]>([]);
   const [dividends, setDividends] = useState<DividendReceipt[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  // Where each window grows from: the header button, resolved at the click
+  // (lib/utils/modalOrigin.ts). Never cleared on close — the exit animates too, and an origin
+  // that changes mid-animation is tweened by the dialog's own `duration-200`, not swapped.
   const [customDialogOrigin, setCustomDialogOrigin] = useState<string | undefined>(undefined);
   const [aiDialogOrigin, setAiDialogOrigin] = useState<string | undefined>(undefined);
   const hasLoadedOnceRef = useRef(false);
+  // Where focus returns when a dialog closes: the button that opened it, taken at the click (the
+  // header mounts its actions twice, and only `currentTarget` is the copy the reader pressed). A
+  // controlled Radix dialog with no Trigger restores focus to nothing, i.e. to `body`.
+  const customOpenerRef = useRef<HTMLElement | null>(null);
+  const aiOpenerRef = useRef<HTMLElement | null>(null);
 
   // Asset trade ledger: «Capitale investito» and «Plusvalenze realizzate» are gated on the migration
   // having run — the tiles degrade (no ledger figure, no Plusvalenze tile) while meta is absent.
@@ -312,13 +324,6 @@ export default function PerformancePage() {
     return map;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [b0.data, b1.data, b2.data, b3.data, b4.data, b5.data, fxRates, isFxLoading]);
-
-  const calculateDialogOrigin = (element: HTMLElement) => {
-    const rect = element.getBoundingClientRect();
-    const x = ((rect.left + rect.width / 2) / window.innerWidth) * 100;
-    const y = ((rect.top + rect.height / 2) / window.innerHeight) * 100;
-    return `${x.toFixed(2)}% ${y.toFixed(2)}%`;
-  };
 
   const handlePeriodChange = (nextPeriod: TimePeriod) => {
     if (nextPeriod === selectedPeriod) return;
@@ -478,16 +483,22 @@ export default function PerformancePage() {
   }, [metrics, eurReturnsById]);
 
   const referenceRow = ranking.rows.find((r) => r.id === REFERENCE_BENCHMARK.id) ?? null;
-  const benchmarkDelta = computeBenchmarkDelta(metrics?.timeWeightedReturn ?? null, referenceRow?.annualized ?? null);
-  const benchmark = benchmarkDelta === null ? null : { name: REFERENCE_BENCHMARK.name, delta: benchmarkDelta };
   const referenceModel = referenceRow?.annualized == null ? null : { name: REFERENCE_BENCHMARK.name, annualized: referenceRow.annualized };
 
-  // The hero states the period return instead of an annualized one when the window is too short for
-  // the extrapolation to mean anything. Verdict quality and the benchmark delta keep the ANNUALIZED
-  // figure: «beats the risk-free rate» and «vs benchmark» are per-year comparisons.
+  // Below a year the hero states the period's return, not an annualised one: «+16,0%» on nine months
+  // is a forecast. The verdict's QUALITY keeps the annualised figure («beats the risk-free rate» is a
+  // per-year comparison); the gap against the model follows the hero's basis, in the verdict AND in
+  // the tile's chip — one function, so the two can never print two different gaps again.
   const heroReturn = resolveHeroReturn(metrics?.timeWeightedReturn ?? null, metrics?.numberOfMonths ?? 0);
-  // The second chip: the period's cumulative TWR (the ROI, a gain over the first month's capital, lives in the Dettaglio).
-  const periodReturnChip = resolvePeriodReturnChip(metrics?.timeWeightedReturn ?? null, metrics?.numberOfMonths ?? 0, heroReturn);
+  const benchmarkGap = resolveBenchmarkGap({
+    benchmark: referenceModel,
+    annualizedReturn: metrics?.timeWeightedReturn ?? null,
+    heroReturn,
+    numberOfMonths: metrics?.numberOfMonths ?? 0,
+  });
+  const benchmark = benchmarkGap === null ? null : { name: REFERENCE_BENCHMARK.name, delta: benchmarkGap };
+  // The second chip: the same TWR on the other basis (the ROI, a gain over the first month's capital, lives in the Dettaglio).
+  const companionReturnChip = resolveCompanionReturnChip(metrics?.timeWeightedReturn ?? null, metrics?.numberOfMonths ?? 0, heroReturn);
   const quality = metrics
     ? summarizePerformance({ timeWeightedReturn: metrics.timeWeightedReturn, sharpeRatio: metrics.sharpeRatio, riskFreeRate: metrics.riskFreeRate })
     : null;
@@ -513,11 +524,15 @@ export default function PerformancePage() {
     });
   }, [metrics, base, periodSnapshots, pensionContributions, assets, dividends]);
 
-  // Capitale investito: the SAME period bounds as the page, never a recalculated window.
+  // The ledger's real buys and sells, on the SAME period bounds as the page — a term of comparison
+  // on the Contributi tile, never its answer (opening positions are not purchases).
   const investedCapital = useMemo(() => {
     if (!metrics || !isLedgerMigrated) return null;
     return computeInvestedCapital(ledgerTrades, metrics.startDate, metrics.endDate);
   }, [metrics, ledgerTrades, isLedgerMigrated]);
+
+  // Contributi's one answer: what every return formula neutralised, channel by channel.
+  const capitalEntered = useMemo(() => summarizeCapitalEntered(metrics?.cashFlows ?? [], metrics?.numberOfMonths ?? 0), [metrics]);
 
   // Plusvalenze realizzate: all-time, independent of the selected period — a sale belongs to its fiscal year.
   const realizedGains = useMemo(() => aggregateRealizedByYear(ledgerTrades), [ledgerTrades]);
@@ -577,11 +592,13 @@ export default function PerformancePage() {
       aiDisabled={isDemo || !metrics || metrics.hasInsufficientData}
       isRefreshing={isRefreshing}
       onCustom={(event) => {
-        setCustomDialogOrigin(calculateDialogOrigin(event.currentTarget));
+        customOpenerRef.current = event.currentTarget;
+        setCustomDialogOrigin(resolveCenteredModalOrigin(event.currentTarget.getBoundingClientRect()));
         setShowCustomDateDialog(true);
       }}
       onAI={(event) => {
-        setAiDialogOrigin(calculateDialogOrigin(event.currentTarget));
+        aiOpenerRef.current = event.currentTarget;
+        setAiDialogOrigin(resolveCenteredModalOrigin(event.currentTarget.getBoundingClientRect()));
         setShowAIAnalysisDialog(true);
       }}
       onRefresh={loadPerformanceData}
@@ -602,7 +619,7 @@ export default function PerformancePage() {
             size="icon"
             onClick={loadPerformanceData}
             disabled={isDemo || isRefreshing}
-            className="h-9 w-9 text-muted-foreground desktop:hidden"
+            className="h-11 w-11 text-muted-foreground desktop:hidden"
             aria-label={isRefreshing ? 'Aggiornamento in corso' : 'Aggiorna'}
           >
             <RefreshCw className={cn('h-4 w-4', isRefreshing && 'animate-spin')} aria-hidden="true" />
@@ -666,12 +683,10 @@ export default function PerformancePage() {
         )}
         <CustomDateRangeDialog
           open={showCustomDateDialog}
-          onOpenChange={(open) => {
-            setShowCustomDateDialog(open);
-            if (!open) setCustomDialogOrigin(undefined);
-          }}
+          onOpenChange={setShowCustomDateDialog}
           onConfirm={handleCustomDateRange}
           triggerOrigin={customDialogOrigin}
+          returnFocusTo={customOpenerRef}
         />
       </PageContainer>
     );
@@ -738,7 +753,7 @@ export default function PerformancePage() {
         className={cn('grid grid-cols-1 gap-3 transition-opacity duration-200 tablet:grid-cols-2 desktop:grid-cols-12', isRefreshing && 'opacity-60')}
         aria-busy={isPendingPeriodChange || isRefreshing}
       >
-        <div className={cn(TILE_CELL_CLASS, 'order-1 tablet:col-span-2 desktop:order-none desktop:col-span-5 desktop:row-span-2')}>
+        <div className={cn(TILE_CELL_CLASS, 'order-1 tablet:col-span-2 desktop:order-none desktop:col-span-5')}>
           <RendimentoTile
             aside={periodAside}
             reading={
@@ -751,53 +766,15 @@ export default function PerformancePage() {
             benchmark={benchmark}
             benchmarkLoading={benchmark === null && isAnyBenchmarkLoading}
             benchmarkName={REFERENCE_BENCHMARK.name}
-            periodReturn={periodReturnChip}
+            companionReturn={companionReturnChip}
             drawdown={drawdownStatus}
             series={growthSeries}
-            footer={`${baseMonthLabel ? `Base 100 a fine ${baseMonthLabel} · ` : ''}benchmark in ${benchmarkCurrency === 'EUR' ? 'EUR ai cambi di fine mese' : 'USD (cambi non disponibili)'} · il primo snapshot è la valutazione di partenza, non un mese misurato`}
+            baseMonthLabel={baseMonthLabel}
+            benchmarkCurrency={benchmarkCurrency}
           />
         </div>
 
-        <div className={cn(TILE_CELL_CLASS, 'order-2 desktop:order-none desktop:col-span-3')}>
-          <RischioTile
-            reading={describeRisk({ volatility: metrics.volatility, sharpeRatio: metrics.sharpeRatio, monthsMeasured: consistency.totalMonths })}
-            monthsMeasured={consistency.totalMonths}
-            riskFreeRate={metrics.riskFreeRate}
-            volatility={metrics.volatility}
-            sharpeRatio={metrics.sharpeRatio}
-            sortinoRatio={sortinoRatio}
-            drawdown={drawdownStory}
-          />
-        </div>
-
-        <div className={cn(TILE_CELL_CLASS, 'order-3 desktop:order-none desktop:col-span-4')}>
-          <ConsistenzaTile reading={describeConsistency(consistency)} heatmap={heatmapData} />
-        </div>
-
-        {/* Below desktop the benchmark reads before the contributions: «rispetto a cosa?» is the page's question. */}
-        <div className={cn(TILE_CELL_CLASS, 'order-5 desktop:order-none desktop:col-span-3')}>
-          <ContributiTile
-            reading={describeContributions({
-              invested: investedCapital,
-              netCashFlow: metrics.netCashFlow,
-              pension: { flow: metrics.pensionFlow, entryFlow: metrics.pensionEntryFlow, entryMonth: base?.pensionEntryMonth ?? null, internalFlow: metrics.pensionInternalFlow },
-              portfolio: { flow: metrics.portfolioFlow, source: metrics.flowSource, measuredMonths: metrics.measuredFlowMonths, totalMonths: metrics.numberOfMonths },
-            })}
-            invested={investedCapital}
-            netCashFlow={metrics.netCashFlow}
-            totalIncome={metrics.totalIncome}
-            totalExpenses={metrics.totalExpenses}
-            totalDividendIncome={metrics.totalDividendIncome}
-            pensionFlow={metrics.pensionFlow}
-            pensionEntryFlow={metrics.pensionEntryFlow}
-            pensionInternalFlow={metrics.pensionInternalFlow}
-            portfolioFlow={metrics.portfolioFlow}
-            flowSource={metrics.flowSource}
-            measuredFlowMonths={metrics.measuredFlowMonths}
-            numberOfMonths={metrics.numberOfMonths}
-          />
-        </div>
-
+        {/* «Rispetto a cosa?» is the page's question: the models sit beside the return, on a phone right after the risk tiles. */}
         <div className={cn(TILE_CELL_CLASS, 'order-4 desktop:order-none desktop:col-span-4')}>
           <BenchmarkTile
             reading={describeBenchmarkRanking(ranking)}
@@ -810,28 +787,71 @@ export default function PerformancePage() {
           />
         </div>
 
-        {/* The attribution sits beside the realized gains — the two «where does the money come from»
-            tiles — and, without a closed sale, beside the capital chart instead. */}
-        {attribution && (
-          <div className={cn(TILE_CELL_CLASS, 'order-6 desktop:order-none', realizedSummary ? 'desktop:col-span-7' : 'desktop:col-span-5')}>
-            <AttribuzioneTile aside={periodAside} reading={describeAttribution(attribution)} attribution={attribution} />
-          </div>
-        )}
-
-        {realizedSummary && (
-          <div className={cn(TILE_CELL_CLASS, 'order-7 desktop:order-none desktop:col-span-5')}>
-            <PlusvalenzeTile reading={describeRealizedGains(realizedSummary, currentYear)} summary={realizedSummary} skippedAssets={realizedGains.skippedAssets} />
-          </div>
-        )}
-
-        {/* With a closed sale the capital chart takes the whole row; without it, the seven columns beside the attribution. */}
-        <div className={cn(TILE_CELL_CLASS, 'order-8 tablet:col-span-2 desktop:order-none', realizedSummary ? 'desktop:col-span-12' : 'desktop:col-span-7')}>
-          <CapitaleMercatoTile
-            aside={`${periodAside} · base misurata`}
-            reading={lastChartPoint ? describeCapitalAndMarket(lastChartPoint, windowEnd) : null}
-            data={chartData}
-            pensionFlow={metrics.pensionFlow}
+        <div className={cn(TILE_CELL_CLASS, 'order-5 desktop:order-none desktop:col-span-3')}>
+          <ContributiTile
+            reading={describeContributions({
+              capital: capitalEntered,
+              totalMonths: metrics.numberOfMonths,
+              pensionEntry: { flow: metrics.pensionEntryFlow, month: base?.pensionEntryMonth ?? null },
+            })}
+            capital={capitalEntered}
+            numberOfMonths={metrics.numberOfMonths}
+            invested={investedCapital}
+            netCashFlow={metrics.netCashFlow}
+            totalIncome={metrics.totalIncome}
+            totalExpenses={metrics.totalExpenses}
+            totalDividendIncome={metrics.totalDividendIncome}
+            pensionEntryFlow={metrics.pensionEntryFlow}
+            pensionInternalFlow={metrics.pensionInternalFlow}
           />
+        </div>
+
+        {/* Below the first row the grid is TWO COLUMNS from desktop (2026-09-20, Storico's answer): each
+            tile keeps its natural height and the capital chart — the one element that can be any
+            height — takes the slack, so no tile is stretched into a void beside a taller neighbour
+            (Plusvalenze with one fiscal year is a sentence). Below desktop the wrappers are
+            `contents`: the tiles are items of the grid again, in their `order-*`. */}
+        <div className="contents desktop:flex desktop:flex-col desktop:gap-3 desktop:col-span-7">
+          {attribution && (
+            <div className={cn(TILE_CELL_CLASS, 'order-6 desktop:order-none')}>
+              <AttribuzioneTile aside={periodAside} reading={describeAttribution(attribution)} attribution={attribution} />
+            </div>
+          )}
+
+          <div className={cn(TILE_CELL_CLASS, 'order-8 tablet:col-span-2 desktop:order-none desktop:flex-1')}>
+            <CapitaleMercatoTile
+              aside={`${periodAside} · base misurata`}
+              reading={lastChartPoint ? describeCapitalAndMarket(lastChartPoint, windowEnd) : null}
+              data={chartData}
+              pensionFlow={metrics.pensionFlow}
+              flowSource={metrics.flowSource}
+            />
+          </div>
+        </div>
+
+        <div className="contents desktop:flex desktop:flex-col desktop:gap-3 desktop:col-span-5">
+          <div className={cn(TILE_CELL_CLASS, 'order-2 desktop:order-none')}>
+            <RischioTile
+              reading={describeRisk({ volatility: metrics.volatility, sharpeRatio: metrics.sharpeRatio, monthsMeasured: consistency.totalMonths })}
+              monthsMeasured={consistency.totalMonths}
+              riskFreeRate={metrics.riskFreeRate}
+              volatility={metrics.volatility}
+              sharpeRatio={metrics.sharpeRatio}
+              sortinoRatio={sortinoRatio}
+              drawdown={drawdownStory}
+            />
+          </div>
+
+          <div className={cn(TILE_CELL_CLASS, cn('order-3 desktop:order-none', !realizedSummary && 'desktop:flex-1'))}>
+            <ConsistenzaTile reading={describeConsistency(consistency)} heatmap={heatmapData} />
+          </div>
+
+          {realizedSummary && (
+            <div className={cn(TILE_CELL_CLASS, 'order-7 desktop:order-none')}>
+              <PlusvalenzeTile reading={describeRealizedGains(realizedSummary, currentYear)} summary={realizedSummary} skippedAssets={realizedGains.skippedAssets} />
+            </div>
+          )}
+
         </div>
       </div>
 
@@ -844,26 +864,22 @@ export default function PerformancePage() {
         rollingSharpe={rollingSharpe}
         underwater={underwaterData}
         attribution={attribution}
+        windowEnd={windowEnd}
       />
 
       {/* ── Dialogs ─────────────────────────────────────────────────────────────── */}
       <CustomDateRangeDialog
         open={showCustomDateDialog}
-        onOpenChange={(open) => {
-          setShowCustomDateDialog(open);
-          if (!open) setCustomDialogOrigin(undefined);
-        }}
+        onOpenChange={setShowCustomDateDialog}
         onConfirm={handleCustomDateRange}
         triggerOrigin={customDialogOrigin}
+        returnFocusTo={customOpenerRef}
       />
 
       {user && ownerId && (
         <AIAnalysisDialog
           open={showAIAnalysisDialog}
-          onOpenChange={(open) => {
-            setShowAIAnalysisDialog(open);
-            if (!open) setAiDialogOrigin(undefined);
-          }}
+          onOpenChange={setShowAIAnalysisDialog}
           metrics={metrics}
           // The modal's title IS this verdict: one sentence judging these numbers, never a
           // second phrasing of it inside the dialog (DESIGN.md → The Verdict-First Rule).
@@ -871,6 +887,7 @@ export default function PerformancePage() {
           timePeriod={selectedPeriod}
           userId={ownerId}
           triggerOrigin={aiDialogOrigin}
+          returnFocusTo={aiOpenerRef}
         />
       )}
     </PageContainer>

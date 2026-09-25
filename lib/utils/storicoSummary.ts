@@ -20,6 +20,7 @@
 import type { DoublingMilestone, MonthlySnapshot } from '@/types/assets';
 import type { Expense } from '@/types/expenses';
 import { getItalyMonth, getItalyYear } from '@/lib/utils/dateHelpers';
+import type { GrowthDrivers } from '@/lib/utils/growthDrivers';
 
 export interface PeriodMonth {
   year: number;
@@ -250,13 +251,11 @@ export function projectNextDoubling(
   return { target: inProgress.endValue, remaining, monthlyPace, monthsToTarget, eta: addMonths(latest, monthsToTarget) };
 }
 
-// ─── Drivers (savings vs market), on chartService's yearly rows ───────────────
+// ─── Drivers, on growthDrivers.ts's yearly rows ───────────────────────────────
 
-export interface DriverYear {
+/** A year of the Driver: the growth and its parts (`lib/utils/growthDrivers.ts`), with its window. */
+export interface DriverYear extends GrowthDrivers {
   year: string;
-  netSavings: number;
-  investmentGrowth: number;
-  netWorthGrowth: number;
   /** Growth over the baseline's value, in percent; `null` without a positive baseline. */
   growthPct: number | null;
   /** The snapshot the year is measured FROM; absent on a legacy row means «December of the previous year». */
@@ -266,13 +265,15 @@ export interface DriverYear {
 }
 
 /**
- * The share of a year's growth each driver explains, 0-100 and summing to 100 by construction
- * (the market's share is the remainder). `null` when either half is negative or nothing was
- * added: a share of a mixed-sign total means nothing.
+ * The share each of the two ENGINES — savings and market — takes of what the two added together,
+ * 0-100 and summing to 100 by construction (the market's share is the remainder). Not a share of
+ * the growth: the tax, the mortgage, the pension contributions and the other changes are named
+ * beside them in euro. `null` when either is negative or nothing was added: a share of a
+ * mixed-sign total means nothing.
  */
-export function resolveDriverShares(row: Pick<DriverYear, 'netSavings' | 'investmentGrowth'>): { savings: number; market: number } | null {
-  if (row.netSavings < 0 || row.investmentGrowth < 0) return null;
-  const total = row.netSavings + row.investmentGrowth;
+export function resolveDriverShares(row: Pick<DriverYear, 'netSavings' | 'market'>): { savings: number; market: number } | null {
+  if (row.netSavings < 0 || row.market < 0) return null;
+  const total = row.netSavings + row.market;
   if (total <= 0) return null;
   const savings = Math.round((row.netSavings / total) * 100);
   return { savings, market: 100 - savings };
@@ -295,18 +296,6 @@ export function runningSinceMonth(row: { baseline?: PeriodMonth }): number {
  */
 export function selectDriverYears<T extends DriverYear>(rows: T[], startYear: number): T[] {
   return rows.filter((row) => Number(row.year) >= startYear).sort((a, b) => Number(b.year) - Number(a.year));
-}
-
-export function sumDriverYears(rows: DriverYear[]): Pick<DriverYear, 'netSavings' | 'investmentGrowth' | 'netWorthGrowth'> | null {
-  if (rows.length === 0) return null;
-  return rows.reduce(
-    (sum, row) => ({
-      netSavings: sum.netSavings + row.netSavings,
-      investmentGrowth: sum.investmentGrowth + row.investmentGrowth,
-      netWorthGrowth: sum.netWorthGrowth + row.netWorthGrowth,
-    }),
-    { netSavings: 0, investmentGrowth: 0, netWorthGrowth: 0 },
-  );
 }
 
 /** The running year when it has a row (it is the one the reading is about), else the newest closed one. */
@@ -334,7 +323,7 @@ export function selectTrailingMonths<T extends PeriodMonth>(rows: T[], count: nu
 /**
  * A window of the recap: the cashflow rows dated from the month AFTER `baseline` to the month of
  * `latest` (both snapshots), and the net-worth growth between the two — the Driver's window
- * (`prepareSavingsVsInvestmentData`), one per year, so the two tiles measure the same interval by
+ * (`buildYearlyGrowthDrivers`), one per year, so the two tiles measure the same interval by
  * construction (DESIGN.md → The Same-Basis Rule).
  */
 export interface LaborWindow {
@@ -368,11 +357,31 @@ export interface LaborMetrics {
   otherIncomeByCategory: OtherIncomeCategory[];
   /** Σ (latest − baseline) over the windows: the total the three causes add up to. */
   netWorthGrowth: number;
-  /** Net-worth growth minus every inflow and outflow: the market's share. */
+  /** The market over the same windows — the Driver's measured market when its drivers are passed. */
   totalInvestmentGrowthGross: number;
+  /** The market net of the estimated tax on today's LATENT gains (cumulative recap only). */
   totalInvestmentGrowthNet: number;
+  /** The Driver's other named parts over the same windows; 0 without drivers. */
+  saleTaxes: number;
+  debtRepaid: number;
+  pensionContributions: number;
+  /** What none of the causes explains, so that every row adds up to `netWorthGrowth`. */
+  otherChanges: number;
   /** Labor income over spending (1 = the work pays exactly the bills); null without spending or without labor income. */
   coverage: number | null;
+}
+
+/**
+ * The «Lavoro e investimenti» chart's «Mercato» series read from the Driver's months, so the line
+ * and the row above it are the same measured market; a month the Driver has no row for keeps the
+ * series' own residual.
+ */
+export function alignLaborChartMarket<T extends PeriodMonth & { investmentGrowth: number }>(rows: T[], monthlyDrivers: Array<PeriodMonth & Pick<GrowthDrivers, 'market'>>): T[] {
+  const marketByMonth = new Map(monthlyDrivers.map((row) => [monthIndex(row), row.market]));
+  return rows.map((row) => {
+    const market = marketByMonth.get(monthIndex(row));
+    return market === undefined ? row : { ...row, investmentGrowth: market };
+  });
 }
 
 /** The Driver's yearly rows as recap windows; a legacy row without a baseline is a December-based one. */
@@ -384,10 +393,15 @@ const monthIndex = (period: PeriodMonth) => period.year * 12 + (period.month - 1
 
 /**
  * The «Lavoro e investimenti» recap over the given windows: what the labor categories brought
- * in, what was left after all spending, what the OTHER income categories added, and the market's
- * share — three causes that add up exactly to the net-worth growth of the same windows:
+ * in, what was left after all spending, what the OTHER income categories added, then the
+ * Driver's own parts of the same windows (`drivers`, summed by the caller from
+ * `buildYearlyGrowthDrivers`) — so the two tiles never print two «mercato» (owner, 2026-09-19):
  *
- *   savedFromWork + otherIncome + investmentGrowthGross = netWorthGrowth
+ *   savedFromWork + otherIncome + market − saleTaxes + debtRepaid + pensionContributions + otherChanges = netWorthGrowth
+ *
+ * `otherChanges` closes the identity on THIS function's rows, so it holds exactly even if the
+ * caller's expenses differ from the drivers' (pass the rows already happened: the drivers stop at
+ * today). Without `drivers` the market is the old residual and the other parts are 0.
  *
  * The windows are the Driver's, so a running year stops at its last snapshot and the recurring
  * rows already materialised for the months to come do not count (until 2026-09-07 the recap had
@@ -404,6 +418,7 @@ export function summarizeLaborMetrics(
   startYear: number,
   windows: LaborWindow[],
   estimatedTaxes: number,
+  drivers: Pick<GrowthDrivers, 'market' | 'taxes' | 'debtRepaid' | 'pensionContributions'> | null = null,
 ): LaborMetrics | null {
   if (laborCategoryIds.length === 0 || expenses.length === 0 || windows.length === 0) return null;
   const categorySet = new Set(laborCategoryIds);
@@ -436,7 +451,12 @@ export function summarizeLaborMetrics(
   const otherIncome = otherIncomeByCategory.reduce((sum, c) => sum + c.amount, 0);
 
   const netWorthGrowth = ranges.reduce((sum, r) => sum + (r.latest.totalNetWorth - r.baseline.totalNetWorth), 0);
-  const totalInvestmentGrowthGross = netWorthGrowth - (totalLaborIncome + otherIncome + totalExpensesSum);
+  const residual = netWorthGrowth - (totalLaborIncome + otherIncome + totalExpensesSum);
+  const totalInvestmentGrowthGross = drivers ? drivers.market : residual;
+  const saleTaxes = drivers?.taxes ?? 0;
+  const debtRepaid = drivers?.debtRepaid ?? 0;
+  const pensionContributions = drivers?.pensionContributions ?? 0;
+  const otherChanges = residual - totalInvestmentGrowthGross + saleTaxes - debtRepaid - pensionContributions;
   const spending = Math.abs(totalExpensesSum);
   const first = ranges[0];
   const lastRange = ranges[ranges.length - 1];
@@ -453,6 +473,10 @@ export function summarizeLaborMetrics(
     netWorthGrowth,
     totalInvestmentGrowthGross,
     totalInvestmentGrowthNet: totalInvestmentGrowthGross - estimatedTaxes,
+    saleTaxes,
+    debtRepaid,
+    pensionContributions,
+    otherChanges,
     coverage: spending > 0 && totalLaborIncome > 0 ? totalLaborIncome / spending : null,
   };
 }

@@ -8,8 +8,7 @@ import {
   updateExpenseFromDividend,
   deleteExpenseForDividend,
 } from '@/lib/services/dividendIncomeService';
-import { getCategoryById } from '@/lib/services/expenseCategoryService';
-import { getSettings } from '@/lib/services/assetAllocationService';
+import { resolveDividendIncomeCategory } from '@/lib/server/dividendUseCase';
 import { DividendFormData } from '@/types/dividend';
 import {
   assertCanAccessAccount,
@@ -84,30 +83,15 @@ export async function PUT(
         // Get updated dividend data
         const updatedDividend = await getDividendById(dividendId);
 
-        if (updatedDividend) {
-          // Get user settings for category info
-          const settings = await getSettings(updatedDividend.userId);
-
-          if (settings?.dividendIncomeCategoryId) {
-            const category = await getCategoryById(settings.dividendIncomeCategoryId);
-
-            if (category) {
-              let subCategoryName: string | undefined;
-              if (settings.dividendIncomeSubCategoryId) {
-                const subCategory = category.subCategories.find(
-                  (sub) => sub.id === settings.dividendIncomeSubCategoryId
-                );
-                subCategoryName = subCategory?.name;
-              }
-
-              await updateExpenseFromDividend(
-                updatedDividend,
-                existingDividend.expenseId,
-                category.name,
-                subCategoryName
-              );
-            }
-          }
+        // The landing category, read server-side (the client readers are refused in a route).
+        const landing = updatedDividend ? await resolveDividendIncomeCategory(updatedDividend.userId) : undefined;
+        if (updatedDividend && landing) {
+          await updateExpenseFromDividend(
+            updatedDividend,
+            existingDividend.expenseId,
+            landing.categoryName,
+            landing.subCategoryName
+          );
         }
       } catch (expenseError) {
         console.error('Error updating linked expense:', expenseError);

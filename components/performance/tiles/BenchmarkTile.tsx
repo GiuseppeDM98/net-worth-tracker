@@ -2,12 +2,13 @@
 
 import type { Narrative } from '@/lib/utils/narrative';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { BenchmarkRanking } from '@/lib/utils/performanceSummary';
+import { printedGap, type BenchmarkRanking } from '@/lib/utils/performanceSummary';
 import { formatNumber, formatPercentage } from '@/lib/services/chartService';
 import { getMetricValueColor } from '@/lib/utils/metricColors';
 import { MONTH_NAMES_SHORT } from '@/lib/utils/period';
 import { cn } from '@/lib/utils';
 import { Tile, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
+import { TileMethodNote } from '@/components/ui/tile-method-note';
 
 interface BenchmarkTileProps {
   /** Null while no model has a return yet (the series are loading). */
@@ -29,11 +30,27 @@ function signedPercent(value: number, decimals = 1): string {
 
 function signedPoints(delta: number): string {
   const points = Math.round(Math.abs(delta) * 10) / 10;
-  return `${delta > 0 ? '+' : delta < 0 ? '−' : ''}${formatNumber(points, 1)}`;
+  // A gap that prints as 0,0 is a tie (`printedGap`): no sign, as it takes no colour below.
+  if (points === 0) return formatNumber(0, 1);
+  return `${delta > 0 ? '+' : '−'}${formatNumber(points, 1)}`;
 }
 
 function monthShort(m: { year: number; month: number }): string {
   return `${MONTH_NAMES_SHORT[m.month - 1].toLowerCase()} ${String(m.year).slice(-2)}`;
+}
+
+/**
+ * «2,5 punti sopra il modello» — the gap cell spelled out for a screen reader, tie included. The
+ * model is not named: the row's own header already announces it before the cell.
+ */
+function spokenGap(delta: number): string {
+  const points = Math.abs(printedGap(delta));
+  if (points === 0) return 'alla pari con il modello';
+  return `${formatNumber(points, 1)} ${points === 1 ? 'punto' : 'punti'} ${delta > 0 ? 'sopra' : 'sotto'} il modello`;
+}
+
+function sameMonth(a: { year: number; month: number }, b: { year: number; month: number }): boolean {
+  return a.year === b.year && a.month === b.month;
 }
 
 const HEAD_CLASS = cn(TILE_SUB_EYEBROW_CLASS, 'pb-1.5 font-semibold');
@@ -44,8 +61,20 @@ const CELL_CLASS = 'py-[7px] text-[13px]';
  * up to its own last available month (the aside says so). Always in EUR: the portfolio is
  * EUR-denominated, so a USD return beside it would compare two currencies. The portfolio row
  * stays first as the reference the deltas are read against; the models rank by return.
+ *
+ * The gap column is the PORTFOLIO's point of view (2026-09-20): `row.delta` always was portfolio
+ * minus model, but under «Δ vs tuo» a red «−5,0» on ACWI's row read as ACWI's loss. The head now
+ * says whose figure it is («Tu − modello»), which is the verdict's «sopra/sotto», and the cell
+ * spells it out for a screen reader.
+ *
+ * «Fino a» exists to serve an exception — a model whose last month is not the portfolio's. With
+ * every series aligned it printed the same month on seven rows, so the column is mounted only when
+ * at least one model differs.
  */
 export function BenchmarkTile({ reading, ranking, portfolioTWR, numberOfMonths, portfolioLastMonth, isLoading, currency, className }: BenchmarkTileProps) {
+  const showLastMonth =
+    portfolioLastMonth !== null && ranking.rows.some((row) => row.lastMonth !== null && !sameMonth(row.lastMonth, portfolioLastMonth));
+
   return (
     <Tile
       eyebrow="Benchmark"
@@ -68,8 +97,10 @@ export function BenchmarkTile({ reading, ranking, portfolioTWR, numberOfMonths, 
             <tr className="text-left">
               <th scope="col" className={HEAD_CLASS}>Portafoglio modello</th>
               <th scope="col" className={cn(HEAD_CLASS, 'text-right')}>Rend.</th>
-              <th scope="col" className={cn(HEAD_CLASS, 'text-right')}>Δ vs tuo</th>
-              <th scope="col" className={cn(HEAD_CLASS, 'text-right')}>Fino a</th>
+              <th scope="col" abbr="Il tuo portafoglio meno il modello, in punti percentuali" className={cn(HEAD_CLASS, 'whitespace-nowrap pl-3 text-right')}>
+                Tu − modello
+              </th>
+              {showLastMonth && <th scope="col" className={cn(HEAD_CLASS, 'whitespace-nowrap pl-3 text-right')}>Fino a</th>}
             </tr>
           </thead>
           <tbody>
@@ -79,9 +110,11 @@ export function BenchmarkTile({ reading, ranking, portfolioTWR, numberOfMonths, 
                 {portfolioTWR === null ? '—' : signedPercent(portfolioTWR)}
               </td>
               <td className={cn(CELL_CLASS, 'text-right font-mono tabular-nums text-muted-foreground')}>—</td>
-              <td className={cn(CELL_CLASS, 'text-right font-mono text-[11px] tabular-nums text-muted-foreground')}>
-                {portfolioLastMonth ? monthShort(portfolioLastMonth) : '—'}
-              </td>
+              {showLastMonth && (
+                <td className={cn(CELL_CLASS, 'text-right font-mono text-[11px] tabular-nums text-muted-foreground')}>
+                  {portfolioLastMonth ? monthShort(portfolioLastMonth) : '—'}
+                </td>
+              )}
             </tr>
             {ranking.rows.map((row) => (
               <tr key={row.id} className="border-t border-border">
@@ -89,23 +122,35 @@ export function BenchmarkTile({ reading, ranking, portfolioTWR, numberOfMonths, 
                 <td className={cn(CELL_CLASS, 'text-right font-mono tabular-nums', row.annualized === null ? 'text-muted-foreground' : 'text-foreground')}>
                   {row.annualized === null ? (isLoading ? '…' : '—') : signedPercent(row.annualized)}
                 </td>
-                <td className={cn(CELL_CLASS, 'text-right font-mono font-semibold tabular-nums', row.delta === null ? 'text-muted-foreground' : getMetricValueColor(row.delta, 'number'))}>
-                  {row.delta === null ? '—' : signedPoints(row.delta)}
+                <td className={cn(CELL_CLASS, 'text-right font-mono font-semibold tabular-nums', row.delta === null ? 'text-muted-foreground' : getMetricValueColor(printedGap(row.delta), 'number'))}>
+                  {row.delta === null ? (
+                    '—'
+                  ) : (
+                    <>
+                      <span aria-hidden="true">{signedPoints(row.delta)}</span>
+                      <span className="sr-only">{spokenGap(row.delta)}</span>
+                    </>
+                  )}
                 </td>
-                <td className={cn(CELL_CLASS, 'text-right font-mono text-[11px] tabular-nums text-muted-foreground')}>
-                  {row.lastMonth ? monthShort(row.lastMonth) : '—'}
-                </td>
+                {showLastMonth && (
+                  <td className={cn(CELL_CLASS, 'text-right font-mono text-[11px] tabular-nums text-muted-foreground')}>
+                    {row.lastMonth ? monthShort(row.lastMonth) : '—'}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      <p className="mt-auto border-t border-border pt-3.5 text-[11px] leading-[1.45] text-muted-foreground">
-        Ogni modello è misurato fino al suo ultimo mese disponibile e annualizzato sugli stessi mesi del tuo portafoglio;{' '}
-        {currency === 'EUR'
-          ? 'ETF in USD convertiti in EUR ai cambi di fine mese, ribilanciamento annuale.'
-          : 'ETF in USD, cambi non disponibili in questo momento: i rendimenti restano in dollari.'}
-      </p>
+      <TileMethodNote subject="Benchmark" summary="Tu − modello, in punti annui.">
+        <span className="block">Ogni modello è annualizzato sugli stessi mesi del tuo portafoglio, fino al suo ultimo mese disponibile; la colonna «Fino a» compare solo quando un modello si ferma a un mese diverso dal tuo.</span>
+        <span className="block">Tu − modello è il tuo rendimento meno quello del modello, in punti percentuali: positivo = sei sopra.</span>
+        <span className="block">
+          {currency === 'EUR'
+            ? 'I modelli sono ETF in USD convertiti in EUR ai cambi di fine mese, con ribilanciamento annuale.'
+            : 'I modelli sono ETF in USD con ribilanciamento annuale; i cambi non sono disponibili in questo momento, quindi i loro rendimenti restano in dollari.'}
+        </span>
+      </TileMethodNote>
     </Tile>
   );
 }

@@ -18,8 +18,11 @@ import type { CostCenter } from '@/types/costCenters';
 import { narrativeToText, type Narrative } from '@/lib/utils/narrative';
 import { summarizeCenter, summarizeCostCenters, buildCenterMonthStack } from '@/lib/utils/costCenterSummary';
 import { buildCategoryComposition, buildSubCategoryComposition } from '@/lib/utils/costCenterUtils';
+import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import {
+  CENTRI_ASIDE,
   CENTRI_FOOTER,
+  EMPTY_CENTRI,
   buildCostCenterVerdict,
   buildCostCentersVerdict,
   describeArchiviati,
@@ -29,11 +32,15 @@ import {
   describeBudgetLabel,
   describeBudgetUsed,
   describeCategorie,
+  describeCeilingHint,
   describeCenterChip,
   describeCenterRow,
   describeCenterTrailingCaption,
   describeCentri,
   describeCiclo,
+  describeColorClash,
+  describeColorSwatch,
+  describeCostCenterDialogCopy,
   describeCicloAside,
   describeCicloFooter,
   describeCosto,
@@ -43,7 +50,16 @@ import {
   describeDormienti,
   describeIdle,
   describeLastYearCaption,
-  describeMonthEndKpi,
+  describeLinkEmpty,
+  describeLinkLeaves,
+  describeLinkOutcome,
+  describeLinkSelection,
+  describeLinkSeries,
+  describeLinkUndone,
+  describeUnlinkOutcome,
+  describeUnlinkSeriesReading,
+  UNLINK_CONSEQUENCE,
+  describeMonthKpi,
   describeMovimenti,
   describeMovimentiAside,
   describeSottocategorie,
@@ -52,7 +68,7 @@ import {
   describeTotaleAside,
   describeTotaleFooter,
   describeTrailingCaption,
-  describeYearEndKpi,
+  describeYearKpi,
 } from '@/lib/utils/costCenterNarrative';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -63,6 +79,8 @@ const NOW = new Date('2026-08-22T10:00:00+02:00');
 const plain = (narrative: Narrative | string) =>
   (typeof narrative === 'string' ? narrative : narrativeToText(narrative)).replace(/ /g, ' ').replace(/'/g, '’');
 const day = (iso: string) => new Date(`${iso}T00:00:00`);
+// The figure exactly as the narrative prints it (the no-break space before € included).
+const euroNbsp = (value: number) => cachedFormatCurrencyEUR(value, true);
 
 function expense(partial: Partial<Expense> & { date: Date; amount: number }): Expense {
   return {
@@ -96,13 +114,21 @@ const AUTO_ROWS: Expense[] = [
   expense({ date: day('2026-08-28'), amount: -50, isInstallment: true }),
 ];
 const CASA_ROWS = [expense({ date: day('2024-06-10'), amount: -1450 }), expense({ date: day('2026-06-10'), amount: -2650 })];
+// The same center with a 300 € instalment in November: nothing more is SPENT, the year ends 300 € higher.
+const CASA_ROWS_WITH_INSTALMENT = [...CASA_ROWS, expense({ date: day('2026-11-10'), amount: -300, isInstallment: true })];
 const BICI_ROWS = [expense({ date: day('2024-09-01'), amount: -700 }), expense({ date: day('2026-04-24'), amount: -300 })];
 
-const list = (overrides: Partial<Record<'auto' | 'casa' | 'bici', Partial<CostCenter>>> = {}, extra: { center: CostCenter; expenses: Expense[] }[] = []) =>
+// Automobile's default ceiling is 250: the 210 € booked hold, the instalment on the 28th crosses
+// it — the RISK as the page knows it since 2026-09-18 (the calendar, never a pace).
+const list = (
+  overrides: Partial<Record<'auto' | 'casa' | 'bici', Partial<CostCenter>>> = {},
+  extra: { center: CostCenter; expenses: Expense[] }[] = [],
+  casaRows: Expense[] = CASA_ROWS,
+) =>
   summarizeCostCenters(
     [
-      { center: center({ id: 'auto', name: 'Automobile', budgetAmount: 300, budgetPeriod: 'monthly', ...overrides.auto }), expenses: AUTO_ROWS },
-      { center: center({ id: 'casa', name: 'Casa al mare', ...overrides.casa }), expenses: CASA_ROWS },
+      { center: center({ id: 'auto', name: 'Automobile', budgetAmount: 250, budgetPeriod: 'monthly', ...overrides.auto }), expenses: AUTO_ROWS },
+      { center: center({ id: 'casa', name: 'Casa al mare', ...overrides.casa }), expenses: casaRows },
       { center: center({ id: 'bici', name: 'Bici', ...overrides.bici }), expenses: BICI_ROWS },
       ...extra,
     ],
@@ -114,11 +140,18 @@ const list = (overrides: Partial<Record<'auto' | 'casa' | 'bici', Partial<CostCe
 describe('buildCostCentersVerdict', () => {
   it('opens on the center at risk, names the most expensive one and the longest-idle one', () => {
     const v = buildCostCentersVerdict(list(), NOW);
-    expect(v.headline).toBe('Automobile rischia di sforare il tetto di agosto.');
+    expect(v.headline).toBe('Automobile supererà il tetto di agosto.');
     expect(v.tone).toBe('warning');
     expect(plain(v.sentence)).toBe(
-      '3 centri attivi per 10.300 € in totale: Automobile è il più caro (5200 €, il 50%) e ad agosto è all’87% del tetto, al ritmo attuale chiude a ~346 € su 300 €; Bici è fermo da 120 giorni.',
+      '3 centri attivi per 10.300 € in totale: Automobile è il più caro (5200 €, il 50%) e ad agosto arriva a 260 € su 250 € con le spese già in calendario; Bici è fermo da 120 giorni.',
     );
+  });
+
+  it('never calls a risk what only a pace would cross: 260 € known on a 300 € ceiling holds', () => {
+    // Until 2026-09-18 this read «al ritmo attuale chiude a ~346 € su 300 €».
+    const v = buildCostCentersVerdict(list({ auto: { budgetAmount: 300 } }), NOW);
+    expect(v.headline).toBe('Automobile è il centro più caro.');
+    expect(plain(v.sentence)).not.toContain('ritmo');
   });
 
   it('states a crossed ceiling as a fact, before anything else', () => {
@@ -144,30 +177,35 @@ describe('buildCostCentersVerdict', () => {
   });
 
   it('separates a second center at risk from the most expensive one', () => {
-    const v = buildCostCentersVerdict(list({ auto: { budgetAmount: undefined, budgetPeriod: undefined }, casa: { budgetAmount: 2700, budgetPeriod: 'annual' } }), NOW);
-    expect(v.headline).toBe('Casa al mare rischia di sforare il tetto del 2026.');
+    const v = buildCostCentersVerdict(
+      list({ auto: { budgetAmount: undefined, budgetPeriod: undefined }, casa: { budgetAmount: 2700, budgetPeriod: 'annual' } }, [], CASA_ROWS_WITH_INSTALMENT),
+      NOW,
+    );
+    expect(v.headline).toBe('Casa al mare supererà il tetto del 2026.');
     expect(plain(v.sentence)).toBe(
-      '3 centri attivi per 10.300 € in totale: Automobile è il più caro (5200 €, il 50%); Casa al mare nel 2026 è al 98% del tetto, al ritmo attuale chiude a ~4134 € su 2700 €; Bici è fermo da 120 giorni.',
+      '3 centri attivi per 10.300 € in totale: Automobile è il più caro (5200 €, il 50%); Casa al mare nel 2026 arriva a 2950 € su 2700 € con le spese già in calendario; Bici è fermo da 120 giorni.',
     );
   });
 
   it('counts two centers at risk or over', () => {
-    const v = buildCostCentersVerdict(list({ casa: { budgetAmount: 2700, budgetPeriod: 'annual' } }), NOW);
-    expect(v.headline).toBe('2 centri rischiano di sforare il tetto.');
+    const v = buildCostCentersVerdict(list({ casa: { budgetAmount: 2700, budgetPeriod: 'annual' } }, [], CASA_ROWS_WITH_INSTALMENT), NOW);
+    expect(v.headline).toBe('2 centri supereranno il tetto.');
     expect(v.tone).toBe('warning');
+    expect(plain(v.sentence)).toContain('Automobile e Casa al mare supereranno il tetto con le spese già in calendario');
   });
 
   it('says when there is nothing to judge', () => {
     expect(buildCostCentersVerdict(summarizeCostCenters([], NOW), NOW)).toEqual({
       headline: 'Nessun centro di costo.',
       tone: 'neutral',
-      sentence: [{ text: 'Crea il primo centro per raggruppare le spese di un oggetto o di un progetto.' }],
+      sentence: [{ text: 'Crea il primo centro per raggruppare le spese di un oggetto o di un progetto: il suo costo è il costo di sempre, senza periodo.' }],
     });
 
     const empty = summarizeCostCenters([{ center: center({ id: 'a', name: 'A' }), expenses: [] }, { center: center({ id: 'b', name: 'B' }), expenses: [] }], NOW);
     const v = buildCostCentersVerdict(empty, NOW);
     expect(v.headline).toBe('Nessuna spesa nei centri di costo.');
-    expect(plain(v.sentence)).toBe('2 centri creati, ancora senza movimenti: collega una spesa da Tracciamento per vederla qui.');
+    // The feature's entry point is a field of ANOTHER page's form: the sentence names it and its place.
+    expect(plain(v.sentence)).toBe('2 centri creati, ancora senza movimenti. Una spesa si collega dal suo form, in Tracciamento: campo «Centro di Costo», sotto «Impostazioni avanzate».');
 
     const archivedOnly = summarizeCostCenters([{ center: center({ archivedAt: day('2025-01-10') }), expenses: AUTO_ROWS }], NOW);
     const a = buildCostCentersVerdict(archivedOnly, NOW);
@@ -186,8 +224,11 @@ describe('buildCostCentersVerdict', () => {
 describe('list readings', () => {
   const s = list();
 
-  it('reads the total with the top shares', () => {
-    expect(plain(describeTotale(s))).toBe('10.300 € dal marzo 2023: Automobile pesa il 50%, i primi 2 il 90%.');
+  const stack = buildCenterMonthStack(s.active, NOW, 12);
+
+  it('reads the total over TIME — since when, this year, the tallest bar — and leaves the shares to the verdict and to Centri', () => {
+    expect(plain(describeTotale(s, stack, NOW))).toBe('Da marzo 2023; quest’anno 4810 €, il 47% del totale. Il mese più caro degli ultimi 12 è giugno (2650 €).');
+    expect(plain(describeTotale(s, stack, NOW))).not.toContain('Automobile');
     expect(plain(describeTotaleAside(s))).toBe('3 centri attivi · in totale');
     expect(describeTotaleFooter(s)).toBeNull();
     const withArchived = list({ bici: { archivedAt: day('2026-05-01') } });
@@ -196,12 +237,32 @@ describe('list readings', () => {
 
   it('reads a single center without a second share', () => {
     const one = summarizeCostCenters([{ center: center(), expenses: AUTO_ROWS }], NOW);
-    expect(plain(describeTotale(one))).toBe('5200 € dal marzo 2023: Automobile è l’unico centro con spese.');
+    // A peak of another year carries its year: «dicembre» alone would read as the one to come.
+    expect(plain(describeTotale(one, buildCenterMonthStack(one.active, NOW, 12), NOW))).toBe(
+      'Da marzo 2023; quest’anno 1860 €, il 36% del totale. Il mese più caro degli ultimi 12 è dicembre 2025 (1240 €).',
+    );
     expect(plain(describeTotaleAside(one))).toBe('1 centro attivo · in totale');
   });
 
-  it('captions last year by its number', () => {
-    expect(plain(describeLastYearCaption(NOW))).toBe('2025, intero');
+  it('says so when the running month is already the record, and drops «quest\'anno» on a history born this year', () => {
+    const young = summarizeCostCenters([{ center: center(), expenses: [expense({ date: day('2026-07-02'), amount: -200 }), expense({ date: day('2026-08-10'), amount: -900 })] }], NOW);
+    expect(plain(describeTotale(young, buildCenterMonthStack(young.active, NOW, 12), NOW))).toBe(
+      'Da luglio 2026. Agosto, ancora in corso, è già il mese più caro degli ultimi 12 (900 €).',
+    );
+  });
+
+  it('captions last year as whole only when the history covers it', () => {
+    expect(plain(describeLastYearCaption(NOW, day('2023-03-14')))).toBe('2025, intero');
+    expect(plain(describeLastYearCaption(NOW, day('2025-01-20')))).toBe('2025, intero');
+    expect(plain(describeLastYearCaption(NOW, null))).toBe('2025, intero');
+    // The owner's account: a first expense in September 2025 read «2025, intero» beside «Quest'anno».
+    expect(plain(describeLastYearCaption(NOW, day('2025-09-03')))).toBe('2025, da settembre');
+  });
+
+  it('gives Centri a scope of its own and an empty page the way in', () => {
+    expect(plain(CENTRI_ASIDE)).toBe('in ordine di costo');
+    expect(plain(CENTRI_ASIDE)).not.toBe(plain(describeTotaleAside(s)));
+    expect(plain(EMPTY_CENTRI)).toBe('Nessun centro ancora. Dopo averne creato uno, una spesa si collega dal suo form, in Tracciamento: campo «Centro di Costo», sotto «Impostazioni avanzate».');
   });
 
   it('captions the bars with the running month', () => {
@@ -218,10 +279,10 @@ describe('list readings', () => {
 
   it('captions each row with its count, its last expense and its own window', () => {
     const [auto, casa, bici] = s.active.map((row) => row.summary);
-    expect(plain(describeCenterRow(auto, NOW))).toBe('7 movimenti · ultima spesa il 18/08 · al ritmo attuale ~346 € su 300 € ad agosto');
+    expect(plain(describeCenterRow(auto, NOW))).toBe('7 movimenti · ultima spesa il 18/08 · con il calendario 260 € su 250 € ad agosto');
     expect(plain(describeCenterRow(casa, NOW))).toBe('2 movimenti · ultima spesa il 10/06 · quest’anno 2650 €');
     expect(plain(describeCenterRow(bici, NOW))).toBe('2 movimenti · ultima spesa il 24/04');
-    expect(describeCenterChip(auto)).toEqual({ label: "tetto mensile all'87%", tone: 'warning' });
+    expect(describeCenterChip(auto)).toEqual({ label: 'tetto mensile al 104%', tone: 'warning' });
     expect(describeCenterChip(casa)).toBeNull();
     expect(describeCenterChip(bici)).toEqual({ label: 'fermo da 120 giorni', tone: 'neutral' });
   });
@@ -259,30 +320,39 @@ describe('list readings', () => {
 // ─── The detail's verdict ─────────────────────────────────────────────────────
 
 describe('buildCostCenterVerdict', () => {
-  it('judges a monthly ceiling at risk, then tells the whole cost', () => {
-    const v = buildCostCenterVerdict(summarizeCenter(center({ budgetAmount: 300, budgetPeriod: 'monthly' }), AUTO_ROWS, NOW), NOW);
-    expect(v.headline).toBe('Automobile rischia di sforare il tetto di agosto.');
+  it('judges a ceiling the calendar will cross as a risk, naming the day on a month, then tells the whole cost', () => {
+    const v = buildCostCenterVerdict(summarizeCenter(center({ budgetAmount: 250, budgetPeriod: 'monthly' }), AUTO_ROWS, NOW), NOW);
+    expect(v.headline).toBe('Automobile supererà il tetto di agosto.');
     expect(v.tone).toBe('warning');
     expect(plain(v.sentence)).toBe(
-      'A 9 giorni dalla fine del mese hai impegnato 260 € su 300 €, e al ritmo attuale chiudi a ~346 €, 46 € oltre; in tutto ti è costato 5200 € da marzo 2023.',
+      'Lo superi il 28 con le spese già in calendario; a 9 giorni dalla fine del mese hai speso 210 € e ne hai in calendario 50 €: 260 € su 250 €, 10 € oltre; in tutto ti è costato 5200 € da marzo 2023.',
     );
 
-    const annual = buildCostCenterVerdict(summarizeCenter(center({ budgetAmount: 2500, budgetPeriod: 'annual' }), AUTO_ROWS, NOW), NOW);
-    expect(annual.headline).toBe('Automobile rischia di sforare il tetto del 2026.');
+    // A year has no crossing day (the guide's declared blind spot): the cause is named, not the date.
+    const annual = buildCostCenterVerdict(summarizeCenter(center({ budgetAmount: 1900, budgetPeriod: 'annual' }), AUTO_ROWS, NOW), NOW);
+    expect(annual.headline).toBe('Automobile supererà il tetto del 2026.');
+    expect(annual.tone).toBe('warning');
     expect(plain(annual.sentence)).toBe(
-      'Da gennaio hai impegnato 1910 € su 2500 €, il 76% al 64% dell’anno, e al ritmo attuale chiudi a ~2951 €, 451 € oltre; in tutto ti è costato 5200 € da marzo 2023.',
+      'Lo superi con le spese già in calendario; da gennaio hai speso 1860 € e ne hai in calendario 50 €: 1910 € su 1900 €, 10 € oltre; in tutto ti è costato 5200 € da marzo 2023.',
     );
   });
 
-  it('tells when a monthly ceiling was crossed, or will be by a row already in the calendar', () => {
+  it('ranks a risk above dormancy, so the detail and the list name the same center for the same reason', () => {
+    // Idle since January, an instalment in November that crosses the annual ceiling.
+    const rows = [expense({ date: day('2026-01-15'), amount: -800 }), expense({ date: day('2026-11-30'), amount: -300, isInstallment: true })];
+    const idle = summarizeCenter(center({ name: 'Fenicottero', budgetAmount: 1000, budgetPeriod: 'annual' }), rows, NOW);
+    expect(idle.lifecycle).toBe('dormant');
+    expect(idle.budget!.atRisk).toBe(true);
+    expect(buildCostCenterVerdict(idle, NOW).headline).toBe('Fenicottero supererà il tetto del 2026.');
+    const listed = buildCostCentersVerdict(summarizeCostCenters([{ center: idle.center, expenses: rows }], NOW), NOW);
+    expect(listed.headline).toBe('Fenicottero supererà il tetto del 2026.');
+  });
+
+  it('tells when a monthly ceiling was crossed by what is booked', () => {
     const crossed = buildCostCenterVerdict(summarizeCenter(center({ budgetAmount: 200, budgetPeriod: 'monthly' }), AUTO_ROWS, NOW), NOW);
     expect(crossed.headline).toBe('Automobile ha superato il tetto di agosto.');
     expect(crossed.tone).toBe('negative');
     expect(plain(crossed.sentence)).toBe('Lo hai superato il 18; a 9 giorni dalla fine del mese hai impegnato 260 € su 200 €, 60 € oltre; in tutto ti è costato 5200 € da marzo 2023.');
-
-    const ahead = buildCostCenterVerdict(summarizeCenter(center({ budgetAmount: 250, budgetPeriod: 'monthly' }), AUTO_ROWS, NOW), NOW);
-    expect(ahead.headline).toBe('Automobile supererà il tetto di agosto.');
-    expect(plain(ahead.sentence)).toBe('Lo superi il 28 con le spese già in calendario; a 9 giorni dalla fine del mese hai impegnato 260 € su 250 €, 10 € oltre; in tutto ti è costato 5200 € da marzo 2023.');
   });
 
   it('judges a holding ceiling with the calendar, and an annual one on the year', () => {
@@ -290,13 +360,13 @@ describe('buildCostCenterVerdict', () => {
     expect(monthly.headline).toBe('Automobile resta nel tetto di agosto.');
     expect(monthly.tone).toBe('positive');
     expect(plain(monthly.sentence)).toBe(
-      'A 9 giorni dalla fine del mese hai impegnato 260 € su 800 €, il 33% al 71% del mese, e al ritmo attuale chiudi a ~346 €; in tutto ti è costato 5200 € da marzo 2023.',
+      'A 9 giorni dalla fine del mese hai impegnato 260 € su 800 €, il 33% al 71% del mese; in tutto ti è costato 5200 € da marzo 2023.',
     );
 
     const annual = buildCostCenterVerdict(summarizeCenter(center({ budgetAmount: 6000, budgetPeriod: 'annual' }), AUTO_ROWS, NOW), NOW);
     expect(annual.headline).toBe('Automobile resta nel tetto del 2026.');
     expect(plain(annual.sentence)).toBe(
-      'Da gennaio hai impegnato 1910 € su 6000 €, il 32% al 64% dell’anno, e al ritmo attuale chiudi a ~2951 €; in tutto ti è costato 5200 € da marzo 2023.',
+      'Da gennaio hai impegnato 1910 € su 6000 €, il 32% al 64% dell’anno; in tutto ti è costato 5200 € da marzo 2023.',
     );
   });
 
@@ -304,7 +374,13 @@ describe('buildCostCenterVerdict', () => {
     const v = buildCostCenterVerdict(summarizeCenter(center(), AUTO_ROWS, NOW), NOW);
     expect(plain(v.headline)).toBe('Automobile costa 124 € al mese.');
     expect(v.tone).toBe('neutral');
-    expect(plain(v.sentence)).toBe('5200 € in 7 movimenti da marzo 2023, 1860 € quest’anno; al ritmo attuale l’anno chiude a ~2951 €.');
+    expect(plain(v.sentence)).toBe('5200 € in 7 movimenti da marzo 2023, 1860 € quest’anno; con le spese in calendario l’anno chiude a 1910 €.');
+    // Nothing in the calendar: the clause drops, it never repeats «quest'anno».
+    const bare = buildCostCenterVerdict(summarizeCenter(center(), AUTO_ROWS.filter((row) => !row.isInstallment), NOW), NOW);
+    expect(plain(bare.sentence)).toBe('5200 € in 7 movimenti da marzo 2023, 1860 € quest’anno.');
+    // Born this year: «900 € … da agosto 2026, 900 € quest'anno» would say the total twice.
+    const young = buildCostCenterVerdict(summarizeCenter(center(), [expense({ date: day('2026-08-10'), amount: -900 })], NOW), NOW);
+    expect(plain(young.sentence)).toBe('900 € in 1 movimento da agosto 2026.');
   });
 
   it('says a dormant center is dormant and gives it no projection', () => {
@@ -321,7 +397,7 @@ describe('buildCostCenterVerdict', () => {
 
     const never = buildCostCenterVerdict(summarizeCenter(center({ name: 'Nuovo' }), [], NOW), NOW);
     expect(never.headline).toBe('Nuovo non ha ancora spese.');
-    expect(plain(never.sentence)).toBe('Collega una spesa da Tracciamento per vederla qui.');
+    expect(plain(never.sentence)).toBe('Una spesa si collega dal suo form, in Tracciamento: campo «Centro di Costo», sotto «Impostazioni avanzate».');
   });
 });
 
@@ -331,8 +407,11 @@ describe('detail readings', () => {
   const s = summarizeCenter(center({ budgetAmount: 400, budgetPeriod: 'monthly' }), AUTO_ROWS, NOW);
 
   it('reads the cost tile', () => {
-    expect(plain(describeCosto(s))).toBe('5200 € in 7 movimenti, 124 € al mese in media; quest’anno 1860 €, il 36%.');
-    expect(plain(describeCostoAside(s))).toBe('dal marzo 2023 · in totale');
+    expect(plain(describeCosto(s, NOW))).toBe('5200 € in 7 movimenti, 124 € al mese in media; quest’anno 1860 €, il 36%.');
+    expect(plain(describeCostoAside(s))).toBe('da marzo 2023 · in totale');
+    // A center born this year IS this year: «quest'anno 900 €, il 100%» would say the total twice.
+    const young = summarizeCenter(center(), [expense({ date: day('2026-08-10'), amount: -900 })], NOW);
+    expect(plain(describeCosto(young, NOW))).toBe('900 € in 1 movimento, 900 € al mese in media; tutto quest’anno.');
     expect(plain(describeCostoFooter(s))).toBe('Fisso 2620 € (il 50%, ricorrenti e rate) · una tantum 2580 €.');
     const oneOff = summarizeCenter(center(), CASA_ROWS, NOW);
     expect(plain(describeCostoFooter(oneOff))).toBe('Tutto una tantum: nessuna spesa ricorrente o a rate.');
@@ -350,19 +429,24 @@ describe('detail readings', () => {
   });
 
   it('reads the three KPIs with their captions', () => {
-    expect(plain(describeMonthEndKpi(s, NOW).value)).toBe('~346 €');
-    expect(describeMonthEndKpi(s, NOW).caption).toEqual([{ text: 'al ritmo attuale' }]);
-    expect(describeMonthEndKpi(s, NOW).tone).toBe('neutral');
-    const atRisk = summarizeCenter(center({ budgetAmount: 300, budgetPeriod: 'monthly' }), AUTO_ROWS, NOW);
-    expect(describeMonthEndKpi(atRisk, NOW).tone).toBe('negative');
-    expect(plain(describeMonthEndKpi(atRisk, NOW).caption)).toBe('al ritmo attuale, 46 € oltre');
-    expect(plain(describeYearEndKpi(s).value)).toBe('~2951 €');
-    expect(plain(describeYearEndKpi(s).caption)).toBe('al ritmo di quest’anno');
+    // The figure is what is BOOKED in the window; the calendar is the caption's. The end is a SUM: no «~».
+    expect(plain(describeMonthKpi(s, NOW).value)).toBe('210 €');
+    expect(plain(describeMonthKpi(s, NOW).caption)).toBe('con il calendario chiude a 260 €');
+    expect(describeMonthKpi(s, NOW).tone).toBe('neutral');
+    const atRisk = summarizeCenter(center({ budgetAmount: 250, budgetPeriod: 'monthly' }), AUTO_ROWS, NOW);
+    expect(describeMonthKpi(atRisk, NOW).tone).toBe('negative');
+    expect(plain(describeMonthKpi(atRisk, NOW).caption)).toBe('con il calendario chiude a 260 €, 10 € oltre');
+    expect(plain(describeYearKpi(s).value)).toBe('1860 €');
+    expect(plain(describeYearKpi(s).caption)).toBe('con il calendario chiude a 1910 €');
+    // Nothing in the calendar: the cell still carries its figure, and says it is the spent part.
+    const bare = summarizeCenter(center(), AUTO_ROWS.filter((row) => !row.isInstallment), NOW);
+    expect(describeMonthKpi(bare, NOW)).toEqual({ value: euroNbsp(210), caption: [{ text: 'speso finora' }], tone: 'neutral' });
+    expect(plain(describeYearKpi(bare).caption)).toBe('speso finora');
     expect(plain(describeAverageKpi(s).value)).toBe('124 €');
     expect(describeAverageKpi(s).caption).toEqual([{ text: 'media su ' }, { text: '42', mono: true }, { text: ' mesi' }]);
     const dormant = summarizeCenter(center({ name: 'Bici' }), BICI_ROWS, NOW);
-    expect(describeMonthEndKpi(dormant, NOW)).toEqual({ value: '—', caption: [{ text: 'nessuna spesa ad agosto' }], tone: 'muted' });
-    expect(describeYearEndKpi(dormant)).toEqual({ value: '—', caption: [{ text: 'centro fermo' }], tone: 'muted' });
+    expect(describeMonthKpi(dormant, NOW)).toEqual({ value: '—', caption: [{ text: 'nessuna spesa ad agosto' }], tone: 'muted' });
+    expect(plain(describeYearKpi(dormant).value)).toBe('300 €');
   });
 
   it('reads the category and subcategory tiles', () => {
@@ -395,5 +479,77 @@ describe('detail readings', () => {
     expect(plain(describeMovimentiAside(s))).toBe('8 voci');
     const casa = summarizeCenter(center(), CASA_ROWS, NOW);
     expect(plain(describeMovimenti(casa))).toBe('2 spese dal 10/06/2024 al 10/06/2026; la più grande è Carburante · Benzina (2650 €) del 10/06/2026.');
+  });
+});
+
+// ─── The form ─────────────────────────────────────────────────────────────────
+
+describe('the create/edit form', () => {
+  it('teaches where an expense is linked on the reading of a NEW center, not of an edit', () => {
+    const create = describeCostCenterDialogCopy(false);
+    expect(plain(create.idle)).toBe(
+      'Un centro misura il costo di sempre di un progetto, senza periodo. Le spese si collegano poi una a una dal loro form: campo «Centro di Costo», sotto «Impostazioni avanzate».',
+    );
+    expect(plain(describeCostCenterDialogCopy(true).idle)).not.toContain('Impostazioni avanzate');
+    expect(create.submitting).toBe('Salvataggio in corso…');
+  });
+
+  it('names a swatch by its position and by who already wears it', () => {
+    expect(describeColorSwatch(0, 8, [], false)).toBe('Colore 1 di 8');
+    expect(describeColorSwatch(0, 8, ['Dacia Jogger'], true)).toBe('Colore 1 di 8, in uso da Dacia Jogger (selezionato)');
+    expect(describeColorSwatch(2, 8, ['A', 'B'], false)).toBe('Colore 3 di 8, in uso da A e B');
+  });
+
+  it('says what a shared colour costs, and nothing when it is free', () => {
+    expect(describeColorClash([])).toBeNull();
+    expect(describeColorClash(['Dacia Jogger'])).toBe('È già il colore di Dacia Jogger: nei grafici i due centri non si distinguono.');
+    expect(describeColorClash(['A', 'B'])).toBe('È già il colore di A e B: nei grafici questi centri non si distinguono.');
+  });
+
+  it('promises no notification for a ceiling: it is read on the page', () => {
+    expect(describeCeilingHint('monthly')).toContain('tetto mensile');
+    expect(describeCeilingHint('annual')).toContain('tetto annuale');
+    expect(describeCeilingHint('annual')).not.toMatch(/ricever|avviso/);
+  });
+});
+
+// ─── Linking many expenses at once ────────────────────────────────────────────
+
+describe('«Collega spese…»', () => {
+  it('counts what the confirm writes and names what it MOVES, before the button is pressed', () => {
+    expect(plain(describeLinkSelection({ rowCount: 0, total: 0, moves: [] }, 'Dacia Jogger'))).toBe(
+      'Nessuna spesa selezionata: spunta quelle che appartengono a Dacia Jogger.',
+    );
+    expect(plain(describeLinkSelection({ rowCount: 1, total: 70, moves: [] }, 'Dacia Jogger'))).toBe('1 spesa, 70 €.');
+    expect(plain(describeLinkSelection({ rowCount: 12, total: 1840, moves: [{ centerId: 'v', centerName: 'Vacanze', count: 3 }] }, 'Dacia Jogger'))).toBe(
+      '12 spese, 1840 € · 3 passano da Vacanze a Dacia Jogger.',
+    );
+    const two = { rowCount: 5, total: 200, moves: [{ centerId: 'v', centerName: 'Vacanze', count: 1 }, { centerId: 'c', centerName: 'Casa', count: 1 }] };
+    expect(plain(describeLinkSelection(two, 'Dacia Jogger'))).toBe('5 spese, 200 € · 2 passano da Vacanze e Casa a Dacia Jogger.');
+    expect(plain(describeLinkSelection({ rowCount: 2, total: 50, moves: [{ centerId: 'v', centerName: 'Vacanze', count: 1 }] }, 'Dacia Jogger'))).toContain('1 passa da Vacanze');
+  });
+
+  it('captions a series as one row that links every occurrence', () => {
+    expect(describeLinkSeries({ kind: 'installment', count: 12, scheduledCount: 4 })).toBe('12 rate · 4 in calendario');
+    expect(describeLinkSeries({ kind: 'installment', count: 1, scheduledCount: 0 })).toBe('1 rata');
+    expect(describeLinkSeries({ kind: 'recurring', count: 24, scheduledCount: 0 })).toBe('serie di 24');
+    expect(describeLinkLeaves([{ centerId: 'v', centerName: 'Vacanze', count: 2 }])).toBe('di Vacanze');
+  });
+
+  it('tells three kinds of empty list apart', () => {
+    expect(describeLinkEmpty({ anyCandidate: false, anyHiddenByOtherCenters: false, filtered: false })).toContain('già tutte in questo centro');
+    expect(describeLinkEmpty({ anyCandidate: true, anyHiddenByOtherCenters: true, filtered: true })).toBe('Nessuna uscita corrisponde ai filtri.');
+    expect(describeLinkEmpty({ anyCandidate: true, anyHiddenByOtherCenters: true, filtered: false })).toContain('«Mostra anche quelle di altri centri»');
+  });
+
+  it('words the outcomes, the undo and the unlink', () => {
+    expect(describeLinkOutcome(12, 'Dacia Jogger')).toBe('12 spese collegate a Dacia Jogger');
+    expect(describeLinkOutcome(1, 'Dacia Jogger')).toBe('1 spesa collegata a Dacia Jogger');
+    expect(describeUnlinkOutcome(3, 'Ornitorinco')).toBe('3 spese scollegate da Ornitorinco');
+    expect(plain(describeLinkUndone(1))).toBe('Annullato: la spesa è tornata com’era.');
+    expect(plain(describeLinkUndone(6))).toBe('Annullato: 6 spese sono tornate com’erano.');
+    expect(UNLINK_CONSEQUENCE).toBe('Scollegando, la spesa resta in Cashflow ed esce dal centro.');
+    expect(describeUnlinkSeriesReading('installment', 12, 'Dacia Jogger')).toContain('un piano di 12 rate collegate a Dacia Jogger');
+    expect(describeUnlinkSeriesReading('recurring', 3, 'Ornitorinco')).toContain('una serie di 3 occorrenze');
   });
 });

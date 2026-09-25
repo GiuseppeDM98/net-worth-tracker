@@ -24,8 +24,8 @@ import { cachedFormatCurrencyEUR, formatPercentageIt as formatPercentage } from 
 import { MONTH_NAMES } from '@/lib/constants/months';
 import { ASSET_CLASS_LABELS } from '@/lib/utils/allocationUtils';
 import { atThePercent, pluralArticleFor } from '@/lib/utils/patrimonioNarrative';
-import { resolveDeclineCause, type PeriodSalesSummary } from '@/lib/utils/periodSales';
-import { declineHeadlineTail, describeSales } from '@/lib/utils/salesNarrative';
+import { resolveDeclineCause, resolveTaxedGrowth, type PeriodSalesSummary } from '@/lib/utils/periodSales';
+import { declineHeadlineTail, describePurchases, describeSales, taxedGrowthHeadline } from '@/lib/utils/salesNarrative';
 import type { Narrative, NarrativeSegment, PageVerdictModel, VerdictTone } from '@/lib/utils/narrative';
 
 export type { Narrative, PageVerdictModel, VerdictTone } from '@/lib/utils/narrative';
@@ -70,6 +70,14 @@ export function periodSubject(period: EmailPeriod): string {
       return MONTH_NAMES[period.month - 1];
   }
 }
+
+/** «Nello stesso trimestre hai comprato …» — the period as a noun after «stesso». */
+const PERIOD_NOUNS: Record<EmailPeriodKind, string> = {
+  monthly: 'mese',
+  quarterly: 'trimestre',
+  semiannual: 'semestre',
+  yearly: 'anno',
+};
 
 /** The email's subject line and header title: "Agosto 2026", "Q3 2026", "Anno 2026". */
 export function periodTitle(period: EmailPeriod): string {
@@ -268,6 +276,16 @@ function resolveHeadline(input: PeriodEmailVerdictInput): { headline: string; to
   }
 
   if (input.netWorthDelta >= 0) {
+    // Grown only on paper: the tax on the period's sales took at least half of the growth — the
+    // Panoramica's rule (`resolveTaxedGrowth`), which needs only Δ and the tax.
+    const taxedGrowth = resolveTaxedGrowth({
+      delta: input.netWorthDelta,
+      deltaPct: input.netWorthDeltaPct,
+      salesTax: input.sales?.estimatedTax ?? null,
+    });
+    if (taxedGrowth) {
+      return { headline: taxedGrowthHeadline(subject, taxedGrowth, input.sales, 'è cresciuto'), tone: 'warning' };
+    }
     if (input.totalIncome > 0 && savings < 0) {
       return { headline: `${subject} è cresciuto, ma le spese hanno superato le entrate.`, tone: 'warning' };
     }
@@ -357,9 +375,12 @@ export function buildPeriodEmailVerdict(input: PeriodEmailVerdictInput): PageVer
     );
   }
 
-  // The sale behind the tax, in the same words the Panoramica prints.
+  // The sale behind the tax, in the same words the Panoramica prints — without its counterfactual,
+  // which the three-part split above already states — then what was bought beside it.
   if (input.sales) {
     sentence.push(prose(' '), ...describeSales(input.sales));
+    const purchases = describePurchases(input.sales, PERIOD_NOUNS[input.period.kind]);
+    if (purchases.length > 0) sentence.push(prose(' '), ...purchases);
   }
 
   return { headline, tone, sentence };

@@ -67,8 +67,11 @@ export interface CashAccountRow {
   name: string;
   /** EUR balance (a foreign-currency account through its converted price). */
   balance: number;
-  /** Share of the cash held on accounts, 0-100. */
-  shareOfCash: number;
+  /**
+   * Share of the money HELD on accounts (the positive balances), 0-100; null for an account in the red
+   * — a credit card is a debt, and a share of a total that nets it out read «138%» and «−57%».
+   */
+  shareOfCash: number | null;
 }
 
 export interface CashAccountsSummary {
@@ -85,7 +88,8 @@ export function summarizeCashAccounts(cashAccounts: Asset[], totalValue: number)
     .map((asset) => ({ id: asset.id, name: asset.name, balance: calculateAssetValue(asset) }))
     .sort((a, b) => b.balance - a.balance);
   const total = valued.reduce((sum, row) => sum + row.balance, 0);
-  const accounts = valued.map((row) => ({ ...row, shareOfCash: total > 0 ? (row.balance / total) * 100 : 0 }));
+  const held = valued.reduce((sum, row) => sum + Math.max(row.balance, 0), 0);
+  const accounts = valued.map((row) => ({ ...row, shareOfCash: row.balance < 0 ? null : held > 0 ? (row.balance / held) * 100 : 0 }));
   return {
     accounts,
     total,

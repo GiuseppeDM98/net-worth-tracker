@@ -31,19 +31,24 @@ import { getAllAssets, calculateTotalEstimatedTaxes } from '@/lib/services/asset
 import { getUserSnapshots, updateSnapshotNote } from '@/lib/services/snapshotService';
 import { getTargets, getDefaultTargets, getSettings } from '@/lib/services/assetAllocationService';
 import { getAllExpenses } from '@/lib/services/expenseService';
+import { getAssetTransactions } from '@/lib/services/assetTransactionService';
+import { getPensionContributions } from '@/lib/services/pensionContributionService';
 import {
   prepareNetWorthHistoryData,
   prepareAssetClassHistoryData,
   prepareYoYVariationData,
-  prepareSavingsVsInvestmentData,
-  prepareSavingsVsInvestmentDataAllMonths,
   prepareDoublingTimeData,
   prepareMonthlyLaborMetricsData,
 } from '@/lib/services/chartService';
 import type { Asset, MonthlySnapshot, AssetAllocationTarget, DoublingMode, AssetAllocationSettings } from '@/types/assets';
 import type { Expense } from '@/types/expenses';
-import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
+import type { AssetTransaction } from '@/types/assetTransactions';
+import type { PensionContribution } from '@/types/pension';
+import { getItalyMonthYear, isItalyDayAfter } from '@/lib/utils/dateHelpers';
+import { buildMonthlyGrowthDrivers, buildYearlyGrowthDrivers, sumGrowthDrivers, type GrowthDriverContext } from '@/lib/utils/growthDrivers';
+import { resolvePensionReturnStart } from '@/lib/utils/pensionReturn';
 import {
+  alignLaborChartMarket,
   laborWindowsOf,
   projectNextDoubling,
   resolveFeaturedDriverYear,
@@ -55,7 +60,6 @@ import {
   summarizeGrowthPace,
   summarizeLaborMetrics,
   summarizeMonthlyMoves,
-  sumDriverYears,
   withMonthDeltas,
   type LaborMetrics,
 } from '@/lib/utils/storicoSummary';
@@ -92,10 +96,10 @@ import { StoricoDettaglio } from '@/components/history/StoricoDettaglio';
 
 /** The grid's geometry, for the skeleton: the same spans as the tiles below. */
 const SKELETON_CELLS: TileSkeletonCell[] = [
-  { span: 8, rows: 2, lines: 12 },
-  { span: 4, rows: 2, lines: 9 },
-  { span: 8, lines: 9 },
+  { span: 8, lines: 12 },
   { span: 4, lines: 7 },
+  { span: 8, lines: 9 },
+  { span: 4, lines: 12 },
   { span: 12, lines: 6 },
 ];
 
@@ -112,6 +116,9 @@ export default function HistoryPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [targets, setTargets] = useState<AssetAllocationTarget | null>(null);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  // The ledger and the pension contributions: the Driver measures the market from them.
+  const [transactions, setTransactions] = useState<AssetTransaction[]>([]);
+  const [pensionContributions, setPensionContributions] = useState<PensionContribution[]>([]);
   const [portfolioSettings, setPortfolioSettings] = useState<AssetAllocationSettings | null>(null);
   const [loading, setLoading] = useState(true);
   /** A failed load is not an empty set: it gets an alert, never a verdict about zeros. */
@@ -123,28 +130,32 @@ export default function HistoryPage() {
   const [selectedMonthKey, setSelectedMonthKey] = useState<string | null>(null);
   const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(new Set());
 
-  /** Snapshots, assets, targets, expenses and settings, in parallel. */
+  /** Snapshots, assets, targets, expenses, settings, the ledger and the pension contributions, in parallel. */
   const loadData = async () => {
     if (!user || !ownerId) return;
     try {
       setLoading(true);
       setLoadFailed(false);
-      const [snapshotsData, assetsData, targetsData, expensesData, settingsData] = await Promise.all([
+      const [snapshotsData, assetsData, targetsData, expensesData, settingsData, transactionsData, contributionsData] = await Promise.all([
         getUserSnapshots(ownerId),
         getAllAssets(ownerId),
         getTargets(ownerId),
         getAllExpenses(ownerId),
         getSettings(ownerId),
+        getAssetTransactions(ownerId),
+        getPensionContributions(ownerId),
       ]);
       setSnapshots(snapshotsData);
       setAssets(assetsData);
       setTargets(targetsData || getDefaultTargets());
       setExpenses(expensesData);
       setPortfolioSettings(settingsData);
+      setTransactions(transactionsData);
+      setPensionContributions(contributionsData);
     } catch (error) {
+      // The `ErrorNotice` below is the failure's one voice: a toast beside it said the same thing twice.
       setLoadFailed(true);
       console.error('Error loading history data:', error);
-      toast.error('Errore nel caricamento dello storico');
     } finally {
       setLoading(false);
     }
@@ -220,36 +231,55 @@ export default function HistoryPage() {
   const pensionAssets = useMemo(() => assets.filter((a) => a.type === 'pensionFund'), [assets]);
   const assetClassHistory = useMemo(() => prepareAssetClassHistoryData(ordered, pensionAssets), [ordered, pensionAssets]);
 
-  // Driver: the yearly split from the cashflow floor, the running year featured, the last twelve months.
+  // Driver: the yearly split from the cashflow floor, the running year featured, the last twelve
+  // months — savings, the market measured per instrument, sale taxes, mortgage, pension
+  // contributions and the rest (lib/utils/growthDrivers.ts). `today` is read when the data
+  // changes: a row after it is in calendar, not saved.
   const startYear = portfolioSettings?.cashflowHistoryStartYear ?? DEFAULT_CASHFLOW_START_YEAR;
   const currentYear = getItalyMonthYear().year;
-  const driverYears = useMemo(() => selectDriverYears(prepareSavingsVsInvestmentData(ordered, expenses), startYear), [ordered, expenses, startYear]);
+  const driverContext = useMemo<GrowthDriverContext>(
+    () => ({
+      expenses,
+      transactions,
+      assets,
+      pension: { contributions: pensionContributions, startMonth: resolvePensionReturnStart(pensionContributions, portfolioSettings?.pensionReturnStartMonth) },
+      today: new Date(),
+    }),
+    [expenses, transactions, assets, pensionContributions, portfolioSettings],
+  );
+  const driverYears = useMemo(() => selectDriverYears(buildYearlyGrowthDrivers(ordered, driverContext), startYear), [ordered, driverContext, startYear]);
   const featuredDriverYear = useMemo(() => resolveFeaturedDriverYear(driverYears, currentYear), [driverYears, currentYear]);
-  const driverTotal = useMemo(() => sumDriverYears(driverYears), [driverYears]);
-  const monthlyDrivers = useMemo(() => prepareSavingsVsInvestmentDataAllMonths(ordered, expenses).filter((row) => row.year >= startYear), [ordered, expenses, startYear]);
+  const driverTotal = useMemo(() => sumGrowthDrivers(driverYears), [driverYears]);
+  const monthlyDrivers = useMemo(() => buildMonthlyGrowthDrivers(ordered, driverContext).filter((row) => row.year >= startYear), [ordered, driverContext, startYear]);
+  const driverMeasuredSince = useMemo(() => {
+    const first = monthlyDrivers.find((row) => row.isMarketMeasured);
+    return first ? { year: first.year, month: first.month } : null;
+  }, [monthlyDrivers]);
   const trailingDriverMonths = useMemo(() => selectTrailingMonths(monthlyDrivers, DRIVER_TRAILING_MONTHS), [monthlyDrivers]);
   const driverYearOptions = useMemo(() => [...new Set(monthlyDrivers.map((row) => row.year))].sort((a, b) => b - a), [monthlyDrivers]);
 
   const yearlyVariation = useMemo(() => prepareYoYVariationData(ordered), [ordered]);
 
   // Lavoro e investimenti — only when the labor categories are configured; the maths is the pure
-  // `summarizeLaborMetrics` over the Driver's own windows (baseline → last snapshot, one per year),
-  // so the recap and the Driver measure the same interval by construction; the tax estimate is the
-  // Patrimonio's (Firebase-coupled, so passed in) and belongs to the cumulative recap only.
+  // `summarizeLaborMetrics` over the Driver's own windows (baseline → last snapshot, one per year)
+  // AND the Driver's own parts, so the two tiles never print two «mercato»; its rows stop at today
+  // like the Driver's savings. The tax estimate on latent gains is the Patrimonio's
+  // (Firebase-coupled, so passed in) and belongs to the cumulative recap only.
   const laborMetrics = useMemo(() => {
     const categoryIds = portfolioSettings?.laborIncomeCategoryIds ?? [];
-    const all = summarizeLaborMetrics(ordered, expenses, categoryIds, startYear, laborWindowsOf(driverYears), calculateTotalEstimatedTaxes(assets));
+    const livedExpenses = expenses.filter((expense) => !isItalyDayAfter(expense.date, driverContext.today));
+    const all = summarizeLaborMetrics(ordered, livedExpenses, categoryIds, startYear, laborWindowsOf(driverYears), calculateTotalEstimatedTaxes(assets), sumGrowthDrivers(driverYears));
     if (!all) return null;
     const years = driverYears
-      .map((row) => ({ year: Number(row.year), metrics: summarizeLaborMetrics(ordered, expenses, categoryIds, startYear, laborWindowsOf([row]), 0) }))
+      .map((row) => ({ year: Number(row.year), metrics: summarizeLaborMetrics(ordered, livedExpenses, categoryIds, startYear, laborWindowsOf([row]), 0, row) }))
       .filter((entry): entry is { year: number; metrics: LaborMetrics } => entry.metrics !== null);
     return {
       all,
       years,
-      chartData: prepareMonthlyLaborMetricsData(ordered, expenses, categoryIds, startYear),
+      chartData: alignLaborChartMarket(prepareMonthlyLaborMetricsData(ordered, livedExpenses, categoryIds, startYear), monthlyDrivers),
       hasDividendCategory: Boolean(portfolioSettings?.dividendIncomeCategoryId),
     };
-  }, [expenses, ordered, portfolioSettings, assets, startYear, driverYears]);
+  }, [expenses, ordered, portfolioSettings, assets, startYear, driverYears, monthlyDrivers, driverContext]);
 
   // Valore per strumento.
   const displayTickerByAssetId = useMemo(() => {
@@ -385,51 +415,55 @@ export default function HistoryPage() {
         <PageVerdict verdict={verdict} ariaLabel="Verdetto sullo storico" />
       </div>
 
-      {/* Below desktop the three actions sit under the verdict as 44px buttons. */}
-      <div className="grid grid-cols-2 gap-2 desktop:hidden">{headerActions(true)}</div>
-
       {/* Tablet (768-1439): Evoluzione full, Raddoppi beside Driver, then Composizione and Valore full — the
-          two 4-column tiles are the only ones narrow enough to share a row there. */}
+          two 4-column tiles are the only ones narrow enough to share a row there.
+          Desktop: two COLUMNS, not two rows. Raddoppi keeps its natural height and the Driver takes the rest
+          of the right column (its ledger and bars want it); on the left the Evoluzione chart is the element
+          that stretches. Below desktop the two wrappers are `contents`, so the four tiles are direct items of
+          the grid and their `order` still applies. */}
       <div className="grid grid-cols-1 gap-3 tablet:grid-cols-2 desktop:grid-cols-12">
-        <div className={cn(TILE_CELL_CLASS, 'order-1 tablet:col-span-2 desktop:order-none desktop:col-span-8 desktop:row-span-2')}>
-          <EvoluzioneTile
-            aside={describeEvolutionAside(growth)}
-            reading={describeEvolution({ ath, moves })}
-            growth={growth}
-            pace={pace}
-            points={evolutionPoints}
-            noteCount={notes.length}
-            onAddNote={() => !isDemo && setNoteDialogOpen(true)}
-            disabled={isDemo}
-          />
+        <div className="contents desktop:col-span-8 desktop:flex desktop:min-w-0 desktop:flex-col desktop:gap-3">
+          <div className={cn(TILE_CELL_CLASS, 'order-1 tablet:col-span-2 desktop:order-none desktop:flex-1')}>
+            <EvoluzioneTile
+              aside={describeEvolutionAside(growth)}
+              reading={describeEvolution({ ath, moves })}
+              growth={growth}
+              pace={pace}
+              points={evolutionPoints}
+              noteCount={notes.length}
+              onAddNote={() => !isDemo && setNoteDialogOpen(true)}
+              disabled={isDemo}
+            />
+          </div>
+          <div className={cn(TILE_CELL_CLASS, 'order-3 tablet:order-4 tablet:col-span-2 desktop:order-none')}>
+            <ComposizioneTile assetClassHistory={assetClassHistory} liquidityHistory={netWorthHistory} hasPensionFunds={pensionAssets.length > 0} />
+          </div>
         </div>
 
-        <div className={cn(TILE_CELL_CLASS, 'order-2 desktop:order-none desktop:col-span-4 desktop:row-span-2')}>
-          <RaddoppiTile
-            reading={describeDoublings({ summary: doublingSummary, mode: doublingMode, projection })}
-            summary={doublingSummary}
-            mode={doublingMode}
-            onModeChange={setDoublingMode}
-            projection={projection}
-            pace={pace}
-            latestValue={growth.latest.value}
-          />
-        </div>
-
-        <div className={cn(TILE_CELL_CLASS, 'order-3 tablet:order-4 tablet:col-span-2 desktop:order-none desktop:col-span-8')}>
-          <ComposizioneTile assetClassHistory={assetClassHistory} liquidityHistory={netWorthHistory} hasPensionFunds={pensionAssets.length > 0} />
-        </div>
-
-        <div className={cn(TILE_CELL_CLASS, 'order-4 tablet:order-3 desktop:order-none desktop:col-span-4')}>
-          <DriverTile
-            reading={describeDrivers(featuredDriverYear)}
-            years={driverYears}
-            featured={featuredDriverYear}
-            total={driverTotal}
-            startYear={startYear}
-            months={trailingDriverMonths}
-            windowMonths={DRIVER_TRAILING_MONTHS}
-          />
+        <div className="contents desktop:col-span-4 desktop:flex desktop:min-w-0 desktop:flex-col desktop:gap-3">
+          <div className={cn(TILE_CELL_CLASS, 'order-2 desktop:order-none')}>
+            <RaddoppiTile
+              reading={describeDoublings({ summary: doublingSummary, mode: doublingMode, projection })}
+              summary={doublingSummary}
+              mode={doublingMode}
+              onModeChange={setDoublingMode}
+              projection={projection}
+              pace={pace}
+              latestValue={growth.latest.value}
+            />
+          </div>
+          <div className={cn(TILE_CELL_CLASS, 'order-4 tablet:order-3 desktop:order-none desktop:flex-1')}>
+            <DriverTile
+              reading={describeDrivers(featuredDriverYear)}
+              years={driverYears}
+              featured={featuredDriverYear}
+              total={driverTotal}
+              startYear={startYear}
+              measuredSince={driverMeasuredSince}
+              months={trailingDriverMonths}
+              windowMonths={DRIVER_TRAILING_MONTHS}
+            />
+          </div>
         </div>
 
         <div className={cn(TILE_CELL_CLASS, 'order-5 tablet:col-span-2 desktop:order-none desktop:col-span-12')}>
@@ -461,6 +495,11 @@ export default function HistoryPage() {
         onAddNote={() => !isDemo && setNoteDialogOpen(true)}
         disabled={isDemo}
       />
+
+      {/* Below desktop the three actions are 44px buttons AFTER the content: exports and a past snapshot
+          are yearly gestures, and under the verdict they stood between the thumb and the first figure
+          (the navbar keeps the «+»). */}
+      <div className="grid grid-cols-2 gap-2 desktop:hidden">{headerActions(true)}</div>
 
       {dialogs}
     </PageContainer>

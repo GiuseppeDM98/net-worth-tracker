@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, type PointerEvent } from 'react';
 import type { PerformanceChartData } from '@/types/performance';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { MONTH_NAMES_SHORT } from '@/lib/utils/period';
@@ -20,6 +20,16 @@ const VIEW_W = 600;
 const VIEW_H = 180;
 const PAD = 4;
 
+/**
+ * One word, one colour per page (AGENTS.md → Recharts): the portfolio's value is `--chart-1` here
+ * as in the Rendimento tile's growth plot — until 2026-09-20 blue was «Capitale immesso» and the
+ * portfolio was amber, two tiles apart. The invested base is a REFERENCE quantity, not a part of
+ * a total, so it takes the neutral ink, like the benchmark line of the growth plot. Exported so
+ * the tile's legend cannot drift from the plot.
+ */
+export const CAPITAL_NET_WORTH_COLOR = 'var(--chart-1)';
+export const CAPITAL_BASE_COLOR = 'var(--muted-foreground)';
+
 /** «03/2026» → { month: 3, year: 2026 }. */
 function parseDate(date: string): { month: number; year: number } {
   const [m, y] = date.split('/');
@@ -30,6 +40,10 @@ function shortLabel(date: string, withYear: boolean): string {
   const { month, year } = parseDate(date);
   const short = MONTH_NAMES_SHORT[month - 1].toLowerCase();
   return withYear ? `${short} ${String(year).slice(-2)}` : short;
+}
+
+function signedEuro(value: number): string {
+  return `${value > 0 ? '+' : value < 0 ? '−' : ''}${cachedFormatCurrencyEUR(Math.abs(value), true)}`;
 }
 
 /**
@@ -61,24 +75,45 @@ export function CapitalMarketChart({ data, minHeight = 150, className }: Capital
   const netWorthPath = netWorth.map((v, i) => `${i === 0 ? 'M' : 'L'}${sx(i).toFixed(1)},${sy(v ?? 0).toFixed(1)}`).join(' ');
 
   const spansYears = data.length > 0 && parseDate(data[0].date).year !== parseDate(data[data.length - 1].date).year;
+  const axisIndices = pickAxisIndices(data.length);
   const hover = useChartHover(data.length, 'nearest');
   const hovered = hover.index !== null ? data[hover.index] : null;
 
-  const label = data
-    .map((d) => `${shortLabel(d.date, true)}: patrimonio ${cachedFormatCurrencyEUR(d.netWorth, true)}, capitale immesso ${cachedFormatCurrencyEUR(d.investedBase, true)}`)
-    .join('; ');
+  // A summary, not the series: one clause per month ran to thousands of characters on «Storico»,
+  // read out in full before anything else in the tile (2026-09-20). The window and the landing
+  // point are what the plot says; the months in between are in the hover and the Dettaglio.
+  const firstPoint = data[0];
+  const lastPoint = data[data.length - 1];
+  const label =
+    firstPoint && lastPoint
+      ? `Patrimonio e capitale immesso da ${shortLabel(firstPoint.date, true)} a ${shortLabel(lastPoint.date, true)}. A ${shortLabel(lastPoint.date, true)}: patrimonio ${cachedFormatCurrencyEUR(lastPoint.netWorth, true)}, capitale immesso ${cachedFormatCurrencyEUR(lastPoint.investedBase, true)}, mercato ${signedEuro(lastPoint.returns)}.`
+      : 'Patrimonio e capitale immesso';
 
   return (
     <div className={cn('flex flex-col', className)}>
-      <div className="relative flex-1" style={{ minHeight }} {...(hover.enabled ? hover.handlers : {})}>
-        <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full overflow-visible" role="img" aria-label={`Capitale immesso e patrimonio per mese. ${label}`}>
-          <path d={areaPath} fill="var(--chart-1)" fillOpacity={0.35} />
-          <path d={basePath} fill="none" stroke="var(--chart-1)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
-          <path d={netWorthPath} fill="none" stroke="var(--chart-3)" strokeWidth={2} vectorEffect="non-scaling-stroke" />
+      {/* A lifted or cancelled touch clears the reading, as in the growth plot: on a hybrid device a tap moved the pointer and never left. */}
+      <div
+        className="relative flex-1"
+        style={{ minHeight }}
+        {...(hover.enabled
+          ? {
+              ...hover.handlers,
+              onPointerUp: (event: PointerEvent<HTMLElement>) => {
+                if (event.pointerType !== 'mouse') hover.handlers.onPointerLeave();
+              },
+              onPointerCancel: hover.handlers.onPointerLeave,
+            }
+          : {})}
+      >
+        <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full overflow-visible" role="img" aria-label={label}>
+          {/* A neutral wash under a neutral edge: the wash is deliberately faint in either theme, so the 1.5px edge is what carries the base's shape. */}
+          <path d={areaPath} fill={CAPITAL_BASE_COLOR} fillOpacity={0.16} />
+          <path d={basePath} fill="none" stroke={CAPITAL_BASE_COLOR} strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+          <path d={netWorthPath} fill="none" stroke={CAPITAL_NET_WORTH_COLOR} strokeWidth={2} vectorEffect="non-scaling-stroke" />
           {hovered && hover.index !== null && (
             <>
               <line x1={sx(hover.index)} x2={sx(hover.index)} y1={0} y2={VIEW_H} stroke="var(--foreground)" strokeOpacity={0.25} vectorEffect="non-scaling-stroke" />
-              <circle cx={sx(hover.index)} cy={sy(hovered.netWorth)} r={3} fill="var(--chart-3)" stroke="var(--card)" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+              <circle cx={sx(hover.index)} cy={sy(hovered.netWorth)} r={3} fill={CAPITAL_NET_WORTH_COLOR} stroke="var(--card)" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
             </>
           )}
         </svg>
@@ -94,24 +129,23 @@ export function CapitalMarketChart({ data, minHeight = 150, className }: Capital
             </span>
             <span className="font-mono tabular-nums">
               <span className="text-muted-foreground">Mercato </span>
-              <span className={hovered.returns >= 0 ? 'text-positive' : 'text-destructive'}>
-                {hovered.returns >= 0 ? '+' : '−'}
-                {cachedFormatCurrencyEUR(Math.abs(hovered.returns), true)}
-              </span>
+              <span className={hovered.returns >= 0 ? 'text-positive' : 'text-destructive'}>{signedEuro(hovered.returns)}</span>
             </span>
           </ChartHoverTip>
         )}
       </div>
       <div className="relative mt-1.5 h-[14px]" aria-hidden="true">
-        {pickAxisIndices(data.length).map((i) => {
+        {axisIndices.map((i, position) => {
           const x = data.length > 1 ? (i / (data.length - 1)) * 100 : 0;
+          // The year is printed where it CHANGES from the label before: with a whole step January may never be a tick.
+          const withYear = spansYears && (position === 0 || parseDate(data[axisIndices[position - 1]].date).year !== parseDate(data[i].date).year);
           return (
             <span
               key={i}
               className="absolute top-0 whitespace-nowrap font-mono text-[10px] tabular-nums text-muted-foreground"
               style={{ left: `${x}%`, transform: i === 0 ? 'none' : i === data.length - 1 ? 'translateX(-100%)' : 'translateX(-50%)' }}
             >
-              {shortLabel(data[i].date, spansYears && (parseDate(data[i].date).month === 1 || i === 0))}
+              {shortLabel(data[i].date, withYear)}
             </span>
           );
         })}

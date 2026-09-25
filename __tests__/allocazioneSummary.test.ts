@@ -11,12 +11,17 @@ vi.mock('@/lib/firebase/config', () => ({ db: {}, auth: {} }));
 vi.mock('firebase/firestore', () => ({ doc: vi.fn(), getDoc: vi.fn(), setDoc: vi.fn(), deleteField: vi.fn() }));
 
 import {
+  activeClassGaps,
   buildCompositionLegend,
   buildCompositionPair,
   buildPensionLookThrough,
   buildPlanView,
+  collapseRepeatedLevels,
+  estimatePlanSaleTax,
+  isDormantClass,
   largestGapByValue,
   offTargetGaps,
+  planSaleNodes,
   summarizeClassGaps,
   summarizeExposure,
   summarizeExposureHighlights,
@@ -27,7 +32,7 @@ import {
 } from '@/lib/utils/allocazioneSummary';
 import type { AllocationData, Asset } from '@/types/assets';
 import type { PortfolioExposureData } from '@/types/exposure';
-import type { AllocatableHolding } from '@/lib/utils/allocationUtils';
+import type { AllocatableHolding, PlanNode } from '@/lib/utils/allocationUtils';
 
 function data({ currentValue, targetPercentage, ...rest }: Partial<AllocationData> & { currentValue: number; targetPercentage: number }): AllocationData {
   const total = 245000;
@@ -59,6 +64,7 @@ const holding = (overrides: Partial<AllocatableHolding>): AllocatableHolding => 
   assetClass: 'equity',
   value: 1000,
   tradable: true,
+  taxableOnSale: true,
   ...overrides,
 });
 
@@ -75,6 +81,32 @@ describe('summarizeClassGaps', () => {
     expect(largestGapByValue(gaps)?.assetClass).toBe('equity');
     expect(offTargetGaps(gaps).map((g) => g.assetClass)).toEqual(['equity', 'bonds']);
     expect(largestGapByValue([])).toBeNull();
+  });
+});
+
+describe('isDormantClass / activeClassGaps', () => {
+  // The owner's real estate: the house is `excluded`, so the class holds nothing inside the
+  // allocated total, and its target entry is 0% — it cannot be off target, so «OK» would be a
+  // verdict on a void and it must not inflate the «N classi su M» denominator.
+  const dormant = data({ currentValue: 0, targetPercentage: 0 });
+
+  it('marks a class with neither allocated value nor a target', () => {
+    expect(isDormantClass(dormant)).toBe(true);
+  });
+
+  it('does not mark a class that holds money, even with no target', () => {
+    expect(isDormantClass(data({ currentValue: 60000, targetPercentage: 0 }))).toBe(false);
+  });
+
+  it('does not mark an unfunded target — new money is exactly how that one gets filled', () => {
+    expect(isDormantClass(data({ currentValue: 0, targetPercentage: 15 }))).toBe(false);
+  });
+
+  it('drops only the dormant classes from the ones a verdict may speak about', () => {
+    const gaps = summarizeClassGaps({ ...BY_CLASS, realestate: dormant, carry: dormant });
+    expect(gaps).toHaveLength(7);
+    expect(gaps.filter((g) => g.dormant).map((g) => g.assetClass)).toEqual(['realestate', 'carry']);
+    expect(activeClassGaps(gaps).map((g) => g.assetClass)).toEqual(['equity', 'bonds', 'crypto', 'cash', 'commodity']);
   });
 });
 
@@ -138,6 +170,36 @@ describe('buildPlanView / summarizeNextMoney', () => {
     expect(view.trades).toBeNull();
   });
 
+  it('breaks a rebalance SELL down to the instruments, summing back to the class amount', () => {
+    const view = buildPlanView('rebalance', 0, inputs);
+    if (view.mode !== 'rebalance') throw new Error('mode');
+    const equity = view.moves.find((m) => m.assetClass === 'equity')!;
+    const leaves = equity.children.flatMap((child) => (child.children.length > 0 ? child.children : [child]));
+    expect(leaves.map((leaf) => leaf.key)).toEqual(['e1']);
+    expect(leaves.reduce((sum, leaf) => sum + leaf.amount, 0)).toBeCloseTo(equity.amount, 2);
+  });
+
+  it('breaks a rebalance BUY down exactly as far as Versa does — no further', () => {
+    // With no sub-targets configured, a contribution has no bucket to descend into, and the
+    // rebalance reuses that very split: «ONE tree with the sign flipped» means the BUY leg of a
+    // rebalance names what Versa would name for the same euros, including when that is nothing.
+    const withoutSubs = buildPlanView('rebalance', 0, inputs);
+    if (withoutSubs.mode !== 'rebalance') throw new Error('mode');
+    expect(withoutSubs.moves.find((m) => m.assetClass === 'bonds')!.children).toEqual([]);
+
+    const bySubCategory = { 'bonds:Governativi': data({ currentValue: 11500, targetPercentage: 100 }) };
+    const classified = inputs.holdings.map((h) => (h.assetClass === 'bonds' ? { ...h, subCategory: 'Governativi' } : h));
+    const withSubs = buildPlanView('rebalance', 0, { ...inputs, bySubCategory, holdings: classified });
+    if (withSubs.mode !== 'rebalance') throw new Error('mode');
+    const bonds = withSubs.moves.find((m) => m.assetClass === 'bonds')!;
+    // «Governativi» receives the whole move and holds one instrument, so its level is a repetition
+    // and `collapseRepeatedLevels` drops it: what is left is the instrument you would trade.
+    expect(bonds.children.map((child) => child.key)).toEqual(['b2']);
+    expect(bonds.children.reduce((sum, leg) => sum + leg.amount, 0)).toBeCloseTo(bonds.amount, 2);
+    // The frozen Cometa sleeve is never a leg of the BUY: a plan may not name what it cannot move.
+    expect(bonds.children.every((leg) => leg.key !== 'b1')).toBe(true);
+  });
+
   it('builds the contribution view and names the classes over target that get nothing', () => {
     const view = buildPlanView('contribute', 1000, inputs);
     if (view.mode !== 'contribute') throw new Error('mode');
@@ -162,6 +224,182 @@ describe('buildPlanView / summarizeNextMoney', () => {
     expect(next.slices.map((s) => s.key)).toEqual(['bonds', 'cash', 'crypto']);
     expect(next.slices[0]).toMatchObject({ label: 'Obbligazioni', kind: 'class' });
     expect(summarizeNextMoney(inputs, 0).slices).toEqual([]);
+  });
+});
+
+describe('collapseRepeatedLevels', () => {
+  const node = (key: string, amount: number, children: PlanNode[] = []): PlanNode => ({
+    key,
+    label: key,
+    amount,
+    currentValue: 0,
+    newValue: 0,
+    newPercentage: 0,
+    targetPercentage: 0,
+    children,
+  });
+
+  // The callers hand it the children of a class, never the class itself: a class row carries the
+  // chip, the drift and the action, and is never a repetition of anything.
+  it('drops a level whose only child carries the same figure, keeping the CHILD', () => {
+    // «Bitcoin −4151 €» over «WisdomTree Physical Bitcoin (WBIT) −4151 €»: the instrument is the
+    // row you can act on, and its sub-category is still named in Per classe.
+    const rows = collapseRepeatedLevels([node('Bitcoin', 4151, [node('WBIT', 4151)])]);
+    expect(rows.map((row) => row.key)).toEqual(['WBIT']);
+    expect(rows[0].children).toEqual([]);
+  });
+
+  it('keeps a level that really splits', () => {
+    // «All World» carries the whole class move, but it has TWO instruments under it: dropping it
+    // would leave two rows with no idea which sleeve they belong to.
+    const rows = collapseRepeatedLevels([node('All World', 22409, [node('VWCE', 17428), node('SWDA', 4981)])]);
+    expect(rows.map((row) => row.key)).toEqual(['All World']);
+    expect(rows[0].children.map((child) => child.key)).toEqual(['VWCE', 'SWDA']);
+  });
+
+  it('collapses a level whose only child carries the same figure, however deep the chain', () => {
+    const rows = collapseRepeatedLevels([node('DBMFE', 12006, [node('iMGP DBi (DBMFE)', 12006)])]);
+    expect(rows.map((row) => row.key)).toEqual(['iMGP DBi (DBMFE)']);
+  });
+
+  it('keeps a level whose only child carries a DIFFERENT figure', () => {
+    // The sleeve gets 3000 of a 5000 move: the two rows are two facts, not one printed twice.
+    const rows = collapseRepeatedLevels([node('Governativi', 5000, [node('IBGS', 3000)])]);
+    expect(rows.map((row) => row.key)).toEqual(['Governativi']);
+    expect(rows[0].children.map((child) => child.key)).toEqual(['IBGS']);
+  });
+
+  it('ignores children below the visible floor when counting them', () => {
+    const rows = collapseRepeatedLevels([node('Breve Termine', 3975, [node('CSBGE3', 3975), node('briciola', 0.2)])]);
+    expect(rows.map((row) => row.key)).toEqual(['CSBGE3']);
+  });
+
+  it('carries the lifted node`s own kind, so a collapsed instrument stays an instrument', () => {
+    // A row's caption follows `isInstrument`, not its depth: an ETF lifted out of the sub-category
+    // that repeated it would otherwise print «→ 100,0%» — «you keep everything» — instead of the
+    // position it leaves behind.
+    const instrument = { ...node('CSBGE3', 3975), isInstrument: true };
+    const [row] = collapseRepeatedLevels([node('Breve Termine', 3975, [instrument])]);
+    expect(row.isInstrument).toBe(true);
+    const [sleeve] = collapseRepeatedLevels([node('Breve Termine', 3975, [node('senza strumenti', 3975)])]);
+    expect(sleeve.isInstrument).toBeUndefined();
+  });
+});
+
+describe('il prelievo si lorda: «prelevare 1000 €» vuol dire 1000 € in mano', () => {
+  // Una posizione da 100.000 € comprata a 60.000: il 40% di quel che vale è plusvalenza, quindi
+  // ogni euro venduto ne porta 0,40 di guadagno e paga 0,104 di ritenuta al 26%.
+  const gainer = holding({ id: 'g', label: 'Gainer', assetClass: 'equity', value: 100000, costBasisEur: 60000, taxRate: 26 });
+  const byClass: Record<string, AllocationData> = { equity: data({ currentValue: 100000, targetPercentage: 50 }) };
+  const inputs = { byAssetClass: byClass, bySubCategory: {}, bySpecificAsset: {}, holdings: [gainer], tradableByClass: { equity: 100000 } };
+
+  const withdraw = (amount: number, overrides = {}) => {
+    const view = buildPlanView('withdraw', amount, { ...inputs, ...overrides });
+    if (view.mode !== 'withdraw') throw new Error('mode');
+    return view;
+  };
+
+  it('vende più di quanto chiesto, e quel che resta dopo la ritenuta è la cifra chiesta', () => {
+    const view = withdraw(1000);
+    expect(view.amount).toBe(1000);
+    expect(view.grossedUp).toBe(true);
+    expect(view.grossAmount).toBeGreaterThan(1000);
+    // La proprietà che conta: lordo − ritenuta sul lordo === il netto chiesto, al euro.
+    const tax = estimatePlanSaleTax(planSaleNodes(view), [gainer])!.tax!;
+    expect(view.grossAmount - tax).toBeCloseTo(1000, 0);
+    // …e le righe sommano il LORDO, perché è quello che il piano vende davvero.
+    expect(view.nodes.reduce((sum, node) => sum + node.amount, 0)).toBeCloseTo(view.grossAmount, 2);
+  });
+
+  it('non si lorda quando le posizioni da vendere non sono in guadagno', () => {
+    const loser = holding({ id: 'g', label: 'Loser', assetClass: 'equity', value: 100000, costBasisEur: 140000, taxRate: 26 });
+    const view = withdraw(1000, { holdings: [loser] });
+    expect(view.grossedUp).toBe(false);
+    expect(view.grossAmount).toBeCloseTo(1000, 2);
+  });
+
+  it('non si lorda quando la ritenuta non è stimabile, e non promette un netto', () => {
+    const unknown = holding({ id: 'g', label: 'Senza base', assetClass: 'equity', value: 100000, taxRate: 26 });
+    const view = withdraw(1000, { holdings: [unknown] });
+    expect(view.grossedUp).toBe(false);
+    expect(view.grossAmount).toBeCloseTo(1000, 2);
+    expect(estimatePlanSaleTax(planSaleNodes(view), [unknown])!.unknownReason).toBe('cost-basis');
+  });
+
+  it('non vende mai più del negoziabile, e lo dichiara', () => {
+    const small = holding({ id: 'g', label: 'Gainer', assetClass: 'equity', value: 1020, costBasisEur: 0, taxRate: 26 });
+    const view = withdraw(1000, {
+      holdings: [small],
+      byAssetClass: { equity: data({ currentValue: 1020, targetPercentage: 0 }) },
+      tradableByClass: { equity: 1020 },
+    });
+    // Servirebbero ~1352 € di vendite per incassarne 1000 netti; ce ne sono 1020.
+    expect(view.grossAmount).toBeLessThanOrEqual(1020);
+    expect(view.exceedsPortfolio).toBe(true);
+  });
+
+  it('un versamento non si lorda: non vende niente', () => {
+    const view = buildPlanView('contribute', 1000, inputs);
+    if (view.mode !== 'contribute') throw new Error('mode');
+    expect(view.nodes.reduce((sum, node) => sum + node.amount, 0)).toBeCloseTo(1000, 2);
+  });
+});
+
+describe('estimatePlanSaleTax / planSaleNodes', () => {
+  // A €10.000 position bought for €6.000: 40% of what it is worth is gain, so selling €1.000 of it
+  // realizes €400 and the broker withholds 26% of that — €104.
+  const gainer = holding({ id: 'g', label: 'Gainer', value: 10000, costBasisEur: 6000, taxRate: 26 });
+  const loser = holding({ id: 'l', label: 'Loser', value: 5000, costBasisEur: 8000, taxRate: 26 });
+  const account = holding({ id: 'acct', label: 'Conto', assetClass: 'cash', value: 20000, taxableOnSale: false });
+  const leaf = (key: string, amount: number) => ({ key, label: key, amount, currentValue: 0, newValue: 0, newPercentage: 0, targetPercentage: 0, children: [] });
+
+  it('taxes the realized fraction of the unrealized gain, at the instrument rate', () => {
+    const estimate = estimatePlanSaleTax([leaf('g', 1000)], [gainer])!;
+    expect(estimate.gross).toBe(1000);
+    expect(estimate.tax).toBeCloseTo(104, 6);
+    expect(estimate.net).toBeCloseTo(896, 6);
+    expect(estimate.unknownReason).toBeNull();
+  });
+
+  // REGRESSION GUARD, not a guard on the caller: falsifying `estimatePlanSaleTax`'s own
+  // `Math.max(0, gainFraction)` leaves this green, because `estimateSaleTax` already floors a
+  // negative gain at zero. What this pins is that floor — remove it there and the losing leg
+  // starts paying a NEGATIVE tax, i.e. silently compensating the gain the app does not model.
+  it('taxes nothing on a position at a loss, and does not net the loss against a gain', () => {
+    const estimate = estimatePlanSaleTax([leaf('g', 1000), leaf('l', 1000)], [gainer, loser])!;
+    expect(estimate.tax).toBeCloseTo(104, 6);
+  });
+
+  it('leaves cash out without making the estimate unknown', () => {
+    const estimate = estimatePlanSaleTax([leaf('g', 1000), leaf('acct', 5000)], [gainer, account])!;
+    expect(estimate.gross).toBe(6000);
+    expect(estimate.tax).toBeCloseTo(104, 6);
+  });
+
+  it('is unknown WITH a reason when a taxable leg has no EUR cost basis', () => {
+    const noBasis = holding({ id: 'g', value: 10000, taxRate: 26 });
+    const estimate = estimatePlanSaleTax([leaf('g', 1000)], [noBasis])!;
+    expect(estimate.tax).toBeNull();
+    expect(estimate.net).toBeNull();
+    expect(estimate.unknownReason).toBe('cost-basis');
+  });
+
+  it('is unknown WITH a reason when a taxable leg has no rate', () => {
+    const noRate = holding({ id: 'g', value: 10000, costBasisEur: 6000 });
+    expect(estimatePlanSaleTax([leaf('g', 1000)], [noRate])!.unknownReason).toBe('rate');
+  });
+
+  it('is null when the plan sells nothing', () => {
+    expect(estimatePlanSaleTax([], [gainer])).toBeNull();
+    expect(estimatePlanSaleTax([leaf('g', 0.2)], [gainer])).toBeNull();
+  });
+
+  it('reads the SELL legs of a rebalance and every leg of a withdrawal', () => {
+    const rebalance = buildPlanView('rebalance', 0, { byAssetClass: BY_CLASS, bySubCategory: {}, bySpecificAsset: {}, holdings: [], tradableByClass: {} });
+    expect(planSaleNodes(rebalance)).toEqual([]);
+    const contribute = buildPlanView('contribute', 1000, { byAssetClass: BY_CLASS, bySubCategory: {}, bySpecificAsset: {}, holdings: [], tradableByClass: {} });
+    // A contribution never sells, so it has no tax to estimate at all.
+    expect(planSaleNodes(contribute)).toEqual([]);
   });
 });
 

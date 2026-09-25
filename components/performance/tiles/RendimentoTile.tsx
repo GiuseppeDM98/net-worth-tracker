@@ -2,12 +2,14 @@
 
 import { TrendingDown, TrendingUp } from 'lucide-react';
 import type { Narrative } from '@/lib/utils/narrative';
-import type { DrawdownStatus, GrowthOfHundredSeries, HeroReturn, PeriodReturnChip } from '@/lib/utils/performanceSummary';
+import type { CompanionReturnChip, DrawdownStatus, GrowthOfHundredSeries, HeroReturn } from '@/lib/utils/performanceSummary';
 import { formatNumber, formatPercentage } from '@/lib/services/chartService';
 import { getMetricValueColor, signChipClass } from '@/lib/utils/metricColors';
 import { useCountUp } from '@/lib/utils/useCountUp';
 import { cn } from '@/lib/utils';
 import { Tile, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
+import { TileMethodNote } from '@/components/ui/tile-method-note';
+import { SeriesLegend } from '@/components/ui/series-legend';
 import { GrowthOfHundredChart } from '@/components/performance/GrowthOfHundredChart';
 
 interface RendimentoTileProps {
@@ -16,17 +18,19 @@ interface RendimentoTileProps {
   heroReturn: HeroReturn;
   /** Months of return the figure is measured on, for the qualifier under the number. */
   numberOfMonths: number;
-  /** The reference model and the gap in points; null while its series is loading or unavailable. */
+  /** The reference model and the gap in points ON THE HERO'S BASIS (`resolveBenchmarkGap`); null while its series is loading or unavailable. */
   benchmark: { name: string; delta: number } | null;
   benchmarkLoading: boolean;
   benchmarkName: string;
-  /** The period's CUMULATIVE TWR, never annualised — the second chip; null when the hero already is the period return. */
-  periodReturn: PeriodReturnChip | null;
+  /** The same TWR on the basis the hero does not state (`resolveCompanionReturnChip`); null when it would repeat the hero or extrapolate. */
+  companionReturn: CompanionReturnChip | null;
   /** Where the portfolio stands today against the period's peak. */
   drawdown: DrawdownStatus | null;
   series: GrowthOfHundredSeries;
-  /** The footer line naming the base month and the currency of the benchmark. */
-  footer: string;
+  /** «fine dic 2025», the month the plot's 100 sits on; null without a series. */
+  baseMonthLabel: string | null;
+  /** The currency the model is measured in: EUR, or USD when the FX route failed. */
+  benchmarkCurrency: 'EUR' | 'USD';
   className?: string;
 }
 
@@ -63,12 +67,11 @@ function Chip({ value, caption, children }: { value: number | null; caption: str
 }
 
 /**
- * «Quanto rende?» — the dominant tile: the TWR (annualised, or the period return below six
- * months, and the qualifier says which), the gap against the reference model, the period's
- * cumulative return (the same TWR de-annualised, never the ROI: a gain over the first month's
- * capital is not the period's return) and today's distance from the period's peak as grouped
- * chips, then the growth-of-100 plot, which is the element that stretches when the tile spans
- * two rows.
+ * «Quanto rende?» — the dominant tile: the TWR (the period's return below a year, annualised from
+ * a year on, and the qualifier says which), the gap against the reference model ON THAT BASIS, the
+ * same return on the other basis (never the ROI: a gain over the first month's capital is not the
+ * period's return) and today's distance from the period's peak as grouped chips, then the
+ * growth-of-100 plot, which is the element that stretches when the tile spans two rows.
  */
 export function RendimentoTile({
   aside,
@@ -78,10 +81,11 @@ export function RendimentoTile({
   benchmark,
   benchmarkLoading,
   benchmarkName,
-  periodReturn,
+  companionReturn,
   drawdown,
   series,
-  footer,
+  baseMonthLabel,
+  benchmarkCurrency,
   className,
 }: RendimentoTileProps) {
   const DeltaIcon = benchmark && benchmark.delta < 0 ? TrendingDown : TrendingUp;
@@ -92,8 +96,15 @@ export function RendimentoTile({
         <p className={cn('font-mono text-[44px] font-bold leading-none tracking-[-0.03em] tabular-nums desktop:text-[54px]', getMetricValueColor(heroReturn.value, 'percentage'))}>
           {heroReturn.value === null ? '—' : <HeroValue value={heroReturn.value} />}
         </p>
+        {/* A period return already names its months («nei 9 mesi»); the annualised one needs them beside it. */}
         <span className="text-[11px] text-muted-foreground">
-          {heroReturn.label} · <span className="font-mono tabular-nums">{numberOfMonths}</span> {numberOfMonths === 1 ? 'mese' : 'mesi'}
+          {heroReturn.isPeriodReturn ? (
+            heroReturn.label
+          ) : (
+            <>
+              {heroReturn.label} · <span className="font-mono tabular-nums">{numberOfMonths}</span> {numberOfMonths === 1 ? 'mese' : 'mesi'}
+            </>
+          )}
         </span>
       </div>
 
@@ -111,10 +122,10 @@ export function RendimentoTile({
             </Chip>
           )
         )}
-        {periodReturn && (
-          <Chip value={periodReturn.value} caption={periodReturn.label}>
-            {periodReturn.value > 0 ? '+' : periodReturn.value < 0 ? '−' : ''}
-            {formatPercentage(Math.abs(periodReturn.value), 1)}
+        {companionReturn && (
+          <Chip value={companionReturn.value} caption={companionReturn.label}>
+            {companionReturn.value > 0 ? '+' : companionReturn.value < 0 ? '−' : ''}
+            {formatPercentage(Math.abs(companionReturn.value), 1)}
           </Chip>
         )}
         {drawdown && (
@@ -128,24 +139,27 @@ export function RendimentoTile({
         <>
           <div className="mt-5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
             <p className={TILE_SUB_EYEBROW_CLASS}>Crescita di 100</p>
-            <div className="flex gap-3 text-[11px] text-muted-foreground" aria-hidden="true">
-              <span className="flex items-center gap-1.5">
-                <span className="inline-block h-2 w-2 rounded-[2px]" style={{ background: 'var(--chart-1)' }} />
-                Portafoglio
-              </span>
-              {series.benchmarkEnd !== null && (
-                <span className="flex items-center gap-1.5">
-                  <span className="inline-block h-2 w-2 rounded-[2px] bg-muted-foreground" />
-                  {benchmarkName}
-                </span>
-              )}
-            </div>
+            <SeriesLegend
+              items={[
+                { label: 'Portafoglio', colors: ['var(--chart-1)'] },
+                ...(series.benchmarkEnd !== null ? [{ label: benchmarkName, colors: ['var(--muted-foreground)'] }] : []),
+              ]}
+            />
           </div>
           <GrowthOfHundredChart series={series} benchmarkName={benchmarkName} minHeight={160} className="mt-2 flex-1" />
         </>
       )}
 
-      <p className="mt-auto border-t border-border pt-3.5 text-[11px] leading-[1.45] text-muted-foreground">{footer}</p>
+      <TileMethodNote subject="Rendimento (TWR)" summary={[baseMonthLabel ? `Base 100 a fine ${baseMonthLabel}.` : null, benchmarkCurrency === 'USD' ? 'Modello in USD: cambi non disponibili.' : null].filter(Boolean).join(' ') || undefined}>
+        <span className="block">
+          Il TWR concatena i rendimenti mensili togliendo da ciascuno il capitale entrato o uscito: misura il portafoglio, non i versamenti.
+        </span>
+        <span className="block">
+          Sotto l&apos;anno la cifra grande è il rendimento del periodo e quella annualizzata sta accanto; da un anno in su è l&apos;inverso. Il confronto con {benchmarkName} è sulla stessa base della cifra grande.
+        </span>
+        <span className="block">Il primo snapshot è la valutazione di partenza, non un mese misurato.</span>
+        {benchmarkCurrency === 'EUR' && <span className="block">Il modello è convertito in EUR ai cambi di fine mese.</span>}
+      </TileMethodNote>
     </Tile>
   );
 }

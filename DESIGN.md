@@ -383,8 +383,6 @@ reason a CSS variable cannot serve, and nowhere else:
   `AndamentoStoricoSection.tsx`) and `AssetSparkline.tsx` (`#16a34a` / `#dc2626` — the retired
   out-of-DOM sign hexes, surviving as a pre-hydration fallback): read once, before the theme's
   slots have resolved.
-- `canvas-confetti` in `FireCalculatorTab.tsx`: a canvas cannot read a CSS variable, said in-file
-  (Storico's `RaddoppiTile` gave up its burst on 2026-09-13).
 - `lib/utils/costCenterColors.ts` — `LEGACY_HEX_SLOTS`, the legacy hex → slot migration map for
   documents that still hold a hex; and `components/expenses/CategoryManagementDialog.tsx`, whose
   hexes are the user's own category colours (a user-chosen colour is an identity, not a slot — see
@@ -505,7 +503,8 @@ The unit of every redesigned page: `Tile` in `components/ui/tile.tsx` (the Panor
 ```tsx
 <section className="flex min-w-0 flex-col rounded-2xl border border-border bg-card p-5 shadow-sm">
   <div className="flex items-baseline justify-between gap-3">
-    <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">{eyebrow}</p>
+    {/* an <h3> under the verdict's <h2>: the class carries every metric */}
+    <h3 className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">{eyebrow}</h3>
     <div className="shrink-0 text-[10px] text-muted-foreground">{aside}</div>
   </div>
   <NarrativeText segments={reading} className="mt-2 text-[13px] leading-[1.45] text-foreground" />
@@ -519,6 +518,8 @@ The unit of every redesigned page: `Tile` in `components/ui/tile.tsx` (the Panor
 - `p-5` (20px) and `gap-3` (12px) between tiles — tighter than the 22/16 of the previous bento; tiles are many and small.
 - The dominant tile (net worth) spans two rows and lets its chart stretch (`relative flex-1 min-h-[180px]` with the SVG `absolute inset-0`); numbers and chips keep their size.
 - No tile repeats another tile's rows (The One-Tile-One-Question Rule).
+- The eyebrow is a heading (`<h3>`, 2026-09-20): a screen reader walks a long page by its headings, and a page of nine tiles listed two.
+- The footer is ONE line. A method that needs more goes behind «Come si calcola» (`components/ui/tile-method-note.tsx`: a popover at a 40–50 character measure, its trigger named after the tile's subject). Storico's footnotes ran to nine lines at 95–130 characters: help that is always on stops being read, and reads as defensiveness.
 
 ### Tile Grid (12-Column Bento)
 
@@ -559,7 +560,7 @@ the viewport and its separation is the scrim, not a shadow (`components/ui/drawe
 (`describeModalStatus`, `describeWriteError`, the `describe*Intent`/`describe*Reading` builders),
 never typed in a component; the destructive primary arms through `lib/hooks/useArmedDelete.ts`.
 
-**Coverage (counted 2026-09-06, recounted 2026-09-14 evening).** 32 surfaces are `ResponsiveModal` —
+**Coverage (counted 2026-09-06, recounted 2026-09-14 evening; closed 2026-09-18).** 32 surfaces were `ResponsiveModal` on 2026-09-14 —
 the vocabulary above. The thirtieth is `components/expenses/SeriesDeleteDialog.tsx`, the one question
 a delete asks on a row of an instalment plan or a recurring series («solo questa o tutte?»), shared by
 the Movimenti table and the tab, which each kept an `AlertDialog` for it until that day; the
@@ -568,14 +569,24 @@ naming the instruments and the floor, then «Sto scaricando» for the whole run 
 replaced closed on the click) and the per-year DPS figures of one row below `desktop:` (`sm`, a
 drawer on a phone; it was a `Dialog max-w-xs` at 16px). A PLAIN row of the Movimenti table and a row
 of the Dividendi table no longer open a modal at all: the delete arms in the row (`useArmedDelete`,
-the row prints the consequence). The vocabulary is NOT yet total: besides
-`components/layout/LogoutDialog.tsx`, which stays an `AlertDialog` on purpose because it interrupts,
-four files still mount the raw shadcn primitives — `app/dashboard/page.tsx` (a `Dialog`),
-`components/cashflow/TransactionFeed.tsx` (three `Drawer`s, titles at `text-lg`, the detail drawer's
-confirm a drawer NESTED in a drawer), `components/cashflow/MobileFiltersDrawer.tsx` (a `Drawer`) and
-`components/assistant/AssistantSheets.tsx` (two `Sheet`s). Those inherit `DialogContent`'s own
-`sm:max-w-lg` (512px, a fifth width) and `DialogTitle`'s 18px, neither of which is on the ramp
-above. Recorded as the remaining distance, not as a licence.
+the row prints the consequence). **The vocabulary is total since 2026-09-18**: the four files that
+still mounted the raw shadcn primitives — `DialogContent`'s own `sm:max-w-lg` (512px, a fifth width)
+and `DialogTitle`'s 18px, neither on the ramp above — are `ResponsiveModal` now. The Panoramica's
+snapshot confirm (`sm`, its title the ACT and the month: «Sovrascrivi lo snapshot di settembre», NOT
+armed because the daily cron rewrites the running month anyway). The feed's detail
+(`components/cashflow/TransactionFeed.tsx`, `sm`): it was three `Drawer`s with the confirm NESTED in
+the detail, and it now arms in its footer while the reading gives way to the consequence in
+`text-destructive` and says «Eliminazione annullata» when let go; a row of a series never arms — its
+one confirmation is `SeriesDeleteDialog`, where it used to confirm twice. The Movimenti filters
+(`MobileFiltersDrawer.tsx`, `sm`): the reading counts what is left («2 filtri attivi: restano 27
+movimenti su 112.»), the primary names it («Mostra 27 movimenti», never «0 movimenti»), «Ripristina»
+is the footer's secondary, and its five field names are form labels where they were a second
+eyebrow. And the assistant's Conversazioni (`md`) and Memoria (`lg`) in
+`components/assistant/AssistantModals.tsx`, two right-side `Sheet`s with a 14px title until then:
+no footer (a list to pick from asks for no decision), the memory's tiles as `bg-muted` sub-tiles,
+and the thread delete off its 3-second timer onto `useArmedDelete`. 40 mounts in 39 files
+(`grep '<ResponsiveModal'`); the one raw primitive left is `components/layout/LogoutDialog.tsx`,
+an `AlertDialog` on purpose because it interrupts.
 
 ### Compact Page Header
 
@@ -625,6 +636,8 @@ The footer line of the net-worth tile: `Mercato:` followed by every asset class 
 
 `components/dashboard/overview/RankedRows.tsx` — the CompositionList idea inside a tile: label · 3px bar (width = rank, the largest row fills the track) · mono amount · share. When the rows are a subset of a stated total, the list closes with a muted residual row (`Altre categorie`, no bar) so the shares visibly sum to 100% (The Narrative Honesty Rule). Bar colour is a chart slot (`var(--chart-1)` expenses, `var(--chart-2)` income), never a hex. A RECORD ranking is a different component (`components/hall-of-fame/RecordRows.tsx`): it carries a position, its value can be negative and its percentage is a variation rather than a slice, so it is not folded into this one — see **The Ranking-Is-Not-An-Axis Rule**.
 
+**The ledger form** (Storico's Driver and «Lavoro e investimenti», 2026-09-20): when the rows are the PARTS of an identity — signed, some of them negative — there is no bar and no share, only label · signed mono amount, closed by a bold row for the total they add up to. A flow (savings, a mortgage repaid, a contribution) is signed and uncoloured, a gain or a loss follows its sign, a tax is always a loss. The printed rows add up to the printed total to the euro: every row is rounded to the printed unit and the remainder row («Altre variazioni») carries the drift, because a reader who adds the rows by hand is exactly the reader this form is for. Six signed figures in one sentence is the pattern this replaces.
+
 ### Table inside a Tile (Strumenti)
 
 The management table of Patrimonio keeps being a table — sortable columns (the three Δ windows included), the «Andamento» VIEW, the optional grouping by class, the `--chart-3` tint on hand-priced rows, the two-click delete without a timer (`useArmedDelete`, one live region per tile) — but it lives inside a tile and takes its cadence: eyebrow (`Strumenti`), the toggles as the aside (`h-8`, 11px outline buttons, `aria-pressed`, remembered per browser), a reading line («16 strumenti, 2 valutati a mano; i 3 maggiori pesano il 39,3%»), then the rows. Column headers are the 9px sub-eyebrow (`TILE_SUB_EYEBROW_CLASS`, `scope="col"`; a sortable one carries `aria-sort` and a `<button>` inside, never a focusable `<th>`), the actions header is named for a screen reader only («Azioni sulla riga» — a visible «AZIONI» sat over a column of «Azioni» class chips), cells are 13px with every number `font-mono tabular-nums`, rows separate with a 1px `border-border` and nothing else, and the first cell of each row is a `<th scope="row">` whose sub-line says what the storage does not: a bond's maturity and next coupon («scade il 10/03/2032 · prossima cedola 10/12»), a hand-valued holding's «valore a mano dal 12/08» with «—» in Quantità · Prezzo · PMC (its value lives in `quantity` at price 1, and a PMC equal to the price is not a PMC). «Andamento» replaces Quantità · Prezzo · PMC · TER with the three Δ windows — a view, not four more columns — so the table fits the tile at 1440 in both states and never scrolls the page; should it ever scroll (its own `overflow-x-auto` wrapper, `-mx-5 px-5`), the actions column is `sticky right-0` on the card surface with a 1px left rule only while it does. A muted footer pinned with `mt-auto` explains the tint and, per state, what the columns are (2026-09-14).
@@ -633,11 +646,11 @@ Below `desktop:` the same rows are a flat `divide-y` list of expandable rows (`A
 
 ### Feed inside a Tile (Movimenti)
 
-The transaction feed of Tracciamento stays the inventory it is — day groups, flat rows, the detail drawer with its drawer-confirm delete, the dense `ExpenseTable` behind a «Feed | Tabella» switch — but it lives inside a tile and takes its cadence: eyebrow (`Movimenti`), the count as the aside («47 voci», or «12 di 47 voci» while the toolbar narrows the list), a reading line that counts the rows by type and names the largest («47 movimenti: 40 spese, 5 entrate e 2 trasferimenti; la voce più grande è Stipendio (4200 €)»), then the toolbar (search, categories, subcategory, account, sort on the left; the view switch and «Esporta CSV» on the right, `ml-auto`) and the rows. The feed keeps `surface="flat"` on every width — a card per day inside a tile would be a card inside a card — and the toolbar is `hidden desktop:block`: below that width the `[periodo · Filtri · ordina]` bar of `MobileFiltersDrawer` renders inside the tile (`mobileToolbar`, `desktop:hidden`) — next to the list it narrows — and its period picker is the SAME `period` the picker under the verdict drives (a second handle, its own accessible name «Periodo dei movimenti», `min-w-0` so the picker yields before the buttons when a phone runs out of room; `e2e/cashflow.mobile.spec.ts` pins the fit at 390 and 360). **The toolbar narrows only this tile**: the verdict and the other tiles read the period slice, never the filtered list, because a savings rate computed over one category is not a savings rate.
+The transaction feed of Tracciamento stays the inventory it is — day groups, flat rows, the detail as a `sm` modal whose delete arms in its footer, the dense `ExpenseTable` behind a «Feed | Tabella» switch — but it lives inside a tile and takes its cadence: eyebrow (`Movimenti`), the count as the aside («47 voci», or «12 di 47 voci» while the toolbar narrows the list), a reading line that counts the rows by type and names the largest («47 movimenti: 40 spese, 5 entrate e 2 trasferimenti; la voce più grande è Stipendio (4200 €)»), then the toolbar (search, categories, subcategory, account, sort on the left; the view switch and «Esporta CSV» on the right, `ml-auto`) and the rows. The feed keeps `surface="flat"` on every width — a card per day inside a tile would be a card inside a card — and the toolbar is `hidden desktop:block`: below that width the `[periodo · Filtri · ordina]` bar of `MobileFiltersDrawer` renders inside the tile (`mobileToolbar`, `desktop:hidden`) — next to the list it narrows — and its period picker is the SAME `period` the picker under the verdict drives (a second handle, its own accessible name «Periodo dei movimenti», `min-w-0` so the picker yields before the buttons when a phone runs out of room; `e2e/cashflow.mobile.spec.ts` pins the fit at 390 and 360). **The toolbar narrows only this tile**: the verdict and the other tiles read the period slice, never the filtered list, because a savings rate computed over one category is not a savings rate.
 
 ### In-tile Bars (hand-written SVG)
 
-A small bar chart inside a tile — income beside spending per month on Tracciamento's hero, the savings rate per month on «Risparmio nel tempo», net dividend income per month AND per year on Dividendi (one component, `NetIncomeBars`, two windows: a second implementation of the same quantity would drift) — is a hand-written `<svg viewBox preserveAspectRatio="none">` of `<rect>`s positioned `absolute inset-0` inside a `relative flex-1` box with a `minHeight` (the sparkline's stretch technique), never Recharts: the bars stretch with the tile's free height and nothing else on the page pays for a chart library. Three rules. The **axis labels live outside the SVG**, in a CSS grid with as many columns as bars (`font-mono text-[10px]`), so they never stretch with the plot. **Colour is the chart slot the rest of the page already uses for that quantity** — `--chart-2` for income, `--chart-1` for spending, the same two the category tiles' bars take — and a month below zero is `--destructive` drawn under the baseline. **A reference line is a dashed `--foreground` at 60% and carries no label**: the reading line above the chart says what it is («In media il 31%»), and a label on the plot would paint over whichever bar stands at the edge. **The month the page is about is outlined** (`stroke="var(--foreground)"`, `vectorEffect="non-scaling-stroke"`) and its axis label set `font-semibold` — never the other months dimmed, since a dimmed slot falls under the 3:1 floor for graphical objects on the light card. **A baseline series is a neutral, and an unknowable baseline is a gap** (Analisi, 2026-08-25): the previous year's same month stands beside the current bar in `--muted-foreground` — neither the gain nor the loss colour, because a baseline is neither — and a month whose baseline cannot be known (below the history floor, or a previous year with no rows at all) draws nothing there, never a flat zero that would read as «spent nothing»; the footer under the chart says which of the two it is. **A window still RUNNING is drawn at reduced fill AND outlined** (Dividendi's current year): it is real data the reader must see, and it is not comparable with the closed ones the reading ranks — the outline says «this one is different», the reduced fill says «not yet finished», and the footer says which; every `<g>` carries a `<title>` with the month's figures, the native tooltip. **With a mouse, the plot reads the point under it** (`components/ui/chart-hover.tsx`: `useChartHover` snaps to the slot of a bar chart or the nearest point of a line, `ChartHoverTip` is the small `bg-popover` card at the top of the plot, centred on the anchor and kept inside it at the edges, figures mono and sign-coloured; a hovered slot is washed with `--foreground` at 6%, a hovered sparkline point gets a dot and a 25% guide line). It mounts only under `(pointer: fine)`: on a phone or a tablet the chart stays a shape and the `<title>`/`aria-label` carry the figures — the same reading exists for the net-worth sparkline of the Panoramica and Patrimonio (`NetWorthSparkline interactive`). The SVG carries `role="img"` and an `aria-label` that lists every month's figures, so the chart reads as a sentence to a screen reader; the legend swatches (`rounded-[2px]`, 8px) are `aria-hidden`.
+A small bar chart inside a tile — income beside spending per month on Tracciamento's hero, the savings rate per month on «Risparmio nel tempo», net dividend income per month AND per year on Dividendi (one component, `NetIncomeBars`, two windows: a second implementation of the same quantity would drift) — is a hand-written `<svg viewBox preserveAspectRatio="none">` of `<rect>`s positioned `absolute inset-0` inside a `relative flex-1` box with a `minHeight` (the sparkline's stretch technique), never Recharts: the bars stretch with the tile's free height and nothing else on the page pays for a chart library. Three rules. The **axis labels live outside the SVG**, in a CSS grid with as many columns as bars (`font-mono text-[10px]`), so they never stretch with the plot. **Colour is the chart slot the rest of the page already uses for that quantity** — `--chart-2` for income, `--chart-1` for spending, the same two the category tiles' bars take — and a month below zero is `--destructive` drawn under the baseline. **A reference line is a dashed `--foreground` at 60% and carries no label**: the reading line above the chart says what it is («In media il 31%»), and a label on the plot would paint over whichever bar stands at the edge. **The month the page is about is outlined** (`stroke="var(--foreground)"`, `vectorEffect="non-scaling-stroke"`) and its axis label set `font-semibold` — never the other months dimmed, since a dimmed slot falls under the 3:1 floor for graphical objects on the light card. **A baseline series is a neutral, and an unknowable baseline is a gap** (Analisi, 2026-08-25): the previous year's same month stands beside the current bar in `--muted-foreground` — neither the gain nor the loss colour, because a baseline is neither — and a month whose baseline cannot be known (below the history floor, or a previous year with no rows at all) draws nothing there, never a flat zero that would read as «spent nothing»; the footer under the chart says which of the two it is. **A window still RUNNING is drawn at reduced fill AND outlined** (Dividendi's current year): it is real data the reader must see, and it is not comparable with the closed ones the reading ranks — the outline says «this one is different», the reduced fill says «not yet finished», and the footer says which; every `<g>` carries a `<title>` with the month's figures, the native tooltip. **With a mouse, the plot reads the point under it** (`components/ui/chart-hover.tsx`: `useChartHover` snaps to the slot of a bar chart or the nearest point of a line, `ChartHoverTip` is the small `bg-popover` card at the top of the plot, centred on the anchor and kept inside it at the edges, figures mono and sign-coloured; a hovered slot is washed with `--foreground` at 6%, a hovered sparkline point gets a dot and a 25% guide line). It mounts only under `(pointer: fine)`: on a phone or a tablet the chart stays a shape and the `<title>`/`aria-label` carry the figures — the same reading exists for the net-worth sparkline of the Panoramica and Patrimonio (`NetWorthSparkline interactive`). The SVG carries `role="img"` and an `aria-label` that lists every month's figures, so the chart reads as a sentence to a screen reader; the legend swatches (`rounded-[2px]`, 8px) are `aria-hidden`. **A histogram is the same shape with bins for months** (`components/ui/histogram-bars.tsx`, 2026-09-24, the one component under the Monte Carlo's final values, the FIRE year and the ruin year of the paths — `year-bars.tsx` names the year bins): the reference bin outlined, and a bin that is not a value of the quantity (the paths past the horizon, «oltre») in the muted ink rather than the series' slot, so a state never wears the colour of a measure.
 
 ### Tick under a Row (Per classe)
 
@@ -699,8 +712,12 @@ its question has none: a project's cost is its whole cost, so Centri di Costo dr
 Mese|Anno|12 mesi|Sempre picker and reads everything «in totale». The rule then inverts — every
 figure is lifetime unless it says otherwise, and the ones that use a window carry it in their own
 words: «quest'anno», «anno scorso», «ultimi 12 mesi», «Tetto mensile · agosto» with today's mark,
-«Fine mese» and «Fine anno» «al ritmo attuale». A delta against "the previous period" has no honest
-predecessor without an axis, so it is gone rather than faked.
+«Questo mese» and «Quest'anno» with the calendar in their caption («con il calendario chiude a
+1100 €»). A delta against "the previous period" has no honest predecessor without an axis, so it
+is gone rather than faked. **A center has no pace** (2026-09-18): until then the two cells were
+«Fine mese» / «Fine anno» «al ritmo attuale», and a 1650 € repair on the 17th read «~2942 € a fine
+mese». A project spends in blocks, and its recurring series are already real future rows, so a
+window's end is what is booked plus what is in the calendar — a sum, printed without «~».
 
 **The Risk-vs-Fact Rule.** A projected overrun and a crossed threshold are two different things
 and never sit in the same tile. «Categorie a rischio» lists the monthly budgets whose month-end
@@ -708,12 +725,16 @@ projection exceeds their amount — money not yet spent, named as a projection (
 ritmo attuale») — and a budget ALREADY over is not there: it is a fact, and facts belong to
 «Avvisi» («Superato», with the threshold it crossed). The alert evaluator still fires a
 forecast-only alert for the email, but the tile filters it out (`thresholdCrossed`), so no row
-appears twice. Corollary on the projection itself: it is the app's ONE rule (the pace on what is
+appears twice. On Centri di Costo the same two names stand on the CALENDAR, not on a pace
+(2026-09-18): a ceiling crossed by what is booked is the fact, one still holding that the rows
+already dated ahead carry past it is the risk («supererà il tetto», «con le spese già in
+calendario») — and the risk outranks dormancy in a center's verdict, or the list and the detail
+answer differently about one center. Corollary on the projection itself: it is the app's ONE rule (the pace on what is
 booked to date plus the rows already in the calendar — Tracciamento's and the Panoramica's), and a
 FIXED or debt category never follows the pace: rent paid on the 1st, extrapolated by the day, would
 read «at risk» all month. First applied on Budget, 2026-08-23.
 
-**The Same-Basis Rule** (Rendimenti, 2026-08-25). A gap printed beside a figure is on that figure's basis. Below six months the hero states the PERIOD return («+2,1% nei 4 mesi»), so the «0,4 punti sopra il Portafoglio 60/40» next to it de-annualises both rates to the same four months — the annualised gap (1,2 points) beside a period figure told the reader the model made a third of what it made. Corollaries: the subject of the verdict names the window actually MEASURED («Negli ultimi 11 mesi» on eleven snapshots, «Da aprile» on a year-to-date that starts there), never the picker's label; «oggi» is said only when the window closes on the latest snapshot, otherwise the closing month is named («a fine dicembre 2024»); and two sentences on one page decide a tie the same way — a gap under a tenth of a point is «in linea» in the verdict and «alla pari» in the Benchmark tile, counted neither as beaten nor as above.
+**The Same-Basis Rule** (Rendimenti, 2026-08-25). A gap printed beside a figure is on that figure's basis. Below a YEAR the hero states the PERIOD return («+2,1% nei 4 mesi» — six months until 2026-09-20, when a nine-month year-to-date still printed «+16,0%» at 54px over a measured +11,8%; the rate per year is the companion chip from six months on), so the «0,4 punti sopra il Portafoglio 60/40» next to it — in the verdict AND in the tile's chip, one function — de-annualises both rates to the same four months — the annualised gap (1,2 points) beside a period figure told the reader the model made a third of what it made. Corollaries: the subject of the verdict names the window actually MEASURED («Negli ultimi 11 mesi» on eleven snapshots, «Da aprile» on a year-to-date that starts there), never the picker's label; «oggi» is said only when the window closes on the latest snapshot, otherwise the closing month is named («a fine dicembre 2024»); and two sentences on one page decide a tie the same way — a gap under a tenth of a point is «in linea» in the verdict and «alla pari» in the Benchmark tile, counted neither as beaten nor as above.
 
 **The One-Pace Corollary** (Storico, 2026-08-25). A page that projects has ONE pace, and every sentence that judges speed uses it. Storico's pace is the average monthly increase of the last twelve months, in euro — linear on purpose: wealth growth is contributions plus returns, and a compound extrapolation of a saver's contributions is a forecast dressed as a measurement — and it decides both the verdict («sta accelerando» against the lifetime monthly average; within ±10% it is «al ritmo di sempre», below it «ha rallentato», negative «nell'ultimo anno ha perso») and the Raddoppi tile's «prossimo raddoppio … a gennaio 2028». Two guards keep it honest: below two years of history no pace is judged (the trailing year overlaps most of the history), and a target more than fifty years away at that pace has no date. A growth rate that includes contributions is always named as such («il 19,4% l'anno, versamenti inclusi»), so it can never be read as Rendimenti's return; the verdict names the best month and the Evoluzione tile the worst, never the same figure twice. Two corollaries on the same page: a running year is measured from its real baseline («Da aprile 2026» when the history starts in March, never a hardcoded «gennaio»), and a quantity effect — a buy, a sell, a deposit landing on a cash account — is a flow, set in mono with a typographic sign and NO colour, because the sign tokens mean gain and loss and nothing else.
 
@@ -927,7 +948,7 @@ A tab switcher for mutually exclusive views within a section. Replaces `<Select>
 
 **Structure:** `role="tablist"` container with `bg-muted rounded-lg p-1 w-fit mx-auto`, each option is a `role="tab"` `motion.button` with `layout="size"`. Active pill is a `motion.div` with `layoutId` and `bg-background shadow-sm` that slides between options.
 
-**Spring:** `stiffness: 400, damping: 35` — snappy without overshooting. Same constant on both `motion.button` `transition` and `motion.div` `transition`, and on every other spring in the app but one: the bottom pill's «add expense» button enters at `400 / 28` (`components/layout/BottomNavigation.tsx:41`), a touch of overshoot on the one element that pops in from nothing rather than sliding between two states.
+**Spring:** `stiffness: 400, damping: 35` — snappy without overshooting. Same constant on both `motion.button` `transition` and `motion.div` `transition`, and on every control that slides between two states. Four springs are NOT `400 / 35`, each for a reason (counted in the code on 2026-09-18 — until then this paragraph said «all but one»): the bottom pill's «add expense» button enters at `400 / 28` (`components/layout/BottomNavigation.tsx:41`), a touch of overshoot on the one element that pops in from nothing; `springLayoutTransition` is `280 / 30`, mass 0.9 (`lib/utils/motionVariants.ts`), softer because it moves whole REGIONS when a conditional section appears — the `layout="position"` wrappers of Panoramica and Patrimonio; `metricSettleTransition` is `320 / 34`, mass 0.8 (same file), a figure that must land without a bounce — today only the Dividendi calendar; and the savings-rate badge enters at `300 / 20` (`components/ui/SavingsRateBadge.tsx:112`), inline and collapsed to duration 0 under reduced motion. A fifth value needs the same kind of sentence here.
 
 #### Variant A — Icon tabs (section navigation)
 
@@ -1230,6 +1251,8 @@ already been dropped from `GoalBasedInvestingTab` in an earlier session in favor
 list, and the file was removed rather than polished once this was discovered).
 
 ### Chart Legend Swatch
+
+**A chart's legend is `components/ui/series-legend.tsx`** (2026-09-20), never Recharts' `<Legend>`: that one prints each label in its series colour — a chart slot as 11px text measured 3,64 · 4,02 · 2,62:1 — and names its icons in English. The words stay in the neutral ink, one entry per SERIES: a bar drawn in the loss token under the baseline is the same series in another state, so its entry carries two swatches («Mercato (rosso se in perdita)») rather than being a fourth entry.
 
 The color swatch used in composition bar / chart legend rows. At 8×8px, shape matters: a fully round circle reads as a "dot indicator" (inline traffic-light semantics); a slightly rounded square reads as a "color key."
 

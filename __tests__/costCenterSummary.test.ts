@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import type { Expense } from '@/types/expenses';
 import type { CostCenter } from '@/types/costCenters';
 import {
-  MIN_YEAR_FORECAST_DAYS,
   buildCenterMonthStack,
   resolveYearCalendar,
   summarizeCenter,
@@ -57,14 +56,11 @@ const AUTO_ROWS: Expense[] = [
 
 describe('resolveYearCalendar', () => {
   it('reads day 234 of 365 on 22 August 2026 with 131 days left', () => {
-    expect(resolveYearCalendar(NOW)).toEqual({ dayOfYear: 234, daysInYear: 365, daysLeft: 131, canForecast: true });
+    expect(resolveYearCalendar(NOW)).toEqual({ dayOfYear: 234, daysInYear: 365, daysLeft: 131 });
   });
 
-  it('refuses a pace before MIN_YEAR_FORECAST_DAYS', () => {
-    const early = resolveYearCalendar(new Date('2026-01-10T10:00:00+01:00'));
-    expect(early.dayOfYear).toBe(10);
-    expect(early.canForecast).toBe(false);
-    expect(MIN_YEAR_FORECAST_DAYS).toBe(28);
+  it('counts the day from the Italian calendar fields, not from elapsed hours', () => {
+    expect(resolveYearCalendar(new Date('2026-01-10T10:00:00+01:00')).dayOfYear).toBe(10);
   });
 
   it('counts 366 days in a leap year', () => {
@@ -86,7 +82,7 @@ describe('projectWindowEndWithScheduled', () => {
 // ─── One center ───────────────────────────────────────────────────────────────
 
 describe('summarizeCenter', () => {
-  it('reads an empty center as never used: no total, no projection, dormant', () => {
+  it('reads an empty center as never used: no total, nothing in the calendar, dormant', () => {
     const s = summarizeCenter(center(), [], NOW);
     expect(s.total).toBe(0);
     expect(s.count).toBe(0);
@@ -94,8 +90,8 @@ describe('summarizeCenter', () => {
     expect(s.lastDate).toBeNull();
     expect(s.idleDays).toBeNull();
     expect(s.lifecycle).toBe('dormant');
-    expect(s.yearProjection).toBeNull();
-    expect(s.monthProjection).toBeNull();
+    expect(s.yearScheduled).toBe(0);
+    expect(s.monthScheduled).toBe(0);
     expect(s.budget).toBeNull();
     expect(s.averageMonthly).toBe(0);
   });
@@ -122,28 +118,42 @@ describe('summarizeCenter', () => {
     expect(s.lastYear).toBe(380);
   });
 
-  it('projects the year end at the app rule: the booked pace over the year plus the scheduled rows', () => {
+  it('reads a window end as what is booked plus what is in the calendar — no pace', () => {
     const s = summarizeCenter(center(), AUTO_ROWS, NOW);
-    expect(s.yearProjection).toBeCloseTo((830 / 234) * 365 + 50, 6);
-    expect(s.monthProjection).toBeCloseTo((210 / 22) * 31 + 50, 6);
+    expect(s.ytd).toBe(830);
+    expect(s.yearScheduled).toBe(50);
+    expect(s.monthSpentToDate).toBe(210);
+    expect(s.monthScheduled).toBe(50);
   });
 
-  it('drops the projections on a dormant center and before the forecast threshold', () => {
-    const dormantRows = [expense({ date: day('2026-04-24'), amount: -100 })];
-    const dormant = summarizeCenter(center(), dormantRows, NOW);
+  it('never counts a recurring series twice: its future rows ARE the calendar', () => {
+    // 50 € of insurance on the 1st of every month of 2026, materialised as twelve real rows.
+    const insurance = Array.from({ length: 12 }, (_, i) =>
+      expense({ date: day(`2026-${String(i + 1).padStart(2, '0')}-01`), amount: -50, isRecurring: true, recurringParentId: 'series' }),
+    );
+    const s = summarizeCenter(center(), insurance, NOW);
+    // Eight booked (January → August), four to come: the year ends at 600, the series' own sum.
+    // The pace the module used until 2026-09-18 read (400 / 234) × 365 + 200 = 824.
+    expect(s.ytd).toBe(400);
+    expect(s.yearScheduled).toBe(200);
+    expect(s.ytd + s.yearScheduled).toBe(600);
+  });
+
+  it('keeps a row scheduled NEXT year out of this year\'s calendar', () => {
+    const s = summarizeCenter(center(), [...AUTO_ROWS, expense({ date: day('2027-01-15'), amount: -900 })], NOW);
+    expect(s.yearScheduled).toBe(50);
+    expect(s.scheduled).toEqual({ total: 950, count: 2 });
+  });
+
+  it('measures dormancy on what is booked, whatever the calendar holds', () => {
+    const dormant = summarizeCenter(center(), [expense({ date: day('2026-04-24'), amount: -100 })], NOW);
     expect(dormant.lifecycle).toBe('dormant');
     expect(dormant.idleDays).toBe(120);
-    expect(dormant.yearProjection).toBeNull();
-    expect(dormant.monthProjection).toBeNull();
-
-    const early = summarizeCenter(center(), [expense({ date: day('2026-01-05'), amount: -100 })], new Date('2026-01-10T10:00:00+01:00'));
-    expect(early.yearProjection).toBeNull();
   });
 
-  it('keeps an archived center out of every projection and names its lifecycle', () => {
+  it('names an archived center\'s lifecycle and still totals it', () => {
     const s = summarizeCenter(center({ archivedAt: day('2025-01-10') }), AUTO_ROWS, NOW);
     expect(s.lifecycle).toBe('archived');
-    expect(s.yearProjection).toBeNull();
     expect(s.total).toBe(1310);
   });
 
@@ -155,7 +165,10 @@ describe('summarizeCenter', () => {
     expect(b.amount).toBe(250);
     // Scheduled rows count as used («impegnato»), like the Budget page's ceiling.
     expect(b.spent).toBe(260);
-    expect(b.exceeded).toBe(true);
+    expect(b.spentToDate).toBe(210);
+    // Risk vs fact: 210 booked holds under 250; it is the instalment on the 28th that crosses it.
+    expect(b.exceeded).toBe(false);
+    expect(b.atRisk).toBe(true);
     expect(b.overBy).toBe(10);
     expect(b.calendarPct).toBeCloseTo((22 / 31) * 100, 6);
     expect(b.usedPct).toBeCloseTo(104, 6);
@@ -164,13 +177,21 @@ describe('summarizeCenter', () => {
     expect(b.status).toBe('over');
   });
 
-  it('reads an annual ceiling year-to-date, today on the year, projection at the app rule', () => {
+  it('reads a monthly ceiling as a FACT once what is booked is past it', () => {
+    const b = summarizeCenter(center({ budgetAmount: 200, budgetPeriod: 'monthly' }), AUTO_ROWS, NOW).budget!;
+    expect(b.exceeded).toBe(true);
+    expect(b.atRisk).toBe(false);
+    // 140 on the 5th holds, 70 on the 18th crosses 200.
+    expect(b.crossedOn).toBe(18);
+    expect(b.overBy).toBe(60);
+  });
+
+  it('reads an annual ceiling year-to-date, with today on the year', () => {
     const s = summarizeCenter(center({ budgetAmount: 2500, budgetPeriod: 'annual' }), AUTO_ROWS, NOW);
     const b = s.budget!;
     expect(b.period).toBe('annual');
     expect(b.spent).toBe(880);
     expect(b.calendarPct).toBeCloseTo((234 / 365) * 100, 6);
-    expect(b.projection).toBeCloseTo((830 / 234) * 365 + 50, 6);
     expect(b.exceeded).toBe(false);
     expect(b.remaining).toBe(1620);
     expect(b.crossedOn).toBeNull();
@@ -178,10 +199,16 @@ describe('summarizeCenter', () => {
     expect(b.atRisk).toBe(false);
   });
 
-  it('flags an annual ceiling at risk when the projection exceeds it and it is not over yet', () => {
-    const s = summarizeCenter(center({ budgetAmount: 1000, budgetPeriod: 'annual' }), AUTO_ROWS, NOW);
-    expect(s.budget!.exceeded).toBe(false);
-    expect(s.budget!.atRisk).toBe(true);
+  it('flags an annual ceiling at risk only when the CALENDAR carries it past, never a pace', () => {
+    // 830 booked + 50 scheduled = 880. The old pace read ~1345 and cried risk on a 1000 ceiling.
+    expect(summarizeCenter(center({ budgetAmount: 1000, budgetPeriod: 'annual' }), AUTO_ROWS, NOW).budget!.atRisk).toBe(false);
+    const byCalendar = summarizeCenter(center({ budgetAmount: 850, budgetPeriod: 'annual' }), AUTO_ROWS, NOW).budget!;
+    expect(byCalendar.exceeded).toBe(false);
+    expect(byCalendar.atRisk).toBe(true);
+    expect(byCalendar.overBy).toBe(30);
+    const fact = summarizeCenter(center({ budgetAmount: 800, budgetPeriod: 'annual' }), AUTO_ROWS, NOW).budget!;
+    expect(fact.exceeded).toBe(true);
+    expect(fact.atRisk).toBe(false);
   });
 
   it('splits fixed and one-off spending over the booked rows', () => {
@@ -235,8 +262,9 @@ describe('summarizeCostCenters', () => {
 
   it('separates the centers over their ceiling from those at risk', () => {
     const s = summarizeCostCenters(rows, NOW);
-    expect(s.over.map((r) => r.center.id)).toEqual(['auto']);
-    expect(s.atRisk).toEqual([]);
+    // Automobile's 250 ceiling holds on the 210 booked; the instalment on the 28th is the risk.
+    expect(s.over).toEqual([]);
+    expect(s.atRisk.map((r) => r.center.id)).toEqual(['auto']);
     expect(s.withBudget).toBe(1);
   });
 

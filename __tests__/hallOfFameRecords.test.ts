@@ -26,6 +26,7 @@ import {
   rankBySavings,
   rankPeriodByNetWorthGrowth,
   summarizeRecordStats,
+  summarizeSinceWorstMonth,
 } from '@/lib/utils/hallOfFameRecords';
 import type { MonthlySnapshot } from '@/types/assets';
 
@@ -69,6 +70,39 @@ describe('calculateYearlyRecords', () => {
     // 2000 (Dec 2025) − 1000 (Dec 2024 baseline) = 1000.
     expect(y2025.netWorthDiff).toBe(1000);
     expect(y2025.startOfYearNetWorth).toBe(1000);
+  });
+
+  it('counts the months a year covers, so a partial first year can say so', () => {
+    const snapshots = [snap(2024, 12, 1000), snap(2025, 6, 1300), snap(2025, 12, 2000)];
+
+    const records = calculateYearlyRecords(snapshots, []);
+
+    expect(records.find((r) => r.year === 2024)?.monthsCovered).toBe(1);
+    expect(records.find((r) => r.year === 2025)?.monthsCovered).toBe(2);
+  });
+});
+
+describe('summarizeSinceWorstMonth', () => {
+  const month = (year: number, m: number, netWorthDiff: number) => ({
+    year, month: m, monthYear: '', netWorthDiff, previousNetWorth: 1000, totalIncome: 0, totalExpenses: 0,
+  });
+
+  it('counts the months after the worst one and how many of them grew', () => {
+    const chronological = [month(2025, 1, 500), month(2025, 2, -900), month(2025, 3, 200), month(2025, 4, -100), month(2025, 5, 0), month(2025, 6, 300)];
+
+    expect(summarizeSinceWorstMonth(chronological)).toEqual({ months: 4, growing: 2 });
+  });
+
+  it('takes the MOST negative month as the worst, not the first decline', () => {
+    const chronological = [month(2025, 1, -100), month(2025, 2, 200), month(2025, 3, -900), month(2025, 4, 400)];
+
+    expect(summarizeSinceWorstMonth(chronological)).toEqual({ months: 1, growing: 1 });
+  });
+
+  it('has nothing to say without a decline, and nothing after a worst month that is the latest', () => {
+    expect(summarizeSinceWorstMonth([month(2025, 1, 100), month(2025, 2, 0)])).toBeNull();
+    expect(summarizeSinceWorstMonth([month(2025, 1, 100), month(2025, 2, -50)])).toEqual({ months: 0, growing: 0 });
+    expect(summarizeSinceWorstMonth([])).toBeNull();
   });
 });
 
@@ -200,7 +234,19 @@ describe('summarizeRecordStats', () => {
       averageMonthlyExpenses: 0,
       firstMonth: null,
       lastMonth: null,
+      sinceWorstMonth: null,
     });
+  });
+
+  it('stores the recovery since the worst month beside the rankings', () => {
+    const withDecline = [
+      { ...monthly[0], netWorthDiff: -400 },
+      { ...monthly[1], netWorthDiff: 300 },
+      { ...monthly[2], netWorthDiff: 200 },
+    ];
+
+    expect(summarizeRecordStats(withDecline, yearly).sinceWorstMonth).toEqual({ months: 2, growing: 2 });
+    expect(summarizeRecordStats(monthly, yearly).sinceWorstMonth).toBeNull();
   });
 });
 

@@ -70,6 +70,12 @@ export interface RecordEntry {
   base: number | null;
   /** True when this row IS the period the reader is living in. */
   isCurrent: boolean;
+  /**
+   * How many months of the year the record covers (1-12) — a first year that starts in
+   * December is ranked beside whole years and must say so. Null on a month, and on a yearly
+   * record written before the field existed.
+   */
+  monthsCovered: number | null;
 }
 
 /** One ranking, plus where the running period sits in it. */
@@ -93,6 +99,11 @@ export interface TimelinePoint {
   key: string;
   /** The axis label: the short month alone ("ago"). */
   label: string;
+  /**
+   * The year, on the first bar of each year and nowhere else: twelve months from four years
+   * printed as months alone read «mar … mar, set … set» and could not say WHEN (2026-09-24).
+   */
+  yearLabel: string | null;
   /** What the hover and the accessible name say ("agosto 2026"). */
   caption: string;
   value: number;
@@ -127,6 +138,8 @@ export interface HallOfFameSummary {
   /** False when there is nothing to rank at all. */
   hasRecords: boolean;
   stats: HallOfFameStats | null;
+  /** When the rankings were last rebuilt; null on a document written before the stamp existed. */
+  rankingsUpdatedAt: Date | null;
   /** Every ranking the document carries; one it does not is absent, never an empty board. */
   boards: Partial<Record<BoardKey, RecordBoard>>;
   /** The three best growth months added up; null below three. */
@@ -173,13 +186,31 @@ function shareOf(value: number, base: number): number | null {
 function toMonthEntry(record: MonthlyRecord, category: RecordCategory, today: HallOfFameToday): RecordEntry {
   const labels = monthLabels(record.year, record.month);
   const isCurrent = record.year === today.year && record.month === today.month;
-  return { ...labels, year: record.year, month: record.month, isCurrent, ...valueOf(record, category, record.previousNetWorth) };
+  return {
+    ...labels,
+    year: record.year,
+    month: record.month,
+    isCurrent,
+    monthsCovered: null,
+    ...valueOf(record, category, record.previousNetWorth),
+  };
 }
 
 function toYearEntry(record: YearlyRecord, category: RecordCategory, today: HallOfFameToday): RecordEntry {
   const labels = yearLabels(record.year);
   const isCurrent = record.year === today.year;
-  return { ...labels, year: record.year, isCurrent, ...valueOf(record, category, record.startOfYearNetWorth) };
+  return {
+    ...labels,
+    year: record.year,
+    isCurrent,
+    monthsCovered: record.monthsCovered ?? null,
+    ...valueOf(record, category, record.startOfYearNetWorth),
+  };
+}
+
+/** A closed year that does not cover its twelve months; the running year says «finora» instead. */
+export function isPartialYear(entry: RecordEntry): boolean {
+  return !entry.isCurrent && entry.monthsCovered !== null && entry.monthsCovered < 12;
 }
 
 /**
@@ -238,7 +269,7 @@ export function summarizeHallOfFame(data: HallOfFameData | null, today: HallOfFa
   const notes = summarizeNotes(data?.notes ?? []);
 
   if (!data) {
-    return { hasRecords: false, stats: null, boards: {}, topThreeGrowth: null, notes };
+    return { hasRecords: false, stats: null, rankingsUpdatedAt: null, boards: {}, topThreeGrowth: null, notes };
   }
 
   const boards: Partial<Record<BoardKey, RecordBoard>> = {};
@@ -281,7 +312,14 @@ export function summarizeHallOfFame(data: HallOfFameData | null, today: HallOfFa
 
   const hasRecords = Object.values(boards).some((board) => board.total > 0);
 
-  return { hasRecords, stats: data.stats ?? null, boards, topThreeGrowth, notes };
+  return {
+    hasRecords,
+    stats: data.stats ?? null,
+    rankingsUpdatedAt: data.rankingsUpdatedAt ?? null,
+    boards,
+    topThreeGrowth,
+    notes,
+  };
 }
 
 /** One ranking, or null when the document does not carry it. */
@@ -291,6 +329,27 @@ export function getBoard(
   category: RecordCategory,
 ): RecordBoard | null {
   return summary.boards[`${period}:${category}`] ?? null;
+}
+
+/** The row one position above the running period; null when it leads, or is not ranked. */
+export function rowAboveCurrent(board: RecordBoard | null): RecordEntry | null {
+  if (!board || board.currentRank === null || board.currentRank < 2) return null;
+  return board.rows[board.currentRank - 2] ?? null;
+}
+
+/**
+ * Whether a period sits in the ranking a note section names — so the note form can say when
+ * a note is being filed on a period no reader will find from a row.
+ */
+export function isPeriodRanked(
+  summary: HallOfFameSummary,
+  section: HallOfFameSectionKey,
+  year: number,
+  month?: number,
+): boolean {
+  const board = Object.values(summary.boards).find((candidate) => candidate.sectionKey === section);
+  if (!board) return false;
+  return board.rows.some((row) => row.year === year && row.month === month);
 }
 
 /**
@@ -305,9 +364,11 @@ export function buildRecordTimeline(rows: RecordEntry[], limit = TIMELINE_LIMIT)
     .sort((a, b) => Math.abs(b.value) - Math.abs(a.value))
     .slice(0, limit)
     .sort((a, b) => (a.year !== b.year ? a.year - b.year : (a.month ?? 0) - (b.month ?? 0)))
-    .map((row) => ({
+    .map((row, index, chronological) => ({
       key: row.key,
       label: row.month ? MONTH_NAMES_SHORT[row.month - 1].toLowerCase() : row.label,
+      // The year is printed once per year, under its first bar, so the axis can date the bars.
+      yearLabel: index === 0 || chronological[index - 1].year !== row.year ? `${row.year}` : null,
       caption: row.longLabel,
       value: row.value,
       isCurrent: row.isCurrent,

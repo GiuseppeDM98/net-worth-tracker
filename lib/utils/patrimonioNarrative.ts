@@ -20,9 +20,16 @@ import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { formatPercentageIt as formatPercentage } from '@/lib/utils/formatters';
 import { MONTH_NAMES } from '@/lib/constants/months';
 import { getItalyDate } from '@/lib/utils/dateHelpers';
-import { resolveDeclineCause, type DeclineCause, type PeriodSalesSummary } from '@/lib/utils/periodSales';
-import { declineHeadlineTail, describeOwnFlowsSplit, describeSales } from '@/lib/utils/salesNarrative';
+import { resolveDeclineCause, resolveTaxedGrowth, type PeriodSalesSummary } from '@/lib/utils/periodSales';
+import {
+  declineHeadlineTail,
+  describeMonthSplit,
+  describePurchases,
+  describeSales,
+  taxedGrowthHeadline,
+} from '@/lib/utils/salesNarrative';
 import type { Narrative, NarrativeSegment, PageVerdictModel, VerdictTone } from '@/lib/utils/narrative';
+import type { MortgageSummary, MortgageYear } from '@/lib/utils/mortgageSummary';
 
 export interface PatrimonioVerdictInput {
   /** Current calendar month, 1-12. */
@@ -43,6 +50,11 @@ export interface PatrimonioVerdictInput {
    * nothing was sold, absent on a payload computed before the field existed.
    */
   sales?: PeriodSalesSummary | null;
+  /**
+   * Income − expenses already happened this month (the Panoramica's `resolveLivedCashflow`); null
+   * or absent when not known — the split then names no part «risparmiati».
+   */
+  savings?: number | null;
 }
 
 export type PatrimonioVerdict = PageVerdictModel;
@@ -143,18 +155,27 @@ export function pluralArticleFor(count: number): string {
 interface ResolvedHeadline {
   headline: string;
   tone: VerdictTone;
-  /** The cause of a falling month; null when the month did not fall. */
-  declineCause: DeclineCause | null;
 }
 
 function resolveHeadline(input: PatrimonioVerdictInput): ResolvedHeadline {
   if (!input.monthlyVariation) {
-    return { headline: `Il tuo portafoglio ${withPrepositionA(monthInSentence(input.month))}.`, tone: 'neutral', declineCause: null };
+    return { headline: `Il tuo portafoglio ${withPrepositionA(monthInSentence(input.month))}.`, tone: 'neutral' };
+  }
+  // Grown only on paper: the tax on a sale took at least half of the growth — the same rule as
+  // the Panoramica's (`resolveTaxedGrowth`). It outranks the record: on the real account settembre
+  // 2026 was a new high at +0,04%, with 4.089 € of withholding on a VWCE sale.
+  const taxedGrowth = resolveTaxedGrowth({
+    delta: input.monthlyVariation.value,
+    deltaPct: input.monthlyVariation.percentage,
+    salesTax: input.sales?.estimatedTax ?? null,
+  });
+  if (taxedGrowth) {
+    return { headline: taxedGrowthHeadline('Il portafoglio', taxedGrowth, input.sales), tone: 'warning' };
   }
   // The record is measured on the live total, the monthly change on the month's snapshot: the
   // two can disagree intraday, and the headline must never contradict the sign the sentence prints.
   if (input.isNewATH && input.monthlyVariation.value >= 0) {
-    return { headline: 'Il portafoglio è al massimo storico.', tone: 'positive', declineCause: null };
+    return { headline: 'Il portafoglio è al massimo storico.', tone: 'positive' };
   }
 
   const marketLost = input.marketEffect !== null && input.marketEffect < 0;
@@ -162,8 +183,8 @@ function resolveHeadline(input: PatrimonioVerdictInput): ResolvedHeadline {
   if (input.monthlyVariation.value >= 0) {
     // Grown while the market lost: the user's own flows did it, and the sentence must not
     // credit the market.
-    if (marketLost) return { headline: 'Il portafoglio cresce, nonostante il mercato.', tone: 'positive', declineCause: null };
-    return { headline: 'Il portafoglio cresce.', tone: 'positive', declineCause: null };
+    if (marketLost) return { headline: 'Il portafoglio cresce, nonostante il mercato.', tone: 'positive' };
+    return { headline: 'Il portafoglio cresce.', tone: 'positive' };
   }
 
   // A falling month is blamed on the market only when the market actually lost money — and never
@@ -178,7 +199,6 @@ function resolveHeadline(input: PatrimonioVerdictInput): ResolvedHeadline {
     headline: `Il portafoglio è in calo${declineHeadlineTail(cause, input.sales)}`,
     // The market did not lose: a tax withheld on a gain is worth attention, not alarm.
     tone: cause === 'despite-market' || cause === 'taxes-despite-market' ? 'warning' : 'negative',
-    declineCause: cause,
   };
 }
 
@@ -214,7 +234,7 @@ export function formatHoldingCounts(instrumentCount: number, accountCount: numbe
  * driver, even if a top mover was handed in.
  */
 export function buildPatrimonioVerdict(input: PatrimonioVerdictInput): PatrimonioVerdict {
-  const { headline, tone, declineCause } = resolveHeadline(input);
+  const { headline, tone } = resolveHeadline(input);
   const sentence: Narrative = [prose('Il portafoglio vale '), figure(cachedFormatCurrencyEUR(input.totalValue))];
 
   if (input.monthlyVariation) {
@@ -229,20 +249,34 @@ export function buildPatrimonioVerdict(input: PatrimonioVerdictInput): Patrimoni
 
   sentence.push(...buildCountClause(input.instrumentCount, input.accountCount));
 
+  // The top mover explains the MARKET half, not the month (the Panoramica's driver clause says the
+  // same): «ha fatto il grosso» credited an instrument with more than the month's whole change.
   if (input.topMover && input.marketEffect !== null) {
-    const action = input.topMover.delta >= 0 ? 'ha fatto il grosso' : 'ha pesato';
-    sentence.push(prose(`; ${input.topMover.name} ${action} (`), signedCurrency(input.topMover.delta, true), prose(')'));
+    const action = input.topMover.delta >= 0 ? 'ha spinto' : 'ha pesato';
+    sentence.push(
+      prose(`; sul mercato ${action} soprattutto ${input.topMover.name} (`),
+      signedCurrency(input.topMover.delta, true),
+      prose(')'),
+    );
   }
 
   sentence.push(prose('.'));
 
-  // The market-vs-flows split and the sale behind it, the same words the Panoramica prints. When
-  // the headline already blames the tax on the sale, the split is redundant and only the sale stays.
-  if (declineCause !== 'taxes-despite-market' && input.monthlyVariation && input.marketEffect !== null) {
-    sentence.push(prose(' '), ...describeOwnFlowsSplit(input.monthlyVariation.value, input.marketEffect));
+  // The market-vs-flows split and the sale behind it, the same words the Panoramica prints. A
+  // taxed sale carries the split itself, with the month without the tax, so the
+  // plain split is printed only when there is no tax to take out.
+  const split =
+    input.monthlyVariation && input.marketEffect !== null
+      ? { delta: input.monthlyVariation.value, marketEffect: input.marketEffect, savings: input.savings ?? null }
+      : undefined;
+  const saleCarriesSplit = split !== undefined && (input.sales?.estimatedTax ?? 0) > 0;
+  if (split && !saleCarriesSplit) {
+    sentence.push(prose(' '), ...describeMonthSplit(split));
   }
   if (input.sales) {
-    sentence.push(prose(' '), ...describeSales(input.sales));
+    sentence.push(prose(' '), ...describeSales(input.sales, split));
+    const purchases = describePurchases(input.sales);
+    if (purchases.length > 0) sentence.push(prose(' '), ...purchases);
   }
   return { headline, tone, sentence };
 }
@@ -401,4 +435,83 @@ export function describeLastPriceUpdate(lastUpdate: Date | null, now: Date): str
   const sameYear = updated.getFullYear() === today.getFullYear();
   const date = `${String(updated.getDate()).padStart(2, '0')}/${String(updated.getMonth() + 1).padStart(2, '0')}${sameYear ? '' : `/${updated.getFullYear()}`}`;
   return `prezzi aggiornati il ${date} alle ${time}`;
+}
+
+// ─── Mutuo ────────────────────────────────────────────────────────────────────
+
+/** «novembre 2036»: a month named with its year, lower case, from a local date. */
+function monthYearOf(date: Date): string {
+  return `${MONTH_NAMES[date.getMonth()].toLowerCase()} ${date.getFullYear()}`;
+}
+
+/** «28 settembre»: the day of an instalment still to come. */
+function dayMonthOf(date: Date): string {
+  return `${date.getDate()} ${MONTH_NAMES[date.getMonth()].toLowerCase()}`;
+}
+
+/** Where the plan ends, as the clause that closes the reading; null without a projection. */
+function describePayoff(summary: MortgageSummary): NarrativeSegment[] | null {
+  const payoff = summary.payoff;
+  if (!payoff) return null;
+  if (payoff.kind === 'repaid') return [prose('il debito è estinto.')];
+  if (payoff.kind === 'never') return [prose('con questa rata il debito non scende: copre appena gli interessi.')];
+  return [prose('al ritmo di oggi il mutuo si chiude a '), figure(monthYearOf(payoff.date)), prose('.')];
+}
+
+/**
+ * The reading of Patrimonio's «Mutuo» tile (lib/utils/mortgageSummary.ts): what the instalments
+ * SETTLED this year cost in interest and repaid in principal, then where the plan ends. Before
+ * the first settled instalment it says what the next one will do, on today's debt — never a
+ * figure for the instalments paid before the link, which the app did not measure.
+ */
+export function describeMortgage(summary: MortgageSummary): Narrative {
+  const payoff = describePayoff(summary);
+  const closing = payoff ? [prose('; '), ...payoff] : [prose('.')];
+  if (summary.yearInstalments > 0) {
+    return [
+      prose(`Nel ${summary.year} hai pagato `),
+      figure(cachedFormatCurrencyEUR(summary.yearInterest)),
+      prose(' di interessi e rimborsato '),
+      figure(cachedFormatCurrencyEUR(summary.yearPrincipal)),
+      prose(` di capitale, in ${summary.yearInstalments === 1 ? '1 rata' : `${summary.yearInstalments} rate`}`),
+      ...closing,
+    ];
+  }
+  if (summary.next) {
+    const lead = summary.trackedSince ? 'La prossima rata, il ' : 'La prima rata collegata, il ';
+    return [
+      prose(lead),
+      figure(dayMonthOf(summary.next.date)),
+      prose(', rimborserà '),
+      figure(cachedFormatCurrencyEUR(summary.next.principal)),
+      prose(' di capitale; '),
+      figure(cachedFormatCurrencyEUR(summary.next.interest)),
+      prose(' saranno interessi'),
+      ...closing,
+    ];
+  }
+  return [prose(`Nel ${summary.year} nessuna rata collegata è ancora stata pagata`), ...closing];
+}
+
+/**
+ * The tile's footer line: from when the interest is measured, and on which TAN — or that the
+ * property has none, so every instalment counts as principal.
+ */
+export function describeMortgageScope(summary: MortgageSummary): string {
+  const since = summary.trackedSince ? `Interessi dalle rate collegate, da ${monthYearOf(summary.trackedSince)}` : 'Interessi dalle rate collegate, dalla prima pagata';
+  if (!summary.annualRatePct || summary.annualRatePct <= 0) return `${since} · senza TAN: ogni rata va tutta in capitale.`;
+  const rate = new Intl.NumberFormat('it-IT', { style: 'percent', maximumFractionDigits: 3 }).format(summary.annualRatePct / 100);
+  return `${since} · TAN ${rate}.`;
+}
+
+/**
+ * The caption of a year in the «Per anno» list: the first measured year is partial from the link
+ * («da settembre»), the running year is not over («finora») — a partial year printed bare would
+ * read as a year of lower interest.
+ */
+export function describeMortgageYearScope(entry: MortgageYear, currentYear: number): string | null {
+  const parts: string[] = [];
+  if (entry.partialFrom) parts.push(`da ${MONTH_NAMES[entry.partialFrom.getMonth()].toLowerCase()}`);
+  if (entry.year === currentYear) parts.push('finora');
+  return parts.length > 0 ? parts.join(', ') : null;
 }

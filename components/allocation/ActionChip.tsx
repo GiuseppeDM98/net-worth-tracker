@@ -11,7 +11,7 @@
 
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { AllocationAction } from '@/lib/utils/allocationUtils';
+import { ACTION_CHIP_FILL_PCT, type AllocationAction } from '@/lib/utils/allocationUtils';
 
 const ACTION_ICON: Record<AllocationAction, typeof TrendingUp> = {
   COMPRA: TrendingUp,
@@ -39,7 +39,7 @@ export function ActionChip({
       )}
       style={{
         color,
-        backgroundColor: `color-mix(in srgb, ${color} 14%, transparent)`,
+        backgroundColor: `color-mix(in srgb, ${color} ${ACTION_CHIP_FILL_PCT}%, transparent)`,
         borderColor: `color-mix(in srgb, ${color} 34%, transparent)`,
       }}
     >

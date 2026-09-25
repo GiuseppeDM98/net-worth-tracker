@@ -99,11 +99,32 @@ export interface Expense {
   installmentNumber?: number; // Current installment number (1, 2, 3...)
   installmentTotal?: number; // Total number of installments in series
   installmentTotalAmount?: number; // Total amount of the purchase (for analytics)
-  // Optional link to a cash-class asset whose balance is updated when this expense is saved.
-  // Only stored on single expenses or the first entry of a recurring/installment series.
+  // Optional link to a cash-class asset whose balance this row moves ON ITS DATE
+  // (lib/utils/cashSettlement.ts). Since 2026-09-19 every occurrence of a series carries it;
+  // older series carry it on their first entry only (the one that moved the account at save).
   linkedCashAssetId?: string;
   // Destination cash asset for transfer-type expenses. Origin is `linkedCashAssetId`.
   transferCashAssetId?: string;
+  // True while a linked row waits for its date: it has NOT moved its account(s) yet, and the
+  // server settles it on the day (lib/server/cashSettlement.ts). Absent = applied — every row
+  // written before the rule moved its account at save, so none is ever applied twice.
+  balancePending?: boolean;
+  // The fee of a transfer is a row of its own (lib/utils/transferFee.ts): a spending row in the
+  // category chosen in Impostazioni, debiting the transfer's origin on the transfer's date. The
+  // two point at each other — the transfer names its fee, the fee names its transfer — so the fee
+  // is edited from the transfer and deleted with it.
+  transferFeeExpenseId?: string; // On a transfer: the fee row it created
+  feeOfTransferId?: string; // On a fee row: the transfer it was charged for
+  // A `debt` row may repay a property's mortgage (lib/utils/mortgageRepayment.ts): on the row's
+  // date — `balancePending` until then, like its account — the property's `outstandingDebt` falls by
+  // the instalment's PRINCIPAL (instalment − debt × TAN / 12), which is then stored here so an edit
+  // or a delete gives back exactly what was repaid. Absent while pending.
+  debtAssetId?: string;
+  debtPrincipalRepaid?: number;
+  // The interest the same instalment paid (debt × TAN / 12 on the day it settled), stored beside
+  // the principal for Patrimonio's «Mutuo» tile. Absent on a row settled before the field existed:
+  // read it through `interestPaidOf` (lib/utils/mortgageSummary.ts).
+  debtInterestPaid?: number;
   // Optional cost center assignment for grouping expenses by object/project (e.g. "Automobile Dacia").
   // costCenterName is denormalized for query performance — same pattern as categoryName.
   // WARNING: If a cost center is renamed, bulk-update all linked expenses via costCenterService.renameCostCenter.
@@ -215,8 +236,12 @@ export interface ExpenseFormData {
   installmentTotalAmount?: number; // Total amount to divide (auto mode only)
   installmentAmounts?: number[]; // Individual amounts for each installment (manual mode)
   installmentStartDate?: Date; // Date of first installment
-  linkedCashAssetId?: string; // ID of cash asset whose balance is updated on save
+  linkedCashAssetId?: string; // ID of cash asset whose balance the row moves on its date
   transferCashAssetId?: string; // Destination cash asset for transfers (origin = linkedCashAssetId)
+  balancePending?: boolean; // Written by the edit path: the row's new date is still to come (see Expense)
+  transferFeeExpenseId?: string; // On a transfer: its fee row (see Expense); written by the service
+  feeOfTransferId?: string; // On a fee row: its transfer (see Expense); written by the service
+  debtAssetId?: string; // On a debt row: the property whose debt it repays on its date (see Expense)
   costCenterId?: string;    // Optional cost center assignment
   costCenterName?: string;  // Denormalized name, must be kept in sync via costCenterService
   personalMemberId?: string; // FamilyMember this row belongs to; absent = in comune (see Expense)

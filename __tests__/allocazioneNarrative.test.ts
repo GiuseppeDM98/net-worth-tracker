@@ -60,6 +60,7 @@ function gap(overrides: Partial<ClassGap> = {}): ClassGap {
     differenceValue: 8085,
     currentValue: 142835,
     action: 'VENDI',
+    dormant: false,
     ...overrides,
   };
 }
@@ -120,6 +121,21 @@ describe('buildAllocazioneVerdict', () => {
     expect(plain(verdict.sentence)).toBe(
       'Le azioni pesano 3,3 pp più del target e le obbligazioni 3,3 pp meno; con 1000 € in più compreresti 940 € di obbligazioni e 60 € di liquidità.',
     );
+  });
+
+  it('articulates the preposition on the score, vowel-initial numbers included', () => {
+    const headlineAt = (score: number) => buildAllocazioneVerdict(verdictInput({ score })).headline;
+    // The owner's live score was 85, and the page printed «Allineato al 85%» until 2026-09-21.
+    expect(headlineAt(85)).toBe("Allineato all'85%.");
+    expect(headlineAt(8)).toBe("Allineato all'8%.");
+    expect(headlineAt(11)).toBe("Allineato all'11%.");
+    expect(headlineAt(1)).toBe("Allineato all'1%.");
+    expect(headlineAt(80)).toBe("Allineato all'80%.");
+    expect(headlineAt(89)).toBe("Allineato all'89%.");
+    // …and the consonant-initial ones keep the plain «al».
+    expect(headlineAt(90)).toBe('Allineato al 90%.');
+    expect(headlineAt(79)).toBe('Allineato al 79%.');
+    expect(headlineAt(0)).toBe('Allineato allo 0%.');
   });
 
   it('is positive when every class is within the band, and says which band', () => {
@@ -294,6 +310,7 @@ describe('describePlan', () => {
     differencePp: 3.3,
     currentPercentage: 58.3,
     targetPercentage: 55,
+    children: [],
     ...overrides,
   });
 
@@ -376,6 +393,8 @@ describe('describePlan', () => {
     const single: PlanView = {
       mode: 'withdraw',
       amount: 1000,
+      grossAmount: 1000,
+      grossedUp: false,
       nodes: [{ key: 'equity', label: 'Azioni', amount: 1000, currentValue: 142835, newValue: 141835, newPercentage: 58.1, targetPercentage: 55, children: [] }],
       trades: null,
       tradableTotal: 203000,
@@ -397,8 +416,48 @@ describe('describePlan', () => {
     );
   });
 
+  it('names the GROSS it sells when the request is a net — «prelevare 1000 €» means 1000 in hand', () => {
+    const view: PlanView = {
+      mode: 'withdraw',
+      amount: 1000,
+      grossAmount: 1087,
+      grossedUp: true,
+      nodes: [
+        { key: 'equity', label: 'Azioni', amount: 837, currentValue: 142835, newValue: 141998, newPercentage: 58.1, targetPercentage: 55, children: [] },
+        { key: 'commodity', label: 'Materie Prime', amount: 250, currentValue: 12740, newValue: 12490, newPercentage: 5, targetPercentage: 5, children: [] },
+      ],
+      trades: null,
+      tradableTotal: 203000,
+      exceedsPortfolio: false,
+      overTarget: ['Azioni'],
+    };
+    // The rows below add up to the GROSS, so the sentence has to name it: a reader who checks them
+    // must find the figure printed. And the net is already its subject, so the tax clause says only
+    // what the broker keeps — never the net twice in one sentence.
+    expect(plain(describePlan(view, band, { gross: 1087, tax: 87, net: 1000, unknownReason: null }))).toBe(
+      'Per prelevare 1000 € netti vendi 1087 €: 837 € dalle azioni e 250 € dalle materie prime, partendo da ciò che è sopra target; la ritenuta stimata è 87 €.',
+    );
+  });
+
+  it('says the net will fall short when even the gross does not fit', () => {
+    const view: PlanView = {
+      mode: 'withdraw',
+      amount: 1000,
+      grossAmount: 1050,
+      grossedUp: true,
+      nodes: [{ key: 'equity', label: 'Azioni', amount: 1050, currentValue: 1050, newValue: 0, newPercentage: 0, targetPercentage: 55, children: [] }],
+      trades: null,
+      tradableTotal: 1050,
+      exceedsPortfolio: true,
+      overTarget: [],
+    };
+    expect(plain(describePlan(view, band, { gross: 1050, tax: 84, net: 966, unknownReason: null }))).toBe(
+      'Per prelevare 1000 € netti servirebbe vendere più dei 1050 € negoziabili: il piano liquida tutto; incassi 966 € netti, dopo circa 84 € di ritenuta.',
+    );
+  });
+
   it('warns when the withdrawal exceeds what can be sold', () => {
-    const view: PlanView = { mode: 'withdraw', amount: 300000, nodes: [], trades: null, tradableTotal: 203000, exceedsPortfolio: true, overTarget: [] };
+    const view: PlanView = { mode: 'withdraw', amount: 300000, grossAmount: 203000, grossedUp: false, nodes: [], trades: null, tradableTotal: 203000, exceedsPortfolio: true, overTarget: [] };
     expect(plain(describePlan(view, band))).toBe('300.000 € superano i 203.000 € negoziabili: il piano liquida tutto.');
     expect(plain(describePlan({ ...view, amount: 0, exceedsPortfolio: false }, band))).toBe('Inserisci un importo per vedere da dove conviene prelevare.');
   });
@@ -407,6 +466,53 @@ describe('describePlan', () => {
     expect(describePlanFooter('rebalance', false)).toContain('Stima indicativa, non un consiglio finanziario.');
     expect(describePlanFooter('withdraw', false)).toContain('Le tasse sulla plusvalenza non sono considerate.');
     expect(describePlanFooter('contribute', true)).toContain('strumenti reali');
+  });
+
+  it('swaps the tax disclaimer for the method once the figure is printed', () => {
+    // The two must never coexist: a footer disclaiming a tax the reading just quoted contradicts
+    // its own tile.
+    const withEstimate = describePlanFooter('rebalance', false, true);
+    expect(withEstimate).not.toContain('Le tasse sulla plusvalenza non sono considerate.');
+    expect(withEstimate).toContain('La ritenuta è stimata sulla plusvalenza della quota venduta');
+    expect(describePlanFooter('withdraw', false, true)).toContain('minusvalenze pregresse');
+  });
+
+  describe('the sale tax clause', () => {
+    const sells: PlanView = {
+      mode: 'rebalance',
+      moves: [move()],
+      trades: null,
+      resultingLeverageRatio: null,
+    };
+
+    it('names the net and the withholding after the plan, inside the full stop', () => {
+      expect(plain(describePlan(sells, band, { gross: 8085, tax: 997, net: 7088, unknownReason: null }))).toBe(
+        'Per rientrare nella soglia: vendi 8085 € di azioni, una sola operazione; incassi 7088 € netti, dopo circa 997 € di ritenuta.',
+      );
+    });
+
+    it('says there is no withholding rather than printing a zero', () => {
+      expect(plain(describePlan(sells, band, { gross: 8085, tax: 0, net: 8085, unknownReason: null }))).toContain(
+        '; nessuna ritenuta, le posizioni da vendere non sono in guadagno.',
+      );
+    });
+
+    it('drops the clause when the tax cannot be estimated, and never softens it', () => {
+      const unknown = plain(describePlan(sells, band, { gross: 8085, tax: null, net: null, unknownReason: 'rate' }));
+      expect(unknown).toBe('Per rientrare nella soglia: vendi 8085 € di azioni, una sola operazione.');
+      expect(unknown).not.toContain('ritenuta');
+    });
+
+    it('never carries the clause on a contribution — a contribution sells nothing', () => {
+      const contribute: PlanView = {
+        mode: 'contribute',
+        amount: 1000,
+        nodes: [{ key: 'bonds', label: 'Obbligazioni', amount: 1000, currentValue: 53165, newValue: 54165, newPercentage: 24.2, targetPercentage: 25, children: [] }],
+        trades: null,
+        overTarget: [],
+      };
+      expect(plain(describePlan(contribute, band, { gross: 8085, tax: 997, net: 7088, unknownReason: null }))).not.toContain('ritenuta');
+    });
   });
 });
 
@@ -458,6 +564,20 @@ describe('describeExposure', () => {
     expect(describeExposure({ topHolding: null, topSector: null, topIssuer: null })).toBeNull();
   });
 
+  it('opens on the clause of the view the reader is in, keeping the other two', () => {
+    const highlights = {
+      topHolding: { name: 'Apple', pct: 4.1, sourceCount: 3 },
+      topSector: { label: 'Tecnologia', pct: 24.3 },
+      topIssuer: { family: 'iShares', etfShare: 61 },
+    };
+    expect(plain(describeExposure(highlights, 'sectors'))).toBe(
+      'Il primo settore è Tecnologia (24,3%); il titolo più pesante è Apple (4,1% del portafoglio, in 3 strumenti) e iShares emette il 61% degli ETF.',
+    );
+    expect(plain(describeExposure(highlights, 'issuers'))).toBe(
+      'iShares emette il 61% degli ETF; il titolo più pesante è Apple (4,1% del portafoglio, in 3 strumenti) e il primo settore è Tecnologia (24,3%).',
+    );
+  });
+
   it('names what an empty view means', () => {
     expect(describeExposureEmpty('holdings')).toContain('Nessun titolo riconosciuto');
     expect(describeExposureEmpty('sectors')).toBe('Nessun dato settoriale per gli ETF in portafoglio.');
@@ -465,7 +585,7 @@ describe('describeExposure', () => {
   });
 
   it('has an aside and a footer', () => {
-    expect(describeExposureAside({ analyzedAssets: 12, totalAssets: 16 })).toBe('12 asset su 16 analizzati');
+    expect(describeExposureAside({ analyzedAssets: 12, totalAssets: 16 })).toBe('12 asset su 16 analizzati · % del portafoglio');
     expect(describeExposureFooter('2026-08-24T06:15:00.000Z')).toBe(
       'Prime ~10 posizioni per ETF da Yahoo Finance: approssimato per i fondi molto diversificati. Nessuna copertura geografica. Aggiornato il 24/08/2026.',
     );

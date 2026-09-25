@@ -20,8 +20,9 @@ interface LiquiditaTileProps {
 
 /**
  * "Quanto è sui conti?" — the cash accounts one per row with their balance, the total as the
- * tile's KPI and the share of the gross total in the reading. Each row is a button: the
- * account's detail dialog (edit, delete) opens from here, as the old card grid did.
+ * tile's KPI (net of any account in the red) and the share of the gross total in the reading. A
+ * row's share is of the money HELD, and an account in the red — a credit card — reads «debito».
+ * Each row is a button: the account's detail dialog (edit, delete) opens from here.
  */
 export function LiquiditaTile({ summary, accountsById, onSelect, onAdd, isDemo, className }: LiquiditaTileProps) {
   const { accounts } = summary;
@@ -52,14 +53,14 @@ export function LiquiditaTile({ summary, accountsById, onSelect, onAdd, isDemo, 
                   type="button"
                   onClick={() => asset && onSelect(asset)}
                   className="-mx-2 flex items-center gap-3 rounded-md px-2 py-[9px] text-left transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  aria-label={`${account.name}, ${cachedFormatCurrencyEUR(account.balance)}`}
+                  aria-label={`${account.name}, ${cachedFormatCurrencyEUR(account.balance)}${account.shareOfCash === null ? ', debito' : ''}`}
                 >
                   <span className="min-w-0 flex-1 truncate text-[13px] text-foreground">{account.name}</span>
                   <span className="shrink-0 font-mono text-[13px] tabular-nums text-foreground">
                     {cachedFormatCurrencyEUR(account.balance)}
                   </span>
-                  <span className="w-[34px] shrink-0 text-right font-mono text-[11px] tabular-nums text-muted-foreground">
-                    {Math.round(account.shareOfCash)}%
+                  <span className="w-[42px] shrink-0 text-right font-mono text-[11px] tabular-nums text-muted-foreground">
+                    {account.shareOfCash === null ? 'debito' : `${Math.round(account.shareOfCash)}%`}
                   </span>
                 </button>
               );

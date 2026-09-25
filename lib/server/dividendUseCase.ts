@@ -10,6 +10,41 @@ import { DividendFormData } from '@/types/dividend';
 import { Asset } from '@/types/assets';
 import { ExpenseCategory } from '@/types/expenses';
 
+/** Where a user's dividends land in the cashflow (Impostazioni › Dividendi). */
+export interface DividendIncomeCategory {
+  categoryId: string;
+  categoryName: string;
+  subCategoryId?: string;
+  subCategoryName?: string;
+}
+
+/**
+ * The income category configured for dividends, or `undefined` when none is set (or it was
+ * deleted). Read with the ADMIN SDK: a route has no signed-in client, so the client readers
+ * (`getSettings`, `getCategoryById`) are refused by the rules there — the dividend PUT route used
+ * them until 2026-09-20 and its `catch` swallowed the refusal, so an edited dividend never
+ * reached its income row.
+ */
+export async function resolveDividendIncomeCategory(userId: string): Promise<DividendIncomeCategory | undefined> {
+  const settingsDoc = await adminDb.collection('assetAllocationTargets').doc(userId).get();
+  const settings = settingsDoc.exists ? settingsDoc.data() : null;
+  if (!settings?.dividendIncomeCategoryId) return undefined;
+
+  const categoryDoc = await adminDb.collection('expenseCategories').doc(settings.dividendIncomeCategoryId).get();
+  if (!categoryDoc.exists) return undefined;
+
+  const category = categoryDoc.data() as ExpenseCategory;
+  const subCategory = settings.dividendIncomeSubCategoryId
+    ? category.subCategories?.find((sub) => sub.id === settings.dividendIncomeSubCategoryId)
+    : undefined;
+  return {
+    categoryId: settings.dividendIncomeCategoryId,
+    categoryName: category.name,
+    subCategoryId: settings.dividendIncomeSubCategoryId,
+    subCategoryName: subCategory?.name,
+  };
+}
+
 export type CreateDividendResult =
   | { skipped: true; reason: string }
   | { skipped: false; dividendId: string; expenseId?: string };
@@ -106,41 +141,18 @@ async function createExpenseIfConfigured(
   dividendId: string
 ): Promise<string | undefined> {
   try {
-    const settingsDoc = await adminDb
-      .collection('assetAllocationTargets')
-      .doc(userId)
-      .get();
-
-    const settings = settingsDoc.exists ? settingsDoc.data() : null;
-    if (!settings?.dividendIncomeCategoryId) return undefined;
-
-    const categoryDoc = await adminDb
-      .collection('expenseCategories')
-      .doc(settings.dividendIncomeCategoryId)
-      .get();
-
-    if (!categoryDoc.exists) return undefined;
-
-    const categoryData = categoryDoc.data() as ExpenseCategory;
-    const category = { ...categoryData, id: categoryDoc.id };
-
-    let subCategoryName: string | undefined;
-    if (settings.dividendIncomeSubCategoryId) {
-      const subCategory = category.subCategories?.find(
-        (sub) => sub.id === settings.dividendIncomeSubCategoryId
-      );
-      subCategoryName = subCategory?.name;
-    }
+    const landing = await resolveDividendIncomeCategory(userId);
+    if (!landing) return undefined;
 
     const dividend = await getDividendById(dividendId);
     if (!dividend) return undefined;
 
     return await createExpenseFromDividend(
       dividend,
-      settings.dividendIncomeCategoryId,
-      category.name,
-      settings.dividendIncomeSubCategoryId,
-      subCategoryName
+      landing.categoryId,
+      landing.categoryName,
+      landing.subCategoryId,
+      landing.subCategoryName
     );
   } catch (error) {
     // Non-critical: dividend creation already succeeded; expense is best-effort

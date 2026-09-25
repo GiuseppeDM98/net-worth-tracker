@@ -20,12 +20,48 @@ import type { FIREProjectionResult } from '@/types/assets';
 
 // ─── Target ───────────────────────────────────────────────────────────────────
 
+/**
+ * What is inside the number besides expenses ÷ SWR (2026-09-24): the state pensions and the
+ * tax on withdrawals, each either considered or declared absent with its reason — the Base di
+ * calcolo prints the rows, the caption and the verdict the clauses.
+ */
+export interface FireTargetHonest {
+  pensionsConsidered: boolean;
+  /** Net annual state pension at steady state, today's euro (0 when none is considered). */
+  pensionNetAnnual: number;
+  /** The year the LATEST pension starts; null without pensions considered. */
+  pensionStartCalendarYear: number | null;
+  pensionCount: number;
+  /** Why the pensions are out: none saved in Coast FIRE, or no age to date them. */
+  pensionsSkipped: 'none-saved' | 'no-age' | null;
+  taxConsidered: boolean;
+  /** The value-weighted capital-gains rate, percent. */
+  taxRate: number;
+  /** Today's unrealised gain as a share of the portfolio, percent. */
+  gainSharePct: number;
+  /** Why the tax is out: no instrument carries a EUR cost basis. */
+  taxSkipped: 'no-basis' | null;
+}
+
+export const NO_HONEST: FireTargetHonest = {
+  pensionsConsidered: false,
+  pensionNetAnnual: 0,
+  pensionStartCalendarYear: null,
+  pensionCount: 0,
+  pensionsSkipped: 'none-saved',
+  taxConsidered: false,
+  taxRate: 0,
+  gainSharePct: 0,
+  taxSkipped: 'no-basis',
+};
+
 export interface FireTarget {
-  /** The number the page runs on: the bridge number when the pension lock is active. */
+  /** The number the page runs on: the requirement of today (bridge, pensions and tax in). */
   fireNumber: number;
-  /** Expenses ÷ SWR — equal to `fireNumber` without the bridge. */
+  /** The number without the bridge — expenses ÷ SWR when nothing else is in. */
   standardFireNumber: number;
   isBridge: boolean;
+  honest: FireTargetHonest;
   /** The FIRE-eligible net worth (residence per setting, locked pension capital subtracted). */
   netWorth: number;
   /** `netWorth / fireNumber × 100`, not clamped: a reached target reads above 100. */
@@ -38,16 +74,19 @@ export interface FireTarget {
 /**
  * The target as the page reads it. `null` when there is no FIRE number — no expenses recorded
  * for the reference year — so the verdict can say so instead of printing «0 €».
+ * `withoutBridgeNumber` is the requirement with the same pensions and tax but no bridge — the
+ * figure «senza il vincolo sarebbe» names; expenses ÷ SWR otherwise.
  */
-export function summarizeTarget(metrics: FIREMetrics, isBridge: boolean): FireTarget | null {
+export function summarizeTarget(metrics: FIREMetrics, isBridge: boolean, honest: FireTargetHonest = NO_HONEST, withoutBridgeNumber?: number): FireTarget | null {
   if (metrics.fireNumber <= 0) return null;
   const wrDecimal = metrics.withdrawalRate / 100;
-  const standardFireNumber = wrDecimal > 0 ? metrics.annualExpenses / wrDecimal : metrics.fireNumber;
+  const standardFireNumber = withoutBridgeNumber ?? (wrDecimal > 0 ? metrics.annualExpenses / wrDecimal : metrics.fireNumber);
   const netWorth = metrics.currentNetWorth;
   return {
     fireNumber: metrics.fireNumber,
     standardFireNumber,
     isBridge,
+    honest,
     netWorth,
     progressPct: (netWorth / metrics.fireNumber) * 100,
     gap: Math.max(0, metrics.fireNumber - netWorth),
@@ -81,8 +120,9 @@ export function summarizeTimeline(
   horizonYears = 50,
 ): FireTimeline {
   const years = projection.baseYearsToFIRE;
-  // `yearlyData[years − 1]` is the FIRE year's row: the walk pushes one row per year, from 1.
-  const fireYearRow = years !== null ? projection.yearlyData[years - 1] : undefined;
+  // `yearlyData[years − 1]` is the FIRE year's row: the walk pushes one row per year, from 1. A
+  // target reached today (years 0) has no row, and its expenses at FIRE are today's.
+  const fireYearRow = years !== null && years > 0 ? projection.yearlyData[years - 1] : undefined;
   return {
     yearsToFire: years,
     calendarYear: years !== null ? currentYear + years : null,
@@ -231,6 +271,8 @@ export interface FanVerdict {
   probabilityPct: number;
   /** True when the year is the simulation's horizon rather than the deterministic FIRE year. */
   onHorizon: boolean;
+  /** True when the deterministic walk is FIRE at year 0: every path starts past the target. */
+  atStart: boolean;
 }
 
 /**
@@ -250,6 +292,7 @@ export function resolveFanVerdict(
     calendarYear: startCalendarYear + index,
     probabilityPct: Math.round(result.percentiles[index]?.fireProbability ?? 0),
     onHorizon,
+    atStart: deterministicBaseYears === 0,
   };
 }
 

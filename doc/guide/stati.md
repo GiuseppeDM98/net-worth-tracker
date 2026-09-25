@@ -1,6 +1,12 @@
 # Stati: caricamento, vuoto, zero, errore
 
-> **When to open this guide** — anyone touching `lib/utils/statesNarrative.ts` (`AbsenceKind`, `resolveSurfaceState`, `describeReadFailure`, `describeLastSuccessfulRead`), `components/ui/{skeleton,empty-state,error-notice,tile-grid-skeleton}.tsx`, `components/ui/sonner.tsx` (the severity of a toast), or wiring a loading · empty · zero · failed branch on any surface. `AGENTS.md` keeps the stub with the essentials; here is the full rule. File: `CLAUDE.md` → *Key Files* → *Stati*.
+> **When to open this guide** — anyone touching `lib/utils/statesNarrative.ts` (`AbsenceKind`, `resolveSurfaceState`, `describeReadFailure`, `describeLastSuccessfulRead`), `components/ui/{skeleton,empty-state,error-notice,tile-grid-skeleton}.tsx`, `components/ui/sonner.tsx` (the severity of a toast), or wiring a loading · empty · zero · failed branch on any surface. `AGENTS.md` keeps the stub with the essentials; here is the full rule. File: § *Files* below.
+
+## Files
+
+Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
+
+- **Stati**: `lib/utils/statesNarrative.ts` (`resolveSurfaceState` = the one wait/failure decision), `components/ui/{skeleton,empty-state,error-notice}.tsx`, `components/ui/sonner.tsx` — doc/guide/stati.md
 
 ## Stati: caricamento, vuoto, zero, errore
 
@@ -35,8 +41,8 @@
   preference is about.
 - **Reduced motion reduces the MOTION, not the content.** `shouldShowSavingsBadge` used to take `reducedMotion` as a
   show condition, so a reader who had asked the OS for stillness was never told their savings rate. It now governs the
-  entrance transition only, in the component. The one remaining `shouldReduceMotion()` caller (the FIRE Calcolatore) gates CONFETTI,
-  which is motion carrying nothing — correct as it is (Storico's burst was removed on 2026-09-13).
+  entrance transition only, in the component. No surface fires confetti any more (Storico's burst went on 2026-09-13, the
+  FIRE Calcolatore's on 2026-09-22 with its critique), so `celebrationUtils` keeps only the once-per-milestone record.
 - **A toast's severity is the icon and a 2px leading rule, never the surface.** Sonner maps `--normal-bg` for every
   type, so before this an error and a success were the same grey tile with a different 16px glyph. The tint variant was
   rejected: `bg-*/10` washes the fill with the text's own hue and this project already records those combinations as
@@ -50,3 +56,7 @@
   the five Cashflow tabs (the `loadFailed` prop is threaded from `app/dashboard/{cashflow,analisi}/page.tsx`, because
   the tabs do not own their queries), Dividendi, the five FIRE tabs, Previdenza and Centri di Costo. Adding a
   twenty-first means: read the query's `isError`, branch with `resolveSurfaceState`, and write the `consequence`.
+
+## Per-page blind spots
+
+- **Il ramo `isError` copre 20 superfici, non ogni query**: cablate quelle da cui dipende il verdetto o l'inventario, non le secondarie (prezzi, benchmark, FX) — una di quelle che fallisce degrada ancora in silenzio. (moved from `CLAUDE.md` → Known Issues on 2026-09-19)

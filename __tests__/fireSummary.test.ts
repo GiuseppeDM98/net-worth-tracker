@@ -126,6 +126,15 @@ describe('summarizeTimeline', () => {
     expect(timeline.horizonCalendarYear).toBe(2076);
   });
 
+  it('reads year 0 as this year, with today\'s expenses and no FIRE-year row', () => {
+    const timeline = summarizeTimeline(projection({ baseYearsToFIRE: 0 }), 2026, 38);
+    expect(timeline.yearsToFire).toBe(0);
+    expect(timeline.calendarYear).toBe(2026);
+    expect(timeline.ageAtFire).toBe(38);
+    // `yearlyData[-1]` is undefined, never the last row of the walk.
+    expect(timeline.monthlyExpensesAtFire).toBeNull();
+  });
+
   it('drops the age without a user age and the FIRE figures beyond the horizon', () => {
     const timeline = summarizeTimeline(projection({ baseYearsToFIRE: null }), 2026, undefined);
     expect(timeline.yearsToFire).toBeNull();
@@ -236,6 +245,8 @@ describe('resolveFanVerdict', () => {
   const result = (probabilities: number[]): AccumulationSimulationResult => ({
     paths: [],
     fireYears: [],
+    retirements: [],
+    retirementHorizonYears: probabilities.length - 1,
     percentiles: probabilities.map((fireProbability, year) => ({
       year,
       p10: 0,
@@ -249,13 +260,17 @@ describe('resolveFanVerdict', () => {
   });
 
   it('anchors on the deterministic base year when it exists', () => {
-    expect(resolveFanVerdict(result([0, 5, 20, 40, 55, 65, 71.4, 80]), 6, 2026)).toEqual({ calendarYear: 2032, probabilityPct: 71, onHorizon: false });
+    expect(resolveFanVerdict(result([0, 5, 20, 40, 55, 65, 71.4, 80]), 6, 2026)).toEqual({ calendarYear: 2032, probabilityPct: 71, onHorizon: false, atStart: false });
+  });
+
+  it('anchors on year 0 and flags it when the deterministic walk is FIRE today', () => {
+    expect(resolveFanVerdict(result([100, 100, 100]), 0, 2026)).toEqual({ calendarYear: 2026, probabilityPct: 100, onHorizon: false, atStart: true });
   });
 
   it('falls back to the simulation horizon and says so', () => {
-    expect(resolveFanVerdict(result([0, 5, 20, 40]), null, 2026)).toEqual({ calendarYear: 2029, probabilityPct: 40, onHorizon: true });
+    expect(resolveFanVerdict(result([0, 5, 20, 40]), null, 2026)).toEqual({ calendarYear: 2029, probabilityPct: 40, onHorizon: true, atStart: false });
     // A base year past the simulated horizon (the fan caps at 40 years) is clamped to the horizon.
-    expect(resolveFanVerdict(result([0, 5, 20, 40]), 12, 2026)).toEqual({ calendarYear: 2029, probabilityPct: 40, onHorizon: true });
+    expect(resolveFanVerdict(result([0, 5, 20, 40]), 12, 2026)).toEqual({ calendarYear: 2029, probabilityPct: 40, onHorizon: true, atStart: false });
   });
 });
 

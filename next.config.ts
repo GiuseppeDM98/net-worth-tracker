@@ -6,25 +6,26 @@ const securityHeaders = [
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
   { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
   { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains' },
-  {
-    // Report-Only on purpose: observe violations in the browser console
-    // before enforcing. Promote to Content-Security-Policy in a follow-up.
-    key: 'Content-Security-Policy-Report-Only',
-    value: [
-      "default-src 'self'",
-      // Next.js inline runtime + styled JSX need unsafe-inline until nonces are wired
-      "script-src 'self' 'unsafe-inline' https://apis.google.com",
-      "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: https:",
-      "font-src 'self' data:",
-      // Firebase Auth + Firestore + Identity Toolkit + FCM
-      "connect-src 'self' https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com wss://*.firebaseio.com",
-      "frame-src 'self' https://*.firebaseapp.com",
-      "frame-ancestors 'none'",
-      "base-uri 'self'",
-      "form-action 'self'",
-    ].join('; '),
-  },
+{
+        // Report-Only on purpose: observe violations in the browser console
+        // before enforcing. Promote to Content-Security-Policy in a follow-up.
+        key: 'Content-Security-Policy-Report-Only',
+        value: [
+          "default-src 'self'",
+          // Next.js inline runtime + styled JSX need unsafe-inline until nonces are wired
+          // Firebase SDK uses eval() for some operations (e.g., WebChannel, protobuf)
+          "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://apis.google.com",
+          "style-src 'self' 'unsafe-inline'",
+          "img-src 'self' data: https:",
+          "font-src 'self' data:",
+          // Firebase Auth + Firestore + Identity Toolkit + FCM
+          "connect-src 'self' https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com wss://*.firebaseio.com",
+          "frame-src 'self' https://*.firebaseapp.com",
+          "frame-ancestors 'none'",
+          "base-uri 'self'",
+          "form-action 'self'",
+        ].join('; '),
+      },
 ];
 
 const nextConfig: NextConfig = {

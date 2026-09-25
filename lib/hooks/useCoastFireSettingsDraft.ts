@@ -21,6 +21,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { getDefaultTargets, setSettings } from '@/lib/services/assetAllocationService';
+import { describeWriteError } from '@/lib/utils/dialogNarrative';
 import {
   normalizeCoastFirePensions,
   normalizeCoastFireTaxBrackets,
@@ -88,9 +89,13 @@ type TaxBracketDraftField = keyof Omit<CoastFireTaxBracketDraft, 'id'>;
 interface UseCoastFireSettingsDraftInput {
   settings: Settings | null | undefined;
   isLoadingSettings: boolean;
-  /** The signed-in viewer's uid — what `setSettings` writes under. */
-  userId: string | undefined;
-  /** Whose data is displayed, for the cache invalidation key. */
+  /**
+   * Whose data is displayed — what `setSettings` writes under AND the cache key it invalidates.
+   * ONE id on purpose (2026-09-23): the hook used to take the viewer's uid as the write target
+   * and the owner's as the cache key, so on a shared account a co-owner's «Salva ipotesi» wrote
+   * a copy of the owner's settings on the co-owner's OWN document, re-read the owner's untouched
+   * one and reported success. Every other FIRE tab writes with `ownerId` (doc/guide/fire.md).
+   */
   ownerId: string | undefined;
 }
 
@@ -131,7 +136,6 @@ export interface CoastFireSettingsDraft {
 export function useCoastFireSettingsDraft({
   settings,
   isLoadingSettings,
-  userId,
   ownerId,
 }: UseCoastFireSettingsDraftInput): CoastFireSettingsDraft {
   const queryClient = useQueryClient();
@@ -216,18 +220,19 @@ export function useCoastFireSettingsDraft({
       coastFirePensions: CoastFirePensionInput[];
       coastFireTaxBrackets: CoastFireTaxBracket[];
     }) =>
-      setSettings(userId!, {
+      setSettings(ownerId!, {
         ...(settings ?? {}),
         targets: settings?.targets || getDefaultTargets(),
         ...nextSettings,
       }),
     onSuccess: () => {
-      toast.success('Impostazioni Coast FIRE salvate con successo');
+      toast.success('Ipotesi Coast FIRE salvate');
       queryClient.invalidateQueries({ queryKey: ['settings', ownerId] });
     },
     onError: (error) => {
       console.error('Error saving Coast FIRE settings:', error);
-      toast.error('Errore nel salvataggio delle impostazioni Coast FIRE');
+      // The ONE translation of a failed write (doc/guide/dialog.md), never the SDK's own words.
+      toast.error(describeWriteError(error));
     },
   });
 

@@ -79,10 +79,13 @@ export async function updateHallOfFame(userId: string): Promise<void> {
     // periodic email (lib/utils/hallOfFameRecords.ts). This file owns the Admin-SDK I/O only.
     const monthlyRecords = calculateMonthlyRecords(snapshots, expenses);
     const yearlyRecords = calculateYearlyRecords(snapshots, expenses);
+    const now = new Date();
     const hallOfFameData = {
       userId,
       ...buildHallOfFameRankings(monthlyRecords, yearlyRecords),
-      updatedAt: new Date(),
+      // Both stamps here, and only here: a note's save moves `updatedAt` alone.
+      rankingsUpdatedAt: now,
+      updatedAt: now,
     };
 
     // Preserve existing notes when recalculating rankings

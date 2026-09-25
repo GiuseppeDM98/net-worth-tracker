@@ -6,6 +6,7 @@ import { UnderwaterDrawdownData } from '@/types/performance';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { formatPercentage } from '@/lib/services/chartService';
 import { chartShellSettle } from '@/lib/utils/motionVariants';
+import { MONTH_NAMES } from '@/lib/constants/months';
 
 interface UnderwaterDrawdownChartProps {
   data: UnderwaterDrawdownData[];
@@ -43,6 +44,36 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
       )}
     </div>
   );
+}
+
+/** «−12,3%», the typographic minus the page uses; a point at the peak reads «0,0%». */
+function formatDepth(drawdown: number): string {
+  const magnitude = formatPercentage(Math.abs(drawdown), 1);
+  return drawdown < 0 ? `−${magnitude}` : magnitude;
+}
+
+function monthLabel(point: UnderwaterDrawdownData): string {
+  return `${MONTH_NAMES[point.month - 1].toLowerCase()} ${point.year}`;
+}
+
+/**
+ * The chart's accessible name, which has to carry its content: `role="img"` makes the SVG one
+ * opaque node, so the two facts a sighted reader takes from the curve — how deep it went and
+ * when, and where it stands now — are said here (AGENTS.md → Recharts, 2026-09-20).
+ */
+export function describeUnderwaterChart(data: ReadonlyArray<UnderwaterDrawdownData>): string {
+  if (data.length === 0) return 'Distanza dal massimo: nessun mese misurato.';
+  const first = data[0];
+  const last = data[data.length - 1];
+  const deepest = data.reduce((low, point) => (point.drawdown < low.drawdown ? point : low), first);
+  const span = `Distanza dal massimo, da ${monthLabel(first)} a ${monthLabel(last)}`;
+  if (deepest.drawdown >= 0) return `${span}: sempre sul massimo.`;
+  // «a fine periodo», not «oggi»: a custom range can end years ago.
+  const atEnd =
+    last.drawdown < 0
+      ? `a fine periodo ${formatDepth(last.drawdown)} dal massimo`
+      : 'a fine periodo di nuovo sul massimo';
+  return `${span}: punto più basso ${formatDepth(deepest.drawdown)} a ${monthLabel(deepest)}, ${atEnd}.`;
 }
 
 /**
@@ -93,7 +124,9 @@ export function UnderwaterDrawdownChart({
       className="space-y-3"
     >
       <ResponsiveContainer width="100%" height={height}>
-      <AreaChart data={data}>
+      {/* Recharts puts `role="application"` + `tabIndex=0` on its svg: an unnamed Tab stop with
+          nothing to operate. An image with a name that says what the curve says instead. */}
+      <AreaChart data={data} role="img" aria-label={describeUnderwaterChart(data)} accessibilityLayer={false}>
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={destructiveColor} stopOpacity={0.72} />

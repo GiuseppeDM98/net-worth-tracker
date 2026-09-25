@@ -64,6 +64,7 @@ import {
 } from '@/lib/utils/bondPricing';
 import { buildBondDetailsFromForm, NO_INFLATION_INDEXATION } from '@/lib/utils/bondDetailsForm';
 import { latestIndexationCoefficient, resolveInflationIndexation } from '@/lib/utils/couponUtils';
+import { NO_DIVIDEND_ACCOUNT, dividendAccountFromForm, paysDividends } from '@/lib/utils/dividendAccount';
 import { scheduleNextCoupon, scheduleFinalPremium } from '@/lib/services/couponScheduling';
 import { getTargets, addSubCategory, getSettings } from '@/lib/services/assetAllocationService';
 import type { Settings } from '@/types/settings';
@@ -215,6 +216,7 @@ function buildAssetFormDataFromValues(
     name: data.name,
     isin: data.isin && data.isin.trim() !== '' ? data.isin.trim().toUpperCase() : undefined,
     exchange: data.exchange && data.exchange.trim() !== '' ? data.exchange.trim() : undefined,
+    dividendCashAssetId: dividendAccountFromForm(data.type, data.dividendCashAssetId),
     type: data.type,
     assetClass: data.assetClass,
     subCategory: data.subCategory || undefined,
@@ -250,6 +252,11 @@ function buildAssetFormDataFromValues(
     outstandingDebt:
       data.outstandingDebt && !isNaN(data.outstandingDebt) && data.outstandingDebt > 0
         ? data.outstandingDebt
+        : undefined,
+    // The TAN only means something beside a debt (lib/utils/mortgageRepayment.ts).
+    debtInterestRate:
+      data.outstandingDebt && data.outstandingDebt > 0 && data.debtInterestRate && !isNaN(data.debtInterestRate) && data.debtInterestRate > 0
+        ? data.debtInterestRate
         : undefined,
     isPrimaryResidence: data.isPrimaryResidence || false,
     allocationRole: data.allocationRole ?? 'tradable',
@@ -353,7 +360,9 @@ const assetSchema = z.object({
   assetClass: z.enum(['equity', 'bonds', 'crypto', 'realestate', 'cash', 'commodity', 'trendFollowing', 'carry']),
   subCategory: z.string().optional(),
   currency: z.string().min(1, 'Serve la valuta'),
-  quantity: z.number().min(0, 'La quantità non può essere negativa'),
+  // A cash account may go below zero (a credit card is an account in the red until it is debited);
+  // every other type is refused in the superRefine below.
+  quantity: z.number(),
   manualPrice: z.number().positive('Il prezzo deve essere maggiore di zero').optional().or(z.nan()),
   averageCost: z.number().positive('Il prezzo di carico deve essere maggiore di zero').optional().or(z.nan()),
   taxRate: z.number().min(0, "L'aliquota non può essere negativa").max(100, "L'aliquota non può superare il 100%").optional().or(z.nan()),
@@ -367,6 +376,7 @@ const assetSchema = z.object({
   autoUpdatePrice: z.boolean().optional(),
   isComposite: z.boolean().optional(),
   outstandingDebt: z.number().nonnegative('Il debito non può essere negativo').optional().or(z.nan()),
+  debtInterestRate: z.number().nonnegative('Il TAN non può essere negativo').max(30, 'Un TAN tra 0 e 30%').optional().or(z.nan()),
   isPrimaryResidence: z.boolean().optional(),
   allocationRole: z.enum(['tradable', 'frozen', 'excluded']).optional(),
   // Opening-position fields (ledger create only): the first buy's date + optional settlement account.
@@ -374,6 +384,8 @@ const assetSchema = z.object({
   // the first buy). Ignored for non-ledger types and in edit mode.
   openingDate: z.string().optional(),
   openingCashAssetId: z.string().optional(),
+  // The cash account this instrument's dividends/coupons credit ('__none__' = the settings default).
+  dividendCashAssetId: z.string().optional(),
   // Bond coupon details (optional, only shown for type=bond + assetClass=bonds)
   bondCouponRate: z.number().min(0).max(100).optional().or(z.nan()),
   bondCouponFrequency: z.enum(['monthly', 'quarterly', 'semiannual', 'annual']).optional(),
@@ -406,6 +418,9 @@ const assetSchema = z.object({
   const tickerRequired = data.type !== 'cash' && data.type !== 'realestate' && data.type !== 'pensionFund';
   if (tickerRequired && (!data.ticker || data.ticker.trim().length === 0)) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Serve il ticker', path: ['ticker'] });
+  }
+  if (data.type !== 'cash' && data.quantity < 0) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'La quantità non può essere negativa', path: ['quantity'] });
   }
 });
 
@@ -456,6 +471,7 @@ const FIELD_LABELS: Partial<Record<keyof AssetFormValues, string>> = {
   totalExpenseRatio: 'TER',
   leverageRatio: 'Leva',
   outstandingDebt: 'Debito residuo',
+  debtInterestRate: 'TAN del mutuo',
   openingDate: 'Data di acquisto',
   bondCouponRate: 'Tasso cedola',
   bondNominalValue: 'Valore nominale',
@@ -575,9 +591,11 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
       autoUpdatePrice: true,
       isComposite: false,
       outstandingDebt: undefined,
+      debtInterestRate: undefined,
       isPrimaryResidence: false,
       allocationRole: 'tradable',
       openingCashAssetId: '__none__',
+      dividendCashAssetId: NO_DIVIDEND_ACCOUNT,
     },
   });
 
@@ -607,6 +625,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
   const watchAllocationRole = useWatch({ control, name: 'allocationRole' });
   const watchStampDutyExempt = useWatch({ control, name: 'stampDutyExempt' });
   const watchOpeningCashAssetId = useWatch({ control, name: 'openingCashAssetId' });
+  const watchDividendCashAssetId = useWatch({ control, name: 'dividendCashAssetId' });
   const watchOpeningDate = useWatch({ control, name: 'openingDate' });
   const watchPensionFamilyMemberId = useWatch({ control, name: 'pensionFamilyMemberId' });
 
@@ -865,10 +884,12 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
         autoUpdatePrice: asset.autoUpdatePrice !== undefined ? asset.autoUpdatePrice : shouldUpdatePrice(asset.type, asset.subCategory),
         isComposite: !!(asset.composition && asset.composition.length > 0),
         outstandingDebt: asset.outstandingDebt || undefined,
+        debtInterestRate: asset.debtInterestRate || undefined,
         isPrimaryResidence: asset.isPrimaryResidence || false,
         allocationRole: resolveAllocationRole(asset),
         isin: asset.isin || undefined,
         exchange: asset.exchange || undefined,
+        dividendCashAssetId: asset.dividendCashAssetId || NO_DIVIDEND_ACCOUNT,
         openingDate: todayIso,
         openingCashAssetId: '__none__',
         pensionProvider: asset.pensionFundDetails?.provider || undefined,
@@ -917,10 +938,12 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
         autoUpdatePrice: true,
         isComposite: false,
         outstandingDebt: undefined,
+        debtInterestRate: undefined,
         isPrimaryResidence: false,
         allocationRole: 'tradable',
         openingDate: todayIso,
         openingCashAssetId: '__none__',
+        dividendCashAssetId: NO_DIVIDEND_ACCOUNT,
         bondCouponRate: undefined,
         bondCouponFrequency: undefined,
         bondIssueDate: undefined,
@@ -1537,6 +1560,35 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
               <p className="text-sm text-destructive">{errors.exchange.message}</p>
             )}
           </div>
+          {/* Where this instrument's dividends and coupons are credited — two brokers, two accounts.
+              Only for the types that pay; the rule is lib/utils/dividendAccount.ts. */}
+          {paysDividends(selectedType) && ledgerCashAssets.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="dividendCashAssetId">
+                Conto di accredito {selectedType === 'bond' ? 'cedole' : 'dividendi'}{' '}
+                <span className="font-normal text-muted-foreground">(opzionale)</span>
+              </Label>
+              <Select
+                value={watchDividendCashAssetId ?? NO_DIVIDEND_ACCOUNT}
+                onValueChange={(value) => setValue('dividendCashAssetId', value)}
+              >
+                <SelectTrigger id="dividendCashAssetId" aria-label="Conto di accredito dei pagamenti">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_DIVIDEND_ACCOUNT}>Predefinito (Impostazioni › Dividendi)</SelectItem>
+                  {ledgerCashAssets.map((cash) => (
+                    <SelectItem key={cash.id} value={cash.id}>
+                      {cash.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Accreditato dal giorno del pagamento in poi: i pagamenti passati non muovono il conto.
+              </p>
+            </div>
+          )}
 
           {/* Type + AssetClass selects — edit mode only; in create mode these are set in step 1 */}
           {isEdit && (
@@ -1703,6 +1755,11 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
               />
               {errors.quantity && (
                 <p className="text-sm text-destructive">{errors.quantity.message}</p>
+              )}
+              {selectedType === 'cash' && (
+                <p className="text-xs text-muted-foreground">
+                  Può essere negativo: una carta di credito è un conto in rosso fino all&apos;addebito. Per non contarla come liquidità da investire, escludila dall&apos;allocazione.
+                </p>
               )}
               {/* Show hint only in edit mode — in create mode there's no previous quantity to compare.
                   Quantity changes represent capital flowing in/out of the portfolio. */}
@@ -2157,6 +2214,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
                     setHasOutstandingDebt(checked);
                     if (!checked) {
                       setValue('outstandingDebt', undefined);
+                      setValue('debtInterestRate', undefined);
                     }
                   }}
                 />
@@ -2178,6 +2236,24 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
                   )}
                   <p className="text-xs text-muted-foreground">
                     Il valore netto dell&apos;immobile sarà calcolato come: valore lordo - debito residuo
+                  </p>
+                  <Label htmlFor="debtInterestRate" className="pt-2">
+                    TAN del mutuo (%) <span className="text-muted-foreground font-normal">(opzionale)</span>
+                  </Label>
+                  <Input
+                    id="debtInterestRate"
+                    type="number"
+                    step="any"
+                    min="0"
+                    {...register('debtInterestRate', { valueAsNumber: true })}
+                    placeholder="es. 3,2"
+                  />
+                  {errors.debtInterestRate && (
+                    <p className="text-sm text-destructive">{errors.debtInterestRate.message}</p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Serve alle rate collegate a questo immobile: ognuna riduce il debito della sola quota capitale
+                    (rata − debito × TAN / 12). Senza TAN, l&apos;intera rata riduce il debito.
                   </p>
                 </div>
               )}

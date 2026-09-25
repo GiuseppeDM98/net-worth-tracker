@@ -13,7 +13,7 @@
  * `getAnnualExpenses` reads the LAST COMPLETE year, and the base seed writes current-month
  * expenses only — so without an explicit figure the Coast projection is null and the tab renders
  * its empty state. `coastFireCustomExpenses` also removes the run-month dependency the FIRE tab
- * has (AGENTS → *Browser-Driven E2E*): the expenses side of every Coast figure is then fixed.
+ * has (doc/guide/e2e-emulatori.md § Browser-Driven E2E (Playwright)): the expenses side of every Coast figure is then fixed.
  *
  * WHAT STAYS RUN-DATE DEPENDENT (deliberately, hence structural assertions in the spec)
  * Each pension's start date is an absolute date, so `yearsUntilStart` — and with it the deflation

@@ -2,10 +2,15 @@
 
 > **When to open this guide** — you are editing `components/cashflow/AnalisiTab.tsx`, `components/cashflow/analisi/*`,
 > or `lib/utils/{analisiSummary,analisiNarrative}.ts` (the four-mode axis, the composition tiles, the entity Scheda,
-> the Sankey). In `AGENTS.md` only the short stub remains; the full rule is here. Modules and files: `CLAUDE.md` →
-> *Key Files* → the **Analisi** entry. The block names Playwright — specs `e2e/analisi.spec.ts` and
+> the Sankey). In `AGENTS.md` only the short stub remains; the full rule is here. Modules and files: § *Files* below. The block names Playwright — specs `e2e/analisi.spec.ts` and
 > `e2e/analisi.mobile.spec.ts` (auth setup `e2e/auth.analisi.setup.ts`), seed `scripts/seedAnalisiE2E.mts` via
 > `npm run e2e:seed:analisi` with the emulators up.
+
+## Files
+
+Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
+
+- **Analisi**: `components/cashflow/AnalisiTab.tsx` (`handleEntitySelect`) + `components/cashflow/analisi/*`, `components/cashflow/{EntityDossier,EntitySearch,ConfrontoAnnualeSection,CashflowSankeyChart,SavingsRateTrendSection,AndamentoStoricoSection}.tsx`; pure `lib/utils/{analisiSummary,analisiNarrative,expenseGrouping,cashflowSankey,cashflowComposition,expenseCategoryMatching,comparisonDeltas,expenseEntityStats,entitySearch}.ts`
 
 ## Analisi — a verdict over tiles (`components/cashflow/AnalisiTab.tsx`, `components/cashflow/analisi/*`, `lib/utils/{analisiSummary,analisiNarrative}.ts`)
 - **ONE axis, three modes** (Anno corrente | Anno | Storico, plus a month): `PeriodMode`/`AnalisiPeriod` live in

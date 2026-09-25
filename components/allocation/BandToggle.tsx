@@ -16,7 +16,7 @@
  * nothing is persisted, so there is no Settings write and no demo-mode concern.
  */
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { AsideToggle } from '@/components/ui/aside-toggle';
 import type { RebalanceBand } from '@/lib/utils/allocationUtils';
@@ -48,6 +48,7 @@ function activeKey(band: RebalanceBand): BandOptionKey {
 }
 
 export function BandToggle({ band, onChange }: BandToggleProps) {
+  const customFieldId = useId();
   const selected = activeKey(band);
   // Remembered so «Personalizza» restores the last custom value instead of resetting to 3.
   const [customPp, setCustomPp] = useState<number>(
@@ -83,8 +84,15 @@ export function BandToggle({ band, onChange }: BandToggleProps) {
     <div className="flex flex-wrap items-center gap-2">
       <AsideToggle options={BAND_OPTIONS} value={selected} onChange={handleSelect} ariaLabel="Soglia di ribilanciamento" />
       {selected === 'custom' && (
+        // A naked number box with «pp» beside it told the eye nothing; the `aria-label` covered
+        // only a screen reader. The visible label says what the figure is, and 32px is the
+        // desktop dense floor — `desktop:h-7` is 28px and is never a target (AGENTS.md).
         <div className="flex items-center gap-1.5">
+          <label htmlFor={customFieldId} className="text-[11px] text-muted-foreground">
+            ±
+          </label>
           <Input
+            id={customFieldId}
             type="number"
             inputMode="decimal"
             min={0}
@@ -93,7 +101,7 @@ export function BandToggle({ band, onChange }: BandToggleProps) {
             value={customPp}
             onChange={(event) => handleCustomInput(event.target.value)}
             aria-label="Soglia personalizzata in punti percentuali"
-            className="h-11 w-16 px-2 font-mono tabular-nums desktop:h-7 desktop:text-[11px]"
+            className="h-11 w-16 px-2 font-mono tabular-nums desktop:h-8 desktop:text-[11px]"
           />
           <span className="text-[11px] text-muted-foreground">pp</span>
         </div>

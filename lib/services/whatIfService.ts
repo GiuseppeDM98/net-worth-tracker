@@ -20,9 +20,11 @@ import {
   calculateFIREMetrics,
   calculateFIREProjection,
   calculateCoastFIREMetrics,
-  calculateFireBridgeNumber,
+  resolveFireRequirement,
   type FIREMetrics,
+  type FireHonestInputs,
 } from './fireService';
+import { resolveGainShare } from '@/lib/utils/withdrawalTax';
 import type { FIREProjectionResult } from '@/types/assets';
 import type {
   WhatIfAdjustedInputs,
@@ -111,28 +113,48 @@ function resolveBridge(baseline: WhatIfBaseline) {
 }
 
 /**
- * The FIRE metrics for one input set — with the bridge override when the baseline carries a
- * locked fund: free assets must cover the spending bridge until the unlock, then the fund tops
- * up the standard requirement (the Calcolatore's `displayedFireMetrics`, same functions).
+ * The honest inputs for a perturbed net worth: money that ARRIVES (a windfall) is basis, money
+ * that LEAVES (a purchase, the months without income) is sold at the portfolio's own gain
+ * share, so the basis shrinks in proportion — the What If perturbs free capital, and the tax
+ * must read the capital it perturbed. Without a tax profile the inputs pass through untouched.
+ */
+function honestFor(baseline: WhatIfBaseline, netWorth: number): FireHonestInputs | undefined {
+  const honest = baseline.honest ?? undefined;
+  if (!honest?.withdrawalTax) return honest;
+  const delta = netWorth - baseline.netWorth;
+  const basisToday =
+    delta >= 0
+      ? honest.withdrawalTax.basisToday + delta
+      : baseline.netWorth > 0
+        ? honest.withdrawalTax.basisToday * (netWorth / baseline.netWorth)
+        : honest.withdrawalTax.basisToday;
+  return { ...honest, withdrawalTax: { ...honest.withdrawalTax, basisToday } };
+}
+
+/**
+ * The FIRE metrics for one input set — with the requirement of today when the baseline carries
+ * a locked fund, the state pensions or the withdrawal tax (`resolveFireRequirement`, the
+ * Calcolatore's `displayedFireMetrics`: same function, same figure).
  */
 function resolveFireMetrics(baseline: WhatIfBaseline, netWorth: number, annualExpenses: number): FIREMetrics {
   const metrics = calculateFIREMetrics(netWorth, annualExpenses, baseline.withdrawalRate);
   const bridge = resolveBridge(baseline);
-  if (!bridge || annualExpenses <= 0) return metrics;
+  const honest = honestFor(baseline, netWorth);
+  if ((!bridge && !honest) || annualExpenses <= 0) return metrics;
 
-  const realReturn = baseline.scenarios.base.growthRate - baseline.scenarios.base.inflationRate;
-  const { bridgeFireNumber } = calculateFireBridgeNumber({
+  const { requirement } = resolveFireRequirement({
     annualExpenses,
     withdrawalRate: baseline.withdrawalRate,
-    realReturn,
-    yearsToUnlock: bridge.yearsToUnlock,
-    pensionValueToday: bridge.valueToday,
-    pensionGrowthRate: realReturn,
+    scenario: baseline.scenarios.base,
+    yearsElapsed: 0,
+    honest,
+    bridge: bridge ? { compartmentValue: bridge.valueToday, yearsToUnlock: bridge.yearsToUnlock } : undefined,
+    gainShare: honest?.withdrawalTax ? resolveGainShare(netWorth, honest.withdrawalTax.basisToday) : 0,
   });
   return {
     ...metrics,
-    fireNumber: bridgeFireNumber,
-    progressToFI: bridgeFireNumber > 0 ? (netWorth / bridgeFireNumber) * 100 : 0,
+    fireNumber: requirement,
+    progressToFI: requirement > 0 ? (netWorth / requirement) * 100 : 0,
   };
 }
 
@@ -154,7 +176,8 @@ function runBaseProjection(
     baseline.withdrawalRate,
     baseline.scenarios,
     WHAT_IF_HORIZON_YEARS,
-    resolveBridge(baseline)
+    resolveBridge(baseline),
+    honestFor(baseline, netWorth)
   );
 }
 

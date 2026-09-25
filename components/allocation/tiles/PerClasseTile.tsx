@@ -40,6 +40,8 @@ interface PerClasseTileProps {
   targets: AssetAllocationTarget | null;
   /** The targets the exclusion stranded — the rows above no longer carry them. */
   orphans: OrphanedTarget[];
+  /** Euro of each class sitting in EXCLUDED assets, so a dormant row can say where its money is. */
+  excludedByClass?: Record<string, number>;
   className?: string;
 }
 
@@ -78,10 +80,10 @@ function OrphanWarning({ orphans }: { orphans: OrphanedTarget[] }) {
   );
 }
 
-export function PerClasseTile({ reading, aside, allocation, targets, orphans, className }: PerClasseTileProps) {
+export function PerClasseTile({ reading, aside, allocation, targets, orphans, excludedByClass, className }: PerClasseTileProps) {
   return (
     <Tile eyebrow="Per classe" aside={aside} reading={reading} className={className} ariaLabel="Allocazione per classe">
-      <AllocationBreakdown allocation={allocation} targets={targets} className="mt-3" />
+      <AllocationBreakdown allocation={allocation} targets={targets} excludedByClass={excludedByClass} className="mt-3" />
 
       <div className="mt-auto border-t border-border pt-3.5 text-[11px] leading-[1.5] text-muted-foreground">
         {orphans.length > 0 ? (
@@ -89,7 +91,8 @@ export function PerClasseTile({ reading, aside, allocation, targets, orphans, cl
         ) : (
           <p>
             Il segno del gap è quello dell&apos;operazione: + c&apos;è troppo, − manca. Una classe con sottocategorie si apre
-            sulla riga.
+            sulla riga, e le sue sottocategorie si compensano dentro la classe: il loro «corrente» è una quota della
+            classe, non del portafoglio.
           </p>
         )}
       </div>

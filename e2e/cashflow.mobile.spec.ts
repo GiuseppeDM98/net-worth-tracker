@@ -6,6 +6,10 @@
  * green with the picker's `min-w-0` override removed on 2026-09-07, so it pins the fit, not a
  * fix), and that picker is a SECOND HANDLE on the page's one period, not a second axis:
  * choosing a preset there moves the picker under the verdict too (PR #332, 2026-09-07).
+ *
+ * And the filters behind «Filtri» are a modal of the vocabulary (2026-09-18, it was a raw
+ * `Drawer` with «Mostra risultati»): the reading counts the movements left, the primary names
+ * them, and «Ripristina» is the footer's secondary — disabled while nothing is set.
  */
 
 import { test, expect } from '@playwright/test';
@@ -50,4 +54,24 @@ test('the picker inside the tile drives the page’s period — one axis, two ha
 
   await expect(tilePicker).toHaveAttribute('aria-label', `Periodo dei movimenti: ${CURRENT_YEAR}`);
   await expect(pagePicker).toHaveAttribute('aria-label', `Periodo selezionato: ${CURRENT_YEAR}`);
+});
+
+test('the filters count what is left of the period, in the reading and on the primary', async ({ page }) => {
+  await page.getByRole('region', { name: 'Movimenti' }).getByRole('button', { name: 'Apri filtri avanzati' }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByRole('heading', { name: 'Filtra i movimenti' })).toBeVisible();
+  const reading = dialog.getByRole('status').first();
+
+  await expect(reading).toHaveText(/^Nessun filtro attivo: la lista mostra (tutti i \d+ movimenti|l’unico movimento) del periodo\.$/);
+  await expect(dialog.getByRole('button', { name: 'Ripristina' })).toBeDisabled();
+  await expect(dialog.getByRole('button', { name: /^Mostra \d+ moviment[io]$/ })).toBeVisible();
+
+  // A decoy no row carries: the empty result is named, and the primary never says «0 movimenti».
+  await dialog.getByLabel('Cerca nelle note, categoria, sottocategoria o importo').fill('ornitorinco-assente');
+  await expect(reading).toHaveText(/^1 filtro attivo: nessun movimento su \d+ lo passa\.$/);
+  await expect(dialog.getByRole('button', { name: 'Torna alla lista' })).toBeVisible();
+
+  await dialog.getByRole('button', { name: 'Ripristina' }).click();
+  await expect(reading).toHaveText(/^Nessun filtro attivo/);
+  await expect(dialog.getByRole('button', { name: 'Ripristina' })).toBeDisabled();
 });

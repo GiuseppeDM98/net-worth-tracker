@@ -12,7 +12,7 @@ import { AssistantHeader } from '@/components/assistant/AssistantHeader';
 import { AssistantLockedState } from '@/components/assistant/AssistantLockedState';
 import { AssistantPeriodSelector } from '@/components/assistant/AssistantPeriodSelector';
 import type { PromptRow } from '@/components/assistant/AssistantPromptRows';
-import { AssistantSheets } from '@/components/assistant/AssistantSheets';
+import { AssistantModals } from '@/components/assistant/AssistantModals';
 import { AssistantSuggestionsBanner } from '@/components/assistant/AssistantSuggestionsBanner';
 import { CashflowContestoTile } from '@/components/assistant/tiles/CashflowContestoTile';
 import { MemoriaTile } from '@/components/assistant/tiles/MemoriaTile';
@@ -118,10 +118,10 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   // and what numeric bundle the server builds for the chat answer.
   const [chatContextType, setChatContextType] = useState<AssistantChatContextType>('none');
 
-  // Sheets are controlled here because more than one surface opens them: the
+  // The two modals are controlled here because more than one surface opens them: the
   // header icons and the companion memory tile.
-  const [isThreadSheetOpen, setIsThreadSheetOpen] = useState(false);
-  const [isMemorySheetOpen, setIsMemorySheetOpen] = useState(false);
+  const [isThreadsOpen, setIsThreadsOpen] = useState(false);
+  const [isMemoryOpen, setIsMemoryOpen] = useState(false);
 
   // Dashboard overview — the numbers of «oggi» for a free question with no period attached.
   // Reuses the React Query cache from Panoramica if the user visited it this session.
@@ -421,8 +421,8 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
             isPreferencesPending={false}
             onPreferencesChange={handlePreferencesChange}
             onNewThread={handleNewThread}
-            onOpenThreads={() => setIsThreadSheetOpen(true)}
-            onOpenMemory={() => setIsMemorySheetOpen(true)}
+            onOpenThreads={() => setIsThreadsOpen(true)}
+            onOpenMemory={() => setIsMemoryOpen(true)}
           />
           <TileGridSkeleton cells={SKELETON_CELLS} />
         </PageContainer>
@@ -445,7 +445,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
       ) : loadingContextBundle ? (
         <TileGridSkeleton verdict={false} cells={[{ span: 12, lines: 5 }, { span: 12, lines: 4 }]} />
       ) : null}
-      <MemoriaTile memory={memory} onOpenMemory={() => setIsMemorySheetOpen(true)} />
+      <MemoriaTile memory={memory} onOpenMemory={() => setIsMemoryOpen(true)} />
       {queryError && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" aria-hidden="true" />
@@ -469,16 +469,16 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
           isPreferencesPending={updateMemoryMutation.isPending}
           onPreferencesChange={handlePreferencesChange}
           onNewThread={handleNewThread}
-          onOpenThreads={() => setIsThreadSheetOpen(true)}
-          onOpenMemory={() => setIsMemorySheetOpen(true)}
+          onOpenThreads={() => setIsThreadsOpen(true)}
+          onOpenMemory={() => setIsMemoryOpen(true)}
         />
 
-        <AssistantSheets
+        <AssistantModals
           ownerId={ownerId}
-          isThreadSheetOpen={isThreadSheetOpen}
-          onThreadSheetOpenChange={setIsThreadSheetOpen}
-          isMemorySheetOpen={isMemorySheetOpen}
-          onMemorySheetOpenChange={setIsMemorySheetOpen}
+          isThreadsOpen={isThreadsOpen}
+          onThreadsOpenChange={setIsThreadsOpen}
+          isMemoryOpen={isMemoryOpen}
+          onMemoryOpenChange={setIsMemoryOpen}
           threads={threads}
           loadingThreads={loadingThreads}
           selectedThreadId={selectedThreadId}

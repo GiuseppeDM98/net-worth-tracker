@@ -71,4 +71,23 @@ export default async function globalSetup(): Promise<void> {
   if (analisiSeed.status !== 0) {
     throw new Error('The Analisi E2E fixture failed to seed — see the output above.');
   }
+
+  // Same shape as Analisi's: its own account, created here before auth.centri.setup.ts parks a session.
+  const centriSeed = spawnSync('npm', ['run', 'e2e:seed:centri'], { stdio: 'inherit', shell: true });
+  if (centriSeed.status !== 0) {
+    throw new Error('The Centri di Costo E2E fixture failed to seed — see the output above.');
+  }
+
+  // Divisione, same shape again: opt-in tab, own account, seeded before its session is parked.
+  const splitSeed = spawnSync('npm', ['run', 'e2e:seed:split'], { stdio: 'inherit', shell: true });
+  if (splitSeed.status !== 0) {
+    throw new Error('The Divisione E2E fixture failed to seed — see the output above.');
+  }
+
+  // Hall of Fame: its own account with a four-year history, seeded before its session is parked.
+  // The seed writes snapshots and rows only — the specs build the rankings through the real route.
+  const hofSeed = spawnSync('npm', ['run', 'e2e:seed:hof'], { stdio: 'inherit', shell: true });
+  if (hofSeed.status !== 0) {
+    throw new Error('The Hall of Fame E2E fixture failed to seed — see the output above.');
+  }
 }

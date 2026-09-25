@@ -104,6 +104,7 @@ function makeHolding(overrides: Partial<AllocatableHolding> = {}): AllocatableHo
     assetClass: 'equity',
     value: 1000,
     tradable: true,
+    taxableOnSale: true,
     ...overrides,
   };
 }
@@ -698,8 +699,47 @@ describe('buildHoldings', () => {
         subCategory: 'World',
         value: 1000,
         tradable: true,
+        taxableOnSale: true,
       },
     ]);
+  });
+
+  it('should carry the EUR cost basis and the rate, so a proposed sale can be taxed', () => {
+    const asset = makeAsset({ id: 'a1', quantity: 5, currentPrice: 200, averageCost: 120, taxRate: 26 });
+    const [holding] = buildHoldings([asset], valueOf);
+    expect(holding.costBasisEur).toBe(600); // 5 × 120, the EUR PMC standing in for a EUR-native asset
+    expect(holding.taxRate).toBe(26);
+    expect(holding.taxableOnSale).toBe(true);
+  });
+
+  it('should leave the basis undefined when the asset has no comparable EUR one', () => {
+    // A foreign position the ledger has not projected: its native PMC is dollars against euros.
+    const asset = makeAsset({ id: 'a1', currency: 'USD', averageCost: 120, taxRate: 26 });
+    expect(buildHoldings([asset], valueOf)[0].costBasisEur).toBeUndefined();
+  });
+
+  it('should mark cash and a pension fund as untaxable on sale, not merely untaxed', () => {
+    const cash = makeAsset({ id: 'c', type: 'cash', assetClass: 'cash' });
+    const fund = makeAsset({ id: 'pf', type: 'pensionFund' });
+    expect(buildHoldings([cash], valueOf)[0].taxableOnSale).toBe(false);
+    expect(buildHoldings([fund], valueOf)[0].taxableOnSale).toBe(false);
+  });
+
+  it('should split the basis of a composite asset by the same weight as its value', () => {
+    const composite = makeAsset({
+      id: 'pf',
+      quantity: 1,
+      currentPrice: 100000,
+      averageCost: 80000,
+      taxRate: 26,
+      composition: [
+        { assetClass: 'equity', percentage: 60 },
+        { assetClass: 'bonds', percentage: 40 },
+      ],
+    });
+    const holdings = buildHoldings([composite], valueOf);
+    expect(holdings[0].costBasisEur).toBe(48000);
+    expect(holdings[1].costBasisEur).toBe(32000);
   });
 
   it('should mark a frozen asset non-tradable while still emitting it', () => {
@@ -839,6 +879,56 @@ describe('frozen holdings', () => {
       const [move] = buildRebalancePlan(byAssetClass).filter((m) => m.assetClass === 'equity');
       expect(move.amount).toBeCloseTo(30000, 2);
       expect(move.limitedByFrozen).toBe(false);
+    });
+
+    it('should carry no children without a descent — the class-level plan is a complete answer', () => {
+      expect(buildRebalancePlan(byAssetClass, sumTradableByClass(holdings)).every((m) => m.children.length === 0)).toBe(true);
+    });
+  });
+
+  // A rebalance IS a withdrawal from the classes above target and a contribution into the ones
+  // below it, so its legs must be the ones Preleva and Versa would name for the same euros. The
+  // property that keeps the two in step is the reconciliation: Σchildren === the class amount.
+  describe('buildRebalancePlan with a descent', () => {
+    const bySubCategory: Record<string, AllocationData> = {
+      'bonds:Governativi': makeAllocationData({ currentValue: 50000, targetPercentage: 100 }),
+    };
+    const descent = { bySubCategory, bySpecificAsset: {}, holdings };
+    const plan = () => buildRebalancePlan(byAssetClass, sumTradableByClass(holdings), undefined, descent);
+
+    it('should break a SELL down to the instruments, summing back to the class amount', () => {
+      const move = plan().find((m) => m.assetClass === 'equity')!;
+      expect(move.amount).toBeCloseTo(10000, 2);
+      expect(sumAmounts(move.children)).toBeCloseTo(move.amount, 2);
+      // The €40k pension sleeve is frozen: the sell can only name the €10k ETF.
+      const leaves = move.children.flatMap((child) => child.children);
+      expect(leaves.map((leaf) => leaf.key)).toEqual(['etf']);
+    });
+
+    it('should break a BUY down through the configured sub-targets', () => {
+      const move = plan().find((m) => m.assetClass === 'bonds')!;
+      expect(move.amount).toBeCloseTo(30000, 2);
+      expect(sumAmounts(move.children)).toBeCloseTo(move.amount, 2);
+      expect(move.children.map((child) => child.key)).toEqual(['Governativi']);
+    });
+
+    it('should name the same instruments a withdrawal of the same euros would', () => {
+      const sell = plan().find((m) => m.assetClass === 'equity')!;
+      const withdrawal = buildWithdrawalPlan(byAssetClass, bySubCategory, holdings, sell.amount);
+      const equity = withdrawal.find((node) => node.key === 'equity')!;
+      const leavesOf = (nodes: typeof sell.children): string[] =>
+        nodes.flatMap((node) => (node.children.length > 0 ? leavesOf(node.children) : [node.key])).sort();
+      expect(leavesOf(sell.children)).toEqual(leavesOf(equity.children));
+    });
+
+    it('should descend on nothing when the sell is entirely frozen', () => {
+      const allFrozen = [makeHolding({ id: 'pf', assetClass: 'equity', value: 50000, tradable: false })];
+      const move = buildRebalancePlan(byAssetClass, sumTradableByClass(allFrozen), undefined, {
+        ...descent,
+        holdings: allFrozen,
+      }).find((m) => m.assetClass === 'equity')!;
+      expect(move.amount).toBe(0);
+      expect(move.children).toEqual([]);
     });
   });
 

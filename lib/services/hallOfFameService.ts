@@ -48,6 +48,8 @@ export async function getHallOfFameData(userId: string): Promise<HallOfFameData 
     return {
       ...data,
       updatedAt: toDate(data.updatedAt),
+      // Absent on documents written before 2026-09-24: the header then says nothing about it.
+      ...(data.rankingsUpdatedAt ? { rankingsUpdatedAt: toDate(data.rankingsUpdatedAt) } : {}),
     } as HallOfFameData;
   } catch (error) {
     console.error('Error fetching Hall of Fame data:', error);
@@ -76,10 +78,13 @@ export async function updateHallOfFame(userId: string): Promise<void> {
     // server writer and the periodic email: a second copy here drifted the moment either changed.
     const monthlyRecords = calculateMonthlyRecords(snapshots, expenses);
     const yearlyRecords = calculateYearlyRecords(snapshots, expenses);
+    const now = new Date();
     const hallOfFameData = {
       userId,
       ...buildHallOfFameRankings(monthlyRecords, yearlyRecords),
-      updatedAt: new Date(),
+      // Both stamps here, and only here: a note's save moves `updatedAt` alone.
+      rankingsUpdatedAt: now,
+      updatedAt: now,
     };
 
     // GET existing document to preserve notes

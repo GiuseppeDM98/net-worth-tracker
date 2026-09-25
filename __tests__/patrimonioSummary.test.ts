@@ -107,6 +107,20 @@ describe('summarizeCashAccounts', () => {
     expect(summary.largest).toMatchObject({ name: 'Conto Fineco', balance: 18420.1 });
   });
 
+  it('should measure the shares on the money held and call an account in the red a debt', () => {
+    // The owner's accounts with a credit card at −3417,93 € (2026-09-19): the old shares read 138% and −57%.
+    const accounts = [
+      makeAsset({ id: 'bnl', name: 'Conto BNL', type: 'cash', assetClass: 'cash', quantity: 8277.95, currentPrice: 1 }),
+      makeAsset({ id: 'directa', name: 'Directa', type: 'cash', assetClass: 'cash', quantity: 1125.11, currentPrice: 1 }),
+      makeAsset({ id: 'carta', name: 'Carta BNL Credit', type: 'cash', assetClass: 'cash', quantity: -3417.93, currentPrice: 1 }),
+    ];
+    const summary = summarizeCashAccounts(accounts, 293859.3);
+    expect(summary.total).toBeCloseTo(5985.13, 2);
+    expect(summary.accounts.find((a) => a.id === 'bnl')!.shareOfCash).toBeCloseTo(88.03, 1);
+    expect(summary.accounts.find((a) => a.id === 'carta')!.shareOfCash).toBeNull();
+    expect(summary.largest).toMatchObject({ id: 'bnl' });
+  });
+
   it('should value a foreign-currency account in EUR through its converted price', () => {
     const usd = makeAsset({ id: 'usd', name: 'Conto USD', type: 'cash', assetClass: 'cash', currency: 'USD', quantity: 1000, currentPrice: 1, currentPriceEur: 0.92 });
     const summary = summarizeCashAccounts([usd], 10000);
