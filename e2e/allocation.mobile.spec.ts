@@ -3,7 +3,7 @@
  *
  * PERCHÉ ESISTE: la riga di copertura (letto · non letto · non applicabile · fuori vista) è una
  * frase con quattro importi e i nomi degli strumenti, sopra un elenco a quattro colonne, e nessuna
- * misura la vedeva su un telefono (doc/perf/PERF-00 § 7, doc/mobile/MOB-07 § 4.2).
+ * misura la vedeva su un telefono (doc/mobile/MOB-07 § 4.2).
  *
  * Account base (`test@example.com`); i profili di Yahoo vengono dal seed
  * (`scripts/instrumentProfileFixtures.ts`), quindi nessuna chiamata alla rete. Si asserisce la

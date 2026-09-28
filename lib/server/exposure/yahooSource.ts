@@ -9,7 +9,7 @@
  * (Title Case, mapped) plus `price.longName`. Which one is asked depends on the asset's TYPE, so
  * each module carries its own `fetchedAt` in the cache document.
  *
- * Normalisation (doc/perf/PERF-00 § 4.4): a fund's holding weights are shares of the whole FUND,
+ * Normalisation: a fund's holding weights are shares of the whole FUND,
  * so they are divided by `stockPosition` to become shares of the EQUITY SLEEVE (a 4,5% name in a
  * fund that is 90% equity is 5% of its equity sleeve); the sector weights are already shares of
  * the sleeve and are not touched. Without a usable `stockPosition` the weights stay as they came

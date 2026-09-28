@@ -88,8 +88,8 @@ dato vecchio starebbe segnalando un bug del persister, non del test.
 
 **Cosa NON persistere**: `performance-cache` (già su Firestore), benchmark/FX (cache server),
 assistant.*, `budgetHistory` (1 h stale, letture da 6 doc), `fireData` (la chiave porta `currentNetWorth`). L'Esposizione:
-fuori dalla allowlist come benchmark e FX, qualunque sia la chiave che PERF-00 lascia (`portfolio.instrumentProfiles` con
-la pesatura nel browser, se il proprietario conferma PERF-00 § 4.9, domanda 1): i profili di Yahoo stanno già dietro una
+fuori dalla allowlist come benchmark e FX, con la chiave che ha oggi (`queryKeys.portfolio.instrumentProfiles(ownerId,
+signature)`, `lib/query/queryKeys.ts`; la pesatura nel browser dal 2026-09-28): i profili di Yahoo stanno già dietro una
 cache server di 30 giorni.
 
 ## 5. File da toccare

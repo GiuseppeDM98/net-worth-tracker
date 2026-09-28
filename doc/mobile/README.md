@@ -41,8 +41,8 @@ temi, la regola degli stati su venti superfici e quaranta modali: escluso.
 ## 3. Baseline (2026-09-26, mirror, dev server)
 
 > Presa PRIMA dei contributi del 2026-09-27. Da #401 la riga **Analisi a 390** cambia: sotto i 640 px il Flusso non è più
-> un Sankey, `charts` scende da 2 a 1, cifre e controlli salgono, le schermate sono da rimisurare; a 768 e 1024 no. Da
-> PERF-00 cambiano le righe **Allocazione** (la base dell'Esposizione e la riga di copertura). #400 a interruttore spento
+> un Sankey, `charts` scende da 2 a 1, cifre e controlli salgono, le schermate sono da rimisurare; a 768 e 1024 no. Dal
+> 2026-09-28 (la nuova Esposizione, #407) cambiano le righe **Allocazione** (la base dell'Esposizione e la riga di copertura). #400 a interruttore spento
 > e #403 non muovono righe. MOB-01 rimisura: il budget nasce con i contributi dentro.
 
 `screens` = schermate di scroll. `tiles` = tessere visibili (sopra la piega = che INIZIANO nella prima schermata;
@@ -182,7 +182,7 @@ Gli archi (A → B = «B dipende da A»), gli stessi dell'intestazione di ogni s
 | MOB-03, 04, 05, 06, 07 | 08, 09 |
 | MOB-08 | 09 |
 
-I contributi esterni del 2026-09-27 (#400, #401, #403) sono già in `develop`, e PERF-00 (la nuova Esposizione) entra
+I contributi esterni del 2026-09-27 (#400, #401, #403) sono già in `develop`, e la nuova Esposizione (PERF-00, #407) è entrata il 2026-09-28,
 prima di PERF-01: MOB-01 misura un'app che li contiene, e MOB-06 e MOB-07 compongono il Flusso e l'Esposizione come sono
 DOPO quei contributi (`doc/perf/README.md` § 5).
 

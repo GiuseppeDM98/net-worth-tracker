@@ -218,7 +218,7 @@ service cloud.firestore {
     // famiglia di un fondo; settore e nome di un'azione), condivise fra tutti gli account.
     // Document ID == encodeURIComponent(ticker); nessun campo userId. Letta e scritta SOLO
     // dall'Admin SDK: il client riceve i profili da /api/portfolio/instrument-profiles. Il
-    // default nega comunque; il blocco lo documenta (doc/perf/PERF-00 § 4.6).
+    // default nega comunque; il blocco lo documenta (doc/guide/allocazione.md § Esposizione).
     match /instrument-profile-cache/{tickerId} {
       allow read, write: if false;
     }

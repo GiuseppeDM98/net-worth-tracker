@@ -125,19 +125,20 @@ Gli archi (A → B = «B dipende da A»), gli stessi dell'intestazione di ogni s
 | PERF-07 | 08, 09, 10 |
 | PERF-12 | 11, 13, 14 (il census in `scripts/`) |
 
-**PERF-00 va prima di tutto, PERF-01 compresa** (proprietario, 2026-09-27): non è una spec di sola velocità — è la
-proposta #402, la nuova Esposizione — ma chiude il difetto misurato di PERF-10 § A e cambia ciò che la baseline di
-Allocazione misura, quindi entra prima che il benchmark fissi i suoi numeri.
+**PERF-00 è entrata prima di tutto, PERF-01 compresa** (proprietario, 2026-09-27; PR #407 in develop dal 2026-09-28, la
+spec ritirata lo stesso giorno): non era una spec di sola velocità — era la proposta #402, la nuova Esposizione — ma
+chiude il difetto misurato di PERF-10 § A e cambia ciò che la baseline di Allocazione misura, quindi è entrata prima che
+il benchmark fissasse i suoi numeri.
 
 Quattro sessioni indipendenti possono partire subito dopo PERF-01: **PERF-05** (dati), **PERF-04** (bundle), **PERF-07 →
 PERF-08 / PERF-10** (server), **PERF-12** (compiler). PERF-02 e PERF-03 sono le due che il proprietario SENTE di più; PERF-03
 vuole PERF-02 e PERF-05 prima. Due spec che toccano lo stesso punto se lo sono spartito: il `layout="position"` delle pagine è
 di PERF-14 sola; il `getDoc` bloccante di `AuthContext` è di PERF-02 sola; la lettura delle impostazioni di `AssetDialog`
-chiuso è di PERF-05 sola; il secondo `MotionConfig` è di PERF-02 sola; la cache dell'Esposizione è di PERF-00 sola
-(PERF-10 vi aggiunge il `Server-Timing`); il Sankey del Flusso dietro `next/dynamic` è di PERF-04 sola.
+chiuso è di PERF-05 sola; il secondo `MotionConfig` è di PERF-02 sola; la cache dell'Esposizione è già in repo
+(`lib/server/exposure/instrumentProfileService.ts`; PERF-10 vi aggiunge il `Server-Timing`); il Sankey del Flusso dietro `next/dynamic` è di PERF-04 sola.
 
 **Contributi esterni e funzioni nuove (proprietario, 2026-09-27).** Le tre PR di Ciocc128 sono entrate PRIMA di PERF-01,
-con le correzioni della revisione; la proposta #402 la implementiamo noi da `doc/perf/PERF-00`, anche lei prima di
+con le correzioni della revisione; la proposta #402 l'abbiamo implementata noi (PR #407, 2026-09-28), anche lei prima di
 PERF-01. Così baseline e budget nascono sull'app che li contiene. Una PR che arriva DOPO PERF-01 segue il protocollo di
 AGENTS.md § Commands: trial merge, matrice contro le spec aperte, emendamenti nello stesso commit, e il tetto del
 budget alzato con la misura se la route cresce (PERF-01 § 9).
@@ -146,7 +147,7 @@ budget alzato con la misura se la route cresce (PERF-01 § 9).
 
 | Spec | Titolo | Priorità | Sforzo | Dipende da | Modello · effort | Stato |
 |---|---|---|---|---|---|---|
-| [PERF-00](PERF-00-esposizione-leva-copertura-cache.md) | Esposizione: leva, copertura, base di Allocazione, cache per ticker (issue #402) | 1 | L | — (#400/#401/#403 già integrate) | Fable 5.1 · xhigh | **fatta** (2026-09-28: pesatura nel browser, `instrument-profile-cache/{ticker}`, route owner-scoped; 0 chiamate a Yahoo alla seconda apertura, provato dal test della route) |
+| PERF-00 | Esposizione: leva, copertura, base di Allocazione, cache per ticker (issue #402) | 1 | L | — (#400/#401/#403 già integrate) | Fable 5.1 · xhigh | **ritirata il 2026-09-28** — PR #407 in develop dal 2026-09-28; 14 divergenze: nove lezioni già a casa (doc/guide/allocazione.md § Esposizione: le parole della copertura riviste sul mirror, l'ETC che chiede `fund`, la firma vuota che non è lo stato vuoto, `LEG_DESTINY` come fonte), quattro lacune colmate in sessione (il test che lega i quattro destini a `compareAllocations`, due falsificazioni viste rosse, la riga del seed dei profili in SETUP.md, una frase falsa nella guida), una decisione (i non-obiettivi) portata nei blind spots della guida; la misura di chiusura resta: 0 chiamate a Yahoo alla seconda apertura (`__tests__/instrumentProfilesRoute.test.ts`) |
 | [PERF-01](PERF-01-benchmark-e-budget.md) | Il benchmark in repo e il budget che può solo scendere | 1 | M | 00 | Opus 5.5 · high | da fare |
 | [PERF-02](PERF-02-avvio-shell-prima-di-auth.md) | La shell prima dell'autenticazione | 2 | M | 01 | Fable 5.1 · xhigh | da fare |
 | [PERF-03](PERF-03-ultimo-dato-noto-subito.md) | L'ultimo dato noto subito, il fresco appena arriva | 2 | M | 02, 05 | Fable 5.1 · xhigh | da fare |

@@ -81,10 +81,10 @@ Impostazioni smette di tenere la SUA copia delle categorie (`loadExpenseCategori
   (§ Dialog Form Reset). `spendingRolesEnabled` (#400) arriva da `useSettings` con gli altri campi e scende a
   `CategoryManagementDialog` per prop, come oggi; i due host che non lo passano (`CategoryDeleteConfirmDialog`,
   `CategoryMoveDialog`) restano così: senza il flag il dialog non mostra né scrive il ruolo, per scelta.
-- Esposizione (PERF-00): se PERF-00 ha chiuso § 4.9, domanda 1 con la pesatura nel browser, la tessera riceve gli asset
-  dalla pagina e legge i profili da `queryKeys.portfolio.instrumentProfiles`; quando Allocazione passa a `useAssets`, la
-  tessera prende `assets` da lì. Altrimenti la sua chiave resta quella che PERF-00 ha scritto, e qui si verifica solo che
-  una modifica di un asset la invalidi.
+- Esposizione: dal 2026-09-28 la tessera riceve gli asset dalla pagina (`EsposizioneTile.tsx`, prop `assets`) e legge i
+  profili da `queryKeys.portfolio.instrumentProfiles` (`lib/hooks/usePortfolioExposure.ts`, la pesatura nel browser);
+  quando Allocazione passa a `useAssets`, la tessera prende `assets` da lì e nient'altro cambia: un asset modificato
+  ricalcola il motore da sé, e la chiave dei profili cambia solo se cambia un ticker in vista.
 - Centri: `groupExpensesByCostCenter(allExpenses)` in `lib/utils/costCenterUtils.ts` (pura, testata) al posto delle N query;
   resta `useCostCenters`. Il conteggio accanto a un'azione distruttiva deve venire dalla STESSA query della mutazione
   (doc/guide/centri-di-costo.md): verificare che la mutazione di eliminazione legga anche lei da `allExpenses` o mantenga la

@@ -3,7 +3,7 @@
  * every quoted ticker of the base fixture (`scripts/seedEmulator.ts`), so the route never has a
  * ticker to ask Yahoo for. Yahoo is called by the SERVER (`yahoo-finance2` inside the route), so
  * `page.route` cannot intercept it — the seed is the only thing standing between a spec and the
- * network (doc/perf/PERF-00 § 7).
+ * network (doc/guide/allocazione.md § Esposizione).
  *
  * Shared by the base seed (once) and by `scripts/seedInstrumentProfilesE2E.mts`, which the
  * Playwright global setup runs on EVERY invocation: an empty answer lives 24 hours in the cache,

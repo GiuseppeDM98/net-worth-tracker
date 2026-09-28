@@ -10,7 +10,7 @@
  *
  * The tile receives the assets from the page like every other tile and owns only the Yahoo
  * profiles of the tickers in view (`usePortfolioExposure`: the route answers profiles from one
- * cache per ticker, the weighing runs here in the browser — doc/perf/PERF-00). The figures come
+ * cache per ticker, the weighing runs here in the browser — doc/guide/allocazione.md § Esposizione). The figures come
  * from `summarizeExposure` / `summarizeExposureHighlights` (`allocazioneSummary.ts`), the words
  * from `describeExposure` and its siblings (`allocazioneNarrative.ts`): this file only renders.
  *

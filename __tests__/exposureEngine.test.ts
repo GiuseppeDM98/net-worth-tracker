@@ -1,6 +1,6 @@
 /**
  * Tests for lib/utils/exposureEngine.ts — the three views of the Esposizione, weighed in the
- * browser on invented assets and profiles (doc/perf/PERF-00 § 7). No network, no user data.
+ * browser on invented assets and profiles. No network, no user data.
  *
  * Seen RED by falsification on 2026-09-28 (each undone right after): Titoli read on `marketValue`
  * instead of `notionalValue` (the 2× fund weighed 1000 instead of 2000); the `outOfView` branch
@@ -23,6 +23,7 @@ vi.mock('firebase/firestore', () => ({ doc: vi.fn(), getDoc: vi.fn(), setDoc: vi
 import { computeExposure, NON_LOOKTHROUGH_ASSET_CLASSES } from '@/lib/utils/exposureEngine';
 import { expandAssetExposure } from '@/lib/utils/assetExposureUtils';
 import { isExposureBaseAsset } from '@/lib/utils/exposureRequests';
+import { compareAllocations } from '@/lib/services/assetAllocationService';
 
 function asset(overrides: Partial<Asset> & { id: string; name: string }): Asset {
   return {
@@ -198,6 +199,21 @@ describe('computeExposure — the identities', () => {
     expect(sum(exposure.issuers)).toBeCloseTo(market, 6);
     expect(exposure.issuers.coverage.outOfView.amount).toBe(0);
     expect(exposure.issuers.coverage.named).toBeCloseTo(exposure.issuers.coverage.read.amount, 6);
+  });
+
+  it('adds up to the notionalValue and marketValue the page prints — compareAllocations on the same list', () => {
+    // The page hands `compareAllocations` the WHOLE list (it partitions by role itself) and Per
+    // classe prints `AllocationResult.notionalValue` / `marketValue`: the four destinies must reach
+    // those figures to the cent, or the Esposizione and Per classe disagree on one screen. The
+    // fixture holds a 2× fund, so the two totals differ and each view is held to ITS measure.
+    // Seen RED on 2026-09-28 with the frozen assets dropped from `isExposureBaseAsset` («expected
+    // 5700 to be close to 10700»): the two identities above stayed GREEN, because they measure
+    // the base with the same filter — only this case sees the page.
+    const page = compareAllocations(assets, null);
+    expect(page.notionalValue).not.toBeCloseTo(page.marketValue, 2);
+    expect(sum(exposure.holdings)).toBeCloseTo(page.notionalValue, 2);
+    expect(sum(exposure.sectors)).toBeCloseTo(page.notionalValue, 2);
+    expect(sum(exposure.issuers)).toBeCloseTo(page.marketValue, 2);
   });
 
   it('names in Titoli only what Yahoo listed, well under what it read; in Settori the weights cover the sleeve', () => {
