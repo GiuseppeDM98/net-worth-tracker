@@ -1,7 +1,7 @@
 /**
  * `perf/routes.json` is the benchmark's list of pages; `lib/constants/navigation.ts` is the app's.
- * The benchmark is plain `.mjs` and cannot import the `@/` alias, so the two are held equal here
- * (doc/perf/PERF-01-benchmark-e-budget.md § 4): a page added to the shell and not to the benchmark,
+ * The benchmark is plain `.mjs` and cannot import the `@/` alias, so the two are held equal here:
+ * a page added to the shell and not to the benchmark,
  * or a route the benchmark visits that the shell no longer has (`/dashboard/dividends` never
  * existed — Dividendi is `?tab=dividends` of Cashflow), fails this file.
  */

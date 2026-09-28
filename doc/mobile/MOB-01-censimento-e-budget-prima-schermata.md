@@ -50,12 +50,12 @@ Lo script non può diventare un budget così com'è (righe del 2026-09-26, chi i
 
 ## 3. Non-obiettivi
 
-- Nessun codice dell'app (MOB-02..07), niente tempi (PERF-01), niente CI, nessuna spec Playwright (MOB-02..08).
+- Nessun codice dell'app (MOB-02..07), niente tempi (`perf:bench`), niente CI, nessuna spec Playwright (MOB-02..08).
 - Le metriche nuove a 768 e 1024 si registrano; vincolanti con MOB-08. Fuori: Assistente e login; B e C.
 
 ## 4. Design
 
-**Due script**, come PERF-01. `scripts/mobileCensus.mjs` misura (emulatori, mirror, build servita); resta `.mjs` perché
+**Due script**, come `perf:bench` e `perf:budget` (`perf/README.md`). `scripts/mobileCensus.mjs` misura (emulatori, mirror, build servita); resta `.mjs` perché
 passa funzioni a `page.evaluate` (un sorgente passato da `tsx` può portarsi dietro l'helper `__name`).
 `scripts/mobileBudget.mts` (con `tsx`, come i seed) confronta, chiamando la pura `lib/utils/mobileBudget.ts`.
 
@@ -110,7 +110,8 @@ nello stesso commit). Allargare: a mano, con l'OK del proprietario, annotato in 
 **API di MOB-02 usate**: la `section` di `PageVerdict`; l'`ul` di `VerdictStrip` dentro di essa; la riga chiusa di
 `Tile` (`sectionTriggerId` → `sectionPanelId` vuoto); la chiave `mobile-sections:<route>[:<tab>]` (per non ereditarla).
 
-**Conflitti con PERF**: PERF-01 è la dipendenza (build, :3200, `--`, pura + `.mts`); PERF-12 ha `perf:census`: nomi
+**Conflitti con PERF**: `perf/` è la base (`perf:build`, `perf:serve` su :3200, il `--`, la pura + `.mts` di
+`perfBudget`); PERF-12 ha `perf:census`: nomi
 distinti; PERF-02 → il settle non guarda lo spinner; PERF-03 → la riga di stato vuota; PERF-04 → il settle aspetta lo
 `Skeleton` dei grafici pigri (a riga chiusa `charts` scende: voluto).
 
@@ -134,7 +135,7 @@ guidato; (2) una cifra è solo «€ e %», come la baseline. Restano (3) e (4),
 
 ## 6. Passi
 
-1. Branch; SESSION_NOTES.md; PERF-01 § 4-5 e `doc/guide/e2e-emulatori.md`.
+1. Branch; SESSION_NOTES.md; `perf/README.md`, `scripts/perfBudget.mts` e `doc/guide/e2e-emulatori.md`.
 2. `lib/utils/mobileBudget.ts` + i tre test, visti rossi e poi verdi.
 3. `scripts/mobileCensus.mjs`, una correzione di § 1 alla volta; `scripts/mobileBudget.mts`; `package.json`.
 4. Emulatori, `npm run mirror:seed -- <email>`, `perf:build`, `perf:serve`, `mobile:census`; uno scarto dalla baseline
@@ -195,8 +196,8 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
   § Browser-Driven E2E), CLAUDE.md (§ Testing, § Known Issues), doc/guide/e2e-emulatori.md
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALI mentre scrivi codice
 - Leggi doc/mobile/README.md (§ 3 è la baseline) e la spec MOB-01 per intero; doc/mobile/MOB-02 § 4.1-4.4 (il contratto
-  che il censimento riconosce); doc/perf/PERF-01-benchmark-e-budget.md § 4-5 (PERF-01 deve essere fatta: perf:build,
-  perf:serve, porta :3200); DESIGN.md § mobile se MOB-09 l'ha già scritta
+  che il censimento riconosce); perf/README.md e scripts/perfBudget.mts (perf:build,
+  perf:serve, porta :3200: il censimento gira sulla stessa build); DESIGN.md § mobile se MOB-09 l'ha già scritta
 - Crea SESSION_NOTES.md; crea il branch dalla branch attiva PRIMA di editare
 
 Regole: nessun commit senza il mio OK; un branch e un commit; rispondi in italiano; le quattro domande di § 4 (mirror o

@@ -20,7 +20,7 @@ da IndexedDB è asincrono: shell → `isRestoring` → dati), poi sostituirlo co
 
 ## 2. Obiettivo misurabile
 
-- Benchmark (PERF-01) con `--revisit` (reload della route dopo una visita): il marcatore `data` su Cashflow, Storico, Analisi,
+- Benchmark con `npm run perf:bench -- --revisit` (reload della route dopo una visita): il marcatore `data` su Cashflow, Storico, Analisi,
   Patrimonio, Previdenza, Hall of Fame scende sotto **300 ms** (oggi 510–2285) e lo `skeleton` NON appare quando esiste un
   dato persistito. FIRE: persistita solo `annualCashflowData`; il suo obiettivo resta quello di PERF-05/06.
 - Mentre il fresco è in volo, la pagina mostra «Aggiornato alle HH:MM» nel `PageVerdict` (o nel `PageHeader` dove non c'è
@@ -105,7 +105,7 @@ cache server di 30 giorni.
 - Le 11 pagine — passano le loro query a `useFreshness` e la lettura al verdetto (una riga per pagina).
 - `lib/hooks/useLogout.ts` / `contexts/AuthContext.tsx` — `clear()` + `removeClient()` al logout.
 - `e2e/auth*.setup.ts` (sei) — cancellano lo store prima di `storageState`.
-- `scripts/perfBenchmark.mjs` — l'opzione `--revisit` se PERF-01 non l'ha già.
+- `scripts/perfBenchmark.mjs` — niente: `--revisit` c'è già (il secondo caricamento della route dopo una prima visita).
 - Test: `__tests__/persistCache.test.ts`, `__tests__/queryPersistence.test.ts`, `__tests__/demoAccount.test.ts`,
   `__tests__/statesNarrative.test.ts` (nuovi casi), `e2e/freshness.spec.ts`.
 

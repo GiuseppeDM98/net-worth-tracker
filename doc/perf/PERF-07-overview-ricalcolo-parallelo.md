@@ -66,7 +66,8 @@ invalidazione vede — un prezzo aggiornato fuori dal cron: verificare che `/api
 
 **`Server-Timing`.** Un helper `lib/server/serverTiming.ts` (`startTiming()` → `mark(name)` → `toHeader()`), puro e testato,
 usato dalla route; nomi corti (`db`, `compute`, `total`), `desc` per la sorgente. Su Vercel il header passa; in locale si
-legge con `curl -sD -` sulla route con un ID token, e il benchmark (PERF-01) lo stampa nella colonna API.
+legge con `curl -sD -` sulla route con un ID token, e `npm run perf:bench` lo scrive per ogni run in
+`perf/last-run.json` (`api[].serverTiming`; a schermo la colonna API conta solo le chiamate).
 
 ## 5. File da toccare
 
@@ -75,7 +76,7 @@ legge con `curl -sD -` sulla route con un ID token, e il benchmark (PERF-01) lo 
 - `lib/services/dashboardOverviewConstants.ts` — TTL 6 h.
 - `app/api/dashboard/overview/route.ts` — il header.
 - `lib/server/serverTiming.ts` — nuovo, puro, testato.
-- `scripts/perfBenchmark.mjs` (PERF-01) — legge `Server-Timing` dalle risposte `/api/*` se non lo fa già.
+- `scripts/perfBenchmark.mjs` — niente: legge già `Server-Timing` dalle risposte `/api/*` (`attachNetwork`).
 - Test: `__tests__/dashboardOverviewService.test.ts` (i quattro casi di freschezza; i tre rami degradabili; i quattro obbligatori
   che rigettano; payload identico a prima con tutti i rami ok), `__tests__/serverTiming.test.ts`, `__tests__/apiAuthRoutes.test.ts`
   (il header presente).

@@ -31,8 +31,8 @@ only after login» — con la shell nell'HTML quella premessa cade (`SidebarProv
 
 - L'HTML prerenderizzato di `/dashboard` contiene: lo skip link «Vai al contenuto principale», la `<nav>` della sidebar con
   le voci di `lib/constants/navigation.ts`, `<main id="page-main">` e il `TileGridSkeleton` generico. Il `PageHeader` NO: è
-  della pagina e arriva con lei dopo l'auth. Misura: `perf:budget` (PERF-01) stampa «testo nell'HTML (caratteri)» per
-  route (il testo del `body`): da 0 a > 300.
+  della pagina e arriva con lei dopo l'auth. Misura: `npm run perf:budget` stampa per route la colonna «testo»
+  (i caratteri del `body`, `countTextChars` in `lib/utils/perfBudget.ts`): da 0 a > 300.
 - Nessuna lettura Firestore prima di `setLoading(false)`: nel benchmark cold, zero richieste `firestore` prima del marcatore
   `auth` — che questa spec ridefinisce in `scripts/perfBenchmark.mjs` come «il nome del profilo appare nella sidebar»
   (lo spinner non esiste più).
@@ -106,8 +106,8 @@ routing); non mettere la sidebar in un Server Component separato — legge `useP
   `lib/utils/userDisplayUtils.ts` o nuovo `lib/utils/authProfile.ts` — `resolveDisplayName`.
 - `components/layout/Sidebar.tsx` — profilo in attesa con `Skeleton`; `components/layout/SecondaryMenuDrawer.tsx` se mostra il profilo.
 - `app/layout.tsx` — script inline pre-idratazione; `lib/constants/colorTheme.ts` — chiave e attributo; `contexts/ColorThemeContext.tsx` li importa.
-- `scripts/perfBenchmark.mjs` — il marcatore `auth` ridefinito. `scripts/perfBudget.mts` — la colonna «testo nell'HTML» se
-  PERF-01 non l'ha già.
+- `scripts/perfBenchmark.mjs` — il marcatore `auth` ridefinito. `lib/utils/perfBudget.ts` — la colonna «testo»
+  c'è già: si aggiorna solo il docstring di `countTextChars` («0 today»).
 - Test: `e2e/shell.boot.spec.ts` + `e2e/shell.boot.mobile.spec.ts` (il NOME sceglie il progetto: AGENTS.md § 5),
   `__tests__/authProfile.test.ts`, i sei `e2e/auth*.setup.ts` (l'ancora dopo il login).
 

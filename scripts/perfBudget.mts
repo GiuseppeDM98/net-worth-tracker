@@ -1,6 +1,6 @@
 /**
  * perf:budget — how much JavaScript each route ships before it can paint, against perf/budget.json
- * (doc/perf/PERF-01-benchmark-e-budget.md § 4).
+ * (the manual: perf/README.md).
  *
  * Reads a PRODUCTION build on disk (no server, no emulators, two seconds): for every prerendered
  * `server/app/<route>.html` it takes the `<script src="/_next/static/chunks/…">` tags, gzips each
@@ -180,7 +180,7 @@ if (!verdict.ok) {
   console.error('\n[perf:budget] ROSSO:');
   for (const violation of verdict.violations) console.error(`  - ${describeViolation(violation)}`);
   console.error('  Una route che cresce per una funzione nuova ALZA il suo tetto in questo commit, con «raisedBy»');
-  console.error('  («#NNN: perché») e la riga in doc/perf/README.md (PERF-01 § 9).');
+  console.error('  («#NNN: perché») e la riga nel registro di perf/README.md § Il ratchet e il tetto alzato.');
   process.exit(1);
 }
 console.log(`\n[perf:budget] verde: ${verdict.rows.length} voci sotto il tetto.`);

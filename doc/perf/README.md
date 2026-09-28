@@ -35,8 +35,9 @@ layout e colori a ogni mount (PERF-14).
 - **Uno script Playwright usa-e-getta** (Chromium headless 1440×900): per ogni route, cold = contesto nuovo, login vero,
   reload della route; warm = un contesto, i link della sidebar uno dopo l'altro. `PerformanceObserver` (LCP, CLS, long
   task, FCP) + `MutationObserver` per i traguardi: `auth` (spinner via), `h1`, `data` (prima cifra in euro in `main`),
-  `skeleton`. Rete classificata (Firestore, API, JS). 3 run cold, 2 warm, mediane. Lo script e i dati grezzi sono in
-  `reference/` (`perf-measure.mjs`, `baseline-2026-09-26-cold.log`, `baseline-2026-09-26-warm.json`); PERF-01 lo porta in repo.
+  `skeleton`. Rete classificata (Firestore, API, JS). 3 run cold, 2 warm, mediane. Lo script è diventato
+  `scripts/perfBenchmark.mjs` (`perf/README.md`); i dati grezzi restano in git
+  (`git show d8d3d98:doc/perf/reference/baseline-2026-09-26-cold.log`, e `…-warm.json`).
 - **La macchina**: il laptop Windows del 2026-09-26. Il proprietario lavora dal Mac (WORKFLOW.md § 3): i TEMPI non sono
   confrontabili fra le due macchine, i CONTEGGI (richieste, chiamate, KB, chunk) sì. Un budget di tempo si confronta solo
   prima/dopo nella stessa sessione, sulla stessa macchina.
@@ -146,14 +147,14 @@ chiuso è di PERF-05 sola; il secondo `MotionConfig` è di PERF-02 sola; la cach
 con le correzioni della revisione; la proposta #402 l'abbiamo implementata noi (PR #407, 2026-09-28), anche lei prima di
 PERF-01. Così baseline e budget nascono sull'app che li contiene. Una PR che arriva DOPO PERF-01 segue il protocollo di
 AGENTS.md § Commands: trial merge, matrice contro le spec aperte, emendamenti nello stesso commit, e il tetto del
-budget alzato con la misura se la route cresce (PERF-01 § 9).
+budget alzato con la misura se la route cresce (perf/README.md § Il ratchet e il tetto alzato).
 
 ## 6. Stato
 
 | Spec | Titolo | Priorità | Sforzo | Dipende da | Modello · effort | Stato |
 |---|---|---|---|---|---|---|
 | PERF-00 | Esposizione: leva, copertura, base di Allocazione, cache per ticker (issue #402) | 1 | L | — (#400/#401/#403 già integrate) | Fable 5.1 · xhigh | **ritirata il 2026-09-28** — PR #407 in develop dal 2026-09-28; 14 divergenze: nove lezioni già a casa (doc/guide/allocazione.md § Esposizione: le parole della copertura riviste sul mirror, l'ETC che chiede `fund`, la firma vuota che non è lo stato vuoto, `LEG_DESTINY` come fonte), quattro lacune colmate in sessione (il test che lega i quattro destini a `compareAllocations`, due falsificazioni viste rosse, la riga del seed dei profili in SETUP.md, una frase falsa nella guida), una decisione (i non-obiettivi) portata nei blind spots della guida; la misura di chiusura resta: 0 chiamate a Yahoo alla seconda apertura (`__tests__/instrumentProfilesRoute.test.ts`) |
-| [PERF-01](PERF-01-benchmark-e-budget.md) | Il benchmark in repo e il budget che può solo scendere | 1 | M | 00 | Opus 5.5 · high | **fatta il 2026-09-28** — `perf:bench`, `perf:budget`, `perf:build`, `perf:serve` (:3200); `perf/budget.json` dalla build di quel giorno (+2%), la regola del tetto alzato con `raisedBy`; nuova baseline in `perf/README.md` (66/66 run a regime; primo numero da 146 ms a 2363 ms; condivisi 460 KB gz); il budget visto rosso con il PDF iniettato nella Panoramica |
+| PERF-01 | Il benchmark in repo e il budget che può solo scendere | 1 | M | 00 | Opus 5.5 · high | **ritirata il 2026-09-28** — PR #409 in develop dal 2026-09-28; 20 divergenze: sedici dove il codice aveva ragione e la lezione era già a casa (commenti alla riga degli script, `perf/README.md`, SETUP, WORKFLOW, AGENTS), un difetto corretto in sessione (il messaggio rosso di `perf:budget` mandava il registro dei tetti a questo README invece che a `perf/README.md`), tre rimandi voluti (`libraryCopies` a PERF-04; niente CI e niente RUM, per scelta non scritti); `reference/` cancellata, lo script vive in `scripts/perfBenchmark.mjs`; la misura di chiusura resta la baseline di `perf/README.md` |
 | [PERF-02](PERF-02-avvio-shell-prima-di-auth.md) | La shell prima dell'autenticazione | 2 | M | 01 | Fable 5.1 · xhigh | da fare |
 | [PERF-03](PERF-03-ultimo-dato-noto-subito.md) | L'ultimo dato noto subito, il fresco appena arriva | 2 | M | 02, 05 | Fable 5.1 · xhigh | da fare |
 | [PERF-04](PERF-04-bundle-recharts-pdf-lucide.md) | recharts una volta, il PDF, le icone e il Sankey quando servono | 2 | M | 01 | Opus 5.5 · high | da fare |
@@ -182,10 +183,10 @@ attraversa regole di dominio dense (Rendimenti, le finestre delle spese, la shel
 
 ## 8. Come si rimisura
 
-Da PERF-01 (2026-09-28; prima si copiava `reference/perf-measure.mjs` nella radice come script usa-e-getta): `npm run perf:build`, `npm run perf:serve` (terminali del proprietario, con gli emulatori e il mirror, porta :3200),
-`npm run perf:bench -- --email=mirror@example.com` e `npm run perf:budget` (il manuale è `perf/README.md`) — il `--` è obbligatorio: senza, npm si tiene le
+`npm run perf:build`, `npm run perf:serve` (terminali del proprietario, con gli emulatori e il mirror, porta :3200),
+`npm run perf:bench -- --email=mirror@example.com` e `npm run perf:budget` (il manuale è `perf/README.md`; fino al 2026-09-28 si copiava nella radice uno script usa-e-getta) — il `--` è obbligatorio: senza, npm si tiene le
 opzioni come `npm_config_*` e lo script non le vede. Una spec o una PR che fa crescere una route alza il suo tetto nello
-stesso commit, con la misura, il `raisedBy` e la riga nel registro di `perf/README.md` (PERF-01 § 9). Firestore emulato risponde in ~1 ms: i waterfall sono più corti che
+stesso commit, con la misura, il `raisedBy` e la riga nel registro di `perf/README.md` (§ Il ratchet e il tetto alzato). Firestore emulato risponde in ~1 ms: i waterfall sono più corti che
 in produzione, e i tempi delle route server si leggono dal `Server-Timing` (PERF-07) nelle DevTools, in produzione.
 
 ## 9. Decisioni del proprietario (2026-09-26)
@@ -198,4 +199,4 @@ in produzione, e i tempi delle route server si leggono dal `Server-Timing` (PERF
 **2026-09-27** (integrazione dei contributi esterni):
 - Le PR #400, #401 e #403 entrano prima di PERF-01, con le correzioni applicate da noi.
 - La proposta #402 la scriviamo noi (PERF-00) ed entra prima di PERF-01; PERF-10 perde § A.
-- Una funzione nuova può alzare un tetto del budget nello stesso commit, con la misura prima/dopo → PERF-01 § 9.
+- Una funzione nuova può alzare un tetto del budget nello stesso commit, con la misura prima/dopo → PERF-01 § 9 (oggi `perf/README.md` § Il ratchet e il tetto alzato).

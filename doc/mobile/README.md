@@ -236,7 +236,7 @@ Fino a MOB-01: `reference/mobile-census.mjs` copiato nella radice del repo come 
 'playwright'` risolve da lì), emulatori + mirror + `npm run dev:emulator`, poi
 `node .tmp-mobile-measure.mjs --out=<cartella fuori dal repo>` (opzioni `--viewports=390,768,1024`,
 `--surfaces=panoramica,rendimenti`), cancellato a fine sessione; il JSON e gli screenshot restano fuori dal repo. Da
-MOB-01: `npm run mobile:census` e `npm run mobile:budget` sulla build di produzione di PERF-01 (:3200), con il `--` di
+MOB-01: `npm run mobile:census` e `npm run mobile:budget` sulla build di produzione di `perf:build`, servita da `perf:serve` (:3200), con il `--` di
 npm davanti alle opzioni.
 
 ## 9. Decisioni del proprietario (2026-09-26)

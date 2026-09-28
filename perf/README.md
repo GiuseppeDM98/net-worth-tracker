@@ -1,6 +1,6 @@
 # perf/ — il benchmark di velocità e il budget di dimensione
 
-> Nato con PERF-01 (`doc/perf/PERF-01-benchmark-e-budget.md`, 2026-09-28). Qui: come si lancia, cosa significa ogni
+> In repo dal 2026-09-28 (PR #409). Qui: come si lancia, cosa significa ogni
 > colonna, la baseline in vigore e il registro dei tetti alzati. La storia (la misura usa-e-getta del 2026-09-26) e le
 > spec che useranno questi numeri stanno in `doc/perf/README.md`.
 
