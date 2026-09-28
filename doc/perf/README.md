@@ -48,8 +48,10 @@ layout e colori a ogni mount (PERF-14).
 ## 3. Baseline (2026-09-26, laptop Windows, mirror, nessun throttling CPU)
 
 > Misurata su `develop` PRIMA dei contributi del 2026-09-27 (#400 e #401: il Flusso per ruolo e sul telefono; #403: il
-> chip composito di Strumenti) e di PERF-00 (la nuova Esposizione). PERF-01 rimisura sulla build che li contiene (§ 5):
-> le tabelle qui sotto restano come storia, e la nota «Esposizione → Yahoo ogni volta» è il «prima» di PERF-00.
+> chip composito di Strumenti) e di PERF-00 (la nuova Esposizione, chiusa il 2026-09-28). PERF-01 rimisura sulla build
+> che li contiene (§ 5): le tabelle qui sotto restano come storia, e la nota «Esposizione → Yahoo ogni volta» è il
+> «prima» di PERF-00 — il «dopo» è una route che risponde dalla cache per ticker (0 chiamate a Yahoo a regime, il test
+> della route lo pinna) e una pesatura nel browser, quindi la colonna API di Allocazione resta 1 ma senza Yahoo dietro.
 
 **Cold** — reload della route dopo il login (ms; mediane di 3):
 
@@ -144,7 +146,7 @@ budget alzato con la misura se la route cresce (PERF-01 § 9).
 
 | Spec | Titolo | Priorità | Sforzo | Dipende da | Modello · effort | Stato |
 |---|---|---|---|---|---|---|
-| [PERF-00](PERF-00-esposizione-leva-copertura-cache.md) | Esposizione: leva, copertura, base di Allocazione, cache per ticker (issue #402) | 1 | L | — (#400/#401/#403 già integrate) | Fable 5.1 · xhigh | da fare |
+| [PERF-00](PERF-00-esposizione-leva-copertura-cache.md) | Esposizione: leva, copertura, base di Allocazione, cache per ticker (issue #402) | 1 | L | — (#400/#401/#403 già integrate) | Fable 5.1 · xhigh | **fatta** (2026-09-28: pesatura nel browser, `instrument-profile-cache/{ticker}`, route owner-scoped; 0 chiamate a Yahoo alla seconda apertura, provato dal test della route) |
 | [PERF-01](PERF-01-benchmark-e-budget.md) | Il benchmark in repo e il budget che può solo scendere | 1 | M | 00 | Opus 5.5 · high | da fare |
 | [PERF-02](PERF-02-avvio-shell-prima-di-auth.md) | La shell prima dell'autenticazione | 2 | M | 01 | Fable 5.1 · xhigh | da fare |
 | [PERF-03](PERF-03-ultimo-dato-noto-subito.md) | L'ultimo dato noto subito, il fresco appena arriva | 2 | M | 02, 05 | Fable 5.1 · xhigh | da fare |

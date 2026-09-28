@@ -114,6 +114,13 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   personali» in the reading, so the hero could have printed anything. Assert a figure on the hero
   (`locator('p.font-mono').first()` with `toHaveText`) and keep `toContainText` for a sentence. A spec line that holds
   a literal no-break space inside a regex defeats the Edit tool's matching: patch it with a node one-liner.
+- **A falsification of a seed-borne belt goes through the FIXTURE MODULE, never through a direct write to the
+  emulator** (2026-09-28, the Esposizione's Yahoo profiles): `e2e/global-setup.ts` re-seeds on EVERY invocation, so a
+  `PATCH` that emptied `VWCE.DE`'s profile was overwritten by `npm run e2e:seed:profiles` before the spec ran and the
+  spec stayed green — the empty profile has to come from `scripts/instrumentProfileFixtures.ts` itself (edited, run,
+  reverted). And the same session's first red was NOT the falsification: a stale `.next-e2e` answered 404 on the
+  BRAND-NEW route at its first cold hit and the tile showed its error branch (the rule above about stale routes,
+  seen on a route that did not exist when the dist dir was built).
 - **A red spec you did not touch: read the fixture in the emulator before the code** (2026-09-20). `.emulator-data`
   persists across sessions, so the base seed DRIFTS: `seed-btp` had lost its `taxRate` a week earlier and the two
   Dividendi specs proposed the 26% fallback instead of the instrument's 12,5% — it read as a regression of the

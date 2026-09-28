@@ -24,8 +24,8 @@ import {
 } from '@/lib/server/apiAuth';
 
 // Mirror of calculateAssetValue() (lib/services/assetService.ts) for ledger-based total return —
-// assetService.ts imports the client Firebase SDK and cannot be used in this Admin route (same
-// reasoning as resolveAssetValueEur in portfolioExposureService.ts). Ledger asset types
+// assetService.ts initialises the client Firebase SDK at module level, so importing it here would
+// carry `firebase/firestore` into the Lambda of this Admin route. Ledger asset types
 // (stock/etf/bond/crypto/commodity) never carry outstandingDebt, so that branch is omitted.
 function resolveLedgerAssetValueEur(asset: {
   quantity: number;

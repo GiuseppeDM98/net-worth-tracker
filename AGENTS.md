@@ -255,6 +255,14 @@ that domain's guide, never here.
   false`; client `staleTime` = server TTL minus headroom.
 - **Schema evolution without a key bump**: add the field as optional and pair it with `?force=true`. Wire "Aggiorna" to
   `refresh()`, never to bare `refetch()`, which receives the same doc.
+- **A shared per-ticker cache the client NEVER reads** (`instrument-profile-cache/{encodeURIComponent(ticker)}`,
+  2026-09-28): rules `allow read, write: if false`, Admin SDK only, the route hands the client what it needs. The
+  document holds ONLY the external source's answers, per module, each with its OWN `fetchedAt` (a user's classification
+  decides which module is asked, so a module is written alone with `mergeFields`, never `merge: true` on the document);
+  TTL per module and per outcome (30 days useful, 24 hours empty, so a «non letto» can heal); a failed refresh serves
+  the stale answer and dates it. The client key carries the SIGNATURE of what is asked («AAPL:stock|VWCE.DE:fund»), so a
+  new ticker restarts the read by itself; the weighing on user data happens in the browser, outside every cache.
+  Nothing of the user's — no name, no class — goes into a document shared by every account (doc/guide/allocazione.md).
 
 ### Server Layer and API Authorization
 - Route = auth → validate → fetch → ownership check → delegate → return; no Firestore queries or business logic in the
@@ -295,8 +303,11 @@ that domain's guide, never here.
 - **Rule of Three**: a map used in 3+ files lives in `lib/constants/<domain>.ts`. The canonical symptom of a duplicated
   `Record<Type, string>` is one copy missing its `dark:` variants — illegible in dark mode with a clean `tsc`.
 - **Declare N fixed hook instances with `enabled: false` for the inactive ones — never loop over hooks.**
-- **Yahoo module asymmetry**: ETFs use `topHoldings` → `sectorWeightings` (snake_case keys matching `SECTOR_LABELS`),
-  stocks use `assetProfile` → a title-case `sector` needing a translation map; the cache key must encode BOTH.
+- **Yahoo module asymmetry**: funds use `topHoldings` → `sectorWeightings` (snake_case keys matching `SECTOR_LABELS`),
+  stocks use `assetProfile` → a title-case `sector` needing `YAHOO_ASSET_PROFILE_SECTOR_TO_KEY` (both maps in
+  `lib/constants/exposureSectors.ts`, dependency-free: the server maps, the browser labels). Since 2026-09-28 the two
+  are two MODULES of one per-ticker document (`fund` / `stock`), each with its own `fetchedAt`, and the client key is the
+  signature of ticker+module pairs — never one key that encodes both.
 
 ---
 
@@ -417,6 +428,7 @@ file used to carry.
 - «Prelevare 1000 €» means 1000 € IN HAND: the withdrawal sells the GROSS that leaves the request after the withholding (`solveWithdrawalGross`), a FIXED POINT and never a division by (1 − rate) — the tax follows which instruments the plan drains, and those follow the amount. The leverage engine too: its orders become the same class → instrument tree (a composite split by composition, a same-class swap as two moves).
 - A DORMANT class (`isDormantClass`: neither value nor target) keeps its row, loses its verdict and leaves every count — the page reads `activeClassGaps`, never the raw `summarizeClassGaps`.
 - A level that repeats the one above it is dropped (`collapseRepeatedLevels`), and which row is an INSTRUMENT is the node's own `isInstrument`, never its depth — a lifted ETF at depth 1 read «→ 100,0%» otherwise.
+- Esposizione (2026-09-28): Titoli and Settori weigh the NOTIONAL of the equity sleeves of the QUOTED instruments (`hasMarketPrice` + a ticker), Emittenti the market value of each one once; every euro of the Allocazione base has ONE of four destinies (read · unread with the name · not applicable · out of this view) and the list adds up to 100 on screen. The engine runs in the BROWSER on the page's assets; the route answers only Yahoo's profiles from ONE cache per ticker, owner-scoped (`assertCanAccessAccount`). Nothing of the user's in a profile.
 - Il resto — the Bull's formula, the leverage engine, the five label maps, the action colours' measured lightness band and the `lab()` trap that made the old clamp dead code, the verdict-over-tiles rules — in `doc/guide/allocazione.md`.
 
 ### Previdenza · Fondo Pensione → `doc/guide/previdenza.md`
@@ -766,14 +778,19 @@ file used to carry.
   had 17 reds before anyone noticed. A falsification is undone with the same tool that made it (the one line back),
   and `tsc` runs again before the next suite.
 - **`npm run lint` is at zero since 2026-09-06 and stays there**: a new `any` gets its real type, a new `eslint-disable`
-  is not written. The config ignores `.agents/**` (the plugin's vendored scripts) and the `.next-*/**` dist dirs — a
+  is not written. A local named `module` is refused by `@next/next/no-assign-module-variable` (2026-09-28: four in one
+  session) — name it after what it holds (`profileModule`). The config ignores `.agents/**` (the plugin's vendored scripts) and the `.next-*/**` dist dirs — a
   Playwright run used to leave ~170 generated-file findings behind.
 - **A heavy module graph is a FIXTURE**: hoist a slow `await import()` into `beforeAll` with an explicit timeout (after
   checking nothing is read at module scope, or per-test `vi.resetModules()` was load-bearing). Inside a test body its
   one-time cost lands on whichever case runs first, so the failure moves with the run order and reads as flakiness.
 - **A `tsc` that fails only inside `.next/dev/types/validator.ts` (TS1109 "Expression expected") is a half-written
   generated file** left by a dev server killed mid-write: delete that one file, never the whole `.next` of a server
-  someone else may be running. The Playwright server leaves the same in `.next-e2e/dev/types/` (2026-09-20:
+  someone else may be running. **A TS2307 «Cannot find module '…/app/api/<route>/route.js'» in the `validator.ts` of
+  EVERY `.next-*` dist** (2026-09-28) is the same file citing a route the session deleted: delete those files, a dev
+  server regenerates them. And on Windows, **Git Bash rewrites a command argument that starts with `//` into `/`**
+  (MSYS path conversion; a marker string handed to a node script arrived one slash short): prefix the command with
+  `MSYS_NO_PATHCONV=1`. The Playwright server leaves the same in `.next-e2e/dev/types/` (2026-09-20:
   `routes.d.ts` TS1434, then `validator.ts` missing `./routes.js` once it is gone) — there the `types` directory goes
   whole: it is generated, and that server is the suite's alone.
 - **A surface with no DOM is verified by RENDERING it** — `tsc` and Vitest see neither a dropped glyph nor an off-token
@@ -820,7 +837,7 @@ file used to carry.
 | Cashflow › Dividendi | `dividendAnalytics`, `dividendiNarrative` (+ `patrimonioNarrative` for the articles) |
 | Analisi | `analisiSummary`, `analisiNarrative` (+ `cashflowNarrative` for the shared readings, `patrimonioNarrative` for the articles), `expenseGrouping`, `cashflowSankey`, `cashflowComposition`, `comparisonDeltas`, `expenseEntityStats`, `entitySearch` |
 | Transfers / cash | `cashBalanceReconciliation`, `updateCashAssetBalancesAtomic`, `transferFeature`, `cashSettlement`, `serverCashSettlement` · **Commissione** `transferFee` (+ `settingsRoundTrip`) · **Mutuo** `mortgageRepayment`, `mortgageSummary`, `updateAssetDebtFields` (+ `patrimonioNarrative` for the tile's words) · **Ricorrenze** `recurrenceDates` · **Browser** `e2e/cashflow.{accounts,transfer-fee,mortgage}.spec.ts` |
-| Allocazione | `allocationUtils`, `allocazioneSummary`, `allocazioneNarrative` · **Tinte d'azione** `actionColorContrast` (dodici blocchi tema) · **Browser** `e2e/allocation.spec.ts` · **Ledger** `assetTransactionUtils`, `assetTransactionsRoutes`, `assetTransactionWriteTx`, `saleTax`, `cents`, `periodSales` · **Browser** `e2e/assets.sale-tax.spec.ts` |
+| Allocazione | `allocationUtils`, `allocazioneSummary`, `allocazioneNarrative` · **Esposizione** `exposureEngine`, `exposureRequests`, `exposureYahooSource`, `instrumentProfileService`, `instrumentProfilesRoute` (+ `assetExposure`) · **Tinte d'azione** `actionColorContrast` (dodici blocchi tema) · **Browser** `e2e/allocation{,.mobile}.spec.ts` · **Ledger** `assetTransactionUtils`, `assetTransactionsRoutes`, `assetTransactionWriteTx`, `saleTax`, `cents`, `periodSales` · **Browser** `e2e/assets.sale-tax.spec.ts` |
 | Fondo pensione | `pensionDeduction`, `pensionContributions`, `pensionReturn`, `pensionContributionService`, `performanceBase`, `pensionFire`, `pensionUnlock`, `pensionFamilyMembers` + the transfer trio · **Verdetto e letture** `pensionSummary`, `pensionNarrative` |
 
 Touching `types/assets.ts`'s `AssetType` also means `assetDialogHelpers` + `allocationUtils` + the three ledger suites;

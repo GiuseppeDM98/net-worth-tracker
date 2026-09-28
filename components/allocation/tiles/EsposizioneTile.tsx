@@ -1,53 +1,58 @@
 'use client';
 
 /**
- * ESPOSIZIONE — «a cosa sono esposto davvero, attraverso gli ETF?»: the six heaviest holdings,
- * sectors or issuers of the look-through as ranked rows closed by the residual of the portfolio,
- * one view at a time (the toggle as the aside), and — when a row is opened — the instruments that
- * carry that exposure, as a flat block under the list.
+ * ESPOSIZIONE — «a cosa sono esposto davvero?»: the six heaviest holdings, sectors or issuers of
+ * the look-through as ranked rows, one view at a time (the toggle as the aside), closed by
+ * «Resto letto» and «Non letto» so the list adds up to 100, under a coverage line that says
+ * where EVERY euro of the view's base went — read, unread with the instrument's name, not
+ * applicable by nature, out of this view (the bond sleeves). When a row is opened, the
+ * instruments that carry that exposure show as a flat block under the list.
  *
- * This is the one tile of the page that owns its data. Every other tile reads the assets the page
- * already holds; the look-through comes from `/api/portfolio/exposure` (Yahoo Finance behind a
- * 24h server cache), so it is fetched here, on mount — the old collapsible waited for a click,
- * but a tile is always visible and its reading line needs the payload to say anything at all.
- * The figures come from `summarizeExposure` / `summarizeExposureHighlights`
- * (`allocazioneSummary.ts`), the words from `describeExposure` and its aside/footer siblings
- * (`allocazioneNarrative.ts`): this file only renders.
+ * The tile receives the assets from the page like every other tile and owns only the Yahoo
+ * profiles of the tickers in view (`usePortfolioExposure`: the route answers profiles from one
+ * cache per ticker, the weighing runs here in the browser — doc/perf/PERF-00). The figures come
+ * from `summarizeExposure` / `summarizeExposureHighlights` (`allocazioneSummary.ts`), the words
+ * from `describeExposure` and its siblings (`allocazioneNarrative.ts`): this file only renders.
  *
- * Three tabs became one list with a view switch because the question is one — what am I really
- * exposed to — and the three cuts are three answers to it, not three tiles (the
- * One-Tile-One-Question Rule). The drill-down is a single block under the list rather than a
- * panel inside each row: one row was ever open at a time in the old card too, and keeping the
- * sources out of the rows leaves the ranked columns aligned. No sign colour anywhere: an
- * exposure is a share of the portfolio, neither a gain nor a loss.
+ * Titoli and Settori weigh the NOTIONAL of the equity sleeves (a 2× fund moves twice), Emittenti
+ * the market value of every quoted instrument once; the aside names the base of the percentage
+ * column. An unread slice is not a failed read: `isError` and the red notice are the query's
+ * alone. No sign colour anywhere: an exposure is a share, neither a gain nor a loss.
  */
 
 import { useMemo, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { usePortfolioExposure } from '@/lib/hooks/usePortfolioExposure';
 import { Skeleton } from '@/components/ui/skeleton';
+import { summarizeExposure, summarizeExposureHighlights, type ExposureRow, type ExposureRowSource, type ExposureViewKey } from '@/lib/utils/allocazioneSummary';
 import {
-  summarizeExposure,
-  summarizeExposureHighlights,
-  type ExposureRow,
-  type ExposureRowSource,
-  type ExposureViewKey,
-} from '@/lib/utils/allocazioneSummary';
-import { describeExposure, describeExposureAside, describeExposureEmpty, describeExposureFooter } from '@/lib/utils/allocazioneNarrative';
+  describeExposure,
+  describeExposureBase,
+  describeExposureCoverage,
+  describeExposureEmpty,
+  describeExposureFooter,
+  describeExposureMethod,
+} from '@/lib/utils/allocazioneNarrative';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { formatPercentage } from '@/lib/services/chartService';
 import { cn } from '@/lib/utils';
+import type { Asset } from '@/types/assets';
 import { Button } from '@/components/ui/button';
 import { Tile, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
+import { TileMethodNote } from '@/components/ui/tile-method-note';
+import { NarrativeText } from '@/components/ui/narrative-text';
 import { AsideToggle } from '@/components/ui/aside-toggle';
 import { RankedRows, type RankedRow } from '@/components/ui/ranked-rows';
 
 interface EsposizioneTileProps {
-  userId: string;
+  /** Whose portfolio: the route reads the OWNER's instruments, a delegate included. */
+  ownerId: string;
+  /** The page's whole asset list; the role and the base are the engine's business. */
+  assets: Asset[];
   className?: string;
 }
 
-/** Rows the tile ranks; the rest folds into the residual so the shares still add up. */
+/** Rows the tile ranks; the rest folds into «Resto letto» so the shares still add up. */
 const VISIBLE_ROWS = 6;
 
 const VIEW_OPTIONS: ReadonlyArray<{ value: ExposureViewKey; label: string }> = [
@@ -60,22 +65,15 @@ const VIEW_OPTIONS: ReadonlyArray<{ value: ExposureViewKey; label: string }> = [
 const LIST_LABELS: Record<ExposureViewKey, string> = {
   holdings: 'Titoli più pesanti',
   sectors: 'Settori',
-  issuers: 'Emittenti degli ETF',
+  issuers: 'Emittenti degli strumenti quotati',
 };
 
 /**
  * The formula line is worth printing only when it says more than the amount: a weight of 1 is a
- * direct stock («100% di 6000 € = 6000 €» repeats the figure) and a missing base value is a v1
- * cached document that never stored it.
+ * direct stock («100% di 6000 € = 6000 €» repeats the figure) and the engine leaves it out.
  */
 function canRenderFormula(source: ExposureRowSource): source is ExposureRowSource & { weight: number; baseValue: number } {
-  return (
-    typeof source.weight === 'number' &&
-    source.weight > 0 &&
-    source.weight < 1 &&
-    typeof source.baseValue === 'number' &&
-    source.baseValue > 0
-  );
+  return typeof source.weight === 'number' && source.weight > 0 && source.weight < 1 && typeof source.baseValue === 'number' && source.baseValue > 0;
 }
 
 /** Mirrors the geometry of a `RankedRows` row, so nothing shifts when the data lands. */
@@ -131,35 +129,32 @@ function SourcesBlock({ row }: { row: ExposureRow }) {
   );
 }
 
-export function EsposizioneTile({ userId, className }: EsposizioneTileProps) {
+export function EsposizioneTile({ ownerId, assets, className }: EsposizioneTileProps) {
   const [view, setView] = useState<ExposureViewKey>('holdings');
   const [activeKey, setActiveKey] = useState<string | null>(null);
 
-  // Fetched on mount: the server answers from its 24h cache unless `refresh()` forces a recompute.
-  const { data, isError, isFetching, refresh, refetch } = usePortfolioExposure(userId, true);
-  const exposure = data?.exposure;
-  const cached = data?.cached ?? false;
-  // React Query keeps the last payload through a failed refresh, so "no data" and "error" are
-  // two different states: a stale list beats an empty tile.
-  const isLoading = !exposure && !isError;
-  const isEmpty = !!exposure && exposure.analyzedAssets === 0;
+  const { exposure, profiles, oldestFetchedAt, isError, isFetching, refresh, refetch } = usePortfolioExposure(ownerId, assets);
+  // React Query keeps the last profiles through a failed refresh, so "no data" and "error" are two
+  // different states: a stale list beats an empty tile.
+  const isWaiting = !exposure && !isError;
+  const isEmpty = !!exposure && exposure.quotedCount === 0;
 
+  const highlights = useMemo(() => (exposure ? summarizeExposureHighlights(exposure) : null), [exposure]);
   // The reading follows the VIEW: opening on the heaviest holding while the list ranks issuers
   // answered a question nobody asked — the only reading on the page that ignored its own state.
-  const reading = useMemo(() => (exposure ? describeExposure(summarizeExposureHighlights(exposure), view) : null), [exposure, view]);
+  const reading = useMemo(() => (highlights ? describeExposure(highlights, view) : null), [highlights, view]);
   const exposureView = useMemo(() => (exposure ? summarizeExposure(exposure, view, VISIBLE_ROWS) : null), [exposure, view]);
+  const coverage = useMemo(() => (exposureView ? describeExposureCoverage(exposureView.coverage, view) : null), [exposureView, view]);
   const rows = useMemo<RankedRow[]>(
-    () =>
-      (exposureView?.rows ?? []).map((row) => ({
-        key: row.key,
-        label: row.label,
-        caption: row.caption,
-        amount: row.amount,
-        percentage: row.percentage,
-      })),
+    () => (exposureView?.rows ?? []).map((row) => ({ key: row.key, label: row.label, caption: row.caption, amount: row.amount, percentage: row.percentage })),
     [exposureView],
   );
   const rowsByKey = useMemo(() => new Map((exposureView?.rows ?? []).map((row) => [row.key, row])), [exposureView]);
+  // The funds whose holding weights Yahoo could not bring to the sleeve: the method note says so.
+  const fundBasisTickers = useMemo(
+    () => Object.values(profiles ?? {}).filter((profile) => profile.fund?.holdingsBasis === 'fund' && profile.fund.holdings?.length).map((profile) => profile.ticker),
+    [profiles],
+  );
 
   // The open row must still be in the list AND have something to show; a key from another view
   // or a row without sources simply matches nothing.
@@ -181,16 +176,18 @@ export function EsposizioneTile({ userId, className }: EsposizioneTileProps) {
 
   const aside = (
     <div className="flex flex-wrap items-center gap-2">
-      {exposure && <span>{describeExposureAside(exposure)}</span>}
+      {!isEmpty && <span>{describeExposureBase(view)}</span>}
       {!isEmpty && <AsideToggle options={VIEW_OPTIONS} value={view} onChange={handleViewChange} ariaLabel="Vista dell'esposizione" />}
     </div>
   );
 
+  const hasList = (exposureView?.rows.length ?? 0) + (exposureView?.remainders.length ?? 0) > 0;
+
   return (
     <Tile eyebrow="Esposizione" aside={aside} reading={reading} className={className} ariaLabel="Esposizione del portafoglio">
-      {isLoading && (
+      {isWaiting && (
         <>
-          <p className="mt-2 text-[13px] leading-[1.45] text-muted-foreground">Sto leggendo la composizione degli ETF…</p>
+          <p className="mt-2 text-[13px] leading-[1.45] text-muted-foreground">Sto leggendo le composizioni degli strumenti quotati…</p>
           <div className="mt-3 flex flex-col divide-y divide-border" aria-hidden="true">
             {Array.from({ length: 5 }).map((_, index) => (
               <SkeletonRow key={index} />
@@ -201,24 +198,24 @@ export function EsposizioneTile({ userId, className }: EsposizioneTileProps) {
 
       {isError && (
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5" role="alert">
-          <p className="text-[13px] leading-[1.45] text-destructive">Errore nel caricamento dell&apos;esposizione.</p>
+          <p className="text-[13px] leading-[1.45] text-destructive">Errore nel caricamento delle composizioni.</p>
           <Button type="button" variant="outline" className="h-11 px-2.5 text-[11px] desktop:h-8" disabled={isFetching} onClick={() => refetch()}>
             Riprova
           </Button>
         </div>
       )}
 
-      {isEmpty && <p className="mt-2 text-[13px] leading-[1.45] text-muted-foreground">Nessun ETF o azione da analizzare.</p>}
+      {isEmpty && <p className="mt-2 text-[13px] leading-[1.45] text-muted-foreground">{describeExposureEmpty()}</p>}
 
-      {exposure && exposureView && !isEmpty && (
+      {exposure && exposureView && coverage && !isEmpty && (
         <div className="mt-2">
-          {rows.length === 0 ? (
-            <p className="mt-1 text-[13px] leading-[1.45] text-muted-foreground">{describeExposureEmpty(view)}</p>
-          ) : (
+          {/* The coverage line, over the list: where every euro of this view's base went. */}
+          <NarrativeText segments={coverage} className="text-[13px] leading-[1.45] text-muted-foreground" figureClassName="font-medium" />
+          {hasList && (
             <RankedRows
               rows={rows}
               color="var(--chart-1)"
-              remainder={exposureView.remainder}
+              remainders={exposureView.remainders}
               onRowClick={handleRowClick}
               activeKey={openRow?.key ?? null}
               ariaLabel={LIST_LABELS[view]}
@@ -232,11 +229,12 @@ export function EsposizioneTile({ userId, className }: EsposizioneTileProps) {
         </div>
       )}
 
-      <div className="mt-auto flex items-center justify-between gap-3 border-t border-border pt-3.5 text-[11px] leading-[1.5] text-muted-foreground">
-        <p>
-          {describeExposureFooter(exposure?.computedAt ?? null)}
-          {cached ? ' Dalla cache.' : ''}
-        </p>
+      <div className="mt-auto flex items-center justify-between gap-3 border-t border-border pt-3.5">
+        <TileMethodNote className="mt-0 min-w-0 border-t-0 pt-0" subject="Esposizione" summary={describeExposureFooter(oldestFetchedAt)}>
+          {describeExposureMethod(fundBasisTickers).map((paragraph) => (
+            <span key={paragraph}>{paragraph}</span>
+          ))}
+        </TileMethodNote>
         <Button
           type="button"
           variant="ghost"
