@@ -221,6 +221,7 @@ For contributors and AI agents, the repo keeps its guidance split by scope:
 | [`CLAUDE.md`](CLAUDE.md) | Index — what each feature is and where it lives |
 | [`AGENTS.md`](AGENTS.md) | Repo-wide conventions, data/state patterns, UI patterns, testing, workflow |
 | [`doc/guide/`](doc/guide/) | One file per domain — a page, a tab, a subsystem (`stati`, `dialog`, `temi`, `account-condiviso-demo`, `e2e-emulatori` for the Playwright and emulator harness) — the full rules and blind spots for that area |
+| [`perf/`](perf/README.md) | The speed benchmark and the per-page size budget: commands, baseline, raised ceilings |
 | [`DESIGN.md`](DESIGN.md) | The aesthetic spec (normative) |
 | [`PRODUCT.md`](PRODUCT.md) · [`SETUP.md`](SETUP.md) · [`WORKFLOW.md`](WORKFLOW.md) | Positioning · environment/emulators · session rules |
 
@@ -241,7 +242,7 @@ For contributors and AI agents, the repo keeps its guidance split by scope:
 | Forms | react-hook-form, zod | Form handling and validation |
 | Dates | date-fns, date-fns-tz | Timezone-aware date operations |
 | Scraping | cheerio | Borsa Italiana dividend and bond price data |
-| Testing | Vitest · Playwright | Unit testing (3186 tests) · browser E2E against the Firebase emulator (37 specs) |
+| Testing | Vitest · Playwright | Unit testing (4564 tests) · browser E2E against the Firebase emulator (40 specs) |
 
 ## Development
 
@@ -264,6 +265,11 @@ npm run dev:emulator   # Run the app against the local emulators
 # Browser tests (needs the emulators above running; app served on :3100, so your dev server can stay up)
 npm run test:e2e       # Playwright: desktop 1440px, mobile 390px, degraded-state scenarios
 npm run test:e2e:ui    # Same, interactive runner
+
+# Speed and size (perf/README.md): options always after `--`
+npm run perf:budget    # JS per page of a production build against perf/budget.json (after `npm run build`)
+npm run perf:build     # Production build against the emulators, then `npm run perf:serve` on :3200
+npm run perf:bench -- --runs=3  # Time to the first figure, cold and by navigation, per page
 ```
 
 See [SETUP.md → Step 6](SETUP.md) for the full local-emulator guide (prerequisites, persistence, reset)

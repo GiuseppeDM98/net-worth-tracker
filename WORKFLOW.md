@@ -134,7 +134,8 @@ npm run dev:emulator     # the app on :3000 pointed at the emulators
 ```
 
 Prerequisites (a JDK) and the full guide: SETUP.md → Step 6. Port 3100 (`npm run dev:e2e`, isolated
-`.next-e2e` build dir) is the Playwright server; keep it separate from the tour server on :3000.
+`.next-e2e` build dir) is the Playwright server; keep it separate from the tour server on :3000. Port
+3200 (`npm run perf:serve`, the `.next-perf` production build) is the speed benchmark's (`perf/README.md`).
 
 ### Obligation 5 — how to hand the owner an app already authenticated
 
@@ -163,8 +164,10 @@ The app **is** locally runnable; there is no fallback to declare.
   page needs — `npm run e2e:seed` (Previdenza), `npm run e2e:seed:analisi` (Analisi),
   `npm run e2e:seed:coast` (Coast FIRE). Give the owner the **exact URL**, e.g.
   `http://localhost:3000/dashboard/pension`, not "go to Previdenza".
-- **The routes** are `/dashboard` plus `assets · cashflow · analisi · dividends · performance ·
-  history · allocation · pension · fire-simulations · hall-of-fame · assistant · settings`.
+- **The routes** are `/dashboard` plus `assets · cashflow · analisi · performance · history ·
+  allocation · pension · fire-simulations · hall-of-fame · assistant · settings` — the list of
+  `perf/routes.json`, held equal to `lib/constants/navigation.ts` by a test. Dividendi is not a route:
+  it is `/dashboard/cashflow?tab=dividends`.
 - **The owner's REAL data, without touching production — the standard since 2026-09-07**: `npm run mirror:seed --
   <production email>` reads the production account (service account from `.env.local`, `.get()` only, refuses to run
   with `FIRESTORE_EMULATOR_HOST`) and seeds it into the emulators under `mirror@example.com` / `test1234` (uid
@@ -230,7 +233,9 @@ The app **is** locally runnable; there is no fallback to declare.
 ### Where things are recorded
 
 - **Branches**: `develop` is the integration branch, `main` the default; a session branches off
-  whatever is active (usually `develop`) and merges into it by PR.
+  whatever is active (usually `develop`) and merges into it by PR. **The `doc/perf/` and `doc/mobile/`
+  specs land on `develop`, one session at a time, and reach `main` together** (owner, 2026-09-28): no
+  PR from `develop` to `main` until every PERF and every MOB spec is done.
 - **The outcome of a verification**: `SESSION_NOTES.md` during the session (untracked — delete it
   before the commit); it is folded into `CLAUDE.md` (the "Latest" entry) and `Draft Release Temp.md`
   before the PR. **Before the closing prompt it ends with one block** (owner, 2026-09-27): *Cosa* (what
