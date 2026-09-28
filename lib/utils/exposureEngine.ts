@@ -1,7 +1,7 @@
 /**
  * exposureEngine — the ONE formula behind the Esposizione tile's three views, pure and I/O-free.
  * It runs IN THE BROWSER, in a `useMemo`, on the assets the Allocazione page already holds and on
- * the profiles the route answered (doc/perf/PERF-00 § 4.3, owner's decision 2026-09-28):
+ * the profiles the route answered (owner's decision, 2026-09-28; doc/guide/allocazione.md § Esposizione):
  *
  *   esposizione[vista][chiave] = Σ_asset Σ_gamba ( valoreGamba × profilo[vista][chiave] )
  *

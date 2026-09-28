@@ -58,7 +58,7 @@ export const queryKeys = {
 
   // Portfolio — the Esposizione's Yahoo profiles, keyed by the OWNER and by the signature of the
   // tickers in view («AAPL:stock|VWCE.DE:fund»): a new ticker is a new key, so the read restarts
-  // by itself (doc/perf/PERF-00 § 4.6). The weighing happens in the browser, outside the cache.
+  // by itself (doc/guide/allocazione.md § Esposizione). The weighing happens in the browser, outside the cache.
   portfolio: {
     instrumentProfiles: (ownerId: string, signature: string) => ['portfolio', 'instrument-profiles', ownerId, signature] as const,
   },

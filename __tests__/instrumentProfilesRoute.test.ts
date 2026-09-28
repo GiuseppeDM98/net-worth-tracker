@@ -4,7 +4,7 @@
  * Yahoo mocked at the library and the Admin SDK mocked with a store that keeps what `set` wrote,
  * `mergeFields` semantics included: the second GET is only honest if the first one's write landed.
  *
- * STEP 2 OF doc/perf/PERF-00: the first version of this file targeted TODAY's route
+ * BORN RED ON PURPOSE: the first version of this file (2026-09-28) targeted the route of that day
  * (`/api/portfolio/exposure`) and went RED on 2026-09-28 — «expected 4 to be 2»: the second GET
  * asked Yahoo again, because the route's three-segment cache key never matched the service's
  * four-segment one (PERF-10 § A). Rewritten here on the new route, where the same assertion holds.

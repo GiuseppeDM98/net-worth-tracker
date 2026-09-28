@@ -918,7 +918,11 @@ widening `AssetClass` also means `ASSET_CLASS_SEQUENCE` and everything reading i
   `splitFromSurplus` re-caps at the capacity; a plan's `Math.max(0, gainFraction)` is inert because `estimateSaleTax`
   already floors a loss; removing `itemProps` from `AsideToggle` does not add Tab stops because the explicit
   `tabIndex` beside it holds them. Naming the load-bearing line is the point: otherwise the next reader deletes it as
-  dead code and the test stays green through the regression. **And the ASSERTION can be
+  dead code and the test stays green through the regression. **And a test added beside existing ones is proven by a
+  falsification that turns ONLY it red** (2026-09-28, `__tests__/exposureEngine.test.ts`, the Esposizione's four
+  destinies against `compareAllocations`): the frozen assets dropped from the engine's base left the two existing
+  identities green — they measure the base with the same filter the engine uses — and only the new case red. If the
+  old ones go red too, the new test repeats them and pins nothing of its own. **And the ASSERTION can be
   the inert one** (2026-09-21, the monthly email's split tile): `expect(html).toContain('1400')` passes whatever the
   amount cell says, because the caption two lines below prints the same figure — the test only went red once it read
   the `<td align="right">` cells. When a falsification stays green, suspect the assertion's ANCHOR before the code.

@@ -1,5 +1,5 @@
 /**
- * Esposizione — the shapes shared by its three layers (doc/perf/PERF-00, 2026-09-28):
+ * Esposizione — the shapes shared by its three layers (2026-09-28, doc/guide/allocazione.md § Esposizione):
  *
  *  - what the browser ASKS: `ProfileRequest` (a ticker and the Yahoo module its type needs),
  *    selected by `lib/utils/exposureRequests.ts` from the assets the page already holds;

@@ -343,7 +343,7 @@ also guarantees they never point at production data.
   la serie?», a row opening its expense form, and on a phone the detail landing at the top with
   every target at 44px.
 
-Four fixture accounts, each seeded by the global setup:
+Four fixture accounts and one shared cache, each seeded by the global setup:
 
 | Script | Account | Why it is separate |
 | --- | --- | --- |
@@ -351,6 +351,7 @@ Four fixture accounts, each seeded by the global setup:
 | `npm run e2e:seed:analisi` | `test-user-analisi` | Every expense dated **January**, so year-to-date windows contain them whatever month the suite runs in and every asserted figure stays exact all year. The base seed's current-month expenses would pollute them |
 | `npm run e2e:seed:centri` | `test-user-centri` (`centri@example.com`) | The tab is opt-in: the flag on the base account would add a fifth tab to every Cashflow spec, and a linked expense is an ordinary expense (it would move Analisi's figures). «Fenicottero» (800 € in January, a 300 € instalment on December 31st, annual ceiling 1000 → the RISK) and «Ornitorinco» (27 rows a year old → dormant, and «Mostra altre» on screen; three of them one recurring series), plus six rows linked to NO center for «Collega spese…» (decoy «Casuario»: three plain ones and an instalment plan of three). The seed `set`s every row whole and removes strays, so a run that died half-way is healed by the next. A spec reaches it by FILENAME: `*centri.spec.ts` / `*centri.mobile.spec.ts` |
 | `npm run e2e:seed:hof` | `hof-user` (`hof@example.com`) | A ranking is worth a browser only with a history behind it: 47 monthly snapshots (novembre 2022 → settembre 2026) and one income + one expense row per month, a story the specs can name (best month marzo 2024 +18.400 €, income record dicembre 2025, a first year of two months). The seed writes NO `hall-of-fame` document: the desktop spec builds it through «Aggiorna i record», the real route. A spec reaches it by FILENAME: `*hof.spec.ts` / `*hof.mobile.spec.ts` |
+| `npm run e2e:seed:profiles` | the shared `instrument-profile-cache` (no account) | The Esposizione's Yahoo profiles for every quoted ticker of the base seed (`VWCE.DE` with ten holdings, `AAPL`, `FONDOPENSIONE` empty), stamped fresh on EVERY run because an empty answer lives 24 hours in the cache: Yahoo is called by the server, so `page.route` cannot keep the Allocazione specs off the network — the seed does (`scripts/instrumentProfileFixtures.ts`, shared with the Step 6 base seed) |
 
 Run either on its own if you want that data in the browser for manual inspection.
 

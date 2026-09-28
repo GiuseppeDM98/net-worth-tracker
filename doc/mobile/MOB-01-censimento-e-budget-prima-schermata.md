@@ -1,6 +1,6 @@
 # MOB-01 — Il censimento in repo e il budget della prima schermata
 
-> Stato: da fare · Priorità: 1 (le altre MOB si chiudono con i suoi numeri) · Sforzo: M · Dipende da: PERF-01 (e PERF-00: l'Esposizione misurata e `instrument-profile-cache` nel seed) · Sblocca: MOB-02..MOB-08
+> Stato: da fare · Priorità: 1 (le altre MOB si chiudono con i suoi numeri) · Sforzo: M · Dipende da: PERF-01 (PERF-00 è chiusa dal 2026-09-28: la nuova Esposizione e `instrument-profile-cache` nel seed ci sono) · Sblocca: MOB-02..MOB-08
 
 ## 1. Il problema, misurato
 
@@ -17,8 +17,8 @@ corsa sulla build, confrontata con essa.
 
 **La baseline precede i contributi del 2026-09-27.** Da #401 il Flusso di Analisi sotto i 640 px non è più un Sankey ma
 una barra e le righe: a 390 `charts` scende da 2 a 1 (il Sankey era un `svg[role="img"]`), cifre e controlli salgono, le
-schermate sono da rimisurare; a 768 e 1024 nulla cambia. Da PERF-00 cambia l'Esposizione di Allocazione (la base e la riga
-di copertura). #400 a interruttore spento e #403 non muovono righe (le quote del chip sono `sr-only`). Uno scarto su
+schermate sono da rimisurare; a 768 e 1024 nulla cambia. Dal 2026-09-28 l'Esposizione di Allocazione è cambiata (la base e la riga
+di copertura, `components/allocation/tiles/EsposizioneTile.tsx`). #400 a interruttore spento e #403 non muovono righe (le quote del chip sono `sr-only`). Uno scarto su
 Analisi a 390 o su Allocazione si attribuisce a quei contributi, non al censimento.
 
 Lo script non può diventare un budget così com'è (righe del 2026-09-26, chi implementa le riverifica):
@@ -169,9 +169,10 @@ guidato; (2) una cifra è solo «€ e %», come la baseline. Restano (3) e (4),
   `screens` o `figuresAboveFold` si guarda prima la data. **Dev contro build**: uno scarto forte dalla baseline (dev) si
   annota in SESSION_NOTES; il budget resta la prima corsa sulla build.
 - **Contratto con MOB-02**: senza l'ARIA di § 4 `firstClosedRowAbovePill` resta `null`. Rollback: tutto additivo.
-- **Yahoo nel fixture**: da PERF-00 l'Esposizione chiede i profili a `/api/portfolio/instrument-profiles`, che chiama
-  Yahoo solo a `instrument-profile-cache` vuota o scaduta, e `emulators:seed` la precompila per i ticker della fixture
-  (`VWCE.DE`, `AAPL`): il budget di Allocazione non tocca la rete. Un ticker non seminato va a Yahoo (senza rete è «non
+- **Yahoo nel fixture**: l'Esposizione chiede i profili a `/api/portfolio/instrument-profiles`, che chiama Yahoo solo a
+  `instrument-profile-cache` vuota o scaduta; `emulators:seed` la precompila per i ticker della fixture (`VWCE.DE`,
+  `AAPL`, `FONDOPENSIONE` vuoto) e il global setup di Playwright la ristampa a ogni corsa
+  (`scripts/instrumentProfileFixtures.ts`, `npm run e2e:seed:profiles`): il budget di Allocazione non tocca la rete. Un ticker non seminato va a Yahoo (senza rete è «non
   letto» e la tessera è più corta): la diagnostica registra il `source` del `Server-Timing` della route (da PERF-10), e un
   `source=yahoo` sul fixture si corregge nel seed prima di prendere il budget, non si assorbe.
 
@@ -194,7 +195,7 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
   § Browser-Driven E2E), CLAUDE.md (§ Testing, § Known Issues), doc/guide/e2e-emulatori.md
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALI mentre scrivi codice
 - Leggi doc/mobile/README.md (§ 3 è la baseline) e la spec MOB-01 per intero; doc/mobile/MOB-02 § 4.1-4.4 (il contratto
-  che il censimento riconosce); doc/perf/PERF-01-benchmark-e-budget.md § 4-5 (PERF-01 deve essere fatta, e doc/perf/PERF-00 pure: perf:build,
+  che il censimento riconosce); doc/perf/PERF-01-benchmark-e-budget.md § 4-5 (PERF-01 deve essere fatta: perf:build,
   perf:serve, porta :3200); DESIGN.md § mobile se MOB-09 l'ha già scritta
 - Crea SESSION_NOTES.md; crea il branch dalla branch attiva PRIMA di editare
 

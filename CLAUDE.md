@@ -13,35 +13,18 @@ Next.js app for Italian investors: net worth, assets, cashflow, dividends, perfo
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic.
-- `tsc` clean; **195 files / 4538 tests** green in `Europe/Rome` + **40 Playwright spec files** (146 tests, incl. 6 auth setups; last full run 2026-09-28 on the Windows laptop — the outcome in the Latest entry below; the known intermittent is `modal.origin`, doc/guide/e2e-emulatori.md). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, which structurally hides timezone bugs.
-- Latest (2026-09-28): **PERF-00 implemented — the Esposizione with the leverage as notional, a coverage line with
-  four destinies, the Allocazione portfolio as the base, ONE cache per ticker with only Yahoo's answers, the weighing in
-  the browser, and the route owner-scoped** (issue #402 by Ciocc128, accepted with changes; the fork was read as a
-  reference, not ported). Titoli and Settori weigh the NOTIONAL of the equity sleeves of the quoted instruments
-  (`hasMarketPrice` + a ticker), Emittenti the market value of each one once; every euro of the base is read · unread
-  (with the instrument's name) · not applicable by nature · out of this view, an identity the engine keeps
-  (`lib/utils/exposureEngine.ts`, pure, run in a `useMemo` on the page's assets); the list closes on «Resto letto» and
-  «Non letto» and adds up to 100 on screen; the aside and the reading name the base of each view. The route
-  `GET /api/portfolio/instrument-profiles?userId=<ownerId>` answers only `{ profiles, oldestFetchedAt }` from
-  `instrument-profile-cache/{ticker}` (Admin only, rules deny the client; per-module `fetchedAt`, `mergeFields`; TTL 30
-  days useful / 24 hours empty; «Aggiorna» = `force=true`); `assertCanAccessAccount` replaces `decodedToken.uid`, so a
-  delegate sees the OWNER's exposure (seen in the browser). Retired: `/api/portfolio/exposure`,
-  `lib/server/portfolioExposureService.ts`, the `exposure-cache` rule (the orphan documents stay, owner's call).
-  `RankedRows` takes `remainders`. The owner's five § 4.9 decisions are in doc/guide/allocazione.md § Esposizione.
-  **Verified**: the route test seen RED on the old route (the second GET asked Yahoo again: «expected 4 to be 2»),
-  eleven falsifications seen red (engine ×4, Yahoo normalisation, per-module `fetchedAt`, the delegate, the drift, a
-  clause at zero, the E2E belt with an empty `VWCE.DE` profile — the last one also caught a wrong regex in the spec:
-  «l'11%» has no space after the apostrophe); `tsc`, lint 0, Vitest **195 / 4538** in both timezones; `curl` 200 own ·
-  403 stranger · 400 · 401 · 404 on the retired route; the delegate in a real browser; Playwright **145 of 146** (the
-  red the known `modal.origin`, green alone right after); Playwright evidence on the mirror at 1440 and 390 (three
-  views, every list at 100, `main` without overflow, the second opening from the cache) before the owner's
-  five-point tour. The tour's first look rewrote the coverage line into TWO sentences («In questa vista: …» /
-  «Fuori da questa vista: …», the not-applicable euros by CLASS, the names only on «non letto»): four figures in a
-  row read as «almost nothing has holdings» when the largest was outside the base — now a Vitest block and the two
-  E2E specs. The E2E belt: `scripts/instrumentProfileFixtures.ts`
-  seeds a FRESH profile for every quoted ticker of the base fixture and the global setup re-stamps them every run
-  (Yahoo is called by the server, out of `page.route`'s reach). The two dossiers this work sits between are
-  `doc/perf/README.md` (PERF-00 done, PERF-01 next) and `doc/mobile/README.md` (implemented AFTER the PERF ones).
+- `tsc` clean; **195 files / 4540 tests** green in `Europe/Rome` + **40 Playwright spec files** (146 tests, incl. 6 auth setups; last full run 2026-09-28 on the Windows laptop — the outcome in the Latest entry below; the known intermittent is `modal.origin`, doc/guide/e2e-emulatori.md). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, which structurally hides timezone bugs.
+- Latest (2026-09-28, second session): **`doc/perf/PERF-00` retired** — the code read against the spec: 14 divergences
+  (9 where the code was right and the lesson already sat in doc/guide/allocazione.md § Esposizione, or now sits in a
+  comment at its line: the tile's wait is the engine's silence, not `isLoading`; the service serves a stale answer
+  useful or empty; 4 gaps closed here: a Vitest case holding the Esposizione's four destinies to `compareAllocations`'
+  `notionalValue`/`marketValue` on the same list — seen red with the frozen assets dropped from the engine's base while
+  the older identities stayed green — two § 7 falsifications seen red on the service (a foreign field in the cached
+  module, the empty-ticker guard), SETUP.md Step 7's row for `npm run e2e:seed:profiles`, the guide's false «no
+  Playwright spec» line; 1 decision moved home: the non-objectives, in the guide's blind spots). Every pointer to the
+  spec in code, tests, e2e, rules, scripts and the sister specs now names the guide or the file; doc/perf/README.md § 6
+  keeps the row as text. **Verified**: `tsc`, lint 0, Vitest **195 / 4540** in `Europe/Rome`; no app code changed
+  beyond comments, so no Playwright run.
 
 ## Architecture Snapshot
 - App Router; protected pages under `app/dashboard/*`.
@@ -83,8 +66,8 @@ One line per area: the question it answers, then where it is described. *What th
 - **Phantom `tsc` errors** clustered in `e2e/` and `lib/utils/expenseImport.ts` after a branch switch: run `npm install` first (AGENTS → *Commands*).
 - **Dev/test without production data**: Firebase Emulator Suite (`npm run emulators` + `emulators:seed` + `dev:emulator`), requires a JDK. SETUP.md → Step 6. **The owner's real data for a tour**: `npm run mirror:seed -- <email>` (production read-only → emulators as `mirror@example.com`, nothing on disk) and `npm run mirror:remove` at the end — the account is the standard, the data is re-read every time (WORKFLOW.md § 3).
 - **Performance**: baseline (cold/warm per page, bundle per route), method and the specs in `doc/perf/README.md` —
-  PERF-00 (the new Esposizione, issue #402) first, then the fourteen; the benchmark lands in repo with PERF-01
-  (`npm run perf:bench` / `perf:budget`).
+  fourteen specs, PERF-01 first (PERF-00, the new Esposizione of issue #402, landed with #407 and its spec was retired on
+  2026-09-28); the benchmark lands in repo with PERF-01 (`npm run perf:bench` / `perf:budget`).
 - **Mobile composition**: the small-screen census (19 surfaces × 390/768/1024), the chosen direction, the nine specs and
   the owner's decisions in `doc/mobile/README.md`; the census script in `doc/mobile/reference/` (MOB-01 ports it to
   `npm run mobile:census` / `mobile:budget`). Implemented after `doc/perf/`.

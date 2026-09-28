@@ -12,7 +12,7 @@ ritorno, per lettura, per stadio sequenziale.
 
 Le route che una PAGINA chiama al mount (audit 2026-09-26): `/api/dashboard/overview` (1 lettura fresca, 3–6 stadi in
 ricalcolo), `/api/performance/yoc` e `current-yield` × 5 periodi (ognuna D+A+S: 10 chiamate), `/api/benchmarks/returns` × 6 e
-`fx-rates` (una lettura di cache l'una), `/api/portfolio/exposure` (da PERF-00 `/api/portfolio/instrument-profiles`, che a regime legge solo la cache per ticker), `/api/dividends/stats` (7 await in serie),
+`fx-rates` (una lettura di cache l'una), `/api/portfolio/instrument-profiles` (a regime legge solo la cache per ticker), `/api/dividends/stats` (7 await in serie),
 `/api/ai/assistant/*` (4). Le chiamate di Rendimenti partono in PARALLELO (le 7 degli hook e le 10 dei rendimenti in due
 `Promise.all`), quindi il costo è di ~2 ondate di ~100 ms di latenza + le letture di ognuna, non 17 viaggi in serie; ma
 ogni lettura Admin dentro ognuna è transatlantica, e la route più lenta dell'ondata detta il tempo. Il browser del

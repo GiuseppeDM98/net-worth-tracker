@@ -6,7 +6,9 @@
  *
  * Seen RED on 2026-09-28: re-stamping every used module's `fetchedAt` at resolution time (a
  * document-level date) — «the first module's fetchedAt is NOT refreshed by the second request»
- * went red.
+ * went red. Seen RED again on 2026-09-28 (the spec's retirement): a `name` field added to the
+ * module the service writes («holds only Yahoo's fields» received `+ "name"`), and the empty-ticker
+ * guard removed («drops an empty ticker» hit the store's throwing `read`).
  */
 import { describe, expect, it, vi } from 'vitest';
 import type { InstrumentFundProfile, InstrumentProfile, InstrumentStockProfile, ProfileModule, ProfileRequest } from '@/types/exposure';

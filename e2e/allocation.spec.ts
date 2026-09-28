@@ -160,7 +160,7 @@ test('il Ribilancia nomina gli strumenti, e le gambe tornano a sommare la mossa 
 });
 
 /**
- * Esposizione (doc/perf/PERF-00, 2026-09-28). I profili di Yahoo vengono dal seed
+ * Esposizione (2026-09-28; le regole in doc/guide/allocazione.md § Esposizione). I profili di Yahoo vengono dal seed
  * (`scripts/instrumentProfileFixtures.ts`): VWCE.DE con dieci titoli e undici settori, AAPL con
  * settore e nome, FONDOPENSIONE vuoto — quindi la route non ha nulla da chiedere a Yahoo e il
  * fixture ha, per costruzione, una riga «Non letto» (il fondo pensione tracciato come ETF).

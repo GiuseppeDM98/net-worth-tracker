@@ -1,6 +1,6 @@
 # PERF-01 — Il benchmark in repo e il budget che può solo scendere
 
-> Stato: da fare · Priorità: 1 (va PRIMA di ogni altra spec PERF, dopo la sola PERF-00) · Sforzo: M · Dipende da: PERF-00 (la baseline la contiene) · Sblocca: 02, 04, 05, 07, 12 — e tutte le altre, che si dichiarano chiuse con i suoi numeri
+> Stato: da fare · Priorità: 1 (va PRIMA di ogni altra spec PERF, dopo la sola PERF-00, chiusa il 2026-09-28) · Sforzo: M · Dipende da: PERF-00 (la baseline la contiene) · Sblocca: 02, 04, 05, 07, 12 — e tutte le altre, che si dichiarano chiuse con i suoi numeri
 
 ## 1. Il problema, misurato
 
@@ -39,7 +39,7 @@ FIRE 743 · Hall of Fame 534 · Impostazioni 610 · Assistente 657 · login 415.
 
 **Questa baseline è di `develop` PRIMA dei contributi del 2026-09-27**: il Flusso per ruolo 50/30/20 e il Flusso sul
 telefono (#400, #401), il chip di classe composito di Strumenti (#403) e, subito dopo, la nuova Esposizione
-(`doc/perf/PERF-00`). Entrano tutti prima di questa spec (proprietario, 2026-09-27; `doc/perf/README.md` § 5):
+(PR #407: `lib/utils/exposureEngine.ts`, `app/api/portfolio/instrument-profiles/route.ts`). Sono entrati tutti prima di questa spec (proprietario, 2026-09-27; `doc/perf/README.md` § 5):
 `perf/budget.json` si scrive dalla build che li contiene, non da questa tabella, e le righe Analisi, Cashflow,
 Impostazioni, Patrimonio e Allocazione qui sopra restano come storia. Allocazione, in particolare, non chiama più
 Yahoo a regime (solo per un ticker mai visto o scaduto, § 4): i 590 ms erano la cache che non andava mai a segno.
@@ -87,7 +87,7 @@ su disco e gira in due secondi.
 - Contabilità di rete per navigazione (`page.on('response')` + `request.sizes()`), classificata: `firestore` (host :8080 o
   `firestore`), `auth`, `api` (`/api/*` con durata e, da PERF-07, il header `Server-Timing`), `js`, `css`, `font`, `external`
   (yahoo, borsaitaliana, frankfurter dal BROWSER). Yahoo è chiamato dal server, quindi il benchmark lo vede solo come
-  tempo della route `api`: da PERF-00 la route dei profili (`/api/portfolio/instrument-profiles`) lo chiama solo per un
+  tempo della route `api`: la route dei profili (`/api/portfolio/instrument-profiles`, `lib/server/exposure/instrumentProfileService.ts`) lo chiama solo per un
   ticker assente o scaduto in `instrument-profile-cache` (o con «Aggiorna», `force=true`), e `emulators:seed` precompila i ticker della fixture. Per Allocazione il benchmark
   stampa la run 1 accanto alla mediana: una run 1 molto più lenta delle altre è un ticker non seminato (il mirror ne ha
   di suoi), non una regressione.
@@ -124,7 +124,7 @@ Il benchmark misura il viaggio che conta per il proprietario: «apro Cashflow, q
   importa `.ts`. La funzione pura sta in `lib/utils/perfBudget.ts` per il test e lo SCRIPT è `scripts/perfBudget.mts` lanciato
   con `tsx`, come i seed — così importa l'alias e la funzione).
 - `perf/budget.json`, `perf/routes.json` — nuovi, tracciati. `perf/README.md` — come si lancia, cosa significa ogni colonna,
-  la baseline misurata in questa sessione sulla build che contiene #400/#401/#403 e PERF-00 (quella del 2026-09-26 resta in
+  la baseline misurata in questa sessione sulla build che contiene #400/#401/#403 e la nuova Esposizione (#407; quella del 2026-09-26 resta in
   `doc/perf/README.md` come storia) e il registro dei tetti alzati (§ 9).
 - `lib/utils/perfBudget.ts` — la funzione pura. `__tests__/perfBudget.test.ts`, `__tests__/perfRoutes.test.ts`.
 - `package.json` — script `perf:build` (`cross-env NEXT_DIST_DIR=.next-perf NEXT_PUBLIC_USE_FIREBASE_EMULATOR=true … next build`),
@@ -205,8 +205,8 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
 - Leggi AGENTS.md (pattern, convenzioni, gotcha), CLAUDE.md (stato corrente, known issues)
 - Leggi doc/guide/e2e-emulatori.md (gli emulatori, i trap di Playwright) e SETUP.md § «npm run start refuses to serve the build»
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice
-- Leggi doc/perf/README.md e poi la spec PERF-01 per intero, § 4-7 e § 9 in particolare; PERF-00 (la nuova
-  Esposizione) deve essere chiusa, perché la baseline la contiene: se è aperta, fermati e dimmelo
+- Leggi doc/perf/README.md e poi la spec PERF-01 per intero, § 4-7 e § 9 in particolare; la nuova
+  Esposizione (PR #407, 2026-09-28) è già in develop e la baseline la contiene
 - Crea SESSION_NOTES.md per tracciare il lavoro; crea il branch dalla branch attiva PRIMA di editare
 
 Regole: nessun commit senza il mio OK; un branch e un commit per sessione; rispondi in italiano.

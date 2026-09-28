@@ -2,7 +2,7 @@
  * instrumentProfileService — the profiles of the tickers in view, through ONE cache shared by
  * every account: `instrument-profile-cache/{encodeURIComponent(ticker)}`, read and written only
  * by the Admin SDK (`firestore.rules` denies the client). A ticker new to the app costs ONE Yahoo
- * call, for every user (doc/perf/PERF-00 § 4.6).
+ * call, for every user (doc/guide/allocazione.md § Esposizione).
  *
  * The document holds only Yahoo's answers, per module — `fund` and `stock`, each with its own
  * `fetchedAt` — and never anything of a user's. A request that needs a module the document lacks
@@ -12,9 +12,10 @@
  * therefore never take another user's holdings away.
  *
  * TTL per module: 30 days for a useful answer, 24 hours for an empty one (a «non letto» must be
- * able to heal). Yahoo failing with a stale useful answer in cache: the stale one is served, and
- * its `fetchedAt` says how old it is. `force` asks Yahoo whatever the age, and keeps the last
- * good answer if Yahoo fails.
+ * able to heal). Yahoo failing with a stale answer in cache — useful or empty — the stale one is
+ * served, and its `fetchedAt` says how old it is (an old empty answer still dates the footer, and
+ * reads «non letto» exactly as no answer would). `force` asks Yahoo whatever the age, and keeps
+ * the last cached answer if Yahoo fails.
  */
 import { adminDb } from '@/lib/firebase/admin';
 import { removeUndefinedDeep } from '@/lib/utils/firestoreData';

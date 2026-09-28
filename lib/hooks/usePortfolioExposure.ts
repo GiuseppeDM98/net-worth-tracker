@@ -25,7 +25,7 @@ const NO_PROFILES: Record<string, InstrumentProfile> = {};
  * The Esposizione of the OWNER's Allocazione portfolio: the route answers only the Yahoo profiles
  * of the tickers in view (`/api/portfolio/instrument-profiles`, one shared cache per ticker), and
  * the weighing runs here, in the browser, on the assets the page already holds
- * (`computeExposure`, doc/perf/PERF-00 § 4.3) — so the euros are Per classe's by construction and
+ * (`computeExposure`) — so the euros are Per classe's by construction and
  * an edited asset recomputes the tile without a third invalidation.
  *
  * The query key carries the SIGNATURE of the tickers in view («AAPL:stock|VWCE.DE:fund»): a new
@@ -34,7 +34,11 @@ const NO_PROFILES: Record<string, InstrumentProfile> = {};
  * crypto reads «non letto» with the names rather than a spinner. `staleTime` is an hour: the
  * server's TTL is 30 days per module, and `refresh()` («Aggiorna») passes `force=true` to it.
  *
- * `isLoading`, not `isPending`: on a disabled query the latter never lifts (AGENTS.md § React Query).
+ * The tile waits on the ENGINE's silence, not on a query flag: it shows its skeleton while
+ * `exposure` is null and nothing failed, because with an empty signature the query is disabled —
+ * never `isLoading` — and the engine has already answered. `isLoading` (never `isPending`, which
+ * stays true forever on a disabled query, AGENTS.md § React Query) is still returned for a caller
+ * with a request in flight; the tile does not read it.
  */
 export function usePortfolioExposure(ownerId: string | undefined, assets: Asset[]) {
   const signature = useMemo(() => profileRequestsSignature(selectProfileRequests(assets)), [assets]);

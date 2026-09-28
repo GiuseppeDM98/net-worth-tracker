@@ -20,7 +20,7 @@ Censimento 2026-09-26, 390×844 (altezze in px; righe di codice da riverificare)
   `contents desktop:flex` (`:461`). Il verdetto è UNA frase di clausole unite da «; »
   (`lib/utils/allocazioneNarrative.ts:211-212`); il punteggio è titolo (`:198`) e anello (`BilanciamentoTile.tsx:129`);
   l'aside di Previdenza è un importo (`allocazioneNarrative.ts:697-702`). Esposizione riceve gli asset dalla pagina e
-  possiede solo i profili (`usePortfolioExposure(ownerId, assets)`, `EsposizioneTile.tsx`; PERF-00, chiusa il
+  possiede solo i profili (`usePortfolioExposure(ownerId, assets)`, `EsposizioneTile.tsx`, dal
   2026-09-28: i profili da `/api/portfolio/instrument-profiles`, la pesatura nel browser, la riga di copertura sopra
   l'elenco), con il suo `role="alert"` per il solo `isError` della query; le righe si rileggono al momento.
 - **Previdenza** (`components/pension/PensionOverview.tsx:263-330`): versamenti non letti = quattro `ErrorNotice`. Il
@@ -39,7 +39,7 @@ Censimento 2026-09-26, 390×844 (altezze in px; righe di codice da riverificare)
   `figuresOutsideVerdict` e `firstClosedRowAbovePill` registrati: con LA tessera oltre ~420 px la prima riga chiusa sta
   sotto la pill (§ 4.6, 5).
 - Playwright: DOM in ordine desktop, pannelli chiusi vuoti, memoria per pagina e per tab, eyebrow rosso, zero richieste
-  `/api/portfolio/instrument-profiles` (la route di PERF-00) a Esposizione chiusa; a 1440 le pagine di oggi salvo § 4.6, 2.
+  `/api/portfolio/instrument-profiles` (la route dei profili) a Esposizione chiusa; a 1440 le pagine di oggi salvo § 4.6, 2.
 
 ## 3. Non-obiettivi
 
@@ -77,7 +77,7 @@ Censimento 2026-09-26, 390×844 (altezze in px; righe di codice da riverificare)
 - **Righe**: `alloc-piano` («Ribilancia, Versa o Preleva»), `alloc-per-classe` («corrente, target e gap»),
   `alloc-esposizione` («titoli, settori, emittenti»), `alloc-previdenza` («il fondo nel mix», non l'importo). Importo e
   modalità del Piano sono stato della pagina.
-- **Esposizione**: la pagina osserva la stessa chiave dell'hook di PERF-00 —
+- **Esposizione**: la pagina osserva la stessa chiave dell'hook `usePortfolioExposure` —
   `queryKeys.portfolio.instrumentProfiles(ownerId, profileRequestsSignature(selectProfileRequests(assets)))`, la firma
   «AAPL:stock|VWCE.DE:fund» di `lib/utils/exposureRequests.ts` — con `enabled` = `!compact ||
   !!collapse('alloc-esposizione')?.mounted` (oggi l'hook è `enabled` a firma non vuota; a firma vuota il motore gira
@@ -129,7 +129,7 @@ Censimento 2026-09-26, 390×844 (altezze in px; righe di codice da riverificare)
 PERF-04 fa pigra la tab intera (What If, Coast, Monte Carlo, Obiettivi; PERF-04 § 4, C), non i grafici dentro: Prima e
 dopo è nel chunk della tab (`WhatIfAnalysisTab.tsx:89`), si monta all'apertura senza scaricare nulla; lo skeleton di
 MOB-02 § 4.8 vale per un grafico pigro da sé. PERF-05: `failed` = gli `isError` degli hook (Previdenza li ha già,
-`PensionOverview.tsx:117-130`); le righe citate si spostano. PERF-00 (e PERF-10 per il `Server-Timing`): l'Esposizione
+`PensionOverview.tsx:117-130`); le righe citate si spostano. L'Esposizione (dal 2026-09-28; PERF-10 per il `Server-Timing`)
 parte all'apertura e da calda non chiama Yahoo. PERF-03:
 `freshness` fuori da «Il perché». PERF-12/14: nessun `layout`. PERF-13: § 3.
 
@@ -175,7 +175,7 @@ cinque tab. 4. Playwright, tsc, lint, Vitest. 5. `mobile:census`/`mobile:budget`
   FIRE: `lead` chiude con «.», vincolo nel `rest` (falsificare lasciando «, e da allora»). `fireNarrative.test.ts`:
   `describeFireLockScope` non nullo ⇔ frase del vincolo (tre tab su `lock`, What If su `isBridge`); didascalia con
   tasse e pensioni (falsificare togliendo `captionHonestClauses`).
-- **`e2e/allocation.mobile.spec.ts`** (esiste da PERF-00 con la riga di copertura a 390: si ESTENDE, non si crea, e il
+- **`e2e/allocation.mobile.spec.ts`** (esiste dal 2026-09-28 con la riga di copertura a 390: si ESTENDE, non si crea, e il
   suo caso apre prima «Esposizione»; progetto `mobile`): (1) due celle ≥ 44 px, KPI «Fuori posizione» nascosto
   e lettura intera, quattro trigger chiusi, `#alloc-piano-panel` `inert` e vuoto; (2) la cella apre il Piano, focus sul
   trigger; (3) zero richieste ai profili a riga chiusa; (4) `page.route('**/api/portfolio/instrument-profiles**', abort)`
@@ -225,7 +225,7 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
   fire-obiettivi.md, stati.md, e2e-emulatori.md
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice
 - Leggi doc/mobile/README.md, MOB-02 (§ 4.1 è il contratto) e questa spec per intero; DESIGN.md § 5 e § 6 (MAI
-  rigenerarlo). MOB-01, MOB-02, PERF-04, PERF-05, PERF-10 e doc/perf/PERF-00 devono essere chiuse
+  rigenerarlo). MOB-01, MOB-02, PERF-04, PERF-05 e PERF-10 devono essere chiuse (la nuova Esposizione è in develop dal 2026-09-28)
 - Crea SESSION_NOTES.md; crea il branch dalla branch attiva PRIMA di editare
 
 Regole: nessun commit senza il mio OK; un branch e un commit; rispondi in italiano; le sette domande di § 4.6 con lo
