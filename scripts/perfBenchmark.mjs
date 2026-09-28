@@ -1,6 +1,6 @@
 /**
  * perf:bench — «how long until the app shows a number?», per dashboard route, on a production
- * build served against the emulators (doc/perf/PERF-01-benchmark-e-budget.md § 4).
+ * build served against the emulators (the manual: perf/README.md).
  *
  * Two scenarios, each N runs, medians:
  *   - COLD: a fresh browser context, the real login form, then a full load of the route. Times are

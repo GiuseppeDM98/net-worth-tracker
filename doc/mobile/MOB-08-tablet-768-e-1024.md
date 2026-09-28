@@ -126,7 +126,7 @@ Tracciamento** (tab, «+» e «Aggiungi», Movimenti; `e2e/cashflow.tablet.spec.
   la rendono al primo paint, un fotogramma senza righe accanto, da annotare.
 - **PERF-04**: un'aperta va a tutta larghezza, nessun grafico pigro monta in una colonna da ~320 px. **PERF-14**: niente
   `layout` di Framer; si anima solo il pannello; `BottomNavigation` non si tocca. **PERF-12**: pura + hook senza stato.
-  **PERF-03**: «Aggiornato alle…» sta nei 715 px. **PERF-01**: il censimento gira su :3200.
+  **PERF-03**: «Aggiornato alle…» sta nei 715 px. **`perf:serve`**: il censimento gira su :3200.
 
 ### 4.6 Domande al proprietario
 
@@ -151,7 +151,7 @@ Tracciamento** (tab, «+» e «Aggiungi», Movimenti; `e2e/cashflow.tablet.spec.
 
 ## 6. Passi
 
-1. Branch; SESSION_NOTES.md; `mobile:census` PRIMA a 768 e 1024 (build di PERF-01, mirror); le domande di § 4.6.
+1. Branch; SESSION_NOTES.md; `mobile:census` PRIMA a 768 e 1024 (la build di `perf:build`, mirror); le domande di § 4.6.
 2. `tabletComposition.ts` + test (rosso, poi verde); l'hook.
 3. Panoramica e Tracciamento, le due spec e le falsificazioni; poi una griglia alla volta, con
    `mobile:census -- --surfaces=<pagina> --viewports=768,1024`.

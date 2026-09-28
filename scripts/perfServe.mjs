@@ -1,6 +1,6 @@
 /**
  * perf:serve — serve the `npm run perf:build` output on :3200 against the local emulators, for
- * `npm run perf:bench` (doc/perf/PERF-01-benchmark-e-budget.md § 5).
+ * `npm run perf:bench` (the manual: perf/README.md).
  *
  * `next start` refuses a `output: "standalone"` build, so this is SETUP.md's recipe («`npm run
  * start` refuses to serve the build») as a script: copy `static` and `public` next to the

@@ -445,7 +445,7 @@ node .next/standalone/server.js
 infers: on the Windows laptop the build lands in `.next/standalone/Documents/GitHub/net-worth-tracker/` (2026-09-28),
 and the two copies go next to THAT `server.js` (`<dir>/.next/static`, `<dir>/public`). Search for it, never hard-code it.
 
-**Against the emulators, on its own port: `npm run perf:build` + `npm run perf:serve`** (PERF-01). The first builds into
+**Against the emulators, on its own port: `npm run perf:build` + `npm run perf:serve`**. The first builds into
 `.next-perf` with the emulator `NEXT_PUBLIC_*` baked in; the second finds `server.js`, does the two copies and serves on
 **:3200** with the Admin SDK routed to the emulators — :3000 stays the tour server and :3100 Playwright's. The benchmark
 and the size budget run on it (`perf/README.md`). A build into a new dist dir makes `next build` add that dir's
