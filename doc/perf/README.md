@@ -47,6 +47,11 @@ layout e colori a ogni mount (PERF-14).
 
 ## 3. Baseline (2026-09-26, laptop Windows, mirror, nessun throttling CPU)
 
+> **Superata il 2026-09-28 da PERF-01**: la baseline in vigore — misurata con `npm run perf:bench` e `npm run perf:budget`
+> sulla build che contiene #400, #401, #403 e #407 — sta in `perf/README.md`, con i comandi e il registro dei tetti
+> alzati. Quella qui sotto resta come storia e come «prima» delle spec già scritte. Una correzione vale anche per lei:
+> i «46 caratteri di testo» dell'HTML erano il `<title>`, il `body` ne ha 0.
+
 > Misurata su `develop` PRIMA dei contributi del 2026-09-27 (#400 e #401: il Flusso per ruolo e sul telefono; #403: il
 > chip composito di Strumenti) e di PERF-00 (la nuova Esposizione, chiusa il 2026-09-28). PERF-01 rimisura sulla build
 > che li contiene (§ 5): le tabelle qui sotto restano come storia, e la nota «Esposizione → Yahoo ogni volta» è il
@@ -148,7 +153,7 @@ budget alzato con la misura se la route cresce (PERF-01 § 9).
 | Spec | Titolo | Priorità | Sforzo | Dipende da | Modello · effort | Stato |
 |---|---|---|---|---|---|---|
 | PERF-00 | Esposizione: leva, copertura, base di Allocazione, cache per ticker (issue #402) | 1 | L | — (#400/#401/#403 già integrate) | Fable 5.1 · xhigh | **ritirata il 2026-09-28** — PR #407 in develop dal 2026-09-28; 14 divergenze: nove lezioni già a casa (doc/guide/allocazione.md § Esposizione: le parole della copertura riviste sul mirror, l'ETC che chiede `fund`, la firma vuota che non è lo stato vuoto, `LEG_DESTINY` come fonte), quattro lacune colmate in sessione (il test che lega i quattro destini a `compareAllocations`, due falsificazioni viste rosse, la riga del seed dei profili in SETUP.md, una frase falsa nella guida), una decisione (i non-obiettivi) portata nei blind spots della guida; la misura di chiusura resta: 0 chiamate a Yahoo alla seconda apertura (`__tests__/instrumentProfilesRoute.test.ts`) |
-| [PERF-01](PERF-01-benchmark-e-budget.md) | Il benchmark in repo e il budget che può solo scendere | 1 | M | 00 | Opus 5.5 · high | da fare |
+| [PERF-01](PERF-01-benchmark-e-budget.md) | Il benchmark in repo e il budget che può solo scendere | 1 | M | 00 | Opus 5.5 · high | **fatta il 2026-09-28** — `perf:bench`, `perf:budget`, `perf:build`, `perf:serve` (:3200); `perf/budget.json` dalla build di quel giorno (+2%), la regola del tetto alzato con `raisedBy`; nuova baseline in `perf/README.md` (66/66 run a regime; primo numero da 146 ms a 2363 ms; condivisi 460 KB gz); il budget visto rosso con il PDF iniettato nella Panoramica |
 | [PERF-02](PERF-02-avvio-shell-prima-di-auth.md) | La shell prima dell'autenticazione | 2 | M | 01 | Fable 5.1 · xhigh | da fare |
 | [PERF-03](PERF-03-ultimo-dato-noto-subito.md) | L'ultimo dato noto subito, il fresco appena arriva | 2 | M | 02, 05 | Fable 5.1 · xhigh | da fare |
 | [PERF-04](PERF-04-bundle-recharts-pdf-lucide.md) | recharts una volta, il PDF, le icone e il Sankey quando servono | 2 | M | 01 | Opus 5.5 · high | da fare |
@@ -177,12 +182,10 @@ attraversa regole di dominio dense (Rendimenti, le finestre delle spese, la shel
 
 ## 8. Come si rimisura
 
-Fino a PERF-01: `reference/perf-measure.mjs` copiato nella radice del repo come `.tmp-perf-measure.mjs` (`import 'playwright'`
-risolve da lì, non dallo scratchpad), lanciato con `node .tmp-perf-measure.mjs --runs=3`, cancellato a fine sessione. Da
-PERF-01: `npm run perf:build`, `npm run perf:serve` (terminali del proprietario, con gli emulatori e il mirror, porta :3200),
-`npm run perf:bench -- --email=mirror@example.com` e `npm run perf:budget` — il `--` è obbligatorio: senza, npm si tiene le
+Da PERF-01 (2026-09-28; prima si copiava `reference/perf-measure.mjs` nella radice come script usa-e-getta): `npm run perf:build`, `npm run perf:serve` (terminali del proprietario, con gli emulatori e il mirror, porta :3200),
+`npm run perf:bench -- --email=mirror@example.com` e `npm run perf:budget` (il manuale è `perf/README.md`) — il `--` è obbligatorio: senza, npm si tiene le
 opzioni come `npm_config_*` e lo script non le vede. Una spec o una PR che fa crescere una route alza il suo tetto nello
-stesso commit, con la misura e la riga di motivazione (PERF-01 § 9). Firestore emulato risponde in ~1 ms: i waterfall sono più corti che
+stesso commit, con la misura, il `raisedBy` e la riga nel registro di `perf/README.md` (PERF-01 § 9). Firestore emulato risponde in ~1 ms: i waterfall sono più corti che
 in produzione, e i tempi delle route server si leggono dal `Server-Timing` (PERF-07) nelle DevTools, in produzione.
 
 ## 9. Decisioni del proprietario (2026-09-26)

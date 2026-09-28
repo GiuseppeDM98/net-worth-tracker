@@ -1,0 +1,50 @@
+{
+  "routes": {
+    "/": {
+      "initialJsGzKB": 458
+    },
+    "/dashboard": {
+      "initialJsGzKB": 546
+    },
+    "/dashboard/allocation": {
+      "initialJsGzKB": 527
+    },
+    "/dashboard/analisi": {
+      "initialJsGzKB": 757
+    },
+    "/dashboard/assets": {
+      "initialJsGzKB": 733
+    },
+    "/dashboard/assistant": {
+      "initialJsGzKB": 670
+    },
+    "/dashboard/cashflow": {
+      "initialJsGzKB": 744
+    },
+    "/dashboard/fire-simulations": {
+      "initialJsGzKB": 759
+    },
+    "/dashboard/hall-of-fame": {
+      "initialJsGzKB": 545
+    },
+    "/dashboard/history": {
+      "initialJsGzKB": 1213
+    },
+    "/dashboard/pension": {
+      "initialJsGzKB": 601
+    },
+    "/dashboard/performance": {
+      "initialJsGzKB": 694
+    },
+    "/dashboard/settings": {
+      "initialJsGzKB": 625
+    },
+    "/login": {
+      "initialJsGzKB": 424
+    },
+    "/register": {
+      "initialJsGzKB": 424
+    }
+  },
+  "sharedGzKB": 470
+}

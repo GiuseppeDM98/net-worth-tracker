@@ -22,6 +22,8 @@
 
 ## 🔧 Improvements
 
+- Added, for development, a repeatable measure of the app's speed and a size budget per page: `npm run perf:bench` opens every page of a production build against the local emulators, cold and by navigation, and reports how long each takes to show its first figure; `npm run perf:budget` reads the build and fails when a page ships more JavaScript than its ceiling allows. A ceiling only goes down with a measure, and a change that makes a page grow must raise that page's ceiling in the same commit and say why.
+
 - Improved Analisi › Flusso on a phone: it is now a bar of the period's spending split by type, each type's categories as rows (a row opens its Scheda) and what was left over as a closing line, instead of a Sankey too narrow to read; the printed shares always add up to 100, a type that rounds to zero reads «<1%», and when the period holds amounts that are only scheduled the closing line says so. From 640px up the Sankey is unchanged. (Contributed by Ciocc128.)
 
 - Improved Patrimonio › Strumenti for a composite instrument (a 60/40 fund, a balanced ETF): still one row, but its class chip now shows every class it holds — one segment per class, as wide as its share and in that class's colour, «Azioni · Obbl.» for two, «Misto» for three or more. A class under 5% gets no segment, a screen reader hears every share, and the group headers and the sort by class keep the prevailing class. (Contributed by Ciocc128.)

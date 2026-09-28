@@ -1,6 +1,6 @@
 # PERF-01 — Il benchmark in repo e il budget che può solo scendere
 
-> Stato: da fare · Priorità: 1 (va PRIMA di ogni altra spec PERF, dopo la sola PERF-00, chiusa il 2026-09-28) · Sforzo: M · Dipende da: PERF-00 (la baseline la contiene) · Sblocca: 02, 04, 05, 07, 12 — e tutte le altre, che si dichiarano chiuse con i suoi numeri
+> Stato: **fatta il 2026-09-28** (manuale e baseline in `perf/README.md`) · Priorità: 1 (va PRIMA di ogni altra spec PERF, dopo la sola PERF-00, chiusa il 2026-09-28) · Sforzo: M · Dipende da: PERF-00 (la baseline la contiene) · Sblocca: 02, 04, 05, 07, 12 — e tutte le altre, che si dichiarano chiuse con i suoi numeri
 
 ## 1. Il problema, misurato
 
@@ -106,7 +106,7 @@ su disco e gira in due secondi.
 { "initialJsGzKB": 760, "raisedBy": "#NNN: perché" }, … }, "sharedGzKB": 470, "libraryCopies": { "recharts": 1 } }`
 (`raisedBy` facoltativo, § 9; `libraryCopies` da PERF-04). Lo script trova la build (`NEXT_DIST_DIR` o `.next`), per ogni
 `server/app/<route>.html` estrae i `<script src="/_next/static/chunks/…">`, somma il gzip dei file (`zlib.gzipSync`), conta i
-caratteri di testo dell'HTML (PERF-02 lo alza da 46) e confronta. Stampa la tabella route | chunk | raw KB | gz KB | testo |
+caratteri di testo del `body` (PERF-02 lo alza da 0: i «46» del 2026-09-26 erano il `<title>`) e confronta. Stampa la tabella route | chunk | raw KB | gz KB | testo |
 tetto | esito, e la lista dei chunk più grandi con le route che li usano (è così che il 2026-09-26 sono emerse le quattro
 copie di recharts: quattro chunk diversi da 350 KB raw, uno per pagina). Esce 1 al primo sforamento. La funzione di
 confronto è pura in `lib/utils/perfBudget.ts` (`compareRoutesToBudget(measured, budget, previousBudget)`), importata dallo script e dal test. `previousBudget` è

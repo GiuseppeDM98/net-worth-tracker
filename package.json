@@ -27,7 +27,11 @@
     "e2e:seed:profiles": "cross-env FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 GCLOUD_PROJECT=demo-net-worth tsx scripts/seedInstrumentProfilesE2E.mts",
     "dev:e2e": "cross-env NEXT_DIST_DIR=.next-e2e NEXT_PUBLIC_USE_FIREBASE_EMULATOR=true FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 GCLOUD_PROJECT=demo-net-worth NEXT_PUBLIC_FIREBASE_API_KEY=demo-key NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-net-worth NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=demo-net-worth.firebaseapp.com next dev -p 3100",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "perf:build": "cross-env NEXT_DIST_DIR=.next-perf NEXT_PUBLIC_USE_FIREBASE_EMULATOR=true NEXT_PUBLIC_FIREBASE_API_KEY=demo-key NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-net-worth NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=demo-net-worth.firebaseapp.com next build",
+    "perf:serve": "node scripts/perfServe.mjs",
+    "perf:bench": "node scripts/perfBenchmark.mjs",
+    "perf:budget": "tsx scripts/perfBudget.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",

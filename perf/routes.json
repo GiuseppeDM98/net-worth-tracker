@@ -1,0 +1,22 @@
+{
+  "$comment": "The dashboard routes the speed benchmark visits, in sidebar order. Held equal to lib/constants/navigation.ts by __tests__/perfRoutes.test.ts (scripts/perfBenchmark.mjs is plain .mjs and cannot import the @/ alias). bench:false = budgeted by perf:budget, never opened by perf:bench.",
+  "routes": [
+    { "name": "Panoramica", "href": "/dashboard" },
+    { "name": "Patrimonio", "href": "/dashboard/assets" },
+    { "name": "Cashflow", "href": "/dashboard/cashflow" },
+    { "name": "Analisi", "href": "/dashboard/analisi" },
+    { "name": "Rendimenti", "href": "/dashboard/performance" },
+    { "name": "Storico", "href": "/dashboard/history" },
+    { "name": "Hall of Fame", "href": "/dashboard/hall-of-fame" },
+    { "name": "Allocazione", "href": "/dashboard/allocation" },
+    { "name": "FIRE e Simulazioni", "href": "/dashboard/fire-simulations" },
+    { "name": "Previdenza", "href": "/dashboard/pension" },
+    {
+      "name": "Assistente AI",
+      "href": "/dashboard/assistant",
+      "bench": false,
+      "why": "Gated by NEXT_PUBLIC_ASSISTANT_AI_ENABLED and wired to Anthropic (doc/guide/assistente.md): a probe never opens a surface that can spend (WORKFLOW.md § 3)."
+    },
+    { "name": "Impostazioni", "href": "/dashboard/settings" }
+  ]
+}

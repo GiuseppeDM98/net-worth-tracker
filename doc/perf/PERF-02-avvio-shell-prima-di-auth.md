@@ -4,7 +4,8 @@
 
 ## 1. Il problema, misurato
 
-L'HTML prerenderizzato di ogni route `/dashboard/*` contiene **46 caratteri di testo: lo spinner**. Niente skip link, niente
+L'HTML prerenderizzato di ogni route `/dashboard/*` ha **0 caratteri di testo nel `body`: solo lo spinner** (i «46» misurati
+il 2026-09-26 erano il `<title>`; `perf:budget`, colonna «testo», 2026-09-28). Niente skip link, niente
 sidebar, niente `<main>`, niente skeleton. Verificato sulla build del 2026-09-26 (`.next-perf/server/app/dashboard.html`:
 `has skip-link=false has spinner=true has <main=false`). La causa è in `app/dashboard/layout.tsx:22-84`: `ProtectedRoute`
 avvolge TUTTO (skip link, `SidebarProvider`, `AppSidebar`, `<main>`, `BottomNavigation`), e `components/ProtectedRoute.tsx`
@@ -31,7 +32,7 @@ only after login» — con la shell nell'HTML quella premessa cade (`SidebarProv
 - L'HTML prerenderizzato di `/dashboard` contiene: lo skip link «Vai al contenuto principale», la `<nav>` della sidebar con
   le voci di `lib/constants/navigation.ts`, `<main id="page-main">` e il `TileGridSkeleton` generico. Il `PageHeader` NO: è
   della pagina e arriva con lei dopo l'auth. Misura: `perf:budget` (PERF-01) stampa «testo nell'HTML (caratteri)» per
-  route: da 46 a > 300.
+  route (il testo del `body`): da 0 a > 300.
 - Nessuna lettura Firestore prima di `setLoading(false)`: nel benchmark cold, zero richieste `firestore` prima del marcatore
   `auth` — che questa spec ridefinisce in `scripts/perfBenchmark.mjs` come «il nome del profilo appare nella sidebar»
   (lo spinner non esiste più).
@@ -181,7 +182,7 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
 
 Regole: nessun commit senza il mio OK; un branch e un commit; rispondi in italiano.
 Misura PRIMA e DOPO nella stessa sessione con npm run perf:bench -- --routes=dashboard,cashflow --runs=3, e conta i
-caratteri di testo dell'HTML prerenderizzato di /dashboard nella build (oggi 46). Le tre asserzioni nuove delle due spec
+caratteri di testo dell'HTML prerenderizzato di /dashboard nella build (oggi 0: npm run perf:budget, colonna «testo»). Le tre asserzioni nuove delle due spec
 shell.boot vanno viste ROSSE una volta (dimmi come le hai rotte). Chiusura: tsc, lint 0, Vitest in Europe/Rome,
 npm run test:e2e COMPLETO verde con i sei setup ancorati al profilo, giro guidato di 5 punti sul mirror (npm run
 mirror:seed -- <email>, poi mirror:remove), poi CLAUDE.md «Latest» e la riga Shell, AGENTS.md § Navigation, le guide

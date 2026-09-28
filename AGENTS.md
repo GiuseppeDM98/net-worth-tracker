@@ -790,7 +790,10 @@ file used to carry.
   EVERY `.next-*` dist** (2026-09-28) is the same file citing a route the session deleted: delete those files, a dev
   server regenerates them. And on Windows, **Git Bash rewrites a command argument that starts with `//` into `/`**
   (MSYS path conversion; a marker string handed to a node script arrived one slash short): prefix the command with
-  `MSYS_NO_PATHCONV=1`. The Playwright server leaves the same in `.next-e2e/dev/types/` (2026-09-20:
+  `MSYS_NO_PATHCONV=1`. **Git Bash's `sed -i` is not a falsification tool** (2026-09-28): a pattern holding `€`
+  matched nothing and exited 0 — the benchmark ran «broken» and stayed green, which read as a detector that could not
+  fail — and on a CRLF file an insert-then-delete left it LF. Swap text with a node script that asserts exactly one match,
+  and grep the line before trusting the run. The Playwright server leaves the same in `.next-e2e/dev/types/` (2026-09-20:
   `routes.d.ts` TS1434, then `validator.ts` missing `./routes.js` once it is gone) — there the `types` directory goes
   whole: it is generated, and that server is the suite's alone.
 - **A surface with no DOM is verified by RENDERING it** — `tsc` and Vitest see neither a dropped glyph nor an off-token
@@ -839,6 +842,7 @@ file used to carry.
 | Transfers / cash | `cashBalanceReconciliation`, `updateCashAssetBalancesAtomic`, `transferFeature`, `cashSettlement`, `serverCashSettlement` · **Commissione** `transferFee` (+ `settingsRoundTrip`) · **Mutuo** `mortgageRepayment`, `mortgageSummary`, `updateAssetDebtFields` (+ `patrimonioNarrative` for the tile's words) · **Ricorrenze** `recurrenceDates` · **Browser** `e2e/cashflow.{accounts,transfer-fee,mortgage}.spec.ts` |
 | Allocazione | `allocationUtils`, `allocazioneSummary`, `allocazioneNarrative` · **Esposizione** `exposureEngine`, `exposureRequests`, `exposureYahooSource`, `instrumentProfileService`, `instrumentProfilesRoute` (+ `assetExposure`) · **Tinte d'azione** `actionColorContrast` (dodici blocchi tema) · **Browser** `e2e/allocation{,.mobile}.spec.ts` · **Ledger** `assetTransactionUtils`, `assetTransactionsRoutes`, `assetTransactionWriteTx`, `saleTax`, `cents`, `periodSales` · **Browser** `e2e/assets.sale-tax.spec.ts` |
 | Fondo pensione | `pensionDeduction`, `pensionContributions`, `pensionReturn`, `pensionContributionService`, `performanceBase`, `pensionFire`, `pensionUnlock`, `pensionFamilyMembers` + the transfer trio · **Verdetto e letture** `pensionSummary`, `pensionNarrative` |
+| Perf tooling (`perf/`, `scripts/perf*`) | `perfBudget` (the ceiling and the raised ceiling), `perfRoutes` (`perf/routes.json` = `navigation.ts`: a new shell route goes in both) · **Build** `npm run perf:budget` after `npm run build` — a route that grows raises its ceiling in the same commit with `raisedBy` (`perf/README.md`) |
 
 Touching `types/assets.ts`'s `AssetType` also means `assetDialogHelpers` + `allocationUtils` + the three ledger suites;
 widening `AssetClass` also means `ASSET_CLASS_SEQUENCE` and everything reading it.
