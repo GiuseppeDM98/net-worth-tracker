@@ -17,8 +17,10 @@ coincidevano mai, nemmeno senza azioni dirette (il segmento vuoto lascia `--`) �
 di Allocazione → **Yahoo `quoteSummary` per ogni ETF e azione** (`:118`, `:147`), in parallelo (`Promise.allSettled`,
 `:114-158`). Benchmark: Allocazione 590 ms cold / 606 warm CON GLI EMULATORI — i 600 ms erano Yahoo vero. PERF-00 ritira
 route, servizio e `exposure-cache/{userId}`: le risposte di Yahoo vivono per ticker in `instrument-profile-cache`, e la
-pesatura si rifà a ogni apertura — nel browser se il proprietario conferma PERF-00 § 4.9, domanda 1; rileggere lì la
-scelta presa prima di toccare § A.
+pesatura si rifà a ogni apertura NEL BROWSER (PERF-00 § 4.9, domanda 1, confermata dal proprietario il 2026-09-28:
+`GET /api/portfolio/instrument-profiles?userId=<ownerId>` risponde solo `{ profiles, oldestFetchedAt }`, il motore
+`lib/utils/exposureEngine.ts` gira in un `useMemo` sugli asset della pagina). Il `Server-Timing` di § 2 si aggiunge a
+QUELLA route, in `lib/server/exposure/instrumentProfileService.ts` (i conteggi `hits`/`fetched` sono per modulo).
 
 **B. `/api/dividends/stats`: sette `await` in serie e D letta tre volte** (`app/api/dividends/stats/route.ts:106, 109, 112, 116,
 123, 144, 173`): `calculateDividendStats` per il periodo (con le date legge per intervallo, `dividendService.ts:417-421`), di

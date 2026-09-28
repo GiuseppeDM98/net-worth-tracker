@@ -13,27 +13,35 @@ Next.js app for Italian investors: net worth, assets, cashflow, dividends, perfo
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic.
-- `tsc` clean; **190 files / 4481 tests** green in `Europe/Rome` + **39 Playwright spec files** (144 tests, incl. 6 auth setups; last full run 2026-09-27 on the Windows laptop: 143 green, the one red the known `modal.origin`, green alone right after — doc/guide/e2e-emulatori.md). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, which structurally hides timezone bugs.
-- Latest (2026-09-27): **Three external PRs integrated with changes (#400, #401, #403, by Ciocc128), the open
-  proposal #402 turned into a spec, and Divisione's pool netted of the common income.** Analisi › Flusso reads by 50/30/20 role (opt-in, the role lives on the category)
-  and below 640px draws a share bar and rows instead of the Sankey; Strumenti splits the class chip of a composite
-  instrument. What the review changed: every phone sentence and share moved into `analisiNarrative.ts` /
-  `spendingRoles.ts`, printed shares that add up to 100, signed income in the roles summary, a category write that
-  invalidates what Analisi reads, `useCssColorTokens` gated by `enabled`, the dead phone-Sankey path deleted, the inert
-  E2E assertions rewritten (overflow on `main`, an absence with its anchor). #402 is `doc/perf/PERF-00`, to implement
-  BEFORE PERF-01; nine PERF and six MOB specs amended to the code as it is; the owner's decisions in the two READMEs
-  § 9. **Verified** (final code): `tsc`, lint 0, Vitest 190 / 4481 in both timezones, Playwright 143 of 144 (the red
-  the known `modal.origin`, green alone right after), `npm run build` green before the Divisione change; six E2E
-  falsifications seen red. The owner's tour on the mirror (five points, all passed) found three defects no fixture
-  could show, each now a Vitest case: two same-named categories labelled alike under one role, the Sankey's shades
-  fading to black past the seventh node, «0%» printed over a role that holds money. Same session, owner's request:
-  **Divisione — income left «in comune» pays the common spending FIRST**, the shares divide the net, a surplus is
-  declared and never distributed, and the base is EVERY income attributed to a person, whatever its category (the
-  sentences say «entrate», `laborIncomeCategoryIds` is no longer read); the «In comune» tile shows «Entrate in comune
-  −X €» and «Da dividere Y €» under its hero, the verdict says it in the one sentence, the email in its reading
-  (doc/guide/cashflow-divisione.md; +13 Vitest, +1 E2E seen red). The two dossiers this work sits between are
-  `doc/perf/README.md` (fourteen specs, PERF-00 and PERF-01 first, 2026-09-26) and `doc/mobile/README.md` (nine specs,
-  implemented AFTER the PERF ones, 2026-09-27); the owner's decisions are in each README § 9.
+- `tsc` clean; **195 files / 4538 tests** green in `Europe/Rome` + **40 Playwright spec files** (146 tests, incl. 6 auth setups; last full run 2026-09-28 on the Windows laptop — the outcome in the Latest entry below; the known intermittent is `modal.origin`, doc/guide/e2e-emulatori.md). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, which structurally hides timezone bugs.
+- Latest (2026-09-28): **PERF-00 implemented — the Esposizione with the leverage as notional, a coverage line with
+  four destinies, the Allocazione portfolio as the base, ONE cache per ticker with only Yahoo's answers, the weighing in
+  the browser, and the route owner-scoped** (issue #402 by Ciocc128, accepted with changes; the fork was read as a
+  reference, not ported). Titoli and Settori weigh the NOTIONAL of the equity sleeves of the quoted instruments
+  (`hasMarketPrice` + a ticker), Emittenti the market value of each one once; every euro of the base is read · unread
+  (with the instrument's name) · not applicable by nature · out of this view, an identity the engine keeps
+  (`lib/utils/exposureEngine.ts`, pure, run in a `useMemo` on the page's assets); the list closes on «Resto letto» and
+  «Non letto» and adds up to 100 on screen; the aside and the reading name the base of each view. The route
+  `GET /api/portfolio/instrument-profiles?userId=<ownerId>` answers only `{ profiles, oldestFetchedAt }` from
+  `instrument-profile-cache/{ticker}` (Admin only, rules deny the client; per-module `fetchedAt`, `mergeFields`; TTL 30
+  days useful / 24 hours empty; «Aggiorna» = `force=true`); `assertCanAccessAccount` replaces `decodedToken.uid`, so a
+  delegate sees the OWNER's exposure (seen in the browser). Retired: `/api/portfolio/exposure`,
+  `lib/server/portfolioExposureService.ts`, the `exposure-cache` rule (the orphan documents stay, owner's call).
+  `RankedRows` takes `remainders`. The owner's five § 4.9 decisions are in doc/guide/allocazione.md § Esposizione.
+  **Verified**: the route test seen RED on the old route (the second GET asked Yahoo again: «expected 4 to be 2»),
+  eleven falsifications seen red (engine ×4, Yahoo normalisation, per-module `fetchedAt`, the delegate, the drift, a
+  clause at zero, the E2E belt with an empty `VWCE.DE` profile — the last one also caught a wrong regex in the spec:
+  «l'11%» has no space after the apostrophe); `tsc`, lint 0, Vitest **195 / 4538** in both timezones; `curl` 200 own ·
+  403 stranger · 400 · 401 · 404 on the retired route; the delegate in a real browser; Playwright **145 of 146** (the
+  red the known `modal.origin`, green alone right after); Playwright evidence on the mirror at 1440 and 390 (three
+  views, every list at 100, `main` without overflow, the second opening from the cache) before the owner's
+  five-point tour. The tour's first look rewrote the coverage line into TWO sentences («In questa vista: …» /
+  «Fuori da questa vista: …», the not-applicable euros by CLASS, the names only on «non letto»): four figures in a
+  row read as «almost nothing has holdings» when the largest was outside the base — now a Vitest block and the two
+  E2E specs. The E2E belt: `scripts/instrumentProfileFixtures.ts`
+  seeds a FRESH profile for every quoted ticker of the base fixture and the global setup re-stamps them every run
+  (Yahoo is called by the server, out of `page.route`'s reach). The two dossiers this work sits between are
+  `doc/perf/README.md` (PERF-00 done, PERF-01 next) and `doc/mobile/README.md` (implemented AFTER the PERF ones).
 
 ## Architecture Snapshot
 - App Router; protected pages under `app/dashboard/*`.
@@ -59,7 +67,7 @@ One line per area: the question it answers, then where it is described. *What th
 - **Dividendi**: «quanto rendono i miei flussi?»; received and announced never one figure; BTP Italia and BTP€i coupons; a payment credits the instrument's account, else the default, never an arrear. doc/guide/cashflow-dividendi.md.
 - **Rendimenti**: «quanto rende il portafoglio, e rispetto a cosa?» — configurable base, six EUR benchmarks, per-instrument attribution; below a year the hero is the period's return, Contributi is the ONE capital the formulas neutralise. doc/guide/rendimenti.md.
 - **Storico**: «come sono arrivato qui?» — wealth growth, contributions included; the Driver splits it into savings, measured market, sale taxes, mortgage, pension contributions and the rest, as a ledger that adds up to the euro behind each year. doc/guide/storico.md.
-- **Allocazione**: «sono allineato al piano, e cosa faccio con i prossimi soldi?» — i tre piani nominano gli STRUMENTI da scambiare e prezzano la ritenuta; «prelevare X» significa X in mano. doc/guide/allocazione.md.
+- **Allocazione**: «sono allineato al piano, e cosa faccio con i prossimi soldi?» — i tre piani nominano gli STRUMENTI da scambiare e prezzano la ritenuta; «prelevare X» significa X in mano. L'Esposizione pesa il nozionale (Titoli, Settori) e il mercato (Emittenti) degli strumenti quotati del portafoglio di Allocazione, dice dove va ogni euro (letto · non letto · non applicabile · fuori vista) e legge UNA cache per ticker con le sole risposte di Yahoo, pesando nel browser. doc/guide/allocazione.md.
 - **Previdenza**: «il fondo sta lavorando?» per contributor, the value typed from the statement ON the page. doc/guide/previdenza.md.
 - **FIRE**: Calcolatore, Coast FIRE, What If, Monte Carlo and Obiettivi, one verdict each. doc/guide/fire.md (+ fire-coast, fire-what-if, fire-monte-carlo, fire-obiettivi).
 - **Assistente AI**: the verdict IS the context; SSE streaming, memory, goal proposals; flag `NEXT_PUBLIC_ASSISTANT_AI_ENABLED`, blocked in demo. doc/guide/assistente.md.
@@ -115,7 +123,7 @@ Cross-cutting entry points only: each area's files open its guide (`doc/guide/<t
 `__tests__/{module}.test.ts`, every page its `e2e/{page}*.spec.ts` where one exists.
 - **Shell**: `app/dashboard/layout.tsx` (`<main>` = `page-main`), `app/dashboard/template.tsx`, `components/layout/{Sidebar,BottomNavigation,SecondaryMenuDrawer,SceneLink,PageHeader,PageTabBar,PageTabs,PageContainer,ThemePicker,LogoutDialog}.tsx`, `lib/utils/viewTransition.ts` (the ONE `startViewTransition`, `data-vt` scoping) + `lib/hooks/useSceneNavigation.ts` (the page scene), `lib/utils/themeTransition.ts`, `components/ui/sidebar.tsx` (`SIDEBAR_WIDTH_ICON`), `lib/constants/navigation.ts` (the ONE source of the nav arrays); tile primitives `components/ui/{tile,tile-method-note,series-legend,narrative-text,ranked-rows,tile-grid-skeleton,page-verdict}.tsx`, `lib/hooks/useRovingFocus.ts` (a list as ONE Tab stop), `lib/utils/narrative.ts` (`Narrative`, `VerdictTone`, `PageVerdictModel`)
 - **Shared primitives / utils** (each the single source of its rule): `components/ui/{composition-list,composition-bar,segmented-pill,drill-breadcrumb,chart-hover}.tsx`; `lib/utils/formatters.ts` · `metricColors.ts` (`getMetricValueColor`) · `assetPricing.ts` (`requiresManualPricing`) · `assetLiquidity.ts` · `expenseTypeTransition.ts` · `firestoreData.ts` (`removeUndefinedDeep`) · `dateHelpers.ts` (`endOfMonthBound`, `getItalyDateIso`, `isItalyDayAfter`) · `spendingProjection.ts` (the ONE month-end projection) · `recurrenceDates.ts` (the ONE source on recurrence)
-- **E2E**: `playwright.config.ts`, `e2e/*.ts`, `e2e/global-setup.ts`, fixtures `scripts/{seedEmulator.ts,seedPensionE2E,seedAnalisiE2E,seedCoastFireE2E,seedCostCentersE2E,seedSplitE2E,seedHallOfFameE2E}.mts`; scripts `test:e2e`/`e2e:seed*`/`dev:e2e`; the production mirror `scripts/mirrorProdAccount.mts` (`mirror:seed`/`mirror:remove`)
+- **E2E**: `playwright.config.ts`, `e2e/*.ts`, `e2e/global-setup.ts`, fixtures `scripts/{seedEmulator.ts,seedPensionE2E,seedAnalisiE2E,seedCoastFireE2E,seedCostCentersE2E,seedSplitE2E,seedHallOfFameE2E,seedInstrumentProfilesE2E}.mts` (+ `scripts/instrumentProfileFixtures.ts`, the Esposizione's Yahoo profiles shared by the base seed and the E2E re-stamp); scripts `test:e2e`/`e2e:seed*`/`dev:e2e`; the production mirror `scripts/mirrorProdAccount.mts` (`mirror:seed`/`mirror:remove`)
 
 
 ## Design Context

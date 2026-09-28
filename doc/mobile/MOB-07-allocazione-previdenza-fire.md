@@ -19,9 +19,10 @@ Censimento 2026-09-26, 390×844 (altezze in px; righe di codice da riverificare)
 - **Allocazione**: `order-1…5` in `app/dashboard/allocation/page.tsx:462-520`; Bilanciamento e Per classe in un wrapper
   `contents desktop:flex` (`:461`). Il verdetto è UNA frase di clausole unite da «; »
   (`lib/utils/allocazioneNarrative.ts:211-212`); il punteggio è titolo (`:198`) e anello (`BilanciamentoTile.tsx:129`);
-  l'aside di Previdenza è un importo (`allocazioneNarrative.ts:697-702`). Esposizione legge da sé
-  (`EsposizioneTile.tsx:139`), con il suo `role="alert"` (`:203`): PERF-00 la riscrive (i profili da una route nuova, la
-  pesatura nel browser sugli asset della pagina, la riga di copertura), e queste righe si riverificano dopo.
+  l'aside di Previdenza è un importo (`allocazioneNarrative.ts:697-702`). Esposizione riceve gli asset dalla pagina e
+  possiede solo i profili (`usePortfolioExposure(ownerId, assets)`, `EsposizioneTile.tsx`; PERF-00, chiusa il
+  2026-09-28: i profili da `/api/portfolio/instrument-profiles`, la pesatura nel browser, la riga di copertura sopra
+  l'elenco), con il suo `role="alert"` per il solo `isError` della query; le righe si rileggono al momento.
 - **Previdenza** (`components/pension/PensionOverview.tsx:263-330`): versamenti non letti = quattro `ErrorNotice`. Il
   verdetto è una frase per contribuente con le tre cause (`lib/utils/pensionNarrative.ts:120-143`); `returnState` viene
   da `isPensionReturnMeasurable` (`lib/utils/pensionReturn.ts:183`); l'aside di Anno fiscale è la RAL (`pensionNarrative.ts:397-404`).
@@ -76,8 +77,11 @@ Censimento 2026-09-26, 390×844 (altezze in px; righe di codice da riverificare)
 - **Righe**: `alloc-piano` («Ribilancia, Versa o Preleva»), `alloc-per-classe` («corrente, target e gap»),
   `alloc-esposizione` («titoli, settori, emittenti»), `alloc-previdenza` («il fondo nel mix», non l'importo). Importo e
   modalità del Piano sono stato della pagina.
-- **Esposizione**: la pagina osserva la stessa chiave dell'hook di PERF-00 (i profili, `enabled` = `!compact ||
-  !!collapse('alloc-esposizione')?.mounted`; la firma esatta si legge dopo PERF-00); con `isError` sotto `desktop:` rende
+- **Esposizione**: la pagina osserva la stessa chiave dell'hook di PERF-00 —
+  `queryKeys.portfolio.instrumentProfiles(ownerId, profileRequestsSignature(selectProfileRequests(assets)))`, la firma
+  «AAPL:stock|VWCE.DE:fund» di `lib/utils/exposureRequests.ts` — con `enabled` = `!compact ||
+  !!collapse('alloc-esposizione')?.mounted` (oggi l'hook è `enabled` a firma non vuota; a firma vuota il motore gira
+  senza chiamate); con `isError` sotto `desktop:` rende
   `<ErrorNotice collapse live={false}>` e passa `failed`. La regione della banda (`page.tsx:447`) resta: annuncia un
   gesto, non un errore. **La riga di copertura** (letto · non letto · non applicabile · fuori vista) sta nel pannello,
   sopra l'elenco: mai nella striscia né in `asideWhenClosed` (porta importi). **Una fetta «non letta» non è una lettura

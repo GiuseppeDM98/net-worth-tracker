@@ -11,7 +11,7 @@
  */
 
 import type { AllocationData, Asset } from '@/types/assets';
-import type { ExposureHolding, ExposureIssuer, ExposureSector, PortfolioExposureData } from '@/types/exposure';
+import type { ExposureCoverage, ExposureEntry, ExposureSource, ExposureViewData, ExposureViewKey, PortfolioExposure } from '@/types/exposure';
 import {
   ASSET_CLASS_CHART_INDEX,
   ASSET_CLASS_LABELS,
@@ -780,116 +780,99 @@ export function summarizeHoldings(holdings: AllocatableHolding[]): HoldingsGroup
 
 // ─── Esposizione ──────────────────────────────────────────────────────────────
 
-export type ExposureViewKey = 'holdings' | 'sectors' | 'issuers';
+export type { ExposureViewKey } from '@/types/exposure';
 
-export interface ExposureRowSource {
-  ticker: string;
-  name: string;
-  amount: number;
-  /** The holding's / sector's weight inside the source (0-1) and the source's value, when known — «5% di 120.000 € = 6000 €». */
-  weight?: number;
-  baseValue?: number;
-}
+/** The instruments behind one row, as the drill-down prints them: the engine's own `ExposureSource`. */
+export type ExposureRowSource = ExposureSource;
 
 export interface ExposureRow {
   key: string;
   label: string;
   caption?: string;
   amount: number;
-  /** Share of the WHOLE portfolio, one decimal. */
+  /** Share of the VIEW's base, a whole percent — the unit `RankedRows` prints, so the list adds up on screen. */
   percentage: number;
   sources: ExposureRowSource[];
 }
 
+export interface ExposureRemainder {
+  key: 'read-rest' | 'unread';
+  label: string;
+  amount: number;
+  percentage: number;
+}
+
 export interface ExposureView {
   rows: ExposureRow[];
-  /** What the rows do not cover, so the shares add up to the portfolio; null when they do. */
-  remainder: { label: string; amount: number; percentage: number } | null;
+  /** «Resto letto» (read − shown), then «Non letto», each only when it holds money; with the rows they add up to 100. */
+  remainders: ExposureRemainder[];
+  coverage: ExposureCoverage;
 }
 
-const round1 = (value: number): number => Math.round(value * 10) / 10;
+export const READ_REST_LABEL = 'Resto letto';
+export const UNREAD_LABEL = 'Non letto';
 
-function holdingRow(holding: ExposureHolding): ExposureRow {
-  return {
-    key: holding.symbol,
-    label: holding.name,
-    caption: holding.symbol,
-    amount: holding.exposureEur,
-    percentage: round1(holding.exposurePct * 100),
-    sources: holding.sources.map((source) => ({
-      ticker: source.ticker,
-      name: source.assetName,
-      amount: source.contributionEur,
-      weight: source.holdingPct,
-      baseValue: source.assetValueEur,
-    })),
-  };
-}
+/**
+ * The rows of one view, the largest `limit` of them, closed by what they leave out: the read euros
+ * the rows do not name («Resto letto» — Yahoo lists ~10 holdings per fund) and the unread ones.
+ *
+ * Every share is rounded to the printed unit and the drift goes to the row that is a remainder BY
+ * DEFINITION, «Resto letto»; without it (every read euro is named, as in Emittenti with few
+ * families) the largest row takes it, where one point is the smallest relative error — AGENTS.md
+ * § Hierarchy, a list that must add up adds up ON SCREEN. A remainder never goes negative or, when
+ * it had a point, to zero: what it cannot absorb goes to the largest row too.
+ */
+export function summarizeExposure(exposure: PortfolioExposure, view: ExposureViewKey, limit: number): ExposureView {
+  const { entries, coverage } = exposure[view];
+  const base = coverage.base;
+  const share = (value: number): number => (base > 0 ? Math.round((value / base) * 100) : 0);
 
-function sectorRow(sector: ExposureSector): ExposureRow {
-  return {
-    key: sector.key,
-    label: sector.label,
-    amount: sector.exposureEur,
-    percentage: round1(sector.exposurePct * 100),
-    sources: sector.sources.map((source) => ({
-      ticker: source.ticker,
-      name: source.assetName,
-      amount: source.contributionEur,
-      weight: source.sectorWeight,
-      baseValue: source.assetValueEur,
-    })),
-  };
-}
+  const rows: ExposureRow[] = entries.slice(0, Math.max(0, limit)).map((entry) => ({ ...entry, percentage: share(entry.amount) }));
+  const shownAmount = rows.reduce((sum, row) => sum + row.amount, 0);
+  const readRest = coverage.read.amount - shownAmount;
+  const remainders: ExposureRemainder[] = [];
+  if (readRest > 0.5) remainders.push({ key: 'read-rest', label: READ_REST_LABEL, amount: readRest, percentage: share(readRest) });
+  if (coverage.unread.amount > 0.5) remainders.push({ key: 'unread', label: UNREAD_LABEL, amount: coverage.unread.amount, percentage: share(coverage.unread.amount) });
 
-function issuerRow(issuer: ExposureIssuer): ExposureRow {
-  return {
-    key: issuer.family,
-    label: issuer.family,
-    amount: issuer.exposureEur,
-    percentage: round1(issuer.exposurePct * 100),
-    sources: issuer.assets.map((asset) => ({ ticker: asset.ticker, name: asset.name, amount: asset.valueEur })),
-  };
-}
-
-/** One label for every view: what the rows leave out is the rest of the portfolio, analysed or not. */
-const REMAINDER_LABEL = 'Resto del portafoglio';
-
-/** The rows of one exposure view, the largest `limit` of them, closed by the residual of the portfolio. */
-export function summarizeExposure(exposure: PortfolioExposureData, view: ExposureViewKey, limit: number): ExposureView {
-  const all =
-    view === 'holdings'
-      ? exposure.topHoldings.map(holdingRow)
-      : view === 'sectors'
-        ? exposure.sectors.map(sectorRow)
-        : exposure.issuers.map(issuerRow);
-  const rows = [...all].sort((a, b) => b.amount - a.amount).slice(0, Math.max(0, limit));
-  const shown = rows.reduce((sum, row) => sum + row.amount, 0);
-  const shownPct = rows.reduce((sum, row) => sum + row.percentage, 0);
-  const restAmount = exposure.totalPortfolioValue - shown;
-  const restPct = round1(100 - shownPct);
-  const remainder = restAmount > 0.5 && restPct > 0 ? { label: REMAINDER_LABEL, amount: restAmount, percentage: restPct } : null;
-  return { rows, remainder };
+  const printed = [...rows, ...remainders];
+  if (base > 0 && printed.length > 0) {
+    const largest = printed.reduce((best, row) => (row.amount > best.amount ? row : best), printed[0]);
+    const remainder = remainders.find((row) => row.key === 'read-rest') ?? largest;
+    const drift = 100 - printed.reduce((sum, row) => sum + row.percentage, 0);
+    const floor = remainder.percentage > 0 ? 1 : 0;
+    const absorbed = Math.max(drift, floor - remainder.percentage);
+    remainder.percentage += absorbed;
+    largest.percentage += drift - absorbed;
+  }
+  return { rows, remainders, coverage };
 }
 
 export interface ExposureHighlights {
   topHolding: { name: string; pct: number; sourceCount: number } | null;
   topSector: { label: string; pct: number } | null;
-  /** The biggest issuer and its share of the ETFs (its exposure over every issuer's). */
-  topIssuer: { family: string; etfShare: number } | null;
+  /** The biggest issuer and its share of the quoted instruments (its market value over the view's base). */
+  topIssuer: { family: string; pct: number } | null;
 }
 
-/** What the Esposizione reading names: the heaviest holding, the first sector, the biggest issuer. */
-export function summarizeExposureHighlights(exposure: PortfolioExposureData): ExposureHighlights {
-  const holding = [...exposure.topHoldings].sort((a, b) => b.exposureEur - a.exposureEur)[0] ?? null;
-  const sector = [...exposure.sectors].sort((a, b) => b.exposureEur - a.exposureEur)[0] ?? null;
-  const issuers = [...exposure.issuers].sort((a, b) => b.exposureEur - a.exposureEur);
-  const issuerTotal = issuers.reduce((sum, issuer) => sum + issuer.exposurePct, 0);
-  const issuer = issuers[0] ?? null;
+const round1 = (value: number): number => Math.round(value * 10) / 10;
+
+/** The first entry of a view as a share of ITS base, one decimal; null when the view has nothing read. */
+function topEntry(view: ExposureViewData): { entry: ExposureEntry; pct: number } | null {
+  const entry = view.entries[0];
+  if (!entry || view.coverage.base <= 0) return null;
+  return { entry, pct: round1((entry.amount / view.coverage.base) * 100) };
+}
+
+/** What the Esposizione reading names: the heaviest holding, the first sector, the biggest issuer, each on its own view's base. */
+export function summarizeExposureHighlights(exposure: PortfolioExposure): ExposureHighlights {
+  const holding = topEntry(exposure.holdings);
+  const sector = topEntry(exposure.sectors);
+  const issuer = topEntry(exposure.issuers);
   return {
-    topHolding: holding ? { name: holding.name, pct: round1(holding.exposurePct * 100), sourceCount: holding.sources.length } : null,
-    topSector: sector ? { label: sector.label, pct: round1(sector.exposurePct * 100) } : null,
-    topIssuer: issuer && issuerTotal > 0 ? { family: issuer.family, etfShare: Math.round((issuer.exposurePct / issuerTotal) * 100) } : null,
+    // «in 3 strumenti» counts INSTRUMENTS: a composite with two equity legs is one instrument, two sources.
+    topHolding: holding ? { name: holding.entry.label, pct: holding.pct, sourceCount: new Set(holding.entry.sources.map((source) => source.name)).size } : null,
+    topSector: sector ? { label: sector.entry.label, pct: sector.pct } : null,
+    topIssuer: issuer ? { family: issuer.entry.label, pct: issuer.pct } : null,
   };
 }
 

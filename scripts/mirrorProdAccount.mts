@@ -32,7 +32,7 @@ const EMULATOR_ENV = {
   GCLOUD_PROJECT: 'demo-net-worth',
 };
 const USER_COLLECTIONS = ['assets', 'expenses', 'expenseCategories', 'monthly-snapshots', 'assetTransactions', 'pensionContributions', 'dividends', 'costCenters', 'goals', 'assistantThreads'];
-const PER_USER_DOCS = ['users', 'assetAllocationTargets', 'assetTransactionsMeta', 'budgets', 'hall-of-fame', 'performance-cache', 'exposure-cache', 'dashboardOverviewSummaries'];
+const PER_USER_DOCS = ['users', 'assetAllocationTargets', 'assetTransactionsMeta', 'budgets', 'hall-of-fame', 'performance-cache', 'dashboardOverviewSummaries'];
 
 type AnyRecord = Record<string, unknown>;
 const [command, argument] = process.argv.slice(2);
@@ -84,7 +84,7 @@ async function seed(email: string | undefined) {
     console.info(`read ${c}: ${snap.size}`);
   }
   for (const c of PER_USER_DOCS) {
-    if (c === 'performance-cache' || c === 'exposure-cache' || c === 'dashboardOverviewSummaries') continue; // recomputed by the app
+    if (c === 'performance-cache' || c === 'dashboardOverviewSummaries') continue; // recomputed by the app
     const snap = await db.doc(`${c}/${uid}`).get();
     dump[`doc:${c}`] = snap.exists ? serialise(snap.data(), Timestamp) : null;
   }

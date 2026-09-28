@@ -1,6 +1,6 @@
 # PERF-00 — Esposizione: la leva come nozionale, la copertura onesta, la base di Allocazione, una cache che va a segno
 
-> Stato: da fare · Priorità: 1 (entra PRIMA di PERF-01) · Sforzo: L · Dipende da: — (l'integrazione di #400/#401/#403
+> Stato: **fatta** (2026-09-28; le decisioni di § 4.9 e le parole FINALI della riga di copertura — due frasi, «In questa vista» / «Fuori da questa vista», riviste dal proprietario sul mirror — in doc/guide/allocazione.md § Esposizione: le frasi di § 4.7 qui sotto sono la stesura di partenza) · Priorità: 1 (entra PRIMA di PERF-01) · Sforzo: L · Dipende da: — (l'integrazione di #400/#401/#403
 > del 2026-09-27 è già nel ramo di partenza) · Sblocca: PERF-01 (la baseline di Allocazione senza Yahoo), PERF-10 (che
 > perde § A), MOB-01, MOB-07
 > · Origine: issue #402 di Ciocc128, accettata con modifiche; il codice lo scriviamo noi (proprietario, 2026-09-27)

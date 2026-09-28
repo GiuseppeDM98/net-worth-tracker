@@ -203,13 +203,13 @@ per spec.
 
 | Spec | Titolo | Priorità | Sforzo | Dipende da | Modello · effort | Stato |
 |---|---|---|---|---|---|---|
-| [MOB-01](MOB-01-censimento-e-budget-prima-schermata.md) | Il censimento in repo e il budget della prima schermata | 1 | M | PERF-01, PERF-00 | Opus 5.5 · high | da fare |
+| [MOB-01](MOB-01-censimento-e-budget-prima-schermata.md) | Il censimento in repo e il budget della prima schermata | 1 | M | PERF-01, PERF-00 (chiusa il 2026-09-28) | Opus 5.5 · high | da fare |
 | [MOB-02](MOB-02-primitive-della-composizione.md) | Le primitive della composizione | 1 | L | MOB-01, PERF-12, PERF-14 (con PERF-02; PERF-03) | Fable 5.1 · xhigh | da fare |
 | [MOB-03](MOB-03-panoramica.md) | Panoramica | 2 | M | MOB-02, PERF-03, PERF-07 | Fable 5.1 · high | da fare |
 | [MOB-04](MOB-04-cashflow-cinque-tab.md) | Cashflow: le cinque tab | 2 | L | MOB-02, PERF-06 | Fable 5.1 · xhigh | da fare |
 | [MOB-05](MOB-05-rendimenti.md) | Rendimenti | 2 | M | MOB-02, PERF-09 | Fable 5.1 · high | da fare |
 | [MOB-06](MOB-06-patrimonio-analisi-storico-hall-of-fame.md) | Patrimonio · Analisi · Storico · Hall of Fame | 3 | L | MOB-02, PERF-11 | Opus 5.5 · high | da fare |
-| [MOB-07](MOB-07-allocazione-previdenza-fire.md) | Allocazione · Previdenza · FIRE | 3 | L | MOB-02 (PERF-04, 05, 10 e PERF-00 chiuse) | Fable 5.1 · high | da fare |
+| [MOB-07](MOB-07-allocazione-previdenza-fire.md) | Allocazione · Previdenza · FIRE | 3 | L | MOB-02 (PERF-04, 05, 10 chiuse; PERF-00 chiusa il 2026-09-28) | Fable 5.1 · high | da fare |
 | [MOB-08](MOB-08-tablet-768-e-1024.md) | Tablet: 768 e 1024 | 3 | M | MOB-03..07 (PERF-01, 02, 14) | Opus 5.5 · high | da fare |
 | [MOB-09](MOB-09-design-md-guide-e-chiusura.md) | DESIGN.md, guide e chiusura | 3 | M | MOB-03..08 | Opus 5.5 · high | da fare |
 

@@ -198,9 +198,9 @@ export function ExpenseSplitTab({ allExpenses, familyMembers, loading, loadFaile
                   <RankedRows
                     rows={commonRows}
                     color="var(--chart-1)"
-                    remainder={
+                    remainders={
                       commonRanking.remainder
-                        ? { label: 'Altre', amount: commonRanking.remainder.amount, percentage: commonRanking.remainder.percentage }
+                        ? [{ label: 'Altre', amount: commonRanking.remainder.amount, percentage: commonRanking.remainder.percentage }]
                         : null
                     }
                     ariaLabel="Spese in comune per categoria"

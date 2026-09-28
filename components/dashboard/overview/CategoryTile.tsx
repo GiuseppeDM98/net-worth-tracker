@@ -78,13 +78,15 @@ export function CategoryTile({
             labelClassName={labelClassName}
             onRowClick={handleRowClick}
             ariaLabel={eyebrow}
-            remainder={
+            remainders={
               remainderAmount >= 1
-                ? {
-                    label: 'Altre categorie',
-                    amount: remainderAmount,
-                    percentage: total > 0 ? (remainderAmount / total) * 100 : 0,
-                  }
+                ? [
+                    {
+                      label: 'Altre categorie',
+                      amount: remainderAmount,
+                      percentage: total > 0 ? (remainderAmount / total) * 100 : 0,
+                    },
+                  ]
                 : null
             }
           />

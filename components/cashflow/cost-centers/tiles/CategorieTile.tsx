@@ -34,7 +34,7 @@ export function CategorieTile({ slices, reading, footer, color, className }: Cat
           <RankedRows
             rows={named.map((slice) => ({ key: slice.key, label: slice.categoryName, amount: slice.total, percentage: slice.pct * 100 }))}
             color={color}
-            remainder={other ? { label: other.categoryName, amount: other.total, percentage: other.pct * 100 } : null}
+            remainders={other ? [{ label: other.categoryName, amount: other.total, percentage: other.pct * 100 }] : null}
           />
         </div>
       )}

@@ -1,61 +1,77 @@
 'use client';
 
-import { useRef } from 'react';
+import { useMemo, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query/queryKeys';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
-import { PortfolioExposureResponse } from '@/types/exposure';
+import { computeExposure } from '@/lib/utils/exposureEngine';
+import { profileRequestsSignature, selectProfileRequests } from '@/lib/utils/exposureRequests';
+import type { Asset } from '@/types/assets';
+import type { InstrumentProfile, InstrumentProfilesResponse } from '@/types/exposure';
 
-async function fetchPortfolioExposure(
-  force: boolean
-): Promise<PortfolioExposureResponse> {
-  const url = force
-    ? '/api/portfolio/exposure?force=true'
-    : '/api/portfolio/exposure';
+async function fetchInstrumentProfiles(ownerId: string, force: boolean): Promise<InstrumentProfilesResponse> {
+  const url = `/api/portfolio/instrument-profiles?userId=${encodeURIComponent(ownerId)}${force ? '&force=true' : ''}`;
   const response = await authenticatedFetch(url);
   if (!response.ok) {
-    throw new Error('Failed to fetch portfolio exposure');
+    throw new Error('Failed to fetch instrument profiles');
   }
-  return response.json() as Promise<PortfolioExposureResponse>;
+  return response.json() as Promise<InstrumentProfilesResponse>;
 }
 
+/** Stable, so a portfolio with nothing to ask computes once and not on every render. */
+const NO_PROFILES: Record<string, InstrumentProfile> = {};
+
 /**
- * Lazily fetches portfolio exposure breakdown (top holdings, sectors, ETF issuers).
+ * The Esposizione of the OWNER's Allocazione portfolio: the route answers only the Yahoo profiles
+ * of the tickers in view (`/api/portfolio/instrument-profiles`, one shared cache per ticker), and
+ * the weighing runs here, in the browser, on the assets the page already holds
+ * (`computeExposure`, doc/perf/PERF-00 § 4.3) — so the euros are Per classe's by construction and
+ * an edited asset recomputes the tile without a third invalidation.
  *
- * `enabled` gates the fetch; the Esposizione tile passes true on mount (the server's 24h cache
- * absorbs the Yahoo Finance cost), a caller that renders on demand can pass false until then.
+ * The query key carries the SIGNATURE of the tickers in view («AAPL:stock|VWCE.DE:fund»): a new
+ * ticker changes the key and the read restarts by itself. Nothing to ask (no quoted instrument
+ * with a module) means no request at all — the engine still runs, so a portfolio of bonds and
+ * crypto reads «non letto» with the names rather than a spinner. `staleTime` is an hour: the
+ * server's TTL is 30 days per module, and `refresh()` («Aggiorna») passes `force=true` to it.
  *
- * The returned `refresh` callback triggers a server-side cache bypass: useful
- * for the "Aggiorna" button when the portfolio composition hasn't changed but
- * the user wants fresh data. Plain `refetch` from React Query alone is not
- * enough because the server returns its Firestore cache when the cacheKey is
- * unchanged.
+ * `isLoading`, not `isPending`: on a disabled query the latter never lifts (AGENTS.md § React Query).
  */
-export function usePortfolioExposure(
-  userId: string | undefined,
-  enabled: boolean
-) {
-  // Set to true by `refresh()` and consumed on the next queryFn call.
-  // A ref (not state) avoids triggering a re-render when we flip it.
+export function usePortfolioExposure(ownerId: string | undefined, assets: Asset[]) {
+  const signature = useMemo(() => profileRequestsSignature(selectProfileRequests(assets)), [assets]);
+
+  // Set to true by `refresh()` and consumed on the next queryFn call — a ref, not state, so
+  // flipping it does not re-render.
   const forceRef = useRef(false);
 
   const query = useQuery({
-    queryKey: queryKeys.portfolio.exposure(userId ?? ''),
+    queryKey: queryKeys.portfolio.instrumentProfiles(ownerId ?? '', signature),
     queryFn: async () => {
       const force = forceRef.current;
       forceRef.current = false;
-      return fetchPortfolioExposure(force);
+      return fetchInstrumentProfiles(ownerId!, force);
     },
-    enabled: !!userId && enabled,
-    // Server cache is 24h; keep client stale for 20 min so navigating away and
-    // back within a session doesn't trigger a redundant refetch.
-    staleTime: 20 * 60 * 1000,
+    enabled: !!ownerId && signature !== '',
+    staleTime: 60 * 60 * 1000,
   });
+
+  // React Query keeps the last payload through a failed refresh, so a stale list beats an empty
+  // tile; with nothing to ask the profiles are simply empty and the engine runs at once.
+  const profiles = signature === '' ? NO_PROFILES : query.data?.profiles;
+  const exposure = useMemo(() => (profiles ? computeExposure(assets, profiles) : null), [assets, profiles]);
 
   const refresh = () => {
     forceRef.current = true;
     return query.refetch();
   };
 
-  return { ...query, refresh };
+  return {
+    exposure,
+    profiles,
+    oldestFetchedAt: query.data?.oldestFetchedAt ?? null,
+    isLoading: query.isLoading,
+    isError: query.isError,
+    isFetching: query.isFetching,
+    refetch: query.refetch,
+    refresh,
+  };
 }
