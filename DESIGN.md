@@ -392,11 +392,12 @@ reason a CSS variable cannot serve, and nowhere else:
   `lib/services/chartService.ts:116` (the «altri» grey) — waived by name in
   `.impeccable/config.json`'s `ignoreValues`.
 
-Everything else is debt, recorded here as fact and not as a fix. Two chrome hues of the default
-theme violate **The Zero-Chroma Rule** today: `components/ui/switch.tsx:14` paints the dark ON
+Everything else is debt, recorded here as fact and not as a fix. One chrome hue of the default
+theme violates **The Zero-Chroma Rule** today: `components/ui/switch.tsx:14` paints the dark ON
 state `bg-blue-600` (because `--primary` is near-white there and a white pill on a white track is
-invisible — the reason is real, the hue is still wrong), and `components/ProtectedRoute.tsx:43` draws
-the auth spinner `border-gray-300 border-t-blue-600`. The third — an emerald Safari `mask-icon`
+invisible — the reason is real, the hue is still wrong). The second, the auth spinner
+`border-gray-300 border-t-blue-600` in `components/ProtectedRoute.tsx`, went on 2026-09-28 with
+PERF-02: the wait is the tile-grid skeleton now. The third — an emerald Safari `mask-icon`
 (`#10B981`) in `app/layout.tsx` for a brand that has no brand colour — was removed on 2026-09-13:
 the tag is legacy (Safari reads the ordinary favicon since 2018) and the icon is multicolour, so it
 never worked as a monochrome mask either. One sign-colour literal sits beside them:

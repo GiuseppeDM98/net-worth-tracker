@@ -14,6 +14,18 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   **The theme is an external store** (2026-09-06): `useSyncExternalStore` over localStorage with `'default'` as the
   server snapshot; the `data-theme` attribute is a pure effect on the value, `writeStoredTheme` applies it before the
   re-render, and the Firestore sync depends on `uid` alone (rewriting an equal value is a no-op in every sink).
+- **The theme is on `<html>` BEFORE the first paint** (PERF-02, 2026-09-28): `app/layout.tsx` inlines
+  `COLOR_THEME_INIT_SCRIPT` in `<head>` — a plain function that reads the storage key, accepts only a name from the
+  list and sets the attribute — the way next-themes puts `.dark` there. Since that day the dashboard shell is in the
+  prerendered HTML, and without the script a reader on a non-default theme would see the default palette until
+  hydration. The key, the attribute, the list and the script live in **`lib/constants/colorTheme.ts`**, a module
+  WITHOUT `'use client'`: the root layout is a Server Component, and a value imported from a client module there is
+  a client reference, not the string. `ColorThemeContext` imports the same constants, and both sides accept a stored
+  value through `isColorTheme` (a stale or hand-edited key is the default). The `ColorTheme` union derives from
+  `COLOR_THEMES` there (`userPreferencesService` re-exports it). In `<head>`, not in `<body>`: a body script runs
+  after the parser may already have had a rendering opportunity. Pinned by `__tests__/colorTheme.test.ts` (the
+  script run in a VM) and by `e2e/shell.boot{,.mobile}.spec.ts` (c): the attribute at the first animation frame,
+  and set while `document.body` did not exist yet.
 - **`useChartColors` timing**: `useEffect + useState + requestAnimationFrame`, NOT `useMemo` — `getComputedStyle` during
   render runs before next-themes has updated the DOM and yields stale colours on a theme switch.
 - **oklch luminance filter**: L > 0.82 in light or L < 0.30 in dark falls back to the static palette, so a theme with
@@ -75,7 +87,8 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   (`--chart-${slot + 1}`), because the hand-written map was a second source that disagreed with the first: crypto's chip
   was `--chart-4` while its chart slot was 2, so one class wore two hues on one screen. `cash` keeps
   `--muted-foreground` on purpose — liquidity is the absence of a position, not a series.
-- **Adding a theme**: CSS blocks `[data-theme="name"]` + `.dark[data-theme="name"]`, the `ColorTheme` union, an entry in
+- **Adding a theme**: CSS blocks `[data-theme="name"]` + `.dark[data-theme="name"]`, the name in `COLOR_THEMES`
+  (`lib/constants/colorTheme.ts` — the union and the pre-hydration script both derive from it), an entry in
   `COLOR_THEME_SWATCHES` (module level in `settings/page.tsx`), the swatch grid columns, `tsc`. The swatch previews carry
   each theme's own literal oklch values ON PURPOSE — they preview a palette that is NOT active, which no CSS token can
   express — and the accessible name is the POSITION («Colore 3 di 6: Midnight Bloom»), never the hue.
@@ -109,4 +122,4 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   entry above is about a slot used as a NON-text signal, which is a different floor and is still open.
 - **Index 9 of `useChartColors()` is still the static lime** (`CHART_COLORS[9]`): no surface uses it. Indices 0-7 are theme-aware since 2026-08-30, index 8 (`--chart-9`, Previdenza) since 2026-09-20.
 - **Sign-colour CHIPS sit below AA, structurally** (`bg-positive/10 text-positive` washes the background with the text's hue: 15 of 24 combinations at 3.34–4.40:1; deliberately not fixed). `MonthlyReturnsHeatmap` fills its cells with the sign tokens at 30/55/85% (the figure is never printed in the cell, so the AA text floor does not apply). (moved from `CLAUDE.md` → Known Issues on 2026-09-19)
-- **Due tinte del chrome violano la Zero-Chroma Rule** (`switch.tsx` ON blu in dark, `ProtectedRoute` spinner; la mask-icon smeraldo è stata rimossa il 2026-09-13; il `text-emerald-*` di `ExpenseTable` è passato a `text-positive` il 2026-09-14); gli altri ~100 hex DOM-side sono eccezioni dichiarate in DESIGN.md → The DOM-side hex inventory. (moved from `CLAUDE.md` → Known Issues on 2026-09-19)
+- **Una tinta del chrome viola la Zero-Chroma Rule** (`switch.tsx` ON blu in dark; lo spinner di `ProtectedRoute` è sparito il 2026-09-28 con PERF-02, l'attesa è lo skeleton a tessere; la mask-icon smeraldo è stata rimossa il 2026-09-13; il `text-emerald-*` di `ExpenseTable` è passato a `text-positive` il 2026-09-14); gli altri ~100 hex DOM-side sono eccezioni dichiarate in DESIGN.md → The DOM-side hex inventory. (moved from `CLAUDE.md` → Known Issues on 2026-09-19)

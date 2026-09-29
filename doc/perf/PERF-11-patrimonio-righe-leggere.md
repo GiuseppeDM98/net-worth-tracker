@@ -31,9 +31,9 @@ renderer che tocca solo ciò che cambia.
   il focus all'opener: `returnFocusTo` è un `RefObject`, `components/ui/responsive-modal.tsx:116`, riempito con
   `event.currentTarget` al click — doc/guide/dialog.md); le due fasi intatte; `e2e/assets.bond.spec.ts` e
   `assets.sale-tax.spec.ts` verdi.
-- Un solo elenco nel DOM per larghezza (mobile O desktop), letto da `useMediaQuery('(min-width: 1440px)')` (dopo PERF-02 è
-  `useSyncExternalStore` con snapshot server `false`: sul server e nel primo frame rende la LISTA — accettabile perché
-  Patrimonio è dietro `ProtectedRoute` e monta solo sul client, ma va detto nel commento): il numero di `AssetRow` + righe
+- Un solo elenco nel DOM per larghezza (mobile O desktop), letto da `useMediaQuery('(min-width: 1440px)')` (dal
+  2026-09-28, PERF-02, è `useSyncExternalStore` con snapshot server `false`: Patrimonio è dietro `ProtectedRoute` e
+  monta solo sul client, DOPO l'idratazione, quindi legge il valore vero già al primo render — va detto nel commento): il numero di `AssetRow` + righe
   `<tr>` = N, non 2N. 1440 inclusivo (AGENTS.md § Tailwind Breakpoints; il progetto Playwright `desktop` gira a 1440).
 - Census (PERF-12, `npm run perf:census -- --route=assets`): 10 tasti in «quantità» di `AssetDialog` → ri-renderizza la sezione
   quantità/PMC, non il picker del tipo.

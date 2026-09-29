@@ -20,7 +20,9 @@ setup('authenticate centri user', async ({ page }) => {
   await page.getByRole('button', { name: 'Accedi', exact: true }).click();
 
   await page.waitForURL(/\/dashboard/, { timeout: 30_000 });
-  await expect(page.getByRole('navigation').or(page.locator('main'))).toBeVisible();
+  // The profile in the sidebar footer, not `navigation`/`main`: those are in the HTML before the
+  // login since PERF-02 (see auth.setup.ts).
+  await expect(page.locator('[data-sidebar="footer"]')).toContainText(EMAIL);
 
   // indexedDB: true — the Firebase Web SDK parks its session there (see auth.setup.ts).
   await page.context().storageState({ path: CENTRI_STORAGE_STATE, indexedDB: true });

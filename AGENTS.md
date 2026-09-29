@@ -541,7 +541,8 @@ file used to carry.
 
 ### Motion
 - Shared variants live in `lib/utils/motionVariants.ts`; `useReducedMotion()` is called once per component and used
-  inline, with `<MotionConfig reducedMotion="user">` at the layout root — no separate CSS media queries.
+  inline, with ONE `<MotionConfig reducedMotion="user">`, in `components/providers/MotionProvider.tsx` at the root
+  layout (the dashboard layout's duplicate went with PERF-02, 2026-09-28) — no separate CSS media queries.
 - **Page transitions use `template.tsx`, NOT `layout.tsx` + `AnimatePresence`** (it re-mounts on every navigation);
   remove page-level `motion.div variants` wrappers once it is in place (compounded opacity: t²). **Since 2026-09-12 a
   click on a shell link is a page SCENE** — a native view transition (`lib/hooks/useSceneNavigation.ts` →
@@ -648,6 +649,22 @@ file used to carry.
 - A sticky `<thead>` needs a fully opaque token, never an alpha background.
 
 ### Navigation
+- **The shell renders BEFORE Firebase Auth resolves** (PERF-02, 2026-09-28): `app/dashboard/layout.tsx` keeps the
+  skip link, `AppSidebar`, `<main>` and `BottomNavigation` OUTSIDE `ProtectedRoute`, which wraps only `{children}`
+  inside `<main>` with the compact header's silhouette (`PageHeaderSkeleton`, no `h1`) and the generic
+  `TileGridSkeleton` (labelled «Verifica dell'accesso») as its `fallback`, kept on screen through the redirect to
+  `/login`; `main h1` therefore still means «the page has mounted». So every shell component runs on the server and hydrates: nothing in it
+  reads `window`/`document` during render, `AppSidebar` and `SecondaryMenuDrawer` accept `user` null (the profile is
+  two `Skeleton` lines on a 44px button, no layout shift when the name lands), the demo banner appears WITH the
+  user, and `AuthContext` sets `user` and `loading` in the same commit with nothing awaited in front (the Firestore
+  `displayName` fallback lands afterwards, doc/guide/accesso-registrazione.md). `npm run perf:budget`'s «testo»
+  column reads that HTML: a dashboard route back at 0 has put the shell behind the gate again.
+- **`useMediaQuery` is SSR-safe — `false` on the server and during hydration, the real value right after**
+  (`useSyncExternalStore`, PERF-02). The shell's FIRST frame is therefore decided by CSS — the fixed sidebar is
+  `hidden desktop:flex`, the bottom nav `desktop:hidden`, the mobile Sheet mounts only when opened — never by that
+  value; a component mounted AFTER login is not hydrating and still reads the real value on its first render.
+  `e2e/shell.boot.spec.ts` and `shell.boot.mobile.spec.ts` assert the console carries no hydration message at 1440
+  and 390, and that a stored theme is on `<html>` at the first frame (the `<head>` script, doc/guide/temi.md).
 - **A `PageTabs` panel names ITSELF** (2026-09-21): `PageTabBar` renders plain buttons, not Radix
   `TabsTrigger`s, so every `TabsContent` was born with an `aria-labelledby` naming a trigger id that
   does not exist and had an EMPTY accessible name. A panel takes `id={pageTabPanelId(layoutId,
@@ -674,9 +691,10 @@ file used to carry.
   size on `sidebarMenuButtonVariants` (`size-11!`, `p-3.5!`, `justify-center`) are what make every collapsed target
   44×44; `SidebarGroup`/`SidebarHeader`/`SidebarFooter` drop to `p-1.5` in icon mode for the same reason. A custom
   button in the rail (the collapse toggle) needs its own `group-data-[state=collapsed]:size-11`.
-- **`PageHeader` mounts its `actions` TWICE** (desktop row, phone navbar): a `ref` on an action lands on whichever
-  copy mounted last and `querySelector` finds the HIDDEN one first (width 0, 2026-09-18). Take the pressed node from
-  `event.currentTarget` (`app/dashboard/page.tsx`, «Crea snapshot»); measure the copy with `offsetWidth > 0`.
+- **`PageHeader` mounts its `actions` — and its `h1` — TWICE** (desktop row, phone navbar): a `ref` on an action lands
+  on whichever copy mounted last and `querySelector` finds the HIDDEN one first (width 0, 2026-09-18). Take the pressed
+  node from `event.currentTarget` (`app/dashboard/page.tsx`, «Crea snapshot»); measure the copy with `offsetWidth > 0`;
+  in a spec `main h1` is a strict-mode violation until it is `.filter({ visible: true })` (2026-09-28, `e2e/shellBoot.ts`).
 - **`PageContainer`** is the 1920px root of a tile page (its only width since 2026-09-06); the loading state must use the same width or
   the page jumps when data lands (the Panoramica's skeleton was 1600 while the page was 1920). The loading state of a
   tile page is `TileGridSkeleton` with the page's own `cells` — never a per-page skeleton component.

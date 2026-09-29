@@ -1,9 +1,12 @@
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
+import type { ColorTheme } from '@/lib/constants/colorTheme';
 
 const COLLECTION = 'userPreferences';
 
-export type ColorTheme = 'default' | 'solar-dusk' | 'elegant-luxury' | 'midnight-bloom' | 'cyberpunk' | 'retro-arcade';
+// The union is derived from `COLOR_THEMES` in lib/constants/colorTheme.ts, the list the
+// pre-hydration script also accepts; re-exported so the consumers of this service keep their import.
+export type { ColorTheme };
 
 export interface UserPreferences {
   colorTheme?: ColorTheme;

@@ -7,7 +7,9 @@
  * - displayName is stored in BOTH Firebase Auth profile AND Firestore document
  *   - Google OAuth users: displayName set in Firebase Auth profile automatically
  *   - Email/password users: displayName stored in Firestore only
- *   - Fallback pattern ensures displayName is always available
+ *   - The gate opens on what Auth knows (`setLoading(false)` in the `onAuthStateChanged`
+ *     callback, nothing awaited — PERF-02); the Firestore fallback lands afterwards and is
+ *     copied into the Auth profile once, so the next sign-in needs no read (`resolveDisplayName`)
  *
  * - User creation is a two-step process:
  *   1. Create Firebase Auth user (email/password or Google OAuth)
@@ -26,7 +28,14 @@
  */
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from 'react';
 import {
   User as FirebaseUser,
   onAuthStateChanged,
@@ -42,6 +51,7 @@ import { auth, db } from '@/lib/firebase/config';
 import { User } from '@/types/assets';
 import { getDefaultTargets, setSettings } from '@/lib/services/assetAllocationService';
 import { waitForAuthTokenRefresh, retryFirestoreOperation } from '@/lib/utils/authHelpers';
+import { resolveDisplayName, type UserDocumentName } from '@/lib/utils/authProfile';
 
 /**
  * Authentication context interface
@@ -69,6 +79,54 @@ function withCode(message: string, code: string): Error & { code: string } {
   const failure = new Error(message) as Error & { code: string };
   failure.code = code;
   return failure;
+}
+
+/**
+ * The displayName fallback for email/password users, run AFTER the gate has opened.
+ *
+ * Google users carry the name in the Auth profile; email/password users only in `users/{uid}`.
+ * This read used to be awaited before `setLoading(false)` — a Firestore round trip in front of
+ * every page, sidebar included (PERF-02). Now it lands when it arrives (the Panoramica's greeting
+ * gains the name a frame later; its `useMemo` already depends on `user?.displayName`), and the
+ * Auth profile learns it once, so from the next sign-in there is nothing to read. It never
+ * throws: a name that cannot be read is not a failed sign-in.
+ */
+async function completeDisplayName(
+  firebaseUser: FirebaseUser,
+  setUser: Dispatch<SetStateAction<User | null>>,
+): Promise<void> {
+  let userDocument: UserDocumentName | null = null;
+  try {
+    const userSnap = await getDoc(doc(db, 'users', firebaseUser.uid));
+    userDocument = userSnap.exists() ? (userSnap.data() as UserDocumentName) : null;
+  } catch (error) {
+    console.error('Error fetching user displayName from Firestore:', error);
+    return;
+  }
+
+  const { displayName, shouldBackfillAuthProfile } = resolveDisplayName(
+    { displayName: firebaseUser.displayName },
+    userDocument,
+  );
+  if (!displayName) return;
+
+  // Only while the same user is still signed in: a sign-out that raced this read must not
+  // bring the name back onto a null user.
+  setUser((current) =>
+    current && current.uid === firebaseUser.uid ? { ...current, displayName } : current,
+  );
+
+  // The demo account is read-only by contract («nessuna modifica viene salvata»): its Auth
+  // profile stays as it is, and the fallback simply runs again next time.
+  const isDemoAccount =
+    !!process.env.NEXT_PUBLIC_DEMO_USER_ID && firebaseUser.uid === process.env.NEXT_PUBLIC_DEMO_USER_ID;
+  if (!shouldBackfillAuthProfile || isDemoAccount) return;
+  try {
+    await updateProfile(firebaseUser, { displayName });
+  } catch (error) {
+    // Best effort: the name is already on screen, and the fallback covers the next sign-in.
+    console.warn('Could not copy displayName into the Auth profile:', error);
+  }
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -101,39 +159,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
-      if (firebaseUser) {
-        // Try to get displayName from Firebase Auth first
-        let displayName = firebaseUser.displayName;
-
-        // If displayName is not in Firebase Auth, try to get it from Firestore
-        // Why dual-lookup? Google OAuth sets displayName in Firebase Auth profile,
-        // but email/password registration stores it in Firestore only.
-        // This fallback ensures displayName is available regardless of signup method.
-        if (!displayName) {
-          try {
-            const userRef = doc(db, 'users', firebaseUser.uid);
-            const userSnap = await getDoc(userRef);
-            if (userSnap.exists()) {
-              const userData = userSnap.data();
-              displayName = userData.displayName || null;
-            }
-          } catch (error) {
-            console.error('Error fetching user displayName from Firestore:', error);
-          }
-        }
-
-        // Convert Firebase user to our User type
-        const userData: User = {
-          uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          displayName: displayName,
-        };
-        setUser(userData);
-      } else {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser: FirebaseUser | null) => {
+      if (!firebaseUser) {
         setUser(null);
+        setLoading(false);
+        return;
       }
+
+      // Unblock on what Auth already knows — nothing is awaited in front of the shell. React
+      // batches the two calls into ONE commit, so the sidebar's profile and the page arrive
+      // together (the benchmark's auth marker counts on it, scripts/perfBenchmark.mjs).
+      setUser({
+        uid: firebaseUser.uid,
+        email: firebaseUser.email,
+        displayName: firebaseUser.displayName,
+      });
       setLoading(false);
+
+      if (!firebaseUser.displayName) {
+        void completeDisplayName(firebaseUser, setUser);
+      }
     });
 
     return () => unsubscribe();
