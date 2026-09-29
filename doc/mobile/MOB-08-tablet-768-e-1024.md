@@ -121,9 +121,10 @@ Tracciamento** (tab, «+» e «Aggiungi», Movimenti; `e2e/cashflow.tablet.spec.
 
 ### 4.5 Conflitti con PERF
 
-- **PERF-02** porta la shell, barra compresa, fuori da `ProtectedRoute`: § 4.3 vale lì, rimisurata sulla build. Le
-  colonne sono CSS, il posto accanto no (`compact` è `false` sul server): oggi la griglia monta dopo i dati; se PERF-02/03
-  la rendono al primo paint, un fotogramma senza righe accanto, da annotare.
+- **PERF-02** (in develop dal 2026-09-29) ha portato la shell, barra compresa, fuori da `ProtectedRoute`
+  (`app/dashboard/layout.tsx`): § 4.3 vale lì, rimisurata sulla build. Le colonne sono CSS, il posto accanto no (`compact` è
+  `false` sul server): la griglia della pagina monta ancora dopo i dati, sul client (nell'HTML c'è solo lo skeleton generico,
+  con le sue colonne CSS); se PERF-03 la rende al primo paint, un fotogramma senza righe accanto, da annotare.
 - **PERF-04**: un'aperta va a tutta larghezza, nessun grafico pigro monta in una colonna da ~320 px. **PERF-14**: niente
   `layout` di Framer; si anima solo il pannello; `BottomNavigation` non si tocca. **PERF-12**: pura + hook senza stato.
   **PERF-03**: «Aggiornato alle…» sta nei 715 px. **`perf:serve`**: il censimento gira su :3200.

@@ -112,7 +112,8 @@ nello stesso commit). Allargare: a mano, con l'OK del proprietario, annotato in 
 
 **Conflitti con PERF**: `perf/` è la base (`perf:build`, `perf:serve` su :3200, il `--`, la pura + `.mts` di
 `perfBudget`); PERF-12 ha `perf:census`: nomi
-distinti; PERF-02 → il settle non guarda lo spinner; PERF-03 → la riga di stato vuota; PERF-04 → il settle aspetta lo
+distinti; PERF-02 (in develop dal 2026-09-29) → nessuno spinner: l'attesa dell'auth è lo skeleton «Verifica dell'accesso»
+in `main` (`app/dashboard/layout.tsx`), `[data-slot="skeleton"]` come ogni altro; PERF-03 → la riga di stato vuota; PERF-04 → il settle aspetta lo
 `Skeleton` dei grafici pigri (a riga chiusa `charts` scende: voluto).
 
 **Decisioni per il proprietario**: (1) budget sul mirror con tolleranza, o su un fixture deterministico (stabile ma

@@ -26,7 +26,7 @@ setup('authenticate degraded account', async ({ page }) => {
 
   await page.waitForURL(/\/dashboard/, { timeout: 30_000 });
   // The profile in the sidebar footer, not `navigation`/`main`: those are in the HTML before the
-  // login since PERF-02 (see auth.setup.ts).
+  // login since 2026-09-28 (see auth.setup.ts).
   await expect(page.locator('[data-sidebar="footer"]')).toContainText(DEGRADED_EMAIL);
 
   // `indexedDB: true` for the same reason as auth.setup.ts: the Firebase Web SDK keeps its session

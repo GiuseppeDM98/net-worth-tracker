@@ -1,7 +1,7 @@
 /**
  * Authentication gate for the dashboard PAGES — not for the shell around them.
  *
- * Since PERF-02 the dashboard layout renders the skip link, the sidebar, `<main>` and the bottom
+ * Since 2026-09-28 the dashboard layout renders the skip link, the sidebar, `<main>` and the bottom
  * nav unconditionally, so they are in the prerendered HTML and on screen before Firebase Auth has
  * resolved; this component sits INSIDE `<main>` and gates only the page. Three states:
  * 1. Loading — render `fallback` (the layout passes the generic tile-grid skeleton: the wait is a

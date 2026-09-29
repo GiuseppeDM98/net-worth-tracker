@@ -1,6 +1,6 @@
 /**
  * The colour theme constants and the pre-hydration script `app/layout.tsx` inlines in <head>
- * (PERF-02): the script is a string, so it is run here in a bare VM with a fake `localStorage` and
+ * (since 2026-09-28): the script is a string, so it is run here in a bare VM with a fake `localStorage` and
  * `document` — what it does before any module loads is what these cases pin.
  */
 import { describe, it, expect, vi } from 'vitest';

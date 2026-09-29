@@ -8,7 +8,7 @@ const getServerSnapshot = () => false;
 /**
  * Whether a CSS media query matches, read as an external store (`useSyncExternalStore`).
  *
- * The dashboard shell is in the prerendered HTML (PERF-02), so this hook now runs on the server
+ * The dashboard shell is in the prerendered HTML (since 2026-09-28), so this hook now runs on the server
  * and during hydration — where `window` does not exist and the only value that does not make React
  * report a mismatch is the server's, `false`. Right after hydration React reads the real snapshot
  * and re-renders the subscribers on its own: no error, no effect, no `setState`. A component

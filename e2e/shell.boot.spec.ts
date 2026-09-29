@@ -1,6 +1,6 @@
 /**
- * PERF-02 at 1440 — the dashboard shell before the login
- * (doc/perf/PERF-02-avvio-shell-prima-di-auth.md § 7). The assertions live in `shellBoot.ts`,
+ * The dashboard shell before the login, at 1440 (in the HTML since 2026-09-28,
+ * AGENTS.md § Navigation). The assertions live in `shellBoot.ts`,
  * shared with the 390 twin. Seen red on 2026-09-28, one at a time: (a) with the shell put back
  * inside `ProtectedRoute`; (b) with a `typeof window` branch rendering different text on the
  * server and on the client; (c) with the <head> script removed from `app/layout.tsx`.

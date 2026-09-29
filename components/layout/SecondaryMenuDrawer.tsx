@@ -265,7 +265,7 @@ export function SecondaryMenuDrawer({ open, onOpenChange }: SecondaryMenuDrawerP
                       </div>
                     </>
                   ) : (
-                    // The same wait state as AppSidebar's footer (PERF-02): the drawer can be opened
+                    // The same wait state as AppSidebar's footer: the drawer can be opened
                     // before Firebase Auth has answered, and two empty lines would read as a defect.
                     <>
                       <Skeleton className="size-7 shrink-0 rounded-md" />

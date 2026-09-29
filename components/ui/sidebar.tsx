@@ -6,7 +6,7 @@ import { PanelLeftIcon } from "lucide-react"
 import { Slot } from "radix-ui"
 
 // PROJECT OVERRIDE: use the project's hook (an SSR-safe external store: `false` on the server
-// and during hydration, the real value right after — PERF-02) instead of the shadcn default.
+// and during hydration, the real value right after; since 2026-09-28) instead of the shadcn default.
 // The 1439px threshold matches the custom `desktop:` breakpoint in app/globals.css
 // (min-width: 1440px). Because the shell is in the prerendered HTML, the FIRST frame is decided
 // by CSS, not by this value: the fixed sidebar below is `hidden desktop:flex`, and the mobile

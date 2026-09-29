@@ -53,10 +53,10 @@ meccanico di tutti e vale ~250 KB gz su Storico e ~100 KB a ogni cambio pagina f
 
 - Non si cambia il grafico o la sua estetica; non si tocca `useChartColors` (PERF-14).
 - Non si sostituisce framer-motion con `LazyMotion`/`m` (33 file, `layout` e `AnimatePresence` richiedono `domMax`: il
-  risparmio è piccolo e il rischio alto). Non si tocca firebase (136 KB, serve ovunque; il login senza Firestore è PERF-02).
+  risparmio è piccolo e il rischio alto). Non si tocca firebase (136 KB, serve ovunque; la lettura bloccante davanti alla shell è già andata: `contexts/AuthContext.tsx`, 2026-09-28).
 - Non si spezzano i dialog di Patrimonio/Cashflow in `next/dynamic`: `AssetDialog` e `ExpenseDialog` sono oggi sempre
   montati; montarli solo all'apertura (con l'uscita animata e il ritorno del focus intatti) è PERF-11.
-- Il modulo Firestore resta nel grafo del root layout, anche su `/login` (136 KB): PERF-02 toglie la LETTURA bloccante, non
+- Il modulo Firestore resta nel grafo del root layout, anche su `/login` (136 KB): PERF-02 ha tolto la LETTURA bloccante (`contexts/AuthContext.tsx`, 2026-09-28), non
   il modulo; toglierlo dal login è un lavoro a parte, non in questa serie.
 
 ## 4. Design

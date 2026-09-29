@@ -27,7 +27,7 @@ build non ha più, o se un tetto è più alto di quello in `HEAD` senza un `rais
 |---|---|
 | chunk | quanti `<script>` iniziali la pagina carica prima di poter disegnare |
 | raw KB / gz KB | la loro somma su disco, prima e dopo gzip (1 KB = 1024 byte) |
-| testo | caratteri di testo nel `body` dell'HTML prerenderizzato. Fino a PERF-02 era 0 su ogni route dashboard (solo lo spinner); dal 2026-09-28 ogni route porta la shell — skip link, le voci della sidebar, la bottom nav, l'attesa dell'auth — e conta qualche centinaio. Una route tornata a 0 ha rimesso la shell dietro il cancello (`e2e/shell.boot.spec.ts` legge lo stesso HTML) |
+| testo | caratteri di testo nel `body` dell'HTML prerenderizzato. Fino al 2026-09-28 era 0 su ogni route dashboard (solo lo spinner); da allora ogni route porta la shell — skip link, le voci della sidebar, la bottom nav, l'attesa dell'auth — e conta qualche centinaio. Una route tornata a 0 ha rimesso la shell dietro il cancello (`e2e/shell.boot.spec.ts` legge lo stesso HTML) |
 | tetto | `initialJsGzKB` di `budget.json`; `(condivisi)` = i chunk che OGNI route dashboard carica, `sharedGzKB` |
 
 Sotto la tabella, i chunk iniziali più grandi con le route che li usano: è così che si vedono le copie di recharts
@@ -76,7 +76,7 @@ Next ci ricopia il percorso del progetto: sul laptop Windows sta in `Documents/G
 
 | Colonna | Significato |
 |---|---|
-| auth | Firebase Auth risolto: l'attesa dell'auth — lo skeleton generico che `ProtectedRoute` mostra dentro `main`, etichettato «Verifica dell'accesso» — se ne va, nello stesso commit in cui il nome del profilo compare nel piè della sidebar (dal 2026-09-28, PERF-02; prima era lo spinner). Il marcatore vive in UNA funzione dello script, `isAuthPending`; legge `main` e non la sidebar perché con `--mobile` la sidebar è uno Sheet chiuso, fuori dal DOM |
+| auth | Firebase Auth risolto: l'attesa dell'auth — lo skeleton generico che `ProtectedRoute` mostra dentro `main`, etichettato «Verifica dell'accesso» — se ne va, nello stesso commit in cui il nome del profilo compare nel piè della sidebar (dal 2026-09-28; prima era lo spinner). Il marcatore vive in UNA funzione dello script, `isAuthPending`; legge `main` e non la sidebar perché con `--mobile` la sidebar è uno Sheet chiuso, fuori dal DOM |
 | h1 | il titolo della pagina è nel DOM |
 | primo numero (run 1) | la prima cifra in euro dentro `main`: la mediana, e fra parentesi la prima run — una run 1 molto più lenta è una cache fredda, non una regressione (sotto) |
 | LCP · long task · CLS | dal `PerformanceObserver` |
@@ -119,7 +119,7 @@ Build di `develop` con #400, #401, #403 e la nuova Esposizione (#407). Mirror: 1
 
 Auth risolto fra 92 e 227 ms su ogni pagina.
 
-**2026-09-28, PERF-02 (la shell prima dell'auth), due route rimisurate prima/dopo nella stessa sessione, laptop Windows,
+**2026-09-28, la shell prima dell'auth (PR #411), due route rimisurate prima/dopo nella stessa sessione, laptop Windows,
 mirror.** Cold, mediane di 3 — Panoramica: auth 102 → 135, primo numero 149 → 178 (run 1: 792 → 570), LCP 580 → 628;
 Cashflow: auth 159 → 171, primo numero 1895 → 1775, LCP 1956 → 1820, long task 234 → 176; CLS 0 in entrambe, Firestore e
 API invariati. Quello che il marcatore non dice: lo skeleton della shell è nel DOM a 23–31 ms (dall'HTML, prima di ogni

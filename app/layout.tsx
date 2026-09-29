@@ -80,7 +80,7 @@ export default function RootLayout({
     <html lang="it" suppressHydrationWarning>
       <head>
         {/* The stored colour theme onto <html> BEFORE the first paint, the way next-themes puts
-            `.dark` there: the dashboard shell is in the prerendered HTML (PERF-02), so without this
+            `.dark` there: the dashboard shell is in the prerendered HTML (since 2026-09-28), so without this
             a reader on a non-default theme would see the default palette until hydration. In
             <head>, not in <body>: a script in the body runs after the parser may already have had
             a rendering opportunity. `suppressHydrationWarning` on <html> covers the attribute the

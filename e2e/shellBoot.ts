@@ -1,5 +1,6 @@
 /**
- * The assertions of PERF-02, shared by `shell.boot.spec.ts` (desktop, 1440) and
+ * The assertions on the dashboard shell before the login (in the HTML since 2026-09-28),
+ * shared by `shell.boot.spec.ts` (desktop, 1440) and
  * `shell.boot.mobile.spec.ts` (390): the dashboard shell is in the HTML before anyone is signed
  * in, hydrates at either width without a mismatch, and a stored colour theme is on <html> from the
  * first frame. A helper, not a spec: the FILENAME chooses the project (AGENTS.md § 5), and this

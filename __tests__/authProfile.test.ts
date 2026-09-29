@@ -1,5 +1,5 @@
 /**
- * `resolveDisplayName` — the decision AuthContext takes AFTER the gate has opened (PERF-02): which
+ * `resolveDisplayName` — the decision AuthContext takes AFTER the gate has opened (since 2026-09-28): which
  * name to show, and whether the Auth profile should learn it so the next sign-in needs no read.
  */
 import { describe, it, expect } from 'vitest';

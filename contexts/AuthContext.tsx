@@ -8,7 +8,7 @@
  *   - Google OAuth users: displayName set in Firebase Auth profile automatically
  *   - Email/password users: displayName stored in Firestore only
  *   - The gate opens on what Auth knows (`setLoading(false)` in the `onAuthStateChanged`
- *     callback, nothing awaited — PERF-02); the Firestore fallback lands afterwards and is
+ *     callback, nothing awaited, since 2026-09-28); the Firestore fallback lands afterwards and is
  *     copied into the Auth profile once, so the next sign-in needs no read (`resolveDisplayName`)
  *
  * - User creation is a two-step process:
@@ -86,7 +86,7 @@ function withCode(message: string, code: string): Error & { code: string } {
  *
  * Google users carry the name in the Auth profile; email/password users only in `users/{uid}`.
  * This read used to be awaited before `setLoading(false)` — a Firestore round trip in front of
- * every page, sidebar included (PERF-02). Now it lands when it arrives (the Panoramica's greeting
+ * every page, sidebar included, until 2026-09-28. Now it lands when it arrives (the Panoramica's greeting
  * gains the name a frame later; its `useMemo` already depends on `user?.displayName`), and the
  * Auth profile learns it once, so from the next sign-in there is nothing to read. It never
  * throws: a name that cannot be read is not a failed sign-in.

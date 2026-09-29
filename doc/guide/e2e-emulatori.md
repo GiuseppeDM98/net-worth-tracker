@@ -92,7 +92,7 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   to `/it/login`, and the probe waited for a form that never came): read the «Local:» line of the dev log first.
 
 ## Browser-Driven E2E (Playwright)
-- **The six `auth*.setup.ts` anchor on the PROFILE, at 1440** (PERF-02, 2026-09-28). Since the shell is in the
+- **The six `auth*.setup.ts` anchor on the PROFILE, at 1440** (2026-09-28). Since the shell is in the
   prerendered HTML, `getByRole('navigation')` and `main` exist on `/dashboard` before Firebase has said who is signed
   in, so the old anchor (`navigation.or(main)`) would have declared the session ready too early. Each setup now waits
   for `waitForURL(/\/dashboard/)` and then for the account's email in `[data-sidebar="footer"]`, which the sidebar

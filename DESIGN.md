@@ -396,18 +396,18 @@ Everything else is debt, recorded here as fact and not as a fix. One chrome hue 
 theme violates **The Zero-Chroma Rule** today: `components/ui/switch.tsx:14` paints the dark ON
 state `bg-blue-600` (because `--primary` is near-white there and a white pill on a white track is
 invisible — the reason is real, the hue is still wrong). The second, the auth spinner
-`border-gray-300 border-t-blue-600` in `components/ProtectedRoute.tsx`, went on 2026-09-28 with
-PERF-02: the wait is the tile-grid skeleton now. The third — an emerald Safari `mask-icon`
-(`#10B981`) in `app/layout.tsx` for a brand that has no brand colour — was removed on 2026-09-13:
-the tag is legacy (Safari reads the ordinary favicon since 2018) and the icon is multicolour, so it
-never worked as a monochrome mask either. One sign-colour literal sits beside them:
-`AssetSparkline.tsx:32`, listed above only because it is a fallback — the hexes it falls back to
-are the ones the emails retired (the other, `ExpenseTable.tsx`'s `text-emerald-*` on an income
-amount, went to `text-positive` on 2026-09-14, when the table's type badges also joined the feed's
-dots and the hero's legend on ONE map, `lib/constants/expenseTypeColors.ts` — until then the
-table said `income → --chart-1`, `fixed → --chart-2` while the legend 400px above said the
-opposite, and the same green meant «Entrate» in one place and «Spese Fisse» in the other). None is
-declared; a linter that flags them is right.
+`border-gray-300 border-t-blue-600` in `components/ProtectedRoute.tsx`, went on 2026-09-28, when
+the shell moved in front of the sign-in check: the wait is the tile-grid skeleton now. The third —
+an emerald Safari `mask-icon` (`#10B981`) in `app/layout.tsx` for a brand that has no brand colour
+— was removed on 2026-09-13: the tag is legacy (Safari reads the ordinary favicon since 2018) and
+the icon is multicolour, so it never worked as a monochrome mask either. One sign-colour literal
+sits beside them: `AssetSparkline.tsx:32`, listed above only because it is a fallback — the hexes
+it falls back to are the ones the emails retired (the other, `ExpenseTable.tsx`'s `text-emerald-*`
+on an income amount, went to `text-positive` on 2026-09-14, when the table's type badges also
+joined the feed's dots and the hero's legend on ONE map, `lib/constants/expenseTypeColors.ts` —
+until then the table said `income → --chart-1`, `fixed → --chart-2` while the legend 400px above
+said the opposite, and the same green meant «Entrate» in one place and «Spese Fisse» in the
+other). None is declared; a linter that flags them is right.
 
 ## 3. Typography
 
