@@ -542,7 +542,8 @@ file used to carry.
 ### Motion
 - Shared variants live in `lib/utils/motionVariants.ts`; `useReducedMotion()` is called once per component and used
   inline, with ONE `<MotionConfig reducedMotion="user">`, in `components/providers/MotionProvider.tsx` at the root
-  layout (the dashboard layout's duplicate went on 2026-09-28) — no separate CSS media queries.
+  layout (the dashboard layout's duplicate went on 2026-09-28, the landing's and `AuthShell`'s on 2026-09-29: a nested
+  copy with the same value is inert, and «ONE» was false while they stood) — no separate CSS media queries.
 - **Page transitions use `template.tsx`, NOT `layout.tsx` + `AnimatePresence`** (it re-mounts on every navigation);
   remove page-level `motion.div variants` wrappers once it is in place (compounded opacity: t²). **Since 2026-09-12 a
   click on a shell link is a page SCENE** — a native view transition (`lib/hooks/useSceneNavigation.ts` →
@@ -661,7 +662,7 @@ file used to carry.
   column reads that HTML: a dashboard route back at 0 has put the shell behind the gate again.
 - **`useMediaQuery` is SSR-safe — `false` on the server and during hydration, the real value right after**
   (`useSyncExternalStore`, 2026-09-28). The shell's FIRST frame is therefore decided by CSS — the fixed sidebar is
-  `hidden desktop:flex`, the bottom nav `desktop:hidden`, the mobile Sheet mounts only when opened — never by that
+  `hidden desktop:block`, the bottom nav `desktop:hidden`, the mobile Sheet mounts only when opened — never by that
   value; a component mounted AFTER login is not hydrating and still reads the real value on its first render.
   `e2e/shell.boot.spec.ts` and `shell.boot.mobile.spec.ts` assert the console carries no hydration message at 1440
   and 390, and that a stored theme is on `<html>` at the first frame (the `<head>` script, doc/guide/temi.md).

@@ -17,7 +17,7 @@ const getServerSnapshot = () => false;
  * kept for the surfaces that branch on the phone width.
  *
  * The one consequence: the shell's FIRST frame must be decided by CSS, never by this value. The
- * fixed sidebar is `hidden desktop:flex` and the bottom nav `desktop:hidden`, so a phone paints the
+ * fixed sidebar is `hidden desktop:block` and the bottom nav `desktop:hidden`, so a phone paints the
  * right chrome before JS corrects `false` to `true` (`e2e/shell.boot.mobile.spec.ts` proves the
  * console stays clean).
  */

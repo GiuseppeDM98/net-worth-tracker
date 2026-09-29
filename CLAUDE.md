@@ -20,14 +20,18 @@ Next.js app for Italian investors: net worth, assets, cashflow, dividends, perfo
   and `lib/utils/perfBudget.ts`; the header's silhouette and the labelled wait → doc/guide/stati.md; the `pageerror`,
   the six setups on the email at 1440 and the `e2e/shellBoot.ts` helper → doc/guide/e2e-emulatori.md; the theme at the
   first rAF and the derived `ColorTheme` → doc/guide/temi.md; the read after the gate and the demo exception →
-  doc/guide/accesso-registrazione.md), 2 defects listed and NOT fixed, the owner decides on issues (two `MotionConfig`
-  still nested under the root `MotionProvider` — `app/page.tsx:159`, `components/auth/AuthShell.tsx:45` — while
-  `app/dashboard/template.tsx:51` and AGENTS.md § Motion call the root one «the ONE»; five comments name the fixed
-  sidebar `hidden desktop:flex` where `components/ui/sidebar.tsx:218` says `desktop:block`), 1 deferred on purpose (the
-  empty-chrome frame before `/login`, accepted in accesso-registrazione.md's blind spots). Every pointer to the spec in
-  code, tests, the guides, `perf/README.md`, DESIGN.md and the sister PERF/MOB specs now names the date, the PR or the
-  file; PERF-02 brought nothing to `reference/`. **Verified**: `tsc`, lint 0, Vitest in `Europe/Rome`; only comments and
-  docs changed, so no Playwright run.
+  doc/guide/accesso-registrazione.md), 2 defects fixed in a second commit on the owner's call (the two `MotionConfig`
+  nested under the root `MotionProvider` removed from `app/page.tsx` and `components/auth/AuthShell.tsx` — inert, same
+  value — so «the ONE» in `app/dashboard/template.tsx` and AGENTS.md § Motion is true since 2026-09-29; five comments
+  corrected from `hidden desktop:flex` to `hidden desktop:block`, the class `components/ui/sidebar.tsx` uses), 1
+  deferred on purpose (the empty-chrome frame before `/login`, accepted in accesso-registrazione.md's blind spots).
+  Every pointer to the spec in code, tests, the guides, `perf/README.md`, DESIGN.md and the sister PERF/MOB specs now
+  names the date, the PR or the file; PERF-02 brought nothing to `reference/`. **Verified**: `tsc`, lint 0, Vitest
+  **199 / 4576** in `Europe/Rome` after each commit; `npm run test:e2e` for the second (two components changed): the full run read 136/154 in 13,5 min because the `next dev`
+  Playwright started answered 404 HTML on EVERY `/api/*` route (doc/guide/e2e-emulatori.md, the tell and the remedy);
+  on a fresh server the 18 red files reran 30/31, the one left `modal.origin`, red three times alone at line 47 and
+  red the same way with develop's landing and `AuthShell` swapped in on the same server — the laptop, not the commit
+  (Known Issues below).
 
 ## Architecture Snapshot
 - App Router; protected pages under `app/dashboard/*`.
@@ -97,7 +101,11 @@ Only what crosses areas; an area's blind spots — the behaviours that look like
   change is not the cause (and it failed once more in the full run of 2026-09-22, green alone right after). When it fails, Rendimenti's «Periodo personalizzato» button has moved **23,4px** between the
   `boundingBox()` the spec takes and the origin captured at the click: a late reflow under suite load, roughly the
   height of the custom-period chip row. It passes alone, and in the `desktop` project alone. Not reproduced on demand,
-  so not yet fixed — re-read this before trusting a single red run of it.
+  so not yet fixed — re-read this before trusting a single red run of it. **A second failure mode on 2026-09-29**
+  (Windows laptop, the machine twice as slow as the day before): red at line 47 — no `data-state="closed"` frame inside
+  the sampler's 2,6 s window, so the dialog opened more than ~1,5 s after the click — three times ALONE on a fresh
+  `.next-e2e`, and identically with develop's `app/page.tsx` and `AuthShell.tsx` swapped in on the same server, so not
+  the day's commit. The window is the spec's, not the app's: a slow machine can fail it without any regression.
 - **Four base specs are red in the cloud container only** (2026-09-25): its Chromium groups four-digit euros («1.100 €»),
   the specs expect «1100 €» as on the Mac (doc/guide/e2e-emulatori.md). Read the received text before «fixing» code.
 - **The icon rail's 44px targets are measured at 1440 with a mouse**; no fixture covers a ≥1440px tablet in landscape.

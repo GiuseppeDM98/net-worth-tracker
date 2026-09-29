@@ -9,7 +9,7 @@ import { Slot } from "radix-ui"
 // and during hydration, the real value right after; since 2026-09-28) instead of the shadcn default.
 // The 1439px threshold matches the custom `desktop:` breakpoint in app/globals.css
 // (min-width: 1440px). Because the shell is in the prerendered HTML, the FIRST frame is decided
-// by CSS, not by this value: the fixed sidebar below is `hidden desktop:flex`, and the mobile
+// by CSS, not by this value: the fixed sidebar below is `hidden desktop:block`, and the mobile
 // Sheet mounts only when opened — so a phone paints no sidebar before JS corrects `isMobile`.
 // ⚠️ shadcn@latest add sidebar will overwrite this import — restore it after upgrades.
 import { useMediaQuery } from "@/lib/hooks/useMediaQuery"

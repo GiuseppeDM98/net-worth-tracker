@@ -107,6 +107,16 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   window` branch planted in the layout — read `page.on('pageerror')` too. And a mismatch makes React regenerate the
   tree on the client, which then prints «Encountered a script tag while rendering React component» for the `<head>`
   theme script: that line is a symptom of the failed hydration, not of the script.
+- **A full run where every spec that calls a route is red is the suite's dev server, not the routes** (2026-09-29,
+  Windows laptop: 18 red of 154 in 13,5 min — the Esposizione, the Dividendi form, «Crea snapshot», an Impostazioni
+  read, all eleven Hall of Fame — while the 136 that never call `/api/*` stayed green). The tell is in the `[WebServer]`
+  lines of the log: «Failed to fetch YOC: Not Found», «Unexpected token '<', "<!DOCTYPE"» from a `response.json()`, a
+  spec reading 404 where it expects 200 — the `next dev` Playwright started answered 404 HTML on EVERY `/api/*` route
+  (`Invoke-WebRequest http://localhost:3100/api/dashboard/overview` from the shell, while it was still up), and its
+  `.next-e2e/dev/types/validator.ts` typed 3 API routes of 37. Not reproduced on demand: `.next-e2e` deleted and
+  `npm run dev:e2e` restarted, the same route answered 401 JSON and the nine red files reran green (30/31, the one
+  left `modal.origin`, CLAUDE.md § Known Issues). Before reading a red spec, probe one route on :3100; if it 404s, restart the server and
+  rerun the red files against it (`reuseExistingServer` is on locally).
 - **In a cloud container the pinned Chromium is not installed** (2026-09-25): `browserType.launch: Executable doesn't
   exist at /opt/pw-browsers/chromium_headless_shell-XXXX`. Never `playwright install` there: a throwaway
   `playwright.local.config.ts` (listed in `.git/info/exclude`, deleted at the end) spreads `playwright.config.ts` and
