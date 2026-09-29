@@ -4,8 +4,8 @@
  *
  * Two scenarios, each N runs, medians:
  *   - COLD: a fresh browser context, the real login form, then a full load of the route. Times are
- *     ms from `navigationStart`: `auth` (ProtectedRoute's spinner left), `h1`, `data` (the first euro
- *     figure inside `main`), LCP, long tasks, CLS.
+ *     ms from `navigationStart`: `auth` (the auth wait left `main`: Firebase Auth resolved), `h1`,
+ *     `data` (the first euro figure inside `main`), LCP, long tasks, CLS.
  *   - WARM: one context, one login, then the routes one after the other by clicking the shell's own
  *     links (the page scene). Times are ms from the click: `url` (the pathname changed), `skeleton`
  *     (the new page showed a wait at all — a React Query hit shows none), `data` (a euro figure with
@@ -90,11 +90,14 @@ function installPerfProbe() {
     // A browser without one of the entry types: the milestones below still work.
   }
 
-  // THE AUTH MARKER — the one place that says when Firebase Auth has resolved: today ProtectedRoute's
-  // spinner (the only `.animate-spin.rounded-full` with `border-4`; Rendimenti's tile has its own
-  // round spinner) leaving the page. PERF-02 removes that spinner and redefines this as «the profile
-  // name appears in the sidebar».
-  const isAuthPending = () => !!document.querySelector('.animate-spin.rounded-full.border-4');
+  // THE AUTH MARKER — the one place that says when Firebase Auth has resolved. Since PERF-02 the
+  // shell is in the HTML and `ProtectedRoute` shows the generic tile skeleton labelled «Verifica
+  // dell'accesso» inside `main` until `onAuthStateChanged` answers; it leaves in the SAME commit
+  // that puts the profile name in the sidebar footer (AuthContext sets user and loading together).
+  // The wait in `main`, not the footer: on `--mobile` the sidebar is a closed Sheet and the footer
+  // is not in the DOM at all. A page's own skeleton is labelled «Caricamento», so it never matches.
+  const AUTH_WAIT_SELECTOR = `main [role="status"][aria-label="Verifica dell'accesso"]`;
+  const isAuthPending = () => !!document.querySelector(AUTH_WAIT_SELECTOR);
 
   const hasEuro = () => /\d\s?€/.test((document.querySelector('main') || document.body)?.textContent || '');
   const hasSkeleton = () => !!document.querySelector('[data-slot="skeleton"]');

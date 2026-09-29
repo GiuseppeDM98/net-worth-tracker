@@ -13,17 +13,25 @@ Next.js app for Italian investors: net worth, assets, cashflow, dividends, perfo
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic.
-- `tsc` clean; **197 files / 4564 tests** green in `Europe/Rome` + **40 Playwright spec files** (146 tests, incl. 6 auth setups; last full run 2026-09-28 on the Windows laptop — the outcome in the Latest entry below; the known intermittent is `modal.origin`, doc/guide/e2e-emulatori.md). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, which structurally hides timezone bugs.
-- Latest (2026-09-28, fourth session): **`doc/perf/PERF-01` retired** — the benchmark and the size budget (PR #409)
-  read against the spec: 20 divergences, 16 where the code was right and the lesson already sat at home (the comments at
-  their lines in `scripts/perfBenchmark.mjs` — the `border-4` auth marker, the warm gate on the heading, the menus
-  opened for Impostazioni, `requestfinished` — plus `perf/README.md`, SETUP, WORKFLOW and AGENTS), 1 defect fixed here
-  (`perf:budget`'s red message sent the raised-ceiling register to `doc/perf/README.md`; it is `perf/README.md`), 3
-  deferred on purpose (`libraryCopies` to PERF-04; no CI job and no RUM, owner's call not to write them down). Every
-  pointer to the spec in code, tests, SETUP and the sister PERF/MOB specs now names `perf/README.md` or the script;
-  PERF-02/03/07 read the script as it is (`--revisit`, the «testo» column and `Server-Timing` already there);
-  `doc/perf/reference/` deleted (the raw 2026-09-26 data stay in git at `d8d3d98`). **Verified**: `tsc`, lint 0,
-  Vitest **197 / 4564** in `Europe/Rome`; only comments and one script message changed, so no Playwright run.
+- `tsc` clean; **199 files / 4576 tests** green in `Europe/Rome` + **42 Playwright spec files** (154 tests, incl. 6 auth setups; last full run 2026-09-28 on the Windows laptop, 154/154 in 7,4 min — the known intermittent is `modal.origin`, doc/guide/e2e-emulatori.md). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, which structurally hides timezone bugs.
+- Latest (2026-09-28, fifth session): **PERF-02 implemented — the dashboard shell before Firebase Auth.**
+  `app/dashboard/layout.tsx` renders the skip link, the sidebar, `<main>` and the bottom nav unconditionally;
+  `ProtectedRoute` wraps only the page inside `<main>` with `fallback` = the compact header's silhouette
+  (`PageHeaderSkeleton`) + the generic `TileGridSkeleton` labelled «Verifica dell'accesso» (also the benchmark's auth
+  marker, read in `main` because on `--mobile` the sidebar is a closed Sheet); the spinner is gone. `useMediaQuery` is
+  `useSyncExternalStore` (`false` on the server and during hydration, the CSS decides the first frame); `AuthContext`
+  sets `user` + `loading` in the callback with nothing awaited and reads the Firestore `displayName` AFTER
+  (`resolveDisplayName`, `lib/utils/authProfile.ts`, `updateProfile` once, never for the demo uid); the profile waits
+  as `Skeleton` lines in the sidebar and the drawer; the stored theme is on `<html>` before the first paint from a
+  `<head>` script whose constants live in `lib/constants/colorTheme.ts` (no `'use client'`); the six `auth*.setup.ts`
+  anchor on the footer's email at 1440. **Measured** (same machine, before → after): «testo» 0 → 265 on every dashboard
+  route; the shell's skeleton in the DOM at 23–31 ms and FCP 80–112 ms where the spinner used to stand until `auth`;
+  Panoramica first figure 149 → 178 ms (LCP 580 → 628), Cashflow 1895 → 1775 (LCP 1956 → 1820), CLS 0, no ceiling raised
+  (`perf/README.md`). **Verified**: `tsc`, lint 0, Vitest **199 / 4576** in `Europe/Rome`, `npm run test:e2e` 154/154;
+  the three new assertions seen red once (the hydration one only after learning that React 19 reports the mismatch as a
+  `pageerror`, not in the console — doc/guide/e2e-emulatori.md); the owner's five-point tour on the mirror (:3000, a
+  non-default theme chosen in the app) 5/5. The memory watchdog killed the emulators, both servers and the running
+  suite once (WORKFLOW.md § 3: detached processes when the owner asks).
 
 ## Architecture Snapshot
 - App Router; protected pages under `app/dashboard/*`.
@@ -34,7 +42,7 @@ Next.js app for Italian investors: net worth, assets, cashflow, dividends, perfo
 ## Key Features (Active)
 One line per area: the question it answers, then where it is described. *What the user sees* → README.md; *repo-wide rules* → AGENTS.md; *an area's rules, files and blind spots* → `doc/guide/<tema>.md`; *the aesthetic* → DESIGN.md.
 
-- **Shell**: skip link · compact `PageHeader` · `PageTabBar` · `PageContainer` (1920) + `TileGridSkeleton` · sidebar · bottom pill + «Altro» drawer; a tile's eyebrow is an `<h3>`. DESIGN → §5; AGENTS → *Navigation*.
+- **Shell**: skip link · compact `PageHeader` · `PageTabBar` · `PageContainer` (1920) + `TileGridSkeleton` · sidebar · bottom pill + «Altro» drawer; a tile's eyebrow is an `<h3>`. Since PERF-02 (2026-09-28) the shell is in the prerendered HTML and renders BEFORE Firebase Auth resolves: `ProtectedRoute` wraps only the page inside `<main>`, with the generic skeleton («Verifica dell'accesso») as fallback; the profile waits as two `Skeleton` lines; a stored theme is on `<html>` from a `<head>` script. DESIGN → §5; AGENTS → *Navigation*; doc/guide/stati.md, temi.md.
 - **Shared account · Demo mode**: a second user as full co-owner (viewer `user.uid` ≠ owner `ownerId`); the demo auto-logs in from the landing and `useDemoMode()` gates every mutation. doc/guide/account-condiviso-demo.md.
 - **Landing**: the Panoramica for someone with no data, the app's real tiles on a declared sample profile. doc/guide/landing.md.
 - **Accesso e Registrazione**: one 420px tile, a verdict generated from the registration state, Italian errors only. doc/guide/accesso-registrazione.md.

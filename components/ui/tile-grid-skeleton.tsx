@@ -15,6 +15,12 @@ interface TileGridSkeletonProps {
   cells?: TileSkeletonCell[];
   /** A placeholder for a control row between the verdict and the grid (Tracciamento's period bar), so nothing jumps. */
   toolbar?: ReactNode;
+  /**
+   * What the wait is announced as. «Caricamento» is a page waiting for its data; the dashboard
+   * layout names the auth wait («Verifica dell'accesso») so a reader hears which one it is — and
+   * the benchmark's auth marker reads that label (scripts/perfBenchmark.mjs).
+   */
+  label?: string;
   className?: string;
 }
 
@@ -41,9 +47,15 @@ function SkeletonTile({ lines }: { lines: number }) {
  * inside it `aria-hidden` (see `Skeleton`). And this is a WAIT: a page must not enter it on a
  * failed query, or the skeleton pulses forever (`resolveSurfaceState`).
  */
-export function TileGridSkeleton({ verdict = true, cells = DEFAULT_SKELETON_CELLS, toolbar, className }: TileGridSkeletonProps) {
+export function TileGridSkeleton({
+  verdict = true,
+  cells = DEFAULT_SKELETON_CELLS,
+  toolbar,
+  label = 'Caricamento',
+  className,
+}: TileGridSkeletonProps) {
   return (
-    <div className={cn('space-y-4', className)} role="status" aria-label="Caricamento">
+    <div className={cn('space-y-4', className)} role="status" aria-label={label}>
       {verdict && (
         // The same `page-verdict` name as `PageVerdict`: the page scene lands on these two lines
         // and the verdict arrives in place when the data does.

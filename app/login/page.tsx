@@ -37,12 +37,12 @@ export default function LoginPage() {
   const { signIn, signInWithGoogle, user, loading: authLoading } = useAuth();
   const router = useRouter();
 
-  // Redirect to dashboard once AuthContext confirms the user is fully loaded.
+  // Redirect to dashboard once AuthContext has the user.
   // Why not router.push() immediately after signIn()? signInWithEmailAndPassword
-  // resolves before onAuthStateChanged finishes its async Firestore lookup for
-  // displayName. During that gap AuthContext.user is still null, so ProtectedRoute
-  // would redirect back to /login. Watching authLoading + user ensures we only
-  // navigate after the full auth state is ready.
+  // resolves before onAuthStateChanged has delivered the user to the context, and a
+  // navigation that lands with `user` still null would be bounced back here by
+  // ProtectedRoute. (The context no longer waits for the Firestore displayName
+  // before unblocking — PERF-02 — so the gap is one Auth callback, not a read.)
   useEffect(() => {
     if (!authLoading && user) {
       router.push('/dashboard');

@@ -26,7 +26,11 @@ setup('authenticate', async ({ page }) => {
 
   // The redirect is the only reliable signal that Firebase accepted the credentials.
   await page.waitForURL(/\/dashboard/, { timeout: 30_000 });
-  await expect(page.getByRole('navigation').or(page.locator('main'))).toBeVisible();
+  // Then the profile in the sidebar footer: since PERF-02 `navigation` and `main` are in the HTML
+  // before Firebase has said who is signed in, so they would declare the session ready too early.
+  // The footer prints the account's email once `onAuthStateChanged` has answered (1440 viewport:
+  // the sidebar is a fixed column only from `desktop:`).
+  await expect(page.locator('[data-sidebar="footer"]')).toContainText(TEST_EMAIL);
 
   // `indexedDB: true` is not optional here: the Firebase Web SDK persists its session in IndexedDB,
   // so the default cookie+localStorage capture produces a state file that silently lands every

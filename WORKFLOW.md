@@ -201,7 +201,13 @@ The app **is** locally runnable; there is no fallback to declare.
   #ffba00` on a second injection) are in there too. Count what belongs to the surface, say the rest is not its. **A probe never opens a control that SPENDS** (2026-09-20): «Analizza con AI» starts its analysis on open, and an evidence pass told to «open and press Escape» made five real Anthropic calls. Read what a control does before scripting a click on it; on Rendimenti that dialog is opened once, to check the abort, or not at all. **A restart of the Claude Code session kills its background tasks** (emulators and dev server alike, 2026-09-14) and an emulator killed that way exports nothing: before the tour, check the ports and re-seed the mirror. **And the session's memory watchdog kills them too** (2026-09-14 evening, three times in a row on the 8 GB Mac right after a full Playwright run, with 37–67% of memory free): for the owner's tour, the emulators and the dev server are started from the OWNER's terminals, which the watchdog does not touch; the agent only re-seeds the mirror and reports the URLs. On 2026-09-20 the owner asked the agent to start them anyway, and both survived the session —
   ~4 hours, two full Playwright runs, three restarts of the dev server: the watchdog is not a certainty. The rule stays (the
   owner's terminals are the safe default); when the owner asks, start them, say they hang on the session, and check the
-  ports before every hand-over.
+  ports before every hand-over. **On the Windows laptop it struck again on 2026-09-28** (16 GB, ~4,6 GB free: emulators,
+  `perf:serve`, `dev:e2e` and the RUNNING suite killed at test 83 of 154, the rest «Target crashed» at 0 ms, and the
+  agent is then told not to restart them on its own). When the owner asks anyway, start each one DETACHED —
+  `Start-Process cmd.exe "/c npm run <script> > <scratchpad>\<name>.log 2>&1" -WindowStyle Hidden` — which is neither a
+  session task the watchdog reaps nor subject to the tools' 10-minute cap; run the full suite the same way and follow its
+  log with a monitor; keep only what the step needs up (no `perf:serve` beside the suite); at the end export the
+  emulators through the hub and stop every process by PID (doc/guide/e2e-emulatori.md § Emulator Exercise Scripts).
 - **Throwaway fixtures** follow the existing seed pattern (`scripts/seedEmulator.ts`,
   `scripts/seedAnalisiE2E.mts`, `scripts/seedPensionE2E.mts`, `scripts/seedCoastFireE2E.mts`) or
   live as a throwaway `.mts` in the session scratchpad. `.mts`, never `.ts`: a `.ts` script is CJS

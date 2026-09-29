@@ -198,9 +198,11 @@ export function extractInitialChunks(html: string): string[] {
 
 /**
  * Characters of visible text in a prerendered page's BODY (scripts, styles and tags removed,
- * whitespace collapsed). Every dashboard route prerenders ProtectedRoute's spinner only, so this is
- * 0 today (2026-09-28; the «46» of 2026-09-26 counted the `<title>`, which nobody sees as the page);
- * PERF-02 raises it by putting the shell in the HTML.
+ * whitespace collapsed). Until PERF-02 every dashboard route prerendered ProtectedRoute's spinner
+ * only, so this was 0 (the «46» of 2026-09-26 counted the `<title>`, which nobody sees as the
+ * page); since 2026-09-28 the shell is in the HTML — the skip link, the sidebar's routes, the
+ * bottom nav — and a dashboard route counts a few hundred. A route that drops back to 0 has put
+ * the shell behind the auth gate again (`e2e/shell.boot.spec.ts` reads the same HTML).
  */
 export function countTextChars(html: string): number {
   const body = html.match(/<body[^>]*>([\s\S]*)<\/body>/i)?.[1] ?? html;

@@ -34,6 +34,17 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   nel Cashflow» — a sentence about the reader's data, told about data nobody read. It rejects now; both its callers
   hold an `ErrorNotice` branch that only a rejection can reach. When wiring a new surface, check the service too: an
   `isError` branch above a service that never rejects is decoration.
+- **The auth wait is a skeleton too, and it is in the HTML** (PERF-02, 2026-09-28). `ProtectedRoute` renders its
+  `fallback` — the dashboard layout passes `<PageContainer><TileGridSkeleton label="Verifica dell'accesso" /></PageContainer>`
+  — while `useAuth().loading` and through the redirect to `/login`; on the server `loading` is always true, so
+  that skeleton is what every prerendered dashboard route carries. The spinner it replaced (`border-gray-300
+  border-t-blue-600`, the last hardcoded chrome) is gone. `TileGridSkeleton` takes a `label` so a screen reader hears
+  WHICH wait it is: the auth wait says «Verifica dell'accesso», a page's own skeleton stays «Caricamento» — and the
+  benchmark's auth marker reads that label (`scripts/perfBenchmark.mjs`, `isAuthPending`). The cold-load sequence is
+  generic skeleton (SSR, the default cells at 1920) → page skeleton (mount, its own cells, the same primitive and
+  width) → data; the page header's WORDS are the page's and arrive with it, but its silhouette is in the fallback
+  (`PageHeaderSkeleton`, `components/layout/PageHeader.tsx`: the same boxes at the same heights, no `h1`), because
+  without it the grid moved down 56px at 1440 and 65px at 390 when the page mounted (measured 2026-09-28).
 - **`Skeleton` (`components/ui/skeleton.tsx`) is the only muted placeholder.** `motion-safe:animate-pulse` — Tailwind's
   bare `animate-pulse` has no reduced-motion guard, and it was hand-written in eight files at six different heights —
   and `aria-hidden`, so the wait is announced once by `TileGridSkeleton`'s `role="status"`. `animate-spin` is

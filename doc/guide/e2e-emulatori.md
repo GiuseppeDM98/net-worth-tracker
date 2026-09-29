@@ -92,6 +92,21 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   to `/it/login`, and the probe waited for a form that never came): read the «Local:» line of the dev log first.
 
 ## Browser-Driven E2E (Playwright)
+- **The six `auth*.setup.ts` anchor on the PROFILE, at 1440** (PERF-02, 2026-09-28). Since the shell is in the
+  prerendered HTML, `getByRole('navigation')` and `main` exist on `/dashboard` before Firebase has said who is signed
+  in, so the old anchor (`navigation.or(main)`) would have declared the session ready too early. Each setup now waits
+  for `waitForURL(/\/dashboard/)` and then for the account's email in `[data-sidebar="footer"]`, which the sidebar
+  prints only once `onAuthStateChanged` has answered — and the six setup projects run at `SETUP_VIEWPORT` (1440×900,
+  `playwright.config.ts`), because below `desktop:` the sidebar is a closed Sheet and the footer is not in the DOM.
+  The same fact for any spec: `main`, the skip link and the bottom nav are not proof of a session; the page's `h1`
+  or the footer's email are. `e2e/shell.boot{,.mobile}.spec.ts` are the shell's own specs (the HTML without JS, a
+  clean hydration console with a positive `console.error` anchor, the theme at the first frame — their assertions
+  are shared in `e2e/shellBoot.ts`, a helper no project collects). **A hydration mismatch is a `pageerror`, not a
+  console line** (2026-09-28): React 19 throws «Hydration failed because the server rendered HTML didn't match the
+  client» as an uncaught error, so a spec listening on `page.on('console')` alone stayed GREEN with a `typeof
+  window` branch planted in the layout — read `page.on('pageerror')` too. And a mismatch makes React regenerate the
+  tree on the client, which then prints «Encountered a script tag while rendering React component» for the `<head>`
+  theme script: that line is a symptom of the failed hydration, not of the script.
 - **In a cloud container the pinned Chromium is not installed** (2026-09-25): `browserType.launch: Executable doesn't
   exist at /opt/pw-browsers/chromium_headless_shell-XXXX`. Never `playwright install` there: a throwaway
   `playwright.local.config.ts` (listed in `.git/info/exclude`, deleted at the end) spreads `playwright.config.ts` and

@@ -18,7 +18,8 @@ a 1024. Le primitive di oggi (righe del 2026-09-26, da riverificare):
 - Radix `CollapsibleContent` (v1.1.12) mette `hidden: !isOpen` e smonta i figli da chiuso
   (`node_modules/@radix-ui/react-collapsible/dist/index.mjs:128`, `:136`): niente transizione di chiusura; il trigger
   stende le props dopo `aria-controls` (`:64`, `:69`).
-- `lib/hooks/useMediaQuery.ts:11-14` legge `window` nell'inizializzatore (PERF-02 lo porta a `useSyncExternalStore`).
+- `lib/hooks/useMediaQuery.ts` è `useSyncExternalStore` dal 2026-09-28 (PERF-02): `false` sul server e durante
+  l'idratazione, il valore vero subito dopo; un componente montato DOPO il login lo legge già al primo render.
 
 ## 2. Obiettivo misurabile
 

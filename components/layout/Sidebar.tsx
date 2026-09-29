@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/sidebar';
 import { LogoutDialog } from '@/components/layout/LogoutDialog';
 import { ThemePicker } from '@/components/layout/ThemePicker';
+import { Skeleton } from '@/components/ui/skeleton';
 import { TILE_EYEBROW_CLASS } from '@/components/ui/tile';
 import { SIDEBAR_AVATAR_CLASS } from '@/components/layout/shellStyles';
 import {
@@ -201,23 +202,41 @@ export function AppSidebar() {
                   <SidebarMenuButton
                     size="lg"
                     tooltip={displayName}
+                    // While the user is unknown the button has no text of its own: name the wait.
+                    aria-label={user ? undefined : "Account, in attesa dell'accesso"}
                     className="h-11 data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                   >
-                    <span className={SIDEBAR_AVATAR_CLASS} aria-hidden="true">{initials}</span>
-                    <div className="grid flex-1 overflow-hidden text-left leading-tight">
-                      <span className="truncate text-[13px] font-medium text-sidebar-foreground">{displayName}</span>
-                      {/* When viewing a shared account, surface WHOSE data is active
-                          instead of the viewer's own email — otherwise the account
-                          being edited is invisible. */}
-                      {isSharedView && activeAccount ? (
-                        <span className="truncate text-[11px] text-primary">
-                          Vedi: {getAccountLabel(activeAccount)}
-                        </span>
-                      ) : (
-                        /* text-sidebar-foreground/50: footer sits on --sidebar, not --background */
-                        <span className="truncate text-[11px] text-sidebar-foreground/50">{user?.email}</span>
-                      )}
-                    </div>
+                    {user ? (
+                      <>
+                        <span className={SIDEBAR_AVATAR_CLASS} aria-hidden="true">{initials}</span>
+                        <div className="grid flex-1 overflow-hidden text-left leading-tight">
+                          <span className="truncate text-[13px] font-medium text-sidebar-foreground">{displayName}</span>
+                          {/* When viewing a shared account, surface WHOSE data is active
+                              instead of the viewer's own email — otherwise the account
+                              being edited is invisible. */}
+                          {isSharedView && activeAccount ? (
+                            <span className="truncate text-[11px] text-primary">
+                              Vedi: {getAccountLabel(activeAccount)}
+                            </span>
+                          ) : (
+                            /* text-sidebar-foreground/50: footer sits on --sidebar, not --background */
+                            <span className="truncate text-[11px] text-sidebar-foreground/50">{user.email}</span>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      // The auth wait, in the shell (PERF-02): the sidebar is in the prerendered HTML
+                      // and the profile is the one thing on it that depends on the user. The avatar's
+                      // square and two lines at the text's own size; the button is 44px tall either
+                      // way, so the name lands with no layout shift (`Skeleton` is `aria-hidden`).
+                      <>
+                        <Skeleton className="size-7 shrink-0 rounded-md" />
+                        <div className="grid flex-1 gap-1.5 overflow-hidden">
+                          <Skeleton className="h-3 w-24" />
+                          <Skeleton className="h-2.5 w-32" />
+                        </div>
+                      </>
+                    )}
                     <ChevronsUpDown className="ml-auto size-4 shrink-0 text-sidebar-foreground/50" />
                   </SidebarMenuButton>
                 </DropdownMenuTrigger>
