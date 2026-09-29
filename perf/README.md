@@ -97,7 +97,7 @@ euro, nessuno skeleton, sulla pagina NUOVA: nulla conta finché il titolo della 
   tempo della route `/api/portfolio/instrument-profiles`, non come chiamata esterna.
 - I TEMPI si confrontano solo sulla stessa macchina, nella stessa sessione (rumore ±10%); i CONTEGGI ovunque.
 
-## Baseline in vigore (2026-09-28, laptop Windows, mirror, nessun throttling)
+## Baseline in vigore (cold 2026-09-28 · warm 2026-09-29, laptop Windows, mirror, nessun throttling)
 
 Build di `develop` con #400, #401, #403 e la nuova Esposizione (#407). Mirror: 1539 spese, 45 snapshot, 31 operazioni.
 
@@ -127,21 +127,29 @@ JS) e l'FCP a 80–112 ms — prima, fino ad `auth`, c'era solo lo spinner. `aut
 l'idratazione di un albero più grande: +12/+33 ms, dentro il rumore. «testo» 0 → 265 su ogni route dashboard; nessun
 tetto alzato (`/dashboard` 535,0 → 535,7 gz KB, condivisi 459,9 → 461,4).
 
-**Warm** (mediane di 3, ms dal click):
+**Warm** (2026-09-29, build con PERF-05 — PR #413; mediane di 3, ms dal click):
 
 | Pagina | skeleton | primo numero | long task | Firestore | API |
 |---|---|---|---|---|---|
-| Panoramica | 0/3 | 83 | 0 | 0 | 0 |
-| Patrimonio | 0/3 | 114 | 0 | 2 | 0 |
-| Cashflow | 3/3 | 1952 | 476 | 4 | 0 |
-| Analisi | 0/3 | 252 | 189 | 2 | 0 |
-| Rendimenti | 3/3 | 630 | 0 | 14 | 17 |
-| Storico | 3/3 | 1428 | 399 | 8 | 0 |
-| Hall of Fame | 3/3 | 127 | 0 | 2 | 0 |
-| Allocazione | 3/3 | 288 | 83 | 5 | 1 |
-| FIRE e Simulazioni | 3/3 | 2082 | 142 | 6 | 0 |
-| Previdenza | 3/3 | 129 | 0 | 2 | 0 |
-| Impostazioni | 3/3 | 356 | 0 | 6 | 0 |
+| Panoramica | 0/3 | 77 | 0 | 0 | 0 |
+| Patrimonio | 0/3 | 100 | 0 | 0 | 0 |
+| Cashflow | 3/3 | 1429 | 320 | 4 | 0 |
+| Analisi | 0/3 | 188 | 135 | 0 | 0 |
+| Rendimenti | 3/3 | 458 | 0 | 12 | 17 |
+| Storico | 0/3 | 261 | 190 | 0 | 0 |
+| Hall of Fame | 3/3 | 103 | 0 | 2 | 0 |
+| Allocazione | 3/3 | 157 | 0 | 2 | 1 |
+| FIRE e Simulazioni | 0/3 | 114 | 0 | 0 | 0 |
+| Previdenza | 0/3 | 76 | 0 | 0 | 0 |
+| Impostazioni | 3/3 | 307 | 0 | 0 | 0 |
+
+**2026-09-29, un solo binario per i dati (PR #413), warm rimisurato prima/dopo nella stessa sessione, laptop Windows,
+mirror.** Prima (la stessa build del 2026-09-28 rimisurata quel giorno): Patrimonio 108 · Cashflow 1478 · Analisi 177 ·
+Rendimenti 588 (13 Firestore) · Storico 1165 (6) · Hall of Fame 108 · Allocazione 209 (4) · FIRE 1556 (6) · Previdenza 112
+· Impostazioni 337 (6). Dopo, la tabella sopra: Storico e FIRE aprono dalla cache senza skeleton (0 letture), Patrimonio,
+Analisi, Previdenza e Impostazioni a 0 letture; Cashflow invariato (tutta E, PERF-06); Rendimenti 13 → 12 (gli stadi 2-5
+sono PERF-09). Il **cold** NON è stato rimisurato: la tabella cold sopra è quella del 2026-09-28, e FIRE a freddo legge
+ora l'intera collezione delle spese (una volta per sessione) invece di due range — doc/guide/fire.md.
 
 **Bundle** (gz KB, chunk iniziali; il tetto in `budget.json` è +2%): condivisi 459,9 (21 chunk) · landing 448,3 ·
 login 415,3 · Panoramica 535,0 · Patrimonio 718,2 · Cashflow 729,2 · Analisi 741,4 · Rendimenti 680,2 · **Storico

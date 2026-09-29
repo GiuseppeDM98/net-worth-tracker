@@ -1,12 +1,12 @@
 # PERF-13 — Impostazioni: sei tab, sei componenti, una bozza sola
 
-> Stato: da fare · Priorità: 3 · Sforzo: L · Dipende da: PERF-12 (il compiler memoizza le viste; il census in `scripts/`), PERF-05 (`useSettings`) · Sblocca: —
+> Stato: da fare · Priorità: 3 · Sforzo: L · Dipende da: PERF-12 (il compiler memoizza le viste; il census in `scripts/`), PERF-05 (chiusa il 2026-09-29: `useSettings`, `settingsQueryOptions`) · Sblocca: —
 
 ## 1. Il problema, misurato
 
 `app/dashboard/settings/page.tsx` è **un componente di 4105 righe** (`SettingsPage` da `:546`) con **70 chiamate a `useState`**, 5 `useEffect`,
-5 `useCallback`, 0 `useMemo`, nessuna query React Query (letture dirette: `getSettings :735`, `getAllCategories :953`,
-`getAllAssets :970` — PERF-05). Sei tab (generale `:2014`, allocazione `:2774`, spese `:3373`, dividendi `:3686`, condivisione
+5 `useCallback`, 0 `useMemo`; dal 2026-09-29 le letture passano dalle chiavi condivise (`fetchQuery(settingsQueryOptions)`
+in `loadTargets` e nel pre-read di «Salva», `useExpenseCategories`, `useAssets`) ma il seed dei 70 stati resta imperativo. Sei tab (generale `:2014`, allocazione `:2774`, spese `:3373`, dividendi `:3686`, condivisione
 `:3875`, aspetto `:3915`) gated da `mountedTabs` (`:661`; `allocazione` sempre in `renderedPanels`, `:1855`): Radix smonta i
 pannelli inattivi (`TabsContent` senza `forceMount`, `:2013-2021`, `:2774-2782`), ma **il JSX di ogni tab visitata più
 allocazione viene ricostruito a ogni render**, e ogni tasto in un campo controllato è un render dell'intera funzione. In
@@ -75,7 +75,7 @@ del badge per ruolo) e `CategoryManagementDialog` (il selettore del ruolo) ricev
 documento salvato: oggi l'interruttore acceso e non ancora salvato colora già i badge e apre il selettore nel dialog, e
 così deve restare. `summarizeCategoryClassification(expenseCategories)` si calcola nella vista, non nell'orchestratore.
 
-**Le letture** (`getSettings`, categorie, asset) dagli hook di PERF-05; il «Salva» invalida `settings.all` e le chiavi delle
+**Le letture** (impostazioni, categorie, asset) dagli hook (dal 2026-09-29); il «Salva» invalida `settings.all` e le chiavi delle
 pagine che leggono un'impostazione (la lista in doc/guide/impostazioni.md).
 
 **Un `useSearchParams` in un figlio dentro `<Suspense>`** (AGENTS.md § Navigation): verificare; il `router.replace`
@@ -161,7 +161,7 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
 - Leggi doc/guide/impostazioni.md PER INTERO (§ Settings — the FIVE places, lo stato per tab, «Annulla» come rilettura, il focus del campo in errore)
 - Leggi doc/guide/allocazione.md (i target), doc/guide/e2e-emulatori.md (la spec che salva restaura il documento intero)
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice
-- Leggi doc/perf/README.md e la spec PERF-13 per intero; PERF-05 e PERF-12 devono essere chiuse
+- Leggi doc/perf/README.md e la spec PERF-13 per intero; PERF-05 è chiusa (2026-09-29), PERF-12 deve esserlo
 - Crea SESSION_NOTES.md; crea il branch dalla branch attiva PRIMA di editare
 
 Regole: nessun commit senza il mio OK; un branch e un commit; rispondi in italiano.

@@ -1,11 +1,11 @@
 # PERF-11 — Patrimonio: N grafici montati al buio, un dialog da 2887 righe sempre vivo
 
-> Stato: da fare · Priorità: 3 · Sforzo: M · Dipende da: PERF-04 (recharts in un chunk), PERF-05 (`AssetDialog` non legge da chiuso), PERF-12 (il census in `scripts/`) · Sblocca: —
+> Stato: da fare · Priorità: 3 · Sforzo: M · Dipende da: PERF-04 (recharts in un chunk), PERF-05 (chiusa il 2026-09-29: `AssetDialog` non legge da chiuso), PERF-12 (il census in `scripts/`) · Sblocca: —
 
 ## 1. Il problema, misurato
 
 Patrimonio: 790 ms cold al primo numero, LCP 1230, **270 ms di long task** al mount (mediana di 3 run, mirror con 25 asset),
-e 314 ms warm con 11 richieste Firestore (PERF-05 ne toglie 7). Il lavoro di rendering, verificato:
+e 314 ms warm con 11 richieste Firestore (dal 2026-09-29 warm ne fa 0: assets, snapshot, overview, ledger e rate in cache). Il lavoro di rendering, verificato:
 
 - `components/assets/StrumentiTile.tsx:621-644` rende **DUE volte l'elenco**: la lista mobile di `AssetRow` (`desktop:hidden`) e
   la tabella desktop (`hidden desktop:block`) sono entrambe nel DOM a ogni larghezza. La sparkline vive SOLO in `AssetRow`
@@ -15,7 +15,7 @@ e 314 ms warm con 11 richieste Firestore (PERF-05 ne toglie 7). Il lavoro di ren
   `getPropertyValue`) e un secondo rAF `setReady` (`AssetSparkline.tsx:22-30`). Con N asset: **N grafici, 2N rAF, N+1
   `getComputedStyle`** montati dentro `display:none` (desktop, la lista intera è nascosta) o dentro righe chiuse (mobile), a ogni apertura.
 - `AssetDialog` (2887 righe, 22 `useState`, 23 `useWatch` alla radice, `:596-618`) e `CashAccountDialog` sono SEMPRE montati
-  (`assets/page.tsx:528, 536`) anche chiusi; da chiuso il dialog legge le impostazioni (PERF-05) e partecipa a ogni render
+  (`assets/page.tsx:528, 536`) anche chiusi; da chiuso il dialog non legge più nulla (`useSettings(ownerId, { enabled: open })`, 2026-09-29) ma partecipa a ogni render
   della pagina. Da aperto, ogni tasto in un campo `useWatch`-ato alla radice ri-renderizza le 2887 righe.
 - `app/dashboard/assets/page.tsx:385`: `motion.div layout="position"` intorno all'INTERA pagina — è di PERF-14, non di questa spec.
 
@@ -145,7 +145,7 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
 - Leggi doc/guide/patrimonio.md, dialog.md (per intero: l'uscita animata e il focus), stati.md, e2e-emulatori.md
 - Leggi components/ui/responsive-modal.tsx PRIMA di decidere il mount condizionale
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice
-- Leggi doc/perf/README.md e la spec PERF-11 per intero; PERF-04, PERF-05 e PERF-12 devono essere chiuse
+- Leggi doc/perf/README.md e la spec PERF-11 per intero; PERF-05 è chiusa (2026-09-29), PERF-04 e PERF-12 devono esserlo
 - Crea SESSION_NOTES.md; crea il branch dalla branch attiva PRIMA di editare
 
 Regole: nessun commit senza il mio OK; un branch e un commit; rispondi in italiano.

@@ -151,7 +151,8 @@ Dividendi 3,77 / 6 / 8. Il codice di oggi (righe da riverificare):
   periodo dopo il refetch per prefisso. PERF-06 fa leggere a Divisione la finestra di Tracciamento (PERF-06 § 4), ma il
   periodo di Divisione è suo (`ExpenseSplitTab.tsx:89`): se la finestra non lo segue, un altro mese legge vuoto — si
   riapre PERF-06.
-- **PERF-05** tocca solo `assets.all` in `loadOtherData`: `otherDataFailed` (`page.tsx:122`) resta l'errore di TAB; il
+- **Dal 2026-09-29** gli asset della tab vengono da `useAssets` (`page.tsx:104, 134`) e `loadOtherData` legge solo la
+  route dei dividendi: `otherDataFailed || assetsError` è l'errore di TAB; il
   `failed` di `dvd-rendimento` è `statsError` di `useDividendStats`, già React Query. **PERF-04**: qui niente recharts
   (SVG a mano, `FlowBarsChart.tsx:27`): una riga chiusa risparmia DOM e render, non un chunk. **PERF-03**: «Aggiornato
   alle…» sopra la striscia. **PERF-12**: niente `setState` in effetto. **PERF-14**: nessun `layout`; `tabPanelSwitch` resta.

@@ -29,8 +29,10 @@
  * The Scenari | Ventaglio switch in the Traguardo's aside is that tile's scope, not an axis.
  *
  * Data flow (unchanged from the previous IA — presentation over the same pure functions):
- * 1. settings + assets + annualCashflowData queries (independent, staleTime 5min);
- * 2. fireData query (depends on assets + settings — gated by `enabled`);
+ * 1. settings, assets, snapshots and the whole expense list from the shared hooks (one round
+ *    trip, four reads in parallel, cached across pages);
+ * 2. the cashflow figures and the FIRE history derived in memory (`computeAnnualCashflowData`,
+ *    `buildFIREData`) — a lock flip recomputes them in the same render;
  * 3. the metrics, the deterministic projection and the fan inputs derived client-side via
  *    useMemo, so preview edits (SWR, RITA controls, scenario params) are instant.
  * `respectPensionLockInFire` governs the WHOLE FIRE page (Coast, What If, Monte Carlo read the
@@ -388,7 +390,7 @@ export function FireCalculatorTab() {
   // free assets must cover the spending bridge until the unlock, then the fund tops up the
   // standard requirement. The expenses are the projection's (`computeAnnualCashflowData`: the last
   // full year, else the running year annualized and said so in the Base di calcolo aside) —
-  // ONE basis for the number, the verdict and the chart (The Same-Basis Rule). `getFIREData`'s
+  // ONE basis for the number, the verdict and the chart (The Same-Basis Rule). `buildFIREData`'s
   // own metrics read the last full year only, which on a fresh account is a 0 that would call
   // the number «non calcolabile» while the projection kept drawing.
   // The requirement of TODAY (`resolveFireRequirement`, the ONE rule the walk runs year by

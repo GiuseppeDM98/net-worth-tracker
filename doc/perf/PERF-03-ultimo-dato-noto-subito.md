@@ -1,6 +1,6 @@
 # PERF-03 — L'ultimo dato noto subito, il dato fresco appena arriva
 
-> Stato: da fare · Priorità: 2 · Sforzo: M · Dipende da: PERF-02 (la shell c'è già), PERF-05 (le pagine leggono da React Query, o non c'è niente da persistere) · Sblocca: —
+> Stato: da fare · Priorità: 2 · Sforzo: M · Dipende da: PERF-02 (la shell c'è già), PERF-05 (chiusa il 2026-09-29: le pagine leggono da React Query) · Sblocca: —
 
 ## 1. Il problema, misurato
 
@@ -22,7 +22,9 @@ da IndexedDB è asincrono: shell → `isRestoring` → dati), poi sostituirlo co
 
 - Benchmark con `npm run perf:bench -- --revisit` (reload della route dopo una visita): il marcatore `data` su Cashflow, Storico, Analisi,
   Patrimonio, Previdenza, Hall of Fame scende sotto **300 ms** (oggi 510–2285) e lo `skeleton` NON appare quando esiste un
-  dato persistito. FIRE: persistita solo `annualCashflowData`; il suo obiettivo resta quello di PERF-05/06.
+  dato persistito. FIRE: dal 2026-09-29 legge `expenses.all` e `snapshots.all` e deriva le sue cifre in memoria
+  (`computeAnnualCashflowData`, `buildFIREData` in `fireService.ts`): persistite quelle due chiavi, nessuna chiave FIRE
+  propria; la finestra di E è di PERF-06.
 - Mentre il fresco è in volo, la pagina mostra «Aggiornato alle HH:MM» nel `PageVerdict` (o nel `PageHeader` dove non c'è
   verdetto), e la riga si svuota quando il fresco è arrivato. Verificato in Playwright leggendo il testo che il nodo
   `role="status"` HA AVUTO durante il ripristino (un `MutationObserver` da `addInitScript` che registra ogni testo del nodo:
@@ -52,8 +54,9 @@ Pacchetti: `@tanstack/react-query-persist-client` + `@tanstack/query-async-stora
   payload persistito, come `DASHBOARD_OVERVIEW_SOURCE_VERSION` fa per l'overview);
 - `dehydrateOptions.shouldDehydrateQuery`: SOLO le chiavi in una allowlist (`queryKeys.assets.all`, `snapshots.all`,
   `expenses.all` e il prefisso `expenses.range` (PERF-06), `expenses.categories`, `dashboard.overview`, `settings.all`,
-  `pensionContributions.all`, `assetTransactions.all`, `costCenters.all`, `hallOfFame.all` (PERF-05 lo porta su React Query),
-  `['annualCashflowData', ownerId]`), con `state.status === 'success'` e MAI per l'account demo: la regola è
+  `pensionContributions.all`, `assetTransactions.all`, `costCenters.all`, `hallOfFame.all`, `goals.all`,
+  `dividendReceipts.all` — tutte su React Query dal 2026-09-29, `lib/query/queryKeys.ts`; nessuna chiave
+  `annualCashflowData`: FIRE deriva le sue cifre da `expenses.all`), con `state.status === 'success'` e MAI per l'account demo: la regola è
   `process.env.NEXT_PUBLIC_DEMO_USER_ID === uid` (`lib/hooks/useDemoMode.ts:13-15`), estratta in una funzione pura
   `isDemoUid(uid)` che il hook e il provider usano entrambi;
 - `serialize`/`deserialize` che preservano `Date` (le spese hanno `date: Date` dopo `toDate()` nel servizio — AGENTS.md § Firebase
@@ -111,7 +114,7 @@ cache server di 30 giorni.
 
 ## 6. Passi
 
-1. Verificare PERF-02 e PERF-05 chiuse (README): senza, Storico/Allocazione/Impostazioni non hanno nulla in cache da persistere.
+1. PERF-02 e PERF-05 sono chiuse (README § 6, entrambe nel 2026-09-29): Storico, Allocazione e Impostazioni leggono dalle chiavi e hanno una cache da persistere.
 2. Dipendenze, provider, allowlist, `gcTime` sugli hook + test puri (Date round trip; demo mai persistito; chiave fuori
    allowlist esclusa).
 3. I sei setup che puliscono lo store; `npm run test:e2e` completo PRIMA di toccare le pagine (il persister cambia il primo
@@ -181,8 +184,8 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
 - Leggi doc/guide/stati.md, doc/guide/dialog.md (il role=status stabile), doc/guide/account-condiviso-demo.md,
   doc/guide/panoramica.md, doc/guide/e2e-emulatori.md (storageState con indexedDB)
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice
-- Leggi doc/perf/README.md e la spec PERF-03 per intero; verifica che PERF-02 e PERF-05 siano chiuse (README), altrimenti
-  fermati e dimmelo
+- Leggi doc/perf/README.md e la spec PERF-03 per intero; PERF-02 e PERF-05 sono chiuse (README § 6, 2026-09-29); se il README
+  dicesse altro, fermati e dimmelo
 - Crea SESSION_NOTES.md; crea il branch dalla branch attiva PRIMA di editare
 
 Regole: nessun commit senza il mio OK; un branch e un commit; rispondi in italiano; ogni domanda di prodotto (dove sta
