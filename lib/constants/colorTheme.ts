@@ -3,7 +3,7 @@
  * `'use client'`, because two worlds read them: `contexts/ColorThemeContext.tsx` (the client store)
  * and `app/layout.tsx`, a Server Component that inlines the pre-hydration script below. A value
  * imported from a client module into a Server Component is a client reference, not the string
- * (PERF-02).
+ * (the shell is in the prerendered HTML since 2026-09-28).
  *
  * WARNING: adding a theme also means the CSS blocks in `app/globals.css`, `COLOR_THEME_SWATCHES` in
  * `app/dashboard/settings/page.tsx` and `__tests__/chartPaletteDistinctness.test.ts` (doc/guide/temi.md).

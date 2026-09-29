@@ -8,7 +8,7 @@ const getServerSnapshot = () => false;
 /**
  * Whether a CSS media query matches, read as an external store (`useSyncExternalStore`).
  *
- * The dashboard shell is in the prerendered HTML (PERF-02), so this hook now runs on the server
+ * The dashboard shell is in the prerendered HTML (since 2026-09-28), so this hook now runs on the server
  * and during hydration — where `window` does not exist and the only value that does not make React
  * report a mismatch is the server's, `false`. Right after hydration React reads the real snapshot
  * and re-renders the subscribers on its own: no error, no effect, no `setState`. A component
@@ -17,7 +17,7 @@ const getServerSnapshot = () => false;
  * kept for the surfaces that branch on the phone width.
  *
  * The one consequence: the shell's FIRST frame must be decided by CSS, never by this value. The
- * fixed sidebar is `hidden desktop:flex` and the bottom nav `desktop:hidden`, so a phone paints the
+ * fixed sidebar is `hidden desktop:block` and the bottom nav `desktop:hidden`, so a phone paints the
  * right chrome before JS corrects `false` to `true` (`e2e/shell.boot.mobile.spec.ts` proves the
  * console stays clean).
  */

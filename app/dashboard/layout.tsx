@@ -14,10 +14,10 @@ import { cn } from '@/lib/utils';
 
 /**
  * The dashboard shell — in the prerendered HTML and on screen BEFORE Firebase Auth resolves
- * (PERF-02): the skip link, the sidebar (its profile in a wait state until the user is known),
+ * (since 2026-09-28): the skip link, the sidebar (its profile in a wait state until the user is known),
  * `<main>` with the generic tile-grid skeleton, the bottom nav. Only the PAGE waits for the user:
  * `ProtectedRoute` sits inside `<main>`. Nothing here may read `window` during render — the first
- * frame on a phone is decided by CSS (`hidden desktop:flex`), and `useMediaQuery` answers the
+ * frame on a phone is decided by CSS (`hidden desktop:block`), and `useMediaQuery` answers the
  * server's `false` until hydration is done. No `MotionConfig` here: the root `MotionProvider` is
  * the one.
  */

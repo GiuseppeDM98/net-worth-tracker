@@ -84,7 +84,7 @@ a 1024. Le primitive di oggi (righe del 2026-09-26, da riverificare):
 
 ### 4.2 La riga chiusa (The Closed-Row Rule, proposta)
 
-`useCompactLayout` = `useMediaQuery('(width < 1440px)')` di PERF-02 (server `false`), non un secondo store: è la query
+`useCompactLayout` = `useMediaQuery('(width < 1440px)')` (`lib/hooks/useMediaQuery.ts`, server `false` dal 2026-09-28), non un secondo store: è la query
 di `max-desktop:` in Tailwind 4.3 (`max-width: 1439px` scoprirebbe le larghezze frazionarie dello zoom). Se `!compact`,
 `collapse(id)` è `undefined`: la `Tile` di oggi. Con `collapse`: Radix `Collapsible` + `CollapsibleTrigger asChild`
 (AGENTS § Motion), **non** `CollapsibleContent` (§ 1); `aria-controls` esplicito.
@@ -170,7 +170,7 @@ frase chiude dopo la cifra del record («in un mese» solo con la percentuale, `
 
 - **PERF-12**: `useSyncExternalStore`, nessun ref restituito, `mounted` nel gestore. **PERF-14**: nessun `layout`; un
   grafico montato all'apertura legge `ChartColorsProvider`. **PERF-04**: un grafico lazy riserva la sua altezza (obbligo
-  di MOB-03..07). **PERF-03**: `freshness` fuori da «Il perché». **PERF-02**: server `false`.
+  di MOB-03..07). **PERF-03**: `freshness` fuori da «Il perché». **PERF-02** (in develop dal 2026-09-29): server `false`, già così in `lib/hooks/useMediaQuery.ts`.
 - **MOB-01**: le pagine a tab crescono di ~12 px: l'unica eccezione al ratchet, dichiarata nel commit.
 
 ### 4.9 Domande al proprietario
@@ -279,7 +279,7 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
 - Leggi doc/guide/hall-of-fame.md, doc/guide/stati.md, doc/guide/e2e-emulatori.md
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice
 - Leggi doc/mobile/README.md e la spec MOB-02 per intero; DESIGN.md § 5 e § 6 (MAI rigenerarlo);
-  doc/mobile/MOB-01 e doc/perf/PERF-02, PERF-03, PERF-12, PERF-14 (devono essere chiuse)
+  doc/mobile/MOB-01 e doc/perf/PERF-03, PERF-12, PERF-14 (devono essere chiuse; PERF-02 lo è dal 2026-09-29)
 - Crea SESSION_NOTES.md; crea il branch dalla branch attiva PRIMA di editare
 
 Regole: nessun commit senza il mio OK; un branch e un commit; rispondi in italiano; le domande di § 4.9 con lo

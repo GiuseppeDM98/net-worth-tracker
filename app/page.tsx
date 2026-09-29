@@ -30,7 +30,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { MotionConfig, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { ArrowRight, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -156,191 +156,189 @@ export default function HomePage() {
   if (user) return null;
 
   return (
-    <MotionConfig reducedMotion="user">
-      <div className="flex min-h-screen flex-col bg-background text-foreground">
-        <a
-          href="#main-content"
-          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-background focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:ring-2 focus:ring-ring"
-        >
-          Vai al contenuto principale
-        </a>
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-background focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:ring-2 focus:ring-ring"
+      >
+        Vai al contenuto principale
+      </a>
 
-        {/* The hairline the app's page headers use as their separator — the only chrome above
-            the verdict, as on the two authentication pages. */}
-        <div className="h-px w-full bg-border" />
+      {/* The hairline the app's page headers use as their separator — the only chrome above
+          the verdict, as on the two authentication pages. */}
+      <div className="h-px w-full bg-border" />
 
-        <main id="main-content" className="flex-1 px-4 pb-10 pt-1 desktop:px-5 desktop:pb-14">
-          {/* The bottom padding of the dashboard container exists for the phone's nav pill,
-              which this page does not have. */}
-          <PageContainer className="max-desktop:portrait:pb-0">
-            <PageHeader
-              label="Portfolio Tracker"
-              title="Panoramica"
-              description="dati d’esempio"
-              actions={
-                <div className="flex items-center gap-2">
-                  <ThemePicker />
-                  <Button variant="outline" className="h-9" asChild>
+      <main id="main-content" className="flex-1 px-4 pb-10 pt-1 desktop:px-5 desktop:pb-14">
+        {/* The bottom padding of the dashboard container exists for the phone's nav pill,
+            which this page does not have. */}
+        <PageContainer className="max-desktop:portrait:pb-0">
+          <PageHeader
+            label="Portfolio Tracker"
+            title="Panoramica"
+            description="dati d’esempio"
+            actions={
+              <div className="flex items-center gap-2">
+                <ThemePicker />
+                <Button variant="outline" className="h-9" asChild>
+                  <Link href="/login">Accedi</Link>
+                </Button>
+              </div>
+            }
+          />
+
+          <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-4">
+            <motion.div variants={cardItem} className="flex flex-col gap-5 pt-1">
+              <PageVerdict verdict={verdict} ariaLabel="Cos’è Portfolio Tracker" />
+
+              <div className="flex flex-col gap-2.5">
+                <div className="flex flex-col gap-3 tablet:flex-row tablet:items-center">
+                  {DEMO_ENABLED && (
+                    <Button
+                      size="lg"
+                      onClick={handleDemoLogin}
+                      disabled={demoLoading}
+                      aria-busy={demoLoading}
+                      // 44px on a phone, the app's `lg` height from tablet up: these two are
+                      // the page's only actions, and a thumb is what presses them.
+                      className="h-11 w-full tablet:h-10 tablet:w-auto"
+                    >
+                      {demoLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                          Accesso demo...
+                        </>
+                      ) : (
+                        <>
+                          Prova la demo
+                          <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
+                        </>
+                      )}
+                    </Button>
+                  )}
+                  <Button
+                    variant={DEMO_ENABLED ? 'outline' : 'default'}
+                    size="lg"
+                    asChild
+                    className="h-11 w-full tablet:h-10 tablet:w-auto"
+                  >
                     <Link href="/login">Accedi</Link>
                   </Button>
                 </div>
-              }
-            />
 
-            <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-4">
-              <motion.div variants={cardItem} className="flex flex-col gap-5 pt-1">
-                <PageVerdict verdict={verdict} ariaLabel="Cos’è Portfolio Tracker" />
-
-                <div className="flex flex-col gap-2.5">
-                  <div className="flex flex-col gap-3 tablet:flex-row tablet:items-center">
-                    {DEMO_ENABLED && (
-                      <Button
-                        size="lg"
-                        onClick={handleDemoLogin}
-                        disabled={demoLoading}
-                        aria-busy={demoLoading}
-                        // 44px on a phone, the app's `lg` height from tablet up: these two are
-                        // the page's only actions, and a thumb is what presses them.
-                        className="h-11 w-full tablet:h-10 tablet:w-auto"
-                      >
-                        {demoLoading ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
-                            Accesso demo...
-                          </>
-                        ) : (
-                          <>
-                            Prova la demo
-                            <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
-                          </>
-                        )}
-                      </Button>
+                {(demoNote || invite) && (
+                  <p className="text-[13px] leading-[1.45] text-muted-foreground">
+                    {demoNote && <span>{narrativeToText(demoNote)} </span>}
+                    {invite && (
+                      <>
+                        {invite.question}{' '}
+                        <Link
+                          href="/register"
+                          className="font-medium text-foreground underline underline-offset-4 transition-colors hover:text-foreground/70 motion-reduce:transition-none"
+                        >
+                          {invite.linkLabel}
+                        </Link>
+                      </>
                     )}
-                    <Button
-                      variant={DEMO_ENABLED ? 'outline' : 'default'}
-                      size="lg"
-                      asChild
-                      className="h-11 w-full tablet:h-10 tablet:w-auto"
-                    >
-                      <Link href="/login">Accedi</Link>
-                    </Button>
-                  </div>
+                  </p>
+                )}
+              </div>
+            </motion.div>
 
-                  {(demoNote || invite) && (
-                    <p className="text-[13px] leading-[1.45] text-muted-foreground">
-                      {demoNote && <span>{narrativeToText(demoNote)} </span>}
-                      {invite && (
-                        <>
-                          {invite.question}{' '}
-                          <Link
-                            href="/register"
-                            className="font-medium text-foreground underline underline-offset-4 transition-colors hover:text-foreground/70 motion-reduce:transition-none"
-                          >
-                            {invite.linkLabel}
-                          </Link>
-                        </>
-                      )}
-                    </p>
-                  )}
-                </div>
-              </motion.div>
+            {/* The sample profile is declared ONCE, in the eyebrow's voice, at the head of the
+                region it governs — a caption under one number would read as a footnote to
+                that number alone. */}
+            <motion.div
+              variants={cardItem}
+              className="flex flex-col gap-1.5 border-t border-border/40 pt-3"
+            >
+              <p className={TILE_EYEBROW_CLASS}>{SAMPLE_PROFILE_EYEBROW}</p>
+              <NarrativeText
+                segments={describeSampleProfile()}
+                className="max-w-[920px] text-[13px] leading-[1.45] text-muted-foreground"
+              />
+            </motion.div>
 
-              {/* The sample profile is declared ONCE, in the eyebrow's voice, at the head of the
-                  region it governs — a caption under one number would read as a footnote to
-                  that number alone. */}
+            <motion.section
+              variants={staggerContainer}
+              initial="hidden"
+              animate="visible"
+              aria-label="Panoramica su un profilo d’esempio"
+              className="grid grid-cols-1 gap-3 tablet:grid-cols-2 desktop:grid-cols-12"
+            >
               <motion.div
                 variants={cardItem}
-                className="flex flex-col gap-1.5 border-t border-border/40 pt-3"
+                className={cn(TILE_CELL_CLASS, 'tablet:col-span-2 desktop:col-span-5 desktop:row-span-2')}
               >
-                <p className={TILE_EYEBROW_CLASS}>{SAMPLE_PROFILE_EYEBROW}</p>
-                <NarrativeText
-                  segments={describeSampleProfile()}
-                  className="max-w-[920px] text-[13px] leading-[1.45] text-muted-foreground"
+                <PatrimonioTile
+                  totalValue={SAMPLE_TOTAL_VALUE}
+                  heroValueClass={resolveHeroValueClass(SAMPLE_TOTAL_VALUE)}
+                  variations={SAMPLE_VARIATIONS}
+                  isNewATH
+                  sparklinePeriod={sparklinePeriod}
+                  onSparklinePeriodChange={setSparklinePeriod}
+                  sparklineDisplay={sparklineDisplay}
+                  movers={SAMPLE_MARKET_MOVERS}
+                  countLine={`${SAMPLE_ASSET_COUNT} asset · profilo d’esempio`}
                 />
               </motion.div>
 
-              <motion.section
-                variants={staggerContainer}
-                initial="hidden"
-                animate="visible"
-                aria-label="Panoramica su un profilo d’esempio"
-                className="grid grid-cols-1 gap-3 tablet:grid-cols-2 desktop:grid-cols-12"
+              <motion.div variants={cardItem} className={cn(TILE_CELL_CLASS, 'desktop:col-span-4')}>
+                <CashflowTile
+                  expenseStats={SAMPLE_EXPENSE_STATS}
+                  month={SAMPLE_MONTH}
+                  dayOfMonth={SAMPLE_DAY_OF_MONTH}
+                  daysInMonth={SAMPLE_DAYS_IN_MONTH}
+                  savingsRate={SAMPLE_SAVINGS_RATE}
+                  coverageRatio={SAMPLE_COVERAGE_RATIO}
+                />
+              </motion.div>
+
+              <motion.div variants={cardItem} className={cn(TILE_CELL_CLASS, 'desktop:col-span-3')}>
+                <ComposizioneTile data={assetClassData} />
+              </motion.div>
+
+              <motion.div
+                variants={cardItem}
+                className={cn(TILE_CELL_CLASS, 'tablet:col-span-2 desktop:col-span-7')}
               >
+                <ObiettivoTile goals={SAMPLE_GOALS} />
+              </motion.div>
+
+              {promises.map((promise) => (
                 <motion.div
+                  key={promise.key}
                   variants={cardItem}
-                  className={cn(TILE_CELL_CLASS, 'tablet:col-span-2 desktop:col-span-5 desktop:row-span-2')}
+                  className={cn(TILE_CELL_CLASS, 'desktop:col-span-4')}
                 >
-                  <PatrimonioTile
-                    totalValue={SAMPLE_TOTAL_VALUE}
-                    heroValueClass={resolveHeroValueClass(SAMPLE_TOTAL_VALUE)}
-                    variations={SAMPLE_VARIATIONS}
-                    isNewATH
-                    sparklinePeriod={sparklinePeriod}
-                    onSparklinePeriodChange={setSparklinePeriod}
-                    sparklineDisplay={sparklineDisplay}
-                    movers={SAMPLE_MARKET_MOVERS}
-                    countLine={`${SAMPLE_ASSET_COUNT} asset · profilo d’esempio`}
-                  />
+                  <LandingPromiseTile promise={promise} />
                 </motion.div>
+              ))}
+            </motion.section>
+          </motion.div>
+        </PageContainer>
+      </main>
 
-                <motion.div variants={cardItem} className={cn(TILE_CELL_CLASS, 'desktop:col-span-4')}>
-                  <CashflowTile
-                    expenseStats={SAMPLE_EXPENSE_STATS}
-                    month={SAMPLE_MONTH}
-                    dayOfMonth={SAMPLE_DAY_OF_MONTH}
-                    daysInMonth={SAMPLE_DAYS_IN_MONTH}
-                    savingsRate={SAMPLE_SAVINGS_RATE}
-                    coverageRatio={SAMPLE_COVERAGE_RATIO}
-                  />
-                </motion.div>
-
-                <motion.div variants={cardItem} className={cn(TILE_CELL_CLASS, 'desktop:col-span-3')}>
-                  <ComposizioneTile data={assetClassData} />
-                </motion.div>
-
-                <motion.div
-                  variants={cardItem}
-                  className={cn(TILE_CELL_CLASS, 'tablet:col-span-2 desktop:col-span-7')}
-                >
-                  <ObiettivoTile goals={SAMPLE_GOALS} />
-                </motion.div>
-
-                {promises.map((promise) => (
-                  <motion.div
-                    key={promise.key}
-                    variants={cardItem}
-                    className={cn(TILE_CELL_CLASS, 'desktop:col-span-4')}
-                  >
-                    <LandingPromiseTile promise={promise} />
-                  </motion.div>
-                ))}
-              </motion.section>
-            </motion.div>
-          </PageContainer>
-        </main>
-
-        <footer className="border-t border-border px-4 py-4 desktop:px-5">
-          <div className="mx-auto flex w-full max-w-[1920px] flex-col gap-1 text-[11px] text-muted-foreground tablet:flex-row tablet:items-center tablet:justify-between">
-            <span>
-              Portfolio Tracker — open source su{' '}
-              <a
-                href="https://github.com/GiuseppeDM98/net-worth-tracker"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Portfolio Tracker su GitHub (apre in una nuova scheda)"
-                className="underline underline-offset-2 hover:text-foreground"
-              >
-                GitHub
-              </a>
-            </span>
-            <NarrativeText
-              segments={describeProjectFacts()}
-              className="text-[11px] text-muted-foreground"
-              figureClassName="font-semibold"
-            />
-          </div>
-        </footer>
-      </div>
-    </MotionConfig>
+      <footer className="border-t border-border px-4 py-4 desktop:px-5">
+        <div className="mx-auto flex w-full max-w-[1920px] flex-col gap-1 text-[11px] text-muted-foreground tablet:flex-row tablet:items-center tablet:justify-between">
+          <span>
+            Portfolio Tracker — open source su{' '}
+            <a
+              href="https://github.com/GiuseppeDM98/net-worth-tracker"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Portfolio Tracker su GitHub (apre in una nuova scheda)"
+              className="underline underline-offset-2 hover:text-foreground"
+            >
+              GitHub
+            </a>
+          </span>
+          <NarrativeText
+            segments={describeProjectFacts()}
+            className="text-[11px] text-muted-foreground"
+            figureClassName="font-semibold"
+          />
+        </div>
+      </footer>
+    </div>
   );
 }

@@ -3,7 +3,7 @@
  *
  * Google users carry it in the Firebase Auth profile; email/password users were registered with
  * it in `users/{uid}` only. `AuthContext` used to await the Firestore read before unblocking the
- * app — a round trip in front of every page (PERF-02). The read is asynchronous now, and this is
+ * app — a round trip in front of every page, until 2026-09-28. The read is asynchronous now, and this is
  * the decision it feeds: which name to show, and whether the Auth profile should learn it so the
  * next sign-in needs no read at all.
  */

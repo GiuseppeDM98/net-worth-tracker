@@ -80,7 +80,7 @@ export default defineConfig({
   },
 
   projects: [
-    // The six setups run at 1440: since PERF-02 the shell (`navigation`, `main`) is in the HTML
+    // The six setups run at 1440: since 2026-09-28 the shell (`navigation`, `main`) is in the HTML
     // before anyone is signed in, so each setup anchors on the profile in the sidebar footer — the
     // one thing that needs the user — and the sidebar is a fixed column only from `desktop:`.
     { name: 'setup', testMatch: /auth\.setup\.ts/, use: SETUP_VIEWPORT },

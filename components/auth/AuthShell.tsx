@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { motion, MotionConfig } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { PageVerdict } from '@/components/ui/page-verdict';
 import { TILE_EYEBROW_CLASS } from '@/components/ui/tile';
 import { ThemePicker } from '@/components/layout/ThemePicker';
@@ -27,8 +27,10 @@ interface AuthShellProps {
  * tile, and a grid of one cell is a grid pretending. Everything is left-aligned like the
  * rest of the app, so the column reads as a page and not as a modal.
  *
- * These routes sit outside the dashboard layout, so they carry their own `MotionConfig`
- * (AGENTS.md → Motion: reduced-motion is propagated at the layout root, and this is theirs).
+ * Reduced motion is honoured here through the root `MotionProvider` (app/layout.tsx), which wraps
+ * these routes like every other: the `MotionConfig` this frame carried until 2026-09-29 was a
+ * nested duplicate with the same value — inert, and the reason AGENTS.md → Motion could not say
+ * «ONE» truthfully.
  */
 export function AuthShell({ verdict, verdictAriaLabel, footer, children }: AuthShellProps) {
   return (
@@ -42,33 +44,31 @@ export function AuthShell({ verdict, verdictAriaLabel, footer, children }: AuthS
       </div>
 
       <div className="flex flex-1 items-center justify-center px-4 pb-10 desktop:px-6 desktop:pb-14">
-        <MotionConfig reducedMotion="user">
-          <motion.div
-            className="flex w-full max-w-[420px] flex-col"
-            variants={staggerContainer}
-            initial="hidden"
-            animate="visible"
-          >
-            <motion.div variants={cardItem} className="flex flex-col gap-3">
-              <p className={TILE_EYEBROW_CLASS}>Portfolio Tracker</p>
-              <PageVerdict verdict={verdict} ariaLabel={verdictAriaLabel} />
-            </motion.div>
-
-            <motion.div variants={cardItem} className="mt-6 flex flex-col">
-              {children}
-            </motion.div>
-
-            <motion.p variants={cardItem} className="mt-4 text-sm text-muted-foreground">
-              {footer.question}{' '}
-              <Link
-                href={footer.href}
-                className="font-medium text-foreground underline underline-offset-4 transition-colors hover:text-foreground/70 motion-reduce:transition-none"
-              >
-                {footer.linkLabel}
-              </Link>
-            </motion.p>
+        <motion.div
+          className="flex w-full max-w-[420px] flex-col"
+          variants={staggerContainer}
+          initial="hidden"
+          animate="visible"
+        >
+          <motion.div variants={cardItem} className="flex flex-col gap-3">
+            <p className={TILE_EYEBROW_CLASS}>Portfolio Tracker</p>
+            <PageVerdict verdict={verdict} ariaLabel={verdictAriaLabel} />
           </motion.div>
-        </MotionConfig>
+
+          <motion.div variants={cardItem} className="mt-6 flex flex-col">
+            {children}
+          </motion.div>
+
+          <motion.p variants={cardItem} className="mt-4 text-sm text-muted-foreground">
+            {footer.question}{' '}
+            <Link
+              href={footer.href}
+              className="font-medium text-foreground underline underline-offset-4 transition-colors hover:text-foreground/70 motion-reduce:transition-none"
+            >
+              {footer.linkLabel}
+            </Link>
+          </motion.p>
+        </motion.div>
       </div>
     </div>
   );

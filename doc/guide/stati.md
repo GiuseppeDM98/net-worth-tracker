@@ -34,7 +34,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   nel Cashflow» — a sentence about the reader's data, told about data nobody read. It rejects now; both its callers
   hold an `ErrorNotice` branch that only a rejection can reach. When wiring a new surface, check the service too: an
   `isError` branch above a service that never rejects is decoration.
-- **The auth wait is a skeleton too, and it is in the HTML** (PERF-02, 2026-09-28). `ProtectedRoute` renders its
+- **The auth wait is a skeleton too, and it is in the HTML** (2026-09-28). `ProtectedRoute` renders its
   `fallback` — the dashboard layout passes `<PageContainer><TileGridSkeleton label="Verifica dell'accesso" /></PageContainer>`
   — while `useAuth().loading` and through the redirect to `/login`; on the server `loading` is always true, so
   that skeleton is what every prerendered dashboard route carries. The spinner it replaced (`border-gray-300

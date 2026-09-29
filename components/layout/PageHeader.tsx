@@ -62,7 +62,7 @@ export function PageHeader({ title, label, description, actions, className }: Pa
 }
 
 /**
- * The compact header's silhouette, for the auth wait of the dashboard layout (PERF-02): the same
+ * The compact header's silhouette, for the auth wait of the dashboard layout: the same
  * two boxes at the same heights — the phone navbar's paddings, its title row at the 36px an action
  * button gives it, its description line; the desktop row's `min-h-9` — and no words, because the
  * words are the page's and arrive with it. Measured on 2026-09-28 before it existed: when the page

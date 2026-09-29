@@ -90,7 +90,7 @@ function installPerfProbe() {
     // A browser without one of the entry types: the milestones below still work.
   }
 
-  // THE AUTH MARKER — the one place that says when Firebase Auth has resolved. Since PERF-02 the
+  // THE AUTH MARKER — the one place that says when Firebase Auth has resolved. Since 2026-09-28 the
   // shell is in the HTML and `ProtectedRoute` shows the generic tile skeleton labelled «Verifica
   // dell'accesso» inside `main` until `onAuthStateChanged` answers; it leaves in the SAME commit
   // that puts the profile name in the sidebar footer (AuthContext sets user and loading together).

@@ -26,7 +26,7 @@ setup('authenticate', async ({ page }) => {
 
   // The redirect is the only reliable signal that Firebase accepted the credentials.
   await page.waitForURL(/\/dashboard/, { timeout: 30_000 });
-  // Then the profile in the sidebar footer: since PERF-02 `navigation` and `main` are in the HTML
+  // Then the profile in the sidebar footer: since 2026-09-28 `navigation` and `main` are in the HTML
   // before Firebase has said who is signed in, so they would declare the session ready too early.
   // The footer prints the account's email once `onAuthStateChanged` has answered (1440 viewport:
   // the sidebar is a fixed column only from `desktop:`).

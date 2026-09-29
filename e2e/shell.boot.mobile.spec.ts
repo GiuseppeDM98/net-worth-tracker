@@ -1,8 +1,9 @@
 /**
- * PERF-02 at 390 — the twin of `shell.boot.spec.ts` on the `mobile` project: the same HTML, and
+ * The dashboard shell before the login, at 390 — the twin of `shell.boot.spec.ts` on the `mobile`
+ * project: the same HTML, and
  * the hydration that matters most here. On a phone `useMediaQuery` answers the server's `false`
  * during hydration while the viewport says `true`; the CSS decides the first frame
- * (`hidden desktop:flex`) and React corrects the value afterwards without an error — (b) is the
+ * (`hidden desktop:block`) and React corrects the value afterwards without an error — (b) is the
  * proof. Seen red on 2026-09-28 with the same three breaks as the desktop spec.
  */
 

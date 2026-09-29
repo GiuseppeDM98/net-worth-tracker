@@ -41,8 +41,8 @@ export default function LoginPage() {
   // Why not router.push() immediately after signIn()? signInWithEmailAndPassword
   // resolves before onAuthStateChanged has delivered the user to the context, and a
   // navigation that lands with `user` still null would be bounced back here by
-  // ProtectedRoute. (The context no longer waits for the Firestore displayName
-  // before unblocking — PERF-02 — so the gap is one Auth callback, not a read.)
+  // ProtectedRoute. (Since 2026-09-28 the context no longer waits for the Firestore displayName
+  // before unblocking, so the gap is one Auth callback, not a read.)
   useEffect(() => {
     if (!authLoading && user) {
       router.push('/dashboard');

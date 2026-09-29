@@ -40,10 +40,10 @@ Il post: −90% re-render della sidebar; `:root:has()` da 24 ms per mutazione (q
 - Zero `layout`/`layout="position"` su wrapper di pagina; le tessere che oggi «scivolano» al cambio di stato (se esistono)
   prendono il `layout` sull'elemento che si muove, non sul padre. `layout-shift` = 0 sul cambio periodo della sparkline,
   come oggi.
-- `BottomNavigation`: resta montata e nascosta da CSS (è nella shell SSR di PERF-02: smontarla con una media query JS
+- `BottomNavigation`: resta montata e nascosta da CSS (è nella shell SSR dal 2026-09-28, `app/dashboard/layout.tsx`: smontarla con una media query JS
   creerebbe un mismatch di idratazione e la toglierebbe dal primo frame del telefono); ma il `layout` sul `motion.nav` e il
   `layoutId` della pill sono attivi SOLO quando è visibile — `const isPortraitBelowDesktop = useMediaQuery('(max-width: 1439px)
-  and (orientation: portrait)')` (SSR-safe dopo PERF-02: `false` sul server = nessuna animazione di layout nel primo frame,
+  and (orientation: portrait)')` (SSR-safe dal 2026-09-28, `lib/hooks/useMediaQuery.ts`: `false` sul server = nessuna animazione di layout nel primo frame,
   che è giusto) gating `layout={isPortraitBelowDesktop}`. Misura: CDP `LayoutCount` a un cambio pathname a 1440 prima/dopo.
 - Un solo `getComputedStyle` per pagina per tema: `ChartColorsProvider` (contesto) calcola la palette al mount e a ogni
   cambio di `colorTheme`/`resolvedTheme`; `useChartColors()` e `useActionColors()` leggono il contesto (stessa firma, stesso
@@ -59,7 +59,7 @@ Il post: −90% re-render della sidebar; `:root:has()` da 24 ms per mutazione (q
 - Non si sostituisce `motion` con `LazyMotion`/`m` (PERF-04 § 3 spiega).
 - Non si toccano `useCountUp`, `useMorphingSeries` (isolati in foglie: già buono, vedi l'audit rendering in README § 2).
 - Nessun cambio di estetica senza la decisione del proprietario (lo stagger).
-- Non si smonta `BottomNavigation` (PERF-02 la vuole nell'HTML).
+- Non si smonta `BottomNavigation` (è nell'HTML prerenderizzato dal 2026-09-28, `app/dashboard/layout.tsx`).
 
 ## 4. Design
 
@@ -170,7 +170,7 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
 - Leggi doc/guide/temi.md PER INTERO, DESIGN.md (le regole citate per nome; MAI rigenerarlo), doc/guide/panoramica.md,
   doc/guide/patrimonio.md, doc/guide/e2e-emulatori.md
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice
-- Leggi doc/perf/README.md e la spec PERF-14 per intero; PERF-12 deve essere chiusa (e PERF-02, per la media query SSR-safe)
+- Leggi doc/perf/README.md e la spec PERF-14 per intero; PERF-12 deve essere chiusa (la media query SSR-safe c'è già: `lib/hooks/useMediaQuery.ts`, 2026-09-28)
 - Crea SESSION_NOTES.md; crea il branch dalla branch attiva PRIMA di editare
 
 Regole: nessun commit senza il mio OK; un branch e un commit; rispondi in italiano.

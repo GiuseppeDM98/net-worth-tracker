@@ -225,7 +225,7 @@ export function AppSidebar() {
                         </div>
                       </>
                     ) : (
-                      // The auth wait, in the shell (PERF-02): the sidebar is in the prerendered HTML
+                      // The auth wait, in the shell: the sidebar is in the prerendered HTML (since 2026-09-28)
                       // and the profile is the one thing on it that depends on the user. The avatar's
                       // square and two lines at the text's own size; the button is 44px tall either
                       // way, so the name lands with no layout shift (`Skeleton` is `aria-hidden`).
