@@ -13,25 +13,20 @@ Next.js app for Italian investors: net worth, assets, cashflow, dividends, perfo
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic.
-- `tsc` clean; **199 files / 4576 tests** green in `Europe/Rome` + **42 Playwright spec files** (154 tests, incl. 6 auth setups; last full run 2026-09-28 on the Windows laptop, 154/154 in 7,4 min — the known intermittent is `modal.origin`, doc/guide/e2e-emulatori.md). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, which structurally hides timezone bugs.
-- Latest (2026-09-29, sixth session): **`doc/perf/PERF-02` retired** — the shell before Firebase Auth (PR #411, in
-  develop since 2026-09-29) read against the spec: 15 divergences, 12 where the code was right and the lesson already sat
-  at home (the auth marker in `main` and «testo» 265 → `perf/README.md` and the comments in `scripts/perfBenchmark.mjs`
-  and `lib/utils/perfBudget.ts`; the header's silhouette and the labelled wait → doc/guide/stati.md; the `pageerror`,
-  the six setups on the email at 1440 and the `e2e/shellBoot.ts` helper → doc/guide/e2e-emulatori.md; the theme at the
-  first rAF and the derived `ColorTheme` → doc/guide/temi.md; the read after the gate and the demo exception →
-  doc/guide/accesso-registrazione.md), 2 defects fixed in a second commit on the owner's call (the two `MotionConfig`
-  nested under the root `MotionProvider` removed from `app/page.tsx` and `components/auth/AuthShell.tsx` — inert, same
-  value — so «the ONE» in `app/dashboard/template.tsx` and AGENTS.md § Motion is true since 2026-09-29; five comments
-  corrected from `hidden desktop:flex` to `hidden desktop:block`, the class `components/ui/sidebar.tsx` uses), 1
-  deferred on purpose (the empty-chrome frame before `/login`, accepted in accesso-registrazione.md's blind spots).
-  Every pointer to the spec in code, tests, the guides, `perf/README.md`, DESIGN.md and the sister PERF/MOB specs now
-  names the date, the PR or the file; PERF-02 brought nothing to `reference/`. **Verified**: `tsc`, lint 0, Vitest
-  **199 / 4576** in `Europe/Rome` after each commit; `npm run test:e2e` for the second (two components changed): the full run read 136/154 in 13,5 min because the `next dev`
-  Playwright started answered 404 HTML on EVERY `/api/*` route (doc/guide/e2e-emulatori.md, the tell and the remedy);
-  on a fresh server the 18 red files reran 30/31, the one left `modal.origin`, red three times alone at line 47 and
-  red the same way with develop's landing and `AuthShell` swapped in on the same server — the laptop, not the commit
-  (Known Issues below).
+- `tsc` clean; **202 files / 4596 tests** green in `Europe/Rome` + **42 Playwright spec files** (154 tests, incl. 6 auth setups; last full run 2026-09-29 on the Windows laptop after PERF-05, 154/154 in 7,6 min — the known intermittent is `modal.origin`, doc/guide/e2e-emulatori.md). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, which structurally hides timezone bugs.
+- Latest (2026-09-29, seventh session): **doc/perf/PERF-05 retired** — ONE data track: every page and component reads
+  assets, snapshots, expenses, categories, settings, contributions, the ledger, cost centres, goals and the Hall of Fame
+  through the React Query hooks (five new: useSettings on the ONE settings key, useCostCenters, useGoalData,
+  useDividendReceipts, useHallOfFame; the read hooks export …QueryOptions for an imperative fetchQuery), so the closing
+  grep on app/ and components/ returns hooks and services only — the rule and the hook list in AGENTS.md § React Query
+  and Derived State. Storico reads six keys through composeReadState, Centri groups its rows in memory (no N+1), «Mutuo»
+  is ONE in-query in chunks of 30, AssetDialog closed reads nothing, ExpenseDialog opens from the keys, FIRE is one
+  round trip of four parallel reads (pure twins of the retired range readers). **Measured** warm on the mirror: Storico
+  1165 → 261 ms and 6 → 0 Firestore reads, FIRE 1556 → 114 and 6 → 0, Patrimonio, Analisi, Previdenza and Impostazioni
+  at 0 reads; **invariance** proved with two dumps before and two after on 18 surfaces (~4900 figures, none lost). The
+  nine divergences from the spec and the per-page lessons: doc/perf/README.md § 6 and the guides it names.
+  **Verified**: tsc, lint 0, Vitest **202 / 4596** in Europe/Rome, the three § 7 falsifications seen red, Playwright
+  154/154 in 7,6 min on a fresh .next-e2e (the /api probe answered 401 before the run).
 
 ## Architecture Snapshot
 - App Router; protected pages under `app/dashboard/*`.

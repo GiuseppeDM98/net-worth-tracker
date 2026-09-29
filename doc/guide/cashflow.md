@@ -169,6 +169,20 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   (setting on), so a category saved with the setting off keeps its classification; a category moved to income or
   transfer sheds its roles.
 
+## The expense form reads the keys (`components/expenses/ExpenseDialog.tsx`)
+- **`ExpenseDialog` opens from the cache** (2026-09-29): its four reads — the categories, the assets (the cash
+  accounts and the repayable properties), the settings (the default accounts, the three feature flags, the family, the
+  fee category) and the cost centres — are `useExpenseCategories`, `useAssets`, `useSettings` and `useCostCenters` with
+  `enabled: open`, the keys every page shares; on Cashflow they are already in memory, so «Nuova spesa» waits for nothing.
+  Until then every opening ran four reads of its own. A category created from the form reaches every reader through
+  the invalidation `loadCategories` now is; the default account of a NEW row is set by an effect declared AFTER the
+  form-reset effect, so the reset clears the field first in the commit that opens the dialog (the order the old async
+  loader had by accident). The form's reset rules are unchanged (AGENTS.md § Dialog Form Reset).
+- **The other category readers go through the key too**: `CategoryDeleteConfirmDialog`, `CategoryMoveDialog`,
+  `CategoryManagementDialog` and the CSV import read once after a write with
+  `queryClient.fetchQuery(categoriesQueryOptions(ownerId))` — the import's commit with `staleTime: 0`, because the
+  preview may be stale.
+
 ## Per-page blind spots
 
 - **A mortgage instalment is split on the debt of the day it SETTLES** (2026-09-25): if the property's debt is typed by hand after the instalments were linked, the next one is split on the new figure; a debt corrected by hand is never reconciled with the rows. A series started in the past repays its past instalments at save, like its account: if the debt typed on the property already reflects them, leave the property empty on the form and link the series afterwards («Collega la serie al mutuo…» takes only the future). A future row of a series written before 2026-09-19 whose account already moved at save cannot be linked to the mortgage (flagging it pending would debit the account twice). An instalment smaller than the month's interest repays nothing (negative amortisation is not modelled). The BATCH re-typing paths (a category moved to another type from Impostazioni) do not give back a repayment already applied: only the expense form and the deletes do; a row re-typed that way keeps its stamp, gives it back if deleted, and a pending one simply repays nothing on its day. The fee of a transfer follows the transfer's date and origin on every edit, so a date typed on the fee row itself is overwritten by the next edit of its transfer.

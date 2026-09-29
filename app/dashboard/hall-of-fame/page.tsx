@@ -24,7 +24,10 @@
  * from the stored rankings in `hallOfFameSummary.ts`. No component computes a figure.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/query/queryKeys';
+import { useHallOfFame } from '@/lib/hooks/useHallOfFame';
 import { resolveCenteredModalOrigin } from '@/lib/utils/modalOrigin';
 import { Loader2, Plus, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
@@ -37,7 +40,6 @@ import type { HallOfFameData, HallOfFameNote, HallOfFameSectionKey } from '@/typ
 import {
   addHallOfFameNote,
   deleteHallOfFameNote,
-  getHallOfFameData,
   updateHallOfFameNote,
 } from '@/lib/services/hallOfFameService';
 import {
@@ -114,11 +116,15 @@ export default function HallOfFamePage() {
   const { ownerId } = useActiveAccount();
   const isDemo = useDemoMode();
 
-  const [data, setData] = useState<HallOfFameData | null>(null);
-  const [loading, setLoading] = useState(true);
-  /** A failed load is not an empty set: it gets an alert, never a verdict about zeros. */
-  const [loadFailed, setLoadFailed] = useState(false);
+  const queryClient = useQueryClient();
+  // The rankings document from its key (2026-09-29): a return visit opens on the cache, and every
+  // write below invalidates the key instead of re-reading by hand.
+  const { data: loadedData, isLoading: loading, isError: loadFailed } = useHallOfFame(ownerId);
+  const data = loadedData ?? null;
   const [recalculating, setRecalculating] = useState(false);
+
+  /** «Aggiorna» and every note write: invalidate the key, never a bare refetch (AGENTS.md § Caching). */
+  const reloadData = () => queryClient.invalidateQueries({ queryKey: queryKeys.hallOfFame.all(ownerId || '') });
 
   const [noteViewOpen, setNoteViewOpen] = useState(false);
   const [viewingNote, setViewingNote] = useState<HallOfFameNote | null>(null);
@@ -134,31 +140,6 @@ export default function HallOfFamePage() {
   // to the form, which keeps growing from the same record. Never cleared on close: the exit
   // animates too, and an origin that changes mid-animation is tweened, not swapped.
   const [noteOrigin, setNoteOrigin] = useState<string | undefined>(undefined);
-
-  const loadData = async () => {
-    if (!user || !ownerId) return;
-    try {
-      setLoading(true);
-      setLoadFailed(false);
-      setData(await getHallOfFameData(ownerId));
-    } catch (error) {
-      setLoadFailed(true);
-      console.error('Error loading Hall of Fame data:', error);
-      toast.error('Errore nel caricamento dei record');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!user || !ownerId) return;
-    // Deferred so the effect body itself sets no state (react-hooks/set-state-in-effect).
-    const timer = setTimeout(() => {
-      loadData();
-    }, 0);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, ownerId]);
 
   // ─── The numbers (pure layer) ───────────────────────────────────────────────
   const today = useMemo(() => getItalyMonthYear(), []);
@@ -202,7 +183,7 @@ export default function HallOfFamePage() {
       });
       if (!response.ok) throw new Error('Failed to recalculate Hall of Fame');
       toast.success('Record aggiornati.');
-      await loadData();
+      await reloadData();
     } catch (error) {
       console.error('Error recalculating Hall of Fame:', error);
       toast.error("Errore durante l'aggiornamento dei record");
@@ -229,13 +210,13 @@ export default function HallOfFamePage() {
         month: note.month,
       });
     }
-    await loadData();
+    await reloadData();
   };
 
   const handleNoteDelete = async (noteId: string) => {
     if (!user || !ownerId) return;
     await deleteHallOfFameNote(ownerId, noteId);
-    await loadData();
+    await reloadData();
   };
 
   const rememberOpener = (trigger: HTMLElement | null) => {
@@ -370,7 +351,7 @@ export default function HallOfFamePage() {
         {header}
         <ErrorNotice
           className="max-w-[920px]"
-          onRetry={() => void loadData()}
+          onRetry={() => void reloadData()}
           notice={describeReadFailure({
             consequence: 'I record non sono stati letti: senza di essi la pagina direbbe che non ne hai nessuno.',
             untouched: 'Le rilevazioni e le note registrate non sono state toccate.',

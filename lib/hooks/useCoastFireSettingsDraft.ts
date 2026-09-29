@@ -19,6 +19,7 @@
 
 import { useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/query/queryKeys';
 import { toast } from 'sonner';
 import { getDefaultTargets, setSettings } from '@/lib/services/assetAllocationService';
 import { describeWriteError } from '@/lib/utils/dialogNarrative';
@@ -227,7 +228,7 @@ export function useCoastFireSettingsDraft({
       }),
     onSuccess: () => {
       toast.success('Ipotesi Coast FIRE salvate');
-      queryClient.invalidateQueries({ queryKey: ['settings', ownerId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.settings.all(ownerId || '') });
     },
     onError: (error) => {
       console.error('Error saving Coast FIRE settings:', error);

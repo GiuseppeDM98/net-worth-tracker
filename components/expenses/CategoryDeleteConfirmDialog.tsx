@@ -63,7 +63,8 @@ import {
 } from '@/components/ui/select';
 import { Plus, Check } from 'lucide-react';
 import { CategoryManagementDialog } from './CategoryManagementDialog';
-import { getAllCategories } from '@/lib/services/expenseCategoryService';
+import { useQueryClient } from '@tanstack/react-query';
+import { categoriesQueryOptions } from '@/lib/hooks/useExpenses';
 import { cn } from '@/lib/utils';
 
 interface CategoryDeleteConfirmDialogProps {
@@ -89,6 +90,7 @@ export function CategoryDeleteConfirmDialog({
 }: CategoryDeleteConfirmDialogProps) {
   const { user } = useAuth();
   const { ownerId } = useActiveAccount();
+  const queryClient = useQueryClient();
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [selectedSubCategoryId, setSelectedSubCategoryId] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -233,9 +235,10 @@ export function CategoryDeleteConfirmDialog({
    * category by sorting by creation timestamp.
    */
   const handleCategoryCreated = async () => {
-    // Reload categories from database to get the newly created one
+    // Re-read the categories through the key every reader shares (the create invalidated it):
+    // the newly created one is in the list.
     if (user && ownerId) {
-      const updatedCategories = await getAllCategories(ownerId);
+      const updatedCategories = await queryClient.fetchQuery(categoriesQueryOptions(ownerId));
       setLocalOverride({ base: allCategories, categories: updatedCategories });
 
       // Auto-select the newly created category (most recent by timestamp)

@@ -42,12 +42,11 @@ import { ExpenseSplitTab } from '@/components/cashflow/ExpenseSplitTab';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { Dividend } from '@/types/dividend';
-import { Asset, FamilyMember } from '@/types/assets';
+import { FamilyMember } from '@/types/assets';
 import { useExpenses, useExpenseCategories } from '@/lib/hooks/useExpenses';
 import { useAssets } from '@/lib/hooks/useAssets';
+import { useSettings } from '@/lib/hooks/useSettings';
 import { queryKeys } from '@/lib/query/queryKeys';
-import { getAllAssets } from '@/lib/services/assetService';
-import { getSettings } from '@/lib/services/assetAllocationService';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { tabPanelSwitch } from '@/lib/utils/motionVariants';
 import { toast } from 'sonner';
@@ -70,6 +69,9 @@ const CASHFLOW_TABS_BASE: TabDef[] = [
 ];
 
 const VALID_CASHFLOW_TABS = ['tracking', 'dividends', 'budget', 'cost-centers', 'split'] as const;
+/** The cashflow floor when the settings carry none: last year (the same default Analisi uses). */
+const DEFAULT_HISTORY_START_YEAR = new Date().getFullYear() - 1;
+const EMPTY_FAMILY_MEMBERS: FamilyMember[] = [];
 type CashflowTabId = (typeof VALID_CASHFLOW_TABS)[number];
 
 function getInitialTab(param: string | null): CashflowTabId {
@@ -92,31 +94,48 @@ export default function CashflowPage() {
   // leaving it out would deny its tab the `aria-controls` its panel can honour.
   const [mountedTabs, setMountedTabs] = useState<Set<string>>(new Set([initialTab, 'tracking']));
   const [activeTab, setActiveTab] = useState<string>(initialTab);
-  // null = settings not yet loaded (avoids the tab appearing late after an async flip from false → true)
-  const [costCentersEnabled, setCostCentersEnabled] = useState<boolean | null>(null);
-  // Same null-until-loaded contract as the cost centres above: a tab that appears late, after an
-  // async flip from false, moves the tab bar under the reader's cursor.
-  const [expenseSplitEnabled, setExpenseSplitEnabled] = useState<boolean | null>(null);
-  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
-
-  // React Query hooks for expenses and categories
+  // React Query hooks for expenses, categories, assets and the settings (2026-09-29: the settings
+  // used to be a one-off `getSettings` in an effect, outside every key).
   const { data: allExpenses = [], isLoading: expensesLoading, isError: expensesError } =
     useExpenses(ownerId);
   const { data: categories = [], isLoading: categoriesLoading, isError: categoriesError } =
     useExpenseCategories(ownerId);
-  const { data: allAssets = [] } = useAssets(ownerId);
+  const { data: allAssets = [], isLoading: assetsLoading, isError: assetsError } = useAssets(ownerId);
+  const { data: settings, isLoading: settingsLoading, isError: settingsError } = useSettings(ownerId);
+
+  // The optional tabs are null UNTIL the settings have answered (a tab appearing late, after an
+  // async flip from false, moves the tab bar under the reader's cursor) — and settled on a failed
+  // read too, with the safe defaults: the settings are non-fatal for the page.
+  const settingsSettled = !settingsLoading && (settings !== undefined || settingsError);
+  const costCentersEnabled: boolean | null = settingsSettled ? (settings?.costCentersEnabled ?? false) : null;
+  const expenseSplitEnabled: boolean | null = settingsSettled ? (settings?.expenseSplitEnabled ?? false) : null;
+  const familyMembers = useMemo(() => settings?.familyMembers ?? EMPTY_FAMILY_MEMBERS, [settings]);
+  const cashflowHistoryStartYear = settings?.cashflowHistoryStartYear ?? DEFAULT_HISTORY_START_YEAR;
+
+  useEffect(() => {
+    if (!settingsError) return;
+    // Logged, not shown: the page keeps its defaults (the floor year, no optional tab).
+    console.error('Failed to load cashflow settings, using fallback defaults', {
+      userId: ownerId,
+      operation: 'loadCashflowSettings',
+      fallbackHistoryStartYear: DEFAULT_HISTORY_START_YEAR,
+      fallbackCostCentersEnabled: false,
+      fallbackExpenseSplitEnabled: false,
+    });
+  }, [settingsError, ownerId]);
 
   const assetNameMap = useMemo(() => {
     const map = new Map<string, string>();
     for (const a of allAssets) map.set(a.id, a.name);
     return map;
   }, [allAssets]);
+  // The Dividendi tab's instruments: equity and bonds (bonds have coupons tracked as dividend
+  // entries), from the SAME assets key every page reads — no second read when the tab mounts.
+  const dividendAssets = useMemo(() => allAssets.filter((a) => a.assetClass === 'equity' || a.assetClass === 'bonds'), [allAssets]);
 
-  const [cashflowHistoryStartYear, setCashflowHistoryStartYear] = useState<number>(new Date().getFullYear() - 1);
-
-  // Manual state for other tabs data (dividends, assets)
+  // The dividends come from the API route, read once the tab is mounted (manual state: not a
+  // Firestore collection the hooks cover).
   const [dividends, setDividends] = useState<Dividend[]>([]);
-  const [assets, setAssets] = useState<Asset[]>([]);
   const [otherDataLoading, setOtherDataLoading] = useState(false);
   const [otherDataFailed, setOtherDataFailed] = useState(false);
   const [otherDataLoaded, setOtherDataLoaded] = useState(false);
@@ -127,7 +146,7 @@ export default function CashflowPage() {
   const loadFailed = expensesError || categoriesError;
   const isDemo = useDemoMode();
 
-  // Load dividends and assets only when their tabs are mounted
+  // Load the dividends only when their tab is mounted
   const loadOtherData = useCallback(async () => {
     if (!user || !ownerId || otherDataLoaded) return;
 
@@ -135,17 +154,11 @@ export default function CashflowPage() {
       setOtherDataLoading(true);
       setOtherDataFailed(false);
 
-      // Fetch only dividends and assets (expenses/categories handled by React Query)
-      const [dividendsData, assetsData] = await Promise.all([
-        authenticatedFetch(`/api/dividends?userId=${ownerId}`)
-          .then(r => r.json())
-          .then(d => d.dividends || []),
-        getAllAssets(ownerId),
-      ]);
+      const dividendsData = await authenticatedFetch(`/api/dividends?userId=${ownerId}`)
+        .then(r => r.json())
+        .then(d => d.dividends || []);
 
       setDividends(dividendsData);
-      // Include equity and bonds: bonds have coupons tracked as dividend entries
-      setAssets(assetsData.filter(a => a.assetClass === 'equity' || a.assetClass === 'bonds'));
       setOtherDataLoaded(true);
     } catch (error) {
       console.error('Failed to load cashflow secondary data', {
@@ -170,47 +183,19 @@ export default function CashflowPage() {
     return () => clearTimeout(timer);
   }, [user, ownerId, mountedTabs, otherDataLoaded, loadOtherData]);
 
-  // Load cashflow history start year from user settings (one-time read per session)
-  useEffect(() => {
-    if (!user || !ownerId) return;
-    const loadSettings = async () => {
-      try {
-        const settings = await getSettings(ownerId);
-
-        if (settings?.cashflowHistoryStartYear !== undefined) {
-          setCashflowHistoryStartYear(settings.cashflowHistoryStartYear);
-        }
-        setCostCentersEnabled(settings?.costCentersEnabled ?? false);
-        setExpenseSplitEnabled(settings?.expenseSplitEnabled ?? false);
-        setFamilyMembers(settings?.familyMembers ?? []);
-      } catch (error) {
-        // Settings bootstrap is non-fatal for the page: keep safe defaults and log explicitly.
-        console.error('Failed to load cashflow settings, using fallback defaults', {
-          userId: ownerId,
-          operation: 'loadCashflowSettings',
-          fallbackHistoryStartYear: 2025,
-          fallbackCostCentersEnabled: false,
-          fallbackExpenseSplitEnabled: false,
-          error: getErrorMessage(error),
-        });
-        setCostCentersEnabled(false);
-        setExpenseSplitEnabled(false);
-      }
-    };
-
-    void loadSettings();
-  }, [user, ownerId]);
-
   const handleRefresh = async () => {
-    // Invalidate React Query caches for expenses and categories
+    // Invalidate React Query caches for expenses, categories and assets
     await queryClient.invalidateQueries({
       queryKey: queryKeys.expenses.all(ownerId || ''),
     });
     await queryClient.invalidateQueries({
       queryKey: queryKeys.expenses.categories(ownerId || ''),
     });
+    await queryClient.invalidateQueries({
+      queryKey: queryKeys.assets.all(ownerId || ''),
+    });
 
-    // Force re-fetch of other data (dividends, assets)
+    // Force re-fetch of the dividends
     setOtherDataLoaded(false);
     await loadOtherData();
   };
@@ -419,9 +404,9 @@ export default function CashflowPage() {
             >
               <DividendTrackingTab
                 dividends={dividends}
-                assets={assets}
-                loading={loading}
-                loadFailed={otherDataFailed}
+                assets={dividendAssets}
+                loading={loading || assetsLoading}
+                loadFailed={otherDataFailed || assetsError}
                 onRefresh={handleRefresh}
               />
             </motion.div>

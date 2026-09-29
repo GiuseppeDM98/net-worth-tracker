@@ -6,30 +6,27 @@
  *
  * DATA FETCHING:
  * - Expenses + categories: React Query via useExpenses / useExpenseCategories
- * - cashflowHistoryStartYear: one-time read from getSettings (non-fatal, safe default on failure)
+ * - cashflowHistoryStartYear + spendingRolesEnabled: `useSettings` (the ONE settings key, 2026-09-29;
+ *   non-fatal, safe defaults on failure)
  *
- * WHY NOT SHARE DATA WITH CASHFLOW PAGE:
- * These are separate routes with separate lifecycles. Sharing would require
- * lifting state to a layout, adding unnecessary coupling. The overhead is one
- * extra Firestore read (settings) which is cached by the service layer.
+ * WHY NOT SHARE STATE WITH THE CASHFLOW PAGE:
+ * These are separate routes with separate lifecycles. The DATA is already shared: both pages
+ * read the same React Query keys, so a visit after Cashflow opens on the cache.
  */
 
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useEffect } from 'react';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useExpenses, useExpenseCategories } from '@/lib/hooks/useExpenses';
-import { getSettings } from '@/lib/services/assetAllocationService';
+import { useSettings } from '@/lib/hooks/useSettings';
 import { AnalisiTab } from '@/components/cashflow/AnalisiTab';
 import { PageContainer } from '@/components/layout/PageContainer';
 
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
+/** The cashflow floor when the settings carry none: last year (the same default Cashflow uses). */
+const DEFAULT_HISTORY_START_YEAR = new Date().getFullYear() - 1;
 
 export default function AnalisiPage() {
-  const { user } = useAuth();
   const { ownerId } = useActiveAccount();
 
   const { data: allExpenses = [], isLoading: expensesLoading, isError: expensesError } =
@@ -39,39 +36,26 @@ export default function AnalisiPage() {
   const { data: categories = [], isLoading: categoriesLoading, isError: categoriesError } =
     useExpenseCategories(ownerId);
 
-  const [cashflowHistoryStartYear, setCashflowHistoryStartYear] = useState<number>(
-    new Date().getFullYear() - 1
-  );
+  // The two settings the page reads — the history floor and the 50/30/20 flag — from the ONE
+  // settings key every page shares (2026-09-29): a visit after Cashflow opens on the cache.
+  const { data: settings, isLoading: settingsLoading, isError: settingsError } = useSettings(ownerId);
   // The URL-focus restore in AnalisiTab validates against the floored history, so it
   // must not fire until the DEFINITIVE floor is known — the restore is one-shot and
-  // a wrong provisional floor would silently drop a valid bookmarked focus.
-  const [settingsSettled, setSettingsSettled] = useState(false);
-  const [spendingRolesEnabled, setSpendingRolesEnabled] = useState(false);
+  // a wrong provisional floor would silently drop a valid bookmarked focus. The flag waits the
+  // same way: a provisional `false` would open the Flusso on «Per tipo» and then jump it.
+  // A failed read settles on the defaults: non-fatal for the page, as it always was.
+  const settingsSettled = !settingsLoading && (settings !== undefined || settingsError);
+  const cashflowHistoryStartYear = settings?.cashflowHistoryStartYear ?? DEFAULT_HISTORY_START_YEAR;
+  const spendingRolesEnabled = settings?.spendingRolesEnabled ?? false;
 
-  // Load cashflowHistoryStartYear — same pattern as cashflow/page.tsx. Literal copy intentional:
-  // avoid a shared hook abstraction for a one-time read used in two places with the same logic.
   useEffect(() => {
-    if (!user || !ownerId) return;
-    const loadSettings = async () => {
-      try {
-        const settings = await getSettings(ownerId);
-        if (settings?.cashflowHistoryStartYear !== undefined) {
-          setCashflowHistoryStartYear(settings.cashflowHistoryStartYear);
-        }
-        setSpendingRolesEnabled(settings?.spendingRolesEnabled ?? false);
-      } catch (error) {
-        // Non-fatal: trend charts will simply show data from currentYear-1 onward.
-        console.error('Failed to load analisi settings, using fallback defaults', {
-          userId: ownerId,
-          operation: 'loadAnalisiSettings',
-          error: getErrorMessage(error),
-        });
-      } finally {
-        setSettingsSettled(true);
-      }
-    };
-    void loadSettings();
-  }, [user, ownerId]);
+    if (!settingsError) return;
+    // Logged, not shown: the trend charts simply start at last year and the Flusso stays «Per tipo».
+    console.error('Failed to load analisi settings, using fallback defaults', {
+      userId: ownerId,
+      operation: 'loadAnalisiSettings',
+    });
+  }, [settingsError, ownerId]);
 
   const loading = expensesLoading || categoriesLoading || !settingsSettled;
   // A failed read is not an empty ledger: `= []` above hides the difference, so the flag

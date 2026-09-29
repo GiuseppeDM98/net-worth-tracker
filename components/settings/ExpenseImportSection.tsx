@@ -32,7 +32,8 @@ import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { cachedFormatCurrencyEUR, formatDate } from '@/lib/utils/formatters';
 import { describeImport } from '@/lib/utils/settingsNarrative';
-import { getAllCategories } from '@/lib/services/expenseCategoryService';
+import { useQueryClient } from '@tanstack/react-query';
+import { categoriesQueryOptions } from '@/lib/hooks/useExpenses';
 import { buildImportPlan, parseImportCsv, buildTemplateCsv } from '@/lib/utils/expenseImport';
 import { commitImportPlan, deleteExpensesByImportBatch } from '@/lib/services/expenseImportService';
 import { ImportPlan } from '@/types/expenseImport';
@@ -64,6 +65,7 @@ function PreviewKpi({ label, value, caption }: { label: string; value: string; c
 
 export default function ExpenseImportSection({ onImported }: ExpenseImportSectionProps) {
   const { ownerId } = useActiveAccount();
+  const queryClient = useQueryClient();
   const isDemo = useDemoMode();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [phase, setPhase] = useState<Phase>('idle');
@@ -97,7 +99,8 @@ export default function ExpenseImportSection({ onImported }: ExpenseImportSectio
     try {
       const text = await file.text();
       const rows = parseImportCsv(text);
-      const categories = await getAllCategories(ownerId);
+      // The categories the preview plans against, through the key every reader shares.
+      const categories = await queryClient.fetchQuery(categoriesQueryOptions(ownerId));
       const built = buildImportPlan(rows, categories);
       setPlan(built);
       setPhase('preview');
@@ -115,9 +118,9 @@ export default function ExpenseImportSection({ onImported }: ExpenseImportSectio
     if (!plan || plan.validRows.length === 0 || !ownerId) return;
     setPhase('committing');
     try {
-      // Re-read categories right before committing: the preview may be stale if the
-      // user edited categories elsewhere while this dialog was open.
-      const categories = await getAllCategories(ownerId);
+      // Re-read categories right before committing (`staleTime: 0`, never the cache): the preview
+      // may be stale if the user edited categories elsewhere while this dialog was open.
+      const categories = await queryClient.fetchQuery({ ...categoriesQueryOptions(ownerId), staleTime: 0 });
       const result = await commitImportPlan(ownerId, plan, categories);
       setLastBatch(result);
       setPhase('done');

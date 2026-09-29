@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { Expense } from '@/types/expenses';
+import type { CostCenter } from '@/types/costCenters';
 import {
+  groupExpensesByCostCenter,
   buildCategoryComposition,
   buildSubCategoryComposition,
   splitRecurringVsOneOff,
@@ -156,5 +158,47 @@ describe('resolveLastActivityDate', () => {
 
     expect(getLifecycleStatus({}, null, NOW)).toBe('dormant');
     expect(getLifecycleStatus({}, resolveLastActivityDate(expenses), NOW)).toBe('active');
+  });
+});
+
+// --- groupExpensesByCostCenter (2026-09-29: the rows per center from the one expenses read) ---
+
+describe('groupExpensesByCostCenter', () => {
+  const center = (id: string): CostCenter => ({ id, userId: 'u1', name: id, color: 'chart-1', archivedAt: null, createdAt: new Date(2025, 0, 1), updatedAt: new Date(2025, 0, 1) } as unknown as CostCenter);
+  const centers = [center('vacanze'), center('auto')];
+
+  it('gives every center its rows — spending only in `spending`, every linked row in the count', () => {
+    const rows = [
+      expense({ id: 'b', date: new Date(2026, 2, 5), amount: -50, costCenterId: 'vacanze' }),
+      expense({ id: 'a', date: new Date(2026, 1, 1), amount: -20, costCenterId: 'vacanze' }),
+      expense({ id: 'r', date: new Date(2026, 3, 1), amount: 15, costCenterId: 'vacanze' }), // a refund: linked, not spending
+      expense({ id: 'n', date: new Date(2026, 3, 2), amount: -9 }), // no center at all
+    ];
+    const grouped = groupExpensesByCostCenter(rows, centers);
+    expect(grouped.vacanze.spending.map((e) => e.id)).toEqual(['a', 'b']);
+    expect(grouped.vacanze.linkedCount).toBe(3);
+  });
+
+  it('returns an EMPTY entry for a center without rows, never undefined', () => {
+    const grouped = groupExpensesByCostCenter([], centers);
+    expect(grouped.auto).toEqual({ spending: [], linkedCount: 0 });
+    expect(grouped.vacanze).toEqual({ spending: [], linkedCount: 0 });
+  });
+
+  it('drops a row naming a center the list does not hold — it lands in NO entry', () => {
+    const rows = [expense({ id: 'x', date: new Date(2026, 0, 1), amount: -30, costCenterId: 'ghost' })];
+    const grouped = groupExpensesByCostCenter(rows, centers);
+    expect(Object.keys(grouped).sort()).toEqual(['auto', 'vacanze']);
+    expect(Object.values(grouped).every((entry) => entry.linkedCount === 0)).toBe(true);
+  });
+
+  it('orders the rows like the per-center query did: date ascending, ties by id', () => {
+    const sameDay = new Date(2026, 4, 10);
+    const rows = [
+      expense({ id: 'z', date: sameDay, amount: -1, costCenterId: 'auto' }),
+      expense({ id: 'k', date: new Date(2026, 4, 11), amount: -1, costCenterId: 'auto' }),
+      expense({ id: 'c', date: sameDay, amount: -1, costCenterId: 'auto' }),
+    ];
+    expect(groupExpensesByCostCenter(rows, centers).auto.spending.map((e) => e.id)).toEqual(['c', 'z', 'k']);
   });
 });

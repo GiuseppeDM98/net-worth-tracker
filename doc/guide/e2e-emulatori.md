@@ -15,6 +15,13 @@
   percentage of the old dump must match one of the new within the noise floor — new values are the feature, missing
   old values the bug. Drive it from a throwaway Playwright spec that opens every collapsible and samples charts by
   hovering at fixed fractions of their width, so figures behind a disclosure or inside a tooltip are captured too.
+- **A diff the noise floor could not show is settled with the browser's clock, not with a rebuild** (2026-09-29,
+  2026-09-29): two dumps six minutes apart drifted on nothing, but the after dumps — taken seventy minutes after the
+  befores — moved 21 FIRE figures by one euro (1.076.926 → 1.076.925 €: the requirement and the deflated pensions are
+  functions of `new Date()`, at ~1 € per million per hour). Re-dump the surface on the NEW build with
+  `context.clock.setFixedTime(<the before dump's instant>)` — `Date.now()` frozen, timers real, the app runs — and
+  compare with that before dump: identical sets mean the refactor changed nothing, and the whole check costs one
+  surface, not a checkout and two production builds. The dump records `at` and each surface's `ms` for exactly this.
 
 ## Emulator Exercise Scripts
 - **On Windows, start `next dev` from PowerShell through the npm script** (2026-09-20): launched from Git Bash as

@@ -34,16 +34,16 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAssets } from '@/lib/hooks/useAssets';
+import { useExpenses } from '@/lib/hooks/useExpenses';
+import { useSettings } from '@/lib/hooks/useSettings';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
-import { calculateAssetValue, calculateFIRENetWorth, calculateIlliquidFIRENetWorth, calculateLiquidFIRENetWorth, filterFireEligibleAssets, getAllAssets } from '@/lib/services/assetService';
+import { calculateAssetValue, calculateFIRENetWorth, calculateIlliquidFIRENetWorth, calculateLiquidFIRENetWorth, filterFireEligibleAssets } from '@/lib/services/assetService';
 import { resolvePensionLockState, resolveRitaUnlockAge } from '@/lib/utils/pensionUnlock';
 import { resolvePortfolioTaxProfile } from '@/lib/utils/withdrawalTax';
-import { getSettings } from '@/lib/services/assetAllocationService';
 import {
   calculateFIRESensitivityMatrix,
-  getAnnualCashflowData,
+  computeAnnualCashflowData,
   getDefaultScenarios,
   normalizeCoastFirePensions,
   normalizeCoastFireTaxBrackets,
@@ -77,7 +77,6 @@ import {
   SENSITIVITY_FOOTER,
 } from '@/lib/utils/whatIfNarrative';
 import type { WhatIfBaseline, WhatIfEventType, WhatIfScenario } from '@/types/whatIf';
-import type { Settings } from '@/types/settings';
 import type { TileSkeletonCell } from '@/lib/utils/tileGridSkeleton';
 import { cn } from '@/lib/utils';
 import { PageVerdict } from '@/components/ui/page-verdict';
@@ -115,30 +114,18 @@ function parseAmount(value: string): number {
 }
 
 export function WhatIfAnalysisTab() {
-  const { user } = useAuth();
   const { ownerId } = useActiveAccount();
 
   // ─── Queries ─────────────────────────────────────────────────────────────────
-  const { data: settings, isLoading: isLoadingSettings, isError: settingsError } = useQuery<Settings | null>({
-    queryKey: ['settings', ownerId],
-    queryFn: () => getSettings(ownerId!),
-    enabled: !!user && !!ownerId,
-    staleTime: 300000,
-  });
+  // Settings and assets from the keys every page shares (2026-09-29).
+  const { data: settings, isLoading: isLoadingSettings, isError: settingsError } = useSettings(ownerId);
+  const { data: assets, isLoading: isLoadingAssets, isError: assetsError } = useAssets(ownerId);
 
-  const { data: assets, isLoading: isLoadingAssets, isError: assetsError } = useQuery({
-    queryKey: ['assets', ownerId],
-    queryFn: () => getAllAssets(ownerId!),
-    enabled: !!user && !!ownerId,
-    staleTime: 300000,
-  });
-
-  const { data: cashflowData, isLoading: isLoadingCashflow, isError: cashflowError } = useQuery({
-    queryKey: ['annualCashflowData', ownerId],
-    queryFn: () => getAnnualCashflowData(ownerId!),
-    enabled: !!user && !!ownerId,
-    staleTime: 300000,
-  });
+  // The Calcolatore's cashflow figures, computed in memory from the SAME expenses key (2026-09-29),
+  // so the two tabs read one figure. A failed read is the key's `isError`: the notice below.
+  const { data: allExpenses, isLoading: isLoadingCashflow, isError: cashflowError } = useExpenses(ownerId);
+  const readAt = useMemo(() => new Date(), []);
+  const cashflowData = useMemo(() => (allExpenses ? computeAnnualCashflowData(allExpenses, readAt) : undefined), [allExpenses, readAt]);
 
   // ─── Scenario state (ephemeral) ──────────────────────────────────────────────
   const [eventType, setEventType] = useState<WhatIfEventType>('jobLoss');

@@ -166,6 +166,19 @@ that domain's guide, never here.
 ## 2. Data and State Patterns
 
 ### React Query and Derived State
+- **A page or a component never calls a read service: it reads a HOOK** (2026-09-29). One key per collection,
+  in `lib/query/queryKeys.ts`, one hook apiece in `lib/hooks/`: `useAssets`, `useSnapshots`, `useExpenses`,
+  `useExpenseCategories`, `useSettings` (the ONE `['settings', ownerId]`), `usePensionContributions`,
+  `useAssetTransactions`, `useCostCenters`, `useGoalData`, `useDividendReceipts`, `useHallOfFame`, `useMortgageInstalments`,
+  `useDashboardOverview`. An imperative read (a refresh, a dialog reading once after a write, the CSV import before it
+  commits) goes through the hook's exported `…QueryOptions(ownerId)` with `queryClient.fetchQuery` — the same key, the
+  same reader, the global staleTime; `staleTime: 0` where the CURRENT document is the point («Annulla» on Impostazioni,
+  the pre-read of its «Salva», the import's commit). The closing grep of a session is
+  `grep -rn "getSettings(\|getAllAssets(\|getUserSnapshots(\|getAllExpenses(\|getAllCategories(" app components`: hooks
+  and services only. Every writer invalidates the key its readers read (`queryKeys.settings.all` from the seven places of
+  doc/guide/impostazioni.md § Settings — the FIVE places, `goals.all` from Obiettivi AND the assistant's goal card).
+- **A page over several keys composes ONE read state** (`composeReadState`, `lib/utils/readState.ts`): `loading` while
+  any query reads, `loadFailed` when any failed — then `resolveSurfaceState`. Storico reads six keys this way.
 - Invalidate all related caches after a mutation; **asset mutations need a dual invalidation** (`queryKeys.assets.all` +
   `queryKeys.dashboard.overview` — the Patrimonio hero reads the overview).
 - `useMemo` for derived state, never `useEffect + setState`. **`forceMount` tabs deriving from a sibling's data MUST use
@@ -376,7 +389,7 @@ file used to carry.
 - `summarizeCenter` splits rows at today: booked ones are the cost; scheduled ones get an «in calendario» chip, feed a window's end and a ceiling's `spent`, and are NEVER summed into the total.
 - A CENTER HAS NO PACE (2026-09-18): a window's end is booked + calendar (`ytd + yearScheduled`), never `projectWindowEndWithScheduled`. Budget keeps its pace — do not unify; a monthly ceiling reads Budget's `summarizeCeiling` but re-derives `exceeded`.
 - The open center lives in the URL (`?tab=cost-centers&center=<id>`); a new center opens on `firstFreeColorKey`, and existing documents are never re-coloured.
-- Every number from `costCenterSummary.ts`, every sentence from `costCenterNarrative.ts`. Any count next to a destructive action comes from the same query the mutation runs.
+- Every number from `costCenterSummary.ts`, every sentence from `costCenterNarrative.ts`. Any count next to a destructive action comes from the same read the mutation runs (the rows are grouped in memory from the expenses key since 2026-09-29).
 - Il resto — risk vs fact (`exceeded`/`atRisk`) and the detail's ranking, the retired picker, the backdated row, how the detail lands and refocuses (`data-center-row`), `CenterStackBars`, «Collega spese…», session-only lenses — in `doc/guide/centri-di-costo.md`.
 
 ### Cashflow › Divisione → `doc/guide/cashflow-divisione.md`

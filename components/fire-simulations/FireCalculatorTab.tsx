@@ -45,9 +45,13 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useExpenses } from '@/lib/hooks/useExpenses';
+import { useSnapshots } from '@/lib/hooks/useSnapshots';
+import { queryKeys } from '@/lib/query/queryKeys';
+import { useAssets } from '@/lib/hooks/useAssets';
+import { useSettings } from '@/lib/hooks/useSettings';
 import { toast } from 'sonner';
-import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import {
@@ -56,19 +60,18 @@ import {
   calculateIlliquidFIRENetWorth,
   calculateLiquidFIRENetWorth,
   filterFireEligibleAssets,
-  getAllAssets,
 } from '@/lib/services/assetService';
 import { resolveGainShare, resolvePortfolioTaxProfile } from '@/lib/utils/withdrawalTax';
 import { getItalyYear } from '@/lib/utils/dateHelpers';
-import { calculateCurrentAllocation, getDefaultTargets, getSettings, setSettings } from '@/lib/services/assetAllocationService';
+import { calculateCurrentAllocation, getDefaultTargets, setSettings } from '@/lib/services/assetAllocationService';
 import { DEFAULT_INPS_RETIREMENT_AGE, resolvePensionLockState, resolveRitaUnlockAge } from '@/lib/utils/pensionUnlock';
 import {
   calculateCoastFireNetRealAnnualPension,
   calculateFIREMetrics,
   calculateFIREProjection,
-  getAnnualCashflowData,
+  computeAnnualCashflowData,
   getDefaultScenarios,
-  getFIREData,
+  buildFIREData,
   normalizeCoastFirePensions,
   normalizeCoastFireTaxBrackets,
   prepareRunwaySummaryLabel,
@@ -196,7 +199,6 @@ function settingsForm(settings: Settings | null | undefined): FireSettingsForm {
 }
 
 export function FireCalculatorTab() {
-  const { user } = useAuth();
   const { ownerId } = useActiveAccount();
   const isDemo = useDemoMode();
   const queryClient = useQueryClient();
@@ -211,26 +213,18 @@ export function FireCalculatorTab() {
   const onFormChange = useCallback((patch: Partial<FireSettingsForm>) => setForm((prev) => ({ ...prev, ...patch })), []);
 
   // ─── Queries ─────────────────────────────────────────────────────────────────
-  const { data: settings, isLoading: isLoadingSettings, isError: settingsError } = useQuery<Settings | null>({
-    queryKey: ['settings', ownerId],
-    queryFn: () => getSettings(ownerId!),
-    enabled: !!user && !!ownerId,
-    staleTime: 300000,
-  });
+  // Settings and assets from the keys every page shares (2026-09-29).
+  const { data: settings, isLoading: isLoadingSettings, isError: settingsError } = useSettings(ownerId);
+  const { data: assets, isLoading: isLoadingAssets, isError: assetsError } = useAssets(ownerId);
 
-  const { data: assets, isLoading: isLoadingAssets, isError: assetsError } = useQuery({
-    queryKey: ['assets', ownerId],
-    queryFn: () => getAllAssets(ownerId!),
-    enabled: !!user && !!ownerId,
-    staleTime: 300000,
-  });
-
-  const { data: cashflowData, isLoading: isLoadingCashflow, isError: cashflowError } = useQuery({
-    queryKey: ['annualCashflowData', ownerId],
-    queryFn: () => getAnnualCashflowData(ownerId!),
-    enabled: !!user && !!ownerId,
-    staleTime: 300000,
-  });
+  // The cashflow figures — the last full year, else the running year annualised — computed in
+  // memory from the expenses key Cashflow reads, and the history's snapshots from theirs: with
+  // the assets and the settings above that is ONE round trip of four parallel reads, where the
+  // tab used to chain three (assets → snapshots + last year → the snapshot window) (2026-09-29).
+  const { data: allExpenses, isLoading: isLoadingCashflow, isError: cashflowError } = useExpenses(ownerId);
+  const { data: snapshots, isLoading: isLoadingSnapshots } = useSnapshots(ownerId);
+  const readAt = useMemo(() => new Date(), []);
+  const cashflowData = useMemo(() => (allExpenses ? computeAnnualCashflowData(allExpenses, readAt) : undefined), [allExpenses, readAt]);
   const annualSavings = cashflowData?.annualSavings ?? 0;
   const projectionAnnualExpenses = cashflowData?.annualExpensesFromCashflow ?? 0;
 
@@ -337,16 +331,17 @@ export function FireCalculatorTab() {
   const liquidNetWorth = assets ? calculateLiquidFIRENetWorth(assets, includePrimaryResidence) : 0;
   const illiquidNetWorth = assets ? Math.max(0, calculateIlliquidFIRENetWorth(assets, includePrimaryResidence) - pensionLockedValue) : 0;
 
-  // `keepPreviousData`: the key moves with every lock flip and residence switch (currentNetWorth),
-  // and without it the whole tab fell back to the skeleton mid-interaction — the pressed switch
-  // unmounted, the Dettaglio closed, every figure counted up from zero.
-  const { data: fireData, isLoading: isLoadingFIRE } = useQuery({
-    queryKey: ['fireData', ownerId, currentNetWorth, withdrawalRate, includePrimaryResidence],
-    queryFn: () => getFIREData(ownerId!, currentNetWorth, withdrawalRate, includePrimaryResidence),
-    enabled: !!user && !!assets && currentNetWorth > 0,
-    staleTime: 300000,
-    placeholderData: keepPreviousData,
-  });
+  // Derived, not queried: a lock flip or the residence switch moves `currentNetWorth` and the
+  // history recomputes in the same render — no key that moves, no skeleton mid-interaction (the
+  // `keepPreviousData` the query needed until 2026-09-29). Nothing without a positive net worth.
+  const fireData = useMemo(
+    () =>
+      assets && snapshots && allExpenses && currentNetWorth > 0
+        ? buildFIREData(snapshots, allExpenses, currentNetWorth, withdrawalRate, includePrimaryResidence, readAt)
+        : undefined,
+    [assets, snapshots, allExpenses, currentNetWorth, withdrawalRate, includePrimaryResidence, readAt],
+  );
+  const isLoadingFIRE = isLoadingSnapshots || isLoadingCashflow;
   const chartData = useMemo(() => fireData?.chartData ?? [], [fireData]);
   const rawRunwayData = useMemo(() => fireData?.runwayData ?? [], [fireData]);
 
@@ -391,7 +386,7 @@ export function FireCalculatorTab() {
   // ─── The numbers (pure layer over the existing engines) ──────────────────────
   // The metrics on the PREVIEW withdrawal rate, with the bridge override when the lock is on:
   // free assets must cover the spending bridge until the unlock, then the fund tops up the
-  // standard requirement. The expenses are the projection's (`getAnnualCashflowData`: the last
+  // standard requirement. The expenses are the projection's (`computeAnnualCashflowData`: the last
   // full year, else the running year annualized and said so in the Base di calcolo aside) —
   // ONE basis for the number, the verdict and the chart (The Same-Basis Rule). `getFIREData`'s
   // own metrics read the last full year only, which on a fresh account is a 0 that would call
@@ -642,7 +637,7 @@ export function FireCalculatorTab() {
       }),
     onSuccess: () => {
       toast.success('Impostazioni FIRE salvate con successo');
-      queryClient.invalidateQueries({ queryKey: ['settings', ownerId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.settings.all(ownerId || '') });
     },
     onError: (error) => {
       console.error('Error saving FIRE settings:', error);
@@ -658,7 +653,7 @@ export function FireCalculatorTab() {
     onSuccess: (_, active) => {
       toast.success(active ? 'Fondo pensione considerato bloccato' : 'Fondo pensione considerato disponibile');
       // Awaited: the switch stays disabled until the refetched doc carries the new value.
-      return queryClient.invalidateQueries({ queryKey: ['settings', ownerId] });
+      return queryClient.invalidateQueries({ queryKey: queryKeys.settings.all(ownerId || '') });
     },
     onError: (error, active) => {
       console.error('Error saving the pension lock:', error);
@@ -677,7 +672,7 @@ export function FireCalculatorTab() {
       }),
     onSuccess: () => {
       toast.success('Parametri scenari salvati con successo');
-      queryClient.invalidateQueries({ queryKey: ['settings', ownerId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.settings.all(ownerId || '') });
     },
     onError: (error) => {
       console.error('Error saving scenario parameters:', error);

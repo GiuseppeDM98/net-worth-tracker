@@ -22,8 +22,8 @@ import { isSpendingType } from '@/lib/utils/spendingRoles';
 import {
   createCategory,
   updateCategory,
-  getAllCategories,
 } from '@/lib/services/expenseCategoryService';
+import { categoriesQueryOptions } from '@/lib/hooks/useExpenses';
 import {
   getExpenseCountByCategoryId,
   getExpenseCountBySubCategoryId,
@@ -707,7 +707,8 @@ export function CategoryManagementDialog({
         toast.warning(`La sottocategoria "${subCat?.name}" non ha transazioni da spostare`);
         return;
       }
-      const categories = await getAllCategories(ownerId);
+      // The list for the move, through the key every reader shares (this dialog invalidates it on every write).
+      const categories = await queryClient.fetchQuery(categoriesQueryOptions(ownerId));
       const subCat = subCategories.find((s) => s.id === subCategoryId);
       if (subCat) {
         setSubCategoryToMove(subCat);

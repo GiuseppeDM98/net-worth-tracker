@@ -31,8 +31,9 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   at least one of them is wide, so the sentence survives.
 - **A service must not swallow its own failure into zeros.** `getAnnualCashflowData` did (a `catch` returning
   `annualSavings: 0`), which meant the FIRE calculator answered a dropped connection with «servono spese registrate
-  nel Cashflow» — a sentence about the reader's data, told about data nobody read. It rejects now; both its callers
-  hold an `ErrorNotice` branch that only a rejection can reach. When wiring a new surface, check the service too: an
+  nel Cashflow» — a sentence about the reader's data, told about data nobody read. It rejected from then on; since
+  2026-09-29 the figure is `computeAnnualCashflowData` over `useExpenses`, and the failure is the expenses key's
+  `isError`, which the three FIRE tabs route to their `ErrorNotice`. When wiring a new surface, check the service too: an
   `isError` branch above a service that never rejects is decoration.
 - **The auth wait is a skeleton too, and it is in the HTML** (2026-09-28). `ProtectedRoute` renders its
   `fallback` — the dashboard layout passes `<PageContainer><TileGridSkeleton label="Verifica dell'accesso" /></PageContainer>`

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Check, Loader2, Target, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/query/queryKeys';
 import { Button } from '@/components/ui/button';
 import { TILE_EYEBROW_CLASS, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
@@ -62,7 +63,7 @@ export function GoalProposalCard({ proposal }: GoalProposalCardProps) {
 
       // Same key the FIRE page's goal query uses, so the new goal is there when the
       // user navigates over.
-      await queryClient.invalidateQueries({ queryKey: ['goalData', ownerId] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.goals.all(ownerId) });
       setState('created');
       toast.success(`Obiettivo "${proposal.name}" creato`);
     } catch (error) {

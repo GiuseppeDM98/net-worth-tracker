@@ -51,6 +51,12 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 ## Storico — a verdict over tiles (`app/dashboard/history/page.tsx`, `components/history/tiles/*`, `lib/utils/{storicoSummary,storicoNarrative}.ts`)
 
+- **The page reads SIX keys and composes ONE read state** (2026-09-29): `useSnapshots`, `useAssets`, `useSettings`
+  (its `targets` are what `getTargets` used to re-read — the same document twice), `useExpenses`, `useAssetTransactions`
+  and `usePensionContributions`, all shared with the other pages, so after Patrimonio or Cashflow the page opens on the
+  cache; `composeReadState` (`lib/utils/readState.ts`) turns the six into `loading` / `loadFailed` — one failed read is
+  the page's alert (pinned, seen red). Until then a `Promise.all` of seven direct reads ran on every visit. «Riprova»
+  and a new manual snapshot invalidate the keys; a saved note is patched into the snapshots cache (`setQueryData`).
 - **The page has NO axis, and its growth is WEALTH growth.** `summarizeGrowth` measures first → latest snapshot with contributions included, and every sentence that prints its CAGR says «versamenti inclusi»; never feed it to a surface that means an investment return (that is Rendimenti's `(endNW/(startNW+netCashFlow))^(1/years)`, § History and Snapshot Baselines).
 - **ONE pace for the whole page** (`summarizeGrowthPace`): the trailing-12-month average monthly increase in EURO, linear. It decides the headline (`accelerating` above the lifetime monthly average ×1.10, `slowing` below ×0.90, `steady` between, `losing` when the year is negative) AND `projectNextDoubling`. Both need the snapshot of EXACTLY twelve months earlier (a gap → `trailingDelta: null`, no clause, no projection) and the verdict needs `PACE_MIN_HISTORY_MONTHS` (24) of history; a projection beyond `PROJECTION_MAX_MONTHS` (600) is `null`, never a date. Do not "improve" it with a compound extrapolation: contributions do not compound.
 - **A month is a pair of snapshots exactly one calendar month apart** (`summarizeMonthlyMoves`, `withMonthDeltas`): a gap is not a month, a zero delta is neither rising nor falling. The verdict names the best month, the Evoluzione tile the worst — never both in one place.

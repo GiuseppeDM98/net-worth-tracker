@@ -14,7 +14,7 @@
  * Demo mode is gated at the UI (button disable), not here.
  */
 
-import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { queryOptions, useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query/queryKeys';
 import {
   getPensionContributions,
@@ -36,11 +36,18 @@ export function usePensionContributions(
   options?: { enabled?: boolean }
 ) {
   return useQuery({
-    queryKey: assetId
-      ? queryKeys.pensionContributions.byAsset(ownerId || '', assetId)
-      : queryKeys.pensionContributions.all(ownerId || ''),
-    queryFn: () => getPensionContributions(ownerId!, assetId),
+    ...pensionContributionsQueryOptions(ownerId || '', assetId),
     enabled: !!ownerId && (options?.enabled ?? true),
+  });
+}
+
+/** The contributions query as options, for an imperative `queryClient.fetchQuery` on the hook's own cache. */
+export function pensionContributionsQueryOptions(ownerId: string, assetId?: string) {
+  return queryOptions({
+    queryKey: assetId
+      ? queryKeys.pensionContributions.byAsset(ownerId, assetId)
+      : queryKeys.pensionContributions.all(ownerId),
+    queryFn: () => getPensionContributions(ownerId, assetId),
   });
 }
 

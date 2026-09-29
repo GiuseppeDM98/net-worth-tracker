@@ -1416,20 +1416,31 @@ export async function linkSeriesToCashAccount(userId: string, expense: Expense, 
   return linkable.length;
 }
 
+/** Firestore's ceiling on the values of one `in` filter. */
+export const FIRESTORE_IN_LIMIT = 30;
+
+/** Split ids into the chunks one `in` filter accepts (30): 31 ids are two queries. */
+export function chunkForInQuery<T>(ids: readonly T[], limit: number = FIRESTORE_IN_LIMIT): T[][] {
+  const chunks: T[][] = [];
+  for (let start = 0; start < ids.length; start += limit) chunks.push(ids.slice(start, start + limit));
+  return chunks;
+}
+
 /**
- * The instalments linked to each of the given properties (`debtAssetId`), for Patrimonio's «Mutuo»
- * tile (lib/utils/mortgageSummary.ts). One query per property with two equalities — `userId`,
- * which `firestore.rules` needs on every list, and the property — the same shape as a series
- * lookup, so no composite index is involved.
+ * The instalments linked to the given properties (`debtAssetId`), for Patrimonio's «Mutuo» tile
+ * (lib/utils/mortgageSummary.ts). ONE query for every property (2026-09-29 — it used to be
+ * one per property): `userId`, which `firestore.rules` needs on every list, and `debtAssetId in
+ * [...]`; two `.where()` calls, so no composite index is involved. Firestore takes at most 30
+ * values in an `in` filter, so past that the ids go in chunks of 30, read in parallel.
  */
 export async function getMortgageInstalments(userId: string, propertyIds: string[]): Promise<Expense[]> {
-  const perProperty = await Promise.all(
-    propertyIds.map(async (propertyId) => {
-      const snapshot = await getDocs(query(collection(db, EXPENSES_COLLECTION), where('userId', '==', userId), where('debtAssetId', '==', propertyId)));
+  const perChunk = await Promise.all(
+    chunkForInQuery(propertyIds).map(async (ids) => {
+      const snapshot = await getDocs(query(collection(db, EXPENSES_COLLECTION), where('userId', '==', userId), where('debtAssetId', 'in', ids)));
       return snapshot.docs.map((docSnapshot) => expenseFromSnapshot(docSnapshot));
     })
   );
-  return perProperty.flat();
+  return perChunk.flat();
 }
 
 /**

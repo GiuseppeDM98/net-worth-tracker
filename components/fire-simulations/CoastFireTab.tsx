@@ -35,21 +35,21 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAssets } from '@/lib/hooks/useAssets';
+import { useExpenses } from '@/lib/hooks/useExpenses';
+import { useSettings } from '@/lib/hooks/useSettings';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { useCoastFireSettingsDraft } from '@/lib/hooks/useCoastFireSettingsDraft';
 import {
   calculateCoastFIREProjection,
-  getAnnualCashflowData,
-  getAnnualExpenses,
+  computeAnnualCashflowData,
+  computeLastYearExpenses,
   getDefaultScenarios,
   type PensionCapitalInflowToday,
 } from '@/lib/services/fireService';
-import { calculateAssetValue, calculateFIRENetWorth, calculateLiquidFIRENetWorth, filterFireEligibleAssets, getAllAssets } from '@/lib/services/assetService';
+import { calculateAssetValue, calculateFIRENetWorth, calculateLiquidFIRENetWorth, filterFireEligibleAssets } from '@/lib/services/assetService';
 import { resolvePortfolioTaxProfile } from '@/lib/utils/withdrawalTax';
-import { getSettings } from '@/lib/services/assetAllocationService';
 import { resolvePensionLockState, resolveRitaUnlockAge } from '@/lib/utils/pensionUnlock';
 import { summarizeLock } from '@/lib/utils/fireSummary';
 import { getItalyYear } from '@/lib/utils/dateHelpers';
@@ -83,7 +83,6 @@ import {
   summarizeCoastScenarios,
   summarizeCoastTarget,
 } from '@/lib/utils/coastFireView';
-import type { Settings } from '@/types/settings';
 import type { TileSkeletonCell } from '@/lib/utils/tileGridSkeleton';
 import { cn } from '@/lib/utils';
 import { PageVerdict } from '@/components/ui/page-verdict';
@@ -121,42 +120,27 @@ const EMPTY_ACTION_CLASS =
 const IPOTESI_OPEN_FOCUS_DELAY_MS = 60;
 
 export function CoastFireTab() {
-  const { user } = useAuth();
   const { ownerId } = useActiveAccount();
   const isDemo = useDemoMode();
   const [ipotesiOpen, setIpotesiOpen] = useState(false);
 
   // ─── Queries ─────────────────────────────────────────────────────────────────
-  const { data: settings, isLoading: isLoadingSettings, isError: settingsError } = useQuery<Settings | null>({
-    queryKey: ['settings', ownerId],
-    queryFn: () => getSettings(ownerId!),
-    enabled: !!user && !!ownerId,
-    staleTime: 300000,
-  });
+  // Settings and assets from the keys every page shares (2026-09-29).
+  const { data: settings, isLoading: isLoadingSettings, isError: settingsError } = useSettings(ownerId);
+  const { data: assets, isLoading: isLoadingAssets, isError: assetsError } = useAssets(ownerId);
 
-  const { data: assets, isLoading: isLoadingAssets, isError: assetsError } = useQuery({
-    queryKey: ['assets', ownerId],
-    queryFn: () => getAllAssets(ownerId!),
-    enabled: !!user && !!ownerId,
-    staleTime: 300000,
-  });
-
-  const { data: annualExpenses, isLoading: isLoadingAnnualExpenses, isError: expensesError } = useQuery({
-    queryKey: ['coastFireAnnualExpenses', ownerId],
-    queryFn: () => getAnnualExpenses(ownerId!),
-    enabled: !!user && !!ownerId,
-    staleTime: 300000,
-  });
+  // The last full year's expenses and the Calcolatore's savings, both computed in memory from
+  // the expenses key Cashflow reads (2026-09-29): no range query of this tab's own.
+  const { data: allExpenses, isLoading: isLoadingAnnualExpenses, isError: expensesError } = useExpenses(ownerId);
+  const readAt = useMemo(() => new Date(), []);
+  const annualExpenses = useMemo(() => (allExpenses ? computeLastYearExpenses(allExpenses, readAt) : undefined), [allExpenses, readAt]);
 
   // The Calcolatore's savings — the SAME query key, so the two tabs read one figure — is the
   // pace the verdict names. It rejects on a failed read (never a zeroed payload), so the
   // failure reaches the notice below like the other three.
-  const { data: cashflowData, isLoading: isLoadingCashflow, isError: cashflowError } = useQuery({
-    queryKey: ['annualCashflowData', ownerId],
-    queryFn: () => getAnnualCashflowData(ownerId!),
-    enabled: !!user && !!ownerId,
-    staleTime: 300000,
-  });
+  const cashflowData = useMemo(() => (allExpenses ? computeAnnualCashflowData(allExpenses, readAt) : undefined), [allExpenses, readAt]);
+  const isLoadingCashflow = isLoadingAnnualExpenses;
+  const cashflowError = expensesError;
 
   const draft = useCoastFireSettingsDraft({ settings, isLoadingSettings, ownerId });
 

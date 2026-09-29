@@ -49,15 +49,14 @@ import {
   prepareMonthlyReturnsHeatmap,
   prepareUnderwaterDrawdownData,
 } from '@/lib/services/performanceService';
-import { getUserSnapshots } from '@/lib/services/snapshotService';
-import { getAllAssets } from '@/lib/services/assetService';
-import { getSettings } from '@/lib/services/assetAllocationService';
-import { getPensionContributions } from '@/lib/services/pensionContributionService';
-import { getAssetTransactions } from '@/lib/services/assetTransactionService';
 import { useQueryClient } from '@tanstack/react-query';
-import { queryKeys } from '@/lib/query/queryKeys';
-// The Admin-SDK dividendService is server-only: a client page reads the registry through this one.
-import { getDividendReceipts } from '@/lib/services/dividendReceiptsService';
+import { snapshotsQueryOptions } from '@/lib/hooks/useSnapshots';
+import { assetsQueryOptions } from '@/lib/hooks/useAssets';
+import { settingsQueryOptions } from '@/lib/hooks/useSettings';
+import { pensionContributionsQueryOptions } from '@/lib/hooks/usePensionContributions';
+import { assetTransactionsQueryOptions } from '@/lib/hooks/useAssetTransactions';
+// The Admin-SDK dividendService is server-only: a client page reads the registry through this hook's reader.
+import { dividendReceiptsQueryOptions } from '@/lib/hooks/useDividendReceipts';
 import { resolveHasBaseline, resolvePerformanceBase, type PerformanceBaseResolution } from '@/lib/utils/performanceBase';
 import { resolveCenteredModalOrigin } from '@/lib/utils/modalOrigin';
 import { attributePeriodReturn, sumDividendsByAsset, type DividendReceipt } from '@/lib/utils/performanceAttribution';
@@ -340,8 +339,9 @@ export default function PerformancePage() {
 
   /**
    * Load every period's metrics and cache the base-projected snapshots for period switching:
-   * one fetch of the snapshots, one of the pre-computed metrics, then the two yield routes per
-   * period in parallel. A refresh bypasses the Firestore cache and rewrites it.
+   * the six collections through the hooks' keys (stage 1, cached across pages), one fetch of the
+   * pre-computed metrics, then the two yield routes per period in parallel. A refresh invalidates
+   * the six keys, bypasses the Firestore cache and rewrites it.
    */
   const loadPerformanceData = async () => {
     if (!user || !ownerId) return;
@@ -351,13 +351,27 @@ export default function PerformancePage() {
       else setIsRefreshing(true);
       setLoadFailed(false);
 
+      // Stage 1 reads through the hooks' own query options (2026-09-29): the same keys every page
+      // uses, so a visit after Patrimonio or Storico answers from the cache under the global
+      // staleTime, and a refresh invalidates the six keys FIRST so `fetchQuery` reads anew.
+      const stageOneQueries = [
+        snapshotsQueryOptions(ownerId),
+        assetsQueryOptions(ownerId),
+        settingsQueryOptions(ownerId),
+        pensionContributionsQueryOptions(ownerId),
+        dividendReceiptsQueryOptions(ownerId),
+        assetTransactionsQueryOptions(ownerId),
+      ] as const;
+      if (!isInitialLoad) {
+        await Promise.all(stageOneQueries.map((options) => queryClient.invalidateQueries({ queryKey: options.queryKey })));
+      }
       const [rawSnapshots, loadedAssets, baseSettings, contributions, loadedDividends, trades] = await Promise.all([
-        getUserSnapshots(ownerId),
-        getAllAssets(ownerId),
-        getSettings(ownerId),
-        getPensionContributions(ownerId),
-        getDividendReceipts(ownerId),
-        queryClient.fetchQuery({ queryKey: queryKeys.assetTransactions.all(ownerId), queryFn: () => getAssetTransactions(ownerId) }),
+        queryClient.fetchQuery(stageOneQueries[0]),
+        queryClient.fetchQuery(stageOneQueries[1]),
+        queryClient.fetchQuery(stageOneQueries[2]),
+        queryClient.fetchQuery(stageOneQueries[3]),
+        queryClient.fetchQuery(stageOneQueries[4]),
+        queryClient.fetchQuery(stageOneQueries[5]),
       ]);
       // The SAME base resolution as getAllPerformanceData (performanceBase.ts): the client-side chart,
       // heatmap, custom-range and attribution helpers read cachedSnapshots and the flows directly, so
