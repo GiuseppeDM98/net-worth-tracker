@@ -128,8 +128,8 @@ Censimento 2026-09-26, 390×844 (altezze in px; righe di codice da riverificare)
 
 PERF-04 fa pigra la tab intera (What If, Coast, Monte Carlo, Obiettivi; PERF-04 § 4, C), non i grafici dentro: Prima e
 dopo è nel chunk della tab (`WhatIfAnalysisTab.tsx:89`), si monta all'apertura senza scaricare nulla; lo skeleton di
-MOB-02 § 4.8 vale per un grafico pigro da sé. PERF-05: `failed` = gli `isError` degli hook (Previdenza li ha già,
-`PensionOverview.tsx:117-130`); le righe citate si spostano. L'Esposizione (dal 2026-09-28; PERF-10 per il `Server-Timing`)
+MOB-02 § 4.8 vale per un grafico pigro da sé. Dal 2026-09-29 `failed` = gli `isError` degli hook su ogni tab FIRE
+(Previdenza: `PensionOverview.tsx:115-118`). L'Esposizione (dal 2026-09-28; PERF-10 per il `Server-Timing`)
 parte all'apertura e da calda non chiama Yahoo. PERF-03:
 `freshness` fuori da «Il perché». PERF-12/14: nessun `layout`. PERF-13: § 3.
 
@@ -225,7 +225,7 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
   fire-obiettivi.md, stati.md, e2e-emulatori.md
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice
 - Leggi doc/mobile/README.md, MOB-02 (§ 4.1 è il contratto) e questa spec per intero; DESIGN.md § 5 e § 6 (MAI
-  rigenerarlo). MOB-01, MOB-02, PERF-04, PERF-05 e PERF-10 devono essere chiuse (la nuova Esposizione è in develop dal 2026-09-28)
+  rigenerarlo). MOB-01, MOB-02, PERF-04 e PERF-10 devono essere chiuse, PERF-05 lo è (2026-09-29) (la nuova Esposizione è in develop dal 2026-09-28)
 - Crea SESSION_NOTES.md; crea il branch dalla branch attiva PRIMA di editare
 
 Regole: nessun commit senza il mio OK; un branch e un commit; rispondi in italiano; le sette domande di § 4.6 con lo

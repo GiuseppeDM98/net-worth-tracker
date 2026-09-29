@@ -133,7 +133,7 @@ test per pagina.
   Un test vieta `lifts` su `storico-driver`; candidato per The Lifted-Figure Rule (MOB-09).
 - **Non si ripete**: `EvoluzioneTile` + `liftedFigures?: readonly ('growth' | 'cagr' | 'trailing')[]`.
 - **Righe**: `storico-raddoppi` · `storico-composizione` («per classe») · `storico-driver` · `storico-valore` («per
-  strumento»). Nessuna riga `failed` (una lettura; dopo PERF-05, l'`isError` delle sue query).
+  strumento»). Nessuna riga `failed` (dal 2026-09-29 la pagina compone gli `isError` delle sue sei chiavi con `composeReadState`).
 
 ### 4.4 Hall of Fame
 

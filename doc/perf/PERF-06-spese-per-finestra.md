@@ -1,6 +1,6 @@
 # PERF-06 — Le spese per finestra: leggere il mese, non la storia
 
-> Stato: da fare · Priorità: 2 · Sforzo: L · Dipende da: PERF-05 · Sblocca: —
+> Stato: da fare · Priorità: 2 · Sforzo: L · Dipende da: PERF-05 (chiusa il 2026-09-29) · Sblocca: —
 
 ## 1. Il problema, misurato
 
@@ -30,7 +30,8 @@ solo la disciplina di usarlo per pagina. Il prezzo: Tracciamento e Analisi non c
 - Benchmark cold (PERF-01): Tracciamento **< 900 ms** al primo numero (oggi 2110), Analisi **< 900** (1690), FIRE **< 1000**
   (2040); documenti letti per Tracciamento ≤ 13 mesi di righe (nel mirror ~350 invece di 1533), contati dal log di richieste.
 - Storico legge tutto UNA volta (`useExpenses`) e nessun'altra pagina la usa se non per esigenza dichiarata.
-- Nessun numero cambia: invarianza come PERF-05 (dump prima/dopo dei set di valori su Tracciamento, Analisi, Budget, FIRE),
+- Nessun numero cambia: invarianza come per PERF-05 (dump prima/dopo dei set di valori su Tracciamento, Analisi, Budget, FIRE;
+  il metodo e l'orologio fissato in doc/guide/e2e-emulatori.md § Proving a refactor changed no number),
   con attenzione ai bordi: la riga del 31 dicembre in calendario (`e2e/cashflow.split.spec.ts`), il primo del mese, le
   ricorrenze future oltre la finestra.
 
@@ -63,9 +64,12 @@ che chiama `getExpensesByDateRange`. Le finestre sono FUNZIONI PURE testate in `
   è una lettura nuova, la prima resta in cache.
 - Budget: `budgetWindow(now)` = dal più vecchio fra l'inizio dell'anno e sei mesi prima (`trailingMonthKeys(now, 6)`,
   doc/guide/cashflow-budget.md: da gennaio a maggio la storia di sei mesi entra nell'anno precedente) alla fine del mese.
-- FIRE: `annualCashflowData` e `getAnnualExpenses` leggono la STESSA chiave (l'anno scorso, con il fallback all'anno
-  corrente quando vuoto: due chiavi, una dopo l'altra, solo se serve); la E storica del Calcolatore (`fireService.ts:811`,
-  da 11 mesi prima del primo snapshot) è già una finestra: resta, su chiave.
+- FIRE: dal 2026-09-29 il Calcolatore, Coast e What If non leggono più un range proprio — `computeAnnualCashflowData`,
+  `computeLastYearExpenses` e `buildFIREData` (`fireService.ts`) filtrano in memoria la lista di `useExpenses`
+  (`selectExpensesBetween`: l'anno scorso con il fallback all'anno corrente; la E storica da 11 mesi prima del primo
+  snapshot). Qui la loro lista diventa una chiave `expenses.range` di FIRE (dall'inizio dell'anno scorso o da 11 mesi
+  prima del primo snapshot, la più vecchia delle due, a oggi) data agli stessi gemelli puri: le funzioni non cambiano,
+  cambia cosa ricevono. `getAnnualExpenses` resta il lettore a range del PDF.
 - Divisione legge dalla finestra di Tracciamento (è sul suo asse). Centri legge `useExpenses` intera: un centro è lifetime.
 - Hall of Fame ricalcolo: intera, com'è (un click, non un mount).
 
@@ -151,7 +155,7 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
 - Leggi doc/guide/cashflow.md, cashflow-tracciamento.md, cashflow-analisi.md, cashflow-budget.md, cashflow-divisione.md,
   centri-di-costo.md, fire.md, e2e-emulatori.md (§ Proving a refactor changed no number)
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice
-- Leggi doc/perf/README.md e la spec PERF-06 per intero; PERF-05 deve essere chiusa
+- Leggi doc/perf/README.md e la spec PERF-06 per intero; PERF-05 è chiusa (2026-09-29)
 - Crea SESSION_NOTES.md; crea il branch dalla branch attiva PRIMA di editare
 
 Regole: nessun commit senza il mio OK; un branch e un commit; rispondi in italiano.

@@ -14,19 +14,19 @@ Next.js app for Italian investors: net worth, assets, cashflow, dividends, perfo
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic.
 - `tsc` clean; **202 files / 4596 tests** green in `Europe/Rome` + **42 Playwright spec files** (154 tests, incl. 6 auth setups; last full run 2026-09-29 on the Windows laptop after PERF-05, 154/154 in 7,6 min — the known intermittent is `modal.origin`, doc/guide/e2e-emulatori.md). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, which structurally hides timezone bugs.
-- Latest (2026-09-29, seventh session): **doc/perf/PERF-05 retired** — ONE data track: every page and component reads
-  assets, snapshots, expenses, categories, settings, contributions, the ledger, cost centres, goals and the Hall of Fame
-  through the React Query hooks (five new: useSettings on the ONE settings key, useCostCenters, useGoalData,
-  useDividendReceipts, useHallOfFame; the read hooks export …QueryOptions for an imperative fetchQuery), so the closing
-  grep on app/ and components/ returns hooks and services only — the rule and the hook list in AGENTS.md § React Query
-  and Derived State. Storico reads six keys through composeReadState, Centri groups its rows in memory (no N+1), «Mutuo»
-  is ONE in-query in chunks of 30, AssetDialog closed reads nothing, ExpenseDialog opens from the keys, FIRE is one
-  round trip of four parallel reads (pure twins of the retired range readers). **Measured** warm on the mirror: Storico
-  1165 → 261 ms and 6 → 0 Firestore reads, FIRE 1556 → 114 and 6 → 0, Patrimonio, Analisi, Previdenza and Impostazioni
-  at 0 reads; **invariance** proved with two dumps before and two after on 18 surfaces (~4900 figures, none lost). The
-  nine divergences from the spec and the per-page lessons: doc/perf/README.md § 6 and the guides it names.
-  **Verified**: tsc, lint 0, Vitest **202 / 4596** in Europe/Rome, the three § 7 falsifications seen red, Playwright
-  154/154 in 7,6 min on a fresh .next-e2e (the /api probe answered 401 before the run).
+- Latest (2026-09-29, eighth session): **`doc/perf/PERF-05` retired** — the one-data-track refactor (PR #413, in develop
+  since 2026-09-29: every page and component reads the ten collections through the React Query hooks, five new, and
+  the `…QueryOptions` the read hooks export) read against its spec: 12 divergences — 8 where the code was right and the
+  lesson already sat at home (FIRE at depth 1 in memory, Rendimenti stage 1 on `fetchQuery`, the ledger gate, the
+  dead `costCenters.expenses` key, Impostazioni seeded through the key, the wider closing grep, `AssetDialog` targets
+  from the same hook, Dividendi from `useAssets` — AGENTS.md § React Query and Derived State and the guides it names),
+  2 defects fixed in this session (four comments still naming the retired `getFIREData`/`getAnnualCashflowData`; the
+  warm baseline of `perf/README.md`, now transcribed from the same-session run: Storico 1165 → 261 ms and 6 → 0
+  Firestore reads, FIRE 1556 → 114 and 6 → 0, cold NOT remeasured), 2 deferred on purpose (the Analisi notice on a
+  failed settings read, in its blind spot; FIRE cold reading the whole expense list until PERF-06, in
+  doc/guide/fire.md). The sister specs (PERF-03/06/09/11/13, MOB-04/06/07) now describe the data layer as it is —
+  PERF-03 and PERF-06 no longer name an `annualCashflowData` key that does not exist. **Verified**: `tsc`, lint 0,
+  Vitest **202 / 4596** in `Europe/Rome`; no Playwright (comments and docs only).
 
 ## Architecture Snapshot
 - App Router; protected pages under `app/dashboard/*`.

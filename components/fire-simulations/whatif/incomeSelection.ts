@@ -7,7 +7,7 @@
 
 import type { IncomeSourceCategory } from '@/lib/services/fireService';
 
-/** The sentinel `getAnnualCashflowData` uses for income recorded without a subcategory. */
+/** The sentinel `buildIncomeSourceBreakdown` (fireService) uses for income recorded without a subcategory. */
 export const NO_SUBCATEGORY_ID = '__none__';
 
 export function leafKey(categoryId: string, subCategoryId: string): string {
