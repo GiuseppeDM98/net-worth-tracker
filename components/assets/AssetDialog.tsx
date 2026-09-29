@@ -33,7 +33,7 @@
  */
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import type { Timestamp } from 'firebase/firestore';
 import { useForm, useFieldArray, useWatch, type FieldErrors } from 'react-hook-form';
@@ -42,14 +42,15 @@ import * as z from 'zod';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
-import { Asset, AssetFormData, AssetType, AssetClass, AllocationRole, AssetAllocationTarget, AssetComposition, CouponFrequency, BondDetails, BondInflationIndexation } from '@/types/assets';
+import { Asset, AssetFormData, AssetType, AssetClass, AllocationRole, AssetComposition, CouponFrequency, BondDetails, BondInflationIndexation } from '@/types/assets';
 import type { PensionFundDetails } from '@/types/pension';
 import { createAsset, updateAsset, updateAssetMetadata } from '@/lib/services/assetService';
 import { isLedgerAssetType, type AssetTransactionFormData } from '@/types/assetTransactions';
 import { deleteAllAssetTransactionsForAsset } from '@/lib/services/assetTransactionService';
 import { useAssets } from '@/lib/hooks/useAssets';
 import { useAssetLedgerMeta, useCreateAssetTransaction } from '@/lib/hooks/useAssetTransactions';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
+import { useSettings } from '@/lib/hooks/useSettings';
 import { queryKeys } from '@/lib/query/queryKeys';
 import { formatCurrency, formatNumberIt, formatPercentageIt } from '@/lib/utils/formatters';
 import { resolveAllocationRole } from '@/lib/utils/allocationUtils';
@@ -66,8 +67,7 @@ import { buildBondDetailsFromForm, NO_INFLATION_INDEXATION } from '@/lib/utils/b
 import { latestIndexationCoefficient, resolveInflationIndexation } from '@/lib/utils/couponUtils';
 import { NO_DIVIDEND_ACCOUNT, dividendAccountFromForm, paysDividends } from '@/lib/utils/dividendAccount';
 import { scheduleNextCoupon, scheduleFinalPremium } from '@/lib/services/couponScheduling';
-import { getTargets, addSubCategory, getSettings } from '@/lib/services/assetAllocationService';
-import type { Settings } from '@/types/settings';
+import { addSubCategory } from '@/lib/services/assetAllocationService';
 import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import {
   ASSET_TYPE_PICKER_READING,
@@ -537,17 +537,16 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
   const { data: ledgerMeta } = useAssetLedgerMeta(ownerId);
   const { data: ledgerAllAssets = [] } = useAssets(ownerId);
   const createTradeMutation = useCreateAssetTransaction(ownerId || '');
-  // Family members for the "Membro famiglia" Select on the pensionFund details section — sourced
-  // from Settings (Impostazioni → Preferenze → Famiglia), same queryKey every other settings
-  // consumer uses so a save there is picked up here too.
-  const { data: settings } = useQuery<Settings | null>({
-    queryKey: ['settings', ownerId],
-    queryFn: () => getSettings(ownerId!),
-    enabled: !!ownerId,
-  });
+  // The settings document — the family members for the pensionFund «Membro famiglia» Select and
+  // the allocation targets for the sub-category Select — from the ONE settings key (2026-09-29),
+  // read only while the dialog is OPEN: Patrimonio mounts this dialog closed, and until
+  // 2026-09-29 it read the targets at mount and the settings on its own key. A save in
+  // Impostazioni invalidates the key, so it is picked up here too.
+  const { data: settings } = useSettings(ownerId, { enabled: open });
+  // What `getTargets` used to read in a second round trip: the same document's `targets`.
+  const allocationTargets = settings?.targets ?? null;
   const ledgerCashAssets = ledgerAllAssets.filter((a) => a.type === 'cash' && a.assetClass === 'cash');
   const [fetchingPrice, setFetchingPrice] = useState(false);
-  const [allocationTargets, setAllocationTargets] = useState<AssetAllocationTarget | null>(null);
   const [showNewSubCategory, setShowNewSubCategory] = useState(false);
   const [newSubCategoryName, setNewSubCategoryName] = useState('');
   const [isAddingSubCategory, setIsAddingSubCategory] = useState(false);
@@ -785,24 +784,6 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
     }
   }
 
-  // Promise-style on purpose: the setter runs inside `.then`, which the
-  // `react-hooks/set-state-in-effect` rule accepts from an effect — an `await` in an async
-  // function it does not see through.
-  const loadAllocationTargets = useCallback((): Promise<void> => {
-    if (!user || !ownerId) return Promise.resolve();
-
-    return getTargets(ownerId)
-      .then((targets) => setAllocationTargets(targets))
-      .catch((error) => console.error('Error loading allocation targets:', error));
-  }, [user, ownerId]);
-
-  // Load allocation targets when dialog opens
-  useEffect(() => {
-    if (open && user) {
-      loadAllocationTargets();
-    }
-  }, [open, user, loadAllocationTargets]);
-
   useEffect(() => {
     // Re-run on every open so a second "new asset" dialog starts clean.
     // Without `open` in deps, `asset` stays null between opens and the effect never re-fires.
@@ -971,8 +952,8 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
       await addSubCategory(ownerId, selectedAssetClass, newSubCategoryName.trim());
       toast.success(`Sottocategoria "${newSubCategoryName}" creata con successo!`);
 
-      // Ricarica i targets per ottenere la nuova sottocategoria
-      await loadAllocationTargets();
+      // Re-read the settings so the new sub-category is in the Select (every reader of the key sees it).
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settings.all(ownerId) });
 
       // Seleziona automaticamente la nuova sottocategoria
       setValue('subCategory', newSubCategoryName.trim());

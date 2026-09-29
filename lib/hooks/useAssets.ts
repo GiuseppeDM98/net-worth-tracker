@@ -11,7 +11,7 @@
  * to ensure UI reflects latest server state (new/updated/deleted assets).
  */
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { queryOptions, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query/queryKeys';
 import { getAllAssets, deleteAsset } from '@/lib/services/assetService';
 
@@ -21,14 +21,27 @@ import { getAllAssets, deleteAsset } from '@/lib/services/assetService';
  * Query only runs when userId is defined (enabled: !!userId) to prevent
  * unnecessary API calls before authentication completes.
  *
+ * `options.enabled` lets a dialog read only while open (`DividendDialog`); read `isLoading`, not
+ * `isPending`, on a disabled query.
+ *
  * @param userId - User ID (undefined before auth completes)
  * @returns React Query result with assets data, loading state, and error
  */
-export function useAssets(userId: string | undefined) {
+export function useAssets(userId: string | undefined, options?: { enabled?: boolean }) {
   return useQuery({
-    queryKey: queryKeys.assets.all(userId || ''),
-    queryFn: () => getAllAssets(userId!),
-    enabled: !!userId, // Only run if userId exists (prevents query before auth)
+    ...assetsQueryOptions(userId || ''),
+    enabled: !!userId && (options?.enabled ?? true), // Only run if userId exists (prevents query before auth)
+  });
+}
+
+/**
+ * The assets query as options, for an imperative `queryClient.fetchQuery` that must share the
+ * hook's cache (Rendimenti's base resolution): the same key, the same reader, the global staleTime.
+ */
+export function assetsQueryOptions(userId: string) {
+  return queryOptions({
+    queryKey: queryKeys.assets.all(userId),
+    queryFn: () => getAllAssets(userId),
   });
 }
 

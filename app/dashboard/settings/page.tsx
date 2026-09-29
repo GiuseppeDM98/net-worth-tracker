@@ -37,7 +37,7 @@
 
 'use client';
 
-import React, { Suspense, useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useTheme } from 'next-themes';
@@ -47,7 +47,6 @@ import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { resolveCenteredModalOrigin } from '@/lib/utils/modalOrigin';
 import {
-  getSettings,
   setSettings,
   getDefaultTargets,
   calculateEquityPercentage,
@@ -85,6 +84,9 @@ import { Save, RotateCcw, Plus, Trash2, ChevronDown, Edit, Receipt, FlaskConical
 import { AccountSharingSection } from '@/components/settings/AccountSharingSection';
 import ExpenseImportSection from '@/components/settings/ExpenseImportSection';
 import { queryKeys } from '@/lib/query/queryKeys';
+import { settingsQueryOptions } from '@/lib/hooks/useSettings';
+import { useAssets } from '@/lib/hooks/useAssets';
+import { useExpenseCategories } from '@/lib/hooks/useExpenses';
 import { useColorTheme, ColorTheme } from '@/contexts/ColorThemeContext';
 import { TabsContent } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
@@ -93,8 +95,7 @@ import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
 import { ExpenseCategory, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
 import { Asset } from '@/types/assets';
-import { getAllAssets } from '@/lib/services/assetService';
-import { getAllCategories, deleteCategory, getCategoryById } from '@/lib/services/expenseCategoryService';
+import { deleteCategory, getCategoryById } from '@/lib/services/expenseCategoryService';
 import { getExpenseCountByCategoryId, reassignExpensesCategory, clearExpensesCategoryAssignment, moveExpensesToCategory, TransferBoundaryError } from '@/lib/services/expenseService';
 import { CategoryManagementDialog, invalidateCategoryCaches } from '@/components/expenses/CategoryManagementDialog';
 import { CategoryDeleteConfirmDialog } from '@/components/expenses/CategoryDeleteConfirmDialog';
@@ -282,6 +283,9 @@ const SETTINGS_TABS: TabDef[] = [
 
 // The assistant is a route gated by this flag; its state tile follows the same gate.
 const SHOW_ASSISTANT = process.env.NEXT_PUBLIC_ASSISTANT_AI_ENABLED !== 'false';
+
+const EMPTY_CATEGORIES: ExpenseCategory[] = [];
+const EMPTY_ASSETS: Asset[] = [];
 
 // Stable no-op store for the SSR/hydration split (same guard ThemePicker uses).
 const neverChanges = () => () => {};
@@ -604,12 +608,11 @@ export default function SettingsPage() {
     [assetClass: string]: { [currentName: string]: string }; // currentName -> originalName
   }>({});
 
-  // Expense categories state. `loadingCategories` starts TRUE: before the first read an empty
-  // list is «not read yet», never «no categories».
-  const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
-  const [loadingCategories, setLoadingCategories] = useState(true);
-  /** The categories were not read: every tile fed by them says so instead of «nessuna». */
-  const [categoriesFailed, setCategoriesFailed] = useState(false);
+  // The expense categories from the key Cashflow, Analisi and the expense form read (2026-09-29: the
+  // page kept its own copy beside it until 2026-09-29). `isLoading` is true before the first read,
+  // so an empty list is «not read yet», never «no categories»; `isError` = the categories were not
+  // read, and every tile fed by them says so instead of «nessuna».
+  const { data: expenseCategories = EMPTY_CATEGORIES, isLoading: loadingCategories, isError: categoriesFailed } = useExpenseCategories(ownerId);
   // Announcements of the Categorie list and of the dividend sync (one live region each).
   const [categoryAnnouncement, setCategoryAnnouncement] = useState('');
   const [syncAnnouncement, setSyncAnnouncement] = useState('');
@@ -628,9 +631,12 @@ export default function SettingsPage() {
 
   // Default cash account settings — the accounts are read beside the settings, with their own
   // wait and their own failure (a failed read is not «nessun conto»).
-  const [cashAssets, setCashAssets] = useState<Asset[]>([]);
-  const [loadingAccounts, setLoadingAccounts] = useState(true);
-  const [accountsFailed, setAccountsFailed] = useState(false);
+  // The cash accounts for the default debit/credit pickers, from the assets key: an actual conto,
+  // not just a "cash-class" asset — a money-market ETF (assetClass 'cash') is not a settlement
+  // account. Strict convention (doc/guide/patrimonio.md § Asset Pricing, FX and Assets). A failed
+  // read is `isError`, never `[]`: the tile used to tell the reader to create an account they had.
+  const { data: allAssets = EMPTY_ASSETS, isLoading: loadingAccounts, isError: accountsFailed } = useAssets(ownerId);
+  const cashAssets = useMemo(() => allAssets.filter((a) => a.type === 'cash' && a.assetClass === 'cash'), [allAssets]);
   const [defaultDebitCashAssetId, setDefaultDebitCashAssetId] = useState<string>('__none__');
   const [defaultCreditCashAssetId, setDefaultCreditCashAssetId] = useState<string>('__none__');
   // Where a transfer's fee lands ('' = none: the expense form's «Commissione» stays off).
@@ -732,7 +738,9 @@ export default function SettingsPage() {
     try {
       if (!quiet) setLoading(true);
       setLoadFailed(false);
-      const settingsData = await getSettings(ownerId);
+      // Through the settings key every page shares (2026-09-29): a warm visit seeds the form from
+      // the cache; «Annulla» (`quiet`) re-reads the document, so a co-owner's save comes back too.
+      const settingsData = await queryClient.fetchQuery(quiet ? { ...settingsQueryOptions(ownerId), staleTime: 0 } : settingsQueryOptions(ownerId));
       const targets = settingsData?.targets || getDefaultTargets();
 
       // Load user age and risk-free rate if available
@@ -942,64 +950,36 @@ export default function SettingsPage() {
     } finally {
       setLoading(false);
     }
-  }, [user, ownerId]);
+  }, [user, ownerId, queryClient]);
 
-  const loadExpenseCategories = useCallback(async () => {
-    if (!user || !ownerId) return;
+  // Re-read the categories after a write here (a category created, moved, deleted, imported) and
+  // «Riprova»: an invalidation of the key every reader shares, never a private re-read.
+  const loadExpenseCategories = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: queryKeys.expenses.categories(ownerId || '') }),
+    [queryClient, ownerId],
+  );
 
-    try {
-      setLoadingCategories(true);
-      setCategoriesFailed(false);
-      const categories = await getAllCategories(ownerId);
-      setExpenseCategories(categories);
-    } catch (error) {
-      // No toast: the tiles that depend on the categories carry the failure in place.
-      console.error('Error loading expense categories:', error);
-      setCategoriesFailed(true);
-    } finally {
-      setLoadingCategories(false);
-    }
-  }, [user, ownerId]);
-
-  const loadCashAccounts = useCallback(async () => {
-    if (!ownerId) return;
-
-    try {
-      setLoadingAccounts(true);
-      setAccountsFailed(false);
-      const assets = await getAllAssets(ownerId);
-      // Default debit/credit account picker: an actual conto, not just a "cash-class" asset —
-      // a money-market ETF (assetClass 'cash') is not a settlement account. Strict convention
-      // (convenzione stretta, doc/guide/patrimonio.md § Asset Pricing, FX and Assets).
-      setCashAssets(assets.filter((a) => a.type === 'cash' && a.assetClass === 'cash'));
-    } catch (error) {
-      // It used to have no catch at all: a failed read left `[]`, and the tile told the reader
-      // to create an account they already had.
-      console.error('Error loading cash accounts:', error);
-      setAccountsFailed(true);
-    } finally {
-      setLoadingAccounts(false);
-    }
-  }, [ownerId]);
+  /** «Riprova» on the accounts: the assets key, which Patrimonio invalidates on every write. */
+  const loadCashAccounts = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId || '') }),
+    [queryClient, ownerId],
+  );
 
   // First load, and again when the viewed account changes (doc/guide/account-condiviso-demo.md § Shared Account / Delegated Access: manual
-  // loaders key on ownerId).
+  // loaders key on ownerId). The categories and the accounts read themselves through their hooks.
   useEffect(() => {
     if (!user || !ownerId) return;
     // Deferred so the effect body itself sets no state (react-hooks/set-state-in-effect).
     const timer = setTimeout(() => {
       loadTargets();
-      loadExpenseCategories();
-      loadCashAccounts();
     }, 0);
     return () => clearTimeout(timer);
-  }, [user, ownerId, loadTargets, loadExpenseCategories, loadCashAccounts]);
+  }, [user, ownerId, loadTargets]);
 
-  // Refresh categories (the import may have created new ones) and invalidate every
-  // Cashflow query key that reads expenses/categories/overview data, so the freshly
-  // imported transactions show up without a manual page reload.
+  // Invalidate every Cashflow query key that reads expenses/categories/overview data (the import
+  // may have created categories), so the freshly imported transactions show up without a manual
+  // page reload.
   const handleExpenseImported = () => {
-    loadExpenseCategories();
     if (ownerId) {
       queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all(ownerId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.expenses.categories(ownerId) });
@@ -1436,8 +1416,8 @@ export default function SettingsPage() {
     try {
       setSaving(true);
 
-      // Fetch current settings to preserve FIRE fields
-      const settingsData = await getSettings(ownerId);
+      // Fetch the CURRENT settings (never the cache) to preserve the fields other pages write
+      const settingsData = await queryClient.fetchQuery({ ...settingsQueryOptions(ownerId), staleTime: 0 });
 
       const targets: AssetAllocationTarget = {};
 
@@ -1536,7 +1516,7 @@ export default function SettingsPage() {
       // Other consumers (AssetDialog's family-member Select, PensionOverview) read settings via
       // React Query with a 5-minute staleTime — without this, a just-added member wouldn't be
       // selectable there until that cache naturally expired.
-      queryClient.invalidateQueries({ queryKey: ['settings', ownerId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.settings.all(ownerId) });
     } catch (error) {
       console.error('Error saving targets:', error);
       toast.error('Errore nel salvataggio dei target');

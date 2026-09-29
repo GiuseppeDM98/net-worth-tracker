@@ -65,9 +65,11 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   other specs plant spending categories of their own. With the switch
   on, each `CategoryRow` badge wears its role's colour (`categoryRoleColor`: income `--positive`, a transfer its saved
   hue), and the category dialog shows the role picker. The flag's dirty snapshot is Spese's.
-- **A category write invalidates what Analisi reads, where the write happens** (2026-09-27): the page keeps its own
-  category list (`loadExpenseCategories`), but Analisi reads `queryKeys.expenses.categories` under the global
-  5-minute staleTime, so a role set here reached its Flusso minutes later. `invalidateCategoryCaches`
+- **A category write invalidates what Analisi reads, where the write happens** (2026-09-27): the page used to keep
+  its own category list (`loadExpenseCategories`, a private read until 2026-09-29 — now the page reads
+  `useExpenseCategories` like Analisi and `loadExpenseCategories` IS the invalidation of that key), while Analisi
+  reads `queryKeys.expenses.categories` under the global 5-minute staleTime, so a role set here reached its Flusso
+  minutes later. `invalidateCategoryCaches`
   (`components/expenses/CategoryManagementDialog.tsx`) invalidates `expenses.categories` after the dialog's create or
   update — the dialog is also what `ExpenseDialog`, `CategoryMoveDialog` and `CategoryDeleteConfirmDialog` mount — and
   `expenses.all` too when the rows were rewritten: a rename or a type change (the cascades inside `updateCategory`), a
@@ -112,7 +114,10 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   `AssetAllocationSettings`, never in `UserPreferences`, and dirty-state snapshot keys contain **only persisted
   fields**, captured *after* the Firestore state is applied.
 - **One Save button validates the whole page** — `handleSave` returns early when allocation targets do not total 100, and
-  must `invalidateQueries(['settings', ownerId])`, which `AssetDialog` reads. **A tab must not grow a second Save**: the
+  must `invalidateQueries(queryKeys.settings.all(ownerId))`, the ONE settings key every reader shares (2026-09-29). The
+  page's own reads go through the keys too: `loadTargets` seeds the form with `queryClient.fetchQuery(settingsQueryOptions)`
+  (the cache on a warm visit; `quiet` — «Annulla» — with `staleTime: 0`, the saved document), «Salva» pre-reads the
+  CURRENT document the same way, the cash accounts come from `useAssets` and the categories from `useExpenseCategories`. **A tab must not grow a second Save**: the
   Dividendi one was deleted on 2026-08-29 because `handleSave` already persisted its two fields, so the tab's own button
   was a second write path for the same data (it also re-read the doc first, and could therefore clobber a concurrent edit).
 - **A field's dirty-snapshot must follow the TAB THAT EDITS IT, not the tab that consumes it**: `userAge`/`riskFreeRate`

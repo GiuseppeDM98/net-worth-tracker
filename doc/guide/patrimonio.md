@@ -219,10 +219,18 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   before the field existed reads it as instalment − principal (`interestPaidOf`). The end is the French amortisation
   on today's debt, TAN and the latest linked instalment (`projectPayoff`: n = −ln(1 − D·r/P)/ln(1 + r), rounded up;
   `never` when the instalment does not cover the interest). No figure takes a sign colour: interest is a cost already
-  counted in Cashflow, not a gain or a loss. The reader is one query per property (`userId` + `debtAssetId`, two
-  equalities, no composite index), keyed UNDER `queryKeys.assets.all` so every debt-moving mutation refreshes it, with
-  `staleTime: 0` because linking a series moves no asset; the page's skeleton waits for it and a failed read is an
-  `ErrorNotice` where the tile would be.
+  counted in Cashflow, not a gain or a loss. The reader is ONE query for every property (`userId` equality +
+  `debtAssetId in [...]`, two `.where()`, no composite index; past thirty properties the ids go in chunks of 30, read in
+  parallel — Firestore's ceiling on an `in` filter, pinned by `__tests__/mortgageInstalmentsQuery.test.ts`; until
+  2026-09-29 it was one query per property), keyed UNDER `queryKeys.assets.all` so every debt-moving mutation refreshes
+  it under the global staleTime; «Collega la serie al mutuo» moves no asset, so `LinkSeriesDialog` invalidates the
+  assets key itself (the hook carried `staleTime: 0` instead, and re-read on every mount). The page's skeleton waits
+  for it and a failed read is an `ErrorNotice` where the tile would be.
+- **`AssetDialog` reads nothing while closed** (2026-09-29): the page mounts it closed, and until then it read
+  the allocation targets at mount and the settings on a key of its own. Now `useSettings(ownerId, { enabled: open })` is
+  its one read — the family members and the targets (`settings.targets`, what `getTargets` used to re-read) come from
+  it, a new sub-category invalidates the key instead of re-reading. The page itself reads its keys through the hooks
+  (assets, snapshots, overview, the ledger meta and the ledger, the instalments).
 - **A failed overview is an alert, not a skeleton**: the page gates the skeleton on `isLoading` of EVERY query it
   reads (assets, overview, snapshots, ledger meta) and, when the overview errs, keeps Liquidità, Movimenti and
   Strumenti alive on the live assets (`totalValue` falls back to `calculateTotalValue(assets)`) behind a

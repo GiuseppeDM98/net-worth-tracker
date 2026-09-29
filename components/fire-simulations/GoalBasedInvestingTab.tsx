@@ -31,17 +31,17 @@
  */
 
 import { useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useAssets } from '@/lib/hooks/useAssets';
+import { useSettings } from '@/lib/hooks/useSettings';
+import { useGoalData, useSaveGoalData } from '@/lib/hooks/useGoalData';
 import Link from 'next/link';
 import { Plus, Settings } from 'lucide-react';
 import { toast } from 'sonner';
-import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
-import { getSettings } from '@/lib/services/assetAllocationService';
-import { getAllAssets } from '@/lib/services/assetService';
-import { calculateGoalProgress, cleanOrphanedAssignments, getGoalData, saveGoalData } from '@/lib/services/goalService';
-import type { GoalAssetAssignment, GoalBasedInvestingData, InvestmentGoal } from '@/types/goals';
+import { calculateGoalProgress, cleanOrphanedAssignments } from '@/lib/services/goalService';
+import type { GoalAssetAssignment, InvestmentGoal } from '@/types/goals';
+import type { Asset } from '@/types/assets';
 import { computeGoalTrajectory, type GoalRow } from '@/lib/utils/goalTrajectory';
 import { buildMilestones, summarizeAssignments, summarizeDerivedAllocation, summarizeGoals, summarizeTrajectory, sumAssetValues } from '@/lib/utils/goalsSummary';
 import {
@@ -92,14 +92,14 @@ const SKELETON_CELLS: TileSkeletonCell[] = [
   { span: 12, lines: 8 },
 ];
 
+const EMPTY_ASSETS: Asset[] = [];
+
 const ASIDE_BUTTON_CLASS =
   'inline-flex h-9 items-center gap-1 rounded-md border border-border px-2.5 text-[11px] font-medium text-foreground transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 desktop:h-7';
 
 export function GoalBasedInvestingTab() {
-  const { user } = useAuth();
   const { ownerId } = useActiveAccount();
   const isDemo = useDemoMode();
-  const queryClient = useQueryClient();
 
   // ─── Dialogs and the selection ───────────────────────────────────────────────
   const [goalDialogOpen, setGoalDialogOpen] = useState(false);
@@ -107,31 +107,13 @@ export function GoalBasedInvestingTab() {
   const [assignmentGoalId, setAssignmentGoalId] = useState<string | null>(null);
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
 
-  // ─── Queries (shared keys with the other FIRE tabs) ──────────────────────────
-  const { data: settings, isLoading: loadingSettings, isError: settingsError } = useQuery({
-    queryKey: ['settings', ownerId],
-    queryFn: () => getSettings(ownerId!),
-    enabled: !!user && !!ownerId,
-  });
+  // ─── Queries (the keys every page shares, 2026-09-29) ───────────────────────────
+  const { data: settings, isLoading: loadingSettings, isError: settingsError } = useSettings(ownerId);
+  const { data: assets = EMPTY_ASSETS, isLoading: loadingAssets, isError: assetsError } = useAssets(ownerId);
+  const { data: goalData, isLoading: loadingGoals, isError: goalsError } = useGoalData(ownerId);
 
-  const { data: assets = [], isLoading: loadingAssets, isError: assetsError } = useQuery({
-    queryKey: ['assets', ownerId],
-    queryFn: () => getAllAssets(ownerId!),
-    enabled: !!user && !!ownerId,
-  });
-
-  const { data: goalData, isLoading: loadingGoals, isError: goalsError } = useQuery({
-    queryKey: ['goalData', ownerId],
-    queryFn: () => getGoalData(ownerId!),
-    enabled: !!user && !!ownerId,
-  });
-
-  const saveMutation = useMutation({
-    mutationFn: (data: GoalBasedInvestingData) => saveGoalData(ownerId!, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['goalData', ownerId] });
-    },
-  });
+  // Invalidates `goals.all`, which Allocazione reads too (goal-driven targets).
+  const saveMutation = useSaveGoalData(ownerId || '');
 
   const isEnabled = settings?.goalBasedInvestingEnabled ?? false;
   const isGoalDriven = settings?.goalDrivenAllocationEnabled ?? false;

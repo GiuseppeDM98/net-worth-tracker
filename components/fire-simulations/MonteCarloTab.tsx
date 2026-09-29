@@ -32,13 +32,16 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/query/queryKeys';
+import { useAssets } from '@/lib/hooks/useAssets';
+import { useSettings } from '@/lib/hooks/useSettings';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
-import { calculateAssetValue, calculateLiquidNetWorth, calculateTotalValue, getAllAssets } from '@/lib/services/assetService';
-import { calculateCurrentAllocation, getDefaultTargets, getSettings, setSettings } from '@/lib/services/assetAllocationService';
+import { calculateAssetValue, calculateLiquidNetWorth, calculateTotalValue } from '@/lib/services/assetService';
+import { calculateCurrentAllocation, getDefaultTargets, setSettings } from '@/lib/services/assetAllocationService';
 import { buildParamsFromScenario, getDefaultMarketParameters, getDefaultMonteCarloScenarios, runMonteCarloSimulation, type AnnualInflow } from '@/lib/services/monteCarloService';
 import { calculateCoastFireNetRealAnnualPension, normalizeCoastFirePensions, normalizeCoastFireTaxBrackets } from '@/lib/services/fireService';
 import { resolvePortfolioTaxProfile } from '@/lib/utils/withdrawalTax';
@@ -130,20 +133,9 @@ export function MonteCarloTab() {
   const queryClient = useQueryClient();
   const isDemo = useDemoMode();
 
-  // ─── Queries (shared keys with the other FIRE tabs) ──────────────────────────
-  const { data: assets, isLoading: isLoadingAssets, isError: assetsError } = useQuery({
-    queryKey: ['assets', ownerId],
-    queryFn: () => getAllAssets(ownerId!),
-    enabled: !!user && !!ownerId,
-    staleTime: 300000,
-  });
-
-  const { data: settings, isLoading: isLoadingSettings, isError: settingsError } = useQuery({
-    queryKey: ['settings', ownerId],
-    queryFn: () => getSettings(ownerId!),
-    enabled: !!user && !!ownerId,
-    staleTime: 300000,
-  });
+  // ─── Queries (the keys every page shares, 2026-09-29) ───────────────────────────
+  const { data: assets, isLoading: isLoadingAssets, isError: assetsError } = useAssets(ownerId);
+  const { data: settings, isLoading: isLoadingSettings, isError: settingsError } = useSettings(ownerId);
 
   // ─── The pension lock (governs the whole FIRE page) ──────────────────────────
   // With the lock on, the locked funds leave the starting portfolio and re-enter the simulation
@@ -320,7 +312,7 @@ export function MonteCarloTab() {
     },
     onSuccess: () => {
       toast.success('Parametri degli scenari salvati');
-      queryClient.invalidateQueries({ queryKey: ['settings', ownerId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.settings.all(ownerId || '') });
     },
     onError: () => toast.error('Errore nel salvataggio dei parametri'),
   });

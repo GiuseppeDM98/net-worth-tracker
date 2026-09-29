@@ -37,23 +37,26 @@
  * lib/utils/allocazioneSummary.ts, words from lib/utils/allocazioneNarrative.ts.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { SlidersHorizontal } from 'lucide-react';
-import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
-import { getAllAssets, calculateAssetValue } from '@/lib/services/assetService';
+import { queryKeys } from '@/lib/query/queryKeys';
+import { useAssets } from '@/lib/hooks/useAssets';
+import { useSettings } from '@/lib/hooks/useSettings';
+import { useGoalData } from '@/lib/hooks/useGoalData';
+import { calculateAssetValue } from '@/lib/services/assetService';
 import {
-  getSettings,
   compareAllocations,
   deriveTargetLeverageRatio,
   getDefaultTargets,
   buildTargetsFromGoalAllocation,
 } from '@/lib/services/assetAllocationService';
-import { getGoalData, deriveTargetAllocationFromGoals } from '@/lib/services/goalService';
+import { deriveTargetAllocationFromGoals } from '@/lib/services/goalService';
 import type { LeveragePlanInputs } from '@/lib/utils/leverageAwareAllocationUtils';
-import type { Asset, AllocationResult, AssetAllocationTarget } from '@/types/assets';
+import type { Asset, AssetAllocationTarget } from '@/types/assets';
 import {
   applyRebalanceBand,
   summarizeBalance,
@@ -126,27 +129,24 @@ const SKELETON_CELLS: TileSkeletonCell[] = [
 const DEFAULT_PLAN_AMOUNT_INPUT = '1000';
 
 const EMPTY_HOLDINGS: AllocatableHolding[] = [];
+const EMPTY_ASSETS: Asset[] = [];
 
 export default function AllocationPage() {
   const { user } = useAuth();
   const { ownerId } = useActiveAccount();
-  const [targets, setTargets] = useState<AssetAllocationTarget | null>(null);
-  const [allocation, setAllocation] = useState<AllocationResult | null>(null);
-  const [loading, setLoading] = useState(true);
-  /** A failed load is not an empty set: it gets an alert, never a verdict about zeros. */
-  const [loadFailed, setLoadFailed] = useState(false);
-  const [usingGoalTargets, setUsingGoalTargets] = useState(false);
+  const queryClient = useQueryClient();
 
-  // Per-instrument rows of everything IN the allocation — tradable and frozen alike. Each carries
-  // its own `tradable` flag: the frozen ones count in every total and percentage but are never
-  // offered as a source or destination, so the plans reach the target by moving the others.
-  const [holdings, setHoldings] = useState<AllocatableHolding[]>(EMPTY_HOLDINGS);
-  // The `tradable` assets themselves: the trade CANDIDATES for the leverage-aware planner.
-  const [tradableAssets, setTradableAssets] = useState<Asset[]>([]);
-  // The wealth this page deliberately ignores — the home you live in. Reported only.
-  const [excludedHoldings, setExcludedHoldings] = useState<AllocatableHolding[]>(EMPTY_HOLDINGS);
+  // ─── The reads: three keys, shared with every other page (2026-09-29) ──────────
+  // Assets, settings and the goal document come from the hooks, so a visit after Patrimonio or
+  // Impostazioni opens on the cache; the page gates on EVERY query it reads (doc/guide/stati.md).
+  const { data: assetsData, isLoading: assetsLoading, isError: assetsError } = useAssets(ownerId);
+  const { data: settings, isLoading: settingsLoading, isError: settingsError } = useSettings(ownerId);
+  const { data: goalData, isLoading: goalsLoading, isError: goalsError } = useGoalData(ownerId);
+  const loading = assetsLoading || settingsLoading || goalsLoading;
+  /** A failed load is not an empty set: it gets an alert, never a verdict about zeros. */
+  const loadFailed = assetsError || settingsError || goalsError;
   // Full, unfiltered asset list — the Previdenza tile's «tutto il patrimonio» needs every role.
-  const [allAssets, setAllAssets] = useState<Asset[]>([]);
+  const allAssets = useMemo(() => assetsData ?? [], [assetsData]);
 
   // The page's one control: the drift tolerance that decides COMPRA/VENDI/OK. Session-only; the
   // default matches the server's ±2 p.p. so the first render equals the persisted classification.
@@ -154,63 +154,63 @@ export default function AllocationPage() {
   const [planMode, setPlanMode] = useState<PlanMode>('rebalance');
   const [amountInput, setAmountInput] = useState(DEFAULT_PLAN_AMOUNT_INPUT);
 
-  const loadData = useCallback(async () => {
-    if (!user || !ownerId) return;
-    try {
-      setLoadFailed(false);
-      const [assetsData, settings, goalData] = await Promise.all([
-        getAllAssets(ownerId),
-        getSettings(ownerId),
-        getGoalData(ownerId),
-      ]);
+  // What the old `Promise.all` loader composed, now derived once the three reads have answered
+  // (`undefined` = not read yet; a settings or goal document that does not exist is `null`).
+  const composed = useMemo(() => {
+    if (!assetsData || settings === undefined || goalData === undefined) return null;
 
-      // Split by role BEFORE any allocation math (see `partitionByAllocationRole`). Goal-derived
-      // targets keep reading the full asset list — a goal is funded by total wealth.
-      const { tradable, frozen, excluded } = partitionByAllocationRole(assetsData);
-      const inAllocation = [...tradable, ...frozen];
+    // Split by role BEFORE any allocation math (see `partitionByAllocationRole`). Goal-derived
+    // targets keep reading the full asset list — a goal is funded by total wealth.
+    const { tradable, frozen, excluded } = partitionByAllocationRole(assetsData);
+    const inAllocation = [...tradable, ...frozen];
 
-      let effectiveTargets: AssetAllocationTarget;
-      let fromGoals = false;
-      if (
-        settings?.goalBasedInvestingEnabled &&
-        settings?.goalDrivenAllocationEnabled &&
-        goalData &&
-        goalData.goals.length > 0
-      ) {
-        const derived = deriveTargetAllocationFromGoals(goalData.goals, goalData.assignments, assetsData);
-        if (derived) {
-          effectiveTargets = buildTargetsFromGoalAllocation(derived, settings?.targets);
-          fromGoals = true;
-        } else {
-          effectiveTargets = settings?.targets || getDefaultTargets();
-        }
+    let effectiveTargets: AssetAllocationTarget;
+    let fromGoals = false;
+    if (
+      settings?.goalBasedInvestingEnabled &&
+      settings?.goalDrivenAllocationEnabled &&
+      goalData &&
+      goalData.goals.length > 0
+    ) {
+      const derived = deriveTargetAllocationFromGoals(goalData.goals, goalData.assignments, assetsData);
+      if (derived) {
+        effectiveTargets = buildTargetsFromGoalAllocation(derived, settings?.targets);
+        fromGoals = true;
       } else {
         effectiveTargets = settings?.targets || getDefaultTargets();
       }
-
-      setTargets(effectiveTargets);
-      setUsingGoalTargets(fromGoals);
-      setAllocation(compareAllocations(inAllocation, effectiveTargets));
-      setHoldings(buildHoldings(inAllocation, calculateAssetValue));
-      setTradableAssets(tradable);
-      setExcludedHoldings(buildHoldings(excluded, calculateAssetValue));
-      setAllAssets(assetsData);
-    } catch (error) {
-      setLoadFailed(true);
-      console.error('Error loading allocation data:', error);
-      toast.error('Errore nel caricamento dei dati');
-    } finally {
-      setLoading(false);
+    } else {
+      effectiveTargets = settings?.targets || getDefaultTargets();
     }
-  }, [user, ownerId]);
 
-  useEffect(() => {
-    // Deferred so the effect body itself sets no state (react-hooks/set-state-in-effect).
-    const timer = setTimeout(() => {
-      loadData();
-    }, 0);
-    return () => clearTimeout(timer);
-  }, [loadData]);
+    return {
+      targets: effectiveTargets,
+      usingGoalTargets: fromGoals,
+      allocation: compareAllocations(inAllocation, effectiveTargets),
+      // Per-instrument rows of everything IN the allocation — tradable and frozen alike. Each
+      // carries its own `tradable` flag: the frozen ones count in every total and percentage but
+      // are never offered as a source or destination, so the plans reach the target by moving the others.
+      holdings: buildHoldings(inAllocation, calculateAssetValue),
+      // The `tradable` assets themselves: the trade CANDIDATES for the leverage-aware planner.
+      tradableAssets: tradable,
+      // The wealth this page deliberately ignores — the home you live in. Reported only.
+      excludedHoldings: buildHoldings(excluded, calculateAssetValue),
+    };
+  }, [assetsData, settings, goalData]);
+  const targets = composed?.targets ?? null;
+  const allocation = composed?.allocation ?? null;
+  const usingGoalTargets = composed?.usingGoalTargets ?? false;
+  const holdings = composed?.holdings ?? EMPTY_HOLDINGS;
+  const tradableAssets = composed?.tradableAssets ?? EMPTY_ASSETS;
+  const excludedHoldings = composed?.excludedHoldings ?? EMPTY_HOLDINGS;
+
+  /** «Riprova» on a failed read: invalidate the three keys, never a bare refetch (AGENTS.md § Caching). */
+  const retryLoad = () => {
+    if (!ownerId) return;
+    queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.settings.all(ownerId) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.goals.all(ownerId) });
+  };
 
   // ─── The numbers (pure layer) ───────────────────────────────────────────────
   // Re-classify the whole result under the active band; the verdict, the plan and the chips all
@@ -409,7 +409,7 @@ export default function AllocationPage() {
         {header}
         <ErrorNotice
           className="max-w-[920px]"
-          onRetry={() => void loadData()}
+          onRetry={retryLoad}
           notice={describeReadFailure({
             consequence: 'Strumenti e obiettivi di allocazione non sono stati letti: senza di essi il piano non è calcolabile.',
             untouched: 'Il piano registrato non è stato toccato.',

@@ -10,7 +10,7 @@
  * API calls before authentication completes.
  */
 
-import { useQuery } from '@tanstack/react-query';
+import { queryOptions, useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query/queryKeys';
 import { getAllExpenses } from '@/lib/services/expenseService';
 import { getAllCategories } from '@/lib/services/expenseCategoryService';
@@ -38,13 +38,26 @@ export function useExpenses(userId: string | undefined) {
  * Query only runs when userId is defined (enabled: !!userId) to prevent
  * unnecessary API calls before authentication completes.
  *
+ * `options.enabled` lets a dialog read only while open (`ExpenseDialog`); read `isLoading`, not
+ * `isPending`, on a disabled query.
+ *
  * @param userId - User ID (undefined before auth completes)
  * @returns React Query result with expense categories data, loading state, and error
  */
-export function useExpenseCategories(userId: string | undefined) {
+export function useExpenseCategories(userId: string | undefined, options?: { enabled?: boolean }) {
   return useQuery({
-    queryKey: queryKeys.expenses.categories(userId || ''),
-    queryFn: () => getAllCategories(userId!),
-    enabled: !!userId, // Only run if userId exists (prevents query before auth)
+    ...categoriesQueryOptions(userId || ''),
+    enabled: !!userId && (options?.enabled ?? true), // Only run if userId exists (prevents query before auth)
+  });
+}
+
+/**
+ * The categories query as options, for an imperative `queryClient.fetchQuery` on the hook's own
+ * cache (a dialog reading the list once after a write, the CSV import before it commits).
+ */
+export function categoriesQueryOptions(userId: string) {
+  return queryOptions({
+    queryKey: queryKeys.expenses.categories(userId),
+    queryFn: () => getAllCategories(userId),
   });
 }

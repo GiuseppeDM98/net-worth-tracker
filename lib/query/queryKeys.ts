@@ -10,6 +10,27 @@ export const queryKeys = {
     byId: (assetId: string) => ['assets', assetId] as const,
   },
 
+  // Settings — the ONE key for the owner's settings document (assetAllocationTargets/{uid}):
+  // every reader goes through `useSettings`, every writer invalidates this key (2026-09-29).
+  settings: {
+    all: (userId: string) => ['settings', userId] as const,
+  },
+
+  // Goal-based investing — the owner's goals and assignments (goalBasedInvesting/{uid}).
+  goals: {
+    all: (userId: string) => ['goal-data', userId] as const,
+  },
+
+  // Dividend receipts — the owner's dividend records as receipts (Rendimenti's attribution).
+  dividendReceipts: {
+    all: (userId: string) => ['dividend-receipts', userId] as const,
+  },
+
+  // Hall of Fame — the pre-computed rankings document (hall-of-fame/{uid}).
+  hallOfFame: {
+    all: (userId: string) => ['hall-of-fame', userId] as const,
+  },
+
   // Snapshots
   snapshots: {
     all: (userId: string) => ['snapshots', userId] as const,
@@ -80,12 +101,10 @@ export const queryKeys = {
       ['pension-contributions', userId, assetId] as const,
   },
 
-  // Cost centers (list + per-center spend stats derived from expenses).
-  // Both keys share the ['cost-centers', userId] prefix so invalidating `all`
-  // also refreshes any open detail view via prefix match.
+  // Cost centers: the centres ALONE (since 2026-09-29 — the key used to carry one query per
+  // centre for its rows, and the detail had a `expenses(userId, centerId)` key of its own; the rows
+  // are now grouped in memory from `useExpenses`, lib/utils/costCenterUtils.ts).
   costCenters: {
     all: (userId: string) => ['cost-centers', userId] as const,
-    expenses: (userId: string, centerId: string) =>
-      ['cost-centers', userId, centerId, 'expenses'] as const,
   },
 } as const;

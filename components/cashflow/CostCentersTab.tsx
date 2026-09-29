@@ -29,7 +29,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
+import { useCostCenters } from '@/lib/hooks/useCostCenters';
+import { useExpenses } from '@/lib/hooks/useExpenses';
 import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -39,7 +41,8 @@ import { useChartColors } from '@/lib/hooks/useChartColors';
 import { queryKeys } from '@/lib/query/queryKeys';
 import type { CostCenter } from '@/types/costCenters';
 import type { Expense } from '@/types/expenses';
-import { getCostCenters, getExpensesForCostCenter, deleteCostCenter, setCostCenterArchived } from '@/lib/services/costCenterService';
+import { deleteCostCenter, setCostCenterArchived } from '@/lib/services/costCenterService';
+import { groupExpensesByCostCenter } from '@/lib/utils/costCenterUtils';
 import { buildCenterMonthStack, summarizeCostCenters } from '@/lib/utils/costCenterSummary';
 import {
   CENTRI_ASIDE,
@@ -86,10 +89,8 @@ const SKELETON_CELLS: TileSkeletonCell[] = [
   { span: 7, lines: 3 },
 ];
 
-interface CenterRows {
-  spending: Expense[];
-  linkedCount: number;
-}
+const EMPTY_CENTERS: CostCenter[] = [];
+const EMPTY_EXPENSES: Expense[] = [];
 
 export function CostCentersTab() {
   const { user } = useAuth();
@@ -98,25 +99,16 @@ export function CostCentersTab() {
   const queryClient = useQueryClient();
   const chartColors = useChartColors();
 
-  // Reads the OWNER's data, not the viewer's: on a shared account they differ.
-  const { data, isLoading: loading, isError } = useQuery({
-    queryKey: queryKeys.costCenters.all(ownerId ?? ''),
-    enabled: !!user && !!ownerId,
-    queryFn: async () => {
-      const userId = ownerId!;
-      const centers = await getCostCenters(userId);
-      const entries = await Promise.all(
-        centers.map(async (center) => {
-          const expenses = await getExpensesForCostCenter(userId, center.id);
-          return [center.id, { spending: expenses.filter((e) => e.amount < 0), linkedCount: expenses.length }] as [string, CenterRows];
-        }),
-      );
-      return { centers, byCenter: Object.fromEntries(entries) as Record<string, CenterRows> };
-    },
-  });
+  // Reads the OWNER's data, not the viewer's: on a shared account they differ. Two keys every
+  // page shares (2026-09-29): the centers, and the rows grouped in memory from the account's whole
+  // expense list — one query per center (N+1) until 2026-09-29. The tab gates on both.
+  const { data: centersData, isLoading: centersLoading, isError: centersError } = useCostCenters(ownerId);
+  const { data: allExpenses, isLoading: expensesLoading, isError: expensesError } = useExpenses(ownerId);
+  const loading = centersLoading || expensesLoading;
+  const isError = centersError || expensesError;
 
-  const centers = useMemo(() => data?.centers ?? [], [data]);
-  const byCenter = useMemo(() => data?.byCenter ?? {}, [data]);
+  const centers = useMemo(() => centersData ?? EMPTY_CENTERS, [centersData]);
+  const byCenter = useMemo(() => groupExpensesByCostCenter(allExpenses ?? EMPTY_EXPENSES, centers), [allExpenses, centers]);
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: queryKeys.costCenters.all(ownerId ?? '') });
 
@@ -240,7 +232,7 @@ export function CostCentersTab() {
         <CostCenterDetail
           costCenter={selectedCenter}
           linkedExpenseCount={byCenter[selectedCenter.id]?.linkedCount ?? 0}
-          initialExpenses={byCenter[selectedCenter.id]?.spending}
+          expenses={byCenter[selectedCenter.id]?.spending ?? EMPTY_EXPENSES}
           onBack={backToList}
           onEdit={openEdit}
           onDelete={handleDelete}

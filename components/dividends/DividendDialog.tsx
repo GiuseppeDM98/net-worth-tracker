@@ -22,7 +22,7 @@
  */
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, type RefObject } from 'react';
+import { useEffect, useMemo, useState, type RefObject } from 'react';
 import { useForm, Controller, useWatch, type FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -31,7 +31,7 @@ import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { Dividend, DividendFormData, DividendType } from '@/types/dividend';
 import { Asset } from '@/types/assets';
-import { getAllAssets } from '@/lib/services/assetService';
+import { useAssets } from '@/lib/hooks/useAssets';
 import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -116,6 +116,8 @@ const round4 = (value: number) => parseFloat(value.toFixed(4));
 
 /** A field is a 44px target on a phone (the modal is a drawer there) and the dense 36px from `desktop:`. */
 const FIELD_CLASS = 'h-11 desktop:h-9';
+
+const EMPTY_ASSETS: Asset[] = [];
 /** A `SelectTrigger` sizes itself through `data-[size]`, which outranks a bare `h-*`. */
 const SELECT_CLASS = 'h-11 data-[size=default]:h-11 desktop:h-9 desktop:data-[size=default]:h-9';
 
@@ -132,8 +134,9 @@ function optionLabel(asset: Asset): string {
 export function DividendDialog({ open, onClose, dividend, onSuccess, returnFocusTo }: DividendDialogProps) {
   const { user } = useAuth();
   const { ownerId } = useActiveAccount();
-  const [assets, setAssets] = useState<Asset[]>([]);
-  const [loadingAssets, setLoadingAssets] = useState(false);
+  // The instruments from the assets key every page shares (2026-09-29), read only while the dialog
+  // is open: on Cashflow they are already in the cache, so the picker opens filled.
+  const { data: assets = EMPTY_ASSETS, isLoading: loadingAssets, isError: assetsUnread } = useAssets(ownerId, { enabled: open && !!user });
   const [status, setStatus] = useState<ModalStatus>({ phase: 'idle' });
   // What the user has typed over: a proposal never overwrites a value the user touched. State,
   // not refs — a ref read inside `register`'s handler trips `react-hooks/refs` during render.
@@ -197,32 +200,6 @@ export function DividendDialog({ open, onClose, dividend, onSuccess, returnFocus
     }
     return list;
   }, [assets, dividend]);
-
-  // Memoized on what it reads, so the effect below can declare it as a dependency without
-  // re-running on every render.
-  const loadAssets = useCallback(async () => {
-    if (!user || !ownerId) return;
-    try {
-      setLoadingAssets(true);
-      setAssets(await getAllAssets(ownerId));
-    } catch (error) {
-      console.error('Error loading assets:', error);
-      setStatus({ phase: 'error', message: 'Gli strumenti non sono stati letti: chiudi e riapri il modulo.' });
-    } finally {
-      setLoadingAssets(false);
-    }
-  }, [user, ownerId]);
-
-  // Load assets when dialog opens. Deferred so the effect body itself sets no state — the
-  // loader flips `loadingAssets` before its await (react-hooks/set-state-in-effect); the
-  // cleanup drops a load the close beat to it.
-  useEffect(() => {
-    if (!open || !user) return;
-    const timer = setTimeout(() => {
-      loadAssets();
-    }, 0);
-    return () => clearTimeout(timer);
-  }, [open, user, loadAssets]);
 
   // The withholding proposal, for a NEW record and an untouched field only: the instrument's
   // own rate over the gross per unit. On an edit the saved figure is the user's (a foreign tax
@@ -367,7 +344,13 @@ export function DividendDialog({ open, onClose, dividend, onSuccess, returnFocus
   };
 
   const editingBond = dividend ? dividend.dividendType === 'coupon' || dividend.dividendType === 'finalPremium' : false;
-  const reading = describeModalStatus(isSubmitting ? { phase: 'submitting' } : status, {
+  // An unread instrument list is the status line's error while it lasts: derived, never set in an
+  // effect, and a retry is a close and a reopen (the query re-runs with the dialog).
+  const shownStatus: ModalStatus =
+    status.phase === 'idle' && assetsUnread
+      ? { phase: 'error', message: 'Gli strumenti non sono stati letti: chiudi e riapri il modulo.' }
+      : status;
+  const reading = describeModalStatus(isSubmitting ? { phase: 'submitting' } : shownStatus, {
     idle: describeDividendIntent({ isEdit: !!dividend, ticker: dividend?.assetTicker, isBond: editingBond }),
     submitting: 'Sto salvando il pagamento.',
   });

@@ -110,9 +110,16 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   `(pointer: fine)`, `legend={false}` for the detail's one-series stack). It replaced the Recharts line chart of
   «Confronta l'andamento»; `costCenterStyles.ts` keeps only `CHART_TICK_STYLE`, which Storico, FIRE and Coast
   import — do not delete the file with the views' last Recharts chart.
-- **The query returns TWO numbers per center**, `spending` and `linkedCount`, and `deleteCostCenter` unlinks
-  *whatever is linked*, income included, by writing `costCenterId: null` (never deleting the row) — **any count
-  next to a destructive action must come from the same query the mutation runs.** The delete is the app's one
+- **The rows per center come from the ONE expenses key, grouped in memory** (2026-09-29):
+  `groupExpensesByCostCenter(allExpenses, centers)` in `costCenterUtils.ts` gives every center TWO numbers,
+  `spending` (the rows with `amount < 0`, date ascending like the per-center query it replaced) and `linkedCount`
+  (every linked row, income included); a center without rows gets an EMPTY entry, a row naming a center the list
+  does not hold lands in none (pinned, seen red). Until then the tab ran one Firestore query per center (N+1) on
+  rows already in `useExpenses`, and the detail a query of its own — the detail now receives its rows from the
+  list and has no skeleton or error of its own (the list gated on the two keys, `useCostCenters` + `useExpenses`).
+  `deleteCostCenter` unlinks *whatever is linked*, income included, by writing `costCenterId: null` (never deleting
+  the row) — **any count next to a destructive action must come from the same read the mutation runs**, and
+  `linkedCount` is that read. The delete is the app's one
   mechanism, `useArmedDelete` (the view kept a hand-written copy until 2026-09-18): the armed button is an
   outline «Conferma» with `aria-pressed`, the consequence prints UNDER the action cluster in `text-destructive`
   on a line reserved from `desktop:` (arming used to push the grid down 20px), arm and disarm are both

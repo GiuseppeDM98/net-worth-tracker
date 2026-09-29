@@ -178,3 +178,42 @@ export function getLifecycleStatus(
   const daysSince = (now.getTime() - lastActivityDate.getTime()) / 86_400_000;
   return daysSince > DORMANT_THRESHOLD_DAYS ? 'dormant' : 'active';
 }
+
+// ==================== Rows per center (2026-09-29) ====================
+
+/**
+ * What a center shows: its spending rows (the math) and how many rows are linked to it at all,
+ * income included — the count a delete names (`deleteCostCenter` unlinks whatever is linked).
+ */
+export interface CostCenterRows {
+  spending: Expense[];
+  linkedCount: number;
+}
+
+/**
+ * Group the account's expenses by cost center, in memory, from the ONE expenses read every
+ * page shares — it replaced one Firestore query per center (N+1, 2026-09-29).
+ *
+ * Every center gets an entry, an empty one when nothing is linked (never `undefined`: the
+ * list's summary maps the centers, not the rows); a row naming a center the list does not hold
+ * (deleted, another account's) lands in NO entry. `spending` keeps the rows with `amount < 0`,
+ * which is what the tab and the detail always read (a refund is spending by type with a
+ * positive amount and belongs to neither figure). The rows come out in the order the per-center
+ * query returned them — date ascending, ties by id — so the bars and the movements list read
+ * the same sequence as before.
+ */
+export function groupExpensesByCostCenter(expenses: Expense[], centers: CostCenter[]): Record<string, CostCenterRows> {
+  const byCenter: Record<string, { linked: Expense[] }> = {};
+  for (const center of centers) byCenter[center.id] = { linked: [] };
+  for (const expense of expenses) {
+    if (!expense.costCenterId) continue;
+    const entry = byCenter[expense.costCenterId];
+    if (entry) entry.linked.push(expense);
+  }
+  const rows: Record<string, CostCenterRows> = {};
+  for (const [centerId, { linked }] of Object.entries(byCenter)) {
+    const ordered = [...linked].sort((a, b) => toDate(a.date).getTime() - toDate(b.date).getTime() || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    rows[centerId] = { spending: ordered.filter((e) => e.amount < 0), linkedCount: ordered.length };
+  }
+  return rows;
+}
