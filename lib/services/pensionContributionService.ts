@@ -394,8 +394,8 @@ export async function deletePensionContribution(contribution: PensionContributio
 /**
  * Overwrite a fund's value from the statement — the «Aggiorna valore» action of Previdenza.
  *
- * NOT a contribution: no record, no transfer, no cash movement (doc/guide/previdenza.md → «the
- * periodic statement is not a contribution»). The value lives in `quantity` at price 1, so the
+ * NOT a contribution: no record, no transfer, no cash movement (doc/guide/previdenza.md § The
+ * periodic statement (NAV overwrite) is NOT a contribution). The value lives in `quantity` at price 1, so the
  * same guard as a contribution refuses a fund whose value would not all be in that field, and
  * `lastPriceUpdate` is stamped so «Il fondo oggi» reads the update's date. The Panoramica's
  * summary is invalidated like any asset update; the caller invalidates the React Query caches.

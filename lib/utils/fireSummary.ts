@@ -238,8 +238,8 @@ function hasUnlockOverride(fund: PensionLockState['funds'][number]['fund']): boo
 
 /**
  * The lock as the page states it. `state` is null when the toggle is off. The unlock year is
- * the latest inflow year (the bridge aggregates multi-fund unlocks on the latest one, AGENTS →
- * FIRE); the source tells whether that date comes from the RITA rule, a per-fund override, or
+ * the latest inflow year (the bridge aggregates multi-fund unlocks on the latest one, doc/guide/fire.md §
+ * FIRE, What If and Goals); the source tells whether that date comes from the RITA rule, a per-fund override, or
  * both, so the caption can say which.
  */
 export function summarizeLock(

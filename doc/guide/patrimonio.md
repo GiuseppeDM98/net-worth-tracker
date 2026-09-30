@@ -9,6 +9,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **Composite class chip** (2026-09-26): `InstrumentClassChip` in `components/assets/AssetRow.tsx` (desktop `Classe` column and phone row; the group header keeps `AssetClassChip`), pure `describeAssetClassChip` + `rankedClassLegs` + `SHORT_CLASS_LABELS` in `lib/utils/assetDisplayClass.ts`; tests `__tests__/assetDisplayClass.test.ts`, `e2e/assets.composite-chip.spec.ts` (1440: the 112px floor, «Andamento» without sideways scroll, the grouped header's plain chip; 390: the chip ends before the amount after a 12-character ticker, `main` does not scroll)
 - **Mutuo tile** (2026-09-25): `components/assets/tiles/MutuoTile.tsx`, pure `lib/utils/mortgageSummary.ts` (`summarizeMortgage`, `projectPayoff`, `interestPaidOf`), words `describeMortgage*` in `patrimonioNarrative.ts`, reader `getMortgageInstalments` + `lib/hooks/useMortgageInstalments.ts`; tests `__tests__/mortgageSummary.test.ts`, `e2e/cashflow.mortgage.spec.ts`
 - **Patrimonio**: `app/dashboard/assets/page.tsx` (owns every dialog), `components/assets/*` (+ `PatrimonioTile`/`ComposizioneTile` reused from the overview), pure `lib/utils/{patrimonioNarrative,patrimonioSummary,assetPerformanceDeltas,costBasisEur}.ts` (`costBasisPerUnitEur`/`unitPriceEur` = EUR against EUR, fees included), `lib/utils/bondPricing.ts` (`resolveBondPrice` = the ONE Borsa Italiana quote → euro per unit, nominal 1 € by default, BTP€i coefficient; `toBorsaItalianaQuote` the inverse; shared with `lib/helpers/priceUpdater.ts`), `lib/utils/bondDetailsForm.ts` (`buildBondDetailsFromForm`, a rate of 0 is a zero coupon); `lib/services/assetService.ts`, `types/assets.ts`; spec `e2e/assets.bond.spec.ts`
+- **Suites to run after a change here — Asset / bond** (moved from `AGENTS.md` § Commands on 2026-09-30): `assetDialogHelpers`, `couponUtils`
 
 ## Asset Pricing, FX and Assets
 
@@ -231,7 +232,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   its one read — the family members and the targets (`settings.targets`, what `getTargets` used to re-read) come from
   it, a new sub-category invalidates the key instead of re-reading. The page itself reads its keys through the hooks
   (assets, snapshots, overview, the ledger meta and the ledger, the instalments). All of them are in the persisted
-  cache's allowlist (2026-09-29, AGENTS.md § Caching) — the ledger META included, because the trades are `enabled` on it: with the
+  cache's allowlist (2026-09-29, doc/guide/cache-persistita.md) — the ledger META included, because the trades are `enabled` on it: with the
   meta left out, a reload painted the skeleton over figures it already had until that one read came back (measured:
   452 ms with a skeleton, 144 ms without one). The header's «Aggiornato alle…» reads the overview on its own minute.
 - **A failed overview is an alert, not a skeleton**: the page gates the skeleton on `isLoading` of EVERY query it
@@ -240,6 +241,23 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   `role="alert"` notice where the verdict would be — the management surface must survive a payload failure.
 - **The hero's «Mercato:» digest names three instruments and closes with «altri»** = `marketEffect − Σ shown`, so
   the three can never hide a negative total behind three gains (the class digest lists every class instead).
+
+## Two-Step Create Dialogs — `AssetDialog`
+
+Moved here on 2026-09-30 from `AGENTS.md` § Two-Step Create Dialogs (`AssetDialog`, `ExpenseDialog`); the rule for any
+form whose fields depend on a discriminant, and the marker rule itself, stay there.
+
+- `AssetDialog`: step 1 picks the type, step 2 shows only that type's fields; edit reuses the same visibility logic and
+  shows a ledger asset's quantity/PMC read-only (the ledger owns them). Class select for ETFs, optional `displayTicker`,
+  `leverageRatio`, and an opt-in TER only for `etf`/`commodity`/`crypto`.
+- **A marker on a label is a claim the validation has to honour.** `*` = required, `(opzionale)` in
+  `text-muted-foreground font-normal` = explicitly optional; the zod schema, any imperative guard in `onSubmit` and the
+  marker's own condition must agree (2026-08-30: Sottocategoria was `.optional()` in zod, blocked by a guard, and
+  starred on a condition — `availableSubCategories().length > 0` — NARROWER than the guard's). It is genuinely optional
+  now: the Select carries a «Nessuna» item (`NO_SUB_CATEGORY_VALUE`, since Radix reserves `''`) and BOTH write paths
+  clear the field — `updateAsset` for cash/realestate/pensionFund, `updateAssetMetadata` for every ledger type, each
+  with the `'subCategory' in updates` guard so a partial caller does not wipe a classification it never sent. The
+  allocation consequence is the `NO_SUBCATEGORY_LABEL` bucket: doc/guide/allocazione.md § Allocation — `allocationRole` and where the filter must live.
 
 ## Per-page blind spots
 

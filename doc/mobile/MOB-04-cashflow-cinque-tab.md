@@ -235,7 +235,7 @@ test, falsificati. 3. `page.tsx`, `PageVerdict`. 4. Tracciamento con il FAB, Bud
 
 - CLAUDE.md «Latest»; le cinque guide di tab § Composizione mobile e § Per-page blind spots (il trio che sparisce a
   390, Dividendi senza striscia); `doc/guide/cashflow.md` (`forceMount`, memoria per tab); `doc/guide/e2e-emulatori.md`
-  (la spec, l'abort); AGENTS.md § Navigation (id prefissati, `active`); `Draft Release Temp.md` (una riga, senza dati privati); `doc/mobile/README.md` § 6.
+  (la spec, l'abort); doc/guide/shell.md § Navigation (id prefissati, `active`); `Draft Release Temp.md` (una riga, senza dati privati); `doc/mobile/README.md` § 6.
 
 ## 11. Prompt di implementazione
 

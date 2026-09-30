@@ -7,6 +7,7 @@
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **FIRE**: Calcolatore `components/fire-simulations/FireCalculatorTab.tsx` + `tiles/*` + `{FireParametri,FireDettaglio,FIREProjectionChart,FireFanChart,FireYearDistributionView,SettledValue}.tsx`, pure `lib/utils/{fireSummary,fireNarrative,fireDistribution,yearHistogram,withdrawalTax,seededRandom}.ts`; shared `lib/services/{fireService,whatIfService,monteCarloService,goalService}.ts`, `lib/utils/{pensionUnlock,monteCarloParams,goalTrajectory,goalMath}.ts` (`pensionUnlock` = the single unlock resolution, `deriveMonteCarloAllocation`, `serializeGoalForFirestore` = the persistence allowlist); Coast `CoastFireTab.tsx` + `coast/*`, pure `lib/utils/coastFireView.ts`, `lib/hooks/useCoastFireSettingsDraft.ts`; What If `WhatIfAnalysisTab.tsx` + `whatif/*`, pure `lib/utils/{whatIfSummary,whatIfNarrative}.ts`, `types/whatIf.ts`; Monte Carlo `MonteCarloTab.tsx` + `components/monte-carlo/*` (`SCENARIO_SLOT`), pure `lib/utils/{monteCarloSummary,monteCarloNarrative}.ts`; Obiettivi `GoalBasedInvestingTab.tsx` + `components/goals/*`, pure `lib/utils/{goalsSummary,goalsNarrative}.ts`; specs `e2e/fire*.spec.ts`, `e2e/coast*.spec.ts`, fixture `scripts/seedCoastFireE2E.mts`
+- **Suites to run after a change here — FIRE / Goals** (moved from `AGENTS.md` § Commands on 2026-09-30): **FIRE/Goals** `fireService`, `monteCarloService`, `monteCarloSummary`, `monteCarloNarrative`, `goalService`, `goalMath`, `goalProposal`, `coastFireView`, `whatIfService`, `whatIfSummary`, `whatIfNarrative`
 
 ## FIRE, What If and Goals
 
@@ -126,7 +127,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   leaves is sold at the portfolio's own gain share (`honestFor`). Coast takes `withdrawalTax` on the projection and
   reads the gain share on the capital grown to the target (a coaster adds no basis); its Ipotesi line says «tasse
   sui prelievi comprese (26% sulla plusvalenza)» or «non stimate».
-- **The fan is SEEDED** (`FAN_SEED`, `createSeededRandom` in `lib/utils/seededRandom.ts`, mulberry32): the same inputs
+- **The fan is SEEDED** (2026-09-24; `FAN_SEED`, `createSeededRandom` in `lib/utils/seededRandom.ts`, mulberry32): the same inputs
   give the same thousand paths at every opening, and — the reason it exists — the lever re-runs on the SAME shocks
   (common random numbers), so a difference between two runs is the difference between two plans and not noise. The
   Monte Carlo tab stays unseeded: its «Esegui» is a new draw by design. `randomNormal` takes the source as a parameter
@@ -138,7 +139,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   buys instead. The lucky tail is named too («il 10% più fortunato passerebbe dal 2030 al 2029»): more saving weighs on
   both tails, and the sentence must not sell the lever as free. No lever without a base year (never within 50 years)
   or with a target already cleared (year 0): nothing to aim at, clause absent (The Narrative Honesty Rule).
-- **«Dal FIRE in poi» is a second ledger on the SAME returns** (`retirementHorizonYears`, `retirements` in the engine):
+- **«Dal FIRE in poi» is a second ledger on the SAME returns** (2026-09-24; `retirementHorizonYears`, `retirements` in the engine):
   from the year after its FIRE year a path withdraws that year's inflated expenses instead of saving (inflow → return →
   withdrawal, the decumulation engine's order) and the ledger records the year the capital runs out; `paths` and
   `percentiles` (the fan) never change — the coherence test stays byte-identical, and one draw per path per year up to

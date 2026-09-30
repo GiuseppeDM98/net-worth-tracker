@@ -67,7 +67,7 @@ const NON_PAYING_ASSET_TYPES = new Set(['pensionFund', 'cash', 'realestate']);
 
 /**
  * Every number the form can leave empty carries its own sentence: `valueAsNumber` hands zod a
- * `NaN`, which without `error` reads as «Invalid input» (AGENTS.md → Dialog e form trasversali).
+ * `NaN`, which without `error` reads as «Invalid input» (doc/guide/dialog.md § Dialog e form trasversali).
  */
 const dividendSchema = z
   .object({
@@ -143,7 +143,7 @@ export function DividendDialog({ open, onClose, dividend, onSuccess, returnFocus
   const [taxEdited, setTaxEdited] = useState(false);
   const [typeEdited, setTypeEdited] = useState(false);
 
-  // Settled during render on the `open` subject (AGENTS.md → react-hooks/set-state-in-effect):
+  // Settled during render on the `open` subject (AGENTS.md § Motion → react-hooks/set-state-in-effect):
   // a reopened form starts idle and untouched, whatever the last attempt said.
   const [prevOpen, setPrevOpen] = useState(open);
   if (prevOpen !== open) {

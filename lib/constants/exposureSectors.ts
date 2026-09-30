@@ -4,7 +4,8 @@
  * a direct stock's sector from the key alone (`lib/utils/exposureEngine.ts`) — the cache stores
  * the key, never the Italian word, so a relabel here reaches every cached profile at once.
  *
- * Yahoo module asymmetry (AGENTS.md § Shared Constants): a fund's `topHoldings.sectorWeightings`
+ * Yahoo module asymmetry (doc/guide/allocazione.md § Esposizione — the per-ticker cache and
+ * Yahoo's two modules): a fund's `topHoldings.sectorWeightings`
  * already uses these snake_case keys; a stock's `assetProfile.sector` is Title Case and needs
  * `YAHOO_ASSET_PROFILE_SECTOR_TO_KEY` first.
  */

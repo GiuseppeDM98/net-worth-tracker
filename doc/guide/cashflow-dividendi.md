@@ -10,6 +10,8 @@
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Dividendi**: `components/dividends/DividendTrackingTab.tsx` + `tiles/*` + `DividendiDettaglio.tsx`, pure `lib/utils/{dividendAnalytics,dividendiNarrative,dividendEligibility}.ts` (`resolveDividendFloor` = the ONE floor under a scraped dividend), `lib/hooks/useDividendStats.ts` → `app/api/dividends/stats/route.ts`; registry and coupons `components/dividends/{DividendTable,DividendCalendar,DividendDialog,DividendDetailsDialog,DividendRecordDetailsDialog,InflationRateDialog,ProvisionalCouponBanner}.tsx`, `lib/utils/couponUtils.ts` (`resolveCoupon` for both mechanisms, `resolveInflationIndexation`, `hasCouponPayments`, the coefficient lookups), `lib/services/couponScheduling.ts`, `types/dividend.ts`
+- **Suites to run after a change here — Dividendi / cron** (moved from `AGENTS.md` § Commands on 2026-09-30): `dividendUseCase`, `dividendProcessor`, `dividendAccount`, `dividendIncomeService` · **Email** `monthlyEmailService`
+- **Suites to run after a change here — Cashflow › Dividendi** (moved from `AGENTS.md` § Commands on 2026-09-30): `dividendAnalytics`, `dividendiNarrative` (+ `patrimonioNarrative` for the articles)
 
 ## Cashflow › Dividendi (`components/dividends/DividendTrackingTab.tsx`, `components/dividends/tiles/*`)
 - **RECEIVED AND ANNOUNCED ARE NEVER ONE FIGURE.** A dividend whose `paymentDate` is in the future is
@@ -156,15 +158,13 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   dividends before `holdingStartDate` are dropped, with `deriveHoldingStartDates` for legacy rebuys). **DPS growth is
   deliberately NOT scoped** — it is a security-level payout history.
 - **A scraped dividend has ONE floor** (`lib/utils/dividendEligibility.ts`, 2026-09-13): the holding start from the
-  ledger when there is one, else the asset's creation date — shared by `/api/dividends/scrape` and cron Phase 1. A
-  floor is never silent: the route returns `filtered`, `floorDate` and `floorSource`, and «Scarica dividendi storici»
-  toasts `describeFilteredDividends` — how many were dropped and, when a floor was the creation date, the recovery
-  (record the purchase in the Registro operazioni with its real date and scrape again). Until then the button said
-  «Nessun nuovo dividendo trovato» for every stock added to the app after its dividends, which read as «none exist».
-- **The floor's two sources, by field name** (moved here from the `AGENTS.md` stub on 2026-09-20): a scraped dividend
-  has ONE floor (`lib/utils/dividendEligibility.ts`: `holdingStartDate` from the ledger, else `createdAt`), shared by
-  `/api/dividends/scrape` and cron Phase 1 — and never silent: the route returns `filtered`/`floorDate`/`floorSource`
-  and the tab toasts `describeFilteredDividends` with the recovery (2026-09-13).
+  ledger when there is one (`holdingStartDate`), else the asset's creation date (`createdAt`) — shared by
+  `/api/dividends/scrape` and cron Phase 1. A floor is never silent: the route returns `filtered`, `floorDate` and
+  `floorSource`, and «Scarica dividendi storici» toasts `describeFilteredDividends` — how many were dropped and, when a
+  floor was the creation date, the recovery (record the purchase in the Registro operazioni with its real date and
+  scrape again). Until then the button said «Nessun nuovo dividendo trovato» for every stock added to the app after
+  its dividends, which read as «none exist». (The two sources by field name came from the `AGENTS.md` stub on
+  2026-09-20 as a second bullet; merged into this one on 2026-09-30.)
 - **Received metrics filter on `paymentDate`, not `exDate`**; use `setHours(23,59,59,999)` for the upper bound, or a
   `…T00:00:00Z` dividend reads as future.
 - **Two inflation mechanisms, ONE field** (`BondDetails.inflationIndexation`, read only through

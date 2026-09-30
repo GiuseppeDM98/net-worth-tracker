@@ -16,10 +16,11 @@
  * visitor and must not land in a visitor's browser (`isDemoUid`).
  *
  * WARNING: `PERSIST_CACHE_VERSION` must be bumped by any change that RENAMES, REMOVES or changes
- * the TYPE of a field in a persisted payload (an asset, an expense, a snapshot, a category, the
- * settings document, a contribution, a trade, a cost centre, a goal, a dividend receipt, the
- * overview payload): a client that restores an older shape would read it as truth until the
- * refetch lands. A new optional field whose absence means the default does not need it
+ * the TYPE of a field in a persisted payload — everything under `PERSISTED_QUERY_PREFIXES`: an
+ * asset (the mortgage instalments under its key too), an expense, a snapshot, a category, the
+ * settings document, a contribution, a trade, the ledger's meta document, a cost centre, the Hall
+ * of Fame rankings, a goal, a dividend receipt, the overview payload. A client that restores an
+ * older shape would read it as truth until the refetch lands. A new optional field whose absence means the default does not need it
  * (AGENTS.md § Caching, beside `CACHE_MATH_VERSION`).
  */
 

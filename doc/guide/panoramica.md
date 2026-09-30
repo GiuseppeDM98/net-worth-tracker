@@ -7,6 +7,7 @@
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Overview**: `app/dashboard/page.tsx`, `app/api/dashboard/overview/route.ts`, `lib/services/dashboardOverviewService.ts`, `lib/hooks/useDashboardOverview.ts`, `components/dashboard/overview/*` (`PatrimonioTile` exports `resolveHeroValueClass`), pure `lib/utils/{overviewNarrative,dashboardOverviewUtils,sparklinePeriod,savingsRateBadge}.ts`; `lib/utils/periodSales.ts` (`summarizePeriodSales` = the month's sells from the ledger with the estimated tax, `resolveDeclineCause` = the ONE cause of a falling month for Panoramica, Patrimonio and the email) + `lib/utils/salesNarrative.ts` (the shared words)
+- **Suites to run after a change here — Overview / materialized summary** (moved from `AGENTS.md` § Commands on 2026-09-30): `apiAuthRoutes`, `dashboardOverviewService`, `dashboardOverviewUtils` · **Verdetto e letture** `overviewNarrative` · **Badge** `savingsRateBadge`
 
 ## Panoramica and Dashboard Data Isolation
 
@@ -130,7 +131,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   the rows of one list must share one track. The third desktop row is 4 · 4 · 4: at 3 columns the income tile could
   not hold a label, a 40px bar and two figures. Costi's «Pesano di più» follows the figures (`mt-4`), not the tile's
   bottom: pinned, it left ~110px of nothing whenever a taller tile shared the row.
-- **The light chart palette holds the dark hue bands** — doc/guide/temi.md § the default theme's light slots.
+- **The light chart palette holds the dark hue bands** — doc/guide/temi.md § The default theme's light slots hold the dark hue bands.
 
 ## A month the tax kept flat (2026-09-19)
 

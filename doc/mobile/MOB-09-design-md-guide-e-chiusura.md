@@ -112,7 +112,7 @@ of Panoramica and Patrimonio», che PERF-14 toglie) riletto con `grep -rn spring
 - **Stub di AGENTS § 3**: «the mobile composition» nella riga «Il resto —»; un punto nuovo solo per una trappola vera.
 - **AGENTS § 4 Hierarchy, Density and Disclosure**: un punto con le quattro regole per nome e le trappole — il pannello
   chiuso è vuoto (una spec apre la riga prima di leggere), la memoria si scrive solo a un gesto, `order-*` letterali.
-  Prima `grep` di § Motion, Navigation, Accessibility (MOB-02): si rimanda, non si duplica.
+  Prima `grep` di § Motion, § Accessibility e di doc/guide/shell.md § Navigation (MOB-02): si rimanda, non si duplica.
 
 ### 4.5 CLAUDE.md e PRODUCT.md
 

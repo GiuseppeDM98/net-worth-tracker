@@ -68,7 +68,7 @@ export function LinkSeriesDialog({ request, ownerId, cashAccounts, properties, n
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
 
-  // The chosen account belongs to THIS opening (AGENTS.md → state stored with its subject).
+  // The chosen account belongs to THIS opening (AGENTS.md § React Query and Derived State).
   const subjectKey = expense?.id ?? '';
   const chosen = accountId?.key === subjectKey ? accountId.value : NONE;
 

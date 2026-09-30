@@ -7,6 +7,7 @@
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Storico / snapshots**: `app/dashboard/history/page.tsx`, `components/history/*` (+ `tiles/*`), pure `lib/utils/{storicoSummary,storicoNarrative,snapshotAssetBreakdown,historyComposition,snapshotUserFields}.ts` (`preserveUserAuthoredSnapshotFields` = i campi che nessuna pipeline ricalcola, portati attraverso la sostituzione; `summarizeLaborMetrics` + `laborWindowsOf` = il recap Lavoro sulle finestre del Driver; `buildDriverLedger` + `reconcileRemainder` = le righe che sommano, all'euro; `isFlowDominated` = un Δ che è un flusso), `lib/utils/growthDrivers.ts` (the Driver's parts, over `lib/utils/marketEffect.ts` shared with the Panoramica), `lib/services/{chartService,snapshotService}.ts`, `components/CreateManualSnapshotModal.tsx` over `lib/utils/manualSnapshotAmounts.ts`, `components/dashboard/LaborMetricsChart.tsx`, shared `components/ui/{tile-method-note,series-legend}.tsx` + `lib/hooks/useRovingFocus.ts`; specs `e2e/history{,.mobile}.spec.ts`; collection `monthly-snapshots`
+- **Suites to run after a change here — Storico** (moved from `AGENTS.md` § Commands on 2026-09-30): `storicoSummary`, `storicoNarrative`, `snapshotAssetBreakdown`, `chartService`, `historyComposition`, `growthDrivers` · **Browser** `e2e/history{,.mobile}.spec.ts`
 
 ## History and Snapshot Baselines
 

@@ -7,6 +7,7 @@
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Centri di Costo**: Centri di Costo `components/cashflow/{CostCentersTab,CostCenterDetail,CostCenterDialog}.tsx` + `cost-centers/*`, pure `lib/utils/{costCenterSummary,costCenterNarrative,costCenterUtils,costCenterColors,costCenterLinking}.ts` (`firstFreeColorKey`/`mapColorSlotUsage` = who wears which slot; `buildLinkCandidates`/`buildLinkPlan` = bulk link with its undo, UI `cost-centers/{LinkExpensesDialog,UnlinkSeriesDialog}.tsx`), `costCenterStyles.ts` (`CHART_TICK_STYLE`), specs `e2e/cashflow.centri{,.mobile}.spec.ts` on `npm run e2e:seed:centri`
+- **Suites to run after a change here — Centri di costo** (moved from `AGENTS.md` § Commands on 2026-09-30): `costCenterSummary`, `costCenterNarrative` (+ `patrimonioNarrative` for the articles, `budgetNarrative` for `dayRef`), `costCenterUtils`, `costCenterColors` · **Browser** `e2e/cashflow.centri{,.mobile}.spec.ts` (own account, `npm run e2e:seed:centri`)
 
 ## Centri di Costo (`CostCentersTab`, `CostCenterDetail`, `components/cashflow/cost-centers/*`, `lib/utils/{costCenterSummary,costCenterNarrative,costCenterUtils,costCenterColors}.ts`)
 - **NO period axis, by decision (2026-08-23).** A project's cost is its whole cost: every figure is lifetime («in

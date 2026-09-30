@@ -8,6 +8,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Cashflow › Divisione**: Divisione `components/cashflow/ExpenseSplitTab.tsx`, pure `lib/utils/{expenseSplitSummary,expenseSplitNarrative}.ts` (`resolveSplitBasis`, `allocateByShare`, `CommonSpending.toSplit`/`surplus`, `describeBasisRemedy`, `describeMemberCalendar`, `describeCommonIncome`, `describeIncomeConsumed`)
 - **Browser**: `e2e/cashflow.split{,.mobile}.spec.ts` on its own account, fixture `scripts/seedSplitE2E.mts` (`npm run e2e:seed:split`), session `e2e/auth.split.setup.ts`, progetti `split` e `split-mobile`
+- **Suites to run after a change here — Cashflow › Divisione** (moved from `AGENTS.md` § Commands on 2026-09-30): `expenseSplitSummary`, `expenseSplitNarrative` (+ `cashflowNarrative` for the scheduled clause, `settingsRoundTrip` for the flag) · **Browser** `e2e/cashflow.split{,.mobile}.spec.ts` (own account, `npm run e2e:seed:split`)
 
 ## Cashflow › Divisione (`components/cashflow/ExpenseSplitTab.tsx`, `lib/utils/{expenseSplitSummary,expenseSplitNarrative}.ts`)
 - **Opt-in, like Centri di Costo** (`expenseSplitEnabled`), on **Tracciamento's period axis** — a division is a fact of a

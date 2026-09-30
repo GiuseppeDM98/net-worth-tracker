@@ -100,7 +100,7 @@ legge con `curl -sD -` sulla route con un ID token, e `npm run perf:bench` lo sc
 - La scrittura dopo la risposta: mock di `after` che registra la callback; `set` NON chiamato prima del `return`, SÌ dentro
   la callback.
 - Header: `Server-Timing` presente e parsabile (`total;dur=`).
-- Suite: `apiAuthRoutes`, `dashboardOverviewService`, `dashboardOverviewUtils`, `overviewNarrative` (AGENTS.md § 5, area Overview).
+- Suite: `apiAuthRoutes`, `dashboardOverviewService`, `dashboardOverviewUtils`, `overviewNarrative` (doc/guide/panoramica.md § Files, «Suites to run after a change here»).
 
 ## 8. Collaudo guidato
 

@@ -7,7 +7,7 @@
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Stati**: `lib/utils/statesNarrative.ts` (`resolveSurfaceState` = the one wait/failure decision), `components/ui/{skeleton,empty-state,error-notice}.tsx`, `components/ui/sonner.tsx` — doc/guide/stati.md
-- **The fourth reading** (2026-09-29): `lib/utils/freshness.ts` (`resolveFreshness`), `lib/hooks/useFreshness.ts`, `describeFreshness` in `statesNarrative.ts`, the `freshness` prop of `components/layout/PageHeader.tsx`; the persisted cache behind it in `lib/constants/persistCache.ts` (AGENTS.md § Caching); `e2e/freshness.spec.ts`
+- **The fourth reading** (2026-09-29): `lib/utils/freshness.ts` (`resolveFreshness`), `lib/hooks/useFreshness.ts`, `describeFreshness` in `statesNarrative.ts`, the `freshness` prop of `components/layout/PageHeader.tsx`; the persisted cache behind it in `lib/constants/persistCache.ts` (doc/guide/cache-persistita.md); `e2e/freshness.spec.ts`
 
 ## Stati: caricamento, vuoto, zero, errore
 
@@ -73,7 +73,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 ## The fourth reading: old but present (2026-09-29)
 
 - **A figure can be on screen and not be current.** Since 2026-09-29 the query cache is persisted to IndexedDB and
-  restored before the first fetch (AGENTS.md § Caching), so a reload paints the last known figures at once and
+  restored before the first fetch (doc/guide/cache-persistita.md), so a reload paints the last known figures at once and
   refetches behind them. That is a fourth state beside the three absences, and it has its own sentence: «Aggiornato
   alle 18:42, sto rileggendo…» — `describeFreshness` (`statesNarrative.ts`): the hour alone on the same Italian
   calendar day, «ieri» the day before, «il 27 settembre» further back; Italy's clock through `Intl` with a `timeZone`,

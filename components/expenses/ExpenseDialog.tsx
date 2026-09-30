@@ -1345,7 +1345,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
     [settings],
   );
   // The fee row the edited transfer already carries, stored WITH the transfer it was read for
-  // (AGENTS.md → state belonging to a subject): a stale read falls back to «loading».
+  // (AGENTS.md § React Query and Derived State → state belonging to a subject): a stale read falls back to «loading».
   const [savedFeeRead, setSavedFeeRead] = useState<{ expenseId: string; failed: boolean; fee: Expense | null } | null>(null);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [categoryInitialName, setCategoryInitialName] = useState('');
