@@ -193,7 +193,7 @@ describe('ceilingFromMeasure and tightenBudget — the ceiling moves only with a
   });
 });
 
-describe('libraryCopies — one copy of a library for the whole build (PERF-04)', () => {
+describe('libraryCopies — one copy of a library for the whole build', () => {
   const guarded: PerfBudget = { ...budget, libraryCopies: { recharts: 1 } };
   const withCopies = (copies: number): MeasuredBuild => ({ ...measuredWithin, libraryCopies: { recharts: copies } });
 

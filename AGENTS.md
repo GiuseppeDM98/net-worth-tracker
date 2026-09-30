@@ -298,18 +298,18 @@ pointer — a stub that grows past that is a guide leaking back (2026-09-20: ten
   **`react-hooks/static-components` flags ANY component obtained from a call during render, a `useMemo(() => lazy(…))`
   included** (probed 2026-09-06): only a property read of a module constant passes, so the icon pickers keep a
   ONE module-level map, `LAZY_CATEGORY_ICONS` in `IconPickerPopover` (shared by the picker, the feed, the drawer and
-  the table; `lazy()` registers a thunk, the chunk still loads on demand). **One chunk per icon since 2026-09-30**
-  (PERF-04): each thunk is a loader of `components/expenses/categoryIconLoaders.ts`, 121 deep paths to lucide's
+  the table; `lazy()` registers a thunk, the chunk still loads on demand). **One chunk per icon since 2026-09-30**:
+  each thunk is a loader of `components/expenses/categoryIconLoaders.ts`, 121 deep paths to lucide's
   canonical files — never `import('lucide-react')` read by a runtime name (the whole 575 KB library at the first
   icon), never `lucide-react/dynamicIconImports` (~1900 loaders: +49 KB gz on Cashflow and Impostazioni, measured).
   A new curated name needs its loader; `__tests__/categoryIcons.test.ts` compares all 121 with lucide's own map.
-- **A library several pages use goes behind ONE module of real code** (2026-09-30, PERF-04): recharts is imported
+- **A library several pages use goes behind ONE module of real code** (2026-09-30): recharts is imported
   only from `components/ui/charts/recharts.ts`. Turbopack batches a library by where it is ENTERED — twenty files
   entering by different deep modules shipped four identical 350 KB copies, one per page — and a module of bare
   `export { … } from` re-exports is transparent to it (the build came out identical to the byte): the barrel binds
   `export const X = RechartsX`. `perf:budget`'s `libraryCopies` counts the chunks carrying `recharts-wrapper` and is
   red at two.
-- **A chart inside something closed by default is a `lazyComponent` at MODULE level** (2026-09-30, PERF-04;
+- **A chart inside something closed by default is a `lazyComponent` at MODULE level** (2026-09-30;
   `components/ui/lazy-component.tsx`), with a `fallback` of the chart's OWN height — a `Skeleton` with the height, or a
   box of the height the placeholder fills (`h-full`/`flex-1`) when the height is a prop — so the chart lands in place:
   `layout-shift` 0, measured on every lazy section. **Not `next/dynamic`**: it is `React.lazy` + Suspense, which
@@ -321,7 +321,7 @@ pointer — a stub that grows past that is a guide leaking back (2026-09-20: ten
   (`import type`). Worked examples: `PerformanceDettaglio`, `ConfrontoAnnualeSection`, `FlussoTile` (the Sankey,
   preloaded at module evaluation from 640px), the four lazy FIRE tabs. **Next prefetches the route of every shell
   link, client chunks included**: a chunk reached by another route's initial graph arrives with that prefetch; only
-  one reached solely by an `import()` stays unfetched (doc/perf/README.md).
+  one reached solely by an `import()` stays unfetched (`perf/README.md`, «Il prefetch dei link della shell»).
 - Pure `lib/utils` modules reach `calculateAssetValue` in one of two established ways — check the precedent: **injected**
   as a `valueOf` param (`allocationUtils`, `pensionFire`) or **imported directly** with the test mocking
   `@/lib/firebase/config` + `firebase/firestore` + `authFetch` + `dashboardOverviewInvalidation`.

@@ -150,7 +150,7 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
 - Leggi doc/guide/patrimonio.md, dialog.md (per intero: l'uscita animata e il focus), stati.md, e2e-emulatori.md
 - Leggi components/ui/responsive-modal.tsx PRIMA di decidere il mount condizionale
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice
-- Leggi doc/perf/README.md e la spec PERF-11 per intero; PERF-05 è chiusa (2026-09-29), PERF-04 e PERF-12 devono esserlo
+- Leggi doc/perf/README.md e la spec PERF-11 per intero; PERF-05 (2026-09-29) e PERF-04 (2026-09-30) sono chiuse, PERF-12 deve esserlo
 - Crea SESSION_NOTES.md; crea il branch dalla branch attiva PRIMA di editare
 
 Regole: nessun commit senza il mio OK; un branch e un commit; rispondi in italiano.

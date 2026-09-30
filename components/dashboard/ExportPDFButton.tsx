@@ -3,7 +3,7 @@
  *
  * Simple wrapper that opens PDFExportDialog modal.
  * Dialog handles the actual PDF generation logic; the press also starts downloading the PDF
- * engine, which is not in the page's initial JavaScript (`loadPDFGenerator`, PERF-04).
+ * engine, which is not in the page's initial JavaScript (`loadPDFGenerator`).
  */
 'use client';
 

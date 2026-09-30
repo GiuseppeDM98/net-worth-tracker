@@ -56,7 +56,7 @@ Il post: −90% re-render della sidebar; `:root:has()` da 24 ms per mutazione (q
 
 ## 3. Non-obiettivi
 
-- Non si sostituisce `motion` con `LazyMotion`/`m` (PERF-04 § 3 spiega).
+- Non si sostituisce `motion` con `LazyMotion`/`m` (doc/perf/README.md § 7: poco risparmio, e `layout` e `AnimatePresence` vogliono `domMax`).
 - Non si toccano `useCountUp`, `useMorphingSeries` (isolati in foglie: già buono, vedi l'audit rendering in README § 2).
 - Nessun cambio di estetica senza la decisione del proprietario (lo stagger).
 - Non si smonta `BottomNavigation` (è nell'HTML prerenderizzato dal 2026-09-28, `app/dashboard/layout.tsx`).

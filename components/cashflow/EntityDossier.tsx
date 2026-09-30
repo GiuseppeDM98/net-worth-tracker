@@ -57,7 +57,7 @@ import { cn } from '@/lib/utils';
 /** The trend plot's height: the chart draws at it and its placeholder holds it, so it lands in place. */
 const TREND_CHART_HEIGHT = 180;
 
-// The plot is not in Analisi's initial JavaScript (PERF-04, 2026-09-30): `lazyComponent` at module level,
+// The plot is not in Analisi's initial JavaScript (2026-09-30): `lazyComponent` at module level,
 // preloaded when the page is idle by AnalisiTab (`ENTITY_DOSSIER_LAZY_CHARTS`), so a Scheda draws it at once.
 const EntityTrendChart = lazyComponent(() => import('@/components/cashflow/EntityTrendChart').then((m) => m.EntityTrendChart));
 export const ENTITY_DOSSIER_LAZY_CHARTS = [EntityTrendChart];

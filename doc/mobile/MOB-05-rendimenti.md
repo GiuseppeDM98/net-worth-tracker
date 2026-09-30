@@ -120,7 +120,8 @@ l'eyebrow in `--destructive`, annuncia solo `PageRest`. Il registro in errore fe
 
 - **PERF-09** riscrive il caricamento (hook, `/api/performance/yields`, attesa su ogni query): MOB-05 parte dopo di
   lei e non tocca letture; la sua spec che conta `/api/performance/*` resta verde. Qui il guadagno è CPU, non rete.
-- **PERF-04**: `UnderwaterDrawdownChart` resta nel «Dettaglio»; le tessere sono SVG a mano (PERF-04 § 1), le righe
+- **PERF-04** (in develop dal 2026-09-30): i tre grafici del «Dettaglio» (`UnderwaterDrawdownChart` e i due rolling) sono
+  `lazyComponent` precaricati a riposo; le tessere sono SVG a mano (doc/guide/rendimenti.md), le righe
   chiuse non risparmiano chunk. **PERF-14** toglie il `layout` dai wrapper di pagina, non il `layout="position"` di
   `AttribuzioneTile.tsx:68` (il riordino al cambio periodo), che resta in un pannello montato all'apertura; la riga
   anima in CSS. **PERF-12**: ref scritti solo negli handler. **PERF-03** (in develop dal 2026-09-30): Rendimenti non ha

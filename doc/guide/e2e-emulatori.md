@@ -140,6 +140,11 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   chunk until the test releases it (`holdChunks`) — a fixed delay loses the race to a preload — and navigate to
   `domcontentloaded`: a held chunk requested before `load` means `load` never fires. The suite runs `next dev`, so these
   prove an import is lazy; sizes are `perf:budget`'s. Worked example: `e2e/bundle.lazy{,.mobile}.spec.ts`.
+- **Only two lazy surfaces are held against a placeholder that moves** (2026-09-30): Analisi's Sankey (`layout-shift` 0
+  and equal heights) and Rendimenti's Dettaglio (no placeholder ever shown), both in `e2e/bundle.lazy.spec.ts`.
+  Analisi's three disclosures and its Scheda and the four lazy FIRE tabs measured `layout-shift` 0 ONCE, on the mirror at
+  1440 and 390; no spec holds them, so a placeholder that loses its height there goes unseen by the suite. If one of
+  them went back into the initial JavaScript, `perf:budget` would still catch it (its route over the ceiling).
 - **«No placeholder ever showed» is watched from BEFORE the action** (2026-09-30): a `MutationObserver` installed before
   the click, read after; counting skeletons once the chart is visible passes whether or not one flashed (seen inert).
 - **In a cloud container the pinned Chromium is not installed** (2026-09-25): `browserType.launch: Executable doesn't

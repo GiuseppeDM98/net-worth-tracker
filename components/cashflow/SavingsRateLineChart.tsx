@@ -3,7 +3,7 @@
 /**
  * The plot of Analisi's «Andamento risparmio» (inside the «Dettaglio» disclosure): the monthly
  * savings rate against the 20% target. A module of its own so the disclosure, closed by default,
- * loads it — and recharts with it — only when it is opened (PERF-04, 2026-09-30).
+ * loads it — and recharts with it — only when it is opened (2026-09-30).
  *
  * connectNulls={false} creates visible gaps for months without income — this correctly represents
  * "no data" rather than "zero savings". YAxis domain={['auto', 'auto']} scales to the actual data

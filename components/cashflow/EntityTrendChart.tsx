@@ -3,7 +3,7 @@
 /**
  * The «Trend mensile · ultimi 24 mesi» plot of Analisi's Scheda (`EntityDossier`): the entity's
  * monthly total as bars, the same month of the year before as a dashed line. A module of its own
- * so recharts reaches Analisi only when a Scheda is opened (PERF-04, 2026-09-30) — with the three
+ * so recharts reaches Analisi only when a Scheda is opened (2026-09-30) — with the three
  * disclosures' plots lazy too, nothing else on the page draws with recharts.
  */
 

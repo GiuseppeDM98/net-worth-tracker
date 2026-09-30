@@ -10,7 +10,7 @@
  *      already spent on an earlier raise does not cover a new one.
  * A ceiling that goes DOWN needs nothing: that is the direction the ratchet exists for.
  *
- * A third check sits beside the ceilings (PERF-04, 2026-09-30): `libraryCopies`, how many chunks
+ * A third check sits beside the ceilings (2026-09-30): `libraryCopies`, how many chunks
  * of the whole build may carry a guarded library — recharts once shipped in four identical copies,
  * one per page, and a byte budget per route could not see it.
  */
@@ -31,7 +31,7 @@ export interface PerfBudget {
   sharedGzKB: number;
   sharedRaisedBy?: string;
   /**
-   * How many chunks of the whole build may carry each guarded library (PERF-04): `{ recharts: 1 }`
+   * How many chunks of the whole build may carry each guarded library: `{ recharts: 1 }`
    * means one copy, shared by every page that draws a chart. Written by hand, never by `--write`.
    */
   libraryCopies?: Record<string, number>;
@@ -52,7 +52,7 @@ export interface MeasuredBuild {
  * EVERY use of the library drags in, not of one primitive: `recharts-cartesian-grid` stayed at one
  * chunk while a sparkline importing `'recharts'` directly duplicated the chart core into a second
  * one (seen on 2026-09-30); `recharts-wrapper` is the div every recharts chart renders. Until that
- * day the build shipped recharts in four identical chunks, one per page with a chart (PERF-04).
+ * day the build shipped recharts in four identical chunks, one per page with a chart.
  */
 export const LIBRARY_SIGNATURES: Readonly<Record<string, string>> = {
   recharts: 'recharts-wrapper',

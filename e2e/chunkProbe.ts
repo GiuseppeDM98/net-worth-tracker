@@ -1,5 +1,5 @@
 /**
- * Which JavaScript chunks a page has downloaded, identified by their CONTENT (PERF-04, 2026-09-30):
+ * Which JavaScript chunks a page has downloaded, identified by their CONTENT (2026-09-30):
  * a chunk's name changes with every build, a library's module path inside it does not. Shared by
  * `bundle.lazy.spec.ts` (1440) and `bundle.lazy.mobile.spec.ts` (390). A helper, not a spec: the
  * FILENAME chooses the project (AGENTS.md § 5), and this one is collected by none.

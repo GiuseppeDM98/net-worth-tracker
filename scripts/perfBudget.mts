@@ -7,7 +7,7 @@
  * chunk and sums them. The decision is `compareRoutesToBudget` (lib/utils/perfBudget.ts), which
  * also receives the budget committed in HEAD (`git show HEAD:perf/budget.json`), so a ceiling
  * raised without a `raisedBy` of its own is red too. It also counts, over EVERY chunk on disk, the
- * copies of each library `libraryCopies` guards (PERF-04: recharts once shipped four times).
+ * copies of each library `libraryCopies` guards (recharts once shipped four times, one per page).
  *
  * Usage (options ALWAYS after `--`, or npm keeps them as npm_config_* and this script never sees them):
  *   npm run build && npm run perf:budget
@@ -191,7 +191,7 @@ for (const chunk of largest) {
   console.log(`  ${chunk.path.replace('static/chunks/', '')} · ${kb(chunk.gzBytes)} · ${kb(chunk.rawBytes)} · ${who}`);
 }
 
-// The copies of each guarded library, over every chunk on disk (PERF-04).
+// The copies of each guarded library, over every chunk on disk.
 console.log('\nCopie delle librerie (chunk che le contengono, iniziali e pigri · massimo):');
 for (const [library, copies] of Object.entries(measured.libraryCopies ?? {})) {
   console.log(`  ${library} · ${copies} · ${budget.libraryCopies?.[library] ?? 'nessun limite'}`);

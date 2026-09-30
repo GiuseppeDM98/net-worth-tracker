@@ -47,7 +47,7 @@
     }
   },
   "sharedGzKB": 483,
-  "sharedRaisedBy": "PERF-04: date-fns, date-fns-tz, dateHelpers e formatters (~14 KB, li carica ogni pagina) passano dalle copie per pagina ai chunk condivisi; nessuna route cresce",
+  "sharedRaisedBy": "#418: date-fns, date-fns-tz, dateHelpers e formatters (~14 KB, li carica ogni pagina) passano dalle copie per pagina ai chunk condivisi; il condiviso non sale perché una route è cresciuta",
   "libraryCopies": {
     "recharts": 1
   }

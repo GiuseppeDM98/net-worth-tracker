@@ -10,7 +10,7 @@ import { SAVINGS_LAZY_CHARTS, SavingsRateTrendSection } from '@/components/cashf
 import { ANDAMENTO_LAZY_CHARTS, AndamentoStoricoSection } from '@/components/cashflow/AndamentoStoricoSection';
 import { usePreloadWhenIdle } from '@/components/ui/lazy-component';
 
-/** The two sections' lazy plots (PERF-04), fetched while the page is idle so an opening draws them at once. */
+/** The two sections' lazy plots, fetched while the page is idle so an opening draws them at once. */
 const DETTAGLIO_LAZY_CHARTS = [...SAVINGS_LAZY_CHARTS, ...ANDAMENTO_LAZY_CHARTS];
 
 interface DettaglioDisclosureProps {

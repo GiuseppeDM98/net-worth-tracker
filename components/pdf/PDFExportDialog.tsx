@@ -44,6 +44,37 @@ export interface PDFExportDialogProps {
   allocationTargets: AssetAllocationTarget;
 }
 
+type PDFGeneratorModule = typeof import('@/lib/utils/pdfGenerator');
+
+let pdfGeneratorLoad: Promise<PDFGeneratorModule> | null = null;
+
+/**
+ * The PDF engine (`@react-pdf/renderer`, pdfkit and the report's sections — 513 KB gz on
+ * 2026-09-26) as a chunk of its own, requested when «Esporta PDF» is pressed and never before
+ * (since 2026-09-30): until then it sat in Storico's initial graph for a button. The opener calls
+ * this at the click so the download overlaps the reader choosing sections; «Genera PDF» awaits the
+ * same promise, so a slow network shows the button's own «Generazione...» and no new spinner. One
+ * promise for the session; a failed load is forgotten, so the next press retries instead of failing
+ * forever.
+ */
+export function loadPDFGenerator(): Promise<PDFGeneratorModule> {
+  pdfGeneratorLoad ??= import('@/lib/utils/pdfGenerator').catch((error: unknown) => {
+    pdfGeneratorLoad = null;
+    throw error;
+  });
+  return pdfGeneratorLoad;
+}
+
+/** The thrown error's own message, or the fallback when it has none. */
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+const ITALIAN_MONTHS = [
+  'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
+  'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre',
+];
+
 /**
  * Dialog component for configuring and exporting portfolio reports to PDF.
  *
@@ -73,36 +104,6 @@ export interface PDFExportDialogProps {
  * @param assets - Current asset holdings
  * @param allocationTargets - User's asset allocation targets
  */
-type PDFGeneratorModule = typeof import('@/lib/utils/pdfGenerator');
-
-let pdfGeneratorLoad: Promise<PDFGeneratorModule> | null = null;
-
-/**
- * The PDF engine (`@react-pdf/renderer`, pdfkit and the report's sections — 513 KB gz on
- * 2026-09-26) as a chunk of its own, requested when «Esporta PDF» is pressed and never before
- * (PERF-04): until then it sat in Storico's initial graph for a button. The opener calls this at the
- * click so the download overlaps the reader choosing sections; «Genera PDF» awaits the same promise,
- * so a slow network shows the button's own «Generazione...» and no new spinner. One promise for
- * the session; a failed load is forgotten, so the next press retries instead of failing forever.
- */
-export function loadPDFGenerator(): Promise<PDFGeneratorModule> {
-  pdfGeneratorLoad ??= import('@/lib/utils/pdfGenerator').catch((error: unknown) => {
-    pdfGeneratorLoad = null;
-    throw error;
-  });
-  return pdfGeneratorLoad;
-}
-
-/** The thrown error's own message, or the fallback when it has none. */
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
-}
-
-const ITALIAN_MONTHS = [
-  'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
-  'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre',
-];
-
 export function PDFExportDialog({
   open,
   onOpenChange,

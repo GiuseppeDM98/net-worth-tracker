@@ -4,7 +4,7 @@
  * Values are Italian display labels for accessibility (aria-label).
  *
  * IMPORTANT: If you add an icon here, add its loader to
- * `components/expenses/categoryIconLoaders.ts` (one chunk per icon, PERF-04);
+ * `components/expenses/categoryIconLoaders.ts` (one chunk per icon);
  * `__tests__/categoryIcons.test.ts` goes red until both lists match lucide.
  */
 export const CATEGORY_ICONS: Record<string, string> = {

@@ -65,7 +65,7 @@ interface FlussoTileProps {
 /**
  * The Sankey (`@nivo/sankey`, d3-sankey and react-spring) is its own chunk, requested only where
  * the tile draws it — from 640px: a phone, which gets the share bar and rows, never downloads it
- * (PERF-04, 2026-09-30; pinned by `e2e/bundle.lazy{,.mobile}.spec.ts`). Declared at MODULE level,
+ * (2026-09-30; pinned by `e2e/bundle.lazy{,.mobile}.spec.ts`). Declared at MODULE level,
  * never in a render (AGENTS.md § Dynamic Imports). The wait fills the box the plot is given: the
  * caller wraps it in a container of the view's own height (`resolveSankeyHeight`), so the chart
  * lands in place and nothing under the tile moves.

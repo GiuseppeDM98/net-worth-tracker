@@ -1,8 +1,7 @@
 'use client';
 
 /**
- * A component whose code is a chunk of its own, loaded on demand — WITHOUT Suspense (PERF-04,
- * 2026-09-30).
+ * A component whose code is a chunk of its own, loaded on demand — WITHOUT Suspense (2026-09-30).
  *
  * Why not `next/dynamic`: it is `React.lazy` under a Suspense boundary, and a lazy component always
  * suspends on its first render — the loader returns a promise even when the module is already in

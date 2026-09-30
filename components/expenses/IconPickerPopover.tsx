@@ -21,7 +21,7 @@ type LazyIconComponent = React.LazyExoticComponent<React.ComponentType<LucidePro
  * call: to the React Compiler a component returned by a call during render is a new type
  * every render (`react-hooks/static-components`), even when the callee caches it.
  *
- * Each icon is ONE small chunk (`CATEGORY_ICON_LOADERS`, PERF-04, 2026-09-30): until then every
+ * Each icon is ONE small chunk (`CATEGORY_ICON_LOADERS`, 2026-09-30): until then every
  * thunk ran `import('lucide-react')` and read the name off the module, so the first icon
  * downloaded the WHOLE library (575 KB raw). A name without a loader gets no entry, so
  * `CategoryIcon` renders its fallback; `__tests__/categoryIcons.test.ts` keeps the two lists equal.

@@ -15,7 +15,7 @@
  *
  * Only the Calcolatore — the tab the page opens on — is in the page's initial JavaScript; the
  * other four are a chunk each, fetched once the page is idle or when their tab is opened, whichever
- * comes first (PERF-04, 2026-09-30). Only the active panel mounts either way (Radix `TabsContent`),
+ * comes first (2026-09-30). Only the active panel mounts either way (Radix `TabsContent`),
  * so what the lazy tabs save is their CODE on the page's critical path: before, all five modules
  * arrived with the page. If a tab is opened before its chunk, the panel shows that tab's own
  * `TileGridSkeleton` (`tabSkeletons.ts`), the same one it shows while its data loads, so the two
