@@ -114,7 +114,7 @@ attende entrambi (gate su ogni query, doc/guide/stati.md). «Aggiorna» invalida
   `getAllPerformanceData` che non risolve mai: la route è comunque stata chiamata; falsificare mettendola dopo → rosso).
 - E2E: `performance.degraded.spec.ts` + una spec che conta le chiamate `/api/performance/*` al mount (= 1) con anchor
   positivo (la chiamata c'è).
-- Invarianza dei valori; suite area Rendimenti (AGENTS.md § 5).
+- Invarianza dei valori; suite area Rendimenti (doc/guide/rendimenti.md § Files).
 
 ## 8. Collaudo guidato
 

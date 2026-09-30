@@ -21,8 +21,8 @@
  * picker. The Rendimento tile does not: YOC and current yield are TTM on the current holding
  * and DPS growth runs on closed calendar years, all measured by the server — so that tile says
  * so in its aside and its footer, and since 2026-09-14 the verdict's yield clause names the
- * window and the population too (AGENTS.md → Centri di Costo, "a view that displays a period
- * must name the window of every figure that uses a different one").
+ * window and the population too (doc/guide/centri-di-costo.md: a view that displays a period
+ * must name the window of every figure that uses a different one).
  *
  * TWO POPULATIONS, BOTH NAMED (2026-09-14, the owner's call). The verdict and the inventory
  * read the REGISTRY — every payment of the period, sold instruments included, because the

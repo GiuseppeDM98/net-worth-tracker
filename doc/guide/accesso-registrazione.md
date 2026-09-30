@@ -7,6 +7,7 @@
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Accesso e Registrazione**: `app/{login,register}/page.tsx`, `components/auth/*`, pure `lib/utils/authNarrative.ts` and `lib/utils/authProfile.ts` (`resolveDisplayName`), `lib/server/registrationPolicy.ts` + `app/api/auth/check-registration/route.ts`, `contexts/AuthContext.tsx`, `components/ProtectedRoute.tsx`; tests `__tests__/{authNarrative,registrationPolicy,authProfile}.test.ts`
+- **Suites to run after a change here — Accesso / Registrazione** (moved from `AGENTS.md` § Commands on 2026-09-30): **Verdetti, letture ed errori** `authNarrative` · **Policy** `registrationPolicy` (i due devono restare d'accordo sulla precedenza whitelist/flag)
 
 ## Accesso e Registrazione (`app/login/page.tsx`, `app/register/page.tsx`, `components/auth/*`, `lib/utils/authNarrative.ts`)
 

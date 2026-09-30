@@ -4,8 +4,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  * Integration test for the trade-ledger write transaction (assetTransactionUseCase).
  *
  * Runs the REAL use-case transaction body against a fake Admin `runTransaction` whose `tx.get`
- * throws once a write has happened — exactly as the live Firestore SDK does (AGENTS.md →
- * runTransaction). A regression to interleaved read/write, or a missing pre-read of a touched cash
+ * throws once a write has happened — exactly as the live Firestore SDK does (AGENTS.md § Firestore
+ * Writes → `runTransaction`). A regression to interleaved read/write, or a missing pre-read of a touched cash
  * account, would fail here. Template: __tests__/updateCashAssetBalancesAtomic.test.ts.
  *
  * Covers: create with cash settlement, edit moving the settlement to a different cash account (two

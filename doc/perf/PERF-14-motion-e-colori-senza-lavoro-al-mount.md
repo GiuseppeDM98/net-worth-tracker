@@ -12,7 +12,7 @@ Lavoro di rendering che ogni pagina paga e nessuno guarda (audit 2026-09-26, ver
   `useChartColors`, ogni refetch di React Query. Nessuno di questi commit muove il wrapper: la misura è pura tassa
   (`getBoundingClientRect` forza il layout sincrono). È questa spec, sola, a toglierlo (PERF-11 non lo tocca).
 - **`BottomNavigation` montata anche sul desktop** (nascosta con `desktop:hidden`, `:73`, e in landscape sotto 1440,
-  `max-desktop:landscape:hidden`: «Bottom nav is portrait-only», AGENTS.md § Navigation) con `motion.nav layout` (`:78-79`,
+  `max-desktop:landscape:hidden`: «Bottom nav is portrait-only», doc/guide/shell.md § Navigation) con `motion.nav layout` (`:78-79`,
   il cui commento dice a cosa serve: «layout-animates its position when the '+' FAB appears») e un `layoutId` pill: una
   misura di layout a ogni cambio pathname, invisibile dove è nascosta.
 - **`useChartColors` per istanza**: ogni host fa un rAF + `getComputedStyle(documentElement)` + 9 `getPropertyValue` +
@@ -71,7 +71,7 @@ tessera Patrimonio soltanto. Rimuovere e guardare (spec Playwright che registra 
 
 **B. `BottomNavigation`: il `layout` solo dove si vede.** `layout={isPortraitBelowDesktop}` sul `motion.nav` (il FAB che
 appare la fa scorrere: resta, in portrait) e `layoutId` della pill solo quando visibile (un `layoutId` su un elemento
-`display:none` misura comunque). `AddExpenseFab` con `useSearchParams` resta dentro `<Suspense>` (AGENTS.md § Navigation).
+`display:none` misura comunque). `AddExpenseFab` con `useSearchParams` resta dentro `<Suspense>` (doc/guide/shell.md § Navigation).
 
 **C. `ChartColorsProvider`.** In `app/dashboard/layout.tsx` (sotto `ColorThemeProvider`, che vive nel root): `useEffect` su
 `[colorTheme, resolvedTheme]` → un rAF → `getComputedStyle` una volta → `setPalette`; il contesto espone `chartColors:

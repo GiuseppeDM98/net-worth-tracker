@@ -262,7 +262,7 @@ frase chiude dopo la cifra del record («in un mese» solo con la percentuale, `
 ## 10. Documentazione da aggiornare
 
 - CLAUDE.md «Latest», § Known Issues (chiusa la metà `PageTabBar`, resta lo `Switch`), § Key Files.
-- AGENTS.md § Motion (la riga e perché non `CollapsibleContent`), § Navigation, § Accessibility (un nodo live).
+- AGENTS.md § Motion (la riga e perché non `CollapsibleContent`), § Accessibility (un nodo live); doc/guide/shell.md § Navigation.
 - `doc/guide/hall-of-fame.md` § Composizione mobile (con le otto voci di MOB-09 § 4.4, che MOB-03..08 copiano),
   `doc/guide/stati.md`, `doc/guide/e2e-emulatori.md`;
   `Draft Release Temp.md`; `doc/mobile/README.md` § stato. DESIGN.md no (MOB-09).

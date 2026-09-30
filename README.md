@@ -222,7 +222,7 @@ For contributors and AI agents, the repo keeps its guidance split by scope:
 | --- | --- |
 | [`CLAUDE.md`](CLAUDE.md) | Index — what each feature is and where it lives |
 | [`AGENTS.md`](AGENTS.md) | Repo-wide conventions, data/state patterns, UI patterns, testing, workflow |
-| [`doc/guide/`](doc/guide/) | One file per domain — a page, a tab, a subsystem (`stati`, `dialog`, `temi`, `account-condiviso-demo`, `e2e-emulatori` for the Playwright and emulator harness) — the full rules and blind spots for that area |
+| [`doc/guide/`](doc/guide/) | One file per domain — a page, a tab, a subsystem (`stati`, `dialog`, `temi`, `account-condiviso-demo`, `shell`, `cache-persistita`, `e2e-emulatori` for the Playwright and emulator harness) — the full rules and blind spots for that area |
 | [`perf/`](perf/README.md) | The speed benchmark and the per-page size budget: commands, baseline, raised ceilings |
 | [`DESIGN.md`](DESIGN.md) | The aesthetic spec (normative) |
 | [`PRODUCT.md`](PRODUCT.md) · [`SETUP.md`](SETUP.md) · [`WORKFLOW.md`](WORKFLOW.md) | Positioning · environment/emulators · session rules |

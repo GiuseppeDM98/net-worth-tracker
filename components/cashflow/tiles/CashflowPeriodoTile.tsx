@@ -43,8 +43,8 @@ interface CashflowPeriodoTileProps {
  * KPIs with their deltas, the income-vs-spending bars of the trailing months (the element
  * that stretches when the tile spans two rows), and, while the month is still running, where
  * spending lands at the current pace next to last month's figure. The savings rate and the
- * coverage ratio sit together on purpose: same relationship, two units (AGENTS.md →
- * Cashflow KPIs and Tracciamento).
+ * coverage ratio sit together on purpose: same relationship, two units (the rules are in
+ * doc/guide/cashflow-tracciamento.md).
  */
 export function CashflowPeriodoTile({
   eyebrow,

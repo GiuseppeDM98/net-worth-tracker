@@ -13,6 +13,7 @@
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Cashflow**: `app/dashboard/cashflow/page.tsx`; Tracciamento `components/cashflow/ExpenseTrackingTab.tsx` + `components/cashflow/{TransactionFeed,CompactExpenseRow,MobileFiltersDrawer}.tsx` + `components/expenses/ExpenseTable.tsx` (the «Tabella» view: armed row delete, `SeriesDeleteDialog`), pure `lib/utils/{tracciamentoSummary,cashflowNarrative,movementsOwnerFilter}.ts` (`settleTotals` = the lived part the verdict judges; `currentComparisonWindow`/`previousComparisonWindow` = the two comparable windows, same days of the previous month for the month in progress; the «Intestatario» filter and the owner chip), `lib/constants/expenseTypeColors.ts` (the ONE type→colour map: dot, badge, flow series), specs `e2e/cashflow.{tracciamento,mobile,owner,accounts}.spec.ts`
+- **Suites to run after a change here — Cashflow › Tracciamento** (moved from `AGENTS.md` § Commands on 2026-09-30): `tracciamentoSummary`, `cashflowNarrative` (+ `overviewNarrative` for `projectMonthEndSpending`, `patrimonioNarrative` for the articles)
 
 ## Cashflow › Tracciamento (`components/cashflow/ExpenseTrackingTab.tsx`, `components/cashflow/tiles/*`)
 - **ONE period axis, two slices.** `expenses` = `filterExpensesByPeriod(allExpenses, period)` feeds the verdict and

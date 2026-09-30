@@ -58,7 +58,7 @@
   in poi». The Traguardo footer names the gross line («472.977 € con il fondo
   pensione dentro») only when the unlock is on the plot; an unlock past the target age is said as such.
 - **The tax on withdrawals is in the Coast number too** (2026-09-24, `calculateCoastFIREProjection(…, withdrawalTax)` →
-  `calculateCoastFIREMetrics` and the needs' `portfolioNeedMultiplier`, doc/guide/fire.md § the tax rule): each scenario reads the
+  `calculateCoastFIREMetrics` and the needs' `portfolioNeedMultiplier`, doc/guide/fire.md § The tax on withdrawals is ONE rule): each scenario reads the
   gain share on the capital grown to the target at its OWN real return — a coaster adds no basis — so the required capital at the target
   is `max(E − P, 0) / (1 − g·τ)` per year and at steady state, and the Coast number today discounts it as before. The tab reads the same
   profile as the Calcolatore (FIRE-eligible assets minus the locked funds) and the Ipotesi line declares it («tasse sui prelievi comprese

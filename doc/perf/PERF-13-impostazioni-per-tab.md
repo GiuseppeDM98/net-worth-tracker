@@ -92,7 +92,7 @@ così deve restare. `summarizeCategoryClassification(expenseCategories)` si calc
 **Le letture** (impostazioni, categorie, asset) dagli hook (dal 2026-09-29); il «Salva» invalida `settings.all` e le chiavi delle
 pagine che leggono un'impostazione (la lista in doc/guide/impostazioni.md).
 
-**Un `useSearchParams` in un figlio dentro `<Suspense>`** (AGENTS.md § Navigation): verificare; il `router.replace`
+**Un `useSearchParams` in un figlio dentro `<Suspense>`** (doc/guide/shell.md § Navigation): verificare; il `router.replace`
 condizionato come Cashflow.
 
 **Ordine di lavoro**: prima la bozza + `settingsDraft.ts` + il test di identità, con la pagina ancora monolitica ma che

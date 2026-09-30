@@ -1,6 +1,7 @@
 /**
  * A modal that grows from its trigger wears ONE `transform-origin`, the trigger's centre, from
- * its first frame to its last — open AND close (doc/guide/dialog.md → `triggerOrigin`).
+ * its first frame to its last — open AND close (doc/guide/dialog.md §
+ * `triggerOrigin` is resolved AT THE CLICK, from the trigger alone).
  *
  * Until 2026-09-18 the app had three recipes. Hall of Fame and Dividendi set the origin in a
  * `requestAnimationFrame` after mount, so the dialog's own `duration-200` tweened it across the

@@ -7,6 +7,7 @@
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Previdenza**: `types/pension.ts`, pure `lib/utils/{pensionSummary,pensionNarrative}.ts` over `lib/utils/{pensionDeduction,pensionContributions,pensionReturn,pensionFire,pensionFamilyMembers}.ts` (`indexPensionSnapshots` = the snapshots reduced ONCE to the funds; `isPensionValueStale` = the ONE age of a hand-kept value), `lib/services/pensionContributionService.ts` (`assertFundValueLivesInQuantity`, `updatePensionFundValue`), `app/dashboard/pension/page.tsx`, `components/pension/*` (`PensionValueDialog`, `pensionStyles.ts`); the two modals' words in `lib/utils/dialogNarrative.ts`; collection `pensionContributions`
+- **Suites to run after a change here — Fondo pensione** (moved from `AGENTS.md` § Commands on 2026-09-30): `pensionDeduction`, `pensionContributions`, `pensionReturn`, `pensionContributionService`, `performanceBase`, `pensionFire`, `pensionUnlock`, `pensionFamilyMembers` + the transfer trio · **Verdetto e letture** `pensionSummary`, `pensionNarrative`
 
 ## Fondo Pensione
 

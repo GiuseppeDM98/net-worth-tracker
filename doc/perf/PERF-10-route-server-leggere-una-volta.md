@@ -99,7 +99,7 @@ in silenzio la 51ª: non accettabile).
 - Statistiche: le funzioni pure riproducono gli attesi della route vecchia (fixture con 7 dividendi come il mirror);
   falsificare sommando ricevuti e annunciati → rosso; `now` a fine anno → l'upcoming cambia (prova che `now` è letto).
 - Thread: 60 thread → 50 + cursore → 10; falsificare il cursore (`startAt` invece di `startAfter`) → 11.
-- Suite: area Dividendi/cron, Allocazione, Assistant (AGENTS.md § 5); `e2e/allocation.spec.ts`; E2E Dividendi.
+- Suite: area Dividendi/cron, Allocazione, Assistant (le «Suites» in § Files di cashflow-dividendi.md, allocazione.md e assistente.md, sotto doc/guide/); `e2e/allocation.spec.ts`; E2E Dividendi.
 
 ## 8. Collaudo guidato
 

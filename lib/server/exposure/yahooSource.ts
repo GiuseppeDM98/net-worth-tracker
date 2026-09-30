@@ -4,7 +4,8 @@
  * `instrumentProfileService.ts`'s. It never throws: Yahoo unreachable is `null` (the service then
  * keeps the last good answer), an unexpected shape is an EMPTY profile («non letto», 24 h TTL).
  *
- * Yahoo module asymmetry (AGENTS.md § Shared Constants): a fund's `topHoldings` → holdings and
+ * Yahoo module asymmetry (doc/guide/allocazione.md § Esposizione — the per-ticker cache and
+ * Yahoo's two modules): a fund's `topHoldings` → holdings and
  * `sectorWeightings` (snake_case keys) plus `fundProfile.family`; a stock's `assetProfile.sector`
  * (Title Case, mapped) plus `price.longName`. Which one is asked depends on the asset's TYPE, so
  * each module carries its own `fetchedAt` in the cache document.
