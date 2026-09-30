@@ -13,7 +13,7 @@
  * so the step never reads as a data glitch. Vertical reference lines mark the two FIRE years.
  */
 
-import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from '@/components/ui/charts/recharts';
 import type { WhatIfComparisonPoint } from '@/lib/utils/whatIfSummary';
 import { formatCurrency, formatCurrencyCompact } from '@/lib/services/chartService';
 import { useChartColors } from '@/lib/hooks/useChartColors';

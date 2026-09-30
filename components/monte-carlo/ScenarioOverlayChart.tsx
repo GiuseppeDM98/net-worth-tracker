@@ -8,7 +8,7 @@
  * tile's footer carries the swatches.
  */
 
-import { Area, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Area, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from '@/components/ui/charts/recharts';
 import type { OverlayPoint } from '@/lib/utils/monteCarloSummary';
 import { formatCurrency, formatCurrencyCompact } from '@/lib/services/chartService';
 import { useChartColors } from '@/lib/hooks/useChartColors';

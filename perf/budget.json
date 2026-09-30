@@ -10,7 +10,7 @@
       "initialJsGzKB": 527
     },
     "/dashboard/analisi": {
-      "initialJsGzKB": 757
+      "initialJsGzKB": 576
     },
     "/dashboard/assets": {
       "initialJsGzKB": 733
@@ -22,19 +22,19 @@
       "initialJsGzKB": 744
     },
     "/dashboard/fire-simulations": {
-      "initialJsGzKB": 759
+      "initialJsGzKB": 667
     },
     "/dashboard/hall-of-fame": {
       "initialJsGzKB": 545
     },
     "/dashboard/history": {
-      "initialJsGzKB": 1213
+      "initialJsGzKB": 698
     },
     "/dashboard/pension": {
       "initialJsGzKB": 601
     },
     "/dashboard/performance": {
-      "initialJsGzKB": 694
+      "initialJsGzKB": 578
     },
     "/dashboard/settings": {
       "initialJsGzKB": 625
@@ -46,5 +46,9 @@
       "initialJsGzKB": 424
     }
   },
-  "sharedGzKB": 470
+  "sharedGzKB": 483,
+  "sharedRaisedBy": "PERF-04: date-fns, date-fns-tz, dateHelpers e formatters (~14 KB, li carica ogni pagina) passano dalle copie per pagina ai chunk condivisi; nessuna route cresce",
+  "libraryCopies": {
+    "recharts": 1
+  }
 }

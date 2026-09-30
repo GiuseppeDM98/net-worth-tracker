@@ -1,6 +1,6 @@
 # PERF-04 — Il JS che ogni pagina spedisce: recharts una volta sola, il PDF, le icone e il Sankey quando servono
 
-> Stato: da fare · Priorità: 2 · Sforzo: M · Dipende da: PERF-01 (il budget misura la chiusura) · Sblocca: PERF-11 (recharts in un chunk prima di toccare le sparkline); il ratchet di `perf/budget.json` scende
+> Stato: **fatta il 2026-09-30** (le misure e le scelte diverse dalla lettera in doc/perf/README.md § 6) · Priorità: 2 · Sforzo: M · Dipende da: PERF-01 (il budget misura la chiusura) · Sblocca: PERF-11 (recharts in un chunk prima di toccare le sparkline); il ratchet di `perf/budget.json` scende
 
 ## 1. Il problema, misurato
 

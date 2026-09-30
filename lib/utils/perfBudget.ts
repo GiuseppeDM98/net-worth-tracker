@@ -9,6 +9,10 @@
  *      a new feature may grow a route, but only by saying so in the same commit, and a reason
  *      already spent on an earlier raise does not cover a new one.
  * A ceiling that goes DOWN needs nothing: that is the direction the ratchet exists for.
+ *
+ * A third check sits beside the ceilings (PERF-04, 2026-09-30): `libraryCopies`, how many chunks
+ * of the whole build may carry a guarded library — recharts once shipped in four identical copies,
+ * one per page, and a byte budget per route could not see it.
  */
 
 /** One route's ceiling in `perf/budget.json`. */
@@ -26,12 +30,46 @@ export interface PerfBudget {
   /** The chunks EVERY dashboard route loads (the shell: React, Firebase, Framer…), gzip KB. */
   sharedGzKB: number;
   sharedRaisedBy?: string;
+  /**
+   * How many chunks of the whole build may carry each guarded library (PERF-04): `{ recharts: 1 }`
+   * means one copy, shared by every page that draws a chart. Written by hand, never by `--write`.
+   */
+  libraryCopies?: Record<string, number>;
 }
 
 /** What the script measured on disk, in the same units as the budget. */
 export interface MeasuredBuild {
   routes: Record<string, number>;
   sharedGzKB: number;
+  /** Chunks on disk (initial AND lazy) that carry each library of `LIBRARY_SIGNATURES`. */
+  libraryCopies?: Record<string, number>;
+}
+
+/**
+ * How a guarded library is recognised inside a chunk: a string only ITS OWN code carries — a class
+ * name it renders — never an export name, which every chunk that merely IMPORTS the library spells
+ * too (`CartesianGrid` is in each chart's chunk as a property read). And the class of a module
+ * EVERY use of the library drags in, not of one primitive: `recharts-cartesian-grid` stayed at one
+ * chunk while a sparkline importing `'recharts'` directly duplicated the chart core into a second
+ * one (seen on 2026-09-30); `recharts-wrapper` is the div every recharts chart renders. Until that
+ * day the build shipped recharts in four identical chunks, one per page with a chart (PERF-04).
+ */
+export const LIBRARY_SIGNATURES: Readonly<Record<string, string>> = {
+  recharts: 'recharts-wrapper',
+};
+
+/**
+ * For each library of `signatures`, how many of the given chunk texts contain its signature: the
+ * number of COPIES of that library the build ships.
+ */
+export function countLibraryCopies(chunkTexts: Iterable<string>, signatures: Readonly<Record<string, string>>): Record<string, number> {
+  const copies: Record<string, number> = Object.fromEntries(Object.keys(signatures).map((library) => [library, 0]));
+  for (const text of chunkTexts) {
+    for (const [library, signature] of Object.entries(signatures)) {
+      if (text.includes(signature)) copies[library] += 1;
+    }
+  }
+  return copies;
 }
 
 /** The key under which the shared chunks appear among the rows and violations. */
@@ -42,7 +80,9 @@ export type BudgetViolation =
   | { kind: 'raised-without-reason'; key: string; ceilingKB: number; previousCeilingKB: number }
   | { kind: 'reason-reused'; key: string; ceilingKB: number; previousCeilingKB: number; raisedBy: string }
   | { kind: 'no-ceiling'; key: string; measuredKB: number }
-  | { kind: 'not-in-build'; key: string; ceilingKB: number };
+  | { kind: 'not-in-build'; key: string; ceilingKB: number }
+  | { kind: 'library-copies'; key: string; copies: number; maxCopies: number }
+  | { kind: 'library-not-found'; key: string };
 
 export interface BudgetRow {
   key: string;
@@ -137,7 +177,24 @@ export function compareRoutesToBudget(
     rows.push({ key, measuredKB, ceilingKB: null, ok: false });
   }
 
+  violations.push(...compareLibraryCopies(measured.libraryCopies ?? {}, budget.libraryCopies ?? {}));
+
   return { ok: violations.length === 0, rows, violations };
+}
+
+/**
+ * The copies half of the budget: more chunks carrying a library than it allows is red, and so is
+ * a guarded library found in NO chunk — a signature that matches nothing (renamed by an upgrade, or
+ * never measured) would keep the check green while guarding nothing.
+ */
+function compareLibraryCopies(measured: Record<string, number>, allowed: Record<string, number>): BudgetViolation[] {
+  const violations: BudgetViolation[] = [];
+  for (const [key, maxCopies] of Object.entries(allowed)) {
+    const copies = measured[key] ?? 0;
+    if (copies === 0) violations.push({ kind: 'library-not-found', key });
+    else if (copies > maxCopies) violations.push({ kind: 'library-copies', key, copies, maxCopies });
+  }
+  return violations;
 }
 
 /**
@@ -164,6 +221,8 @@ export function tightenBudget(measured: MeasuredBuild, budget: PerfBudget | null
     routes,
     sharedGzKB: shared.initialJsGzKB,
     ...(shared.raisedBy ? { sharedRaisedBy: shared.raisedBy } : {}),
+    // The copies are a rule, not a measure: `--write` carries them over untouched.
+    ...(budget?.libraryCopies ? { libraryCopies: budget.libraryCopies } : {}),
   };
 }
 
@@ -180,6 +239,10 @@ export function describeViolation(v: BudgetViolation): string {
       return `${v.key}: ${v.measuredKB} KB gz e nessun tetto in perf/budget.json`;
     case 'not-in-build':
       return `${v.key}: ha un tetto (${v.ceilingKB} KB) ma la build non ha la sua pagina`;
+    case 'library-copies':
+      return `${v.key}: in ${v.copies} chunk, il massimo è ${v.maxCopies} — una pagina lo importa senza passare dal suo modulo unico`;
+    case 'library-not-found':
+      return `${v.key}: nessun chunk contiene la sua firma («${LIBRARY_SIGNATURES[v.key] ?? '?'}»): il controllo non guarda più nulla`;
   }
 }
 

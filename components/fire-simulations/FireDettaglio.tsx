@@ -16,7 +16,7 @@
 
 import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
-import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from '@/components/ui/charts/recharts';
 import type { HistoricalFIRERunwayPoint, HistoricalFIRERunwaySummary, MonthlyFIREData } from '@/lib/services/fireService';
 import type { Narrative } from '@/lib/utils/narrative';
 import { CASHFLOW_CHART_READING, EXPLAINER_READING } from '@/lib/utils/fireNarrative';

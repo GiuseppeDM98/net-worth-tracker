@@ -77,7 +77,7 @@ import {
   SENSITIVITY_FOOTER,
 } from '@/lib/utils/whatIfNarrative';
 import type { WhatIfBaseline, WhatIfEventType, WhatIfScenario } from '@/types/whatIf';
-import type { TileSkeletonCell } from '@/lib/utils/tileGridSkeleton';
+import { WHAT_IF_TAB_SKELETON_CELLS } from './tabSkeletons';
 import { cn } from '@/lib/utils';
 import { PageVerdict } from '@/components/ui/page-verdict';
 import { TILE_CELL_CLASS } from '@/components/ui/tile';
@@ -91,13 +91,8 @@ import { DeltaTile } from '@/components/fire-simulations/whatif/tiles/DeltaTile'
 import { EventoTile, type WhatIfEventForm } from '@/components/fire-simulations/whatif/tiles/EventoTile';
 import { SensibilitaTile } from '@/components/fire-simulations/whatif/tiles/SensibilitaTile';
 
-/** The grid's geometry, for the skeleton: the same spans as the tiles below. */
-const SKELETON_CELLS: TileSkeletonCell[] = [
-  { span: 5, lines: 12 },
-  { span: 3, lines: 9 },
-  { span: 4, lines: 10 },
-  { span: 12, lines: 6 },
-];
+/** The grid's geometry, for the skeleton: the same spans as the tiles below — shared with the page's lazy-tab wait. */
+const SKELETON_CELLS = WHAT_IF_TAB_SKELETON_CELLS;
 
 const EMPTY_FORM: WhatIfEventForm = {
   monthsWithoutIncome: '6',

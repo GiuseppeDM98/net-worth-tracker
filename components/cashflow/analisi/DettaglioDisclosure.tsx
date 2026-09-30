@@ -6,8 +6,12 @@ import type { Expense } from '@/types/expenses';
 import { cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { TILE_EYEBROW_CLASS } from '@/components/ui/tile';
-import { SavingsRateTrendSection } from '@/components/cashflow/SavingsRateTrendSection';
-import { AndamentoStoricoSection } from '@/components/cashflow/AndamentoStoricoSection';
+import { SAVINGS_LAZY_CHARTS, SavingsRateTrendSection } from '@/components/cashflow/SavingsRateTrendSection';
+import { ANDAMENTO_LAZY_CHARTS, AndamentoStoricoSection } from '@/components/cashflow/AndamentoStoricoSection';
+import { usePreloadWhenIdle } from '@/components/ui/lazy-component';
+
+/** The two sections' lazy plots (PERF-04), fetched while the page is idle so an opening draws them at once. */
+const DETTAGLIO_LAZY_CHARTS = [...SAVINGS_LAZY_CHARTS, ...ANDAMENTO_LAZY_CHARTS];
 
 interface DettaglioDisclosureProps {
   allExpenses: Expense[];
@@ -26,6 +30,7 @@ interface DettaglioDisclosureProps {
  */
 export function DettaglioDisclosure({ allExpenses, historyStartYear, scopeYear, showHistory }: DettaglioDisclosureProps) {
   const [open, setOpen] = useState(false);
+  usePreloadWhenIdle(DETTAGLIO_LAZY_CHARTS);
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>

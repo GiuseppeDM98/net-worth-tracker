@@ -66,7 +66,7 @@ import {
   MILESTONE_FOOTER,
   resolveTraiettoriaHero,
 } from '@/lib/utils/goalsNarrative';
-import type { TileSkeletonCell } from '@/lib/utils/tileGridSkeleton';
+import { GOALS_TAB_SKELETON_CELLS } from './tabSkeletons';
 import { cn } from '@/lib/utils';
 import { PageVerdict } from '@/components/ui/page-verdict';
 import { Tile, TILE_CELL_CLASS } from '@/components/ui/tile';
@@ -83,14 +83,8 @@ import { GoalsDettaglio } from '@/components/goals/GoalsDettaglio';
 import { GoalFormDialog } from '@/components/goals/GoalFormDialog';
 import { AssetAssignmentDialog } from '@/components/goals/AssetAssignmentDialog';
 
-/** The grid's geometry, for the skeleton: the same spans as the tiles below. */
-const SKELETON_CELLS: TileSkeletonCell[] = [
-  { span: 5, rows: 2, lines: 14 },
-  { span: 7, lines: 10 },
-  { span: 4, lines: 6 },
-  { span: 3, lines: 5 },
-  { span: 12, lines: 8 },
-];
+/** The grid's geometry, for the skeleton: the same spans as the tiles below — shared with the page's lazy-tab wait. */
+const SKELETON_CELLS = GOALS_TAB_SKELETON_CELLS;
 
 const EMPTY_ASSETS: Asset[] = [];
 

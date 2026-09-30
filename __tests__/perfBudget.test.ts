@@ -8,9 +8,11 @@ import { describe, it, expect } from 'vitest';
 import {
   compareRoutesToBudget,
   ceilingFromMeasure,
+  countLibraryCopies,
   countTextChars,
   extractInitialChunks,
   tightenBudget,
+  LIBRARY_SIGNATURES,
   SHARED_KEY,
   type MeasuredBuild,
   type PerfBudget,
@@ -188,6 +190,43 @@ describe('ceilingFromMeasure and tightenBudget — the ceiling moves only with a
     const next = tightenBudget({ ...measuredWithin, routes: { ...measuredWithin.routes, '/dashboard': 900 } }, budget);
 
     expect(next.routes['/dashboard']).toEqual({ initialJsGzKB: 546 });
+  });
+});
+
+describe('libraryCopies — one copy of a library for the whole build (PERF-04)', () => {
+  const guarded: PerfBudget = { ...budget, libraryCopies: { recharts: 1 } };
+  const withCopies = (copies: number): MeasuredBuild => ({ ...measuredWithin, libraryCopies: { recharts: copies } });
+
+  it('counts the chunks that carry the library, not the chunks that only import it', () => {
+    const recharts = `e.s(["CartesianGrid",0,x]);className:"${LIBRARY_SIGNATURES.recharts}"`;
+    const chartPage = 'n.CartesianGrid,n.LineChart'; // a chart's own chunk: export names, no library code
+
+    expect(countLibraryCopies([recharts, chartPage, 'other'], LIBRARY_SIGNATURES)).toEqual({ recharts: 1 });
+    expect(countLibraryCopies([recharts, recharts, recharts, recharts], LIBRARY_SIGNATURES)).toEqual({ recharts: 4 });
+  });
+
+  it('passes with the library in as many chunks as it allows', () => {
+    expect(compareRoutesToBudget(withCopies(1), guarded, guarded).ok).toBe(true);
+  });
+
+  it('fails and names the library when a second copy appears', () => {
+    const verdict = compareRoutesToBudget(withCopies(4), guarded, guarded);
+
+    expect(verdict.ok).toBe(false);
+    expect(verdict.violations).toEqual([{ kind: 'library-copies', key: 'recharts', copies: 4, maxCopies: 1 }]);
+  });
+
+  it('fails when the library is in no chunk at all: a signature that matches nothing guards nothing', () => {
+    expect(compareRoutesToBudget(withCopies(0), guarded, guarded).violations).toEqual([{ kind: 'library-not-found', key: 'recharts' }]);
+    expect(compareRoutesToBudget(measuredWithin, guarded, guarded).violations).toEqual([{ kind: 'library-not-found', key: 'recharts' }]);
+  });
+
+  it('checks nothing when the budget guards no library', () => {
+    expect(compareRoutesToBudget(withCopies(4), budget, budget).ok).toBe(true);
+  });
+
+  it('is carried over by --write untouched: it is a rule, not a measure', () => {
+    expect(tightenBudget(withCopies(4), guarded).libraryCopies).toEqual({ recharts: 1 });
   });
 });
 

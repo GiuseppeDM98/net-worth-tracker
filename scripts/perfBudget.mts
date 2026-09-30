@@ -6,7 +6,8 @@
  * `server/app/<route>.html` it takes the `<script src="/_next/static/chunks/…">` tags, gzips each
  * chunk and sums them. The decision is `compareRoutesToBudget` (lib/utils/perfBudget.ts), which
  * also receives the budget committed in HEAD (`git show HEAD:perf/budget.json`), so a ceiling
- * raised without a `raisedBy` of its own is red too.
+ * raised without a `raisedBy` of its own is red too. It also counts, over EVERY chunk on disk, the
+ * copies of each library `libraryCopies` guards (PERF-04: recharts once shipped four times).
  *
  * Usage (options ALWAYS after `--`, or npm keeps them as npm_config_* and this script never sees them):
  *   npm run build && npm run perf:budget
@@ -21,10 +22,12 @@ import { join, relative, sep } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import {
   compareRoutesToBudget,
+  countLibraryCopies,
   countTextChars,
   describeViolation,
   extractInitialChunks,
   tightenBudget,
+  LIBRARY_SIGNATURES,
   SHARED_KEY,
   type MeasuredBuild,
   type PerfBudget,
@@ -69,6 +72,17 @@ function listPrerenderedPages(dir: string): string[] {
     else if (entry.name.endsWith('.html')) found.push(full);
   }
   return found;
+}
+
+/**
+ * Every JS chunk on disk, initial AND lazy: a library's copies are counted over the whole build,
+ * since a lazy page section is exactly where a second copy would hide from the per-route sums.
+ */
+function readAllChunkTexts(): string[] {
+  const chunksDir = join(DIST, 'static', 'chunks');
+  return readdirSync(chunksDir, { recursive: true, encoding: 'utf-8' })
+    .filter((name) => name.endsWith('.js'))
+    .map((name) => readFileSync(join(chunksDir, name), 'utf-8'));
 }
 
 /** Next's own error pages are not routes anybody opens. */
@@ -131,6 +145,7 @@ const sharedChunks = dashboardPages.length
 const measured: MeasuredBuild = {
   routes: Object.fromEntries(pages.map((page) => [page.route, kb(sumGz(page.chunks))])),
   sharedGzKB: kb(sumGz(sharedChunks)),
+  libraryCopies: countLibraryCopies(readAllChunkTexts(), LIBRARY_SIGNATURES),
 };
 
 // Compare with the budget
@@ -174,6 +189,12 @@ for (const chunk of largest) {
   const routes = usage.get(chunk.path) ?? [];
   const who = routes.length === pages.length ? 'tutte' : routes.length > 4 ? `${routes.length} route` : routes.join(', ');
   console.log(`  ${chunk.path.replace('static/chunks/', '')} · ${kb(chunk.gzBytes)} · ${kb(chunk.rawBytes)} · ${who}`);
+}
+
+// The copies of each guarded library, over every chunk on disk (PERF-04).
+console.log('\nCopie delle librerie (chunk che le contengono, iniziali e pigri · massimo):');
+for (const [library, copies] of Object.entries(measured.libraryCopies ?? {})) {
+  console.log(`  ${library} · ${copies} · ${budget.libraryCopies?.[library] ?? 'nessun limite'}`);
 }
 
 if (!verdict.ok) {

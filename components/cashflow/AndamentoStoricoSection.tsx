@@ -10,7 +10,7 @@
  * setting) — see lib/utils/cashflowTimeSeries.ts.
  *
  * PATTERNS (AGENTS.md / sibling components):
- * - Chart sub-components are module-level (React Compiler: never nest components).
+ * - The plots live in AndamentoStoricoCharts.tsx and load lazily, module-level (React Compiler: never nest components).
  * - Colours come exclusively from useChartColors() — no hardcoded hex.
  * - Recharts tooltips are styled via CSS vars, never inline hex.
  * - Pill toggles use the shared SegmentedPill (components/ui/segmented-pill.tsx).
@@ -22,22 +22,9 @@ import { useChartColors } from '@/lib/hooks/useChartColors';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { type Expense } from '@/types/expenses';
 import { Tile } from '@/components/ui/tile';
+import { Skeleton } from '@/components/ui/skeleton';
+import { lazyComponent } from '@/components/ui/lazy-component';
 import { AsideToggle } from '@/components/cashflow/analisi/AsideToggle';
-import {
-  ComposedChart,
-  LineChart,
-  Line,
-  Area,
-  AreaChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from 'recharts';
-import { formatCurrency, formatCurrencyCompact, formatPercentage } from '@/lib/services/chartService';
 import {
   buildTimeBuckets,
   buildCategoryTimeSeries,
@@ -45,209 +32,25 @@ import {
   type TimeGranularity,
 } from '@/lib/utils/cashflowTimeSeries';
 import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
-import { CHART_TICK_STYLE } from '@/components/cashflow/costCenterStyles';
 
-// ── Shared tooltip style ──────────────────────────────────────────────────────
-// Defined once (mirrors ConfrontoAnnualeSection) so all sub-charts stay consistent.
-const TOOLTIP_CONTENT_STYLE = {
-  backgroundColor: 'var(--card)',
-  border: '1px solid var(--border)',
-  color: 'var(--card-foreground)',
-  fontSize: 12,
-  borderRadius: 8,
-} as const;
+/** Chart A's height; B and C take 240 on a phone and 300 above it (`seriesChartHeight`). */
+const FLOW_CHART_HEIGHT = 280;
 
-const TOOLTIP_LABEL_STYLE = { fontWeight: 600, color: 'var(--card-foreground)' } as const;
+/**
+ * The three plots are not in the page's initial JavaScript (PERF-04, 2026-09-30): `lazyComponent` at
+ * module level (AGENTS.md § Dynamic Imports and Module Hygiene), preloaded when the page is idle by
+ * `DettaglioDisclosure` (`ANDAMENTO_LAZY_CHARTS`). Each sits in a box of its own height and the
+ * placeholder fills the box, so a plot lands in place; the box, not the placeholder, knows the
+ * height, because B and C change theirs with the width.
+ */
+const chartSlotPlaceholder = <Skeleton className="h-full w-full" />;
+const FlowComposedChart = lazyComponent(() => import('@/components/cashflow/AndamentoStoricoCharts').then((m) => m.FlowComposedChart));
+const CategoryLinesChart = lazyComponent(() => import('@/components/cashflow/AndamentoStoricoCharts').then((m) => m.CategoryLinesChart));
+const TypeCompositionChart = lazyComponent(() => import('@/components/cashflow/AndamentoStoricoCharts').then((m) => m.TypeCompositionChart));
+export const ANDAMENTO_LAZY_CHARTS = [FlowComposedChart, CategoryLinesChart, TypeCompositionChart];
 
 type CategoryChartType = 'expenses' | 'income';
 type TypeChartView = 'absolute' | 'percent';
-
-// ── FlowComposedChart ─────────────────────────────────────────────────────────
-// Chart A: income/expense bars + net-savings line. Module-level (React Compiler).
-
-function FlowComposedChart({
-  data,
-  colors,
-}: {
-  data: ReturnType<typeof buildTimeBuckets>;
-  colors: string[];
-}) {
-  return (
-    <ResponsiveContainer width="100%" height={280}>
-      <ComposedChart data={data} margin={{ top: 8, right: 4, left: -8, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-        <XAxis
-          dataKey="label"
-          tick={CHART_TICK_STYLE}
-          axisLine={false}
-          tickLine={false}
-          interval="preserveStartEnd"
-        />
-        <YAxis
-          tickFormatter={formatCurrencyCompact}
-          tick={CHART_TICK_STYLE}
-          axisLine={false}
-          tickLine={false}
-          // Keep the 0 baseline for the bars but extend below it when net savings
-          // go negative (deficit period) so the risparmio line isn't clipped.
-          domain={[(dataMin: number) => Math.min(0, dataMin), 'auto']}
-        />
-        <Tooltip
-          formatter={(value, name) => [
-            formatCurrency(Number(value ?? 0)),
-            name === 'income' ? 'Entrate' : name === 'expenses' ? 'Uscite' : 'Risparmio',
-          ]}
-          contentStyle={TOOLTIP_CONTENT_STYLE}
-          labelStyle={TOOLTIP_LABEL_STYLE}
-          cursor={{ fill: 'var(--muted)', fillOpacity: 0.4 }}
-        />
-        <Legend
-          formatter={(value) =>
-            value === 'income' ? 'Entrate' : value === 'expenses' ? 'Uscite' : 'Risparmio'
-          }
-          wrapperStyle={{ fontSize: 12, color: 'var(--muted-foreground)' }}
-        />
-        {/* The page's slots: income is chart-2, spending chart-1 — the same two the category tiles use. */}
-        <Bar dataKey="income" fill={colors[1] ?? 'var(--chart-2)'} radius={[3, 3, 0, 0]} animationDuration={600} animationEasing="ease-out" />
-        <Bar dataKey="expenses" fill={colors[0] ?? 'var(--chart-1)'} radius={[3, 3, 0, 0]} animationDuration={600} animationEasing="ease-out" />
-        <Line
-          type="monotone"
-          dataKey="net"
-          stroke={colors[2] ?? '#10b981'}
-          strokeWidth={2}
-          dot={false}
-          activeDot={{ r: 4, strokeWidth: 0 }}
-          animationDuration={800}
-          animationEasing="ease-out"
-        />
-      </ComposedChart>
-    </ResponsiveContainer>
-  );
-}
-
-// ── CategoryLinesChart ────────────────────────────────────────────────────────
-// Chart B: one line per category over time. Module-level (React Compiler).
-
-function CategoryLinesChart({
-  series,
-  rows,
-  colors,
-  height,
-}: {
-  series: ReturnType<typeof buildCategoryTimeSeries>['series'];
-  // Recharts wants row objects keyed by series name; we pivot in the parent.
-  rows: Array<Record<string, string | number>>;
-  colors: string[];
-  height: number;
-}) {
-  return (
-    <ResponsiveContainer width="100%" height={height}>
-      <LineChart data={rows} margin={{ top: 8, right: 4, left: -8, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-        <XAxis
-          dataKey="label"
-          tick={CHART_TICK_STYLE}
-          axisLine={false}
-          tickLine={false}
-          interval="preserveStartEnd"
-        />
-        <YAxis
-          tickFormatter={formatCurrencyCompact}
-          tick={CHART_TICK_STYLE}
-          axisLine={false}
-          tickLine={false}
-          domain={['auto', 'auto']}
-        />
-        <Tooltip
-          formatter={(value, name) => [formatCurrency(Number(value ?? 0)), String(name)]}
-          // Order tooltip rows by value (desc) so they mirror the vertical stacking
-          // of the lines at the hovered point, instead of the fixed series order.
-          itemSorter={(item) => -(item.value as number)}
-          contentStyle={TOOLTIP_CONTENT_STYLE}
-          labelStyle={TOOLTIP_LABEL_STYLE}
-          cursor={{ stroke: 'var(--border)', strokeWidth: 1 }}
-        />
-        <Legend wrapperStyle={{ fontSize: 12, color: 'var(--muted-foreground)' }} />
-        {series.map((s, i) => (
-          <Line
-            key={s.name}
-            type="monotone"
-            dataKey={s.name}
-            stroke={colors[i % colors.length] ?? '#6366f1'}
-            strokeWidth={2}
-            dot={false}
-            activeDot={{ r: 4, strokeWidth: 0 }}
-            connectNulls
-            animationDuration={600}
-            animationEasing="ease-out"
-          />
-        ))}
-      </LineChart>
-    </ResponsiveContainer>
-  );
-}
-
-// ── TypeCompositionChart ──────────────────────────────────────────────────────
-// 100%-stacked area: the spending mix (Fisse/Variabili/Debiti) as a share of total
-// per bucket, so diversification reads independently of the absolute spend level.
-// Module-level (React Compiler).
-
-function TypeCompositionChart({
-  series,
-  rows,
-  colors,
-  height,
-}: {
-  series: ReturnType<typeof buildTypeTimeSeries>['series'];
-  // Rows are pre-normalised to percentages (0-100) per bucket in the parent.
-  rows: Array<Record<string, string | number>>;
-  colors: string[];
-  height: number;
-}) {
-  return (
-    <ResponsiveContainer width="100%" height={height}>
-      <AreaChart data={rows} margin={{ top: 8, right: 4, left: -8, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-        <XAxis
-          dataKey="label"
-          tick={CHART_TICK_STYLE}
-          axisLine={false}
-          tickLine={false}
-          interval="preserveStartEnd"
-        />
-        <YAxis
-          tickFormatter={(v: number) => formatPercentage(v, 0)}
-          tick={CHART_TICK_STYLE}
-          axisLine={false}
-          tickLine={false}
-          domain={[0, 100]}
-        />
-        <Tooltip
-          formatter={(value, name) => [formatPercentage(Number(value ?? 0), 1), String(name)]}
-          itemSorter={(item) => -(item.value as number)}
-          contentStyle={TOOLTIP_CONTENT_STYLE}
-          labelStyle={TOOLTIP_LABEL_STYLE}
-          cursor={{ stroke: 'var(--border)', strokeWidth: 1 }}
-        />
-        <Legend wrapperStyle={{ fontSize: 12, color: 'var(--muted-foreground)' }} />
-        {series.map((s, i) => (
-          <Area
-            key={s.name}
-            type="monotone"
-            dataKey={s.name}
-            stackId="type-composition"
-            stroke={colors[i % colors.length] ?? '#6366f1'}
-            fill={colors[i % colors.length] ?? '#6366f1'}
-            fillOpacity={0.7}
-            strokeWidth={1.5}
-            animationDuration={600}
-            animationEasing="ease-out"
-          />
-        ))}
-      </AreaChart>
-    </ResponsiveContainer>
-  );
-}
 
 // ── EmptyState ────────────────────────────────────────────────────────────────
 
@@ -335,6 +138,7 @@ export function AndamentoStoricoSection({
   const hasTypeTrend = typeSeries.buckets.length >= 2 && typeSeries.series.length > 0;
 
   const granularityLabel = granularity === 'year' ? 'per anno' : 'per mese';
+  const seriesChartHeight = isMobile ? 240 : 300;
 
   return (
     <div className="flex flex-col gap-3">
@@ -357,7 +161,13 @@ export function AndamentoStoricoSection({
         }
       >
         <div className="mt-3">
-          {hasFlowTrend ? <FlowComposedChart data={flowData} colors={chartColors} /> : <EmptyState message="Servono almeno due periodi per mostrare l'andamento" />}
+          {hasFlowTrend ? (
+            <div style={{ height: FLOW_CHART_HEIGHT }}>
+              <FlowComposedChart data={flowData} colors={chartColors} height={FLOW_CHART_HEIGHT} fallback={chartSlotPlaceholder} />
+            </div>
+          ) : (
+            <EmptyState message="Servono almeno due periodi per mostrare l'andamento" />
+          )}
         </div>
       </Tile>
 
@@ -381,7 +191,9 @@ export function AndamentoStoricoSection({
       >
         <div className="mt-3">
           {hasCategoryTrend ? (
-            <CategoryLinesChart series={categorySeries.series} rows={categoryRows} colors={chartColors} height={isMobile ? 240 : 300} />
+            <div style={{ height: seriesChartHeight }}>
+              <CategoryLinesChart series={categorySeries.series} rows={categoryRows} colors={chartColors} height={seriesChartHeight} fallback={chartSlotPlaceholder} />
+            </div>
           ) : (
             <EmptyState message="Servono almeno due periodi per mostrare l'andamento" />
           )}
@@ -410,11 +222,13 @@ export function AndamentoStoricoSection({
       >
         <div className="mt-3">
           {hasTypeTrend ? (
-            typeView === 'percent' ? (
-              <TypeCompositionChart series={typeSeries.series} rows={typePercentRows} colors={chartColors} height={isMobile ? 240 : 300} />
-            ) : (
-              <CategoryLinesChart series={typeSeries.series} rows={typeRows} colors={chartColors} height={isMobile ? 240 : 300} />
-            )
+            <div style={{ height: seriesChartHeight }}>
+              {typeView === 'percent' ? (
+                <TypeCompositionChart series={typeSeries.series} rows={typePercentRows} colors={chartColors} height={seriesChartHeight} fallback={chartSlotPlaceholder} />
+              ) : (
+                <CategoryLinesChart series={typeSeries.series} rows={typeRows} colors={chartColors} height={seriesChartHeight} fallback={chartSlotPlaceholder} />
+              )}
+            </div>
           ) : (
             <EmptyState message="Servono almeno due periodi per mostrare l'andamento" />
           )}

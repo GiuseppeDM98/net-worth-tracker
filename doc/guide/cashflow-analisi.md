@@ -10,7 +10,7 @@
 
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
-- **Analisi**: `components/cashflow/AnalisiTab.tsx` (`handleEntitySelect`) + `components/cashflow/analisi/*`, `components/cashflow/{EntityDossier,EntitySearch,ConfrontoAnnualeSection,CashflowSankeyChart,SavingsRateTrendSection,AndamentoStoricoSection}.tsx`; pure `lib/utils/{analisiSummary,analisiNarrative,expenseGrouping,cashflowSankey,cashflowComposition,expenseCategoryMatching,comparisonDeltas,expenseEntityStats,entitySearch}.ts`
+- **Analisi**: `components/cashflow/AnalisiTab.tsx` (`handleEntitySelect`) + `components/cashflow/analisi/*`, `components/cashflow/{EntityDossier,EntitySearch,ConfrontoAnnualeSection,CashflowSankeyChart,SavingsRateTrendSection,AndamentoStoricoSection}.tsx`, their lazy plots `components/cashflow/{ConfrontoAnnualeCharts,SavingsRateLineChart,AndamentoStoricoCharts,EntityTrendChart}.tsx` (PERF-04; what the page downloads: `e2e/bundle.lazy{,.mobile}.spec.ts`); pure `lib/utils/{analisiSummary,analisiNarrative,expenseGrouping,cashflowSankey,cashflowComposition,expenseCategoryMatching,comparisonDeltas,expenseEntityStats,entitySearch}.ts`
 - **Flusso**: `components/cashflow/analisi/tiles/FlussoTile.tsx` (the view, the drill, the 640px switch); from 640px the Sankey `components/cashflow/CashflowSankeyChart.tsx` on the pure builders of `lib/utils/cashflowSankey.ts` (the roles' at its end), the role colours from `lib/constants/spendingRoleColors.ts` through `lib/hooks/useCssColorTokens.ts` + pure `lib/utils/cssColorToHex.ts`; below 640px `components/cashflow/analisi/FlowShareMobile.tsx` on the shared `components/ui/composition-bar.tsx`, with its TWO callers `SpendingTypesMobileFlow.tsx` (the type view, numbers from `buildTypeFlowBreakdown` in `analisiSummary.ts`) and `SpendingRolesMobileFlow.tsx` (the roles view, numbers from `summarizeSpendingRoleShares` in `spendingRoles.ts`); the words in `analisiNarrative.ts` — `describeFlow`, `describeSpendingRolesFlow`, and for the phone `describeTypeFlowBar`, `describeSpendingRolesBar`, `describeFlowSurplus`, `describeFlowAbsence`; tests `__tests__/{cashflowSankey,spendingRoles,analisiSummary,analisiNarrative,cssColorToHex,compositionBar}.test.ts`; browser: the Flusso tests and the «50/30/20» blocks of `e2e/analisi{,.mobile}.spec.ts`, the deficit block of the mobile one
 - **Suites to run after a change here — Analisi** (moved from `AGENTS.md` § Commands on 2026-09-30): `analisiSummary`, `analisiNarrative` (+ `cashflowNarrative` for the shared readings, `patrimonioNarrative` for the articles), `expenseGrouping`, `cashflowSankey`, `cashflowComposition`, `comparisonDeltas`, `expenseEntityStats`, `entitySearch`
 
@@ -127,6 +127,25 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   **A drill is stored WITH its subject** (`{ isMobile, drill }`, AGENTS.md → React Query and Derived State): it is a
   place inside the Sankey, so below 640px it resolves to none — no effect resets it — and it comes back if the width
   does.
+- **The Sankey is a chunk of its own, never on a phone** (2026-09-30, PERF-04): `CashflowSankeyChart` (`@nivo/sankey`,
+  d3-sankey, react-spring — ~88 KB gz) is a `lazyComponent` at module level in `FlussoTile`
+  (`components/ui/lazy-component.tsx`), so below 640px, where the tile draws the bar and rows, nothing of it is
+  downloaded (`e2e/bundle.lazy.mobile.spec.ts`, seen red with the static import back). From 640px the download starts
+  when `FlussoTile`'s module is EVALUATED (`CashflowSankeyChart.preload()`, guarded by AnalisiTab's phone query
+  negated), and with the module in memory the chart draws in the same render as the figures — a `next/dynamic` held
+  its Suspense placeholder ~275 ms after them even then (warm on the mirror: 1613 ms to the first figure with no
+  placeholder, 1343 with the helper, develop 1430). The placeholder fills a box of the plot's own height
+  (`minHeight` = `resolveSankeyHeight`, a `flex-1` `Skeleton`), so the chart lands in place — `e2e/bundle.lazy.spec.ts`
+  holds the Sankey's chunk until the placeholder is measured (`holdChunks`: a fixed delay lost the race to the preload)
+  and asserts `layout-shift` 0 and equal heights, each seen red alone; it navigates to `domcontentloaded`, since the
+  held chunk is requested before `load`.
+- **Every other plot of the page is lazy too** (2026-09-30): the three disclosures' (`ConfrontoAnnualeCharts.tsx`,
+  `SavingsRateLineChart.tsx`, `AndamentoStoricoCharts.tsx`) and the Scheda's trend (`EntityTrendChart.tsx`) are
+  `lazyComponent`s in the component that owns them, each in a box of its height (the Andamento's B and C change
+  theirs with the width: the box knows it, the placeholder fills it), preloaded once the page is idle AFTER its data
+  (the disclosures mount after it; AnalisiTab passes `!loading` for the Scheda's — started during the load, the
+  preload pushed the first figure ~130 ms later). recharts is out of Analisi's initial JavaScript: 744,9 → 564,6 KB
+  gz; an opening draws in 3–20 ms and `layout-shift` is 0 at each, at 1440 and 390, measured on the mirror.
 - **The Flusso picks its drawing at 640px — a legibility threshold of the chart, not a second composition: from 640
   to 1439 the Sankey, below it a share bar and ranked rows** (owner's decision, 2026-09-27; the switch is AnalisiTab's
   `useMediaQuery('(max-width: 639px)')`, older than the phone view). A four-column Sankey gets ~80px a column at 390, so

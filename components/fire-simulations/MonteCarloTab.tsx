@@ -85,7 +85,7 @@ import {
   scenarioLabel,
 } from '@/lib/utils/monteCarloNarrative';
 import type { MonteCarloCapitalInflow, MonteCarloParams, MonteCarloScenarios } from '@/types/assets';
-import type { TileSkeletonCell } from '@/lib/utils/tileGridSkeleton';
+import { MONTE_CARLO_TAB_SKELETON_CELLS } from './tabSkeletons';
 import { cn } from '@/lib/utils';
 import { PageVerdict } from '@/components/ui/page-verdict';
 import { TILE_CELL_CLASS } from '@/components/ui/tile';
@@ -99,13 +99,8 @@ import { DistribuzioneTile } from '@/components/monte-carlo/tiles/DistribuzioneT
 import { ScenariConfrontoTile } from '@/components/monte-carlo/tiles/ScenariConfrontoTile';
 import { ParametriTile, type MonteCarloForm } from '@/components/monte-carlo/tiles/ParametriTile';
 
-/** The grid's geometry, for the skeleton: the same spans as the tiles below. */
-const SKELETON_CELLS: TileSkeletonCell[] = [
-  { span: 5, lines: 14 },
-  { span: 4, lines: 10 },
-  { span: 3, lines: 9 },
-  { span: 12, lines: 10 },
-];
+/** The grid's geometry, for the skeleton: the same spans as the tiles below — shared with the page's lazy-tab wait. */
+const SKELETON_CELLS = MONTE_CARLO_TAB_SKELETON_CELLS;
 
 const DEFAULT_RETIREMENT_YEARS = 30;
 const DEFAULT_SIMULATIONS = DEFAULT_MONTE_CARLO_SIMULATIONS;

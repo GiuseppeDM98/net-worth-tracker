@@ -83,7 +83,7 @@ import {
   summarizeCoastScenarios,
   summarizeCoastTarget,
 } from '@/lib/utils/coastFireView';
-import type { TileSkeletonCell } from '@/lib/utils/tileGridSkeleton';
+import { COAST_TAB_SKELETON_CELLS } from './tabSkeletons';
 import { cn } from '@/lib/utils';
 import { PageVerdict } from '@/components/ui/page-verdict';
 import { Tile, TILE_CELL_CLASS } from '@/components/ui/tile';
@@ -98,12 +98,8 @@ import { CoastIpotesi } from './coast/CoastIpotesi';
 import { CoastDettaglio } from './coast/CoastDettaglio';
 import { CoastFireProjectionChart } from './CoastFireProjectionChart';
 
-/** The grid's geometry, for the skeleton: the same spans as the tiles below. */
-const SKELETON_CELLS: TileSkeletonCell[] = [
-  { span: 5, rows: 2, lines: 12 },
-  { span: 7, lines: 5 },
-  { span: 7, lines: 4 },
-];
+/** The grid's geometry, for the skeleton: the same spans as the tiles below — shared with the page's lazy-tab wait. */
+const SKELETON_CELLS = COAST_TAB_SKELETON_CELLS;
 
 /** The three cells of the grid: one class per tile, shared by the data and the empty branches. */
 const GRID_CLASS = 'grid grid-cols-1 gap-3 tablet:grid-cols-2 desktop:grid-cols-12';

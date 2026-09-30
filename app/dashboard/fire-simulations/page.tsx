@@ -12,7 +12,14 @@
  *
  * Mobile/tablet pattern (< 1440px): PageTabBar renders a centered segmented pill (icon-only
  * inactive tabs). Desktop (≥ 1440px): standard TabsList with icons.
- * No lazy loading needed - components load quickly.
+ *
+ * Only the Calcolatore — the tab the page opens on — is in the page's initial JavaScript; the
+ * other four are a chunk each, fetched once the page is idle or when their tab is opened, whichever
+ * comes first (PERF-04, 2026-09-30). Only the active panel mounts either way (Radix `TabsContent`),
+ * so what the lazy tabs save is their CODE on the page's critical path: before, all five modules
+ * arrived with the page. If a tab is opened before its chunk, the panel shows that tab's own
+ * `TileGridSkeleton` (`tabSkeletons.ts`), the same one it shows while its data loads, so the two
+ * waits read as one.
  *
  * The container is `wide` (1920px, the tile grid's root): every tab is propagated to «Verdict
  * over Tiles» — Calcolatore, Coast FIRE, What If, Monte Carlo and, since 2026-08-26, Obiettivi.
@@ -30,15 +37,28 @@ import { useSettings } from '@/lib/hooks/useSettings';
 import { useSnapshots } from '@/lib/hooks/useSnapshots';
 import { TabsContent } from '@/components/ui/tabs';
 import { FireCalculatorTab } from '@/components/fire-simulations/FireCalculatorTab';
-import { CoastFireTab } from '@/components/fire-simulations/CoastFireTab';
-import { WhatIfAnalysisTab } from '@/components/fire-simulations/WhatIfAnalysisTab';
-import { MonteCarloTab } from '@/components/fire-simulations/MonteCarloTab';
-import { GoalBasedInvestingTab } from '@/components/fire-simulations/GoalBasedInvestingTab';
+import {
+  COAST_TAB_SKELETON_CELLS,
+  GOALS_TAB_SKELETON_CELLS,
+  MONTE_CARLO_TAB_SKELETON_CELLS,
+  WHAT_IF_TAB_SKELETON_CELLS,
+} from '@/components/fire-simulations/tabSkeletons';
+import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
+import { lazyComponent, usePreloadWhenIdle } from '@/components/ui/lazy-component';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PageTabs } from '@/components/layout/PageTabs';
 import { pageTabPanelId } from '@/components/layout/PageTabBar';
 import type { TabDef } from '@/components/layout/PageTabs';
+
+// The four tabs the page does not open on, one chunk each (see the header): `lazyComponent` at module
+// level (AGENTS.md § Dynamic Imports and Module Hygiene), preloaded once the page is idle, so a tab
+// opened later is drawn at once — no Suspense fallback held on screen.
+const CoastFireTab = lazyComponent(() => import('@/components/fire-simulations/CoastFireTab').then((m) => m.CoastFireTab));
+const WhatIfAnalysisTab = lazyComponent(() => import('@/components/fire-simulations/WhatIfAnalysisTab').then((m) => m.WhatIfAnalysisTab));
+const MonteCarloTab = lazyComponent(() => import('@/components/fire-simulations/MonteCarloTab').then((m) => m.MonteCarloTab));
+const GoalBasedInvestingTab = lazyComponent(() => import('@/components/fire-simulations/GoalBasedInvestingTab').then((m) => m.GoalBasedInvestingTab));
+const LAZY_TABS = [CoastFireTab, WhatIfAnalysisTab, MonteCarloTab, GoalBasedInvestingTab];
 
 type TabValue = 'fire' | 'coast' | 'whatif' | 'montecarlo' | 'goals';
 
@@ -56,12 +76,12 @@ export default function FireSimulationsPage() {
   // The header's «Aggiornato alle…» over the four keys the Calcolatore — the tab the
   // page opens on — paints from; the same cache entries the tabs read, no second read. The goals
   // document stays out: it is read only once Obiettivi is opened.
-  const freshness = useFreshness([
-    useSettings(ownerId),
-    useAssets(ownerId),
-    useExpenses(ownerId),
-    useSnapshots(ownerId),
-  ]);
+  const calculatorReads = [useSettings(ownerId), useAssets(ownerId), useExpenses(ownerId), useSnapshots(ownerId)];
+  const freshness = useFreshness(calculatorReads);
+  // The lazy tabs are fetched once the Calcolatore's reads are in and the page is idle: started
+  // earlier, the «idle» browser is only waiting for Firestore and the download competes with the
+  // first figures.
+  usePreloadWhenIdle(LAZY_TABS, calculatorReads.every((query) => query.data !== undefined));
 
   return (
     <PageContainer>
@@ -91,10 +111,10 @@ export default function FireSimulationsPage() {
             className="mt-0"
           >
             {tab.value === 'fire'       && <FireCalculatorTab />}
-            {tab.value === 'coast'      && <CoastFireTab />}
-            {tab.value === 'whatif'     && <WhatIfAnalysisTab />}
-            {tab.value === 'montecarlo' && <MonteCarloTab />}
-            {tab.value === 'goals'      && <GoalBasedInvestingTab />}
+            {tab.value === 'coast'      && <CoastFireTab fallback={<TileGridSkeleton cells={COAST_TAB_SKELETON_CELLS} />} />}
+            {tab.value === 'whatif'     && <WhatIfAnalysisTab fallback={<TileGridSkeleton cells={WHAT_IF_TAB_SKELETON_CELLS} />} />}
+            {tab.value === 'montecarlo' && <MonteCarloTab fallback={<TileGridSkeleton cells={MONTE_CARLO_TAB_SKELETON_CELLS} />} />}
+            {tab.value === 'goals'      && <GoalBasedInvestingTab fallback={<TileGridSkeleton cells={GOALS_TAB_SKELETON_CELLS} />} />}
           </TabsContent>
         ))}
       </PageTabs>

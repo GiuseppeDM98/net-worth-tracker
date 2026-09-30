@@ -131,6 +131,17 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   `npm run dev:e2e` restarted, the same route answered 401 JSON and the nine red files reran green (30/31, the one
   left `modal.origin`, CLAUDE.md § Known Issues). Before reading a red spec, probe one route on :3100; if it 404s, restart the server and
   rerun the red files against it (`reuseExistingServer` is on locally).
+- **All six setups red at 30 s on `/login` is a COLD dev server** (2026-09-30, after an `npm ci`, CPU loaded): start
+  `npm run dev:e2e` detached, request the 13 routes once, run `--project=setup`, then the suite — it reuses the server.
+- **What a page DOWNLOADS is asserted by chunk CONTENT** (`e2e/chunkProbe.ts`, 2026-09-30): chunk names change every
+  build, so `probeChunks` reads each body for a library's module path (`node_modules/d3-sankey/`) or a function only one
+  module defines — never OUR module's path, which the importer's chunk also names in its `import()` loader, and never a
+  word a comment could hold (dev chunks keep comments). To measure a placeholder against what replaces it, HOLD the
+  chunk until the test releases it (`holdChunks`) — a fixed delay loses the race to a preload — and navigate to
+  `domcontentloaded`: a held chunk requested before `load` means `load` never fires. The suite runs `next dev`, so these
+  prove an import is lazy; sizes are `perf:budget`'s. Worked example: `e2e/bundle.lazy{,.mobile}.spec.ts`.
+- **«No placeholder ever showed» is watched from BEFORE the action** (2026-09-30): a `MutationObserver` installed before
+  the click, read after; counting skeletons once the chart is visible passes whether or not one flashed (seen inert).
 - **In a cloud container the pinned Chromium is not installed** (2026-09-25): `browserType.launch: Executable doesn't
   exist at /opt/pw-browsers/chromium_headless_shell-XXXX`. Never `playwright install` there: a throwaway
   `playwright.local.config.ts` (listed in `.git/info/exclude`, deleted at the end) spreads `playwright.config.ts` and

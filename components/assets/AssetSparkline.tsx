@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useReducedMotion } from 'framer-motion';
-import { LineChart, Line, YAxis, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, YAxis, ResponsiveContainer } from '@/components/ui/charts/recharts';
 import { useChartColors } from '@/lib/hooks/useChartColors';
 
 interface AssetSparklineProps {
