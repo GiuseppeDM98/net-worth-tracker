@@ -13,7 +13,8 @@ import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import { Camera } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCreateSnapshot } from '@/lib/hooks/useSnapshots';
-import { useDashboardOverview } from '@/lib/hooks/useDashboardOverview';
+import { DASHBOARD_OVERVIEW_STALE_TIME_MS, useDashboardOverview } from '@/lib/hooks/useDashboardOverview';
+import { useFreshness } from '@/lib/hooks/useFreshness';
 import { SavingsRateBadge } from '@/components/ui/SavingsRateBadge';
 import { getItalyDate, getItalyMonthYear } from '@/lib/utils/dateHelpers';
 import { getGreeting } from '@/lib/utils/getGreeting';
@@ -101,8 +102,18 @@ export default function DashboardPage() {
     return { title, date: ITALIAN_LONG_DATE.format(now) };
   }, [user?.displayName]);
 
-  const { data: overview, isLoading: loadingOverview, isError: overviewError, refetch: refetchOverview } =
-    useDashboardOverview(ownerId);
+  const overviewQuery = useDashboardOverview(ownerId);
+  const { data: overview, isLoading: loadingOverview, isError: overviewError, refetch: refetchOverview } = overviewQuery;
+  // The header's «Aggiornato alle…» while a payload restored from the persisted cache is being
+  // reread (PERF-03): on the overview's own one-minute threshold, and dated by the payload's
+  // `freshness.updatedAt` when the materialised summary is older than the read that fetched it.
+  const freshness = useFreshness([
+    {
+      query: overviewQuery,
+      staleAfterMs: DASHBOARD_OVERVIEW_STALE_TIME_MS,
+      contentUpdatedAt: overview ? Date.parse(overview.freshness.updatedAt) : null,
+    },
+  ]);
   const createSnapshotMutation = useCreateSnapshot(ownerId || '');
 
   // ─── UI State ─────────────────────────────────────────────────────────────────
@@ -265,7 +276,7 @@ export default function DashboardPage() {
   });
 
   const pageChrome = (
-    <PageHeader label="Panoramica" title={header.title} description={header.date} />
+    <PageHeader label="Panoramica" title={header.title} description={header.date} freshness={freshness} />
   );
 
   if (overviewState === 'loading') {
@@ -338,6 +349,7 @@ export default function DashboardPage() {
           title={header.title}
           description={header.date}
           actions={snapshotAction}
+          freshness={freshness}
         />
 
         <motion.div variants={cardItem} initial="hidden" animate="visible" className="pt-1">

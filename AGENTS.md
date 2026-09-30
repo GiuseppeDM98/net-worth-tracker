@@ -276,6 +276,34 @@ that domain's guide, never here.
   the stale answer and dates it. The client key carries the SIGNATURE of what is asked («AAPL:stock|VWCE.DE:fund»), so a
   new ticker restarts the read by itself; the weighing on user data happens in the browser, outside every cache.
   Nothing of the user's — no name, no class — goes into a document shared by every account (doc/guide/allocazione.md).
+- **The React Query cache is persisted to IndexedDB and restored before the first fetch** (PERF-03, 2026-09-29:
+  `lib/constants/persistCache.ts`, `lib/query/queryPersister.ts`, `lib/providers/QueryClientProvider.tsx`). ONLY the
+  keys of `PERSISTED_QUERY_PREFIXES` — the twelve owner collections read through the hooks above, plus the ledger's
+  meta document Patrimonio gates its trades on — only successful
+  reads, and NEVER the demo uid (`isDemoUid`, `lib/utils/demoAccount.ts`, the ONE rule `useDemoMode` reads too); out
+  by design: the assistant, benchmarks/FX/ECB, the Esposizione's profiles, the budget history. `maxAge` 24 h, and the
+  same 24 h as `gcTime` set PER PREFIX by `applyPersistedQueryDefaults` — the global ten minutes would drop an inactive
+  query from the next save, and «riaprire dopo un'ora» would restore nothing; a hook never sets its own. **Bump
+  `PERSIST_CACHE_VERSION` (the `buster`) on any change that RENAMES, REMOVES or retypes a field of a persisted payload**
+  — an asset, an expense, a snapshot, a category, the settings document, a contribution, a trade, a cost centre, a
+  goal, a receipt, the overview — or a client restores the old shape and reads it as truth until the refetch lands; a
+  new optional field whose absence means the default does not need it. Dates cross the store by VALUE
+  (`lib/utils/queryPersistence.ts`: `Date`, a `Timestamp` and a bare `{ seconds, nanoseconds }` become one tagged ISO
+  and come back a `Date`), never through a list of date fields per key. Three traps, each paid for on 2026-09-29:
+  during the restore every query is `pending` and NOT fetching, so `isLoading` is false and `data` undefined —
+  `ProtectedRoute` holds the pages on the auth fallback until `useIsRestoring()` is false, and a surface mounted outside
+  it must gate on that hook itself; the cache is forgotten at sign-out by the PROVIDER on the user→null transition
+  (`SignOutCacheGuard`), never in the sign-out handler — a `clear()` under still-mounted hooks is rebuilt, refetched
+  with the outgoing session and back on disk a second later (five keys, measured); and the persister writes on a
+  one-second throttle whose FIRST call is immediate, so the record on disk can hold the settings alone while the
+  expenses are still a second away (`e2e/freshness.spec.ts` polls for the key it needs). Rollback:
+  `NEXT_PUBLIC_PERSIST_QUERIES=false` (never set on the Playwright server). **The restore INVALIDATES what it
+  restored** (`onSuccess`, `refetchType: 'none'`): every load rereads, stale-while-revalidate — without it a reload
+  within `staleTime` painted the restored figures and read nothing for five minutes (an Admin write between two
+  `goto` stayed invisible to four specs). The reader is told when a figure from BEFORE this load is being reread —
+  «Aggiornato alle 18:42, sto rileggendo…» in the page header, `useFreshness` + `describeFreshness`, «old» being
+  `dataUpdatedAt < performance.timeOrigin` or older than the query's own `staleTime` — doc/guide/stati.md § The
+  fourth reading.
 
 ### Server Layer and API Authorization
 - Route = auth → validate → fetch → ownership check → delegate → return; no Firestore queries or business logic in the

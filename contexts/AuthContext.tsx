@@ -52,6 +52,7 @@ import { User } from '@/types/assets';
 import { getDefaultTargets, setSettings } from '@/lib/services/assetAllocationService';
 import { waitForAuthTokenRefresh, retryFirestoreOperation } from '@/lib/utils/authHelpers';
 import { resolveDisplayName, type UserDocumentName } from '@/lib/utils/authProfile';
+import { isDemoUid } from '@/lib/utils/demoAccount';
 
 /**
  * Authentication context interface
@@ -118,9 +119,7 @@ async function completeDisplayName(
 
   // The demo account is read-only by contract («nessuna modifica viene salvata»): its Auth
   // profile stays as it is, and the fallback simply runs again next time.
-  const isDemoAccount =
-    !!process.env.NEXT_PUBLIC_DEMO_USER_ID && firebaseUser.uid === process.env.NEXT_PUBLIC_DEMO_USER_ID;
-  if (!shouldBackfillAuthProfile || isDemoAccount) return;
+  if (!shouldBackfillAuthProfile || isDemoUid(firebaseUser.uid)) return;
   try {
     await updateProfile(firebaseUser, { displayName });
   } catch (error) {

@@ -114,7 +114,7 @@ Additivo: `sentence` resta intera (70 riferimenti a `PageVerdictModel` in 29 fil
 `leadLength` su un confine di frase e `restLabel`. `splitVerdict`: senza taglio `rest = []`; **un segmento `binding` oltre
 il taglio annulla il taglio**.
 
-Sotto `desktop:`: titolo → prima frase → `freshness` (PERF-03) → `strip` → `scope` (riga d'ambito, sempre visibile) →
+Sotto `desktop:`: titolo → prima frase → `strip` → `scope` (riga d'ambito, sempre visibile) →
 «Il perché · {restLabel}» (`min-h-11`, `aria-expanded`) → seguito. Un solo DOM: il `<p>` ha `<span>` lead e `<span
 id={sectionPanelId(restCollapse.id)}>` (`NarrativeSegments`, `components/ui/narrative-text.tsx:29`); striscia e bottone,
 fratelli del `<p>`, stanno DENTRO la `section` (§ 4.9, 5); sotto `desktop:` il `<p>` è `max-desktop:contents` con
@@ -170,7 +170,10 @@ frase chiude dopo la cifra del record («in un mese» solo con la percentuale, `
 
 - **PERF-12**: `useSyncExternalStore`, nessun ref restituito, `mounted` nel gestore. **PERF-14**: nessun `layout`; un
   grafico montato all'apertura legge `ChartColorsProvider`. **PERF-04**: un grafico lazy riserva la sua altezza (obbligo
-  di MOB-03..07). **PERF-03**: `freshness` fuori da «Il perché». **PERF-02** (in develop dal 2026-09-29): server `false`, già così in `lib/hooks/useMediaQuery.ts`.
+  di MOB-03..07). **PERF-03** (implementata il 2026-09-29): «Aggiornato alle…» NON è uno slot della composizione — sta nel
+  `PageHeader` (desktop: dopo la descrizione; sotto `desktop:` al posto della descrizione, `[data-freshness]`,
+  decisione del proprietario), quindi nessuna riga da riservare fra la prima frase e la striscia (doc/guide/stati.md § The
+  fourth reading). **PERF-02** (in develop dal 2026-09-29): server `false`, già così in `lib/hooks/useMediaQuery.ts`.
 - **MOB-01**: le pagine a tab crescono di ~12 px: l'unica eccezione al ratchet, dichiarata nel commit.
 
 ### 4.9 Domande al proprietario

@@ -7,6 +7,7 @@
 
 import { test as setup, expect } from '@playwright/test';
 import { SPLIT_STORAGE_STATE } from '../playwright.config';
+import { stripPersistedQueryCache } from './persistedCache';
 
 /** Matches `scripts/seedSplitE2E.mts`. */
 const EMAIL = 'split@example.com';
@@ -26,4 +27,6 @@ setup('authenticate split user', async ({ page }) => {
 
   // indexedDB: true — the Firebase Web SDK parks its session there (see auth.setup.ts).
   await page.context().storageState({ path: SPLIT_STORAGE_STATE, indexedDB: true });
+  // The persisted React Query cache out of the state file (PERF-03, see auth.setup.ts).
+  stripPersistedQueryCache(SPLIT_STORAGE_STATE);
 });

@@ -22,6 +22,12 @@
 
 import { useState } from 'react';
 import { Flame, Dices, Mountain, Target, Lightbulb } from 'lucide-react';
+import { useActiveAccount } from '@/contexts/ActiveAccountContext';
+import { useAssets } from '@/lib/hooks/useAssets';
+import { useExpenses } from '@/lib/hooks/useExpenses';
+import { useFreshness } from '@/lib/hooks/useFreshness';
+import { useSettings } from '@/lib/hooks/useSettings';
+import { useSnapshots } from '@/lib/hooks/useSnapshots';
 import { TabsContent } from '@/components/ui/tabs';
 import { FireCalculatorTab } from '@/components/fire-simulations/FireCalculatorTab';
 import { CoastFireTab } from '@/components/fire-simulations/CoastFireTab';
@@ -46,6 +52,16 @@ const TABS: TabDef[] = [
 
 export default function FireSimulationsPage() {
   const [activeTab, setActiveTab] = useState<TabValue>('fire');
+  const { ownerId } = useActiveAccount();
+  // The header's «Aggiornato alle…» (PERF-03) over the four keys the Calcolatore — the tab the
+  // page opens on — paints from; the same cache entries the tabs read, no second read. The goals
+  // document stays out: it is read only once Obiettivi is opened.
+  const freshness = useFreshness([
+    useSettings(ownerId),
+    useAssets(ownerId),
+    useExpenses(ownerId),
+    useSnapshots(ownerId),
+  ]);
 
   return (
     <PageContainer>
@@ -53,6 +69,7 @@ export default function FireSimulationsPage() {
         label="Pianificazione"
         title="FIRE e Simulazioni"
         description="Libertà finanziaria e sostenibilità del piano"
+        freshness={freshness}
       />
 
       <PageTabs

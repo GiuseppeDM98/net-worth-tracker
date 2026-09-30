@@ -4,7 +4,7 @@
 
 ## Files
 
-- **E2E ed emulatori**: `playwright.config.ts`, `e2e/*.spec.ts`, `e2e/global-setup.ts`, the seeds `scripts/seedEmulator.ts` + `scripts/seed*.mts` (`seedPensionE2E`, `seedAnalisiE2E`, `seedCoastFireE2E`, `seedCostCentersE2E`), the production mirror `scripts/mirrorProdAccount.mts` (`npm run mirror:seed` / `mirror:remove`), throwaway exercises `scripts/*.tmp.mts` (untracked); npm scripts `test:e2e` / `e2e:seed*` / `dev:e2e` / `emulators` / `emulators:seed` / `dev:emulator`
+- **E2E ed emulatori**: `playwright.config.ts`, `e2e/*.spec.ts`, `e2e/global-setup.ts`, the six `e2e/auth*.setup.ts` + `e2e/persistedCache.ts` (the helper that keeps the persisted query cache out of the parked sessions), `e2e/shellBoot.ts`, the seeds `scripts/seedEmulator.ts` + `scripts/seed*.mts` (`seedPensionE2E`, `seedAnalisiE2E`, `seedCoastFireE2E`, `seedCostCentersE2E`), the production mirror `scripts/mirrorProdAccount.mts` (`npm run mirror:seed` / `mirror:remove`), throwaway exercises `scripts/*.tmp.mts` (untracked); npm scripts `test:e2e` / `e2e:seed*` / `dev:e2e` / `emulators` / `emulators:seed` / `dev:emulator`
 
 ## Proving a refactor changed no number
 - **Measure the noise floor BEFORE interpreting a diff**: anything downstream of `new Date()` drifts (cents at two
@@ -97,6 +97,13 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   read `netstat -ano`, confirm each PID's command line is this repo's, then `Stop-Process -Id … -Force`. **A port 3000
   held by another app sends `next dev` to 3001 on its own** (2026-09-19: a foreign app answered `/login` with a redirect
   to `/it/login`, and the probe waited for a form that never came): read the «Local:» line of the dev log first.
+- **After a long session the Firestore emulator can refuse every gRPC WRITE while REST still answers** (2026-09-29,
+  Windows laptop: two full suites, six partial runs, four benchmarks and a mirror seed in one evening, the JVM at
+  2,5 GB): `global-setup` died on the Centri seed's `WriteBatch.commit` with `4 DEADLINE_EXCEEDED … after 60.0s`, the
+  Admin SDK's channel, while a REST `PATCH`/`DELETE` on the same emulator took 70 ms and the app (WebChannel) kept
+  working — so the tour looked healthy and every spec was unrunnable. The tell is the pair: a 60 s Admin timeout
+  beside a fast `curl`. Not a defect of the seed or of the branch: export and restart the emulators (from the
+  terminal that started them, so `--export-on-exit` runs) and rerun.
 
 ## Browser-Driven E2E (Playwright)
 - **The six `auth*.setup.ts` anchor on the PROFILE, at 1440** (2026-09-28). Since the shell is in the
@@ -180,6 +187,24 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   there, the file looks valid and every spec lands on `/login`. **Drive the dev server on `localhost`, never
   `127.0.0.1`**: Next blocks cross-origin dev resources from the bare IP, the page never hydrates and the login form
   submits natively — indistinguishable from a wrong password.
+- **And since PERF-03 that capture also takes the persisted React Query cache** (2026-09-29): the app writes its
+  cache to the `nwt-query-cache` database, so a parked session would carry into EVERY spec the figures the setup's
+  login happened to read, and the first frame of every spec would be a restore. The six `auth*.setup.ts` strip that
+  database from the state file they just wrote — `stripPersistedQueryCache` in `e2e/persistedCache.ts`, AFTER
+  `storageState`, not an `indexedDB.deleteDatabase` from the page before it: the app holds the database open and a
+  delete would wait on that connection forever. The names are repeated in the helper (a spec cannot import `lib/`)
+  and `__tests__/persistCache.test.ts` pins them to `lib/constants/persistCache.ts`. So every spec's first visit is
+  a genuine first visit; a spec that RELOADS inside itself sees the restored figures first and the fresh ones as they
+  land — an assertion that retries (`toHaveText`, `toBeVisible`) waits for them, a one-shot `innerText()` read right
+  after the reload may catch the old frame — and an Admin write made between two `goto` of one spec IS reread by the
+  second (the restore invalidates what it restored), which is what four specs of the full run had silently relied on
+  (`assets.bond`, `cashflow.owner`, `cashflow.transfer-fee`, `fire`: red until the restore invalidated, 2026-09-29).
+  Three things `e2e/freshness.spec.ts` learned: the persister writes on a one-second throttle whose first call is
+  immediate, so poll the record for the KEY you need (`expenses/<uid>`), not for any record; the auth wait is
+  `role="status"` «Verifica dell'accesso» and the page's own skeleton «Caricamento» — match the label, not the role;
+  and an emptied `<p>` has no width, which Playwright calls NOT visible — assert the emptied node without a `visible`
+  filter (both header copies, `toHaveText(['', ''])`). The sign-out test reads the record back through IndexedDB
+  itself (`indexedDB.open` + `get`), the way «assert on data» means here.
 - **Prove the test can fail before trusting it** (the 1440px assertions were re-run at 1200px, where they must fail).
 - **Reading the page — the traps, each seen once**: `page.addInitScript` runs BEFORE `document.documentElement` exists
   (observe `document` with `subtree: true`, or the script dies and the spec passes having observed nothing);

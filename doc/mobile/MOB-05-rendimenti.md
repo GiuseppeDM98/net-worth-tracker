@@ -123,7 +123,9 @@ l'eyebrow in `--destructive`, annuncia solo `PageRest`. Il registro in errore fe
 - **PERF-04**: `UnderwaterDrawdownChart` resta nel «Dettaglio»; le tessere sono SVG a mano (PERF-04 § 1), le righe
   chiuse non risparmiano chunk. **PERF-14** toglie il `layout` dai wrapper di pagina, non il `layout="position"` di
   `AttribuzioneTile.tsx:68` (il riordino al cambio periodo), che resta in un pannello montato all'apertura; la riga
-  anima in CSS. **PERF-12**: ref scritti solo negli handler. **PERF-03**: `freshness`, se c'è, sopra la striscia.
+  anima in CSS. **PERF-12**: ref scritti solo negli handler. **PERF-03** (implementata il 2026-09-29): Rendimenti non ha
+  «Aggiornato alle…» — lo stadio 1 legge con `fetchQuery` e non dipinge mai un dato vecchio (PERF-09 potrà darglielo, nel
+  `PageHeader` come le altre pagine, mai nella composizione).
 
 ### 4.8 Domande al proprietario
 

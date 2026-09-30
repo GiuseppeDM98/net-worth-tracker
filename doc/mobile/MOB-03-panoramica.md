@@ -51,7 +51,7 @@ Righe del 2026-09-26, da riverificare:
 
 ### 4.1 La prima schermata
 
-Sotto `desktop:`: titolo → prima frase (decisione 4; domanda 1) → «Aggiornato alle…» (PERF-03) → striscia → «Il perché ·
+Sotto `desktop:`: titolo → prima frase (decisione 4; domanda 1) → striscia → «Il perché ·
 {restLabel}» → **LA tessera `panoramica-patrimonio`** (aperta, fuori dal controller) → «Il resto della pagina» → le
 righe. `useMobileSections({ route: 'panoramica', sections })` (chiave `mobile-sections:panoramica`), un `SectionSpec` per
 tessera presente, nessun `failed` (un payload solo: se fallisce resta l'`ErrorNotice` di pagina, `page.tsx:282-299`).
@@ -122,8 +122,10 @@ Sotto `tablet:` la curva scende a `min-h-[120px]`: si accorcia la curva, mai la 
 
 ### 4.5 Conflitti con PERF e con MOB-06
 
-- **PERF-03**: `freshness` fra la prima frase e la striscia, mai in «Il perché»; età = la più vecchia fra
-  `dataUpdatedAt` e `overview.freshness.updatedAt`. Le celle non hanno count-up: non saltano all'arrivo del fresco.
+- **PERF-03** (implementata il 2026-09-29): «Aggiornato alle…» sta nel `PageHeader` — sul telefono al posto della
+  descrizione (la data) finché dura — non fra la prima frase e la striscia (decisione del proprietario); età = la più
+  vecchia fra `dataUpdatedAt` e `overview.freshness.updatedAt`, soglia il minuto dell'overview
+  (`DASHBOARD_OVERVIEW_STALE_TIME_MS`). Le celle non hanno count-up: non saltano all'arrivo del fresco.
 - **PERF-07**: il ricalcolo non ha interfaccia propria, è il «sto rileggendo…» della stessa riga `status`; il payload
   non cambia forma. Senza PERF-07 dura solo di più.
 - **PERF-14**: `layout="position"` (`page.tsx:335`) è suo, non si rimette. **PERF-04**: qui niente recharts.

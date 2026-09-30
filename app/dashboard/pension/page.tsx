@@ -9,15 +9,31 @@
  *
  * The compact header is a breadcrumb: the page's real headline is the verdict rendered by
  * `PensionOverview` (DESIGN.md → Compact Page Header). «Registra versamento» keeps the header's
- * actions slot, as the Panoramica's «Crea snapshot» does.
+ * actions slot, as the Panoramica's «Crea snapshot» does. The header's freshness reading
+ * («Aggiornato alle…», PERF-03) is taken here from the same four keys `PensionOverview` paints —
+ * the same cache entries, no second read.
  */
 
+import { useActiveAccount } from '@/contexts/ActiveAccountContext';
+import { useAssets } from '@/lib/hooks/useAssets';
+import { useFreshness } from '@/lib/hooks/useFreshness';
+import { usePensionContributions } from '@/lib/hooks/usePensionContributions';
+import { useSettings } from '@/lib/hooks/useSettings';
+import { useSnapshots } from '@/lib/hooks/useSnapshots';
 import { PensionOverview } from '@/components/pension/PensionOverview';
 import { PensionHeaderAction } from '@/components/pension/PensionHeaderAction';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
 
 export default function PensionPage() {
+  const { ownerId } = useActiveAccount();
+  const freshness = useFreshness([
+    useAssets(ownerId),
+    usePensionContributions(ownerId),
+    useSettings(ownerId),
+    useSnapshots(ownerId),
+  ]);
+
   return (
     <PageContainer>
       <PageHeader
@@ -25,6 +41,7 @@ export default function PensionPage() {
         title="Previdenza"
         description="Versamenti, beneficio fiscale e plafond del tuo fondo pensione"
         actions={<PensionHeaderAction />}
+        freshness={freshness}
       />
       <PensionOverview />
     </PageContainer>

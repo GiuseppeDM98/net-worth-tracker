@@ -51,6 +51,13 @@ const VIEWPORT = MOBILE ? { width: 390, height: 844 } : { width: 1440, height: 9
 const BASE = 'http://localhost:3200';
 const OUT = 'perf/last-run.json';
 const SETTLE_TIMEOUT_MS = 20_000;
+/**
+ * The persisted React Query cache (PERF-03): `PERSIST_CACHE_DB_NAME` / `_STORE_NAME` / `_KEY` in
+ * lib/constants/persistCache.ts, repeated here because an .mjs cannot import it. The persister
+ * writes ~1 s after the LAST cache event, so a revisit taken right at `data` would find nothing.
+ */
+const PERSISTED_CACHE = { db: 'nwt-query-cache', store: 'queries', key: 'react-query' };
+const PERSIST_FLUSH_TIMEOUT_MS = 8_000;
 
 const ROUTES = selectRoutes(JSON.parse(readFileSync('perf/routes.json', 'utf-8')).routes, args.routes);
 
@@ -245,6 +252,45 @@ async function readPerf(page) {
   });
 }
 
+/**
+ * Wait until the persisted query cache holds a NON-EMPTY record written after `sinceEpochMs` — the
+ * save that follows the first visit's figures. Two saves happen on a load: an immediate one at the
+ * first cache event (nothing read yet: an empty client) and, ~1 s after the LAST event, the one
+ * with the figures — so the instant to beat is the moment the figures were on screen, not the
+ * navigation. Gives up after PERSIST_FLUSH_TIMEOUT_MS: with the persister off
+ * (`NEXT_PUBLIC_PERSIST_QUERIES=false`) there is never one, and the revisit then measures the app
+ * as it was. Read through IndexedDB itself, the way e2e/freshness.spec.ts does.
+ */
+async function waitForPersistedCache(page, sinceEpochMs) {
+  const deadline = Date.now() + PERSIST_FLUSH_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    const record = await page.evaluate(
+      ({ db: dbName, store, key }) =>
+        new Promise((resolve) => {
+          const request = indexedDB.open(dbName);
+          request.onerror = () => resolve(null);
+          request.onsuccess = () => {
+            const db = request.result;
+            if (!db.objectStoreNames.contains(store)) { db.close(); resolve(null); return; }
+            const get = db.transaction(store, 'readonly').objectStore(store).get(key);
+            get.onerror = () => resolve(null);
+            get.onsuccess = () => {
+              db.close();
+              try {
+                const parsed = typeof get.result === 'string' ? JSON.parse(get.result) : null;
+                resolve(parsed ? { timestamp: parsed.timestamp ?? null, queries: parsed.clientState?.queries?.length ?? 0 } : null);
+              } catch { resolve(null); }
+            };
+          };
+        }),
+      PERSISTED_CACHE,
+    );
+    if (record && typeof record.timestamp === 'number' && record.timestamp >= sinceEpochMs && record.queries > 0) return true;
+    await page.waitForTimeout(250);
+  }
+  return false;
+}
+
 async function measureCold(browser, route) {
   const { context, page } = await newMeasuredPage(browser);
   try {
@@ -252,6 +298,8 @@ async function measureCold(browser, route) {
     if (REVISIT) {
       await page.goto(`${BASE}${route.href}`, { waitUntil: 'load' });
       await waitForMarks(page, ['h1', 'data']);
+      // The figures just read must be on disk before the reload, or the revisit restores nothing.
+      await waitForPersistedCache(page, Date.now());
     }
     const net = attachNetwork(page);
     await page.goto(`${BASE}${route.href}`, { waitUntil: 'load' });

@@ -94,7 +94,7 @@ Diagnostica non vincolante: `mainTop` (la barra a 1024), `pillTop`, `headerHeigh
   `spendingRolesEnabled` spento, il default. La vista per ruolo non è nel budget; sul mirror il report stampa lo stato
   dell'interruttore, perché il Flusso a 390 cambia forma con lui.
 - **Il settle**: `h1`, nessun `[data-slot="skeleton"]` visibile (`components/ui/skeleton.tsx:20`), una cifra o 8 s, nessun
-  `role="status"` con testo nella `section` del verdetto o nel `PageHeader` (la riga di PERF-03 § 4; gli altri di `main`
+  `[data-freshness]` con testo nel `PageHeader` (la riga di PERF-03, implementata il 2026-09-29; gli altri `role="status"` di `main`
   no: `components/fire-simulations/coast/CoastIpotesi.tsx:276` resta pieno), poi 500 ms; oltre 60 s `unsettled` (rosso).
   Contesto `reducedMotion: 'reduce'`, uno per viewport, nessun `mobile-sections:*`, nessuna riga aperta.
 - **Privacy e opzioni**: uscita in `.mobile-census/` (gitignored), testi solo con `--texts`; sempre dopo `--`: `--email`,

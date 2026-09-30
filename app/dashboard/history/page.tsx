@@ -33,6 +33,7 @@ import { queryKeys } from '@/lib/query/queryKeys';
 import { useSnapshots } from '@/lib/hooks/useSnapshots';
 import { useAssets } from '@/lib/hooks/useAssets';
 import { useSettings } from '@/lib/hooks/useSettings';
+import { useFreshness } from '@/lib/hooks/useFreshness';
 import { useExpenses } from '@/lib/hooks/useExpenses';
 import { useAssetTransactions } from '@/lib/hooks/useAssetTransactions';
 import { usePensionContributions } from '@/lib/hooks/usePensionContributions';
@@ -136,6 +137,9 @@ export default function HistoryPage() {
   // The ledger and the pension contributions: the Driver measures the market from them.
   const transactionsQuery = useAssetTransactions(ownerId);
   const contributionsQuery = usePensionContributions(ownerId);
+  // The header's «Aggiornato alle…» while figures restored from the persisted cache are being
+  // reread (PERF-03): the same six keys the read state composes.
+  const freshness = useFreshness([snapshotsQuery, assetsQuery, settingsQuery, expensesQuery, transactionsQuery, contributionsQuery]);
   const { loading, loadFailed } = useMemo(
     () => composeReadState([snapshotsQuery, assetsQuery, settingsQuery, expensesQuery, transactionsQuery, contributionsQuery]),
     [snapshotsQuery, assetsQuery, settingsQuery, expensesQuery, transactionsQuery, contributionsQuery],
@@ -346,6 +350,7 @@ export default function HistoryPage() {
       label="Analisi"
       title="Storico"
       description={describeStoricoHeader(growth)}
+      freshness={freshness}
       actions={
         <>
           <div className="hidden items-center gap-2 desktop:flex">{headerActions(false)}</div>

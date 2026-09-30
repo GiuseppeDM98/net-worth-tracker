@@ -28,6 +28,7 @@ import { useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query/queryKeys';
 import { useHallOfFame } from '@/lib/hooks/useHallOfFame';
+import { useFreshness } from '@/lib/hooks/useFreshness';
 import { resolveCenteredModalOrigin } from '@/lib/utils/modalOrigin';
 import { Loader2, Plus, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
@@ -119,7 +120,11 @@ export default function HallOfFamePage() {
   const queryClient = useQueryClient();
   // The rankings document from its key (2026-09-29): a return visit opens on the cache, and every
   // write below invalidates the key instead of re-reading by hand.
-  const { data: loadedData, isLoading: loading, isError: loadFailed } = useHallOfFame(ownerId);
+  const hallOfFameQuery = useHallOfFame(ownerId);
+  const { data: loadedData, isLoading: loading, isError: loadFailed } = hallOfFameQuery;
+  // The header's «Aggiornato alle…» while a document restored from the persisted cache is being
+  // reread (PERF-03).
+  const freshness = useFreshness([hallOfFameQuery]);
   const data = loadedData ?? null;
   const [recalculating, setRecalculating] = useState(false);
 
@@ -288,6 +293,7 @@ export default function HallOfFamePage() {
       label="Analisi"
       title="Hall of Fame"
       description={describeHallOfFameHeader(summary.stats, summary.rankingsUpdatedAt)}
+      freshness={freshness}
       // Below desktop the two actions sit under the verdict at 44px; the sticky navbar carries
       // no third «Aggiungi una nota» (a 36px icon, the same name twice in the Tab order).
       actions={<div className="hidden items-center gap-2 desktop:flex">{headerActions(false)}</div>}

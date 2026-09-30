@@ -142,7 +142,9 @@ WORKFLOW § Where things are recorded; cifre tonde inventate e nomi generici, ma
 
 - **PERF-14** scrive in DESIGN.md solo se il proprietario cambia lo stagger (§ 4 D, § 10) e non tocca il sidecar:
   MOB-09 rilegge dopo, aggiunge accanto, riallinea `spring-layout` (§ 4.3).
-- **PERF-03**: se «Aggiornato alle…» ha un nome in DESIGN.md, The First-Screen Rule lo cita (sotto la prima frase).
+- **PERF-03** (implementata il 2026-09-29): se «Aggiornato alle…» avrà un nome in DESIGN.md, The First-Screen Rule lo cita
+  DOV'È — la riga dell'header (desktop dopo la descrizione, sotto al posto della descrizione), per decisione del
+  proprietario, non sotto la prima frase.
 - **PERF-04**: «a closed row downloads no chart» regge sul grafico dietro `dynamic` di modulo (AGENTS § Dynamic Imports
   and Module Hygiene, PERF-04 § 10): si rimanda lì, NON a «Deferred Chart Mount» (`:1277`, **Superseded (2026-09-06)**,
   parla del count-up). **`perf:serve`**: `mobile:budget` su :3200.

@@ -87,6 +87,7 @@ import { queryKeys } from '@/lib/query/queryKeys';
 import { settingsQueryOptions } from '@/lib/hooks/useSettings';
 import { useAssets } from '@/lib/hooks/useAssets';
 import { useExpenseCategories } from '@/lib/hooks/useExpenses';
+import { useFreshness } from '@/lib/hooks/useFreshness';
 import { useColorTheme, ColorTheme } from '@/contexts/ColorThemeContext';
 import { TabsContent } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
@@ -612,7 +613,8 @@ export default function SettingsPage() {
   // page kept its own copy beside it until 2026-09-29). `isLoading` is true before the first read,
   // so an empty list is «not read yet», never «no categories»; `isError` = the categories were not
   // read, and every tile fed by them says so instead of «nessuna».
-  const { data: expenseCategories = EMPTY_CATEGORIES, isLoading: loadingCategories, isError: categoriesFailed } = useExpenseCategories(ownerId);
+  const categoriesQuery = useExpenseCategories(ownerId);
+  const { data: expenseCategories = EMPTY_CATEGORIES, isLoading: loadingCategories, isError: categoriesFailed } = categoriesQuery;
   // Announcements of the Categorie list and of the dividend sync (one live region each).
   const [categoryAnnouncement, setCategoryAnnouncement] = useState('');
   const [syncAnnouncement, setSyncAnnouncement] = useState('');
@@ -635,7 +637,12 @@ export default function SettingsPage() {
   // not just a "cash-class" asset — a money-market ETF (assetClass 'cash') is not a settlement
   // account. Strict convention (doc/guide/patrimonio.md § Asset Pricing, FX and Assets). A failed
   // read is `isError`, never `[]`: the tile used to tell the reader to create an account they had.
-  const { data: allAssets = EMPTY_ASSETS, isLoading: loadingAccounts, isError: accountsFailed } = useAssets(ownerId);
+  const accountsQuery = useAssets(ownerId);
+  const { data: allAssets = EMPTY_ASSETS, isLoading: loadingAccounts, isError: accountsFailed } = accountsQuery;
+  // The header's «Aggiornato alle…» while the two lists restored from the persisted cache are being
+  // reread (PERF-03). The settings document itself is not among them: the form reads it through
+  // `fetchQuery` and never paints an older one (see `loadTargets`).
+  const freshness = useFreshness([categoriesQuery, accountsQuery]);
   const cashAssets = useMemo(() => allAssets.filter((a) => a.type === 'cash' && a.assetClass === 'cash'), [allAssets]);
   const [defaultDebitCashAssetId, setDefaultDebitCashAssetId] = useState<string>('__none__');
   const [defaultCreditCashAssetId, setDefaultCreditCashAssetId] = useState<string>('__none__');
@@ -1859,6 +1866,7 @@ export default function SettingsPage() {
           label="Configurazione"
           title="Impostazioni"
           description="Target, preferenze e flussi"
+          freshness={freshness}
         />
         <PageTabs
           tabs={SETTINGS_TABS}
@@ -1883,6 +1891,7 @@ export default function SettingsPage() {
           label="Configurazione"
           title="Impostazioni"
           description="Target, preferenze e flussi"
+          freshness={freshness}
         />
         <ErrorNotice
           className="mt-4 max-w-[920px]"
@@ -1946,6 +1955,7 @@ export default function SettingsPage() {
         label="Configurazione"
         title="Impostazioni"
         description="Target, preferenze e flussi"
+        freshness={freshness}
         actions={
           <div className="flex items-center gap-2">
             {/* The save STATE is the bar at the bottom of the page (it names the tabs) and the dot
