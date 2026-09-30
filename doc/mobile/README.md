@@ -5,7 +5,7 @@
 > implementazione (`MOB-NN-*.md`, sul template di `doc/perf/`, ognuna con il prompt e il modello in coda), il censimento
 > di riferimento in `reference/` e questo indice: la domanda con la risposta, come è stato misurato il mobile attuale,
 > la baseline, le tre direzioni disegnate e quella scelta, l'ordine consigliato e lo stato. **Si implementa DOPO le 14
-> spec di `doc/perf/`** (decisione del proprietario): PERF-02 (in develop dal 2026-09-29) e PERF-03 (implementata il 2026-09-29: la riga «Aggiornato alle…» sta nel `PageHeader`, non nella composizione) cambiano la shell che il mobile eredita, PERF-04/11/12/14
+> spec di `doc/perf/`** (decisione del proprietario): PERF-02 (in develop dal 2026-09-29) e PERF-03 (in develop dal 2026-09-30: la riga «Aggiornato alle…» sta nel `PageHeader`, non nella composizione) cambiano la shell che il mobile eredita, PERF-04/11/12/14
 > toccano gli stessi componenti. Una spec che si chiude aggiorna la tabella in § 6 e, se ha rimisurato, la baseline in § 3.
 
 ## 1. La domanda e la risposta

@@ -187,7 +187,7 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   there, the file looks valid and every spec lands on `/login`. **Drive the dev server on `localhost`, never
   `127.0.0.1`**: Next blocks cross-origin dev resources from the bare IP, the page never hydrates and the login form
   submits natively — indistinguishable from a wrong password.
-- **And since PERF-03 that capture also takes the persisted React Query cache** (2026-09-29): the app writes its
+- **And that capture also takes the persisted React Query cache** (since 2026-09-29): the app writes its
   cache to the `nwt-query-cache` database, so a parked session would carry into EVERY spec the figures the setup's
   login happened to read, and the first frame of every spec would be a restore. The six `auth*.setup.ts` strip that
   database from the state file they just wrote — `stripPersistedQueryCache` in `e2e/persistedCache.ts`, AFTER

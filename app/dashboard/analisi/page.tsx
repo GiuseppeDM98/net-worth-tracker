@@ -42,7 +42,7 @@ export default function AnalisiPage() {
   const settingsQuery = useSettings(ownerId);
   const { data: settings, isLoading: settingsLoading, isError: settingsError } = settingsQuery;
   // The header's «Aggiornato alle…» while figures restored from the persisted cache are being
-  // reread (PERF-03); the tab owns the header, so the reading travels down as a prop.
+  // reread; the tab owns the header, so the reading travels down as a prop.
   const freshness = useFreshness([expensesQuery, categoriesQuery, settingsQuery]);
   // The URL-focus restore in AnalisiTab validates against the floored history, so it
   // must not fire until the DEFINITIVE floor is known — the restore is one-shot and

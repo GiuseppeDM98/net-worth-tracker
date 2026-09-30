@@ -26,7 +26,7 @@
  *   --warm-only | --cold-only    one scenario
  *   --mobile                     390×844 and a 4× CPU throttle (AGENTS.md § Motion: the phone's budget)
  *   --cpu=N                      CPU throttle rate via CDP (default 1, or 4 with --mobile)
- *   --revisit                    cold = the SECOND load of the route after a first visit (PERF-03)
+ *   --revisit                    cold = the SECOND load of the route after a first visit (the persisted cache)
  * Writes perf/last-run.json (gitignored) with every run and the medians.
  */
 import { chromium } from 'playwright';
@@ -52,7 +52,7 @@ const BASE = 'http://localhost:3200';
 const OUT = 'perf/last-run.json';
 const SETTLE_TIMEOUT_MS = 20_000;
 /**
- * The persisted React Query cache (PERF-03): `PERSIST_CACHE_DB_NAME` / `_STORE_NAME` / `_KEY` in
+ * The persisted React Query cache: `PERSIST_CACHE_DB_NAME` / `_STORE_NAME` / `_KEY` in
  * lib/constants/persistCache.ts, repeated here because an .mjs cannot import it. The persister
  * writes ~1 s after the LAST cache event, so a revisit taken right at `data` would find nothing.
  */

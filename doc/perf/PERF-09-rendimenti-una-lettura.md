@@ -26,6 +26,15 @@ che il hero (`setPerformanceData` a `:378`) esista — e 30 letture Admin per un
 lookups resolving the same message ID three separate times → resolved once: −78% wall-clock». Qui la stessa collezione è
 risolta dodici volte.
 
+**Visto chiudendo la cache persistita (2026-09-29; annotato al ritiro della sua spec, 2026-09-30).** Rendimenti è, con
+Impostazioni (PERF-13 § 1), la route che al reload mostra ancora il suo skeleton, e l'unica senza la riga «Aggiornato
+alle…» nell'header: lo stadio 1 legge con `queryClient.fetchQuery`, che non ha observer (niente da passare a
+`useFreshness`) e, poiché il ripristino invalida ciò che ripristina, ATTENDE la rilettura delle sei collezioni invece di
+dipingere quelle restaurate; il hero viene poi da `performance-cache`, che sta su Firestore e fuori dalla allowlist per
+scelta. Misura (`perf/README.md` § Revisit): 686 → 685 ms, skeleton sì → sì. Non è un obiettivo di § 2: se questa spec
+vuole la regola delle altre pagine — l'ultimo dato noto subito, detto nell'header (doc/guide/stati.md § The fourth
+reading) — lo decide il proprietario qui, e il design A (§ 4) è il punto dove entrerebbe.
+
 ## 2. Obiettivo misurabile
 
 - Chiamate API al mount: da 17 a **8** (6 benchmark + 1 FX + **1** `/api/performance/yields`); richieste Firestore client:

@@ -33,6 +33,6 @@ setup('authenticate degraded account', async ({ page }) => {
   // `indexedDB: true` for the same reason as auth.setup.ts: the Firebase Web SDK keeps its session
   // there, and the default capture produces a state file that lands every spec back on /login.
   await page.context().storageState({ path: DEGRADED_STORAGE_STATE, indexedDB: true });
-  // The persisted React Query cache out of the state file (PERF-03, see auth.setup.ts).
+  // The persisted React Query cache out of the state file (see auth.setup.ts).
   stripPersistedQueryCache(DEGRADED_STORAGE_STATE);
 });

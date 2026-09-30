@@ -1,5 +1,5 @@
 /**
- * The allowlist of the persisted queries (PERF-03): which keys reach IndexedDB, whose they are,
+ * The allowlist of the persisted queries: which keys reach IndexedDB, whose they are,
  * and that the demo account's never do. Pinned against `lib/query/queryKeys.ts` itself, so a key
  * that changes shape turns this red before a page reads a stale one.
  */
@@ -75,6 +75,56 @@ describe('isPersistableQuery', () => {
 
   it('should treat a key whose second segment is not a string as ownerless', () => {
     expect(isPersistableQuery(['assets', 42], DEMO)).toBe(false);
+  });
+});
+
+describe('every key builder under a persisted prefix', () => {
+  /**
+   * The builders of `queryKeys` whose FIRST parameter is the owner's uid and whose key falls under
+   * a persisted prefix. Declared by hand on purpose: a new builder under one of those prefixes turns
+   * this red until someone has checked that its first argument really is the owner — the persister
+   * reads that segment as the uid, and an asset id or a label there would slip past the demo guard.
+   * Seen red both ways on 2026-09-30, this case alone: a builder keyed by an asset id
+   * (`['assets', assetId]`, the dead `assets.byId` removed that day) fails the declaration; one with
+   * the owner out of position (`['assets', 'range', uid]`) fails the position.
+   */
+  const OWNER_KEYED_BUILDERS = [
+    'assetTransactions.all',
+    'assetTransactions.byAsset',
+    'assetTransactions.meta',
+    'assets.all',
+    'costCenters.all',
+    'dashboard.overview',
+    'dividendReceipts.all',
+    'expenses.all',
+    'expenses.categories',
+    'expenses.month',
+    'goals.all',
+    'hallOfFame.all',
+    'pensionContributions.all',
+    'pensionContributions.byAsset',
+    'settings.all',
+    'snapshots.all',
+    'snapshots.range',
+  ];
+
+  type KeyBuilder = (...args: string[]) => readonly unknown[];
+
+  it('should carry its first argument right after the prefix, and be declared as owner-keyed', () => {
+    const underAPrefix: string[] = [];
+
+    for (const [group, builders] of Object.entries(queryKeys)) {
+      for (const [name, builder] of Object.entries(builders)) {
+        // One distinct sentinel per position: the owner segment must be the FIRST argument.
+        const key = (builder as unknown as KeyBuilder)('arg0', 'arg1', 'arg2', 'arg3', 'arg4');
+        const owner = resolvePersistedOwner(key);
+        if (owner === null) continue;
+        expect(owner, `${group}.${name}`).toBe('arg0');
+        underAPrefix.push(`${group}.${name}`);
+      }
+    }
+
+    expect(underAPrefix.sort()).toEqual(OWNER_KEYED_BUILDERS);
   });
 });
 

@@ -68,7 +68,7 @@ occupano una colonna, aperte le allarga `OPEN_CELL_CLASS` (esce dopo `tablet:`).
   risalgono; oltre `MAX_BESIDE_ROWS` le chiuse vanno sotto su tre colonne. Chi sta sotto ha una riga ESPLICITA
   (`belowRow`): la cella `1fr` × colonna 3 è libera e l'auto-placement la riempirebbe per prima (§ 8.5, il cursore
   riparte dalla riga 1), con la settima chiusa della Panoramica stirata accanto al fondo di LA tessera.
-- Verdetto breve, striscia e riga d'ambito stanno sopra la griglia (la `freshness` di PERF-03 è nell'header, non qui); `LIFTED_FIGURE_CLASS`
+- Verdetto breve, striscia e riga d'ambito stanno sopra la griglia (la `freshness` è nel `PageHeader`, non qui); `LIFTED_FIGURE_CLASS`
   (`max-tablet:hidden`) ridà le cifre sollevate (The Lifted-Figure Rule).
 - **Il Flusso di Analisi sceglie il disegno a 640 px, non a `desktop:`** (proprietario, 2026-09-27): sotto i 640 px una
   barra e le righe, da 640 il Sankey. È una soglia di leggibilità del GRAFICO (a 390 quattro colonne da ~80 px), come la
@@ -124,11 +124,11 @@ Tracciamento** (tab, «+» e «Aggiungi», Movimenti; `e2e/cashflow.tablet.spec.
 - **PERF-02** (in develop dal 2026-09-29) ha portato la shell, barra compresa, fuori da `ProtectedRoute`
   (`app/dashboard/layout.tsx`): § 4.3 vale lì, rimisurata sulla build. Le colonne sono CSS, il posto accanto no (`compact` è
   `false` sul server): la griglia della pagina monta ancora dopo i dati, sul client (nell'HTML c'è solo lo skeleton generico,
-  con le sue colonne CSS); PERF-03 (implementata il 2026-09-29) la monta con le cifre già lette appena auth e ripristino
+  con le sue colonne CSS); PERF-03 (in develop dal 2026-09-30) la monta con le cifre già lette appena auth e ripristino
   hanno risposto — un fotogramma senza righe accanto resta possibile, da annotare.
 - **PERF-04**: un'aperta va a tutta larghezza, nessun grafico pigro monta in una colonna da ~320 px. **PERF-14**: niente
   `layout` di Framer; si anima solo il pannello; `BottomNavigation` non si tocca. **PERF-12**: pura + hook senza stato.
-  **PERF-03** (implementata il 2026-09-29): «Aggiornato alle…» sta nella riga dell'header (sotto `desktop:` al posto della
+  **PERF-03** (in develop dal 2026-09-30): «Aggiornato alle…» sta nella riga dell'header (sotto `desktop:` al posto della
   descrizione, troncata a una riga), non nei 715 px della composizione. **`perf:serve`**: il censimento gira su :3200.
 
 ### 4.6 Domande al proprietario

@@ -130,7 +130,7 @@ PERF-04 fa pigra la tab intera (What If, Coast, Monte Carlo, Obiettivi; PERF-04 
 dopo è nel chunk della tab (`WhatIfAnalysisTab.tsx:89`), si monta all'apertura senza scaricare nulla; lo skeleton di
 MOB-02 § 4.8 vale per un grafico pigro da sé. Dal 2026-09-29 `failed` = gli `isError` degli hook su ogni tab FIRE
 (Previdenza: `PensionOverview.tsx:115-118`). L'Esposizione (dal 2026-09-28; PERF-10 per il `Server-Timing`)
-parte all'apertura e da calda non chiama Yahoo. PERF-03 (implementata il 2026-09-29): «Aggiornato alle…» sta nel
+parte all'apertura e da calda non chiama Yahoo. PERF-03 (in develop dal 2026-09-30): «Aggiornato alle…» sta nel
 `PageHeader` — le pagine Previdenza e FIRE leggono gli stessi hook dei loro componenti per la riga — mai nella
 composizione né in «Il perché». PERF-12/14: nessun `layout`. PERF-13: § 3.
 

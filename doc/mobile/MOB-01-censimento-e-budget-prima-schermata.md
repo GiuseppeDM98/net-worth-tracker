@@ -94,7 +94,7 @@ Diagnostica non vincolante: `mainTop` (la barra a 1024), `pillTop`, `headerHeigh
   `spendingRolesEnabled` spento, il default. La vista per ruolo non è nel budget; sul mirror il report stampa lo stato
   dell'interruttore, perché il Flusso a 390 cambia forma con lui.
 - **Il settle**: `h1`, nessun `[data-slot="skeleton"]` visibile (`components/ui/skeleton.tsx:20`), una cifra o 8 s, nessun
-  `[data-freshness]` con testo nel `PageHeader` (la riga di PERF-03, implementata il 2026-09-29; gli altri `role="status"` di `main`
+  `[data-freshness]` con testo nel `PageHeader` (la riga di freschezza, `components/layout/PageHeader.tsx`, in develop dal 2026-09-30; gli altri `role="status"` di `main`
   no: `components/fire-simulations/coast/CoastIpotesi.tsx:276` resta pieno), poi 500 ms; oltre 60 s `unsettled` (rosso).
   Contesto `reducedMotion: 'reduce'`, uno per viewport, nessun `mobile-sections:*`, nessuna riga aperta.
 - **Privacy e opzioni**: uscita in `.mobile-census/` (gitignored), testi solo con `--texts`; sempre dopo `--`: `--email`,
@@ -113,7 +113,7 @@ nello stesso commit). Allargare: a mano, con l'OK del proprietario, annotato in 
 **Conflitti con PERF**: `perf/` è la base (`perf:build`, `perf:serve` su :3200, il `--`, la pura + `.mts` di
 `perfBudget`); PERF-12 ha `perf:census`: nomi
 distinti; PERF-02 (in develop dal 2026-09-29) → nessuno spinner: l'attesa dell'auth è lo skeleton «Verifica dell'accesso»
-in `main` (`app/dashboard/layout.tsx`), `[data-slot="skeleton"]` come ogni altro; PERF-03 → la riga di stato vuota; PERF-04 → il settle aspetta lo
+in `main` (`app/dashboard/layout.tsx`), `[data-slot="skeleton"]` come ogni altro; PERF-03 (in develop dal 2026-09-30) → la riga di stato vuota, `[data-freshness]`; PERF-04 → il settle aspetta lo
 `Skeleton` dei grafici pigri (a riga chiusa `charts` scende: voluto).
 
 **Decisioni per il proprietario**: (1) budget sul mirror con tolleranza, o su un fixture deterministico (stabile ma

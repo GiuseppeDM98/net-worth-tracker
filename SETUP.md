@@ -185,7 +185,7 @@ REGISTRATION_WHITELIST=
 NEXT_PUBLIC_ENABLE_TEST_SNAPSHOTS=false
 
 # Persisted query cache (optional). The app keeps its last successful reads in the browser's
-# IndexedDB and paints them at once on the next load (PERF-03). `false` switches that off — the
+# IndexedDB and paints them at once on the next load. `false` switches that off — the
 # rollback of a deploy; never set it on the Playwright server (`dev:e2e`).
 # NEXT_PUBLIC_PERSIST_QUERIES=false
 

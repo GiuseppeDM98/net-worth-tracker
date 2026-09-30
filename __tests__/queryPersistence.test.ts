@@ -1,5 +1,5 @@
 /**
- * The round trip through the persister keeps the dates (PERF-03): a `Date` comes back a `Date` at
+ * The round trip through the persister keeps the dates: a `Date` comes back a `Date` at
  * the same instant, a Firestore `Timestamp` — or its prototype-less `{ seconds, nanoseconds }`
  * shape — comes back the `Date` its type declared, and nothing else is touched.
  */

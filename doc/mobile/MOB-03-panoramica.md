@@ -122,7 +122,7 @@ Sotto `tablet:` la curva scende a `min-h-[120px]`: si accorcia la curva, mai la 
 
 ### 4.5 Conflitti con PERF e con MOB-06
 
-- **PERF-03** (implementata il 2026-09-29): «Aggiornato alle…» sta nel `PageHeader` — sul telefono al posto della
+- **PERF-03** (in develop dal 2026-09-30): «Aggiornato alle…» sta nel `PageHeader` — sul telefono al posto della
   descrizione (la data) finché dura — non fra la prima frase e la striscia (decisione del proprietario); età = la più
   vecchia fra `dataUpdatedAt` e `overview.freshness.updatedAt`, soglia il minuto dell'overview
   (`DASHBOARD_OVERVIEW_STALE_TIME_MS`). Le celle non hanno count-up: non saltano all'arrivo del fresco.
@@ -224,7 +224,7 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice
 - Leggi doc/mobile/README.md, doc/mobile/MOB-02-primitive-della-composizione.md (§ 4, il contratto) e MOB-03 per
   intero; DESIGN.md § 5 (Page Verdict, Tile, Market Digest Line), § 6 e The Scheduled-Is-Not-Spent Rule (MAI
-  rigenerarlo); doc/perf/PERF-03 e PERF-07 (devono essere chiuse); se MOB-06 è chiusa, il suo diff su PatrimonioTile
+  rigenerarlo); doc/perf/PERF-07 (deve essere chiusa; PERF-03 lo è dal 2026-09-30: doc/guide/stati.md § The fourth reading); se MOB-06 è chiusa, il suo diff su PatrimonioTile
 - Crea SESSION_NOTES.md; crea il branch dalla branch attiva PRIMA di editare
 
 Regole: nessun commit senza il mio OK; un branch e un commit; rispondi in italiano; le cinque domande di § 4.6 con lo

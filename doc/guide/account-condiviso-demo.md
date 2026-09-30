@@ -39,3 +39,12 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **Switching gotcha**: React Query keys namespace by the id passed in, but manual `useEffect` loaders (settings, history,
   performance, allocation, hall of fame) must include `ownerId` in their deps. The switcher must exist in BOTH the
   Sidebar and the `SecondaryMenuDrawer`, since portrait has no Sidebar.
+
+## Per-page blind spots
+
+- **That the demo account writes nothing to IndexedDB is proven by a pure test, never seen in a browser**
+  (2026-09-30): `isPersistableQuery` refuses every key whose owner segment is the demo uid, and
+  `__tests__/persistCache.test.ts` pins both that and the position of the owner in every key builder under a
+  persisted prefix. No spec opens the demo and reads the store — the emulators carry no
+  `NEXT_PUBLIC_DEMO_USER_ID` — and the tour of 2026-09-29 did not visit it. So a missing browser check here is
+  known; a `nwt-query-cache` record holding a key of the demo uid in a visitor's browser would be a real defect.

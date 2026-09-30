@@ -155,7 +155,7 @@ interface AnalisiTabProps {
   historyStartYear?: number;
   /** settings.spendingRolesEnabled — adds the 50/30/20 view to Flusso, and makes it the default. */
   spendingRolesEnabled?: boolean;
-  /** The page's freshness reading for the header the tab owns (`useFreshness`, PERF-03). */
+  /** The page's freshness reading for the header the tab owns (`useFreshness`). */
   freshness?: PageFreshness;
 }
 

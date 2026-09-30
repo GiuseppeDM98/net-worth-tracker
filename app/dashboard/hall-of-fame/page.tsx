@@ -123,7 +123,7 @@ export default function HallOfFamePage() {
   const hallOfFameQuery = useHallOfFame(ownerId);
   const { data: loadedData, isLoading: loading, isError: loadFailed } = hallOfFameQuery;
   // The header's «Aggiornato alle…» while a document restored from the persisted cache is being
-  // reread (PERF-03).
+  // reread.
   const freshness = useFreshness([hallOfFameQuery]);
   const data = loadedData ?? null;
   const [recalculating, setRecalculating] = useState(false);

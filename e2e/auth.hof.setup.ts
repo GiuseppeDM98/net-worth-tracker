@@ -27,6 +27,6 @@ setup('authenticate hof user', async ({ page }) => {
 
   // indexedDB: true — the Firebase Web SDK parks its session there (see auth.setup.ts).
   await page.context().storageState({ path: HOF_STORAGE_STATE, indexedDB: true });
-  // The persisted React Query cache out of the state file (PERF-03, see auth.setup.ts).
+  // The persisted React Query cache out of the state file (see auth.setup.ts).
   stripPersistedQueryCache(HOF_STORAGE_STATE);
 });

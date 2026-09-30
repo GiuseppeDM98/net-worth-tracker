@@ -1,3 +1,8 @@
+// WARNING: a key that starts with one of `PERSISTED_QUERY_PREFIXES` (lib/constants/persistCache.ts)
+// is written to IndexedDB and kept for 24 hours, and the segment RIGHT AFTER the prefix is read as
+// the owner's uid — it is what keeps the demo account's data off a visitor's disk. So under those
+// prefixes the owner comes first (`['expenses', uid, …]`, never `['expenses', 'range', uid]`), and a
+// new builder there is declared in `__tests__/persistCache.test.ts` (`OWNER_KEYED_BUILDERS`).
 export const queryKeys = {
   // Dashboard
   dashboard: {
@@ -7,7 +12,6 @@ export const queryKeys = {
   // Assets
   assets: {
     all: (userId: string) => ['assets', userId] as const,
-    byId: (assetId: string) => ['assets', assetId] as const,
   },
 
   // Settings — the ONE key for the owner's settings document (assetAllocationTargets/{uid}):

@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 /**
  * The sign-out, shared by the sidebar and the «Altro» drawer.
  *
- * It only signs out: the query cache — in memory and in IndexedDB since PERF-03 — is forgotten by
+ * It only signs out: the query cache — in memory and in IndexedDB — is forgotten by
  * the provider on the user-to-none transition (`SignOutCacheGuard`, lib/providers/QueryClientProvider.tsx),
  * once the pages have unmounted. Clearing it HERE, with the pages still mounted for one render,
  * made their hooks refetch and re-persist the outgoing account's data (2026-09-29).

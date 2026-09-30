@@ -13,23 +13,21 @@ Next.js app for Italian investors: net worth, assets, cashflow, dividends, perfo
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic.
-- `tsc` clean; **207 files / 4637 tests** green in `Europe/Rome` + **43 Playwright spec files** (157 tests, incl. 6 auth setups; last full run 2026-09-29 on the Windows laptop with the persister on, 156/157 in 6,9 min — the one red was `modal.origin`, the known intermittent; the run before it also had a 44px check that read 43,999998 under load and now rounds; doc/guide/e2e-emulatori.md). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, which structurally hides timezone bugs.
-- Latest (2026-09-29, ninth session): **`doc/perf/PERF-03` implemented — the last known figures first.** The React
-  Query cache is persisted to IndexedDB (`lib/constants/persistCache.ts`: an allowlist of the owner's collections,
-  never the demo uid, `maxAge` 24 h with `gcTime` 24 h per prefix, `buster` `PERSIST_CACHE_VERSION`; dates cross the
-  store by value, `lib/utils/queryPersistence.ts`) and restored before the first fetch (`ProtectedRoute` waits for
-  `useIsRestoring()` too), then INVALIDATED so every load rereads — stale-while-revalidate, the F5 still a fresh read;
-  the header says «Aggiornato alle 18:42, sto rileggendo…» while a figure read before this load is reread
-  (`useFreshness` + `describeFreshness`, the owner's placement: the header line, not under the verdict) and empties
-  when it lands; the cache is forgotten at sign-out by the provider; the six Playwright setups strip the store from
-  the parked sessions; `NEXT_PUBLIC_PERSIST_QUERIES=false` is the rollback. Measured with `perf:bench -- --revisit`
-  (which now waits for the persisted record): Cashflow 1208 → 179 ms, Storico 1455 → 385, Analisi 1150 → 259, FIRE
-  1199 → 181, Patrimonio 437 → 144, no page skeleton on nine routes (`perf/README.md` § Revisit). Three lessons paid
-  for: a `clear()` under mounted hooks re-persists the outgoing account; a reload within `staleTime` used to read
-  nothing at all; the persister's first save is empty and the real one lands ~1 s after the last event. **Verified**:
-  `tsc`, lint 0, Vitest **207 / 4637** in `Europe/Rome`, `npm run test:e2e` 156/157 (above), the three
-  `e2e/freshness.spec.ts` assertions and the five pure tests seen red once each. AGENTS.md § Caching, doc/guide/stati.md
-  § The fourth reading, e2e-emulatori.md, account-condiviso-demo.md.
+- `tsc` clean; **207 files / 4638 tests** green in `Europe/Rome` + **43 Playwright spec files** (157 tests, incl. 6 auth setups; last full run 2026-09-29 on the Windows laptop with the persister on, 156/157 in 6,9 min — the one red was `modal.origin`, the known intermittent; the run before it also had a 44px check that read 43,999998 under load and now rounds; doc/guide/e2e-emulatori.md). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, which structurally hides timezone bugs.
+- Latest (2026-09-30): **`doc/perf/PERF-03` retired** — the persisted query cache (PR #415, in develop since
+  2026-09-30: the last known figures first, «Aggiornato alle…» in the header while they are reread) read against its
+  spec: 24 divergences — 14 where the code was right (already in AGENTS.md § Caching and doc/guide/stati.md; two
+  lessons moved now: how `e2e/freshness.spec.ts` was seen red, in its header; «the owner's uid right after a persisted
+  prefix», a warning atop `lib/query/queryKeys.ts`), 4 defects fixed here on the owner's decision (the dead
+  `queryKeys.assets.byId`, an asset id where the persister reads the owner — `__tests__/persistCache.test.ts` now pins
+  every key builder under a prefix, seen red both ways; an unread export; the flag missing from `.env.local.example`;
+  `@tanstack/react-query` below the persist client's peer range), 6 deferred on purpose (Storico at 385 ms against the
+  300 ms target, and ONE persisted record that in a real session holds every key, so every route pays the whole
+  restore → `perf/README.md` § Revisit, PERF-06 § 1; Rendimenti, no line and a skeleton on reload → PERF-09 § 1;
+  Impostazioni → PERF-13 § 1; the demo never seen in a browser → account-condiviso-demo.md's blind spots; the rollback
+  flag stays until the release has run in production → AGENTS.md § Caching; the line's DESIGN.md entry → MOB-09).
+  **Verified**: `tsc`, lint 0, Vitest **207 / 4638** in `Europe/Rome`; no Playwright, by the owner's decision (dead
+  code removed, installed versions unchanged).
 
 ## Architecture Snapshot
 - App Router; protected pages under `app/dashboard/*`.
@@ -73,7 +71,7 @@ One line per area: the question it answers, then where it is described. *What th
 - **Performance**: `npm run perf:budget` (JS per route against `perf/budget.json`, two seconds, after a build) and
   `npm run perf:bench -- --runs=3` (cold/warm on the mirror, via `perf:build` + `perf:serve` on :3200); commands, columns,
   the baseline in force and the raised-ceiling register in `perf/README.md`. A route that grows raises its ceiling in the
-  same commit with `raisedBy`. The specs and the 2026-09-26 history in `doc/perf/README.md` (PERF-00, PERF-01 and PERF-02 done, their specs retired).
+  same commit with `raisedBy`. The specs and the 2026-09-26 history in `doc/perf/README.md` (PERF-00, 01, 02, 03 and 05 done, their specs retired).
 - **Mobile composition**: the small-screen census (19 surfaces × 390/768/1024), the chosen direction, the nine specs and
   the owner's decisions in `doc/mobile/README.md`; the census script in `doc/mobile/reference/` (MOB-01 ports it to
   `npm run mobile:census` / `mobile:budget`). Implemented after `doc/perf/`.

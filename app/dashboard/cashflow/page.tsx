@@ -106,7 +106,7 @@ export default function CashflowPage() {
   const { data: allAssets = [], isLoading: assetsLoading, isError: assetsError } = assetsQuery;
   const { data: settings, isLoading: settingsLoading, isError: settingsError } = settingsQuery;
   // The header's «Aggiornato alle…» while figures restored from the persisted cache are being
-  // reread (PERF-03): the four keys every tab paints from.
+  // reread: the four keys every tab paints from.
   const freshness = useFreshness([expensesQuery, categoriesQuery, assetsQuery, settingsQuery]);
 
   // The optional tabs are null UNTIL the settings have answered (a tab appearing late, after an

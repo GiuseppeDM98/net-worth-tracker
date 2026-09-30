@@ -276,7 +276,7 @@ that domain's guide, never here.
   the stale answer and dates it. The client key carries the SIGNATURE of what is asked («AAPL:stock|VWCE.DE:fund»), so a
   new ticker restarts the read by itself; the weighing on user data happens in the browser, outside every cache.
   Nothing of the user's — no name, no class — goes into a document shared by every account (doc/guide/allocazione.md).
-- **The React Query cache is persisted to IndexedDB and restored before the first fetch** (PERF-03, 2026-09-29:
+- **The React Query cache is persisted to IndexedDB and restored before the first fetch** (2026-09-29:
   `lib/constants/persistCache.ts`, `lib/query/queryPersister.ts`, `lib/providers/QueryClientProvider.tsx`). ONLY the
   keys of `PERSISTED_QUERY_PREFIXES` — the twelve owner collections read through the hooks above, plus the ledger's
   meta document Patrimonio gates its trades on — only successful
@@ -297,7 +297,8 @@ that domain's guide, never here.
   with the outgoing session and back on disk a second later (five keys, measured); and the persister writes on a
   one-second throttle whose FIRST call is immediate, so the record on disk can hold the settings alone while the
   expenses are still a second away (`e2e/freshness.spec.ts` polls for the key it needs). Rollback:
-  `NEXT_PUBLIC_PERSIST_QUERIES=false` (never set on the Playwright server). **The restore INVALIDATES what it
+  `NEXT_PUBLIC_PERSIST_QUERIES=false` (never set on the Playwright server); the flag and the plain-provider branch stay
+  until the release that carries the persister has run in production. **The restore INVALIDATES what it
   restored** (`onSuccess`, `refetchType: 'none'`): every load rereads, stale-while-revalidate — without it a reload
   within `staleTime` painted the restored figures and read nothing for five minutes (an Admin write between two
   `goto` stayed invisible to four specs). The reader is told when a figure from BEFORE this load is being reread —
@@ -831,6 +832,9 @@ file used to carry.
 - **Phantom `tsc` errors**: `papaparse` and `@playwright/test` are declared but can be missing from the (untracked,
   branch-shared) `node_modules` — the tell is ~25 errors clustered in `e2e/` and `lib/utils/expenseImport.ts` rather
   than in what you touched. Run `npm install` first.
+- **A dependency RANGE alone is changed by hand in both files** (2026-09-30): `npm install --package-lock-only`, asked to
+  sync one range the installed version already satisfied, rewrote 66 unrelated lines of the lock (the bundled
+  `@tailwindcss/oxide-wasm32-wasi` entries). Edit `package.json` and the lock's root entry, then read `git diff --stat`.
 - `npm test -- <file>` / `npx vitest run <file>` for targeted tests; **`npx tsc --noEmit` before any PR**, re-run AFTER
   writing the tests, not only after the code.
 - **Never `git checkout <file>` to undo ONE edit on uncommitted work** (2026-09-24): it restores the COMMITTED file and

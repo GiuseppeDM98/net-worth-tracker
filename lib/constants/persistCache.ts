@@ -1,5 +1,5 @@
 /**
- * What React Query persists to IndexedDB, and for how long (PERF-03, 2026-09-29).
+ * What React Query persists to IndexedDB, and for how long (2026-09-29).
  *
  * The cache used to live in memory only: every reload started from an empty client, so a page
  * that had just shown its figures went back to a skeleton for one to two seconds. The persister
@@ -48,12 +48,11 @@ export const PERSIST_CACHE_KEY = 'react-query';
 export const PERSIST_CACHE_THROTTLE_MS = 1000;
 
 /**
- * The environment flag that switches the persister OFF (`'false'`): the rollback for a deploy,
- * never set by the Playwright server (`dev:e2e`), whose suite runs with the persister on.
+ * Whether the persister runs, from the build-time value of `NEXT_PUBLIC_PERSIST_QUERIES`: only the
+ * literal `'false'` switches it OFF — the rollback for a deploy, never set by the Playwright server
+ * (`dev:e2e`), whose suite runs with the persister on. The default reads the variable by its full
+ * name because Next inlines a `NEXT_PUBLIC_*` value only where it is spelled out.
  */
-export const PERSIST_QUERIES_ENV = 'NEXT_PUBLIC_PERSIST_QUERIES';
-
-/** Whether the persister runs, from the build-time flag value. */
 export function isQueryPersistenceEnabled(flagValue: string | undefined = process.env.NEXT_PUBLIC_PERSIST_QUERIES): boolean {
   return flagValue !== 'false';
 }

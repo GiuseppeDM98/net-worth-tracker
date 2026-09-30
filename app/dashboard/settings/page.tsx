@@ -640,7 +640,7 @@ export default function SettingsPage() {
   const accountsQuery = useAssets(ownerId);
   const { data: allAssets = EMPTY_ASSETS, isLoading: loadingAccounts, isError: accountsFailed } = accountsQuery;
   // The header's «Aggiornato alle…» while the two lists restored from the persisted cache are being
-  // reread (PERF-03). The settings document itself is not among them: the form reads it through
+  // reread. The settings document itself is not among them: the form reads it through
   // `fetchQuery` and never paints an older one (see `loadTargets`).
   const freshness = useFreshness([categoriesQuery, accountsQuery]);
   const cashAssets = useMemo(() => allAssets.filter((a) => a.type === 'cash' && a.assetClass === 'cash'), [allAssets]);

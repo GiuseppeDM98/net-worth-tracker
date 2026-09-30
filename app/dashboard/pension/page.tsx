@@ -10,7 +10,7 @@
  * The compact header is a breadcrumb: the page's real headline is the verdict rendered by
  * `PensionOverview` (DESIGN.md → Compact Page Header). «Registra versamento» keeps the header's
  * actions slot, as the Panoramica's «Crea snapshot» does. The header's freshness reading
- * («Aggiornato alle…», PERF-03) is taken here from the same four keys `PensionOverview` paints —
+ * («Aggiornato alle…») is taken here from the same four keys `PensionOverview` paints —
  * the same cache entries, no second read.
  */
 

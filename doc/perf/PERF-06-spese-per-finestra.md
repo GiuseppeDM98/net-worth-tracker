@@ -25,6 +25,15 @@ Gli indici ci sono già: `firestore.indexes.json` ha `expenses (userId, date DES
 solo la disciplina di usarlo per pagina. Il prezzo: Tracciamento e Analisi non condividono più la stessa voce di cache
 (finestre diverse) — ognuna legge un quarto dei documenti, e la misura di chiusura è il cold.
 
+**Ereditato dalla cache persistita (in develop dal 2026-09-30; annotato al ritiro di PERF-03).** Al reload le pagine
+dipingono l'ultimo dato noto da IndexedDB e rileggono dietro (AGENTS.md § Caching), quindi ciò che il proprietario sente
+al reload non è più il cold della tabella ma il RIPRISTINO, che sta dentro l'attesa dell'auth: `auth` 115 → 179 ms su
+Cashflow e 161 → 385 su Storico, l'unica route rimasta sopra i 300 ms al primo numero (`perf/README.md` § Revisit). Due
+fatti che questa spec eredita: il record persistito è UNO e contiene ogni chiave letta nelle ultime 24 ore, quindi la
+lista intera di `expenses.all` pesa sul ripristino di QUALSIASI route finché resta nel record; e Storico continua a
+volerla tutta (§ 3), quindi le finestre accorciano il record di chi non apre Storico, non il suo. Chi implementa
+rimisura anche `npm run perf:bench -- --revisit`: è lì che l'effetto di questa spec sul reload si vede.
+
 ## 2. Obiettivo misurabile
 
 - Benchmark cold (PERF-01): Tracciamento **< 900 ms** al primo numero (oggi 2110), Analisi **< 900** (1690), FIRE **< 1000**
@@ -85,8 +94,11 @@ tab), la finestra lo dichiara nel test.
 
 ## 5. File da toccare
 
-- `lib/query/queryKeys.ts` — `expenses.range`. `lib/hooks/useExpenses.ts` — `useExpensesInRange` (con `gcTime` di PERF-03 se
-  già in vigore: la allowlist prende il prefisso).
+- `lib/query/queryKeys.ts` — `expenses.range`, con il uid SUBITO dopo il prefisso (`['expenses', uid, 'range', …]`): sotto
+  un prefisso persistito quel segmento è letto come proprietario (`resolvePersistedOwner`, `lib/constants/persistCache.ts`),
+  e il costruttore nuovo si dichiara in `__tests__/persistCache.test.ts` (`OWNER_KEYED_BUILDERS`). `lib/hooks/useExpenses.ts`
+  — `useExpensesInRange`, SENZA `gcTime`: la chiave è già persistita e tenuta 24 h per prefisso
+  (`applyPersistedQueryDefaults`, AGENTS.md § Caching).
 - `lib/utils/expenseWindows.ts` — nuovo, puro: `trackingWindow`, `analisiWindow`, `budgetWindow`, `fireWindows`.
 - `lib/services/expenseService.ts` — `getExpensesByDateRange` con `userId` + bordi (esiste? riusare).
 - `app/dashboard/cashflow/page.tsx`, `components/cashflow/{ExpenseTrackingTab,AnalisiTab,BudgetTab,ExpenseSplitTab}.tsx`,
@@ -129,9 +141,10 @@ tab), la finestra lo dichiara nel test.
 
 - Il rischio è una riga ai bordi persa (una ricorrenza futura, il 31/12, il 1° del mese a UTC): i test dei bordi nei due fusi
   e la spec Divisione lo pinnano.
-- Più chiavi = più cache. Senza PERF-03 il `gcTime` globale (10 min) pulisce le finestre inattive; con PERF-03 le chiavi
-  `expenses.*` portano `gcTime` 24 h e il persister le tiene fino a `maxAge` — è il comportamento voluto: la finestra del mese
-  è ciò che si vuole subito al reload.
+- Più chiavi = più cache. Dal 2026-09-29 le chiavi sotto `['expenses']` hanno `gcTime` 24 h per prefisso e il persister le
+  tiene fino a `maxAge` (AGENTS.md § Caching) — è il comportamento voluto: la finestra del mese è ciò che si vuole subito
+  al reload. Ma ogni finestra letta è un payload in più nell'UNICO record persistito, che si ripristina intero a ogni
+  caricamento (§ 1): contare le chiavi `expenses.*` che restano nel record dopo un giro di pagine.
 - Rollback: `useExpensesInRange` può restituire `useExpenses` intera dietro un flag di emergenza per un giorno.
 
 ## 10. Documentazione da aggiornare
