@@ -98,7 +98,7 @@ di `max-desktop:` in Tailwind 4.3 (`max-width: 1439px` scoprirebbe le larghezze 
   (`components/history/tiles/DriverTile.tsx:161-162`), il padding su un NIPOTE (sul figlio resta visibile a `0fr`);
   il chevron con la stessa curva.
 - **Il pannello c'è, il contenuto no** (come `PageTabs`, AGENTS § Navigation): `reading` e `children` montano con `mounted`
-  (aperta ora o già in questa visita, scritto nel gestore) e restano alla chiusura. Il chunk di un grafico (PERF-04) aspetta.
+  (aperta ora o già in questa visita, scritto nel gestore) e restano alla chiusura. Il chunk di un grafico pigro (`lazyComponent`, `components/ui/lazy-component.tsx`) aspetta.
   `collapse(id)` è lo STESSO oggetto finché la sua sezione non cambia (`onOpenChange` stabile): se no il compiler
   ri-renderizza ogni tessera a ogni tap.
 - `failed`: eyebrow `text-destructive` + `AlertTriangle`, `sr-only` «, lettura fallita».
@@ -169,7 +169,7 @@ frase chiude dopo la cifra del record («in un mese» solo con la percentuale, `
 ### 4.8 Conflitti con PERF
 
 - **PERF-12**: `useSyncExternalStore`, nessun ref restituito, `mounted` nel gestore. **PERF-14**: nessun `layout`; un
-  grafico montato all'apertura legge `ChartColorsProvider`. **PERF-04**: un grafico lazy riserva la sua altezza (obbligo
+  grafico montato all'apertura legge `ChartColorsProvider`. **PERF-04** (in develop dal 2026-09-30): un grafico lazy riserva la sua altezza, il `fallback` di `lazyComponent` (obbligo
   di MOB-03..07). **PERF-03** (in develop dal 2026-09-30): «Aggiornato alle…» NON è uno slot della composizione — sta nel
   `PageHeader` (desktop: dopo la descrizione; sotto `desktop:` al posto della descrizione, `[data-freshness]`,
   decisione del proprietario), quindi nessuna riga da riservare fra la prima frase e la striscia (doc/guide/stati.md § The

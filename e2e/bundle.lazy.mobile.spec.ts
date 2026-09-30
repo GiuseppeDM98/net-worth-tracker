@@ -1,7 +1,7 @@
 /**
  * At 390 the Flusso of Analisi is a share bar and rows, never a Sankey (the 640px legibility
- * threshold, doc/guide/cashflow-analisi.md) — and since PERF-04 (2026-09-30) the phone does not
- * DOWNLOAD the Sankey either: `@nivo/sankey` and d3-sankey sit behind `next/dynamic` in
+ * threshold, doc/guide/cashflow-analisi.md) — and since 2026-09-30 the phone does not
+ * DOWNLOAD the Sankey either: `@nivo/sankey` and d3-sankey sit behind a `lazyComponent` in
  * `FlussoTile.tsx`, requested only where the chart is drawn. Base account (`mobile` project); the
  * positive anchor — the same chunk arriving at 1440 — is `bundle.lazy.spec.ts`.
  *

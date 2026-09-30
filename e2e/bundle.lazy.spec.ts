@@ -1,5 +1,5 @@
 /**
- * What a page downloads, and when, at 1440 on the base account (PERF-04, 2026-09-30).
+ * What a page downloads, and when, at 1440 on the base account (2026-09-30).
  *
  * - Storico: the PDF engine (`@react-pdf/renderer` and pdfkit, 513 KB gz in the production build of
  *   2026-09-26) is NOT in the page's JavaScript; it is requested when «Esporta PDF» is pressed.
@@ -12,7 +12,8 @@
  *
  * Chunks are recognised by content (`chunkProbe.ts`), and the suite runs on `next dev`: these
  * tests prove the laziness of an IMPORT; the sizes are `npm run perf:budget`'s, on the build.
- * Seen red on 2026-09-30 by putting each static import back (SESSION_NOTES of PERF-04).
+ * Seen red on 2026-09-30 by putting each static import back (doc/guide/storico.md,
+ * rendimenti.md and cashflow-analisi.md say how).
  */
 import { test, expect } from '@playwright/test';
 import { PDF_ENGINE_SIGNATURE, SANKEY_SIGNATURE, UNDERWATER_CHART_SIGNATURE, holdChunks, layoutShiftSince, probeChunks, recordLayoutShifts } from './chunkProbe';

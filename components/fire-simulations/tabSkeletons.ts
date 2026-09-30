@@ -1,5 +1,5 @@
 /**
- * The grid geometry of the four FIRE tabs the page loads lazily (PERF-04, 2026-09-30): Coast FIRE,
+ * The grid geometry of the four FIRE tabs the page loads lazily (2026-09-30): Coast FIRE,
  * What If, Monte Carlo and Obiettivi. Each tab module arrives as its own chunk when the tab is first
  * opened, and while it does the page shows THIS geometry — the same `TileGridSkeleton` the tab shows
  * while its data loads — so the chunk's wait and the data's wait are one skeleton and nothing jumps

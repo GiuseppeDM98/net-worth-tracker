@@ -37,7 +37,7 @@ import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
 const FLOW_CHART_HEIGHT = 280;
 
 /**
- * The three plots are not in the page's initial JavaScript (PERF-04, 2026-09-30): `lazyComponent` at
+ * The three plots are not in the page's initial JavaScript (2026-09-30): `lazyComponent` at
  * module level (AGENTS.md § Dynamic Imports and Module Hygiene), preloaded when the page is idle by
  * `DettaglioDisclosure` (`ANDAMENTO_LAZY_CHARTS`). Each sits in a box of its own height and the
  * placeholder fills the box, so a plot lands in place; the box, not the placeholder, knows the

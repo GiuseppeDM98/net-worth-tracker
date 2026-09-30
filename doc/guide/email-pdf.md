@@ -34,7 +34,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   comes from fixed-width right-aligned COLUMNS (a declared exception to the Mono Mandate, in `PDF_FONTS`). WinAnsi
   has no U+2212 and react-pdf drops what it cannot encode **silently**: the Allocazione gaps printed «620» where they
   meant «−620 €». `pdfSafeText` converts it at the boundary — every PDF text node goes through it.
-- **The engine is loaded at the press, not with the page** (2026-09-30, PERF-04): `lib/utils/pdfGenerator.tsx` — and
+- **The engine is loaded at the press, not with the page** (2026-09-30): `lib/utils/pdfGenerator.tsx` — and
   with it `@react-pdf/renderer`, pdfkit, `components/pdf/*` and `pdfDataService` — is reached only by the `import()` in
   `loadPDFGenerator` (`components/pdf/PDFExportDialog.tsx`): ONE promise for the session, started by «Esporta PDF»,
   awaited by «Genera PDF», forgotten on failure so the next press retries. Nothing else may import `pdfGenerator` or

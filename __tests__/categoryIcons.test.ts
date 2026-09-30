@@ -1,5 +1,5 @@
 /**
- * Every curated category icon loads the lucide icon it names (PERF-04, 2026-09-30).
+ * Every curated category icon loads the lucide icon it names (2026-09-30).
  *
  * The category icons load one chunk per icon through a hand-kept map of deep paths
  * (`components/expenses/categoryIconLoaders.ts`). A name with no loader renders the fallback in

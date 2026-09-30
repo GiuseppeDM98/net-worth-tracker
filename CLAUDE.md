@@ -14,15 +14,16 @@ Next.js app for Italian investors: net worth, assets, cashflow, dividends, perfo
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic.
 - `tsc` clean; **208 files / 4767 tests** green in `Europe/Rome` + **45 Playwright spec files** (161 tests, incl. 6 auth setups; last full run 2026-09-30 on the Windows laptop, 159/161 in 8,5 min — `modal.origin`, the known intermittent, and `cashflow.dividendi`, red on develop too (Known Issues); doc/guide/e2e-emulatori.md). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, which structurally hides timezone bugs.
-- Latest (2026-09-30): **`doc/perf/PERF-04` done** (measures and choices in `doc/perf/README.md` § 6). recharts ships
-  ONCE behind `components/ui/charts/recharts.ts` (the four copies were Turbopack batching by entry point; checked by
-  `perf:budget`'s `libraryCopies`); the PDF engine arrives at «Esporta PDF» (Storico 1200,9 → 684,0 KB gz); closed
-  charts, the four non-default FIRE tabs and Analisi's Sankey (never on a phone) are `lazyComponent`s
-  (`components/ui/lazy-component.tsx`, no Suspense — owner's decision; `layout-shift` 0, openings 3–37 ms); category
-  icons one chunk each (`components/expenses/categoryIconLoaders.ts`). Analisi 744,9 → 564,6, Rendimenti 686,0 → 566,3,
-  FIRE 749,9 → 653,7; shared ceiling 470 → 483 with no route growing (`perf/README.md` registry). **Verified**: `tsc`,
-  lint 0, Vitest **208 / 4767** in `Europe/Rome`, Playwright full (above), the four § 7 falsifications red. Mirror
-  tour passed (the PDF generated for real, Rendimenti, the five FIRE tabs, the icons, Analisi at 390 and 1440).
+- Latest (2026-09-30): **`doc/perf/PERF-04` retired** — recharts once, the PDF at the click, the lazy charts and
+  icons (PR #418, in develop since 2026-09-30) read against its spec: 24 divergences — 14 where the code was right
+  (lessons already home: AGENTS.md § Dynamic Imports and Module Hygiene, `perf/README.md`, the Storico, Rendimenti,
+  FIRE, Analisi, Cashflow, PDF and E2E guides; the owner's «no Suspense» decision now also in `doc/perf/README.md`
+  § 9), 5 defects fixed here on the owner's decision (comments and pointers only: two E2E spec headers, AGENTS' prefetch
+  pointer, «no route grew» beside Patrimonio's +7,4 KB, `PDFExportDialog`'s detached JSDoc), 5 deferred (Patrimonio's
+  +7,4 → PERF-11 § 1; four never written down, now where their subject lives: which lazy charts no spec holds →
+  doc/guide/e2e-emulatori.md, the untimed icon picker → doc/guide/cashflow.md, the unchecked libraries and Firestore
+  on `/login` → `perf/README.md` § Il budget). **Verified**: `tsc`, lint 0, Vitest **208 / 4767** in `Europe/Rome`;
+  no Playwright (comments and documents only).
 
 ## Architecture Snapshot
 - App Router; protected pages under `app/dashboard/*`.
@@ -98,7 +99,7 @@ Only what crosses areas; an area's blind spots — the behaviours that look like
   `.next-e2e`, and identically with develop's `app/page.tsx` and `AuthShell.tsx` swapped in on the same server, so not
   the day's commit. The window is the spec's, not the app's: a slow machine can fail it without any regression.
 - **`e2e/cashflow.dividendi.spec.ts` › «the form refuses…» is red after `cashflow.accounts` + `cashflow.budget`** (2026-09-30:
-  3/3 on a clean `develop` worktree, 2/3 on the PERF-04 branch, green alone): after the refusal the dialog stays open
+  3/3 on a clean `develop` worktree, 2/3 on the branch of PR #418, green alone): after the refusal the dialog stays open
   with its form reset — `reset` re-runs, cause not traced yet. Two of four full runs that day had it red.
 - **Four base specs are red in the cloud container only** (2026-09-25): its Chromium groups four-digit euros («1.100 €»),
   the specs expect «1100 €» as on the Mac (doc/guide/e2e-emulatori.md). Read the received text before «fixing» code.
@@ -111,7 +112,7 @@ Only what crosses areas; an area's blind spots — the behaviours that look like
 Cross-cutting entry points only: each area's files open its guide (`doc/guide/<tema>.md` § Files), every pure module has
 `__tests__/{module}.test.ts`, every page its `e2e/{page}*.spec.ts` where one exists.
 - **Shell**: `app/dashboard/layout.tsx` (`<main>` = `page-main`), `app/dashboard/template.tsx`, `components/layout/{Sidebar,BottomNavigation,SecondaryMenuDrawer,SceneLink,PageHeader,PageTabBar,PageTabs,PageContainer,ThemePicker,LogoutDialog}.tsx`, `lib/utils/viewTransition.ts` (the ONE `startViewTransition`, `data-vt` scoping) + `lib/hooks/useSceneNavigation.ts` (the page scene), `lib/utils/themeTransition.ts`, `components/ui/sidebar.tsx` (`SIDEBAR_WIDTH_ICON`), `lib/constants/navigation.ts` (the ONE source of the nav arrays); tile primitives `components/ui/{tile,tile-method-note,series-legend,narrative-text,ranked-rows,tile-grid-skeleton,page-verdict}.tsx`, `lib/hooks/useRovingFocus.ts` (a list as ONE Tab stop), `lib/utils/narrative.ts` (`Narrative`, `VerdictTone`, `PageVerdictModel`)
-- **Shared primitives / utils** (each the single source of its rule): `components/ui/{composition-list,composition-bar,segmented-pill,drill-breadcrumb,chart-hover}.tsx`, `components/ui/charts/recharts.ts` (the ONE door to recharts, PERF-04); `lib/utils/formatters.ts` · `metricColors.ts` (`getMetricValueColor`) · `assetPricing.ts` (`requiresManualPricing`) · `assetLiquidity.ts` · `expenseTypeTransition.ts` · `firestoreData.ts` (`removeUndefinedDeep`) · `dateHelpers.ts` (`endOfMonthBound`, `getItalyDateIso`, `isItalyDayAfter`) · `spendingProjection.ts` (the ONE month-end projection) · `recurrenceDates.ts` (the ONE source on recurrence)
+- **Shared primitives / utils** (each the single source of its rule): `components/ui/{composition-list,composition-bar,segmented-pill,drill-breadcrumb,chart-hover}.tsx`, `components/ui/charts/recharts.ts` (the ONE door to recharts); `lib/utils/formatters.ts` · `metricColors.ts` (`getMetricValueColor`) · `assetPricing.ts` (`requiresManualPricing`) · `assetLiquidity.ts` · `expenseTypeTransition.ts` · `firestoreData.ts` (`removeUndefinedDeep`) · `dateHelpers.ts` (`endOfMonthBound`, `getItalyDateIso`, `isItalyDayAfter`) · `spendingProjection.ts` (the ONE month-end projection) · `recurrenceDates.ts` (the ONE source on recurrence)
 - **E2E**: `playwright.config.ts`, `e2e/*.ts`, `e2e/global-setup.ts`, fixtures `scripts/{seedEmulator.ts,seedPensionE2E,seedAnalisiE2E,seedCoastFireE2E,seedCostCentersE2E,seedSplitE2E,seedHallOfFameE2E,seedInstrumentProfilesE2E}.mts` (+ `scripts/instrumentProfileFixtures.ts`, the Esposizione's Yahoo profiles shared by the base seed and the E2E re-stamp); scripts `test:e2e`/`e2e:seed*`/`dev:e2e`; the production mirror `scripts/mirrorProdAccount.mts` (`mirror:seed`/`mirror:remove`)
 
 

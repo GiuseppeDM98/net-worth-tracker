@@ -3,7 +3,7 @@
 /**
  * The plot of a rolling tile of Rendimenti's «Dettaglio» (CAGR and Sharpe at 12 months, each with
  * its 3-month moving average). A module of its own so the Dettaglio can load it — and recharts
- * with it — only once the disclosure is opened (PERF-04, 2026-09-30): the page's own tiles are
+ * with it — only once the disclosure is opened (2026-09-30): the page's own tiles are
  * hand-written SVG, and these two plots and the underwater chart were the only reason recharts sat
  * in Rendimenti's initial JavaScript. The tile, its reading and its legend stay in
  * `PerformanceDettaglio`; this draws inside the 220px box the tile reserves.

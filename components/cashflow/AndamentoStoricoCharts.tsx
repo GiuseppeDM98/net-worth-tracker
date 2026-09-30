@@ -4,7 +4,7 @@
  * The three plots of Analisi's «Andamento nel tempo» (history mode, inside the «Dettaglio»
  * disclosure): the flows, the categories and the spending types over time. A module of their own so
  * the disclosure, closed by default, loads them — and recharts with them — only when it is opened
- * (PERF-04, 2026-09-30). Each draws at the height the section reserves for it.
+ * (2026-09-30). Each draws at the height the section reserves for it.
  */
 
 import { ComposedChart, LineChart, Line, Area, AreaChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from '@/components/ui/charts/recharts';

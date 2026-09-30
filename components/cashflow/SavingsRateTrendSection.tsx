@@ -25,7 +25,7 @@ import { MONTH_NAMES } from '@/lib/constants/months';
 /** The plot's height: the chart draws at it and its placeholder holds it, so it lands in place. */
 const SAVINGS_CHART_HEIGHT = 200;
 
-// The plot is not in the page's initial JavaScript (PERF-04, 2026-09-30): `lazyComponent` at module level,
+// The plot is not in the page's initial JavaScript (2026-09-30): `lazyComponent` at module level,
 // preloaded when the page is idle by `DettaglioDisclosure` (`SAVINGS_LAZY_CHARTS`).
 const SavingsRateLineChart = lazyComponent(() => import('@/components/cashflow/SavingsRateLineChart').then((m) => m.SavingsRateLineChart));
 export const SAVINGS_LAZY_CHARTS = [SavingsRateLineChart];

@@ -40,8 +40,8 @@ const DETTAGLIO_CHART_HEIGHT = 220;
 
 /**
  * The Dettaglio's three plots are the only recharts on Rendimenti (the tiles are hand-written
- * SVG), and the Dettaglio opens closed: they are not in the page's initial JavaScript (PERF-04,
- * 2026-09-30). Module level, never in a render (AGENTS.md § Dynamic Imports); preloaded once the
+ * SVG), and the Dettaglio opens closed: they are not in the page's initial JavaScript
+ * (2026-09-30). Module level, never in a render (AGENTS.md § Dynamic Imports); preloaded once the
  * page is idle, so an opening finds them in memory and draws them at once (`lazyComponent`, no
  * Suspense); until then each placeholder is its plot's own height, so nothing moves when it lands.
  */

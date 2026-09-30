@@ -1,6 +1,6 @@
 /**
  * lucide-react's per-icon ES modules ship no declarations of their own; the category icons load
- * them one chunk each (`components/expenses/categoryIconLoaders.ts`, PERF-04). Each module's
+ * them one chunk each (`components/expenses/categoryIconLoaders.ts`). Each module's
  * default export is the icon component.
  */
 declare module 'lucide-react/dist/esm/icons/*.js' {

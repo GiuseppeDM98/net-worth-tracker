@@ -145,8 +145,8 @@ WORKFLOW § Where things are recorded; cifre tonde inventate e nomi generici, ma
 - **PERF-03** (in develop dal 2026-09-30): se «Aggiornato alle…» avrà un nome in DESIGN.md, The First-Screen Rule lo cita
   DOV'È — la riga dell'header (desktop dopo la descrizione, sotto al posto della descrizione), per decisione del
   proprietario, non sotto la prima frase.
-- **PERF-04**: «a closed row downloads no chart» regge sul grafico dietro `dynamic` di modulo (AGENTS § Dynamic Imports
-  and Module Hygiene, PERF-04 § 10): si rimanda lì, NON a «Deferred Chart Mount» (`:1277`, **Superseded (2026-09-06)**,
+- **PERF-04**: «a closed row downloads no chart» regge sul grafico pigro di modulo, `lazyComponent` (AGENTS § Dynamic Imports
+  and Module Hygiene): si rimanda lì, NON a «Deferred Chart Mount» (`:1277`, **Superseded (2026-09-06)**,
   parla del count-up). **`perf:serve`**: `mobile:budget` su :3200.
 
 ### 4.9 Domande al proprietario

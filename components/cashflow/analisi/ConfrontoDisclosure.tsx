@@ -42,7 +42,7 @@ const dayOf = (expense: Expense): MonthRef & { day: number } => {
  */
 export function ConfrontoDisclosure({ allExpenses, period, today, todayDay, historyStartYear, availableDataYears, onCategoryFocus }: ConfrontoDisclosureProps) {
   const [open, setOpen] = useState(false);
-  // The section's plots are lazy (PERF-04): fetched while the page is idle, so opening draws them at once.
+  // The section's plots are lazy: fetched while the page is idle, so opening draws them at once.
   usePreloadWhenIdle(CONFRONTO_LAZY_CHARTS);
   const [comparisonYearChoice, setComparisonYearChoice] = useState<number | null>(null);
 

@@ -67,7 +67,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **The goal document is rewritten WHOLE, never patched.** So the Admin append is a transaction (the FIRE page writes
   the same doc), the goals already stored and `assignments` pass through **verbatim**, and the colour is picked INSIDE
   the transaction (`pickNextGoalColor`), or two goals created concurrently come out the same hue.
-- **Only the Calcolatore is in the page's initial JavaScript** (2026-09-30, PERF-04): Coast FIRE, What If, Monte Carlo
+- **Only the Calcolatore is in the page's initial JavaScript** (2026-09-30): Coast FIRE, What If, Monte Carlo
   and Obiettivi are `lazyComponent`s at module level in `app/dashboard/fire-simulations/page.tsx`, one chunk each,
   preloaded once the Calcolatore's four reads are in and the page is idle (`usePreloadWhenIdle(LAZY_TABS, ready)`), so
   a tab opens at once (4–37 ms on the mirror; Monte Carlo ~420, its simulation) — only the active panel ever mounted,

@@ -1,6 +1,6 @@
 /**
  * The ONE door to recharts: every chart in the app imports its primitives from here, never from
- * `'recharts'` directly (PERF-04, 2026-09-30).
+ * `'recharts'` directly (2026-09-30).
  *
  * The Turbopack production build of 2026-09-26 shipped recharts in FOUR identical 350 KB chunks, one
  * per page that draws a chart (Patrimonio, Analisi, Storico, Rendimenti + FIRE), so every move between

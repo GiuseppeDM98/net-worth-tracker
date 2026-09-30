@@ -260,7 +260,7 @@ function resolvePeriodLabel(period: AnalisiPeriod): string {
 
 export function AnalisiTab({ allExpenses, categories, loading, loadFailed, historyStartYear = 2024, spendingRolesEnabled = false, freshness }: AnalisiTabProps) {
   const COLORS = useChartColors();
-  // The Scheda's trend plot is lazy (PERF-04): fetched when the page is idle AFTER its data, so a
+  // The Scheda's trend plot is lazy: fetched when the page is idle AFTER its data, so a
   // Scheda draws it at once and the preload never competes with the first figures.
   usePreloadWhenIdle(ENTITY_DOSSIER_LAZY_CHARTS, !loading && !loadFailed);
   const router = useRouter();

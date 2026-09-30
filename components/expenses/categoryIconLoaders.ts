@@ -1,5 +1,5 @@
 /**
- * One loader per curated category icon, each a chunk of its own (PERF-04, 2026-09-30).
+ * One loader per curated category icon, each a chunk of its own (2026-09-30).
  *
  * Why a hand-kept list of deep paths and not lucide's own name map: until 2026-09-30 every lazy icon
  * ran `import('lucide-react')` and read its name off the module, so the FIRST icon on screen

@@ -39,7 +39,7 @@ import { cn } from '@/lib/utils';
 const MENSILE_CHART_HEIGHT = 240;
 const HISTORY_CHART_HEIGHT = 200;
 
-// The plots are not in the page's initial JavaScript (PERF-04, 2026-09-30): `lazyComponent` at module level,
+// The plots are not in the page's initial JavaScript (2026-09-30): `lazyComponent` at module level,
 // preloaded when the page is idle by `ConfrontoDisclosure` (`CONFRONTO_LAZY_CHARTS`), so an opening draws them at once.
 const MensileBarChart = lazyComponent(() => import('@/components/cashflow/ConfrontoAnnualeCharts').then((m) => m.MensileBarChart));
 const HistoryBarChart = lazyComponent(() => import('@/components/cashflow/ConfrontoAnnualeCharts').then((m) => m.HistoryBarChart));

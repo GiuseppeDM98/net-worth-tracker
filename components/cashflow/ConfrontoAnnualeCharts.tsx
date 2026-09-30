@@ -3,7 +3,7 @@
 /**
  * The two plots of Analisi's «Confronto annuale»: the monthly bars of a year against its baseline
  * and the multi-year totals of the history. A module of their own so the disclosure — closed by
- * default — loads them, and recharts with them, only when it is opened (PERF-04, 2026-09-30).
+ * default — loads them, and recharts with them, only when it is opened (2026-09-30).
  * The section keeps the tile, the reading and the delta ranking; these draw inside the box the
  * section reserves at the heights exported below.
  */
