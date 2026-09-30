@@ -22,6 +22,20 @@ punto sulla tab, la barra in basso, «Annulla modifiche» come RILETTURA dal ser
 salvataggio di un co-proprietario torna), il «Salva» che apre il gruppo e focalizza il campo in errore
 (`allocationTargetValidation.ts` dice DOVE).
 
+**Visto sul mirror il 2026-09-29, chiudendo PERF-03 (proprietario, punto 4 del giro).** Impostazioni è l'unica pagina che
+al reload mostra ancora lo skeleton: il documento è letto con `fetchQuery(settingsQueryOptions)` in `loadTargets` e il
+ripristino della cache persistita lo invalida, quindi la pagina attende il documento fresco (~244 ms sul mirror, «primo
+numero» 348 ms contro 115–180 delle altre route, `perf/README.md` § Revisit) — e lo skeleton che mostra
+(`TileGridSkeleton verdict={false} cells={[{ span: 5 }, { span: 7 }, { span: 12, lines: 8 }]}`) ha proporzioni diverse
+dalle tessere della tab che lo sostituisce, così la pagina «si ricompone» sotto gli occhi. Decisione del proprietario:
+non uno skeleton più fedele, ma la stessa regola delle altre pagine, QUI: la vista di una tab si semina dal documento
+già in cache (`queryClient.getQueryData(settingsQueryOptions(ownerId).queryKey)`, che dopo il ripristino c'è) e la
+rilettura fresca — la stessa `loadTargets({ quiet: true })` di «Annulla» — la aggiorna dietro, con «Aggiornato alle…»
+nell'header intanto (`useFreshness` su un `useSettings(ownerId)` osservato dalla pagina, oggi assente: il
+`fetchQuery` non ha observer e la riga dice solo categorie e conti). Lo skeleton resta per la sola prima visita
+dell'account. Rischio da collaudare: la bozza (§ 4) non deve essere sovrascritta dalla rilettura se il lettore ha già
+toccato un campo — la rilettura entra solo finché nessuna tab è sporca.
+
 ## 2. Obiettivo misurabile
 
 - `app/dashboard/settings/page.tsx` sotto **500 righe**: l'orchestratore (tab attiva, `mountedTabs`, la BOZZA con `useReducer`,

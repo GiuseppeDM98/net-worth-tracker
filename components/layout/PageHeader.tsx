@@ -1,14 +1,27 @@
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TILE_EYEBROW_CLASS } from '@/components/ui/tile';
+import type { PageFreshness } from '@/lib/hooks/useFreshness';
 
 interface PageHeaderProps {
   title: React.ReactNode;
   label?: string;
   description?: string;
   actions?: React.ReactNode;
+  /**
+   * The page's freshness reading (`useFreshness`): «Aggiornato alle 18:42, sto rileggendo…»
+   * while the figures on screen were restored from the persisted cache and the fresh read is in
+   * flight, `null` otherwise. Rendered in ONE stable `role="status"` node per width that changes
+   * text and empties — never a node that appears and disappears (doc/guide/dialog.md), and never
+   * a line that grows: on desktop it follows the description in the same fixed-height row, on a
+   * phone it takes the description's line while it lasts. So nothing under it moves when it goes.
+   */
+  freshness?: PageFreshness;
   className?: string;
 }
+
+/** The live region's attributes, the same on both copies (see `freshness` above). */
+const FRESHNESS_LIVE_PROPS = { role: 'status', 'aria-live': 'polite', 'aria-atomic': true, 'data-freshness': '' } as const;
 
 /**
  * The compact page header (the default since the shell redesign, the only one since the last
@@ -18,7 +31,9 @@ interface PageHeaderProps {
  * tiles' eyebrow (10px, 0.1em) so the page has a single eyebrow voice. The mobile sticky
  * navbar is one block, and its title is what the user anchors to while scrolling.
  */
-export function PageHeader({ title, label, description, actions, className }: PageHeaderProps) {
+export function PageHeader({ title, label, description, actions, freshness, className }: PageHeaderProps) {
+  const freshnessSentence = freshness?.sentence ?? null;
+
   return (
     // `page-header`: the page scene morphs this line into the next page's (globals.css → Page scene).
     // The STICKY box is this wrapper, not the navbar inside it: `position: sticky` travels only
@@ -42,8 +57,13 @@ export function PageHeader({ title, label, description, actions, className }: Pa
             <div className="flex shrink-0 items-center gap-1.5 ml-2">{actions}</div>
           )}
         </div>
-        {description && (
-          <p className="text-sm text-muted-foreground leading-tight">{description}</p>
+        {(description || freshness) && (
+          // With a freshness reading the line is reserved even on a page with no description, so
+          // the sentence never adds a line under the title; the description yields to it and returns.
+          <p className={cn('text-sm text-muted-foreground leading-tight truncate', freshness && 'min-h-[1.25em]')}>
+            {freshness && <span {...FRESHNESS_LIVE_PROPS}>{freshnessSentence ?? ''}</span>}
+            {!freshnessSentence && description}
+          </p>
         )}
       </div>
 
@@ -54,6 +74,11 @@ export function PageHeader({ title, label, description, actions, className }: Pa
             <span className="font-medium text-foreground">{title}</span>
             {description && <span> · {description}</span>}
           </h1>
+          {freshness && (
+            <p {...FRESHNESS_LIVE_PROPS} className="shrink-0 text-sm text-muted-foreground">
+              {freshnessSentence ? `· ${freshnessSentence}` : ''}
+            </p>
+          )}
         </div>
         {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
       </div>

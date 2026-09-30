@@ -8,6 +8,7 @@
 
 import { test as setup, expect } from '@playwright/test';
 import { ANALISI_STORAGE_STATE } from '../playwright.config';
+import { stripPersistedQueryCache } from './persistedCache';
 
 /** Matches `scripts/seedAnalisiE2E.mts`. */
 const EMAIL = 'analisi@example.com';
@@ -27,4 +28,6 @@ setup('authenticate analisi user', async ({ page }) => {
 
   // indexedDB: true — the Firebase Web SDK parks its session there (see auth.setup.ts).
   await page.context().storageState({ path: ANALISI_STORAGE_STATE, indexedDB: true });
+  // The persisted React Query cache out of the state file (PERF-03, see auth.setup.ts).
+  stripPersistedQueryCache(ANALISI_STORAGE_STATE);
 });

@@ -20,6 +20,7 @@ import { useEffect } from 'react';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useExpenses, useExpenseCategories } from '@/lib/hooks/useExpenses';
 import { useSettings } from '@/lib/hooks/useSettings';
+import { useFreshness } from '@/lib/hooks/useFreshness';
 import { AnalisiTab } from '@/components/cashflow/AnalisiTab';
 import { PageContainer } from '@/components/layout/PageContainer';
 
@@ -29,16 +30,20 @@ const DEFAULT_HISTORY_START_YEAR = new Date().getFullYear() - 1;
 export default function AnalisiPage() {
   const { ownerId } = useActiveAccount();
 
-  const { data: allExpenses = [], isLoading: expensesLoading, isError: expensesError } =
-    useExpenses(ownerId);
+  const expensesQuery = useExpenses(ownerId);
+  const { data: allExpenses = [], isLoading: expensesLoading, isError: expensesError } = expensesQuery;
   // The taxonomy feeds AnalisiTab directly (entity search + URL-focus label
   // resolution) and shares the RQ cache with the Cashflow page's sibling tabs.
-  const { data: categories = [], isLoading: categoriesLoading, isError: categoriesError } =
-    useExpenseCategories(ownerId);
+  const categoriesQuery = useExpenseCategories(ownerId);
+  const { data: categories = [], isLoading: categoriesLoading, isError: categoriesError } = categoriesQuery;
 
   // The two settings the page reads — the history floor and the 50/30/20 flag — from the ONE
   // settings key every page shares (2026-09-29): a visit after Cashflow opens on the cache.
-  const { data: settings, isLoading: settingsLoading, isError: settingsError } = useSettings(ownerId);
+  const settingsQuery = useSettings(ownerId);
+  const { data: settings, isLoading: settingsLoading, isError: settingsError } = settingsQuery;
+  // The header's «Aggiornato alle…» while figures restored from the persisted cache are being
+  // reread (PERF-03); the tab owns the header, so the reading travels down as a prop.
+  const freshness = useFreshness([expensesQuery, categoriesQuery, settingsQuery]);
   // The URL-focus restore in AnalisiTab validates against the floored history, so it
   // must not fire until the DEFINITIVE floor is known — the restore is one-shot and
   // a wrong provisional floor would silently drop a valid bookmarked focus. The flag waits the
@@ -71,6 +76,7 @@ export default function AnalisiPage() {
         loadFailed={loadFailed}
         historyStartYear={cashflowHistoryStartYear}
         spendingRolesEnabled={spendingRolesEnabled}
+        freshness={freshness}
       />
     </PageContainer>
   );

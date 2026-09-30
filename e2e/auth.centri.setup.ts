@@ -7,6 +7,7 @@
 
 import { test as setup, expect } from '@playwright/test';
 import { CENTRI_STORAGE_STATE } from '../playwright.config';
+import { stripPersistedQueryCache } from './persistedCache';
 
 /** Matches `scripts/seedCostCentersE2E.mts`. */
 const EMAIL = 'centri@example.com';
@@ -26,4 +27,6 @@ setup('authenticate centri user', async ({ page }) => {
 
   // indexedDB: true — the Firebase Web SDK parks its session there (see auth.setup.ts).
   await page.context().storageState({ path: CENTRI_STORAGE_STATE, indexedDB: true });
+  // The persisted React Query cache out of the state file (PERF-03, see auth.setup.ts).
+  stripPersistedQueryCache(CENTRI_STORAGE_STATE);
 });

@@ -83,7 +83,12 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   min-h-[…]` box, never with `h-full` alone. **`PeriodSelector` has no intrinsic width** (`flex-1` buttons): in a flex
   row give its wrapper an explicit width or the labels collapse into one word.
 - **`PageHeader variant="compact"`** collapses the desktop header to one line (eyebrow · title · description) for
-  pages whose real headline is in the content; the mobile sticky navbar is unchanged.
+  pages whose real headline is in the content; the mobile sticky navbar is unchanged. Since 2026-09-29 that line
+  also carries the page's freshness reading («Aggiornato alle 08:00, sto rileggendo…») while a payload restored from
+  the persisted cache is being reread: on the overview's OWN minute (`DASHBOARD_OVERVIEW_STALE_TIME_MS`), and dated
+  by the older of the read and the payload's `freshness.updatedAt` — a materialised summary can be hours older than
+  the request that fetched it, and the reader is told that age, not the request's (doc/guide/stati.md § The fourth
+  reading).
 - **`SavingsRateBadge` is once per calendar month per account**, recorded in localStorage through
   `celebrationUtils` under `savings_rate_{ownerId}_{YYYY-MM}` — a sessionStorage flag dies with every new window and
   re-greets the user on every login. The decision is pure (`lib/utils/savingsRateBadge.ts`); the effect defers its

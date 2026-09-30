@@ -14,11 +14,74 @@
  *    a confirm NESTED in the detail): title at 20px, the delete arms in the footer, the reading
  *    gives way to the consequence in `text-destructive`, ONE dialog the whole time, and Escape
  *    disarms without closing and without deleting.
+ * 5. A saved expense lands in place (the owner's tour, 2026-09-29): the counter and the table
+ *    follow the write with NO page skeleton in between — the save used to reread the dividends
+ *    and put the skeleton over Tracciamento for the length of a call it never uses. TWO lines of
+ *    `app/dashboard/cashflow/page.tsx` hold it, either alone: the tab's `loading` without
+ *    `otherDataLoading`, and `handleRefresh` rereading the dividends only with their tab mounted.
+ *    The falsification that turns this red removes BOTH (seen: «1 before the save, 2 after»).
  *
  * Runs on the base account (`desktop` project): the assertions are structural, never amounts.
  */
 
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
+
+process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080';
+process.env.GCLOUD_PROJECT = 'demo-net-worth';
+
+const UID = 'test-user-1';
+
+async function admin() {
+  const { initializeApp, getApps } = await import('firebase-admin/app');
+  const { getFirestore } = await import('firebase-admin/firestore');
+  const app = getApps()[0] ?? initializeApp({ projectId: process.env.GCLOUD_PROJECT });
+  return { db: getFirestore(app) };
+}
+
+interface SkeletonCount {
+  /** Every `[data-slot="skeleton"]` that appeared in `main` — the auth wait included: proof the observer runs. */
+  any: number;
+  /** The page's own wait, «Caricamento» — the one a save must never bring back. */
+  page: number;
+}
+
+/** From the next navigation on, count the skeletons that appear in `main`, each node once. */
+async function countSkeletons(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const counts: SkeletonCount = { any: 0, page: 0 };
+    Object.assign(window, { __skeletons: counts });
+    const seen = new WeakSet<Element>();
+    const check = () => {
+      for (const el of Array.from(document.querySelectorAll('main [data-slot="skeleton"]'))) {
+        if (!seen.has(el)) { seen.add(el); counts.any += 1; }
+      }
+      for (const el of Array.from(document.querySelectorAll('main [role="status"][aria-label="Caricamento"]'))) {
+        if (!seen.has(el)) { seen.add(el); counts.page += 1; }
+      }
+    };
+    // `document`, not `documentElement`: it does not exist yet when an init script runs.
+    new MutationObserver(check).observe(document, { subtree: true, childList: true, characterData: true });
+  });
+}
+
+const readSkeletons = (page: Page) => page.evaluate(() => (window as unknown as { __skeletons: SkeletonCount }).__skeletons);
+
+/**
+ * Delete every row of the decoy amount THROUGH THE APP (the row's two-click delete, which also gives
+ * a linked account its balance back) — an earlier run that failed mid-way leaves its own behind, and
+ * a REST delete would skip the reversal. Ends back on the Feed, where the test started.
+ */
+async function removeDecoyRows(movimenti: Locator, amount: RegExp): Promise<void> {
+  await movimenti.getByRole('tab', { name: 'Tabella' }).click();
+  const rows = movimenti.getByRole('table').getByRole('row').filter({ hasText: amount });
+  for (let left = await rows.count(); left > 0; left = await rows.count()) {
+    const row = rows.first();
+    await row.getByRole('button', { name: /^Elimina / }).click();
+    await row.getByRole('button', { name: /^Premi di nuovo per eliminare / }).click();
+    await expect(rows).toHaveCount(left - 1);
+  }
+  await movimenti.getByRole('tab', { name: 'Feed' }).click();
+}
 
 async function measureRankedLists(page: Page) {
   return page.evaluate(() => {
@@ -109,6 +172,57 @@ test('the Tabella view names its columns, sets its figures in mono, arms a delet
   await expect(page.getByRole('region', { name: 'Movimenti' })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole('region', { name: 'Movimenti' }).getByRole('tab', { name: 'Tabella' })).toHaveAttribute('aria-selected', 'true');
   await page.getByRole('region', { name: 'Movimenti' }).getByRole('tab', { name: 'Feed' }).click();
+});
+
+test('a saved expense lands in place: the counter and the table follow the write, no page skeleton in between', async ({ page }) => {
+  // A note no seed carries, and an amount no seed row has (every seeded amount is round).
+  const DECOY = 'Ornitorinco senza skeleton';
+  const AMOUNT = '123.45';
+  const AMOUNT_TEXT = /123,45/;
+
+  await countSkeletons(page);
+  await page.reload({ waitUntil: 'load' });
+  const movimenti = page.getByRole('region', { name: 'Movimenti' });
+  await expect(movimenti).toBeVisible({ timeout: 30_000 });
+  // Positive anchor: the observer does see skeletons (the auth wait at least) before the absence below means anything.
+  expect((await readSkeletons(page)).any).toBeGreaterThan(0);
+  // What an earlier failed run left behind goes first, so the counter and the read-back start clean.
+  await removeDecoyRows(movimenti, AMOUNT_TEXT);
+  const before = await readSkeletons(page);
+  const total = Number((await movimenti.textContent())?.match(/(\d+) voci/)?.[1]);
+  expect(total).toBeGreaterThan(0);
+  const { db } = await admin();
+  const planted = () => db.collection('expenses').where('userId', '==', UID).where('notes', '==', DECOY).get().then((snap) => snap.size);
+  await expect.poll(planted).toBe(0);
+
+  try {
+    await page.getByRole('button', { name: 'Nuova Spesa' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('radio', { name: /^Spesa variabile/ }).click();
+    await dialog.locator('#amount').fill(AMOUNT);
+    await dialog.locator('#categoryId').click();
+    await dialog.getByRole('button', { name: 'Alimentari', exact: true }).click();
+    await dialog.locator('#notes').fill(DECOY);
+    await dialog.getByRole('button', { name: 'Crea voce' }).click();
+    await expect(dialog).toBeHidden();
+
+    // The write is real (Firestore), the counter follows it, the row is in the table — and the
+    // page skeleton count is what it was: the month updated in place.
+    await expect.poll(planted).toBe(1);
+    await expect(movimenti).toContainText(`${total + 1} voci`);
+    await movimenti.getByRole('tab', { name: 'Tabella' }).click();
+    await expect(movimenti.getByRole('table').getByRole('row').filter({ hasText: AMOUNT_TEXT })).toHaveCount(1);
+    const after = await readSkeletons(page);
+    expect(after.page, `page skeletons: ${before.page} before the save, ${after.page} after`).toBe(before.page);
+
+    // Removed BY THE APP (the row's two-click delete), the counter back where it was.
+    await removeDecoyRows(movimenti, AMOUNT_TEXT);
+    await expect(movimenti).toContainText(`${total} voci`);
+    await expect.poll(planted).toBe(0);
+  } finally {
+    // A run that failed above still takes its row away — quietly, so the failure above stays the one reported.
+    await removeDecoyRows(movimenti, AMOUNT_TEXT).catch(() => undefined);
+  }
 });
 
 test('the feed’s detail arms its delete in the footer: one dialog, the consequence in the reading, Escape disarms', async ({ page }) => {

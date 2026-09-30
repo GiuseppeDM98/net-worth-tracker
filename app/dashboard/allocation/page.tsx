@@ -47,6 +47,7 @@ import { queryKeys } from '@/lib/query/queryKeys';
 import { useAssets } from '@/lib/hooks/useAssets';
 import { useSettings } from '@/lib/hooks/useSettings';
 import { useGoalData } from '@/lib/hooks/useGoalData';
+import { useFreshness } from '@/lib/hooks/useFreshness';
 import { calculateAssetValue } from '@/lib/services/assetService';
 import {
   compareAllocations,
@@ -139,9 +140,15 @@ export default function AllocationPage() {
   // ─── The reads: three keys, shared with every other page (2026-09-29) ──────────
   // Assets, settings and the goal document come from the hooks, so a visit after Patrimonio or
   // Impostazioni opens on the cache; the page gates on EVERY query it reads (doc/guide/stati.md).
-  const { data: assetsData, isLoading: assetsLoading, isError: assetsError } = useAssets(ownerId);
-  const { data: settings, isLoading: settingsLoading, isError: settingsError } = useSettings(ownerId);
-  const { data: goalData, isLoading: goalsLoading, isError: goalsError } = useGoalData(ownerId);
+  const assetsQuery = useAssets(ownerId);
+  const settingsQuery = useSettings(ownerId);
+  const goalsQuery = useGoalData(ownerId);
+  const { data: assetsData, isLoading: assetsLoading, isError: assetsError } = assetsQuery;
+  const { data: settings, isLoading: settingsLoading, isError: settingsError } = settingsQuery;
+  const { data: goalData, isLoading: goalsLoading, isError: goalsError } = goalsQuery;
+  // The header's «Aggiornato alle…» while figures restored from the persisted cache are being
+  // reread (PERF-03). The Esposizione's profiles stay out: they sit behind a server cache of their own.
+  const freshness = useFreshness([assetsQuery, settingsQuery, goalsQuery]);
   const loading = assetsLoading || settingsLoading || goalsLoading;
   /** A failed load is not an empty set: it gets an alert, never a verdict about zeros. */
   const loadFailed = assetsError || settingsError || goalsError;
@@ -368,6 +375,7 @@ export default function AllocationPage() {
       label="Pianificazione"
       title="Allocazione"
       description={headerDescription}
+      freshness={freshness}
       actions={
         <Button asChild variant="outline" className="hidden h-8 gap-1.5 px-2.5 text-xs desktop:inline-flex">
           <Link href="/dashboard/settings">

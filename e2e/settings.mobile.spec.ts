@@ -72,7 +72,10 @@ test('«Ripristina default» ha un nome anche quando mostra solo l\'icona', asyn
   await openSettings(page, 'allocazione');
   const reset = page.locator('button:visible').filter({ has: page.locator('svg.lucide-rotate-ccw') }).first();
   await expect(reset).toHaveAccessibleName('Ripristina default');
-  expect((await reset.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  // Rounded: under a full suite the page's entrance spring (scale 0.995 → 1, lib/utils/motionVariants.ts)
+  // can still be a frame from settled when the box is read, and `h-11` then measures 43,999998 —
+  // the same 44px target, not a smaller one (2026-09-29, red in two full runs, green alone).
+  expect(Math.round((await reset.boundingBox())!.height)).toBeGreaterThanOrEqual(44);
 });
 
 test('nessun tab scorre di lato', async ({ page }) => {

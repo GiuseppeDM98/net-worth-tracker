@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  describeFreshness,
   describeLastSuccessfulRead,
   describeReadFailure,
   resolveSurfaceState,
@@ -87,5 +88,48 @@ describe('describeLastSuccessfulRead', () => {
   it('should drop the clause entirely when there has never been a good read', () => {
     // The Narrative Honesty Rule: a missing input removes its clause, it never pads it.
     expect(describeLastSuccessfulRead(null, now)).toBeNull();
+  });
+});
+
+describe('describeFreshness', () => {
+  // Instants, not local Dates: the reading speaks Italy's clock whatever the machine's zone.
+  const now = new Date('2026-09-29T14:30:00.000Z'); // 16:30 in Rome (CEST)
+
+  it('should say the hour alone when the figure was read the same Italian day', () => {
+    expect(describeFreshness({ updatedAt: new Date('2026-09-29T07:42:00.000Z'), now })).toBe(
+      'Aggiornato alle 09:42, sto rileggendo…',
+    );
+  });
+
+  it('should say «ieri» for the day before, on the Italian calendar', () => {
+    // 23:30 UTC on the 28th is already 01:30 on the 29th in Rome: today, not yesterday.
+    expect(describeFreshness({ updatedAt: new Date('2026-09-28T23:30:00.000Z'), now })).toBe(
+      'Aggiornato alle 01:30, sto rileggendo…',
+    );
+    expect(describeFreshness({ updatedAt: new Date('2026-09-28T16:42:00.000Z'), now })).toBe(
+      'Aggiornato ieri alle 18:42, sto rileggendo…',
+    );
+  });
+
+  it('should name the day further back', () => {
+    expect(describeFreshness({ updatedAt: new Date('2026-09-27T16:42:00.000Z'), now })).toBe(
+      'Aggiornato il 27 settembre alle 18:42, sto rileggendo…',
+    );
+  });
+
+  it('should find yesterday across a month edge and a DST edge', () => {
+    expect(describeFreshness({ updatedAt: new Date('2026-09-30T20:00:00.000Z'), now: new Date('2026-10-01T10:00:00.000Z') })).toBe(
+      'Aggiornato ieri alle 22:00, sto rileggendo…',
+    );
+    // 2026-10-25 is the autumn change in Rome (03:00 CEST → 02:00 CET, 01:00 UTC): 09:00 UTC is
+    // already 10:00 CET, and the day after it «ieri» is still the 25th, 23 or 25 hours apart.
+    expect(describeFreshness({ updatedAt: new Date('2026-10-25T09:00:00.000Z'), now: new Date('2026-10-26T00:30:00.000Z') })).toBe(
+      'Aggiornato ieri alle 10:00, sto rileggendo…',
+    );
+  });
+
+  it('should say nothing when nothing on screen is old', () => {
+    // The Narrative Honesty Rule: no placeholder, the header line simply holds the description.
+    expect(describeFreshness({ updatedAt: null, now })).toBeNull();
   });
 });

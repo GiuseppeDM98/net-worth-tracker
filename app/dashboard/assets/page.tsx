@@ -40,7 +40,8 @@ import { calculateTotalValue } from '@/lib/services/assetService';
 import { useAssetLedgerMeta, useAssetTransactions } from '@/lib/hooks/useAssetTransactions';
 import { migrateAssetLedger, backfillAverageCostEur } from '@/lib/services/assetTransactionService';
 import { useSnapshots } from '@/lib/hooks/useSnapshots';
-import { useDashboardOverview } from '@/lib/hooks/useDashboardOverview';
+import { DASHBOARD_OVERVIEW_STALE_TIME_MS, useDashboardOverview } from '@/lib/hooks/useDashboardOverview';
+import { useFreshness } from '@/lib/hooks/useFreshness';
 import { useChartColors } from '@/lib/hooks/useChartColors';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { queryKeys } from '@/lib/query/queryKeys';
@@ -109,9 +110,12 @@ export default function AssetsPage() {
   const queryClient = useQueryClient();
   const chartColors = useChartColors();
 
-  const { data: assets = [], isLoading: loadingAssets, isError: assetsError } = useAssets(ownerId);
-  const { data: snapshots = [], isLoading: loadingSnapshots } = useSnapshots(ownerId);
-  const { data: overview, isLoading: loadingOverview, isError: overviewError } = useDashboardOverview(ownerId);
+  const assetsQuery = useAssets(ownerId);
+  const snapshotsQuery = useSnapshots(ownerId);
+  const overviewQuery = useDashboardOverview(ownerId);
+  const { data: assets = [], isLoading: loadingAssets, isError: assetsError } = assetsQuery;
+  const { data: snapshots = [], isLoading: loadingSnapshots } = snapshotsQuery;
+  const { data: overview, isLoading: loadingOverview, isError: overviewError } = overviewQuery;
   const deleteAssetMutation = useDeleteAsset(ownerId || '');
 
   // ─── Trade-ledger migration trigger ───────────────────────────────────────────
@@ -165,7 +169,8 @@ export default function AssetsPage() {
   // The whole ledger of the owner, filtered to the month in memory: a month query would need a
   // (userId, date) composite index that does not exist, and every trade mutation already
   // invalidates this cache (doc/guide/registro-operazioni.md § Asset Trade Ledger).
-  const { data: trades = [], isLoading: loadingTrades } = useAssetTransactions(ownerId, undefined, { enabled: ledgerReady });
+  const tradesQuery = useAssetTransactions(ownerId, undefined, { enabled: ledgerReady });
+  const { data: trades = [], isLoading: loadingTrades } = tradesQuery;
 
   // ─── Dialog state ─────────────────────────────────────────────────────────────
   // `initialType` skips the type picker: «Aggiungi conto» already knows it wants a cash account.
@@ -198,11 +203,25 @@ export default function AssetsPage() {
     () => assets.filter((a) => a.type === 'realestate' && a.assetClass === 'realestate').map((a) => a.id),
     [assets],
   );
+  const mortgageQuery = useMortgageInstalments(ownerId, propertyIds);
   const {
     data: mortgageRows = [],
     isLoading: loadingMortgage,
     isError: mortgageError,
-  } = useMortgageInstalments(ownerId, propertyIds);
+  } = mortgageQuery;
+  // The header's «Aggiornato alle…» while figures restored from the persisted cache are being
+  // reread (PERF-03): every key the tiles paint, the overview on its own one-minute threshold.
+  const freshness = useFreshness([
+    assetsQuery,
+    snapshotsQuery,
+    tradesQuery,
+    mortgageQuery,
+    {
+      query: overviewQuery,
+      staleAfterMs: DASHBOARD_OVERVIEW_STALE_TIME_MS,
+      contentUpdatedAt: overview ? Date.parse(overview.freshness.updatedAt) : null,
+    },
+  ]);
   const mortgages = useMemo(() => {
     const now = new Date();
     return assets
@@ -353,7 +372,7 @@ export default function AssetsPage() {
   if (loadingAssets || loadingOverview || loadingSnapshots || isLedgerMetaLoading || loadingMortgage) {
     return (
       <PageContainer>
-        <PageHeader label="Patrimonio" title="Strumenti e conti" />
+        <PageHeader label="Patrimonio" title="Strumenti e conti" freshness={freshness} />
         <TileGridSkeleton cells={SKELETON_CELLS} />
       </PageContainer>
     );
@@ -362,7 +381,7 @@ export default function AssetsPage() {
   if (assetsError) {
     return (
       <PageContainer>
-        <PageHeader label="Patrimonio" title="Strumenti e conti" />
+        <PageHeader label="Patrimonio" title="Strumenti e conti" freshness={freshness} />
         <ErrorNotice
           className="max-w-[920px]"
           notice={describeReadFailure({
@@ -388,6 +407,7 @@ export default function AssetsPage() {
           title="Strumenti e conti"
           description={lastPriceUpdate ?? undefined}
           actions={headerActions}
+          freshness={freshness}
         />
 
         <motion.div variants={cardItem} initial="hidden" animate="visible" className="pt-1">

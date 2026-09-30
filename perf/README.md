@@ -155,3 +155,36 @@ ora l'intera collezione delle spese (una volta per sessione) invece di due range
 login 415,3 · Panoramica 535,0 · Patrimonio 718,2 · Cashflow 729,2 · Analisi 741,4 · Rendimenti 680,2 · **Storico
 1189,2** (il PDF: un chunk da 513 KB gz) · Hall of Fame 533,9 · Allocazione 515,8 · FIRE 743,5 · Previdenza 588,9 ·
 Assistente 656,4 · Impostazioni 612,6.
+
+## Revisit — «il secondo caricamento della route» (PERF-03, 2026-09-29)
+
+`--revisit` misura il RELOAD di una route già visitata nello stesso contesto: login, prima visita fino a `data`, poi
+la seconda `goto`. Dal 2026-09-29 fra le due aspetta che la cache persistita di React Query sia su disco (un record NON
+vuoto scritto dopo la prima visita: il persister scrive ~1 s dopo l'ULTIMO evento di cache, e il primo salvataggio, a
+mount, è vuoto — una rivisita presa a `data` non ripristinava nulla e misurava l'app di prima); con il persister spento
+(`NEXT_PUBLIC_PERSIST_QUERIES=false`) il record non arriva mai e ogni rivisita paga il timeout di 8 s, per questo quella
+run dura di più. Lo «skeleton della pagina» non è una colonna della tabella: si legge in `last-run.json` da
+`marks.skeletonGone − marks.auth` (0 = dopo l'attesa dell'auth nessun altro skeleton, la pagina è nata con le cifre).
+
+**Prima/dopo nella stessa sessione** (laptop Windows, mirror, 3 run, mediane, ms dal `navigationStart` al primo numero;
+«prima» = la stessa build con il persister spento, «dopo» = con il persister; fra parentesi le richieste Firestore):
+
+| Pagina | prima | dopo | skeleton della pagina prima → dopo |
+|---|---|---|---|
+| Panoramica | 148 (3) | 115 (3) | sì → no |
+| Patrimonio | 437 (8) | 144 (4) | sì → no |
+| Cashflow | 1208 (4) | 179 (4) | sì → no |
+| Analisi | 1150 (3) | 259 (3) | sì → no |
+| Rendimenti | 686 (13) | 685 (14) | sì → sì (lo stadio 1 legge con `fetchQuery`: PERF-09) |
+| Storico | 1455 (5) | 385 (1) | sì → no |
+| Hall of Fame | 235 (3) | 113 (3) | sì → no |
+| Allocazione | 344 (4) | 106 (3) | sì → 53 ms (lo skeleton di UNA tessera, l'Esposizione) |
+| FIRE e Simulazioni | 1199 (5) | 181 (3) | sì → no |
+| Previdenza | 355 (4) | 122 (3) | sì → no |
+| Impostazioni | 398 (3) | 348 (3) | sì → sì (il documento delle impostazioni è letto con `staleTime: 0`: PERF-13) |
+
+Quello che la tabella non dice: con il persister l'attesa dell'auth INCLUDE il ripristino (JSON di 0,3–1,5 MB dal
+mirror: `auth` 115 → 179 su Cashflow, 161 → 385 su Storico, dove il record ha sei chiavi) — è il costo che PERF-06 abbassa
+riducendo le spese a una finestra; le richieste Firestore scendono perché le riletture partono in un colpo solo sul
+canale già aperto, non perché si legga di meno (ogni ripristino rilegge tutto). La misura precedente della stessa sera,
+con la rivisita presa a `data` e senza attesa, dava «dopo» = «prima» su ogni route: è il motivo dell'attesa.

@@ -154,8 +154,9 @@ Dividendi 3,77 / 6 / 8. Il codice di oggi (righe da riverificare):
 - **Dal 2026-09-29** gli asset della tab vengono da `useAssets` (`page.tsx:104, 134`) e `loadOtherData` legge solo la
   route dei dividendi: `otherDataFailed || assetsError` è l'errore di TAB; il
   `failed` di `dvd-rendimento` è `statsError` di `useDividendStats`, già React Query. **PERF-04**: qui niente recharts
-  (SVG a mano, `FlowBarsChart.tsx:27`): una riga chiusa risparmia DOM e render, non un chunk. **PERF-03**: «Aggiornato
-  alle…» sopra la striscia. **PERF-12**: niente `setState` in effetto. **PERF-14**: nessun `layout`; `tabPanelSwitch` resta.
+  (SVG a mano, `FlowBarsChart.tsx:27`): una riga chiusa risparmia DOM e render, non un chunk. **PERF-03** (implementata il
+  2026-09-29): «Aggiornato alle…» sta nel `PageHeader` della pagina (le quattro chiavi di `app/dashboard/cashflow/page.tsx`),
+  non nel tab. **PERF-12**: niente `setState` in effetto. **PERF-14**: nessun `layout`; `tabPanelSwitch` resta.
 
 ### 4.8 Domande al proprietario
 

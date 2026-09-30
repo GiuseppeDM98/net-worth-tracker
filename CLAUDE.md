@@ -13,24 +13,27 @@ Next.js app for Italian investors: net worth, assets, cashflow, dividends, perfo
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic.
-- `tsc` clean; **202 files / 4596 tests** green in `Europe/Rome` + **42 Playwright spec files** (154 tests, incl. 6 auth setups; last full run 2026-09-29 on the Windows laptop after PERF-05, 154/154 in 7,6 min — the known intermittent is `modal.origin`, doc/guide/e2e-emulatori.md). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, which structurally hides timezone bugs.
-- Latest (2026-09-29, eighth session): **`doc/perf/PERF-05` retired** — the one-data-track refactor (PR #413, in develop
-  since 2026-09-29: every page and component reads the ten collections through the React Query hooks, five new, and
-  the `…QueryOptions` the read hooks export) read against its spec: 12 divergences — 8 where the code was right and the
-  lesson already sat at home (FIRE at depth 1 in memory, Rendimenti stage 1 on `fetchQuery`, the ledger gate, the
-  dead `costCenters.expenses` key, Impostazioni seeded through the key, the wider closing grep, `AssetDialog` targets
-  from the same hook, Dividendi from `useAssets` — AGENTS.md § React Query and Derived State and the guides it names),
-  2 defects fixed in this session (four comments still naming the retired `getFIREData`/`getAnnualCashflowData`; the
-  warm baseline of `perf/README.md`, now transcribed from the same-session run: Storico 1165 → 261 ms and 6 → 0
-  Firestore reads, FIRE 1556 → 114 and 6 → 0, cold NOT remeasured), 2 deferred on purpose (the Analisi notice on a
-  failed settings read, in its blind spot; FIRE cold reading the whole expense list until PERF-06, in
-  doc/guide/fire.md). The sister specs (PERF-03/06/09/11/13, MOB-04/06/07) now describe the data layer as it is —
-  PERF-03 and PERF-06 no longer name an `annualCashflowData` key that does not exist. **Verified**: `tsc`, lint 0,
-  Vitest **202 / 4596** in `Europe/Rome`; no Playwright (comments and docs only).
+- `tsc` clean; **207 files / 4637 tests** green in `Europe/Rome` + **43 Playwright spec files** (157 tests, incl. 6 auth setups; last full run 2026-09-29 on the Windows laptop with the persister on, 156/157 in 6,9 min — the one red was `modal.origin`, the known intermittent; the run before it also had a 44px check that read 43,999998 under load and now rounds; doc/guide/e2e-emulatori.md). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, which structurally hides timezone bugs.
+- Latest (2026-09-29, ninth session): **`doc/perf/PERF-03` implemented — the last known figures first.** The React
+  Query cache is persisted to IndexedDB (`lib/constants/persistCache.ts`: an allowlist of the owner's collections,
+  never the demo uid, `maxAge` 24 h with `gcTime` 24 h per prefix, `buster` `PERSIST_CACHE_VERSION`; dates cross the
+  store by value, `lib/utils/queryPersistence.ts`) and restored before the first fetch (`ProtectedRoute` waits for
+  `useIsRestoring()` too), then INVALIDATED so every load rereads — stale-while-revalidate, the F5 still a fresh read;
+  the header says «Aggiornato alle 18:42, sto rileggendo…» while a figure read before this load is reread
+  (`useFreshness` + `describeFreshness`, the owner's placement: the header line, not under the verdict) and empties
+  when it lands; the cache is forgotten at sign-out by the provider; the six Playwright setups strip the store from
+  the parked sessions; `NEXT_PUBLIC_PERSIST_QUERIES=false` is the rollback. Measured with `perf:bench -- --revisit`
+  (which now waits for the persisted record): Cashflow 1208 → 179 ms, Storico 1455 → 385, Analisi 1150 → 259, FIRE
+  1199 → 181, Patrimonio 437 → 144, no page skeleton on nine routes (`perf/README.md` § Revisit). Three lessons paid
+  for: a `clear()` under mounted hooks re-persists the outgoing account; a reload within `staleTime` used to read
+  nothing at all; the persister's first save is empty and the real one lands ~1 s after the last event. **Verified**:
+  `tsc`, lint 0, Vitest **207 / 4637** in `Europe/Rome`, `npm run test:e2e` 156/157 (above), the three
+  `e2e/freshness.spec.ts` assertions and the five pure tests seen red once each. AGENTS.md § Caching, doc/guide/stati.md
+  § The fourth reading, e2e-emulatori.md, account-condiviso-demo.md.
 
 ## Architecture Snapshot
 - App Router; protected pages under `app/dashboard/*`.
-- `lib/services/*` (service layer) → pure `lib/utils/*` → `lib/server/*` (server-only). React Query for caching/invalidation.
+- `lib/services/*` (service layer) → pure `lib/utils/*` → `lib/server/*` (server-only). React Query for caching/invalidation, its cache persisted to IndexedDB and restored before the first fetch (an allowlist, `lib/constants/persistCache.ts`; AGENTS.md § Caching).
 - Italy timezone helpers in `lib/utils/dateHelpers.ts`.
 - Convention: extract logic into pure, tested `lib/utils`/`lib/services` functions; keep Firestore-coupled code thin.
 
@@ -58,7 +61,7 @@ One line per area: the question it answers, then where it is described. *What th
 - **Assistente AI**: the verdict IS the context; SSE streaming, memory, goal proposals; flag `NEXT_PUBLIC_ASSISTANT_AI_ENABLED`, blocked in demo. doc/guide/assistente.md.
 - **Hall of Fame**: «quali sono stati i mesi e gli anni migliori?», no axis. doc/guide/hall-of-fame.md.
 - **Impostazioni**: six tabs, no verdict, one Save per page with the save state per tab (a dot, a bottom bar, «Annulla modifiche»); the write fan-out in doc/guide/impostazioni.md § Settings — the FIVE places.
-- **States**: loading · nothing recorded · measured zero · failed read, on 20 surfaces. doc/guide/stati.md; DESIGN → The Absence-Has-Three-Names Rule.
+- **States**: loading · nothing recorded · measured zero · failed read, on 20 surfaces — and, since 2026-09-29, «old but present»: the header's «Aggiornato alle HH:MM, sto rileggendo…» while a figure restored from the persisted cache is reread. doc/guide/stati.md; DESIGN → The Absence-Has-Three-Names Rule.
 - **Dialogs and forms**: 40 modals on one vocabulary in `ResponsiveModal`; row deletes arm in the row. doc/guide/dialog.md; DESIGN → The Modal-Is-A-Tile Rule.
 - **Periodic emails · budget email · PDF export**: rule-generated verdict first, AI comment second; every hex from `printTokens.ts`. doc/guide/email-pdf.md; DESIGN → The Out-Of-DOM Token Rule.
 - **Themes**: twelve theme blocks × nine chart slots through `useChartColors`, every block held to the distinctness floor by `__tests__/chartPaletteDistinctness.test.ts`. doc/guide/temi.md.

@@ -184,6 +184,11 @@ REGISTRATION_WHITELIST=
 # Development Features (optional - for testing/demo)
 NEXT_PUBLIC_ENABLE_TEST_SNAPSHOTS=false
 
+# Persisted query cache (optional). The app keeps its last successful reads in the browser's
+# IndexedDB and paints them at once on the next load (PERF-03). `false` switches that off — the
+# rollback of a deploy; never set it on the Playwright server (`dev:e2e`).
+# NEXT_PUBLIC_PERSIST_QUERIES=false
+
 # Resend — Monthly email summaries (optional)
 # Required only if you want to receive automatic monthly portfolio reports.
 # Sign up for free at https://resend.com (free tier: 3000 emails/month).
@@ -197,6 +202,7 @@ RESEND_FROM_EMAIL=onboarding@resend.dev
 - `CRON_SECRET`: Generate a random string (e.g., use `openssl rand -hex 32`)
 - `NEXT_PUBLIC_ENABLE_TEST_SNAPSHOTS`: Set to `true` to enable dummy data generation in Settings page (for development, testing, or demo purposes). **Warning**: Test data is saved to the same Firebase collections as real data. You can delete all dummy data using the "Elimina Tutti i Dati Dummy" button in Settings. See [README.md](./README.md) for full feature documentation. **Recommended**: Keep `false` in production environments.
 - `ANTHROPIC_API_KEY` (optional): Enables AI-powered performance analysis. If omitted, the rest of the app still works normally.
+- `NEXT_PUBLIC_PERSIST_QUERIES` (optional): `false` disables the persisted query cache (the pages then start from a skeleton on every load, as before 2026-09-29). Unset or any other value keeps it on. Build-time, like every `NEXT_PUBLIC_*` variable.
 - `RESEND_API_KEY` (optional): Enables monthly email summaries. Create a free API key at [resend.com/api-keys](https://resend.com/api-keys). If omitted, the email feature is silently disabled.
 - `RESEND_FROM_EMAIL` (optional): Sender address for monthly emails. Options:
   - `onboarding@resend.dev` — Resend shared domain, no setup required. Delivers only to your Resend account's email address (suitable for personal/single-user deployments).

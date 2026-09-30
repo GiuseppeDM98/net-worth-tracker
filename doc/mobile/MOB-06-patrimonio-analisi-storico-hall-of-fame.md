@@ -154,8 +154,8 @@ il Dettaglio, come in Storico (`history/page.tsx:498-501`): gesti rari, ~56 px d
   solo i grafici dentro le disclosure (§ 4 C: Dettaglio di Storico, sezioni di Analisi) e il Sankey del Flusso, che sotto
   i 640 px non si scarica più; Composizione e Valore di Storico restano statici e recharts arriva comunque con
   Evoluzione: la riga chiusa risparmia il mount, non il download; un grafico di riga reso `dynamic` riserva l'altezza
-  (MOB-02 § 4.8). **PERF-03**: «Aggiornato alle…» sta
-  nel budget. **PERF-05/06**: la striscia legge i riassunti come sono. **PERF-12**: `mounted` nel gestore, `reveal` in
+  (MOB-02 § 4.8). **PERF-03** (implementata il 2026-09-29): «Aggiornato alle…» sta nel `PageHeader`, nella riga della
+  descrizione: nessuna riga in più nel budget. **PERF-05/06**: la striscia legge i riassunti come sono. **PERF-12**: `mounted` nel gestore, `reveal` in
   un `setTimeout`, mai nel corpo di un effetto (§ 4.2).
 
 ### 4.6 Domande al proprietario

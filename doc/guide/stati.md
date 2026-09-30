@@ -1,12 +1,13 @@
 # Stati: caricamento, vuoto, zero, errore
 
-> **When to open this guide** — anyone touching `lib/utils/statesNarrative.ts` (`AbsenceKind`, `resolveSurfaceState`, `describeReadFailure`, `describeLastSuccessfulRead`), `components/ui/{skeleton,empty-state,error-notice,tile-grid-skeleton}.tsx`, `components/ui/sonner.tsx` (the severity of a toast), or wiring a loading · empty · zero · failed branch on any surface. `AGENTS.md` keeps the stub with the essentials; here is the full rule. File: § *Files* below.
+> **When to open this guide** — anyone touching `lib/utils/statesNarrative.ts` (`AbsenceKind`, `resolveSurfaceState`, `describeReadFailure`, `describeLastSuccessfulRead`, `describeFreshness`), `lib/utils/freshness.ts` + `lib/hooks/useFreshness.ts` (the «old but present» reading), `components/ui/{skeleton,empty-state,error-notice,tile-grid-skeleton}.tsx`, `components/ui/sonner.tsx` (the severity of a toast), or wiring a loading · empty · zero · failed branch on any surface. `AGENTS.md` keeps the stub with the essentials; here is the full rule. File: § *Files* below.
 
 ## Files
 
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Stati**: `lib/utils/statesNarrative.ts` (`resolveSurfaceState` = the one wait/failure decision), `components/ui/{skeleton,empty-state,error-notice}.tsx`, `components/ui/sonner.tsx` — doc/guide/stati.md
+- **The fourth reading** (2026-09-29): `lib/utils/freshness.ts` (`resolveFreshness`), `lib/hooks/useFreshness.ts`, `describeFreshness` in `statesNarrative.ts`, the `freshness` prop of `components/layout/PageHeader.tsx`; the persisted cache behind it in `lib/constants/persistCache.ts` (AGENTS.md § Caching); `e2e/freshness.spec.ts`
 
 ## Stati: caricamento, vuoto, zero, errore
 
@@ -68,6 +69,48 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   the five Cashflow tabs (the `loadFailed` prop is threaded from `app/dashboard/{cashflow,analisi}/page.tsx`, because
   the tabs do not own their queries), Dividendi, the five FIRE tabs, Previdenza and Centri di Costo. Adding a
   twenty-first means: read the query's `isError`, branch with `resolveSurfaceState`, and write the `consequence`.
+
+## The fourth reading: old but present (2026-09-29)
+
+- **A figure can be on screen and not be current.** Since PERF-03 the query cache is persisted to IndexedDB and
+  restored before the first fetch (AGENTS.md § Caching), so a reload paints the last known figures at once and
+  refetches behind them. That is a fourth state beside the three absences, and it has its own sentence: «Aggiornato
+  alle 18:42, sto rileggendo…» — `describeFreshness` (`statesNarrative.ts`): the hour alone on the same Italian
+  calendar day, «ieri» the day before, «il 27 settembre» further back; Italy's clock through `Intl` with a `timeZone`,
+  whatever the machine's zone, and no Firebase import (`dateHelpers` carries `Timestamp` as a value). `null` when
+  nothing on screen is old — the clause disappears, never a placeholder.
+- **Every load rereads what it restored.** The restore marks the restored queries invalidated (`onSuccess` of the
+  provider, `refetchType: 'none'`): every hook that mounts on them, and every `fetchQuery`, refetches whatever their
+  age — stale-while-revalidate, not stale-instead-of-fresh. Without it a reload within `staleTime` painted the
+  restored figures and read NOTHING for five minutes (the full suite found it on 2026-09-29: an Admin write between
+  two `goto` stayed invisible), and an F5 asked to refresh would have refreshed nothing — the one behaviour the
+  in-memory cache never had.
+- **The decision is `resolveFreshness`** (`lib/utils/freshness.ts`): a query is «old» when it is REFETCHING a figure
+  it already has (`isFetching` and not `isLoading`) AND that figure was either read BEFORE this page load
+  (`dataUpdatedAt < performance.timeOrigin`: it came out of the persisted cache, another load's reading of the world,
+  however young) or is older than the query's own `staleTime` — the global five minutes
+  (`lib/query/queryDefaults.ts`), the overview's minute. So a reload thirty seconds after the first visit says
+  «Aggiornato alle…» (true: the figures are from another load), while an invalidation after a save rereads a
+  two-minute-old list in silence, exactly as the app always did. The page's OLDEST such figure is the one dated; the
+  overview's payload dates its own content (`freshness.updatedAt`), and the older of the two wins.
+- **The line lives in the page HEADER, not under the verdict** (owner, 2026-09-29): on `desktop:` after the
+  description in the same fixed-height row («Cashflow · Traccia e analizza… · Aggiornato alle 18:42, sto
+  rileggendo…»), below it in the description's line, which the sentence takes while it lasts and the description gets
+  back — so nothing under it moves when the sentence goes (a reserved 16px slot under every verdict, or a 16px jump
+  when it emptied, were the alternatives). ONE stable `role="status" aria-live="polite" aria-atomic` node per width,
+  marked `data-freshness`, that changes text and EMPTIES — never a node that appears and disappears
+  (doc/guide/dialog.md). A page passes its `useQuery` results to `useFreshness` and the reading to `PageHeader`
+  (`freshness`); a tab that owns the header takes it as a prop (Analisi); a page whose queries live in its component
+  reads the same hooks itself (Previdenza, FIRE: the same cache entries, no second read).
+- **The skeleton is for a FIRST read only.** During the restore every query is `pending` and not fetching —
+  `isLoading` false, `data` undefined — and a page mounted then would print «nothing recorded» about a set it is
+  about to receive: `ProtectedRoute` keeps the auth fallback («Verifica dell'accesso») until `useIsRestoring()` is
+  false as well, so no page ever sees that frame. With a restored figure the page skips its own skeleton and opens
+  on the header's sentence; `e2e/freshness.spec.ts` pins the three facts on Cashflow (no page skeleton on the reload,
+  the node HAD the sentence, the node is empty once the fresh read landed).
+- **Two surfaces carry no sentence by construction**: Rendimenti reads its six collections with `fetchQuery` (no
+  observer, and a stale entry is awaited, never painted), and Impostazioni's settings document is read with
+  `staleTime: 0` — there the header dates only the categories and the accounts lists.
 
 ## Per-page blind spots
 

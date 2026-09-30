@@ -6,7 +6,8 @@
  * resolved; this component sits INSIDE `<main>` and gates only the page. Three states:
  * 1. Loading — render `fallback` (the layout passes the generic tile-grid skeleton: the wait is a
  *    WAIT and takes the primitive every page uses, DESIGN.md → The Absence-Has-Three-Names Rule).
- *    On the server `loading` is always true, so the fallback is what the HTML carries.
+ *    On the server `loading` is always true, so the fallback is what the HTML carries. The same
+ *    fallback also covers the restore of the persisted query cache (`useIsRestoring`, PERF-03).
  * 2. Not authenticated — keep the fallback on screen and redirect in an effect: the beat between
  *    the verdict and the navigation shows the same skeleton, not an empty `main`.
  * 3. Authenticated — render the page.
@@ -18,6 +19,7 @@
 
 import { useEffect, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
+import { useIsRestoring } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface ProtectedRouteProps {
@@ -28,6 +30,12 @@ interface ProtectedRouteProps {
 
 export function ProtectedRoute({ children, fallback = null }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
+  // The persisted query cache is still being read from IndexedDB (PERF-03, a few ms after the
+  // shell): a page mounted before it lands would see every query `pending` and NOT fetching — so
+  // `isLoading` false and `data` undefined, which every page reads as «nothing recorded». The
+  // restore usually beats Firebase Auth, but nothing guarantees it; the gate holds the same
+  // fallback until both have answered. `false` when the persister is off (the context's default).
+  const isRestoring = useIsRestoring();
   const router = useRouter();
 
   useEffect(() => {
@@ -36,7 +44,7 @@ export function ProtectedRoute({ children, fallback = null }: ProtectedRouteProp
     }
   }, [user, loading, router]);
 
-  if (loading || !user) {
+  if (loading || isRestoring || !user) {
     return <>{fallback}</>;
   }
 

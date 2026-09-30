@@ -11,6 +11,7 @@
 
 import { test as setup, expect } from '@playwright/test';
 import { STORAGE_STATE } from '../playwright.config';
+import { stripPersistedQueryCache } from './persistedCache';
 
 /** Matches `scripts/seedEmulator.ts` / `scripts/seedPensionE2E.mts`. */
 const TEST_EMAIL = 'test@example.com';
@@ -36,4 +37,7 @@ setup('authenticate', async ({ page }) => {
   // so the default cookie+localStorage capture produces a state file that silently lands every
   // later spec back on the login page.
   await page.context().storageState({ path: STORAGE_STATE, indexedDB: true });
+  // The capture also took the persisted React Query cache (PERF-03): out of the state file, so
+  // every spec starts with an empty cache and shows what a first visit shows (e2e/persistedCache.ts).
+  stripPersistedQueryCache(STORAGE_STATE);
 });

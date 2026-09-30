@@ -46,6 +46,7 @@ import { FamilyMember } from '@/types/assets';
 import { useExpenses, useExpenseCategories } from '@/lib/hooks/useExpenses';
 import { useAssets } from '@/lib/hooks/useAssets';
 import { useSettings } from '@/lib/hooks/useSettings';
+import { useFreshness } from '@/lib/hooks/useFreshness';
 import { queryKeys } from '@/lib/query/queryKeys';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { tabPanelSwitch } from '@/lib/utils/motionVariants';
@@ -96,12 +97,17 @@ export default function CashflowPage() {
   const [activeTab, setActiveTab] = useState<string>(initialTab);
   // React Query hooks for expenses, categories, assets and the settings (2026-09-29: the settings
   // used to be a one-off `getSettings` in an effect, outside every key).
-  const { data: allExpenses = [], isLoading: expensesLoading, isError: expensesError } =
-    useExpenses(ownerId);
-  const { data: categories = [], isLoading: categoriesLoading, isError: categoriesError } =
-    useExpenseCategories(ownerId);
-  const { data: allAssets = [], isLoading: assetsLoading, isError: assetsError } = useAssets(ownerId);
-  const { data: settings, isLoading: settingsLoading, isError: settingsError } = useSettings(ownerId);
+  const expensesQuery = useExpenses(ownerId);
+  const categoriesQuery = useExpenseCategories(ownerId);
+  const assetsQuery = useAssets(ownerId);
+  const settingsQuery = useSettings(ownerId);
+  const { data: allExpenses = [], isLoading: expensesLoading, isError: expensesError } = expensesQuery;
+  const { data: categories = [], isLoading: categoriesLoading, isError: categoriesError } = categoriesQuery;
+  const { data: allAssets = [], isLoading: assetsLoading, isError: assetsError } = assetsQuery;
+  const { data: settings, isLoading: settingsLoading, isError: settingsError } = settingsQuery;
+  // The header's «Aggiornato alle…» while figures restored from the persisted cache are being
+  // reread (PERF-03): the four keys every tab paints from.
+  const freshness = useFreshness([expensesQuery, categoriesQuery, assetsQuery, settingsQuery]);
 
   // The optional tabs are null UNTIL the settings have answered (a tab appearing late, after an
   // async flip from false, moves the tab bar under the reader's cursor) — and settled on a failed
@@ -140,7 +146,10 @@ export default function CashflowPage() {
   const [otherDataFailed, setOtherDataFailed] = useState(false);
   const [otherDataLoaded, setOtherDataLoaded] = useState(false);
 
-  const loading = expensesLoading || categoriesLoading || otherDataLoading;
+  // The dividends' own read is NOT in here: it is the Dividendi tab's wait alone (below). Until
+  // 2026-09-29 it was, so every expense saved put the skeleton over Tracciamento for the length
+  // of a `/api/dividends` call it never uses — the «refresh» the owner saw on the tour.
+  const loading = expensesLoading || categoriesLoading;
   // Every tab defaults its data to `[]`, so without this a dropped connection reads as an
   // empty ledger — the one thing a tracker must never say (lib/utils/statesNarrative.ts).
   const loadFailed = expensesError || categoriesError;
@@ -195,9 +204,12 @@ export default function CashflowPage() {
       queryKey: queryKeys.assets.all(ownerId || ''),
     });
 
-    // Force re-fetch of the dividends
-    setOtherDataLoaded(false);
-    await loadOtherData();
+    // The dividends are reread only where they are on screen: a save on Tracciamento used to
+    // fetch them for a tab that was never opened (and to skeleton the list meanwhile, above).
+    if (mountedTabs.has('dividends')) {
+      setOtherDataLoaded(false);
+      await loadOtherData();
+    }
   };
 
   /**
@@ -243,6 +255,7 @@ export default function CashflowPage() {
         label="Operatività"
         title="Cashflow"
         description="Traccia e analizza le tue entrate e uscite nel tempo"
+        freshness={freshness}
         actions={
           <div className="flex items-center gap-2">
             {effectiveTab === 'tracking' && (
@@ -405,7 +418,7 @@ export default function CashflowPage() {
               <DividendTrackingTab
                 dividends={dividends}
                 assets={dividendAssets}
-                loading={loading || assetsLoading}
+                loading={loading || otherDataLoading || assetsLoading}
                 loadFailed={otherDataFailed || assetsError}
                 onRefresh={handleRefresh}
               />
