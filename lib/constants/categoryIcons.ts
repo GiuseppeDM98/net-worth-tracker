@@ -3,8 +3,9 @@
  * Keys are exact Lucide component names (used for dynamic lookup).
  * Values are Italian display labels for accessibility (aria-label).
  *
- * IMPORTANT: If you add an icon here, verify the name matches an export in
- * the installed version of lucide-react.
+ * IMPORTANT: If you add an icon here, add its loader to
+ * `components/expenses/categoryIconLoaders.ts` (one chunk per icon, PERF-04);
+ * `__tests__/categoryIcons.test.ts` goes red until both lists match lucide.
  */
 export const CATEGORY_ICONS: Record<string, string> = {
   // ── Food & drink ─────────────────────────────────────────────────────────

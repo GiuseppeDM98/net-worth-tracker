@@ -30,8 +30,16 @@ build non ha più, o se un tetto è più alto di quello in `HEAD` senza un `rais
 | testo | caratteri di testo nel `body` dell'HTML prerenderizzato. Fino al 2026-09-28 era 0 su ogni route dashboard (solo lo spinner); da allora ogni route porta la shell — skip link, le voci della sidebar, la bottom nav, l'attesa dell'auth — e conta qualche centinaio. Una route tornata a 0 ha rimesso la shell dietro il cancello (`e2e/shell.boot.spec.ts` legge lo stesso HTML) |
 | tetto | `initialJsGzKB` di `budget.json`; `(condivisi)` = i chunk che OGNI route dashboard carica, `sharedGzKB` |
 
-Sotto la tabella, i chunk iniziali più grandi con le route che li usano: è così che si vedono le copie di recharts
-(quattro chunk da 350 KB raw, uno per pagina) e il PDF nel grafo di Storico.
+Sotto la tabella, i chunk iniziali più grandi con le route che li usano: è così che si sono viste le copie di recharts
+(quattro chunk da 350 KB raw, uno per pagina) e il PDF nel grafo di Storico, fino a PERF-04 (2026-09-30).
+
+**Le copie di una libreria** (`libraryCopies` in `budget.json`, da PERF-04): quante chunk di TUTTA la build — iniziali
+e pigri — possono contenere una libreria, riconosciuta da una firma che solo il suo codice scrive
+(`LIBRARY_SIGNATURES` in `lib/utils/perfBudget.ts`: per recharts `recharts-wrapper`, il div che ogni suo grafico rende).
+`{ "recharts": 1 }`: una seconda copia è ROSSO, e lo è anche una firma che non trova nulla (il controllo non guarderebbe
+più niente). È una regola, non una misura: `--write` la ricopia com'è. Visto rosso il 2026-09-30 con una sparkline che
+importava `'recharts'` direttamente — e con la firma `recharts-cartesian-grid` di allora rimasto VERDE, perché la
+sparkline non usa quel modulo: la firma va presa dal cuore che OGNI uso della libreria si porta dietro.
 
 ### Il ratchet e il tetto alzato
 
@@ -48,7 +56,7 @@ Sotto la tabella, i chunk iniziali più grandi con le route che li usano: è cos
 
 | Data | Route | Da → a (KB gz) | PR | Perché |
 |---|---|---|---|---|
-| — | — | — | — | nessuno finora |
+| 2026-09-30 | (condivisi) | 470 → 483 | PERF-04 | Nessuna route cresce: `date-fns`, `date-fns-tz`, `lib/utils/dateHelpers.ts` e `lib/utils/formatters.ts` (54 moduli, ~14 KB) che ogni pagina carica stavano in chunk PER PAGINA, una copia a pagina, e ora stanno nei chunk condivisi (analizzatore Turbopack, prima/dopo: l'insieme dei moduli che ogni pagina carica è lo stesso). Misura 464,6 → 473,5 |
 
 ## Il benchmark — «quanto ci mette l'app a mostrare un numero?»
 
@@ -151,10 +159,18 @@ Analisi, Previdenza e Impostazioni a 0 letture; Cashflow invariato (tutta E, PER
 sono PERF-09). Il **cold** NON è stato rimisurato: la tabella cold sopra è quella del 2026-09-28, e FIRE a freddo legge
 ora l'intera collezione delle spese (una volta per sessione) invece di due range — doc/guide/fire.md.
 
-**Bundle** (gz KB, chunk iniziali; il tetto in `budget.json` è +2%): condivisi 459,9 (21 chunk) · landing 448,3 ·
-login 415,3 · Panoramica 535,0 · Patrimonio 718,2 · Cashflow 729,2 · Analisi 741,4 · Rendimenti 680,2 · **Storico
-1189,2** (il PDF: un chunk da 513 KB gz) · Hall of Fame 533,9 · Allocazione 515,8 · FIRE 743,5 · Previdenza 588,9 ·
-Assistente 656,4 · Impostazioni 612,6.
+**Bundle** (gz KB, chunk iniziali; il tetto in `budget.json` è +2%) — **dal 2026-09-30, PERF-04**: condivisi 473,5
+(22 chunk) · landing 452,0 · login 418,2 · Panoramica 538,0 · Patrimonio 731,1 · Cashflow 735,4 · **Analisi 564,6** ·
+**Rendimenti 566,3** · **Storico 684,0** · Hall of Fame 541,2 · Allocazione 520,6 · **FIRE 653,7** · Previdenza 592,6 ·
+Assistente 659,4 · Impostazioni 623,9; recharts in UN chunk (93,2 gz), iniziale solo su Patrimonio, Storico e FIRE.
+Prima (2026-09-28): condivisi 459,9 · Patrimonio 718,2 · Cashflow 729,2 · Analisi 741,4 · Rendimenti 680,2 · Storico
+1189,2 (il PDF: un chunk da 513 KB gz) · FIRE 743,5 · le altre ±1.
+
+**Il prefetch dei link della shell** (osservato il 2026-09-30): Next prefetcha la route di ogni link visibile e con il
+payload arrivano i chunk client di quella route — a freddo, la finestra di una pagina qualsiasi scaricava ~2057 KB di JS
+(tutte le route, le quattro copie di recharts e il PDF compresi), da PERF-04 ~1030. Un chunk raggiunto SOLO da un
+`import()` (il PDF, il Sankey sul telefono, le icone, le tab di FIRE) non viene prefetchato; uno nel grafo iniziale di
+un'altra route sì. La colonna JS del benchmark lo include: è una traccia, non il budget.
 
 ## Revisit — «il secondo caricamento della route» (2026-09-29)
 

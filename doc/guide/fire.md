@@ -67,6 +67,15 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **The goal document is rewritten WHOLE, never patched.** So the Admin append is a transaction (the FIRE page writes
   the same doc), the goals already stored and `assignments` pass through **verbatim**, and the colour is picked INSIDE
   the transaction (`pickNextGoalColor`), or two goals created concurrently come out the same hue.
+- **Only the Calcolatore is in the page's initial JavaScript** (2026-09-30, PERF-04): Coast FIRE, What If, Monte Carlo
+  and Obiettivi are `lazyComponent`s at module level in `app/dashboard/fire-simulations/page.tsx`, one chunk each,
+  preloaded once the Calcolatore's four reads are in and the page is idle (`usePreloadWhenIdle(LAZY_TABS, ready)`), so
+  a tab opens at once (4–37 ms on the mirror; Monte Carlo ~420, its simulation) — only the active panel ever mounted,
+  what the page saves is their CODE on the critical path: 749,9 → 653,7 KB gz. If a tab is opened before its chunk
+  the panel shows that tab's OWN `TileGridSkeleton`, whose cells live
+  in `components/fire-simulations/tabSkeletons.ts` — imported by the tab AND by the page — so the chunk's wait and the
+  data's wait are one skeleton. A new lazy tab takes its cells there, never from its own module (a value import from
+  the tab would put it back in the page's graph). recharts stays initial here: the Calcolatore draws with it.
 
 ## FIRE › Calcolatore — a verdict over tiles (`components/fire-simulations/FireCalculatorTab.tsx`, `components/fire-simulations/tiles/*`, `lib/utils/{fireSummary,fireNarrative}.ts`)
 

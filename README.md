@@ -269,7 +269,7 @@ npm run test:e2e       # Playwright: desktop 1440px, mobile 390px, degraded-stat
 npm run test:e2e:ui    # Same, interactive runner
 
 # Speed and size (perf/README.md): options always after `--`
-npm run perf:budget    # JS per page of a production build against perf/budget.json (after `npm run build`)
+npm run perf:budget    # JS per page of a production build against perf/budget.json, and one copy of recharts (after `npm run build`)
 npm run perf:build     # Production build against the emulators, then `npm run perf:serve` on :3200
 npm run perf:bench -- --runs=3  # Time to the first figure, cold and by navigation, per page
 ```

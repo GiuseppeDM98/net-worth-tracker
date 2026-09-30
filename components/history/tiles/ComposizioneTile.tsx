@@ -16,7 +16,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useReducedMotion } from 'framer-motion';
 import { Info } from 'lucide-react';
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from '@/components/ui/charts/recharts';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { Tile, TILE_FOOTER_ACTION_CLASS } from '@/components/ui/tile';

@@ -82,6 +82,17 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **`summarizeSelection` runs on the union like `change`**: an instrument ticked in an earlier month and sold in full counts its whole previous value as a quantity loss (`departed`), so the panel agrees with the trend line under it.
 - **JSX text after an expression inside a flex chip loses its leading space** (`{pct} l'anno` rendered «19,4%l'anno»): an anonymous flex item's leading whitespace is collapsed. Build the string in one expression.
 - **`SnapshotSearchDialog` sets the note in the select handler**, not in an effect (react-hooks/set-state-in-effect); the page patches the note into local state after `updateSnapshotNote`, no refetch.
+- **The PDF engine is not in the page's JavaScript** (2026-09-30, PERF-04): `@react-pdf/renderer`, pdfkit and the
+  report's sections (513 KB gz) arrive when «Esporta PDF» is PRESSED — `loadPDFGenerator` in
+  `components/pdf/PDFExportDialog.tsx`, started by `ExportPDFButton`'s click, awaited by «Genera PDF» inside its own
+  «Generazione...». The dialog itself stays static (it opens at once; the download overlaps the choice of sections).
+  Initial JS 1200,9 → 684,0 KB gz; cold on the mirror, long task 727 → 597 ms and first figure 2424 → 2177 ms (same
+  machine, same session). Pinned by `e2e/bundle.lazy.spec.ts` (no chunk with `@react-pdf` before the press, one after —
+  seen red with a static import back).
+- **The Dettaglio's plots stay static, on purpose** (2026-09-30): recharts is in Storico's initial JS anyway (Evoluzione,
+  Composizione, Valore per strumento draw with it at sight) and the Dettaglio's own chart code weighs ~2 KB gz
+  (`StoricoDettaglio` 4,8 KB compressed in all, `LaborMetricsChart` 1,0, from the bundle analyzer) — a `lazyComponent`
+  would cost a round trip and a placeholder for nothing. Revisit only if the three tiles stop using recharts.
 - **No scrub, no confetti (2026-09-13).** For one day (4b0a2dd) the Evoluzione series drove every tile under the pointer (`resolveScrubView`, `storicoScrub.ts`); the owner removed it together with the milestone confetti of Raddoppi. The tiles read today, the Recharts tooltip is the whole hover reading, `ComposizioneTile` renders `series.breakdown` as plain rows, the Driver bars light only their own hover, and `EvoluzioneTile`'s head is `OverviewAnimatedCurrency` on the latest value. Do not bring either back on this page (DESIGN.md → The Scrub Rule, retired).
 
 ## Per-page blind spots

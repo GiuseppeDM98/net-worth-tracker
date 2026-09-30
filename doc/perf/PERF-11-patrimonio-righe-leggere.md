@@ -18,6 +18,11 @@ e 314 ms warm con 11 richieste Firestore (dal 2026-09-29 warm ne fa 0: assets, s
   (`assets/page.tsx:528, 536`) anche chiusi; da chiuso il dialog non legge più nulla (`useSettings(ownerId, { enabled: open })`, 2026-09-29) ma partecipa a ogni render
   della pagina. Da aperto, ogni tasto in un campo `useWatch`-ato alla radice ri-renderizza le 2887 righe.
 - `app/dashboard/assets/page.tsx:385`: `motion.div layout="position"` intorno all'INTERA pagina — è di PERF-14, non di questa spec.
+- **Da PERF-04 (2026-09-30) la sparkline paga l'unione di recharts**: recharts è in UN chunk condiviso (il barrel
+  `components/ui/charts/recharts.ts`), che contiene i moduli di TUTTI i grafici dell'app; la copia che Patrimonio aveva
+  prima conteneva solo ciò che `AssetSparkline` usa. Patrimonio 723,7 → 731,1 KB gz (+28,5 KB stimati di `recharts/es6/*`
+  e +6,3 di `es-toolkit`, dall'analizzatore). Una sparkline montata all'apertura della riga (§ 4) — o disegnata a mano in
+  SVG, come le tessere di Rendimenti — toglie recharts dal grafo iniziale di Patrimonio: `perf:budget` lo dirà.
 
 Il post: 6.900 hook e 900 sottoscrizioni nel percorso di digitazione del composer; la tabella resa cella per cella; il
 renderer che tocca solo ciò che cambia.

@@ -3,7 +3,7 @@
 import { useEffect, useId, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { UnderwaterDrawdownData } from '@/types/performance';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from '@/components/ui/charts/recharts';
 import { formatPercentage } from '@/lib/services/chartService';
 import { chartShellSettle } from '@/lib/utils/motionVariants';
 import { MONTH_NAMES } from '@/lib/constants/months';

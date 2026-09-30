@@ -28,7 +28,7 @@ import {
   Tooltip,
   XAxis,
   YAxis,
-} from 'recharts';
+} from '@/components/ui/charts/recharts';
 import type { AccumulationSimulationResult } from '@/lib/services/monteCarloService';
 import type { FanVerdict } from '@/lib/utils/fireSummary';
 import { formatCurrency, formatCurrencyCompact } from '@/lib/services/chartService';

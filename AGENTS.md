@@ -298,7 +298,30 @@ pointer — a stub that grows past that is a guide leaking back (2026-09-20: ten
   **`react-hooks/static-components` flags ANY component obtained from a call during render, a `useMemo(() => lazy(…))`
   included** (probed 2026-09-06): only a property read of a module constant passes, so the icon pickers keep a
   ONE module-level map, `LAZY_CATEGORY_ICONS` in `IconPickerPopover` (shared by the picker, the feed, the drawer and
-  the table; `lazy()` registers a thunk, the chunk still loads on demand).
+  the table; `lazy()` registers a thunk, the chunk still loads on demand). **One chunk per icon since 2026-09-30**
+  (PERF-04): each thunk is a loader of `components/expenses/categoryIconLoaders.ts`, 121 deep paths to lucide's
+  canonical files — never `import('lucide-react')` read by a runtime name (the whole 575 KB library at the first
+  icon), never `lucide-react/dynamicIconImports` (~1900 loaders: +49 KB gz on Cashflow and Impostazioni, measured).
+  A new curated name needs its loader; `__tests__/categoryIcons.test.ts` compares all 121 with lucide's own map.
+- **A library several pages use goes behind ONE module of real code** (2026-09-30, PERF-04): recharts is imported
+  only from `components/ui/charts/recharts.ts`. Turbopack batches a library by where it is ENTERED — twenty files
+  entering by different deep modules shipped four identical 350 KB copies, one per page — and a module of bare
+  `export { … } from` re-exports is transparent to it (the build came out identical to the byte): the barrel binds
+  `export const X = RechartsX`. `perf:budget`'s `libraryCopies` counts the chunks carrying `recharts-wrapper` and is
+  red at two.
+- **A chart inside something closed by default is a `lazyComponent` at MODULE level** (2026-09-30, PERF-04;
+  `components/ui/lazy-component.tsx`), with a `fallback` of the chart's OWN height — a `Skeleton` with the height, or a
+  box of the height the placeholder fills (`h-full`/`flex-1`) when the height is a prop — so the chart lands in place:
+  `layout-shift` 0, measured on every lazy section. **Not `next/dynamic`**: it is `React.lazy` + Suspense, which
+  suspends on every first render even with the module in memory, and React 19 holds a committed fallback ~300 ms —
+  every first opening showed a placeholder, measured. Preload with `usePreloadWhenIdle(ARRAY, dataReady)` (a
+  module-level array; `enabled` = the page's data is in, or the «idle» browser waiting on Firestore downloads during
+  the first paint: +130 ms on Analisi, measured). Lazy the PLOT, never the section that owns the trigger, and decide
+  an empty series outside the lazy module. A value import from the lazy module puts it back in the graph: types only
+  (`import type`). Worked examples: `PerformanceDettaglio`, `ConfrontoAnnualeSection`, `FlussoTile` (the Sankey,
+  preloaded at module evaluation from 640px), the four lazy FIRE tabs. **Next prefetches the route of every shell
+  link, client chunks included**: a chunk reached by another route's initial graph arrives with that prefetch; only
+  one reached solely by an `import()` stays unfetched (doc/perf/README.md).
 - Pure `lib/utils` modules reach `calculateAssetValue` in one of two established ways — check the precedent: **injected**
   as a `valueOf` param (`allocationUtils`, `pensionFire`) or **imported directly** with the test mocking
   `@/lib/firebase/config` + `firebase/firestore` + `authFetch` + `dashboardOverviewInvalidation`.
@@ -586,6 +609,9 @@ file used to carry.
   CONTENT — see the `SavingsRateBadge` entry in doc/guide/panoramica.md § Panoramica and Dashboard Data Isolation.
 
 ### Recharts
+- **Import recharts from `@/components/ui/charts/recharts`, never from `'recharts'`** (2026-09-30): one module of
+  real code in front of the library is what keeps it in ONE chunk (§ Dynamic Imports and Module Hygiene); a primitive
+  it does not list yet is added there.
 - **`useChartColors()` is mandatory for every series** — read CSS vars after paint and pass `chartColors[0..4]` as props.
 - **A Recharts series CAN drive the page, not just its tooltip — but no page does today**: `onMouseMove` hands
   `activeTooltipIndex` (a number OR a numeric string in 3.x — coerce it) and `onMouseLeave` the end; lift the index's
@@ -780,7 +806,10 @@ file used to carry.
   --abort`. A worktree has no `node_modules`: a directory junction to the main one (`New-Item -ItemType Junction` in
   PowerShell — `cmd //c mklink` is refused by the sandbox), removed with `rmdir`, which drops only the link. Two at a
   time on 16 GB; a conflicting PR is judged on `git merge-tree --write-tree` and `git show <tree>:<path>`, never resolved
-  by guessing.
+  by guessing. **Never `git worktree remove --force` a worktree that held a junction or a build** (2026-09-30: after a
+  `.next-perf` build in a junction-backed worktree, the removal left the main `node_modules` EMPTY — `npm ci` rebuilt
+  it from the untouched lock): drop the junction, check its PATH no longer exists, delete the build by hand, remove the
+  worktree, then count `ls node_modules | wc -l`.
 - **Merging an accepted PR "with changes" means applying its diff to the working tree, not merging its commits**
   (2026-09-07): `git diff base...head > pr.patch`, `git apply --reject`, the rejected hunk redone by hand, then the
   session's own fixes on top — one commit, the author as `Co-authored-by`, the review's list of changes visible in the
@@ -800,7 +829,7 @@ file used to carry.
   here» — this section's table until 2026-09-30). Two crossings no guide owns: touching `types/assets.ts`'s `AssetType`
   also means `assetDialogHelpers` + `allocationUtils` + the three ledger suites; widening `AssetClass` also means
   `ASSET_CLASS_SEQUENCE` and everything reading it. **Perf tooling** (`perf/`, `scripts/perf*`): `perfBudget` (the
-  ceiling and the raised ceiling), `perfRoutes` (`perf/routes.json` = `navigation.ts`: a new shell route goes in both)
+  ceiling, the raised ceiling and `libraryCopies`), `perfRoutes` (`perf/routes.json` = `navigation.ts`: a new shell route goes in both)
   · **Build** `npm run perf:budget` after `npm run build` — a route that grows raises its ceiling in the same commit
   with `raisedBy` (`perf/README.md`).
 - **`firebase deploy --only firestore:rules` with a stale CLI login fails with a 401 on `serviceusage`**, not with

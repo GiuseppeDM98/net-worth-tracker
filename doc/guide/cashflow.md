@@ -16,7 +16,21 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **Transfer fee** (2026-09-25): `lib/utils/transferFee.ts` (pure), `createTransferWithFee` / `saveTransferFee` / `getTransferFeeOf` / `deleteExpenseRows` in `lib/services/expenseService.ts`; tests `__tests__/transferFee.test.ts`, `e2e/cashflow.transfer-fee.spec.ts`
 - **50/30/20 roles**: pure `lib/utils/spendingRoles.ts` (resolution, summary, the printed shares `summarizeSpendingRoleShares`, classification counts, the badge colour), the bucket → `--role-*` token map `lib/constants/spendingRoleColors.ts`, the `deleteField()` in `updateCategory` (`lib/services/expenseCategoryService.ts`), the picker and the cache invalidation (`invalidateCategoryCaches`) in `components/expenses/CategoryManagementDialog.tsx`; tests `__tests__/{spendingRoles,expenseCategoryService}.test.ts`, `e2e/settings.roles.spec.ts`
 - **Mortgage instalment → property debt** (2026-09-25): `lib/utils/mortgageRepayment.ts` (pure), `lib/services/debtRepaymentService.ts` (client transactions), the server half inside `lib/server/cashSettlement.ts`; tests `__tests__/{mortgageRepayment,serverCashSettlement,updateAssetDebtFields}.test.ts`, `e2e/cashflow.mortgage.spec.ts`
+- **Category icons** (2026-09-30, PERF-04): the curated names and labels `lib/constants/categoryIcons.ts`, one loader per icon `components/expenses/categoryIconLoaders.ts` (deep paths to lucide's canonical files, typed by `types/lucide-icon-modules.d.ts`), the ONE lazy map `LAZY_CATEGORY_ICONS` + `CategoryIcon` in `components/expenses/IconPickerPopover.tsx`; test `__tests__/categoryIcons.test.ts`
 - **Suites to run after a change here — Transfers / cash** (moved from `AGENTS.md` § Commands on 2026-09-30): `cashBalanceReconciliation`, `updateCashAssetBalancesAtomic`, `transferFeature`, `cashSettlement`, `serverCashSettlement` · **Commissione** `transferFee` (+ `settingsRoundTrip`) · **Mutuo** `mortgageRepayment`, `mortgageSummary`, `updateAssetDebtFields` (+ `patrimonioNarrative` for the tile's words) · **Ricorrenze** `recurrenceDates` · **Browser** `e2e/cashflow.{accounts,transfer-fee,mortgage}.spec.ts`
+
+## Category icons: one chunk per icon, by name (`components/expenses/categoryIconLoaders.ts`)
+- **A category stores its icon by lucide's PascalCase name; the screen loads that one icon, never the library**
+  (2026-09-30, PERF-04). Until then each lazy icon ran `import('lucide-react')` and read the name off the module — an
+  import read by a runtime name cannot be tree-shaken, so the first icon of Tracciamento downloaded all of lucide
+  (575 KB raw, 143 gz). lucide's own `dynamicIconImports` was measured and refused: its ~1900 loaders land in the
+  initial JS of every page that renders an icon (+49 KB gz on Cashflow and Impostazioni). The 121 loaders point at
+  the CANONICAL file (six names are aliases: `Home` → `house.js`, `Train` → `tram-front.js`, `ParkingSquare` →
+  `square-parking.js`, `BarChart2` → `chart-no-axes-column.js`, `AlertCircle` → `circle-alert.js`, `IceCream` →
+  `ice-cream-cone.js`); one icon is a ~350 B gz chunk, the picker's grid loads one per icon it shows.
+- **A new curated icon is two lines**: its label in `CATEGORY_ICONS`, its loader in `CATEGORY_ICON_LOADERS`.
+  `__tests__/categoryIcons.test.ts` goes red until both lists agree and each loader draws what lucide's map draws
+  under the same kebab name (seen red with an invented «Fenicottero»); a name without a loader renders the fallback.
 
 ## Expense Grouping: key by id, label by name (`lib/utils/expenseGrouping.ts`)
 - **Category names are NOT unique and never will be** — the product deliberately allows "Casa" as both a *Spese Fisse*
