@@ -72,7 +72,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 ## The fourth reading: old but present (2026-09-29)
 
-- **A figure can be on screen and not be current.** Since PERF-03 the query cache is persisted to IndexedDB and
+- **A figure can be on screen and not be current.** Since 2026-09-29 the query cache is persisted to IndexedDB and
   restored before the first fetch (AGENTS.md § Caching), so a reload paints the last known figures at once and
   refetches behind them. That is a fourth state beside the three absences, and it has its own sentence: «Aggiornato
   alle 18:42, sto rileggendo…» — `describeFreshness` (`statesNarrative.ts`): the hour alone on the same Italian

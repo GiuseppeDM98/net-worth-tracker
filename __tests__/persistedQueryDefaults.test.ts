@@ -1,6 +1,6 @@
 /**
  * `applyPersistedQueryDefaults` — every persisted prefix keeps its queries in memory for the
- * persisted retention, and only those (PERF-03): the allowlist and the `gcTime` are ONE list.
+ * persisted retention, and only those: the allowlist and the `gcTime` are ONE list.
  */
 import { QueryClient } from '@tanstack/react-query';
 import { describe, expect, it } from 'vitest';

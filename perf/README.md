@@ -68,7 +68,7 @@ PowerShell 5.1 il `--` viene mangiato** (2026-09-28): `npm run perf:budget -- --
 leggendo, e da Git Bash i due comandi ricevono le opzioni. `--email=`
 (default `mirror@example.com`), `--runs=`, `--routes=assets,history` (nomi di `routes.json`, con o senza
 `/dashboard/`, o il nome della pagina), `--warm-only`, `--cold-only`, `--mobile` (390×844 e CPU 4×), `--cpu=N`,
-`--revisit` (il secondo caricamento della route dopo una prima visita, per PERF-03). La porta è :3200 perché :3000 è
+`--revisit` (il secondo caricamento della route dopo una prima visita: la cache persistita, § Revisit). La porta è :3200 perché :3000 è
 il server del giro e :3100 quello di Playwright. `perf:serve` cerca `server.js` sotto `.next-perf/standalone/`, perché
 Next ci ricopia il percorso del progetto: sul laptop Windows sta in `Documents/GitHub/net-worth-tracker/`.
 
@@ -156,7 +156,7 @@ login 415,3 · Panoramica 535,0 · Patrimonio 718,2 · Cashflow 729,2 · Analisi
 1189,2** (il PDF: un chunk da 513 KB gz) · Hall of Fame 533,9 · Allocazione 515,8 · FIRE 743,5 · Previdenza 588,9 ·
 Assistente 656,4 · Impostazioni 612,6.
 
-## Revisit — «il secondo caricamento della route» (PERF-03, 2026-09-29)
+## Revisit — «il secondo caricamento della route» (2026-09-29)
 
 `--revisit` misura il RELOAD di una route già visitata nello stesso contesto: login, prima visita fino a `data`, poi
 la seconda `goto`. Dal 2026-09-29 fra le due aspetta che la cache persistita di React Query sia su disco (un record NON
@@ -188,3 +188,13 @@ mirror: `auth` 115 → 179 su Cashflow, 161 → 385 su Storico, dove il record h
 riducendo le spese a una finestra; le richieste Firestore scendono perché le riletture partono in un colpo solo sul
 canale già aperto, non perché si legga di meno (ogni ripristino rilegge tutto). La misura precedente della stessa sera,
 con la rivisita presa a `data` e senza attesa, dava «dopo» = «prima» su ogni route: è il motivo dell'attesa.
+
+**Due letture scritte il 2026-09-30, rileggendo la misura contro il suo obiettivo** (primo numero sotto 300 ms alla
+rivisita). Raggiunto su otto route e **mancato su Storico (385)**, dove quasi tutto il tempo è il ripristino dentro
+`auth`; Rendimenti e Impostazioni non erano nell'obiettivo. E la tabella SOTTOSTIMA il ripristino di una sessione vera:
+ogni run apre un contesto nuovo per route (`measureCold`), quindi il record che ripristina contiene solo le chiavi di
+quella route più l'overview del login, mentre il persister scrive UN record con tutte le chiavi lette nelle ultime 24
+ore — chi ha aperto Storico paga poi il suo JSON a ogni caricamento di QUALSIASI route, Panoramica compresa. PERF-06
+accorcia il record delle pagine che leggeranno una finestra (Cashflow, Analisi, FIRE), non quello di Storico, che vuole
+tutte le spese per scelta: finché `expenses.all` è nel record, quel costo resta. Per misurarlo serve una rivisita presa
+dopo aver aperto tutte le route nello stesso contesto, che lo script oggi non fa.

@@ -1,7 +1,7 @@
 /**
  * Is the page showing the last KNOWN figures while the fresh ones are in flight?
  *
- * With the query cache persisted (PERF-03, lib/constants/persistCache.ts) a page paints the
+ * With the query cache persisted (lib/constants/persistCache.ts) a page paints the
  * figures restored from IndexedDB at once and rereads them behind (the restore invalidates what it
  * restored: every load is a fresh read, stale-while-revalidate). The reader has to be told —
  * «Aggiornato alle 18:42, sto rileggendo…» — when what is on screen is genuinely from before:

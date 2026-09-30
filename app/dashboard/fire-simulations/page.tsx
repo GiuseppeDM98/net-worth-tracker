@@ -53,7 +53,7 @@ const TABS: TabDef[] = [
 export default function FireSimulationsPage() {
   const [activeTab, setActiveTab] = useState<TabValue>('fire');
   const { ownerId } = useActiveAccount();
-  // The header's «Aggiornato alle…» (PERF-03) over the four keys the Calcolatore — the tab the
+  // The header's «Aggiornato alle…» over the four keys the Calcolatore — the tab the
   // page opens on — paints from; the same cache entries the tabs read, no second read. The goals
   // document stays out: it is read only once Obiettivi is opened.
   const freshness = useFreshness([

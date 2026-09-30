@@ -10,7 +10,7 @@
  * - retry: 1 - Single retry on failure (default is 3, reduced for faster feedback)
  * - refetchOnWindowFocus: false - Don't refetch when user returns to tab (manual refresh preferred)
  *
- * Persistence (PERF-03, 2026-09-29): the cache is written to IndexedDB and restored before the
+ * Persistence (2026-09-29): the cache is written to IndexedDB and restored before the
  * first fetch, so a reload paints the last known figures at once (lib/constants/persistCache.ts
  * — the allowlist, the version, the retention; lib/query/queryPersister.ts — the store). Only the
  * keys of the allowlist, only successful reads, never the demo account's. The restore is
@@ -58,6 +58,11 @@ const PERSISTENCE_ENABLED = isQueryPersistenceEnabled();
  * back in IndexedDB, 2026-09-29). Here the user is already `null` in the commit that unmounted
  * the pages behind `ProtectedRoute` (children's cleanups run before a parent's effect), so no
  * observer is left to refetch. It also covers a session that ends without the «Esci» button.
+ *
+ * A switch from one account straight to another, with no `null` in between, is NOT covered: no
+ * path in the UI produces one today (the landing and /login send a signed-in user to the
+ * dashboard before a second sign-in can be pressed), and every key carries its owner, so the
+ * second account never reads the first one's — the record would only outlive its owner by a day.
  */
 function SignOutCacheGuard({ queryClient, persister }: { queryClient: QueryClient; persister: Persister | null }) {
   const { user } = useAuth();

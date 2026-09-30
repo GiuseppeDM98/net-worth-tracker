@@ -1,5 +1,5 @@
 /**
- * The persisted query cache and the parked sessions (PERF-03).
+ * The persisted query cache and the parked sessions.
  *
  * `storageState({ indexedDB: true })` captures EVERY IndexedDB database of the origin — the
  * Firebase session it is there for, and the React Query cache the app now persists beside it. Left

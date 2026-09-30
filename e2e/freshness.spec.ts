@@ -1,5 +1,5 @@
 /**
- * The last known figures first, the fresh ones as they land (PERF-03) — on Cashflow, the page the
+ * The last known figures first, the fresh ones as they land — on Cashflow, the page the
  * owner feels most (2,1 s to a number from an empty cache).
  *
  * WHY A BROWSER: the persister lives in IndexedDB and restores in an effect before the first fetch;
@@ -16,6 +16,12 @@
  *
  * The parked session carries NO persisted cache (`e2e/persistedCache.ts` strips it), so the first
  * visit of every context is a genuine first visit — the positive anchor the absence needs.
+ *
+ * SEEN RED (2026-09-29), one behaviour at a time: (a) the reload without a skeleton, with
+ * `maxAge: 0` on the provider (the record is discarded at the restore and the skeleton returns) —
+ * not with `NEXT_PUBLIC_PERSIST_QUERIES=false`, which needs a server of its own and was exercised
+ * by the benchmark's «prima» build instead (perf/README.md § Revisit); (b) the sentence, with
+ * `describeFreshness`'s words changed; (c) the emptied node, with the sentence latched once shown.
  */
 
 import { test, expect, type Page } from '@playwright/test';

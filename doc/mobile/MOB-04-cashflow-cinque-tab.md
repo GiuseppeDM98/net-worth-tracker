@@ -154,8 +154,8 @@ Dividendi 3,77 / 6 / 8. Il codice di oggi (righe da riverificare):
 - **Dal 2026-09-29** gli asset della tab vengono da `useAssets` (`page.tsx:104, 134`) e `loadOtherData` legge solo la
   route dei dividendi: `otherDataFailed || assetsError` è l'errore di TAB; il
   `failed` di `dvd-rendimento` è `statsError` di `useDividendStats`, già React Query. **PERF-04**: qui niente recharts
-  (SVG a mano, `FlowBarsChart.tsx:27`): una riga chiusa risparmia DOM e render, non un chunk. **PERF-03** (implementata il
-  2026-09-29): «Aggiornato alle…» sta nel `PageHeader` della pagina (le quattro chiavi di `app/dashboard/cashflow/page.tsx`),
+  (SVG a mano, `FlowBarsChart.tsx:27`): una riga chiusa risparmia DOM e render, non un chunk. **PERF-03** (in develop dal
+  2026-09-30): «Aggiornato alle…» sta nel `PageHeader` della pagina (le quattro chiavi di `app/dashboard/cashflow/page.tsx`),
   non nel tab. **PERF-12**: niente `setState` in effetto. **PERF-14**: nessun `layout`; `tabPanelSwitch` resta.
 
 ### 4.8 Domande al proprietario
@@ -253,8 +253,8 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
   cashflow-dividendi.md, stati.md, e2e-emulatori.md
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice
 - Leggi doc/mobile/README.md, MOB-01 e MOB-02 per intero (chiuse; MOB-02 è il contratto: non rinominare nulla) e
-  questa spec per intero; DESIGN.md § 5 e § 6 (MAI rigenerarlo); doc/perf/PERF-06 (deve essere chiusa), PERF-03,
-  PERF-05, PERF-12, PERF-14
+  questa spec per intero; DESIGN.md § 5 e § 6 (MAI rigenerarlo); doc/perf/PERF-06 (deve essere chiusa), PERF-12,
+  PERF-14 (PERF-03 e PERF-05 sono ritirate: doc/guide/stati.md § The fourth reading, AGENTS.md § React Query and Derived State)
 - Crea SESSION_NOTES.md; crea il branch dalla branch attiva PRIMA di editare
 
 Regole: nessun commit senza il mio OK; un branch e un commit; rispondi in italiano; le otto domande di § 4.8 con lo

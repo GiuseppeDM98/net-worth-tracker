@@ -210,7 +210,7 @@ export default function AssetsPage() {
     isError: mortgageError,
   } = mortgageQuery;
   // The header's «Aggiornato alle…» while figures restored from the persisted cache are being
-  // reread (PERF-03): every key the tiles paint, the overview on its own one-minute threshold.
+  // reread: every key the tiles paint, the overview on its own one-minute threshold.
   const freshness = useFreshness([
     assetsQuery,
     snapshotsQuery,

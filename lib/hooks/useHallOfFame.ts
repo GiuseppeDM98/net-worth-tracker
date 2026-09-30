@@ -3,8 +3,8 @@
 /**
  * React Query hook for the Hall of Fame document (`hall-of-fame/{uid}`): the pre-computed rankings
  * and the notes. Read through a key so the page shows the cached document on a return visit and
- * «Aggiorna i record» invalidates instead of re-reading by hand (2026-09-29; PERF-03
- * persists this key across reloads).
+ * «Aggiorna i record» invalidates instead of re-reading by hand (2026-09-29; the key is on the
+ * persisted allowlist, so the document survives a reload — lib/constants/persistCache.ts).
  */
 
 import { useQuery } from '@tanstack/react-query';

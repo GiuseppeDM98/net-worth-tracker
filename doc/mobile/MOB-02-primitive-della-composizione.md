@@ -144,8 +144,8 @@ localStorage.getItem(key), () => null)`: snapshot = stringa grezza, parse in `us
 va in `dismissed` (non persistito). LA tessera non è nel controller.
 
 **Errori** (da C): `failed` dall'`isError` della pagina; nel pannello `<ErrorNotice collapse live={!compact}>` al posto
-della tessera. Sotto `desktop:` il solo nodo live degli errori è di `PageRest` (il `role="status"` di `freshness`,
-PERF-03, resta): `describeFailedSections` → «Una sezione non è stata letta: Benchmark.» / «2 sezioni non sono state
+della tessera. Sotto `desktop:` il solo nodo live degli errori è di `PageRest` (il `role="status"` di `freshness`
+nel `PageHeader` resta): `describeFailedSections` → «Una sezione non è stata letta: Benchmark.» / «2 sezioni non sono state
 lette: Benchmark, Contributi.» / `null`; `announcement` è `null` se `!compact`: a 1440 nulla cambia.
 
 ### 4.6 `PageTabBar`
@@ -170,7 +170,7 @@ frase chiude dopo la cifra del record («in un mese» solo con la percentuale, `
 
 - **PERF-12**: `useSyncExternalStore`, nessun ref restituito, `mounted` nel gestore. **PERF-14**: nessun `layout`; un
   grafico montato all'apertura legge `ChartColorsProvider`. **PERF-04**: un grafico lazy riserva la sua altezza (obbligo
-  di MOB-03..07). **PERF-03** (implementata il 2026-09-29): «Aggiornato alle…» NON è uno slot della composizione — sta nel
+  di MOB-03..07). **PERF-03** (in develop dal 2026-09-30): «Aggiornato alle…» NON è uno slot della composizione — sta nel
   `PageHeader` (desktop: dopo la descrizione; sotto `desktop:` al posto della descrizione, `[data-freshness]`,
   decisione del proprietario), quindi nessuna riga da riservare fra la prima frase e la striscia (doc/guide/stati.md § The
   fourth reading). **PERF-02** (in develop dal 2026-09-29): server `false`, già così in `lib/hooks/useMediaQuery.ts`.
@@ -282,7 +282,8 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
 - Leggi doc/guide/hall-of-fame.md, doc/guide/stati.md, doc/guide/e2e-emulatori.md
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice
 - Leggi doc/mobile/README.md e la spec MOB-02 per intero; DESIGN.md § 5 e § 6 (MAI rigenerarlo);
-  doc/mobile/MOB-01 e doc/perf/PERF-03, PERF-12, PERF-14 (devono essere chiuse; PERF-02 lo è dal 2026-09-29)
+  doc/mobile/MOB-01 e doc/perf/PERF-12, PERF-14 (devono essere chiuse; PERF-02 lo è dal 2026-09-29, PERF-03 dal
+  2026-09-30: la riga di freschezza è in doc/guide/stati.md § The fourth reading)
 - Crea SESSION_NOTES.md; crea il branch dalla branch attiva PRIMA di editare
 
 Regole: nessun commit senza il mio OK; un branch e un commit; rispondi in italiano; le domande di § 4.9 con lo

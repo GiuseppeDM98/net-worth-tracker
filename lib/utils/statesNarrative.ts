@@ -148,7 +148,7 @@ export interface FreshnessInput {
 
 /**
  * The header's reading while the page shows the last KNOWN figures and rereads them
- * (PERF-03: the query cache survives a reload, so the page paints before the fresh read lands).
+ * (the query cache survives a reload, so the page paints before the fresh read lands).
  *
  * «Aggiornato alle 18:42, sto rileggendo…» — the hour alone on the same Italian calendar day,
  * «ieri» the day before, the date further back. First person, like every other sentence the app

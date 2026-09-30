@@ -196,7 +196,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   `describeDeficitMonths`, `describeMonthWindow`, `describeFlowWindow`) rendered through `NarrativeText`, so every
   count and year in them is mono — the Tile's `aside` slot carries no `font-mono` of its own.
 - **A save lands in place — the tab's `loading` is its OWN two keys, never a sibling tab's read** (2026-09-29, the
-  owner's tour of PERF-03): `app/dashboard/cashflow/page.tsx` gates Tracciamento on `expensesLoading ||
+  owner's tour of the persisted cache): `app/dashboard/cashflow/page.tsx` gates Tracciamento on `expensesLoading ||
   categoriesLoading` alone. Until then `otherDataLoading` — the Dividendi tab's `/api/dividends` read — was in it,
   and `handleRefresh` (called after every save and delete) reread the dividends even with that tab never opened, so
   every saved expense put the skeleton over the month for the length of a call Tracciamento never uses. The dividends

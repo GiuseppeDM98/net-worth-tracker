@@ -105,7 +105,7 @@ export default function DashboardPage() {
   const overviewQuery = useDashboardOverview(ownerId);
   const { data: overview, isLoading: loadingOverview, isError: overviewError, refetch: refetchOverview } = overviewQuery;
   // The header's «Aggiornato alle…» while a payload restored from the persisted cache is being
-  // reread (PERF-03): on the overview's own one-minute threshold, and dated by the payload's
+  // reread: on the overview's own one-minute threshold, and dated by the payload's
   // `freshness.updatedAt` when the materialised summary is older than the read that fetched it.
   const freshness = useFreshness([
     {

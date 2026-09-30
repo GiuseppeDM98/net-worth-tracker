@@ -231,7 +231,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   its one read — the family members and the targets (`settings.targets`, what `getTargets` used to re-read) come from
   it, a new sub-category invalidates the key instead of re-reading. The page itself reads its keys through the hooks
   (assets, snapshots, overview, the ledger meta and the ledger, the instalments). All of them are in the persisted
-  cache's allowlist (PERF-03, 2026-09-29) — the ledger META included, because the trades are `enabled` on it: with the
+  cache's allowlist (2026-09-29, AGENTS.md § Caching) — the ledger META included, because the trades are `enabled` on it: with the
   meta left out, a reload painted the skeleton over figures it already had until that one read came back (measured:
   452 ms with a skeleton, 144 ms without one). The header's «Aggiornato alle…» reads the overview on its own minute.
 - **A failed overview is an alert, not a skeleton**: the page gates the skeleton on `isLoading` of EVERY query it

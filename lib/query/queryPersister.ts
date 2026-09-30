@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * The React Query persister on IndexedDB (PERF-03, 2026-09-29).
+ * The React Query persister on IndexedDB (2026-09-29).
  *
  * IndexedDB and not `localStorage`: the owner's expenses and snapshots (with `byAsset`) run past
  * `localStorage`'s 5 MB. `idb-keyval` is the 2 KB adapter; the async-storage persister of TanStack

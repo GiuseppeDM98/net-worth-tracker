@@ -147,7 +147,7 @@ export default function AllocationPage() {
   const { data: settings, isLoading: settingsLoading, isError: settingsError } = settingsQuery;
   const { data: goalData, isLoading: goalsLoading, isError: goalsError } = goalsQuery;
   // The header's «Aggiornato alle…» while figures restored from the persisted cache are being
-  // reread (PERF-03). The Esposizione's profiles stay out: they sit behind a server cache of their own.
+  // reread. The Esposizione's profiles stay out: they sit behind a server cache of their own.
   const freshness = useFreshness([assetsQuery, settingsQuery, goalsQuery]);
   const loading = assetsLoading || settingsLoading || goalsLoading;
   /** A failed load is not an empty set: it gets an alert, never a verdict about zeros. */

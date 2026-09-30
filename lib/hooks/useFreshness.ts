@@ -3,7 +3,7 @@
 /**
  * The page's freshness reading for the header: «Aggiornato alle 18:42, sto rileggendo…» while the
  * figures on screen were restored from the persisted cache and the fresh read is in flight;
- * nothing once it has landed (PERF-03). The decision is `resolveFreshness` (lib/utils/freshness.ts),
+ * nothing once it has landed. The decision is `resolveFreshness` (lib/utils/freshness.ts),
  * the words are `describeFreshness` (lib/utils/statesNarrative.ts); this hook only hands them the
  * page's queries and the clock, and `PageHeader` prints the sentence in its one stable
  * `role="status"` node.

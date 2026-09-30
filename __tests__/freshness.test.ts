@@ -1,5 +1,5 @@
 /**
- * `resolveFreshness` — when the header says «Aggiornato alle…» (PERF-03): a figure on screen that
+ * `resolveFreshness` — when the header says «Aggiornato alle…»: a figure on screen that
  * is being reread AND is either older than its threshold or was read BEFORE this page load (a
  * restored figure, however young). Pinned: a first fetch is a wait, not an old figure; an
  * invalidation of a fresh in-session figure is silent; the page's oldest figure is the one named;

@@ -138,7 +138,7 @@ export default function HistoryPage() {
   const transactionsQuery = useAssetTransactions(ownerId);
   const contributionsQuery = usePensionContributions(ownerId);
   // The header's «Aggiornato alle…» while figures restored from the persisted cache are being
-  // reread (PERF-03): the same six keys the read state composes.
+  // reread: the same six keys the read state composes.
   const freshness = useFreshness([snapshotsQuery, assetsQuery, settingsQuery, expensesQuery, transactionsQuery, contributionsQuery]);
   const { loading, loadFailed } = useMemo(
     () => composeReadState([snapshotsQuery, assetsQuery, settingsQuery, expensesQuery, transactionsQuery, contributionsQuery]),

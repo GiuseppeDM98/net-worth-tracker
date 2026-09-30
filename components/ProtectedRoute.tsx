@@ -7,7 +7,7 @@
  * 1. Loading — render `fallback` (the layout passes the generic tile-grid skeleton: the wait is a
  *    WAIT and takes the primitive every page uses, DESIGN.md → The Absence-Has-Three-Names Rule).
  *    On the server `loading` is always true, so the fallback is what the HTML carries. The same
- *    fallback also covers the restore of the persisted query cache (`useIsRestoring`, PERF-03).
+ *    fallback also covers the restore of the persisted query cache (`useIsRestoring`).
  * 2. Not authenticated — keep the fallback on screen and redirect in an effect: the beat between
  *    the verdict and the navigation shows the same skeleton, not an empty `main`.
  * 3. Authenticated — render the page.
@@ -30,7 +30,7 @@ interface ProtectedRouteProps {
 
 export function ProtectedRoute({ children, fallback = null }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
-  // The persisted query cache is still being read from IndexedDB (PERF-03, a few ms after the
+  // The persisted query cache is still being read from IndexedDB (a few ms after the
   // shell): a page mounted before it lands would see every query `pending` and NOT fetching — so
   // `isLoading` false and `data` undefined, which every page reads as «nothing recorded». The
   // restore usually beats Firebase Auth, but nothing guarantees it; the gate holds the same
