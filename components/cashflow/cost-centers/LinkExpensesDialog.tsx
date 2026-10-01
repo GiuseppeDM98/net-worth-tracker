@@ -96,7 +96,8 @@ function CandidateRow({ candidate, checked, onToggle }: { candidate: LinkCandida
 
 export function LinkExpensesDialog({ open, onClose, costCenter, onLink, returnFocusTo }: LinkExpensesDialogProps) {
   const { ownerId } = useActiveAccount();
-  // Lazy: the account's whole expense list is only read once the window is asked for.
+  // Lazy: the account's whole expense list is only read once the dialog is asked for — whole,
+  // because any expense ever recorded can be linked to a center (the tab behind it reads the same key).
   const { data: expenses, isLoading, isError } = useExpenses(open ? (ownerId ?? undefined) : undefined);
 
   const [filters, setFilters] = useState<LinkFilters>(DEFAULT_LINK_FILTERS);

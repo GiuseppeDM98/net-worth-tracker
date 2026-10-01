@@ -99,9 +99,11 @@ export function CostCentersTab() {
   const queryClient = useQueryClient();
   const chartColors = useChartColors();
 
-  // Reads the OWNER's data, not the viewer's: on a shared account they differ. Two keys every
-  // page shares (2026-09-29): the centers, and the rows grouped in memory from the account's whole
-  // expense list — one query per center (N+1) until 2026-09-29. The tab gates on both.
+  // Reads the OWNER's data, not the viewer's: on a shared account they differ. Two keys
+  // (2026-09-29): the centers, and the rows grouped in memory from the account's WHOLE expense
+  // list — one query per center (N+1) until then. Whole by declared need: a center is lifetime (no
+  // period axis), so unlike the other Cashflow tabs this one has no window to read
+  // (lib/utils/expenseWindows.ts). The tab gates on both.
   const { data: centersData, isLoading: centersLoading, isError: centersError } = useCostCenters(ownerId);
   const { data: allExpenses, isLoading: expensesLoading, isError: expensesError } = useExpenses(ownerId);
   const loading = centersLoading || expensesLoading;
@@ -111,6 +113,12 @@ export function CostCentersTab() {
   const byCenter = useMemo(() => groupExpensesByCostCenter(allExpenses ?? EMPTY_EXPENSES, centers), [allExpenses, centers]);
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: queryKeys.costCenters.all(ownerId ?? '') });
+  // A delete unlinks the centre's rows and a rename rewrites the name they carry (`costCenterName`
+  // is denormalised on the row): both are writes of EXPENSES, so every reader of them rereads too —
+  // the prefix reaches this tab's list and each window another page holds. Until 2026-09-30 only
+  // the centres were invalidated, and Tracciamento kept the chip of a centre that was gone.
+  const invalidateWithRows = () =>
+    Promise.all([invalidate(), queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all(ownerId ?? '') })]);
 
   // --- The open center is the URL's, never local state (see the header) ---
   const router = useRouter();
@@ -186,7 +194,7 @@ export function CostCentersTab() {
 
   // The detail reads its center from `centers`, so a saved edit reaches it with the refetch.
   const handleDialogSuccess = () => {
-    invalidate();
+    void invalidateWithRows();
   };
 
   const handleDelete = async (center: CostCenter) => {
@@ -203,7 +211,7 @@ export function CostCentersTab() {
       );
       // replace, not push: Back must not land on the detail of a center that no longer exists.
       router.replace(`${pathname}?tab=cost-centers`, { scroll: false });
-      invalidate();
+      void invalidateWithRows();
     } catch (error) {
       console.error('Error deleting cost center:', error);
       // What did NOT happen first (the user's doubt after a failed delete), then the cause.

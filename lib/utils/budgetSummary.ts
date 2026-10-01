@@ -30,6 +30,7 @@ import {
 import { getItalyDate, getItalyMonth, getItalyYear } from '@/lib/utils/dateHelpers';
 import { MONTH_NAMES_SHORT } from '@/lib/utils/period';
 import { resolveMonthCeilings, type MonthCeiling } from '@/lib/utils/budgetHistory';
+import { BUDGET_HISTORY_MONTHS } from '@/lib/utils/expenseWindows';
 
 // ─── The ceiling ──────────────────────────────────────────────────────────────
 
@@ -277,8 +278,12 @@ export interface SpendingHistory {
   average: number | null;
 }
 
-/** The 'YYYY-MM' keys of the trailing `count` months ending with the month of `now`, oldest first. */
-export function trailingMonthKeys(now: Date, count = 6): string[] {
+/**
+ * The 'YYYY-MM' keys of the trailing `count` months ending with the month of `now`, oldest first.
+ * The default count is the one `budgetWindow` reads the expenses for (lib/utils/expenseWindows.ts):
+ * a longer history here needs a wider window there.
+ */
+export function trailingMonthKeys(now: Date, count = BUDGET_HISTORY_MONTHS): string[] {
   const year = getItalyYear(now);
   const month = getItalyMonth(now);
   const keys: string[] = [];
@@ -300,7 +305,7 @@ export function buildSpendingHistory(
   expenses: Expense[],
   now: Date,
   ceiling: number | null,
-  count = 6,
+  count = BUDGET_HISTORY_MONTHS,
   records: BudgetHistoryRecord[] = [],
 ): SpendingHistory {
   const keys = trailingMonthKeys(now, count);

@@ -165,6 +165,22 @@ Analisi, Previdenza e Impostazioni a 0 letture; Cashflow invariato (tutta E, PER
 sono PERF-09). Il **cold** NON è stato rimisurato: la tabella cold sopra è quella del 2026-09-28, e FIRE a freddo legge
 ora l'intera collezione delle spese (una volta per sessione) invece di due range — doc/guide/fire.md.
 
+**2026-09-30, le spese per finestra (PERF-06, branch `feat/perf-06-spese-per-finestra`), prima/dopo nella stessa
+sessione, laptop Windows, mirror (1547 spese: 838 nei 13 mesi di Tracciamento, 675 nel 2026 di Budget, 1299 + 48 nelle
+due finestre di FIRE; Analisi resta sull'intera collezione per decisione del proprietario).** Cold, mediane di 5, primo
+numero · LCP · long task · Firestore: Cashflow 1898 → **1072** · 1936 → 1132 · 210 → 217 · 3 → 4 (la finestra più i due
+documenti dei bordi); FIRE 1737 → **1291** · 1748 → 1304 · 283 → 153 · 3 → 6 (la finestra recente, poi la vecchia
+dietro gli snapshot); Analisi 1398 → 1480 (codice invariato: rumore). Revisit, mediane di 3: Cashflow 192 → 164,
+Analisi 237 → 206, FIRE 213 → 161, Panoramica 103 → 109. **Warm** (mediane di 3, ms dal click): Cashflow 1429 → 937,
+Analisi 188 → **1403**, Storico 261 → 270, FIRE 114 → **1137**, il resto ±: la prima apertura in sessione di Analisi e
+FIRE non parte più dalla lista che Cashflow leggeva (Analisi la legge intera da sé, poi Storico e Centri la trovano in
+cache; FIRE legge la sua). **Il record persistito dopo un giro** di Tracciamento, Budget, Divisione, FIRE e Storico:
+6 chiavi `expenses.*`, 4407 righe, 2,2 MB — una chiave, 1547 righe e 0,8 MB con la sola lista intera — e l'auth
+della Panoramica con quel record 165 ms contro ~109 con il record di una route sola (5 caricamenti, mediana). Il
+guadagno è a freddo e sulle pagine a finestra; il costo sta nella prima apertura warm delle altre e nel ripristino di
+chi gira molte pagine. Nessuna route cresce oltre il tetto (Cashflow 735,4 → 736,8, FIRE 653,7 → 654,7, Analisi 564,6
+→ 565,1).
+
 **Bundle** (gz KB, chunk iniziali; il tetto in `budget.json` è +2%) — **dal 2026-09-30, PR #418**: condivisi 473,5
 (22 chunk) · landing 452,0 · login 418,2 · Panoramica 538,0 · Patrimonio 731,1 · Cashflow 735,4 · **Analisi 564,6** ·
 **Rendimenti 566,3** · **Storico 684,0** · Hall of Fame 541,2 · Allocazione 520,6 · **FIRE 653,7** · Previdenza 592,6 ·
@@ -206,8 +222,9 @@ run dura di più. Lo «skeleton della pagina» non è una colonna della tabella:
 | Impostazioni | 398 (3) | 348 (3) | sì → sì (il documento delle impostazioni è letto con `staleTime: 0`: PERF-13) |
 
 Quello che la tabella non dice: con il persister l'attesa dell'auth INCLUDE il ripristino (JSON di 0,3–1,5 MB dal
-mirror: `auth` 115 → 179 su Cashflow, 161 → 385 su Storico, dove il record ha sei chiavi) — è il costo che PERF-06 abbassa
-riducendo le spese a una finestra; le richieste Firestore scendono perché le riletture partono in un colpo solo sul
+mirror: `auth` 115 → 179 su Cashflow, 161 → 385 su Storico, dove il record ha sei chiavi) — un costo che PERF-06 ha
+spostato, non abbassato: la finestra di una route sola è più leggera della lista intera, ma un giro di pagine lascia
+nel record una finestra per pagina più la lista intera di Storico (misurato il 2026-09-30, sopra); le richieste Firestore scendono perché le riletture partono in un colpo solo sul
 canale già aperto, non perché si legga di meno (ogni ripristino rilegge tutto). La misura precedente della stessa sera,
 con la rivisita presa a `data` e senza attesa, dava «dopo» = «prima» su ogni route: è il motivo dell'attesa.
 

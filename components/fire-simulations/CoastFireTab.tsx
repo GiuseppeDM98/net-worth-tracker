@@ -36,7 +36,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useAssets } from '@/lib/hooks/useAssets';
-import { useExpenses } from '@/lib/hooks/useExpenses';
+import { useExpensesInRange } from '@/lib/hooks/useExpenses';
+import { fireWindows } from '@/lib/utils/expenseWindows';
 import { useSettings } from '@/lib/hooks/useSettings';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
@@ -126,15 +127,17 @@ export function CoastFireTab() {
   const { data: assets, isLoading: isLoadingAssets, isError: assetsError } = useAssets(ownerId);
 
   // The last full year's expenses and the Calcolatore's savings, both computed in memory from
-  // the expenses key Cashflow reads (2026-09-29): no range query of this tab's own.
-  const { data: allExpenses, isLoading: isLoadingAnnualExpenses, isError: expensesError } = useExpenses(ownerId);
+  // the FIRE page's recent expenses window (January of last year → this December, `fireWindows`):
+  // the key the Calcolatore reads, so after it this tab reads nothing.
   const readAt = useMemo(() => new Date(), []);
-  const annualExpenses = useMemo(() => (allExpenses ? computeLastYearExpenses(allExpenses, readAt) : undefined), [allExpenses, readAt]);
+  const recentWindow = useMemo(() => fireWindows(readAt, null).recent, [readAt]);
+  const { data: recentExpenses, isLoading: isLoadingAnnualExpenses, isError: expensesError } = useExpensesInRange(ownerId, recentWindow);
+  const annualExpenses = useMemo(() => (recentExpenses ? computeLastYearExpenses(recentExpenses, readAt) : undefined), [recentExpenses, readAt]);
 
   // The Calcolatore's savings — the SAME query key, so the two tabs read one figure — is the
   // pace the verdict names. It rejects on a failed read (never a zeroed payload), so the
   // failure reaches the notice below like the other three.
-  const cashflowData = useMemo(() => (allExpenses ? computeAnnualCashflowData(allExpenses, readAt) : undefined), [allExpenses, readAt]);
+  const cashflowData = useMemo(() => (recentExpenses ? computeAnnualCashflowData(recentExpenses, readAt) : undefined), [recentExpenses, readAt]);
   const isLoadingCashflow = isLoadingAnnualExpenses;
   const cashflowError = expensesError;
 

@@ -104,14 +104,23 @@ function persistedKeys(record: string | null): string[] {
   );
 }
 
+/** Whether the record holds a WINDOW of the base account's expenses (`['expenses', uid, 'range', …]`). */
+function holdsExpensesWindow(record: string | null): boolean {
+  if (!record) return false;
+  const parsed = JSON.parse(record) as { clientState: { queries: Array<{ queryKey: unknown[] }> } };
+  return parsed.clientState.queries.some((query) => query.queryKey[0] === 'expenses' && query.queryKey[1] === BASE_UID && query.queryKey[2] === 'range');
+}
+
 /**
  * Wait until the EXPENSES of the base account are on disk. The persister writes on a one-second
  * throttle, first call immediately: the first record can hold the settings alone, written the
- * moment they settled, while the 1533-row expenses list is still a second away — a reload taken
- * then restores no expenses and shows the skeleton for a reason that is not the page's.
+ * moment they settled, while the month's rows are still a moment away — a reload taken then
+ * restores no expenses and shows the skeleton for a reason that is not the page's. The key
+ * waited for is the WINDOW Tracciamento paints from (2026-09-30): the collection's bounds sit
+ * under the same `expenses/<uid>` prefix and land first, and they restore no figure.
  */
 async function waitForPersistedExpenses(page: Page): Promise<void> {
-  await expect.poll(async () => persistedKeys(await readPersistedRecord(page)), { timeout: 5_000 }).toContain(`expenses/${BASE_UID}`);
+  await expect.poll(async () => holdsExpensesWindow(await readPersistedRecord(page)), { timeout: 5_000 }).toBe(true);
 }
 
 test.describe('the last known figures first', () => {

@@ -16,7 +16,11 @@
  *   Mobile (1 col):   Evoluzione → Raddoppi → Composizione → Driver → Valore per strumento
  *
  * DATA: snapshots, assets, settings, expenses, the ledger and the pension contributions come
- * from the React Query keys every page shares (2026-09-29: one read per session, no `Promise.all`); every
+ * from React Query keys (2026-09-29: one read per session, no `Promise.all`) — five of them the
+ * ones every page shares, and the expenses WHOLE (`useExpenses`), by declared need: the Driver
+ * splits the growth of every year recorded, so this page has no window to read. It shares that
+ * list with Analisi and Centri di Costo; since 2026-09-30 Cashflow's other tabs and FIRE read a
+ * window of their own instead (lib/utils/expenseWindows.ts); every
  * figure a tile shows is derived from them in a pure, tested util (storicoSummary.ts, the
  * chartService preparers, snapshotAssetBreakdown.ts, historyComposition.ts) — never in a
  * component. A snapshot is a frozen photograph: nothing here recomputes a stored value.
@@ -127,7 +131,7 @@ export default function HistoryPage() {
   const isDemo = useDemoMode();
   const queryClient = useQueryClient();
 
-  // ─── The reads: six keys, shared with every other page (2026-09-29) ────────────
+  // ─── The reads: six keys (2026-09-29), the expenses the whole collection (see the header) ─────
   // The page gates on EVERY query it reads (doc/guide/stati.md): `loading` while any is still
   // reading, `failed` when any read did not happen — a failed read is not an empty set.
   const snapshotsQuery = useSnapshots(ownerId);

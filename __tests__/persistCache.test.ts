@@ -50,6 +50,10 @@ describe('isPersistableQuery', () => {
     expect(isPersistableQuery(queryKeys.pensionContributions.byAsset(OWNER, 'fund-1'), DEMO)).toBe(true);
     expect(isPersistableQuery([...queryKeys.assets.all(OWNER), 'mortgage-instalments', ['house']], DEMO)).toBe(true);
     expect(isPersistableQuery(queryKeys.snapshots.range(OWNER, 2024, 1, 2024, 12), DEMO)).toBe(true);
+    // A window of the expenses and the collection's bounds: persisted with their prefix, never for the demo.
+    expect(isPersistableQuery(queryKeys.expenses.range(OWNER, '2025-08-31T22:00:00.000Z', '2026-09-30T21:59:59.999Z'), DEMO)).toBe(true);
+    expect(isPersistableQuery(queryKeys.expenses.bounds(OWNER), DEMO)).toBe(true);
+    expect(isPersistableQuery(queryKeys.expenses.range(DEMO, '2025-08-31T22:00:00.000Z', '2026-09-30T21:59:59.999Z'), DEMO)).toBe(false);
   });
 
   it('should keep the assistant, the benchmarks, the FX rates and the Esposizione out', () => {
@@ -97,8 +101,10 @@ describe('every key builder under a persisted prefix', () => {
     'dashboard.overview',
     'dividendReceipts.all',
     'expenses.all',
+    'expenses.bounds',
     'expenses.categories',
     'expenses.month',
+    'expenses.range',
     'goals.all',
     'hallOfFame.all',
     'pensionContributions.all',

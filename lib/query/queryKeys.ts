@@ -46,6 +46,13 @@ export const queryKeys = {
   // Expenses
   expenses: {
     all: (userId: string) => ['expenses', userId] as const,
+    // A window of the collection, both bounds as ISO instants (lib/utils/expenseWindows.ts is the
+    // ONE source of the windows, since 2026-09-30). `all` is its prefix, so every expense write —
+    // they all invalidate `all` — reaches every window a page holds, whatever its bounds.
+    range: (userId: string, fromIso: string, toIso: string) => ['expenses', userId, 'range', fromIso, toIso] as const,
+    // The dates of the oldest and of the newest row: what a page that reads a window still has to
+    // know about the rest of the collection (the years a picker offers, an account with no rows).
+    bounds: (userId: string) => ['expenses', userId, 'bounds'] as const,
     month: (userId: string, year: number, month: number) =>
       ['expenses', userId, year, month] as const,
     categories: (userId: string) => ['expense-categories', userId] as const,

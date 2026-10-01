@@ -5,13 +5,18 @@
  * Owns its own data-fetching so it's usable independently from the Cashflow route.
  *
  * DATA FETCHING:
- * - Expenses + categories: React Query via useExpenses / useExpenseCategories
+ * - Expenses + categories: React Query via useExpenses / useExpenseCategories. The expenses are
+ *   the WHOLE collection, by declared need (2026-09-30, when Cashflow and FIRE moved to a window
+ *   of their own — lib/utils/expenseWindows.ts): the Scheda, the Confronto, the Dettaglio and the
+ *   search span the history from the floor on and the Andamento ranks its categories on the rows
+ *   after this year too, so on the owner's account a window left out 48 rows of 1547.
  * - cashflowHistoryStartYear + spendingRolesEnabled: `useSettings` (the ONE settings key, 2026-09-29;
  *   non-fatal, safe defaults on failure)
  *
  * WHY NOT SHARE STATE WITH THE CASHFLOW PAGE:
- * These are separate routes with separate lifecycles. The DATA is already shared: both pages
- * read the same React Query keys, so a visit after Cashflow opens on the cache.
+ * These are separate routes with separate lifecycles. Categories and settings are the same React
+ * Query keys on both; the expenses key is the one Storico and Centri di Costo read, so a visit
+ * after either opens on the cache (Tracciamento reads its period's window, not this list).
  */
 
 'use client';

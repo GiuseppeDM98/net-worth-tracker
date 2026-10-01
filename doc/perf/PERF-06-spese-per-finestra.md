@@ -1,6 +1,8 @@
 # PERF-06 — Le spese per finestra: leggere il mese, non la storia
 
-> Stato: da fare · Priorità: 2 · Sforzo: L · Dipende da: PERF-05 (chiusa il 2026-09-29) · Sblocca: —
+> Stato: **fatta il 2026-09-30** (branch `feat/perf-06-spese-per-finestra`; le divergenze e le misure in
+> `doc/perf/README.md` § 6, la regola in AGENTS.md § React Query e doc/guide/cashflow.md § Expenses by window) ·
+> Priorità: 2 · Sforzo: L · Dipende da: PERF-05 (chiusa il 2026-09-29) · Sblocca: —
 
 ## 1. Il problema, misurato
 

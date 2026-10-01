@@ -22,6 +22,14 @@
   `context.clock.setFixedTime(<the before dump's instant>)` — `Date.now()` frozen, timers real, the app runs — and
   compare with that before dump: identical sets mean the refactor changed nothing, and the whole check costs one
   surface, not a checkout and two production builds. The dump records `at` and each surface's `ms` for exactly this.
+- **Freeze the clock at SEVERAL instants, not today's** (2026-09-30, the expense windows): the same real data read
+  «today», on a 15 March (the Budget's six bars reach into last year) and on a 10 January (last year has just
+  closed) exercised every branch of the windows on the mirror at no extra cost — a frozen clock makes the app live
+  any day — and with the clock frozen the noise floor between two dumps of unchanged code was ZERO, so a single
+  value lost is a finding. Two were: a chart that ranks on rows after «today» (Analisi's Andamento) and a history
+  that reads up to a snapshot the frozen clock had not reached yet (FIRE). And a spec that never sees a page settle
+  (every surface «NOT SETTLED») on a build that settles fine by hand was a game running on the laptop: check the
+  process list before doubting the code.
 
 ## Emulator Exercise Scripts
 - **On Windows, start `next dev` from PowerShell through the npm script** (2026-09-20): launched from Git Bash as
