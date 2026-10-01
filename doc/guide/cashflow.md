@@ -63,6 +63,11 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **A new window is a wait, never the previous window's rows** (no `placeholderData`): the rows of another period
   under the new one would be figures of the wrong months. A window read in the last 24 hours opens from the
   persisted cache (doc/guide/cache-persistita.md).
+- **A window has no rollback flag: its rollback is the revert** (owner, 2026-10-01). Nothing written changes shape —
+  the collection, the rows and every writer are as before — and every reader filters in memory the list it is handed,
+  so the whole-collection list is one `git revert` away and no emergency switch has to be kept alive and tested. A
+  flag is for a change that alters what sits on DISK across a release (the persisted cache, AGENTS.md § Caching),
+  never for a refactor of the readers.
 
 ## Category icons: one chunk per icon, by name (`components/expenses/categoryIconLoaders.ts`)
 - **A category stores its icon by lucide's PascalCase name; the screen loads that one icon, never the library**

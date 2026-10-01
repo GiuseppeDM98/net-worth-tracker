@@ -62,7 +62,7 @@ export function isQueryPersistenceEnabled(flagValue: string | undefined = proces
  * The key prefixes that are persisted, each followed IN THE KEY by the owner's uid
  * (`lib/query/queryKeys.ts`): `['assets', uid]`, `['dashboard', 'overview', uid]`, … A longer key
  * under one of them — a per-fund contribution list, the mortgage instalments under the assets key,
- * a snapshot range, tomorrow's expense window (PERF-06) — is persisted with its prefix.
+ * a snapshot range, a window of the expenses (`lib/utils/expenseWindows.ts`) — is persisted with its prefix.
  */
 export const PERSISTED_QUERY_PREFIXES: readonly (readonly string[])[] = [
   ['assets'],
