@@ -157,8 +157,8 @@ pointer — a stub that grows past that is a guide leaking back (2026-09-20: ten
 
 ### React Query and Derived State
 - **A page or a component never calls a read service: it reads a HOOK** (2026-09-29). One key per collection,
-  in `lib/query/queryKeys.ts`, one hook apiece in `lib/hooks/`: `useAssets`, `useSnapshots`, `useExpenses`,
-  `useExpenseCategories`, `useSettings` (the ONE `['settings', ownerId]`), `usePensionContributions`,
+  in `lib/query/queryKeys.ts`, one hook apiece in `lib/hooks/`: `useAssets`, `useSnapshots`, `useExpenses` (and its
+  windows, next bullet), `useExpenseCategories`, `useSettings` (the ONE `['settings', ownerId]`), `usePensionContributions`,
   `useAssetTransactions`, `useCostCenters`, `useGoalData`, `useDividendReceipts`, `useHallOfFame`, `useMortgageInstalments`,
   `useDashboardOverview`. An imperative read (a refresh, a dialog reading once after a write, the CSV import before it
   commits) goes through the hook's exported `…QueryOptions(ownerId)` with `queryClient.fetchQuery` — the same key, the
@@ -167,6 +167,21 @@ pointer — a stub that grows past that is a guide leaking back (2026-09-20: ten
   `grep -rn "getSettings(\|getAllAssets(\|getUserSnapshots(\|getAllExpenses(\|getAllCategories(" app components`: hooks
   and services only. Every writer invalidates the key its readers read (`queryKeys.settings.all` from the seven places of
   doc/guide/impostazioni.md § Settings — the FIVE places, `goals.all` from Obiettivi AND the assistant's goal card).
+- **The expenses are read by WINDOW, and `lib/utils/expenseWindows.ts` is the ONE source of the windows** (2026-09-30):
+  Tracciamento and Divisione (`trackingWindow`), Budget (`budgetWindow`, and its dialog's `budgetSuggestionWindow`)
+  and FIRE (`fireWindows`) read `useExpensesInRange(ownerId, window)` — one key per window UNDER the `expenses.all`
+  prefix, so the one invalidation every expense write makes reaches them all — and derive in memory with the same
+  pure functions as before. Storico, Analisi, Centri di Costo and «Collega spese…» stay on `useExpenses`, the whole
+  collection, by declared need, and share that one list (Analisi by the owner's decision: a window left out 48 rows of
+  1547 on the real account — measure before giving a page a window, each one is a list more in memory and on disk). **A window is the UNION of what its page reads, the readers behind the period
+  included** (a savings history, a six-month baseline, a chart that draws a range's last month whole): a new reader of
+  a page's list widens its window in the same commit and joins `__tests__/expenseWindows.test.ts`, which runs every
+  reader on the window's rows and on the whole list and compares. **The bounds are calendar days, never UTC** — the
+  EARLIER of the local and the Italian midnight of the first day, the LATER of the two ends of the last: the form saves
+  at local midnight, the period slice compares in the browser's calendar and every month bucket reads the Italian one.
+  What a window cannot say about the rest of the collection (the years a picker offers, an account with no rows) comes
+  from `useExpenseBounds`; never `placeholderData` on a window — the previous window's rows under the new period are
+  figures of the wrong months, so a new window waits on a skeleton with its picker still mounted.
 - **A page over several keys composes ONE read state** (`composeReadState`, `lib/utils/readState.ts`): `loading` while
   any query reads, `loadFailed` when any failed — then `resolveSurfaceState`. Storico reads six keys this way.
 - Invalidate all related caches after a mutation; **asset mutations need a dual invalidation** (`queryKeys.assets.all` +

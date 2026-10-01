@@ -27,11 +27,12 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Flame, Dices, Mountain, Target, Lightbulb } from 'lucide-react';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useAssets } from '@/lib/hooks/useAssets';
-import { useExpenses } from '@/lib/hooks/useExpenses';
+import { useExpensesInRange } from '@/lib/hooks/useExpenses';
+import { fireWindows } from '@/lib/utils/expenseWindows';
 import { useFreshness } from '@/lib/hooks/useFreshness';
 import { useSettings } from '@/lib/hooks/useSettings';
 import { useSnapshots } from '@/lib/hooks/useSnapshots';
@@ -74,9 +75,12 @@ export default function FireSimulationsPage() {
   const [activeTab, setActiveTab] = useState<TabValue>('fire');
   const { ownerId } = useActiveAccount();
   // The header's «Aggiornato alle…» over the four keys the Calcolatore — the tab the
-  // page opens on — paints from; the same cache entries the tabs read, no second read. The goals
-  // document stays out: it is read only once Obiettivi is opened.
-  const calculatorReads = [useSettings(ownerId), useAssets(ownerId), useExpenses(ownerId), useSnapshots(ownerId)];
+  // page opens on — paints from; the same cache entries the tabs read, no second read. The
+  // expenses are the page's RECENT window (last year and this one: what every tab's number stands
+  // on); the older rows behind the Calcolatore's «Dettaglio» and the goals document stay out,
+  // each read only by the surface that shows it.
+  const recentExpensesWindow = useMemo(() => fireWindows(new Date(), null).recent, []);
+  const calculatorReads = [useSettings(ownerId), useAssets(ownerId), useExpensesInRange(ownerId, recentExpensesWindow), useSnapshots(ownerId)];
   const freshness = useFreshness(calculatorReads);
   // The lazy tabs are fetched once the Calcolatore's reads are in and the page is idle: started
   // earlier, the «idle» browser is only waiting for Firestore and the download competes with the

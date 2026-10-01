@@ -6,8 +6,8 @@
  * The centres ALONE: until 2026-09-29 `queryKeys.costCenters.all` carried the centres and
  * one Firestore query per centre for its rows (N+1 on rows already in `useExpenses`). The rows are
  * now grouped in memory by `groupExpensesByCostCenter` (lib/utils/costCenterUtils.ts) from the
- * expenses key, so this hook and `useExpenses` are the two reads the tab, the detail and the
- * expense form share. Every write that links or unlinks a row invalidates `costCenters.all` AND
+ * whole-collection expenses key, so this hook and `useExpenses` are the two reads of the tab and
+ * its detail (the expense form reads the centres alone). Every write that links or unlinks a row invalidates `costCenters.all` AND
  * `expenses.all` (doc/guide/centri-di-costo.md).
  */
 

@@ -35,7 +35,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAssets } from '@/lib/hooks/useAssets';
-import { useExpenses } from '@/lib/hooks/useExpenses';
+import { useExpensesInRange } from '@/lib/hooks/useExpenses';
+import { fireWindows } from '@/lib/utils/expenseWindows';
 import { useSettings } from '@/lib/hooks/useSettings';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { calculateAssetValue, calculateFIRENetWorth, calculateIlliquidFIRENetWorth, calculateLiquidFIRENetWorth, filterFireEligibleAssets } from '@/lib/services/assetService';
@@ -116,11 +117,13 @@ export function WhatIfAnalysisTab() {
   const { data: settings, isLoading: isLoadingSettings, isError: settingsError } = useSettings(ownerId);
   const { data: assets, isLoading: isLoadingAssets, isError: assetsError } = useAssets(ownerId);
 
-  // The Calcolatore's cashflow figures, computed in memory from the SAME expenses key (2026-09-29),
-  // so the two tabs read one figure. A failed read is the key's `isError`: the notice below.
-  const { data: allExpenses, isLoading: isLoadingCashflow, isError: cashflowError } = useExpenses(ownerId);
+  // The Calcolatore's cashflow figures, computed in memory from the SAME key — the FIRE page's
+  // recent expenses window (January of last year → this December, `fireWindows`) — so the two tabs
+  // read one figure. A failed read is the key's `isError`: the notice below.
   const readAt = useMemo(() => new Date(), []);
-  const cashflowData = useMemo(() => (allExpenses ? computeAnnualCashflowData(allExpenses, readAt) : undefined), [allExpenses, readAt]);
+  const recentWindow = useMemo(() => fireWindows(readAt, null).recent, [readAt]);
+  const { data: recentExpenses, isLoading: isLoadingCashflow, isError: cashflowError } = useExpensesInRange(ownerId, recentWindow);
+  const cashflowData = useMemo(() => (recentExpenses ? computeAnnualCashflowData(recentExpenses, readAt) : undefined), [recentExpenses, readAt]);
 
   // ─── Scenario state (ephemeral) ──────────────────────────────────────────────
   const [eventType, setEventType] = useState<WhatIfEventType>('jobLoss');

@@ -17,7 +17,52 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **50/30/20 roles**: pure `lib/utils/spendingRoles.ts` (resolution, summary, the printed shares `summarizeSpendingRoleShares`, classification counts, the badge colour), the bucket → `--role-*` token map `lib/constants/spendingRoleColors.ts`, the `deleteField()` in `updateCategory` (`lib/services/expenseCategoryService.ts`), the picker and the cache invalidation (`invalidateCategoryCaches`) in `components/expenses/CategoryManagementDialog.tsx`; tests `__tests__/{spendingRoles,expenseCategoryService}.test.ts`, `e2e/settings.roles.spec.ts`
 - **Mortgage instalment → property debt** (2026-09-25): `lib/utils/mortgageRepayment.ts` (pure), `lib/services/debtRepaymentService.ts` (client transactions), the server half inside `lib/server/cashSettlement.ts`; tests `__tests__/{mortgageRepayment,serverCashSettlement,updateAssetDebtFields}.test.ts`, `e2e/cashflow.mortgage.spec.ts`
 - **Category icons** (2026-09-30): the curated names and labels `lib/constants/categoryIcons.ts`, one loader per icon `components/expenses/categoryIconLoaders.ts` (deep paths to lucide's canonical files, typed by `types/lucide-icon-modules.d.ts`), the ONE lazy map `LAZY_CATEGORY_ICONS` + `CategoryIcon` in `components/expenses/IconPickerPopover.tsx`; test `__tests__/categoryIcons.test.ts`
+- **Expenses by window** (2026-09-30): pure `lib/utils/expenseWindows.ts` (`trackingWindow`, `budgetWindow`, `budgetSuggestionWindow`, `fireWindows`, `listExpenseYears`), hooks `useExpensesInRange` / `useExpenseBounds` / `expensesInRangeQueryOptions` in `lib/hooks/useExpenses.ts`, readers `getExpensesByDateRange` / `getExpenseDateBounds` in `lib/services/expenseService.ts`, keys `queryKeys.expenses.{range,bounds}`; tests `__tests__/expenseWindows.test.ts` (bounds and invariance), `__tests__/persistCache.test.ts` (the two builders), `e2e/cashflow.tracciamento.spec.ts` (the second window)
 - **Suites to run after a change here — Transfers / cash** (moved from `AGENTS.md` § Commands on 2026-09-30): `cashBalanceReconciliation`, `updateCashAssetBalancesAtomic`, `transferFeature`, `cashSettlement`, `serverCashSettlement` · **Commissione** `transferFee` (+ `settingsRoundTrip`) · **Mutuo** `mortgageRepayment`, `mortgageSummary`, `updateAssetDebtFields` (+ `patrimonioNarrative` for the tile's words) · **Ricorrenze** `recurrenceDates` · **Browser** `e2e/cashflow.{accounts,transfer-fee,mortgage}.spec.ts`
+
+## Expenses by window (`lib/utils/expenseWindows.ts`)
+- **Tracciamento, Divisione, Budget and FIRE read a WINDOW of the expenses, never the collection** (2026-09-30).
+  The pure functions of each page did not change — they still slice and bucket the list they are handed — what
+  changed is the list: `useExpensesInRange(ownerId, window)`, one key per window under the `expenses.all` prefix.
+  Until then every one of them read the whole collection to show a month (1547 documents on the owner's account),
+  and the cost was the SDK deserialising them on the main thread: Cashflow's cold load took 1,9 s to its first figure
+  and takes 1,0 with 838.
+- **The windows, and the ONE module that defines them**: `trackingWindow(period)` — from the first day of the month
+  twelve months before the period starts to the end of the MONTH it ends in (Tracciamento; Divisione on its own
+  period); `budgetWindow(now)` — from the older of January and the first of the six trailing months, to December;
+  `budgetSuggestionWindow(now, floor)` — whole years from the floor to last year, read by the budget dialog alone;
+  `fireWindows(now, firstSnapshot)` — `recent` (January of last year → December) for every FIRE tab and `older` (from
+  eleven months before the first snapshot) for the Calcolatore's «Dettaglio» only. Each guide says what its window
+  holds and why.
+- **A window is the UNION of what its page reads, not its period.** The readers behind the period count: the
+  previous period and the same days of the previous month, the six months of the flow chart, the twelve of the
+  savings history — and both charts draw the period's LAST MONTH WHOLE, so a custom range that stops on the 20th
+  reads to the end of that month (the first draft closed on the range's last day: the invariance test found it).
+  A reader added to a page widens its window in the same commit and joins `__tests__/expenseWindows.test.ts`, which
+  runs every reader twice — on the window's rows and on the whole list — and compares.
+- **The bounds are calendar days in BOTH calendars, never UTC.** The form saves at LOCAL midnight
+  (`new Date(dateString + 'T00:00:00')`), the period slice compares in the browser's calendar and every month bucket
+  reads the ITALIAN one. So a window opens at the earlier of the two midnights of its first day and closes at the
+  later of the two ends of its last: the same instants in Italy, a few hours wider anywhere else. Local midnight
+  alone — the spec's first wording — lost the rows of the 1st from Budget's buckets in a browser west of Italy (seen
+  red under `TZ=America/New_York`), and `Date.UTC` loses them in Italy itself.
+- **What a window cannot say about the rest of the collection comes from `useExpenseBounds`**: the dates of the
+  oldest and of the newest row (two one-document reads, `['expenses', uid, 'bounds']`). The period pickers take their
+  years from it (`listExpenseYears`), CONTIGUOUS from the oldest to the newest — a year with no row in between is
+  offered too, and opens on an empty period.
+- **Who has NO window, by declared need**: Storico (the Driver spans every year), Centri di Costo and «Collega
+  spese…» (a centre is lifetime), Hall of Fame's recalculation — and Analisi, by the owner's decision of 2026-09-30:
+  its Scheda, Confronto, Dettaglio and search span the history from the floor on and the Andamento ranks its categories
+  on the rows after this year too, so a window left out 48 rows of 1547 on the real account, for one more list in
+  memory and in the persisted record. They share the one `useExpenses` list. **Measure before giving a page a
+  window**: a window pays where the page reads a small part of the collection, and costs a key everywhere.
+- **Every expense write invalidates `queryKeys.expenses.all`, and that is enough**: it is the prefix of every window
+  and of the bounds. The windows on screen reread at once; the others (another period, another page) are marked and
+  reread when next opened. Found while checking every writer: deleting or renaming a cost centre rewrites expense
+  rows and invalidated the centres only — it now invalidates the prefix too (doc/guide/centri-di-costo.md).
+- **A new window is a wait, never the previous window's rows** (no `placeholderData`): the rows of another period
+  under the new one would be figures of the wrong months. A window read in the last 24 hours opens from the
+  persisted cache (doc/guide/cache-persistita.md).
 
 ## Category icons: one chunk per icon, by name (`components/expenses/categoryIconLoaders.ts`)
 - **A category stores its icon by lucide's PascalCase name; the screen loads that one icon, never the library**

@@ -39,6 +39,24 @@ function SkeletonTile({ lines }: { lines: number }) {
 }
 
 /**
+ * The lines a verdict arrives on, alone — for a page that keeps its own controls mounted beside
+ * them while it waits (Tracciamento's period picker: a new period is a new read, and the picker
+ * that asked for it must keep its place and its focus). Silent like every `Skeleton`: the wait is
+ * announced by the grid's `role="status"`.
+ */
+export function VerdictSkeleton({ className }: { className?: string }) {
+  return (
+    // The same `page-verdict` name as `PageVerdict`: the page scene lands on these lines and the
+    // verdict arrives in place when the data does.
+    <div className={cn('flex max-w-[920px] flex-col gap-2.5', className)} style={{ viewTransitionName: 'page-verdict' }}>
+      <Skeleton className="h-8 w-72" />
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-4 w-3/4" />
+    </div>
+  );
+}
+
+/**
  * The ONE loading state of a redesigned page: the verdict's two lines, then the tile grid
  * with the page's own spans and no numbers (DESIGN.md → §5 Tile Grid Skeleton). A page passes
  * its `cells` so the skeleton has the proportions of what replaces it and nothing jumps on load.
@@ -56,15 +74,7 @@ export function TileGridSkeleton({
 }: TileGridSkeletonProps) {
   return (
     <div className={cn('space-y-4', className)} role="status" aria-label={label}>
-      {verdict && (
-        // The same `page-verdict` name as `PageVerdict`: the page scene lands on these two lines
-        // and the verdict arrives in place when the data does.
-        <div className="flex max-w-[920px] flex-col gap-2.5 pt-1" style={{ viewTransitionName: 'page-verdict' }}>
-          <Skeleton className="h-8 w-72" />
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-3/4" />
-        </div>
-      )}
+      {verdict && <VerdictSkeleton className="pt-1" />}
       {toolbar}
       <div className="grid grid-cols-1 gap-3 tablet:grid-cols-2 desktop:grid-cols-12">
         {cells.map((cell, i) => (

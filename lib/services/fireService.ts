@@ -11,6 +11,7 @@ import { Expense } from '@/types/expenses';
 import { MONTH_NAMES } from '@/lib/constants/months';
 import { getItalyMonth, getItalyMonthYear, getItalyYear, toDate } from '@/lib/utils/dateHelpers';
 import { resolveGainShare, resolveTaxMultiplier } from '@/lib/utils/withdrawalTax';
+import { FIRE_HISTORY_LOOKBACK_MONTHS } from '@/lib/utils/expenseWindows';
 import { calculateTotalExpenses, calculateTotalIncome, getExpensesByDateRange } from './expenseService';
 
 export interface FIREMetrics {
@@ -661,8 +662,9 @@ export function calculateHistoricalFIRERunway(
 
 /**
  * The rows dated within `[start, end]`, both ends included: the in-memory twin of
- * `getExpensesByDateRange` (the same comparison on the same instants), so a page that already
- * holds the account's whole expense list (`useExpenses`) reads no range of its own (2026-09-29).
+ * `getExpensesByDateRange` (the same comparison on the same instants). Every figure below takes
+ * its own slice of the list it is handed with this — so the list may be wider than the slice (the
+ * FIRE page hands the rows of `fireWindows`, lib/utils/expenseWindows.ts), never narrower.
  */
 export function selectExpensesBetween(expenses: Expense[], start: Date, end: Date): Expense[] {
   return expenses.filter((expense) => {
@@ -679,13 +681,16 @@ function lastFullYearBounds(now: Date): { lastYear: number; start: Date; end: Da
 }
 
 /**
- * The expenses of the last fully completed year, from the account's whole expense list.
+ * The expenses of the last fully completed year, from a list that holds that year whole.
  *
  * Why last year instead of current year? Using the current year mid-period (e.g., March)
  * gives only 3 months of data, which dramatically understates annual spending and makes
  * FIRE metrics like "years of expenses" misleading. The last full year is the most
- * representative baseline for planning purposes. Coast FIRE reads it off `useExpenses`;
- * `getAnnualExpenses` below is the same figure read by range, for the PDF.
+ * representative baseline for planning purposes. Coast FIRE computes it on the rows of the FIRE
+ * page's recent window (`fireWindows`); `getAnnualExpenses` below is the same figure read by
+ * range, for the PDF.
+ *
+ * @param expenses - Any list that holds the whole of last year
  */
 export function computeLastYearExpenses(expenses: Expense[], now: Date): number {
   const { start, end } = lastFullYearBounds(now);
@@ -797,12 +802,12 @@ export interface FIREHistoryData {
 }
 
 /**
- * The FIRE history (metrics + chart data + runway data) from the snapshots and the account's
- * whole expense list, in memory (2026-09-29). Until then `getFIREData(userId, …)` read
- * the snapshots and the last year's expenses, THEN the expenses of the snapshot window — a third
- * round trip in series behind the assets; the Calcolatore now reads the two keys every page
- * shares and computes here. `snapshots` are `getUserSnapshots`' order (oldest first): the window
- * runs from eleven months before the first to the end of the last.
+ * The FIRE history (metrics + chart data + runway data) from the snapshots and the expenses, in
+ * memory (2026-09-29; until then `getFIREData(userId, …)` chained three round trips).
+ * `snapshots` are `getUserSnapshots`' order (oldest first): the history reads the expenses from
+ * eleven months before the first snapshot to the end of the last, so `expenses` must hold that
+ * span — the Calcolatore hands the two lists of `fireWindows` joined (lib/utils/expenseWindows.ts,
+ * which starts its older window from the same `FIRE_HISTORY_LOOKBACK_MONTHS`).
  */
 export function buildFIREData(
   snapshots: MonthlySnapshot[],
@@ -833,7 +838,7 @@ export function buildFIREData(
 
   const firstSnapshot = snapshots[0];
   const lastSnapshot = snapshots[snapshots.length - 1];
-  const expenseWindowStart = shiftMonth(firstSnapshot.year, firstSnapshot.month, -11);
+  const expenseWindowStart = shiftMonth(firstSnapshot.year, firstSnapshot.month, -FIRE_HISTORY_LOOKBACK_MONTHS);
   const expenseRangeStart = getMonthStartDate(expenseWindowStart.year, expenseWindowStart.month);
   const expenseRangeEnd = getMonthEndDate(lastSnapshot.year, lastSnapshot.month);
   const monthlyExpenseBuckets = buildMonthlyExpenseBuckets(selectExpensesBetween(expenses, expenseRangeStart, expenseRangeEnd));
@@ -943,11 +948,10 @@ export function buildIncomeSourceBreakdown(
 
 /**
  * ONE expense figure for the FIRE number, the verdict and the chart: the last full year, else
- * the running year annualised (`isAnnualized` says which; doc/guide/fire.md). From the account's
- * whole expense list, in memory (2026-09-29): until then `getAnnualCashflowData(userId)`
- * read the two ranges itself, on a key of its own beside `useExpenses`. A failed read is the
- * expenses key's `isError`, never a zeroed payload (the 2026-09-01 rule): FIRE › Calcolatore and
- * What If both hold an ErrorNotice branch on it.
+ * the running year annualised (`isAnnualized` says which; doc/guide/fire.md). Computed in memory
+ * (2026-09-29) on a list that holds last year and this one up to `now` — the FIRE page's
+ * recent window (`fireWindows`). A failed read is that key's `isError`, never a zeroed payload
+ * (the 2026-09-01 rule): FIRE › Calcolatore and What If both hold an ErrorNotice branch on it.
  */
 export function computeAnnualCashflowData(allExpenses: Expense[], now: Date): AnnualCashflowData {
   const { year: currentYear } = getItalyMonthYear(now);

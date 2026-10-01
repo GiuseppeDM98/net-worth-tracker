@@ -1,13 +1,14 @@
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BudgetItem, BudgetKind, BudgetPeriod } from '@/types/budget';
-import { Expense, ExpenseCategory } from '@/types/expenses';
+import { ExpenseCategory } from '@/types/expenses';
 import {
   budgetItemKey,
   categoryKind,
@@ -18,6 +19,8 @@ import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { cn } from '@/lib/utils';
 import { describeFormRefusal, describeModalStatus, type ModalStatus } from '@/lib/utils/dialogNarrative';
 import { describeBudgetAmountRefusal, describeBudgetDuplicateRefusal, describeBudgetItemCopy } from '@/lib/utils/budgetNarrative';
+import { expensesInRangeQueryOptions, useExpensesInRange } from '@/lib/hooks/useExpenses';
+import { budgetSuggestionWindow } from '@/lib/utils/expenseWindows';
 
 const NONE = '__none__';
 
@@ -25,7 +28,10 @@ interface BudgetItemDialogProps {
   open: boolean;
   onClose: () => void;
   categories: ExpenseCategory[];
-  allExpenses: Expense[];
+  /** Whose history the suggested amount is read from; null before the account resolves. */
+  ownerId: string | null;
+  /** The tab's clock: «last year» for the suggestion is the year before this instant's. */
+  now: Date;
   historyStartYear: number;
   existingItems: BudgetItem[];
   overallMonthlyAmount: number | undefined;
@@ -132,7 +138,8 @@ export function BudgetItemDialog({
   open,
   onClose,
   categories,
-  allExpenses,
+  ownerId,
+  now,
   historyStartYear,
   existingItems,
   overallMonthlyAmount,
@@ -140,6 +147,16 @@ export function BudgetItemDialog({
   onSubmit,
 }: BudgetItemDialogProps) {
   const isEdit = editingItem !== null;
+  const queryClient = useQueryClient();
+
+  // The years a NEW budget's amount is suggested from (`budgetSuggestionWindow`: whole years, back
+  // to the floor) are not in the tab's own window, so the dialog reads them — from the moment it
+  // opens, so that the rows are usually in memory by the time a category is picked. An edit
+  // suggests nothing and reads nothing.
+  const suggestionWindow = useMemo(() => (isEdit ? null : budgetSuggestionWindow(now, historyStartYear)), [isEdit, now, historyStartYear]);
+  useExpensesInRange(ownerId ?? undefined, suggestionWindow);
+  // The category the latest suggestion was asked for: an answer for an earlier pick is dropped.
+  const suggestionFor = useRef<string | null>(null);
 
   const [kind, setKind] = useState<BudgetKind>(editingItem?.kind ?? 'expense');
   const [period, setPeriod] = useState<BudgetPeriod>(editingItem?.period ?? 'monthly');
@@ -205,18 +222,28 @@ export function BudgetItemDialog({
     clearRefusal();
     setCategoryId(id);
     setSubCategoryId(NONE);
+    suggestionFor.current = id;
     // Pre-fill the amount from history when the user hasn't typed one yet.
-    if (id !== NONE && amount === '') {
-      const cat = categories.find((c) => c.id === id);
-      if (cat) {
-        const suggested = getDefaultAmount(
-          { kind, scope: 'category', categoryId: id },
-          allExpenses,
-          historyStartYear,
-          period
-        );
-        if (suggested > 0) setAmount(String(Math.round(suggested)));
-      }
+    if (id !== NONE && amount === '' && categories.some((c) => c.id === id)) void suggestAmount(id);
+  }
+
+  /**
+   * Fill the empty amount with last year's spending on the category (`getDefaultAmount`). The
+   * rows come from the key the dialog has been reading since it opened, so this usually answers
+   * from memory; when it does not, the suggestion arrives a moment after the pick.
+   */
+  async function suggestAmount(id: string) {
+    if (!ownerId || !suggestionWindow) return;
+    try {
+      const history = await queryClient.fetchQuery(expensesInRangeQueryOptions(ownerId, suggestionWindow));
+      if (suggestionFor.current !== id) return;
+      const suggested = getDefaultAmount({ kind, scope: 'category', categoryId: id }, history, historyStartYear, period);
+      // Only into a field still empty: what was typed while the rows were being read wins.
+      if (suggested > 0) setAmount((current) => (current === '' ? String(Math.round(suggested)) : current));
+    } catch (error) {
+      // A suggestion that cannot be read is not a refusal of the form: the field stays empty,
+      // exactly as it does for a category with no history.
+      console.error('Failed to read the history behind a budget suggestion', { ownerId, categoryId: id, error });
     }
   }
 

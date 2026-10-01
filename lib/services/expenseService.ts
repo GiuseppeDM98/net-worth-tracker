@@ -29,6 +29,7 @@ import {
   where,
   Timestamp,
   orderBy,
+  limit,
   writeBatch,
   deleteField,
   type DocumentSnapshot
@@ -94,8 +95,43 @@ export async function getAllExpenses(userId: string): Promise<Expense[]> {
   }
 }
 
+/** The dates of the oldest and of the newest expense of an account. */
+export interface ExpenseDateBounds {
+  oldest: Date;
+  newest: Date;
+}
+
 /**
- * Get expenses in a date range
+ * The dates of the oldest and of the newest expense — two one-document reads on the
+ * `(userId, date)` indexes — or null for an account with no expense at all.
+ *
+ * What a page that reads a WINDOW of the collection (lib/utils/expenseWindows.ts) still needs
+ * to know about the rest of it: which years its period picker can offer, and whether an empty
+ * window is an empty period or an empty account.
+ */
+export async function getExpenseDateBounds(userId: string): Promise<ExpenseDateBounds | null> {
+  try {
+    const expensesRef = collection(db, EXPENSES_COLLECTION);
+    // The `userId` filter is what the rules need on a list, at any size (AGENTS.md § Firestore Queries and the Rules).
+    const readEdge = (direction: 'asc' | 'desc') =>
+      getDocs(query(expensesRef, where('userId', '==', userId), orderBy('date', direction), limit(1)));
+    const [oldest, newest] = await Promise.all([readEdge('asc'), readEdge('desc')]);
+
+    const oldestDate: Date | undefined = oldest.docs[0]?.data().date?.toDate();
+    const newestDate: Date | undefined = newest.docs[0]?.data().date?.toDate();
+    if (!oldestDate || !newestDate) return null;
+    return { oldest: oldestDate, newest: newestDate };
+  } catch (error) {
+    console.error('Error getting expense date bounds:', error);
+    throw new Error('Failed to fetch expense date bounds');
+  }
+}
+
+/**
+ * Get expenses in a date range, both ends included.
+ *
+ * The reader behind every page that shows a window of the collection (`useExpensesInRange`);
+ * the bounds come from lib/utils/expenseWindows.ts, never from `Date.UTC`.
  */
 export async function getExpensesByDateRange(
   userId: string,

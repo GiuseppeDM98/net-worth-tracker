@@ -13,21 +13,26 @@ Next.js app for Italian investors: net worth, assets, cashflow, dividends, perfo
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic.
-- `tsc` clean; **208 files / 4767 tests** green in `Europe/Rome` + **45 Playwright spec files** (161 tests, incl. 6 auth setups; last full run 2026-09-30 on the Windows laptop, 159/161 in 8,5 min — `modal.origin`, the known intermittent, and `cashflow.dividendi`, red on develop too (Known Issues); doc/guide/e2e-emulatori.md). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, which structurally hides timezone bugs.
-- Latest (2026-09-30): **`doc/perf/PERF-04` retired** — recharts once, the PDF at the click, the lazy charts and
-  icons (PR #418, in develop since 2026-09-30) read against its spec: 24 divergences — 14 where the code was right
-  (lessons already home: AGENTS.md § Dynamic Imports and Module Hygiene, `perf/README.md`, the Storico, Rendimenti,
-  FIRE, Analisi, Cashflow, PDF and E2E guides; the owner's «no Suspense» decision now also in `doc/perf/README.md`
-  § 9), 5 defects fixed here on the owner's decision (comments and pointers only: two E2E spec headers, AGENTS' prefetch
-  pointer, «no route grew» beside Patrimonio's +7,4 KB, `PDFExportDialog`'s detached JSDoc), 5 deferred (Patrimonio's
-  +7,4 → PERF-11 § 1; four never written down, now where their subject lives: which lazy charts no spec holds →
-  doc/guide/e2e-emulatori.md, the untimed icon picker → doc/guide/cashflow.md, the unchecked libraries and Firestore
-  on `/login` → `perf/README.md` § Il budget). **Verified**: `tsc`, lint 0, Vitest **208 / 4767** in `Europe/Rome`;
-  no Playwright (comments and documents only).
+- `tsc` clean; **209 files / 4803 tests** green in `Europe/Rome` and in the machine's zone + **45 Playwright spec files** (162 tests, incl. 6 auth setups; last full run 2026-09-30 evening on the Windows laptop, 162/162 in 8,3 min — `modal.origin` and `cashflow.dividendi`, the two intermittents of Known Issues, green that run; doc/guide/e2e-emulatori.md). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, which structurally hides timezone bugs.
+- Latest (2026-09-30, evening): **PERF-06 — the expenses by window** (`lib/utils/expenseWindows.ts`, the ONE source;
+  `useExpensesInRange` + `useExpenseBounds`; AGENTS.md § React Query). Tracciamento and Divisione read their period and
+  the twelve months before it, Budget its year and six trailing months, FIRE last year and this one (its «Dettaglio»
+  the older rows behind, after the snapshots); Storico, Centri and — the owner's decision, measured — Analisi stay on the
+  whole collection. Bounds are calendar days in BOTH calendars (local and Italian), never UTC. No number changed: 33
+  surfaces dumped at three frozen instants, 0 lost; 36 unit cases of bounds and invariance (every reader on the window
+  and on the whole list), ten falsifications seen red, green in six timezones; the E2E of the second window seen red
+  both ways. Cold on the mirror (medians of 5, first figure): Cashflow 1898 → 1072 ms, FIRE 1737 → 1291, Analisi
+  1398 → 1480 (unchanged code, noise); revisit 192 → 164 · 213 → 161; **Verified**: `tsc`, lint 0, Vitest 209 / 4803
+  in both zones, Playwright 162/162; the price: a first Analisi/FIRE/Storico of a
+  session no longer opens on Cashflow's list (warm Analisi 188 → 1403, FIRE 114 → 1137), and the persisted record after
+  a tour holds six `expenses.*` keys, 4407 rows, 2,2 MB (one key, 1547 rows before) — `perf/README.md`. The spec's
+  premise (~350 rows per 13 months) was off on the real account (838): `doc/perf/README.md` § 6. Two things found on
+  the way: deleting or renaming a cost centre did not invalidate the expense rows it rewrote (fixed), and Analisi's
+  Andamento ranks its categories on a plan's future rows (declared, not changed).
 
 ## Architecture Snapshot
 - App Router; protected pages under `app/dashboard/*`.
-- `lib/services/*` (service layer) → pure `lib/utils/*` → `lib/server/*` (server-only). React Query for caching/invalidation, its cache persisted to IndexedDB and restored before the first fetch (an allowlist, `lib/constants/persistCache.ts`; doc/guide/cache-persistita.md, its stub in AGENTS.md § Caching).
+- `lib/services/*` (service layer) → pure `lib/utils/*` → `lib/server/*` (server-only). React Query for caching/invalidation, its cache persisted to IndexedDB and restored before the first fetch (an allowlist, `lib/constants/persistCache.ts`; doc/guide/cache-persistita.md, its stub in AGENTS.md § Caching). The expenses are read by WINDOW on Cashflow and FIRE (`lib/utils/expenseWindows.ts`, the ONE source; doc/guide/cashflow.md § Expenses by window), whole on Storico, Analisi and Centri.
 - Italy timezone helpers in `lib/utils/dateHelpers.ts`.
 - Convention: extract logic into pure, tested `lib/utils`/`lib/services` functions; keep Firestore-coupled code thin.
 
@@ -100,7 +105,8 @@ Only what crosses areas; an area's blind spots — the behaviours that look like
   the day's commit. The window is the spec's, not the app's: a slow machine can fail it without any regression.
 - **`e2e/cashflow.dividendi.spec.ts` › «the form refuses…» is red after `cashflow.accounts` + `cashflow.budget`** (2026-09-30:
   3/3 on a clean `develop` worktree, 2/3 on the branch of PR #418, green alone): after the refusal the dialog stays open
-  with its form reset — `reset` re-runs, cause not traced yet. Two of four full runs that day had it red.
+  with its form reset — `reset` re-runs, cause not traced yet. Two of four full runs that day had it red; green in
+  the evening's full run of the same day (162/162).
 - **Four base specs are red in the cloud container only** (2026-09-25): its Chromium groups four-digit euros («1.100 €»),
   the specs expect «1100 €» as on the Mac (doc/guide/e2e-emulatori.md). Read the received text before «fixing» code.
 - **The icon rail's 44px targets are measured at 1440 with a mouse**; no fixture covers a ≥1440px tablet in landscape.
@@ -112,7 +118,7 @@ Only what crosses areas; an area's blind spots — the behaviours that look like
 Cross-cutting entry points only: each area's files open its guide (`doc/guide/<tema>.md` § Files), every pure module has
 `__tests__/{module}.test.ts`, every page its `e2e/{page}*.spec.ts` where one exists.
 - **Shell**: `app/dashboard/layout.tsx` (`<main>` = `page-main`), `app/dashboard/template.tsx`, `components/layout/{Sidebar,BottomNavigation,SecondaryMenuDrawer,SceneLink,PageHeader,PageTabBar,PageTabs,PageContainer,ThemePicker,LogoutDialog}.tsx`, `lib/utils/viewTransition.ts` (the ONE `startViewTransition`, `data-vt` scoping) + `lib/hooks/useSceneNavigation.ts` (the page scene), `lib/utils/themeTransition.ts`, `components/ui/sidebar.tsx` (`SIDEBAR_WIDTH_ICON`), `lib/constants/navigation.ts` (the ONE source of the nav arrays); tile primitives `components/ui/{tile,tile-method-note,series-legend,narrative-text,ranked-rows,tile-grid-skeleton,page-verdict}.tsx`, `lib/hooks/useRovingFocus.ts` (a list as ONE Tab stop), `lib/utils/narrative.ts` (`Narrative`, `VerdictTone`, `PageVerdictModel`)
-- **Shared primitives / utils** (each the single source of its rule): `components/ui/{composition-list,composition-bar,segmented-pill,drill-breadcrumb,chart-hover}.tsx`, `components/ui/charts/recharts.ts` (the ONE door to recharts); `lib/utils/formatters.ts` · `metricColors.ts` (`getMetricValueColor`) · `assetPricing.ts` (`requiresManualPricing`) · `assetLiquidity.ts` · `expenseTypeTransition.ts` · `firestoreData.ts` (`removeUndefinedDeep`) · `dateHelpers.ts` (`endOfMonthBound`, `getItalyDateIso`, `isItalyDayAfter`) · `spendingProjection.ts` (the ONE month-end projection) · `recurrenceDates.ts` (the ONE source on recurrence)
+- **Shared primitives / utils** (each the single source of its rule): `components/ui/{composition-list,composition-bar,segmented-pill,drill-breadcrumb,chart-hover}.tsx`, `components/ui/charts/recharts.ts` (the ONE door to recharts); `lib/utils/expenseWindows.ts` (the ONE source of the expense windows) · `formatters.ts` · `metricColors.ts` (`getMetricValueColor`) · `assetPricing.ts` (`requiresManualPricing`) · `assetLiquidity.ts` · `expenseTypeTransition.ts` · `firestoreData.ts` (`removeUndefinedDeep`) · `dateHelpers.ts` (`endOfMonthBound`, `getItalyDateIso`, `isItalyDayAfter`) · `spendingProjection.ts` (the ONE month-end projection) · `recurrenceDates.ts` (the ONE source on recurrence)
 - **E2E**: `playwright.config.ts`, `e2e/*.ts`, `e2e/global-setup.ts`, fixtures `scripts/{seedEmulator.ts,seedPensionE2E,seedAnalisiE2E,seedCoastFireE2E,seedCostCentersE2E,seedSplitE2E,seedHallOfFameE2E,seedInstrumentProfilesE2E}.mts` (+ `scripts/instrumentProfileFixtures.ts`, the Esposizione's Yahoo profiles shared by the base seed and the E2E re-stamp); scripts `test:e2e`/`e2e:seed*`/`dev:e2e`; the production mirror `scripts/mirrorProdAccount.mts` (`mirror:seed`/`mirror:remove`)
 
 

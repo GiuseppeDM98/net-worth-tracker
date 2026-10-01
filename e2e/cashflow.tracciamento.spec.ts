@@ -20,6 +20,14 @@
  *    `app/dashboard/cashflow/page.tsx` hold it, either alone: the tab's `loading` without
  *    `otherDataLoading`, and `handleRefresh` rereading the dividends only with their tab mounted.
  *    The falsification that turns this red removes BOTH (seen: «1 before the save, 2 after»).
+ * 6. The tab reads a WINDOW of the expenses, and a new period is a new read (2026-09-30,
+ *    lib/utils/expenseWindows.ts). A row saved with a date in NEXT year is outside this month's
+ *    window: it shows when the period moves there — after that year was already opened once, so
+ *    its window was in the cache and only the write's invalidation (`expenses.all`, the prefix of
+ *    every window) can have brought the row into it. The picker's «Anni» then offers the year,
+ *    which it reads off the collection's bounds. Seen red both ways: with `range` keyed outside
+ *    the prefix the row never appears in the cached year; with the page reading this month's
+ *    window whatever the period, the year is empty.
  *
  * Runs on the base account (`desktop` project): the assertions are structural, never amounts.
  */
@@ -222,6 +230,78 @@ test('a saved expense lands in place: the counter and the table follow the write
   } finally {
     // A run that failed above still takes its row away — quietly, so the failure above stays the one reported.
     await removeDecoyRows(movimenti, AMOUNT_TEXT).catch(() => undefined);
+  }
+});
+
+/** Type a whole year into the picker's range inputs: «Applica» normalises it to the year period. */
+async function pickYearByRange(page: Page, year: number): Promise<void> {
+  await page.getByRole('combobox', { name: /Periodo selezionato/ }).filter({ visible: true }).first().click();
+  await page.locator('#period-picker-from').filter({ visible: true }).first().fill(`01/01/${year}`);
+  await page.locator('#period-picker-to').filter({ visible: true }).first().fill(`31/12/${year}`);
+  await page.getByRole('button', { name: 'Applica', exact: true }).filter({ visible: true }).first().click();
+  await expect(page.getByRole('combobox', { name: `Periodo selezionato: ${year}` }).filter({ visible: true }).first()).toBeVisible();
+}
+
+async function pickPreset(page: Page, label: string): Promise<void> {
+  await page.getByRole('combobox', { name: /Periodo selezionato/ }).filter({ visible: true }).first().click();
+  await page.getByRole('button', { name: label, exact: true }).filter({ visible: true }).first().click();
+}
+
+test('a row dated next year shows when the period moves there: the second window is read, and the write reached it', async ({ page }) => {
+  // A note and an amount no seed carries; next year, so the row is outside this month's window.
+  const DECOY = 'Fenicottero della seconda finestra';
+  const AMOUNT = '67.89';
+  const AMOUNT_TEXT = /67,89/;
+  const nextYear = new Date().getFullYear() + 1;
+
+  const movimenti = page.getByRole('region', { name: 'Movimenti' });
+  const decoyRows = movimenti.getByRole('table').getByRole('row').filter({ hasText: AMOUNT_TEXT });
+  const { db } = await admin();
+  const planted = () => db.collection('expenses').where('userId', '==', UID).where('notes', '==', DECOY).get().then((snap) => snap.size);
+
+  try {
+    // Next year FIRST: its window is read now and stays in the cache, so that later only the
+    // invalidation can bring a new row into it. What an earlier failed run left there goes first.
+    await pickYearByRange(page, nextYear);
+    await expect(movimenti).toBeVisible();
+    await removeDecoyRows(movimenti, AMOUNT_TEXT);
+    await expect.poll(planted).toBe(0);
+
+    // Back on this month, save the row dated next year through the form.
+    await pickPreset(page, 'Questo mese');
+    await expect(page.getByRole('region', { name: 'Verdetto del periodo' })).toBeVisible();
+    const total = Number((await movimenti.textContent())?.match(/(\d+) voci/)?.[1]);
+    expect(total).toBeGreaterThan(0);
+    await page.getByRole('button', { name: 'Nuova Spesa' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('radio', { name: /^Spesa variabile/ }).click();
+    await dialog.locator('#amount').fill(AMOUNT);
+    await dialog.locator('#date').fill(`${nextYear}-03-15`);
+    await dialog.locator('#categoryId').click();
+    await dialog.getByRole('button', { name: 'Alimentari', exact: true }).click();
+    await dialog.locator('#notes').fill(DECOY);
+    await dialog.getByRole('button', { name: 'Crea voce' }).click();
+    await expect(dialog).toBeHidden();
+    await expect.poll(planted).toBe(1);
+
+    // This month did not gain a row: the write is outside its window, and outside its period.
+    await expect(movimenti).toContainText(`${total} voci`);
+
+    // The year is now one the picker offers (the collection's newest row moved), and its window —
+    // cached before the write — holds the row.
+    await pickPreset(page, String(nextYear));
+    await expect(page.getByRole('combobox', { name: `Periodo selezionato: ${nextYear}` }).filter({ visible: true }).first()).toBeVisible();
+    await movimenti.getByRole('tab', { name: 'Tabella' }).click();
+    await expect(decoyRows).toHaveCount(1);
+
+    // Removed BY THE APP, in the period that shows it.
+    await removeDecoyRows(movimenti, AMOUNT_TEXT);
+    await expect.poll(planted).toBe(0);
+  } finally {
+    // A run that failed above still takes its row away, from the year that holds it.
+    await pickYearByRange(page, nextYear).catch(() => undefined);
+    await removeDecoyRows(movimenti, AMOUNT_TEXT).catch(() => undefined);
+    await pickPreset(page, 'Questo mese').catch(() => undefined);
   }
 });
 

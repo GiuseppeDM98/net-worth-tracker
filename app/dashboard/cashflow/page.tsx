@@ -43,11 +43,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { Dividend } from '@/types/dividend';
 import { FamilyMember } from '@/types/assets';
-import { useExpenses, useExpenseCategories } from '@/lib/hooks/useExpenses';
+import type { Expense } from '@/types/expenses';
+import { useExpensesInRange, useExpenseBounds, useExpenseCategories } from '@/lib/hooks/useExpenses';
 import { useAssets } from '@/lib/hooks/useAssets';
 import { useSettings } from '@/lib/hooks/useSettings';
 import { useFreshness } from '@/lib/hooks/useFreshness';
 import { queryKeys } from '@/lib/query/queryKeys';
+import { listExpenseYears, trackingWindow } from '@/lib/utils/expenseWindows';
+import { type Period, currentMonthPeriod } from '@/lib/utils/period';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { tabPanelSwitch } from '@/lib/utils/motionVariants';
 import { toast } from 'sonner';
@@ -73,6 +76,7 @@ const VALID_CASHFLOW_TABS = ['tracking', 'dividends', 'budget', 'cost-centers', 
 /** The cashflow floor when the settings carry none: last year (the same default Analisi uses). */
 const DEFAULT_HISTORY_START_YEAR = new Date().getFullYear() - 1;
 const EMPTY_FAMILY_MEMBERS: FamilyMember[] = [];
+const EMPTY_EXPENSES: Expense[] = [];
 type CashflowTabId = (typeof VALID_CASHFLOW_TABS)[number];
 
 function getInitialTab(param: string | null): CashflowTabId {
@@ -95,18 +99,26 @@ export default function CashflowPage() {
   // leaving it out would deny its tab the `aria-controls` its panel can honour.
   const [mountedTabs, setMountedTabs] = useState<Set<string>>(new Set([initialTab, 'tracking']));
   const [activeTab, setActiveTab] = useState<string>(initialTab);
-  // React Query hooks for expenses, categories, assets and the settings (2026-09-29: the settings
-  // used to be a one-off `getSettings` in an effect, outside every key).
-  const expensesQuery = useExpenses(ownerId);
+  // Tracciamento's axis lives here, beside the read that follows it: the tab is handed the rows of
+  // ITS WINDOW — the period and the twelve months behind it (lib/utils/expenseWindows.ts) — not the
+  // account's history, so a new period is a new key, and a period already visited opens from the
+  // cache. Budget and Divisione mount later and read their own windows when they do; Centri di
+  // Costo reads the whole collection, a centre being lifetime.
+  const [trackingPeriod, setTrackingPeriod] = useState<Period>(() => currentMonthPeriod());
+  const trackingExpensesWindow = useMemo(() => trackingWindow(trackingPeriod), [trackingPeriod]);
+  const expensesQuery = useExpensesInRange(ownerId, trackingExpensesWindow);
+  // What a window cannot say about the rest of the collection: the years the pickers offer.
+  const { data: expenseBounds } = useExpenseBounds(ownerId);
+  const availableYears = useMemo(() => listExpenseYears(expenseBounds), [expenseBounds]);
   const categoriesQuery = useExpenseCategories(ownerId);
   const assetsQuery = useAssets(ownerId);
   const settingsQuery = useSettings(ownerId);
-  const { data: allExpenses = [], isLoading: expensesLoading, isError: expensesError } = expensesQuery;
+  const { data: trackingExpenses = EMPTY_EXPENSES, isLoading: expensesLoading, isError: expensesError } = expensesQuery;
   const { data: categories = [], isLoading: categoriesLoading, isError: categoriesError } = categoriesQuery;
   const { data: allAssets = [], isLoading: assetsLoading, isError: assetsError } = assetsQuery;
   const { data: settings, isLoading: settingsLoading, isError: settingsError } = settingsQuery;
   // The header's «Aggiornato alle…» while figures restored from the persisted cache are being
-  // reread: the four keys every tab paints from.
+  // reread: Tracciamento's window and the three keys every tab paints from.
   const freshness = useFreshness([expensesQuery, categoriesQuery, assetsQuery, settingsQuery]);
 
   // The optional tabs are null UNTIL the settings have answered (a tab appearing late, after an
@@ -193,7 +205,11 @@ export default function CashflowPage() {
   }, [user, ownerId, mountedTabs, otherDataLoaded, loadOtherData]);
 
   const handleRefresh = async () => {
-    // Invalidate React Query caches for expenses, categories and assets
+    // Invalidate React Query caches for expenses, categories and assets. `expenses.all` is the
+    // PREFIX of every window and of the bounds, so this one call rereads Tracciamento's period,
+    // Budget's year and Divisione's period where they are mounted, and marks every other window
+    // in the cache (another period, FIRE's, the whole list of Storico, Analisi and Centri) to be
+    // reread when it is next opened.
     await queryClient.invalidateQueries({
       queryKey: queryKeys.expenses.all(ownerId || ''),
     });
@@ -387,7 +403,10 @@ export default function CashflowPage() {
             variants={tabPanelSwitch}
           >
             <ExpenseTrackingTab
-              allExpenses={allExpenses}
+              windowExpenses={trackingExpenses}
+              period={trackingPeriod}
+              onPeriodChange={setTrackingPeriod}
+              availableYears={availableYears}
               categories={categories}
               initialOwnerId={ownerParam}
               loading={loading}
@@ -442,10 +461,9 @@ export default function CashflowPage() {
               variants={tabPanelSwitch}
             >
               <BudgetTab
-                allExpenses={allExpenses}
                 categories={categories}
-                loading={loading}
-                loadFailed={loadFailed}
+                categoriesLoading={categoriesLoading}
+                categoriesFailed={categoriesError}
                 historyStartYear={cashflowHistoryStartYear}
                 userId={ownerId ?? ''}
               />
@@ -467,12 +485,7 @@ export default function CashflowPage() {
               animate={effectiveTab === 'split' ? 'visible' : 'hidden'}
               variants={tabPanelSwitch}
             >
-              <ExpenseSplitTab
-                allExpenses={allExpenses}
-                familyMembers={familyMembers}
-                loading={loading}
-                loadFailed={loadFailed}
-              />
+              <ExpenseSplitTab familyMembers={familyMembers} availableYears={availableYears} />
             </motion.div>
           </TabsContent>
         )}

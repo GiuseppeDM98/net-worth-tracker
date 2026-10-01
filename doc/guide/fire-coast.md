@@ -13,7 +13,7 @@
   projection's own numbers (the savings figure included).
 - **«Non ancora» has a «quando»** (2026-09-23, the tab's first critique): `resolveCoastPace(projectionData, annualSavings,
   realReturnRate, reached)` adds the Calcolatore's savings — `computeAnnualCashflowData(expenses, now).annualSavings`,
-  computed from the SAME expenses key (`useExpenses`, 2026-09-29), kept constant in today's euro — to the projection's OWN base series
+  computed from the SAME expenses key (the FIRE page's recent window since 2026-09-30, `fireWindows` — `useExpenses` from 2026-09-29 until then), kept constant in today's euro — to the projection's OWN base series
   and names the first year the sum clears the Coast number of THAT year, `fireNumberTarget(t) / (1+r)^(Y−t)` (the
   plotted target already steps with the fund, so the curve does too). From that year the series coasts and lands on
   the requirement at the target age by construction — that is the dotted line in the base slot on the chart, with a

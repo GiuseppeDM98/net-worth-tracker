@@ -29,10 +29,13 @@
  * The Scenari | Ventaglio switch in the Traguardo's aside is that tile's scope, not an axis.
  *
  * Data flow (unchanged from the previous IA — presentation over the same pure functions):
- * 1. settings, assets, snapshots and the whole expense list from the shared hooks (one round
- *    trip, four reads in parallel, cached across pages);
+ * 1. settings, assets, snapshots and the expenses of last year and this one from the shared hooks
+ *    (one round trip, four reads in parallel): what the verdict and the four tiles stand on;
  * 2. the cashflow figures and the FIRE history derived in memory (`computeAnnualCashflowData`,
- *    `buildFIREData`) — a lock flip recomputes them in the same render;
+ *    `buildFIREData`) — a lock flip recomputes them in the same render. The history alone needs
+ *    the spending behind every snapshot: it reads those older rows once the snapshots have said
+ *    how far back they go, and the «Dettaglio» waits for them — the grid does not
+ *    (`fireWindows`, lib/utils/expenseWindows.ts, 2026-09-30);
  * 3. the metrics, the deterministic projection and the fan inputs derived client-side via
  *    useMemo, so preview edits (SWR, RITA controls, scenario params) are instant.
  * `respectPensionLockInFire` governs the WHOLE FIRE page (Coast, What If, Monte Carlo read the
@@ -48,7 +51,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useExpenses } from '@/lib/hooks/useExpenses';
+import { useExpensesInRange } from '@/lib/hooks/useExpenses';
+import { fireWindows } from '@/lib/utils/expenseWindows';
 import { useSnapshots } from '@/lib/hooks/useSnapshots';
 import { queryKeys } from '@/lib/query/queryKeys';
 import { useAssets } from '@/lib/hooks/useAssets';
@@ -220,13 +224,26 @@ export function FireCalculatorTab() {
   const { data: assets, isLoading: isLoadingAssets, isError: assetsError } = useAssets(ownerId);
 
   // The cashflow figures — the last full year, else the running year annualised — computed in
-  // memory from the expenses key Cashflow reads, and the history's snapshots from theirs: with
-  // the assets and the settings above that is ONE round trip of four parallel reads, where the
-  // tab used to chain three (assets → snapshots + last year → the snapshot window) (2026-09-29).
-  const { data: allExpenses, isLoading: isLoadingCashflow, isError: cashflowError } = useExpenses(ownerId);
-  const { data: snapshots, isLoading: isLoadingSnapshots } = useSnapshots(ownerId);
+  // memory from the page's RECENT expenses window (January of last year → this December: the key
+  // Coast FIRE and What If read too), in parallel with the assets, the settings and the snapshots.
+  // The history behind the «Dettaglio» also needs the rows before that window, back to eleven
+  // months before the first snapshot: a second, OLDER window that can only be asked for once the
+  // snapshots are in, and that the grid does not wait for (2026-09-30; until then the tab read
+  // the account's whole expense list for it).
   const readAt = useMemo(() => new Date(), []);
-  const cashflowData = useMemo(() => (allExpenses ? computeAnnualCashflowData(allExpenses, readAt) : undefined), [allExpenses, readAt]);
+  const { data: snapshots, isLoading: isLoadingSnapshots } = useSnapshots(ownerId);
+  const expenseWindows = useMemo(() => fireWindows(readAt, snapshots?.[0] ?? null), [readAt, snapshots]);
+  const { data: recentExpenses, isLoading: isLoadingCashflow, isError: recentExpensesError } = useExpensesInRange(ownerId, expenseWindows.recent);
+  const { data: olderExpenses, isLoading: isLoadingOlderExpenses, isError: olderExpensesError } = useExpensesInRange(ownerId, expenseWindows.older);
+  const cashflowError = recentExpensesError || olderExpensesError;
+  const cashflowData = useMemo(() => (recentExpenses ? computeAnnualCashflowData(recentExpenses, readAt) : undefined), [recentExpenses, readAt]);
+  // The history's rows: the two windows joined — disjoint and contiguous by construction, so no
+  // row is there twice and none is missing. Undefined until every list it needs is in.
+  const historyExpenses = useMemo(() => {
+    if (!snapshots || !recentExpenses) return undefined;
+    if (expenseWindows.older === null) return recentExpenses;
+    return olderExpenses ? [...olderExpenses, ...recentExpenses] : undefined;
+  }, [snapshots, recentExpenses, olderExpenses, expenseWindows.older]);
   const annualSavings = cashflowData?.annualSavings ?? 0;
   const projectionAnnualExpenses = cashflowData?.annualExpensesFromCashflow ?? 0;
 
@@ -338,12 +355,13 @@ export function FireCalculatorTab() {
   // `keepPreviousData` the query needed until 2026-09-29). Nothing without a positive net worth.
   const fireData = useMemo(
     () =>
-      assets && snapshots && allExpenses && currentNetWorth > 0
-        ? buildFIREData(snapshots, allExpenses, currentNetWorth, withdrawalRate, includePrimaryResidence, readAt)
+      assets && snapshots && historyExpenses && currentNetWorth > 0
+        ? buildFIREData(snapshots, historyExpenses, currentNetWorth, withdrawalRate, includePrimaryResidence, readAt)
         : undefined,
-    [assets, snapshots, allExpenses, currentNetWorth, withdrawalRate, includePrimaryResidence, readAt],
+    [assets, snapshots, historyExpenses, currentNetWorth, withdrawalRate, includePrimaryResidence, readAt],
   );
-  const isLoadingFIRE = isLoadingSnapshots || isLoadingCashflow;
+  // The history's wait is the «Dettaglio»'s alone: nothing in the grid reads `fireData`.
+  const isLoadingHistory = currentNetWorth > 0 && (isLoadingSnapshots || isLoadingOlderExpenses);
   const chartData = useMemo(() => fireData?.chartData ?? [], [fireData]);
   const rawRunwayData = useMemo(() => fireData?.runwayData ?? [], [fireData]);
 
@@ -709,7 +727,7 @@ export function FireCalculatorTab() {
   // ─── Loading ─────────────────────────────────────────────────────────────────
   // A failed read comes BEFORE the wait: these queries default to undefined, and a plan built
   // on a base that was never read is a number with nothing behind it.
-  if (resolveSurfaceState({ loading: isLoadingSettings || isLoadingAssets || isLoadingCashflow || (currentNetWorth > 0 && isLoadingFIRE), failed: settingsError || assetsError || cashflowError }) === 'failed') {
+  if (resolveSurfaceState({ loading: isLoadingSettings || isLoadingAssets || isLoadingCashflow, failed: settingsError || assetsError || cashflowError }) === 'failed') {
     return (
       <ErrorNotice
         className="max-w-[920px]"
@@ -721,7 +739,7 @@ export function FireCalculatorTab() {
     );
   }
 
-  if (isLoadingSettings || isLoadingAssets || isLoadingCashflow || (currentNetWorth > 0 && isLoadingFIRE)) {
+  if (isLoadingSettings || isLoadingAssets || isLoadingCashflow) {
     return <TileGridSkeleton cells={SKELETON_CELLS} />;
   }
 
@@ -760,6 +778,7 @@ export function FireCalculatorTab() {
 
   const dettaglio = (
     <FireDettaglio
+      loading={isLoadingHistory}
       description={describeDettaglio({
         runwayYears: displayedRunwaySummary.currentYearsOfExpenses,
         runwayDelta: displayedRunwaySummary.totalDeltaVs12Months,

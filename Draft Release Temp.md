@@ -14,6 +14,8 @@
 
 ## 🐛 Bug Fixes
 
+- Fixed a cost centre deleted or renamed from Cashflow › Centri di Costo keeping its old chip on the movements in Tracciamento for a few minutes: the rows it rewrites are now reread at once.
+
 - Fixed Cashflow › Tracciamento going back to its loading skeleton every time a movement was saved or deleted: the page was rereading the dividends for the Dividendi tab (even when that tab had never been opened) and hiding the month meanwhile. A save now updates the counters and the list in place, and the dividends are reread only where they are shown.
 
 - Fixed a category edited in Impostazioni › Spese (name, type or role) keeping its old values in Analisi for up to five minutes: the change now arrives at once.
@@ -25,6 +27,8 @@
 - Fixed a member of a shared account seeing their OWN exposure on the owner's Allocazione page: the Esposizione now reads the owner's instruments, like every other tile.
 
 ## 🔧 Improvements
+
+- Cashflow › Tracciamento, Divisione, Budget and FIRE e Simulazioni now read only the movements they show — the period and the months behind it, the year and its six trailing months, last year and this one — instead of the whole ledger every time they open: on an account with a few years of movements Cashflow shows its first figure about half a second sooner from a cold start and FIRE about a third, and every figure is the same as before. A period never opened before is read when it is picked (the picker stays where it is, the tiles wait a moment), and one opened in the last day comes from the device. Storico, Centri di Costo and Analisi keep reading the whole ledger, because their questions span it.
 
 - Every page with charts downloads less before it can show a figure: the charting library now ships once for the whole app instead of once per page; the PDF report's engine arrives only when «Esporta PDF» is pressed (Storico's first download roughly halved); the charts behind Rendimenti's and Analisi's «Dettaglio», Analisi's «Confronto annuale» and the category card, and the four FIRE tabs other than the Calcolatore load when they are opened, each placeholder the size of its chart so nothing moves when it lands; the flow chart of Analisi is never downloaded on a phone, where it is drawn as a bar and rows; and a category icon downloads only itself instead of the whole icon library. Measured on the same machine: Storico and Analisi show their first figure about 0,2 s sooner from a cold start, and a section opened later draws its chart at once.
 

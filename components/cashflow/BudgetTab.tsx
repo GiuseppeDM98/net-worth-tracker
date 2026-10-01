@@ -35,6 +35,8 @@ import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { useBudgetConfig, BudgetSaveStatus } from '@/lib/hooks/useBudgetConfig';
 import { useBudgetHistory } from '@/lib/hooks/useBudgetHistory';
+import { useExpensesInRange } from '@/lib/hooks/useExpenses';
+import { BUDGET_HISTORY_MONTHS, budgetWindow } from '@/lib/utils/expenseWindows';
 import { evaluateBudgetAlerts, rankCategoriesAtRisk } from '@/lib/utils/budgetUtils';
 import {
   buildCategoryRows,
@@ -82,11 +84,11 @@ import { AnnualiTile } from '@/components/cashflow/budget/tiles/AnnualiTile';
 import { PerCategoriaTile } from '@/components/cashflow/budget/tiles/PerCategoriaTile';
 
 interface BudgetTabProps {
-  allExpenses: Expense[];
   categories: ExpenseCategory[];
-  loading: boolean;
-  /** The queries behind `allExpenses`/`categories` failed: say so, never render zeros. */
-  loadFailed: boolean;
+  /** The page's categories query: the tab waits for it and for its own expenses window. */
+  categoriesLoading: boolean;
+  /** The categories query failed: say so, never render zeros (the tab adds its own window's failure). */
+  categoriesFailed: boolean;
   historyStartYear: number;
   userId: string;
 }
@@ -98,9 +100,6 @@ const SAVE_STATUS_LABEL: Record<BudgetSaveStatus, string | null> = {
   invalid: 'Oltre il tetto: non salvato',
   error: 'Errore di salvataggio',
 };
-
-/** Months of the hero's bars. */
-const HISTORY_MONTHS = 6;
 
 /** How long «Salvato» stays in the aside: a confirmation, not a permanent state. */
 const SAVED_LABEL_MS = 4000;
@@ -116,7 +115,9 @@ const SKELETON_CELLS: TileSkeletonCell[] = [
 
 const SETTINGS_ID = 'budget-impostazioni';
 
-export function BudgetTab({ allExpenses, categories, loading, loadFailed, historyStartYear, userId }: BudgetTabProps) {
+const EMPTY_EXPENSES: Expense[] = [];
+
+export function BudgetTab({ categories, categoriesLoading, categoriesFailed, historyStartYear, userId }: BudgetTabProps) {
   const isDemo = useDemoMode();
   const { ownerId } = useActiveAccount();
   const budget = useBudgetConfig({ userId, categories, disabled: isDemo });
@@ -144,32 +145,40 @@ export function BudgetTab({ allExpenses, categories, loading, loadFailed, histor
 
   // Evaluated once per mount — the budget month is the current Italy month.
   const now = useMemo(() => new Date(), []);
+
+  // The tab's own read: the rows of `budgetWindow` — this year whole (the annual budgets count the
+  // months ahead too) and the trailing months of the hero's bars, never the account's history. Read
+  // here and not by the page because the window follows THIS tab's clock, and the tab mounts late.
+  const expensesWindow = useMemo(() => budgetWindow(now), [now]);
+  const { data: windowExpenses = EMPTY_EXPENSES, isLoading: expensesLoading, isError: expensesFailed } = useExpensesInRange(ownerId, expensesWindow);
+  const loading = categoriesLoading || expensesLoading;
+  const loadFailed = categoriesFailed || expensesFailed;
   const calendar = useMemo(() => resolveBudgetCalendar(now), [now]);
 
   const expenseItems = useMemo(() => budget.items.filter((i) => i.kind === 'expense'), [budget.items]);
 
   // --- Every number, from the pure layer ---
-  const ceiling = useMemo(() => summarizeCeiling(budget.overallMonthlyAmount, allExpenses, now), [budget.overallMonthlyAmount, allExpenses, now]);
-  const risk = useMemo(() => rankCategoriesAtRisk(expenseItems, allExpenses, now, categories), [expenseItems, allExpenses, now, categories]);
+  const ceiling = useMemo(() => summarizeCeiling(budget.overallMonthlyAmount, windowExpenses, now), [budget.overallMonthlyAmount, windowExpenses, now]);
+  const risk = useMemo(() => rankCategoriesAtRisk(expenseItems, windowExpenses, now, categories), [expenseItems, windowExpenses, now, categories]);
   const alerts = useMemo(
     () =>
       summarizeAlerts(
         budget.alertsEnabled
-          ? evaluateBudgetAlerts(expenseItems, budget.overallMonthlyAmount, allExpenses, budget.alertThresholds, now, categories)
+          ? evaluateBudgetAlerts(expenseItems, budget.overallMonthlyAmount, windowExpenses, budget.alertThresholds, now, categories)
           : [],
       ),
-    [budget.alertsEnabled, expenseItems, budget.overallMonthlyAmount, allExpenses, budget.alertThresholds, now, categories],
+    [budget.alertsEnabled, expenseItems, budget.overallMonthlyAmount, windowExpenses, budget.alertThresholds, now, categories],
   );
-  const annual = useMemo(() => summarizeAnnualBudgets(budget.items, allExpenses, now), [budget.items, allExpenses, now]);
-  const income = useMemo(() => summarizeIncomeTargets(budget.items, allExpenses, now), [budget.items, allExpenses, now]);
-  const rows = useMemo(() => buildCategoryRows(budget.items, categories, allExpenses, now), [budget.items, categories, allExpenses, now]);
+  const annual = useMemo(() => summarizeAnnualBudgets(budget.items, windowExpenses, now), [budget.items, windowExpenses, now]);
+  const income = useMemo(() => summarizeIncomeTargets(budget.items, windowExpenses, now), [budget.items, windowExpenses, now]);
+  const rows = useMemo(() => buildCategoryRows(budget.items, categories, windowExpenses, now), [budget.items, categories, windowExpenses, now]);
   // The ceiling each trailing month reads against: its own where the cron recorded it, today's
   // otherwise. The records are the cron's alone (no invalidation to chase).
-  const historyKeys = useMemo(() => trailingMonthKeys(now, HISTORY_MONTHS), [now]);
+  const historyKeys = useMemo(() => trailingMonthKeys(now, BUDGET_HISTORY_MONTHS), [now]);
   const { data: historyRecords = [] } = useBudgetHistory(ownerId, historyKeys);
   const history = useMemo(
-    () => buildSpendingHistory(allExpenses, now, ceiling?.ceiling ?? null, HISTORY_MONTHS, historyRecords),
-    [allExpenses, now, ceiling, historyRecords],
+    () => buildSpendingHistory(windowExpenses, now, ceiling?.ceiling ?? null, BUDGET_HISTORY_MONTHS, historyRecords),
+    [windowExpenses, now, ceiling, historyRecords],
   );
 
   const hasItems = budget.items.length > 0 || ceiling !== null;
@@ -348,7 +357,8 @@ export function BudgetTab({ allExpenses, categories, loading, loadFailed, histor
           open={dialogOpen}
           onClose={closeDialog}
           categories={categories}
-          allExpenses={allExpenses}
+          ownerId={ownerId ?? null}
+          now={now}
           historyStartYear={historyStartYear}
           existingItems={budget.items}
           overallMonthlyAmount={budget.overallMonthlyAmount}

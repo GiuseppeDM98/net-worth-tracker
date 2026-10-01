@@ -196,17 +196,30 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   page called the number «non calcolabile» beside a projection it kept drawing (caught by Playwright on the base
   fixture). `buildFIREData` still feeds the runway and the cashflow history.
 - **The page reads FOUR keys in parallel and computes the rest in memory** (2026-09-29): `useAssets`,
-  `useSettings`, `useSnapshots` and `useExpenses` — the keys every page shares, so after Cashflow or Storico the tab
-  opens on the cache — and the pure twins in `fireService.ts` do what the readers did: `selectExpensesBetween` is
-  `getExpensesByDateRange` on the list (both ends included, the same instants), `computeLastYearExpenses` is
-  `getAnnualExpenses` (which stays, for the PDF, implemented on the twin), `computeAnnualCashflowData` is the retired
-  `getAnnualCashflowData`, `buildFIREData(snapshots, expenses, …, now)` the retired `getFIREData` (the window from eleven
-  months before the first snapshot to the end of the last). Until then the Calcolatore chained three round trips —
-  assets → snapshots + last year → the snapshot window — and the What If and Coast tabs read the same ranges on keys of
-  their own. The history is a `useMemo`, not a query: a lock flip moves `currentNetWorth` and it recomputes in the same
-  render (the `keepPreviousData` the query needed is gone with it). A failed read is the expenses key's `isError`: the
-  three tabs' notice. `__tests__/fireCashflowInMemory.test.ts` pins the twins. Cost: FIRE cold reads the whole expense
-  list instead of two ranges (PERF-06 narrows it), once per session.
+  `useSettings`, `useSnapshots` and the expenses — and the pure twins in `fireService.ts` do what the readers did:
+  `selectExpensesBetween` is `getExpensesByDateRange` on the list (both ends included, the same instants),
+  `computeLastYearExpenses` is `getAnnualExpenses` (which stays, for the PDF, implemented on the twin),
+  `computeAnnualCashflowData` is the retired `getAnnualCashflowData`, `buildFIREData(snapshots, expenses, …, now)` the
+  retired `getFIREData` (the window from eleven months before the first snapshot to the end of the last). Until then
+  the Calcolatore chained three round trips — assets → snapshots + last year → the snapshot window — and the What If
+  and Coast tabs read the same ranges on keys of their own. The history is a `useMemo`, not a query: a lock flip
+  moves `currentNetWorth` and it recomputes in the same render (the `keepPreviousData` the query needed is gone with
+  it). A failed read is the expenses key's `isError`: the three tabs' notice. `__tests__/fireCashflowInMemory.test.ts`
+  pins the twins.
+- **The expenses are TWO WINDOWS, not the collection** (2026-09-30, `fireWindows` in `lib/utils/expenseWindows.ts`;
+  the rule in doc/guide/cashflow.md § Expenses by window). `recent` — January of last year to December of this one —
+  is what `computeAnnualCashflowData` and `computeLastYearExpenses` read, on all three tabs (`useExpensesInRange`
+  with the same key, so Coast and What If read nothing after the Calcolatore); it closes on December and not on this
+  month because the history reads up to the month of the LAST snapshot, which the server stamps, and a device whose
+  clock is behind would otherwise lose it. `older` — from eleven months before the first snapshot
+  (`FIRE_HISTORY_LOOKBACK_MONTHS`, the constant `buildFIREData` reads too) to one millisecond before `recent` —
+  exists only when the history reaches further back, is asked for once the snapshots say where it starts, and feeds
+  the «Dettaglio» alone: `historyExpenses` is the two lists joined (disjoint and contiguous, no row twice), the grid
+  no longer waits for the snapshots, and `FireDettaglio` takes `loading` and shows its own skeleton until the history
+  is in — a wait is not the «no history» readings. A failed read of either window is the tab's notice. Until then the
+  page read the whole collection (1547 rows on the owner's account against 1299 + 48). Pinned by
+  `__tests__/expenseWindows.test.ts` (the number and the history on the windows against the whole list, a last
+  snapshot ahead of the device's clock included).
 - **The lock switch saves on change** (optimistic `setRespectPensionLockIn`, reverted on error, disabled while
   pending and in demo with the reason in visible copy) and is NOT part of `hasUnsavedChanges`; the form keeps the SWR,
   the residence, the INPS age and the RITA hypothesis behind an explicit save. The config-first collapse (`useRef`

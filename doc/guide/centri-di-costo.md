@@ -111,6 +111,13 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   `(pointer: fine)`, `legend={false}` for the detail's one-series stack). It replaced the Recharts line chart of
   «Confronta l'andamento»; `costCenterStyles.ts` keeps only `CHART_TICK_STYLE`, which Storico, FIRE and Coast
   import — do not delete the file with the views' last Recharts chart.
+- **The tab reads the WHOLE expense collection, declared** (2026-09-30): a centre is lifetime, so there is no window
+  to read — while Tracciamento, Divisione and Budget, the other Cashflow tabs, read one
+  (doc/guide/cashflow.md § Expenses by window). It shares the `useExpenses` list with Storico and Analisi; opened after
+  Tracciamento alone it reads the collection itself. **A delete and a rename are writes of EXPENSES** — the delete
+  unlinks the centre's rows, the rename rewrites their denormalised `costCenterName` — and until that day they
+  invalidated `costCenters.all` only, so Tracciamento kept the chip of a centre that was gone: `CostCentersTab` now
+  invalidates `expenses.all` with it (`invalidateWithRows`), as the detail's link changes always did.
 - **The rows per center come from the ONE expenses key, grouped in memory** (2026-09-29):
   `groupExpensesByCostCenter(allExpenses, centers)` in `costCenterUtils.ts` gives every center TWO numbers,
   `spending` (the rows with `amount < 0`, date ascending like the per-center query it replaced) and `linkedCount`

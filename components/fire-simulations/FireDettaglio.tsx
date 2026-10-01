@@ -8,8 +8,11 @@
  * table of the projection was dropped on the owner's request, 2026-08-25: the Scenari chart and
  * the Scenari tile already say what it listed.)
  *
- * Nothing is fetched here: the two charts read the `fireData` the tab already holds, so opening
- * it costs no round trip and no figure can disagree with the grid. The two Recharts charts keep
+ * Nothing is fetched here: the two charts read the `fireData` the tab holds, so opening it costs
+ * no round trip and no figure can disagree with the grid. That history is the ONE thing on the tab
+ * that needs the spending behind every snapshot, so it lands after the grid (`loading`, since
+ * 2026-09-30): until then the content is a skeleton, never the «no history» readings — a wait is
+ * not an absence. The two Recharts charts keep
  * their tooltips and their chart slots; a legend is `SeriesLegend` under the plot and a target
  * line is neutral ink, dashed (AGENTS.md → Recharts, since 2026-09-22 here too).
  */
@@ -30,10 +33,14 @@ import { Tile, TILE_CELL_CLASS, TILE_EYEBROW_CLASS, TILE_SUB_EYEBROW_CLASS } fro
 import { SeriesLegend } from '@/components/ui/series-legend';
 import { CHART_TICK_STYLE } from '@/components/cashflow/costCenterStyles';
 import { SettledYearsValue } from '@/components/fire-simulations/SettledValue';
+import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
+import type { TileSkeletonCell } from '@/lib/utils/tileGridSkeleton';
 
 interface FireDettaglioProps {
   /** `describeDettaglio(...)`. */
   description: string;
+  /** The history (snapshots, the older expenses) is still being read: the content waits. */
+  loading: boolean;
   runwayData: HistoricalFIRERunwayPoint[];
   runwaySummary: HistoricalFIRERunwaySummary;
   /** `describeRunway(...)`. */
@@ -46,6 +53,13 @@ interface FireDettaglioProps {
 const TOOLTIP_CONTENT_STYLE = { backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--card-foreground)', fontSize: 12 } as const;
 const TOOLTIP_LABEL_STYLE = { color: 'var(--card-foreground)', fontWeight: 600 } as const;
 const TOOLTIP_ITEM_STYLE = { color: 'var(--card-foreground)' } as const;
+
+/** The content's own grid — runway (6), cashflow history (6), explainer (12) — for its wait. */
+const SKELETON_CELLS: TileSkeletonCell[] = [
+  { span: 6, lines: 6 },
+  { span: 6, lines: 6 },
+  { span: 12, lines: 4 },
+];
 
 const oneDecimal = (value: number) => value.toLocaleString('it-IT', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
@@ -96,22 +110,38 @@ function RunwayTooltip({ active, payload, label }: { active?: boolean; payload?:
   );
 }
 
-export function FireDettaglio({ description, runwayData, runwaySummary, runwayReading, chartData, simulationCount }: FireDettaglioProps) {
+export function FireDettaglio({ description, loading, runwayData, runwaySummary, runwayReading, chartData, simulationCount }: FireDettaglioProps) {
   const [open, setOpen] = useState(false);
   const chartColors = useChartColors();
   // The chart is drawn only when the latest point measures something: with points but no expenses
   // in the trailing twelve months, the reading says so and a plot of nulls would say nothing.
   const hasRunway = runwayData.length > 0 && runwaySummary.currentYearsOfExpenses !== null;
 
+  // The same trigger in both returns below: it keeps its place, and its focus, when the history lands.
+  const trigger = (
+    <CollapsibleTrigger className="flex min-h-11 w-full items-center justify-between gap-3 border-t border-border/40 py-3 text-left">
+      <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <span className={TILE_EYEBROW_CLASS}>Dettaglio</span>
+        <span className="text-[13px] text-muted-foreground">{description}</span>
+      </span>
+      <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform', open && 'rotate-180')} aria-hidden="true" />
+    </CollapsibleTrigger>
+  );
+
+  if (loading) {
+    return (
+      <Collapsible open={open} onOpenChange={setOpen}>
+        {trigger}
+        <CollapsibleContent className="pt-1">
+          <TileGridSkeleton verdict={false} cells={SKELETON_CELLS} />
+        </CollapsibleContent>
+      </Collapsible>
+    );
+  }
+
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger className="flex min-h-11 w-full items-center justify-between gap-3 border-t border-border/40 py-3 text-left">
-        <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <span className={TILE_EYEBROW_CLASS}>Dettaglio</span>
-          <span className="text-[13px] text-muted-foreground">{description}</span>
-        </span>
-        <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform', open && 'rotate-180')} aria-hidden="true" />
-      </CollapsibleTrigger>
+      {trigger}
 
       <CollapsibleContent className="pt-1">
         <div className="grid grid-cols-1 gap-3 tablet:grid-cols-2 desktop:grid-cols-12">
