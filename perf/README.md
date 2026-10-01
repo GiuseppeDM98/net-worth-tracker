@@ -233,7 +233,8 @@ rivisita). Raggiunto su otto route e **mancato su Storico (385)**, dove quasi tu
 `auth`; Rendimenti e Impostazioni non erano nell'obiettivo. E la tabella SOTTOSTIMA il ripristino di una sessione vera:
 ogni run apre un contesto nuovo per route (`measureCold`), quindi il record che ripristina contiene solo le chiavi di
 quella route più l'overview del login, mentre il persister scrive UN record con tutte le chiavi lette nelle ultime 24
-ore — chi ha aperto Storico paga poi il suo JSON a ogni caricamento di QUALSIASI route, Panoramica compresa. PERF-06
-accorcia il record delle pagine che leggeranno una finestra (Cashflow, Analisi, FIRE), non quello di Storico, che vuole
-tutte le spese per scelta: finché `expenses.all` è nel record, quel costo resta. Per misurarlo serve una rivisita presa
-dopo aver aperto tutte le route nello stesso contesto, che lo script oggi non fa.
+ore — chi ha aperto Storico paga poi il suo JSON a ogni caricamento di QUALSIASI route, Panoramica compresa. Le
+finestre delle spese (dal 2026-09-30, `lib/utils/expenseWindows.ts`) alleggeriscono il record di chi apre solo Cashflow o
+FIRE, non quello di chi apre anche Storico, Analisi o Centri, che leggono tutte le spese per scelta: finché
+`expenses.all` è nel record, quel costo resta — e un giro di pagine vi aggiunge una finestra per pagina (sopra, 2026-09-30).
+Per misurarlo serve una rivisita presa dopo aver aperto tutte le route nello stesso contesto, che lo script oggi non fa.

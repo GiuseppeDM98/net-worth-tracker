@@ -14,21 +14,14 @@ Next.js app for Italian investors: net worth, assets, cashflow, dividends, perfo
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic.
 - `tsc` clean; **209 files / 4803 tests** green in `Europe/Rome` and in the machine's zone + **45 Playwright spec files** (162 tests, incl. 6 auth setups; last full run 2026-09-30 evening on the Windows laptop, 162/162 in 8,3 min — `modal.origin` and `cashflow.dividendi`, the two intermittents of Known Issues, green that run; doc/guide/e2e-emulatori.md). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, which structurally hides timezone bugs.
-- Latest (2026-09-30, evening): **PERF-06 — the expenses by window** (`lib/utils/expenseWindows.ts`, the ONE source;
-  `useExpensesInRange` + `useExpenseBounds`; AGENTS.md § React Query). Tracciamento and Divisione read their period and
-  the twelve months before it, Budget its year and six trailing months, FIRE last year and this one (its «Dettaglio»
-  the older rows behind, after the snapshots); Storico, Centri and — the owner's decision, measured — Analisi stay on the
-  whole collection. Bounds are calendar days in BOTH calendars (local and Italian), never UTC. No number changed: 33
-  surfaces dumped at three frozen instants, 0 lost; 36 unit cases of bounds and invariance (every reader on the window
-  and on the whole list), ten falsifications seen red, green in six timezones; the E2E of the second window seen red
-  both ways. Cold on the mirror (medians of 5, first figure): Cashflow 1898 → 1072 ms, FIRE 1737 → 1291, Analisi
-  1398 → 1480 (unchanged code, noise); revisit 192 → 164 · 213 → 161; **Verified**: `tsc`, lint 0, Vitest 209 / 4803
-  in both zones, Playwright 162/162; the price: a first Analisi/FIRE/Storico of a
-  session no longer opens on Cashflow's list (warm Analisi 188 → 1403, FIRE 114 → 1137), and the persisted record after
-  a tour holds six `expenses.*` keys, 4407 rows, 2,2 MB (one key, 1547 rows before) — `perf/README.md`. The spec's
-  premise (~350 rows per 13 months) was off on the real account (838): `doc/perf/README.md` § 6. Two things found on
-  the way: deleting or renaming a cost centre did not invalidate the expense rows it rewrote (fixed), and Analisi's
-  Andamento ranks its categories on a plan's future rows (declared, not changed).
+- Latest (2026-10-01): **`doc/perf/PERF-06` retired** — the expenses by window (PR #421, in develop since 2026-10-01)
+  read against its spec: 21 divergences — 19 where the code was right and the lesson already home (`lib/utils/expenseWindows.ts`,
+  AGENTS.md § React Query, the Cashflow, Budget, Divisione, Analisi, Centri, FIRE, persisted-cache and E2E guides, the
+  comments at the lines), 0 defects, 2 deferred and already written (the § 2 targets missed on a wrong premise →
+  `perf/README.md`; Analisi's Andamento on future rows → doc/guide/cashflow-analisi.md); one lesson moved here (a window
+  has no rollback flag, its rollback is the revert → doc/guide/cashflow.md § Expenses by window); the measures stay in
+  `doc/perf/README.md` § 6 and `perf/README.md`. **Verified**: `tsc`, lint 0, Vitest in `Europe/Rome`; no Playwright
+  (comments and documents only).
 
 ## Architecture Snapshot
 - App Router; protected pages under `app/dashboard/*`.
