@@ -312,7 +312,7 @@ describe('setSettings — scrittura, ramo senza targets (merge: true)', () => {
   );
 });
 
-describe('setSettings — il riepilogo della Panoramica (PERF-07)', () => {
+describe('setSettings — il riepilogo della Panoramica', () => {
   // Il riepilogo resta fresco per tutto il giorno: ogni campo che il payload legge deve invalidarlo,
   // anche quando arriva da solo (prima reggeva per caso: Impostazioni manda sempre il bollo).
   beforeEach(() => vi.mocked(invalidateDashboardOverviewSummary).mockClear());

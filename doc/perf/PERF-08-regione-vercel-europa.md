@@ -22,7 +22,7 @@ proprietario (Italia) → `iad1` aggiunge un altro ~100 ms per ondata rispetto a
 
 - `x-vercel-id` nelle risposte delle route inizia con una regione europea (`fra1::…`, `cdg1::…` o `dub1::…`), letto dalle
   DevTools o con `curl -sI https://<app>/api/benchmarks/fx-rates`.
-- `Server-Timing: total` (PERF-07) di `/api/dashboard/overview` in ricalcolo: prima/dopo, atteso −50% o più; di
+- `Server-Timing: total` (l'header che la route emette dal 2026-10-03: `auth, db, compute, total, source`) di `/api/dashboard/overview` in ricalcolo: prima/dopo, atteso −50% o più; di
   `/api/benchmarks/fx-rates` (una lettura): da ~120 ms a ~30 ms.
 - I due cron continuano a girare (Vercel → Logs il giorno dopo) e le email arrivano.
 
@@ -43,7 +43,7 @@ tutte, e un solo posto è la regola del repo (una sorgente).
 `<regione letta dalla console>`; le funzioni Vercel sono in `fra1` per starle vicine»), e CLAUDE.md § Data & Integrations. Il
 valore preciso lo legge il proprietario dalla console (Firestore → Database → Posizione) e lo detta in sessione.
 
-**La prova del prima/dopo** si fa in produzione, con il header di PERF-07 e `x-vercel-id`, perché in locale non esiste
+**La prova del prima/dopo** si fa in produzione, con il `Server-Timing` di `/api/dashboard/overview` (doc/guide/panoramica.md § The materialized summary) e `x-vercel-id`, perché in locale non esiste
 latenza. L'app usa l'SDK modulare: NON esiste un `firebase` globale nella pagina. La lettura si fa dalle DevTools senza
 codice: Network → una richiesta `/api/*` già fatta dall'app → tasto destro → «Copy as fetch» → incollare nella console →
 leggere `.headers.get('server-timing')` e `.headers.get('x-vercel-id')` dalla `Response` (il token è già nell'header
@@ -80,6 +80,11 @@ regola «un commit per sessione», e va chiesta prima).
 - F (proprietario, produzione): 1) `x-vercel-id` europeo; 2) `Server-Timing` di `overview` in ricalcolo dimezzato; 3)
   Rendimenti apre visibilmente prima (è la pagina con 17 chiamate); 4) il cron serale ha scritto lo snapshot (Storico il
   giorno dopo). Non coperto: niente in locale.
+- Prima delle letture «prima», il giro di produzione che il ricalcolo a un giro della Panoramica (2026-10-03) non ha
+  ancora avuto: per deroga del proprietario (2026-10-03, WORKFLOW.md § 3) develop va su main PRIMA di questa spec,
+  così il header è in produzione con le funzioni ancora nella vecchia regione — in SOLA LETTURA, DevTools → Network → `overview` → Timing →
+  Server Timing: 1) alla prima apertura `source=recompute`, annotare `total` e `db`; 2) ricaricando dopo 10 minuti
+  senza modifiche `source=materialized`; 3) alla prima apertura del mattino dopo di nuovo `recompute` (il giorno è cambiato).
 - G: nessun fixture da rimuovere (la prova è in produzione, in sola lettura).
 
 ## 9. Rischi e rollback
@@ -96,14 +101,16 @@ regola «un commit per sessione», e va chiesta prima).
 
 ```text
 Ciao, in questa sessione implementiamo doc/perf/PERF-08-regione-vercel-europa.md: le funzioni Vercel vanno nella regione
-europea vicina a Firestore (vercel.json → regions), con la prova prima/dopo letta dal Server-Timing di PERF-07 e da
+europea vicina a Firestore (vercel.json → regions), con la prova prima/dopo letta dal Server-Timing di /api/dashboard/overview e da
 x-vercel-id in produzione, e la regione di Firestore registrata in SETUP.md e CLAUDE.md.
 
 Da fare TASSATIVAMENTE prima di ogni cosa:
 - Leggi WORKFLOW.md, AGENTS.md (§ Server Layer and API Authorization, § 5 Commands), CLAUDE.md (§ Known Issues: firebase-admin e l'Edge)
 - Leggi SETUP.md (Step 1 e la sezione Vercel), doc/guide/panoramica.md
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE se scrivi codice (il test di vercel.json)
-- Leggi doc/perf/README.md e la spec PERF-08 per intero; PERF-07 deve essere in produzione (il header esiste)
+- Leggi doc/perf/README.md e la spec PERF-08 per intero; il header Server-Timing della
+  Panoramica (in develop dal 2026-10-03) deve essere IN PRODUZIONE (deroga del 2026-10-03, WORKFLOW.md § 3: develop va su main
+  prima di questa spec e di nuovo dopo): se main non l'ha ancora ricevuto, fermati e dimmelo
 - Crea SESSION_NOTES.md; crea il branch dalla branch attiva PRIMA di editare
 
 Regole: nessun commit senza il mio OK; un branch e un commit; rispondi in italiano; chiedimi con lo strumento interattivo

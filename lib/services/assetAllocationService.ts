@@ -10,7 +10,7 @@ import { DEFAULT_SUB_CATEGORIES } from '@/lib/constants/defaultSubCategories';
 const ALLOCATION_TARGETS_COLLECTION = 'assetAllocationTargets';
 
 // WARNING: every settings field the overview payload reads (dashboardOverviewService.ts →
-// buildLiveOverviewPayload) belongs here — since PERF-07 a summary stays fresh for the day, so a
+// buildLiveOverviewPayload) belongs here — a summary stays fresh for the whole Italian day, so a
 // field missing from this list leaves the Panoramica on the old value for hours.
 // `pensionReturnStartMonth` is cleared by sending the key with no value, so it counts by presence.
 function settingsAffectDashboardOverview(settings: AssetAllocationSettings): boolean {

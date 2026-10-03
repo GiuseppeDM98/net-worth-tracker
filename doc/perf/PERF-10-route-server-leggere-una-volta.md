@@ -35,7 +35,7 @@ com'è, dichiarato in § 3.
 
 ## 2. Obiettivo misurabile
 
-- A: **solo la misura di chiusura che la nuova Esposizione non poteva avere** (PERF-07 non esisteva): `Server-Timing` sulla route
+- A: **solo la misura di chiusura che la nuova Esposizione non poteva avere** (l'helper `lib/server/serverTiming.ts` non esisteva ancora): `Server-Timing` sulla route
   `/api/portfolio/instrument-profiles` (`db`, `yahoo`, i due conteggi `hits` e `fetched`, e `source=cache` quando tutti i profili vengono dalla
   cache, `source=yahoo` quando almeno uno è stato chiesto a Yahoo), e il benchmark di Allocazione che conferma
   zero chiamate a Yahoo alla seconda apertura (`total` < 100 ms in locale). Il test «seconda chiamata → mock Yahoo a 0
@@ -58,7 +58,8 @@ com'è, dichiarato in § 3.
 
 **A. `Server-Timing` sulla route dei profili.** Il servizio dei profili (`resolveInstrumentProfiles`,
 `lib/server/exposure/instrumentProfileService.ts`) restituisce accanto ai profili quanti ne ha presi dalla cache e quanti
-da Yahoo; la route li scrive nel header con il helper di PERF-07. § A non tocca la chiave né il TTL: sono del servizio.
+da Yahoo; la route li scrive nel header con `startTiming` di `lib/server/serverTiming.ts` (un `mark(nome)` a fine stadio,
+`toHeader({ source })`; l'esempio in uso è `app/api/dashboard/overview/route.ts`). § A non tocca la chiave né il TTL: sono del servizio.
 
 **B. Un giro.** `Promise.all([getAllDividends, getUserAssetsAdmin, getUserSnapshotsAdmin, getAssetTransactionsAdmin])`; poi
 `summarizeDividendStats(all, { startDate, endDate, assetId, now })` e `summarizeDividendStats(all, { now })` come funzioni PURE
@@ -73,7 +74,7 @@ untestable»); la lettura resta nella route. `upcoming` dallo stesso array se `g
 diventa `useInfiniteQuery` e la lista mostra «Mostra altre» quando c'è una pagina dopo (senza UI il `limit` nasconderebbe
 in silenzio la 51ª: non accettabile).
 
-**`Server-Timing`** (PERF-07) su tutte e tre le route: è la misura di chiusura.
+**`Server-Timing`** (`lib/server/serverTiming.ts`) su tutte e tre le route: è la misura di chiusura.
 
 ## 5. File da toccare
 
@@ -139,7 +140,7 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
   § Dynamic Imports: le funzioni con new Date() dentro), CLAUDE.md
 - Leggi doc/guide/allocazione.md, cashflow-dividendi.md, assistente.md, e2e-emulatori.md
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice
-- Leggi doc/perf/README.md e la spec PERF-10 per intero; PERF-07 deve essere chiusa (il helper Server-Timing esiste)
+- Leggi doc/perf/README.md e la spec PERF-10 per intero; PERF-07 è chiusa dal 2026-10-03 (l'helper Server-Timing è lib/server/serverTiming.ts)
 - Crea SESSION_NOTES.md; crea il branch dalla branch attiva PRIMA di editare
 
 Regole: nessun commit senza il mio OK; un branch e un commit; rispondi in italiano.

@@ -346,6 +346,8 @@ function tradesAfterSnapshot(transactions: AssetTransaction[], snapshot: Monthly
 }
 
 function buildLiveOverviewPayload(
+  // The request time, the one the readers chose their months by: the builder never reads its own clock.
+  now: Date,
   assets: Asset[],
   snapshots: MonthlySnapshot[],
   settings: AssetAllocationSettings | null,
@@ -354,7 +356,7 @@ function buildLiveOverviewPayload(
   pensionContributions: PensionContribution[],
   transactions: AssetTransaction[] = []
 ): Omit<DashboardOverviewPayload, 'freshness'> {
-  const { month: currentMonth, year: currentYear } = getItalyMonthYear();
+  const { month: currentMonth, year: currentYear } = getItalyMonthYear(now);
   const currentMonthSnapshot = snapshots.find(
     (snapshot) => snapshot.year === currentYear && snapshot.month === currentMonth
   ) ?? null;
@@ -713,7 +715,7 @@ async function recomputeDashboardOverview(
   }
 
   const payloadWithoutFreshness = {
-    ...buildLiveOverviewPayload(assets, snapshots, settings, expenseStats, goalData, pensionContributions, transactions),
+    ...buildLiveOverviewPayload(now, assets, snapshots, settings, expenseStats, goalData, pensionContributions, transactions),
     monthSales,
   };
   timing?.mark('compute');

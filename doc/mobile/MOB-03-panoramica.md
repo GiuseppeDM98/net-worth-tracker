@@ -126,8 +126,9 @@ Sotto `tablet:` la curva scende a `min-h-[120px]`: si accorcia la curva, mai la 
   descrizione (la data) finché dura — non fra la prima frase e la striscia (decisione del proprietario); età = la più
   vecchia fra `dataUpdatedAt` e `overview.freshness.updatedAt`, soglia il minuto dell'overview
   (`DASHBOARD_OVERVIEW_STALE_TIME_MS`). Le celle non hanno count-up: non saltano all'arrivo del fresco.
-- **PERF-07**: il ricalcolo non ha interfaccia propria, è il «sto rileggendo…» della stessa riga `status`; il payload
-  non cambia forma. Senza PERF-07 dura solo di più.
+- **PERF-07** (in develop dal 2026-10-03): il ricalcolo non ha interfaccia propria, è il «sto rileggendo…» della stessa
+  riga `status`; il payload non ha cambiato forma. Il riepilogo è fresco per il giorno italiano, quindi dopo la prima
+  apertura del giorno la rilettura è una lettura sola (doc/guide/panoramica.md § The materialized summary).
 - **PERF-14**: `layout="position"` (`page.tsx:335`) è suo, non si rimette. **PERF-04**: qui niente recharts.
 - **MOB-06**: `PatrimonioTile.liftedFigures`, la curva a 120 px sotto `tablet:` e i `binding` di `describeSales` sono di
   MOB-03 (MOB-06 § 3 lo dice); se MOB-06 arriva prima li scrive con questi nomi, e chi arriva secondo rilegge il diff del
@@ -224,7 +225,7 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice
 - Leggi doc/mobile/README.md, doc/mobile/MOB-02-primitive-della-composizione.md (§ 4, il contratto) e MOB-03 per
   intero; DESIGN.md § 5 (Page Verdict, Tile, Market Digest Line), § 6 e The Scheduled-Is-Not-Spent Rule (MAI
-  rigenerarlo); doc/perf/PERF-07 (deve essere chiusa; PERF-03 lo è dal 2026-09-30: doc/guide/stati.md § The fourth reading); se MOB-06 è chiusa, il suo diff su PatrimonioTile
+  rigenerarlo); PERF-07 e PERF-03 sono chiuse (2026-10-03: doc/guide/panoramica.md § The materialized summary; 2026-09-30: doc/guide/stati.md § The fourth reading); se MOB-06 è chiusa, il suo diff su PatrimonioTile
 - Crea SESSION_NOTES.md; crea il branch dalla branch attiva PRIMA di editare
 
 Regole: nessun commit senza il mio OK; un branch e un commit; rispondi in italiano; le cinque domande di § 4.6 con lo

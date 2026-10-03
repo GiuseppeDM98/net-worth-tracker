@@ -439,7 +439,7 @@ describe('recordPensionContribution (validation)', () => {
 
 // ─── deletePensionContribution ───────────────────────────────────────────────
 
-describe('the overview summary (PERF-07)', () => {
+describe('the overview summary', () => {
   // The Panoramica splits a fund's growth into contributions and return from these records: the
   // summary is invalidated once the RECORD is written or gone, not only when the balances moved —
   // a summary rebuilt in between would hold the old split for the rest of the day.

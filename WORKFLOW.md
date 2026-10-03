@@ -241,7 +241,9 @@ The app **is** locally runnable; there is no fallback to declare.
 - **Branches**: `develop` is the integration branch, `main` the default; a session branches off
   whatever is active (usually `develop`) and merges into it by PR. **The `doc/perf/` and `doc/mobile/`
   specs land on `develop`, one session at a time, and reach `main` together** (owner, 2026-09-28): no
-  PR from `develop` to `main` until every PERF and every MOB spec is done.
+  PR from `develop` to `main` until every PERF and every MOB spec is done. **One exception** (owner, 2026-10-03):
+  `develop` goes to `main` BEFORE PERF-08 and again after it — its before/after is read in production, and the
+  «before» needs the Panoramica's `Server-Timing` header deployed while the functions are still in the old region.
 - **The outcome of a verification**: `SESSION_NOTES.md` during the session (untracked — delete it
   before the commit); it is folded into `CLAUDE.md` (the "Latest" entry) and `Draft Release Temp.md`
   before the PR. **Before the closing prompt it ends with one block** (owner, 2026-09-27): *Cosa* (what

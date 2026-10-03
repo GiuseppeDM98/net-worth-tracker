@@ -227,7 +227,7 @@ describe('deleteExpenseForDividend', () => {
 });
 
 describe('the overview summary', () => {
-  // The ROW is the Panoramica's input (the month's income), credited or not (2026-10-03, PERF-07):
+  // The ROW is the Panoramica's input (the month's income), credited or not (2026-10-03):
   // invalidating only on a credit left an arrear out of a summary now fresh for the whole day.
   beforeEach(() => vi.mocked(invalidateDashboardOverviewSummaryServer).mockClear());
 
