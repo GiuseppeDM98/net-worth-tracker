@@ -65,6 +65,7 @@ import {
   updateExpenseFromDividend,
 } from '@/lib/services/dividendIncomeService';
 import { updateDividend } from '@/lib/services/dividendService';
+import { invalidateDashboardOverviewSummaryServer } from '@/lib/services/dashboardOverviewInvalidation.server';
 import type { Dividend } from '@/types/dividend';
 
 /** 20:00 in Italy on 2026-09-20: the cron's hour. */
@@ -222,6 +223,38 @@ describe('deleteExpenseForDividend', () => {
     expect(payload).toHaveProperty('expenseId');
     expect(payload.expenseId).toBeInstanceOf(FieldValue);
     expect((payload.expenseId as FieldValue).isEqual(FieldValue.delete())).toBe(true);
+  });
+});
+
+describe('the overview summary', () => {
+  // The ROW is the Panoramica's input (the month's income), credited or not (2026-10-03, PERF-07):
+  // invalidating only on a credit left an arrear out of a summary now fresh for the whole day.
+  beforeEach(() => vi.mocked(invalidateDashboardOverviewSummaryServer).mockClear());
+
+  it('is invalidated when an uncredited row is written, edited and deleted', async () => {
+    seed({ assetAccount: 'directa' });
+
+    const expenseId = await createExpenseFromDividend(
+      dividend({ paymentDate: LAST_SPRING }), 'cat-1', 'Dividendi', undefined, undefined, NOW,
+    );
+    await updateExpenseFromDividend(dividend({ paymentDate: LAST_SPRING, netAmount: 20 }), expenseId, 'Dividendi');
+    await deleteExpenseForDividend('div-1', expenseId);
+
+    expect(vi.mocked(invalidateDashboardOverviewSummaryServer).mock.calls).toEqual([
+      ['u1', 'dividend_income_created'],
+      ['u1', 'dividend_income_updated'],
+      ['u1', 'dividend_income_deleted'],
+    ]);
+  });
+
+  it('is not invalidated by the idempotent second call, which writes nothing', async () => {
+    seed({ assetAccount: 'directa' });
+    await createExpenseFromDividend(dividend(), 'cat-1', 'Dividendi', undefined, undefined, NOW);
+    vi.mocked(invalidateDashboardOverviewSummaryServer).mockClear();
+
+    await createExpenseFromDividend(dividend(), 'cat-1', 'Dividendi', undefined, undefined, NOW);
+
+    expect(invalidateDashboardOverviewSummaryServer).not.toHaveBeenCalled();
   });
 });
 

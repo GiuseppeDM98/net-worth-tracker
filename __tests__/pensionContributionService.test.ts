@@ -58,6 +58,11 @@ vi.mock('@/lib/services/expenseCategoryService', () => ({
   getCategoryById: (...args: unknown[]) => getCategoryByIdMock(...args),
 }));
 
+const invalidateOverviewMock = vi.fn();
+vi.mock('@/lib/services/dashboardOverviewInvalidation', () => ({
+  invalidateDashboardOverviewSummary: (...args: unknown[]) => invalidateOverviewMock(...args),
+}));
+
 import {
   getPensionContributions,
   recordPensionContribution,
@@ -433,6 +438,33 @@ describe('recordPensionContribution (validation)', () => {
 });
 
 // ─── deletePensionContribution ───────────────────────────────────────────────
+
+describe('the overview summary (PERF-07)', () => {
+  // The Panoramica splits a fund's growth into contributions and return from these records: the
+  // summary is invalidated once the RECORD is written or gone, not only when the balances moved —
+  // a summary rebuilt in between would hold the old split for the rest of the day.
+  it('is invalidated after the contribution record is written', async () => {
+    const order: string[] = [];
+    addDocMock.mockImplementation(async () => { order.push('record'); return { id: 'new-contribution' }; });
+    invalidateOverviewMock.mockImplementation(async (_owner: string, reason: string) => { order.push(reason); });
+
+    await recordPensionContribution(USER_ID, { assetId: FUND_ID, source: 'tfr', amount: 1500, date: CONTRIBUTION_DATE });
+
+    expect(order).toEqual(['record', 'pension_contribution_recorded']);
+    expect(invalidateOverviewMock).toHaveBeenCalledWith(USER_ID, 'pension_contribution_recorded');
+  });
+
+  it('is invalidated after the contribution record is deleted', async () => {
+    const order: string[] = [];
+    deleteDocMock.mockImplementation(async () => { order.push('record'); });
+    invalidateOverviewMock.mockImplementation(async (_owner: string, reason: string) => { order.push(reason); });
+
+    await deletePensionContribution(makeStoredContribution());
+
+    expect(order).toEqual(['record', 'pension_contribution_deleted']);
+    expect(invalidateOverviewMock).toHaveBeenCalledWith(USER_ID, 'pension_contribution_deleted');
+  });
+});
 
 describe('deletePensionContribution', () => {
   it('should debit the fund and remove the record for a TFR contribution', async () => {

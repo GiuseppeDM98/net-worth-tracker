@@ -239,6 +239,9 @@ async function writePensionContribution(
   });
 
   const docRef = await addDoc(collection(db, PENSION_CONTRIBUTIONS_COLLECTION), payload);
+  // AFTER the record: the balance moves invalidated before it existed, and a summary rebuilt in
+  // between would split the fund's growth without this contribution for the rest of the day.
+  await invalidateDashboardOverviewSummary(userId, 'pension_contribution_recorded');
   return docRef.id;
 }
 
@@ -389,6 +392,7 @@ export async function deletePensionContribution(contribution: PensionContributio
   }
 
   await deleteDoc(doc(db, PENSION_CONTRIBUTIONS_COLLECTION, contribution.id));
+  await invalidateDashboardOverviewSummary(contribution.userId, 'pension_contribution_deleted');
 }
 
 /**
