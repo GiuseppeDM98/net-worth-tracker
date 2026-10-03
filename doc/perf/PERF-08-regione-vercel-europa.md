@@ -6,7 +6,7 @@
 
 `vercel.json` contiene solo i due cron; nessuna route esporta `preferredRegion`; `next.config.ts` non ha `regions`. Le
 funzioni serverless girano quindi nella regione di default di Vercel, **`iad1` (Washington)**. Firestore di produzione sta in
-**Europa** (proprietario, 2026-09-26; il repo non lo registra: `.firebaserc` ha solo il progetto, `SETUP.md:58` consiglia
+**Europa**, in **`eur3`** (la multi-regione Belgio + Paesi Bassi, letta dal proprietario nella console il 2026-10-03; il repo non lo registra: `.firebaserc` ha solo il progetto, `SETUP.md:58` consiglia
 `europe-west1`). Ogni lettura Admin SDK da una route è un viaggio Washington → Belgio → Washington: ~90–110 ms di andata e
 ritorno, per lettura, per stadio sequenziale.
 
@@ -38,9 +38,8 @@ proprietario (Italia) → `iad1` aggiunge un altro ~100 ms per ondata rispetto a
 
 ## 4. Design
 
-`vercel.json` → `"regions": ["fra1"]` (Francoforte; `cdg1` Parigi o `dub1` Dublino sono equivalenti per Belgio/`eur3`; scegliere
-quella con il `Server-Timing` migliore se il proprietario vuole provarne due). Il piano Hobby accetta UNA regione in
-`regions`; Pro anche più d'una. In alternativa per singola route `export const preferredRegion = 'fra1'` — ma qui vale per
+`vercel.json` → `"regions": ["fra1"]` (Francoforte; `cdg1` Parigi o `dub1` Dublino sono equivalenti per Belgio/`eur3`).
+Il proprietario è sul piano **Hobby** (2026-10-03), che accetta UNA regione in `regions`: `fra1` e basta. In alternativa per singola route `export const preferredRegion = 'fra1'` — ma qui vale per
 tutte, e un solo posto è la regola del repo (una sorgente).
 
 **Registrare la regione di Firestore** dove il repo la cerca: `SETUP.md` Step 1 (una riga: «Il progetto di produzione è in
@@ -63,8 +62,8 @@ c'è anche su un 401); i tempi no, perché l'anteprima non legge il Firestore di
 
 ## 6. Passi
 
-1. Chiedere al proprietario (strumento interattivo) la posizione letta dalla console e il piano Vercel (Hobby/Pro).
-   Se la posizione NON è europea, fermarsi: la riga peggiorerebbe.
+1. Niente da chiedere: la posizione (`eur3`) e il piano (Hobby) sono già detti (2026-10-03, § 1 e § 4). Se il
+   proprietario dice che una delle due è cambiata, e la posizione NON è più europea, fermarsi: la riga peggiorerebbe.
 2. `vercel.json` + il test + la documentazione (SETUP.md, CLAUDE.md § Data & Integrations) in UN commit, dopo l'OK; push.
 3. Sul deploy di anteprima, se raggiungibile: `x-vercel-id`, nella descrizione della PR.
 4. Alla release (§ 8 F): `x-vercel-id`, il `Server-Timing` di `overview`, i cron nei log il giorno dopo.
@@ -88,9 +87,9 @@ c'è anche su un 401); i tempi no, perché l'anteprima non legge il Firestore di
 
 ## 9. Rischi e rollback
 
-- Se il proprietario è su Hobby e `regions` ha più di un valore, il deploy fallisce: una regione sola.
-- Se Firestore fosse in `us-central1` (contro quanto detto), la riga peggiorerebbe e nessun «prima/dopo» lo mostrerebbe:
-  per questo la posizione letta dalla console è il passo 1 e ferma la sessione se non è europea. Il rollback è una riga.
+- Il proprietario è su Hobby: se `regions` ha più di un valore, il deploy fallisce — una regione sola.
+- Senza un «prima/dopo» una regione sbagliata non si vedrebbe: per questo la posizione è stata letta dalla console
+  (`eur3`, 2026-10-03) prima di scegliere `fra1`. Il rollback è una riga.
 
 ## 10. Documentazione da aggiornare
 
@@ -111,9 +110,8 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
   della Panoramica è in develop e arriva in produzione con la release, insieme a questa riga)
 - Crea SESSION_NOTES.md; crea il branch dalla branch attiva PRIMA di editare
 
-Regole: nessun commit senza il mio OK; un branch e un commit; rispondi in italiano; chiedimi con lo strumento interattivo
-la posizione di Firestore letta dalla console e il piano Vercel, prima di scegliere la regione; se la posizione non è
-europea, fermati.
+Regole: nessun commit senza il mio OK; un branch e un commit; rispondi in italiano; la posizione di
+Firestore (eur3) e il piano Vercel (Hobby: una regione sola) sono già nella spec, la regione è fra1.
 Chiusura: la riga + il test Vitest di vercel.json + la documentazione (SETUP.md, CLAUDE.md «Latest» e § Data &
 Integrations, Draft Release Temp.md, doc/perf/README.md) in UN diff; tsc, lint 0, Vitest in Europe/Rome; proponi il
 commit; dopo il push x-vercel-id dal deploy di anteprima se è raggiungibile, nella descrizione della PR; scrivimi i

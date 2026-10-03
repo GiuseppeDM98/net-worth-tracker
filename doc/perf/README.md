@@ -241,3 +241,5 @@ in produzione, e i tempi delle route server si leggono dal `Server-Timing` (`lib
 - PERF-08 si chiude senza un «prima/dopo» di produzione: «tutto su main alla fine» resta senza deroghe, la prova è
   `x-vercel-id` e il numero si legge una volta alla release, insieme al giro di produzione di PERF-07 → PERF-08 § 2
   e § 8. Le anteprime Vercel non leggono il Firestore di produzione, quindi non danno un «prima».
+- Firestore di produzione è in `eur3` (letto dalla console) e il piano Vercel è Hobby, una regione sola → PERF-08
+  sceglie `fra1` senza altre domande.
