@@ -7,7 +7,7 @@
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Overview**: `app/dashboard/page.tsx`, `app/api/dashboard/overview/route.ts`, `lib/services/dashboardOverviewService.ts`, `lib/hooks/useDashboardOverview.ts`, `components/dashboard/overview/*` (`PatrimonioTile` exports `resolveHeroValueClass`), pure `lib/utils/{overviewNarrative,dashboardOverviewUtils,sparklinePeriod,savingsRateBadge}.ts`; `lib/utils/periodSales.ts` (`summarizePeriodSales` = the month's sells from the ledger with the estimated tax, `resolveDeclineCause` = the ONE cause of a falling month for Panoramica, Patrimonio and the email) + `lib/utils/salesNarrative.ts` (the shared words)
-- **Server-Timing**: `lib/server/serverTiming.ts` (`startTiming` → `mark` → `toHeader`, pure, the clock injected) — the route's header since PERF-07 (2026-10-03)
+- **Server-Timing**: `lib/server/serverTiming.ts` (`startTiming` → `mark` → `toHeader`, pure, the clock injected) — the route's header since 2026-10-03
 - **Suites to run after a change here — Overview / materialized summary** (moved from `AGENTS.md` § Commands on 2026-09-30): `apiAuthRoutes`, `dashboardOverviewService`, `dashboardOverviewUtils`, `serverTiming` · **Verdetto e letture** `overviewNarrative` · **Badge** `savingsRateBadge` · **A writer of an overview input** (the invalidation it owes, § The materialized summary): `expenseCategoryRewriteInvalidation`, `goalWritesInvalidation`, `dividendIncomeService`, `pensionContributionService`, `settingsRoundTrip`
 
 ## Panoramica and Dashboard Data Isolation
@@ -103,7 +103,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   a `null` target hides the stale number on the same render. A tick queued before a newer target's cleanup is dropped
   by the writer's own guard.
 
-## The materialized summary — one round, written after, fresh for the day (PERF-07, 2026-10-03)
+## The materialized summary — one round, written after, fresh for the day (2026-10-03)
 
 - **A recompute is ONE round of reads** (`readOverviewInputs` in `dashboardOverviewService.ts`): assets, snapshots,
   settings and goals in a `Promise.all` — any of them failing rejects the route, as always — launched TOGETHER with an
@@ -136,6 +136,12 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   (create, edit, delete), the two goal writers (`saveGoalData`, `appendInvestmentGoal`), the settings predicate (3 of
   the 5 fields: it held only because Impostazioni always sends the stamp duty) and the pension contribution record
   (invalidated before the record existed). A new writer of an input owes its invalidation in the same commit.
+- **The request time is ONE `now`, from the freshness test to the payload** (2026-10-03): `getDashboardOverview`
+  takes it and hands it to the readers, the expense stats and `buildLiveOverviewPayload` — a function of the recompute
+  never reads its own clock, or a request across a month's midnight builds half its payload on each month. Pinned by
+  `__tests__/dashboardOverviewService.test.ts` → *reads the current month from the request time…*, which asserts on
+  the ARGUMENT of `getItalyMonthYear`: that file mocks it to April, so an assertion on the payload stays green with
+  the defect in.
 - **`Server-Timing`**: `auth;dur, db;dur, compute;dur, total;dur, source;desc=materialized|recompute`. `db` sums the
   summary read and the round of reads; `total` runs from the handler's first line to the header, so the auth and the
   tiny rest are inside it; the write after the response is in none of them. In production: DevTools → Network → the

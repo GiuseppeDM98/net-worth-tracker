@@ -1,6 +1,6 @@
 /**
  * The two writers of `goalBasedInvesting/{uid}` invalidate the Panoramica's summary after the write
- * (2026-10-03, PERF-07): the Obiettivo tile reads that document, and a summary now fresh for the whole
+ * (2026-10-03): the Obiettivo tile reads that document, and a summary now fresh for the whole
  * Italian day would otherwise show the old goals for hours — after a save on FIRE › Obiettivi
  * (`saveGoalData`, client SDK) or a goal proposed by the assistant (`appendInvestmentGoal`, Admin SDK).
  */

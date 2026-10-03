@@ -1,12 +1,12 @@
 # PERF-08 — Le funzioni Vercel nella regione di Firestore
 
-> Stato: da fare · Priorità: 3 (piccola, ma vale ~100 ms per ogni lettura server) · Sforzo: S · Dipende da: PERF-07 (il `Server-Timing` che prova il prima/dopo) · Sblocca: —
+> Stato: da fare · Priorità: 3 (piccola, ma vale ~100 ms per ogni lettura server) · Sforzo: S · Dipende da: PERF-07 (il `Server-Timing` che si legge alla release) · Sblocca: —
 
 ## 1. Il problema, misurato
 
 `vercel.json` contiene solo i due cron; nessuna route esporta `preferredRegion`; `next.config.ts` non ha `regions`. Le
 funzioni serverless girano quindi nella regione di default di Vercel, **`iad1` (Washington)**. Firestore di produzione sta in
-**Europa** (proprietario, 2026-09-26; il repo non lo registra: `.firebaserc` ha solo il progetto, `SETUP.md:58` consiglia
+**Europa**, in **`eur3`** (la multi-regione Belgio + Paesi Bassi, letta dal proprietario nella console il 2026-10-03; il repo non lo registra: `.firebaserc` ha solo il progetto, `SETUP.md:58` consiglia
 `europe-west1`). Ogni lettura Admin SDK da una route è un viaggio Washington → Belgio → Washington: ~90–110 ms di andata e
 ritorno, per lettura, per stadio sequenziale.
 
@@ -22,8 +22,12 @@ proprietario (Italia) → `iad1` aggiunge un altro ~100 ms per ondata rispetto a
 
 - `x-vercel-id` nelle risposte delle route inizia con una regione europea (`fra1::…`, `cdg1::…` o `dub1::…`), letto dalle
   DevTools o con `curl -sI https://<app>/api/benchmarks/fx-rates`.
-- `Server-Timing: total` (PERF-07) di `/api/dashboard/overview` in ricalcolo: prima/dopo, atteso −50% o più; di
-  `/api/benchmarks/fx-rates` (una lettura): da ~120 ms a ~30 ms.
+- **Nessun «prima/dopo» di produzione** (proprietario, 2026-10-03): la spec si chiude per costruzione — le funzioni
+  accanto al database — senza portare develop su main prima. Il header che darebbe il «prima» (`Server-Timing` di
+  `/api/dashboard/overview`: `auth, db, compute, total, source`) arriva in produzione con la stessa release che porta
+  questa riga, e le anteprime Vercel non leggono il Firestore di produzione. Il numero si legge UNA volta, alla
+  release: `db` di `overview` in ricalcolo è un solo giro di letture, atteso nell'ordine di un round trip europeo
+  (decine di ms, non ~100).
 - I due cron continuano a girare (Vercel → Logs il giorno dopo) e le email arrivano.
 
 ## 3. Non-obiettivi
@@ -34,24 +38,21 @@ proprietario (Italia) → `iad1` aggiunge un altro ~100 ms per ondata rispetto a
 
 ## 4. Design
 
-`vercel.json` → `"regions": ["fra1"]` (Francoforte; `cdg1` Parigi o `dub1` Dublino sono equivalenti per Belgio/`eur3`; scegliere
-quella con il `Server-Timing` migliore se il proprietario vuole provarne due). Il piano Hobby accetta UNA regione in
-`regions`; Pro anche più d'una. In alternativa per singola route `export const preferredRegion = 'fra1'` — ma qui vale per
+`vercel.json` → `"regions": ["fra1"]` (Francoforte; `cdg1` Parigi o `dub1` Dublino sono equivalenti per Belgio/`eur3`).
+Il proprietario è sul piano **Hobby** (2026-10-03), che accetta UNA regione in `regions`: `fra1` e basta. In alternativa per singola route `export const preferredRegion = 'fra1'` — ma qui vale per
 tutte, e un solo posto è la regola del repo (una sorgente).
 
 **Registrare la regione di Firestore** dove il repo la cerca: `SETUP.md` Step 1 (una riga: «Il progetto di produzione è in
 `<regione letta dalla console>`; le funzioni Vercel sono in `fra1` per starle vicine»), e CLAUDE.md § Data & Integrations. Il
 valore preciso lo legge il proprietario dalla console (Firestore → Database → Posizione) e lo detta in sessione.
 
-**La prova del prima/dopo** si fa in produzione, con il header di PERF-07 e `x-vercel-id`, perché in locale non esiste
-latenza. L'app usa l'SDK modulare: NON esiste un `firebase` globale nella pagina. La lettura si fa dalle DevTools senza
-codice: Network → una richiesta `/api/*` già fatta dall'app → tasto destro → «Copy as fetch» → incollare nella console →
-leggere `.headers.get('server-timing')` e `.headers.get('x-vercel-id')` dalla `Response` (il token è già nell'header
-copiato; scade dopo un'ora, basta ricopiare). Sequenza: 1) prima del deploy, 5 letture su `fx-rates` e `overview`
-(annotare); 2) la riga, il commit approvato, il push; 3) sul **deploy di anteprima** del branch (Vercel lo costruisce per
-ogni push, con la stessa regione) le stesse 5 letture + `x-vercel-id`; 4) i numeri nella descrizione della PR e in CLAUDE.md
-nella sessione successiva (o, se il proprietario lo concede, un secondo commit di sole note: è una deroga esplicita alla
-regola «un commit per sessione», e va chiesta prima).
+**La prova è la regione, non un confronto** (proprietario, 2026-10-03). In sessione: la posizione di Firestore letta
+dalla console decide la regione, il test tiene `vercel.json`. Alla release, in produzione e in SOLA LETTURA, dalle
+DevTools senza codice (l'app usa l'SDK modulare: NON esiste un `firebase` globale nella pagina): Network → una
+richiesta `/api/*` già fatta dall'app → Headers: `x-vercel-id` con la regione scelta; Timing → Server Timing sulla
+richiesta `overview` (doc/guide/panoramica.md § The materialized summary). `x-vercel-id` si può leggere già sul deploy
+di anteprima del branch, se l'anteprima è raggiungibile (`curl -sI <anteprima>/api/benchmarks/fx-rates`: il header
+c'è anche su un 401); i tempi no, perché l'anteprima non legge il Firestore di produzione.
 
 ## 5. File da toccare
 
@@ -61,32 +62,34 @@ regola «un commit per sessione», e va chiesta prima).
 
 ## 6. Passi
 
-1. Chiedere al proprietario (strumento interattivo) la posizione letta dalla console, il piano Vercel (Hobby/Pro) e se
-   concede il secondo commit di sole note o preferisce i numeri nella PR.
-2. Le 5 letture «prima» in produzione («Copy as fetch»).
-3. `vercel.json` + il test + la documentazione (SETUP.md, CLAUDE.md § Data & Integrations) in UN commit, dopo l'OK; push.
-4. Sul deploy di anteprima: le 5 letture «dopo» + `x-vercel-id`; la tabella in SESSION_NOTES e nella descrizione della PR.
-5. Il giorno dopo il merge: i cron nei log.
+1. Niente da chiedere: la posizione (`eur3`) e il piano (Hobby) sono già detti (2026-10-03, § 1 e § 4). Se il
+   proprietario dice che una delle due è cambiata, e la posizione NON è più europea, fermarsi: la riga peggiorerebbe.
+2. `vercel.json` + il test + la documentazione (SETUP.md, CLAUDE.md § Data & Integrations) in UN commit, dopo l'OK; push.
+3. Sul deploy di anteprima, se raggiungibile: `x-vercel-id`, nella descrizione della PR.
+4. Alla release (§ 8 F): `x-vercel-id`, il `Server-Timing` di `overview`, i cron nei log il giorno dopo.
 
 ## 7. Test e falsificazione
 
-- Non c'è codice: la prova è il header. La falsificazione è la lettura «prima» stessa (se «prima» e «dopo» sono uguali, la
-  regione non è cambiata: controllare `x-vercel-id`).
+- Non c'è codice: la prova è `x-vercel-id`. Senza un «prima» non c'è un confronto da falsificare: se alla release `db`
+  di `overview` in ricalcolo resta nell'ordine dei ~100 ms, la regione scelta non è quella di Firestore.
 - Un test Vitest banale che `vercel.json` è JSON valido con `regions` non vuoto e i due cron intatti (`__tests__/vercelConfig.test.ts`),
   perché una virgola in quel file rompe il deploy senza rumore.
 
 ## 8. Collaudo guidato
 
-- F (proprietario, produzione): 1) `x-vercel-id` europeo; 2) `Server-Timing` di `overview` in ricalcolo dimezzato; 3)
-  Rendimenti apre visibilmente prima (è la pagina con 17 chiamate); 4) il cron serale ha scritto lo snapshot (Storico il
-  giorno dopo). Non coperto: niente in locale.
+- F (proprietario, IN PRODUZIONE ALLA RELEASE, in SOLA LETTURA): 1) `x-vercel-id` con la regione scelta; 2) il cron
+  serale ha scritto lo snapshot (Storico il giorno dopo). Non coperto: niente in locale, nessun «prima».
+- Nello stesso giro, quello che il ricalcolo a un giro della Panoramica (2026-10-03) non ha ancora avuto — DevTools →
+  Network → `overview` → Timing → Server Timing: 1) alla prima apertura `source=recompute`, annotare `total` e `db`;
+  2) ricaricando dopo 10 minuti senza modifiche `source=materialized`. Il terzo caso (il giorno cambia → di nuovo
+  `recompute`) non si aspetta: lo tiene `__tests__/dashboardOverviewService.test.ts`, visto rosso.
 - G: nessun fixture da rimuovere (la prova è in produzione, in sola lettura).
 
 ## 9. Rischi e rollback
 
-- Se il proprietario è su Hobby e `regions` ha più di un valore, il deploy fallisce: una regione sola.
-- Se Firestore fosse in `us-central1` (contro quanto detto), la riga peggiorerebbe: la lettura «prima/dopo» lo mostra e il
-  rollback è una riga.
+- Il proprietario è su Hobby: se `regions` ha più di un valore, il deploy fallisce — una regione sola.
+- Senza un «prima/dopo» una regione sbagliata non si vedrebbe: per questo la posizione è stata letta dalla console
+  (`eur3`, 2026-10-03) prima di scegliere `fra1`. Il rollback è una riga.
 
 ## 10. Documentazione da aggiornare
 
@@ -96,23 +99,23 @@ regola «un commit per sessione», e va chiesta prima).
 
 ```text
 Ciao, in questa sessione implementiamo doc/perf/PERF-08-regione-vercel-europa.md: le funzioni Vercel vanno nella regione
-europea vicina a Firestore (vercel.json → regions), con la prova prima/dopo letta dal Server-Timing di PERF-07 e da
-x-vercel-id in produzione, e la regione di Firestore registrata in SETUP.md e CLAUDE.md.
+europea vicina a Firestore (vercel.json → regions), SENZA un prima/dopo di produzione (deciso il 2026-10-03: main riceve
+tutto con la release, la prova è x-vercel-id), e la regione di Firestore registrata in SETUP.md e CLAUDE.md.
 
 Da fare TASSATIVAMENTE prima di ogni cosa:
 - Leggi WORKFLOW.md, AGENTS.md (§ Server Layer and API Authorization, § 5 Commands), CLAUDE.md (§ Known Issues: firebase-admin e l'Edge)
 - Leggi SETUP.md (Step 1 e la sezione Vercel), doc/guide/panoramica.md
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE se scrivi codice (il test di vercel.json)
-- Leggi doc/perf/README.md e la spec PERF-08 per intero; PERF-07 deve essere in produzione (il header esiste)
+- Leggi doc/perf/README.md e la spec PERF-08 per intero; PERF-07 è chiusa dal 2026-10-03 (il header Server-Timing
+  della Panoramica è in develop e arriva in produzione con la release, insieme a questa riga)
 - Crea SESSION_NOTES.md; crea il branch dalla branch attiva PRIMA di editare
 
-Regole: nessun commit senza il mio OK; un branch e un commit; rispondi in italiano; chiedimi con lo strumento interattivo
-la posizione di Firestore letta dalla console, il piano Vercel e se concedo un secondo commit di sole note, prima di
-scegliere la regione.
-Chiusura: le 5 letture «prima» dalle DevTools (Copy as fetch, senza codice), la riga + il test Vitest di vercel.json + la
-documentazione (SETUP.md, CLAUDE.md «Latest» e § Data & Integrations, Draft Release Temp.md, doc/perf/README.md) in UN
-diff; tsc, lint 0, Vitest in Europe/Rome; proponi il commit; dopo il push le 5 letture «dopo» sul deploy di anteprima con
-x-vercel-id, in SESSION_NOTES e nella descrizione della PR.
+Regole: nessun commit senza il mio OK; un branch e un commit; rispondi in italiano; la posizione di
+Firestore (eur3) e il piano Vercel (Hobby: una regione sola) sono già nella spec, la regione è fra1.
+Chiusura: la riga + il test Vitest di vercel.json + la documentazione (SETUP.md, CLAUDE.md «Latest» e § Data &
+Integrations, Draft Release Temp.md, doc/perf/README.md) in UN diff; tsc, lint 0, Vitest in Europe/Rome; proponi il
+commit; dopo il push x-vercel-id dal deploy di anteprima se è raggiungibile, nella descrizione della PR; scrivimi i
+punti del giro di produzione da fare alla release (§ 8 F).
 ```
 
 ## 12. Modello ed effort

@@ -149,7 +149,7 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
 - Leggi WORKFLOW.md, AGENTS.md (§ Caching, § Server Layer and API Authorization, § React Query, § Audit habits), CLAUDE.md
 - Leggi doc/guide/rendimenti.md PER INTERO (è la guida più densa di regole), doc/guide/stati.md, doc/guide/e2e-emulatori.md
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice
-- Leggi doc/perf/README.md e la spec PERF-09 per intero; PERF-05 è chiusa (2026-09-29), PERF-07 deve esserlo
+- Leggi doc/perf/README.md e la spec PERF-09 per intero; PERF-05 è chiusa (2026-09-29), PERF-07 anche (2026-10-03: l'helper Server-Timing è lib/server/serverTiming.ts)
 - Crea SESSION_NOTES.md; crea il branch dalla branch attiva PRIMA di editare
 
 Regole: nessun commit senza il mio OK; un branch e un commit; rispondi in italiano.

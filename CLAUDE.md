@@ -13,14 +13,14 @@ Next.js app for Italian investors: net worth, assets, cashflow, dividends, perfo
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic.
-- `tsc` clean; **212 files / 4845 tests** green in `Europe/Rome` and in the machine's zone + **45 Playwright spec files** (162 tests, incl. 6 auth setups; last full run 2026-10-03 on the Windows laptop, 151/162 in 10,2 min — nine red on a base seed of the previous month, green after `npm run emulators:seed`, and `modal.origin`, Known Issues; doc/guide/e2e-emulatori.md). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, which structurally hides timezone bugs.
-- Latest (2026-10-03): **`doc/perf/PERF-07` implemented** (retired in a later session) — the Panoramica's recompute
-  reads in ONE round, writes its summary in `after()` under a precondition, stays fresh for the Italian day (≤ 6 h, never
-  after an invalidation) and answers with `Server-Timing`; five writers of its inputs that did not invalidate now do.
-  Emulator: recompute 105/97 → 58/57 ms, payload identical to the byte. Rules → doc/guide/panoramica.md § The
-  materialized summary; measures → `doc/perf/README.md` § 6. **Verified**: `tsc`, lint 0, Vitest in both zones, every
-  new test seen red, the invalidation driven from the real dialog, the precondition refused by the real emulator,
-  Playwright (above). The production tour (read-only, DevTools `Server-Timing`) is the owner's after the deploy.
+- `tsc` clean; **212 files / 4846 tests** green in `Europe/Rome` and in the machine's zone + **45 Playwright spec files** (162 tests, incl. 6 auth setups; last full run 2026-10-03 on the Windows laptop, 151/162 in 10,2 min — nine red on a base seed of the previous month, green after `npm run emulators:seed`, and `modal.origin`, Known Issues; doc/guide/e2e-emulatori.md). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, which structurally hides timezone bugs.
+- Latest (2026-10-03): **the PERF-07 spec retired** (the Panoramica's one-round recompute, PR #423 in develop since
+  2026-10-03) — 14 divergences read against the code: nine where the code was right and the lesson was already home
+  (doc/guide/panoramica.md § The materialized summary, AGENTS.md § Caching, the line comments), one defect fixed in
+  the retirement on the owner's call (`buildLiveOverviewPayload` read the month from its own clock while the rest of
+  the recompute takes the injected `now`; its test seen red), four deferrals written where they live (`doc/perf/README.md`
+  § 6 and § 9; the production tour — read-only, DevTools `Server-Timing` — waits for the release and is now in
+  PERF-08 § 8, which the owner chose to close without a production before/after). Spec deleted, every reference rewritten to the present: `tsc`, lint 0, Vitest in `Europe/Rome`.
 
 ## Architecture Snapshot
 - App Router; protected pages under `app/dashboard/*`.
@@ -64,7 +64,7 @@ One line per area: the question it answers, then where it is described. *What th
 - **Performance**: `npm run perf:budget` (JS per route against `perf/budget.json`, two seconds, after a build) and
   `npm run perf:bench -- --runs=3` (cold/warm on the mirror, via `perf:build` + `perf:serve` on :3200); commands, columns,
   the baseline in force and the raised-ceiling register in `perf/README.md`. A route that grows raises its ceiling in the
-  same commit with `raisedBy`. The specs and the 2026-09-26 history in `doc/perf/README.md` (PERF-00, 01, 02, 03 and 05 done, their specs retired).
+  same commit with `raisedBy`. The specs and the 2026-09-26 history in `doc/perf/README.md` (PERF-00 to 07 done, their specs retired).
 - **Mobile composition**: the small-screen census (19 surfaces × 390/768/1024), the chosen direction, the nine specs and
   the owner's decisions in `doc/mobile/README.md`; the census script in `doc/mobile/reference/` (MOB-01 ports it to
   `npm run mobile:census` / `mobile:budget`). Implemented after `doc/perf/`.

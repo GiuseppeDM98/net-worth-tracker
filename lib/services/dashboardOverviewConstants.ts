@@ -53,6 +53,6 @@ export const DASHBOARD_OVERVIEW_SOURCE_VERSION = 20;
 // earlier Italian DAY (the payload is the day's: the current/previous month and the month-end
 // projection are read from «today»), or older than this. Every mutation of an input already
 // invalidates it, so the age is only the safety net for an input no invalidation sees — the same
-// 6 h as `performance-cache`. Until 2026-10-03 (PERF-07) it was 5 minutes, which made almost every
+// 6 h as `performance-cache`. Until 2026-10-03 it was 5 minutes, which made almost every
 // opening of the app a full recompute.
 export const DASHBOARD_OVERVIEW_SUMMARY_TTL_MS = 6 * 60 * 60 * 1000;

@@ -141,6 +141,7 @@ vi.mock('@/lib/utils/dateHelpers', async () => {
 
 import { getDashboardOverview } from '@/lib/services/dashboardOverviewService';
 import { DASHBOARD_OVERVIEW_SOURCE_VERSION } from '@/lib/services/dashboardOverviewConstants';
+import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
 
 // The `updateTime` of the stale summary the recompute read: the write's precondition.
 const STALE_SUMMARY_UPDATE_TIME = { seconds: 1775460600, nanoseconds: 0 };
@@ -565,7 +566,7 @@ describe('dashboardOverviewService — G/P in EUR on both sides (costBasisEur.ts
   });
 });
 
-describe('dashboardOverviewService — one round of reads, the write after the response, fresh by day (PERF-07)', () => {
+describe('dashboardOverviewService — one round of reads, the write after the response, fresh by day', () => {
   // A summary as the recompute stores it, computed at `computedAt`; `invalidatedAt` when a mutation followed.
   const storedSummary = (computedAt: Date, invalidatedAt: Date | null = null) => ({
     exists: true,
@@ -770,6 +771,20 @@ describe('dashboardOverviewService — one round of reads, the write after the r
       expect(overviewSummaryDocCreateMock).toHaveBeenCalledWith(
         expect.objectContaining({ computedAt: now, updatedAt: now })
       );
+    });
+
+    it('reads the current month from the request time, never from the process clock', async () => {
+      // `getItalyMonthYear` is mocked to April in this file, so the payload cannot tell the two clocks
+      // apart: the assertion is on the ARGUMENT. A call with none reads `new Date()` — a request across
+      // a month's midnight would build half its payload on each month. Seen red (2026-10-03) with the
+      // payload builder calling it bare.
+      const now = new Date('2026-04-15T13:00:00.000Z');
+
+      await getDashboardOverview('user-1', { now });
+
+      const calls = vi.mocked(getItalyMonthYear).mock.calls;
+      expect(calls.length).toBeGreaterThan(0);
+      expect(calls.filter((args) => args[0] !== now)).toEqual([]);
     });
 
     it('keeps an invalidation that landed during the recompute: the write loses its precondition quietly', async () => {

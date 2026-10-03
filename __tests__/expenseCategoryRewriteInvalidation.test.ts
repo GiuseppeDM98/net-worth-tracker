@@ -1,6 +1,6 @@
 /**
  * The bulk rewrites of expense rows that a category edit cascades into invalidate the Panoramica's
- * materialized summary AFTER their batch commits (2026-10-03, PERF-07). Since the summary stays fresh
+ * materialized summary AFTER their batch commits (2026-10-03). Since the summary stays fresh
  * for the whole Italian day, a rename, a type change, a reassign or a move that did not invalidate
  * left the Panoramica printing the old category names and the old month totals for hours.
  * `reassignExpensesSubCategory` is the one that does not: the payload never reads the subcategory.
