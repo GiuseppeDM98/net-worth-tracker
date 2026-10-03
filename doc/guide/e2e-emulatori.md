@@ -188,7 +188,10 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   persists across sessions, so the base seed DRIFTS: `seed-btp` had lost its `taxRate` a week earlier and the two
   Dividendi specs proposed the 26% fallback instead of the instrument's 12,5% — it read as a regression of the
   session's change. `curl` the document (`Bearer owner`), and `npm run emulators:seed` restores the base account
-  without touching the other fixtures.
+  without touching the other fixtures. **It also drifts by CALENDAR** (2026-10-03): `scripts/seedEmulator.ts` dates its
+  rows on the month it ran and `global-setup` never re-runs it, so the first suite of a new month finds no
+  current-month row — nine Tracciamento, freshness, owner and mobile specs red with «Nessun movimento registrato ad
+  ottobre» / «the seed has no current-month row». After a month change, re-seed before the full run.
 - **What belongs here**: only what needs a real layout — the `desktop:` switch at 1440px, a collapsible, a state flash,
   computed font sizes, bounding boxes, overflow; the arithmetic stays with Vitest. **Two limits**: a race between
   concurrent queries is not reproducible locally (the Firestore Web SDK multiplexes every target onto ONE webchannel),

@@ -13,15 +13,14 @@ Next.js app for Italian investors: net worth, assets, cashflow, dividends, perfo
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic.
-- `tsc` clean; **209 files / 4803 tests** green in `Europe/Rome` and in the machine's zone + **45 Playwright spec files** (162 tests, incl. 6 auth setups; last full run 2026-09-30 evening on the Windows laptop, 162/162 in 8,3 min — `modal.origin` and `cashflow.dividendi`, the two intermittents of Known Issues, green that run; doc/guide/e2e-emulatori.md). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, which structurally hides timezone bugs.
-- Latest (2026-10-01): **`doc/perf/PERF-06` retired** — the expenses by window (PR #421, in develop since 2026-10-01)
-  read against its spec: 21 divergences — 19 where the code was right and the lesson already home (`lib/utils/expenseWindows.ts`,
-  AGENTS.md § React Query, the Cashflow, Budget, Divisione, Analisi, Centri, FIRE, persisted-cache and E2E guides, the
-  comments at the lines), 0 defects, 2 deferred and already written (the § 2 targets missed on a wrong premise →
-  `perf/README.md`; Analisi's Andamento on future rows → doc/guide/cashflow-analisi.md); one lesson moved here (a window
-  has no rollback flag, its rollback is the revert → doc/guide/cashflow.md § Expenses by window); the measures stay in
-  `doc/perf/README.md` § 6 and `perf/README.md`. **Verified**: `tsc`, lint 0, Vitest in `Europe/Rome`; no Playwright
-  (comments and documents only).
+- `tsc` clean; **212 files / 4845 tests** green in `Europe/Rome` and in the machine's zone + **45 Playwright spec files** (162 tests, incl. 6 auth setups; last full run 2026-10-03 on the Windows laptop, 151/162 in 10,2 min — nine red on a base seed of the previous month, green after `npm run emulators:seed`, and `modal.origin`, Known Issues; doc/guide/e2e-emulatori.md). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, which structurally hides timezone bugs.
+- Latest (2026-10-03): **`doc/perf/PERF-07` implemented** (retired in a later session) — the Panoramica's recompute
+  reads in ONE round, writes its summary in `after()` under a precondition, stays fresh for the Italian day (≤ 6 h, never
+  after an invalidation) and answers with `Server-Timing`; five writers of its inputs that did not invalidate now do.
+  Emulator: recompute 105/97 → 58/57 ms, payload identical to the byte. Rules → doc/guide/panoramica.md § The
+  materialized summary; measures → `doc/perf/README.md` § 6. **Verified**: `tsc`, lint 0, Vitest in both zones, every
+  new test seen red, the invalidation driven from the real dialog, the precondition refused by the real emulator,
+  Playwright (above). The production tour (read-only, DevTools `Server-Timing`) is the owner's after the deploy.
 
 ## Architecture Snapshot
 - App Router; protected pages under `app/dashboard/*`.
@@ -36,7 +35,7 @@ One line per area: the question it answers, then where it is described. *What th
 - **Shared account · Demo mode**: a second user as full co-owner (viewer `user.uid` ≠ owner `ownerId`); the demo auto-logs in from the landing and `useDemoMode()` gates every mutation. doc/guide/account-condiviso-demo.md.
 - **Landing**: the Panoramica for someone with no data, the app's real tiles on a declared sample profile. doc/guide/landing.md.
 - **Accesso e Registrazione**: one 420px tile, a verdict generated from the registration state, Italian errors only. doc/guide/accesso-registrazione.md.
-- **Panoramica**: «come va il mese?» — rule-generated verdict over a tile grid on `GET /api/dashboard/overview`. doc/guide/panoramica.md.
+- **Panoramica**: «come va il mese?» — rule-generated verdict over a tile grid on `GET /api/dashboard/overview` — a server-owned summary fresh for the Italian day, invalidated by every write to its inputs, timed by `Server-Timing`. doc/guide/panoramica.md.
 - **Patrimonio**: the portfolio's verdict (its driver an instrument) over six tiles, plus «Mutuo» per property with linked instalments (interest and principal by year, projected end); Strumenti is the management table, a composite instrument's class chip split by class. doc/guide/patrimonio.md.
 - **Registro operazioni**: BUY/SELL/ADJUSTMENT with cash settlement in cents (a sell net of the withheld tax), the asset doc rebuilt by full replay. doc/guide/registro-operazioni.md.
 - **Cashflow › Tracciamento**: «come sta andando il mese?» on one period axis. doc/guide/cashflow-tracciamento.md; shared rules (sign, recurrence, a linked account moving on each row's own date, a transfer's fee as its own row, a mortgage instalment repaying its property's principal, CSV import, grouping, Sankey) in doc/guide/cashflow.md.
@@ -96,6 +95,8 @@ Only what crosses areas; an area's blind spots — the behaviours that look like
   the sampler's 2,6 s window, so the dialog opened more than ~1,5 s after the click — three times ALONE on a fresh
   `.next-e2e`, and identically with develop's `app/page.tsx` and `AuthShell.tsx` swapped in on the same server, so not
   the day's commit. The window is the spec's, not the app's: a slow machine can fail it without any regression.
+  **2026-10-03** (Windows laptop, PERF-07 branch — server and write-path code only, no client file): the FIRST mode,
+  22,7px at line 53, red in the full run AND alone right after — so «green alone» no longer holds on this machine.
 - **`e2e/cashflow.dividendi.spec.ts` › «the form refuses…» is red after `cashflow.accounts` + `cashflow.budget`** (2026-09-30:
   3/3 on a clean `develop` worktree, 2/3 on the branch of PR #418, green alone): after the refusal the dialog stays open
   with its form reset — `reset` re-runs, cause not traced yet. Two of four full runs that day had it red; green in

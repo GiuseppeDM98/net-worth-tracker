@@ -262,6 +262,12 @@ pointer — a stub that grows past that is a guide leaking back (2026-09-20: ten
 - **Per-user pre-computed cache** (`performance-cache/{userId}`): the key encodes **every** determining input — a hash of
   the WHOLE snapshot series, the base signature, the risk-free rate, the dividend category. TTL fallback (6h) covers what
   the key cannot; reads/writes are `try/catch` fire-and-forget; `Date` ↔ `Timestamp` is field-by-field, never JSON.
+- **Server-owned materialized summary** (`dashboardOverviewSummaries/{userId}`, 2026-10-03): no key — FRESH means no
+  `invalidatedAt`, the same `sourceVersion`, the same ITALIAN DAY as `computedAt` (a payload that reads «today» goes
+  stale at midnight with nobody writing) and at most 6 h old. That holds only because **every write to an input
+  invalidates it** — a new writer owes its invalidation in the same commit (five were missing, found by grep). The
+  rebuild is written in `after()` under a precondition (`update` with `lastUpdateTime`, `create`), so an invalidation
+  landing mid-rebuild survives it; `Server-Timing` on the route. doc/guide/panoramica.md § The materialized summary.
 - **A changed FORMULA is the one input no signature can see — that is `CACHE_MATH_VERSION`** (`v5`), bumped on any change
   to what the pipeline computes from unchanged inputs. When verifying by hand, press **Aggiorna** (`forceRefresh`) first.
 - **Global shared cache** (benchmark, FX, ECB): natural key as doc id, no `userId`, `read: isAuthenticated(); write:
@@ -365,7 +371,7 @@ know before opening the guide — then the pointer. In code comments and the oth
 file used to carry.
 
 ### Panoramica → `doc/guide/panoramica.md`
-- Overview data flows through `GET /api/dashboard/overview` + `useDashboardOverview()` only — no page-level fan-out, no full-history expense queries; `dashboardOverviewSummaries/{userId}` is server-owned and every overview-relevant mutation invalidates it. Both endpoints owner-scoped.
+- Overview data flows through `GET /api/dashboard/overview` + `useDashboardOverview()` only — no page-level fan-out, no full-history expense queries; `dashboardOverviewSummaries/{userId}` is server-owned, fresh for the Italian day, and every write to an input invalidates it — a new writer owes its invalidation (§ The materialized summary). Both endpoints owner-scoped.
 - `topMovers`/`marketEffect` are MARKET return, never the user's flows: `[]` when the previous snapshot has no `byAsset`, `null` when not attributable (≠ measured 0).
 - Every sentence comes from `overviewNarrative.ts`; a falling month blames the market only when `marketEffect < 0`. `resolveDeclineCause` (`lib/utils/periodSales.ts`) is the ONE decision for Panoramica, Patrimonio and the email (the tax in the headline, 2026-09-13), `resolveTaxedGrowth` its twin for a month that did NOT fall (2026-09-19).
 - A driver subject missing from `CLASS_SUBJECTS` drops the clause, never prints itself; the page has no «Dettaglio» of its own.

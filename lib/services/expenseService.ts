@@ -962,6 +962,8 @@ export async function updateExpensesCategoryName(
     });
 
     await batch.commit();
+    // The Panoramica prints category names from the rows: a renamed category is a changed input.
+    await invalidateDashboardOverviewSummary(userId, 'expense_category_renamed');
   } catch (error) {
     console.error('Error updating expenses category name:', error);
     throw new Error('Failed to update expenses category name');
@@ -1018,6 +1020,7 @@ export async function reassignExpensesCategory(
     });
 
     await batch.commit();
+    await invalidateDashboardOverviewSummary(userId, 'expense_category_reassigned');
     return count;
   } catch (error) {
     console.error('Error reassigning expenses category:', error);
@@ -1063,6 +1066,7 @@ export async function clearExpensesCategoryAssignment(
     });
 
     await batch.commit();
+    await invalidateDashboardOverviewSummary(userId, 'expense_category_cleared');
     return count;
   } catch (error) {
     console.error('Error clearing expenses category assignment:', error);
@@ -1192,6 +1196,7 @@ export async function moveExpensesToCategory(
     });
 
     await batch.commit();
+    await invalidateDashboardOverviewSummary(userId, 'expense_category_moved');
     return count;
   } catch (error) {
     if (error instanceof TransferBoundaryError) throw error;
@@ -1268,6 +1273,7 @@ export async function moveExpensesFromSubCategory(
     });
 
     await batch.commit();
+    await invalidateDashboardOverviewSummary(userId, 'expense_category_moved');
     return count;
   } catch (error) {
     if (error instanceof TransferBoundaryError) throw error;
@@ -1333,6 +1339,7 @@ export async function updateExpensesType(
     });
 
     await batch.commit();
+    await invalidateDashboardOverviewSummary(userId, 'expense_category_type_changed');
     return count;
   } catch (error) {
     if (error instanceof TransferBoundaryError) throw error;

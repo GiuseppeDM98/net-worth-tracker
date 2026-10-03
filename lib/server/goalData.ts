@@ -6,6 +6,7 @@ import {
   InvestmentGoal,
 } from '@/types/goals';
 import { pickNextGoalColor, serializeGoalForFirestore } from '@/lib/utils/goalMath';
+import { invalidateDashboardOverviewSummaryServer } from '@/lib/services/dashboardOverviewInvalidation.server';
 
 /**
  * Goal-Based Investing — the Admin-SDK gateway.
@@ -66,7 +67,7 @@ export async function appendInvestmentGoal(
 ): Promise<InvestmentGoal> {
   const docRef = adminDb.collection(GOALS_COLLECTION).doc(userId);
 
-  return adminDb.runTransaction(async (tx) => {
+  const stored = await adminDb.runTransaction(async (tx) => {
     const snap = await tx.get(docRef);
     const data = snap.exists ? snap.data() : undefined;
     const storedGoals = (data?.goals ?? []) as InvestmentGoal[];
@@ -83,4 +84,7 @@ export async function appendInvestmentGoal(
 
     return created;
   });
+  // The Panoramica's Obiettivo tile reads this document.
+  await invalidateDashboardOverviewSummaryServer(userId, 'goal_created');
+  return stored;
 }

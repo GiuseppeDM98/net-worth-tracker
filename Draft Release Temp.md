@@ -14,6 +14,8 @@
 
 ## 🐛 Bug Fixes
 
+- Fixed the Panoramica showing old figures for up to five minutes after a change it reads from: renaming a category, changing its type, moving or reassigning its movements, recording, editing or deleting a dividend that is not credited to an account, saving goals (from FIRE › Obiettivi or from the assistant), adding or removing a pension contribution, and changing the goals or pension-return settings on their own. Each of these now refreshes the Panoramica at once.
+
 - Fixed a cost centre deleted or renamed from Cashflow › Centri di Costo keeping its old chip on the movements in Tracciamento for a few minutes: the rows it rewrites are now reread at once.
 
 - Fixed Cashflow › Tracciamento going back to its loading skeleton every time a movement was saved or deleted: the page was rereading the dividends for the Dividendi tab (even when that tab had never been opened) and hiding the month meanwhile. A save now updates the counters and the list in place, and the dividends are reread only where they are shown.
@@ -27,6 +29,8 @@
 - Fixed a member of a shared account seeing their OWN exposure on the owner's Allocazione page: the Esposizione now reads the owner's instruments, like every other tile.
 
 ## 🔧 Improvements
+
+- Improved the Panoramica's speed: when its figures must be recomputed everything is read at once instead of in six steps, the saved result is written after the page already has it, and that result now stays good for the whole day (until you change something it reads, at most six hours) instead of five minutes — the first opening of a new day always recomputes, because «this month» depends on the date. Its response also carries a Server-Timing header, so the browser's developer tools show where the time went and whether the figures were recomputed.
 
 - Cashflow › Tracciamento, Divisione, Budget and FIRE e Simulazioni now read only the movements they show — the period and the months behind it, the year and its six trailing months, last year and this one — instead of the whole ledger every time they open: on an account with a few years of movements Cashflow shows its first figure about half a second sooner from a cold start and FIRE about a third, and every figure is the same as before. A period never opened before is read when it is picked (the picker stays where it is, the tiles wait a moment), and one opened in the last day comes from the device. Storico, Centri di Costo and Analisi keep reading the whole ledger, because their questions span it.
 
@@ -45,6 +49,8 @@
 - Improved Patrimonio › Strumenti for a composite instrument (a 60/40 fund, a balanced ETF): still one row, but its class chip now shows every class it holds — one segment per class, as wide as its share and in that class's colour, «Azioni · Obbl.» for two, «Misto» for three or more. A class under 5% gets no segment, a screen reader hears every share, and the group headers and the sort by class keep the prevailing class. (Contributed by Ciocc128.)
 
 ## 📚 Documentation
+
+- The Panoramica guide now explains when its saved summary is recomputed (an invalidation, a new day, six hours, a new version), the rule that every change to something the Panoramica reads must invalidate it, and how to read the `Server-Timing` header in production.
 
 - The Cashflow guide's section on the expense windows now says why they ship without an emergency switch: nothing stored changes shape and every page filters in memory, so going back is a plain revert. The mobile specification for the Cashflow tabs reads the windows as they are in the code (Divisione on its own period) rather than as a plan.
 

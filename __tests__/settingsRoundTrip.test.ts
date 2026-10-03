@@ -34,6 +34,7 @@ const DELETE_SENTINEL = { __deleteField: true };
 
 import { getDoc, setDoc } from 'firebase/firestore';
 import { getSettings, setSettings } from '@/lib/services/assetAllocationService';
+import { invalidateDashboardOverviewSummary } from '@/lib/services/dashboardOverviewInvalidation';
 import type { AssetAllocationSettings, AssetAllocationTarget } from '@/types/assets';
 
 /** Ogni valore è scelto per essere DIVERSO dal default, così un campo perso si vede. */
@@ -309,4 +310,27 @@ describe('setSettings — scrittura, ramo senza targets (merge: true)', () => {
       expect(writtenPayload()).not.toHaveProperty(field);
     }
   );
+});
+
+describe('setSettings — il riepilogo della Panoramica (PERF-07)', () => {
+  // Il riepilogo resta fresco per tutto il giorno: ogni campo che il payload legge deve invalidarlo,
+  // anche quando arriva da solo (prima reggeva per caso: Impostazioni manda sempre il bollo).
+  beforeEach(() => vi.mocked(invalidateDashboardOverviewSummary).mockClear());
+
+  it.each([
+    ['goalBasedInvestingEnabled', { goalBasedInvestingEnabled: true }],
+    ['pensionReturnStartMonth', { pensionReturnStartMonth: '2026-01' }],
+    ['pensionReturnStartMonth svuotato', { pensionReturnStartMonth: undefined }],
+    ['stampDutyEnabled', { stampDutyEnabled: false }],
+  ])('invalida per %s', async (_field, update) => {
+    await setSettings('user-1', update as Partial<AssetAllocationSettings> as AssetAllocationSettings);
+
+    expect(invalidateDashboardOverviewSummary).toHaveBeenCalledWith('user-1', 'overview_settings_updated');
+  });
+
+  it('non invalida per un campo che il payload non legge', async () => {
+    await setSettings('user-1', { costCentersEnabled: true } as AssetAllocationSettings);
+
+    expect(invalidateDashboardOverviewSummary).not.toHaveBeenCalled();
+  });
 });

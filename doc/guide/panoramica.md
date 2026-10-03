@@ -7,7 +7,8 @@
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Overview**: `app/dashboard/page.tsx`, `app/api/dashboard/overview/route.ts`, `lib/services/dashboardOverviewService.ts`, `lib/hooks/useDashboardOverview.ts`, `components/dashboard/overview/*` (`PatrimonioTile` exports `resolveHeroValueClass`), pure `lib/utils/{overviewNarrative,dashboardOverviewUtils,sparklinePeriod,savingsRateBadge}.ts`; `lib/utils/periodSales.ts` (`summarizePeriodSales` = the month's sells from the ledger with the estimated tax, `resolveDeclineCause` = the ONE cause of a falling month for Panoramica, Patrimonio and the email) + `lib/utils/salesNarrative.ts` (the shared words)
-- **Suites to run after a change here — Overview / materialized summary** (moved from `AGENTS.md` § Commands on 2026-09-30): `apiAuthRoutes`, `dashboardOverviewService`, `dashboardOverviewUtils` · **Verdetto e letture** `overviewNarrative` · **Badge** `savingsRateBadge`
+- **Server-Timing**: `lib/server/serverTiming.ts` (`startTiming` → `mark` → `toHeader`, pure, the clock injected) — the route's header since PERF-07 (2026-10-03)
+- **Suites to run after a change here — Overview / materialized summary** (moved from `AGENTS.md` § Commands on 2026-09-30): `apiAuthRoutes`, `dashboardOverviewService`, `dashboardOverviewUtils`, `serverTiming` · **Verdetto e letture** `overviewNarrative` · **Badge** `savingsRateBadge` · **A writer of an overview input** (the invalidation it owes, § The materialized summary): `expenseCategoryRewriteInvalidation`, `goalWritesInvalidation`, `dividendIncomeService`, `pensionContributionService`, `settingsRoundTrip`
 
 ## Panoramica and Dashboard Data Isolation
 
@@ -102,6 +103,46 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   a `null` target hides the stale number on the same render. A tick queued before a newer target's cleanup is dropped
   by the writer's own guard.
 
+## The materialized summary — one round, written after, fresh for the day (PERF-07, 2026-10-03)
+
+- **A recompute is ONE round of reads** (`readOverviewInputs` in `dashboardOverviewService.ts`): assets, snapshots,
+  settings and goals in a `Promise.all` — any of them failing rejects the route, as always — launched TOGETHER with an
+  `allSettled` of the pension contributions, the trade ledger and the two months of expenses. Never in series: with
+  the functions and Firestore an ocean apart each stage is ~100 ms. The contributions are read speculatively (an empty
+  query for an account without a fund), but a failed read REJECTS for a holder of a fund, as before (owner's call):
+  degrading to «no contributions» would print every euro paid in as the fund's market return — a wrong figure, not a
+  missing clause. The ledger degrades to «no sales clause», the expenses to `expenseStats: null`, each with its warn.
+  Pinned by `__tests__/dashboardOverviewService.test.ts` → *one round of reads…* (a held `assets` read with the six
+  others already in flight).
+- **The summary is written AFTER the response** (`after()` of `next/server`, which keeps the function alive until the
+  write settles) and only if nothing touched the document since the read that found it stale: `update(…, {
+  lastUpdateTime })` on an existing document, `create` on a missing one. Firestore refuses the write (codes 9 and 6,
+  logged as `info`) when an invalidation landed during the recompute — with a summary fresh for the day, a plain `set`
+  with `invalidatedAt: null` would erase that mutation for hours (the 5-minute TTL used to hide it). Verified on the
+  emulator on 2026-10-03: read → invalidation → stale `update` refused, the invalidation kept, the same write with the
+  current `updateTime` accepted.
+- **Fresh = same Italian day, at most 6 h, never after an invalidation** (`isSummaryStale(summary, now)`;
+  `DASHBOARD_OVERVIEW_SUMMARY_TTL_MS` = 6 h). The DAY test is the one nothing else can replace: the payload reads
+  «today» (the current and previous month, the month-end projection, what is still scheduled) and nothing writes at
+  midnight — computed at 23:50, it is yesterday's at 00:10 (the test of that case went red with the day test removed).
+  The 6 h are the safety net for an input no invalidation sees; the daily snapshot cron (18:00 UTC) invalidates every
+  account anyway.
+- **The rule that makes the day-long freshness true: every write to an input of the payload invalidates the summary**
+  — assets, snapshots, the five settings fields the payload reads (`settingsAffectDashboardOverview`, a checklist
+  comment in `assetAllocationService.ts`), `goalBasedInvesting`, pension contributions, the trade ledger and the
+  expense rows (name, type, amount, date, category). On 2026-10-03 a grep of every writer found five that did not,
+  all fixed that day: the category cascades of `expenseService` (rename, type change, reassign, clear, move — the
+  subcategory reassign alone stays out, the payload never reads it), a dividend income row NOT credited to an account
+  (create, edit, delete), the two goal writers (`saveGoalData`, `appendInvestmentGoal`), the settings predicate (3 of
+  the 5 fields: it held only because Impostazioni always sends the stamp duty) and the pension contribution record
+  (invalidated before the record existed). A new writer of an input owes its invalidation in the same commit.
+- **`Server-Timing`**: `auth;dur, db;dur, compute;dur, total;dur, source;desc=materialized|recompute`. `db` sums the
+  summary read and the round of reads; `total` runs from the handler's first line to the header, so the auth and the
+  tiny rest are inside it; the write after the response is in none of them. In production: DevTools → Network → the
+  `overview` request → Timing → *Server Timing*. On the emulator (2026-10-03, the mirror, dev server): a recompute
+  `db` ~45 ms, `compute` ~2, `total` ~50; a materialized read `total` ~7. The route's wall time in recompute went from
+  a median of 105/97 ms to 58/57 ms with the payload identical to the byte (doc/perf/README.md § 6).
+
 ## The critique of 2026-09-13 — what changed and why
 
 - **Every subject the driver clause can name is in `CLASS_SUBJECTS`, the pension band included** (`overviewNarrative.ts`).
@@ -186,6 +227,14 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   without `incomeScheduled` gets no lived reading (`null`), never half a subtraction.
 
 ## Per-page blind spots
+
+- **Three writers still do not invalidate the summary** (2026-10-03, judged minor and left): `migrateAssetLedger`
+  (once per account, its baseline BUYs move the month's market split), the coupon cleanup of `dividendService`
+  (`deleteUpcomingCoupons` / `deleteFinalPremium`, which matters only for a coupon dated today) and the dummy data
+  behind `NEXT_PUBLIC_ENABLE_TEST_SNAPSHOTS`. Each can leave the Panoramica on the old figure until the next
+  invalidation, the next Italian day, six hours or the evening cron — whichever comes first. So can a client
+  invalidation whose POST fails: it is best-effort by design (`dashboardOverviewInvalidation.ts`).
+- **The first opening of each day recomputes** — by design: the payload is the day's.
 
 - **The Cashflow tile keeps the WHOLE month** («Messo da parte il 17%», calendar included) beside the verdict's «45%
   finora»: the tile shows the month's three figures and its projection, the verdict judges the days lived. Seen by the
