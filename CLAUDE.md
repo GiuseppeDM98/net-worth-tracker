@@ -19,8 +19,8 @@ Next.js app for Italian investors: net worth, assets, cashflow, dividends, perfo
   (doc/guide/panoramica.md § The materialized summary, AGENTS.md § Caching, the line comments), one defect fixed in
   the retirement on the owner's call (`buildLiveOverviewPayload` read the month from its own clock while the rest of
   the recompute takes the injected `now`; its test seen red), four deferrals written where they live (`doc/perf/README.md`
-  § 6 and § 9; the production tour — read-only, DevTools `Server-Timing` — is now in PERF-08 § 8, and `develop`
-  goes to `main` BEFORE PERF-08 by the owner's exception, WORKFLOW.md § 3). Spec deleted, every reference rewritten to the present: `tsc`, lint 0, Vitest in `Europe/Rome`.
+  § 6 and § 9; the production tour — read-only, DevTools `Server-Timing` — waits for the release and is now in
+  PERF-08 § 8, which the owner chose to close without a production before/after). Spec deleted, every reference rewritten to the present: `tsc`, lint 0, Vitest in `Europe/Rome`.
 
 ## Architecture Snapshot
 - App Router; protected pages under `app/dashboard/*`.

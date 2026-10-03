@@ -238,6 +238,6 @@ in produzione, e i tempi delle route server si leggono dal `Server-Timing` (`lib
   blind spots della guida.
 - Il difetto trovato nel ritiro (il mese letto dal proprio orologio in `buildLiveOverviewPayload`) si corregge nel
   ritiro, con il suo test visto rosso; senza Playwright (in produzione i due orologi distano millisecondi).
-- Deroga a «tutto su main alla fine»: develop va su main PRIMA di PERF-08 e di nuovo dopo, perché il suo «prima» si
-  legge in produzione con il header già deployato e le funzioni ancora nella vecchia regione → WORKFLOW.md § 3,
-  PERF-08 § 8 (che porta anche il giro di produzione di PERF-07).
+- PERF-08 si chiude senza un «prima/dopo» di produzione: «tutto su main alla fine» resta senza deroghe, la prova è
+  `x-vercel-id` e il numero si legge una volta alla release, insieme al giro di produzione di PERF-07 → PERF-08 § 2
+  e § 8. Le anteprime Vercel non leggono il Firestore di produzione, quindi non danno un «prima».
