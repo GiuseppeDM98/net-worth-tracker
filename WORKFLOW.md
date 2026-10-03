@@ -241,7 +241,8 @@ The app **is** locally runnable; there is no fallback to declare.
 - **Branches**: `develop` is the integration branch, `main` the default; a session branches off
   whatever is active (usually `develop`) and merges into it by PR. **The `doc/perf/` and `doc/mobile/`
   specs land on `develop`, one session at a time, and reach `main` together** (owner, 2026-09-28): no
-  PR from `develop` to `main` until every PERF and every MOB spec is done.- **The outcome of a verification**: `SESSION_NOTES.md` during the session (untracked — delete it
+  PR from `develop` to `main` until every PERF and every MOB spec is done.
+- **The outcome of a verification**: `SESSION_NOTES.md` during the session (untracked — delete it
   before the commit); it is folded into `CLAUDE.md` (the "Latest" entry) and `Draft Release Temp.md`
   before the PR. **Before the closing prompt it ends with one block** (owner, 2026-09-27): *Cosa* (what
   was implemented), *Perché* (the decision behind it), *Nota* (gotchas and measures, each with its date),
