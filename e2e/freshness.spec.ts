@@ -6,8 +6,8 @@
  * whether a reload paints figures or a skeleton, and what the header's live region says in the
  * milliseconds while the fresh read is in flight, exist only in a real page. On the emulators that
  * window is a few ms, so a `getByText` would arrive late: a MutationObserver installed by
- * `addInitScript` records every text the `[data-freshness]` node has had (the `pension.spec.ts`
- * pattern), and the assertions read the recording.
+ * `addInitScript` records every text the `[data-freshness]` node has had (`e2e/freshnessProbe.ts`,
+ * shared with Rendimenti's spec), and the assertions read the recording.
  *
  * NO CLOCK TRICK: a restored figure is reread on every load whatever its age (the restore
  * invalidates what it restored — stale-while-revalidate, so a reload is still a fresh read), and
@@ -25,43 +25,10 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
-import { PERSISTED_CACHE_DB_NAME, PERSISTED_CACHE_RECORD_KEY, PERSISTED_CACHE_STORE_NAME } from './persistedCache';
+import { persistedQueryKeys, readPersistedRecord, readRecording, recordLoad } from './freshnessProbe';
 
 /** `test-user-1`'s uid — the owner segment of every persisted key of the base account. */
 const BASE_UID = 'test-user-1';
-
-interface LoadRecording {
-  /** Every text the header's freshness node has had, in order, deduplicated when unchanged. */
-  freshnessTexts: string[];
-  /** The page's own skeleton («Caricamento», never the auth wait) was in the DOM at some point. */
-  pageSkeletonSeen: boolean;
-}
-
-declare global {
-  interface Window {
-    __load: LoadRecording;
-  }
-}
-
-/** Record the page skeleton and the freshness texts from the first script on, on every navigation. */
-async function recordLoad(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    window.__load = { freshnessTexts: [], pageSkeletonSeen: false };
-    const check = () => {
-      // The page's own wait, not the shell's («Verifica dell'accesso» is the auth wait, on every load).
-      if (document.querySelector('main [role="status"][aria-label="Caricamento"]')) window.__load.pageSkeletonSeen = true;
-      const node = document.querySelector('[data-freshness]');
-      if (!node) return;
-      const text = node.textContent ?? '';
-      const texts = window.__load.freshnessTexts;
-      if (texts[texts.length - 1] !== text) texts.push(text);
-    };
-    // `document`, NOT `document.documentElement`: it does not exist yet when this runs.
-    new MutationObserver(check).observe(document, { subtree: true, childList: true, characterData: true });
-  });
-}
-
-const readRecording = (page: Page) => page.evaluate(() => window.__load);
 
 /** The Cashflow page with its month on screen: the verdict region and a euro figure in `main`. */
 async function waitForCashflow(page: Page): Promise<void> {
@@ -69,46 +36,16 @@ async function waitForCashflow(page: Page): Promise<void> {
   await expect(page.locator('main')).toContainText(/\d,\d{2}\s?€/);
 }
 
-/** The persisted record as the app wrote it, `null` when there is none. Read through IndexedDB itself. */
-async function readPersistedRecord(page: Page): Promise<string | null> {
-  return page.evaluate(
-    ([dbName, storeName, key]) =>
-      new Promise<string | null>((resolve) => {
-        const request = indexedDB.open(dbName);
-        request.onerror = () => resolve(null);
-        request.onsuccess = () => {
-          const db = request.result;
-          if (!db.objectStoreNames.contains(storeName)) {
-            db.close();
-            resolve(null);
-            return;
-          }
-          const get = db.transaction(storeName, 'readonly').objectStore(storeName).get(key);
-          get.onerror = () => resolve(null);
-          get.onsuccess = () => {
-            db.close();
-            resolve(typeof get.result === 'string' ? get.result : null);
-          };
-        };
-      }),
-    [PERSISTED_CACHE_DB_NAME, PERSISTED_CACHE_STORE_NAME, PERSISTED_CACHE_RECORD_KEY] as const,
-  );
-}
-
 /** The persisted queries of a record as `prefix/owner` — whose data it holds, and which. */
 function persistedKeys(record: string | null): string[] {
-  if (!record) return [];
-  const parsed = JSON.parse(record) as { clientState: { queries: Array<{ queryKey: unknown[] }> } };
-  return parsed.clientState.queries.map((query) =>
-    query.queryKey[1] === 'overview' ? `overview/${String(query.queryKey[2])}` : `${String(query.queryKey[0])}/${String(query.queryKey[1])}`,
+  return persistedQueryKeys(record).map((queryKey) =>
+    queryKey[1] === 'overview' ? `overview/${String(queryKey[2])}` : `${String(queryKey[0])}/${String(queryKey[1])}`,
   );
 }
 
 /** Whether the record holds a WINDOW of the base account's expenses (`['expenses', uid, 'range', …]`). */
 function holdsExpensesWindow(record: string | null): boolean {
-  if (!record) return false;
-  const parsed = JSON.parse(record) as { clientState: { queries: Array<{ queryKey: unknown[] }> } };
-  return parsed.clientState.queries.some((query) => query.queryKey[0] === 'expenses' && query.queryKey[1] === BASE_UID && query.queryKey[2] === 'range');
+  return persistedQueryKeys(record).some((queryKey) => queryKey[0] === 'expenses' && queryKey[1] === BASE_UID && queryKey[2] === 'range');
 }
 
 /**

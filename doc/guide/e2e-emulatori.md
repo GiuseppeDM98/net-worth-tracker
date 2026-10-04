@@ -4,7 +4,7 @@
 
 ## Files
 
-- **E2E ed emulatori**: `playwright.config.ts`, `e2e/*.spec.ts`, `e2e/global-setup.ts`, the six `e2e/auth*.setup.ts` + `e2e/persistedCache.ts` (the helper that keeps the persisted query cache out of the parked sessions), `e2e/shellBoot.ts`, the seeds `scripts/seedEmulator.ts` + `scripts/seed*.mts` (`seedPensionE2E`, `seedAnalisiE2E`, `seedCoastFireE2E`, `seedCostCentersE2E`), the production mirror `scripts/mirrorProdAccount.mts` (`npm run mirror:seed` / `mirror:remove`), throwaway exercises `scripts/*.tmp.mts` (untracked); npm scripts `test:e2e` / `e2e:seed*` / `dev:e2e` / `emulators` / `emulators:seed` / `dev:emulator`
+- **E2E ed emulatori**: `playwright.config.ts`, `e2e/*.spec.ts`, `e2e/global-setup.ts`, the six `e2e/auth*.setup.ts` + `e2e/persistedCache.ts` (the helper that keeps the persisted query cache out of the parked sessions), `e2e/freshnessProbe.ts` (the helper that records what a load showed and reads what the app persisted), `e2e/shellBoot.ts`, the seeds `scripts/seedEmulator.ts` + `scripts/seed*.mts` (`seedPensionE2E`, `seedAnalisiE2E`, `seedCoastFireE2E`, `seedCostCentersE2E`), the production mirror `scripts/mirrorProdAccount.mts` (`npm run mirror:seed` / `mirror:remove`), throwaway exercises `scripts/*.tmp.mts` (untracked); npm scripts `test:e2e` / `e2e:seed*` / `dev:e2e` / `emulators` / `emulators:seed` / `dev:emulator`
 
 ## Proving a refactor changed no number
 - **Measure the noise floor BEFORE interpreting a diff**: anything downstream of `new Date()` drifts (cents at two
@@ -191,7 +191,10 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   without touching the other fixtures. **It also drifts by CALENDAR** (2026-10-03): `scripts/seedEmulator.ts` dates its
   rows on the month it ran and `global-setup` never re-runs it, so the first suite of a new month finds no
   current-month row — nine Tracciamento, freshness, owner and mobile specs red with «Nessun movimento registrato ad
-  ottobre» / «the seed has no current-month row». After a month change, re-seed before the full run.
+  ottobre» / «the seed has no current-month row». After a month change, re-seed before the full run. **And until 2026-10-04 a re-seed in the first four days of a
+  month made things worse**: the seed dated its three expenses on the 5th, so they were FUTURE rows — FIRE said «servono
+  spese registrate», Coast lost its pace sentence, Storico's Driver had nothing to open (five specs red, on `develop`
+  too, checked in a worktree against the same emulators). The seed now dates them `min(5, today)`.
 - **What belongs here**: only what needs a real layout — the `desktop:` switch at 1440px, a collapsible, a state flash,
   computed font sizes, bounding boxes, overflow; the arithmetic stays with Vitest. **Two limits**: a race between
   concurrent queries is not reproducible locally (the Firestore Web SDK multiplexes every target onto ONE webchannel),
@@ -244,7 +247,10 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   'load'`, then `.inputValue()`); `addInitScript` runs on EVERY navigation, reloads included, so a `localStorage.removeItem`
   placed there to start clean also wipes the persistence the spec is about to verify — guard it with a `sessionStorage`
   flag (2026-09-14); on `/login` `getByLabel(/password/i)` resolves the «Mostra password» toggle first and `fill()`
-  refuses a button — use `input[type=password]` (2026-09-19). **Renaming an `aria-label` breaks every spec that matched its old substring** («Modifica asset» →
+  refuses a button — use `input[type=password]` (2026-09-19). **A box read for a geometry assertion is taken AFTER the entrance** (2026-10-04, `e2e/modal.origin.spec.ts`): a
+  header button is enabled from the page's first frame and glides 4px for ~250 ms with the page scene, so a
+  `boundingBox()` right after `toBeEnabled` was up to 4px off — wait for the page's verdict, then for a box two reads
+  100 ms apart agree on. **Renaming an `aria-label` breaks every spec that matched its old substring** («Modifica asset» →
   «Modifica {name}», `assets.bond.spec.ts` on 2026-09-14): grep `e2e/` for the old name in the same commit.
 - **After Escape a vaul drawer is still in the DOM for ~1,5 s, and `main` sits under an `aria-hidden` ancestor all
   that time** (2026-09-18, at 390): `getByRole(…)` on anything in the page counts 0, so a step that comes right after

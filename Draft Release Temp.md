@@ -4,7 +4,7 @@
 
 ## ✨ New Features
 
-- Every dashboard page now opens on the figures it showed last time, at once, and rereads them behind: the app keeps its last successful reads on the device (instruments, snapshots, movements, categories, settings, pension contributions, the trade ledger, cost centres, goals, the Hall of Fame and the Panoramica summary — nothing of the assistant, the benchmarks or the demo account), so a reload or a return after an hour no longer starts from a skeleton. While the fresh read is in flight the page header says so in the line under the title — «Aggiornato alle 18:42, sto rileggendo…», «Aggiornato ieri alle 18:42…» — and the sentence goes the moment the fresh figures land, without anything moving. What is kept expires after a day and is forgotten at sign-out; a save you make still shows its result the usual way, with no sentence, because nothing on screen is old then.
+- Every dashboard page now opens on the figures it showed last time, at once, and rereads them behind: the app keeps its last successful reads on the device (instruments, snapshots, movements, categories, settings, pension contributions, the trade ledger, cost centres, goals, the Hall of Fame, the metrics of Rendimenti and the Panoramica summary — nothing of the assistant, the benchmarks or the demo account), so a reload or a return after an hour no longer starts from a skeleton. While the fresh read is in flight the page header says so in the line under the title — «Aggiornato alle 18:42, sto rileggendo…», «Aggiornato ieri alle 18:42…» — and the sentence goes the moment the fresh figures land, without anything moving. What is kept expires after a day and is forgotten at sign-out; a save you make still shows its result the usual way, with no sentence, because nothing on screen is old then.
 
 - Added an optional reading of Analisi › Flusso by 50/30/20 role (Necessità · Desideri · Risparmi): switch it on in Impostazioni › Spese, give each spending category a role (a subcategory can override it), and the Flusso opens on «Per ruolo» with «Per tipo» one tap away. What has no role yet reads «Da classificare», a period that spent more than it earned shows the gap as «Coperto dal patrimonio», and when some spending is itself a saving the reading says how much was set aside and how much was left over. (Contributed by Ciocc128.)
 
@@ -13,6 +13,8 @@
 - Rebuilt the Esposizione tile of Allocazione: Titoli and Settori now weigh the notional exposure of the equity sleeves (a 2× fund counts twice its price, a 60/40 fund enters with its equity leg only), Emittenti the market value of every quoted instrument once, and a line above the list says where every euro went — «In questa vista: 120.000 € di azionario nozionale, letti al 94%: 7000 € (un ETF sintetico) non hanno una composizione pubblicata; i primi dieci titoli di ogni fondo ne nominano il 31%, il resto è «Resto letto». Fuori da questa vista: 40.000 € di obbligazionario; 8000 € di materie prime, senza titoli per natura». The percentages are shares of the base named beside the column, the list closes on «Resto letto» and «Non letto» and always adds up to 100, and «Aggiorna» asks Yahoo again while the footer dates the oldest answer used. (Proposed by Ciocc128 in #402, implemented with changes.)
 
 ## 🐛 Bug Fixes
+
+- Fixed «Aggiorna» on Rendimenti with a custom period selected leaving the page on «Servono almeno due snapshot mensili…»: the refresh now drops the custom range and returns to the year to date.
 
 - Fixed the Panoramica showing old figures for up to five minutes after a change it reads from: renaming a category, changing its type, moving or reassigning its movements, recording, editing or deleting a dividend that is not credited to an account, saving goals (from FIRE › Obiettivi or from the assistant), adding or removing a pension contribution, and changing the goals or pension-return settings on their own. Each of these now refreshes the Panoramica at once.
 
@@ -29,6 +31,8 @@
 - Fixed a member of a shared account seeing their OWN exposure on the owner's Allocazione page: the Esposizione now reads the owner's instruments, like every other tile.
 
 ## 🔧 Improvements
+
+- Rendimenti opens sooner: it reads each of its collections once and asks the dividend yields of all five periods (Yield on Cost, current yield) in a single request sent together with the metrics, instead of two requests per period sent after them. On a reload it shows the figures of the last visit at once, with «Aggiornato alle…» in the header while it rereads them, like the other pages; every figure is the same as before.
 
 - Moved the app's server functions to Frankfurt, next to the database (which is in Belgium and the Netherlands) instead of Washington: every read a page makes from the server no longer crosses the Atlantic, so pages that fetch several figures at opening answer sooner.
 
@@ -51,6 +55,8 @@
 - Improved Patrimonio › Strumenti for a composite instrument (a 60/40 fund, a balanced ETF): still one row, but its class chip now shows every class it holds — one segment per class, as wide as its share and in that class's colour, «Azioni · Obbl.» for two, «Misto» for three or more. A class under 5% gets no segment, a screen reader hears every share, and the group headers and the sort by class keep the prevailing class. (Contributed by Ciocc128.)
 
 ## 📚 Documentation
+
+- The Rendimenti guide now explains how the page reads — every collection once, the metrics and the dividend yields asked together, why the yields are kept beside the saved metrics and not inside them — and the PDF guide notes that a yearly export of the current year measures one month less than the page's «YTD».
 
 - Retired the specification that moved the server functions next to the database after reading it against the code (thirteen differences, no defect in the code): the setup guide now explains how to read which region a function ran in — the first part of the `x-vercel-id` header is the edge nearest to you, not the function — and what to look at after changing region, and the test that holds the deployment configuration was seen failing in each of the ways it guards against.
 

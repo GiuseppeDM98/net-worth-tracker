@@ -1,6 +1,6 @@
 # PERF-09 — Rendimenti: ogni collezione letta una volta, i rendimenti da dividendo in una chiamata
 
-> Stato: da fare · Priorità: 2 · Sforzo: M · Dipende da: PERF-05 (chiusa il 2026-09-29: gli hook condivisi), PERF-07 (`Server-Timing`) · Sblocca: —
+> Stato: **fatta il 2026-10-04** (misure e divergenze in `README.md` § 6 e § 9; la spec resta fino al ritiro) · Priorità: 2 · Sforzo: M · Dipende da: PERF-05 (chiusa il 2026-09-29: gli hook condivisi), PERF-07 (`Server-Timing`) · Sblocca: —
 
 ## 1. Il problema, misurato
 

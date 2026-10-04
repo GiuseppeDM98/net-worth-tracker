@@ -30,6 +30,15 @@ export const queryKeys = {
     all: (userId: string) => ['dividend-receipts', userId] as const,
   },
 
+  // Rendimenti — the pre-computed metrics, named by the service's own cache key (every input they
+  // depend on: a changed snapshot, base or setting is a new key), and the dividend yields, named by
+  // the windows asked. Both persisted (lib/constants/persistCache.ts): a reload paints the last
+  // known figures and rereads behind them.
+  performance: {
+    data: (userId: string, cacheKey: string) => ['performance', 'data', userId, cacheKey] as const,
+    yields: (userId: string, periodsSignature: string) => ['performance', 'yields', userId, periodsSignature] as const,
+  },
+
   // Hall of Fame — the pre-computed rankings document (hall-of-fame/{uid}).
   hallOfFame: {
     all: (userId: string) => ['hall-of-fame', userId] as const,

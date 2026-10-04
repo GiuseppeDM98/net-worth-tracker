@@ -11,15 +11,18 @@
  * The ALLOWLIST is the safety: only the owner's own collections, read through the hooks of
  * AGENTS.md § React Query and Derived State, are persisted. What stays out: the assistant's threads
  * and contexts (they change on every message), the benchmark/FX/ECB series (a server cache already
- * holds them), the Esposizione's Yahoo profiles (same), the budget history and the performance
- * cache (already on Firestore) — and EVERYTHING of the demo account, whose data is shared by every
- * visitor and must not land in a visitor's browser (`isDemoUid`).
+ * holds them), the Esposizione's Yahoo profiles (same), the budget history — and EVERYTHING of
+ * the demo account, whose data is shared by every visitor and must not land in a visitor's browser
+ * (`isDemoUid`). Rendimenti's two payloads are IN since 2026-10-04 (the owner's decision): the
+ * metrics also live in `performance-cache/{uid}` on Firestore, but that is a round trip — with only
+ * the six collections restored, a reload painted a skeleton under «Aggiornato alle…».
  *
  * WARNING: `PERSIST_CACHE_VERSION` must be bumped by any change that RENAMES, REMOVES or changes
  * the TYPE of a field in a persisted payload — everything under `PERSISTED_QUERY_PREFIXES`: an
  * asset (the mortgage instalments under its key too), an expense, a snapshot, a category, the
  * settings document, a contribution, a trade, the ledger's meta document, a cost centre, the Hall
- * of Fame rankings, a goal, a dividend receipt, the overview payload. A client that restores an
+ * of Fame rankings, a goal, a dividend receipt, the overview payload, Rendimenti's
+ * `PerformanceData` and its dividend yields. A client that restores an
  * older shape would read it as truth until the refetch lands. A new optional field whose absence means the default does not need it
  * (AGENTS.md § Caching, beside `CACHE_MATH_VERSION`).
  */
@@ -80,6 +83,10 @@ export const PERSISTED_QUERY_PREFIXES: readonly (readonly string[])[] = [
   ['hall-of-fame'],
   ['goal-data'],
   ['dividend-receipts'],
+  // Rendimenti: the pre-computed metrics, named by the cache key of the inputs they were computed
+  // from (restored inputs resolve to the same key, so the pair is consistent), and the yields.
+  ['performance', 'data'],
+  ['performance', 'yields'],
 ];
 
 function matchesPrefix(queryKey: readonly unknown[], prefix: readonly string[]): boolean {

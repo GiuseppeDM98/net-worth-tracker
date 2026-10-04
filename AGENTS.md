@@ -160,7 +160,9 @@ pointer — a stub that grows past that is a guide leaking back (2026-09-20: ten
   in `lib/query/queryKeys.ts`, one hook apiece in `lib/hooks/`: `useAssets`, `useSnapshots`, `useExpenses` (and its
   windows, next bullet), `useExpenseCategories`, `useSettings` (the ONE `['settings', ownerId]`), `usePensionContributions`,
   `useAssetTransactions`, `useCostCenters`, `useGoalData`, `useDividendReceipts`, `useHallOfFame`, `useMortgageInstalments`,
-  `useDashboardOverview`. An imperative read (a refresh, a dialog reading once after a write, the CSV import before it
+  `useDashboardOverview`. **A service that computes from collections takes them as an argument** (2026-10-04,
+  `getAllPerformanceData(userId, forceRefresh, inputs?)`): the page hands over what its hooks hold instead of letting the
+  service read them a second time. An imperative read (a refresh, a dialog reading once after a write, the CSV import before it
   commits) goes through the hook's exported `…QueryOptions(ownerId)` with `queryClient.fetchQuery` — the same key, the
   same reader, the global staleTime; `staleTime: 0` where the CURRENT document is the point («Annulla» on Impostazioni,
   the pre-read of its «Salva», the import's commit). The closing grep of a session is
@@ -262,13 +264,16 @@ pointer — a stub that grows past that is a guide leaking back (2026-09-20: ten
 - **Per-user pre-computed cache** (`performance-cache/{userId}`): the key encodes **every** determining input — a hash of
   the WHOLE snapshot series, the base signature, the risk-free rate, the dividend category. TTL fallback (6h) covers what
   the key cannot; reads/writes are `try/catch` fire-and-forget; `Date` ↔ `Timestamp` is field-by-field, never JSON.
+  **A figure whose inputs the key does not cover stays OUT of the document** (2026-10-04): Rendimenti's dividend yields
+  read the dividends and today's prices, so they live in React Query beside it (doc/guide/rendimenti.md § every
+  collection read once).
 - **Server-owned materialized summary** (`dashboardOverviewSummaries/{userId}`, 2026-10-03): no key — FRESH means no
   `invalidatedAt`, the same `sourceVersion`, the same ITALIAN DAY as `computedAt` (a payload that reads «today» goes
   stale at midnight with nobody writing) and at most 6 h old. That holds only because **every write to an input
   invalidates it** — a new writer owes its invalidation in the same commit (five were missing, found by grep). The
   rebuild is written in `after()` under a precondition (`update` with `lastUpdateTime`, `create`), so an invalidation
   landing mid-rebuild survives it; `Server-Timing` on the route. doc/guide/panoramica.md § The materialized summary.
-- **A changed FORMULA is the one input no signature can see — that is `CACHE_MATH_VERSION`** (`v5`), bumped on any change
+- **A changed FORMULA is the one input no signature can see — that is `CACHE_MATH_VERSION`** (`v8`), bumped on any change
   to what the pipeline computes from unchanged inputs. When verifying by hand, press **Aggiorna** (`forceRefresh`) first.
 - **Global shared cache** (benchmark, FX, ECB): natural key as doc id, no `userId`, `read: isAuthenticated(); write:
   false`; client `staleTime` = server TTL minus headroom.
@@ -825,7 +830,9 @@ file used to carry.
 - **A trial merge of an open PR runs in a worktree, never in the main checkout** (2026-09-07): fetch the head as
   `refs/pr/<N>`, `git merge --no-commit --no-ff refs/pr/<N>`, then `tsc`, the area suites and eslint, then `git merge
   --abort`. A worktree has no `node_modules`: a directory junction to the main one (`New-Item -ItemType Junction` in
-  PowerShell — `cmd //c mklink` is refused by the sandbox), removed with `rmdir`, which drops only the link. Two at a
+  PowerShell — `cmd //c mklink` is refused by the sandbox), removed with `rmdir`, which drops only the link. On the Mac a
+  symlinked `node_modules` is refused by Turbopack («Symlink … points out of the filesystem root», 2026-10-04): clone it
+  with `cp -cR` (copy-on-write, instant) and delete the clone and the worktree's `.next-*` before `git worktree remove`. Two at a
   time on 16 GB; a conflicting PR is judged on `git merge-tree --write-tree` and `git show <tree>:<path>`, never resolved
   by guessing. **Never `git worktree remove --force` a worktree that held a junction or a build** (2026-09-30: after a
   `.next-perf` build in a junction-backed worktree, the removal left the main `node_modules` EMPTY — `npm ci` rebuilt
