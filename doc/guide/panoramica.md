@@ -147,7 +147,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   tiny rest are inside it; the write after the response is in none of them. In production: DevTools → Network → the
   `overview` request → Timing → *Server Timing*. On the emulator (2026-10-03, the mirror, dev server): a recompute
   `db` ~45 ms, `compute` ~2, `total` ~50; a materialized read `total` ~7. The route's wall time in recompute went from
-  a median of 105/97 ms to 58/57 ms with the payload identical to the byte (doc/perf/README.md § 6). The functions run in `fra1` since PERF-08 (`vercel.json` → `regions`); no production reading was taken (owner, 2026-10-04).
+  a median of 105/97 ms to 58/57 ms with the payload identical to the byte (doc/perf/README.md § 6). The functions run in `fra1` since 2026-10-04 (`vercel.json` → `regions`, SETUP.md § Function region); no production reading was taken (owner, 2026-10-04).
 
 ## The critique of 2026-09-13 — what changed and why
 

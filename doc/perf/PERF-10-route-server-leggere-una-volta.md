@@ -25,7 +25,7 @@ QUELLA route, in `lib/server/exposure/instrumentProfileService.ts` (i conteggi `
 **B. `/api/dividends/stats`: sette `await` in serie e D letta tre volte** (`app/api/dividends/stats/route.ts:106, 109, 112, 116,
 123, 144, 173`): `calculateDividendStats` per il periodo (con le date legge per intervallo, `dividendService.ts:417-421`), di
 nuovo per all-time (TUTTA D), `getUpcomingDividends`, A, S, T, poi `getAllDividends` (tutta D di nuovo). La tab Dividendi
-chiama in più `/api/dividends` (D ancora, `cashflow/page.tsx:132-162`). Con `iad1` → Europa: sette viaggi ≈ 700 ms prima delle
+chiama in più `/api/dividends` (D ancora, `cashflow/page.tsx:132-162`). Sono sette viaggi in serie — dal 2026-10-04 dentro l'Europa: le funzioni girano in `fra1` accanto a Firestore (`vercel.json` → `regions`; con `iad1` erano ≈ 700 ms stimati, mai misurati in produzione) — prima delle
 statistiche.
 
 **C. Assistente:** `listAssistantThreads` senza `limit` (`lib/server/assistant/store.ts:184-189`: cresce per sempre). Il

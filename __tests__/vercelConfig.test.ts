@@ -4,6 +4,11 @@
  * A stray comma in this file breaks the deploy silently, and the Hobby plan
  * rejects more than one region, so the file is held here: valid JSON, ONE
  * European region next to Firestore (eur3), and the two crons intact.
+ *
+ * The region is pinned by name on purpose: moving or removing it (the
+ * rollback) is a deliberate change, and this expectation changes in the same
+ * commit. Each guard was seen red on 2026-10-04: a second region, a renamed
+ * cron path, and a doubled comma (the suite then fails at collection).
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';

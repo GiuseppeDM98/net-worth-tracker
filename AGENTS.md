@@ -812,7 +812,7 @@ file used to carry.
   route the session deleted: delete those files, a dev server regenerates them. The Playwright server leaves the same
   in `.next-e2e/dev/types/` (2026-09-20: `routes.d.ts` TS1434, then `validator.ts` missing `./routes.js` once it is
   gone) — there the `types` directory goes whole: it is generated, and that server is the suite's alone.
-- **Git Bash on Windows, two traps.** It rewrites a command argument that starts with `//` into `/` (MSYS path
+- **Git Bash on Windows, two traps.** It rewrites a command argument that starts with `//` into `/` — and one that starts with a single `/` into a Windows path (2026-10-04: `/api/cron/…` handed to a swap script matched nothing) — (MSYS path
   conversion): prefix the command with `MSYS_NO_PATHCONV=1`. **Its `sed -i` is not a falsification tool**
   (2026-09-28): a pattern holding `€` matched nothing and exited 0 — the benchmark ran «broken» and stayed green,
   which read as a detector that could not fail — and on a CRLF file an insert-then-delete left it LF. Swap text with a
