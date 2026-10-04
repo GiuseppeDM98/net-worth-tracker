@@ -52,7 +52,7 @@ const anthropic = new Anthropic({
  *
  * MODEL CONFIG:
  * - PERFORMANCE_ANALYSIS_MODEL (lib/constants/aiModels.ts) for optimal cost/quality balance
- * - Extended Thinking (10k budget) for deeper financial reasoning
+ * - Adaptive thinking at effort `high` for deeper financial reasoning
  * - web_search_20250305: Claude autonomously searches for market events (max 3 uses)
  *
  * `signal` is the SDK's own request option: aborting it closes the upstream HTTP stream, which is
@@ -62,11 +62,9 @@ async function callAnthropicForPerformanceAnalysis(prompt: string, signal: Abort
   return anthropic.messages.create(
     {
       model: PERFORMANCE_ANALYSIS_MODEL,
-      max_tokens: 16000, // thinking 10k + output ~6k max
-      thinking: {
-        type: 'enabled',
-        budget_tokens: 10000,
-      },
+      max_tokens: 16000, // covers thinking AND text together
+      thinking: { type: 'adaptive' },
+      output_config: { effort: 'high' },
       tools: [
         {
           // Native web search — no external API key needed; billed at $10/1000 searches + token costs.
