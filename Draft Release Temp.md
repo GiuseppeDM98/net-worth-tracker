@@ -56,6 +56,8 @@
 
 ## 📚 Documentation
 
+- Retired the specification behind Rendimenti's single read after reading it against the code (twenty-seven differences, none in the behaviour): the agent guidelines now say a date in a request is validated as text before it is converted — converted directly, a missing date was read as 1970 instead of being refused — and the Rendimenti guide and two code comments no longer describe a loader the page dropped.
+
 - The Rendimenti guide now explains how the page reads — every collection once, the metrics and the dividend yields asked together, why the yields are kept beside the saved metrics and not inside them — and the PDF guide notes that a yearly export of the current year measures one month less than the page's «YTD».
 
 - Retired the specification that moved the server functions next to the database after reading it against the code (thirteen differences, no defect in the code): the setup guide now explains how to read which region a function ran in — the first part of the `x-vercel-id` header is the edge nearest to you, not the function — and what to look at after changing region, and the test that holds the deployment configuration was seen failing in each of the ways it guards against.

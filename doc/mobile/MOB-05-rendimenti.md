@@ -8,15 +8,15 @@
 Censimento 2026-09-26. **390×844**: 4,71 schermate, 8 tessere (1 sopra la piega / 0 intere), 53 cifre (7 sopra), 27
 controlli, 2 grafici; navbar 74 px, verdetto 153 px; LA tessera da y 478, alta 585: finisce sotto la pill; l'ultima
 tessera finisce a y 3706. **768**: 2,75 · 8 (3/1). **1024×768**: 3,62 · 8 (1/0). Il codice (righe del 2026-09-26, PRIMA
-di PERF-09: riverificarle):
+che il caricamento passasse a `lib/hooks/usePerformanceData.ts`, 2026-10-04: riverificarle):
 
 - `app/dashboard/performance/page.tsx:721-736` verdetto + riga d'ambito (`:727-732`, `describeMeasurementBase`);
   `:738-742` sotto `desktop:` selettore e due bottoni da 44 px DOPO verdetto e base. `:616-626` la navbar mobile ha
   solo «Aggiorna»; a dati insufficienti (`:663-693`) il telefono non ha il periodo personalizzato.
 - `:292-294` meta e registro leggono solo `data`: una meta in errore vale «non migrato», `realizedSummary` è `null`
   (`:539`), la tessera non si monta (`:849-853`). **Plusvalenze sparisce**, e Contributi perde il registro (`:529-532`).
-  Il registro in errore invece ferma GIÀ la pagina: lo stadio 1 lo legge sulla stessa chiave (`:360`) e il `catch` mette
-  `loadFailed` (`:380-381`).
+  Il registro in errore invece ferma GIÀ la pagina: è una delle sei letture di `usePerformanceData`
+  (`useAssetTransactions`, sulla stessa chiave), e `composeReadState` mette `loadFailed`.
 - `components/performance/tiles/RendimentoTile.tsx`: eroe `:95-109`, chip dello scarto `:112-124`, chip sull'altra base
   `:125-130`, chip «dal massimo del periodo» `:131-135`, curva `minHeight={160}` `:149`.
 - `lib/utils/performanceNarrative.ts:309-352` una frase sola, `:355-360` nessun taglio. I modali hanno già
@@ -32,7 +32,8 @@ di PERF-09: riverificarle):
 ## 3. Non-obiettivi
 
 - B e C; il desktop oltre § 4.5; le colonne del tablet (MOB-08); DESIGN.md (MOB-09).
-- Letture, base, flussi e cache: PERF-09. Qui nessuna query cambia.
+- Letture, base, flussi e cache: sono di `lib/hooks/usePerformanceData.ts` (doc/guide/rendimenti.md § every collection
+  read once). Qui nessuna query cambia.
 - Il chip sull'altra base e il ROI non entrano nella striscia; `AIAnalysisDialog` non cambia.
 
 ## 4. Design
@@ -105,8 +106,8 @@ tiene il dato già letto, come ogni pagina con la cache persistita — doc/guide
 Con `failed`, a ogni larghezza, `ErrorNotice` da `describeReadFailure({ subject: 'Plusvalenze realizzate',
 consequence: 'Le plusvalenze realizzate non sono state lette: …', canRetry: true })`, riprova = refetch delle due
 query. Sotto `desktop:` `collapse`, `live={!compact}`, `SectionSpec.failed`: la riga si apre da sola, chiusa ha
-l'eyebrow in `--destructive`, annuncia solo `PageRest`. Il registro in errore ferma la pagina oggi (§ 1) e dopo PERF-09
-(gate su ogni query, PERF-09 § 4 A): il caso vero è la meta.
+l'eyebrow in `--destructive`, annuncia solo `PageRest`. Il registro in errore ferma la pagina (§ 1:
+`usePerformanceData` attende ogni query e compone `loadFailed`): il caso vero è la meta.
 
 ### 4.6 Le azioni
 
@@ -118,15 +119,17 @@ l'eyebrow in `--destructive`, annuncia solo `PageRest`. Il registro in errore fe
 
 ### 4.7 Conflitti con PERF
 
-- **PERF-09** riscrive il caricamento (hook, `/api/performance/yields`, attesa su ogni query): MOB-05 parte dopo di
-  lei e non tocca letture; la sua spec che conta `/api/performance/*` resta verde. Qui il guadagno è CPU, non rete.
+- **PERF-09** (in develop dal 2026-10-04, spec ritirata) ha riscritto il caricamento: `lib/hooks/usePerformanceData.ts`,
+  `POST /api/performance/yields`, attesa su ogni query (doc/guide/rendimenti.md § every collection read once). MOB-05
+  non tocca letture; il test di `e2e/performance.degraded.spec.ts` che conta `/api/performance/*` resta verde. Qui il
+  guadagno è CPU, non rete.
 - **PERF-04** (in develop dal 2026-09-30): i tre grafici del «Dettaglio» (`UnderwaterDrawdownChart` e i due rolling) sono
   `lazyComponent` precaricati a riposo; le tessere sono SVG a mano (doc/guide/rendimenti.md), le righe
   chiuse non risparmiano chunk. **PERF-14** toglie il `layout` dai wrapper di pagina, non il `layout="position"` di
   `AttribuzioneTile.tsx:68` (il riordino al cambio periodo), che resta in un pannello montato all'apertura; la riga
-  anima in CSS. **PERF-12**: ref scritti solo negli handler. **PERF-03** (in develop dal 2026-09-30): Rendimenti non ha
-  «Aggiornato alle…» — lo stadio 1 legge con `fetchQuery` e non dipinge mai un dato vecchio (PERF-09 § 1 lo annota e potrà darglielo, nel
-  `PageHeader` come le altre pagine, mai nella composizione).
+  anima in CSS. **PERF-12**: ref scritti solo negli handler. **PERF-03** (in develop dal 2026-09-30): Rendimenti ha
+  «Aggiornato alle…» dal 2026-10-04 (`useFreshness(loaded.freshnessQueries)` in `page.tsx`, i due payload nella cache
+  persistita): sta nel `PageHeader` come nelle altre pagine, mai nella composizione.
 
 ### 4.8 Domande al proprietario
 
@@ -220,7 +223,7 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
 - Leggi doc/guide/rendimenti.md PER INTERO, doc/guide/stati.md, doc/guide/dialog.md, doc/guide/e2e-emulatori.md
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice
 - Leggi doc/mobile/README.md, MOB-02 e il codice che ha lasciato, la spec MOB-05 per intero; DESIGN.md § 5, § 6 e
-  il capitolo mobile se c'è (MAI rigenerarlo); doc/perf/PERF-09 (deve essere chiusa)
+  il capitolo mobile se c'è (MAI rigenerarlo); `lib/hooks/usePerformanceData.ts` (il caricamento com'è dal 2026-10-04)
 - Crea SESSION_NOTES.md; crea il branch dalla branch attiva PRIMA di editare
 
 Regole: nessun commit senza il mio OK; un branch e un commit; rispondi in italiano; le cinque domande di § 4.8 con lo
