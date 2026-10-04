@@ -310,7 +310,7 @@ and a pension fund unlocking inside the projection's horizon). Note: the emulato
 
 1. Import the repository on [vercel.com](https://vercel.com)
 2. Add all environment variables from `.env.local`
-3. Deploy — cron jobs for snapshots and dividends are configured in `vercel.json`
+3. Deploy — cron jobs for snapshots and dividends, and the region the functions run in (`fra1`, next to Firestore), are configured in `vercel.json`
 
 Two cron jobs run daily at 18:00 UTC:
 - `/api/cron/monthly-snapshot` — Automatic monthly portfolio snapshots

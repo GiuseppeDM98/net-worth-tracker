@@ -52,6 +52,8 @@
 
 ## 📚 Documentation
 
+- Retired the specification that moved the server functions next to the database after reading it against the code (thirteen differences, no defect in the code): the setup guide now explains how to read which region a function ran in — the first part of the `x-vercel-id` header is the edge nearest to you, not the function — and what to look at after changing region, and the test that holds the deployment configuration was seen failing in each of the ways it guards against.
+
 - Retired the specification of the Panoramica's faster recompute after reading it against the code (fourteen differences: nine already explained in the guides, one small defect fixed on the spot — the summary now takes «this month» from the moment of the request in every part — four things postponed and now written where they will be read); the specifications that build on it describe the timing header as it exists today, and the owner's read-only check in production is carried by the next server specification.
 
 - The Panoramica guide now explains when its saved summary is recomputed (an invalidation, a new day, six hours, a new version), the rule that every change to something the Panoramica reads must invalidate it, and how to read the `Server-Timing` header in production.

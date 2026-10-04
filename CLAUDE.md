@@ -14,13 +14,7 @@ Next.js app for Italian investors: net worth, assets, cashflow, dividends, perfo
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic.
 - `tsc` clean; **213 files / 4848 tests** green in `Europe/Rome` and in the machine's zone + **45 Playwright spec files** (162 tests, incl. 6 auth setups; last full run 2026-10-03 on the Windows laptop, 151/162 in 10,2 min — nine red on a base seed of the previous month, green after `npm run emulators:seed`, and `modal.origin`, Known Issues; doc/guide/e2e-emulatori.md). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, which structurally hides timezone bugs.
-- Latest (2026-10-04): **PERF-08 — the Vercel functions in `fra1`** (`vercel.json` → `"regions": ["fra1"]`, next to Firestore `eur3`; before, the default `iad1` made every Admin read a transatlantic round trip). No production before/after (owner, 2026-10-03): no production tour either (owner, 2026-10-04): the spec closes by construction, the regions aligned and the test holding the file. Hobby takes one region, so more than one fails the deploy; `__tests__/vercelConfig.test.ts` holds the file. SETUP.md records the location. Rollback is one line.
-- Previously (2026-10-03): **the PERF-07 spec retired** (the Panoramica's one-round recompute, PR #423 in develop since
-  2026-10-03) — 14 divergences read against the code: nine where the code was right and the lesson was already home
-  (doc/guide/panoramica.md § The materialized summary, AGENTS.md § Caching, the line comments), one defect fixed in
-  the retirement on the owner's call (`buildLiveOverviewPayload` read the month from its own clock while the rest of
-  the recompute takes the injected `now`; its test seen red), four deferrals written where they live (`doc/perf/README.md`
-  § 6 and § 9; the production tour was dropped by the owner, 2026-10-04, with PERF-08 closed without a before/after). Spec deleted, every reference rewritten to the present: `tsc`, lint 0, Vitest in `Europe/Rome`.
+- Latest (2026-10-04): **the PERF-08 spec retired** (the Vercel functions in `fra1`, PR #426 in develop since 2026-10-04) — 13 divergences read against the code: seven where the code was right (five already home; two lessons carried: `x-vercel-id` does not START with the function's region — its first segment is the edge nearest the caller — in SETUP.md § Function region, and the rollback being the line PLUS the test's expectation, in the header of `__tests__/vercelConfig.test.ts`), one proof gap closed on the owner's call (the cron case never seen red: falsified with a second region and a doubled comma, all three red), five deferrals written where they live (no production reading, by decision; the crons to watch after the release in SETUP.md § Function region; `doc/perf/README.md` § 6 and § 9). Spec deleted, every reference rewritten to the present: `tsc`, lint 0, Vitest in `Europe/Rome`.
 
 ## Architecture Snapshot
 - App Router; protected pages under `app/dashboard/*`.
@@ -64,14 +58,14 @@ One line per area: the question it answers, then where it is described. *What th
 - **Performance**: `npm run perf:budget` (JS per route against `perf/budget.json`, two seconds, after a build) and
   `npm run perf:bench -- --runs=3` (cold/warm on the mirror, via `perf:build` + `perf:serve` on :3200); commands, columns,
   the baseline in force and the raised-ceiling register in `perf/README.md`. A route that grows raises its ceiling in the
-  same commit with `raisedBy`. The specs and the 2026-09-26 history in `doc/perf/README.md` (PERF-00 to 08 done; their specs retired except 08).
+  same commit with `raisedBy`. The specs and the 2026-09-26 history in `doc/perf/README.md` (PERF-00 to 08 done, their specs retired).
 - **Mobile composition**: the small-screen census (19 surfaces × 390/768/1024), the chosen direction, the nine specs and
   the owner's decisions in `doc/mobile/README.md`; the census script in `doc/mobile/reference/` (MOB-01 ports it to
   `npm run mobile:census` / `mobile:budget`). Implemented after `doc/perf/`.
 - **Browser (E2E)**: Playwright, `npm run test:e2e` with the emulators up (needs **Java ≥ 21**); app on :3100 with an isolated build dir. Accounts and fixtures: SETUP.md → Step 7; gotchas: doc/guide/e2e-emulatori.md § Browser-Driven E2E (Playwright).
 
 ## Data & Integrations
-Firestore client + admin (production in `eur3`, Belgium + Netherlands; the Vercel functions in `fra1` via `vercel.json` → `regions`, ONE region on the Hobby plan, held by `__tests__/vercelConfig.test.ts`; PERF-08) · Yahoo Finance (prices, benchmark history) · Borsa Italiana scraping (Italian bonds, dividends) · Frankfurter (FX) · FRED (`FRED_API_KEY`, series ECBDFR) · Anthropic (`claude-sonnet-5` analysis + assistant, `claude-haiku-4-5` extraction).
+Firestore client + admin (production in `eur3`, Belgium + Netherlands; the Vercel functions in `fra1` via `vercel.json` → `regions`, ONE region on the Hobby plan, held by `__tests__/vercelConfig.test.ts`) · Yahoo Finance (prices, benchmark history) · Borsa Italiana scraping (Italian bonds, dividends) · Frankfurter (FX) · FRED (`FRED_API_KEY`, series ECBDFR) · Anthropic (`claude-sonnet-5` analysis + assistant, `claude-haiku-4-5` extraction).
 
 ## Known Issues (Active)
 Only what crosses areas; an area's blind spots — the behaviours that look like bugs and are not — close its `doc/guide/<tema>.md` (§ Per-page blind spots). The demo account's manual setup is in README.md → Known Issues, the shared account's prerequisites in SETUP.md → Step 5b.
