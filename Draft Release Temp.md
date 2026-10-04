@@ -30,6 +30,8 @@
 
 ## 🔧 Improvements
 
+- Moved the app's server functions to Frankfurt, next to the database (which is in Belgium and the Netherlands) instead of Washington: every read a page makes from the server no longer crosses the Atlantic, so pages that fetch several figures at opening answer sooner.
+
 - Improved the Panoramica's speed: when its figures must be recomputed everything is read at once instead of in six steps, the saved result is written after the page already has it, and that result now stays good for the whole day (until you change something it reads, at most six hours) instead of five minutes — the first opening of a new day always recomputes, because «this month» depends on the date. Its response also carries a Server-Timing header, so the browser's developer tools show where the time went and whether the figures were recomputed.
 
 - Cashflow › Tracciamento, Divisione, Budget and FIRE e Simulazioni now read only the movements they show — the period and the months behind it, the year and its six trailing months, last year and this one — instead of the whole ledger every time they open: on an account with a few years of movements Cashflow shows its first figure about half a second sooner from a cold start and FIRE about a third, and every figure is the same as before. A period never opened before is read when it is picked (the picker stays where it is, the tiles wait a moment), and one opened in the last day comes from the device. Storico, Centri di Costo and Analisi keep reading the whole ledger, because their questions span it.
