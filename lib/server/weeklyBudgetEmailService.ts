@@ -312,7 +312,9 @@ Niente elenchi, saluti, premesse o titoli.`;
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const message = await anthropic.messages.create({
       model: EMAIL_ANALYSIS_MODEL,
-      max_tokens: 400,
+      // Thinking counts toward max_tokens: a ceiling sized for two sentences alone leaves
+      // adaptive thinking at `high` no room, and the reply comes back cut or empty.
+      max_tokens: 4096,
       thinking: { type: 'adaptive' },
       output_config: { effort: 'high' },
       messages: [{ role: 'user', content: prompt }],
