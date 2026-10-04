@@ -121,10 +121,9 @@ export type PerformanceBase = 'portfolio' | 'netWorth';
  * Cosa tenere DENTRO la base, letto dalle impostazioni utente. Entrambi i flag sono opt-in:
  * assenti (o `false`) significa "escludi", che è il default del prodotto.
  *
- * WARNING (checklist comment): i due chiamanti di `resolvePerformanceExclusions` devono passare
- * le STESSE opzioni, o un periodo CUSTOM finisce per disaccordarsi con le metriche precalcolate —
- * `lib/services/performanceService.ts` (`getAllPerformanceData`) e
- * `app/dashboard/performance/page.tsx` (`cachedSnapshots`).
+ * WARNING (checklist comment): le opzioni si leggono in UN punto, `resolvePerformanceBase`, il solo
+ * chiamante di `resolvePerformanceExclusions`: una seconda lettura con opzioni diverse farebbe
+ * disaccordare un periodo CUSTOM dalle metriche precalcolate.
  */
 export interface PerformanceBaseOptions {
   /** `true` = i fondi pensione restano nella base. Default `false`. */
@@ -397,10 +396,11 @@ function classifyContribution(contribution: PensionContribution, ctx: Contributi
 /**
  * Resolve the measured base once: which snapshots, which exclusions, which pension flows.
  *
- * WARNING (checklist comment): the TWO callers must both go through here —
- * `lib/services/performanceService.ts` (`getAllPerformanceData`) and
- * `app/dashboard/performance/page.tsx` (`cachedSnapshots` + the custom range) — or a custom period
- * disagrees with the pre-computed ones. `buildCacheKey` fingerprints the resolution.
+ * WARNING (checklist comment): every caller must go through here — `resolvePerformanceSetup` in
+ * `lib/services/performanceService.ts` (the service, and the page through
+ * `lib/hooks/usePerformanceData.ts`: its charts and its custom range read that base) and
+ * `lib/services/pdfDataService.ts` (`preparePerformanceData`) — or a custom period, or the report,
+ * disagrees with the pre-computed metrics. `buildCacheKey` fingerprints the resolution.
  *
  * With the funds OUT (toggle off, no fund, or no trustable start) the projection is the one the
  * file has always made, and the only flows are the voluntary contributions that left a cash

@@ -309,6 +309,9 @@ pointer — a stub that grows past that is a guide leaking back (2026-09-20: ten
   `/api/portfolio/snapshot` must keep accepting `cronSecret`.
 - **Validation**: `lib/server/validation.ts` owns the reusable schemas and `parseOr400` — never cast with `as { … }`
   first, use `z.coerce.date()` for dates, and validate **Firestore-originated** inputs at the service entry point too.
+  **A date in a request is a STRING first** (2026-10-04, `isoDateSchema` = `z.string().min(1).pipe(z.coerce.date())`):
+  alone, `z.coerce.date()` turns `null` into 1970-01-01 and a number into a timestamp, so a missing date answers 200 on
+  an epoch instead of 400 — pinned by the «a null date» case of `__tests__/performanceYieldsRoute.test.ts`.
   Tests that touch a `server-only` module need `vi.mock('server-only', () => ({}))`.
 - **`REGISTRATION_WHITELIST` has no `NEXT_PUBLIC_` prefix**, and `lib/constants/appConfig.ts` must stay client-safe.
 - **Do NOT bump `firebase-admin` past 13.x** — `@14 → jwks-rsa@4 → jose@6` is pure ESM and Vercel's Lambda runtime

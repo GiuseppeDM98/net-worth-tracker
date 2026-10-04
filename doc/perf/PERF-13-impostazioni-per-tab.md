@@ -22,8 +22,9 @@ punto sulla tab, la barra in basso, «Annulla modifiche» come RILETTURA dal ser
 salvataggio di un co-proprietario torna), il «Salva» che apre il gruppo e focalizza il campo in errore
 (`allocationTargetValidation.ts` dice DOVE).
 
-**Visto sul mirror il 2026-09-29, chiudendo PERF-03 (proprietario, punto 4 del giro).** Impostazioni è, con Rendimenti (PERF-09 § 1), la
-pagina che al reload mostra ancora lo skeleton: il documento è letto con `fetchQuery(settingsQueryOptions)` in `loadTargets` e il
+**Visto sul mirror il 2026-09-29, chiudendo PERF-03 (proprietario, punto 4 del giro).** Impostazioni era, con Rendimenti, la
+pagina che al reload mostrava ancora lo skeleton, e dal 2026-10-04 è la sola (Rendimenti dipinge l'ultimo dato noto:
+doc/guide/rendimenti.md § every collection read once): il documento è letto con `fetchQuery(settingsQueryOptions)` in `loadTargets` e il
 ripristino della cache persistita lo invalida, quindi la pagina attende il documento fresco (~244 ms sul mirror, «primo
 numero» 348 ms contro 115–180 delle altre route, `perf/README.md` § Revisit) — e lo skeleton che mostra
 (`TileGridSkeleton verdict={false} cells={[{ span: 5 }, { span: 7 }, { span: 12, lines: 8 }]}`) ha proporzioni diverse
