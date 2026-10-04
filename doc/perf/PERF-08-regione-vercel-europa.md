@@ -1,6 +1,6 @@
 # PERF-08 — Le funzioni Vercel nella regione di Firestore
 
-> Stato: da fare · Priorità: 3 (piccola, ma vale ~100 ms per ogni lettura server) · Sforzo: S · Dipende da: PERF-07 (il `Server-Timing` che si legge alla release) · Sblocca: —
+> Stato: **fatta il 2026-10-04, chiusa senza giro di produzione** (proprietario: «allineare le regioni è già tanto»; `x-vercel-id` e `Server-Timing` non si leggono, § 6.4 e § 8 F restano come procedura, non come impegno) · Priorità: 3 (piccola, ma vale ~100 ms per ogni lettura server) · Sforzo: S · Dipende da: PERF-07 (il `Server-Timing` che si legge alla release) · Sblocca: —
 
 ## 1. Il problema, misurato
 
@@ -66,7 +66,7 @@ c'è anche su un 401); i tempi no, perché l'anteprima non legge il Firestore di
    proprietario dice che una delle due è cambiata, e la posizione NON è più europea, fermarsi: la riga peggiorerebbe.
 2. `vercel.json` + il test + la documentazione (SETUP.md, CLAUDE.md § Data & Integrations) in UN commit, dopo l'OK; push.
 3. Sul deploy di anteprima, se raggiungibile: `x-vercel-id`, nella descrizione della PR.
-4. Alla release (§ 8 F): `x-vercel-id`, il `Server-Timing` di `overview`, i cron nei log il giorno dopo.
+4. ~~Alla release (§ 8 F)~~ — **non si fa** (proprietario, 2026-10-04): la chiusura è per costruzione, la regione allineata e il test che tiene `vercel.json`.
 
 ## 7. Test e falsificazione
 
@@ -77,7 +77,7 @@ c'è anche su un 401); i tempi no, perché l'anteprima non legge il Firestore di
 
 ## 8. Collaudo guidato
 
-- F (proprietario, IN PRODUZIONE ALLA RELEASE, in SOLA LETTURA): 1) `x-vercel-id` con la regione scelta; 2) il cron
+- **Non si fa** (proprietario, 2026-10-04); resta come procedura se un giorno servisse. F (IN PRODUZIONE ALLA RELEASE, in SOLA LETTURA): 1) `x-vercel-id` con la regione scelta; 2) il cron
   serale ha scritto lo snapshot (Storico il giorno dopo). Non coperto: niente in locale, nessun «prima».
 - Nello stesso giro, quello che il ricalcolo a un giro della Panoramica (2026-10-03) non ha ancora avuto — DevTools →
   Network → `overview` → Timing → Server Timing: 1) alla prima apertura `source=recompute`, annotare `total` e `db`;

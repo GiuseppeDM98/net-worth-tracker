@@ -1,4 +1,5 @@
 {
+  "regions": ["fra1"],
   "crons": [
     {
       "path": "/api/cron/monthly-snapshot",

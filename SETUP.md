@@ -55,7 +55,7 @@ Firebase provides the backend infrastructure (database, authentication) for this
 3. Choose a starting mode:
    - **Production mode** (recommended): Start with secure rules, you'll configure them next
    - **Test mode**: Open access (not recommended for production)
-4. Select a Cloud Firestore location (choose closest to your users, e.g., `europe-west1` for Europe)
+4. Select a Cloud Firestore location (choose closest to your users, e.g., `europe-west1` for Europe). The production project is in `eur3` (the Belgium + Netherlands multi-region); the Vercel functions run in `fra1` (Frankfurt) to stay close to it — see "Function region" in the Vercel section below
 5. Click **"Enable"**
 
 ### Step 4: Configure Firestore Security Rules
@@ -529,6 +529,10 @@ git push -u origin main
 2. Wait for the deployment to complete (usually 1-2 minutes)
 3. Visit your deployed app at `https://your-app.vercel.app`
 
+### Function region
+
+`vercel.json` carries `"regions": ["fra1"]`: the serverless functions run in Frankfurt, next to Firestore (`eur3`), instead of Vercel's default `iad1` (Washington), which turned every Admin SDK read into a transatlantic round trip. The **Hobby** plan accepts ONE region in `regions` (more than one fails the deploy). If your Firestore is elsewhere, pick the Vercel region nearest to it. To check: DevTools → Network → any `/api/*` request → Headers → `x-vercel-id` starts with the region (`fra1::…`), or `curl -sI https://your-app.vercel.app/api/benchmarks/fx-rates`.
+
 ### Step 5: Configure Cron Jobs
 
 Vercel Cron Jobs are configured in `vercel.json` file in the project root.
@@ -539,6 +543,7 @@ The current `vercel.json` file contains:
 
 ```json
 {
+  "regions": ["fra1"],
   "crons": [
     {
       "path": "/api/cron/monthly-snapshot",
