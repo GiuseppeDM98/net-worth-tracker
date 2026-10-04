@@ -181,6 +181,17 @@ guadagno è a freddo e sulle pagine a finestra; il costo sta nella prima apertur
 chi gira molte pagine. Nessuna route cresce oltre il tetto (Cashflow 735,4 → 736,8, FIRE 653,7 → 654,7, Analisi 564,6
 → 565,1).
 
+**2026-10-04, Rendimenti legge ogni collezione una volta (PERF-09, branch `perf/09-rendimenti-una-lettura`),
+prima/dopo nella stessa sessione, sul MAC del proprietario (i tempi non si confrontano con le tabelle sopra, del laptop
+Windows; i conteggi sì), mirror (46 snapshot, 25 asset, 7 dividendi).** Solo `--routes=performance`. Cold, mediane di
+5: primo numero 511 → 311 ms, LCP 524 → 328, Firestore 10 → 5, API 17 → 8. Warm, mediane di 5: 424 → 241 ms, Firestore
+15 → 8, API 17 → 8, lo skeleton resta (5/5: una prima apertura in sessione legge comunque la cache delle metriche).
+Rivisita, mediane di 3: 442 → 90 ms, e la cifra è a schermo allo stesso istante di `auth` — i due payload di Rendimenti
+sono nella cache persistita dal 2026-10-04; `skeletonGone − auth` resta 56 ms, non della pagina (il suo skeleton non
+compare più, `e2e/performance.degraded.spec.ts`): quale tessera lo tenga non è stato verificato. La route
+`POST /api/performance/yields`: 30 ms di mediana (11 chiamate) contro 60 e 67 delle due vecchie (55 ciascuna). Bundle:
+Rendimenti 566,3 → 569,2 gz KB (tetto 578), condivisi 473,5 → 475,4 (tetto 483): nessun tetto toccato.
+
 **Bundle** (gz KB, chunk iniziali; il tetto in `budget.json` è +2%) — **dal 2026-09-30, PR #418**: condivisi 473,5
 (22 chunk) · landing 452,0 · login 418,2 · Panoramica 538,0 · Patrimonio 731,1 · Cashflow 735,4 · **Analisi 564,6** ·
 **Rendimenti 566,3** · **Storico 684,0** · Hall of Fame 541,2 · Allocazione 520,6 · **FIRE 653,7** · Previdenza 592,6 ·
@@ -213,7 +224,7 @@ run dura di più. Lo «skeleton della pagina» non è una colonna della tabella:
 | Patrimonio | 437 (8) | 144 (4) | sì → no |
 | Cashflow | 1208 (4) | 179 (4) | sì → no |
 | Analisi | 1150 (3) | 259 (3) | sì → no |
-| Rendimenti | 686 (13) | 685 (14) | sì → sì (lo stadio 1 legge con `fetchQuery`: PERF-09) |
+| Rendimenti | 686 (13) | 685 (14) | sì → sì (lo stadio 1 legge con `fetchQuery`: PERF-09 — dal 2026-10-04 nessuno skeleton, sopra) |
 | Storico | 1455 (5) | 385 (1) | sì → no |
 | Hall of Fame | 235 (3) | 113 (3) | sì → no |
 | Allocazione | 344 (4) | 106 (3) | sì → 53 ms (lo skeleton di UNA tessera, l'Esposizione) |

@@ -156,4 +156,10 @@ PDF half seen from inside the section, this is the recipe for both surfaces.
 
 ## Per-page blind spots
 
+- **The YEARLY PDF of the current year measures one month less than Rendimenti's «YTD»** (seen 2026-10-04, driving the
+  export on the mirror; not changed): the dialog hands the report the year's snapshots only (`filterSnapshotsByTime`), so
+  January's snapshot is the starting valuation and the window is February → today, where the page reaches back to
+  December and measures from January. TWR, ROI and the two yields are annualised over 9 months against the page's 10; the
+  dividends received are the same. The TOTAL export has the page's whole-history window, and its twelve yield fields were
+  equal to the page's, field by field.
 - **Fuori dal DOM restano tre punti ciechi**: le email non rispecchiano i cinque temi nominati (scelta — si leggono su una scheda bianca); «un hex sta solo in `printTokens`» è documentato ma **non applicato da un linter**; e `@react-pdf/renderer` scarta in SILENZIO ogni carattere fuori da WinAnsi (`pdfSafeText` copre U+2212; frecce, simboli ed emoji no). Le tre superfici si verificano solo renderizzandole, e **nessuna di quelle verifiche è nella suite**. doc/guide/email-pdf.md. (moved from `CLAUDE.md` → Known Issues on 2026-09-19)

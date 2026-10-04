@@ -19,6 +19,20 @@ test('Rendimenti: the custom-period modal keeps ONE origin, the button’s centr
   await page.goto('/dashboard/performance');
   const button = page.getByRole('button', { name: /personalizzat/i }).filter({ visible: true }).first();
   await expect(button).toBeEnabled({ timeout: 30_000 });
+  // The button is enabled from the page's first frame, and for ~250 ms after it the header is still
+  // on its entrance glide (4px, measured frame by frame on 2026-10-04: y 26 → 22): a box read then
+  // is up to 4px off the centre the click will see — the 3,3–3,5px this spec failed by in two full
+  // runs that day. So the page's verdict first (the data, or its absence, has landed: no later
+  // reflow), then a box that two reads 100 ms apart agree on.
+  await expect(page.getByRole('region', { name: 'Verdetto sui rendimenti' })).toBeVisible({ timeout: 30_000 });
+  await expect
+    .poll(async () => {
+      const first = await button.boundingBox();
+      await page.waitForTimeout(100);
+      const second = await button.boundingBox();
+      return first && second ? Math.abs(first.x - second.x) + Math.abs(first.y - second.y) : Number.NaN;
+    })
+    .toBe(0);
   const box = (await button.boundingBox())!;
 
   await page.evaluate(() => {

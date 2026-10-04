@@ -243,7 +243,10 @@ async function seedCategoriesAndExpenses(): Promise<void> {
         categoryName: e.categoryName,
         amount: e.amount,
         currency: 'EUR',
-        date: new Date(now.getFullYear(), now.getMonth(), 5),
+        // The 5th, or today when the month is younger than that: a row dated after «today» is a
+        // FUTURE row, and from the 1st to the 4th a fresh seed left FIRE, Coast and Storico's Driver
+        // with no spending to date (five specs red on 2026-10-04, on develop too).
+        date: new Date(now.getFullYear(), now.getMonth(), Math.min(5, now.getDate())),
         createdAt: now,
         updatedAt: now,
       })

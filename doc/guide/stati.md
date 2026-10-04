@@ -109,9 +109,11 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   false as well, so no page ever sees that frame. With a restored figure the page skips its own skeleton and opens
   on the header's sentence; `e2e/freshness.spec.ts` pins the three facts on Cashflow (no page skeleton on the reload,
   the node HAD the sentence, the node is empty once the fresh read landed).
-- **Two surfaces carry no sentence by construction**: Rendimenti reads its six collections with `fetchQuery` (no
-  observer, and a stale entry is awaited, never painted), and Impostazioni's settings document is read with
-  `staleTime: 0` — there the header dates only the categories and the accounts lists.
+- **One surface carries no sentence by construction**: Impostazioni's settings document is read with
+  `staleTime: 0` — there the header dates only the categories and the accounts lists. Rendimenti was the other until
+  2026-10-04 (it read with `fetchQuery`, no observer): it now reads the shared hooks and its two payloads are
+  persisted, so its reload carries the sentence over restored figures (doc/guide/rendimenti.md § every collection
+  read once).
 
 ## Per-page blind spots
 

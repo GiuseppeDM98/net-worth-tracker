@@ -10,7 +10,7 @@ Moved here from `AGENTS.md` § Caching on 2026-09-30.
 - **The demo**: `lib/utils/demoAccount.ts` (`isDemoUid`), read by `lib/hooks/useDemoMode.ts` and by `isPersistableQuery` — doc/guide/account-condiviso-demo.md
 - **The restore gate**: `components/ProtectedRoute.tsx` (`useIsRestoring()`)
 - **The freshness reading**: `lib/hooks/useFreshness.ts`, `lib/utils/freshness.ts` (`resolveFreshness`, the «old» rule), `describeFreshness` in `lib/utils/statesNarrative.ts` — doc/guide/stati.md
-- **Tests**: `__tests__/persistCache.test.ts`, `__tests__/persistedQueryDefaults.test.ts`, `__tests__/queryPersistence.test.ts`, `__tests__/freshness.test.ts`; `e2e/freshness.spec.ts`, and `e2e/persistedCache.ts` (a helper, not a spec: it strips the persisted database from the parked sessions)
+- **Tests**: `__tests__/persistCache.test.ts`, `__tests__/persistedQueryDefaults.test.ts`, `__tests__/queryPersistence.test.ts`, `__tests__/freshness.test.ts`; `e2e/freshness.spec.ts` (Cashflow) and the reload test of `e2e/performance.degraded.spec.ts` (Rendimenti), over `e2e/freshnessProbe.ts` (a helper: what a load showed, what is on disk), and `e2e/persistedCache.ts` (a helper, not a spec: it strips the persisted database from the parked sessions)
 
 ## The React Query cache is persisted to IndexedDB and restored before the first fetch
 
@@ -21,7 +21,14 @@ Moved here from `AGENTS.md` § Caching on 2026-09-30.
 - ONLY the keys of `PERSISTED_QUERY_PREFIXES` — the twelve owner collections read through the hooks of
   AGENTS.md § React Query and Derived State, plus the ledger's meta document Patrimonio gates its trades on — only
   successful reads, and NEVER the demo uid (`isDemoUid`, `lib/utils/demoAccount.ts`, the ONE rule `useDemoMode` reads
-  too); out by design: the assistant, benchmarks/FX/ECB, the Esposizione's profiles, the budget history.
+  too); out by design: the assistant, benchmarks/FX/ECB, the Esposizione's profiles, the budget history. Since
+  2026-10-04 also Rendimenti's two COMPUTED payloads, `['performance', 'data', uid, cacheKey]` and
+  `['performance', 'yields', uid, windows]` (the owner's decision): the metrics also live in `performance-cache/{uid}`,
+  but that is a round trip, and with only the collections restored the reload painted a skeleton under «Aggiornato
+  alle…». The metrics are named by the cache key of the inputs they were computed from, so restored inputs and
+  restored metrics are one consistent pair; a new cache key leaves the old entry on disk until its 24 hours pass.
+  Measured on the mirror (2026-10-04, one visit to Rendimenti): the metrics are ~40 KB and the yields ~3 KB of a
+  136 KB record whose snapshots are 55.
 
 ### Retention: `maxAge` and `gcTime`
 
@@ -34,7 +41,8 @@ Moved here from `AGENTS.md` § Caching on 2026-09-30.
 - **Bump `PERSIST_CACHE_VERSION` (the `buster`) on any change that RENAMES, REMOVES or retypes a field of a persisted
   payload** — everything under `PERSISTED_QUERY_PREFIXES`: an asset (the mortgage instalments under its key too), an
   expense, a snapshot, a category, the settings document, a contribution, a trade, the ledger's meta document, a cost
-  centre, the Hall of Fame rankings, a goal, a receipt, the overview — or a client restores the old shape and reads it
+  centre, the Hall of Fame rankings, a goal, a receipt, the overview, Rendimenti's `PerformanceData` and its yields —
+  or a client restores the old shape and reads it
   as truth until the refetch lands; a new optional field whose absence means the default does not need it.
 
 ### Dates by value

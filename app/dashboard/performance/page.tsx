@@ -21,10 +21,12 @@
  *
  * CALCULATION ENGINE (unchanged): every metric comes from performanceService.ts — TWR, IRR,
  * Sharpe, volatility, drawdown, rolling windows — cached in performance-cache/{userId} under
- * CACHE_MATH_VERSION. The snapshots are fetched once, resolved onto the configurable base
- * (`resolvePerformanceBase`: which capital, from which month the pension funds count, which
- * boundary flows) and cached in state, so a period switch and a custom range recompute from
- * memory. The window is always read back off the payload (`nominalPeriodStart`,
+ * CACHE_MATH_VERSION. Every collection is read ONCE, through the app's shared hooks
+ * (lib/hooks/usePerformanceData.ts), and handed to the service; the snapshots are resolved onto
+ * the configurable base (`resolvePerformanceBase`: which capital, from which month the pension
+ * funds count, which boundary flows), so a period switch and a custom range recompute from
+ * memory. The dividend yields of the five periods come from one route, asked together with the
+ * metrics and merged in. The window is always read back off the payload (`nominalPeriodStart`,
  * `selectSnapshotsForMetrics`), never re-derived from today's date.
  *
  * Every figure a tile shows that the payload does not carry is computed in a pure, tested util
@@ -32,7 +34,7 @@
  * never in a component.
  */
 
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { useMemo, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { CalendarDays, RefreshCw, Sparkles } from 'lucide-react';
 import dynamic from 'next/dynamic';
@@ -42,7 +44,6 @@ import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-  getAllPerformanceData,
   calculatePerformanceForPeriod,
   preparePerformanceChartData,
   selectSnapshotsForMetrics,
@@ -50,22 +51,18 @@ import {
   prepareUnderwaterDrawdownData,
 } from '@/lib/services/performanceService';
 import { useQueryClient } from '@tanstack/react-query';
-import { snapshotsQueryOptions } from '@/lib/hooks/useSnapshots';
-import { assetsQueryOptions } from '@/lib/hooks/useAssets';
-import { settingsQueryOptions } from '@/lib/hooks/useSettings';
-import { pensionContributionsQueryOptions } from '@/lib/hooks/usePensionContributions';
-import { assetTransactionsQueryOptions } from '@/lib/hooks/useAssetTransactions';
-// The Admin-SDK dividendService is server-only: a client page reads the registry through this hook's reader.
-import { dividendReceiptsQueryOptions } from '@/lib/hooks/useDividendReceipts';
-import { resolveHasBaseline, resolvePerformanceBase, type PerformanceBaseResolution } from '@/lib/utils/performanceBase';
+import { usePerformanceData } from '@/lib/hooks/usePerformanceData';
+import { useFreshness } from '@/lib/hooks/useFreshness';
+import { performanceYieldsQueryOptions, withYields } from '@/lib/query/performanceQueries';
+import { resolveHasBaseline, type PerformanceBaseResolution } from '@/lib/utils/performanceBase';
 import { resolveCenteredModalOrigin } from '@/lib/utils/modalOrigin';
 import { attributePeriodReturn, sumDividendsByAsset, type DividendReceipt } from '@/lib/utils/performanceAttribution';
 import type { PerformanceData, PerformanceMetrics, TimePeriod } from '@/types/performance';
 import type { Asset, MonthlySnapshot } from '@/types/assets';
 import type { PensionContribution } from '@/types/pension';
+import type { AssetTransaction } from '@/types/assetTransactions';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PageVerdict } from '@/components/ui/page-verdict';
@@ -106,7 +103,7 @@ import {
   describeWindow,
   resolveBenchmarkGap,
 } from '@/lib/utils/performanceNarrative';
-import { useAssetLedgerMeta, useAssetTransactions } from '@/lib/hooks/useAssetTransactions';
+import { useAssetLedgerMeta } from '@/lib/hooks/useAssetTransactions';
 import { computeInvestedCapital, aggregateRealizedByYear } from '@/lib/utils/assetTransactionUtils';
 import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
 import { MONTH_NAMES_SHORT } from '@/lib/utils/period';
@@ -151,45 +148,15 @@ const DEFAULT_BASE: Pick<PerformanceBaseResolution, 'options' | 'pensionEntryMon
 /** The reference model of the verdict: the first definition, the classic balanced allocation. */
 const REFERENCE_BENCHMARK = BENCHMARKS[0];
 
-const EMPTY_YIELDS = {
-  yocGross: null,
-  yocNet: null,
-  yocDividendsGross: 0,
-  yocDividendsNet: 0,
-  yocCostBasis: 0,
-  yocAssetCount: 0,
-  currentYield: null,
-  currentYieldNet: null,
-  currentYieldDividends: 0,
-  currentYieldDividendsNet: 0,
-  currentYieldPortfolioValue: 0,
-  currentYieldAssetCount: 0,
-};
+/** The custom range's key in the yields request. */
+const CUSTOM_YIELD_KEY = 'custom';
 
-/** YOC and current yield need the Admin SDK, so they come from two routes per period. */
-async function fetchYieldMetrics(ownerId: string, metrics: PerformanceMetrics): Promise<Partial<PerformanceMetrics>> {
-  if (metrics.hasInsufficientData) return EMPTY_YIELDS;
-  try {
-    const params = new URLSearchParams({
-      userId: ownerId,
-      startDate: metrics.startDate.toISOString(),
-      dividendEndDate: metrics.dividendEndDate.toISOString(),
-      numberOfMonths: metrics.numberOfMonths.toString(),
-    });
-    const [yocResponse, currentYieldResponse] = await Promise.all([
-      authenticatedFetch(`/api/performance/yoc?${params.toString()}`),
-      authenticatedFetch(`/api/performance/current-yield?${params.toString()}`),
-    ]);
-    if (!yocResponse.ok) console.warn('Failed to fetch YOC:', yocResponse.statusText);
-    if (!currentYieldResponse.ok) console.warn('Failed to fetch current yield:', currentYieldResponse.statusText);
-    const yoc = yocResponse.ok ? await yocResponse.json() : {};
-    const currentYield = currentYieldResponse.ok ? await currentYieldResponse.json() : {};
-    return { ...EMPTY_YIELDS, ...yoc, ...currentYield };
-  } catch (error) {
-    console.error('Error fetching yield metrics:', error);
-    return EMPTY_YIELDS;
-  }
-}
+// Stable empties: a fresh `[]` per render would re-run every memo that reads it.
+const NO_SNAPSHOTS: MonthlySnapshot[] = [];
+const NO_ASSETS: Asset[] = [];
+const NO_CONTRIBUTIONS: PensionContribution[] = [];
+const NO_DIVIDENDS: DividendReceipt[] = [];
+const NO_TRADES: AssetTransaction[] = [];
 
 /** «1 ago 2025» for the compact header's description. */
 function shortDate(date: Date): string {
@@ -259,27 +226,35 @@ export default function PerformancePage() {
   const { ownerId } = useActiveAccount();
   const isDemo = useDemoMode();
   const [isPendingPeriodChange, startPeriodTransition] = useTransition();
-  const [performanceData, setPerformanceData] = useState<PerformanceData | null>(null);
-  const [loading, setLoading] = useState(true);
-  /** A failed load is not an empty set: it gets an alert, never a verdict about zeros. */
-  const [loadFailed, setLoadFailed] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('YTD');
   const [showCustomDateDialog, setShowCustomDateDialog] = useState(false);
   const [showAIAnalysisDialog, setShowAIAnalysisDialog] = useState(false);
-  const [cachedSnapshots, setCachedSnapshots] = useState<MonthlySnapshot[]>([]);
-  // The resolved base (which capital, the pension entry month, the boundary flows), the inputs the
-  // attribution reads beside it, and the dividends it adds to each instrument.
-  const [base, setBase] = useState<PerformanceBaseResolution | null>(null);
-  const [assets, setAssets] = useState<Asset[]>([]);
-  const [pensionContributions, setPensionContributions] = useState<PensionContribution[]>([]);
-  const [dividends, setDividends] = useState<DividendReceipt[]>([]);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  /** The custom range's metrics, computed here on demand; the five periods come from the hook. */
+  const [customMetrics, setCustomMetrics] = useState<PerformanceMetrics | null>(null);
+  // Every read of the page — the six collections once, then the metrics and the yields together
+  // (lib/hooks/usePerformanceData.ts). A failed read is not an empty set: `loadFailed` gets an
+  // alert, never a verdict about zeros.
+  const loaded = usePerformanceData(ownerId);
+  const { loading, loadFailed, isRefreshing, refresh } = loaded;
+  // The resolved base (which capital, the pension entry month, the boundary flows) with its
+  // projected snapshots — what a period switch and a custom range recompute from, in memory — the
+  // inputs the attribution reads beside it, and the dividends it adds to each instrument.
+  const base = loaded.base;
+  const cachedSnapshots = base?.snapshots ?? NO_SNAPSHOTS;
+  const assets = loaded.assets ?? NO_ASSETS;
+  const pensionContributions = loaded.contributions ?? NO_CONTRIBUTIONS;
+  const dividends = loaded.dividends ?? NO_DIVIDENDS;
+  const performanceData = useMemo<PerformanceData | null>(
+    () => (loaded.performanceData ? { ...loaded.performanceData, custom: customMetrics } : null),
+    [loaded.performanceData, customMetrics],
+  );
+  // «Aggiornato alle…» in the header while figures restored from the persisted cache are reread.
+  const freshness = useFreshness(loaded.freshnessQueries);
   // Where each window grows from: the header button, resolved at the click
   // (lib/utils/modalOrigin.ts). Never cleared on close — the exit animates too, and an origin
   // that changes mid-animation is tweened by the dialog's own `duration-200`, not swapped.
   const [customDialogOrigin, setCustomDialogOrigin] = useState<string | undefined>(undefined);
   const [aiDialogOrigin, setAiDialogOrigin] = useState<string | undefined>(undefined);
-  const hasLoadedOnceRef = useRef(false);
   // Where focus returns when a dialog closes: the button that opened it, taken at the click (the
   // header mounts its actions twice, and only `currentTarget` is the copy the reader pressed). A
   // controlled Radix dialog with no Trigger restores focus to nothing, i.e. to `body`.
@@ -287,12 +262,12 @@ export default function PerformancePage() {
   const aiOpenerRef = useRef<HTMLElement | null>(null);
 
   // Asset trade ledger: «Capitale investito» and «Plusvalenze realizzate» are gated on the migration
-  // having run — the tiles degrade (no ledger figure, no Plusvalenze tile) while meta is absent.
+  // having run — the tiles degrade (no ledger figure, no Plusvalenze tile) while meta is absent. The
+  // trades are the list the base resolution already read (one key, one read).
   const { data: ledgerMeta } = useAssetLedgerMeta(ownerId);
   const isLedgerMigrated = !!ledgerMeta;
-  const { data: ledgerTrades = [] } = useAssetTransactions(ownerId, undefined, { enabled: isLedgerMigrated });
-  // The base resolution reads the ledger too (the measured flows prefer it): through the SAME query
-  // key as the hook above, so the two share one read instead of two.
+  const ledgerTrades = isLedgerMigrated ? (loaded.trades ?? NO_TRADES) : NO_TRADES;
+  // The custom range asks its yields through the same query options as the five periods.
   const queryClient = useQueryClient();
 
   // The six model portfolios, one fixed hook each (React rules: a stable hook count), all enabled:
@@ -338,85 +313,22 @@ export default function PerformancePage() {
   };
 
   /**
-   * Load every period's metrics and cache the base-projected snapshots for period switching:
-   * the six collections through the hooks' keys (stage 1, cached across pages), one fetch of the
-   * pre-computed metrics, then the two yield routes per period in parallel. A refresh invalidates
-   * the six keys, bypasses the Firestore cache and rewrites it.
+   * «Aggiorna» (and the retry of a failed read): the six collections read anew, the metrics
+   * recomputed past the Firestore cache, the yields asked again. A custom range was measured on
+   * the snapshots of before, so it goes: the page returns to the year to date.
    */
-  const loadPerformanceData = async () => {
-    if (!user || !ownerId) return;
-    try {
-      const isInitialLoad = !hasLoadedOnceRef.current;
-      if (isInitialLoad) setLoading(true);
-      else setIsRefreshing(true);
-      setLoadFailed(false);
-
-      // Stage 1 reads through the hooks' own query options (2026-09-29): the same keys every page
-      // uses, so a visit after Patrimonio or Storico answers from the cache under the global
-      // staleTime, and a refresh invalidates the six keys FIRST so `fetchQuery` reads anew.
-      const stageOneQueries = [
-        snapshotsQueryOptions(ownerId),
-        assetsQueryOptions(ownerId),
-        settingsQueryOptions(ownerId),
-        pensionContributionsQueryOptions(ownerId),
-        dividendReceiptsQueryOptions(ownerId),
-        assetTransactionsQueryOptions(ownerId),
-      ] as const;
-      if (!isInitialLoad) {
-        await Promise.all(stageOneQueries.map((options) => queryClient.invalidateQueries({ queryKey: options.queryKey })));
-      }
-      const [rawSnapshots, loadedAssets, baseSettings, contributions, loadedDividends, trades] = await Promise.all([
-        queryClient.fetchQuery(stageOneQueries[0]),
-        queryClient.fetchQuery(stageOneQueries[1]),
-        queryClient.fetchQuery(stageOneQueries[2]),
-        queryClient.fetchQuery(stageOneQueries[3]),
-        queryClient.fetchQuery(stageOneQueries[4]),
-        queryClient.fetchQuery(stageOneQueries[5]),
-      ]);
-      // The SAME base resolution as getAllPerformanceData (performanceBase.ts): the client-side chart,
-      // heatmap, custom-range and attribution helpers read cachedSnapshots and the flows directly, so
-      // they need the exact same projection or a custom period would disagree with the pre-computed ones.
-      const resolved = resolvePerformanceBase({ snapshots: rawSnapshots, assets: loadedAssets, contributions, settings: baseSettings, trades });
-      setCachedSnapshots(resolved.snapshots);
-      setBase(resolved);
-      setAssets(loadedAssets);
-      setPensionContributions(contributions);
-      setDividends(loadedDividends);
-
-      const data = await getAllPerformanceData(ownerId, hasLoadedOnceRef.current);
-
-      const periods = ['ytd', 'oneYear', 'threeYear', 'fiveYear', 'allTime'] as const;
-      const yields = await Promise.all(periods.map((key) => fetchYieldMetrics(ownerId, data[key])));
-      periods.forEach((key, index) => Object.assign(data[key], yields[index]));
-
-      setPerformanceData(data);
-      hasLoadedOnceRef.current = true;
-    } catch (error) {
-      setLoadFailed(true);
-      console.error('Error loading performance data:', error);
-      toast.error('Errore nel caricamento delle metriche di performance');
-    } finally {
-      setLoading(false);
-      setIsRefreshing(false);
-    }
+  const handleRefresh = async () => {
+    setCustomMetrics(null);
+    if (selectedPeriod === 'CUSTOM') setSelectedPeriod('YTD');
+    const refreshed = await refresh();
+    if (!refreshed) toast.error('Errore nel caricamento delle metriche di performance');
   };
 
-  // First load, and again when the viewed account changes; a refresh re-runs the same function.
-  useEffect(() => {
-    if (!user || !ownerId) return;
-    // Deferred so the effect body itself sets no state (react-hooks/set-state-in-effect).
-    const timer = setTimeout(() => {
-      loadPerformanceData();
-    }, 0);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, ownerId]);
-
-  /** A custom range recomputes from the cached snapshots — no round trip but the two yield routes. */
+  /** A custom range recomputes from the base's snapshots — no round trip but the yields of its window. */
   const handleCustomDateRange = async (startDate: Date, endDate: Date) => {
     if (!user || !ownerId || !performanceData || cachedSnapshots.length === 0) return;
     try {
-      const customMetrics = await calculatePerformanceForPeriod(
+      const measured = await calculatePerformanceForPeriod(
         ownerId,
         cachedSnapshots,
         'CUSTOM',
@@ -428,8 +340,20 @@ export default function PerformancePage() {
         base?.pensionFlows ?? [],
         base?.portfolioFlows ?? [],
       );
-      Object.assign(customMetrics, await fetchYieldMetrics(ownerId, customMetrics));
-      setPerformanceData({ ...performanceData, custom: customMetrics });
+      // A yield that cannot be read leaves the range without it, like the five periods.
+      const yields = measured.hasInsufficientData
+        ? undefined
+        : await queryClient
+            .fetchQuery(
+              performanceYieldsQueryOptions(ownerId, [
+                { key: CUSTOM_YIELD_KEY, startDate: measured.startDate, dividendEndDate: measured.dividendEndDate, numberOfMonths: measured.numberOfMonths },
+              ]),
+            )
+            .catch((error) => {
+              console.warn('Dividend yields not read for the custom range:', error);
+              return undefined;
+            });
+      setCustomMetrics(withYields(measured, yields?.[CUSTOM_YIELD_KEY]));
       handlePeriodChange('CUSTOM');
       toast.success('Periodo personalizzato calcolato');
     } catch (error) {
@@ -615,7 +539,7 @@ export default function PerformancePage() {
         setAiDialogOrigin(resolveCenteredModalOrigin(event.currentTarget.getBoundingClientRect()));
         setShowAIAnalysisDialog(true);
       }}
-      onRefresh={loadPerformanceData}
+      onRefresh={handleRefresh}
     />
   );
 
@@ -624,6 +548,7 @@ export default function PerformancePage() {
       label="Analisi"
       title="Rendimenti"
       description={describeHeaderWindow(metrics)}
+      freshness={freshness}
       actions={
         <>
           <div className="hidden items-center gap-2 desktop:flex">{headerActions(false)}</div>
@@ -631,7 +556,7 @@ export default function PerformancePage() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={loadPerformanceData}
+            onClick={handleRefresh}
             disabled={isDemo || isRefreshing}
             className="h-11 w-11 text-muted-foreground desktop:hidden"
             aria-label={isRefreshing ? 'Aggiornamento in corso' : 'Aggiorna'}
@@ -663,7 +588,7 @@ export default function PerformancePage() {
         {header}
         <ErrorNotice
           className="max-w-[920px]"
-          onRetry={() => void loadPerformanceData()}
+          onRetry={() => void handleRefresh()}
           notice={describeReadFailure({
             consequence: 'Le metriche di rendimento non sono state lette: un rendimento non misurato non è uno zero.',
             untouched: 'Le rilevazioni e le operazioni registrate non sono state toccate.',
@@ -764,8 +689,8 @@ export default function PerformancePage() {
           the plots morph, the heatmap fades cell by cell, the bars slide — so the tiles must survive
           it. Only a refresh, which re-reads the data, dims the grid while it waits. */}
       <div
-        className={cn('grid grid-cols-1 gap-3 transition-opacity duration-200 tablet:grid-cols-2 desktop:grid-cols-12', isRefreshing && 'opacity-60')}
-        aria-busy={isPendingPeriodChange || isRefreshing}
+        className={cn('grid grid-cols-1 gap-3 transition-opacity duration-200 tablet:grid-cols-2 desktop:grid-cols-12', (isRefreshing || loaded.isRecomputing) && 'opacity-60')}
+        aria-busy={isPendingPeriodChange || isRefreshing || loaded.isRecomputing}
       >
         <div className={cn(TILE_CELL_CLASS, 'order-1 tablet:col-span-2 desktop:order-none desktop:col-span-5')}>
           <RendimentoTile

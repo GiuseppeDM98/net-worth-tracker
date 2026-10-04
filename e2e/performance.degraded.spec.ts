@@ -21,6 +21,7 @@
 
 import { spawnSync } from 'node:child_process';
 import { test, expect, type Page } from '@playwright/test';
+import { persistedQueryKeys, readPersistedRecord, readRecording, recordLoad } from './freshnessProbe';
 
 const UID = 'test-user-degraded';
 const FIRESTORE = 'http://127.0.0.1:8080/v1/projects/demo-net-worth/databases/(default)/documents';
@@ -211,4 +212,74 @@ test('the controls answer to keyboard and touch: the axis is a radiogroup, a mon
   await expect(tile.getByRole('button', { name: 'Come si calcola: Contributi' })).toBeVisible();
   // The four «?» became one «Come si calcola» per tile: no 20px help target is left on the grid.
   await expect(page.locator('main section button[aria-label^="Mostra definizione"]')).toHaveCount(0);
+});
+
+// ─── One read of everything (2026-10-04) ─────────────────────────────────────
+//
+// What only a browser knows about the page's READS: how many calls leave for `/api/performance/*`
+// when it mounts (it was ten — two routes per period — and is one), and what a reload paints
+// before the fresh reads land. Both seen red: the count with a second `fetchPerformanceYields`
+// planted in the yields query (two calls counted), the reload with the two `performance` prefixes
+// taken off the persisted allowlist (nothing of Rendimenti on disk: red at the anchor that both
+// payloads are persisted, before the reload is even taken).
+
+test('the dividend yields of every period leave in ONE call, and nothing else is asked of /api/performance', async ({ page }) => {
+  await setPensionToggle(false);
+  const performanceCalls: string[] = [];
+  page.on('request', (request) => {
+    const { pathname } = new URL(request.url());
+    if (pathname.startsWith('/api/performance/')) performanceCalls.push(`${request.method()} ${pathname}`);
+  });
+  const yieldsAnswer = page.waitForResponse((response) => new URL(response.url()).pathname === '/api/performance/yields');
+
+  await gotoPerformance(page);
+
+  // Positive anchor: the call IS made, it is answered, and it carries the periods the page shows.
+  const response = await yieldsAnswer;
+  expect(response.status()).toBe(200);
+  const asked = (response.request().postDataJSON() as { userId: string; periods: Array<{ key: string }> });
+  expect(asked.userId).toBe(UID);
+  expect(asked.periods.length).toBeGreaterThan(0);
+  expect(Object.keys(await response.json())).toEqual(asked.periods.map((period) => period.key));
+
+  // The figures are on screen (the caption waits for every query, the yields included): a second
+  // call would have left by now. An absence has no event to wait for, hence the one fixed wait.
+  await page.waitForTimeout(1_000);
+  expect(performanceCalls).toEqual(['POST /api/performance/yields']);
+});
+
+test('a reload paints the last known figures — no page skeleton, the header says it is rereading, then falls silent', async ({ page }) => {
+  await setPensionToggle(false);
+  await recordLoad(page);
+
+  // ── The positive anchor: a first visit, with nothing persisted, DOES show the page skeleton.
+  await page.goto('/dashboard/performance', { waitUntil: 'load' });
+  await expect(baseCaption(page)).toBeVisible({ timeout: 30_000 });
+  const firstVisit = await readRecording(page);
+  expect(firstVisit.pageSkeletonSeen, 'the first visit is the anchor: its skeleton must have been seen').toBe(true);
+  // `textContent`, what `toHaveText` compares below (`innerText` would add the line breaks).
+  const verdict = (await page.getByRole('region', { name: 'Verdetto sui rendimenti' }).textContent()) ?? '';
+  expect(verdict).toContain('%');
+
+  // The metrics and the yields of THIS account are on disk (the persister writes on a throttle).
+  await expect
+    .poll(
+      async () =>
+        persistedQueryKeys(await readPersistedRecord(page))
+          .filter((queryKey) => queryKey[0] === 'performance' && queryKey[2] === UID)
+          .map((queryKey) => queryKey[1])
+          .sort(),
+      { timeout: 5_000 },
+    )
+    .toEqual(['data', 'yields']);
+
+  await page.reload({ waitUntil: 'load' });
+  await expect(baseCaption(page)).toBeVisible({ timeout: 30_000 });
+
+  const reload = await readRecording(page);
+  expect(reload.pageSkeletonSeen, 'the reload must paint the restored figures, not a skeleton').toBe(false);
+  expect(reload.freshnessTexts.some((text) => text.includes('Aggiornato alle')), `texts seen: ${JSON.stringify(reload.freshnessTexts)}`).toBe(true);
+  // The same verdict, and the header silent once the fresh reads have landed (both copies emptied, never removed).
+  await expect(page.getByRole('region', { name: 'Verdetto sui rendimenti' })).toHaveText(verdict);
+  await expect(page.locator('[data-freshness]')).toHaveText(['', '']);
 });

@@ -148,6 +148,31 @@ export const assetTransactionUpdateSchema = assetTransactionBaseSchema
   .superRefine(refineAssetTransaction);
 
 /**
+ * An ISO date string, coerced to a Date. The `string` first: `z.coerce.date()` alone turns `null`
+ * into 1970-01-01 and a number into a timestamp, and a missing date must be a 400, not an epoch.
+ */
+const isoDateSchema = z.string().min(1).pipe(z.coerce.date());
+
+/**
+ * POST /api/performance/yields — the dividend windows of the periods Rendimenti shows (five
+ * pre-computed, or one custom range, or the PDF's one).
+ */
+export const performanceYieldsRequestSchema = z.object({
+  userId: z.string().min(1),
+  periods: z
+    .array(
+      z.object({
+        key: z.string().min(1).max(32),
+        startDate: isoDateSchema,
+        dividendEndDate: isoDateSchema,
+        numberOfMonths: z.number().int().min(0).max(1200),
+      })
+    )
+    .min(1)
+    .max(8),
+});
+
+/**
  * Goal-Based Investing: the assistant's ```goal-proposal payload IS the body of
  * POST /api/goals, so there is one schema for both.
  *

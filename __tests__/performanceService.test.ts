@@ -27,9 +27,8 @@ import {
   getCashFlowsFromExpenses,
   prepareMonthlyReturnsHeatmap,
   preparePerformanceChartData,
-  calculateYocMetrics,
-  calculateCurrentYieldMetrics,
 } from '@/lib/services/performanceService'
+import { calculateYocMetrics, calculateCurrentYieldMetrics } from '@/lib/utils/dividendYield'
 import { MonthlySnapshot } from '@/types/assets'
 import { CashFlowData, TimePeriod, PensionBoundaryFlow, PortfolioBoundaryFlow } from '@/types/performance'
 import { Expense, ExpenseType } from '@/types/expenses'

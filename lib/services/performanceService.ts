@@ -1,6 +1,8 @@
 import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
-import { MonthlySnapshot } from '@/types/assets';
+import type { Asset, AssetAllocationSettings, MonthlySnapshot } from '@/types/assets';
+import type { AssetTransaction } from '@/types/assetTransactions';
+import type { PensionContribution } from '@/types/pension';
 import { Expense } from '@/types/expenses';
 import {
   PerformanceMetrics,
@@ -27,9 +29,9 @@ import { getAssetTransactions } from './assetTransactionService';
 import { buildCashFlowMap, externalFlowOf, mergePensionFlows, mergePortfolioFlows, monthKey, monthKeyOf } from '@/lib/utils/cashFlowMap';
 import { removeUndefinedDeep } from '@/lib/utils/firestoreData';
 import { endOfMonthBound } from '@/lib/utils/dateHelpers';
-import { computeDividendYieldMetrics, type AssetInput, type DividendInput } from '@/lib/utils/yieldOnCost';
 import { buildTwrIndex, computeDrawdownSeries, findMaxDrawdown } from '@/lib/utils/drawdownSeries';
 import { resolvePerformanceBase, type PerformanceBaseResolution } from '@/lib/utils/performanceBase';
+import type { PerformanceYieldPeriod } from '@/lib/utils/dividendYield';
 import type { FlowSource, PensionBoundaryFlow, PortfolioBoundaryFlow } from '@/types/performance';
 
 const PERFORMANCE_CACHE_COLLECTION = 'performance-cache';
@@ -547,146 +549,6 @@ export function calculateRecoveryTime(
 }
 
 /**
- * Calculate Yield on Cost (YOC) metrics for a period
- *
- * YOC measures annualized dividend yield based on original cost basis (not current market value).
- * This metric shows the return on your initial investment, making it useful for evaluating
- * dividend growth over time.
- *
- * ANNUALIZATION STRATEGY:
- * - Periods < 12 months: Scale up to annual rate (totalDividends / months × 12)
- * - Periods >= 12 months: Average annual dividends (totalDividends / years)
- * - This ensures comparability across different time periods
- *
- * FORMULA:
- * YOC% = (Projected Annual Dividends / Cost Basis) × 100
- *
- * Where:
- * - Projected Annual Dividends = annualized DPS × current quantity per asset
- * - Cost Basis = current quantity × averageCost for assets that paid dividends
- *
- * DPS-based projection is used instead of raw dividend totals to avoid a quantity mismatch:
- * if shares are bought AFTER a dividend is paid, raw totals inflate the cost basis without
- * a corresponding increase in dividends received, understating YOC.
- * Using DPS (from dividend records) projected onto current quantity gives forward-looking
- * YOC that is quantity-neutral per asset (annualizedDPS / averageCost cancels qty),
- * correctly reflecting yield on cost regardless of when additional shares were purchased.
- *
- * FILTERING (delegated to computeDividendYieldMetrics):
- * - Dividends filtered by payment date (when money actually received)
- * - endDate is CAPPED AT TODAY to exclude future dividends not yet received
- * - Only currently-held assets (quantity > 0, averageCost > 0) contribute: dividends from
- *   fully-sold positions are excluded from BOTH numerator and denominator, so they no longer
- *   inflate the reported yield
- * - Multi-currency: EUR DPS derived as (grossAmountEur ?? grossAmount) / div.quantity
- *
- * @param dividends - All user dividends (will be filtered by period internally)
- * @param assets - All user assets (for cost basis calculation)
- * @param startDate - Period start date (inclusive)
- * @param endDate - Period end date (inclusive, MUST be capped at today to exclude future dividends)
- * @param numberOfMonths - Duration in months (used for annualization)
- * @returns Object with YOC metrics or null values if insufficient data.
- *          yocDividendsGross/Net report dividends actually received from held assets (display).
- */
-export function calculateYocMetrics(
-  dividends: DividendInput[],
-  assets: AssetInput[],
-  startDate: Date,
-  endDate: Date,
-  numberOfMonths: number
-): {
-  yocGross: number | null;
-  yocNet: number | null;
-  yocDividendsGross: number;
-  yocDividendsNet: number;
-  yocCostBasis: number;
-  yocAssetCount: number;
-} {
-  // Delegate to the shared, per-share YOC engine (single source of truth, also used by
-  // the Dividendi tab). It excludes sold assets and uses current averageCost, so the
-  // reported yield reflects the CURRENT portfolio (see lib/utils/yieldOnCost.ts).
-  const metrics = computeDividendYieldMetrics(dividends, assets, startDate, endDate, numberOfMonths);
-
-  return {
-    yocGross: metrics.portfolioYocGross,
-    yocNet: metrics.portfolioYocNet,
-    // Dividends actually received in the window from currently-held assets (display only)
-    yocDividendsGross: metrics.totalRealizedGross,
-    yocDividendsNet: metrics.totalRealizedNet,
-    yocCostBasis: metrics.totalCostBasis,
-    yocAssetCount: metrics.assetCount,
-  };
-}
-
-/**
- * Calculate Current Yield metrics for a period
- *
- * Current Yield measures annualized dividend yield based on current market value.
- * Unlike YOC (which uses original cost basis), Current Yield shows the yield
- * an investor would receive TODAY if purchasing the assets at current prices.
- *
- * ANNUALIZATION STRATEGY (same as YOC):
- * - Periods < 12 months: Scale up to annual rate (totalDividends / months × 12)
- * - Periods >= 12 months: Average annual dividends (totalDividends / years)
- * - This ensures comparability across different time periods
- *
- * FORMULA:
- * Current Yield% = (Annualized Dividends / Current Portfolio Value) × 100
- *
- * Where:
- * - Annualized Dividends = Dividends adjusted to annual rate
- * - Current Portfolio Value = Sum of (quantity × currentPrice) for dividend-paying assets
- *
- * FILTERING (consistent with YOC):
- * - Dividends filtered by payment date (when money actually received)
- * - endDate CAPPED AT TODAY to exclude future dividends
- * - Only assets with quantity > 0 that paid dividends in period
- * - Multi-currency dividends use EUR conversion if available
- *
- * COMPARISON WITH YOC:
- * - Current Yield > YOC: Price increased more than dividend growth
- * - Current Yield < YOC: Dividends grew or price decreased (good for long-term holders)
- * - Current Yield = YOC: Proportional growth in both price and dividends
- *
- * @param dividends - All user dividends (filtered by period internally)
- * @param assets - All user assets (for current price calculation)
- * @param startDate - Period start date (inclusive)
- * @param endDate - Period end date (inclusive, MUST be capped at today)
- * @param numberOfMonths - Duration in months (for annualization)
- * @returns Object with Current Yield metrics or null if insufficient data
- */
-export function calculateCurrentYieldMetrics(
-  dividends: DividendInput[],
-  assets: AssetInput[],
-  startDate: Date,
-  endDate: Date,
-  numberOfMonths: number
-): {
-  currentYield: number | null;
-  currentYieldNet: number | null;
-  currentYieldDividends: number;
-  currentYieldDividendsNet: number;
-  currentYieldPortfolioValue: number;
-  currentYieldAssetCount: number;
-} {
-  // Delegate to the shared per-share engine (same source as YOC). Current Yield differs
-  // from YOC only in the denominator: current market value instead of cost basis. Sold
-  // assets are excluded, so the numerator can no longer count payouts whose value is
-  // absent from the denominator (see lib/utils/yieldOnCost.ts).
-  const metrics = computeDividendYieldMetrics(dividends, assets, startDate, endDate, numberOfMonths);
-
-  return {
-    currentYield: metrics.portfolioCurrentYieldGross,
-    currentYieldNet: metrics.portfolioCurrentYieldNet,
-    // Dividends actually received in the window from currently-held assets (display only)
-    currentYieldDividends: metrics.totalRealizedGross,
-    currentYieldDividendsNet: metrics.totalRealizedNet,
-    currentYieldPortfolioValue: metrics.totalMarketValue,
-    currentYieldAssetCount: metrics.assetCount,
-  };
-}
-
-/**
  * Whole months elapsed from one date to another — month boundaries crossed, days ignored.
  *
  * The measure of DISTANCE between two months: Jan → Mar is 2. Use it whenever the question is
@@ -970,6 +832,71 @@ export function getCashFlowsFromExpenses(
   return cashFlows.sort((a, b) => a.date.getTime() - b.date.getTime());
 }
 
+/** The measured span of a period: where it opens, where it closes, and how many months it links. */
+interface MeasuredWindow {
+  /** The 1st of the month AFTER the starting valuation. */
+  startDate: Date;
+  /** The last instant of the closing snapshot's month. */
+  endDate: Date;
+  /** `endDate` capped at `now`: a dividend not yet received is not a return. */
+  dividendEndDate: Date;
+  /** The months from `startDate` to `endDate`, both included — the number of linked monthly returns. */
+  numberOfMonths: number;
+}
+
+/**
+ * The span a pair of snapshots measures — the ONE derivation, read by the metrics
+ * (`calculatePerformanceForPeriod`, which explains the rule where it applies it) and by the
+ * dividend-yield request (`resolveYieldPeriods`), so the two can never describe different windows.
+ *
+ * @param startSnapshot - The starting valuation (the period's first snapshot)
+ * @param endSnapshot - The period's last snapshot
+ * @param now - "Today", the cap of the dividend window
+ */
+function resolveMeasuredWindow(startSnapshot: MonthlySnapshot, endSnapshot: MonthlySnapshot, now: Date): MeasuredWindow {
+  // month index (0-based) === month number (1-based) → the first day of the FOLLOWING month
+  const startDate = new Date(startSnapshot.year, startSnapshot.month, 1);
+  const endDate = endOfMonthBound(endSnapshot.year, endSnapshot.month);
+  // For dividend calculations, cap at today to exclude future dividends not yet received
+  const dividendEndDate = endDate > now ? now : endDate;
+  return { startDate, endDate, dividendEndDate, numberOfMonths: calculateMonthsDifference(endDate, startDate) };
+}
+
+/** The five pre-computed periods, by their key in `PerformanceData`. */
+const PRECOMPUTED_PERIODS = [
+  ['ytd', 'YTD'],
+  ['oneYear', '1Y'],
+  ['threeYear', '3Y'],
+  ['fiveYear', '5Y'],
+  ['allTime', 'ALL'],
+] as const satisfies ReadonlyArray<readonly [keyof PerformanceData, TimePeriod]>;
+
+/**
+ * The dividend windows of the five pre-computed periods, from the snapshots alone.
+ *
+ * It exists so the yields can be asked for BEFORE the metrics are back (the page fires both
+ * together): the windows come from the same selection and the same derivation the metrics use,
+ * not from their payload. A period the metrics would call insufficient (fewer than two snapshots,
+ * a span shorter than a month) is left out — it has no yield to ask for.
+ *
+ * @param snapshots - The base-projected snapshots (`resolvePerformanceBase`), any order
+ * @param now - "Today"
+ */
+export function resolveYieldPeriods(snapshots: MonthlySnapshot[], now: Date): PerformanceYieldPeriod[] {
+  const periods: PerformanceYieldPeriod[] = [];
+  for (const [key, timePeriod] of PRECOMPUTED_PERIODS) {
+    // A copy: for ALL the selection IS the caller's array, and a sort in place would reorder it.
+    const sorted = [...getSnapshotsForPeriod(snapshots, timePeriod, undefined, undefined, now)].sort((a, b) =>
+      a.year !== b.year ? a.year - b.year : a.month - b.month
+    );
+    if (sorted.length < 2) continue;
+    const { startDate, dividendEndDate, numberOfMonths } = resolveMeasuredWindow(sorted[0], sorted[sorted.length - 1], now);
+    if (numberOfMonths < 1) continue;
+    periods.push({ key, startDate, dividendEndDate, numberOfMonths });
+  }
+  return periods;
+}
+
 /**
  * Calculate performance metrics for a specific time period
  *
@@ -1088,15 +1015,7 @@ export async function calculatePerformanceForPeriod(
   // affect that return), where taking sortedSnapshots[1] would have opened it in March.
   const startSnapshot = sortedSnapshots[0];
   const endSnapshot = sortedSnapshots[sortedSnapshots.length - 1];
-
-  // month index (0-based) === month number (1-based) → the first day of the FOLLOWING month
-  const startDate = new Date(startSnapshot.year, startSnapshot.month, 1);
-  const endDate = endOfMonthBound(endSnapshot.year, endSnapshot.month);
-
-  // For dividend calculations, cap at today to exclude future dividends not yet received
-  const dividendEndDate = endDate > now ? now : endDate;
-
-  const numberOfMonths = calculateMonthsDifference(endDate, startDate);
+  const { startDate, endDate, dividendEndDate, numberOfMonths } = resolveMeasuredWindow(startSnapshot, endSnapshot, now);
   if (numberOfMonths < 1) {
     // Two snapshots in the same month (duplicates): there is no measurable span, and every
     // annualized metric would divide by zero years.
@@ -1197,8 +1116,8 @@ export async function calculatePerformanceForPeriod(
     ? calculateSharpeRatio(timeWeightedReturn, riskFreeRate, volatility)
     : null;
 
-  // YOC metrics are calculated server-side via API route
-  // These fields are populated by the client after fetching from /api/performance/yoc
+  // The yields need the Admin SDK: the client merges them in from POST /api/performance/yields
+  // (lib/utils/dividendYield.ts). Here they are the empty reading.
   const yocMetrics = {
     yocGross: null as number | null,
     yocNet: null as number | null,
@@ -1208,8 +1127,6 @@ export async function calculatePerformanceForPeriod(
     yocAssetCount: 0,
   };
 
-  // Current Yield metrics are calculated server-side via API route
-  // These fields are populated by the client after fetching from /api/performance/current-yield
   const currentYieldMetrics = {
     currentYield: null as number | null,
     currentYieldNet: null as number | null,
@@ -1466,6 +1383,71 @@ export function buildCacheKey(inputs: {
 }
 
 /**
+ * What the metrics are computed from, besides the expenses: the five collections
+ * `resolvePerformanceBase` reads. The settings are `null` when the document does not exist yet.
+ */
+export interface PerformanceInputs {
+  snapshots: MonthlySnapshot[];
+  settings: AssetAllocationSettings | null | undefined;
+  assets: Asset[];
+  contributions: PensionContribution[];
+  trades: AssetTransaction[];
+}
+
+/**
+ * Read the five input collections in parallel, for a caller that did not bring them.
+ *
+ * The ledger read is not guarded: a registry that cannot be read is a failed load (the page's
+ * isError branch), never an empty one silently measured from the quantities alone.
+ */
+async function readPerformanceInputs(userId: string): Promise<PerformanceInputs> {
+  const [snapshots, settings, assets, contributions, trades] = await Promise.all([
+    getUserSnapshots(userId),
+    getSettings(userId),
+    getAllAssets(userId),
+    getPensionContributions(userId),
+    getAssetTransactions(userId),
+  ]);
+  return { snapshots, settings, assets, contributions, trades };
+}
+
+/** What the inputs decide before any metric is computed: the base, the two settings, the cache key. */
+export interface PerformanceSetup {
+  base: PerformanceBaseResolution;
+  riskFreeRate: number;
+  dividendCategoryId: string | undefined;
+  /** `buildCacheKey` over the above: equal keys mean equal pre-computed metrics. */
+  cacheKey: string;
+}
+
+/**
+ * Resolve the measured base, the two settings the metrics read and the cache key, from the inputs.
+ *
+ * Pure. `getAllPerformanceData` starts here; the page calls it too, so the base its charts read and
+ * the key that names its cached payload are the service's own.
+ *
+ * Rendimenti measures the ACTIVELY MANAGED portfolio: by default the pension funds and the
+ * non-allocated assets (the home you live in) are out of every metric; with the pension toggle
+ * on, the funds enter the base from the month their contributions are tracked, as a flow, and
+ * every later contribution is a flow too; with the liquidity toggle the cash accounts are out
+ * and what they pay for is measured as a flow — see performanceBase.ts.
+ * WARNING: lib/services/pdfDataService.ts resolves the same base through the SAME function. Keep
+ * every call site on `resolvePerformanceBase` or the report silently disagrees with the page.
+ */
+export function resolvePerformanceSetup(inputs: PerformanceInputs): PerformanceSetup {
+  const { snapshots, assets, contributions, settings, trades } = inputs;
+  const base = resolvePerformanceBase({ snapshots, assets, contributions, settings, trades });
+
+  // `??`, not `||`: a deliberate 0% risk-free rate is a legitimate setting (it makes Sharpe the raw
+  // return over volatility) and must not be silently replaced by the 2.5% default.
+  const riskFreeRate = settings?.riskFreeRate ?? 2.5;
+  const dividendCategoryId = settings?.dividendIncomeCategoryId;
+
+  const cacheKey = buildCacheKey({ snapshots: base.snapshots, base, riskFreeRate, dividendCategoryId });
+  return { base, riskFreeRate, dividendCategoryId, cacheKey };
+}
+
+/**
  * Get all performance data for the page
  *
  * Calculates performance metrics for multiple time periods:
@@ -1478,40 +1460,20 @@ export function buildCacheKey(inputs: {
  *
  * @param userId - User ID for fetching data
  * @param forceRefresh - Skip cache and recompute (used by the refresh button)
+ * @param inputs - The five collections already read by the caller (the page reads them through
+ *   its hooks, once for the whole app). Absent, they are read here — the result is the same.
  * @returns Complete performance data for all periods
  */
-export async function getAllPerformanceData(userId: string, forceRefresh = false): Promise<PerformanceData> {
-  // ==== STEP 1: Fetch snapshots, settings, assets, pension contributions and the ledger in parallel ====
-  // The ledger read is not guarded: a registry that cannot be read is a failed load (the page's
-  // isError branch), never an empty one silently measured from the quantities alone.
-  const [rawSnapshots, settings, assets, contributions, trades] = await Promise.all([
-    getUserSnapshots(userId),
-    getSettings(userId),
-    getAllAssets(userId),
-    getPensionContributions(userId),
-    getAssetTransactions(userId),
-  ]);
+export async function getAllPerformanceData(userId: string, forceRefresh = false, inputs?: PerformanceInputs): Promise<PerformanceData> {
+  // ==== STEP 1: The inputs — the caller's, or read here in parallel ====
+  const resolvedInputs = inputs ?? (await readPerformanceInputs(userId));
 
-  // Rendimenti measures the ACTIVELY MANAGED portfolio: by default the pension funds and the
-  // non-allocated assets (the home you live in) are out of every metric below; with the pension
-  // toggle on, the funds enter the base from the month their contributions are tracked, as a flow,
-  // and every later contribution is a flow too; with the liquidity toggle the cash accounts are
-  // out and what they pay for is measured as a flow — see performanceBase.ts.
-  // WARNING: app/dashboard/performance/page.tsx and lib/services/pdfDataService.ts resolve the
-  // same base through the SAME function. Keep every call site on `resolvePerformanceBase` or a
-  // custom period (or the report) silently disagrees with the pre-computed ones.
-  const base = resolvePerformanceBase({ snapshots: rawSnapshots, assets, contributions, settings, trades });
+  const { base, riskFreeRate, dividendCategoryId, cacheKey } = resolvePerformanceSetup(resolvedInputs);
   const { snapshots, pensionFlows, portfolioFlows } = base;
-
-  // `??`, not `||`: a deliberate 0% risk-free rate is a legitimate setting (it makes Sharpe the raw
-  // return over volatility) and must not be silently replaced by the 2.5% default.
-  const riskFreeRate = settings?.riskFreeRate ?? 2.5;
-  const dividendCategoryId = settings?.dividendIncomeCategoryId;
 
   // ==== STEP 2: Check cache before fetching expenses ====
   // The key fingerprints every input the numbers depend on — see buildCacheKey for the full list
   // and for what a stale hit costs. On a hit we skip the expensive whole-history expense fetch.
-  const cacheKey = buildCacheKey({ snapshots, base, riskFreeRate, dividendCategoryId });
   if (!forceRefresh) {
     const cached = await readPerformanceCache(userId);
     if (cached && cached.cacheKey === cacheKey) {

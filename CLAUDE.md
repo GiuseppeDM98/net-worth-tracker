@@ -13,8 +13,8 @@ Next.js app for Italian investors: net worth, assets, cashflow, dividends, perfo
 
 ## Current Status
 - Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic.
-- `tsc` clean; **213 files / 4848 tests** green in `Europe/Rome` and in the machine's zone + **45 Playwright spec files** (162 tests, incl. 6 auth setups; last full run 2026-10-03 on the Windows laptop, 151/162 in 10,2 min — nine red on a base seed of the previous month, green after `npm run emulators:seed`, and `modal.origin`, Known Issues; doc/guide/e2e-emulatori.md). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, which structurally hides timezone bugs.
-- Latest (2026-10-04): **the PERF-08 spec retired** (the Vercel functions in `fra1`, PR #426 in develop since 2026-10-04) — 13 divergences read against the code: seven where the code was right (five already home; two lessons carried: `x-vercel-id` does not START with the function's region — its first segment is the edge nearest the caller — in SETUP.md § Function region, and the rollback being the line PLUS the test's expectation, in the header of `__tests__/vercelConfig.test.ts`), one proof gap closed on the owner's call (the cron case never seen red: falsified with a second region and a doubled comma, all three red), five deferrals written where they live (no production reading, by decision; the crons to watch after the release in SETUP.md § Function region; `doc/perf/README.md` § 6 and § 9). Spec deleted, every reference rewritten to the present: `tsc`, lint 0, Vitest in `Europe/Rome`.
+- `tsc` clean; **217 files / 4883 tests** green in `Europe/Rome` and in the machine's zone + **45 Playwright spec files** (164 tests, incl. 6 auth setups; last full run 2026-10-04 on the Mac, 164/164 in 5,1 min — after the base seed stopped dating its expenses in the future on the first four days of a month, doc/guide/e2e-emulatori.md). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, which structurally hides timezone bugs.
+- Latest (2026-10-04): **Rendimenti reads every collection once** (PERF-09, branch `perf/09-rendimenti-una-lettura`): the six collections through the shared hooks (`lib/hooks/usePerformanceData.ts`), `getAllPerformanceData(…, inputs?)` on what they hold, the dividend yields of the five periods from ONE route, `POST /api/performance/yields`, asked together with the metrics (`lib/query/performanceQueries.ts`) and kept in React Query — never in `performance-cache`, whose key covers neither dividends nor prices; both payloads persisted, so a reload paints the last figures under «Aggiornato alle…»; the PDF on the same route, `/api/performance/yoc` and `/current-yield` removed. Measured on the mirror, same session: API calls at mount 17 → 8, cold first figure 511 → 311 ms, warm 424 → 241, revisit 442 → 90 with no skeleton; the five periods' dump identical line by line. doc/guide/rendimenti.md § every collection read once; doc/perf/README.md § 6.
 
 ## Architecture Snapshot
 - App Router; protected pages under `app/dashboard/*`.
@@ -58,7 +58,7 @@ One line per area: the question it answers, then where it is described. *What th
 - **Performance**: `npm run perf:budget` (JS per route against `perf/budget.json`, two seconds, after a build) and
   `npm run perf:bench -- --runs=3` (cold/warm on the mirror, via `perf:build` + `perf:serve` on :3200); commands, columns,
   the baseline in force and the raised-ceiling register in `perf/README.md`. A route that grows raises its ceiling in the
-  same commit with `raisedBy`. The specs and the 2026-09-26 history in `doc/perf/README.md` (PERF-00 to 08 done, their specs retired).
+  same commit with `raisedBy`. The specs and the 2026-09-26 history in `doc/perf/README.md` (PERF-00 to 08 done, their specs retired; PERF-09 done).
 - **Mobile composition**: the small-screen census (19 surfaces × 390/768/1024), the chosen direction, the nine specs and
   the owner's decisions in `doc/mobile/README.md`; the census script in `doc/mobile/reference/` (MOB-01 ports it to
   `npm run mobile:census` / `mobile:budget`). Implemented after `doc/perf/`.
@@ -79,18 +79,12 @@ Only what crosses areas; an area's blind spots — the behaviours that look like
   2026-09-21, on the compact `PageHeader`'s description) — just under the AA floor of 4,5:1, on every page that uses
   the shell, not on one. It is a theme-token change with a twelve-block blast radius, so it belongs to a
   `doc/guide/temi.md` session, not to a page's.
-- **`e2e/modal.origin.spec.ts` is intermittent in a FULL run** (2026-09-21): it failed twice in a row and then passed
-  twice with the same code — once with `components/ui/period-picker.tsx` reverted and once with it restored, so that
-  change is not the cause (and it failed once more in the full run of 2026-09-22, green alone right after). When it fails, Rendimenti's «Periodo personalizzato» button has moved **23,4px** between the
-  `boundingBox()` the spec takes and the origin captured at the click: a late reflow under suite load, roughly the
-  height of the custom-period chip row. It passes alone, and in the `desktop` project alone. Not reproduced on demand,
-  so not yet fixed — re-read this before trusting a single red run of it. **A second failure mode on 2026-09-29**
-  (Windows laptop, the machine twice as slow as the day before): red at line 47 — no `data-state="closed"` frame inside
-  the sampler's 2,6 s window, so the dialog opened more than ~1,5 s after the click — three times ALONE on a fresh
-  `.next-e2e`, and identically with develop's `app/page.tsx` and `AuthShell.tsx` swapped in on the same server, so not
-  the day's commit. The window is the spec's, not the app's: a slow machine can fail it without any regression.
-  **2026-10-03** (Windows laptop, PERF-07 branch — server and write-path code only, no client file): the FIRST mode,
-  22,7px at line 53, red in the full run AND alone right after — so «green alone» no longer holds on this machine.
+- **`e2e/modal.origin.spec.ts` can fail on a SLOW or cold dev server** (no `data-state="closed"` frame inside the
+  sampler's 2,6 s window — the dialog opened more than ~1,5 s after the click; 2026-09-29 on the Windows laptop, 2026-10-04
+  on the Mac with the server started cold for the one spec, on `develop` too). The window is the spec's, not the app's. Its
+  OTHER mode — the origin off the button's centre, by 23px or by 3,4px, the «intermittent in a full run» of 2026-09-21 — was
+  the spec reading the button's box during the header's entrance glide or before the data landed: closed on 2026-10-04 (the
+  spec waits for the verdict and for a box two reads agree on; green in the full run and four times alone).
 - **`e2e/cashflow.dividendi.spec.ts` › «the form refuses…» is red after `cashflow.accounts` + `cashflow.budget`** (2026-09-30:
   3/3 on a clean `develop` worktree, 2/3 on the branch of PR #418, green alone): after the refusal the dialog stays open
   with its form reset — `reset` re-runs, cause not traced yet. Two of four full runs that day had it red; green in

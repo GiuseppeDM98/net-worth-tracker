@@ -6,9 +6,49 @@
 
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
-- **Rendimenti**: `app/dashboard/performance/page.tsx`, `components/performance/*` (+ `tiles/*`, `AttribuzioneTile`; the hand-written plots glide through `lib/hooks/useMorphingSeries.ts` over pure `lib/utils/seriesMorph.ts`), pure `lib/utils/{performanceNarrative,performanceSummary,performanceBase,portfolioFlows,performanceAttribution,drawdownSeries,cashFlowMap,benchmarkPeriodReturn}.ts` (`resolvePerformanceBase` = the ONE base for service, page and PDF; `externalFlowOf`/`mergePensionFlows`/`mergePortfolioFlows` = the two flow channels; `buildPortfolioBoundaryFlows` = the measured boundary; `resolvePeriodReturnChip`/`deannualizeReturn`; `attributePeriodReturn` + `RESIDUAL_ALERT_SHARE` = the residual guard), `lib/services/performanceService.ts` (`CACHE_MATH_VERSION`); cache `performance-cache/{userId}`; spec `e2e/performance.degraded.spec.ts` on `npm run e2e:seed -- performance`. Yields: `lib/utils/yieldOnCost.ts` (`computeDividendYieldMetrics`, also behind `app/api/dividends/stats/route.ts`)
+- **Rendimenti**: `app/dashboard/performance/page.tsx`, `components/performance/*` (+ `tiles/*`, `AttribuzioneTile`; the hand-written plots glide through `lib/hooks/useMorphingSeries.ts` over pure `lib/utils/seriesMorph.ts`), pure `lib/utils/{performanceNarrative,performanceSummary,performanceBase,portfolioFlows,performanceAttribution,drawdownSeries,cashFlowMap,benchmarkPeriodReturn}.ts` (`resolvePerformanceBase` = the ONE base for service, page and PDF; `externalFlowOf`/`mergePensionFlows`/`mergePortfolioFlows` = the two flow channels; `buildPortfolioBoundaryFlows` = the measured boundary; `resolvePeriodReturnChip`/`deannualizeReturn`; `attributePeriodReturn` + `RESIDUAL_ALERT_SHARE` = the residual guard), `lib/services/performanceService.ts` (`CACHE_MATH_VERSION`); cache `performance-cache/{userId}`; spec `e2e/performance.degraded.spec.ts` on `npm run e2e:seed -- performance`. Yields: `lib/utils/yieldOnCost.ts` (`computeDividendYieldMetrics`, also behind `app/api/dividends/stats/route.ts`), `lib/utils/dividendYield.ts` (`computeYieldsForPeriods`, the twelve yield fields per period), `app/api/performance/yields/route.ts`, `lib/services/performanceYieldsService.ts` (the client reader, the PDF's too). Reads: `lib/hooks/usePerformanceData.ts` (every read of the page), `lib/query/performanceQueries.ts` (the two queries, built together — pure), `resolvePerformanceSetup` / `resolveYieldPeriods` / `PerformanceInputs` in the service
 - **Benchmark**: `lib/constants/benchmarks.ts`, `app/api/benchmarks/*`, `lib/server/ecbRatesService.ts`; caches `benchmark-cache/*`, `fx-rate-cache/usd-eur`, `ecb-rate-cache/deposit-rate`
-- **Suites to run after a change here — Rendimenti** (moved from `AGENTS.md` § Commands on 2026-09-30): `performanceService` (+ `performanceBase`, `drawdownSeries`, `cashFlowMap`) · **Attribuzione** `performanceAttribution`, `snapshotAssetBreakdown` · **Verdetto e letture** `performanceNarrative`, `performanceSummaryTiles`, `performanceSummary` (+ `patrimonioNarrative` for the articles) · **Browser** `e2e/performance.degraded.spec.ts`
+- **Suites to run after a change here — Rendimenti** (moved from `AGENTS.md` § Commands on 2026-09-30): `performanceService` (+ `performanceBase`, `drawdownSeries`, `cashFlowMap`) · **Attribuzione** `performanceAttribution`, `snapshotAssetBreakdown` · **Verdetto e letture** `performanceNarrative`, `performanceSummaryTiles`, `performanceSummary` (+ `patrimonioNarrative` for the articles) · **Letture e rendimenti da dividendo** `performanceInputs`, `performanceQueries`, `dividendYield`, `performanceYieldsRoute` (+ `persistCache`) · **Browser** `e2e/performance.degraded.spec.ts`
+
+## Rendimenti — every collection read once (`lib/hooks/usePerformanceData.ts`, `lib/query/performanceQueries.ts`)
+
+- **Depth two, eight API calls** (2026-10-04; it was four to five round trips in series and seventeen calls). First the six
+  collections through the app's shared hooks — snapshots, assets, settings, pension contributions, dividend receipts, the
+  ledger — then, TOGETHER, the pre-computed metrics and the dividend yields. The page never calls a read service and never
+  holds the collections in state: `usePerformanceData(ownerId)` is its one door, and the base its charts read is
+  `resolvePerformanceSetup(inputs).base`, the service's own resolution.
+- **`getAllPerformanceData(userId, forceRefresh, inputs?)` takes the inputs already read**: the page hands over what the
+  hooks hold, so the service reads only `performance-cache/{uid}` (one `getDoc`) and, on a miss, the expenses. Without
+  `inputs` it reads the five collections itself and computes the same payload (`__tests__/performanceInputs.test.ts`: the
+  equivalence, seen red with `assets: []` handed over). `resolvePerformanceSetup` is the pure head of that function — base,
+  risk-free rate, dividend category, cache key — and the page's metrics query is NAMED by that cache key
+  (`['performance', 'data', uid, cacheKey]`): the metrics are read again exactly when an input that decides them changes.
+- **The yields: one route, asked with the metrics, never after them.** `POST /api/performance/yields` takes the periods in
+  its body and reads dividends, assets and snapshots ONCE (the two routes it replaced, `/api/performance/yoc` and
+  `/api/performance/current-yield`, each read the three per period: thirty collection reads for five periods). The windows
+  it is asked come from `resolveYieldPeriods(base.snapshots, now)`, which runs the SAME selection and the SAME derivation
+  as the metrics (`resolveMeasuredWindow`, read by `calculatePerformanceForPeriod` too) — so the call leaves before the
+  metrics exist, and the two can never describe different windows on a fresh computation.
+  `__tests__/performanceQueries.test.ts` holds the order with a metrics read that never resolves. The custom range and the
+  PDF ask the same route with their one window.
+- **The yields live in React Query, NOT in `performance-cache`**: that document's key covers the snapshots, the base, the
+  rate and the dividend category — not the dividends registry and not today's prices, which YOC and current yield read. In
+  the Firestore cache they would be stale for up to six hours with nothing to invalidate them (AGENTS.md § Caching: the key
+  encodes EVERY determining input). The query is named by its windows, the dividend cap by its DAY
+  (`describeYieldPeriods`: the cap of an open period is «now», and a name carrying the instant would be new at every load);
+  the request carries the exact instant. `CACHE_MATH_VERSION` did not move: the cached document has the shape it had.
+- **Both payloads are persisted** (`['performance', 'data']`, `['performance', 'yields']` in
+  `lib/constants/persistCache.ts`, the owner's decision, 2026-10-04): a reload paints the last known figures with
+  «Aggiornato alle…» in the header and rereads behind them — first figure at ~90 ms on the mirror, it was ~440, with no
+  page skeleton. With only the six collections restored the hero waited one round trip under a skeleton, and the header
+  said «sto rileggendo» over it. A change of shape of `PerformanceData` now owes a `PERSIST_CACHE_VERSION` bump.
+- **«Aggiorna» reads everything anew and stands the observers still** (`paused`): it invalidates the six keys, recomputes
+  the metrics with `forceRefresh` on the fresh inputs and asks the yields again, the two together, then moves the page's
+  clock so its queries find both answers under their keys. A custom range is dropped by a refresh (it was measured on the
+  snapshots of before) and the page returns to the year to date — until 2026-10-04 the refresh left «CUSTOM» selected with
+  no metrics, which read as «servono almeno due snapshot».
+- **A yield that cannot be read is not a failed page**: the yields gate the WAIT (the hero appears with them) but not the
+  failure — the metrics show without them, as with the old routes, and the query does not retry.
 
 ## Rendimenti — measurement base (`lib/utils/performanceBase.ts`, `drawdownSeries.ts`)
 
@@ -187,6 +227,12 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 ## Per-page blind spots
 
+- **The yields follow TODAY's window, the cached metrics the window of when they were cached** (2026-10-04). On a fresh
+  computation the two are one derivation. On the first visit after a month rollover, with no new snapshot and the cache
+  still inside its six hours, the metrics still describe last month's window (the known residual of `buildCacheKey`) while
+  the yields are asked on this month's: for those hours YOC and current yield are annualised over a window one month off
+  the hero's. «Aggiorna» realigns them. And the yields' dividend cap is the instant the page was OPENED (or last
+  refreshed), not the instant of each render.
 - **Rendimenti**: `e2e/performance.degraded.spec.ts` covers the structure only (the base caption, the attribution tile, the pension channel on and off); the six benchmark series + FX load on every visit (6h `staleTime`), only a FAILED FX route falls back to USD (the aside says so); Sharpe/Sortino use the settings' risk-free rate; the payload's `drawdownDuration`/`recoveryTime` are no longer displayed (the tiles read `resolveDrawdownStory`); a 1-anno window without the current month's snapshot measures 11 months and says so; the rolling readings live in `PerformanceDettaglio` (untested; a rolling CAGR with no measurable rate is `null` and leaves a gap, never a 0); `AIAnalysisDialog` starts its analysis ON OPEN by decision (one click = the report) and ABORTS it on close, client and server (`request.signal` → the SDK's `{ signal }`; an abort is not an error and logs nothing) — a probe that only «opens and escapes» it still spends a call; **with the pension toggle ON, a period that straddles `pensionEntryMonth` carries the funds' whole value as a flow in that month** — «Capitale immesso» jumps by it and the Contributi tile names it as the entry, not as savings; **a pension fund's statement credited late still reads as a temporary market loss** (the Previdenza blind spot, now on this page too); **«Non attribuito» is not a bug**: it is every euro that moved the total without moving an instrument's unit value, and on the real account it was −2.326 € on a 16.836 € YTD gain — since 2026-09-07 the months where it exceeds 2% of the base are named, not explained (a dividend landing in cash trips the guard too); **on any account with something out of the base — the default — the months with `byAsset` on both snapshots neutralise the MEASURED boundary flows, not the cashflow's savings** (2026-09-07): a deposit on an account inside the base is a flow even if no income row exists, interest credited on it reads as a deposit, a split or an in-kind transfer as a purchase, a trade left out of the ledger vanishes for a covered instrument, and the months before `byAsset` (2025-11 on the real account) still use the cashflow — the Contributi tile says how many months were measured; **«Liquidità fuori dalla base» measured on the real account (2026-09-07, in memory)**: ON → YTD 15,36% (OFF 14,73%), 1Y 16,81% (16,03%), ALL 29,76% (27,08%), measured flows +5.058 € (the net buys) instead of −650 € (the accounts' net balance change); the four accounts are 3% of the base, so the gain is cleanliness, not size, and the ALL window stays mixed before 2025-12 because the cashflow's savings landed on accounts that are then outside the base.
 - **Rendimenti before `byAsset`: correct denominator, wrong numerator** (2023-01 → 2025-10 on the real account): the basis step is removed, but the excluded assets' variation stays inside the measured return. Not reconstructible — and those months cannot be attributed to an instrument either: «Da dove viene il rendimento» names the months it covers. (moved from `CLAUDE.md` → Known Issues on 2026-09-19)
 - **«Non attribuito» in Rendimenti is a measurement, not a bug**: cash interest, balances corrected by hand, expenses paid from untracked accounts and dividends recorded in only one of cashflow/registry all move the total without moving an instrument's unit value (−2.326 € on a 16.836 € YTD gain on the real account). Per-instrument dividends come from the `dividends` registry, the gain from the cashflow: a dividend present in one place only lands there. With the pension toggle ON, a period straddling the entry month carries the funds' whole value as a flow in that month, and a late-credited statement reads as a temporary market loss on this page too. (moved from `CLAUDE.md` → Known Issues on 2026-09-19)
