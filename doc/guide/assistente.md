@@ -195,4 +195,9 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **The context preview reads the page's copy of the test-snapshot preference** (2026-10-05), not the stored one:
   the two differ only when the preference was changed from another device inside the memory query's five minutes. It
   is the toggle of test accounts, shown only where dummy snapshots exist.
+- **The stream route reads the memory twice per message, on purpose** (read against the code on 2026-10-05):
+  once before the answer, for the active items the prompt carries, and once in `extractAndSaveMemory`, after the
+  stream has closed — possibly a minute later. The second read is what honours a `memoryEnabled` switched off while
+  the answer was streaming, and what dedupes against an item added from the panel meanwhile; it runs in the
+  background, off the reader's wait. Do not hand the first read down to it.
 - **A confirmed goal proposal can be confirmed again after a reload** (accepted for v1): reopening the thread re-parses the fenced block and a second press creates a SECOND goal. (moved from `CLAUDE.md` → Known Issues on 2026-09-19)

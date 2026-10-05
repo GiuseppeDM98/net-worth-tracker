@@ -78,6 +78,8 @@ async function extractAndSaveMemory(
   assistantMessage: string
 ): Promise<void> {
   try {
+    // Read again here, not handed down from the POST handler's read: this runs after the stream
+    // has closed, and the toggle below or the items deduped against may have changed meanwhile.
     const memoryDoc = await getAssistantMemoryDocument(userId);
 
     // Respect the user's memoryEnabled toggle — never extract when disabled
