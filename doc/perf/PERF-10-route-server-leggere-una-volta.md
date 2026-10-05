@@ -1,6 +1,6 @@
 # PERF-10 — Le route server leggono una volta: le statistiche dividendi, le thread dell'assistente (l'Esposizione ha già la sua cache)
 
-> Stato: da fare · Priorità: 2 · Sforzo: S/M · Dipende da: PERF-07 (`Server-Timing`), PERF-00 (chiude § A) · Sblocca: —
+> Stato: fatta il 2026-10-05 (misure e divergenze in doc/perf/README.md § 6) · Priorità: 2 · Sforzo: S/M · Dipende da: PERF-07 (`Server-Timing`), PERF-00 (chiude § A) · Sblocca: —
 
 ## 1. Il problema, misurato
 

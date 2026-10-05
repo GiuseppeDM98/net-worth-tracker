@@ -123,6 +123,25 @@ describe('GET /api/portfolio/instrument-profiles', () => {
     expect((await second.json()).oldestFetchedAt).toBe(body.oldestFetchedAt);
   });
 
+  // PERF-10 (2026-10-05): the header is the production reading of the case above. Seen RED by
+  // setting USEFUL_PROFILE_TTL_MS to zero: the second call read «source=yahoo», «fetched=2».
+  it('says in Server-Timing where the profiles came from: Yahoo first, the cache second', async () => {
+    const descriptions = (header: string | null) =>
+      Object.fromEntries((header ?? '').split(', ').filter((entry) => entry.includes(';desc=')).map((entry) => entry.split(';desc=')));
+    const stages = (header: string | null) => (header ?? '').split(', ').map((entry) => entry.split(';')[0]);
+
+    const first = await instrumentProfilesRoute(request(`${ROUTE}?userId=owner-1`));
+    expect(descriptions(first.headers.get('server-timing'))).toEqual({ hits: '0', fetched: '2', source: 'yahoo' });
+    expect(stages(first.headers.get('server-timing')).slice(0, 4)).toEqual(['auth', 'db', 'yahoo', 'total']);
+
+    const second = await instrumentProfilesRoute(request(`${ROUTE}?userId=owner-1`));
+    expect(descriptions(second.headers.get('server-timing'))).toEqual({ hits: '2', fetched: '0', source: 'cache' });
+    expect(Object.keys(await second.json()).sort(), 'the counts stay out of the body').toEqual(['oldestFetchedAt', 'profiles']);
+
+    const forced = await instrumentProfilesRoute(request(`${ROUTE}?userId=owner-1&force=true`));
+    expect(descriptions(forced.headers.get('server-timing')).source, '«Aggiorna» asks Yahoo').toBe('yahoo');
+  });
+
   it('«Aggiorna» (force=true) asks Yahoo again on a fresh cache', async () => {
     await instrumentProfilesRoute(request(`${ROUTE}?userId=owner-1`));
     const callsAfterFirst = quoteSummaryMock.mock.calls.length;

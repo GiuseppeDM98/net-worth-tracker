@@ -11,7 +11,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Dividendi**: `components/dividends/DividendTrackingTab.tsx` + `tiles/*` + `DividendiDettaglio.tsx`, pure `lib/utils/{dividendAnalytics,dividendiNarrative,dividendEligibility}.ts` (`resolveDividendFloor` = the ONE floor under a scraped dividend), `lib/hooks/useDividendStats.ts` → `app/api/dividends/stats/route.ts`; registry and coupons `components/dividends/{DividendTable,DividendCalendar,DividendDialog,DividendDetailsDialog,DividendRecordDetailsDialog,InflationRateDialog,ProvisionalCouponBanner}.tsx`, `lib/utils/couponUtils.ts` (`resolveCoupon` for both mechanisms, `resolveInflationIndexation`, `hasCouponPayments`, the coefficient lookups), `lib/services/couponScheduling.ts`, `types/dividend.ts`
 - **Suites to run after a change here — Dividendi / cron** (moved from `AGENTS.md` § Commands on 2026-09-30): `dividendUseCase`, `dividendProcessor`, `dividendAccount`, `dividendIncomeService` · **Email** `monthlyEmailService`
-- **Suites to run after a change here — Cashflow › Dividendi** (moved from `AGENTS.md` § Commands on 2026-09-30): `dividendAnalytics`, `dividendiNarrative` (+ `patrimonioNarrative` for the articles)
+- **Suites to run after a change here — Cashflow › Dividendi** (moved from `AGENTS.md` § Commands on 2026-09-30): `dividendAnalytics`, `dividendiNarrative` (+ `patrimonioNarrative` for the articles) · **The stats route** `dividendStatsRoute` (its answer pinned on a fixture, 2026-10-05)
 
 ## Cashflow › Dividendi (`components/dividends/DividendTrackingTab.tsx`, `components/dividends/tiles/*`)
 - **RECEIVED AND ANNOUNCED ARE NEVER ONE FIGURE.** A dividend whose `paymentDate` is in the future is
@@ -149,7 +149,8 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **The coupon cron is self-healing, not exact-day**: Phases 2-3 query a 370-day lookback and Phase 3 walks
   `getFollowingCouponDate` forward, so a missed run cannot stop the chain.
 - **Adding a `DividendType` is a six-file fan-out** and nothing enforces it: `types/dividend.ts`, `DividendTable`,
-  `DividendDetailsDialog`, `DividendTrackingTab`, `DividendDialog`, plus `dividendService.ts`'s `byType` initializer.
+  `DividendDetailsDialog`, `DividendTrackingTab`, `DividendDialog`, plus the `byType` initializer of
+  `summarizeDividendStats` in `dividendAnalytics.ts` (in `dividendService.ts` until 2026-10-05).
 - **A coupon's tax rate is the asset's own `taxRate`** (12,5% government, 26% corporate), never a constant.
 - **YOC and Current Yield share one pure function**, `computeDividendYieldMetrics`, prospective and per-share:
   `annualizedDPS = Σ(grossEur/div.quantity)` annualized, YOC = `DPS ÷ averageCost`, Current Yield = `DPS ÷ price`, only
@@ -191,6 +192,21 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   `portfolioCurrentYieldGross/Net`): `computeDividendYieldMetrics` has always produced them and the
   route used to drop them, which forced every consumer wanting a net figure to re-derive it from an
   average tax rate. `averageYield` stays only as the deprecated alias of the gross current yield.
+- **`/api/dividends/stats` reads every collection ONCE** (PERF-10, 2026-10-05): one `Promise.all` of the dividends,
+  the assets, the snapshots and the trade ledger, then the period, all-time and upcoming figures are derived from
+  that ONE dividend list by the pure `summarizeDividendStats(list, { startDate?, endDate?, assetId?, now })` and
+  `selectUpcomingDividends(list, now)` in `lib/utils/dividendAnalytics.ts` — it was seven serial reads, the dividends
+  four times (a range, the whole collection, a `paymentDate >= now` query, the whole collection again).
+  `calculateDividendStats` and `getUpcomingDividends` are gone from `dividendService.ts`. The pure functions keep the
+  old queries' semantics to the bit: the NATIVE amounts (not the `*Eur` fields the tab reads), the end of «today» as
+  `endOfServerDay(now)` (23:59:59.999 of the process day — UTC on Vercel), upcoming as a payment INSTANT ≥ `now`,
+  nearest first with ties by id (Firestore's order), and the list's newest-first order so every float sum adds in the
+  same order. `now` is read ONCE per request and passed to every figure, the TTM window included. Pinned by
+  `__tests__/dividendStatsRoute.test.ts`: an in-memory Admin Firestore serves a fixture of the mirror's shape and the
+  route must answer the JSON the OLD route answered on it (`dividendStatsRoute.answer.json`, four query shapes,
+  captured before the change) with one read per collection («dividends: 4» seen red on the old route). `Server-Timing:
+  auth, db, compute, total` on the response. On the mirror (2026-10-05, production build): 25/22 → 12/11 ms of median
+  wall time, `db` ~8–10 ms; the answers identical before and after.
 - **The date bounds of that route only ever narrowed `periodStats`.** `yieldOnCostAssets`,
   `totalReturnAssets` and `dividendGrowthData` are TTM/all-time whatever is passed — do not add a
   range expecting them to move (§ Cashflow › Dividendi).

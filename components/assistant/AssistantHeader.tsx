@@ -10,6 +10,8 @@ interface AssistantHeaderProps {
   isDemo: boolean;
   isStreaming: boolean;
   threadsCount: number;
+  /** A page of threads is still unread (PERF-10): the count is a floor, «più di N». */
+  hasMoreThreads?: boolean;
   activeMemoryCount: number;
   /** «6 conversazioni · 3 obiettivi e 3 fatti in memoria» — from `describeAssistantHeader`. */
   description: string;
@@ -22,15 +24,19 @@ interface AssistantHeaderProps {
   onOpenMemory: () => void;
 }
 
-/** Small count dot overlaid on an icon action — visual only, the count is in the aria-label. */
-function CountDot({ count }: { count: number }) {
+/**
+ * Small count dot overlaid on an icon action — visual only, the count is in the aria-label. A
+ * count that is a floor wears a «+» («50+» while a page of threads is unread, «99+» past two
+ * digits): a bare «50» or «99» would be a count that stopped in silence.
+ */
+function CountDot({ count, isFloor = false }: { count: number; isFloor?: boolean }) {
   if (count === 0) return null;
   return (
     <span
       aria-hidden="true"
       className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 font-mono text-[10px] font-medium text-primary-foreground"
     >
-      {count > 99 ? '99' : count}
+      {count > 99 || isFloor ? `${Math.min(count, 99)}+` : count}
     </span>
   );
 }
@@ -46,6 +52,7 @@ export function AssistantHeader({
   isDemo,
   isStreaming,
   threadsCount,
+  hasMoreThreads = false,
   activeMemoryCount,
   description,
   memory,
@@ -72,13 +79,13 @@ export function AssistantHeader({
               isDemo
                 ? 'Conversazioni — non disponibili in modalità demo'
                 : threadsCount > 0
-                  ? `Conversazioni (${threadsCount})`
+                  ? `Conversazioni (${hasMoreThreads ? 'più di ' : ''}${threadsCount})`
                   : 'Conversazioni'
             }
             onClick={onOpenThreads}
           >
             <MessagesSquare className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-            <CountDot count={threadsCount} />
+            <CountDot count={threadsCount} isFloor={hasMoreThreads} />
           </Button>
 
           <Button

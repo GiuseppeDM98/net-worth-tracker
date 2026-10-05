@@ -276,7 +276,9 @@ npm run perf:bench -- --runs=3  # Time to the first figure, cold and by navigati
 
 Server time, which the emulators cannot show, is read in production: `GET /api/dashboard/overview` answers with a
 `Server-Timing` header (`auth`, `db`, `compute`, `total`, and `source` = `materialized` or `recompute`), visible in
-DevTools → Network → the request → Timing.
+DevTools → Network → the request → Timing. So do the Dividendi statistics (`/api/dividends/stats`), Rendimenti's
+yields (`/api/performance/yields`), the assistant's conversation list and the Esposizione's profiles
+(`/api/portfolio/instrument-profiles`, whose `source` says `cache` or `yahoo`).
 
 See [SETUP.md → Step 6](SETUP.md) for the full local-emulator guide (prerequisites, persistence, reset)
 and [SETUP.md → Step 7](SETUP.md) for the Playwright suite.

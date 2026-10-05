@@ -22,6 +22,9 @@ import {
   summarizeTotalReturn,
   sliceForList,
   resolvePeriodBounds,
+  summarizeDividendStats,
+  selectUpcomingDividends,
+  endOfServerDay,
 } from '@/lib/utils/dividendAnalytics';
 
 // --- Fixtures ---------------------------------------------------------------
@@ -650,5 +653,69 @@ describe('sliceForList — announced payments are bounded too', () => {
 
   it('never drops a received payment the period covers', () => {
     expect(sliceForList([received], 'year', NOW)).toHaveLength(1);
+  });
+});
+
+// --- The stats route's sums (PERF-10) ----------------------------------------
+//
+// The route reads the collection once and derives three figures from it. The fixture holds the
+// mirror's mix (2026-10-05): received and announced, a coupon, a payment in USD with EUR fields,
+// a second instrument. Three falsifications were seen RED here: summing announced money into the
+// received totals (the `<= endOfToday` gate dropped), the period's range ignored, and `now` not
+// read by the upcoming selection (the same array at the end of the year).
+describe('summarizeDividendStats / selectUpcomingDividends', () => {
+  const at = (iso: string) => new Date(iso);
+  const routeNow = at('2026-06-15T10:00:00.000Z');
+  const list: Dividend[] = [
+    makeDividend({ id: 'd3', assetId: 'eni', assetTicker: 'ENI.MI', paymentDate: at('2026-09-23T00:00:00Z'), grossAmount: 26, taxAmount: 6.76, dividendType: 'final' }),
+    makeDividend({ id: 'd6', assetId: 'btp', assetTicker: 'BTP', paymentDate: at('2026-09-01T00:00:00Z'), grossAmount: 62.5, taxAmount: 7.8125, dividendType: 'coupon' }),
+    makeDividend({ id: 'd4', assetId: 'aapl', assetTicker: 'AAPL', paymentDate: at('2026-06-15T00:00:00Z'), grossAmount: 2.6, taxAmount: 0.39, grossAmountEur: 2.4, netAmountEur: 2.04 }),
+    makeDividend({ id: 'd5', assetId: 'btp', assetTicker: 'BTP', paymentDate: at('2026-03-01T00:00:00Z'), grossAmount: 62.5, taxAmount: 7.8125, dividendType: 'coupon' }),
+    makeDividend({ id: 'd2', assetId: 'eni', assetTicker: 'ENI.MI', paymentDate: at('2025-11-19T00:00:00Z'), grossAmount: 26, taxAmount: 6.76, dividendType: 'interim' }),
+    makeDividend({ id: 'd1', assetId: 'eni', assetTicker: 'ENI.MI', paymentDate: at('2025-05-21T00:00:00Z'), grossAmount: 25, taxAmount: 6.5 }),
+  ];
+
+  it('sums only what was RECEIVED: the two announced payments are never in the totals', () => {
+    const stats = summarizeDividendStats(list, { now: routeNow });
+    expect(stats.count).toBe(4);
+    expect(stats.totalGross).toBeCloseTo(25 + 26 + 62.5 + 2.6, 10);
+    expect(stats.byType.final.count, 'the announced final dividend').toBe(0);
+    expect(stats.byType.coupon.count, 'the paid coupon only').toBe(1);
+  });
+
+  it('sums the NATIVE amounts, never the *Eur fields the tab reads (the route’s contract)', () => {
+    const stats = summarizeDividendStats(list, { now: routeNow, assetId: 'aapl' });
+    expect(stats.totalGross).toBe(2.6);
+    expect(stats.byAsset.aapl).toMatchObject({ assetTicker: 'AAPL', totalGross: 2.6, count: 1 });
+  });
+
+  it('counts a payment dated today as received, whatever the hour of `now`', () => {
+    const stats = summarizeDividendStats(list, { now: routeNow, assetId: 'aapl' });
+    expect(stats.count).toBe(1);
+    expect(selectUpcomingDividends(list, routeNow).map((d) => d.id)).not.toContain('d4');
+  });
+
+  it('honours the period range, inclusive at both ends, and an open bound', () => {
+    const year2025 = summarizeDividendStats(list, { now: routeNow, startDate: at('2025-01-01T00:00:00Z'), endDate: at('2025-11-19T00:00:00Z') });
+    expect(year2025.count).toBe(2);
+    const from2026 = summarizeDividendStats(list, { now: routeNow, startDate: at('2026-01-01T00:00:00Z') });
+    expect(Object.keys(from2026.byAsset).sort()).toEqual(['aapl', 'btp']);
+  });
+
+  it('selects the announced payments nearest first, ties by id like the Firestore query', () => {
+    const tie = makeDividend({ id: 'd0', assetId: 'x', paymentDate: at('2026-09-01T00:00:00Z') });
+    expect(selectUpcomingDividends([...list, tie], routeNow).map((d) => d.id)).toEqual(['d0', 'd6', 'd3']);
+  });
+
+  it('reads `now`: at the end of the year nothing of this list is upcoming any more', () => {
+    expect(selectUpcomingDividends(list, routeNow)).toHaveLength(2);
+    expect(selectUpcomingDividends(list, at('2026-12-31T12:00:00Z'))).toHaveLength(0);
+    expect(summarizeDividendStats(list, { now: at('2026-12-31T12:00:00Z') }).count).toBe(6);
+  });
+
+  it('draws the end of today at 23:59:59.999 of the process day', () => {
+    const end = endOfServerDay(routeNow);
+    expect([end.getHours(), end.getMinutes(), end.getSeconds(), end.getMilliseconds()]).toEqual([23, 59, 59, 999]);
+    expect(routeNow.getTime(), 'the input is not mutated').toBe(at('2026-06-15T10:00:00.000Z').getTime());
   });
 });

@@ -154,6 +154,16 @@ export const assetTransactionUpdateSchema = assetTransactionBaseSchema
   .superRefine(refineAssetTransaction);
 
 /**
+ * GET /api/ai/assistant/threads?after= — the cursor of the next page is a thread id: never empty
+ * (`.doc('')` throws) and never a path (a slash would address a subcollection).
+ */
+export const assistantThreadCursorSchema = z
+  .string()
+  .min(1)
+  .max(1500)
+  .regex(/^[^/]+$/, 'Invalid thread cursor');
+
+/**
  * POST /api/performance/yields — the dividend windows of the periods Rendimenti shows (five
  * pre-computed, or one custom range, or the PDF's one).
  */

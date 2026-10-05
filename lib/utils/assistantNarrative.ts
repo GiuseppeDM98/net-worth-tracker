@@ -492,10 +492,19 @@ export function describeConversation(input: {
 
 /**
  * The reading of the Conversazioni modal: how many threads are saved and what pressing one does.
- * While the list is still loading the count is unknown, so the sentence claims none.
+ * While the list is still loading the count is unknown, so the sentence claims none. With a page
+ * still unread (`hasMore`, PERF-10) the count is of the most RECENT ones, and the sentence says
+ * where the others are — a count that stopped at 50 in silence would hide the 51st.
  */
-export function describeThreadsReading(input: { count: number; loading: boolean }): Narrative {
+export function describeThreadsReading(input: { count: number; loading: boolean; hasMore?: boolean }): Narrative {
   if (input.loading) return [prose('Sto leggendo le conversazioni salvate.')];
+  if (input.hasMore) {
+    return [
+      prose('Le '),
+      figure(String(input.count)),
+      prose(' conversazioni più recenti: premine una per riprenderla; «Mostra altre» legge le precedenti.'),
+    ];
+  }
   if (input.count === 0) return [prose('Nessuna conversazione salvata: il primo messaggio ne apre una.')];
   if (input.count === 1) return [figure('1'), prose(' conversazione salvata: premila per riprenderla da dove era rimasta.')];
   return [figure(String(input.count)), prose(' conversazioni salvate: premine una per riprenderla da dove era rimasta.')];
@@ -508,10 +517,17 @@ export function describeThreadsReading(input: { count: number; loading: boolean 
  */
 export const THREAD_DELETE_CONSEQUENCE = 'Eliminando, la conversazione e i suoi messaggi spariscono; la memoria resta.';
 
-/** «6 conversazioni · 3 obiettivi e 3 fatti in memoria» — the compact header's description. */
-export function describeAssistantHeader(counts: { threads: number; goals: number; facts: number }): string {
-  const { threads, goals, facts } = counts;
-  const conversations = threads === 0 ? 'Nessuna conversazione' : `${threads} ${plural(threads, 'conversazione', 'conversazioni')}`;
+/**
+ * «6 conversazioni · 3 obiettivi e 3 fatti in memoria» — the compact header's description. With a
+ * page of threads still unread (`moreThreads`, PERF-10) the count is a floor: «Più di 50 conversazioni».
+ */
+export function describeAssistantHeader(counts: { threads: number; moreThreads?: boolean; goals: number; facts: number }): string {
+  const { threads, moreThreads, goals, facts } = counts;
+  const conversations = moreThreads
+    ? `Più di ${threads} conversazioni`
+    : threads === 0
+      ? 'Nessuna conversazione'
+      : `${threads} ${plural(threads, 'conversazione', 'conversazioni')}`;
   if (goals === 0 && facts === 0) return `${conversations} · memoria vuota`;
   const memory: string[] = [];
   if (goals > 0) memory.push(`${goals} ${plural(goals, 'obiettivo', 'obiettivi')}`);

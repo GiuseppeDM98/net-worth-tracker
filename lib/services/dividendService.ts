@@ -2,11 +2,7 @@ import 'server-only';
 
 import { adminDb } from '@/lib/firebase/admin';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
-import {
-  Dividend,
-  DividendFormData,
-  DividendStats,
-} from '@/types/dividend';
+import { Dividend, DividendFormData } from '@/types/dividend';
 import { convertMultipleToEur, getExchangeRateToEur } from './currencyConversionService';
 import { removeUndefinedDeep as removeUndefinedFields } from '@/lib/utils/firestoreData';
 
@@ -391,128 +387,6 @@ export async function deleteDividend(dividendId: string): Promise<void> {
   } catch (error) {
     console.error('Error deleting dividend:', error);
     throw new Error('Failed to delete dividend');
-  }
-}
-
-/**
- * Calculate dividend statistics for a user
- *
- * Aggregates dividend totals by asset and type (ordinary, extraordinary, interim, final).
- * Excludes future dividends (only counts paid/realized dividends).
- *
- * @param userId - User ID
- * @param startDate - Optional start date filter
- * @param endDate - Optional end date filter
- * @returns Dividend statistics with totals and breakdowns
- */
-export async function calculateDividendStats(
-  userId: string,
-  startDate?: Date,
-  endDate?: Date,
-  assetId?: string
-): Promise<DividendStats> {
-  try {
-    let dividends: Dividend[];
-
-    if (startDate && endDate) {
-      dividends = await getDividendsByDateRange(userId, startDate, endDate);
-    } else {
-      dividends = await getAllDividends(userId);
-    }
-
-    // Filter by asset when a specific asset is selected
-    if (assetId) {
-      dividends = dividends.filter(d => d.assetId === assetId);
-    }
-
-    // Filter out future dividends - only calculate stats for paid/realized dividends
-    // Upcoming dividends are tracked separately and shouldn't inflate statistics
-    const today = new Date();
-    today.setHours(23, 59, 59, 999);
-    const paidDividends = dividends.filter(div => {
-      const paymentDate = div.paymentDate instanceof Date ? div.paymentDate : new Date();
-      return paymentDate <= today;
-    });
-
-    const stats: DividendStats = {
-      totalGross: 0,
-      totalTax: 0,
-      totalNet: 0,
-      count: paidDividends.length,
-      byAsset: {},
-      byType: {
-        ordinary: { totalGross: 0, totalTax: 0, totalNet: 0, count: 0 },
-        extraordinary: { totalGross: 0, totalTax: 0, totalNet: 0, count: 0 },
-        interim: { totalGross: 0, totalTax: 0, totalNet: 0, count: 0 },
-        final: { totalGross: 0, totalTax: 0, totalNet: 0, count: 0 },
-        coupon: { totalGross: 0, totalTax: 0, totalNet: 0, count: 0 },
-        finalPremium: { totalGross: 0, totalTax: 0, totalNet: 0, count: 0 },
-      },
-    };
-
-    paidDividends.forEach(dividend => {
-      // Total stats
-      stats.totalGross += dividend.grossAmount;
-      stats.totalTax += dividend.taxAmount;
-      stats.totalNet += dividend.netAmount;
-
-      // By asset stats
-      if (!stats.byAsset[dividend.assetId]) {
-        stats.byAsset[dividend.assetId] = {
-          assetTicker: dividend.assetTicker,
-          assetName: dividend.assetName,
-          totalGross: 0,
-          totalTax: 0,
-          totalNet: 0,
-          count: 0,
-        };
-      }
-      stats.byAsset[dividend.assetId].totalGross += dividend.grossAmount;
-      stats.byAsset[dividend.assetId].totalTax += dividend.taxAmount;
-      stats.byAsset[dividend.assetId].totalNet += dividend.netAmount;
-      stats.byAsset[dividend.assetId].count += 1;
-
-      // By type stats
-      stats.byType[dividend.dividendType].totalGross += dividend.grossAmount;
-      stats.byType[dividend.dividendType].totalTax += dividend.taxAmount;
-      stats.byType[dividend.dividendType].totalNet += dividend.netAmount;
-      stats.byType[dividend.dividendType].count += 1;
-    });
-
-    return stats;
-  } catch (error) {
-    console.error('Error calculating dividend stats:', error);
-    throw new Error('Failed to calculate dividend stats');
-  }
-}
-
-/**
- * Get upcoming dividends (payment date in the future)
- * Sorted by payment date (nearest first)
- */
-export async function getUpcomingDividends(userId: string): Promise<Dividend[]> {
-  try {
-    const now = new Date();
-    const querySnapshot = await adminDb
-      .collection(DIVIDENDS_COLLECTION)
-      .where('userId', '==', userId)
-      .where('paymentDate', '>=', Timestamp.fromDate(now))
-      .orderBy('paymentDate', 'asc')
-      .get();
-
-    const dividends = querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      exDate: doc.data().exDate?.toDate() || new Date(),
-      paymentDate: doc.data().paymentDate?.toDate() || new Date(),
-      createdAt: doc.data().createdAt?.toDate() || new Date(),
-      updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-    })) as Dividend[];
-
-    return dividends;
-  } catch (error) {
-    console.error('Error getting upcoming dividends:', error);
-    throw new Error('Failed to fetch upcoming dividends');
   }
 }
 
