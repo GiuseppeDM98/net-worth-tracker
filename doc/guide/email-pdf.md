@@ -116,8 +116,8 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   tax the owner ALSO records as a cashflow expense would be counted twice in the split (doc/guide/panoramica.md § Per-page blind spots).
 - **Every email cap is stated in the prompt**: `MAX_CATEGORY_DELTAS` (12) is named in the section header together with
   how many categories were left out. The selection is by SPEND, not by size of variation — describe it as it is.
-- **`max_tokens` and the word ceiling scale together** per period (6000/8000/8000/10000 against 500/700/700/900 words):
-  raise one and the other has to follow. Web search is offered only when `includeMacroContext` allows it, like the
+- **`max_tokens` scales with the period** (6000/8000/8000/10000), and the format contract names the period in its
+  length line instead of a word count. Web search is offered only when `includeMacroContext` allows it, like the
   assistant's structured analyses.
 
 ## Verifying a surface with no DOM

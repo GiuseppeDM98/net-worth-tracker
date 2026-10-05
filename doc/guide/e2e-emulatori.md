@@ -43,7 +43,7 @@
   exercise a `server-only` module, which a script cannot import.
 A collection whose value is in the *wiring* gets one: the unit suites mock Firestore away, so only an exercise covers
 the rules permitting the writes, real `Timestamp` values surviving `removeUndefinedDeep` and the real atomic transaction.
-- **A throwaway is an `.mts` FILE run from INSIDE the repo** (`scripts/*.tmp.mts`, untracked, deleted in phase F): a
+- **A throwaway is an `.mts` FILE run from INSIDE the repo** (`scripts/*.tmp.mts`, untracked, deleted in phase G): a
   `.ts` script is CJS under tsx with no top-level await (nor has `npx tsx -e`); a bash heredoc with an apostrophe or a
   backtick dies with «unexpected EOF» before running a line (2026-08-25) — and the tracked files are CRLF on a Windows
   clone, so an exact-match patch from a script must normalise `\r\n` before comparing and restore it on write
@@ -191,10 +191,9 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   without touching the other fixtures. **It also drifts by CALENDAR** (2026-10-03): `scripts/seedEmulator.ts` dates its
   rows on the month it ran and `global-setup` never re-runs it, so the first suite of a new month finds no
   current-month row — nine Tracciamento, freshness, owner and mobile specs red with «Nessun movimento registrato ad
-  ottobre» / «the seed has no current-month row». After a month change, re-seed before the full run. **And until 2026-10-04 a re-seed in the first four days of a
-  month made things worse**: the seed dated its three expenses on the 5th, so they were FUTURE rows — FIRE said «servono
-  spese registrate», Coast lost its pace sentence, Storico's Driver had nothing to open (five specs red, on `develop`
-  too, checked in a worktree against the same emulators). The seed now dates them `min(5, today)`.
+  ottobre» / «the seed has no current-month row». After a month change, re-seed before the full run. **The seed dates its three expenses `min(5, today)`**:
+  on a fixed 5th, a re-seed in the first four days of a month writes FUTURE rows — FIRE says «servono spese
+  registrate», Coast loses its pace sentence, Storico's Driver has nothing to open (five specs red).
 - **What belongs here**: only what needs a real layout — the `desktop:` switch at 1440px, a collapsible, a state flash,
   computed font sizes, bounding boxes, overflow; the arithmetic stays with Vitest. **Two limits**: a race between
   concurrent queries is not reproducible locally (the Firestore Web SDK multiplexes every target onto ONE webchannel),

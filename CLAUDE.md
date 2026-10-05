@@ -65,7 +65,7 @@ One line per area: the question it answers, then where it is described. *What th
 - **Browser (E2E)**: Playwright, `npm run test:e2e` with the emulators up (needs **Java ≥ 21**); app on :3100 with an isolated build dir. Accounts and fixtures: SETUP.md → Step 7; gotchas: doc/guide/e2e-emulatori.md § Browser-Driven E2E (Playwright).
 
 ## Data & Integrations
-Firestore client + admin (production in `eur3`, Belgium + Netherlands; the Vercel functions in `fra1` via `vercel.json` → `regions`, ONE region on the Hobby plan, held by `__tests__/vercelConfig.test.ts`) · Yahoo Finance (prices, benchmark history) · Borsa Italiana scraping (Italian bonds, dividends) · Frankfurter (FX) · FRED (`FRED_API_KEY`, series ECBDFR) · Anthropic (`claude-sonnet-5` analysis + assistant, `claude-haiku-4-5` extraction).
+Firestore client + admin (production in `eur3`, Belgium + Netherlands; the Vercel functions in `fra1` via `vercel.json` → `regions`, ONE region on the Hobby plan, held by `__tests__/vercelConfig.test.ts`) · Yahoo Finance (prices, benchmark history) · Borsa Italiana scraping (Italian bonds, dividends) · Frankfurter (FX) · FRED (`FRED_API_KEY`, series ECBDFR) · Anthropic (the four model ids in `lib/constants/aiModels.ts`; Known Issues).
 
 ## Known Issues (Active)
 Only what crosses areas; an area's blind spots — the behaviours that look like bugs and are not — close its `doc/guide/<tema>.md` (§ Per-page blind spots). The demo account's manual setup is in README.md → Known Issues, the shared account's prerequisites in SETUP.md → Step 5b.
@@ -81,10 +81,8 @@ Only what crosses areas; an area's blind spots — the behaviours that look like
   `doc/guide/temi.md` session, not to a page's.
 - **`e2e/modal.origin.spec.ts` can fail on a SLOW or cold dev server** (no `data-state="closed"` frame inside the
   sampler's 2,6 s window — the dialog opened more than ~1,5 s after the click; 2026-09-29 on the Windows laptop, 2026-10-04
-  on the Mac with the server started cold for the one spec, on `develop` too). The window is the spec's, not the app's. Its
-  OTHER mode — the origin off the button's centre, by 23px or by 3,4px, the «intermittent in a full run» of 2026-09-21 — was
-  the spec reading the button's box during the header's entrance glide or before the data landed: closed on 2026-10-04 (the
-  spec waits for the verdict and for a box two reads agree on; green in the full run and four times alone).
+  on the Mac with the server started cold for the one spec, on `develop` too). The window is the spec's, not the app's. An
+  origin off the button's centre is NOT this flake: the spec reads the box after the entrance (doc/guide/e2e-emulatori.md).
 - **`e2e/cashflow.dividendi.spec.ts` › «the form refuses…» is red after `cashflow.accounts` + `cashflow.budget`** (2026-09-30:
   3/3 on a clean `develop` worktree, 2/3 on the branch of PR #418, green alone): after the refusal the dialog stays open
   with its form reset — `reset` re-runs, cause not traced yet. Two of four full runs that day had it red; green in

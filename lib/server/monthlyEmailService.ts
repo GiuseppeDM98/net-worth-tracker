@@ -731,8 +731,8 @@ export function buildEmailAiPrompt(
 
 /**
  * Output budget per period, thinking included (`max_tokens` covers thinking AND text).
- * It scales with the period because the format contract's word ceiling does: a 900-word
- * annual recap on the monthly budget would be cut off mid-section.
+ * It scales with the period because the causes to explain do: an annual recap on the
+ * monthly budget would be cut off mid-section.
  */
 const EMAIL_AI_MAX_TOKENS: Record<EmailPeriodType, number> = {
   monthly: 6000,

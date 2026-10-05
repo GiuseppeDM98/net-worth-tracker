@@ -460,15 +460,15 @@ describe('buildEmailAiPrompt', () => {
     expect(withoutMemory).not.toContain('comprare casa');
   });
 
-  it('scales the word ceiling with the period and states the new patrimony section', () => {
-    const cases: Array<[MonthlyEmailData['periodType'], number]> = [
-      ['monthly', 500],
-      ['quarterly', 700],
-      ['semiannual', 700],
-      ['yearly', 900],
+  it('names the period in the length line and states the new patrimony section', () => {
+    const cases: Array<[MonthlyEmailData['periodType'], string]> = [
+      ['monthly', 'un mese'],
+      ['quarterly', 'un trimestre'],
+      ['semiannual', 'un semestre'],
+      ['yearly', 'un anno'],
     ];
 
-    for (const [periodType, words] of cases) {
+    for (const [periodType, scope] of cases) {
       const { system } = buildEmailAiPrompt(
         makeMonthlyData({ periodType, month: periodType === 'monthly' ? 3 : 12 }),
         makeComparison(),
@@ -476,7 +476,8 @@ describe('buildEmailAiPrompt', () => {
         makePreferences(),
         []
       );
-      expect(system).toContain(`massimo ${words} parole`);
+      expect(system).toContain(`le cause di ${scope}`);
+      expect(system).not.toMatch(/massimo \d+ parole/);
       expect(system).toContain('Patrimonio e investimenti');
     }
   });

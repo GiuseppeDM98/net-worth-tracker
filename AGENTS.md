@@ -308,10 +308,12 @@ pointer — a stub that grows past that is a guide leaking back (2026-09-20: ten
 - Server-owned materialized docs are mutated only via a private authenticated route; cron routes use `CRON_SECRET`, and
   `/api/portfolio/snapshot` must keep accepting `cronSecret`.
 - **Validation**: `lib/server/validation.ts` owns the reusable schemas and `parseOr400` — never cast with `as { … }`
-  first, use `z.coerce.date()` for dates, and validate **Firestore-originated** inputs at the service entry point too.
+  first, coerce dates with `z.coerce.date()` (behind a string when they come from a request, below), and validate
+  **Firestore-originated** inputs at the service entry point too.
   **A date in a request is a STRING first** (2026-10-04, `isoDateSchema` = `z.string().min(1).pipe(z.coerce.date())`):
   alone, `z.coerce.date()` turns `null` into 1970-01-01 and a number into a timestamp, so a missing date answers 200 on
-  an epoch instead of 400 — pinned by the «a null date» case of `__tests__/performanceYieldsRoute.test.ts`.
+  an epoch instead of 400 — every request date in the file goes through it (yields, dividends, transactions), pinned by
+  the «a null date» case of `__tests__/performanceYieldsRoute.test.ts` and the date cases of `serverValidation.test.ts`.
   Tests that touch a `server-only` module need `vi.mock('server-only', () => ({}))`.
 - **`REGISTRATION_WHITELIST` has no `NEXT_PUBLIC_` prefix**, and `lib/constants/appConfig.ts` must stay client-safe.
 - **Do NOT bump `firebase-admin` past 13.x** — `@14 → jwks-rsa@4 → jose@6` is pure ESM and Vercel's Lambda runtime
@@ -873,7 +875,7 @@ file used to carry.
 ### Emulator Exercise Scripts → `doc/guide/e2e-emulatori.md`
 - A collection whose value is in the *wiring* gets an exercise: the unit suites mock Firestore away, so only an exercise
   covers the rules, real `Timestamp` values through `removeUndefinedDeep` and the real atomic transaction.
-- **A throwaway is an `.mts` FILE run from INSIDE the repo** (`scripts/*.tmp.mts`, untracked, deleted in phase F): a
+- **A throwaway is an `.mts` FILE run from INSIDE the repo** (`scripts/*.tmp.mts`, untracked, deleted in phase G): a
   `.ts` script is CJS under tsx with no top-level await, a bash heredoc dies on an apostrophe (2026-08-25), and from the
   session scratchpad `firebase-admin` fails with `ERR_MODULE_NOT_FOUND`. A throwaway Playwright spec lives in `e2e/`.
 - **Drive the mutations through the app's services** (client SDK, rule-evaluated), reads and fixture edits with the

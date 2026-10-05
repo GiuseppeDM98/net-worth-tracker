@@ -8,8 +8,8 @@
  * Each builder returns { system, userContent } instead of one combined string:
  * - `system` is byte-identical across every request of that mode (role, domain
  *   vocabulary, data-integrity rules, web-search policy, formatting conventions,
- *   and that mode's output contract) — callers pass it as a cached system block
- *   (see anthropicStream.ts) so repeated requests don't re-pay for it in full.
+ *   and that mode's output contract) — cacheable as a system block, though
+ *   anthropicStream.ts deliberately sends it without `cache_control` (see there).
  * - `userContent` carries everything that changes per request: the period label,
  *   the numeric data bundle, memory, and the user's question.
  */
@@ -499,7 +499,7 @@ export const ASSISTANT_SYSTEM_CORE = [
   '- Markdown semplice: grassetto per i numeri chiave, elenchi puntati per le liste. Evita tabelle complesse e intestazioni annidate oltre un livello',
   '- Valute in formato italiano (es. €1.234), percentuali con segno esplicito (+2,3% / -1,1%)',
   "- Non ripetere meccanicamente i numeri già presenti nei dati senza aggiungere interpretazione: il valore che dai è nel collegare un numero a una causa o a un'azione, non nel ridirlo",
-  '- Non aprire con premesse generiche ("Come assistente AI...", "Analizzando i dati forniti..."): vai dritto al punto richiesto',
+  '- Apri con la risposta al punto richiesto, senza premesse',
   '',
   '# Calibrazione del tono',
   '- Evita: "Il patrimonio è cresciuto. Questo è un buon segno per i tuoi investimenti."',
@@ -536,12 +536,10 @@ export const ASSISTANT_SYSTEM_CORE = [
 
 // ─── Per-mode format contracts (static per mode, cacheable) ──────────────────
 //
-// Word ceilings were raised (450/500/550 → 600/700/750) when the data block became
-// exhaustive: a question like "break Casa down by subcategory, then add these five
-// categories" needs room to answer, and the old ceilings would have truncated exactly
-// the enumeration that was asked for. Structured analyses run at max_tokens 7000 with a
-// 4000-token thinking budget, so ~3000 tokens of output — 750 Italian words is roughly
-// 1300, comfortably inside. Chat mode has no ceiling.
+// The output budget lives in anthropicStream.ts (`max_tokens` covers thinking AND text
+// under adaptive thinking): whatever length a contract asks for must fit inside it.
+// A question like "break Casa down by subcategory, then add these five categories"
+// needs room for exactly the enumeration that was asked for.
 
 const MONTH_FORMAT_CONTRACT = [
   '# Formato della risposta',
@@ -550,7 +548,7 @@ const MONTH_FORMAT_CONTRACT = [
   '2. **Cosa ha mosso il patrimonio** — i principali driver (mercato, cashflow, allocazione)',
   "3. **1-2 azioni o attenzioni** — osservazioni pratiche per l'investitore",
   '',
-  'Vincoli: massimo 600 parole.',
+  'Lunghezza: quella che le tre sezioni richiedono, nello stile di risposta indicato nel messaggio.',
 ].join('\n');
 
 const YEAR_FORMAT_CONTRACT = [
@@ -560,7 +558,7 @@ const YEAR_FORMAT_CONTRACT = [
   "2. **Cosa ha mosso il patrimonio nell'anno** — i principali driver (mercato, cashflow, allocazione, eventi); se l'anno è ancora in corso, precisa che sono i driver osservati finora",
   "3. **1-2 azioni o attenzioni** — osservazioni pratiche per l'investitore",
   '',
-  'Vincoli: massimo 700 parole.',
+  'Lunghezza: quella che le tre sezioni richiedono, nello stile di risposta indicato nel messaggio.',
 ].join('\n');
 
 const YTD_FORMAT_CONTRACT = [
@@ -570,7 +568,7 @@ const YTD_FORMAT_CONTRACT = [
   "2. **Cosa ha mosso il patrimonio da inizio anno** — principali driver osservati finora",
   '3. **1-2 azioni o attenzioni** — osservazioni pratiche',
   '',
-  "Vincoli: massimo 600 parole. Non proiettare valori annualizzati salvo esplicita richiesta dell'utente — il periodo è per definizione parziale.",
+  "Non proiettare valori annualizzati salvo esplicita richiesta dell'utente — il periodo è per definizione parziale.",
 ].join('\n');
 
 const HISTORY_FORMAT_CONTRACT = [
@@ -580,7 +578,7 @@ const HISTORY_FORMAT_CONTRACT = [
   '2. **Trend storici principali** — cashflow cumulativo, crescita patrimonio, composizione del portafoglio nel tempo',
   '3. **1-2 osservazioni strategiche** — cosa emerge dal lungo periodo, opportunità o rischi strutturali',
   '',
-  'Vincoli: massimo 750 parole. Privilegia la visione di lungo periodo rispetto ai dettagli di un singolo mese.',
+  'Privilegia la visione di lungo periodo rispetto ai dettagli di un singolo mese.',
 ].join('\n');
 
 const CHAT_FORMAT_CONTRACT = [
@@ -588,19 +586,18 @@ const CHAT_FORMAT_CONTRACT = [
   "Modalità conversazionale: nessuna struttura fissa a sezioni. Rispondi direttamente alla domanda, usando i dati forniti quando disponibili e restando comunque entro le regole sui dati e lo stile definiti sopra.",
 ].join('\n');
 
-// Word ceiling per email period. A quarter carries three months of causes to explain and
-// a year twelve, against the same six sections: one ceiling for all four would either
-// truncate the annual recap or pad the monthly one.
+// The period named in the length line. A quarter carries three months of causes to explain
+// and a year twelve, against the same six sections, so the length follows the period.
 // WARNING: the keys must stay in step with `EmailPeriodType` in monthlyEmailService.ts —
 // the two unions are structurally identical and nothing but this comment says so
 // (prompts.ts must not import that module, which pulls firebase-admin and Resend).
 export type EmailPeriodicPeriodType = 'monthly' | 'quarterly' | 'semiannual' | 'yearly';
 
-const EMAIL_PERIODIC_WORD_LIMITS: Record<EmailPeriodicPeriodType, number> = {
-  monthly: 500,
-  quarterly: 700,
-  semiannual: 700,
-  yearly: 900,
+const EMAIL_PERIOD_SCOPE: Record<EmailPeriodicPeriodType, string> = {
+  monthly: 'un mese',
+  quarterly: 'un trimestre',
+  semiannual: 'un semestre',
+  yearly: 'un anno',
 };
 
 /**
@@ -628,7 +625,7 @@ export function buildEmailPeriodicFormatContract(periodType: EmailPeriodicPeriod
     '',
     "I blocchi delle spese per categoria e sottocategoria e delle entrate per categoria sono ESAUSTIVI: una voce che non c'è ha avuto importo zero nel periodo — dillo come \"nessuna spesa registrata\", non come dato mancante. L'unica eccezione sono le righe di omissione dichiarate esplicitamente nel testo dei dati.",
     '',
-    `Vincoli: massimo ${EMAIL_PERIODIC_WORD_LIMITS[periodType]} parole.`,
+    `Lunghezza: quella che serve a spiegare le cause di ${EMAIL_PERIOD_SCOPE[periodType]}; chi legge scorre un'email, quindi ogni frase porta un numero o una causa.`,
   ].join('\n');
 }
 
@@ -638,7 +635,7 @@ export function buildEmailPeriodicFormatContract(periodType: EmailPeriodicPeriod
  * Builds the system + user content sent to Claude for a month analysis.
  *
  * `system` (role, domain, guardrails, month output contract) is identical across
- * every request of this mode — pass it as a cached block. `userContent` carries
+ * every request of this mode, so it is cacheable. `userContent` carries
  * the period label, numeric bundle, memory, and the user's question.
  */
 export function buildMonthAnalysisPrompt(
@@ -700,7 +697,7 @@ export function buildYearAnalysisPrompt(
     : 'Non fare affidamento su memoria persistente. Usa solo il contesto esplicito.';
 
   const partialNote = isCurrentYear
-    ? `IMPORTANTE: il ${yearLabel} è ancora in corso. I dati cashflow e patrimoniali sono parziali. Non trarre conclusioni definitive sull'anno — evidenzia le tendenze finora visibili.`
+    ? `Il ${yearLabel} è ancora in corso. I dati cashflow e patrimoniali sono parziali. Non trarre conclusioni definitive sull'anno — evidenzia le tendenze finora visibili.`
     : '';
 
   const userContent = [
@@ -747,7 +744,7 @@ export function buildYtdAnalysisPrompt(
     macroInstruction,
     memoryBlock,
     '',
-    `IMPORTANTE: stai analizzando il periodo YTD (da inizio ${yearLabel} a oggi). L\'anno è in corso — i dati sono parziali. Non trarre conclusioni finali sull\'anno.`,
+    `Stai analizzando il periodo YTD (da inizio ${yearLabel} a oggi). L\'anno è in corso — i dati sono parziali. Non trarre conclusioni finali sull\'anno.`,
     '',
     'Di seguito trovi i dati finanziari YTD, estratti in modo affidabile dal sistema:',
     '',

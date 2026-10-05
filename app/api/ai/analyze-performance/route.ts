@@ -283,7 +283,7 @@ export async function POST(request: NextRequest) {
  * - Professional analyst persona (Italian financial expert)
  * - Instructs Claude to use web_search to find recent market events for the period
  * - Structured metrics presentation (4 categories: Rendimento, Rischio, Contesto, Dividendi)
- * - Clear instructions for concise, actionable analysis (max 350 words)
+ * - Clear instructions for concise, actionable analysis
  * - Markdown formatting requested (bold, bullet points) for better readability
  * - Includes translated period label + date range for better context
  *
@@ -334,7 +334,7 @@ ${performanceMetrics.yocGross !== null ? `**Metriche Dividendi:**
 - Current Yield Lordo: ${formatMetric(performanceMetrics.currentYield)}
 - Current Yield Netto: ${formatMetric(performanceMetrics.currentYieldNet)}` : ''}
 
-Fornisci un'analisi concisa e actionable (massimo 350 parole) che:
+Fornisci un'analisi concisa e actionable, che si legge in un paio di minuti, che:
 1. Interpreta le metriche chiave e cosa significano per questo portafoglio
 2. Decomponi la variazione del patrimonio: quanta parte della crescita (o perdita) è organica (rendimenti) vs apporti di nuovo capitale. Se TWR e MWR divergono significativamente, spiega cosa implica sul timing dei contributi
 3. Identifica gli eventi chiave dei mercati finanziari nel periodo analizzato (trovati con la web search) e spiega come potrebbero aver influenzato la performance del portafoglio
