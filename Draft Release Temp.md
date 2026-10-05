@@ -32,6 +32,10 @@
 
 ## 🔧 Improvements
 
+- Cashflow › Dividendi loads its yield and growth figures sooner: the server reads the dividends, the instruments, the snapshots and the trades once and together, instead of seven reads one after the other with the dividends read four times; every figure is the same as before.
+
+- The assistant's «Riprendi una conversazione» list now loads the 50 most recent conversations and offers «Mostra altre» for the earlier ones, instead of reading every conversation ever saved at each opening; while some are still unread the header says «Più di 50 conversazioni» and the list says the ones shown are the most recent, so none is hidden.
+
 - Rendimenti opens sooner: it reads each of its collections once and asks the dividend yields of all five periods (Yield on Cost, current yield) in a single request sent together with the metrics, instead of two requests per period sent after them. On a reload it shows the figures of the last visit at once, with «Aggiornato alle…» in the header while it rereads them, like the other pages; every figure is the same as before.
 
 - Moved the app's server functions to Frankfurt, next to the database (which is in Belgium and the Netherlands) instead of Washington: every read a page makes from the server no longer crosses the Atlantic, so pages that fetch several figures at opening answer sooner.
@@ -55,6 +59,8 @@
 - Improved Patrimonio › Strumenti for a composite instrument (a 60/40 fund, a balanced ETF): still one row, but its class chip now shows every class it holds — one segment per class, as wide as its share and in that class's colour, «Azioni · Obbl.» for two, «Misto» for three or more. A class under 5% gets no segment, a screen reader hears every share, and the group headers and the sort by class keep the prevailing class. (Contributed by Ciocc128.)
 
 ## 📚 Documentation
+
+- The Dividendi, Assistente and Allocazione guides now explain how their server reads work — the dividend statistics derived from one read, the conversations read a page at a time with a count that never stops in silence, and the timing header of the Esposizione that says whether its profiles came from the saved cache or from Yahoo.
 
 - Retired the specification behind Rendimenti's single read after reading it against the code (twenty-seven differences, none in the behaviour): the agent guidelines now say a date in a request is validated as text before it is converted — converted directly, a missing date was read as 1970 instead of being refused — and the Rendimenti guide and two code comments no longer describe a loader the page dropped.
 

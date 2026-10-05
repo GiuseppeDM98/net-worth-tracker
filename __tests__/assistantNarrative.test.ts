@@ -555,10 +555,15 @@ describe('describeAssistantHeader', () => {
     expect(describeAssistantHeader({ threads: 0, goals: 1, facts: 0 })).toBe('Nessuna conversazione · 1 obiettivo in memoria');
     expect(describeAssistantHeader({ threads: 0, goals: 0, facts: 2 })).toBe('Nessuna conversazione · 2 fatti in memoria');
   });
+
+  it('says «più di» while a page of threads is still unread (PERF-10, the owner’s wording)', () => {
+    expect(describeAssistantHeader({ threads: 50, moreThreads: true, goals: 0, facts: 0 })).toBe('Più di 50 conversazioni · memoria vuota');
+    expect(describeAssistantHeader({ threads: 50, moreThreads: false, goals: 0, facts: 0 })).toBe('50 conversazioni · memoria vuota');
+  });
 });
 
 describe('describeThreadsReading — the Conversazioni modal', () => {
-  const text = (input: { count: number; loading: boolean }) => describeThreadsReading(input).map((segment) => segment.text).join('');
+  const text = (input: { count: number; loading: boolean; hasMore?: boolean }) => describeThreadsReading(input).map((segment) => segment.text).join('');
 
   it('counts the saved threads and says what pressing one does', () => {
     expect(text({ count: 12, loading: false })).toBe('12 conversazioni salvate: premine una per riprenderla da dove era rimasta.');
@@ -569,5 +574,12 @@ describe('describeThreadsReading — the Conversazioni modal', () => {
   it('claims no count while the list is still being read', () => {
     // `threads` defaults to [] before the query lands: «Nessuna conversazione» there would be a lie.
     expect(text({ count: 0, loading: true })).toBe('Sto leggendo le conversazioni salvate.');
+  });
+
+  it('names the count the most RECENT ones, and where the rest is, while a page is unread', () => {
+    expect(text({ count: 50, loading: false, hasMore: true })).toBe(
+      'Le 50 conversazioni più recenti: premine una per riprenderla; «Mostra altre» legge le precedenti.'
+    );
+    expect(text({ count: 100, loading: false, hasMore: true })).toMatch(/^Le 100 conversazioni più recenti/);
   });
 });

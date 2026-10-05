@@ -11,6 +11,7 @@ import {
   AssistantPreferences,
   AssistantThread,
   AssistantThreadDetail,
+  AssistantThreadsResponse,
 } from '@/types/assistant';
 import { toDate } from '@/lib/utils/dateHelpers';
 import { getDefaultAssistantPreferences } from './webSearchPolicy';
@@ -181,14 +182,46 @@ export function isAssistantStoreError(error: unknown): error is AssistantStoreEr
   return error instanceof AssistantStoreError;
 }
 
-export async function listAssistantThreads(userId: string): Promise<AssistantThread[]> {
-  const snapshot = await adminDb
+/** One page of the Conversazioni list (PERF-10): the list used to be read whole and grew forever. */
+export const ASSISTANT_THREADS_PAGE_SIZE = 50;
+
+/**
+ * One page of the owner's threads, most recently updated first, and the cursor of the next page —
+ * the id of this page's last thread, `null` when nothing follows. The query asks for ONE more
+ * thread than the page: its presence is what says another page exists, so a list of exactly 50
+ * offers no empty «Mostra altre».
+ *
+ * `after` is a thread id of the same owner; the next page starts AFTER it (`startAfter`, never
+ * `startAt`, which would print the cursor's thread twice). A cursor that is not the owner's is
+ * refused like a thread read (403), a missing one is 404 — a thread deleted between two pages.
+ */
+export async function listAssistantThreads(
+  userId: string,
+  { limit = ASSISTANT_THREADS_PAGE_SIZE, after }: { limit?: number; after?: string } = {}
+): Promise<AssistantThreadsResponse> {
+  let query = adminDb
     .collection(THREADS_COLLECTION)
     .where('userId', '==', userId)
-    .orderBy('updatedAt', 'desc')
-    .get();
+    .orderBy('updatedAt', 'desc');
 
-  return snapshot.docs.map((doc) => mapThread(doc.id, doc.data()));
+  if (after) {
+    const cursor = await adminDb.collection(THREADS_COLLECTION).doc(after).get();
+    if (!cursor.exists) {
+      throw new AssistantStoreError(404, 'Thread non trovato');
+    }
+    if (cursor.data()?.userId !== userId) {
+      throw new AssistantStoreError(403, 'Thread non appartenente all’utente autenticato');
+    }
+    query = query.startAfter(cursor);
+  }
+
+  const snapshot = await query.limit(limit + 1).get();
+  const pageDocs = snapshot.docs.slice(0, limit);
+
+  return {
+    threads: pageDocs.map((doc) => mapThread(doc.id, doc.data())),
+    nextCursor: snapshot.docs.length > limit ? pageDocs[pageDocs.length - 1].id : null,
+  };
 }
 
 export async function createAssistantThread(

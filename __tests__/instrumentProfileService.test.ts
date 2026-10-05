@@ -64,7 +64,7 @@ describe('resolveInstrumentProfiles — the TTL per module', () => {
     const { store, writes } = memoryStore({ 'VWCE.DE': { fund: cachedFund } });
     const { source, fetchFund } = fakeSource();
 
-    const response = await resolveInstrumentProfiles([fundRequest], { now: NOW, source, store });
+    const { response } = await resolveInstrumentProfiles([fundRequest], { now: NOW, source, store });
 
     expect(fetchFund).not.toHaveBeenCalled();
     expect(response.profiles['VWCE.DE'].fund).toEqual(cachedFund);
@@ -76,7 +76,7 @@ describe('resolveInstrumentProfiles — the TTL per module', () => {
     const { store, writes, documents } = memoryStore({ 'VWCE.DE': { fund: { fetchedAt: daysAgo(31), holdingsBasis: 'sleeve', family: 'Vanguard' } } });
     const { source, fetchFund } = fakeSource();
 
-    const response = await resolveInstrumentProfiles([fundRequest], { now: NOW, source, store });
+    const { response } = await resolveInstrumentProfiles([fundRequest], { now: NOW, source, store });
     await settle();
 
     expect(fetchFund).toHaveBeenCalledTimes(1);
@@ -95,7 +95,7 @@ describe('resolveInstrumentProfiles — the TTL per module', () => {
 
     const old = memoryStore({ 'VWCE.DE': { fund: emptyFund(hoursAgo(25)) } });
     const oldSource = fakeSource();
-    const response = await resolveInstrumentProfiles([fundRequest], { now: NOW, source: oldSource.source, store: old.store });
+    const { response } = await resolveInstrumentProfiles([fundRequest], { now: NOW, source: oldSource.source, store: old.store });
     expect(oldSource.fetchFund).toHaveBeenCalledTimes(1);
     expect(response.profiles['VWCE.DE'].fund?.family).toBe('Vanguard');
   });
@@ -104,7 +104,7 @@ describe('resolveInstrumentProfiles — the TTL per module', () => {
     const { store, writes } = memoryStore({ 'VWCE.DE': { fund: { fetchedAt: daysAgo(40), holdingsBasis: 'sleeve', family: 'Vanguard' } } });
     const { source } = fakeSource({ fund: null });
 
-    const response = await resolveInstrumentProfiles([fundRequest], { now: NOW, source, store });
+    const { response } = await resolveInstrumentProfiles([fundRequest], { now: NOW, source, store });
 
     expect(response.profiles['VWCE.DE'].fund?.family).toBe('Vanguard');
     expect(response.oldestFetchedAt).toBe(daysAgo(40));
@@ -114,7 +114,7 @@ describe('resolveInstrumentProfiles — the TTL per module', () => {
   it('leaves the module absent — «non letto» — when Yahoo fails and nothing is cached', async () => {
     const { store } = memoryStore();
     const { source } = fakeSource({ fund: null });
-    const response = await resolveInstrumentProfiles([fundRequest], { now: NOW, source, store });
+    const { response } = await resolveInstrumentProfiles([fundRequest], { now: NOW, source, store });
     expect(response.profiles['VWCE.DE']).toEqual({ ticker: 'VWCE.DE' });
     expect(response.oldestFetchedAt).toBeNull();
   });
@@ -123,13 +123,13 @@ describe('resolveInstrumentProfiles — the TTL per module', () => {
     const cachedFund: InstrumentFundProfile = { fetchedAt: daysAgo(1), holdingsBasis: 'sleeve', family: 'Vanguard' };
     const refreshed = memoryStore({ 'VWCE.DE': { fund: cachedFund } });
     const refreshedSource = fakeSource({ fund: { family: 'Vanguard Group' } });
-    const response = await resolveInstrumentProfiles([fundRequest], { now: NOW, force: true, source: refreshedSource.source, store: refreshed.store });
+    const { response } = await resolveInstrumentProfiles([fundRequest], { now: NOW, force: true, source: refreshedSource.source, store: refreshed.store });
     expect(refreshedSource.fetchFund).toHaveBeenCalledTimes(1);
     expect(response.profiles['VWCE.DE'].fund?.family).toBe('Vanguard Group');
 
     const failed = memoryStore({ 'VWCE.DE': { fund: cachedFund } });
     const failedSource = fakeSource({ fund: null });
-    const kept = await resolveInstrumentProfiles([fundRequest], { now: NOW, force: true, source: failedSource.source, store: failed.store });
+    const { response: kept } = await resolveInstrumentProfiles([fundRequest], { now: NOW, force: true, source: failedSource.source, store: failed.store });
     expect(kept.profiles['VWCE.DE'].fund).toEqual(cachedFund);
   });
 });
@@ -143,7 +143,7 @@ describe('resolveInstrumentProfiles — one document, two modules', () => {
 
     await resolveInstrumentProfiles([{ ticker: 'X', module: 'stock' }], { now: first, source, store });
     await settle();
-    const response = await resolveInstrumentProfiles([{ ticker: 'X', module: 'fund' }, { ticker: 'X', module: 'stock' }], { now: later, source, store });
+    const { response } = await resolveInstrumentProfiles([{ ticker: 'X', module: 'fund' }, { ticker: 'X', module: 'stock' }], { now: later, source, store });
     await settle();
 
     expect(documents.get('X')?.stock?.fetchedAt).toBe(first.toISOString());
@@ -158,7 +158,7 @@ describe('resolveInstrumentProfiles — one document, two modules', () => {
       AAPL: { stock: { fetchedAt: daysAgo(12), sectorKey: 'technology', longName: 'Apple Inc.' }, fund: { fetchedAt: daysAgo(29), holdingsBasis: 'fund', family: 'Nobody' } },
     });
     const { source, fetchFund, fetchStock } = fakeSource();
-    const response = await resolveInstrumentProfiles([fundRequest, stockRequest], { now: NOW, source, store });
+    const { response } = await resolveInstrumentProfiles([fundRequest, stockRequest], { now: NOW, source, store });
     expect(fetchFund).not.toHaveBeenCalled();
     expect(fetchStock).not.toHaveBeenCalled();
     // AAPL's stale-ish fund module was not requested: it must not date the footer.
@@ -187,7 +187,7 @@ describe('resolveInstrumentProfiles — nothing of the user’s, nothing that ca
     });
     const store: ProfileCacheStore = { read, writeModule: vi.fn(async () => undefined) };
     const { source, fetchFund } = fakeSource();
-    const response = await resolveInstrumentProfiles([{ ticker: '   ', module: 'fund' }], { now: NOW, source, store });
+    const { response } = await resolveInstrumentProfiles([{ ticker: '   ', module: 'fund' }], { now: NOW, source, store });
     expect(read).not.toHaveBeenCalled();
     expect(fetchFund).not.toHaveBeenCalled();
     expect(response).toEqual({ profiles: {}, oldestFetchedAt: null });
@@ -201,7 +201,7 @@ describe('resolveInstrumentProfiles — nothing of the user’s, nothing that ca
       }),
     };
     const { source } = fakeSource();
-    const response = await resolveInstrumentProfiles([fundRequest], { now: NOW, source, store });
+    const { response } = await resolveInstrumentProfiles([fundRequest], { now: NOW, source, store });
     await settle();
     expect(response.profiles['VWCE.DE'].fund?.family).toBe('Vanguard');
   });

@@ -315,6 +315,12 @@ pointer — a stub that grows past that is a guide leaking back (2026-09-20: ten
   an epoch instead of 400 — every request date in the file goes through it (yields, dividends, transactions), pinned by
   the «a null date» case of `__tests__/performanceYieldsRoute.test.ts` and the date cases of `serverValidation.test.ts`.
   Tests that touch a `server-only` module need `vi.mock('server-only', () => ({}))`.
+- **A route's latency is a `Server-Timing` header** (`lib/server/serverTiming.ts`; five routes since 2026-10-05: overview,
+  yields, dividend stats, instrument profiles, assistant threads): `startTiming()` at the handler's top, `mark('auth')`
+  after `assertCanAccessAccount`, `mark('db')` after ONE round of reads, `mark('compute')` before the response; a service
+  with stages of its own takes the recorder (`timing?: ServerTimingRecorder`) instead of returning times, and a count
+  the header carries travels BESIDE the body, never inside it (`resolveInstrumentProfiles` → `{ response, counts }`).
+  The route tests read the header's stage names (`__tests__/{dividendStatsRoute,instrumentProfilesRoute}.test.ts`).
 - **`REGISTRATION_WHITELIST` has no `NEXT_PUBLIC_` prefix**, and `lib/constants/appConfig.ts` must stay client-safe.
 - **Do NOT bump `firebase-admin` past 13.x** — `@14 → jwks-rsa@4 → jose@6` is pure ESM and Vercel's Lambda runtime
   `require()`s it (`ERR_REQUIRE_ESM` on every Admin route).
@@ -863,7 +869,9 @@ file used to carry.
   also means `assetDialogHelpers` + `allocationUtils` + the three ledger suites; widening `AssetClass` also means
   `ASSET_CLASS_SEQUENCE` and everything reading it. **Perf tooling** (`perf/`, `scripts/perf*`): `perfBudget` (the
   ceiling, the raised ceiling and `libraryCopies`), `perfRoutes` (`perf/routes.json` = `navigation.ts`: a new shell route goes in both)
-  · **Build** `npm run perf:budget` after `npm run build` — a route that grows raises its ceiling in the same commit
+  · **Build** `npm run perf:budget` after `npm run build` (after `npm run perf:build` it is `npm run perf:budget --
+  --dist=.next-perf`: without it the script reads `.next`, which on the Mac held a build of 15/08 and read RED on five
+  routes, 2026-10-05 — the `[perf:budget] build …` line says which) — a route that grows raises its ceiling in the same commit
   with `raisedBy` (`perf/README.md`).
 - **`firebase deploy --only firestore:rules` with a stale CLI login fails with a 401 on `serviceusage`**, not with
   "please log in". Fix by the code flow: `npx firebase logout`, `npx firebase login --no-localhost`, open the URL of

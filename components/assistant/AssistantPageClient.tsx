@@ -127,7 +127,17 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   // Reuses the React Query cache from Panoramica if the user visited it this session.
   const { data: overviewData, isError: overviewError } = useDashboardOverview(ownerId);
 
-  const { data: threads = [], isLoading: loadingThreads, error: threadsError } = useAssistantThreads(ownerId);
+  // One page of 50 at a time (PERF-10). The period auto-select below scans only the pages read:
+  // a period thread older than them is not found and the next question opens a new one
+  // (doc/guide/assistente.md § Per-page blind spots — the owner's call, 2026-10-05).
+  const {
+    data: threads = [],
+    isLoading: loadingThreads,
+    error: threadsError,
+    hasNextPage: hasMoreThreads,
+    isFetchingNextPage: loadingMoreThreads,
+    fetchNextPage: fetchMoreThreads,
+  } = useAssistantThreads(ownerId);
   const { data: threadDetail, isLoading: loadingThreadDetail, error: threadError } = useAssistantThread(
     selectedThreadId,
     ownerId
@@ -282,6 +292,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   const activeGoalsCount = activeItems.filter((item) => item.category === 'goal').length;
   const headerDescription = describeAssistantHeader({
     threads: threads.length,
+    moreThreads: hasMoreThreads,
     goals: activeGoalsCount,
     facts: activeItems.length - activeGoalsCount,
   });
@@ -462,6 +473,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
           isDemo={isDemo}
           isStreaming={isStreaming}
           threadsCount={threads.length}
+          hasMoreThreads={hasMoreThreads}
           activeMemoryCount={activeItems.length}
           description={headerDescription}
           memory={memory}
@@ -481,6 +493,9 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
           onMemoryOpenChange={setIsMemoryOpen}
           threads={threads}
           loadingThreads={loadingThreads}
+          hasMoreThreads={hasMoreThreads}
+          loadingMoreThreads={loadingMoreThreads}
+          onLoadMoreThreads={() => void fetchMoreThreads()}
           selectedThreadId={selectedThreadId}
           isStreaming={isStreaming}
           isDeletingId={deleteThreadMutation.variables as string | undefined}

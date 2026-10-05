@@ -186,7 +186,7 @@ describe('Assistant private API routes', () => {
     buildAssistantYearContextMock.mockResolvedValue(null);
     buildAssistantYtdContextMock.mockResolvedValue(null);
     buildAssistantHistoryContextMock.mockResolvedValue(null);
-    listAssistantThreadsMock.mockResolvedValue([]);
+    listAssistantThreadsMock.mockResolvedValue({ threads: [], nextCursor: null });
     createAssistantThreadMock.mockResolvedValue({
       id: 'thread-1',
       userId: 'user-1',
@@ -330,6 +330,37 @@ describe('Assistant private API routes', () => {
       error: 'Authenticated user does not have access to requested account',
     });
     expect(listAssistantThreadsMock).not.toHaveBeenCalled();
+  });
+
+  // PERF-10: the list is paged. The store's own page arithmetic (60 → 50 + 10, the cursor never
+  // repeated) is pinned in __tests__/assistantThreadsStore.test.ts; here the route's wiring.
+  it('answers one page with its cursor, passes «after» to the store, and times the read', async () => {
+    listAssistantThreadsMock.mockResolvedValue({ threads: [], nextCursor: 'thread-50' });
+    const response = await getThreadsRoute(
+      createJsonRequest('http://localhost/api/ai/assistant/threads?userId=user-1&after=thread-49', {
+        headers: { Authorization: 'Bearer valid-token' },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ threads: [], nextCursor: 'thread-50' });
+    expect(listAssistantThreadsMock).toHaveBeenCalledWith('user-1', { after: 'thread-49' });
+    expect((response.headers.get('server-timing') ?? '').split(', ').map((entry) => entry.split(';')[0])).toEqual(['auth', 'db', 'total']);
+  });
+
+  it('reads the first page without a cursor, and refuses an empty or path-shaped one with 400', async () => {
+    const authorized = { headers: { Authorization: 'Bearer valid-token' } };
+    await getThreadsRoute(createJsonRequest('http://localhost/api/ai/assistant/threads?userId=user-1', authorized));
+    expect(listAssistantThreadsMock).toHaveBeenLastCalledWith('user-1', { after: undefined });
+
+    for (const cursor of ['', 'threads%2Fx']) {
+      listAssistantThreadsMock.mockClear();
+      const response = await getThreadsRoute(
+        createJsonRequest(`http://localhost/api/ai/assistant/threads?userId=user-1&after=${cursor}`, authorized)
+      );
+      expect(response.status).toBe(400);
+      expect(listAssistantThreadsMock).not.toHaveBeenCalled();
+    }
   });
 
   it('returns a thread detail for the authenticated user', async () => {

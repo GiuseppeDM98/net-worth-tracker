@@ -192,6 +192,18 @@ compare più, `e2e/performance.degraded.spec.ts`): quale tessera lo tenga non è
 `POST /api/performance/yields`: 30 ms di mediana (11 chiamate) contro 60 e 67 delle due vecchie (55 ciascuna). Bundle:
 Rendimenti 566,3 → 569,2 gz KB (tetto 578), condivisi 473,5 → 475,4 (tetto 483): nessun tetto toccato.
 
+**2026-10-05, le route server leggono una volta (PERF-10, branch `perf/10-route-server-una-lettura`), prima/dopo
+nella stessa sessione, sul Mac, mirror (7 dividendi, 25 asset, 6 conversazioni).** `--routes=allocation,cashflow`,
+mediane di 5: Allocazione cold 222 → 194 ms, warm 218 → 216; Cashflow cold 620 → 598, warm 519 → 531 — nessun file
+client di queste due pagine toccato: rumore. Il benchmark di Cashflow NON chiama `/api/dividends/stats`: la tab
+Dividendi non è quella di default e `routes.json` non porta query, quindi la misura di Dividendi è la route, 20
+chiamate dirette due volte: **25/22 → 12/11 ms** di mediana, `Server-Timing` `db` ~8–10 · `compute` ~1 · `total`
+~10–13 (dividendi letti 4 → 1 volta, sette letture in serie → un `Promise.all` di quattro). La route dei profili ora
+porta `Server-Timing` (`auth, db, yahoo, total, hits, fetched, source`): nel benchmark `source=cache`, `hits=12`,
+`fetched=0`, `total` 14–24 ms, zero chiamate a Yahoo a regime. Bundle: Assistente 660,6 gz KB (tetto 670), le altre
+invariate; nessun tetto toccato. **`npm run perf:budget` senza `--dist=.next-perf` legge `.next`**: sul Mac era una
+build del 15/08, ROSSA su cinque route e su recharts — la riga `[perf:budget] build …` in testa lo dice.
+
 **Bundle** (gz KB, chunk iniziali; il tetto in `budget.json` è +2%) — **dal 2026-09-30, PR #418**: condivisi 473,5
 (22 chunk) · landing 452,0 · login 418,2 · Panoramica 538,0 · Patrimonio 731,1 · Cashflow 735,4 · **Analisi 564,6** ·
 **Rendimenti 566,3** · **Storico 684,0** · Hall of Fame 541,2 · Allocazione 520,6 · **FIRE 653,7** · Previdenza 592,6 ·

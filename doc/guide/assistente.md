@@ -13,7 +13,7 @@
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Assistant**: `app/dashboard/assistant/page.tsx`, `components/assistant/AssistantPageClient.tsx` + `tiles/*`, pure `lib/utils/{assistantNarrative,assistantPeriodOptions}.ts`; `app/api/ai/assistant/*`, `lib/server/assistant/*` (`goalEvaluation.ts` pure, `goalEvaluationService.ts` I/O, `memoryExtraction.ts`, `store.ts` → `mergeMemoryItem`), `components/assistant/AssistantModals.tsx` (Conversazioni · Memoria), `lib/hooks/useAssistantStreaming.ts`, `lib/services/assistantMonthContextService.ts` over `lib/utils/expenseBreakdown.ts` (`buildCashflowBreakdown`); goals `lib/server/goalData.ts`, `lib/utils/goalProposal.ts` (ONE zod schema), `app/api/goals/route.ts`, `components/assistant/GoalProposalCard.tsx`
-- **Suites to run after a change here — Assistant** (moved from `AGENTS.md` § Commands on 2026-09-30): `assistantRoutes`, `assistantWebSearchPolicy`, `assistantMonthContextService` · **Verdetto e letture** `assistantNarrative` (+ `overviewNarrative` for the no-context verdict) · **Obiettivi** `assistantGoalEvaluation`, `assistantGoalEvaluationService`, `assistantMemoryExtraction`, `assistantMemoryStore` · **Goal-Based** `goalMath`, `goalProposal`, `apiAuthRoutes`
+- **Suites to run after a change here — Assistant** (moved from `AGENTS.md` § Commands on 2026-09-30): `assistantRoutes`, `assistantThreadsStore` (the pages and the cursor), `assistantWebSearchPolicy`, `assistantMonthContextService` · **Verdetto e letture** `assistantNarrative` (+ `overviewNarrative` for the no-context verdict) · **Obiettivi** `assistantGoalEvaluation`, `assistantGoalEvaluationService`, `assistantMemoryExtraction`, `assistantMemoryStore` · **Goal-Based** `goalMath`, `goalProposal`, `apiAuthRoutes`
 
 ## Assistant
 
@@ -50,6 +50,21 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   data it was never given.
 
 ### Streaming, threads, memory
+- **The thread list is read 50 at a time** (PERF-10, 2026-10-05; it was read whole and grew forever):
+  `listAssistantThreads(userId, { limit = ASSISTANT_THREADS_PAGE_SIZE, after })` asks for ONE more than the page,
+  so `nextCursor` (the page's last id) is `null` on a list of exactly 50, and the next page starts with
+  `startAfter(<cursor snapshot>)` — `startAt` repeats the cursor's thread (seen red: 11 rows, «t049» twice,
+  `__tests__/assistantThreadsStore.test.ts`). A cursor of another account is 403, a deleted one 404;
+  `GET /api/ai/assistant/threads?after=` validates it (`assistantThreadCursorSchema`: never empty, never a path)
+  and answers `{ threads, nextCursor }` with `Server-Timing: auth, db, total`. `useAssistantThreads` is a
+  `useInfiniteQuery` whose `select` flattens the pages, on the same key every writer invalidates (an invalidation
+  re-reads every loaded page from the fresh cursors). **Nothing hides in silence** (owner's wording, 2026-10-05):
+  while a page is unread the list closes on «Mostra altre», the header says «Più di 50 conversazioni»
+  (`describeAssistantHeader` `moreThreads`), its icon «Conversazioni (più di 50)» with a «50+» dot (`CountDot`'s
+  `isFloor`; past two digits it reads «99+», where it printed a bare «99» until 2026-10-05) and the modal «Le 50
+  conversazioni più recenti: premine una per riprenderla; «Mostra altre» legge le precedenti.»
+  (`describeThreadsReading` `hasMore`). Seen in the browser on 60 planted threads (2026-10-05, a throwaway spec):
+  50 rows, the three sentences, «Mostra altre» → 60 rows, none twice, the button gone.
 - `deleteAssistantThread` must delete the `messages` subcollection in ≤400-doc batches first (no cascade in the Admin
   SDK). Never clear `streamingMessages` in a `useEffect([selectedThreadId])` — the SSE `meta` event sets the id
   mid-stream and wipes the buffer; post-stream invalidation uses a local `resolvedThreadId` updated from `meta`.
@@ -163,4 +178,8 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Assistente**: no Playwright spec (the throwaway specs were deleted); the Cashflow tile is absent for a period without cashflow rows; the savings rate is `netCashFlow / (income + dividends)`; «Patrimonio oggi» prints the GROSS total (the verdict's figure), the old card printed the net; the Conversazione count includes the user's messages; starter rows prefill the composer, follow-up rows submit; the thread rows and the memory rows both use `useArmedDelete` (the threads' 3 s auto-disarm went on 2026-09-18, with the sheet); a companion taller than the viewport is reachable only at the end of the scroll (sticky, by design); the «goal reached» tile and the sheet's row are two surfaces of ONE suggestion.
 - **The Assistant's cashflow figures changed on 2026-07-29**; saved threads are prose and are not regenerated (moved here from CLAUDE.md → Known Issues on 2026-09-18: it is this page's blind spot, not a cross-cutting one).
+- **A period's own thread older than the pages read is not found** (owner's call, 2026-10-05): switching period
+  re-opens the existing thread for it by scanning the LOADED threads (`findThreadForPeriod`), so with more than 50
+  conversations one older than the 50 most recent is not resumed and the next question opens a new one — until
+  «Mostra altre» has read its page. No query of its own, by decision.
 - **A confirmed goal proposal can be confirmed again after a reload** (accepted for v1): reopening the thread re-parses the fenced block and a second press creates a SECOND goal. (moved from `CLAUDE.md` → Known Issues on 2026-09-19)

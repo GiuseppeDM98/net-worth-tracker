@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Timestamp } from 'firebase-admin/firestore';
-import {
-  calculateDividendStats,
-  getUpcomingDividends,
-  getAllDividends
-} from '@/lib/services/dividendService';
+import { getAllDividends } from '@/lib/services/dividendService';
 import { adminDb } from '@/lib/firebase/admin';
+import { startTiming } from '@/lib/server/serverTiming';
+import {
+  endOfServerDay,
+  selectUpcomingDividends,
+  summarizeDividendStats,
+} from '@/lib/utils/dividendAnalytics';
 import { AssetDividendGrowth, Dividend, DividendGrowthData, TotalReturnAsset, YieldOnCostAsset } from '@/types/dividend';
 import { computeDividendYieldMetrics } from '@/lib/utils/yieldOnCost';
 import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
@@ -65,10 +67,15 @@ function computeDividendReturnPercentage(
 
 /**
  * GET /api/dividends/stats
- * Query params: userId (required), startDate (optional), endDate (optional)
+ * Query params: userId (required), startDate (optional), endDate (optional), assetId (optional)
  * Returns dividend statistics for a user, optionally filtered by date range
+ *
+ * Reads every collection once, in one parallel round (PERF-10, 2026-10-05; it was seven serial
+ * reads with the dividends read four times), and answers with `Server-Timing: auth, db, compute,
+ * total` — the production latency of the Dividendi tab's one server call (doc/guide/cashflow-dividendi.md).
  */
 export async function GET(request: NextRequest) {
+  const timing = startTiming();
   try {
     const decodedToken = await requireFirebaseAuth(request);
     const searchParams = request.nextUrl.searchParams;
@@ -78,6 +85,7 @@ export async function GET(request: NextRequest) {
     const assetId = searchParams.get('assetId') || undefined;
 
     await assertCanAccessAccount(decodedToken, userId);
+    timing.mark('auth');
     const authenticatedUserId = userId as string;
 
     let startDate: Date | undefined;
@@ -97,30 +105,37 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // getDividendsByDateRange (and calculateDividendStats) require both bounds.
-    // Fill in the missing bound with a sensible default so a single date still filters correctly.
+    // A single bound is valid: the missing one is filled so the response's `period` names a closed
+    // range, as it always has.
     if (startDate && !endDate) endDate = new Date('9999-12-31');
     if (endDate && !startDate) startDate = new Date(0);
 
-    // Calculate period statistics (filtered by date range and optionally by asset)
-    const periodStats = await calculateDividendStats(authenticatedUserId, startDate, endDate, assetId);
+    // ONE round of reads, in parallel (PERF-10): the dividends once — the period, all-time,
+    // upcoming and chart figures are all derived from that one list below — plus the assets
+    // (sold ones are filtered out of upcoming and growth), the snapshots and the trade ledger.
+    // The assets are read raw rather than through getUserAssetsAdmin: the mapping below keeps
+    // `holdingStartDate` as a Timestamp to convert, and `averageCostEur` as stored.
+    const [allDividends, assetsSnapshot, snapshots, allTrades] = await Promise.all([
+      getAllDividends(authenticatedUserId),
+      adminDb.collection('assets').where('userId', '==', authenticatedUserId).get(),
+      getUserSnapshotsAdmin(authenticatedUserId),
+      getAssetTransactionsAdmin(authenticatedUserId),
+    ]);
+    timing.mark('db');
 
-    // Calculate all-time statistics (also filtered by asset if provided)
-    const allTimeStats = await calculateDividendStats(authenticatedUserId, undefined, undefined, assetId);
+    // «Now» once, for every figure of the answer (AGENTS.md § Dynamic Imports: a function that
+    // reads the clock itself is untestable). `today` is the end of the server's day: a payment
+    // dated today is received.
+    const now = new Date();
+    const today = endOfServerDay(now);
 
-    // Get upcoming dividends and filter by asset ownership
-    const upcomingDividends = await getUpcomingDividends(authenticatedUserId);
-
-    // Fetch user assets to filter out dividends for sold assets (quantity = 0)
-    // Using admin SDK to bypass Firestore Security Rules (server-side)
-    const assetsSnapshot = await adminDb
-      .collection('assets')
-      .where('userId', '==', authenticatedUserId)
-      .get();
+    const periodStats = summarizeDividendStats(allDividends, { startDate, endDate, assetId, now });
+    const allTimeStats = summarizeDividendStats(allDividends, { assetId, now });
+    const upcomingDividends = selectUpcomingDividends(allDividends, now);
 
     // Holding-start per asset (from snapshots): lets the per-share engine ignore dividends from a
     // previous, discontinuous holding when an instrument was sold and later rebought (same id).
-    const holdingStarts = deriveHoldingStartDates(await getUserSnapshotsAdmin(authenticatedUserId));
+    const holdingStarts = deriveHoldingStartDates(snapshots);
 
     const userAssets = assetsSnapshot.docs.map(doc => ({
       id: doc.id,
@@ -141,7 +156,6 @@ export async function GET(request: NextRequest) {
     // Trade-ledger transactions, grouped by asset (Fase D §6): assets WITH ledger entries get a
     // date-exact total return via replayTransactions; assets without one keep the static fallback
     // below (only possible for a position opened and never migrated/re-bought).
-    const allTrades = await getAssetTransactionsAdmin(authenticatedUserId);
     const tradesByAssetId = new Map<string, AssetTransaction[]>();
     allTrades.forEach(t => {
       const arr = tradesByAssetId.get(t.assetId) ?? [];
@@ -169,17 +183,12 @@ export async function GET(request: NextRequest) {
       count: asset.count,
     })).sort((a, b) => b.totalNet - a.totalNet);
 
-    // Get all dividends for year and month grouping
-    const allDividends = await getAllDividends(authenticatedUserId);
-
     // Helper function to convert Date | Timestamp to Date
     const toDate = (date: Date | Timestamp): Date => {
       return date instanceof Date ? date : date.toDate();
     };
 
     // Filter out future dividends for charts (only show paid dividends)
-    const today = new Date();
-    today.setHours(23, 59, 59, 999);
     const paidDividends = allDividends.filter(div => {
       const paymentDate = toDate(div.paymentDate);
       return paymentDate <= today;
@@ -442,7 +451,7 @@ export async function GET(request: NextRequest) {
     // Uses the same per-share engine as the Performance page so both surfaces report a
     // single consistent number; dividends from fully-sold positions are excluded
     // (see lib/utils/yieldOnCost.ts).
-    const twelveMonthsAgo = new Date();
+    const twelveMonthsAgo = new Date(now);
     twelveMonthsAgo.setFullYear(twelveMonthsAgo.getFullYear() - 1);
 
     const ttmMetrics = computeDividendYieldMetrics(allDividends, userAssets, twelveMonthsAgo, today, 12);
@@ -520,14 +529,18 @@ export async function GET(request: NextRequest) {
       ...(dividendGrowthData && { dividendGrowthData }),
     };
 
-    return NextResponse.json({
-      success: true,
-      stats,
-      period: startDate && endDate ? {
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
-      } : 'all_time',
-    });
+    timing.mark('compute');
+    return NextResponse.json(
+      {
+        success: true,
+        stats,
+        period: startDate && endDate ? {
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString(),
+        } : 'all_time',
+      },
+      { headers: { 'Server-Timing': timing.toHeader() } }
+    );
   } catch (error) {
     const authErrorResponse = getApiAuthErrorResponse(error);
     if (authErrorResponse) {

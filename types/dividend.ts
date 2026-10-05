@@ -3,7 +3,7 @@
 // - DividendDetailsDialog.tsx (type labels + badge map)
 // - DividendTrackingTab.tsx (type labels)
 // - DividendDialog.tsx (select options + Zod enum)
-// - dividendService.ts (byType initializer in calculateDividendStats)
+// - dividendAnalytics.ts (byType initializer in summarizeDividendStats)
 export type DividendType = 'ordinary' | 'extraordinary' | 'interim' | 'final' | 'coupon' | 'finalPremium';
 // coupon: bond coupon payment, auto-generated from BondDetails on asset save
 // finalPremium: one-time bonus paid at maturity (e.g. BTP Valore 0.8%)

@@ -16,6 +16,12 @@
  * served, and its `fetchedAt` says how old it is (an old empty answer still dates the footer, and
  * reads «non letto» exactly as no answer would). `force` asks Yahoo whatever the age, and keeps
  * the last cached answer if Yahoo fails.
+ *
+ * Two stages, timed apart for the route's `Server-Timing` (PERF-10, 2026-10-05): every cached
+ * document is read first, in parallel (`db`), then Yahoo is asked for what is missing, expired or
+ * forced (`yahoo`), and the answer counts the modules served from the cache (`hits`) and those
+ * asked to Yahoo (`fetched`). The counts travel beside the response, never inside it: the body the
+ * route answers stays `{ profiles, oldestFetchedAt }`.
  */
 import { adminDb } from '@/lib/firebase/admin';
 import { removeUndefinedDeep } from '@/lib/utils/firestoreData';
@@ -27,6 +33,7 @@ import type {
   ProfileModule,
   ProfileRequest,
 } from '@/types/exposure';
+import type { ServerTimingRecorder } from '@/lib/server/serverTiming';
 import { yahooProfileSource, type YahooProfileSource } from './yahooSource';
 
 export const INSTRUMENT_PROFILE_CACHE_COLLECTION = 'instrument-profile-cache';
@@ -91,6 +98,24 @@ export interface ResolveInstrumentProfilesOptions {
   now?: Date;
   source?: YahooProfileSource;
   store?: ProfileCacheStore;
+  /** Marks `db` once the cache is read and `yahoo` once Yahoo has answered (the route's header). */
+  timing?: ServerTimingRecorder;
+}
+
+type ResolvedOptions = Required<Omit<ResolveInstrumentProfilesOptions, 'timing'>>;
+
+/** Where the modules of one resolution came from — one count per (ticker, module) asked. */
+export interface ProfileResolutionCounts {
+  /** Served from the cache because fresh (and not forced). */
+  hits: number;
+  /** Asked to Yahoo — missing, expired or forced — whether Yahoo answered or not. */
+  fetched: number;
+}
+
+export interface ResolvedInstrumentProfiles {
+  /** The body the route answers: Yahoo's answers and nothing of the user's. */
+  response: InstrumentProfilesResponse;
+  counts: ProfileResolutionCounts;
 }
 
 /**
@@ -102,10 +127,15 @@ async function resolveModule<M extends ProfileModule>(
   ticker: string,
   module: M,
   cached: ModuleData[M] | undefined,
-  { force, now, source, store }: Required<ResolveInstrumentProfilesOptions>,
+  { force, now, source, store }: ResolvedOptions,
+  counts: ProfileResolutionCounts,
 ): Promise<ModuleData[M] | undefined> {
-  if (cached && !force && isFresh(module, cached, now)) return cached;
+  if (cached && !force && isFresh(module, cached, now)) {
+    counts.hits += 1;
+    return cached;
+  }
 
+  counts.fetched += 1;
   const answer = (module === 'fund' ? await source.fetchFund(ticker, now) : await source.fetchStock(ticker, now)) as ModuleData[M] | null;
   if (!answer) return cached;
 
@@ -119,15 +149,20 @@ async function resolveModule<M extends ProfileModule>(
   return answer;
 }
 
-async function resolveTicker(ticker: string, modules: Set<ProfileModule>, options: Required<ResolveInstrumentProfilesOptions>): Promise<InstrumentProfile> {
-  const cached = await options.store.read(ticker);
+async function resolveTicker(
+  ticker: string,
+  modules: Set<ProfileModule>,
+  cached: InstrumentProfile | null,
+  options: ResolvedOptions,
+  counts: ProfileResolutionCounts,
+): Promise<InstrumentProfile> {
   const profile: InstrumentProfile = { ticker };
   if (modules.has('fund')) {
-    const fund = await resolveModule(ticker, 'fund', cached?.fund, options);
+    const fund = await resolveModule(ticker, 'fund', cached?.fund, options, counts);
     if (fund) profile.fund = fund;
   }
   if (modules.has('stock')) {
-    const stock = await resolveModule(ticker, 'stock', cached?.stock, options);
+    const stock = await resolveModule(ticker, 'stock', cached?.stock, options, counts);
     if (stock) profile.stock = stock;
   }
   return profile;
@@ -135,14 +170,15 @@ async function resolveTicker(ticker: string, modules: Set<ProfileModule>, option
 
 /**
  * The profiles for the requests, keyed by ticker, and the oldest `fetchedAt` among the modules
- * actually used — what the tile's footer prints. A request with an empty ticker is dropped
- * before any `.doc()` (the Admin SDK throws synchronously on an empty id).
+ * actually used — what the tile's footer prints — beside the counts of where they came from. A
+ * request with an empty ticker is dropped before any `.doc()` (the Admin SDK throws synchronously
+ * on an empty id).
  */
 export async function resolveInstrumentProfiles(
   requests: ProfileRequest[],
   options: ResolveInstrumentProfilesOptions = {},
-): Promise<InstrumentProfilesResponse> {
-  const resolved: Required<ResolveInstrumentProfilesOptions> = {
+): Promise<ResolvedInstrumentProfiles> {
+  const resolved: ResolvedOptions = {
     force: options.force ?? false,
     now: options.now ?? new Date(),
     source: options.source ?? yahooProfileSource,
@@ -158,7 +194,15 @@ export async function resolveInstrumentProfiles(
     modulesByTicker.set(ticker, modules);
   }
 
-  const profiles = await Promise.all(Array.from(modulesByTicker.entries()).map(([ticker, modules]) => resolveTicker(ticker, modules, resolved)));
+  const tickers = Array.from(modulesByTicker.keys());
+  const cachedProfiles = await Promise.all(tickers.map((ticker) => resolved.store.read(ticker)));
+  options.timing?.mark('db');
+
+  const counts: ProfileResolutionCounts = { hits: 0, fetched: 0 };
+  const profiles = await Promise.all(
+    tickers.map((ticker, index) => resolveTicker(ticker, modulesByTicker.get(ticker)!, cachedProfiles[index], resolved, counts)),
+  );
+  options.timing?.mark('yahoo');
 
   const fetchedAts = profiles
     .flatMap((profile) => [profile.fund?.fetchedAt, profile.stock?.fetchedAt])
@@ -166,7 +210,10 @@ export async function resolveInstrumentProfiles(
     .sort((a, b) => Date.parse(a) - Date.parse(b));
 
   return {
-    profiles: Object.fromEntries(profiles.map((profile) => [profile.ticker, profile])),
-    oldestFetchedAt: fetchedAts[0] ?? null,
+    response: {
+      profiles: Object.fromEntries(profiles.map((profile) => [profile.ticker, profile])),
+      oldestFetchedAt: fetchedAts[0] ?? null,
+    },
+    counts,
   };
 }
