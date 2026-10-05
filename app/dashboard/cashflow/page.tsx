@@ -25,7 +25,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useQueryClient } from '@tanstack/react-query';
@@ -39,7 +39,6 @@ import { DividendTrackingTab } from '@/components/dividends/DividendTrackingTab'
 import { BudgetTab } from '@/components/cashflow/BudgetTab';
 import { CostCentersTab } from '@/components/cashflow/CostCentersTab';
 import { ExpenseSplitTab } from '@/components/cashflow/ExpenseSplitTab';
-import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { Dividend } from '@/types/dividend';
 import { FamilyMember } from '@/types/assets';
@@ -49,20 +48,15 @@ import { useAssets } from '@/lib/hooks/useAssets';
 import { useSettings } from '@/lib/hooks/useSettings';
 import { useFreshness } from '@/lib/hooks/useFreshness';
 import { queryKeys } from '@/lib/query/queryKeys';
+import { dividendStatsQueryKey, useDividendRegistry } from '@/lib/hooks/useDividendStats';
 import { listExpenseYears, trackingWindow } from '@/lib/utils/expenseWindows';
 import { type Period, currentMonthPeriod } from '@/lib/utils/period';
-import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { tabPanelSwitch } from '@/lib/utils/motionVariants';
-import { toast } from 'sonner';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PageTabs } from '@/components/layout/PageTabs';
 import { pageTabPanelId } from '@/components/layout/PageTabBar';
 import type { TabDef } from '@/components/layout/PageTabs';
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 
 // Module-level constant: stable reference for React Compiler
 // Analisi tab removed — it now lives at /dashboard/analisi as a standalone page.
@@ -76,6 +70,7 @@ const VALID_CASHFLOW_TABS = ['tracking', 'dividends', 'budget', 'cost-centers', 
 /** The cashflow floor when the settings carry none: last year (the same default Analisi uses). */
 const DEFAULT_HISTORY_START_YEAR = new Date().getFullYear() - 1;
 const EMPTY_FAMILY_MEMBERS: FamilyMember[] = [];
+const EMPTY_DIVIDENDS: Dividend[] = [];
 const EMPTY_EXPENSES: Expense[] = [];
 type CashflowTabId = (typeof VALID_CASHFLOW_TABS)[number];
 
@@ -84,7 +79,6 @@ function getInitialTab(param: string | null): CashflowTabId {
 }
 
 export default function CashflowPage() {
-  const { user } = useAuth();
   const { ownerId } = useActiveAccount();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
@@ -151,58 +145,23 @@ export default function CashflowPage() {
   // entries), from the SAME assets key every page reads — no second read when the tab mounts.
   const dividendAssets = useMemo(() => allAssets.filter((a) => a.assetClass === 'equity' || a.assetClass === 'bonds'), [allAssets]);
 
-  // The dividends come from the API route, read once the tab is mounted (manual state: not a
-  // Firestore collection the hooks cover).
-  const [dividends, setDividends] = useState<Dividend[]>([]);
-  const [otherDataLoading, setOtherDataLoading] = useState(false);
-  const [otherDataFailed, setOtherDataFailed] = useState(false);
-  const [otherDataLoaded, setOtherDataLoaded] = useState(false);
+  // The dividends come from the tab's ONE request, read once the tab is mounted: the same answer
+  // carries the list (here) and the server's measures (`useDividendStats`, in the tab). Until
+  // 2026-10-05 the list was a second request, `/api/dividends`, and a second read of the collection.
+  const {
+    data: dividends = EMPTY_DIVIDENDS,
+    isLoading: dividendsLoading,
+    isError: dividendsError,
+  } = useDividendRegistry(ownerId, mountedTabs.has('dividends'));
 
   // The dividends' own read is NOT in here: it is the Dividendi tab's wait alone (below). Until
   // 2026-09-29 it was, so every expense saved put the skeleton over Tracciamento for the length
-  // of a `/api/dividends` call it never uses — the «refresh» the owner saw on the tour.
+  // of a dividend read it never uses — the «refresh» the owner saw on the tour.
   const loading = expensesLoading || categoriesLoading;
   // Every tab defaults its data to `[]`, so without this a dropped connection reads as an
   // empty ledger — the one thing a tracker must never say (lib/utils/statesNarrative.ts).
   const loadFailed = expensesError || categoriesError;
   const isDemo = useDemoMode();
-
-  // Load the dividends only when their tab is mounted
-  const loadOtherData = useCallback(async () => {
-    if (!user || !ownerId || otherDataLoaded) return;
-
-    try {
-      setOtherDataLoading(true);
-      setOtherDataFailed(false);
-
-      const dividendsData = await authenticatedFetch(`/api/dividends?userId=${ownerId}`)
-        .then(r => r.json())
-        .then(d => d.dividends || []);
-
-      setDividends(dividendsData);
-      setOtherDataLoaded(true);
-    } catch (error) {
-      console.error('Failed to load cashflow secondary data', {
-        userId: ownerId,
-        operation: 'loadOtherData',
-        error: getErrorMessage(error),
-      });
-      setOtherDataFailed(true);
-      toast.error('Errore nel caricamento dei dati');
-    } finally {
-      setOtherDataLoading(false);
-    }
-  }, [user, ownerId, otherDataLoaded]);
-
-  useEffect(() => {
-    const needsOtherData = mountedTabs.has('dividends');
-    if (!user || !ownerId || !needsOtherData || otherDataLoaded) return;
-    // Deferred so the effect body itself sets no state (react-hooks/set-state-in-effect).
-    const timer = setTimeout(() => {
-      loadOtherData();
-    }, 0);
-    return () => clearTimeout(timer);
-  }, [user, ownerId, mountedTabs, otherDataLoaded, loadOtherData]);
 
   const handleRefresh = async () => {
     // Invalidate React Query caches for expenses, categories and assets. `expenses.all` is the
@@ -220,12 +179,12 @@ export default function CashflowPage() {
       queryKey: queryKeys.assets.all(ownerId || ''),
     });
 
-    // The dividends are reread only where they are on screen: a save on Tracciamento used to
-    // fetch them for a tab that was never opened (and to skeleton the list meanwhile, above).
-    if (mountedTabs.has('dividends')) {
-      setOtherDataLoaded(false);
-      await loadOtherData();
-    }
+    // The dividends — list and measures, one key — are reread only where they are on screen: the
+    // query is enabled by the mounted tab, so on a page that never opened it this only marks the
+    // key stale and fetches nothing. The list stays drawn while the fresh answer is in flight.
+    await queryClient.invalidateQueries({
+      queryKey: dividendStatsQueryKey(ownerId),
+    });
   };
 
   /**
@@ -437,8 +396,8 @@ export default function CashflowPage() {
               <DividendTrackingTab
                 dividends={dividends}
                 assets={dividendAssets}
-                loading={loading || otherDataLoading || assetsLoading}
-                loadFailed={otherDataFailed || assetsError}
+                loading={loading || dividendsLoading || assetsLoading}
+                loadFailed={dividendsError || assetsError}
                 onRefresh={handleRefresh}
               />
             </motion.div>

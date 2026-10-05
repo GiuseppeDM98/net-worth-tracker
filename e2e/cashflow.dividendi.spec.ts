@@ -14,6 +14,9 @@
  *    row, the tile's live region speaking); Escape disarms and deletes nothing.
  * 4. The period axis is a radiogroup: the arrows move it, Tab leaves it after one stop.
  * 5. With nothing recorded the page shows ONE tile naming the next action, not a hero at 0 €.
+ * 6. Opening the tab asks the server ONCE: the payment list and the server's measures arrive in the
+ *    one answer of `/api/dividends/stats`. Seen RED on 2026-10-05, on the page that still read the
+ *    list from `/api/dividends` — the dividends read once per route, twice per opening.
  *
  * Runs on the base account (`desktop` project), which has no dividends: the spec creates its
  * own coupon on «BTP Valore 2030» with a decoy note and removes it THROUGH THE APP at the end
@@ -77,6 +80,23 @@ test('with nothing recorded the page names the next action instead of printing z
   await expect(pagamenti.getByRole('button', { name: 'Aggiungi dividendo', exact: true })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Incasso netto del periodo' })).toHaveCount(0);
   await expect(page.getByRole('region', { name: 'Affidabilità' })).toHaveCount(0);
+});
+
+test('opening the tab asks the server once: the list and the measures arrive in one answer', async ({ page }) => {
+  const reads: string[] = [];
+  page.on('request', (request) => {
+    const { pathname } = new URL(request.url());
+    if (request.method() === 'GET' && pathname.startsWith('/api/dividends')) reads.push(pathname);
+  });
+
+  // A fresh load with the listener already on (the beforeEach's own load is not counted). The
+  // tile below is the positive anchor: it is drawn only once the list has been read.
+  const answered = page.waitForResponse((r) => new URL(r.url()).pathname === '/api/dividends/stats');
+  await openDividendi(page);
+  expect((await answered).status()).toBe(200);
+  await expect(page.getByRole('region', { name: 'Pagamenti' })).toContainText('Nessun pagamento registrato');
+
+  expect(reads).toEqual(['/api/dividends/stats']);
 });
 
 test('the form refuses in the reading line, proposes the instrument’s rate, writes, and the row deletes armed in place', async ({ page }) => {

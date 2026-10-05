@@ -17,7 +17,7 @@
  * reads «non letto» exactly as no answer would). `force` asks Yahoo whatever the age, and keeps
  * the last cached answer if Yahoo fails.
  *
- * Two stages, timed apart for the route's `Server-Timing` (PERF-10, 2026-10-05): every cached
+ * Two stages, timed apart for the route's `Server-Timing` (since 2026-10-05): every cached
  * document is read first, in parallel (`db`), then Yahoo is asked for what is missing, expired or
  * forced (`yahoo`), and the answer counts the modules served from the cache (`hits`) and those
  * asked to Yahoo (`fetched`). The counts travel beside the response, never inside it: the body the

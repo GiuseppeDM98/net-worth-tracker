@@ -58,7 +58,7 @@ async function fetchThread(threadId: string, userId: string): Promise<AssistantT
 }
 
 /**
- * The owner's threads, one page of 50 at a time (PERF-10): `data` is the threads of every page read
+ * The owner's threads, one page of 50 at a time: `data` is the threads of every page read
  * so far, most recent first, and `hasNextPage` says another page exists — the list's «Mostra
  * altre» calls `fetchNextPage`, and every count on the page says «più di N» while it does
  * (`describeAssistantHeader`, `describeThreadsReading`), so no thread is ever hidden in silence.

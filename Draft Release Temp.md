@@ -32,7 +32,7 @@
 
 ## 🔧 Improvements
 
-- Cashflow › Dividendi loads its yield and growth figures sooner: the server reads the dividends, the instruments, the snapshots and the trades once and together, instead of seven reads one after the other with the dividends read four times; every figure is the same as before.
+- Improved the speed of Cashflow › Dividendi: the payments and the yield and growth figures arrive together in a single request, read once on the server instead of in several steps, and every figure is the same as before. After you add, edit or delete a payment the list stays on screen while it is refreshed and the yield figures follow at once; if those figures cannot be computed the payments are still shown and the page says so («Lettura fallita»).
 
 - The assistant's «Riprendi una conversazione» list now loads the 50 most recent conversations and offers «Mostra altre» for the earlier ones, instead of reading every conversation ever saved at each opening; while some are still unread the header says «Più di 50 conversazioni» and the list says the ones shown are the most recent, so none is hidden.
 
@@ -59,6 +59,8 @@
 - Improved Patrimonio › Strumenti for a composite instrument (a 60/40 fund, a balanced ETF): still one row, but its class chip now shows every class it holds — one segment per class, as wide as its share and in that class's colour, «Azioni · Obbl.» for two, «Misto» for three or more. A class under 5% gets no segment, a screen reader hears every share, and the group headers and the sort by class keep the prevailing class. (Contributed by Ciocc128.)
 
 ## 📚 Documentation
+
+- Retired the specification behind the server reads of Dividendi, the assistant and the Esposizione after reading it against the code (twenty differences): the Dividendi guide now describes the single request the tab opens with and what it shows when the yield figures cannot be computed, the assistant guide the preference its context preview takes from the page instead of reading it again, and two tests now say which failures they were seen to catch.
 
 - The Dividendi, Assistente and Allocazione guides now explain how their server reads work — the dividend statistics derived from one read, the conversations read a page at a time with a count that never stops in silence, and the timing header of the Esposizione that says whether its profiles came from the saved cache or from Yahoo.
 

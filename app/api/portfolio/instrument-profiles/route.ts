@@ -19,7 +19,7 @@ import type { InstrumentProfilesResponse } from '@/types/exposure';
  * that account gets the OWNER's profiles (the route it replaced read `decodedToken.uid`, so a
  * delegate saw their own exposure on the owner's page). `force=true` is the tile's «Aggiorna».
  *
- * Answers with `Server-Timing: auth, db, yahoo, total, hits, fetched, source` (PERF-10): `db` is
+ * Answers with `Server-Timing: auth, db, yahoo, total, hits, fetched, source`: `db` is
  * the assets plus the cache documents, `hits`/`fetched` count the modules served from the cache and
  * asked to Yahoo, and `source` is `cache` when every module came from the cache, `yahoo` when at
  * least one was asked — the one place a cache miss can be read in production.

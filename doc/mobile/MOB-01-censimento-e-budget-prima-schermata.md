@@ -175,7 +175,7 @@ guidato; (2) una cifra è solo «€ e %», come la baseline. Restano (3) e (4),
   `instrument-profile-cache` vuota o scaduta; `emulators:seed` la precompila per i ticker della fixture (`VWCE.DE`,
   `AAPL`, `FONDOPENSIONE` vuoto) e il global setup di Playwright la ristampa a ogni corsa
   (`scripts/instrumentProfileFixtures.ts`, `npm run e2e:seed:profiles`): il budget di Allocazione non tocca la rete. Un ticker non seminato va a Yahoo (senza rete è «non
-  letto» e la tessera è più corta): la diagnostica registra il `source` del `Server-Timing` della route (da PERF-10), e un
+  letto» e la tessera è più corta): la diagnostica registra il `source` del `Server-Timing` della route (`app/api/portfolio/instrument-profiles/route.ts`, dal 2026-10-05), e un
   `source=yahoo` sul fixture si corregge nel seed prima di prendere il budget, non si assorbe.
 
 ## 10. Documentazione da aggiornare
