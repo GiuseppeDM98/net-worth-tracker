@@ -150,7 +150,7 @@ export interface AssistantMemoryDocument {
 }
 
 /**
- * One page of `GET /api/ai/assistant/threads` (PERF-10): `nextCursor` is the `after` of the
+ * One page of `GET /api/ai/assistant/threads`: `nextCursor` is the `after` of the
  * next page, `null` on the last one.
  */
 export interface AssistantThreadsResponse {

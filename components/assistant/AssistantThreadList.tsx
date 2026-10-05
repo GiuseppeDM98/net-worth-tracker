@@ -58,7 +58,7 @@ function formatThreadDate(date: Date): string {
 interface AssistantThreadListProps {
   threads: AssistantThread[];
   loadingThreads: boolean;
-  /** Another page of threads exists on the server (PERF-10: the list reads 50 at a time). */
+  /** Another page of threads exists on the server (the list reads 50 at a time). */
   hasMoreThreads: boolean;
   loadingMoreThreads: boolean;
   onLoadMore: () => void;
@@ -185,7 +185,7 @@ function ThreadRow({ thread, isActive, isDeleting, isStreaming, onSelect, onDele
  * side sheet; inside a modal that timer is a WCAG 2.2.1 time limit AND a trap — Escape would
  * close the modal with the row still armed, which `ResponsiveModal` now refuses.
  *
- * The list is read 50 threads at a time (PERF-10): while a page is unread, «Mostra altre» closes
+ * The list is read 50 threads at a time: while a page is unread, «Mostra altre» closes
  * the list and the modal's reading says the count is of the most recent ones — the 51st thread is
  * one press away, never hidden in silence.
  */

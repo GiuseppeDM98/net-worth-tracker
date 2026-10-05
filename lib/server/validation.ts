@@ -164,6 +164,13 @@ export const assistantThreadCursorSchema = z
   .regex(/^[^/]+$/, 'Invalid thread cursor');
 
 /**
+ * GET /api/ai/assistant/context?includeDummy= — the test-snapshot preference the page already
+ * holds, as a query string: the two literals and nothing else, so a typo is a 400 and never a
+ * silent `false`.
+ */
+export const assistantIncludeDummySchema = z.enum(['true', 'false']);
+
+/**
  * POST /api/performance/yields — the dividend windows of the periods Rendimenti shows (five
  * pre-computed, or one custom range, or the PDF's one).
  */

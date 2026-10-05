@@ -656,7 +656,7 @@ describe('sliceForList — announced payments are bounded too', () => {
   });
 });
 
-// --- The stats route's sums (PERF-10) ----------------------------------------
+// --- The stats route's sums ----------------------------------------
 //
 // The route reads the collection once and derives three figures from it. The fixture holds the
 // mirror's mix (2026-10-05): received and announced, a coupon, a payment in USD with EUR fields,

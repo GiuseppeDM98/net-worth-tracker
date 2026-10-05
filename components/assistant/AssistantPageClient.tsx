@@ -127,7 +127,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   // Reuses the React Query cache from Panoramica if the user visited it this session.
   const { data: overviewData, isError: overviewError } = useDashboardOverview(ownerId);
 
-  // One page of 50 at a time (PERF-10). The period auto-select below scans only the pages read:
+  // One page of 50 at a time. The period auto-select below scans only the pages read:
   // a period thread older than them is not found and the next question opens a new one
   // (doc/guide/assistente.md § Per-page blind spots — the owner's call, 2026-10-05).
   const {
@@ -206,7 +206,9 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
     today.year,
     // history start year: the hook fetches it server-side; pass 0 as placeholder key
     0,
-    shouldFetchContext
+    shouldFetchContext,
+    // Already read with the memory above: sent along so the route does not read it again.
+    memory?.preferences.includeDummySnapshots
   );
 
   // Populate the context from the fetched bundle when no SSE bundle is present.

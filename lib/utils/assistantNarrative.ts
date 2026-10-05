@@ -493,7 +493,7 @@ export function describeConversation(input: {
 /**
  * The reading of the Conversazioni modal: how many threads are saved and what pressing one does.
  * While the list is still loading the count is unknown, so the sentence claims none. With a page
- * still unread (`hasMore`, PERF-10) the count is of the most RECENT ones, and the sentence says
+ * still unread (`hasMore`) the count is of the most RECENT ones, and the sentence says
  * where the others are — a count that stopped at 50 in silence would hide the 51st.
  */
 export function describeThreadsReading(input: { count: number; loading: boolean; hasMore?: boolean }): Narrative {
@@ -519,7 +519,7 @@ export const THREAD_DELETE_CONSEQUENCE = 'Eliminando, la conversazione e i suoi 
 
 /**
  * «6 conversazioni · 3 obiettivi e 3 fatti in memoria» — the compact header's description. With a
- * page of threads still unread (`moreThreads`, PERF-10) the count is a floor: «Più di 50 conversazioni».
+ * page of threads still unread (`moreThreads`) the count is a floor: «Più di 50 conversazioni».
  */
 export function describeAssistantHeader(counts: { threads: number; moreThreads?: boolean; goals: number; facts: number }): string {
   const { threads, moreThreads, goals, facts } = counts;

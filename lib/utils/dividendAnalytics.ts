@@ -869,7 +869,7 @@ export function sliceForList(
 // ==================== The stats route's sums (`/api/dividends/stats`) ====================
 //
 // The route reads the dividend collection ONCE and derives its period, all-time and upcoming
-// figures here (PERF-10, 2026-10-05). Until then each of the three was its own Firestore query —
+// figures here (since 2026-10-05). Until then each of the three was its own Firestore query —
 // a date range, the whole collection, a `paymentDate >= now` — and each built «today» from the
 // server's own clock. These keep the exact semantics of those queries, so the route's answer did
 // not move by a cent: the fixture answer captured before the change is pinned by
@@ -907,9 +907,9 @@ function emptyTotals() {
  *
  * The amounts are the NATIVE `grossAmount`/`taxAmount`/`netAmount`, not the `*Eur` fields the tab's
  * own figures read through `netEur`: that is the route's contract from before the redesign, and
- * PERF-10 moved where the sum happens, not what it sums. Iterating in the input's order keeps the
- * floating-point sums identical to the old per-query ones (the route hands the list newest first,
- * as both old queries did).
+ * reading the collection once moved where the sum happens, not what it sums. Iterating in the
+ * input's order keeps the floating-point sums identical to the old per-query ones (the route hands
+ * the list newest first, as both old queries did).
  *
  * WARNING: a new `DividendType` needs its `byType` entry below (types/dividend.ts checklist).
  */

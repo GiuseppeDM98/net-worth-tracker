@@ -7,7 +7,7 @@
  * BORN RED ON PURPOSE: the first version of this file (2026-09-28) targeted the route of that day
  * (`/api/portfolio/exposure`) and went RED on 2026-09-28 — «expected 4 to be 2»: the second GET
  * asked Yahoo again, because the route's three-segment cache key never matched the service's
- * four-segment one (PERF-10 § A). Rewritten here on the new route, where the same assertion holds.
+ * four-segment one. Rewritten here on the new route, where the same assertion holds.
  *
  * The security pair: the SAME request against the caller's own account, against someone else's
  * (403) and, with a grant, as a delegate — who must receive the OWNER's tickers, not their own.
@@ -123,7 +123,7 @@ describe('GET /api/portfolio/instrument-profiles', () => {
     expect((await second.json()).oldestFetchedAt).toBe(body.oldestFetchedAt);
   });
 
-  // PERF-10 (2026-10-05): the header is the production reading of the case above. Seen RED by
+  // Since 2026-10-05 the header is the production reading of the case above. Seen RED by
   // setting USEFUL_PROFILE_TTL_MS to zero: the second call read «source=yahoo», «fetched=2».
   it('says in Server-Timing where the profiles came from: Yahoo first, the cache second', async () => {
     const descriptions = (header: string | null) =>

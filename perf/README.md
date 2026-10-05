@@ -203,6 +203,12 @@ porta `Server-Timing` (`auth, db, yahoo, total, hits, fetched, source`): nel ben
 `fetched=0`, `total` 14–24 ms, zero chiamate a Yahoo a regime. Bundle: Assistente 660,6 gz KB (tetto 670), le altre
 invariate; nessun tetto toccato. **`npm run perf:budget` senza `--dist=.next-perf` legge `.next`**: sul Mac era una
 build del 15/08, ROSSA su cinque route e su recharts — la riga `[perf:budget] build …` in testa lo dice.
+**Lo stesso giorno, ritirando la spec**: la tab Dividendi apre con UNA richiesta invece di due (la lista viaggia nella
+risposta di `/api/dividends/stats`; `/api/dividends` non è più chiamata all'apertura) e la collezione dei dividendi è
+letta una volta per apertura invece di due — contato in richieste da `e2e/cashflow.dividendi.spec.ts` (visto rosso a
+due) e in letture da `__tests__/dividendStatsRoute.test.ts`; nessun tempo misurato. La route del contesto
+dell'assistente non rilegge memoria e impostazioni quando la pagina le manda la preferenza (due documenti in meno, in
+serie prima del builder; tenuto da `__tests__/assistantRoutes.test.ts`).
 
 **Bundle** (gz KB, chunk iniziali; il tetto in `budget.json` è +2%) — **dal 2026-09-30, PR #418**: condivisi 473,5
 (22 chunk) · landing 452,0 · login 418,2 · Panoramica 538,0 · Patrimonio 731,1 · Cashflow 735,4 · **Analisi 564,6** ·

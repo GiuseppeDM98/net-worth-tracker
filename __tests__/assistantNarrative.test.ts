@@ -556,7 +556,7 @@ describe('describeAssistantHeader', () => {
     expect(describeAssistantHeader({ threads: 0, goals: 0, facts: 2 })).toBe('Nessuna conversazione · 2 fatti in memoria');
   });
 
-  it('says «più di» while a page of threads is still unread (PERF-10, the owner’s wording)', () => {
+  it('says «più di» while a page of threads is still unread (the owner’s wording)', () => {
     expect(describeAssistantHeader({ threads: 50, moreThreads: true, goals: 0, facts: 0 })).toBe('Più di 50 conversazioni · memoria vuota');
     expect(describeAssistantHeader({ threads: 50, moreThreads: false, goals: 0, facts: 0 })).toBe('50 conversazioni · memoria vuota');
   });

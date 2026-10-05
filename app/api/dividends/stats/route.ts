@@ -68,14 +68,22 @@ function computeDividendReturnPercentage(
 /**
  * GET /api/dividends/stats
  * Query params: userId (required), startDate (optional), endDate (optional), assetId (optional)
- * Returns dividend statistics for a user, optionally filtered by date range
+ * Returns `stats`, the dividend statistics of a user (the period's, optionally narrowed by a date
+ * range), and `dividends`, the owner's whole registry whatever the bounds.
  *
- * Reads every collection once, in one parallel round (PERF-10, 2026-10-05; it was seven serial
- * reads with the dividends read four times), and answers with `Server-Timing: auth, db, compute,
- * total` — the production latency of the Dividendi tab's one server call (doc/guide/cashflow-dividendi.md).
+ * Reads every collection once, in one parallel round (it was seven serial reads with the dividends
+ * read four times, until 2026-10-05), and hands the registry out in the same answer: it is the
+ * ONE request the Dividendi tab makes to open, where the list used to be a second request and a
+ * second read of the collection (`GET /api/dividends`). Answers with `Server-Timing: auth, db,
+ * compute, total` (doc/guide/cashflow-dividendi.md).
  */
 export async function GET(request: NextRequest) {
   const timing = startTiming();
+  // The registry, held outside the `try` once it is read: when a LATER stage fails (the assets, the
+  // snapshots, the ledger, the computation) the answer still hands the list out, with `stats: null`.
+  // While list and measures were two requests a failed measure never took the list with it, and
+  // the tab still says «le metriche non sono state lette» under payments it can draw.
+  let registry: Dividend[] | undefined;
   try {
     const decodedToken = await requireFirebaseAuth(request);
     const searchParams = request.nextUrl.searchParams;
@@ -110,17 +118,24 @@ export async function GET(request: NextRequest) {
     if (startDate && !endDate) endDate = new Date('9999-12-31');
     if (endDate && !startDate) startDate = new Date(0);
 
-    // ONE round of reads, in parallel (PERF-10): the dividends once — the period, all-time,
+    // ONE round of reads, in parallel: the dividends once — the period, all-time,
     // upcoming and chart figures are all derived from that one list below — plus the assets
     // (sold ones are filtered out of upcoming and growth), the snapshots and the trade ledger.
     // The assets are read raw rather than through getUserAssetsAdmin: the mapping below keeps
     // `holdingStartDate` as a Timestamp to convert, and `averageCostEur` as stored.
-    const [allDividends, assetsSnapshot, snapshots, allTrades] = await Promise.all([
-      getAllDividends(authenticatedUserId),
+    const dividendsRead = getAllDividends(authenticatedUserId);
+    const measureInputsRead = Promise.all([
       adminDb.collection('assets').where('userId', '==', authenticatedUserId).get(),
       getUserSnapshotsAdmin(authenticatedUserId),
       getAssetTransactionsAdmin(authenticatedUserId),
     ]);
+    // All four are already in flight; the dividends are AWAITED first so the registry is in hand
+    // if one of the others fails. The no-op handler keeps that failure from being reported as
+    // unhandled while the dividends are still being read — it is thrown again by the await below.
+    measureInputsRead.catch(() => undefined);
+    const allDividends = await dividendsRead;
+    registry = allDividends;
+    const [assetsSnapshot, snapshots, allTrades] = await measureInputsRead;
     timing.mark('db');
 
     // «Now» once, for every figure of the answer (AGENTS.md § Dynamic Imports: a function that
@@ -534,6 +549,7 @@ export async function GET(request: NextRequest) {
       {
         success: true,
         stats,
+        dividends: allDividends,
         period: startDate && endDate ? {
           startDate: startDate.toISOString(),
           endDate: endDate.toISOString(),
@@ -548,6 +564,9 @@ export async function GET(request: NextRequest) {
     }
 
     console.error('Error calculating dividend stats:', error);
+    if (registry) {
+      return NextResponse.json({ success: true, stats: null, dividends: registry });
+    }
     return NextResponse.json(
       { error: 'Failed to calculate dividend statistics', details: (error as Error).message },
       { status: 500 }

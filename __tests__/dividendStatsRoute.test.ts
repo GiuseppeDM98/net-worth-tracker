@@ -4,9 +4,17 @@
  * The fixture is the mirror's shape (2026-10-05: 7 dividends, received and announced, a coupon, a
  * dividend in USD with its EUR fields, an instrument already sold, a ledger and a static position),
  * served by an in-memory Admin Firestore that honours `where` and `orderBy` — so the route runs its
- * REAL readers, whatever they are. CAPTURED_ANSWER below is the JSON the route answered BEFORE
- * PERF-10 (seven serial reads, D three times), captured on 2026-10-05 from this very file: the route
- * that reads once must answer the same bytes.
+ * REAL readers, whatever they are. CAPTURED_ANSWER below is the JSON the route answered while it
+ * still made seven serial reads, the dividends four times — captured on 2026-10-05 from this very
+ * file: the route that reads once must answer the same `success`, `stats` and `period`.
+ *
+ * Since the same day the answer also carries `dividends`, the owner's whole registry: the list the
+ * Dividendi tab used to ask `/api/dividends` for in a second request (the collection read once per
+ * route, twice per opening). It is pinned against that route's own answer on the same fixture.
+ *
+ * Seen RED on purpose (2026-10-05): one read per collection, on the old route («dividends: 4»);
+ * the `Server-Timing` stages, with `mark('db')` removed («auth, compute, total»); the registry,
+ * with the field dropped from the answer.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
@@ -17,7 +25,9 @@ vi.mock('@/lib/firebase/config', () => ({ auth: { currentUser: null }, db: {} })
 
 type Row = { id: string; data: Record<string, unknown> };
 
-const { verifyIdTokenMock, accountAccessGetMock, collections, readsByCollection } = vi.hoisted(() => ({
+const { verifyIdTokenMock, accountAccessGetMock, collections, readsByCollection, failingCollections } = vi.hoisted(() => ({
+  // Collections whose read rejects, to fail one stage of the route at a time.
+  failingCollections: new Set<string>(),
   verifyIdTokenMock: vi.fn(),
   accountAccessGetMock: vi.fn(),
   collections: new Map<string, Array<{ id: string; data: Record<string, unknown> }>>(),
@@ -51,6 +61,7 @@ vi.mock('@/lib/firebase/admin', () => {
       },
       async get() {
         readsByCollection.set(name, (readsByCollection.get(name) ?? 0) + 1);
+        if (failingCollections.has(name)) throw new Error(`${name} unavailable`);
         let rows = (collections.get(name) ?? []).filter((row) => filters.every((test) => test(row)));
         if (order) {
           // Firestore drops a document without the ordered field, and breaks ties by document id
@@ -81,6 +92,7 @@ vi.mock('@/lib/firebase/admin', () => {
 });
 
 import { GET as dividendStatsRoute } from '@/app/api/dividends/stats/route';
+import { GET as dividendsRoute } from '@/app/api/dividends/route';
 import CAPTURED_ANSWER from './dividendStatsRoute.answer.json';
 
 const OWNER = 'owner-1';
@@ -139,8 +151,8 @@ const QUERIES = {
   eniOnly: `userId=${OWNER}&assetId=a-eni`,
 };
 
-function request(query: string, authenticated = true): NextRequest {
-  return new NextRequest(`http://localhost/api/dividends/stats?${query}`, {
+function request(query: string, authenticated = true, path = '/api/dividends/stats'): NextRequest {
+  return new NextRequest(`http://localhost${path}?${query}`, {
     headers: authenticated ? { authorization: 'Bearer token' } : {},
   });
 }
@@ -152,6 +164,7 @@ describe('GET /api/dividends/stats', () => {
     vi.setSystemTime(NOW);
     collections.clear();
     readsByCollection.clear();
+    failingCollections.clear();
     seedFixture();
     verifyIdTokenMock.mockResolvedValue({ uid: OWNER });
     accountAccessGetMock.mockResolvedValue({ exists: false, data: () => undefined });
@@ -161,14 +174,28 @@ describe('GET /api/dividends/stats', () => {
     vi.useRealTimers();
   });
 
-  it.each(Object.entries(QUERIES))('answers what the route answered before PERF-10 (%s)', async (name, query) => {
+  it.each(Object.entries(QUERIES))('answers the figures the seven-read route answered (%s)', async (name, query) => {
     const response = await dividendStatsRoute(request(query));
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual(CAPTURED_ANSWER[name as keyof typeof QUERIES]);
+    const answer = await response.json();
+    // The registry is pinned by the next case; everything else is the captured answer, whole.
+    delete answer.dividends;
+    expect(answer).toEqual(CAPTURED_ANSWER[name as keyof typeof QUERIES]);
   });
 
-  // Seen RED on the route before PERF-10 (2026-10-05): «dividends: 4» — the period's range, the
-  // whole collection for all-time, the upcoming query and the whole collection again for the charts.
+  // The tab's list rides the same answer, so opening the tab costs one request and one read of the
+  // collection. It is the WHOLE registry whatever was asked: the bounds and the instrument only
+  // ever narrowed `periodStats`.
+  it.each(Object.values(QUERIES))('carries the whole registry, as /api/dividends answers it (%s)', async (query) => {
+    const registry = await (await dividendsRoute(request(`userId=${OWNER}`, true, '/api/dividends'))).json();
+    expect(registry.dividends.map((row: { id: string }) => row.id).sort()).toEqual(['d1', 'd2', 'd3', 'd4', 'd5', 'd6', 'd7']);
+
+    const response = await dividendStatsRoute(request(query));
+    expect((await response.json()).dividends).toEqual(registry.dividends);
+  });
+
+  // Seen RED on the seven-read route (2026-10-05): «dividends: 4» — the period's range, the whole
+  // collection for all-time, the upcoming query and the whole collection again for the charts.
   it('reads each collection ONCE per request, the period bounds included', async () => {
     await dividendStatsRoute(request(QUERIES.year2025));
     expect(Object.fromEntries(readsByCollection)).toEqual({
@@ -193,6 +220,30 @@ describe('GET /api/dividends/stats', () => {
     const refused = await dividendStatsRoute(request(`userId=${OWNER}`));
     expect(refused.status).toBe(403);
     expect(readsByCollection.size).toBe(0);
+  });
+
+  // List and measures were two requests until 2026-10-05, so a failed measure never took the list
+  // with it: the tab drew its payments and said the measures were not read. One answer keeps
+  // that. Seen RED with the registry branch of the route's `catch` removed (500, no list).
+  it('still hands the registry out, with `stats: null`, when a measure input cannot be read', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    failingCollections.add('assetTransactions');
+
+    const response = await dividendStatsRoute(request(QUERIES.all));
+    expect(response.status).toBe(200);
+    const answer = await response.json();
+    expect(answer.stats).toBeNull();
+    expect(answer.dividends.map((row: { id: string }) => row.id).sort()).toEqual(['d1', 'd2', 'd3', 'd4', 'd5', 'd6', 'd7']);
+    expect(logged).toHaveBeenCalled();
+    logged.mockRestore();
+  });
+
+  it('answers 500 when the registry itself cannot be read', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    failingCollections.add('dividends');
+
+    expect((await dividendStatsRoute(request(QUERIES.all))).status).toBe(500);
+    logged.mockRestore();
   });
 
   it('answers 401 without a token and 400 on a date it cannot read', async () => {

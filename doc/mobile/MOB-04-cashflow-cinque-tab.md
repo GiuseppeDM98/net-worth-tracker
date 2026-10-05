@@ -20,7 +20,8 @@ Dividendi 3,77 / 6 / 8. Il codice di oggi (righe da riverificare):
   parte vissuta e col calendario chiude con `calendarSentence` (`:345-372`). `:800-806`: il secondo handle sul `period`.
 - `ExpenseSplitTab.tsx:89`: Divisione ha un `period` SUO; `expenseSplitNarrative.ts:286` mette «Nel totale ci sono ancora
   X € … in calendario» (qualifica «In comune») dopo i residui. `BudgetTab.tsx:309`: il `role="status"` del salvataggio
-  sta nell'aside di Per categoria. `DividendTrackingTab.tsx:211`: `/api/dividends/stats` è l'unica lettura PER TESSERA.
+  sta nell'aside di Per categoria. `DividendTrackingTab.tsx:211`: `/api/dividends/stats` è l'unica lettura PER TESSERA — e, dal 2026-10-05, l'unica
+  richiesta della tab: la stessa risposta porta la lista (`useDividendRegistry`, nella pagina).
 
 ## 2. Obiettivo misurabile
 
@@ -153,9 +154,10 @@ Dividendi 3,77 / 6 / 8. Il codice di oggi (righe da riverificare):
   con una `useExpensesInRange` propria (`ExpenseSplitTab.tsx:85-91`, `trackingWindow(period)`): la stessa chiave di
   Tracciamento solo quando i due mostrano lo stesso periodo, mai un mese letto vuoto. Il periodo di Tracciamento vive in
   `app/dashboard/cashflow/page.tsx` (`period`/`onPeriodChange` sono prop della tab): la striscia lo riceve da lì.
-- **Dal 2026-09-29** gli asset della tab vengono da `useAssets` (`page.tsx:104, 134`) e `loadOtherData` legge solo la
-  route dei dividendi: `otherDataFailed || assetsError` è l'errore di TAB; il
-  `failed` di `dvd-rendimento` è `statsError` di `useDividendStats`, già React Query. **PERF-04**: qui niente recharts
+- **Dal 2026-09-29** gli asset della tab vengono da `useAssets` (`page.tsx:104, 134`) e, dal 2026-10-05, la lista viene da
+  `useDividendRegistry` (`lib/hooks/useDividendStats.ts`, la stessa richiesta delle misure): `dividendsError ||
+  assetsError` è l'errore di TAB; il `failed` di `dvd-rendimento` è `statsError` di `useDividendStats`, vero anche
+  quando la risposta arriva con la lista e `stats: null`. **PERF-04**: qui niente recharts
   (SVG a mano, `FlowBarsChart.tsx:27`): una riga chiusa risparmia DOM e render, non un chunk. **PERF-03** (in develop dal
   2026-09-30): «Aggiornato alle…» sta nel `PageHeader` della pagina (le quattro chiavi di `app/dashboard/cashflow/page.tsx`),
   non nel tab. **PERF-12**: niente `setState` in effetto. **PERF-14**: nessun `layout`; `tabPanelSwitch` resta.
@@ -211,8 +213,9 @@ test, falsificati. 3. `page.tsx`, `PageVerdict`. 4. Tracciamento con il FAB, Bud
   (`cashflow.budget.mobile.spec.ts:22`), il test lo scrive e lo toglie; «Fine mese» apre Categorie a rischio (anche
   `null`); (4) una riga di Budget aperta → Tracciamento → Budget → reload: aperta,
   `localStorage['mobile-sections:cashflow:budget']`; (5) tre tab VISITATE, nessun id duplicato; (6) l'account base non ha
-  dividendi (niente Rendimento): cedola esca via REST, poi `page.route('**/api/dividends/stats**', r => r.abort())`
-  (`e2e/settings.spec.ts:143`; `retry: 1`): Rendimento aperta, chiusa → eyebrow `text-destructive`; (7) `reducedMotion:
+  dividendi (niente Rendimento): cedola esca via REST, poi la risposta di `/api/dividends/stats` riscritta con `stats: null`
+  (`page.route` + `route.fetch()` + `route.fulfill({ response, json })`, come `e2e/panoramica.snapshot.spec.ts` —
+  NON `r.abort()`: dal 2026-10-05 quella richiesta porta anche la lista, e abortirla è l'errore di TAB): Rendimento aperta, chiusa → eyebrow `text-destructive`; (7) `reducedMotion:
   'reduce'` → `transition-duration` 0s; (8) `main` senza sforamento. Falsificare (1), (2), (5), (6) rompendo il codice.
 - `cashflow.split.mobile.spec.ts` (`split-mobile`, `:128-137`), su «Anno corrente» (il fixture vale sull'anno,
   `scripts/seedSplitE2E.mts:12-17`): celle per persona, una a 100 € `positive` (non −100), paragrafo intero con la

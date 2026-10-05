@@ -10,6 +10,18 @@ import { queryKeys } from '@/lib/query/queryKeys';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 
 /**
+ * The test-snapshot preference as a query-string suffix. The page reads the memory at mount and
+ * passes the preference on, so the route does not read the memory document again; while the
+ * memory has not answered yet (`undefined`) nothing is sent and the route reads it itself.
+ *
+ * It is deliberately NOT part of the query keys: the value is the stored one either way, and a key
+ * that changed when the memory lands would fetch every context twice.
+ */
+function includeDummyParam(includeDummySnapshots: boolean | undefined): string {
+  return includeDummySnapshots === undefined ? '' : `&includeDummy=${includeDummySnapshots}`;
+}
+
+/**
  * Fetches the numeric context bundle for a given month synchronously (no streaming).
  * Used to repopulate the context panel when an existing month_analysis thread is opened
  * and no active SSE bundle is present in component state.
@@ -20,10 +32,11 @@ import { authenticatedFetch } from '@/lib/utils/authFetch';
 async function fetchMonthContext(
   userId: string,
   year: number,
-  month: number
+  month: number,
+  includeDummySnapshots: boolean | undefined
 ): Promise<AssistantMonthContextBundle> {
   const response = await authenticatedFetch(
-    `/api/ai/assistant/context?userId=${encodeURIComponent(userId)}&year=${year}&month=${month}`
+    `/api/ai/assistant/context?userId=${encodeURIComponent(userId)}&year=${year}&month=${month}${includeDummyParam(includeDummySnapshots)}`
   );
 
   if (!response.ok) {
@@ -35,9 +48,13 @@ async function fetchMonthContext(
   return contextResponse.bundle as AssistantMonthContextBundle;
 }
 
-async function fetchYearContext(userId: string, year: number): Promise<AssistantMonthContextBundle> {
+async function fetchYearContext(
+  userId: string,
+  year: number,
+  includeDummySnapshots: boolean | undefined
+): Promise<AssistantMonthContextBundle> {
   const response = await authenticatedFetch(
-    `/api/ai/assistant/context?userId=${encodeURIComponent(userId)}&mode=year_analysis&year=${year}`
+    `/api/ai/assistant/context?userId=${encodeURIComponent(userId)}&mode=year_analysis&year=${year}${includeDummyParam(includeDummySnapshots)}`
   );
 
   if (!response.ok) {
@@ -49,9 +66,9 @@ async function fetchYearContext(userId: string, year: number): Promise<Assistant
   return contextResponse.bundle as AssistantMonthContextBundle;
 }
 
-async function fetchYtdContext(userId: string): Promise<AssistantMonthContextBundle> {
+async function fetchYtdContext(userId: string, includeDummySnapshots: boolean | undefined): Promise<AssistantMonthContextBundle> {
   const response = await authenticatedFetch(
-    `/api/ai/assistant/context?userId=${encodeURIComponent(userId)}&mode=ytd_analysis`
+    `/api/ai/assistant/context?userId=${encodeURIComponent(userId)}&mode=ytd_analysis${includeDummyParam(includeDummySnapshots)}`
   );
 
   if (!response.ok) {
@@ -63,9 +80,9 @@ async function fetchYtdContext(userId: string): Promise<AssistantMonthContextBun
   return contextResponse.bundle as AssistantMonthContextBundle;
 }
 
-async function fetchHistoryContext(userId: string): Promise<AssistantMonthContextBundle> {
+async function fetchHistoryContext(userId: string, includeDummySnapshots: boolean | undefined): Promise<AssistantMonthContextBundle> {
   const response = await authenticatedFetch(
-    `/api/ai/assistant/context?userId=${encodeURIComponent(userId)}&mode=history_analysis`
+    `/api/ai/assistant/context?userId=${encodeURIComponent(userId)}&mode=history_analysis${includeDummyParam(includeDummySnapshots)}`
   );
 
   if (!response.ok) {
@@ -81,7 +98,8 @@ async function fetchHistoryContext(userId: string): Promise<AssistantMonthContex
 
 function useAssistantMonthContext(
   userId: string | undefined,
-  month: AssistantMonthSelectorValue | null
+  month: AssistantMonthSelectorValue | null,
+  includeDummySnapshots: boolean | undefined
 ): UseQueryResult<AssistantMonthContextBundle> {
   const enabled = !!userId && month !== null;
 
@@ -89,7 +107,7 @@ function useAssistantMonthContext(
     queryKey: enabled
       ? queryKeys.assistant.context(userId!, month!.year, month!.month)
       : ['assistant', 'context', 'disabled'],
-    queryFn: () => fetchMonthContext(userId!, month!.year, month!.month),
+    queryFn: () => fetchMonthContext(userId!, month!.year, month!.month, includeDummySnapshots),
     enabled,
     staleTime: 5 * 60 * 1000,
   });
@@ -99,7 +117,8 @@ function useAssistantMonthContext(
 
 function useAssistantYearContext(
   userId: string | undefined,
-  year: number | null
+  year: number | null,
+  includeDummySnapshots: boolean | undefined
 ): UseQueryResult<AssistantMonthContextBundle> {
   const enabled = !!userId && year !== null;
 
@@ -107,7 +126,7 @@ function useAssistantYearContext(
     queryKey: enabled
       ? queryKeys.assistant.contextYear(userId!, year!)
       : ['assistant', 'context', 'disabled'],
-    queryFn: () => fetchYearContext(userId!, year!),
+    queryFn: () => fetchYearContext(userId!, year!, includeDummySnapshots),
     enabled,
     staleTime: 5 * 60 * 1000,
   });
@@ -117,7 +136,8 @@ function useAssistantYearContext(
 
 function useAssistantYtdContext(
   userId: string | undefined,
-  currentYear: number | null
+  currentYear: number | null,
+  includeDummySnapshots: boolean | undefined
 ): UseQueryResult<AssistantMonthContextBundle> {
   const enabled = !!userId && currentYear !== null;
 
@@ -125,7 +145,7 @@ function useAssistantYtdContext(
     queryKey: enabled
       ? queryKeys.assistant.contextYtd(userId!, currentYear!)
       : ['assistant', 'context', 'disabled'],
-    queryFn: () => fetchYtdContext(userId!),
+    queryFn: () => fetchYtdContext(userId!, includeDummySnapshots),
     enabled,
     // YTD data changes frequently — shorter stale time
     staleTime: 2 * 60 * 1000,
@@ -136,7 +156,8 @@ function useAssistantYtdContext(
 
 function useAssistantHistoryContext(
   userId: string | undefined,
-  startYear: number | null
+  startYear: number | null,
+  includeDummySnapshots: boolean | undefined
 ): UseQueryResult<AssistantMonthContextBundle> {
   const enabled = !!userId && startYear !== null;
 
@@ -144,7 +165,7 @@ function useAssistantHistoryContext(
     queryKey: enabled
       ? queryKeys.assistant.contextHistory(userId!, startYear!)
       : ['assistant', 'context', 'disabled'],
-    queryFn: () => fetchHistoryContext(userId!),
+    queryFn: () => fetchHistoryContext(userId!, includeDummySnapshots),
     enabled,
     staleTime: 5 * 60 * 1000,
   });
@@ -155,6 +176,8 @@ function useAssistantHistoryContext(
 /**
  * Dispatches to the correct context hook based on mode and thread pins.
  * Used in AssistantPageClient to repopulate the context panel on thread open.
+ * `includeDummySnapshots` is the preference the page already holds, `undefined` until its memory
+ * has answered (see `includeDummyParam`).
  */
 export function useAssistantPeriodContext(
   userId: string | undefined,
@@ -163,7 +186,8 @@ export function useAssistantPeriodContext(
   pinnedYear: number | null,
   currentYear: number,
   historyStartYear: number | null,
-  enabled: boolean
+  enabled: boolean,
+  includeDummySnapshots: boolean | undefined
 ): UseQueryResult<AssistantMonthContextBundle> {
   const monthEnabled = enabled && mode === 'month_analysis' && pinnedMonth !== null;
   const yearEnabled = enabled && mode === 'year_analysis' && pinnedYear !== null;
@@ -172,19 +196,23 @@ export function useAssistantPeriodContext(
 
   const monthResult = useAssistantMonthContext(
     monthEnabled ? userId : undefined,
-    monthEnabled ? pinnedMonth : null
+    monthEnabled ? pinnedMonth : null,
+    includeDummySnapshots
   );
   const yearResult = useAssistantYearContext(
     yearEnabled ? userId : undefined,
-    yearEnabled ? pinnedYear : null
+    yearEnabled ? pinnedYear : null,
+    includeDummySnapshots
   );
   const ytdResult = useAssistantYtdContext(
     ytdEnabled ? userId : undefined,
-    ytdEnabled ? currentYear : null
+    ytdEnabled ? currentYear : null,
+    includeDummySnapshots
   );
   const historyResult = useAssistantHistoryContext(
     historyEnabled ? userId : undefined,
-    historyEnabled ? historyStartYear : null
+    historyEnabled ? historyStartYear : null,
+    includeDummySnapshots
   );
 
   // Return the result for the active mode

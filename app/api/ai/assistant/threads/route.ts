@@ -16,7 +16,7 @@ import { assistantThreadCursorSchema, parseOr400 } from '@/lib/server/validation
  * GET /api/ai/assistant/threads?userId=<ownerId>[&after=<threadId>]
  *
  * One page of the owner's threads, most recent first: `{ threads, nextCursor }`, `nextCursor` being
- * the `after` of the next page and `null` on the last (PERF-10: the list was read whole). The
+ * the `after` of the next page and `null` on the last (until 2026-10-05 the list was read whole). The
  * Conversazioni list pages through it with «Mostra altre» (`useAssistantThreads`). Answers with
  * `Server-Timing: auth, db, total`.
  */

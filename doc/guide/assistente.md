@@ -50,7 +50,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   data it was never given.
 
 ### Streaming, threads, memory
-- **The thread list is read 50 at a time** (PERF-10, 2026-10-05; it was read whole and grew forever):
+- **The thread list is read 50 at a time** (2026-10-05; it was read whole and grew forever):
   `listAssistantThreads(userId, { limit = ASSISTANT_THREADS_PAGE_SIZE, after })` asks for ONE more than the page,
   so `nextCursor` (the page's last id) is `null` on a list of exactly 50, and the next page starts with
   `startAfter(<cursor snapshot>)` — `startAt` repeats the cursor's thread (seen red: 11 rows, «t049» twice,
@@ -65,6 +65,16 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   conversazioni più recenti: premine una per riprenderla; «Mostra altre» legge le precedenti.»
   (`describeThreadsReading` `hasMore`). Seen in the browser on 60 planted threads (2026-10-05, a throwaway spec):
   50 rows, the three sentences, «Mostra altre» → 60 rows, none twice, the button gone.
+- **The context route takes the test-snapshot preference from the request** (2026-10-05):
+  `GET /api/ai/assistant/context?…&includeDummy=true|false` (`assistantIncludeDummySchema`: anything else is 400).
+  The page reads the memory at mount and hands `memory.preferences.includeDummySnapshots` to
+  `useAssistantPeriodContext`, so the route no longer reads the memory a second time per opening —
+  `getAssistantMemoryDocument` is TWO documents, the memory and the settings behind it, and it ran in series before
+  the builder. While the memory has not answered the parameter is absent and the route reads the stored preference
+  itself, as it always did. The value is NOT in the query keys: a key that changed when the memory lands would fetch
+  every context twice. The builders are untouched (they take the same boolean), and the stream route already took
+  its preferences from the request body. Pinned by `__tests__/assistantRoutes.test.ts` (seen red: the memory read
+  under a request that carried the value).
 - `deleteAssistantThread` must delete the `messages` subcollection in ≤400-doc batches first (no cascade in the Admin
   SDK). Never clear `streamingMessages` in a `useEffect([selectedThreadId])` — the SSE `meta` event sets the id
   mid-stream and wipes the buffer; post-stream invalidation uses a local `resolvedThreadId` updated from `meta`.
@@ -182,4 +192,12 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   re-opens the existing thread for it by scanning the LOADED threads (`findThreadForPeriod`), so with more than 50
   conversations one older than the 50 most recent is not resumed and the next question opens a new one — until
   «Mostra altre» has read its page. No query of its own, by decision.
+- **The context preview reads the page's copy of the test-snapshot preference** (2026-10-05), not the stored one:
+  the two differ only when the preference was changed from another device inside the memory query's five minutes. It
+  is the toggle of test accounts, shown only where dummy snapshots exist.
+- **The stream route reads the memory twice per message, on purpose** (read against the code on 2026-10-05):
+  once before the answer, for the active items the prompt carries, and once in `extractAndSaveMemory`, after the
+  stream has closed — possibly a minute later. The second read is what honours a `memoryEnabled` switched off while
+  the answer was streaming, and what dedupes against an item added from the panel meanwhile; it runs in the
+  background, off the reader's wait. Do not hand the first read down to it.
 - **A confirmed goal proposal can be confirmed again after a reload** (accepted for v1): reopening the thread re-parses the fenced block and a second press creates a SECOND goal. (moved from `CLAUDE.md` → Known Issues on 2026-09-19)

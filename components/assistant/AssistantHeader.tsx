@@ -10,7 +10,7 @@ interface AssistantHeaderProps {
   isDemo: boolean;
   isStreaming: boolean;
   threadsCount: number;
-  /** A page of threads is still unread (PERF-10): the count is a floor, «più di N». */
+  /** A page of threads is still unread: the count is a floor, «più di N». */
   hasMoreThreads?: boolean;
   activeMemoryCount: number;
   /** «6 conversazioni · 3 obiettivi e 3 fatti in memoria» — from `describeAssistantHeader`. */

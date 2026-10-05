@@ -182,7 +182,7 @@ export function isAssistantStoreError(error: unknown): error is AssistantStoreEr
   return error instanceof AssistantStoreError;
 }
 
-/** One page of the Conversazioni list (PERF-10): the list used to be read whole and grew forever. */
+/** One page of the Conversazioni list: until 2026-10-05 it was read whole and grew forever. */
 export const ASSISTANT_THREADS_PAGE_SIZE = 50;
 
 /**

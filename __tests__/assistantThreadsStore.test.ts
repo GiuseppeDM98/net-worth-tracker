@@ -1,6 +1,6 @@
 /**
  * Tests for `listAssistantThreads` (lib/server/assistant/store.ts) — the Conversazioni list read
- * one page at a time (PERF-10, 2026-10-05), against an in-memory Admin Firestore that honours
+ * one page at a time (since 2026-10-05), against an in-memory Admin Firestore that honours
  * `where`, `orderBy`, `startAfter`/`startAt` (a document snapshot) and `limit`.
  *
  * Seen RED on purpose: the cursor written as `startAt` printed the page's last thread twice — the
