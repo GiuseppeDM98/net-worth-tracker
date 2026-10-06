@@ -103,6 +103,11 @@ const SKELETON_CELLS = [
 /** How many instruments the hero footer names in its "Mercato:" digest. */
 const DIGEST_INSTRUMENTS = 3;
 
+// Module-level so the page's try block holds no conditional: keeps it compilable by the React Compiler.
+function describePriceUpdate(data: { updated: number; failed: unknown[] }): string {
+  return `Aggiornati ${data.updated} prezzi${data.failed.length > 0 ? `, ${data.failed.length} falliti` : ''}`;
+}
+
 export default function AssetsPage() {
   const { user } = useAuth();
   const { ownerId } = useActiveAccount();
@@ -303,7 +308,7 @@ export default function AssetsPage() {
       });
       const data = await response.json();
       if (response.ok) {
-        toast.success(`Aggiornati ${data.updated} prezzi${data.failed.length > 0 ? `, ${data.failed.length} falliti` : ''}`);
+        toast.success(describePriceUpdate(data));
         invalidatePortfolio();
         queryClient.invalidateQueries({ queryKey: queryKeys.snapshots.all(ownerId) });
       } else {
@@ -312,9 +317,9 @@ export default function AssetsPage() {
     } catch (error) {
       console.error('Error updating prices:', error);
       toast.error("Errore nell'aggiornamento dei prezzi");
-    } finally {
-      setUpdatingPrices(false);
     }
+    // After the try/catch rather than in a `finally`: keeps the page compilable by the React Compiler.
+    setUpdatingPrices(false);
   };
 
   const openCreate = () => setAssetDialog({ open: true, asset: null });

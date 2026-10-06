@@ -89,12 +89,13 @@ export function AssetAssignmentDialog({
     if (pct <= 0 || pct > maxAllowedPct) return;
 
     setSaving(true);
-    try {
+    // `.finally` on a promise, not a try/finally: the React Compiler cannot lower the statement.
+    // A failed save still rejects to the caller, as it did.
+    const save = async () => {
       await onSave(goalId, selectedAssetId, pct);
       onClose();
-    } finally {
-      setSaving(false);
-    }
+    };
+    await save().finally(() => setSaving(false));
   };
 
   return (

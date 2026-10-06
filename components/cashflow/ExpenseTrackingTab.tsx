@@ -234,6 +234,9 @@ function applyListFilters(expenses: Expense[], filters: ListFilters): Expense[] 
   return filtered;
 }
 
+// Module-level loader: an `import()` inside the component keeps the React Compiler from compiling it.
+const loadExpenseService = () => import('@/lib/services/expenseService');
+
 /** Where the desktop list view is remembered; read once at mount, written on every switch. */
 const LIST_VIEW_STORAGE_KEY = 'cashflow.movimenti.vista';
 
@@ -457,17 +460,19 @@ export function ExpenseTrackingTab({
 
   const deleteSingleExpense = useCallback(
     async (expense: Expense) => {
+      // Read before the try: the React Compiler refuses a logical expression inside a try/catch.
+      const invalidationOwner = user && ownerId ? ownerId : null;
       try {
         // Give back what the row has applied — both accounts of a transfer — before deleting
         // it; a row still waiting for its date moved nothing (mirror of ExpenseTable's delete).
         // A transfer's fee row goes with it (lib/utils/transferFee.ts), its balance given back too.
-        const { deleteExpenseRows, getTransferFeeOf } = await import('@/lib/services/expenseService');
+        const { deleteExpenseRows, getTransferFeeOf } = await loadExpenseService();
         const rows = rowsDeletedWith(expense, await getTransferFeeOf(expense));
-        if ((await reverseAppliedBalances(rows)) && user && ownerId) {
-          queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
+        if (await reverseAppliedBalances(rows)) {
+          if (invalidationOwner) queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(invalidationOwner) });
         }
         await deleteExpenseRows(expense.userId, rows);
-        if (user && ownerId) queryClient.invalidateQueries({ queryKey: queryKeys.costCenters.all(ownerId) });
+        if (invalidationOwner) queryClient.invalidateQueries({ queryKey: queryKeys.costCenters.all(invalidationOwner) });
         toast.success('Voce eliminata con successo');
         await onRefresh();
       } catch (error) {
@@ -501,15 +506,16 @@ export function ExpenseTrackingTab({
     // The series query is scoped by owner (firestore.rules refuses an unscoped list), so
     // without an owner there is nothing to delete — and no way to ask for it.
     if (!ownerId) return;
+    const invalidationOwner = user && ownerId ? ownerId : null;
     try {
       // Give back what the occurrences already happened have applied, in one transaction.
       const seriesExpenses = await getExpensesByRecurringParentId(ownerId, recurringParentId);
-      if ((await reverseAppliedBalances(seriesExpenses)) && user && ownerId) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
+      if (await reverseAppliedBalances(seriesExpenses)) {
+        if (invalidationOwner) queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(invalidationOwner) });
       }
-      const { deleteRecurringExpenses } = await import('@/lib/services/expenseService');
+      const { deleteRecurringExpenses } = await loadExpenseService();
       await deleteRecurringExpenses(ownerId, recurringParentId);
-      if (user && ownerId) queryClient.invalidateQueries({ queryKey: queryKeys.costCenters.all(ownerId) });
+      if (invalidationOwner) queryClient.invalidateQueries({ queryKey: queryKeys.costCenters.all(invalidationOwner) });
       toast.success('Tutte le voci ricorrenti sono state eliminate');
       await onRefresh();
     } catch (error) {
@@ -522,15 +528,16 @@ export function ExpenseTrackingTab({
     // The series query is scoped by owner (firestore.rules refuses an unscoped list), so
     // without an owner there is nothing to delete — and no way to ask for it.
     if (!ownerId) return;
+    const invalidationOwner = user && ownerId ? ownerId : null;
     try {
       // Give back what the instalments already due have applied, in one transaction.
       const seriesExpenses = await getExpensesByInstallmentParentId(ownerId, installmentParentId);
-      if ((await reverseAppliedBalances(seriesExpenses)) && user && ownerId) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
+      if (await reverseAppliedBalances(seriesExpenses)) {
+        if (invalidationOwner) queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(invalidationOwner) });
       }
-      const { deleteInstallmentExpenses } = await import('@/lib/services/expenseService');
+      const { deleteInstallmentExpenses } = await loadExpenseService();
       await deleteInstallmentExpenses(ownerId, installmentParentId);
-      if (user && ownerId) queryClient.invalidateQueries({ queryKey: queryKeys.costCenters.all(ownerId) });
+      if (invalidationOwner) queryClient.invalidateQueries({ queryKey: queryKeys.costCenters.all(invalidationOwner) });
       toast.success('Tutte le rate sono state eliminate');
       await onRefresh();
     } catch (error) {

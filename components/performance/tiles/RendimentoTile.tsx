@@ -89,6 +89,10 @@ export function RendimentoTile({
   className,
 }: RendimentoTileProps) {
   const DeltaIcon = benchmark && benchmark.delta < 0 ? TrendingDown : TrendingUp;
+  // Two statements, not one inline expression in the JSX: the React Compiler cannot lower `||`
+  // whose left side holds conditionals.
+  const methodSummaryText = [baseMonthLabel ? `Base 100 a fine ${baseMonthLabel}.` : null, benchmarkCurrency === 'USD' ? 'Modello in USD: cambi non disponibili.' : null].filter(Boolean).join(' ');
+  const methodSummary = methodSummaryText || undefined;
 
   return (
     <Tile eyebrow="Rendimento (TWR)" aside={aside} reading={reading} className={className} ariaLabel="Rendimento">
@@ -150,7 +154,7 @@ export function RendimentoTile({
         </>
       )}
 
-      <TileMethodNote subject="Rendimento (TWR)" summary={[baseMonthLabel ? `Base 100 a fine ${baseMonthLabel}.` : null, benchmarkCurrency === 'USD' ? 'Modello in USD: cambi non disponibili.' : null].filter(Boolean).join(' ') || undefined}>
+      <TileMethodNote subject="Rendimento (TWR)" summary={methodSummary}>
         <span className="block">
           Il TWR concatena i rendimenti mensili togliendo da ciascuno il capitale entrato o uscito: misura il portafoglio, non i versamenti.
         </span>

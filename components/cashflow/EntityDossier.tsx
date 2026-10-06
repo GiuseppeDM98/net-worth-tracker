@@ -293,25 +293,25 @@ interface EntityDossierProps {
 }
 
 export function EntityDossier({ allExpenses, scope, color, period, periodLabel, historyStartYear, isIncome, columns = false, aside }: EntityDossierProps) {
-  const now = { year: getItalyYear(), month: getItalyMonth() };
+  // now derives from the clock: keyed on its two numbers, it stays the same object within a
+  // month, so the memos below take it as a dep without recomputing on every render.
+  const nowYear = getItalyYear();
+  const nowMonth = getItalyMonth();
+  const now = useMemo(() => ({ year: nowYear, month: nowMonth }), [nowYear, nowMonth]);
 
   const yearRows = useMemo(
     () => buildEntityYearRows(allExpenses, scope, historyStartYear, now, monthOf),
-    // now derives from the clock: stable within a render session, deliberately not a dep.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [allExpenses, scope, historyStartYear]
+    [allExpenses, scope, historyStartYear, now]
   );
 
   const runRate = useMemo(
     () => computeEntityRunRate(allExpenses, scope, period, historyStartYear, now, monthOf),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [allExpenses, scope, period, historyStartYear]
+    [allExpenses, scope, period, historyStartYear, now]
   );
 
   const monthlySeries = useMemo(
     () => buildEntityMonthlySeries(allExpenses, scope, 24, historyStartYear, now, monthOf),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [allExpenses, scope, historyStartYear]
+    [allExpenses, scope, historyStartYear, now]
   );
 
   /**
@@ -330,8 +330,7 @@ export function EntityDossier({ allExpenses, scope, color, period, periodLabel, 
       byYear.set(row.year, buildEntitySubCategoryDeltas(allExpenses, scope.category, current, baseline, historyStartYear, monthOf));
     }
     return byYear;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allExpenses, scope, yearRows, historyStartYear]);
+  }, [allExpenses, scope, yearRows, historyStartYear, now.month]);
 
   /**
    * Which year row is open. Stored WITH the entity it belongs to instead of being reset by an

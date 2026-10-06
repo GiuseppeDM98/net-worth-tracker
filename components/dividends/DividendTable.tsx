@@ -69,6 +69,15 @@ const CELL = 'py-2.5 text-[13px]';
 const NUM = 'text-right font-mono tabular-nums';
 const STATE_BADGE_CLASS = 'h-4 shrink-0 border-warning-border px-1.5 py-0 text-[10px] font-normal text-warning-foreground';
 
+/**
+ * Throws the route's refusal as an Error. Outside the component: the React Compiler does not
+ * compile a `throw` (nor a logical expression) inside a try.
+ */
+async function throwDeleteFailure(response: Response): Promise<never> {
+  const error = await response.json().catch(() => ({}));
+  throw new Error(error.message || error.error || "Errore nell'eliminazione del dividendo");
+}
+
 const formatDay = (date: Date | string | Timestamp): string => format(toDate(date), 'dd/MM/yyyy', { locale: it });
 
 /** «la cedola di BTP Valore del 10/09/2026» — how a row names itself to an action. */
@@ -345,18 +354,15 @@ export function DividendTable({
     try {
       setDeletingId(dividend.id);
       const response = await authenticatedFetch(`/api/dividends/${dividend.id}`, { method: 'DELETE' });
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
-        throw new Error(error.message || error.error || "Errore nell'eliminazione del dividendo");
-      }
+      if (!response.ok) await throwDeleteFailure(response);
       toast.success('Pagamento eliminato');
       onRefresh();
     } catch (error) {
       console.error('Error deleting dividend:', error);
       toast.error(describeWriteError(error));
-    } finally {
-      setDeletingId(null);
     }
+    // After the catch, not in a finally: the React Compiler does not compile a try/finally.
+    setDeletingId(null);
   };
 
   const handleSort = (column: SortColumn) => {

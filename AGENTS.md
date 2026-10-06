@@ -356,7 +356,8 @@ pointer — a stub that grows past that is a guide leaking back (2026-09-20: ten
   the first paint: +130 ms on Analisi, measured). Lazy the PLOT, never the section that owns the trigger, and decide
   an empty series outside the lazy module. A value import from the lazy module puts it back in the graph: types only
   (`import type`). Worked examples: `PerformanceDettaglio`, `ConfrontoAnnualeSection`, `FlussoTile` (the Sankey,
-  preloaded at module evaluation from 640px), the four lazy FIRE tabs. **Next prefetches the route of every shell
+  preloaded at module evaluation from 640px), the four lazy FIRE tabs, Cashflow's four non-default tabs (2026-10-05,
+  their skeleton cells in `lib/constants/cashflowTabSkeletons.ts` so the page never imports a value from them). **Next prefetches the route of every shell
   link, client chunks included**: a chunk reached by another route's initial graph arrives with that prefetch; only
   one reached solely by an `import()` stays unfetched (`perf/README.md`, «Il prefetch dei link della shell»).
 - Pure `lib/utils` modules reach `calculateAssetValue` in one of two established ways — check the precedent: **injected**
@@ -632,6 +633,21 @@ file used to carry.
 - **`react-hooks/refs`: a custom hook must never RETURN a ref inside its object** — every read of that object during
   render (`del.armed`, `del.onClick`) is flagged "Cannot access refs during render". Take the ref as an argument
   (`useArmedDelete(ref, onDelete)`, `lib/hooks/useArmedDelete.ts`, there since 2026-08-31).
+- **The React Compiler RUNS since 2026-10-05** (`reactCompiler: true` in `next.config.ts`, `babel-plugin-react-compiler`
+  1.0; PERF-12): no `React.memo` by hand unless `npm run perf:census` shows it is needed (perf/README.md § Il census).
+  **A component it cannot compile is skipped WHOLE and in silence**: the page works, it just re-renders everything
+  again. Lint at zero is NOT the map: `react-hooks/todo` and `react-hooks/hooks` are outside the plugin's
+  `recommended` and «value blocks within a try/catch» reaches no rule. **`__tests__/reactCompilerCoverage.test.ts` is
+  the map**: it runs the same plugin over app/, components/, contexts/ and lib/ and names every skipped function (48 on
+  the first run, all rewritten; seen red with a `finally` and with an `eslint-disable` put back). The rewrites that keep
+  behaviour, in a component or hook: a `try … finally` → the finally's body right after the try/catch when neither
+  branch returns or rethrows, else `.finally()` on the one awaited call, or a module-level try/catch/finally helper
+  (`runGuarded` in the settings page); a `throw`, a loop or a `?:`/`&&`/`??`/`?.` inside a `try` → a module-level
+  helper called from the try (`assertSnapshotCreated`, `forEachSseEvent`), or the try body moved whole into a local
+  `const save = async () => {…}` and the try reduced to `await save()`; an `import()` → a module-level loader; an
+  `eslint-disable` of `exhaustive-deps` (it skips the WHOLE component) → `useEffectEvent` for what the effect reads but
+  must not re-run on. **The price is JavaScript**: +20–26% gz on component code, the most on Cashflow (five tabs as
+  static imports) — `perf/README.md` § Registro.
 - **`react-hooks/preserve-manual-memoization` ("Compilation Skipped")**: the compiler refuses to optimize the whole
   component when a dep array is *more specific* than what it infers — align the dep to the inferred value. The OTHER
   message, "memoized in source but not in output", cannot be aligned away: a `useMemo` whose value never escapes (only

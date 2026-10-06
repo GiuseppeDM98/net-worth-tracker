@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useEffectEvent, useRef } from 'react';
 import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import { TILE_EYEBROW_CLASS, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { NarrativeText } from '@/components/ui/narrative-text';
@@ -100,7 +100,10 @@ export function AIAnalysisDialog({
     setAnalysis('');
     setStatus({ phase: 'submitting' });
 
-    try {
+    // The stream is read in a nested function so the try below wraps ONE await: the React Compiler
+    // cannot lower a `throw` or conditionals inside a try block. A `return` here ends the read
+    // exactly as it ended `fetchAnalysis`, since nothing follows the try/catch.
+    const readStream = async () => {
       const response = await authenticatedFetch('/api/ai/analyze-performance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -159,6 +162,10 @@ export function AIAnalysisDialog({
 
       setLoading(false);
       setStatus({ phase: 'success' });
+    };
+
+    try {
+      await readStream();
     } catch (err) {
       if (request.signal.aborted) {
         // An abort is the reader's own choice, not a failure: no error reading, no toast. A newer
@@ -178,22 +185,27 @@ export function AIAnalysisDialog({
     }
   };
 
+  // Read by the opening effect, never its triggers: only `open` starts (or keeps) a report.
+  const hasReportOrRequest = useEffectEvent(() => Boolean(analysis) || loading);
+  const startAnalysis = useEffectEvent(() => {
+    fetchAnalysis();
+  });
+
   useEffect(() => {
     if (!open) return;
     // The cleanup runs on close AND on unmount: both abort the stream, client and server side
     // (the route forwards the abort to the Anthropic request). Aborting a settled request is a
     // no-op, so a finished report survives a close and is still there on reopen.
     const abortInFlight = () => requestRef.current?.abort();
-    if (analysis || loading) return abortInFlight;
+    if (hasReportOrRequest()) return abortInFlight;
     // Deferred so the effect body itself sets no state (react-hooks/set-state-in-effect).
     const timer = setTimeout(() => {
-      fetchAnalysis();
+      startAnalysis();
     }, 0);
     return () => {
       clearTimeout(timer);
       abortInFlight();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const handleCopyAnalysis = async () => {

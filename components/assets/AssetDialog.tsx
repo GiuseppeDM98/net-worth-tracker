@@ -964,9 +964,9 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
     } catch (error) {
       console.error('Error adding subcategory:', error);
       toast.error(describeWriteError(error));
-    } finally {
-      setIsAddingSubCategory(false);
     }
+    // After the try/catch, not in a `finally`: the React Compiler cannot lower try/finally.
+    setIsAddingSubCategory(false);
   };
 
   const addCompositionEntry = () => {
@@ -1095,7 +1095,11 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
       return;
     }
 
-    try {
+    // The save lives in a nested function so the try below wraps ONE await: the React Compiler
+    // cannot lower try/finally, nor conditionals/logicals inside a try block. An early `return`
+    // here leaves `save`, and `setFetchingPrice(false)` after the try/catch still runs, as the
+    // `finally` did.
+    const save = async () => {
       setFetchingPrice(true);
 
       // Bonds with ISIN use Borsa Italiana pricing (% of par convention).
@@ -1252,12 +1256,15 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
       }
 
       onClose();
+    };
+
+    try {
+      await save();
     } catch (error) {
       console.error('Error saving asset:', error);
       setStatus({ phase: 'error', message: describeWriteError(error) });
-    } finally {
-      setFetchingPrice(false);
     }
+    setFetchingPrice(false);
   };
 
   // taxRate is asset metadata, not a ledger concept: the trade ledger derives quantity/PMC from

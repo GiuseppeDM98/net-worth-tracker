@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
@@ -55,6 +55,7 @@ import type { TileSkeletonCell } from '@/lib/utils/tileGridSkeleton';
 import {
   AssistantChatContextType,
   AssistantMode,
+  AssistantMonthContextBundle,
   AssistantMonthSelectorValue,
   AssistantPromptChip,
   AssistantThread,
@@ -213,12 +214,18 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
 
   // Populate the context from the fetched bundle when no SSE bundle is present.
   // SSE bundle (set by the streaming hook) always takes priority — this effect
-  // only fires when contextBundle is still null.
-  useEffect(() => {
-    if (fetchedContextBundle && contextBundle === null) {
-      setContextBundle(fetchedContextBundle);
+  // only fires when contextBundle is still null. An Effect Event: the current bundle is read,
+  // never a trigger — only a newly fetched bundle runs it.
+  const adoptFetchedBundle = useEffectEvent((bundle: AssistantMonthContextBundle) => {
+    if (contextBundle === null) {
+      setContextBundle(bundle);
     }
-  }, [fetchedContextBundle]); // eslint-disable-line react-hooks/exhaustive-deps
+  });
+  useEffect(() => {
+    if (fetchedContextBundle) {
+      adoptFetchedBundle(fetchedContextBundle);
+    }
+  }, [fetchedContextBundle]);
 
   // Follow-up chips: shown after a completed assistant answer, derived purely
   // from the answer's mode + the period bundle. Hidden while streaming.
@@ -233,9 +240,11 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
 
   // Sync mode and period picker to the loaded thread so the UI stays coherent
   // with the conversation being shown. Runs when threadDetail resolves, but not
-  // during streaming (streamingMessages.length > 0) to avoid disrupting active input.
+  // during streaming (streamingMessages.length > 0) to avoid disrupting active input. The stream
+  // buffer is read through an Effect Event: it gates the sync, it never triggers one.
+  const hasStreamBuffer = useEffectEvent(() => streamingMessages.length > 0);
   useEffect(() => {
-    if (!threadDetail || streamingMessages.length > 0) {
+    if (!threadDetail || hasStreamBuffer()) {
       return;
     }
     // Deferred with setTimeout(0) so the sync happens outside the effect body
@@ -251,7 +260,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
       }
     }, 0);
     return () => clearTimeout(timer);
-  }, [threadDetail]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [threadDetail]);
 
   // Scroll to the bottom when messages are available, but not while the thread
   // is still loading — scrolling to an empty area before content arrives feels jarring.

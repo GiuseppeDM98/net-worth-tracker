@@ -31,6 +31,7 @@
     "perf:build": "cross-env NEXT_DIST_DIR=.next-perf NEXT_PUBLIC_USE_FIREBASE_EMULATOR=true NEXT_PUBLIC_FIREBASE_API_KEY=demo-key NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-net-worth NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=demo-net-worth.firebaseapp.com next build",
     "perf:serve": "node scripts/perfServe.mjs",
     "perf:bench": "node scripts/perfBenchmark.mjs",
+    "perf:census": "node scripts/perfRenderCensus.mjs",
     "perf:budget": "tsx scripts/perfBudget.mts"
   },
   "dependencies": {
@@ -77,6 +78,7 @@
     "postcss": "^8.5.14"
   },
   "devDependencies": {
+    "@babel/core": "^7.29.7",
     "@playwright/test": "^1.62.1",
     "@react-pdf/types": "^2.11.1",
     "@storybook/addon-docs": "^10.4.1",
@@ -86,6 +88,7 @@
     "@types/papaparse": "^5.5.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "babel-plugin-react-compiler": "^1.0.0",
     "cross-env": "^10.1.0",
     "eslint": "^9",
     "eslint-config-next": "16.0.1",

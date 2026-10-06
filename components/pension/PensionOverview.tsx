@@ -165,14 +165,17 @@ export function PensionOverview() {
   const ledger = useMemo(() => summarizeLedger(contributions, funds, assets, activeYear), [contributions, funds, assets, activeYear]);
 
   // ─── The words ───────────────────────────────────────────────────────────────
-  const failures: PensionLoadFailure[] = [
-    ...(contributionsError ? (['contributions'] as const) : []),
-    ...(snapshotsError ? (['snapshots'] as const) : []),
-  ];
+  // Memoized on its two booleans, the verdict's real inputs, so the verdict below can list it.
+  const failures = useMemo<PensionLoadFailure[]>(
+    () => [
+      ...(contributionsError ? (['contributions'] as const) : []),
+      ...(snapshotsError ? (['snapshots'] as const) : []),
+    ],
+    [contributionsError, snapshotsError],
+  );
   const verdict = useMemo(
     () => (failures.length > 0 ? buildPensionLoadErrorVerdict(failures) : buildPensionVerdict({ blocks, taxYear: activeYear, currentYear })),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `failures` is rebuilt every render; its two booleans are the real inputs.
-    [contributionsError, snapshotsError, blocks, activeYear, currentYear],
+    [failures, blocks, activeYear, currentYear],
   );
 
   // ─── Delete: reverses the value/transfer effect (invariant #5) ───────────────

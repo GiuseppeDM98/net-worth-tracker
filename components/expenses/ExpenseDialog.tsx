@@ -26,7 +26,7 @@
  */
 
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useForm, Controller, useWatch, type FieldErrors, type UseFormReturn } from 'react-hook-form';
+import { useForm, useFormState, Controller, useWatch, type FieldErrors, type UseFormReturn } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useQueryClient } from '@tanstack/react-query';
@@ -485,7 +485,11 @@ function ExpenseFormBody({
   advancedOpen,
   setAdvancedOpen,
 }: Readonly<FormBodyProps>) {
-  const { register, control, handleSubmit, setValue, getValues, formState: { errors } } = form;
+  const { register, control, handleSubmit, setValue, getValues } = form;
+  // Subscribed HERE, not read off `form.formState`: `form` is the same object on every render, so
+  // under the React Compiler the parent hands down unchanged props and this body would never
+  // re-render to show a field's error (seen in e2e/cashflow.tracciamento.spec.ts, 2026-10-05).
+  const { errors } = useFormState({ control });
   const chartColors = useChartColors();
   // An archived center is closed: it takes no new expense. The one this expense is ALREADY
   // linked to stays listed, or opening an old row would show «Nessun centro» and unlink it on save.
@@ -1818,7 +1822,9 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
     const requestedFee = data.type === 'transfer' ? normalizeTransferFee(data.transferFee) : null;
     const feeNote = describeTransferFeeNote(cashAssets.find((asset) => asset.id === transferCashAssetId)?.name);
 
-    try {
+    // The save is a function of its own, awaited in the try below: the React Compiler does not
+    // compile conditional or logical expressions written inside a try/catch, and this body is full of them.
+    const save = async () => {
       const expenseData: ExpenseFormData = {
         type: data.type,
         categoryId: data.categoryId,
@@ -1992,6 +1998,10 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
 
       onSuccess?.();
       onClose();
+    };
+
+    try {
+      await save();
     } catch (error) {
       console.error('Error saving expense:', error);
       setStatus({ phase: 'error', message: describeWriteError(error) });

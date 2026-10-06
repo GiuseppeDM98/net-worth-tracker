@@ -125,7 +125,8 @@ export default function ExpenseImportSection({ onImported }: ExpenseImportSectio
       setLastBatch(result);
       setPhase('done');
       toast.success(`Importate ${result.created} transazioni.`);
-      onImported?.();
+      // An `if`, not `?.()`: the React Compiler refuses optional chaining inside a try.
+      if (onImported) onImported();
     } catch (err) {
       console.error('Import commit error:', err);
       toast.error("Errore durante l'importazione.");
@@ -139,14 +140,14 @@ export default function ExpenseImportSection({ onImported }: ExpenseImportSectio
     try {
       const deleted = await deleteExpensesByImportBatch(ownerId, lastBatch.importBatchId);
       toast.success(`Import annullato: ${deleted} transazioni rimosse.`);
-      onImported?.();
+      if (onImported) onImported();
       reset();
     } catch (err) {
       console.error('Undo import error:', err);
       toast.error("Errore durante l'annullamento.");
-    } finally {
-      setUndoing(false);
     }
+    // After the try/catch rather than in a `finally`: keeps the section compilable by the React Compiler.
+    setUndoing(false);
   };
 
   const reading =

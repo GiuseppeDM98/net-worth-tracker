@@ -231,7 +231,7 @@ For contributors and AI agents, the repo keeps its guidance split by scope:
 
 | Category | Technology | Purpose |
 |----------|-----------|---------|
-| Framework | Next.js 16, React 19 | SSR, routing, API routes |
+| Framework | Next.js 16, React 19 + React Compiler | SSR, routing, API routes; automatic memoization |
 | Language | TypeScript 5 | Type safety |
 | Styling | Tailwind CSS v4, shadcn/ui | UI components and design system |
 | Data | React Query (TanStack) | Client-side caching and server state |
@@ -272,6 +272,7 @@ npm run test:e2e:ui    # Same, interactive runner
 npm run perf:budget    # JS per page of a production build against perf/budget.json, and one copy of recharts (after `npm run build`)
 npm run perf:build     # Production build against the emulators, then `npm run perf:serve` on :3200
 npm run perf:bench -- --runs=3  # Time to the first figure, cold and by navigation, per page
+npm run perf:census -- --runs=5 # Components re-rendered per key / tab switch (after `npm run perf:build -- --profile`)
 ```
 
 Server time, which the emulators cannot show, is read in production: `GET /api/dashboard/overview` answers with a

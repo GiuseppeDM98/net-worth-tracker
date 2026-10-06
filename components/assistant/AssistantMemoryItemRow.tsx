@@ -88,12 +88,11 @@ export function AssistantMemoryItemRow({
       return;
     }
     setIsSaving(true);
-    try {
-      await onEdit(item.id, trimmed);
-      setIsEditing(false);
-    } finally {
-      setIsSaving(false);
-    }
+    // Promise chain, not try/finally: keeps the row compilable by the React Compiler. A rejected
+    // edit still skips the close, settles the spinner and propagates.
+    await onEdit(item.id, trimmed)
+      .then(() => setIsEditing(false))
+      .finally(() => setIsSaving(false));
   };
 
   const handleCancel = () => {

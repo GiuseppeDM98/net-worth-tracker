@@ -37,6 +37,11 @@ const nextConfig: NextConfig = {
   // Unset everywhere else → the default `.next`.
   ...(process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),
   allowedDevOrigins: ['192.168.1.114'],
+  // The React Compiler memoizes every component and hook (babel-plugin-react-compiler, applied by
+  // Next only to files with JSX or hooks). On since 2026-10-05 (PERF-12): the lint already held the
+  // compiler's rules at zero, and the before/after census is in perf/README.md § Il census. Rollback
+  // is this line; `npm run lint` stays the map of what the compiler would skip (AGENTS.md § Motion).
+  reactCompiler: true,
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];
   },

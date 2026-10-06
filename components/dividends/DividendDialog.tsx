@@ -294,7 +294,9 @@ export function DividendDialog({ open, onClose, dividend, onSuccess, returnFocus
       return;
     }
 
-    try {
+    // The save is a function of its own, awaited in the try below: the React Compiler does not
+    // compile a `throw` or a conditional expression written inside a try/catch.
+    const save = async () => {
       const dividendData: DividendFormData = {
         assetId: data.assetId,
         exDate: data.exDate,
@@ -337,6 +339,9 @@ export function DividendDialog({ open, onClose, dividend, onSuccess, returnFocus
       toast.success(dividend ? 'Pagamento aggiornato' : 'Pagamento registrato');
       onSuccess?.();
       onClose();
+    };
+    try {
+      await save();
     } catch (error) {
       console.error('Error saving dividend:', error);
       setStatus({ phase: 'error', message: describeWriteError(error) });

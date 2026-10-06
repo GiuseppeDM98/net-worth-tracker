@@ -9,6 +9,7 @@
 | `budget.json` | Il tetto di JS iniziale (gzip, KB) per route e per i chunk condivisi | sì |
 | `routes.json` | Le route che il benchmark visita, uguali a `lib/constants/navigation.ts` (`__tests__/perfRoutes.test.ts`) | sì |
 | `last-run.json` | Tutte le run e le mediane dell'ultimo `perf:bench` | no |
+| `last-census.json` | Tutte le run e le mediane dell'ultimo `perf:census` | no |
 
 ## Il budget — «quanto JS spedisce ogni route?»
 
@@ -62,6 +63,7 @@ stati verificati nell'analizzatore: il dubbio sul tree-shaking di `radix-ui` res
 
 | Data | Route | Da → a (KB gz) | PR | Perché |
 |---|---|---|---|---|
+| 2026-10-05 | dodici route (tutte tranne Cashflow, login e register) | / 458 → 469 · Panoramica 546 → 569 · Allocazione 527 → 553 · Analisi 576 → 611 · Patrimonio 733 → 780 · Assistente 670 → 700 · FIRE 667 → 698 · Hall of Fame 545 → 574 · Storico 698 → 735 · Previdenza 601 → 631 · Rendimenti 578 → 612 · Impostazioni 625 → 670 | PERF-12 | Il React Compiler acceso: ogni componente porta la sua memo cache, +20–26% gz sul codice dei componenti (stimato file per file e confermato dalla build). Misura senza / con il compiler, stessa sessione, Mac: condivisi 475,5 → 482,8 (dentro il tetto) · / 452,4 → 459,4 · Panoramica 538,3 → 557,0 · Allocazione 520,5 → 542,0 · Analisi 565,6 → 598,2 · Patrimonio 731,7 → 764,7 · Assistente 660,7 → 686,1 · FIRE 655,3 → 683,7 · Hall of Fame 541,3 → 562,5 · Storico 684,9 → 720,0 · Previdenza 593,5 → 618,0 · Rendimenti 569,4 → 599,5 · Impostazioni 624,3 → 656,7. **Cashflow SCENDE** 736,2 → 717,3 (tetto 744 → 732): con il compiler cresceva a 832,5 e il primo numero a freddo da 616 a 730 ms, quindi le quattro tab non di default sono diventate `lazyComponent` nella stessa spec. I tempi non regrediscono: A/B ravvicinato, 7 run, Cashflow 593 / 593 ms, long task 0 / 0; Analisi (controllo) 920 / 951 |
 | 2026-09-30 | (condivisi) | 470 → 483 | #418 | Il condiviso non sale perché una route è cresciuta: `date-fns`, `date-fns-tz`, `lib/utils/dateHelpers.ts` e `lib/utils/formatters.ts` (54 moduli, ~14 KB) che ogni pagina carica stavano in chunk PER PAGINA, una copia a pagina, e ora stanno nei chunk condivisi (analizzatore Turbopack, prima/dopo: l'insieme dei moduli che ogni pagina carica è lo stesso). Misura 464,6 → 473,5. Patrimonio cresce a parte (+7,4, dentro il suo tetto): recharts è ora UN chunk con i moduli di tutti i grafici |
 
 ## Il benchmark — «quanto ci mette l'app a mostrare un numero?»
@@ -222,6 +224,42 @@ payload arrivano i chunk client di quella route — a freddo, la finestra di una
 (tutte le route, le quattro copie di recharts e il PDF compresi), dal 2026-09-30 ~1030. Un chunk raggiunto SOLO da un
 `import()` (il PDF, il Sankey sul telefono, le icone, le tab di FIRE) non viene prefetchato; uno nel grafo iniziale di
 un'altra route sì. La colonna JS del benchmark lo include: è una traccia, non il budget.
+
+## Il census — «quanta pagina ri-renderizza UN tasto?» (2026-10-05, PERF-12)
+
+`scripts/perfRenderCensus.mjs`, sulla stessa build e la stessa porta del benchmark, ma con il profiling di React:
+
+```bash
+npm run perf:build -- --profile                     # next build --profile: React di profiling, i tempi nei fiber
+npm run perf:serve                                  # :3200
+npm run perf:census -- --runs=5 --label=prima       # ~2 minuti; --scenario=settings,expense,tabs · --mobile
+```
+
+Tre scenari, ognuno in un contesto nuovo con il login vero, nulla salvato: **settings** (10 tasti in «Anno inizio
+storico cashflow» di Impostazioni › Preferenze, un input controllato della pagina), **expense** (10 tasti in «Importo» di
+«Nuova Spesa» › Spesa variabile, letto da `useWatch` alla radice del dialog), **tabs** (Cashflow Tracciamento ⇄ Budget,
+quattro cambi con entrambe le tab già montate). Le colonne sono PER TASTO (per cambio, in `tabs`):
+
+| Colonna | Significato |
+|---|---|
+| commitsPerUnit | commit di React |
+| renderedPerUnit | componenti la cui funzione è stata ESEGUITA in quei commit: un finto hook delle DevTools (`__REACT_DEVTOOLS_GLOBAL_HOOK__`, iniettato prima del bundle) percorre l'albero a ogni commit come le DevTools — un sottoalbero condiviso col commit prima non è stato visitato, un fiber visitato ha girato solo se porta il flag `PerformedWork`. Funziona anche su una build senza `--profile` |
+| renderMsPerUnit | `actualDuration` della radice: solo sulla build `--profile`, altrimenti «-» |
+| layoutPerUnit · recalcStylePerUnit | `LayoutCount` e `RecalcStyleCount` di CDP (`Performance.getMetrics`) |
+| scriptMs · layoutMs · recalcStyleMs · taskMs | le durate CDP sull'intera finestra (10 tasti + 600 ms) |
+| longTasks · longTaskMs | dal `PerformanceObserver` |
+
+Sotto la tabella, i nomi dei componenti più renderizzati (minificati: `?`, lettere — i primitivi di Radix tengono il
+`displayName`). I conteggi sono deterministici: cinque run danno lo stesso numero, quindi un cambio di UNO è un
+cambio vero.
+
+**Prima/dopo del React Compiler** (PERF-12, 2026-10-05, Mac, mirror, mediane di 5, build `--profile` senza / con
+`reactCompiler`, con ogni componente compilato — `__tests__/reactCompilerCoverage.test.ts`): **Impostazioni 423 → 318**
+componenti per tasto (render 6,12 → 4,09 ms); **Nuova spesa 242 → 1** (2,87 → 0,40 ms; commit 2 → 1); **cambio tab
+1785,5 → 121,5** (18,42 → 2,55 ms; commit 5,5 → 3,5). A metà strada, col compiler acceso ma 48 componenti ancora saltati
+(fra cui `SettingsPage`, `CashflowPage` ed `ExpenseDialog`), i numeri erano 401 · 76 · 1013,5: un componente saltato
+rende di nuovo tutto il suo sottoalbero. Layout e style recalc quasi invariati, long task 0: il compiler toglie lavoro
+di React, non del DOM.
 
 ## Revisit — «il secondo caricamento della route» (2026-09-29)
 

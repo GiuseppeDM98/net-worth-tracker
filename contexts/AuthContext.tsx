@@ -46,7 +46,7 @@ import {
   GoogleAuthProvider,
   updateProfile,
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, deleteDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, deleteDoc, type DocumentReference } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase/config';
 import { User } from '@/types/assets';
 import { getDefaultTargets, setSettings } from '@/lib/services/assetAllocationService';
@@ -125,6 +125,76 @@ async function completeDisplayName(
   } catch (error) {
     // Best effort: the name is already on screen, and the fallback covers the next sign-in.
     console.warn('Could not copy displayName into the Auth profile:', error);
+  }
+}
+
+/**
+ * The registration half of `signInWithGoogle`, for a Google user with no `users/{uid}` document:
+ * check the whitelist, clean up on a refusal, create the document and the default allocation.
+ * Module-level because it throws inside a try: keeps `AuthProvider` compilable by the React Compiler.
+ */
+async function registerGoogleUser(googleUser: FirebaseUser, userRef: DocumentReference): Promise<void> {
+  try {
+    const response = await fetch('/api/auth/check-registration', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: googleUser.email }),
+    });
+
+    if (!response.ok) {
+      // Registration is not allowed - cleanup everything
+      // Why cleanup? Race condition: Firebase Auth succeeded but registration denied.
+      // Without cleanup, user can't retry (Auth user exists but Firestore doesn't).
+      // We must delete BOTH Auth user AND any orphan Firestore doc.
+      try {
+        // First, check if a Firestore document was created (race condition)
+        // Another process might have created it between our check and now
+        const orphanDocSnap = await getDoc(userRef);
+        if (orphanDocSnap.exists()) {
+          await deleteDoc(userRef);
+          console.log(`[CLEANUP] Deleted orphan Firestore document for user: ${googleUser.uid}`);
+        }
+
+        // Delete the Firebase Auth user
+        await googleUser.delete();
+      } catch (deleteError) {
+        console.error('[CLEANUP_ERROR]', deleteError);
+        // If we couldn't delete the user, sign them out
+        // Prevents stuck state where user sees authenticated UI but has no permissions
+        await firebaseSignOut(auth);
+      }
+
+      const body = await response.json().catch(() => ({}));
+      throw withCode(
+        body.message || 'Registrations are currently closed.',
+        typeof body.code === 'string' ? body.code : 'registration/not-allowed',
+      );
+    }
+
+    // Registration is allowed - wait for token refresh first
+    console.log('[AuthContext] Google OAuth: Waiting for authentication token refresh...');
+    await waitForAuthTokenRefresh(googleUser);
+
+    // Create Firestore document
+    await setDoc(userRef, {
+      email: googleUser.email,
+      displayName: googleUser.displayName || '',
+      createdAt: new Date(),
+    });
+
+    // Set default asset allocation (60% equity, 40% bonds)
+    // Wrapped in retry logic as additional safety net for permission synchronization
+    await retryFirestoreOperation(async () => {
+      await setSettings(googleUser.uid, {
+        targets: getDefaultTargets(),
+      });
+    });
+  } catch (error: unknown) {
+    // Re-throw AS IS: wrapping in a fresh Error would drop the `code` the page needs
+    // to say the failure in words (see withCode above).
+    throw error instanceof Error
+      ? error
+      : new Error('Unable to verify registration permissions.');
   }
 }
 
@@ -280,68 +350,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // If user doesn't exist, this is a registration, so check permissions
     if (!userSnap.exists() && result.user.email) {
-      try {
-        const response = await fetch('/api/auth/check-registration', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: result.user.email }),
-        });
-
-        if (!response.ok) {
-          // Registration is not allowed - cleanup everything
-          // Why cleanup? Race condition: Firebase Auth succeeded but registration denied.
-          // Without cleanup, user can't retry (Auth user exists but Firestore doesn't).
-          // We must delete BOTH Auth user AND any orphan Firestore doc.
-          try {
-            // First, check if a Firestore document was created (race condition)
-            // Another process might have created it between our check and now
-            const orphanDocSnap = await getDoc(userRef);
-            if (orphanDocSnap.exists()) {
-              await deleteDoc(userRef);
-              console.log(`[CLEANUP] Deleted orphan Firestore document for user: ${result.user.uid}`);
-            }
-
-            // Delete the Firebase Auth user
-            await result.user.delete();
-          } catch (deleteError) {
-            console.error('[CLEANUP_ERROR]', deleteError);
-            // If we couldn't delete the user, sign them out
-            // Prevents stuck state where user sees authenticated UI but has no permissions
-            await firebaseSignOut(auth);
-          }
-
-          const body = await response.json().catch(() => ({}));
-          throw withCode(
-            body.message || 'Registrations are currently closed.',
-            typeof body.code === 'string' ? body.code : 'registration/not-allowed',
-          );
-        }
-
-        // Registration is allowed - wait for token refresh first
-        console.log('[AuthContext] Google OAuth: Waiting for authentication token refresh...');
-        await waitForAuthTokenRefresh(result.user);
-
-        // Create Firestore document
-        await setDoc(userRef, {
-          email: result.user.email,
-          displayName: result.user.displayName || '',
-          createdAt: new Date(),
-        });
-
-        // Set default asset allocation (60% equity, 40% bonds)
-        // Wrapped in retry logic as additional safety net for permission synchronization
-        await retryFirestoreOperation(async () => {
-          await setSettings(result.user.uid, {
-            targets: getDefaultTargets(),
-          });
-        });
-      } catch (error: unknown) {
-        // Re-throw AS IS: wrapping in a fresh Error would drop the `code` the page needs
-        // to say the failure in words (see withCode above).
-        throw error instanceof Error
-          ? error
-          : new Error('Unable to verify registration permissions.');
-      }
+      await registerGoogleUser(result.user, userRef);
     }
   };
 

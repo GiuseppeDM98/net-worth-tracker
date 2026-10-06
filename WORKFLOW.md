@@ -143,6 +143,9 @@ The app **is** locally runnable; there is no fallback to declare.
 
 - **The tour server**: `npm run dev:emulator` → `http://localhost:3000`. It reads the emulators, so
   nothing seen there can touch production data.
+- **The tour starts at the owner's go, not when the work is ready** (owner, 2026-10-05): finish everything that needs
+  no eyes, say «pronto», and wait — the owner starts it when they can give it at least 20 minutes, because a session
+  left idle mid-tour is what the memory watchdog kills, emulators and dev server with it.
 - **One `next dev` at a time.** Stop the :3100 server before the tour: it exists for the suite only.
   On 2026-09-07 three background processes (the emulators and two `next dev`) plus Playwright and
   Vitest exhausted the machine's memory and the system killed all three; an emulator killed that

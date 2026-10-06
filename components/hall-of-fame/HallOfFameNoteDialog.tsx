@@ -159,22 +159,25 @@ export function HallOfFameNoteDialog({
   async function handleSave() {
     if (!canSave || selectedYear === null) return;
     setSaving(true);
+    // Built before the try, and `setSaving(false)` after the catch rather than in a `finally`:
+    // the React Compiler cannot lower conditionals in a try block, nor try/finally.
+    const note = {
+      id: editNote?.id,
+      text: noteText.trim(),
+      sections: Array.from(selectedSections),
+      year: selectedYear,
+      month: monthRequired ? (selectedMonth ?? undefined) : undefined,
+    };
+    const savedMessage = editNote ? 'Nota aggiornata.' : 'Nota salvata.';
     try {
-      await onSave({
-        id: editNote?.id,
-        text: noteText.trim(),
-        sections: Array.from(selectedSections),
-        year: selectedYear,
-        month: monthRequired ? (selectedMonth ?? undefined) : undefined,
-      });
-      toast.success(editNote ? 'Nota aggiornata.' : 'Nota salvata.');
+      await onSave(note);
+      toast.success(savedMessage);
       onOpenChange(false);
     } catch (error) {
       console.error('Error saving note:', error);
       toast.error(describeWriteError(error));
-    } finally {
-      setSaving(false);
     }
+    setSaving(false);
   }
 
   /** The confirmed delete. Arming it is `useArmedDelete`'s job — no timer (WCAG 2.2.1). */

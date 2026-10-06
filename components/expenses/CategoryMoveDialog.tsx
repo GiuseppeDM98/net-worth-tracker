@@ -224,15 +224,17 @@ export function CategoryMoveDialog({
   const handleConfirm = async () => {
     if (!selectedCategoryId) return;
 
+    // Read before the try, and the reset after the catch rather than in a finally: the React
+    // Compiler does not compile a logical expression inside a try/catch, nor a try/finally.
+    const subCategoryId = selectedSubCategoryId || undefined;
     setIsSubmitting(true);
     try {
-      await onConfirm(selectedCategoryId, selectedSubCategoryId || undefined);
+      await onConfirm(selectedCategoryId, subCategoryId);
       onClose();
     } catch (error) {
       console.error('Error during move:', error);
-    } finally {
-      setIsSubmitting(false);
     }
+    setIsSubmitting(false);
   };
 
   const sourceLabel = sourceSubCategory

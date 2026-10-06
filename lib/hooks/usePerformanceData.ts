@@ -16,7 +16,7 @@
  */
 
 import { useCallback, useMemo, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { snapshotsQueryOptions, useSnapshots } from '@/lib/hooks/useSnapshots';
 import { assetsQueryOptions, useAssets } from '@/lib/hooks/useAssets';
 import { settingsQueryOptions, useSettings } from '@/lib/hooks/useSettings';
@@ -36,6 +36,15 @@ import { composeReadState } from '@/lib/utils/readState';
 import type { PerformanceYieldPeriod } from '@/lib/utils/dividendYield';
 
 const NO_PERIODS: PerformanceYieldPeriod[] = [];
+
+// Module-level so `refresh`'s try block holds no conditional: keeps the hook compilable by the React Compiler.
+function refetchYields(queryClient: QueryClient, ownerId: string, periods: PerformanceYieldPeriod[]): Promise<unknown> | undefined {
+  return periods.length > 0
+    ? queryClient.fetchQuery({ ...performanceYieldsQueryOptions(ownerId, periods), staleTime: 0 }).catch((error) => {
+        console.warn('Dividend yields not refreshed:', error);
+      })
+    : undefined;
+}
 
 /**
  * @param ownerId - Whose portfolio (`useActiveAccount().ownerId`, never the viewer's uid)
@@ -129,20 +138,17 @@ export function usePerformanceData(ownerId: string | undefined) {
       const freshPeriods = resolveYieldPeriods(freshSetup.base.snapshots, now);
       await Promise.all([
         queryClient.fetchQuery({ ...performanceDataQueryOptions(ownerId, freshInputs, freshSetup.cacheKey, true), staleTime: 0 }),
-        freshPeriods.length > 0
-          ? queryClient.fetchQuery({ ...performanceYieldsQueryOptions(ownerId, freshPeriods), staleTime: 0 }).catch((error) => {
-              console.warn('Dividend yields not refreshed:', error);
-            })
-          : undefined,
+        refetchYields(queryClient, ownerId, freshPeriods),
       ]);
       // The windows just asked become the page's: its queries find both answers under their keys.
       setClock(now);
+      // On both paths rather than in a `finally`: keeps the hook compilable by the React Compiler.
+      setIsRefreshing(false);
       return true;
     } catch (error) {
       console.error('Error refreshing performance data:', error);
-      return false;
-    } finally {
       setIsRefreshing(false);
+      return false;
     }
   }, [ownerId, queryClient]);
 

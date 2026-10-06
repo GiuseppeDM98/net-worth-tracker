@@ -22,6 +22,14 @@ interface GoalProposalCardProps {
 
 type SubmitState = 'idle' | 'saving' | 'created' | 'dismissed';
 
+// Module-level so the card's try block holds no `throw`: keeps it compilable by the React Compiler.
+async function assertGoalCreated(response: Response): Promise<void> {
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(payload?.error ?? "Impossibile creare l'obiettivo");
+  }
+}
+
 /**
  * The confirmation half of the ```goal-proposal protocol.
  *
@@ -56,10 +64,7 @@ export function GoalProposalCard({ proposal }: GoalProposalCardProps) {
         body: JSON.stringify({ userId: ownerId, goal: proposal }),
       });
 
-      if (!response.ok) {
-        const payload = (await response.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(payload?.error ?? "Impossibile creare l'obiettivo");
-      }
+      await assertGoalCreated(response);
 
       // Same key the FIRE page's goal query uses, so the new goal is there when the
       // user navigates over.

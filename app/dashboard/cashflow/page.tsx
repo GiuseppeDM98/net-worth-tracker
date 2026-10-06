@@ -7,6 +7,8 @@
  * - Tabs mounted only when first activated (mountedTabs state tracking)
  * - Once mounted, tabs stay mounted (no unmounting on tab switch)
  * - Reduces initial page load time, improves perceived performance
+ * - The CODE of every tab but Tracciamento is a chunk of its own too (`lazyComponent`, preloaded
+ *   once the page's data is in): see the note above `getInitialTab`
  *
  * TAB STRUCTURE:
  * - Tracking: verdict + tile grid over the period's movements (ExpenseTrackingTab)
@@ -25,7 +27,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useEffectEvent, useMemo } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useQueryClient } from '@tanstack/react-query';
@@ -35,10 +37,14 @@ import { Button } from '@/components/ui/button';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { TabsContent } from '@/components/ui/tabs';
 import { ExpenseTrackingTab } from '@/components/cashflow/ExpenseTrackingTab';
-import { DividendTrackingTab } from '@/components/dividends/DividendTrackingTab';
-import { BudgetTab } from '@/components/cashflow/BudgetTab';
-import { CostCentersTab } from '@/components/cashflow/CostCentersTab';
-import { ExpenseSplitTab } from '@/components/cashflow/ExpenseSplitTab';
+import { lazyComponent, usePreloadWhenIdle } from '@/components/ui/lazy-component';
+import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
+import {
+  BUDGET_SKELETON_CELLS,
+  COST_CENTERS_SKELETON_CELLS,
+  DIVIDENDS_SKELETON_CELLS,
+  SPLIT_SKELETON_CELLS,
+} from '@/lib/constants/cashflowTabSkeletons';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { Dividend } from '@/types/dividend';
 import { FamilyMember } from '@/types/assets';
@@ -73,6 +79,22 @@ const EMPTY_FAMILY_MEMBERS: FamilyMember[] = [];
 const EMPTY_DIVIDENDS: Dividend[] = [];
 const EMPTY_EXPENSES: Expense[] = [];
 type CashflowTabId = (typeof VALID_CASHFLOW_TABS)[number];
+
+// The four tabs that are not the default load their code on demand (PERF-12, 2026-10-05): with the
+// React Compiler on, all five tabs as static imports cost Cashflow +96 KB gz of initial JavaScript
+// and its first figure +114 ms cold, measured on the mirror. Each one draws its own skeleton until
+// its chunk arrives (`lazyComponent`, no Suspense), and they are preloaded once the page's data is
+// in, so a click usually finds the chunk in memory. Never import a VALUE from these modules here:
+// it would put them back in the page's initial graph (types only).
+const DividendTrackingTab = lazyComponent(() => import('@/components/dividends/DividendTrackingTab').then((m) => m.DividendTrackingTab));
+const BudgetTab = lazyComponent(() => import('@/components/cashflow/BudgetTab').then((m) => m.BudgetTab));
+const ExpenseSplitTab = lazyComponent(() => import('@/components/cashflow/ExpenseSplitTab').then((m) => m.ExpenseSplitTab));
+const CostCentersTab = lazyComponent(() => import('@/components/cashflow/CostCentersTab').then((m) => m.CostCentersTab));
+// Module-level arrays (usePreloadWhenIdle runs its effect on the array's identity); the optional
+// tabs are preloaded only for an account that has them on.
+const ALWAYS_SHOWN_LAZY_TABS = [DividendTrackingTab, BudgetTab];
+const SPLIT_LAZY_TAB = [ExpenseSplitTab];
+const COST_CENTERS_LAZY_TAB = [CostCentersTab];
 
 function getInitialTab(param: string | null): CashflowTabId {
   return (VALID_CASHFLOW_TABS as readonly string[]).includes(param ?? '') ? (param as CashflowTabId) : 'tracking';
@@ -162,6 +184,12 @@ export default function CashflowPage() {
   // empty ledger — the one thing a tracker must never say (lib/utils/statesNarrative.ts).
   const loadFailed = expensesError || categoriesError;
   const isDemo = useDemoMode();
+  // After Tracciamento's figures, never during them: a preload is a download competing with the
+  // first read (the «idle» browser waiting on Firestore — AGENTS.md § Dynamic Imports).
+  const tabsPreloadReady = !loading && !loadFailed;
+  usePreloadWhenIdle(ALWAYS_SHOWN_LAZY_TABS, tabsPreloadReady);
+  usePreloadWhenIdle(SPLIT_LAZY_TAB, tabsPreloadReady && expenseSplitEnabled === true);
+  usePreloadWhenIdle(COST_CENTERS_LAZY_TAB, tabsPreloadReady && costCentersEnabled === true);
 
   const handleRefresh = async () => {
     // Invalidate React Query caches for expenses, categories and assets. `expenses.all` is the
@@ -199,13 +227,16 @@ export default function CashflowPage() {
     router.replace(`${pathname}?tab=${value}${extraSearch}`, { scroll: false });
   };
 
-  // Canonicalize the URL on mount only when the tab param is absent or invalid
-  useEffect(() => {
+  // Canonicalize the URL on mount only when the tab param is absent or invalid. An Effect Event:
+  // the URL and the router are read, never triggers — it runs once, at mount.
+  const canonicalizeTabParam = useEffectEvent(() => {
     const currentTab = searchParams.get('tab');
     if (currentTab !== initialTab) {
       router.replace(`${pathname}?tab=${initialTab}`, { scroll: false });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  });
+  useEffect(() => {
+    canonicalizeTabParam();
   }, []);
 
   const allTabs: TabDef[] = [
@@ -394,6 +425,7 @@ export default function CashflowPage() {
               variants={tabPanelSwitch}
             >
               <DividendTrackingTab
+                fallback={<TileGridSkeleton cells={DIVIDENDS_SKELETON_CELLS} className="pt-1" />}
                 dividends={dividends}
                 assets={dividendAssets}
                 loading={loading || dividendsLoading || assetsLoading}
@@ -420,6 +452,7 @@ export default function CashflowPage() {
               variants={tabPanelSwitch}
             >
               <BudgetTab
+                fallback={<TileGridSkeleton cells={BUDGET_SKELETON_CELLS} className="pt-1" />}
                 categories={categories}
                 categoriesLoading={categoriesLoading}
                 categoriesFailed={categoriesError}
@@ -444,7 +477,11 @@ export default function CashflowPage() {
               animate={effectiveTab === 'split' ? 'visible' : 'hidden'}
               variants={tabPanelSwitch}
             >
-              <ExpenseSplitTab familyMembers={familyMembers} availableYears={availableYears} />
+              <ExpenseSplitTab
+                fallback={<TileGridSkeleton cells={SPLIT_SKELETON_CELLS} className="pt-1" />}
+                familyMembers={familyMembers}
+                availableYears={availableYears}
+              />
             </motion.div>
           </TabsContent>
         )}
@@ -463,7 +500,7 @@ export default function CashflowPage() {
               animate={effectiveTab === 'cost-centers' ? 'visible' : 'hidden'}
               variants={tabPanelSwitch}
             >
-              <CostCentersTab />
+              <CostCentersTab fallback={<TileGridSkeleton cells={COST_CENTERS_SKELETON_CELLS} className="pt-1" />} />
             </motion.div>
           </TabsContent>
         )}

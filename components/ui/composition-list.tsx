@@ -50,10 +50,14 @@ interface CompositionListProps {
   ariaLabel: string;
 }
 
+// A module-level default, not an inline arrow: the React Compiler cannot reorder an arrow
+// function used as a parameter default.
+const formatEuro = (v: number) => cachedFormatCurrencyEUR(v);
+
 export function CompositionList({
   items,
   onItemClick,
-  formatValue = (v) => cachedFormatCurrencyEUR(v),
+  formatValue = formatEuro,
   maxRows,
   ariaLabel,
 }: CompositionListProps) {

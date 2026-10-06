@@ -1,43 +1,55 @@
 {
   "routes": {
     "/": {
-      "initialJsGzKB": 458
+      "initialJsGzKB": 469,
+      "raisedBy": "PERF-12: il React Compiler acceso (memo cache per componente, +20–26% gz sul codice dei componenti; misura prima/dopo in perf/README.md § Registro)"
     },
     "/dashboard": {
-      "initialJsGzKB": 546
+      "initialJsGzKB": 569,
+      "raisedBy": "PERF-12: il React Compiler acceso (memo cache per componente, +20–26% gz sul codice dei componenti; misura prima/dopo in perf/README.md § Registro)"
     },
     "/dashboard/allocation": {
-      "initialJsGzKB": 527
+      "initialJsGzKB": 553,
+      "raisedBy": "PERF-12: il React Compiler acceso (memo cache per componente, +20–26% gz sul codice dei componenti; misura prima/dopo in perf/README.md § Registro)"
     },
     "/dashboard/analisi": {
-      "initialJsGzKB": 576
+      "initialJsGzKB": 611,
+      "raisedBy": "PERF-12: il React Compiler acceso (memo cache per componente, +20–26% gz sul codice dei componenti; misura prima/dopo in perf/README.md § Registro)"
     },
     "/dashboard/assets": {
-      "initialJsGzKB": 733
+      "initialJsGzKB": 780,
+      "raisedBy": "PERF-12: il React Compiler acceso (memo cache per componente, +20–26% gz sul codice dei componenti; misura prima/dopo in perf/README.md § Registro)"
     },
     "/dashboard/assistant": {
-      "initialJsGzKB": 670
+      "initialJsGzKB": 700,
+      "raisedBy": "PERF-12: il React Compiler acceso (memo cache per componente, +20–26% gz sul codice dei componenti; misura prima/dopo in perf/README.md § Registro)"
     },
     "/dashboard/cashflow": {
-      "initialJsGzKB": 744
+      "initialJsGzKB": 732
     },
     "/dashboard/fire-simulations": {
-      "initialJsGzKB": 667
+      "initialJsGzKB": 698,
+      "raisedBy": "PERF-12: il React Compiler acceso (memo cache per componente, +20–26% gz sul codice dei componenti; misura prima/dopo in perf/README.md § Registro)"
     },
     "/dashboard/hall-of-fame": {
-      "initialJsGzKB": 545
+      "initialJsGzKB": 574,
+      "raisedBy": "PERF-12: il React Compiler acceso (memo cache per componente, +20–26% gz sul codice dei componenti; misura prima/dopo in perf/README.md § Registro)"
     },
     "/dashboard/history": {
-      "initialJsGzKB": 698
+      "initialJsGzKB": 735,
+      "raisedBy": "PERF-12: il React Compiler acceso (memo cache per componente, +20–26% gz sul codice dei componenti; misura prima/dopo in perf/README.md § Registro)"
     },
     "/dashboard/pension": {
-      "initialJsGzKB": 601
+      "initialJsGzKB": 631,
+      "raisedBy": "PERF-12: il React Compiler acceso (memo cache per componente, +20–26% gz sul codice dei componenti; misura prima/dopo in perf/README.md § Registro)"
     },
     "/dashboard/performance": {
-      "initialJsGzKB": 578
+      "initialJsGzKB": 612,
+      "raisedBy": "PERF-12: il React Compiler acceso (memo cache per componente, +20–26% gz sul codice dei componenti; misura prima/dopo in perf/README.md § Registro)"
     },
     "/dashboard/settings": {
-      "initialJsGzKB": 625
+      "initialJsGzKB": 670,
+      "raisedBy": "PERF-12: il React Compiler acceso (memo cache per componente, +20–26% gz sul codice dei componenti; misura prima/dopo in perf/README.md § Registro)"
     },
     "/login": {
       "initialJsGzKB": 424

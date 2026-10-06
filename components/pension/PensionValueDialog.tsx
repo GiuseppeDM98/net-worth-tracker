@@ -14,7 +14,7 @@
  * With one fund the picker is not drawn; with several the reading names the chosen one.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useEffectEvent, useMemo, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -74,12 +74,15 @@ export function PensionValueDialog({ open, onClose, defaultAssetId }: PensionVal
   const fund = funds.find((candidate) => candidate.id === watchAssetId) ?? null;
 
   // Dialog reset pattern (AGENTS.md): `open` in deps, guard on !open, enumerate every field.
+  // The funds are read once per opening, never a trigger of their own.
+  const resetForOpening = useEffectEvent((assetIdFromCaller: string | undefined) => {
+    const initial = funds.find((candidate) => candidate.id === assetIdFromCaller) ?? funds[0];
+    reset({ assetId: initial?.id ?? '', value: initial ? Math.round(calculateAssetValue(initial) * 100) / 100 : undefined });
+  });
   useEffect(() => {
     if (!open) return;
-    const initial = funds.find((candidate) => candidate.id === defaultAssetId) ?? funds[0];
-    reset({ assetId: initial?.id ?? '', value: initial ? Math.round(calculateAssetValue(initial) * 100) / 100 : undefined });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the funds are read once per opening
-  }, [open, defaultAssetId, reset]);
+    resetForOpening(defaultAssetId);
+  }, [open, defaultAssetId]);
 
   // The status line resets on opening, derived during render (the TransactionDialog pattern):
   // a setState inside the effect above would cascade a render for a value known before it.
