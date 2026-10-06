@@ -137,7 +137,9 @@ export function GoalFormDialog({
     if (!isAllocationValid) return;
 
     setSaving(true);
-    try {
+    // `.finally` on a promise, not a try/finally: the React Compiler cannot lower the statement.
+    // A failed save still rejects to the caller, as it did.
+    const save = async () => {
       const now = new Date();
       const parsedTarget = targetAmount ? parseFloat(targetAmount) : undefined;
       const parsedContribution = monthlyContribution ? parseFloat(monthlyContribution) : undefined;
@@ -157,9 +159,8 @@ export function GoalFormDialog({
         updatedAt: now,
       };
       await onSave(goalData);
-    } finally {
-      setSaving(false);
-    }
+    };
+    await save().finally(() => setSaving(false));
   };
 
   return (

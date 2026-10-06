@@ -73,7 +73,7 @@ import { NarrativeText } from '@/components/ui/narrative-text';
 import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
 import { ErrorNotice } from '@/components/ui/error-notice';
 import { describeReadFailure, resolveSurfaceState } from '@/lib/utils/statesNarrative';
-import type { TileSkeletonCell } from '@/lib/utils/tileGridSkeleton';
+import { BUDGET_SKELETON_CELLS } from '@/lib/constants/cashflowTabSkeletons';
 import { cn } from '@/lib/utils';
 import { BudgetItemDialog } from '@/components/cashflow/budget/BudgetItemDialog';
 import { BudgetImpostazioni } from '@/components/cashflow/budget/BudgetImpostazioni';
@@ -103,15 +103,6 @@ const SAVE_STATUS_LABEL: Record<BudgetSaveStatus, string | null> = {
 
 /** How long «Salvato» stays in the aside: a confirmation, not a permanent state. */
 const SAVED_LABEL_MS = 4000;
-
-/** The page's own grid, so the loading state has the proportions of what replaces it. */
-const SKELETON_CELLS: TileSkeletonCell[] = [
-  { span: 5, rows: 2, lines: 8 },
-  { span: 4, lines: 4 },
-  { span: 3, lines: 4 },
-  { span: 7, lines: 4 },
-  { span: 12, lines: 6 },
-];
 
 const SETTINGS_ID = 'budget-impostazioni';
 
@@ -228,7 +219,7 @@ export function BudgetTab({ categories, categoriesLoading, categoriesFailed, his
   }
 
   if (loading || budget.loading) {
-    return <TileGridSkeleton cells={SKELETON_CELLS} className="pt-1" />;
+    return <TileGridSkeleton cells={BUDGET_SKELETON_CELLS} className="pt-1" />;
   }
 
   const saveLabel = budget.saveStatus === 'saved' && savedDismissed ? null : SAVE_STATUS_LABEL[budget.saveStatus];

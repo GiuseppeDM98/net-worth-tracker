@@ -164,12 +164,9 @@ export function CostCenterDetail({
 
   /** Writes a plan and offers its undo in the outcome toast: «Annulla» is the plan's other side, not a guess. */
   const applyPlan = async (plan: LinkPlan, outcome: string) => {
-    try {
-      await assignExpensesToCostCenter(plan.writes);
-    } finally {
-      // Also on failure: past one batch a run can stop half-way, and the lists must show what IS.
-      await refreshAfterLinkChange();
-    }
+    // Also on failure: past one batch a run can stop half-way, and the lists must show what IS.
+    // `.finally` rather than try/finally keeps the component compilable by the React Compiler.
+    await assignExpensesToCostCenter(plan.writes).finally(() => refreshAfterLinkChange());
     toast.success(outcome, {
       action: {
         label: 'Annulla',
@@ -180,9 +177,9 @@ export function CostCenterDetail({
           } catch (error) {
             console.error('Error undoing a cost center link change:', error);
             toast.error(`L'annullamento non è riuscito. ${describeWriteError(error)}`);
-          } finally {
-            await refreshAfterLinkChange();
           }
+          // After the try/catch, not in a finally: the React Compiler does not compile try/finally.
+          await refreshAfterLinkChange();
         },
       },
     });
@@ -198,9 +195,8 @@ export function CostCenterDetail({
     } catch (error) {
       console.error('Error unlinking expenses from cost center:', error);
       toast.error(`${rows.length === 1 ? 'La spesa non è stata scollegata' : 'Le spese non sono state scollegate'}. ${describeWriteError(error)}`);
-    } finally {
-      setUnlinking(false);
     }
+    setUnlinking(false);
   };
 
   const askUnlinkSeries = (expense: Expense) => {

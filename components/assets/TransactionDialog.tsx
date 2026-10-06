@@ -140,6 +140,21 @@ function estimateTradePriceEur(asset: Asset, pricePerUnitNative: number): number
   return pricePerUnitNative;
 }
 
+/**
+ * The sale's marginal realized P&L and its own taxable gain. Module-level so the component's
+ * try/catch wraps a plain call: the React Compiler cannot lower `?.`/`??` inside a try block.
+ */
+function previewSaleEffect(
+  base: AssetTransaction[],
+  draft: AssetTransaction
+): { value: number; taxableGain: number } {
+  const replayed = replayTransactionsWithEffects([...base, draft]);
+  const without = replayTransactions(base).realizedPnlEur;
+  // The tax base is the draft's own effect: the price difference, no commission on either side.
+  const taxableGain = replayed.effects.find((effect) => effect.transactionId === draft.id)?.taxableGainEur ?? 0;
+  return { value: replayed.state.realizedPnlEur - without, taxableGain };
+}
+
 export function TransactionDialog({ open, onClose, asset, transaction }: TransactionDialogProps) {
   const { ownerId } = useActiveAccount();
   const isDemo = useDemoMode();
@@ -346,11 +361,7 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
     // Exclude the edited trade so an edit re-prices against the rest of the history.
     const base = existingTransactions.filter((t) => t.id !== transaction?.id);
     try {
-      const replayed = replayTransactionsWithEffects([...base, draft]);
-      const without = replayTransactions(base).realizedPnlEur;
-      // The tax base is the draft's own effect: the price difference, no commission on either side.
-      const taxableGain = replayed.effects.find((effect) => effect.transactionId === draft.id)?.taxableGainEur ?? 0;
-      return { value: replayed.state.realizedPnlEur - without, taxableGain };
+      return previewSaleEffect(base, draft);
     } catch (error) {
       if (error instanceof LedgerValidationError) return { error: error.userMessage };
       return { error: 'Sequenza non valida.' };
@@ -425,7 +436,9 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
     const noteValue = data.note?.trim() ? data.note.trim() : undefined;
     const feeValue = data.fees && !isNaN(data.fees) && data.fees > 0 ? data.fees : undefined;
 
-    try {
+    // A nested function so the try below wraps ONE await: the React Compiler cannot lower
+    // conditionals inside a try block.
+    const persist = async () => {
       if (transaction) {
         // Edit. Baseline trades accept only quantity/pricePerUnit/note (server enforces it too).
         const updates: Partial<AssetTransactionFormData> = isBaseline
@@ -465,6 +478,10 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
         );
       }
       onClose();
+    };
+
+    try {
+      await persist();
     } catch (error) {
       // A 422 body carries the server's own Italian, marked user-facing by the service; anything
       // else is translated rather than shown, so an SDK string never reaches the reader.

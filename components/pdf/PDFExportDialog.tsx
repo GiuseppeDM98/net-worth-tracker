@@ -264,7 +264,7 @@ export function PDFExportDialog({
    * Error handling:
    * - Validation errors: Show specific message via toast, abort early
    * - Generation errors: Show generic error message, log to console
-   * - Always set loading=false in finally block
+   * - Always set loading=false after the try/catch
    *
    * On success: Close dialog and show success toast
    */
@@ -274,7 +274,10 @@ export function PDFExportDialog({
       return;
     }
 
-    try {
+    // The export lives in a nested function so the try below wraps ONE await: the React Compiler
+    // cannot lower try/finally, nor conditionals inside a try block. `setLoading(false)` after the
+    // try/catch runs on every path, as the `finally` did.
+    const exportPdf = async () => {
       setLoading(true);
 
       // Filter snapshots to selected time period with user-chosen year/month
@@ -316,13 +319,15 @@ export function PDFExportDialog({
 
       toast.success('PDF generato con successo');
       onOpenChange(false);
+    };
 
+    try {
+      await exportPdf();
     } catch (error) {
       console.error('PDF generation error:', error);
       toast.error(errorMessage(error, 'Errore durante la generazione del PDF'));
-    } finally {
-      setLoading(false);
     }
+    setLoading(false);
   };
 
   const selectedCount = Object.values(sections).filter(Boolean).length;

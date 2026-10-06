@@ -65,7 +65,7 @@ import { Button } from '@/components/ui/button';
 import { PageVerdict } from '@/components/ui/page-verdict';
 import { TILE_CELL_CLASS } from '@/components/ui/tile';
 import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
-import type { TileSkeletonCell } from '@/lib/utils/tileGridSkeleton';
+import { COST_CENTERS_SKELETON_CELLS } from '@/lib/constants/cashflowTabSkeletons';
 import { CostCenterDialog } from './CostCenterDialog';
 import { CostCenterDetail } from './CostCenterDetail';
 import { ErrorNotice } from '@/components/ui/error-notice';
@@ -81,13 +81,6 @@ import { ArchiviatiDisclosure } from './cost-centers/ArchiviatiDisclosure';
 const TRAILING_MONTHS = 12;
 /** The URL parameter that holds the open center's id. */
 const CENTER_PARAM = 'center';
-
-/** The page's own grid, so the loading state has the proportions of what replaces it. */
-const SKELETON_CELLS: TileSkeletonCell[] = [
-  { span: 5, rows: 2, lines: 8 },
-  { span: 7, lines: 6 },
-  { span: 7, lines: 3 },
-];
 
 const EMPTY_CENTERS: CostCenter[] = [];
 const EMPTY_EXPENSES: Expense[] = [];
@@ -200,15 +193,16 @@ export function CostCentersTab() {
   const handleDelete = async (center: CostCenter) => {
     if (!user || !ownerId) return;
     const unlinkedCount = byCenter[center.id]?.linkedCount ?? 0;
+    // The cascade is the part the user cannot see: name the outcome and the reassurance —
+    // the expenses survive, they only lose the tag. Composed before the try: the React Compiler
+    // refuses a conditional expression inside a try/catch.
+    const deletedMessage =
+      unlinkedCount > 0
+        ? `"${center.name}" eliminato · ${unlinkedCount} ${unlinkedCount === 1 ? 'spesa scollegata resta' : 'spese scollegate restano'} in Cashflow`
+        : `"${center.name}" eliminato`;
     try {
       await deleteCostCenter(ownerId, center.id);
-      // The cascade is the part the user cannot see: name the outcome and the reassurance —
-      // the expenses survive, they only lose the tag.
-      toast.success(
-        unlinkedCount > 0
-          ? `"${center.name}" eliminato · ${unlinkedCount} ${unlinkedCount === 1 ? 'spesa scollegata resta' : 'spese scollegate restano'} in Cashflow`
-          : `"${center.name}" eliminato`,
-      );
+      toast.success(deletedMessage);
       // replace, not push: Back must not land on the detail of a center that no longer exists.
       router.replace(`${pathname}?tab=cost-centers`, { scroll: false });
       void invalidateWithRows();
@@ -221,9 +215,10 @@ export function CostCentersTab() {
 
   const handleArchiveToggle = async (center: CostCenter) => {
     const archiving = !center.archivedAt;
+    const doneMessage = archiving ? `"${center.name}" archiviato` : `"${center.name}" ripristinato`;
     try {
       await setCostCenterArchived(center.id, archiving);
-      toast.success(archiving ? `"${center.name}" archiviato` : `"${center.name}" ripristinato`);
+      toast.success(doneMessage);
       invalidate();
     } catch (error) {
       console.error('Error archiving cost center:', error);
@@ -253,7 +248,7 @@ export function CostCentersTab() {
   }
 
   if (loading) {
-    return <TileGridSkeleton cells={SKELETON_CELLS} className="pt-1" />;
+    return <TileGridSkeleton cells={COST_CENTERS_SKELETON_CELLS} className="pt-1" />;
   }
 
   // --- List view ---

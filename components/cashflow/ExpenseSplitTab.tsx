@@ -28,6 +28,7 @@ import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Tile, TILE_CELL_CLASS, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
 import { TileGridSkeleton, VerdictSkeleton } from '@/components/ui/tile-grid-skeleton';
+import { SPLIT_SKELETON_CELLS } from '@/lib/constants/cashflowTabSkeletons';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorNotice } from '@/components/ui/error-notice';
 import { describeReadFailure, resolveSurfaceState } from '@/lib/utils/statesNarrative';
@@ -53,16 +54,6 @@ import {
 } from '@/lib/utils/expenseSplitNarrative';
 import type { Expense } from '@/types/expenses';
 import type { FamilyMember } from '@/types/assets';
-
-// The desktop geometry of the grid below, so the skeleton has its proportions and nothing
-// jumps when the data lands. THREE cells, because the people share one: «In comune» over two
-// rows, «Quota» beside it, and the row of person tiles under that. It declared 5/7/7 against a
-// grid that landed 5/7/6/6 until 2026-09-21, and the page jumped every time the data arrived.
-const SKELETON_CELLS = [
-  { span: 5, rows: 2, lines: 6 },
-  { span: 7, lines: 3 },
-  { span: 7, lines: 4 },
-];
 
 interface ExpenseSplitTabProps {
   familyMembers: FamilyMember[];
@@ -153,7 +144,7 @@ export function ExpenseSplitTab({ familyMembers, availableYears }: ExpenseSplitT
     return (
       <div className="space-y-4">
         {periodRows}
-        {surface === 'loading' && <TileGridSkeleton verdict={false} cells={SKELETON_CELLS} />}
+        {surface === 'loading' && <TileGridSkeleton verdict={false} cells={SPLIT_SKELETON_CELLS} />}
       </div>
     );
   }

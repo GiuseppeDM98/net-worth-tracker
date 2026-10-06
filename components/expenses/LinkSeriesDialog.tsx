@@ -102,7 +102,10 @@ export function LinkSeriesDialog({ request, ownerId, cashAccounts, properties, n
     if (!expense || chosen === NONE) return;
     setBusy(true);
     setFailure(null);
-    try {
+    // The link is a function of its own, awaited in the try below, and the reset follows the
+    // catch rather than a finally: the React Compiler does not compile conditional expressions
+    // inside a try/catch, nor a try/finally.
+    const link = async () => {
       const linked =
         target === 'debt' ? await linkSeriesToDebt(ownerId, expense, chosen, now) : await linkSeriesToCashAccount(ownerId, expense, chosen, now);
       toast.success(`${linked} ${mode === 'installment' ? (linked === 1 ? 'rata collegata' : 'rate collegate') : linked === 1 ? 'voce collegata' : 'voci collegate'} a ${accountName ?? (target === 'debt' ? 'immobile' : 'conto')}`);
@@ -113,11 +116,13 @@ export function LinkSeriesDialog({ request, ownerId, cashAccounts, properties, n
       queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
       onLinked();
       close();
+    };
+    try {
+      await link();
     } catch (error) {
       setFailure(describeWriteError(error));
-    } finally {
-      setBusy(false);
     }
+    setBusy(false);
   };
 
   return (

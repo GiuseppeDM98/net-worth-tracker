@@ -96,19 +96,24 @@ export function CreateDummySnapshotModal({
 
     setIsGenerating(true);
 
+    // Computed before the try, and `setIsGenerating(false)` after the catch rather than in a
+    // `finally`: the React Compiler cannot lower conditionals in a try block, nor try/finally.
+    const incomeToSeed = generateExpenses ? income : undefined;
+    const expensesToSeed = generateExpenses ? expenses : undefined;
+    const message = generateExpenses
+      ? `${months} snapshot e dati di spese/entrate creati con successo!`
+      : `${months} snapshot fittizi creati con successo!`;
+
     try {
       await generateDummySnapshots({
         userId,
         initialNetWorth: netWorth,
         monthlyGrowthRate: growthRate,
         numberOfMonths: months,
-        averageMonthlyIncome: generateExpenses ? income : undefined,
-        averageMonthlyExpenses: generateExpenses ? expenses : undefined,
+        averageMonthlyIncome: incomeToSeed,
+        averageMonthlyExpenses: expensesToSeed,
       });
 
-      const message = generateExpenses
-        ? `${months} snapshot e dati di spese/entrate creati con successo!`
-        : `${months} snapshot fittizi creati con successo!`;
       toast.success(message);
       onOpenChange(false);
 
@@ -121,9 +126,8 @@ export function CreateDummySnapshotModal({
     } catch (error) {
       console.error('Error generating dummy snapshots:', error);
       toast.error('Errore durante la creazione degli snapshot');
-    } finally {
-      setIsGenerating(false);
     }
+    setIsGenerating(false);
   };
 
   return (

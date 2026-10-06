@@ -129,17 +129,19 @@ export function SnapshotSearchDialog({
 
     setSaving(true);
     setFailure(null);
+    // Chosen before the try, and `setSaving(false)` after the catch rather than in a `finally`:
+    // the React Compiler cannot lower conditionals in a try block, nor try/finally.
+    const savedMessage = noteText.trim() ? 'Nota salvata' : 'Nota eliminata';
     try {
       await onSave(selectedSnapshot.year, selectedSnapshot.month, noteText);
-      toast.success(noteText.trim() ? 'Nota salvata' : 'Nota eliminata');
+      toast.success(savedMessage);
       onOpenChange(false);
       setSelectedSnapshotId('');
     } catch (error) {
       console.error('Error saving note:', error);
       setFailure(describeWriteError(error));
-    } finally {
-      setSaving(false);
     }
+    setSaving(false);
   };
 
   const handleDelete = async () => {
@@ -155,9 +157,8 @@ export function SnapshotSearchDialog({
     } catch (error) {
       console.error('Error deleting note:', error);
       setFailure(describeWriteError(error));
-    } finally {
-      setSaving(false);
     }
+    setSaving(false);
   };
 
   // The reading IS the status line: a refusal takes its place and its negative tone.

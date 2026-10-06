@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { describeWriteError, userFacingError } from '@/lib/utils/dialogNarrative';
 import { queryKeys } from '@/lib/query/queryKeys';
@@ -28,6 +28,87 @@ function parseSseEvent(rawChunk: string): AssistantStreamEvent | null {
   }
 
   return JSON.parse(payload) as AssistantStreamEvent;
+}
+
+// The helpers below are module-level so `submit`'s try block holds no conditional expression and
+// no `throw`: keeps the hook compilable by the React Compiler.
+
+function buildStreamRequestBody(args: {
+  ownerId: string;
+  modeToSend: AssistantMode;
+  promptToSend: string;
+  selectedThreadId: string | undefined;
+  selectedMonth: AssistantMonthSelectorValue;
+  selectedYear: number;
+  chatContextType: AssistantChatContextType;
+  preferences: AssistantPreferences | undefined;
+}): string {
+  const { ownerId, modeToSend, promptToSend, selectedThreadId, selectedMonth, selectedYear, chatContextType, preferences } = args;
+  return JSON.stringify({
+    userId: ownerId,
+    mode: modeToSend,
+    prompt: promptToSend,
+    threadId: selectedThreadId,
+    // Include period selectors based on mode
+    ...(modeToSend === 'month_analysis' ? { month: selectedMonth } : {}),
+    ...(modeToSend === 'year_analysis' ? { year: selectedYear } : {}),
+    // Libera (chat) optionally attaches a period context selected next to the axis.
+    ...(modeToSend === 'chat'
+      ? {
+          chatContext: chatContextType,
+          ...(chatContextType === 'month' ? { month: selectedMonth } : {}),
+          ...(chatContextType === 'year' ? { year: selectedYear } : {}),
+        }
+      : {}),
+    preferences,
+  });
+}
+
+/** The response's body stream, or the route's own error as a user-facing failure. */
+async function openStreamBody(response: Response): Promise<NonNullable<Response['body']>> {
+  if (!response.ok || !response.body) {
+    const payload = await response.json().catch(() => null);
+    throw userFacingError(payload?.error ?? 'Impossibile avviare lo stream dell\'assistente');
+  }
+  return response.body;
+}
+
+/** Reads the SSE body to its end, handing each parsed event to `onEvent` in order; a throw from it stops the read. */
+async function forEachSseEvent(
+  body: NonNullable<Response['body']>,
+  onEvent: (event: AssistantStreamEvent) => void,
+): Promise<void> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const events = buffer.split('\n\n');
+    buffer = events.pop() ?? '';
+
+    for (const rawEvent of events) {
+      const event = parseSseEvent(rawEvent);
+      if (!event) continue;
+      onEvent(event);
+    }
+  }
+}
+
+async function invalidateAssistantThread(
+  queryClient: QueryClient,
+  ownerId: string,
+  resolvedThreadId: string | undefined,
+): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: queryKeys.assistant.threads(ownerId) }),
+    resolvedThreadId
+      ? queryClient.invalidateQueries({ queryKey: queryKeys.assistant.thread(resolvedThreadId) })
+      : Promise.resolve(),
+  ]);
 }
 
 interface UseAssistantStreamingArgs {
@@ -186,107 +267,77 @@ export function useAssistantStreaming({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         signal: abortController.signal,
-        body: JSON.stringify({
-          userId: ownerId,
-          mode: modeToSend,
-          prompt: promptToSend,
-          threadId: selectedThreadId,
-          // Include period selectors based on mode
-          ...(modeToSend === 'month_analysis' ? { month: selectedMonth } : {}),
-          ...(modeToSend === 'year_analysis' ? { year: selectedYear } : {}),
-          // Libera (chat) optionally attaches a period context selected next to the axis.
-          ...(modeToSend === 'chat'
-            ? {
-                chatContext: chatContextType,
-                ...(chatContextType === 'month' ? { month: selectedMonth } : {}),
-                ...(chatContextType === 'year' ? { year: selectedYear } : {}),
-              }
-            : {}),
+        body: buildStreamRequestBody({
+          ownerId,
+          modeToSend,
+          promptToSend,
+          selectedThreadId,
+          selectedMonth,
+          selectedYear,
+          chatContextType,
           preferences,
         }),
       });
 
-      if (!response.ok || !response.body) {
-        const payload = await response.json().catch(() => null);
-        throw userFacingError(payload?.error ?? 'Impossibile avviare lo stream dell\'assistente');
-      }
+      const body = await openStreamBody(response);
 
       // Save prompt for retry before clearing draft — retry needs the original text
       lastSentPromptRef.current = promptToSend;
       // Clear draft only after the request succeeds to avoid losing text on network errors
       onDraftConsumed();
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const events = buffer.split('\n\n');
-        buffer = events.pop() ?? '';
-
-        for (const rawEvent of events) {
-          const event = parseSseEvent(rawEvent);
-          if (!event) continue;
-
-          if (event.type === 'meta' && event.threadId) {
-            onThreadIdResolved(event.threadId);
-            resolvedThreadId = event.threadId;
-          }
-
-          // Populate the context panel from the server-built bundle.
-          // This fires before text streaming starts.
-          if (event.type === 'context') {
-            setContextBundle(event.bundle);
-          }
-
-          // Surface the server's progress phase (e.g. web search) in the header badge.
-          if (event.type === 'status') {
-            setStreamStatus(event.status);
-          }
-
-          if (event.type === 'text') {
-            // First token received — dismiss the slow-response nudge
-            setIsSlowResponse(false);
-            setStreamingMessages((current) =>
-              current.map((message) =>
-                message.id === assistantMessageId
-                  ? { ...message, content: message.content + event.text }
-                  : message
-              )
-            );
-          }
-
-          if (event.type === 'done') {
-            // Mark stream complete: clears streamingMessageId so the message
-            // transitions from plain-text to ReactMarkdown rendering.
-            setStreamingMessageId(undefined);
-            setStreamingMessages((current) =>
-              current.map((message) =>
-                message.id === assistantMessageId
-                  ? { ...message, webSearchUsed: event.webSearchUsed }
-                  : message
-              )
-            );
-          }
-
-          if (event.type === 'error') {
-            setIsInterrupted(true);
-            throw userFacingError(event.error);
-          }
+      // The read loop is module-level (`forEachSseEvent`): a loop inside the try would keep the hook
+      // from compiling under the React Compiler. Each event is handled here, in order.
+      await forEachSseEvent(body, (event) => {
+        if (event.type === 'meta' && event.threadId) {
+          onThreadIdResolved(event.threadId);
+          resolvedThreadId = event.threadId;
         }
-      }
+
+        // Populate the context panel from the server-built bundle.
+        // This fires before text streaming starts.
+        if (event.type === 'context') {
+          setContextBundle(event.bundle);
+        }
+
+        // Surface the server's progress phase (e.g. web search) in the header badge.
+        if (event.type === 'status') {
+          setStreamStatus(event.status);
+        }
+
+        if (event.type === 'text') {
+          // First token received — dismiss the slow-response nudge
+          setIsSlowResponse(false);
+          setStreamingMessages((current) =>
+            current.map((message) =>
+              message.id === assistantMessageId
+                ? { ...message, content: message.content + event.text }
+                : message
+            )
+          );
+        }
+
+        if (event.type === 'done') {
+          // Mark stream complete: clears streamingMessageId so the message
+          // transitions from plain-text to ReactMarkdown rendering.
+          setStreamingMessageId(undefined);
+          setStreamingMessages((current) =>
+            current.map((message) =>
+              message.id === assistantMessageId
+                ? { ...message, webSearchUsed: event.webSearchUsed }
+                : message
+            )
+          );
+        }
+
+        if (event.type === 'error') {
+          setIsInterrupted(true);
+          throw userFacingError(event.error);
+        }
+      });
 
       if (ownerId) {
-        await Promise.all([
-          queryClient.invalidateQueries({ queryKey: queryKeys.assistant.threads(ownerId) }),
-          resolvedThreadId
-            ? queryClient.invalidateQueries({ queryKey: queryKeys.assistant.thread(resolvedThreadId) })
-            : Promise.resolve(),
-        ]);
+        await invalidateAssistantThread(queryClient, ownerId, resolvedThreadId);
       }
     } catch (error) {
       // AbortError is a user-initiated stop — keep partial text visible, no toast
@@ -295,12 +346,12 @@ export function useAssistantStreaming({
       }
       setIsInterrupted(true);
       setStreamingMessageId(undefined);
-    } finally {
-      abortControllerRef.current = null;
-      setIsStreaming(false);
-      setIsSlowResponse(false);
-      setStreamStatus(null);
     }
+    // After the try/catch rather than in a `finally`: keeps the hook compilable by the React Compiler.
+    abortControllerRef.current = null;
+    setIsStreaming(false);
+    setIsSlowResponse(false);
+    setStreamStatus(null);
   };
 
   // Aborts the in-flight SSE stream. The catch block in submit detects

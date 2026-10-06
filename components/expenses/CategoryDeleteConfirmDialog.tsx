@@ -260,14 +260,16 @@ export function CategoryDeleteConfirmDialog({
   const handleConfirm = async () => {
     if (mode === 'reassign' && !selectedCategoryId) return;
 
+    // Convert sentinel value to undefined (Radix Select doesn't allow empty string). Read before
+    // the try, and the reset after the catch rather than in a finally: the React Compiler does not
+    // compile a conditional expression inside a try/catch, nor a try/finally.
+    const subCategoryId = selectedSubCategoryId && selectedSubCategoryId !== '__none__'
+      ? selectedSubCategoryId
+      : undefined;
     setIsSubmitting(true);
     setStatus({ phase: 'submitting' });
     try {
       if (mode === 'reassign') {
-        // Convert sentinel value to undefined (Radix Select doesn't allow empty string)
-        const subCategoryId = selectedSubCategoryId && selectedSubCategoryId !== '__none__'
-          ? selectedSubCategoryId
-          : undefined;
         await onConfirm(selectedCategoryId, subCategoryId);
       } else {
         await onConfirm(undefined, undefined);
@@ -276,9 +278,8 @@ export function CategoryDeleteConfirmDialog({
     } catch (error) {
       console.error('Error during category deletion:', error);
       setStatus({ phase: 'error', message: describeWriteError(error) });
-    } finally {
-      setIsSubmitting(false);
     }
+    setIsSubmitting(false);
   };
 
   const kindLabel = subCategoryToDelete ? 'sottocategoria' : 'categoria';

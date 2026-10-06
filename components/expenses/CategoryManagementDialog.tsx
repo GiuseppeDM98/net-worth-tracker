@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { useForm, useWatch } from 'react-hook-form';
+import { useForm, useFormState, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useAuth } from '@/contexts/AuthContext';
@@ -179,7 +179,10 @@ function CategoryFormBody({
   spendingRolesEnabled,
   form,
 }: Readonly<FormBodyProps>) {
-  const { register, setValue, control, formState: { errors } } = form;
+  const { register, setValue, control } = form;
+  // Subscribed here, not read off `form.formState`: `form` never changes identity, so under the
+  // React Compiler the parent's unchanged props would never re-render this body to show an error.
+  const { errors } = useFormState({ control });
   const selectedColor = useWatch({ control, name: 'color' });
   const selectedType  = useWatch({ control, name: 'type' });
   const selectedIcon  = useWatch({ control, name: 'icon' });
@@ -673,12 +676,14 @@ export function CategoryManagementDialog({
 
   const handleConfirmSubCategoryDelete = async (newCategoryId?: string, newSubCategoryId?: string) => {
     if (!category || !subCategoryToDelete || !user || !ownerId) return;
+    // Read before the try: the React Compiler does not compile a conditional expression inside a try/catch.
+    const newSubCategoryName = newSubCategoryId ? subCategories.find((s) => s.id === newSubCategoryId)?.name : undefined;
     try {
       if (newCategoryId) {
         await reassignExpensesSubCategory(
           category.id, subCategoryToDelete.id, ownerId,
           newSubCategoryId,
-          newSubCategoryId ? subCategories.find((s) => s.id === newSubCategoryId)?.name : undefined
+          newSubCategoryName
         );
         setSubCategories(subCategories.filter((s) => s.id !== subCategoryToDelete.id));
         toast.success('Spese riassegnate e sottocategoria rimossa');
@@ -700,16 +705,18 @@ export function CategoryManagementDialog({
 
   const handleMoveSubCategory = async (subCategoryId: string) => {
     if (!category || !user || !ownerId) return;
+    // Read before the try (the same snapshot either way): the React Compiler does not compile
+    // optional chaining inside a try/catch.
+    const subCat = subCategories.find((s) => s.id === subCategoryId);
+    const subCatName = subCat?.name;
     try {
       const expenseCount = await getExpenseCountBySubCategoryId(category.id, subCategoryId, ownerId);
       if (expenseCount === 0) {
-        const subCat = subCategories.find((s) => s.id === subCategoryId);
-        toast.warning(`La sottocategoria "${subCat?.name}" non ha transazioni da spostare`);
+        toast.warning(`La sottocategoria "${subCatName}" non ha transazioni da spostare`);
         return;
       }
       // The list for the move, through the key every reader shares (this dialog invalidates it on every write).
       const categories = await queryClient.fetchQuery(categoriesQueryOptions(ownerId));
-      const subCat = subCategories.find((s) => s.id === subCategoryId);
       if (subCat) {
         setSubCategoryToMove(subCat);
         setSubCategoryMoveExpenseCount(expenseCount);
@@ -724,7 +731,9 @@ export function CategoryManagementDialog({
 
   const handleConfirmMoveSubCategory = async (newCategoryId: string, newSubCategoryId?: string) => {
     if (!category || !subCategoryToMove || !user || !ownerId) return;
-    try {
+    // The move is a function of its own, awaited in the try below: the React Compiler does not
+    // compile conditional/logical expressions inside a try/catch.
+    const move = async () => {
       const newCategory = allCategoriesForMove.find((cat) => cat.id === newCategoryId);
       if (!newCategory) { toast.error('Categoria di destinazione non trovata'); return; }
       let resolvedSubName: string | undefined;
@@ -744,6 +753,9 @@ export function CategoryManagementDialog({
       setMoveSubCategoryDialogOpen(false);
       setSubCategoryToMove(null);
       setSubCategoryMoveExpenseCount(0);
+    };
+    try {
+      await move();
     } catch (error) {
       console.error('Error moving subcategory expenses:', error);
       toast.error(
@@ -754,7 +766,9 @@ export function CategoryManagementDialog({
 
   const onSubmit = async (data: CategoryFormValues) => {
     if (!user || !ownerId) { toast.error('Devi essere autenticato'); return; }
-    try {
+    // The save is a function of its own, awaited in the try below: the React Compiler does not
+    // compile conditional/logical expressions inside a try/catch.
+    const save = async () => {
       const categoryData: ExpenseCategoryFormData = {
         name: data.name.trim(),
         type: data.type,
@@ -784,6 +798,9 @@ export function CategoryManagementDialog({
       invalidateCategoryCaches(queryClient, ownerId, { rowsChanged });
       onSuccess?.();
       onClose();
+    };
+    try {
+      await save();
     } catch (error) {
       console.error('Error saving category:', error);
       toast.error(

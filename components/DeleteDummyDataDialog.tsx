@@ -55,9 +55,9 @@ export function DeleteDummyDataDialog({
     } catch (error) {
       console.error('Error loading dummy data count:', error);
       setStatus({ phase: 'error', message: describeWriteError(error) });
-    } finally {
-      setIsLoading(false);
     }
+    // After the try/catch, not in a `finally`: the React Compiler cannot lower try/finally.
+    setIsLoading(false);
   }, [userId]);
 
   // Load count when dialog opens
@@ -91,9 +91,8 @@ export function DeleteDummyDataDialog({
     } catch (error) {
       console.error('Error deleting dummy data:', error);
       setStatus({ phase: 'error', message: describeWriteError(error) });
-    } finally {
-      setIsDeleting(false);
     }
+    setIsDeleting(false);
   };
 
 

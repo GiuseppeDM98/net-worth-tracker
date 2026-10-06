@@ -50,7 +50,7 @@ import {
   prepareMonthlyReturnsHeatmap,
   prepareUnderwaterDrawdownData,
 } from '@/lib/services/performanceService';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { usePerformanceData } from '@/lib/hooks/usePerformanceData';
 import { useFreshness } from '@/lib/hooks/useFreshness';
 import { performanceYieldsQueryOptions, withYields } from '@/lib/query/performanceQueries';
@@ -58,6 +58,7 @@ import { resolveHasBaseline, type PerformanceBaseResolution } from '@/lib/utils/
 import { resolveCenteredModalOrigin } from '@/lib/utils/modalOrigin';
 import { attributePeriodReturn, sumDividendsByAsset, type DividendReceipt } from '@/lib/utils/performanceAttribution';
 import type { PerformanceData, PerformanceMetrics, TimePeriod } from '@/types/performance';
+import type { PerformanceYields } from '@/lib/utils/dividendYield';
 import type { Asset, MonthlySnapshot } from '@/types/assets';
 import type { PensionContribution } from '@/types/pension';
 import type { AssetTransaction } from '@/types/assetTransactions';
@@ -157,6 +158,31 @@ const NO_ASSETS: Asset[] = [];
 const NO_CONTRIBUTIONS: PensionContribution[] = [];
 const NO_DIVIDENDS: DividendReceipt[] = [];
 const NO_TRADES: AssetTransaction[] = [];
+
+/**
+ * The custom range's dividend yields. A yield that cannot be read leaves the range without it,
+ * like the five periods. Module-level so the page's try block holds no conditional: keeps the page
+ * compilable by the React Compiler.
+ */
+async function readCustomRangeYields(
+  queryClient: QueryClient,
+  ownerId: string,
+  measured: PerformanceMetrics,
+): Promise<PerformanceYields | undefined> {
+  const yields = measured.hasInsufficientData
+    ? undefined
+    : await queryClient
+        .fetchQuery(
+          performanceYieldsQueryOptions(ownerId, [
+            { key: CUSTOM_YIELD_KEY, startDate: measured.startDate, dividendEndDate: measured.dividendEndDate, numberOfMonths: measured.numberOfMonths },
+          ]),
+        )
+        .catch((error) => {
+          console.warn('Dividend yields not read for the custom range:', error);
+          return undefined;
+        });
+  return yields?.[CUSTOM_YIELD_KEY];
+}
 
 /** «1 ago 2025» for the compact header's description. */
 function shortDate(date: Date): string {
@@ -290,13 +316,15 @@ export default function PerformancePage() {
   const eurReturnsById = useMemo(() => {
     const map: Record<string, MonthlyReturnPoint[] | undefined> = {};
     if (isFxLoading) return map;
+    // The series themselves, not `benchmarkResults` (a new array every render): the map changes
+    // only when a series or the FX does.
+    const series = [b0.data, b1.data, b2.data, b3.data, b4.data, b5.data];
     BENCHMARKS.forEach((b, i) => {
-      const raw = benchmarkResults[i].data;
+      const raw = series[i];
       if (!raw) return;
       map[b.id] = fxRates && fxRates.length > 0 ? applyFxConversion(raw, fxRates) : raw;
     });
     return map;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [b0.data, b1.data, b2.data, b3.data, b4.data, b5.data, fxRates, isFxLoading]);
 
   const handlePeriodChange = (nextPeriod: TimePeriod) => {
@@ -327,6 +355,9 @@ export default function PerformancePage() {
   /** A custom range recomputes from the base's snapshots — no round trip but the yields of its window. */
   const handleCustomDateRange = async (startDate: Date, endDate: Date) => {
     if (!user || !ownerId || !performanceData || cachedSnapshots.length === 0) return;
+    // Read before the try, which may hold no `?.`/`??` under the React Compiler.
+    const pensionFlows = base?.pensionFlows ?? [];
+    const portfolioFlows = base?.portfolioFlows ?? [];
     try {
       const measured = await calculatePerformanceForPeriod(
         ownerId,
@@ -337,23 +368,10 @@ export default function PerformancePage() {
         endDate,
         undefined,
         performanceData.ytd.dividendCategoryId,
-        base?.pensionFlows ?? [],
-        base?.portfolioFlows ?? [],
+        pensionFlows,
+        portfolioFlows,
       );
-      // A yield that cannot be read leaves the range without it, like the five periods.
-      const yields = measured.hasInsufficientData
-        ? undefined
-        : await queryClient
-            .fetchQuery(
-              performanceYieldsQueryOptions(ownerId, [
-                { key: CUSTOM_YIELD_KEY, startDate: measured.startDate, dividendEndDate: measured.dividendEndDate, numberOfMonths: measured.numberOfMonths },
-              ]),
-            )
-            .catch((error) => {
-              console.warn('Dividend yields not read for the custom range:', error);
-              return undefined;
-            });
-      setCustomMetrics(withYields(measured, yields?.[CUSTOM_YIELD_KEY]));
+      setCustomMetrics(withYields(measured, await readCustomRangeYields(queryClient, ownerId, measured)));
       handlePeriodChange('CUSTOM');
       toast.success('Periodo personalizzato calcolato');
     } catch (error) {
@@ -437,9 +455,6 @@ export default function PerformancePage() {
   const benchmark = benchmarkGap === null ? null : { name: REFERENCE_BENCHMARK.name, delta: benchmarkGap };
   // The second chip: the same TWR on the other basis (the ROI, a gain over the first month's capital, lives in the Dettaglio).
   const companionReturnChip = resolveCompanionReturnChip(metrics?.timeWeightedReturn ?? null, metrics?.numberOfMonths ?? 0, heroReturn);
-  const quality = metrics
-    ? summarizePerformance({ timeWeightedReturn: metrics.timeWeightedReturn, sharpeRatio: metrics.sharpeRatio, riskFreeRate: metrics.riskFreeRate })
-    : null;
   const consistency = useMemo(() => computeReturnConsistency(heatmapData), [heatmapData]);
   const drawdownStatus = useMemo(() => computeDrawdownStatus(underwaterData), [underwaterData]);
   const drawdownStory = useMemo(() => (metrics ? resolveDrawdownStory(periodSnapshots, metrics.cashFlows) : null), [metrics, periodSnapshots]);
@@ -476,25 +491,27 @@ export default function PerformancePage() {
   const realizedGains = useMemo(() => aggregateRealizedByYear(ledgerTrades), [ledgerTrades]);
   const realizedSummary = useMemo(() => (isLedgerMigrated ? summarizeRealizedGains(realizedGains.byYear) : null), [isLedgerMigrated, realizedGains]);
 
+  const referenceAnnualized = referenceRow?.annualized;
   const verdict = useMemo(() => {
-    if (!metrics || !quality) return null;
+    if (!metrics) return null;
+    // heroReturn and referenceModel are rebuilt here from the deps (the same expressions as above,
+    // `metrics` known to be set), and the quality is read here only: the render's copies are new
+    // objects every render, and the verdict changes only with what decides them.
     return buildPerformanceVerdict({
       period: selectedPeriod,
       nominalPeriodStart: metrics.nominalPeriodStart,
       startDate: metrics.startDate,
       endDate: metrics.endDate,
       numberOfMonths: metrics.numberOfMonths,
-      heroReturn,
+      heroReturn: resolveHeroReturn(metrics.timeWeightedReturn ?? null, metrics.numberOfMonths ?? 0),
       annualizedReturn: metrics.timeWeightedReturn,
-      quality,
+      quality: summarizePerformance({ timeWeightedReturn: metrics.timeWeightedReturn, sharpeRatio: metrics.sharpeRatio, riskFreeRate: metrics.riskFreeRate }),
       sharpeRatio: metrics.sharpeRatio,
-      benchmark: referenceModel,
+      benchmark: referenceAnnualized == null ? null : { name: REFERENCE_BENCHMARK.name, annualized: referenceAnnualized },
       drawdown: drawdownStory,
       consistency,
     });
-    // heroReturn/quality/referenceModel are derived from the same inputs as the deps below.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [metrics, selectedPeriod, referenceRow?.annualized, drawdownStory, consistency]);
+  }, [metrics, selectedPeriod, referenceAnnualized, drawdownStory, consistency]);
 
   const rollingCagr = useMemo(() => {
     if (!performanceData || !metrics) return [];

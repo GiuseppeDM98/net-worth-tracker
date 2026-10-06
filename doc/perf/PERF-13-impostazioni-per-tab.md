@@ -4,18 +4,26 @@
 
 ## 1. Il problema, misurato
 
-`app/dashboard/settings/page.tsx` è **un componente di 4105 righe** (`SettingsPage` da `:546`) con **70 chiamate a `useState`**, 5 `useEffect`,
+`app/dashboard/settings/page.tsx` è **un componente di 4118 righe** (`SettingsPage` da `:571`; righe rilette il 2026-10-05) con **70 chiamate a `useState`**, 5 `useEffect`,
 5 `useCallback`, 0 `useMemo`; dal 2026-09-29 le letture passano dalle chiavi condivise (`fetchQuery(settingsQueryOptions)`
-in `loadTargets` e nel pre-read di «Salva», `useExpenseCategories`, `useAssets`) ma il seed dei 70 stati resta imperativo. Sei tab (generale `:2014`, allocazione `:2774`, spese `:3373`, dividendi `:3686`, condivisione
-`:3875`, aspetto `:3915`) gated da `mountedTabs` (`:661`; `allocazione` sempre in `renderedPanels`, `:1855`): Radix smonta i
-pannelli inattivi (`TabsContent` senza `forceMount`, `:2013-2021`, `:2774-2782`), ma **il JSX di ogni tab visitata più
+in `loadTargets` e nel pre-read di «Salva», `useExpenseCategories`, `useAssets`) ma il seed dei 70 stati resta imperativo. Sei tab (generale `:2028`, allocazione `:2788`, spese `:3387`, dividendi `:3700`, condivisione
+`:3889`, aspetto `:3929`) gated da `mountedTabs` (`:694`; `allocazione` sempre in `renderedPanels`, `:1865`): Radix smonta i
+pannelli inattivi (`TabsContent` senza `forceMount`), ma **il JSX di ogni tab visitata più
 allocazione viene ricostruito a ogni render**, e ogni tasto in un campo controllato è un render dell'intera funzione. In
-allocazione, `forceMount` sui `CollapsibleContent` per classe (`:3055`) e per sotto-categoria (`:3226`) rende OGNI editor
-anche collassato. Al mount, `router.replace(\`${pathname}?tab=${initialTab}\`)` incondizionato (`:688-691`) e a ogni cambio tab
-(`:685`): ogni `useSearchParams`/`usePathname` consumer (i `SceneLink`, `AddExpenseFab`) ri-renderizza.
+allocazione, `forceMount` sui `CollapsibleContent` per classe (`:3068`) e per sotto-categoria (`:3239`) rende OGNI editor
+anche collassato. Al mount, `router.replace(\`${pathname}?tab=${initialTab}\`)` incondizionato (`syncTabParam`, un `useEffectEvent` chiamato da un effetto `[]`, `:723-728`) e a ogni cambio tab
+(`handleTabChange`, `:715`): ogni `useSearchParams`/`usePathname` consumer (i `SceneLink`, `AddExpenseFab`) ri-renderizza.
 
 Il proprietario lo sente digitando (2026-09-26). Con il compiler acceso (PERF-12) i FIGLI memoizzano, ma il componente
-stesso ha 70 stati e continua a rieseguire 4000 righe di funzione: il compiler non può spezzare un componente. La regola del
+stesso ha 70 stati e continua a rieseguire 4000 righe di funzione: il compiler non può spezzare un componente.
+**Misurato chiudendo PERF-12 (2026-10-05, mirror, build `--profile`, census `settings`)**: un tasto in «Anno inizio storico
+cashflow» ri-renderizza **318** componenti (423 senza compiler), render React 4,09 ms per tasto, 2 commit — è il «prima» di
+questa spec. PERF-12 ha anche reso compilabile la pagina senza spezzarla: i quattro gestori asincroni con `try … finally` o
+`throw` (`loadTargets`, la sincronizzazione dei dividendi, `handleSave`, l'email di prova) e i due spostamenti di categoria
+passano da `runGuarded` (try/catch/finally a livello di modulo, `:300`), e la sincronizzazione del `?tab` al mount da un
+`useEffectEvent`. Le viste nuove seguono le stesse riscritture (AGENTS.md § Motion), o `__tests__/reactCompilerCoverage.test.ts` è
+rosso; una vista che riceve `form` e ne legge `formState` si iscrive con `useFormState` (doc/guide/cashflow.md § The expense
+form reads the keys). La regola del
 repo esiste già: «Prefer rendering large local subtrees as pure render helpers or top-level components» (AGENTS.md
 § Hierarchy). E doc/guide/impostazioni.md fissa la struttura: UN «Salva» per pagina con lo stato di salvataggio PER TAB (un
 punto sulla tab, la barra in basso, «Annulla modifiche» come RILETTURA dal server — `loadTargets({ quiet: true })`, così il
@@ -48,7 +56,8 @@ toccato un campo — la rilettura entra solo finché nessuna tab è sporca.
 - La bozza è UN `useReducer(settingsDraftReducer)` nella pagina, con il reducer e `composeSettingsDocument`/`sliceSettings`
   in `lib/utils/settingsDraft.ts` (puri, testati contro `STORED_SETTINGS`); le sette sedi di § Settings — the FIVE places
   restano UNA scrittura.
-- Census (PERF-12, `npm run perf:census -- --route=settings`): 10 tasti in Generale → componenti ri-renderizzati per tasto =
+- Census (PERF-12, `npm run perf:census -- --scenario=settings`, già nello script: 10 tasti in «Anno inizio storico cashflow»;
+  uno scenario per Allocazione si aggiunge in questa spec): 10 tasti in Generale → componenti ri-renderizzati per tasto =
   la vista Generale e l'orchestratore, MAI le altre viste; `ScriptDuration` per tasto −70% rispetto a prima.
 - `router.replace` al mount solo quando `?tab` manca o è invalido (come Cashflow `:236`), mai incondizionato.
 - Allocazione: un editor di classe/sotto-categoria collassato NON è nel DOM; quando «Salva» trova un errore in un gruppo
@@ -107,6 +116,7 @@ accorcia a ogni passo e il diff resta leggibile.
 - `lib/utils/settingsDraft.ts` (nuovo, puro): reducer, `sliceSettings`, `composeSettingsDocument`, `isSliceDirty`.
 - `components/settings/tabs/*Tab.tsx` (6 nuovi), `components/settings/allocation/{AllocationClassEditor,SubTargetEditor}.tsx`
   (nuovi), `components/settings/{ExpenseImportSection,AccountSharingSection}.tsx` (invariati, ospitati dalle viste).
+- `scripts/perfRenderCensus.mjs` — uno scenario per Allocazione (tasti in un target di classe), accanto a `settings`.
 - Test: `__tests__/settingsDraft.test.ts` (compose∘slice = identità sul fixture; una fetta con errore blocca il compose e
   nomina la sede; `isSliceDirty`), `settingsRoundTrip`, `settingsNarrative`, `allocationTargetValidation`,
   `e2e/settings{,.mobile}.spec.ts` (+ una spec che salva da una tab e verifica, dopo hard refresh — «only a hard refresh
@@ -115,7 +125,7 @@ accorcia a ogni passo e il diff resta leggibile.
 
 ## 6. Passi
 
-1. Census prima (PERF-12): tasti in Generale e in Allocazione.
+1. Census prima (PERF-12, build `--profile`): `--scenario=settings` (318 per tasto il 2026-10-05) e lo scenario nuovo di Allocazione.
 2. `settingsDraft.ts` + test di identità sul fixture; la pagina legge/scrive la bozza (ancora monolitica).
 3. Le sei viste nell'ordine di § 4, con le suite dopo ognuna.
 4. `router.replace` condizionato; `useSearchParams` in Suspense; il focus attraverso le tab.
@@ -182,7 +192,7 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
 Regole: nessun commit senza il mio OK; un branch e un commit; rispondi in italiano.
 Metodo: prima la bozza con la pagina ancora monolitica, poi una tab alla volta nell'ordine della spec § 4 con tsc +
 settingsRoundTrip + settingsNarrative + e2e/settings* dopo ognuna; il census dei re-render per tasto prima/dopo (npm run
-perf:census -- --route=settings); le quattro falsificazioni di § 7 viste ROSSE; il documento letto dall'emulatore
+perf:census -- --scenario=settings su una build perf:build -- --profile; il prima è 318 per tasto); le quattro falsificazioni di § 7 viste ROSSE; il documento letto dall'emulatore
 prima/dopo un salvataggio da OGNI tab. Chiusura: tsc, lint 0, Vitest in Europe/Rome, npm run test:e2e COMPLETO; giro
 guidato di 5 punti sul mirror a 390 e 1440, poi mirror:remove; CLAUDE.md «Latest» e la riga Impostazioni,
 doc/guide/impostazioni.md, AGENTS.md § Hierarchy e § React Query, Draft Release Temp.md (senza dati privati),

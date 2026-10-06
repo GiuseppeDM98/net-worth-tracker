@@ -112,6 +112,11 @@ function collectAvailableYears(data: HallOfFameData): number[] {
   return Array.from(years).sort((a, b) => b - a);
 }
 
+// Module-level so the page's try block holds no `throw`: keeps it compilable by the React Compiler.
+function assertRecalculated(response: Response): void {
+  if (!response.ok) throw new Error('Failed to recalculate Hall of Fame');
+}
+
 export default function HallOfFamePage() {
   const { user } = useAuth();
   const { ownerId } = useActiveAccount();
@@ -186,15 +191,15 @@ export default function HallOfFamePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: ownerId }),
       });
-      if (!response.ok) throw new Error('Failed to recalculate Hall of Fame');
+      assertRecalculated(response);
       toast.success('Record aggiornati.');
       await reloadData();
     } catch (error) {
       console.error('Error recalculating Hall of Fame:', error);
       toast.error("Errore durante l'aggiornamento dei record");
-    } finally {
-      setRecalculating(false);
     }
+    // After the try/catch rather than in a `finally`: keeps the page compilable by the React Compiler.
+    setRecalculating(false);
   };
 
   const handleNoteSave = async (note: {

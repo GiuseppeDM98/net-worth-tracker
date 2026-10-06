@@ -70,7 +70,7 @@ import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
 import { ErrorNotice } from '@/components/ui/error-notice';
 import { EmptyState } from '@/components/ui/empty-state';
 import { describeReadFailure, resolveSurfaceState } from '@/lib/utils/statesNarrative';
-import type { TileSkeletonCell } from '@/lib/utils/tileGridSkeleton';
+import { DIVIDENDS_SKELETON_CELLS } from '@/lib/constants/cashflowTabSkeletons';
 import { Download, FileDown, Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -148,16 +148,6 @@ const FLOW_MONTHS = 6;
 const RANKED_PAYERS = 5;
 /** Announced payments listed in the hero's footer. */
 const UPCOMING_SHOWN = 3;
-
-/** The page's own grid, so the loading state has the proportions of what replaces it. */
-const SKELETON_CELLS: TileSkeletonCell[] = [
-  { span: 5, rows: 2, lines: 8 },
-  { span: 3, lines: 5 },
-  { span: 4, lines: 5 },
-  { span: 4, lines: 6 },
-  { span: 3, lines: 4 },
-  { span: 12, lines: 6 },
-];
 
 const ALL = '__all__';
 
@@ -367,7 +357,11 @@ export function DividendTrackingTab({ dividends, assets, loading, loadFailed, on
    */
   const executeScrapeAll = async () => {
     if (!user || !ownerId) return;
-    try {
+    // The run and each instrument's request are functions of their own, awaited inside the
+    // try blocks, and the reset follows the catch instead of a finally: the React Compiler does
+    // not compile conditional/logical expressions inside a try/catch, nor a try/finally, nor
+    // `++` on a variable a nested function captures (hence `+= 1` on the counters).
+    const scrapeAll = async () => {
       setScraping(true);
       let successCount = 0;
       let failedCount = 0;
@@ -377,24 +371,27 @@ export function DividendTrackingTab({ dividends, assets, loading, loadFailed, on
       // «Nessun nuovo dividendo trovato» and nothing else.
       let filteredCount = 0;
       let filteredByCreation = 0;
+      const scrapeOne = async (asset: Asset) => {
+        const response = await authenticatedFetch('/api/dividends/scrape', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: ownerId, assetId: asset.id }),
+        });
+        if (response.ok) {
+          const result = await response.json();
+          if (result.created > 0) successCount += 1;
+          if (typeof result.filtered === 'number' && result.filtered > 0) {
+            filteredCount += result.filtered;
+            if (result.floorSource === 'created') filteredByCreation += 1;
+          }
+        } else failedCount += 1;
+      };
       for (const asset of assetsWithIsin) {
         try {
-          const response = await authenticatedFetch('/api/dividends/scrape', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: ownerId, assetId: asset.id }),
-          });
-          if (response.ok) {
-            const result = await response.json();
-            if (result.created > 0) successCount++;
-            if (typeof result.filtered === 'number' && result.filtered > 0) {
-              filteredCount += result.filtered;
-              if (result.floorSource === 'created') filteredByCreation++;
-            }
-          } else failedCount++;
+          await scrapeOne(asset);
         } catch (error) {
           console.error(`Error scraping ${asset.ticker}:`, error);
-          failedCount++;
+          failedCount += 1;
         }
       }
       if (successCount > 0) {
@@ -407,13 +404,16 @@ export function DividendTrackingTab({ dividends, assets, loading, loadFailed, on
         toast.info(describeFilteredDividends(filteredCount, filteredByCreation), { duration: 12_000 });
       }
       if (failedCount > 0) toast.warning(`${failedCount} ${failedCount === 1 ? 'strumento ha' : 'strumenti hanno'} fallito lo scarico`);
+    };
+
+    try {
+      await scrapeAll();
     } catch (error) {
       console.error('Error scraping dividends:', error);
       toast.error('Errore durante lo scarico dei dividendi');
-    } finally {
-      setScraping(false);
-      setScrapeDialogOpen(false);
     }
+    setScraping(false);
+    setScrapeDialogOpen(false);
   };
 
   const handleExportCSV = () => {
@@ -467,7 +467,7 @@ export function DividendTrackingTab({ dividends, assets, loading, loadFailed, on
   if (loading) {
     return (
       <TileGridSkeleton
-        cells={SKELETON_CELLS}
+        cells={DIVIDENDS_SKELETON_CELLS}
         className="pt-1"
         toolbar={<Skeleton className="mx-auto h-9 w-full max-w-[320px] rounded-lg desktop:hidden" />}
       />

@@ -37,7 +37,7 @@
 
 'use client';
 
-import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import React, { Suspense, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useTheme } from 'next-themes';
@@ -290,6 +290,26 @@ const EMPTY_ASSETS: Asset[] = [];
 
 // Stable no-op store for the SSR/hydration split (same guard ThemePicker uses).
 const neverChanges = () => () => {};
+
+/**
+ * A try/catch/finally at module level, for the page's async handlers: the React Compiler refuses a
+ * `finally`, a `throw` and any conditional expression inside a component's own try block, and these
+ * handlers have all three. `work` is the try block (its `return` is the handler's), `onError` the
+ * catch, `onSettled` the finally — same order, same propagation.
+ */
+async function runGuarded<T>(
+  work: () => Promise<T>,
+  onError: (error: unknown) => T,
+  onSettled?: () => void,
+): Promise<T> {
+  try {
+    return await work();
+  } catch (error) {
+    return onError(error);
+  } finally {
+    onSettled?.();
+  }
+}
 
 // Aspetto → Modalità: the three next-themes modes, applied with the circle view transition.
 const THEME_MODES = [
@@ -698,10 +718,13 @@ export default function SettingsPage() {
     router.replace(`${pathname}?tab=${value}`, { scroll: false });
   };
 
-  // Sync URL on mount so the initial tab is always reflected
-  useEffect(() => {
+  // Sync URL on mount so the initial tab is always reflected. An Effect Event: the router, the
+  // path and the tab are read, never triggers — it runs once, at mount.
+  const syncTabParam = useEffectEvent(() => {
     router.replace(`${pathname}?tab=${initialTab}`, { scroll: false });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  });
+  useEffect(() => {
+    syncTabParam();
   }, []);
 
   // Auto-calculated Azioni/Obbligazioni: the pair is a function of age, risk-free rate and the
@@ -742,7 +765,7 @@ export default function SettingsPage() {
   const loadTargets = useCallback(async ({ quiet = false }: { quiet?: boolean } = {}): Promise<boolean> => {
     if (!user || !ownerId) return false;
 
-    try {
+    return runGuarded(async () => {
       if (!quiet) setLoading(true);
       setLoadFailed(false);
       // Through the settings key every page shares (2026-09-29): a warm visit seeds the form from
@@ -949,14 +972,14 @@ export default function SettingsPage() {
         })
       );
       return true;
-    } catch (error) {
+    }, (error) => {
       setLoadFailed(true);
       console.error('Error loading targets:', error);
       toast.error('Errore nel caricamento dei target');
       return false;
-    } finally {
+    }, () => {
       setLoading(false);
-    }
+    });
   }, [user, ownerId, queryClient]);
 
   // Re-read the categories after a write here (a category created, moved, deleted, imported) and
@@ -1039,7 +1062,7 @@ export default function SettingsPage() {
   ) => {
     if (!categoryToDelete || !user || !ownerId) return;
 
-    try {
+    await runGuarded(async () => {
       // If no new category ID provided, delete without reassignment
       if (!newCategoryId) {
         // Clear category assignment from expenses (set to "Senza categoria")
@@ -1103,10 +1126,10 @@ export default function SettingsPage() {
       setExpenseCountToReassign(0);
       invalidateCategoryCaches(queryClient, ownerId, { rowsChanged: true });
       await loadExpenseCategories();
-    } catch (error) {
+    }, (error) => {
       console.error('Error during reassignment and deletion:', error);
       toast.error('Errore durante la riassegnazione delle spese');
-    }
+    });
   };
 
   // The second press of an armed row (zero-expense path).
@@ -1155,7 +1178,7 @@ export default function SettingsPage() {
   ) => {
     if (!categoryToMove || !user || !ownerId) return;
 
-    try {
+    await runGuarded(async () => {
       const newCategory = await getCategoryById(newCategoryId);
       if (!newCategory) {
         toast.error('Categoria di destinazione non trovata');
@@ -1195,12 +1218,12 @@ export default function SettingsPage() {
       setMoveCategoryDialogOpen(false);
       setCategoryToMove(null);
       setExpenseCountToMove(0);
-    } catch (error) {
+    }, (error) => {
       console.error('Error during category move:', error);
       toast.error(
         error instanceof TransferBoundaryError ? error.message : 'Errore nello spostamento delle transazioni'
       );
-    }
+    });
   };
 
   const handleExpenseCategoryDialogClose = () => {
@@ -1225,7 +1248,7 @@ export default function SettingsPage() {
       return;
     }
 
-    try {
+    await runGuarded(async () => {
       setSyncingDividends(true);
 
       // Get category details
@@ -1282,12 +1305,12 @@ export default function SettingsPage() {
       } else {
         toast.success(`Sincronizzazione completata: ${result.created} voci create, ${result.skipped} già presenti.`);
       }
-    } catch (error) {
+    }, (error) => {
       console.error('Error syncing dividends:', error);
       toast.error('Errore nella sincronizzazione dei dividendi');
-    } finally {
+    }, () => {
       setSyncingDividends(false);
-    }
+    });
   };
 
   const getCategoriesByType = (type: ExpenseType): ExpenseCategory[] => {
@@ -1420,7 +1443,7 @@ export default function SettingsPage() {
     }
     if (cleanedStates !== assetClassStates) setAssetClassStates(cleanedStates);
 
-    try {
+    await runGuarded(async () => {
       setSaving(true);
 
       // Fetch the CURRENT settings (never the cache) to preserve the fields other pages write
@@ -1524,12 +1547,12 @@ export default function SettingsPage() {
       // React Query with a 5-minute staleTime — without this, a just-added member wouldn't be
       // selectable there until that cache naturally expired.
       queryClient.invalidateQueries({ queryKey: queryKeys.settings.all(ownerId) });
-    } catch (error) {
+    }, (error) => {
       console.error('Error saving targets:', error);
       toast.error('Errore nel salvataggio dei target');
-    } finally {
+    }, () => {
       setSaving(false);
-    }
+    });
   };
 
   const handleReset = () => {
@@ -2578,7 +2601,7 @@ export default function SettingsPage() {
                               disabled={isDemo || monthlyEmailRecipients.length === 0 || sendingTestEmailType !== null}
                               onClick={async () => {
                                 setSendingTestEmailType(type);
-                                try {
+                                await runGuarded(async () => {
                                   const res = await authenticatedFetch(
                                     '/api/user/monthly-email/send',
                                     {
@@ -2593,11 +2616,11 @@ export default function SettingsPage() {
                                     const resBody = await res.json().catch(() => ({}));
                                     toast.error(resBody.error ?? "Errore durante l'invio");
                                   }
-                                } catch {
+                                }, () => {
                                   toast.error("Errore durante l'invio dell'email");
-                                } finally {
+                                }, () => {
                                   setSendingTestEmailType(null);
-                                }
+                                });
                               }}
                             >
                               {sendingTestEmailType === type ? (

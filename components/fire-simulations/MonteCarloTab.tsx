@@ -280,9 +280,9 @@ export function MonteCarloTab() {
       } catch (error) {
         console.error('Error running the Monte Carlo scenarios:', error);
         toast.error('Errore durante la simulazione');
-      } finally {
-        setIsRunning(false);
       }
+      // After the try/catch, not in a `finally`: the React Compiler cannot lower try/finally.
+      setIsRunning(false);
     }, 60);
   }, []);
 

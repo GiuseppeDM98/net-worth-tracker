@@ -531,10 +531,12 @@ export function FireCalculatorTab() {
     return { statePensions, withdrawalTax: honest.withdrawalTax };
   }, [honestSummary.pensionsConsidered, honest, userAge, scenarios.base.inflationRate, now]);
   const runFan = useCallback(
-    (inputs: FanSimulationInputs, annualSavings = inputs.annualSavings) =>
+    // No `= inputs.annualSavings` parameter default: the React Compiler cannot reorder a default
+    // that reads another parameter.
+    (inputs: FanSimulationInputs, annualSavings?: number) =>
       runAccumulationSimulation({
         ...inputs,
-        annualSavings,
+        annualSavings: annualSavings ?? inputs.annualSavings,
         years: fanYears,
         retirementHorizonYears,
         fireTargets: fanFireTargets,

@@ -38,7 +38,7 @@
  */
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useChartColors } from '@/lib/hooks/useChartColors';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -312,7 +312,11 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
   }, []);
 
   // Keep the URL in sync with the period AND the focus — replace (not push) so filter changes
-  // don't spam browser history with back-button stops.
+  // don't spam browser history with back-button stops. router/pathname are read, not triggers:
+  // only a period or focus change writes the URL.
+  const replaceUrl = useEffectEvent((query: string) => {
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  });
   useEffect(() => {
     const params = new URLSearchParams();
     if (periodMode !== 'current') params.set('period', periodMode);
@@ -323,9 +327,7 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
       params.set('focusCat', drillDown.selectedCategory.key);
       if (drillDown.level === 'expenseList' && drillDown.selectedSubCategory) params.set('focusSub', drillDown.selectedSubCategory.key);
     }
-    const query = params.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- router/pathname are stable
+    replaceUrl(params.toString());
   }, [periodMode, selectedYear, selectedMonth, drillDown]);
 
   // Cold-load focus restore: the URL triple is captured once at mount, then applied as soon as
@@ -347,8 +349,8 @@ export function AnalisiTab({ allExpenses, categories, loading, loadFailed, histo
     });
     // A deep link should LAND on the Scheda, not leave it below the fold.
     scrollToScheda();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- fires once when loading settles
-  }, [loading, allExpenses, categories, historyStartYear]);
+    // Fires once when loading settles: the ref is cleared on the first pass, and scrollToScheda is stable.
+  }, [loading, allExpenses, categories, historyStartYear, scrollToScheda]);
 
   const isMobile = useMediaQuery('(max-width: 639px)');
 

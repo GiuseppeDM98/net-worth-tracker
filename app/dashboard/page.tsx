@@ -73,6 +73,11 @@ const ITALIAN_LONG_DATE = new Intl.DateTimeFormat('it-IT', {
 /** Grid cell wrapper: the tile stretches to the row height so `mt-auto` footers align. */
 const CELL_CLASS = TILE_CELL_CLASS;
 
+// Module-level so the page's try block holds no conditional: keeps it compilable by the React Compiler.
+function resolveSnapshotDialogOrigin(reducedMotion: boolean | null, trigger: HTMLElement): string | undefined {
+  return reducedMotion ? undefined : resolveCenteredModalOrigin(trigger.getBoundingClientRect());
+}
+
 export default function DashboardPage() {
   const { user } = useAuth();
   const { ownerId } = useActiveAccount();
@@ -210,12 +215,12 @@ export default function DashboardPage() {
 
   const handleCreateSnapshot = async (event: MouseEvent<HTMLButtonElement>) => {
     if (!user || !ownerId) return;
+    // Read before the try, which may hold no optional chain under the React Compiler.
+    const snapshotExists = overview?.flags.currentMonthSnapshotExists;
     try {
-      if (overview?.flags.currentMonthSnapshotExists) {
+      if (snapshotExists) {
         snapshotOpenerRef.current = event.currentTarget;
-        setSnapshotOrigin(
-          prefersReducedMotion ? undefined : resolveCenteredModalOrigin(event.currentTarget.getBoundingClientRect()),
-        );
+        setSnapshotOrigin(resolveSnapshotDialogOrigin(prefersReducedMotion, event.currentTarget));
         setShowConfirmDialog(true);
       } else {
         await createSnapshot();
@@ -244,9 +249,9 @@ export default function DashboardPage() {
       console.error('Error creating snapshot:', error);
       toast.dismiss('snapshot-creation');
       toast.error('Errore nella creazione dello snapshot');
-    } finally {
-      setCreatingSnapshot(false);
     }
+    // After the try/catch rather than in a `finally`: keeps the page compilable by the React Compiler.
+    setCreatingSnapshot(false);
   };
 
   // A plain button: it used to sit in a `motion.div` with the app's ONLY `whileTap` (scale 0.97)

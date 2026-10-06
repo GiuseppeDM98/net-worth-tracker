@@ -128,7 +128,9 @@ export function DividendCalendar({ dividends, now, bounds }: DividendCalendarPro
   };
 
   // What the displayed month holds — received and announced counted apart, never summed.
-  const monthSummary = useMemo(() => {
+  // Computed in render rather than in a useMemo whose deps skip the helpers it calls: the
+  // React Compiler memoizes it on everything it reads.
+  const monthSummary = (() => {
     let days = 0;
     let received = 0;
     let announced = 0;
@@ -144,8 +146,7 @@ export function DividendCalendar({ dividends, now, bounds }: DividendCalendarPro
       }
     }
     return { days, received, announced };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [calendarGrid, dividendsByDate, now, currentMonth, currentYear]);
+  })();
 
   // How far the arrows may travel — the period's own window.
   const atLowerBound =
@@ -172,14 +173,13 @@ export function DividendCalendar({ dividends, now, bounds }: DividendCalendarPro
   };
 
   // Which cell is in the Tab order: the remembered one for this month, else today when the
-  // grid holds it, else the first day of the month.
-  const focusedIndex = useMemo(() => {
+  // grid holds it, else the first day of the month. In render, like monthSummary above.
+  const focusedIndex = (() => {
     if (focus && focus.month === currentMonth && focus.year === currentYear) return focus.index;
     const todayIndex = calendarGrid.findIndex((date) => isToday(date));
     if (todayIndex >= 0) return todayIndex;
     return Math.max(0, calendarGrid.findIndex((date) => isCurrentMonth(date)));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focus, currentMonth, currentYear, calendarGrid]);
+  })();
 
   const moveFocus = (index: number) => {
     const clamped = Math.max(0, Math.min(41, index));

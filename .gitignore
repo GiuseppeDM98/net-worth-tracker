@@ -75,3 +75,5 @@ skills-lock.json
 
 # Speed benchmark: every run and the medians of the last `npm run perf:bench` (machine-specific times)
 /perf/last-run.json
+# …and of the last `npm run perf:census` (React renders and browser counters per key)
+/perf/last-census.json
