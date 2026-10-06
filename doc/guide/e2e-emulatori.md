@@ -148,8 +148,16 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   chunk until the test releases it (`holdChunks`) — a fixed delay loses the race to a preload — and navigate to
   `domcontentloaded`: a held chunk requested before `load` means `load` never fires. The suite runs `next dev`, so these
   prove an import is lazy; sizes are `perf:budget`'s. Worked example: `e2e/bundle.lazy{,.mobile}.spec.ts`.
-- **Only two lazy surfaces are held against a placeholder that moves** (2026-09-30): Analisi's Sankey (`layout-shift` 0
-  and equal heights) and Rendimenti's Dettaglio (no placeholder ever shown), both in `e2e/bundle.lazy.spec.ts`.
+- **Only four lazy surfaces are held against a placeholder that moves**: Analisi's Sankey (`layout-shift` 0
+  and equal heights) and Rendimenti's Dettaglio (no placeholder ever shown), both in `e2e/bundle.lazy.spec.ts`
+  (2026-09-30); Cashflow's Dividendi at 390 and Divisione at 390 and 1440 (2026-10-06, `e2e/lazyTabLanding.ts`, run
+  by `bundle.lazy.mobile.spec.ts` and `cashflow.split{,.mobile}.spec.ts`): the tab's chunk held, then the tab put in
+  its OWN loading state (its stats request held; Firestore's channel held behind a period never read), the grid's
+  first cell at the same place — seen red at 52, 56 and 4 px with the old fallbacks. **A layout-shift score cannot see
+  a node that REPLACES another**: the tab remounts the fallback's nodes, and the score stayed 0 while the grid
+  jumped 52 px — measure the position, and only once the panel's entrance (`tabPanelSwitch`, 6 px) has settled: two
+  readings 250 ms apart, not `expect.poll`, whose first reading sits beside the previous one. Budget and Centri di
+  Costo are not held: their fallback and their loading state are the same cells of one constant.
   Analisi's three disclosures and its Scheda and the four lazy FIRE tabs measured `layout-shift` 0 ONCE, on the mirror at
   1440 and 390; no spec holds them, so a placeholder that loses its height there goes unseen by the suite. If one of
   them went back into the initial JavaScript, `perf:budget` would still catch it (its route over the ceiling).

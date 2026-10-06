@@ -1,8 +1,8 @@
 /**
  * perf:census — «how much of the page does ONE keystroke re-render?», on a production build served
- * against the emulators (the manual: perf/README.md § Il census). Written for PERF-12 (the React
- * Compiler) and reused by PERF-11 and PERF-13: a before/after of the same scenario, same machine,
- * same session.
+ * against the emulators (the manual: perf/README.md § Il census). Written to measure the React
+ * Compiler (2026-10-05); a change that claims fewer re-renders runs a before/after of the same
+ * scenario, same machine, same session, and adds its own scenario when none of these fits.
  *
  * Two measures per scenario, over the same window (the keys typed, plus a settle):
  *   (a) The browser's work, from CDP `Performance.getMetrics` read before and after: LayoutCount,

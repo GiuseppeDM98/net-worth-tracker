@@ -127,7 +127,7 @@ Tracciamento** (tab, «+» e «Aggiungi», Movimenti; `e2e/cashflow.tablet.spec.
   con le sue colonne CSS); PERF-03 (in develop dal 2026-09-30) la monta con le cifre già lette appena auth e ripristino
   hanno risposto — un fotogramma senza righe accanto resta possibile, da annotare.
 - **PERF-04**: un'aperta va a tutta larghezza, nessun grafico pigro monta in una colonna da ~320 px. **PERF-14**: niente
-  `layout` di Framer; si anima solo il pannello; `BottomNavigation` non si tocca. **PERF-12**: pura + hook senza stato.
+  `layout` di Framer; si anima solo il pannello; `BottomNavigation` non si tocca. **PERF-12** (in develop dal 2026-10-06, AGENTS.md § Motion): pura + hook senza stato.
   **PERF-03** (in develop dal 2026-09-30): «Aggiornato alle…» sta nella riga dell'header (sotto `desktop:` al posto della
   descrizione, troncata a una riga), non nei 715 px della composizione. **`perf:serve`**: il censimento gira su :3200.
 

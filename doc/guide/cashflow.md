@@ -19,8 +19,9 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **Category icons** (2026-09-30): the curated names and labels `lib/constants/categoryIcons.ts`, one loader per icon `components/expenses/categoryIconLoaders.ts` (deep paths to lucide's canonical files, typed by `types/lucide-icon-modules.d.ts`), the ONE lazy map `LAZY_CATEGORY_ICONS` + `CategoryIcon` in `components/expenses/IconPickerPopover.tsx`; test `__tests__/categoryIcons.test.ts`
 - **Expenses by window** (2026-09-30): pure `lib/utils/expenseWindows.ts` (`trackingWindow`, `budgetWindow`, `budgetSuggestionWindow`, `fireWindows`, `listExpenseYears`), hooks `useExpensesInRange` / `useExpenseBounds` / `expensesInRangeQueryOptions` in `lib/hooks/useExpenses.ts`, readers `getExpensesByDateRange` / `getExpenseDateBounds` in `lib/services/expenseService.ts`, keys `queryKeys.expenses.{range,bounds}`; tests `__tests__/expenseWindows.test.ts` (bounds and invariance), `__tests__/persistCache.test.ts` (the two builders), `e2e/cashflow.tracciamento.spec.ts` (the second window)
 - **Tabs on demand** (2026-10-05): the four `lazyComponent`s at the top of `app/dashboard/cashflow/page.tsx`, their
-  skeleton cells `lib/constants/cashflowTabSkeletons.ts`; held by `perf:budget` (Cashflow's ceiling) and by every
-  `e2e/cashflow.*.spec.ts` that opens a tab
+  skeleton cells `lib/constants/cashflowTabSkeletons.ts`, the fallbacks of Dividendi and Divisione
+  `components/cashflow/CashflowTabSkeletons.tsx` (2026-10-06); held by `perf:budget` (Cashflow's ceiling), by every
+  `e2e/cashflow.*.spec.ts` that opens a tab, and by `e2e/lazyTabLanding.ts` (the fallback's geometry)
 - **Suites to run after a change here — Transfers / cash** (moved from `AGENTS.md` § Commands on 2026-09-30): `cashBalanceReconciliation`, `updateCashAssetBalancesAtomic`, `transferFeature`, `cashSettlement`, `serverCashSettlement` · **Commissione** `transferFee` (+ `settingsRoundTrip`) · **Mutuo** `mortgageRepayment`, `mortgageSummary`, `updateAssetDebtFields` (+ `patrimonioNarrative` for the tile's words) · **Ricorrenze** `recurrenceDates` · **Browser** `e2e/cashflow.{accounts,transfer-fee,mortgage}.spec.ts`
 
 ## Expenses by window (`lib/utils/expenseWindows.ts`)
@@ -261,14 +262,20 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   body). Any new child that reads `formState` from a `form` prop does the same.
 
 ## The tabs load their code on demand (`app/dashboard/cashflow/page.tsx`)
-- **Dividendi, Budget, Divisione and Centri di Costo are `lazyComponent`s** (2026-10-05, PERF-12): only Tracciamento's
+- **Dividendi, Budget, Divisione and Centri di Costo are `lazyComponent`s** (2026-10-05): only Tracciamento's
   code is in Cashflow's initial JavaScript. With the React Compiler on, the five tabs as static imports took the page
   from 736 to 832 KB gz and its first figure from 616 to 730 ms cold on the mirror; lazy, 717 KB and the same 593 ms as
   without the compiler (A/B, 7 runs). Each tab is preloaded once Tracciamento's data is in (`usePreloadWhenIdle`, the
   optional two only when their flag is on), so a click usually draws at once; until the chunk arrives the panel shows
-  the tab's OWN skeleton, the cells of `lib/constants/cashflowTabSkeletons.ts`, which the tab draws too while its data
-  loads. A value imported from a tab module into the page puts it back in the initial graph — types only. A deep link
-  (`?tab=dividends`) pays one chunk request before the tab's own reads.
+  the tab's OWN loading state, so nothing moves when the tab mounts: the cells of
+  `lib/constants/cashflowTabSkeletons.ts` for Budget and Centri di Costo, and for the two tabs that draw a control row
+  while they load the components of `components/cashflow/CashflowTabSkeletons.tsx` (2026-10-06) — Dividendi's IS its
+  loading state, Divisione's mirrors the rows of its LIVE period picker (the tab keeps the picker mounted while it
+  reads, so the fallback can only copy its size: change `periodRows` or `PeriodPicker`'s height, change it too).
+  Until that day the two fallbacks were cells alone and a deep link jumped 52 px (Dividendi at 390), 56 (Divisione at
+  390) and 4 (Divisione at 1440); `e2e/lazyTabLanding.ts` holds the geometry. A value imported from a tab module into
+  the page puts it back in the initial graph — types only. A deep link (`?tab=dividends`) pays one chunk request
+  before the tab's own reads.
 
 ## Per-page blind spots
 

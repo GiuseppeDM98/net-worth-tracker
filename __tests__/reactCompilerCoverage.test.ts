@@ -10,7 +10,7 @@
  * is the map: it runs the same Babel plugin Next runs, with a logger, over app/, components/,
  * contexts/ and lib/, and fails naming each skipped function and the compiler's reason.
  *
- * On 2026-10-05 (PERF-12) the first run found 48 skipped functions, the settings, Cashflow,
+ * On 2026-10-05, when the compiler was turned on, the first run found 48 skipped functions, the settings, Cashflow,
  * Rendimenti, Patrimonio and Panoramica pages among them; each was rewritten without changing
  * behaviour, and the ways to do it are in AGENTS.md § Motion. Seen red that day with a
  * `try … finally` put back in a component, and with an `eslint-disable-next-line

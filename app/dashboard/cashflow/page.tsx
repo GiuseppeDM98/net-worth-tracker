@@ -39,12 +39,8 @@ import { TabsContent } from '@/components/ui/tabs';
 import { ExpenseTrackingTab } from '@/components/cashflow/ExpenseTrackingTab';
 import { lazyComponent, usePreloadWhenIdle } from '@/components/ui/lazy-component';
 import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
-import {
-  BUDGET_SKELETON_CELLS,
-  COST_CENTERS_SKELETON_CELLS,
-  DIVIDENDS_SKELETON_CELLS,
-  SPLIT_SKELETON_CELLS,
-} from '@/lib/constants/cashflowTabSkeletons';
+import { BUDGET_SKELETON_CELLS, COST_CENTERS_SKELETON_CELLS } from '@/lib/constants/cashflowTabSkeletons';
+import { DividendsTabSkeleton, SplitTabSkeleton } from '@/components/cashflow/CashflowTabSkeletons';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { Dividend } from '@/types/dividend';
 import { FamilyMember } from '@/types/assets';
@@ -80,7 +76,7 @@ const EMPTY_DIVIDENDS: Dividend[] = [];
 const EMPTY_EXPENSES: Expense[] = [];
 type CashflowTabId = (typeof VALID_CASHFLOW_TABS)[number];
 
-// The four tabs that are not the default load their code on demand (PERF-12, 2026-10-05): with the
+// The four tabs that are not the default load their code on demand (2026-10-05): with the
 // React Compiler on, all five tabs as static imports cost Cashflow +96 KB gz of initial JavaScript
 // and its first figure +114 ms cold, measured on the mirror. Each one draws its own skeleton until
 // its chunk arrives (`lazyComponent`, no Suspense), and they are preloaded once the page's data is
@@ -425,7 +421,7 @@ export default function CashflowPage() {
               variants={tabPanelSwitch}
             >
               <DividendTrackingTab
-                fallback={<TileGridSkeleton cells={DIVIDENDS_SKELETON_CELLS} className="pt-1" />}
+                fallback={<DividendsTabSkeleton />}
                 dividends={dividends}
                 assets={dividendAssets}
                 loading={loading || dividendsLoading || assetsLoading}
@@ -478,7 +474,7 @@ export default function CashflowPage() {
               variants={tabPanelSwitch}
             >
               <ExpenseSplitTab
-                fallback={<TileGridSkeleton cells={SPLIT_SKELETON_CELLS} className="pt-1" />}
+                fallback={<SplitTabSkeleton />}
                 familyMembers={familyMembers}
                 availableYears={availableYears}
               />

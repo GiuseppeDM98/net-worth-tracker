@@ -357,7 +357,10 @@ pointer — a stub that grows past that is a guide leaking back (2026-09-20: ten
   an empty series outside the lazy module. A value import from the lazy module puts it back in the graph: types only
   (`import type`). Worked examples: `PerformanceDettaglio`, `ConfrontoAnnualeSection`, `FlussoTile` (the Sankey,
   preloaded at module evaluation from 640px), the four lazy FIRE tabs, Cashflow's four non-default tabs (2026-10-05,
-  their skeleton cells in `lib/constants/cashflowTabSkeletons.ts` so the page never imports a value from them). **Next prefetches the route of every shell
+  their skeleton cells in `lib/constants/cashflowTabSkeletons.ts` so the page never imports a value from them). **A
+  lazy TAB's fallback is the tab's own loading state, control rows included** (2026-10-06,
+  `components/cashflow/CashflowTabSkeletons.tsx`: Dividendi's phone toolbar and Divisione's picker rows were missing, and a
+  deep link jumped 52–56 px; `e2e/lazyTabLanding.ts`). **Next prefetches the route of every shell
   link, client chunks included**: a chunk reached by another route's initial graph arrives with that prefetch; only
   one reached solely by an `import()` stays unfetched (`perf/README.md`, «Il prefetch dei link della shell»).
 - Pure `lib/utils` modules reach `calculateAssetValue` in one of two established ways — check the precedent: **injected**
@@ -634,7 +637,7 @@ file used to carry.
   render (`del.armed`, `del.onClick`) is flagged "Cannot access refs during render". Take the ref as an argument
   (`useArmedDelete(ref, onDelete)`, `lib/hooks/useArmedDelete.ts`, there since 2026-08-31).
 - **The React Compiler RUNS since 2026-10-05** (`reactCompiler: true` in `next.config.ts`, `babel-plugin-react-compiler`
-  1.0; PERF-12): no `React.memo` by hand unless `npm run perf:census` shows it is needed (perf/README.md § Il census).
+  1.0): no `React.memo` by hand unless `npm run perf:census` shows it is needed (perf/README.md § Il census).
   **A component it cannot compile is skipped WHOLE and in silence**: the page works, it just re-renders everything
   again. Lint at zero is NOT the map: `react-hooks/todo` and `react-hooks/hooks` are outside the plugin's
   `recommended` and «value blocks within a try/catch» reaches no rule. **`__tests__/reactCompilerCoverage.test.ts` is
@@ -646,8 +649,12 @@ file used to carry.
   helper called from the try (`assertSnapshotCreated`, `forEachSseEvent`), or the try body moved whole into a local
   `const save = async () => {…}` and the try reduced to `await save()`; an `import()` → a module-level loader; an
   `eslint-disable` of `exhaustive-deps` (it skips the WHOLE component) → `useEffectEvent` for what the effect reads but
-  must not re-run on. **The price is JavaScript**: +20–26% gz on component code, the most on Cashflow (five tabs as
-  static imports) — `perf/README.md` § Registro.
+  must not re-run on. **A build is compiled when its chunks carry `react.memo_cache_sentinel`** (count the occurrences
+  in `.next*/static/chunks/*.js`: 3 without the compiler, 1318 with it, 2026-10-05) — the `_c(`/`useMemoCache` names
+  do not survive minification; check it again after a Next or plugin upgrade. **The price is JavaScript and build
+  time**: +20–26% gz on component code (`perf/README.md` § Registro) and `next build` 29 → 47 s on the Mac (2026-10-05).
+  Cashflow paid the most, so its four non-default tabs load on demand (doc/guide/cashflow.md § The tabs load their
+  code on demand).
 - **`react-hooks/preserve-manual-memoization` ("Compilation Skipped")**: the compiler refuses to optimize the whole
   component when a dep array is *more specific* than what it infers — align the dep to the inferred value. The OTHER
   message, "memoized in source but not in output", cannot be aligned away: a `useMemo` whose value never escapes (only

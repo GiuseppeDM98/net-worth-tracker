@@ -111,7 +111,7 @@ nello stesso commit). Allargare: a mano, con l'OK del proprietario, annotato in 
 `Tile` (`sectionTriggerId` → `sectionPanelId` vuoto); la chiave `mobile-sections:<route>[:<tab>]` (per non ereditarla).
 
 **Conflitti con PERF**: `perf/` è la base (`perf:build`, `perf:serve` su :3200, il `--`, la pura + `.mts` di
-`perfBudget`); PERF-12 ha `perf:census`: nomi
+`perfBudget`); `perf:census` esiste (`scripts/perfRenderCensus.mjs`, in develop dal 2026-10-06): nomi
 distinti; PERF-02 (in develop dal 2026-09-29) → nessuno spinner: l'attesa dell'auth è lo skeleton «Verifica dell'accesso»
 in `main` (`app/dashboard/layout.tsx`), `[data-slot="skeleton"]` come ogni altro; PERF-03 (in develop dal 2026-09-30) → la riga di stato vuota, `[data-freshness]`; PERF-04 (in develop dal 2026-09-30, `components/ui/lazy-component.tsx`) → il settle aspetta lo
 `Skeleton` dei grafici pigri (a riga chiusa `charts` scende: voluto).

@@ -14,7 +14,7 @@ allocazione, `forceMount` sui `CollapsibleContent` per classe (`:3068`) e per so
 anche collassato. Al mount, `router.replace(\`${pathname}?tab=${initialTab}\`)` incondizionato (`syncTabParam`, un `useEffectEvent` chiamato da un effetto `[]`, `:723-728`) e a ogni cambio tab
 (`handleTabChange`, `:715`): ogni `useSearchParams`/`usePathname` consumer (i `SceneLink`, `AddExpenseFab`) ri-renderizza.
 
-Il proprietario lo sente digitando (2026-09-26). Con il compiler acceso (PERF-12) i FIGLI memoizzano, ma il componente
+Il proprietario lo sente digitando (2026-09-26). Con il compiler acceso (dal 2026-10-05) i FIGLI memoizzano, ma il componente
 stesso ha 70 stati e continua a rieseguire 4000 righe di funzione: il compiler non può spezzare un componente.
 **Misurato chiudendo PERF-12 (2026-10-05, mirror, build `--profile`, census `settings`)**: un tasto in «Anno inizio storico
 cashflow» ri-renderizza **318** componenti (423 senza compiler), render React 4,09 ms per tasto, 2 commit — è il «prima» di
@@ -56,7 +56,7 @@ toccato un campo — la rilettura entra solo finché nessuna tab è sporca.
 - La bozza è UN `useReducer(settingsDraftReducer)` nella pagina, con il reducer e `composeSettingsDocument`/`sliceSettings`
   in `lib/utils/settingsDraft.ts` (puri, testati contro `STORED_SETTINGS`); le sette sedi di § Settings — the FIVE places
   restano UNA scrittura.
-- Census (PERF-12, `npm run perf:census -- --scenario=settings`, già nello script: 10 tasti in «Anno inizio storico cashflow»;
+- Census (`npm run perf:census -- --scenario=settings`, perf/README.md § Il census, già nello script: 10 tasti in «Anno inizio storico cashflow»;
   uno scenario per Allocazione si aggiunge in questa spec): 10 tasti in Generale → componenti ri-renderizzati per tasto =
   la vista Generale e l'orchestratore, MAI le altre viste; `ScriptDuration` per tasto −70% rispetto a prima.
 - `router.replace` al mount solo quando `?tab` manca o è invalido (come Cashflow `:236`), mai incondizionato.
@@ -125,7 +125,7 @@ accorcia a ogni passo e il diff resta leggibile.
 
 ## 6. Passi
 
-1. Census prima (PERF-12, build `--profile`): `--scenario=settings` (318 per tasto il 2026-10-05) e lo scenario nuovo di Allocazione.
+1. Census prima (build `--profile`, perf/README.md § Il census): `--scenario=settings` (318 per tasto il 2026-10-05) e lo scenario nuovo di Allocazione.
 2. `settingsDraft.ts` + test di identità sul fixture; la pagina legge/scrive la bozza (ancora monolitica).
 3. Le sei viste nell'ordine di § 4, con le suite dopo ognuna.
 4. `router.replace` condizionato; `useSearchParams` in Suspense; il focus attraverso le tab.
@@ -186,7 +186,7 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
 - Leggi doc/guide/impostazioni.md PER INTERO (§ Settings — the FIVE places, lo stato per tab, «Annulla» come rilettura, il focus del campo in errore)
 - Leggi doc/guide/allocazione.md (i target), doc/guide/e2e-emulatori.md (la spec che salva restaura il documento intero)
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice
-- Leggi doc/perf/README.md e la spec PERF-13 per intero; PERF-05 è chiusa (2026-09-29), PERF-12 deve esserlo
+- Leggi doc/perf/README.md e la spec PERF-13 per intero; PERF-05 è chiusa (2026-09-29), PERF-12 è ritirata (2026-10-06: il compiler e la sua mappa in AGENTS.md § Motion, il census in perf/README.md § Il census)
 - Crea SESSION_NOTES.md; crea il branch dalla branch attiva PRIMA di editare
 
 Regole: nessun commit senza il mio OK; un branch e un commit; rispondi in italiano.

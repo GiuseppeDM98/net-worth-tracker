@@ -160,7 +160,7 @@ Dividendi 3,77 / 6 / 8. Il codice di oggi (righe da riverificare):
   quando la risposta arriva con la lista e `stats: null`. **PERF-04**: qui niente recharts
   (SVG a mano, `FlowBarsChart.tsx:27`): una riga chiusa risparmia DOM e render, non un chunk. **PERF-03** (in develop dal
   2026-09-30): «Aggiornato alle…» sta nel `PageHeader` della pagina (le quattro chiavi di `app/dashboard/cashflow/page.tsx`),
-  non nel tab. **PERF-12**: niente `setState` in effetto. **PERF-14**: nessun `layout`; `tabPanelSwitch` resta.
+  non nel tab. **PERF-12** (in develop dal 2026-10-06, AGENTS.md § Motion): niente `setState` in effetto. **PERF-14**: nessun `layout`; `tabPanelSwitch` resta.
 
 ### 4.8 Domande al proprietario
 
@@ -258,8 +258,8 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
   cashflow-dividendi.md, stati.md, e2e-emulatori.md
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice
 - Leggi doc/mobile/README.md, MOB-01 e MOB-02 per intero (chiuse; MOB-02 è il contratto: non rinominare nulla) e
-  questa spec per intero; DESIGN.md § 5 e § 6 (MAI rigenerarlo); doc/perf/PERF-12, PERF-14 (PERF-03, PERF-05 e PERF-06
-  sono ritirate: doc/guide/stati.md § The fourth reading, AGENTS.md § React Query and Derived State, doc/guide/cashflow.md
+  questa spec per intero; DESIGN.md § 5 e § 6 (MAI rigenerarlo); doc/perf/PERF-14 (PERF-03, PERF-05, PERF-06 e PERF-12
+  sono ritirate: AGENTS.md § Motion (il compiler), doc/guide/stati.md § The fourth reading, AGENTS.md § React Query and Derived State, doc/guide/cashflow.md
   § Expenses by window)
 - Crea SESSION_NOTES.md; crea il branch dalla branch attiva PRIMA di editare
 

@@ -45,7 +45,7 @@ renderer che tocca solo ciò che cambia.
   2026-09-28, PERF-02, è `useSyncExternalStore` con snapshot server `false`: Patrimonio è dietro `ProtectedRoute` e
   monta solo sul client, DOPO l'idratazione, quindi legge il valore vero già al primo render — va detto nel commento): il numero di `AssetRow` + righe
   `<tr>` = N, non 2N. 1440 inclusivo (AGENTS.md § Tailwind Breakpoints; il progetto Playwright `desktop` gira a 1440).
-- Census (PERF-12, `scripts/perfRenderCensus.mjs`): lo script NON ha ancora uno scenario per Patrimonio (ha `settings`,
+- Census (`scripts/perfRenderCensus.mjs`, perf/README.md § Il census): lo script NON ha ancora uno scenario per Patrimonio (ha `settings`,
   `expense`, `tabs`, scelti con `--scenario=`; `--route=` non esiste) — questa spec AGGIUNGE lo scenario `asset` (10 tasti
   in «quantità» di «Modifica» su un ETF del mirror, sul modello di `expense`) e lo lancia con
   `npm run perf:census -- --scenario=asset`. Obiettivo: un tasto ri-renderizza la sezione quantità/PMC, non il picker del
@@ -85,7 +85,7 @@ per i dialog che restano montati, e un solo modo è meglio di due: dirlo nel com
 **D. Meno lavoro per tasto nel dialog.** I 23 `useWatch` alla radice di `AssetDialog` diventano `useWatch` DENTRO le sezioni
 che li usano (ogni sezione un componente a livello di modulo che riceve `control`): un tasto in «quantità» ri-renderizza la
 sezione quantità/PMC, non il picker del tipo. `useWatch()` per il render, `getValues()` per gli handler, mai `watch()`
-(AGENTS.md § Dialog Form Reset). Con il React Compiler (PERF-12) le sezioni memoizzano da sole.
+(AGENTS.md § Dialog Form Reset). Con il React Compiler (acceso dal 2026-10-05) le sezioni memoizzano da sole.
 **D si decide sulla misura** (emendamento del 2026-10-05): il compiler è acceso e `AssetDialog` compila; se il census
 `asset` del passo 1 mostra già pochi componenti per tasto, D cade e la spec lo scrive in § 6 di doc/perf/README.md con
 il numero. Se D si fa, una sezione che riceve `form` (lo stesso oggetto a ogni render) NON legge `form.formState`: si
@@ -168,7 +168,7 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
 - Leggi doc/guide/patrimonio.md, dialog.md (per intero: l'uscita animata e il focus), stati.md, e2e-emulatori.md
 - Leggi components/ui/responsive-modal.tsx PRIMA di decidere il mount condizionale
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice
-- Leggi doc/perf/README.md e la spec PERF-11 per intero; PERF-05 (2026-09-29) e PERF-04 (2026-09-30) sono chiuse, PERF-12 deve esserlo
+- Leggi doc/perf/README.md e la spec PERF-11 per intero; PERF-05 (2026-09-29) e PERF-04 (2026-09-30) sono chiuse, PERF-12 è ritirata (2026-10-06: il compiler e la sua mappa in AGENTS.md § Motion, il census in perf/README.md § Il census)
 - Crea SESSION_NOTES.md; crea il branch dalla branch attiva PRIMA di editare
 
 Regole: nessun commit senza il mio OK; un branch e un commit; rispondi in italiano.

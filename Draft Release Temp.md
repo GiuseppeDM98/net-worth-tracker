@@ -34,7 +34,7 @@
 
 - Improved the speed of Cashflow › Dividendi: the payments and the yield and growth figures arrive together in a single request, read once on the server instead of in several steps, and every figure is the same as before. After you add, edit or delete a payment the list stays on screen while it is refreshed and the yield figures follow at once; if those figures cannot be computed the payments are still shown and the page says so («Lettura fallita»).
 
-- Cashflow loads only the code of the tab you open: Dividendi, Budget, Divisione and Centri di Costo arrive on their own once Tracciamento has its figures, so the first load of Cashflow stays as fast as before and a tab opened later usually appears at once.
+- Cashflow loads only the code of the tab you open: Dividendi, Budget, Divisione and Centri di Costo arrive on their own once Tracciamento has its figures, so the first load of Cashflow stays as fast as before and a tab opened later usually appears at once. While a tab's code is still on its way — opened from a link, say — the tab shows its own placeholder, the toolbar and the period picker included, so nothing moves when it takes over.
 
 - The assistant's «Riprendi una conversazione» list now loads the 50 most recent conversations and offers «Mostra altre» for the earlier ones, instead of reading every conversation ever saved at each opening; while some are still unread the header says «Più di 50 conversazioni» and the list says the ones shown are the most recent, so none is hidden.
 
@@ -63,6 +63,8 @@
 - Improved Patrimonio › Strumenti for a composite instrument (a 60/40 fund, a balanced ETF): still one row, but its class chip now shows every class it holds — one segment per class, as wide as its share and in that class's colour, «Azioni · Obbl.» for two, «Misto» for three or more. A class under 5% gets no segment, a screen reader hears every share, and the group headers and the sort by class keep the prevailing class. (Contributed by Ciocc128.)
 
 ## 📚 Documentation
+
+- Retired the specification behind the React Compiler after reading it against the code (eighteen differences): the agent guidelines now say how to tell that a build is really compiled and that the compiler also lengthens the build, a configuration comment no longer calls the linter the map of what the compiler skips, and the speed manual declares that the full before/after benchmark of that change was never written down.
 
 - The agent guidelines now explain how to keep every component compilable by the React Compiler, with the test that names any component it skips, and the Cashflow guide how its tabs load on demand.
 

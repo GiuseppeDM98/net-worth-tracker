@@ -108,7 +108,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   `actionColor.ts`'s `parseToOklch` (ONE `lab()` parser in the repo). **`enabled` is whether the caller paints them this
   render**: `FlussoTile` passes it only while the roles Sankey is on screen (the setting on, «Per ruolo», from 640px),
   so with the setting off the tile renders once at mount and never calls `getComputedStyle` — the read's `setState`
-  always hands over a new object, a second render and a second Sankey build for nothing (PERF-12/14).
+  always hands over a new object, a second render and a second Sankey build for nothing (PERF-14).
 
 ## Per-page blind spots
 
