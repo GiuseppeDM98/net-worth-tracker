@@ -50,6 +50,14 @@ Il post: −90% re-render della sidebar; `:root:has()` da 24 ms per mutazione (q
   valore, nessun rAF per host), con un fallback al calcolo locale quando il provider manca (la landing, i test). Il filtro
   di luminanza legge la L di `lab()` con il parser di `lib/utils/actionColor.ts` (mai `/^oklch\(/`). Misura: CDP
   `RecalcStyleCount`/`LayoutCount` al mount di Storico e FIRE prima/dopo; e i render per host (census di PERF-12) da 2 a 1.
+  **Il census non misura ancora un MOUNT** (emendamento del 2026-10-05, chiudendo PERF-12): `scripts/perfRenderCensus.mjs`
+  conta i commit di un'INTERAZIONE (`--scenario=settings|expense|tabs`). Questa spec gli aggiunge lo scenario `mount`
+  (`--scenario=mount`, la route da misurare in un'opzione): la registrazione accesa dall'init script prima della
+  navigazione, poi commit e componenti renderizzati fino a «dati a schermo» + 1 s — il secondo render di ogni host di
+  grafico (il `setState` di `useChartColors` un frame dopo il mount) è un commit in più che il compiler NON toglie, e
+  deve sparire. Le metriche CDP le dà già lo stesso script (`Performance.getMetrics`). Un `ChartColorsProvider` nuovo
+  segue le regole del compiler (AGENTS.md § Motion; `__tests__/reactCompilerCoverage.test.ts` verde): ogni consumatore
+  di un contesto si ri-renderizza al suo cambio anche se memoizzato, quindi il valore del contesto è stabile per tema.
 - Benchmark cold Panoramica/Patrimonio/FIRE: long task ≤ prima; `cls` = 0 come oggi.
 - Lo stagger: una tabella «tempo al 100% di opacità dell'ultima tessera» prima; se il proprietario sceglie di accorciarlo,
   dopo — in DESIGN.md la scelta è sua (mai rigenerare il file).
@@ -101,6 +109,7 @@ solo prima visita. La risposta va in DESIGN.md per mano sua o con una riga conco
   `lib/hooks/useCssColorTokens.ts`, `lib/utils/colorParse.ts` (nuovo: `parseToOklch` da `actionColor.ts` e
   la gamba OKLCH → sRGB da `cssColorToHex.ts`; i due moduli lo importano), `app/dashboard/layout.tsx`.
 - `lib/utils/motionVariants.ts` — solo se D è approvata.
+- `scripts/perfRenderCensus.mjs` — lo scenario `mount` (e la sua riga in perf/README.md § Il census).
 - Test: `__tests__/chartColorsContext.test.ts` (la palette dal provider = quella del vecchio hook su un `getComputedStyle`
   finto che risponde `lab(…)`; il fallback senza provider; il filtro vivo su una L fuori soglia), `e2e/motion.layout.spec.ts`
   (1440: `layout-shift` 0 sul cambio periodo della Panoramica; `LayoutCount` a un cambio pathname) e
@@ -109,7 +118,8 @@ solo prima visita. La risposta va in DESIGN.md per mano sua o con una riga conco
 
 ## 6. Passi
 
-1. Metriche CDP al mount (Storico, FIRE, Panoramica) e a un cambio pathname a 1440 prima; render per host (census) prima;
+1. Lo scenario `mount` nel census; metriche CDP al mount (Storico, FIRE, Panoramica) e a un cambio pathname a 1440 prima;
+   render per host (census `--scenario=mount`, build `perf:build -- --profile`) prima;
    `git log -S` dei due `layout`.
 2. A + spec `layout-shift`; B + la spec mobile; benchmark.
 3. C con il fallback e il filtro vivo; i test; tutte le pagine con grafici a vista (390 e 1440, due temi) — è un cambio di
@@ -175,7 +185,8 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
 
 Regole: nessun commit senza il mio OK; un branch e un commit; rispondi in italiano.
 Metodo: metriche CDP (LayoutCount, RecalcStyleCount, ScriptDuration) al mount di Storico, FIRE e Panoramica e a un cambio
-pathname a 1440, prima/dopo; render per host con il census prima/dopo; le tre falsificazioni di § 7 viste ROSSE;
+pathname a 1440, prima/dopo; render per host con il census prima/dopo (aggiungi lo scenario mount a
+scripts/perfRenderCensus.mjs; oggi misura solo interazioni); le tre falsificazioni di § 7 viste ROSSE;
 chartPaletteDistinctness e actionColorContrast verdi; se il filtro reso vivo cambia una palette, fermati e mostramelo.
 Chiusura: tsc, lint 0, Vitest in Europe/Rome, npm run test:e2e COMPLETO; giro guidato di 5 punti sul mirror a 390 e 1440
 con due temi, poi mirror:remove; CLAUDE.md «Latest», AGENTS.md § Motion e § Recharts, doc/guide/temi.md, Draft Release

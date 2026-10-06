@@ -17,6 +17,11 @@ e 314 ms warm con 11 richieste Firestore (dal 2026-09-29 warm ne fa 0: assets, s
 - `AssetDialog` (2887 righe, 22 `useState`, 23 `useWatch` alla radice, `:596-618`) e `CashAccountDialog` sono SEMPRE montati
   (`assets/page.tsx:528, 536`) anche chiusi; da chiuso il dialog non legge più nulla (`useSettings(ownerId, { enabled: open })`, 2026-09-29) ma partecipa a ogni render
   della pagina. Da aperto, ogni tasto in un campo `useWatch`-ato alla radice ri-renderizza le 2887 righe.
+  **Lettura di PRIMA del compiler** (emendamento del 2026-10-05, chiudendo PERF-12): fino a quel giorno la radice di
+  `AssetDialog` NON era compilata (due `try … finally`, `:950` e `:1098`, la facevano saltare intera); da PERF-12 compila
+  (`__tests__/reactCompilerCoverage.test.ts`), e il dialog gemello `ExpenseDialog`, nella stessa situazione, è sceso da
+  242 a **1** componente per tasto in «Importo». Il costo per tasto di `AssetDialog` va quindi RIMISURATO prima di § 4 D:
+  può essere già quello che D voleva ottenere.
 - `app/dashboard/assets/page.tsx:385`: `motion.div layout="position"` intorno all'INTERA pagina — è di PERF-14, non di questa spec.
 - **Da PERF-04 (2026-09-30) la sparkline paga l'unione di recharts**: recharts è in UN chunk condiviso (il barrel
   `components/ui/charts/recharts.ts`), che contiene i moduli di TUTTI i grafici dell'app; la copia che Patrimonio aveva
@@ -40,8 +45,11 @@ renderer che tocca solo ciò che cambia.
   2026-09-28, PERF-02, è `useSyncExternalStore` con snapshot server `false`: Patrimonio è dietro `ProtectedRoute` e
   monta solo sul client, DOPO l'idratazione, quindi legge il valore vero già al primo render — va detto nel commento): il numero di `AssetRow` + righe
   `<tr>` = N, non 2N. 1440 inclusivo (AGENTS.md § Tailwind Breakpoints; il progetto Playwright `desktop` gira a 1440).
-- Census (PERF-12, `npm run perf:census -- --route=assets`): 10 tasti in «quantità» di `AssetDialog` → ri-renderizza la sezione
-  quantità/PMC, non il picker del tipo.
+- Census (PERF-12, `scripts/perfRenderCensus.mjs`): lo script NON ha ancora uno scenario per Patrimonio (ha `settings`,
+  `expense`, `tabs`, scelti con `--scenario=`; `--route=` non esiste) — questa spec AGGIUNGE lo scenario `asset` (10 tasti
+  in «quantità» di «Modifica» su un ETF del mirror, sul modello di `expense`) e lo lancia con
+  `npm run perf:census -- --scenario=asset`. Obiettivo: un tasto ri-renderizza la sezione quantità/PMC, non il picker del
+  tipo — se il «prima» con il compiler lo fa già, D non si fa (§ 4).
 
 ## 3. Non-obiettivi
 
@@ -78,13 +86,21 @@ per i dialog che restano montati, e un solo modo è meglio di due: dirlo nel com
 che li usano (ogni sezione un componente a livello di modulo che riceve `control`): un tasto in «quantità» ri-renderizza la
 sezione quantità/PMC, non il picker del tipo. `useWatch()` per il render, `getValues()` per gli handler, mai `watch()`
 (AGENTS.md § Dialog Form Reset). Con il React Compiler (PERF-12) le sezioni memoizzano da sole.
+**D si decide sulla misura** (emendamento del 2026-10-05): il compiler è acceso e `AssetDialog` compila; se il census
+`asset` del passo 1 mostra già pochi componenti per tasto, D cade e la spec lo scrive in § 6 di doc/perf/README.md con
+il numero. Se D si fa, una sezione che riceve `form` (lo stesso oggetto a ogni render) NON legge `form.formState`: si
+iscrive con `useFormState({ control })`, o con il compiler il padre ripassa prop invariate e l'errore del campo non
+compare più (visto su `ExpenseDialog` il 2026-10-05, doc/guide/cashflow.md § The expense form reads the keys). Ogni
+`try` delle sezioni nuove segue le riscritture di AGENTS.md § Motion (niente `finally`, niente `throw` dentro un `try`):
+il test di copertura del compiler è rosso altrimenti.
 
 ## 5. File da toccare
 
 - `components/assets/AssetRow.tsx`, `AssetSparkline.tsx` (prop `colors`), `StrumentiTile.tsx` (un elenco; `chartColors` per riga).
 - `app/dashboard/assets/page.tsx` — mount condizionale dei due dialog con `mounted`/`onExitComplete` + `returnFocusTo`.
 - `components/ui/responsive-modal.tsx` — `onExitComplete` se manca.
-- `components/assets/AssetDialog.tsx` — sezioni con `useWatch` locale.
+- `components/assets/AssetDialog.tsx` — sezioni con `useWatch` locale (solo se § 4 D resta).
+- `scripts/perfRenderCensus.mjs` — lo scenario `asset` (e la sua riga nella tabella di perf/README.md § Il census).
 - Test: `e2e/assets.rows.spec.ts` (1440: 0 sparkline al mount; `<tr>` = N, `AssetRow` = 0; il focus torna all'opener dopo
   Escape), `e2e/assets.rows.mobile.spec.ts` (390: 1 sparkline dopo l'apertura di una riga, righe = N — il NOME sceglie il
   progetto), `e2e/assets.bond.spec.ts`, `assets.sale-tax.spec.ts`, `assets.composite-chip.spec.ts` (1440 e 390 con
@@ -94,10 +110,11 @@ sezione quantità/PMC, non il picker del tipo. `useWatch()` per il render, `getV
 
 ## 6. Passi
 
-1. Benchmark cold Patrimonio prima; conteggio `svg.recharts-surface` al mount; census prima (10 tasti in «quantità»).
+1. Benchmark cold Patrimonio prima; conteggio `svg.recharts-surface` al mount; lo scenario `asset` nel census, poi il
+   census prima (10 tasti in «quantità», build `--profile`) — e la decisione su D.
 2. A + B; le due spec nuove; E2E Patrimonio; benchmark.
 3. C (con la lettura di `ResponsiveModal`); la spec del focus; il giro delle due fasi.
-4. D; census dopo.
+4. D se resta; census dopo.
 5. E2E completo; benchmark dopo.
 
 ## 7. Test e falsificazione
@@ -143,7 +160,8 @@ Ciao, in questa sessione implementiamo doc/perf/PERF-11-patrimonio-righe-leggere
 nascono solo quando la riga si apre (colori a prop dalla pagina, non un hook per riga), un solo elenco nel DOM per
 larghezza (useMediaQuery, 1440 inclusivo), AssetDialog e CashAccountDialog montati solo da aperti e smontati DOPO
 l'animazione di uscita (onExitComplete) con returnFocusTo, e i useWatch di AssetDialog spostati nelle sezioni che li
-usano. Nessun numero e nessun aspetto cambia. Il layout="position" della pagina NON si tocca (è PERF-14).
+usano SOLO se il census lo mostra ancora necessario (dal 2026-10-05 AssetDialog compila con il React Compiler: § 4 D).
+Nessun numero e nessun aspetto cambia. Il layout="position" della pagina NON si tocca (è PERF-14).
 
 Da fare TASSATIVAMENTE prima di ogni cosa:
 - Leggi WORKFLOW.md, AGENTS.md (§ Motion, § Recharts, § Dialog Form Reset, § Two-Step Create Dialogs, § Tailwind Breakpoints, § 5 Testing), CLAUDE.md
@@ -155,7 +173,9 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
 
 Regole: nessun commit senza il mio OK; un branch e un commit; rispondi in italiano.
 Metodo: benchmark cold su /dashboard/assets prima/dopo; conteggio dei grafici montati al mount prima/dopo; il census di
-scripts/perfRenderCensus.mjs per i re-render per tasto nel dialog prima/dopo; le tre falsificazioni di § 7 viste ROSSE.
+scripts/perfRenderCensus.mjs (aggiungi lo scenario `asset`, poi npm run perf:census -- --scenario=asset su una build
+perf:build -- --profile) per i re-render per tasto nel dialog prima/dopo; le tre falsificazioni di § 7 viste ROSSE;
+reactCompilerCoverage verde.
 Chiusura: tsc, lint 0, Vitest in Europe/Rome, npm run test:e2e COMPLETO (Patrimonio e Mutuo in particolare); giro
 guidato di 5 punti sul mirror a 390 e 1440, poi mirror:remove; CLAUDE.md «Latest», doc/guide/patrimonio.md, dialog.md,
 e2e-emulatori.md, AGENTS.md § Recharts e § Two-Step, Draft Release Temp.md (senza dati privati), doc/perf/README.md;

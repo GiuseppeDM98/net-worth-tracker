@@ -294,3 +294,8 @@ in produzione, e i tempi delle route server si leggono dal `Server-Timing` (`lib
   `raisedBy` → perf/README.md § Registro.
 - Il giro guidato aspetta il via del proprietario (una finestra di almeno 20 minuti, per non farsi uccidere la sessione
   dal watchdog).
+- PERF-11, PERF-13 e PERF-14 si emendano subito, con un secondo commit sulla stessa PR in deroga a «un commit per
+  sessione» (2026-10-06): il census ha `--scenario=`, non `--route=`, e ognuna aggiunge il suo scenario (`asset`, uno per
+  Allocazione, `mount`); `AssetDialog` compila, quindi PERF-11 § 4 D si decide sul census; il «prima» di PERF-13 è 318
+  componenti per tasto, con le righe di `settings/page.tsx` rilette; le viste e i provider nuovi seguono le riscritture
+  di AGENTS.md § Motion e la trappola di `useFormState`.
