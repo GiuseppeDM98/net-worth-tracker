@@ -42,7 +42,6 @@ import { resolveCenteredModalOrigin } from '@/lib/utils/modalOrigin';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useDividendStats } from '@/lib/hooks/useDividendStats';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { Dividend } from '@/types/dividend';
@@ -66,11 +65,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ResponsiveModal } from '@/components/ui/responsive-modal';
 import { PageVerdict } from '@/components/ui/page-verdict';
 import { Tile, TILE_CELL_CLASS } from '@/components/ui/tile';
-import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
 import { ErrorNotice } from '@/components/ui/error-notice';
 import { EmptyState } from '@/components/ui/empty-state';
 import { describeReadFailure, resolveSurfaceState } from '@/lib/utils/statesNarrative';
-import { DIVIDENDS_SKELETON_CELLS } from '@/lib/constants/cashflowTabSkeletons';
+import { DividendsTabSkeleton } from '@/components/cashflow/CashflowTabSkeletons';
 import { Download, FileDown, Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -465,13 +463,8 @@ export function DividendTrackingTab({ dividends, assets, loading, loadFailed, on
   }
 
   if (loading) {
-    return (
-      <TileGridSkeleton
-        cells={DIVIDENDS_SKELETON_CELLS}
-        className="pt-1"
-        toolbar={<Skeleton className="mx-auto h-9 w-full max-w-[320px] rounded-lg desktop:hidden" />}
-      />
-    );
+    // The page draws the same element while this tab's chunk is on its way: one wait, nothing moves.
+    return <DividendsTabSkeleton />;
   }
 
   // The axis picks a VALUE the whole page reads, so it is a radiogroup, not a tablist with no

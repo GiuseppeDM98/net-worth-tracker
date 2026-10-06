@@ -28,8 +28,9 @@ a 1024. Le primitive di oggi (righe del 2026-09-26, da riverificare):
 - Ogni tab della pill ≥ 44×44 sotto `desktop:`.
 - A 1440 Hall of Fame è quella di oggi salvo la punteggiatura del verdetto (§ 4.7).
 - In Playwright: DOM in ordine desktop, pannello chiuso vuoto, memoria dopo il reload, reduced motion senza transizioni.
-- `npm run perf:census -- --route=hall-of-fame`: aprire una riga ri-renderizza quella sezione e `PageRest`, non le altre
-  (il census di PERF-12 conta i commit per tasto: gli serve un'azione a clic).
+- `npm run perf:census -- --scenario=hall-of-fame`: aprire una riga ri-renderizza quella sezione e `PageRest`, non le altre
+  (`scripts/perfRenderCensus.mjs` ha oggi `settings`, `expense` e `tabs`, scelti con `--scenario=` — `--route=` non esiste —:
+  questa spec gli aggiunge `hall-of-fame`, un clic che apre una riga, sul modello di `tabs`).
 
 ## 3. Non-obiettivi
 
@@ -168,7 +169,7 @@ frase chiude dopo la cifra del record («in un mese» solo con la percentuale, `
 
 ### 4.8 Conflitti con PERF
 
-- **PERF-12**: `useSyncExternalStore`, nessun ref restituito, `mounted` nel gestore. **PERF-14**: nessun `layout`; un
+- **PERF-12** (in develop dal 2026-10-06, AGENTS.md § Motion): `useSyncExternalStore`, nessun ref restituito, `mounted` nel gestore. **PERF-14**: nessun `layout`; un
   grafico montato all'apertura legge `ChartColorsProvider`. **PERF-04** (in develop dal 2026-09-30): un grafico lazy riserva la sua altezza, il `fallback` di `lazyComponent` (obbligo
   di MOB-03..07). **PERF-03** (in develop dal 2026-09-30): «Aggiornato alle…» NON è uno slot della composizione — sta nel
   `PageHeader` (desktop: dopo la descrizione; sotto `desktop:` al posto della descrizione, `[data-freshness]`,
@@ -282,7 +283,8 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
 - Leggi doc/guide/hall-of-fame.md, doc/guide/stati.md, doc/guide/e2e-emulatori.md
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice
 - Leggi doc/mobile/README.md e la spec MOB-02 per intero; DESIGN.md § 5 e § 6 (MAI rigenerarlo);
-  doc/mobile/MOB-01 e doc/perf/PERF-12, PERF-14 (devono essere chiuse; PERF-02 lo è dal 2026-09-29, PERF-03 dal
+  doc/mobile/MOB-01 e doc/perf/PERF-14 (devono essere chiuse; PERF-12 è ritirata dal 2026-10-06 — il compiler in AGENTS.md
+  § Motion, il census in perf/README.md § Il census —, PERF-02 lo è dal 2026-09-29, PERF-03 dal
   2026-09-30: la riga di freschezza è in doc/guide/stati.md § The fourth reading)
 - Crea SESSION_NOTES.md; crea il branch dalla branch attiva PRIMA di editare
 

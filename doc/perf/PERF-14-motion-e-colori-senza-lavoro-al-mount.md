@@ -49,7 +49,7 @@ Il post: −90% re-render della sidebar; `:root:has()` da 24 ms per mutazione (q
   cambio di `colorTheme`/`resolvedTheme`; `useChartColors()` e `useActionColors()` leggono il contesto (stessa firma, stesso
   valore, nessun rAF per host), con un fallback al calcolo locale quando il provider manca (la landing, i test). Il filtro
   di luminanza legge la L di `lab()` con il parser di `lib/utils/actionColor.ts` (mai `/^oklch\(/`). Misura: CDP
-  `RecalcStyleCount`/`LayoutCount` al mount di Storico e FIRE prima/dopo; e i render per host (census di PERF-12) da 2 a 1.
+  `RecalcStyleCount`/`LayoutCount` al mount di Storico e FIRE prima/dopo; e i render per host (il census, `scripts/perfRenderCensus.mjs`) da 2 a 1.
   **Il census non misura ancora un MOUNT** (emendamento del 2026-10-05, chiudendo PERF-12): `scripts/perfRenderCensus.mjs`
   conta i commit di un'INTERAZIONE (`--scenario=settings|expense|tabs`). Questa spec gli aggiunge lo scenario `mount`
   (`--scenario=mount`, la route da misurare in un'opzione): la registrazione accesa dall'init script prima della
@@ -135,7 +135,7 @@ solo prima visita. La risposta va in DESIGN.md per mano sua o con una riga conco
   quella stringa (mai `/^oklch\(/`, la trappola documentata); una L fuori soglia cade sul colore statico (falsificare:
   rimettere `parseOklchL` → il filtro non scatta, rosso); senza provider il hook restituisce la stessa palette del calcolo locale.
 - Il Flusso per ruolo: con i ruoli accesi `FlussoTile` non chiama `getComputedStyle` al mount (spy) e renderizza una volta
-  (census di PERF-12); i cinque hex del Sankey sono quelli di `colorToHex` (`cssColorToHex.ts`) sugli stessi token (identità sul fixture).
+  (il census); i cinque hex del Sankey sono quelli di `colorToHex` (`cssColorToHex.ts`) sugli stessi token (identità sul fixture).
 - Bottom nav: a 1440 `LayoutCount` a un cambio pathname non cresce per la nav (misura CDP prima/dopo, con il `layout` gated);
   a 390 portrait il FAB che appare la fa scorrere (anchor: la posizione cambia). Falsificare invertendo la media query.
 - Suite: `chartPaletteDistinctness`, `actionColorContrast`, E2E completo (ogni grafico legge i colori).
@@ -180,7 +180,7 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
 - Leggi doc/guide/temi.md PER INTERO, DESIGN.md (le regole citate per nome; MAI rigenerarlo), doc/guide/panoramica.md,
   doc/guide/patrimonio.md, doc/guide/e2e-emulatori.md
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice
-- Leggi doc/perf/README.md e la spec PERF-14 per intero; PERF-12 deve essere chiusa (la media query SSR-safe c'è già: `lib/hooks/useMediaQuery.ts`, 2026-09-28)
+- Leggi doc/perf/README.md e la spec PERF-14 per intero; PERF-12 è ritirata (2026-10-06: il compiler e la sua mappa in AGENTS.md § Motion, il census in perf/README.md § Il census; la media query SSR-safe c'è già: `lib/hooks/useMediaQuery.ts`, 2026-09-28)
 - Crea SESSION_NOTES.md; crea il branch dalla branch attiva PRIMA di editare
 
 Regole: nessun commit senza il mio OK; un branch e un commit; rispondi in italiano.

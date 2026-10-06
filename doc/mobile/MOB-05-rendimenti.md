@@ -127,7 +127,7 @@ l'eyebrow in `--destructive`, annuncia solo `PageRest`. Il registro in errore fe
   `lazyComponent` precaricati a riposo; le tessere sono SVG a mano (doc/guide/rendimenti.md), le righe
   chiuse non risparmiano chunk. **PERF-14** toglie il `layout` dai wrapper di pagina, non il `layout="position"` di
   `AttribuzioneTile.tsx:68` (il riordino al cambio periodo), che resta in un pannello montato all'apertura; la riga
-  anima in CSS. **PERF-12**: ref scritti solo negli handler. **PERF-03** (in develop dal 2026-09-30): Rendimenti ha
+  anima in CSS. **PERF-12** (in develop dal 2026-10-06, AGENTS.md § Motion): ref scritti solo negli handler. **PERF-03** (in develop dal 2026-09-30): Rendimenti ha
   «Aggiornato alle…» dal 2026-10-04 (`useFreshness(loaded.freshnessQueries)` in `page.tsx`, i due payload nella cache
   persistita): sta nel `PageHeader` come nelle altre pagine, mai nella composizione.
 

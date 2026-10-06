@@ -133,7 +133,7 @@ MOB-02 § 4.8 vale per un grafico pigro da sé. Dal 2026-09-29 `failed` = gli `i
 (Previdenza: `PensionOverview.tsx:115-118`). L'Esposizione (dal 2026-09-28; il `Server-Timing` della sua route dice `source=cache|yahoo` dal 2026-10-05)
 parte all'apertura e da calda non chiama Yahoo. PERF-03 (in develop dal 2026-09-30): «Aggiornato alle…» sta nel
 `PageHeader` — le pagine Previdenza e FIRE leggono gli stessi hook dei loro componenti per la riga — mai nella
-composizione né in «Il perché». PERF-12/14: nessun `layout`. PERF-13: § 3.
+composizione né in «Il perché». PERF-12 (in develop dal 2026-10-06, AGENTS.md § Motion) e PERF-14: nessun `layout`. PERF-13: § 3.
 
 ### 4.6 Domande al proprietario
 

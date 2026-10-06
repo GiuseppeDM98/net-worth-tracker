@@ -127,7 +127,7 @@ export function FlussoTile({ expenses, isMobile, reading, flow, spendingRoles, s
   const mode: FlowMode = spendingRoles ? preferredMode : 'types';
   // The role colours are read from the theme only while the roles Sankey is on screen: with the
   // setting off, on «Per tipo» or on a phone nothing paints them, and the read would cost a second
-  // render of the tile and a second build of the Sankey for nothing (PERF-12/PERF-14).
+  // render of the tile and a second build of the Sankey for nothing (PERF-14).
   const rolesSankeyDrawn = !isMobile && spendingRoles !== null && mode === 'roles';
   // SPENDING_ROLE_TOKEN is a module-level constant, so the hook's effect sees a stable identity.
   const palette: SpendingRolePalette = useCssColorTokens(SPENDING_ROLE_TOKEN, DEFAULT_SPENDING_ROLE_PALETTE, rolesSankeyDrawn);

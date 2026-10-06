@@ -8,7 +8,7 @@
  * these probes prove is that an IMPORT is lazy (the library is not fetched until the moment it is
  * needed), never how big a chunk is — that is `npm run perf:budget`'s, on the build.
  */
-import type { Page } from '@playwright/test';
+import type { Page, Route } from '@playwright/test';
 
 /**
  * A module path only the library's own chunk carries — never a word a comment of ours could hold,
@@ -63,6 +63,29 @@ export async function holdChunks(page: Page, signature: string): Promise<{ relea
     await route.fulfill({ response, body });
   });
   return { release };
+}
+
+/**
+ * Hold back every request matching the glob until `release()` is called (then let it through
+ * untouched) — to keep a surface in its loading state while it is measured: Dividendi's
+ * `/api/dividends/stats`, or Firestore's `Listen` channel for a read started after the call.
+ */
+export async function holdRequests(page: Page, glob: string): Promise<{ release: () => Promise<void> }> {
+  let open!: () => void;
+  const released = new Promise<void>((resolve) => {
+    open = resolve;
+  });
+  const handler = async (route: Route) => {
+    await released;
+    await route.continue();
+  };
+  await page.route(glob, handler);
+  return {
+    async release() {
+      open();
+      await page.unroute(glob, handler);
+    },
+  };
 }
 
 /**

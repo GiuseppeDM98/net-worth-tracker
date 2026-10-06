@@ -18,6 +18,7 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
+import { expectSplitTabLandsInPlace } from './lazyTabLanding';
 
 /** The euro figures print with a NO-BREAK SPACE before €; four digits are ungrouped. */
 const euro = (amount: string) => new RegExp(`${amount}[\\s ]*€`);
@@ -178,4 +179,9 @@ test.describe('Cashflow › Divisione', () => {
     // is a shadcn `Select`, whose trigger is a combobox named by `aria-label`.
     await expect(page.getByRole('combobox', { name: 'Filtra per intestatario' })).toContainText('In comune');
   });
+});
+
+test('the tab lands on the placeholder the page drew for its chunk: the grid does not move', async ({ page }) => {
+  test.setTimeout(120_000);
+  await expectSplitTabLandsInPlace(page);
 });

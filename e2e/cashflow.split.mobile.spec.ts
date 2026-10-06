@@ -10,6 +10,7 @@
  */
 
 import { test, expect } from '@playwright/test';
+import { expectSplitTabLandsInPlace } from './lazyTabLanding';
 
 /** The house floor for a touch target (PRODUCT.md → Accessibility & Inclusion). */
 const TOUCH_FLOOR = 44;
@@ -68,4 +69,9 @@ test.describe('Cashflow › Divisione (phone)', () => {
     expect(tarsio!.y).toBeGreaterThan(ghiandaia!.y + ghiandaia!.height - 2);
     expect(Math.abs(ghiandaia!.width - tarsio!.width)).toBeLessThan(2);
   });
+});
+
+test('the tab lands on the placeholder the page drew for its chunk: the picker row is already there', async ({ page }) => {
+  test.setTimeout(120_000);
+  await expectSplitTabLandsInPlace(page);
 });

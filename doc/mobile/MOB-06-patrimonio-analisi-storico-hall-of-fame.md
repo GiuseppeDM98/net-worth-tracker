@@ -155,7 +155,7 @@ il Dettaglio, come in Storico (`history/page.tsx:498-501`): gesti rari, ~56 px d
   640 px non si scarica (doc/guide/cashflow-analisi.md); su Storico solo il PDF è pigro: Composizione, Valore ed
   Evoluzione portano recharts nel grafo iniziale e il Dettaglio resta statico (doc/guide/storico.md) — la riga chiusa
   risparmia il mount, non il download; un grafico di riga reso pigro (`lazyComponent`) riserva l'altezza (MOB-02 § 4.8). **PERF-03** (in develop dal 2026-09-30): «Aggiornato alle…» sta nel `PageHeader`, nella riga della
-  descrizione: nessuna riga in più nel budget. **PERF-05/06**: la striscia legge i riassunti come sono. **PERF-12**: `mounted` nel gestore, `reveal` in
+  descrizione: nessuna riga in più nel budget. **PERF-05/06**: la striscia legge i riassunti come sono. **PERF-12** (in develop dal 2026-10-06, AGENTS.md § Motion): `mounted` nel gestore, `reveal` in
   un `setTimeout`, mai nel corpo di un effetto (§ 4.2).
 
 ### 4.6 Domande al proprietario
