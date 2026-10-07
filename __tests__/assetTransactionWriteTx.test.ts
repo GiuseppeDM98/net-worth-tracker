@@ -201,6 +201,23 @@ describe('assetTransactionUseCase — atomic write transaction', () => {
     expect(invalidateMock).toHaveBeenCalledWith(OWNER, 'asset_transaction_created');
   });
 
+  it('stores the settled balance to the cent, without the binary noise of the sum (2026-10-07)', async () => {
+    expect(4033.37 - 0.07).not.toBe(4033.3); // the raw sum is noisy
+    seedAsset({ quantity: 0 });
+    seedCash('cash-1', 4033.37);
+
+    await createAssetTransaction(OWNER, {
+      assetId: 'asset-1',
+      type: 'buy',
+      date: new Date(),
+      quantity: 1,
+      pricePerUnit: 0.07,
+      linkedCashAssetId: 'cash-1',
+    });
+
+    expect(store.get(docKey('assets', 'cash-1'))!.quantity).toBe(4033.3);
+  });
+
   it('writes a EUR-side averageCostEur distinct from the native averageCost for a foreign-currency buy', async () => {
     // A USD trade at 100 USD/quota, but the trade-date rate made it 90 EUR/quota: the native PMC
     // and the EUR PMC must diverge on the asset doc, otherwise G/P math re-mixes the two currencies

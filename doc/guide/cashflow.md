@@ -100,6 +100,15 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   fixed+variable+debt together and let transfers through.
 
 ## Expense Sign Convention and Type Changes
+- **A cash account's balance is stored to the cent, not only the movement** (2026-10-07): every movement was already
+  `roundToCents`, but `balance + movement` in binary floats left a residue that grew at each write and surfaced raw in
+  the asset form's «Saldo» («4033,050000000001» on the owner's account). Every writer of a cash account's `quantity`
+  rounds the RESULT — `lib/server/cashSettlement.ts`, `lib/server/assetTransactionUseCase.ts`, `assetService`'s
+  `updateCashAssetBalance` and `updateCashAssetBalancesAtomic`, `dividendIncomeService`'s credit, difference and
+  give-back; the list and the why in `lib/utils/cents.ts`. A new writer of a balance goes there too. A balance saved
+  noisy before that day is cleaned by its next movement. Pinned per writer, each case anchored on a raw sum that IS
+  noisy (`updateCashAssetBalancesAtomic`, `serverCashSettlement`, `dividendIncomeService`, `assetTransactionWriteTx`;
+  seen red together by taking the rounding out).
 - Income positive, expenses negative, net savings = `sum(income) + sum(expenses)`; crossing the boundary flips the sign.
 - **Classification is ALWAYS by `type`, never by the sign of `amount`** (`transfer` skipped, `income` income, everything
   else spending via `Math.abs`) — by sign, a refund counts as income. Fixtures must carry an explicit `type`.

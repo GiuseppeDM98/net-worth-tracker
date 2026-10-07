@@ -67,7 +67,8 @@ async function remove(db: FirebaseFirestore.Firestore) {
 async function openPatrimonio(page: Page, width: number) {
   await page.setViewportSize({ width, height: width >= 1024 ? 900 : 844 });
   await page.goto('/dashboard/assets', { waitUntil: 'load' });
-  // Both the desktop table and the phone rows are in the DOM, one hidden by CSS: wait for the visible one.
+  // One list is in the DOM per width since PERF-11 (the table at 1440, the phone rows at 390), so
+  // the name is there once; the visible filter stays harmless and says what is being waited for.
   await expect(page.getByText(PELLICANO.name).filter({ visible: true }).first()).toBeVisible({ timeout: 90_000 });
 }
 

@@ -122,7 +122,7 @@ export async function createExpenseFromDividend(
         createdAt: now,
         updatedAt: now,
       });
-      if (account) tx.update(account.ref, { quantity: account.quantity + amount, updatedAt: now });
+      if (account) tx.update(account.ref, { quantity: roundToCents(account.quantity + amount), updatedAt: now });
       tx.update(dividendRef, { expenseId: expenseRef.id, updatedAt: Timestamp.fromDate(now) });
       return { expenseId: expenseRef.id, credited: !!account, written: true };
     });
@@ -179,7 +179,7 @@ export async function updateExpenseFromDividend(
       });
       const account = accountSnap?.exists ? accountSnap.data() : undefined;
       if (!accountRef || !account || account.userId !== dividend.userId) return;
-      tx.update(accountRef, { quantity: ((account.quantity as number) ?? 0) + difference, updatedAt: now });
+      tx.update(accountRef, { quantity: roundToCents(((account.quantity as number) ?? 0) + difference), updatedAt: now });
     });
 
     // The row's amount and date changed even when no account moved.
@@ -215,7 +215,7 @@ export async function deleteExpenseForDividend(
       const ownerId = row?.userId as string | undefined;
       const account = accountSnap?.exists ? accountSnap.data() : undefined;
       if (!applied || !accountRef || !account || account.userId !== ownerId) return ownerId;
-      tx.update(accountRef, { quantity: ((account.quantity as number) ?? 0) - applied.amount, updatedAt: now });
+      tx.update(accountRef, { quantity: roundToCents(((account.quantity as number) ?? 0) - applied.amount), updatedAt: now });
       return ownerId;
     });
 

@@ -116,6 +116,19 @@ describe('createExpenseFromDividend', () => {
     expect(fake.docs.get('dividends/div-1')?.expenseId).toBe(expenseId);
   });
 
+  it('should store the credited balance to the cent, without the binary noise of the sum (2026-10-07)', async () => {
+    expect(4033.3 + 0.07).not.toBe(4033.37); // the raw sum is noisy
+    seed({ assetAccount: 'directa' });
+    fake.docs.set('assets/directa', { userId: 'u1', type: 'cash', assetClass: 'cash', currency: 'EUR', quantity: 4033.3 });
+
+    const expenseId = await createExpenseFromDividend(dividend({ netAmount: 0.07 }), 'cat-1', 'Dividendi', undefined, undefined, NOW);
+    expect(balanceOf('directa')).toBe(4033.37);
+
+    // The give-back lands on the cent too: back to the balance before the credit, exactly.
+    await deleteExpenseForDividend('div-1', expenseId);
+    expect(balanceOf('directa')).toBe(4033.3);
+  });
+
   it('should fall back to the default account of the settings', async () => {
     seed({ defaultAccount: 'fineco' });
 

@@ -1,6 +1,6 @@
 # PERF-11 — Patrimonio: N grafici montati al buio, un dialog da 2887 righe sempre vivo
 
-> Stato: da fare · Priorità: 3 · Sforzo: M · Dipende da: PERF-04 (recharts in un chunk), PERF-05 (chiusa il 2026-09-29: `AssetDialog` non legge da chiuso), PERF-12 (il census in `scripts/`) · Sblocca: —
+> Stato: fatta il 2026-10-07 (misure e divergenze in README.md § 6) · Priorità: 3 · Sforzo: M · Dipende da: PERF-04 (recharts in un chunk), PERF-05 (chiusa il 2026-09-29: `AssetDialog` non legge da chiuso), PERF-12 (il census in `scripts/`) · Sblocca: —
 
 ## 1. Il problema, misurato
 

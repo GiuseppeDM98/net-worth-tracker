@@ -225,7 +225,10 @@ pointer — a stub that grows past that is a guide leaking back (2026-09-20: ten
   reconciliation consequences the in-form notice must explain, so the `Select` stays there and only there.
 - **`setStep(record ? 2 : 1)` is settled during render on the `(open, record)` subject**, never in `useState`'s
   initializer (the record prop stays null between opens and the second "new" would reopen on the form) and, since
-  2026-09-06, no longer in the `open` effect either (`react-hooks/set-state-in-effect`).
+  2026-09-06, no longer in the `open` effect either (`react-hooks/set-state-in-effect`). **It stays so where the host
+  mounts the dialog only while open** (Patrimonio since 2026-10-07, PERF-11 — doc/guide/dialog.md): there an
+  initializer would be right, but one way that holds for every host beats two; the comment above `openSubject` in
+  `AssetDialog.tsx` says so, and `e2e/assets.rows.spec.ts` keeps «Nuovo after Modifica opens on step 1» as a guard.
 - **Make the back-link callback OPTIONAL and let its absence select the `Select`** (`onBackToTypePicker?`), so the two
   controls are mutually exclusive by construction rather than via a second boolean that can drift.
 - **The picker is a module-level component**, and the type entry carries `Icon` as the COMPONENT, never a rendered node.
@@ -654,7 +657,9 @@ file used to carry.
   do not survive minification; check it again after a Next or plugin upgrade. **The price is JavaScript and build
   time**: +20–26% gz on component code (`perf/README.md` § Registro) and `next build` 29 → 47 s on the Mac (2026-10-05).
   Cashflow paid the most, so its four non-default tabs load on demand (doc/guide/cashflow.md § The tabs load their
-  code on demand).
+  code on demand). **Compiled is not memoized** (2026-10-07): the compiler compiled `AssetDialog` and left its whole
+  step-2 form outside every memo scope, so one root `useWatch` re-rendered 562 components per key — measure a form with
+  `npm run perf:census` and move a per-keystroke watch into the leaf that reads it (doc/guide/patrimonio.md § Two-Step).
 - **`react-hooks/preserve-manual-memoization` ("Compilation Skipped")**: the compiler refuses to optimize the whole
   component when a dep array is *more specific* than what it infers — align the dep to the inferred value. The OTHER
   message, "memoized in source but not in output", cannot be aligned away: a `useMemo` whose value never escapes (only
@@ -673,6 +678,9 @@ file used to carry.
   real code in front of the library is what keeps it in ONE chunk (§ Dynamic Imports and Module Hygiene); a primitive
   it does not list yet is added there.
 - **`useChartColors()` is mandatory for every series** — read CSS vars after paint and pass `chartColors[0..4]` as props.
+  **Once per page or tile, never once per row** (2026-10-07, PERF-11): a list of small charts takes the palette as a
+  prop (`AssetSparkline`'s `colors`, from Patrimonio's one hook) — a hook per row was a rAF and a `getComputedStyle`
+  per row, 15 of them closed on the owner's phone. Same pattern as `useActionColors`.
 - **A Recharts series CAN drive the page, not just its tooltip — but no page does today**: `onMouseMove` hands
   `activeTooltipIndex` (a number OR a numeric string in 3.x — coerce it) and `onMouseLeave` the end; lift the index's
   PERIOD, never the index (the tiles that follow have their own arrays), attach the handlers only under `(pointer:

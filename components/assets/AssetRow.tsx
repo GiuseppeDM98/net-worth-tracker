@@ -21,7 +21,20 @@ import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
 import { getMetricValueColor } from '@/lib/utils/metricColors';
 import type { AssetPerformanceData } from '@/lib/utils/assetPerformanceDeltas';
 import { cn } from '@/lib/utils';
-import { AssetSparkline } from '@/components/assets/AssetSparkline';
+import { lazyComponent } from '@/components/ui/lazy-component';
+
+/**
+ * The unit-price sparkline, its code a chunk of its own: it is the only path from Patrimonio to
+ * recharts, and it is drawn only inside a row someone opened (AGENTS.md § Dynamic Imports — a chart
+ * inside something closed by default). `StrumentiTile` preloads it when idle, on a phone only.
+ */
+const AssetSparkline = lazyComponent(() => import('@/components/assets/AssetSparkline').then((m) => m.AssetSparkline));
+
+/** Every lazy chart of a row, for `usePreloadWhenIdle` (a module-level array, so it runs once). */
+export const ASSET_ROW_LAZY_CHARTS = [AssetSparkline];
+
+/** The sparkline's 32px, reserved before the row is opened and while its chunk arrives: nothing moves. */
+const SPARKLINE_SLOT = <div className="h-8" aria-hidden="true" />;
 
 /** "+1,2%" / "−3,4%" / "—" — it-IT decimals, typographic minus (The Comma Rule). */
 export function formatDeltaPercent(delta: number | null): string {
@@ -162,7 +175,8 @@ interface AssetRowProps {
   totalValue: number;
   /** The clock the dated sub-line is read against (one per tile). */
   now: Date;
-  onEdit: (asset: Asset) => void;
+  /** `opener` is the button pressed: the page hands the focus back to it when the dialog closes. */
+  onEdit: (asset: Asset, opener: HTMLElement) => void;
   onDelete: (assetId: string) => void;
   /** The tile's one live region: the arm and the disarm of Elimina are spoken there. */
   announce: (text: string) => void;
@@ -170,6 +184,8 @@ interface AssetRowProps {
   isManualPrice: boolean;
   isDemo?: boolean;
   sparklineData?: { value: number }[];
+  /** The page's `useChartColors()` palette, for the sparkline: one read per page, not one per row. */
+  chartColors: readonly string[];
   performance?: AssetPerformanceData;
   /** Trade-ledger row actions — shown only for ledger asset types once migration has run. */
   showLedgerActions?: boolean;
@@ -196,12 +212,16 @@ export function AssetRow({
   isManualPrice,
   isDemo = false,
   sparklineData,
+  chartColors,
   performance,
   showLedgerActions = false,
   onRegisterTrade,
   onMovements,
 }: AssetRowProps) {
   const [open, setOpen] = useState(false);
+  // The sparkline is born at the first opening and stays: unmounting it on close would empty the
+  // panel while it collapses, and a reopened row would draw it again for nothing.
+  const [hasOpened, setHasOpened] = useState(false);
   const deleteRef = useRef<HTMLButtonElement | null>(null);
   const { armed, onClick: onDeleteClick, onBlur: onDeleteBlur } = useArmedDelete(deleteRef, () => onDelete(asset.id));
   const wasArmed = useRef(false);
@@ -269,7 +289,10 @@ export function AssetRow({
     >
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          setOpen((v) => !v);
+          setHasOpened(true);
+        }}
         aria-expanded={open}
         aria-controls={panelId}
         className="flex min-h-[56px] w-full items-center gap-3 py-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -325,9 +348,18 @@ export function AssetRow({
               ))}
             </div>
 
-            {sparklineData && sparklineData.length >= 2 && (
-              <AssetSparkline data={sparklineData} label={`Prezzo unitario di ${asset.name}`} />
-            )}
+            {sparklineData &&
+              sparklineData.length >= 2 &&
+              (hasOpened ? (
+                <AssetSparkline
+                  fallback={SPARKLINE_SLOT}
+                  data={sparklineData}
+                  label={`Prezzo unitario di ${asset.name}`}
+                  colors={chartColors}
+                />
+              ) : (
+                SPARKLINE_SLOT
+              ))}
 
             {performance && (
               <div className="flex flex-col divide-y divide-border border-t border-border">
@@ -388,7 +420,7 @@ export function AssetRow({
                 type="button"
                 variant="outline"
                 className="h-11"
-                onClick={() => onEdit(asset)}
+                onClick={(event) => onEdit(asset, event.currentTarget)}
                 disabled={isDemo}
                 title={isDemo ? 'Non disponibile in modalità demo' : undefined}
               >

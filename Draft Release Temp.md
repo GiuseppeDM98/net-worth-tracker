@@ -14,6 +14,10 @@
 
 ## 🐛 Bug Fixes
 
+- Fixed account balances and bond coupons showing long tails of digits in their edit forms (for example «4033,050000000001» as a balance, «6,500000000000001» as a coupon per unit). A balance is now stored to the cent at every movement and a coupon as the decimal it is, without changing any figure shown at two decimals.
+
+- Fixed the asset and cash-account windows on Patrimonio closing without their animation or leaving the keyboard focus nowhere: both now slide away as every other window does and hand the focus back to the button or row that opened them. Editing an account from its detail returns to that account's row in Liquidità once the form closes.
+
 - Fixed «Aggiorna» on Rendimenti with a custom period selected leaving the page on «Servono almeno due snapshot mensili…»: the refresh now drops the custom range and returns to the year to date.
 
 - Fixed the Panoramica showing old figures for up to five minutes after a change it reads from: renaming a category, changing its type, moving or reassigning its movements, recording, editing or deleting a dividend that is not credited to an account, saving goals (from FIRE › Obiettivi or from the assistant), adding or removing a pension contribution, and changing the goals or pension-return settings on their own. Each of these now refreshes the Panoramica at once.
@@ -60,9 +64,13 @@
 
 - Improved Analisi › Flusso on a phone: it is now a bar of the period's spending split by type, each type's categories as rows (a row opens its Scheda) and what was left over as a closing line, instead of a Sankey too narrow to read; the printed shares always add up to 100, a type that rounds to zero reads «<1%», and when the period holds amounts that are only scheduled the closing line says so. From 640px up the Sankey is unchanged. (Contributed by Ciocc128.)
 
+- Patrimonio opens faster, most of all on a phone: the instruments are drawn once (the table on a wide screen, the rows on a phone, no longer both), a row draws its price line only when you open it, and the asset form exists only while it is open. Typing in the form no longer redraws the whole window at each key, and every figure and element looks as before.
+
 - Improved Patrimonio › Strumenti for a composite instrument (a 60/40 fund, a balanced ETF): still one row, but its class chip now shows every class it holds — one segment per class, as wide as its share and in that class's colour, «Azioni · Obbl.» for two, «Misto» for three or more. A class under 5% gets no segment, a screen reader hears every share, and the group headers and the sort by class keep the prevailing class. (Contributed by Ciocc128.)
 
 ## 📚 Documentation
+
+- The Patrimonio, dialog and testing guides now explain how Patrimonio keeps one list per width, draws a row's chart only once opened and mounts its two dialogs only while needed, and how to prove that a window really played its closing animation; the Cashflow and Dividendi guides explain why balances are stored to the cent and coupons without binary noise.
 
 - Retired the specification behind the React Compiler after reading it against the code (eighteen differences): the agent guidelines now say how to tell that a build is really compiled and that the compiler also lengthens the build, a configuration comment no longer calls the linter the map of what the compiler skips, and the speed manual declares that the full before/after benchmark of that change was never written down.
 

@@ -19,6 +19,7 @@
 
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { toDate } from '@/lib/utils/dateHelpers';
+import { stripFloatNoise } from '@/lib/utils/floatNoise';
 import { buildCouponNote, getNextCouponDate, hasCouponPayments, resolveCoupon } from '@/lib/utils/couponUtils';
 import { BondDetails } from '@/types/assets';
 
@@ -111,7 +112,7 @@ export async function scheduleFinalPremium(params: ScheduleCouponParams): Promis
 
   const nominalValue = bondDetails.nominalValue ?? 1;
   const effectiveTaxRate = resolveCouponTaxRate(taxRate);
-  const premiumPerShare = (bondDetails.finalPremiumRate / 100) * nominalValue;
+  const premiumPerShare = stripFloatNoise((bondDetails.finalPremiumRate / 100) * nominalValue);
   const premiumGross = premiumPerShare * quantity;
   const premiumTax = premiumGross * (effectiveTaxRate / 100);
 

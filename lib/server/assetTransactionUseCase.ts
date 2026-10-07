@@ -15,6 +15,7 @@ import { getUserAssetsAdmin } from '@/lib/server/assetAdminRepository';
 import { invalidateDashboardOverviewSummaryServer } from '@/lib/services/dashboardOverviewInvalidation.server';
 import { removeUndefinedDeep } from '@/lib/utils/firestoreData';
 import { toDate, getItalyDayBoundsUtc } from '@/lib/utils/dateHelpers';
+import { roundToCents } from '@/lib/utils/cents';
 import {
   ASSET_TRANSACTIONS_COLLECTION,
   ASSET_TRANSACTIONS_META_COLLECTION,
@@ -485,7 +486,7 @@ async function commitTradeMutation(
         continue;
       }
       const currentQuantity = (snap.data()?.quantity as number) ?? 0;
-      tx.update(ref, { quantity: currentQuantity + delta, updatedAt: new Date() });
+      tx.update(ref, { quantity: roundToCents(currentQuantity + delta), updatedAt: new Date() });
     }
 
     outcome = {

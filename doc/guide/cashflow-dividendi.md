@@ -10,7 +10,7 @@
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Dividendi**: `components/dividends/DividendTrackingTab.tsx` + `tiles/*` + `DividendiDettaglio.tsx`, pure `lib/utils/{dividendAnalytics,dividendiNarrative,dividendEligibility}.ts` (`resolveDividendFloor` = the ONE floor under a scraped dividend), `lib/hooks/useDividendStats.ts` (`useDividendRegistry` for the page's list, `useDividendStats` for the tab's measures: ONE request) → `app/api/dividends/stats/route.ts`; registry and coupons `components/dividends/{DividendTable,DividendCalendar,DividendDialog,DividendDetailsDialog,DividendRecordDetailsDialog,InflationRateDialog,ProvisionalCouponBanner}.tsx`, `lib/utils/couponUtils.ts` (`resolveCoupon` for both mechanisms, `resolveInflationIndexation`, `hasCouponPayments`, the coefficient lookups), `lib/services/couponScheduling.ts`, `types/dividend.ts`
-- **Suites to run after a change here — Dividendi / cron** (moved from `AGENTS.md` § Commands on 2026-09-30): `dividendUseCase`, `dividendProcessor`, `dividendAccount`, `dividendIncomeService` · **Email** `monthlyEmailService`
+- **Suites to run after a change here — Dividendi / cron** (moved from `AGENTS.md` § Commands on 2026-09-30): `dividendUseCase`, `dividendProcessor`, `dividendAccount`, `dividendIncomeService`, `floatNoise` · **Email** `monthlyEmailService`
 - **Suites to run after a change here — Cashflow › Dividendi** (moved from `AGENTS.md` § Commands on 2026-09-30): `dividendAnalytics`, `dividendiNarrative` (+ `patrimonioNarrative` for the articles) · **The stats route** `dividendStatsRoute` (its answer pinned on a fixture, 2026-10-05)
 
 ## Cashflow › Dividendi (`components/dividends/DividendTrackingTab.tsx`, `components/dividends/tiles/*`)
@@ -139,7 +139,15 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   row (no `balancePending`: applied), so Tracciamento's edits and deletes give the account back through
   `lib/utils/cashSettlement.ts`; `updateExpenseFromDividend` moves the DIFFERENCE and `deleteExpenseForDividend` gives
   back what was applied. The amount is cents (`dividendIncomeAmount`); an account that is not the user's own cash
-  account, or is in another currency than the row, is skipped and the row written without a link.
+  account, or is in another currency than the row, is skipped and the row written without a link. The BALANCE the
+  credit lands on is rounded to the cent too (2026-10-07, doc/guide/cashflow.md § Expense Sign Convention).
+- **A coupon per unit is stored as the decimal it is, not its binary neighbour** (2026-10-07,
+  `lib/utils/floatNoise.ts`): `(1,3 / 100 / 2) × 1000` is 6.500000000000001 in binary, and the owner's BTP Valore showed
+  it in «Importo lordo per unità». It cannot be cents — a BTP€i per 1 € of nominal has five or six meaningful decimals —
+  so `stripFloatNoise` keeps twelve significant digits: in `calculateCouponPerShare`, in `resolveCoupon`'s indexed
+  coupon (× coefficient, + FOI inflation) and in the final premium (`couponScheduling`). Records saved before keep their
+  value; `DividendDialog` shows the clean one and saves it back on the next edit. The totals (gross, tax, net) keep
+  their exact values as before; the cents are applied where money moves. `__tests__/floatNoise.test.ts`.
 - **A route reads settings and categories with the ADMIN SDK** (`resolveDividendIncomeCategory`, 2026-09-20): the
   dividend PUT route used the client readers (`getSettings`, `getCategoryById`), which the rules refuse with no
   signed-in client, and its `catch` swallowed the refusal — an edited dividend NEVER reached its income row. Found by
