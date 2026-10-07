@@ -17,8 +17,7 @@
       "raisedBy": "#432: il React Compiler acceso (memo cache per componente, +20–26% gz sul codice dei componenti; misura prima/dopo in perf/README.md § Registro)"
     },
     "/dashboard/assets": {
-      "initialJsGzKB": 780,
-      "raisedBy": "#432: il React Compiler acceso (memo cache per componente, +20–26% gz sul codice dei componenti; misura prima/dopo in perf/README.md § Registro)"
+      "initialJsGzKB": 669
     },
     "/dashboard/assistant": {
       "initialJsGzKB": 700,

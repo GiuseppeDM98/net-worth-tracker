@@ -232,13 +232,15 @@ un'altra route sì. La colonna JS del benchmark lo include: è una traccia, non 
 ```bash
 npm run perf:build -- --profile                     # next build --profile: React di profiling, i tempi nei fiber
 npm run perf:serve                                  # :3200
-npm run perf:census -- --runs=5 --label=prima       # ~2 minuti; --scenario=settings,expense,tabs · --mobile
+npm run perf:census -- --runs=5 --label=prima       # ~2 minuti; --scenario=settings,expense,tabs,asset · --mobile
 ```
 
-Tre scenari, ognuno in un contesto nuovo con il login vero, nulla salvato: **settings** (10 tasti in «Anno inizio
+Quattro scenari, ognuno in un contesto nuovo con il login vero, nulla salvato: **settings** (10 tasti in «Anno inizio
 storico cashflow» di Impostazioni › Preferenze, un input controllato della pagina), **expense** (10 tasti in «Importo» di
 «Nuova Spesa» › Spesa variabile, letto da `useWatch` alla radice del dialog), **tabs** (Cashflow Tracciamento ⇄ Budget,
-quattro cambi con entrambe le tab già montate). Le colonne sono PER TASTO (per cambio, in `tabs`):
+quattro cambi con entrambe le tab già montate), **asset** (dal 2026-10-07, PERF-11: 10 tasti in «Quantità» di
+«Aggiungi asset» › ETF, la posizione iniziale — non «Modifica»: un ETF è un tipo del registro, e in modifica quantità e
+PMC sono in sola lettura). Le colonne sono PER TASTO (per cambio, in `tabs`):
 
 | Colonna | Significato |
 |---|---|
@@ -262,6 +264,12 @@ rende di nuovo tutto il suo sottoalbero. Layout e style recalc quasi invariati, 
 di React, non del DOM. Il benchmark completo prima/dopo di quella sessione (`perf:bench -- --runs=3`) NON fu trascritto:
 restano gli A/B ravvicinati di Cashflow (593 / 593 ms) e di Analisi (920 / 951) in § Registro, e la baseline in vigore
 resta quella sopra.
+
+**Prima/dopo di PERF-11** (2026-10-07, laptop Windows, mirror, mediane di 5, build `--profile`): **asset 562 → 0**
+componenti per tasto, commit 2 → 0 (render 1,8 ms → nessuno; script sulla finestra 93 → 7 ms); expense 1 → 1. Il
+compiler compilava `AssetDialog` ma lasciava il form del passo 2 fuori da ogni scope di memo, quindi un `useWatch` alla
+radice ri-renderizzava tutto: i campi digitati sono letti da foglie che li osservano (doc/guide/patrimonio.md § Two-Step).
+Per leggere i NOMI dei componenti al posto di `?`: `npm run perf:build -- --profile --no-mangling` (stessi conteggi).
 
 ## Revisit — «il secondo caricamento della route» (2026-09-29)
 

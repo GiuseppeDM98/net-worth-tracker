@@ -19,13 +19,16 @@
  *       out, and the flag stays off. On a `--profile` build the root's `actualDuration` adds the
  *       render time of the commit; on a plain build it is absent and printed as «-».
  *
- * Scenarios (`--scenario=`, comma-separated, default all three):
+ * Scenarios (`--scenario=`, comma-separated, default all four):
  *   settings   Impostazioni › Preferenze: 10 keys in «Anno inizio storico cashflow» — a controlled
  *              input of the 4000-line settings page, so every key is a `setState` on the page root.
  *   expense    Cashflow › «Nuova Spesa» › Spesa variabile: 10 keys in «Importo», watched by
  *              `useWatch` at the dialog's root.
  *   tabs       Cashflow: Tracciamento ⇄ Budget, both already mounted (`forceMount`), four switches —
  *              does the hidden tab re-render?
+ *   asset      Patrimonio › «Aggiungi asset» › ETF: 10 keys in «Quantità» of the opening position,
+ *              watched by `useWatch` at the root of the 2900-line `AssetDialog` (PERF-11). Not an
+ *              edit: an ETF is a ledger type, and editing one shows quantity and PMC read-only.
  * Never saves anything: the typed values are dropped with the context.
  *
  * Prerequisites, in the owner's terminals: `npm run emulators`, the mirror
@@ -49,7 +52,7 @@ const PASSWORD = 'test1234';
 const LABEL = args.label ?? '';
 const MOBILE = args.mobile === 'true';
 const VIEWPORT = MOBILE ? { width: 390, height: 844 } : { width: 1440, height: 900 };
-const SCENARIOS = (args.scenario ?? 'settings,expense,tabs').split(',');
+const SCENARIOS = (args.scenario ?? 'settings,expense,tabs,asset').split(',');
 // :3000 is the tour server, :3100 the Playwright one, :3200 the benchmark's (perf/README.md).
 const BASE = args.base ?? 'http://localhost:3200';
 const OUT = 'perf/last-census.json';
@@ -226,6 +229,16 @@ const scenarioRunners = {
         await page.waitForTimeout(400);
       }
     });
+  },
+  async asset(page, cdp) {
+    await page.goto(`${BASE}/dashboard/assets`, { waitUntil: 'load' });
+    await page.getByRole('button', { name: 'Aggiungi asset' }).filter({ visible: true }).first().click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('radio', { name: /^ETF/ }).click();
+    const input = dialog.locator('#quantity');
+    await input.waitFor({ state: 'visible', timeout: 30_000 });
+    await page.waitForTimeout(1_000); // the dialog's entrance and the settings read it starts on open
+    return record(page, cdp, KEYS.length, () => typeKeys(page, input));
   },
 };
 

@@ -154,6 +154,16 @@ describe('settleDueBalances — a mortgage instalment on its day', () => {
     expect(collections.assets.get('bnl')!.quantity).toBe(5000 - 1012);
   });
 
+  it('should store the balance to the cent, without the binary noise of the sum (2026-10-07)', async () => {
+    expect(4033.37 - 0.07).not.toBe(4033.3); // the raw sum is noisy
+    collections.assets.set('bnl', { userId: UID, quantity: 4033.37 });
+    collections.expenses.set('coffee', { userId: UID, type: 'variable', amount: -0.07, date: new Date(2026, 9, 10, 12), linkedCashAssetId: 'bnl', balancePending: true });
+
+    await settleDueBalances(UID, NOW);
+
+    expect(collections.assets.get('bnl')!.quantity).toBe(4033.3);
+  });
+
   it('should settle a plain linked row exactly as before, with no debt stamp', async () => {
     collections.expenses.set('groceries', { userId: UID, type: 'variable', amount: -80, date: new Date(2026, 9, 10, 12), linkedCashAssetId: 'bnl', balancePending: true });
 

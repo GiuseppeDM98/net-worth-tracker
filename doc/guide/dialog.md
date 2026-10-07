@@ -84,6 +84,19 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   pivot 253px from the button). Pinned by `e2e/modal.origin.spec.ts` and `e2e/panoramica.snapshot.spec.ts`, open AND
   close; read the geometry on an OPEN settled frame — a closing panel at scale 0.95 is displaced by 0.05 × its
   distance from the pivot, which reads as an 18px error that is not one.
+- **A modal mounted only while it is needed unmounts in `onExitComplete`, never at `onClose`** (PERF-11,
+  2026-10-07, Patrimonio's `AssetDialog` and `CashAccountDialog`): the host keeps `{ open, mounted }`, `open` drives the
+  animation, `mounted` the tree, and `ResponsiveModal.onExitComplete` turns it false. That callback is Radix's
+  `onCloseAutoFocus`, which the `FocusScope` dispatches in a `setTimeout(0)` from its cleanup — after `Presence` has
+  waited for the exit animation (the dialog's zoom-out and vaul's `slideToBottom` keyframes alike) — so the focus is
+  handed back first, then the host unmounts. A reopen during the exit keeps the content, so the event does not come;
+  the host still guards on its own `open` (`prev.open ? prev : …`), since a timer queued before a reopen can land after
+  it. Keep the record through the exit (the modal leaves on its own title) and pass `returnFocusTo` from
+  `event.currentTarget`. **The focus does NOT prove the exit happened**: unmounted at `onClose`, the dialog still gave
+  the focus back (seen 2026-10-07 — the scope's cleanup calls the handler after the unmount, and the handler holds the
+  ref); what proves it is a `[role=dialog][data-state="closed"]` frame watched from BEFORE the Escape
+  (`e2e/assets.rows.spec.ts`). On a hand-over to another modal, clear the closing one's opener (or move it to the next
+  modal), or its restore sends the focus behind the modal that is opening.
 - **In light mode `--card` and `--background` are both `oklch(1 0 0)`**, so a test that proves a modal is «lifted» by
   comparing it with the page background passes only in dark mode. What separates it there is the border and the Float
   shadow; assert the modal's surface equals a TILE's instead.
@@ -120,4 +133,9 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   replaces it. `returnFocusTo` is the cure, fed from `event.currentTarget` at the click (a `PageHeader` action is mounted
   twice; only `currentTarget` is the copy that was pressed). Every modal opened from a plain button without it has the same
   defect: pass the opener when you touch one. Pinned by `e2e/performance.degraded.spec.ts`.
+- **`e2e/modal.origin.spec.ts` can fail on a SLOW or cold dev server** (no `data-state="closed"` frame inside the
+  sampler's 2,6 s window — the dialog opened more than ~1,5 s after the click; 2026-09-29 on the Windows laptop, 2026-10-04
+  on the Mac with the server started cold for the one spec, on `develop` too). The window is the spec's, not the app's. An
+  origin off the button's centre is NOT this flake: the spec reads the box after the entrance (doc/guide/e2e-emulatori.md).
+  (moved from `CLAUDE.md` → Known Issues on 2026-10-07)
 - **Sotto i 769px nessuna modale prende il fuoco quando si apre** (2026-09-18): `vaul` nasce con `autoFocus = false`, il fuoco resta sull'opener e dopo un passaggio tra due drawer finisce su `body`. Non cambiato: `autoFocus` su un telefono apre la tastiera su ogni form — una decisione per 40 mount. doc/guide/dialog.md. (moved from `CLAUDE.md` → Known Issues on 2026-09-19)

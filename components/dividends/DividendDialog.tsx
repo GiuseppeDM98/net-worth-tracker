@@ -45,6 +45,7 @@ import { cn } from '@/lib/utils';
 import { formatCurrency, formatNumberIt } from '@/lib/utils/formatters';
 import { toDate } from '@/lib/utils/dateHelpers';
 import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
+import { stripFloatNoise } from '@/lib/utils/floatNoise';
 import { dividendTypeLabels } from '@/lib/constants/dividendTypes';
 import {
   describeDividendIntent,
@@ -226,7 +227,9 @@ export function DividendDialog({ open, onClose, dividend, onSuccess, returnFocus
     if (dividend) {
       reset({
         assetId: dividend.assetId,
-        grossAmountPerShare: dividend.dividendPerShare,
+        // A coupon saved before 2026-10-07 can carry binary noise (6.500000000000001): shown and
+        // saved back as the decimal it is (lib/utils/floatNoise.ts).
+        grossAmountPerShare: stripFloatNoise(dividend.dividendPerShare),
         withholdingTax: dividend.quantity > 0 ? round4(dividend.taxAmount / dividend.quantity) : 0,
         sharesHeld: dividend.quantity,
         exDate: toDate(dividend.exDate),

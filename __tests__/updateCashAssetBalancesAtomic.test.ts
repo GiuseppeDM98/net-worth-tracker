@@ -95,6 +95,16 @@ describe('updateCashAssetBalancesAtomic', () => {
     expect(invalidateMock).not.toHaveBeenCalled(); // no write → no invalidation
   });
 
+  it('stores the balance to the cent, without the binary noise of the sum (2026-10-07)', async () => {
+    // The anchor: the raw sum IS noisy, so the case proves the rounding and not a lucky pair.
+    expect(4000.1 + 33.2).not.toBe(4033.3);
+    store.set('a', { userId: 'u1', quantity: 4000.1 });
+
+    await updateCashAssetBalancesAtomic([{ assetId: 'a', signedDelta: 33.2 }]);
+
+    expect(store.get('a')!.quantity).toBe(4033.3);
+  });
+
   it('sums multiple deltas on the same asset', async () => {
     store.set('a', { userId: 'u1', quantity: 1000 });
 

@@ -4,7 +4,7 @@
 
 ## Files
 
-- **E2E ed emulatori**: `playwright.config.ts`, `e2e/*.spec.ts`, `e2e/global-setup.ts`, the six `e2e/auth*.setup.ts` + `e2e/persistedCache.ts` (the helper that keeps the persisted query cache out of the parked sessions), `e2e/freshnessProbe.ts` (the helper that records what a load showed and reads what the app persisted), `e2e/shellBoot.ts`, the seeds `scripts/seedEmulator.ts` + `scripts/seed*.mts` (`seedPensionE2E`, `seedAnalisiE2E`, `seedCoastFireE2E`, `seedCostCentersE2E`), the production mirror `scripts/mirrorProdAccount.mts` (`npm run mirror:seed` / `mirror:remove`), throwaway exercises `scripts/*.tmp.mts` (untracked); npm scripts `test:e2e` / `e2e:seed*` / `dev:e2e` / `emulators` / `emulators:seed` / `dev:emulator`
+- **E2E ed emulatori**: `playwright.config.ts`, `e2e/*.spec.ts`, `e2e/global-setup.ts`, the six `e2e/auth*.setup.ts` + `e2e/persistedCache.ts` (the helper that keeps the persisted query cache out of the parked sessions), `e2e/freshnessProbe.ts` (the helper that records what a load showed and reads what the app persisted), `e2e/shellBoot.ts`, the seeds `scripts/seedEmulator.ts` + `scripts/seed*.mts` (`seedPensionE2E`, `seedAnalisiE2E`, `seedCoastFireE2E`, `seedCostCentersE2E`, `seedSplitE2E`, `seedHallOfFameE2E`, `seedInstrumentProfilesE2E` + `scripts/instrumentProfileFixtures.ts`, the Esposizione's Yahoo profiles shared by the base seed and the E2E re-stamp), the production mirror `scripts/mirrorProdAccount.mts` (`npm run mirror:seed` / `mirror:remove`), throwaway exercises `scripts/*.tmp.mts` (untracked); npm scripts `test:e2e` / `e2e:seed*` / `dev:e2e` / `emulators` / `emulators:seed` / `dev:emulator`
 
 ## Proving a refactor changed no number
 - **Measure the noise floor BEFORE interpreting a diff**: anything downstream of `new Date()` drifts (cents at two
@@ -161,6 +161,10 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   Analisi's three disclosures and its Scheda and the four lazy FIRE tabs measured `layout-shift` 0 ONCE, on the mirror at
   1440 and 390; no spec holds them, so a placeholder that loses its height there goes unseen by the suite. If one of
   them went back into the initial JavaScript, `perf:budget` would still catch it (its route over the ceiling).
+- **A chunk held from the first navigation makes an absence at mount inert** (2026-10-07, `e2e/assets.rows.mobile.spec.ts`):
+  «0 sparklines before any row is opened» stayed green with every row mounting its chart, because the held chunk kept
+  them all on their placeholder. The absence is asserted with the chunk ARRIVED (`probeChunks` polled until it has),
+  the placeholder-against-chart height in a second test that holds it.
 - **«No placeholder ever showed» is watched from BEFORE the action** (2026-09-30): a `MutationObserver` installed before
   the click, read after; counting skeletons once the chart is visible passes whether or not one flashed (seen inert).
 - **In a cloud container the pinned Chromium is not installed** (2026-09-25): `browserType.launch: Executable doesn't
@@ -249,7 +253,8 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   Recharts tooltip need `textContent`); `boundingBox()` is viewport-relative (`scrollIntoViewIfNeeded()` before hovering
   a chart below the fold) and two calls sample two FRAMES (read every rect one assertion compares in ONE `evaluate()`,
   never during an animation); responsive DOM duplicates make `.first()` the HIDDEN mobile copy (`.filter({ visible:
-  true })`); a collapsed CSS-grid region is still "visible" (scope through the toggle's `aria-controls` and measure
+  true })`) — not on Patrimonio's Strumenti since PERF-11 (2026-10-07): one list per width there, the table at 1440 and
+  the rows at 390, so a row locator finds one copy and a count is the instrument count; a collapsed CSS-grid region is still "visible" (scope through the toggle's `aria-controls` and measure
   height); a `fill()` right after `goto(…, { waitUntil: 'domcontentloaded' })` is wiped by hydration (`waitUntil:
   'load'`, then `.inputValue()`); `addInitScript` runs on EVERY navigation, reloads included, so a `localStorage.removeItem`
   placed there to start clean also wipes the persistence the spec is about to verify — guard it with a `sessionStorage`
