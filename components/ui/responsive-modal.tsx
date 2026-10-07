@@ -117,7 +117,7 @@ export interface ResponsiveModalProps {
   /**
    * Called once the closing animation has finished and the content has left the DOM — the moment
    * a caller that mounts the modal only while it is needed may unmount it (Patrimonio's
-   * `AssetDialog` and `CashAccountDialog`, PERF-11). Unmounting at `onClose` instead would cut the
+   * `AssetDialog` and `CashAccountDialog`). Unmounting at `onClose` instead would cut the
    * exit animation and skip the focus restore, which happens here, on the same event.
    *
    * The event is Radix's `onCloseAutoFocus`: the `FocusScope` dispatches it in a `setTimeout(0)`

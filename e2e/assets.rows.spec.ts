@@ -1,10 +1,10 @@
 /**
  * Patrimonio at 1440 — ONE list in the DOM, no sparkline code, and the two dialogs that mount only
- * while they are needed (PERF-11, 2026-10-07). Base account (`desktop` project).
+ * while they are needed (2026-10-07). Base account (`desktop` project).
  *
  * What only a browser can prove:
  * - Strumenti renders the TABLE and nothing else: one `<tr>` per instrument (counted in Firestore,
- *   not on the page), no phone row (`AssetRow`), no chart. Until PERF-11 both lists were in the
+ *   not on the page), no phone row (`AssetRow`), no chart. Until 2026-10-07 both lists were in the
  *   DOM at every width, the hidden one included. Seen red by rendering both lists again.
  * - The desktop never downloads the sparkline's chunk: the line lives only in a phone row, behind
  *   a `lazyComponent`, preloaded on a phone only. The positive anchor — the same chunk arriving at
@@ -17,12 +17,12 @@
  *   Radix's `FocusScope` dispatches `onCloseAutoFocus` from its cleanup, after the unmount, and the
  *   handler holds the ref — so the closing frame is the assertion about the exit.
  * - «Aggiungi asset» opens on step 1 after a «Modifica»: a REGRESSION GUARD that stayed green
- *   through PERF-11 — with the dialog mounted only while open, the initializer trap it was written
+ *   through that change — with the dialog mounted only while open, the initializer trap it was written
  *   for (AGENTS.md § Two-Step Create Dialogs) cannot happen on this page any more; the reset during
  *   render still has to hold for a host that keeps its dialog mounted (WORKFLOW.md § 2).
  *
  * The absence of a chart is asserted on an `svg.recharts-surface` count; at 1440 that was already
- * 0 before PERF-11 (a `ResponsiveContainer` inside `display:none` draws nothing), so it is a guard
+ * 0 before 2026-10-07 (a `ResponsiveContainer` inside `display:none` draws nothing), so it is a guard
  * for the table, not the proof that rows stopped mounting their sparkline — that one is at 390.
  */
 import { test, expect, type Page } from '@playwright/test';

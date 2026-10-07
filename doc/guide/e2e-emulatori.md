@@ -247,13 +247,16 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   filter (both header copies, `toHaveText(['', ''])`). The sign-out test reads the record back through IndexedDB
   itself (`indexedDB.open` + `get`), the way «assert on data» means here.
 - **Prove the test can fail before trusting it** (the 1440px assertions were re-run at 1200px, where they must fail).
+- **`e2e/cashflow.transfer-fee.spec.ts` was red ONCE in a full run** (2026-10-07, Windows laptop, the second full run
+  of PR #434, which did not touch transfers): green alone and in the suite's order, cause not traced. A second red
+  there is a pattern, not noise — note the run before re-running it.
 - **Reading the page — the traps, each seen once**: `page.addInitScript` runs BEFORE `document.documentElement` exists
   (observe `document` with `subtree: true`, or the script dies and the spec passes having observed nothing);
   `innerText` applies `text-transform` and is `''` for anything not rendered (an uppercase eyebrow marker or an open
   Recharts tooltip need `textContent`); `boundingBox()` is viewport-relative (`scrollIntoViewIfNeeded()` before hovering
   a chart below the fold) and two calls sample two FRAMES (read every rect one assertion compares in ONE `evaluate()`,
   never during an animation); responsive DOM duplicates make `.first()` the HIDDEN mobile copy (`.filter({ visible:
-  true })`) — not on Patrimonio's Strumenti since PERF-11 (2026-10-07): one list per width there, the table at 1440 and
+  true })`) — not on Patrimonio's Strumenti since 2026-10-07: one list per width there, the table at 1440 and
   the rows at 390, so a row locator finds one copy and a count is the instrument count; a collapsed CSS-grid region is still "visible" (scope through the toggle's `aria-controls` and measure
   height); a `fill()` right after `goto(…, { waitUntil: 'domcontentloaded' })` is wiped by hydration (`waitUntil:
   'load'`, then `.inputValue()`); `addInitScript` runs on EVERY navigation, reloads included, so a `localStorage.removeItem`

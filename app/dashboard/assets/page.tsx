@@ -179,7 +179,7 @@ export default function AssetsPage() {
 
   // ─── Dialog state ─────────────────────────────────────────────────────────────
   // The two dialogs a reader opens most are MOUNTED only from their opening to the end of their
-  // exit animation (PERF-11, 2026-10-07): `AssetDialog` is 2900 lines and used to take part in every
+  // exit animation (since 2026-10-07): `AssetDialog` is 2900 lines and used to take part in every
   // render of the page while closed. `open` drives the animation, `mounted` the tree: it turns false
   // in `onExitComplete`, after Radix has handed the focus back to the opener — unmounting at
   // `onClose` would cut the exit and drop the focus on `body`. The record stays through the exit,

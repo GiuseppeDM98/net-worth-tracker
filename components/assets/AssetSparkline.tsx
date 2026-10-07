@@ -16,7 +16,7 @@ interface AssetSparklineProps {
  * phone (13 of them, measured 2026-09-14): the chart is an image with a name, not a widget
  * (AGENTS.md → Recharts, accessibility goes on the chart).
  *
- * No hook of its own (PERF-11, 2026-10-07): it used to call `useChartColors` and wait one more rAF
+ * No hook of its own (since 2026-10-07): it used to call `useChartColors` and wait one more rAF
  * per row, and every row mounted it closed — 15 recharts charts, 30 rAF and 16 `getComputedStyle`
  * on the owner's phone at each visit. Now the row draws it at its first opening, as a
  * `lazyComponent` (the module is the only path to recharts on Patrimonio), with the page's colours.

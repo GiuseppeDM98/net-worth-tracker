@@ -1,14 +1,14 @@
 /**
  * Patrimonio at 390 — the phone rows alone, and a sparkline only in a row someone opened
- * (PERF-11, 2026-10-07). Base account (`mobile` project).
+ * (2026-10-07). Base account (`mobile` project).
  *
  * What only a browser can prove:
  * - Strumenti renders the phone ROWS and nothing else: one `AssetRow` per instrument (counted in
- *   Firestore), no `<tr>`. Until PERF-11 the desktop table was in the DOM too, hidden by CSS.
+ *   Firestore), no `<tr>`. Until 2026-10-07 the desktop table was in the DOM too, hidden by CSS.
  * - No row mounts its chart until it is opened: 0 `svg.recharts-surface` once the sparkline's chunk
  *   is in (the phone preloads it when idle — this chunk arriving is the positive anchor of
  *   `assets.rows.spec.ts`, which asserts the desktop never fetches it), 1 after opening a row.
- *   Before PERF-11 every closed row drew one (15 on the owner's 18 instruments). Seen red by
+ *   Before 2026-10-07 every closed row drew one (15 on the owner's 18 instruments). Seen red by
  *   mounting `AssetSparkline` without the `hasOpened` gate: the count read one per row.
  * - The line lands without moving the row: with the sparkline's chunk HELD, the opened panel shows
  *   its 32px slot; released, the chart replaces it at the same height. A separate test, because a
