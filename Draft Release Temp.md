@@ -70,6 +70,8 @@
 
 ## 📚 Documentation
 
+- The speed manual now records the before/after timings and page size of Patrimonio's lighter rows; the Patrimonio guide describes the account detail's state correctly and drops a stale note about lint errors; the testing guide records one isolated failure of the transfer-fee browser test.
+
 - The Patrimonio, dialog and testing guides now explain how Patrimonio keeps one list per width, draws a row's chart only once opened and mounts its two dialogs only while needed, and how to prove that a window really played its closing animation; the Cashflow and Dividendi guides explain why balances are stored to the cent and coupons without binary noise.
 
 - Retired the specification behind the React Compiler after reading it against the code (eighteen differences): the agent guidelines now say how to tell that a build is really compiled and that the compiler also lengthens the build, a configuration comment no longer calls the linter the map of what the compiler skips, and the speed manual declares that the full before/after benchmark of that change was never written down.

@@ -27,8 +27,10 @@
  *   tabs       Cashflow: Tracciamento ⇄ Budget, both already mounted (`forceMount`), four switches —
  *              does the hidden tab re-render?
  *   asset      Patrimonio › «Aggiungi asset» › ETF: 10 keys in «Quantità» of the opening position,
- *              watched by `useWatch` at the root of the 2900-line `AssetDialog` (PERF-11). Not an
- *              edit: an ETF is a ledger type, and editing one shows quantity and PMC read-only.
+ *              watched by a leaf of `AssetDialog` since 2026-10-07 — at the dialog's root it
+ *              re-rendered the whole form, 562 components per key (doc/guide/patrimonio.md
+ *              § Two-Step). Not an edit: an ETF is a ledger type, and editing one shows quantity
+ *              and PMC read-only.
  * Never saves anything: the typed values are dropped with the context.
  *
  * Prerequisites, in the owner's terminals: `npm run emulators`, the mirror

@@ -28,7 +28,7 @@ interface CashAccountDialogProps {
   isDemo: boolean;
   /** The Liquidità row that opened the detail: the focus goes back to it on close. */
   returnFocusTo?: RefObject<HTMLElement | null>;
-  /** The exit animation is over: the page unmounts the detail here (PERF-11). */
+  /** The exit animation is over: the page unmounts the detail here. */
   onExitComplete?: () => void;
 }
 
@@ -43,7 +43,7 @@ interface CashAccountDialogProps {
  * 2026-09-14 the armed state lived in the page on a 3 s timer: Escape closed the modal with the
  * row still armed, and the reading kept describing how the balance moves.
  *
- * The page mounts it only from the opening to the end of the exit animation (PERF-11, 2026-10-07):
+ * The page mounts it only from the opening to the end of the exit animation (since 2026-10-07):
  * until then it unmounted the moment the account was cleared, so it vanished without its exit and
  * the focus fell on `body`.
  */

@@ -217,7 +217,7 @@ pointer — a stub that grows past that is a guide leaking back (2026-09-20: ten
 - **`setStep(record ? 2 : 1)` is settled during render on the `(open, record)` subject**, never in `useState`'s
   initializer (the record prop stays null between opens and the second "new" would reopen on the form) and, since
   2026-09-06, no longer in the `open` effect either (`react-hooks/set-state-in-effect`). **It stays so where the host
-  mounts the dialog only while open** (Patrimonio since 2026-10-07, PERF-11 — doc/guide/dialog.md): there an
+  mounts the dialog only while open** (Patrimonio since 2026-10-07 — doc/guide/dialog.md): there an
   initializer would be right, but one way that holds for every host beats two; the comment above `openSubject` in
   `AssetDialog.tsx` says so, and `e2e/assets.rows.spec.ts` keeps «Nuovo after Modifica opens on step 1» as a guard.
 - **Make the back-link callback OPTIONAL and let its absence select the `Select`** (`onBackToTypePicker?`), so the two
@@ -626,7 +626,7 @@ file used to carry.
 - **Import recharts from `@/components/ui/charts/recharts`, never from `'recharts'`** (2026-09-30): the one module of
   real code that keeps the library in ONE chunk (§ Dynamic Imports); a primitive it lacks is added there.
 - **`useChartColors()` is mandatory for every series** — CSS vars read after paint, `chartColors[0..4]` as props —
-  **once per page or tile, never once per row** (2026-10-07, PERF-11): a list of small charts takes the palette as a
+  **once per page or tile, never once per row** (2026-10-07): a list of small charts takes the palette as a
   prop (`AssetSparkline`'s `colors`), as `useActionColors` does; a hook per row was a rAF and a `getComputedStyle` each.
 - **A series CAN drive the page, but no page does today**: `onMouseMove`'s `activeTooltipIndex` (a number OR a numeric
   string in 3.x), lift the index's PERIOD, handlers only under `(pointer: fine)`, a pure module resolving the followers.

@@ -84,8 +84,9 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   pivot 253px from the button). Pinned by `e2e/modal.origin.spec.ts` and `e2e/panoramica.snapshot.spec.ts`, open AND
   close; read the geometry on an OPEN settled frame — a closing panel at scale 0.95 is displaced by 0.05 × its
   distance from the pivot, which reads as an 18px error that is not one.
-- **A modal mounted only while it is needed unmounts in `onExitComplete`, never at `onClose`** (PERF-11,
-  2026-10-07, Patrimonio's `AssetDialog` and `CashAccountDialog`): the host keeps `{ open, mounted }`, `open` drives the
+- **A modal mounted only while it is needed unmounts in `onExitComplete`, never at `onClose`** (2026-10-07,
+  Patrimonio's `AssetDialog` and `CashAccountDialog`): the host keeps `{ open, mounted }` (or `{ open, record }`, a
+  record set meaning mounted), `open` drives the
   animation, `mounted` the tree, and `ResponsiveModal.onExitComplete` turns it false. That callback is Radix's
   `onCloseAutoFocus`, which the `FocusScope` dispatches in a `setTimeout(0)` from its cleanup — after `Presence` has
   waited for the exit animation (the dialog's zoom-out and vaul's `slideToBottom` keyframes alike) — so the focus is

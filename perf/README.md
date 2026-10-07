@@ -212,10 +212,19 @@ due) e in letture da `__tests__/dividendStatsRoute.test.ts`; nessun tempo misura
 dell'assistente non rilegge memoria e impostazioni quando la pagina le manda la preferenza (due documenti in meno, in
 serie prima del builder; tenuto da `__tests__/assistantRoutes.test.ts`).
 
+**2026-10-07, Patrimonio a righe leggere (PR #434, branch `perf/11-patrimonio-righe-leggere`), prima/dopo nella
+stessa sessione, laptop Windows, mirror (25 asset, 18 strumenti), mediane di 5.** Solo Patrimonio. Cold a 1440: primo
+numero 521 → 443 ms, LCP 956 → 852, long task 73 → 54. Cold a 390 con CPU 4× (`--mobile`): primo numero 2001 → 1466 ms,
+LCP 2508 → 1712, long task 1327 → 754. Grafici montati a 390: 15 → 0 (1 dopo l'apertura di una riga); righe di
+Strumenti nel DOM 36 → 18 a ogni larghezza. Bundle: Patrimonio 764,7 → 655,8 gz KB, recharts fuori dal suo grafo
+iniziale (tetto 780 → 669, `raisedBy` tolto). Il census per tasto è in § Il census. Trascritto il giorno stesso,
+ritirando la spec: la chiusura l'aveva scritto solo nell'indice del dossier e in CLAUDE.md.
+
 **Bundle** (gz KB, chunk iniziali; il tetto in `budget.json` è +2%) — **dal 2026-09-30, PR #418**: condivisi 473,5
 (22 chunk) · landing 452,0 · login 418,2 · Panoramica 538,0 · Patrimonio 731,1 · Cashflow 735,4 · **Analisi 564,6** ·
 **Rendimenti 566,3** · **Storico 684,0** · Hall of Fame 541,2 · Allocazione 520,6 · **FIRE 653,7** · Previdenza 592,6 ·
-Assistente 659,4 · Impostazioni 623,9; recharts in UN chunk (93,2 gz), iniziale solo su Patrimonio, Storico e FIRE.
+Assistente 659,4 · Impostazioni 623,9; recharts in UN chunk (93,2 gz), iniziale solo su Patrimonio, Storico e FIRE — su Patrimonio non più dal 2026-10-07
+(PR #434, sopra).
 Prima (2026-09-28): condivisi 459,9 · Patrimonio 718,2 · Cashflow 729,2 · Analisi 741,4 · Rendimenti 680,2 · Storico
 1189,2 (il PDF: un chunk da 513 KB gz) · FIRE 743,5 · le altre ±1.
 
@@ -238,7 +247,7 @@ npm run perf:census -- --runs=5 --label=prima       # ~2 minuti; --scenario=sett
 Quattro scenari, ognuno in un contesto nuovo con il login vero, nulla salvato: **settings** (10 tasti in «Anno inizio
 storico cashflow» di Impostazioni › Preferenze, un input controllato della pagina), **expense** (10 tasti in «Importo» di
 «Nuova Spesa» › Spesa variabile, letto da `useWatch` alla radice del dialog), **tabs** (Cashflow Tracciamento ⇄ Budget,
-quattro cambi con entrambe le tab già montate), **asset** (dal 2026-10-07, PERF-11: 10 tasti in «Quantità» di
+quattro cambi con entrambe le tab già montate), **asset** (dal 2026-10-07, PR #434: 10 tasti in «Quantità» di
 «Aggiungi asset» › ETF, la posizione iniziale — non «Modifica»: un ETF è un tipo del registro, e in modifica quantità e
 PMC sono in sola lettura). Le colonne sono PER TASTO (per cambio, in `tabs`):
 
@@ -265,7 +274,7 @@ di React, non del DOM. Il benchmark completo prima/dopo di quella sessione (`per
 restano gli A/B ravvicinati di Cashflow (593 / 593 ms) e di Analisi (920 / 951) in § Registro, e la baseline in vigore
 resta quella sopra.
 
-**Prima/dopo di PERF-11** (2026-10-07, laptop Windows, mirror, mediane di 5, build `--profile`): **asset 562 → 0**
+**Prima/dopo delle righe leggere di Patrimonio** (PR #434, 2026-10-07, laptop Windows, mirror, mediane di 5, build `--profile`): **asset 562 → 0**
 componenti per tasto, commit 2 → 0 (render 1,8 ms → nessuno; script sulla finestra 93 → 7 ms); expense 1 → 1. Il
 compiler compilava `AssetDialog` ma lasciava il form del passo 2 fuori da ogni scope di memo, quindi un `useWatch` alla
 radice ri-renderizzava tutto: i campi digitati sono letti da foglie che li osservano (doc/guide/patrimonio.md § Two-Step).

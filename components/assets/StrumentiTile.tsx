@@ -16,7 +16,7 @@
  * only gestures of the page out of view (it did, by 202px at 1440).
  *
  * Below `desktop:` the table becomes a flat list of expandable rows (`AssetRow`): a card per
- * row would be a card inside the tile. ONE of the two is in the DOM, chosen by the width (PERF-11,
+ * row would be a card inside the tile. ONE of the two is in the DOM, chosen by the width (since
  * 2026-10-07): until then both were, the hidden copy included, with every phone row's sparkline
  * mounted inside it. The two toggles are remembered per browser
  * (localStorage): a reader who compares the Δ windows every month should not re-enable them.

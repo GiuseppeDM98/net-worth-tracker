@@ -6,18 +6,18 @@
 
 Lavoro di rendering che ogni pagina paga e nessuno guarda (audit 2026-09-26, verificato a riga):
 
-- **`motion.div layout="position"` intorno all'INTERA pagina** in `app/dashboard/page.tsx:335` e `app/dashboard/assets/page.tsx:385`
+- **`motion.div layout="position"` intorno all'INTERA pagina** in `app/dashboard/page.tsx:335` e `app/dashboard/assets/page.tsx:448`
   (header, griglia, modal, badge). Framer misura il wrapper prima e dopo OGNI commit della pagina: il toggle della
   sparkline, l'apertura del confirm, `creatingSnapshot`, il timer del `SavingsRateBadge`, il `setState` da rAF di
   `useChartColors`, ogni refetch di React Query. Nessuno di questi commit muove il wrapper: la misura è pura tassa
-  (`getBoundingClientRect` forza il layout sincrono). È questa spec, sola, a toglierlo (PERF-11 non lo tocca).
+  (`getBoundingClientRect` forza il layout sincrono). È questa spec, sola, a toglierlo (su Patrimonio è ancora lì dopo le righe leggere del 2026-10-07).
 - **`BottomNavigation` montata anche sul desktop** (nascosta con `desktop:hidden`, `:73`, e in landscape sotto 1440,
   `max-desktop:landscape:hidden`: «Bottom nav is portrait-only», doc/guide/shell.md § Navigation) con `motion.nav layout` (`:78-79`,
   il cui commento dice a cosa serve: «layout-animates its position when the '+' FAB appears») e un `layoutId` pill: una
   misura di layout a ogni cambio pathname, invisibile dove è nascosta.
 - **`useChartColors` per istanza**: ogni host fa un rAF + `getComputedStyle(documentElement)` + 9 `getPropertyValue` +
   `setState` (`lib/hooks/useChartColors.ts`), quindi renderizza DUE volte; sulla Panoramica l'istanza è a livello di pagina
-  (`app/dashboard/page.tsx:118`) e la seconda render tocca il `layout="position"` sopra; Patrimonio ne ha 1 + N (PERF-11);
+  (`app/dashboard/page.tsx:118`) e la seconda render tocca il `layout="position"` sopra; Patrimonio ne ha 1 dal 2026-10-07 (la pagina, `app/dashboard/assets/page.tsx:116`: le sparkline di Strumenti prendono i colori a prop);
   FIRE fino a 12 sparse per tab e tessera; `useActionColors` fa lo stesso per tessera. I valori sono gli STESSI per tutta
   la pagina finché non cambiano `colorTheme` o `resolvedTheme`. E il filtro di luminanza dentro (`parseOklchL`) è INERTE:
   il browser risponde `lab(…)`, non `oklch(…)` (doc/guide/temi.md; AGENTS.md § Layout and Color Tokens: «Anything that READS

@@ -528,7 +528,7 @@ const assetClasses: { value: AssetClass; label: string }[] = [
 ];
 
 /*
- * The fields typed key by key, watched WHERE they are read (PERF-11, 2026-10-07). With their
+ * The fields typed key by key, watched WHERE they are read (since 2026-10-07). With their
  * `useWatch` at the dialog's root, every key in «Quantità» re-rendered the whole form — 562
  * components per key on the census, two commits each, with the React Compiler on: the compiler
  * compiles `AssetDialog` but leaves the step-2 form outside every memo scope, so nothing under the
@@ -891,7 +891,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
   // touched flags, the section toggles, the composition and the calculator. Re-running on every
   // open is what makes a second "new asset" start clean — `asset` stays null between opens.
   // The form itself is reset in the effect further down: `reset`, `setValue` and `replaceTiers`
-  // are not state setters. Patrimonio mounts this dialog only while it is open (PERF-11), where a
+  // are not state setters. Patrimonio mounts this dialog only while it is open, where a
   // `useState(asset ? 2 : 1)` initializer would be right too; the reset stays here anyway, because
   // it is the one way that also holds for a host that keeps the dialog mounted (AGENTS.md § Two-Step
   // Create Dialogs), and two ways to open a dialog are one too many.
