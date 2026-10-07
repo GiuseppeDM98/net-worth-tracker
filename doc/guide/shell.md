@@ -7,8 +7,8 @@
 Compiled on 2026-09-30, when § Navigation and two § Motion bullets moved here from `AGENTS.md`: only the files the
 rules below name.
 
-- **Layout and scene**: `app/dashboard/layout.tsx`, `app/dashboard/template.tsx`, `lib/hooks/useSceneNavigation.ts`,
-  `lib/utils/viewTransition.ts`, the `::view-transition-*` rules in `app/globals.css`, `next.config.ts`
+- **Layout and scene**: `app/dashboard/layout.tsx` (`<main>` = `page-main`), `app/dashboard/template.tsx`,
+  `lib/hooks/useSceneNavigation.ts`, `lib/utils/viewTransition.ts`, `lib/utils/themeTransition.ts`, the `::view-transition-*` rules in `app/globals.css`, `next.config.ts`
 - **Navigation**: `lib/constants/navigation.ts` (`assistantNavItem`), `components/layout/SceneLink.tsx`,
   `components/layout/{Sidebar,BottomNavigation,SecondaryMenuDrawer}.tsx` (`AppSidebar`, `NavItems`, `AddExpenseFab`),
   `components/ui/sidebar.tsx` (`SIDEBAR_WIDTH_ICON`, `sidebarMenuButtonVariants`)
@@ -100,4 +100,8 @@ rules below name.
 
 ## Per-page blind spots
 
-None recorded for the shell alone; the two shell-wide open items (the icon rail's 44px targets measured only at 1440 with a mouse, `PageTabBar` and `Switch` below 44px on touch) are in `CLAUDE.md` → Known Issues.
+- **The icon rail's 44px targets are measured at 1440 with a mouse**; no fixture covers a ≥1440px tablet in landscape.
+  (moved from `CLAUDE.md` → Known Issues on 2026-10-07)
+
+The one shell-wide open item that crosses every page (`PageTabBar` and `Switch` below 44px on touch) stays in
+`CLAUDE.md` → Known Issues.

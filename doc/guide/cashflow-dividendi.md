@@ -245,6 +245,11 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 ## Per-page blind spots
 
+- **`e2e/cashflow.dividendi.spec.ts` › «the form refuses…» is red after `cashflow.accounts` + `cashflow.budget`** (2026-09-30:
+  3/3 on a clean `develop` worktree, 2/3 on the branch of PR #418, green alone): after the refusal the dialog stays open
+  with its form reset — `reset` re-runs, cause not traced yet. Two of four full runs that day had it red; green in
+  the evening's full run of the same day (162/162). (moved from `CLAUDE.md` → Known Issues on 2026-10-07)
+
 - **A coupon recovered the day after a missed cron is NOT credited to its account** — by the owner's rule (only a
   payment dated today or later credits, so arrears never count twice). The income row is there, without an account:
   adjust the balance by hand or link the row from Tracciamento.

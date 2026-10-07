@@ -133,4 +133,9 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   replaces it. `returnFocusTo` is the cure, fed from `event.currentTarget` at the click (a `PageHeader` action is mounted
   twice; only `currentTarget` is the copy that was pressed). Every modal opened from a plain button without it has the same
   defect: pass the opener when you touch one. Pinned by `e2e/performance.degraded.spec.ts`.
+- **`e2e/modal.origin.spec.ts` can fail on a SLOW or cold dev server** (no `data-state="closed"` frame inside the
+  sampler's 2,6 s window — the dialog opened more than ~1,5 s after the click; 2026-09-29 on the Windows laptop, 2026-10-04
+  on the Mac with the server started cold for the one spec, on `develop` too). The window is the spec's, not the app's. An
+  origin off the button's centre is NOT this flake: the spec reads the box after the entrance (doc/guide/e2e-emulatori.md).
+  (moved from `CLAUDE.md` → Known Issues on 2026-10-07)
 - **Sotto i 769px nessuna modale prende il fuoco quando si apre** (2026-09-18): `vaul` nasce con `autoFocus = false`, il fuoco resta sull'opener e dopo un passaggio tra due drawer finisce su `body`. Non cambiato: `autoFocus` su un telefono apre la tastiera su ogni form — una decisione per 40 mount. doc/guide/dialog.md. (moved from `CLAUDE.md` → Known Issues on 2026-09-19)
