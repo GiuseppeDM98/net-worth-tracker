@@ -75,7 +75,10 @@ rules below name.
 - **A shell component that reads `useSearchParams` puts it in a child rendered inside `<Suspense>`** (`AddExpenseFab` in
   `BottomNavigation`): the layout is a `'use client'` component that is
   still prerendered — the shell is in the HTML since 2026-09-28 — and the hook bails static rendering out without a
-  boundary.
+  boundary. **A PAGE under `ProtectedRoute` needs no boundary** (verified 2026-10-08, Impostazioni and Cashflow read
+  `useSearchParams` at their root and `/dashboard/settings` is in the prerender manifest): on the server `loading` is
+  always true, so `ProtectedRoute` renders only its fallback and the page function never runs at prerender — the rule
+  above is for what sits OUTSIDE it.
 - **Sidebar active state for `/dashboard` must be `pathname === item.href`**, never `startsWith`. **Bottom nav is
   portrait-only**, so an in-page button duplicating the FAB must be hidden **only in portrait** — in landscape the FAB
   is gone and it is the only add affordance.

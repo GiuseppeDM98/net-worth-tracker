@@ -695,7 +695,7 @@ file used to carry.
   so split the help copy (`hidden desktop:block` / `desktop:hidden`) and label each card's axes explicitly.
 - **Prefer rendering large local subtrees as pure render helpers or top-level components** — a nested JSX definition
   inside a page component means a simple row selection remounts the whole table. `cn` is NOT auto-imported in pages.
-  **The worked example is Impostazioni** (PERF-13, 2026-10-08): one 4100-line component with 70 `useState`s re-ran
+  **The worked example is Impostazioni** (2026-10-08): one 4100-line component with 70 `useState`s re-ran
   whole on every keystroke (286 components per key on the laptop, with the compiler on — it cannot split a
   component); now the page is an orchestrator under 500 lines holding ONE `useReducer` draft, and each tab a
   module-level CONTROLLED view of its slice (`slice` in, `onChange(patch)` out, no form state of its own because Radix

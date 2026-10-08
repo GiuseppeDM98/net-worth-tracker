@@ -3,7 +3,7 @@
 /**
  * One asset class of Impostazioni › Allocazione › Target per classe: the class row (its target,
  * the «fisso €» switch for Liquidità, the Sottocategorie toggle) and, behind a Collapsible that is
- * NOT force-mounted (PERF-13), the subcategory group — enable switch, the rows sorted by name,
+ * NOT force-mounted (since 2026-10-08), the subcategory group — enable switch, the rows sorted by name,
  * «Aggiungi sottocategoria». A collapsed group is not in the DOM.
  *
  * A controlled editor: `draft` in, `onChange(patch)` out; its rows are patched BY COPY, because

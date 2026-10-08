@@ -45,8 +45,9 @@ Censimento 2026-09-26, 390×844 (altezze in px; righe di codice da riverificare)
 
 - B e C; il desktop; le primitive (MOB-02); il tablet (MOB-08); DESIGN.md (MOB-09); calcoli, parole (salvo la riga
   d'ambito, § 4.1), tessere nuove.
-- **Impostazioni**: nessun verdetto né cifra da sollevare, un modulo con un «Salva»; PERF-13 la riscrive in sei
-  componenti. La pill a 44 px arriva da MOB-02. **Assistente**: la conversazione è il contenuto, nessuna tessera.
+- **Impostazioni**: nessun verdetto né cifra da sollevare, un modulo con un «Salva»; dal 2026-10-08 è un orchestratore
+  (`app/dashboard/settings/page.tsx`) su sei viste controllate (`components/settings/tabs/*Tab.tsx`,
+  doc/guide/impostazioni.md). La pill a 44 px arriva da MOB-02. **Assistente**: la conversazione è il contenuto, nessuna tessera.
 
 ## 4. Design
 
@@ -133,7 +134,7 @@ MOB-02 § 4.8 vale per un grafico pigro da sé. Dal 2026-09-29 `failed` = gli `i
 (Previdenza: `PensionOverview.tsx:115-118`). L'Esposizione (dal 2026-09-28; il `Server-Timing` della sua route dice `source=cache|yahoo` dal 2026-10-05)
 parte all'apertura e da calda non chiama Yahoo. PERF-03 (in develop dal 2026-09-30): «Aggiornato alle…» sta nel
 `PageHeader` — le pagine Previdenza e FIRE leggono gli stessi hook dei loro componenti per la riga — mai nella
-composizione né in «Il perché». PERF-12 (in develop dal 2026-10-06, AGENTS.md § Motion) e PERF-14: nessun `layout`. PERF-13: § 3.
+composizione né in «Il perché». PERF-12 (in develop dal 2026-10-06, AGENTS.md § Motion) e PERF-14: nessun `layout`. Impostazioni: § 3.
 
 ### 4.6 Domande al proprietario
 

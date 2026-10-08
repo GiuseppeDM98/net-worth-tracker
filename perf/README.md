@@ -255,7 +255,7 @@ npm run perf:census -- --runs=5 --label=prima       # ~2 minuti; --scenario=sett
 
 Cinque scenari, ognuno in un contesto nuovo con il login vero, nulla salvato: **settings** (10 tasti in «Anno inizio
 storico cashflow» di Impostazioni › Preferenze, un input controllato della pagina), **allocation** (dal 2026-10-08,
-PERF-13: 10 tasti in «Target Criptovalute» di Impostazioni › Allocazione, la tab più grande — Crypto perché la formula
+PR #439: 10 tasti in «Target Criptovalute» di Impostazioni › Allocazione, la tab più grande — Crypto perché la formula
 non la possiede mai, quindi il campo è abilitato su ogni account), **expense** (10 tasti in «Importo» di
 «Nuova Spesa» › Spesa variabile, letto da `useWatch` alla radice del dialog), **tabs** (Cashflow Tracciamento ⇄ Budget,
 quattro cambi con entrambe le tab già montate), **asset** (dal 2026-10-07, PR #434: 10 tasti in «Quantità» di
@@ -291,9 +291,10 @@ compiler compilava `AssetDialog` ma lasciava il form del passo 2 fuori da ogni s
 radice ri-renderizzava tutto: i campi digitati sono letti da foglie che li osservano (doc/guide/patrimonio.md § Two-Step).
 Per leggere i NOMI dei componenti al posto di `?`: `npm run perf:build -- --profile --no-mangling` (stessi conteggi).
 
-**Prima/dopo di Impostazioni per tab** (PERF-13, 2026-10-08, laptop Windows, mirror riseminato quel giorno, mediane di 5,
+**Prima/dopo di Impostazioni per tab** (PR #439, 2026-10-08, laptop Windows, mirror riseminato quel giorno, mediane di 5,
 build `--profile`): **settings 286,1 → 32,1** componenti per tasto (commit 2 → 1, render 2,88 → 0,64 ms, script sulla
-finestra 85 → 31 ms, task 185 → 97); **allocation 405,1 → 112,1** (render 2,43 → 1,33 ms, script 74 → 45 ms). Il 318 di
+finestra 85 → 31 ms — −64%, sotto il −70% che la spec chiedeva: lo script della finestra porta anche Radix e il DOM, non solo
+React —, task 185 → 97); **allocation 405,1 → 112,1** (render 2,43 → 1,33 ms, script 74 → 45 ms). Il 318 di
 PERF-12 era il Mac con il mirror del 2026-10-05: il «prima» si rimisura sulla stessa macchina e lo stesso mirror del
 «dopo». Dove sono andati: la pagina era un componente solo con 70 stati e ogni tasto lo rieseguiva intero (il compiler
 non spezza un componente); ora è un orchestratore sotto 500 righe con UNA bozza (`useReducer`) e sei viste controllate
@@ -328,7 +329,7 @@ run dura di più. Lo «skeleton della pagina» non è una colonna della tabella:
 | Allocazione | 344 (4) | 106 (3) | sì → 53 ms (lo skeleton di UNA tessera, l'Esposizione) |
 | FIRE e Simulazioni | 1199 (5) | 181 (3) | sì → no |
 | Previdenza | 355 (4) | 122 (3) | sì → no |
-| Impostazioni | 398 (3) | 348 (3) | sì → sì (il documento delle impostazioni è letto con `staleTime: 0`: PERF-13) |
+| Impostazioni | 398 (3) | 348 (3) | sì → sì (il documento delle impostazioni era letto con `staleTime: 0` — dal 2026-10-08 la pagina osserva `useSettings` e si semina dalla cache persistita: nessuno skeleton al reload, visto nel giro sul mirror, non rimisurato con `--revisit`) |
 
 Quello che la tabella non dice: con il persister l'attesa dell'auth INCLUDE il ripristino (JSON di 0,3–1,5 MB dal
 mirror: `auth` 115 → 179 su Cashflow, 161 → 385 su Storico, dove il record ha sei chiavi) — un costo che PERF-06 ha

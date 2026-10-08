@@ -1,6 +1,6 @@
 /**
  * The settings draft (lib/utils/settingsDraft.ts) — the ONE reducer behind Impostazioni's six
- * tabs since PERF-13 (2026-10-08).
+ * tabs since 2026-10-08.
  *
  * PERCHÉ ESISTE: the page used to hold 70 `useState`s; splitting it into six views means every
  * field now travels slice → view → patch → compose, and a field that one of those steps forgets

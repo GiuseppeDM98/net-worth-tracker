@@ -84,6 +84,8 @@
 
 ## 📚 Documentation
 
+- The shell guide records why a dashboard page can read the URL without a Suspense boundary (at prerender the auth gate renders only its placeholder); the speed manual now says that Impostazioni no longer shows a skeleton on a reload and records the one secondary timing target of its rewrite that fell short; the page's line count and the census figures are stated with the machine they were measured on.
+
 - The unit suite is green under `TZ=UTC` as well: the four fixtures that sat beside midnight are now named by the Italian clock, and the testing rules say how to write the next one. The speed manual records why fourteen size ceilings rose on 2026-10-08 (Firebase 12.19, required by firebase-admin 14) and the workflow says when `develop` reaches `main`.
 
 - The speed manual now records the before/after timings and page size of Patrimonio's lighter rows; the Patrimonio guide describes the account detail's state correctly and drops a stale note about lint errors; the testing guide records one isolated failure of the transfer-fee browser test.
