@@ -151,7 +151,7 @@ npm run dev
 
 ## Prerequisites
 
-- **Node.js** 22.x or higher (firebase-admin 14 loads the ESM-only `jose` through `require`, native since Node 22.12; the Vercel project runs 22.x)
+- **Node.js** 24.x (`engines.node` in `package.json`, the same major on Vercel)
 - **Firebase project** with Firestore + Authentication enabled (free tier is sufficient)
 - **Vercel account** (recommended for deployment and cron jobs) or **Docker** for self-hosting
 - **Anthropic API key** (optional — enables AI performance analysis)
