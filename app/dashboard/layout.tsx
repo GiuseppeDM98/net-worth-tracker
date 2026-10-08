@@ -1,6 +1,7 @@
 'use client';
 
 import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { ChartColorsProvider } from '@/contexts/ChartColorsContext';
 import { AppSidebar } from '@/components/layout/Sidebar';
 import { BottomNavigation } from '@/components/layout/BottomNavigation';
 import { PageContainer } from '@/components/layout/PageContainer';
@@ -19,7 +20,8 @@ import { cn } from '@/lib/utils';
  * `ProtectedRoute` sits inside `<main>`. Nothing here may read `window` during render — the first
  * frame on a phone is decided by CSS (`hidden desktop:block`), and `useMediaQuery` answers the
  * server's `false` until hydration is done. No `MotionConfig` here: the root `MotionProvider` is
- * the one.
+ * the one. `ChartColorsProvider` reads the theme's chart palette once per theme, while the shell
+ * waits for the user, so every page's charts mount with it (doc/guide/temi.md).
  */
 export default function DashboardLayout({
   children,
@@ -30,7 +32,7 @@ export default function DashboardLayout({
   const isDemo = useDemoMode();
 
   return (
-    <>
+    <ChartColorsProvider>
       {/* The first Tab stop of every dashboard page: the sidebar is fourteen stops (measured on Storico,
           2026-09-20) between a keyboard reader and the page. The landing has the same link. */}
       <a
@@ -106,6 +108,6 @@ export default function DashboardLayout({
 
       {/* Bottom Navigation — mobile portrait only */}
       <BottomNavigation />
-    </>
+    </ChartColorsProvider>
   );
 }

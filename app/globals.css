@@ -201,6 +201,16 @@ html[data-vt="theme"]::view-transition-old(root) {
   z-index: -1;
 }
 
+/* The page scene names three regions for good (page-main, page-header, page-verdict, set     */
+/* inline). A named element is snapshotted as its OWN group, outside `root`, so during a theme */
+/* change the circle revealed only the sidebar while the page merely cross-faded (2026-09-12   */
+/* to 2026-10-08, seen on the owner's tour). For the theme scene the names are switched off:   */
+/* `data-vt` is stamped before `startViewTransition`, so the snapshots see one `root`.         */
+/* Pinned by e2e/motion.layout.spec.ts.                                                        */
+html[data-vt="theme"] * {
+  view-transition-name: none !important;
+}
+
 /* Page scene — a navigation between two dashboard pages (DESIGN.md → The Page Scene).      */
 /* The shell (sidebar, bottom pill) is not part of the scene: the root swaps at once and   */
 /* only the named regions animate. The main region cross-fades with a 6px settle; the     */
@@ -238,6 +248,19 @@ html[data-vt="page"]::view-transition-group(page-header),
 html[data-vt="page"]::view-transition-group(page-verdict) {
   animation-duration: 0.32s;
   animation-timing-function: cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+/* The phone's bottom nav is shell, not scene: a group of its own only so that page-main's  */
+/* snapshots do not paint over it (BottomNavigation.tsx). The old image leaves at once and  */
+/* the new one is live — the active pill glides inside it. e2e/motion.layout.mobile.spec.ts. */
+html[data-vt="page"]::view-transition-group(bottom-nav),
+html[data-vt="page"]::view-transition-new(bottom-nav) {
+  animation: none;
+}
+
+html[data-vt="page"]::view-transition-old(bottom-nav) {
+  animation: none;
+  opacity: 0;
 }
 
 /* The two snapshots of a morphing region overlap while one fades out and the other in. */

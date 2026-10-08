@@ -1,10 +1,10 @@
 'use client';
 
-import { type MouseEvent, useCallback, useMemo, useRef, useState } from 'react';
+import { type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion, useReducedMotion } from 'framer-motion';
-import { cardItem, springLayoutTransition, staggerContainer } from '@/lib/utils/motionVariants';
+import { cardItem, staggerContainer } from '@/lib/utils/motionVariants';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { updateHallOfFame } from '@/lib/services/hallOfFameService';
@@ -73,6 +73,17 @@ const ITALIAN_LONG_DATE = new Intl.DateTimeFormat('it-IT', {
 /** Grid cell wrapper: the tile stretches to the row height so `mt-auto` footers align. */
 const CELL_CLASS = TILE_CELL_CLASS;
 
+/**
+ * Whether the tile grid's entrance cascade has played in this session (until a reload). The
+ * cascade — `staggerContainer` × 8 tiles + `cardItem` — keeps the figures semi-transparent for
+ * ~1 s after the data (962 ms measured on the mirror, 2026-10-08); the Panoramica is the page
+ * reopened most, and from the second opening the cascade reveals nothing the page scene does not
+ * already say. So it plays the FIRST time the grid renders in a session, and later openings show
+ * the tiles at once (owner's call, PERF-14 § 4 D). Set after the grid commits, never on a
+ * skeleton or a failed read: those openings have not shown the cascade.
+ */
+const tileGridEntrance = { played: false };
+
 // Module-level so the page's try block holds no conditional: keeps it compilable by the React Compiler.
 function resolveSnapshotDialogOrigin(reducedMotion: boolean | null, trigger: HTMLElement): string | undefined {
   return reducedMotion ? undefined : resolveCenteredModalOrigin(trigger.getBoundingClientRect());
@@ -133,6 +144,8 @@ export default function DashboardPage() {
 
   const chartColors = useChartColors();
   const [sparklinePeriod, setSparklinePeriod] = useState<SparklinePeriod>('1A');
+  // Decided once per mount: a later opening in the session finds the cascade already played.
+  const [playsEntrance] = useState(() => !tileGridEntrance.played);
 
   // ─── Derived metrics ──────────────────────────────────────────────────────────
   const totalValue = overview?.metrics.totalValue ?? 0;
@@ -255,9 +268,9 @@ export default function DashboardPage() {
   };
 
   // A plain button: it used to sit in a `motion.div` with the app's ONLY `whileTap` (scale 0.97)
-  // on `springLayoutTransition`, the soft spring DESIGN.md keeps for whole regions — ~300 ms to
-  // shrink and ~500 ms to come back, so a normal click was still «breathing» while the confirm
-  // opened over it.
+  // on `springLayoutTransition`, the soft spring for whole regions (gone with the page wrapper on
+  // 2026-10-08) — ~300 ms to shrink and ~500 ms to come back, so a normal click was still
+  // «breathing» while the confirm opened over it.
   const snapshotAction = (
     <Button
       onClick={handleCreateSnapshot}
@@ -279,6 +292,10 @@ export default function DashboardPage() {
     loading: loadingOverview,
     failed: overviewError || !overview || !verdict,
   });
+  useEffect(() => {
+    if (overviewState === 'ready') tileGridEntrance.played = true;
+  }, [overviewState]);
+  const entranceInitial = playsEntrance ? 'hidden' : false;
 
   const pageChrome = (
     <PageHeader label="Panoramica" title={header.title} description={header.date} freshness={freshness} />
@@ -348,7 +365,7 @@ export default function DashboardPage() {
   // ─── Render ───────────────────────────────────────────────────────────────────
   return (
     <PageContainer>
-      <motion.div layout="position" transition={springLayoutTransition} className="space-y-4">
+      <div className="space-y-4">
         <PageHeader
           label="Panoramica"
           title={header.title}
@@ -357,13 +374,13 @@ export default function DashboardPage() {
           freshness={freshness}
         />
 
-        <motion.div variants={cardItem} initial="hidden" animate="visible" className="pt-1">
+        <motion.div variants={cardItem} initial={entranceInitial} animate="visible" className="pt-1">
           <OverviewVerdict verdict={verdict} />
         </motion.div>
 
         <motion.div
           variants={staggerContainer}
-          initial="hidden"
+          initial={entranceInitial}
           animate="visible"
           className="grid grid-cols-1 gap-3 tablet:grid-cols-2 desktop:grid-cols-12"
         >
@@ -542,7 +559,7 @@ export default function DashboardPage() {
             previousMonthExpenses={expenseStats.previousMonth.expenses}
           />
         )}
-      </motion.div>
+      </div>
     </PageContainer>
   );
 }

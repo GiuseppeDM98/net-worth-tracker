@@ -1,26 +1,26 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useTheme } from 'next-themes';
-import { useColorTheme } from '@/contexts/ColorThemeContext';
-import { colorToHex } from '@/lib/utils/cssColorToHex';
+import { useMemo } from 'react';
+import { useSharedThemePalette } from '@/contexts/ChartColorsContext';
+import { useThemePaletteReader } from '@/lib/hooks/useThemePaletteReader';
 
 /**
  * Theme colour tokens resolved to `#rrggbb`, for the chart libraries that cannot take a CSS
  * colour as the browser serves it (Nivo's react-spring interpolates neither `oklch()` nor `lab()`).
  *
  * `tokens` maps a result key to a CSS custom property; `fallbacks` gives the hex painted before the
- * first read and whenever a token is missing or unreadable. Re-read after every colour-theme or
- * light/dark change on the next animation frame — the same timing as useChartColors, because a
- * synchronous read during render sees the previous theme.
+ * first read and whenever a token is missing or unreadable. The hexes come from
+ * `ChartColorsProvider`, which resolves `THEME_HEX_TOKENS` (lib/utils/themePalette.ts) once per
+ * theme — a token passed here must be in that list (since 2026-10-08, PERF-14; the five `--role-*`
+ * aliases are, by construction).
  *
- * `enabled` is whether the caller will actually PAINT the colours this render. Disabled, the effect
- * returns before scheduling anything: no requestAnimationFrame, no getComputedStyle, no setState —
- * so a host that draws nothing with them renders once at mount instead of twice (the read's
- * setState always hands over a new object). The last colours read, or the fallbacks, are returned
- * meanwhile; turning it on schedules a fresh read.
+ * `enabled` is whether the caller will actually PAINT the colours this render. With the provider
+ * mounted nothing is read here at all; without it (no dashboard layout above), the fallback read
+ * runs only while enabled — disabled, no requestAnimationFrame, no getComputedStyle, no setState,
+ * so a host that draws nothing with them renders once at mount. The last colours read, or the
+ * fallbacks, are returned meanwhile.
  *
- * Pass module-level constants: the effect depends on the objects' identity.
+ * Pass module-level constants: the result is memoized on the objects' identity.
  *
  * Used by: components/cashflow/analisi/tiles/FlussoTile.tsx (the 50/30/20 Sankey's role colours).
  */
@@ -29,22 +29,15 @@ export function useCssColorTokens<K extends string>(
   fallbacks: Readonly<Record<K, string>>,
   enabled: boolean
 ): Record<K, string> {
-  const { colorTheme } = useColorTheme();
-  const { resolvedTheme } = useTheme();
-  const [colors, setColors] = useState<Record<K, string>>(fallbacks);
+  const shared = useSharedThemePalette();
+  const local = useThemePaletteReader(shared === null && enabled);
+  const { tokenHex } = shared ?? local;
 
-  useEffect(() => {
-    if (!enabled) return;
-    const frame = requestAnimationFrame(() => {
-      const style = getComputedStyle(document.documentElement);
-      const next: Record<K, string> = { ...fallbacks };
-      for (const key of Object.keys(tokens) as K[]) {
-        next[key] = colorToHex(style.getPropertyValue(tokens[key])) ?? fallbacks[key];
-      }
-      setColors(next);
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [enabled, colorTheme, resolvedTheme, tokens, fallbacks]);
-
-  return colors;
+  return useMemo(() => {
+    const colors: Record<K, string> = { ...fallbacks };
+    for (const key of Object.keys(tokens) as K[]) {
+      colors[key] = tokenHex[tokens[key]] ?? fallbacks[key];
+    }
+    return colors;
+  }, [tokenHex, tokens, fallbacks]);
 }

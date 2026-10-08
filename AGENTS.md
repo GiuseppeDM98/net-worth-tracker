@@ -141,10 +141,11 @@ pointer — a stub that grows past that is a guide leaking back (2026-09-20: ten
   surface, because a fill mixed from the text's own hue pulls the background towards the text.
 - **A computed custom property comes back as `lab()`, never as the `oklch()` you authored**
   (`getComputedStyle(root).getPropertyValue('--chart-3')` answers `lab(64.8793% 25.0679 78.4211)`): **anything that
-  READS a colour token parses `lab()` too** and never asserts `/^oklch\(/`. `useChartColors` knows this;
-  `useActionColors`' legibility clamp matched `/oklch\(/` and was DEAD CODE from the day it was written (2026-09-21,
-  measured in the browser: raw chart slots as 10-18px text at 2,39-4,02:1). Worked example:
-  `lib/utils/actionColor.ts`, whose test feeds it the browser's own serialisation.
+  READS a colour token parses `lab()` (and `#hex`) too and never asserts `/^oklch\(/` — through
+  `lib/utils/colorParse.ts`, the ONE parser since 2026-10-08. Two readers were DEAD CODE from the day they were
+  written: `useActionColors`' legibility clamp (until 2026-09-21, measured in the browser: raw chart slots as 10-18px
+  text at 2,39-4,02:1) and `useChartColors`' luminance filter (until 2026-10-08, `__tests__/chartColorsContext.test.ts`).
+  Worked example: `lib/utils/actionColor.ts`, whose test feeds it the browser's own serialisation.
 - **Sidebar tokens**: `--sidebar-accent` is a background, `--sidebar-accent-foreground` text ON it; hover on inactive
   items uses `hover:text-sidebar-foreground`. **Inline `style` blocks Tailwind hover variants**, so migrate to classes
   before adding `hover:`/`focus:`.
@@ -570,13 +571,16 @@ file used to carry.
 
 ### Color Theme System → `doc/guide/temi.md`
 - **Parallel theming**: next-themes owns `.dark`, the custom system owns `data-theme` (an external store, 2026-09-06).
-- **`useChartColors` timing**: `useEffect + useState + requestAnimationFrame`, NOT `useMemo`. The browser RETURNS
-  `lab(…)`, not the `oklch()` you authored: never assert `/^oklch\(/` (2026-08-30).
+- **The chart palette is read ONCE per theme** (2026-10-08, PERF-14): `ChartColorsProvider` in `app/dashboard/layout.tsx`
+  reads `--chart-*`, the action colours and the `--role-*` hexes; `useChartColors`/`useActionColors`/`useCssColorTokens`
+  read its context and fall back to their own read without it (the landing). Timing: `useEffect + useState +
+  requestAnimationFrame`, NOT `useMemo`. The browser RETURNS `lab(…)` or `#hex`, not the `oklch()` you authored: read it
+  through `lib/utils/colorParse.ts`, never assert `/^oklch\(/` (2026-08-30).
 - **A user-chosen identity colour is a SLOT, not a hex** (`'chart-1'..'chart-8'`, `resolveCostCenterColor`); indices
   0-8 theme-aware (`--chart-9` is Storico's «Previdenza» band), 9 static.
 - **Every theme block is held to the distinctness floor** (`__tests__/chartPaletteDistinctness.test.ts`, all twelve
   since 2026-09-20): nine slots, ΔE00 ≥ 14 between any two. A new theme or a moved slot runs it first.
-- Il resto — il filtro di luminanza oklch, gli slot senza backfill, la tinta tenuta tra i due modi, `useActionColors`,
+- Il resto — il filtro di luminanza (vivo dal 2026-10-08), gli slot senza backfill, la tinta tenuta tra i due modi, `useActionColors`,
   i sign token per tema, `--chart-6/7/8`, `getAssetClassCssVar`, «Adding a theme» — in `doc/guide/temi.md`.
 
 ---
@@ -589,11 +593,20 @@ file used to carry.
   copies went on 2026-09-28/29: a nested copy with the same value is inert) — no separate CSS media queries.
 - **Page transitions use `template.tsx`, NOT `layout.tsx` + `AnimatePresence`**; since 2026-09-12 a shell-link click is
   a page SCENE through `lib/utils/viewTransition.ts`, the ONE entry to `document.startViewTransition`, and a
-  `view-transition-name` is unique among the RENDERED elements (do not name the tile grid) → doc/guide/shell.md § Motion.
+  `view-transition-name` is unique among the RENDERED elements (do not name the tile grid); a named element leaves
+  `root` for EVERY transition — the theme scene switches the names off, and fixed shell over `<main>` needs a name of
+  its own (2026-10-08) → doc/guide/shell.md § Motion.
 - `useCountUp` always with `once: true`, called **before** any early return and unconditionally for both branches of a
   mode switch (it has no `enabled`: gate the display in JSX); **a `fromPrevious` count-up passes `landFirstValue`**
   (2026-09-23), or a figure that settles between previews counts from «0 €» under a track already at its share.
   **`layout="position"`, not bare `layout`, when a Framer parent wraps a Radix `CollapsibleContent`.**
+- **No `layout` on a page wrapper, and a `layout`/`layoutId` only where the element is VISIBLE** (2026-10-08, PERF-14):
+  Framer measures a layout element before and after every commit that touches it — under `display: none` too (6
+  `getBoundingClientRect` per navigation at 1440 on the hidden bottom nav, `e2e/motion.layout.spec.ts`). Put `layout` on
+  the element that moves, never on the page root; gate a hidden one on a `useMediaQuery` of where it shows. **Turning
+  `layout` on after mount does not take** — Framer sets the measuring up when the element MOUNTS, and the media query
+  answers `true` only after hydration: remount it with a `key` on the gate (`BottomNavigation`, the pill jumped without,
+  `e2e/motion.layout.mobile.spec.ts`). The Panoramica's tile cascade plays once per session (doc/guide/panoramica.md).
 - **Collapsible technique, by content shape:** rows expanding into sub-rows → CSS `grid-rows-[0fr] → [1fr]` with an
   `overflow-hidden` child and `inert` on the closed wrapper (Framer + `height:'auto'` left rows stuck at opacity 0);
   tall or unpredictable sections → Radix `<Collapsible>` + CSS transition; small predictable content →
@@ -639,8 +652,9 @@ file used to carry.
 ### Recharts
 - **Import recharts from `@/components/ui/charts/recharts`, never from `'recharts'`** (2026-09-30): the one module of
   real code that keeps the library in ONE chunk (§ Dynamic Imports); a primitive it lacks is added there.
-- **`useChartColors()` is mandatory for every series** — CSS vars read after paint, `chartColors[0..4]` as props —
-  **once per page or tile, never once per row** (2026-10-07): a list of small charts takes the palette as a
+- **`useChartColors()` is mandatory for every series** — the theme's slots from `ChartColorsProvider` (read once per
+  theme in the dashboard layout since 2026-10-08, so a host renders once; its own read after paint without the
+  provider), `chartColors[0..4]` as props — **once per page or tile, never once per row** (2026-10-07): a list of small charts takes the palette as a
   prop (`AssetSparkline`'s `colors`), as `useActionColors` does; a hook per row was a rAF and a `getComputedStyle` each.
 - **A series CAN drive the page, but no page does today**: `onMouseMove`'s `activeTooltipIndex` (a number OR a numeric
   string in 3.x), lift the index's PERIOD, handlers only under `(pointer: fine)`, a pure module resolving the followers.
