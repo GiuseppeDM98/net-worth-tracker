@@ -254,6 +254,12 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   inside `holdChunks`' route handler (`chunkProbe.ts:61`) — a chunk fetched by the handler was disposed before its body
   was read, i.e. the page had moved on; green ×2 alone right after (`--repeat-each=2`). If it returns, read the body
   inside a `try` and `route.continue()` on the disposed one rather than widening a timeout.
+- **A green suite on the emulators says nothing about a server dependency's MODULE LOADING on Vercel** (2026-10-08):
+  `verifyIdToken` skips the signature against the Auth emulator, so the `jwks-rsa → jose` chain of firebase-admin never
+  ran under Playwright, and 173 green tests preceded a deploy where every Admin route answered 500 (`ERR_REQUIRE_ESM`;
+  AGENTS.md § Server Layer has the rule and the cure). The check that exists for that: the standalone production build
+  on the laptop with the real credentials, probed with a forged token (expected 401 with the audience error in the log,
+  never 500) — and then the preview deploy, which only the owner can open.
 - **Reading the page — the traps, each seen once**: `page.addInitScript` runs BEFORE `document.documentElement` exists
   (observe `document` with `subtree: true`, or the script dies and the spec passes having observed nothing);
   `innerText` applies `text-transform` and is `''` for anything not rendered (an uppercase eyebrow marker or an open
