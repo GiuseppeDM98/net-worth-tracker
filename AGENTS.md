@@ -165,7 +165,10 @@ pointer — a stub that grows past that is a guide leaking back (2026-09-20: ten
   service read them a second time. An imperative read (a refresh, a dialog reading once after a write, the CSV import before it
   commits) goes through the hook's exported `…QueryOptions(ownerId)` with `queryClient.fetchQuery` — the same key, the
   same reader, the global staleTime; `staleTime: 0` where the CURRENT document is the point («Annulla» on Impostazioni,
-  the pre-read of its «Salva», the import's commit). The closing grep of a session is
+  the pre-read of its «Salva», the import's commit). **A form seeded from a document OBSERVES its hook and settles the
+  seed during render** (Impostazioni since 2026-10-08): the first document of the owner seeds the draft, a fresher
+  read re-seeds it only while nothing is dirty, and «Annulla» is a RE-READ (`fetchQuery`, `staleTime: 0`) followed by
+  a reset — never a copy kept in memory (doc/guide/impostazioni.md). The closing grep of a session is
   `grep -rn "getSettings(\|getAllAssets(\|getUserSnapshots(\|getAllExpenses(\|getAllCategories(" app components`: hooks
   and services only. Every writer invalidates the key its readers read (`queryKeys.settings.all` from the seven places of
   doc/guide/impostazioni.md § Settings — the FIVE places, `goals.all` from Obiettivi AND the assistant's goal card).
@@ -499,6 +502,7 @@ file used to carry.
 - Il resto — `PDF_RAMP`, the class labels, `signedPct`/`signedEur` it-IT, the deterministic-comparison rule, the AI-prompt body — in `doc/guide/email-pdf.md`.
 
 ### Impostazioni — tessere senza verdetto → `doc/guide/impostazioni.md`
+- ONE draft, six views (2026-10-08): the page is an orchestrator over `useReducer(settingsDraftReducer)` (`lib/utils/settingsDraft.ts`), each tab a module-level CONTROLLED view of its slice with no form state of its own (Radix unmounts an inactive panel); `compose ∘ slice ≡ document` is pinned by `__tests__/settingsDraft.test.ts`; the read is an observed `useSettings` seeding the draft in render; the focus of a refused «Salva» crosses the tabs through the draft (`pendingFocus`).
 - The page has NO verdict and must not grow one (a configuration page measures nothing) — it keeps the CADENCE: 23 `describe*` functions in `settingsNarrative.ts`, NO `build*Verdict`.
 - ONE «Salva», so the save state is PER TAB (2026-09-22): a dot on each tab holding edits, a bottom bar naming them with «Annulla modifiche» (a re-read, not a copy); the target rules are `allocationTargetValidation.ts`, which says WHERE they failed so «Salva» opens the group and focuses the field. A failed read here is never an empty list (members, categories, accounts).
 - A reading declares the effect DOWNSTREAM, not the control under it; the Narrative Honesty Rule holds (a missing input drops its clause).
@@ -691,6 +695,12 @@ file used to carry.
   so split the help copy (`hidden desktop:block` / `desktop:hidden`) and label each card's axes explicitly.
 - **Prefer rendering large local subtrees as pure render helpers or top-level components** — a nested JSX definition
   inside a page component means a simple row selection remounts the whole table. `cn` is NOT auto-imported in pages.
+  **The worked example is Impostazioni** (PERF-13, 2026-10-08): one 4100-line component with 70 `useState`s re-ran
+  whole on every keystroke (286 components per key on the laptop, with the compiler on — it cannot split a
+  component); now the page is an orchestrator under 500 lines holding ONE `useReducer` draft, and each tab a
+  module-level CONTROLLED view of its slice (`slice` in, `onChange(patch)` out, no form state of its own because Radix
+  unmounts an inactive panel). A keystroke then re-renders that view and the page, never the other tabs
+  (`npm run perf:census -- --scenario=settings,allocation`; doc/guide/impostazioni.md).
 - **A radius on the element that carries a `divide-y` hairline bends the ends of the rule** (2026-09-18,
   `AssistantThreadList`): the `li` stays square, the hover/selected wash goes on an inner box.
 - **A tile's footer is ONE line; the method goes behind «Come si calcola»** (`components/ui/tile-method-note.tsx`, 2026-09-20): help printed on every tile at all times stops being read, and an 11px footnote at full tile width runs to 95–130 characters a line (the detector's `line-length`). The line that stays says what the figures ARE; name the trigger after its subject — a page carries several. **A list that must add up adds up ON SCREEN**: round every row to the printed unit and give the drift to the row that is a remainder by definition, or the reader who checks it finds a euro missing.

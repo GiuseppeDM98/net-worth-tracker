@@ -4,6 +4,7 @@ import { invalidateDashboardOverviewSummary } from '@/lib/services/dashboardOver
 import { Asset, AssetClass, AssetAllocationTarget, AssetAllocationSettings, AllocationResult, AllocationData } from '@/types/assets';
 import { calculateAssetValue, calculateTotalValue } from './assetService';
 import { expandAssetExposure } from '@/lib/utils/assetExposureUtils';
+import { calculateFormulaEquityPercentage } from '@/lib/utils/equityBondsAutoTargets';
 import { partitionByAllocationRole, ASSET_CLASS_SEQUENCE, NO_SUBCATEGORY_LABEL } from '@/lib/utils/allocationUtils';
 import { DEFAULT_SUB_CATEGORIES } from '@/lib/constants/defaultSubCategories';
 
@@ -1043,15 +1044,14 @@ export function compareAllocations(
 
 /**
  * Calculate equity percentage based on age and risk-free rate
- * Formula: 125 - age - (riskFreeRate * 5)
+ * Formula: 125 - age - (riskFreeRate * 5) — the pure rule lives in
+ * `lib/utils/equityBondsAutoTargets.ts`, where the settings draft settles the pair (2026-10-08).
  */
 export function calculateEquityPercentage(
   userAge: number,
   riskFreeRate: number
 ): number {
-  const percentage = 125 - userAge - (riskFreeRate * 5);
-  // Ensure percentage is between 0 and 100
-  return Math.max(0, Math.min(100, percentage));
+  return calculateFormulaEquityPercentage(userAge, riskFreeRate);
 }
 
 /**

@@ -253,8 +253,10 @@ npm run perf:serve                                  # :3200
 npm run perf:census -- --runs=5 --label=prima       # ~2 minuti; --scenario=settings,expense,tabs,asset · --mobile
 ```
 
-Quattro scenari, ognuno in un contesto nuovo con il login vero, nulla salvato: **settings** (10 tasti in «Anno inizio
-storico cashflow» di Impostazioni › Preferenze, un input controllato della pagina), **expense** (10 tasti in «Importo» di
+Cinque scenari, ognuno in un contesto nuovo con il login vero, nulla salvato: **settings** (10 tasti in «Anno inizio
+storico cashflow» di Impostazioni › Preferenze, un input controllato della pagina), **allocation** (dal 2026-10-08,
+PERF-13: 10 tasti in «Target Criptovalute» di Impostazioni › Allocazione, la tab più grande — Crypto perché la formula
+non la possiede mai, quindi il campo è abilitato su ogni account), **expense** (10 tasti in «Importo» di
 «Nuova Spesa» › Spesa variabile, letto da `useWatch` alla radice del dialog), **tabs** (Cashflow Tracciamento ⇄ Budget,
 quattro cambi con entrambe le tab già montate), **asset** (dal 2026-10-07, PR #434: 10 tasti in «Quantità» di
 «Aggiungi asset» › ETF, la posizione iniziale — non «Modifica»: un ETF è un tipo del registro, e in modifica quantità e
@@ -288,6 +290,18 @@ componenti per tasto, commit 2 → 0 (render 1,8 ms → nessuno; script sulla fi
 compiler compilava `AssetDialog` ma lasciava il form del passo 2 fuori da ogni scope di memo, quindi un `useWatch` alla
 radice ri-renderizzava tutto: i campi digitati sono letti da foglie che li osservano (doc/guide/patrimonio.md § Two-Step).
 Per leggere i NOMI dei componenti al posto di `?`: `npm run perf:build -- --profile --no-mangling` (stessi conteggi).
+
+**Prima/dopo di Impostazioni per tab** (PERF-13, 2026-10-08, laptop Windows, mirror riseminato quel giorno, mediane di 5,
+build `--profile`): **settings 286,1 → 32,1** componenti per tasto (commit 2 → 1, render 2,88 → 0,64 ms, script sulla
+finestra 85 → 31 ms, task 185 → 97); **allocation 405,1 → 112,1** (render 2,43 → 1,33 ms, script 74 → 45 ms). Il 318 di
+PERF-12 era il Mac con il mirror del 2026-10-05: il «prima» si rimisura sulla stessa macchina e lo stesso mirror del
+«dopo». Dove sono andati: la pagina era un componente solo con 70 stati e ogni tasto lo rieseguiva intero (il compiler
+non spezza un componente); ora è un orchestratore sotto 500 righe con UNA bozza (`useReducer`) e sei viste controllate
+(`components/settings/tabs/*Tab.tsx`), quindi un tasto in Preferenze rende la vista Preferenze e l'orchestratore, mai le
+altre; in Allocazione un gruppo di sottocategorie chiuso non è nel DOM (`CollapsibleContent` senza `forceMount`). A
+metà strada il census leggeva 78 e 158: le due barre dei tab (12 `motion.button` e le icone) si ri-renderizzavano a ogni
+tasto perché l'array dei tab era ricostruito a ogni render — memoizzato sulla STRINGA delle tab sporche, l'unico `useMemo`
+a mano che il census ha giustificato. Il resto del `settings` sono i `TabsContent`/`Presence` di Radix e la vista stessa.
 
 ## Revisit — «il secondo caricamento della route» (2026-09-29)
 
