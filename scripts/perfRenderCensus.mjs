@@ -36,12 +36,22 @@
  *              re-rendered the whole form, 562 components per key (doc/guide/patrimonio.md
  *              § Two-Step). Not an edit: an ETF is a ledger type, and editing one shows quantity
  *              and PMC read-only.
+ *   mount      A full load of one route (`--route=`, comma-separated; default `history`): recording is
+ *              switched on by an init script BEFORE the navigation and stops when the page's data is
+ *              on screen (`main h1`, a euro figure, no skeleton left) plus 1 s. One unit per load.
+ *              Added 2026-10-08 (PERF-14) to count what a mount costs on its own — a host of
+ *              `useChartColors` used to render twice, the second time one frame after mounting.
+ *   nav        A pathname change at the viewport's width, through the sidebar's own links: Hall of
+ *              Fame ⇄ Previdenza, four switches, each waited until the new page has no skeleton
+ *              (+ 800 ms). Added 2026-10-08 (PERF-14): the bottom nav, hidden at 1440, measured its
+ *              layout at every pathname change.
  * Never saves anything: the typed values are dropped with the context.
  *
  * Prerequisites, in the owner's terminals: `npm run emulators`, the mirror
  * (`npm run mirror:seed -- <production email>`), `npm run perf:build -- --profile`, `npm run perf:serve` (:3200).
  * Usage — options ALWAYS after `--` (perf/README.md):
  *   npm run perf:census -- --runs=3 --scenario=settings,expense --label=prima
+ *   npm run perf:census -- --scenario=mount,nav --route=history,fire-simulations,dashboard --label=prima
  * Writes perf/last-census.json (gitignored): every run and the medians, with the label.
  */
 import { chromium } from 'playwright';
@@ -59,7 +69,14 @@ const PASSWORD = 'test1234';
 const LABEL = args.label ?? '';
 const MOBILE = args.mobile === 'true';
 const VIEWPORT = MOBILE ? { width: 390, height: 844 } : { width: 1440, height: 900 };
-const SCENARIOS = (args.scenario ?? 'settings,allocation,expense,tabs,asset').split(',');
+// `mount` expands to one scenario per route: «mount:/dashboard/history». A route token is a path
+// («/dashboard/history»), a segment under /dashboard («history») or «dashboard» for the Panoramica.
+const MOUNT_ROUTES = (args.route ?? 'history').split(',').map((token) =>
+  token.startsWith('/') ? token : token === 'dashboard' ? '/dashboard' : `/dashboard/${token}`,
+);
+const SCENARIOS = (args.scenario ?? 'settings,allocation,expense,tabs,asset')
+  .split(',')
+  .flatMap((name) => (name === 'mount' ? MOUNT_ROUTES.map((href) => `mount:${href}`) : [name]));
 // :3000 is the tour server, :3100 the Playwright one, :3200 the benchmark's (perf/README.md).
 const BASE = args.base ?? 'http://localhost:3200';
 const OUT = 'perf/last-census.json';
@@ -168,6 +185,11 @@ async function record(page, cdp, units, act) {
   const before = await readMetrics(cdp);
   await act();
   await page.waitForTimeout(SETTLE_MS);
+  return collect(page, cdp, units, before);
+}
+
+/** Stop the recording and turn the counters into per-unit figures against `before`. */
+async function collect(page, cdp, units, before) {
   const after = await readMetrics(cdp);
   const react = await page.evaluate(() => {
     window.__census.recording = false;
@@ -190,6 +212,9 @@ async function record(page, cdp, units, act) {
     longTasks: react.long.count,
     longTaskMs: Math.round(react.long.ms),
     topNames,
+    // Every component's count, for the JSON only: a host that should render once instead of
+    // twice is read by name here (a `--no-mangling` build gives the names).
+    byName: react.byName,
   };
 }
 
@@ -255,7 +280,68 @@ const scenarioRunners = {
     await page.waitForTimeout(1_000); // the dialog's entrance and the settings read it starts on open
     return record(page, cdp, KEYS.length, () => typeKeys(page, input));
   },
+  async nav(page, cdp) {
+    await page.goto(`${BASE}/dashboard/hall-of-fame`, { waitUntil: 'load' });
+    await page.waitForFunction(isPageSettled, { previousHeading: null }, { timeout: 30_000, polling: 100 });
+    await page.waitForTimeout(1_000);
+    const link = (name) => page.getByRole('link', { name, exact: true }).filter({ visible: true }).first();
+    const switches = [
+      ['Previdenza', '/dashboard/pension'],
+      ['Hall of Fame', '/dashboard/hall-of-fame'],
+      ['Previdenza', '/dashboard/pension'],
+      ['Hall of Fame', '/dashboard/hall-of-fame'],
+    ];
+    return record(page, cdp, switches.length, async () => {
+      for (const [name, path] of switches) {
+        const previousHeading = await page.evaluate(() => document.querySelector('main h1')?.textContent ?? null);
+        await link(name).click();
+        await page.waitForURL(`**${path}`);
+        await page.waitForFunction(isPageSettled, { previousHeading }, { timeout: 30_000, polling: 100 });
+        await page.waitForTimeout(800);
+      }
+    });
+  },
 };
+
+/**
+ * In the page: the route's own heading is there (a different one than `previousHeading`, after a
+ * client navigation), and no skeleton is left in `main`. The mount scenario also wants a euro
+ * figure — «data on screen», the benchmark's `data` mark.
+ */
+function isPageSettled({ previousHeading, needsEuro = false }) {
+  const main = document.querySelector('main');
+  const heading = main?.querySelector('h1')?.textContent ?? null;
+  if (!heading || heading === previousHeading) return false;
+  if (main.querySelector('[data-slot="skeleton"]')) return false;
+  return !needsEuro || /\d\s?€/.test(main.textContent || '');
+}
+
+/**
+ * A full load of `href`, recorded from before its first byte. The login has already landed on the
+ * Panoramica; its reads are given 2 s to reach the persisted cache, so every run starts from the
+ * same record (the Panoramica's own mount then restores it, as a revisit does).
+ */
+async function mountRoute(page, cdp, href) {
+  await page.locator('main h1').filter({ visible: true }).first().waitFor({ timeout: 30_000 });
+  await page.waitForTimeout(2_000);
+  // Registered after installRenderProbe, so it runs after it on the NEXT document: the probe
+  // exists and starts recording before React DOM is evaluated.
+  await page.addInitScript(() => {
+    window.__census.recording = true;
+  });
+  await page.goto(`${BASE}${href}`, { waitUntil: 'commit' });
+  await page.waitForFunction(isPageSettled, { previousHeading: null, needsEuro: true }, { timeout: 30_000, polling: 100 });
+  await page.waitForTimeout(1_000);
+  // CDP's counters belong to the DOCUMENT and start from zero on a full navigation (measured
+  // 2026-10-08: LayoutCount 5 → 2 across a reload), so the new document's own reading is the delta.
+  const zero = Object.fromEntries(CDP_METRICS.map((name) => [name, 0]));
+  return collect(page, cdp, 1, zero);
+}
+
+function runnerFor(name) {
+  if (name.startsWith('mount:')) return (page, cdp) => mountRoute(page, cdp, name.slice('mount:'.length));
+  return scenarioRunners[name];
+}
 
 async function runScenario(browser, name) {
   const context = await browser.newContext({ viewport: VIEWPORT, isMobile: MOBILE, hasTouch: MOBILE });
@@ -265,7 +351,7 @@ async function runScenario(browser, name) {
     await login(page);
     const cdp = await context.newCDPSession(page);
     await cdp.send('Performance.enable');
-    return { scenario: name, ok: true, ...(await scenarioRunners[name](page, cdp)) };
+    return { scenario: name, ok: true, ...(await runnerFor(name)(page, cdp)) };
   } catch (error) {
     return { scenario: name, ok: false, error: String(error?.message ?? error) };
   } finally {
@@ -290,7 +376,7 @@ async function assertReachable(url, hint) {
 }
 
 for (const name of SCENARIOS) {
-  if (!scenarioRunners[name]) throw new Error(`--scenario: «${name}» is not one of ${Object.keys(scenarioRunners).join(', ')}`);
+  if (!runnerFor(name)) throw new Error(`--scenario: «${name}» is not one of mount, ${Object.keys(scenarioRunners).join(', ')}`);
 }
 await assertReachable(`${BASE}/login`, 'start `npm run perf:serve` (after `npm run perf:build -- --profile`).');
 await assertReachable('http://127.0.0.1:9099', 'start `npm run emulators` and seed the account (`npm run mirror:seed -- <email>`).');
@@ -308,13 +394,13 @@ for (const name of SCENARIOS) {
 }
 await browser.close();
 
-// Medians per scenario; «per unit» = per key (settings, expense) or per switch (tabs).
+// Medians per scenario; «per unit» = per key, per switch (tabs, nav) or per load (mount).
 const FIELDS = ['commitsPerUnit', 'renderedPerUnit', 'renderMsPerUnit', 'layoutPerUnit', 'recalcStylePerUnit', 'scriptMs', 'layoutMs', 'recalcStyleMs', 'taskMs', 'longTasks', 'longTaskMs'];
 const table = SCENARIOS.map((name) => {
   const ok = runs.filter((r) => r.scenario === name && r.ok);
   return { scenario: name, runs: ok.length, ...Object.fromEntries(FIELDS.map((f) => [f, median(ok.map((r) => r[f]))])), topNames: ok.at(-1)?.topNames ?? [] };
 });
-console.log(`\nperf:census${LABEL ? ` «${LABEL}»` : ''} — medians of ${RUNS} (per key; per switch for tabs)`);
+console.log(`\nperf:census${LABEL ? ` «${LABEL}»` : ''} — medians of ${RUNS} (per key; per switch for tabs and nav; per load for mount)`);
 console.table(table.map((row) => Object.fromEntries(Object.entries(row).filter(([key]) => key !== 'topNames'))));
 for (const row of table) console.log(`${row.scenario}: ${row.topNames.map(([n, c]) => `${n}×${c}`).join(', ')}`);
 writeFileSync(OUT, JSON.stringify({ label: LABEL, at: new Date().toISOString(), base: BASE, viewport: VIEWPORT, runs, table }, null, 2));

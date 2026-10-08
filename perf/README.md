@@ -251,6 +251,7 @@ un'altra route sì. La colonna JS del benchmark lo include: è una traccia, non 
 npm run perf:build -- --profile                     # next build --profile: React di profiling, i tempi nei fiber
 npm run perf:serve                                  # :3200
 npm run perf:census -- --runs=5 --label=prima       # ~2 minuti; --scenario=settings,expense,tabs,asset · --mobile
+npm run perf:census -- --scenario=mount,nav --route=history,fire-simulations,dashboard   # un caricamento, un cambio di pagina
 ```
 
 Cinque scenari, ognuno in un contesto nuovo con il login vero, nulla salvato: **settings** (10 tasti in «Anno inizio
@@ -260,7 +261,15 @@ non la possiede mai, quindi il campo è abilitato su ogni account), **expense** 
 «Nuova Spesa» › Spesa variabile, letto da `useWatch` alla radice del dialog), **tabs** (Cashflow Tracciamento ⇄ Budget,
 quattro cambi con entrambe le tab già montate), **asset** (dal 2026-10-07, PR #434: 10 tasti in «Quantità» di
 «Aggiungi asset» › ETF, la posizione iniziale — non «Modifica»: un ETF è un tipo del registro, e in modifica quantità e
-PMC sono in sola lettura). Le colonne sono PER TASTO (per cambio, in `tabs`):
+PMC sono in sola lettura). Dal 2026-10-08 (PERF-14) due scenari che non digitano: **mount** (un caricamento pieno della
+route di `--route=`, una o più separate da virgole, default `history`: la registrazione si accende con un init script
+PRIMA della navigazione e si ferma a «dati a schermo» — `main h1`, una cifra in euro, nessuno skeleton — più 1 s; il
+login è già atterrato sulla Panoramica e le sue letture hanno 2 s per entrare nella cache persistita, quindi ogni run
+parte dallo stesso record) e **nav** (Hall of Fame ⇄ Previdenza dai link della sidebar, quattro cambi, ognuno atteso
+fino alla pagina nuova senza skeleton + 800 ms). **I contatori CDP sono del DOCUMENTO**: ripartono da zero a una
+navigazione piena (LayoutCount 5 → 2 su un reload, misurato), quindi `mount` legge il documento nuovo da zero. Il JSON
+porta anche `byName` intero per run: un host che deve renderizzare una volta invece di due si legge per nome (build
+`--no-mangling`). Le colonne sono PER TASTO (per cambio, in `tabs` e `nav`; per caricamento, in `mount`):
 
 | Colonna | Significato |
 |---|---|
@@ -290,6 +299,17 @@ componenti per tasto, commit 2 → 0 (render 1,8 ms → nessuno; script sulla fi
 compiler compilava `AssetDialog` ma lasciava il form del passo 2 fuori da ogni scope di memo, quindi un `useWatch` alla
 radice ri-renderizzava tutto: i campi digitati sono letti da foglie che li osservano (doc/guide/patrimonio.md § Two-Step).
 Per leggere i NOMI dei componenti al posto di `?`: `npm run perf:build -- --profile --no-mangling` (stessi conteggi).
+
+**Prima/dopo dei colori letti una volta e del motion senza misure** (PERF-14, 2026-10-08, laptop Windows, mirror
+riseminato quel giorno, mediane di 5, build `--profile --no-mangling`): **mount Storico** commit 67 → 62, componenti
+11357 → 10859, render 416,9 → 352,0 ms, script 1024 → 854 ms, Layout 173 → 168; **mount FIRE** 3344 → 3203 componenti,
+render 123,4 → 96,8 ms, script 635 → 477 ms; **mount Panoramica** 1088 → 1046 (−13 `motion.div`, −6 `MeasureLayout`: il
+wrapper `layout="position"`); per host 2 → 1 (Storico `ComposizioneTile`, FIRE `FIREProjectionChart` e `ScenariTile`, la
+`CompositionBar` della Panoramica), `ChartColorsProvider` 3 render per sessione. **nav**: −1 `MeasureLayout` per cambio
+(la pill nascosta), ma LayoutCount 31 → 34,3 — dentro il rumore (due giri «prima» davano 34 e 31): una misura su un
+sottoalbero `display:none` non forza layout, il guadagno è lavoro di React e Framer. Il benchmark cold di quella sessione
+(quattro giri alternati prima/dopo) NON separa i due: anche `auth`, che il cambio non tocca, oscillava 136–201 ms; CLS 0
+ovunque, long task dentro il rumore.
 
 **Prima/dopo di Impostazioni per tab** (PR #439, 2026-10-08, laptop Windows, mirror riseminato quel giorno, mediane di 5,
 build `--profile`): **settings 286,1 → 32,1** componenti per tasto (commit 2 → 1, render 2,88 → 0,64 ms, script sulla

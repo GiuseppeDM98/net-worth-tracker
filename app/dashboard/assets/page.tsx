@@ -49,7 +49,7 @@ import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
 import { ASSET_CLASS_CHART_INDEX } from '@/lib/utils/allocationUtils';
 import { filterSparklineByPeriod } from '@/lib/utils/sparklinePeriod';
-import { cardItem, springLayoutTransition, staggerContainer } from '@/lib/utils/motionVariants';
+import { cardItem, staggerContainer } from '@/lib/utils/motionVariants';
 import { buildPatrimonioVerdict, describeLastPriceUpdate, formatHoldingCounts } from '@/lib/utils/patrimonioNarrative';
 import {
   isCashAccount,
@@ -445,7 +445,7 @@ export default function AssetsPage() {
   // ─── Render ───────────────────────────────────────────────────────────────────
   return (
     <PageContainer>
-      <motion.div layout="position" transition={springLayoutTransition} className="space-y-4">
+      <div className="space-y-4">
         <PageHeader
           label="Patrimonio"
           title="Strumenti e conti"
@@ -587,7 +587,7 @@ export default function AssetsPage() {
             />
           </motion.div>
         </motion.div>
-      </motion.div>
+      </div>
 
       {/* ── Dialogs — one instance each, shared by the header and every tile ── */}
       {assetDialog.mounted && (

@@ -14,6 +14,10 @@
 
 ## 🐛 Bug Fixes
 
+- Fixed the light/dark switch revealing only the sidebar: the circle now spreads from the button over the whole page, header and tiles included, instead of the page simply fading.
+
+- Fixed the phone's bottom bar disappearing and popping back at every change of page: it now stays in place while the page changes beneath it, and only the highlight slides to the new section.
+
 - Closing any dialog or bottom sheet now hands the keyboard focus back to the control that opened it, on every page: 27 of the 40 dialogs still dropped it on the page body, so a keyboard user landed at the top of the page after every «Salva» or Escape.
 
 - Captions, reading lines and inactive labels meet the AA contrast floor (4,5:1) on the page, on tiles and on pills in all twelve colour themes: six were below it — the default light theme on pills, Retro Arcade dark at 2:1, Midnight Bloom light at 2,9:1 — and a test now holds the floor.
@@ -41,6 +45,8 @@
 - Fixed a member of a shared account seeing their OWN exposure on the owner's Allocazione page: the Esposizione now reads the owner's instruments, like every other tile.
 
 ## 🔧 Improvements
+
+- Pages with charts mount with less work: the active theme's chart colours are read once, while the app's frame waits for the sign-in, instead of once per chart on every page — each chart is now drawn once instead of twice, and Storico and FIRE e Simulazioni do about a sixth less script at opening. The Panoramica and Patrimonio no longer measure the whole page after every change, and the phone's bottom bar animates only where it is visible (it still glides aside when the «+» of Tracciamento appears). The Panoramica's tiles cascade in the first time you open it in a session; when you come back to it they are there at once. The safeguard that swaps a chart colour too pale for a light page (or too dark for a dark one) now actually works — no colour of today's twelve themes trips it.
 
 - Impostazioni types fluently and opens at once: the page used to re-render every tile of every visited tab on each keystroke (the whole form was one component with seventy pieces of state), and on a reload it was the one page left showing a skeleton while the others painted their last figures. Each tab is now a view of one shared draft, so typing in Preferenze re-renders Preferenze alone, a target typed in Allocazione re-renders its own list, a collapsed group of subcategories is not on the page at all, and a reload paints the saved form from the device's copy with «Aggiornato alle…» in the header while the fresh read lands behind it. Nothing changed in what is saved: a value typed in one tab is still there after a visit to another, «Salva» from any tab still writes every field, «Salva» with a group that does not add up still opens that group and puts the cursor on the field, and «Annulla modifiche» still re-reads what is saved.
 
@@ -83,6 +89,8 @@
 - Updated Next.js to 16.4 (every 16.x up to 16.3.7 carried critical advisories), firebase-admin to 14 and the Firebase SDK to 12.19: the dependency audit goes from 50 advisories, two critical, to 20 with none critical, all inside developer tooling.
 
 ## 📚 Documentation
+
+- The theme guide describes the one place the chart colours are read (the provider in the dashboard frame, with the hooks' own read as the fallback outside it), the one colour parser and the lightness safeguard; the repo rules say why a page wrapper carries no layout animation and why a hidden element's layout animation is switched off; the speed manual gains two measures — a whole page load and a change of page — with their before/after.
 
 - The shell guide records why a dashboard page can read the URL without a Suspense boundary (at prerender the auth gate renders only its placeholder); the speed manual now says that Impostazioni no longer shows a skeleton on a reload and records the one secondary timing target of its rewrite that fell short; the page's line count and the census figures are stated with the machine they were measured on.
 

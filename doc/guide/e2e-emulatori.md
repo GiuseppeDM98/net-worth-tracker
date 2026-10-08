@@ -165,6 +165,14 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   «0 sparklines before any row is opened» stayed green with every row mounting its chart, because the held chunk kept
   them all on their placeholder. The absence is asserted with the chunk ARRIVED (`probeChunks` polled until it has),
   the placeholder-against-chart height in a second test that holds it.
+- **An animation tied to a navigation is sampled WITHOUT the page scene** (2026-10-08, `e2e/motion.layout.mobile.spec.ts`):
+  on the dev server a shell-link click runs a view transition whose update waits for the route to compile, and the
+  browser renders NO frame meanwhile (rAF still from 52 to 355 ms) — a spring started in that commit settles in the dark
+  and the frames read a jump whatever the code did. `delete Document.prototype.startViewTransition` in an init script
+  takes the browser-without-view-transitions path (`runViewTransition` feature-detects). And a spy on
+  `getComputedStyle(document.documentElement)` counts Next's router too (two calls per navigation, its scroll
+  handling): spy on what the code under test reads — the `--chart-*` tokens through
+  `CSSStyleDeclaration.prototype.getPropertyValue` — not on the call.
 - **«No placeholder ever showed» is watched from BEFORE the action** (2026-09-30): a `MutationObserver` installed before
   the click, read after; counting skeletons once the chart is visible passes whether or not one flashed (seen inert).
 - **In a cloud container the pinned Chromium is not installed** (2026-09-25): `browserType.launch: Executable doesn't

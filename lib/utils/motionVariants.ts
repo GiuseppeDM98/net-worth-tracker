@@ -17,14 +17,6 @@ import type { Transition, Variants } from "framer-motion";
 /** Ease-out-quart cubic-bezier — matches useCountUp easing */
 const easeOutQuart = [0.25, 1, 0.5, 1] as const;
 
-/** Shared spring for layout reflow when conditional sections appear or resize. */
-export const springLayoutTransition: Transition = {
-  type: "spring",
-  stiffness: 280,
-  damping: 30,
-  mass: 0.9,
-};
-
 /** Full-page fade-in on mount (used as outermost wrapper after loading resolves).
  *  y: 4 on hidden provides a native-app-style subtle slide-up on enter. */
 export const pageVariants: Variants = {

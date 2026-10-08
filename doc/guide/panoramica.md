@@ -28,6 +28,18 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   Panoramica's hero and, with `movers`/`countLine`, Patrimonio's — a second hero would drift (the pre-v3 twin did).
   `ComposizioneTile` likewise takes `eyebrow`/`footer`. `resolveHeroValueClass` is the one overflow step-down.
 - Count-up lives in `OverviewAnimatedCurrency` leaf nodes, never in the page component.
+- **No `layout` on the page root** (2026-10-08, PERF-14): the page sat in a `motion.div layout="position"` since
+  2026-04-03 (`git log -S`: «softer reflow of conditional cards», for metric blocks that the Verdict-over-Tiles redesign
+  removed on 2026-08-22, leaving the root wrapper alone). The root never moves inside `PageContainer`, so Framer measured
+  it after every commit of the page for nothing; it is a plain `div`, and `springLayoutTransition` went with it (the
+  same on Patrimonio). The period switch still shifts nothing (`e2e/motion.layout.spec.ts`, `layout-shift` 0 with a
+  positive anchor).
+- **The tile cascade plays once per session** (owner's call, 2026-10-08, DESIGN.md → Tile Grid): `staggerContainer`
+  × 8 tiles + `cardItem` kept the figures semi-transparent ~1 s after the data (962 ms on a load, 944 ms on a client
+  navigation, measured on the mirror). A module-level `tileGridEntrance.played` is set once the grid has rendered, and a
+  later mount reads it in a `useState` initializer: `initial={false}`, the tiles there at once. A skeleton or a failed
+  read does not count as played; a reload starts a new session. Pinned by `e2e/motion.layout.spec.ts` (seen red with the
+  cascade forced). Patrimonio, the landing and `AuthShell` keep the shared variants on every opening.
 - **The page is a verdict over a tile grid** (`components/dashboard/overview/*`): `Tile` (`components/ui/tile.tsx`,
   re-exported as `OverviewTile`; `NarrativeText` and `RankedRows` likewise live in `components/ui/`) is the ONE shell
   (eyebrow · aside · `reading` narrative · body), grid cells wrap it in `TILE_CELL_CLASS` (`flex min-w-0 [&>section]:flex-1`)
