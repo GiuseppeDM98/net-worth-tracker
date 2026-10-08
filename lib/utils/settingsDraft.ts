@@ -1,8 +1,9 @@
 /**
- * The ONE draft of Impostazioni (PERF-13, 2026-10-08).
+ * The ONE draft of Impostazioni (2026-10-08).
  *
  * Until then `app/dashboard/settings/page.tsx` held 70 `useState`s in one 4100-line component:
- * every keystroke re-ran the whole function (318 components per key with the compiler on), and
+ * every keystroke re-ran the whole function (286 components per key on the laptop with the
+ * compiler on, 318 on the Mac — the census, perf/README.md), and
  * the six tabs could not become components of their own because Radix unmounts an inactive panel
  * — a view with form state of its own would lose it at every tab change, and «Salva» from
  * another tab would never see it. So the page keeps ONE `useReducer(settingsDraftReducer)` and
@@ -56,8 +57,8 @@ export function isSettingsTabId(value: string | null | undefined): value is Sett
 /**
  * The class rows in the order the Target per classe tile prints them — Azioni → Obbligazioni →
  * Commodities → Immobili → Liquidità → Crypto → Trend Following → Carry. Not `ASSET_CLASS_SEQUENCE`
- * (Allocazione's order): the two have differed since the page was written, and PERF-13 changes no
- * visible order.
+ * (Allocazione's order): the two have differed since the page was written, and the 2026-10-08
+ * split of the page changed no visible order.
  */
 export const SETTINGS_CLASS_ORDER: readonly AssetClass[] = [
   'equity', 'bonds', 'commodity', 'realestate', 'cash', 'crypto', 'trendFollowing', 'carry',

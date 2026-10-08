@@ -36,7 +36,7 @@ import { getDoc, setDoc } from 'firebase/firestore';
 import { getSettings, setSettings } from '@/lib/services/assetAllocationService';
 import { invalidateDashboardOverviewSummary } from '@/lib/services/dashboardOverviewInvalidation';
 import type { AssetAllocationSettings, AssetAllocationTarget } from '@/types/assets';
-// The fixture is shared with settingsDraft.test.ts since 2026-10-08 (PERF-13): the page's draft
+// The fixture is shared with settingsDraft.test.ts since 2026-10-08: the page's draft
 // is held to the same document the service's whitelists are.
 import { STORED_SETTINGS } from './fixtures/storedSettings';
 

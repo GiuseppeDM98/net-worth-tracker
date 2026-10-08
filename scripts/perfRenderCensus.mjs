@@ -21,12 +21,12 @@
  *
  * Scenarios (`--scenario=`, comma-separated, default all five):
  *   settings   Impostazioni › Preferenze: 10 keys in «Anno inizio storico cashflow» — a controlled
- *              input of the settings page. Until PERF-13 (2026-10-08) every key was a `setState`
- *              on a 4000-line page root (318 components per key with the compiler); since then
- *              the page holds ONE draft and the tab is a view of its slice.
+ *              input of the settings page. Until 2026-10-08 every key was a `setState` on a
+ *              4000-line page root (286 components per key on the laptop with the compiler, 318 on
+ *              the Mac); since then the page holds ONE draft and the tab is a view of its slice.
  *   allocation Impostazioni › Allocazione: 10 keys in «Target Criptovalute», a class target of
- *              the biggest tab (added by PERF-13 to measure its own view — the class list used to
- *              render every collapsed sub-target editor too).
+ *              the biggest tab (added 2026-10-08 to measure that view on its own — the class list
+ *              used to render every collapsed sub-target editor too).
  *   expense    Cashflow › «Nuova Spesa» › Spesa variabile: 10 keys in «Importo», watched by
  *              `useWatch` at the dialog's root.
  *   tabs       Cashflow: Tracciamento ⇄ Budget, both already mounted (`forceMount`), four switches —

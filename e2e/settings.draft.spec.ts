@@ -1,5 +1,5 @@
 /**
- * Impostazioni — the ONE draft behind six views (PERF-13, 2026-10-08), at 1440px on the base account.
+ * Impostazioni — the ONE draft behind six views (2026-10-08), at 1440px on the base account.
  *
  * PERCHÉ ESISTE: the page used to be one component with 70 states; now each tab is a view of a
  * slice of ONE reducer, and two things can silently break that structure:

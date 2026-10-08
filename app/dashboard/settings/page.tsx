@@ -1,9 +1,10 @@
 /**
- * SETTINGS PAGE — the orchestrator (PERF-13, 2026-10-08).
+ * SETTINGS PAGE — the orchestrator (2026-10-08).
  *
- * Six tabs, six views, ONE draft. Until PERF-13 this file was one 4100-line component with 70
- * `useState`s, and every keystroke re-ran the whole function (318 components per key with the
- * compiler on). Now the page holds the draft in a single `useReducer(settingsDraftReducer)`
+ * Six tabs, six views, ONE draft. Until 2026-10-08 this file was one 4100-line component with 70
+ * `useState`s, and every keystroke re-ran the whole function (286 components per key on the
+ * laptop with the compiler on, 318 on the Mac — the census, perf/README.md). Now the page holds
+ * the draft in a single `useReducer(settingsDraftReducer)`
  * (lib/utils/settingsDraft.ts) and each tab — `components/settings/tabs/*Tab.tsx` — is a
  * controlled view of its SLICE: it receives the slice, emits a patch, keeps no form state. It has
  * to be so: Radix unmounts an inactive panel, a view with fields of its own would lose them at
@@ -127,7 +128,7 @@ export default function SettingsPage() {
   // The settings document, OBSERVED through the key every page shares (2026-10-08). On a warm
   // visit the persisted cache hands the document at once and the form is seeded from it — no
   // skeleton — while the fresh read lands behind, dated by «Aggiornato alle…» in the header
-  // (doc/perf/PERF-13 § 1, the owner's decision of 2026-09-29). The skeleton is for the first
+  // (the owner's decision of 2026-09-29, doc/guide/impostazioni.md). The skeleton is for the first
   // visit of the account only.
   const settingsQuery = useSettings(ownerId);
   const settingsDocument = settingsQuery.data; // undefined = not read yet; null = no document

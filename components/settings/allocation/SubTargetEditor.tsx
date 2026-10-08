@@ -3,7 +3,7 @@
 /**
  * One subcategory row of a class in Impostazioni › Allocazione › Target per classe: name, share of
  * the class, delete — and, once named, the «Traccia asset specifici» switch with its asset list
- * behind a Collapsible that is NOT force-mounted (PERF-13): a closed list is not in the DOM, so a
+ * behind a Collapsible that is NOT force-mounted (since 2026-10-08): a closed list is not in the DOM, so a
  * keystroke elsewhere on the page renders no hidden editor.
  *
  * A controlled row: `target` in, `onChange(patch)` out (the class editor patches its row by copy).

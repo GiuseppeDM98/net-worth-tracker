@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * What the six Impostazioni views share (PERF-13, 2026-10-08): the panel each one renders, the
+ * What the six Impostazioni views share (2026-10-08): the panel each one renders, the
  * control transition class, the declaration row of the read-only tiles, the percentage label.
  * Each view is a module-level component controlled by the page's draft (lib/utils/settingsDraft.ts):
  * it receives its slice, emits a patch, keeps no form state — Radix unmounts an inactive panel,
