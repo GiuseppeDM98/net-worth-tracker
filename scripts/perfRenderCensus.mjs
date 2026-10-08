@@ -19,9 +19,14 @@
  *       out, and the flag stays off. On a `--profile` build the root's `actualDuration` adds the
  *       render time of the commit; on a plain build it is absent and printed as «-».
  *
- * Scenarios (`--scenario=`, comma-separated, default all four):
+ * Scenarios (`--scenario=`, comma-separated, default all five):
  *   settings   Impostazioni › Preferenze: 10 keys in «Anno inizio storico cashflow» — a controlled
- *              input of the 4000-line settings page, so every key is a `setState` on the page root.
+ *              input of the settings page. Until PERF-13 (2026-10-08) every key was a `setState`
+ *              on a 4000-line page root (318 components per key with the compiler); since then
+ *              the page holds ONE draft and the tab is a view of its slice.
+ *   allocation Impostazioni › Allocazione: 10 keys in «Target Criptovalute», a class target of
+ *              the biggest tab (added by PERF-13 to measure its own view — the class list used to
+ *              render every collapsed sub-target editor too).
  *   expense    Cashflow › «Nuova Spesa» › Spesa variabile: 10 keys in «Importo», watched by
  *              `useWatch` at the dialog's root.
  *   tabs       Cashflow: Tracciamento ⇄ Budget, both already mounted (`forceMount`), four switches —
@@ -54,7 +59,7 @@ const PASSWORD = 'test1234';
 const LABEL = args.label ?? '';
 const MOBILE = args.mobile === 'true';
 const VIEWPORT = MOBILE ? { width: 390, height: 844 } : { width: 1440, height: 900 };
-const SCENARIOS = (args.scenario ?? 'settings,expense,tabs,asset').split(',');
+const SCENARIOS = (args.scenario ?? 'settings,allocation,expense,tabs,asset').split(',');
 // :3000 is the tour server, :3100 the Playwright one, :3200 the benchmark's (perf/README.md).
 const BASE = args.base ?? 'http://localhost:3200';
 const OUT = 'perf/last-census.json';
@@ -203,6 +208,14 @@ const scenarioRunners = {
     const input = page.locator('#cashflowHistoryStartYear');
     await input.waitFor({ state: 'visible', timeout: 30_000 });
     await page.waitForTimeout(1_000); // the settings document and the count-ups land first
+    return record(page, cdp, KEYS.length, () => typeKeys(page, input));
+  },
+  async allocation(page, cdp) {
+    await page.goto(`${BASE}/dashboard/settings?tab=allocazione`, { waitUntil: 'load' });
+    // Crypto: never owned by the auto-calculated formula, so the field is enabled on any account.
+    const input = page.getByRole('spinbutton', { name: 'Target Criptovalute' });
+    await input.waitFor({ state: 'visible', timeout: 30_000 });
+    await page.waitForTimeout(1_000); // the settings document lands first
     return record(page, cdp, KEYS.length, () => typeKeys(page, input));
   },
   async expense(page, cdp) {

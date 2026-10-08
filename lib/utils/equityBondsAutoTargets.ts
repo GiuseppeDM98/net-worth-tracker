@@ -33,6 +33,18 @@ export interface AutoEquityBondsSplit {
 const roundToTwoDecimals = (value: number): number => Math.round(value * 100) / 100;
 
 /**
+ * The Bull's equity share: 125 − age − (risk-free rate × 5), clamped to [0, 100].
+ *
+ * Lives here, beside the split it feeds, so the settings draft (`lib/utils/settingsDraft.ts`)
+ * can settle the auto-calculated pair without importing the service layer (which loads the
+ * Firebase SDK at module scope); `assetAllocationService.calculateEquityPercentage` delegates.
+ */
+export function calculateFormulaEquityPercentage(userAge: number, riskFreeRate: number): number {
+  const percentage = 125 - userAge - riskFreeRate * 5;
+  return Math.max(0, Math.min(100, percentage));
+}
+
+/**
  * Resolve the equity and bonds targets for the auto-calculated split.
  *
  * @param formulaEquityPercentage - The Bull's output (`calculateEquityPercentage`), 0-100.

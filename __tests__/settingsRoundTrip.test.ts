@@ -36,27 +36,9 @@ import { getDoc, setDoc } from 'firebase/firestore';
 import { getSettings, setSettings } from '@/lib/services/assetAllocationService';
 import { invalidateDashboardOverviewSummary } from '@/lib/services/dashboardOverviewInvalidation';
 import type { AssetAllocationSettings, AssetAllocationTarget } from '@/types/assets';
-
-/** Ogni valore è scelto per essere DIVERSO dal default, così un campo perso si vede. */
-const STORED_SETTINGS = {
-  targets: { equity: { targetPercentage: 60 }, bonds: { targetPercentage: 40 } },
-  performanceIncludesPensionFunds: true,
-  performanceIncludesExcludedAssets: true,
-  performanceExcludesCash: true,
-  pensionReturnStartMonth: '2026-07',
-  costCentersEnabled: true,
-  includePrimaryResidenceInFIRE: true,
-  respectPensionLockInFire: true,
-  pensionInpsRetirementAge: 68,
-  pensionRitaLongUnemployment: true,
-  cashflowHistoryStartYear: 2019,
-  familyMembers: [{ id: 'm1', name: 'Giuseppe' }],
-  expenseSplitEnabled: true,
-  spendingRolesEnabled: true,
-  dividendCashAssetId: 'cash-1',
-  transferFeeCategoryId: 'cat-fee',
-  transferFeeSubCategoryId: 'sub-fee',
-};
+// The fixture is shared with settingsDraft.test.ts since 2026-10-08 (PERF-13): the page's draft
+// is held to the same document the service's whitelists are.
+import { STORED_SETTINGS } from './fixtures/storedSettings';
 
 const TARGETS = { equity: { targetPercentage: 100 } } as unknown as AssetAllocationTarget;
 
