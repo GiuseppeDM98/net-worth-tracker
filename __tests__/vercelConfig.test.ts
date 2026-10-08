@@ -18,6 +18,33 @@ const config = JSON.parse(
   readFileSync(path.resolve(__dirname, '../vercel.json'), 'utf8'),
 ) as { regions?: string[]; crons?: { path: string; schedule: string }[] };
 
+const manifest = JSON.parse(
+  readFileSync(path.resolve(__dirname, '../package.json'), 'utf8'),
+) as { engines?: { node?: string }; overrides?: Record<string, string> };
+
+describe('package.json on Vercel', () => {
+  /**
+   * Vercel honours `engines.node` over the project setting: the laptop and the Lambda run the
+   * same major, so a module that loads here loads there. Seen red with the field removed.
+   */
+  it('pins the Lambda to the Node major the laptop runs', () => {
+    expect(manifest.engines?.node).toBe('24.x');
+  });
+
+  /**
+   * A Vercel Function starts Node with `--no-experimental-require-module`, so a `require()` of an
+   * ESM-only package fails at ANY Node version: on 2026-10-08 every Admin route answered 500 —
+   * `ERR_REQUIRE_ESM` on `jose@6`, which `jwks-rsa@4` (firebase-admin 14) `require()`s — on the
+   * 22.x and the 24.x runtime alike, while the same production build on the laptop answered 401.
+   * The override keeps `jwks-rsa` on 3.x (jose 4, CommonJS); firebase-admin calls only
+   * `jwks({ jwksUri, cache })` and `getSigningKeys()`, identical in both majors. The emulator suite
+   * cannot see this (`verifyIdToken` skips the signature there). Seen red with the override removed.
+   */
+  it('keeps jwks-rsa on 3.x, the last major whose jose firebase-admin can require on a Vercel Function', () => {
+    expect(manifest.overrides?.['jwks-rsa']).toBe('^3.2.2');
+  });
+});
+
 describe('vercel.json', () => {
   it('runs the functions in one European region (Hobby accepts one)', () => {
     expect(config.regions).toEqual(['fra1']);
