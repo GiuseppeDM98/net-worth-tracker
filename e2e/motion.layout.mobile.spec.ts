@@ -1,5 +1,5 @@
 /**
- * PERF-14 at 390 portrait — where the bottom nav IS visible, its layout animation stays (2026-10-08).
+ * At 390 portrait — where the bottom nav IS visible, its layout animation stays (2026-10-08).
  *
  * `BottomNavigation` turns `layout` and the active pill's `layoutId` on only in portrait below 1440
  * (`useMediaQuery`, `false` on the server and during hydration). Here it must be on:

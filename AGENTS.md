@@ -157,6 +157,12 @@ pointer — a stub that grows past that is a guide leaking back (2026-09-20: ten
 ## 2. Data and State Patterns
 
 ### React Query and Derived State
+- **Query + invalidation, never realtime — and Firestore is not the limit** (measured 2026-09-26, the speed dossier):
+  with the emulator answering in ~1 ms Cashflow still took 2,1 s and Storico 2,3 s to show a figure — browser CPU
+  (deserialising 1533 documents, reducing, mounting) and the boot chain, not the database; in production a round trip
+  is 50–150 ms, so what counts is round trips IN SERIES. No `onSnapshot`, and no migration (Postgres/Supabase/Convex
+  would rewrite ~40 services, the rules and the harness without touching the measured causes): the two Firestore
+  levers are the function region (SETUP.md § Function region) and the materialized per-page summaries (§ Caching).
 - **A page or a component never calls a read service: it reads a HOOK** (2026-09-29). One key per collection,
   in `lib/query/queryKeys.ts`, one hook apiece in `lib/hooks/`: `useAssets`, `useSnapshots`, `useExpenses` (and its
   windows, next bullet), `useExpenseCategories`, `useSettings` (the ONE `['settings', ownerId]`), `usePensionContributions`,
@@ -340,7 +346,7 @@ pointer — a stub that grows past that is a guide leaking back (2026-09-20: ten
   state, control rows included** (2026-10-06, `components/cashflow/CashflowTabSkeletons.tsx`, `e2e/lazyTabLanding.ts`).
   Worked examples: `PerformanceDettaglio`, `ConfrontoAnnualeSection`, `FlussoTile`, the four lazy FIRE tabs, Cashflow's
   four non-default tabs, `AssetRow`'s sparkline. **Next prefetches every shell link's route, client chunks included**:
-  only a chunk reached solely by an `import()` stays unfetched (`perf/README.md`, «Il prefetch dei link della shell»).
+  only a chunk reached solely by an `import()` stays unfetched (`doc/guide/velocita.md`, «Il prefetch dei link della shell»).
 - Pure `lib/utils` modules reach `calculateAssetValue` **injected** as a `valueOf` param (`allocationUtils`,
   `pensionFire`) or **imported directly** with the test mocking `@/lib/firebase/config` + `firebase/firestore` +
   `authFetch` + `dashboardOverviewInvalidation` — check the precedent.
@@ -571,7 +577,7 @@ file used to carry.
 
 ### Color Theme System → `doc/guide/temi.md`
 - **Parallel theming**: next-themes owns `.dark`, the custom system owns `data-theme` (an external store, 2026-09-06).
-- **The chart palette is read ONCE per theme** (2026-10-08, PERF-14): `ChartColorsProvider` in `app/dashboard/layout.tsx`
+- **The chart palette is read ONCE per theme** (2026-10-08): `ChartColorsProvider` in `app/dashboard/layout.tsx`
   reads `--chart-*`, the action colours and the `--role-*` hexes; `useChartColors`/`useActionColors`/`useCssColorTokens`
   read its context and fall back to their own read without it (the landing). Timing: `useEffect + useState +
   requestAnimationFrame`, NOT `useMemo`. The browser RETURNS `lab(…)` or `#hex`, not the `oklch()` you authored: read it
@@ -600,13 +606,17 @@ file used to carry.
   mode switch (it has no `enabled`: gate the display in JSX); **a `fromPrevious` count-up passes `landFirstValue`**
   (2026-09-23), or a figure that settles between previews counts from «0 €» under a track already at its share.
   **`layout="position"`, not bare `layout`, when a Framer parent wraps a Radix `CollapsibleContent`.**
-- **No `layout` on a page wrapper, and a `layout`/`layoutId` only where the element is VISIBLE** (2026-10-08, PERF-14):
+- **No `layout` on a page wrapper, and a `layout`/`layoutId` only where the element is VISIBLE** (2026-10-08):
   Framer measures a layout element before and after every commit that touches it — under `display: none` too (6
   `getBoundingClientRect` per navigation at 1440 on the hidden bottom nav, `e2e/motion.layout.spec.ts`). Put `layout` on
   the element that moves, never on the page root; gate a hidden one on a `useMediaQuery` of where it shows. **Turning
   `layout` on after mount does not take** — Framer sets the measuring up when the element MOUNTS, and the media query
   answers `true` only after hydration: remount it with a `key` on the gate (`BottomNavigation`, the pill jumped without,
   `e2e/motion.layout.mobile.spec.ts`). The Panoramica's tile cascade plays once per session (doc/guide/panoramica.md).
+  **The cost is React and Framer work, not browser layout** (census `nav`, 2026-10-08: −1 `MeasureLayout` per change, CDP
+  `LayoutCount` unmoved — a measure on a `display:none` subtree forces no layout), so a `layout` gate is judged by the
+  census (`doc/guide/velocita.md` § Il census), never by `LayoutCount`. **No `LazyMotion`/`m` in place of `motion`**
+  (decided 2026-09-26, 33 files): little to save, and `layout` and `AnimatePresence` want `domMax` anyway.
 - **Collapsible technique, by content shape:** rows expanding into sub-rows → CSS `grid-rows-[0fr] → [1fr]` with an
   `overflow-hidden` child and `inert` on the closed wrapper (Framer + `height:'auto'` left rows stuck at opacity 0);
   tall or unpredictable sections → Radix `<Collapsible>` + CSS transition; small predictable content →
@@ -624,7 +634,7 @@ file used to carry.
 - **`react-hooks/refs`: a custom hook never RETURNS a ref inside its object** (every read of it during render is
   flagged): take the ref as an argument (`useArmedDelete(ref, onDelete)`, since 2026-08-31).
 - **The React Compiler RUNS since 2026-10-05** (`reactCompiler: true`, `babel-plugin-react-compiler` 1.0): no
-  `React.memo` by hand unless `npm run perf:census` shows it is needed (perf/README.md § Il census). **A component it
+  `React.memo` by hand unless `npm run perf:census` shows it is needed (doc/guide/velocita.md § Il census). **A component it
   cannot compile is skipped WHOLE and in silence**, and lint at zero is NOT the map (`react-hooks/todo` and
   `react-hooks/hooks` are outside `recommended`; «value blocks within a try/catch» reaches no rule):
   **`__tests__/reactCompilerCoverage.test.ts` is the map** (48 skips on the first run, all rewritten; seen red with a
@@ -634,7 +644,7 @@ file used to carry.
   (`assertSnapshotCreated`, `forEachSseEvent`) or the body moved into a local `const save = async () => {…}`; an
   `import()` → a module-level loader; an `eslint-disable` of `exhaustive-deps` → `useEffectEvent`. **A build is
   compiled when its chunks carry `react.memo_cache_sentinel`** (3 without, 1318 with, 2026-10-05; `_c(` does not survive
-  minification). **The price**: +20–26% gz on component code (`perf/README.md` § Registro) and `next build` 29 → 47 s;
+  minification). **The price**: +20–26% gz on component code (`doc/guide/velocita.md` § Registro) and `next build` 29 → 47 s;
   Cashflow paid the most, so its four non-default tabs load on demand (doc/guide/cashflow.md). **Compiled is not
   memoized** (2026-10-07): the compiler compiled `AssetDialog` and left its whole step-2 form outside every memo scope,
   so one root `useWatch` re-rendered 562 components per key — measure a form with the census and move a per-keystroke
@@ -816,7 +826,7 @@ file used to carry.
   build, remove the worktree, count `ls node_modules | wc -l`.
 - **An accepted PR merged "with changes" is its diff applied, not its commits** (2026-09-07): `git apply --reject` of
   `base...head`, the session's fixes on top, one commit with the author as `Co-authored-by`, never the PR's own
-  `CLAUDE.md` and draft hunks. **While `doc/perf/` or `doc/mobile/` are open** (2026-09-27) it is crossed with the open
+  `CLAUDE.md` and draft hunks. **While `doc/mobile/` is open** (2026-09-27; `doc/perf/` closed on 2026-10-08) it is crossed with the open
   specs (a cited line that moves, a count, a baseline, a rule the new code should follow), the specs amended in the
   same commit; it lands BEFORE a spec that rewrites the same files. Look first for the five defects of that day's three
   PRs: a sentence or number born in a component, an overflow asserted on `document`, an absence with no positive
@@ -833,7 +843,7 @@ file used to carry.
   suites; widening `AssetClass` means `ASSET_CLASS_SEQUENCE` and its readers. **Perf tooling**: `perfBudget`,
   `perfRoutes` (`perf/routes.json` = `navigation.ts`); `npm run perf:budget` after `npm run build`, or `-- --dist=.next-perf`
   after `perf:build` (2026-10-05: without it the script read a `.next` of 15/08 — its first line names the build); a
-  route that grows raises its ceiling with `raisedBy` in the same commit (`perf/README.md`).
+  route that grows raises its ceiling with `raisedBy` in the same commit (`doc/guide/velocita.md`).
 - **`firebase deploy --only firestore:rules` with a stale login fails with a 401 on `serviceusage`**: `npx firebase
   logout`, `npx firebase login --no-localhost`, open THAT run's URL, `npx firebase login <code>`. Always `npx firebase`.
 - `npx knip` uses the root `knip.json` (`components/ui/**` and `public/sw.js` ignored, `firebase-tools` an ignored
@@ -885,6 +895,17 @@ file used to carry.
   wiping a `fill()`), the vaul drawer after Escape, locators that are not buttons and substring matching (`exact: true`),
   the euro regex and U+202F, forcing a server flag on the response, the settings reload rule, the armed two-click
   confirm, the three tour-spec traps, Java ≥ 21 and foreign emulators on 8080/9099 — in `doc/guide/e2e-emulatori.md`.
+
+### Performance tooling → `doc/guide/velocita.md`
+- **Three tools, one port**: `npm run perf:budget` (JS per route against `perf/budget.json`, two seconds, no server),
+  `perf:bench` (cold / warm / revisit on the `.next-perf` build that `perf:serve` serves on :3200, mirror data) and
+  `perf:census` (React commits and components per keystroke, per tab change, per load, per navigation). Options ALWAYS
+  after `--`, and PowerShell 5.1 eats the `--`: use Git Bash.
+- **A ceiling only a measure may lower, and only a new feature may raise** — `raisedBy` on the route, the before/after
+  and a row in § Registro dei tetti alzati, in the same commit; `libraryCopies: { recharts: 1 }` is a rule, not a
+  measure. TIMES compare only on the same machine in the same session (±10%); COUNTS compare anywhere.
+- Il resto — every column, the baseline in force and the historical one of 2026-09-26, the before/after of every speed
+  session, the census scenarios, `--revisit` and what the tables do not say — in `doc/guide/velocita.md`.
 
 ---
 

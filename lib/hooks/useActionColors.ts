@@ -21,7 +21,7 @@ import type { AllocationAction } from '@/lib/utils/allocationUtils';
  * 2026-09-21 this docstring claimed to guarantee contrast and the default light palette measured
  * 2,39:1.
  *
- * Read from `ChartColorsProvider` since 2026-10-08 (PERF-14), with the hook's own read as the
+ * Read from `ChartColorsProvider` since 2026-10-08, with the hook's own read as the
  * fallback when no provider is mounted (`resolveActionColors` in lib/utils/themePalette.ts). Read
  * once per section and pass the result down — never call this per row.
  */

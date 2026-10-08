@@ -5,7 +5,7 @@
  * `--chart-*` slots), `useActionColors` (COMPRA / VENDI / OK, clamped to a legible band) and
  * `useCssColorTokens` (the five `--role-*` aliases as hexes for Nivo). The values are the same for
  * the whole page until the colour theme or the light/dark mode changes, so since 2026-10-08
- * (PERF-14) `ChartColorsProvider` reads them once per theme and the three hooks read its context.
+ * `ChartColorsProvider` reads them once per theme and the three hooks read its context.
  * This module is the pure half: given a token reader and the mode, the palette. The provider and
  * the hooks' no-provider fallback both call `readThemePalette`, so the two can never disagree.
  *

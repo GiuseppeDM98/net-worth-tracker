@@ -1,11 +1,14 @@
-# perf/ — il benchmark di velocità e il budget di dimensione
+# Velocità e dimensione (budget, benchmark, census)
 
-> In repo dal 2026-09-28 (PR #409). Qui: come si lancia, cosa significa ogni
-> colonna, la baseline in vigore e il registro dei tetti alzati. La storia (la misura usa-e-getta del 2026-09-26) e le
-> spec che useranno questi numeri stanno in `doc/perf/README.md`.
+> **When to open this guide** — anyone touching `perf/budget.json`, `perf/routes.json`, the four scripts `scripts/perf{Budget.mts,Benchmark.mjs,Serve.mjs,RenderCensus.mjs}` or `lib/utils/perfBudget.ts`, a PR that makes a route grow past its ceiling, or anyone who has to say whether a change made the app faster or heavier. The tooling is in repo since 2026-09-28 (PR #409); this manual lived in `perf/README.md` until 2026-10-08, when the last of the fourteen PERF specs of 2026-09-26 was retired and their dossier (`doc/perf/`) with it — the measure they all started from is § Baseline storica below. `AGENTS.md` keeps the stub (`AGENTS.md § Performance tooling`, `AGENTS.md § Commands`); here is the full rule: how each tool is run, what every column means, the baseline in force, the before/after of every speed session and the register of raised ceilings (the body is in Italian, as the manual was written). The environment — the production build on :3200, the emulators, the mirror — is SETUP.md → Step 6-7 and WORKFLOW.md § 3.
+
+## Files
 
 | File | Cosa | Tracciato |
 |---|---|---|
+| `scripts/perfBudget.mts` · `lib/utils/perfBudget.ts` (la metà pura, tenuta da `__tests__/perfBudget.test.ts`) | `npm run perf:budget` | sì |
+| `scripts/perfBenchmark.mjs` · `scripts/perfServe.mjs` | `npm run perf:bench` · `npm run perf:serve` (la build di `npm run perf:build`, in `.next-perf`) | sì |
+| `scripts/perfRenderCensus.mjs` | `npm run perf:census` | sì |
 | `budget.json` | Il tetto di JS iniziale (gzip, KB) per route e per i chunk condivisi | sì |
 | `routes.json` | Le route che il benchmark visita, uguali a `lib/constants/navigation.ts` (`__tests__/perfRoutes.test.ts`) | sì |
 | `last-run.json` | Tutte le run e le mediane dell'ultimo `perf:bench` | no |
@@ -243,6 +246,69 @@ payload arrivano i chunk client di quella route — a freddo, la finestra di una
 `import()` (il PDF, il Sankey sul telefono, le icone, le tab di FIRE) non viene prefetchato; uno nel grafo iniziale di
 un'altra route sì. La colonna JS del benchmark lo include: è una traccia, non il budget.
 
+## Baseline storica (2026-09-26, laptop Windows, mirror, nessun throttling CPU)
+
+La misura usa-e-getta da cui sono partite le quattordici spec PERF (dossier `doc/perf/`, 2026-09-26 → 2026-10-08), presa su
+`develop` PRIMA dei contributi del 2026-09-27 (#400, #401, #403) e della nuova Esposizione (PERF-00, #407), con uno script
+Playwright usa-e-getta poi diventato `scripts/perfBenchmark.mjs`: 3 run cold, 2 warm, mediane; i grezzi restano in git
+(`git show d8d3d98:doc/perf/reference/baseline-2026-09-26-cold.log`, e `…-warm.json`). Superata il 2026-09-28 dalla
+baseline in vigore sopra; resta come «prima» di tutto il lavoro. I «46 caratteri di testo» dell'HTML erano il `<title>`:
+il `body` ne aveva 0.
+
+**Le tre domande di partenza, con le risposte.** Firebase non è il limite: con Firestore emulato (round trip ~1 ms)
+Cashflow impiegava 2,1 s a mostrare un numero, Storico 2,3 s, Analisi 1,7 s — CPU del browser (deserializzare 1533
+documenti, ridurli, montare la pagina) e catena d'avvio (HTML vuoto → JS → Firebase Auth → query); in produzione ogni
+round trip vale 50–150 ms, quindi contano i round trip IN SERIE (Rendimenti ne faceva 4–5 con 17 chiamate API; la
+Panoramica ricalcolava il riepilogo in sei stadi sequenziali con le funzioni Vercel a Washington). Non serviva migrare
+(AGENTS.md § React Query and Derived State): le due leve lato Firebase erano la regione delle funzioni e i riassunti
+materializzati per pagina. Lato codice stava quasi tutto: la shell che non esisteva finché Auth non risolveva, la cache
+che moriva al reload, 460 KB gz di JS su ogni pagina con recharts quattro volte e il PDF nel grafo di Storico, le stesse
+collezioni lette con meccanismi diversi, le spese intere per mostrare un mese, N grafici montati al buio su Patrimonio,
+il React Compiler mai acceso e 70 stati in un componente, il lavoro di layout e colori a ogni mount.
+
+**Cold** — reload della route dopo il login (ms; mediane di 3):
+
+| Pagina | primo numero | LCP | long task | Firestore | API | note |
+|---|---|---|---|---|---|---|
+| Panoramica | 150 | 680 | 93 | 3 | 1 | un payload materializzato |
+| Patrimonio | 790 | 1230 | 270 | 8 | 1 | N sparkline montate; waterfall mutuo e ledger |
+| Cashflow › Tracciamento | 2110 | 2200 | 400 | 3 | 0 | tutta E (1533 doc) |
+| Analisi | 1690 | 1710 | 565 | 3 | 0 | tutta E |
+| Rendimenti | 1110 (1000–2070) | 1140 | 144–377 | 10–14 | 17 | 5 collezioni lette due volte + 10 route yield |
+| Storico | 2285 | 2300 | 670 | 3 | 0 | tutta E; PDF nel bundle |
+| Allocazione | 590 | 610 | 165 | 4 | 1 | Esposizione → Yahoo ogni volta |
+| Previdenza | 584 | 600 | 96 | 4 | 0 | il modello: tutto su React Query |
+| FIRE | 2040 | 2050 | 300 | 7–8 | 0–1 | catena a 3 |
+| Hall of Fame | 510 | 530 | 88 | 3 | 0 | un documento |
+| Impostazioni | 527 | 548 | 93 | 5 | 0 | 71 `useState` |
+
+Lo spinner di `ProtectedRoute` (Firebase Auth) se ne andava fra 86 e 228 ms dal `navigationStart`.
+
+**Warm** — navigazione client dalla sidebar, stessa sessione (ms dal click; mediane di 2):
+
+| Pagina | skeleton mostrato | primo numero | long task | Firestore | API |
+|---|---|---|---|---|---|
+| Panoramica | no | 141 | 0 | 5 | 0 |
+| Patrimonio | sì | 314 | 83 | 11 | 0 |
+| Cashflow | sì | 1226 | 124 | 4 | 0 |
+| Analisi (spese già in cache) | **no** | **242** | 153 | 2 | 0 |
+| Rendimenti | sì | 574 | 0 | 13 | 17 |
+| Storico | sì | 1250 | 255 | 8 | 0 |
+| Allocazione | sì | 606 | 55 | 4 | 1 |
+| Previdenza | sì | 131 | 0 | 2 | 0 |
+| FIRE | sì | 1757 | 75 | 6 | 0 |
+| Hall of Fame | sì | 127 | 0 | 2 | 0 |
+
+Analisi con le spese già in cache (242 ms, nessuno skeleton) contro Analisi a freddo (1690 ms): la stessa pagina, con lo
+stesso dato già in memoria, sette volte più veloce — la misura che ha giustificato la cache persistita e un solo binario
+per i dati (doc/guide/cache-persistita.md, AGENTS.md § React Query and Derived State).
+
+**Bundle** (gzip, chunk iniziali per route): condivisi da ogni pagina 460 KB (21 chunk; 136 KB firebase, 69 react-dom, 43
+framer-motion) · login 415 · Panoramica 535 · Patrimonio 717 · Cashflow 726 · Analisi 734 · Rendimenti 681 · **Storico
+1192** · Allocazione 510 · Previdenza 589 · FIRE 743 · Hall of Fame 534 · Impostazioni 610 · Assistente 657; recharts in
+QUATTRO chunk da 350 KB raw (uno per pagina); lucide-react intero (575 KB raw / 143 KB gz) alla prima icona di
+categoria; 93 chunk su disco, 9,0 MB raw.
+
 ## Il census — «quanta pagina ri-renderizza UN tasto?» (2026-10-05)
 
 `scripts/perfRenderCensus.mjs`, sulla stessa build e la stessa porta del benchmark, ma con il profiling di React:
@@ -261,7 +327,7 @@ non la possiede mai, quindi il campo è abilitato su ogni account), **expense** 
 «Nuova Spesa» › Spesa variabile, letto da `useWatch` alla radice del dialog), **tabs** (Cashflow Tracciamento ⇄ Budget,
 quattro cambi con entrambe le tab già montate), **asset** (dal 2026-10-07, PR #434: 10 tasti in «Quantità» di
 «Aggiungi asset» › ETF, la posizione iniziale — non «Modifica»: un ETF è un tipo del registro, e in modifica quantità e
-PMC sono in sola lettura). Dal 2026-10-08 (PERF-14) due scenari che non digitano: **mount** (un caricamento pieno della
+PMC sono in sola lettura). Dal 2026-10-08 (PR #441) due scenari che non digitano: **mount** (un caricamento pieno della
 route di `--route=`, una o più separate da virgole, default `history`: la registrazione si accende con un init script
 PRIMA della navigazione e si ferma a «dati a schermo» — `main h1`, una cifra in euro, nessuno skeleton — più 1 s; il
 login è già atterrato sulla Panoramica e le sue letture hanno 2 s per entrare nella cache persistita, quindi ogni run
@@ -300,7 +366,7 @@ compiler compilava `AssetDialog` ma lasciava il form del passo 2 fuori da ogni s
 radice ri-renderizzava tutto: i campi digitati sono letti da foglie che li osservano (doc/guide/patrimonio.md § Two-Step).
 Per leggere i NOMI dei componenti al posto di `?`: `npm run perf:build -- --profile --no-mangling` (stessi conteggi).
 
-**Prima/dopo dei colori letti una volta e del motion senza misure** (PERF-14, 2026-10-08, laptop Windows, mirror
+**Prima/dopo dei colori letti una volta e del motion senza misure** (PR #441, 2026-10-08, laptop Windows, mirror
 riseminato quel giorno, mediane di 5, build `--profile --no-mangling`): **mount Storico** commit 67 → 62, componenti
 11357 → 10859, render 416,9 → 352,0 ms, script 1024 → 854 ms, Layout 173 → 168; **mount FIRE** 3344 → 3203 componenti,
 render 123,4 → 96,8 ms, script 635 → 477 ms; **mount Panoramica** 1088 → 1046 (−13 `motion.div`, −6 `MeasureLayout`: il

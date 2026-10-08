@@ -75,7 +75,7 @@ export function BottomNavigation() {
   // The nav stays mounted everywhere (it is in the prerendered shell, hidden by CSS), but its
   // layout animations run only where it is visible: a `layout` or `layoutId` element is MEASURED
   // at every update even under `display: none`, so at 1440 each pathname change paid for a pill
-  // nobody sees (PERF-14). `false` on the server and during hydration — no layout animation in the
+  // nobody sees (2026-10-08). `false` on the server and during hydration — no layout animation in the
   // first frame — then the real value.
   const isPillVisible = useMediaQuery(PILL_VISIBLE_QUERY);
   const activePillLayoutId = isPillVisible ? ACTIVE_PILL_LAYOUT_ID : undefined;

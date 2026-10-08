@@ -6,7 +6,7 @@ import type { ThemePalette } from '@/lib/utils/themePalette';
 
 /**
  * The chart palette of the active theme, read ONCE per theme for everything under the dashboard
- * layout (since 2026-10-08, PERF-14). Before it every host of `useChartColors` — up to twelve on a
+ * layout (since 2026-10-08). Before it every host of `useChartColors` — up to twelve on a
  * FIRE tab — ran its own rAF and `getComputedStyle`, then rendered a second time one frame after
  * mounting to swap the static palette for the theme's.
  *

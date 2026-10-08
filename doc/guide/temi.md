@@ -26,13 +26,13 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   after the parser may already have had a rendering opportunity. Pinned by `__tests__/colorTheme.test.ts` (the
   script run in a VM) and by `e2e/shell.boot{,.mobile}.spec.ts` (c): the attribute at the first animation frame,
   and set while `document.body` did not exist yet.
-- **The palette is read ONCE per theme, by `ChartColorsProvider`** (2026-10-08, PERF-14). Until then every host of
+- **The palette is read ONCE per theme, by `ChartColorsProvider`** (2026-10-08). Until then every host of
   `useChartColors` (up to twelve on a FIRE tab), `useActionColors` and `useCssColorTokens` ran its own rAF and
   `getComputedStyle`, then rendered a second time one frame after mounting. The provider sits in
   `app/dashboard/layout.tsx`, which outlives the pages: it reads while the shell waits for Firebase Auth, so a page mounts
   with the theme's colours already in hand and its charts render once (census `mount`: Storico's Composizione 2 → 1,
   FIRE's projection and scenarios 2 → 1, the Panoramica's composition bar 2 → 1; script at Storico's mount 1024 → 854
-  ms — `perf/README.md` § Il census). Its value is the reader's state object, replaced only on a colour-theme or mode
+  ms — `doc/guide/velocita.md` § Il census). Its value is the reader's state object, replaced only on a colour-theme or mode
   change, so a consumer re-renders only then. The three hooks keep their signatures and, **without the provider** (the
   landing, the auth pages, a test), read the theme themselves through the same `useThemePaletteReader` — so the palette
   is the same with or without it by construction. **A new hex token for Nivo goes in `THEME_HEX_TOKENS`**

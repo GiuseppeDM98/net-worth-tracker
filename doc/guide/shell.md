@@ -79,7 +79,7 @@ rules below name.
   `useSearchParams` at their root and `/dashboard/settings` is in the prerender manifest): on the server `loading` is
   always true, so `ProtectedRoute` renders only its fallback and the page function never runs at prerender — the rule
   above is for what sits OUTSIDE it.
-- **The bottom nav's layout animations run only where it is visible** (2026-10-08, PERF-14): it stays mounted at every
+- **The bottom nav's layout animations run only where it is visible** (2026-10-08): it stays mounted at every
   width (it is in the prerendered shell), but `layout` on the `motion.nav` and the active pill's `layoutId` follow
   `useMediaQuery('(max-width: 1439px) and (orientation: portrait)')` — the complement of its `desktop:hidden
   max-desktop:landscape:hidden` classes, `PILL_VISIBLE_QUERY` beside them. The `motion.nav` carries a `key` on that

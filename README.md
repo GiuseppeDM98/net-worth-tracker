@@ -223,7 +223,7 @@ For contributors and AI agents, the repo keeps its guidance split by scope:
 | [`CLAUDE.md`](CLAUDE.md) | Index — what each feature is and where it lives |
 | [`AGENTS.md`](AGENTS.md) | Repo-wide conventions, data/state patterns, UI patterns, testing, workflow |
 | [`doc/guide/`](doc/guide/) | One file per domain — a page, a tab, a subsystem (`stati`, `dialog`, `temi`, `account-condiviso-demo`, `shell`, `cache-persistita`, `e2e-emulatori` for the Playwright and emulator harness) — the full rules and blind spots for that area |
-| [`perf/`](perf/README.md) | The speed benchmark and the per-page size budget: commands, baseline, raised ceilings |
+| [`perf/`](perf/) · [`doc/guide/velocita.md`](doc/guide/velocita.md) | The size budget (`budget.json`), the benchmark's routes and last runs; the manual — commands, baseline, raised ceilings, census — is the guide |
 | [`DESIGN.md`](DESIGN.md) | The aesthetic spec (normative) |
 | [`PRODUCT.md`](PRODUCT.md) · [`SETUP.md`](SETUP.md) · [`WORKFLOW.md`](WORKFLOW.md) | Positioning · environment/emulators · session rules |
 
@@ -268,7 +268,7 @@ npm run dev:emulator   # Run the app against the local emulators
 npm run test:e2e       # Playwright: desktop 1440px, mobile 390px, degraded-state scenarios
 npm run test:e2e:ui    # Same, interactive runner
 
-# Speed and size (perf/README.md): options always after `--`
+# Speed and size (doc/guide/velocita.md): options always after `--`
 npm run perf:budget    # JS per page of a production build against perf/budget.json, and one copy of recharts (after `npm run build`)
 npm run perf:build     # Production build against the emulators, then `npm run perf:serve` on :3200
 npm run perf:bench -- --runs=3  # Time to the first figure, cold and by navigation, per page

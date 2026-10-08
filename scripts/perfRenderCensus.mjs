@@ -1,6 +1,6 @@
 /**
  * perf:census — «how much of the page does ONE keystroke re-render?», on a production build served
- * against the emulators (the manual: perf/README.md § Il census). Written to measure the React
+ * against the emulators (the manual: doc/guide/velocita.md § Il census). Written to measure the React
  * Compiler (2026-10-05); a change that claims fewer re-renders runs a before/after of the same
  * scenario, same machine, same session, and adds its own scenario when none of these fits.
  *
@@ -39,17 +39,17 @@
  *   mount      A full load of one route (`--route=`, comma-separated; default `history`): recording is
  *              switched on by an init script BEFORE the navigation and stops when the page's data is
  *              on screen (`main h1`, a euro figure, no skeleton left) plus 1 s. One unit per load.
- *              Added 2026-10-08 (PERF-14) to count what a mount costs on its own — a host of
+ *              Added 2026-10-08 to count what a mount costs on its own — a host of
  *              `useChartColors` used to render twice, the second time one frame after mounting.
  *   nav        A pathname change at the viewport's width, through the sidebar's own links: Hall of
  *              Fame ⇄ Previdenza, four switches, each waited until the new page has no skeleton
- *              (+ 800 ms). Added 2026-10-08 (PERF-14): the bottom nav, hidden at 1440, measured its
+ *              (+ 800 ms). Added 2026-10-08: the bottom nav, hidden at 1440, measured its
  *              layout at every pathname change.
  * Never saves anything: the typed values are dropped with the context.
  *
  * Prerequisites, in the owner's terminals: `npm run emulators`, the mirror
  * (`npm run mirror:seed -- <production email>`), `npm run perf:build -- --profile`, `npm run perf:serve` (:3200).
- * Usage — options ALWAYS after `--` (perf/README.md):
+ * Usage — options ALWAYS after `--` (doc/guide/velocita.md):
  *   npm run perf:census -- --runs=3 --scenario=settings,expense --label=prima
  *   npm run perf:census -- --scenario=mount,nav --route=history,fire-simulations,dashboard --label=prima
  * Writes perf/last-census.json (gitignored): every run and the medians, with the label.
@@ -77,7 +77,7 @@ const MOUNT_ROUTES = (args.route ?? 'history').split(',').map((token) =>
 const SCENARIOS = (args.scenario ?? 'settings,allocation,expense,tabs,asset')
   .split(',')
   .flatMap((name) => (name === 'mount' ? MOUNT_ROUTES.map((href) => `mount:${href}`) : [name]));
-// :3000 is the tour server, :3100 the Playwright one, :3200 the benchmark's (perf/README.md).
+// :3000 is the tour server, :3100 the Playwright one, :3200 the benchmark's (doc/guide/velocita.md).
 const BASE = args.base ?? 'http://localhost:3200';
 const OUT = 'perf/last-census.json';
 const KEYS = '1234567890'; // each key yields a DIFFERENT value, so each one is a real state change

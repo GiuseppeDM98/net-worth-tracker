@@ -3,7 +3,7 @@
  *
  * Until then `app/dashboard/settings/page.tsx` held 70 `useState`s in one 4100-line component:
  * every keystroke re-ran the whole function (286 components per key on the laptop with the
- * compiler on, 318 on the Mac — the census, perf/README.md), and
+ * compiler on, 318 on the Mac — the census, doc/guide/velocita.md), and
  * the six tabs could not become components of their own because Radix unmounts an inactive panel
  * — a view with form state of its own would lose it at every tab change, and «Salva» from
  * another tab would never see it. So the page keeps ONE `useReducer(settingsDraftReducer)` and

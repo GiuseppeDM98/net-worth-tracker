@@ -17,7 +17,7 @@
  * CSS `lab()` is D50-referenced (CSS Color 4) while OKLab is D65, so the path is
  * Lab(D50) → XYZ(D50) → Bradford → XYZ(D65) → OKLab → OKLCH. sRGB goes straight to OKLab
  * through linear light (Ottosson's matrices). Moved here from `actionColor.ts` and
- * `cssColorToHex.ts` on 2026-10-08 (PERF-14).
+ * `cssColorToHex.ts` on 2026-10-08.
  */
 
 export type Triple = [number, number, number];

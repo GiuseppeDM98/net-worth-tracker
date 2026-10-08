@@ -9,7 +9,7 @@
  *   - how many figures (euro / percent) the page prints, and how many sit above the fold
  *   - words, controls, charts, tabs; whether `main` overflows sideways
  *   - two screenshots: the first screen, and the whole page (main unclipped)
- * Structure only: timings are not measured here (dev server, doc/perf has the baseline).
+ * Structure only: timings are not measured here (dev server; the time baseline is doc/guide/velocita.md).
  *
  * Usage: node .tmp-mobile-measure.mjs [--email=mirror@example.com] [--base=http://localhost:3000]
  *        [--out=<dir>] [--viewports=390,768,1024] [--surfaces=panoramica,storico]

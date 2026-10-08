@@ -28,7 +28,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   Panoramica's hero and, with `movers`/`countLine`, Patrimonio's — a second hero would drift (the pre-v3 twin did).
   `ComposizioneTile` likewise takes `eyebrow`/`footer`. `resolveHeroValueClass` is the one overflow step-down.
 - Count-up lives in `OverviewAnimatedCurrency` leaf nodes, never in the page component.
-- **No `layout` on the page root** (2026-10-08, PERF-14): the page sat in a `motion.div layout="position"` since
+- **No `layout` on the page root** (2026-10-08): the page sat in a `motion.div layout="position"` since
   2026-04-03 (`git log -S`: «softer reflow of conditional cards», for metric blocks that the Verdict-over-Tiles redesign
   removed on 2026-08-22, leaving the root wrapper alone). The root never moves inside `PageContainer`, so Framer measured
   it after every commit of the page for nothing; it is a plain `div`, and `springLayoutTransition` went with it (the
@@ -159,7 +159,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   tiny rest are inside it; the write after the response is in none of them. In production: DevTools → Network → the
   `overview` request → Timing → *Server Timing*. On the emulator (2026-10-03, the mirror, dev server): a recompute
   `db` ~45 ms, `compute` ~2, `total` ~50; a materialized read `total` ~7. The route's wall time in recompute went from
-  a median of 105/97 ms to 58/57 ms with the payload identical to the byte (doc/perf/README.md § 6). The functions run in `fra1` since 2026-10-04 (`vercel.json` → `regions`, SETUP.md § Function region); no production reading was taken (owner, 2026-10-04).
+  a median of 105/97 ms to 58/57 ms with the payload identical to the byte. The functions run in `fra1` since 2026-10-04 (`vercel.json` → `regions`, SETUP.md § Function region); no production reading was taken (owner, 2026-10-04).
 
 ## The critique of 2026-09-13 — what changed and why
 

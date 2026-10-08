@@ -129,7 +129,7 @@ Sotto `tablet:` la curva scende a `min-h-[120px]`: si accorcia la curva, mai la 
 - **PERF-07** (in develop dal 2026-10-03): il ricalcolo non ha interfaccia propria, è il «sto rileggendo…» della stessa
   riga `status`; il payload non ha cambiato forma. Il riepilogo è fresco per il giorno italiano, quindi dopo la prima
   apertura del giorno la rilettura è una lettura sola (doc/guide/panoramica.md § The materialized summary).
-- **PERF-14**: `layout="position"` (`page.tsx:335`) è suo, non si rimette. **PERF-04**: qui niente recharts.
+- **PERF-14** (in develop dal 2026-10-08): il `layout="position"` della pagina è tolto (doc/guide/panoramica.md), non si rimette. **PERF-04**: qui niente recharts.
 - **MOB-06**: `PatrimonioTile.liftedFigures`, la curva a 120 px sotto `tablet:` e i `binding` di `describeSales` sono di
   MOB-03 (MOB-06 § 3 lo dice); se MOB-06 arriva prima li scrive con questi nomi, e chi arriva secondo rilegge il diff del
   primo.

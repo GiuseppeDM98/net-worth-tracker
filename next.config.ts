@@ -39,7 +39,7 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ['192.168.1.114'],
   // The React Compiler memoizes every component and hook (babel-plugin-react-compiler, applied by
   // Next only to files with JSX or hooks). On since 2026-10-05; the before/after census is in
-  // perf/README.md § Il census. Rollback is this line. A component it cannot compile is skipped whole
+  // doc/guide/velocita.md § Il census. Rollback is this line. A component it cannot compile is skipped whole
   // and in silence, and `npm run lint` does not see most of the causes:
   // __tests__/reactCompilerCoverage.test.ts is the map (AGENTS.md § Motion).
   reactCompiler: true,

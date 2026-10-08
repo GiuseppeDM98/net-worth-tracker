@@ -89,4 +89,4 @@ Three traps, each paid for on 2026-09-29:
   contains the restore rose on every page — measured on the Panoramica. The rows are the same rows several times:
   a window is a slice of the collection, not new data. Counting the keys of that record after a tour is part of
   giving a page a window (`doc/guide/cashflow.md § Expenses by window`); merging the slices into one list is not
-  written. The deferred items of the persister's retirement review (one persisted record holding every key, the demo never seen in a browser) are in `perf/README.md` § Revisit and `doc/guide/account-condiviso-demo.md` § Per-page blind spots.
+  written. The deferred items of the persister's retirement review (one persisted record holding every key, the demo never seen in a browser) are in `doc/guide/velocita.md` § Revisit and `doc/guide/account-condiviso-demo.md` § Per-page blind spots.

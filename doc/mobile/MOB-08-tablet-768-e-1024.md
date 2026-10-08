@@ -126,7 +126,7 @@ Tracciamento** (tab, «+» e «Aggiungi», Movimenti; `e2e/cashflow.tablet.spec.
   `false` sul server): la griglia della pagina monta ancora dopo i dati, sul client (nell'HTML c'è solo lo skeleton generico,
   con le sue colonne CSS); PERF-03 (in develop dal 2026-09-30) la monta con le cifre già lette appena auth e ripristino
   hanno risposto — un fotogramma senza righe accanto resta possibile, da annotare.
-- **PERF-04**: un'aperta va a tutta larghezza, nessun grafico pigro monta in una colonna da ~320 px. **PERF-14**: niente
+- **PERF-04**: un'aperta va a tutta larghezza, nessun grafico pigro monta in una colonna da ~320 px. **PERF-14** (in develop dal 2026-10-08): niente
   `layout` di Framer; si anima solo il pannello; `BottomNavigation` non si tocca. **PERF-12** (in develop dal 2026-10-06, AGENTS.md § Motion): pura + hook senza stato.
   **PERF-03** (in develop dal 2026-09-30): «Aggiornato alle…» sta nella riga dell'header (sotto `desktop:` al posto della
   descrizione, troncata a una riga), non nei 715 px della composizione. **`perf:serve`**: il censimento gira su :3200.
@@ -222,7 +222,7 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALI mentre scrivi codice
 - Leggi doc/mobile/README.md, la spec MOB-08 per intero, MOB-01 § 4 e MOB-02 § 4 (le API: non rinominarne nessuna);
   DESIGN.md § 5 e § Navigation, e il capitolo mobile se MOB-09 l'ha scritto (MAI rigenerarlo); MOB-03..07, PERF-01,
-  PERF-02 e PERF-14 devono essere chiuse
+  PERF-02 e PERF-14 sono ritirate (l'ultima il 2026-10-08)
 - Crea SESSION_NOTES.md; crea il branch dalla branch attiva PRIMA di editare
 
 Regole: nessun commit senza il mio OK; un branch e un commit; rispondi in italiano; le cinque domande di § 4.6 chiedimele
