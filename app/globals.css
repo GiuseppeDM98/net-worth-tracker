@@ -71,7 +71,8 @@
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
+  /* 0.546, not shadcn's 0.556: the reading line sits on `bg-muted` too, where 0.556 measured 4,34:1 (2026-10-08). */
+  --muted-foreground: oklch(0.546 0 0);
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
@@ -200,6 +201,16 @@ html[data-vt="theme"]::view-transition-old(root) {
   z-index: -1;
 }
 
+/* The page scene names three regions for good (page-main, page-header, page-verdict, set     */
+/* inline). A named element is snapshotted as its OWN group, outside `root`, so during a theme */
+/* change the circle revealed only the sidebar while the page merely cross-faded (2026-09-12   */
+/* to 2026-10-08, seen on the owner's tour). For the theme scene the names are switched off:   */
+/* `data-vt` is stamped before `startViewTransition`, so the snapshots see one `root`.         */
+/* Pinned by e2e/motion.layout.spec.ts.                                                        */
+html[data-vt="theme"] * {
+  view-transition-name: none !important;
+}
+
 /* Page scene — a navigation between two dashboard pages (DESIGN.md → The Page Scene).      */
 /* The shell (sidebar, bottom pill) is not part of the scene: the root swaps at once and   */
 /* only the named regions animate. The main region cross-fades with a 6px settle; the     */
@@ -237,6 +248,19 @@ html[data-vt="page"]::view-transition-group(page-header),
 html[data-vt="page"]::view-transition-group(page-verdict) {
   animation-duration: 0.32s;
   animation-timing-function: cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+/* The phone's bottom nav is shell, not scene: a group of its own only so that page-main's  */
+/* snapshots do not paint over it (BottomNavigation.tsx). The old image leaves at once and  */
+/* the new one is live — the active pill glides inside it. e2e/motion.layout.mobile.spec.ts. */
+html[data-vt="page"]::view-transition-group(bottom-nav),
+html[data-vt="page"]::view-transition-new(bottom-nav) {
+  animation: none;
+}
+
+html[data-vt="page"]::view-transition-old(bottom-nav) {
+  animation: none;
+  opacity: 0;
 }
 
 /* The two snapshots of a morphing region overlap while one fades out and the other in. */
@@ -303,8 +327,10 @@ html[data-vt="page"]::view-transition-image-pair(page-verdict) {
   --primary-foreground: oklch(1.0000 0 0);
   --secondary: oklch(0.6437 0.1019 187.3840);
   --secondary-foreground: oklch(1.0000 0 0);
-  --muted: oklch(0.5230 0.0283 219.1365);
-  --muted-foreground: oklch(0.6979 0.0159 196.7940);
+  /* The preset's muted (L 0.523) was a MID tone under a muted-foreground equal to the foreground
+     (2,01:1); the surface now sits below the card and the muted ink above the foreground (2026-10-08). */
+  --muted: oklch(0.36 0.0283 219.1365);
+  --muted-foreground: oklch(0.76 0.0159 196.7940);
   --accent: oklch(0.5808 0.1732 39.5003);
   --accent-foreground: oklch(1.0000 0 0);
   --destructive: oklch(0.7367 0.2064 27.1172);
@@ -392,7 +418,7 @@ html[data-vt="page"]::view-transition-image-pair(page-verdict) {
   --secondary: oklch(0.2542 0.0611 281.1423);
   --secondary-foreground: oklch(0.9513 0.0074 260.7315);
   --muted: oklch(0.2123 0.0522 280.9917);
-  --muted-foreground: oklch(0.6245 0.0500 278.1046);
+  --muted-foreground: oklch(0.63 0.0500 278.1046);
   --accent: oklch(0.8903 0.1739 171.2690);
   --accent-foreground: oklch(0.1649 0.0352 281.8285);
   --destructive: oklch(0.6535 0.2348 34.0370);
@@ -441,7 +467,7 @@ html[data-vt="page"]::view-transition-image-pair(page-verdict) {
   --secondary: oklch(0.8276 0.0752 74.4400);
   --secondary-foreground: oklch(0.4444 0.0096 73.6390);
   --muted: oklch(0.9363 0.0218 83.2637);
-  --muted-foreground: oklch(0.5534 0.0116 58.0708);
+  --muted-foreground: oklch(0.523 0.0116 58.0708);
   --accent: oklch(0.9000 0.0500 74.9889);
   --accent-foreground: oklch(0.4444 0.0096 73.6390);
   --destructive: oklch(0.4437 0.1613 26.8994);
@@ -610,8 +636,9 @@ html[data-vt="page"]::view-transition-image-pair(page-verdict) {
   --primary-foreground: oklch(1.0000 0 0);
   --secondary: oklch(0.8214 0.0720 249.3482);
   --secondary-foreground: oklch(0.3211 0 0);
-  --muted: oklch(0.8202 0.0213 91.6163);
-  --muted-foreground: oklch(0.5382 0 0);
+  /* The preset's beige muted (L 0.82) left its ink at 2,93:1; lighter surface, darker ink (2026-10-08). */
+  --muted: oklch(0.90 0.0213 91.6163);
+  --muted-foreground: oklch(0.49 0 0);
   --accent: oklch(0.6475 0.0642 117.4260);
   --accent-foreground: oklch(1.0000 0 0);
   --destructive: oklch(0.5880 0.2078 25.3313);
@@ -653,7 +680,7 @@ html[data-vt="page"]::view-transition-image-pair(page-verdict) {
   --secondary: oklch(0.3390 0.1793 301.6848);
   --secondary-foreground: oklch(0.9219 0 0);
   --muted: oklch(0.3867 0.025 270.0000);
-  --muted-foreground: oklch(0.7155 0 0);
+  --muted-foreground: oklch(0.761 0 0);
   --accent: oklch(0.6746 0.1414 261.3380);
   --accent-foreground: oklch(0.9219 0 0);
   --destructive: oklch(0.7521 0.2078 25.3313);

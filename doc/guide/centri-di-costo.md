@@ -7,6 +7,7 @@
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Centri di Costo**: Centri di Costo `components/cashflow/{CostCentersTab,CostCenterDetail,CostCenterDialog}.tsx` + `cost-centers/*`, pure `lib/utils/{costCenterSummary,costCenterNarrative,costCenterUtils,costCenterColors,costCenterLinking}.ts` (`firstFreeColorKey`/`mapColorSlotUsage` = who wears which slot; `buildLinkCandidates`/`buildLinkPlan` = bulk link with its undo, UI `cost-centers/{LinkExpensesDialog,UnlinkSeriesDialog}.tsx`), `costCenterStyles.ts` (`CHART_TICK_STYLE`), specs `e2e/cashflow.centri{,.mobile}.spec.ts` on `npm run e2e:seed:centri`
+- **Suites to run after a change here — Centri di costo** (moved from `AGENTS.md` § Commands on 2026-09-30): `costCenterSummary`, `costCenterNarrative` (+ `patrimonioNarrative` for the articles, `budgetNarrative` for `dayRef`), `costCenterUtils`, `costCenterColors` · **Browser** `e2e/cashflow.centri{,.mobile}.spec.ts` (own account, `npm run e2e:seed:centri`)
 
 ## Centri di Costo (`CostCentersTab`, `CostCenterDetail`, `components/cashflow/cost-centers/*`, `lib/utils/{costCenterSummary,costCenterNarrative,costCenterUtils,costCenterColors}.ts`)
 - **NO period axis, by decision (2026-08-23).** A project's cost is its whole cost: every figure is lifetime («in
@@ -110,9 +111,23 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   `(pointer: fine)`, `legend={false}` for the detail's one-series stack). It replaced the Recharts line chart of
   «Confronta l'andamento»; `costCenterStyles.ts` keeps only `CHART_TICK_STYLE`, which Storico, FIRE and Coast
   import — do not delete the file with the views' last Recharts chart.
-- **The query returns TWO numbers per center**, `spending` and `linkedCount`, and `deleteCostCenter` unlinks
-  *whatever is linked*, income included, by writing `costCenterId: null` (never deleting the row) — **any count
-  next to a destructive action must come from the same query the mutation runs.** The delete is the app's one
+- **The tab reads the WHOLE expense collection, declared** (2026-09-30): a centre is lifetime, so there is no window
+  to read — while Tracciamento, Divisione and Budget, the other Cashflow tabs, read one
+  (doc/guide/cashflow.md § Expenses by window). It shares the `useExpenses` list with Storico and Analisi; opened after
+  Tracciamento alone it reads the collection itself. **A delete and a rename are writes of EXPENSES** — the delete
+  unlinks the centre's rows, the rename rewrites their denormalised `costCenterName` — and until that day they
+  invalidated `costCenters.all` only, so Tracciamento kept the chip of a centre that was gone: `CostCentersTab` now
+  invalidates `expenses.all` with it (`invalidateWithRows`), as the detail's link changes always did.
+- **The rows per center come from the ONE expenses key, grouped in memory** (2026-09-29):
+  `groupExpensesByCostCenter(allExpenses, centers)` in `costCenterUtils.ts` gives every center TWO numbers,
+  `spending` (the rows with `amount < 0`, date ascending like the per-center query it replaced) and `linkedCount`
+  (every linked row, income included); a center without rows gets an EMPTY entry, a row naming a center the list
+  does not hold lands in none (pinned, seen red). Until then the tab ran one Firestore query per center (N+1) on
+  rows already in `useExpenses`, and the detail a query of its own — the detail now receives its rows from the
+  list and has no skeleton or error of its own (the list gated on the two keys, `useCostCenters` + `useExpenses`).
+  `deleteCostCenter` unlinks *whatever is linked*, income included, by writing `costCenterId: null` (never deleting
+  the row) — **any count next to a destructive action must come from the same read the mutation runs**, and
+  `linkedCount` is that read. The delete is the app's one
   mechanism, `useArmedDelete` (the view kept a hand-written copy until 2026-09-18): the armed button is an
   outline «Conferma» with `aria-pressed`, the consequence prints UNDER the action cluster in `text-destructive`
   on a line reserved from `desktop:` (arming used to push the grid down 20px), arm and disarm are both

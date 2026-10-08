@@ -1,6 +1,6 @@
 /**
  * Small-screen census, session 2026-09-26 (the throwaway that measured the baseline in doc/mobile/README.md § 3;
- * MOB-01 ports it into scripts/ as `npm run mobile:census`). Kept here as the reference, like doc/perf/reference/.
+ * MOB-01 ports it into scripts/ as `npm run mobile:census`). Kept here as the reference until then.
  *
  * For every dashboard surface (route or tab) at three small viewports — 390×844 phone, 768×1024
  * tablet portrait, 1024×768 tablet landscape — after a real login on the emulator dev server:
@@ -9,7 +9,7 @@
  *   - how many figures (euro / percent) the page prints, and how many sit above the fold
  *   - words, controls, charts, tabs; whether `main` overflows sideways
  *   - two screenshots: the first screen, and the whole page (main unclipped)
- * Structure only: timings are not measured here (dev server, doc/perf has the baseline).
+ * Structure only: timings are not measured here (dev server; the time baseline is doc/guide/velocita.md).
  *
  * Usage: node .tmp-mobile-measure.mjs [--email=mirror@example.com] [--base=http://localhost:3000]
  *        [--out=<dir>] [--viewports=390,768,1024] [--surfaces=panoramica,storico]

@@ -134,7 +134,8 @@ npm run dev:emulator     # the app on :3000 pointed at the emulators
 ```
 
 Prerequisites (a JDK) and the full guide: SETUP.md → Step 6. Port 3100 (`npm run dev:e2e`, isolated
-`.next-e2e` build dir) is the Playwright server; keep it separate from the tour server on :3000.
+`.next-e2e` build dir) is the Playwright server; keep it separate from the tour server on :3000. Port
+3200 (`npm run perf:serve`, the `.next-perf` production build) is the speed benchmark's (`doc/guide/velocita.md`).
 
 ### Obligation 5 — how to hand the owner an app already authenticated
 
@@ -142,6 +143,9 @@ The app **is** locally runnable; there is no fallback to declare.
 
 - **The tour server**: `npm run dev:emulator` → `http://localhost:3000`. It reads the emulators, so
   nothing seen there can touch production data.
+- **The tour starts at the owner's go, not when the work is ready** (owner, 2026-10-05): finish everything that needs
+  no eyes, say «pronto», and wait — the owner starts it when they can give it at least 20 minutes, because a session
+  left idle mid-tour is what the memory watchdog kills, emulators and dev server with it.
 - **One `next dev` at a time.** Stop the :3100 server before the tour: it exists for the suite only.
   On 2026-09-07 three background processes (the emulators and two `next dev`) plus Playwright and
   Vitest exhausted the machine's memory and the system killed all three; an emulator killed that
@@ -163,8 +167,10 @@ The app **is** locally runnable; there is no fallback to declare.
   page needs — `npm run e2e:seed` (Previdenza), `npm run e2e:seed:analisi` (Analisi),
   `npm run e2e:seed:coast` (Coast FIRE). Give the owner the **exact URL**, e.g.
   `http://localhost:3000/dashboard/pension`, not "go to Previdenza".
-- **The routes** are `/dashboard` plus `assets · cashflow · analisi · dividends · performance ·
-  history · allocation · pension · fire-simulations · hall-of-fame · assistant · settings`.
+- **The routes** are `/dashboard` plus `assets · cashflow · analisi · performance · history ·
+  allocation · pension · fire-simulations · hall-of-fame · assistant · settings` — the list of
+  `perf/routes.json`, held equal to `lib/constants/navigation.ts` by a test. Dividendi is not a route:
+  it is `/dashboard/cashflow?tab=dividends`.
 - **The owner's REAL data, without touching production — the standard since 2026-09-07**: `npm run mirror:seed --
   <production email>` reads the production account (service account from `.env.local`, `.get()` only, refuses to run
   with `FIRESTORE_EMULATOR_HOST`) and seeds it into the emulators under `mirror@example.com` / `test1234` (uid
@@ -195,14 +201,21 @@ The app **is** locally runnable; there is no fallback to declare.
   in-page detector's count before quoting it** (2026-09-18, Centri di Costo: 71 and 110 findings, the CLI on the same
   files 0): every Cashflow tab stays mounted and hidden (`forceMount`), so ~36 hits per scan were Tracciamento's; the
   9–11px «undersized text» is the enumerated ramp; the shell, the sidebar and the overlay's own yellow (`dark-glow
-  #ffba00` on a second injection) are in there too. Count what belongs to the surface, say the rest is not its. **A probe never opens a control that SPENDS** (2026-09-20): «Analizza con AI» starts its analysis on open, and an evidence pass told to «open and press Escape» made five real Anthropic calls. Read what a control does before scripting a click on it; on Rendimenti that dialog is opened once, to check the abort, or not at all. **A restart of the Claude Code session kills its background tasks** (emulators and dev server alike, 2026-09-14) and an emulator killed that way exports nothing: before the tour, check the ports and re-seed the mirror. **And the session's memory watchdog kills them too** (2026-09-14 evening, three times in a row on the 8 GB Mac right after a full Playwright run, with 37–67% of memory free): for the owner's tour, the emulators and the dev server are started from the OWNER's terminals, which the watchdog does not touch; the agent only re-seeds the mirror and reports the URLs. On 2026-09-20 the owner asked the agent to start them anyway, and both survived the session —
-  ~4 hours, two full Playwright runs, three restarts of the dev server: the watchdog is not a certainty. The rule stays (the
-  owner's terminals are the safe default); when the owner asks, start them, say they hang on the session, and check the
-  ports before every hand-over.
+  #ffba00` on a second injection) are in there too. Count what belongs to the surface, say the rest is not its. **A probe never opens a control that SPENDS** (2026-09-20): «Analizza con AI» starts its analysis on open, and an evidence pass told to «open and press Escape» made five real Anthropic calls. Read what a control does before scripting a click on it; on Rendimenti that dialog is opened once, to check the abort, or not at all. **The session's background tasks die with it**: a restart of the Claude Code session, or its memory watchdog (on the
+  8 GB Mac and on the 16 GB Windows laptop, even with memory free and even mid-suite), kills the emulators and the dev
+  server alike, and an emulator killed that way exports nothing. The safe default for the owner's tour: the emulators and
+  the dev server run in the OWNER's terminals, which the watchdog does not touch; the agent re-seeds the mirror, checks
+  the ports and reports the URLs, and does not restart a killed process on its own. When the owner asks the agent to
+  start them, say they hang on the session and check the ports before every hand-over; on Windows start each one DETACHED —
+  `Start-Process cmd.exe "/c npm run <script> > <scratchpad>\<name>.log 2>&1" -WindowStyle Hidden` — which is neither a
+  session task the watchdog reaps nor subject to the tools' 10-minute cap; run the full suite the same way and follow its
+  log with a monitor; keep only what the step needs up (no `perf:serve` beside the suite); at the end export the
+  emulators through the hub and stop every process by PID (doc/guide/e2e-emulatori.md § Emulator Exercise Scripts).
 - **Throwaway fixtures** follow the existing seed pattern (`scripts/seedEmulator.ts`,
   `scripts/seedAnalisiE2E.mts`, `scripts/seedPensionE2E.mts`, `scripts/seedCoastFireE2E.mts`) or
-  live as a throwaway `.mts` in the session scratchpad. `.mts`, never `.ts`: a `.ts` script is CJS
-  under tsx and has no top-level await (doc/guide/e2e-emulatori.md § Emulator Exercise Scripts).
+  live as a throwaway `scripts/*.tmp.mts` inside the repo (untracked, deleted in phase G) — never in
+  the session scratchpad, where `firebase-admin` does not resolve. `.mts`, never `.ts`: a `.ts` script
+  is CJS under tsx and has no top-level await (doc/guide/e2e-emulatori.md § Emulator Exercise Scripts).
 - **The authenticated browser already exists.** The Playwright projects park an authenticated
   `storageState` per fixture account (`e2e/.auth/{user,analisi,degraded}.json`, minted by the three
   `auth*.setup.ts` projects), so a script does not have to reproduce the login:
@@ -225,12 +238,26 @@ The app **is** locally runnable; there is no fallback to declare.
   `REGISTRATION_WHITELIST`. The positive/negative pair is the owner's document against another
   account's document — same collection, same shape.
 - **Phase G**: prefer deleting the few documents you created (`curl -X DELETE` with the same
-  `Bearer owner` header) over wiping `.emulator-data/`, which throws away the shared seed.
+  `Bearer owner` header) over wiping `.emulator-data/`, which throws away the shared seed. A
+  document with side effects — a transaction or trade, whose deletion re-runs the replay — is
+  deleted BY THE APP instead: a REST delete skips the replay (doc/guide/e2e-emulatori.md § Browser-Driven E2E (Playwright)).
 
 ### Where things are recorded
 
 - **Branches**: `develop` is the integration branch, `main` the default; a session branches off
-  whatever is active (usually `develop`) and merges into it by PR.
+  whatever is active (usually `develop`) and merges into it by PR. **The `doc/mobile/` specs land on `develop`,
+  one session at a time** (the fourteen `doc/perf/` specs did the same, 2026-09-28 → 2026-10-08). The 2026-09-28 rule
+  («they reach `main` together») was derogated by the owner on 2026-10-08: `develop` goes to `main` **after the last
+  PERF spec and the Known Issues session of 2026-10-08** — the Next 16.4 security fix ships with the perf work — and
+  the MOB specs follow in a second release. PERF-14 was retired on 2026-10-08: from that day the PR from `develop` to
+  `main` is the owner's to open.
+- **A spec is retired by a session of its own** (fourteen times, 2026-09-28 → 2026-10-08): the code is read against the
+  spec, every divergence gets a verdict, the lessons go home (AGENTS.md, the guide, a comment at the line, CLAUDE.md),
+  then the spec and every pointer to it go. A text-only defect found there is fixed in the retirement with `tsc`, lint
+  and Vitest, no Playwright; a runtime one only on the owner's call, with the area suite and the full Playwright; a
+  deferral nobody wrote goes where its theme lives (a guide's blind spots, the speed manual); a tour done in the
+  implementation session is recorded by the dossier's index. **`Draft Release Temp.md` never says a spec was retired**
+  (owner, 2026-10-08): its § Documentation line names what the guides now say, surface by surface.
 - **The outcome of a verification**: `SESSION_NOTES.md` during the session (untracked — delete it
   before the commit); it is folded into `CLAUDE.md` (the "Latest" entry) and `Draft Release Temp.md`
   before the PR. **Before the closing prompt it ends with one block** (owner, 2026-09-27): *Cosa* (what
@@ -269,7 +296,8 @@ The app **is** locally runnable; there is no fallback to declare.
   `target_fingerprint` are those of the machine that wrote it** (2026-09-14): `latest` accepts only the local
   absolute path and the local bytes (a Windows checkout is CRLF under `* text=auto`, so its fingerprint never
   matches a Mac's), while `trend` and `signals` match by slug. The four snapshots written on Windows were
-  rewritten to this Mac's path and LF fingerprint; the owner works from the Mac only.
+  rewritten to this Mac's path and LF fingerprint. The owner also works from a Windows laptop
+  (CLAUDE.md § Current Status), so close a snapshot on the machine that wrote it.
 - **Do not duplicate project conventions here.** Code and comment conventions live in
   `DEVELOPMENT_GUIDELINES.md` and `COMMENTS.md`, repo-wide patterns and traps in `AGENTS.md`, the
   per-area rules in `doc/guide/<tema>.md`, the aesthetic in `DESIGN.md`, environment and emulators

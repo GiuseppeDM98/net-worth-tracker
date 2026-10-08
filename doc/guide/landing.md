@@ -7,6 +7,7 @@
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Landing**: `app/page.tsx`, `components/landing/LandingPromiseTile.tsx`, pure `lib/utils/{landingNarrative,landingSampleData}.ts`
+- **Suites to run after a change here — Landing pubblica** (moved from `AGENTS.md` § Commands on 2026-09-30): **Parole** `landingNarrative` · **Invarianti del profilo** `landingSampleData` (+ `authNarrative` per la promessa condivisa e la precedenza registrazioni)
 
 ## Landing pubblica (`app/page.tsx`, `components/landing/LandingPromiseTile.tsx`, `lib/utils/{landingNarrative,landingSampleData}.ts`)
 

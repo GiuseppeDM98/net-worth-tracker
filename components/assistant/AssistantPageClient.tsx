@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
@@ -55,6 +55,7 @@ import type { TileSkeletonCell } from '@/lib/utils/tileGridSkeleton';
 import {
   AssistantChatContextType,
   AssistantMode,
+  AssistantMonthContextBundle,
   AssistantMonthSelectorValue,
   AssistantPromptChip,
   AssistantThread,
@@ -127,7 +128,17 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   // Reuses the React Query cache from Panoramica if the user visited it this session.
   const { data: overviewData, isError: overviewError } = useDashboardOverview(ownerId);
 
-  const { data: threads = [], isLoading: loadingThreads, error: threadsError } = useAssistantThreads(ownerId);
+  // One page of 50 at a time. The period auto-select below scans only the pages read:
+  // a period thread older than them is not found and the next question opens a new one
+  // (doc/guide/assistente.md § Per-page blind spots — the owner's call, 2026-10-05).
+  const {
+    data: threads = [],
+    isLoading: loadingThreads,
+    error: threadsError,
+    hasNextPage: hasMoreThreads,
+    isFetchingNextPage: loadingMoreThreads,
+    fetchNextPage: fetchMoreThreads,
+  } = useAssistantThreads(ownerId);
   const { data: threadDetail, isLoading: loadingThreadDetail, error: threadError } = useAssistantThread(
     selectedThreadId,
     ownerId
@@ -196,17 +207,25 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
     today.year,
     // history start year: the hook fetches it server-side; pass 0 as placeholder key
     0,
-    shouldFetchContext
+    shouldFetchContext,
+    // Already read with the memory above: sent along so the route does not read it again.
+    memory?.preferences.includeDummySnapshots
   );
 
   // Populate the context from the fetched bundle when no SSE bundle is present.
   // SSE bundle (set by the streaming hook) always takes priority — this effect
-  // only fires when contextBundle is still null.
-  useEffect(() => {
-    if (fetchedContextBundle && contextBundle === null) {
-      setContextBundle(fetchedContextBundle);
+  // only fires when contextBundle is still null. An Effect Event: the current bundle is read,
+  // never a trigger — only a newly fetched bundle runs it.
+  const adoptFetchedBundle = useEffectEvent((bundle: AssistantMonthContextBundle) => {
+    if (contextBundle === null) {
+      setContextBundle(bundle);
     }
-  }, [fetchedContextBundle]); // eslint-disable-line react-hooks/exhaustive-deps
+  });
+  useEffect(() => {
+    if (fetchedContextBundle) {
+      adoptFetchedBundle(fetchedContextBundle);
+    }
+  }, [fetchedContextBundle]);
 
   // Follow-up chips: shown after a completed assistant answer, derived purely
   // from the answer's mode + the period bundle. Hidden while streaming.
@@ -221,9 +240,11 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
 
   // Sync mode and period picker to the loaded thread so the UI stays coherent
   // with the conversation being shown. Runs when threadDetail resolves, but not
-  // during streaming (streamingMessages.length > 0) to avoid disrupting active input.
+  // during streaming (streamingMessages.length > 0) to avoid disrupting active input. The stream
+  // buffer is read through an Effect Event: it gates the sync, it never triggers one.
+  const hasStreamBuffer = useEffectEvent(() => streamingMessages.length > 0);
   useEffect(() => {
-    if (!threadDetail || streamingMessages.length > 0) {
+    if (!threadDetail || hasStreamBuffer()) {
       return;
     }
     // Deferred with setTimeout(0) so the sync happens outside the effect body
@@ -239,7 +260,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
       }
     }, 0);
     return () => clearTimeout(timer);
-  }, [threadDetail]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [threadDetail]);
 
   // Scroll to the bottom when messages are available, but not while the thread
   // is still loading — scrolling to an empty area before content arrives feels jarring.
@@ -282,6 +303,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
   const activeGoalsCount = activeItems.filter((item) => item.category === 'goal').length;
   const headerDescription = describeAssistantHeader({
     threads: threads.length,
+    moreThreads: hasMoreThreads,
     goals: activeGoalsCount,
     facts: activeItems.length - activeGoalsCount,
   });
@@ -462,6 +484,7 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
           isDemo={isDemo}
           isStreaming={isStreaming}
           threadsCount={threads.length}
+          hasMoreThreads={hasMoreThreads}
           activeMemoryCount={activeItems.length}
           description={headerDescription}
           memory={memory}
@@ -481,6 +504,9 @@ export function AssistantPageClient({ assistantConfigured }: AssistantPageClient
           onMemoryOpenChange={setIsMemoryOpen}
           threads={threads}
           loadingThreads={loadingThreads}
+          hasMoreThreads={hasMoreThreads}
+          loadingMoreThreads={loadingMoreThreads}
+          onLoadMoreThreads={() => void fetchMoreThreads()}
           selectedThreadId={selectedThreadId}
           isStreaming={isStreaming}
           isDeletingId={deleteThreadMutation.variables as string | undefined}

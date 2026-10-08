@@ -15,7 +15,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ChevronDown, MessageSquare, Settings } from 'lucide-react';
 import { useReducedMotion } from 'framer-motion';
-import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from '@/components/ui/charts/recharts';
 import type { Narrative } from '@/lib/utils/narrative';
 import type { PeriodMonth } from '@/lib/utils/storicoSummary';
 import { reconcileRemainder, describeLabor, describeLaborTaxes, describeLaborWindow, describeMonthlyDrivers, describeNotes, describeOtherIncome, describeYearlyVariation, DIVIDENDS_OUTSIDE_CASHFLOW, formatPeriodMonth, type LaborMetricsInput, type MonthlyDriverRow, type YearlyVariationRow } from '@/lib/utils/storicoNarrative';

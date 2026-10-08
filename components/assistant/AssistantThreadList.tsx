@@ -58,6 +58,10 @@ function formatThreadDate(date: Date): string {
 interface AssistantThreadListProps {
   threads: AssistantThread[];
   loadingThreads: boolean;
+  /** Another page of threads exists on the server (the list reads 50 at a time). */
+  hasMoreThreads: boolean;
+  loadingMoreThreads: boolean;
+  onLoadMore: () => void;
   selectedThreadId: string | undefined;
   isStreaming: boolean;
   isDeletingId: string | undefined;
@@ -180,10 +184,17 @@ function ThreadRow({ thread, isActive, isDeleting, isStreaming, onSelect, onDele
  * elsewhere, Escape or blur disarms). It kept a 3-second auto-disarm while the list lived in a
  * side sheet; inside a modal that timer is a WCAG 2.2.1 time limit AND a trap — Escape would
  * close the modal with the row still armed, which `ResponsiveModal` now refuses.
+ *
+ * The list is read 50 threads at a time: while a page is unread, «Mostra altre» closes
+ * the list and the modal's reading says the count is of the most recent ones — the 51st thread is
+ * one press away, never hidden in silence.
  */
 export function AssistantThreadList({
   threads,
   loadingThreads,
+  hasMoreThreads,
+  loadingMoreThreads,
+  onLoadMore,
   selectedThreadId,
   isStreaming,
   isDeletingId,
@@ -231,6 +242,20 @@ export function AssistantThreadList({
           />
         ))}
       </ul>
+      {hasMoreThreads && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="mt-3 h-11 w-full desktop:h-8 desktop:w-auto"
+          onClick={onLoadMore}
+          disabled={loadingMoreThreads}
+          aria-busy={loadingMoreThreads}
+        >
+          {loadingMoreThreads && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
+          Mostra altre
+        </Button>
+      )}
       <span className="sr-only" role="status" aria-live="polite">
         {announcement}
       </span>

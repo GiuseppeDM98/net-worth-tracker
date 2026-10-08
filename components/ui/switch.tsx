@@ -11,7 +11,11 @@ const Switch = React.forwardRef<
     className={cn(
       // In dark mode --primary is near-white (oklch 0.922); override to blue so the
       // ON state is clearly distinguishable from the background.
-      "peer inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary dark:data-[state=checked]:bg-blue-600 data-[state=unchecked]:bg-input",
+      "peer relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary dark:data-[state=checked]:bg-blue-600 data-[state=unchecked]:bg-input",
+      // The painted control stays 36×20 (shadcn's), the TARGET is 44×44 (AGENTS.md § Accessibility):
+      // a pseudo-element grows the button's hit box by 12px above and below and 4px on each
+      // side without moving a label beside it. It paints before the thumb, so it never covers it.
+      "before:absolute before:-inset-x-1 before:-inset-y-3 before:content-['']",
       className
     )}
     {...props}

@@ -35,15 +35,14 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Archive, ArchiveRestore, Link2, Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { queryKeys } from '@/lib/query/queryKeys';
 import type { CostCenter } from '@/types/costCenters';
 import type { Expense } from '@/types/expenses';
-import { assignExpensesToCostCenter, getExpensesForCostCenter } from '@/lib/services/costCenterService';
+import { assignExpensesToCostCenter } from '@/lib/services/costCenterService';
 import { buildUnlinkPlan, seriesKeyOf, seriesRowsOf, type LinkPlan } from '@/lib/utils/costCenterLinking';
 import { describeWriteError } from '@/lib/utils/dialogNarrative';
 import { buildCategoryComposition, buildSubCategoryComposition } from '@/lib/utils/costCenterUtils';
@@ -79,10 +78,6 @@ import { useArmedDelete } from '@/lib/hooks/useArmedDelete';
 import { Button } from '@/components/ui/button';
 import { PageVerdict } from '@/components/ui/page-verdict';
 import { TILE_CELL_CLASS } from '@/components/ui/tile';
-import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
-import type { TileSkeletonCell } from '@/lib/utils/tileGridSkeleton';
-import { ErrorNotice } from '@/components/ui/error-notice';
-import { describeReadFailure } from '@/lib/utils/statesNarrative';
 import { CostoTile } from './cost-centers/tiles/CostoTile';
 import { CategorieTile } from './cost-centers/tiles/CategorieTile';
 import { CicloTile } from './cost-centers/tiles/CicloTile';
@@ -93,25 +88,15 @@ import { UnlinkSeriesDialog, type UnlinkSeriesRequest } from './cost-centers/Unl
 import { ExpenseDialog } from '@/components/expenses/ExpenseDialog';
 
 /** Stable identity for the empty case: a `= []` default would defeat every memo below. */
-const EMPTY_EXPENSES: Expense[] = [];
 const EMPTY_KEYS: ReadonlySet<string> = new Set();
 const TRAILING_MONTHS = 12;
-
-/** The detail's own grid, so the loading state has the proportions of what replaces it. */
-const SKELETON_CELLS: TileSkeletonCell[] = [
-  { span: 5, rows: 2, lines: 8 },
-  { span: 4, lines: 5 },
-  { span: 3, lines: 4 },
-  { span: 7, lines: 6 },
-  { span: 12, lines: 6 },
-];
 
 interface CostCenterDetailProps {
   costCenter: CostCenter;
   /** Rows linked to this center, income included — the delete cascade's count. */
   linkedExpenseCount: number;
-  /** The list's already-loaded spending rows, seeding the query so the view paints at once. */
-  initialExpenses?: Expense[];
+  /** The center's spending rows (`amount < 0`), grouped by the list from the one expenses key. */
+  expenses: Expense[];
   onBack: () => void;
   onEdit: (costCenter: CostCenter) => void;
   onDelete: (costCenter: CostCenter) => void;
@@ -122,31 +107,19 @@ interface CostCenterDetailProps {
 export function CostCenterDetail({
   costCenter,
   linkedExpenseCount,
-  initialExpenses,
+  expenses: allExpenses,
   onBack,
   onEdit,
   onDelete,
   onArchiveToggle,
   isDemo = false,
 }: CostCenterDetailProps) {
-  const { user } = useAuth();
   const { ownerId } = useActiveAccount();
   const chartColors = useChartColors();
   const queryClient = useQueryClient();
 
-  // Shares the ['cost-centers', userId] prefix invalidated by ExpenseDialog, so the detail
-  // stays in sync with expense mutations elsewhere. placeholderData, NOT initialData: the
-  // global staleTime would turn a seeded query into one that never fetches.
-  const { data, isLoading: loading, isError } = useQuery({
-    queryKey: queryKeys.costCenters.expenses(ownerId ?? '', costCenter.id),
-    enabled: !!user && !!ownerId,
-    queryFn: async () => {
-      const rows = await getExpensesForCostCenter(ownerId!, costCenter.id);
-      return rows.filter((e) => e.amount < 0);
-    },
-    placeholderData: initialExpenses,
-  });
-  const allExpenses = data ?? EMPTY_EXPENSES;
+  // The rows arrive from the list, already grouped from the expenses key (2026-09-29): a link or an
+  // unlink invalidates `expenses.all` and the detail re-reads with the list. No query of its own.
 
   // Evaluated once per mount — the figures read the day the view was opened.
   const now = useMemo(() => new Date(), []);
@@ -191,12 +164,9 @@ export function CostCenterDetail({
 
   /** Writes a plan and offers its undo in the outcome toast: «Annulla» is the plan's other side, not a guess. */
   const applyPlan = async (plan: LinkPlan, outcome: string) => {
-    try {
-      await assignExpensesToCostCenter(plan.writes);
-    } finally {
-      // Also on failure: past one batch a run can stop half-way, and the lists must show what IS.
-      await refreshAfterLinkChange();
-    }
+    // Also on failure: past one batch a run can stop half-way, and the lists must show what IS.
+    // `.finally` rather than try/finally keeps the component compilable by the React Compiler.
+    await assignExpensesToCostCenter(plan.writes).finally(() => refreshAfterLinkChange());
     toast.success(outcome, {
       action: {
         label: 'Annulla',
@@ -207,9 +177,9 @@ export function CostCenterDetail({
           } catch (error) {
             console.error('Error undoing a cost center link change:', error);
             toast.error(`L'annullamento non è riuscito. ${describeWriteError(error)}`);
-          } finally {
-            await refreshAfterLinkChange();
           }
+          // After the try/catch, not in a finally: the React Compiler does not compile try/finally.
+          await refreshAfterLinkChange();
         },
       },
     });
@@ -225,9 +195,8 @@ export function CostCenterDetail({
     } catch (error) {
       console.error('Error unlinking expenses from cost center:', error);
       toast.error(`${rows.length === 1 ? 'La spesa non è stata scollegata' : 'Le spese non sono state scollegate'}. ${describeWriteError(error)}`);
-    } finally {
-      setUnlinking(false);
     }
+    setUnlinking(false);
   };
 
   const askUnlinkSeries = (expense: Expense) => {
@@ -359,18 +328,9 @@ export function CostCenterDetail({
         </p>
       </div>
 
-      {loading ? (
-        <TileGridSkeleton verdict={false} cells={SKELETON_CELLS} />
-      ) : isError ? (
-        <ErrorNotice
-          className="max-w-[920px]"
-          notice={describeReadFailure({
-            consequence: 'Le spese collegate a questo centro non sono state lette: il costo del progetto non è calcolabile.',
-            untouched: 'Il centro e le spese registrate non sono stati toccati.',
-          })}
-        />
-      ) : (
-        /* ── Tile grid ─────────────────────────────────────────────────────────── */
+      {/* ── Tile grid — the rows arrived with the list, which already waited and gated on
+          the two reads (loading and failure are the list's states, not the detail's) ── */}
+      {(
         <div className="grid grid-cols-1 gap-3 tablet:grid-cols-2 desktop:grid-cols-12">
           <div className={cn(TILE_CELL_CLASS, 'order-1 tablet:col-span-2 desktop:order-none desktop:col-span-5 desktop:row-span-2')}>
             <CostoTile

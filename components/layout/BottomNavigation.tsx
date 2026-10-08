@@ -9,8 +9,26 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { SecondaryMenuDrawer } from './SecondaryMenuDrawer';
 import { isNavItemActive } from '@/lib/utils/navUtils';
 import { primaryNav, secondaryHrefs } from '@/lib/constants/navigation';
+import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
+
+/**
+ * Where the pill is on screen: the complement of `desktop:hidden max-desktop:landscape:hidden`
+ * on its container. Kept beside those classes — change one, change the other.
+ */
+const PILL_VISIBLE_QUERY = '(max-width: 1439px) and (orientation: portrait)';
+const ACTIVE_PILL_LAYOUT_ID = 'bottom-nav-active-pill';
 
 const BOTTOM = 'calc(env(safe-area-inset-bottom, 0px) + 12px)';
+/**
+ * The container has its own `view-transition-name`: the page scene names `<main>` (`page-main`),
+ * and a named region is painted in a layer ABOVE the unnamed root — on a phone `<main>` runs under
+ * the pill, so for the whole scene the page's snapshots covered it, and the pill vanished and
+ * popped back on every navigation (2026-10-08, the owner's tour). As its own group, later in paint
+ * order than `<main>`, it stays on top; `globals.css` gives it no animation in the page scene. The
+ * full-width container, not the pill, carries the name: its box never moves, so the group never
+ * morphs while the pill glides inside it. Not rendered at 1440 (`desktop:hidden`), so not captured.
+ */
+const PILL_CONTAINER_STYLE = { bottom: BOTTOM, viewTransitionName: 'bottom-nav' };
 const PILL_STYLE = {
   background: 'var(--sidebar)',
   border: '1px solid var(--sidebar-border)',
@@ -54,6 +72,13 @@ export function BottomNavigation() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   // Framer Motion's hook reads prefers-reduced-motion from the OS.
   const prefersReducedMotion = useReducedMotion();
+  // The nav stays mounted everywhere (it is in the prerendered shell, hidden by CSS), but its
+  // layout animations run only where it is visible: a `layout` or `layoutId` element is MEASURED
+  // at every update even under `display: none`, so at 1440 each pathname change paid for a pill
+  // nobody sees (2026-10-08). `false` on the server and during hydration — no layout animation in the
+  // first frame — then the real value.
+  const isPillVisible = useMediaQuery(PILL_VISIBLE_QUERY);
+  const activePillLayoutId = isPillVisible ? ACTIVE_PILL_LAYOUT_ID : undefined;
 
   const isAltroActive = secondaryHrefs.some(
     (href) => pathname === href || pathname.startsWith(href + '/')
@@ -71,12 +96,16 @@ export function BottomNavigation() {
           desktop sidebar <nav> when a screen reader lists nav regions. */}
       <div
         className="fixed z-30 left-0 right-0 desktop:hidden max-desktop:portrait:flex max-desktop:landscape:hidden items-center justify-center"
-        style={{ bottom: BOTTOM }}
+        style={PILL_CONTAINER_STYLE}
       >
         <div className="flex items-center gap-2">
-          {/* Nav pill — layout-animates its position when the "+" FAB appears */}
+          {/* Nav pill — layout-animates its position when the "+" FAB appears (where it is visible).
+              Remounted when the gate flips: Framer sets up its layout measuring when the element
+              MOUNTS, so a `layout` turned on afterwards (the media query answers `true` only after
+              hydration) never animated — the pill jumped (seen in e2e/motion.layout.mobile.spec.ts). */}
           <motion.nav
-            layout
+            key={isPillVisible ? 'pill-animated' : 'pill-static'}
+            layout={isPillVisible}
             aria-label="Navigazione principale"
             className="flex rounded-full"
             style={PILL_STYLE}
@@ -99,7 +128,7 @@ export function BottomNavigation() {
                   >
                     {isActive && (
                       <motion.div
-                        layoutId="bottom-nav-active-pill"
+                        layoutId={activePillLayoutId}
                         className="absolute inset-0 rounded-full bg-[var(--sidebar-foreground)]/[0.12]"
                         transition={pillTransition}
                       />
@@ -125,7 +154,7 @@ export function BottomNavigation() {
               >
                 {isAltroActive && (
                   <motion.div
-                    layoutId="bottom-nav-active-pill"
+                    layoutId={activePillLayoutId}
                     className="absolute inset-0 rounded-full bg-[var(--sidebar-foreground)]/[0.12]"
                     transition={pillTransition}
                   />

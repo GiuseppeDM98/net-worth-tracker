@@ -10,6 +10,7 @@
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Cashflow › Budget**: Budget `components/cashflow/BudgetTab.tsx` + `components/cashflow/budget/*` (`BudgetTrack`, `BudgetDeleteButton`, `BudgetItemDialog`), pure `lib/utils/{budgetSummary,budgetNarrative,budgetUtils,budgetHistory}.ts`, specs `e2e/cashflow.budget{,.mobile}.spec.ts`, `lib/hooks/{useBudgetConfig,useBudgetHistory}.ts`, `lib/server/budgetHistoryService.ts` (cron phase 8), collections `budgets/{userId}`, `budgetHistory/{userId}/months/{YYYY-MM}`
+- **Suites to run after a change here — Cashflow › Budget** (moved from `AGENTS.md` § Commands on 2026-09-30): `budgetUtils`, `budgetSummary`, `budgetNarrative` (+ `patrimonioNarrative` for the articles, `weeklyBudgetEmailService`, `monthlyEmailService`)
 
 ## Cashflow › Budget (`components/cashflow/BudgetTab.tsx`, `components/cashflow/budget/*`, `lib/utils/{budgetUtils,budgetSummary,budgetNarrative}.ts`, `lib/hooks/useBudgetConfig.ts`)
 - **Opt-in**: `reconcileBudgetItems` only refreshes denormalized names and drops orphans, never auto-creates.
@@ -18,6 +19,16 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   enter `validateBudgetAllocation`. The **overall** budget is a ceiling on ALL month spending, while the validator sums
   only monthly expense *category* budgets. **Auto-save is paused while the allocation is invalid**, and the status
   («Salvato» / «Oltre il tetto: non salvato») is the Per categoria tile's aside (`role="status"`), not a bar of its own.
+- **The tab reads its own window** (2026-09-30, `budgetWindow` in `lib/utils/expenseWindows.ts`; doc/guide/cashflow.md
+  § Expenses by window): from the older of January and the first of the six trailing months, to DECEMBER — the annual
+  budgets sum the Italian year whole, the rows already in the calendar included, and from January to May the six bars
+  reach into last year (in March the window starts in October; `BUDGET_HISTORY_MONTHS` is the one constant behind
+  `trailingMonthKeys` and the window). The tab calls `useExpensesInRange` itself, with its own clock, and gates on it
+  beside the page's categories. **The dialog's suggested amount reads years of its own**
+  (`budgetSuggestionWindow`: `getDefaultAmount` wants WHOLE years from the floor to last year — the months of last
+  year the tab's window holds in spring would read as a year's total): `BudgetItemDialog` reads them from the moment
+  it opens for a new budget and fills the empty amount when they are in, a beat after the category is picked at
+  most; a later pick drops an earlier answer, and an edit reads nothing.
 - **NO period axis.** A budget is always read on the current Italian month (`now` once per mount); the annual budgets
   are year-to-date and get their own tile whose aside names the window («2026, da gennaio · anno al 64%») — the
   Off-Axis Tile Rule — never a row in the monthly list.

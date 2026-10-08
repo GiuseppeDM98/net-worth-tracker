@@ -49,6 +49,17 @@ interface AssetEntry {
   totalValue: number;
 }
 
+/**
+ * Throws the server's message when the snapshot was refused. Module-level so the component holds
+ * no `throw` inside its try: the React Compiler cannot lower one there.
+ */
+async function assertSnapshotCreated(response: Response): Promise<void> {
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Errore durante la creazione dello snapshot');
+  }
+}
+
 export function CreateManualSnapshotModal({
   open,
   onOpenChange,
@@ -204,23 +215,20 @@ export function CreateManualSnapshotModal({
         body: JSON.stringify(snapshot),
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Errore durante la creazione dello snapshot');
-      }
+      await assertSnapshotCreated(response);
 
       toast.success('Snapshot creato');
       onOpenChange(false);
-      onSuccess?.();
+      if (onSuccess) onSuccess();
 
       // Reset form
       resetForm();
     } catch (error) {
       console.error('Error creating manual snapshot:', error);
       setStatus({ phase: 'error', message: describeWriteError(error) });
-    } finally {
-      setIsCreating(false);
     }
+    // After the try/catch, not in a `finally`: the React Compiler cannot lower try/finally.
+    setIsCreating(false);
   };
 
   const resetForm = () => {

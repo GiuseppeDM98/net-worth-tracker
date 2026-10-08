@@ -35,20 +35,16 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { useAssets } from '@/lib/hooks/useAssets';
 import { calculateAssetValue } from '@/lib/services/assetService';
-import { getSettings } from '@/lib/services/assetAllocationService';
+import { useSettings } from '@/lib/hooks/useSettings';
+import { useSnapshots } from '@/lib/hooks/useSnapshots';
 import { usePensionContributions, useDeletePensionContribution } from '@/lib/hooks/usePensionContributions';
 import { derivePensionContributionYears, resolveActivePensionYear } from '@/lib/utils/pensionContributions';
 import { calculateProgressiveTax, normalizeCoastFireTaxBrackets } from '@/lib/services/fireService';
-import { getUserSnapshots } from '@/lib/services/snapshotService';
-import { queryKeys } from '@/lib/query/queryKeys';
-import type { MonthlySnapshot } from '@/types/assets';
-import type { Settings } from '@/types/settings';
 import { getItalyYear } from '@/lib/utils/dateHelpers';
 import {
   summarizeFundToday,
@@ -116,18 +112,10 @@ export function PensionOverview() {
   const isDemo = useDemoMode();
   const { data: assets = [], isLoading: assetsLoading, isError: assetsError } = useAssets(ownerId);
   const { data: contributions = [], isLoading: contributionsLoading, isError: contributionsError } = usePensionContributions(ownerId);
-  const { data: settings, isLoading: settingsLoading, isError: settingsError } = useQuery<Settings | null>({
-    queryKey: ['settings', ownerId],
-    queryFn: () => getSettings(ownerId!),
-    enabled: !!ownerId,
-  });
+  const { data: settings, isLoading: settingsLoading, isError: settingsError } = useSettings(ownerId);
   // The fund's return is read from the monthly snapshots: the only place its value is frozen
   // month by month (the asset carries only the current value).
-  const { data: snapshots = [], isLoading: snapshotsLoading, isError: snapshotsError } = useQuery<MonthlySnapshot[]>({
-    queryKey: queryKeys.snapshots.all(ownerId || ''),
-    queryFn: () => getUserSnapshots(ownerId!),
-    enabled: !!ownerId,
-  });
+  const { data: snapshots = [], isLoading: snapshotsLoading, isError: snapshotsError } = useSnapshots(ownerId);
   const deleteMutation = useDeletePensionContribution(ownerId || '');
 
   // One `now` per mount: the live overlay's month, the digest's window and the year axis agree.
@@ -177,14 +165,17 @@ export function PensionOverview() {
   const ledger = useMemo(() => summarizeLedger(contributions, funds, assets, activeYear), [contributions, funds, assets, activeYear]);
 
   // ─── The words ───────────────────────────────────────────────────────────────
-  const failures: PensionLoadFailure[] = [
-    ...(contributionsError ? (['contributions'] as const) : []),
-    ...(snapshotsError ? (['snapshots'] as const) : []),
-  ];
+  // Memoized on its two booleans, the verdict's real inputs, so the verdict below can list it.
+  const failures = useMemo<PensionLoadFailure[]>(
+    () => [
+      ...(contributionsError ? (['contributions'] as const) : []),
+      ...(snapshotsError ? (['snapshots'] as const) : []),
+    ],
+    [contributionsError, snapshotsError],
+  );
   const verdict = useMemo(
     () => (failures.length > 0 ? buildPensionLoadErrorVerdict(failures) : buildPensionVerdict({ blocks, taxYear: activeYear, currentYear })),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `failures` is rebuilt every render; its two booleans are the real inputs.
-    [contributionsError, snapshotsError, blocks, activeYear, currentYear],
+    [failures, blocks, activeYear, currentYear],
   );
 
   // ─── Delete: reverses the value/transfer effect (invariant #5) ───────────────

@@ -49,4 +49,10 @@ export const DASHBOARD_OVERVIEW_SUMMARY_COLLECTION = 'dashboardOverviewSummaries
 // the price difference, no commission on either side (`taxableGainEur`, lib/utils/saleTax.ts):
 // a stored settembre would keep 4089 €.
 export const DASHBOARD_OVERVIEW_SOURCE_VERSION = 20;
-export const DASHBOARD_OVERVIEW_SUMMARY_TTL_MS = 5 * 60 * 1000;
+// The materialized summary is stale when invalidated, of another source version, computed on an
+// earlier Italian DAY (the payload is the day's: the current/previous month and the month-end
+// projection are read from «today»), or older than this. Every mutation of an input already
+// invalidates it, so the age is only the safety net for an input no invalidation sees — the same
+// 6 h as `performance-cache`. Until 2026-10-03 it was 5 minutes, which made almost every
+// opening of the app a full recompute.
+export const DASHBOARD_OVERVIEW_SUMMARY_TTL_MS = 6 * 60 * 60 * 1000;

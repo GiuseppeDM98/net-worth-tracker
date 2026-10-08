@@ -19,6 +19,7 @@
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
+import { INSTRUMENT_PROFILE_CACHE_COLLECTION, instrumentProfileFixtureDocuments } from './instrumentProfileFixtures';
 
 if (!process.env.FIRESTORE_EMULATOR_HOST) {
   console.error(
@@ -242,7 +243,10 @@ async function seedCategoriesAndExpenses(): Promise<void> {
         categoryName: e.categoryName,
         amount: e.amount,
         currency: 'EUR',
-        date: new Date(now.getFullYear(), now.getMonth(), 5),
+        // The 5th, or today when the month is younger than that: a row dated after «today» is a
+        // FUTURE row, and from the 1st to the 4th a fresh seed left FIRE, Coast and Storico's Driver
+        // with no spending to date (five specs red on 2026-10-04, on develop too).
+        date: new Date(now.getFullYear(), now.getMonth(), Math.min(5, now.getDate())),
         createdAt: now,
         updatedAt: now,
       })
@@ -293,6 +297,17 @@ async function seedSnapshots(): Promise<void> {
   console.info(`  ✓ ${snapshots.length} monthly snapshots`);
 }
 
+/**
+ * A fresh Yahoo profile for every quoted ticker of the assets above, so the Esposizione tile
+ * never sends the route to the network (`scripts/instrumentProfileFixtures.ts`; the Playwright
+ * global setup re-stamps them on every run, since an empty answer lives 24 hours).
+ */
+async function seedInstrumentProfiles(): Promise<void> {
+  const documents = instrumentProfileFixtureDocuments(now);
+  await Promise.all(documents.map((fixture) => db.collection(INSTRUMENT_PROFILE_CACHE_COLLECTION).doc(encodeURIComponent(fixture.ticker)).set(fixture.data)));
+  console.info(`  ✓ ${documents.length} instrument profiles (${documents.map((fixture) => fixture.ticker).join(', ')})`);
+}
+
 async function main(): Promise<void> {
   console.info(`\nSeeding emulator (project ${PROJECT_ID}) …`);
   await seedAuthUser();
@@ -300,6 +315,7 @@ async function main(): Promise<void> {
   await seedSettings();
   await seedCategoriesAndExpenses();
   await seedSnapshots();
+  await seedInstrumentProfiles();
   console.info('\n✅ Seed complete.');
   console.info('   Login:  ' + TEST_EMAIL + '  /  ' + TEST_PASSWORD);
   console.info('   Open the app with `npm run dev:emulator`, then log in with the above.');

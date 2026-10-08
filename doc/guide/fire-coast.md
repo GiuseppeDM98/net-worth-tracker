@@ -12,8 +12,8 @@
   difference (surplus) and the savings pace below; the parity test pins that every euro printed is one of the
   projection's own numbers (the savings figure included).
 - **«Non ancora» has a «quando»** (2026-09-23, the tab's first critique): `resolveCoastPace(projectionData, annualSavings,
-  realReturnRate, reached)` adds the Calcolatore's savings — `getAnnualCashflowData().annualSavings`, read through the
-  SAME query key `['annualCashflowData', ownerId]`, kept constant in today's euro — to the projection's OWN base series
+  realReturnRate, reached)` adds the Calcolatore's savings — `computeAnnualCashflowData(expenses, now).annualSavings`,
+  computed from the SAME expenses key (the FIRE page's recent window since 2026-09-30, `fireWindows` — `useExpenses` from 2026-09-29 until then), kept constant in today's euro — to the projection's OWN base series
   and names the first year the sum clears the Coast number of THAT year, `fireNumberTarget(t) / (1+r)^(Y−t)` (the
   plotted target already steps with the fund, so the curve does too). From that year the series coasts and lands on
   the requirement at the target age by construction — that is the dotted line in the base slot on the chart, with a
@@ -58,7 +58,7 @@
   in poi». The Traguardo footer names the gross line («472.977 € con il fondo
   pensione dentro») only when the unlock is on the plot; an unlock past the target age is said as such.
 - **The tax on withdrawals is in the Coast number too** (2026-09-24, `calculateCoastFIREProjection(…, withdrawalTax)` →
-  `calculateCoastFIREMetrics` and the needs' `portfolioNeedMultiplier`, doc/guide/fire.md § the tax rule): each scenario reads the
+  `calculateCoastFIREMetrics` and the needs' `portfolioNeedMultiplier`, doc/guide/fire.md § The tax on withdrawals is ONE rule): each scenario reads the
   gain share on the capital grown to the target at its OWN real return — a coaster adds no basis — so the required capital at the target
   is `max(E − P, 0) / (1 − g·τ)` per year and at steady state, and the Coast number today discounts it as before. The tab reads the same
   profile as the Calcolatore (FIRE-eligible assets minus the locked funds) and the Ipotesi line declares it («tasse sui prelievi comprese

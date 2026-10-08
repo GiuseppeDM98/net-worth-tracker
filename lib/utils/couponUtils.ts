@@ -20,6 +20,7 @@ import {
   CouponRateTier,
   IndexationCoefficientEntry,
 } from '@/types/assets';
+import { stripFloatNoise } from '@/lib/utils/floatNoise';
 
 /**
  * Returns the number of coupon payments per year for the given frequency.
@@ -170,7 +171,9 @@ export function calculateCouponPerShare(
   nominalValue: number,
   frequency: CouponFrequency
 ): number {
-  return (couponRate / 100 / getPeriodsPerYear(frequency)) * nominalValue;
+  // Stored on the dividend and shown in its form: the decimal coupon, not its binary neighbour
+  // (1,3% semiannual on 1.000 € is 6.500000000000001 raw — lib/utils/floatNoise.ts).
+  return stripFloatNoise((couponRate / 100 / getPeriodsPerYear(frequency)) * nominalValue);
 }
 
 /**
@@ -420,7 +423,7 @@ export function resolveCoupon(
     const coefficient = announced ?? latestIndexationCoefficient(bondDetails.indexationCoefficients, paymentDate) ?? 1;
     return {
       ...base,
-      perShare: fixedPerShare * coefficient,
+      perShare: stripFloatNoise(fixedPerShare * coefficient),
       indexationCoefficient: coefficient,
       isProvisional: announced === null,
     };
@@ -437,7 +440,7 @@ export function resolveCoupon(
   const inflationPerShare = (flooredInflation / 100) * nominalValue;
   return {
     ...base,
-    perShare: fixedPerShare + inflationPerShare,
+    perShare: stripFloatNoise(fixedPerShare + inflationPerShare),
     inflationPeriodRate: flooredInflation,
     isProvisional: false,
   };

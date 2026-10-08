@@ -64,8 +64,8 @@ import { resolvePerformanceBase } from '@/lib/utils/performanceBase';
 import { describeMeasurementBase } from '@/lib/utils/performanceNarrative';
 import { getAnnualExpenses, getAnnualIncome, calculateFIREMetrics } from './fireService';
 import { filterExpensesByTime, DEFAULT_CASHFLOW_HISTORY_START_YEAR } from '@/lib/utils/pdfTimeFilters';
-import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { calculatePerformanceForPeriod } from './performanceService';
+import { fetchPerformanceYields } from './performanceYieldsService';
 
 // Cached expenses to avoid duplicate fetching
 let cachedExpenses: Expense[] | null = null;
@@ -621,38 +621,17 @@ async function preparePerformanceData(
       return null;
     }
 
-    // Fetch YOC and Current Yield metrics via API routes
-    // These require server-side Firebase Admin SDK for asset access
-    const startDate = metrics.startDate.toISOString();
-    const dividendEndDate = metrics.dividendEndDate.toISOString();
-    const numberOfMonths = metrics.numberOfMonths;
-
-    // Parallel fetch for performance optimization
-    const [yocResponse, currentYieldResponse] = await Promise.all([
-      authenticatedFetch(`/api/performance/yoc?userId=${userId}&startDate=${startDate}&dividendEndDate=${dividendEndDate}&numberOfMonths=${numberOfMonths}`),
-      authenticatedFetch(`/api/performance/current-yield?userId=${userId}&startDate=${startDate}&dividendEndDate=${dividendEndDate}&numberOfMonths=${numberOfMonths}`)
-    ]);
-
-    // Merge YOC metrics if API call successful
-    if (yocResponse.ok) {
-      const yocData = await yocResponse.json();
-      metrics.yocGross = yocData.yocGross;
-      metrics.yocNet = yocData.yocNet;
-      metrics.yocDividendsGross = yocData.yocDividendsGross;
-      metrics.yocDividendsNet = yocData.yocDividendsNet;
-      metrics.yocCostBasis = yocData.yocCostBasis;
-      metrics.yocAssetCount = yocData.yocAssetCount;
-    }
-
-    // Merge Current Yield metrics if API call successful
-    if (currentYieldResponse.ok) {
-      const currentYieldData = await currentYieldResponse.json();
-      metrics.currentYield = currentYieldData.currentYield;
-      metrics.currentYieldNet = currentYieldData.currentYieldNet;
-      metrics.currentYieldDividends = currentYieldData.currentYieldDividends;
-      metrics.currentYieldDividendsNet = currentYieldData.currentYieldDividendsNet;
-      metrics.currentYieldPortfolioValue = currentYieldData.currentYieldPortfolioValue;
-      metrics.currentYieldAssetCount = currentYieldData.currentYieldAssetCount;
+    // YOC and current yield need the Admin SDK: the same route Rendimenti asks, with the report's
+    // one window. A yield that cannot be read leaves the report without it (the metrics above
+    // stand), as the page does.
+    const REPORT_YIELD_KEY = 'report';
+    try {
+      const yieldsByKey = await fetchPerformanceYields(userId, [
+        { key: REPORT_YIELD_KEY, startDate: metrics.startDate, dividendEndDate: metrics.dividendEndDate, numberOfMonths: metrics.numberOfMonths },
+      ]);
+      Object.assign(metrics, yieldsByKey[REPORT_YIELD_KEY]);
+    } catch (error) {
+      console.warn('Dividend yields not read for the PDF:', error);
     }
 
     // Generate period label for display

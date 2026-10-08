@@ -1,0 +1,731 @@
+{
+  "all": {
+    "success": true,
+    "stats": {
+      "period": {
+        "totalGross": 156.1,
+        "totalTax": 31.8625,
+        "totalNet": 124.23750000000001,
+        "count": 5
+      },
+      "allTime": {
+        "totalGross": 156.1,
+        "totalTax": 31.8625,
+        "totalNet": 124.23750000000001,
+        "count": 5
+      },
+      "averageYield": 1.3511450381679388,
+      "upcomingTotal": 73.9275,
+      "byAsset": [
+        {
+          "assetTicker": "IT0005547408",
+          "assetName": "BTP 2031",
+          "totalNet": 54.6875,
+          "count": 1
+        },
+        {
+          "assetTicker": "ENI.MI",
+          "assetName": "Eni",
+          "totalNet": 37.739999999999995,
+          "count": 2
+        },
+        {
+          "assetTicker": "SPM.MI",
+          "assetName": "Saipem",
+          "totalNet": 29.6,
+          "count": 1
+        },
+        {
+          "assetTicker": "AAPL",
+          "assetName": "Apple",
+          "totalNet": 2.21,
+          "count": 1
+        }
+      ],
+      "byYear": [
+        {
+          "year": 2025,
+          "totalGross": 91,
+          "totalTax": 23.66,
+          "totalNet": 67.34
+        },
+        {
+          "year": 2026,
+          "totalGross": 65.1,
+          "totalTax": 8.2025,
+          "totalNet": 56.8975
+        }
+      ],
+      "byMonth": [
+        {
+          "month": "2025-05",
+          "totalNet": 48.1
+        },
+        {
+          "month": "2025-11",
+          "totalNet": 19.24
+        },
+        {
+          "month": "2026-03",
+          "totalNet": 54.6875
+        },
+        {
+          "month": "2026-06",
+          "totalNet": 2.21
+        }
+      ],
+      "portfolioYieldOnCost": 1.4390243902439026,
+      "portfolioYieldOnCostNet": 1.2020731707317074,
+      "portfolioCurrentYieldGross": 1.3511450381679388,
+      "portfolioCurrentYieldNet": 1.1286641221374045,
+      "totalCostBasis": 6150,
+      "yieldOnCostAssets": [
+        {
+          "assetId": "a-eni",
+          "assetTicker": "ENI.MI",
+          "assetName": "Eni",
+          "quantity": 100,
+          "averageCost": 12,
+          "currentPrice": 15,
+          "ttmGrossDividends": 26,
+          "yocPercentage": 2.166666666666667,
+          "currentYieldPercentage": 1.7333333333333332,
+          "difference": 0.4333333333333338
+        },
+        {
+          "assetId": "a-btp",
+          "assetTicker": "IT0005547408",
+          "assetName": "BTP 2031",
+          "quantity": 50,
+          "averageCost": 99,
+          "currentPrice": 101,
+          "ttmGrossDividends": 62.5,
+          "yocPercentage": 1.2626262626262625,
+          "currentYieldPercentage": 1.2376237623762376,
+          "difference": 0.025002500250024928
+        }
+      ],
+      "totalReturnAssets": [
+        {
+          "assetId": "a-aapl",
+          "assetTicker": "AAPL",
+          "assetName": "Apple",
+          "quantity": 10,
+          "averageCost": 150,
+          "currentPrice": 200,
+          "costBasis": 1500,
+          "currentValue": 2000,
+          "netDividends": 2.04,
+          "capitalGainAbsolute": 500,
+          "capitalGainPercentage": 33.33333333333333,
+          "dividendReturnPercentage": 0.136,
+          "totalReturnPercentage": 33.46933333333333
+        },
+        {
+          "assetId": "a-eni",
+          "assetTicker": "ENI.MI",
+          "assetName": "Eni",
+          "quantity": 100,
+          "averageCost": 12,
+          "currentPrice": 15,
+          "costBasis": 1200,
+          "currentValue": 1500,
+          "netDividends": 37.739999999999995,
+          "capitalGainAbsolute": 300,
+          "capitalGainPercentage": 25,
+          "dividendReturnPercentage": 3.145,
+          "totalReturnPercentage": 28.145,
+          "realizedPnlEur": 0,
+          "isClosed": false
+        },
+        {
+          "assetId": "a-spm",
+          "assetTicker": "SPM.MI",
+          "assetName": "Saipem",
+          "quantity": 0,
+          "averageCost": 20,
+          "currentPrice": 2,
+          "costBasis": 0,
+          "currentValue": 0,
+          "netDividends": 29.6,
+          "capitalGainAbsolute": 400,
+          "capitalGainPercentage": 20,
+          "dividendReturnPercentage": 1.48,
+          "totalReturnPercentage": 21.48,
+          "realizedPnlEur": 400,
+          "isClosed": true
+        },
+        {
+          "assetId": "a-btp",
+          "assetTicker": "IT0005547408",
+          "assetName": "BTP 2031",
+          "quantity": 50,
+          "averageCost": 99,
+          "currentPrice": 101,
+          "costBasis": 4950,
+          "currentValue": 5050,
+          "netDividends": 54.6875,
+          "capitalGainAbsolute": 100,
+          "capitalGainPercentage": 2.0202020202020203,
+          "dividendReturnPercentage": 1.10479797979798,
+          "totalReturnPercentage": 3.125
+        }
+      ],
+      "dividendGrowthData": {
+        "byAsset": [
+          {
+            "assetId": "a-aapl",
+            "assetTicker": "AAPL",
+            "assetName": "Apple",
+            "currency": "USD",
+            "yearlyDps": [
+              {
+                "year": 2026,
+                "totalDps": 0.26
+              }
+            ],
+            "yoyGrowth": {}
+          },
+          {
+            "assetId": "a-eni",
+            "assetTicker": "ENI.MI",
+            "assetName": "Eni",
+            "currency": "EUR",
+            "yearlyDps": [
+              {
+                "year": 2025,
+                "totalDps": 0.51
+              }
+            ],
+            "yoyGrowth": {}
+          }
+        ]
+      }
+    },
+    "period": "all_time"
+  },
+  "year2025": {
+    "success": true,
+    "stats": {
+      "period": {
+        "totalGross": 91,
+        "totalTax": 23.66,
+        "totalNet": 67.34,
+        "count": 3
+      },
+      "allTime": {
+        "totalGross": 156.1,
+        "totalTax": 31.8625,
+        "totalNet": 124.23750000000001,
+        "count": 5
+      },
+      "averageYield": 1.3511450381679388,
+      "upcomingTotal": 73.9275,
+      "byAsset": [
+        {
+          "assetTicker": "ENI.MI",
+          "assetName": "Eni",
+          "totalNet": 37.739999999999995,
+          "count": 2
+        },
+        {
+          "assetTicker": "SPM.MI",
+          "assetName": "Saipem",
+          "totalNet": 29.6,
+          "count": 1
+        }
+      ],
+      "byYear": [
+        {
+          "year": 2025,
+          "totalGross": 91,
+          "totalTax": 23.66,
+          "totalNet": 67.34
+        }
+      ],
+      "byMonth": [
+        {
+          "month": "2025-05",
+          "totalNet": 48.1
+        },
+        {
+          "month": "2025-11",
+          "totalNet": 19.24
+        }
+      ],
+      "portfolioYieldOnCost": 1.4390243902439026,
+      "portfolioYieldOnCostNet": 1.2020731707317074,
+      "portfolioCurrentYieldGross": 1.3511450381679388,
+      "portfolioCurrentYieldNet": 1.1286641221374045,
+      "totalCostBasis": 6150,
+      "yieldOnCostAssets": [
+        {
+          "assetId": "a-eni",
+          "assetTicker": "ENI.MI",
+          "assetName": "Eni",
+          "quantity": 100,
+          "averageCost": 12,
+          "currentPrice": 15,
+          "ttmGrossDividends": 26,
+          "yocPercentage": 2.166666666666667,
+          "currentYieldPercentage": 1.7333333333333332,
+          "difference": 0.4333333333333338
+        },
+        {
+          "assetId": "a-btp",
+          "assetTicker": "IT0005547408",
+          "assetName": "BTP 2031",
+          "quantity": 50,
+          "averageCost": 99,
+          "currentPrice": 101,
+          "ttmGrossDividends": 62.5,
+          "yocPercentage": 1.2626262626262625,
+          "currentYieldPercentage": 1.2376237623762376,
+          "difference": 0.025002500250024928
+        }
+      ],
+      "totalReturnAssets": [
+        {
+          "assetId": "a-aapl",
+          "assetTicker": "AAPL",
+          "assetName": "Apple",
+          "quantity": 10,
+          "averageCost": 150,
+          "currentPrice": 200,
+          "costBasis": 1500,
+          "currentValue": 2000,
+          "netDividends": 2.04,
+          "capitalGainAbsolute": 500,
+          "capitalGainPercentage": 33.33333333333333,
+          "dividendReturnPercentage": 0.136,
+          "totalReturnPercentage": 33.46933333333333
+        },
+        {
+          "assetId": "a-eni",
+          "assetTicker": "ENI.MI",
+          "assetName": "Eni",
+          "quantity": 100,
+          "averageCost": 12,
+          "currentPrice": 15,
+          "costBasis": 1200,
+          "currentValue": 1500,
+          "netDividends": 37.739999999999995,
+          "capitalGainAbsolute": 300,
+          "capitalGainPercentage": 25,
+          "dividendReturnPercentage": 3.145,
+          "totalReturnPercentage": 28.145,
+          "realizedPnlEur": 0,
+          "isClosed": false
+        },
+        {
+          "assetId": "a-spm",
+          "assetTicker": "SPM.MI",
+          "assetName": "Saipem",
+          "quantity": 0,
+          "averageCost": 20,
+          "currentPrice": 2,
+          "costBasis": 0,
+          "currentValue": 0,
+          "netDividends": 29.6,
+          "capitalGainAbsolute": 400,
+          "capitalGainPercentage": 20,
+          "dividendReturnPercentage": 1.48,
+          "totalReturnPercentage": 21.48,
+          "realizedPnlEur": 400,
+          "isClosed": true
+        },
+        {
+          "assetId": "a-btp",
+          "assetTicker": "IT0005547408",
+          "assetName": "BTP 2031",
+          "quantity": 50,
+          "averageCost": 99,
+          "currentPrice": 101,
+          "costBasis": 4950,
+          "currentValue": 5050,
+          "netDividends": 54.6875,
+          "capitalGainAbsolute": 100,
+          "capitalGainPercentage": 2.0202020202020203,
+          "dividendReturnPercentage": 1.10479797979798,
+          "totalReturnPercentage": 3.125
+        }
+      ],
+      "dividendGrowthData": {
+        "byAsset": [
+          {
+            "assetId": "a-aapl",
+            "assetTicker": "AAPL",
+            "assetName": "Apple",
+            "currency": "USD",
+            "yearlyDps": [
+              {
+                "year": 2026,
+                "totalDps": 0.26
+              }
+            ],
+            "yoyGrowth": {}
+          },
+          {
+            "assetId": "a-eni",
+            "assetTicker": "ENI.MI",
+            "assetName": "Eni",
+            "currency": "EUR",
+            "yearlyDps": [
+              {
+                "year": 2025,
+                "totalDps": 0.51
+              }
+            ],
+            "yoyGrowth": {}
+          }
+        ]
+      }
+    },
+    "period": {
+      "startDate": "2025-01-01T00:00:00.000Z",
+      "endDate": "2025-12-31T00:00:00.000Z"
+    }
+  },
+  "fromOnly": {
+    "success": true,
+    "stats": {
+      "period": {
+        "totalGross": 65.1,
+        "totalTax": 8.2025,
+        "totalNet": 56.8975,
+        "count": 2
+      },
+      "allTime": {
+        "totalGross": 156.1,
+        "totalTax": 31.8625,
+        "totalNet": 124.23750000000001,
+        "count": 5
+      },
+      "averageYield": 1.3511450381679388,
+      "upcomingTotal": 73.9275,
+      "byAsset": [
+        {
+          "assetTicker": "IT0005547408",
+          "assetName": "BTP 2031",
+          "totalNet": 54.6875,
+          "count": 1
+        },
+        {
+          "assetTicker": "AAPL",
+          "assetName": "Apple",
+          "totalNet": 2.21,
+          "count": 1
+        }
+      ],
+      "byYear": [
+        {
+          "year": 2026,
+          "totalGross": 65.1,
+          "totalTax": 8.2025,
+          "totalNet": 56.8975
+        }
+      ],
+      "byMonth": [
+        {
+          "month": "2026-03",
+          "totalNet": 54.6875
+        },
+        {
+          "month": "2026-06",
+          "totalNet": 2.21
+        }
+      ],
+      "portfolioYieldOnCost": 1.4390243902439026,
+      "portfolioYieldOnCostNet": 1.2020731707317074,
+      "portfolioCurrentYieldGross": 1.3511450381679388,
+      "portfolioCurrentYieldNet": 1.1286641221374045,
+      "totalCostBasis": 6150,
+      "yieldOnCostAssets": [
+        {
+          "assetId": "a-eni",
+          "assetTicker": "ENI.MI",
+          "assetName": "Eni",
+          "quantity": 100,
+          "averageCost": 12,
+          "currentPrice": 15,
+          "ttmGrossDividends": 26,
+          "yocPercentage": 2.166666666666667,
+          "currentYieldPercentage": 1.7333333333333332,
+          "difference": 0.4333333333333338
+        },
+        {
+          "assetId": "a-btp",
+          "assetTicker": "IT0005547408",
+          "assetName": "BTP 2031",
+          "quantity": 50,
+          "averageCost": 99,
+          "currentPrice": 101,
+          "ttmGrossDividends": 62.5,
+          "yocPercentage": 1.2626262626262625,
+          "currentYieldPercentage": 1.2376237623762376,
+          "difference": 0.025002500250024928
+        }
+      ],
+      "totalReturnAssets": [
+        {
+          "assetId": "a-aapl",
+          "assetTicker": "AAPL",
+          "assetName": "Apple",
+          "quantity": 10,
+          "averageCost": 150,
+          "currentPrice": 200,
+          "costBasis": 1500,
+          "currentValue": 2000,
+          "netDividends": 2.04,
+          "capitalGainAbsolute": 500,
+          "capitalGainPercentage": 33.33333333333333,
+          "dividendReturnPercentage": 0.136,
+          "totalReturnPercentage": 33.46933333333333
+        },
+        {
+          "assetId": "a-eni",
+          "assetTicker": "ENI.MI",
+          "assetName": "Eni",
+          "quantity": 100,
+          "averageCost": 12,
+          "currentPrice": 15,
+          "costBasis": 1200,
+          "currentValue": 1500,
+          "netDividends": 37.739999999999995,
+          "capitalGainAbsolute": 300,
+          "capitalGainPercentage": 25,
+          "dividendReturnPercentage": 3.145,
+          "totalReturnPercentage": 28.145,
+          "realizedPnlEur": 0,
+          "isClosed": false
+        },
+        {
+          "assetId": "a-spm",
+          "assetTicker": "SPM.MI",
+          "assetName": "Saipem",
+          "quantity": 0,
+          "averageCost": 20,
+          "currentPrice": 2,
+          "costBasis": 0,
+          "currentValue": 0,
+          "netDividends": 29.6,
+          "capitalGainAbsolute": 400,
+          "capitalGainPercentage": 20,
+          "dividendReturnPercentage": 1.48,
+          "totalReturnPercentage": 21.48,
+          "realizedPnlEur": 400,
+          "isClosed": true
+        },
+        {
+          "assetId": "a-btp",
+          "assetTicker": "IT0005547408",
+          "assetName": "BTP 2031",
+          "quantity": 50,
+          "averageCost": 99,
+          "currentPrice": 101,
+          "costBasis": 4950,
+          "currentValue": 5050,
+          "netDividends": 54.6875,
+          "capitalGainAbsolute": 100,
+          "capitalGainPercentage": 2.0202020202020203,
+          "dividendReturnPercentage": 1.10479797979798,
+          "totalReturnPercentage": 3.125
+        }
+      ],
+      "dividendGrowthData": {
+        "byAsset": [
+          {
+            "assetId": "a-aapl",
+            "assetTicker": "AAPL",
+            "assetName": "Apple",
+            "currency": "USD",
+            "yearlyDps": [
+              {
+                "year": 2026,
+                "totalDps": 0.26
+              }
+            ],
+            "yoyGrowth": {}
+          },
+          {
+            "assetId": "a-eni",
+            "assetTicker": "ENI.MI",
+            "assetName": "Eni",
+            "currency": "EUR",
+            "yearlyDps": [
+              {
+                "year": 2025,
+                "totalDps": 0.51
+              }
+            ],
+            "yoyGrowth": {}
+          }
+        ]
+      }
+    },
+    "period": {
+      "startDate": "2026-01-01T00:00:00.000Z",
+      "endDate": "9999-12-31T00:00:00.000Z"
+    }
+  },
+  "eniOnly": {
+    "success": true,
+    "stats": {
+      "period": {
+        "totalGross": 51,
+        "totalTax": 13.26,
+        "totalNet": 37.739999999999995,
+        "count": 2
+      },
+      "allTime": {
+        "totalGross": 51,
+        "totalTax": 13.26,
+        "totalNet": 37.739999999999995,
+        "count": 2
+      },
+      "averageYield": 1.3511450381679388,
+      "upcomingTotal": 19.24,
+      "byAsset": [
+        {
+          "assetTicker": "ENI.MI",
+          "assetName": "Eni",
+          "totalNet": 37.739999999999995,
+          "count": 2
+        }
+      ],
+      "byYear": [
+        {
+          "year": 2025,
+          "totalGross": 51,
+          "totalTax": 13.26,
+          "totalNet": 37.739999999999995
+        }
+      ],
+      "byMonth": [
+        {
+          "month": "2025-05",
+          "totalNet": 18.5
+        },
+        {
+          "month": "2025-11",
+          "totalNet": 19.24
+        }
+      ],
+      "portfolioYieldOnCost": 1.4390243902439026,
+      "portfolioYieldOnCostNet": 1.2020731707317074,
+      "portfolioCurrentYieldGross": 1.3511450381679388,
+      "portfolioCurrentYieldNet": 1.1286641221374045,
+      "totalCostBasis": 6150,
+      "yieldOnCostAssets": [
+        {
+          "assetId": "a-eni",
+          "assetTicker": "ENI.MI",
+          "assetName": "Eni",
+          "quantity": 100,
+          "averageCost": 12,
+          "currentPrice": 15,
+          "ttmGrossDividends": 26,
+          "yocPercentage": 2.166666666666667,
+          "currentYieldPercentage": 1.7333333333333332,
+          "difference": 0.4333333333333338
+        },
+        {
+          "assetId": "a-btp",
+          "assetTicker": "IT0005547408",
+          "assetName": "BTP 2031",
+          "quantity": 50,
+          "averageCost": 99,
+          "currentPrice": 101,
+          "ttmGrossDividends": 62.5,
+          "yocPercentage": 1.2626262626262625,
+          "currentYieldPercentage": 1.2376237623762376,
+          "difference": 0.025002500250024928
+        }
+      ],
+      "totalReturnAssets": [
+        {
+          "assetId": "a-aapl",
+          "assetTicker": "AAPL",
+          "assetName": "Apple",
+          "quantity": 10,
+          "averageCost": 150,
+          "currentPrice": 200,
+          "costBasis": 1500,
+          "currentValue": 2000,
+          "netDividends": 2.04,
+          "capitalGainAbsolute": 500,
+          "capitalGainPercentage": 33.33333333333333,
+          "dividendReturnPercentage": 0.136,
+          "totalReturnPercentage": 33.46933333333333
+        },
+        {
+          "assetId": "a-eni",
+          "assetTicker": "ENI.MI",
+          "assetName": "Eni",
+          "quantity": 100,
+          "averageCost": 12,
+          "currentPrice": 15,
+          "costBasis": 1200,
+          "currentValue": 1500,
+          "netDividends": 37.739999999999995,
+          "capitalGainAbsolute": 300,
+          "capitalGainPercentage": 25,
+          "dividendReturnPercentage": 3.145,
+          "totalReturnPercentage": 28.145,
+          "realizedPnlEur": 0,
+          "isClosed": false
+        },
+        {
+          "assetId": "a-spm",
+          "assetTicker": "SPM.MI",
+          "assetName": "Saipem",
+          "quantity": 0,
+          "averageCost": 20,
+          "currentPrice": 2,
+          "costBasis": 0,
+          "currentValue": 0,
+          "netDividends": 29.6,
+          "capitalGainAbsolute": 400,
+          "capitalGainPercentage": 20,
+          "dividendReturnPercentage": 1.48,
+          "totalReturnPercentage": 21.48,
+          "realizedPnlEur": 400,
+          "isClosed": true
+        },
+        {
+          "assetId": "a-btp",
+          "assetTicker": "IT0005547408",
+          "assetName": "BTP 2031",
+          "quantity": 50,
+          "averageCost": 99,
+          "currentPrice": 101,
+          "costBasis": 4950,
+          "currentValue": 5050,
+          "netDividends": 54.6875,
+          "capitalGainAbsolute": 100,
+          "capitalGainPercentage": 2.0202020202020203,
+          "dividendReturnPercentage": 1.10479797979798,
+          "totalReturnPercentage": 3.125
+        }
+      ],
+      "dividendGrowthData": {
+        "byAsset": [
+          {
+            "assetId": "a-eni",
+            "assetTicker": "ENI.MI",
+            "assetName": "Eni",
+            "currency": "EUR",
+            "yearlyDps": [
+              {
+                "year": 2025,
+                "totalDps": 0.51
+              }
+            ],
+            "yoyGrowth": {}
+          }
+        ]
+      }
+    },
+    "period": "all_time"
+  }
+}

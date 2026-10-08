@@ -38,7 +38,7 @@ import {
   Tooltip,
   ReferenceLine,
   ResponsiveContainer,
-} from 'recharts';
+} from '@/components/ui/charts/recharts';
 
 interface FIREProjectionChartProps {
   yearlyData: FIREProjectionYearData[];

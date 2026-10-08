@@ -102,6 +102,20 @@ function MemberRow({ member, disabled, removing, onRevoke, announce }: MemberRow
   );
 }
 
+// The two helpers below are module-level so the section's try blocks hold no `throw` and no `??`:
+// keeps it compilable by the React Compiler.
+
+async function readMembers(response: Response): Promise<Member[]> {
+  if (!response.ok) throw new Error('load failed');
+  const data = await response.json();
+  return data.members ?? [];
+}
+
+/** The route's own error message, or the tile's fallback sentence. */
+function routeErrorMessage(data: { error?: string }, fallback: string): string {
+  return data.error ?? fallback;
+}
+
 interface AccountSharingSectionProps {
   /** Disables all mutations (demo mode). */
   disabled?: boolean;
@@ -122,17 +136,15 @@ export function AccountSharingSection({
   const loadMembers = useCallback(async () => {
     try {
       const response = await authenticatedFetch('/api/account/members');
-      if (!response.ok) throw new Error('load failed');
-      const data = await response.json();
-      setMembers(data.members ?? []);
+      setMembers(await readMembers(response));
       setLoadFailed(false);
     } catch (error) {
       // No toast: the tile itself becomes the failure, in place of a list that would read «nobody».
       console.error('[AccountSharing] load failed:', error);
       setLoadFailed(true);
-    } finally {
-      setLoading(false);
     }
+    // After the try/catch rather than in a `finally` (the React Compiler refuses one).
+    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -155,19 +167,19 @@ export function AccountSharingSection({
         body: JSON.stringify({ email }),
       });
       const data = await response.json();
+      // An else, not an early return, so the reset below runs on every path without a `finally`.
       if (!response.ok) {
-        toast.error(data.error ?? "Impossibile aggiungere l'accesso");
-        return;
+        toast.error(routeErrorMessage(data, "Impossibile aggiungere l'accesso"));
+      } else {
+        setMembers((prev) => [...prev, data.member]);
+        setEmailInput('');
+        toast.success(`Accesso concesso a ${data.member.email}`);
       }
-      setMembers((prev) => [...prev, data.member]);
-      setEmailInput('');
-      toast.success(`Accesso concesso a ${data.member.email}`);
     } catch (error) {
       console.error('[AccountSharing] add failed:', error);
       toast.error("Impossibile aggiungere l'accesso");
-    } finally {
-      setAdding(false);
     }
+    setAdding(false);
   };
 
   const handleRemove = async (member: Member) => {
@@ -180,17 +192,16 @@ export function AccountSharingSection({
       );
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        toast.error(data.error ?? "Impossibile revocare l'accesso");
-        return;
+        toast.error(routeErrorMessage(data, "Impossibile revocare l'accesso"));
+      } else {
+        setMembers((prev) => prev.filter((m) => m.uid !== member.uid));
+        toast.success(`Accesso revocato a ${member.email}`);
       }
-      setMembers((prev) => prev.filter((m) => m.uid !== member.uid));
-      toast.success(`Accesso revocato a ${member.email}`);
     } catch (error) {
       console.error('[AccountSharing] remove failed:', error);
       toast.error("Impossibile revocare l'accesso");
-    } finally {
-      setRemovingUid(null);
     }
+    setRemovingUid(null);
   };
 
   const retry = () => {

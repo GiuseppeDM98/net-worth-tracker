@@ -5,9 +5,12 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { PanelLeftIcon } from "lucide-react"
 import { Slot } from "radix-ui"
 
-// PROJECT OVERRIDE: use the project's flash-free hook (initialises synchronously
-// from window.matchMedia) instead of the shadcn default. The 1439px threshold
-// matches the custom `desktop:` breakpoint in app/globals.css (min-width: 1440px).
+// PROJECT OVERRIDE: use the project's hook (an SSR-safe external store: `false` on the server
+// and during hydration, the real value right after; since 2026-09-28) instead of the shadcn default.
+// The 1439px threshold matches the custom `desktop:` breakpoint in app/globals.css
+// (min-width: 1440px). Because the shell is in the prerendered HTML, the FIRST frame is decided
+// by CSS, not by this value: the fixed sidebar below is `hidden desktop:block`, and the mobile
+// Sheet mounts only when opened — so a phone paints no sidebar before JS corrects `isMobile`.
 // ⚠️ shadcn@latest add sidebar will overwrite this import — restore it after upgrades.
 import { useMediaQuery } from "@/lib/hooks/useMediaQuery"
 import { cn } from "@/lib/utils"

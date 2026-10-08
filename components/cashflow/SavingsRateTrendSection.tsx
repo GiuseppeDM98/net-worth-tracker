@@ -16,117 +16,19 @@ import { useMemo, useState } from 'react';
 import { useChartColors } from '@/lib/hooks/useChartColors';
 import { Expense } from '@/types/expenses';
 import { AsideToggle } from '@/components/cashflow/analisi/AsideToggle';
-import { formatPercentage } from '@/lib/services/chartService';
 import { Tile } from '@/components/ui/tile';
-import { CHART_TICK_STYLE } from '@/components/cashflow/costCenterStyles';
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ReferenceLine,
-  ReferenceArea,
-  ResponsiveContainer,
-} from 'recharts';
+import { Skeleton } from '@/components/ui/skeleton';
+import { lazyComponent } from '@/components/ui/lazy-component';
 import { getItalyMonth, getItalyYear, toDate } from '@/lib/utils/dateHelpers';
 import { MONTH_NAMES } from '@/lib/constants/months';
 
-// 20% is the commonly cited minimum savings target for Italian households.
-// Above this line = "on track"; below = "needs attention" (red zone).
-const SAVINGS_TARGET = 20;
+/** The plot's height: the chart draws at it and its placeholder holds it, so it lands in place. */
+const SAVINGS_CHART_HEIGHT = 200;
 
-// ── SavingsRateLineChart ──────────────────────────────────────────────────────
-// Module-level component required by React Compiler (never define inside render).
-
-/**
- * LineChart for savings rate with target reference line and red zone below 20%.
- *
- * connectNulls={false} creates visible gaps for months without income —
- * this correctly represents "no data" rather than "zero savings".
- *
- * YAxis domain={['auto', 'auto']} scales to the actual data range to prevent
- * the flat-line problem (AGENTS.md § Recharts — sparkline flat-line on large
- * absolute numbers").
- */
-function SavingsRateLineChart({
-  data,
-  colors,
-}: {
-  data: Array<{ label: string; rate: number | null }>;
-  colors: string[];
-}) {
-  return (
-    <ResponsiveContainer width="100%" height={200}>
-      <LineChart
-        data={data}
-        margin={{ top: 4, right: 16, left: -16, bottom: 0 }}
-        role="img"
-        accessibilityLayer={false}
-        aria-label={`Tasso di risparmio per mese, obiettivo ${SAVINGS_TARGET}%. ${data.map((point) => `${point.label}: ${point.rate === null ? 'nessuna entrata' : formatPercentage(point.rate, 1)}`).join('; ')}`}
-      >
-        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-
-        {/* Axis ticks are figures: the Mono Mandate reaches them only through `tick` (AGENTS.md → Recharts). */}
-        <XAxis dataKey="label" tick={CHART_TICK_STYLE} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-        <YAxis
-          // Intl prints a hyphen; the page's minus is U+2212 everywhere else.
-          tickFormatter={(v: number) => formatPercentage(v, 0).replace(/^-/, '−')}
-          tick={CHART_TICK_STYLE}
-          axisLine={false}
-          tickLine={false}
-          domain={['auto', 'auto']}
-        />
-
-        {/* CSS vars for tooltip — never hardcoded hex (AGENTS.md § Recharts — tooltip style props) */}
-        <Tooltip
-          formatter={(value) =>
-            value != null ? [formatPercentage(Number(value), 1), 'Tasso di risparmio'] : ['—', '']
-          }
-          contentStyle={{
-            backgroundColor: 'var(--card)',
-            border: '1px solid var(--border)',
-            color: 'var(--card-foreground)',
-            fontSize: 12,
-            borderRadius: 8,
-          }}
-          labelStyle={{ fontWeight: 600, color: 'var(--card-foreground)' }}
-        />
-
-        {/* Red tint below target — signals "needs improvement" zone */}
-        <ReferenceArea y1={-100} y2={SAVINGS_TARGET} fill="var(--destructive)" fillOpacity={0.06} />
-
-        {/* Dashed green reference line at 20% target */}
-        <ReferenceLine
-          y={SAVINGS_TARGET}
-          stroke="var(--positive)"
-          strokeDasharray="4 4"
-          strokeWidth={1.5}
-          label={{
-            value: `${SAVINGS_TARGET}% obiettivo`,
-            position: 'insideTopRight',
-            fontSize: 10,
-            fill: 'var(--positive)',
-          }}
-        />
-
-        <Line
-          type="monotone"
-          dataKey="rate"
-          stroke={colors[0] ?? '#6366f1'}
-          strokeWidth={2}
-          dot={false}
-          activeDot={{ r: 5, strokeWidth: 0 }}
-          // Gap at months with null income rather than connecting to zero
-          connectNulls={false}
-          animationDuration={800}
-          animationEasing="ease-out"
-        />
-      </LineChart>
-    </ResponsiveContainer>
-  );
-}
+// The plot is not in the page's initial JavaScript (2026-09-30): `lazyComponent` at module level,
+// preloaded when the page is idle by `DettaglioDisclosure` (`SAVINGS_LAZY_CHARTS`).
+const SavingsRateLineChart = lazyComponent(() => import('@/components/cashflow/SavingsRateLineChart').then((m) => m.SavingsRateLineChart));
+export const SAVINGS_LAZY_CHARTS = [SavingsRateLineChart];
 
 // ── Range toggle ──────────────────────────────────────────────────────────────
 // 'all' shows the entire history (default) so the long-term savings trend isn't
@@ -277,7 +179,7 @@ export function SavingsRateTrendSection({
         {!hasEnoughData ? (
           <p className="py-6 text-center text-[13px] text-muted-foreground">Servono almeno 3 mesi di entrate per il trend</p>
         ) : (
-          <SavingsRateLineChart data={trendData} colors={chartColors} />
+          <SavingsRateLineChart data={trendData} colors={chartColors} height={SAVINGS_CHART_HEIGHT} fallback={<Skeleton className="w-full" style={{ height: SAVINGS_CHART_HEIGHT }} />} />
         )}
       </div>
     </Tile>

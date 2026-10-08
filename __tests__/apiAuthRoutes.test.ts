@@ -534,6 +534,9 @@ describe('Private API route auth', () => {
     );
 
     expect(response.status).toBe(200);
+    // Server-Timing: the production latency of the route, readable in DevTools.
+    const serverTiming = response.headers.get('Server-Timing') ?? '';
+    expect(serverTiming).toMatch(/^auth;dur=[\d.]+, db;dur=[\d.]+, compute;dur=[\d.]+, total;dur=[\d.]+, source;desc=materialized$/);
     await expect(response.json()).resolves.toMatchObject({
       metrics: {
         totalValue: 1234,

@@ -239,6 +239,9 @@ async function writePensionContribution(
   });
 
   const docRef = await addDoc(collection(db, PENSION_CONTRIBUTIONS_COLLECTION), payload);
+  // AFTER the record: the balance moves invalidated before it existed, and a summary rebuilt in
+  // between would split the fund's growth without this contribution for the rest of the day.
+  await invalidateDashboardOverviewSummary(userId, 'pension_contribution_recorded');
   return docRef.id;
 }
 
@@ -389,13 +392,14 @@ export async function deletePensionContribution(contribution: PensionContributio
   }
 
   await deleteDoc(doc(db, PENSION_CONTRIBUTIONS_COLLECTION, contribution.id));
+  await invalidateDashboardOverviewSummary(contribution.userId, 'pension_contribution_deleted');
 }
 
 /**
  * Overwrite a fund's value from the statement — the «Aggiorna valore» action of Previdenza.
  *
- * NOT a contribution: no record, no transfer, no cash movement (doc/guide/previdenza.md → «the
- * periodic statement is not a contribution»). The value lives in `quantity` at price 1, so the
+ * NOT a contribution: no record, no transfer, no cash movement (doc/guide/previdenza.md § The
+ * periodic statement (NAV overwrite) is NOT a contribution). The value lives in `quantity` at price 1, so the
  * same guard as a contribution refuses a fund whose value would not all be in that field, and
  * `lastPriceUpdate` is stamped so «Il fondo oggi» reads the update's date. The Panoramica's
  * summary is invalidated like any asset update; the caller invalidates the React Query caches.

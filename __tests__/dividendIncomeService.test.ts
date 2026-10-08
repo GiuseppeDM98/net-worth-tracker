@@ -65,6 +65,7 @@ import {
   updateExpenseFromDividend,
 } from '@/lib/services/dividendIncomeService';
 import { updateDividend } from '@/lib/services/dividendService';
+import { invalidateDashboardOverviewSummaryServer } from '@/lib/services/dashboardOverviewInvalidation.server';
 import type { Dividend } from '@/types/dividend';
 
 /** 20:00 in Italy on 2026-09-20: the cron's hour. */
@@ -113,6 +114,19 @@ describe('createExpenseFromDividend', () => {
     expect(balanceOf('directa')).toBe(1012.35);
     expect(balanceOf('fineco')).toBe(500);
     expect(fake.docs.get('dividends/div-1')?.expenseId).toBe(expenseId);
+  });
+
+  it('should store the credited balance to the cent, without the binary noise of the sum (2026-10-07)', async () => {
+    expect(4033.3 + 0.07).not.toBe(4033.37); // the raw sum is noisy
+    seed({ assetAccount: 'directa' });
+    fake.docs.set('assets/directa', { userId: 'u1', type: 'cash', assetClass: 'cash', currency: 'EUR', quantity: 4033.3 });
+
+    const expenseId = await createExpenseFromDividend(dividend({ netAmount: 0.07 }), 'cat-1', 'Dividendi', undefined, undefined, NOW);
+    expect(balanceOf('directa')).toBe(4033.37);
+
+    // The give-back lands on the cent too: back to the balance before the credit, exactly.
+    await deleteExpenseForDividend('div-1', expenseId);
+    expect(balanceOf('directa')).toBe(4033.3);
   });
 
   it('should fall back to the default account of the settings', async () => {
@@ -222,6 +236,38 @@ describe('deleteExpenseForDividend', () => {
     expect(payload).toHaveProperty('expenseId');
     expect(payload.expenseId).toBeInstanceOf(FieldValue);
     expect((payload.expenseId as FieldValue).isEqual(FieldValue.delete())).toBe(true);
+  });
+});
+
+describe('the overview summary', () => {
+  // The ROW is the Panoramica's input (the month's income), credited or not (2026-10-03):
+  // invalidating only on a credit left an arrear out of a summary now fresh for the whole day.
+  beforeEach(() => vi.mocked(invalidateDashboardOverviewSummaryServer).mockClear());
+
+  it('is invalidated when an uncredited row is written, edited and deleted', async () => {
+    seed({ assetAccount: 'directa' });
+
+    const expenseId = await createExpenseFromDividend(
+      dividend({ paymentDate: LAST_SPRING }), 'cat-1', 'Dividendi', undefined, undefined, NOW,
+    );
+    await updateExpenseFromDividend(dividend({ paymentDate: LAST_SPRING, netAmount: 20 }), expenseId, 'Dividendi');
+    await deleteExpenseForDividend('div-1', expenseId);
+
+    expect(vi.mocked(invalidateDashboardOverviewSummaryServer).mock.calls).toEqual([
+      ['u1', 'dividend_income_created'],
+      ['u1', 'dividend_income_updated'],
+      ['u1', 'dividend_income_deleted'],
+    ]);
+  });
+
+  it('is not invalidated by the idempotent second call, which writes nothing', async () => {
+    seed({ assetAccount: 'directa' });
+    await createExpenseFromDividend(dividend(), 'cat-1', 'Dividendi', undefined, undefined, NOW);
+    vi.mocked(invalidateDashboardOverviewSummaryServer).mockClear();
+
+    await createExpenseFromDividend(dividend(), 'cat-1', 'Dividendi', undefined, undefined, NOW);
+
+    expect(invalidateDashboardOverviewSummaryServer).not.toHaveBeenCalled();
   });
 });
 

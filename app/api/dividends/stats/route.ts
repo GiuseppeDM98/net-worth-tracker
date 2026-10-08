@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Timestamp } from 'firebase-admin/firestore';
-import {
-  calculateDividendStats,
-  getUpcomingDividends,
-  getAllDividends
-} from '@/lib/services/dividendService';
+import { getAllDividends } from '@/lib/services/dividendService';
 import { adminDb } from '@/lib/firebase/admin';
+import { startTiming } from '@/lib/server/serverTiming';
+import {
+  endOfServerDay,
+  selectUpcomingDividends,
+  summarizeDividendStats,
+} from '@/lib/utils/dividendAnalytics';
 import { AssetDividendGrowth, Dividend, DividendGrowthData, TotalReturnAsset, YieldOnCostAsset } from '@/types/dividend';
 import { computeDividendYieldMetrics } from '@/lib/utils/yieldOnCost';
 import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
@@ -24,8 +26,8 @@ import {
 } from '@/lib/server/apiAuth';
 
 // Mirror of calculateAssetValue() (lib/services/assetService.ts) for ledger-based total return —
-// assetService.ts imports the client Firebase SDK and cannot be used in this Admin route (same
-// reasoning as resolveAssetValueEur in portfolioExposureService.ts). Ledger asset types
+// assetService.ts initialises the client Firebase SDK at module level, so importing it here would
+// carry `firebase/firestore` into the Lambda of this Admin route. Ledger asset types
 // (stock/etf/bond/crypto/commodity) never carry outstandingDebt, so that branch is omitted.
 function resolveLedgerAssetValueEur(asset: {
   quantity: number;
@@ -65,10 +67,23 @@ function computeDividendReturnPercentage(
 
 /**
  * GET /api/dividends/stats
- * Query params: userId (required), startDate (optional), endDate (optional)
- * Returns dividend statistics for a user, optionally filtered by date range
+ * Query params: userId (required), startDate (optional), endDate (optional), assetId (optional)
+ * Returns `stats`, the dividend statistics of a user (the period's, optionally narrowed by a date
+ * range), and `dividends`, the owner's whole registry whatever the bounds.
+ *
+ * Reads every collection once, in one parallel round (it was seven serial reads with the dividends
+ * read four times, until 2026-10-05), and hands the registry out in the same answer: it is the
+ * ONE request the Dividendi tab makes to open, where the list used to be a second request and a
+ * second read of the collection (`GET /api/dividends`). Answers with `Server-Timing: auth, db,
+ * compute, total` (doc/guide/cashflow-dividendi.md).
  */
 export async function GET(request: NextRequest) {
+  const timing = startTiming();
+  // The registry, held outside the `try` once it is read: when a LATER stage fails (the assets, the
+  // snapshots, the ledger, the computation) the answer still hands the list out, with `stats: null`.
+  // While list and measures were two requests a failed measure never took the list with it, and
+  // the tab still says «le metriche non sono state lette» under payments it can draw.
+  let registry: Dividend[] | undefined;
   try {
     const decodedToken = await requireFirebaseAuth(request);
     const searchParams = request.nextUrl.searchParams;
@@ -78,6 +93,7 @@ export async function GET(request: NextRequest) {
     const assetId = searchParams.get('assetId') || undefined;
 
     await assertCanAccessAccount(decodedToken, userId);
+    timing.mark('auth');
     const authenticatedUserId = userId as string;
 
     let startDate: Date | undefined;
@@ -97,30 +113,44 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // getDividendsByDateRange (and calculateDividendStats) require both bounds.
-    // Fill in the missing bound with a sensible default so a single date still filters correctly.
+    // A single bound is valid: the missing one is filled so the response's `period` names a closed
+    // range, as it always has.
     if (startDate && !endDate) endDate = new Date('9999-12-31');
     if (endDate && !startDate) startDate = new Date(0);
 
-    // Calculate period statistics (filtered by date range and optionally by asset)
-    const periodStats = await calculateDividendStats(authenticatedUserId, startDate, endDate, assetId);
+    // ONE round of reads, in parallel: the dividends once — the period, all-time,
+    // upcoming and chart figures are all derived from that one list below — plus the assets
+    // (sold ones are filtered out of upcoming and growth), the snapshots and the trade ledger.
+    // The assets are read raw rather than through getUserAssetsAdmin: the mapping below keeps
+    // `holdingStartDate` as a Timestamp to convert, and `averageCostEur` as stored.
+    const dividendsRead = getAllDividends(authenticatedUserId);
+    const measureInputsRead = Promise.all([
+      adminDb.collection('assets').where('userId', '==', authenticatedUserId).get(),
+      getUserSnapshotsAdmin(authenticatedUserId),
+      getAssetTransactionsAdmin(authenticatedUserId),
+    ]);
+    // All four are already in flight; the dividends are AWAITED first so the registry is in hand
+    // if one of the others fails. The no-op handler keeps that failure from being reported as
+    // unhandled while the dividends are still being read — it is thrown again by the await below.
+    measureInputsRead.catch(() => undefined);
+    const allDividends = await dividendsRead;
+    registry = allDividends;
+    const [assetsSnapshot, snapshots, allTrades] = await measureInputsRead;
+    timing.mark('db');
 
-    // Calculate all-time statistics (also filtered by asset if provided)
-    const allTimeStats = await calculateDividendStats(authenticatedUserId, undefined, undefined, assetId);
+    // «Now» once, for every figure of the answer (AGENTS.md § Dynamic Imports: a function that
+    // reads the clock itself is untestable). `today` is the end of the server's day: a payment
+    // dated today is received.
+    const now = new Date();
+    const today = endOfServerDay(now);
 
-    // Get upcoming dividends and filter by asset ownership
-    const upcomingDividends = await getUpcomingDividends(authenticatedUserId);
-
-    // Fetch user assets to filter out dividends for sold assets (quantity = 0)
-    // Using admin SDK to bypass Firestore Security Rules (server-side)
-    const assetsSnapshot = await adminDb
-      .collection('assets')
-      .where('userId', '==', authenticatedUserId)
-      .get();
+    const periodStats = summarizeDividendStats(allDividends, { startDate, endDate, assetId, now });
+    const allTimeStats = summarizeDividendStats(allDividends, { assetId, now });
+    const upcomingDividends = selectUpcomingDividends(allDividends, now);
 
     // Holding-start per asset (from snapshots): lets the per-share engine ignore dividends from a
     // previous, discontinuous holding when an instrument was sold and later rebought (same id).
-    const holdingStarts = deriveHoldingStartDates(await getUserSnapshotsAdmin(authenticatedUserId));
+    const holdingStarts = deriveHoldingStartDates(snapshots);
 
     const userAssets = assetsSnapshot.docs.map(doc => ({
       id: doc.id,
@@ -141,7 +171,6 @@ export async function GET(request: NextRequest) {
     // Trade-ledger transactions, grouped by asset (Fase D §6): assets WITH ledger entries get a
     // date-exact total return via replayTransactions; assets without one keep the static fallback
     // below (only possible for a position opened and never migrated/re-bought).
-    const allTrades = await getAssetTransactionsAdmin(authenticatedUserId);
     const tradesByAssetId = new Map<string, AssetTransaction[]>();
     allTrades.forEach(t => {
       const arr = tradesByAssetId.get(t.assetId) ?? [];
@@ -169,17 +198,12 @@ export async function GET(request: NextRequest) {
       count: asset.count,
     })).sort((a, b) => b.totalNet - a.totalNet);
 
-    // Get all dividends for year and month grouping
-    const allDividends = await getAllDividends(authenticatedUserId);
-
     // Helper function to convert Date | Timestamp to Date
     const toDate = (date: Date | Timestamp): Date => {
       return date instanceof Date ? date : date.toDate();
     };
 
     // Filter out future dividends for charts (only show paid dividends)
-    const today = new Date();
-    today.setHours(23, 59, 59, 999);
     const paidDividends = allDividends.filter(div => {
       const paymentDate = toDate(div.paymentDate);
       return paymentDate <= today;
@@ -442,7 +466,7 @@ export async function GET(request: NextRequest) {
     // Uses the same per-share engine as the Performance page so both surfaces report a
     // single consistent number; dividends from fully-sold positions are excluded
     // (see lib/utils/yieldOnCost.ts).
-    const twelveMonthsAgo = new Date();
+    const twelveMonthsAgo = new Date(now);
     twelveMonthsAgo.setFullYear(twelveMonthsAgo.getFullYear() - 1);
 
     const ttmMetrics = computeDividendYieldMetrics(allDividends, userAssets, twelveMonthsAgo, today, 12);
@@ -520,14 +544,19 @@ export async function GET(request: NextRequest) {
       ...(dividendGrowthData && { dividendGrowthData }),
     };
 
-    return NextResponse.json({
-      success: true,
-      stats,
-      period: startDate && endDate ? {
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
-      } : 'all_time',
-    });
+    timing.mark('compute');
+    return NextResponse.json(
+      {
+        success: true,
+        stats,
+        dividends: allDividends,
+        period: startDate && endDate ? {
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString(),
+        } : 'all_time',
+      },
+      { headers: { 'Server-Timing': timing.toHeader() } }
+    );
   } catch (error) {
     const authErrorResponse = getApiAuthErrorResponse(error);
     if (authErrorResponse) {
@@ -535,6 +564,9 @@ export async function GET(request: NextRequest) {
     }
 
     console.error('Error calculating dividend stats:', error);
+    if (registry) {
+      return NextResponse.json({ success: true, stats: null, dividends: registry });
+    }
     return NextResponse.json(
       { error: 'Failed to calculate dividend statistics', details: (error as Error).message },
       { status: 500 }

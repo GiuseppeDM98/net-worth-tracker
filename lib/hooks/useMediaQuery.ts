@@ -1,24 +1,36 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 
+/** The server has no viewport: every query answers `false` there, and during hydration. */
+const getServerSnapshot = () => false;
+
+/**
+ * Whether a CSS media query matches, read as an external store (`useSyncExternalStore`).
+ *
+ * The dashboard shell is in the prerendered HTML (since 2026-09-28), so this hook now runs on the server
+ * and during hydration — where `window` does not exist and the only value that does not make React
+ * report a mismatch is the server's, `false`. Right after hydration React reads the real snapshot
+ * and re-renders the subscribers on its own: no error, no effect, no `setState`. A component
+ * mounted LATER (every page, every dialog) is not hydrating, so it reads the real value on its first
+ * render — the flash-free behaviour the old `useState(() => matchMedia(…).matches)` initializer gave,
+ * kept for the surfaces that branch on the phone width.
+ *
+ * The one consequence: the shell's FIRST frame must be decided by CSS, never by this value. The
+ * fixed sidebar is `hidden desktop:block` and the bottom nav `desktop:hidden`, so a phone paints the
+ * right chrome before JS corrects `false` to `true` (`e2e/shell.boot.mobile.spec.ts` proves the
+ * console stays clean).
+ */
 export function useMediaQuery(query: string): boolean {
-  // Initialize with the real value immediately instead of false.
-  // The classic useState(false) pattern (SSR-safe default) causes an extra re-render
-  // on mobile when the effect corrects false → true, which competes with rAF-based
-  // animations running at mount time. Safe to read window here because all callers
-  // are 'use client' components rendered only after login.
-  const [matches, setMatches] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    return window.matchMedia(query).matches;
-  });
+  const subscribe = useCallback(
+    (onChange: () => void) => {
+      const media = window.matchMedia(query);
+      media.addEventListener('change', onChange);
+      return () => media.removeEventListener('change', onChange);
+    },
+    [query],
+  );
+  const getSnapshot = useCallback(() => window.matchMedia(query).matches, [query]);
 
-  useEffect(() => {
-    const media = window.matchMedia(query);
-    const listener = () => setMatches(media.matches);
-    media.addEventListener('change', listener);
-    return () => media.removeEventListener('change', listener);
-  }, [query]);
-
-  return matches;
+  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }

@@ -34,6 +34,13 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   comes from fixed-width right-aligned COLUMNS (a declared exception to the Mono Mandate, in `PDF_FONTS`). WinAnsi
   has no U+2212 and react-pdf drops what it cannot encode **silently**: the Allocazione gaps printed «620» where they
   meant «−620 €». `pdfSafeText` converts it at the boundary — every PDF text node goes through it.
+- **The engine is loaded at the press, not with the page** (2026-09-30): `lib/utils/pdfGenerator.tsx` — and
+  with it `@react-pdf/renderer`, pdfkit, `components/pdf/*` and `pdfDataService` — is reached only by the `import()` in
+  `loadPDFGenerator` (`components/pdf/PDFExportDialog.tsx`): ONE promise for the session, started by «Esporta PDF»,
+  awaited by «Genera PDF», forgotten on failure so the next press retries. Nothing else may import `pdfGenerator` or
+  `components/pdf/*` statically, or 513 KB gz go back into Storico's first paint — `e2e/bundle.lazy.spec.ts` goes red.
+  `printTokens.ts` stays where it is (the emails read it on the server; it is small). Seen on the mirror: the modal in
+  ~110 ms, a 13-page report downloaded 3,5 s after the press.
 - **Sub-tiles are a `--muted` fill with no border**: on white paper a 1px rule at 0.92 lightness is invisible, and a
   4%-ink fill survives a photocopy.
 - **A section's reading must not mix two windows.** `HistoryData` carries `netWorthEvolution` (the filtered series the
@@ -109,8 +116,8 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   tax the owner ALSO records as a cashflow expense would be counted twice in the split (doc/guide/panoramica.md § Per-page blind spots).
 - **Every email cap is stated in the prompt**: `MAX_CATEGORY_DELTAS` (12) is named in the section header together with
   how many categories were left out. The selection is by SPEND, not by size of variation — describe it as it is.
-- **`max_tokens` and the word ceiling scale together** per period (6000/8000/8000/10000 against 500/700/700/900 words):
-  raise one and the other has to follow. Web search is offered only when `includeMacroContext` allows it, like the
+- **`max_tokens` scales with the period** (6000/8000/8000/10000), and the format contract names the period in its
+  length line instead of a word count. Web search is offered only when `includeMacroContext` allows it, like the
   assistant's structured analyses.
 
 ## Verifying a surface with no DOM
@@ -149,4 +156,10 @@ PDF half seen from inside the section, this is the recipe for both surfaces.
 
 ## Per-page blind spots
 
+- **The YEARLY PDF of the current year measures one month less than Rendimenti's «YTD»** (seen 2026-10-04, driving the
+  export on the mirror; not changed): the dialog hands the report the year's snapshots only (`filterSnapshotsByTime`), so
+  January's snapshot is the starting valuation and the window is February → today, where the page reaches back to
+  December and measures from January. TWR, ROI and the two yields are annualised over 9 months against the page's 10; the
+  dividends received are the same. The TOTAL export has the page's whole-history window, and its twelve yield fields were
+  equal to the page's, field by field.
 - **Fuori dal DOM restano tre punti ciechi**: le email non rispecchiano i cinque temi nominati (scelta — si leggono su una scheda bianca); «un hex sta solo in `printTokens`» è documentato ma **non applicato da un linter**; e `@react-pdf/renderer` scarta in SILENZIO ogni carattere fuori da WinAnsi (`pdfSafeText` copre U+2212; frecce, simboli ed emoji no). Le tre superfici si verificano solo renderizzandole, e **nessuna di quelle verifiche è nella suite**. doc/guide/email-pdf.md. (moved from `CLAUDE.md` → Known Issues on 2026-09-19)

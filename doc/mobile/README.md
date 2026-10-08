@@ -2,11 +2,11 @@
 
 > Sessione del 2026-09-26, dalla domanda del proprietario: «l'app è densa di informazioni in ogni sua parte, ed è
 > questo che le va contro sul telefono: lì guardo al massimo 4–5 informazioni». Questa cartella tiene UNA specifica per
-> implementazione (`MOB-NN-*.md`, sul template di `doc/perf/`, ognuna con il prompt e il modello in coda), il censimento
+> implementazione (`MOB-NN-*.md`, sullo stesso template delle 14 spec PERF, tutte ritirate entro il 2026-10-08, ognuna con il prompt e il modello in coda), il censimento
 > di riferimento in `reference/` e questo indice: la domanda con la risposta, come è stato misurato il mobile attuale,
 > la baseline, le tre direzioni disegnate e quella scelta, l'ordine consigliato e lo stato. **Si implementa DOPO le 14
-> spec di `doc/perf/`** (decisione del proprietario): PERF-02/03 cambiano la shell che il mobile eredita, PERF-04/11/12/14
-> toccano gli stessi componenti. Una spec che si chiude aggiorna la tabella in § 6 e, se ha rimisurato, la baseline in § 3.
+> spec PERF** (decisione del proprietario; tutte in develop e ritirate, l'ultima il 2026-10-08): PERF-02 (in develop dal 2026-09-29) e PERF-03 (in develop dal 2026-09-30: la riga «Aggiornato alle…» sta nel `PageHeader`, non nella composizione) cambiano la shell che il mobile eredita, PERF-04 (in develop dal 2026-09-30), PERF-12 (dal 2026-10-06) e PERF-11 (dal 2026-10-07) e PERF-14 (dal 2026-10-08)
+> hanno toccato gli stessi componenti. Una spec che si chiude aggiorna la tabella in § 6 e, se ha rimisurato, la baseline in § 3.
 
 ## 1. La domanda e la risposta
 
@@ -34,15 +34,15 @@ temi, la regola degli stati su venti superfici e quaranta modali: escluso.
   `top`, altezza, cifre e parole; le cifre (`\d[\d.,]*\s?(€|%)`) e le parole totali e «sopra la piega» (il nodo
   inizia nella prima schermata); i controlli; i grafici; le tablist; `scrollWidth > clientWidth`. Due screenshot per
   superficie (prima schermata e pagina intera con `main` sbloccato).
-- **Cosa NON misura**: i tempi (dev server, non build di produzione: la baseline dei tempi è `doc/perf/README.md § 3`);
+- **Cosa NON misura**: i tempi (dev server, non build di produzione: la baseline dei tempi è doc/guide/velocita.md § Baseline in vigore, quella storica del 2026-09-26 in § Baseline storica);
   la differenza fra cifre «nel verdetto» e «fuori» (le ha contate lo script a mano nelle tre pagine dei mock; MOB-01
   la rende una misura). I dati grezzi (JSON e screenshot) restano fuori dal repo: portano le cifre reali.
 
 ## 3. Baseline (2026-09-26, mirror, dev server)
 
 > Presa PRIMA dei contributi del 2026-09-27. Da #401 la riga **Analisi a 390** cambia: sotto i 640 px il Flusso non è più
-> un Sankey, `charts` scende da 2 a 1, cifre e controlli salgono, le schermate sono da rimisurare; a 768 e 1024 no. Da
-> PERF-00 cambiano le righe **Allocazione** (la base dell'Esposizione e la riga di copertura). #400 a interruttore spento
+> un Sankey, `charts` scende da 2 a 1, cifre e controlli salgono, le schermate sono da rimisurare; a 768 e 1024 no. Dal
+> 2026-09-28 (la nuova Esposizione, #407) cambiano le righe **Allocazione** (la base dell'Esposizione e la riga di copertura). #400 a interruttore spento
 > e #403 non muovono righe. MOB-01 rimisura: il budget nasce con i contributi dentro.
 
 `screens` = schermate di scroll. `tiles` = tessere visibili (sopra la piega = che INIZIANO nella prima schermata;
@@ -152,7 +152,7 @@ https://claude.ai/artifact/JQcXUcUt55HeiUUeP2EMNh.
 | Tesi | verdetto breve · striscia di ≤4 cifre · LA tessera aperta · il resto in righe chiuse con il loro eyebrow | la Panoramica mobile è il feed dei verdetti delle 12 pagine; le pagine sono 1–2 tessere + «Il resto · N» | verdetto e indice fermi, una tessera per schermata, swipe |
 | Cifre fuori dal verdetto (Panoramica / Tracciamento / Rendimenti) | 5 / 5 / 5 | 3 / 5 / 3 | 5 / 7 / 4 |
 | Shell | invariata | la Panoramica cambia natura | il 28% dello schermo fisso |
-| Costo | `PageVerdict`, `Tile`, `PageHeader`, `PageTabBar` | + `DiaryRow`, un endpoint aggregato (contro `doc/perf/`), una regola «una cifra per pagina» | + un `TilePager` con cinque regole proprie |
+| Costo | `PageVerdict`, `Tile`, `PageHeader`, `PageTabBar` | + `DiaryRow`, un endpoint aggregato (contro le spec PERF), una regola «una cifra per pagina» | + un `TilePager` con cinque regole proprie |
 | Rischio principale | 16–36 px sopra la pill; le clausole del verdetto dietro un tap | una cifra per pagina può smentire la pagina | screen reader: 1 tessera su 8; swipe dal bordo su iOS |
 
 **Scelta (proprietario, 2026-09-26): A come base su tutte le pagine.** Da C si prendono due cose che servono comunque:
@@ -182,9 +182,9 @@ Gli archi (A → B = «B dipende da A»), gli stessi dell'intestazione di ogni s
 | MOB-03, 04, 05, 06, 07 | 08, 09 |
 | MOB-08 | 09 |
 
-I contributi esterni del 2026-09-27 (#400, #401, #403) sono già in `develop`, e PERF-00 (la nuova Esposizione) entra
+I contributi esterni del 2026-09-27 (#400, #401, #403) sono già in `develop`, e la nuova Esposizione (PERF-00, #407) è entrata il 2026-09-28,
 prima di PERF-01: MOB-01 misura un'app che li contiene, e MOB-06 e MOB-07 compongono il Flusso e l'Esposizione come sono
-DOPO quei contributi (`doc/perf/README.md` § 5).
+DOPO quei contributi.
 
 MOB-01 va prima di tutto, come PERF-01: le altre si chiudono con i suoi numeri. MOB-02 è il CONTRATTO che sette spec
 citano alla lettera (la tabella delle API in § 4.1): le due decisioni di fondazione che pone — l'ordine del DOM e la
@@ -203,13 +203,13 @@ per spec.
 
 | Spec | Titolo | Priorità | Sforzo | Dipende da | Modello · effort | Stato |
 |---|---|---|---|---|---|---|
-| [MOB-01](MOB-01-censimento-e-budget-prima-schermata.md) | Il censimento in repo e il budget della prima schermata | 1 | M | PERF-01, PERF-00 | Opus 5.5 · high | da fare |
+| [MOB-01](MOB-01-censimento-e-budget-prima-schermata.md) | Il censimento in repo e il budget della prima schermata | 1 | M | PERF-01, PERF-00 (chiusa il 2026-09-28) | Opus 5.5 · high | da fare |
 | [MOB-02](MOB-02-primitive-della-composizione.md) | Le primitive della composizione | 1 | L | MOB-01, PERF-12, PERF-14 (con PERF-02; PERF-03) | Fable 5.1 · xhigh | da fare |
 | [MOB-03](MOB-03-panoramica.md) | Panoramica | 2 | M | MOB-02, PERF-03, PERF-07 | Fable 5.1 · high | da fare |
 | [MOB-04](MOB-04-cashflow-cinque-tab.md) | Cashflow: le cinque tab | 2 | L | MOB-02, PERF-06 | Fable 5.1 · xhigh | da fare |
 | [MOB-05](MOB-05-rendimenti.md) | Rendimenti | 2 | M | MOB-02, PERF-09 | Fable 5.1 · high | da fare |
 | [MOB-06](MOB-06-patrimonio-analisi-storico-hall-of-fame.md) | Patrimonio · Analisi · Storico · Hall of Fame | 3 | L | MOB-02, PERF-11 | Opus 5.5 · high | da fare |
-| [MOB-07](MOB-07-allocazione-previdenza-fire.md) | Allocazione · Previdenza · FIRE | 3 | L | MOB-02 (PERF-04, 05, 10 e PERF-00 chiuse) | Fable 5.1 · high | da fare |
+| [MOB-07](MOB-07-allocazione-previdenza-fire.md) | Allocazione · Previdenza · FIRE | 3 | L | MOB-02 (PERF-04, 05, 10 chiuse; PERF-00 chiusa il 2026-09-28) | Fable 5.1 · high | da fare |
 | [MOB-08](MOB-08-tablet-768-e-1024.md) | Tablet: 768 e 1024 | 3 | M | MOB-03..07 (PERF-01, 02, 14) | Opus 5.5 · high | da fare |
 | [MOB-09](MOB-09-design-md-guide-e-chiusura.md) | DESIGN.md, guide e chiusura | 3 | M | MOB-03..08 | Opus 5.5 · high | da fare |
 
@@ -236,7 +236,7 @@ Fino a MOB-01: `reference/mobile-census.mjs` copiato nella radice del repo come 
 'playwright'` risolve da lì), emulatori + mirror + `npm run dev:emulator`, poi
 `node .tmp-mobile-measure.mjs --out=<cartella fuori dal repo>` (opzioni `--viewports=390,768,1024`,
 `--surfaces=panoramica,rendimenti`), cancellato a fine sessione; il JSON e gli screenshot restano fuori dal repo. Da
-MOB-01: `npm run mobile:census` e `npm run mobile:budget` sulla build di produzione di PERF-01 (:3200), con il `--` di
+MOB-01: `npm run mobile:census` e `npm run mobile:budget` sulla build di produzione di `perf:build`, servita da `perf:serve` (:3200), con il `--` di
 npm davanti alle opzioni.
 
 ## 9. Decisioni del proprietario (2026-09-26)
@@ -250,7 +250,7 @@ npm davanti alle opzioni.
   una cifra (tasse su una vendita, base misurata, calendario) resta sempre visibile.
 - **Una tessera sul telefono non ripete** ciò che striscia o verdetto hanno stampato; torna intera dal tablet.
 - **Le sezioni aperte si ricordano per pagina** (`localStorage`, per dispositivo).
-- Prima le 14 spec di `doc/perf/`, poi queste.
+- Prima le 14 spec PERF (tutte ritirate entro il 2026-10-08), poi queste.
 - **Decisioni di fondazione (2026-09-27, prima di MOB-02/MOB-03)**: (1) **una sequenza sola** — nessun riordino
   CSS, l'ordine del DOM è l'ordine di lettura su ogni dispositivo, e dove LA tessera non è già la prima della griglia si
   sposta anche sul desktop (chiude AGENTS § Hierarchy vs `doc/guide/patrimonio.md`: vale la seconda); (2) **l'asse sotto

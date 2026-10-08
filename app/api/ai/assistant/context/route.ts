@@ -12,6 +12,7 @@ import {
 } from '@/lib/services/assistantMonthContextService';
 import { getDefaultAssistantPreferences } from '@/lib/server/assistant/webSearchPolicy';
 import { getAssistantMemoryDocument } from '@/lib/server/assistant/store';
+import { assistantIncludeDummySchema, parseOr400 } from '@/lib/server/validation';
 
 /**
  * GET /api/ai/assistant/context
@@ -28,6 +29,11 @@ import { getAssistantMemoryDocument } from '@/lib/server/assistant/store';
  *   year_analysis:  ?userId=&mode=year_analysis&year=
  *   ytd_analysis:   ?userId=&mode=ytd_analysis
  *   history_analysis: ?userId=&mode=history_analysis (reads startYear from settings)
+ *
+ * Every mode also takes `includeDummy=true|false`, the test-snapshot preference. The page holds
+ * it already (it reads the memory at mount) and sends it, so this route does not read the memory
+ * document a second time per opening; without the parameter — the page asked before its memory
+ * had answered — the route reads the stored preference itself, as it always did.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -47,14 +53,22 @@ export async function GET(request: NextRequest) {
     // enforcement only ever worked via the throw propagating past this dead wrapper.
     await assertCanAccessAccount(decodedToken, userId);
 
-    // Load user preferences to honour includeDummySnapshots for test accounts.
-    // Errors are non-fatal — fall back to safe defaults.
-    const memoryDoc = await getAssistantMemoryDocument(userId).catch(() => null);
-    const preferences = {
-      ...getDefaultAssistantPreferences(),
-      ...(memoryDoc?.preferences ?? {}),
-    };
-    const includeDummy = preferences.includeDummySnapshots ?? false;
+    // includeDummySnapshots (test accounts): from the request when the page sent it, else from
+    // the stored preferences. That read is non-fatal — it falls back to the safe defaults.
+    const includeDummyParam = searchParams.get('includeDummy');
+    let includeDummy: boolean;
+    if (includeDummyParam !== null) {
+      const parsed = parseOr400(assistantIncludeDummySchema, includeDummyParam);
+      if (!parsed.ok) return parsed.response;
+      includeDummy = parsed.data === 'true';
+    } else {
+      const memoryDoc = await getAssistantMemoryDocument(userId).catch(() => null);
+      const preferences = {
+        ...getDefaultAssistantPreferences(),
+        ...(memoryDoc?.preferences ?? {}),
+      };
+      includeDummy = preferences.includeDummySnapshots ?? false;
+    }
 
     let bundle;
 

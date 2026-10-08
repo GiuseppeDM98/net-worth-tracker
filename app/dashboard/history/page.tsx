@@ -15,24 +15,36 @@
  *                     Valore per strumento(12)
  *   Mobile (1 col):   Evoluzione → Raddoppi → Composizione → Driver → Valore per strumento
  *
- * DATA: the snapshots, assets, targets, expenses and settings load once in parallel; every
+ * DATA: snapshots, assets, settings, expenses, the ledger and the pension contributions come
+ * from React Query keys (2026-09-29: one read per session, no `Promise.all`) — five of them the
+ * ones every page shares, and the expenses WHOLE (`useExpenses`), by declared need: the Driver
+ * splits the growth of every year recorded, so this page has no window to read. It shares that
+ * list with Analisi and Centri di Costo; since 2026-09-30 Cashflow's other tabs and FIRE read a
+ * window of their own instead (lib/utils/expenseWindows.ts); every
  * figure a tile shows is derived from them in a pure, tested util (storicoSummary.ts, the
  * chartService preparers, snapshotAssetBreakdown.ts, historyComposition.ts) — never in a
  * component. A snapshot is a frozen photograph: nothing here recomputes a stored value.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Download, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
-import { getAllAssets, calculateTotalEstimatedTaxes } from '@/lib/services/assetService';
-import { getUserSnapshots, updateSnapshotNote } from '@/lib/services/snapshotService';
-import { getTargets, getDefaultTargets, getSettings } from '@/lib/services/assetAllocationService';
-import { getAllExpenses } from '@/lib/services/expenseService';
-import { getAssetTransactions } from '@/lib/services/assetTransactionService';
-import { getPensionContributions } from '@/lib/services/pensionContributionService';
+import { queryKeys } from '@/lib/query/queryKeys';
+import { useSnapshots } from '@/lib/hooks/useSnapshots';
+import { useAssets } from '@/lib/hooks/useAssets';
+import { useSettings } from '@/lib/hooks/useSettings';
+import { useFreshness } from '@/lib/hooks/useFreshness';
+import { useExpenses } from '@/lib/hooks/useExpenses';
+import { useAssetTransactions } from '@/lib/hooks/useAssetTransactions';
+import { usePensionContributions } from '@/lib/hooks/usePensionContributions';
+import { calculateTotalEstimatedTaxes } from '@/lib/services/assetService';
+import { updateSnapshotNote } from '@/lib/services/snapshotService';
+import { getDefaultTargets } from '@/lib/services/assetAllocationService';
+import { composeReadState } from '@/lib/utils/readState';
 import {
   prepareNetWorthHistoryData,
   prepareAssetClassHistoryData,
@@ -40,7 +52,7 @@ import {
   prepareDoublingTimeData,
   prepareMonthlyLaborMetricsData,
 } from '@/lib/services/chartService';
-import type { Asset, MonthlySnapshot, AssetAllocationTarget, DoublingMode, AssetAllocationSettings } from '@/types/assets';
+import type { Asset, MonthlySnapshot, DoublingMode } from '@/types/assets';
 import type { Expense } from '@/types/expenses';
 import type { AssetTransaction } from '@/types/assetTransactions';
 import type { PensionContribution } from '@/types/pension';
@@ -107,69 +119,64 @@ const SKELETON_CELLS: TileSkeletonCell[] = [
 const DRIVER_TRAILING_MONTHS = 12;
 /** The cashflow floor when the settings carry none. */
 const DEFAULT_CASHFLOW_START_YEAR = 2025;
+const EMPTY_SNAPSHOTS: MonthlySnapshot[] = [];
+const EMPTY_ASSETS: Asset[] = [];
+const EMPTY_EXPENSES: Expense[] = [];
+const EMPTY_TRANSACTIONS: AssetTransaction[] = [];
+const EMPTY_CONTRIBUTIONS: PensionContribution[] = [];
 
 export default function HistoryPage() {
   const { user } = useAuth();
   const { ownerId } = useActiveAccount();
   const isDemo = useDemoMode();
-  const [snapshots, setSnapshots] = useState<MonthlySnapshot[]>([]);
-  const [assets, setAssets] = useState<Asset[]>([]);
-  const [targets, setTargets] = useState<AssetAllocationTarget | null>(null);
-  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const queryClient = useQueryClient();
+
+  // ─── The reads: six keys (2026-09-29), the expenses the whole collection (see the header) ─────
+  // The page gates on EVERY query it reads (doc/guide/stati.md): `loading` while any is still
+  // reading, `failed` when any read did not happen — a failed read is not an empty set.
+  const snapshotsQuery = useSnapshots(ownerId);
+  const assetsQuery = useAssets(ownerId);
+  const settingsQuery = useSettings(ownerId);
+  const expensesQuery = useExpenses(ownerId);
   // The ledger and the pension contributions: the Driver measures the market from them.
-  const [transactions, setTransactions] = useState<AssetTransaction[]>([]);
-  const [pensionContributions, setPensionContributions] = useState<PensionContribution[]>([]);
-  const [portfolioSettings, setPortfolioSettings] = useState<AssetAllocationSettings | null>(null);
-  const [loading, setLoading] = useState(true);
-  /** A failed load is not an empty set: it gets an alert, never a verdict about zeros. */
-  const [loadFailed, setLoadFailed] = useState(false);
+  const transactionsQuery = useAssetTransactions(ownerId);
+  const contributionsQuery = usePensionContributions(ownerId);
+  // The header's «Aggiornato alle…» while figures restored from the persisted cache are being
+  // reread: the same six keys the read state composes.
+  const freshness = useFreshness([snapshotsQuery, assetsQuery, settingsQuery, expensesQuery, transactionsQuery, contributionsQuery]);
+  const { loading, loadFailed } = useMemo(
+    () => composeReadState([snapshotsQuery, assetsQuery, settingsQuery, expensesQuery, transactionsQuery, contributionsQuery]),
+    [snapshotsQuery, assetsQuery, settingsQuery, expensesQuery, transactionsQuery, contributionsQuery],
+  );
+  const snapshots = snapshotsQuery.data ?? EMPTY_SNAPSHOTS;
+  const assets = assetsQuery.data ?? EMPTY_ASSETS;
+  const portfolioSettings = settingsQuery.data ?? null;
+  const expenses = expensesQuery.data ?? EMPTY_EXPENSES;
+  const transactions = transactionsQuery.data ?? EMPTY_TRANSACTIONS;
+  const pensionContributions = contributionsQuery.data ?? EMPTY_CONTRIBUTIONS;
+  // What `getTargets` used to read in a second round trip: the same document's `targets`.
+  const targets = portfolioSettings?.targets ?? null;
+
+  /** «Riprova» and a new manual snapshot: invalidate the keys, never a bare refetch (AGENTS.md § Caching). */
+  const reloadData = () => {
+    if (!ownerId) return;
+    for (const key of [
+      queryKeys.snapshots.all(ownerId),
+      queryKeys.assets.all(ownerId),
+      queryKeys.settings.all(ownerId),
+      queryKeys.expenses.all(ownerId),
+      queryKeys.assetTransactions.all(ownerId),
+      queryKeys.pensionContributions.all(ownerId),
+    ]) {
+      queryClient.invalidateQueries({ queryKey: key });
+    }
+  };
   const [doublingMode, setDoublingMode] = useState<DoublingMode>('geometric');
   const [showManualSnapshotModal, setShowManualSnapshotModal] = useState(false);
   const [noteDialogOpen, setNoteDialogOpen] = useState(false);
   // Valore per strumento: the month (null = the latest with a breakdown) and the ticked instruments.
   const [selectedMonthKey, setSelectedMonthKey] = useState<string | null>(null);
   const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(new Set());
-
-  /** Snapshots, assets, targets, expenses, settings, the ledger and the pension contributions, in parallel. */
-  const loadData = async () => {
-    if (!user || !ownerId) return;
-    try {
-      setLoading(true);
-      setLoadFailed(false);
-      const [snapshotsData, assetsData, targetsData, expensesData, settingsData, transactionsData, contributionsData] = await Promise.all([
-        getUserSnapshots(ownerId),
-        getAllAssets(ownerId),
-        getTargets(ownerId),
-        getAllExpenses(ownerId),
-        getSettings(ownerId),
-        getAssetTransactions(ownerId),
-        getPensionContributions(ownerId),
-      ]);
-      setSnapshots(snapshotsData);
-      setAssets(assetsData);
-      setTargets(targetsData || getDefaultTargets());
-      setExpenses(expensesData);
-      setPortfolioSettings(settingsData);
-      setTransactions(transactionsData);
-      setPensionContributions(contributionsData);
-    } catch (error) {
-      // The `ErrorNotice` below is the failure's one voice: a toast beside it said the same thing twice.
-      setLoadFailed(true);
-      console.error('Error loading history data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!user || !ownerId) return;
-    // Deferred so the effect body itself sets no state (react-hooks/set-state-in-effect).
-    const timer = setTimeout(() => {
-      loadData();
-    }, 0);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, ownerId]);
 
   /** CSV of the whole history: date, total, liquid, illiquid. */
   const handleExportCSV = () => {
@@ -192,11 +199,13 @@ export default function HistoryPage() {
     toast.success('Storico esportato con successo');
   };
 
-  /** A note is saved first, then patched into the local snapshot — no refetch. Never in demo: the snapshots are shared. */
+  /** A note is saved first, then patched into the cached snapshot — no refetch. Never in demo: the snapshots are shared. */
   const handleSaveNote = async (year: number, month: number, note: string) => {
     if (!user || !ownerId || isDemo) return;
     await updateSnapshotNote(ownerId, year, month, note);
-    setSnapshots((previous) => previous.map((s) => (s.year === year && s.month === month ? { ...s, note: note.trim() || undefined } : s)));
+    queryClient.setQueryData<MonthlySnapshot[]>(queryKeys.snapshots.all(ownerId), (previous) =>
+      previous?.map((s) => (s.year === year && s.month === month ? { ...s, note: note.trim() || undefined } : s)),
+    );
   };
 
   // ─── The numbers (pure layer) ───────────────────────────────────────────────
@@ -345,6 +354,7 @@ export default function HistoryPage() {
       label="Analisi"
       title="Storico"
       description={describeStoricoHeader(growth)}
+      freshness={freshness}
       actions={
         <>
           <div className="hidden items-center gap-2 desktop:flex">{headerActions(false)}</div>
@@ -359,7 +369,7 @@ export default function HistoryPage() {
 
   const dialogs = (
     <>
-      <CreateManualSnapshotModal open={showManualSnapshotModal} onOpenChange={setShowManualSnapshotModal} userId={ownerId || ''} onSuccess={loadData} />
+      <CreateManualSnapshotModal open={showManualSnapshotModal} onOpenChange={setShowManualSnapshotModal} userId={ownerId || ''} onSuccess={reloadData} />
       <SnapshotSearchDialog open={noteDialogOpen} onOpenChange={setNoteDialogOpen} snapshots={snapshots} onSave={handleSaveNote} />
     </>
   );
@@ -382,7 +392,7 @@ export default function HistoryPage() {
         {header}
         <ErrorNotice
           className="max-w-[920px]"
-          onRetry={() => void loadData()}
+          onRetry={reloadData}
           notice={describeReadFailure({
             consequence: 'Lo storico non è stato letto: senza le rilevazioni mensili non c’è una crescita da misurare.',
             untouched: 'Le rilevazioni registrate non sono state toccate.',

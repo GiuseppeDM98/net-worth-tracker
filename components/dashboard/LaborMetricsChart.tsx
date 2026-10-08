@@ -16,7 +16,7 @@
  * colour (3,64 · 4,02 · 2,62:1 as 11px text, measured) and names its icons in English.
  */
 
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from '@/components/ui/charts/recharts';
 import type { prepareMonthlyLaborMetricsData } from '@/lib/services/chartService';
 import { formatCurrency, formatCurrencyCompact } from '@/lib/services/chartService';
 import { useChartColors } from '@/lib/hooks/useChartColors';

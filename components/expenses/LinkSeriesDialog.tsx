@@ -17,6 +17,7 @@
 
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/query/queryKeys';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -67,7 +68,7 @@ export function LinkSeriesDialog({ request, ownerId, cashAccounts, properties, n
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
 
-  // The chosen account belongs to THIS opening (AGENTS.md → state stored with its subject).
+  // The chosen account belongs to THIS opening (AGENTS.md § React Query and Derived State).
   const subjectKey = expense?.id ?? '';
   const chosen = accountId?.key === subjectKey ? accountId.value : NONE;
 
@@ -101,19 +102,27 @@ export function LinkSeriesDialog({ request, ownerId, cashAccounts, properties, n
     if (!expense || chosen === NONE) return;
     setBusy(true);
     setFailure(null);
-    try {
+    // The link is a function of its own, awaited in the try below, and the reset follows the
+    // catch rather than a finally: the React Compiler does not compile conditional expressions
+    // inside a try/catch, nor a try/finally.
+    const link = async () => {
       const linked =
         target === 'debt' ? await linkSeriesToDebt(ownerId, expense, chosen, now) : await linkSeriesToCashAccount(ownerId, expense, chosen, now);
       toast.success(`${linked} ${mode === 'installment' ? (linked === 1 ? 'rata collegata' : 'rate collegate') : linked === 1 ? 'voce collegata' : 'voci collegate'} a ${accountName ?? (target === 'debt' ? 'immobile' : 'conto')}`);
       // The next opening must read the series again: its occurrences now carry the account.
       queryClient.invalidateQueries({ queryKey: ['expense-series', ownerId] });
+      // Patrimonio's «Mutuo» rows live under the assets key (lib/hooks/useMortgageInstalments.ts):
+      // linking a series moves no asset, so nothing else would refresh them.
+      queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
       onLinked();
       close();
+    };
+    try {
+      await link();
     } catch (error) {
       setFailure(describeWriteError(error));
-    } finally {
-      setBusy(false);
     }
+    setBusy(false);
   };
 
   return (

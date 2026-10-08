@@ -11,6 +11,11 @@
  * `ExpenseSplitSummary` does not belong on this screen — and the monthly email, which reads the
  * same two modules, can never disagree with what is printed here.
  *
+ * WHAT IT READS: the rows of Tracciamento's window for ITS period (`trackingWindow`,
+ * lib/utils/expenseWindows.ts) — the same key as Tracciamento's when the two tabs show the same
+ * period, so the second one to open reads nothing. The tab mounts late and has its own axis, so
+ * the read is its own; a new period is a new read, during which the picker stays and the tiles wait.
+ *
  * ONE TILE PER PERSON, on purpose. Previdenza puts one block per contributor inside a single
  * tile; here each person is a tile, because the reader is looking for THEIR own figure and a
  * tile is the unit the eye lands on. It also makes the grid scale to a third person without a
@@ -21,9 +26,9 @@
 
 import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Tile, TILE_CELL_CLASS, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
-import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
+import { TileGridSkeleton, VerdictSkeleton } from '@/components/ui/tile-grid-skeleton';
+import { SPLIT_SKELETON_CELLS } from '@/lib/constants/cashflowTabSkeletons';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorNotice } from '@/components/ui/error-notice';
 import { describeReadFailure, resolveSurfaceState } from '@/lib/utils/statesNarrative';
@@ -32,6 +37,9 @@ import { NarrativeText } from '@/components/ui/narrative-text';
 import { RankedRows, type RankedRow } from '@/components/ui/ranked-rows';
 import { PeriodPicker } from '@/components/ui/period-picker';
 import { currentMonthPeriod, type Period } from '@/lib/utils/period';
+import { useActiveAccount } from '@/contexts/ActiveAccountContext';
+import { useExpensesInRange } from '@/lib/hooks/useExpenses';
+import { trackingWindow } from '@/lib/utils/expenseWindows';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { filterExpensesByPeriod, rankCategories } from '@/lib/utils/tracciamentoSummary';
 import { summarizeExpenseSplit } from '@/lib/utils/expenseSplitSummary';
@@ -47,23 +55,13 @@ import {
 import type { Expense } from '@/types/expenses';
 import type { FamilyMember } from '@/types/assets';
 
-// The desktop geometry of the grid below, so the skeleton has its proportions and nothing
-// jumps when the data lands. THREE cells, because the people share one: «In comune» over two
-// rows, «Quota» beside it, and the row of person tiles under that. It declared 5/7/7 against a
-// grid that landed 5/7/6/6 until 2026-09-21, and the page jumped every time the data arrived.
-const SKELETON_CELLS = [
-  { span: 5, rows: 2, lines: 6 },
-  { span: 7, lines: 3 },
-  { span: 7, lines: 4 },
-];
-
 interface ExpenseSplitTabProps {
-  allExpenses: Expense[];
   familyMembers: FamilyMember[];
-  loading: boolean;
-  /** The queries behind `allExpenses`/`categories` failed: say so, never render zeros. */
-  loadFailed: boolean;
+  /** The years the picker offers, from the account's oldest and newest row (`listExpenseYears`). */
+  availableYears: number[];
 }
+
+const EMPTY_EXPENSES: Expense[] = [];
 
 /**
  * One line of the pool's arithmetic under the hero: «Entrate in comune −1000 €», «Da dividere
@@ -78,19 +76,17 @@ function PoolRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function ExpenseSplitTab({ allExpenses, familyMembers, loading, loadFailed }: ExpenseSplitTabProps) {
+export function ExpenseSplitTab({ familyMembers, availableYears }: ExpenseSplitTabProps) {
+  const { ownerId } = useActiveAccount();
   const [period, setPeriod] = useState<Period>(() => currentMonthPeriod());
   // ONE `now` per mount, like every other tab: a page whose clock moves under it would move its
   // own figures between two renders.
   const [now] = useState(() => new Date());
 
-  const availableYears = useMemo(() => {
-    if (allExpenses.length === 0) return [];
-    const years = allExpenses.map((expense) => new Date(expense.date).getFullYear());
-    return Array.from(new Set(years)).sort((a, b) => b - a);
-  }, [allExpenses]);
+  const expensesWindow = useMemo(() => trackingWindow(period), [period]);
+  const { data: windowExpenses = EMPTY_EXPENSES, isLoading: loading, isError: loadFailed } = useExpensesInRange(ownerId, expensesWindow);
 
-  const expenses = useMemo(() => filterExpensesByPeriod(allExpenses, period), [allExpenses, period]);
+  const expenses = useMemo(() => filterExpensesByPeriod(windowExpenses, period), [windowExpenses, period]);
 
   const summary = useMemo(
     () => summarizeExpenseSplit({ expenses, members: familyMembers, now }),
@@ -110,25 +106,46 @@ export function ExpenseSplitTab({ allExpenses, familyMembers, loading, loadFaile
     percentage: row.percentage,
   }));
 
-  if (resolveSurfaceState({ loading: loading, failed: loadFailed }) === 'failed') {
-    return (
+  // A wait is a skeleton, a failed read a notice — and in both the picker stays: the read is the
+  // read of ONE period, and the way out of it is another period (Tracciamento's rule).
+  const surface = resolveSurfaceState({ loading: loading, failed: loadFailed });
+  const verdictSlot =
+    surface === 'failed' ? (
       <ErrorNotice
-        className="max-w-[920px]"
+        className="max-w-[920px] min-w-0 flex-1"
         notice={describeReadFailure({
           consequence: 'I movimenti non sono stati letti: senza di essi non si sa cosa è stato speso in comune.',
           untouched: 'I movimenti registrati non sono stati toccati.',
         })}
       />
+    ) : surface === 'loading' ? (
+      <VerdictSkeleton className="flex-1" />
+    ) : (
+      <PageVerdict verdict={verdict} ariaLabel="Verdetto sulla divisione" />
     );
-  }
 
-  if (loading) {
+  // The same rows in both returns below: the picker is the same element while its period is read.
+  const periodRows = (
+    <>
+      {/* ── Verdict, with the period axis beside it on desktop ─────────────────── */}
+      <div className="flex items-start justify-between gap-6 pt-1">
+        {verdictSlot}
+        <div className="hidden desktop:block">
+          <PeriodPicker value={period} onChange={setPeriod} availableYears={availableYears} className="shrink-0" />
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center justify-center gap-2 desktop:hidden">
+        <PeriodPicker value={period} onChange={setPeriod} availableYears={availableYears} className="max-w-[190px] shrink-0" />
+      </div>
+    </>
+  );
+
+  if (surface !== 'ready') {
     return (
-      <TileGridSkeleton
-        cells={SKELETON_CELLS}
-        className="pt-1"
-        toolbar={<Skeleton className="desktop:hidden mx-auto h-9 w-[190px] rounded-md" />}
-      />
+      <div className="space-y-4">
+        {periodRows}
+        {surface === 'loading' && <TileGridSkeleton verdict={false} cells={SPLIT_SKELETON_CELLS} />}
+      </div>
     );
   }
 
@@ -145,16 +162,7 @@ export function ExpenseSplitTab({ allExpenses, familyMembers, loading, loadFaile
 
   return (
     <div className="space-y-4">
-      {/* ── Verdict, with the period axis beside it on desktop ─────────────────── */}
-      <div className="flex items-start justify-between gap-6 pt-1">
-        <PageVerdict verdict={verdict} ariaLabel="Verdetto sulla divisione" />
-        <div className="hidden desktop:block">
-          <PeriodPicker value={period} onChange={setPeriod} availableYears={availableYears} className="shrink-0" />
-        </div>
-      </div>
-      <div className="flex flex-wrap items-center justify-center gap-2 desktop:hidden">
-        <PeriodPicker value={period} onChange={setPeriod} availableYears={availableYears} className="max-w-[190px] shrink-0" />
-      </div>
+      {periodRows}
 
       {/* ── Tile grid ──────────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-3 tablet:grid-cols-2 desktop:grid-cols-12">
@@ -198,9 +206,9 @@ export function ExpenseSplitTab({ allExpenses, familyMembers, loading, loadFaile
                   <RankedRows
                     rows={commonRows}
                     color="var(--chart-1)"
-                    remainder={
+                    remainders={
                       commonRanking.remainder
-                        ? { label: 'Altre', amount: commonRanking.remainder.amount, percentage: commonRanking.remainder.percentage }
+                        ? [{ label: 'Altre', amount: commonRanking.remainder.amount, percentage: commonRanking.remainder.percentage }]
                         : null
                     }
                     ariaLabel="Spese in comune per categoria"

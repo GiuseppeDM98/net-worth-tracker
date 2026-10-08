@@ -11,6 +11,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { fromZonedTime } from 'date-fns-tz';
 import {
   getActualForItem,
   getMonthlyActualsForItem,
@@ -418,7 +419,9 @@ describe('findCrossingDay and projectCrossingDay', () => {
   it('collects the month spending rows by Italian calendar day, income and transfers out', () => {
     const expenses: Expense[] = [
       makeExpense({ categoryId: 'c1', amount: -300, date: new Date(2026, 2, 10) }),
-      makeExpense({ categoryId: 'c2', amount: -90, date: new Date(2026, 2, 10, 23, 30) }),
+      // Late evening by the ITALIAN clock: the day is read in Rome, so the fixture is named there
+      // too, or a suite running in UTC sees the 11th (2026-10-08).
+      makeExpense({ categoryId: 'c2', amount: -90, date: fromZonedTime('2026-03-10T23:30:00', 'Europe/Rome') }),
       makeExpense({ type: 'income', categoryId: 'inc', amount: 2000, date: new Date(2026, 2, 3) }),
       makeExpense({ type: 'transfer', categoryId: 'c1', amount: -500, date: new Date(2026, 2, 9) }),
       makeExpense({ categoryId: 'c1', amount: -10, date: new Date(2026, 3, 1) }),

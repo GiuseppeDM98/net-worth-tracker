@@ -31,7 +31,7 @@ import {
   MIN_VISIBLE_AMOUNT,
 } from '@/lib/utils/allocazioneSummary';
 import type { AllocationData, Asset } from '@/types/assets';
-import type { PortfolioExposureData } from '@/types/exposure';
+import type { ExposureBucket, ExposureCoverage, ExposureViewData, PortfolioExposure } from '@/types/exposure';
 import { buildHoldings, sumTradableByClass, type AllocatableHolding, type PlanNode } from '@/lib/utils/allocationUtils';
 
 function data({ currentValue, targetPercentage, ...rest }: Partial<AllocationData> & { currentValue: number; targetPercentage: number }): AllocationData {
@@ -587,52 +587,128 @@ describe('summarizeHoldings', () => {
 });
 
 describe('summarizeExposure', () => {
-  const exposure: PortfolioExposureData = {
-    topHoldings: [
-      { symbol: 'AAPL', name: 'Apple', exposureEur: 10045, exposurePct: 0.041, sources: [{ assetName: 'A', ticker: 'IWDA', contributionEur: 5000, holdingPct: 0.05 }, { assetName: 'B', ticker: 'CSPX', contributionEur: 5045, holdingPct: 0.07 }] },
-      { symbol: 'MSFT', name: 'Microsoft', exposureEur: 9310, exposurePct: 0.038, sources: [] },
-      { symbol: 'NVDA', name: 'Nvidia', exposureEur: 8575, exposurePct: 0.035, sources: [] },
-    ],
-    sectors: [
-      { key: 'technology', label: 'Tecnologia', exposureEur: 59535, exposurePct: 0.243, sources: [] },
-      { key: 'financial', label: 'Finanza', exposureEur: 30000, exposurePct: 0.122, sources: [] },
-    ],
-    issuers: [
-      { family: 'iShares', exposureEur: 100000, exposurePct: 0.408, assets: [] },
-      { family: 'Vanguard', exposureEur: 64000, exposurePct: 0.261, assets: [] },
-    ],
-    totalAnalyzedValue: 164000,
-    totalPortfolioValue: 245000,
-    analyzedAssets: 12,
-    totalAssets: 16,
-    computedAt: '2026-08-24T06:15:00.000Z',
-    cacheKey: 'k',
+  const bucket = (amount: number, ...instruments: string[]): ExposureBucket => ({ amount, instruments });
+  const coverage = (overrides: Partial<ExposureCoverage>): ExposureCoverage => ({
+    measure: 'notional',
+    base: 0,
+    read: bucket(0),
+    unread: bucket(0),
+    notApplicable: { ...bucket(0), byClass: {}, unquoted: 0 },
+    outOfView: bucket(0),
+    named: 0,
+    ...overrides,
+  });
+  const empty: ExposureViewData = { entries: [], coverage: coverage({}) };
+
+  // Invented: 120.000 € of equity notional, of which 113.000 read (Yahoo named 27.930 of them),
+  // 7000 unread; gold and a bond sleeve around it. Issuers on a 164.000 € market base.
+  const exposure: PortfolioExposure = {
+    holdings: {
+      entries: [
+        { key: 'AAPL', label: 'Apple', caption: 'AAPL', amount: 10045, sources: [{ ticker: 'IWDA', name: 'A', amount: 5000, weight: 0.05, baseValue: 100000 }, { ticker: 'CSPX', name: 'B', amount: 5045, weight: 0.07, baseValue: 72071 }] },
+        { key: 'MSFT', label: 'Microsoft', caption: 'MSFT', amount: 9310, sources: [] },
+        { key: 'NVDA', label: 'Nvidia', caption: 'NVDA', amount: 8575, sources: [] },
+      ],
+      coverage: coverage({ base: 120000, read: bucket(113000, 'A', 'B'), unread: bucket(7000, 'Swap'), notApplicable: { ...bucket(8000, 'Oro'), byClass: { commodity: 8000 }, unquoted: 0 }, outOfView: bucket(40000, 'BTP'), named: 27930 }),
+    },
+    sectors: {
+      entries: [
+        { key: 'technology', label: 'Tecnologia', amount: 59535, sources: [] },
+        { key: 'financial_services', label: 'Finanza', amount: 30000, sources: [] },
+      ],
+      coverage: coverage({ base: 120000, read: bucket(113000, 'A', 'B'), unread: bucket(7000, 'Swap'), notApplicable: { ...bucket(8000, 'Oro'), byClass: { commodity: 8000 }, unquoted: 0 }, outOfView: bucket(40000, 'BTP'), named: 113000 }),
+    },
+    issuers: {
+      entries: [
+        { key: 'iShares', label: 'iShares', amount: 100000, sources: [] },
+        { key: 'Vanguard', label: 'Vanguard', amount: 64000, sources: [] },
+      ],
+      coverage: coverage({ measure: 'market', base: 164000, read: bucket(164000, 'A', 'B'), notApplicable: { ...bucket(8000, 'Conto'), byClass: {}, unquoted: 8000 }, named: 164000 }),
+    },
+    quotedCount: 12,
   };
 
-  it('turns a view into ranked rows in percent of the portfolio, closed by a residual', () => {
+  const printedTotal = (view: ReturnType<typeof summarizeExposure>) => [...view.rows, ...view.remainders].reduce((sum, row) => sum + row.percentage, 0);
+
+  it('ranks the rows in whole percents of the VIEW base, closed by «Resto letto» and «Non letto», adding up to 100', () => {
     const view = summarizeExposure(exposure, 'holdings', 2);
-    expect(view.rows.map((r) => [r.key, r.amount, r.percentage])).toEqual([
-      ['AAPL', 10045, 4.1],
-      ['MSFT', 9310, 3.8],
+    // 10045 / 120000 = 8,37 → 8; 9310 → 7,76 → 8; the rest of the read euros 93.645 → 78; unread 7000 → 6.
+    expect(view.rows.map((row) => [row.key, row.amount, row.percentage])).toEqual([
+      ['AAPL', 10045, 8],
+      ['MSFT', 9310, 8],
     ]);
-    expect(view.remainder).toEqual({ label: 'Resto del portafoglio', amount: 245000 - 10045 - 9310, percentage: 92.1 });
-    expect(summarizeExposure(exposure, 'sectors', 5).rows[0]).toMatchObject({ key: 'technology', label: 'Tecnologia' });
-    expect(summarizeExposure(exposure, 'issuers', 5).remainder?.label).toBe('Resto del portafoglio');
+    expect(view.remainders).toEqual([
+      { key: 'read-rest', label: 'Resto letto', amount: 93645, percentage: 78 },
+      { key: 'unread', label: 'Non letto', amount: 7000, percentage: 6 },
+    ]);
+    expect(printedTotal(view)).toBe(100);
+    expect(summarizeExposure(exposure, 'sectors', 5).rows[0]).toMatchObject({ key: 'technology', label: 'Tecnologia', percentage: 50 });
   });
 
-  it('has no residual when the rows cover the portfolio, and keeps drill-down sources', () => {
-    const view = summarizeExposure({ ...exposure, topHoldings: [{ symbol: 'ALL', name: 'Tutto', exposureEur: 245000, exposurePct: 1, sources: [] }] }, 'holdings', 5);
-    expect(view.remainder).toBeNull();
+  it('hands the rounding drift to «Resto letto», the remainder by definition', () => {
+    // 33,4% + 33,4% + a rest of 33,2% print 33 + 33 + 33 = 99: the rest takes the point.
+    const custom: PortfolioExposure = {
+      ...exposure,
+      holdings: {
+        entries: [
+          { key: 'A', label: 'A', amount: 33400, sources: [] },
+          { key: 'B', label: 'B', amount: 33400, sources: [] },
+        ],
+        coverage: coverage({ base: 100000, read: bucket(100000, 'X'), named: 66800 }),
+      },
+    };
+    const view = summarizeExposure(custom, 'holdings', 2);
+    expect(view.rows.map((row) => row.percentage)).toEqual([33, 33]);
+    expect(view.remainders).toEqual([{ key: 'read-rest', label: 'Resto letto', amount: 33200, percentage: 34 }]);
+    expect(printedTotal(view)).toBe(100);
+  });
+
+  it('without a «Resto letto» the largest row takes the drift', () => {
+    const custom: PortfolioExposure = {
+      ...exposure,
+      issuers: {
+        entries: ['X', 'Y', 'Z'].map((key) => ({ key, label: key, amount: 50000, sources: [] })),
+        coverage: coverage({ measure: 'market', base: 150000, read: bucket(150000, 'X', 'Y', 'Z'), named: 150000 }),
+      },
+    };
+    const view = summarizeExposure(custom, 'issuers', 6);
+    expect(view.rows.map((row) => row.percentage)).toEqual([34, 33, 33]);
+    expect(view.remainders).toEqual([]);
+    expect(printedTotal(view)).toBe(100);
+  });
+
+  it('is empty on a view with nothing in it, and is only «Non letto» when nothing was read', () => {
+    const nothing = summarizeExposure({ holdings: empty, sectors: empty, issuers: empty, quotedCount: 0 }, 'holdings', 6);
+    expect(nothing.rows).toEqual([]);
+    expect(nothing.remainders).toEqual([]);
+
+    const unreadOnly = summarizeExposure(
+      { holdings: { entries: [], coverage: coverage({ base: 5000, unread: bucket(5000, 'Swap') }) }, sectors: empty, issuers: empty, quotedCount: 1 },
+      'holdings',
+      6,
+    );
+    expect(unreadOnly.rows).toEqual([]);
+    expect(unreadOnly.remainders).toEqual([{ key: 'unread', label: 'Non letto', amount: 5000, percentage: 100 }]);
+  });
+
+  it('keeps the drill-down sources and the coverage', () => {
     expect(summarizeExposure(exposure, 'holdings', 5).rows[0].sources).toHaveLength(2);
+    expect(summarizeExposure(exposure, 'issuers', 5).coverage).toBe(exposure.issuers.coverage);
   });
 
-  it('extracts the highlights the reading names, with the issuer share of the ETFs', () => {
+  it('extracts the highlights the reading names, each on its own base, counting instruments and not sources', () => {
     expect(summarizeExposureHighlights(exposure)).toEqual({
-      topHolding: { name: 'Apple', pct: 4.1, sourceCount: 2 },
-      topSector: { label: 'Tecnologia', pct: 24.3 },
-      topIssuer: { family: 'iShares', etfShare: 61 },
+      topHolding: { name: 'Apple', pct: 8.4, sourceCount: 2 },
+      topSector: { label: 'Tecnologia', pct: 49.6 },
+      topIssuer: { family: 'iShares', pct: 61 },
     });
-    expect(summarizeExposureHighlights({ ...exposure, topHoldings: [], sectors: [], issuers: [] })).toEqual({ topHolding: null, topSector: null, topIssuer: null });
+    // Two sources from ONE instrument (a composite with two equity legs) are one instrument.
+    const twoLegs: PortfolioExposure = {
+      ...exposure,
+      holdings: { ...exposure.holdings, entries: [{ key: 'AAPL', label: 'Apple', amount: 100, sources: [{ ticker: 'X', name: 'Same', amount: 60 }, { ticker: 'X', name: 'Same', amount: 40 }] }] },
+    };
+    expect(summarizeExposureHighlights(twoLegs).topHolding?.sourceCount).toBe(1);
+    expect(summarizeExposureHighlights({ holdings: empty, sectors: empty, issuers: empty, quotedCount: 0 })).toEqual({ topHolding: null, topSector: null, topIssuer: null });
   });
 });
 

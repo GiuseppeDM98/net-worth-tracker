@@ -13,7 +13,11 @@
  *                                                      | Risparmio nel tempo (7)
  *                     Movimenti (12)
  *
- * ONE period axis governs the verdict and every tile. The toolbar filters (search, categories,
+ * ONE period axis governs the verdict and every tile — and what the tab READS: the page hands it
+ * the rows of `trackingWindow(period)` (lib/utils/expenseWindows.ts: the period and the twelve
+ * months before it), not the account's history, so the period lives in the page beside that read
+ * and a new period is a new read. While one is in flight the pickers stay mounted and the tiles
+ * wait as a skeleton. The toolbar filters (search, categories,
  * subcategory, account, owner, sort) narrow ONLY the Movimenti list: a verdict computed on the
  * «Alimentari» filter would read «speso più di quanto è entrato» over a slice that has no
  * income by construction.
@@ -31,7 +35,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Expense, ExpenseCategory, ExpenseType, EXPENSE_TYPE_LABELS } from '@/types/expenses';
 import type { FamilyMember } from '@/types/assets';
 import {
@@ -70,7 +73,7 @@ import { SegmentedControl } from '@/components/ui/segmented-control';
 import { MobileFiltersDrawer } from '@/components/cashflow/MobileFiltersDrawer';
 import { PageVerdict } from '@/components/ui/page-verdict';
 import { TILE_CELL_CLASS, TILE_FOOTER_ACTION_CLASS } from '@/components/ui/tile';
-import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
+import { TileGridSkeleton, VerdictSkeleton } from '@/components/ui/tile-grid-skeleton';
 import { ErrorNotice } from '@/components/ui/error-notice';
 import { describeReadFailure, resolveSurfaceState } from '@/lib/utils/statesNarrative';
 import { CategoryTile } from '@/components/dashboard/overview/CategoryTile';
@@ -81,11 +84,7 @@ import { MovimentiTile } from '@/components/cashflow/tiles/MovimentiTile';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { PeriodPicker } from '@/components/ui/period-picker';
-import {
-  type Period,
-  periodLabel,
-  currentMonthPeriod,
-} from '@/lib/utils/period';
+import { type Period, periodLabel } from '@/lib/utils/period';
 import { MultiSelect, type MultiSelectGroup } from '@/components/ui/multi-select';
 import { getExpenseDate } from '@/lib/utils/expenseHelpers';
 import { cn } from '@/lib/utils';
@@ -141,10 +140,21 @@ const SKELETON_CELLS = [
 // ─── Main component ───────────────────────────────────────────────────────────
 
 interface ExpenseTrackingTabProps {
-  allExpenses: Expense[];
+  /**
+   * The rows of `trackingWindow(period)`: the period whole, scheduled rows included, and the twelve
+   * months before it — what the delta, the flow chart and the savings history read behind the
+   * period. NOT the account's history: a row outside the window is simply not here.
+   */
+  windowExpenses: Expense[];
+  /** The page's axis, owned by the page because the window it reads follows it. */
+  period: Period;
+  onPeriodChange: (period: Period) => void;
+  /** The years the pickers offer, from the account's oldest and newest row (`listExpenseYears`). */
+  availableYears: number[];
   categories: ExpenseCategory[];
+  /** The period's window or the categories are being read for the first time. */
   loading: boolean;
-  /** The queries behind `allExpenses`/`categories` failed: say so, never render zeros. */
+  /** The queries behind `windowExpenses`/`categories` failed: say so, never render zeros. */
   loadFailed: boolean;
   onRefresh: () => Promise<void>;
   /** id→name map for cash assets; built in the parent to avoid a cross-domain subscription here. */
@@ -224,6 +234,9 @@ function applyListFilters(expenses: Expense[], filters: ListFilters): Expense[] 
   return filtered;
 }
 
+// Module-level loader: an `import()` inside the component keeps the React Compiler from compiling it.
+const loadExpenseService = () => import('@/lib/services/expenseService');
+
 /** Where the desktop list view is remembered; read once at mount, written on every switch. */
 const LIST_VIEW_STORAGE_KEY = 'cashflow.movimenti.vista';
 
@@ -251,7 +264,10 @@ function writeStoredListView(view: 'feed' | 'table'): void {
  * 4. Add type validation in ExpenseDialog schema
  */
 export function ExpenseTrackingTab({
-  allExpenses,
+  windowExpenses,
+  period,
+  onPeriodChange,
+  availableYears,
   categories,
   loading,
   loadFailed,
@@ -277,9 +293,6 @@ export function ExpenseTrackingTab({
     window.addEventListener('cashflow:add-expense', handler);
     return () => window.removeEventListener('cashflow:add-expense', handler);
   }, []);
-  // Unified period filter (replaces separate selectedYear + selectedMonth)
-  const [period, setPeriod] = useState<Period>(() => currentMonthPeriod());
-
   // The one question a series adds to a delete from the feed: «solo questa o tutte?»
   const [seriesRequest, setSeriesRequest] = useState<SeriesDeleteRequest | null>(null);
   // «Collega la serie…» from a series row's detail (LinkSeriesDialog).
@@ -329,19 +342,12 @@ export function ExpenseTrackingTab({
   // A link arriving from Divisione changes `?owner=` without remounting this tab (it is
   // `forceMount`), so the initializer above would never run again. Settled DURING render on the
   // param as its subject — never `useEffect + setState`, which would paint one frame of the old
-  // filter (AGENTS.md → react-hooks/set-state-in-effect, answer 3).
+  // filter (AGENTS.md § Motion → react-hooks/set-state-in-effect, answer 3).
   const [ownerParamSeen, setOwnerParamSeen] = useState<string | null | undefined>(initialOwnerId);
   if (ownerParamSeen !== initialOwnerId) {
     setOwnerParamSeen(initialOwnerId);
     setSelectedOwnerId(initialOwnerId ?? OWNER_FILTER_ALL);
   }
-
-  // Generate available years from ALL expenses (not filtered)
-  const availableYears = useMemo(() => {
-    if (allExpenses.length === 0) return [];
-    const years = allExpenses.map((e) => getExpenseDate(e.date).getFullYear());
-    return Array.from(new Set(years)).sort((a, b) => b - a);
-  }, [allExpenses]);
 
   // Receives individual category IDs from MultiSelect; promotes to type-level when
   // ALL categories of a type are selected (covers deleted-category edge case).
@@ -384,7 +390,7 @@ export function ExpenseTrackingTab({
   // marks each such row, and no figure passes a forecast off as a fact.
   //
   // The toolbar filters below narrow `filteredExpenses` (the Movimenti list), never this.
-  const expenses = useMemo(() => filterExpensesByPeriod(allExpenses, period), [allExpenses, period]);
+  const expenses = useMemo(() => filterExpensesByPeriod(windowExpenses, period), [windowExpenses, period]);
   const scheduled = useMemo(() => summarizeScheduled(expenses, now), [expenses, now]);
 
   const handleAddExpense = () => {
@@ -454,17 +460,19 @@ export function ExpenseTrackingTab({
 
   const deleteSingleExpense = useCallback(
     async (expense: Expense) => {
+      // Read before the try: the React Compiler refuses a logical expression inside a try/catch.
+      const invalidationOwner = user && ownerId ? ownerId : null;
       try {
         // Give back what the row has applied — both accounts of a transfer — before deleting
         // it; a row still waiting for its date moved nothing (mirror of ExpenseTable's delete).
         // A transfer's fee row goes with it (lib/utils/transferFee.ts), its balance given back too.
-        const { deleteExpenseRows, getTransferFeeOf } = await import('@/lib/services/expenseService');
+        const { deleteExpenseRows, getTransferFeeOf } = await loadExpenseService();
         const rows = rowsDeletedWith(expense, await getTransferFeeOf(expense));
-        if ((await reverseAppliedBalances(rows)) && user && ownerId) {
-          queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
+        if (await reverseAppliedBalances(rows)) {
+          if (invalidationOwner) queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(invalidationOwner) });
         }
         await deleteExpenseRows(expense.userId, rows);
-        if (user && ownerId) queryClient.invalidateQueries({ queryKey: queryKeys.costCenters.all(ownerId) });
+        if (invalidationOwner) queryClient.invalidateQueries({ queryKey: queryKeys.costCenters.all(invalidationOwner) });
         toast.success('Voce eliminata con successo');
         await onRefresh();
       } catch (error) {
@@ -498,15 +506,16 @@ export function ExpenseTrackingTab({
     // The series query is scoped by owner (firestore.rules refuses an unscoped list), so
     // without an owner there is nothing to delete — and no way to ask for it.
     if (!ownerId) return;
+    const invalidationOwner = user && ownerId ? ownerId : null;
     try {
       // Give back what the occurrences already happened have applied, in one transaction.
       const seriesExpenses = await getExpensesByRecurringParentId(ownerId, recurringParentId);
-      if ((await reverseAppliedBalances(seriesExpenses)) && user && ownerId) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
+      if (await reverseAppliedBalances(seriesExpenses)) {
+        if (invalidationOwner) queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(invalidationOwner) });
       }
-      const { deleteRecurringExpenses } = await import('@/lib/services/expenseService');
+      const { deleteRecurringExpenses } = await loadExpenseService();
       await deleteRecurringExpenses(ownerId, recurringParentId);
-      if (user && ownerId) queryClient.invalidateQueries({ queryKey: queryKeys.costCenters.all(ownerId) });
+      if (invalidationOwner) queryClient.invalidateQueries({ queryKey: queryKeys.costCenters.all(invalidationOwner) });
       toast.success('Tutte le voci ricorrenti sono state eliminate');
       await onRefresh();
     } catch (error) {
@@ -519,15 +528,16 @@ export function ExpenseTrackingTab({
     // The series query is scoped by owner (firestore.rules refuses an unscoped list), so
     // without an owner there is nothing to delete — and no way to ask for it.
     if (!ownerId) return;
+    const invalidationOwner = user && ownerId ? ownerId : null;
     try {
       // Give back what the instalments already due have applied, in one transaction.
       const seriesExpenses = await getExpensesByInstallmentParentId(ownerId, installmentParentId);
-      if ((await reverseAppliedBalances(seriesExpenses)) && user && ownerId) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
+      if (await reverseAppliedBalances(seriesExpenses)) {
+        if (invalidationOwner) queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(invalidationOwner) });
       }
-      const { deleteInstallmentExpenses } = await import('@/lib/services/expenseService');
+      const { deleteInstallmentExpenses } = await loadExpenseService();
       await deleteInstallmentExpenses(ownerId, installmentParentId);
-      if (user && ownerId) queryClient.invalidateQueries({ queryKey: queryKeys.costCenters.all(ownerId) });
+      if (invalidationOwner) queryClient.invalidateQueries({ queryKey: queryKeys.costCenters.all(invalidationOwner) });
       toast.success('Tutte le rate sono state eliminate');
       await onRefresh();
     } catch (error) {
@@ -684,8 +694,8 @@ export function ExpenseTrackingTab({
   // the period has no honest predecessor (a custom range).
   const previousTotals = useMemo(() => {
     const previous = previousPeriod(period, now);
-    return previous ? summarizePeriodCashflow(filterExpensesByPeriod(allExpenses, previous)) : null;
-  }, [allExpenses, period, now]);
+    return previous ? summarizePeriodCashflow(filterExpensesByPeriod(windowExpenses, previous)) : null;
+  }, [windowExpenses, period, now]);
 
   // The delta compares like with like. `totals` spans the whole period — for a year still
   // running that includes months the previous year cannot match, for the month in progress the
@@ -698,10 +708,10 @@ export function ExpenseTrackingTab({
     const previous = previousComparisonWindow(period, now);
     if (!current || !previous) return null;
     return computePeriodDelta(
-      summarizePeriodCashflow(filterExpensesByPeriod(allExpenses, current)),
-      summarizePeriodCashflow(filterExpensesByPeriod(allExpenses, previous)),
+      summarizePeriodCashflow(filterExpensesByPeriod(windowExpenses, current)),
+      summarizePeriodCashflow(filterExpensesByPeriod(windowExpenses, previous)),
     );
-  }, [allExpenses, period, now]);
+  }, [windowExpenses, period, now]);
 
   const verdict = useMemo(() => buildCashflowVerdict({ period, now, totals, delta, scheduled }), [period, now, totals, delta, scheduled]);
   const comparisonPhrase = describeComparisonPhrase(period, now);
@@ -710,15 +720,15 @@ export function ExpenseTrackingTab({
   // The income-vs-spending bars: the trailing months for a month, the year's own months for a year.
   const flows = useMemo(() => {
     const window = resolveFlowWindow(period, now, FLOW_MONTHS);
-    return buildTrailingMonthFlows(allExpenses, window.endYear, window.endMonth, window.count, now);
-  }, [allExpenses, period, now]);
+    return buildTrailingMonthFlows(windowExpenses, window.endYear, window.endMonth, window.count, now);
+  }, [windowExpenses, period, now]);
   const anchor = useMemo(() => resolveAnchorMonth(period, now), [period, now]);
   // Only a month is ONE bar of the chart; a year or a range is the whole axis.
   const highlightKey = period.kind === 'month' ? `${anchor.year}-${String(anchor.month).padStart(2, '0')}` : null;
 
   const savingsHistory = useMemo(
-    () => summarizeSavingsHistory(buildTrailingMonthFlows(allExpenses, anchor.year, anchor.month, HISTORY_MONTHS), now),
-    [allExpenses, anchor, now],
+    () => summarizeSavingsHistory(buildTrailingMonthFlows(windowExpenses, anchor.year, anchor.month, HISTORY_MONTHS), now),
+    [windowExpenses, anchor, now],
   );
 
   // Where spending lands at the current pace — only while the month is still running.
@@ -741,25 +751,107 @@ export function ExpenseTrackingTab({
   // rows. `now` splits them into happened and scheduled — the clause the tiles above need.
   const movementsSummary = useMemo(() => summarizeMovements(filteredExpenses, now), [filteredExpenses, now]);
 
-  if (resolveSurfaceState({ loading: loading, failed: loadFailed }) === 'failed') {
-    return (
+  // A wait is a skeleton, a failed read a notice — and in both the pickers stay: the read that is
+  // waited for, or that failed, is the read of ONE period, and the way out of it is another period.
+  const surface = resolveSurfaceState({ loading: loading, failed: loadFailed });
+  const verdictSlot =
+    surface === 'failed' ? (
       <ErrorNotice
-        className="max-w-[920px]"
+        className="max-w-[920px] min-w-0 flex-1"
         notice={describeReadFailure({
           consequence: 'I movimenti non sono stati letti: il mese non è misurabile, e uno zero qui sarebbe falso.',
           untouched: 'I movimenti registrati non sono stati toccati.',
         })}
       />
+    ) : surface === 'loading' ? (
+      <VerdictSkeleton className="flex-1" />
+    ) : (
+      <PageVerdict verdict={verdict} ariaLabel="Verdetto del periodo" />
     );
-  }
 
-  if (loading) {
-    return (
-      <TileGridSkeleton
-        cells={SKELETON_CELLS}
-        className="pt-1"
-        toolbar={<Skeleton className="desktop:hidden mx-auto h-9 w-[190px] rounded-md" />}
+  const periodRows = (
+    <>
+      {/* ── Verdict, with the one period axis beside it on desktop. While a window is being read
+          (or when its read failed) the pickers stay where they are — the same elements, so the
+          one that asked for the new period keeps its focus — and only the verdict and the tiles
+          give way ──────────────── */}
+      <div className="flex items-start justify-between gap-6 pt-1">
+        {verdictSlot}
+        <div className="desktop:block hidden">
+          <PeriodPicker value={period} onChange={onPeriodChange} availableYears={availableYears} className="shrink-0" />
+        </div>
+      </div>
+
+      {/* ── Below desktop: the period (the page's axis) under the verdict, plus the landscape
+          add button (the portrait FAB in the bottom nav is the only «add» there) ────── */}
+      <div className="desktop:hidden flex flex-wrap items-center justify-center gap-2">
+        <PeriodPicker value={period} onChange={onPeriodChange} availableYears={availableYears} className="shrink-0 max-w-[190px]" />
+        <Button
+          size="sm"
+          onClick={handleAddExpense}
+          disabled={isDemo}
+          aria-label={isDemo ? 'Aggiungi — non disponibile in modalità demo' : 'Aggiungi voce'}
+          title={isDemo ? 'Non disponibile in modalità demo' : undefined}
+          className="max-desktop:portrait:hidden h-9 shrink-0"
+        >
+          <Plus className="mr-1.5 h-4 w-4" />
+          Aggiungi
+        </Button>
+      </div>
+    </>
+  );
+
+  // The dialogs sit in the same place of both returns below, so an open one survives a reread.
+  const dialogs = (
+    <>
+      {/* Expense Dialog */}
+      <ExpenseDialog
+        open={dialogOpen}
+        onClose={handleDialogClose}
+        expense={editingExpense}
+        onSuccess={handleSuccess}
       />
+
+      {/* «Solo questa o tutte?» — for a row of an instalment plan or a recurring series deleted from the feed */}
+      <SeriesDeleteDialog
+        request={seriesRequest}
+        onClose={() => setSeriesRequest(null)}
+        onDeleteOne={(expense) => {
+          setSeriesRequest(null);
+          void deleteSingleExpense(expense);
+        }}
+        onDeleteAll={(expense) => {
+          setSeriesRequest(null);
+          if (expense.isInstallment && expense.installmentParentId) {
+            void deleteAllInstallmentExpenses(expense.installmentParentId);
+          } else if (expense.isRecurring && expense.recurringParentId) {
+            void deleteAllRecurringExpenses(expense.recurringParentId);
+          }
+        }}
+      />
+
+      {/* «Collega la serie a un conto» — the occurrences still to come move the account on their date */}
+      {ownerId && (
+        <LinkSeriesDialog
+          request={linkRequest}
+          ownerId={ownerId}
+          cashAccounts={cashAccounts}
+          properties={repayableProperties}
+          now={now}
+          onClose={() => setLinkRequest(null)}
+          onLinked={() => void onRefresh()}
+        />
+      )}
+    </>
+  );
+
+  if (surface !== 'ready') {
+    return (
+      <div className="space-y-4">
+        {periodRows}
+        {surface === 'loading' && <TileGridSkeleton verdict={false} cells={SKELETON_CELLS} />}
+        {dialogs}
+      </div>
     );
   }
 
@@ -805,7 +897,7 @@ export function ExpenseTrackingTab({
   const mobileToolbar = (
     <MobileFiltersDrawer
       period={period}
-      onPeriodChange={setPeriod}
+      onPeriodChange={onPeriodChange}
       availableYears={availableYears}
       searchQuery={searchQuery}
       onSearchChange={setSearchQuery}
@@ -996,30 +1088,7 @@ export function ExpenseTrackingTab({
 
   return (
     <div className="space-y-4">
-      {/* ── Verdict, with the one period axis beside it on desktop ──────────────── */}
-      <div className="flex items-start justify-between gap-6 pt-1">
-        <PageVerdict verdict={verdict} ariaLabel="Verdetto del periodo" />
-        <div className="desktop:block hidden">
-          <PeriodPicker value={period} onChange={setPeriod} availableYears={availableYears} className="shrink-0" />
-        </div>
-      </div>
-
-      {/* ── Below desktop: the period (the page's axis) under the verdict, plus the landscape
-          add button (the portrait FAB in the bottom nav is the only «add» there) ────── */}
-      <div className="desktop:hidden flex flex-wrap items-center justify-center gap-2">
-        <PeriodPicker value={period} onChange={setPeriod} availableYears={availableYears} className="shrink-0 max-w-[190px]" />
-        <Button
-          size="sm"
-          onClick={handleAddExpense}
-          disabled={isDemo}
-          aria-label={isDemo ? 'Aggiungi — non disponibile in modalità demo' : 'Aggiungi voce'}
-          title={isDemo ? 'Non disponibile in modalità demo' : undefined}
-          className="max-desktop:portrait:hidden h-9 shrink-0"
-        >
-          <Plus className="mr-1.5 h-4 w-4" />
-          Aggiungi
-        </Button>
-      </div>
+      {periodRows}
 
       {/* ── Tile grid ───────────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-3 tablet:grid-cols-2 desktop:grid-cols-12">
@@ -1110,44 +1179,7 @@ export function ExpenseTrackingTab({
         </div>
       </div>
 
-      {/* Expense Dialog */}
-      <ExpenseDialog
-        open={dialogOpen}
-        onClose={handleDialogClose}
-        expense={editingExpense}
-        onSuccess={handleSuccess}
-      />
-
-      {/* «Solo questa o tutte?» — for a row of an instalment plan or a recurring series deleted from the feed */}
-      <SeriesDeleteDialog
-        request={seriesRequest}
-        onClose={() => setSeriesRequest(null)}
-        onDeleteOne={(expense) => {
-          setSeriesRequest(null);
-          void deleteSingleExpense(expense);
-        }}
-        onDeleteAll={(expense) => {
-          setSeriesRequest(null);
-          if (expense.isInstallment && expense.installmentParentId) {
-            void deleteAllInstallmentExpenses(expense.installmentParentId);
-          } else if (expense.isRecurring && expense.recurringParentId) {
-            void deleteAllRecurringExpenses(expense.recurringParentId);
-          }
-        }}
-      />
-
-      {/* «Collega la serie a un conto» — the occurrences still to come move the account on their date */}
-      {ownerId && (
-        <LinkSeriesDialog
-          request={linkRequest}
-          ownerId={ownerId}
-          cashAccounts={cashAccounts}
-          properties={repayableProperties}
-          now={now}
-          onClose={() => setLinkRequest(null)}
-          onLinked={() => void onRefresh()}
-        />
-      )}
+      {dialogs}
     </div>
   );
 }

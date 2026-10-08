@@ -19,7 +19,7 @@ This guide will walk you through setting up the Portfolio Tracker web app from s
 
 Before you begin, ensure you have:
 
-- **Node.js** 18.x or higher ([Download](https://nodejs.org/))
+- **Node.js** 24.x ([Download](https://nodejs.org/)) — `engines.node` in `package.json`, which Vercel honours (Settings → Build and Deployment → Node.js Version is 24.x too). Note that a Vercel Function never `require()`s an ESM-only package at any Node version (`--no-experimental-require-module`): `package.json` `overrides` keeps `jwks-rsa` on 3.x for firebase-admin (AGENTS.md § Server Layer, 2026-10-08)
 - **npm** or **yarn** package manager
 - A **Google account** (for Firebase)
 - A **Vercel account** (free tier available at [vercel.com](https://vercel.com))
@@ -55,7 +55,7 @@ Firebase provides the backend infrastructure (database, authentication) for this
 3. Choose a starting mode:
    - **Production mode** (recommended): Start with secure rules, you'll configure them next
    - **Test mode**: Open access (not recommended for production)
-4. Select a Cloud Firestore location (choose closest to your users, e.g., `europe-west1` for Europe)
+4. Select a Cloud Firestore location (choose closest to your users, e.g., `europe-west1` for Europe). The production project is in `eur3` (the Belgium + Netherlands multi-region); the Vercel functions run in `fra1` (Frankfurt) to stay close to it — see "Function region" in the Vercel section below
 5. Click **"Enable"**
 
 ### Step 4: Configure Firestore Security Rules
@@ -184,6 +184,11 @@ REGISTRATION_WHITELIST=
 # Development Features (optional - for testing/demo)
 NEXT_PUBLIC_ENABLE_TEST_SNAPSHOTS=false
 
+# Persisted query cache (optional). The app keeps its last successful reads in the browser's
+# IndexedDB and paints them at once on the next load. `false` switches that off — the
+# rollback of a deploy; never set it on the Playwright server (`dev:e2e`).
+# NEXT_PUBLIC_PERSIST_QUERIES=false
+
 # Resend — Monthly email summaries (optional)
 # Required only if you want to receive automatic monthly portfolio reports.
 # Sign up for free at https://resend.com (free tier: 3000 emails/month).
@@ -197,6 +202,7 @@ RESEND_FROM_EMAIL=onboarding@resend.dev
 - `CRON_SECRET`: Generate a random string (e.g., use `openssl rand -hex 32`)
 - `NEXT_PUBLIC_ENABLE_TEST_SNAPSHOTS`: Set to `true` to enable dummy data generation in Settings page (for development, testing, or demo purposes). **Warning**: Test data is saved to the same Firebase collections as real data. You can delete all dummy data using the "Elimina Tutti i Dati Dummy" button in Settings. See [README.md](./README.md) for full feature documentation. **Recommended**: Keep `false` in production environments.
 - `ANTHROPIC_API_KEY` (optional): Enables AI-powered performance analysis. If omitted, the rest of the app still works normally.
+- `NEXT_PUBLIC_PERSIST_QUERIES` (optional): `false` disables the persisted query cache (the pages then start from a skeleton on every load, as before 2026-09-29). Unset or any other value keeps it on. Build-time, like every `NEXT_PUBLIC_*` variable.
 - `RESEND_API_KEY` (optional): Enables monthly email summaries. Create a free API key at [resend.com/api-keys](https://resend.com/api-keys). If omitted, the email feature is silently disabled.
 - `RESEND_FROM_EMAIL` (optional): Sender address for monthly emails. Options:
   - `onboarding@resend.dev` — Resend shared domain, no setup required. Delivers only to your Resend account's email address (suitable for personal/single-user deployments).
@@ -343,7 +349,7 @@ also guarantees they never point at production data.
   la serie?», a row opening its expense form, and on a phone the detail landing at the top with
   every target at 44px.
 
-Four fixture accounts, each seeded by the global setup:
+Four fixture accounts and one shared cache, each seeded by the global setup:
 
 | Script | Account | Why it is separate |
 | --- | --- | --- |
@@ -351,6 +357,7 @@ Four fixture accounts, each seeded by the global setup:
 | `npm run e2e:seed:analisi` | `test-user-analisi` | Every expense dated **January**, so year-to-date windows contain them whatever month the suite runs in and every asserted figure stays exact all year. The base seed's current-month expenses would pollute them |
 | `npm run e2e:seed:centri` | `test-user-centri` (`centri@example.com`) | The tab is opt-in: the flag on the base account would add a fifth tab to every Cashflow spec, and a linked expense is an ordinary expense (it would move Analisi's figures). «Fenicottero» (800 € in January, a 300 € instalment on December 31st, annual ceiling 1000 → the RISK) and «Ornitorinco» (27 rows a year old → dormant, and «Mostra altre» on screen; three of them one recurring series), plus six rows linked to NO center for «Collega spese…» (decoy «Casuario»: three plain ones and an instalment plan of three). The seed `set`s every row whole and removes strays, so a run that died half-way is healed by the next. A spec reaches it by FILENAME: `*centri.spec.ts` / `*centri.mobile.spec.ts` |
 | `npm run e2e:seed:hof` | `hof-user` (`hof@example.com`) | A ranking is worth a browser only with a history behind it: 47 monthly snapshots (novembre 2022 → settembre 2026) and one income + one expense row per month, a story the specs can name (best month marzo 2024 +18.400 €, income record dicembre 2025, a first year of two months). The seed writes NO `hall-of-fame` document: the desktop spec builds it through «Aggiorna i record», the real route. A spec reaches it by FILENAME: `*hof.spec.ts` / `*hof.mobile.spec.ts` |
+| `npm run e2e:seed:profiles` | the shared `instrument-profile-cache` (no account) | The Esposizione's Yahoo profiles for every quoted ticker of the base seed (`VWCE.DE` with ten holdings, `AAPL`, `FONDOPENSIONE` empty), stamped fresh on EVERY run because an empty answer lives 24 hours in the cache: Yahoo is called by the server, so `page.route` cannot keep the Allocazione specs off the network — the seed does (`scripts/instrumentProfileFixtures.ts`, shared with the Step 6 base seed) |
 
 Run either on its own if you want that data in the browser for manual inspection.
 
@@ -440,6 +447,17 @@ Copy-Item -Recurse -Force public .next/standalone/public
 node .next/standalone/server.js
 ```
 
+**`server.js` is not always at the top of `standalone/`.** Next copies the project's path below the tracing root it
+infers: on the Windows laptop the build lands in `.next/standalone/Documents/GitHub/net-worth-tracker/` (2026-09-28),
+and the two copies go next to THAT `server.js` (`<dir>/.next/static`, `<dir>/public`). Search for it, never hard-code it.
+
+**Against the emulators, on its own port: `npm run perf:build` + `npm run perf:serve`**. The first builds into
+`.next-perf` with the emulator `NEXT_PUBLIC_*` baked in; the second finds `server.js`, does the two copies and serves on
+**:3200** with the Admin SDK routed to the emulators — :3000 stays the tour server and :3100 Playwright's. The benchmark
+and the size budget run on it (`doc/guide/velocita.md`). A build into a new dist dir makes `next build` add that dir's
+`types/**` to `tsconfig.json` and reformat the whole file: the `.next-perf` lines are committed, so a diff there after a
+build means another dist dir — keep its two lines, not the reformat.
+
 ### Font-loading changes cannot be verified in dev
 
 `next/font` emits no `<link rel="preload">` in `next dev` (0 on every route). The build filename
@@ -511,6 +529,10 @@ git push -u origin main
 2. Wait for the deployment to complete (usually 1-2 minutes)
 3. Visit your deployed app at `https://your-app.vercel.app`
 
+### Function region
+
+`vercel.json` carries `"regions": ["fra1"]`: the serverless functions run in Frankfurt, next to Firestore (`eur3`), instead of Vercel's default `iad1` (Washington), which turned every Admin SDK read into a transatlantic round trip. The **Hobby** plan accepts ONE region in `regions` (more than one fails the deploy). If your Firestore is elsewhere, pick the Vercel region nearest to it. To check, read `x-vercel-id` on the response of a route that runs a function (DevTools → Network → an `/api/*` request → Headers, or `curl -sI https://your-app.vercel.app/api/benchmarks/fx-rates`): the header lists the regions the request went through and then the one where the function ran, so its FIRST segment is the edge nearest to the caller — from Italy it is European whatever `regions` says — and the function's region is the segment after it (e.g. `fra1::fra1::…` with this line, `fra1::iad1::…` without it). A preview behind Vercel's Deployment Protection answers 302 from the edge alone and says nothing about the function; Vercel → Logs names the region of each invocation as well. After a change of region, look at Vercel → Logs the day after for the two crons, and at Storico for the evening snapshot. As of 2026-10-04 none of this has been read in production: the line reaches it with the next release. A Vercel preview deploy gives no «before» either: previews do not read the production Firestore (owner, 2026-10-03).
+
 ### Step 5: Configure Cron Jobs
 
 Vercel Cron Jobs are configured in `vercel.json` file in the project root.
@@ -521,6 +543,7 @@ The current `vercel.json` file contains:
 
 ```json
 {
+  "regions": ["fra1"],
   "crons": [
     {
       "path": "/api/cron/monthly-snapshot",

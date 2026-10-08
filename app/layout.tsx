@@ -31,6 +31,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { MotionProvider } from "@/components/providers/MotionProvider";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { ColorThemeProvider } from "@/contexts/ColorThemeContext";
+import { COLOR_THEME_INIT_SCRIPT } from "@/lib/constants/colorTheme";
 
 // Load Geist fonts with CSS variables for Tailwind integration
 const geistSans = Geist({
@@ -77,6 +78,15 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="it" suppressHydrationWarning>
+      <head>
+        {/* The stored colour theme onto <html> BEFORE the first paint, the way next-themes puts
+            `.dark` there: the dashboard shell is in the prerendered HTML (since 2026-09-28), so without this
+            a reader on a non-default theme would see the default palette until hydration. In
+            <head>, not in <body>: a script in the body runs after the parser may already have had
+            a rendering opportunity. `suppressHydrationWarning` on <html> covers the attribute the
+            server did not render. The script and the key: lib/constants/colorTheme.ts. */}
+        <script dangerouslySetInnerHTML={{ __html: COLOR_THEME_INIT_SCRIPT }} />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >

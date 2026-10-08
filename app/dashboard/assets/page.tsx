@@ -40,7 +40,8 @@ import { calculateTotalValue } from '@/lib/services/assetService';
 import { useAssetLedgerMeta, useAssetTransactions } from '@/lib/hooks/useAssetTransactions';
 import { migrateAssetLedger, backfillAverageCostEur } from '@/lib/services/assetTransactionService';
 import { useSnapshots } from '@/lib/hooks/useSnapshots';
-import { useDashboardOverview } from '@/lib/hooks/useDashboardOverview';
+import { DASHBOARD_OVERVIEW_STALE_TIME_MS, useDashboardOverview } from '@/lib/hooks/useDashboardOverview';
+import { useFreshness } from '@/lib/hooks/useFreshness';
 import { useChartColors } from '@/lib/hooks/useChartColors';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { queryKeys } from '@/lib/query/queryKeys';
@@ -48,7 +49,7 @@ import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
 import { ASSET_CLASS_CHART_INDEX } from '@/lib/utils/allocationUtils';
 import { filterSparklineByPeriod } from '@/lib/utils/sparklinePeriod';
-import { cardItem, springLayoutTransition, staggerContainer } from '@/lib/utils/motionVariants';
+import { cardItem, staggerContainer } from '@/lib/utils/motionVariants';
 import { buildPatrimonioVerdict, describeLastPriceUpdate, formatHoldingCounts } from '@/lib/utils/patrimonioNarrative';
 import {
   isCashAccount,
@@ -102,6 +103,11 @@ const SKELETON_CELLS = [
 /** How many instruments the hero footer names in its "Mercato:" digest. */
 const DIGEST_INSTRUMENTS = 3;
 
+// Module-level so the page's try block holds no conditional: keeps it compilable by the React Compiler.
+function describePriceUpdate(data: { updated: number; failed: unknown[] }): string {
+  return `Aggiornati ${data.updated} prezzi${data.failed.length > 0 ? `, ${data.failed.length} falliti` : ''}`;
+}
+
 export default function AssetsPage() {
   const { user } = useAuth();
   const { ownerId } = useActiveAccount();
@@ -109,9 +115,12 @@ export default function AssetsPage() {
   const queryClient = useQueryClient();
   const chartColors = useChartColors();
 
-  const { data: assets = [], isLoading: loadingAssets, isError: assetsError } = useAssets(ownerId);
-  const { data: snapshots = [], isLoading: loadingSnapshots } = useSnapshots(ownerId);
-  const { data: overview, isLoading: loadingOverview, isError: overviewError } = useDashboardOverview(ownerId);
+  const assetsQuery = useAssets(ownerId);
+  const snapshotsQuery = useSnapshots(ownerId);
+  const overviewQuery = useDashboardOverview(ownerId);
+  const { data: assets = [], isLoading: loadingAssets, isError: assetsError } = assetsQuery;
+  const { data: snapshots = [], isLoading: loadingSnapshots } = snapshotsQuery;
+  const { data: overview, isLoading: loadingOverview, isError: overviewError } = overviewQuery;
   const deleteAssetMutation = useDeleteAsset(ownerId || '');
 
   // ─── Trade-ledger migration trigger ───────────────────────────────────────────
@@ -165,15 +174,28 @@ export default function AssetsPage() {
   // The whole ledger of the owner, filtered to the month in memory: a month query would need a
   // (userId, date) composite index that does not exist, and every trade mutation already
   // invalidates this cache (doc/guide/registro-operazioni.md § Asset Trade Ledger).
-  const { data: trades = [], isLoading: loadingTrades } = useAssetTransactions(ownerId, undefined, { enabled: ledgerReady });
+  const tradesQuery = useAssetTransactions(ownerId, undefined, { enabled: ledgerReady });
+  const { data: trades = [], isLoading: loadingTrades } = tradesQuery;
 
   // ─── Dialog state ─────────────────────────────────────────────────────────────
-  // `initialType` skips the type picker: «Aggiungi conto» already knows it wants a cash account.
-  const [assetDialog, setAssetDialog] = useState<{ open: boolean; asset: Asset | null; initialType?: Asset['type'] }>({
-    open: false,
-    asset: null,
-  });
-  const [cashDetail, setCashDetail] = useState<Asset | null>(null);
+  // The two dialogs a reader opens most are MOUNTED only from their opening to the end of their
+  // exit animation (since 2026-10-07): `AssetDialog` is 2900 lines and used to take part in every
+  // render of the page while closed. `open` drives the animation, `mounted` the tree: it turns false
+  // in `onExitComplete`, after Radix has handed the focus back to the opener — unmounting at
+  // `onClose` would cut the exit and drop the focus on `body`. The record stays through the exit,
+  // so the dialog leaves on its own title. `initialType` skips the type picker: «Aggiungi conto»
+  // already knows it wants a cash account.
+  const [assetDialog, setAssetDialog] = useState<{
+    open: boolean;
+    mounted: boolean;
+    asset: Asset | null;
+    initialType?: Asset['type'];
+  }>({ open: false, mounted: false, asset: null });
+  const [cashDetail, setCashDetail] = useState<{ open: boolean; asset: Asset | null }>({ open: false, asset: null });
+  // The control each dialog was opened from (`event.currentTarget` at the click: a header action is
+  // mounted twice, and Safari never focuses a pressed button), where its close returns the focus.
+  const assetOpenerRef = useRef<HTMLElement | null>(null);
+  const cashOpenerRef = useRef<HTMLElement | null>(null);
   const [tradeAsset, setTradeAsset] = useState<Asset | null>(null);
   const [movementsAsset, setMovementsAsset] = useState<Asset | null>(null);
   const [taxAsset, setTaxAsset] = useState<Asset | null>(null);
@@ -198,11 +220,25 @@ export default function AssetsPage() {
     () => assets.filter((a) => a.type === 'realestate' && a.assetClass === 'realestate').map((a) => a.id),
     [assets],
   );
+  const mortgageQuery = useMortgageInstalments(ownerId, propertyIds);
   const {
     data: mortgageRows = [],
     isLoading: loadingMortgage,
     isError: mortgageError,
-  } = useMortgageInstalments(ownerId, propertyIds);
+  } = mortgageQuery;
+  // The header's «Aggiornato alle…» while figures restored from the persisted cache are being
+  // reread: every key the tiles paint, the overview on its own one-minute threshold.
+  const freshness = useFreshness([
+    assetsQuery,
+    snapshotsQuery,
+    tradesQuery,
+    mortgageQuery,
+    {
+      query: overviewQuery,
+      staleAfterMs: DASHBOARD_OVERVIEW_STALE_TIME_MS,
+      contentUpdatedAt: overview ? Date.parse(overview.freshness.updatedAt) : null,
+    },
+  ]);
   const mortgages = useMemo(() => {
     const now = new Date();
     return assets
@@ -284,7 +320,7 @@ export default function AssetsPage() {
       });
       const data = await response.json();
       if (response.ok) {
-        toast.success(`Aggiornati ${data.updated} prezzi${data.failed.length > 0 ? `, ${data.failed.length} falliti` : ''}`);
+        toast.success(describePriceUpdate(data));
         invalidatePortfolio();
         queryClient.invalidateQueries({ queryKey: queryKeys.snapshots.all(ownerId) });
       } else {
@@ -293,17 +329,44 @@ export default function AssetsPage() {
     } catch (error) {
       console.error('Error updating prices:', error);
       toast.error("Errore nell'aggiornamento dei prezzi");
-    } finally {
-      setUpdatingPrices(false);
     }
+    // After the try/catch rather than in a `finally`: keeps the page compilable by the React Compiler.
+    setUpdatingPrices(false);
   };
 
-  const openCreate = () => setAssetDialog({ open: true, asset: null });
-  const openCreateCashAccount = () => setAssetDialog({ open: true, asset: null, initialType: 'cash' });
-  const openEdit = (asset: Asset) => setAssetDialog({ open: true, asset });
+  const openAssetDialog = (opener: HTMLElement | null, asset: Asset | null, initialType?: Asset['type']) => {
+    assetOpenerRef.current = opener;
+    setAssetDialog({ open: true, mounted: true, asset, initialType });
+  };
+  const openCreate = (opener: HTMLElement) => openAssetDialog(opener, null);
+  const openCreateCashAccount = (opener: HTMLElement) => openAssetDialog(opener, null, 'cash');
+  const openEdit = (asset: Asset, opener: HTMLElement) => openAssetDialog(opener, asset);
   const handleAssetDialogClose = () => {
-    setAssetDialog({ open: false, asset: null });
+    setAssetDialog((prev) => ({ ...prev, open: false }));
     invalidatePortfolio();
+  };
+  // A reopen during the exit keeps the dialog: only a dialog still closed is unmounted.
+  const handleAssetDialogExited = () => setAssetDialog((prev) => (prev.open ? prev : { open: false, mounted: false, asset: null }));
+  // «Registra operazione» inside the edit form closes it and opens the trade dialog: the focus must
+  // not go back to the table behind a modal that is opening.
+  const handleRegisterTradeFromDialog = (asset: Asset) => {
+    assetOpenerRef.current = null;
+    setTradeAsset(asset);
+  };
+
+  const openCashDetail = (asset: Asset, opener: HTMLElement) => {
+    cashOpenerRef.current = opener;
+    setCashDetail({ open: true, asset });
+  };
+  const closeCashDetail = () => setCashDetail((prev) => ({ ...prev, open: false }));
+  const handleCashDetailExited = () => setCashDetail((prev) => (prev.open ? prev : { open: false, asset: null }));
+  // «Modifica» hands the account over to AssetDialog: the closing detail gives up the focus, and the
+  // form returns it to the Liquidità row the detail was opened from (its own button is gone).
+  const editCashAccount = (asset: Asset) => {
+    const row = cashOpenerRef.current;
+    cashOpenerRef.current = null;
+    closeCashDetail();
+    openAssetDialog(row, asset);
   };
 
   // The two-click arm lives in the dialog (`useArmedDelete`, no timer); the page only deletes.
@@ -311,7 +374,7 @@ export default function AssetsPage() {
     try {
       await deleteAssetMutation.mutateAsync(assetId);
       toast.success('Conto eliminato');
-      setCashDetail(null);
+      closeCashDetail();
     } catch (error) {
       console.error('Error deleting cash account:', error);
       toast.error(describeWriteError(error));
@@ -335,7 +398,7 @@ export default function AssetsPage() {
       <Button
         type="button"
         className="h-9"
-        onClick={openCreate}
+        onClick={(event) => openCreate(event.currentTarget)}
         disabled={isDemo}
         title={isDemo ? 'Non disponibile in modalità demo' : undefined}
         aria-label="Aggiungi asset"
@@ -353,7 +416,7 @@ export default function AssetsPage() {
   if (loadingAssets || loadingOverview || loadingSnapshots || isLedgerMetaLoading || loadingMortgage) {
     return (
       <PageContainer>
-        <PageHeader label="Patrimonio" title="Strumenti e conti" />
+        <PageHeader label="Patrimonio" title="Strumenti e conti" freshness={freshness} />
         <TileGridSkeleton cells={SKELETON_CELLS} />
       </PageContainer>
     );
@@ -362,7 +425,7 @@ export default function AssetsPage() {
   if (assetsError) {
     return (
       <PageContainer>
-        <PageHeader label="Patrimonio" title="Strumenti e conti" />
+        <PageHeader label="Patrimonio" title="Strumenti e conti" freshness={freshness} />
         <ErrorNotice
           className="max-w-[920px]"
           notice={describeReadFailure({
@@ -382,12 +445,13 @@ export default function AssetsPage() {
   // ─── Render ───────────────────────────────────────────────────────────────────
   return (
     <PageContainer>
-      <motion.div layout="position" transition={springLayoutTransition} className="space-y-4">
+      <div className="space-y-4">
         <PageHeader
           label="Patrimonio"
           title="Strumenti e conti"
           description={lastPriceUpdate ?? undefined}
           actions={headerActions}
+          freshness={freshness}
         />
 
         <motion.div variants={cardItem} initial="hidden" animate="visible" className="pt-1">
@@ -457,7 +521,7 @@ export default function AssetsPage() {
             <LiquiditaTile
               summary={cashSummary}
               accountsById={assetsById}
-              onSelect={setCashDetail}
+              onSelect={openCashDetail}
               onAdd={openCreateCashAccount}
               isDemo={isDemo}
             />
@@ -511,6 +575,7 @@ export default function AssetsPage() {
               totalValue={totalValue}
               performance={performance}
               unitPriceSeries={unitPriceSeries}
+              chartColors={chartColors}
               ledgerReady={ledgerReady}
               isDemo={isDemo}
               ownerId={ownerId}
@@ -522,28 +587,33 @@ export default function AssetsPage() {
             />
           </motion.div>
         </motion.div>
-      </motion.div>
+      </div>
 
       {/* ── Dialogs — one instance each, shared by the header and every tile ── */}
-      <AssetDialog
-        open={assetDialog.open}
-        asset={assetDialog.asset}
-        initialType={assetDialog.initialType}
-        onClose={handleAssetDialogClose}
-        onRegisterTrade={setTradeAsset}
-      />
+      {assetDialog.mounted && (
+        <AssetDialog
+          open={assetDialog.open}
+          asset={assetDialog.asset}
+          initialType={assetDialog.initialType}
+          onClose={handleAssetDialogClose}
+          onRegisterTrade={handleRegisterTradeFromDialog}
+          returnFocusTo={assetOpenerRef}
+          onExitComplete={handleAssetDialogExited}
+        />
+      )}
 
-      <CashAccountDialog
-        asset={cashDetail}
-        open={cashDetail !== null}
-        onClose={() => setCashDetail(null)}
-        onEdit={(asset) => {
-          setCashDetail(null);
-          openEdit(asset);
-        }}
-        onDelete={handleCashDelete}
-        isDemo={isDemo}
-      />
+      {cashDetail.asset && (
+        <CashAccountDialog
+          asset={cashDetail.asset}
+          open={cashDetail.open}
+          onClose={closeCashDetail}
+          onEdit={editCashAccount}
+          onDelete={handleCashDelete}
+          isDemo={isDemo}
+          returnFocusTo={cashOpenerRef}
+          onExitComplete={handleCashDetailExited}
+        />
+      )}
 
       {tradeAsset && <TransactionDialog open onClose={() => setTradeAsset(null)} asset={tradeAsset} />}
 

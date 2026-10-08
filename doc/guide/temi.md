@@ -1,12 +1,12 @@
 # Temi colore (Color Theme System)
 
-> **When to open this guide** — whoever touches `app/globals.css` (the twelve theme blocks: `:root` + `.dark` and the five named themes, each as `[data-theme="name"]` + `.dark[data-theme="name"]`), `contexts/ColorThemeContext.tsx`, `lib/hooks/useChartColors.ts`, `lib/hooks/useActionColors.ts`, `lib/hooks/useCssColorTokens.ts` (with its parser `lib/utils/cssColorToHex.ts`), `lib/utils/costCenterColors.ts`, `lib/constants/colors.ts`, `components/layout/ThemePicker.tsx` or the `COLOR_THEME_SWATCHES` in `app/dashboard/settings/page.tsx`. The palette itself is in `DESIGN.md` → §2 (Colors: The Zero-Chroma Foundation). `AGENTS.md` keeps the stub with the essentials plus the repo-wide token rules (`AGENTS.md § Layout and Color Tokens`, `AGENTS.md § Recharts`); here is the full rule.
+> **When to open this guide** — whoever touches `app/globals.css` (the twelve theme blocks: `:root` + `.dark` and the five named themes, each as `[data-theme="name"]` + `.dark[data-theme="name"]`), `contexts/ColorThemeContext.tsx`, `lib/hooks/useChartColors.ts`, `lib/hooks/useActionColors.ts`, `lib/hooks/useCssColorTokens.ts` (with `lib/utils/cssColorToHex.ts`), `contexts/ChartColorsContext.tsx`, `lib/hooks/useThemePaletteReader.ts`, `lib/utils/{themePalette,colorParse}.ts`, `lib/utils/costCenterColors.ts`, `lib/constants/colors.ts`, `components/layout/ThemePicker.tsx` or the `COLOR_THEME_SWATCHES` in `app/dashboard/settings/page.tsx`. The palette itself is in `DESIGN.md` → §2 (Colors: The Zero-Chroma Foundation). `AGENTS.md` keeps the stub with the essentials plus the repo-wide token rules (`AGENTS.md § Layout and Color Tokens`, `AGENTS.md § Recharts`); here is the full rule.
 
 ## Files
 
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
-- **Temi**: `app/globals.css` (twelve theme blocks, plus the five `--role-*` aliases in `:root`), `contexts/ColorThemeContext.tsx`, `lib/hooks/{useChartColors,useActionColors,useCssColorTokens}.ts`, pure `lib/utils/cssColorToHex.ts` (a served colour → `#rrggbb` for Nivo, on `actionColor.ts`'s `parseToOklch`), `lib/utils/costCenterColors.ts` — doc/guide/temi.md; tests `__tests__/{chartPaletteDistinctness,cssColorToHex}.test.ts`
+- **Temi**: `app/globals.css` (twelve theme blocks, plus the five `--role-*` aliases in `:root`), `contexts/ColorThemeContext.tsx`, `contexts/ChartColorsContext.tsx` (`ChartColorsProvider`, mounted by `app/dashboard/layout.tsx`), `lib/hooks/{useThemePaletteReader,useChartColors,useActionColors,useCssColorTokens}.ts`, pure `lib/utils/themePalette.ts` (`readThemePalette`: the slots through the luminance filter, the action colours, the `--role-*` hexes), `lib/utils/colorParse.ts` (the ONE colour parser: `oklch()`, `lab()`, `#hex`, `rgb()` → OKLCH, and OKLCH → hex), `lib/utils/cssColorToHex.ts` (a served colour → `#rrggbb` for Nivo), `lib/utils/actionColor.ts` (the COMPRA/VENDI/OK clamp), `lib/utils/costCenterColors.ts` — doc/guide/temi.md; tests `__tests__/{chartPaletteDistinctness,cssColorToHex,actionColorContrast,chartColorsContext}.test.ts`, `e2e/motion.layout.spec.ts` (a client navigation reads no palette token)
 
 ## Color Theme System
 - **Parallel theming**: next-themes owns `.dark`, the custom system owns `data-theme` — fully independent. CSS:
@@ -14,18 +14,50 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   **The theme is an external store** (2026-09-06): `useSyncExternalStore` over localStorage with `'default'` as the
   server snapshot; the `data-theme` attribute is a pure effect on the value, `writeStoredTheme` applies it before the
   re-render, and the Firestore sync depends on `uid` alone (rewriting an equal value is a no-op in every sink).
-- **`useChartColors` timing**: `useEffect + useState + requestAnimationFrame`, NOT `useMemo` — `getComputedStyle` during
-  render runs before next-themes has updated the DOM and yields stale colours on a theme switch.
-- **oklch luminance filter**: L > 0.82 in light or L < 0.30 in dark falls back to the static palette, so a theme with
-  chart colours at extreme luminance always falls back — fix it at the CSS level. Below ~0.015 chroma everything looks
-  identically gray, so `--card`/`--background`/`--muted` need chroma ≥ 0.020.
+- **The theme is on `<html>` BEFORE the first paint** (2026-09-28): `app/layout.tsx` inlines
+  `COLOR_THEME_INIT_SCRIPT` in `<head>` — a plain function that reads the storage key, accepts only a name from the
+  list and sets the attribute — the way next-themes puts `.dark` there. Since that day the dashboard shell is in the
+  prerendered HTML, and without the script a reader on a non-default theme would see the default palette until
+  hydration. The key, the attribute, the list and the script live in **`lib/constants/colorTheme.ts`**, a module
+  WITHOUT `'use client'`: the root layout is a Server Component, and a value imported from a client module there is
+  a client reference, not the string. `ColorThemeContext` imports the same constants, and both sides accept a stored
+  value through `isColorTheme` (a stale or hand-edited key is the default). The `ColorTheme` union derives from
+  `COLOR_THEMES` there (`userPreferencesService` re-exports it). In `<head>`, not in `<body>`: a body script runs
+  after the parser may already have had a rendering opportunity. Pinned by `__tests__/colorTheme.test.ts` (the
+  script run in a VM) and by `e2e/shell.boot{,.mobile}.spec.ts` (c): the attribute at the first animation frame,
+  and set while `document.body` did not exist yet.
+- **The palette is read ONCE per theme, by `ChartColorsProvider`** (2026-10-08). Until then every host of
+  `useChartColors` (up to twelve on a FIRE tab), `useActionColors` and `useCssColorTokens` ran its own rAF and
+  `getComputedStyle`, then rendered a second time one frame after mounting. The provider sits in
+  `app/dashboard/layout.tsx`, which outlives the pages: it reads while the shell waits for Firebase Auth, so a page mounts
+  with the theme's colours already in hand and its charts render once (census `mount`: Storico's Composizione 2 → 1,
+  FIRE's projection and scenarios 2 → 1, the Panoramica's composition bar 2 → 1; script at Storico's mount 1024 → 854
+  ms — `doc/guide/velocita.md` § Il census). Its value is the reader's state object, replaced only on a colour-theme or mode
+  change, so a consumer re-renders only then. The three hooks keep their signatures and, **without the provider** (the
+  landing, the auth pages, a test), read the theme themselves through the same `useThemePaletteReader` — so the palette
+  is the same with or without it by construction. **A new hex token for Nivo goes in `THEME_HEX_TOKENS`**
+  (`lib/utils/themePalette.ts`): with the provider mounted, `useCssColorTokens` answers its fallback for a token outside
+  that list. A client navigation reads no `--chart-*` / `--role-*` token (`e2e/motion.layout.spec.ts`, seen red at 85
+  with the provider removed); `getComputedStyle(<html>)` itself is still called twice per navigation — by Next's router,
+  for its scroll handling.
+- **The timing**: `useEffect + useState + requestAnimationFrame`, NOT `useMemo` — `getComputedStyle` during render runs
+  before next-themes has updated the DOM and yields stale colours on a theme switch. It lives in ONE place,
+  `useThemePaletteReader`; the provider renders three times per session (mount, next-themes' `resolvedTheme` after
+  hydration, the read).
+- **The luminance filter — LIVE since 2026-10-08**: L > 0.82 in light or L < 0.30 in dark falls back to the static
+  palette at that index, so a theme with chart colours at extreme luminance always falls back — fix it at the CSS level.
+  It reads the SERVED string through `cssColorToOklch` (`lib/utils/colorParse.ts`: `lab()`, `#hex`, `rgb()`, `oklch()`);
+  a form it cannot model (a keyword, `color-mix()`, `color(display-p3 …)`) passes UNFILTERED. Measured in the browser
+  that day on the twelve blocks: every slot served as `lab()`, 0 slots changed — the highest light L 0,683, the lowest
+  dark L 0,56; `__tests__/chartColorsContext.test.ts` holds it on the authored slots in their served form. Below ~0.015
+  chroma everything looks identically gray, so `--card`/`--background`/`--muted` need chroma ≥ 0.020.
 - **The token you AUTHOR is not the token the browser RETURNS.** Turbopack's CSS transform transpiles `oklch()` for the
   build's browser targets, and `getComputedStyle(document.documentElement).getPropertyValue('--chart-6')` came back as a
   `lab(…)` string under `npm run dev:e2e` (measured 2026-08-30). Two consequences. A Playwright assertion on a resolved
   token must compare CHANNELS or DISTINCTNESS — never match `/^oklch\(/`, a regex on the authored syntax that fails on a
-  correct value and can only ever pass by accident. And `parseOklchL` returns `null` for anything not literally
-  `oklch(`, so the luminance fallback above is **inert** wherever the served string is transpiled: the colour passes
-  through unfiltered. Read the served string before trusting either.
+  correct value and can only ever pass by accident. And the luminance fallback above read the L with a regex on
+  `oklch(` (`parseOklchL`) until 2026-10-08, so it was **inert** wherever the served string is transpiled — which is
+  everywhere: the colour passed through unfiltered. Read the served string before trusting a reader of it.
 - **Action/semantic colors that must follow the theme: clamp lightness, do not index-fallback.** `useActionColors` clamps
   only the oklch L channel, preserving hue and chroma; `useChartColors`' same-index fallback would lose the theme hue and
   can collapse two states onto one colour. Resolve **once per section** and pass the colour down.
@@ -57,6 +89,20 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   teal · magenta · orange · violet; midnight-bloom violet · orchid · coral · blue · mint. **The values came from a
   search, not from taste** (a throwaway annealing over L, C and a few degrees of hue, maximising the closest pair under
   those constraints): re-run the idea, not the numbers, when a theme is added.
+- **`--muted-foreground` is held to 4,5:1 on THREE surfaces, in all twelve blocks** (2026-10-08,
+  `__tests__/mutedForegroundContrast.test.ts`, reading `globals.css`): `--background`, `--card` and `--muted` — the
+  reading line, the eyebrow and every inactive label are printed on all three, and the pill (`bg-muted`) is where the
+  floor was lowest. Measured that day from the file (WCAG from oklch, the same arithmetic as `actionColorContrast`):
+  `:root` 4,73 on the page but 4,34 on the pill (the detector's 4,46 of 2026-09-21 was this ink on a tinted surface);
+  retro-arcade dark 2,01 on the pill (its muted was a MID tone, L 0.52, under an ink equal to the foreground);
+  midnight-bloom light 2,93 (a beige pill, L 0.82); midnight-bloom dark 3,87; solar-dusk light 3,98 on the pill and 4,38
+  on the card; cyberpunk dark 4,44 on the card. Re-pitched to the nearest L that clears all three: the ink alone on
+  `:root` (0.556 → 0.546), cyberpunk dark (0.63), solar-dusk light (0.523), midnight-bloom dark (0.761); ink AND surface
+  where the surface was the fault — retro-arcade dark muted 0.52 → 0.36 with the ink 0.70 → 0.76, midnight-bloom light
+  muted 0.82 → 0.90 with the ink 0.54 → 0.49. The values come from a search along L at the theme's own chroma and hue
+  (the throwaway `mutedSuggest.mjs` of that session, the idea of the chart annealing above). A new theme runs this test
+  first; a token that fails it is a surface problem as often as an ink problem — look at `--muted` before darkening
+  the ink past the theme's `--foreground`.
 - **`--chart-9` is Storico's «Previdenza» band, in all twelve blocks** (2026-09-20). It was the static indigo
   `#6366F1` from `CHART_COLORS[8]`, a ninth colour no theme had been measured against: ΔE00 3.8 from midnight-bloom's
   Azioni, 8.4 from retro-arcade dark's Liquidità, 10.3 from the DEFAULT theme's Azioni. `useChartColors` now resolves
@@ -75,7 +121,8 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   (`--chart-${slot + 1}`), because the hand-written map was a second source that disagreed with the first: crypto's chip
   was `--chart-4` while its chart slot was 2, so one class wore two hues on one screen. `cash` keeps
   `--muted-foreground` on purpose — liquidity is the absence of a position, not a series.
-- **Adding a theme**: CSS blocks `[data-theme="name"]` + `.dark[data-theme="name"]`, the `ColorTheme` union, an entry in
+- **Adding a theme**: CSS blocks `[data-theme="name"]` + `.dark[data-theme="name"]`, the name in `COLOR_THEMES`
+  (`lib/constants/colorTheme.ts` — the union and the pre-hydration script both derive from it), an entry in
   `COLOR_THEME_SWATCHES` (module level in `settings/page.tsx`), the swatch grid columns, `tsc`. The swatch previews carry
   each theme's own literal oklch values ON PURPOSE — they preview a palette that is NOT active, which no CSS token can
   express — and the accessible name is the POSITION («Colore 3 di 6: Midnight Bloom»), never the hue.
@@ -90,14 +137,20 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   own later. The bucket → token map is ONE constant, `lib/constants/spendingRoleColors.ts` (`SPENDING_ROLE_TOKEN`, and
   `spendingRoleColorVar` for a `var()`), read by its three painters. The phone's 50/30/20 bar and the Impostazioni
   badge read them as `var()`; Nivo cannot, so the roles Sankey reads them through
-  **`useCssColorTokens(tokens, fallbacks, enabled)`** — `useChartColors`' timing (rAF → `getComputedStyle` →
-  `setState`), with `lib/utils/cssColorToHex.ts` turning the served `#hex` / `lab()` / `oklch()` into hex through
-  `actionColor.ts`'s `parseToOklch` (ONE `lab()` parser in the repo). **`enabled` is whether the caller paints them this
-  render**: `FlussoTile` passes it only while the roles Sankey is on screen (the setting on, «Per ruolo», from 640px),
-  so with the setting off the tile renders once at mount and never calls `getComputedStyle` — the read's `setState`
-  always hands over a new object, a second render and a second Sankey build for nothing (PERF-12/14).
+  **`useCssColorTokens(tokens, fallbacks, enabled)`** — since 2026-10-08 the hexes `ChartColorsProvider` resolved once
+  per theme (`tokenHex`, through `lib/utils/cssColorToHex.ts` on `lib/utils/colorParse.ts`, the ONE colour parser),
+  memoized on the objects' identity. **`enabled` is whether the caller paints them this render**: it matters only
+  without the provider, where the hook's own read runs only while enabled — `FlussoTile` passes it only while the roles
+  Sankey is on screen (the setting on, «Per ruolo», from 640px), so a tile that draws nothing with them never calls
+  `getComputedStyle`.
 
 ## Per-page blind spots
+
+- **Retro-arcade dark prints its `--foreground` on a pill at 4,02:1** (2026-10-08): the theme's foreground is a light
+  teal (L 0.70) and the pill (`--muted`) now sits at L 0.36 — lowering it further would make it indistinguishable from
+  the card (L 0.31). Only `--muted-foreground` is held to the floor on `--muted` (`mutedForegroundContrast`); an active
+  pill label in that theme is the one place a foreground reads under AA, and the fix is a lighter foreground for the
+  whole theme, a decision on its look rather than a token.
 
 - **The chart slots are measured for DISTANCE, not for every surface they land on** (2026-09-20): ΔE00 ≥ 14 and the luminance guard hold on all twelve blocks, and the re-pitched slots were searched at ≥ 3:1 against their card — but that contrast is NOT asserted by the suite, the default theme's two slots under 3:1 (next entry) are untouched, and a colour-blind reader is not modelled: a composition is never readable by colour alone, which is why every band is also a named row.
 - **Two DEFAULT-theme chart slots and the row focus ring sit under 3:1 as non-text signals** (measured 2026-09-18 on a
@@ -109,4 +162,4 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   entry above is about a slot used as a NON-text signal, which is a different floor and is still open.
 - **Index 9 of `useChartColors()` is still the static lime** (`CHART_COLORS[9]`): no surface uses it. Indices 0-7 are theme-aware since 2026-08-30, index 8 (`--chart-9`, Previdenza) since 2026-09-20.
 - **Sign-colour CHIPS sit below AA, structurally** (`bg-positive/10 text-positive` washes the background with the text's hue: 15 of 24 combinations at 3.34–4.40:1; deliberately not fixed). `MonthlyReturnsHeatmap` fills its cells with the sign tokens at 30/55/85% (the figure is never printed in the cell, so the AA text floor does not apply). (moved from `CLAUDE.md` → Known Issues on 2026-09-19)
-- **Due tinte del chrome violano la Zero-Chroma Rule** (`switch.tsx` ON blu in dark, `ProtectedRoute` spinner; la mask-icon smeraldo è stata rimossa il 2026-09-13; il `text-emerald-*` di `ExpenseTable` è passato a `text-positive` il 2026-09-14); gli altri ~100 hex DOM-side sono eccezioni dichiarate in DESIGN.md → The DOM-side hex inventory. (moved from `CLAUDE.md` → Known Issues on 2026-09-19)
+- **Una tinta del chrome viola la Zero-Chroma Rule** (`switch.tsx` ON blu in dark; lo spinner di `ProtectedRoute` è sparito il 2026-09-28 con la shell prima dell'auth, l'attesa è lo skeleton a tessere; la mask-icon smeraldo è stata rimossa il 2026-09-13; il `text-emerald-*` di `ExpenseTable` è passato a `text-positive` il 2026-09-14); gli altri ~100 hex DOM-side sono eccezioni dichiarate in DESIGN.md → The DOM-side hex inventory. (moved from `CLAUDE.md` → Known Issues on 2026-09-19)

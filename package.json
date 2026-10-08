@@ -2,6 +2,9 @@
   "name": "net-worth-tracker",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -24,17 +27,25 @@
     "e2e:seed:split": "cross-env FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 GCLOUD_PROJECT=demo-net-worth tsx scripts/seedSplitE2E.mts",
     "e2e:seed:hof": "cross-env FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 GCLOUD_PROJECT=demo-net-worth tsx scripts/seedHallOfFameE2E.mts",
     "e2e:seed:coast": "cross-env FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 GCLOUD_PROJECT=demo-net-worth tsx scripts/seedCoastFireE2E.mts",
+    "e2e:seed:profiles": "cross-env FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 GCLOUD_PROJECT=demo-net-worth tsx scripts/seedInstrumentProfilesE2E.mts",
     "dev:e2e": "cross-env NEXT_DIST_DIR=.next-e2e NEXT_PUBLIC_USE_FIREBASE_EMULATOR=true FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 GCLOUD_PROJECT=demo-net-worth NEXT_PUBLIC_FIREBASE_API_KEY=demo-key NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-net-worth NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=demo-net-worth.firebaseapp.com next dev -p 3100",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "perf:build": "cross-env NEXT_DIST_DIR=.next-perf NEXT_PUBLIC_USE_FIREBASE_EMULATOR=true NEXT_PUBLIC_FIREBASE_API_KEY=demo-key NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-net-worth NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=demo-net-worth.firebaseapp.com next build",
+    "perf:serve": "node scripts/perfServe.mjs",
+    "perf:bench": "node scripts/perfBenchmark.mjs",
+    "perf:census": "node scripts/perfRenderCensus.mjs",
+    "perf:budget": "tsx scripts/perfBudget.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",
     "@hookform/resolvers": "^5.2.2",
     "@nivo/sankey": "^0.99.0",
     "@react-pdf/renderer": "^4.3.1",
-    "@tanstack/react-query": "^5.90.12",
+    "@tanstack/query-async-storage-persister": "^5.104.0",
+    "@tanstack/react-query": "^5.104.0",
     "@tanstack/react-query-devtools": "^5.91.1",
+    "@tanstack/react-query-persist-client": "^5.104.0",
     "cheerio": "^1.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -42,10 +53,11 @@
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",
     "firebase": "^12.5.0",
-    "firebase-admin": "^13.6.0",
+    "firebase-admin": "^14.5.0",
     "framer-motion": "^12.38.0",
+    "idb-keyval": "^6.3.0",
     "lucide-react": "^0.553.0",
-    "next": "~16.2.12",
+    "next": "^16.4.0",
     "next-themes": "^0.4.6",
     "papaparse": "^5.5.4",
     "radix-ui": "^1.4.3",
@@ -65,10 +77,12 @@
     "zod": "^4.1.12"
   },
   "overrides": {
+    "jwks-rsa": "^3.2.2",
     "minimatch": ">=10.2.1",
     "postcss": "^8.5.14"
   },
   "devDependencies": {
+    "@babel/core": "^7.29.7",
     "@playwright/test": "^1.62.1",
     "@react-pdf/types": "^2.11.1",
     "@storybook/addon-docs": "^10.4.1",
@@ -78,6 +92,7 @@
     "@types/papaparse": "^5.5.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "babel-plugin-react-compiler": "^1.0.0",
     "cross-env": "^10.1.0",
     "eslint": "^9",
     "eslint-config-next": "16.0.1",

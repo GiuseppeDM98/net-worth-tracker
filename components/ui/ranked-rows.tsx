@@ -41,10 +41,11 @@ interface RankedRowsProps {
   /** Bar colour, a theme chart slot (`var(--chart-1)`), never a literal hex. */
   color: string;
   /**
-   * The residual not covered by `rows` (the month total minus the rows shown), rendered as a
-   * muted closing row so the list visibly adds up to the total. Omit when rows are exhaustive.
+   * What `rows` do not cover, rendered as muted closing rows so the list visibly adds up to the
+   * total: one row on most surfaces (the month total minus the rows shown), two on the
+   * Esposizione («Resto letto», then «Non letto»). Omit when rows are exhaustive.
    */
-  remainder?: { label: string; amount: number; percentage: number } | null;
+  remainders?: Array<{ label: string; amount: number; percentage: number }> | null;
   /** Width reserved for the label column. */
   labelClassName?: string;
   /**
@@ -64,7 +65,7 @@ interface RankedRowsProps {
  * where no category dominates still reads at a glance (the `CompositionList` rule). The list is
  * a real `<ul>`: a clickable row keeps its button semantics instead of borrowing `listitem`.
  */
-export function RankedRows({ rows, color, remainder, labelClassName, onRowClick, activeKey, ariaLabel }: RankedRowsProps) {
+export function RankedRows({ rows, color, remainders, labelClassName, onRowClick, activeKey, ariaLabel }: RankedRowsProps) {
   const labelWidth = cn(LABEL_COLUMN_CLASS, labelClassName);
   const maxAmount = Math.max(...rows.map((r) => r.amount), 0);
   // ONE Tab stop for the whole list, the arrows moving inside it: six clickable rows put whatever
@@ -126,20 +127,22 @@ export function RankedRows({ rows, color, remainder, labelClassName, onRowClick,
           </li>
         );
       })}
-      {remainder && remainder.amount > 0 && (
-        <li className="flex items-center gap-3 py-[9px]">
-          <span className={cn('min-w-0 truncate text-[13px] text-muted-foreground', labelWidth)}>
-            {remainder.label}
-          </span>
-          <div className={BAR_TRACK_CLASS} aria-hidden="true" />
-          <span className="w-[64px] shrink-0 text-right font-mono text-[13px] tabular-nums text-muted-foreground">
-            {cachedFormatCurrencyEUR(remainder.amount, true)}
-          </span>
-          <span className={SHARE_COLUMN_CLASS}>
-            {Math.round(remainder.percentage)}%
-          </span>
-        </li>
-      )}
+      {(remainders ?? [])
+        .filter((remainder) => remainder.amount > 0)
+        .map((remainder) => (
+          <li key={remainder.label} className="flex items-center gap-3 py-[9px]">
+            <span className={cn('min-w-0 truncate text-[13px] text-muted-foreground', labelWidth)}>
+              {remainder.label}
+            </span>
+            <div className={BAR_TRACK_CLASS} aria-hidden="true" />
+            <span className="w-[64px] shrink-0 text-right font-mono text-[13px] tabular-nums text-muted-foreground">
+              {cachedFormatCurrencyEUR(remainder.amount, true)}
+            </span>
+            <span className={SHARE_COLUMN_CLASS}>
+              {Math.round(remainder.percentage)}%
+            </span>
+          </li>
+        ))}
     </ul>
   );
 }

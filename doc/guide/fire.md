@@ -7,6 +7,7 @@
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **FIRE**: Calcolatore `components/fire-simulations/FireCalculatorTab.tsx` + `tiles/*` + `{FireParametri,FireDettaglio,FIREProjectionChart,FireFanChart,FireYearDistributionView,SettledValue}.tsx`, pure `lib/utils/{fireSummary,fireNarrative,fireDistribution,yearHistogram,withdrawalTax,seededRandom}.ts`; shared `lib/services/{fireService,whatIfService,monteCarloService,goalService}.ts`, `lib/utils/{pensionUnlock,monteCarloParams,goalTrajectory,goalMath}.ts` (`pensionUnlock` = the single unlock resolution, `deriveMonteCarloAllocation`, `serializeGoalForFirestore` = the persistence allowlist); Coast `CoastFireTab.tsx` + `coast/*`, pure `lib/utils/coastFireView.ts`, `lib/hooks/useCoastFireSettingsDraft.ts`; What If `WhatIfAnalysisTab.tsx` + `whatif/*`, pure `lib/utils/{whatIfSummary,whatIfNarrative}.ts`, `types/whatIf.ts`; Monte Carlo `MonteCarloTab.tsx` + `components/monte-carlo/*` (`SCENARIO_SLOT`), pure `lib/utils/{monteCarloSummary,monteCarloNarrative}.ts`; Obiettivi `GoalBasedInvestingTab.tsx` + `components/goals/*`, pure `lib/utils/{goalsSummary,goalsNarrative}.ts`; specs `e2e/fire*.spec.ts`, `e2e/coast*.spec.ts`, fixture `scripts/seedCoastFireE2E.mts`
+- **Suites to run after a change here — FIRE / Goals** (moved from `AGENTS.md` § Commands on 2026-09-30): **FIRE/Goals** `fireService`, `monteCarloService`, `monteCarloSummary`, `monteCarloNarrative`, `goalService`, `goalMath`, `goalProposal`, `coastFireView`, `whatIfService`, `whatIfSummary`, `whatIfNarrative`
 
 ## FIRE, What If and Goals
 
@@ -66,6 +67,15 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **The goal document is rewritten WHOLE, never patched.** So the Admin append is a transaction (the FIRE page writes
   the same doc), the goals already stored and `assignments` pass through **verbatim**, and the colour is picked INSIDE
   the transaction (`pickNextGoalColor`), or two goals created concurrently come out the same hue.
+- **Only the Calcolatore is in the page's initial JavaScript** (2026-09-30): Coast FIRE, What If, Monte Carlo
+  and Obiettivi are `lazyComponent`s at module level in `app/dashboard/fire-simulations/page.tsx`, one chunk each,
+  preloaded once the Calcolatore's four reads are in and the page is idle (`usePreloadWhenIdle(LAZY_TABS, ready)`), so
+  a tab opens at once (4–37 ms on the mirror; Monte Carlo ~420, its simulation) — only the active panel ever mounted,
+  what the page saves is their CODE on the critical path: 749,9 → 653,7 KB gz. If a tab is opened before its chunk
+  the panel shows that tab's OWN `TileGridSkeleton`, whose cells live
+  in `components/fire-simulations/tabSkeletons.ts` — imported by the tab AND by the page — so the chunk's wait and the
+  data's wait are one skeleton. A new lazy tab takes its cells there, never from its own module (a value import from
+  the tab would put it back in the page's graph). recharts stays initial here: the Calcolatore draws with it.
 
 ## FIRE › Calcolatore — a verdict over tiles (`components/fire-simulations/FireCalculatorTab.tsx`, `components/fire-simulations/tiles/*`, `lib/utils/{fireSummary,fireNarrative}.ts`)
 
@@ -126,7 +136,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   leaves is sold at the portfolio's own gain share (`honestFor`). Coast takes `withdrawalTax` on the projection and
   reads the gain share on the capital grown to the target (a coaster adds no basis); its Ipotesi line says «tasse
   sui prelievi comprese (26% sulla plusvalenza)» or «non stimate».
-- **The fan is SEEDED** (`FAN_SEED`, `createSeededRandom` in `lib/utils/seededRandom.ts`, mulberry32): the same inputs
+- **The fan is SEEDED** (2026-09-24; `FAN_SEED`, `createSeededRandom` in `lib/utils/seededRandom.ts`, mulberry32): the same inputs
   give the same thousand paths at every opening, and — the reason it exists — the lever re-runs on the SAME shocks
   (common random numbers), so a difference between two runs is the difference between two plans and not noise. The
   Monte Carlo tab stays unseeded: its «Esegui» is a new draw by design. `randomNormal` takes the source as a parameter
@@ -138,7 +148,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   buys instead. The lucky tail is named too («il 10% più fortunato passerebbe dal 2030 al 2029»): more saving weighs on
   both tails, and the sentence must not sell the lever as free. No lever without a base year (never within 50 years)
   or with a target already cleared (year 0): nothing to aim at, clause absent (The Narrative Honesty Rule).
-- **«Dal FIRE in poi» is a second ledger on the SAME returns** (`retirementHorizonYears`, `retirements` in the engine):
+- **«Dal FIRE in poi» is a second ledger on the SAME returns** (2026-09-24; `retirementHorizonYears`, `retirements` in the engine):
   from the year after its FIRE year a path withdraws that year's inflated expenses instead of saving (inflow → return →
   withdrawal, the decumulation engine's order) and the ledger records the year the capital runs out; `paths` and
   `percentiles` (the fan) never change — the coherence test stays byte-identical, and one draw per path per year up to
@@ -180,11 +190,36 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **No confetti** (2026-09-22): the one-shot burst inherited from the old FireReachedBanner is gone with its five
   hexes and with `shouldReduceMotion` (`celebrationUtils` keeps only the once-per-milestone record for the savings
   badge). A reached target is the verdict's sentence — the product reports, it does not cheer.
-- **ONE expense figure for the number, the verdict and the chart**: `getAnnualCashflowData` (the last full year, else
-  the running year annualized — the Base di calcolo aside says which). `getFIREData`'s own `metrics.annualExpenses`
+- **ONE expense figure for the number, the verdict and the chart**: `computeAnnualCashflowData` (the last full year, else
+  the running year annualized — the Base di calcolo aside says which). `buildFIREData`'s own `metrics.annualExpenses`
   reads the last full year ONLY and is not used for the number: on an account with no last-year rows it is 0, and the
   page called the number «non calcolabile» beside a projection it kept drawing (caught by Playwright on the base
-  fixture). `getFIREData` still feeds the runway and the cashflow history.
+  fixture). `buildFIREData` still feeds the runway and the cashflow history.
+- **The page reads FOUR keys in parallel and computes the rest in memory** (2026-09-29): `useAssets`,
+  `useSettings`, `useSnapshots` and the expenses — and the pure twins in `fireService.ts` do what the readers did:
+  `selectExpensesBetween` is `getExpensesByDateRange` on the list (both ends included, the same instants),
+  `computeLastYearExpenses` is `getAnnualExpenses` (which stays, for the PDF, implemented on the twin),
+  `computeAnnualCashflowData` is the retired `getAnnualCashflowData`, `buildFIREData(snapshots, expenses, …, now)` the
+  retired `getFIREData` (the window from eleven months before the first snapshot to the end of the last). Until then
+  the Calcolatore chained three round trips — assets → snapshots + last year → the snapshot window — and the What If
+  and Coast tabs read the same ranges on keys of their own. The history is a `useMemo`, not a query: a lock flip
+  moves `currentNetWorth` and it recomputes in the same render (the `keepPreviousData` the query needed is gone with
+  it). A failed read is the expenses key's `isError`: the three tabs' notice. `__tests__/fireCashflowInMemory.test.ts`
+  pins the twins.
+- **The expenses are TWO WINDOWS, not the collection** (2026-09-30, `fireWindows` in `lib/utils/expenseWindows.ts`;
+  the rule in doc/guide/cashflow.md § Expenses by window). `recent` — January of last year to December of this one —
+  is what `computeAnnualCashflowData` and `computeLastYearExpenses` read, on all three tabs (`useExpensesInRange`
+  with the same key, so Coast and What If read nothing after the Calcolatore); it closes on December and not on this
+  month because the history reads up to the month of the LAST snapshot, which the server stamps, and a device whose
+  clock is behind would otherwise lose it. `older` — from eleven months before the first snapshot
+  (`FIRE_HISTORY_LOOKBACK_MONTHS`, the constant `buildFIREData` reads too) to one millisecond before `recent` —
+  exists only when the history reaches further back, is asked for once the snapshots say where it starts, and feeds
+  the «Dettaglio» alone: `historyExpenses` is the two lists joined (disjoint and contiguous, no row twice), the grid
+  no longer waits for the snapshots, and `FireDettaglio` takes `loading` and shows its own skeleton until the history
+  is in — a wait is not the «no history» readings. A failed read of either window is the tab's notice. Until then the
+  page read the whole collection (1547 rows on the owner's account against 1299 + 48). Pinned by
+  `__tests__/expenseWindows.test.ts` (the number and the history on the windows against the whole list, a last
+  snapshot ahead of the device's clock included).
 - **The lock switch saves on change** (optimistic `setRespectPensionLockIn`, reverted on error, disabled while
   pending and in demo with the reason in visible copy) and is NOT part of `hasUnsavedChanges`; the form keeps the SWR,
   the residence, the INPS age and the RITA hypothesis behind an explicit save. The config-first collapse (`useRef`
@@ -237,6 +272,6 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 ## Per-page blind spots
 
-- **FIRE › Calcolatore**: «FIRE nel {anno}» is the BASE scenario of a deterministic walk on the last full cashflow year (or the running year annualized, said in Base di calcolo) — changed expenses read stale until the year closes; a target reached «today» prints no passive-income clause, the Scenari rows say «oggi · già raggiunto» and the Scenari chart draws no FIRE marker for it; the Ventaglio and the Distribuzione run only while open, the probability lives in the Traguardo footer; **the fan is seeded** (since 2026-09-24): two openings show the same thousand paths and the same distribution — not a frozen cache, a fixed seed — while the Monte Carlo tab's «Esegui» still draws anew; **the Distribuzione's percentiles are nearest-rank** and can differ by a year from what the fan's bands suggest; **the number is net of the state pensions and gross of the tax only where the inputs exist** — a pension saved in Coast FIRE without a saved age is OUT (the Base di calcolo row says it), a portfolio with no EUR PMC pays no modelled tax (the row says it), and an instrument with no PMC counts as basis, so a foreign position before its backfill understates the tax; the tax reads the gain share at the FIRE year of the deterministic walk (basis = today's + savings + the fund), so a rebalance that realises gains today lowers tomorrow's estimate; the pension's net figure is the Coast tab's (IRPEF brackets on the real-at-start gross), one year of bridge whatever the month; the median of the paths can land AFTER the deterministic base year (volatility drag: the arithmetic-mean return of the walk overstates the median path) and the reading says «dopo il base»; the lever's «servirebbero +X € l'anno» is rounded up to 100 € and re-run, so a smaller figure may also work; «dal FIRE in poi» withdraws the expenses only — no state pension, no tax — so its survival understates a plan that has either; `getFIREData` still runs for runway and history but its `metrics` are ignored; the fan is unavailable without an allocation in the four MC classes; the pension-lock switch is optimistic (a failed save reverts with a toast), disabled in demo; Parametri reopens on every unsaved edit; the bridge number can stay put while the SWR moves (the pension floor binds) — the caption's «senza il vincolo sarebbe» is the figure that moves; the parameter inputs are native `type=number` and print `3.5` with a dot, a limit of the control the it-IT figures around it do not share; Recharts logs «The width(-1) and height(-1) of chart should be greater than 0» once when the Scenari or the Ventaglio mounts (the absolute box measures 0 on the first layout pass, then the chart draws) — seen in every Playwright run, harmless, the Distribuzione view (hand-written SVG) logs nothing.
+- **FIRE › Calcolatore**: «FIRE nel {anno}» is the BASE scenario of a deterministic walk on the last full cashflow year (or the running year annualized, said in Base di calcolo) — changed expenses read stale until the year closes; a target reached «today» prints no passive-income clause, the Scenari rows say «oggi · già raggiunto» and the Scenari chart draws no FIRE marker for it; the Ventaglio and the Distribuzione run only while open, the probability lives in the Traguardo footer; **the fan is seeded** (since 2026-09-24): two openings show the same thousand paths and the same distribution — not a frozen cache, a fixed seed — while the Monte Carlo tab's «Esegui» still draws anew; **the Distribuzione's percentiles are nearest-rank** and can differ by a year from what the fan's bands suggest; **the number is net of the state pensions and gross of the tax only where the inputs exist** — a pension saved in Coast FIRE without a saved age is OUT (the Base di calcolo row says it), a portfolio with no EUR PMC pays no modelled tax (the row says it), and an instrument with no PMC counts as basis, so a foreign position before its backfill understates the tax; the tax reads the gain share at the FIRE year of the deterministic walk (basis = today's + savings + the fund), so a rebalance that realises gains today lowers tomorrow's estimate; the pension's net figure is the Coast tab's (IRPEF brackets on the real-at-start gross), one year of bridge whatever the month; the median of the paths can land AFTER the deterministic base year (volatility drag: the arithmetic-mean return of the walk overstates the median path) and the reading says «dopo il base»; the lever's «servirebbero +X € l'anno» is rounded up to 100 € and re-run, so a smaller figure may also work; «dal FIRE in poi» withdraws the expenses only — no state pension, no tax — so its survival understates a plan that has either; `buildFIREData` still runs for runway and history but its `metrics` are ignored; the fan is unavailable without an allocation in the four MC classes; the pension-lock switch is optimistic (a failed save reverts with a toast), disabled in demo; Parametri reopens on every unsaved edit; the bridge number can stay put while the SWR moves (the pension floor binds) — the caption's «senza il vincolo sarebbe» is the figure that moves; the parameter inputs are native `type=number` and print `3.5` with a dot, a limit of the control the it-IT figures around it do not share; Recharts logs «The width(-1) and height(-1) of chart should be greater than 0» once when the Scenari or the Ventaglio mounts (the absolute box measures 0 on the first layout pass, then the chart draws) — seen in every Playwright run, harmless, the Distribuzione view (hand-written SVG) logs nothing.
 - The blind spots of the other four tabs live at the end of their own guides: `doc/guide/fire-coast.md`, `doc/guide/fire-what-if.md`, `doc/guide/fire-monte-carlo.md`, `doc/guide/fire-obiettivi.md`.
-- **Le 5 spec del Calcolatore FIRE falliscono se la suite E2E gira prima del 5 del mese**: `seedEmulator.ts` data le spese al giorno 5 del mese corrente e `getAnnualCashflowData` interroga «inizio anno → adesso», quindi la finestra è vuota. Artefatto della fixture, non una regressione. (moved from `CLAUDE.md` → Known Issues on 2026-09-19)
+- **Le 5 spec del Calcolatore FIRE falliscono se la suite E2E gira prima del 5 del mese**: `seedEmulator.ts` data le spese al giorno 5 del mese corrente e `computeAnnualCashflowData` legge «inizio anno → adesso», quindi la finestra è vuota. Artefatto della fixture, non una regressione. (moved from `CLAUDE.md` → Known Issues on 2026-09-19)

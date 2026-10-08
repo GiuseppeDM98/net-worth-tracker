@@ -27,6 +27,12 @@ export const tickerSchema = z
   .max(20)
   .regex(/^[A-Za-z0-9.^=\-]+$/, 'Invalid ticker format');
 
+/**
+ * An ISO date string, coerced to a Date. The `string` first: `z.coerce.date()` alone turns `null`
+ * into 1970-01-01 and a number into a timestamp, and a missing date must be a 400, not an epoch.
+ */
+const isoDateSchema = z.string().min(1).pipe(z.coerce.date());
+
 export const snapshotRequestSchema = z.object({
   userId: z.string().min(1),
   year: z.number().int().min(2000).max(2100).optional(),
@@ -37,9 +43,9 @@ export const snapshotRequestSchema = z.object({
 /** Covers the server-relevant subset of DividendFormData fields. */
 export const dividendDataSchema = z.object({
   assetId: z.string().min(1),
-  // Dates arrive as ISO strings in JSON; coerce to Date objects.
-  exDate: z.coerce.date(),
-  paymentDate: z.coerce.date(),
+  // Dates arrive as ISO strings in JSON (a Date the client could not build serializes as null).
+  exDate: isoDateSchema,
+  paymentDate: isoDateSchema,
   dividendPerShare: z.number().finite(),
   quantity: z.number().finite(),
   grossAmount: z.number().finite(),
@@ -81,8 +87,8 @@ const assetTransactionTypeSchema = z.enum(['buy', 'sell', 'adjustment']);
 const assetTransactionBaseSchema = z.object({
   assetId: z.string().min(1),
   type: assetTransactionTypeSchema,
-  // Dates arrive as ISO strings in JSON; coerce to Date objects.
-  date: z.coerce.date(),
+  // Dates arrive as ISO strings in JSON (a Date the client could not build serializes as null).
+  date: isoDateSchema,
   quantity: z.number().finite().min(0),
   pricePerUnit: z.number().finite().min(0),
   fees: z.number().finite().min(0).optional(),
@@ -146,6 +152,42 @@ export const assetTransactionUpdateSchema = assetTransactionBaseSchema
   .omit({ assetId: true })
   .partial()
   .superRefine(refineAssetTransaction);
+
+/**
+ * GET /api/ai/assistant/threads?after= — the cursor of the next page is a thread id: never empty
+ * (`.doc('')` throws) and never a path (a slash would address a subcollection).
+ */
+export const assistantThreadCursorSchema = z
+  .string()
+  .min(1)
+  .max(1500)
+  .regex(/^[^/]+$/, 'Invalid thread cursor');
+
+/**
+ * GET /api/ai/assistant/context?includeDummy= — the test-snapshot preference the page already
+ * holds, as a query string: the two literals and nothing else, so a typo is a 400 and never a
+ * silent `false`.
+ */
+export const assistantIncludeDummySchema = z.enum(['true', 'false']);
+
+/**
+ * POST /api/performance/yields — the dividend windows of the periods Rendimenti shows (five
+ * pre-computed, or one custom range, or the PDF's one).
+ */
+export const performanceYieldsRequestSchema = z.object({
+  userId: z.string().min(1),
+  periods: z
+    .array(
+      z.object({
+        key: z.string().min(1).max(32),
+        startDate: isoDateSchema,
+        dividendEndDate: isoDateSchema,
+        numberOfMonths: z.number().int().min(0).max(1200),
+      })
+    )
+    .min(1)
+    .max(8),
+});
 
 /**
  * Goal-Based Investing: the assistant's ```goal-proposal payload IS the body of

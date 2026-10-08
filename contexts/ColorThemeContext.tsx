@@ -2,15 +2,20 @@
 
 import { createContext, useContext, useEffect, useRef, useSyncExternalStore, ReactNode } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { getUserPreferences, setUserPreferences } from '@/lib/services/userPreferencesService';
 import {
-  getUserPreferences,
-  setUserPreferences,
-  ColorTheme,
-} from '@/lib/services/userPreferencesService';
+  COLOR_THEME_ATTRIBUTE,
+  COLOR_THEME_STORAGE_KEY,
+  DEFAULT_COLOR_THEME,
+  isColorTheme,
+  type ColorTheme,
+} from '@/lib/constants/colorTheme';
 
 export type { ColorTheme };
 
-const STORAGE_KEY = 'color-theme';
+// The key and the attribute live in `lib/constants/colorTheme.ts` (no 'use client'), because the
+// root layout's pre-hydration script reads the same two strings from a Server Component.
+const STORAGE_KEY = COLOR_THEME_STORAGE_KEY;
 
 interface ColorThemeContextType {
   colorTheme: ColorTheme;
@@ -23,10 +28,10 @@ const ColorThemeContext = createContext<ColorThemeContextType>({
 });
 
 function applyThemeAttribute(theme: ColorTheme) {
-  if (theme === 'default') {
-    document.documentElement.removeAttribute('data-theme');
+  if (theme === DEFAULT_COLOR_THEME) {
+    document.documentElement.removeAttribute(COLOR_THEME_ATTRIBUTE);
   } else {
-    document.documentElement.setAttribute('data-theme', theme);
+    document.documentElement.setAttribute(COLOR_THEME_ATTRIBUTE, theme);
   }
 }
 
@@ -48,14 +53,16 @@ function subscribe(listener: () => void): () => void {
 
 function readStoredTheme(): ColorTheme {
   try {
-    return (localStorage.getItem(STORAGE_KEY) ?? 'default') as ColorTheme;
+    const stored = localStorage.getItem(STORAGE_KEY);
+    // The same acceptance as the pre-hydration script: a stale or hand-edited value is the default.
+    return isColorTheme(stored) ? stored : DEFAULT_COLOR_THEME;
   } catch {
-    return 'default';
+    return DEFAULT_COLOR_THEME;
   }
 }
 
 function readServerTheme(): ColorTheme {
-  return 'default';
+  return DEFAULT_COLOR_THEME;
 }
 
 /** Persists the theme and applies it to the document at once — before React re-renders. */

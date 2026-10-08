@@ -9,10 +9,10 @@ import {
 } from '@/types/assets';
 import { Expense } from '@/types/expenses';
 import { MONTH_NAMES } from '@/lib/constants/months';
-import { getItalyMonth, getItalyMonthYear, getItalyYear } from '@/lib/utils/dateHelpers';
+import { getItalyMonth, getItalyMonthYear, getItalyYear, toDate } from '@/lib/utils/dateHelpers';
 import { resolveGainShare, resolveTaxMultiplier } from '@/lib/utils/withdrawalTax';
+import { FIRE_HISTORY_LOOKBACK_MONTHS } from '@/lib/utils/expenseWindows';
 import { calculateTotalExpenses, calculateTotalIncome, getExpensesByDateRange } from './expenseService';
-import { getUserSnapshots } from './snapshotService';
 
 export interface FIREMetrics {
   // Input values
@@ -661,22 +661,52 @@ export function calculateHistoricalFIRERunway(
 }
 
 /**
- * Calculate annual expenses for the last fully completed year.
+ * The rows dated within `[start, end]`, both ends included: the in-memory twin of
+ * `getExpensesByDateRange` (the same comparison on the same instants). Every figure below takes
+ * its own slice of the list it is handed with this — so the list may be wider than the slice (the
+ * FIRE page hands the rows of `fireWindows`, lib/utils/expenseWindows.ts), never narrower.
+ */
+export function selectExpensesBetween(expenses: Expense[], start: Date, end: Date): Expense[] {
+  return expenses.filter((expense) => {
+    const date = toDate(expense.date);
+    return date >= start && date <= end;
+  });
+}
+
+/** The calendar bounds of the last full year before `now` (Italian calendar). */
+function lastFullYearBounds(now: Date): { lastYear: number; start: Date; end: Date } {
+  const { year: currentYear } = getItalyMonthYear(now);
+  const lastYear = currentYear - 1;
+  return { lastYear, start: new Date(lastYear, 0, 1), end: new Date(lastYear, 11, 31, 23, 59, 59, 999) };
+}
+
+/**
+ * The expenses of the last fully completed year, from a list that holds that year whole.
  *
  * Why last year instead of current year? Using the current year mid-period (e.g., March)
  * gives only 3 months of data, which dramatically understates annual spending and makes
  * FIRE metrics like "years of expenses" misleading. The last full year is the most
- * representative baseline for planning purposes.
+ * representative baseline for planning purposes. Coast FIRE computes it on the rows of the FIRE
+ * page's recent window (`fireWindows`); `getAnnualExpenses` below is the same figure read by
+ * range, for the PDF.
+ *
+ * @param expenses - Any list that holds the whole of last year
+ */
+export function computeLastYearExpenses(expenses: Expense[], now: Date): number {
+  const { start, end } = lastFullYearBounds(now);
+  return calculateTotalExpenses(selectExpensesBetween(expenses, start, end));
+}
+
+/**
+ * Calculate annual expenses for the last fully completed year (the PDF's reader; the pages
+ * compute the same figure in memory with `computeLastYearExpenses`).
  */
 export async function getAnnualExpenses(userId: string): Promise<number> {
   try {
-    const { year: currentYear } = getItalyMonthYear();
-    const lastYear = currentYear - 1;
-    const startDate = new Date(lastYear, 0, 1);
-    const endDate = new Date(lastYear, 11, 31, 23, 59, 59, 999);
-
-    const expenses = await getExpensesByDateRange(userId, startDate, endDate);
-    return calculateTotalExpenses(expenses);
+    const now = new Date();
+    const { start, end } = lastFullYearBounds(now);
+    const expenses = await getExpensesByDateRange(userId, start, end);
+    return computeLastYearExpenses(expenses, now);
   } catch (error) {
     console.error('Error calculating annual expenses:', error);
     throw new Error('Failed to calculate annual expenses');
@@ -764,71 +794,69 @@ export function calculatePlannedFIREMetrics(
   };
 }
 
-/**
- * Get all FIRE data for the user (metrics + chart data + runway data)
- */
-export async function getFIREData(
-  userId: string,
-  currentNetWorth: number,
-  withdrawalRate: number,
-  includePrimaryResidence: boolean = false
-): Promise<{
+export interface FIREHistoryData {
   metrics: FIREMetrics;
   chartData: MonthlyFIREData[];
   runwayData: HistoricalFIRERunwayPoint[];
   runwaySummary: HistoricalFIRERunwaySummary;
-}> {
-  try {
-    const [annualExpenses, snapshots] = await Promise.all([
-      getAnnualExpenses(userId),
-      getUserSnapshots(userId),
-    ]);
+}
 
-    const metrics = calculateFIREMetrics(currentNetWorth, annualExpenses, withdrawalRate);
+/**
+ * The FIRE history (metrics + chart data + runway data) from the snapshots and the expenses, in
+ * memory (2026-09-29; until then `getFIREData(userId, …)` chained three round trips).
+ * `snapshots` are `getUserSnapshots`' order (oldest first): the history reads the expenses from
+ * eleven months before the first snapshot to the end of the last, so `expenses` must hold that
+ * span — the Calcolatore hands the two lists of `fireWindows` joined (lib/utils/expenseWindows.ts,
+ * which starts its older window from the same `FIRE_HISTORY_LOOKBACK_MONTHS`).
+ */
+export function buildFIREData(
+  snapshots: MonthlySnapshot[],
+  expenses: Expense[],
+  currentNetWorth: number,
+  withdrawalRate: number,
+  includePrimaryResidence: boolean,
+  now: Date
+): FIREHistoryData {
+  const metrics = calculateFIREMetrics(currentNetWorth, computeLastYearExpenses(expenses, now), withdrawalRate);
 
-    if (snapshots.length === 0) {
-      return {
-        metrics,
-        chartData: [],
-        runwayData: [],
-        runwaySummary: {
-          currentMonthLabel: null,
-          currentYearsOfExpenses: null,
-          currentLiquidYearsOfExpenses: null,
-          totalDeltaVs12Months: null,
-          liquidDeltaVs12Months: null,
-          currentProgressToFI: null,
-          targetYearsOfExpenses: withdrawalRate > 0 ? 100 / withdrawalRate : null,
-        },
-      };
-    }
-
-    const firstSnapshot = snapshots[0];
-    const lastSnapshot = snapshots[snapshots.length - 1];
-    const expenseWindowStart = shiftMonth(firstSnapshot.year, firstSnapshot.month, -11);
-    const expenseRangeStart = getMonthStartDate(expenseWindowStart.year, expenseWindowStart.month);
-    const expenseRangeEnd = getMonthEndDate(lastSnapshot.year, lastSnapshot.month);
-    const expenses = await getExpensesByDateRange(userId, expenseRangeStart, expenseRangeEnd);
-    const monthlyExpenseBuckets = buildMonthlyExpenseBuckets(expenses);
-
-    const chartData = prepareFIREChartData(snapshots, monthlyExpenseBuckets, withdrawalRate, includePrimaryResidence);
-    const { runwayData, runwaySummary } = calculateHistoricalFIRERunway(
-      snapshots,
-      monthlyExpenseBuckets,
-      withdrawalRate,
-      includePrimaryResidence
-    );
-
+  if (snapshots.length === 0) {
     return {
       metrics,
-      chartData,
-      runwayData,
-      runwaySummary,
+      chartData: [],
+      runwayData: [],
+      runwaySummary: {
+        currentMonthLabel: null,
+        currentYearsOfExpenses: null,
+        currentLiquidYearsOfExpenses: null,
+        totalDeltaVs12Months: null,
+        liquidDeltaVs12Months: null,
+        currentProgressToFI: null,
+        targetYearsOfExpenses: withdrawalRate > 0 ? 100 / withdrawalRate : null,
+      },
     };
-  } catch (error) {
-    console.error('Error getting FIRE data:', error);
-    throw new Error('Failed to get FIRE data');
   }
+
+  const firstSnapshot = snapshots[0];
+  const lastSnapshot = snapshots[snapshots.length - 1];
+  const expenseWindowStart = shiftMonth(firstSnapshot.year, firstSnapshot.month, -FIRE_HISTORY_LOOKBACK_MONTHS);
+  const expenseRangeStart = getMonthStartDate(expenseWindowStart.year, expenseWindowStart.month);
+  const expenseRangeEnd = getMonthEndDate(lastSnapshot.year, lastSnapshot.month);
+  const monthlyExpenseBuckets = buildMonthlyExpenseBuckets(selectExpensesBetween(expenses, expenseRangeStart, expenseRangeEnd));
+
+  const chartData = prepareFIREChartData(snapshots, monthlyExpenseBuckets, withdrawalRate, includePrimaryResidence);
+  const { runwayData, runwaySummary } = calculateHistoricalFIRERunway(
+    snapshots,
+    monthlyExpenseBuckets,
+    withdrawalRate,
+    includePrimaryResidence
+  );
+
+  return {
+    metrics,
+    chartData,
+    runwayData,
+    runwaySummary,
+  };
 }
 
 /**
@@ -918,62 +946,56 @@ export function buildIncomeSourceBreakdown(
   return Array.from(categories.values());
 }
 
-export async function getAnnualCashflowData(userId: string): Promise<AnnualCashflowData> {
-  try {
-    const now = new Date();
-    const { year: currentYear } = getItalyMonthYear(now);
-    const lastYear = currentYear - 1;
+/**
+ * ONE expense figure for the FIRE number, the verdict and the chart: the last full year, else
+ * the running year annualised (`isAnnualized` says which; doc/guide/fire.md). Computed in memory
+ * (2026-09-29) on a list that holds last year and this one up to `now` — the FIRE page's
+ * recent window (`fireWindows`). A failed read is that key's `isError`, never a zeroed payload
+ * (the 2026-09-01 rule): FIRE › Calcolatore and What If both hold an ErrorNotice branch on it.
+ */
+export function computeAnnualCashflowData(allExpenses: Expense[], now: Date): AnnualCashflowData {
+  const { year: currentYear } = getItalyMonthYear(now);
+  const { lastYear, start: lastYearStart, end: lastYearEnd } = lastFullYearBounds(now);
+  const lastYearExpenses = selectExpensesBetween(allExpenses, lastYearStart, lastYearEnd);
 
-    const lastYearStart = new Date(lastYear, 0, 1);
-    const lastYearEnd = new Date(lastYear, 11, 31, 23, 59, 59, 999);
-    const lastYearExpenses = await getExpensesByDateRange(userId, lastYearStart, lastYearEnd);
-
-    if (lastYearExpenses.length > 0) {
-      const income = calculateTotalIncome(lastYearExpenses);
-      const expenses = calculateTotalExpenses(lastYearExpenses);
-      return {
-        annualSavings: Math.max(income - expenses, 0),
-        annualExpensesFromCashflow: expenses,
-        referenceYear: lastYear,
-        isAnnualized: false,
-        incomeSources: buildIncomeSourceBreakdown(lastYearExpenses, 1),
-      };
-    }
-
-    const currentYearStart = new Date(currentYear, 0, 1);
-    const currentYearExpenses = await getExpensesByDateRange(userId, currentYearStart, now);
-
-    if (currentYearExpenses.length === 0) {
-      return {
-        annualSavings: 0,
-        annualExpensesFromCashflow: 0,
-        referenceYear: currentYear,
-        isAnnualized: true,
-        incomeSources: [],
-      };
-    }
-
-    const income = calculateTotalIncome(currentYearExpenses);
-    const expenses = calculateTotalExpenses(currentYearExpenses);
-    const savings = income - expenses;
-    const monthsElapsed = Math.max(getItalyMonth(now), 1);
-    const annualizationFactor = 12 / monthsElapsed;
-
+  if (lastYearExpenses.length > 0) {
+    const income = calculateTotalIncome(lastYearExpenses);
+    const expenses = calculateTotalExpenses(lastYearExpenses);
     return {
-      annualSavings: Math.max((savings / monthsElapsed) * 12, 0),
-      annualExpensesFromCashflow: (expenses / monthsElapsed) * 12,
+      annualSavings: Math.max(income - expenses, 0),
+      annualExpensesFromCashflow: expenses,
+      referenceYear: lastYear,
+      isAnnualized: false,
+      incomeSources: buildIncomeSourceBreakdown(lastYearExpenses, 1),
+    };
+  }
+
+  const currentYearStart = new Date(currentYear, 0, 1);
+  const currentYearExpenses = selectExpensesBetween(allExpenses, currentYearStart, now);
+
+  if (currentYearExpenses.length === 0) {
+    return {
+      annualSavings: 0,
+      annualExpensesFromCashflow: 0,
       referenceYear: currentYear,
       isAnnualized: true,
-      incomeSources: buildIncomeSourceBreakdown(currentYearExpenses, annualizationFactor),
+      incomeSources: [],
     };
-  } catch (error) {
-    // NOT a zeroed payload (changed 2026-09-01). Swallowing the failure here made a dropped
-    // connection read as «servono spese registrate nel Cashflow» — a sentence about the user's
-    // data, told about data that was never read. The two callers (FIRE › Calcolatore and
-    // What If) both hold an ErrorNotice branch that only a rejection can reach.
-    console.error('Error calculating annual cashflow data:', error);
-    throw new Error('Failed to fetch annual cashflow data', { cause: error });
   }
+
+  const income = calculateTotalIncome(currentYearExpenses);
+  const expenses = calculateTotalExpenses(currentYearExpenses);
+  const savings = income - expenses;
+  const monthsElapsed = Math.max(getItalyMonth(now), 1);
+  const annualizationFactor = 12 / monthsElapsed;
+
+  return {
+    annualSavings: Math.max((savings / monthsElapsed) * 12, 0),
+    annualExpensesFromCashflow: (expenses / monthsElapsed) * 12,
+    referenceYear: currentYear,
+    isAnnualized: true,
+    incomeSources: buildIncomeSourceBreakdown(currentYearExpenses, annualizationFactor),
+  };
 }
 
 /**

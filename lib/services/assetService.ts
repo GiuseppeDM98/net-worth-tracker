@@ -15,6 +15,7 @@ import {
 import { db } from '@/lib/firebase/config';
 import { removeUndefinedDeep as removeUndefinedFields } from '@/lib/utils/firestoreData';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
+import { roundToCents } from '@/lib/utils/cents';
 import { suggestIsLiquid } from '@/lib/utils/assetLiquidity';
 import { costBasisPerUnitEur, unitPriceEur } from '@/lib/utils/costBasisEur';
 import { CHECKING_ACCOUNT_STAMP_DUTY_EUR, CHECKING_ACCOUNT_STAMP_DUTY_THRESHOLD_EUR } from '@/lib/constants/stampDuty';
@@ -406,7 +407,7 @@ export async function updateCashAssetBalance(assetId: string, signedDelta: numbe
     }
 
     // For cash assets, treat quantity as the direct balance (e.g., €8000 balance = quantity 8000)
-    const newQuantity = asset.quantity + signedDelta;
+    const newQuantity = roundToCents(asset.quantity + signedDelta);
     const assetRef = doc(db, ASSETS_COLLECTION, assetId);
     await updateDoc(assetRef, {
       quantity: newQuantity,
@@ -461,7 +462,7 @@ export async function updateCashAssetBalancesAtomic(
       const data = snap.data();
       if (!userId) userId = data.userId as string;
       tx.update(ref, {
-        quantity: (data.quantity as number) + signedDelta,
+        quantity: roundToCents((data.quantity as number) + signedDelta),
         updatedAt: new Date(),
       });
     }

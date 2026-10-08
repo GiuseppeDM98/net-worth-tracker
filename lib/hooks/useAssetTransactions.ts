@@ -9,7 +9,7 @@
  * disable), like every other mutation — not here.
  */
 
-import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { queryOptions, useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query/queryKeys';
 import {
   getAssetTransactions,
@@ -32,11 +32,18 @@ export function useAssetTransactions(
   options?: { enabled?: boolean }
 ) {
   return useQuery({
-    queryKey: assetId
-      ? queryKeys.assetTransactions.byAsset(ownerId || '', assetId)
-      : queryKeys.assetTransactions.all(ownerId || ''),
-    queryFn: () => getAssetTransactions(ownerId!, assetId),
+    ...assetTransactionsQueryOptions(ownerId || '', assetId),
     enabled: !!ownerId && (options?.enabled ?? true),
+  });
+}
+
+/** The ledger query as options, for an imperative `queryClient.fetchQuery` on the hook's own cache. */
+export function assetTransactionsQueryOptions(ownerId: string, assetId?: string) {
+  return queryOptions({
+    queryKey: assetId
+      ? queryKeys.assetTransactions.byAsset(ownerId, assetId)
+      : queryKeys.assetTransactions.all(ownerId),
+    queryFn: () => getAssetTransactions(ownerId, assetId),
   });
 }
 

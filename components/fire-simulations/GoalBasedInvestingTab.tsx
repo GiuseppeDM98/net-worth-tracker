@@ -31,17 +31,17 @@
  */
 
 import { useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useAssets } from '@/lib/hooks/useAssets';
+import { useSettings } from '@/lib/hooks/useSettings';
+import { useGoalData, useSaveGoalData } from '@/lib/hooks/useGoalData';
 import Link from 'next/link';
 import { Plus, Settings } from 'lucide-react';
 import { toast } from 'sonner';
-import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
-import { getSettings } from '@/lib/services/assetAllocationService';
-import { getAllAssets } from '@/lib/services/assetService';
-import { calculateGoalProgress, cleanOrphanedAssignments, getGoalData, saveGoalData } from '@/lib/services/goalService';
-import type { GoalAssetAssignment, GoalBasedInvestingData, InvestmentGoal } from '@/types/goals';
+import { calculateGoalProgress, cleanOrphanedAssignments } from '@/lib/services/goalService';
+import type { GoalAssetAssignment, InvestmentGoal } from '@/types/goals';
+import type { Asset } from '@/types/assets';
 import { computeGoalTrajectory, type GoalRow } from '@/lib/utils/goalTrajectory';
 import { buildMilestones, summarizeAssignments, summarizeDerivedAllocation, summarizeGoals, summarizeTrajectory, sumAssetValues } from '@/lib/utils/goalsSummary';
 import {
@@ -66,7 +66,7 @@ import {
   MILESTONE_FOOTER,
   resolveTraiettoriaHero,
 } from '@/lib/utils/goalsNarrative';
-import type { TileSkeletonCell } from '@/lib/utils/tileGridSkeleton';
+import { GOALS_TAB_SKELETON_CELLS } from './tabSkeletons';
 import { cn } from '@/lib/utils';
 import { PageVerdict } from '@/components/ui/page-verdict';
 import { Tile, TILE_CELL_CLASS } from '@/components/ui/tile';
@@ -83,23 +83,17 @@ import { GoalsDettaglio } from '@/components/goals/GoalsDettaglio';
 import { GoalFormDialog } from '@/components/goals/GoalFormDialog';
 import { AssetAssignmentDialog } from '@/components/goals/AssetAssignmentDialog';
 
-/** The grid's geometry, for the skeleton: the same spans as the tiles below. */
-const SKELETON_CELLS: TileSkeletonCell[] = [
-  { span: 5, rows: 2, lines: 14 },
-  { span: 7, lines: 10 },
-  { span: 4, lines: 6 },
-  { span: 3, lines: 5 },
-  { span: 12, lines: 8 },
-];
+/** The grid's geometry, for the skeleton: the same spans as the tiles below — shared with the page's lazy-tab wait. */
+const SKELETON_CELLS = GOALS_TAB_SKELETON_CELLS;
+
+const EMPTY_ASSETS: Asset[] = [];
 
 const ASIDE_BUTTON_CLASS =
   'inline-flex h-9 items-center gap-1 rounded-md border border-border px-2.5 text-[11px] font-medium text-foreground transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 desktop:h-7';
 
 export function GoalBasedInvestingTab() {
-  const { user } = useAuth();
   const { ownerId } = useActiveAccount();
   const isDemo = useDemoMode();
-  const queryClient = useQueryClient();
 
   // ─── Dialogs and the selection ───────────────────────────────────────────────
   const [goalDialogOpen, setGoalDialogOpen] = useState(false);
@@ -107,31 +101,13 @@ export function GoalBasedInvestingTab() {
   const [assignmentGoalId, setAssignmentGoalId] = useState<string | null>(null);
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
 
-  // ─── Queries (shared keys with the other FIRE tabs) ──────────────────────────
-  const { data: settings, isLoading: loadingSettings, isError: settingsError } = useQuery({
-    queryKey: ['settings', ownerId],
-    queryFn: () => getSettings(ownerId!),
-    enabled: !!user && !!ownerId,
-  });
+  // ─── Queries (the keys every page shares, 2026-09-29) ───────────────────────────
+  const { data: settings, isLoading: loadingSettings, isError: settingsError } = useSettings(ownerId);
+  const { data: assets = EMPTY_ASSETS, isLoading: loadingAssets, isError: assetsError } = useAssets(ownerId);
+  const { data: goalData, isLoading: loadingGoals, isError: goalsError } = useGoalData(ownerId);
 
-  const { data: assets = [], isLoading: loadingAssets, isError: assetsError } = useQuery({
-    queryKey: ['assets', ownerId],
-    queryFn: () => getAllAssets(ownerId!),
-    enabled: !!user && !!ownerId,
-  });
-
-  const { data: goalData, isLoading: loadingGoals, isError: goalsError } = useQuery({
-    queryKey: ['goalData', ownerId],
-    queryFn: () => getGoalData(ownerId!),
-    enabled: !!user && !!ownerId,
-  });
-
-  const saveMutation = useMutation({
-    mutationFn: (data: GoalBasedInvestingData) => saveGoalData(ownerId!, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['goalData', ownerId] });
-    },
-  });
+  // Invalidates `goals.all`, which Allocazione reads too (goal-driven targets).
+  const saveMutation = useSaveGoalData(ownerId || '');
 
   const isEnabled = settings?.goalBasedInvestingEnabled ?? false;
   const isGoalDriven = settings?.goalDrivenAllocationEnabled ?? false;

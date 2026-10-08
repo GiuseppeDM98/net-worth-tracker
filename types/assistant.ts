@@ -149,8 +149,13 @@ export interface AssistantMemoryDocument {
   hasDummySnapshots?: boolean;
 }
 
+/**
+ * One page of `GET /api/ai/assistant/threads`: `nextCursor` is the `after` of the
+ * next page, `null` on the last one.
+ */
 export interface AssistantThreadsResponse {
   threads: AssistantThread[];
+  nextCursor: string | null;
 }
 
 // Extends the memory document with computed fields returned only by the GET endpoint.

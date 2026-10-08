@@ -1,6 +1,6 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AssistantThread,
   AssistantThreadDetail,
@@ -30,8 +30,9 @@ function normalizeThreadDetail(threadResponse: AssistantThreadResponse): Assista
   };
 }
 
-async function fetchThreads(userId: string): Promise<AssistantThread[]> {
-  const response = await authenticatedFetch(`/api/ai/assistant/threads?userId=${userId}`);
+async function fetchThreadsPage(userId: string, after: string | undefined): Promise<AssistantThreadsResponse> {
+  const cursor = after ? `&after=${encodeURIComponent(after)}` : '';
+  const response = await authenticatedFetch(`/api/ai/assistant/threads?userId=${userId}${cursor}`);
 
   if (!response.ok) {
     const errorResponse = await response.json().catch(() => null);
@@ -39,7 +40,7 @@ async function fetchThreads(userId: string): Promise<AssistantThread[]> {
   }
 
   const threadsResponse = (await response.json()) as AssistantThreadsResponse;
-  return threadsResponse.threads.map(normalizeThread);
+  return { threads: threadsResponse.threads.map(normalizeThread), nextCursor: threadsResponse.nextCursor };
 }
 
 async function fetchThread(threadId: string, userId: string): Promise<AssistantThreadDetail> {
@@ -56,10 +57,23 @@ async function fetchThread(threadId: string, userId: string): Promise<AssistantT
   return normalizeThreadDetail(threadResponse);
 }
 
+/**
+ * The owner's threads, one page of 50 at a time: `data` is the threads of every page read
+ * so far, most recent first, and `hasNextPage` says another page exists — the list's «Mostra
+ * altre» calls `fetchNextPage`, and every count on the page says «più di N» while it does
+ * (`describeAssistantHeader`, `describeThreadsReading`), so no thread is ever hidden in silence.
+ *
+ * The key is the one every writer already invalidates (the stream's end, the delete): an
+ * invalidation re-reads every page loaded, each from the cursor of the fresh page before it.
+ * Not persisted (`lib/constants/persistCache.ts`).
+ */
 export function useAssistantThreads(userId: string | undefined) {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: queryKeys.assistant.threads(userId || ''),
-    queryFn: () => fetchThreads(userId!),
+    queryFn: ({ pageParam }) => fetchThreadsPage(userId!, pageParam),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    select: (data): AssistantThread[] => data.pages.flatMap((page) => page.threads),
     enabled: !!userId,
   });
 }

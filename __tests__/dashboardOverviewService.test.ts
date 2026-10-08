@@ -10,16 +10,20 @@ vi.mock('@/lib/firebase/config', () => ({
 
 const {
   overviewSummaryDocGetMock,
-  overviewSummaryDocSetMock,
+  overviewSummaryDocUpdateMock,
+  overviewSummaryDocCreateMock,
   assetsGetMock,
   snapshotsGetMock,
   settingsDocGetMock,
   expensesGetMock,
   goalDocGetMock,
   assetTransactionsGetMock,
+  pensionContributionsGetMock,
+  afterCallbacks,
 } = vi.hoisted(() => ({
   overviewSummaryDocGetMock: vi.fn(),
-  overviewSummaryDocSetMock: vi.fn(),
+  overviewSummaryDocUpdateMock: vi.fn(),
+  overviewSummaryDocCreateMock: vi.fn(),
   assetsGetMock: vi.fn(),
   snapshotsGetMock: vi.fn(),
   settingsDocGetMock: vi.fn(),
@@ -27,7 +31,20 @@ const {
   goalDocGetMock: vi.fn(),
   // An empty ledger by default (clearAllMocks keeps the implementation); one test fills it.
   assetTransactionsGetMock: vi.fn(async () => ({ docs: [] as unknown[] })),
+  pensionContributionsGetMock: vi.fn(async () => ({ docs: [] as unknown[] })),
+  // What the service hands to `after()`: run by the test, the way Next runs it once the response is sent.
+  afterCallbacks: [] as Array<() => unknown>,
 }));
+
+vi.mock('next/server', async () => {
+  const actual = await vi.importActual<typeof import('next/server')>('next/server');
+  return {
+    ...actual,
+    after: vi.fn((callback: () => unknown) => {
+      afterCallbacks.push(callback);
+    }),
+  };
+});
 
 vi.mock('@/lib/firebase/admin', () => ({
   adminDb: {
@@ -36,7 +53,8 @@ vi.mock('@/lib/firebase/admin', () => ({
         return {
           doc: vi.fn(() => ({
             get: overviewSummaryDocGetMock,
-            set: overviewSummaryDocSetMock,
+            update: overviewSummaryDocUpdateMock,
+            create: overviewSummaryDocCreateMock,
           })),
         };
       }
@@ -94,7 +112,7 @@ vi.mock('@/lib/firebase/admin', () => ({
       if (name === 'pensionContributions') {
         return {
           where: vi.fn(() => ({
-            get: vi.fn(async () => ({ docs: [] })),
+            get: pensionContributionsGetMock,
           })),
         };
       }
@@ -123,11 +141,17 @@ vi.mock('@/lib/utils/dateHelpers', async () => {
 
 import { getDashboardOverview } from '@/lib/services/dashboardOverviewService';
 import { DASHBOARD_OVERVIEW_SOURCE_VERSION } from '@/lib/services/dashboardOverviewConstants';
+import { getItalyMonthYear } from '@/lib/utils/dateHelpers';
+
+// The `updateTime` of the stale summary the recompute read: the write's precondition.
+const STALE_SUMMARY_UPDATE_TIME = { seconds: 1775460600, nanoseconds: 0 };
 
 describe('dashboardOverviewService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    overviewSummaryDocSetMock.mockResolvedValue(undefined);
+    afterCallbacks.length = 0;
+    overviewSummaryDocUpdateMock.mockResolvedValue(undefined);
+    overviewSummaryDocCreateMock.mockResolvedValue(undefined);
     goalDocGetMock.mockResolvedValue({ exists: false });
   });
 
@@ -180,12 +204,13 @@ describe('dashboardOverviewService', () => {
     expect(result.metrics.totalValue).toBe(100000);
     expect(result.freshness.source).toBe('materialized_summary');
     expect(assetsGetMock).not.toHaveBeenCalled();
-    expect(overviewSummaryDocSetMock).not.toHaveBeenCalled();
+    expect(afterCallbacks).toHaveLength(0);
   });
 
   it('recomputes and persists a new summary when the materialized document is stale', async () => {
     overviewSummaryDocGetMock.mockResolvedValue({
       exists: true,
+      updateTime: STALE_SUMMARY_UPDATE_TIME,
       data: () => ({
         payload: {
           metrics: {
@@ -444,7 +469,16 @@ describe('dashboardOverviewService', () => {
     expect(result.monthSales?.instruments).toEqual([
       { id: 'etf-1', name: 'VWCE', proceeds: 1995, realizedGain: 495, estimatedTax: expect.closeTo(130, 6), taxIsWithheld: false },
     ]);
-    expect(overviewSummaryDocSetMock).toHaveBeenCalledTimes(1);
+    // The summary is written AFTER the response, and only if nothing touched it since the read.
+    expect(overviewSummaryDocUpdateMock).not.toHaveBeenCalled();
+    expect(afterCallbacks).toHaveLength(1);
+    await afterCallbacks[0]();
+    expect(overviewSummaryDocUpdateMock).toHaveBeenCalledTimes(1);
+    expect(overviewSummaryDocUpdateMock).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'user-1', invalidatedAt: null, sourceVersion: DASHBOARD_OVERVIEW_SOURCE_VERSION }),
+      { lastUpdateTime: STALE_SUMMARY_UPDATE_TIME }
+    );
+    expect(overviewSummaryDocCreateMock).not.toHaveBeenCalled();
   });
 
   it('publishes no sale when the month holds none, and survives a ledger read that fails', async () => {
@@ -469,7 +503,9 @@ describe('dashboardOverviewService', () => {
 describe('dashboardOverviewService — G/P in EUR on both sides (costBasisEur.ts)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    overviewSummaryDocSetMock.mockResolvedValue(undefined);
+    afterCallbacks.length = 0;
+    overviewSummaryDocUpdateMock.mockResolvedValue(undefined);
+    overviewSummaryDocCreateMock.mockResolvedValue(undefined);
     goalDocGetMock.mockResolvedValue({ exists: false });
     overviewSummaryDocGetMock.mockResolvedValue({ exists: false });
     snapshotsGetMock.mockResolvedValue({ docs: [] });
@@ -527,5 +563,278 @@ describe('dashboardOverviewService — G/P in EUR on both sides (costBasisEur.ts
 
     expect(result.flags.hasCostBasisTracking).toBe(false);
     expect(result.metrics.unrealizedGains).toBe(0);
+  });
+});
+
+describe('dashboardOverviewService — one round of reads, the write after the response, fresh by day', () => {
+  // A summary as the recompute stores it, computed at `computedAt`; `invalidatedAt` when a mutation followed.
+  const storedSummary = (computedAt: Date, invalidatedAt: Date | null = null) => ({
+    exists: true,
+    updateTime: STALE_SUMMARY_UPDATE_TIME,
+    data: () => ({
+      payload: {
+        metrics: { totalValue: 4242 },
+        variations: { monthly: null, yearly: null },
+        expenseStats: null,
+        charts: { assetClassData: [], assetData: [], liquidityData: [] },
+        flags: { assetCount: 1, hasCostBasisTracking: false, hasTERTracking: false, hasStampDuty: false, currentMonthSnapshotExists: false },
+      },
+      updatedAt: computedAt,
+      computedAt,
+      sourceVersion: DASHBOARD_OVERVIEW_SOURCE_VERSION,
+      invalidatedAt,
+    }),
+  });
+
+  const cashAsset = {
+    id: 'cash-1',
+    data: () => ({
+      userId: 'user-1', ticker: 'LIQ', name: 'Conto', type: 'cash', assetClass: 'cash', currency: 'EUR',
+      quantity: 1000, currentPrice: 1, isLiquid: true,
+      lastPriceUpdate: new Date('2026-04-06T09:00:00.000Z'), createdAt: new Date('2026-01-01T00:00:00.000Z'), updatedAt: new Date('2026-04-06T09:00:00.000Z'),
+    }),
+  };
+  const pensionFundAsset = {
+    id: 'fund-1',
+    data: () => ({
+      userId: 'user-1', ticker: 'FONDO', name: 'Fondo', type: 'pensionFund', assetClass: 'equity', currency: 'EUR',
+      quantity: 1, currentPrice: 5000, isLiquid: false,
+      lastPriceUpdate: new Date('2026-04-06T09:00:00.000Z'), createdAt: new Date('2026-01-01T00:00:00.000Z'), updatedAt: new Date('2026-04-06T09:00:00.000Z'),
+    }),
+  };
+  const salary = {
+    id: 'income-1',
+    data: () => ({
+      userId: 'user-1', type: 'income', categoryId: 'salary', categoryName: 'Stipendio', amount: 2000, currency: 'EUR',
+      date: new Date('2026-04-02T10:00:00.000Z'), createdAt: new Date('2026-04-02T10:00:00.000Z'), updatedAt: new Date('2026-04-02T10:00:00.000Z'),
+    }),
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    afterCallbacks.length = 0;
+    overviewSummaryDocUpdateMock.mockResolvedValue(undefined);
+    overviewSummaryDocCreateMock.mockResolvedValue(undefined);
+    overviewSummaryDocGetMock.mockResolvedValue({ exists: false });
+    assetsGetMock.mockResolvedValue({ docs: [cashAsset] });
+    snapshotsGetMock.mockResolvedValue({ docs: [] });
+    settingsDocGetMock.mockResolvedValue({ exists: false });
+    goalDocGetMock.mockResolvedValue({ exists: false });
+    expensesGetMock.mockResolvedValue({ docs: [salary] });
+  });
+
+  describe('freshness', () => {
+    // Italy is UTC+2 in April: 2026-04-15T15:00 Italian is 13:00Z.
+    const italian = (iso: string) => new Date(`${iso}+02:00`);
+
+    it('serves a summary computed today five hours ago, with no invalidation since', async () => {
+      overviewSummaryDocGetMock.mockResolvedValue(storedSummary(italian('2026-04-15T10:00:00')));
+
+      const result = await getDashboardOverview('user-1', { now: italian('2026-04-15T15:00:00') });
+
+      expect(result.freshness.source).toBe('materialized_summary');
+      expect(result.metrics.totalValue).toBe(4242);
+      expect(assetsGetMock).not.toHaveBeenCalled();
+    });
+
+    it('recomputes a summary of today that a mutation invalidated', async () => {
+      overviewSummaryDocGetMock.mockResolvedValue(
+        storedSummary(italian('2026-04-15T10:00:00'), italian('2026-04-15T11:00:00'))
+      );
+
+      const result = await getDashboardOverview('user-1', { now: italian('2026-04-15T15:00:00') });
+
+      expect(result.freshness.source).toBe('live_recompute');
+    });
+
+    it('recomputes a summary of today older than six hours (the safety net)', async () => {
+      overviewSummaryDocGetMock.mockResolvedValue(storedSummary(italian('2026-04-15T08:00:00')));
+
+      const result = await getDashboardOverview('user-1', { now: italian('2026-04-15T15:00:00') });
+
+      expect(result.freshness.source).toBe('live_recompute');
+    });
+
+    it('recomputes a summary computed yesterday at 23:50 when asked today at 00:10', async () => {
+      // Twenty minutes apart: only the Italian day can tell them, the age cannot.
+      overviewSummaryDocGetMock.mockResolvedValue(storedSummary(italian('2026-04-14T23:50:00')));
+
+      const result = await getDashboardOverview('user-1', { now: italian('2026-04-15T00:10:00') });
+
+      expect(result.freshness.source).toBe('live_recompute');
+    });
+  });
+
+  describe('the degradable reads', () => {
+    it('drops only the sales clause when the ledger read fails', async () => {
+      assetTransactionsGetMock.mockRejectedValueOnce(new Error('ledger down'));
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const result = await getDashboardOverview('user-1');
+
+      expect(result.monthSales).toBeNull();
+      expect(result.metrics.totalValue).toBe(1000);
+      expect(result.expenseStats?.currentMonth.income).toBe(2000);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('trade ledger'), expect.anything());
+      warn.mockRestore();
+    });
+
+    it('drops only the expense stats when a month of expenses fails', async () => {
+      expensesGetMock.mockReset();
+      expensesGetMock.mockResolvedValueOnce({ docs: [salary] }).mockRejectedValueOnce(new Error('expenses down'));
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const result = await getDashboardOverview('user-1');
+
+      expect(result.expenseStats).toBeNull();
+      expect(result.metrics.totalValue).toBe(1000);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('expense stats'), expect.anything());
+      warn.mockRestore();
+    });
+
+    it('ignores a failed contributions read for an account without a pension fund', async () => {
+      pensionContributionsGetMock.mockRejectedValueOnce(new Error('pension down'));
+
+      const result = await getDashboardOverview('user-1');
+
+      expect(result.metrics.totalValue).toBe(1000);
+    });
+
+    it('rejects when the contributions read fails for a holder of a pension fund, as it always has', async () => {
+      // Degrading to «no contributions» would print every euro paid in as the fund's market return.
+      assetsGetMock.mockResolvedValue({ docs: [cashAsset, pensionFundAsset] });
+      pensionContributionsGetMock.mockRejectedValueOnce(new Error('pension down'));
+
+      await expect(getDashboardOverview('user-1')).rejects.toThrow('pension down');
+      expect(afterCallbacks).toHaveLength(0);
+    });
+  });
+
+  describe('the required reads', () => {
+    it.each([
+      ['assets', () => assetsGetMock],
+      ['snapshots', () => snapshotsGetMock],
+      ['settings', () => settingsDocGetMock],
+      ['goals', () => goalDocGetMock],
+    ])('rejects the overview when the %s read fails, and persists nothing', async (_name, mockOf) => {
+      mockOf().mockRejectedValueOnce(new Error('required read down'));
+
+      await expect(getDashboardOverview('user-1')).rejects.toThrow('required read down');
+      expect(afterCallbacks).toHaveLength(0);
+    });
+
+    it('launches every read in the same round, the degradable ones included', async () => {
+      // Hold the assets read open: in one round the other six are already in flight while it waits.
+      // Seen red by awaiting the required Promise.all before the settled reads; a falsification that
+      // calls getAssetsForUser a SECOND time stays green (that call is not the held one).
+      let releaseAssets: (value: unknown) => void = () => {};
+      assetsGetMock.mockReturnValueOnce(new Promise((resolve) => { releaseAssets = resolve; }));
+
+      const pending = getDashboardOverview('user-1');
+      await vi.waitFor(() => expect(assetsGetMock).toHaveBeenCalled());
+
+      expect(snapshotsGetMock).toHaveBeenCalledTimes(1);
+      expect(settingsDocGetMock).toHaveBeenCalledTimes(1);
+      expect(goalDocGetMock).toHaveBeenCalledTimes(1);
+      expect(pensionContributionsGetMock).toHaveBeenCalledTimes(1);
+      expect(assetTransactionsGetMock).toHaveBeenCalledTimes(1);
+      expect(expensesGetMock).toHaveBeenCalledTimes(2);
+
+      releaseAssets({ docs: [cashAsset] });
+      await expect(pending).resolves.toMatchObject({ freshness: { source: 'live_recompute' } });
+    });
+  });
+
+  describe('the write after the response', () => {
+    it('creates the summary only inside the after() callback when none existed', async () => {
+      const result = await getDashboardOverview('user-1');
+
+      expect(result.freshness.source).toBe('live_recompute');
+      expect(overviewSummaryDocCreateMock).not.toHaveBeenCalled();
+      expect(afterCallbacks).toHaveLength(1);
+
+      await afterCallbacks[0]();
+
+      expect(overviewSummaryDocCreateMock).toHaveBeenCalledTimes(1);
+      expect(overviewSummaryDocCreateMock).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 'user-1', invalidatedAt: null, computedAt: expect.any(Date) })
+      );
+      expect(overviewSummaryDocUpdateMock).not.toHaveBeenCalled();
+    });
+
+    it('stamps the summary with the request time, so its Italian day is the one it was computed for', async () => {
+      const now = new Date('2026-04-15T13:00:00.000Z');
+
+      await getDashboardOverview('user-1', { now });
+      await afterCallbacks[0]();
+
+      expect(overviewSummaryDocCreateMock).toHaveBeenCalledWith(
+        expect.objectContaining({ computedAt: now, updatedAt: now })
+      );
+    });
+
+    it('reads the current month from the request time, never from the process clock', async () => {
+      // `getItalyMonthYear` is mocked to April in this file, so the payload cannot tell the two clocks
+      // apart: the assertion is on the ARGUMENT. A call with none reads `new Date()` — a request across
+      // a month's midnight would build half its payload on each month. Seen red (2026-10-03) with the
+      // payload builder calling it bare.
+      const now = new Date('2026-04-15T13:00:00.000Z');
+
+      await getDashboardOverview('user-1', { now });
+
+      const calls = vi.mocked(getItalyMonthYear).mock.calls;
+      expect(calls.length).toBeGreaterThan(0);
+      expect(calls.filter((args) => args[0] !== now)).toEqual([]);
+    });
+
+    it('keeps an invalidation that landed during the recompute: the write loses its precondition quietly', async () => {
+      overviewSummaryDocGetMock.mockResolvedValue(
+        storedSummary(new Date('2026-04-15T08:00:00.000Z'), new Date('2026-04-15T09:00:00.000Z'))
+      );
+      overviewSummaryDocUpdateMock.mockRejectedValueOnce(Object.assign(new Error('FAILED_PRECONDITION'), { code: 9 }));
+      const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      await getDashboardOverview('user-1', { now: new Date('2026-04-15T10:00:00.000Z') });
+      await afterCallbacks[0]();
+
+      expect(overviewSummaryDocUpdateMock).toHaveBeenCalledWith(expect.anything(), { lastUpdateTime: STALE_SUMMARY_UPDATE_TIME });
+      expect(info).toHaveBeenCalledWith(expect.stringContaining('not persisted'), 'user-1');
+      expect(warn).not.toHaveBeenCalled();
+      info.mockRestore();
+      warn.mockRestore();
+    });
+
+    it('logs any other failure of the write as a warning, never as an error of the response', async () => {
+      overviewSummaryDocCreateMock.mockRejectedValueOnce(new Error('quota'));
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const result = await getDashboardOverview('user-1');
+      await afterCallbacks[0]();
+
+      expect(result.metrics.totalValue).toBe(1000);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('persist materialized summary'), expect.any(Error));
+      warn.mockRestore();
+    });
+  });
+
+  describe('timing', () => {
+    it('marks db after the summary read and after the round of reads, compute after the payload', async () => {
+      const marks: string[] = [];
+
+      await getDashboardOverview('user-1', { timing: { mark: (name) => marks.push(name) } });
+
+      expect(marks).toEqual(['db', 'db', 'compute']);
+    });
+
+    it('marks db then compute when the materialized summary is served', async () => {
+      const now = new Date('2026-04-15T13:00:00.000Z');
+      overviewSummaryDocGetMock.mockResolvedValue(storedSummary(new Date('2026-04-15T12:00:00.000Z')));
+      const marks: string[] = [];
+
+      await getDashboardOverview('user-1', { now, timing: { mark: (name) => marks.push(name) } });
+
+      expect(marks).toEqual(['db', 'compute']);
+    });
   });
 });

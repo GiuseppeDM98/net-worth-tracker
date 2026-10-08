@@ -21,7 +21,7 @@
  * the toast's action: the order that prevents the double count is taught where it matters.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useEffectEvent, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -158,10 +158,10 @@ export function PensionContributionDialog({ open, onClose, defaultAssetId, onRec
   const watchTaxYear = useWatch({ control, name: 'taxYear' });
 
   // Dialog reset pattern (AGENTS.md): `open` in deps, guard on !open, enumerate every field.
-  useEffect(() => {
-    if (!open) return;
+  // The funds, today and the fiscal year are read at the opening, never triggers of their own.
+  const resetForOpening = useEffectEvent((assetIdFromCaller: string | undefined) => {
     reset({
-      assetId: defaultAssetId ?? funds[0]?.id ?? '',
+      assetId: assetIdFromCaller ?? funds[0]?.id ?? '',
       source: 'voluntary',
       amount: undefined,
       date: todayIso,
@@ -169,8 +169,11 @@ export function PensionContributionDialog({ open, onClose, defaultAssetId, onRec
       sourceCashAssetId: '__none__',
       notes: '',
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, defaultAssetId, reset]);
+  });
+  useEffect(() => {
+    if (!open) return;
+    resetForOpening(defaultAssetId);
+  }, [open, defaultAssetId]);
 
   // The status line resets on opening, derived during render (the TransactionDialog pattern):
   // a setState inside the effect above would cascade a render for a value known before it.
@@ -183,30 +186,33 @@ export function PensionContributionDialog({ open, onClose, defaultAssetId, onRec
   // The fiscal year follows the date: a new date resets it to its own year, and the reader
   // re-chooses the neighbouring year only for the straddling case (January for the year before).
   const dateYear = yearOfIso(watchDate);
+  // Runs on the date's year only: `setValue` is react-hook-form's stable setter, never a trigger.
   useEffect(() => {
     if (dateYear !== null) setValue('taxYear', dateYear, { shouldValidate: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs on the date's year only; the fiscal year is what it sets
-  }, [dateYear]);
+  }, [dateYear, setValue]);
   const taxYearOptions = dateYear !== null ? [dateYear - 1, dateYear, dateYear + 1] : [currentTaxYear - 1, currentTaxYear, currentTaxYear + 1];
 
   const onSubmit = async (data: ContributionFormValues) => {
     setStatus({ phase: 'submitting' });
+    // Built before the try: the React Compiler cannot lower conditionals inside a try block.
+    const contribution = {
+      assetId: data.assetId,
+      source: data.source,
+      amount: data.amount,
+      date: new Date(data.date),
+      taxYear: data.taxYear,
+      notes: data.notes?.trim() || undefined,
+      sourceCashAssetId:
+        data.source === 'voluntary' && data.sourceCashAssetId !== '__none__'
+          ? data.sourceCashAssetId
+          : undefined,
+    };
+    const recordedAction = onRecorded ? { label: PENSION_CONTRIBUTION_RECORDED.action, onClick: onRecorded } : undefined;
     try {
-      await recordMutation.mutateAsync({
-        assetId: data.assetId,
-        source: data.source,
-        amount: data.amount,
-        date: new Date(data.date),
-        taxYear: data.taxYear,
-        notes: data.notes?.trim() || undefined,
-        sourceCashAssetId:
-          data.source === 'voluntary' && data.sourceCashAssetId !== '__none__'
-            ? data.sourceCashAssetId
-            : undefined,
-      });
+      await recordMutation.mutateAsync(contribution);
       toast.success(PENSION_CONTRIBUTION_RECORDED.title, {
         description: PENSION_CONTRIBUTION_RECORDED.next,
-        action: onRecorded ? { label: PENSION_CONTRIBUTION_RECORDED.action, onClick: onRecorded } : undefined,
+        action: recordedAction,
       });
       onClose();
     } catch (error) {

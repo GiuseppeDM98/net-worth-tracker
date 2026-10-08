@@ -19,6 +19,7 @@
 
 import { useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/query/queryKeys';
 import { toast } from 'sonner';
 import { getDefaultTargets, setSettings } from '@/lib/services/assetAllocationService';
 import { describeWriteError } from '@/lib/utils/dialogNarrative';
@@ -150,7 +151,16 @@ export function useCoastFireSettingsDraft({
   );
   const [draft, setDraft] = useState<{ seed: DraftState; values: DraftState } | null>(null);
   const values = draft?.seed === seed ? draft.values : seed;
-  const { userAge, retirementAge, useCustomExpenses, customExpenses, pensions, taxBrackets } = values;
+  // `customExpensesEnabled`, not `useCustomExpenses`: a local named use* reads as a hook to the React
+  // Compiler, which then refuses the whole hook. The returned key keeps its name.
+  const {
+    userAge,
+    retirementAge,
+    useCustomExpenses: customExpensesEnabled,
+    customExpenses,
+    pensions,
+    taxBrackets,
+  } = values;
 
   /** Applies an edit to the current draft, seeding it from `seed` when it is the first one. */
   const updateDraft = (patch: (current: DraftState) => Partial<DraftState>) =>
@@ -178,7 +188,7 @@ export function useCoastFireSettingsDraft({
 
   const parsedCustomExpenses = parseFloat(customExpenses);
   const usesCustomExpenses =
-    useCustomExpenses && !isNaN(parsedCustomExpenses) && parsedCustomExpenses > 0;
+    customExpensesEnabled && !isNaN(parsedCustomExpenses) && parsedCustomExpenses > 0;
 
   const previewPensions = useMemo(() => parsePensionDrafts(pensions), [pensions]);
   const previewTaxBrackets = useMemo(() => parseTaxBracketDrafts(taxBrackets), [taxBrackets]);
@@ -207,8 +217,8 @@ export function useCoastFireSettingsDraft({
   const hasUnsavedChanges =
     userAge !== (settings?.userAge !== undefined ? String(settings.userAge) : '') ||
     retirementAge !== String(savedRetirementAge) ||
-    useCustomExpenses !== (settings?.coastFireCustomExpenses !== undefined) ||
-    (useCustomExpenses && parsedCustomExpenses !== settings?.coastFireCustomExpenses) ||
+    customExpensesEnabled !== (settings?.coastFireCustomExpenses !== undefined) ||
+    (customExpensesEnabled && parsedCustomExpenses !== settings?.coastFireCustomExpenses) ||
     previewPensionSnapshotKey !== savedPensionSnapshotKey ||
     previewTaxBracketSnapshotKey !== savedTaxBracketSnapshotKey;
 
@@ -227,7 +237,7 @@ export function useCoastFireSettingsDraft({
       }),
     onSuccess: () => {
       toast.success('Ipotesi Coast FIRE salvate');
-      queryClient.invalidateQueries({ queryKey: ['settings', ownerId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.settings.all(ownerId || '') });
     },
     onError: (error) => {
       console.error('Error saving Coast FIRE settings:', error);
@@ -251,7 +261,7 @@ export function useCoastFireSettingsDraft({
     setUserAge,
     retirementAge,
     setRetirementAge,
-    useCustomExpenses,
+    useCustomExpenses: customExpensesEnabled,
     setUseCustomExpenses: (checked: boolean) => {
       setUseCustomExpensesState(checked);
       if (!checked) setCustomExpenses('');

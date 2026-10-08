@@ -159,6 +159,76 @@ test('il Ribilancia nomina gli strumenti, e le gambe tornano a sommare la mossa 
   expect(Math.abs(sum - euro(classAmount))).toBeLessThanOrEqual(legs.length);
 });
 
+/**
+ * Esposizione (2026-09-28; le regole in doc/guide/allocazione.md § Esposizione). I profili di Yahoo vengono dal seed
+ * (`scripts/instrumentProfileFixtures.ts`): VWCE.DE con dieci titoli e undici settori, AAPL con
+ * settore e nome, FONDOPENSIONE vuoto — quindi la route non ha nulla da chiedere a Yahoo e il
+ * fixture ha, per costruzione, una riga «Non letto» (il fondo pensione tracciato come ETF).
+ *
+ * Visto rosso seminando VUOTO il profilo di `VWCE.DE`: la riga di copertura la nomina come non
+ * letta e Nvidia sparisce dall'elenco.
+ */
+test("l'Esposizione dice dove va ogni euro e l'elenco torna a 100, senza chiamare Yahoo", async ({ page }) => {
+  const profileResponses: number[] = [];
+  const oldRouteCalls: string[] = [];
+  page.on('response', (response) => {
+    if (response.url().includes('/api/portfolio/instrument-profiles')) profileResponses.push(response.status());
+    if (response.url().includes('/api/portfolio/exposure')) oldRouteCalls.push(response.url());
+  });
+
+  await openAllocazione(page);
+  const tile = page.getByRole('region', { name: 'Esposizione del portafoglio' });
+  const coverage = tile.locator('p', { hasText: /In questa vista/ }).first();
+  await expect(coverage).toBeVisible({ timeout: 30_000 });
+
+  // ONE read of the profiles, 200, and never the retired route.
+  expect(profileResponses).toEqual([200]);
+  expect(oldRouteCalls).toEqual([]);
+
+  // Titoli: what is in view and how much was read, then what is out of it. The seed's VWCE
+  // profile is read, so its heaviest holding is a row and the fund is NOT among the unread.
+  // «al 25%», «all'11%», «allo 0%»: the article follows the printed figure, with no space after all'.
+  await expect(coverage).toContainText(/azionario nozionale, letti (al |all'|allo )\d+%: /);
+  await expect(coverage).toContainText('non hanno una composizione pubblicata');
+  await expect(coverage).not.toContainText('Vanguard FTSE All-World');
+  await expect(coverage).toContainText(/Fuori da questa vista: .*obbligazionario/);
+  await expect(coverage).toContainText(/strumenti non quotati, senza titoli per natura\.$/);
+  await expect(tile.getByText("% dell'azionario nozionale", { exact: true })).toBeVisible();
+  const list = tile.getByRole('list', { name: 'Titoli più pesanti' });
+  await expect(list.getByRole('button', { name: /NVIDIA/ })).toBeVisible();
+
+  // The printed shares of the rows plus the two closing rows add up to exactly 100.
+  const printedShares = async () =>
+    list.locator('li').evaluateAll((items) =>
+      items.map((li) => {
+        const cells = Array.from(li.querySelectorAll('span'));
+        const share = cells.map((cell) => (cell.textContent ?? '').trim()).find((text) => /^\d+%$/.test(text));
+        return share ? Number(share.replace('%', '')) : NaN;
+      }),
+    );
+  const titoli = await printedShares();
+  expect(titoli.every((share) => Number.isFinite(share)), 'ogni riga stampa una quota').toBe(true);
+  expect(titoli.reduce((sum, share) => sum + share, 0)).toBe(100);
+  await expect(list.getByText('Resto letto')).toBeVisible();
+  await expect(list.getByText('Non letto')).toBeVisible();
+
+  // Emittenti: the base changes with the view, and the profiles are NOT read again.
+  await tile.getByRole('group', { name: "Vista dell'esposizione" }).getByRole('button', { name: 'Emittenti', exact: true }).click();
+  await expect(tile.getByText('% degli strumenti quotati', { exact: true })).toBeVisible();
+  await expect(tile.getByText(/In questa vista: .*strumenti quotati, letti/)).toBeVisible();
+  const issuers = tile.getByRole('list', { name: 'Emittenti degli strumenti quotati' });
+  await expect(issuers.getByRole('button', { name: /Vanguard/ })).toBeVisible();
+  await expect(issuers.getByRole('button', { name: /Apple Inc\./ })).toBeVisible();
+  const emittenti = await issuers.locator('li').evaluateAll((items) =>
+    items.map((li) => {
+      const share = Array.from(li.querySelectorAll('span')).map((cell) => (cell.textContent ?? '').trim()).find((text) => /^\d+%$/.test(text));
+      return share ? Number(share.replace('%', '')) : NaN;
+    }),
+  );
+  expect(emittenti.reduce((sum, share) => sum + share, 0)).toBe(100);
+  expect(profileResponses).toEqual([200]);
+});
+
 test('la pagina non scorre di lato, misurato sugli elementi e non sul contenitore', async ({ page }) => {
   await openAllocazione(page);
 

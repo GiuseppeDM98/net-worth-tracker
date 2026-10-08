@@ -32,13 +32,16 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/query/queryKeys';
+import { useAssets } from '@/lib/hooks/useAssets';
+import { useSettings } from '@/lib/hooks/useSettings';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
-import { calculateAssetValue, calculateLiquidNetWorth, calculateTotalValue, getAllAssets } from '@/lib/services/assetService';
-import { calculateCurrentAllocation, getDefaultTargets, getSettings, setSettings } from '@/lib/services/assetAllocationService';
+import { calculateAssetValue, calculateLiquidNetWorth, calculateTotalValue } from '@/lib/services/assetService';
+import { calculateCurrentAllocation, getDefaultTargets, setSettings } from '@/lib/services/assetAllocationService';
 import { buildParamsFromScenario, getDefaultMarketParameters, getDefaultMonteCarloScenarios, runMonteCarloSimulation, type AnnualInflow } from '@/lib/services/monteCarloService';
 import { calculateCoastFireNetRealAnnualPension, normalizeCoastFirePensions, normalizeCoastFireTaxBrackets } from '@/lib/services/fireService';
 import { resolvePortfolioTaxProfile } from '@/lib/utils/withdrawalTax';
@@ -82,7 +85,7 @@ import {
   scenarioLabel,
 } from '@/lib/utils/monteCarloNarrative';
 import type { MonteCarloCapitalInflow, MonteCarloParams, MonteCarloScenarios } from '@/types/assets';
-import type { TileSkeletonCell } from '@/lib/utils/tileGridSkeleton';
+import { MONTE_CARLO_TAB_SKELETON_CELLS } from './tabSkeletons';
 import { cn } from '@/lib/utils';
 import { PageVerdict } from '@/components/ui/page-verdict';
 import { TILE_CELL_CLASS } from '@/components/ui/tile';
@@ -96,13 +99,8 @@ import { DistribuzioneTile } from '@/components/monte-carlo/tiles/DistribuzioneT
 import { ScenariConfrontoTile } from '@/components/monte-carlo/tiles/ScenariConfrontoTile';
 import { ParametriTile, type MonteCarloForm } from '@/components/monte-carlo/tiles/ParametriTile';
 
-/** The grid's geometry, for the skeleton: the same spans as the tiles below. */
-const SKELETON_CELLS: TileSkeletonCell[] = [
-  { span: 5, lines: 14 },
-  { span: 4, lines: 10 },
-  { span: 3, lines: 9 },
-  { span: 12, lines: 10 },
-];
+/** The grid's geometry, for the skeleton: the same spans as the tiles below — shared with the page's lazy-tab wait. */
+const SKELETON_CELLS = MONTE_CARLO_TAB_SKELETON_CELLS;
 
 const DEFAULT_RETIREMENT_YEARS = 30;
 const DEFAULT_SIMULATIONS = DEFAULT_MONTE_CARLO_SIMULATIONS;
@@ -130,20 +128,9 @@ export function MonteCarloTab() {
   const queryClient = useQueryClient();
   const isDemo = useDemoMode();
 
-  // ─── Queries (shared keys with the other FIRE tabs) ──────────────────────────
-  const { data: assets, isLoading: isLoadingAssets, isError: assetsError } = useQuery({
-    queryKey: ['assets', ownerId],
-    queryFn: () => getAllAssets(ownerId!),
-    enabled: !!user && !!ownerId,
-    staleTime: 300000,
-  });
-
-  const { data: settings, isLoading: isLoadingSettings, isError: settingsError } = useQuery({
-    queryKey: ['settings', ownerId],
-    queryFn: () => getSettings(ownerId!),
-    enabled: !!user && !!ownerId,
-    staleTime: 300000,
-  });
+  // ─── Queries (the keys every page shares, 2026-09-29) ───────────────────────────
+  const { data: assets, isLoading: isLoadingAssets, isError: assetsError } = useAssets(ownerId);
+  const { data: settings, isLoading: isLoadingSettings, isError: settingsError } = useSettings(ownerId);
 
   // ─── The pension lock (governs the whole FIRE page) ──────────────────────────
   // With the lock on, the locked funds leave the starting portfolio and re-enter the simulation
@@ -293,9 +280,9 @@ export function MonteCarloTab() {
       } catch (error) {
         console.error('Error running the Monte Carlo scenarios:', error);
         toast.error('Errore durante la simulazione');
-      } finally {
-        setIsRunning(false);
       }
+      // After the try/catch, not in a `finally`: the React Compiler cannot lower try/finally.
+      setIsRunning(false);
     }, 60);
   }, []);
 
@@ -320,7 +307,7 @@ export function MonteCarloTab() {
     },
     onSuccess: () => {
       toast.success('Parametri degli scenari salvati');
-      queryClient.invalidateQueries({ queryKey: ['settings', ownerId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.settings.all(ownerId || '') });
     },
     onError: () => toast.error('Errore nel salvataggio dei parametri'),
   });

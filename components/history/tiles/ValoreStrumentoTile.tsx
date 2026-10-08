@@ -23,7 +23,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useReducedMotion } from 'framer-motion';
 import { ArrowDown, ArrowUp } from 'lucide-react';
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from '@/components/ui/charts/recharts';
 import type { Narrative } from '@/lib/utils/narrative';
 import { MONTH_NAMES_SHORT } from '@/lib/utils/period';
 import { articleForPercent } from '@/lib/utils/patrimonioNarrative';

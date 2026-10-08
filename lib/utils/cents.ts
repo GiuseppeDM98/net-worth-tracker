@@ -8,6 +8,14 @@
  * balance movement or a cashflow row: the trade settlement (`computeCashDelta`) and the income row
  * of a dividend (`dividendIncomeService`).
  *
+ * And the BALANCE a movement lands on (2026-10-07): a movement in cents still leaves binary noise
+ * in the sum — 4000.1 + 33.2 is 4033.2999999999997 — which grows a little at every write and
+ * surfaced raw in the asset form's «Saldo» («4033,050000000001»). Every writer of a cash account's
+ * `quantity` rounds the result too: `lib/server/cashSettlement.ts`, `assetTransactionUseCase.ts`
+ * (trade settlement), `assetService.ts` (`updateCashAssetBalance`, `updateCashAssetBalancesAtomic`),
+ * `dividendIncomeService.ts` (credit, difference, give-back). A balance saved noisy before that day
+ * is cleaned by its next movement.
+ *
  * SDK-free.
  */
 

@@ -26,7 +26,7 @@
  */
 
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useForm, Controller, useWatch, type FieldErrors, type UseFormReturn } from 'react-hook-form';
+import { useForm, useFormState, Controller, useWatch, type FieldErrors, type UseFormReturn } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useQueryClient } from '@tanstack/react-query';
@@ -43,13 +43,15 @@ import {
 import { CostCenter } from '@/types/costCenters';
 import { resolveCostCenterColor } from '@/lib/utils/costCenterColors';
 import { useChartColors } from '@/lib/hooks/useChartColors';
-import { getCostCenters } from '@/lib/services/costCenterService';
+import { useCostCenters } from '@/lib/hooks/useCostCenters';
+import { useAssets } from '@/lib/hooks/useAssets';
+import { useSettings } from '@/lib/hooks/useSettings';
+import { useExpenseCategories } from '@/lib/hooks/useExpenses';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Asset, FamilyMember } from '@/types/assets';
 import { createExpenseSettledOnDate, createTransferWithFee, getTransferFeeOf, saveTransferFee, updateExpense } from '@/lib/services/expenseService';
 import { applyDebtRepaymentEdit, applyDebtRepayments } from '@/lib/services/debtRepaymentService';
 import { isRepayableProperty, splitInstalment } from '@/lib/utils/mortgageRepayment';
-import { getAllAssets } from '@/lib/services/assetService';
 import { applyBalanceEffects } from '@/lib/services/cashBalanceReconciliation';
 import { editBalanceEffects } from '@/lib/utils/cashSettlement';
 import {
@@ -61,8 +63,7 @@ import {
   type TransferFeeSettings,
 } from '@/lib/utils/transferFee';
 import Link from 'next/link';
-import { getSettings } from '@/lib/services/assetAllocationService';
-import { getAllCategories, ensureTransferCategory } from '@/lib/services/expenseCategoryService';
+import { ensureTransferCategory } from '@/lib/services/expenseCategoryService';
 import { resolveEquivalentCategory } from '@/lib/utils/expenseCategoryMatching';
 import { queryKeys } from '@/lib/query/queryKeys';
 import { deleteField } from 'firebase/firestore';
@@ -484,7 +485,11 @@ function ExpenseFormBody({
   advancedOpen,
   setAdvancedOpen,
 }: Readonly<FormBodyProps>) {
-  const { register, control, handleSubmit, setValue, getValues, formState: { errors } } = form;
+  const { register, control, handleSubmit, setValue, getValues } = form;
+  // Subscribed HERE, not read off `form.formState`: `form` is the same object on every render, so
+  // under the React Compiler the parent hands down unchanged props and this body would never
+  // re-render to show a field's error (seen in e2e/cashflow.tracciamento.spec.ts, 2026-10-05).
+  const { errors } = useFormState({ control });
   const chartColors = useChartColors();
   // An archived center is closed: it takes no new expense. The one this expense is ALREADY
   // linked to stays listed, or opening an old row would show «Nessun centro» and unlink it on save.
@@ -1302,6 +1307,10 @@ function ExpenseFormBody({
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
+const EMPTY_CATEGORIES: ExpenseCategory[] = [];
+const EMPTY_ASSETS: Asset[] = [];
+const EMPTY_COST_CENTERS: CostCenter[] = [];
+const EMPTY_FAMILY_MEMBERS: FamilyMember[] = [];
 
 export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<ExpenseDialogProps>) {
   const { user } = useAuth();
@@ -1310,26 +1319,37 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
 
   // The modal's reading IS the status line: what the form wants, what it is doing, how it went.
   const [status, setStatus] = useState<ModalStatus>({ phase: 'idle' });
-  const [categories, setCategories] = useState<ExpenseCategory[]>([]);
-  const [loadingCategories, setLoadingCategories] = useState(false);
-  const [cashAssets, setCashAssets] = useState<Asset[]>([]);
-  const [defaultDebitCashAssetId, setDefaultDebitCashAssetId] = useState<string>('__none__');
-  const [defaultCreditCashAssetId, setDefaultCreditCashAssetId] = useState<string>('__none__');
-  const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
-  const [costCentersEnabled, setCostCentersEnabled] = useState(false);
+
+  // The four reads — categories, assets, settings, cost centres — from the keys every page shares
+  // (2026-09-29), only while the dialog is open: on Cashflow they are already in the cache, so
+  // «Nuova spesa» opens with nothing to wait for. Until 2026-09-29 each opening read them again.
+  const readsEnabled = open && !!user;
+  const { data: categories = EMPTY_CATEGORIES, isLoading: loadingCategories } = useExpenseCategories(ownerId, { enabled: readsEnabled });
+  const { data: allAssets = EMPTY_ASSETS } = useAssets(ownerId, { enabled: readsEnabled });
+  const { data: settings } = useSettings(ownerId, { enabled: readsEnabled });
+  const { data: costCenters = EMPTY_COST_CENTERS } = useCostCenters(ownerId, { enabled: readsEnabled });
+  const cashAssets = useMemo(() => allAssets.filter((a) => a.type === 'cash' && a.assetClass === 'cash'), [allAssets]);
+  // Properties a debt row can repay. A property already named by the row stays listed even once
+  // its debt is repaid.
+  const properties = useMemo(() => allAssets.filter((a) => isRepayableProperty(a) || a.id === expense?.debtAssetId), [allAssets, expense?.debtAssetId]);
+  const defaultDebitCashAssetId = settings?.defaultDebitCashAssetId || '__none__';
+  const defaultCreditCashAssetId = settings?.defaultCreditCashAssetId || '__none__';
+  const costCentersEnabled = settings?.costCentersEnabled ?? false;
   const [selectedCostCenterId, setSelectedCostCenterId] = useState<string>('__none__');
   // Divisione: '' is «in comune», the default. Stored as its own state rather than a form field
   // because it is not validated and has no error state — same shape as the cost centre above.
-  const [splitEnabled, setSplitEnabled] = useState(false);
-  const [spendingRolesEnabled, setSpendingRolesEnabled] = useState(false);
-  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
+  const splitEnabled = settings?.expenseSplitEnabled ?? false;
+  const spendingRolesEnabled = settings?.spendingRolesEnabled ?? false;
+  const familyMembers = useMemo(() => settings?.familyMembers ?? EMPTY_FAMILY_MEMBERS, [settings]);
   const [personalMemberId, setPersonalMemberId] = useState<string>('');
-  // Where a new transfer fee lands (Impostazioni › Spese), read with the other settings.
-  const [transferFeeSettings, setTransferFeeSettings] = useState<TransferFeeSettings | null>(null);
-  // Properties a debt row can repay (read with the accounts).
-  const [properties, setProperties] = useState<Asset[]>([]);
+  // Where a new transfer fee lands (Impostazioni › Spese), read with the other settings; null
+  // until the settings document has answered (the field waits, it does not guess).
+  const transferFeeSettings = useMemo<TransferFeeSettings | null>(
+    () => (settings === undefined ? null : { transferFeeCategoryId: settings?.transferFeeCategoryId, transferFeeSubCategoryId: settings?.transferFeeSubCategoryId }),
+    [settings],
+  );
   // The fee row the edited transfer already carries, stored WITH the transfer it was read for
-  // (AGENTS.md → state belonging to a subject): a stale read falls back to «loading».
+  // (AGENTS.md § React Query and Derived State → state belonging to a subject): a stale read falls back to «loading».
   const [savedFeeRead, setSavedFeeRead] = useState<{ expenseId: string; failed: boolean; fee: Expense | null } | null>(null);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [categoryInitialName, setCategoryInitialName] = useState('');
@@ -1418,55 +1438,12 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
     selectedRecurringDay,
   ]);
 
-  // Fetched once per opening. Both are `useCallback`s so the effects that call them can name them
-  // as dependencies. `loadCashAssets` is promise-style on purpose: its setters run inside
-  // `.then`, which the `react-hooks/set-state-in-effect` rule accepts from an effect — an
-  // `await` in an async function it does not see through. `loadCategories` raises its loading
-  // flag synchronously, so the effect defers it instead (see there).
-  const loadCategories = useCallback(async () => {
-    if (!user || !ownerId) return;
-    try {
-      setLoadingCategories(true);
-      const allCategories = await getAllCategories(ownerId);
-      setCategories(allCategories);
-    } catch (error) {
-      console.error('Error loading categories:', error);
-      toast.error('Errore nel caricamento delle categorie');
-    } finally {
-      setLoadingCategories(false);
-    }
-  }, [user, ownerId]);
-
-  const loadCashAssets = useCallback((): Promise<void> => {
-    if (!user || !ownerId) return Promise.resolve();
-    return Promise.all([getAllAssets(ownerId), getSettings(ownerId), getCostCenters(ownerId)])
-      .then(([allAssets, settings, centers]) => {
-        setCashAssets(allAssets.filter((a) => a.type === 'cash' && a.assetClass === 'cash'));
-        // A property already named by the row stays listed even once its debt is repaid.
-        setProperties(allAssets.filter((a) => isRepayableProperty(a) || a.id === expense?.debtAssetId));
-        const debitId = settings?.defaultDebitCashAssetId || '__none__';
-        const creditId = settings?.defaultCreditCashAssetId || '__none__';
-        setDefaultDebitCashAssetId(debitId);
-        setDefaultCreditCashAssetId(creditId);
-        setCostCentersEnabled(settings?.costCentersEnabled ?? false);
-        setCostCenters(centers);
-        setSplitEnabled(settings?.expenseSplitEnabled ?? false);
-        setSpendingRolesEnabled(settings?.spendingRolesEnabled ?? false);
-        setFamilyMembers(settings?.familyMembers ?? []);
-        setTransferFeeSettings({
-          transferFeeCategoryId: settings?.transferFeeCategoryId,
-          transferFeeSubCategoryId: settings?.transferFeeSubCategoryId,
-        });
-        if (!expense) {
-          const currentType = getValues('type');
-          const defaultId = currentType === 'income' ? creditId : debitId;
-          if (defaultId !== '__none__') {
-            setValue('linkedCashAssetId', defaultId);
-          }
-        }
-      })
-      .catch((error) => console.error('Error loading cash assets:', error));
-  }, [user, ownerId, expense, getValues, setValue]);
+  // A category written from here (a new one, the transfer stub) reaches the key every reader
+  // shares: an invalidation, never a private copy of the list.
+  const loadCategories = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: queryKeys.expenses.categories(ownerId || '') }),
+    [queryClient, ownerId],
+  );
 
   // The transfer category id fetched during THIS opening (see the auto-set effect below).
   const transferCategoryIdRef = useRef<string | null>(null);
@@ -1496,18 +1473,6 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
     if (!open) return;
     transferCategoryIdRef.current = null; // Reset transfer category cache on dialog open
   }, [open, expense]);
-
-  useEffect(() => {
-    if (!open || !user) return;
-    // `loadCategories` raises the loading flag BEFORE its first await (the Select shows it, and
-    // the two handlers that re-fetch rely on it), so from an effect it is deferred a tick — the
-    // sanctioned way to keep a synchronous setter out of an effect body (AGENTS.md → Motion).
-    const timer = setTimeout(() => {
-      void loadCategories();
-    }, 0);
-    loadCashAssets();
-    return () => clearTimeout(timer);
-  }, [open, user, loadCategories, loadCashAssets]);
 
   useEffect(() => {
     if (!expense) {
@@ -1592,6 +1557,16 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
       });
     }
   }, [expense, reset, open]);
+
+  // A NEW row opens on the default account of its type (Impostazioni › Spese) once the settings
+  // have answered. Declared AFTER the reset effect above, so in the commit that opens the dialog
+  // the reset clears the field first and this fills it — the order the old async loader had.
+  useEffect(() => {
+    if (!open || expense || !settings) return;
+    const currentType = getValues('type');
+    const defaultId = currentType === 'income' ? defaultCreditCashAssetId : defaultDebitCashAssetId;
+    if (defaultId !== '__none__') setValue('linkedCashAssetId', defaultId);
+  }, [open, expense, settings, defaultCreditCashAssetId, defaultDebitCashAssetId, getValues, setValue]);
 
   // The fee row of an edited transfer is read at each opening and its amount put in the field:
   // the fee is edited FROM the transfer (lib/utils/transferFee.ts). Promise-style, so the setters
@@ -1847,7 +1822,9 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
     const requestedFee = data.type === 'transfer' ? normalizeTransferFee(data.transferFee) : null;
     const feeNote = describeTransferFeeNote(cashAssets.find((asset) => asset.id === transferCashAssetId)?.name);
 
-    try {
+    // The save is a function of its own, awaited in the try below: the React Compiler does not
+    // compile conditional or logical expressions written inside a try/catch, and this body is full of them.
+    const save = async () => {
       const expenseData: ExpenseFormData = {
         type: data.type,
         categoryId: data.categoryId,
@@ -2021,6 +1998,10 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
 
       onSuccess?.();
       onClose();
+    };
+
+    try {
+      await save();
     } catch (error) {
       console.error('Error saving expense:', error);
       setStatus({ phase: 'error', message: describeWriteError(error) });

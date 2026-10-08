@@ -1,6 +1,6 @@
 # MOB-01 — Il censimento in repo e il budget della prima schermata
 
-> Stato: da fare · Priorità: 1 (le altre MOB si chiudono con i suoi numeri) · Sforzo: M · Dipende da: PERF-01 (e PERF-00: l'Esposizione misurata e `instrument-profile-cache` nel seed) · Sblocca: MOB-02..MOB-08
+> Stato: da fare · Priorità: 1 (le altre MOB si chiudono con i suoi numeri) · Sforzo: M · Dipende da: PERF-01 (PERF-00 è chiusa dal 2026-09-28: la nuova Esposizione e `instrument-profile-cache` nel seed ci sono) · Sblocca: MOB-02..MOB-08
 
 ## 1. Il problema, misurato
 
@@ -17,8 +17,8 @@ corsa sulla build, confrontata con essa.
 
 **La baseline precede i contributi del 2026-09-27.** Da #401 il Flusso di Analisi sotto i 640 px non è più un Sankey ma
 una barra e le righe: a 390 `charts` scende da 2 a 1 (il Sankey era un `svg[role="img"]`), cifre e controlli salgono, le
-schermate sono da rimisurare; a 768 e 1024 nulla cambia. Da PERF-00 cambia l'Esposizione di Allocazione (la base e la riga
-di copertura). #400 a interruttore spento e #403 non muovono righe (le quote del chip sono `sr-only`). Uno scarto su
+schermate sono da rimisurare; a 768 e 1024 nulla cambia. Dal 2026-09-28 l'Esposizione di Allocazione è cambiata (la base e la riga
+di copertura, `components/allocation/tiles/EsposizioneTile.tsx`). #400 a interruttore spento e #403 non muovono righe (le quote del chip sono `sr-only`). Uno scarto su
 Analisi a 390 o su Allocazione si attribuisce a quei contributi, non al censimento.
 
 Lo script non può diventare un budget così com'è (righe del 2026-09-26, chi implementa le riverifica):
@@ -50,12 +50,12 @@ Lo script non può diventare un budget così com'è (righe del 2026-09-26, chi i
 
 ## 3. Non-obiettivi
 
-- Nessun codice dell'app (MOB-02..07), niente tempi (PERF-01), niente CI, nessuna spec Playwright (MOB-02..08).
+- Nessun codice dell'app (MOB-02..07), niente tempi (`perf:bench`), niente CI, nessuna spec Playwright (MOB-02..08).
 - Le metriche nuove a 768 e 1024 si registrano; vincolanti con MOB-08. Fuori: Assistente e login; B e C.
 
 ## 4. Design
 
-**Due script**, come PERF-01. `scripts/mobileCensus.mjs` misura (emulatori, mirror, build servita); resta `.mjs` perché
+**Due script**, come `perf:bench` e `perf:budget` (`doc/guide/velocita.md`). `scripts/mobileCensus.mjs` misura (emulatori, mirror, build servita); resta `.mjs` perché
 passa funzioni a `page.evaluate` (un sorgente passato da `tsx` può portarsi dietro l'helper `__name`).
 `scripts/mobileBudget.mts` (con `tsx`, come i seed) confronta, chiamando la pura `lib/utils/mobileBudget.ts`.
 
@@ -94,7 +94,7 @@ Diagnostica non vincolante: `mainTop` (la barra a 1024), `pillTop`, `headerHeigh
   `spendingRolesEnabled` spento, il default. La vista per ruolo non è nel budget; sul mirror il report stampa lo stato
   dell'interruttore, perché il Flusso a 390 cambia forma con lui.
 - **Il settle**: `h1`, nessun `[data-slot="skeleton"]` visibile (`components/ui/skeleton.tsx:20`), una cifra o 8 s, nessun
-  `role="status"` con testo nella `section` del verdetto o nel `PageHeader` (la riga di PERF-03 § 4; gli altri di `main`
+  `[data-freshness]` con testo nel `PageHeader` (la riga di freschezza, `components/layout/PageHeader.tsx`, in develop dal 2026-09-30; gli altri `role="status"` di `main`
   no: `components/fire-simulations/coast/CoastIpotesi.tsx:276` resta pieno), poi 500 ms; oltre 60 s `unsettled` (rosso).
   Contesto `reducedMotion: 'reduce'`, uno per viewport, nessun `mobile-sections:*`, nessuna riga aperta.
 - **Privacy e opzioni**: uscita in `.mobile-census/` (gitignored), testi solo con `--texts`; sempre dopo `--`: `--email`,
@@ -110,8 +110,10 @@ nello stesso commit). Allargare: a mano, con l'OK del proprietario, annotato in 
 **API di MOB-02 usate**: la `section` di `PageVerdict`; l'`ul` di `VerdictStrip` dentro di essa; la riga chiusa di
 `Tile` (`sectionTriggerId` → `sectionPanelId` vuoto); la chiave `mobile-sections:<route>[:<tab>]` (per non ereditarla).
 
-**Conflitti con PERF**: PERF-01 è la dipendenza (build, :3200, `--`, pura + `.mts`); PERF-12 ha `perf:census`: nomi
-distinti; PERF-02 → il settle non guarda lo spinner; PERF-03 → la riga di stato vuota; PERF-04 → il settle aspetta lo
+**Conflitti con PERF**: `perf/` è la base (`perf:build`, `perf:serve` su :3200, il `--`, la pura + `.mts` di
+`perfBudget`); `perf:census` esiste (`scripts/perfRenderCensus.mjs`, in develop dal 2026-10-06): nomi
+distinti; PERF-02 (in develop dal 2026-09-29) → nessuno spinner: l'attesa dell'auth è lo skeleton «Verifica dell'accesso»
+in `main` (`app/dashboard/layout.tsx`), `[data-slot="skeleton"]` come ogni altro; PERF-03 (in develop dal 2026-09-30) → la riga di stato vuota, `[data-freshness]`; PERF-04 (in develop dal 2026-09-30, `components/ui/lazy-component.tsx`) → il settle aspetta lo
 `Skeleton` dei grafici pigri (a riga chiusa `charts` scende: voluto).
 
 **Decisioni per il proprietario**: (1) budget sul mirror con tolleranza, o su un fixture deterministico (stabile ma
@@ -134,7 +136,7 @@ guidato; (2) una cifra è solo «€ e %», come la baseline. Restano (3) e (4),
 
 ## 6. Passi
 
-1. Branch; SESSION_NOTES.md; PERF-01 § 4-5 e `doc/guide/e2e-emulatori.md`.
+1. Branch; SESSION_NOTES.md; `doc/guide/velocita.md`, `scripts/perfBudget.mts` e `doc/guide/e2e-emulatori.md`.
 2. `lib/utils/mobileBudget.ts` + i tre test, visti rossi e poi verdi.
 3. `scripts/mobileCensus.mjs`, una correzione di § 1 alla volta; `scripts/mobileBudget.mts`; `package.json`.
 4. Emulatori, `npm run mirror:seed -- <email>`, `perf:build`, `perf:serve`, `mobile:census`; uno scarto dalla baseline
@@ -169,10 +171,11 @@ guidato; (2) una cifra è solo «€ e %», come la baseline. Restano (3) e (4),
   `screens` o `figuresAboveFold` si guarda prima la data. **Dev contro build**: uno scarto forte dalla baseline (dev) si
   annota in SESSION_NOTES; il budget resta la prima corsa sulla build.
 - **Contratto con MOB-02**: senza l'ARIA di § 4 `firstClosedRowAbovePill` resta `null`. Rollback: tutto additivo.
-- **Yahoo nel fixture**: da PERF-00 l'Esposizione chiede i profili a `/api/portfolio/instrument-profiles`, che chiama
-  Yahoo solo a `instrument-profile-cache` vuota o scaduta, e `emulators:seed` la precompila per i ticker della fixture
-  (`VWCE.DE`, `AAPL`): il budget di Allocazione non tocca la rete. Un ticker non seminato va a Yahoo (senza rete è «non
-  letto» e la tessera è più corta): la diagnostica registra il `source` del `Server-Timing` della route (da PERF-10), e un
+- **Yahoo nel fixture**: l'Esposizione chiede i profili a `/api/portfolio/instrument-profiles`, che chiama Yahoo solo a
+  `instrument-profile-cache` vuota o scaduta; `emulators:seed` la precompila per i ticker della fixture (`VWCE.DE`,
+  `AAPL`, `FONDOPENSIONE` vuoto) e il global setup di Playwright la ristampa a ogni corsa
+  (`scripts/instrumentProfileFixtures.ts`, `npm run e2e:seed:profiles`): il budget di Allocazione non tocca la rete. Un ticker non seminato va a Yahoo (senza rete è «non
+  letto» e la tessera è più corta): la diagnostica registra il `source` del `Server-Timing` della route (`app/api/portfolio/instrument-profiles/route.ts`, dal 2026-10-05), e un
   `source=yahoo` sul fixture si corregge nel seed prima di prendere il budget, non si assorbe.
 
 ## 10. Documentazione da aggiornare
@@ -194,8 +197,8 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
   § Browser-Driven E2E), CLAUDE.md (§ Testing, § Known Issues), doc/guide/e2e-emulatori.md
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALI mentre scrivi codice
 - Leggi doc/mobile/README.md (§ 3 è la baseline) e la spec MOB-01 per intero; doc/mobile/MOB-02 § 4.1-4.4 (il contratto
-  che il censimento riconosce); doc/perf/PERF-01-benchmark-e-budget.md § 4-5 (PERF-01 deve essere fatta, e doc/perf/PERF-00 pure: perf:build,
-  perf:serve, porta :3200); DESIGN.md § mobile se MOB-09 l'ha già scritta
+  che il censimento riconosce); doc/guide/velocita.md e scripts/perfBudget.mts (perf:build,
+  perf:serve, porta :3200: il censimento gira sulla stessa build); DESIGN.md § mobile se MOB-09 l'ha già scritta
 - Crea SESSION_NOTES.md; crea il branch dalla branch attiva PRIMA di editare
 
 Regole: nessun commit senza il mio OK; un branch e un commit; rispondi in italiano; le quattro domande di § 4 (mirror o

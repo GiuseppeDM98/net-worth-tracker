@@ -18,7 +18,8 @@ a 1024. Le primitive di oggi (righe del 2026-09-26, da riverificare):
 - Radix `CollapsibleContent` (v1.1.12) mette `hidden: !isOpen` e smonta i figli da chiuso
   (`node_modules/@radix-ui/react-collapsible/dist/index.mjs:128`, `:136`): niente transizione di chiusura; il trigger
   stende le props dopo `aria-controls` (`:64`, `:69`).
-- `lib/hooks/useMediaQuery.ts:11-14` legge `window` nell'inizializzatore (PERF-02 lo porta a `useSyncExternalStore`).
+- `lib/hooks/useMediaQuery.ts` è `useSyncExternalStore` dal 2026-09-28 (PERF-02): `false` sul server e durante
+  l'idratazione, il valore vero subito dopo; un componente montato DOPO il login lo legge già al primo render.
 
 ## 2. Obiettivo misurabile
 
@@ -27,8 +28,9 @@ a 1024. Le primitive di oggi (righe del 2026-09-26, da riverificare):
 - Ogni tab della pill ≥ 44×44 sotto `desktop:`.
 - A 1440 Hall of Fame è quella di oggi salvo la punteggiatura del verdetto (§ 4.7).
 - In Playwright: DOM in ordine desktop, pannello chiuso vuoto, memoria dopo il reload, reduced motion senza transizioni.
-- `npm run perf:census -- --route=hall-of-fame`: aprire una riga ri-renderizza quella sezione e `PageRest`, non le altre
-  (il census di PERF-12 conta i commit per tasto: gli serve un'azione a clic).
+- `npm run perf:census -- --scenario=hall-of-fame`: aprire una riga ri-renderizza quella sezione e `PageRest`, non le altre
+  (`scripts/perfRenderCensus.mjs` ha oggi `settings`, `expense` e `tabs`, scelti con `--scenario=` — `--route=` non esiste —:
+  questa spec gli aggiunge `hall-of-fame`, un clic che apre una riga, sul modello di `tabs`).
 
 ## 3. Non-obiettivi
 
@@ -83,7 +85,7 @@ a 1024. Le primitive di oggi (righe del 2026-09-26, da riverificare):
 
 ### 4.2 La riga chiusa (The Closed-Row Rule, proposta)
 
-`useCompactLayout` = `useMediaQuery('(width < 1440px)')` di PERF-02 (server `false`), non un secondo store: è la query
+`useCompactLayout` = `useMediaQuery('(width < 1440px)')` (`lib/hooks/useMediaQuery.ts`, server `false` dal 2026-09-28), non un secondo store: è la query
 di `max-desktop:` in Tailwind 4.3 (`max-width: 1439px` scoprirebbe le larghezze frazionarie dello zoom). Se `!compact`,
 `collapse(id)` è `undefined`: la `Tile` di oggi. Con `collapse`: Radix `Collapsible` + `CollapsibleTrigger asChild`
 (AGENTS § Motion), **non** `CollapsibleContent` (§ 1); `aria-controls` esplicito.
@@ -97,7 +99,7 @@ di `max-desktop:` in Tailwind 4.3 (`max-width: 1439px` scoprirebbe le larghezze 
   (`components/history/tiles/DriverTile.tsx:161-162`), il padding su un NIPOTE (sul figlio resta visibile a `0fr`);
   il chevron con la stessa curva.
 - **Il pannello c'è, il contenuto no** (come `PageTabs`, AGENTS § Navigation): `reading` e `children` montano con `mounted`
-  (aperta ora o già in questa visita, scritto nel gestore) e restano alla chiusura. Il chunk di un grafico (PERF-04) aspetta.
+  (aperta ora o già in questa visita, scritto nel gestore) e restano alla chiusura. Il chunk di un grafico pigro (`lazyComponent`, `components/ui/lazy-component.tsx`) aspetta.
   `collapse(id)` è lo STESSO oggetto finché la sua sezione non cambia (`onOpenChange` stabile): se no il compiler
   ri-renderizza ogni tessera a ogni tap.
 - `failed`: eyebrow `text-destructive` + `AlertTriangle`, `sr-only` «, lettura fallita».
@@ -113,7 +115,7 @@ Additivo: `sentence` resta intera (70 riferimenti a `PageVerdictModel` in 29 fil
 `leadLength` su un confine di frase e `restLabel`. `splitVerdict`: senza taglio `rest = []`; **un segmento `binding` oltre
 il taglio annulla il taglio**.
 
-Sotto `desktop:`: titolo → prima frase → `freshness` (PERF-03) → `strip` → `scope` (riga d'ambito, sempre visibile) →
+Sotto `desktop:`: titolo → prima frase → `strip` → `scope` (riga d'ambito, sempre visibile) →
 «Il perché · {restLabel}» (`min-h-11`, `aria-expanded`) → seguito. Un solo DOM: il `<p>` ha `<span>` lead e `<span
 id={sectionPanelId(restCollapse.id)}>` (`NarrativeSegments`, `components/ui/narrative-text.tsx:29`); striscia e bottone,
 fratelli del `<p>`, stanno DENTRO la `section` (§ 4.9, 5); sotto `desktop:` il `<p>` è `max-desktop:contents` con
@@ -143,8 +145,8 @@ localStorage.getItem(key), () => null)`: snapshot = stringa grezza, parse in `us
 va in `dismissed` (non persistito). LA tessera non è nel controller.
 
 **Errori** (da C): `failed` dall'`isError` della pagina; nel pannello `<ErrorNotice collapse live={!compact}>` al posto
-della tessera. Sotto `desktop:` il solo nodo live degli errori è di `PageRest` (il `role="status"` di `freshness`,
-PERF-03, resta): `describeFailedSections` → «Una sezione non è stata letta: Benchmark.» / «2 sezioni non sono state
+della tessera. Sotto `desktop:` il solo nodo live degli errori è di `PageRest` (il `role="status"` di `freshness`
+nel `PageHeader` resta): `describeFailedSections` → «Una sezione non è stata letta: Benchmark.» / «2 sezioni non sono state
 lette: Benchmark, Contributi.» / `null`; `announcement` è `null` se `!compact`: a 1440 nulla cambia.
 
 ### 4.6 `PageTabBar`
@@ -167,9 +169,12 @@ frase chiude dopo la cifra del record («in un mese» solo con la percentuale, `
 
 ### 4.8 Conflitti con PERF
 
-- **PERF-12**: `useSyncExternalStore`, nessun ref restituito, `mounted` nel gestore. **PERF-14**: nessun `layout`; un
-  grafico montato all'apertura legge `ChartColorsProvider`. **PERF-04**: un grafico lazy riserva la sua altezza (obbligo
-  di MOB-03..07). **PERF-03**: `freshness` fuori da «Il perché». **PERF-02**: server `false`.
+- **PERF-12** (in develop dal 2026-10-06, AGENTS.md § Motion): `useSyncExternalStore`, nessun ref restituito, `mounted` nel gestore. **PERF-14** (in develop dal 2026-10-08, AGENTS.md § Motion, doc/guide/temi.md): nessun `layout`; un
+  grafico montato all'apertura legge `ChartColorsProvider`. **PERF-04** (in develop dal 2026-09-30): un grafico lazy riserva la sua altezza, il `fallback` di `lazyComponent` (obbligo
+  di MOB-03..07). **PERF-03** (in develop dal 2026-09-30): «Aggiornato alle…» NON è uno slot della composizione — sta nel
+  `PageHeader` (desktop: dopo la descrizione; sotto `desktop:` al posto della descrizione, `[data-freshness]`,
+  decisione del proprietario), quindi nessuna riga da riservare fra la prima frase e la striscia (doc/guide/stati.md § The
+  fourth reading). **PERF-02** (in develop dal 2026-09-29): server `false`, già così in `lib/hooks/useMediaQuery.ts`.
 - **MOB-01**: le pagine a tab crescono di ~12 px: l'unica eccezione al ratchet, dichiarata nel commit.
 
 ### 4.9 Domande al proprietario
@@ -258,7 +263,7 @@ frase chiude dopo la cifra del record («in un mese» solo con la percentuale, `
 ## 10. Documentazione da aggiornare
 
 - CLAUDE.md «Latest», § Known Issues (chiusa la metà `PageTabBar`, resta lo `Switch`), § Key Files.
-- AGENTS.md § Motion (la riga e perché non `CollapsibleContent`), § Navigation, § Accessibility (un nodo live).
+- AGENTS.md § Motion (la riga e perché non `CollapsibleContent`), § Accessibility (un nodo live); doc/guide/shell.md § Navigation.
 - `doc/guide/hall-of-fame.md` § Composizione mobile (con le otto voci di MOB-09 § 4.4, che MOB-03..08 copiano),
   `doc/guide/stati.md`, `doc/guide/e2e-emulatori.md`;
   `Draft Release Temp.md`; `doc/mobile/README.md` § stato. DESIGN.md no (MOB-09).
@@ -278,7 +283,9 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
 - Leggi doc/guide/hall-of-fame.md, doc/guide/stati.md, doc/guide/e2e-emulatori.md
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice
 - Leggi doc/mobile/README.md e la spec MOB-02 per intero; DESIGN.md § 5 e § 6 (MAI rigenerarlo);
-  doc/mobile/MOB-01 e doc/perf/PERF-02, PERF-03, PERF-12, PERF-14 (devono essere chiuse)
+  doc/mobile/MOB-01 (deve essere chiusa; PERF-14 è ritirata dal 2026-10-08 — il provider dei colori e il `layout` solo dove si vede in AGENTS.md § Motion e doc/guide/{temi,shell,panoramica}.md —, PERF-12 dal 2026-10-06 — il compiler in AGENTS.md
+  § Motion, il census in doc/guide/velocita.md § Il census —, PERF-02 lo è dal 2026-09-29, PERF-03 dal
+  2026-09-30: la riga di freschezza è in doc/guide/stati.md § The fourth reading)
 - Crea SESSION_NOTES.md; crea il branch dalla branch attiva PRIMA di editare
 
 Regole: nessun commit senza il mio OK; un branch e un commit; rispondi in italiano; le domande di § 4.9 con lo

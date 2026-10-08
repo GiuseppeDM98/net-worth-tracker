@@ -6,6 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CATEGORY_ICONS, CATEGORY_ICON_NAMES, CATEGORY_ICONS_BY_TYPE } from '@/lib/constants/categoryIcons';
+import { CATEGORY_ICON_LOADERS } from '@/components/expenses/categoryIconLoaders';
 import { cn } from '@/lib/utils';
 import type { LucideProps } from 'lucide-react';
 
@@ -19,16 +20,17 @@ type LazyIconComponent = React.LazyExoticComponent<React.ComponentType<LucidePro
  * not a function, so a render can READ a component by name instead of obtaining it from a
  * call: to the React Compiler a component returned by a call during render is a new type
  * every render (`react-hooks/static-components`), even when the callee caches it.
+ *
+ * Each icon is ONE small chunk (`CATEGORY_ICON_LOADERS`, 2026-09-30): until then every
+ * thunk ran `import('lucide-react')` and read the name off the module, so the first icon
+ * downloaded the WHOLE library (575 KB raw). A name without a loader gets no entry, so
+ * `CategoryIcon` renders its fallback; `__tests__/categoryIcons.test.ts` keeps the two lists equal.
  */
 export const LAZY_CATEGORY_ICONS: Partial<Record<string, LazyIconComponent>> = Object.fromEntries(
-  CATEGORY_ICON_NAMES.map((name) => [
-    name,
-    lazy(() =>
-      import('lucide-react').then((mod) => ({
-        default: (mod as unknown as Record<string, React.ComponentType<LucideProps>>)[name],
-      }))
-    ),
-  ])
+  CATEGORY_ICON_NAMES.flatMap((name) => {
+    const load = CATEGORY_ICON_LOADERS[name];
+    return load ? [[name, lazy(load)]] : [];
+  })
 );
 
 /**

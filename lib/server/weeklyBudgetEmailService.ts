@@ -303,7 +303,7 @@ REGOLE
 - Rispetta l'orizzonte di ogni voce. I budget mensili e il budget complessivo si misurano sul MESE CORRENTE e le loro proiezioni sono A FINE MESE: non definirle mai "a fine anno". Solo i budget annuali riguardano l'anno.
 - Nessun dato qui è settimanale: la mail arriva ogni settimana, ma i numeri no. Non parlare di "questa settimana".
 
-Scrivi esattamente DUE frasi in italiano (massimo 45 parole in totale):
+Scrivi esattamente DUE frasi brevi in italiano, da leggere in un colpo d'occhio:
 1. il fatto più rilevante — il budget più critico (vicino o oltre il limite) oppure, se è tutto in ordine, l'andamento positivo più significativo;
 2. una singola azione concreta e specifica che l'utente può fare da qui a fine periodo.
 Niente elenchi, saluti, premesse o titoli.`;
@@ -312,7 +312,9 @@ Niente elenchi, saluti, premesse o titoli.`;
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const message = await anthropic.messages.create({
       model: EMAIL_ANALYSIS_MODEL,
-      max_tokens: 400,
+      // Thinking counts toward max_tokens: a ceiling sized for two sentences alone leaves
+      // adaptive thinking at `high` no room, and the reply comes back cut or empty.
+      max_tokens: 4096,
       thinking: { type: 'adaptive' },
       output_config: { effort: 'high' },
       messages: [{ role: 'user', content: prompt }],

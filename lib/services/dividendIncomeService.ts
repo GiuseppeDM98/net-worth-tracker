@@ -104,7 +104,7 @@ export async function createExpenseFromDividend(
       // ALL reads before ANY write: the dividend (idempotency), then the account.
       const dividendSnap = await tx.get(dividendRef);
       const existingExpenseId = dividendSnap.data()?.expenseId as string | undefined;
-      if (existingExpenseId) return { expenseId: existingExpenseId, credited: false };
+      if (existingExpenseId) return { expenseId: existingExpenseId, credited: false, written: false };
       const account = accountId ? await readCreditableAccount(tx, accountId, dividend.userId, currency) : undefined;
 
       tx.set(expenseRef, {
@@ -122,12 +122,14 @@ export async function createExpenseFromDividend(
         createdAt: now,
         updatedAt: now,
       });
-      if (account) tx.update(account.ref, { quantity: account.quantity + amount, updatedAt: now });
+      if (account) tx.update(account.ref, { quantity: roundToCents(account.quantity + amount), updatedAt: now });
       tx.update(dividendRef, { expenseId: expenseRef.id, updatedAt: Timestamp.fromDate(now) });
-      return { expenseId: expenseRef.id, credited: !!account };
+      return { expenseId: expenseRef.id, credited: !!account, written: true };
     });
 
-    if (result.credited) await invalidateDashboardOverviewSummaryServer(dividend.userId, 'dividend_income_credited');
+    // The ROW is an input of the Panoramica (the month's income) whether or not an account was
+    // credited: invalidating only on a credit left an uncredited payment out of it for hours.
+    if (result.written) await invalidateDashboardOverviewSummaryServer(dividend.userId, 'dividend_income_created');
     console.log(`[dividendIncomeService] Income row in ${currency} (amount: ${amount.toFixed(2)}, credited: ${result.credited})`);
     return result.expenseId;
   } catch (error) {
@@ -159,7 +161,7 @@ export async function updateExpenseFromDividend(
     const expenseRef = adminDb.collection(EXPENSES_COLLECTION).doc(expenseId);
     const now = new Date();
 
-    const hasMovedAccount = await adminDb.runTransaction(async (tx) => {
+    await adminDb.runTransaction(async (tx) => {
       const expenseSnap = await tx.get(expenseRef);
       const applied = expenseSnap.exists ? appliedCreditOf(expenseSnap.data() as SettlementRow) : undefined;
       const difference = applied ? roundToCents(amount - applied.amount) : 0;
@@ -176,12 +178,12 @@ export async function updateExpenseFromDividend(
         updatedAt: now,
       });
       const account = accountSnap?.exists ? accountSnap.data() : undefined;
-      if (!accountRef || !account || account.userId !== dividend.userId) return false;
-      tx.update(accountRef, { quantity: ((account.quantity as number) ?? 0) + difference, updatedAt: now });
-      return true;
+      if (!accountRef || !account || account.userId !== dividend.userId) return;
+      tx.update(accountRef, { quantity: roundToCents(((account.quantity as number) ?? 0) + difference), updatedAt: now });
     });
 
-    if (hasMovedAccount) await invalidateDashboardOverviewSummaryServer(dividend.userId, 'dividend_income_updated');
+    // The row's amount and date changed even when no account moved.
+    await invalidateDashboardOverviewSummaryServer(dividend.userId, 'dividend_income_updated');
     console.log(`[dividendIncomeService] Updated income row in ${currency} (amount: ${amount.toFixed(2)})`);
   } catch (error) {
     console.error('Error updating expense from dividend:', error);
@@ -201,7 +203,8 @@ export async function deleteExpenseForDividend(
     const expenseRef = adminDb.collection(EXPENSES_COLLECTION).doc(expenseId);
     const now = new Date();
 
-    const debitedUserId = await adminDb.runTransaction(async (tx) => {
+    // The owner of the deleted row, whose overview loses an income row whether or not it was credited.
+    const rowOwnerId = await adminDb.runTransaction(async (tx) => {
       const expenseSnap = await tx.get(expenseRef);
       const row = expenseSnap.exists ? expenseSnap.data() : undefined;
       const applied = row ? appliedCreditOf(row as SettlementRow) : undefined;
@@ -209,10 +212,11 @@ export async function deleteExpenseForDividend(
       const accountSnap = accountRef ? await tx.get(accountRef) : undefined;
 
       tx.delete(expenseRef);
+      const ownerId = row?.userId as string | undefined;
       const account = accountSnap?.exists ? accountSnap.data() : undefined;
-      if (!applied || !accountRef || !account || account.userId !== row?.userId) return undefined;
-      tx.update(accountRef, { quantity: ((account.quantity as number) ?? 0) - applied.amount, updatedAt: now });
-      return row?.userId as string;
+      if (!applied || !accountRef || !account || account.userId !== ownerId) return ownerId;
+      tx.update(accountRef, { quantity: roundToCents(((account.quantity as number) ?? 0) - applied.amount), updatedAt: now });
+      return ownerId;
     });
 
     // Remove expense reference from dividend: the key must be PRESENT with `undefined`,
@@ -221,7 +225,7 @@ export async function deleteExpenseForDividend(
     await updateDividend(dividendId, {
       expenseId: undefined,
     });
-    if (debitedUserId) await invalidateDashboardOverviewSummaryServer(debitedUserId, 'dividend_income_deleted');
+    if (rowOwnerId) await invalidateDashboardOverviewSummaryServer(rowOwnerId, 'dividend_income_deleted');
   } catch (error) {
     console.error('Error deleting expense for dividend:', error);
     throw new Error('Failed to delete expense for dividend');

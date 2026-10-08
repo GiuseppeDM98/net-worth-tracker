@@ -9,6 +9,8 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **Composite class chip** (2026-09-26): `InstrumentClassChip` in `components/assets/AssetRow.tsx` (desktop `Classe` column and phone row; the group header keeps `AssetClassChip`), pure `describeAssetClassChip` + `rankedClassLegs` + `SHORT_CLASS_LABELS` in `lib/utils/assetDisplayClass.ts`; tests `__tests__/assetDisplayClass.test.ts`, `e2e/assets.composite-chip.spec.ts` (1440: the 112px floor, «Andamento» without sideways scroll, the grouped header's plain chip; 390: the chip ends before the amount after a 12-character ticker, `main` does not scroll)
 - **Mutuo tile** (2026-09-25): `components/assets/tiles/MutuoTile.tsx`, pure `lib/utils/mortgageSummary.ts` (`summarizeMortgage`, `projectPayoff`, `interestPaidOf`), words `describeMortgage*` in `patrimonioNarrative.ts`, reader `getMortgageInstalments` + `lib/hooks/useMortgageInstalments.ts`; tests `__tests__/mortgageSummary.test.ts`, `e2e/cashflow.mortgage.spec.ts`
 - **Patrimonio**: `app/dashboard/assets/page.tsx` (owns every dialog), `components/assets/*` (+ `PatrimonioTile`/`ComposizioneTile` reused from the overview), pure `lib/utils/{patrimonioNarrative,patrimonioSummary,assetPerformanceDeltas,costBasisEur}.ts` (`costBasisPerUnitEur`/`unitPriceEur` = EUR against EUR, fees included), `lib/utils/bondPricing.ts` (`resolveBondPrice` = the ONE Borsa Italiana quote → euro per unit, nominal 1 € by default, BTP€i coefficient; `toBorsaItalianaQuote` the inverse; shared with `lib/helpers/priceUpdater.ts`), `lib/utils/bondDetailsForm.ts` (`buildBondDetailsFromForm`, a rate of 0 is a zero coupon); `lib/services/assetService.ts`, `types/assets.ts`; spec `e2e/assets.bond.spec.ts`
+- **Light rows and dialogs** (2026-10-07): `StrumentiTile` (`useMediaQuery('(min-width: 1440px)')`, one list), `AssetRow` (`ASSET_ROW_LAZY_CHARTS`, the sparkline a `lazyComponent`), `AssetSparkline` (colours as a prop), the `{ open, mounted }` state and the openers in `app/dashboard/assets/page.tsx`, `onExitComplete` in `components/ui/responsive-modal.tsx`, the six watching leaves at the top of `AssetDialog.tsx`; specs `e2e/assets.rows.spec.ts` (1440) and `e2e/assets.rows.mobile.spec.ts` (390), the census scenario `asset` (`scripts/perfRenderCensus.mjs`)
+- **Suites to run after a change here — Asset / bond** (moved from `AGENTS.md` § Commands on 2026-09-30): `assetDialogHelpers`, `couponUtils`
 
 ## Asset Pricing, FX and Assets
 
@@ -126,7 +128,18 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **Peso is measured over the GROSS total** (cash accounts included), like the Classi and Liquidità shares —
   before the redesign the table measured it over the instruments only.
 - **Below `desktop:` the rows are `AssetRow`, flat and expandable** (CSS `grid-rows-[0fr] → [1fr]` with `inert`
-  on the closed panel): a card per row inside the Strumenti tile would be a card inside a card. Class chips take
+  on the closed panel): a card per row inside the Strumenti tile would be a card inside a card. **ONE list is in the
+  DOM per width** (2026-10-07): `StrumentiTile` reads `useMediaQuery('(min-width: 1440px)')` — inclusive, as
+  `desktop:` — and renders the table OR the rows; until then both were there at every width, the hidden copy
+  included. The tile mounts after the page's data, long after hydration, so the hook's server snapshot (`false`) never
+  decides it. The tile's toggles and footer sentences still switch by CSS: they hold no list. **A row draws its
+  sparkline at its FIRST opening and keeps it** (`hasOpened`; unmounting it on close would empty the panel while it
+  collapses), in a 32px slot reserved before (`SPARKLINE_SLOT`), so the panel's height never moves; the chart is a
+  `lazyComponent` — the only path from Patrimonio to recharts, so the page's initial JS lost recharts (764,7 → 655,8 KB
+  gz) — preloaded when idle on a phone only, and its colours come from the page's ONE `useChartColors()` as a prop. It
+  no longer animates its draw: the line used to animate inside the closed row at page load, so a reader opening a row
+  always found it already still. Before: 15 recharts charts, 30 rAF and 16 `getComputedStyle` on the owner's phone at
+  each visit, all closed. Pinned by `e2e/assets.rows{,.mobile}.spec.ts`. Class chips take
   their label from `ASSET_CLASS_LABELS` (Italian); `lib/utils/assetUtils.ts` with its English map is gone.
 - **A composite instrument is ONE row with a split chip** (2026-09-26): a 60/40 fund stays one row, grouped and sorted
   under its prevailing class, but its chip (`InstrumentClassChip`) has one segment per composition leg, as wide as the
@@ -219,10 +232,30 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   before the field existed reads it as instalment − principal (`interestPaidOf`). The end is the French amortisation
   on today's debt, TAN and the latest linked instalment (`projectPayoff`: n = −ln(1 − D·r/P)/ln(1 + r), rounded up;
   `never` when the instalment does not cover the interest). No figure takes a sign colour: interest is a cost already
-  counted in Cashflow, not a gain or a loss. The reader is one query per property (`userId` + `debtAssetId`, two
-  equalities, no composite index), keyed UNDER `queryKeys.assets.all` so every debt-moving mutation refreshes it, with
-  `staleTime: 0` because linking a series moves no asset; the page's skeleton waits for it and a failed read is an
-  `ErrorNotice` where the tile would be.
+  counted in Cashflow, not a gain or a loss. The reader is ONE query for every property (`userId` equality +
+  `debtAssetId in [...]`, two `.where()`, no composite index; past thirty properties the ids go in chunks of 30, read in
+  parallel — Firestore's ceiling on an `in` filter, pinned by `__tests__/mortgageInstalmentsQuery.test.ts`; until
+  2026-09-29 it was one query per property), keyed UNDER `queryKeys.assets.all` so every debt-moving mutation refreshes
+  it under the global staleTime; «Collega la serie al mutuo» moves no asset, so `LinkSeriesDialog` invalidates the
+  assets key itself (the hook carried `staleTime: 0` instead, and re-read on every mount). The page's skeleton waits
+  for it and a failed read is an `ErrorNotice` where the tile would be.
+- **`AssetDialog` and `CashAccountDialog` exist only from their opening to the end of their exit animation**
+  (2026-10-07): the page keeps `{ open, mounted }` for `AssetDialog` and `{ open, asset }` for the account detail (an
+  account set IS mounted), each cleared in `onExitComplete`
+  (`ResponsiveModal`, doc/guide/dialog.md) — never at `onClose`, which would cut the exit. The record stays through the
+  exit, so the dialog leaves on its own title (it used to flip to the create title while closing). Each opener passes
+  `event.currentTarget` (`onEdit(asset, opener)`, `onAdd(opener)`, `onSelect(asset, opener)`), the focus returns there;
+  two hand-overs move it on purpose: «Modifica» in the account detail hands the account's Liquidità row to the asset
+  form, and «Registra operazione» inside the edit form clears the opener, so no focus is sent behind the trade dialog
+  that is opening. `CashAccountDialog` was already conditional, but the page cleared the account at close, so it
+  vanished without its exit and dropped the focus. **Before 2026-10-07 `AssetDialog` read nothing while closed** (2026-09-29): the page mounted it closed, and until then it read
+  the allocation targets at mount and the settings on a key of its own. Now `useSettings(ownerId, { enabled: open })` is
+  its one read — the family members and the targets (`settings.targets`, what `getTargets` used to re-read) come from
+  it, a new sub-category invalidates the key instead of re-reading. The page itself reads its keys through the hooks
+  (assets, snapshots, overview, the ledger meta and the ledger, the instalments). All of them are in the persisted
+  cache's allowlist (2026-09-29, doc/guide/cache-persistita.md) — the ledger META included, because the trades are `enabled` on it: with the
+  meta left out, a reload painted the skeleton over figures it already had until that one read came back (measured:
+  452 ms with a skeleton, 144 ms without one). The header's «Aggiornato alle…» reads the overview on its own minute.
 - **A failed overview is an alert, not a skeleton**: the page gates the skeleton on `isLoading` of EVERY query it
   reads (assets, overview, snapshots, ledger meta) and, when the overview errs, keeps Liquidità, Movimenti and
   Strumenti alive on the live assets (`totalValue` falls back to `calculateTotalValue(assets)`) behind a
@@ -230,9 +263,40 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **The hero's «Mercato:» digest names three instruments and closes with «altri»** = `marketEffect − Σ shown`, so
   the three can never hide a negative total behind three gains (the class digest lists every class instead).
 
+## Two-Step Create Dialogs — `AssetDialog`
+
+Moved here on 2026-09-30 from `AGENTS.md` § Two-Step Create Dialogs (`AssetDialog`, `ExpenseDialog`); the rule for any
+form whose fields depend on a discriminant, and the marker rule itself, stay there.
+
+- `AssetDialog`: step 1 picks the type, step 2 shows only that type's fields; edit reuses the same visibility logic and
+  shows a ledger asset's quantity/PMC read-only (the ledger owns them). Class select for ETFs, optional `displayTicker`,
+  `leverageRatio`, and an opt-in TER only for `etf`/`commodity`/`crypto`.
+- **A field typed key by key is watched by the leaf that reads it, never at the root** (2026-10-07): quantity,
+  PMC, nominal, coupon rate, final premium, indexation coefficient and opening date feed six module-level leaves
+  (`QuantityChangeNotice`, `BondPurchasePricePreview`, `BondQuoteInEuro`, `CouponPreview`, `FinalPremiumPreview`,
+  `SettlementTimingHint`, with `useBondQuoteBasis`), each taking `control`. The React Compiler compiles `AssetDialog`
+  but leaves the step-2 form outside every memo scope (its output, read on 2026-10-07: the form JSX is rebuilt at each
+  render), so a watch at the root re-renders EVERYTHING: 562 components and 2 commits per key in «Quantità» on the
+  census, 0 and 0 after the move (`npm run perf:census -- --scenario=asset`; one `useWatch('quantity')` put back at the
+  root read 563, seen red). The root keeps the watches that decide the form's SHAPE (type, class, the switches and
+  selects — one change per click) and the ISIN. Submit-time reads stay `getValues()`/the `data` of `handleSubmit`.
+- **A marker on a label is a claim the validation has to honour.** `*` = required, `(opzionale)` in
+  `text-muted-foreground font-normal` = explicitly optional; the zod schema, any imperative guard in `onSubmit` and the
+  marker's own condition must agree (2026-08-30: Sottocategoria was `.optional()` in zod, blocked by a guard, and
+  starred on a condition — `availableSubCategories().length > 0` — NARROWER than the guard's). It is genuinely optional
+  now: the Select carries a «Nessuna» item (`NO_SUB_CATEGORY_VALUE`, since Radix reserves `''`) and BOTH write paths
+  clear the field — `updateAsset` for cash/realestate/pensionFund, `updateAssetMetadata` for every ledger type, each
+  with the `'subCategory' in updates` guard so a partial caller does not wipe a classification it never sent. The
+  allocation consequence is the `NO_SUBCATEGORY_LABEL` bucket: doc/guide/allocazione.md § Allocation — `allocationRole` and where the filter must live.
+
 ## Per-page blind spots
 
-- **Patrimonio**: Δ columns are empty for pension funds and cash accounts by design; the Rendimento tile ranks only within the overview's `topAssets` (15 largest); «Movimenti del mese» reads the whole ledger and filters in memory; **«Andamento» hides Quantità/Prezzo/PMC/TER while it is on** (a view, not a bug — the footer says so); a hand-valued row shows «—» for quantity, price and PMC and has no G/P (its PMC is its price); `text-muted-foreground` on the tile surface measures 4,48:1 in light on the owner's named theme (0,02 under AA; the default theme passes — a theme issue, doc/guide/temi.md, not touched); **a foreign-currency position has no G/P, no YOC and no PMC in euro until its ledger has projected `averageCostEur`** (the backfill runs on the first visit to Patrimonio; before it, the Panoramica's «Asset principali» and the PDF print no return for it — never the old dollar-against-euro figure); a EUR position measured against the native PMC before the backfill reads a G/P higher by its purchase fees; `AssetDialog.tsx` carries 7 pre-existing `react-hooks` errors. **Two accepted side effects of the optional Sottocategoria** (2026-08-30; neither is new — without the asterisk they are only less signalled): a cash account without the «conti correnti» subcategory loses the 5.000 € stamp-duty threshold AND the flat fee — it pays the securities' rate on its balance (`calculateStampDuty`, a rule Impostazioni already states), and changing Tipo or Classe does not clear `subCategory`, so an out-of-class value can survive invisibly — Radix shows the placeholder because the value is not among the items. **The checking-account duty is a flat 34,20 € above 5.000 €** (`lib/constants/stampDuty.ts`, fixed 2026-09-24: until then the account paid `balance × 0,2%` while the comment beside it said the flat rule and the test pinned the wrong figure — 12 € on 6.000 €, 2.000 € on a million); the threshold reads TODAY's balance, while the law reads the year's average balance, which the app does not keep — an account that dips under 5.000 € on the day the Costi tile is read shows no duty.
+- **Patrimonio**: Δ columns are empty for pension funds and cash accounts by design; the Rendimento tile ranks only within the overview's `topAssets` (15 largest); «Movimenti del mese» reads the whole ledger and filters in memory; **«Andamento» hides Quantità/Prezzo/PMC/TER while it is on** (a view, not a bug — the footer says so); a hand-valued row shows «—» for quantity, price and PMC and has no G/P (its PMC is its price); `text-muted-foreground` on the tile surface measures 4,48:1 in light on the owner's named theme (0,02 under AA; the default theme passes — a theme issue, doc/guide/temi.md, not touched); **a foreign-currency position has no G/P, no YOC and no PMC in euro until its ledger has projected `averageCostEur`** (the backfill runs on the first visit to Patrimonio; before it, the Panoramica's «Asset principali» and the PDF print no return for it — never the old dollar-against-euro figure); a EUR position measured against the native PMC before the backfill reads a G/P higher by its purchase fees. **Two accepted side effects of the optional Sottocategoria** (2026-08-30; neither is new — without the asterisk they are only less signalled): a cash account without the «conti correnti» subcategory loses the 5.000 € stamp-duty threshold AND the flat fee — it pays the securities' rate on its balance (`calculateStampDuty`, a rule Impostazioni already states), and changing Tipo or Classe does not clear `subCategory`, so an out-of-class value can survive invisibly — Radix shows the placeholder because the value is not among the items. **The checking-account duty is a flat 34,20 € above 5.000 €** (`lib/constants/stampDuty.ts`, fixed 2026-09-24: until then the account paid `balance × 0,2%` while the comment beside it said the flat rule and the test pinned the wrong figure — 12 € on 6.000 €, 2.000 € on a million); the threshold reads TODAY's balance, while the law reads the year's average balance, which the app does not keep — an account that dips under 5.000 € on the day the Costi tile is read shows no duty.
+- **Light rows and dialogs** (2026-10-07): typing an ISIN still re-renders the whole asset form at each key — it turns
+  every bond label to «% del nominale», so it stays a root watch (rare, one field); a row's sparkline, once opened,
+  stays mounted until the page unmounts; the account detail and the asset form cross-fade when «Modifica» hands one
+  over to the other (the detail plays its exit, which it used to skip); a phone downloads the sparkline's chunk when
+  idle even if no row is ever opened.
 - **Composite chip**: sorting by «Classe» and the group headers still read the PREVALENT class only — a 60/40 fund
   sorts and groups with pure «Azioni» (one instrument, one row; the split lives in the chip); the chip's segments are
   the stored `composition`, never re-read from the market, so a fund whose mix drifted shows its last saved split.

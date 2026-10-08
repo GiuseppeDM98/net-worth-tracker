@@ -11,7 +11,7 @@
  * snapshots AND assets queries since snapshot creation updates asset prices.
  */
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { queryOptions, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query/queryKeys';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { getUserSnapshots } from '@/lib/services/snapshotService';
@@ -27,9 +27,16 @@ import { getUserSnapshots } from '@/lib/services/snapshotService';
  */
 export function useSnapshots(userId: string | undefined) {
   return useQuery({
-    queryKey: queryKeys.snapshots.all(userId || ''),
-    queryFn: () => getUserSnapshots(userId!),
+    ...snapshotsQueryOptions(userId || ''),
     enabled: !!userId, // Only run if userId exists (prevents query before auth)
+  });
+}
+
+/** The snapshots query as options, for an imperative `queryClient.fetchQuery` on the hook's own cache. */
+export function snapshotsQueryOptions(userId: string) {
+  return queryOptions({
+    queryKey: queryKeys.snapshots.all(userId),
+    queryFn: () => getUserSnapshots(userId),
   });
 }
 

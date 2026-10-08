@@ -8,12 +8,19 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Cashflow › Divisione**: Divisione `components/cashflow/ExpenseSplitTab.tsx`, pure `lib/utils/{expenseSplitSummary,expenseSplitNarrative}.ts` (`resolveSplitBasis`, `allocateByShare`, `CommonSpending.toSplit`/`surplus`, `describeBasisRemedy`, `describeMemberCalendar`, `describeCommonIncome`, `describeIncomeConsumed`)
 - **Browser**: `e2e/cashflow.split{,.mobile}.spec.ts` on its own account, fixture `scripts/seedSplitE2E.mts` (`npm run e2e:seed:split`), session `e2e/auth.split.setup.ts`, progetti `split` e `split-mobile`
+- **Suites to run after a change here — Cashflow › Divisione** (moved from `AGENTS.md` § Commands on 2026-09-30): `expenseSplitSummary`, `expenseSplitNarrative` (+ `cashflowNarrative` for the scheduled clause, `settingsRoundTrip` for the flag) · **Browser** `e2e/cashflow.split{,.mobile}.spec.ts` (own account, `npm run e2e:seed:split`)
 
 ## Cashflow › Divisione (`components/cashflow/ExpenseSplitTab.tsx`, `lib/utils/{expenseSplitSummary,expenseSplitNarrative}.ts`)
 - **Opt-in, like Centri di Costo** (`expenseSplitEnabled`), on **Tracciamento's period axis** — a division is a fact of a
   month the way a month's savings are. The tab computes nothing: numbers from `expenseSplitSummary.ts`, words from
   `expenseSplitNarrative.ts`, and the monthly email reads the SAME two modules, so the page and the email can never
   print two different splits.
+- **The tab reads Tracciamento's window for ITS period** (2026-09-30, `trackingWindow`, doc/guide/cashflow.md
+  § Expenses by window): its own `useExpensesInRange`, because it mounts late and has its own period state — the same
+  key as Tracciamento's while the two show the same period, so the second to open reads nothing. A new period is a
+  new read: the picker stays mounted, the tiles wait. The picker's years come from the page (`availableYears`, the
+  collection's bounds). The 31 December row of `e2e/cashflow.split.spec.ts` is inside every window that shows it: a
+  period's window ends with the month the period ends in.
 - **ONE field carries the whole feature**: `Expense.personalMemberId`. **Absent (or `null`) MEANS «in comune»** — that
   default is why there is no migration (every row ever written is already shared) and why the normal case costs no
   interaction. A value is a `FamilyMember` id, the SAME people as Previdenza's RAL: never a second list of names.

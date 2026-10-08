@@ -4,8 +4,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  * Integration test for the trade-ledger write transaction (assetTransactionUseCase).
  *
  * Runs the REAL use-case transaction body against a fake Admin `runTransaction` whose `tx.get`
- * throws once a write has happened — exactly as the live Firestore SDK does (AGENTS.md →
- * runTransaction). A regression to interleaved read/write, or a missing pre-read of a touched cash
+ * throws once a write has happened — exactly as the live Firestore SDK does (AGENTS.md § Firestore
+ * Writes → `runTransaction`). A regression to interleaved read/write, or a missing pre-read of a touched cash
  * account, would fail here. Template: __tests__/updateCashAssetBalancesAtomic.test.ts.
  *
  * Covers: create with cash settlement, edit moving the settlement to a different cash account (two
@@ -199,6 +199,23 @@ describe('assetTransactionUseCase — atomic write transaction', () => {
     expect(asset.averageCost).toBe(100);
     expect(asset.averageCostEur).toBe(100);
     expect(invalidateMock).toHaveBeenCalledWith(OWNER, 'asset_transaction_created');
+  });
+
+  it('stores the settled balance to the cent, without the binary noise of the sum (2026-10-07)', async () => {
+    expect(4033.37 - 0.07).not.toBe(4033.3); // the raw sum is noisy
+    seedAsset({ quantity: 0 });
+    seedCash('cash-1', 4033.37);
+
+    await createAssetTransaction(OWNER, {
+      assetId: 'asset-1',
+      type: 'buy',
+      date: new Date(),
+      quantity: 1,
+      pricePerUnit: 0.07,
+      linkedCashAssetId: 'cash-1',
+    });
+
+    expect(store.get(docKey('assets', 'cash-1'))!.quantity).toBe(4033.3);
   });
 
   it('writes a EUR-side averageCostEur distinct from the native averageCost for a foreign-currency buy', async () => {

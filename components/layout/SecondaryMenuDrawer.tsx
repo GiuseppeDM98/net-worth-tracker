@@ -24,6 +24,7 @@ import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { getAccountLabel, getDisplayInfo } from '@/lib/utils/userDisplayUtils';
 import { analysisNav, planningNav, assistantNavItem } from '@/lib/constants/navigation';
 import { SIDEBAR_AVATAR_CLASS } from '@/components/layout/shellStyles';
+import { Skeleton } from '@/components/ui/skeleton';
 import { TILE_EYEBROW_CLASS } from '@/components/ui/tile';
 
 interface SecondaryMenuDrawerProps {
@@ -246,20 +247,34 @@ export function SecondaryMenuDrawer({ open, onOpenChange }: SecondaryMenuDrawerP
               {/* Footer: user identity + account options dropdown */}
               <div className="shrink-0 border-t border-sidebar-border">
                 <div className="flex items-center gap-3 px-4 py-3">
-                  <span className={SIDEBAR_AVATAR_CLASS} aria-hidden="true">{initials}</span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13px] font-medium">{displayName}</p>
-                    {/* When viewing a shared account, surface WHOSE data is active
-                        instead of the viewer's own email — otherwise the account
-                        being edited is invisible. Same rule as AppSidebar. */}
-                    {isSharedView && activeAccount ? (
-                      <p className="truncate text-[11px] text-primary">
-                        Vedi: {getAccountLabel(activeAccount)}
-                      </p>
-                    ) : (
-                      <p className="truncate text-[11px] text-sidebar-foreground/50">{user?.email}</p>
-                    )}
-                  </div>
+                  {user ? (
+                    <>
+                      <span className={SIDEBAR_AVATAR_CLASS} aria-hidden="true">{initials}</span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[13px] font-medium">{displayName}</p>
+                        {/* When viewing a shared account, surface WHOSE data is active
+                            instead of the viewer's own email — otherwise the account
+                            being edited is invisible. Same rule as AppSidebar. */}
+                        {isSharedView && activeAccount ? (
+                          <p className="truncate text-[11px] text-primary">
+                            Vedi: {getAccountLabel(activeAccount)}
+                          </p>
+                        ) : (
+                          <p className="truncate text-[11px] text-sidebar-foreground/50">{user.email}</p>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    // The same wait state as AppSidebar's footer: the drawer can be opened
+                    // before Firebase Auth has answered, and two empty lines would read as a defect.
+                    <>
+                      <Skeleton className="size-7 shrink-0 rounded-md" />
+                      <div className="grid min-w-0 flex-1 gap-1.5">
+                        <Skeleton className="h-3 w-24" />
+                        <Skeleton className="h-2.5 w-32" />
+                      </div>
+                    </>
+                  )}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <button

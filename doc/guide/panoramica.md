@@ -7,6 +7,8 @@
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Overview**: `app/dashboard/page.tsx`, `app/api/dashboard/overview/route.ts`, `lib/services/dashboardOverviewService.ts`, `lib/hooks/useDashboardOverview.ts`, `components/dashboard/overview/*` (`PatrimonioTile` exports `resolveHeroValueClass`), pure `lib/utils/{overviewNarrative,dashboardOverviewUtils,sparklinePeriod,savingsRateBadge}.ts`; `lib/utils/periodSales.ts` (`summarizePeriodSales` = the month's sells from the ledger with the estimated tax, `resolveDeclineCause` = the ONE cause of a falling month for Panoramica, Patrimonio and the email) + `lib/utils/salesNarrative.ts` (the shared words)
+- **Server-Timing**: `lib/server/serverTiming.ts` (`startTiming` → `mark` → `toHeader`, pure, the clock injected) — the route's header since 2026-10-03
+- **Suites to run after a change here — Overview / materialized summary** (moved from `AGENTS.md` § Commands on 2026-09-30): `apiAuthRoutes`, `dashboardOverviewService`, `dashboardOverviewUtils`, `serverTiming` · **Verdetto e letture** `overviewNarrative` · **Badge** `savingsRateBadge` · **A writer of an overview input** (the invalidation it owes, § The materialized summary): `expenseCategoryRewriteInvalidation`, `goalWritesInvalidation`, `dividendIncomeService`, `pensionContributionService`, `settingsRoundTrip`
 
 ## Panoramica and Dashboard Data Isolation
 
@@ -26,6 +28,18 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   Panoramica's hero and, with `movers`/`countLine`, Patrimonio's — a second hero would drift (the pre-v3 twin did).
   `ComposizioneTile` likewise takes `eyebrow`/`footer`. `resolveHeroValueClass` is the one overflow step-down.
 - Count-up lives in `OverviewAnimatedCurrency` leaf nodes, never in the page component.
+- **No `layout` on the page root** (2026-10-08): the page sat in a `motion.div layout="position"` since
+  2026-04-03 (`git log -S`: «softer reflow of conditional cards», for metric blocks that the Verdict-over-Tiles redesign
+  removed on 2026-08-22, leaving the root wrapper alone). The root never moves inside `PageContainer`, so Framer measured
+  it after every commit of the page for nothing; it is a plain `div`, and `springLayoutTransition` went with it (the
+  same on Patrimonio). The period switch still shifts nothing (`e2e/motion.layout.spec.ts`, `layout-shift` 0 with a
+  positive anchor).
+- **The tile cascade plays once per session** (owner's call, 2026-10-08, DESIGN.md → Tile Grid): `staggerContainer`
+  × 8 tiles + `cardItem` kept the figures semi-transparent ~1 s after the data (962 ms on a load, 944 ms on a client
+  navigation, measured on the mirror). A module-level `tileGridEntrance.played` is set once the grid has rendered, and a
+  later mount reads it in a `useState` initializer: `initial={false}`, the tiles there at once. A skeleton or a failed
+  read does not count as played; a reload starts a new session. Pinned by `e2e/motion.layout.spec.ts` (seen red with the
+  cascade forced). Patrimonio, the landing and `AuthShell` keep the shared variants on every opening.
 - **The page is a verdict over a tile grid** (`components/dashboard/overview/*`): `Tile` (`components/ui/tile.tsx`,
   re-exported as `OverviewTile`; `NarrativeText` and `RankedRows` likewise live in `components/ui/`) is the ONE shell
   (eyebrow · aside · `reading` narrative · body), grid cells wrap it in `TILE_CELL_CLASS` (`flex min-w-0 [&>section]:flex-1`)
@@ -83,7 +97,12 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   min-h-[…]` box, never with `h-full` alone. **`PeriodSelector` has no intrinsic width** (`flex-1` buttons): in a flex
   row give its wrapper an explicit width or the labels collapse into one word.
 - **`PageHeader variant="compact"`** collapses the desktop header to one line (eyebrow · title · description) for
-  pages whose real headline is in the content; the mobile sticky navbar is unchanged.
+  pages whose real headline is in the content; the mobile sticky navbar is unchanged. Since 2026-09-29 that line
+  also carries the page's freshness reading («Aggiornato alle 08:00, sto rileggendo…») while a payload restored from
+  the persisted cache is being reread: on the overview's OWN minute (`DASHBOARD_OVERVIEW_STALE_TIME_MS`), and dated
+  by the older of the read and the payload's `freshness.updatedAt` — a materialised summary can be hours older than
+  the request that fetched it, and the reader is told that age, not the request's (doc/guide/stati.md § The fourth
+  reading).
 - **`SavingsRateBadge` is once per calendar month per account**, recorded in localStorage through
   `celebrationUtils` under `savings_rate_{ownerId}_{YYYY-MM}` — a sessionStorage flag dies with every new window and
   re-greets the user on every login. The decision is pure (`lib/utils/savingsRateBadge.ts`); the effect defers its
@@ -95,6 +114,52 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   the rAF ticks write. Two readings changed, neither a bug: the first frame shows the start value instead of `null`, and
   a `null` target hides the stale number on the same render. A tick queued before a newer target's cleanup is dropped
   by the writer's own guard.
+
+## The materialized summary — one round, written after, fresh for the day (2026-10-03)
+
+- **A recompute is ONE round of reads** (`readOverviewInputs` in `dashboardOverviewService.ts`): assets, snapshots,
+  settings and goals in a `Promise.all` — any of them failing rejects the route, as always — launched TOGETHER with an
+  `allSettled` of the pension contributions, the trade ledger and the two months of expenses. Never in series: with
+  the functions and Firestore an ocean apart each stage is ~100 ms. The contributions are read speculatively (an empty
+  query for an account without a fund), but a failed read REJECTS for a holder of a fund, as before (owner's call):
+  degrading to «no contributions» would print every euro paid in as the fund's market return — a wrong figure, not a
+  missing clause. The ledger degrades to «no sales clause», the expenses to `expenseStats: null`, each with its warn.
+  Pinned by `__tests__/dashboardOverviewService.test.ts` → *one round of reads…* (a held `assets` read with the six
+  others already in flight).
+- **The summary is written AFTER the response** (`after()` of `next/server`, which keeps the function alive until the
+  write settles) and only if nothing touched the document since the read that found it stale: `update(…, {
+  lastUpdateTime })` on an existing document, `create` on a missing one. Firestore refuses the write (codes 9 and 6,
+  logged as `info`) when an invalidation landed during the recompute — with a summary fresh for the day, a plain `set`
+  with `invalidatedAt: null` would erase that mutation for hours (the 5-minute TTL used to hide it). Verified on the
+  emulator on 2026-10-03: read → invalidation → stale `update` refused, the invalidation kept, the same write with the
+  current `updateTime` accepted.
+- **Fresh = same Italian day, at most 6 h, never after an invalidation** (`isSummaryStale(summary, now)`;
+  `DASHBOARD_OVERVIEW_SUMMARY_TTL_MS` = 6 h). The DAY test is the one nothing else can replace: the payload reads
+  «today» (the current and previous month, the month-end projection, what is still scheduled) and nothing writes at
+  midnight — computed at 23:50, it is yesterday's at 00:10 (the test of that case went red with the day test removed).
+  The 6 h are the safety net for an input no invalidation sees; the daily snapshot cron (18:00 UTC) invalidates every
+  account anyway.
+- **The rule that makes the day-long freshness true: every write to an input of the payload invalidates the summary**
+  — assets, snapshots, the five settings fields the payload reads (`settingsAffectDashboardOverview`, a checklist
+  comment in `assetAllocationService.ts`), `goalBasedInvesting`, pension contributions, the trade ledger and the
+  expense rows (name, type, amount, date, category). On 2026-10-03 a grep of every writer found five that did not,
+  all fixed that day: the category cascades of `expenseService` (rename, type change, reassign, clear, move — the
+  subcategory reassign alone stays out, the payload never reads it), a dividend income row NOT credited to an account
+  (create, edit, delete), the two goal writers (`saveGoalData`, `appendInvestmentGoal`), the settings predicate (3 of
+  the 5 fields: it held only because Impostazioni always sends the stamp duty) and the pension contribution record
+  (invalidated before the record existed). A new writer of an input owes its invalidation in the same commit.
+- **The request time is ONE `now`, from the freshness test to the payload** (2026-10-03): `getDashboardOverview`
+  takes it and hands it to the readers, the expense stats and `buildLiveOverviewPayload` — a function of the recompute
+  never reads its own clock, or a request across a month's midnight builds half its payload on each month. Pinned by
+  `__tests__/dashboardOverviewService.test.ts` → *reads the current month from the request time…*, which asserts on
+  the ARGUMENT of `getItalyMonthYear`: that file mocks it to April, so an assertion on the payload stays green with
+  the defect in.
+- **`Server-Timing`**: `auth;dur, db;dur, compute;dur, total;dur, source;desc=materialized|recompute`. `db` sums the
+  summary read and the round of reads; `total` runs from the handler's first line to the header, so the auth and the
+  tiny rest are inside it; the write after the response is in none of them. In production: DevTools → Network → the
+  `overview` request → Timing → *Server Timing*. On the emulator (2026-10-03, the mirror, dev server): a recompute
+  `db` ~45 ms, `compute` ~2, `total` ~50; a materialized read `total` ~7. The route's wall time in recompute went from
+  a median of 105/97 ms to 58/57 ms with the payload identical to the byte. The functions run in `fra1` since 2026-10-04 (`vercel.json` → `regions`, SETUP.md § Function region); no production reading was taken (owner, 2026-10-04).
 
 ## The critique of 2026-09-13 — what changed and why
 
@@ -125,7 +190,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   the rows of one list must share one track. The third desktop row is 4 · 4 · 4: at 3 columns the income tile could
   not hold a label, a 40px bar and two figures. Costi's «Pesano di più» follows the figures (`mt-4`), not the tile's
   bottom: pinned, it left ~110px of nothing whenever a taller tile shared the row.
-- **The light chart palette holds the dark hue bands** — doc/guide/temi.md § the default theme's light slots.
+- **The light chart palette holds the dark hue bands** — doc/guide/temi.md § The default theme's light slots hold the dark hue bands.
 
 ## A month the tax kept flat (2026-09-19)
 
@@ -180,6 +245,14 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   without `incomeScheduled` gets no lived reading (`null`), never half a subtraction.
 
 ## Per-page blind spots
+
+- **Three writers still do not invalidate the summary** (2026-10-03, judged minor and left): `migrateAssetLedger`
+  (once per account, its baseline BUYs move the month's market split), the coupon cleanup of `dividendService`
+  (`deleteUpcomingCoupons` / `deleteFinalPremium`, which matters only for a coupon dated today) and the dummy data
+  behind `NEXT_PUBLIC_ENABLE_TEST_SNAPSHOTS`. Each can leave the Panoramica on the old figure until the next
+  invalidation, the next Italian day, six hours or the evening cron — whichever comes first. So can a client
+  invalidation whose POST fails: it is best-effort by design (`dashboardOverviewInvalidation.ts`).
+- **The first opening of each day recomputes** — by design: the payload is the day's.
 
 - **The Cashflow tile keeps the WHOLE month** («Messo da parte il 17%», calendar included) beside the verdict's «45%
   finora»: the tile shows the month's three figures and its projection, the verdict judges the days lived. Seen by the

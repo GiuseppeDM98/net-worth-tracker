@@ -146,7 +146,7 @@ function GroupRows({ group, onEntityClick }: { group: FlowShareGroup; onEntityCl
           <RankedRows
             rows={rows}
             color={group.color}
-            remainder={rest.length > 0 ? { label: restLabel, amount: restTotal, percentage: share(restTotal) } : null}
+            remainders={rest.length > 0 ? [{ label: restLabel, amount: restTotal, percentage: share(restTotal) }] : null}
             // No fixed label width: the primitive's 42% column is ~133px at 390 and yields with
             // the tile, where a fixed 140px added up to the whole phone column (review of #400, F2).
             ariaLabel={`Categorie in ${group.label}`}

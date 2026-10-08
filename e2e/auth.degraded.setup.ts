@@ -11,6 +11,7 @@
 
 import { test as setup, expect } from '@playwright/test';
 import { DEGRADED_STORAGE_STATE } from '../playwright.config';
+import { stripPersistedQueryCache } from './persistedCache';
 
 /** Matches `scripts/seedPensionE2E.mts` → DEGRADED_EMAIL. */
 const DEGRADED_EMAIL = 'degraded@example.com';
@@ -25,9 +26,13 @@ setup('authenticate degraded account', async ({ page }) => {
   await page.getByRole('button', { name: 'Accedi', exact: true }).click();
 
   await page.waitForURL(/\/dashboard/, { timeout: 30_000 });
-  await expect(page.getByRole('navigation').or(page.locator('main'))).toBeVisible();
+  // The profile in the sidebar footer, not `navigation`/`main`: those are in the HTML before the
+  // login since 2026-09-28 (see auth.setup.ts).
+  await expect(page.locator('[data-sidebar="footer"]')).toContainText(DEGRADED_EMAIL);
 
   // `indexedDB: true` for the same reason as auth.setup.ts: the Firebase Web SDK keeps its session
   // there, and the default capture produces a state file that lands every spec back on /login.
   await page.context().storageState({ path: DEGRADED_STORAGE_STATE, indexedDB: true });
+  // The persisted React Query cache out of the state file (see auth.setup.ts).
+  stripPersistedQueryCache(DEGRADED_STORAGE_STATE);
 });

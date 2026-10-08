@@ -12,7 +12,7 @@
  */
 
 import { useMemo } from 'react';
-import { Area, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Area, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from '@/components/ui/charts/recharts';
 import type { PercentilesData } from '@/types/assets';
 import { formatCurrency, formatCurrencyCompact } from '@/lib/services/chartService';
 import { useChartColors } from '@/lib/hooks/useChartColors';

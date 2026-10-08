@@ -29,8 +29,13 @@
  * The Scenari | Ventaglio switch in the Traguardo's aside is that tile's scope, not an axis.
  *
  * Data flow (unchanged from the previous IA — presentation over the same pure functions):
- * 1. settings + assets + annualCashflowData queries (independent, staleTime 5min);
- * 2. fireData query (depends on assets + settings — gated by `enabled`);
+ * 1. settings, assets, snapshots and the expenses of last year and this one from the shared hooks
+ *    (one round trip, four reads in parallel): what the verdict and the four tiles stand on;
+ * 2. the cashflow figures and the FIRE history derived in memory (`computeAnnualCashflowData`,
+ *    `buildFIREData`) — a lock flip recomputes them in the same render. The history alone needs
+ *    the spending behind every snapshot: it reads those older rows once the snapshots have said
+ *    how far back they go, and the «Dettaglio» waits for them — the grid does not
+ *    (`fireWindows`, lib/utils/expenseWindows.ts, 2026-09-30);
  * 3. the metrics, the deterministic projection and the fan inputs derived client-side via
  *    useMemo, so preview edits (SWR, RITA controls, scenario params) are instant.
  * `respectPensionLockInFire` governs the WHOLE FIRE page (Coast, What If, Monte Carlo read the
@@ -45,9 +50,14 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useExpensesInRange } from '@/lib/hooks/useExpenses';
+import { fireWindows } from '@/lib/utils/expenseWindows';
+import { useSnapshots } from '@/lib/hooks/useSnapshots';
+import { queryKeys } from '@/lib/query/queryKeys';
+import { useAssets } from '@/lib/hooks/useAssets';
+import { useSettings } from '@/lib/hooks/useSettings';
 import { toast } from 'sonner';
-import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import {
@@ -56,19 +66,18 @@ import {
   calculateIlliquidFIRENetWorth,
   calculateLiquidFIRENetWorth,
   filterFireEligibleAssets,
-  getAllAssets,
 } from '@/lib/services/assetService';
 import { resolveGainShare, resolvePortfolioTaxProfile } from '@/lib/utils/withdrawalTax';
 import { getItalyYear } from '@/lib/utils/dateHelpers';
-import { calculateCurrentAllocation, getDefaultTargets, getSettings, setSettings } from '@/lib/services/assetAllocationService';
+import { calculateCurrentAllocation, getDefaultTargets, setSettings } from '@/lib/services/assetAllocationService';
 import { DEFAULT_INPS_RETIREMENT_AGE, resolvePensionLockState, resolveRitaUnlockAge } from '@/lib/utils/pensionUnlock';
 import {
   calculateCoastFireNetRealAnnualPension,
   calculateFIREMetrics,
   calculateFIREProjection,
-  getAnnualCashflowData,
+  computeAnnualCashflowData,
   getDefaultScenarios,
-  getFIREData,
+  buildFIREData,
   normalizeCoastFirePensions,
   normalizeCoastFireTaxBrackets,
   prepareRunwaySummaryLabel,
@@ -196,7 +205,6 @@ function settingsForm(settings: Settings | null | undefined): FireSettingsForm {
 }
 
 export function FireCalculatorTab() {
-  const { user } = useAuth();
   const { ownerId } = useActiveAccount();
   const isDemo = useDemoMode();
   const queryClient = useQueryClient();
@@ -211,26 +219,31 @@ export function FireCalculatorTab() {
   const onFormChange = useCallback((patch: Partial<FireSettingsForm>) => setForm((prev) => ({ ...prev, ...patch })), []);
 
   // ─── Queries ─────────────────────────────────────────────────────────────────
-  const { data: settings, isLoading: isLoadingSettings, isError: settingsError } = useQuery<Settings | null>({
-    queryKey: ['settings', ownerId],
-    queryFn: () => getSettings(ownerId!),
-    enabled: !!user && !!ownerId,
-    staleTime: 300000,
-  });
+  // Settings and assets from the keys every page shares (2026-09-29).
+  const { data: settings, isLoading: isLoadingSettings, isError: settingsError } = useSettings(ownerId);
+  const { data: assets, isLoading: isLoadingAssets, isError: assetsError } = useAssets(ownerId);
 
-  const { data: assets, isLoading: isLoadingAssets, isError: assetsError } = useQuery({
-    queryKey: ['assets', ownerId],
-    queryFn: () => getAllAssets(ownerId!),
-    enabled: !!user && !!ownerId,
-    staleTime: 300000,
-  });
-
-  const { data: cashflowData, isLoading: isLoadingCashflow, isError: cashflowError } = useQuery({
-    queryKey: ['annualCashflowData', ownerId],
-    queryFn: () => getAnnualCashflowData(ownerId!),
-    enabled: !!user && !!ownerId,
-    staleTime: 300000,
-  });
+  // The cashflow figures — the last full year, else the running year annualised — computed in
+  // memory from the page's RECENT expenses window (January of last year → this December: the key
+  // Coast FIRE and What If read too), in parallel with the assets, the settings and the snapshots.
+  // The history behind the «Dettaglio» also needs the rows before that window, back to eleven
+  // months before the first snapshot: a second, OLDER window that can only be asked for once the
+  // snapshots are in, and that the grid does not wait for (2026-09-30; until then the tab read
+  // the account's whole expense list for it).
+  const readAt = useMemo(() => new Date(), []);
+  const { data: snapshots, isLoading: isLoadingSnapshots } = useSnapshots(ownerId);
+  const expenseWindows = useMemo(() => fireWindows(readAt, snapshots?.[0] ?? null), [readAt, snapshots]);
+  const { data: recentExpenses, isLoading: isLoadingCashflow, isError: recentExpensesError } = useExpensesInRange(ownerId, expenseWindows.recent);
+  const { data: olderExpenses, isLoading: isLoadingOlderExpenses, isError: olderExpensesError } = useExpensesInRange(ownerId, expenseWindows.older);
+  const cashflowError = recentExpensesError || olderExpensesError;
+  const cashflowData = useMemo(() => (recentExpenses ? computeAnnualCashflowData(recentExpenses, readAt) : undefined), [recentExpenses, readAt]);
+  // The history's rows: the two windows joined — disjoint and contiguous by construction, so no
+  // row is there twice and none is missing. Undefined until every list it needs is in.
+  const historyExpenses = useMemo(() => {
+    if (!snapshots || !recentExpenses) return undefined;
+    if (expenseWindows.older === null) return recentExpenses;
+    return olderExpenses ? [...olderExpenses, ...recentExpenses] : undefined;
+  }, [snapshots, recentExpenses, olderExpenses, expenseWindows.older]);
   const annualSavings = cashflowData?.annualSavings ?? 0;
   const projectionAnnualExpenses = cashflowData?.annualExpensesFromCashflow ?? 0;
 
@@ -337,16 +350,18 @@ export function FireCalculatorTab() {
   const liquidNetWorth = assets ? calculateLiquidFIRENetWorth(assets, includePrimaryResidence) : 0;
   const illiquidNetWorth = assets ? Math.max(0, calculateIlliquidFIRENetWorth(assets, includePrimaryResidence) - pensionLockedValue) : 0;
 
-  // `keepPreviousData`: the key moves with every lock flip and residence switch (currentNetWorth),
-  // and without it the whole tab fell back to the skeleton mid-interaction — the pressed switch
-  // unmounted, the Dettaglio closed, every figure counted up from zero.
-  const { data: fireData, isLoading: isLoadingFIRE } = useQuery({
-    queryKey: ['fireData', ownerId, currentNetWorth, withdrawalRate, includePrimaryResidence],
-    queryFn: () => getFIREData(ownerId!, currentNetWorth, withdrawalRate, includePrimaryResidence),
-    enabled: !!user && !!assets && currentNetWorth > 0,
-    staleTime: 300000,
-    placeholderData: keepPreviousData,
-  });
+  // Derived, not queried: a lock flip or the residence switch moves `currentNetWorth` and the
+  // history recomputes in the same render — no key that moves, no skeleton mid-interaction (the
+  // `keepPreviousData` the query needed until 2026-09-29). Nothing without a positive net worth.
+  const fireData = useMemo(
+    () =>
+      assets && snapshots && historyExpenses && currentNetWorth > 0
+        ? buildFIREData(snapshots, historyExpenses, currentNetWorth, withdrawalRate, includePrimaryResidence, readAt)
+        : undefined,
+    [assets, snapshots, historyExpenses, currentNetWorth, withdrawalRate, includePrimaryResidence, readAt],
+  );
+  // The history's wait is the «Dettaglio»'s alone: nothing in the grid reads `fireData`.
+  const isLoadingHistory = currentNetWorth > 0 && (isLoadingSnapshots || isLoadingOlderExpenses);
   const chartData = useMemo(() => fireData?.chartData ?? [], [fireData]);
   const rawRunwayData = useMemo(() => fireData?.runwayData ?? [], [fireData]);
 
@@ -391,9 +406,9 @@ export function FireCalculatorTab() {
   // ─── The numbers (pure layer over the existing engines) ──────────────────────
   // The metrics on the PREVIEW withdrawal rate, with the bridge override when the lock is on:
   // free assets must cover the spending bridge until the unlock, then the fund tops up the
-  // standard requirement. The expenses are the projection's (`getAnnualCashflowData`: the last
+  // standard requirement. The expenses are the projection's (`computeAnnualCashflowData`: the last
   // full year, else the running year annualized and said so in the Base di calcolo aside) —
-  // ONE basis for the number, the verdict and the chart (The Same-Basis Rule). `getFIREData`'s
+  // ONE basis for the number, the verdict and the chart (The Same-Basis Rule). `buildFIREData`'s
   // own metrics read the last full year only, which on a fresh account is a 0 that would call
   // the number «non calcolabile» while the projection kept drawing.
   // The requirement of TODAY (`resolveFireRequirement`, the ONE rule the walk runs year by
@@ -516,10 +531,12 @@ export function FireCalculatorTab() {
     return { statePensions, withdrawalTax: honest.withdrawalTax };
   }, [honestSummary.pensionsConsidered, honest, userAge, scenarios.base.inflationRate, now]);
   const runFan = useCallback(
-    (inputs: FanSimulationInputs, annualSavings = inputs.annualSavings) =>
+    // No `= inputs.annualSavings` parameter default: the React Compiler cannot reorder a default
+    // that reads another parameter.
+    (inputs: FanSimulationInputs, annualSavings?: number) =>
       runAccumulationSimulation({
         ...inputs,
-        annualSavings,
+        annualSavings: annualSavings ?? inputs.annualSavings,
         years: fanYears,
         retirementHorizonYears,
         fireTargets: fanFireTargets,
@@ -642,7 +659,7 @@ export function FireCalculatorTab() {
       }),
     onSuccess: () => {
       toast.success('Impostazioni FIRE salvate con successo');
-      queryClient.invalidateQueries({ queryKey: ['settings', ownerId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.settings.all(ownerId || '') });
     },
     onError: (error) => {
       console.error('Error saving FIRE settings:', error);
@@ -658,7 +675,7 @@ export function FireCalculatorTab() {
     onSuccess: (_, active) => {
       toast.success(active ? 'Fondo pensione considerato bloccato' : 'Fondo pensione considerato disponibile');
       // Awaited: the switch stays disabled until the refetched doc carries the new value.
-      return queryClient.invalidateQueries({ queryKey: ['settings', ownerId] });
+      return queryClient.invalidateQueries({ queryKey: queryKeys.settings.all(ownerId || '') });
     },
     onError: (error, active) => {
       console.error('Error saving the pension lock:', error);
@@ -677,7 +694,7 @@ export function FireCalculatorTab() {
       }),
     onSuccess: () => {
       toast.success('Parametri scenari salvati con successo');
-      queryClient.invalidateQueries({ queryKey: ['settings', ownerId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.settings.all(ownerId || '') });
     },
     onError: (error) => {
       console.error('Error saving scenario parameters:', error);
@@ -712,7 +729,7 @@ export function FireCalculatorTab() {
   // ─── Loading ─────────────────────────────────────────────────────────────────
   // A failed read comes BEFORE the wait: these queries default to undefined, and a plan built
   // on a base that was never read is a number with nothing behind it.
-  if (resolveSurfaceState({ loading: isLoadingSettings || isLoadingAssets || isLoadingCashflow || (currentNetWorth > 0 && isLoadingFIRE), failed: settingsError || assetsError || cashflowError }) === 'failed') {
+  if (resolveSurfaceState({ loading: isLoadingSettings || isLoadingAssets || isLoadingCashflow, failed: settingsError || assetsError || cashflowError }) === 'failed') {
     return (
       <ErrorNotice
         className="max-w-[920px]"
@@ -724,7 +741,7 @@ export function FireCalculatorTab() {
     );
   }
 
-  if (isLoadingSettings || isLoadingAssets || isLoadingCashflow || (currentNetWorth > 0 && isLoadingFIRE)) {
+  if (isLoadingSettings || isLoadingAssets || isLoadingCashflow) {
     return <TileGridSkeleton cells={SKELETON_CELLS} />;
   }
 
@@ -763,6 +780,7 @@ export function FireCalculatorTab() {
 
   const dettaglio = (
     <FireDettaglio
+      loading={isLoadingHistory}
       description={describeDettaglio({
         runwayYears: displayedRunwaySummary.currentYearsOfExpenses,
         runwayDelta: displayedRunwaySummary.totalDeltaVs12Months,

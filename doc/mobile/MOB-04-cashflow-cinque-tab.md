@@ -20,7 +20,8 @@ Dividendi 3,77 / 6 / 8. Il codice di oggi (righe da riverificare):
   parte vissuta e col calendario chiude con `calendarSentence` (`:345-372`). `:800-806`: il secondo handle sul `period`.
 - `ExpenseSplitTab.tsx:89`: Divisione ha un `period` SUO; `expenseSplitNarrative.ts:286` mette «Nel totale ci sono ancora
   X € … in calendario» (qualifica «In comune») dopo i residui. `BudgetTab.tsx:309`: il `role="status"` del salvataggio
-  sta nell'aside di Per categoria. `DividendTrackingTab.tsx:211`: `/api/dividends/stats` è l'unica lettura PER TESSERA.
+  sta nell'aside di Per categoria. `DividendTrackingTab.tsx:211`: `/api/dividends/stats` è l'unica lettura PER TESSERA — e, dal 2026-10-05, l'unica
+  richiesta della tab: la stessa risposta porta la lista (`useDividendRegistry`, nella pagina).
 
 ## 2. Obiettivo misurabile
 
@@ -32,7 +33,7 @@ Dividendi 3,77 / 6 / 8. Il codice di oggi (righe da riverificare):
 ## 3. Non-obiettivi
 
 - B e C; il desktop; Analisi (MOB-06); le primitive (MOB-02: qui si USANO); il tablet (MOB-08); DESIGN.md (MOB-09); le
-  query delle spese (PERF-06).
+  finestre delle spese (`lib/utils/expenseWindows.ts`, doc/guide/cashflow.md § Expenses by window).
 - Le disclosure fuori dalla griglia restano com'erano, dopo le righe e fuori da «Apri tutte»: Budget › Impostazioni
   (`BudgetTab.tsx:333`), Centri › Archiviati, Dividendi › Dettaglio.
 - L'altezza di «Aggiungi» in orizzontale (`h-11 desktop:h-9`, `ExpenseTrackingTab.tsx:1017`) è di MOB-08 § 4.3: qui solo
@@ -147,14 +148,19 @@ Dividendi 3,77 / 6 / 8. Il codice di oggi (righe da riverificare):
 
 ### 4.7 Conflitti con PERF
 
-- **PERF-06**: la striscia legge i riassunti delle tessere, quindi la stessa finestra; il FAB rivela solo righe del
-  periodo dopo il refetch per prefisso. PERF-06 fa leggere a Divisione la finestra di Tracciamento (PERF-06 § 4), ma il
-  periodo di Divisione è suo (`ExpenseSplitTab.tsx:89`): se la finestra non lo segue, un altro mese legge vuoto — si
-  riapre PERF-06.
-- **PERF-05** tocca solo `assets.all` in `loadOtherData`: `otherDataFailed` (`page.tsx:122`) resta l'errore di TAB; il
-  `failed` di `dvd-rendimento` è `statsError` di `useDividendStats`, già React Query. **PERF-04**: qui niente recharts
-  (SVG a mano, `FlowBarsChart.tsx:27`): una riga chiusa risparmia DOM e render, non un chunk. **PERF-03**: «Aggiornato
-  alle…» sopra la striscia. **PERF-12**: niente `setState` in effetto. **PERF-14**: nessun `layout`; `tabPanelSwitch` resta.
+- **Le spese per finestra** (in develop dal 2026-09-30, `lib/utils/expenseWindows.ts`; doc/guide/cashflow.md
+  § Expenses by window): la striscia legge i riassunti delle tessere, quindi la stessa finestra della tab; il FAB rivela
+  solo righe del periodo, dopo il refetch per prefisso (`expenses.all`). Divisione legge la finestra del SUO periodo
+  con una `useExpensesInRange` propria (`ExpenseSplitTab.tsx:85-91`, `trackingWindow(period)`): la stessa chiave di
+  Tracciamento solo quando i due mostrano lo stesso periodo, mai un mese letto vuoto. Il periodo di Tracciamento vive in
+  `app/dashboard/cashflow/page.tsx` (`period`/`onPeriodChange` sono prop della tab): la striscia lo riceve da lì.
+- **Dal 2026-09-29** gli asset della tab vengono da `useAssets` (`page.tsx:104, 134`) e, dal 2026-10-05, la lista viene da
+  `useDividendRegistry` (`lib/hooks/useDividendStats.ts`, la stessa richiesta delle misure): `dividendsError ||
+  assetsError` è l'errore di TAB; il `failed` di `dvd-rendimento` è `statsError` di `useDividendStats`, vero anche
+  quando la risposta arriva con la lista e `stats: null`. **PERF-04**: qui niente recharts
+  (SVG a mano, `FlowBarsChart.tsx:27`): una riga chiusa risparmia DOM e render, non un chunk. **PERF-03** (in develop dal
+  2026-09-30): «Aggiornato alle…» sta nel `PageHeader` della pagina (le quattro chiavi di `app/dashboard/cashflow/page.tsx`),
+  non nel tab. **PERF-12** (in develop dal 2026-10-06, AGENTS.md § Motion): niente `setState` in effetto. **PERF-14** (in develop dal 2026-10-08, AGENTS.md § Motion): nessun `layout`; `tabPanelSwitch` resta.
 
 ### 4.8 Domande al proprietario
 
@@ -183,7 +189,7 @@ Dividendi 3,77 / 6 / 8. Il codice di oggi (righe da riverificare):
 
 ## 6. Passi
 
-1. Branch; guide; `mobile:census` PRIMA; PERF-06 chiusa e la sua finestra di Divisione; le domande di § 4.8. 2. Pure e
+1. Branch; guide; `mobile:census` PRIMA; la finestra di Divisione com'è (§ 4.7); le domande di § 4.8. 2. Pure e
 test, falsificati. 3. `page.tsx`, `PageVerdict`. 4. Tracciamento con il FAB, Budget, Dividendi, Divisione, Centri.
 5. Spec Playwright. 6. `mobile:census`/`mobile:budget`, giro sul mirror, documentazione, commit proposto.
 
@@ -207,8 +213,9 @@ test, falsificati. 3. `page.tsx`, `PageVerdict`. 4. Tracciamento con il FAB, Bud
   (`cashflow.budget.mobile.spec.ts:22`), il test lo scrive e lo toglie; «Fine mese» apre Categorie a rischio (anche
   `null`); (4) una riga di Budget aperta → Tracciamento → Budget → reload: aperta,
   `localStorage['mobile-sections:cashflow:budget']`; (5) tre tab VISITATE, nessun id duplicato; (6) l'account base non ha
-  dividendi (niente Rendimento): cedola esca via REST, poi `page.route('**/api/dividends/stats**', r => r.abort())`
-  (`e2e/settings.spec.ts:143`; `retry: 1`): Rendimento aperta, chiusa → eyebrow `text-destructive`; (7) `reducedMotion:
+  dividendi (niente Rendimento): cedola esca via REST, poi la risposta di `/api/dividends/stats` riscritta con `stats: null`
+  (`page.route` + `route.fetch()` + `route.fulfill({ response, json })`, come `e2e/panoramica.snapshot.spec.ts` —
+  NON `r.abort()`: dal 2026-10-05 quella richiesta porta anche la lista, e abortirla è l'errore di TAB): Rendimento aperta, chiusa → eyebrow `text-destructive`; (7) `reducedMotion:
   'reduce'` → `transition-duration` 0s; (8) `main` senza sforamento. Falsificare (1), (2), (5), (6) rompendo il codice.
 - `cashflow.split.mobile.spec.ts` (`split-mobile`, `:128-137`), su «Anno corrente» (il fixture vale sull'anno,
   `scripts/seedSplitE2E.mts:12-17`): celle per persona, una a 100 € `positive` (non −100), paragrafo intero con la
@@ -233,7 +240,7 @@ test, falsificati. 3. `page.tsx`, `PageVerdict`. 4. Tracciamento con il FAB, Bud
 
 - CLAUDE.md «Latest»; le cinque guide di tab § Composizione mobile e § Per-page blind spots (il trio che sparisce a
   390, Dividendi senza striscia); `doc/guide/cashflow.md` (`forceMount`, memoria per tab); `doc/guide/e2e-emulatori.md`
-  (la spec, l'abort); AGENTS.md § Navigation (id prefissati, `active`); `Draft Release Temp.md` (una riga, senza dati privati); `doc/mobile/README.md` § 6.
+  (la spec, l'abort); doc/guide/shell.md § Navigation (id prefissati, `active`); `Draft Release Temp.md` (una riga, senza dati privati); `doc/mobile/README.md` § 6.
 
 ## 11. Prompt di implementazione
 
@@ -251,8 +258,9 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
   cashflow-dividendi.md, stati.md, e2e-emulatori.md
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice
 - Leggi doc/mobile/README.md, MOB-01 e MOB-02 per intero (chiuse; MOB-02 è il contratto: non rinominare nulla) e
-  questa spec per intero; DESIGN.md § 5 e § 6 (MAI rigenerarlo); doc/perf/PERF-06 (deve essere chiusa), PERF-03,
-  PERF-05, PERF-12, PERF-14
+  questa spec per intero; DESIGN.md § 5 e § 6 (MAI rigenerarlo); PERF-14 (ritirata il 2026-10-08: AGENTS.md § Motion, doc/guide/temi.md; PERF-03, PERF-05, PERF-06 e PERF-12
+  sono ritirate: AGENTS.md § Motion (il compiler), doc/guide/stati.md § The fourth reading, AGENTS.md § React Query and Derived State, doc/guide/cashflow.md
+  § Expenses by window)
 - Crea SESSION_NOTES.md; crea il branch dalla branch attiva PRIMA di editare
 
 Regole: nessun commit senza il mio OK; un branch e un commit; rispondi in italiano; le otto domande di § 4.8 con lo

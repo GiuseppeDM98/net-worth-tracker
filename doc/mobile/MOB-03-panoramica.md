@@ -51,7 +51,7 @@ Righe del 2026-09-26, da riverificare:
 
 ### 4.1 La prima schermata
 
-Sotto `desktop:`: titolo → prima frase (decisione 4; domanda 1) → «Aggiornato alle…» (PERF-03) → striscia → «Il perché ·
+Sotto `desktop:`: titolo → prima frase (decisione 4; domanda 1) → striscia → «Il perché ·
 {restLabel}» → **LA tessera `panoramica-patrimonio`** (aperta, fuori dal controller) → «Il resto della pagina» → le
 righe. `useMobileSections({ route: 'panoramica', sections })` (chiave `mobile-sections:panoramica`), un `SectionSpec` per
 tessera presente, nessun `failed` (un payload solo: se fallisce resta l'`ErrorNotice` di pagina, `page.tsx:282-299`).
@@ -122,11 +122,14 @@ Sotto `tablet:` la curva scende a `min-h-[120px]`: si accorcia la curva, mai la 
 
 ### 4.5 Conflitti con PERF e con MOB-06
 
-- **PERF-03**: `freshness` fra la prima frase e la striscia, mai in «Il perché»; età = la più vecchia fra
-  `dataUpdatedAt` e `overview.freshness.updatedAt`. Le celle non hanno count-up: non saltano all'arrivo del fresco.
-- **PERF-07**: il ricalcolo non ha interfaccia propria, è il «sto rileggendo…» della stessa riga `status`; il payload
-  non cambia forma. Senza PERF-07 dura solo di più.
-- **PERF-14**: `layout="position"` (`page.tsx:335`) è suo, non si rimette. **PERF-04**: qui niente recharts.
+- **PERF-03** (in develop dal 2026-09-30): «Aggiornato alle…» sta nel `PageHeader` — sul telefono al posto della
+  descrizione (la data) finché dura — non fra la prima frase e la striscia (decisione del proprietario); età = la più
+  vecchia fra `dataUpdatedAt` e `overview.freshness.updatedAt`, soglia il minuto dell'overview
+  (`DASHBOARD_OVERVIEW_STALE_TIME_MS`). Le celle non hanno count-up: non saltano all'arrivo del fresco.
+- **PERF-07** (in develop dal 2026-10-03): il ricalcolo non ha interfaccia propria, è il «sto rileggendo…» della stessa
+  riga `status`; il payload non ha cambiato forma. Il riepilogo è fresco per il giorno italiano, quindi dopo la prima
+  apertura del giorno la rilettura è una lettura sola (doc/guide/panoramica.md § The materialized summary).
+- **PERF-14** (in develop dal 2026-10-08): il `layout="position"` della pagina è tolto (doc/guide/panoramica.md), non si rimette. **PERF-04**: qui niente recharts.
 - **MOB-06**: `PatrimonioTile.liftedFigures`, la curva a 120 px sotto `tablet:` e i `binding` di `describeSales` sono di
   MOB-03 (MOB-06 § 3 lo dice); se MOB-06 arriva prima li scrive con questi nomi, e chi arriva secondo rilegge il diff del
   primo.
@@ -222,7 +225,7 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice
 - Leggi doc/mobile/README.md, doc/mobile/MOB-02-primitive-della-composizione.md (§ 4, il contratto) e MOB-03 per
   intero; DESIGN.md § 5 (Page Verdict, Tile, Market Digest Line), § 6 e The Scheduled-Is-Not-Spent Rule (MAI
-  rigenerarlo); doc/perf/PERF-03 e PERF-07 (devono essere chiuse); se MOB-06 è chiusa, il suo diff su PatrimonioTile
+  rigenerarlo); PERF-07 e PERF-03 sono chiuse (2026-10-03: doc/guide/panoramica.md § The materialized summary; 2026-09-30: doc/guide/stati.md § The fourth reading); se MOB-06 è chiusa, il suo diff su PatrimonioTile
 - Crea SESSION_NOTES.md; crea il branch dalla branch attiva PRIMA di editare
 
 Regole: nessun commit senza il mio OK; un branch e un commit; rispondi in italiano; le cinque domande di § 4.6 con lo

@@ -12,7 +12,8 @@ import { cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { TILE_EYEBROW_CLASS } from '@/components/ui/tile';
 import { NarrativeText } from '@/components/ui/narrative-text';
-import { ConfrontoAnnualeSection } from '@/components/cashflow/ConfrontoAnnualeSection';
+import { CONFRONTO_LAZY_CHARTS, ConfrontoAnnualeSection } from '@/components/cashflow/ConfrontoAnnualeSection';
+import { usePreloadWhenIdle } from '@/components/ui/lazy-component';
 
 interface ConfrontoDisclosureProps {
   allExpenses: Expense[];
@@ -41,6 +42,8 @@ const dayOf = (expense: Expense): MonthRef & { day: number } => {
  */
 export function ConfrontoDisclosure({ allExpenses, period, today, todayDay, historyStartYear, availableDataYears, onCategoryFocus }: ConfrontoDisclosureProps) {
   const [open, setOpen] = useState(false);
+  // The section's plots are lazy: fetched while the page is idle, so opening draws them at once.
+  usePreloadWhenIdle(CONFRONTO_LAZY_CHARTS);
   const [comparisonYearChoice, setComparisonYearChoice] = useState<number | null>(null);
 
   const currentYear = period.mode === 'history' ? null : period.year;

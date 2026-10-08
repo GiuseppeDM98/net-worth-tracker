@@ -16,6 +16,78 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **Transfer fee** (2026-09-25): `lib/utils/transferFee.ts` (pure), `createTransferWithFee` / `saveTransferFee` / `getTransferFeeOf` / `deleteExpenseRows` in `lib/services/expenseService.ts`; tests `__tests__/transferFee.test.ts`, `e2e/cashflow.transfer-fee.spec.ts`
 - **50/30/20 roles**: pure `lib/utils/spendingRoles.ts` (resolution, summary, the printed shares `summarizeSpendingRoleShares`, classification counts, the badge colour), the bucket → `--role-*` token map `lib/constants/spendingRoleColors.ts`, the `deleteField()` in `updateCategory` (`lib/services/expenseCategoryService.ts`), the picker and the cache invalidation (`invalidateCategoryCaches`) in `components/expenses/CategoryManagementDialog.tsx`; tests `__tests__/{spendingRoles,expenseCategoryService}.test.ts`, `e2e/settings.roles.spec.ts`
 - **Mortgage instalment → property debt** (2026-09-25): `lib/utils/mortgageRepayment.ts` (pure), `lib/services/debtRepaymentService.ts` (client transactions), the server half inside `lib/server/cashSettlement.ts`; tests `__tests__/{mortgageRepayment,serverCashSettlement,updateAssetDebtFields}.test.ts`, `e2e/cashflow.mortgage.spec.ts`
+- **Category icons** (2026-09-30): the curated names and labels `lib/constants/categoryIcons.ts`, one loader per icon `components/expenses/categoryIconLoaders.ts` (deep paths to lucide's canonical files, typed by `types/lucide-icon-modules.d.ts`), the ONE lazy map `LAZY_CATEGORY_ICONS` + `CategoryIcon` in `components/expenses/IconPickerPopover.tsx`; test `__tests__/categoryIcons.test.ts`
+- **Expenses by window** (2026-09-30): pure `lib/utils/expenseWindows.ts` (`trackingWindow`, `budgetWindow`, `budgetSuggestionWindow`, `fireWindows`, `listExpenseYears`), hooks `useExpensesInRange` / `useExpenseBounds` / `expensesInRangeQueryOptions` in `lib/hooks/useExpenses.ts`, readers `getExpensesByDateRange` / `getExpenseDateBounds` in `lib/services/expenseService.ts`, keys `queryKeys.expenses.{range,bounds}`; tests `__tests__/expenseWindows.test.ts` (bounds and invariance), `__tests__/persistCache.test.ts` (the two builders), `e2e/cashflow.tracciamento.spec.ts` (the second window)
+- **Tabs on demand** (2026-10-05): the four `lazyComponent`s at the top of `app/dashboard/cashflow/page.tsx`, their
+  skeleton cells `lib/constants/cashflowTabSkeletons.ts`, the fallbacks of Dividendi and Divisione
+  `components/cashflow/CashflowTabSkeletons.tsx` (2026-10-06); held by `perf:budget` (Cashflow's ceiling), by every
+  `e2e/cashflow.*.spec.ts` that opens a tab, and by `e2e/lazyTabLanding.ts` (the fallback's geometry)
+- **Suites to run after a change here — Transfers / cash** (moved from `AGENTS.md` § Commands on 2026-09-30): `cashBalanceReconciliation`, `updateCashAssetBalancesAtomic`, `transferFeature`, `cashSettlement`, `serverCashSettlement` · **Commissione** `transferFee` (+ `settingsRoundTrip`) · **Mutuo** `mortgageRepayment`, `mortgageSummary`, `updateAssetDebtFields` (+ `patrimonioNarrative` for the tile's words) · **Ricorrenze** `recurrenceDates` · **Browser** `e2e/cashflow.{accounts,transfer-fee,mortgage}.spec.ts`
+
+## Expenses by window (`lib/utils/expenseWindows.ts`)
+- **Tracciamento, Divisione, Budget and FIRE read a WINDOW of the expenses, never the collection** (2026-09-30).
+  The pure functions of each page did not change — they still slice and bucket the list they are handed — what
+  changed is the list: `useExpensesInRange(ownerId, window)`, one key per window under the `expenses.all` prefix.
+  Until then every one of them read the whole collection to show a month (1547 documents on the owner's account),
+  and the cost was the SDK deserialising them on the main thread: Cashflow's cold load took 1,9 s to its first figure
+  and takes 1,0 with 838.
+- **The windows, and the ONE module that defines them**: `trackingWindow(period)` — from the first day of the month
+  twelve months before the period starts to the end of the MONTH it ends in (Tracciamento; Divisione on its own
+  period); `budgetWindow(now)` — from the older of January and the first of the six trailing months, to December;
+  `budgetSuggestionWindow(now, floor)` — whole years from the floor to last year, read by the budget dialog alone;
+  `fireWindows(now, firstSnapshot)` — `recent` (January of last year → December) for every FIRE tab and `older` (from
+  eleven months before the first snapshot) for the Calcolatore's «Dettaglio» only. Each guide says what its window
+  holds and why.
+- **A window is the UNION of what its page reads, not its period.** The readers behind the period count: the
+  previous period and the same days of the previous month, the six months of the flow chart, the twelve of the
+  savings history — and both charts draw the period's LAST MONTH WHOLE, so a custom range that stops on the 20th
+  reads to the end of that month (the first draft closed on the range's last day: the invariance test found it).
+  A reader added to a page widens its window in the same commit and joins `__tests__/expenseWindows.test.ts`, which
+  runs every reader twice — on the window's rows and on the whole list — and compares.
+- **The bounds are calendar days in BOTH calendars, never UTC.** The form saves at LOCAL midnight
+  (`new Date(dateString + 'T00:00:00')`), the period slice compares in the browser's calendar and every month bucket
+  reads the ITALIAN one. So a window opens at the earlier of the two midnights of its first day and closes at the
+  later of the two ends of its last: the same instants in Italy, a few hours wider anywhere else. Local midnight
+  alone — the spec's first wording — lost the rows of the 1st from Budget's buckets in a browser west of Italy (seen
+  red under `TZ=America/New_York`), and `Date.UTC` loses them in Italy itself.
+- **What a window cannot say about the rest of the collection comes from `useExpenseBounds`**: the dates of the
+  oldest and of the newest row (two one-document reads, `['expenses', uid, 'bounds']`). The period pickers take their
+  years from it (`listExpenseYears`), CONTIGUOUS from the oldest to the newest — a year with no row in between is
+  offered too, and opens on an empty period.
+- **Who has NO window, by declared need**: Storico (the Driver spans every year), Centri di Costo and «Collega
+  spese…» (a centre is lifetime), Hall of Fame's recalculation — and Analisi, by the owner's decision of 2026-09-30:
+  its Scheda, Confronto, Dettaglio and search span the history from the floor on and the Andamento ranks its categories
+  on the rows after this year too, so a window left out 48 rows of 1547 on the real account, for one more list in
+  memory and in the persisted record. They share the one `useExpenses` list. **Measure before giving a page a
+  window**: a window pays where the page reads a small part of the collection, and costs a key everywhere.
+- **Every expense write invalidates `queryKeys.expenses.all`, and that is enough**: it is the prefix of every window
+  and of the bounds. The windows on screen reread at once; the others (another period, another page) are marked and
+  reread when next opened. Found while checking every writer: deleting or renaming a cost centre rewrites expense
+  rows and invalidated the centres only — it now invalidates the prefix too (doc/guide/centri-di-costo.md).
+- **A new window is a wait, never the previous window's rows** (no `placeholderData`): the rows of another period
+  under the new one would be figures of the wrong months. A window read in the last 24 hours opens from the
+  persisted cache (doc/guide/cache-persistita.md).
+- **A window has no rollback flag: its rollback is the revert** (owner, 2026-10-01). Nothing written changes shape —
+  the collection, the rows and every writer are as before — and every reader filters in memory the list it is handed,
+  so the whole-collection list is one `git revert` away and no emergency switch has to be kept alive and tested. A
+  flag is for a change that alters what sits on DISK across a release (the persisted cache, AGENTS.md § Caching),
+  never for a refactor of the readers.
+
+## Category icons: one chunk per icon, by name (`components/expenses/categoryIconLoaders.ts`)
+- **A category stores its icon by lucide's PascalCase name; the screen loads that one icon, never the library**
+  (2026-09-30). Until then each lazy icon ran `import('lucide-react')` and read the name off the module — an
+  import read by a runtime name cannot be tree-shaken, so the first icon of Tracciamento downloaded all of lucide
+  (575 KB raw, 143 gz). lucide's own `dynamicIconImports` was measured and refused: its ~1900 loaders land in the
+  initial JS of every page that renders an icon (+49 KB gz on Cashflow and Impostazioni). The 121 loaders point at
+  the CANONICAL file (six names are aliases: `Home` → `house.js`, `Train` → `tram-front.js`, `ParkingSquare` →
+  `square-parking.js`, `BarChart2` → `chart-no-axes-column.js`, `AlertCircle` → `circle-alert.js`, `IceCream` →
+  `ice-cream-cone.js`); one icon is a ~350 B gz chunk, the picker's grid loads one per icon it shows.
+- **A new curated icon is two lines**: its label in `CATEGORY_ICONS`, its loader in `CATEGORY_ICON_LOADERS`.
+  `__tests__/categoryIcons.test.ts` goes red until both lists agree and each loader draws what lucide's map draws
+  under the same kebab name (seen red with an invented «Fenicottero»); a name without a loader renders the fallback.
+- **The picker's grid has never been timed** (2026-09-30): opening it requests one chunk per icon it shows — up to
+  121, ~350 B gz each — and nobody measured that on a slow network. If it proves slow, the picker imports the 121
+  icons statically (tree-shaken, ~30 KB raw by the 2026-09-26 estimate) and only the render by name keeps the lazy map.
 
 ## Expense Grouping: key by id, label by name (`lib/utils/expenseGrouping.ts`)
 - **Category names are NOT unique and never will be** — the product deliberately allows "Casa" as both a *Spese Fisse*
@@ -28,6 +100,15 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   fixed+variable+debt together and let transfers through.
 
 ## Expense Sign Convention and Type Changes
+- **A cash account's balance is stored to the cent, not only the movement** (2026-10-07): every movement was already
+  `roundToCents`, but `balance + movement` in binary floats left a residue that grew at each write and surfaced raw in
+  the asset form's «Saldo» («4033,050000000001» on the owner's account). Every writer of a cash account's `quantity`
+  rounds the RESULT — `lib/server/cashSettlement.ts`, `lib/server/assetTransactionUseCase.ts`, `assetService`'s
+  `updateCashAssetBalance` and `updateCashAssetBalancesAtomic`, `dividendIncomeService`'s credit, difference and
+  give-back; the list and the why in `lib/utils/cents.ts`. A new writer of a balance goes there too. A balance saved
+  noisy before that day is cleaned by its next movement. Pinned per writer, each case anchored on a raw sum that IS
+  noisy (`updateCashAssetBalancesAtomic`, `serverCashSettlement`, `dividendIncomeService`, `assetTransactionWriteTx`;
+  seen red together by taking the rounding out).
 - Income positive, expenses negative, net savings = `sum(income) + sum(expenses)`; crossing the boundary flips the sign.
 - **Classification is ALWAYS by `type`, never by the sign of `amount`** (`transfer` skipped, `income` income, everything
   else spending via `Math.abs`) — by sign, a refund counts as income. Fixtures must carry an explicit `type`.
@@ -168,6 +249,42 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   is present with `undefined`; the key absent means "not edited". **The dialog writes the role only when it showed it**
   (setting on), so a category saved with the setting off keeps its classification; a category moved to income or
   transfer sheds its roles.
+
+## The expense form reads the keys (`components/expenses/ExpenseDialog.tsx`)
+- **`ExpenseDialog` opens from the cache** (2026-09-29): its four reads — the categories, the assets (the cash
+  accounts and the repayable properties), the settings (the default accounts, the three feature flags, the family, the
+  fee category) and the cost centres — are `useExpenseCategories`, `useAssets`, `useSettings` and `useCostCenters` with
+  `enabled: open`, the keys every page shares; on Cashflow they are already in memory, so «Nuova spesa» waits for nothing.
+  Until then every opening ran four reads of its own. A category created from the form reaches every reader through
+  the invalidation `loadCategories` now is; the default account of a NEW row is set by an effect declared AFTER the
+  form-reset effect, so the reset clears the field first in the commit that opens the dialog (the order the old async
+  loader had by accident). The form's reset rules are unchanged (AGENTS.md § Dialog Form Reset).
+- **The other category readers go through the key too**: `CategoryDeleteConfirmDialog`, `CategoryMoveDialog`,
+  `CategoryManagementDialog` and the CSV import read once after a write with
+  `queryClient.fetchQuery(categoriesQueryOptions(ownerId))` — the import's commit with `staleTime: 0`, because the
+  preview may be stale.
+- **A form body handed `form` subscribes to the errors itself: `useFormState({ control })`** (2026-10-05, the React
+  Compiler). `FormBody` (here) and `CategoryFormBody` (`CategoryManagementDialog`) receive the `useForm` object, which
+  is the same object on every render; with the compiler on, the parent hands them unchanged props, React skips them,
+  and an error read off `form.formState.errors` never showed under its field («L'importo è obbligatorio», «Scegli il
+  conto di origine»: `e2e/cashflow.{tracciamento,accounts}.spec.ts` went red until the subscription moved into the
+  body). Any new child that reads `formState` from a `form` prop does the same.
+
+## The tabs load their code on demand (`app/dashboard/cashflow/page.tsx`)
+- **Dividendi, Budget, Divisione and Centri di Costo are `lazyComponent`s** (2026-10-05): only Tracciamento's
+  code is in Cashflow's initial JavaScript. With the React Compiler on, the five tabs as static imports took the page
+  from 736 to 832 KB gz and its first figure from 616 to 730 ms cold on the mirror; lazy, 717 KB and the same 593 ms as
+  without the compiler (A/B, 7 runs). Each tab is preloaded once Tracciamento's data is in (`usePreloadWhenIdle`, the
+  optional two only when their flag is on), so a click usually draws at once; until the chunk arrives the panel shows
+  the tab's OWN loading state, so nothing moves when the tab mounts: the cells of
+  `lib/constants/cashflowTabSkeletons.ts` for Budget and Centri di Costo, and for the two tabs that draw a control row
+  while they load the components of `components/cashflow/CashflowTabSkeletons.tsx` (2026-10-06) — Dividendi's IS its
+  loading state, Divisione's mirrors the rows of its LIVE period picker (the tab keeps the picker mounted while it
+  reads, so the fallback can only copy its size: change `periodRows` or `PeriodPicker`'s height, change it too).
+  Until that day the two fallbacks were cells alone and a deep link jumped 52 px (Dividendi at 390), 56 (Divisione at
+  390) and 4 (Divisione at 1440); `e2e/lazyTabLanding.ts` holds the geometry. A value imported from a tab module into
+  the page puts it back in the initial graph — types only. A deep link (`?tab=dividends`) pays one chunk request
+  before the tab's own reads.
 
 ## Per-page blind spots
 

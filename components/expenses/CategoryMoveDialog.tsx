@@ -52,7 +52,8 @@ import {
 } from '@/components/ui/select';
 import { Plus, Check } from 'lucide-react';
 import { CategoryManagementDialog } from './CategoryManagementDialog';
-import { getAllCategories } from '@/lib/services/expenseCategoryService';
+import { useQueryClient } from '@tanstack/react-query';
+import { categoriesQueryOptions } from '@/lib/hooks/useExpenses';
 import { crossesTransferBoundary } from '@/lib/utils/expenseTypeTransition';
 import { cn } from '@/lib/utils';
 
@@ -79,6 +80,7 @@ export function CategoryMoveDialog({
 }: CategoryMoveDialogProps) {
   const { user } = useAuth();
   const { ownerId } = useActiveAccount();
+  const queryClient = useQueryClient();
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [selectedSubCategoryId, setSelectedSubCategoryId] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -204,7 +206,8 @@ export function CategoryMoveDialog({
    */
   const handleCategoryCreated = async () => {
     if (user && ownerId) {
-      const updatedCategories = await getAllCategories(ownerId);
+      // Through the key every reader shares (the create invalidated it): the new one is in the list.
+      const updatedCategories = await queryClient.fetchQuery(categoriesQueryOptions(ownerId));
       setLocalOverride({ base: allCategories, categories: updatedCategories });
 
       // Auto-select newest category
@@ -221,15 +224,17 @@ export function CategoryMoveDialog({
   const handleConfirm = async () => {
     if (!selectedCategoryId) return;
 
+    // Read before the try, and the reset after the catch rather than in a finally: the React
+    // Compiler does not compile a logical expression inside a try/catch, nor a try/finally.
+    const subCategoryId = selectedSubCategoryId || undefined;
     setIsSubmitting(true);
     try {
-      await onConfirm(selectedCategoryId, selectedSubCategoryId || undefined);
+      await onConfirm(selectedCategoryId, subCategoryId);
       onClose();
     } catch (error) {
       console.error('Error during move:', error);
-    } finally {
-      setIsSubmitting(false);
     }
+    setIsSubmitting(false);
   };
 
   const sourceLabel = sourceSubCategory

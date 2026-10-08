@@ -8,6 +8,7 @@ import {
 } from '@/types/goals';
 import { calculateAssetValue } from './assetService';
 import { serializeGoalForFirestore } from '@/lib/utils/goalMath';
+import { invalidateDashboardOverviewSummary } from './dashboardOverviewInvalidation';
 
 // Goal-Based Investing Service
 //
@@ -69,6 +70,8 @@ export async function saveGoalData(
       userId,
       updatedAt: new Date(),
     });
+    // The Panoramica's Obiettivo tile reads this document.
+    await invalidateDashboardOverviewSummary(userId, 'goal_data_saved');
   } catch (error) {
     console.error('Error saving goal data:', error);
     throw error;

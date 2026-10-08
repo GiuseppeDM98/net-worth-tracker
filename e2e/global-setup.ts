@@ -90,4 +90,12 @@ export default async function globalSetup(): Promise<void> {
   if (hofSeed.status !== 0) {
     throw new Error('The Hall of Fame E2E fixture failed to seed — see the output above.');
   }
+
+  // The Esposizione's Yahoo profiles, re-stamped fresh: the route asks Yahoo for any ticker whose
+  // cached answer has aged out (24 h for an empty one), and Yahoo is called by the SERVER, out of
+  // reach of `page.route` — the seed is what keeps the Allocazione specs off the network.
+  const profilesSeed = spawnSync('npm', ['run', 'e2e:seed:profiles'], { stdio: 'inherit', shell: true });
+  if (profilesSeed.status !== 0) {
+    throw new Error('The instrument-profile fixture failed to seed — see the output above.');
+  }
 }

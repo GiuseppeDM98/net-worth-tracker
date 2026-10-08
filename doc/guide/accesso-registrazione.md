@@ -6,7 +6,8 @@
 
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
-- **Accesso e Registrazione**: `app/{login`app/{login,register}/page.tsx`, `components/auth/*`, pure `lib/utils/authNarrative.ts`, `lib/server/registrationPolicy.ts` + `app/api/auth/check-registration/route.ts`, `contexts/AuthContext.tsx`, `components/ProtectedRoute.tsx`
+- **Accesso e Registrazione**: `app/{login,register}/page.tsx`, `components/auth/*`, pure `lib/utils/authNarrative.ts` and `lib/utils/authProfile.ts` (`resolveDisplayName`), `lib/server/registrationPolicy.ts` + `app/api/auth/check-registration/route.ts`, `contexts/AuthContext.tsx`, `components/ProtectedRoute.tsx`; tests `__tests__/{authNarrative,registrationPolicy,authProfile}.test.ts`
+- **Suites to run after a change here — Accesso / Registrazione** (moved from `AGENTS.md` § Commands on 2026-09-30): **Verdetti, letture ed errori** `authNarrative` · **Policy** `registrationPolicy` (i due devono restare d'accordo sulla precedenza whitelist/flag)
 
 ## Accesso e Registrazione (`app/login/page.tsx`, `app/register/page.tsx`, `components/auth/*`, `lib/utils/authNarrative.ts`)
 
@@ -29,6 +30,14 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   Firebase throws «Firebase: Error (auth/invalid-credential).» — English, provider-named, code in parentheses: a log
   line, not a sentence. 14 codes are mapped; anything else takes a sentence that claims nothing about the cause
   (Narrative Honesty applied to an error). Adding a case is a line in `AUTH_ERROR_TEXT` plus its test.
+- **`AuthContext` unblocks on what Auth knows, and reads Firestore AFTER** (2026-09-28). The
+  `onAuthStateChanged` callback sets `user` and `loading` together with nothing awaited — React batches them into
+  ONE commit, which the benchmark's auth marker and the six setups count on. The `displayName` fallback for
+  email/password users (`completeDisplayName` → `resolveDisplayName`, `lib/utils/authProfile.ts`) runs after: it
+  patches `user` only while the same uid is still signed in, and copies the name into the Auth profile once
+  (`updateProfile`, best effort, never for `NEXT_PUBLIC_DEMO_USER_ID`), so the next sign-in needs no read. Every
+  surface reading `user.displayName` must accept it arriving a frame later — the Panoramica greeting's `useMemo`
+  already depends on it. Before this the read stood in front of every page, sidebar included.
 - **A code must survive the context layer.** `AuthContext` used to rethrow `new Error(error.message)`, which DROPS
   `code` and leaves the page nothing to map. Use `withCode(message, code)` and, in a catch, rethrow an `Error` as is.
   The 403 of `/api/auth/check-registration` carries `code: 'registration/not-allowed'` for the same reason: the words
@@ -54,4 +63,4 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 ## Per-page blind spots
 
-- **Accesso e Registrazione**: no Playwright spec (the session's throwaway ones were deleted); `ProtectedRoute` keeps its pre-redesign spinner, the last piece of old chrome on the sign-in path. The submit button stays ENABLED with the password rules unmet, as before the redesign — the refusal is the reading line, not a dead control. That reading lives in a **polite** `role="status"` even on failure: a node that switched to `role="alert"` would change identity in the accessibility tree and some screen readers announce nothing across the swap. On success the form stays frozen until the redirect (it used to re-enable). The outcome toasts are gone from both pages: the tile says the state. `describeAuthError` covers 14 codes and anything else takes the generic sentence, so a NEW Firebase cause is invisible until it is added. The whitelist stays a DEROGATION from `REGISTRATIONS_ENABLED=false` (SETUP.md → Step 5b depends on it): `resolveRegistrationAccess` mirrors that, it does not correct it.
+- **Accesso e Registrazione**: no Playwright spec of the two pages themselves (the session's throwaway ones were deleted; `e2e/shell.boot*.spec.ts` cover the redirect of `/dashboard` without a session). `ProtectedRoute` has no spinner since 2026-09-28: it shows the layout's tile-grid skeleton while Auth resolves and keeps it through the redirect, so a signed-out reader sees one frame of empty dashboard chrome before `/login` — accepted (doc/guide/stati.md). The submit button stays ENABLED with the password rules unmet, as before the redesign — the refusal is the reading line, not a dead control. That reading lives in a **polite** `role="status"` even on failure: a node that switched to `role="alert"` would change identity in the accessibility tree and some screen readers announce nothing across the swap. On success the form stays frozen until the redirect (it used to re-enable). The outcome toasts are gone from both pages: the tile says the state. `describeAuthError` covers 14 codes and anything else takes the generic sentence, so a NEW Firebase cause is invisible until it is added. The whitelist stays a DEROGATION from `REGISTRATIONS_ENABLED=false` (SETUP.md → Step 5b depends on it): `resolveRegistrationAccess` mirrors that, it does not correct it.

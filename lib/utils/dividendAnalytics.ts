@@ -21,7 +21,7 @@
 
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
-import { Dividend, DividendStatsPayload, DividendType } from '@/types/dividend';
+import { Dividend, DividendStats, DividendStatsPayload, DividendType } from '@/types/dividend';
 import { toDate, getItalyMonth, getItalyYear } from '@/lib/utils/dateHelpers';
 
 // The period axis driving every figure on the tab. Mirrors the Cost Centers axis;
@@ -864,4 +864,117 @@ export function sliceForList(
 ): Dividend[] {
   const bounds = resolvePeriodBounds(period, now);
   return dividends.filter((d) => isInPeriodWindow(toDate(d.paymentDate), bounds));
+}
+
+// ==================== The stats route's sums (`/api/dividends/stats`) ====================
+//
+// The route reads the dividend collection ONCE and derives its period, all-time and upcoming
+// figures here (since 2026-10-05). Until then each of the three was its own Firestore query —
+// a date range, the whole collection, a `paymentDate >= now` — and each built «today» from the
+// server's own clock. These keep the exact semantics of those queries, so the route's answer did
+// not move by a cent: the fixture answer captured before the change is pinned by
+// `__tests__/dividendStatsRoute.test.ts`.
+
+/**
+ * The end of «today» as the stats route has always drawn it: `now` with the clock set to
+ * 23:59:59.999 in the PROCESS timezone (UTC on Vercel). A payment dated any time today counts as
+ * received, so a `…T00:00:00Z` dividend never reads as future (doc/guide/cashflow-dividendi.md).
+ */
+export function endOfServerDay(now: Date): Date {
+  const end = new Date(now);
+  end.setHours(23, 59, 59, 999);
+  return end;
+}
+
+/** One scope of the route's received totals: an optional payment-date range and instrument. */
+export interface DividendStatsScope {
+  /** Inclusive; with no `endDate` the range is open above. */
+  startDate?: Date;
+  /** Inclusive; with no `startDate` the range is open below. */
+  endDate?: Date;
+  assetId?: string;
+  now: Date;
+}
+
+function emptyTotals() {
+  return { totalGross: 0, totalTax: 0, totalNet: 0, count: 0 };
+}
+
+/**
+ * The RECEIVED totals of one scope — overall, per instrument, per type. A payment dated after the
+ * end of today is announced money and is never in these sums: received and announced are never
+ * one figure (doc/guide/cashflow-dividendi.md); the announced half is `selectUpcomingDividends`.
+ *
+ * The amounts are the NATIVE `grossAmount`/`taxAmount`/`netAmount`, not the `*Eur` fields the tab's
+ * own figures read through `netEur`: that is the route's contract from before the redesign, and
+ * reading the collection once moved where the sum happens, not what it sums. Iterating in the
+ * input's order keeps the floating-point sums identical to the old per-query ones (the route hands
+ * the list newest first, as both old queries did).
+ *
+ * WARNING: a new `DividendType` needs its `byType` entry below (types/dividend.ts checklist).
+ */
+export function summarizeDividendStats(dividends: Dividend[], scope: DividendStatsScope): DividendStats {
+  const { startDate, endDate, assetId, now } = scope;
+  const endOfToday = endOfServerDay(now);
+
+  const received = dividends.filter((dividend) => {
+    const paymentDate = toDate(dividend.paymentDate);
+    if (startDate && paymentDate < startDate) return false;
+    if (endDate && paymentDate > endDate) return false;
+    if (assetId && dividend.assetId !== assetId) return false;
+    return paymentDate <= endOfToday;
+  });
+
+  const stats: DividendStats = {
+    ...emptyTotals(),
+    count: received.length,
+    byAsset: {},
+    byType: {
+      ordinary: emptyTotals(),
+      extraordinary: emptyTotals(),
+      interim: emptyTotals(),
+      final: emptyTotals(),
+      coupon: emptyTotals(),
+      finalPremium: emptyTotals(),
+    },
+  };
+
+  for (const dividend of received) {
+    stats.totalGross += dividend.grossAmount;
+    stats.totalTax += dividend.taxAmount;
+    stats.totalNet += dividend.netAmount;
+
+    const asset = (stats.byAsset[dividend.assetId] ??= {
+      assetTicker: dividend.assetTicker,
+      assetName: dividend.assetName,
+      ...emptyTotals(),
+    });
+    asset.totalGross += dividend.grossAmount;
+    asset.totalTax += dividend.taxAmount;
+    asset.totalNet += dividend.netAmount;
+    asset.count += 1;
+
+    const type = stats.byType[dividend.dividendType];
+    type.totalGross += dividend.grossAmount;
+    type.totalTax += dividend.taxAmount;
+    type.totalNet += dividend.netAmount;
+    type.count += 1;
+  }
+
+  return stats;
+}
+
+/**
+ * The announced payments: a payment INSTANT at or after `now` (not the end of today — a payment
+ * dated today at midnight is received and not upcoming), nearest first, a tie broken by document
+ * id ascending, which is the order Firestore's `paymentDate >= now` query returned them in.
+ */
+export function selectUpcomingDividends(dividends: Dividend[], now: Date): Dividend[] {
+  return dividends
+    .filter((dividend) => toDate(dividend.paymentDate).getTime() >= now.getTime())
+    .sort((a, b) => {
+      const byDate = toDate(a.paymentDate).getTime() - toDate(b.paymentDate).getTime();
+      if (byDate !== 0) return byDate;
+      return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+    });
 }

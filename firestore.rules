@@ -214,11 +214,13 @@ service cloud.firestore {
       allow delete: if canAccess(userId);
     }
 
-    // Collezione exposure-cache - cache esposizione portafoglio (ETF holdings, settori, emittenti)
-    // Document ID == ownerUid; Admin SDK write only (client cannot write directly).
-    match /exposure-cache/{userId} {
-      allow read: if canAccess(userId);
-      allow write: if false;
+    // Collezione instrument-profile-cache - le risposte di Yahoo per ticker (holdings, settori,
+    // famiglia di un fondo; settore e nome di un'azione), condivise fra tutti gli account.
+    // Document ID == encodeURIComponent(ticker); nessun campo userId. Letta e scritta SOLO
+    // dall'Admin SDK: il client riceve i profili da /api/portfolio/instrument-profiles. Il
+    // default nega comunque; il blocco lo documenta (doc/guide/allocazione.md § Esposizione).
+    match /instrument-profile-cache/{tickerId} {
+      allow read, write: if false;
     }
 
     // Collezione benchmark-cache - rendimenti storici dei portafogli modello (dato globale)

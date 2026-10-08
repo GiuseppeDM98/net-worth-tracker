@@ -47,7 +47,8 @@ export default function DashboardTemplate({
       variants={pageVariants}
       // Belt-and-suspenders: CSS opacity:0 + translateY covers the single frame
       // before Framer Motion's useLayoutEffect runs on very slow JS threads.
-      // Omitted when reduced motion is preferred — MotionConfig in layout.tsx already
+      // Omitted when reduced motion is preferred — the root MotionProvider's
+      // `MotionConfig reducedMotion="user"` (the ONE in the app since 2026-09-29) already
       // skips durations, so this inline style would cause a one-frame invisible flash
       // without any animation payoff for reduced-motion users.
       // Values must match pageVariants.hidden exactly when applied.

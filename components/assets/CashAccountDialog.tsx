@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, type RefObject } from 'react';
 import { Pencil, Trash2, Wallet } from 'lucide-react';
 import { Timestamp } from 'firebase/firestore';
 import type { Asset } from '@/types/assets';
@@ -20,12 +20,16 @@ function formatAssetDate(ts: Date | Timestamp | null | undefined): string {
 }
 
 interface CashAccountDialogProps {
-  asset: Asset | null;
+  asset: Asset;
   open: boolean;
   onClose: () => void;
   onEdit: (asset: Asset) => void;
   onDelete: (assetId: string) => void;
   isDemo: boolean;
+  /** The Liquidità row that opened the detail: the focus goes back to it on close. */
+  returnFocusTo?: RefObject<HTMLElement | null>;
+  /** The exit animation is over: the page unmounts the detail here. */
+  onExitComplete?: () => void;
 }
 
 /**
@@ -38,13 +42,21 @@ interface CashAccountDialogProps {
  * button stays a compact «Premi di nuovo» (DESIGN.md → The Status-Is-The-Reading Rule). Until
  * 2026-09-14 the armed state lived in the page on a 3 s timer: Escape closed the modal with the
  * row still armed, and the reading kept describing how the balance moves.
+ *
+ * The page mounts it only from the opening to the end of the exit animation (since 2026-10-07):
+ * until then it unmounted the moment the account was cleared, so it vanished without its exit and
+ * the focus fell on `body`.
  */
-export function CashAccountDialog({ asset, open, onClose, onEdit, onDelete, isDemo }: CashAccountDialogProps) {
-  if (!asset) return null;
-  return <CashAccountDetail asset={asset} open={open} onClose={onClose} onEdit={onEdit} onDelete={onDelete} isDemo={isDemo} />;
-}
-
-function CashAccountDetail({ asset, open, onClose, onEdit, onDelete, isDemo }: CashAccountDialogProps & { asset: Asset }) {
+export function CashAccountDialog({
+  asset,
+  open,
+  onClose,
+  onEdit,
+  onDelete,
+  isDemo,
+  returnFocusTo,
+  onExitComplete,
+}: CashAccountDialogProps) {
   const value = calculateAssetValue(asset);
   const deleteRef = useRef<HTMLButtonElement | null>(null);
   const { armed, onClick, onBlur } = useArmedDelete(deleteRef, () => onDelete(asset.id));
@@ -54,6 +66,8 @@ function CashAccountDetail({ asset, open, onClose, onEdit, onDelete, isDemo }: C
     <ResponsiveModal
       open={open}
       onClose={onClose}
+      returnFocusTo={returnFocusTo}
+      onExitComplete={onExitComplete}
       eyebrow="Patrimonio · Liquidità"
       title={asset.name}
       reading={reading}

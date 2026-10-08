@@ -29,7 +29,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
+import { useCostCenters } from '@/lib/hooks/useCostCenters';
+import { useExpenses } from '@/lib/hooks/useExpenses';
 import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -39,7 +41,8 @@ import { useChartColors } from '@/lib/hooks/useChartColors';
 import { queryKeys } from '@/lib/query/queryKeys';
 import type { CostCenter } from '@/types/costCenters';
 import type { Expense } from '@/types/expenses';
-import { getCostCenters, getExpensesForCostCenter, deleteCostCenter, setCostCenterArchived } from '@/lib/services/costCenterService';
+import { deleteCostCenter, setCostCenterArchived } from '@/lib/services/costCenterService';
+import { groupExpensesByCostCenter } from '@/lib/utils/costCenterUtils';
 import { buildCenterMonthStack, summarizeCostCenters } from '@/lib/utils/costCenterSummary';
 import {
   CENTRI_ASIDE,
@@ -62,7 +65,7 @@ import { Button } from '@/components/ui/button';
 import { PageVerdict } from '@/components/ui/page-verdict';
 import { TILE_CELL_CLASS } from '@/components/ui/tile';
 import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
-import type { TileSkeletonCell } from '@/lib/utils/tileGridSkeleton';
+import { COST_CENTERS_SKELETON_CELLS } from '@/lib/constants/cashflowTabSkeletons';
 import { CostCenterDialog } from './CostCenterDialog';
 import { CostCenterDetail } from './CostCenterDetail';
 import { ErrorNotice } from '@/components/ui/error-notice';
@@ -79,17 +82,8 @@ const TRAILING_MONTHS = 12;
 /** The URL parameter that holds the open center's id. */
 const CENTER_PARAM = 'center';
 
-/** The page's own grid, so the loading state has the proportions of what replaces it. */
-const SKELETON_CELLS: TileSkeletonCell[] = [
-  { span: 5, rows: 2, lines: 8 },
-  { span: 7, lines: 6 },
-  { span: 7, lines: 3 },
-];
-
-interface CenterRows {
-  spending: Expense[];
-  linkedCount: number;
-}
+const EMPTY_CENTERS: CostCenter[] = [];
+const EMPTY_EXPENSES: Expense[] = [];
 
 export function CostCentersTab() {
   const { user } = useAuth();
@@ -98,27 +92,26 @@ export function CostCentersTab() {
   const queryClient = useQueryClient();
   const chartColors = useChartColors();
 
-  // Reads the OWNER's data, not the viewer's: on a shared account they differ.
-  const { data, isLoading: loading, isError } = useQuery({
-    queryKey: queryKeys.costCenters.all(ownerId ?? ''),
-    enabled: !!user && !!ownerId,
-    queryFn: async () => {
-      const userId = ownerId!;
-      const centers = await getCostCenters(userId);
-      const entries = await Promise.all(
-        centers.map(async (center) => {
-          const expenses = await getExpensesForCostCenter(userId, center.id);
-          return [center.id, { spending: expenses.filter((e) => e.amount < 0), linkedCount: expenses.length }] as [string, CenterRows];
-        }),
-      );
-      return { centers, byCenter: Object.fromEntries(entries) as Record<string, CenterRows> };
-    },
-  });
+  // Reads the OWNER's data, not the viewer's: on a shared account they differ. Two keys
+  // (2026-09-29): the centers, and the rows grouped in memory from the account's WHOLE expense
+  // list — one query per center (N+1) until then. Whole by declared need: a center is lifetime (no
+  // period axis), so unlike the other Cashflow tabs this one has no window to read
+  // (lib/utils/expenseWindows.ts). The tab gates on both.
+  const { data: centersData, isLoading: centersLoading, isError: centersError } = useCostCenters(ownerId);
+  const { data: allExpenses, isLoading: expensesLoading, isError: expensesError } = useExpenses(ownerId);
+  const loading = centersLoading || expensesLoading;
+  const isError = centersError || expensesError;
 
-  const centers = useMemo(() => data?.centers ?? [], [data]);
-  const byCenter = useMemo(() => data?.byCenter ?? {}, [data]);
+  const centers = useMemo(() => centersData ?? EMPTY_CENTERS, [centersData]);
+  const byCenter = useMemo(() => groupExpensesByCostCenter(allExpenses ?? EMPTY_EXPENSES, centers), [allExpenses, centers]);
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: queryKeys.costCenters.all(ownerId ?? '') });
+  // A delete unlinks the centre's rows and a rename rewrites the name they carry (`costCenterName`
+  // is denormalised on the row): both are writes of EXPENSES, so every reader of them rereads too —
+  // the prefix reaches this tab's list and each window another page holds. Until 2026-09-30 only
+  // the centres were invalidated, and Tracciamento kept the chip of a centre that was gone.
+  const invalidateWithRows = () =>
+    Promise.all([invalidate(), queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all(ownerId ?? '') })]);
 
   // --- The open center is the URL's, never local state (see the header) ---
   const router = useRouter();
@@ -194,24 +187,25 @@ export function CostCentersTab() {
 
   // The detail reads its center from `centers`, so a saved edit reaches it with the refetch.
   const handleDialogSuccess = () => {
-    invalidate();
+    void invalidateWithRows();
   };
 
   const handleDelete = async (center: CostCenter) => {
     if (!user || !ownerId) return;
     const unlinkedCount = byCenter[center.id]?.linkedCount ?? 0;
+    // The cascade is the part the user cannot see: name the outcome and the reassurance —
+    // the expenses survive, they only lose the tag. Composed before the try: the React Compiler
+    // refuses a conditional expression inside a try/catch.
+    const deletedMessage =
+      unlinkedCount > 0
+        ? `"${center.name}" eliminato · ${unlinkedCount} ${unlinkedCount === 1 ? 'spesa scollegata resta' : 'spese scollegate restano'} in Cashflow`
+        : `"${center.name}" eliminato`;
     try {
       await deleteCostCenter(ownerId, center.id);
-      // The cascade is the part the user cannot see: name the outcome and the reassurance —
-      // the expenses survive, they only lose the tag.
-      toast.success(
-        unlinkedCount > 0
-          ? `"${center.name}" eliminato · ${unlinkedCount} ${unlinkedCount === 1 ? 'spesa scollegata resta' : 'spese scollegate restano'} in Cashflow`
-          : `"${center.name}" eliminato`,
-      );
+      toast.success(deletedMessage);
       // replace, not push: Back must not land on the detail of a center that no longer exists.
       router.replace(`${pathname}?tab=cost-centers`, { scroll: false });
-      invalidate();
+      void invalidateWithRows();
     } catch (error) {
       console.error('Error deleting cost center:', error);
       // What did NOT happen first (the user's doubt after a failed delete), then the cause.
@@ -221,9 +215,10 @@ export function CostCentersTab() {
 
   const handleArchiveToggle = async (center: CostCenter) => {
     const archiving = !center.archivedAt;
+    const doneMessage = archiving ? `"${center.name}" archiviato` : `"${center.name}" ripristinato`;
     try {
       await setCostCenterArchived(center.id, archiving);
-      toast.success(archiving ? `"${center.name}" archiviato` : `"${center.name}" ripristinato`);
+      toast.success(doneMessage);
       invalidate();
     } catch (error) {
       console.error('Error archiving cost center:', error);
@@ -240,7 +235,7 @@ export function CostCentersTab() {
         <CostCenterDetail
           costCenter={selectedCenter}
           linkedExpenseCount={byCenter[selectedCenter.id]?.linkedCount ?? 0}
-          initialExpenses={byCenter[selectedCenter.id]?.spending}
+          expenses={byCenter[selectedCenter.id]?.spending ?? EMPTY_EXPENSES}
           onBack={backToList}
           onEdit={openEdit}
           onDelete={handleDelete}
@@ -253,7 +248,7 @@ export function CostCentersTab() {
   }
 
   if (loading) {
-    return <TileGridSkeleton cells={SKELETON_CELLS} className="pt-1" />;
+    return <TileGridSkeleton cells={COST_CENTERS_SKELETON_CELLS} className="pt-1" />;
   }
 
   // --- List view ---

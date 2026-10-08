@@ -109,11 +109,28 @@ export interface ResponsiveModalProps {
    * 2026-09-20, opener still connected and focused at open. The cause is Radix's own: a MODAL
    * `Dialog.Content` answers `onCloseAutoFocus` with `preventDefault()` + `triggerRef.focus()`,
    * which cancels the focus scope's restore-to-previous and, in a controlled dialog with no
-   * `Dialog.Trigger`, focuses nothing (react-dialog 1.1.15; vaul wraps the same content). So
-   * every modal opened from state needs its opener named here. A caller that knows its trigger
-   * passes it — a ref the page writes at the click works where Safari never focused the button.
+   * `Dialog.Trigger`, focuses nothing (react-dialog 1.1.15; vaul wraps the same content).
+   *
+   * Since 2026-10-08 the modal keeps its own fallback: the element focused when `open` turned
+   * true, restored on close when this prop is absent — which is every keyboard opener and every
+   * Chrome click on a button. This prop still wins, and is still the only cure where the opener
+   * never held the focus: Safari does not focus a clicked button, and a row opened from a
+   * window event or a non-focusable cell leaves `body` focused at open.
    */
   returnFocusTo?: React.RefObject<HTMLElement | null>;
+  /**
+   * Called once the closing animation has finished and the content has left the DOM — the moment
+   * a caller that mounts the modal only while it is needed may unmount it (Patrimonio's
+   * `AssetDialog` and `CashAccountDialog`). Unmounting at `onClose` instead would cut the
+   * exit animation and skip the focus restore, which happens here, on the same event.
+   *
+   * The event is Radix's `onCloseAutoFocus`: the `FocusScope` dispatches it in a `setTimeout(0)`
+   * after `Presence` unmounted the content, and `Presence` waits for the exit animation — the
+   * dialog's `zoom-out`, and vaul's `slideToBottom` keyframes on a drawer alike. A reopen during
+   * the exit keeps the content mounted, so the event does not fire: a caller still guards on its
+   * own `open`, since a timer queued before a reopen can land after it.
+   */
+  onExitComplete?: () => void;
 }
 
 /**
@@ -138,14 +155,33 @@ export function ResponsiveModal({
   triggerOrigin,
   dialogClassName,
   returnFocusTo,
+  onExitComplete,
 }: Readonly<ResponsiveModalProps>) {
   const isMobile = useMediaQuery('(max-width: 768px)');
 
-  const restoreFocus = (event: Event) => {
-    const target = returnFocusTo?.current;
-    if (!target) return;
-    event.preventDefault();
-    target.focus();
+  // The element focused when the modal opened, the fallback for `returnFocusTo`. A LAYOUT
+  // effect on purpose: the parent's layout effects run before any child's passive effect, and
+  // Radix's FocusScope moves the focus into the content from a passive effect — a `useEffect`
+  // here would read the dialog's own first field. `body` is not an opener: leaving it null
+  // keeps Radix's default, which is what happened before this fallback existed.
+  const openerRef = React.useRef<HTMLElement | null>(null);
+  React.useLayoutEffect(() => {
+    if (!open) return;
+    const active = document.activeElement;
+    openerRef.current = active instanceof HTMLElement && active !== document.body ? active : null;
+  }, [open]);
+
+  // The content has just left the DOM: hand the focus back, then let the caller unmount. An
+  // opener that has since unmounted (a row deleted from inside its own modal) is skipped, and
+  // the focus follows Radix's default rather than a detached node.
+  const handleCloseAutoFocus = (event: Event) => {
+    const target = returnFocusTo?.current ?? openerRef.current;
+    openerRef.current = null;
+    if (target?.isConnected) {
+      event.preventDefault();
+      target.focus();
+    }
+    onExitComplete?.();
   };
 
   const resolvedReading: ModalReading | null =
@@ -162,7 +198,7 @@ export function ResponsiveModal({
       // when the keyboard opens and doesn't fully restore when it closes,
       // leaving the footer buttons stuck away from the bottom edge.
       <Drawer open={open} onOpenChange={(v) => !v && onClose()} noBodyStyles repositionInputs={false}>
-        <DrawerContent onEscapeKeyDown={refuseEscapeWhileArmed} onCloseAutoFocus={restoreFocus}>
+        <DrawerContent onEscapeKeyDown={refuseEscapeWhileArmed} onCloseAutoFocus={handleCloseAutoFocus}>
           <DrawerHeader className="border-b px-4 pb-3 pt-2 text-left">
             {eyebrow && <p className={TILE_EYEBROW_CLASS}>{eyebrow}</p>}
             <DrawerTitle className="text-[20px] font-semibold leading-[1.25] tracking-[-0.01em]">
@@ -197,7 +233,7 @@ export function ResponsiveModal({
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent
         onEscapeKeyDown={refuseEscapeWhileArmed}
-        onCloseAutoFocus={restoreFocus}
+        onCloseAutoFocus={handleCloseAutoFocus}
         className={cn(
           'flex max-h-[90vh] w-full flex-col overflow-hidden p-0',
           WIDTH_CLASS[width],

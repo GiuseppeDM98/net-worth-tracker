@@ -66,9 +66,9 @@ export function CategorieTile({ eyebrow, kind, slices, total, reading, activeKey
               const slice = bySliceKey.get(row.key);
               if (slice) onSelect(slice);
             }}
-            remainder={
+            remainders={
               hidden.length > 0
-                ? { label: hiddenLabel, amount: hiddenAmount, percentage: total > 0 ? (hiddenAmount / total) * 100 : 0 }
+                ? [{ label: hiddenLabel, amount: hiddenAmount, percentage: total > 0 ? (hiddenAmount / total) * 100 : 0 }]
                 : null
             }
           />

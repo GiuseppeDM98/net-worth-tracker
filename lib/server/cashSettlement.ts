@@ -21,6 +21,7 @@
 import { FieldValue, type DocumentReference } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
 import { toDate } from '@/lib/utils/dateHelpers';
+import { roundToCents } from '@/lib/utils/cents';
 import { balanceEffectsOf, netBalanceEffects, repaysDebt, settlesLater, type SettlementRow } from '@/lib/utils/cashSettlement';
 import { planDebtRepayments, type DebtRow, type PropertyDebt } from '@/lib/utils/mortgageRepayment';
 import { invalidateDashboardOverviewSummaryServer } from '@/lib/services/dashboardOverviewInvalidation.server';
@@ -75,7 +76,7 @@ async function settleChunk(userId: string, refs: DocumentReference[], now: Date)
         console.warn('[cashSettlement] Skipping an account that is missing or not the user\'s', { userId, assetId: effect.assetId });
         return;
       }
-      tx.update(assetRefs[index], { quantity: (asset.data()!.quantity as number) + effect.delta, updatedAt: new Date() });
+      tx.update(assetRefs[index], { quantity: roundToCents((asset.data()!.quantity as number) + effect.delta), updatedAt: new Date() });
     });
 
     // A property missing or someone else's is left out of `debts`: its rows repay 0 and settle.

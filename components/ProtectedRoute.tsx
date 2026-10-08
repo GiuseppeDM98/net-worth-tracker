@@ -1,54 +1,51 @@
 /**
- * Authentication guard for protected dashboard routes
+ * Authentication gate for the dashboard PAGES — not for the shell around them.
  *
- * ARCHITECTURE:
- * Three-state render pattern for Firebase auth lifecycle:
- * 1. Loading - Show spinner (prevent flash of redirect)
- * 2. Not authenticated - Return null, redirect in useEffect
- * 3. Authenticated - Render children
+ * Since 2026-09-28 the dashboard layout renders the skip link, the sidebar, `<main>` and the bottom
+ * nav unconditionally, so they are in the prerendered HTML and on screen before Firebase Auth has
+ * resolved; this component sits INSIDE `<main>` and gates only the page. Three states:
+ * 1. Loading — render `fallback` (the layout passes the generic tile-grid skeleton: the wait is a
+ *    WAIT and takes the primitive every page uses, DESIGN.md → The Absence-Has-Three-Names Rule).
+ *    On the server `loading` is always true, so the fallback is what the HTML carries. The same
+ *    fallback also covers the restore of the persisted query cache (`useIsRestoring`).
+ * 2. Not authenticated — keep the fallback on screen and redirect in an effect: the beat between
+ *    the verdict and the navigation shows the same skeleton, not an empty `main`.
+ * 3. Authenticated — render the page.
  *
- * Race Condition Prevention:
- * - Checks !loading && !user before redirect
- * - Redirect in useEffect (not render) to avoid React errors
- * - Returns null during redirect to prevent flash of protected content
+ * Race condition prevention: the redirect checks `!loading && !user` (never before Auth has
+ * answered) and runs in `useEffect`, not during render.
  */
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
+import { useIsRestoring } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 
-export function ProtectedRoute({ children }: { children: React.ReactNode }) {
+interface ProtectedRouteProps {
+  children: ReactNode;
+  /** What stands in for the page while Auth resolves (and during the redirect to /login). */
+  fallback?: ReactNode;
+}
+
+export function ProtectedRoute({ children, fallback = null }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
+  // The persisted query cache is still being read from IndexedDB (a few ms after the
+  // shell): a page mounted before it lands would see every query `pending` and NOT fetching — so
+  // `isLoading` false and `data` undefined, which every page reads as «nothing recorded». The
+  // restore usually beats Firebase Auth, but nothing guarantees it; the gate holds the same
+  // fallback until both have answered. `false` when the persister is off (the context's default).
+  const isRestoring = useIsRestoring();
   const router = useRouter();
 
-  /**
-   * Redirect in useEffect to avoid "Cannot update component while rendering" error.
-   * The !loading check prevents premature redirect during Firebase auth state resolution.
-   *
-   * Why router in deps? Ensures effect re-runs if Next.js router instance changes,
-   * though unlikely in practice.
-   */
   useEffect(() => {
     if (!loading && !user) {
       router.push('/login');
     }
   }, [user, loading, router]);
 
-  // Show spinner with min-h-screen to prevent layout shift during auth check.
-  // Better UX than blank screen or flash of login page.
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-300 border-t-blue-600" />
-      </div>
-    );
-  }
-
-  // Return null instead of redirecting here to avoid rendering protected content
-  // during router.push() transition. Redirect handled in useEffect above.
-  if (!user) {
-    return null;
+  if (loading || isRestoring || !user) {
+    return <>{fallback}</>;
   }
 
   return <>{children}</>;

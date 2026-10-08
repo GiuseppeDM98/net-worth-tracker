@@ -150,9 +150,9 @@ export function InflationRateDialog({ open, coupon, asset, onClose, onSaved }: I
     } catch (error) {
       console.error('Error setting inflation datum:', error);
       toast.error("Errore nell'aggiornamento della cedola");
-    } finally {
-      setSaving(false);
     }
+    // After the catch, not in a finally: the React Compiler does not compile a try/finally.
+    setSaving(false);
   };
 
   return (

@@ -35,21 +35,22 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAssets } from '@/lib/hooks/useAssets';
+import { useExpensesInRange } from '@/lib/hooks/useExpenses';
+import { fireWindows } from '@/lib/utils/expenseWindows';
+import { useSettings } from '@/lib/hooks/useSettings';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { useCoastFireSettingsDraft } from '@/lib/hooks/useCoastFireSettingsDraft';
 import {
   calculateCoastFIREProjection,
-  getAnnualCashflowData,
-  getAnnualExpenses,
+  computeAnnualCashflowData,
+  computeLastYearExpenses,
   getDefaultScenarios,
   type PensionCapitalInflowToday,
 } from '@/lib/services/fireService';
-import { calculateAssetValue, calculateFIRENetWorth, calculateLiquidFIRENetWorth, filterFireEligibleAssets, getAllAssets } from '@/lib/services/assetService';
+import { calculateAssetValue, calculateFIRENetWorth, calculateLiquidFIRENetWorth, filterFireEligibleAssets } from '@/lib/services/assetService';
 import { resolvePortfolioTaxProfile } from '@/lib/utils/withdrawalTax';
-import { getSettings } from '@/lib/services/assetAllocationService';
 import { resolvePensionLockState, resolveRitaUnlockAge } from '@/lib/utils/pensionUnlock';
 import { summarizeLock } from '@/lib/utils/fireSummary';
 import { getItalyYear } from '@/lib/utils/dateHelpers';
@@ -83,8 +84,7 @@ import {
   summarizeCoastScenarios,
   summarizeCoastTarget,
 } from '@/lib/utils/coastFireView';
-import type { Settings } from '@/types/settings';
-import type { TileSkeletonCell } from '@/lib/utils/tileGridSkeleton';
+import { COAST_TAB_SKELETON_CELLS } from './tabSkeletons';
 import { cn } from '@/lib/utils';
 import { PageVerdict } from '@/components/ui/page-verdict';
 import { Tile, TILE_CELL_CLASS } from '@/components/ui/tile';
@@ -99,12 +99,8 @@ import { CoastIpotesi } from './coast/CoastIpotesi';
 import { CoastDettaglio } from './coast/CoastDettaglio';
 import { CoastFireProjectionChart } from './CoastFireProjectionChart';
 
-/** The grid's geometry, for the skeleton: the same spans as the tiles below. */
-const SKELETON_CELLS: TileSkeletonCell[] = [
-  { span: 5, rows: 2, lines: 12 },
-  { span: 7, lines: 5 },
-  { span: 7, lines: 4 },
-];
+/** The grid's geometry, for the skeleton: the same spans as the tiles below — shared with the page's lazy-tab wait. */
+const SKELETON_CELLS = COAST_TAB_SKELETON_CELLS;
 
 /** The three cells of the grid: one class per tile, shared by the data and the empty branches. */
 const GRID_CLASS = 'grid grid-cols-1 gap-3 tablet:grid-cols-2 desktop:grid-cols-12';
@@ -121,42 +117,29 @@ const EMPTY_ACTION_CLASS =
 const IPOTESI_OPEN_FOCUS_DELAY_MS = 60;
 
 export function CoastFireTab() {
-  const { user } = useAuth();
   const { ownerId } = useActiveAccount();
   const isDemo = useDemoMode();
   const [ipotesiOpen, setIpotesiOpen] = useState(false);
 
   // ─── Queries ─────────────────────────────────────────────────────────────────
-  const { data: settings, isLoading: isLoadingSettings, isError: settingsError } = useQuery<Settings | null>({
-    queryKey: ['settings', ownerId],
-    queryFn: () => getSettings(ownerId!),
-    enabled: !!user && !!ownerId,
-    staleTime: 300000,
-  });
+  // Settings and assets from the keys every page shares (2026-09-29).
+  const { data: settings, isLoading: isLoadingSettings, isError: settingsError } = useSettings(ownerId);
+  const { data: assets, isLoading: isLoadingAssets, isError: assetsError } = useAssets(ownerId);
 
-  const { data: assets, isLoading: isLoadingAssets, isError: assetsError } = useQuery({
-    queryKey: ['assets', ownerId],
-    queryFn: () => getAllAssets(ownerId!),
-    enabled: !!user && !!ownerId,
-    staleTime: 300000,
-  });
-
-  const { data: annualExpenses, isLoading: isLoadingAnnualExpenses, isError: expensesError } = useQuery({
-    queryKey: ['coastFireAnnualExpenses', ownerId],
-    queryFn: () => getAnnualExpenses(ownerId!),
-    enabled: !!user && !!ownerId,
-    staleTime: 300000,
-  });
+  // The last full year's expenses and the Calcolatore's savings, both computed in memory from
+  // the FIRE page's recent expenses window (January of last year → this December, `fireWindows`):
+  // the key the Calcolatore reads, so after it this tab reads nothing.
+  const readAt = useMemo(() => new Date(), []);
+  const recentWindow = useMemo(() => fireWindows(readAt, null).recent, [readAt]);
+  const { data: recentExpenses, isLoading: isLoadingAnnualExpenses, isError: expensesError } = useExpensesInRange(ownerId, recentWindow);
+  const annualExpenses = useMemo(() => (recentExpenses ? computeLastYearExpenses(recentExpenses, readAt) : undefined), [recentExpenses, readAt]);
 
   // The Calcolatore's savings — the SAME query key, so the two tabs read one figure — is the
   // pace the verdict names. It rejects on a failed read (never a zeroed payload), so the
   // failure reaches the notice below like the other three.
-  const { data: cashflowData, isLoading: isLoadingCashflow, isError: cashflowError } = useQuery({
-    queryKey: ['annualCashflowData', ownerId],
-    queryFn: () => getAnnualCashflowData(ownerId!),
-    enabled: !!user && !!ownerId,
-    staleTime: 300000,
-  });
+  const cashflowData = useMemo(() => (recentExpenses ? computeAnnualCashflowData(recentExpenses, readAt) : undefined), [recentExpenses, readAt]);
+  const isLoadingCashflow = isLoadingAnnualExpenses;
+  const cashflowError = expensesError;
 
   const draft = useCoastFireSettingsDraft({ settings, isLoadingSettings, ownerId });
 

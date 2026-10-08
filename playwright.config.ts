@@ -60,6 +60,9 @@ export const SPLIT_STORAGE_STATE = 'e2e/.auth/split.json';
  */
 export const HOF_STORAGE_STATE = 'e2e/.auth/hof.json';
 
+/** The `desktop:` width, where the sidebar — and the profile the setups wait for — is a fixed column. */
+const SETUP_VIEWPORT = { viewport: { width: 1440, height: 900 } };
+
 export default defineConfig({
   testDir: './e2e',
   globalSetup: './e2e/global-setup.ts',
@@ -77,12 +80,15 @@ export default defineConfig({
   },
 
   projects: [
-    { name: 'setup', testMatch: /auth\.setup\.ts/ },
-    { name: 'setup-degraded', testMatch: /auth\.degraded\.setup\.ts/ },
-    { name: 'setup-analisi', testMatch: /auth\.analisi\.setup\.ts/ },
-    { name: 'setup-centri', testMatch: /auth\.centri\.setup\.ts/ },
-    { name: 'setup-split', testMatch: /auth\.split\.setup\.ts/ },
-    { name: 'setup-hof', testMatch: /auth\.hof\.setup\.ts/ },
+    // The six setups run at 1440: since 2026-09-28 the shell (`navigation`, `main`) is in the HTML
+    // before anyone is signed in, so each setup anchors on the profile in the sidebar footer — the
+    // one thing that needs the user — and the sidebar is a fixed column only from `desktop:`.
+    { name: 'setup', testMatch: /auth\.setup\.ts/, use: SETUP_VIEWPORT },
+    { name: 'setup-degraded', testMatch: /auth\.degraded\.setup\.ts/, use: SETUP_VIEWPORT },
+    { name: 'setup-analisi', testMatch: /auth\.analisi\.setup\.ts/, use: SETUP_VIEWPORT },
+    { name: 'setup-centri', testMatch: /auth\.centri\.setup\.ts/, use: SETUP_VIEWPORT },
+    { name: 'setup-split', testMatch: /auth\.split\.setup\.ts/, use: SETUP_VIEWPORT },
+    { name: 'setup-hof', testMatch: /auth\.hof\.setup\.ts/, use: SETUP_VIEWPORT },
     {
       name: 'desktop',
       // 1440px is the project's `desktop:` breakpoint — the width where the layout switches.

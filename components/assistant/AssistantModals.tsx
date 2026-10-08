@@ -14,6 +14,9 @@ interface AssistantModalsProps {
   onMemoryOpenChange: (open: boolean) => void;
   threads: AssistantThread[];
   loadingThreads: boolean;
+  hasMoreThreads: boolean;
+  loadingMoreThreads: boolean;
+  onLoadMoreThreads: () => void;
   selectedThreadId: string | undefined;
   isStreaming: boolean;
   isDeletingId: string | undefined;
@@ -41,6 +44,9 @@ export function AssistantModals({
   onMemoryOpenChange,
   threads,
   loadingThreads,
+  hasMoreThreads,
+  loadingMoreThreads,
+  onLoadMoreThreads,
   selectedThreadId,
   isStreaming,
   isDeletingId,
@@ -64,13 +70,16 @@ export function AssistantModals({
         eyebrow="Assistente · Conversazioni"
         title="Riprendi una conversazione"
         reading={{
-          narrative: describeThreadsReading({ count: threads.length, loading: loadingThreads }),
+          narrative: describeThreadsReading({ count: threads.length, loading: loadingThreads, hasMore: hasMoreThreads }),
           tone: 'neutral',
         }}
       >
         <AssistantThreadList
           threads={threads}
           loadingThreads={loadingThreads}
+          hasMoreThreads={hasMoreThreads}
+          loadingMoreThreads={loadingMoreThreads}
+          onLoadMore={onLoadMoreThreads}
           selectedThreadId={selectedThreadId}
           isStreaming={isStreaming}
           isDeletingId={isDeletingId}

@@ -21,12 +21,19 @@ async function fetchDashboardOverview(
   return response.json() as Promise<DashboardOverviewPayload>;
 }
 
+/**
+ * The overview is fresh for one minute, not the global five: it is the page the reader lands on
+ * after every write. Exported for the Panoramica's freshness reading, which calls a restored
+ * payload «old» on the same threshold (lib/utils/freshness.ts).
+ */
+export const DASHBOARD_OVERVIEW_STALE_TIME_MS = 60 * 1000;
+
 export function useDashboardOverview(userId: string | undefined) {
   return useQuery({
     queryKey: queryKeys.dashboard.overview(userId || ''),
     // `enabled` guarantees userId is defined before the query runs.
     queryFn: () => fetchDashboardOverview(userId as string),
     enabled: !!userId,
-    staleTime: 60 * 1000,
+    staleTime: DASHBOARD_OVERVIEW_STALE_TIME_MS,
   });
 }

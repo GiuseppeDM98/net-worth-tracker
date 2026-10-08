@@ -13,6 +13,7 @@
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Cashflow**: `app/dashboard/cashflow/page.tsx`; Tracciamento `components/cashflow/ExpenseTrackingTab.tsx` + `components/cashflow/{TransactionFeed,CompactExpenseRow,MobileFiltersDrawer}.tsx` + `components/expenses/ExpenseTable.tsx` (the «Tabella» view: armed row delete, `SeriesDeleteDialog`), pure `lib/utils/{tracciamentoSummary,cashflowNarrative,movementsOwnerFilter}.ts` (`settleTotals` = the lived part the verdict judges; `currentComparisonWindow`/`previousComparisonWindow` = the two comparable windows, same days of the previous month for the month in progress; the «Intestatario» filter and the owner chip), `lib/constants/expenseTypeColors.ts` (the ONE type→colour map: dot, badge, flow series), specs `e2e/cashflow.{tracciamento,mobile,owner,accounts}.spec.ts`
+- **Suites to run after a change here — Cashflow › Tracciamento** (moved from `AGENTS.md` § Commands on 2026-09-30): `tracciamentoSummary`, `cashflowNarrative` (+ `overviewNarrative` for `projectMonthEndSpending`, `patrimonioNarrative` for the articles)
 
 ## Cashflow › Tracciamento (`components/cashflow/ExpenseTrackingTab.tsx`, `components/cashflow/tiles/*`)
 - **ONE period axis, two slices.** `expenses` = `filterExpensesByPeriod(allExpenses, period)` feeds the verdict and
@@ -20,6 +21,20 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   «12 di 47 voci» while narrowed, its reading counts the filtered rows). Before the redesign the toolbar also
   narrowed the KPIs — a savings rate computed over «Alimentari» is not a savings rate. Never route a tile through
   `filteredExpenses`.
+- **The tab is handed the rows of ITS WINDOW, and a new period is a new read** (2026-09-30,
+  `trackingWindow` in `lib/utils/expenseWindows.ts`; the rule in doc/guide/cashflow.md § Expenses by window): the
+  period and the twelve months before it, to the end of the month the period ends in — what `previousPeriod`, the
+  two comparison windows, the flow chart and the savings history read behind the period. The period state lives in
+  `app/dashboard/cashflow/page.tsx`, beside the read that follows it (`period` / `onPeriodChange` are props, and the
+  page's freshness reading covers that key). While a window is read for the first time — or its read failed — the
+  two pickers stay MOUNTED, the same elements with their focus, and only the verdict and the tiles give way (a
+  `VerdictSkeleton` and the grid's skeleton, or the notice): the tab has two returns that share `periodRows` and
+  `dialogs` at the same positions. A period already opened in the last 24 hours paints from the cache. The pickers'
+  years come from the collection's bounds (`availableYears`, `listExpenseYears`), not from the rows on screen.
+  Pinned by `__tests__/expenseWindows.test.ts` (every reader on the window and on the whole list, nine periods,
+  three «today»s) and by `e2e/cashflow.tracciamento.spec.ts` › «a row dated next year shows when the period moves
+  there» (seen red with `range` keyed outside the `expenses.all` prefix, and with the page reading this month's
+  window whatever the period).
 - **Every number is born in `lib/utils/tracciamentoSummary.ts`** (`summarizePeriodCashflow`, `previousPeriod`,
   `computePeriodDelta`, `resolveAnchorMonth`/`resolveFlowWindow`, `buildTrailingMonthFlows`,
   `summarizeSavingsHistory`, `rankCategories`, `summarizeMovements`, `resolvePeriodCalendar`), every sentence in
@@ -195,7 +210,16 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **Asides, footers and chart sub-eyebrows are `Narrative`s, not strings** (`describeMovementsCount`,
   `describeDeficitMonths`, `describeMonthWindow`, `describeFlowWindow`) rendered through `NarrativeText`, so every
   count and year in them is mono — the Tile's `aside` slot carries no `font-mono` of its own.
+- **A save lands in place — the tab's `loading` is its OWN two keys, never a sibling tab's read** (2026-09-29, the
+  owner's tour of the persisted cache): `app/dashboard/cashflow/page.tsx` gates Tracciamento on `expensesLoading ||
+  categoriesLoading` alone. Until then the Dividendi tab's own read (`/api/dividends` in the page's state, then) was in it,
+  and `handleRefresh` (called after every save and delete) reread the dividends even with that tab never opened, so
+  every saved expense put the skeleton over the month for the length of a call Tracciamento never uses. The dividends
+  gate only their tab and are reread only while it is mounted; a save is an invalidation of the three keys, so the
+  counters and the list move without a remount. Pinned by `e2e/cashflow.tracciamento.spec.ts` › «a saved expense
+  lands in place» (the page-skeleton count before and after the write, the row and the counter, the write read back
+  from Firestore, the row removed BY THE APP).
 
 ## Per-page blind spots
 
-- **Tracciamento**: the period slice uses `periodToRange` (browser local time) while the month buckets use the Italian calendar; the phone bar's controls are 36px; `TransactionFeed`/`CompactExpenseRow` carry two pre-existing `react-hooks` errors; a custom range has no previous period; the month-end projection exists only in the current month; `components/dashboard/overview/NarrativeText.tsx` is an unused re-export (knip). The hero's KPIs print the PERIOD's totals (calendar included) beside a delta measured on the lived window («↓ 70,1% vs 1–14 ago» under a whole-month 1953 €) — the verdict's second sentence is what reconciles the two, by design. The Movimenti reading still sums scheduled spending and income into one figure («7 in calendario (3753 €)»). The `describePeriodCashflow` reading and `expenseEntityStats` keep their own windows (§ *Two conventions now coexist on purpose*, above in this guide — the citation pointed at an `AGENTS.md` section that left it with the 2026-09-06 scorporo).
+- **Tracciamento**: a period never opened before shows the tiles' skeleton while its window is read (the pickers stay), and the pickers offer every year between the oldest and the newest row, one with no row included; the period slice uses `periodToRange` (browser local time) while the month buckets use the Italian calendar; the phone bar's controls are 36px; `TransactionFeed`/`CompactExpenseRow` carry two pre-existing `react-hooks` errors; a custom range has no previous period; the month-end projection exists only in the current month; `components/dashboard/overview/NarrativeText.tsx` is an unused re-export (knip). The hero's KPIs print the PERIOD's totals (calendar included) beside a delta measured on the lived window («↓ 70,1% vs 1–14 ago» under a whole-month 1953 €) — the verdict's second sentence is what reconciles the two, by design. The Movimenti reading still sums scheduled spending and income into one figure («7 in calendario (3753 €)»). The `describePeriodCashflow` reading and `expenseEntityStats` keep their own windows (§ *Two conventions now coexist on purpose*, above in this guide — the citation pointed at an `AGENTS.md` section that left it with the 2026-09-06 scorporo).

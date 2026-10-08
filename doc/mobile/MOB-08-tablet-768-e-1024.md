@@ -68,7 +68,7 @@ occupano una colonna, aperte le allarga `OPEN_CELL_CLASS` (esce dopo `tablet:`).
   risalgono; oltre `MAX_BESIDE_ROWS` le chiuse vanno sotto su tre colonne. Chi sta sotto ha una riga ESPLICITA
   (`belowRow`): la cella `1fr` × colonna 3 è libera e l'auto-placement la riempirebbe per prima (§ 8.5, il cursore
   riparte dalla riga 1), con la settima chiusa della Panoramica stirata accanto al fondo di LA tessera.
-- Verdetto breve, `freshness` (PERF-03), striscia e riga d'ambito stanno sopra la griglia; `LIFTED_FIGURE_CLASS`
+- Verdetto breve, striscia e riga d'ambito stanno sopra la griglia (la `freshness` è nel `PageHeader`, non qui); `LIFTED_FIGURE_CLASS`
   (`max-tablet:hidden`) ridà le cifre sollevate (The Lifted-Figure Rule).
 - **Il Flusso di Analisi sceglie il disegno a 640 px, non a `desktop:`** (proprietario, 2026-09-27): sotto i 640 px una
   barra e le righe, da 640 il Sankey. È una soglia di leggibilità del GRAFICO (a 390 quattro colonne da ~80 px), come la
@@ -121,12 +121,15 @@ Tracciamento** (tab, «+» e «Aggiungi», Movimenti; `e2e/cashflow.tablet.spec.
 
 ### 4.5 Conflitti con PERF
 
-- **PERF-02** porta la shell, barra compresa, fuori da `ProtectedRoute`: § 4.3 vale lì, rimisurata sulla build. Le
-  colonne sono CSS, il posto accanto no (`compact` è `false` sul server): oggi la griglia monta dopo i dati; se PERF-02/03
-  la rendono al primo paint, un fotogramma senza righe accanto, da annotare.
-- **PERF-04**: un'aperta va a tutta larghezza, nessun grafico pigro monta in una colonna da ~320 px. **PERF-14**: niente
-  `layout` di Framer; si anima solo il pannello; `BottomNavigation` non si tocca. **PERF-12**: pura + hook senza stato.
-  **PERF-03**: «Aggiornato alle…» sta nei 715 px. **PERF-01**: il censimento gira su :3200.
+- **PERF-02** (in develop dal 2026-09-29) ha portato la shell, barra compresa, fuori da `ProtectedRoute`
+  (`app/dashboard/layout.tsx`): § 4.3 vale lì, rimisurata sulla build. Le colonne sono CSS, il posto accanto no (`compact` è
+  `false` sul server): la griglia della pagina monta ancora dopo i dati, sul client (nell'HTML c'è solo lo skeleton generico,
+  con le sue colonne CSS); PERF-03 (in develop dal 2026-09-30) la monta con le cifre già lette appena auth e ripristino
+  hanno risposto — un fotogramma senza righe accanto resta possibile, da annotare.
+- **PERF-04**: un'aperta va a tutta larghezza, nessun grafico pigro monta in una colonna da ~320 px. **PERF-14** (in develop dal 2026-10-08): niente
+  `layout` di Framer; si anima solo il pannello; `BottomNavigation` non si tocca. **PERF-12** (in develop dal 2026-10-06, AGENTS.md § Motion): pura + hook senza stato.
+  **PERF-03** (in develop dal 2026-09-30): «Aggiornato alle…» sta nella riga dell'header (sotto `desktop:` al posto della
+  descrizione, troncata a una riga), non nei 715 px della composizione. **`perf:serve`**: il censimento gira su :3200.
 
 ### 4.6 Domande al proprietario
 
@@ -151,7 +154,7 @@ Tracciamento** (tab, «+» e «Aggiungi», Movimenti; `e2e/cashflow.tablet.spec.
 
 ## 6. Passi
 
-1. Branch; SESSION_NOTES.md; `mobile:census` PRIMA a 768 e 1024 (build di PERF-01, mirror); le domande di § 4.6.
+1. Branch; SESSION_NOTES.md; `mobile:census` PRIMA a 768 e 1024 (la build di `perf:build`, mirror); le domande di § 4.6.
 2. `tabletComposition.ts` + test (rosso, poi verde); l'hook.
 3. Panoramica e Tracciamento, le due spec e le falsificazioni; poi una griglia alla volta, con
    `mobile:census -- --surfaces=<pagina> --viewports=768,1024`.
@@ -219,7 +222,7 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALI mentre scrivi codice
 - Leggi doc/mobile/README.md, la spec MOB-08 per intero, MOB-01 § 4 e MOB-02 § 4 (le API: non rinominarne nessuna);
   DESIGN.md § 5 e § Navigation, e il capitolo mobile se MOB-09 l'ha scritto (MAI rigenerarlo); MOB-03..07, PERF-01,
-  PERF-02 e PERF-14 devono essere chiuse
+  PERF-02 e PERF-14 sono ritirate (l'ultima il 2026-10-08)
 - Crea SESSION_NOTES.md; crea il branch dalla branch attiva PRIMA di editare
 
 Regole: nessun commit senza il mio OK; un branch e un commit; rispondi in italiano; le cinque domande di § 4.6 chiedimele

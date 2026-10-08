@@ -7,116 +7,69 @@
 ## Project Overview
 Next.js app for Italian investors: net worth, assets, cashflow, dividends, performance metrics and long-term planning on Firebase.
 
-**This file is the INDEX**: "what it is + where it lives", nothing more — keep it well under 20.000 characters; it is injected into every turn. Repo-wide conventions and gotchas live in **AGENTS.md**; the per-area rules and traps in **`doc/guide/<tema>.md`** (one file per page/tab/subsystem — the feature index below points to each, and AGENTS.md § 3 carries a stub apiece; the test harness is `doc/guide/e2e-emulatori.md`, its two stubs in AGENTS.md § 5); the aesthetic spec in **DESIGN.md**; env/emulators/Playwright in **SETUP.md**; users and positioning in **PRODUCT.md**. Session rules and the guided-verification protocol in **[WORKFLOW.md](WORKFLOW.md)** (see the note at the top).
+**This file is the INDEX**: "what it is + where it lives", nothing more — keep it well under 20.000 characters; it is injected into every turn. Repo-wide conventions and gotchas live in **AGENTS.md**; the per-area rules, files and blind spots in **`doc/guide/<tema>.md`** (one file per page/tab/subsystem, a stub apiece in AGENTS.md § 3; the test harness `doc/guide/e2e-emulatori.md`); the aesthetic in **DESIGN.md**; env/emulators/Playwright in **SETUP.md**; users and positioning in **PRODUCT.md**; what the user sees in **README.md**.
 
 > **Language**: this file and AGENTS.md are in English. Italian is reserved for user-facing UI text. Page and feature names stay Italian, because they are the labels the product shows: Panoramica, Patrimonio, Cashflow, Analisi, Rendimenti, Allocazione, Storico, Previdenza, Impostazioni.
 
 ## Current Status
-- Stack: Next.js 16, React 19, TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic.
-- `tsc` clean; **190 files / 4481 tests** green in `Europe/Rome` + **39 Playwright spec files** (144 tests, incl. 6 auth setups; last full run 2026-09-27 on the Windows laptop: 143 green, the one red the known `modal.origin`, green alone right after — doc/guide/e2e-emulatori.md). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, which structurally hides timezone bugs.
-- Latest (2026-09-27): **Three external PRs integrated with changes (#400, #401, #403, by Ciocc128), the open
-  proposal #402 turned into a spec, and Divisione's pool netted of the common income.** Analisi › Flusso reads by 50/30/20 role (opt-in, the role lives on the category)
-  and below 640px draws a share bar and rows instead of the Sankey; Strumenti splits the class chip of a composite
-  instrument. What the review changed: every phone sentence and share moved into `analisiNarrative.ts` /
-  `spendingRoles.ts`, printed shares that add up to 100, signed income in the roles summary, a category write that
-  invalidates what Analisi reads, `useCssColorTokens` gated by `enabled`, the dead phone-Sankey path deleted, the inert
-  E2E assertions rewritten (overflow on `main`, an absence with its anchor). #402 is `doc/perf/PERF-00`, to implement
-  BEFORE PERF-01; nine PERF and six MOB specs amended to the code as it is; the owner's decisions in the two READMEs
-  § 9. **Verified** (final code): `tsc`, lint 0, Vitest 190 / 4481 in both timezones, Playwright 143 of 144 (the red
-  the known `modal.origin`, green alone right after), `npm run build` green before the Divisione change; six E2E
-  falsifications seen red. The owner's tour on the mirror (five points, all passed) found three defects no fixture
-  could show, each now a Vitest case: two same-named categories labelled alike under one role, the Sankey's shades
-  fading to black past the seventh node, «0%» printed over a role that holds money. Same session, owner's request:
-  **Divisione — income left «in comune» pays the common spending FIRST**, the shares divide the net, a surplus is
-  declared and never distributed, and the base is EVERY income attributed to a person, whatever its category (the
-  sentences say «entrate», `laborIncomeCategoryIds` is no longer read); the «In comune» tile shows «Entrate in comune
-  −X €» and «Da dividere Y €» under its hero, the verdict says it in the one sentence, the email in its reading
-  (doc/guide/cashflow-divisione.md; +13 Vitest, +1 E2E seen red). The two dossiers this work sits between are
-  `doc/perf/README.md` (fourteen specs, PERF-00 and PERF-01 first, 2026-09-26) and `doc/mobile/README.md` (nine specs,
-  implemented AFTER the PERF ones, 2026-09-27); the owner's decisions are in each README § 9.
+- Stack: Next.js 16, React 19 **with the React Compiler on** (since 2026-10-05), TypeScript 5, Tailwind v4, Firebase, Vitest, Framer Motion, Recharts, Yahoo Finance, Borsa Italiana scraping, Anthropic.
+- `tsc` clean; **224 files / 4994 tests** green in `Europe/Rome`, in the machine's zone AND under `TZ=UTC` (since 2026-10-08); **50 Playwright spec files** (183 tests incl. 6 auth setups; last full run 2026-10-08 on Next 16.4, Windows laptop, closing the motion-and-colours work of PR #441: 183 green in 8,4 min — doc/guide/e2e-emulatori.md). Run Vitest under `TZ=Europe/Rome` too — every date fixture sits at noon, the ones beside midnight are named by the Italian clock.
+- Latest (2026-10-08): **the PERF-14 spec retired, and the `doc/perf/` dossier with it** (the last of fourteen; PR #441 in develop since 2026-10-08) — 27 divergences: twenty-two where the code was right and the lesson already home, two brought home now (a Framer measure on a hidden subtree is React/Framer work, not browser layout, so a `layout` gate is judged by the census; no `LazyMotion` → AGENTS.md § Motion); two text defects fixed on the owner's call (`__tests__/chartPaletteDistinctness.test.ts` imports the filter's thresholds from `themePalette.ts` instead of repeating them; `FlussoTile`'s comment on `enabled`); three deferrals, one written now (FlussoTile's single render never measured → doc/guide/cashflow-analisi.md § Per-page blind spots). The dossier's standing lessons moved home one by one: «query + invalidation, Firestore is not the limit» → AGENTS.md § React Query; the retirement rule and «the draft never names a retired spec» → WORKFLOW.md § Where things are recorded; Vercel previews give no «before» → SETUP.md § Function region. **The speed manual is `doc/guide/velocita.md`** (`git mv` of `perf/README.md`, same section names, the 2026-09-26 baseline added as § Baseline storica; stub in AGENTS.md § Performance tooling). No runtime code changed: `tsc`, lint 0 and Vitest only. The closing measure of PERF-14 stays: chart hosts 2 → 1 render, script at mount Storico 1024 → 854 ms and FIRE 635 → 477 (doc/guide/velocita.md § Il census).
 
 ## Architecture Snapshot
 - App Router; protected pages under `app/dashboard/*`.
-- `lib/services/*` (service layer) → pure `lib/utils/*` → `lib/server/*` (server-only). React Query for caching/invalidation.
-- Italy timezone helpers in `lib/utils/dateHelpers.ts`.
-- Convention: extract logic into pure, tested `lib/utils`/`lib/services` functions; keep Firestore-coupled code thin.
+- `lib/services/*` (service layer) → pure `lib/utils/*` → `lib/server/*` (server-only). React Query for caching/invalidation, its cache persisted to IndexedDB (doc/guide/cache-persistita.md). The expenses are read by WINDOW on Cashflow and FIRE, whole on Storico, Analisi and Centri (doc/guide/cashflow.md § Expenses by window).
+- Italy timezone helpers in `lib/utils/dateHelpers.ts`; logic in pure, tested `lib/utils`/`lib/services` functions, Firestore-coupled code thin.
 
 ## Key Features (Active)
-One line per area: the question it answers, then where it is described. *What the user sees* → README.md; *repo-wide rules* → AGENTS.md; *an area's rules, files and blind spots* → `doc/guide/<tema>.md`; *the aesthetic* → DESIGN.md.
+One line per area: the question it answers, then where it is described (README.md for what the user sees).
 
-- **Shell**: skip link · compact `PageHeader` · `PageTabBar` · `PageContainer` (1920) + `TileGridSkeleton` · sidebar · bottom pill + «Altro» drawer; a tile's eyebrow is an `<h3>`. DESIGN → §5; AGENTS → *Navigation*.
-- **Shared account · Demo mode**: a second user as full co-owner (viewer `user.uid` ≠ owner `ownerId`); the demo auto-logs in from the landing and `useDemoMode()` gates every mutation. doc/guide/account-condiviso-demo.md.
-- **Landing**: the Panoramica for someone with no data, the app's real tiles on a declared sample profile. doc/guide/landing.md.
-- **Accesso e Registrazione**: one 420px tile, a verdict generated from the registration state, Italian errors only. doc/guide/accesso-registrazione.md.
-- **Panoramica**: «come va il mese?» — rule-generated verdict over a tile grid on `GET /api/dashboard/overview`. doc/guide/panoramica.md.
-- **Patrimonio**: the portfolio's verdict (its driver an instrument) over six tiles, plus «Mutuo» per property with linked instalments (interest and principal by year, projected end); Strumenti is the management table, a composite instrument's class chip split by class. doc/guide/patrimonio.md.
-- **Registro operazioni**: BUY/SELL/ADJUSTMENT with cash settlement in cents (a sell net of the withheld tax), the asset doc rebuilt by full replay. doc/guide/registro-operazioni.md.
-- **Cashflow › Tracciamento**: «come sta andando il mese?» on one period axis. doc/guide/cashflow-tracciamento.md; shared rules (sign, recurrence, a linked account moving on each row's own date, a transfer's fee as its own row, a mortgage instalment repaying its property's principal, CSV import, grouping, Sankey) in doc/guide/cashflow.md.
-- **Cashflow › Budget**: «sto rispettando il budget?», no axis, the ceiling historicised by the daily cron. doc/guide/cashflow-budget.md.
-- **Centri di Costo** (optional): «quanto sta costando il progetto?», no axis and no pace. doc/guide/centri-di-costo.md.
-- **Cashflow › Divisione** (optional): «quanto è costato in comune, e quanto resta a ciascuno?» — le entrate in comune pagano prima, le quote dividono il netto; il residuo è di denaro che si è mosso, il calendario è una clausola a parte. doc/guide/cashflow-divisione.md.
-- **Analisi**: «dove vanno i soldi, e cosa è cambiato?» on a four-mode axis; the app's only Sankey, by type or — opt-in `spendingRolesEnabled` — by 50/30/20 role; below 640px the Flusso is a share bar and rows. doc/guide/cashflow-analisi.md; the roles in doc/guide/cashflow.md.
-- **Dividendi**: «quanto rendono i miei flussi?»; received and announced never one figure; BTP Italia and BTP€i coupons; a payment credits the instrument's account, else the default, never an arrear. doc/guide/cashflow-dividendi.md.
-- **Rendimenti**: «quanto rende il portafoglio, e rispetto a cosa?» — configurable base, six EUR benchmarks, per-instrument attribution; below a year the hero is the period's return, Contributi is the ONE capital the formulas neutralise. doc/guide/rendimenti.md.
-- **Storico**: «come sono arrivato qui?» — wealth growth, contributions included; the Driver splits it into savings, measured market, sale taxes, mortgage, pension contributions and the rest, as a ledger that adds up to the euro behind each year. doc/guide/storico.md.
-- **Allocazione**: «sono allineato al piano, e cosa faccio con i prossimi soldi?» — i tre piani nominano gli STRUMENTI da scambiare e prezzano la ritenuta; «prelevare X» significa X in mano. doc/guide/allocazione.md.
-- **Previdenza**: «il fondo sta lavorando?» per contributor, the value typed from the statement ON the page. doc/guide/previdenza.md.
+- **Shell**: prerendered, before Firebase Auth resolves (2026-09-28); skip link, compact `PageHeader`, `PageTabBar`, sidebar, bottom pill + «Altro». doc/guide/shell.md; DESIGN → §5.
+- **Shared account · Demo mode**: a co-owner (viewer `user.uid` ≠ owner `ownerId`); the demo gated by `useDemoMode()`. doc/guide/account-condiviso-demo.md.
+- **Landing** and **Accesso e Registrazione**: the app's tiles on a sample profile; one 420px tile with a generated verdict. doc/guide/landing.md, accesso-registrazione.md.
+- **Panoramica**: «come va il mese?» on a server-owned summary fresh for the Italian day. doc/guide/panoramica.md.
+- **Patrimonio**: «cosa possiedo, e cosa si è mosso?» — verdict, six tiles, «Mutuo» per mortgaged property, Strumenti. doc/guide/patrimonio.md.
+- **Registro operazioni**: BUY/SELL/ADJUSTMENT settled in cents, the asset rebuilt by full replay. doc/guide/registro-operazioni.md.
+- **Cashflow › Tracciamento**: «come sta andando il mese?». doc/guide/cashflow-tracciamento.md; shared expense rules in doc/guide/cashflow.md.
+- **Cashflow › Budget**: «sto rispettando il budget?». doc/guide/cashflow-budget.md.
+- **Centri di Costo** (optional): «quanto sta costando il progetto?». doc/guide/centri-di-costo.md.
+- **Cashflow › Divisione** (optional): «quanto è costato in comune, e quanto resta a ciascuno?» — shared income pays first, the shares split the net. doc/guide/cashflow-divisione.md.
+- **Analisi**: «dove vanno i soldi, e cosa è cambiato?» — the app's only Sankey, by type or 50/30/20 role. doc/guide/cashflow-analisi.md.
+- **Dividendi**: «quanto rendono i miei flussi?» — received and announced never one figure; BTP Italia and BTP€i coupons. doc/guide/cashflow-dividendi.md.
+- **Rendimenti**: «quanto rende il portafoglio, e rispetto a cosa?». doc/guide/rendimenti.md.
+- **Storico**: «come sono arrivato qui?» — the Driver's ledger adds up to the euro. doc/guide/storico.md.
+- **Allocazione**: «sono allineato al piano, e cosa faccio con i prossimi soldi?» — three plans naming the instruments; the Esposizione. doc/guide/allocazione.md.
+- **Previdenza**: «il fondo sta lavorando?» per contributor. doc/guide/previdenza.md.
 - **FIRE**: Calcolatore, Coast FIRE, What If, Monte Carlo and Obiettivi, one verdict each. doc/guide/fire.md (+ fire-coast, fire-what-if, fire-monte-carlo, fire-obiettivi).
-- **Assistente AI**: the verdict IS the context; SSE streaming, memory, goal proposals; flag `NEXT_PUBLIC_ASSISTANT_AI_ENABLED`, blocked in demo. doc/guide/assistente.md.
-- **Hall of Fame**: «quali sono stati i mesi e gli anni migliori?», no axis. doc/guide/hall-of-fame.md.
-- **Impostazioni**: six tabs, no verdict, one Save per page with the save state per tab (a dot, a bottom bar, «Annulla modifiche»); the write fan-out in doc/guide/impostazioni.md § Settings — the FIVE places.
-- **States**: loading · nothing recorded · measured zero · failed read, on 20 surfaces. doc/guide/stati.md; DESIGN → The Absence-Has-Three-Names Rule.
-- **Dialogs and forms**: 40 modals on one vocabulary in `ResponsiveModal`; row deletes arm in the row. doc/guide/dialog.md; DESIGN → The Modal-Is-A-Tile Rule.
-- **Periodic emails · budget email · PDF export**: rule-generated verdict first, AI comment second; every hex from `printTokens.ts`. doc/guide/email-pdf.md; DESIGN → The Out-Of-DOM Token Rule.
-- **Themes**: twelve theme blocks × nine chart slots through `useChartColors`, every block held to the distinctness floor by `__tests__/chartPaletteDistinctness.test.ts`. doc/guide/temi.md.
+- **Assistente AI**: the verdict IS the context; flag `NEXT_PUBLIC_ASSISTANT_AI_ENABLED`, blocked in demo. doc/guide/assistente.md.
+- **Hall of Fame**: «quali sono stati i mesi e gli anni migliori?». doc/guide/hall-of-fame.md.
+- **Impostazioni**: six tabs, six controlled views of ONE draft (`useReducer` + `lib/utils/settingsDraft.ts`), one Save per page. doc/guide/impostazioni.md (§ Settings — the FIVE places).
+- **States**: loading · nothing recorded · measured zero · failed read, and «old but present» (2026-09-29). doc/guide/stati.md; DESIGN → The Absence-Has-Three-Names Rule.
+- **Dialogs and forms**: 40 modals on `ResponsiveModal`. doc/guide/dialog.md; DESIGN → The Modal-Is-A-Tile Rule.
+- **Periodic emails · budget email · PDF export**: verdict first, AI comment second. doc/guide/email-pdf.md; DESIGN → The Out-Of-DOM Token Rule.
+- **Themes**: twelve theme blocks × nine chart slots. doc/guide/temi.md.
 
 ## Testing
-- Vitest: `npx vitest run <file>`, `npm test -- <file>`, `npx tsc --noEmit`. New tests in `__tests__/`; prefer pure functions over Firestore-coupled code.
-- **Phantom `tsc` errors** clustered in `e2e/` and `lib/utils/expenseImport.ts` after a branch switch: run `npm install` first (AGENTS → *Commands*).
-- **Dev/test without production data**: Firebase Emulator Suite (`npm run emulators` + `emulators:seed` + `dev:emulator`), requires a JDK. SETUP.md → Step 6. **The owner's real data for a tour**: `npm run mirror:seed -- <email>` (production read-only → emulators as `mirror@example.com`, nothing on disk) and `npm run mirror:remove` at the end — the account is the standard, the data is re-read every time (WORKFLOW.md § 3).
-- **Performance**: baseline (cold/warm per page, bundle per route), method and the specs in `doc/perf/README.md` —
-  PERF-00 (the new Esposizione, issue #402) first, then the fourteen; the benchmark lands in repo with PERF-01
-  (`npm run perf:bench` / `perf:budget`).
-- **Mobile composition**: the small-screen census (19 surfaces × 390/768/1024), the chosen direction, the nine specs and
-  the owner's decisions in `doc/mobile/README.md`; the census script in `doc/mobile/reference/` (MOB-01 ports it to
-  `npm run mobile:census` / `mobile:budget`). Implemented after `doc/perf/`.
-- **Browser (E2E)**: Playwright, `npm run test:e2e` with the emulators up (needs **Java ≥ 21**); app on :3100 with an isolated build dir. Accounts and fixtures: SETUP.md → Step 7; gotchas: doc/guide/e2e-emulatori.md § Browser-Driven E2E (Playwright).
+- Vitest: `npx vitest run <file>`, `npm test -- <file>`, `npx tsc --noEmit`; new tests in `__tests__/`. Commands and traps: AGENTS.md § Commands.
+- **Without production data**: the Firebase Emulator Suite (`npm run emulators` + `emulators:seed` + `dev:emulator`, a JDK) — SETUP.md → Step 6. **The owner's real data for a tour**: `npm run mirror:seed -- <email>` and `npm run mirror:remove` at the end (WORKFLOW.md § 3).
+- **Browser (E2E)**: `npm run test:e2e` with the emulators up (Java ≥ 21), app on :3100 — SETUP.md → Step 7; doc/guide/e2e-emulatori.md.
+- **Performance**: `npm run perf:budget`, `perf:bench`, `perf:census` — doc/guide/velocita.md (the budget, the benchmark, the census, the baselines and the register of raised ceilings; the fourteen PERF specs of 2026-09-26 were all implemented and retired by 2026-10-08). **Mobile composition**: `doc/mobile/README.md`.
 
 ## Data & Integrations
-Firestore client + admin · Yahoo Finance (prices, benchmark history) · Borsa Italiana scraping (Italian bonds, dividends) · Frankfurter (FX) · FRED (`FRED_API_KEY`, series ECBDFR) · Anthropic (`claude-sonnet-5` analysis + assistant, `claude-haiku-4-5` extraction).
+Firestore client + admin (production in `eur3`; the Vercel functions in `fra1`, held by `__tests__/vercelConfig.test.ts`) · Yahoo Finance · Borsa Italiana scraping · Frankfurter (FX) · FRED (`FRED_API_KEY`, ECBDFR) · Anthropic (the model ids in `lib/constants/aiModels.ts`).
 
 ## Known Issues (Active)
-Only what crosses areas; an area's blind spots — the behaviours that look like bugs and are not — close its `doc/guide/<tema>.md` (§ Per-page blind spots). The demo account's manual setup is in README.md → Known Issues, the shared account's prerequisites in SETUP.md → Step 5b.
+Only what crosses areas; an area's blind spots — behaviours that look like bugs and are not — close its `doc/guide/<tema>.md` (§ Per-page blind spots). The demo account's setup is in README.md → Known Issues, the shared account's in SETUP.md → Step 5b.
 
-- **Two Sonnet generations coexist** (`lib/constants/aiModels.ts`): the Rendimenti analysis runs on `claude-sonnet-4-6`, the assistant and the emails on `claude-sonnet-5`. Aligning them changes cost and output, so it is a product decision still to take; until then the four constants stay distinct and each modal reads its OWN route's.
-- **Two deliberate dependency pins keep advisories open.** `firebase-admin` at `^13.6.0` (@14 pulls pure-ESM `jose@6` → `ERR_REQUIRE_ESM` on Vercel; 8 moderate `uuid` advisories stay) and `next` at `~16.2.12` (16.3.0 breaks Vercel at `onBuildComplete`; 2 HIGH libvips advisories via `sharp`, low exposure). **Unpin next and re-run `npm audit fix` once Vercel digests 16.3.x.**
-- **Per-page blind spots** — the behaviours that look like bugs and are not — live at the end of each `doc/guide/<page>.md` (one *Per-page blind spots* section per page). Moved there verbatim from this file's Known Issues; CLAUDE.md keeps only the cross-cutting ones.
-- **Three Vitest cases fail under `TZ=UTC`** (`budgetUtils` › crossing day, `pensionSummary` › value age, `tracciamentoSummary` › `isScheduledRow`), on a clean `develop` too (checked in a worktree, 2026-09-20): they read «today» by Italian calendar day against fixtures built in the process timezone. The suite's two timezones are the machine's and `Europe/Rome`; a CI in UTC would see them red.
-- **Every controlled `ResponsiveModal` opened without `returnFocusTo` drops focus on `body` when it closes** (Radix cancels its own restore when there is no `Trigger`; doc/guide/dialog.md). Rendimenti's two and Hall of Fame's two are fixed; the others take the opener when they are next touched.
-- **`--muted-foreground` measures 4,46:1 on `--background` in the default LIGHT theme** (measured in the browser,
-  2026-09-21, on the compact `PageHeader`'s description) — just under the AA floor of 4,5:1, on every page that uses
-  the shell, not on one. It is a theme-token change with a twelve-block blast radius, so it belongs to a
-  `doc/guide/temi.md` session, not to a page's.
-- **`e2e/modal.origin.spec.ts` is intermittent in a FULL run** (2026-09-21): it failed twice in a row and then passed
-  twice with the same code — once with `components/ui/period-picker.tsx` reverted and once with it restored, so that
-  change is not the cause (and it failed once more in the full run of 2026-09-22, green alone right after). When it fails, Rendimenti's «Periodo personalizzato» button has moved **23,4px** between the
-  `boundingBox()` the spec takes and the origin captured at the click: a late reflow under suite load, roughly the
-  height of the custom-period chip row. It passes alone, and in the `desktop` project alone. Not reproduced on demand,
-  so not yet fixed — re-read this before trusting a single red run of it.
-- **Four base specs are red in the cloud container only** (2026-09-25): its Chromium groups four-digit euros («1.100 €»),
-  the specs expect «1100 €» as on the Mac (doc/guide/e2e-emulatori.md). Read the received text before «fixing» code.
-- **The icon rail's 44px targets are measured at 1440 with a mouse**; no fixture covers a ≥1440px tablet in landscape.
-- **Two shared primitives stay below 44px on touch, on every page**: the `PageTabBar` pill below 1440 (inactive tabs
-  38×32, icon only) and the `Switch` (36×20; its row's `Label` is clickable, the thumb alone is not). Measured on
-  Impostazioni, 2026-09-22; left alone there because enlarging either changes every page at once.
+- **`npm audit` keeps 20 advisories, none critical** (2026-10-08, after Next 16.4 / firebase-admin 14 / `npm audit fix`): all inside `firebase-tools` (the dev-only CLI; its fix is a semver-major downgrade) and `@grpc/grpc-js` under the client `firebase` SDK (fix = `firebase@9`, not an option). Re-read after the next `npm update`; never `npm audit fix --force`.
+- **firebase-admin 14 pins the client `firebase` to ≥ 12.19 AND Node to 24** (2026-10-08): both want `@firebase/app` 0.16.2, and any lower `firebase` leaves two copies and kills the build on «Component auth has not been registered yet»; firebase 12.19 is +57 KB gz on every page (`doc/guide/velocita.md` § Registro). A Vercel Function never `require()`s an ESM-only package (`--no-experimental-require-module`, at any Node version): every Admin route was a 500 on the develop deploy of #436 (`ERR_REQUIRE_ESM` on `jose@6` via `jwks-rsa@4`), cured by the `overrides` → `jwks-rsa ^3.2.2` in `package.json`, held by `__tests__/vercelConfig.test.ts` (AGENTS.md § Server Layer).
+- **The `PageTabBar` pill stays below 44px on touch below 1440** (38×32, 2026-09-22): MOB-02 § 4.6 owns the fix (`min-h-11 min-w-11`); the `Switch` got its 44×44 target on 2026-10-08.
+- **A `ResponsiveModal` opener that never held the focus still leaves it on `body` at close** (2026-10-08): the modal restores the element focused at open, which covers the keyboard and Chrome's click, not Safari's (it does not focus a clicked button) nor a non-focusable row — those hosts pass `returnFocusTo` (doc/guide/dialog.md).
 
 ## Key Files
-Cross-cutting entry points only: each area's files open its guide (`doc/guide/<tema>.md` § Files), every pure module has
-`__tests__/{module}.test.ts`, every page its `e2e/{page}*.spec.ts` where one exists.
-- **Shell**: `app/dashboard/layout.tsx` (`<main>` = `page-main`), `app/dashboard/template.tsx`, `components/layout/{Sidebar,BottomNavigation,SecondaryMenuDrawer,SceneLink,PageHeader,PageTabBar,PageTabs,PageContainer,ThemePicker,LogoutDialog}.tsx`, `lib/utils/viewTransition.ts` (the ONE `startViewTransition`, `data-vt` scoping) + `lib/hooks/useSceneNavigation.ts` (the page scene), `lib/utils/themeTransition.ts`, `components/ui/sidebar.tsx` (`SIDEBAR_WIDTH_ICON`), `lib/constants/navigation.ts` (the ONE source of the nav arrays); tile primitives `components/ui/{tile,tile-method-note,series-legend,narrative-text,ranked-rows,tile-grid-skeleton,page-verdict}.tsx`, `lib/hooks/useRovingFocus.ts` (a list as ONE Tab stop), `lib/utils/narrative.ts` (`Narrative`, `VerdictTone`, `PageVerdictModel`)
-- **Shared primitives / utils** (each the single source of its rule): `components/ui/{composition-list,composition-bar,segmented-pill,drill-breadcrumb,chart-hover}.tsx`; `lib/utils/formatters.ts` · `metricColors.ts` (`getMetricValueColor`) · `assetPricing.ts` (`requiresManualPricing`) · `assetLiquidity.ts` · `expenseTypeTransition.ts` · `firestoreData.ts` (`removeUndefinedDeep`) · `dateHelpers.ts` (`endOfMonthBound`, `getItalyDateIso`, `isItalyDayAfter`) · `spendingProjection.ts` (the ONE month-end projection) · `recurrenceDates.ts` (the ONE source on recurrence)
-- **E2E**: `playwright.config.ts`, `e2e/*.ts`, `e2e/global-setup.ts`, fixtures `scripts/{seedEmulator.ts,seedPensionE2E,seedAnalisiE2E,seedCoastFireE2E,seedCostCentersE2E,seedSplitE2E,seedHallOfFameE2E}.mts`; scripts `test:e2e`/`e2e:seed*`/`dev:e2e`; the production mirror `scripts/mirrorProdAccount.mts` (`mirror:seed`/`mirror:remove`)
-
+Each area's files open its guide (`doc/guide/<tema>.md` § Files: the shell in shell.md, the E2E harness and seeds in e2e-emulatori.md); every pure module has `__tests__/{module}.test.ts`. Cross-cutting entry points only:
+- **Tile primitives**: `components/ui/{tile,tile-method-note,series-legend,narrative-text,ranked-rows,tile-grid-skeleton,page-verdict}.tsx`, `lib/hooks/useRovingFocus.ts` (a list as ONE Tab stop), `lib/utils/narrative.ts` (`Narrative`, `VerdictTone`, `PageVerdictModel`)
+- **Shared primitives / utils** (each the single source of its rule): `components/ui/{composition-list,composition-bar,segmented-pill,drill-breadcrumb,chart-hover,lazy-component}.tsx`, `components/ui/charts/recharts.ts` (the ONE door to recharts); `lib/utils/expenseWindows.ts` · `formatters.ts` · `metricColors.ts` (`getMetricValueColor`) · `assetPricing.ts` (`requiresManualPricing`) · `assetLiquidity.ts` · `expenseTypeTransition.ts` · `firestoreData.ts` (`removeUndefinedDeep`) · `dateHelpers.ts` (`endOfMonthBound`, `getItalyDateIso`, `isItalyDayAfter`) · `spendingProjection.ts` · `recurrenceDates.ts` · `cents.ts` (`roundToCents`) · `floatNoise.ts`
 
 ## Design Context
-Authoritative aesthetic spec: **DESIGN.md** — hand-maintained, **never regenerate it**; its YAML frontmatter is the normative layer read by the impeccable detector, `.impeccable/design.json` only the extensions sidecar (its narrative is DESIGN.md verbatim — script-check before rewriting it; its `extensions.motion` is read from the CODE). Product truth: **PRODUCT.md**. Rules are cited by name (DESIGN → **The X Rule**) and enforced by `components/ui/{tile,page-verdict,responsive-modal}.tsx`, `statesNarrative.ts` and `printTokens.ts`. A change to a page starts from its `doc/guide/<page>.md` and DESIGN.md's named rules. History: `git log`.
+Authoritative aesthetic spec: **DESIGN.md** — hand-maintained, **never regenerate it**; its YAML frontmatter is the normative layer read by the impeccable detector, `.impeccable/design.json` only the extensions sidecar (script-check before rewriting it). Product truth: **PRODUCT.md**. Rules are cited by name (DESIGN → **The X Rule**) and enforced by `components/ui/{tile,page-verdict,responsive-modal}.tsx`, `statesNarrative.ts` and `printTokens.ts`. A change to a page starts from its `doc/guide/<page>.md` and DESIGN.md's named rules.

@@ -34,28 +34,11 @@ const DELETE_SENTINEL = { __deleteField: true };
 
 import { getDoc, setDoc } from 'firebase/firestore';
 import { getSettings, setSettings } from '@/lib/services/assetAllocationService';
+import { invalidateDashboardOverviewSummary } from '@/lib/services/dashboardOverviewInvalidation';
 import type { AssetAllocationSettings, AssetAllocationTarget } from '@/types/assets';
-
-/** Ogni valore è scelto per essere DIVERSO dal default, così un campo perso si vede. */
-const STORED_SETTINGS = {
-  targets: { equity: { targetPercentage: 60 }, bonds: { targetPercentage: 40 } },
-  performanceIncludesPensionFunds: true,
-  performanceIncludesExcludedAssets: true,
-  performanceExcludesCash: true,
-  pensionReturnStartMonth: '2026-07',
-  costCentersEnabled: true,
-  includePrimaryResidenceInFIRE: true,
-  respectPensionLockInFire: true,
-  pensionInpsRetirementAge: 68,
-  pensionRitaLongUnemployment: true,
-  cashflowHistoryStartYear: 2019,
-  familyMembers: [{ id: 'm1', name: 'Giuseppe' }],
-  expenseSplitEnabled: true,
-  spendingRolesEnabled: true,
-  dividendCashAssetId: 'cash-1',
-  transferFeeCategoryId: 'cat-fee',
-  transferFeeSubCategoryId: 'sub-fee',
-};
+// The fixture is shared with settingsDraft.test.ts since 2026-10-08: the page's draft
+// is held to the same document the service's whitelists are.
+import { STORED_SETTINGS } from './fixtures/storedSettings';
 
 const TARGETS = { equity: { targetPercentage: 100 } } as unknown as AssetAllocationTarget;
 
@@ -309,4 +292,27 @@ describe('setSettings — scrittura, ramo senza targets (merge: true)', () => {
       expect(writtenPayload()).not.toHaveProperty(field);
     }
   );
+});
+
+describe('setSettings — il riepilogo della Panoramica', () => {
+  // Il riepilogo resta fresco per tutto il giorno: ogni campo che il payload legge deve invalidarlo,
+  // anche quando arriva da solo (prima reggeva per caso: Impostazioni manda sempre il bollo).
+  beforeEach(() => vi.mocked(invalidateDashboardOverviewSummary).mockClear());
+
+  it.each([
+    ['goalBasedInvestingEnabled', { goalBasedInvestingEnabled: true }],
+    ['pensionReturnStartMonth', { pensionReturnStartMonth: '2026-01' }],
+    ['pensionReturnStartMonth svuotato', { pensionReturnStartMonth: undefined }],
+    ['stampDutyEnabled', { stampDutyEnabled: false }],
+  ])('invalida per %s', async (_field, update) => {
+    await setSettings('user-1', update as Partial<AssetAllocationSettings> as AssetAllocationSettings);
+
+    expect(invalidateDashboardOverviewSummary).toHaveBeenCalledWith('user-1', 'overview_settings_updated');
+  });
+
+  it('non invalida per un campo che il payload non legge', async () => {
+    await setSettings('user-1', { costCentersEnabled: true } as AssetAllocationSettings);
+
+    expect(invalidateDashboardOverviewSummary).not.toHaveBeenCalled();
+  });
 });

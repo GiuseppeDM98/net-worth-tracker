@@ -34,16 +34,17 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAssets } from '@/lib/hooks/useAssets';
+import { useExpensesInRange } from '@/lib/hooks/useExpenses';
+import { fireWindows } from '@/lib/utils/expenseWindows';
+import { useSettings } from '@/lib/hooks/useSettings';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
-import { calculateAssetValue, calculateFIRENetWorth, calculateIlliquidFIRENetWorth, calculateLiquidFIRENetWorth, filterFireEligibleAssets, getAllAssets } from '@/lib/services/assetService';
+import { calculateAssetValue, calculateFIRENetWorth, calculateIlliquidFIRENetWorth, calculateLiquidFIRENetWorth, filterFireEligibleAssets } from '@/lib/services/assetService';
 import { resolvePensionLockState, resolveRitaUnlockAge } from '@/lib/utils/pensionUnlock';
 import { resolvePortfolioTaxProfile } from '@/lib/utils/withdrawalTax';
-import { getSettings } from '@/lib/services/assetAllocationService';
 import {
   calculateFIRESensitivityMatrix,
-  getAnnualCashflowData,
+  computeAnnualCashflowData,
   getDefaultScenarios,
   normalizeCoastFirePensions,
   normalizeCoastFireTaxBrackets,
@@ -77,8 +78,7 @@ import {
   SENSITIVITY_FOOTER,
 } from '@/lib/utils/whatIfNarrative';
 import type { WhatIfBaseline, WhatIfEventType, WhatIfScenario } from '@/types/whatIf';
-import type { Settings } from '@/types/settings';
-import type { TileSkeletonCell } from '@/lib/utils/tileGridSkeleton';
+import { WHAT_IF_TAB_SKELETON_CELLS } from './tabSkeletons';
 import { cn } from '@/lib/utils';
 import { PageVerdict } from '@/components/ui/page-verdict';
 import { TILE_CELL_CLASS } from '@/components/ui/tile';
@@ -92,13 +92,8 @@ import { DeltaTile } from '@/components/fire-simulations/whatif/tiles/DeltaTile'
 import { EventoTile, type WhatIfEventForm } from '@/components/fire-simulations/whatif/tiles/EventoTile';
 import { SensibilitaTile } from '@/components/fire-simulations/whatif/tiles/SensibilitaTile';
 
-/** The grid's geometry, for the skeleton: the same spans as the tiles below. */
-const SKELETON_CELLS: TileSkeletonCell[] = [
-  { span: 5, lines: 12 },
-  { span: 3, lines: 9 },
-  { span: 4, lines: 10 },
-  { span: 12, lines: 6 },
-];
+/** The grid's geometry, for the skeleton: the same spans as the tiles below — shared with the page's lazy-tab wait. */
+const SKELETON_CELLS = WHAT_IF_TAB_SKELETON_CELLS;
 
 const EMPTY_FORM: WhatIfEventForm = {
   monthsWithoutIncome: '6',
@@ -115,30 +110,20 @@ function parseAmount(value: string): number {
 }
 
 export function WhatIfAnalysisTab() {
-  const { user } = useAuth();
   const { ownerId } = useActiveAccount();
 
   // ─── Queries ─────────────────────────────────────────────────────────────────
-  const { data: settings, isLoading: isLoadingSettings, isError: settingsError } = useQuery<Settings | null>({
-    queryKey: ['settings', ownerId],
-    queryFn: () => getSettings(ownerId!),
-    enabled: !!user && !!ownerId,
-    staleTime: 300000,
-  });
+  // Settings and assets from the keys every page shares (2026-09-29).
+  const { data: settings, isLoading: isLoadingSettings, isError: settingsError } = useSettings(ownerId);
+  const { data: assets, isLoading: isLoadingAssets, isError: assetsError } = useAssets(ownerId);
 
-  const { data: assets, isLoading: isLoadingAssets, isError: assetsError } = useQuery({
-    queryKey: ['assets', ownerId],
-    queryFn: () => getAllAssets(ownerId!),
-    enabled: !!user && !!ownerId,
-    staleTime: 300000,
-  });
-
-  const { data: cashflowData, isLoading: isLoadingCashflow, isError: cashflowError } = useQuery({
-    queryKey: ['annualCashflowData', ownerId],
-    queryFn: () => getAnnualCashflowData(ownerId!),
-    enabled: !!user && !!ownerId,
-    staleTime: 300000,
-  });
+  // The Calcolatore's cashflow figures, computed in memory from the SAME key — the FIRE page's
+  // recent expenses window (January of last year → this December, `fireWindows`) — so the two tabs
+  // read one figure. A failed read is the key's `isError`: the notice below.
+  const readAt = useMemo(() => new Date(), []);
+  const recentWindow = useMemo(() => fireWindows(readAt, null).recent, [readAt]);
+  const { data: recentExpenses, isLoading: isLoadingCashflow, isError: cashflowError } = useExpensesInRange(ownerId, recentWindow);
+  const cashflowData = useMemo(() => (recentExpenses ? computeAnnualCashflowData(recentExpenses, readAt) : undefined), [recentExpenses, readAt]);
 
   // ─── Scenario state (ephemeral) ──────────────────────────────────────────────
   const [eventType, setEventType] = useState<WhatIfEventType>('jobLoss');

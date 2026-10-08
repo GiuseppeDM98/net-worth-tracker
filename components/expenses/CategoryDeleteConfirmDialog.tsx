@@ -63,7 +63,8 @@ import {
 } from '@/components/ui/select';
 import { Plus, Check } from 'lucide-react';
 import { CategoryManagementDialog } from './CategoryManagementDialog';
-import { getAllCategories } from '@/lib/services/expenseCategoryService';
+import { useQueryClient } from '@tanstack/react-query';
+import { categoriesQueryOptions } from '@/lib/hooks/useExpenses';
 import { cn } from '@/lib/utils';
 
 interface CategoryDeleteConfirmDialogProps {
@@ -89,6 +90,7 @@ export function CategoryDeleteConfirmDialog({
 }: CategoryDeleteConfirmDialogProps) {
   const { user } = useAuth();
   const { ownerId } = useActiveAccount();
+  const queryClient = useQueryClient();
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [selectedSubCategoryId, setSelectedSubCategoryId] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -233,9 +235,10 @@ export function CategoryDeleteConfirmDialog({
    * category by sorting by creation timestamp.
    */
   const handleCategoryCreated = async () => {
-    // Reload categories from database to get the newly created one
+    // Re-read the categories through the key every reader shares (the create invalidated it):
+    // the newly created one is in the list.
     if (user && ownerId) {
-      const updatedCategories = await getAllCategories(ownerId);
+      const updatedCategories = await queryClient.fetchQuery(categoriesQueryOptions(ownerId));
       setLocalOverride({ base: allCategories, categories: updatedCategories });
 
       // Auto-select the newly created category (most recent by timestamp)
@@ -257,14 +260,16 @@ export function CategoryDeleteConfirmDialog({
   const handleConfirm = async () => {
     if (mode === 'reassign' && !selectedCategoryId) return;
 
+    // Convert sentinel value to undefined (Radix Select doesn't allow empty string). Read before
+    // the try, and the reset after the catch rather than in a finally: the React Compiler does not
+    // compile a conditional expression inside a try/catch, nor a try/finally.
+    const subCategoryId = selectedSubCategoryId && selectedSubCategoryId !== '__none__'
+      ? selectedSubCategoryId
+      : undefined;
     setIsSubmitting(true);
     setStatus({ phase: 'submitting' });
     try {
       if (mode === 'reassign') {
-        // Convert sentinel value to undefined (Radix Select doesn't allow empty string)
-        const subCategoryId = selectedSubCategoryId && selectedSubCategoryId !== '__none__'
-          ? selectedSubCategoryId
-          : undefined;
         await onConfirm(selectedCategoryId, subCategoryId);
       } else {
         await onConfirm(undefined, undefined);
@@ -273,9 +278,8 @@ export function CategoryDeleteConfirmDialog({
     } catch (error) {
       console.error('Error during category deletion:', error);
       setStatus({ phase: 'error', message: describeWriteError(error) });
-    } finally {
-      setIsSubmitting(false);
     }
+    setIsSubmitting(false);
   };
 
   const kindLabel = subCategoryToDelete ? 'sottocategoria' : 'categoria';

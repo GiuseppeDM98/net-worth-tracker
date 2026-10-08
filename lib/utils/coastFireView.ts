@@ -492,7 +492,7 @@ export interface CoastPaceReached {
 }
 
 export interface CoastPace {
-  /** The Calcolatore's savings (`getAnnualCashflowData().annualSavings`), kept constant in today's euro. */
+  /** The Calcolatore's savings (`computeAnnualCashflowData(expenses, now).annualSavings`), kept constant in today's euro. */
   annualSavings: number;
   /** The first year the savings-fed capital clears the Coast number of THAT year; null when it does not before the target age. */
   reached: CoastPaceReached | null;

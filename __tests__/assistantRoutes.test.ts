@@ -113,6 +113,7 @@ import {
   DELETE as deleteMemoryRoute,
 } from '@/app/api/ai/assistant/memory/route';
 import { POST as streamRoute } from '@/app/api/ai/assistant/stream/route';
+import { GET as getContextRoute } from '@/app/api/ai/assistant/context/route';
 
 function createJsonRequest(
   url: string,
@@ -186,7 +187,7 @@ describe('Assistant private API routes', () => {
     buildAssistantYearContextMock.mockResolvedValue(null);
     buildAssistantYtdContextMock.mockResolvedValue(null);
     buildAssistantHistoryContextMock.mockResolvedValue(null);
-    listAssistantThreadsMock.mockResolvedValue([]);
+    listAssistantThreadsMock.mockResolvedValue({ threads: [], nextCursor: null });
     createAssistantThreadMock.mockResolvedValue({
       id: 'thread-1',
       userId: 'user-1',
@@ -330,6 +331,82 @@ describe('Assistant private API routes', () => {
       error: 'Authenticated user does not have access to requested account',
     });
     expect(listAssistantThreadsMock).not.toHaveBeenCalled();
+  });
+
+  // The list is paged. The store's own page arithmetic (60 → 50 + 10, the cursor never
+  // repeated) is pinned in __tests__/assistantThreadsStore.test.ts; here the route's wiring.
+  // The header's stages were seen RED on 2026-10-05 with the route's `mark('db')` removed
+  // («auth, total»).
+  it('answers one page with its cursor, passes «after» to the store, and times the read', async () => {
+    listAssistantThreadsMock.mockResolvedValue({ threads: [], nextCursor: 'thread-50' });
+    const response = await getThreadsRoute(
+      createJsonRequest('http://localhost/api/ai/assistant/threads?userId=user-1&after=thread-49', {
+        headers: { Authorization: 'Bearer valid-token' },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ threads: [], nextCursor: 'thread-50' });
+    expect(listAssistantThreadsMock).toHaveBeenCalledWith('user-1', { after: 'thread-49' });
+    expect((response.headers.get('server-timing') ?? '').split(', ').map((entry) => entry.split(';')[0])).toEqual(['auth', 'db', 'total']);
+  });
+
+  it('reads the first page without a cursor, and refuses an empty or path-shaped one with 400', async () => {
+    const authorized = { headers: { Authorization: 'Bearer valid-token' } };
+    await getThreadsRoute(createJsonRequest('http://localhost/api/ai/assistant/threads?userId=user-1', authorized));
+    expect(listAssistantThreadsMock).toHaveBeenLastCalledWith('user-1', { after: undefined });
+
+    for (const cursor of ['', 'threads%2Fx']) {
+      listAssistantThreadsMock.mockClear();
+      const response = await getThreadsRoute(
+        createJsonRequest(`http://localhost/api/ai/assistant/threads?userId=user-1&after=${cursor}`, authorized)
+      );
+      expect(response.status).toBe(400);
+      expect(listAssistantThreadsMock).not.toHaveBeenCalled();
+    }
+  });
+
+  // The page already holds the preference (it reads the memory at mount), so the context route
+  // takes it from the request instead of reading the memory document a second time per opening.
+  // Seen RED on the route that always read it (2026-10-05): the memory read once, the builder
+  // called with the STORED `false` under a request saying `true`.
+  describe('GET /api/ai/assistant/context — the dummy-snapshot preference', () => {
+    const contextUrl = (extra = '') => `http://localhost/api/ai/assistant/context?userId=user-1&year=2026&month=3${extra}`;
+    const authorized = { headers: { Authorization: 'Bearer valid-token' } };
+
+    it.each([
+      ['true', true],
+      ['false', false],
+    ])('takes includeDummy=%s from the request and does not read the memory', async (param, expected) => {
+      const response = await getContextRoute(createJsonRequest(contextUrl(`&includeDummy=${param}`), authorized));
+
+      expect(response.status).toBe(200);
+      expect(getAssistantMemoryDocumentMock).not.toHaveBeenCalled();
+      expect(buildAssistantMonthContextMock).toHaveBeenCalledWith('user-1', { year: 2026, month: 3 }, expected);
+    });
+
+    it('reads the stored preference when the request carries none', async () => {
+      getAssistantMemoryDocumentMock.mockResolvedValue({
+        preferences: { responseStyle: 'balanced', includeMacroContext: false, memoryEnabled: true, includeDummySnapshots: true },
+        items: [],
+        suggestions: [],
+        updatedAt: null,
+      });
+
+      const response = await getContextRoute(createJsonRequest(contextUrl(), authorized));
+
+      expect(response.status).toBe(200);
+      expect(getAssistantMemoryDocumentMock).toHaveBeenCalledTimes(1);
+      expect(buildAssistantMonthContextMock).toHaveBeenCalledWith('user-1', { year: 2026, month: 3 }, true);
+    });
+
+    it('refuses a value that is neither «true» nor «false» with 400, reading and building nothing', async () => {
+      const response = await getContextRoute(createJsonRequest(contextUrl('&includeDummy=yes'), authorized));
+
+      expect(response.status).toBe(400);
+      expect(getAssistantMemoryDocumentMock).not.toHaveBeenCalled();
+      expect(buildAssistantMonthContextMock).not.toHaveBeenCalled();
+    });
   });
 
   it('returns a thread detail for the authenticated user', async () => {

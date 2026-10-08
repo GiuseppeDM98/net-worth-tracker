@@ -94,7 +94,8 @@ export function HallOfFameDettaglio({ summary, notes, onNoteClick, onAddNote }: 
 
   // Whether the table actually scrolls inside its strip: only then the right edge fades, so
   // the columns cut off at 390 («Variazione», «Patrimonio prima», «Nota») read as continuing
-  // instead of as missing. Measured, never assumed (AGENTS.md → the Strumenti precedent).
+  // instead of as missing. Measured, never assumed (AGENTS.md § Tailwind Breakpoints and
+  // Responsive Layout → `sticky`, the Strumenti precedent).
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const [tableScrolls, setTableScrolls] = useState(false);
   useEffect(() => {

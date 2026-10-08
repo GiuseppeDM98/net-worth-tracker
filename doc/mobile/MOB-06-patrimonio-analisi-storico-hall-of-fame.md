@@ -17,7 +17,7 @@ Censimento 2026-09-26 (`doc/mobile/README.md` § 3), 390 × 844:
 Righe del 2026-09-26 (chi implementa le riverifica):
 
 - **Patrimonio** `app/dashboard/assets/page.tsx:410-525`: sette celle aperte; `:168` legge il registro senza `isError`
-  (fallita = «nessuna operazione»); `StrumentiTile.tsx:621` (lista) e `:645` (tabella): l'elenco due volte. Verdetto
+  (fallita = «nessuna operazione»); `StrumentiTile.tsx` rende la lista O la tabella dal 2026-10-07 (`useMediaQuery`, `:259`). Verdetto
   `patrimonioNarrative.ts:236-282`: una frase fino a «; sul mercato…» (`:257`), poi le vendite con la ritenuta (`:277`,
   `describeSales`, `salesNarrative.ts:150`, condiviso con la Panoramica).
 - **Analisi** `components/cashflow/AnalisiTab.tsx:708-799`; la Scheda esiste solo con un focus (`:775`); si atterra da
@@ -41,7 +41,7 @@ Righe del 2026-09-26 (chi implementa le riverifica):
 ## 3. Non-obiettivi
 
 B e C; le primitive (un campo nuovo solo additivo); il tablet (MOB-08); DESIGN.md (MOB-09); la Panoramica (MOB-03);
-Plusvalenze (MOB-05); le sparkline e i dialog (PERF-11); la matematica; le azioni della navbar. Sono di altre spec, e qui
+Plusvalenze (MOB-05); le sparkline e i dialog (in develop dal 2026-10-07, doc/guide/patrimonio.md); la matematica; le azioni della navbar. Sono di altre spec, e qui
 si usano: il contratto di `PatrimonioTile` (`liftedFigures`, la curva a 120 px) e i `binding` di `describeSales` (MOB-03
 § 4.3-4.4), il `binding` di `scheduledSentence` (MOB-04 § 4.5); se questa spec arriva prima li scrive con quei nomi.
 
@@ -133,7 +133,7 @@ test per pagina.
   Un test vieta `lifts` su `storico-driver`; candidato per The Lifted-Figure Rule (MOB-09).
 - **Non si ripete**: `EvoluzioneTile` + `liftedFigures?: readonly ('growth' | 'cagr' | 'trailing')[]`.
 - **Righe**: `storico-raddoppi` · `storico-composizione` («per classe») · `storico-driver` · `storico-valore` («per
-  strumento»). Nessuna riga `failed` (una lettura; dopo PERF-05, l'`isError` delle sue query).
+  strumento»). Nessuna riga `failed` (dal 2026-09-29 la pagina compone gli `isError` delle sue sei chiavi con `composeReadState`).
 
 ### 4.4 Hall of Fame
 
@@ -143,19 +143,21 @@ il Dettaglio, come in Storico (`history/page.tsx:498-501`): gesti rari, ~56 px d
 
 ### 4.5 Conflitti con PERF
 
-- **PERF-11, nessun conflitto**: la riga monta Strumenti all'apertura, poi UN elenco (B) e ogni `AssetRow` la sua
-  sparkline solo aperta (A). Ritocco: il `useMediaQuery('(min-width: 1440px)')` di B diventa `!useCompactLayout()` (una
-  sorgente), e il primo frame server passa dalla lista alla TABELLA: il commento che PERF-11 § 2 chiede si aggiorna. I
-  dialog di C sono della pagina; il suo `assets.rows.mobile.spec.ts` apre prima «Strumenti». Lo stesso vale per la prova
+- **Le righe leggere di Strumenti (PERF-11, in develop dal 2026-10-07), nessun conflitto**: la riga monta Strumenti
+  all'apertura, poi UN elenco — `components/assets/StrumentiTile.tsx` rende la tabella O le `AssetRow` — e ogni
+  `AssetRow` disegna la sua sparkline dalla prima apertura. Ritocco: quel `useMediaQuery('(min-width: 1440px)')` diventa
+  `!useCompactLayout()` (una sorgente), e il primo frame server passa dalla lista alla TABELLA: il commento sopra
+  `isDesktop` in `StrumentiTile.tsx` si aggiorna. I due dialog montati da aperti sono della pagina
+  (`app/dashboard/assets/page.tsx`); `e2e/assets.rows.mobile.spec.ts` apre prima «Strumenti». Lo stesso vale per la prova
   a 390 di `e2e/assets.composite-chip.spec.ts` (#403): gira nel progetto `desktop` con `setViewportSize`, ma
   `useCompactLayout` legge la larghezza, quindi a 390 Strumenti è chiusa e le `AssetRow` non esistono — il suo
   `openPatrimonio` apre la riga `patrimonio-strumenti` prima di aspettare il nome dello strumento.
-- **PERF-14**: `layout="position"` (`assets/page.tsx:385`) è già tolto; nessun `layout` nuovo. **PERF-04** rende pigri
-  solo i grafici dentro le disclosure (§ 4 C: Dettaglio di Storico, sezioni di Analisi) e il Sankey del Flusso, che sotto
-  i 640 px non si scarica più; Composizione e Valore di Storico restano statici e recharts arriva comunque con
-  Evoluzione: la riga chiusa risparmia il mount, non il download; un grafico di riga reso `dynamic` riserva l'altezza
-  (MOB-02 § 4.8). **PERF-03**: «Aggiornato alle…» sta
-  nel budget. **PERF-05/06**: la striscia legge i riassunti come sono. **PERF-12**: `mounted` nel gestore, `reveal` in
+- **PERF-14** (in develop dal 2026-10-08): il `layout="position"` di `assets/page.tsx` è tolto; nessun `layout` nuovo. **PERF-04** (in develop dal
+  2026-09-30) ha reso pigri i grafici delle disclosure e della Scheda di Analisi e il Sankey del Flusso, che sotto i
+  640 px non si scarica (doc/guide/cashflow-analisi.md); su Storico solo il PDF è pigro: Composizione, Valore ed
+  Evoluzione portano recharts nel grafo iniziale e il Dettaglio resta statico (doc/guide/storico.md) — la riga chiusa
+  risparmia il mount, non il download; un grafico di riga reso pigro (`lazyComponent`) riserva l'altezza (MOB-02 § 4.8). **PERF-03** (in develop dal 2026-09-30): «Aggiornato alle…» sta nel `PageHeader`, nella riga della
+  descrizione: nessuna riga in più nel budget. **PERF-05/06**: la striscia legge i riassunti come sono. **PERF-12** (in develop dal 2026-10-06, AGENTS.md § Motion): `mounted` nel gestore, `reveal` in
   un `setTimeout`, mai nel corpo di un effetto (§ 4.2).
 
 ### 4.6 Domande al proprietario
@@ -249,7 +251,7 @@ CLAUDE.md «Latest»; `doc/guide/{patrimonio,cashflow-analisi,storico,hall-of-fa
 Ciao, in questa sessione implementiamo doc/mobile/MOB-06-patrimonio-analisi-storico-hall-of-fame.md: Patrimonio,
 Analisi e Storico sulle primitive di MOB-02 (LA tessera, select<Page>Strip, i blocchi non ripetuti, le righe
 chiuse, i binding), la Scheda come riga che si apre da sola dall'URL, il ledger del Driver mai sollevato, Strumenti
-chiusa sopra PERF-11, le azioni di Hall of Fame in fondo. I nomi sono quelli di MOB-02 § 4.1: non rinominarli.
+chiusa sopra le sue righe leggere (un elenco per larghezza, la sparkline all'apertura), le azioni di Hall of Fame in fondo. I nomi sono quelli di MOB-02 § 4.1: non rinominarli.
 
 Da fare TASSATIVAMENTE prima di ogni cosa:
 - Leggi WORKFLOW.md, AGENTS.md (§ Tailwind Breakpoints and Responsive Layout, § React Query and Derived State,
@@ -257,7 +259,7 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
 - Leggi doc/guide/patrimonio.md, cashflow-analisi.md, storico.md, hall-of-fame.md, stati.md, e2e-emulatori.md
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice
 - Leggi doc/mobile/README.md, MOB-02 e questa spec per intero; DESIGN.md § 5, § 6 e il capitolo mobile se c'è (MAI
-  rigenerarlo); doc/perf/PERF-11 (deve essere chiusa); MOB-03 § 4.2-4.4 e MOB-04 § 4.2 e § 4.5 (i nomi di
+  rigenerarlo); MOB-03 § 4.2-4.4 e MOB-04 § 4.2 e § 4.5 (i nomi di
   PatrimonioTile, `decimals`, i binding di describeSales e scheduledSentence): se sono chiuse, il loro diff
 - Crea SESSION_NOTES.md; crea il branch dalla branch attiva PRIMA di editare
 

@@ -34,16 +34,6 @@
 
 import { useId, useMemo, useState, type ReactNode } from 'react';
 import { ChevronDown } from 'lucide-react';
-import {
-  Bar,
-  CartesianGrid,
-  ComposedChart,
-  Line,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
 import { Expense } from '@/types/expenses';
 import {
   buildEntityMonthlySeries,
@@ -59,28 +49,18 @@ import {
 import { formatPercentage } from '@/lib/services/chartService';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { getItalyMonth, getItalyYear, toDate } from '@/lib/utils/dateHelpers';
-import { CHART_TICK_STYLE } from '@/components/cashflow/costCenterStyles';
 import { TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
+import { Skeleton } from '@/components/ui/skeleton';
+import { lazyComponent } from '@/components/ui/lazy-component';
 import { cn } from '@/lib/utils';
 
-// ── Shared chart styles (module-level, as-const — see AGENTS.md Recharts rules) ──
+/** The trend plot's height: the chart draws at it and its placeholder holds it, so it lands in place. */
+const TREND_CHART_HEIGHT = 180;
 
-const TOOLTIP_CONTENT_STYLE = {
-  backgroundColor: 'var(--card)',
-  border: '1px solid var(--border)',
-  color: 'var(--card-foreground)',
-  fontSize: 12,
-  borderRadius: 8,
-} as const;
-
-const TOOLTIP_LABEL_STYLE = {
-  fontWeight: 600,
-  color: 'var(--card-foreground)',
-} as const;
-
-const TOOLTIP_ITEM_STYLE = {
-  color: 'var(--card-foreground)',
-} as const;
+// The plot is not in Analisi's initial JavaScript (2026-09-30): `lazyComponent` at module level,
+// preloaded when the page is idle by AnalisiTab (`ENTITY_DOSSIER_LAZY_CHARTS`), so a Scheda draws it at once.
+const EntityTrendChart = lazyComponent(() => import('@/components/cashflow/EntityTrendChart').then((m) => m.EntityTrendChart));
+export const ENTITY_DOSSIER_LAZY_CHARTS = [EntityTrendChart];
 
 // Resolves an expense's Italy-calendar month for the pure layer.
 const monthOf = (expense: Expense): { year: number; month: number } => {
@@ -313,25 +293,25 @@ interface EntityDossierProps {
 }
 
 export function EntityDossier({ allExpenses, scope, color, period, periodLabel, historyStartYear, isIncome, columns = false, aside }: EntityDossierProps) {
-  const now = { year: getItalyYear(), month: getItalyMonth() };
+  // now derives from the clock: keyed on its two numbers, it stays the same object within a
+  // month, so the memos below take it as a dep without recomputing on every render.
+  const nowYear = getItalyYear();
+  const nowMonth = getItalyMonth();
+  const now = useMemo(() => ({ year: nowYear, month: nowMonth }), [nowYear, nowMonth]);
 
   const yearRows = useMemo(
     () => buildEntityYearRows(allExpenses, scope, historyStartYear, now, monthOf),
-    // now derives from the clock: stable within a render session, deliberately not a dep.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [allExpenses, scope, historyStartYear]
+    [allExpenses, scope, historyStartYear, now]
   );
 
   const runRate = useMemo(
     () => computeEntityRunRate(allExpenses, scope, period, historyStartYear, now, monthOf),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [allExpenses, scope, period, historyStartYear]
+    [allExpenses, scope, period, historyStartYear, now]
   );
 
   const monthlySeries = useMemo(
     () => buildEntityMonthlySeries(allExpenses, scope, 24, historyStartYear, now, monthOf),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [allExpenses, scope, historyStartYear]
+    [allExpenses, scope, historyStartYear, now]
   );
 
   /**
@@ -350,8 +330,7 @@ export function EntityDossier({ allExpenses, scope, color, period, periodLabel, 
       byYear.set(row.year, buildEntitySubCategoryDeltas(allExpenses, scope.category, current, baseline, historyStartYear, monthOf));
     }
     return byYear;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allExpenses, scope, yearRows, historyStartYear]);
+  }, [allExpenses, scope, yearRows, historyStartYear, now.month]);
 
   /**
    * Which year row is open. Stored WITH the entity it belongs to instead of being reset by an
@@ -455,32 +434,7 @@ export function EntityDossier({ allExpenses, scope, color, period, periodLabel, 
       </div>
       {hasTrendData ? (
         <div className="mt-2">
-          <ResponsiveContainer width="100%" height={180}>
-            <ComposedChart
-              data={monthlySeries}
-              margin={{ top: 4, right: 4, left: -16, bottom: 0 }}
-              role="img"
-              accessibilityLayer={false}
-              aria-label={`${seriesName} per mese, ultimi 24 mesi. ${monthlySeries.map((point) => `${point.label}: ${formatCurrency(point.value)}${point.prevYearValue !== null ? `, anno precedente ${formatCurrency(point.prevYearValue)}` : ''}`).join('; ')}`}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-              <XAxis dataKey="label" tick={CHART_TICK_STYLE} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-              {/* «150 €», the page's own format — not «€150» with the symbol in front. */}
-              <YAxis tickFormatter={(value: number) => formatCurrency(value)} tick={CHART_TICK_STYLE} axisLine={false} tickLine={false} width={56} />
-              <Tooltip
-                // A null baseline (pre-floor month) is a gap, not a zero — the tooltip must
-                // not resurrect the fabricated 0 the series refused.
-                formatter={(value) => (value == null ? '—' : formatCurrency(Number(value)))}
-                contentStyle={TOOLTIP_CONTENT_STYLE}
-                labelStyle={TOOLTIP_LABEL_STYLE}
-                itemStyle={TOOLTIP_ITEM_STYLE}
-                cursor={{ fill: 'var(--muted)', fillOpacity: 0.4 }}
-              />
-              <Bar dataKey="value" name={seriesName} fill={color} animationDuration={600} animationEasing="ease-out" radius={[2, 2, 0, 0]} />
-              {/* connectNulls stays false: pre-floor baseline months render as a gap. */}
-              <Line dataKey="prevYearValue" name="Anno precedente" stroke="var(--muted-foreground)" strokeDasharray="4 3" strokeWidth={1.5} dot={false} isAnimationActive={false} />
-            </ComposedChart>
-          </ResponsiveContainer>
+          <EntityTrendChart data={monthlySeries} seriesName={seriesName} color={color} height={TREND_CHART_HEIGHT} fallback={<Skeleton className="w-full" style={{ height: TREND_CHART_HEIGHT }} />} />
         </div>
       ) : (
         <p className="py-3 text-[13px] text-muted-foreground">Nessun movimento negli ultimi 24 mesi.</p>

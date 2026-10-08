@@ -7,6 +7,8 @@ import {
   tickerSchema,
   snapshotRequestSchema,
   dividendDataSchema,
+  assetTransactionDataSchema,
+  assetTransactionUpdateSchema,
   parseOr400,
 } from '@/lib/server/validation';
 
@@ -154,6 +156,45 @@ describe('dividendDataSchema', () => {
 
   it('accepts payload without optional assetIsin', () => {
     expect(dividendDataSchema.safeParse(basePayload).success).toBe(true);
+  });
+
+  // A Date the client could not build serializes as null; coerced alone it became 1970-01-01.
+  it.each([
+    ['exDate', null],
+    ['paymentDate', null],
+    ['exDate', 1718409600000],
+    ['paymentDate', ''],
+  ])('rejects a %s of %s instead of coercing it', (field, value) => {
+    expect(dividendDataSchema.safeParse({ ...basePayload, [field]: value }).success).toBe(false);
+  });
+
+  it('rejects a null date on a partial update too', () => {
+    expect(dividendDataSchema.partial().safeParse({ exDate: null }).success).toBe(false);
+  });
+});
+
+describe('assetTransactionDataSchema / assetTransactionUpdateSchema', () => {
+  const basePayload = {
+    assetId: 'asset-1',
+    type: 'buy',
+    date: '2024-06-15T00:00:00.000Z',
+    quantity: 10,
+    pricePerUnit: 100,
+  };
+
+  it('accepts an ISO date string and returns a Date', () => {
+    const result = assetTransactionDataSchema.safeParse(basePayload);
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.date).toBeInstanceOf(Date);
+  });
+
+  it.each([null, 1718409600000, ''])('rejects a date of %s instead of coercing it', (value) => {
+    expect(assetTransactionDataSchema.safeParse({ ...basePayload, date: value }).success).toBe(false);
+  });
+
+  it('rejects a null date on an update, and accepts an update without one', () => {
+    expect(assetTransactionUpdateSchema.safeParse({ date: null }).success).toBe(false);
+    expect(assetTransactionUpdateSchema.safeParse({ quantity: 5 }).success).toBe(true);
   });
 });
 

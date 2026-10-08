@@ -78,7 +78,8 @@ export const MIN_CHIP_SEGMENT_PCT = 5;
 
 /**
  * Fixed short forms, so «Azioni · Obbl.» fits the chip; the accessible name spells every class out.
- * The sixth Italian class-label map (doc/guide/allocazione.md § label maps), in its own register:
+ * The sixth Italian class-label map (doc/guide/allocazione.md § A label map has its own
+ * REGISTER and is extended, never consolidated), in its own register:
  * abbreviated to the CHIP. It differs from the PDF's `getAssetClassShort` on purpose — that column
  * holds one name alone and can afford «Immobili» or «Liquidità», while the chip holds two names joined
  * by « · » inside a pill whose width carries the proportions, so every long form is cut and the dot
