@@ -96,7 +96,7 @@ Mai rigenerato né parafrasato: `keyCharacteristics[8]`, `donts[32]` e `rules[26
 righe nuove; quattro `{ name, body, section: "components" }` dopo «The Tile Grid Rule»; `components[]` Page Verdict,
 Tile, Error Notice estese con le parole nuove di DESIGN.md; `extensions.motion` + `ease-spring` col `linear()` di
 `app/globals.css` (la motion si legge dal CODICE) e il `purpose` di `spring-layout` («the `layout="position"` wrappers
-of Panoramica and Patrimonio», che PERF-14 toglie) riletto con `grep -rn springLayoutTransition app components`; il
+of Panoramica and Patrimonio», tolto il 2026-10-08: `springLayoutTransition` non esiste più) riletto con `grep -rn springLayoutTransition app components`; il
 `purpose` di `breakpoints` desktop; `generatedAt`. Lo script di § 7 prima e dopo.
 
 ### 4.4 Guide e AGENTS.md
@@ -140,8 +140,9 @@ WORKFLOW § Where things are recorded; cifre tonde inventate e nomi generici, ma
 
 ### 4.8 Conflitti con PERF
 
-- **PERF-14** scrive in DESIGN.md solo se il proprietario cambia lo stagger (§ 4 D, § 10) e non tocca il sidecar:
-  MOB-09 rilegge dopo, aggiunge accanto, riallinea `spring-layout` (§ 4.3).
+- **PERF-14** (in develop dal 2026-10-08) ha scritto in DESIGN.md la riga «The cascade plays once per session» (→ Tile Grid)
+  e ha tolto `springLayoutTransition` dalla frase delle molle; il sidecar non l'ha toccato: MOB-09 rilegge, aggiunge
+  accanto, riallinea `spring-layout` (§ 4.3).
 - **PERF-03** (in develop dal 2026-09-30): se «Aggiornato alle…» avrà un nome in DESIGN.md, The First-Screen Rule lo cita
   DOV'È — la riga dell'header (desktop dopo la descrizione, sotto al posto della descrizione), per decisione del
   proprietario, non sotto la prima frase.
@@ -213,8 +214,8 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
 - Leggi WORKFLOW.md (§ 2 e § Where things are recorded), AGENTS.md (§ 0, § 3, § 4 Motion, Navigation, Hierarchy,
   Density and Disclosure, Accessibility), CLAUDE.md
 - Leggi DESIGN.md § 1, § 2 Named Rules, § 5 Tile, Tile Grid, Navigation, Segmented Pill Control, § 6 — MAI rigenerarlo
-- Leggi le guide di § 4.4, il git log di MOB-03..08, doc/guide/stati.md § The fourth reading (la riga «Aggiornato alle…» di PERF-03, ritirata) e doc/perf/PERF-14 (le loro
-  righe in DESIGN.md)
+- Leggi le guide di § 4.4, il git log di MOB-03..08, doc/guide/stati.md § The fourth reading (la riga «Aggiornato alle…» di PERF-03, ritirata) e le righe di PERF-14 in DESIGN.md (→ Tile Grid «The cascade
+  plays once per session», la frase delle molle senza `springLayoutTransition`)
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md
 - Leggi doc/mobile/README.md, la spec MOB-09 per intero e MOB-02 § 4.1 (i nomi delle API)
 - Crea SESSION_NOTES.md; crea il branch dalla branch attiva PRIMA di editare

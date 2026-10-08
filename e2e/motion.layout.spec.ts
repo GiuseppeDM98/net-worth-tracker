@@ -1,5 +1,5 @@
 /**
- * PERF-14 at 1440 — no layout work at mount that nobody sees (2026-10-08).
+ * At 1440 — no layout work at mount that nobody sees (2026-10-08).
  *
  * 1. The Panoramica's period switch moves nothing: `layout-shift` 0. The page used to sit in a
  *    `motion.div layout="position"` that Framer measured before and after EVERY commit of the
@@ -16,7 +16,7 @@
  *    `getComputedStyle(<html>)`: Next's router reads that twice per navigation for its scroll
  *    handling (`getScrollPaddingTop`, measured 2026-10-08).
  * 4. The tile cascade plays the first time the grid renders in a session and not on a later
- *    opening (owner's call, PERF-14 § 4 D: ~1 s of semi-transparent figures at every return).
+ *    opening (owner's call, 2026-10-08: ~1 s of semi-transparent figures at every return).
  *
  * Seen red (2026-10-08): (2) with the media query inverted in `BottomNavigation.tsx`; (3) with
  * `ChartColorsProvider` taken out of `app/dashboard/layout.tsx` (the hooks fall back to reading

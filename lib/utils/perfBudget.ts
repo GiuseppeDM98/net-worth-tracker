@@ -1,6 +1,6 @@
 /**
  * The size budget of the build: how much JavaScript each route ships before it can paint, against
- * a ceiling that only a MEASURE may move (perf/README.md § Il ratchet e il tetto alzato).
+ * a ceiling that only a MEASURE may move (doc/guide/velocita.md § Il ratchet e il tetto alzato).
  *
  * Pure on purpose: `scripts/perfBudget.mts` reads the build and git, this module decides. The
  * ratchet has two halves, and both live here so a test can watch each go red:

@@ -11,7 +11,7 @@ import { useThemePaletteReader } from '@/lib/hooks/useThemePaletteReader';
  * `tokens` maps a result key to a CSS custom property; `fallbacks` gives the hex painted before the
  * first read and whenever a token is missing or unreadable. The hexes come from
  * `ChartColorsProvider`, which resolves `THEME_HEX_TOKENS` (lib/utils/themePalette.ts) once per
- * theme — a token passed here must be in that list (since 2026-10-08, PERF-14; the five `--role-*`
+ * theme — a token passed here must be in that list (since 2026-10-08; the five `--role-*`
  * aliases are, by construction).
  *
  * `enabled` is whether the caller will actually PAINT the colours this render. With the provider

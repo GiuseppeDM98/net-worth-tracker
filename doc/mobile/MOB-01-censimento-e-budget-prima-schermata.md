@@ -55,7 +55,7 @@ Lo script non può diventare un budget così com'è (righe del 2026-09-26, chi i
 
 ## 4. Design
 
-**Due script**, come `perf:bench` e `perf:budget` (`perf/README.md`). `scripts/mobileCensus.mjs` misura (emulatori, mirror, build servita); resta `.mjs` perché
+**Due script**, come `perf:bench` e `perf:budget` (`doc/guide/velocita.md`). `scripts/mobileCensus.mjs` misura (emulatori, mirror, build servita); resta `.mjs` perché
 passa funzioni a `page.evaluate` (un sorgente passato da `tsx` può portarsi dietro l'helper `__name`).
 `scripts/mobileBudget.mts` (con `tsx`, come i seed) confronta, chiamando la pura `lib/utils/mobileBudget.ts`.
 
@@ -136,7 +136,7 @@ guidato; (2) una cifra è solo «€ e %», come la baseline. Restano (3) e (4),
 
 ## 6. Passi
 
-1. Branch; SESSION_NOTES.md; `perf/README.md`, `scripts/perfBudget.mts` e `doc/guide/e2e-emulatori.md`.
+1. Branch; SESSION_NOTES.md; `doc/guide/velocita.md`, `scripts/perfBudget.mts` e `doc/guide/e2e-emulatori.md`.
 2. `lib/utils/mobileBudget.ts` + i tre test, visti rossi e poi verdi.
 3. `scripts/mobileCensus.mjs`, una correzione di § 1 alla volta; `scripts/mobileBudget.mts`; `package.json`.
 4. Emulatori, `npm run mirror:seed -- <email>`, `perf:build`, `perf:serve`, `mobile:census`; uno scarto dalla baseline
@@ -197,7 +197,7 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
   § Browser-Driven E2E), CLAUDE.md (§ Testing, § Known Issues), doc/guide/e2e-emulatori.md
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALI mentre scrivi codice
 - Leggi doc/mobile/README.md (§ 3 è la baseline) e la spec MOB-01 per intero; doc/mobile/MOB-02 § 4.1-4.4 (il contratto
-  che il censimento riconosce); perf/README.md e scripts/perfBudget.mts (perf:build,
+  che il censimento riconosce); doc/guide/velocita.md e scripts/perfBudget.mts (perf:build,
   perf:serve, porta :3200: il censimento gira sulla stessa build); DESIGN.md § mobile se MOB-09 l'ha già scritta
 - Crea SESSION_NOTES.md; crea il branch dalla branch attiva PRIMA di editare
 

@@ -152,7 +152,7 @@ il Dettaglio, come in Storico (`history/page.tsx:498-501`): gesti rari, ~56 px d
   a 390 di `e2e/assets.composite-chip.spec.ts` (#403): gira nel progetto `desktop` con `setViewportSize`, ma
   `useCompactLayout` legge la larghezza, quindi a 390 Strumenti è chiusa e le `AssetRow` non esistono — il suo
   `openPatrimonio` apre la riga `patrimonio-strumenti` prima di aspettare il nome dello strumento.
-- **PERF-14**: `layout="position"` (`assets/page.tsx:385`) è già tolto; nessun `layout` nuovo. **PERF-04** (in develop dal
+- **PERF-14** (in develop dal 2026-10-08): il `layout="position"` di `assets/page.tsx` è tolto; nessun `layout` nuovo. **PERF-04** (in develop dal
   2026-09-30) ha reso pigri i grafici delle disclosure e della Scheda di Analisi e il Sankey del Flusso, che sotto i
   640 px non si scarica (doc/guide/cashflow-analisi.md); su Storico solo il PDF è pigro: Composizione, Valore ed
   Evoluzione portano recharts nel grafo iniziale e il Dettaglio resta statico (doc/guide/storico.md) — la riga chiusa

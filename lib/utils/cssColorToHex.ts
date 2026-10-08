@@ -7,7 +7,7 @@
  * and to `lab()` for the rest, and `getComputedStyle` hands back that served form. Out-of-gamut
  * values are clipped per channel, which is what the browser does when painting them.
  *
- * Every form is read by `lib/utils/colorParse.ts`, the one colour parser of the repo (PERF-14,
+ * Every form is read by `lib/utils/colorParse.ts`, the one colour parser of the repo (since
  * 2026-10-08): this module only chooses the route — an sRGB form keeps its exact channels, an
  * `oklch()` / `lab()` one goes through OKLCH.
  *

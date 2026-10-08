@@ -20,7 +20,7 @@
  * SEEN RED (2026-09-29), one behaviour at a time: (a) the reload without a skeleton, with
  * `maxAge: 0` on the provider (the record is discarded at the restore and the skeleton returns) —
  * not with `NEXT_PUBLIC_PERSIST_QUERIES=false`, which needs a server of its own and was exercised
- * by the benchmark's «prima» build instead (perf/README.md § Revisit); (b) the sentence, with
+ * by the benchmark's «prima» build instead (doc/guide/velocita.md § Revisit); (b) the sentence, with
  * `describeFreshness`'s words changed; (c) the emptied node, with the sentence latched once shown.
  */
 

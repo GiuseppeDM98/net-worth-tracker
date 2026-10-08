@@ -1,5 +1,5 @@
 /**
- * The size budget's two halves (perf/README.md § Il ratchet e il tetto alzato): a route over its
+ * The size budget's two halves (doc/guide/velocita.md § Il ratchet e il tetto alzato): a route over its
  * ceiling is red, and a ceiling that climbs above the committed one is red unless it carries a
  * reason of its own. The script only reads the build and git; every decision is pinned here, so
  * the budget is never a check that has not been seen red.

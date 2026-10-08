@@ -79,7 +79,7 @@ const CELL_CLASS = TILE_CELL_CLASS;
  * ~1 s after the data (962 ms measured on the mirror, 2026-10-08); the Panoramica is the page
  * reopened most, and from the second opening the cascade reveals nothing the page scene does not
  * already say. So it plays the FIRST time the grid renders in a session, and later openings show
- * the tiles at once (owner's call, PERF-14 § 4 D). Set after the grid commits, never on a
+ * the tiles at once (owner's call, 2026-10-08). Set after the grid commits, never on a
  * skeleton or a failed read: those openings have not shown the cascade.
  */
 const tileGridEntrance = { played: false };

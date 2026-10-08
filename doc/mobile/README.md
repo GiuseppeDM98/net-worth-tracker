@@ -2,11 +2,11 @@
 
 > Sessione del 2026-09-26, dalla domanda del proprietario: «l'app è densa di informazioni in ogni sua parte, ed è
 > questo che le va contro sul telefono: lì guardo al massimo 4–5 informazioni». Questa cartella tiene UNA specifica per
-> implementazione (`MOB-NN-*.md`, sul template di `doc/perf/`, ognuna con il prompt e il modello in coda), il censimento
+> implementazione (`MOB-NN-*.md`, sullo stesso template delle 14 spec PERF, tutte ritirate entro il 2026-10-08, ognuna con il prompt e il modello in coda), il censimento
 > di riferimento in `reference/` e questo indice: la domanda con la risposta, come è stato misurato il mobile attuale,
 > la baseline, le tre direzioni disegnate e quella scelta, l'ordine consigliato e lo stato. **Si implementa DOPO le 14
-> spec di `doc/perf/`** (decisione del proprietario): PERF-02 (in develop dal 2026-09-29) e PERF-03 (in develop dal 2026-09-30: la riga «Aggiornato alle…» sta nel `PageHeader`, non nella composizione) cambiano la shell che il mobile eredita, PERF-04 (in develop dal 2026-09-30), PERF-12 (dal 2026-10-06) e PERF-11 (dal 2026-10-07) hanno toccato e PERF-14
-> tocca gli stessi componenti. Una spec che si chiude aggiorna la tabella in § 6 e, se ha rimisurato, la baseline in § 3.
+> spec PERF** (decisione del proprietario; tutte in develop e ritirate, l'ultima il 2026-10-08): PERF-02 (in develop dal 2026-09-29) e PERF-03 (in develop dal 2026-09-30: la riga «Aggiornato alle…» sta nel `PageHeader`, non nella composizione) cambiano la shell che il mobile eredita, PERF-04 (in develop dal 2026-09-30), PERF-12 (dal 2026-10-06) e PERF-11 (dal 2026-10-07) e PERF-14 (dal 2026-10-08)
+> hanno toccato gli stessi componenti. Una spec che si chiude aggiorna la tabella in § 6 e, se ha rimisurato, la baseline in § 3.
 
 ## 1. La domanda e la risposta
 
@@ -34,7 +34,7 @@ temi, la regola degli stati su venti superfici e quaranta modali: escluso.
   `top`, altezza, cifre e parole; le cifre (`\d[\d.,]*\s?(€|%)`) e le parole totali e «sopra la piega» (il nodo
   inizia nella prima schermata); i controlli; i grafici; le tablist; `scrollWidth > clientWidth`. Due screenshot per
   superficie (prima schermata e pagina intera con `main` sbloccato).
-- **Cosa NON misura**: i tempi (dev server, non build di produzione: la baseline dei tempi è `doc/perf/README.md § 3`);
+- **Cosa NON misura**: i tempi (dev server, non build di produzione: la baseline dei tempi è doc/guide/velocita.md § Baseline in vigore, quella storica del 2026-09-26 in § Baseline storica);
   la differenza fra cifre «nel verdetto» e «fuori» (le ha contate lo script a mano nelle tre pagine dei mock; MOB-01
   la rende una misura). I dati grezzi (JSON e screenshot) restano fuori dal repo: portano le cifre reali.
 
@@ -152,7 +152,7 @@ https://claude.ai/artifact/JQcXUcUt55HeiUUeP2EMNh.
 | Tesi | verdetto breve · striscia di ≤4 cifre · LA tessera aperta · il resto in righe chiuse con il loro eyebrow | la Panoramica mobile è il feed dei verdetti delle 12 pagine; le pagine sono 1–2 tessere + «Il resto · N» | verdetto e indice fermi, una tessera per schermata, swipe |
 | Cifre fuori dal verdetto (Panoramica / Tracciamento / Rendimenti) | 5 / 5 / 5 | 3 / 5 / 3 | 5 / 7 / 4 |
 | Shell | invariata | la Panoramica cambia natura | il 28% dello schermo fisso |
-| Costo | `PageVerdict`, `Tile`, `PageHeader`, `PageTabBar` | + `DiaryRow`, un endpoint aggregato (contro `doc/perf/`), una regola «una cifra per pagina» | + un `TilePager` con cinque regole proprie |
+| Costo | `PageVerdict`, `Tile`, `PageHeader`, `PageTabBar` | + `DiaryRow`, un endpoint aggregato (contro le spec PERF), una regola «una cifra per pagina» | + un `TilePager` con cinque regole proprie |
 | Rischio principale | 16–36 px sopra la pill; le clausole del verdetto dietro un tap | una cifra per pagina può smentire la pagina | screen reader: 1 tessera su 8; swipe dal bordo su iOS |
 
 **Scelta (proprietario, 2026-09-26): A come base su tutte le pagine.** Da C si prendono due cose che servono comunque:
@@ -184,7 +184,7 @@ Gli archi (A → B = «B dipende da A»), gli stessi dell'intestazione di ogni s
 
 I contributi esterni del 2026-09-27 (#400, #401, #403) sono già in `develop`, e la nuova Esposizione (PERF-00, #407) è entrata il 2026-09-28,
 prima di PERF-01: MOB-01 misura un'app che li contiene, e MOB-06 e MOB-07 compongono il Flusso e l'Esposizione come sono
-DOPO quei contributi (`doc/perf/README.md` § 5).
+DOPO quei contributi.
 
 MOB-01 va prima di tutto, come PERF-01: le altre si chiudono con i suoi numeri. MOB-02 è il CONTRATTO che sette spec
 citano alla lettera (la tabella delle API in § 4.1): le due decisioni di fondazione che pone — l'ordine del DOM e la
@@ -250,7 +250,7 @@ npm davanti alle opzioni.
   una cifra (tasse su una vendita, base misurata, calendario) resta sempre visibile.
 - **Una tessera sul telefono non ripete** ciò che striscia o verdetto hanno stampato; torna intera dal tablet.
 - **Le sezioni aperte si ricordano per pagina** (`localStorage`, per dispositivo).
-- Prima le 14 spec di `doc/perf/`, poi queste.
+- Prima le 14 spec PERF (tutte ritirate entro il 2026-10-08), poi queste.
 - **Decisioni di fondazione (2026-09-27, prima di MOB-02/MOB-03)**: (1) **una sequenza sola** — nessun riordino
   CSS, l'ordine del DOM è l'ordine di lettura su ogni dispositivo, e dove LA tessera non è già la prima della griglia si
   sposta anche sul desktop (chiude AGENTS § Hierarchy vs `doc/guide/patrimonio.md`: vale la seconda); (2) **l'asse sotto

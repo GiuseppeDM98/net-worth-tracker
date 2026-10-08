@@ -1,5 +1,5 @@
 /**
- * The palette `ChartColorsProvider` hands to every chart (PERF-14, 2026-10-08) — and the luminance
+ * The palette `ChartColorsProvider` hands to every chart (2026-10-08) — and the luminance
  * filter inside it, which was INERT until that day.
  *
  * The provider and the hooks' no-provider fallback (the landing) run the same reader,

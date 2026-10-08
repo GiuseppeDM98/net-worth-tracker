@@ -18,8 +18,8 @@ import { useThemePaletteReader } from '@/lib/hooks/useThemePaletteReader';
  * trendFollowing 6 and carry 7, and on the default theme the static teal at index 6
  * measured ΔE00 0.87 from --chart-2 — not "close to" Obbligazioni, the same colour.
  *
- * Read from `ChartColorsProvider` (the dashboard layout reads the theme once; since 2026-10-08,
- * PERF-14), so a host renders once instead of twice. Without the provider (the landing) the hook
+ * Read from `ChartColorsProvider` (the dashboard layout reads the theme once, since 2026-10-08),
+ * so a host renders once instead of twice. Without the provider (the landing) the hook
  * reads the theme itself, after paint — the timing and the luminance filter are in
  * `useThemePaletteReader` and `lib/utils/themePalette.ts`.
  */

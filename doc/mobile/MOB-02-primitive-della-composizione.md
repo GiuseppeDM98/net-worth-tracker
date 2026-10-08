@@ -169,7 +169,7 @@ frase chiude dopo la cifra del record («in un mese» solo con la percentuale, `
 
 ### 4.8 Conflitti con PERF
 
-- **PERF-12** (in develop dal 2026-10-06, AGENTS.md § Motion): `useSyncExternalStore`, nessun ref restituito, `mounted` nel gestore. **PERF-14**: nessun `layout`; un
+- **PERF-12** (in develop dal 2026-10-06, AGENTS.md § Motion): `useSyncExternalStore`, nessun ref restituito, `mounted` nel gestore. **PERF-14** (in develop dal 2026-10-08, AGENTS.md § Motion, doc/guide/temi.md): nessun `layout`; un
   grafico montato all'apertura legge `ChartColorsProvider`. **PERF-04** (in develop dal 2026-09-30): un grafico lazy riserva la sua altezza, il `fallback` di `lazyComponent` (obbligo
   di MOB-03..07). **PERF-03** (in develop dal 2026-09-30): «Aggiornato alle…» NON è uno slot della composizione — sta nel
   `PageHeader` (desktop: dopo la descrizione; sotto `desktop:` al posto della descrizione, `[data-freshness]`,
@@ -283,8 +283,8 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
 - Leggi doc/guide/hall-of-fame.md, doc/guide/stati.md, doc/guide/e2e-emulatori.md
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice
 - Leggi doc/mobile/README.md e la spec MOB-02 per intero; DESIGN.md § 5 e § 6 (MAI rigenerarlo);
-  doc/mobile/MOB-01 e doc/perf/PERF-14 (devono essere chiuse; PERF-12 è ritirata dal 2026-10-06 — il compiler in AGENTS.md
-  § Motion, il census in perf/README.md § Il census —, PERF-02 lo è dal 2026-09-29, PERF-03 dal
+  doc/mobile/MOB-01 (deve essere chiusa; PERF-14 è ritirata dal 2026-10-08 — il provider dei colori e il `layout` solo dove si vede in AGENTS.md § Motion e doc/guide/{temi,shell,panoramica}.md —, PERF-12 dal 2026-10-06 — il compiler in AGENTS.md
+  § Motion, il census in doc/guide/velocita.md § Il census —, PERF-02 lo è dal 2026-09-29, PERF-03 dal
   2026-09-30: la riga di freschezza è in doc/guide/stati.md § The fourth reading)
 - Crea SESSION_NOTES.md; crea il branch dalla branch attiva PRIMA di editare
 

@@ -14,8 +14,9 @@
  * measured — never a transcription that can drift. Three floors per theme:
  *
  *   - ΔE00 ≥ 14 between any two slots of one mode. A composition bar is 8px of colour and nothing else.
- *   - the luminance guard of `useChartColors` must not trip: L ≤ 0.82 in light and L ≥ 0.30 in
- *     dark, or the slot silently falls back to the static palette (doc/guide/temi.md) — cyberpunk's
+ *   - the luminance filter of `lib/utils/themePalette.ts` (what `useChartColors` returns) must not
+ *     trip: L ≤ `CHART_LIGHT_MAX_L` (0.82) in light and L ≥ `CHART_DARK_MIN_L` (0.30) in dark, or
+ *     the slot silently falls back to the static palette (doc/guide/temi.md) — cyberpunk's
  *     light slots 3-5 sat at L 0.84–0.92 until the same day.
  *   - a slot keeps its hue across the two modes (≤ 30°), so a class does not change identity when
  *     the mode flips. A NEUTRAL slot (chroma < 0.03: solar-dusk's Immobili is a warm grey on
@@ -25,6 +26,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { CHART_DARK_MIN_L, CHART_LIGHT_MAX_L } from '@/lib/utils/themePalette';
 
 // ─── OKLCH → CIE Lab (D65), then CIEDE2000 ────────────────────────────────────
 
@@ -148,8 +150,8 @@ const darkSelector = (theme: ThemeName) => (theme ? `.dark[data-theme="${theme}"
 const NEUTRAL_CHROMA = 0.03;
 
 const BLOCKS = THEMES.flatMap((theme) => [
-  { label: `${theme ?? 'default'} · light`, selector: lightSelector(theme), guard: { maxL: 0.82, minL: 0 } },
-  { label: `${theme ?? 'default'} · dark`, selector: darkSelector(theme), guard: { maxL: 1, minL: 0.3 } },
+  { label: `${theme ?? 'default'} · light`, selector: lightSelector(theme), guard: { maxL: CHART_LIGHT_MAX_L, minL: 0 } },
+  { label: `${theme ?? 'default'} · dark`, selector: darkSelector(theme), guard: { maxL: 1, minL: CHART_DARK_MIN_L } },
 ]);
 
 describe.each(BLOCKS)('the chart slots of $label', ({ selector, guard }) => {
@@ -160,7 +162,7 @@ describe.each(BLOCKS)('the chart slots of $label', ({ selector, guard }) => {
     expect(deltaE, `${a} ↔ ${b} measure ΔE00 ${deltaE.toFixed(1)} — the same colour to a reader`).toBeGreaterThanOrEqual(MIN_DELTA_E);
   });
 
-  it('stays inside the luminance guard of useChartColors, so no slot falls back to the static palette', () => {
+  it('stays inside the luminance filter of themePalette, so no slot falls back to the static palette', () => {
     slots.forEach(([L], i) => {
       expect(L, `${SLOT_NAMES[i]} L=${L}`).toBeLessThanOrEqual(guard.maxL);
       expect(L, `${SLOT_NAMES[i]} L=${L}`).toBeGreaterThanOrEqual(guard.minL);

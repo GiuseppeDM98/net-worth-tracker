@@ -135,7 +135,7 @@ npm run dev:emulator     # the app on :3000 pointed at the emulators
 
 Prerequisites (a JDK) and the full guide: SETUP.md → Step 6. Port 3100 (`npm run dev:e2e`, isolated
 `.next-e2e` build dir) is the Playwright server; keep it separate from the tour server on :3000. Port
-3200 (`npm run perf:serve`, the `.next-perf` production build) is the speed benchmark's (`perf/README.md`).
+3200 (`npm run perf:serve`, the `.next-perf` production build) is the speed benchmark's (`doc/guide/velocita.md`).
 
 ### Obligation 5 — how to hand the owner an app already authenticated
 
@@ -245,11 +245,19 @@ The app **is** locally runnable; there is no fallback to declare.
 ### Where things are recorded
 
 - **Branches**: `develop` is the integration branch, `main` the default; a session branches off
-  whatever is active (usually `develop`) and merges into it by PR. **The `doc/perf/` and `doc/mobile/`
-  specs land on `develop`, one session at a time.** The 2026-09-28 rule («they reach `main` together») was
-  derogated by the owner on 2026-10-08: `develop` goes to `main` **after the last PERF spec (PERF-14) and the
-  Known Issues session of 2026-10-08** — the Next 16.4 security fix ships with the perf work — and the MOB
-  specs follow in a second release. Until PERF-14 is retired, still no PR from `develop` to `main`.
+  whatever is active (usually `develop`) and merges into it by PR. **The `doc/mobile/` specs land on `develop`,
+  one session at a time** (the fourteen `doc/perf/` specs did the same, 2026-09-28 → 2026-10-08). The 2026-09-28 rule
+  («they reach `main` together») was derogated by the owner on 2026-10-08: `develop` goes to `main` **after the last
+  PERF spec and the Known Issues session of 2026-10-08** — the Next 16.4 security fix ships with the perf work — and
+  the MOB specs follow in a second release. PERF-14 was retired on 2026-10-08: from that day the PR from `develop` to
+  `main` is the owner's to open.
+- **A spec is retired by a session of its own** (fourteen times, 2026-09-28 → 2026-10-08): the code is read against the
+  spec, every divergence gets a verdict, the lessons go home (AGENTS.md, the guide, a comment at the line, CLAUDE.md),
+  then the spec and every pointer to it go. A text-only defect found there is fixed in the retirement with `tsc`, lint
+  and Vitest, no Playwright; a runtime one only on the owner's call, with the area suite and the full Playwright; a
+  deferral nobody wrote goes where its theme lives (a guide's blind spots, the speed manual); a tour done in the
+  implementation session is recorded by the dossier's index. **`Draft Release Temp.md` never says a spec was retired**
+  (owner, 2026-10-08): its § Documentation line names what the guides now say, surface by surface.
 - **The outcome of a verification**: `SESSION_NOTES.md` during the session (untracked — delete it
   before the commit); it is folded into `CLAUDE.md` (the "Latest" entry) and `Draft Release Temp.md`
   before the PR. **Before the closing prompt it ends with one block** (owner, 2026-09-27): *Cosa* (what
