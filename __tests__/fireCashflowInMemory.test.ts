@@ -8,6 +8,7 @@
  * range queries printed.
  */
 import { describe, it, expect, vi } from 'vitest';
+import { fromZonedTime } from 'date-fns-tz';
 
 vi.mock('@/lib/firebase/config', () => ({ db: {} }));
 vi.mock('firebase/firestore', () => ({}));
@@ -104,7 +105,9 @@ describe('buildFIREData', () => {
     });
     const rows = [
       row({ date: new Date(2025, 2, 10), amount: -1, type: 'variable' }), // March 2025: the last full year (metrics), before the runway's window
-      row({ date: new Date(2026, 6, 31, 23, 59), amount: -1000, type: 'variable' }), // the last day of July 2026: the last snapshot's month
+      // The last day of July 2026 by the ITALIAN clock (the month is read in Rome; built from the
+      // process zone this row was August when the suite ran in UTC, 2026-10-08): the last snapshot's month.
+      row({ date: fromZonedTime('2026-07-31T23:59:00', 'Europe/Rome'), amount: -1000, type: 'variable' }),
       row({ date: new Date(2026, 7, 1), amount: -1000, type: 'variable' }), // August 2026: after the last snapshot, in no point
     ];
     const data = buildFIREData(snapshots, rows, 111_000, 4, false, NOW);

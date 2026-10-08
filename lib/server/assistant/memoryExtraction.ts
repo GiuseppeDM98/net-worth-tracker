@@ -366,9 +366,9 @@ async function callMemoryExtractionTool(
       model: EXTRACTION_MODEL,
       max_tokens: 1024,
       // Static across every call — cache_control lets back-to-back extractions (one per
-      // completed assistant turn, across users) share the cached prefix. Below the Haiku
-      // 4.5 minimum cacheable prefix (4096 tokens) today, so this is a safe no-op rather
-      // than a guaranteed hit — harmless to leave on, and correct if the prompt grows.
+      // completed assistant turn, across users) share the cached prefix. Below Haiku's
+      // minimum cacheable prefix today, so this is a safe no-op rather than a guaranteed
+      // hit — harmless to leave on, and correct if the prompt grows.
       system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
       tools: [MEMORY_TOOL],
       // Forced: the model has no way to answer in prose, so there is no prose to parse.

@@ -14,6 +14,12 @@
 
 ## 🐛 Bug Fixes
 
+- Closing any dialog or bottom sheet now hands the keyboard focus back to the control that opened it, on every page: 27 of the 40 dialogs still dropped it on the page body, so a keyboard user landed at the top of the page after every «Salva» or Escape.
+
+- Captions, reading lines and inactive labels meet the AA contrast floor (4,5:1) on the page, on tiles and on pills in all twelve colour themes: six were below it — the default light theme on pills, Retro Arcade dark at 2:1, Midnight Bloom light at 2,9:1 — and a test now holds the floor.
+
+- Every switch (Impostazioni, FIRE, the dialogs) has a 44×44 touch target without changing its look.
+
 - Fixed account balances and bond coupons showing long tails of digits in their edit forms (for example «4033,050000000001» as a balance, «6,500000000000001» as a coupon per unit). A balance is now stored to the cent at every movement and a coupon as the decimal it is, without changing any figure shown at two decimals.
 
 - Fixed the asset and cash-account windows on Patrimonio closing without their animation or leaving the keyboard focus nowhere: both now slide away as every other window does and hand the focus back to the button or row that opened them. Editing an account from its detail returns to that account's row in Liquidità once the form closes.
@@ -35,6 +41,8 @@
 - Fixed a member of a shared account seeing their OWN exposure on the owner's Allocazione page: the Esposizione now reads the owner's instruments, like every other tile.
 
 ## 🔧 Improvements
+
+- The AI surfaces — Rendimenti's «Analizza con AI», the assistant and the periodic emails — run on one model generation, Claude Sonnet 5.5 (the analysis was still on Sonnet 4.6, at a higher price); the assistant's memory extraction moved to Claude Haiku 5.5. When the model declines a request the assistant says so in one line instead of showing an empty bubble.
 
 - Improved the speed of Cashflow › Dividendi: the payments and the yield and growth figures arrive together in a single request, read once on the server instead of in several steps, and every figure is the same as before. After you add, edit or delete a payment the list stays on screen while it is refreshed and the yield figures follow at once; if those figures cannot be computed the payments are still shown and the page says so («Lettura fallita»).
 
@@ -68,7 +76,13 @@
 
 - Improved Patrimonio › Strumenti for a composite instrument (a 60/40 fund, a balanced ETF): still one row, but its class chip now shows every class it holds — one segment per class, as wide as its share and in that class's colour, «Azioni · Obbl.» for two, «Misto» for three or more. A class under 5% gets no segment, a screen reader hears every share, and the group headers and the sort by class keep the prevailing class. (Contributed by Ciocc128.)
 
+## 🔒 Security
+
+- Updated Next.js to 16.4 (every 16.x up to 16.3.7 carried critical advisories), firebase-admin to 14 and the Firebase SDK to 12.19: the dependency audit goes from 50 advisories, two critical, to 20 with none critical, all inside developer tooling.
+
 ## 📚 Documentation
+
+- The unit suite is green under `TZ=UTC` as well: the four fixtures that sat beside midnight are now named by the Italian clock, and the testing rules say how to write the next one. The speed manual records why fourteen size ceilings rose on 2026-10-08 (Firebase 12.19, required by firebase-admin 14) and the workflow says when `develop` reaches `main`.
 
 - The speed manual now records the before/after timings and page size of Patrimonio's lighter rows; the Patrimonio guide describes the account detail's state correctly and drops a stale note about lint errors; the testing guide records one isolated failure of the transfer-fee browser test.
 

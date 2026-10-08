@@ -131,9 +131,14 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **A controlled modal with no Radix `Trigger` hands focus to `body` on close** (2026-09-20, Rendimenti's two header dialogs,
   measured 2/2): `@radix-ui/react-dialog`'s modal content handles `onCloseAutoFocus` with `preventDefault()` +
   `triggerRef.current?.focus()`, and with no Trigger that ref is null — the FocusScope's own restore is cancelled and nothing
-  replaces it. `returnFocusTo` is the cure, fed from `event.currentTarget` at the click (a `PageHeader` action is mounted
-  twice; only `currentTarget` is the copy that was pressed). Every modal opened from a plain button without it has the same
-  defect: pass the opener when you touch one. Pinned by `e2e/performance.degraded.spec.ts`.
+  replaces it. **Since 2026-10-08 `ResponsiveModal` keeps its own fallback**: a layout effect on `open` records
+  `document.activeElement` (before Radix's FocusScope moves it into the content from a passive effect) and
+  `onCloseAutoFocus` restores it — skipped when it is `body` or has since unmounted — so every keyboard opener and
+  every Chrome click gets its focus back on all 40 modals without a prop (pinned by `e2e/pension.spec.ts`, seen red with
+  the fallback removed). `returnFocusTo` still wins and is still needed where the opener NEVER held the focus: Safari
+  does not focus a clicked button, and a row opened from a window event or a non-focusable cell leaves `body` focused at
+  open. Fed from `event.currentTarget` at the click (a `PageHeader` action is mounted twice; only `currentTarget` is the
+  copy that was pressed). Pinned by `e2e/performance.degraded.spec.ts`.
 - **`e2e/modal.origin.spec.ts` can fail on a SLOW or cold dev server** (no `data-state="closed"` frame inside the
   sampler's 2,6 s window — the dialog opened more than ~1,5 s after the click; 2026-09-29 on the Windows laptop, 2026-10-04
   on the Mac with the server started cold for the one spec, on `develop` too). The window is the spec's, not the app's. An

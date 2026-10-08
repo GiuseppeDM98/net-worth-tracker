@@ -246,8 +246,10 @@ The app **is** locally runnable; there is no fallback to declare.
 
 - **Branches**: `develop` is the integration branch, `main` the default; a session branches off
   whatever is active (usually `develop`) and merges into it by PR. **The `doc/perf/` and `doc/mobile/`
-  specs land on `develop`, one session at a time, and reach `main` together** (owner, 2026-09-28): no
-  PR from `develop` to `main` until every PERF and every MOB spec is done.
+  specs land on `develop`, one session at a time.** The 2026-09-28 rule («they reach `main` together») was
+  derogated by the owner on 2026-10-08: `develop` goes to `main` **after the last PERF spec (PERF-14) and the
+  Known Issues session of 2026-10-08** — the Next 16.4 security fix ships with the perf work — and the MOB
+  specs follow in a second release. Until PERF-14 is retired, still no PR from `develop` to `main`.
 - **The outcome of a verification**: `SESSION_NOTES.md` during the session (untracked — delete it
   before the commit); it is folded into `CLAUDE.md` (the "Latest" entry) and `Draft Release Temp.md`
   before the PR. **Before the closing prompt it ends with one block** (owner, 2026-09-27): *Cosa* (what

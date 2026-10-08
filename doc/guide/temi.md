@@ -69,6 +69,20 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   teal · magenta · orange · violet; midnight-bloom violet · orchid · coral · blue · mint. **The values came from a
   search, not from taste** (a throwaway annealing over L, C and a few degrees of hue, maximising the closest pair under
   those constraints): re-run the idea, not the numbers, when a theme is added.
+- **`--muted-foreground` is held to 4,5:1 on THREE surfaces, in all twelve blocks** (2026-10-08,
+  `__tests__/mutedForegroundContrast.test.ts`, reading `globals.css`): `--background`, `--card` and `--muted` — the
+  reading line, the eyebrow and every inactive label are printed on all three, and the pill (`bg-muted`) is where the
+  floor was lowest. Measured that day from the file (WCAG from oklch, the same arithmetic as `actionColorContrast`):
+  `:root` 4,73 on the page but 4,34 on the pill (the detector's 4,46 of 2026-09-21 was this ink on a tinted surface);
+  retro-arcade dark 2,01 on the pill (its muted was a MID tone, L 0.52, under an ink equal to the foreground);
+  midnight-bloom light 2,93 (a beige pill, L 0.82); midnight-bloom dark 3,87; solar-dusk light 3,98 on the pill and 4,38
+  on the card; cyberpunk dark 4,44 on the card. Re-pitched to the nearest L that clears all three: the ink alone on
+  `:root` (0.556 → 0.546), cyberpunk dark (0.63), solar-dusk light (0.523), midnight-bloom dark (0.761); ink AND surface
+  where the surface was the fault — retro-arcade dark muted 0.52 → 0.36 with the ink 0.70 → 0.76, midnight-bloom light
+  muted 0.82 → 0.90 with the ink 0.54 → 0.49. The values come from a search along L at the theme's own chroma and hue
+  (the throwaway `mutedSuggest.mjs` of that session, the idea of the chart annealing above). A new theme runs this test
+  first; a token that fails it is a surface problem as often as an ink problem — look at `--muted` before darkening
+  the ink past the theme's `--foreground`.
 - **`--chart-9` is Storico's «Previdenza» band, in all twelve blocks** (2026-09-20). It was the static indigo
   `#6366F1` from `CHART_COLORS[8]`, a ninth colour no theme had been measured against: ΔE00 3.8 from midnight-bloom's
   Azioni, 8.4 from retro-arcade dark's Liquidità, 10.3 from the DEFAULT theme's Azioni. `useChartColors` now resolves
@@ -111,6 +125,12 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   always hands over a new object, a second render and a second Sankey build for nothing (PERF-14).
 
 ## Per-page blind spots
+
+- **Retro-arcade dark prints its `--foreground` on a pill at 4,02:1** (2026-10-08): the theme's foreground is a light
+  teal (L 0.70) and the pill (`--muted`) now sits at L 0.36 — lowering it further would make it indistinguishable from
+  the card (L 0.31). Only `--muted-foreground` is held to the floor on `--muted` (`mutedForegroundContrast`); an active
+  pill label in that theme is the one place a foreground reads under AA, and the fix is a lighter foreground for the
+  whole theme, a decision on its look rather than a token.
 
 - **The chart slots are measured for DISTANCE, not for every surface they land on** (2026-09-20): ΔE00 ≥ 14 and the luminance guard hold on all twelve blocks, and the re-pitched slots were searched at ≥ 3:1 against their card — but that contrast is NOT asserted by the suite, the default theme's two slots under 3:1 (next entry) are untouched, and a colour-blind reader is not modelled: a composition is never readable by colour alone, which is why every band is also a named row.
 - **Two DEFAULT-theme chart slots and the row focus ring sit under 3:1 as non-text signals** (measured 2026-09-18 on a

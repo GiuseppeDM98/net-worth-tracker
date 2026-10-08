@@ -141,6 +141,20 @@ test('the pension-lock switch in Base di calcolo persists and is reflected in th
   await expect(lockSwitch).toBeVisible();
   const initial = (await lockSwitch.getAttribute('aria-checked')) === 'true';
 
+  // The painted switch is 36×20 and its TARGET is 44×44 (the pseudo-element of `components/ui/switch.tsx`,
+  // 2026-10-08): a tap 8px above or below the paint still lands on the switch. `boundingBox` cannot see a
+  // pseudo-element, so the probe is hit-testing. Seen red with the `before:` classes removed.
+  const paint = await lockSwitch.boundingBox();
+  if (!paint) throw new Error('the switch has no box');
+  const hits = await page.evaluate(
+    ({ x, y, h }) => {
+      const at = (py: number) => document.elementFromPoint(x, py)?.closest('[role="switch"]') !== null;
+      return { above: at(y - 8), below: at(y + h + 8) };
+    },
+    { x: paint.x + paint.width / 2, y: paint.y, h: paint.height },
+  );
+  expect(hits).toEqual({ above: true, below: true });
+
   // Flip, and expect the saved-state toast (the switch saves on change).
   await lockSwitch.click();
   await expect(page.getByText(initial ? 'Fondo pensione considerato disponibile' : 'Fondo pensione considerato bloccato')).toBeVisible({ timeout: 10_000 });

@@ -1,64 +1,68 @@
 {
   "routes": {
     "/": {
-      "initialJsGzKB": 469,
-      "raisedBy": "#432: il React Compiler acceso (memo cache per componente, +20–26% gz sul codice dei componenti; misura prima/dopo in perf/README.md § Registro)"
+      "initialJsGzKB": 511,
+      "raisedBy": "#436: firebase 12.13 → 12.19 (@firebase/firestore 4.14 → 4.17), +57 KB gz sui condivisi che Next 16.4 riduce di 16; richiesto da firebase-admin 14 (@firebase/app 0.16.2). Misura prima/dopo in perf/README.md § Registro"
     },
     "/dashboard": {
-      "initialJsGzKB": 569,
-      "raisedBy": "#432: il React Compiler acceso (memo cache per componente, +20–26% gz sul codice dei componenti; misura prima/dopo in perf/README.md § Registro)"
+      "initialJsGzKB": 608,
+      "raisedBy": "#436: firebase 12.13 → 12.19 (@firebase/firestore 4.14 → 4.17), +57 KB gz sui condivisi che Next 16.4 riduce di 16; richiesto da firebase-admin 14 (@firebase/app 0.16.2). Misura prima/dopo in perf/README.md § Registro"
     },
     "/dashboard/allocation": {
-      "initialJsGzKB": 553,
-      "raisedBy": "#432: il React Compiler acceso (memo cache per componente, +20–26% gz sul codice dei componenti; misura prima/dopo in perf/README.md § Registro)"
+      "initialJsGzKB": 593,
+      "raisedBy": "#436: firebase 12.13 → 12.19 (@firebase/firestore 4.14 → 4.17), +57 KB gz sui condivisi che Next 16.4 riduce di 16; richiesto da firebase-admin 14 (@firebase/app 0.16.2). Misura prima/dopo in perf/README.md § Registro"
     },
     "/dashboard/analisi": {
-      "initialJsGzKB": 611,
-      "raisedBy": "#432: il React Compiler acceso (memo cache per componente, +20–26% gz sul codice dei componenti; misura prima/dopo in perf/README.md § Registro)"
+      "initialJsGzKB": 648,
+      "raisedBy": "#436: firebase 12.13 → 12.19 (@firebase/firestore 4.14 → 4.17), +57 KB gz sui condivisi che Next 16.4 riduce di 16; richiesto da firebase-admin 14 (@firebase/app 0.16.2). Misura prima/dopo in perf/README.md § Registro"
     },
     "/dashboard/assets": {
-      "initialJsGzKB": 669
+      "initialJsGzKB": 699,
+      "raisedBy": "#436: firebase 12.13 → 12.19 (@firebase/firestore 4.14 → 4.17), +57 KB gz sui condivisi che Next 16.4 riduce di 16; richiesto da firebase-admin 14 (@firebase/app 0.16.2). Misura prima/dopo in perf/README.md § Registro"
     },
     "/dashboard/assistant": {
       "initialJsGzKB": 700,
       "raisedBy": "#432: il React Compiler acceso (memo cache per componente, +20–26% gz sul codice dei componenti; misura prima/dopo in perf/README.md § Registro)"
     },
     "/dashboard/cashflow": {
-      "initialJsGzKB": 732
+      "initialJsGzKB": 763,
+      "raisedBy": "#436: firebase 12.13 → 12.19 (@firebase/firestore 4.14 → 4.17), +57 KB gz sui condivisi che Next 16.4 riduce di 16; richiesto da firebase-admin 14 (@firebase/app 0.16.2). Misura prima/dopo in perf/README.md § Registro"
     },
     "/dashboard/fire-simulations": {
-      "initialJsGzKB": 698,
-      "raisedBy": "#432: il React Compiler acceso (memo cache per componente, +20–26% gz sul codice dei componenti; misura prima/dopo in perf/README.md § Registro)"
+      "initialJsGzKB": 736,
+      "raisedBy": "#436: firebase 12.13 → 12.19 (@firebase/firestore 4.14 → 4.17), +57 KB gz sui condivisi che Next 16.4 riduce di 16; richiesto da firebase-admin 14 (@firebase/app 0.16.2). Misura prima/dopo in perf/README.md § Registro"
     },
     "/dashboard/hall-of-fame": {
-      "initialJsGzKB": 574,
-      "raisedBy": "#432: il React Compiler acceso (memo cache per componente, +20–26% gz sul codice dei componenti; misura prima/dopo in perf/README.md § Registro)"
+      "initialJsGzKB": 615,
+      "raisedBy": "#436: firebase 12.13 → 12.19 (@firebase/firestore 4.14 → 4.17), +57 KB gz sui condivisi che Next 16.4 riduce di 16; richiesto da firebase-admin 14 (@firebase/app 0.16.2). Misura prima/dopo in perf/README.md § Registro"
     },
     "/dashboard/history": {
-      "initialJsGzKB": 735,
-      "raisedBy": "#432: il React Compiler acceso (memo cache per componente, +20–26% gz sul codice dei componenti; misura prima/dopo in perf/README.md § Registro)"
+      "initialJsGzKB": 772,
+      "raisedBy": "#436: firebase 12.13 → 12.19 (@firebase/firestore 4.14 → 4.17), +57 KB gz sui condivisi che Next 16.4 riduce di 16; richiesto da firebase-admin 14 (@firebase/app 0.16.2). Misura prima/dopo in perf/README.md § Registro"
     },
     "/dashboard/pension": {
-      "initialJsGzKB": 631,
-      "raisedBy": "#432: il React Compiler acceso (memo cache per componente, +20–26% gz sul codice dei componenti; misura prima/dopo in perf/README.md § Registro)"
+      "initialJsGzKB": 661,
+      "raisedBy": "#436: firebase 12.13 → 12.19 (@firebase/firestore 4.14 → 4.17), +57 KB gz sui condivisi che Next 16.4 riduce di 16; richiesto da firebase-admin 14 (@firebase/app 0.16.2). Misura prima/dopo in perf/README.md § Registro"
     },
     "/dashboard/performance": {
-      "initialJsGzKB": 612,
-      "raisedBy": "#432: il React Compiler acceso (memo cache per componente, +20–26% gz sul codice dei componenti; misura prima/dopo in perf/README.md § Registro)"
+      "initialJsGzKB": 651,
+      "raisedBy": "#436: firebase 12.13 → 12.19 (@firebase/firestore 4.14 → 4.17), +57 KB gz sui condivisi che Next 16.4 riduce di 16; richiesto da firebase-admin 14 (@firebase/app 0.16.2). Misura prima/dopo in perf/README.md § Registro"
     },
     "/dashboard/settings": {
-      "initialJsGzKB": 670,
-      "raisedBy": "#432: il React Compiler acceso (memo cache per componente, +20–26% gz sul codice dei componenti; misura prima/dopo in perf/README.md § Registro)"
+      "initialJsGzKB": 701,
+      "raisedBy": "#436: firebase 12.13 → 12.19 (@firebase/firestore 4.14 → 4.17), +57 KB gz sui condivisi che Next 16.4 riduce di 16; richiesto da firebase-admin 14 (@firebase/app 0.16.2). Misura prima/dopo in perf/README.md § Registro"
     },
     "/login": {
-      "initialJsGzKB": 424
+      "initialJsGzKB": 474,
+      "raisedBy": "#436: firebase 12.13 → 12.19 (@firebase/firestore 4.14 → 4.17), +57 KB gz sui condivisi che Next 16.4 riduce di 16; richiesto da firebase-admin 14 (@firebase/app 0.16.2). Misura prima/dopo in perf/README.md § Registro"
     },
     "/register": {
-      "initialJsGzKB": 424
+      "initialJsGzKB": 475,
+      "raisedBy": "#436: firebase 12.13 → 12.19 (@firebase/firestore 4.14 → 4.17), +57 KB gz sui condivisi che Next 16.4 riduce di 16; richiesto da firebase-admin 14 (@firebase/app 0.16.2). Misura prima/dopo in perf/README.md § Registro"
     }
   },
-  "sharedGzKB": 483,
-  "sharedRaisedBy": "#418: date-fns, date-fns-tz, dateHelpers e formatters (~14 KB, li carica ogni pagina) passano dalle copie per pagina ai chunk condivisi; il condiviso non sale perché una route è cresciuta",
+  "sharedGzKB": 534,
+  "sharedRaisedBy": "#436: firebase 12.13 → 12.19 (@firebase/firestore 4.14 → 4.17), +57 KB gz misurati a parità di Next (482,8 → 539,5), −16 da Next 16.2 → 16.4 (→ 523,5); richiesto da firebase-admin 14, che vuole @firebase/app 0.16.2 e con ogni firebase < 12.19 ne lascia due copie",
   "libraryCopies": {
     "recharts": 1
   }

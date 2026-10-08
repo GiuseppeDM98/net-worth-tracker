@@ -63,7 +63,7 @@ Twelve dashboard routes in three named tiers — primary (Panoramica, Patrimonio
 - Category identity is keyed by document id, never by name.
 - The cron named `monthly-snapshot` actually runs daily at 18:00 UTC.
 
-**Required third-party services**, none of which is a partnership or endorsement: Yahoo Finance, Borsa Italiana (scraping), Frankfurter (FX), FRED (`FRED_API_KEY`, series ECBDFR), Anthropic (`ANTHROPIC_API_KEY`; `claude-sonnet-5` + `claude-haiku-4-5`), Resend (`RESEND_API_KEY`, `RESEND_FROM_EMAIL`).
+**Required third-party services**, none of which is a partnership or endorsement: Yahoo Finance, Borsa Italiana (scraping), Frankfurter (FX), FRED (`FRED_API_KEY`, series ECBDFR), Anthropic (`ANTHROPIC_API_KEY`; `claude-sonnet-5-5` + `claude-haiku-5-5`, `lib/constants/aiModels.ts`), Resend (`RESEND_API_KEY`, `RESEND_FROM_EMAIL`).
 
 **Opt-in / flagged capabilities**: `NEXT_PUBLIC_ASSISTANT_AI_ENABLED`, `costCentersEnabled`, Budget, `stampDutyEnabled`, goal-driven allocation, and the demo-mode env trio.
 
