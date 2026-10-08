@@ -232,6 +232,10 @@ test('«Aggiorna valore» overwrites the fund from the statement, on the page, a
   await field.fill('29900');
   await dialog.getByRole('button', { name: 'Aggiorna' }).click();
   await expect(dialog).toBeHidden();
+  // The focus comes back to the opener although the page passes no `returnFocusTo`: the modal
+  // remembers what was focused when it opened (ResponsiveModal, 2026-10-08). Seen red with the
+  // fallback removed — the focus sat on `body`.
+  await expect(action).toBeFocused();
   await expect(page.getByRole('region', { name: 'Il fondo oggi' }).getByText(euro('29.900,00'))).toBeVisible({ timeout: 15_000 });
   // It is a value change, never a contribution: the ledger keeps its three rows.
   await expect(page.getByRole('region', { name: /^Versamenti 20[0-9][0-9]$/ }).getByRole('button', { name: /^Elimina versamento/ })).toHaveCount(3);

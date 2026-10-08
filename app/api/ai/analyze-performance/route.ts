@@ -31,7 +31,7 @@ const ANALYZE_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
  * 5. Client appends chunks progressively for real-time UI updates
  *
  * WEB SEARCH:
- * - Claude uses native web_search_20250305 tool to fetch recent market events
+ * - Claude uses the native web_search_20260209 tool to fetch recent market events
  * - No preprocessing needed — Claude decides what to search and when
  * - tool_use and web_search_tool_result stream blocks are silently ignored
  *
@@ -53,7 +53,8 @@ const anthropic = new Anthropic({
  * MODEL CONFIG:
  * - PERFORMANCE_ANALYSIS_MODEL (lib/constants/aiModels.ts) for optimal cost/quality balance
  * - Adaptive thinking at effort `high` for deeper financial reasoning
- * - web_search_20250305: Claude autonomously searches for market events (max 3 uses)
+ * - web_search_20260209: Claude autonomously searches for market events (max 3 uses); the
+ *   variant with dynamic filtering, the one the Sonnet 5.x generation is documented on
  *
  * `signal` is the SDK's own request option: aborting it closes the upstream HTTP stream, which is
  * what stops the generation (and its billing) when the reader walks away.
@@ -68,7 +69,7 @@ async function callAnthropicForPerformanceAnalysis(prompt: string, signal: Abort
       tools: [
         {
           // Native web search — no external API key needed; billed at $10/1000 searches + token costs.
-          type: 'web_search_20250305',
+          type: 'web_search_20260209',
           name: 'web_search',
           max_uses: 3, // limit to keep latency reasonable
         },

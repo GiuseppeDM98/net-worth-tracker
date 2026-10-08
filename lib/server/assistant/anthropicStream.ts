@@ -119,6 +119,14 @@ function buildMessagesArray(
 const TRUNCATION_NOTICE =
   '\n\n_(Risposta interrotta: ho raggiunto il limite di lunghezza. Chiedimi di continuare o restringi la domanda.)_';
 
+/**
+ * The whole answer when the model declined (`stop_reason: 'refusal'`, an HTTP 200 with no
+ * text): the Sonnet 5.x generation declines in more categories than before, and an empty
+ * bubble would read as a broken stream rather than as a decision.
+ */
+const REFUSAL_NOTICE =
+  '_(Non posso rispondere a questa richiesta. Riformula la domanda sui tuoi dati finanziari.)_';
+
 /** The object stored at `key`, when `value` is an object holding one there. */
 function readNestedObject(value: unknown, key: string): object | undefined {
   if (typeof value !== 'object' || value === null || !(key in value)) return undefined;
@@ -196,10 +204,10 @@ export async function streamAssistantResponse({
         ? {
             tools: [
               {
-                type: 'web_search_20250305',
+                type: 'web_search_20260209',
                 name: 'web_search',
                 max_uses: isStructuredAnalysis ? 2 : 3,
-              } satisfies Anthropic.WebSearchTool20250305,
+              } satisfies Anthropic.WebSearchTool20260209,
             ],
           }
         : {}),
@@ -240,6 +248,9 @@ export async function streamAssistantResponse({
     if (stopReason === 'max_tokens' && text.length > 0) {
       onText(TRUNCATION_NOTICE);
       text += TRUNCATION_NOTICE;
+    } else if (stopReason === 'refusal' && text.length === 0) {
+      onText(REFUSAL_NOTICE);
+      text = REFUSAL_NOTICE;
     }
 
     onStatus('saving');

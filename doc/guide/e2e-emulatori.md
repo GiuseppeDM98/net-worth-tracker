@@ -249,7 +249,11 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
 - **Prove the test can fail before trusting it** (the 1440px assertions were re-run at 1200px, where they must fail).
 - **`e2e/cashflow.transfer-fee.spec.ts` was red ONCE in a full run** (2026-10-07, Windows laptop, the second full run
   of PR #434, which did not touch transfers): green alone and in the suite's order, cause not traced. A second red
-  there is a pattern, not noise — note the run before re-running it.
+  there is a pattern, not noise — note the run before re-running it. **`e2e/bundle.lazy.spec.ts` › Analisi was red ONCE
+  the same way** (2026-10-08, the first full run on Next 16.4, PR #436): `apiResponse.text: Response has been disposed`
+  inside `holdChunks`' route handler (`chunkProbe.ts:61`) — a chunk fetched by the handler was disposed before its body
+  was read, i.e. the page had moved on; green ×2 alone right after (`--repeat-each=2`). If it returns, read the body
+  inside a `try` and `route.continue()` on the disposed one rather than widening a timeout.
 - **Reading the page — the traps, each seen once**: `page.addInitScript` runs BEFORE `document.documentElement` exists
   (observe `document` with `subtree: true`, or the script dies and the spec passes having observed nothing);
   `innerText` applies `text-transform` and is `''` for anything not rendered (an uppercase eyebrow marker or an open

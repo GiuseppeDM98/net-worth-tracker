@@ -63,6 +63,7 @@ stati verificati nell'analizzatore: il dubbio sul tree-shaking di `radix-ui` res
 
 | Data | Route | Da → a (KB gz) | PR | Perché |
 |---|---|---|---|---|
+| 2026-10-08 | (condivisi) e quattordici route (tutte tranne Assistente) | condivisi 483 → 534 · / 469 → 511 · Panoramica 569 → 608 · Allocazione 553 → 593 · Analisi 611 → 648 · Patrimonio 669 → 699 · Cashflow 732 → 763 · FIRE 698 → 736 · Hall of Fame 574 → 615 · Storico 735 → 772 · Previdenza 631 → 661 · Rendimenti 612 → 651 · Impostazioni 670 → 701 · login 424 → 474 · register 424 → 475 | #436 | **Una dipendenza, non una funzione**: `firebase` 12.13 → 12.19 (`@firebase/firestore` 4.14.1 → 4.17.2, +5% unpacked; auth e app invariati) porta +57 KB gz nel chunk vendor che ogni pagina carica (135,6 → 192,2), e `next` 16.2.12 → 16.4.0 ne toglie 16 (→ 190,7). Misurato a parità dell'altra: condivisi 482,8 → 539,5 con Next 16.2 + firebase 12.19, → 523,5 con Next 16.4. **Non si può restare a 12.13**: `firebase-admin` 14 vuole `@firebase/app` 0.16.2, che solo firebase ≥ 12.19 porta — con ogni versione inferiore `npm ls @firebase/app` ne mostra due e la build muore su «Component auth has not been registered yet» (provato su 12.13, 12.16, 12.18). Il tetto è la misura +2%; l'Assistente resta sotto il suo (680,8 su 700) |
 | 2026-10-05 | dodici route (tutte tranne Cashflow, login e register) | / 458 → 469 · Panoramica 546 → 569 · Allocazione 527 → 553 · Analisi 576 → 611 · Patrimonio 733 → 780 · Assistente 670 → 700 · FIRE 667 → 698 · Hall of Fame 545 → 574 · Storico 698 → 735 · Previdenza 601 → 631 · Rendimenti 578 → 612 · Impostazioni 625 → 670 | #432 | Il React Compiler acceso: ogni componente porta la sua memo cache, +20–26% gz sul codice dei componenti (stimato file per file e confermato dalla build). Misura senza / con il compiler, stessa sessione, Mac: condivisi 475,5 → 482,8 (dentro il tetto) · / 452,4 → 459,4 · Panoramica 538,3 → 557,0 · Allocazione 520,5 → 542,0 · Analisi 565,6 → 598,2 · Patrimonio 731,7 → 764,7 · Assistente 660,7 → 686,1 · FIRE 655,3 → 683,7 · Hall of Fame 541,3 → 562,5 · Storico 684,9 → 720,0 · Previdenza 593,5 → 618,0 · Rendimenti 569,4 → 599,5 · Impostazioni 624,3 → 656,7. **Cashflow SCENDE** 736,2 → 717,3 (tetto 744 → 732): con il compiler cresceva a 832,5 e il primo numero a freddo da 616 a 730 ms, quindi le quattro tab non di default sono diventate `lazyComponent` nella stessa spec. I tempi non regrediscono: A/B ravvicinato, 7 run, Cashflow 593 / 593 ms, long task 0 / 0; Analisi (controllo) 920 / 951 |
 | 2026-09-30 | (condivisi) | 470 → 483 | #418 | Il condiviso non sale perché una route è cresciuta: `date-fns`, `date-fns-tz`, `lib/utils/dateHelpers.ts` e `lib/utils/formatters.ts` (54 moduli, ~14 KB) che ogni pagina carica stavano in chunk PER PAGINA, una copia a pagina, e ora stanno nei chunk condivisi (analizzatore Turbopack, prima/dopo: l'insieme dei moduli che ogni pagina carica è lo stesso). Misura 464,6 → 473,5. Patrimonio cresce a parte (+7,4, dentro il suo tetto): recharts è ora UN chunk con i moduli di tutti i grafici |
 
@@ -219,6 +220,14 @@ LCP 2508 → 1712, long task 1327 → 754. Grafici montati a 390: 15 → 0 (1 do
 Strumenti nel DOM 36 → 18 a ogni larghezza. Bundle: Patrimonio 764,7 → 655,8 gz KB, recharts fuori dal suo grafo
 iniziale (tetto 780 → 669, `raisedBy` tolto). Il census per tasto è in § Il census. Trascritto il giorno stesso,
 ritirando la spec: la chiusura l'aveva scritto solo nell'indice del dossier e in CLAUDE.md.
+
+**Bundle dal 2026-10-08 (PR #436, Next 16.4 + firebase 12.19 + firebase-admin 14)**: condivisi 523,5 (22 chunk) ·
+landing 500,8 · login 464,7 · register 465,1 · Panoramica 595,4 · Patrimonio 685,1 · Cashflow 747,2 · Analisi 634,8 ·
+Rendimenti 637,3 · Storico 756,7 · Hall of Fame 602,2 · Allocazione 580,6 · FIRE 720,6 · Previdenza 647,4 · Assistente
+680,8 · Impostazioni 686,9 — +38…43 per route, tutto nel chunk vendor (il registro sopra dice di chi). Prima, il 2026-10-07
+(PR #434): condivisi 482,8 · landing 459,4 · login 422,1 · Panoramica 557,1 · Patrimonio 655,8 · Cashflow 717,6 · Analisi
+598,3 · Rendimenti 599,5 · Storico 720,0 · Hall of Fame 562,5 · Allocazione 542,0 · FIRE 683,7 · Previdenza 618,0 ·
+Assistente 686,1 · Impostazioni 656,7.
 
 **Bundle** (gz KB, chunk iniziali; il tetto in `budget.json` è +2%) — **dal 2026-09-30, PR #418**: condivisi 473,5
 (22 chunk) · landing 452,0 · login 418,2 · Panoramica 538,0 · Patrimonio 731,1 · Cashflow 735,4 · **Analisi 564,6** ·

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { fromZonedTime } from 'date-fns-tz';
 import {
   isPensionValueStale,
   resolveLastFundUpdate,
@@ -184,8 +185,10 @@ describe('summarizeFundToday', () => {
 
   it('judges the age of a value with ONE rule, shared with the «Aggiorna valore» modal', () => {
     // The last day of the previous month is a closed month; the first of the current one is not.
-    expect(isPensionValueStale(new Date(2026, 6, 31, 23, 30), NOW)).toBe(true);
-    expect(isPensionValueStale(new Date(2026, 7, 1, 0, 30), NOW)).toBe(false);
+    // Both instants are named by the ITALIAN clock: the month is read in Rome, and a fixture built
+    // from the process zone crosses midnight the wrong way when the suite runs in UTC (2026-10-08).
+    expect(isPensionValueStale(fromZonedTime('2026-07-31T23:30:00', 'Europe/Rome'), NOW)).toBe(true);
+    expect(isPensionValueStale(fromZonedTime('2026-08-01T00:30:00', 'Europe/Rome'), NOW)).toBe(false);
     // A value never updated has no age to judge.
     expect(isPensionValueStale(null, NOW)).toBe(false);
     // `lastPriceUpdate` wins over `updatedAt` (a later `updatedAt` does not make the value fresh);

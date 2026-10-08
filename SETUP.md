@@ -19,7 +19,7 @@ This guide will walk you through setting up the Portfolio Tracker web app from s
 
 Before you begin, ensure you have:
 
-- **Node.js** 18.x or higher ([Download](https://nodejs.org/))
+- **Node.js** 22.x or higher ([Download](https://nodejs.org/)) — firebase-admin 14 needs `require(esm)`, native since 22.12; the Vercel project is set to 22.x (Settings → General → Node.js Version)
 - **npm** or **yarn** package manager
 - A **Google account** (for Firebase)
 - A **Vercel account** (free tier available at [vercel.com](https://vercel.com))

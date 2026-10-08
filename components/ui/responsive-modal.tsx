@@ -109,9 +109,13 @@ export interface ResponsiveModalProps {
    * 2026-09-20, opener still connected and focused at open. The cause is Radix's own: a MODAL
    * `Dialog.Content` answers `onCloseAutoFocus` with `preventDefault()` + `triggerRef.focus()`,
    * which cancels the focus scope's restore-to-previous and, in a controlled dialog with no
-   * `Dialog.Trigger`, focuses nothing (react-dialog 1.1.15; vaul wraps the same content). So
-   * every modal opened from state needs its opener named here. A caller that knows its trigger
-   * passes it — a ref the page writes at the click works where Safari never focused the button.
+   * `Dialog.Trigger`, focuses nothing (react-dialog 1.1.15; vaul wraps the same content).
+   *
+   * Since 2026-10-08 the modal keeps its own fallback: the element focused when `open` turned
+   * true, restored on close when this prop is absent — which is every keyboard opener and every
+   * Chrome click on a button. This prop still wins, and is still the only cure where the opener
+   * never held the focus: Safari does not focus a clicked button, and a row opened from a
+   * window event or a non-focusable cell leaves `body` focused at open.
    */
   returnFocusTo?: React.RefObject<HTMLElement | null>;
   /**
@@ -155,10 +159,25 @@ export function ResponsiveModal({
 }: Readonly<ResponsiveModalProps>) {
   const isMobile = useMediaQuery('(max-width: 768px)');
 
-  // The content has just left the DOM: hand the focus back, then let the caller unmount.
+  // The element focused when the modal opened, the fallback for `returnFocusTo`. A LAYOUT
+  // effect on purpose: the parent's layout effects run before any child's passive effect, and
+  // Radix's FocusScope moves the focus into the content from a passive effect — a `useEffect`
+  // here would read the dialog's own first field. `body` is not an opener: leaving it null
+  // keeps Radix's default, which is what happened before this fallback existed.
+  const openerRef = React.useRef<HTMLElement | null>(null);
+  React.useLayoutEffect(() => {
+    if (!open) return;
+    const active = document.activeElement;
+    openerRef.current = active instanceof HTMLElement && active !== document.body ? active : null;
+  }, [open]);
+
+  // The content has just left the DOM: hand the focus back, then let the caller unmount. An
+  // opener that has since unmounted (a row deleted from inside its own modal) is skipped, and
+  // the focus follows Radix's default rather than a detached node.
   const handleCloseAutoFocus = (event: Event) => {
-    const target = returnFocusTo?.current;
-    if (target) {
+    const target = returnFocusTo?.current ?? openerRef.current;
+    openerRef.current = null;
+    if (target?.isConnected) {
       event.preventDefault();
       target.focus();
     }

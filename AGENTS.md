@@ -299,8 +299,10 @@ pointer — a stub that grows past that is a guide leaking back (2026-09-20: ten
   the header carries travels BESIDE the body, never inside it (`resolveInstrumentProfiles` → `{ response, counts }`).
   The route tests read the header's stage names (`__tests__/{dividendStatsRoute,instrumentProfilesRoute}.test.ts`).
 - **`REGISTRATION_WHITELIST` has no `NEXT_PUBLIC_` prefix**, and `lib/constants/appConfig.ts` must stay client-safe.
-- **Do NOT bump `firebase-admin` past 13.x** — `@14 → jwks-rsa@4 → jose@6` is pure ESM and Vercel's Lambda runtime
-  `require()`s it (`ERR_REQUIRE_ESM` on every Admin route).
+- **`firebase-admin` 14 since 2026-10-08** — `@14 → jwks-rsa@4 → jose@6` is pure ESM, and Vercel's Lambda runtime
+  `require()`s it: fine ONLY because the project runs Node 22.x there (`require(esm)` is native from 22.12; on 20.x it was
+  `ERR_REQUIRE_ESM` on every Admin route, 2026-08). Never lower the Vercel Node version below 22. The same bump pins the
+  CLIENT `firebase` to ≥ 12.19 (one `@firebase/app`, CLAUDE.md § Known Issues).
 - **A `server-only` module is not protected by `tsc`**: importing `lib/services/dividendService.ts` (Admin SDK) from a
   client page type-checks and dies in the browser as a Next build error («You're importing a module that depends on
   "server-only"») — the browser is the check (2026-09-06). A client page reads such a registry through a client
@@ -529,8 +531,10 @@ file used to carry.
   `alert`); `describeWriteError` (`lib/utils/dialogNarrative.ts`) is the ONE translation of a failed write.
 - Two-click confirms live in `lib/hooks/useArmedDelete.ts`: no timer, ever; Escape while armed means DISARM
   (`hasArmedConfirm()`). The two form rules stay here: § Dialog Form Reset, § Two-Step Create Dialogs.
-- A controlled modal with no Radix `Trigger` drops focus on `body` when it closes unless the caller passes
-  `returnFocusTo`, taken from `event.currentTarget` at the click (2026-09-20, pinned by `e2e/performance.degraded.spec.ts`).
+- A controlled modal with no Radix `Trigger` drops focus on `body` when it closes; since 2026-10-08 `ResponsiveModal`
+  restores the element focused at open (every keyboard opener; pinned by `e2e/pension.spec.ts`), and a host whose opener
+  never held the focus (Safari's click, a non-focusable row) still passes `returnFocusTo`, taken from `event.currentTarget`
+  at the click (2026-09-20, `e2e/performance.degraded.spec.ts`).
 - Il resto — the footer order, the status-line a11y traps, `userFacingError`, the `bg-muted` block, the singular
   eyebrow, the armed detail's READING, `triggerOrigin` at the click, no focus below 769px — in `doc/guide/dialog.md`.
 
@@ -695,7 +699,9 @@ file used to carry.
   buttons, a Radix `<Popover>` for information; **a `title` added by a STATE CHANGE is never shown** — put the
   consequence in visible copy.
 - **Touch targets ≥ 44×44px**: `h-8 w-8` in dense lists, `h-10 w-10` for primary and destructive actions (shadcn
-  `size="icon"` is 36px). **Actions hidden with `opacity-0` are unreachable on keyboard AND invisible on touch** — gate
+  `size="icon"` is 36px). **A control that must stay small grows its HIT BOX, not its paint**: the `Switch` is 36×20 on
+  screen and 44×44 to the finger through a `before:absolute before:-inset-x-1 before:-inset-y-3` pseudo-element
+  (2026-10-08); `boundingBox()` cannot see it, so a spec proves it by `elementFromPoint` (`e2e/fire.spec.ts`). **Actions hidden with `opacity-0` are unreachable on keyboard AND invisible on touch** — gate
   them behind `[@media(pointer:fine)]:`. **`desktop:h-7` is 28px — never a target**: copy `h-11 → desktop:h-8`
   (`AsideToggle` since 2026-09-20; four Previdenza sites shipped 28px until 2026-09-13). A 1440px tablet in landscape
   reads the desktop layout by touch (doc/guide/shell.md § Per-page blind spots).
@@ -787,7 +793,11 @@ file used to carry.
   anchor, a hook running with its feature off, a write that does not invalidate its reader's key.
 - **Run the suite under `TZ=Europe/Rome` too**: every date fixture sits at noon, twelve hours clear of the DST edge,
   while production dates are local midnight and the pure layer runs in the user's browser. Day-of-year from calendar
-  fields in UTC (`Date.UTC(y,m,d) - Date.UTC(y,0,0)`), and one fixture built the way the dialog builds one.
+  fields in UTC (`Date.UTC(y,m,d) - Date.UTC(y,0,0)`), and one fixture built the way the dialog builds one. **A fixture
+  that sits BESIDE midnight is named by the Italian clock** — `fromZonedTime('2026-07-31T23:59:00', 'Europe/Rome')`,
+  never `new Date(2026, 6, 31, 23, 59)`: the rule under test reads the Italian day, and the process-zone date is the
+  next day in Rome whenever the suite runs in UTC (four cases were red there until 2026-10-08; the suite is now green
+  under `TZ=UTC` as well, and stays so).
 - **The suites to run after a change are listed per area in each guide's § *Files*** (since 2026-09-30). Two crossings
   no guide owns: `types/assets.ts`'s `AssetType` also means `assetDialogHelpers` + `allocationUtils` + the three ledger
   suites; widening `AssetClass` means `ASSET_CLASS_SEQUENCE` and its readers. **Perf tooling**: `perfBudget`,
@@ -888,7 +898,7 @@ CLAUDE.md keeps only the cross-cutting ones.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
-# This is NOT the Next.js you know
+## This is NOT the Next.js you know
 
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
 

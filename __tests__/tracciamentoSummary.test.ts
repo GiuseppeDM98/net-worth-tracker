@@ -10,6 +10,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { fromZonedTime } from 'date-fns-tz';
 import type { Expense } from '@/types/expenses';
 import type { Period } from '@/lib/utils/period';
 import { endOfMonthBound } from '@/lib/utils/dateHelpers';
@@ -50,6 +51,13 @@ function makeExpense(overrides: Partial<Expense> & { amount: number; date: Date 
 
 /** Noon on the 15th: twelve hours clear of any DST edge, in every timezone the suite runs in. */
 const d = (year: number, month: number, day = 15, hour = 12) => new Date(year, month - 1, day, hour);
+
+/**
+ * An instant named by its ITALIAN wall clock, for the cases that sit next to midnight: the rule
+ * under test reads the Italian calendar day, so a fixture built from the process zone's clock
+ * (`new Date(y, m, d, 23, 59)`) is the 23rd in Rome whenever the suite runs in UTC (2026-10-08).
+ */
+const italy = (iso: string) => fromZonedTime(iso, 'Europe/Rome');
 
 const AUGUST: Period = { kind: 'month', year: 2026, month: 8 };
 const NOW = d(2026, 8, 22);
@@ -609,11 +617,11 @@ describe('isScheduledRow', () => {
     // a row saved from the dialog carries its creation TIME, and the page's `now` is frozen at
     // mount — so a spesa recorded at 18:42 was «in calendario» until the next reload.
     expect(isScheduledRow(makeExpense({ amount: -1, date: d(2026, 8, 22, 18) }), NOW)).toBe(false);
-    expect(isScheduledRow(makeExpense({ amount: -1, date: new Date(2026, 7, 22, 23, 59, 59) }), NOW)).toBe(false);
+    expect(isScheduledRow(makeExpense({ amount: -1, date: italy('2026-08-22T23:59:59') }), NOW)).toBe(false);
     // A CSV import lands at noon, so the morning is the mirror case: still today, still booked.
     expect(isScheduledRow(makeExpense({ amount: -1, date: d(2026, 8, 22) }), d(2026, 8, 22, 7))).toBe(false);
-    // Tomorrow at midnight is the first instant that IS scheduled.
-    expect(isScheduledRow(makeExpense({ amount: -1, date: new Date(2026, 7, 23, 0, 0) }), NOW)).toBe(true);
+    // Tomorrow at midnight (Italian) is the first instant that IS scheduled.
+    expect(isScheduledRow(makeExpense({ amount: -1, date: italy('2026-08-23T00:00:00') }), NOW)).toBe(true);
   });
 
   it('should split today into what is booked, never into what is scheduled', () => {
