@@ -3,9 +3,11 @@
  * (a route, or a tab of Cashflow and FIRE) at 390×844, 768×1024 and 1024×768, on the production
  * build `perf:serve` serves on :3200 (the manual: doc/guide/prima-schermata.md). `npm run mobile:budget` then holds the run against doc/mobile/budget.json.
  *
- * Ported on 2026-10-10 (MOB-01) from the throwaway that measured the mirror on 2026-09-26
- * (doc/mobile/reference/mobile-census.mjs, the baseline of doc/mobile/README.md § 3), with the
- * seven corrections of MOB-01 § 1:
+ * Ported on 2026-10-10 from the throwaway that measured the mirror on 2026-09-26
+ * (doc/mobile/reference/mobile-census.mjs, the baseline of doc/mobile/README.md § 3). It stays
+ * `.mjs`, run by node and not by tsx: both measuring functions below are serialised into the page
+ * by `page.evaluate`, and a source transformed by tsx can carry a `__name` helper the browser does
+ * not have. Seven corrections to what the throwaway got wrong:
  *   1. the first screen ends at the TOP of the bottom pill, which is `fixed` over `main` — not at
  *      `main.clientHeight` (the pill's 88px are padding at the END of the scroll); at 1024 the
  *      pill is hidden and the first screen is `main` itself, below the 49px landscape bar;
@@ -31,6 +33,8 @@
  *   npm run mobile:census -- --email=census@example.com     re-seeds the fixture, then measures
  *   npm run mobile:census -- --email=mirror@example.com     the owner's mirror, for the tour only
  *   npm run mobile:census -- --viewports=390 --surfaces=panoramica,cashflow-budget
+ *                                                          (keys of budget.json's `surfaces` and the
+ *                                                          three viewports; anything else exits 1)
  *   npm run mobile:census -- --selftest                    the measure on a known fragment, no server
  * Other options: `--password=` (default `test1234`), `--base=` (default http://localhost:3200),
  * `--texts` (adds the h1, the verdict's title and the eyebrows to the JSON — never commit it).
@@ -178,6 +182,11 @@ export function measureFirstScreen({ figurePattern, withTexts }) {
   const firstClosed = tiles.find((tile) => tile.closed);
 
   const stickyHeader = [...main.querySelectorAll('div')].find((el) => el.classList.contains('max-desktop:sticky'));
+  // The 50/30/20 switch of Analisi's Flusso (`settings.spendingRolesEnabled`): the tile shows the
+  // «Raggruppa il flusso» group only with the setting on, and the pressed option says which view
+  // was measured — on a phone the Flusso changes shape with it, so a mirror run must say so.
+  const flowGroup = [...main.querySelectorAll('[role="group"][aria-label="Raggruppa il flusso"]')].find(hasBox);
+  const flowPressed = flowGroup?.querySelector('[aria-pressed="true"]')?.textContent?.trim() ?? null;
   return {
     metrics: {
       screens: Number((main.scrollHeight / main.clientHeight).toFixed(2)),
@@ -199,6 +208,7 @@ export function measureFirstScreen({ figurePattern, withTexts }) {
       charts: [...main.querySelectorAll('svg.recharts-surface, svg[role="img"]')].filter(hasBox).length,
       tiles: tiles.map((tile) => ({ top: tile.top, height: tile.height, closed: tile.closed, ...(withTexts ? { eyebrow: tile.eyebrow } : {}) })),
       savingsRateBadge: [...main.querySelectorAll('.fixed')].some((el) => el.classList.contains('bg-positive/10') && hasBox(el)),
+      spendingRoles: flowGroup ? { enabled: true, view: flowPressed === 'Per ruolo' ? 'roles' : 'types' } : null,
       ...(withTexts
         ? { h1: [...main.querySelectorAll('h1')].find(hasBox)?.innerText ?? '', verdictTitle: verdict?.querySelector('h2')?.innerText ?? '' }
         : {}),
@@ -332,12 +342,34 @@ function profilesSourceOf(headerValue) {
   return headerValue?.match(/source;desc="?(\w+)/)?.[1] ?? null;
 }
 
+/**
+ * An option value that is not one of the allowed keys is an error naming it, never a silent drop:
+ * on 2026-10-10 `--surfaces=cashflow` (a page, not a key) measured nothing and overwrote
+ * last-run.json with an empty run. Exported for its test.
+ */
+export function validateSelection(requested, allowed, what) {
+  if (requested.length === 0) return `nessuna ${what} valida richiesta — valide: ${allowed.join(', ')}`;
+  const unknown = requested.filter((value) => !allowed.includes(value));
+  if (unknown.length === 0) return null;
+  return `${what} sconosciute: ${unknown.join(', ')} — valide: ${allowed.join(', ')}`;
+}
+
 async function census(options) {
   const { chromium } = await import('playwright');
   const budget = JSON.parse(readFileSync(BUDGET_PATH, 'utf-8'));
   const allSurfaces = Object.entries(budget.surfaces).map(([key, spec]) => ({ key, ...spec }));
+  if (options.surfaces) {
+    const error = validateSelection(options.surfaces, allSurfaces.map((s) => s.key), 'superfici');
+    if (error) {
+      console.error(`[mobile:census] ${error}`);
+      process.exit(1);
+    }
+  }
   const surfaces = options.surfaces ? allSurfaces.filter((s) => options.surfaces.includes(s.key)) : allSurfaces;
   const started = Date.now();
+  // Set by ANY instrument-profiles answer from Yahoo, the warm-up lap included: the measured visit
+  // reads the cache that answer filled, so only a run-level flag can tell the budget to refuse.
+  let yahooCalled = false;
 
   if (options.email === CENSUS_ACCOUNT) {
     // Owner, 2026-10-10: from the 1st to the 4th the fixture's rows of the 5th are still in the
@@ -364,7 +396,10 @@ async function census(options) {
       const page = await context.newPage();
       let profilesSource = null;
       page.on('response', (response) => {
-        if (response.url().includes(PROFILES_ROUTE)) profilesSource = profilesSourceOf(response.headers()['server-timing']) ?? profilesSource;
+        if (!response.url().includes(PROFILES_ROUTE)) return;
+        const source = profilesSourceOf(response.headers()['server-timing']);
+        if (source) profilesSource = source;
+        if (source === 'yahoo') yahooCalled = true;
       });
       await login(page, options.base, options.email, options.password);
       // The warm-up lap: the first visit writes migrations (Patrimonio's ledger and loans), so the
@@ -397,12 +432,15 @@ async function census(options) {
   }
 
   const durationMs = Date.now() - started;
-  const run = { email: options.email, base: options.base, at: new Date().toISOString(), durationMs, viewports: options.viewports, results };
+  const run = { email: options.email, base: options.base, at: new Date().toISOString(), durationMs, viewports: options.viewports, yahooCalled, results };
   writeFileSync(join(OUT, 'last-run.json'), `${JSON.stringify(run, null, 2)}\n`);
   console.log(`\n[mobile:census] ${join(OUT, 'last-run.json')} + ${results.filter((r) => r.status === 'ok').length * 2} screenshot · durata ${(durationMs / 60000).toFixed(1)} min`);
-  const yahoo = results.filter((r) => r.diagnostics?.profilesSource === 'yahoo');
-  if (yahoo.length && options.email === CENSUS_ACCOUNT) {
-    console.error(`[mobile:census] ATTENZIONE: Yahoo chiamato su ${yahoo.map((r) => `${r.surface}@${r.viewport}`).join(', ')} — un ticker del fixture non ha il suo profilo: si corregge nel seed, il budget non si prende.`);
+  if (yahooCalled && options.email === CENSUS_ACCOUNT) {
+    // The run is written (it is still a reading), but it is red: `mobile:budget -- --tighten`
+    // refuses it on `yahooCalled`, and the exit code says so here too.
+    const where = results.filter((r) => r.diagnostics?.profilesSource === 'yahoo').map((r) => `${r.surface}@${r.viewport}`);
+    console.error(`[mobile:census] ROSSO: Yahoo chiamato${where.length ? ` su ${where.join(', ')}` : ' nel giro di riscaldamento'} — un ticker del fixture non ha il suo profilo: si corregge nel seed, il budget non si prende.`);
+    process.exitCode = 1;
   }
 }
 
@@ -413,7 +451,7 @@ function printRow(row) {
   console.log(
     `[${row.viewport}] ${row.surface.padEnd(22)} screens=${m.screens} tiles=${m.tilesAboveFold}/${m.tilesFullyAboveFold} ` +
       `figures=${m.figuresAboveFold} fuori=${m.figuresOutsideVerdict} riga=${m.firstClosedRowAbovePill} overflowX=${m.overflowX} ` +
-      `(pill ${d.pillTop}, main ${d.mainTop}, charts ${d.charts}${d.savingsRateBadge ? ', BADGE' : ''}${d.profilesSource ? `, profili ${d.profilesSource}` : ''})`,
+      `(pill ${d.pillTop}, main ${d.mainTop}, charts ${d.charts}${d.savingsRateBadge ? ', BADGE' : ''}${d.profilesSource ? `, profili ${d.profilesSource}` : ''}${d.spendingRoles ? `, 50/30/20 ${d.spendingRoles.view}` : ''})`,
   );
 }
 
@@ -483,12 +521,18 @@ async function main() {
     console.log('[mobile:census] --selftest (nessun server, nessun account)');
     return selftest();
   }
+  const viewports = (args.viewports ?? '390,768,1024').split(',').filter(Boolean);
+  const viewportError = validateSelection(viewports, Object.keys(VIEWPORTS), 'viewport');
+  if (viewportError) {
+    console.error(`[mobile:census] ${viewportError}`);
+    process.exit(1);
+  }
   const options = {
     email: args.email ?? CENSUS_ACCOUNT,
     password: args.password ?? DEFAULT_PASSWORD,
     base: args.base ?? 'http://localhost:3200',
-    viewports: (args.viewports ?? '390,768,1024').split(',').filter((v) => v in VIEWPORTS),
-    surfaces: args.surfaces ? args.surfaces.split(',') : null,
+    viewports,
+    surfaces: args.surfaces ? args.surfaces.split(',').filter(Boolean) : null,
     texts: args.texts === 'true',
   };
   console.log(
@@ -498,7 +542,7 @@ async function main() {
   await census(options);
 }
 
-// The test suite imports FIGURE_PATTERN from this file: run only when launched directly.
+// The test suite imports FIGURE_PATTERN and validateSelection from this file: run only when launched directly.
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   main().catch((error) => {
     console.error(error);

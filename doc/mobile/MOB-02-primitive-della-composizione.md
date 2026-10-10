@@ -1,13 +1,13 @@
 # MOB-02 — Le primitive della composizione
 
-> Stato: da fare · riletta in modo adversariale il 2026-10-10: 30 rilievi, 11 decisioni · Priorità: 1 (sette spec ne citano le API) · Sforzo: L · Dipende da: MOB-01 (PERF-12, PERF-14, PERF-02 e PERF-03
+> Stato: da fare · riletta in modo adversariale il 2026-10-10: 30 rilievi, 11 decisioni · Priorità: 1 (sette spec ne citano le API) · Sforzo: L · Dipende da: MOB-01 (ritirata il 2026-10-10, in develop dal 2026-10-10, PR #448; PERF-12, PERF-14, PERF-02 e PERF-03
 > sono in develop e ritirate) · Sblocca: MOB-03..08
 
 ## 1. Il problema, misurato
 
 Censimento 2026-09-26 a 390×844: ogni pagina con dati apre con il verdetto e l'inizio di UNA tessera, poi 2–5 schermate.
 **Hall of Fame**: 3,43 schermate, 5 tessere (1 sopra la piega, 0 intere), 49 cifre (17 sopra la piega); 2,17 a 768, 2,85
-a 1024 (il mirror; il valore di partenza del budget è quello di `doc/mobile/budget.json` sul fixture di MOB-01). Le primitive di oggi (righe del 2026-09-26, da riverificare):
+a 1024 (il mirror; il valore di partenza del budget è quello di `doc/mobile/budget.json` sul fixture `census@example.com`, README § 3.1). Le primitive di oggi (righe del 2026-09-26, da riverificare):
 
 - `components/ui/tile.tsx:50-75`: `Tile` sempre aperta; eyebrow `<h3>` (`:66`); l'aside può essere un controllo
   (`components/hall-of-fame/tiles/NoteTile.tsx:31`); `TILE_CELL_CLASS = 'flex min-w-0 [&>section]:flex-1'` (`:42`) stira
@@ -28,8 +28,8 @@ a 1024 (il mirror; il valore di partenza del budget è quello di `doc/mobile/bud
 
 ## 2. Obiettivo misurabile
 
-- `npm run mobile:budget`, `hall-of-fame` a 390: `screens` dal valore che `doc/mobile/budget.json` registra dopo MOB-01
-  (fixture `census@example.com`, README § 9, 6 e 10) a **≤ 2,0**, una tessera aperta, `budget.json` stretto con
+- `npm run mobile:budget`, `hall-of-fame` a 390: `screens` dal valore che `doc/mobile/budget.json` registra dal 2026-10-10
+  (fixture `census@example.com`, README § 3.1 e § 9, 6 e 10) a **≤ 2,0**, una tessera aperta, `budget.json` stretto con
   `mobile:budget -- --tighten` nello stesso commit; `figuresOutsideVerdict` registrato (LA tessera compresa, 16) e
   `firstClosedRowAbovePill: true` (README § 9, 4 e 25: cede il grafico, poi le azioni in fondo; se non basta `raisedBy`, 19).
 - Ogni tab della pill ≥ 44×44 sotto `desktop:` (22: le pagine a tab crescono di ~12 px, `raisedBy: "MOB-02: pill a 44 px"`).
@@ -119,7 +119,7 @@ di `max-desktop:` in Tailwind 4.3 (`max-width: 1439px` scoprirebbe le larghezze 
 - `<section id={collapse.id} aria-label>` → `<h3>` → `<button id={sectionTriggerId(id)} aria-expanded aria-controls={sectionPanelId(id)}>`
   (scritto DOPO lo spread di Radix, che altrimenti mette il suo `contentId`) a tutta larghezza, `min-h-[52px] px-5 active:bg-muted`:
   eyebrow, `asideWhenClosed` da chiusa (parole: «per mese», «3 note»; mai un importo né un conteggio di cifre), chevron.
-  Da aperta l'`aside` (testo o controllo) sta fuori dal bottone, come la Tile di oggi. È la forma che MOB-01 § 4 riconosce:
+  Da aperta l'`aside` (testo o controllo) sta fuori dal bottone, come la Tile di oggi. È la forma che il censimento riconosce (`isClosedRow` in `scripts/mobileCensus.mjs`):
   `section.rounded-2xl[id]` → `h3 > button[aria-expanded][aria-controls=<id>-panel]`.
 - Pannello `<div id={sectionPanelId(id)} data-state inert={!open}>`, senza `role` (la `section` ha già `aria-label`,
   `tile.tsx:52-54`: è lei la region; un `role="region"` per pannello raddoppierebbe le landmark, fino a 16 sulla
@@ -250,14 +250,14 @@ lettura fallita: come oggi. Il tipo `loan` (2026-10-10) non tocca la pagina: leg
   `PageHeader` (desktop: dopo la descrizione; sotto `desktop:` al posto della descrizione, `[data-freshness]`,
   decisione del proprietario), quindi nessuna riga da riservare fra la prima frase e la striscia (doc/guide/stati.md § The
   fourth reading). **PERF-02** (in develop dal 2026-09-29): server `false`, già così in `lib/hooks/useMediaQuery.ts`.
-- **MOB-01**: le pagine a tab crescono di ~12 px: `raisedBy` sulle voci mosse (§ 4.6). `Tile`, `PageVerdict` ed
+- **Il budget della prima schermata** (`doc/mobile/budget.json`, doc/guide/prima-schermata.md): le pagine a tab crescono di ~12 px: `raisedBy` sulle voci mosse (§ 4.6). `Tile`, `PageVerdict` ed
   `ErrorNotice` entrano in ogni route e nella landing (`app/page.tsx:42-44`): `perf:budget` prima e dopo (§ 11).
 
 ### 4.9 Decisioni (README § 9)
 
 Tutte le domande di questa spec sono chiuse: (1) il podio conta nel ≤ 5, LA tessera compresa (16); (2) LA tessera non si
 chiude mai (21); (3) il verdetto in due frasi anche a 1440 (5); (4) +12 px con `raisedBy` (22); (5) le cifre della striscia
-contano fuori dal verdetto (MOB-01 § 4); (6) cede il grafico, poi le azioni in fondo, poi `raisedBy` (4, 19, 25);
+contano fuori dal verdetto (`figuresOutsideVerdict`, doc/guide/prima-schermata.md); (6) cede il grafico, poi le azioni in fondo, poi `raisedBy` (4, 19, 25);
 (7) «Quest'anno» può ricomparire in «Il perché» (8); (8) una sequenza sola, il DOM di oggi (1, 11); (9) lo slot `axis`
 subito sotto il titolo, due istanze a 1440 (2, 12); le celle possono ripetere letture e classifiche (15); lo zero senza
 segno (20).
@@ -368,8 +368,8 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
 - Leggi doc/guide/hall-of-fame.md, doc/guide/stati.md, doc/guide/e2e-emulatori.md, doc/guide/velocita.md § Il census
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice
 - Leggi doc/mobile/README.md (§ 9 per intero: le decisioni 1–25 sono il contratto) e la spec MOB-02 per intero;
-  DESIGN.md § 5 e § 6 (MAI rigenerarlo); doc/mobile/MOB-01 (deve essere chiusa: mobile:census, budget.json e il fixture
-  census@example.com esistono)
+  DESIGN.md § 5 e § 6 (MAI rigenerarlo); doc/guide/prima-schermata.md (MOB-01 è ritirata: mobile:census, budget.json e il
+  fixture census@example.com esistono)
 - Crea SESSION_NOTES.md; crea il branch dalla branch attiva PRIMA di editare
 
 Regole: nessun commit senza il mio OK; un branch e un commit; rispondi in italiano; nessuna domanda è aperta (README

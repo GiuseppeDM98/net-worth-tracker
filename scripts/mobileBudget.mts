@@ -11,8 +11,9 @@
  * Usage (options ALWAYS after `--`, from Git Bash on Windows):
  *   npm run mobile:budget
  *   npm run mobile:budget -- --tighten   writes the exact measure where it is better; never widens.
- *                                        Refused unless the run is census@example.com's and every
- *                                        surface settled.
+ *                                        Refused unless the run is census@example.com's, complete
+ *                                        (every budget entry measured), every surface settled and
+ *                                        no profile came from Yahoo.
  * Exit 1 on any violation, or on a refused `--tighten`.
  */
 import { execFileSync } from 'node:child_process';
@@ -61,7 +62,7 @@ console.log(
 
 // Tighten first, then compare what was written
 if (TIGHTEN) {
-  const refusal = tightenRefusal(run);
+  const refusal = tightenRefusal(run, budget);
   if (refusal) {
     console.error(`[mobile:budget] --tighten rifiutato: ${refusal}.`);
     process.exit(1);

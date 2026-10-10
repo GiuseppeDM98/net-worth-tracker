@@ -2,6 +2,9 @@
  * The first-screen budget (`lib/utils/mobileBudget.ts`): every metric in its direction with zero
  * tolerance, the three-state closed-row ratchet, the widening that needs a NEW `raisedBy`, and a
  * `--tighten` that only ever tightens, to the exact measure.
+ *
+ * Seen red on 2026-10-10 with the ceiling comparison of `compareEntry` inverted (`>` → `<`): six
+ * cases failed, the green-when-better one first.
  */
 import { describe, it, expect } from 'vitest';
 import {
@@ -259,16 +262,29 @@ describe('tightenBudget', () => {
 
 describe('tightenRefusal', () => {
   it('refuses a run that is not the census fixture\'s', () => {
-    expect(tightenRefusal({ email: 'mirror@example.com', at: '', results: [row()] })).toContain('census@example.com');
+    expect(tightenRefusal({ email: 'mirror@example.com', at: '', results: [row()] }, makeBudget())).toContain('census@example.com');
   });
 
   it('refuses a run with a missing or unsettled surface, naming it', () => {
     const results: CensusRow[] = [row(), { surface: 'cashflow-divisione', viewport: '390', status: 'missing', metrics: null }];
 
-    expect(tightenRefusal({ email: 'census@example.com', at: '', results })).toContain('cashflow-divisione@390 (missing)');
+    expect(tightenRefusal({ email: 'census@example.com', at: '', results }, makeBudget())).toContain('cashflow-divisione@390 (missing)');
   });
 
-  it('lets a clean census run through', () => {
-    expect(tightenRefusal({ email: 'census@example.com', at: '', results: [row()] })).toBeNull();
+  it('refuses a run during which Yahoo answered a profile, on the run flag or on a row', () => {
+    expect(tightenRefusal({ email: 'census@example.com', at: '', yahooCalled: true, results: [row()] }, makeBudget())).toContain('Yahoo');
+    const rows: CensusRow[] = [{ ...row(), diagnostics: { profilesSource: 'yahoo' } }];
+    expect(tightenRefusal({ email: 'census@example.com', at: '', results: rows }, makeBudget())).toContain('panoramica@390');
+  });
+
+  it('refuses a partial run: every budget entry must have been measured', () => {
+    const budget = makeBudget();
+    budget.budget.panoramica['768'] = { ...METRICS };
+
+    expect(tightenRefusal({ email: 'census@example.com', at: '', results: [row()] }, budget)).toContain('panoramica@768');
+  });
+
+  it('lets a clean, complete census run through', () => {
+    expect(tightenRefusal({ email: 'census@example.com', at: '', results: [row()] }, makeBudget())).toBeNull();
   });
 });

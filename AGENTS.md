@@ -849,7 +849,7 @@ file used to carry.
   `exposureRequests.MODULE_BY_TYPE`, `DividendDialog`'s non-paying set (the `loan` of 2026-10-10 touched all five);
   widening `AssetClass` means `ASSET_CLASS_SEQUENCE` and its readers. **Perf tooling**: `perfBudget`,
   `perfRoutes` (`perf/routes.json` = `navigation.ts`), and for the first-screen census `mobileBudget`, `mobileSurfaces`
-  (`doc/mobile/budget.json`'s surfaces = `navigation.ts` minus the assistant) and `mobileCensusFigures`; `npm run perf:budget` after `npm run build`, or `-- --dist=.next-perf`
+  (`doc/mobile/budget.json`'s surfaces = `navigation.ts` minus the assistant), `mobileCensusFigures` and `mobileCensusOptions`; `npm run perf:budget` after `npm run build`, or `-- --dist=.next-perf`
   after `perf:build` (2026-10-05: without it the script read a `.next` of 15/08 — its first line names the build); a
   route that grows raises its ceiling with `raisedBy` in the same commit (`doc/guide/velocita.md`).
 - **`firebase deploy --only firestore:rules` with a stale login fails with a 401 on `serviceusage`**: `npx firebase
@@ -915,7 +915,9 @@ file used to carry.
 - **The first-screen census shares the port** (2026-10-10, MOB-01; its manual is `doc/guide/prima-schermata.md`): `npm run mobile:census` measures the composition of
   19 surfaces × 390/768/1024 on the same :3200 build, re-seeding its own fixture `census@example.com`; `npm run
   mobile:budget` holds the run against `doc/mobile/budget.json` (zero tolerance, it only tightens, a widening carries
-  `raisedBy: "MOB-NN: …"`). The fixture refuses to be measured from the 1st to the 4th and on the month's last day.
+  `raisedBy: "MOB-NN: …"`; `--tighten` refuses a partial run and a run in which Yahoo answered a profile, 2026-10-10).
+  The fixture refuses to be measured from the 1st to the 4th and on the month's last day; an unknown `--surfaces` key
+  or `--viewports` value exits 1 with the valid ones.
 - Il resto — every column, the baseline in force and the historical one of 2026-09-26, the before/after of every speed
   session, the census scenarios, `--revisit` and what the tables do not say — in `doc/guide/velocita.md`.
 
