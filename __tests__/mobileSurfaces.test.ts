@@ -5,6 +5,9 @@
  * and not to the census, or a surface the shell no longer has (`/dashboard/dividends` never
  * existed — Dividendi is `?tab=dividends` of Cashflow), fails this file. And every surface has a
  * budget at each of the three viewports, with no budget for a surface that is not listed.
+ *
+ * Seen red on 2026-10-10 with a surface on `/dashboard/dividends` added to the JSON (three cases)
+ * and with the `768` entry of `storico` removed (one case).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';

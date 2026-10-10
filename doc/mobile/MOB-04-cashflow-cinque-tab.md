@@ -1,7 +1,7 @@
 # MOB-04 — Cashflow: le cinque tab
 
 > Stato: da fare · riletta in modo adversariale il 2026-10-10: 34 rilievi, 9 decisioni · Priorità: 2 (Tracciamento è la pagina del telefono: l'unica con il «+») · Sforzo: L · Dipende da:
-> MOB-01, MOB-02, MOB-03 (sequenza, README § 9, 9; PERF-06 ritirata, in develop) · Sblocca: MOB-05..08 (`e2e/cashflow.tablet.spec.ts`), MOB-09
+> MOB-01 (ritirata il 2026-10-10, in develop dal 2026-10-10, PR #448), MOB-02, MOB-03 (sequenza, README § 9, 9; PERF-06 ritirata, in develop) · Sblocca: MOB-05..08 (`e2e/cashflow.tablet.spec.ts`), MOB-09
 
 ## 1. Il problema, misurato
 
@@ -34,8 +34,8 @@ Dividendi 3,77 / 6 / 8. Il codice di oggi (righe da riverificare):
 
 - `npm run mobile:budget` sul fixture `census@example.com` (Centri e Divisione accesi, una cedola, una riga in
   calendario: README § 9, 10) a 390: Tracciamento, Budget, Dividendi **≤ 2,0** schermate, Centri e Divisione **≤ 1,5**; su
-  tutte ≤ 5 cifre fuori dal verdetto (la striscia conta fuori, lo `scope` dentro: MOB-01 § 4) e `firstClosedRowAbovePill:
-  true` (Budget senza curva: `raisedBy` se non ci sta, README § 9, 19); `budget.json` stretto con `--tighten`. MOB-01
+  tutte ≤ 5 cifre fuori dal verdetto (la striscia conta fuori, lo `scope` dentro: doc/guide/prima-schermata.md) e `firstClosedRowAbovePill:
+  true` (Budget senza curva: `raisedBy` se non ci sta, README § 9, 19); `budget.json` stretto con `--tighten`. Il censimento
   misura il verdetto VISIBILE (`checkVisibility`): le tab nascoste non contano.
 - A 1440 le cinque tab sono quelle di oggi, salvo quattro aggiunte dichiarate: il «−» U+2212 di Divisione (§ 4.5,
   README § 9, 32), la riga d'ambito del calendario sotto il paragrafo di Divisione (14), la didascalia del calendario
@@ -141,6 +141,9 @@ Dividendi 3,77 / 6 / 8. Il codice di oggi (righe da riverificare):
   `bud-avvisi`, `bud-annuali`, `bud-categorie`; senza budget LA tessera è `bud-categorie` col suo stato vuoto, senza righe
   e senza `PageRest`. Gli aside di oggi hanno cifre (`describeAnnualAside` «anno al 64%», `:480`; `describeAlertsAside`
   «soglie di quota 90 · 100», `:424`): da chiusa parlano con `describeBudgetClosedAsides`, i testi esatti sopra.
+- **La fila KPI del Tetto si sovrappone a 390** (visto dal censimento sul fixture il 2026-10-10, README § 5): a tetto
+  superato «~11.274 €» e «840 €» si accavallano — una cella senza `min-w-0` né contenitore per un importo largo. Qui si
+  corregge (la fila è ricomposta comunque dai KPI sollevati) e si asserisce in § 7.
 - **Striscia** = `selectBudgetStrip(ceiling)` in `budgetSummary.ts`, due KPI sollevati dal Tetto (`TettoTile.tsx:104-137`;
   `TettoTile` prende `liftedFigures?: readonly ('fine-mese' | 'restano' | 'oltre')[]`, un KPI per blocco, «Al giorno»
   resta): «Fine mese» (`approx-currency`, `negative` se oltre; `null` → `reason` «dal quarto giorno») apre `bud-rischio`;
@@ -264,6 +267,8 @@ oltre il tetto con la frase intera (33); l'ordine di Dividendi = DOM (11); l'ass
   calendario, alla prima frase con calendario e parte vissuta (falsificare con `leadLength` sempre alla prima frase);
   `describeTrackingScope` non nulla con `scheduled` > 0, nulla a zero, testo senza spazio iniziale (falsificare
   restituendo `null`); i due `restLabel`.
+- `e2e/cashflow.budget.mobile.spec.ts` (o la spec mobile di Budget che § 5 nomina): a 390, a tetto superato, i due
+  `boundingBox` della fila KPI del Tetto non si intersecano (falsificare rimettendo la cella senza `min-w-0`: rosso).
 - `budgetSummary.test.ts`: «Restano» → `bud-categorie`, «Oltre» → `bud-avvisi` con `crossedOn` ≤ oggi, «Supererai» →
   `bud-rischio` con `crossedOn` dopo oggi, «Fine mese» → `bud-rischio`, `null` → `reason` (falsificare scambiando
   `opens`). `budgetNarrative.test.ts`: `describeBudgetClosedAsides` restituisce i testi esatti «a fine mese», «soglie di
@@ -345,7 +350,7 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
 - Leggi doc/guide/cashflow.md, cashflow-tracciamento.md, cashflow-budget.md, centri-di-costo.md, cashflow-divisione.md,
   cashflow-dividendi.md, stati.md, dialog.md, e2e-emulatori.md
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice
-- Leggi doc/mobile/README.md (§ 9: le decisioni 1–35), MOB-01, MOB-02 e MOB-03 (chiuse; MOB-02 è il contratto: non
+- Leggi doc/mobile/README.md (§ 9: le decisioni 1–35), doc/guide/prima-schermata.md (la misura: MOB-01 è ritirata), MOB-02 e MOB-03 (chiuse; MOB-02 è il contratto: non
   rinominare nulla; MOB-03 ha scritto describeScheduledCaption e il binding di salesNarrative) e questa spec per
   intero; DESIGN.md § 5 e § 6 (MAI rigenerarlo); riverifica le righe di ExpenseDialog.tsx (onSuccess :381/:2078, ids
   :2034 con le commissioni dopo i genitori, dal 2026-10-10)

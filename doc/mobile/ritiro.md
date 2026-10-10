@@ -37,13 +37,13 @@ come segnale. DDL: nessuno — la serie non tocca `firestore.rules` né `firesto
 (si deployano a mano, `firebase deploy --only firestore:rules` / `firestore:indexes`,
 SETUP.md:80-98) e non scrive migrazioni dati (le one-shot del repo girano alla prima visita
 di una pagina, `lib/services/loanMigration.ts` e `app/dashboard/assets/page.tsx`, e sono
-del 2026-10-10, fuori serie: il censimento le attraversa nel giro di riscaldamento, MOB-01
-§ 4); l'unica persistenza nuova della serie è `localStorage` per dispositivo
+del 2026-10-10, fuori serie: il censimento le attraversa nel giro di riscaldamento,
+doc/guide/prima-schermata.md § La corsa); l'unica persistenza nuova della serie è `localStorage` per dispositivo
 (`mobile-sections:<route>[:<tab>]`, MOB-02; README § 9), che non si deploya e non si migra.
 Lo si prova con `git diff <base>..<merge> -- firestore.rules firestore.indexes.json` vuoto
 e con `grep -n -i -E "firestore\.rules|indexes|migrazion" doc/mobile/*.md` (il 2026-10-10:
-nessuna voce di DDL, solo le due migrazioni citate come trappola in MOB-01 § 4 e MOB-06
-§ 4); se la spec ne porta uno, la clausola non vale: FERMATI e chiedi. Se un criterio non
+nessuna voce di DDL, solo le due migrazioni citate come trappola nella guida della prima
+schermata e in MOB-06 § 4); se la spec ne porta uno, la clausola non vale: FERMATI e chiedi. Se un criterio non
 regge, un segnale manca o uno script non è stato
 speso, FERMATI e dillo: una spec si ritira intera, mai a metà, e non si ritira una spec
 la cui implementazione ha lasciato un «da decidere».
@@ -99,13 +99,12 @@ ORDINE DI LAVORO
 
 2) MISURA I RIFERIMENTI, non stimarli: sempre con `--exclude-dir=node_modules
    --exclude-dir=.next --exclude-dir=.next-perf --exclude-dir=.next-e2e --exclude-dir=.git
-   --exclude-dir=.mobile-census` — (a) il numero: `grep -rn "MOB-<NN>" .` (il 2026-10-10
-   MOB-01 contava 68 occorrenze: 8 fuori dalla cartella in 7 file tracciati —
+   --exclude-dir=.mobile-census` — (a) il numero: `grep -rn "MOB-<NN>" .` (al ritiro di
+   MOB-01, il 2026-10-10, contava 79 occorrenze: 11 fuori dalla cartella in 8 file tracciati —
    `scripts/mobileCensus.mjs` 2, `scripts/seedCensusE2E.mts`, `lib/utils/mobileBudget.ts`,
-   `doc/guide/prima-schermata.md` (fino allo scorporo del 2026-10-10: `velocita.md`), CLAUDE.md, AGENTS.md,
-   WORKFLOW.md — più 3 in SESSION_NOTES.md
-   (untracked), 25 in README, 28 nelle otto spec sorelle, 1 in `reference/mobile-census.mjs`
-   e 3 nella spec stessa); (b) il percorso: `grep -rn "doc/mobile/<SPEC senza cartella>" .`
+   `doc/guide/prima-schermata.md` 2 (fino allo scorporo del 2026-10-10: `velocita.md`), CLAUDE.md 2, AGENTS.md,
+   WORKFLOW.md, README.md — 25 in README, 28 nelle otto spec sorelle, 1 in `reference/mobile-census.mjs`,
+   11 in questo prompt e 3 nella spec stessa; dopo il ritiro ne restano solo le etichette); (b) il percorso: `grep -rn "doc/mobile/<SPEC senza cartella>" .`
    e `grep -rn "doc/mobile" .` (il 2026-10-10: 19 righe in 7 file di codice e test —
    `scripts/mobileBudget.mts` 4, `scripts/mobileCensus.mjs` 3, `scripts/seedCensusE2E.mts`
    2, `lib/utils/mobileBudget.ts` 4, `__tests__/mobileSurfaces.test.ts` 4,
@@ -127,8 +126,9 @@ ORDINE DI LAVORO
    restano valide finché vive l'indice e si riscrivono in regola + data nel ritiro della
    spec che le ha generate, o il giorno dell'ultima); (e) `doc/mobile/budget.json` NON è
    documentazione ma un artefatto vivo: lo leggono `scripts/mobileBudget.mts` (`BUDGET_PATH`,
-   riga 31, e `git show HEAD:doc/mobile/budget.json`, riga 45), `scripts/mobileCensus.mjs`
-   (`BUDGET_PATH`, riga 52: le superfici), `__tests__/mobileSurfaces.test.ts` (riga 15) —
+   riga 31, e `git show HEAD:doc/mobile/budget.json`, riga 45 — righe del 2026-10-10, da
+   rileggere con `grep -n`), `scripts/mobileCensus.mjs` (`BUDGET_PATH`: le superfici),
+   `__tests__/mobileSurfaces.test.ts` (riga 15) —
    `grep -rn "doc/mobile/budget.json" .` il 2026-10-10: 20 occorrenze in 8 file fuori dalla
    serie e 18 in 9 file dentro; finché vive l'indice resta dov'è. Le ETICHETTE DELLA SERIE
    che restano vive finché vive l'indice: `MOB-NN` nelle intestazioni e in § 5/§ 6/§ 9
@@ -173,14 +173,14 @@ ORDINE DI LAVORO
    tre direzioni e la scelta → README.md § Documentation come storia, con le date;
    `doc/mobile/budget.json` SI SPOSTA e non si cancella mai: la casa proposta, imitando la
    serie PERF (`perf/budget.json` e `perf/routes.json` stanno in `perf/`, fuori da `doc/`),
-   è `perf/mobile-budget.json`, con `BUDGET_PATH` di `scripts/mobileBudget.mts:31`, il
-   `git show HEAD:` di `:45`, `BUDGET_PATH` di `scripts/mobileCensus.mjs:52`, il `resolve`
-   di `__tests__/mobileSurfaces.test.ts:15` e ogni frase di CLAUDE.md, AGENTS.md,
+   è `perf/mobile-budget.json`, con `BUDGET_PATH` e il `git show HEAD:` di
+   `scripts/mobileBudget.mts`, `BUDGET_PATH` di `scripts/mobileCensus.mjs`, il `resolve`
+   di `__tests__/mobileSurfaces.test.ts` (`grep -n "doc/mobile/budget.json"` dà le righe) e ogni frase di CLAUDE.md, AGENTS.md,
    prima-schermata.md e dei commenti che lo nomina mossi NELLO STESSO commit, `git mv` per tenere
    la storia, e `grep -rn "doc/mobile/budget.json" .` a zero prima del commit;
    `doc/mobile/reference/mobile-census.mjs` (lo script usa-e-getta della baseline) se ne va
    con la cartella, `git log -- doc/mobile/reference/` è il suo archivio, e
-   `scripts/mobileCensus.mjs:8`, che il 2026-10-10 lo cita per percorso, passa a citarlo
+   l'intestazione di `scripts/mobileCensus.mjs`, che il 2026-10-10 lo cita per percorso, passa a citarlo
    per data (2026-09-26) e per `git log`. Sostituire, mai
    accumulare. Il prompt, il modello e l'effort in fondo alla spec NON si travasano.
 
@@ -216,20 +216,23 @@ ORDINE DI LAVORO
    (3) le intestazioni delle spec sorelle «Dipende da: MOB-NN» — dopo il ritiro «MOB-NN
    ritirata il <data>, in develop dal <data>, PR #NNN», come oggi scrivono le PERF — e la
    colonna «Proprietaria» di § 5; (4) CLAUDE.md «Latest» (riga 17) e § Testing («Mobile
-   composition», riga 56); (5) AGENTS.md § Commands («While `doc/mobile/` is open», riga
-   831) e § Performance tooling (riga 912, «2026-10-10, MOB-01»); (6) WORKFLOW.md § 3 (la
-   riga del fixture `census@example.com` «(MOB-01)», riga 166; «Where things are recorded»,
-   righe 250-251); (7) README.md § Documentation (riga 217: la tabella dei file di guida,
-   che il 2026-10-10 non nomina `doc/mobile/` e che l'ultimo ritiro riscrive con la storia
-   della serie, come f2d4ec3 fece per `perf/`). Se era l'ultima spec, dillo
+   composition», riga 56); (5) AGENTS.md § Commands («While `doc/mobile/` is open») e
+   § Performance tooling («2026-10-10, MOB-01») — le righe si rileggono con `grep -n`;
+   (6) WORKFLOW.md § 3 (la riga del fixture `census@example.com` «(MOB-01)»; «Where things
+   are recorded», il paragrafo «Branches», che dal ritiro di MOB-01 data ogni ritiro);
+   (7) README.md § Documentation (la riga `doc/mobile/` della tabella dei file di guida, dal
+   2026-10-10, che l'ultimo ritiro riscrive con la storia della serie, come f2d4ec3 fece
+   per `perf/`). Se era l'ultima spec, dillo
    esplicitamente e chiudi la serie come l'ultimo precedente.
    `grep -rn -E "MOB-<NN>|<SLUG>" CLAUDE.md AGENTS.md WORKFLOW.md README.md doc/mobile/
    doc/guide/ scripts lib __tests__ e2e` seguito da `grep -rn -E "fatta il|da fare|ritirata
    il|in develop dal|Stato:" doc/mobile/` e da `grep -n -E "MOB-|doc/mobile" CLAUDE.md`
-   (il 2026-10-10 lo stato di MOB-01 stava in: `doc/mobile/MOB-01-…md:3` «Stato: fatta il
+   (prima del ritiro di MOB-01 il suo stato stava in: `doc/mobile/MOB-01-…md:3` «Stato: fatta il
    2026-10-10», README riga 13 «MOB-01 è fatta (2026-10-10)» e riga 281 «fatta il
    2026-10-10 (…)», CLAUDE.md riga 17 «Latest (2026-10-10): MOB-01, the first-screen census
-   and its budget» — tre file, quattro righe, una data) deve dire la stessa cosa ovunque.
+   and its budget» — tre file, quattro righe, una data; dopo: «ritirata il 2026-10-10» nel
+   preambolo e in § 6, «ritirata» nelle intestazioni delle sorelle, CLAUDE.md «Latest»)
+   deve dire la stessa cosa ovunque.
 
 CANCELLI: nell'ordine — `npx tsc --noEmit` pulito; `npm run lint` a zero; `TZ=Europe/Rome
 npx vitest run` E `TZ=UTC npx vitest run` verdi (il 2026-10-10: 228 file / 5076 test;

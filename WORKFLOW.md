@@ -163,7 +163,7 @@ The app **is** locally runnable; there is no fallback to declare.
   | `degraded@example.com` | `test-user-degraded` | The states in which a return is *not* a measure — empty/degraded readings |
   | `split@example.com` | `test-user-split` | Cashflow › Divisione ON: Ghiandaia and Tarsio at 60/40, with one row dated 31 December that stays «in calendario» all year — `npm run e2e:seed:split` |
   | `hof@example.com` | `hof-user` | Hall of Fame: 47 monthly snapshots from novembre 2022 with a story (best month marzo 2024, worst ottobre 2023, a two-month first year); NO rankings document — the specs press «Aggiorna i record» — `npm run e2e:seed:hof` |
-  | `census@example.com` | `census-user` | The first-screen budget's fixture (MOB-01): every surface with data — Centri and Divisione on, a coupon, a Budget ceiling, a pension fund, 47 snapshots ending last month, one row «in calendario» on the month's last day — dated relative to the run; `npm run mobile:census` re-seeds it and rebuilds its Hall of Fame (`npm run e2e:seed:census` alone does not) |
+  | `census@example.com` | `census-user` | The first-screen budget's fixture (MOB-01): every surface with data, each option in its default state — Centri and Divisione on, a coupon, a Budget ceiling, a pension fund, 47 snapshots ending last month, one row «in calendario» on the month's last day; FIRE › Obiettivi OFF until MOB-07 turns it on (doc/mobile/README.md § 9, 60) — dated relative to the run; `npm run mobile:census` re-seeds it and rebuilds its Hall of Fame (`npm run e2e:seed:census` alone does not) |
 
 - **So the screen is not empty**: `npm run emulators:seed` for the base account, plus the fixture the
   page needs — `npm run e2e:seed` (Previdenza), `npm run e2e:seed:analisi` (Analisi),
@@ -248,7 +248,8 @@ The app **is** locally runnable; there is no fallback to declare.
 
 - **Branches**: `develop` is the integration branch, `main` the default; a session branches off
   whatever is active (usually `develop`) and merges into it by PR. **The `doc/mobile/` specs land on `develop`,
-  one session at a time** (the fourteen `doc/perf/` specs did the same, 2026-09-28 → 2026-10-08). The 2026-09-28 rule
+  one session at a time** (the fourteen `doc/perf/` specs did the same, 2026-09-28 → 2026-10-08; MOB-01 landed and was
+  retired on 2026-10-10, PR #448). The 2026-09-28 rule
   («they reach `main` together») was derogated by the owner on 2026-10-08: `develop` goes to `main` **after the last
   PERF spec and the Known Issues session of 2026-10-08** — the Next 16.4 security fix ships with the perf work — and
   the MOB specs follow in a second release. PERF-14 was retired on 2026-10-08: from that day the PR from `develop` to
@@ -259,7 +260,9 @@ The app **is** locally runnable; there is no fallback to declare.
   and Vitest, no Playwright; a runtime one only on the owner's call, with the area suite and the full Playwright; a
   deferral nobody wrote goes where its theme lives (a guide's blind spots, the speed manual); a tour done in the
   implementation session is recorded by the dossier's index. **`Draft Release Temp.md` never says a spec was retired**
-  (owner, 2026-10-08): its § Documentation line names what the guides now say, surface by surface.
+  (owner, 2026-10-08): its § Documentation line names what the guides now say, surface by surface. **The draft carries
+  user-visible changes only** (owner, 2026-10-10): a developer tool — a census, a budget, a seed, a script — gets no
+  row, not even a «dev» one; its home is the guide and CLAUDE.md «Latest».
 - **The outcome of a verification**: `SESSION_NOTES.md` during the session (untracked — delete it
   before the commit); it is folded into `CLAUDE.md` (the "Latest" entry) and `Draft Release Temp.md`
   before the PR. **Before the closing prompt it ends with one block** (owner, 2026-09-27): *Cosa* (what

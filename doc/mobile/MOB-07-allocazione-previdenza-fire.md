@@ -1,6 +1,6 @@
 # MOB-07 — Allocazione · Previdenza · FIRE
 
-> Stato: da fare · riletta in modo adversariale il 2026-10-10: 27 rilievi, 7 decisioni · Priorità: 3 (Pianificazione, la meno aperta dal telefono) · Sforzo: L · Dipende da: MOB-01, MOB-02
+> Stato: da fare · riletta in modo adversariale il 2026-10-10: 27 rilievi, 7 decisioni · Priorità: 3 (Pianificazione, la meno aperta dal telefono) · Sforzo: L · Dipende da: MOB-01 (ritirata il 2026-10-10, in develop dal 2026-10-10, PR #448), MOB-02
 > (sequenza, README § 9, 9; PERF-04, PERF-05, PERF-10 e PERF-00 ritirate, in develop) · Sblocca: MOB-08, MOB-09
 
 ## 1. Il problema, misurato
@@ -49,7 +49,9 @@ Censimento 2026-09-26, 390×844 (altezze in px; righe di codice da riverificare)
 - `npm run mobile:budget` sul fixture `census@example.com` a 390: `budget.json` prende la prima corsa dopo
   l'implementazione con `--tighten`; le soglie qui sotto sono l'obiettivo di chiusura, e una superficie che le supera
   resta col valore misurato e il commit la nomina con la misura: Allocazione ≤ 1,8 · Previdenza ≤ 1,9 · Calcolatore ≤ 1,9
-  · Coast ≤ 1,8 · What If ≤ 2,2 · Monte Carlo ≤ 1,8 · Obiettivi 1,00; `overflowX` `false`. `figuresOutsideVerdict` ≤ 5;
+  · Coast ≤ 1,8 · What If ≤ 2,2 · Monte Carlo ≤ 1,8 · Obiettivi ≤ 1,8 (ACCESO nel seed da questa spec, README § 9, 60:
+  il fixture lo misurava spento, `screens` 1,00 su una tessera sola, e il budget non guardava le righe `goals-*`);
+  `overflowX` `false`. `figuresOutsideVerdict` ≤ 5;
   `firstClosedRowAbovePill: true` dove LA tessera ha una curva (la curva cede, § 4.5), e `false` con `raisedBy` per
   Bilanciamento ed Evento, che non ne hanno (README § 9, 19).
 - Playwright: ordine del DOM, pannelli chiusi vuoti, memoria per pagina e per tab, eyebrow rosso, zero richieste
@@ -207,6 +209,10 @@ ripetono la lettura (15); LA tessera sempre aperta (21); lo scope dentro il verd
 
 - `app/dashboard/allocation/page.tsx`, `components/allocation/tiles/{Bilanciamento,Piano,PerClasse,Esposizione,Previdenza}Tile.tsx`,
   `lib/hooks/usePortfolioExposure.ts` (`options.enabled`).
+- `scripts/seedCensusE2E.mts` (README § 9, 60): `goalBasedInvestingEnabled: true` e UN obiettivo inventato, con uno
+  stato che vale dal 5 al penultimo giorno (doc/guide/prima-schermata.md § Il fixture); `fire-obiettivi` rimisurato
+  con `--tighten` nelle tre viewport, la riga di README § 3.1 riscritta; WORKFLOW.md § 3 (la riga del fixture) e
+  l'intestazione del seed perdono «Obiettivi spento».
 - `components/pension/PensionOverview.tsx`, `components/pension/tiles/{FondoOggi,Rendimento,AnnoFiscale,Versato,Versamenti}Tile.tsx`,
   `lib/utils/pensionNarrative.ts` (`leadLength`, `restLabel`).
 - `components/fire-simulations/{FireCalculatorTab,CoastFireTab,WhatIfAnalysisTab,MonteCarloTab,GoalBasedInvestingTab}.tsx`;

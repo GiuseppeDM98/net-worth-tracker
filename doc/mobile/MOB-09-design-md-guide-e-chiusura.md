@@ -203,8 +203,9 @@ altre dodici cancellate nello stesso commit (WORKFLOW: la critica di una superfi
 
 `doc/mobile/README.md`: § 6 una riga per MOB-01..09 (data, misura); § 3.1 la tabella del fixture nello stato finale; § 3
 la tabella «dopo» del mirror accanto a quella del 2026-09-26, solo numeri aggregati.
-`Draft Release Temp.md`: le voci di MOB-01..08 (Hall of Fame di MOB-02 compresa, la riga «dev» di MOB-01 in 🔧
-Improvements) riscritte nel loro stato finale in ✨ New Features, una per pagina (README § 9, 55: Panoramica, Patrimonio,
+`Draft Release Temp.md`: le voci di MOB-02..08 (Hall of Fame di MOB-02 compresa; MOB-01 non ne ha: il draft porta
+solo cambiamenti visibili all'utente, WORKFLOW.md § Where things are recorded, 2026-10-10) riscritte nel loro stato
+finale in ✨ New Features, una per pagina (README § 9, 55: Panoramica, Patrimonio,
 ogni tab di Cashflow e di FIRE…), più una di 📚 Documentation; si ANTEPONE; se il file manca (tag tagliato) si ricrea dal
 modello di WORKFLOW § Where things are recorded; cifre tonde inventate e nomi generici, mai del mirror.
 
@@ -215,7 +216,7 @@ modello di WORKFLOW § Where things are recorded; cifre tonde inventate e nomi g
   aggiunge accanto, toglie `spring-layout` (§ 4.3).
 - **PERF-03** (in develop dal 2026-09-30, ritirata): DESIGN.md non nomina «Aggiornato alle…» (grep vuoto il 2026-10-10),
   quindi The First-Screen Rule non lo cita; la riga sta nel `PageHeader` (doc/guide/stati.md § The fourth reading) e il
-  census aspetta che `[data-freshness]` sia vuoto (MOB-01 § 4).
+  census aspetta che `[data-freshness]` sia vuoto (`readSettleState` in `scripts/mobileCensus.mjs`).
 - **PERF-04**: «a closed row downloads no chart» regge sul grafico pigro di modulo, `lazyComponent` (AGENTS § Dynamic Imports
   and Module Hygiene): si rimanda lì, NON a «Deferred Chart Mount» (`:1277`, **Superseded (2026-09-06)**,
   parla del count-up). **`perf:serve`**: `mobile:budget` su :3200.

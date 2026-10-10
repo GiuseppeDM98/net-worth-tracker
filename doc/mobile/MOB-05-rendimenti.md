@@ -1,7 +1,7 @@
 # MOB-05 — Rendimenti
 
 > Stato: da fare · riletta in modo adversariale il 2026-10-10: 25 rilievi, 4 decisioni · Priorità: 2 (la base è una clausola vincolante; Plusvalenze sparisce in silenzio) · Sforzo: M ·
-> Dipende da: MOB-01, MOB-02 (PERF-09 chiusa il 2026-10-04, in develop) · Sblocca: MOB-06..08, MOB-09
+> Dipende da: MOB-01 (ritirata il 2026-10-10, in develop dal 2026-10-10, PR #448), MOB-02 (PERF-09 chiusa il 2026-10-04, in develop) · Sblocca: MOB-06..08, MOB-09
 
 ## 1. Il problema, misurato
 

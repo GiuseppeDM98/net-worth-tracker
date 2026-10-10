@@ -10,8 +10,8 @@
 > «Fixture» (creata da MOB-01 con la prima corsa sul fixture del budget); la tabella del 2026-09-26 sul mirror (§ 3) resta
 > intatta come riferimento storico, e le corse sul mirror di fine spec vanno in SESSION_NOTES (solo aggregati). **Lettura
 > adversariale del 2026-10-10**: tutte e nove le spec rilette insieme contro il codice e le decisioni di § 9, 261 rilievi
-> corretti in loco e 49 domande chiuse (§ 9, decisioni 9–57); § 10 è vuoto. MOB-01 è fatta (2026-10-10): § 3.1 ha
-> la prima tabella del fixture.
+> corretti in loco e 49 domande chiuse (§ 9, decisioni 9–57); § 10 è vuoto. MOB-01 è fatta e ritirata (2026-10-10, PR #448): § 3.1 ha
+> la prima tabella del fixture, il suo testo è in `git log -- doc/mobile/`.
 
 ## 1. La domanda e la risposta
 
@@ -117,7 +117,8 @@ intere · cifre sopra la piega): **Analisi 390** 4,88 · 1/0 · 13 (#401: il Flu
 **Allocazione** 390 5,04 · 2/1 · 26 · 768 3,02 · 2/1 · 48 · 1024 3,86 · 2/1 · 36 (la nuova Esposizione, #407). La
 definizione di cifra di MOB-01, più stretta (ritagli, `[inert]`, opacità 0 e sovrapposizioni `fixed` esclusi), sulla
 stessa corsa differisce da quella della baseline di UNA cifra su 57 misure: gli altri scarti dal 26/9 sono dati del mese
-(Divisione nello stato «quote non calcolabili», un verdetto con una riga in più) e sono in SESSION_NOTES di quel giorno.
+(Divisione nello stato «quote non calcolabili», un verdetto con una riga in più); il dettaglio riga per riga stava nelle
+note di quella sessione, che non sopravvivono al commit (WORKFLOW.md § Where things are recorded).
 
 ### 3.1 Fixture (dal primo `mobile:census` di MOB-01)
 
@@ -278,7 +279,7 @@ non spec per spec.
 
 | Spec | Titolo | Priorità | Sforzo | Dipende da | Modello · effort | Stato |
 |---|---|---|---|---|---|---|
-| [MOB-01](MOB-01-censimento-e-budget-prima-schermata.md) | Il censimento in repo e il budget della prima schermata | 1 | M | — (PERF-01 e PERF-00 in develop) | Opus 5.5 · high | fatta il 2026-10-10 (`mobile:census`, `mobile:budget`, il fixture `census@example.com`, § 3.1); due decisioni nuove in § 9 (58, 59) |
+| MOB-01 | Il censimento in repo e il budget della prima schermata | 1 | M | — (PERF-01 e PERF-00 in develop) | Opus 5.5 · high | **ritirata il 2026-10-10** — PR #448 in develop dal 2026-10-10; 30 divergenze su 156 criteri letti contro il codice (sei lettori e tre scettici, tutto Opus): tredici dove il codice aveva ragione e la lezione era già a casa (le sette correzioni nell'intestazione di `scripts/mobileCensus.mjs`, le metriche e il settle in doc/guide/prima-schermata.md, il fixture nell'intestazione del seed, `compareCensusToBudget` con il terzo argomento e `informational` nel suo JSDoc, i dati del seed modellati sui fixture `centri` e `split` e non copiati) → doc/guide/prima-schermata.md, WORKFLOW.md § 3, i commenti alle righe; **quattro difetti a runtime degli script corretti nel ritiro, su decisione del proprietario** (§ 9, 61: la guardia Yahoo era cieca — il census azzerava il `source` dopo il giro di riscaldamento, l'unica chiamata che può dire `yahoo`, e `--tighten` non lo guardava; `--surfaces=cashflow` misurava zero superfici in silenzio; `--tighten` su una corsa parziale scriveva `budget.json` prima di andare rosso; lo stato dell'interruttore 50/30/20 promesso per il mirror e mai scritto — `tightenRefusal(run, budget)`, `validateSelection`, `yahooCalled`, `spendingRoles`; test visti rossi in `__tests__/mobileBudget.test.ts` e `mobileCensusOptions.test.ts`), sette difetti di solo testo corretti (le tre intestazioni dei test senza la falsificazione vista rossa — rifatte nel ritiro: verso invertito 6 rossi, `\s?` tolto 4, `/dashboard/dividends` 3 e una voce tolta 1; `reference/mobile-census.mjs` che diceva «until then»; § 3 che rimandava a SESSION_NOTES; la decisione 10 «in qualunque giorno» contro la 59; MOB-06 «sopra la piega» per una metrica che conta sopra la pill; MOB-03 che partiva dal 4,41 del mirror; le righe di `ritiro.md` del 2026-10-10 già mosse dallo scorporo della guida), cinque rinvii scritti ora (Obiettivi spento nel fixture → § 9, 60 e MOB-07 § 5; la colonna «obiettivo» a 768/1024 e la decisione 51 riscritta sul fixture → MOB-08 § 2 e § 5; la fila KPI del Tetto che si sovrappone a 390 → MOB-04 § 4 e § 7; il perché del `.mjs` (`__name` di tsx) → l'intestazione del census; la riga «dev» del draft tolta da 279858f → la regola in WORKFLOW.md § Where things are recorded e MOB-09 § 4); fuori dai non-obiettivi e dichiarato: PR #448 tocca `e2e/motion.layout.spec.ts` (il tema colore allineato a `localStorage` prima di ogni load, visto rosso 4/5 senza; doc/guide/e2e-emulatori.md). Nessun giro guidato F (proprietario, 2026-10-10). La misura di chiusura resta e si è rifatta nel ritiro sul codice corretto: 19 × 3 sul fixture in 2,0 min, `mobile:budget` verde su 57 misure, `yahooCalled` falso, `--selftest` verde; il `--tighten` rifiutato con `yahooCalled` forzato e con una corsa di una superficie, `budget.json` intatto. `budget.json` e il fixture sono di § 5; la tabella § 3.1 non cambia |
 | [MOB-02](MOB-02-primitive-della-composizione.md) | Le primitive della composizione | 1 | L | MOB-01 | Fable 5.1 · xhigh | da fare · riletta in modo adversariale il 2026-10-10: 30 rilievi, 11 decisioni |
 | [MOB-03](MOB-03-panoramica.md) | Panoramica | 2 | M | MOB-01, MOB-02 | Fable 5.1 · high | da fare · riletta in modo adversariale il 2026-10-10: 28 rilievi, 6 decisioni |
 | [MOB-04](MOB-04-cashflow-cinque-tab.md) | Cashflow: le cinque tab | 2 | L | MOB-01, MOB-02, MOB-03 | Fable 5.1 · xhigh | da fare · riletta in modo adversariale il 2026-10-10: 34 rilievi, 9 decisioni |
@@ -352,8 +353,8 @@ ha misurato la baseline.
     della spec con il numero più basso che lo tocca (tabella in § 5). (10) **Il budget si misura sull'account dedicato
     `census@example.com`** (`npm run e2e:seed:census`, `scripts/seedCensusE2E.mts`: Centri e Divisione accesi, una cedola,
     una riga in calendario, la storia di Hall of Fame del seed `hof`, date relative al giorno della corsa così che ogni
-    superficie mostri gli stessi conteggi in qualunque giorno del mese); `mobile:census` lo risemina prima di misurare
-    quando `--email` è il suo. (11) **L'ordine unico è il DOM di oggi su ogni pagina**: a 1440 non cambia nulla salvo LA
+    superficie mostri gli stessi conteggi in qualunque giorno del mese — dal 5 al penultimo, decisione 59); `mobile:census`
+    lo risemina prima di misurare quando `--email` è il suo. (11) **L'ordine unico è il DOM di oggi su ogni pagina**: a 1440 non cambia nulla salvo LA
     tessera portata in testa dove non lo è (What If); sul telefono le righe chiuse seguono il DOM desktop (Panoramica:
     Sintesi prima di Cashflow); nessuna classe `order-*` nelle griglie composte; ogni guida dichiara l'ordine in
     § Composizione mobile. (12) **L'asse sta subito sotto il titolo, prima della prima frase** (titolo → asse → prima
@@ -422,12 +423,28 @@ ha misurato la baseline.
     stanno solo le chiuse che precedono la prima aperta, da lei in poi tutto va sotto in ordine DOM (da 1); flusso
     `sparse`, mai `dense` (da 1). (50) iPad 12,9" in verticale (contenitore 992 px): tre colonne con la pill; lo skeleton
     generico resta a due colonne. (51) Il criterio «`screens` a 1024 ≤ `screens` a 768» è sostituito da «`screens` a 1024
-    ≤ la baseline del 2026-09-26 a 1024 (§ 3)» per ogni superficie composta, misurato da `mobile:budget` sul fixture.
+    ≤ il valore di `budget.json` a 1024 com'è nato il 2026-10-10 (§ 3.1)» per ogni superficie composta: è il tetto che
+    `mobile:budget` già tiene sul fixture. **Riscritta il 2026-10-10 nel ritiro di MOB-01** (proprietario): la forma
+    precedente, «≤ la baseline del 2026-09-26 a 1024 (§ 3)», confrontava il fixture sulla build con il mirror sul dev
+    server — che la serie dice di non confrontare — e il fixture la superava già su Centri (1,76 contro 1,74), Divisione
+    (1,62 contro 1,55) e Impostazioni (1,70 contro 1,68).
   - **MOB-01 (2026-10-10, nella sessione di implementazione).** (58) **I record di Hall of Fame del fixture li costruisce
     il server**: `mobile:census` chiama `POST /api/hall-of-fame/recalculate` dopo il seed (un seed Admin non può
     importare i builder, che portano dentro l'SDK client). (59) **Il fixture non si misura dal 1 al 4 del mese né
     l'ultimo giorno** (ora italiana): le righe del mese stanno al 5 e il Budget non prevede prima del giorno 4;
     l'ultimo giorno la riga in calendario scade. `mobile:census` esce 1 con il perché.
+  - **MOB-01 (2026-10-10, nel ritiro).** (60) **Il fixture misura ogni opzione nel suo stato di default, Obiettivi
+    compresi**: FIRE › Obiettivi è spento (`goalBasedInvestingEnabled: false`, verdetto «Gli obiettivi non sono attivi»),
+    quindi il budget non guarda la composizione delle righe `goals-*` di MOB-07; MOB-07 accende gli obiettivi nel seed
+    (`scripts/seedCensusE2E.mts` entra nel suo § 5) con un obiettivo inventato e rimisura `fire-obiettivi` con
+    `--tighten`. (61) **Quattro difetti degli script corretti nel ritiro**, con i test visti rossi: la guardia Yahoo
+    rifiuta davvero (`yahooCalled` a livello di corsa, letto anche nel giro di riscaldamento; `mobile:budget -- --tighten`
+    lo rifiuta e il census esce 1 sul fixture); una chiave di `--surfaces` o un `--viewports` ignoti escono 1 con
+    l'elenco delle valide (prima: 0 misure in silenzio e `last-run.json` sovrascritto); `--tighten` rifiuta una corsa
+    parziale (prima scriveva `budget.json` e poi andava rosso su «non misurata»); il report registra lo stato
+    dell'interruttore 50/30/20 (`spendingRoles` nella diagnostica di Analisi), promesso per il mirror e mai scritto.
+    Il draft delle release non porta la riga «dev» (WORKFLOW.md § Where things are recorded). Nessun giro guidato F
+    (proprietario, 2026-10-10).
   - **MOB-09.** (52) Il testo delle quattro regole lo applica Claude verbatim in DESIGN.md e nel sidecar, dopo l'OK del
     proprietario sul testo nella sessione MOB-09. (53) Critiche Impeccable: nuove per Panoramica, Tracciamento,
     Rendimenti e Hall of Fame; le altre dodici cancellate nello stesso commit, rifatte da `polish` in sessioni successive.
@@ -440,6 +457,6 @@ ha misurato la baseline.
 ## 10. Domande aperte al proprietario
 
 Nessuna: le 49 domande della lettura adversariale del 2026-10-10 sono chiuse in § 9 (decisioni 9–57), le due della
-sessione MOB-01 sono le decisioni 58 e 59, e ogni spec
+sessione MOB-01 sono le decisioni 58 e 59, le due del suo ritiro 60 e 61 (con la 51 riscritta), e ogni spec
 scrive la sua risposta come istruzione. Una domanda nuova nasce solo da un fatto che una sessione di implementazione
 scopre nel codice, si pone subito al proprietario con lo strumento interattivo e la risposta si aggiunge qui.

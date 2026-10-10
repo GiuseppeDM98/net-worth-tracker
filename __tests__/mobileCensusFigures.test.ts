@@ -2,6 +2,8 @@
  * What the first-screen census counts as a «figure» (`FIGURE_PATTERN` of scripts/mobileCensus.mjs):
  * a number followed by € or % — decision 7 of doc/mobile/README.md § 9, the baseline's own rule —
  * with the no-break spaces Intl writes before the unit. A count of things («11 strumenti») is not one.
+ *
+ * Seen red on 2026-10-10 with the `\s?` removed from the pattern: four of the five cases failed.
  */
 import { describe, it, expect } from 'vitest';
 import { FIGURE_PATTERN } from '../scripts/mobileCensus.mjs';

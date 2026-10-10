@@ -9,11 +9,14 @@
  * base account (every spec writes into it). And every surface must have something to show, or a
  * budget on an empty page would guard nothing: Centri di Costo and Divisione are ON, there is a
  * coupon, a Budget ceiling, a pension fund, 47 monthly snapshots for Hall of Fame, a row still in
- * the calendar at the end of the month.
+ * the calendar at the end of the month. Every OPTION is measured in its default state (owner,
+ * 2026-10-10): the 50/30/20 roles are off, and FIRE › Obiettivi is off too — the one surface
+ * measured with nothing to show («Gli obiettivi non sono attivi», one tile) until the spec that
+ * composes it turns it on here with an invented goal (doc/mobile/README.md § 9, 60).
  *
  * THE DATES are relative to the day of the run, so every surface counts the same on any day of
  * the month: the month's rows sit on the 5th, the previous month is whole, the snapshots end last
- * month. Two days break it, and `mobile:census` refuses to measure on them (owner, 2026-10-10):
+ * month. Two windows break it, and `mobile:census` refuses to measure in them (owner, 2026-10-10):
  * - from the 1st to the 4th the rows of the 5th are still «in calendario», and the Budget makes
  *   no forecast before day 4 (`MIN_FORECAST_DAYS`, lib/utils/budgetUtils.ts);
  * - on the month's last day the row «in calendario» comes due.
@@ -163,7 +166,8 @@ const assetBase = () => ({ userId: UID, lastPriceUpdate: now, createdAt: now, up
 
 // Quoted tickers are only the ones `scripts/instrumentProfileFixtures.ts` stamps (VWCE.DE, AAPL):
 // any other would send `/api/portfolio/instrument-profiles` to Yahoo, and the Esposizione would
-// change with the network (MOB-01 § 9).
+// change with the network — the census reads the route's `Server-Timing` and a `source=yahoo` on
+// this account stops the budget from being taken (doc/guide/prima-schermata.md, 2026-10-10).
 const ASSETS: SeedAsset[] = [
   {
     id: 'census-vwce',

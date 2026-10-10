@@ -1,6 +1,8 @@
 /**
- * Small-screen census, session 2026-09-26 (the throwaway that measured the baseline in doc/mobile/README.md § 3;
- * MOB-01 ports it into scripts/ as `npm run mobile:census`). Kept here as the reference until then.
+ * Small-screen census, session 2026-09-26: the throwaway that measured the baseline in doc/mobile/README.md § 3.
+ * Ported into scripts/mobileCensus.mjs (`npm run mobile:census`) on 2026-10-10, with seven corrections listed in
+ * that file's header; kept here, unchanged, as the script that measured the baseline, for as long as the
+ * series' index lives.
  *
  * For every dashboard surface (route or tab) at three small viewports — 390×844 phone, 768×1024
  * tablet portrait, 1024×768 tablet landscape — after a real login on the emulator dev server:

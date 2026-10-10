@@ -1,6 +1,6 @@
 # MOB-06 — Patrimonio · Analisi · Storico · Hall of Fame
 
-> Stato: da fare · riletta in modo adversariale il 2026-10-10: 35 rilievi, 8 decisioni · Priorità: 3 (quattro pagine su un contratto già scritto) · Sforzo: L · Dipende da: MOB-01, MOB-02, MOB-03
+> Stato: da fare · riletta in modo adversariale il 2026-10-10: 35 rilievi, 8 decisioni · Priorità: 3 (quattro pagine su un contratto già scritto) · Sforzo: L · Dipende da: MOB-01 (ritirata il 2026-10-10, in develop dal 2026-10-10, PR #448), MOB-02, MOB-03
 > (`PatrimonioTile`, `ComposizioneTile`, `describeSales`), MOB-04 (`describeTrackingScope`, `CashflowKpiTrio`) — sequenza, README § 9, 9; PERF-11 ritirata, in develop · Sblocca: MOB-07, MOB-08, MOB-09
 
 ## 1. Il problema, misurato
@@ -43,7 +43,7 @@ Righe del 2026-09-26 (chi implementa le riverifica):
 `npm run mobile:budget` sul fixture `census@example.com` (README § 9, 10) a 390, `doc/mobile/budget.json` stretto con `--tighten`:
 
 - Patrimonio, Analisi, Storico: schermate **≤ 2,5**; una tessera aperta; **≤ 5 cifre fuori dal verdetto** sopra la
-  piega (LA tessera compresa, 16); la prima riga chiusa sopra la pill. L'ordine dei tagli è fisso: sotto `desktop:` il
+  pill (`figuresOutsideVerdict`: il nodo finisce sopra il bordo alto della pill, non la piega; LA tessera compresa, 16); la prima riga chiusa sopra la pill. L'ordine dei tagli è fisso: sotto `desktop:` il
   grafico di LA tessera è alto 120 px (README § 9, 4: Patrimonio `max-desktop:min-h-[120px]` di MOB-03 § 4.3; Evoluzione
   `max-desktop:min-h-[120px] desktop:min-h-[220px]` su `EvoluzioneTile.tsx:187`; le barre di Periodo, `SpendingBarsChart`
   in `PeriodoTile`, a 120 px), sempre; poi, su Patrimonio, la striscia perde la cella Liquidità (README § 9, 40); mai la
@@ -163,7 +163,7 @@ classifiche e ledger restano interi: 15, 17); `validateStrip` in un test per pag
   - **L'aside con controlli** sta fuori dal bottone, solo da aperta (MOB-02 § 4.2): sotto i 640 px è il solo «Per ruolo ·
     Per tipo», e solo con l'interruttore acceso; «Sottocategorie» e il conteggio dei nodi esistono da 640 in su. La vista
     scelta è stato della tessera: non entra in `mobile-sections:analisi` e riparte da «Per ruolo» a ogni montaggio.
-  - **«Mostra tutte»** è una disclosure con `aria-expanded` e `aria-controls`: non è una riga chiusa (MOB-01 § 4).
+  - **«Mostra tutte»** è una disclosure con `aria-expanded` e `aria-controls`: non è una riga chiusa (`isClosedRow` in `scripts/mobileCensus.mjs` vuole `aria-controls` = `<id>-panel` di una `section.rounded-2xl[id]`).
 - **La Scheda** è in `sections` solo con un focus. Sotto `desktop:` l'atterraggio (`handleEntitySelect`, restauro
   dall'URL) chiama `sections.reveal('analisi-scheda')` al posto di `scrollToScheda`, DENTRO lo stesso `setTimeout`, ma
   attraverso un ref aggiornato a ogni commit (`revealRef.current = sections.reveal`, scritto in un effetto di layout senza

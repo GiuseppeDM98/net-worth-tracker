@@ -31,7 +31,7 @@ export type FloorMetric = (typeof FLOOR_METRICS)[number];
 export type NumericMetric = CeilingMetric | FloorMetric;
 export type MobileMetric = NumericMetric | 'firstClosedRowAbovePill' | 'overflowX';
 
-/** What the census measures on one surface at one viewport (MOB-01 § 4, the table). */
+/** What the census measures on one surface at one viewport (the metrics table of doc/guide/prima-schermata.md). */
 export interface MobileMetrics {
   screens: number;
   tilesAboveFold: number;
@@ -80,12 +80,20 @@ export interface CensusRow {
   viewport: MobileViewport;
   status: 'ok' | 'missing' | 'unsettled';
   metrics: MobileMetrics | null;
+  /** Non-binding readings of the run; only `profilesSource` is read here (the Yahoo guard). */
+  diagnostics?: { profilesSource?: string | null; [key: string]: unknown } | null;
 }
 
 export interface CensusRun {
   email: string;
   at: string;
   results: CensusRow[];
+  /**
+   * True when ANY instrument-profiles response of the run — the warm-up lap included — came from
+   * Yahoo: a ticker of the fixture had no seeded profile, so the Esposizione's figures came from
+   * the network and the budget cannot be taken from this run (2026-10-10).
+   */
+  yahooCalled?: boolean;
 }
 
 export type MobileViolation =
@@ -257,12 +265,26 @@ export function compareCensusToBudget(
 
 /**
  * Why `mobile:budget -- --tighten` must refuse this run, or null when it may write: the budget
- * is born and moves only on the census fixture, and only from a run where every surface settled.
+ * is born and moves only on the census fixture, only from a run where every surface settled, only
+ * from a COMPLETE run (a `--surfaces`/`--viewports` subset would tighten a few entries and then go
+ * red on the rest, 2026-10-10), and never from a run in which Yahoo answered a profile — the
+ * figures of the Esposizione would be the network's, not the seed's.
  */
-export function tightenRefusal(run: CensusRun): string | null {
+export function tightenRefusal(run: CensusRun, budget: MobileBudget): string | null {
   if (run.email !== CENSUS_ACCOUNT) return `la corsa è di ${run.email}: il budget si misura solo su ${CENSUS_ACCOUNT}`;
   const broken = run.results.filter((row) => row.status !== 'ok' || !row.metrics);
   if (broken.length > 0) return `superfici non misurate: ${broken.map((row) => `${row.surface}@${row.viewport} (${row.status})`).join(', ')}`;
+  const yahooRows = run.results.filter((row) => row.diagnostics?.profilesSource === 'yahoo');
+  if (run.yahooCalled || yahooRows.length > 0) {
+    const where = yahooRows.length > 0 ? ` (${yahooRows.map((row) => `${row.surface}@${row.viewport}`).join(', ')})` : ' (nel giro di riscaldamento)';
+    return `Yahoo ha risposto a un profilo${where}: un ticker del fixture non ha il suo profilo, si corregge nel seed`;
+  }
+  const measured = new Set(run.results.map((row) => `${row.surface}@${row.viewport}`));
+  const notMeasured: string[] = [];
+  for (const [surface, entries] of Object.entries(budget.budget)) {
+    for (const viewport of MOBILE_VIEWPORTS) if (entries[viewport] && !measured.has(`${surface}@${viewport}`)) notMeasured.push(`${surface}@${viewport}`);
+  }
+  if (notMeasured.length > 0) return `corsa parziale, il budget si stringe solo su una corsa completa — mancano ${notMeasured.join(', ')}`;
   return null;
 }
 

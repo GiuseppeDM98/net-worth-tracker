@@ -1,7 +1,7 @@
 # MOB-03 — Panoramica
 
 > Stato: da fare · riletta in modo adversariale il 2026-10-10: 28 rilievi, 6 decisioni · Priorità: 2 (la pagina che si apre per prima, e la prima E2E del suo contenuto) · Sforzo: M ·
-> Dipende da: MOB-01, MOB-02 (PERF-03 e PERF-07 ritirate, in develop) · Sblocca: MOB-04..08, MOB-09
+> Dipende da: MOB-01 (ritirata il 2026-10-10, in develop dal 2026-10-10, PR #448), MOB-02 (PERF-03 e PERF-07 ritirate, in develop) · Sblocca: MOB-04..08, MOB-09
 
 ## 1. Il problema, misurato
 
@@ -39,7 +39,7 @@ Righe del 2026-09-26, da riverificare:
 
 ## 2. Obiettivo misurabile
 
-- `mobile:budget` sul fixture `census@example.com` (README § 9, 6 e 10), `panoramica` a 390: `screens` da 4,41 (mirror) a
+- `mobile:budget` sul fixture `census@example.com` (README § 9, 6 e 10), `panoramica` a 390: `screens` da 3,56 (il fixture, README § 3.1; il mirror del 26/9 dava 4,41) a
   **≤ 1,6** (deroga «solo titolo», decisione 3); **`figuresOutsideVerdict` ≤ 5** (3 celle, l'eroe, l'etichetta sinistra
   della curva; l'euro del chip dell'anno passa nel seguito, 17); `firstClosedRowAbovePill: true`; `budget.json` stretto
   con `--tighten`.

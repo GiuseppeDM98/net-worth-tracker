@@ -1,7 +1,7 @@
 # MOB-08 — Tablet: 768 e 1024
 
 > Stato: da fare · riletta in modo adversariale il 2026-10-10: 30 rilievi, 5 decisioni · Priorità: 3 (il telefono prima; qui si raddrizza il landscape) · Sforzo: M · Dipende da: MOB-02..07
-> (e quindi MOB-01; PERF-01, PERF-02, PERF-14 ritirate, in develop) · Sblocca: MOB-09
+> (e quindi MOB-01, ritirata il 2026-10-10, in develop dal 2026-10-10, PR #448; PERF-01, PERF-02, PERF-14 ritirate, in develop) · Sblocca: MOB-09
 
 ## 1. Il problema, misurato
 
@@ -13,7 +13,7 @@ Analisi 1/1): il landscape è il tablet peggiore. Righe del 2026-09-26, da river
   e § 5): due colonne anche a 1024. Le celle sono `TILE_CELL_CLASS = 'flex min-w-0 [&>section]:flex-1'`
   (`components/ui/tile.tsx:42`): si stirano sulla traccia; MOB-02 § 4.2 mette `max-desktop:self-start` sulle celle delle righe.
 - La barra (`app/dashboard/layout.tsx:37`, `py-2.5` + `border-b`, solo `max-desktop:landscape`) porta `SidebarTrigger`
-  a `size-7` (`components/ui/sidebar.tsx:275`): 10 + 28 + 10 + 1 = **49 px** (`main` 719, MOB-01). Il suo solo controllo,
+  a `size-7` (`components/ui/sidebar.tsx:275`): 10 + 28 + 10 + 1 = **49 px** (`main` 719: `mainTop` 49 nel censimento del 2026-10-10, sul fixture). Il suo solo controllo,
   28×28 su un touch, apre il drawer (DESIGN.md § 6: «Don't ship a touch target under 44px in … the phone drawer»).
 - Senza pill (`components/layout/BottomNavigation.tsx:73`, `max-desktop:landscape:hidden`) l'unico modo di aggiungere è
   «Aggiungi» (`components/cashflow/ExpenseTrackingTab.tsx`, `max-desktop:portrait:hidden h-9`, in un contenitore
@@ -29,11 +29,12 @@ Analisi 1/1): il landscape è il tablet peggiore. Righe del 2026-09-26, da river
 ## 2. Obiettivo misurabile
 
 - `npm run mobile:budget` verde su 19 superfici × 3 viewport sul fixture `census@example.com` (README § 9, 10), con 768 e
-  1024 resi vincolanti (la lista `informational` di `budget.json` svuotata, MOB-01 § 4) e stretti con `-- --tighten`
+  1024 resi vincolanti (la lista `informational` di `budget.json` svuotata, doc/guide/prima-schermata.md § Il ratchet) e stretti con `-- --tighten`
   nello stesso commit; a 768/1024 la colonna «obiettivo» stampa il misurato, che fa da tetto (README § 9, 16).
-- Su ogni superficie composta, a 768 e 1024: `firstClosedRowAbovePill: true` (a 1024 = fondo di `main`, MOB-01 § 4;
-  Bilanciamento ed Evento con il loro `raisedBy`), `overflowX: false`, **`screens` a 1024 ≤ la baseline del 2026-09-26 a
-  1024 (README § 3)** per ogni superficie (README § 9, 51: un tetto per superficie × viewport, letto da `mobile:budget`).
+- Su ogni superficie composta, a 768 e 1024: `firstClosedRowAbovePill: true` (a 1024 = fondo di `main`: `pillTop` in `scripts/mobileCensus.mjs`;
+  Bilanciamento ed Evento con il loro `raisedBy`), `overflowX: false`, **`screens` a 1024 ≤ il valore di `budget.json`
+  a 1024 com'è nato il 2026-10-10 (README § 3.1)** per ogni superficie (README § 9, 51 riscritta il 2026-10-10: il tetto
+  che `mobile:budget` già tiene; la baseline § 3 è del mirror sul dev server e non si confronta col fixture).
   Su Panoramica e Tracciamento, a 768 e a 1024, LA tessera finisce sopra la piega (test (2)): la curva a 120 px sotto
   `desktop:` (README § 9, 4) vale anche qui.
 - La barra misurata come in § 4.3, trigger ≥ 44×44 (README § 9, 48). A 1440 le due pagine campione hanno 12 colonne e
@@ -136,7 +137,7 @@ prima schermata lo dice il nodo live di `PageRest`, e chiusa dal lettore torna i
 schermata e nessun criterio la vincola, una riga in doc/guide/account-condiviso-demo.md § Per-page blind spots):
 `page.evaluate` legge l'altezza del genitore di `[data-sidebar="trigger"]` (la barra), il `top` di `#page-main` (uguale)
 e `main.clientHeight` (= 768 − barra: la prima schermata); `nav[aria-label="Navigazione principale"]` non visibile,
-trigger ≥ 44×44. MOB-01 la registra (`mainTop`). **Decisione** (README § 9, 48): `size-11` e `py-1` → 4 + 44 + 4 + 1 =
+trigger ≥ 44×44. Il censimento la registra (`mainTop`, diagnostica di `last-run.json`). **Decisione** (README § 9, 48): `size-11` e `py-1` → 4 + 44 + 4 + 1 =
 **53 px** (A-notes: «circa 52»), prima schermata 719 → 715; il misurato va in `doc/guide/shell.md` § Navigation,
 `doc/guide/e2e-emulatori.md` e a MOB-09. La barra vale per ogni schermo in orizzontale sotto `desktop:`
 (`max-desktop:landscape`): su un telefono in orizzontale `main` perde 4 px, annotato in shell.md, senza budget (non è una
@@ -185,7 +186,9 @@ baseline (51).
   `components/fire-simulations/{FireCalculatorTab.tsx,CoastFireTab.tsx,WhatIfAnalysisTab.tsx,MonteCarloTab.tsx,GoalBasedInvestingTab.tsx}`
   (le righe citate sono del 2026-09-26: MOB-02..07 le hanno spostate).
 - `app/dashboard/layout.tsx` (la barra), `components/ui/sidebar.tsx` (`size-11`), `components/cashflow/ExpenseTrackingTab.tsx`
-  («Aggiungi» `h-11`), `playwright.config.ts`, `doc/mobile/budget.json` (`informational` svuotata).
+  («Aggiungi» `h-11`), `playwright.config.ts`, `doc/mobile/budget.json` (`informational` svuotata),
+  `lib/utils/mobileBudget.ts` + `__tests__/mobileBudget.test.ts` (`firstScreenTarget`: a 768/1024 oggi stampa sempre «non
+  ancora (obiettivo = il misurato di MOB-08)» — qui diventa «sì» quando il misurato è entro il budget, visto rosso).
 
 ## 6. Passi
 
@@ -193,7 +196,8 @@ baseline (51).
    `perf:build` servita da `perf:serve`, :3200; il mirror serve solo al giro di § 8 F).
 2. `tabletComposition.ts` + test (rosso, poi verde); l'hook.
 3. Panoramica e Tracciamento, le due spec e le falsificazioni; poi una griglia alla volta, con
-   `mobile:census -- --surfaces=<pagina> --viewports=768,1024` (da Git Bash: PowerShell 5.1 mangia il `--`).
+   `mobile:census -- --surfaces=<chiavi di surfaces in budget.json, es. cashflow-tracciamento,cashflow-budget>
+   --viewports=768,1024` (da Git Bash: PowerShell 5.1 mangia il `--`; una chiave ignota esce 1 con l'elenco).
 4. Barra e «Aggiungi», misura di § 4.3. 5. `playwright.config.ts`; `npx playwright test --list --project=desktop` senza
    `.tablet.`. 6. Suite intera, `mobile:budget -- --tighten`, `perf:budget`, `perf:census`, documentazione, commit proposto.
 
@@ -266,7 +270,7 @@ Ciao, in questa sessione implementiamo doc/mobile/MOB-08-tablet-768-e-1024.md: 7
 aperta a tutta larghezza, 1024 landscape a tre con LA tessera su due e le righe chiuse che precedono la prima aperta
 nella terza, il resto sotto in ordine DOM (lib/utils/tabletComposition.ts, lib/hooks/useTabletComposition.ts, su
 tutte le griglie composte da MOB-02..07); la barra in alto misurata, trigger a 44 px; i progetti Playwright tablet e
-tablet-landscape con e2e/overview.tablet.spec.ts e e2e/cashflow.tablet.spec.ts; il budget di MOB-01 vincolante a 768
+tablet-landscape con e2e/overview.tablet.spec.ts e e2e/cashflow.tablet.spec.ts; il budget della prima schermata vincolante a 768
 e 1024.
 
 Da fare TASSATIVAMENTE prima di ogni cosa:
@@ -275,7 +279,7 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
 - Leggi doc/guide/e2e-emulatori.md, doc/guide/shell.md, doc/guide/panoramica.md, doc/guide/cashflow-tracciamento.md
   (e le guide che tocchi)
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALI mentre scrivi codice
-- Leggi doc/mobile/README.md (§ 9: le decisioni 1–51), la spec MOB-08 per intero, MOB-01 § 4 e MOB-02 § 4 (le API:
+- Leggi doc/mobile/README.md (§ 9: le decisioni 1–51), la spec MOB-08 per intero, doc/guide/prima-schermata.md (le metriche) e MOB-02 § 4 (le API:
   non rinominarne nessuna) e le guide § Composizione mobile scritte da MOB-02..07, che sono chiuse (README § 6);
   DESIGN.md § 5 e § Navigation (MAI rigenerarlo; il capitolo mobile lo scrive MOB-09, dopo questa spec); PERF-01,
   PERF-02 e PERF-14 sono in develop e ritirate
