@@ -320,8 +320,10 @@ describe('describeBondRow / describeManualValuation — the sub-line under a row
 
 describe('describeMortgage — the «Mutuo» tile\'s reading', () => {
   const BASE: MortgageSummary = {
-    propertyId: 'casa',
+    loanId: 'mutuo-casa',
+    loanName: 'Mutuo Casa',
     propertyName: 'Casa',
+    kind: 'mortgage',
     debt: 65_608.36,
     annualRatePct: 0.7,
     year: 2026,
@@ -339,6 +341,10 @@ describe('describeMortgage — the «Mutuo» tile\'s reading', () => {
     expect(plain(describeMortgage(BASE))).toBe(
       'Nel 2026 hai pagato 38,57 € di interessi e rimborsato 518,73 € di capitale, in 1 rata; al ritmo di oggi il mutuo si chiude a novembre 2036.'
     );
+  });
+
+  it('should call a personal loan a prestito where it closes', () => {
+    expect(plain(describeMortgage({ ...BASE, kind: 'loan', propertyName: null, loanName: 'Prestito auto' }))).toContain('il prestito si chiude a novembre 2036.');
   });
 
   it('should speak of the first linked instalment before any has been paid', () => {

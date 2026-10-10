@@ -23,7 +23,7 @@
  * this position moved since I started tracking it", deliberately distinct from G/P.
  */
 
-import type { Asset, MonthlySnapshot } from '@/types/assets';
+import { isLoanAsset, type Asset, type MonthlySnapshot } from '@/types/assets';
 import { calculateAssetValue } from '@/lib/services/assetService';
 
 export interface AssetPerformanceData {
@@ -43,9 +43,9 @@ export interface UnitPricePoint {
 
 const EMPTY: AssetPerformanceData = { lastSnapshotDelta: null, ytdDelta: null, allTimeDelta: null };
 
-/** Types whose unit price is pinned at 1 — the quantity carries the value, so no Δ exists. */
+/** Types whose unit price is pinned at 1 — the quantity carries the value (a loan its debt), so no Δ exists. */
 function hasNoUnitPrice(asset: Pick<Asset, 'type'>): boolean {
-  return asset.type === 'pensionFund' || asset.type === 'cash';
+  return asset.type === 'pensionFund' || asset.type === 'cash' || isLoanAsset(asset);
 }
 
 /**
@@ -57,9 +57,9 @@ function isRealEstate(asset: Pick<Asset, 'type'>): boolean {
   return asset.type === 'realestate';
 }
 
-/** Today's EUR unit price; null when there is no quantity to divide by. */
+/** Today's EUR unit price; null when there is no quantity to divide by, or for a loan (a debt has no price). */
 function currentUnitPrice(asset: Asset): number | null {
-  if (!(asset.quantity > 0)) return null;
+  if (!(asset.quantity > 0) || isLoanAsset(asset)) return null;
   // Gross of debt: the debt is not a price. `calculateAssetValue` clamps an underwater
   // property at 0, so the gross value is rebuilt without the debt rather than adding it back.
   const value = isRealEstate(asset) ? calculateAssetValue({ ...asset, outstandingDebt: undefined }) : calculateAssetValue(asset);

@@ -11,7 +11,7 @@
  * — how many occurrences, from when, and that the past stays as it is — before it is pressed.
  *
  * The same modal links a mortgage series to its PROPERTY (`target: 'debt'`, 2026-09-25): each
- * occurrence still to come then repays the property's debt by its principal on its date
+ * occurrence still to come then repays the loan's debt by its principal on its date (a loan asset since 2026-10-10)
  * (lib/utils/mortgageRepayment.ts). Same shape, a different list and a different selection rule.
  */
 
@@ -32,7 +32,7 @@ import type { Asset } from '@/types/assets';
 import type { Expense } from '@/types/expenses';
 import type { SeriesDeleteMode } from '@/components/expenses/SeriesDeleteDialog';
 
-/** What a series is linked to: the account its rows move, or the property whose mortgage they repay. */
+/** What a series is linked to: the account its rows move, or the loan they repay. */
 export type LinkSeriesTarget = 'account' | 'debt';
 
 export interface LinkSeriesRequest {
@@ -48,8 +48,8 @@ interface LinkSeriesDialogProps {
   ownerId: string;
   /** The cash accounts the series can move (`type === 'cash'`, class cash). */
   cashAccounts: Asset[];
-  /** The properties a mortgage series can repay (`isRepayableProperty`). */
-  properties: Asset[];
+  /** The loans a mortgage series can repay (`isRepayableDebt`). */
+  loans: Asset[];
   now: Date;
   onClose: () => void;
   /** After a successful link: the caller refetches the movements. */
@@ -58,11 +58,11 @@ interface LinkSeriesDialogProps {
 
 const NONE = '__none__';
 
-export function LinkSeriesDialog({ request, ownerId, cashAccounts, properties, now, onClose, onLinked }: LinkSeriesDialogProps) {
+export function LinkSeriesDialog({ request, ownerId, cashAccounts, loans, now, onClose, onLinked }: LinkSeriesDialogProps) {
   const expense = request?.expense ?? null;
   const mode = request?.mode ?? 'recurring';
   const target = request?.target ?? 'account';
-  const choices = target === 'debt' ? properties : cashAccounts;
+  const choices = target === 'debt' ? loans : cashAccounts;
   const [accountId, setAccountId] = useState<{ key: string; value: string } | null>(null);
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
@@ -108,7 +108,7 @@ export function LinkSeriesDialog({ request, ownerId, cashAccounts, properties, n
     const link = async () => {
       const linked =
         target === 'debt' ? await linkSeriesToDebt(ownerId, expense, chosen, now) : await linkSeriesToCashAccount(ownerId, expense, chosen, now);
-      toast.success(`${linked} ${mode === 'installment' ? (linked === 1 ? 'rata collegata' : 'rate collegate') : linked === 1 ? 'voce collegata' : 'voci collegate'} a ${accountName ?? (target === 'debt' ? 'immobile' : 'conto')}`);
+      toast.success(`${linked} ${mode === 'installment' ? (linked === 1 ? 'rata collegata' : 'rate collegate') : linked === 1 ? 'voce collegata' : 'voci collegate'} a ${accountName ?? (target === 'debt' ? 'prestito' : 'conto')}`);
       // The next opening must read the series again: its occurrences now carry the account.
       queryClient.invalidateQueries({ queryKey: ['expense-series', ownerId] });
       // Patrimonio's «Mutuo» rows live under the assets key (lib/hooks/useMortgageInstalments.ts):
@@ -155,7 +155,7 @@ export function LinkSeriesDialog({ request, ownerId, cashAccounts, properties, n
       }
       description={
         target === 'debt'
-          ? 'Scegli l’immobile il cui debito le rate future della serie ridurranno alla loro data.'
+          ? 'Scegli il prestito il cui debito le rate future della serie ridurranno alla loro data.'
           : 'Scegli il conto che le voci future della serie scaleranno alla loro data.'
       }
       footer={
@@ -170,13 +170,13 @@ export function LinkSeriesDialog({ request, ownerId, cashAccounts, properties, n
       }
     >
       <div className="space-y-2">
-        <Label htmlFor="link-series-account">{target === 'debt' ? 'Immobile' : 'Conto'}</Label>
+        <Label htmlFor="link-series-account">{target === 'debt' ? 'Prestito' : 'Conto'}</Label>
         <Select value={chosen} onValueChange={(value) => setAccountId({ key: subjectKey, value })} disabled={busy || facts.linkable.length === 0}>
           <SelectTrigger id="link-series-account">
-            <SelectValue placeholder={target === 'debt' ? 'Seleziona immobile' : 'Seleziona conto'} />
+            <SelectValue placeholder={target === 'debt' ? 'Seleziona prestito' : 'Seleziona conto'} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={NONE}>{target === 'debt' ? 'Seleziona immobile' : 'Seleziona conto'}</SelectItem>
+            <SelectItem value={NONE}>{target === 'debt' ? 'Seleziona prestito' : 'Seleziona conto'}</SelectItem>
             {choices.map((asset) => (
               <SelectItem key={asset.id} value={asset.id}>
                 {asset.name}

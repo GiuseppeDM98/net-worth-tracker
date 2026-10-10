@@ -27,14 +27,15 @@ import { Expense, ExpenseCategory, EXPENSE_TYPE_LABELS } from '@/types/expenses'
 import { LAZY_CATEGORY_ICONS } from '@/components/expenses/IconPickerPopover';
 import {
   deleteExpenseRows,
-  getTransferFeeOf,
+  getFeeOf,
+  getFeesOf,
   deleteRecurringExpenses,
   deleteInstallmentExpenses,
   getExpensesByRecurringParentId,
   getExpensesByInstallmentParentId,
 } from '@/lib/services/expenseService';
 import { reverseAppliedBalances } from '@/lib/services/cashBalanceReconciliation';
-import { rowsDeletedWith } from '@/lib/utils/transferFee';
+import { rowsDeletedWith } from '@/lib/utils/expenseFee';
 import { queryKeys } from '@/lib/query/queryKeys';
 import {
   Table,
@@ -301,8 +302,8 @@ export function ExpenseTable({ expenses, onEdit, onRefresh, isDemo = false, hasA
       setDeletingId(expense.id);
       // Give back what the row has applied — both accounts of a transfer — before deleting it;
       // a row still waiting for its date moved nothing (lib/utils/cashSettlement.ts).
-      // A transfer's fee row goes with it (lib/utils/transferFee.ts), its balance given back too.
-      const rows = rowsDeletedWith(expense, await getTransferFeeOf(expense));
+      // The row's fee goes with it (lib/utils/expenseFee.ts), its balance given back too.
+      const rows = rowsDeletedWith(expense, await getFeeOf(expense));
       if (await reverseAppliedBalances(rows)) {
         if (invalidationOwner) queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(invalidationOwner) });
       }
@@ -323,10 +324,10 @@ export function ExpenseTable({ expenses, onEdit, onRefresh, isDemo = false, hasA
     const invalidationOwner = user && ownerId ? ownerId : null;
     try {
       setDeletingId(recurringParentId);
-      // Give back what the occurrences already happened have applied, in one transaction; the
-      // ones still waiting for their date moved nothing.
+      // Give back what the occurrences already happened have applied, their fees included, in one
+      // transaction (lib/utils/expenseFee.ts); the ones still waiting for their date moved nothing.
       const seriesExpenses = await getExpensesByRecurringParentId(ownerId, recurringParentId);
-      if (await reverseAppliedBalances(seriesExpenses)) {
+      if (await reverseAppliedBalances([...seriesExpenses, ...(await getFeesOf(ownerId, seriesExpenses))])) {
         if (invalidationOwner) queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(invalidationOwner) });
       }
       await deleteRecurringExpenses(ownerId, recurringParentId);
@@ -346,10 +347,10 @@ export function ExpenseTable({ expenses, onEdit, onRefresh, isDemo = false, hasA
     const invalidationOwner = user && ownerId ? ownerId : null;
     try {
       setDeletingId(installmentParentId);
-      // Give back what the instalments already due have applied, in one transaction; the ones
-      // still waiting for their date moved nothing.
+      // Give back what the instalments already due have applied, their fees included, in one
+      // transaction; the ones still waiting for their date moved nothing.
       const seriesExpenses = await getExpensesByInstallmentParentId(ownerId, installmentParentId);
-      if (await reverseAppliedBalances(seriesExpenses)) {
+      if (await reverseAppliedBalances([...seriesExpenses, ...(await getFeesOf(ownerId, seriesExpenses))])) {
         if (invalidationOwner) queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(invalidationOwner) });
       }
       await deleteInstallmentExpenses(ownerId, installmentParentId);

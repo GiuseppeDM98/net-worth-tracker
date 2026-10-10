@@ -71,8 +71,8 @@ test per pagina.
   `min-h-[120px]` sotto `tablet:` sono di MOB-03 § 4.3; li aggiunge chi arriva prima, con questi nomi.
 - **Il conteggio dell'hero** sotto `desktop:` chiama `sections.reveal('patrimonio-strumenti')`; a 1440 resta il link a
   `#strumenti` (`page.tsx:430`, `StrumentiTile.tsx:571`): se la `section` prende l'id della riga, l'`href` lo segue.
-- **Righe**: `patrimonio-movimenti` (il mese) · `-liquidita` («3 conti») · `-classi` («per asset class») · `-rendimento`
-  («vs PMC») · `-mutuo-<propertyId>` (il nome dell'immobile se più d'uno, se no «interessi e capitale») · `-strumenti`
+- **Righe**: `patrimonio-movimenti` (il mese) · `-liquidita` («3 conti»; dal 2026-10-10 anche un prestito personale, letto «debito», che apre il form asset e non il dettaglio conto) · `-classi` («per asset class») · `-rendimento`
+  («vs PMC») · `-mutuo-<loanId>` (dal 2026-10-10 una tessera per PRESTITO, eyebrow «Mutuo» o «Prestito»: il nome dell'immobile o del prestito se più d'uno, se no «interessi e capitale») · `-strumenti`
   (`formatHoldingCounts(held, 0)`: la tabella di gestione, chiusa non monta nulla; il chip di classe composito di #403
   vive dentro le sue righe, con le quote `sr-only`: non tocca striscia né budget).
 - **Stati**: `isError` del registro → Movimenti `failed` con `ErrorNotice collapse`; `mortgageError` → una riga

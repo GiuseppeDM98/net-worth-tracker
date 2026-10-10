@@ -54,5 +54,13 @@ describe('updateAsset — the debt fields of a property', () => {
     await updateAsset('casa', { currentPrice: 260_000 });
     expect(written()).not.toHaveProperty('outstandingDebt');
     expect(written()).not.toHaveProperty('debtInterestRate');
+    expect(written()).not.toHaveProperty('financedAssetId');
+  });
+
+  it('should delete a loan\'s financed property when the form clears it («Nessun immobile»), and keep it for a partial caller', async () => {
+    await updateAsset('mutuo', { financedAssetId: undefined });
+    expect(written().financedAssetId).toBe(DELETE_SENTINEL);
+    await updateAsset('mutuo', { financedAssetId: 'casa' });
+    expect(written()).toMatchObject({ financedAssetId: 'casa' });
   });
 });

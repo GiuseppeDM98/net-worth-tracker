@@ -16,6 +16,9 @@ import {
   getNextCouponDate,
   getFollowingCouponDate,
   calculateCouponPerShare,
+  calculateMaturityCouponPerShare,
+  bondTermYears,
+  isSingleCouponAtMaturity,
   couponFrequencyLabel,
   findAnnouncedInflationRate,
   upsertAnnouncedInflationRate,
@@ -53,6 +56,12 @@ describe('getPeriodsPerYear', () => {
 
   it('returns 2 for semiannual', () => {
     expect(getPeriodsPerYear('semiannual')).toBe(2);
+  });
+
+  it('returns 0 for a single coupon at maturity, which has no cadence', () => {
+    expect(getPeriodsPerYear('maturity')).toBe(0);
+    expect(isSingleCouponAtMaturity('maturity')).toBe(true);
+    expect(isSingleCouponAtMaturity('annual')).toBe(false);
   });
 
   it('returns 1 for annual', () => {
@@ -244,6 +253,60 @@ describe('couponFrequencyLabel', () => {
     expect(couponFrequencyLabel('quarterly')).toBe('trimestrale');
     expect(couponFrequencyLabel('semiannual')).toBe('semestrale');
     expect(couponFrequencyLabel('annual')).toBe('annuale');
+    expect(couponFrequencyLabel('maturity')).toBe('unica a scadenza');
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('a single coupon at maturity — the BTP Valore «Insieme» (2026-10-10)', () => {
+  // A 5-year bond issued 2026-10-28, redeemed 2031-10-28, at a 3,5% guaranteed annual rate.
+  const ISSUE = new Date(2026, 9, 28);
+  const MATURITY = new Date(2031, 9, 28);
+  const INSIEME: BondDetails = { couponRate: 3.5, couponFrequency: 'maturity', issueDate: ISSUE, maturityDate: MATURITY, nominalValue: 1000 };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2027, 2, 3));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('should read the term in years from the two dates, by whole months', () => {
+    expect(bondTermYears(ISSUE, MATURITY)).toBe(5);
+    expect(bondTermYears(new Date(2026, 9, 28), new Date(2029, 3, 28))).toBe(2.5);
+    // A day's drift never adds a month; a term under a month is floored at one.
+    expect(bondTermYears(new Date(2026, 9, 28), new Date(2031, 9, 27))).toBe(5);
+    expect(bondTermYears(new Date(2026, 9, 28), new Date(2026, 9, 29))).toBeCloseTo(1 / 12, 10);
+  });
+
+  it('should capitalise the annual rate over the term: nominal × ((1 + r)^years − 1)', () => {
+    // 1000 × (1,035^5 − 1) = 187,686…
+    expect(calculateMaturityCouponPerShare(3.5, 1000, 5)).toBeCloseTo(187.6863, 3);
+    expect(calculateCouponPerShare(3.5, 1000, 'maturity', 5)).toBeCloseTo(187.6863, 3);
+    // Simple interest would say 175: the owner's reading of «rendimenti equivalenti» is the compound one.
+    expect(calculateCouponPerShare(3.5, 1000, 'maturity', 5)).toBeGreaterThan(175);
+  });
+
+  it('should fall ON the maturity date, once, and never after it', () => {
+    expect(getNextCouponDate(ISSUE, 'maturity', MATURITY)?.getTime()).toBe(MATURITY.getTime());
+    expect(getFollowingCouponDate(MATURITY, 'maturity', MATURITY)).toBeNull();
+    vi.setSystemTime(new Date(2031, 10, 1));
+    expect(getNextCouponDate(ISSUE, 'maturity', MATURITY)).toBeNull();
+  });
+
+  it('should resolve the one coupon with its term and name the capitalisation in the note', () => {
+    const resolved = resolveCoupon(MATURITY, INSIEME, 1000);
+    expect(resolved.termYears).toBe(5);
+    expect(resolved.perShare).toBeCloseTo(187.6863, 3);
+    expect(resolved.isProvisional).toBe(false);
+    expect(buildCouponNote(resolved, 'maturity')).toBe('Cedola unica a scadenza — tasso annuo 3,5% capitalizzato per 5 anni = 18,77% del nominale');
+  });
+
+  it('should leave every other cadence exactly as it was', () => {
+    expect(calculateCouponPerShare(2.8, 1000, 'semiannual')).toBe(14);
+    expect(resolveCoupon(new Date(2027, 3, 28), { ...INSIEME, couponFrequency: 'semiannual' }, 1000).perShare).toBe(17.5);
   });
 });
 

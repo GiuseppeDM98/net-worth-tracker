@@ -802,12 +802,12 @@ describe('describeSpendingRolesSetting', () => {
 describe('describeTransferFeeCategory', () => {
   it('says where a typed fee lands, subcategory included, and which account pays it', () => {
     expect(plain(describeTransferFeeCategory({ categoryName: 'Commissioni', subCategoryName: 'Bonifici' }))).toBe(
-      'La commissione scritta su un trasferimento diventa una spesa in Commissioni › Bonifici, addebitata sul conto di origine.'
+      'La commissione scritta su una voce diventa una spesa in Commissioni › Bonifici, addebitata sul suo conto alla sua data; su una serie, una per ogni voce.'
     );
   });
 
   it('says what stalls without a category: the form field stays off', () => {
-    expect(plain(describeTransferFeeCategory({}))).toBe('Senza una categoria, il campo «Commissione» dei trasferimenti resta spento.');
+    expect(plain(describeTransferFeeCategory({}))).toBe('Senza una categoria, il campo «Commissione» del form spesa resta spento.');
   });
 });
 

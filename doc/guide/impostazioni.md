@@ -166,7 +166,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   in `SpeseSlice` because Spese edits them. Get this wrong and the dot lands on the wrong tab, or on none, over an
   edited field.
 - `cashflowHistoryStartYear` is shared (Cashflow / Storico / Assistant / overview) — never rename it page-specifically.
-- **«Commissioni sui trasferimenti»** (Spese, 2026-09-25): `transferFeeCategoryId` / `transferFeeSubCategoryId`, both
+- **«Commissioni bancarie»** (Spese, 2026-09-25 as «Commissioni sui trasferimenti»; the fee of ANY row since 2026-10-10, doc/guide/cashflow.md — the keys keep their name): `transferFeeCategoryId` / `transferFeeSubCategoryId`, both
   user-clearable (`'x' in settings` in both `setSettings` branches), in the `spese` snapshot, read ONLY by the expense
   form (no server mapper). The Select lists the spending categories grouped by type — the fee row takes the category's
   type. `e2e/cashflow.transfer-fee.spec.ts` is the one spec that WRITES this page's settings: it picks the category,

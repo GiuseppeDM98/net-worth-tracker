@@ -47,8 +47,8 @@ import {
   getExpensesByInstallmentParentId,
 } from '@/lib/services/expenseService';
 import { reverseAppliedBalances } from '@/lib/services/cashBalanceReconciliation';
-import { rowsDeletedWith } from '@/lib/utils/transferFee';
-import { isRepayableProperty } from '@/lib/utils/mortgageRepayment';
+import { rowsDeletedWith } from '@/lib/utils/expenseFee';
+import { isRepayableDebt } from '@/lib/utils/mortgageRepayment';
 import { queryKeys } from '@/lib/query/queryKeys';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -300,11 +300,12 @@ export function ExpenseTrackingTab({
   // The cash accounts: the detail names the account a row moves, and a series is linked to one.
   const { data: allAssets } = useAssets(ownerId ?? undefined);
   const cashAccounts = useMemo(() => (allAssets ?? []).filter((a) => a.type === 'cash' && a.assetClass === 'cash'), [allAssets]);
-  const accountNames = useMemo(() => new Map((allAssets ?? []).filter((a) => a.type === 'cash').map((a) => [a.id, a.name.trim()])), [allAssets]);
-  // Properties a mortgage instalment can repay (lib/utils/mortgageRepayment.ts); the names cover
-  // every property, so a row whose debt was repaid in full still names its house.
-  const repayableProperties = useMemo(() => (allAssets ?? []).filter(isRepayableProperty), [allAssets]);
-  const propertyNames = useMemo(() => new Map((allAssets ?? []).filter((a) => a.type === 'realestate').map((a) => [a.id, a.name.trim()])), [allAssets]);
+  // Every asset's name: a transfer can land on a property (a deposit on a house, 2026-10-10), not only on an account.
+  const accountNames = useMemo(() => new Map((allAssets ?? []).map((a) => [a.id, a.name.trim()])), [allAssets]);
+  // Loans an instalment can repay (lib/utils/mortgageRepayment.ts); the names cover every loan
+  // and property, so a row whose debt was repaid in full still names what it repaid.
+  const repayableLoans = useMemo(() => (allAssets ?? []).filter(isRepayableDebt), [allAssets]);
+  const propertyNames = useMemo(() => new Map((allAssets ?? []).filter((a) => a.type === 'loan' || a.type === 'realestate').map((a) => [a.id, a.name.trim()])), [allAssets]);
 
   // Desktop list view: the day-grouped feed (default, shared with mobile) or the dense table.
   // Remembered (localStorage), like Patrimonio's toggles: a reader who works in the table
@@ -465,9 +466,9 @@ export function ExpenseTrackingTab({
       try {
         // Give back what the row has applied — both accounts of a transfer — before deleting
         // it; a row still waiting for its date moved nothing (mirror of ExpenseTable's delete).
-        // A transfer's fee row goes with it (lib/utils/transferFee.ts), its balance given back too.
-        const { deleteExpenseRows, getTransferFeeOf } = await loadExpenseService();
-        const rows = rowsDeletedWith(expense, await getTransferFeeOf(expense));
+        // The row's fee goes with it (lib/utils/expenseFee.ts), its balance given back too.
+        const { deleteExpenseRows, getFeeOf } = await loadExpenseService();
+        const rows = rowsDeletedWith(expense, await getFeeOf(expense));
         if (await reverseAppliedBalances(rows)) {
           if (invalidationOwner) queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(invalidationOwner) });
         }
@@ -508,12 +509,13 @@ export function ExpenseTrackingTab({
     if (!ownerId) return;
     const invalidationOwner = user && ownerId ? ownerId : null;
     try {
-      // Give back what the occurrences already happened have applied, in one transaction.
+      // Give back what the occurrences already happened have applied, their fees included, in one
+      // transaction (lib/utils/expenseFee.ts: each occurrence may carry a fee row of its own).
       const seriesExpenses = await getExpensesByRecurringParentId(ownerId, recurringParentId);
-      if (await reverseAppliedBalances(seriesExpenses)) {
+      const { deleteRecurringExpenses, getFeesOf } = await loadExpenseService();
+      if (await reverseAppliedBalances([...seriesExpenses, ...(await getFeesOf(ownerId, seriesExpenses))])) {
         if (invalidationOwner) queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(invalidationOwner) });
       }
-      const { deleteRecurringExpenses } = await loadExpenseService();
       await deleteRecurringExpenses(ownerId, recurringParentId);
       if (invalidationOwner) queryClient.invalidateQueries({ queryKey: queryKeys.costCenters.all(invalidationOwner) });
       toast.success('Tutte le voci ricorrenti sono state eliminate');
@@ -530,12 +532,12 @@ export function ExpenseTrackingTab({
     if (!ownerId) return;
     const invalidationOwner = user && ownerId ? ownerId : null;
     try {
-      // Give back what the instalments already due have applied, in one transaction.
+      // Give back what the instalments already due have applied, their fees included, in one transaction.
       const seriesExpenses = await getExpensesByInstallmentParentId(ownerId, installmentParentId);
-      if (await reverseAppliedBalances(seriesExpenses)) {
+      const { deleteInstallmentExpenses, getFeesOf } = await loadExpenseService();
+      if (await reverseAppliedBalances([...seriesExpenses, ...(await getFeesOf(ownerId, seriesExpenses))])) {
         if (invalidationOwner) queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(invalidationOwner) });
       }
-      const { deleteInstallmentExpenses } = await loadExpenseService();
       await deleteInstallmentExpenses(ownerId, installmentParentId);
       if (invalidationOwner) queryClient.invalidateQueries({ queryKey: queryKeys.costCenters.all(invalidationOwner) });
       toast.success('Tutte le rate sono state eliminate');
@@ -836,7 +838,7 @@ export function ExpenseTrackingTab({
           request={linkRequest}
           ownerId={ownerId}
           cashAccounts={cashAccounts}
-          properties={repayableProperties}
+          loans={repayableLoans}
           now={now}
           onClose={() => setLinkRequest(null)}
           onLinked={() => void onRefresh()}
@@ -870,7 +872,7 @@ export function ExpenseTrackingTab({
         if (mode) setLinkRequest({ expense, mode, target });
       }}
       accountNames={accountNames}
-      propertyNames={repayableProperties.length > 0 ? propertyNames : undefined}
+      propertyNames={repayableLoans.length > 0 ? propertyNames : undefined}
       isDemo={isDemo}
       hasActiveFilters={hasActiveFilters}
       categoryMetaMap={categoryMetaMap}

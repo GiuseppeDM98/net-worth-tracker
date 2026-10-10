@@ -128,6 +128,20 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   and `dividendTypeNoun` («la cedola», «il dividendo») live in `dividendiNarrative.ts`.
 
 ## Dividends and Coupons
+- **A bond may pay ONE coupon, with the redemption** (`CouponFrequency 'maturity'`, 2026-10-10 — the BTP Valore
+  «Insieme» of the 19–23 October dual-tranche issue, MEF comunicato of 2026-09-25: five years, no intermediate coupon,
+  «rendimenti equivalenti» to the quarterly step-up Valore). The owner's reading of that equivalence is COMPOUND:
+  the coupon is `nominal × ((1 + rate)^years − 1)` (`calculateMaturityCouponPerShare`), years = whole months from issue
+  to maturity over 12 (`bondTermYears`); simple interest would understate it — the MEF publishes the rates on 16/10, the
+  form's preview («Cedola unica a scadenza (3,50% capitalizzato per 5,00 anni)») is what the owner checks against the
+  scheda. `getPeriodsPerYear('maturity')` is 0 and every caller that divides by it asks `isSingleCouponAtMaturity`
+  first: `getNextCouponDate` answers the maturity date (or null once past), `getFollowingCouponDate` null,
+  `resolveCoupon` carries `termYears`, `buildCouponNote` says «Cedola unica a scadenza — tasso annuo 3,5% capitalizzato
+  per 5 anni = 18,77% del nominale»; the step-up schedule leaves the form (one coupon has one rate), the inflation
+  mechanisms are not combined with it (none exists on the market). The Patrimonio row's «prossima cedola» is the
+  maturity; YOC and the current yield read nothing until it is paid (a blind spot, below). Pinned by
+  `__tests__/couponUtils.test.ts` and `e2e/assets.bond.spec.ts` (the coupon materialised on the maturity date, the
+  compound figure, the note).
 - **A payment credits a cash account — per instrument, then a default** (2026-09-20, `lib/utils/dividendAccount.ts`).
   `Asset.dividendCashAssetId` (the asset form, only for `paysDividends` types: stock/etf/bond — two brokers, two
   accounts) wins over the setting `dividendCashAssetId` (Impostazioni › Dividendi); neither → the income row moves
@@ -253,5 +267,6 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **A coupon recovered the day after a missed cron is NOT credited to its account** — by the owner's rule (only a
   payment dated today or later credits, so arrears never count twice). The income row is there, without an account:
   adjust the balance by hand or link the row from Tracciamento.
+- **A single coupon at maturity** (2026-10-10): YOC and the current yield of a BTP Valore Insieme read 0 until the coupon is paid — the registry holds one future payment and the yields measure what was received; the coupon's note states the capitalisation the OWNER chose (compound), not a figure the MEF published — the scheda of 16/10 is the check; a step-up schedule saved on a bond later switched to «Unica a scadenza» is dropped by the form (`showStepUp` off), by design.
 - **Dividendi**: the payments table dropped *Tax/Netto/Costo per azione*; the calendar day opens the day dialog instead of filtering; under «Mese» no month arrows, under «Anno» they stop at January/December; the list toolbar is rendered twice (desktop and phone, one hidden). The yield never follows the period (TTM on the current holding); the DPS running-year column is a partial sum; no `averageCost` → the tile becomes an explanation. Since 2026-09-14: Chi paga di più ranks only the HELD payers while its aside's total is the whole period's (the «venduti» row closes the gap); the verdict's «da 3 strumenti» counts sold payers too, on purpose; an edit form opens with the picker focused and its list open (Radix focuses the first field); a phone has no delete for a payment; the Dividendi axis options are `radio`, not `tab`, in a spec.
 - **YOC/Current Yield** exclude sold assets and are scoped to the current holding via `holdingStartDate`; a sell+rebuy inside one month counts the prior holding's dividends against the new cost basis (an overstated YOC, never a regression). (moved from `CLAUDE.md` → Known Issues on 2026-09-19)

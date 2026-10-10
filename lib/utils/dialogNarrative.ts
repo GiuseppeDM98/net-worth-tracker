@@ -501,9 +501,9 @@ export function describeLinkSeriesReading(facts: LinkSeriesFacts): Narrative {
  */
 function describeLinkSeriesToDebtReading(facts: LinkSeriesFacts, noun: { one: string; many: string }, past: Narrative): Narrative {
   if (facts.futureCount === 0 || !facts.firstDate) {
-    return [{ text: `Nessuna ${noun.one} futura da collegare: quelle ancora da venire riducono già il debito di un immobile, o la serie è finita.` }];
+    return [{ text: `Nessuna ${noun.one} futura da collegare: quelle ancora da venire riducono già il debito di un prestito, o la serie è finita.` }];
   }
-  const property: Narrative = facts.accountName ? [{ text: `di ${facts.accountName}` }] : [{ text: 'dell’immobile che scegli' }];
+  const property: Narrative = facts.accountName ? [{ text: `di ${facts.accountName}` }] : [{ text: 'del prestito che scegli' }];
   const day = { text: format(facts.firstDate, 'd MMMM yyyy', { locale: it }), mono: true };
   if (facts.futureCount === 1) {
     return [{ text: `L’unica ${noun.one} futura, il ` }, day, { text: ', ridurrà il debito ' }, ...property, { text: ' della sua quota capitale' }, ...past];
@@ -1040,71 +1040,92 @@ function negative(text: string): ModalReading {
   return { narrative: [{ text }], tone: 'negative' };
 }
 
-export interface TransferFeeFieldFacts {
-  /** The fee in the field, through `normalizeTransferFee` (null: empty or zero). */
+export interface ExpenseFeeFieldFacts {
+  /** The fee in the field, through `normalizeExpenseFee` (null: empty or zero). */
   amount: number | null;
   /** Where the fee lands: the existing fee row's category, else the one chosen in Impostazioni. */
   categoryLabel: string | null;
-  /** The fee the transfer already carries, as saved (null: none). */
+  /** The fee the row already carries, as saved (null: none). */
   savedAmount: number | null;
+  /** The row's type: a transfer's fee leaves its origin, any other row's its account. */
+  type: 'variable' | 'fixed' | 'debt' | 'income' | 'transfer';
+  /** A new series or instalment plan: the fee is charged on EVERY occurrence. */
+  isSeries?: boolean;
 }
 
 /**
- * The line under the «Commissione» field of a transfer — what saving does with the figure typed
- * (lib/utils/transferFee.ts). Null when there is nowhere for a fee to land: the form then prints
- * `TRANSFER_FEE_NEEDS_CATEGORY` with its link to Impostazioni instead.
+ * The line under the «Commissione» field — what saving does with the figure typed
+ * (lib/utils/expenseFee.ts). Null when there is nowhere for a fee to land: the form then prints
+ * `EXPENSE_FEE_NEEDS_CATEGORY` with its link to Impostazioni instead.
  */
-export function describeTransferFeeField(facts: TransferFeeFieldFacts): string | null {
+export function describeExpenseFeeField(facts: ExpenseFeeFieldFacts): string | null {
   if (!facts.categoryLabel) return null;
+  const account = facts.type === 'transfer' ? 'il conto di origine' : 'il conto collegato';
+  const when = facts.type === 'transfer' ? 'alla data del trasferimento' : 'alla data della voce';
   if (facts.amount === null) {
     return facts.savedAmount !== null
-      ? `Svuotata, la commissione di ${cachedFormatCurrencyEUR(facts.savedAmount)} viene eliminata e il conto di origine riaccreditato di quanto aveva già pagato.`
-      : `Il costo del bonifico, se c'è: diventa una spesa in ${facts.categoryLabel}, addebitata sul conto di origine.`;
+      ? `Svuotata, la commissione di ${cachedFormatCurrencyEUR(facts.savedAmount)} viene eliminata e ${account} riaccreditato di quanto aveva già pagato.`
+      : `Il costo bancario dell’operazione, se c’è: diventa una spesa in ${facts.categoryLabel}, addebitata su${facts.type === 'transfer' ? 'l conto di origine' : 'l conto collegato'}.`;
   }
-  return `Dal conto di origine escono ${cachedFormatCurrencyEUR(facts.amount)} in più: una spesa in ${facts.categoryLabel} alla data del trasferimento.`;
+  if (facts.isSeries) {
+    return `Su ogni voce della serie escono ${cachedFormatCurrencyEUR(facts.amount)} in più da${facts.type === 'transfer' ? 'l conto di origine' : 'l conto collegato'}: una spesa in ${facts.categoryLabel} per ciascuna, alla sua data.`;
+  }
+  return `Da${facts.type === 'transfer' ? 'l conto di origine' : 'l conto collegato'} escono ${cachedFormatCurrencyEUR(facts.amount)} in più: una spesa in ${facts.categoryLabel} ${when}.`;
 }
 
 /** The sentence before the link to Impostazioni › Spese when no fee category is chosen. */
-export const TRANSFER_FEE_NEEDS_CATEGORY = 'Per registrare il costo del bonifico scegli prima la categoria delle commissioni in';
+export const EXPENSE_FEE_NEEDS_CATEGORY = 'Per registrare il costo bancario dell’operazione scegli prima la categoria delle commissioni in';
 
-/** The line under «Commissione» while the edited transfer's saved fee is being read. */
-export const TRANSFER_FEE_READING = 'Sto leggendo la commissione di questo trasferimento…';
+/** The line under «Commissione» while the edited row's saved fee is being read. */
+export const EXPENSE_FEE_READING = 'Sto leggendo la commissione di questa voce…';
 
 /**
  * The refusal when the saved fee could not be read: saving now could neither keep, change nor
  * delete it knowingly, so the form refuses rather than guess (a duplicate fee, or an orphan).
  */
-export const TRANSFER_FEE_UNREAD = 'La commissione di questo trasferimento non è stata letta: chiudi e riapri la voce per salvarla.';
+export const EXPENSE_FEE_UNREAD = 'La commissione di questa voce non è stata letta: chiudi e riapri la voce per salvarla.';
 
 export interface DebtRepaymentFieldFacts {
-  /** The property chosen under «Riduce il debito di»; null when none is. */
-  propertyName: string | null;
-  /** Its debt today, and its TAN in percent (absent: none typed on the property). */
+  /** The loan chosen under «Riduce il debito di»; null when none is. */
+  loanName: string | null;
+  /** Its debt today, and its TAN in percent (absent: none typed on the loan). */
   debt: number;
   annualRatePct?: number;
   /** The instalment typed so far (positive); null while the field is empty. */
   instalment: number | null;
   /** Today's split of that instalment on today's debt (`splitInstalment`); null without an instalment. */
   split: { interest: number; principal: number } | null;
+  /** «Estinzione anticipata» is ticked: the whole amount is principal. */
+  isPayoff?: boolean;
 }
 
 /**
  * The line under «Riduce il debito di» on a `debt` row (lib/utils/mortgageRepayment.ts): that only
  * the PRINCIPAL lowers the debt, and how much of this instalment it is on today's debt — the
- * figure an owner can check against the bank's amortisation plan before saving.
+ * figure an owner can check against the bank's amortisation plan before saving. On a payoff the
+ * whole amount is principal, and the debt it leaves is said.
  */
 export function describeDebtRepaymentField(facts: DebtRepaymentFieldFacts): string {
-  if (!facts.propertyName) {
-    return 'Se è la rata di un mutuo, scegli l’immobile: alla data della rata il suo debito scende della quota capitale.';
+  if (!facts.loanName) {
+    return 'Se è la rata di un mutuo o di un prestito, scegli il prestito: alla data della rata il suo debito scende della quota capitale.';
   }
   const eur = (value: number) => cachedFormatCurrencyEUR(value);
+  if (facts.isPayoff) {
+    if (facts.instalment === null || !facts.split) {
+      return `Estinzione anticipata: alla data della voce il debito di ${facts.loanName} (${eur(facts.debt)}) scende di tutto l’importo. Una penale o gli interessi del periodo vanno nella commissione.`;
+    }
+    const left = Math.max(0, facts.debt - facts.split.principal);
+    return left > 0
+      ? `Estinzione parziale: alla data della voce il debito di ${facts.loanName} scende di ${eur(facts.split.principal)}, da ${eur(facts.debt)} a ${eur(left)}. Una penale o gli interessi del periodo vanno nella commissione.`
+      : `Estinzione totale: alla data della voce il debito di ${facts.loanName} (${eur(facts.debt)}) va a zero. Una penale o gli interessi del periodo vanno nella commissione.`;
+  }
   if (!facts.annualRatePct || facts.annualRatePct <= 0) {
-    return `Alla data della rata il debito di ${facts.propertyName} scende dell’intera rata: l’immobile non ha un TAN (si imposta in Patrimonio).`;
+    return `Alla data della rata il debito di ${facts.loanName} scende dell’intera rata: il prestito non ha un TAN (si imposta in Patrimonio).`;
   }
   // A TAN prints with the decimals it was typed with («3,2%», «3,25%»), never a padded «3,20%».
   const rate = new Intl.NumberFormat('it-IT', { style: 'percent', maximumFractionDigits: 3 }).format(facts.annualRatePct / 100);
   if (!facts.split || facts.instalment === null) {
-    return `Alla data della rata il debito di ${facts.propertyName} (${eur(facts.debt)}) scende della quota capitale, al TAN ${rate}.`;
+    return `Alla data della rata il debito di ${facts.loanName} (${eur(facts.debt)}) scende della quota capitale, al TAN ${rate}.`;
   }
-  return `Alla data della rata il debito di ${facts.propertyName} scende della quota capitale: sul debito di oggi ${eur(facts.split.principal)} di ${eur(facts.instalment)}, il resto (${eur(facts.split.interest)}) sono interessi al TAN ${rate}.`;
+  return `Alla data della rata il debito di ${facts.loanName} scende della quota capitale: sul debito di oggi ${eur(facts.split.principal)} di ${eur(facts.instalment)}, il resto (${eur(facts.split.interest)}) sono interessi al TAN ${rate}.`;
 }

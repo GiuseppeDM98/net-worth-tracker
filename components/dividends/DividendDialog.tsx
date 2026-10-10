@@ -64,7 +64,7 @@ const DEFAULT_TAX_RATE = 26;
 /** The classes whose instruments pay something the registry records — the page's own filter. */
 const PAYING_ASSET_CLASSES = new Set(['equity', 'bonds']);
 /** A pension fund, an account or a house sits in an equity/bonds class and pays nothing here. */
-const NON_PAYING_ASSET_TYPES = new Set(['pensionFund', 'cash', 'realestate']);
+const NON_PAYING_ASSET_TYPES = new Set(['pensionFund', 'cash', 'realestate', 'loan']);
 
 /**
  * Every number the form can leave empty carries its own sentence: `valueAsNumber` hands zod a

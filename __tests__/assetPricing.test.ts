@@ -12,7 +12,7 @@ import { hasMarketPrice, requiresManualPricing } from '@/lib/utils/assetPricing'
 import type { AssetType } from '@/types/assets';
 
 const MARKET_TRADED_TYPES: AssetType[] = ['stock', 'etf', 'bond', 'crypto', 'commodity'];
-const MANUALLY_VALUED_TYPES: AssetType[] = ['cash', 'realestate', 'pensionFund'];
+const MANUALLY_VALUED_TYPES: AssetType[] = ['cash', 'realestate', 'pensionFund', 'loan'];
 
 describe('hasMarketPrice', () => {
   it.each(MARKET_TRADED_TYPES)('is true for the market-traded type %s', (type) => {

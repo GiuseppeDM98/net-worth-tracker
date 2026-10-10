@@ -631,15 +631,15 @@ export interface TransferFeeCategoryInput {
 }
 
 /**
- * Commissioni sui trasferimenti — where the fee typed on a transfer lands. Without a category the
+ * Commissioni bancarie — where the fee typed on any row lands (a transfer's alone until 2026-10-10). Without a category the
  * form's field stays off, and the sentence says so: that is what stalls without the input.
  */
 export function describeTransferFeeCategory({ categoryName, subCategoryName }: TransferFeeCategoryInput): Narrative {
   if (!categoryName) {
-    return [prose('Senza una categoria, il campo «Commissione» dei trasferimenti resta spento.')];
+    return [prose('Senza una categoria, il campo «Commissione» del form spesa resta spento.')];
   }
   const target = subCategoryName ? `${categoryName} › ${subCategoryName}` : categoryName;
-  return [prose(`La commissione scritta su un trasferimento diventa una spesa in ${target}, addebitata sul conto di origine.`)];
+  return [prose(`La commissione scritta su una voce diventa una spesa in ${target}, addebitata sul suo conto alla sua data; su una serie, una per ogni voce.`)];
 }
 
 export interface ExpenseCategoryCounts {

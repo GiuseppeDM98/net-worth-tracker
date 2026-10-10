@@ -104,7 +104,7 @@
  * lunghezza che il service applicava).
  */
 
-import type { Asset, AssetAllocationSettings, MonthlySnapshot } from '@/types/assets';
+import { isLoanAsset, type Asset, type AssetAllocationSettings, type MonthlySnapshot } from '@/types/assets';
 import type { AssetTransaction } from '@/types/assetTransactions';
 import type { PensionBoundaryFlow, PeriodMonth, PortfolioBoundaryFlow } from '@/types/performance';
 import type { PensionContribution } from '@/types/pension';
@@ -173,10 +173,15 @@ export function resolvePerformanceExclusions(
   options: PerformanceBaseOptions = {}
 ): string[] {
   const { includePensionFunds = false, includeExcludedAssets = false, excludeCash = false } = options;
-  if (includePensionFunds && includeExcludedAssets && !excludeCash) return [];
 
   const excluded = new Set<string>();
   for (const asset of assets) {
+    // A loan is a debt, never an investment (2026-10-10): out of every base, whatever its role
+    // and whatever the toggles say — its principal moves by repayment, which is not a return.
+    if (isLoanAsset(asset)) {
+      excluded.add(asset.id);
+      continue;
+    }
     // A pension fund answers to its own toggle only: its allocation role (usually `excluded`, the
     // natural pick for capital locked until retirement) must not veto it, or the toggle is a
     // silent no-op — see the header.
