@@ -248,8 +248,8 @@ The app **is** locally runnable; there is no fallback to declare.
 
 - **Branches**: `develop` is the integration branch, `main` the default; a session branches off
   whatever is active (usually `develop`) and merges into it by PR. **The `doc/mobile/` specs land on `develop`,
-  one session at a time** (the fourteen `doc/perf/` specs did the same, 2026-09-28 → 2026-10-08; MOB-01 landed and was
-  retired on 2026-10-10, PR #448). The 2026-09-28 rule
+  one session at a time** (the fourteen `doc/perf/` specs did the same, 2026-09-28 → 2026-10-08; MOB-01 and MOB-02 landed and
+  were retired on 2026-10-10, PRs #448 and #450). The 2026-09-28 rule
   («they reach `main` together») was derogated by the owner on 2026-10-08: `develop` goes to `main` **after the last
   PERF spec and the Known Issues session of 2026-10-08** — the Next 16.4 security fix ships with the perf work — and
   the MOB specs follow in a second release. PERF-14 was retired on 2026-10-08: from that day the PR from `develop` to

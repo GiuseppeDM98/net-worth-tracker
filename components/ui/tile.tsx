@@ -8,7 +8,8 @@ import { NarrativeText } from '@/components/ui/narrative-text';
 
 /**
  * A row of the small-screen composition, as `useMobileSections().collapse(id)` hands it to a
- * tile (The Closed-Row Rule, doc/mobile/MOB-02 § 4.2). The same object until the row changes.
+ * tile (The Closed-Row Rule, since 2026-10-10; AGENTS.md § Motion). The same object until the
+ * row changes.
  */
 export interface TileCollapse {
   /** The `section`'s id; the trigger is `<id>-trigger`, the panel `<id>-panel`. */
@@ -73,13 +74,17 @@ export const TILE_CELL_CLASS = 'flex min-w-0 [&>section]:flex-1';
 /**
  * The cell of a ROW of the composition: below `desktop:` it does not stretch, or at 768 a closed
  * row beside an open one would be pulled to the open one's height and read as an empty card
- * (doc/mobile/MOB-02 § 4.2). At 1440 it is `TILE_CELL_CLASS`.
+ * (2026-10-10). At 1440 it is `TILE_CELL_CLASS`.
  */
 export const TILE_ROW_CELL_CLASS = `${TILE_CELL_CLASS} max-desktop:self-start`;
 
 /**
  * The block of a tile that the verdict's strip already prints, hidden on a phone (The
- * Lifted-Figure Rule): a key from `liftedBlocks(strip, section)` takes this class.
+ * Lifted-Figure Rule): a key from `liftedBlocks(strip, section)` takes this class. The
+ * convention for a page tile that lifts (first used by the Panoramica): the tile takes
+ * `liftedFigures?: readonly K[]` with `K` the union of its block names, and its module exports
+ * `isXLiftedBlock(b: string): b is K`, the guard that narrows the `string[]` of `liftedBlocks`
+ * at the call site. Only the repeated figure hides; the rest of the block stays (2026-10-10).
  */
 export const LIFTED_FIGURE_CLASS = 'max-tablet:hidden';
 

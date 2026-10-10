@@ -48,7 +48,7 @@
  *   hall-of-fame  A tap on a CLOSED row of the phone composition, on the `tabs` model: Hall of Fame
  *              at 390 (`--mobile` is required — at 1440 there is no row and the scenario fails
  *              naming it), the Anni row opened and closed twice, four taps. Added 2026-10-10
- *              (doc/mobile/MOB-02 § 2): a tap must re-render that row, `PageRest` and the page
+ *              (the composition's own measure): a tap must re-render that row, `PageRest` and the page
  *              that holds the controller — never another tile, nor `PageVerdict` or `VerdictStrip`;
  *              read `byName` on a `--no-mangling` build to see who ran.
  * Never saves anything: the typed values are dropped with the context.

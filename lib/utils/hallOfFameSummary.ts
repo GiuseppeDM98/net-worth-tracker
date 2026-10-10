@@ -424,7 +424,7 @@ export const HOF_SECTION_IDS = {
 } as const;
 
 /**
- * The three figures of a phone's first screen (doc/mobile/MOB-02 § 4.7), each READ from a board
+ * The three figures of a phone's first screen (since 2026-10-10), each READ from a board
  * the tiles already print — the running year's growth (the verdict's own figure, which may show
  * again in the opened «Il perché», decision 8), the income record and the savings record — and
  * each opening the row that explains it. A figure that is not there says why, never a zero:

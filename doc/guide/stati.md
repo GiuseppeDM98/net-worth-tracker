@@ -66,7 +66,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   product's own Italian (the assistant hooks' `payload?.error ?? '<italiano>'`), the throw is marked with
   `userFacingError` so the translation keeps it; everything unmarked takes the generic sentence. The assistant's SSE
   route no longer forwards the Anthropic SDK's English message to the client either — that string is a log line.
-- **Below `desktop:` an `ErrorNotice` IS the tile's closed row, and it is silent** (2026-10-10, doc/mobile/MOB-02 § 4.5):
+- **Below `desktop:` an `ErrorNotice` IS the tile's closed row, and it is silent** (2026-10-10, `components/ui/error-notice.tsx`):
   with `collapse` (from `useMobileSections().collapse(id)`, the section marked `failed: true`) it takes the row's
   structure — `section[id]` → `h3` → trigger with `aria-controls` — the red eyebrow («Benchmark · lettura fallita») with
   its `AlertTriangle` as the trigger, open on every visit until the reader closes it, message, reassurance and «Riprova»

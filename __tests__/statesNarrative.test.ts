@@ -136,7 +136,8 @@ describe('describeFreshness', () => {
 });
 
 /**
- * The one announcement of a phone's failed reads (doc/mobile/MOB-02 § 4.5). Falsified on
+ * The one announcement of a phone's failed reads (`PageRest`'s live node, since 2026-10-10;
+ * AGENTS.md § Accessibility). Falsified on
  * 2026-10-10: the two-section case went red with the singular sentence fixed for every count.
  */
 describe('describeFailedSections', () => {

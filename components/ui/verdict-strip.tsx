@@ -11,9 +11,11 @@ interface VerdictStripProps {
   /** What a cell opens: a row (`sections.reveal`), the verdict's rest, or THE tile (the page's own handler). */
   onOpen(section: string): void;
   /**
-   * The eyebrow a cell announces («, apre Anni»), by the section it opens. A page passes its rows'
-   * eyebrows and, for a cell that opens no row, the words it wants («l'andamento da inizio anno»).
-   * Absent, the cell's own label.
+   * The eyebrow a cell announces («, apre Anni»), by the section it opens: the controller's
+   * `sections.eyebrows` (every row), spread with the page's own words for a cell that opens THE
+   * tile or no row («l'andamento da inizio anno»). The strip does not know the rows, so an id
+   * missing here falls back to the cell's own label — «apre Quest'anno», which is why the map
+   * comes from the controller since 2026-10-10.
    */
   eyebrows?: Readonly<Record<string, string>>;
 }

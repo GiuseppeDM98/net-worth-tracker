@@ -1,6 +1,6 @@
 /**
  * Tests for lib/utils/mobileSections.ts — the memory of a page's rows below `desktop:` and the
- * ids the DOM uses (The Closed-Row Rule, doc/mobile/MOB-02 § 4.5).
+ * ids the DOM uses (The Closed-Row Rule, since 2026-10-10).
  *
  * Falsified on 2026-10-10: «a failed read opens against the memory» went red with the `∪ failed`
  * loop removed from `resolveOpenSections`; «setAll leaves the rest as it was» went red with

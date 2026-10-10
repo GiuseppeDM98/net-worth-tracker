@@ -1,7 +1,7 @@
 # MOB-03 — Panoramica
 
 > Stato: da fare · riletta in modo adversariale il 2026-10-10: 28 rilievi, 6 decisioni · Priorità: 2 (la pagina che si apre per prima, e la prima E2E del suo contenuto) · Sforzo: M ·
-> Dipende da: MOB-01 (ritirata il 2026-10-10, in develop dal 2026-10-10, PR #448), MOB-02 (PERF-03 e PERF-07 ritirate, in develop) · Sblocca: MOB-04..08, MOB-09
+> Dipende da: MOB-01 (ritirata il 2026-10-10, in develop dal 2026-10-10, PR #448), MOB-02 (ritirata il 2026-10-10, in develop dal 2026-10-10, PR #450; PERF-03 e PERF-07 ritirate, in develop) · Sblocca: MOB-04..08, MOB-09
 
 ## 1. Il problema, misurato
 
@@ -92,7 +92,7 @@ In `lib/utils/overviewSummary.ts` (nuovo: il modello della Panoramica è il payl
 | Da inizio anno | `variations.yearly.percentage` | `signed-percent` · 2 | `panoramica-patrimonio` | `yearly` | nessuno snapshot da cui contare l'anno |
 | Messo da parte finora | `Math.round` della quota del verdetto (`resolveLivedCashflow(expenseStats)?.savingsRate`, altrimenti `monthSavingsRate`: la stessa di `overviewNarrative.ts:338`) | `percent` · 0 | `panoramica-cashflow` | — | «nessuna entrata finora» con `resolveLivedCashflow` non `null`, «nessuna entrata nel mese» senza |
 
-**`StripFigure.decimals`** (MOB-02 § 4.1): il verdetto stampa l'euro e la percentuale a due decimali
+**`StripFigure.decimals`** (`lib/utils/verdictStrip.ts`): il verdetto stampa l'euro e la percentuale a due decimali
 (`overviewNarrative.ts:112-128`) e la quota intera (`Math.round`, `:338`): la cella porta il valore GIÀ arrotondato come la
 frase, così `Intl` non arrotonda una seconda volta (−12,5 → «-12%» in entrambe; `Intl` da solo darebbe −13%). «Messo da
 parte finora» è la quota del verdetto (README § 9, 26); la tessera Cashflow tiene il mese intero. Tutte `null` → `[]`,
@@ -107,7 +107,8 @@ commit (`requestAnimationFrame`), scorre a `#panoramica-patrimonio-andamento` (`
 `[role="radiogroup"][aria-label="Periodo del grafico"] [role="radio"][aria-checked="true"]`; `PatrimonioTile` prende
 `id?: string` (inoltrato a `Tile`) e mette `id={`${id}-andamento`}` sulla riga di «Andamento» (`:161`); nessuna modifica a
 `SegmentedPill`. Senza curva (< 2 punti, `PatrimonioTile.tsx:122`) scorre alla tessera. La pagina passa a `VerdictStrip`
-`eyebrows={{ 'panoramica-patrimonio': "l'andamento da inizio anno" }}`, così lo `sr-only` legge «, apre l'andamento da
+`eyebrows={{ ...sections.eyebrows, 'panoramica-patrimonio': "l'andamento da inizio anno" }}` (dal ritiro di MOB-02, 2026-10-10, gli
+eyebrow delle righe vengono dal controller: senza, una cella annuncia la propria etichetta), così lo `sr-only` legge «, apre l'andamento da
 inizio anno». La curva YTD parte da gennaio (`lib/utils/sparklinePeriod.ts:27-33`), la percentuale da dicembre:
 l'etichetta sinistra non è la sua base; a gennaio la curva YTD ricade sugli ultimi due punti (`:30-32`) e le due celle
 del mese e dell'anno possono riportare la stessa percentuale, ed è corretto.
@@ -159,7 +160,7 @@ prende i due campi opzionali di `PageVerdictModel`:
   `expensesScheduled`/`incomeScheduled`; «Risparmio» (`net`) prende «di cui … di spese e … di entrate già in calendario»
   quando uno dei due è ≥ 1 €.
 - **Lo zero**: `signedCurrency`/`signedPercent` (`overviewNarrative.ts:112-128`) stampano lo zero senza segno («0,00 €»,
-  «0,00%», e «−0,004» è zero), la regola `isPrintedZero` di MOB-02 § 4.1 (README § 9, 20).
+  «0,00%», e «−0,004» è zero), la regola `isPrintedZero` di `lib/utils/verdictStrip.ts` (README § 9, 20).
 - `restLabel` da `overviewRestLabel({ market, savings, sale })`: sempre «il patrimonio» seguito, nell'ordine, da «il
   risparmio», «il mercato», «la vendita», uniti da virgole e «e» finale, con «del mese» in coda: «il patrimonio, il
   risparmio e il mercato del mese»; con nessuno dei tre «il patrimonio del mese».
@@ -211,7 +212,7 @@ dopo la vendita con `taxIsTheStory` (27), la cella lunga su una riga intera (28)
   `/mercato/.test(narrativeToText(buildOverviewVerdict(input).sentence))` su: senza `marketEffect`, senza
   `monthlyVariation`, classe ignota senza split, vendita tassata con split, vendita con plusvalenza netta ≤ 0 e tasse > 0
   (attesa: falsa). Falsificare con `input.marketEffect !== null`: rosso sull'ultimo caso.
-- `__tests__/narrative.test.ts`: `leadLength: 0` = `lead` vuoto lo prova MOB-02 § 7; qui si riesegue.
+- `__tests__/narrative.test.ts`: `leadLength: 0` = `lead` vuoto lo prova già `__tests__/narrative.test.ts` (2026-10-10); qui si riesegue.
 - `__tests__/overviewNarrative.test.ts`: `leadLength: 0`, o il taglio dopo la vendita con `taxIsTheStory` (falsificare
   spostandolo di un segmento); asides senza `/\d/` né «€» (falsificare con «giorno N di M»); `describeScheduledCaption` a
   0, 0,5 e 350 € e con «già in calendario» (falsificare con `> 0` e togliendo «già»); `overviewRestLabel` sulle 8
@@ -231,8 +232,8 @@ dopo la vendita con `taxIsTheStory` (27), la cella lunga su una riga intera (28)
   sulla radio. (5) Δ −10.000, mercato +5000, tasse 20.000 (`taxes-despite-market`): le tasse visibili senza tap.
   (6) Δ +30.000, tasse 10.000 (non «la storia»): niente «Il perché», paragrafo intero, «Questo mese» porta il focus sul
   paragrafo. (7) Reload: due righe aperte, `mobile-sections:panoramica` = `["panoramica-cashflow","panoramica-sintesi"]`.
-  (8) L'ordine di `y` delle celle della griglia è l'ordine del DOM (Patrimonio, PageRest, Sintesi, Cashflow, …), nessun
-  `[class*="order-"]` nella griglia, nessun bottone «Il perché» fuori da `main`; nessuno sforamento (guardia di
+  (8) L'ordine di `y` delle celle della griglia è l'ordine del DOM (Patrimonio, PageRest, Sintesi, Cashflow, …), nessuna
+  classe `order-*` (dalla `classList` con `/^(?:[a-z-]+:)*order-/`: `[class*="order-"]` prende ogni `border-*`, doc/guide/e2e-emulatori.md) nella griglia, nessun bottone «Il perché» fuori da `main`; nessuno sforamento (guardia di
   `e2e/fire.mobile.spec.ts:62-80`). Rossi falsificando: (1) contenuto montato da chiusa; (2) `onOpen('perche')` a
   vuoto; (3) `reveal` senza focus; (4) la cella che non cambia periodo; (5) `binding` tolto; (6) `splitVerdict` che
   ignora `binding`; (7) nessuna scrittura; (8) un `order-1` rimesso sulla cella di Cashflow.
@@ -251,7 +252,7 @@ dopo la vendita con `taxIsTheStory` (27), la cella lunga su una riga intera (28)
 - Sul mirror un mese con una vendita tassata allunga il paragrafo (le tasse sono `binding`): lo si vede nel giro F, non
   sposta il budget, che è del fixture; l'invariante la tiene la E2E.
 - «+3000,00 €» sono 10 caratteri in una cella di ~110 px: 18 px, e oltre 9 caratteri la cella prende una riga intera
-  (MOB-02 § 4.4); con sei cifre intere la guardia (8) e la E2E con Δ +123.456,78 €.
+  (`WIDE_CELL_CHARS` in `components/ui/verdict-strip.tsx`, README § 9, 28 — la prima prova della regola: MOB-02 non ne ha lasciata una); con sei cifre intere la guardia (8) e la E2E con Δ +123.456,78 €.
 - Rollback per lettera: `liftedFigures` o `strip` non passati; `leadLength` assente = paragrafo intero. Mai togliere
   `binding` lasciando un taglio.
 
@@ -282,8 +283,7 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
   riga sugli order-* —, § Accessibility, § 3 Panoramica), CLAUDE.md
 - Leggi doc/guide/panoramica.md per intero, doc/guide/stati.md, doc/guide/e2e-emulatori.md
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALE mentre scrivi codice
-- Leggi doc/mobile/README.md (§ 9: le decisioni 1–28), doc/mobile/MOB-02-primitive-della-composizione.md (§ 4, il
-  contratto, e il codice che ha lasciato) e MOB-03 per intero; DESIGN.md § 5 (Page Verdict, Tile, Market Digest
+- Leggi doc/mobile/README.md (§ 9: le decisioni 1–28), il codice di MOB-02 (ritirata il 2026-10-10: `lib/utils/{verdictStrip,mobileSections,narrative}.ts`, `lib/hooks/useMobileSections.ts`, `components/ui/{tile,page-verdict,verdict-strip,page-rest,error-notice}.tsx`; la pagina campione in doc/guide/hall-of-fame.md § Composizione mobile) e MOB-03 per intero; DESIGN.md § 5 (Page Verdict, Tile, Market Digest
   Line), § 6 e The Scheduled-Is-Not-Spent Rule (MAI rigenerarlo)
 - Crea SESSION_NOTES.md; crea il branch dalla branch attiva PRIMA di editare
 

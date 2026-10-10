@@ -1,7 +1,7 @@
 # MOB-08 — Tablet: 768 e 1024
 
 > Stato: da fare · riletta in modo adversariale il 2026-10-10: 30 rilievi, 5 decisioni · Priorità: 3 (il telefono prima; qui si raddrizza il landscape) · Sforzo: M · Dipende da: MOB-02..07
-> (e quindi MOB-01, ritirata il 2026-10-10, in develop dal 2026-10-10, PR #448; PERF-01, PERF-02, PERF-14 ritirate, in develop) · Sblocca: MOB-09
+> (MOB-02 ritirata il 2026-10-10, in develop dal 2026-10-10, PR #450, e quindi MOB-01, ritirata il 2026-10-10, in develop dal 2026-10-10, PR #448; PERF-01, PERF-02, PERF-14 ritirate, in develop) · Sblocca: MOB-09
 
 ## 1. Il problema, misurato
 
@@ -11,7 +11,8 @@ Analisi 1/1): il landscape è il tablet peggiore. Righe del 2026-09-26, da river
 
 - Griglie `grid-cols-1 gap-3 tablet:grid-cols-2 desktop:grid-cols-12` (The Tile Grid Rule; `app/dashboard/page.tsx:351`
   e § 5): due colonne anche a 1024. Le celle sono `TILE_CELL_CLASS = 'flex min-w-0 [&>section]:flex-1'`
-  (`components/ui/tile.tsx:42`): si stirano sulla traccia; MOB-02 § 4.2 mette `max-desktop:self-start` sulle celle delle righe.
+  (`components/ui/tile.tsx`): si stirano sulla traccia; le celle delle righe prendono `TILE_ROW_CELL_CLASS` (= `TILE_CELL_CLASS` +
+  `max-desktop:self-start`, dal 2026-10-10).
 - La barra (`app/dashboard/layout.tsx:37`, `py-2.5` + `border-b`, solo `max-desktop:landscape`) porta `SidebarTrigger`
   a `size-7` (`components/ui/sidebar.tsx:275`): 10 + 28 + 10 + 1 = **49 px** (`main` 719: `mainTop` 49 nel censimento del 2026-10-10, sul fixture). Il suo solo controllo,
   28×28 su un touch, apre il drawer (DESIGN.md § 6: «Don't ship a touch target under 44px in … the phone drawer»).
@@ -84,7 +85,7 @@ Contenitore: 736 px a 768, 992 a 1024 (anche su un 12,9" in verticale, 1024×136
   riga), un'altra aperta chiude il gruppo e prende una riga sua, la chiusa dopo apre una riga nuova. Nessuna chiusa
   «risale» sopra un'aperta che la precede nel DOM. La traccia finale `1fr` prende l'altezza di LA tessera (chi
   attraversa una traccia flessibile dà spazio solo a lei, CSS Grid § 11.5) e le righe accanto restano alte quanto il
-  trigger più il bordo (`max-desktop:self-start`, MOB-02). Chi sta sotto ha una riga ESPLICITA (`belowRow`): la cella
+  trigger più il bordo (`TILE_ROW_CELL_CLASS`, `components/ui/tile.tsx`). Chi sta sotto ha una riga ESPLICITA (`belowRow`): la cella
   `1fr` × colonna 3 è libera e l'auto-placement la riempirebbe per prima (§ 8.5, il cursore riparte dalla riga 1).
 - Verdetto breve, striscia e riga d'ambito stanno sopra la griglia (la `freshness` è nel `PageHeader`, non qui); `LIFTED_FIGURE_CLASS`
   (`max-tablet:hidden`) ridà le cifre sollevate (The Lifted-Figure Rule); la curva di LA tessera resta a 120 px fino a 1439.
@@ -125,8 +126,8 @@ di `p-4` di `main`, senza sidebar sotto `desktop:`) e solo allora, per le righe 
 `sections.reveal(id)` DOPO il commit che sposta la riga sotto LA tessera (`flushSync(() => inner.onOpenChange(true))`,
 poi lo `scrollIntoView` e il focus di `reveal`); altrove (390, 768) restituisce il `collapse(id)` di MOB-02 invariato,
 così il tap del telefono non cambia. Alla chiusura il fuoco resta sul trigger, che risale in colonna 3, e il gestore
-chiama `scrollIntoView({ block: 'nearest' })` dopo il commit. Nessun nome di MOB-02 cambia; il `collapse(id)` avvolto
-resta lo stesso oggetto finché non cambia quello di MOB-02 (memo per id col pattern di MOB-02 § 4.2; lo prova
+chiama `scrollIntoView({ block: 'nearest' })` dopo il commit. Nessun nome di `useMobileSections` cambia; il `collapse(id)` avvolto
+resta lo stesso oggetto finché non cambia quello del hook (memo per id col pattern di `rebuildRows`, `lib/hooks/useMobileSections.ts`; lo prova
 `perf:census`, § 11). Il salto di posizione di una riga è istantaneo a ogni impostazione; il pannello segue
 `motion-safe:` di MOB-02. Una riga in lettura fallita aperta a 1024 va sotto LA tessera come ogni aperta; l'errore nella
 prima schermata lo dice il nodo live di `PageRest`, e chiusa dal lettore torna in colonna 3 con l'eyebrow rosso.
@@ -279,8 +280,8 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
 - Leggi doc/guide/e2e-emulatori.md, doc/guide/shell.md, doc/guide/panoramica.md, doc/guide/cashflow-tracciamento.md
   (e le guide che tocchi)
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md e APPLICALI mentre scrivi codice
-- Leggi doc/mobile/README.md (§ 9: le decisioni 1–51), la spec MOB-08 per intero, doc/guide/prima-schermata.md (le metriche) e MOB-02 § 4 (le API:
-  non rinominarne nessuna) e le guide § Composizione mobile scritte da MOB-02..07, che sono chiuse (README § 6);
+- Leggi doc/mobile/README.md (§ 9: le decisioni 1–51), la spec MOB-08 per intero, doc/guide/prima-schermata.md (le metriche) e le API di MOB-02 nel codice (ritirata il 2026-10-10: `lib/hooks/useMobileSections.ts`,
+  `components/ui/{tile,page-verdict,verdict-strip,page-rest,error-notice}.tsx`; non rinominarne nessuna) e le guide § Composizione mobile scritte da MOB-02..07, che sono chiuse (README § 6);
   DESIGN.md § 5 e § Navigation (MAI rigenerarlo; il capitolo mobile lo scrive MOB-09, dopo questa spec); PERF-01,
   PERF-02 e PERF-14 sono in develop e ritirate
 - Crea SESSION_NOTES.md; crea il branch dalla branch attiva PRIMA di editare

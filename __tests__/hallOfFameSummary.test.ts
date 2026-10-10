@@ -370,7 +370,7 @@ describe('summarizeNotes', () => {
 });
 
 /**
- * The phone's strip (doc/mobile/MOB-02 § 4.4 and § 4.7): every cell prints EXACTLY what the
+ * The phone's strip (since 2026-10-10; doc/guide/hall-of-fame.md § Composizione mobile): every cell prints EXACTLY what the
  * sentence that owns the figure prints — the strip reads the boards, it never recomputes.
  * Falsified on 2026-10-10: the identities went red with the cells formatted through the
  * non-compact euro (`cachedFormatCurrencyEUR(value)`: «6.940,00 €» against the reading's «6940 €»).

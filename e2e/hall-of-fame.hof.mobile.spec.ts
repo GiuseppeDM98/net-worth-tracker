@@ -9,7 +9,7 @@
  * Account and arithmetic: `scripts/seedHallOfFameE2E.mts`. The `hof` project runs first and
  * builds the document; if this project runs alone, the first navigation builds it itself.
  *
- * Since 2026-10-10 (doc/mobile/MOB-02) the page is composed for a phone: «Il resto della pagina»
+ * Since 2026-10-10 the page is composed for a phone: «Il resto della pagina»
  * is a second level-2 heading, so the verdict is `.first()`, and every tile but Record del
  * patrimonio is a CLOSED row with an empty panel — a test that reads inside Anni opens it first.
  * The composition itself is `e2e/mobile-composition.hof.mobile.spec.ts`.

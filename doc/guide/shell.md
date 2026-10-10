@@ -126,5 +126,5 @@ rules below name.
 - **The icon rail's 44px targets are measured at 1440 with a mouse**; no fixture covers a ≥1440px tablet in landscape.
   (moved from `CLAUDE.md` → Known Issues on 2026-10-07)
 
-The one shell-wide open item that crosses every page (`PageTabBar` and `Switch` below 44px on touch) stays in
-`CLAUDE.md` → Known Issues.
+No shell-wide open item crosses every page any more: the `PageTabBar` pill reached 44×44 on 2026-10-10 (§ Navigation
+above) and the `Switch` its 44×44 hit box on 2026-10-08, and the `CLAUDE.md` → Known Issues entry went with them.

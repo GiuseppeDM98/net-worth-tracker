@@ -1,9 +1,10 @@
 'use client';
 
 /**
- * The controller of a page's rows below `desktop:` (The Closed-Row Rule, doc/mobile/MOB-02 § 4.2
- * and § 4.5): which tile is open, what the browser remembers, which failed read stays open, and
- * the one `TileCollapse` object each `Tile` receives.
+ * The controller of a page's rows below `desktop:` (The Closed-Row Rule, since 2026-10-10;
+ * AGENTS.md § Motion, doc/guide/hall-of-fame.md § Composizione mobile): which tile is open, what
+ * the browser remembers, which failed read stays open, and the one `TileCollapse` object each
+ * `Tile` receives.
  *
  * What a page does: `const sections = useMobileSections({ route: 'hall-of-fame', sections: ROWS })`,
  * then `collapse={sections.collapse('hof-anni')}` on each row, `restCollapse={sections.collapse(
@@ -54,7 +55,12 @@ export interface MobileSections {
   compact: boolean;
   /** The `TileCollapse` of a row (or of the verdict's rest); `undefined` at 1440 and for an unknown id. */
   collapse(id: string): TileCollapse | undefined;
-  /** Opens a row, scrolls it into view and puts the focus on its trigger — what a strip cell does. */
+  /**
+   * Opens a row, scrolls it into view and puts the focus on its trigger — what a strip cell does.
+   * Rows only: the verdict's rest has no `section` and no `-trigger` (its button carries no id),
+   * so a cell that opens it calls `restCollapse.onOpenChange(true)` instead; THE tile is the
+   * page's own `onOpen`.
+   */
   reveal(id: string): void;
   /** Every row open (the verdict's rest not counted). */
   allOpen: boolean;
@@ -62,6 +68,14 @@ export interface MobileSections {
   setAll(open: boolean): void;
   /** The one live sentence for the failed reads (`PageRest`); `null` at 1440 or with nothing failed. */
   announcement: string | null;
+  /**
+   * Every row's eyebrow by id — what a strip cell announces it opens («, apre Anni»). A page hands
+   * it to `VerdictStrip` as `eyebrows`, spreading its own entry for a cell that opens THE tile or
+   * no row at all (`{ ...sections.eyebrows, 'panoramica-patrimonio': "l'andamento da inizio anno" }`).
+   * Born here on 2026-10-10 (the retirement): the strip does not know the rows, so without this map
+   * a cell fell back to its own label and said «apre Quest'anno».
+   */
+  eyebrows: Readonly<Record<string, string>>;
 }
 
 export interface UseMobileSectionsOptions {
@@ -181,6 +195,8 @@ export function useMobileSections({
   const failed = new Set(failedIds);
   const open = resolveOpenSections({ stored, known, defaults: defaultOpen, failed: failedIds, dismissed });
   const rows = known.filter((id) => id !== restId);
+  const openRows = rows.filter((id) => open.has(id));
+  const eyebrows = Object.fromEntries(sections.map((section) => [section.id, section.eyebrow]));
 
   // Pattern (3) of AGENTS.md § Motion: the cache settles during render, before any return.
   const [rowsCache, setRowsCache] = useState<ReadonlyMap<string, CachedRow>>(() => new Map());
@@ -189,9 +205,10 @@ export function useMobileSections({
 
   const collapse = (id: string): TileCollapse | undefined => (compact ? current.get(id)?.collapse : undefined);
 
-  // `reveal` and `setAll` close over nothing that changes on a tap (not `open`, not the cache): a
-  // page hands `reveal` to its strip as `onOpen`, and a handler reborn on every tap would re-render
-  // the verdict and the strip each time. What they need of the moment they read from the store.
+  // `reveal` closes over nothing that changes on a tap (not `open`, not the cache): a page hands it
+  // to its strip as `onOpen`, and a handler reborn on every tap would re-render the verdict and the
+  // strip each time. What it needs of the moment it reads from the store. `setAll` may read this
+  // render's open rows: `PageRest`, its only holder, re-renders on every tap anyway.
   const reveal = (id: string): void => {
     createSectionHandler(id, key, defaultOpen, setVisited, setDismissed)(true);
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -202,7 +219,11 @@ export function useMobileSections({
 
   const setAll = (nextOpen: boolean): void => {
     if (!nextOpen) rows.forEach(returnFocusFromPanel);
-    if (nextOpen) setVisited((prev) => new Set([...prev, ...rows]));
+    // Opened once in this visit, a row keeps its content closed. «Apri tutte» opens them all; «Chiudi
+    // tutte» must count the rows open at LOAD (the memory, a default, a failed read) as opened too,
+    // or their content unmounts with no closing transition (seen on 2026-10-10, the retirement:
+    // `visited` starts empty on every mount while `open` comes from the store).
+    setVisited((prev) => new Set([...prev, ...(nextOpen ? rows : openRows)]));
     // «Chiudi tutte» dismisses every failed row for this visit; «Apri tutte» lets them all open again.
     setDismissed(nextOpen ? new Set() : new Set(failedIds));
     // The rest is never a failed row, so what the reader chose is what is open: read it from the store.
@@ -213,5 +234,5 @@ export function useMobileSections({
   const allOpen = rows.every((id) => open.has(id));
   const announcement = compact ? describeFailedSections(sections.filter((section) => section.failed).map((section) => section.eyebrow)) : null;
 
-  return { compact, collapse, reveal, allOpen, setAll, announcement };
+  return { compact, collapse, reveal, allOpen, setAll, announcement, eyebrows };
 }

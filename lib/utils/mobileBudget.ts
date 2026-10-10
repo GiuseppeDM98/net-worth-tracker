@@ -38,7 +38,7 @@ export interface MobileMetrics {
   tilesFullyAboveFold: number;
   figuresAboveFold: number;
   figuresOutsideVerdict: number;
-  /** `null` while the page has no closed row (MOB-02 § 4.2 creates them). */
+  /** `null` while the page has no closed row (`TileRowShell`, since 2026-10-10). */
   firstClosedRowAbovePill: boolean | null;
   overflowX: boolean;
 }

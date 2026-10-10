@@ -62,7 +62,7 @@ oltre 60 s è `unsettled`. Una tab assente, o che non risulta selezionata, è `m
 | `tilesAboveFold` · `tilesFullyAboveFold` | `section.rounded-2xl` visibili che iniziano / stanno entro `main.clientHeight` (la piega della baseline) | pavimento |
 | `figuresAboveFold` | cifre (€ o %) SULLO SCHERMO che iniziano entro `main.clientHeight`, verdetto compreso | tetto |
 | `figuresOutsideVerdict` | cifre sullo schermo che FINISCONO sopra il bordo alto della pill, fuori dalla `section` visibile `page-verdict` (lo `scope` conta dentro, la striscia `ul[aria-label="Le cifre del verdetto"]` fuori); senza verdetto, tutte | tetto; obiettivo ≤ 5 a 390 |
-| `firstClosedRowAbovePill` | la prima riga chiusa di MOB-02 (`section.rounded-2xl[id]` → `h3 > button[aria-expanded="false"]` con `aria-controls` = `<id>-panel`) finisce sopra la pill; `null` finché non ce n'è | `null` accetta solo `null`; `true` resta `true`; `false` solo con `raisedBy` |
+| `firstClosedRowAbovePill` | la prima riga chiusa della composizione (`TileRowShell`, dal 2026-10-10: `section.rounded-2xl[id]` → `h3 > button[aria-expanded="false"]` con `aria-controls` = `<id>-panel`) finisce sopra la pill; `null` finché non ce n'è | `null` accetta solo `null`; `true` resta `true`; `false` solo con `raisedBy` |
 | `overflowX` | `main.scrollWidth > main.clientWidth` | sempre `false` |
 
 **Una cifra divisa in due nodi di testo è UNA cifra, solo se l'unità è lo span di `NarrativeSegments`** (2026-10-10):
@@ -105,7 +105,9 @@ stampato: MOB-08 svuota la lista. Un budget misurato e non registrato, o registr
 **La colonna «obiettivo»** (The First-Screen Rule, proposta in MOB-09): a 390 «sì» con ≤ 5 cifre fuori dal verdetto E
 la prima riga chiusa sopra la pill; a 768/1024 l'obiettivo è il misurato di MOB-08 — oggi `firstScreenTarget` stampa
 «non ancora» a quelle viewport in ogni caso, e MOB-08 lo cambia insieme al suo test; «—» per Impostazioni (nessun
-verdetto). Fino a MOB-02 non esiste una riga chiusa: ogni superficie legge «non ancora».
+verdetto). Dal 2026-10-10 Hall of Fame è la prima superficie con righe chiuse, e legge ancora «non ancora»: a 390 la
+prima riga chiusa resta sotto la pill (`raisedBy`, `doc/mobile/README.md` § 3.1); ogni altra superficie non ha righe
+finché la sua spec non la compone.
 
 **Il fixture tiene STATI che non dipendono dal giorno** (2026-10-10, `scripts/seedCensusE2E.mts`): un tetto di Budget
 sopra lo speso è giudicato dal ritmo (`speso / giorno × giorni`), che lo sfora a inizio mese e non a fine mese — con

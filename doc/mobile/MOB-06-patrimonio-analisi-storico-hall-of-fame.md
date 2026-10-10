@@ -1,6 +1,6 @@
 # MOB-06 — Patrimonio · Analisi · Storico · Hall of Fame
 
-> Stato: da fare · riletta in modo adversariale il 2026-10-10: 35 rilievi, 8 decisioni · Priorità: 3 (quattro pagine su un contratto già scritto) · Sforzo: L · Dipende da: MOB-01 (ritirata il 2026-10-10, in develop dal 2026-10-10, PR #448), MOB-02, MOB-03
+> Stato: da fare · riletta in modo adversariale il 2026-10-10: 35 rilievi, 8 decisioni · Priorità: 3 (quattro pagine su un contratto già scritto) · Sforzo: L · Dipende da: MOB-01 (ritirata il 2026-10-10, in develop dal 2026-10-10, PR #448), MOB-02 (ritirata il 2026-10-10, in develop dal 2026-10-10, PR #450), MOB-03
 > (`PatrimonioTile`, `ComposizioneTile`, `describeSales`), MOB-04 (`describeTrackingScope`, `CashflowKpiTrio`) — sequenza, README § 9, 9; PERF-11 ritirata, in develop · Sblocca: MOB-07, MOB-08, MOB-09
 
 ## 1. Il problema, misurato
@@ -36,7 +36,7 @@ Righe del 2026-09-26 (chi implementa le riverifica):
   (`:436-479`) con `order-1/3/2/4/5` e i wrapper `contents` delle due colonne desktop; due chip di `EvoluzioneTile.tsx:151-170`
   ripetono la prima frase; il Driver è un ledger che torna all'euro (`storicoNarrative.ts:461`); `storicoNarrative.ts:26`
   importa già a runtime da `storicoSummary.ts`.
-- **Hall of Fame**: composta da MOB-02 § 4.7, azioni in fondo comprese (README § 9, 25).
+- **Hall of Fame**: composta da MOB-02 (ritirata il 2026-10-10; doc/guide/hall-of-fame.md § Composizione mobile), azioni in fondo comprese (README § 9, 25).
 
 ## 2. Obiettivo misurabile
 
@@ -160,15 +160,15 @@ classifiche e ledger restano interi: 15, 17); `validateStrip` in un test per pag
     quanto è uscito (X €)», e la coda del disavanzo «X € dal patrimonio») perdono l'importo sotto `desktop:` quando
     ristampa una cifra del verdetto o della striscia; lo tengono con un disavanzo, dove la base è diversa dalle entrate
     (README § 9, 42).
-  - **L'aside con controlli** sta fuori dal bottone, solo da aperta (MOB-02 § 4.2): sotto i 640 px è il solo «Per ruolo ·
+  - **L'aside con controlli** sta fuori dal bottone, solo da aperta (`TileRowShell`, `components/ui/tile.tsx`: un aside di testo resta nel trigger, uno con controlli apre la prima riga del pannello): sotto i 640 px è il solo «Per ruolo ·
     Per tipo», e solo con l'interruttore acceso; «Sottocategorie» e il conteggio dei nodi esistono da 640 in su. La vista
     scelta è stato della tessera: non entra in `mobile-sections:analisi` e riparte da «Per ruolo» a ogni montaggio.
   - **«Mostra tutte»** è una disclosure con `aria-expanded` e `aria-controls`: non è una riga chiusa (`isClosedRow` in `scripts/mobileCensus.mjs` vuole `aria-controls` = `<id>-panel` di una `section.rounded-2xl[id]`).
 - **La Scheda** è in `sections` solo con un focus. Sotto `desktop:` l'atterraggio (`handleEntitySelect`, restauro
-  dall'URL) chiama `sections.reveal('analisi-scheda')` al posto di `scrollToScheda`, DENTRO lo stesso `setTimeout`, ma
-  attraverso un ref aggiornato a ogni commit (`revealRef.current = sections.reveal`, scritto in un effetto di layout senza
-  `setState`): quando il timer scatta `analisi-scheda` è già in `sections`, mentre un `reveal` catturato dalla chiusura
-  di `scrollToScheda` (stabile, dipendenze vuote, per il React Compiler) vedrebbe l'insieme senza la Scheda. Nel restauro
+  dall'URL) chiama `sections.reveal('analisi-scheda')` al posto di `scrollToScheda`, DENTRO lo stesso `setTimeout`,
+  direttamente: `reveal` non cattura `sections` (scrive la memoria dal store al gesto e cerca `#analisi-scheda` nel DOM al
+  momento della chiamata, `lib/hooks/useMobileSections.ts`), quindi quando il timer scatta trova la Scheda già montata;
+  nessun ref (`react-hooks/refs`; il `revealRef` scritto prima del ritiro di MOB-02 ragionava su una cattura che non c'è). Nel restauro
   è il callback asincrono dell'effetto che esiste già, mai un `setState` nel suo corpo (`react-hooks/set-state-in-effect`,
   AGENTS.md § Motion; lo schema «differito perché il corpo dell'effetto non scriva stato» è in
   `components/DeleteDummyDataDialog.tsx:66`). Il chevron chiude la riga, non il focus (l'URL lo tiene: un reload la
@@ -193,8 +193,8 @@ classifiche e ledger restano interi: 15, 17); `validateStrip` in un test per pag
   → niente cella.
 - **Il ledger non si solleva mai**: torna all'euro sotto gli occhi (DESIGN → Ranked Rows with Residual; README § 9, 15);
   una cella lo APRE. Un test vieta `lifts` su `storico-driver`.
-- **Non si ripete**: `EvoluzioneTile` + `liftedFigures?: readonly ('growth' | 'cagr' | 'trailing')[]`; la pagina passa
-  `[...liftedBlocks(strip, 'storico-evoluzione'), 'growth', 'cagr']` (i due chip ristampano la prima frase del `lead`:
+- **Non si ripete**: `EvoluzioneTile` + `liftedFigures?: readonly ('growth' | 'cagr' | 'trailing')[]` ed esporta `isEvoluzioneLiftedBlock`; la pagina passa
+  `[...liftedBlocks(strip, 'storico-evoluzione').filter(isEvoluzioneLiftedBlock), 'growth', 'cagr']` (i due chip ristampano la prima frase del `lead`:
   crescita, percentuale e CAGR, `storicoNarrative.ts:212-216`).
 - **Righe**, nell'ordine del DOM di oggi (README § 9, 11; `order-*` tolte, i wrapper `contents` restano):
   `storico-composizione` («per classe») · `storico-raddoppi` · `storico-driver` · `storico-valore` («per strumento»).
@@ -220,7 +220,7 @@ qui censimento, `budget.json` e guida.
   2026-09-30) ha reso pigri i grafici delle disclosure e della Scheda di Analisi e il Sankey del Flusso, che sotto i
   640 px non si scarica (doc/guide/cashflow-analisi.md); su Storico solo il PDF è pigro: Composizione, Valore ed
   Evoluzione portano recharts nel grafo iniziale e il Dettaglio resta statico (doc/guide/storico.md) — la riga chiusa
-  risparmia il mount, non il download; un grafico di riga reso pigro (`lazyComponent`) riserva l'altezza (MOB-02 § 4.8). **PERF-03** (in develop dal 2026-09-30): «Aggiornato alle…» sta nel `PageHeader`, nella riga della
+  risparmia il mount, non il download; un grafico di riga reso pigro (`lazyComponent`) riserva l'altezza (`lazyComponent`, PERF-04). **PERF-03** (in develop dal 2026-09-30): «Aggiornato alle…» sta nel `PageHeader`, nella riga della
   descrizione: nessuna riga in più nel budget. **PERF-05/06**: la striscia legge i riassunti come sono. **PERF-12** (in develop dal 2026-10-06, AGENTS.md § Motion): `mounted` nel gestore, `reveal` in
   un `setTimeout`, mai nel corpo di un effetto (§ 4.2).
 - **`perf/budget.json`** ha i tetti di `/dashboard/assets` (699), `analisi` (648), `history` (772), `hall-of-fame` (615):
@@ -263,7 +263,7 @@ con la sua spec verde prima della successiva. 4. Spec esistenti, E2E completo, c
   con `value >= 0 ? '+'`); l'euro dell'anno fra parentesi; il mercato come frase sua.
 - `e2e/mobile-composition.patrimonio.mobile.spec.ts` (`mobile`, seed base): prima schermata (eroe visibile, chip del
   mese e dell'anno nascosti, celle), `#patrimonio-strumenti-panel` `inert` e vuoto, 0 `AssetRow`; il conteggio apre
-  Strumenti; memoria; l'ordine delle `y` = ordine del DOM e nessun `[class*="order-"]`; nessuno sforamento; con
+  Strumenti; memoria; l'ordine delle `y` = ordine del DOM e nessuna classe `order-*` (dalla `classList`); nessuno sforamento; con
   l'overview interrotta (`page.route('**/api/dashboard/overview*', r => r.abort())`, come `e2e/settings.spec.ts:143`)
   l'`ErrorNotice`, nessuna striscia, `PageRest` primo figlio, Movimenti aperta. Rossi falsificando: `collapse` tolto a
   Strumenti (N `AssetRow`), nessuna scrittura della memoria (chiusa dopo il reload), `defaultOpen` ignorato,
@@ -293,7 +293,7 @@ con la sua spec verde prima della successiva. 4. Spec esistenti, E2E completo, c
   nasconde il `lifts` della cella, quindi la cella «Risparmio» stampa l'avanzo e la regione «Risparmio» del Flusso non è
   visibile, con la legenda come ancora positiva (falsificare togliendo `liftedFigures` a `FlussoTile`: la regione torna
   visibile); le didascalie della barra senza importo a 390. L'eyebrow rosso di Movimenti e Mutuo resta a Vitest
-  (`resolveOpenSections` con `failed`): registro e rate sono Firestore dal client (MOB-02 § 7).
+  (`resolveOpenSections` con `failed`): registro e rate sono Firestore dal client (come Hall of Fame, che non ha letture via `/api/*`).
 
 ## 8. Collaudo guidato
 
@@ -325,8 +325,8 @@ Analisi e Storico sulle primitive di MOB-02 (LA tessera con la curva a 120 px, s
 ripetuti — solo la cifra ripetuta, l'euro dell'anno nella frase —, le righe chiuse nell'ordine del DOM con le order-*
 tolte, i binding), il calendario di Analisi come scope, la Scheda come riga che si apre da sola dall'URL, una sola
 cella del Driver e il ledger mai sollevato, Strumenti chiusa sopra le sue righe leggere (un elenco per larghezza, la
-sparkline all'apertura), Movimenti in errore come ErrorNotice anche a 1440. I nomi sono quelli di MOB-02 § 4.1
-(axis compreso), MOB-03 § 4.3 e MOB-04 § 4.2: non rinominarli.
+sparkline all'apertura), Movimenti in errore come ErrorNotice anche a 1440. I nomi sono quelli del codice di MOB-02 (ritirata il 2026-10-10: `lib/hooks/useMobileSections.ts`, `components/ui/{tile,page-verdict,verdict-strip,page-rest,error-notice}.tsx`,
+`axis` compreso), MOB-03 § 4.3 e MOB-04 § 4.2: non rinominarli.
 
 Da fare TASSATIVAMENTE prima di ogni cosa:
 - Leggi WORKFLOW.md, AGENTS.md (§ Tailwind Breakpoints and Responsive Layout, § React Query and Derived State,

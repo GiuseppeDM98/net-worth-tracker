@@ -1,16 +1,18 @@
 /**
- * The small-screen composition, on its sample page (doc/mobile/MOB-02 § 7): Hall of Fame at 390,
+ * The small-screen composition, on its sample page (since 2026-10-10; the rules in
+ * doc/guide/hall-of-fame.md § Composizione mobile and AGENTS.md § Motion): Hall of Fame at 390,
  * on the `hof` fixture (`scripts/seedHallOfFameE2E.mts`: 47 snapshots, best month marzo 2024,
  * income record dicembre 2025 at 6900 €, savings record the same month at +3700 €, running month
  * settembre 2026 fourth).
  *
  * What a browser alone can prove here: the first screen holds the title, the first sentence,
- * the strip and THE tile; a never-opened row has an EMPTY panel; a row opens and closes with the
- * grid transition; the memory survives a reload; a strip cell opens its row and hands it the
- * focus; «Apri tutte» spares «Il perché»; reduced motion means no transition; the DOM order is
- * the vertical order at 390 AND at 1440, with no `order-*` left in the grid; nothing runs off
- * `main`. The words and the arithmetic are Vitest's (`__tests__/{narrative,mobileSections,
- * verdictStrip,hallOfFameNarrative,hallOfFameSummary}.test.ts`).
+ * the strip and THE tile's reading ABOVE the pill; a never-opened row has an EMPTY panel; a row
+ * opens and closes with the grid transition; the memory survives a reload, «Il perché» as a row
+ * of it, and «Chiudi tutte» keeps the content of rows open at load; a strip cell opens its row
+ * and hands it the focus; «Apri tutte» spares «Il perché»; reduced motion means no transition;
+ * the DOM order is the vertical order at 390 AND at 1440, with no `order-*` left in the grid;
+ * nothing runs off `main`. The words and the arithmetic are Vitest's
+ * (`__tests__/{narrative,mobileSections,verdictStrip,hallOfFameNarrative,hallOfFameSummary}.test.ts`).
  *
  * The browser's clock is fixed at 15 settembre 2026 before every load: `summarizeHallOfFame`
  * reads «today» on the client, so settembre 2026 and the 2026 stay the running month and year
@@ -27,6 +29,11 @@
  * removed from the handler (nothing in `localStorage` after the taps); (4) `reveal` without the
  * `focus()`; (5) `nextSectionsForAll` including the rest; (6) the panel's `transition` without
  * `motion-safe:`; (7) an `order-1` put back on the Entrate cell; (8) a `min-w-[420px]` on a cell.
+ * Added in the retirement of the spec, the same day, each seen red: (9) «Chiudi tutte» after a
+ * reload with every row remembered open — with `setAll(false)` leaving the rows out of the visit
+ * the panels had 0 children; (10) the first screen measured against the pill's top — a strip cell
+ * at 600px put the verdict at 831 against 767; (11) «Il perché» remembered — with `restId` dropped
+ * from `known` the button did not exist after the reload.
  */
 
 import { test, expect, type Page } from '@playwright/test';
@@ -81,7 +88,20 @@ test.describe('Hall of Fame, composed for a phone', () => {
     }
 
     // THE tile is open, with its reading.
-    await expect(page.getByRole('region', { name: 'Record del patrimonio' })).toContainText('I tre mesi migliori valgono insieme');
+    const theTile = page.getByRole('region', { name: 'Record del patrimonio' });
+    const reading = theTile.getByText('I tre mesi migliori valgono insieme');
+    await expect(reading).toBeVisible();
+
+    // The first screen ENDS at the pill: title, verdict (first sentence, cells, «Il perché») and THE
+    // tile's reading all sit above it — what `mobile:budget` measures on the fixture, held here on
+    // the `hof` one. Added 2026-10-10 (the retirement): until then this test proved only visibility.
+    const pillTop = await page.locator('nav[aria-label="Navigazione principale"]').evaluate((el) => el.getBoundingClientRect().top);
+    expect(pillTop).toBeGreaterThan(600);
+    const bottomOf = async (locator: ReturnType<Page['locator']>) => (await locator.boundingBox())!.y + (await locator.boundingBox())!.height;
+    expect(await bottomOf(page.locator('main h1').filter({ visible: true }).first()), 'title').toBeLessThanOrEqual(pillTop);
+    expect(await bottomOf(verdict), 'verdict').toBeLessThanOrEqual(pillTop);
+    for (let i = 0; i < 3; i++) expect(await bottomOf(cells.nth(i)), `cell ${i}`).toBeLessThanOrEqual(pillTop);
+    expect(await bottomOf(reading), 'reading').toBeLessThanOrEqual(pillTop);
 
     // Then «Il resto della pagina» and the four rows, closed, their panels empty.
     await expect(page.getByRole('heading', { level: 2, name: 'Il resto della pagina' })).toBeVisible();
@@ -141,6 +161,37 @@ test.describe('Hall of Fame, composed for a phone', () => {
     await expect(trigger(page, 'hof-entrate')).toHaveAttribute('aria-expanded', 'true');
     await expect(trigger(page, 'hof-risparmio')).toHaveAttribute('aria-expanded', 'false');
     await expect(trigger(page, 'hof-note')).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.getByRole('region', { name: 'Gli anni con la crescita di patrimonio più alta' })).toContainText('Il tuo anno migliore è il');
+
+    // «Chiudi tutte» on rows open at LOAD and never tapped (every row remembered open, the button
+    // reads «Chiudi tutte» at once): their content stays mounted (closed, inert) and the panel
+    // shrinks through the transition. Seen red on 2026-10-10 (the retirement): `setAll(false)` left
+    // them out of the visit, the content unmounted and the panel snapped shut.
+    await page.evaluate((key) => localStorage.setItem(key, JSON.stringify(['hof-anni', 'hof-entrate', 'hof-note', 'hof-risparmio'])), STORAGE_KEY);
+    await page.reload({ waitUntil: 'load' });
+    await expect(page.getByRole('heading', { level: 2, name: 'Il tuo mese migliore è marzo 2024' })).toBeVisible({ timeout: 30_000 });
+    for (const id of ROW_IDS) await expect(trigger(page, id)).toHaveAttribute('aria-expanded', 'true');
+    await page.getByRole('button', { name: 'Chiudi tutte' }).click();
+    await expect(trigger(page, 'hof-anni')).toHaveAttribute('aria-expanded', 'false');
+    await expect(panel(page, 'hof-anni')).toHaveAttribute('inert', '');
+    expect(await panel(page, 'hof-anni').evaluate((el) => el.children.length)).toBeGreaterThan(0);
+    expect(await panel(page, 'hof-entrate').evaluate((el) => el.children.length)).toBeGreaterThan(0);
+    await page.waitForTimeout(400);
+    expect(await panelHeight(page, 'hof-anni')).toBe(0);
+  });
+
+  test('«Il perché» is remembered across a reload, as a row of the memory', async ({ page }) => {
+    await openPage(page);
+    await perche(page).click();
+    await expect(perche(page)).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.getByRole('region', { name: 'Verdetto sui record' }).getByText(/Il 2026 è finora/)).toBeVisible();
+    // The rest is a row of the controller (`restId`, part of `known`): the memory keeps it as one.
+    expect(await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)).toBe('["perche"]');
+
+    await page.reload({ waitUntil: 'load' });
+    await expect(page.getByRole('heading', { level: 2, name: 'Il tuo mese migliore è marzo 2024' })).toBeVisible({ timeout: 30_000 });
+    await expect(perche(page)).toHaveAttribute('aria-expanded', 'true');
+    for (const id of ROW_IDS) await expect(trigger(page, id)).toHaveAttribute('aria-expanded', 'false');
   });
 
   test('«Quest\'anno» opens the Anni row, scrolls it into view and hands it the focus', async ({ page }) => {

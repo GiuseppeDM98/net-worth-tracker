@@ -19,13 +19,13 @@ Righe del 2026-10-10 (MOB-02..08 possono spostarle: riverificare).
   `springLayoutTransition`; l'unica occorrenza del grep è il commento di `app/dashboard/page.tsx:271`); `components[]`
   descrive Page Verdict, Tile ed Error Notice («role=alert») come oggi; `extensions.breakpoints[1].purpose` dice
   «iPad Mini landscape (1024px) gets the mobile layout by design - never use lg:».
-- `PRODUCT.md:9` «Mobile-first at 390px with desktop as an elevated variant». `CLAUDE.md:66` (Known Issues): la pill
-  «38×32» (lo `Switch` è chiuso dal 2026-10-08); 13.133 byte in LF il 2026-10-10 (da rimisurare alla chiusura) contro
+- `PRODUCT.md:9` «Mobile-first at 390px with desktop as an elevated variant». `CLAUDE.md` § Known Issues: la voce della pill
+  «38×32» tolta da MOB-02 il 2026-10-10 (lo `Switch` chiuso dal 2026-10-08); 13.133 byte in LF il 2026-10-10 (da rimisurare alla chiusura) contro
   «well under 20.000»; `CLAUDE.md` § Current Status: «50 Playwright spec files (189 tests incl. 6 auth setups)»: MOB-02..08
   aggiungono 11 file e tre progetti. `README.md` utente: `:58` «tiles stack in one column» (Rendimenti), `:107` «tab
   navigation uses a dropdown on small screens» (FIRE), `:114` «at 390px the tiles stack with the plan last» (Monte Carlo).
 - `AGENTS.md:733` «Keep the DOM in the desktop order so Tab follows the eye; the phone re-orders with `order-*` (Storico
-  and Rendimenti are the worked examples)» (MOB-02 § 10 la riscrive; qui si verifica).
+  and Rendimenti are the worked examples)» (riscritta da MOB-02 il 2026-10-10: «Keep ONE sequence…» con l'elenco delle pagine che portano ancora `order-*`; qui si verifica che l'elenco sia vuoto).
 - `grep -rn "Composizione mobile" doc/guide` → 0 oggi; MOB-02..08 ne scrivono una per pagina, ognuna a modo suo.
 - `.impeccable/critique/`: 16 snapshot `closed: true` (2026-09-13 → 09-24) sulla composizione di PRIMA.
   `doc/mobile/README.md` § 6 tiene tutte le spec «da fare»: qui si chiude, una riga per spec con data e misura.
@@ -179,7 +179,7 @@ only layout switch: below it every page uses the one small-screen composition (T
 
 - Key Features, riga **Shell**: «below `desktop:` verdict · axis · strip · one tile · «Il resto della pagina» (DESIGN → The
   First-Screen Rule)». Known Issues: la voce «The `PageTabBar` pill stays below 44px on touch below 1440» si cancella
-  intera (la pill l'ha chiusa MOB-02 § 4.6, lo `Switch` è a 44×44 dal 2026-10-08); se MOB-02 l'ha già tolta, nulla.
+  intera — già tolta da MOB-02 il 2026-10-10 (la pill a 44×44, lo `Switch` dal 2026-10-08): nulla da fare.
   Latest: MOB-02..08 fuse in UNA voce. § Current Status: i conteggi Vitest e Playwright (file, test, progetti) riletti da
   `ls e2e/*.spec.ts` e dalla corsa intera.
 - PRODUCT.md § Platform: «Mobile-first at 390px, composed below `desktop:` — the same tiles and narratives, a first
@@ -297,7 +297,7 @@ Da fare TASSATIVAMENTE prima di ogni cosa:
 - Leggi le guide di § 4.4, il git log di MOB-02..08, doc/guide/stati.md § The fourth reading e le righe di PERF-14 in
   DESIGN.md (→ Tile Grid «The cascade plays once per session», la frase delle molle senza springLayoutTransition)
 - Leggi COMMENTS.md e DEVELOPMENT_GUIDELINES.md
-- Leggi doc/mobile/README.md (§ 9: le decisioni 1–57), la spec MOB-09 per intero e MOB-02 § 4.1 (i nomi delle API)
+- Leggi doc/mobile/README.md (§ 9: le decisioni 1–57), la spec MOB-09 per intero e i nomi delle API di MOB-02 nel codice (ritirata il 2026-10-10: `lib/hooks/useMobileSections.ts`, `lib/utils/{verdictStrip,mobileSections}.ts`, `components/ui/{tile,page-verdict,verdict-strip,page-rest,error-notice}.tsx`)
 - Crea SESSION_NOTES.md; crea il branch dalla branch attiva PRIMA di editare
 
 Regole: nessun commit senza il mio OK; un branch e un commit; rispondi in italiano; nessuna domanda è aperta (README

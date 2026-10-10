@@ -115,9 +115,6 @@ const HOF_SECTIONS: readonly SectionSpec[] = [
   { id: HOF_SECTION_IDS.note, eyebrow: 'Note' },
 ];
 
-/** What a strip cell announces it opens: the row's eyebrow. */
-const HOF_EYEBROWS: Readonly<Record<string, string>> = Object.fromEntries(HOF_SECTIONS.map((section) => [section.id, section.eyebrow]));
-
 /** Every year a ranking mentions, newest first — the years a note can be filed under. */
 function collectAvailableYears(data: HallOfFameData): number[] {
   const rankings = [
@@ -457,7 +454,7 @@ export default function HallOfFamePage() {
         <PageVerdict
           verdict={verdict}
           ariaLabel="Verdetto sui record"
-          strip={<VerdictStrip figures={strip} onOpen={handleStripOpen} eyebrows={HOF_EYEBROWS} />}
+          strip={<VerdictStrip figures={strip} onOpen={handleStripOpen} eyebrows={sections.eyebrows} />}
           restCollapse={sections.collapse(VERDICT_REST_SECTION)}
         />
       </div>

@@ -1,6 +1,6 @@
 /**
  * Tests for lib/utils/narrative.ts — `splitVerdict`, where a phone cuts a verdict (The
- * Binding-Clause Rule, doc/mobile/MOB-02 § 4.3).
+ * Binding-Clause Rule, since 2026-10-10: a `binding` clause past the cut cancels the cut).
  *
  * Falsified on 2026-10-10: the `binding` case went red with the `rest.some(binding)` branch
  * removed; the `leadLength: 0` case went red with the check rewritten as `if (!model.leadLength)`

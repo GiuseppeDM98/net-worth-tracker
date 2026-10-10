@@ -1,7 +1,7 @@
 # MOB-07 — Allocazione · Previdenza · FIRE
 
 > Stato: da fare · riletta in modo adversariale il 2026-10-10: 27 rilievi, 7 decisioni · Priorità: 3 (Pianificazione, la meno aperta dal telefono) · Sforzo: L · Dipende da: MOB-01 (ritirata il 2026-10-10, in develop dal 2026-10-10, PR #448), MOB-02
-> (sequenza, README § 9, 9; PERF-04, PERF-05, PERF-10 e PERF-00 ritirate, in develop) · Sblocca: MOB-08, MOB-09
+> (ritirata il 2026-10-10, in develop dal 2026-10-10, PR #450; sequenza, README § 9, 9; PERF-04, PERF-05, PERF-10 e PERF-00 ritirate, in develop) · Sblocca: MOB-08, MOB-09
 
 ## 1. Il problema, misurato
 
@@ -72,7 +72,9 @@ Censimento 2026-09-26, 390×844 (altezze in px; righe di codice da riverificare)
 
 ### 4.1 Regole comuni
 
-- **API**: quelle di MOB-02 § 4.1, coi loro nomi (`axis` compreso). **Chiavi**: `mobileSectionsKey('allocation')`,
+- **API**: quelle del codice di MOB-02 (ritirata il 2026-10-10: `lib/utils/{verdictStrip,mobileSections,narrative}.ts`,
+  `lib/hooks/useMobileSections.ts`, `components/ui/{tile,page-verdict,verdict-strip,page-rest,error-notice}.tsx`), coi loro nomi
+  (`axis` compreso; `eyebrows={sections.eyebrows}` sulla striscia). **Chiavi**: `mobileSectionsKey('allocation')`,
   `('pension')`, `('fire-simulations', tab)`, `tab` ∈ `fire` · `coast` · `whatif` · `montecarlo` · `goals`: ogni tab ha il suo
   `useMobileSections` e ricorda da sé; `defaultOpen` vuoto ovunque; `sections` passa solo le righe rese in quel render
   (`alloc-previdenza` solo con un fondo, `page.tsx:527`; `goals-*` condizionali): una riga che sparisce esce da `known`.
@@ -83,8 +85,8 @@ Censimento 2026-09-26, 390×844 (altezze in px; righe di codice da riverificare)
   «Dettaglio», fuori da `PageRest`. Una pagina o tab con zero righe (What If senza base, Monte Carlo senza run, Obiettivi
   vuoto o spento) non rende `PageRest` né «Il resto della pagina».
 - **Striscia**: ogni cella è una cifra che verdetto o lettura stampano già (§ 7 lo prova sul testo; se no, non entra; una
-  lettura resta intera, README § 9, 15), col `format` dato qui sotto. Il formatter della pagina si rifà con il contratto di
-  MOB-02 § 4.1: `'pp'` («pp», `allocazioneNarrative.ts:50-52`), `decimals` (due decimali, `pensionNarrative.ts:43-46`; i
+  lettura resta intera, README § 9, 15), col `format` dato qui sotto. Il formatter della pagina si rifà con `formatStripFigure` di
+  `lib/utils/verdictStrip.ts`: `'pp'` («pp», `allocazioneNarrative.ts:50-52`), `decimals` (due decimali, `pensionNarrative.ts:43-46`; i
   decimali variabili di `monteCarloNarrative.ts:39-42` li calcola il selettore). `verdictStrip.ts` non si tocca.
 - **Il vincolo del fondo** (`respectPensionLockInFire`) cambia il senso di ogni cifra FIRE: sotto `desktop:` diventa lo
   `scope` di `PageVerdict` (README § 9, 44), da `describeFireLockScope(lock: FireLock): string | null` (nuova,
@@ -105,7 +107,8 @@ Censimento 2026-09-26, 390×844 (altezze in px; righe di codice da riverificare)
 - **Striscia** `selectAllocazioneStrip({ balance: BalanceScore, gaps: ClassGap[] })` (`allocazioneSummary.ts`;
   `BalanceScore` in `lib/utils/allocationUtils.ts:303`), tono `neutral` (The Scope-Is-Not-An-Axis Rule), due celle
   (README § 9, 45): «Fuori posizione» `misallocationPct`, `percent`, → `alloc-piano`, `lifts: { section:
-  'alloc-bilanciamento', block: 'fuori-posizione' }` (si nasconde solo il valore del KPI; la didascalia «… € da
+  'alloc-bilanciamento', block: 'fuori-posizione' }` (`BilanciamentoTile` prende `liftedFigures?: readonly 'fuori-posizione'[]` ed esporta
+  `isBilanciamentoLiftedBlock`, `LIFTED_FIGURE_CLASS` in `components/ui/tile.tsx`; si nasconde solo il valore del KPI; la didascalia «… € da
   spostare», che nessun altro stampa, resta sotto l'etichetta: 17; la lettura «il 3,5% è fuori posizione» resta intera,
   15); sotto 0,05 (la soglia di `describeBalance`) `null` con `reason` «nulla», la parola che la lettura stampa;
   «{classe} sopra|sotto» `Math.abs(differencePp)` di `offTargetGaps(activeClassGaps(gaps))[0]`, `'pp'`, →
@@ -191,7 +194,7 @@ Censimento 2026-09-26, 390×844 (altezze in px; righe di codice da riverificare)
 PERF-04 (in develop dal 2026-09-30) ha reso pigra la tab intera (What If, Coast, Monte Carlo, Obiettivi: `lazyComponent`
 in `app/dashboard/fire-simulations/page.tsx`, doc/guide/fire.md), non i grafici dentro: Prima e
 dopo è nel chunk della tab (`WhatIfAnalysisTab.tsx:89`), si monta all'apertura senza scaricare nulla; lo skeleton di
-MOB-02 § 4.8 vale per un grafico pigro da sé. L'Esposizione (dal 2026-09-28; il `Server-Timing` della sua route dice
+PERF-04 (`lazyComponent` riserva l'altezza) vale per un grafico pigro da sé. L'Esposizione (dal 2026-09-28; il `Server-Timing` della sua route dice
 `source=cache|yahoo` dal 2026-10-05) parte all'apertura e da calda non chiama Yahoo. PERF-03 (in develop dal 2026-09-30):
 «Aggiornato alle…» sta nel `PageHeader` — le pagine Previdenza e FIRE leggono gli stessi hook dei loro componenti per la
 riga — mai nella composizione né in «Il perché». PERF-12 (in develop dal 2026-10-06) e PERF-14 (dal 2026-10-08),
@@ -251,7 +254,7 @@ cinque tab. 4. Playwright, tsc, lint, Vitest. 5. `mobile:census`/`mobile:budget 
   `#alloc-piano-panel` `inert` e vuoto; (2) la cella apre il Piano, focus sul trigger; (3) zero richieste ai profili a
   riga chiusa; (4) `page.route('**/api/portfolio/instrument-profiles**', abort)` (`e2e/settings.spec.ts:143`), aprire e
   chiudere: eyebrow `text-destructive`, l'annuncio; (5) reload, `mobile-sections:allocation`; (6) nessuno sforamento,
-  nessun `[class*="order-"]`. Rossi falsificando: (1) `liftedFigures` assente; (2) `reveal` senza focus; (3) `enabled`
+  nessuna classe `order-*` (dalla `classList`). Rossi falsificando: (1) `liftedFigures` assente; (2) `reveal` senza focus; (3) `enabled`
   sempre vero nell'hook; (4) `failed` sempre falso; (5) nessuna scrittura; (6) una cella `min-w-[420px]`.
 - `pension.mobile.spec.ts`: `:19` ordine dalle righe, `:67` apre Versamenti; tre celle su `scripts/seedPensionE2E.mts`
   (rosso se il selettore ne rende due); solo titolo + striscia, la frase in «Il perché». `fire.mobile.spec.ts:28`,

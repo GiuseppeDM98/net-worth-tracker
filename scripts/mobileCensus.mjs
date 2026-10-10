@@ -178,7 +178,7 @@ export function measureFirstScreen({ figurePattern, withTexts }) {
     else figuresOutsideVerdict += count;
   }
 
-  // The closed row of MOB-02 § 4.2: `section.rounded-2xl[id]` → `h3 > button[aria-expanded="false"]`
+  // The closed row of the phone composition (2026-10-10, `TileRowShell`): `section.rounded-2xl[id]` → `h3 > button[aria-expanded="false"]`
   // whose `aria-controls` is `<id>-panel`. Any other `aria-expanded` button (a Radix «Dettaglio»,
   // an AssetRow) is not a closed tile.
   const isClosedRow = (section) => {
@@ -343,7 +343,7 @@ async function newContext(browser, viewport) {
     locale: 'it-IT',
     reducedMotion: 'reduce',
   });
-  // The default state of every page: no remembered open sections (MOB-02's `mobile-sections:*`).
+  // The default state of every page: no remembered open sections (`useMobileSections`'s `mobile-sections:*`).
   await context.addInitScript(() => {
     try {
       for (const key of Object.keys(localStorage)) if (key.startsWith('mobile-sections:')) localStorage.removeItem(key);
@@ -477,8 +477,8 @@ function printRow(row) {
 /**
  * A known fragment at 390×844, no server: the pill (top 768), a HIDDEN verdict and a visible one,
  * a figure under `grid-rows-[0fr]` + `overflow-hidden`, a fake SavingsRateBadge, a figure between
- * the pill and `main`'s bottom, and a closed row in MOB-02 § 4.2's shape. It proves corrections 1,
- * 2 and 4 in a real browser and the POSITIVE recognition of a closed row, which MOB-02 creates.
+ * the pill and `main`'s bottom, and a closed row in `TileRowShell`'s shape. It proves corrections 1,
+ * 2 and 4 in a real browser and the POSITIVE recognition of a closed row (since 2026-10-10).
  */
 const SELFTEST_HTML = `<!doctype html><html><body style="margin:0">
 <main style="position:relative;height:844px;overflow-y:auto">

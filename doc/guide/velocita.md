@@ -321,7 +321,7 @@ npm run perf:census -- --scenario=mount,nav --route=history,fire-simulations,das
 npm run perf:census -- --mobile --scenario=hall-of-fame                                 # un tap su una riga chiusa (MOB-02)
 ```
 
-Cinque scenari, ognuno in un contesto nuovo con il login vero, nulla salvato: **settings** (10 tasti in «Anno inizio
+Otto scenari (i cinque di default qui, poi i tre aggiunti), ognuno in un contesto nuovo con il login vero, nulla salvato: **settings** (10 tasti in «Anno inizio
 storico cashflow» di Impostazioni › Preferenze, un input controllato della pagina), **allocation** (dal 2026-10-08,
 PR #439: 10 tasti in «Target Criptovalute» di Impostazioni › Allocazione, la tab più grande — Crypto perché la formula
 non la possiede mai, quindi il campo è abilitato su ogni account), **expense** (10 tasti in «Importo» di
