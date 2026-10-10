@@ -7,7 +7,7 @@
  *
  * connectNulls={false} creates visible gaps for months without income — this correctly represents
  * "no data" rather than "zero savings". YAxis domain={['auto', 'auto']} scales to the actual data
- * range to prevent the flat-line problem (AGENTS.md § Recharts).
+ * range to prevent the flat-line problem (doc/guide/grafici.md § Recharts).
  */
 
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceArea, ResponsiveContainer } from '@/components/ui/charts/recharts';
@@ -38,7 +38,7 @@ export function SavingsRateLineChart({
       >
         <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
 
-        {/* Axis ticks are figures: the Mono Mandate reaches them only through `tick` (AGENTS.md → Recharts). */}
+        {/* Axis ticks are figures: the Mono Mandate reaches them only through `tick` (doc/guide/grafici.md § Recharts). */}
         <XAxis dataKey="label" tick={CHART_TICK_STYLE} axisLine={false} tickLine={false} interval="preserveStartEnd" />
         <YAxis
           // Intl prints a hyphen; the page's minus is U+2212 everywhere else.
@@ -49,7 +49,7 @@ export function SavingsRateLineChart({
           domain={['auto', 'auto']}
         />
 
-        {/* CSS vars for tooltip — never hardcoded hex (AGENTS.md § Recharts — tooltip style props) */}
+        {/* CSS vars for tooltip — never hardcoded hex (doc/guide/grafici.md § Recharts — tooltip style props) */}
         <Tooltip
           formatter={(value) =>
             value != null ? [formatPercentage(Number(value), 1), 'Tasso di risparmio'] : ['—', '']

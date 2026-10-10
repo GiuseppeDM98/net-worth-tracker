@@ -100,7 +100,7 @@ test('toggle OFF: the fund stays out, the attribution lists the ETF alone and it
   await expect(baseCaption(page)).toContainText("Base: portafoglio gestito, al netto dei fondi pensione e degli asset esclusi dall'allocazione.");
 
   // +2%, +1,5%, +2% on 10.000 € over three measured months: 200 + 153 + 207 — the ETF is the whole market.
-  await expect(attribution(page)).toContainText('Il mercato ha reso +560 €: ETF Mondo E2E ne ha portati +560 €.');
+  await expect(attribution(page)).toContainText(/Il mercato ha reso \+560[\s\u00a0]*€: ETF Mondo E2E ne ha portati \+560[\s\u00a0]*€\./);
   await expect(marketRow(page).getByText(euro('\\+560'))).toBeVisible();
   // Rows, not text: the footer explains what «Non attribuito» would be, and must not count as one.
   await expect(attribution(page).getByRole('listitem').filter({ hasText: /^Non attribuito/ })).toHaveCount(0);

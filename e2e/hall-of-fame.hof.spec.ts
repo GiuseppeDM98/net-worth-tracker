@@ -178,6 +178,32 @@ test.describe('Hall of Fame', () => {
     await page.keyboard.press('Escape');
   });
 
+  /**
+   * The phone composition leaves 1440 alone (doc/mobile/MOB-02 § 4.7): no row trigger in the
+   * grid (the «Dettaglio» has its own `aria-expanded`), the strip and «Il resto della pagina» not
+   * shown, no «Il perché», and the verdict's two sentences in ONE `<p>` — `useMobileSections` hands
+   * the page no `restCollapse` at 1440, so `PageVerdict` prints the paragraph of today; only the
+   * punctuation changed («; il 2026» → «. Il 2026», decision 5). No page passes a `scope` yet: its
+   * visibility at 1440 is asserted by the first that does (MOB-04). Seen red on 2026-10-10 with
+   * `useCompactLayout` answering `true` at every width (four triggers in the grid, the strip visible,
+   * the sentence split in a `div`).
+   */
+  test('is the page of every width at 1440: no rows, no strip, one paragraph', async ({ page }) => {
+    await openPage(page);
+    await expect(page.locator('main [id$="-trigger"]')).toHaveCount(0);
+    await expect(page.getByRole('list', { name: 'Le cifre del verdetto' })).toBeHidden();
+    await expect(page.getByRole('heading', { level: 2, name: 'Il resto della pagina' })).toBeHidden();
+    await expect(page.getByRole('button', { name: /^Il perché/ })).toHaveCount(0);
+
+    const verdict = page.getByRole('region', { name: 'Verdetto sui record' });
+    await expect(verdict).toContainText(/in un mese\. Il 2026 è finora/);
+    await expect(verdict.locator('#perche-panel')).toHaveCount(0);
+    // One block: the sentence is a `p`, the first sentence and the rest its text, not two blocks.
+    const paragraphs = verdict.locator('p');
+    await expect(paragraphs).toHaveCount(1);
+    await expect(paragraphs).toContainText(/in un mese\. Il 2026 è finora/);
+  });
+
   /** The Dettaglio's grammar and vocabulary, on the ranking that used to read «dal migliore» over costs. */
   test('orders the full ranking of costs in its own terms', async ({ page }) => {
     await openPage(page);

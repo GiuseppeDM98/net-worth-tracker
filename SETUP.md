@@ -19,7 +19,7 @@ This guide will walk you through setting up the Portfolio Tracker web app from s
 
 Before you begin, ensure you have:
 
-- **Node.js** 24.x ([Download](https://nodejs.org/)) — `engines.node` in `package.json`, which Vercel honours (Settings → Build and Deployment → Node.js Version is 24.x too). Note that a Vercel Function never `require()`s an ESM-only package at any Node version (`--no-experimental-require-module`): `package.json` `overrides` keeps `jwks-rsa` on 3.x for firebase-admin (AGENTS.md § Server Layer, 2026-10-08)
+- **Node.js** 24.x ([Download](https://nodejs.org/)) — `engines.node` in `package.json`, which Vercel honours (Settings → Build and Deployment → Node.js Version is 24.x too). Note that a Vercel Function never `require()`s an ESM-only package at any Node version (`--no-experimental-require-module`): `package.json` `overrides` keeps `jwks-rsa` on 3.x for firebase-admin (doc/guide/server.md § Server Layer and API Authorization, 2026-10-08)
 - **npm** or **yarn** package manager
 - A **Google account** (for Firebase)
 - A **Vercel account** (free tier available at [vercel.com](https://vercel.com))

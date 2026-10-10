@@ -25,7 +25,7 @@
           "lib/services/dashboardOverviewService.ts"
         ],
         "createdAt": "2026-08-13T00:00:00.000Z",
-        "reason": "Liquidity-chart slice colour baked into the server payload; remapped to the active theme at render time per AGENTS.md 'Server-cached chart data'. Confirmed by Giuseppe 2026-08-13"
+        "reason": "Liquidity-chart slice colour baked into the server payload; remapped to the active theme at render time per doc/guide/grafici.md § Recharts ('Server-cached chart data'). Confirmed by Giuseppe 2026-08-13"
       },
       {
         "rule": "design-system-color",
@@ -34,7 +34,7 @@
           "lib/services/dashboardOverviewService.ts"
         ],
         "createdAt": "2026-08-13T00:00:00.000Z",
-        "reason": "Liquidity-chart slice colour baked into the server payload; remapped to the active theme at render time per AGENTS.md 'Server-cached chart data'. Confirmed by Giuseppe 2026-08-13"
+        "reason": "Liquidity-chart slice colour baked into the server payload; remapped to the active theme at render time per doc/guide/grafici.md § Recharts ('Server-cached chart data'). Confirmed by Giuseppe 2026-08-13"
       },
       {
         "rule": "design-system-color",

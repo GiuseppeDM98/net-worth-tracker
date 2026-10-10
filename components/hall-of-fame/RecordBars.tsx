@@ -8,7 +8,12 @@ import { ChartHoverTip, useChartHover } from '@/components/ui/chart-hover';
 interface RecordBarsProps {
   points: TimelinePoint[];
   ariaLabel: string;
-  minHeight?: number;
+  /**
+   * The plot's floor, as classes: the tile decides it per width (`min-h-[120px] desktop:min-h-[130px]`
+   * on Record del patrimonio since 2026-10-10 — the phone yields the chart, never the podium nor
+   * the reading, doc/mobile/README.md § 9, decision 4). Default the 130px of every width.
+   */
+  plotClassName?: string;
   className?: string;
 }
 
@@ -33,7 +38,7 @@ const HEAD_ROOM = 6;
  * drawn at reduced fill AND outlined: it is real data, and it is not yet comparable with the
  * closed months it is ranked against.
  */
-export function RecordBars({ points, ariaLabel, minHeight = 130, className }: RecordBarsProps) {
+export function RecordBars({ points, ariaLabel, plotClassName = 'min-h-[130px]', className }: RecordBarsProps) {
   const hover = useChartHover(points.length, 'slot');
   const hovered = hover.index !== null ? points[hover.index] : null;
 
@@ -50,7 +55,7 @@ export function RecordBars({ points, ariaLabel, minHeight = 130, className }: Re
 
   return (
     <div className={cn('flex flex-col', className)}>
-      <div className="relative flex-1" style={{ minHeight }} {...(hover.enabled ? hover.handlers : {})}>
+      <div className={cn('relative flex-1', plotClassName)} {...(hover.enabled ? hover.handlers : {})}>
         <svg
           viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
           preserveAspectRatio="none"

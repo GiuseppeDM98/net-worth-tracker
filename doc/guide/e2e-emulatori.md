@@ -114,6 +114,16 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   terminal that started them, so `--export-on-exit` runs) and rerun.
 
 ## Browser-Driven E2E (Playwright)
+- **A phone spec freezes the clock BEFORE `goto`, and a closed row holds nothing** (2026-10-10, MOB-02,
+  `e2e/mobile-composition.hof.mobile.spec.ts`): `page.clock.setFixedTime(new Date('2026-09-15T12:00:00+02:00'))` keeps
+  the `hof` fixture's running month and year whatever the calendar — the parked Firebase token outlives the frozen
+  instant and the emulator does not check it, so the session holds (the fallback the spec names, moving the memory
+  test to Vitest, was not needed). Below `desktop:` every tile but THE tile is a closed row with an EMPTY panel until
+  its first opening: a spec reading inside one clicks `#<id>-trigger` first (`hall-of-fame.hof.mobile.spec.ts` on
+  Anni), and the level-2 heading is `.first()` or by name — «Il resto della pagina» is a second `h2`. A spec that
+  asserts «no `order-*` in the grid» reads `classList` with `/^(?:[a-z-]+:)*order-/`: a `[class*="order-"]` selector
+  matches every `border-*` (13 hits on a page with none, seen that day). The composition's `reducedMotion` is asked
+  through `test.use({ contextOptions: { reducedMotion: 'reduce' } })` (`reducedMotion` is not a test option).
 - **The parked session may or may not carry what a Firestore sync writes into `localStorage`**
   (2026-10-10, `e2e/motion.layout.spec.ts`): `auth*.setup.ts` captures the state as soon as the
   profile shows, so the colour theme `ColorThemeProvider` copies from `userPreferences/{uid}` is in
@@ -274,7 +284,7 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
 - **A green suite on the emulators says nothing about a server dependency's MODULE LOADING on Vercel** (2026-10-08):
   `verifyIdToken` skips the signature against the Auth emulator, so the `jwks-rsa → jose` chain of firebase-admin never
   ran under Playwright, and 173 green tests preceded a deploy where every Admin route answered 500 (`ERR_REQUIRE_ESM`;
-  AGENTS.md § Server Layer has the rule and the cure). The check that exists for that: the standalone production build
+  doc/guide/server.md § Server Layer and API Authorization has the rule and the cure). The check that exists for that: the standalone production build
   on the laptop with the real credentials, probed with a forged token (expected 401 with the audience error in the log,
   never 500) — and then the preview deploy, which only the owner can open.
 - **Reading the page — the traps, each seen once**: `page.addInitScript` runs BEFORE `document.documentElement` exists
@@ -317,7 +327,10 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
 - **Numbers on the page**: on the BASE account FIRE figures depend on the RUN MONTH, so a spec there asserts STRUCTURE
   and FORMAT, never amounts; the euro regex must accept ungrouped four-digit amounts,
   `(\d{1,3}(\.\d{3})+|\d{1,4}),\d{2}` (CLDR `minimumGroupingDigits = 2`, the AGENTS.md § Italian Localization trap); Node's
-  `Intl` puts a NARROW no-break space (U+202F) before `€`, the browser a plain one (U+00A0) — flatten both sides. A
+  `Intl` puts a NARROW no-break space (U+202F) before `€`, the browser a plain one (U+00A0) — flatten both sides. **And
+  a sentence rendered by `NarrativeSegments` has NO space before the unit in the DOM** (2026-10-10: the unit is its own
+  span, AGENTS.md § Italian Localization): `[\s\u00a0]*€` matches every surface, a literal `' €'` matches only the
+  figures printed outside the narrative (`RecordRows`, the heroes, the tables). A
   decoy-absence check on Cashflow must scope to `[role="tabpanel"][data-state="active"]` — every tab stays mounted
   (`forceMount`) and hidden.
 - **Three traps of a tour spec, each seen once (2026-09-07)**: `/dashboard/settings` opens on `?tab=allocazione`, so a

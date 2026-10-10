@@ -193,7 +193,7 @@ const expenseSchema = z
   })
   .superRefine((data, ctx) => {
     // A transfer IS the pair of accounts: the two labels carried an asterisk the schema did
-    // not honour (AGENTS.md → «a marker on a label is a claim the validation has to honour»),
+    // not honour (doc/guide/dialog.md § Two-Step Create Dialogs, «a marker on a label is a claim the validation has to honour»),
     // so a transfer saved without them moved no money and nothing said so (2026-09-13). The
     // Select stores the `__none__` sentinel, which counts as empty here.
     if (data.type !== 'transfer') return;

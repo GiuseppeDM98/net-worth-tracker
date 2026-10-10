@@ -318,6 +318,7 @@ npm run perf:build -- --profile                     # next build --profile: Reac
 npm run perf:serve                                  # :3200
 npm run perf:census -- --runs=5 --label=prima       # ~2 minuti; --scenario=settings,expense,tabs,asset · --mobile
 npm run perf:census -- --scenario=mount,nav --route=history,fire-simulations,dashboard   # un caricamento, un cambio di pagina
+npm run perf:census -- --mobile --scenario=hall-of-fame                                 # un tap su una riga chiusa (MOB-02)
 ```
 
 Cinque scenari, ognuno in un contesto nuovo con il login vero, nulla salvato: **settings** (10 tasti in «Anno inizio
@@ -333,7 +334,19 @@ PRIMA della navigazione e si ferma a «dati a schermo» — `main h1`, una cifra
 login è già atterrato sulla Panoramica e le sue letture hanno 2 s per entrare nella cache persistita, quindi ogni run
 parte dallo stesso record) e **nav** (Hall of Fame ⇄ Previdenza dai link della sidebar, quattro cambi, ognuno atteso
 fino alla pagina nuova senza skeleton + 800 ms). **I contatori CDP sono del DOCUMENTO**: ripartono da zero a una
-navigazione piena (LayoutCount 5 → 2 su un reload, misurato), quindi `mount` legge il documento nuovo da zero. Il JSON
+navigazione piena (LayoutCount 5 → 2 su un reload, misurato), quindi `mount` legge il documento nuovo da zero. Dal
+2026-10-10 (MOB-02) **hall-of-fame**: un tap su una riga chiusa della composizione mobile, sul modello di `tabs` — Hall of
+Fame a 390 (`--mobile` obbligatorio: a 1440 non c'è riga e lo scenario esce nominandolo), la riga Anni aperta e chiusa
+una volta prima di misurare (il contenuto monta alla prima apertura e resta), poi quattro tap; un tap deve ri-renderizzare
+quella riga, `PageRest` e la pagina che tiene il controller, nessun'altra tessera né `PageVerdict` né `VerdictStrip` —
+si legge in `byName` su una build `--no-mangling`. **Misurato il 2026-10-10** (Mac, fixture `census@example.com`, mediane
+di 3, build `--profile --no-mangling`): **35 → 20 componenti per tap**, 1 commit, render 1,7 → 1,1 ms. I 35 erano la
+pagina intera — `PageVerdict`, `VerdictStrip` e i tre `RecordBoardTile` a ogni tap — per due cause lette nell'output
+compilato: `handleStripOpen` chiudeva su `sections` (nuovo a ogni render → `onOpen` nuovo → striscia e verdetto
+ri-renderizzati: ora la pagina passa `reveal` stesso, che il hook tiene stabile), e il compiler lasciava
+`describeIncomeRecords` e `describeSavingsRecords` fuori dalla cache accanto a chiamate identiche che cachava (un
+`useMemo` a mano, AGENTS.md § Motion). I 20 di oggi: la pagina, `PageContainer`, `PageHeader`, `PageRest`, la riga toccata
+(`RecordBoardTile` → `Tile` → `TileRowShell` → i primitivi Radix del `Collapsible`). Il JSON
 porta anche `byName` intero per run: un host che deve renderizzare una volta invece di due si legge per nome (build
 `--no-mangling`). Le colonne sono PER TASTO (per cambio, in `tabs` e `nav`; per caricamento, in `mount`):
 

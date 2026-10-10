@@ -295,7 +295,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 ## Two-Step Create Dialogs — `AssetDialog`
 
-Moved here on 2026-09-30 from `AGENTS.md` § Two-Step Create Dialogs (`AssetDialog`, `ExpenseDialog`); the rule for any
+Moved here on 2026-09-30 from `AGENTS.md` § 2, now doc/guide/dialog.md § Two-Step Create Dialogs (`AssetDialog`, `ExpenseDialog`); the rule for any
 form whose fields depend on a discriminant, and the marker rule itself, stay there.
 
 - `AssetDialog`: step 1 picks the type, step 2 shows only that type's fields; edit reuses the same visibility logic and

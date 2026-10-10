@@ -24,7 +24,7 @@ import type { InstrumentProfilesResponse } from '@/types/exposure';
  * asked to Yahoo, and `source` is `cache` when every module came from the cache, `yahoo` when at
  * least one was asked — the one place a cache miss can be read in production.
  *
- * Auth → validate → fetch → ownership → delegate → return (AGENTS.md § Server Layer).
+ * Auth → validate → fetch → ownership → delegate → return (doc/guide/server.md § Server Layer and API Authorization).
  */
 export async function GET(request: NextRequest) {
   const timing = startTiming();

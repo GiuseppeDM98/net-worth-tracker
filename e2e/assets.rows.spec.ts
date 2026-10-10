@@ -18,7 +18,7 @@
  *   handler holds the ref — so the closing frame is the assertion about the exit.
  * - «Aggiungi asset» opens on step 1 after a «Modifica»: a REGRESSION GUARD that stayed green
  *   through that change — with the dialog mounted only while open, the initializer trap it was written
- *   for (AGENTS.md § Two-Step Create Dialogs) cannot happen on this page any more; the reset during
+ *   for (doc/guide/dialog.md § Two-Step Create Dialogs) cannot happen on this page any more; the reset during
  *   render still has to hold for a host that keeps its dialog mounted (WORKFLOW.md § 2).
  *
  * The absence of a chart is asserted on an `svg.recharts-surface` count; at 1440 that was already

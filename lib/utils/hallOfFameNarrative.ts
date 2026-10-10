@@ -159,31 +159,43 @@ export function buildHallOfFameVerdict(input: HallOfFameVerdictInput): PageVerdi
     ? `${capitalize(bestMonth.longLabel)} è il tuo mese migliore.`
     : `Il tuo mese migliore è ${bestMonth.longLabel}.`;
 
+  // The first sentence closes on the record's figures — a phone shows it alone (The Binding-Clause
+  // Rule, doc/mobile/MOB-02 § 4.7); the running year and month follow as a SECOND sentence at
+  // every width («; il 2026» became «. Il 2026» on 2026-10-10, doc/mobile/README.md § 9, decision 5).
   const sentence: Narrative = [prose('In quel mese il patrimonio è salito di '), signedCurrency(bestMonth.value)];
   if (bestMonth.percentage !== null) {
     sentence.push(prose(', il '), signedPercent(bestMonth.percentage), prose(' in un mese'));
   }
+  sentence.push(prose('.'));
+  const leadLength = sentence.length;
 
-  if (currentYear && currentYearRank !== null) {
+  const hasYear = !!currentYear && currentYearRank !== null;
+  const hasMonth = !!currentMonth && currentMonthRank !== null && !bestMonth.isCurrent;
+
+  if (hasYear) {
     sentence.push(
-      prose('; il '),
+      prose(' Il '),
       figure(currentYear.label),
       prose(` è finora ${yearRankPhrase(currentYearRank)}, con `),
       signedCurrency(currentYear.value),
     );
   }
 
-  if (currentMonth && currentMonthRank !== null && !bestMonth.isCurrent) {
+  if (hasMonth) {
+    const month = monthNameOf(currentMonth);
     sentence.push(
-      prose(`, e ${monthNameOf(currentMonth)} è oggi al `),
+      prose(hasYear ? `, e ${month} è oggi al ` : ` ${capitalize(month)} è oggi al `),
       figure(ordinal(currentMonthRank)),
       prose(' posto tra i mesi'),
     );
   }
 
-  sentence.push(prose('.'));
+  // Without a running year nor month there is no second sentence: no cut, no «Il perché».
+  if (!hasYear && !hasMonth) return { headline, tone: 'positive', sentence };
 
-  return { headline, tone: 'positive', sentence };
+  sentence.push(prose('.'));
+  const restLabel = hasYear && hasMonth ? "l'anno e il mese in corso" : hasYear ? "l'anno in corso" : 'il mese in corso';
+  return { headline, tone: 'positive', sentence, leadLength, restLabel };
 }
 
 // ─── Tile readings ────────────────────────────────────────────────────────────
@@ -417,6 +429,17 @@ export function describeNotes(summary: NotesSummary): Narrative {
   }
   narrative.push(prose('.'));
   return narrative;
+}
+
+/**
+ * «nessuna nota» / «una nota» / «4 note» — what the closed Note row says beside its eyebrow on a
+ * phone (The Closed-Row Rule: words, never an amount). A count of notes is not a figure of the
+ * census (only € and % are, decision 7), so it may stand on a closed row.
+ */
+export function describeClosedNotesAside(summary: NotesSummary): string {
+  if (summary.total === 0) return 'nessuna nota';
+  if (summary.total === 1) return 'una nota';
+  return `${summary.total} note`;
 }
 
 /** What each ranking is, in the singular and in the plural. */

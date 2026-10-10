@@ -4,8 +4,9 @@ import { NotebookPen, Plus } from 'lucide-react';
 import type { HallOfFameNote } from '@/types/hall-of-fame';
 import type { NotesSummary } from '@/lib/utils/hallOfFameSummary';
 import type { Narrative } from '@/lib/utils/narrative';
+import { describeClosedNotesAside } from '@/lib/utils/hallOfFameNarrative';
 import { Button } from '@/components/ui/button';
-import { Tile } from '@/components/ui/tile';
+import { Tile, type TileCollapse } from '@/components/ui/tile';
 
 interface NoteTileProps {
   reading: Narrative;
@@ -15,6 +16,8 @@ interface NoteTileProps {
   onOpenNote: (note: HallOfFameNote, trigger: HTMLElement | null) => void;
   onAddNote: (trigger: HTMLElement | null) => void;
   disabled: boolean;
+  /** The row below `desktop:` (`useMobileSections().collapse(id)`); `undefined` at 1440. */
+  collapse?: TileCollapse;
 }
 
 /**
@@ -24,10 +27,12 @@ interface NoteTileProps {
  * drops out of the top twenty, which is why the tile lists notes rather than decorating rows.
  * The markers on the ranked rows are the other half of the same feature.
  */
-export function NoteTile({ reading, summary, notes, onOpenNote, onAddNote, disabled }: NoteTileProps) {
+export function NoteTile({ reading, summary, notes, onOpenNote, onAddNote, disabled, collapse }: NoteTileProps) {
   return (
     <Tile
       eyebrow="Note"
+      collapse={collapse}
+      asideWhenClosed={describeClosedNotesAside(summary)}
       aside={
         <Button
           variant="ghost"

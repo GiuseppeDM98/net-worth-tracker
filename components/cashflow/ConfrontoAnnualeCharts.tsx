@@ -13,7 +13,7 @@ import { formatCurrency as formatCurrencyWithCents, formatCurrencyCompact } from
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { CHART_TICK_STYLE } from '@/components/cashflow/costCenterStyles';
 
-// ── Shared chart styles (module-level, as-const — see AGENTS.md Recharts rules) ──
+// ── Shared chart styles (module-level, as-const — see doc/guide/grafici.md § Recharts) ──
 
 const TOOLTIP_CONTENT_STYLE = {
   backgroundColor: 'var(--card)',

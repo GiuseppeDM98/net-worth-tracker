@@ -221,7 +221,7 @@ export function DividendDialog({ open, onClose, dividend, onSuccess, returnFocus
   }, [selectedAssetId, assets, dividend, typeEdited, setValue]);
 
   // Reset form when dividend changes or dialog opens. Only react-hook-form calls live here
-  // (AGENTS.md → Dialog Form Reset).
+  // (doc/guide/dialog.md § Dialog Form Reset).
   useEffect(() => {
     if (!open) return;
     if (dividend) {

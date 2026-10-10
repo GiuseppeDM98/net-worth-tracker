@@ -1,12 +1,13 @@
 # Dialog e form trasversali
 
-> **When to open this guide** — anyone touching `components/ui/responsive-modal.tsx` (the modal, `ModalWidth` sm/md/lg/xl), `components/ui/modal-status-line.tsx`, `lib/utils/dialogNarrative.ts` (every sentence a modal speaks), `lib/hooks/useArmedDelete.ts` (two-click confirms, `hasArmedConfirm`), or adding a modal or a form to any surface. `AGENTS.md` keeps the stub with the essentials plus the two form rules that stay there — `AGENTS.md § Dialog Form Reset` and `AGENTS.md § Two-Step Create Dialogs`; here is the full rule. File: § *Files* below.
+> **When to open this guide** — anyone touching `components/ui/responsive-modal.tsx` (the modal, `ModalWidth` sm/md/lg/xl), `components/ui/modal-status-line.tsx`, `lib/utils/dialogNarrative.ts` (every sentence a modal speaks), `lib/hooks/useArmedDelete.ts` (two-click confirms, `hasArmedConfirm`), the two-step create dialogs (`components/assets/AssetDialog.tsx`, `components/expenses/ExpenseDialog.tsx` — § Two-Step Create Dialogs (`AssetDialog`, `ExpenseDialog`)), a dialog's reset `useEffect` (§ Dialog Form Reset), or adding a modal or a form to any surface. `AGENTS.md` keeps the stubs with the essentials — `AGENTS.md § Dialog e form trasversali`, `§ Dialog Form Reset` and `§ Two-Step Create Dialogs`, whose full text moved here on 2026-10-10; here is the full rule. File: § *Files* below.
 
 ## Files
 
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Dialog e form trasversali**: `components/ui/{responsive-modal,modal-status-line}.tsx` (`ModalWidth` sm/md/lg/xl), `lib/utils/modalOrigin.ts` (`resolveCenteredModalOrigin`), `lib/utils/dialogNarrative.ts` (`describeFormRefusal`, `describeExpenseDeleteConsequence`, `describeSeriesDeleteReading`, `describeMovementDetailReading`, `describeMovementsFilterReading`, `describeSnapshotOverwrite`), `lib/hooks/useArmedDelete.ts`, `components/expenses/SeriesDeleteDialog.tsx` (`resolveSeriesDeleteMode` = the ONE rule for «solo questa o tutte?»), `lib/constants/aiModels.ts`; `components/layout/LogoutDialog.tsx` stays an `AlertDialog` — doc/guide/dialog.md
+- **Two-step create dialogs and the reset rule** (moved here from `AGENTS.md` § 2 on 2026-10-10): `components/assets/AssetDialog.tsx`, `components/expenses/ExpenseDialog.tsx` (the `openSubject` reset during render in both); guard `e2e/assets.rows.spec.ts` «Nuovo after Modifica opens on step 1» (the test «AssetDialog leaves with its exit animation and gives the focus back to «Modifica»; «Aggiungi asset» then opens on step 1»)
 
 ## Dialog e form trasversali
 - **A modal is a tile lifted off the page** (DESIGN.md → The Modal-Is-A-Tile Rule): eyebrow · title 20px · reading ·
@@ -101,6 +102,40 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **In light mode `--card` and `--background` are both `oklch(1 0 0)`**, so a test that proves a modal is «lifted» by
   comparing it with the page background passes only in dark mode. What separates it there is the border and the Float
   shadow; assert the modal's surface equals a TILE's instead.
+
+## Dialog Form Reset
+- The reset `useEffect` must include `open` in its deps and start with `if (!open) return`. It holds ONLY the
+  react-hook-form calls (`reset`, `setValue`, `replaceTiers`); every `useState` setter of the dialog's own UI state
+  (step, status, toggles, a selected id) is settled during render, keyed on `(open, record)` — see AGENTS.md § Motion →
+  `react-hooks/set-state-in-effect` (2026-09-06).
+- The new-record branch must enumerate **every** field, optional ones included, and call `replaceTiers([])` — `reset()`
+  does not clear field arrays.
+- **`useWatch()` for render, `getValues()` for handlers — never `watch()`** (incompatible with the React Compiler, which
+  then skips the whole component).
+
+## Two-Step Create Dialogs (`AssetDialog`, `ExpenseDialog`)
+> The default for a form whose fields depend on a discriminant. Keep the two implementations in step.
+- **A marker on a label is a claim the validation has to honour.** `*` = required, `(opzionale)` in
+  `text-muted-foreground font-normal` = explicitly optional; the zod schema, any imperative guard in `onSubmit` and the
+  marker's own condition must agree (2026-08-30: Sottocategoria was `.optional()` in zod, blocked by a guard, and
+  starred on a condition NARROWER than the guard's). `AssetDialog`'s own fields, and how Sottocategoria became
+  genuinely optional on both write paths: doc/guide/patrimonio.md § Two-Step Create Dialogs — `AssetDialog`.
+- **The picker exists because the type is not one field among many** — it decides which categories/classes exist, which
+  accounts are asked for, and how many balances move. Step 1 turns *one form with N conditional shapes* into *N plain
+  forms*; a discriminant that only re-labels things does NOT earn a step.
+- **Create opens on step 1, edit skips to step 2** — changing a saved record's type is a different act, with
+  reconciliation consequences the in-form notice must explain, so the `Select` stays there and only there.
+- **`setStep(record ? 2 : 1)` is settled during render on the `(open, record)` subject**, never in `useState`'s
+  initializer (the record prop stays null between opens and the second "new" would reopen on the form) and, since
+  2026-09-06, no longer in the `open` effect either (`react-hooks/set-state-in-effect`). **It stays so where the host
+  mounts the dialog only while open** (Patrimonio since 2026-10-07 — § Dialog e form trasversali above): there an
+  initializer would be right, but one way that holds for every host beats two; the comment above `openSubject` in
+  `AssetDialog.tsx` says so, and `e2e/assets.rows.spec.ts` keeps «Nuovo after Modifica opens on step 1» as a guard.
+- **Make the back-link callback OPTIONAL and let its absence select the `Select`** (`onBackToTypePicker?`), so the two
+  controls are mutually exclusive by construction rather than via a second boolean that can drift.
+- **The picker is a module-level component**, and the type entry carries `Icon` as the COMPONENT, never a rendered node.
+- Step 1 selects through the same handler that re-points the category on a type change: the user can return to the
+  picker with a category already chosen, and that category belongs to the type being left.
 
 ## Per-page blind spots
 

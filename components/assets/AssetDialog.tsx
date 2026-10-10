@@ -933,8 +933,8 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
   // The form itself is reset in the effect further down: `reset`, `setValue` and `replaceTiers`
   // are not state setters. Patrimonio mounts this dialog only while it is open, where a
   // `useState(asset ? 2 : 1)` initializer would be right too; the reset stays here anyway, because
-  // it is the one way that also holds for a host that keeps the dialog mounted (AGENTS.md § Two-Step
-  // Create Dialogs), and two ways to open a dialog are one too many.
+  // it is the one way that also holds for a host that keeps the dialog mounted (doc/guide/dialog.md
+  // § Two-Step Create Dialogs), and two ways to open a dialog are one too many.
   const [openSubject, setOpenSubject] = useState<{ open: boolean; asset: Asset | null | undefined } | null>(null);
   if (!openSubject || openSubject.open !== open || openSubject.asset !== asset) {
     setOpenSubject({ open, asset });

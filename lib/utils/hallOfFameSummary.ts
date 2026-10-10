@@ -22,6 +22,7 @@ import { SECTION_LABELS } from '@/lib/constants/hallOfFame';
 import { MONTH_NAMES } from '@/lib/constants/months';
 import { MONTH_NAMES_SHORT } from '@/lib/utils/period';
 import { periodSavings } from '@/lib/utils/hallOfFameRecords';
+import type { StripFigure } from '@/lib/utils/verdictStrip';
 import type {
   HallOfFameData,
   HallOfFameNote,
@@ -410,4 +411,59 @@ export function countNotedRows(board: RecordBoard | null, notes: HallOfFameNote[
       (note) => note.year === row.year && note.month === row.month && note.sections.includes(board.sectionKey),
     ),
   ).length;
+}
+
+// ─── The phone's strip ────────────────────────────────────────────────────────
+
+/** The rows of the page below `desktop:`, as `useMobileSections` and the strip name them. */
+export const HOF_SECTION_IDS = {
+  entrate: 'hof-entrate',
+  risparmio: 'hof-risparmio',
+  anni: 'hof-anni',
+  note: 'hof-note',
+} as const;
+
+/**
+ * The three figures of a phone's first screen (doc/mobile/MOB-02 § 4.7), each READ from a board
+ * the tiles already print — the running year's growth (the verdict's own figure, which may show
+ * again in the opened «Il perché», decision 8), the income record and the savings record — and
+ * each opening the row that explains it. A figure that is not there says why, never a zero:
+ * «in calo quest'anno» when the running year sits in the decline ranking, «non ancora misurato»
+ * in January before a snapshot or without a ranking; «arriva con il prossimo aggiornamento» when
+ * the document predates the savings ranking (2026-08-25), «nessun mese con entrate» when it holds
+ * it empty. The cells repeat the rows' readings and their first line, which stay whole
+ * (decision 15): nothing is lifted on this page.
+ */
+export function selectHallOfFameStrip(summary: HallOfFameSummary): StripFigure[] {
+  const growthYears = getBoard(summary, 'annual', 'growth');
+  const declineYears = getBoard(summary, 'annual', 'decline');
+  const incomeMonths = getBoard(summary, 'monthly', 'income');
+  const savingMonths = getBoard(summary, 'monthly', 'savings');
+
+  const currentYear = growthYears?.current ?? null;
+  const yearInDecline = declineYears?.current !== null && declineYears?.current !== undefined;
+
+  return [
+    {
+      label: "Quest'anno",
+      value: currentYear ? currentYear.value : null,
+      format: 'signed-currency',
+      opens: HOF_SECTION_IDS.anni,
+      ...(currentYear ? {} : { reason: yearInDecline ? "in calo quest'anno" : 'non ancora misurato' }),
+    },
+    {
+      label: 'Entrate record',
+      value: incomeMonths?.top ? incomeMonths.top.value : null,
+      format: 'currency',
+      opens: HOF_SECTION_IDS.entrate,
+      ...(incomeMonths?.top ? {} : { reason: 'nessuna entrata registrata' }),
+    },
+    {
+      label: 'Risparmio record',
+      value: savingMonths?.top ? savingMonths.top.value : null,
+      format: 'signed-currency',
+      opens: HOF_SECTION_IDS.risparmio,
+      ...(savingMonths?.top ? {} : { reason: savingMonths ? 'nessun mese con entrate' : 'arriva con il prossimo aggiornamento' }),
+    },
+  ];
 }

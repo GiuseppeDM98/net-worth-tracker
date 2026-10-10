@@ -1,6 +1,6 @@
 import { AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { TILE_EYEBROW_CLASS } from '@/components/ui/tile';
+import { TILE_EYEBROW_CLASS, TILE_SURFACE_CLASS, TileRowShell, type TileCollapse } from '@/components/ui/tile';
 import type { ReadFailureNotice } from '@/lib/utils/statesNarrative';
 
 interface ErrorNoticeProps {
@@ -14,9 +14,22 @@ interface ErrorNoticeProps {
    * Drop the "what was not touched" line, for a cell too narrow to carry three lines without
    * the notice growing taller than the tiles beside it — in practice a span of 4 of 12 or less.
    * A wider cell keeps it: it is the sentence that stops a reader reaching for a backup, and on
-   * any page where several queries fail together at least one of them is wide.
+   * any page where several queries fail together at least one of them is wide. Not the width of
+   * the composition: that one is `sections.compact`, and it drives `live` and `collapse`.
    */
   compact?: boolean;
+  /**
+   * Below `desktop:` the notice IS the tile's row (The Closed-Row Rule): the red eyebrow is the
+   * trigger, open on every visit until the reader closes it; message, reassurance and «Riprova»
+   * sit in the panel. From `useMobileSections().collapse(id)` with `failed: true` on the section.
+   */
+  collapse?: TileCollapse;
+  /**
+   * `role="alert"` on this notice. A page passes `live={!sections.compact}`: below `desktop:` the
+   * ONE live node is `PageRest`'s announcement, so three failed reads are one sentence and not
+   * three alerts (AGENTS.md § Accessibility, one live region per list).
+   */
+  live?: boolean;
   className?: string;
 }
 
@@ -36,17 +49,45 @@ interface ErrorNoticeProps {
  * Supersedes `PensionErrorNotice` and `CostCenterErrorNotice`, which were the same component
  * written twice, and the two inline copies on Patrimonio.
  */
-export function ErrorNotice({ notice, onRetry, footNote, compact = false, className }: ErrorNoticeProps) {
+export function ErrorNotice({ notice, onRetry, footNote, compact = false, collapse, live = true, className }: ErrorNoticeProps) {
   const hasFooter = Boolean(onRetry && notice.retryLabel) || Boolean(footNote);
 
-  return (
-    <section
-      role="alert"
-      className={cn(
-        'flex min-w-0 flex-col rounded-2xl border border-border bg-card p-5 shadow-sm',
-        className,
+  const footer = hasFooter && (
+    <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-border pt-3.5 text-[11px] text-muted-foreground">
+      {onRetry && notice.retryLabel && (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="inline-flex h-7 items-center rounded-md border border-border px-2.5 text-[12px] font-medium text-foreground transition-colors hover:bg-muted max-desktop:h-11"
+        >
+          {notice.retryLabel}
+        </button>
       )}
-    >
+      {footNote && <span>{footNote}</span>}
+    </div>
+  );
+
+  if (collapse) {
+    // The eyebrow already says «· lettura fallita»: no second `sr-only` here, unlike a `Tile`.
+    const eyebrow = (
+      <span className={cn(TILE_EYEBROW_CLASS, 'flex min-w-0 items-center gap-1.5 text-destructive')}>
+        <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+        <span className="min-w-0">{notice.eyebrow}</span>
+      </span>
+    );
+    return (
+      <TileRowShell collapse={collapse} eyebrow={eyebrow} ariaLabel={notice.eyebrow} role={live ? 'alert' : undefined} className={className}>
+        <div className="space-y-1.5">
+          <p className="text-[13px] leading-[1.45] text-foreground">{notice.message}</p>
+          {!compact && <p className="text-[11px] leading-[1.45] text-muted-foreground">{notice.reassurance}</p>}
+        </div>
+        {footer}
+      </TileRowShell>
+    );
+  }
+
+  return (
+    <section role={live ? 'alert' : undefined} aria-label={live ? undefined : notice.eyebrow} className={cn(TILE_SURFACE_CLASS, 'p-5', className)}>
       <div className="flex gap-2.5">
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden="true" />
         <div className="min-w-0 space-y-1.5">
@@ -58,20 +99,7 @@ export function ErrorNotice({ notice, onRetry, footNote, compact = false, classN
         </div>
       </div>
 
-      {hasFooter && (
-        <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-border pt-3.5 text-[11px] text-muted-foreground">
-          {onRetry && notice.retryLabel && (
-            <button
-              type="button"
-              onClick={onRetry}
-              className="inline-flex h-7 items-center rounded-md border border-border px-2.5 text-[12px] font-medium text-foreground transition-colors hover:bg-muted"
-            >
-              {notice.retryLabel}
-            </button>
-          )}
-          {footNote && <span>{footNote}</span>}
-        </div>
-      )}
+      {footer}
     </section>
   );
 }

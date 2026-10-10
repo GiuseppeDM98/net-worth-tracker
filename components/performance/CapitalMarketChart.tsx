@@ -21,7 +21,7 @@ const VIEW_H = 180;
 const PAD = 4;
 
 /**
- * One word, one colour per page (AGENTS.md → Recharts): the portfolio's value is `--chart-1` here
+ * One word, one colour per page (doc/guide/grafici.md § Recharts): the portfolio's value is `--chart-1` here
  * as in the Rendimento tile's growth plot — until 2026-09-20 blue was «Capitale immesso» and the
  * portfolio was amber, two tiles apart. The invested base is a REFERENCE quantity, not a part of
  * a total, so it takes the neutral ink, like the benchmark line of the growth plot. Exported so
@@ -51,7 +51,7 @@ function signedEuro(value: number): string {
  * since) as an area under the net worth as a line — the distance between the two IS the market.
  * One area under one line, never two stacked bands: cumulative contributions go negative whenever
  * tracked spending outpaces tracked income, and a stacked band drawn downward stops meeting the
- * total (AGENTS.md → Recharts). Hand-written, so it stretches with the tile and reads on hover.
+ * total (doc/guide/grafici.md § Recharts). Hand-written, so it stretches with the tile and reads on hover.
  * On a period switch the area and the line glide into the new window (`useMorphingSeries`).
  */
 export function CapitalMarketChart({ data, minHeight = 150, className }: CapitalMarketChartProps) {

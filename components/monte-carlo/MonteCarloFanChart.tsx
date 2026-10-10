@@ -8,7 +8,7 @@
  * fan and median, ticks in the mono face, `height="100%"` inside an absolutely positioned box.
  *
  * No legend: the tile's footer says what the line and the bands are in words. The tooltip is a
- * module-level component (AGENTS → Recharts) with card tokens so it follows the theme.
+ * module-level component (doc/guide/grafici.md § Recharts) with card tokens so it follows the theme.
  */
 
 import { useMemo } from 'react';

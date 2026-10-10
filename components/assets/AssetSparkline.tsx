@@ -14,7 +14,7 @@ interface AssetSparklineProps {
  * The unit-price line inside an expanded `AssetRow`. Recharts 3 puts `tabIndex=0` and
  * `role="application"` on its own `<svg>`, which made every expanded row a mute tab stop on a
  * phone (13 of them, measured 2026-09-14): the chart is an image with a name, not a widget
- * (AGENTS.md → Recharts, accessibility goes on the chart).
+ * (doc/guide/grafici.md § Recharts, accessibility goes on the chart).
  *
  * No hook of its own (since 2026-10-07): it used to call `useChartColors` and wait one more rAF
  * per row, and every row mounted it closed — 15 recharts charts, 30 rAF and 16 `getComputedStyle`

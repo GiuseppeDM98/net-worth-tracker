@@ -161,147 +161,162 @@
     },
     "cashflow-tracciamento": {
       "390": {
-        "screens": 3.15,
+        "screens": 3.16,
         "tilesAboveFold": 1,
         "tilesFullyAboveFold": 0,
         "figuresAboveFold": 15,
         "figuresOutsideVerdict": 5,
         "firstClosedRowAbovePill": null,
-        "overflowX": false
+        "overflowX": false,
+        "raisedBy": "MOB-02: pill a 44 px"
       },
       "768": {
-        "screens": 2.33,
+        "screens": 2.34,
         "tilesAboveFold": 3,
         "tilesFullyAboveFold": 1,
-        "figuresAboveFold": 24,
+        "figuresAboveFold": 23,
         "figuresOutsideVerdict": 13,
         "firstClosedRowAbovePill": null,
-        "overflowX": false
+        "overflowX": false,
+        "raisedBy": "MOB-02: pill a 44 px"
       },
       "1024": {
-        "screens": 3.06,
+        "screens": 3.07,
         "tilesAboveFold": 1,
         "tilesFullyAboveFold": 0,
         "figuresAboveFold": 14,
         "figuresOutsideVerdict": 5,
         "firstClosedRowAbovePill": null,
-        "overflowX": false
+        "overflowX": false,
+        "raisedBy": "MOB-02: pill a 44 px"
       }
     },
     "cashflow-budget": {
       "390": {
-        "screens": 2.72,
+        "screens": 2.73,
         "tilesAboveFold": 1,
         "tilesFullyAboveFold": 0,
         "figuresAboveFold": 15,
         "figuresOutsideVerdict": 9,
         "firstClosedRowAbovePill": null,
-        "overflowX": false
+        "overflowX": false,
+        "raisedBy": "MOB-02: pill a 44 px"
       },
       "768": {
-        "screens": 1.88,
+        "screens": 1.9,
         "tilesAboveFold": 3,
         "tilesFullyAboveFold": 1,
         "figuresAboveFold": 21,
         "figuresOutsideVerdict": 11,
         "firstClosedRowAbovePill": null,
-        "overflowX": false
+        "overflowX": false,
+        "raisedBy": "MOB-02: pill a 44 px"
       },
       "1024": {
-        "screens": 2.35,
+        "screens": 2.37,
         "tilesAboveFold": 1,
         "tilesFullyAboveFold": 0,
         "figuresAboveFold": 15,
         "figuresOutsideVerdict": 9,
         "firstClosedRowAbovePill": null,
-        "overflowX": false
+        "overflowX": false,
+        "raisedBy": "MOB-02: pill a 44 px"
       }
     },
     "cashflow-centri": {
       "390": {
-        "screens": 2.04,
+        "screens": 2.05,
         "tilesAboveFold": 1,
         "tilesFullyAboveFold": 0,
         "figuresAboveFold": 10,
         "figuresOutsideVerdict": 5,
         "firstClosedRowAbovePill": null,
-        "overflowX": false
+        "overflowX": false,
+        "raisedBy": "MOB-02: pill a 44 px"
       },
       "768": {
-        "screens": 1.46,
+        "screens": 1.47,
         "tilesAboveFold": 2,
         "tilesFullyAboveFold": 1,
         "figuresAboveFold": 18,
         "figuresOutsideVerdict": 11,
         "firstClosedRowAbovePill": null,
-        "overflowX": false
+        "overflowX": false,
+        "raisedBy": "MOB-02: pill a 44 px"
       },
       "1024": {
-        "screens": 1.76,
+        "screens": 1.78,
         "tilesAboveFold": 1,
         "tilesFullyAboveFold": 0,
         "figuresAboveFold": 10,
         "figuresOutsideVerdict": 5,
         "firstClosedRowAbovePill": null,
-        "overflowX": false
+        "overflowX": false,
+        "raisedBy": "MOB-02: pill a 44 px"
       }
     },
     "cashflow-divisione": {
       "390": {
-        "screens": 2.02,
+        "screens": 2.04,
         "tilesAboveFold": 1,
         "tilesFullyAboveFold": 0,
         "figuresAboveFold": 22,
-        "figuresOutsideVerdict": 6,
+        "figuresOutsideVerdict": 5,
         "firstClosedRowAbovePill": null,
-        "overflowX": false
+        "overflowX": false,
+        "raisedBy": "MOB-02: pill a 44 px"
       },
       "768": {
-        "screens": 1.3,
+        "screens": 1.31,
         "tilesAboveFold": 4,
         "tilesFullyAboveFold": 2,
         "figuresAboveFold": 38,
         "figuresOutsideVerdict": 18,
         "firstClosedRowAbovePill": null,
-        "overflowX": false
+        "overflowX": false,
+        "raisedBy": "MOB-02: pill a 44 px"
       },
       "1024": {
-        "screens": 1.62,
+        "screens": 1.61,
         "tilesAboveFold": 1,
         "tilesFullyAboveFold": 0,
-        "figuresAboveFold": 23,
+        "figuresAboveFold": 22,
         "figuresOutsideVerdict": 8,
         "firstClosedRowAbovePill": null,
-        "overflowX": false
+        "overflowX": false,
+        "raisedBy": "MOB-02: pill a 44 px"
       }
     },
     "cashflow-dividendi": {
       "390": {
-        "screens": 3.03,
+        "screens": 3.05,
         "tilesAboveFold": 2,
         "tilesFullyAboveFold": 1,
         "figuresAboveFold": 8,
         "figuresOutsideVerdict": 4,
         "firstClosedRowAbovePill": null,
-        "overflowX": false
+        "overflowX": false,
+        "raisedBy": "MOB-02: pill a 44 px"
       },
       "768": {
-        "screens": 1.92,
+        "screens": 1.94,
         "tilesAboveFold": 3,
         "tilesFullyAboveFold": 1,
         "figuresAboveFold": 16,
         "figuresOutsideVerdict": 12,
         "firstClosedRowAbovePill": null,
-        "overflowX": false
+        "overflowX": false,
+        "raisedBy": "MOB-02: pill a 44 px"
       },
       "1024": {
-        "screens": 2.44,
+        "screens": 2.45,
         "tilesAboveFold": 3,
         "tilesFullyAboveFold": 1,
         "figuresAboveFold": 7,
-        "figuresOutsideVerdict": 5,
+        "figuresOutsideVerdict": 4,
         "firstClosedRowAbovePill": null,
-        "overflowX": false
+        "overflowX": false,
+        "raisedBy": "MOB-02: pill a 44 px"
       }
     },
     "analisi": {
@@ -393,7 +408,7 @@
     },
     "allocazione": {
       "390": {
-        "screens": 3.65,
+        "screens": 3.63,
         "tilesAboveFold": 2,
         "tilesFullyAboveFold": 1,
         "figuresAboveFold": 25,
@@ -451,118 +466,130 @@
     },
     "fire-calcolatore": {
       "390": {
-        "screens": 3.18,
+        "screens": 3.19,
         "tilesAboveFold": 1,
         "tilesFullyAboveFold": 0,
         "figuresAboveFold": 16,
         "figuresOutsideVerdict": 8,
         "firstClosedRowAbovePill": null,
-        "overflowX": false
+        "overflowX": false,
+        "raisedBy": "MOB-02: pill a 44 px"
       },
       "768": {
-        "screens": 1.93,
+        "screens": 1.94,
         "tilesAboveFold": 3,
         "tilesFullyAboveFold": 1,
-        "figuresAboveFold": 25,
+        "figuresAboveFold": 23,
         "figuresOutsideVerdict": 12,
         "firstClosedRowAbovePill": null,
-        "overflowX": false
+        "overflowX": false,
+        "raisedBy": "MOB-02: pill a 44 px"
       },
       "1024": {
-        "screens": 2.44,
+        "screens": 2.45,
         "tilesAboveFold": 1,
         "tilesFullyAboveFold": 0,
         "figuresAboveFold": 16,
         "figuresOutsideVerdict": 9,
         "firstClosedRowAbovePill": null,
-        "overflowX": false
+        "overflowX": false,
+        "raisedBy": "MOB-02: pill a 44 px"
       }
     },
     "fire-coast": {
       "390": {
-        "screens": 2.3,
+        "screens": 2.32,
         "tilesAboveFold": 1,
         "tilesFullyAboveFold": 0,
         "figuresAboveFold": 16,
-        "figuresOutsideVerdict": 11,
+        "figuresOutsideVerdict": 10,
         "firstClosedRowAbovePill": null,
-        "overflowX": false
+        "overflowX": false,
+        "raisedBy": "MOB-02: pill a 44 px"
       },
       "768": {
-        "screens": 1.53,
+        "screens": 1.55,
         "tilesAboveFold": 3,
         "tilesFullyAboveFold": 2,
         "figuresAboveFold": 20,
         "figuresOutsideVerdict": 12,
         "firstClosedRowAbovePill": null,
-        "overflowX": false
+        "overflowX": false,
+        "raisedBy": "MOB-02: pill a 44 px"
       },
       "1024": {
-        "screens": 1.93,
+        "screens": 1.95,
         "tilesAboveFold": 1,
         "tilesFullyAboveFold": 0,
         "figuresAboveFold": 16,
         "figuresOutsideVerdict": 11,
         "firstClosedRowAbovePill": null,
-        "overflowX": false
+        "overflowX": false,
+        "raisedBy": "MOB-02: pill a 44 px"
       }
     },
     "fire-what-if": {
       "390": {
-        "screens": 4.08,
+        "screens": 4.09,
         "tilesAboveFold": 1,
         "tilesFullyAboveFold": 0,
         "figuresAboveFold": 20,
         "figuresOutsideVerdict": 5,
         "firstClosedRowAbovePill": null,
-        "overflowX": false
+        "overflowX": false,
+        "raisedBy": "MOB-02: pill a 44 px"
       },
       "768": {
-        "screens": 3.02,
+        "screens": 3.03,
         "tilesAboveFold": 2,
         "tilesFullyAboveFold": 1,
         "figuresAboveFold": 27,
         "figuresOutsideVerdict": 17,
         "firstClosedRowAbovePill": null,
-        "overflowX": false
+        "overflowX": false,
+        "raisedBy": "MOB-02: pill a 44 px"
       },
       "1024": {
-        "screens": 4.04,
+        "screens": 4.06,
         "tilesAboveFold": 1,
         "tilesFullyAboveFold": 0,
         "figuresAboveFold": 20,
-        "figuresOutsideVerdict": 10,
+        "figuresOutsideVerdict": 8,
         "firstClosedRowAbovePill": null,
-        "overflowX": false
+        "overflowX": false,
+        "raisedBy": "MOB-02: pill a 44 px"
       }
     },
     "fire-monte-carlo": {
       "390": {
-        "screens": 4.89,
+        "screens": 4.9,
         "tilesAboveFold": 1,
         "tilesFullyAboveFold": 0,
         "figuresAboveFold": 6,
         "figuresOutsideVerdict": 1,
         "firstClosedRowAbovePill": null,
-        "overflowX": false
+        "overflowX": false,
+        "raisedBy": "MOB-02: pill a 44 px"
       },
       "768": {
-        "screens": 2.69,
+        "screens": 2.7,
         "tilesAboveFold": 2,
         "tilesFullyAboveFold": 1,
         "figuresAboveFold": 8,
         "figuresOutsideVerdict": 3,
         "firstClosedRowAbovePill": null,
-        "overflowX": false
+        "overflowX": false,
+        "raisedBy": "MOB-02: pill a 44 px"
       },
       "1024": {
-        "screens": 3.48,
+        "screens": 3.49,
         "tilesAboveFold": 1,
         "tilesFullyAboveFold": 0,
         "figuresAboveFold": 7,
         "figuresOutsideVerdict": 2,
         "firstClosedRowAbovePill": null,
-        "overflowX": false
+        "overflowX": false,
+        "raisedBy": "MOB-02: pill a 44 px"
       }
     },
     "fire-obiettivi": {
@@ -596,60 +623,65 @@
     },
     "hall-of-fame": {
       "390": {
-        "screens": 2.88,
+        "screens": 1.8,
         "tilesAboveFold": 1,
         "tilesFullyAboveFold": 0,
-        "figuresAboveFold": 17,
-        "figuresOutsideVerdict": 12,
-        "firstClosedRowAbovePill": null,
-        "overflowX": false
+        "figuresAboveFold": 19,
+        "figuresOutsideVerdict": 15,
+        "firstClosedRowAbovePill": false,
+        "overflowX": false,
+        "raisedBy": "MOB-02: la striscia (3 cifre) e il podio a cinque righe sopra la pill, la prima riga chiusa sotto la pill con il grafico già a 120 px (decisioni 16, 19, 25)"
       },
       "768": {
-        "screens": 1.84,
-        "tilesAboveFold": 3,
-        "tilesFullyAboveFold": 1,
-        "figuresAboveFold": 34,
-        "figuresOutsideVerdict": 25,
-        "firstClosedRowAbovePill": null,
+        "screens": 1.3,
+        "tilesAboveFold": 5,
+        "tilesFullyAboveFold": 4,
+        "figuresAboveFold": 19,
+        "figuresOutsideVerdict": 17,
+        "firstClosedRowAbovePill": true,
         "overflowX": false
       },
       "1024": {
-        "screens": 2.37,
+        "screens": 1.65,
         "tilesAboveFold": 1,
         "tilesFullyAboveFold": 0,
         "figuresAboveFold": 17,
-        "figuresOutsideVerdict": 12,
-        "firstClosedRowAbovePill": null,
-        "overflowX": false
+        "figuresOutsideVerdict": 15,
+        "firstClosedRowAbovePill": false,
+        "overflowX": false,
+        "raisedBy": "MOB-02: la striscia (3 cifre) e il podio a cinque righe sopra la pill, la prima riga chiusa sotto la pill con il grafico già a 120 px (decisioni 16, 19, 25)"
       }
     },
     "impostazioni": {
       "390": {
-        "screens": 2.09,
+        "screens": 2.1,
         "tilesAboveFold": 2,
         "tilesFullyAboveFold": 1,
         "figuresAboveFold": 2,
         "figuresOutsideVerdict": 2,
         "firstClosedRowAbovePill": null,
-        "overflowX": false
+        "overflowX": false,
+        "raisedBy": "MOB-02: pill a 44 px"
       },
       "768": {
-        "screens": 1.36,
+        "screens": 1.38,
         "tilesAboveFold": 3,
         "tilesFullyAboveFold": 2,
         "figuresAboveFold": 4,
         "figuresOutsideVerdict": 4,
         "firstClosedRowAbovePill": null,
-        "overflowX": false
+        "overflowX": false,
+        "raisedBy": "MOB-02: pill a 44 px"
       },
       "1024": {
-        "screens": 1.7,
+        "screens": 1.71,
         "tilesAboveFold": 3,
         "tilesFullyAboveFold": 2,
         "figuresAboveFold": 4,
         "figuresOutsideVerdict": 4,
         "firstClosedRowAbovePill": null,
-        "overflowX": false
+        "overflowX": false,
+        "raisedBy": "MOB-02: pill a 44 px"
       }
     }
   }

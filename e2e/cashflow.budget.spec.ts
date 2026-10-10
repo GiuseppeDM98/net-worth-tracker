@@ -107,7 +107,7 @@ test('the budget dialog refuses in the reading line, keeps its submit alive and 
   const perCategoria = page.getByRole('region', { name: 'Per categoria' });
   const row = perCategoria.getByRole('row', { name: /Alimentari/ });
   await expect(row).toBeVisible();
-  await expect(row).toContainText(`${DECOY_AMOUNT} €`);
+  await expect(row).toContainText(new RegExp(`${DECOY_AMOUNT}[\\s\\u00a0]*€`));
   await expect(perCategoria.getByRole('status').filter({ hasText: 'Salvato' })).toBeVisible({ timeout: 10_000 });
   await expect.poll(savedBudgetAmounts).toContain(DECOY_AMOUNT);
 

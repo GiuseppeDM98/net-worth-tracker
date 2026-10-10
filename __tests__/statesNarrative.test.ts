@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  describeFailedSections,
   describeFreshness,
   describeLastSuccessfulRead,
   describeReadFailure,
@@ -131,5 +132,23 @@ describe('describeFreshness', () => {
   it('should say nothing when nothing on screen is old', () => {
     // The Narrative Honesty Rule: no placeholder, the header line simply holds the description.
     expect(describeFreshness({ updatedAt: null, now })).toBeNull();
+  });
+});
+
+/**
+ * The one announcement of a phone's failed reads (doc/mobile/MOB-02 § 4.5). Falsified on
+ * 2026-10-10: the two-section case went red with the singular sentence fixed for every count.
+ */
+describe('describeFailedSections', () => {
+  it('should say nothing when nothing failed, so the live node empties', () => {
+    expect(describeFailedSections([])).toBeNull();
+  });
+
+  it('should name one failed section in the singular', () => {
+    expect(describeFailedSections(['Benchmark'])).toBe('Una sezione non è stata letta: Benchmark.');
+  });
+
+  it('should count the failed sections and list them in the plural', () => {
+    expect(describeFailedSections(['Benchmark', 'Contributi'])).toBe('2 sezioni non sono state lette: Benchmark, Contributi.');
   });
 });

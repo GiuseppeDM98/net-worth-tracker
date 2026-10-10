@@ -65,6 +65,16 @@ oltre 60 s è `unsettled`. Una tab assente, o che non risulta selezionata, è `m
 | `firstClosedRowAbovePill` | la prima riga chiusa di MOB-02 (`section.rounded-2xl[id]` → `h3 > button[aria-expanded="false"]` con `aria-controls` = `<id>-panel`) finisce sopra la pill; `null` finché non ce n'è | `null` accetta solo `null`; `true` resta `true`; `false` solo con `raisedBy` |
 | `overflowX` | `main.scrollWidth > main.clientWidth` | sempre `false` |
 
+**Una cifra divisa in due nodi di testo è UNA cifra, solo se l'unità è lo span di `NarrativeSegments`** (2026-10-10):
+`NarrativeSegments` disegna l'unità in uno span `[data-figure-unit]` («+11.967» e «€» sono due nodi), e il census — che
+conta per nodo di testo — la riconosce quando un nodo di solo «€»/«%» DENTRO quello span segue un nodo che finisce in
+cifre, misurandola dove stanno le cifre; prima della correzione una corsa contava 8 cifre sopra la piega sulla Panoramica
+invece di 15. Senza l'attributo (un KPI o un eroe che stampano valore e unità in due span propri) la coppia resta non
+contata, come la baseline l'ha sempre lasciata (decisione 7): la stessa regola senza attributo contava 25 cifre su Analisi
+a 768 invece di 20 con le tessere ferme allo stesso pixel — il budget si sarebbe mosso per una definizione, non per
+l'app. Il `--selftest` ha una cifra divisa con l'attributo nel verdetto e nella tessera e una senza: visto rosso a 2 e 2
+ignorando il nodo dell'unità, e a 4 ignorando l'attributo.
+
 «Sullo schermo»: `checkVisibility` con visibilità e opacità, nessun antenato `[inert]` o `.sr-only`, nessun antenato
 `fixed` diverso dalla pill (il `SavingsRateBadge`), area non nulla dentro ogni antenato con `overflow` non `visible` fra
 il nodo e `main`. `aria-hidden` non esclude: è una cifra che l'occhio vede. La pill è `nav[aria-label="Navigazione

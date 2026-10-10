@@ -16,7 +16,8 @@
  *      hidden verdict of height 0 on every other tab;
  *   3. figures are split: inside the verdict (its scope included, README § 9 decision 13) and
  *      outside it (the strip `ul[aria-label="Le cifre del verdetto"]` counts outside), which is
- *      what The First-Screen Rule limits;
+ *      what The First-Screen Rule limits — and a figure whose unit is a text node of its own
+ *      (`NarrativeSegments`, 2026-10-10) is ONE figure, not none;
  *   4. «visible» means ON SCREEN: `[inert]`, `.sr-only`, opacity 0, a `fixed` overlay other than
  *      the pill (the SavingsRateBadge) and every node clipped to nothing by an `overflow` ancestor
  *      (a `grid-rows-[0fr]` panel) are out;
@@ -135,8 +136,17 @@ export function measureFirstScreen({ figurePattern, withTexts }) {
   );
   const strip = verdict?.querySelector('ul[aria-label="Le cifre del verdetto"]') ?? null;
 
-  // Correction 3: every figure counted once per text node (NarrativeText prints one per span).
+  // Correction 3: every figure counted once per text node (NarrativeText prints one per span) —
+  // and since 2026-10-10 `NarrativeSegments` draws the unit in a `[data-figure-unit]` span of its
+  // own, so «+11.967» and «€» are TWO text nodes: such a unit node whose previous text node ends in
+  // digits is that figure, counted once and measured where the digits are (the unit sits on the
+  // same line). ONLY that span: a value and a unit split elsewhere (a KPI block, a hero) stay
+  // uncounted as the baseline left them (decision 7, «una cifra come la baseline»), or the budget
+  // would move for a definition and not for the app (seen 2026-10-10: Analisi at 768, 20 → 25).
   const figure = new RegExp(figurePattern, 'g');
+  const endsInDigits = /\d[\d.,]*[\s\u00a0\u202f]?$/;
+  const bareUnit = /^[\s\u00a0\u202f]*[€%][\s\u00a0\u202f]*$/;
+  const isUnitNode = (node) => bareUnit.test(node.textContent) && node.parentElement?.hasAttribute('data-figure-unit');
   const range = document.createRange();
   const walker = document.createTreeWalker(main, NodeFilter.SHOW_TEXT);
   let figuresAboveFold = 0;
@@ -146,12 +156,19 @@ export function measureFirstScreen({ figurePattern, withTexts }) {
   // out, nothing else), kept as a diagnostic: it splits a gap from README § 3 into what the
   // stricter definition removes and what the data or the app changed.
   let baselineFiguresAboveFold = 0;
+  let previous = null;
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-    const count = (node.textContent.match(figure) ?? []).length;
-    const parent = node.parentElement;
+    let count = (node.textContent.match(figure) ?? []).length;
+    let anchor = node;
+    if (count === 0 && isUnitNode(node) && previous && endsInDigits.test(previous.textContent)) {
+      count = 1;
+      anchor = previous;
+    }
+    if (node.textContent.trim() !== '') previous = node;
+    const parent = anchor.parentElement;
     if (count === 0 || !parent) continue;
     if (hasBox(parent) && !parent.closest('.sr-only') && parent.getBoundingClientRect().top < fold) baselineFiguresAboveFold += count;
-    range.selectNodeContents(node);
+    range.selectNodeContents(anchor);
     const rect = range.getBoundingClientRect();
     if (!isOnScreen(parent, rect)) continue;
     if (rect.top < fold) figuresAboveFold += count;
@@ -466,9 +483,9 @@ function printRow(row) {
 const SELFTEST_HTML = `<!doctype html><html><body style="margin:0">
 <main style="position:relative;height:844px;overflow-y:auto">
   <section style="view-transition-name:page-verdict;display:none"><h2>Nascosto</h2><p>1 €</p></section>
-  <section style="view-transition-name:page-verdict;height:200px"><h2>Verdetto</h2><p>10 € e 20 %</p>
+  <section style="view-transition-name:page-verdict;height:200px"><h2>Verdetto</h2><p>10 € e 20 % e <span>+5<span data-figure-unit="">%</span></span></p>
     <ul aria-label="Le cifre del verdetto"><li><button>30 €</button></li></ul></section>
-  <section class="rounded-2xl" style="position:absolute;top:220px;left:0;width:300px;height:200px"><h3>Tessera</h3><p>40 €</p>
+  <section class="rounded-2xl" style="position:absolute;top:220px;left:0;width:300px;height:200px"><h3>Tessera</h3><p>40 € e <span>50<span data-figure-unit="">€</span></span> e <span>70<span>€</span></span></p>
     <div style="display:grid;grid-template-rows:0fr"><div style="overflow:hidden;min-height:0"><p>99 €</p></div></div></section>
   <section class="rounded-2xl" id="sel-riga" style="position:absolute;top:600px;left:0;width:300px;height:52px">
     <h3><button aria-expanded="false" aria-controls="sel-riga-panel">Riga chiusa</button></h3><div id="sel-riga-panel"></div></section>
@@ -480,10 +497,13 @@ const SELFTEST_HTML = `<!doctype html><html><body style="margin:0">
 </body></html>`;
 
 const SELFTEST_EXPECTED = {
-  // 30 € of the strip + 40 € of the tile. Not: 10 € and 20 % (in the verdict), 1 € (hidden
-  // verdict), 99 € (clipped), 77 % (fixed overlay), 60 € (ends below the pill's top edge).
-  figuresOutsideVerdict: 2,
-  verdictFigures: 2,
+  // 30 € of the strip + 40 € and the split «50»+«€» of the tile. Not: 10 €, 20 % and the split
+  // «+5»+«%» (in the verdict: 3), 1 € (hidden verdict), 99 € (clipped), 77 % (fixed overlay),
+  // 60 € (ends below the pill's top edge), nor «70»+«€» — split WITHOUT `data-figure-unit`, as the
+  // baseline never counted it. The two counted splits are `NarrativeSegments`' shape since
+  // 2026-10-10 — seen red at 2 and 2 with the unit node ignored, and at 4 with the attribute ignored.
+  figuresOutsideVerdict: 3,
+  verdictFigures: 3,
   firstClosedRowAbovePill: true,
 };
 
