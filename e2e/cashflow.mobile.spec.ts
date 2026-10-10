@@ -34,6 +34,22 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByRole('region', { name: 'Movimenti' })).toBeVisible();
 });
 
+/**
+ * The section pill of `PageTabBar` is a thumb's target since 2026-10-10 (doc/mobile/README.md § 9,
+ * decision 22: it measured 38×32 until then). Seen red with `min-h-11` removed from the tab.
+ */
+test('every tab of the pill is at least 44×44', async ({ page }) => {
+  const tabs = page.getByRole('tab').filter({ visible: true });
+  expect(await tabs.count()).toBeGreaterThanOrEqual(2);
+  for (const tab of await tabs.all()) {
+    const name = (await tab.getAttribute('aria-label')) ?? '';
+    const box = await tab.boundingBox();
+    expect(box, name).not.toBeNull();
+    expect(box!.height, name).toBeGreaterThanOrEqual(44);
+    expect(box!.width, name).toBeGreaterThanOrEqual(44);
+  }
+});
+
 test('the Movimenti toolbar fits at 390 and at 360 with no horizontal overflow', async ({ page }) => {
   await expect(page.getByRole('region', { name: 'Movimenti' }).getByRole('combobox', { name: /^Periodo dei movimenti:/ })).toBeVisible();
   expect(await measureOverflow(page)).toEqual({ scroll: 0, culprits: [] });

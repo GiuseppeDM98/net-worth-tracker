@@ -8,6 +8,11 @@
  *
  * Account and arithmetic: `scripts/seedHallOfFameE2E.mts`. The `hof` project runs first and
  * builds the document; if this project runs alone, the first navigation builds it itself.
+ *
+ * Since 2026-10-10 (doc/mobile/MOB-02) the page is composed for a phone: «Il resto della pagina»
+ * is a second level-2 heading, so the verdict is `.first()`, and every tile but Record del
+ * patrimonio is a CLOSED row with an empty panel — a test that reads inside Anni opens it first.
+ * The composition itself is `e2e/mobile-composition.hof.mobile.spec.ts`.
  */
 
 import { test, expect, type Page } from '@playwright/test';
@@ -17,7 +22,7 @@ const TOUCH_FLOOR = 44;
 
 async function openPage(page: Page): Promise<void> {
   await page.goto('/dashboard/hall-of-fame');
-  await expect(page.getByRole('heading', { level: 2 })).toBeVisible({ timeout: 45_000 });
+  await expect(page.getByRole('heading', { level: 2 }).first()).toBeVisible({ timeout: 45_000 });
   const empty = page.getByRole('heading', { level: 2, name: 'I record cominciano dal secondo snapshot' });
   if (await empty.isVisible()) {
     await page.getByRole('button', { name: 'Aggiorna i record' }).filter({ visible: true }).first().click();
@@ -93,6 +98,8 @@ test.describe('Hall of Fame (phone)', () => {
 
   test('never cuts the running year at 390 either', async ({ page }) => {
     await openPage(page);
+    // A closed row holds nothing: open it before reading its rows.
+    await page.locator('#hof-anni-trigger').click();
     const anni = page.getByRole('region', { name: 'Gli anni con la crescita di patrimonio più alta' });
     const label = anni.getByRole('listitem').filter({ hasText: '2026' }).getByText('2026', { exact: true });
     await label.scrollIntoViewIfNeeded();

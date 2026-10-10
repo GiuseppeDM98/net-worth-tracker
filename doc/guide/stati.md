@@ -66,6 +66,16 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   product's own Italian (the assistant hooks' `payload?.error ?? '<italiano>'`), the throw is marked with
   `userFacingError` so the translation keeps it; everything unmarked takes the generic sentence. The assistant's SSE
   route no longer forwards the Anthropic SDK's English message to the client either — that string is a log line.
+- **Below `desktop:` an `ErrorNotice` IS the tile's closed row, and it is silent** (2026-10-10, doc/mobile/MOB-02 § 4.5):
+  with `collapse` (from `useMobileSections().collapse(id)`, the section marked `failed: true`) it takes the row's
+  structure — `section[id]` → `h3` → trigger with `aria-controls` — the red eyebrow («Benchmark · lettura fallita») with
+  its `AlertTriangle` as the trigger, open on every visit until the reader closes it, message, reassurance and «Riprova»
+  in the panel; `live={!sections.compact}` drops its `role="alert"` there, because the page's ONE live node for failed
+  reads is `PageRest`'s `describeFailedSections` («Una sezione non è stata letta: Benchmark.» / «2 sezioni non sono state
+  lette: Benchmark, Contributi.» / `null`). At 1440 nothing changes: `collapse` is `undefined`, `live` true. Hall of Fame
+  has one payload and renders neither a row nor an announcement for a failure; the first rows in error are MOB-04
+  (Dividendi), MOB-05 (Benchmark) and MOB-07 (Esposizione). `compact` (the cell width, drops the reassurance) is NOT
+  `sections.compact` (the composition's width): write the latter in full at the call site.
 - **Where the 20 surfaces are**: `app/dashboard/{page,assets,history,performance,allocation,hall-of-fame,settings}`,
   the five Cashflow tabs (the `loadFailed` prop is threaded from `app/dashboard/{cashflow,analisi}/page.tsx`, because
   the tabs do not own their queries), Dividendi, the five FIRE tabs, Previdenza and Centri di Costo. Adding a

@@ -133,25 +133,46 @@ entro `main.clientHeight` · cifre sopra la piega / cifre fuori dal verdetto sop
 |---|---|---|---|
 | Panoramica | 3,56 · 1/0 · 15 / 5 | 2,1 · 3/1 · 39 / 23 | 2,75 · 1/0 · 22 / 7 |
 | Patrimonio | 3,34 · 1/0 · 12 / 5 | 2,1 · 5/3 · 22 / 15 | 2,73 · 1/0 · 18 / 11 |
-| Cashflow › Tracciamento | 3,15 · 1/0 · 15 / 5 | 2,33 · 3/1 · 24 / 13 | 3,06 · 1/0 · 14 / 5 |
-| Cashflow › Budget | 2,72 · 1/0 · 15 / 9 | 1,88 · 3/1 · 21 / 11 | 2,35 · 1/0 · 15 / 9 |
-| Cashflow › Centri | 2,04 · 1/0 · 10 / 5 | 1,46 · 2/1 · 18 / 11 | 1,76 · 1/0 · 10 / 5 |
-| Cashflow › Divisione | 2,02 · 1/0 · 22 / 6 | 1,3 · 4/2 · 38 / 18 | 1,62 · 1/0 · 23 / 8 |
-| Cashflow › Dividendi | 3,03 · 2/1 · 8 / 4 | 1,92 · 3/1 · 16 / 12 | 2,44 · 3/1 · 7 / 5 |
+| Cashflow › Tracciamento | 3,16 · 1/0 · 15 / 5 | 2,34 · 3/1 · 23 / 13 | 3,07 · 1/0 · 14 / 5 |
+| Cashflow › Budget | 2,73 · 1/0 · 15 / 9 | 1,9 · 3/1 · 21 / 11 | 2,37 · 1/0 · 15 / 9 |
+| Cashflow › Centri | 2,05 · 1/0 · 10 / 5 | 1,47 · 2/1 · 18 / 11 | 1,78 · 1/0 · 10 / 5 |
+| Cashflow › Divisione | 2,04 · 1/0 · 22 / 5 | 1,31 · 4/2 · 38 / 18 | 1,61 · 1/0 · 22 / 8 |
+| Cashflow › Dividendi | 3,05 · 2/1 · 8 / 4 | 1,94 · 3/1 · 16 / 12 | 2,45 · 3/1 · 7 / 4 |
 | Analisi | 3,72 · 1/0 · 12 / 7 | 2,44 · 3/1 · 20 / 13 | 3,25 · 1/1 · 12 / 7 |
 | Rendimenti | 4,11 · 1/0 · 8 / 6 | 2,47 · 3/1 · 16 / 11 | 3,25 · 1/0 · 8 / 6 |
 | Storico | 4,82 · 1/0 · 15 / 9 | 3,05 · 3/1 · 28 / 19 | 3,98 · 1/0 · 16 / 10 |
-| Allocazione | 3,65 · 2/1 · 25 / 17 | 2,36 · 4/2 · 33 / 28 | 2,99 · 2/1 · 27 / 23 |
+| Allocazione | 3,63 · 2/1 · 25 / 17 | 2,36 · 4/2 · 33 / 28 | 2,99 · 2/1 · 27 / 23 |
 | Previdenza | 3,9 · 1/0 · 12 / 7 | 2,62 · 3/1 · 24 / 12 | 3,36 · 1/0 · 12 / 9 |
-| FIRE › Calcolatore | 3,18 · 1/0 · 16 / 8 | 1,93 · 3/1 · 25 / 12 | 2,44 · 1/0 · 16 / 9 |
-| FIRE › Coast | 2,3 · 1/0 · 16 / 11 | 1,53 · 3/2 · 20 / 12 | 1,93 · 1/0 · 16 / 11 |
-| FIRE › What If | 4,08 · 1/0 · 20 / 5 | 3,02 · 2/1 · 27 / 17 | 4,04 · 1/0 · 20 / 10 |
-| FIRE › Monte Carlo | 4,89 · 1/0 · 6 / 1 | 2,69 · 2/1 · 8 / 3 | 3,48 · 1/0 · 7 / 2 |
+| FIRE › Calcolatore | 3,19 · 1/0 · 16 / 8 | 1,94 · 3/1 · 23 / 12 | 2,45 · 1/0 · 16 / 9 |
+| FIRE › Coast | 2,32 · 1/0 · 16 / 10 | 1,55 · 3/2 · 20 / 12 | 1,95 · 1/0 · 16 / 11 |
+| FIRE › What If | 4,09 · 1/0 · 20 / 5 | 3,03 · 2/1 · 27 / 17 | 4,06 · 1/0 · 20 / 8 |
+| FIRE › Monte Carlo | 4,9 · 1/0 · 6 / 1 | 2,7 · 2/1 · 8 / 3 | 3,49 · 1/0 · 7 / 2 |
 | FIRE › Obiettivi (spento) | 1 · 1/1 · 0 / 0 | 1 · 1/1 · 0 / 0 | 1 · 1/1 · 0 / 0 |
-| Hall of Fame | 2,88 · 1/0 · 17 / 12 | 1,84 · 3/1 · 34 / 25 | 2,37 · 1/0 · 17 / 12 |
-| Impostazioni | 2,09 · 2/1 · 2 / 2 | 1,36 · 3/2 · 4 / 4 | 1,7 · 3/2 · 4 / 4 |
+| Hall of Fame (MOB-02, 2026-10-10: era 2,88 · 1/0 · 17 / 12 · 1,84 · 3/1 · 34 / 25 · 2,37 · 1/0 · 17 / 12) | 1,8 · 1/0 · 19 / 15 · riga `false` | 1,3 · 5/4 · 19 / 17 · riga `true` | 1,65 · 1/0 · 17 / 15 · riga `false` |
+| Impostazioni | 2,1 · 2/1 · 2 / 2 | 1,38 · 3/2 · 4 / 4 | 1,71 · 3/2 · 4 / 4 |
 
-**Voci allargate con `raisedBy`** (decisioni 19 e 22): nessuna.
+**Voci allargate con `raisedBy`** (decisioni 19 e 22):
+
+- **`MOB-02: pill a 44 px`** (2026-10-10, decisione 22): `screens` di ogni superficie a tab, alle tre viewport — le cinque di
+  Cashflow, Calcolatore, Coast, What If e Monte Carlo di FIRE, Impostazioni (30 voci; Obiettivi, una schermata, non si
+  muove): +0,01/0,02 schermate ciascuna, la pill da ~40 a 52 px. I valori sono il misurato esatto.
+- **`MOB-02: la striscia (3 cifre) e il podio a cinque righe sopra la pill, la prima riga chiusa sotto la pill con il grafico
+  già a 120 px (decisioni 16, 19, 25)`** (2026-10-10): Hall of Fame a 390 (`figuresAboveFold` 17 → 19,
+  `figuresOutsideVerdict` 12 → 15, `firstClosedRowAbovePill` `false`) e a 1024 (`figuresOutsideVerdict` 12 → 15,
+  `firstClosedRowAbovePill` `false`). Il perché, misurato sul fixture a 390: la pill inizia a 767 px; il verdetto (titolo,
+  prima frase, 3 celle, «Il perché») è alto 214 e LA tessera, aperta con il grafico a 120 px e il podio a cinque righe
+  (decisione 25), 553 — la prima riga chiusa inizia a 943, e anche senza grafico (−170 px) resterebbe sotto; le 15 cifre
+  fuori dal verdetto sono le 3 celle, le 2 della lettura e le 10 del podio, che la decisione 15 lascia intere. A 768 la riga
+  chiusa sta sopra la pill (`true`, registrato da `--tighten`). L'obiettivo «≤ 5 a 390» resta non raggiunto per questa
+  pagina, e dichiarato: MOB-06 ne fa il censimento, MOB-09 scrive la regola.
+- **Strette senza `raisedBy`, nello stesso commit** (2026-10-10, `--tighten`): dieci celle di altre superfici scendono
+  di uno o due punti (Allocazione 390 `screens` 3,65 → 3,63, Divisione 390 cifre fuori 6 → 5, Coast 390 11 → 10,
+  Tracciamento 768 cifre 24 → 23, Calcolatore 768 25 → 23, Divisione 1024 1,62 → 1,61 e 23 → 22, Dividendi 1024 5 → 4,
+  What If 1024 10 → 8) perché l'unità di una cifra è ora uno span proprio in `NarrativeSegments` (una cella di
+  monospazio in meno per cifra: qualche frase in una riga in meno). Il contatore del census riconosce la coppia
+  cifra+unità solo in quello span (`[data-figure-unit]`): senza quel vincolo contava anche i KPI che stampano valore e
+  unità divisi, che la baseline non ha mai contato — 25 cifre invece di 20 su Analisi a 768 con le tessere ferme
+  (doc/guide/prima-schermata.md).
 
 ### Le tessere a 390 delle tre pagine dei mock (top e altezza in px da inizio `main`)
 
@@ -280,7 +301,7 @@ non spec per spec.
 | Spec | Titolo | Priorità | Sforzo | Dipende da | Modello · effort | Stato |
 |---|---|---|---|---|---|---|
 | MOB-01 | Il censimento in repo e il budget della prima schermata | 1 | M | — (PERF-01 e PERF-00 in develop) | Opus 5.5 · high | **ritirata il 2026-10-10** — PR #448 in develop dal 2026-10-10; 30 divergenze su 156 criteri letti contro il codice (sei lettori e tre scettici, tutto Opus): tredici dove il codice aveva ragione e la lezione era già a casa (le sette correzioni nell'intestazione di `scripts/mobileCensus.mjs`, le metriche e il settle in doc/guide/prima-schermata.md, il fixture nell'intestazione del seed, `compareCensusToBudget` con il terzo argomento e `informational` nel suo JSDoc, i dati del seed modellati sui fixture `centri` e `split` e non copiati) → doc/guide/prima-schermata.md, WORKFLOW.md § 3, i commenti alle righe; **quattro difetti a runtime degli script corretti nel ritiro, su decisione del proprietario** (§ 9, 61: la guardia Yahoo era cieca — il census azzerava il `source` dopo il giro di riscaldamento, l'unica chiamata che può dire `yahoo`, e `--tighten` non lo guardava; `--surfaces=cashflow` misurava zero superfici in silenzio; `--tighten` su una corsa parziale scriveva `budget.json` prima di andare rosso; lo stato dell'interruttore 50/30/20 promesso per il mirror e mai scritto — `tightenRefusal(run, budget)`, `validateSelection`, `yahooCalled`, `spendingRoles`; test visti rossi in `__tests__/mobileBudget.test.ts` e `mobileCensusOptions.test.ts`), sette difetti di solo testo corretti (le tre intestazioni dei test senza la falsificazione vista rossa — rifatte nel ritiro: verso invertito 6 rossi, `\s?` tolto 4, `/dashboard/dividends` 3 e una voce tolta 1; `reference/mobile-census.mjs` che diceva «until then»; § 3 che rimandava a SESSION_NOTES; la decisione 10 «in qualunque giorno» contro la 59; MOB-06 «sopra la piega» per una metrica che conta sopra la pill; MOB-03 che partiva dal 4,41 del mirror; le righe di `ritiro.md` del 2026-10-10 già mosse dallo scorporo della guida), cinque rinvii scritti ora (Obiettivi spento nel fixture → § 9, 60 e MOB-07 § 5; la colonna «obiettivo» a 768/1024 e la decisione 51 riscritta sul fixture → MOB-08 § 2 e § 5; la fila KPI del Tetto che si sovrappone a 390 → MOB-04 § 4 e § 7; il perché del `.mjs` (`__name` di tsx) → l'intestazione del census; la riga «dev» del draft tolta da 279858f → la regola in WORKFLOW.md § Where things are recorded e MOB-09 § 4); fuori dai non-obiettivi e dichiarato: PR #448 tocca `e2e/motion.layout.spec.ts` (il tema colore allineato a `localStorage` prima di ogni load, visto rosso 4/5 senza; doc/guide/e2e-emulatori.md). Nessun giro guidato F (proprietario, 2026-10-10). La misura di chiusura resta e si è rifatta nel ritiro sul codice corretto: 19 × 3 sul fixture in 2,0 min, `mobile:budget` verde su 57 misure, `yahooCalled` falso, `--selftest` verde; il `--tighten` rifiutato con `yahooCalled` forzato e con una corsa di una superficie, `budget.json` intatto. `budget.json` e il fixture sono di § 5; la tabella § 3.1 non cambia |
-| [MOB-02](MOB-02-primitive-della-composizione.md) | Le primitive della composizione | 1 | L | MOB-01 | Fable 5.1 · xhigh | da fare · riletta in modo adversariale il 2026-10-10: 30 rilievi, 11 decisioni |
+| [MOB-02](MOB-02-primitive-della-composizione.md) | Le primitive della composizione | 1 | L | MOB-01 | Fable 5.1 · xhigh | **implementata il 2026-10-10** (branch `feat/mob-02-primitive-composizione`, da ritirare dopo il merge): le API di § 4.1 con i loro nomi, più tre aggiunte (`TileRowShell`, la forma della riga scritta una volta per `Tile` ed `ErrorNotice`; `TILE_ROW_CELL_CLASS`; `TILE_SURFACE_CLASS`) e una sostituzione nel solo chiamante (`RecordBars.minHeight` → `plotClassName`); lo `scope` di `PageVerdict` reso due volte (dopo la striscia sotto `desktop:`, dopo il seguito a 1440: una sequenza sola non può stare in entrambi i posti, la decisione 12 fa lo stesso con l'asse); a 1440 `collapse()` è `undefined` e il verdetto è il `<p>` di oggi. Hall of Fame composta: verdetto in due frasi anche a 1440 (5), striscia «Quest'anno · Entrate record · Risparmio record», grafico a 120 px, quattro righe chiuse, azioni in fondo (25), `order-*` tolte. **Misura** (fixture, build di produzione, Mac): 390 **2,88 → 1,80** (≤ 2,0 ✓), 768 1,84 → 1,30 (5/4 tessere, riga chiusa sopra la pill), 1024 2,37 → 1,65; la prima riga chiusa a 390 e 1024 sotto la pill e le cifre fuori dal verdetto 12 → 15 registrate con `raisedBy` (§ 3.1, decisioni 16, 19, 25); la pill a 44 px muove `screens` di 30 voci a tab di +0,01/0,02 (`raisedBy: "MOB-02: pill a 44 px"`); `mobile:budget` verde su 57 dopo `--tighten` (il contatore delle cifre riconosce la coppia cifra+unità di `NarrativeSegments`, § 3.1); `perf:budget` verde (Hall of Fame 566,0 → 573,1 KB gz, condivisi 485,4 → 488,2, nessun tetto alzato). Test: 232 file / 5135 Vitest verdi nei due fusi (+3 file, +54 prove, 18 falsificazioni viste rosse); Playwright **199/199** in 7,2 min (51 file: `e2e/mobile-composition.hof.mobile.spec.ts` con 8 prove, una a 1440 in `hall-of-fame.hof.spec.ts`, una in `cashflow.mobile.spec.ts`; 10 falsificazioni viste rosse una per volta); `perf:census -- --mobile --scenario=hall-of-fame` nuovo: **35 → 20 componenti per tap** (la pagina, `PageRest`, la riga toccata; `PageVerdict`, `VerdictStrip` e le altre tessere ferme — doc/guide/velocita.md § Il census). Documentazione: doc/guide/hall-of-fame.md § Composizione mobile (le otto voci), stati.md, shell.md, e2e-emulatori.md, velocita.md, AGENTS § Motion/Accessibility/Hierarchy/Performance tooling, CLAUDE.md |
 | [MOB-03](MOB-03-panoramica.md) | Panoramica | 2 | M | MOB-01, MOB-02 | Fable 5.1 · high | da fare · riletta in modo adversariale il 2026-10-10: 28 rilievi, 6 decisioni |
 | [MOB-04](MOB-04-cashflow-cinque-tab.md) | Cashflow: le cinque tab | 2 | L | MOB-01, MOB-02, MOB-03 | Fable 5.1 · xhigh | da fare · riletta in modo adversariale il 2026-10-10: 34 rilievi, 9 decisioni |
 | [MOB-05](MOB-05-rendimenti.md) | Rendimenti | 2 | M | MOB-01, MOB-02 | Fable 5.1 · high | da fare · riletta in modo adversariale il 2026-10-10: 25 rilievi, 4 decisioni |
@@ -332,6 +353,15 @@ ha misurato la baseline.
 - **Una tessera sul telefono non ripete** ciò che striscia o verdetto hanno stampato; torna intera dal tablet.
 - **Le sezioni aperte si ricordano per pagina** (`localStorage`, per dispositivo).
 - Prima le 14 spec PERF (tutte ritirate entro il 2026-10-08), poi queste.
+- **MOB-02 (2026-10-10, nella sessione di implementazione — scelte d'ingegneria, non domande aperte)**: lo `scope` di
+  `PageVerdict` è reso due volte (`desktop:hidden` dopo la striscia, `hidden desktop:block` dopo il seguito) perché una
+  sequenza sola non può stare dopo la striscia sotto `desktop:` E sotto il paragrafo a 1440 senza spezzarlo; a 1440 il
+  controller non dà `restCollapse` e il verdetto è il `<p>` di oggi; i gestori delle righe non leggono valori di render
+  (`react-hooks/refs`): leggono la memoria dallo store al gesto e sono legati a `key` e `defaultOpen` (a livello di
+  modulo nelle pagine); il pannello di una riga mai aperta è VUOTO (nessun figlio elemento); **un aside di testo resta nel
+  trigger anche da aperta** (nel pannello era tagliato sotto il trigger e saltava a ogni tap, giro F del 2026-10-10 —
+  «fuori dal bottone» di MOB-02 § 4.2 vale per un controllo, che apre la prima riga del pannello); nella striscia l'unità
+  è uno span proprio dopo `ml-[0.2em]` (in Geist Mono lo spazio prima di «€» è una cella intera, a 22 px un buco).
 - **Decisioni di fondazione (2026-09-27, prima di MOB-02/MOB-03)**: (1) **una sequenza sola** — nessun riordino
   CSS, l'ordine del DOM è l'ordine di lettura su ogni dispositivo, e dove LA tessera non è già la prima della griglia si
   sposta anche sul desktop (chiude AGENTS § Hierarchy vs `doc/guide/patrimonio.md`: vale la seconda); (2) **l'asse sotto

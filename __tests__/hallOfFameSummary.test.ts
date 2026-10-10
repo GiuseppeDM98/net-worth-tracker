@@ -16,13 +16,23 @@ vi.mock('@/lib/firebase/config', () => ({ auth: { currentUser: null }, db: {} })
 import {
   buildRecordTimeline,
   getBoard,
+  HOF_SECTION_IDS,
   isPartialYear,
   isPeriodRanked,
   rowAboveCurrent,
+  selectHallOfFameStrip,
   summarizeHallOfFame,
   summarizeNotes,
   TIMELINE_LIMIT,
 } from '@/lib/utils/hallOfFameSummary';
+import {
+  buildHallOfFameVerdict,
+  describeIncomeRecords,
+  describeSavingsRecords,
+} from '@/lib/utils/hallOfFameNarrative';
+import { narrativeToText } from '@/lib/utils/narrative';
+import { formatStripFigure, validateStrip, type StripFigure } from '@/lib/utils/verdictStrip';
+import { VERDICT_REST_SECTION } from '@/lib/utils/mobileSections';
 import type { HallOfFameData, HallOfFameNote, MonthlyRecord, YearlyRecord } from '@/types/hall-of-fame';
 
 const TODAY = { year: 2026, month: 8 };
@@ -356,5 +366,81 @@ describe('summarizeNotes', () => {
     expect(summary.rows).toEqual([]);
     expect(summary.latest).toBeNull();
     expect(summary.total).toBe(0);
+  });
+});
+
+/**
+ * The phone's strip (doc/mobile/MOB-02 § 4.4 and § 4.7): every cell prints EXACTLY what the
+ * sentence that owns the figure prints — the strip reads the boards, it never recomputes.
+ * Falsified on 2026-10-10: the identities went red with the cells formatted through the
+ * non-compact euro (`cachedFormatCurrencyEUR(value)`: «6.940,00 €» against the reading's «6940 €»).
+ */
+describe('selectHallOfFameStrip', () => {
+  const summary = summarizeHallOfFame(makeData(), TODAY);
+  const strip = selectHallOfFameStrip(summary);
+  /** Node's Intl writes a narrow no-break space before «€»: both sides read it as a plain one. */
+  const plain = (text: string) => text.replace(/[\u00a0\u202f]/g, ' ');
+  const cellText = (figure: StripFigure) => plain(narrativeToText([formatStripFigure(figure)!]));
+  const sentenceText = (narrative: ReturnType<typeof describeIncomeRecords>) => plain(narrativeToText(narrative));
+
+  it('reads three cells that open the three rows and pass the strip rules', () => {
+    expect(strip.map((figure) => figure.label)).toEqual(["Quest'anno", 'Entrate record', 'Risparmio record']);
+    expect(strip.map((figure) => figure.opens)).toEqual([HOF_SECTION_IDS.anni, HOF_SECTION_IDS.entrate, HOF_SECTION_IDS.risparmio]);
+    expect(validateStrip(strip, [...Object.values(HOF_SECTION_IDS), VERDICT_REST_SECTION])).toEqual([]);
+  });
+
+  it('prints «Quest\'anno» as the verdict prints the running year', () => {
+    const growthYears = getBoard(summary, 'annual', 'growth')!;
+    const verdict = buildHallOfFameVerdict({
+      hasRecords: true,
+      bestMonth: getBoard(summary, 'monthly', 'growth')!.top,
+      worstMonth: getBoard(summary, 'monthly', 'decline')!.top,
+      currentMonth: getBoard(summary, 'monthly', 'growth')!.current,
+      currentMonthRank: getBoard(summary, 'monthly', 'growth')!.currentRank,
+      bestYear: growthYears.top,
+      currentYear: growthYears.current,
+      currentYearRank: growthYears.currentRank,
+    });
+
+    expect(cellText(strip[0])).toBe('+41.300 €');
+    expect(sentenceText(verdict.sentence)).toContain(cellText(strip[0]));
+  });
+
+  it('prints «Entrate record» and «Risparmio record» as the rows\' readings print them', () => {
+    const income = describeIncomeRecords({ top: getBoard(summary, 'monthly', 'income')!.top, averageMonthlyIncome: 4280 });
+    const savings = describeSavingsRecords(getBoard(summary, 'monthly', 'savings')!.top);
+
+    expect(sentenceText(income)).toContain(cellText(strip[1]));
+    expect(sentenceText(savings)).toContain(cellText(strip[2]));
+    expect(formatStripFigure(strip[1])!.sign).toBeUndefined();
+    expect(formatStripFigure(strip[2])!.sign).toBe('positive');
+  });
+
+  it('says why a figure is missing, never a zero: the running year', () => {
+    const noYear = selectHallOfFameStrip(summarizeHallOfFame(makeData({ bestYearsByNetWorthGrowth: [yearRecord(2024, 48_900, 156_700)] }), TODAY));
+    expect(noYear[0]).toMatchObject({ value: null, reason: 'non ancora misurato' });
+
+    const declining = selectHallOfFameStrip(
+      summarizeHallOfFame(
+        makeData({ bestYearsByNetWorthGrowth: [yearRecord(2024, 48_900, 156_700)], worstYearsByNetWorthDecline: [yearRecord(2026, -3000, 212_900)] }),
+        TODAY,
+      ),
+    );
+    expect(declining[0]).toMatchObject({ value: null, reason: "in calo quest'anno" });
+  });
+
+  it('says why a figure is missing: the income and the savings records', () => {
+    const noIncome = selectHallOfFameStrip(summarizeHallOfFame(makeData({ bestMonthsByIncome: [] }), TODAY));
+    expect(noIncome[1]).toMatchObject({ value: null, reason: 'nessuna entrata registrata' });
+
+    const emptySavings = selectHallOfFameStrip(summarizeHallOfFame(makeData({ bestMonthsBySavings: [] }), TODAY));
+    expect(emptySavings[2]).toMatchObject({ value: null, reason: 'nessun mese con entrate' });
+
+    const olderDocument = selectHallOfFameStrip(summarizeHallOfFame(makeData({ bestMonthsBySavings: undefined }), TODAY));
+    expect(olderDocument[2]).toMatchObject({ value: null, reason: 'arriva con il prossimo aggiornamento' });
+  });
+
+  it('lifts nothing: the cells repeat readings and ranking rows, which stay whole (decision 15)', () => {
+    expect(strip.every((figure) => figure.lifts === undefined)).toBe(true);
   });
 });

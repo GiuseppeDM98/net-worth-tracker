@@ -75,10 +75,13 @@ export function RecordPatrimonioTile({
               </div>
               {/* It stretches with the tile's free height, but not past a ceiling: with three
                   podium rows above it, a 450px plot reads as the tile's subject rather than its
-                  second fact. Whatever slack is left sits above the footer. */}
+                  second fact. Whatever slack is left sits above the footer. Below `desktop:` THE
+                  tile yields its chart to the first screen — 120px, always, never the podium
+                  (doc/mobile/README.md § 9, decisions 4 and 25). */}
               <RecordBars
                 points={timeline}
                 ariaLabel="I mesi record, in ordine cronologico."
+                plotClassName="min-h-[120px] desktop:min-h-[130px]"
                 className="mt-2.5 max-h-[300px] flex-1"
               />
             </>

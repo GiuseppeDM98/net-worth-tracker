@@ -56,7 +56,14 @@ pointer — a stub that grows past that is a guide leaking back (2026-09-20: ten
   `inline-flex` chip drops the leading space of a text-node child too** (each child is a flex item: «69,7%verso FI»)
   — give the words their own `<span>` and let `gap-1` space them, `{' '}` does not paint there.
 - **Italian `Intl` breaks naive matching**: four-digit amounts print ungrouped (`1821,01 €` but `29.800,00 €`) and the
-  `€` carries a non-breaking space. Anchor as `/^821,01[\s ]*€$/`; never concatenate `amount + ' €'`.
+  `€` carries a non-breaking space. Anchor as `/^821,01[\s ]*€$/`; never concatenate `amount + ' €'`. **And in the DOM
+  the space is gone** (2026-10-10, owner): `NarrativeSegments` draws a figure's unit («€», «pt», «pp») as its own span at
+  `ml-[0.2em]` (`splitFigureUnit`, `components/ui/narrative-text.tsx`; the span carries `data-figure-unit`, which is how
+  the first-screen census still counts the pair as ONE figure — doc/guide/prima-schermata.md), because in Geist Mono the
+  no-break space is a whole cell and «+11.967 €» read as a figure, a hole and a sign — the segment's TEXT keeps it (`narrativeToText`, the
+  accessible names, the identity tests), `textContent` does not, so a spec that reads a verdict, a reading or a strip
+  cell anchors `[\s\u00a0]*€`, never a literal `' €'` (ten assertions rewritten that day). Figures printed outside
+  `NarrativeSegments` (`RecordRows`, the heroes, the tables) still carry the space.
 
 ### Firebase Dates and Timezone
 - `toDate()` to convert; `getItalyMonth()`/`getItalyYear()`/`getItalyMonthYear()` for domain grouping, never
@@ -626,7 +633,18 @@ file used to carry.
   `overflow-hidden` child and `inert` on the closed wrapper (Framer + `height:'auto'` left rows stuck at opacity 0);
   tall or unpredictable sections → Radix `<Collapsible>` + CSS transition; small predictable content →
   `AnimatePresence` + `height:'auto'`. **Always a chevron on an expandable row**; `CollapsibleTrigger asChild` propagates
-  `data-state`.
+  `data-state`. **A closed TILE of the phone composition is `TileRowShell`** (`components/ui/tile.tsx`, 2026-10-10,
+  doc/mobile/MOB-02 § 4.2): Radix `Collapsible` + `CollapsibleTrigger asChild` for the toggle, but NEVER
+  `CollapsibleContent` — it unmounts the children while closed and has no closing transition — so the panel is our
+  own `grid-rows-[0fr]↔[1fr]` with `motion-safe:transition-[grid-template-rows] motion-safe:duration-300
+  motion-safe:ease-spring` (`--ease-spring`, the 400/35 spring sampled as `linear()` in globals.css), an
+  `overflow-hidden min-h-0` child (a `0fr` track's child does not shrink below its min-content without `min-h-0`),
+  the padding on the GRANDCHILD (on the child it stays visible at 0fr), `inert` while closed, no `role` (the
+  `section` is the landmark), and the content mounted on the first opening and kept (`TileCollapse.mounted`); the
+  button's `aria-controls` is written AFTER Radix's spread or it names Radix's `contentId`. The controller is
+  `useMobileSections` (`lib/hooks`): `collapse(id)` is the SAME object until that row changes (a cache settled
+  during render, pattern 3) and its handlers hold no render value (they read the memory from the store at event
+  time) — `npm run perf:census -- --mobile --scenario=hall-of-fame` is the measure.
 - **An auto-dismiss timer lives in its OWN `useEffect([visible])`** — in an effect that also depends on data, a refetch
   cancels the timer and the badge sticks.
 - **`react-hooks/set-state-in-effect` — four answers, in this order** (2026-09-06; lint at zero): (1) derive it
@@ -653,7 +671,12 @@ file used to carry.
   Cashflow paid the most, so its four non-default tabs load on demand (doc/guide/cashflow.md). **Compiled is not
   memoized** (2026-10-07): the compiler compiled `AssetDialog` and left its whole step-2 form outside every memo scope,
   so one root `useWatch` re-rendered 562 components per key — measure a form with the census and move a per-keystroke
-  watch into the leaf that reads it (doc/guide/patrimonio.md § Two-Step).
+  watch into the leaf that reads it (doc/guide/patrimonio.md § Two-Step). **And it can leave ONE call out of the cache
+  beside identical calls it caches** (2026-10-10, Hall of Fame: `describeIncomeRecords(…)` and `describeSavingsRecords(…)`
+  recomputed on every render, `describeNetWorthRecords(…)` and `describeWorstYear(…)` cached — a new `Narrative` prop, two
+  rows re-rendered on every tap of a third): read the COMPILED output before guessing (`transformAsync` with
+  `babel-plugin-react-compiler` from a throwaway `scripts/*.tmp.mjs`, grep `const tN = …` outside an `if ($[…]`), then a
+  `useMemo` on the call's own inputs, which the compiler preserves.
 - **`react-hooks/preserve-manual-memoization` ("Compilation Skipped")**: a dep array *more specific* than the inferred
   value skips the component — align the dep. «Memoized in source but not in output» cannot be aligned away: a `useMemo`
   whose value never escapes is pruned — inline the computation.
@@ -733,7 +756,7 @@ file used to carry.
 - **A radius on the element that carries a `divide-y` hairline bends the ends of the rule** (2026-09-18,
   `AssistantThreadList`): the `li` stays square, the hover/selected wash goes on an inner box.
 - **A tile's footer is ONE line; the method goes behind «Come si calcola»** (`components/ui/tile-method-note.tsx`, 2026-09-20): help printed on every tile at all times stops being read, and an 11px footnote at full tile width runs to 95–130 characters a line (the detector's `line-length`). The line that stays says what the figures ARE; name the trigger after its subject — a page carries several. **A list that must add up adds up ON SCREEN**: round every row to the printed unit and give the drift to the row that is a remainder by definition, or the reader who checks it finds a euro missing.
-- **A tile stretched beside a taller neighbour is cured in the GRID, never in the tile** (2026-09-20, Rendimenti): moving eight method footers behind «Come si calcola» made the voids BIGGER (Benchmark ~170 → ~215px, Plusvalenze ~280 → ~380px). Tiles share a row only with tiles of their own height; below that row use two columns at natural height — wrappers `contents` below `desktop:`, `desktop:flex desktop:flex-col` from it — and let the ONE element that can be any height (a chart, `desktop:flex-1`) take the slack. Keep the DOM in the desktop order so Tab follows the eye; the phone re-orders with `order-*` (Storico and Rendimenti are the worked examples).
+- **A tile stretched beside a taller neighbour is cured in the GRID, never in the tile** (2026-09-20, Rendimenti): moving eight method footers behind «Come si calcola» made the voids BIGGER (Benchmark ~170 → ~215px, Plusvalenze ~280 → ~380px). Tiles share a row only with tiles of their own height; below that row use two columns at natural height — wrappers `contents` below `desktop:`, `desktop:flex desktop:flex-col` from it — and let the ONE element that can be any height (a chart, `desktop:flex-1`) take the slack. **Keep ONE sequence: the DOM order is the reading order on every device**; the desktop places cells with `desktop:col-start-*`/`row-start-*`, never with an `order` swap (2026-09-27, doc/mobile/README.md § 9, decisions 1 and 11; Hall of Fame lost its `order-1…5` on 2026-10-10, `e2e/mobile-composition.hof.mobile.spec.ts` holds the DOM-equals-vertical order at 390 and 1440 and `main [class*="order-"]` at 0). Storico and Rendimenti still carry `order-*` until MOB-05 and MOB-06 compose them.
 - **A row's caption WRAPS, it is never truncated, and the label column never grows to make room for it** (2026-09-14,
   `RankedRows`): a cut fact is no fact («30 set · Asilo nido · in calendario»), and at 4 grid columns 46% is the most
   the label can take beside the bar's 40px floor, the amount and the share (58% painted the share outside the tile,
@@ -777,7 +800,11 @@ file used to carry.
   the button** (2026-08-31): Radix's dismiss layer listens from the dialog's MOUNT, so `useArmedDelete` exports
   `hasArmedConfirm()` and `ResponsiveModal` calls `preventDefault()` in `onEscapeKeyDown`. **The armed button stays a
   compact «Conferma» and the ROW prints the consequence** (2026-09-13, `VersamentiTile`, `text-destructive`). **One
-  live region per list, not per row.**
+  live region per list, not per row** — and **one live node for a phone's failed reads** (2026-10-10, doc/mobile/MOB-02
+  § 4.5): below `desktop:` every `ErrorNotice` row takes `live={!sections.compact}` and `PageRest` carries the ONE
+  `role="alert"` with `describeFailedSections` («2 sezioni non sono state lette: Benchmark, Contributi.»), a stable
+  `sr-only` node that changes text and empties; the header's `freshness` status stays. Three failed reads are one
+  sentence, not three alerts.
 - **A list of same-kind controls is ONE Tab stop** (`lib/hooks/useRovingFocus.ts`, 2026-09-20: 24 checkboxes put
   «Dettaglio» ~55 Tabs down Storico): `containerProps` on the wrapper, `itemProps(i)` on each control (`data-roving-item`,
   no ref), an `sr-only` hint the table is `aria-describedby`. **The dashboard's first Tab stop is «Vai al contenuto
@@ -912,6 +939,9 @@ file used to carry.
 - **A ceiling only a measure may lower, and only a new feature may raise** — `raisedBy` on the route, the before/after
   and a row in § Registro dei tetti alzati, in the same commit; `libraryCopies: { recharts: 1 }` is a rule, not a
   measure. TIMES compare only on the same machine in the same session (±10%); COUNTS compare anywhere.
+- **`perf:census` has a scenario for the phone composition** (2026-10-10, MOB-02): `npm run perf:census -- --mobile
+  --scenario=hall-of-fame` taps a closed row four times; a tap re-renders that row, `PageRest` and the page, never
+  another tile nor the verdict — a new `collapse(id)` identity on every render is what it would catch.
 - **The first-screen census shares the port** (2026-10-10, MOB-01; its manual is `doc/guide/prima-schermata.md`): `npm run mobile:census` measures the composition of
   19 surfaces × 390/768/1024 on the same :3200 build, re-seeding its own fixture `census@example.com`; `npm run
   mobile:budget` holds the run against `doc/mobile/budget.json` (zero tolerance, it only tightens, a widening carries

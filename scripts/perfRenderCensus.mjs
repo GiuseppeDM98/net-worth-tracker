@@ -45,6 +45,12 @@
  *              Fame ⇄ Previdenza, four switches, each waited until the new page has no skeleton
  *              (+ 800 ms). Added 2026-10-08: the bottom nav, hidden at 1440, measured its
  *              layout at every pathname change.
+ *   hall-of-fame  A tap on a CLOSED row of the phone composition, on the `tabs` model: Hall of Fame
+ *              at 390 (`--mobile` is required — at 1440 there is no row and the scenario fails
+ *              naming it), the Anni row opened and closed twice, four taps. Added 2026-10-10
+ *              (doc/mobile/MOB-02 § 2): a tap must re-render that row, `PageRest` and the page
+ *              that holds the controller — never another tile, nor `PageVerdict` or `VerdictStrip`;
+ *              read `byName` on a `--no-mangling` build to see who ran.
  * Never saves anything: the typed values are dropped with the context.
  *
  * Prerequisites, in the owner's terminals: `npm run emulators`, the mirror
@@ -52,6 +58,7 @@
  * Usage — options ALWAYS after `--` (doc/guide/velocita.md):
  *   npm run perf:census -- --runs=3 --scenario=settings,expense --label=prima
  *   npm run perf:census -- --scenario=mount,nav --route=history,fire-simulations,dashboard --label=prima
+ *   npm run perf:census -- --mobile --scenario=hall-of-fame
  * Writes perf/last-census.json (gitignored): every run and the medians, with the label.
  */
 import { chromium } from 'playwright';
@@ -279,6 +286,26 @@ const scenarioRunners = {
     await input.waitFor({ state: 'visible', timeout: 30_000 });
     await page.waitForTimeout(1_000); // the dialog's entrance and the settings read it starts on open
     return record(page, cdp, KEYS.length, () => typeKeys(page, input));
+  },
+  async 'hall-of-fame'(page, cdp) {
+    if (!MOBILE) throw new Error('hall-of-fame: the rows exist only below 1440 — run with --mobile');
+    await page.goto(`${BASE}/dashboard/hall-of-fame`, { waitUntil: 'load' });
+    await page.waitForFunction(isPageSettled, { previousHeading: null, needsEuro: true }, { timeout: 30_000, polling: 100 });
+    const anni = page.locator('#hof-anni-trigger');
+    await anni.waitFor({ state: 'visible', timeout: 30_000 });
+    await page.waitForTimeout(1_000);
+    // Open once first: the row's content mounts on the first opening and stays, so every measured
+    // tap toggles a mounted row, as `tabs` toggles two mounted panels.
+    await anni.click();
+    await page.waitForTimeout(600);
+    await anni.click();
+    await page.waitForTimeout(600);
+    return record(page, cdp, 4, async () => {
+      for (let i = 0; i < 4; i++) {
+        await anni.click();
+        await page.waitForTimeout(400);
+      }
+    });
   },
   async nav(page, cdp) {
     await page.goto(`${BASE}/dashboard/hall-of-fame`, { waitUntil: 'load' });

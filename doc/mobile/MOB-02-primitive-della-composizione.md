@@ -1,6 +1,6 @@
 # MOB-02 — Le primitive della composizione
 
-> Stato: da fare · riletta in modo adversariale il 2026-10-10: 30 rilievi, 11 decisioni · Priorità: 1 (sette spec ne citano le API) · Sforzo: L · Dipende da: MOB-01 (ritirata il 2026-10-10, in develop dal 2026-10-10, PR #448; PERF-12, PERF-14, PERF-02 e PERF-03
+> Stato: **implementata il 2026-10-10** (branch `feat/mob-02-primitive-composizione`; il ritiro con `ritiro.md` dopo il merge in develop) · riletta in modo adversariale il 2026-10-10: 30 rilievi, 11 decisioni · Priorità: 1 (sette spec ne citano le API) · Sforzo: L · Dipende da: MOB-01 (ritirata il 2026-10-10, in develop dal 2026-10-10, PR #448; PERF-12, PERF-14, PERF-02 e PERF-03
 > sono in develop e ritirate) · Sblocca: MOB-03..08
 
 ## 1. Il problema, misurato

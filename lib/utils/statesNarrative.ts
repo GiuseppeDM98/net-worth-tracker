@@ -100,6 +100,18 @@ export function describeReadFailure({
   };
 }
 
+/**
+ * The ONE announcement of a phone's failed reads (`PageRest`'s live region): below `desktop:` the
+ * rows are closed and each `ErrorNotice` is silent (`live={false}`), so three failures are one
+ * sentence instead of three alerts. «Una sezione non è stata letta: Benchmark.» · «2 sezioni non
+ * sono state lette: Benchmark, Contributi.» · `null` when nothing failed — the node empties.
+ */
+export function describeFailedSections(eyebrows: readonly string[]): string | null {
+  if (eyebrows.length === 0) return null;
+  if (eyebrows.length === 1) return `Una sezione non è stata letta: ${eyebrows[0]}.`;
+  return `${eyebrows.length} sezioni non sono state lette: ${eyebrows.join(', ')}.`;
+}
+
 const TIME_FORMAT = new Intl.DateTimeFormat('it-IT', { hour: '2-digit', minute: '2-digit' });
 const DAY_FORMAT = new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'long' });
 

@@ -79,6 +79,10 @@ rules below name.
   `useSearchParams` at their root and `/dashboard/settings` is in the prerender manifest): on the server `loading` is
   always true, so `ProtectedRoute` renders only its fallback and the page function never runs at prerender — the rule
   above is for what sits OUTSIDE it.
+- **The `PageTabBar` pill's tabs are 44×44 since 2026-10-10** (`min-h-11 min-w-11 justify-center`, doc/mobile/README.md
+  § 9, decision 22; they measured 38×32 on touch until then): the pill grew from ~40 to 52px, so every tabbed surface
+  of the first-screen budget moved ~12px (`doc/mobile/budget.json`, `raisedBy: "MOB-02: pill a 44 px"`). `layout="size"`
+  on the tab stays. `e2e/cashflow.mobile.spec.ts` holds the size of every visible tab.
 - **The bottom nav's layout animations run only where it is visible** (2026-10-08): it stays mounted at every
   width (it is in the prerendered shell), but `layout` on the `motion.nav` and the active pill's `layoutId` follow
   `useMediaQuery('(max-width: 1439px) and (orientation: portrait)')` — the complement of its `desktop:hidden

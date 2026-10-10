@@ -57,7 +57,7 @@ test('opens with the verdict and states the seeded KPI totals with their YoY pac
   // «Da inizio anno» is the mode that keeps the same-months rule).
   const verdict = page.getByRole('region', { name: 'Verdetto del periodo' });
   await expect(verdict.getByRole('heading', { level: 2 })).toHaveText(`Nel ${CURRENT_YEAR} spendi meno dell'anno scorso.`);
-  await expect(verdict).toContainText(`hai speso 780 €`);
+  await expect(verdict).toContainText(/hai speso 780[\s\u00a0]*€/);
   await expect(verdict).toContainText(`−13,3% su ${PREVIOUS_YEAR}`);
   await expect(verdict).not.toContainText('su gen–');
 
@@ -111,7 +111,7 @@ test('drills category → Scheda → subcategory transactions, writing the focus
 
   // The Scheda: reading, period hero + per-year table + its own subcategory ranking.
   await expect(scheda(page)).toBeVisible();
-  await expect(scheda(page)).toContainText(`Nel ${CURRENT_YEAR} hai speso 380 € in Casa`);
+  await expect(scheda(page)).toContainText(new RegExp(`Nel ${CURRENT_YEAR} hai speso 380[\\s\\u00a0]*€ in Casa`));
   await expect(dossierHero(page, String(CURRENT_YEAR)).getByText(/^380[\s ]*€$/)).toBeVisible();
   const casaYears = perYearTable(page);
   await expect(casaYears.getByText('YTD')).toBeVisible();
@@ -201,7 +201,7 @@ test('ranks the YoY drivers in the Confronto disclosure, ceased categories inclu
 
   // The disclosure row already carries the answer; open, the delta ranking is the default view.
   const trigger = page.getByRole('button', { name: 'Confronto annuale' });
-  await expect(trigger).toContainText('−120 €');
+  await expect(trigger).toContainText(/−120[\s\u00a0]*€/);
   await trigger.click();
 
   // Sorted by |Δ|: Alimentari −100, Palestra −60 (spent only last year → a driver, not an
@@ -310,7 +310,7 @@ test.describe('Flusso by 50/30/20 role', () => {
     // unclassified; Risparmi is the 1220 surplus (no row classified as a saving, so no «di cui»
     // clause). Shares of the 2000 that came in, in the order the Sankey draws the roles.
     await expect(flusso).toContainText(
-      'Delle entrate (2000 €): necessità 15%, desideri 4%, da classificare 20%, risparmi 61%. Il riferimento è 50/30/20.'
+      /Delle entrate \(2000[\s\u00a0]*€\): necessità 15%, desideri 4%, da classificare 20%, risparmi 61%\. Il riferimento è 50\/30\/20\./
     );
 
     const chart = flusso.getByRole('img');

@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import type { HallOfFameNote } from '@/types/hall-of-fame';
 import type { RecordBoard } from '@/lib/utils/hallOfFameSummary';
 import type { Narrative } from '@/lib/utils/narrative';
-import { Tile } from '@/components/ui/tile';
+import { Tile, type TileCollapse } from '@/components/ui/tile';
 import { NarrativeText } from '@/components/ui/narrative-text';
 import { TileMethodNote } from '@/components/ui/tile-method-note';
 import { RecordRows } from '@/components/hall-of-fame/RecordRows';
@@ -12,8 +12,10 @@ import type { NotePrefill } from '@/components/hall-of-fame/NoteTrigger';
 
 interface RecordBoardTileProps {
   eyebrow: string;
-  /** The scope of the ranking, on the right of the eyebrow. */
+  /** The scope of the ranking, on the right of the eyebrow — and what the closed row says on a phone. */
   aside: string;
+  /** The row below `desktop:` (`useMobileSections().collapse(id)`); `undefined` at 1440. */
+  collapse?: TileCollapse;
   reading: Narrative;
   board: RecordBoard | null;
   /** How many positions to draw; the rest live in the Dettaglio's table. */
@@ -49,6 +51,7 @@ interface RecordBoardTileProps {
 export function RecordBoardTile({
   eyebrow,
   aside,
+  collapse,
   reading,
   board,
   limit,
@@ -66,7 +69,7 @@ export function RecordBoardTile({
   const hasRows = !!board && board.total > 0;
 
   return (
-    <Tile eyebrow={eyebrow} aside={aside} reading={reading} ariaLabel={ariaLabel}>
+    <Tile eyebrow={eyebrow} aside={aside} asideWhenClosed={aside} collapse={collapse} reading={reading} ariaLabel={ariaLabel}>
       {hasRows ? (
         <div className="mt-2.5">
           <RecordRows
