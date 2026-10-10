@@ -568,8 +568,8 @@ file used to carry.
   `overflow-hidden` child and `inert` on the closed wrapper (Framer + `height:'auto'` left rows stuck at opacity 0);
   tall or unpredictable sections → Radix `<Collapsible>` + CSS transition; small predictable content →
   `AnimatePresence` + `height:'auto'`. Always a chevron on an expandable row; `CollapsibleTrigger asChild` propagates
-  `data-state`. **A closed TILE of the phone composition is `TileRowShell`** (`components/ui/tile.tsx`, 2026-10-10,
-  doc/mobile/MOB-02 § 4.2): Radix `Collapsible` + `CollapsibleTrigger asChild` for the toggle but NEVER
+  `data-state`. **A closed TILE of the phone composition is `TileRowShell`** (`components/ui/tile.tsx`, 2026-10-10;
+  the sample page is Hall of Fame, doc/guide/hall-of-fame.md § Composizione mobile): Radix `Collapsible` + `CollapsibleTrigger asChild` for the toggle but NEVER
   `CollapsibleContent` (it unmounts the children while closed, no closing transition) — the panel is our own
   `grid-rows-[0fr]↔[1fr]` with `motion-safe:transition-[grid-template-rows] motion-safe:duration-300
   motion-safe:ease-spring` (`--ease-spring`, the 400/35 spring sampled as `linear()` in globals.css), an
@@ -579,7 +579,12 @@ file used to carry.
   `aria-controls` is written AFTER Radix's spread or it names Radix's `contentId`. The controller is
   `useMobileSections` (`lib/hooks`): `collapse(id)` is the SAME object until that row changes (a cache settled during
   render, pattern 3) and its handlers hold no render value (they read the memory from the store at event time) —
-  `npm run perf:census -- --mobile --scenario=hall-of-fame` is the measure.
+  `npm run perf:census -- --mobile --scenario=hall-of-fame` is the measure. A page's `sections` and `defaultOpen` are
+  MODULE-LEVEL constants (a literal array is a new identity every render: every handler reborn, every tile
+  re-rendered); a strip cell names the row it opens from the controller's `sections.eyebrows` (2026-10-10, the spec's
+  retirement: the strip does not know the rows, a missing id fell back to the cell's label); «Chiudi tutte» counts
+  the rows open at LOAD as opened, so their content stays mounted (seen red the same day,
+  `e2e/mobile-composition.hof.mobile.spec.ts`).
 - **An auto-dismiss timer lives in its OWN `useEffect([visible])`** — in an effect that also depends on data, a refetch
   cancels the timer and the badge sticks.
 - **`react-hooks/set-state-in-effect` — four answers, in this order** (2026-09-06; lint at zero): (1) derive it
@@ -671,8 +676,10 @@ file used to carry.
   height (a chart, `desktop:flex-1`) takes the slack. **Keep ONE sequence: the DOM order is the reading order on every
   device**; the desktop places cells with `desktop:col-start-*`/`row-start-*`, never with an `order` swap (2026-09-27,
   doc/mobile/README.md § 9, decisions 1 and 11; Hall of Fame lost its `order-1…5` on 2026-10-10,
-  `e2e/mobile-composition.hof.mobile.spec.ts` holds the DOM-equals-vertical order at 390 and 1440 and `main
-  [class*="order-"]` at 0). Storico and Rendimenti still carry `order-*` until MOB-05 and MOB-06 compose them.
+  `e2e/mobile-composition.hof.mobile.spec.ts` holds the DOM-equals-vertical order at 390 and 1440 and the `order-*`
+  utilities in `main` at 0 — read from `classList` with `/^(?:[a-z-]+:)*order-/`, since `[class*="order-"]` matches
+  every `border-*`, doc/guide/e2e-emulatori.md). Every other page still carries `order-*` (the Panoramica, the Cashflow
+  tabs, Dividendi, Storico, Rendimenti, Allocazione, Previdenza, every FIRE tab) until MOB-03..07 compose them.
 - **A row's caption WRAPS, it is never truncated, and the label column never grows to make room for it** (2026-09-14,
   `RankedRows`): a cut fact is no fact («30 set · Asilo nido · in calendario»); at 4 grid columns 46% is the most the
   label can take beside the bar's 40px floor, the amount and the share (58% painted the share outside the tile,
@@ -717,8 +724,8 @@ file used to carry.
   the button** (2026-08-31): Radix's dismiss layer listens from the dialog's MOUNT, so `useArmedDelete` exports
   `hasArmedConfirm()` and `ResponsiveModal` calls `preventDefault()` in `onEscapeKeyDown`. **The armed button stays a
   compact «Conferma» and the ROW prints the consequence** (2026-09-13, `VersamentiTile`, `text-destructive`). **One
-  live region per list, not per row** — and **one live node for a phone's failed reads** (2026-10-10, doc/mobile/MOB-02
-  § 4.5): below `desktop:` every `ErrorNotice` row takes `live={!sections.compact}` and `PageRest` carries the ONE
+  live region per list, not per row** — and **one live node for a phone's failed reads** (2026-10-10,
+  `components/ui/page-rest.tsx`): below `desktop:` every `ErrorNotice` row takes `live={!sections.compact}` and `PageRest` carries the ONE
   `role="alert"` with `describeFailedSections` («2 sezioni non sono state lette: Benchmark, Contributi.»), a stable
   `sr-only` node that changes text and empties; the header's `freshness` status stays.
 - **A list of same-kind controls is ONE Tab stop** (`lib/hooks/useRovingFocus.ts`, 2026-09-20: 24 checkboxes put

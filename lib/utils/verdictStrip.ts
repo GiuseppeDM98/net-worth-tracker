@@ -1,8 +1,8 @@
 /**
  * The strip under a phone's verdict: at most four figures, each READ from a tile's `*Summary`
  * (never recomputed), each opening the row that explains it (The First-Screen Rule, proposed in
- * doc/mobile/MOB-09; the contract is doc/mobile/MOB-02 § 4.1, decisions 15, 17, 20, 28 of
- * doc/mobile/README.md § 9).
+ * doc/mobile/MOB-09; the contract is this module's exports since 2026-10-10, under decisions 15,
+ * 17, 20, 28 of doc/mobile/README.md § 9).
  *
  * A page's `select<Page>Strip(summary)` builds the figures; `VerdictStrip` renders them;
  * `formatStripFigure` is the ONE formatter, so a cell prints exactly what the tile's reading
@@ -54,11 +54,16 @@ function isPrintedZero(text: string): boolean {
   return !/[1-9]/.test(text);
 }
 
-/** «+1,2 pt» — points of difference against a benchmark (`RendimentoTile`'s `formatPoints`). */
+/**
+ * «+1,2 pt» — points of difference against a benchmark (`RendimentoTile`'s `formatPoints`): a
+ * whole number bare, otherwise one decimal. With the tile's own `decimals` the raw value is
+ * formatted directly — rounding to one decimal first printed «+1,20 pt» for 1,234 (2026-10-10).
+ */
 function formatPoints(value: number, decimals?: number): string {
-  const points = Math.round(Math.abs(value) * 10) / 10;
-  const digits = decimals ?? (points === Math.round(points) ? 0 : 1);
-  return `${formatNumberIt(points, digits)} pt`;
+  const magnitude = Math.abs(value);
+  if (decimals !== undefined) return `${formatNumberIt(magnitude, decimals)} pt`;
+  const points = Math.round(magnitude * 10) / 10;
+  return `${formatNumberIt(points, points === Math.round(points) ? 0 : 1)} pt`;
 }
 
 /** The unsigned text of a figure, in the format's own face. */

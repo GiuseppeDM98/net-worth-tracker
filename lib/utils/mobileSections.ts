@@ -1,7 +1,7 @@
 /**
  * The rows of a page below `desktop:` — which are open, what is remembered, and the ids the DOM
  * uses — as pure functions and ONE store per browser (The Closed-Row Rule, proposed in
- * doc/mobile/MOB-09; the contract is doc/mobile/MOB-02 § 4.1 and § 4.5).
+ * doc/mobile/MOB-09; the contract is this module's exports and `useMobileSections`, since 2026-10-10).
  *
  * `useMobileSections` (lib/hooks) is the controller; everything it decides is decided here, so
  * `__tests__/mobileSections.test.ts` pins the memory without a DOM.

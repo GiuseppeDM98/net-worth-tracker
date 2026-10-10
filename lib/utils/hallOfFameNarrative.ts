@@ -160,7 +160,7 @@ export function buildHallOfFameVerdict(input: HallOfFameVerdictInput): PageVerdi
     : `Il tuo mese migliore è ${bestMonth.longLabel}.`;
 
   // The first sentence closes on the record's figures — a phone shows it alone (The Binding-Clause
-  // Rule, doc/mobile/MOB-02 § 4.7); the running year and month follow as a SECOND sentence at
+  // Rule, since 2026-10-10); the running year and month follow as a SECOND sentence at
   // every width («; il 2026» became «. Il 2026» on 2026-10-10, doc/mobile/README.md § 9, decision 5).
   const sentence: Narrative = [prose('In quel mese il patrimonio è salito di '), signedCurrency(bestMonth.value)];
   if (bestMonth.percentage !== null) {

@@ -52,8 +52,11 @@ const SENTENCE_CLASS = 'text-[14px] leading-[1.6] text-muted-foreground desktop:
  * The verdict, in ONE DOM in reading order on every width — no `order-*`, no `contents`
  * (doc/mobile/README.md § 9, decisions 1 and 12): title → axis → first sentence → strip →
  * scope → «Il perché» → the rest. Below `desktop:` the first sentence stands alone and the rest
- * opens under the button (The Binding-Clause Rule, `splitVerdict`); at 1440 the strip and the
- * button are hidden and the two inline spans read as the paragraph of today.
+ * opens under the button (The Binding-Clause Rule, `splitVerdict`). At 1440 the controller hands
+ * the page no `restCollapse` (`useMobileSections` answers `undefined` there), so the branch below
+ * renders the one `<p>` of every width; the `desktop:` classes of the split branch keep it right
+ * for a caller that passes `restCollapse` at any width (the strip and the button hidden, the two
+ * inline spans reading as the paragraph).
  *
  * The scope is the one slot rendered twice: below `desktop:` it follows the strip, at 1440 it
  * closes the paragraph — and no single position in the sequence is both, since between the

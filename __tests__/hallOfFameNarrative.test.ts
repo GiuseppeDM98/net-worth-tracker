@@ -6,7 +6,8 @@
  * formatter, whose Firebase chain is mocked away. Every phrasing is pinned here, and a missing
  * input drops its clause instead of printing a placeholder (The Narrative Honesty Rule).
  *
- * The verdict is TWO sentences since 2026-10-10 (doc/mobile/MOB-02 § 4.7): the record's figures
+ * The verdict is TWO sentences since 2026-10-10 (the phone shows the first alone, The
+ * Binding-Clause Rule; doc/guide/hall-of-fame.md § Composizione mobile): the record's figures
  * close the first, the running year and month make the second, `leadLength` points at the
  * boundary. Falsified that day: the two-sentence cases went red with «; il» put back in place of
  * «. Il» (the lead no longer ended on «.» and the rest did not open on a capital).

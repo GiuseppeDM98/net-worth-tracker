@@ -1,7 +1,7 @@
 # MOB-05 — Rendimenti
 
 > Stato: da fare · riletta in modo adversariale il 2026-10-10: 25 rilievi, 4 decisioni · Priorità: 2 (la base è una clausola vincolante; Plusvalenze sparisce in silenzio) · Sforzo: M ·
-> Dipende da: MOB-01 (ritirata il 2026-10-10, in develop dal 2026-10-10, PR #448), MOB-02 (PERF-09 chiusa il 2026-10-04, in develop) · Sblocca: MOB-06..08, MOB-09
+> Dipende da: MOB-01 (ritirata il 2026-10-10, in develop dal 2026-10-10, PR #448), MOB-02 (ritirata il 2026-10-10, in develop dal 2026-10-10, PR #450; PERF-09 chiusa il 2026-10-04, in develop) · Sblocca: MOB-06..08, MOB-09
 
 ## 1. Il problema, misurato
 
@@ -45,7 +45,7 @@ che il caricamento passasse a `lib/hooks/usePerformanceData.ts`, 2026-10-04: riv
 ## 3. Non-obiettivi
 
 - B e C; il desktop oltre § 2; le colonne del tablet (MOB-08); DESIGN.md (MOB-09); lo skeleton sotto `desktop:` (sette
-  celle alte contro le righe: come MOB-02 § 3).
+  celle alte contro le righe: come per Hall of Fame).
 - Letture, base, flussi e cache: sono di `lib/hooks/usePerformanceData.ts` (doc/guide/rendimenti.md § every collection
   read once). Qui nessuna query cambia; `useAssetLedgerMeta(ownerId)` si rilegge dal suo `refetch`.
 - Il chip sull'altra base e il ROI non entrano nella striscia; `AIAnalysisDialog` non cambia. Il tipo `loan`
@@ -82,8 +82,9 @@ Sotto l'anno la cifra è il rendimento del periodo, MAI annualizzato (`resolveHe
 con la funzione del verdetto e del chip (**The Same-Basis Rule**). `resolveBenchmarkGap` sta in
 `performanceNarrative.ts:259`, che importa da `performanceSummary.ts`: la striscia riceve il risultato, mai la chiama
 (import circolare). L'etichetta porta la base: la didascalia che **The Binding-Clause Rule** (proposta, MOB-09) chiede.
-`RendimentoTile` prende `liftedFigures?: readonly ('hero' | 'benchmark-chip' | 'drawdown-chip')[]` da
-`liftedBlocks(strip, 'rend-twr')` più `'drawdown-chip'` (§ 4.3) e mette `LIFTED_FIGURE_CLASS` sui blocchi: il blocco
+`RendimentoTile` prende `liftedFigures?: readonly ('hero' | 'benchmark-chip' | 'drawdown-chip')[]` ed esporta
+`isRendimentoLiftedBlock` (la guardia su `liftedBlocks`, `LIFTED_FIGURE_CLASS` in `components/ui/tile.tsx`); la pagina passa
+`liftedBlocks(strip, 'rend-twr').filter(isRendimentoLiftedBlock)` più `'drawdown-chip'` (§ 4.3) e mette `LIFTED_FIGURE_CLASS` sui blocchi: il blocco
 `hero` è l'intero `div` della cifra (cifra + qualificatore, `:99-113`); il blocco `benchmark-chip` è il `Chip` dello
 scarto con valore; con la cella 2 `null` (`liftedBlocks` non la restituisce) il chip «in arrivo» resta nella tessera come
 oggi. Quando il 60/40 arriva dopo il primo render la cella passa da «in arrivo» al valore e il verdetto cambia ramo
@@ -212,7 +213,7 @@ slot (2, 12); LA tessera sempre aperta (21); l'ordine del DOM (11).
   mesi positivi», `sentence` invariata (attese di `:147`, `:248`); senza il 60/40 il «.» al primo «;» con la maiuscola e
   `restLabel` «Sharpe, drawdown e mesi positivi» (falsificare lasciando «; il»); assenti senza rendimento (falsificare
   tagliando anche lì); la clausola «dal massimo» nel seguito; `PERFORMANCE_CLOSED_ASIDES` senza `/\d|€|%/` (falsificare
-  con «8 mesi»). `leadLength: 0` lo prova MOB-02 § 7.
+  con «8 mesi»). `leadLength: 0` lo prova già `__tests__/narrative.test.ts` (2026-10-10).
 - **`e2e/mobile-composition.performance.degraded.mobile.spec.ts`**, progetto `degraded-mobile` (390×844, touch,
   `DEGRADED_STORAGE_STATE`, `testMatch: /\.degraded\.mobile\.spec\.ts/`), seed `performance` in `beforeAll` come
   `e2e/performance.degraded.spec.ts:87-88` (nessun registro: **6 righe**); `page.route('**/api/ai/**')` conta 0 a fine
@@ -223,7 +224,7 @@ slot (2, 12); LA tessera sempre aperta (21); l'ordine del DOM (11).
   → fuoco sull'icona; (4) la cella dello scarto apre `rend-benchmark`, fuoco sul trigger; (5) reload con due righe
   aperte; (6) `**/api/benchmarks/returns**` → `abort` (`retry: 1`, `useBenchmarkReturns.ts:35`): riga aperta da sola,
   chiusa rossa, un solo `role="alert"`, cella 2 «modello non disponibile»; (7) `main` senza sforamenti, ordine delle `y`
-  = ordine del DOM, nessun `[class*="order-"]`. Rossi falsificando: (1) la base in «Il perché»; (2) l'AI solo in
+  = ordine del DOM, nessuna classe `order-*` (dalla `classList`, come `e2e/mobile-composition.hof.mobile.spec.ts`). Rossi falsificando: (1) la base in «Il perché»; (2) l'AI solo in
   `headerActions(true)`; (3) senza `returnFocusTo`; (4) `reveal` senza focus; (5) nessuna scrittura; (6) `failed`
   ignorato; (7) un `order-2` rimesso su Rischio.
 - A 1440 `performance.degraded.spec.ts`: il test del reload confronta titolo e paragrafo del verdetto (`section > h2`,
@@ -252,8 +253,8 @@ slot (2, 12); LA tessera sempre aperta (21); l'ordine del DOM (11).
 - CLAUDE.md «Latest» e § Current Status; `doc/guide/rendimenti.md` § Composizione mobile (la deroga con il 60/40
   dichiarata, il chip nel seguito, l'ordine del DOM) e § Per-page blind spots (meta non provata nel browser; Contributi
   senza registro); `doc/guide/stati.md` (Benchmark in errore); `doc/guide/e2e-emulatori.md` (il progetto
-  `degraded-mobile`, la serie fissa dei benchmark); AGENTS.md § Hierarchy, Density and Disclosure (Rendimenti tolto dagli
-  esempi di `order-*`, se MOB-02 non ha già riscritto la riga); `Draft Release Temp.md` (una riga, senza dati privati);
+  `degraded-mobile`, la serie fissa dei benchmark); AGENTS.md § Hierarchy, Density and Disclosure (la riga riscritta da MOB-02
+  il 2026-10-10 elenca le pagine che portano ancora `order-*`: Rendimenti si toglie); `Draft Release Temp.md` (una riga, senza dati privati);
   `doc/mobile/README.md` § 6 e § 3.1.
 
 ## 11. Prompt di implementazione

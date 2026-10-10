@@ -179,7 +179,7 @@ test.describe('Hall of Fame', () => {
   });
 
   /**
-   * The phone composition leaves 1440 alone (doc/mobile/MOB-02 § 4.7): no row trigger in the
+   * The phone composition leaves 1440 alone (since 2026-10-10): no row trigger in the
    * grid (the «Dettaglio» has its own `aria-expanded`), the strip and «Il resto della pagina» not
    * shown, no «Il perché», and the verdict's two sentences in ONE `<p>` — `useMobileSections` hands
    * the page no `restCollapse` at 1440, so `PageVerdict` prints the paragraph of today; only the

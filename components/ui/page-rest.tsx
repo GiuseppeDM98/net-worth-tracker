@@ -10,8 +10,8 @@ interface PageRestProps {
 }
 
 /**
- * The line between THE tile and the rows on a phone (The Closed-Row Rule, doc/mobile/MOB-02
- * § 4.5): «Il resto della pagina» as the second level-2 heading of the page, and the one button
+ * The line between THE tile and the rows on a phone (The Closed-Row Rule, since 2026-10-10):
+ * «Il resto della pagina» as the second level-2 heading of the page, and the one button
  * that opens or closes every row — never the verdict's «Il perché». A child of the grid, right
  * after THE tile's cell in the DOM on every page, `col-span-full`, hidden from `desktop:`.
  *

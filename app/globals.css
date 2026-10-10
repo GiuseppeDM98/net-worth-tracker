@@ -59,7 +59,8 @@
 
   /* The spring standard (stiffness 400, damping 35, ζ ≈ 0,875) sampled over 300 ms as a CSS
      easing (`ease-spring`), for a transition Framer cannot drive — a row's `grid-template-rows`
-     and its chevron (doc/mobile/MOB-02 § 4.2). The same curve as `SPRING` in the motion code. */
+     and its chevron (The Closed-Row Rule, 2026-10-10; `TileRowShell` in components/ui/tile.tsx).
+     The same curve as `SPRING` in the motion code. */
   --ease-spring: linear(0, 0.093 8.3%, 0.280 16.7%, 0.476 25%, 0.643 33.3%, 0.771 41.7%, 0.861 50%, 0.922 58.3%, 0.960 66.7%, 0.982 75%, 0.994 83.3%, 1);
 }
 

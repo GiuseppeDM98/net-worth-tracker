@@ -1,6 +1,7 @@
 /**
- * Tests for lib/utils/verdictStrip.ts — the strip under a phone's verdict (doc/mobile/MOB-02
- * § 4.1 and § 4.4): the nine formats, the signs, the zero, the validation and the lifted blocks.
+ * Tests for lib/utils/verdictStrip.ts — the strip under a phone's verdict (The First-Screen
+ * Rule, since 2026-10-10): the nine formats, the signs, the zero, the validation and the lifted
+ * blocks.
  *
  * Falsified on 2026-10-10: «−83 €» went red with `cachedFormatCurrencyEUR(value, true)` called
  * on the signed value (Intl prints the hyphen-minus, U+002D); «a null value prints nothing» went
@@ -67,6 +68,10 @@ describe('formatStripFigure — the nine formats', () => {
     expect(text(cell({ format: 'percent', value: 12.345, decimals: 2 }))).toBe('12,35%');
     expect(text(cell({ format: 'ratio', value: 2, decimals: 0 }))).toBe('2');
     expect(text(cell({ format: 'points', value: 1.5, decimals: 2 }))).toBe('+1,50 pt');
+    // Seen red on 2026-10-10 («+1,20 pt»): the points were rounded to one decimal BEFORE the
+    // tile's decimals were applied, so a selector passing 2 could never print the third digit.
+    expect(text(cell({ format: 'points', value: 1.234, decimals: 2 }))).toBe('+1,23 pt');
+    expect(text(cell({ format: 'points', value: -0.456, decimals: 2 }))).toBe('−0,46 pt');
   });
 });
 

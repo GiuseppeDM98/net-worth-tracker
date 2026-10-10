@@ -1,7 +1,7 @@
 # MOB-04 — Cashflow: le cinque tab
 
 > Stato: da fare · riletta in modo adversariale il 2026-10-10: 34 rilievi, 9 decisioni · Priorità: 2 (Tracciamento è la pagina del telefono: l'unica con il «+») · Sforzo: L · Dipende da:
-> MOB-01 (ritirata il 2026-10-10, in develop dal 2026-10-10, PR #448), MOB-02, MOB-03 (sequenza, README § 9, 9; PERF-06 ritirata, in develop) · Sblocca: MOB-05..08 (`e2e/cashflow.tablet.spec.ts`), MOB-09
+> MOB-01 (ritirata il 2026-10-10, in develop dal 2026-10-10, PR #448), MOB-02 (ritirata il 2026-10-10, in develop dal 2026-10-10, PR #450), MOB-03 (sequenza, README § 9, 9; PERF-06 ritirata, in develop) · Sblocca: MOB-05..08 (`e2e/cashflow.tablet.spec.ts`), MOB-09
 
 ## 1. Il problema, misurato
 
@@ -64,7 +64,7 @@ Dividendi 3,77 / 6 / 8. Il codice di oggi (righe da riverificare):
 - **`forceMount` resta.** (1) La memoria regge il cambio di tab. (2) La riga chiusa monta solo il pannello:
   Tracciamento nascosta non tiene più il feed nel DOM. (3) **Id unici**: prefisso per tab (`trk-`, `bud-`, `cdc-`,
   `spl-`, `dvd-`), «Il perché» compreso: invece di `VERDICT_REST_SECTION` (cinque `perche-panel`) ogni
-  tab passa `restId: '<prefisso>-perche'` a `useMobileSections` (MOB-02 § 4.1, § 4.3): il pannello è
+  tab passa `restId: '<prefisso>-perche'` a `useMobileSections` (`restId`, `lib/hooks/useMobileSections.ts`): il pannello è
   `sectionPanelId(restCollapse.id)`, fuori da «Apri tutte». (4) Un `role="alert"` sotto
   `display:none` non si sente: ogni tab riceve `active` e rende `<PageRest key={active ? 'attiva' : 'inattiva'}>`;
   all'attivazione l'alert annuncia solo se `announcement` non è `null`.
@@ -85,8 +85,8 @@ Dividendi 3,77 / 6 / 8. Il codice di oggi (righe da riverificare):
 - **La striscia** esce da `select<Page>Strip` nel modulo dei numeri della tab, testo identico a quello della tessera
   (§ 7); mai una cifra fuori dall'asse (**The Off-Axis Tile Rule**); tutta vuota o zero = nessuna striscia (**The
   Absence-Has-Three-Names Rule**). `'approx-currency'` («~1234 €», come `budget/tiles/TettoTile.tsx:110`) e il «−» U+2212
-  di `'currency'` sono nel contratto di MOB-02 § 4.1. Una lettura fallita per tessera: `<ErrorNotice
-  collapse={collapse(id)} live={!sections.compact}>` nel posto della tessera (MOB-02 § 4.5).
+  di `'currency'` sono in `formatStripFigure` (`lib/utils/verdictStrip.ts`). Una lettura fallita per tessera: `<ErrorNotice
+  collapse={collapse(id)} live={!sections.compact}>` nel posto della tessera (`collapse` e `live` di `components/ui/error-notice.tsx`).
 - **Id di LA tessera**: `trk-periodo`, `bud-tetto`, `cdc-totale`, `cdc-centro-costo`, `spl-comune`, `dvd-incasso`.
 
 ### 4.2 Tracciamento
@@ -96,7 +96,8 @@ Dividendi 3,77 / 6 / 8. Il codice di oggi (righe da riverificare):
 - **Striscia** = `selectTracciamentoStrip({ totals })` in `tracciamentoSummary.ts`: Entrate (`currency`, `positive` se > 0,
   apre `trk-entrate`), Spese (`negative` se > 0, `trk-spese`), Risparmio (`currency`, il `−` solo se negativo come il
   trio, `trk-risparmio`), tutte `lifts: { section: 'trk-periodo', block: 'trio' }` (README § 9, 31: il trio sollevato,
-  non le spese avvenute). `CashflowPeriodoTile` prende `liftedFigures?: readonly 'trio'[]`: sotto `tablet:` nel trio
+  non le spese avvenute). `CashflowPeriodoTile` prende `liftedFigures?: readonly 'trio'[]` ed esporta `isCashflowPeriodoLiftedBlock` (la guardia
+  su `liftedBlocks`: `LIFTED_FIGURE_CLASS` in `components/ui/tile.tsx`): sotto `tablet:` nel trio
   (`CashflowKpiTrio`) si nascondono solo le tre cifre ripetute; quota di risparmio, copertura e delta restano (17). `[]`
   se entrate e spese sono zero. Il blocco «Spese a fine mese» di LA tessera (~X € e il mese scorso) sta dopo il grafico e
   la lettura, sotto la pill.
@@ -145,7 +146,7 @@ Dividendi 3,77 / 6 / 8. Il codice di oggi (righe da riverificare):
   superato «~11.274 €» e «840 €» si accavallano — una cella senza `min-w-0` né contenitore per un importo largo. Qui si
   corregge (la fila è ricomposta comunque dai KPI sollevati) e si asserisce in § 7.
 - **Striscia** = `selectBudgetStrip(ceiling)` in `budgetSummary.ts`, due KPI sollevati dal Tetto (`TettoTile.tsx:104-137`;
-  `TettoTile` prende `liftedFigures?: readonly ('fine-mese' | 'restano' | 'oltre')[]`, un KPI per blocco, «Al giorno»
+  `TettoTile` prende `liftedFigures?: readonly ('fine-mese' | 'restano' | 'oltre')[]` ed esporta `isTettoLiftedBlock`, un KPI per blocco, «Al giorno»
   resta): «Fine mese» (`approx-currency`, `negative` se oltre; `null` → `reason` «dal quarto giorno») apre `bud-rischio`;
   «Restano» apre `bud-categorie`; oppure, oltre il tetto, **«Oltre»** (`negative`) apre `bud-avvisi` quando il
   superamento è già avvenuto, e si chiama **«Supererai»** e apre `bud-rischio` quando `crossedOn` è dopo oggi («Lo
@@ -290,7 +291,7 @@ oltre il tetto con la frase intera (33); l'ordine di Dividendi = DOM (11); l'ass
   dopo 1 s dalla chiusura; (3) Budget: l'account base non ha tetto (`cashflow.budget.mobile.spec.ts:22`), il test lo
   scrive e lo toglie; «Fine mese» apre Categorie a rischio (anche `null`); (4) una riga di Budget aperta → Tracciamento →
   Budget → reload: aperta, `localStorage['mobile-sections:cashflow:budget']`; (5) l'ordine delle `y` delle righe di
-  Dividendi è l'ordine del DOM (Affidabilità prima di Rendimento), nessun `[class*="order-"]`; (6) l'account base non ha
+  Dividendi è l'ordine del DOM (Affidabilità prima di Rendimento), nessuna classe `order-*` (dalla `classList`, come `e2e/mobile-composition.hof.mobile.spec.ts`); (6) l'account base non ha
   dividendi (niente Rendimento): cedola esca via REST, poi la risposta di `/api/dividends/stats` riscritta con `stats:
   null` (`page.route` + `route.fetch()` + `route.fulfill({ response, json })`, come `e2e/panoramica.snapshot.spec.ts` —
   NON `r.abort()`: dal 2026-10-05 quella richiesta porta anche la lista, e abortirla è l'errore di TAB): Rendimento
@@ -301,7 +302,7 @@ oltre il tetto con la frase intera (33); l'ordine di Dividendi = DOM (11); l'ass
 - **`e2e/mobile-composition.cashflow.split.mobile.spec.ts`** (progetto `split-mobile`, account split, `:128-137`), su
   «Anno corrente» (il fixture vale sull'anno, `scripts/seedSplitE2E.mts:12-27`): due celle, Ghiandaia «2200 €» e Tarsio
   «500 €» `positive` (non «−100 €», il residuo del periodo; falsificare leggendo `remaining`); lo `scope` del calendario
-  visibile sotto il paragrafo a 390 (e, in `cashflow.split.spec.ts`, a 1440); Tracciamento e Divisione visitate, entrambe
+  visibile sotto il paragrafo a 390 (e, in `cashflow.split.spec.ts`, a 1440: la prova che MOB-02 ha rinviato qui, nessuna sua pagina passa uno `scope`; falsificare ignorando `compact`); Tracciamento e Divisione visitate, entrambe
   con «Il perché», nessun `id` duplicato in `main` (falsificare passando a entrambe il `restId` di default: due
   `perche-panel`). `cashflow.centri.mobile.spec.ts` (`centri-mobile`, `:140-149`): elenco e dettaglio, Back. Riscritte
   (aprono la riga prima di leggere): `cashflow{,.budget,.dividendi}.mobile.spec.ts`; rilanciate verdi:
