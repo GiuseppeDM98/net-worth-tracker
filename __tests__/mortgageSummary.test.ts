@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest';
 import { interestPaidOf, isSettled, projectPayoff, summarizeMortgage, type MortgageRow } from '@/lib/utils/mortgageSummary';
 
 const NOW = new Date(2026, 9, 5, 12);
-const HOME = { id: 'casa', name: 'Casa', outstandingDebt: 65_608.36, debtInterestRate: 0.7 };
+const HOME = { id: 'mutuo-casa', name: 'Mutuo Casa', debt: 65_608.36, debtInterestRate: 0.7, financedAssetName: 'Casa' };
 
 const settled = (id: string, date: Date, principal: number, interest?: number): MortgageRow => ({
   id,
@@ -37,6 +37,29 @@ describe('isSettled and interestPaidOf', () => {
 });
 
 describe('summarizeMortgage', () => {
+  it('should name the loan, the property it finances and its kind', () => {
+    const mortgage = summarizeMortgage(HOME, [settled('a', new Date(2026, 8, 28, 12), 518.73, 38.57)], NOW);
+    expect(mortgage).toMatchObject({ loanId: 'mutuo-casa', loanName: 'Mutuo Casa', propertyName: 'Casa', kind: 'mortgage' });
+    const personal = summarizeMortgage({ ...HOME, id: 'auto', name: 'Prestito auto', financedAssetName: null }, [], NOW);
+    expect(personal).toMatchObject({ loanId: 'auto', loanName: 'Prestito auto', propertyName: null, kind: 'loan' });
+  });
+
+  it('should keep a payoff out of the rhythm the end is projected on', () => {
+    // A 4.000 € early repayment settled in September is principal in the year's figures, but the
+    // plan still runs on the 557,30 € instalment, not on the one-off.
+    const rows: MortgageRow[] = [
+      settled('a', new Date(2026, 7, 28, 12), 518.73, 38.57),
+      { ...settled('payoff', new Date(2026, 8, 15, 12), 4000, 0), amount: -4000, isDebtPayoff: true },
+      pending('b', new Date(2026, 9, 28, 12)),
+    ];
+    const mortgage = summarizeMortgage(HOME, rows, NOW);
+    expect(mortgage.yearPrincipal).toBe(4518.73);
+    expect(mortgage.next?.amount).toBe(557.3);
+    expect(mortgage.payoff?.kind).toBe('date');
+    const withoutPayoff = summarizeMortgage(HOME, [rows[0], rows[2]], NOW);
+    expect(mortgage.payoff).toEqual(withoutPayoff.payoff);
+  });
+
   it('should sum the year\'s settled instalments and split the next one on today\'s debt', () => {
     const summary = summarizeMortgage(HOME, [settled('sep', new Date(2026, 8, 28, 12), 518.73, 38.57), pending('oct', new Date(2026, 9, 28, 12))], NOW);
     expect(summary).toMatchObject({ year: 2026, yearInterest: 38.57, yearPrincipal: 518.73, yearInstalments: 1, totalInterest: 38.57, debt: 65_608.36 });

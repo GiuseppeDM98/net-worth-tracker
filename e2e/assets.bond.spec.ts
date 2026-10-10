@@ -25,6 +25,7 @@ const UID = 'test-user-1';
 const ORNITORINCO_ID = 'e2e-btpei-ornitorinco';
 const ZERO_TICKER = 'FENICOTTEROZERO';
 const ZERO_COUPON_ISIN = 'IT0005696338'; // BTP Valore Marzo 2032 — not in the base seed
+const INSIEME_TICKER = 'TARSIOINSIEME';
 
 test.setTimeout(240_000);
 
@@ -58,7 +59,7 @@ async function plantBtpEi(db: FirebaseFirestore.Firestore) {
 
 /** Everything the fixture and the app wrote for these two bonds, looped so an earlier failed run leaves nothing. */
 async function removeBonds(db: FirebaseFirestore.Firestore) {
-  const created = await db.collection('assets').where('userId', '==', UID).where('ticker', '==', ZERO_TICKER).get();
+  const created = await db.collection('assets').where('userId', '==', UID).where('ticker', 'in', [ZERO_TICKER, INSIEME_TICKER]).get();
   for (const assetId of [ORNITORINCO_ID, ...created.docs.map((d) => d.id)]) {
     for (const collection of ['assetTransactions', 'dividends']) {
       const rows = await db.collection(collection).where('userId', '==', UID).where('assetId', '==', assetId).get();
@@ -184,6 +185,54 @@ test('a BTP€i and a zero-coupon bond write what the pure layer promises', asyn
     expect(zero.averageCost).toBeCloseTo(0.96, 10); // the opening buy: 96 % of a 1 € unit
     const zeroCoupons = await db.collection('dividends').where('userId', '==', UID).where('assetId', '==', created.docs[0].id).get();
     expect(zeroCoupons.size).toBe(0);
+  } finally {
+    await removeBonds(db);
+    if (plantedMeta) await metaRef.delete();
+  }
+});
+
+test('a bond with ONE coupon at maturity (BTP Valore Insieme) materialises it on the maturity date, capitalised over the term', async ({ page }) => {
+  const db = await admin();
+  await removeBonds(db);
+  const metaRef = db.collection('assetTransactionsMeta').doc(UID);
+  const plantedMeta = !(await metaRef.get()).exists;
+  if (plantedMeta) {
+    const now = new Date();
+    await metaRef.set({ userId: UID, migratedAt: now, baselineDate: new Date(2025, 0, 1), migratedAssetCount: 0, createdAt: now, updatedAt: now });
+  }
+
+  try {
+    await page.goto('/dashboard/assets', { waitUntil: 'load' });
+    await page.getByRole('button', { name: 'Aggiungi asset' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('radio', { name: /Obbligazione/ }).click();
+    await dialog.locator('#ticker').fill(INSIEME_TICKER);
+    await dialog.locator('#name').fill('BTP Valore Insieme Tarsio');
+    await dialog.locator('#quantity').fill('5000');
+    await dialog.locator('#averageCost').fill('1');
+    await dialog.getByRole('switch', { name: 'Dettagli cedole' }).check();
+    await dialog.locator('#bondCouponRate').fill('3.5');
+    await dialog.getByText('Seleziona periodicità').click();
+    await page.getByRole('option', { name: 'Unica a scadenza (BTP Valore Insieme)' }).click();
+    // The step-up schedule has no meaning for one coupon: the toggle leaves the form.
+    await expect(dialog.locator('#showStepUp')).toHaveCount(0);
+    await dialog.locator('#bondIssueDate').fill('2026-10-28');
+    await dialog.locator('#bondMaturityDate').fill('2031-10-28');
+    // The preview is the compound figure the owner checks against the MEF's scheda: 1 € × (1,035^5 − 1) × 5000.
+    await expect(dialog.getByText(/Cedola unica a scadenza \(3,50% capitalizzato per 5,00 anni\)/)).toContainText(/938,4/);
+    await dialog.getByRole('button', { name: 'Crea strumento' }).click();
+    await expect(dialog).toBeHidden({ timeout: 90_000 });
+
+    const created = await db.collection('assets').where('userId', '==', UID).where('ticker', '==', INSIEME_TICKER).get();
+    expect(created.size).toBe(1);
+    expect(created.docs[0].data().bondDetails).toMatchObject({ couponRate: 3.5, couponFrequency: 'maturity' });
+    const coupons = await db.collection('dividends').where('userId', '==', UID).where('assetId', '==', created.docs[0].id).get();
+    expect(coupons.size).toBe(1);
+    const coupon = coupons.docs[0].data();
+    expect(coupon.paymentDate.toDate().toISOString().slice(0, 10)).toBe('2031-10-28');
+    expect(coupon.dividendPerShare).toBeCloseTo(0.1876863, 6);
+    expect(coupon.grossAmount).toBeCloseTo(938.43, 1);
+    expect(coupon.notes).toBe('Cedola unica a scadenza — tasso annuo 3,5% capitalizzato per 5 anni = 18,77% del nominale');
   } finally {
     await removeBonds(db);
     if (plantedMeta) await metaRef.delete();

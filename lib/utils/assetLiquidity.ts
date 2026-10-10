@@ -11,10 +11,15 @@
  * surface and illiquid on another: the create-mode form default and the edit-mode
  * legacy fallback in AssetDialog, and calculateLiquidNetWorth's read-time fallback for
  * documents saved before `isLiquid` existed.
+ *
+ * A loan follows what it finances (2026-10-10): a mortgage on a property is as illiquid as the
+ * property, a personal loan is negative liquidity, like a credit card. The form and the migration
+ * always write `isLiquid` on a loan, so the fallback below is reached only by a hand-written doc.
  */
 
 import type { AssetType } from '@/types/assets';
 
-export function suggestIsLiquid(type: AssetType, subCategory?: string): boolean {
+export function suggestIsLiquid(type: AssetType, subCategory?: string, financedAssetId?: string): boolean {
+  if (type === 'loan') return !financedAssetId;
   return !(type === 'realestate' || type === 'pensionFund' || subCategory === 'Private Equity');
 }

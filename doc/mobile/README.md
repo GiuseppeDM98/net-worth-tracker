@@ -194,6 +194,17 @@ moduli condivisi (`PatrimonioTile`, `salesNarrative`, `scheduledSentence`, `play
 a chi arriva prima, e le spec dicono in § 3 chi possiede cosa. MOB-08 (tablet) vuole le pagine composte; MOB-09 chiude
 la serie: finché manca, DESIGN.md dice il contrario del codice.
 
+**Cosa è cambiato dopo le spec (2026-10-10, fuori dossier, in develop)** — chi apre MOB-04 e MOB-06 riverifica contro il codice:
+Patrimonio ha un tipo di asset in più, il **prestito** (`loan`, valore negativo, `doc/guide/patrimonio.md`): la tessera
+«Mutuo» è ora UNA PER PRESTITO (eyebrow «Mutuo» o «Prestito», MOB-06 § 4.1 `-mutuo-<loanId>`), un prestito personale
+è una riga «debito» della Liquidità, il conteggio dell'hero dice «18 strumenti, 4 conti e 1 prestito»
+(`formatHoldingCounts(held, accounts, loans)`), e la prima apertura migra da sola il debito dell'immobile. Il form
+spesa (MOB-04 § 4) ha il campo «Commissione» su OGNI riga e su ogni voce di una serie, la spunta «Estinzione
+anticipata» su una rata «Debiti», e un trasferimento può atterrare su un immobile («Destinazione» raggruppata Conti /
+Immobili); le righe citate di `ExpenseDialog.tsx` sono quindi spostate. Il BTP Valore Insieme (cedola unica a
+scadenza) non tocca la composizione. Nessuna striscia e nessun budget cambia per questo: le cifre nuove sono dentro
+le tessere che già c'erano.
+
 Un avvertimento del passaggio di coerenza, da tenere davanti: **il budget della prima schermata rischia di diventare
 una lista di eccezioni** — le clausole vincolanti annullano il taglio del verdetto, le tessere eroe sono alte 585–709 px,
 e si misura sul mirror, che cambia con il giorno del mese. Le domande comuni in § 10 vanno risposte una volta, non spec

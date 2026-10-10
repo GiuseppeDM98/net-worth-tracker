@@ -13,16 +13,16 @@
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Cashflow services**: services `lib/services/{budgetService,costCenterService,cashBalanceReconciliation,expenseImportService}.ts`, `lib/utils/expenseImport.ts`; the settlement rule `lib/utils/cashSettlement.ts` (pure) + `lib/server/cashSettlement.ts` (the server half, run by `/api/portfolio/snapshot`), «Collega la serie» (to an account or to a mortgage) in `components/expenses/LinkSeriesDialog.tsx`
-- **Transfer fee** (2026-09-25): `lib/utils/transferFee.ts` (pure), `createTransferWithFee` / `saveTransferFee` / `getTransferFeeOf` / `deleteExpenseRows` in `lib/services/expenseService.ts`; tests `__tests__/transferFee.test.ts`, `e2e/cashflow.transfer-fee.spec.ts`
+- **Expense fee** (2026-09-25 on a transfer; any row and every occurrence of a series since 2026-10-10): `lib/utils/expenseFee.ts` (pure; `transferFee.ts` until then), `createExpenseSettledOnDate(…, fee)` / `saveExpenseFee` / `getFeeOf` / `getFeesOf` / `deleteExpenseRows` / `deleteSeriesDocuments` in `lib/services/expenseService.ts`, the words `describeExpenseFeeField` + `EXPENSE_FEE_*` in `dialogNarrative.ts`; tests `__tests__/expenseFee.test.ts`, `e2e/cashflow.transfer-fee.spec.ts` (a transfer, a spesa, a two-row series, a transfer onto a property)
 - **50/30/20 roles**: pure `lib/utils/spendingRoles.ts` (resolution, summary, the printed shares `summarizeSpendingRoleShares`, classification counts, the badge colour), the bucket → `--role-*` token map `lib/constants/spendingRoleColors.ts`, the `deleteField()` in `updateCategory` (`lib/services/expenseCategoryService.ts`), the picker and the cache invalidation (`invalidateCategoryCaches`) in `components/expenses/CategoryManagementDialog.tsx`; tests `__tests__/{spendingRoles,expenseCategoryService}.test.ts`, `e2e/settings.roles.spec.ts`
-- **Mortgage instalment → property debt** (2026-09-25): `lib/utils/mortgageRepayment.ts` (pure), `lib/services/debtRepaymentService.ts` (client transactions), the server half inside `lib/server/cashSettlement.ts`; tests `__tests__/{mortgageRepayment,serverCashSettlement,updateAssetDebtFields}.test.ts`, `e2e/cashflow.mortgage.spec.ts`
+- **Mortgage instalment → loan debt** (2026-09-25; on a `loan` asset since 2026-10-10, doc/guide/patrimonio.md): `lib/utils/mortgageRepayment.ts` (pure: `splitInstalment` with the payoff, `debtBalanceOf`/`debtBalanceField`, `isRepayableDebt`), `lib/services/debtRepaymentService.ts` (client transactions), the server half inside `lib/server/cashSettlement.ts`; tests `__tests__/{mortgageRepayment,serverCashSettlement,updateAssetDebtFields,loanAssets}.test.ts`, `e2e/cashflow.mortgage.spec.ts`
 - **Category icons** (2026-09-30): the curated names and labels `lib/constants/categoryIcons.ts`, one loader per icon `components/expenses/categoryIconLoaders.ts` (deep paths to lucide's canonical files, typed by `types/lucide-icon-modules.d.ts`), the ONE lazy map `LAZY_CATEGORY_ICONS` + `CategoryIcon` in `components/expenses/IconPickerPopover.tsx`; test `__tests__/categoryIcons.test.ts`
 - **Expenses by window** (2026-09-30): pure `lib/utils/expenseWindows.ts` (`trackingWindow`, `budgetWindow`, `budgetSuggestionWindow`, `fireWindows`, `listExpenseYears`), hooks `useExpensesInRange` / `useExpenseBounds` / `expensesInRangeQueryOptions` in `lib/hooks/useExpenses.ts`, readers `getExpensesByDateRange` / `getExpenseDateBounds` in `lib/services/expenseService.ts`, keys `queryKeys.expenses.{range,bounds}`; tests `__tests__/expenseWindows.test.ts` (bounds and invariance), `__tests__/persistCache.test.ts` (the two builders), `e2e/cashflow.tracciamento.spec.ts` (the second window)
 - **Tabs on demand** (2026-10-05): the four `lazyComponent`s at the top of `app/dashboard/cashflow/page.tsx`, their
   skeleton cells `lib/constants/cashflowTabSkeletons.ts`, the fallbacks of Dividendi and Divisione
   `components/cashflow/CashflowTabSkeletons.tsx` (2026-10-06); held by `perf:budget` (Cashflow's ceiling), by every
   `e2e/cashflow.*.spec.ts` that opens a tab, and by `e2e/lazyTabLanding.ts` (the fallback's geometry)
-- **Suites to run after a change here — Transfers / cash** (moved from `AGENTS.md` § Commands on 2026-09-30): `cashBalanceReconciliation`, `updateCashAssetBalancesAtomic`, `transferFeature`, `cashSettlement`, `serverCashSettlement` · **Commissione** `transferFee` (+ `settingsRoundTrip`) · **Mutuo** `mortgageRepayment`, `mortgageSummary`, `updateAssetDebtFields` (+ `patrimonioNarrative` for the tile's words) · **Ricorrenze** `recurrenceDates` · **Browser** `e2e/cashflow.{accounts,transfer-fee,mortgage}.spec.ts`
+- **Suites to run after a change here — Transfers / cash** (moved from `AGENTS.md` § Commands on 2026-09-30): `cashBalanceReconciliation`, `updateCashAssetBalancesAtomic`, `transferFeature`, `cashSettlement`, `serverCashSettlement` · **Commissione** `expenseFee`, `dialogNarrative` (+ `settingsRoundTrip`, `settingsNarrative`) · **Mutuo** `mortgageRepayment`, `mortgageSummary`, `updateAssetDebtFields`, `loanAssets`, `growthDrivers` (+ `patrimonioNarrative` for the tile's words) · **Ricorrenze** `recurrenceDates` · **Browser** `e2e/cashflow.{accounts,transfer-fee,mortgage}.spec.ts`
 
 ## Expenses by window (`lib/utils/expenseWindows.ts`)
 - **Tracciamento, Divisione, Budget and FIRE read a WINDOW of the expenses, never the collection** (2026-09-30).
@@ -148,28 +148,57 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   the rule carries its account on the first row only; `linkSeriesToCashAccount` puts the chosen account on the
   occurrences still to come that have not moved one (`selectLinkableOccurrences`) and leaves them pending. The past is
   never touched — its effect is in today's balance — and an occurrence linked AND applied is never re-pointed.
-- **A transfer's fee is a ROW of its own, linked both ways** (2026-09-25, `lib/utils/transferFee.ts`). A transfer is
-  net-zero and in no total, so a fee kept on it would never reach Tracciamento, Analisi or Budget: the form's
-  «Commissione» writes a spending row in the category chosen in Impostazioni › Spese (`transferFeeCategoryId`, its TYPE
-  follows the category), same date, debiting the transfer's ORIGIN on its date like any linked row. The transfer carries
-  `transferFeeExpenseId`, the fee `feeOfTransferId`; creation is ONE batch with pre-generated ids
-  (`createTransferWithFee`). The fee is edited FROM the transfer (`planTransferFee` → `saveTransferFee`: update follows
-  the transfer's date and origin, a cleared field or a row re-typed away from transfer deletes it, a new one needs the
-  category) — its category and note are its own and never rewritten. A single delete goes through `rowsDeletedWith` +
-  `deleteExpenseRows`: the fee goes with its transfer, its applied balance given back; a fee deleted by hand unlinks
-  itself from its transfer in the same batch. Without a category the field is disabled and LINKS the setting; the edit
-  form refuses to save while the saved fee is unread (it could only guess: a duplicate, or an orphan).
-- **A `debt` row can repay a property's mortgage — by its PRINCIPAL** (2026-09-25, `lib/utils/mortgageRepayment.ts`).
-  `debtAssetId` names the property; on the row's date (the SAME `balancePending` as its account: `hasDatedEffects`)
-  `outstandingDebt` falls by `instalment − debt × TAN / 12` (`splitInstalment`, French amortisation, TAN =
-  `Asset.debtInterestRate`, absent = 0% and said in the form), never by the whole instalment — the interest would
-  otherwise inflate the net worth every month. Rows applied together go in DATE ORDER on the debt the previous one left
-  (`planDebtRepayments`). What a row repaid is STORED (`debtPrincipalRepaid`, and beside it the interest it paid,
-  `debtInterestPaid`, read by Patrimonio's «Mutuo» tile) because the interest depends on that day's debt: an edit gives it back and re-splits on today's debt (`planDebtEdit`, a no-op when property, amount and date side
-  are unchanged), a delete gives back exactly it (`reverseAppliedBalances` → `reverseDebtRepayments`). The client applies
-  the rows already happened (`debtRepaymentService`), `settleDueBalances` the rest on their day, in the same
-  transaction as the accounts. «Collega la serie al mutuo…» (`selectDebtLinkableOccurrences`) links only the future
-  occurrences not yet linked whose account has not moved; the past is never touched — the typed debt reflects it.
+- **A row's fee is a ROW of its own, linked both ways** (2026-09-25 on a transfer; ANY row, and every occurrence of
+  a series, since 2026-10-10 — owner's call; `lib/utils/expenseFee.ts`). The bank's charge for an operation — a wire's
+  commission, the «spese incasso rata», the penalty of a payoff — is a cost the row cannot carry: a transfer is net-zero
+  and in no total, and on any other row it would be mixed into the category of the thing paid for. The form's
+  «Commissione» writes a spending row in the category chosen in Impostazioni › Spese (`transferFeeCategoryId`, the key
+  kept from the transfer-only days; its TYPE follows the category), same date, debiting the parent's account (a
+  transfer's ORIGIN) on its date like any linked row. The parent carries `transferFeeExpenseId`, the fee
+  `feeOfTransferId` — the stored names say «transfer» because they were born on one, and renaming them would have
+  rewritten every row. Creation is ONE batch with pre-generated ids (`writeExpenseRows(…, fee)`: a single row and its
+  fee, or a series with ONE FEE PER OCCURRENCE, each on its occurrence's date and account, `balancePending` with it;
+  `commitInBatches` keeps the 2N documents under Firestore's 500 — the `ids` list the parents first, then the fees).
+  The fee is edited FROM its parent (`planExpenseFee` → `saveExpenseFee`: the update follows the parent's date and
+  account, a cleared field deletes it, a new one needs the category) — its category and note are its own and never
+  rewritten; a fee row (`isFeeRow`) takes no fee of its own, so the field is absent when editing one. A single delete
+  goes through `rowsDeletedWith` + `deleteExpenseRows`: the fee goes with its parent, its applied balance given back; a
+  fee deleted by hand unlinks itself in the same batch; a SERIES delete gives back the fees' balances too
+  (`getFeesOf`, one `in` query per 30 parents — both the tab and the table do it, 2026-10-10: the table's own series
+  delete left a fee's debit behind until the spec found it) and `deleteSeriesDocuments` removes each occurrence's fee.
+  Without a category the field is disabled and LINKS the setting; the edit form refuses to save while the saved fee is
+  unread (it could only guess: a duplicate, or an orphan).
+- **A `debt` row can repay a LOAN — by its PRINCIPAL** (2026-09-25 on the property's own debt, on a `loan` asset since
+  2026-10-10 — doc/guide/patrimonio.md; `lib/utils/mortgageRepayment.ts`). `debtAssetId` names the loan; on the row's
+  date (the SAME `balancePending` as its account: `hasDatedEffects`) the loan's principal falls by `instalment − debt
+  × TAN / 12` (`splitInstalment`, French amortisation, TAN = `Asset.debtInterestRate`, absent = 0% and said in the
+  form), never by the whole instalment — the interest would otherwise inflate the net worth every month. WHERE the debt
+  lives on the document (a loan's `quantity`, a legacy property's `outstandingDebt`) is `debtBalanceField`'s knowledge
+  alone: the client (`debtRepaymentService`) and the server (`cashSettlement.ts`) ask it, never spell a field. Rows
+  applied together go in DATE ORDER on the debt the previous one left (`planDebtRepayments`). What a row repaid is
+  STORED (`debtPrincipalRepaid`, and beside it the interest it paid, `debtInterestPaid`, read by Patrimonio's «Mutuo»
+  tile) because the interest depends on that day's debt: an edit gives it back and re-splits on today's debt
+  (`planDebtEdit`, a no-op when loan, amount, payoff flag and date side are unchanged), a delete gives back exactly it
+  (`reverseAppliedBalances` → `reverseDebtRepayments`). The client applies the rows already happened, `settleDueBalances`
+  the rest on their day, in the same transaction as the accounts. «Collega la serie al mutuo…»
+  (`selectDebtLinkableOccurrences`) links only the future occurrences not yet linked whose account has not moved; the
+  past is never touched — the typed debt reflects it.
+- **«Estinzione anticipata» is a `debt` row that is ALL principal** (`isDebtPayoff`, owner 2026-10-10): the checkbox
+  appears under «Riduce il debito di» on a single row (never a series — a payoff is one act), the hint says the debt it
+  leaves («da 10.000 € a 6.000 €», «va a zero» for a total payoff), `splitInstalment(…, isPayoff)` caps the principal at
+  the debt and pays no interest; a penalty or the period's accrued interest is a cost and goes on the row's
+  «Commissione», never into the principal. The flag rides on the written row (`WrittenRow.isDebtPayoff`) so the
+  client's `applyDebtRepayments` reads it — without it a payoff saved today was split like an instalment (seen in the
+  browser, pinned by `e2e/cashflow.mortgage.spec.ts`). A total payoff leaves the loan at zero: «Estinto» in Patrimonio,
+  the «Mutuo» tile says «il debito è estinto».
+- **A transfer can land on a PROPERTY** (owner, 2026-10-10 — the deposit on a house): `transferCashAssetId` may name a
+  `realestate` asset whose value lives in `quantity` at price 1 (the shape the form writes; a property priced otherwise
+  is not offered, since a euro delta cannot land on a quantity at another price — the pension fund's own rule,
+  `assertFundValueLivesInQuantity`). The account falls and the property's value rises by the amount on the transfer's
+  date (`balanceEffectsOf` is generic over asset ids; the client and the server write `quantity + delta` whatever the
+  asset), net-zero for Cashflow, a transfer for the Driver (`other` on both legs, which cancel). The picker groups
+  «Conti» and «Immobili» and the hint says it is patrimony changing form, not a spending; the origin stays a cash
+  account. The feed and the table name the destination from EVERY asset (`accountNames`), not the cash ones alone.
 - **The BATCH paths refuse to cross the transfer boundary** (`crossesTransferBoundary`): `updateExpensesType`,
   `moveExpensesToCategory`, `moveExpensesFromSubCategory` throw `TransferBoundaryError` when expenses exist, since each
   row would need its own destination account.
@@ -288,6 +317,6 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 ## Per-page blind spots
 
-- **A mortgage instalment is split on the debt of the day it SETTLES** (2026-09-25): if the property's debt is typed by hand after the instalments were linked, the next one is split on the new figure; a debt corrected by hand is never reconciled with the rows. A series started in the past repays its past instalments at save, like its account: if the debt typed on the property already reflects them, leave the property empty on the form and link the series afterwards («Collega la serie al mutuo…» takes only the future). A future row of a series written before 2026-09-19 whose account already moved at save cannot be linked to the mortgage (flagging it pending would debit the account twice). An instalment smaller than the month's interest repays nothing (negative amortisation is not modelled). The BATCH re-typing paths (a category moved to another type from Impostazioni) do not give back a repayment already applied: only the expense form and the deletes do; a row re-typed that way keeps its stamp, gives it back if deleted, and a pending one simply repays nothing on its day. The fee of a transfer follows the transfer's date and origin on every edit, so a date typed on the fee row itself is overwritten by the next edit of its transfer.
+- **A mortgage instalment is split on the debt of the day it SETTLES** (2026-09-25): if the loan's debt is typed by hand after the instalments were linked, the next one is split on the new figure; a debt corrected by hand is never reconciled with the rows. A series started in the past repays its past instalments at save, like its account: if the debt typed on the loan already reflects them, leave the loan empty on the form and link the series afterwards («Collega la serie al mutuo…» takes only the future). A future row of a series written before 2026-09-19 whose account already moved at save cannot be linked to the loan (flagging it pending would debit the account twice). An instalment smaller than the month's interest repays nothing (negative amortisation is not modelled). The BATCH re-typing paths (a category moved to another type from Impostazioni) do not give back a repayment already applied: only the expense form and the deletes do; a row re-typed that way keeps its stamp, gives it back if deleted, and a pending one simply repays nothing on its day. The fee of a row follows the parent's date and account on every edit, so a date typed on the fee row itself is overwritten by the next edit of its parent. **A payoff never changes the instalment** (2026-10-10): after a partial payoff the bank shortens the plan or lowers the instalment, and the app learns it only from the next rows — the «Fine prevista» keeps projecting on the latest linked instalment. **A fee on a series is N rows the import never sees**: the CSV import still rejects transfers and writes no fee; a series' fees are deleted with the series from the tab and the table, but a fee deleted by hand leaves its occurrence unlinked and the other occurrences' fees in place. **A transfer onto a property is not a purchase**: the property's `lastPriceUpdate` does not move (the sub-line still says «valore a mano dal …» of the last hand-typed value), the Registro knows nothing of it, and a deposit lost (the sale falling through) is re-typed by the owner as a spending row — the app has no «caparra persa».
 - **A row that comes due moves its account in the evening, not at midnight** (2026-09-19): the settlement runs with the snapshot at 18:00 UTC (20:00 in Italy), so until then Patrimonio shows the balance without the day's instalment while Tracciamento already counts it as happened. A row entered TODAY with a past or today's date moves the account at save — including a series started in the past: if the balance typed from the bank already reflects those rows, leave the account empty or they are debited twice. A credit card is a cash account allowed below zero (doc/guide/patrimonio.md); its monthly payment is one transfer typed on the day, since a transfer cannot recur.
 - **A running year is the WHOLE calendar year on Tracciamento and Analisi**, so its figures include what is only scheduled; each verdict declares it with amount and horizon, each such row is chipped «In calendario» and drops its sign colour. **«Da inizio anno» (YTD) is the other window** (`Period.kind = 'ytd'`, Analisi's fourth `PeriodMode`): it runs to the END of today's month, not to today, so it carries scheduled rows too. **On «Anno corrente» the delta compares twelve months against twelve** (`resolveComparisonScope` → `fullYear`), biased downward as the year runs; YTD keeps `sameMonths`, and Tracciamento's verdict and a category's Scheda still say «stessi mesi». Not extended to Panoramica, Storico, Budget or Centri di Costo. DESIGN → *The Scheduled-Is-Not-Spent Rule*. (moved from `CLAUDE.md` → Known Issues on 2026-09-19)

@@ -64,7 +64,14 @@ import {
   type BondQuoteBasis,
 } from '@/lib/utils/bondPricing';
 import { buildBondDetailsFromForm, NO_INFLATION_INDEXATION } from '@/lib/utils/bondDetailsForm';
-import { latestIndexationCoefficient, resolveInflationIndexation } from '@/lib/utils/couponUtils';
+import {
+  bondTermYears,
+  calculateMaturityCouponPerShare,
+  getPeriodsPerYear,
+  isSingleCouponAtMaturity,
+  latestIndexationCoefficient,
+  resolveInflationIndexation,
+} from '@/lib/utils/couponUtils';
 import { NO_DIVIDEND_ACCOUNT, dividendAccountFromForm, paysDividends } from '@/lib/utils/dividendAccount';
 import { scheduleNextCoupon, scheduleFinalPremium } from '@/lib/services/couponScheduling';
 import { addSubCategory } from '@/lib/services/assetAllocationService';
@@ -90,7 +97,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Calculator, Plus, X, BarChart3, Landmark, Bitcoin, Wallet, Home, Package, TrendingUp, ChevronLeft, PiggyBank } from 'lucide-react';
+import { Calculator, Plus, X, BarChart3, Landmark, Bitcoin, Wallet, Home, Package, TrendingUp, ChevronLeft, PiggyBank, HandCoins } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 
 /**
@@ -236,7 +243,8 @@ function buildAssetFormDataFromValues(
       data.type === 'etf' && data.leverageRatio && !isNaN(data.leverageRatio) && data.leverageRatio > 1
         ? data.leverageRatio
         : undefined,
-    stampDutyExempt: data.stampDutyExempt || false,
+    // A loan is no securities account: never in the stamp duty, whatever the switch says.
+    stampDutyExempt: data.type === 'loan' ? true : data.stampDutyExempt || false,
     currentPrice,
     currentPriceEur: fetchedCurrentPriceEur,
     isLiquid: data.isLiquid,
@@ -247,15 +255,15 @@ function buildAssetFormDataFromValues(
       ? data.autoUpdatePrice
       : false,
     composition: isComposite && composition.length > 0 ? composition : undefined,
-    outstandingDebt:
-      data.outstandingDebt && !isNaN(data.outstandingDebt) && data.outstandingDebt > 0
-        ? data.outstandingDebt
-        : undefined,
-    // The TAN only means something beside a debt (lib/utils/mortgageRepayment.ts).
+    // LEGACY, always cleared: a property saved after the migration sheds its old debt field
+    // (`updateAsset`'s `in` guard turns the undefined into a deleteField).
+    outstandingDebt: undefined,
+    // The TAN and the financed property belong to a loan (lib/utils/mortgageRepayment.ts).
     debtInterestRate:
-      data.outstandingDebt && data.outstandingDebt > 0 && data.debtInterestRate && !isNaN(data.debtInterestRate) && data.debtInterestRate > 0
+      data.type === 'loan' && data.debtInterestRate && !isNaN(data.debtInterestRate) && data.debtInterestRate > 0
         ? data.debtInterestRate
         : undefined,
+    financedAssetId: data.type === 'loan' && data.financedAssetId && data.financedAssetId !== '__none__' ? data.financedAssetId : undefined,
     isPrimaryResidence: data.isPrimaryResidence || false,
     allocationRole: data.allocationRole ?? 'tradable',
     pensionFundDetails: buildPensionFundDetailsFromForm(data),
@@ -312,7 +320,16 @@ const TYPE_TO_CLASS: Record<AssetType, AssetClass> = {
   // composition has not been filled in yet; 'equity' is the least-wrong default for the typical
   // (equity-tilted) comparto. The form always prompts for the composition.
   pensionFund: 'equity',
+  // A loan takes the class of what it finances (types/assets.ts → LOAN_ASSET_TYPE): `realestate`
+  // once «Immobile finanziato» names a property (the effect below re-points it), `cash` for a
+  // personal loan — negative liquidity, like a credit card.
+  loan: 'cash',
 };
+
+/** The class a loan sits in, from the property it finances. */
+function loanClassOf(financedAssetId: string | undefined): AssetClass {
+  return financedAssetId && financedAssetId !== '__none__' ? 'realestate' : 'cash';
+}
 
 // Type picker card definitions for step 1 of the create flow
 const TYPE_CARDS: { type: AssetType; label: string; title: string; Icon: React.ElementType; description: string }[] = [
@@ -324,6 +341,7 @@ const TYPE_CARDS: { type: AssetType; label: string; title: string; Icon: React.E
   { type: 'realestate', label: 'Immobile', title: 'Nuovo Immobile', Icon: Home, description: 'Proprietà immobiliari' },
   { type: 'commodity', label: 'Materia Prima', title: 'Nuova Materia Prima', Icon: Package, description: 'Oro, argento, petrolio, ecc.' },
   { type: 'pensionFund', label: 'Fondo Pensione', title: 'Nuovo Fondo Pensione', Icon: PiggyBank, description: 'Previdenza complementare, valore da estratto conto' },
+  { type: 'loan', label: 'Prestito', title: 'Nuovo Prestito', Icon: HandCoins, description: 'Mutuo o prestito: il debito residuo, che le rate riducono' },
 ];
 
 // Zod validation schema for asset form
@@ -349,7 +367,7 @@ const assetSchema = z.object({
   // Mirrors the AssetType union in types/assets.ts — keep the two in lock-step (tsc catches drift
   // where the form value is passed back as an AssetType). 'pensionFund' is accepted here from P0 on;
   // its type card and its dedicated fields land with the pension UI phase.
-  type: z.enum(['stock', 'etf', 'bond', 'crypto', 'commodity', 'cash', 'realestate', 'pensionFund']),
+  type: z.enum(['stock', 'etf', 'bond', 'crypto', 'commodity', 'cash', 'realestate', 'pensionFund', 'loan']),
   // Mirrors the AssetClass union in types/assets.ts (tsc catches drift the same way as `type` above).
   // 'trendFollowing'/'carry' are accepted here from L0 on but have no picker entry yet in the
   // `assetClasses` composition-leg Select below — that lands with the leverage UI (phase L2).
@@ -371,8 +389,9 @@ const assetSchema = z.object({
   isLiquid: z.boolean().optional(),
   autoUpdatePrice: z.boolean().optional(),
   isComposite: z.boolean().optional(),
-  outstandingDebt: z.number().nonnegative('Il debito non può essere negativo').optional().or(z.nan()),
+  // A loan's TAN and the property it finances ('__none__' = a personal loan), type 'loan' only.
   debtInterestRate: z.number().nonnegative('Il TAN non può essere negativo').max(30, 'Un TAN tra 0 e 30%').optional().or(z.nan()),
+  financedAssetId: z.string().optional(),
   isPrimaryResidence: z.boolean().optional(),
   allocationRole: z.enum(['tradable', 'frozen', 'excluded']).optional(),
   // Opening-position fields (ledger create only): the first buy's date + optional settlement account.
@@ -384,7 +403,7 @@ const assetSchema = z.object({
   dividendCashAssetId: z.string().optional(),
   // Bond coupon details (optional, only shown for type=bond + assetClass=bonds)
   bondCouponRate: z.number().min(0).max(100).optional().or(z.nan()),
-  bondCouponFrequency: z.enum(['monthly', 'quarterly', 'semiannual', 'annual']).optional(),
+  bondCouponFrequency: z.enum(['monthly', 'quarterly', 'semiannual', 'annual', 'maturity']).optional(),
   bondIssueDate: z.string().optional(),
   bondMaturityDate: z.string().optional(),
   bondNominalValue: z.number().positive('Il valore nominale deve essere positivo').optional().or(z.nan()),
@@ -411,7 +430,7 @@ const assetSchema = z.object({
   pensionUnlockDate: z.string().optional(),
   pensionFamilyMemberId: z.string().optional(),
 }).superRefine((data, ctx) => {
-  const tickerRequired = data.type !== 'cash' && data.type !== 'realestate' && data.type !== 'pensionFund';
+  const tickerRequired = data.type !== 'cash' && data.type !== 'realestate' && data.type !== 'pensionFund' && data.type !== 'loan';
   if (tickerRequired && (!data.ticker || data.ticker.trim().length === 0)) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Serve il ticker', path: ['ticker'] });
   }
@@ -463,8 +482,8 @@ const FIELD_LABELS: Partial<Record<keyof AssetFormValues, string>> = {
   taxRate: 'Aliquota fiscale',
   totalExpenseRatio: 'TER',
   leverageRatio: 'Leva',
-  outstandingDebt: 'Debito residuo',
-  debtInterestRate: 'TAN del mutuo',
+  debtInterestRate: 'TAN',
+  financedAssetId: 'Immobile finanziato',
   openingDate: 'Data di acquisto',
   bondCouponRate: 'Tasso cedola',
   bondNominalValue: 'Valore nominale',
@@ -482,6 +501,7 @@ const assetTypes: { value: AssetType; label: string }[] = [
   { value: 'cash', label: 'Liquidità' },
   { value: 'realestate', label: 'Immobile' },
   { value: 'pensionFund', label: 'Fondo Pensione' },
+  { value: 'loan', label: 'Prestito' },
 ];
 
 /**
@@ -602,7 +622,9 @@ function BondQuoteInEuro({ control, knownCoefficient, quote }: { control: AssetF
 /**
  * Dynamic coupon preview based on current form values. The nominal defaults to 1 € exactly as the
  * saved bond will (effectiveBondNominal), so the preview and the first materialised coupon agree.
- * A rate of 0 is a zero coupon: no preview.
+ * A rate of 0 is a zero coupon: no preview. A single coupon at maturity reads the two dates too:
+ * it is the rate capitalised over the term (`calculateMaturityCouponPerShare`), so the owner can
+ * check it against the MEF's scheda before saving.
  */
 function CouponPreview({
   control,
@@ -621,19 +643,24 @@ function CouponPreview({
   const nominal = effectiveBondNominal(useWatch({ control, name: 'bondNominalValue' }));
   const qty = useWatch({ control, name: 'quantity' });
   const typedCoefficient = useWatch({ control, name: 'bondIndexationCoefficient' });
-  const periodsMap: Record<string, number> = { monthly: 12, quarterly: 4, semiannual: 2, annual: 1 };
-  const periods = couponFrequency ? periodsMap[couponFrequency] : null;
-  if (rate && !isNaN(rate) && periods && qty > 0) {
+  const issueDateStr = useWatch({ control, name: 'bondIssueDate' });
+  const maturityDateStr = useWatch({ control, name: 'bondMaturityDate' });
+  const atMaturity = couponFrequency ? isSingleCouponAtMaturity(couponFrequency) : false;
+  const periods = couponFrequency && !atMaturity ? getPeriodsPerYear(couponFrequency) : null;
+  const termYears = atMaturity && issueDateStr && maturityDateStr ? bondTermYears(new Date(issueDateStr), new Date(maturityDateStr)) : null;
+  if (rate && !isNaN(rate) && (periods || termYears) && qty > 0) {
     const coefficient = isEuroIndexed && typedCoefficient && !isNaN(typedCoefficient) && typedCoefficient > 0
       ? typedCoefficient
       : 1;
-    const perShare = (rate / 100 / periods) * nominal * coefficient;
+    const perShare = termYears ? calculateMaturityCouponPerShare(rate, nominal, termYears) : (rate / 100 / (periods as number)) * nominal * coefficient;
     const total = perShare * qty;
-    const label = inflationIndexation === 'italia'
-      ? 'Cedola minima (solo fisso)'
-      : isEuroIndexed
-        ? `Cedola stimata (al coefficiente ${formatNumberIt(coefficient, 5)})`
-        : 'Cedola stimata';
+    const label = termYears
+      ? `Cedola unica a scadenza (${formatNumberIt(rate, 2)}% capitalizzato per ${formatNumberIt(termYears, 2)} anni)`
+      : inflationIndexation === 'italia'
+        ? 'Cedola minima (solo fisso)'
+        : isEuroIndexed
+          ? `Cedola stimata (al coefficiente ${formatNumberIt(coefficient, 5)})`
+          : 'Cedola stimata';
     return (
       <p className="text-xs text-primary font-medium">
         → {label}: {formatNumberIt(perShare, 4)} {currency}/unità × {formatNumberIt(qty, 0)} = {formatNumberIt(total)} {currency} per pagamento
@@ -710,7 +737,8 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
   const [newSubCategoryName, setNewSubCategoryName] = useState('');
   const [isAddingSubCategory, setIsAddingSubCategory] = useState(false);
   const [composition, setComposition] = useState<AssetComposition[]>([]);
-  const [hasOutstandingDebt, setHasOutstandingDebt] = useState(false);
+  // The properties a loan can finance («Immobile finanziato»): the owner's real estate.
+  const financeableProperties = ledgerAllAssets.filter((a) => a.type === 'realestate' && a.assetClass === 'realestate');
   // True once the user has picked an allocation role by hand — from then on the type/sub-category
   // driven suggestion stops overriding their choice.
   const [allocationRoleTouched, setAllocationRoleTouched] = useState(false);
@@ -737,8 +765,8 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
       isLiquid: true,
       autoUpdatePrice: true,
       isComposite: false,
-      outstandingDebt: undefined,
       debtInterestRate: undefined,
+      financedAssetId: '__none__',
       isPrimaryResidence: false,
       allocationRole: 'tradable',
       openingCashAssetId: '__none__',
@@ -763,6 +791,8 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
   const watchBondInflationIndexation = useWatch({ control, name: 'bondInflationIndexation' });
   const watchIsPrimaryResidence = useWatch({ control, name: 'isPrimaryResidence' });
   const watchAllocationRole = useWatch({ control, name: 'allocationRole' });
+  // A loan's property: one change per click, and it decides the class and the liquidity default.
+  const watchFinancedAssetId = useWatch({ control, name: 'financedAssetId' });
   const watchStampDutyExempt = useWatch({ control, name: 'stampDutyExempt' });
   const watchOpeningCashAssetId = useWatch({ control, name: 'openingCashAssetId' });
   const watchDividendCashAssetId = useWatch({ control, name: 'dividendCashAssetId' });
@@ -796,11 +826,12 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
       : undefined;
 
   // Field visibility based on asset type — applies to both create and edit modes.
-  const newAsset_showTicker = selectedType !== 'cash' && selectedType !== 'realestate' && selectedType !== 'pensionFund';
+  const isLoan = selectedType === 'loan';
+  const newAsset_showTicker = selectedType !== 'cash' && selectedType !== 'realestate' && selectedType !== 'pensionFund' && !isLoan;
   const newAsset_showISIN = selectedType === 'stock' || selectedType === 'etf' || selectedType === 'bond';
-  const newAsset_quantityLabel = selectedType === 'cash' ? 'Saldo' : selectedType === 'realestate' ? 'Valore stimato' : selectedType === 'pensionFund' ? 'Valore attuale' : 'Quantità';
-  const newAsset_showAutoUpdate = selectedType !== 'cash' && selectedType !== 'realestate' && selectedType !== 'pensionFund';
-  const newAsset_showCostBasis = selectedType !== 'cash' && selectedType !== 'realestate' && selectedType !== 'pensionFund';
+  const newAsset_quantityLabel = selectedType === 'cash' ? 'Saldo' : selectedType === 'realestate' ? 'Valore stimato' : selectedType === 'pensionFund' ? 'Valore attuale' : isLoan ? 'Debito residuo' : 'Quantità';
+  const newAsset_showAutoUpdate = selectedType !== 'cash' && selectedType !== 'realestate' && selectedType !== 'pensionFund' && !isLoan;
+  const newAsset_showCostBasis = selectedType !== 'cash' && selectedType !== 'realestate' && selectedType !== 'pensionFund' && !isLoan;
   // TER applies to funds/ETC (ongoing management fee), never to a single stock. `commodity` and
   // `crypto` both double as either a direct spot holding (no TER) or an ETC wrapper around that
   // same underlying (e.g. WisdomTree Agriculture AIGA.MI, WisdomTree Physical Bitcoin) — the toggle
@@ -825,8 +856,9 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
   // asset's role changes without the user asking. Once they pick a role, we stop steering.
   useEffect(() => {
     if (isEdit || allocationRoleTouched) return;
+    // A loan is a debt, not an investment: out of the allocation whatever it finances.
     const suggested: AllocationRole =
-      selectedAssetClass === 'realestate'
+      selectedAssetClass === 'realestate' || selectedType === 'loan'
         ? 'excluded'
         : selectedSubCategory === 'Private Equity' || selectedType === 'pensionFund'
           ? 'frozen'
@@ -850,11 +882,19 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
   // manual toggle, and no existing asset changes without the user asking (edit is out).
   useEffect(() => {
     if (isEdit || isLiquidTouched) return;
-    const suggested = suggestIsLiquid(selectedType, selectedSubCategory);
+    const suggested = suggestIsLiquid(selectedType, selectedSubCategory, watchFinancedAssetId === '__none__' ? undefined : watchFinancedAssetId);
     if (watchIsLiquid !== suggested) {
       setValue('isLiquid', suggested);
     }
-  }, [isEdit, isLiquidTouched, selectedType, selectedSubCategory, watchIsLiquid, setValue]);
+  }, [isEdit, isLiquidTouched, selectedType, selectedSubCategory, watchFinancedAssetId, watchIsLiquid, setValue]);
+
+  // A loan's class follows what it finances (TYPE_TO_CLASS): a property puts it among the
+  // Immobili, so the class still sums to the equity; none leaves it in Liquidità.
+  useEffect(() => {
+    if (selectedType !== 'loan') return;
+    const suggested = loanClassOf(watchFinancedAssetId);
+    if (selectedAssetClass !== suggested) setValue('assetClass', suggested);
+  }, [selectedType, selectedAssetClass, watchFinancedAssetId, setValue]);
 
   // The three blocks below adjust UI state DURING render when the thing it follows changes
   // (React's "adjusting state when a prop changes"), never from an effect — a setter called
@@ -910,7 +950,6 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
       setBrokerEntries([{ qty: '', price: '' }]);
       if (asset) {
         setComposition(asset.composition && asset.composition.length > 0 ? asset.composition : []);
-        setHasOutstandingDebt(!!(asset.outstandingDebt && asset.outstandingDebt > 0));
         setShowCostBasis(!!((asset.averageCost && asset.averageCost > 0) || (asset.taxRate && asset.taxRate > 0)));
         setShowTER(!!(asset.totalExpenseRatio && asset.totalExpenseRatio > 0));
         setShowBondDetails(!!asset.bondDetails);
@@ -922,7 +961,6 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
         }
       } else {
         setComposition([]);
-        setHasOutstandingDebt(false);
         setShowCostBasis(false);
         setShowTER(false);
         setShowBondDetails(false);
@@ -942,7 +980,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
       // predicate as the create-mode suggestion and calculateLiquidNetWorth.
       const defaultIsLiquid = asset.isLiquid !== undefined
         ? asset.isLiquid
-        : suggestIsLiquid(asset.type, asset.subCategory);
+        : suggestIsLiquid(asset.type, asset.subCategory, asset.financedAssetId);
 
       reset({
         ticker: asset.ticker,
@@ -988,8 +1026,8 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
         isLiquid: defaultIsLiquid,
         autoUpdatePrice: asset.autoUpdatePrice !== undefined ? asset.autoUpdatePrice : shouldUpdatePrice(asset.type, asset.subCategory),
         isComposite: !!(asset.composition && asset.composition.length > 0),
-        outstandingDebt: asset.outstandingDebt || undefined,
         debtInterestRate: asset.debtInterestRate || undefined,
+        financedAssetId: asset.financedAssetId || '__none__',
         isPrimaryResidence: asset.isPrimaryResidence || false,
         allocationRole: resolveAllocationRole(asset),
         isin: asset.isin || undefined,
@@ -1040,8 +1078,8 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
         isLiquid: true,
         autoUpdatePrice: true,
         isComposite: false,
-        outstandingDebt: undefined,
         debtInterestRate: undefined,
+        financedAssetId: '__none__',
         isPrimaryResidence: false,
         allocationRole: 'tradable',
         openingDate: todayIso,
@@ -1853,9 +1891,16 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
                   Può essere negativo: una carta di credito è un conto in rosso fino all&apos;addebito. Per non contarla come liquidità da investire, escludila dall&apos;allocazione.
                 </p>
               )}
+              {isLoan && (
+                <p className="text-xs text-muted-foreground">
+                  Il capitale ancora dovuto oggi, come lo dice la banca: vale in negativo nel patrimonio. Le rate collegate lo
+                  riducono da sole; per allinearlo alla banca correggilo qui.
+                </p>
+              )}
               {/* Show hint only in edit mode — in create mode there's no previous quantity to compare.
                   Quantity changes represent capital flowing in/out of the portfolio. */}
-              {isEdit && asset && selectedAssetClass !== 'cash' && (
+              {/* Not on a loan either: a changed principal is a correction of the debt, not capital. */}
+              {isEdit && asset && selectedAssetClass !== 'cash' && !isLoan && (
                 <QuantityChangeNotice control={control} previousQuantity={asset.quantity ?? 0} />
               )}
             </div>
@@ -2272,66 +2317,53 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
           </div>
           )}
 
-          {/* Debito Residuo - solo per immobili */}
-          {selectedType === 'realestate' && selectedAssetClass === 'realestate' && (
-            <div className="space-y-2 rounded-lg border p-4">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="hasOutstandingDebt">Debito residuo</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Es. mutuo residuo sull&apos;immobile. Il valore netto sarà: valore - debito
-                  </p>
-                </div>
-                <Switch
-                  id="hasOutstandingDebt"
-                  checked={hasOutstandingDebt}
-                  onCheckedChange={(checked) => {
-                    setHasOutstandingDebt(checked);
-                    if (!checked) {
-                      setValue('outstandingDebt', undefined);
-                      setValue('debtInterestRate', undefined);
-                    }
-                  }}
+          {/* Prestito: the TAN its instalments are split on and the property it finances
+              (types/assets.ts → LOAN_ASSET_TYPE). The debt itself is the «Debito residuo» field above. */}
+          {isLoan && (
+            <div className="space-y-4 rounded-lg border p-4">
+              <div className="space-y-2">
+                <Label htmlFor="debtInterestRate">
+                  TAN (%) <span className="text-muted-foreground font-normal">(opzionale)</span>
+                </Label>
+                <Input
+                  id="debtInterestRate"
+                  type="number"
+                  step="any"
+                  min="0"
+                  {...register('debtInterestRate', { valueAsNumber: true })}
+                  placeholder="es. 3,2"
                 />
+                {errors.debtInterestRate && (
+                  <p className="text-sm text-destructive">{errors.debtInterestRate.message}</p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Ogni rata «Debiti» collegata a questo prestito riduce il debito della sola quota capitale
+                  (rata − debito × TAN / 12). Senza TAN, l&apos;intera rata riduce il debito. Un&apos;estinzione anticipata
+                  va tutta in capitale.
+                </p>
               </div>
-
-              {hasOutstandingDebt && (
-                <div className="mt-4 space-y-2">
-                  <Label htmlFor="outstandingDebt">Importo del debito residuo ({watchCurrency})</Label>
-                  <Input
-                    id="outstandingDebt"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    {...register('outstandingDebt', { valueAsNumber: true })}
-                    placeholder="es. 150000"
-                  />
-                  {errors.outstandingDebt && (
-                    <p className="text-sm text-destructive">{errors.outstandingDebt.message}</p>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    Il valore netto dell&apos;immobile sarà calcolato come: valore lordo - debito residuo
-                  </p>
-                  <Label htmlFor="debtInterestRate" className="pt-2">
-                    TAN del mutuo (%) <span className="text-muted-foreground font-normal">(opzionale)</span>
-                  </Label>
-                  <Input
-                    id="debtInterestRate"
-                    type="number"
-                    step="any"
-                    min="0"
-                    {...register('debtInterestRate', { valueAsNumber: true })}
-                    placeholder="es. 3,2"
-                  />
-                  {errors.debtInterestRate && (
-                    <p className="text-sm text-destructive">{errors.debtInterestRate.message}</p>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    Serve alle rate collegate a questo immobile: ognuna riduce il debito della sola quota capitale
-                    (rata − debito × TAN / 12). Senza TAN, l&apos;intera rata riduce il debito.
-                  </p>
-                </div>
-              )}
+              <div className="space-y-2">
+                <Label htmlFor="financedAssetId">
+                  Immobile finanziato <span className="text-muted-foreground font-normal">(opzionale)</span>
+                </Label>
+                <Select value={watchFinancedAssetId || '__none__'} onValueChange={(value) => setValue('financedAssetId', value)}>
+                  <SelectTrigger id="financedAssetId">
+                    <SelectValue placeholder="Nessun immobile" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Nessun immobile (prestito personale)</SelectItem>
+                    {financeableProperties.map((property) => (
+                      <SelectItem key={property.id} value={property.id}>
+                        {property.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Un mutuo sta nella classe Immobili accanto alla casa, che resta al suo valore lordo; un prestito
+                  personale è liquidità negativa, come una carta di credito.
+                </p>
+              </div>
             </div>
           )}
 
@@ -2480,8 +2512,15 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
                           <SelectItem value="quarterly">Trimestrale (4/anno)</SelectItem>
                           <SelectItem value="semiannual">Semestrale (2/anno)</SelectItem>
                           <SelectItem value="annual">Annuale (1/anno)</SelectItem>
+                          <SelectItem value="maturity">Unica a scadenza (BTP Valore Insieme)</SelectItem>
                         </SelectContent>
                       </Select>
+                      {watchBondCouponFrequency === 'maturity' && (
+                        <p className="text-xs text-muted-foreground">
+                          Una sola cedola, pagata col rimborso: il tasso annuo si capitalizza per tutta la durata, come
+                          per il BTP Valore Insieme.
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -2537,7 +2576,8 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
                     />
                   </div>
 
-                  {/* Step-Up Coupon Rate Schedule */}
+                  {/* Step-Up Coupon Rate Schedule — not for a single coupon at maturity, which has one rate */}
+                  {watchBondCouponFrequency !== 'maturity' && (
                   <div className="space-y-3 rounded-md border border-dashed p-3">
                     <div className="flex items-center gap-2">
                       <input
@@ -2621,6 +2661,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
                       </div>
                     )}
                   </div>
+                  )}
 
                   {/* Premio Finale */}
                   <div className="space-y-2">
@@ -2934,11 +2975,12 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
           )}
 
           {/* color-mix() on --primary so the info box tracks the active theme colour. */}
-          {(selectedType === 'realestate' || selectedType === 'pensionFund' || selectedSubCategory === 'Private Equity' || shouldUpdatePrice(selectedType, selectedSubCategory)) && (
+          {(selectedType === 'realestate' || selectedType === 'pensionFund' || isLoan || selectedSubCategory === 'Private Equity' || shouldUpdatePrice(selectedType, selectedSubCategory)) && (
           <div className="rounded-lg bg-[color-mix(in_oklch,var(--primary)_8%,transparent)] border border-[color-mix(in_oklch,var(--primary)_20%,transparent)] p-3">
             <p className="text-sm text-foreground">
               <strong>Nota:</strong>
-              {selectedType === 'realestate' && ' Per immobili, il prezzo deve essere aggiornato manualmente.'}
+              {selectedType === 'realestate' && ' Per immobili, il prezzo deve essere aggiornato manualmente; un mutuo è un prestito a parte, collegato all’immobile.'}
+              {isLoan && ' Il debito residuo scende con le rate «Debiti» collegate a questo prestito dal form spesa, e con un’estinzione anticipata.'}
               {selectedType === 'pensionFund' && " Per i fondi pensione, il valore va aggiornato manualmente quando arriva l'estratto conto: i versamenti registrati da Previdenza si sommano da soli."}
               {selectedSubCategory === 'Private Equity' && ' Per Private Equity, il prezzo deve essere aggiornato manualmente.'}
               {shouldUpdatePrice(selectedType, selectedSubCategory) && ` Puoi inserire un prezzo manuale nel campo apposito, oppure il prezzo verrà recuperato automaticamente da ${priceSource}. In caso di errore nel recupero automatico, potrai sempre impostare il prezzo manualmente.`}

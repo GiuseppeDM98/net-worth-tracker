@@ -46,6 +46,7 @@ const MODULE_BY_TYPE: Record<AssetType, ProfileModule | null> = {
   cash: null,
   realestate: null,
   pensionFund: null,
+  loan: null,
 };
 
 export function profileModuleFor(type: AssetType): ProfileModule | null {

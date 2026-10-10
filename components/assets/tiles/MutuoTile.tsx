@@ -1,7 +1,7 @@
 'use client';
 
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
-import { describeMortgage, describeMortgageScope, describeMortgageYearScope } from '@/lib/utils/patrimonioNarrative';
+import { describeMortgage, describeMortgageScope, describeMortgageYearScope, loanNoun } from '@/lib/utils/patrimonioNarrative';
 import type { MortgageSummary } from '@/lib/utils/mortgageSummary';
 import { MONTH_NAMES } from '@/lib/constants/months';
 import { Tile, TILE_SUB_EYEBROW_CLASS } from '@/components/ui/tile';
@@ -9,7 +9,7 @@ import { TileMethodNote } from '@/components/ui/tile-method-note';
 
 interface MutuoTileProps {
   summary: MortgageSummary;
-  /** Several properties with a linked mortgage: the aside names which one this tile is. */
+  /** Several loans with linked instalments: the aside names which one this tile is. */
   showPropertyName: boolean;
   className?: string;
 }
@@ -30,12 +30,14 @@ function Kpi({ label, value, caption }: { label: string; value: string; caption?
 }
 
 /**
- * «Quanto mi costa il mutuo?» — Patrimonio's tile for a property whose instalments are linked to
- * its debt (lib/utils/mortgageRepayment.ts). The reading says what this year's settled instalments
- * paid in interest and repaid in principal, and where the plan ends; the four figures are the
- * debt, the year's interest and principal, and the projected end. From the second measured year
- * a «Per anno» table lists every year, a partial one captioned («da settembre», «finora»). Every number comes from
- * `summarizeMortgage`, every sentence from `patrimonioNarrative`.
+ * «Quanto mi costa il mutuo?» — Patrimonio's tile for a loan whose instalments are linked to it
+ * (lib/utils/mortgageRepayment.ts; one per property until 2026-10-10). The eyebrow says «Mutuo»
+ * for a loan that finances a property and «Prestito» for one that finances nothing; the aside
+ * names the loan (and its property). The reading says what this year's settled instalments paid
+ * in interest and repaid in principal, and where the plan ends; the four figures are the debt,
+ * the year's interest and principal, and the projected end. From the second measured year a
+ * «Per anno» table lists every year, a partial one captioned («da settembre», «finora»). Every
+ * number comes from `summarizeMortgage`, every sentence from `patrimonioNarrative`.
  *
  * Interest is neither a gain nor a loss of the portfolio but a cost already counted in Cashflow,
  * so no figure here takes a sign colour (AGENTS.md → sign tokens mean gain and loss).
@@ -50,11 +52,15 @@ export function MutuoTile({ summary, showPropertyName, className }: MutuoTilePro
         ? 'la rata copre appena gli interessi'
         : undefined;
 
+  const eyebrow = summary.kind === 'mortgage' ? 'Mutuo' : 'Prestito';
+  // A mortgage is named by its property, a personal loan by its own name.
+  const aside = summary.propertyName ?? summary.loanName;
+
   return (
     <Tile
-      eyebrow="Mutuo"
-      ariaLabel={showPropertyName ? `Mutuo · ${summary.propertyName}` : 'Mutuo'}
-      aside={showPropertyName ? summary.propertyName : undefined}
+      eyebrow={eyebrow}
+      ariaLabel={showPropertyName ? `${eyebrow} · ${aside}` : eyebrow}
+      aside={showPropertyName ? aside : undefined}
       reading={describeMortgage(summary)}
       className={className}
     >
@@ -102,15 +108,15 @@ export function MutuoTile({ summary, showPropertyName, className }: MutuoTilePro
           </table>
         </div>
       )}
-      <TileMethodNote summary={describeMortgageScope(summary)} subject="Mutuo" className="mt-4">
+      <TileMethodNote summary={describeMortgageScope(summary)} subject={eyebrow} className="mt-4">
         <span>
-          Ogni rata collegata all&apos;immobile, nel suo giorno, divide l&apos;importo in interessi (debito del giorno ×
-          TAN / 12) e capitale (il resto), e solo il capitale riduce il debito. Qui si sommano le rate già pagate
-          dell&apos;anno.
+          Ogni rata collegata al {loanNoun(summary.kind)}, nel suo giorno, divide l&apos;importo in interessi (debito del giorno ×
+          TAN / 12) e capitale (il resto), e solo il capitale riduce il debito. Un&apos;estinzione anticipata va tutta in
+          capitale. Qui si sommano le rate già pagate dell&apos;anno.
         </span>
         <span>
-          Le rate pagate prima del collegamento non sono misurate e non vengono ricostruite. Spese o assicurazioni
-          prelevate con la rata vanno registrate a parte, o finirebbero nel capitale.
+          Le rate pagate prima del collegamento non sono misurate e non vengono ricostruite. Spese, penali o assicurazioni
+          prelevate con la rata vanno nella sua commissione, o finirebbero nel capitale.
         </span>
         <span>
           La fine prevista applica l&apos;ammortamento alla francese al debito di oggi, al TAN e all&apos;ultima rata

@@ -121,7 +121,7 @@ interface TransactionDetailModalProps {
  */
 function describeDebtLink(expense: Expense, names: Map<string, string>): string | null {
   if (expense.type !== 'debt' || !expense.debtAssetId) return null;
-  const name = names.get(expense.debtAssetId) ?? 'immobile eliminato';
+  const name = names.get(expense.debtAssetId) ?? 'prestito eliminato';
   if (expense.balancePending) return `${name} · alla data della rata`;
   return expense.debtPrincipalRepaid !== undefined ? `${name} · capitale ${cachedFormatCurrencyEUR(expense.debtPrincipalRepaid)}` : name;
 }

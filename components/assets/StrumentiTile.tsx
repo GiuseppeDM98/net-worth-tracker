@@ -48,7 +48,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import type { Asset } from '@/types/assets';
+import { isLoanAsset, type Asset } from '@/types/assets';
 import { isLedgerAssetType } from '@/types/assetTransactions';
 import { calculateAssetValue } from '@/lib/services/assetService';
 import { formatCurrency, formatNumber, formatPercentage } from '@/lib/services/chartService';
@@ -77,6 +77,7 @@ import {
   RealEstateValueTooltip,
   describeAssetRowSubLine,
   formatDeltaPercent,
+  resolveMortgageOf,
 } from '@/components/assets/AssetRow';
 
 const DELTA_WINDOWS = [
@@ -287,6 +288,9 @@ export function StrumentiTile({
   // Sold-out rows stay in the table («Azzerato») but are not something the user owns: the
   // reading counts held positions only.
   const held = assets.filter(isHeld);
+  // The property a loan finances, for the loan row's sub-line («mutuo su Casa · TAN 3,2%»).
+  const financedNameOf = (asset: Asset): string | null =>
+    isLoanAsset(asset) && asset.financedAssetId ? (assets.find((candidate) => candidate.id === asset.financedAssetId)?.name ?? null) : null;
   const manualCount = held.filter((asset) => requiresManualPricing(asset)).length;
   const reading = describeInstruments(held.length, manualCount, computeTopWeightShare(assets, totalValue));
 
@@ -406,12 +410,12 @@ export function StrumentiTile({
     const withCost = gain !== null;
     const gainLoss = gain?.gainLoss ?? 0;
     const gainPct = gain?.gainPercent ?? 0;
-    const isMortgaged = asset.assetClass === 'realestate' && !!asset.outstandingDebt && asset.outstandingDebt > 0;
+    const mortgage = resolveMortgageOf(asset, assets);
     // The PMC cell is the EUR PMC (fees included — the one the G/P beside it uses); a foreign row
     // keeps its native PMC under it, alone when the ledger has not projected the EUR one yet.
     const pmcEur = isHandValued ? undefined : costBasisPerUnitEur(asset);
     const nativePmc = !isHandValued && !isEurNative(asset) && asset.averageCost ? asset.averageCost : undefined;
-    const subLine = describeAssetRowSubLine(asset, now);
+    const subLine = describeAssetRowSubLine(asset, now, financedNameOf(asset));
     const dash = <span className="text-muted-foreground">—</span>;
 
     return (
@@ -438,7 +442,7 @@ export function StrumentiTile({
             </div>
             {asset.quantity === 0 && (
               <span className="shrink-0 rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                Azzerato
+                {isLoanAsset(asset) ? 'Estinto' : 'Azzerato'}
               </span>
             )}
           </div>
@@ -472,7 +476,7 @@ export function StrumentiTile({
           </>
         )}
         <td className={cn(CELL_CLASS, 'font-mono font-semibold tabular-nums')}>
-          {isMortgaged ? <RealEstateValueTooltip asset={asset} value={value} /> : formatCurrency(value)}
+          {mortgage ? <RealEstateValueTooltip asset={asset} value={value} debt={mortgage.debt} /> : formatCurrency(value)}
         </td>
         <td className={cn(CELL_CLASS, 'font-mono font-medium tabular-nums')}>
           {totalValue > 0 ? formatPercentage((value / totalValue) * 100, 2) : '—'}
@@ -650,6 +654,8 @@ export function StrumentiTile({
                   isDemo={isDemo}
                   sparklineData={unitPriceSeries[asset.id]}
                   chartColors={chartColors}
+                  mortgage={resolveMortgageOf(asset, assets)}
+                  financedAssetName={financedNameOf(asset)}
                   performance={performance[asset.id]}
                   showLedgerActions={showLedgerActions(asset)}
                   onRegisterTrade={onRegisterTrade}
