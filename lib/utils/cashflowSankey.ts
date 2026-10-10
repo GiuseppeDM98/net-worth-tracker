@@ -6,7 +6,7 @@
  * `__tests__/**\/*.test.ts`, so logic living inside a `.tsx` has no way to be covered at
  * all. The shapes below are plain objects; @nivo/sankey consumes them structurally.
  *
- * A second, structural reason to keep this file free of React: AGENTS.md § Recharts records that
+ * A second, structural reason to keep this file free of React: doc/guide/grafici.md § Recharts records that
  * `useChartColors()` must never reach a Nivo component (react-spring cannot interpolate
  * oklch and crashes on arity). The palettes live here precisely because a module that
  * cannot import a hook cannot break that rule.
@@ -105,7 +105,7 @@ export const MAX_SUBCATEGORIES = 4;
 /**
  * Label text, one neutral per mode — the labels used to take each node's colour brightened
  * 1.5×, which put rgb(255,255,19) yellow beside the type's violet. Hex because the chart is
- * Nivo on react-spring (AGENTS.md → Recharts: never a CSS token here); the values are the
+ * Nivo on react-spring (doc/guide/grafici.md § Recharts: never a CSS token here); the values are the
  * sRGB of DESIGN.md's off-blanc and charcoal, declared in the DOM-side hex inventory.
  */
 export const LABEL_TEXT_COLORS = { dark: '#e5e5e5', light: '#262626' } as const;

@@ -14,7 +14,7 @@
  * Runs on the base seed (`test@example.com`, «Conto Corrente» = `seed-cash`). It plants a second
  * account «Conto Fenicottero» and a spending category «Commissioni Ornitorinco» (decoys absent
  * from the seed), and RESTORES the WHOLE settings document it read, which other fixtures also write
- * (AGENTS.md → a spec that edits a shared document restores, never deletes): «Salva» rewrites every
+ * (AGENTS.md § Audit habits: a spec that edits a document another fixture writes restores, never deletes): «Salva» rewrites every
  * field the page holds, the allocation `targets` included — the page drops the seed's sub-targets,
  * and on 2026-09-25 restoring only the two fee fields left Allocazione's spec with no class to open.
  */

@@ -14,7 +14,7 @@
  * 2026-09-30): until then the content is a skeleton, never the «no history» readings — a wait is
  * not an absence. The two Recharts charts keep
  * their tooltips and their chart slots; a legend is `SeriesLegend` under the plot and a target
- * line is neutral ink, dashed (AGENTS.md → Recharts, since 2026-09-22 here too).
+ * line is neutral ink, dashed (doc/guide/grafici.md § Recharts, since 2026-09-22 here too).
  */
 
 import { useState } from 'react';
@@ -167,7 +167,7 @@ export function FireDettaglio({ description, loading, runwayData, runwaySummary,
                           <XAxis dataKey="monthLabel" tick={CHART_TICK_STYLE} tickMargin={6} />
                           <YAxis width={44} tickFormatter={(value) => `${Number(value).toFixed(0)}a`} tick={CHART_TICK_STYLE} />
                           <Tooltip content={RunwayTooltip} />
-                          {/* A reference line, not a series: neutral ink, dashed (AGENTS → Recharts). */}
+                          {/* A reference line, not a series: neutral ink, dashed (doc/guide/grafici.md § Recharts). */}
                           {runwaySummary.targetYearsOfExpenses !== null && (
                             <ReferenceLine
                               y={runwaySummary.targetYearsOfExpenses}

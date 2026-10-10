@@ -59,7 +59,7 @@ function monthLabel(point: UnderwaterDrawdownData): string {
 /**
  * The chart's accessible name, which has to carry its content: `role="img"` makes the SVG one
  * opaque node, so the two facts a sighted reader takes from the curve — how deep it went and
- * when, and where it stands now — are said here (AGENTS.md → Recharts, 2026-09-20).
+ * when, and where it stands now — are said here (doc/guide/grafici.md § Recharts, 2026-09-20).
  */
 export function describeUnderwaterChart(data: ReadonlyArray<UnderwaterDrawdownData>): string {
   if (data.length === 0) return 'Distanza dal massimo: nessun mese misurato.';

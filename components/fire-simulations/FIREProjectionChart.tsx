@@ -11,7 +11,7 @@
  * Colour: each scenario takes a chart SLOT (bear → slot 5, base → slot 1, bull → slot 2, the
  * same mapping the Scenari tile's swatches use), never a named hue — on a themed palette the
  * bear is not red and the bull is not green, so neither the legend nor the accessible name says
- * so. The legend is `SeriesLegend` under the plot (AGENTS.md → Recharts): Recharts' own
+ * so. The legend is `SeriesLegend` under the plot (doc/guide/grafici.md § Recharts): Recharts' own
  * `<Legend>` paints each label in its series colour, which measured 3,11:1 and 3,77:1 here.
  *
  * The year each scenario reaches FIRE is a vertical reference line. Scenarios that reach it in
@@ -238,7 +238,7 @@ export function FIREProjectionChart({
               animationDuration={800}
               animationEasing="ease-out"
             />
-            {/* A reference series, not a part of the total: neutral ink, dashed (AGENTS → Recharts). */}
+            {/* A reference series, not a part of the total: neutral ink, dashed (doc/guide/grafici.md § Recharts). */}
             <Line
               type="monotone"
               dataKey="baseFireNumber"

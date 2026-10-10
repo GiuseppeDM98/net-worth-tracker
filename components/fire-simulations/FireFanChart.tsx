@@ -73,7 +73,7 @@ interface FanChartTooltipProps {
 
 /**
  * Custom tooltip: percentiles + moving target + cumulative FIRE probability for the hovered
- * year. A module-level component (AGENTS → Recharts); card tokens so it follows the theme.
+ * year. A module-level component (doc/guide/grafici.md § Recharts); card tokens so it follows the theme.
  */
 function FanChartTooltip({ active, payload, label }: FanChartTooltipProps) {
   if (!active || !payload || payload.length === 0) return null;
@@ -121,7 +121,7 @@ function FanChartTooltip({ active, payload, label }: FanChartTooltipProps) {
 export function FireFanChart({ result, startCalendarYear, verdict, height }: FireFanChartProps) {
   const chartColors = useChartColors();
   // Fan + median share the base scenario's slot (the same one the Scenari view gives it); the
-  // moving target is a reference series, so it takes the neutral ink, dashed (AGENTS → Recharts).
+  // moving target is a reference series, so it takes the neutral ink, dashed (doc/guide/grafici.md § Recharts).
   const fanColor = chartColors[0] || 'var(--chart-1)';
   const targetColor = 'var(--muted-foreground)';
 

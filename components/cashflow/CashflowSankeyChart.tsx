@@ -8,7 +8,7 @@
  * `onNodeClick` with the node's DESCRIPTOR — the index says what a node is, the handler never
  * infers it from the id's shape.
  *
- * Colours reach it as hex (react-spring cannot interpolate oklch — AGENTS.md → Recharts): the type
+ * Colours reach it as hex (react-spring cannot interpolate oklch — doc/guide/grafici.md § Recharts): the type
  * view's are hardcoded, the 50/30/20 view's roles are theme tokens resolved by useCssColorTokens.
  *
  * Drawn from 640px only: below it the Flusso is a share bar and rows (FlowShareMobile), so there is

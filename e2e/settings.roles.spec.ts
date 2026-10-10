@@ -11,7 +11,7 @@
  * The base account is SHARED by every desktop spec, and some of them plant spending categories of
  * their own (cashflow.mortgage, cashflow.transfer-fee) that a crashed cleanup would leave behind:
  * the tile's counts are therefore read from the emulator at the moment of the assertion, never
- * pinned (AGENTS.md → «On a shared account never pin ABSOLUTE values»).
+ * pinned (AGENTS.md § Emulator Exercise Scripts, «On a shared account never pin ABSOLUTE values»).
  *
  * What only a browser can prove here: the switch lives in Spese and its dirty state belongs to that
  * tab; the dialog shows the picker only with the switch on; «Da classificare» DELETES the stored

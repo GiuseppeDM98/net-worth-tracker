@@ -16,7 +16,7 @@
  * for euro; a pension fund that merges into the portfolio counts as basis (its exit taxation is
  * another regime, `pensionDeduction.ts`, out of this model and said so).
  *
- * Pure and Firestore-free; the asset reader takes `valueOf` injected (AGENTS → Module Hygiene).
+ * Pure and Firestore-free; the asset reader takes `valueOf` injected (AGENTS.md § Dynamic Imports and Module Hygiene).
  */
 
 import type { Asset } from '@/types/assets';

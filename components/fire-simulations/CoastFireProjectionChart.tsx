@@ -7,7 +7,7 @@
  * The target line is flat because Coast FIRE uses a real-return model: inflation is already
  * netted out of each scenario, so the capital required at the target age is expressed in
  * today's money throughout the chart. It is a reference, not a part of the total: neutral ink,
- * dashed (AGENTS.md → Recharts), like the Calcolatore's.
+ * dashed (doc/guide/grafici.md § Recharts), like the Calcolatore's.
  *
  * With the pension bridge model active, the unlock year shows a visible step in all three
  * series AND in the target line — the locked fund re-enters the spendable capital there, and

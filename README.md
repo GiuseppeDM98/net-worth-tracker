@@ -222,7 +222,7 @@ For contributors and AI agents, the repo keeps its guidance split by scope:
 | --- | --- |
 | [`CLAUDE.md`](CLAUDE.md) | Index — what each feature is and where it lives |
 | [`AGENTS.md`](AGENTS.md) | Repo-wide conventions, data/state patterns, UI patterns, testing, workflow |
-| [`doc/guide/`](doc/guide/) | One file per domain — a page, a tab, a subsystem (`stati`, `dialog`, `temi`, `account-condiviso-demo`, `shell`, `cache-persistita`, `e2e-emulatori` for the Playwright and emulator harness) — the full rules and blind spots for that area |
+| [`doc/guide/`](doc/guide/) | One file per domain — a page, a tab, a subsystem (`stati`, `dialog` with the two-step dialogs and the form reset, `temi`, `account-condiviso-demo`, `shell`, `cache-persistita`, `grafici` for Recharts and the hand-written charts, `server` for the API routes and the Admin SDK, `prima-schermata` for the first-screen census, `e2e-emulatori` for the Playwright and emulator harness) — the full rules and blind spots for that area; `AGENTS.md` keeps a 3–4-point stub per guide |
 | [`perf/`](perf/) · [`doc/guide/velocita.md`](doc/guide/velocita.md) | The size budget (`budget.json`), the benchmark's routes and last runs; the manual — commands, baseline, raised ceilings, census — is the guide |
 | [`doc/mobile/`](doc/mobile/) | The live mobile-composition series (MOB-01..09): the index with the baseline, the decisions and the state, one spec per session, the first-screen budget (`budget.json`, its manual in [`doc/guide/prima-schermata.md`](doc/guide/prima-schermata.md)) and the prompt that retires a spec — the folder goes when the last spec is retired |
 | [`DESIGN.md`](DESIGN.md) | The aesthetic spec (normative) |
