@@ -19,6 +19,8 @@
 
 ## 🔧 Improvements
 
+- **Sviluppo (dev)** — Added a census of the first screen on phone and tablet: one command measures every page at three sizes (how long it is, what sits above the bottom bar, how many figures are outside the verdict) on a dedicated test account, and a budget per page that can only get better.
+
 - **FIRE** — Improved the FIRE number: the loan on an excluded primary residence is left out with the house, so a debt on a thing not counted never lowers the figure.
 - **Storico › Driver** — Improved «mutuo»: a month that opens a loan shows the debt going up and one that closes it shows it repaid.
 - **Rendimenti** — Improved the base: a loan is out of every performance base, whatever the toggles say.

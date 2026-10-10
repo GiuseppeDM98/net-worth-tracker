@@ -77,3 +77,6 @@ skills-lock.json
 /perf/last-run.json
 # …and of the last `npm run perf:census` (React renders and browser counters per key)
 /perf/last-census.json
+
+# First-screen census: the JSON and screenshots of the last `npm run mobile:census` (figures of the account measured)
+/.mobile-census/
