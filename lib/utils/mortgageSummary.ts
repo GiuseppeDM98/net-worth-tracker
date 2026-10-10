@@ -1,6 +1,8 @@
 /**
- * «Quanto mi costa il mutuo?» — the figures of Patrimonio's «Mutuo» tile, one property at a time,
- * read from the instalments linked to it (lib/utils/mortgageRepayment.ts).
+ * «Quanto mi costa il mutuo?» — the figures of Patrimonio's «Mutuo» tile, one loan at a time
+ * (types/assets.ts → LOAN_ASSET_TYPE; one property at a time until 2026-10-10), read from the
+ * instalments linked to it (lib/utils/mortgageRepayment.ts). A loan that finances a property is a
+ * «Mutuo», one that finances nothing a «Prestito» (`kind`): same figures, its own name.
  *
  * The interest is a MEASURE only from the rows the app has settled: each stores the principal it
  * repaid and the interest it paid on the debt of its day. Instalments paid before the link carry
@@ -24,15 +26,21 @@ import { getItalyYear } from '@/lib/utils/dateHelpers';
 import { splitInstalment } from '@/lib/utils/mortgageRepayment';
 
 /** The fields of a linked instalment the summary reads. */
-export type MortgageRow = Pick<Expense, 'id' | 'amount' | 'debtPrincipalRepaid' | 'debtInterestPaid' | 'balancePending'> & { date: Date };
+export type MortgageRow = Pick<Expense, 'id' | 'amount' | 'isDebtPayoff' | 'debtPrincipalRepaid' | 'debtInterestPaid' | 'balancePending'> & { date: Date };
 
-/** The property as the summary reads it. */
-export interface MortgageProperty {
+/** The loan as the summary reads it: its name, its debt today, its TAN, and what it finances. */
+export interface MortgageLoan {
   id: string;
   name: string;
-  outstandingDebt?: number;
+  /** The outstanding principal today (`debtBalanceOf`, lib/utils/mortgageRepayment.ts). */
+  debt: number;
   debtInterestRate?: number;
+  /** The property the loan finances, when it does; null for a personal loan. */
+  financedAssetName: string | null;
 }
+
+/** «Mutuo» finances a property, «Prestito» finances nothing — the tile's eyebrow. */
+export type MortgageKind = 'mortgage' | 'loan';
 
 /** One calendar year of settled instalments, for the tile's «Per anno» list. */
 export interface MortgageYear {
@@ -48,8 +56,12 @@ export interface MortgageYear {
 export type MortgagePayoff = { kind: 'date'; months: number; date: Date } | { kind: 'never' } | { kind: 'repaid' };
 
 export interface MortgageSummary {
-  propertyId: string;
-  propertyName: string;
+  loanId: string;
+  /** The loan's own name («Mutuo casa», «Prestito auto»). */
+  loanName: string;
+  /** The property it finances; null for a personal loan. */
+  propertyName: string | null;
+  kind: MortgageKind;
   debt: number;
   /** TAN in percent; absent = none typed on the property (a 0% loan for the split). */
   annualRatePct?: number;
@@ -119,26 +131,29 @@ export function projectPayoff(debt: number, instalment: number, annualRatePct: n
 }
 
 /**
- * The tile's figures for one property from the rows linked to it. `now` decides the year and what
+ * The tile's figures for one loan from the rows linked to it. `now` decides the year and what
  * is still ahead; rows are read whatever their order.
  */
-export function summarizeMortgage(property: MortgageProperty, rows: MortgageRow[], now: Date): MortgageSummary {
+export function summarizeMortgage(loan: MortgageLoan, rows: MortgageRow[], now: Date): MortgageSummary {
   const year = getItalyYear(now);
-  const debt = property.outstandingDebt ?? 0;
+  const debt = loan.debt;
   const ordered = [...rows].sort((a, b) => a.date.getTime() - b.date.getTime());
   const settled = ordered.filter(isSettled);
   const ofYear = settled.filter((row) => getItalyYear(row.date) === year);
 
   const nextRow = ordered.find((row) => !isSettled(row) && row.balancePending) ?? null;
   const next = nextRow
-    ? { date: nextRow.date, amount: Math.abs(nextRow.amount), ...splitInstalment(nextRow.amount, debt, property.debtInterestRate) }
+    ? { date: nextRow.date, amount: Math.abs(nextRow.amount), ...splitInstalment(nextRow.amount, debt, loan.debtInterestRate, nextRow.isDebtPayoff === true) }
     : null;
 
-  // The plan runs on the latest instalment the owner has linked: the next one if any, else the last paid.
-  const lastSettled = settled[settled.length - 1] ?? null;
-  const projectionRow = nextRow ?? lastSettled;
+  // The plan runs on the latest instalment the owner has linked: the next one if any, else the
+  // last paid — a payoff is a one-off, never the rhythm the plan is projected on.
+  const instalments = ordered.filter((row) => row.isDebtPayoff !== true);
+  const lastSettled = instalments.filter(isSettled).at(-1) ?? null;
+  const nextInstalment = instalments.find((row) => !isSettled(row) && row.balancePending) ?? null;
+  const projectionRow = nextInstalment ?? lastSettled;
   const payoff = projectionRow
-    ? projectPayoff(debt, projectionRow.amount, property.debtInterestRate, nextRow ? nextRow.date : addMonths(lastSettled!.date, 1))
+    ? projectPayoff(debt, projectionRow.amount, loan.debtInterestRate, nextInstalment ? nextInstalment.date : addMonths(lastSettled!.date, 1))
     : null;
 
   const years = new Map<number, MortgageYear>();
@@ -155,10 +170,12 @@ export function summarizeMortgage(property: MortgageProperty, rows: MortgageRow[
   if (firstYear && settled[0].date.getMonth() > 0) firstYear.partialFrom = settled[0].date;
 
   return {
-    propertyId: property.id,
-    propertyName: property.name,
+    loanId: loan.id,
+    loanName: loan.name,
+    propertyName: loan.financedAssetName,
+    kind: loan.financedAssetName !== null ? 'mortgage' : 'loan',
     debt,
-    annualRatePct: property.debtInterestRate,
+    annualRatePct: loan.debtInterestRate,
     year,
     yearPrincipal: toCents(ofYear.reduce((sum, row) => sum + (row.debtPrincipalRepaid ?? 0), 0)),
     yearInterest: toCents(ofYear.reduce((sum, row) => sum + interestPaidOf(row), 0)),

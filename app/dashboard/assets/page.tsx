@@ -54,6 +54,7 @@ import { buildPatrimonioVerdict, describeLastPriceUpdate, formatHoldingCounts } 
 import {
   isCashAccount,
   isHeld,
+  isLiquidityRow,
   rankInstrumentReturns,
   resolveLastPriceUpdate,
   summarizeCashAccounts,
@@ -61,7 +62,10 @@ import {
   summarizeUnrealizedGains,
 } from '@/lib/utils/patrimonioSummary';
 import { computeAssetPerformanceDeltas, computeAssetUnitPriceSeries } from '@/lib/utils/assetPerformanceDeltas';
-import type { Asset } from '@/types/assets';
+import { isLoanAsset, type Asset } from '@/types/assets';
+import { debtBalanceOf } from '@/lib/utils/mortgageRepayment';
+import { propertiesWithLegacyDebt } from '@/lib/utils/loanMigration';
+import { migratePropertyDebtsToLoans } from '@/lib/services/loanMigration';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ErrorNotice } from '@/components/ui/error-notice';
@@ -171,6 +175,28 @@ export default function AssetsPage() {
       });
   }, [ownerId, isDemo, isLedgerMetaLoading, ledgerMeta, queryClient]);
 
+  // ─── Legacy property debt → loan migration trigger ────────────────────────────
+  // One-shot (2026-10-10): a property that still carries `outstandingDebt` gets a `loan` asset of
+  // its own, its instalments re-pointed (lib/services/loanMigration.ts). Idempotent — once no
+  // property carries a debt there is nothing to do — and gated on the demo like every write.
+  const loanMigrationAttemptedRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!ownerId || isDemo || loadingAssets || propertiesWithLegacyDebt(assets).length === 0) return;
+    if (loanMigrationAttemptedRef.current === ownerId) return;
+    loanMigrationAttemptedRef.current = ownerId;
+
+    migratePropertyDebtsToLoans(ownerId, assets)
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all(ownerId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.overview(ownerId) });
+      })
+      .catch((error) => {
+        console.error('[AssetsPage] Loan migration failed:', error);
+      });
+  }, [ownerId, isDemo, loadingAssets, assets, queryClient]);
+
   // The whole ledger of the owner, filtered to the month in memory: a month query would need a
   // (userId, date) composite index that does not exist, and every trade mutation already
   // invalidates this cache (doc/guide/registro-operazioni.md § Asset Trade Ledger).
@@ -209,18 +235,23 @@ export default function AssetsPage() {
   const totalValue = useMemo(() => overview?.metrics.totalValue ?? calculateTotalValue(assets), [overview, assets]);
 
   const cashAccounts = useMemo(() => assets.filter(isCashAccount), [assets]);
+  // The Liquidità tile's rows: the accounts and the personal loans, which read «debito» beside them.
+  const liquidityRows = useMemo(() => assets.filter(isLiquidityRow), [assets]);
   const instruments = useMemo(() => assets.filter((a) => !isCashAccount(a)), [assets]);
   // Sold-out positions stay in the table («Azzerato») but are not owned: every count runs on these.
-  const heldInstruments = useMemo(() => instruments.filter(isHeld), [instruments]);
+  // A loan is neither an instrument nor an account: counted apart («1 prestito»).
+  const heldInstruments = useMemo(() => instruments.filter((a) => isHeld(a) && !isLoanAsset(a)), [instruments]);
+  const heldLoans = useMemo(() => assets.filter((a) => isLoanAsset(a) && isHeld(a)), [assets]);
   const assetsById = useMemo(() => new Map(assets.map((a) => [a.id, a])), [assets]);
 
-  // «Mutuo»: every property is asked for its linked instalments (a repaid one keeps its history);
-  // a tile appears only for a property that has at least one (lib/utils/mortgageSummary.ts).
-  const propertyIds = useMemo(
-    () => assets.filter((a) => a.type === 'realestate' && a.assetClass === 'realestate').map((a) => a.id),
+  // «Mutuo»: every loan — and, until the migration below reaches it, every property still carrying
+  // a legacy debt — is asked for its linked instalments (a repaid one keeps its history); a tile
+  // appears only for one that has at least one (lib/utils/mortgageSummary.ts).
+  const debtIds = useMemo(
+    () => assets.filter((a) => isLoanAsset(a) || (a.type === 'realestate' && (a.outstandingDebt ?? 0) > 0)).map((a) => a.id),
     [assets],
   );
-  const mortgageQuery = useMortgageInstalments(ownerId, propertyIds);
+  const mortgageQuery = useMortgageInstalments(ownerId, debtIds);
   const {
     data: mortgageRows = [],
     isLoading: loadingMortgage,
@@ -242,13 +273,26 @@ export default function AssetsPage() {
   const mortgages = useMemo(() => {
     const now = new Date();
     return assets
-      .filter((a) => propertyIds.includes(a.id))
-      .map((property) => ({ property, rows: mortgageRows.filter((row) => row.debtAssetId === property.id) }))
+      .filter((a) => debtIds.includes(a.id))
+      .map((loan) => ({ loan, rows: mortgageRows.filter((row) => row.debtAssetId === loan.id) }))
       .filter(({ rows }) => rows.length > 0)
-      .map(({ property, rows }) => summarizeMortgage(property, rows, now));
-  }, [assets, propertyIds, mortgageRows]);
+      .map(({ loan, rows }) =>
+        summarizeMortgage(
+          {
+            id: loan.id,
+            name: loan.name,
+            debt: debtBalanceOf(loan),
+            debtInterestRate: loan.debtInterestRate,
+            // A legacy property IS what it finances; a loan names its property, a personal loan none.
+            financedAssetName: isLoanAsset(loan) ? (loan.financedAssetId ? (assetsById.get(loan.financedAssetId)?.name ?? null) : null) : loan.name,
+          },
+          rows,
+          now,
+        ),
+      );
+  }, [assets, assetsById, debtIds, mortgageRows]);
 
-  const cashSummary = useMemo(() => summarizeCashAccounts(cashAccounts, totalValue), [cashAccounts, totalValue]);
+  const cashSummary = useMemo(() => summarizeCashAccounts(liquidityRows, totalValue), [liquidityRows, totalValue]);
   const tradesSummary = useMemo(() => summarizeMonthTrades(trades, today), [trades, today]);
   const gains = useMemo(() => summarizeUnrealizedGains(instruments), [instruments]);
   const ranking = useMemo(() => rankInstrumentReturns(overview?.topAssets ?? []), [overview]);
@@ -262,7 +306,7 @@ export default function AssetsPage() {
   }, [overview, sparklinePeriod]);
 
   const heroValueClass = useMemo(() => resolveHeroValueClass(totalValue), [totalValue]);
-  const holdingCounts = formatHoldingCounts(heldInstruments.length, cashAccounts.length);
+  const holdingCounts = formatHoldingCounts(heldInstruments.length, cashAccounts.length, heldLoans.length);
 
   // Composition remapped by ASSET_CLASS_CHART_INDEX so a class is the same hue as everywhere.
   const assetClassData = useMemo(
@@ -294,12 +338,13 @@ export default function AssetsPage() {
       isNewATH: overview.ath?.isNewATH ?? false,
       instrumentCount: heldInstruments.length,
       accountCount: cashAccounts.length,
+      loanCount: heldLoans.length,
       marketEffect: overview.marketEffect ?? null,
       topMover: overview.topInstrumentMovers?.[0] ?? null,
       sales: overview.monthSales ?? null,
       savings: resolveLivedCashflow(overview.expenseStats)?.savings ?? null,
     });
-  }, [overview, today.month, totalValue, heldInstruments.length, cashAccounts.length]);
+  }, [overview, today.month, totalValue, heldInstruments.length, cashAccounts.length, heldLoans.length]);
 
   // ─── Handlers ─────────────────────────────────────────────────────────────────
   const invalidatePortfolio = () => {
@@ -355,6 +400,12 @@ export default function AssetsPage() {
   };
 
   const openCashDetail = (asset: Asset, opener: HTMLElement) => {
+    // A personal loan sits among the Liquidità rows («debito») but is no account: its detail is
+    // the asset form, where the principal and the TAN are typed.
+    if (isLoanAsset(asset)) {
+      openEdit(asset, opener);
+      return;
+    }
     cashOpenerRef.current = opener;
     setCashDetail({ open: true, asset });
   };
@@ -557,13 +608,13 @@ export default function AssetsPage() {
               <ErrorNotice
                 notice={describeReadFailure({
                   subject: 'Mutuo',
-                  consequence: 'Le rate collegate agli immobili non sono state lette: interessi e capitale pagati tornano al prossimo caricamento.',
+                  consequence: 'Le rate collegate ai prestiti non sono state lette: interessi e capitale pagati tornano al prossimo caricamento.',
                 })}
               />
             </motion.div>
           ) : (
             mortgages.map((summary) => (
-              <motion.div key={summary.propertyId} variants={cardItem} className={cn(TILE_CELL_CLASS, 'tablet:col-span-2 desktop:col-span-12')}>
+              <motion.div key={summary.loanId} variants={cardItem} className={cn(TILE_CELL_CLASS, 'tablet:col-span-2 desktop:col-span-12')}>
                 <MutuoTile summary={summary} showPropertyName={mortgages.length > 1} />
               </motion.div>
             ))

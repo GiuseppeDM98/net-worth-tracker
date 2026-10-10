@@ -11,8 +11,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   appliedDebtRepaymentOf,
+  debtBalanceField,
+  debtBalanceOf,
   debtGivenBackBy,
-  isRepayableProperty,
+  isRepayableDebt,
+  loanDebtOf,
   planDebtEdit,
   planDebtRepayments,
   selectDebtLinkableOccurrences,
@@ -59,6 +62,29 @@ describe('splitInstalment', () => {
     // and pays as interest no more than itself.
     expect(splitInstalment(100, 200_000, 3.6)).toEqual({ interest: 100, principal: 0 });
     expect(splitInstalment(1012, 0, 3.6)).toEqual({ interest: 0, principal: 0 });
+  });
+
+  it('should make a payoff all principal, capped at the debt, whatever the TAN', () => {
+    // 4.000 € of early repayment on a 10.000 € loan at 3,6%: no interest split, the debt falls by all of it.
+    expect(splitInstalment(4000, 10_000, 3.6, true)).toEqual({ interest: 0, principal: 4000 });
+    // A total payoff typed above the debt repays the debt and not a cent more.
+    expect(splitInstalment(10_500, 10_000, 3.6, true)).toEqual({ interest: 0, principal: 10_000 });
+  });
+});
+
+describe('debtBalanceOf, debtBalanceField and loanDebtOf — where the debt lives', () => {
+  it('should read a loan\'s debt from its quantity and write it there', () => {
+    const loan = { type: 'loan', assetClass: 'realestate', quantity: 95_000, debtInterestRate: 3.2 } as const;
+    expect(debtBalanceOf(loan)).toBe(95_000);
+    expect(debtBalanceField(loan)).toBe('quantity');
+    expect(loanDebtOf(loan)).toEqual({ debt: 95_000, annualRatePct: 3.2 });
+  });
+
+  it('should read a legacy property\'s debt from its outstandingDebt and write it there', () => {
+    const property = { type: 'realestate', assetClass: 'realestate', quantity: 1, outstandingDebt: 180_000 } as const;
+    expect(debtBalanceOf(property)).toBe(180_000);
+    expect(debtBalanceField(property)).toBe('outstandingDebt');
+    expect(debtBalanceOf({ type: 'realestate', quantity: 1 })).toBe(0);
   });
 });
 
@@ -176,11 +202,34 @@ describe('selectDebtLinkableOccurrences', () => {
   });
 });
 
-describe('isRepayableProperty', () => {
-  it('should offer real estate carrying a debt, and nothing else', () => {
-    expect(isRepayableProperty({ type: 'realestate', assetClass: 'realestate', outstandingDebt: 180_000 })).toBe(true);
-    expect(isRepayableProperty({ type: 'realestate', assetClass: 'realestate', outstandingDebt: 0 })).toBe(false);
-    expect(isRepayableProperty({ type: 'realestate', assetClass: 'realestate' })).toBe(false);
-    expect(isRepayableProperty({ type: 'etf', assetClass: 'realestate', outstandingDebt: 1 })).toBe(false);
+describe('isRepayableDebt', () => {
+  it('should offer a loan with a principal left, and a legacy property still carrying a debt', () => {
+    expect(isRepayableDebt({ type: 'loan', assetClass: 'realestate', quantity: 95_000 })).toBe(true);
+    expect(isRepayableDebt({ type: 'loan', assetClass: 'cash', quantity: 0 })).toBe(false);
+    expect(isRepayableDebt({ type: 'realestate', assetClass: 'realestate', quantity: 1, outstandingDebt: 180_000 })).toBe(true);
+    expect(isRepayableDebt({ type: 'realestate', assetClass: 'realestate', quantity: 1, outstandingDebt: 0 })).toBe(false);
+    expect(isRepayableDebt({ type: 'realestate', assetClass: 'realestate', quantity: 1 })).toBe(false);
+    expect(isRepayableDebt({ type: 'etf', assetClass: 'realestate', quantity: 1, outstandingDebt: 1 })).toBe(false);
+  });
+});
+
+describe('planDebtRepayments and planDebtEdit — a payoff row', () => {
+  it('should apply a payoff as all principal, then the next instalment on the debt it left', () => {
+    const debts = new Map([['casa', { debt: 10_000, annualRatePct: 3.6 }]]);
+    const plan = planDebtRepayments(
+      [instalment('payoff', new Date(2026, 8, 1, 12), { amount: -4000, isDebtPayoff: true }), instalment('next', PAST, { amount: -500 })],
+      debts
+    );
+    expect(plan.principals.get('payoff')).toBe(4000);
+    expect(plan.interests.get('payoff')).toBe(0);
+    // 6.000 × 3,6% / 12 = 18 of interest → 482 of principal.
+    expect(plan.principals.get('next')).toBe(482);
+    expect(plan.debts.get('casa')).toBe(5518);
+  });
+
+  it('should read the payoff flag as a change worth recomputing', () => {
+    const before = { type: 'debt' as const, amount: -1012, debtAssetId: 'casa', debtPrincipalRepaid: 412 };
+    expect(planDebtEdit(before, { type: 'debt', amount: -1012, debtAssetId: 'casa', date: PAST }, TODAY).unchanged).toBe(true);
+    expect(planDebtEdit(before, { type: 'debt', amount: -1012, debtAssetId: 'casa', isDebtPayoff: true, date: PAST }, TODAY).unchanged).toBe(false);
   });
 });

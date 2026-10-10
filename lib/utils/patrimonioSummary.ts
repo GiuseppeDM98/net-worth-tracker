@@ -54,6 +54,16 @@ export function isCashAccount(asset: Pick<Asset, 'type' | 'assetClass'>): boolea
 }
 
 /**
+ * A row of the Liquidità tile: a cash account, or a loan that finances no property (owner,
+ * 2026-10-10: a personal loan is negative liquidity, like a credit card — it reads «debito» beside
+ * the accounts). A mortgage sits in the Immobili class and is not liquidity. Wider than
+ * `isCashAccount` on purpose: a loan is never a settlement account, so the picker rule stays.
+ */
+export function isLiquidityRow(asset: Pick<Asset, 'type' | 'assetClass'>): boolean {
+  return isCashAccount(asset) || (asset.type === 'loan' && asset.assetClass === 'cash');
+}
+
+/**
  * A position still held. `quantity = 0` marks a sold asset (doc/guide/patrimonio.md § Asset Pricing, FX and Assets): it stays
  * in the table with its «Azzerato» badge, but it is not something the user owns — every count,
  * share and sum on the page runs over held positions only.

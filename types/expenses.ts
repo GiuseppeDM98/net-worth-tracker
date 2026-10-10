@@ -133,17 +133,23 @@ export interface Expense {
   // server settles it on the day (lib/server/cashSettlement.ts). Absent = applied — every row
   // written before the rule moved its account at save, so none is ever applied twice.
   balancePending?: boolean;
-  // The fee of a transfer is a row of its own (lib/utils/transferFee.ts): a spending row in the
-  // category chosen in Impostazioni, debiting the transfer's origin on the transfer's date. The
-  // two point at each other — the transfer names its fee, the fee names its transfer — so the fee
-  // is edited from the transfer and deleted with it.
-  transferFeeExpenseId?: string; // On a transfer: the fee row it created
-  feeOfTransferId?: string; // On a fee row: the transfer it was charged for
-  // A `debt` row may repay a property's mortgage (lib/utils/mortgageRepayment.ts): on the row's
-  // date — `balancePending` until then, like its account — the property's `outstandingDebt` falls by
-  // the instalment's PRINCIPAL (instalment − debt × TAN / 12), which is then stored here so an edit
-  // or a delete gives back exactly what was repaid. Absent while pending.
+  // The fee of a row is a row of its own (lib/utils/expenseFee.ts): a spending row in the category
+  // chosen in Impostazioni, debiting the parent row's account on the parent's date. The two point
+  // at each other — the parent names its fee, the fee names its parent — so the fee is edited from
+  // the parent and deleted with it. Since 2026-10-10 ANY row can carry one (a transfer only until
+  // then, hence the field names, kept so no document had to be rewritten); every occurrence of a
+  // series carries its own.
+  transferFeeExpenseId?: string; // On any row: the fee row it created
+  feeOfTransferId?: string; // On a fee row: the row it was charged for
+  // A `debt` row may repay a loan (lib/utils/mortgageRepayment.ts; a property's own debt until
+  // 2026-10-10): on the row's date — `balancePending` until then, like its account — the loan's
+  // principal falls by the instalment's PRINCIPAL (instalment − debt × TAN / 12), which is then
+  // stored here so an edit or a delete gives back exactly what was repaid. Absent while pending.
   debtAssetId?: string;
+  // «Estinzione anticipata» (2026-10-10): the row repays its whole amount as principal, no interest
+  // split — a partial or total early repayment. A penalty or the period's accrued interest is a
+  // cost, and goes on the row's fee (`transferFeeExpenseId`), never into the principal.
+  isDebtPayoff?: boolean;
   debtPrincipalRepaid?: number;
   // The interest the same instalment paid (debt × TAN / 12 on the day it settled), stored beside
   // the principal for Patrimonio's «Mutuo» tile. Absent on a row settled before the field existed:
@@ -263,9 +269,10 @@ export interface ExpenseFormData {
   linkedCashAssetId?: string; // ID of cash asset whose balance the row moves on its date
   transferCashAssetId?: string; // Destination cash asset for transfers (origin = linkedCashAssetId)
   balancePending?: boolean; // Written by the edit path: the row's new date is still to come (see Expense)
-  transferFeeExpenseId?: string; // On a transfer: its fee row (see Expense); written by the service
-  feeOfTransferId?: string; // On a fee row: its transfer (see Expense); written by the service
-  debtAssetId?: string; // On a debt row: the property whose debt it repays on its date (see Expense)
+  transferFeeExpenseId?: string; // On any row: its fee row (see Expense); written by the service
+  feeOfTransferId?: string; // On a fee row: the row it was charged for (see Expense); written by the service
+  debtAssetId?: string; // On a debt row: the loan it repays on its date (see Expense)
+  isDebtPayoff?: boolean; // On a debt row: an early repayment, all principal (see Expense)
   costCenterId?: string;    // Optional cost center assignment
   costCenterName?: string;  // Denormalized name, must be kept in sync via costCenterService
   personalMemberId?: string; // FamilyMember this row belongs to; absent = in comune (see Expense)

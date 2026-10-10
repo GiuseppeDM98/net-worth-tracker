@@ -25,7 +25,7 @@ import {
   describeSettlementTiming,
   describeWithheldTaxField,
   describeSnapshotOverwrite,
-  describeTransferFeeField,
+  describeExpenseFeeField,
   describeDebtRepaymentField,
   describeTradeIntent,
   describeWriteError,
@@ -559,29 +559,44 @@ describe('describeExpenseDeleteConsequence — the row says what the second pres
   });
 });
 
-describe('describeTransferFeeField — the line under a transfer\'s «Commissione»', () => {
+describe('describeExpenseFeeField — the line under «Commissione»', () => {
   const flat = (text: string | null) => text?.replace(/\u00a0/g, ' ') ?? null;
 
-  it('says what a typed fee does: more money out of the origin, as a spending row', () => {
-    expect(flat(describeTransferFeeField({ amount: 1.5, categoryLabel: 'Commissioni › Bonifici', savedAmount: null }))).toBe(
+  it('says what a typed fee does on a transfer: more money out of the origin, as a spending row', () => {
+    expect(flat(describeExpenseFeeField({ amount: 1.5, categoryLabel: 'Commissioni › Bonifici', savedAmount: null, type: 'transfer' }))).toBe(
       'Dal conto di origine escono 1,50 € in più: una spesa in Commissioni › Bonifici alla data del trasferimento.'
     );
   });
 
+  it('says what a typed fee does on any other row: out of its account, on its date', () => {
+    expect(flat(describeExpenseFeeField({ amount: 2, categoryLabel: 'Commissioni', savedAmount: null, type: 'debt' }))).toBe(
+      'Dal conto collegato escono 2,00 € in più: una spesa in Commissioni alla data della voce.'
+    );
+  });
+
+  it('says that a series charges the fee on every occurrence', () => {
+    expect(flat(describeExpenseFeeField({ amount: 2, categoryLabel: 'Commissioni', savedAmount: null, type: 'debt', isSeries: true }))).toBe(
+      'Su ogni voce della serie escono 2,00 € in più dal conto collegato: una spesa in Commissioni per ciascuna, alla sua data.'
+    );
+  });
+
   it('invites the fee while the field is empty', () => {
-    expect(describeTransferFeeField({ amount: null, categoryLabel: 'Commissioni', savedAmount: null })).toBe(
-      "Il costo del bonifico, se c'è: diventa una spesa in Commissioni, addebitata sul conto di origine."
+    expect(describeExpenseFeeField({ amount: null, categoryLabel: 'Commissioni', savedAmount: null, type: 'transfer' })).toBe(
+      'Il costo bancario dell’operazione, se c’è: diventa una spesa in Commissioni, addebitata sul conto di origine.'
+    );
+    expect(describeExpenseFeeField({ amount: null, categoryLabel: 'Commissioni', savedAmount: null, type: 'variable' })).toBe(
+      'Il costo bancario dell’operazione, se c’è: diventa una spesa in Commissioni, addebitata sul conto collegato.'
     );
   });
 
   it('says that clearing a saved fee deletes it and gives back what it paid', () => {
-    expect(flat(describeTransferFeeField({ amount: null, categoryLabel: 'Commissioni', savedAmount: 2 }))).toBe(
+    expect(flat(describeExpenseFeeField({ amount: null, categoryLabel: 'Commissioni', savedAmount: 2, type: 'transfer' }))).toBe(
       'Svuotata, la commissione di 2,00 € viene eliminata e il conto di origine riaccreditato di quanto aveva già pagato.'
     );
   });
 
   it('has nothing to say without somewhere for the fee to land (the form links Impostazioni)', () => {
-    expect(describeTransferFeeField({ amount: 3, categoryLabel: null, savedAmount: null })).toBeNull();
+    expect(describeExpenseFeeField({ amount: 3, categoryLabel: null, savedAmount: null, type: 'transfer' })).toBeNull();
   });
 });
 
@@ -685,9 +700,9 @@ describe('describeLinkSeriesReading — «Collega la serie a un conto»', () => 
       'Le 3 voci future, dal 28 settembre 2026, ridurranno il debito di Casa della loro quota capitale, ciascuna alla sua data; le 9 già avvenute restano come sono.',
     );
     expect(plain(describeLinkSeriesReading({ mode: 'installment', futureCount: 1, firstDate: first, pastCount: 0, accountName: null, target: 'debt' }))).toBe(
-      'L’unica rata futura, il 28 settembre 2026, ridurrà il debito dell’immobile che scegli della sua quota capitale.',
+      'L’unica rata futura, il 28 settembre 2026, ridurrà il debito del prestito che scegli della sua quota capitale.',
     );
-    expect(plain(describeLinkSeriesReading({ mode: 'recurring', futureCount: 0, firstDate: null, pastCount: 4, accountName: 'Casa', target: 'debt' }))).toContain('riducono già il debito di un immobile');
+    expect(plain(describeLinkSeriesReading({ mode: 'recurring', futureCount: 0, firstDate: null, pastCount: 4, accountName: 'Casa', target: 'debt' }))).toContain('riducono già il debito di un prestito');
   });
 });
 
@@ -695,26 +710,36 @@ describe('describeDebtRepaymentField — the line under «Riduce il debito di»'
   const flat = (text: string) => text.replace(/\u00a0/g, ' ');
 
   it('should invite the link while no property is chosen', () => {
-    expect(describeDebtRepaymentField({ propertyName: null, debt: 0, instalment: null, split: null })).toBe(
-      'Se è la rata di un mutuo, scegli l’immobile: alla data della rata il suo debito scende della quota capitale.'
+    expect(describeDebtRepaymentField({ loanName: null, debt: 0, instalment: null, split: null })).toBe(
+      'Se è la rata di un mutuo o di un prestito, scegli il prestito: alla data della rata il suo debito scende della quota capitale.'
     );
   });
 
   it('should split this instalment into principal and interest on today\'s debt', () => {
-    expect(flat(describeDebtRepaymentField({ propertyName: 'Casa', debt: 200_000, annualRatePct: 3.6, instalment: 1012, split: { interest: 600, principal: 412 } }))).toBe(
+    expect(flat(describeDebtRepaymentField({ loanName: 'Casa', debt: 200_000, annualRatePct: 3.6, instalment: 1012, split: { interest: 600, principal: 412 } }))).toBe(
       'Alla data della rata il debito di Casa scende della quota capitale: sul debito di oggi 412,00 € di 1012,00 €, il resto (600,00 €) sono interessi al TAN 3,6%.'
     );
   });
 
   it('should name the debt and the TAN before an amount is typed', () => {
-    expect(flat(describeDebtRepaymentField({ propertyName: 'Casa', debt: 182_000, annualRatePct: 3.25, instalment: null, split: null }))).toBe(
+    expect(flat(describeDebtRepaymentField({ loanName: 'Casa', debt: 182_000, annualRatePct: 3.25, instalment: null, split: null }))).toBe(
       'Alla data della rata il debito di Casa (182.000,00 €) scende della quota capitale, al TAN 3,25%.'
     );
   });
 
   it('should say that without a TAN the whole instalment lowers the debt', () => {
-    expect(describeDebtRepaymentField({ propertyName: 'Casa', debt: 1000, instalment: 100, split: { interest: 0, principal: 100 } })).toBe(
-      'Alla data della rata il debito di Casa scende dell’intera rata: l’immobile non ha un TAN (si imposta in Patrimonio).'
+    expect(describeDebtRepaymentField({ loanName: 'Casa', debt: 1000, instalment: 100, split: { interest: 0, principal: 100 } })).toBe(
+      'Alla data della rata il debito di Casa scende dell’intera rata: il prestito non ha un TAN (si imposta in Patrimonio).'
     );
+  });
+
+  it('should read a payoff as all principal, partial or total, and send the costs to the fee', () => {
+    expect(flat(describeDebtRepaymentField({ loanName: 'Mutuo Casa', debt: 10_000, annualRatePct: 3.6, instalment: 4000, split: { interest: 0, principal: 4000 }, isPayoff: true }))).toBe(
+      'Estinzione parziale: alla data della voce il debito di Mutuo Casa scende di 4000,00 €, da 10.000,00 € a 6000,00 €. Una penale o gli interessi del periodo vanno nella commissione.'
+    );
+    expect(flat(describeDebtRepaymentField({ loanName: 'Mutuo Casa', debt: 10_000, annualRatePct: 3.6, instalment: 10_000, split: { interest: 0, principal: 10_000 }, isPayoff: true }))).toBe(
+      'Estinzione totale: alla data della voce il debito di Mutuo Casa (10.000,00 €) va a zero. Una penale o gli interessi del periodo vanno nella commissione.'
+    );
+    expect(flat(describeDebtRepaymentField({ loanName: 'Mutuo Casa', debt: 10_000, instalment: null, split: null, isPayoff: true }))).toContain('scende di tutto l’importo');
   });
 });

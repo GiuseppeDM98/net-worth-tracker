@@ -20,8 +20,9 @@
  * - `realestate`: property appraisals, not market quotes
  * - `cash`: the unit of measurement itself, price is always 1
  * - `pensionFund`: the value is an "estratto conto" overwrite from the fund manager
+ * - `loan`: the outstanding principal, as the bank states it, moved by the linked instalments
  */
-const MANUALLY_VALUED_TYPES: ReadonlySet<string> = new Set(['realestate', 'cash', 'pensionFund']);
+const MANUALLY_VALUED_TYPES: ReadonlySet<string> = new Set(['realestate', 'cash', 'pensionFund', 'loan']);
 
 /**
  * Sub-category that overrides an otherwise market-traded type. A Private Equity position sits

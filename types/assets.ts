@@ -11,11 +11,31 @@ import type { PensionFundDetails } from './pension';
 // - cash -> cash
 // - realestate -> realestate
 // - pensionFund -> equity (fallback only; the real mix lives in `composition`) - see TYPE_TO_CLASS
+// - loan -> the class of what it finances: realestate when `financedAssetId` names a property,
+//           cash otherwise (a personal loan is negative liquidity, like a credit card) - see TYPE_TO_CLASS
 //
 // WARNING: adding a type here requires updating TYPE_TO_CLASS in components/assets/AssetDialog.tsx
-// (exhaustive `Record<AssetType, AssetClass>` — tsc catches this one) and deciding whether the type
+// (exhaustive `Record<AssetType, AssetClass>` — tsc catches this one), MANUALLY_VALUED_TYPES in
+// lib/utils/assetPricing.ts when its value is typed by hand, and deciding whether the type
 // belongs in LEDGER_ASSET_TYPES (types/assetTransactions.ts — tsc does NOT catch that one).
-export type AssetType = 'stock' | 'etf' | 'bond' | 'crypto' | 'commodity' | 'cash' | 'realestate' | 'pensionFund';
+export type AssetType = 'stock' | 'etf' | 'bond' | 'crypto' | 'commodity' | 'cash' | 'realestate' | 'pensionFund' | 'loan';
+
+/**
+ * A `loan` is a LIABILITY stored as an asset (owner, 2026-10-10): a mortgage or a personal loan
+ * whose `quantity` is the outstanding principal (positive, as the bank states it) at
+ * `currentPrice` 1, and whose value is MINUS that principal (`calculateAssetValue`). It sits in
+ * the assets collection so every total — net worth, the class sums, the snapshots, Storico, FIRE —
+ * subtracts it with no second reader: a property stays at its gross value and its mortgage is a
+ * row of its own beside it, so the «Immobili» class still sums to the equity it summed to when the
+ * debt was a field of the property. A `debt` cashflow row linked to it (`Expense.debtAssetId`)
+ * lowers the principal on its own date (lib/utils/mortgageRepayment.ts).
+ */
+export const LOAN_ASSET_TYPE: AssetType = 'loan';
+
+/** Whether an asset is a loan — the ONE predicate, so no reader spells the type name itself. */
+export function isLoanAsset(asset: Pick<Asset, 'type'>): boolean {
+  return asset.type === LOAN_ASSET_TYPE;
+}
 // trendFollowing (managed futures) and carry are exposure-only classes reached via a leveraged/
 // composite `etf`'s `composition` legs — no
 // AssetType maps to them directly in TYPE_TO_CLASS.
@@ -23,8 +43,10 @@ export type AssetClass = 'equity' | 'bonds' | 'crypto' | 'realestate' | 'cash' |
                         | 'trendFollowing' | 'carry';
 
 // Coupon payment frequency for bonds.
-// Determines how many times per year the coupon is paid.
-export type CouponFrequency = 'monthly' | 'quarterly' | 'semiannual' | 'annual';
+// Determines how many times per year the coupon is paid. `maturity` is ONE coupon, paid with the
+// redemption (the BTP Valore «Insieme» of October 2026): the annual rate capitalises over the
+// bond's whole life and is cashed once — see `calculateCouponPerShare` in lib/utils/couponUtils.ts.
+export type CouponFrequency = 'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'maturity';
 
 // One tier of a step-up coupon schedule.
 // yearFrom/yearTo are 1-based years from issueDate (inclusive).
@@ -174,10 +196,20 @@ export interface Asset {
   isLiquid?: boolean; // Default: true - indicates whether the asset is liquid or illiquid
   autoUpdatePrice?: boolean; // Default: true - indicates whether price should be automatically updated via Yahoo Finance
   composition?: AssetComposition[]; // For composite assets (e.g., pension funds with mixed allocation: 60% equity, 40% bonds)
-  outstandingDebt?: number; // Outstanding mortgage/loan for real estate. Net value calculation: value - outstandingDebt
-  // The mortgage's TAN in percent (3.2 = 3,2%): splits each linked instalment into interest and the
-  // principal that lowers `outstandingDebt` (lib/utils/mortgageRepayment.ts). Absent = a 0% loan.
+  // LEGACY (until 2026-10-10): the mortgage as a field of the property, netted off its value by
+  // `calculateAssetValue`. Since then a debt is a `loan` asset of its own (see LOAN_ASSET_TYPE) and
+  // `migratePropertyDebtsToLoans` (lib/services/loanMigration.ts) moves every property's debt into
+  // one on the owner's first visit to Patrimonio. Read-only: the form never writes it any more,
+  // the netting stays for a document the migration has not reached (the demo account).
+  outstandingDebt?: number;
+  // On a `loan`: its TAN in percent (3.2 = 3,2%), which splits each linked instalment into interest
+  // and the principal that lowers `quantity` (lib/utils/mortgageRepayment.ts). Absent = a 0% loan.
   debtInterestRate?: number;
+  // On a `loan`: the property it finances (a `realestate` asset of the same owner). Decides the
+  // loan's class (realestate, else cash), its FIRE exclusion (it follows an excluded primary
+  // residence — `filterFireEligibleAssets`) and Patrimonio's «Mutuo» tile eyebrow. Absent = a
+  // personal loan.
+  financedAssetId?: string;
   isPrimaryResidence?: boolean; // Indicates if this real estate is the primary residence (excluded from FIRE calculations based on user setting)
   allocationRole?: AllocationRole; // How the Allocazione page treats this asset. See AllocationRole. Absent → legacy excludeFromAllocation, else 'tradable'.
   /** @deprecated Superseded by `allocationRole`. Read-only legacy fallback: true → 'excluded'. Never write it. */
@@ -223,8 +255,9 @@ export interface AssetFormData {
   isLiquid?: boolean;
   autoUpdatePrice?: boolean;
   composition?: AssetComposition[];
-  outstandingDebt?: number;
-  debtInterestRate?: number; // TAN % of the mortgage (see Asset)
+  outstandingDebt?: number; // LEGACY, never set by the form: sent `undefined` so a save clears a migrated field (see Asset)
+  debtInterestRate?: number; // TAN % of a loan (see Asset)
+  financedAssetId?: string; // The property a loan finances (see Asset)
   isPrimaryResidence?: boolean;
   allocationRole?: AllocationRole; // How the Allocazione page treats this asset. See AllocationRole.
   leverageRatio?: number; // For a leveraged/composite ETF: 2 = 2x, 3 = 3x, 1 or absent = no leverage.

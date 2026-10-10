@@ -124,6 +124,39 @@ describe('buildMonthlyGrowthDrivers — a month measured instrument by instrumen
     expect(september.debtRepaid).toBeCloseTo(-40.72, 6);
   });
 
+  it('should measure the mortgage from a LOAN row (minus its principal) and keep it out of the market (2026-10-10)', () => {
+    // The same September, on the new model: the house at its gross value and the loan beside it,
+    // 60.000 € in August and 59.500 € in September — the same 500 € of principal repaid.
+    const assets = [...ASSETS, { id: 'loan', name: 'Mutuo Casa', type: 'loan', financedAssetId: 'house' }] as unknown as Asset[];
+    const august = snap(2026, 8, [row('vwce', 10, 100, 1000), row('cash', 500, 1, 500), row('house', 1, 100000, 100000), row('loan', 60000, 1, -60000), row('fund', 2000, 1, 2000)]);
+    const september = snap(2026, 9, [row('vwce', 0, 120, 0), row('copper', 5, 104, 520), row('cash', 1343, 1, 1343), row('house', 1, 100000, 100000), row('loan', 59500, 1, -59500), row('fund', 2150, 1, 2150)]);
+    const [drivers] = buildMonthlyGrowthDrivers([august, september], context({ assets }));
+    const [legacy] = buildMonthlyGrowthDrivers([AUGUST, SEPTEMBER], context());
+    expect(drivers.debtRepaid).toBeCloseTo(500, 6);
+    expect(drivers.market).toBeCloseTo(legacy.market, 6);
+    expect(drivers.other).toBeCloseTo(legacy.other, 6);
+  });
+
+  it('should cross the migration month without a jump: the legacy debt falls to zero, the loan opens by the same figure', () => {
+    // August on the old model (house net of 60.000 €), September on the new one (house gross, loan −59.500 €).
+    const assets = [...ASSETS, { id: 'loan', name: 'Mutuo Casa', type: 'loan', financedAssetId: 'house' }] as unknown as Asset[];
+    const september = snap(2026, 9, [row('vwce', 0, 120, 0), row('copper', 5, 104, 520), row('cash', 1343, 1, 1343), row('house', 1, 100000, 100000), row('loan', 59500, 1, -59500), row('fund', 2150, 1, 2150)]);
+    const [drivers] = buildMonthlyGrowthDrivers([AUGUST, september], context({ assets }));
+    expect(drivers.debtRepaid).toBeCloseTo(500, 6);
+    expect(drivers.netWorthGrowth).toBeCloseTo(SEPTEMBER.totalNetWorth - AUGUST.totalNetWorth, 6);
+  });
+
+  it('should read a loan opened in the month as debt that went up, and one deleted after its payoff as repaid', () => {
+    const assets = [...ASSETS, { id: 'loan', name: 'Prestito auto', type: 'loan' }] as unknown as Asset[];
+    const before = snap(2026, 8, [row('cash', 500, 1, 500)]);
+    const opened = snap(2026, 9, [row('cash', 10500, 1, 10500), row('loan', 10000, 1, -10000)]);
+    const [opening] = buildMonthlyGrowthDrivers([before, opened], context({ assets, expenses: [] }));
+    expect(opening.debtRepaid).toBeCloseTo(-10000, 6);
+    const closed = snap(2026, 10, [row('cash', 500, 1, 500)]);
+    const [closing] = buildMonthlyGrowthDrivers([opened, closed], context({ assets, expenses: [] }));
+    expect(closing.debtRepaid).toBeCloseTo(10000, 6);
+  });
+
   it('should fall back to the residual net of what is named when a snapshot has no per-instrument breakdown', () => {
     const legacyAugust = snap(2026, 8, [], 43500);
     const [september] = buildMonthlyGrowthDrivers([legacyAugust, SEPTEMBER], context());

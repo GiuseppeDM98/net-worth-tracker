@@ -19,6 +19,11 @@ describe('suggestIsLiquid', () => {
     expect(suggestIsLiquid('pensionFund')).toBe(false);
   });
 
+  it('lets a loan follow what it finances: a mortgage is illiquid, a personal loan negative liquidity', () => {
+    expect(suggestIsLiquid('loan', undefined, 'house')).toBe(false);
+    expect(suggestIsLiquid('loan')).toBe(true);
+  });
+
   it('suggests illiquid for a Private Equity position, whatever the type', () => {
     expect(suggestIsLiquid('stock', 'Private Equity')).toBe(false);
   });

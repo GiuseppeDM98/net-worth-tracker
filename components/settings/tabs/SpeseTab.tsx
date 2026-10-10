@@ -503,13 +503,13 @@ export function SpeseTab({
         )}
       </div>
 
-      {/* Commissioni sui trasferimenti — where a transfer's fee lands (lib/utils/transferFee.ts) */}
+      {/* Commissioni bancarie — where any row's fee lands (lib/utils/expenseFee.ts; the stored key keeps its transfer-era name) */}
       <div className={TILE_CELL_CLASS}>
         {categoriesState === 'failed' ? (
           <ErrorNotice
             onRetry={() => void onRetryCategories()}
             notice={describeReadFailure({
-              subject: 'Commissioni sui trasferimenti',
+              subject: 'Commissioni bancarie',
               consequence:
                 'Le categorie non sono state lette: quella delle commissioni non si può mostrare. Quella salvata resta.',
               canRetry: true,
@@ -517,7 +517,7 @@ export function SpeseTab({
           />
         ) : (
         <Tile
-          eyebrow="Commissioni sui trasferimenti"
+          eyebrow="Commissioni bancarie"
           reading={
             categoriesState === 'loading'
               ? null
@@ -538,7 +538,7 @@ export function SpeseTab({
                   value={transferFeeCategoryId || undefined}
                   onValueChange={(value) => onChange({ transferFeeCategoryId: value, transferFeeSubCategoryId: '' })}
                 >
-                  <SelectTrigger className={cn('w-52', INTERACTIVE_CONTROL_CLASS)} aria-label="Categoria delle commissioni sui trasferimenti">
+                  <SelectTrigger className={cn('w-52', INTERACTIVE_CONTROL_CLASS)} aria-label="Categoria delle commissioni bancarie">
                     <SelectValue placeholder="Seleziona categoria" />
                   </SelectTrigger>
                   <SelectContent>
@@ -582,7 +582,7 @@ export function SpeseTab({
                   onValueChange={(value) => onChange({ transferFeeSubCategoryId: value })}
                   disabled={!transferFeeCategoryId}
                 >
-                  <SelectTrigger className={cn('w-52', INTERACTIVE_CONTROL_CLASS)} aria-label="Sottocategoria delle commissioni sui trasferimenti">
+                  <SelectTrigger className={cn('w-52', INTERACTIVE_CONTROL_CLASS)} aria-label="Sottocategoria delle commissioni bancarie">
                     <SelectValue placeholder="Seleziona sottocategoria" />
                   </SelectTrigger>
                   <SelectContent>

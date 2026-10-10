@@ -41,6 +41,8 @@ export interface PatrimonioVerdictInput {
   instrumentCount: number;
   /** Cash accounts (type cash AND class cash). */
   accountCount: number;
+  /** Loans with a principal left (types/assets.ts → LOAN_ASSET_TYPE); absent on an older caller. */
+  loanCount?: number;
   /** Portfolio-wide market effect this month; null when not attributable. */
   marketEffect: number | null;
   /** The instrument whose market price moved the most; null when none. */
@@ -202,8 +204,12 @@ function resolveHeadline(input: PatrimonioVerdictInput): ResolvedHeadline {
   };
 }
 
-/** ", 16 strumenti e 3 conti" — whichever counts are non-zero, in the singular when one. */
-function buildCountClause(instrumentCount: number, accountCount: number): Narrative {
+/**
+ * ", 16 strumenti, 3 conti e 1 prestito" — whichever counts are non-zero, in the singular when
+ * one; the loans (types/assets.ts → LOAN_ASSET_TYPE) are neither instruments nor accounts and
+ * are counted apart, so «18 strumenti» never includes a debt.
+ */
+function buildCountClause(instrumentCount: number, accountCount: number, loanCount: number = 0): Narrative {
   const parts: Narrative[] = [];
   if (instrumentCount > 0) {
     parts.push([figure(String(instrumentCount)), prose(` ${pluralize(instrumentCount, 'strumento', 'strumenti')}`)]);
@@ -211,18 +217,21 @@ function buildCountClause(instrumentCount: number, accountCount: number): Narrat
   if (accountCount > 0) {
     parts.push([figure(String(accountCount)), prose(` ${pluralize(accountCount, 'conto', 'conti')}`)]);
   }
+  if (loanCount > 0) {
+    parts.push([figure(String(loanCount)), prose(` ${pluralize(loanCount, 'prestito', 'prestiti')}`)]);
+  }
   if (parts.length === 0) return [];
   const clause: Narrative = [prose(', ')];
   parts.forEach((part, i) => {
-    if (i > 0) clause.push(prose(' e '));
+    if (i > 0) clause.push(prose(i === parts.length - 1 ? ' e ' : ', '));
     clause.push(...part);
   });
   return clause;
 }
 
-/** "16 strumenti e 3 conti" as plain text — the hero tile's count line. Empty when both are 0. */
-export function formatHoldingCounts(instrumentCount: number, accountCount: number): string {
-  return buildCountClause(instrumentCount, accountCount)
+/** "16 strumenti e 3 conti" as plain text — the hero tile's count line. Empty when all are 0. */
+export function formatHoldingCounts(instrumentCount: number, accountCount: number, loanCount: number = 0): string {
+  return buildCountClause(instrumentCount, accountCount, loanCount)
     .map((segment) => segment.text)
     .join('')
     .replace(/^, /, '');
@@ -247,7 +256,7 @@ export function buildPatrimonioVerdict(input: PatrimonioVerdictInput): Patrimoni
     );
   }
 
-  sentence.push(...buildCountClause(input.instrumentCount, input.accountCount));
+  sentence.push(...buildCountClause(input.instrumentCount, input.accountCount, input.loanCount ?? 0));
 
   // The top mover explains the MARKET half, not the month (the Panoramica's driver clause says the
   // same): «ha fatto il grosso» credited an instrument with more than the month's whole change.
@@ -417,6 +426,18 @@ export function describeManualValuation(lastUpdate: Date | null | undefined, now
 }
 
 /**
+ * «mutuo su Casa · TAN 3,2%» / «prestito · senza TAN» — the sub-line of a loan row (types/assets.ts
+ * → LOAN_ASSET_TYPE): what it finances and the rate its instalments are split on. A TAN prints with
+ * the decimals it was typed with, never a padded «3,20%».
+ */
+export function describeLoanRow(financedAssetName: string | null, annualRatePct: number | undefined): string {
+  const subject = financedAssetName ? `mutuo su ${financedAssetName}` : 'prestito';
+  if (!annualRatePct || annualRatePct <= 0) return `${subject} · senza TAN`;
+  const rate = new Intl.NumberFormat('it-IT', { style: 'percent', maximumFractionDigits: 3 }).format(annualRatePct / 100);
+  return `${subject} · TAN ${rate}`;
+}
+
+/**
  * "prezzi aggiornati oggi alle 09:12" — the compact header's description. Day words follow the
  * Italian wall clock of both instants; beyond yesterday the date is spelled as dd/MM.
  */
@@ -449,13 +470,18 @@ function dayMonthOf(date: Date): string {
   return `${date.getDate()} ${MONTH_NAMES[date.getMonth()].toLowerCase()}`;
 }
 
+/** «il mutuo» or «il prestito», by what the loan finances (lib/utils/mortgageSummary.ts). */
+export function loanNoun(kind: MortgageSummary['kind']): string {
+  return kind === 'mortgage' ? 'mutuo' : 'prestito';
+}
+
 /** Where the plan ends, as the clause that closes the reading; null without a projection. */
 function describePayoff(summary: MortgageSummary): NarrativeSegment[] | null {
   const payoff = summary.payoff;
   if (!payoff) return null;
   if (payoff.kind === 'repaid') return [prose('il debito è estinto.')];
   if (payoff.kind === 'never') return [prose('con questa rata il debito non scende: copre appena gli interessi.')];
-  return [prose('al ritmo di oggi il mutuo si chiude a '), figure(monthYearOf(payoff.date)), prose('.')];
+  return [prose(`al ritmo di oggi il ${loanNoun(summary.kind)} si chiude a `), figure(monthYearOf(payoff.date)), prose('.')];
 }
 
 /**

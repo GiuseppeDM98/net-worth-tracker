@@ -7,7 +7,8 @@
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Composite class chip** (2026-09-26): `InstrumentClassChip` in `components/assets/AssetRow.tsx` (desktop `Classe` column and phone row; the group header keeps `AssetClassChip`), pure `describeAssetClassChip` + `rankedClassLegs` + `SHORT_CLASS_LABELS` in `lib/utils/assetDisplayClass.ts`; tests `__tests__/assetDisplayClass.test.ts`, `e2e/assets.composite-chip.spec.ts` (1440: the 112px floor, «Andamento» without sideways scroll, the grouped header's plain chip; 390: the chip ends before the amount after a 12-character ticker, `main` does not scroll)
-- **Mutuo tile** (2026-09-25): `components/assets/tiles/MutuoTile.tsx`, pure `lib/utils/mortgageSummary.ts` (`summarizeMortgage`, `projectPayoff`, `interestPaidOf`), words `describeMortgage*` in `patrimonioNarrative.ts`, reader `getMortgageInstalments` + `lib/hooks/useMortgageInstalments.ts`; tests `__tests__/mortgageSummary.test.ts`, `e2e/cashflow.mortgage.spec.ts`
+- **Mutuo tile** (2026-09-25; per LOAN since 2026-10-10): `components/assets/tiles/MutuoTile.tsx`, pure `lib/utils/mortgageSummary.ts` (`summarizeMortgage`, `projectPayoff`, `interestPaidOf`), words `describeMortgage*` + `loanNoun` in `patrimonioNarrative.ts`, reader `getMortgageInstalments` + `lib/hooks/useMortgageInstalments.ts`; tests `__tests__/mortgageSummary.test.ts`, `e2e/cashflow.mortgage.spec.ts`
+- **Loans — a debt as an asset** (2026-10-10): `types/assets.ts` (`LOAN_ASSET_TYPE`, `isLoanAsset`, `Asset.financedAssetId`), the sign in `calculateAssetValue` (`lib/services/assetService.ts`, with `isFireExcluded`), `lib/utils/mortgageRepayment.ts` (`debtBalanceOf`, `debtBalanceField`, `isRepayableDebt`), the one-shot migration `lib/utils/loanMigration.ts` (pure plan) + `lib/services/loanMigration.ts` (fired by `app/dashboard/assets/page.tsx`), the Liquidità rows `isLiquidityRow` (`patrimonioSummary.ts`), the row's words `describeLoanRow`, the badge `resolveMortgageOf` (`AssetRow.tsx`), the form's «Prestito» card and `loanClassOf` (`AssetDialog.tsx`); tests `__tests__/loanAssets.test.ts`, `__tests__/updateAssetDebtFields.test.ts`, `e2e/cashflow.mortgage.spec.ts` (the migration case too)
 - **Patrimonio**: `app/dashboard/assets/page.tsx` (owns every dialog), `components/assets/*` (+ `PatrimonioTile`/`ComposizioneTile` reused from the overview), pure `lib/utils/{patrimonioNarrative,patrimonioSummary,assetPerformanceDeltas,costBasisEur}.ts` (`costBasisPerUnitEur`/`unitPriceEur` = EUR against EUR, fees included), `lib/utils/bondPricing.ts` (`resolveBondPrice` = the ONE Borsa Italiana quote → euro per unit, nominal 1 € by default, BTP€i coefficient; `toBorsaItalianaQuote` the inverse; shared with `lib/helpers/priceUpdater.ts`), `lib/utils/bondDetailsForm.ts` (`buildBondDetailsFromForm`, a rate of 0 is a zero coupon); `lib/services/assetService.ts`, `types/assets.ts`; spec `e2e/assets.bond.spec.ts`
 - **Light rows and dialogs** (2026-10-07): `StrumentiTile` (`useMediaQuery('(min-width: 1440px)')`, one list), `AssetRow` (`ASSET_ROW_LAZY_CHARTS`, the sparkline a `lazyComponent`), `AssetSparkline` (colours as a prop), the `{ open, mounted }` state and the openers in `app/dashboard/assets/page.tsx`, `onExitComplete` in `components/ui/responsive-modal.tsx`, the six watching leaves at the top of `AssetDialog.tsx`; specs `e2e/assets.rows.spec.ts` (1440) and `e2e/assets.rows.mobile.spec.ts` (390), the census scenario `asset` (`scripts/perfRenderCensus.mjs`)
 - **Suites to run after a change here — Asset / bond** (moved from `AGENTS.md` § Commands on 2026-09-30): `assetDialogHelpers`, `couponUtils`
@@ -217,21 +218,50 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   landed under 0,5% on the Panoramica (found in the browser, 2026-08-30). A hard-coded «al »/«del » is correct for most
   figures, which is precisely why it survives review — grep for a quoted preposition sitting next to a
   `formatPercentage` call before writing another one.
-- **A property's debt moves by itself when instalments are linked to it** (2026-09-25, doc/guide/cashflow.md § Expense
-  Sign Convention and Type Changes): the form's «TAN del mutuo» (`debtInterestRate`, shown with «Debito residuo»)
-  splits each linked instalment into interest and the principal that lowers `outstandingDebt`. Both fields are
-  user-clearable through `updateAsset`'s `'x' in updates` guard — before it, switching «Debito residuo» off saved
-  nothing and the debt came back on the next load (pinned by `__tests__/updateAssetDebtFields.test.ts`).
+- **A debt is a `loan` ASSET, worth minus its principal** (owner, 2026-10-10; `types/assets.ts` → `LOAN_ASSET_TYPE`).
+  Until then a mortgage was two fields of the property (`outstandingDebt`, `debtInterestRate`) netted off its value by
+  `calculateAssetValue`; now the property keeps its GROSS value and the loan is a row beside it: `quantity` is the
+  outstanding principal as the bank states it, `currentPrice` 1, the value `−quantity` (ONE branch, in
+  `calculateAssetValue`), so every sum — net worth, the class sums, the snapshots' `byAsset` (unit value −1, which keeps
+  `attributeSelectedChange`'s split exact), Storico, FIRE — subtracts it with no second reader. **Its class is the class
+  of what it finances** (`loanClassOf`): `realestate` when `financedAssetId` names a property, so «Immobili» still sums
+  to the equity it summed to before; `cash` for a personal loan, which is negative liquidity like a credit card (owner's
+  call) — it reads «debito» among the Liquidità rows (`isLiquidityRow`, wider than the cash-picker rule, which never
+  offers a loan as a settlement account) and opens the asset form, not the account detail. Defaults the form suggests:
+  `isLiquid` false when linked, `allocationRole: 'excluded'` always (a debt is not an investment; `buildHoldings`
+  skips a non-positive value anyway, so the FINANCED property enters the allocation gross if it is tradable — the
+  owner's house is excluded), `stampDutyExempt` true (never a securities account), out of every Rendimenti base
+  whatever the toggles (`resolvePerformanceExclusions`), no Δ column (`hasNoUnitPrice`), no G/P, never a dividend
+  payer. **FIRE leaves the loan out with the primary residence it finances** (`isFireExcluded`): the house out and its
+  mortgage in would charge the FIRE number with a debt on a thing it does not count. A repaid loan (`quantity` 0)
+  reads «Estinto» where a sold position reads «Azzerato» and counts in nothing (`isHeld`); the hero's count line says
+  «18 strumenti, 4 conti e 1 prestito» (`formatHoldingCounts`, loans counted apart). The TAN (`debtInterestRate`) and
+  the financed property are user-clearable through `updateAsset`'s `'x' in updates` guard; the form always sends
+  `outstandingDebt: undefined`, so a property saved after the migration sheds its legacy field.
+- **The migration is one shot, silent and idempotent** (`migratePropertyDebtsToLoans`, fired by the Patrimonio page
+  like the ledger migration and the PMC backfill, gated on the demo): every property with `outstandingDebt > 0` gets a
+  loan «Mutuo {name}» (debt, TAN, currency, class realestate, illiquid, excluded, exempt), the instalments linked to the
+  property are re-pointed at the loan (their stamps are facts of their day, so the «Mutuo» tile keeps its history) and
+  the two legacy fields leave the property — three writes in that order, the loan first, so a failure leaves the
+  account readable. The legacy netting stays in `calculateAssetValue` for a document the migration never reaches (the
+  demo account), the Driver reads both models across the migration month (doc/guide/storico.md), and `isRepayableDebt`
+  still offers a legacy property to an instalment. Pinned by `__tests__/loanAssets.test.ts` and the last case of
+  `e2e/cashflow.mortgage.spec.ts` (a reload creates no second loan).
+- **A property's value is a valuation, its mortgage a fact**: re-valuing the house from 130 to 150 moves the net worth
+  by 20.000 and Storico reads it as the property's «mercato» (gross of debt, as before); the loan does not move.
 - **«Mutuo» answers «quanto mi costa il mutuo?»** (2026-09-25, owner's choice of place): one full-width tile per
-  property with at least one linked instalment, between Rendimento and Strumenti. The reading says what this year's
+  LOAN with at least one linked instalment (per property until 2026-10-10), between Rendimento and Strumenti — eyebrow
+  «Mutuo» for a loan that finances a property, «Prestito» for a personal one (`MortgageSummary.kind`, the aside names
+  the property or the loan). The reading says what this year's
   SETTLED instalments paid in interest and repaid in principal, and where the plan ends; the KPIs are the debt, the
   year's interest and principal and the projected end; from the second measured year a «Per anno» table lists every
   year, the first one captioned from the link («da settembre») and the running one «finora». The interest is a MEASURE
   only from the rows the app settled — each stores `debtInterestPaid` beside `debtPrincipalRepaid` — and the
   instalments paid before the link are NOT reconstructed (owner): the footer says from when it counts. A row settled
   before the field existed reads it as instalment − principal (`interestPaidOf`). The end is the French amortisation
-  on today's debt, TAN and the latest linked instalment (`projectPayoff`: n = −ln(1 − D·r/P)/ln(1 + r), rounded up;
-  `never` when the instalment does not cover the interest). No figure takes a sign colour: interest is a cost already
+  on today's debt, TAN and the latest linked INSTALMENT (`projectPayoff`: n = −ln(1 − D·r/P)/ln(1 + r), rounded up;
+  `never` when the instalment does not cover the interest) — a payoff row (`isDebtPayoff`, doc/guide/cashflow.md) counts
+  in the year's principal but never sets the rhythm the end is projected on. No figure takes a sign colour: interest is a cost already
   counted in Cashflow, not a gain or a loss. The reader is ONE query for every property (`userId` equality +
   `debtAssetId in [...]`, two `.where()`, no composite index; past thirty properties the ids go in chunks of 30, read in
   parallel — Firestore's ceiling on an `in` filter, pinned by `__tests__/mortgageInstalmentsQuery.test.ts`; until
@@ -300,7 +330,8 @@ form whose fields depend on a discriminant, and the marker rule itself, stay the
 - **Composite chip**: sorting by «Classe» and the group headers still read the PREVALENT class only — a 60/40 fund
   sorts and groups with pure «Azioni» (one instrument, one row; the split lives in the chip); the chip's segments are
   the stored `composition`, never re-read from the market, so a fund whose mix drifted shows its last saved split.
-- **Mutuo**: the interest counts from the first instalment the app settled, never before the link; the projected end assumes monthly instalments of the latest linked amount at today's TAN (a variable rate moves it); the tile appears only for a property with a linked instalment, so a mortgage tracked without the link has no tile; the «Per anno» table appears from the second measured year.
+- **Mutuo**: the interest counts from the first instalment the app settled, never before the link; the projected end assumes monthly instalments of the latest linked amount at today's TAN (a variable rate moves it); the tile appears only for a loan with a linked instalment, so a loan tracked without the link has no tile; the «Per anno» table appears from the second measured year.
+- **Loans** (2026-10-10): a personal loan larger than the accounts turns the Liquidità class NEGATIVE on the Composizione tiles and in Storico's composition (the credit-card case of 2026-09-19, now reachable on purpose — declared, not clamped); a loan's row in Storico's «Valore per strumento» is a negative line that rises to zero; the Panoramica's «Asset principali» never ranks it (price effect 0 by construction); a loan deleted by hand after its payoff is read by the Driver as repaid in that month (its negative `totalValue` leaves the snapshots); the demo account keeps the legacy property debt (no write on the demo), so there a mortgage is still a field of the house and the «Mutuo» tile reads the property; the migration runs on the owner's next visit to Patrimonio and nowhere else — an account that never opens the page keeps the old model, which still works.
 - **FX** depends on Frankfurter with a 24h in-memory cache (no fallback on a cold instance). Pre-migration non-EUR assets without `currentPriceEur` show the native price as EUR until the first update; one with `autoUpdatePrice: false` never self-heals until re-saved. (moved from `CLAUDE.md` → Known Issues on 2026-09-19)
 - **Bonds saved before 2026-09-11 with the nominal empty or 1 keep a wrong PMC and opening trade** (the raw quote as
   euro: 99 for 0,99); the current price heals at the next cron, the PMC does not — corrected by the user from the

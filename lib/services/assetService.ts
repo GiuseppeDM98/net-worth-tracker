@@ -20,7 +20,7 @@ import { suggestIsLiquid } from '@/lib/utils/assetLiquidity';
 import { costBasisPerUnitEur, unitPriceEur } from '@/lib/utils/costBasisEur';
 import { CHECKING_ACCOUNT_STAMP_DUTY_EUR, CHECKING_ACCOUNT_STAMP_DUTY_THRESHOLD_EUR } from '@/lib/constants/stampDuty';
 import { invalidateDashboardOverviewSummary } from '@/lib/services/dashboardOverviewInvalidation';
-import { Asset, AssetFormData, BondDetails } from '@/types/assets';
+import { Asset, AssetFormData, BondDetails, isLoanAsset } from '@/types/assets';
 
 const ASSETS_COLLECTION = 'assets';
 
@@ -249,14 +249,19 @@ export async function updateAsset(
       cleanedUpdates.subCategory = deleteField();
     }
 
-    // The debt and its TAN are user-clearable (the «Debito residuo» switch off, an emptied TAN).
-    // The `in` guard keeps a partial caller — a price refresh — from wiping a debt it never sent;
-    // the linked instalments move the debt through their own transaction (debtRepaymentService).
+    // The legacy property debt, a loan's TAN and the property it finances are user-clearable (an
+    // emptied TAN, «Nessun immobile»; the form always sends `outstandingDebt` undefined, so a
+    // property saved after the migration sheds the legacy field). The `in` guard keeps a partial
+    // caller — a price refresh — from wiping a field it never sent; the linked instalments move a
+    // loan's principal through their own transaction (debtRepaymentService).
     if ('outstandingDebt' in updates && updates.outstandingDebt === undefined) {
       cleanedUpdates.outstandingDebt = deleteField();
     }
     if ('debtInterestRate' in updates && updates.debtInterestRate === undefined) {
       cleanedUpdates.debtInterestRate = deleteField();
+    }
+    if ('financedAssetId' in updates && updates.financedAssetId === undefined) {
+      cleanedUpdates.financedAssetId = deleteField();
     }
 
     // dividendCashAssetId is user-clearable («Predefinito» in AssetDialog). The `in` guard keeps a
@@ -539,13 +544,19 @@ export async function deleteAsset(assetId: string, userId: string): Promise<void
 }
 
 /**
- * Calculate total value of an asset
+ * Calculate total value of an asset — the ONE definition of an asset's EUR value.
  *
- * For real estate with outstanding debt: net value = gross value - debt
- * This calculates the equity (net ownership) rather than gross property value.
+ * A `loan` (types/assets.ts → LOAN_ASSET_TYPE) is a liability: its `quantity` is the outstanding
+ * principal and its value is MINUS that, so every sum over assets subtracts it by itself. The
+ * snapshot route stores the same figure in `byAsset.totalValue`, where a unit value of −1
+ * (`totalValue / quantity`) keeps the price/quantity attribution exact (snapshotAssetBreakdown.ts).
+ *
+ * LEGACY: a property that still carries `outstandingDebt` (a document the migration of
+ * lib/services/loanMigration.ts has not reached — the demo account) is netted here as it was
+ * until 2026-10-10, floored at 0 for an underwater mortgage.
  *
  * @param asset - Asset to calculate value for
- * @returns Total asset value (quantity × price, minus outstanding debt for real estate)
+ * @returns Total asset value (quantity × price; negative for a loan)
  */
 export function calculateAssetValue(asset: Asset): number {
   // The unit price in EUR (`unitPriceEur`, costBasisEur.ts): the pre-converted currentPriceEur
@@ -553,9 +564,9 @@ export function calculateAssetValue(asset: Asset): number {
   // price with the GBp guard. Per unit there, so the sale simulation and the yields share it.
   const baseValue = asset.quantity * unitPriceEur(asset);
 
-  // For real estate with outstanding debt, subtract the debt to get net equity.
-  // Use Math.max(0, ...) to prevent negative values for underwater mortgages
-  // (where debt > property value). Negative net worth is tracked at portfolio level.
+  // `|| 0` so a repaid loan is 0, never −0 (an `Object.is` equality and a «−0 €» print).
+  if (isLoanAsset(asset)) return -baseValue || 0;
+
   if (asset.assetClass === 'realestate' && asset.outstandingDebt) {
     return Math.max(0, baseValue - asset.outstandingDebt);
   }
@@ -593,7 +604,7 @@ export function calculateLiquidNetWorth(assets: Asset[]): number {
       }
       // Legacy fallback for documents saved before the field existed — the same
       // predicate as the AssetDialog default (see lib/utils/assetLiquidity.ts).
-      return suggestIsLiquid(asset.type, asset.subCategory);
+      return suggestIsLiquid(asset.type, asset.subCategory, asset.financedAssetId);
     })
     .reduce((total, asset) => total + calculateAssetValue(asset), 0);
 }
@@ -615,7 +626,7 @@ export function calculateIlliquidNetWorth(assets: Asset[]): number {
       }
       // Legacy fallback — exact complement of calculateLiquidNetWorth's, so the
       // two totals always partition the whole portfolio.
-      return !suggestIsLiquid(asset.type, asset.subCategory);
+      return !suggestIsLiquid(asset.type, asset.subCategory, asset.financedAssetId);
     })
     .reduce((total, asset) => total + calculateAssetValue(asset), 0);
 }
@@ -641,18 +652,30 @@ export function calculateIlliquidNetWorth(assets: Asset[]): number {
  * @returns Total value of FIRE-eligible assets
  */
 /**
+ * Whether the FIRE number leaves an asset out: a primary residence when the setting keeps it
+ * out, and the loan that finances it (2026-10-10) — the house out and its mortgage in would
+ * charge the FIRE net worth with a debt on a thing it does not count. The ONE predicate behind
+ * `filterFireEligibleAssets` and the two liquid/illiquid halves below.
+ */
+function isFireExcluded(asset: Asset, assets: Asset[], includePrimaryResidence: boolean): boolean {
+  if (includePrimaryResidence) return false;
+  const isExcludedHome = (candidate: Asset) => candidate.assetClass === 'realestate' && candidate.isPrimaryResidence === true;
+  if (isExcludedHome(asset)) return true;
+  if (isLoanAsset(asset) && asset.financedAssetId) {
+    const financed = assets.find((candidate) => candidate.id === asset.financedAssetId);
+    return financed !== undefined && isExcludedHome(financed);
+  }
+  return false;
+}
+
+/**
  * The assets the FIRE number runs on: everything but a primary residence, when the setting
- * keeps it out. ONE filter, shared by the net worth below and by the tax profile of the
- * withdrawals (`resolvePortfolioTaxProfile`), so the basis and the value are read on the same set.
+ * keeps it out, and the loan on it. ONE filter, shared by the net worth below and by the tax
+ * profile of the withdrawals (`resolvePortfolioTaxProfile`), so the basis and the value are read
+ * on the same set.
  */
 export function filterFireEligibleAssets(assets: Asset[], includePrimaryResidence: boolean = false): Asset[] {
-  return assets.filter(asset => {
-    // Exclude real estate marked as primary residence (if user setting is disabled)
-    if (!includePrimaryResidence && asset.assetClass === 'realestate' && asset.isPrimaryResidence === true) {
-      return false;
-    }
-    return true;
-  });
+  return assets.filter((asset) => !isFireExcluded(asset, assets, includePrimaryResidence));
 }
 
 export function calculateFIRENetWorth(assets: Asset[], includePrimaryResidence: boolean = false): number {
@@ -671,9 +694,7 @@ export function calculateFIRENetWorth(assets: Asset[], includePrimaryResidence: 
 export function calculateLiquidFIRENetWorth(assets: Asset[], includePrimaryResidence: boolean = false): number {
   return assets
     .filter(asset => {
-      if (!includePrimaryResidence && asset.assetClass === 'realestate' && asset.isPrimaryResidence === true) {
-        return false;
-      }
+      if (isFireExcluded(asset, assets, includePrimaryResidence)) return false;
       if (asset.isLiquid !== undefined) return asset.isLiquid === true;
       return asset.assetClass !== 'realestate' && asset.subCategory !== 'Private Equity';
     })
@@ -692,9 +713,7 @@ export function calculateLiquidFIRENetWorth(assets: Asset[], includePrimaryResid
 export function calculateIlliquidFIRENetWorth(assets: Asset[], includePrimaryResidence: boolean = false): number {
   return assets
     .filter(asset => {
-      if (!includePrimaryResidence && asset.assetClass === 'realestate' && asset.isPrimaryResidence === true) {
-        return false;
-      }
+      if (isFireExcluded(asset, assets, includePrimaryResidence)) return false;
       if (asset.isLiquid !== undefined) return asset.isLiquid === false;
       return asset.assetClass === 'realestate' || asset.subCategory === 'Private Equity';
     })

@@ -23,7 +23,9 @@ import {
 import { stripFloatNoise } from '@/lib/utils/floatNoise';
 
 /**
- * Returns the number of coupon payments per year for the given frequency.
+ * Returns the number of coupon payments per year for the given frequency. A single coupon at
+ * maturity has no yearly cadence: it is 0 here, and every caller that divides by it asks
+ * `isSingleCouponAtMaturity` first.
  */
 export function getPeriodsPerYear(frequency: CouponFrequency): number {
   switch (frequency) {
@@ -31,11 +33,36 @@ export function getPeriodsPerYear(frequency: CouponFrequency): number {
     case 'quarterly':  return 4;
     case 'semiannual': return 2;
     case 'annual':     return 1;
+    case 'maturity':   return 0;
   }
 }
 
+/** ONE coupon, paid with the redemption (the BTP Valore «Insieme»): no schedule between issue and maturity. */
+export function isSingleCouponAtMaturity(frequency: CouponFrequency): boolean {
+  return frequency === 'maturity';
+}
+
 /**
- * Returns the number of months between coupon payments.
+ * The bond's life in years, from issue to maturity, in whole months over 12 (a 5-year BTP Valore is
+ * exactly 5; a day's drift between the two dates never adds a month). Floored at one month.
+ */
+export function bondTermYears(issueDate: Date, maturityDate: Date): number {
+  const months = (maturityDate.getFullYear() - issueDate.getFullYear()) * 12 + (maturityDate.getMonth() - issueDate.getMonth());
+  return Math.max(1, months) / 12;
+}
+
+/**
+ * The gross single coupon per unit of a bond paid at maturity: the annual rate CAPITALISED over
+ * the term — nominal × ((1 + rate)^years − 1) — the owner's reading (2026-10-10) of the MEF's
+ * «rendimenti equivalenti» between the quarterly BTP Valore and the Insieme: a saver who cannot
+ * reinvest intermediate coupons is made whole by compounding. Simple interest would understate it.
+ */
+export function calculateMaturityCouponPerShare(couponRate: number, nominalValue: number, termYears: number): number {
+  return stripFloatNoise((Math.pow(1 + couponRate / 100, termYears) - 1) * nominalValue);
+}
+
+/**
+ * Returns the number of months between coupon payments (never asked for a single coupon at maturity).
  */
 function getMonthsPerPeriod(frequency: CouponFrequency): number {
   return 12 / getPeriodsPerYear(frequency);
@@ -74,6 +101,9 @@ export function getNextCouponDate(
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
+  // The one coupon of a bond paid at maturity falls ON the maturity date, or never again.
+  if (isSingleCouponAtMaturity(frequency)) return maturityDate > today ? new Date(maturityDate) : null;
+
   const monthsPerPeriod = getMonthsPerPeriod(frequency);
 
   // First coupon is issueDate + 1 period
@@ -111,6 +141,8 @@ export function getFollowingCouponDate(
   frequency: CouponFrequency,
   maturityDate: Date
 ): Date | null {
+  // After the single coupon at maturity there is nothing left to pay.
+  if (isSingleCouponAtMaturity(frequency)) return null;
   const next = addMonths(paidDate, getMonthsPerPeriod(frequency));
   return next > maturityDate ? null : next;
 }
@@ -162,15 +194,21 @@ export function getApplicableCouponRate(
  * Example: 4% annual, quarterly, nominalValue=1000
  *   → (4 / 100 / 4) * 1000 = €10.00 per unit per quarter
  *
+ * For a single coupon at maturity the rate capitalises over the whole term
+ * (`calculateMaturityCouponPerShare`): `termYears` is then required.
+ *
  * @param couponRate - Annual coupon rate as percentage (e.g. 4.0 for 4%)
  * @param nominalValue - Face value per unit in currency (e.g. 1000 for a €1000 bond)
  * @param frequency - Payment frequency
+ * @param termYears - The bond's life in years (`bondTermYears`), read only at maturity
  */
 export function calculateCouponPerShare(
   couponRate: number,
   nominalValue: number,
-  frequency: CouponFrequency
+  frequency: CouponFrequency,
+  termYears: number = 0
 ): number {
+  if (isSingleCouponAtMaturity(frequency)) return calculateMaturityCouponPerShare(couponRate, nominalValue, termYears);
   // Stored on the dividend and shown in its form: the decimal coupon, not its binary neighbour
   // (1,3% semiannual on 1.000 € is 6.500000000000001 raw — lib/utils/floatNoise.ts).
   return stripFloatNoise((couponRate / 100 / getPeriodsPerYear(frequency)) * nominalValue);
@@ -233,6 +271,7 @@ export function couponFrequencyLabel(frequency: CouponFrequency): string {
     case 'quarterly':  return 'trimestrale';
     case 'semiannual': return 'semestrale';
     case 'annual':     return 'annuale';
+    case 'maturity':   return 'unica a scadenza';
   }
 }
 
@@ -378,6 +417,7 @@ export interface ResolvedCoupon {
   inflationPeriodRate: number | null; // `italia`: announced per-period inflation % (floored at 0), or null if not announced
   indexationCoefficient: number | null; // `euro`: the coefficient applied (the announced one, or the latest known when provisional)
   isProvisional: boolean;             // True when inflation-linked AND the period's figure is not yet announced
+  termYears: number;                  // The bond's life in years (`bondTermYears`): what a single coupon at maturity capitalises over
 }
 
 /**
@@ -407,9 +447,10 @@ export function resolveCoupon(
     bondDetails.couponRate,
     bondDetails.couponRateSchedule
   );
-  const fixedPerShare = calculateCouponPerShare(fixedAnnualRate, nominalValue, bondDetails.couponFrequency);
+  const termYears = bondTermYears(issueDate, coerceDate(bondDetails.maturityDate));
+  const fixedPerShare = calculateCouponPerShare(fixedAnnualRate, nominalValue, bondDetails.couponFrequency, termYears);
   const indexation = resolveInflationIndexation(bondDetails);
-  const base = { fixedAnnualRate, indexation, inflationPeriodRate: null, indexationCoefficient: null };
+  const base = { fixedAnnualRate, indexation, inflationPeriodRate: null, indexationCoefficient: null, termYears };
 
   // Plain / step-up bond: no inflation component.
   if (indexation === null) {
@@ -457,6 +498,12 @@ export function resolveCoupon(
  */
 export function buildCouponNote(resolved: ResolvedCoupon, frequency: CouponFrequency): string {
   const freqLabel = couponFrequencyLabel(frequency);
+
+  // The single coupon at maturity names the capitalisation it is made of.
+  if (isSingleCouponAtMaturity(frequency)) {
+    const total = (Math.pow(1 + resolved.fixedAnnualRate / 100, resolved.termYears) - 1) * 100;
+    return `Cedola ${freqLabel} — tasso annuo ${formatRate(resolved.fixedAnnualRate)}% capitalizzato per ${formatRate(resolved.termYears)} anni = ${formatRate(total)}% del nominale`;
+  }
 
   // Non-inflation-linked: keep the historical annual-rate phrasing.
   if (resolved.indexation === null) {

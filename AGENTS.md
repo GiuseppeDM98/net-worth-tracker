@@ -383,11 +383,12 @@ file used to carry.
 
 ### Patrimonio · Asset Pricing, FX and Assets → `doc/guide/patrimonio.md`
 - "Does this asset have a market price?" is ONE rule in `assetPricing.ts` (`hasMarketPrice`/`requiresManualPricing`); a new hand-valued type goes in `MANUALLY_VALUED_TYPES` and nowhere else.
+- **A debt is a `loan` ASSET worth minus its principal** (2026-10-10, `types/assets.ts` → `LOAN_ASSET_TYPE`, the sign in `calculateAssetValue`): the property stays GROSS, the loan sits in the class of what it finances (`realestate` when `financedAssetId`, else `cash` = negative liquidity), always `excluded` from the allocation and from every Rendimenti base, out of FIRE with the primary residence it finances. Where the debt lives on the document is `debtBalanceField`'s alone (a loan's `quantity`, a legacy property's `outstandingDebt`, read-only since the one-shot migration `loanMigration.ts`).
 - GBp (pence) ≠ GBP — normalize `price / 100` before any FX; never call Frankfurter from the browser; `quantity = 0` marks a sold asset.
 - A Borsa Italiana bond quote is `% of par`, always, and `lib/utils/bondPricing.ts` is the ONE conversion (`quote / 100 × nominal × coefficient`, nominal **1 €** by default). Never re-implement it; never guard it on `nominal > 1` again (issue #340).
 - Every G/P, tax estimate, YOC and PMC cell stands EUR against EUR through `lib/utils/costBasisEur.ts` (`costBasisPerUnitEur`, fees included); `undefined` without a EUR PMC — print nothing, never dollars against euros.
 - Δ columns are UNIT-PRICE variations, not P&L; `isHeld` (`quantity > 0`) gates every count/share/sum; numbers not in the payload are born in `patrimonioSummary.ts`; the page owns every dialog.
-- Il resto — the «Mutuo» tile (interest measured only from the settled instalments, `mortgageSummary.ts`), the split class chip of a composite instrument (`describeAssetClassChip`), BTP€i, the «Andamento» view, `hasCostBasis`, `MIN_ANNUALIZABLE_DAYS`, the instrument driver, `suggestIsLiquid`, the cash-account picker rule, the article helpers, the failed-overview branch, the `averageCostEur` backfill — in `doc/guide/patrimonio.md`.
+- Il resto — the «Mutuo» tile, one per LOAN (interest measured only from the settled instalments, `mortgageSummary.ts`), the loan migration and its blind spots, the split class chip of a composite instrument (`describeAssetClassChip`), BTP€i, the «Andamento» view, `hasCostBasis`, `MIN_ANNUALIZABLE_DAYS`, the instrument driver, `suggestIsLiquid`, the cash-account picker rule, the article helpers, the failed-overview branch, the `averageCostEur` backfill — in `doc/guide/patrimonio.md`.
 
 ### Asset Trade Ledger → `doc/guide/registro-operazioni.md`
 - ALL trade money-math (replay, PMC, realized P&L, XIRR, invested capital) lives in `assetTransactionUtils.ts`, pure; the service/route layer is a thin atomic writer. A new `AssetTransactionType` updates the replay switch, the zod schema AND `TransactionDialog`.
@@ -403,7 +404,8 @@ file used to carry.
 - A recurring expense is N real future-dated rows sharing `recurringParentId`, not a rule; `canTypeRecur` = `fixed`/`variable`/`debt` only; `MAX_RECURRENCE_OCCURRENCES` keeps the batch under 500.
 - A linked row moves its account ON ITS OWN DATE (`lib/utils/cashSettlement.ts`, 2026-09-19): `balancePending` until `settleDueBalances` runs in `/api/portfolio/snapshot`; the flag ABSENT means applied; edits and deletes move only what was applied.
 - CSV import: MANDATORY preview, undo by `importBatchId`, category identity is (name, type). ONE drill destination (`handleEntitySelect`); Sankey ids are built from ids.
-- Il resto — le sei regole per esteso, `linkedCashAssetId` su ogni occorrenza, «Collega la serie», lo schema del transfer e la sua spec, la commissione come riga propria (`transferFee.ts`), la rata che riduce il debito per la QUOTA CAPITALE (`mortgageRepayment.ts`) — in `doc/guide/cashflow.md`.
+- **A row's fee is a row of its own, on ANY row and on every occurrence of a series** (2026-10-10, `lib/utils/expenseFee.ts`; a transfer's alone until then — the stored field names `transferFeeExpenseId`/`feeOfTransferId` keep their birth name): created in the same batch as its parent, edited from it, deleted with it — a SERIES delete gives the fees' balances back too (`getFeesOf`), from the tab AND the table. A `debt` row repays a LOAN (`debtAssetId`); «Estinzione anticipata» (`isDebtPayoff`) is all principal. A transfer may land on a property priced 1 (a deposit).
+- Il resto — le sei regole per esteso, `linkedCashAssetId` su ogni occorrenza, «Collega la serie», lo schema del transfer e la sua spec, la commissione come riga propria (`expenseFee.ts`), la rata che riduce il debito per la QUOTA CAPITALE (`mortgageRepayment.ts`), l'estinzione, il trasferimento su un immobile — in `doc/guide/cashflow.md`.
 
 ### Cashflow › Tracciamento → `doc/guide/cashflow-tracciamento.md`
 - ONE period axis, two slices: `expenses` feeds the verdict and every tile; `filteredExpenses` feeds ONLY the Movimenti list. Never route a tile through `filteredExpenses`; the phone bar's picker is a second HANDLE on the same `period`, never a second axis.
@@ -446,14 +448,14 @@ file used to carry.
 - RECEIVED AND ANNOUNCED ARE NEVER ONE FIGURE — counted, totalled and coloured apart on every surface; `summarizePayments` returns two halves and no sum.
 - ONE period axis (`resolvePeriodBounds`, upper bound = end of the period's own unit, NOT today), the announced money ON it; filters narrow only the list. TWO POPULATIONS, BOTH NAMED (2026-09-14): verdict and inventory read the REGISTRY (sold included); Affidabilità and Chi paga di più measure the HELD portfolio (`heldAssetIds`).
 - A coupon's cashflow expense is created only by the daily cron on payment date (`!isAutoGenerated`, idempotent via `expenseId`), and it credits the instrument's account, else the default, ONLY when the payment is not an arrear (`lib/utils/dividendAccount.ts`, 2026-09-20) — row, balance and `expenseId` in one transaction.
-- Two inflation mechanisms, ONE field (`inflationIndexation`, read via `resolveInflationIndexation`): BTP Italia ADDS the FOI rate, a BTP€i MULTIPLIES by the coefficient. Adding a `DividendType` is a six-file fan-out.
+- Two inflation mechanisms, ONE field (`inflationIndexation`, read via `resolveInflationIndexation`): BTP Italia ADDS the FOI rate, a BTP€i MULTIPLIES by the coefficient. Adding a `DividendType` is a six-file fan-out. **A `CouponFrequency 'maturity'` is ONE coupon with the redemption** (2026-10-10, the BTP Valore Insieme): `getPeriodsPerYear` is 0 there and every divider asks `isSingleCouponAtMaturity` first; the coupon is the rate COMPOUNDED over the term (`calculateMaturityCouponPerShare`).
 - Il resto — the Rendimento tile off the axis, `useDividendStats` without date bounds, the tab's ONE request (the stats answer carries the list, `useDividendRegistry`; `stats: null` keeps the list when a measure fails), every number from `dividendAnalytics.ts`, a scraped dividend's ONE floor (`lib/utils/dividendEligibility.ts`, 2026-09-13), the zero coupon (`hasCouponPayments`), the calendar, the form (`taxRate` proposal, picker) and the armed row delete, `computeDividendYieldMetrics`, the legacy `isInflationLinked`, provisional coupons, the running-window rule, `couponUtils` — in `doc/guide/cashflow-dividendi.md`.
 
 ### Storico · History and Snapshot Baselines → `doc/guide/storico.md`
 - The snapshot cron runs DAILY (the name lies) and both writers REPLACE the document: a new `MonthlySnapshot` field no pipeline recomputes goes in `SNAPSHOT_USER_AUTHORED_FIELDS` or the cron erases it (§ *Firestore Writes*).
 - Reuse `byAsset.totalValue` for per-instrument history, never recompute; `byAsset.price` is RAW NATIVE currency (EUR unit value = `totalValue / quantity`).
 - The page's CAGR is WEALTH growth (`(endNW/startNW)^(12/months)−1`, «versamenti inclusi»), never Rendimenti's return; ONE linear pace (`summarizeGrowthPace`), do not compound it.
-- The Driver is SIX parts (`lib/utils/growthDrivers.ts`, 2026-09-19), its market MEASURED per instrument (`marketEffect.ts`) — never «Δ − risparmio»; Lavoro takes the Driver's windows AND parts.
+- The Driver is SIX parts (`lib/utils/growthDrivers.ts`, 2026-09-19), its market MEASURED per instrument (`marketEffect.ts`) — never «Δ − risparmio»; Lavoro takes the Driver's windows AND parts. «Mutuo» reads the LOAN rows as a total since 2026-10-10 (a loan's `byAsset.totalValue` is minus its principal), the legacy property pairing beside it: the two cross the migration month without a jump.
 - The parts are a LEDGER (`buildDriverLedger`, 2026-09-20) that closes TO THE EURO (`reconcileRemainder`); a flow is signed and uncoloured (`isFlowDominated`).
 - Il resto — baselines, attribution (`buildMonthAssetBreakdown`), each Driver part, `summarizeLaborMetrics`/`laborWindowsOf`, the manual-snapshot cross-validation, Recharts in a flex tile, the container-query table, the two-column grid — in `doc/guide/storico.md`.
 
@@ -840,7 +842,9 @@ file used to carry.
   under `TZ=UTC` as well, and stays so).
 - **The suites to run after a change are listed per area in each guide's § *Files*** (since 2026-09-30). Two crossings
   no guide owns: `types/assets.ts`'s `AssetType` also means `assetDialogHelpers` + `allocationUtils` + the three ledger
-  suites; widening `AssetClass` means `ASSET_CLASS_SEQUENCE` and its readers. **Perf tooling**: `perfBudget`,
+  suites, `TYPE_TO_CLASS` and `TYPE_CARDS` in `AssetDialog.tsx`, `MANUALLY_VALUED_TYPES` when hand-valued,
+  `exposureRequests.MODULE_BY_TYPE`, `DividendDialog`'s non-paying set (the `loan` of 2026-10-10 touched all five);
+  widening `AssetClass` means `ASSET_CLASS_SEQUENCE` and its readers. **Perf tooling**: `perfBudget`,
   `perfRoutes` (`perf/routes.json` = `navigation.ts`); `npm run perf:budget` after `npm run build`, or `-- --dist=.next-perf`
   after `perf:build` (2026-10-05: without it the script read a `.next` of 15/08 — its first line names the build); a
   route that grows raises its ceiling with `raisedBy` in the same commit (`doc/guide/velocita.md`).
