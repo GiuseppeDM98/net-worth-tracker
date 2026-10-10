@@ -23,9 +23,29 @@
  * the theme per host: 85 token reads); (4) with the cascade forced on every opening (the second
  * opening's least opaque cell read 0). (1) is a regression guard: the period switch shifted
  * nothing with the old wrapper either.
+ *
+ * THE PRECONDITION every test here shares: no colour-theme change during the test. The browser's
+ * stored colour theme (`localStorage`, the client's source of truth) is set to the one the account
+ * keeps in Firestore BEFORE the page loads, so the sync `ColorThemeProvider` runs once signed in
+ * writes the same value and changes nothing. Without it (2026-10-10, Mac): the base account's
+ * `userPreferences` carried a colour theme the parked session's `localStorage` lacked — the state
+ * file is captured before that sync lands, or not, run by run — so the theme switched a few hundred
+ * ms after the load, the provider rightly re-read the palette, and (3) counted 17 token reads in
+ * two full suites. Seen red by removing `color-theme` from `localStorage` before each test: (3)
+ * red four runs in five, 17 reads each time; with the alignment, the file green five times running.
+ * The theme-circle test (5) went red in the same full suites (the page's named regions animating
+ * inside the circle) and was green alone; with the alignment it was green in two full suites
+ * running, but its link to the late sync was NOT isolated — if it comes back, start there.
  */
 
 import { test, expect, type Page } from '@playwright/test';
+
+const PREFERENCES_DOC =
+  'http://127.0.0.1:8080/v1/projects/demo-net-worth/databases/(default)/documents/userPreferences/test-user-1';
+/** `COLOR_THEME_STORAGE_KEY` in lib/constants/colorTheme.ts (a spec cannot import `lib/`). */
+const COLOR_THEME_STORAGE_KEY = 'color-theme';
+/** The colour theme the account keeps in Firestore, or null for the default (read once, below). */
+let storedColorTheme: string | null = null;
 
 /** Counters installed before any page script, on every document. */
 function installSpies() {
@@ -74,7 +94,26 @@ async function waitForPage(page: Page, title: RegExp) {
   await expect(page.locator('main [data-slot="skeleton"]')).toHaveCount(0, { timeout: 30_000 });
 }
 
+test.beforeAll(async () => {
+  const res = await fetch(PREFERENCES_DOC, { headers: { Authorization: 'Bearer owner' } });
+  // A 404 is an account with no preferences: the default theme, which the sync never writes.
+  const doc = res.ok ? ((await res.json()) as { fields?: { colorTheme?: { stringValue?: string } } }) : null;
+  storedColorTheme = doc?.fields?.colorTheme?.stringValue ?? null;
+});
+
 test.beforeEach(async ({ page }) => {
+  // The precondition of the header: the stored colour theme is the account's before the first frame.
+  await page.addInitScript(
+    ({ key, theme }) => {
+      try {
+        if (theme) localStorage.setItem(key, theme);
+        else localStorage.removeItem(key);
+      } catch {
+        // Storage blocked: the sync would then change the theme, and (3) says so.
+      }
+    },
+    { key: COLOR_THEME_STORAGE_KEY, theme: storedColorTheme },
+  );
   await page.addInitScript(installSpies);
 });
 

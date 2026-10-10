@@ -135,7 +135,8 @@ npm run dev:emulator     # the app on :3000 pointed at the emulators
 
 Prerequisites (a JDK) and the full guide: SETUP.md → Step 6. Port 3100 (`npm run dev:e2e`, isolated
 `.next-e2e` build dir) is the Playwright server; keep it separate from the tour server on :3000. Port
-3200 (`npm run perf:serve`, the `.next-perf` production build) is the speed benchmark's (`doc/guide/velocita.md`).
+3200 (`npm run perf:serve`, the `.next-perf` production build) is the speed benchmark's and the first-screen census's
+(`npm run mobile:census`, `doc/guide/prima-schermata.md`).
 
 ### Obligation 5 — how to hand the owner an app already authenticated
 
@@ -162,6 +163,7 @@ The app **is** locally runnable; there is no fallback to declare.
   | `degraded@example.com` | `test-user-degraded` | The states in which a return is *not* a measure — empty/degraded readings |
   | `split@example.com` | `test-user-split` | Cashflow › Divisione ON: Ghiandaia and Tarsio at 60/40, with one row dated 31 December that stays «in calendario» all year — `npm run e2e:seed:split` |
   | `hof@example.com` | `hof-user` | Hall of Fame: 47 monthly snapshots from novembre 2022 with a story (best month marzo 2024, worst ottobre 2023, a two-month first year); NO rankings document — the specs press «Aggiorna i record» — `npm run e2e:seed:hof` |
+  | `census@example.com` | `census-user` | The first-screen budget's fixture (MOB-01): every surface with data — Centri and Divisione on, a coupon, a Budget ceiling, a pension fund, 47 snapshots ending last month, one row «in calendario» on the month's last day — dated relative to the run; `npm run mobile:census` re-seeds it and rebuilds its Hall of Fame (`npm run e2e:seed:census` alone does not) |
 
 - **So the screen is not empty**: `npm run emulators:seed` for the base account, plus the fixture the
   page needs — `npm run e2e:seed` (Previdenza), `npm run e2e:seed:analisi` (Analisi),

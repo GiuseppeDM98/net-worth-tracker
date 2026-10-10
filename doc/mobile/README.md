@@ -3,14 +3,15 @@
 > Sessione del 2026-09-26, dalla domanda del proprietario: «l'app è densa di informazioni in ogni sua parte, ed è
 > questo che le va contro sul telefono: lì guardo al massimo 4–5 informazioni». Questa cartella tiene UNA specifica per
 > implementazione (`MOB-NN-*.md`, sullo stesso template delle 14 spec PERF, tutte ritirate entro il 2026-10-08, ognuna con il prompt e il modello in coda), il censimento
-> di riferimento in `reference/` e questo indice: la domanda con la risposta, come è stato misurato il mobile attuale,
+> di riferimento in `reference/`, il prompt che ritira una spec dopo il suo merge in `develop` (`ritiro.md`) e questo indice: la domanda con la risposta, come è stato misurato il mobile attuale,
 > la baseline, le tre direzioni disegnate e quella scelta, l'ordine consigliato e lo stato. **Si implementa DOPO le 14
 > spec PERF** (decisione del proprietario; tutte in develop e ritirate, l'ultima il 2026-10-08): PERF-02 (in develop dal 2026-09-29) e PERF-03 (in develop dal 2026-09-30: la riga «Aggiornato alle…» sta nel `PageHeader`, non nella composizione) cambiano la shell che il mobile eredita, PERF-04 (in develop dal 2026-09-30), PERF-12 (dal 2026-10-06) e PERF-11 (dal 2026-10-07) e PERF-14 (dal 2026-10-08)
 > hanno toccato gli stessi componenti. Una spec che si chiude aggiorna la tabella in § 6 e, se ha rimisurato, la tabella § 3.1
 > «Fixture» (creata da MOB-01 con la prima corsa sul fixture del budget); la tabella del 2026-09-26 sul mirror (§ 3) resta
 > intatta come riferimento storico, e le corse sul mirror di fine spec vanno in SESSION_NOTES (solo aggregati). **Lettura
 > adversariale del 2026-10-10**: tutte e nove le spec rilette insieme contro il codice e le decisioni di § 9, 261 rilievi
-> corretti in loco e 49 domande chiuse (§ 9, decisioni 9–57); § 10 è vuoto.
+> corretti in loco e 49 domande chiuse (§ 9, decisioni 9–57); § 10 è vuoto. MOB-01 è fatta (2026-10-10): § 3.1 ha
+> la prima tabella del fixture.
 
 ## 1. La domanda e la risposta
 
@@ -110,12 +111,46 @@ Lettura: a 768 la griglia a due colonne dimezza lo scroll (mediana ~2,4 schermat
 una intera; a 1024 landscape (768 px di altezza) si torna a UNA tessera sopra la piega e ~3,1 schermate (mediana 3,11). La composizione
 attuale premia il portrait e penalizza il landscape.
 
+**Rimisurate il 2026-10-10 (MOB-01)**, mirror riseminato quel giorno, build di produzione su :3200, `npm run
+mobile:census` — le righe che i contributi del 2026-09-27/28 dovevano muovere (`screens` · tessere sopra la piega /
+intere · cifre sopra la piega): **Analisi 390** 4,88 · 1/0 · 13 (#401: il Flusso sotto 640 px è barra e righe);
+**Allocazione** 390 5,04 · 2/1 · 26 · 768 3,02 · 2/1 · 48 · 1024 3,86 · 2/1 · 36 (la nuova Esposizione, #407). La
+definizione di cifra di MOB-01, più stretta (ritagli, `[inert]`, opacità 0 e sovrapposizioni `fixed` esclusi), sulla
+stessa corsa differisce da quella della baseline di UNA cifra su 57 misure: gli altri scarti dal 26/9 sono dati del mese
+(Divisione nello stato «quote non calcolabili», un verdetto con una riga in più) e sono in SESSION_NOTES di quel giorno.
+
 ### 3.1 Fixture (dal primo `mobile:census` di MOB-01)
 
-La tabella la scrive MOB-01 con la prima corsa sul fixture `census@example.com` (decisione 10): data, account, le 19
-superfici × 390/768/1024 con le metriche di MOB-01 § 4, solo numeri aggregati. È la tabella che le spec MOB-02..08
-aggiornano quando rimisurano, e la base di `doc/mobile/budget.json`; sotto, l'elenco delle voci allargate con `raisedBy`
-(decisioni 19 e 22). La tabella § 3 (mirror, dev server, 2026-09-26) non si tocca più.
+**2026-10-10, `census@example.com`, build di produzione su :3200 (Mac), 19 superfici × 3 viewport in 2,0 minuti; due
+corse consecutive identiche.** È `doc/mobile/budget.json` com'è nato (`mobile:budget -- --tighten` sulla prima corsa) e
+la tabella che le spec MOB-02..08 aggiornano quando rimisurano. Cella = `screens` · tessere che iniziano / stanno intere
+entro `main.clientHeight` · cifre sopra la piega / cifre fuori dal verdetto sopra la pill. `firstClosedRowAbovePill` è
+`null` ovunque (nessuna riga chiusa prima di MOB-02), `overflowX` `false` ovunque. La tabella § 3 (mirror, dev server,
+2026-09-26) non si tocca più.
+
+| Superficie | 390 | 768 | 1024 |
+|---|---|---|---|
+| Panoramica | 3,56 · 1/0 · 15 / 5 | 2,1 · 3/1 · 39 / 23 | 2,75 · 1/0 · 22 / 7 |
+| Patrimonio | 3,34 · 1/0 · 12 / 5 | 2,1 · 5/3 · 22 / 15 | 2,73 · 1/0 · 18 / 11 |
+| Cashflow › Tracciamento | 3,15 · 1/0 · 15 / 5 | 2,33 · 3/1 · 24 / 13 | 3,06 · 1/0 · 14 / 5 |
+| Cashflow › Budget | 2,72 · 1/0 · 15 / 9 | 1,88 · 3/1 · 21 / 11 | 2,35 · 1/0 · 15 / 9 |
+| Cashflow › Centri | 2,04 · 1/0 · 10 / 5 | 1,46 · 2/1 · 18 / 11 | 1,76 · 1/0 · 10 / 5 |
+| Cashflow › Divisione | 2,02 · 1/0 · 22 / 6 | 1,3 · 4/2 · 38 / 18 | 1,62 · 1/0 · 23 / 8 |
+| Cashflow › Dividendi | 3,03 · 2/1 · 8 / 4 | 1,92 · 3/1 · 16 / 12 | 2,44 · 3/1 · 7 / 5 |
+| Analisi | 3,72 · 1/0 · 12 / 7 | 2,44 · 3/1 · 20 / 13 | 3,25 · 1/1 · 12 / 7 |
+| Rendimenti | 4,11 · 1/0 · 8 / 6 | 2,47 · 3/1 · 16 / 11 | 3,25 · 1/0 · 8 / 6 |
+| Storico | 4,82 · 1/0 · 15 / 9 | 3,05 · 3/1 · 28 / 19 | 3,98 · 1/0 · 16 / 10 |
+| Allocazione | 3,65 · 2/1 · 25 / 17 | 2,36 · 4/2 · 33 / 28 | 2,99 · 2/1 · 27 / 23 |
+| Previdenza | 3,9 · 1/0 · 12 / 7 | 2,62 · 3/1 · 24 / 12 | 3,36 · 1/0 · 12 / 9 |
+| FIRE › Calcolatore | 3,18 · 1/0 · 16 / 8 | 1,93 · 3/1 · 25 / 12 | 2,44 · 1/0 · 16 / 9 |
+| FIRE › Coast | 2,3 · 1/0 · 16 / 11 | 1,53 · 3/2 · 20 / 12 | 1,93 · 1/0 · 16 / 11 |
+| FIRE › What If | 4,08 · 1/0 · 20 / 5 | 3,02 · 2/1 · 27 / 17 | 4,04 · 1/0 · 20 / 10 |
+| FIRE › Monte Carlo | 4,89 · 1/0 · 6 / 1 | 2,69 · 2/1 · 8 / 3 | 3,48 · 1/0 · 7 / 2 |
+| FIRE › Obiettivi (spento) | 1 · 1/1 · 0 / 0 | 1 · 1/1 · 0 / 0 | 1 · 1/1 · 0 / 0 |
+| Hall of Fame | 2,88 · 1/0 · 17 / 12 | 1,84 · 3/1 · 34 / 25 | 2,37 · 1/0 · 17 / 12 |
+| Impostazioni | 2,09 · 2/1 · 2 / 2 | 1,36 · 3/2 · 4 / 4 | 1,7 · 3/2 · 4 / 4 |
+
+**Voci allargate con `raisedBy`** (decisioni 19 e 22): nessuna.
 
 ### Le tessere a 390 delle tre pagine dei mock (top e altezza in px da inizio `main`)
 
@@ -229,7 +264,9 @@ spesa (MOB-04 § 4) ha il campo «Commissione» su OGNI riga e su ogni voce di u
 anticipata» su una rata «Debiti», e un trasferimento può atterrare su un immobile («Destinazione» raggruppata Conti /
 Immobili); le righe citate di `ExpenseDialog.tsx` sono quindi spostate. Il BTP Valore Insieme (cedola unica a
 scadenza) non tocca la composizione. Nessuna striscia e nessun budget cambia per questo: le cifre nuove sono dentro
-le tessere che già c'erano.
+le tessere che già c'erano. **Visto da MOB-01 (2026-10-10, fixture a 390)**: nella fila KPI di Tetto del mese
+(`TettoTile`) a tetto superato «~11.274 €» e «840 €» si sovrappongono — una cella senza `min-w-0`/contenitore per un
+importo largo; MOB-04, che ricompone il Budget, lo corregge e lo asserisce.
 
 Un avvertimento del passaggio di coerenza, da tenere davanti: **il budget della prima schermata rischia di diventare
 una lista di eccezioni** — le clausole vincolanti annullano il taglio del verdetto, le tessere eroe sono alte 585–709 px.
@@ -241,7 +278,7 @@ non spec per spec.
 
 | Spec | Titolo | Priorità | Sforzo | Dipende da | Modello · effort | Stato |
 |---|---|---|---|---|---|---|
-| [MOB-01](MOB-01-censimento-e-budget-prima-schermata.md) | Il censimento in repo e il budget della prima schermata | 1 | M | — (PERF-01 e PERF-00 in develop) | Opus 5.5 · high | da fare · riletta in modo adversariale il 2026-10-10: 25 rilievi, 5 decisioni |
+| [MOB-01](MOB-01-censimento-e-budget-prima-schermata.md) | Il censimento in repo e il budget della prima schermata | 1 | M | — (PERF-01 e PERF-00 in develop) | Opus 5.5 · high | fatta il 2026-10-10 (`mobile:census`, `mobile:budget`, il fixture `census@example.com`, § 3.1); due decisioni nuove in § 9 (58, 59) |
 | [MOB-02](MOB-02-primitive-della-composizione.md) | Le primitive della composizione | 1 | L | MOB-01 | Fable 5.1 · xhigh | da fare · riletta in modo adversariale il 2026-10-10: 30 rilievi, 11 decisioni |
 | [MOB-03](MOB-03-panoramica.md) | Panoramica | 2 | M | MOB-01, MOB-02 | Fable 5.1 · high | da fare · riletta in modo adversariale il 2026-10-10: 28 rilievi, 6 decisioni |
 | [MOB-04](MOB-04-cashflow-cinque-tab.md) | Cashflow: le cinque tab | 2 | L | MOB-01, MOB-02, MOB-03 | Fable 5.1 · xhigh | da fare · riletta in modo adversariale il 2026-10-10: 34 rilievi, 9 decisioni |
@@ -273,14 +310,14 @@ chi implementa le riverifica, perché nel frattempo le PERF riscrivono i caricam
 
 ## 8. Come si rimisura
 
-Fino a MOB-01: `reference/mobile-census.mjs` copiato nella radice del repo come `.tmp-mobile-measure.mjs` (`import
-'playwright'` risolve da lì), emulatori + mirror + `npm run dev:emulator`, poi
-`node .tmp-mobile-measure.mjs --out=<cartella fuori dal repo>` (opzioni `--viewports=390,768,1024`,
-`--surfaces=panoramica,rendimenti`), cancellato a fine sessione; il JSON e gli screenshot restano fuori dal repo. Da
-MOB-01: `npm run mobile:census -- --email=census@example.com` e `npm run mobile:budget` sulla build di produzione di
-`perf:build`, servita da `perf:serve` (:3200), con il `--` di npm davanti alle opzioni, da Git Bash (PowerShell 5.1
-mangia il `--`, doc/guide/velocita.md); il mirror (`--email=mirror@example.com`) solo per il giro guidato e il
-confronto con la baseline § 3 in SESSION_NOTES.
+`npm run mobile:census -- --email=census@example.com` e poi `npm run mobile:budget`, sulla build di produzione di
+`perf:build` servita da `perf:serve` (:3200), con gli emulatori accesi, il `--` di npm davanti alle opzioni e da Git Bash
+su Windows (PowerShell 5.1 mangia il `--`). Il censimento risemina il fixture, ricostruisce i suoi record di Hall of
+Fame e si rifiuta dal 1 al 4 del mese e l'ultimo giorno; l'uscita (`.mobile-census/`: JSON senza testi e screenshot)
+è gitignored. Il mirror (`--email=mirror@example.com`) serve al giro guidato e al confronto con la baseline § 3 in
+SESSION_NOTES, mai al budget. Comandi, colonne e ratchet: doc/guide/prima-schermata.md.
+`--selftest` prova la misura su un frammento noto, senza server. `reference/mobile-census.mjs` resta come lo script che
+ha misurato la baseline.
 
 ## 9. Decisioni del proprietario (2026-09-26)
 
@@ -386,6 +423,11 @@ confronto con la baseline § 3 in SESSION_NOTES.
     `sparse`, mai `dense` (da 1). (50) iPad 12,9" in verticale (contenitore 992 px): tre colonne con la pill; lo skeleton
     generico resta a due colonne. (51) Il criterio «`screens` a 1024 ≤ `screens` a 768» è sostituito da «`screens` a 1024
     ≤ la baseline del 2026-09-26 a 1024 (§ 3)» per ogni superficie composta, misurato da `mobile:budget` sul fixture.
+  - **MOB-01 (2026-10-10, nella sessione di implementazione).** (58) **I record di Hall of Fame del fixture li costruisce
+    il server**: `mobile:census` chiama `POST /api/hall-of-fame/recalculate` dopo il seed (un seed Admin non può
+    importare i builder, che portano dentro l'SDK client). (59) **Il fixture non si misura dal 1 al 4 del mese né
+    l'ultimo giorno** (ora italiana): le righe del mese stanno al 5 e il Budget non prevede prima del giorno 4;
+    l'ultimo giorno la riga in calendario scade. `mobile:census` esce 1 con il perché.
   - **MOB-09.** (52) Il testo delle quattro regole lo applica Claude verbatim in DESIGN.md e nel sidecar, dopo l'OK del
     proprietario sul testo nella sessione MOB-09. (53) Critiche Impeccable: nuove per Panoramica, Tracciamento,
     Rendimenti e Hall of Fame; le altre dodici cancellate nello stesso commit, rifatte da `polish` in sessioni successive.
@@ -397,6 +439,7 @@ confronto con la baseline § 3 in SESSION_NOTES.
 
 ## 10. Domande aperte al proprietario
 
-Nessuna: le 49 domande della lettura adversariale del 2026-10-10 sono chiuse in § 9 (decisioni 9–57), e ogni spec
+Nessuna: le 49 domande della lettura adversariale del 2026-10-10 sono chiuse in § 9 (decisioni 9–57), le due della
+sessione MOB-01 sono le decisioni 58 e 59, e ogni spec
 scrive la sua risposta come istruzione. Una domanda nuova nasce solo da un fatto che una sessione di implementazione
 scopre nel codice, si pone subito al proprietario con lo strumento interattivo e la risposta si aggiunge qui.

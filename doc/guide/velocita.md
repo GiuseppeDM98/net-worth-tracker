@@ -1,6 +1,6 @@
 # Velocità e dimensione (budget, benchmark, census)
 
-> **When to open this guide** — anyone touching `perf/budget.json`, `perf/routes.json`, the four scripts `scripts/perf{Budget.mts,Benchmark.mjs,Serve.mjs,RenderCensus.mjs}` or `lib/utils/perfBudget.ts`, a PR that makes a route grow past its ceiling, or anyone who has to say whether a change made the app faster or heavier. The tooling is in repo since 2026-09-28 (PR #409); this manual lived in `perf/README.md` until 2026-10-08, when the last of the fourteen PERF specs of 2026-09-26 was retired and their dossier (`doc/perf/`) with it — the measure they all started from is § Baseline storica below. `AGENTS.md` keeps the stub (`AGENTS.md § Performance tooling`, `AGENTS.md § Commands`); here is the full rule: how each tool is run, what every column means, the baseline in force, the before/after of every speed session and the register of raised ceilings (the body is in Italian, as the manual was written). The environment — the production build on :3200, the emulators, the mirror — is SETUP.md → Step 6-7 and WORKFLOW.md § 3.
+> **When to open this guide** — anyone touching `perf/budget.json`, `perf/routes.json`, the four scripts `scripts/perf{Budget.mts,Benchmark.mjs,Serve.mjs,RenderCensus.mjs}` or `lib/utils/perfBudget.ts`, a PR that makes a route grow past its ceiling, or anyone who has to say whether a change made the app faster or heavier. The tooling is in repo since 2026-09-28 (PR #409); this manual lived in `perf/README.md` until 2026-10-08, when the last of the fourteen PERF specs of 2026-09-26 was retired and their dossier (`doc/perf/`) with it — the measure they all started from is § Baseline storica below. `AGENTS.md` keeps the stub (`AGENTS.md § Performance tooling`, `AGENTS.md § Commands`); here is the full rule: how each tool is run, what every column means, the baseline in force, the before/after of every speed session and the register of raised ceilings (the body is in Italian, as the manual was written). The environment — the production build on :3200, the emulators, the mirror — is SETUP.md → Step 6-7 and WORKFLOW.md § 3. The first-screen census, which runs on the same build and port but measures composition rather than time, has its own guide since 2026-10-10: `doc/guide/prima-schermata.md`.
 
 ## Files
 
@@ -434,3 +434,10 @@ finestre delle spese (dal 2026-09-30, `lib/utils/expenseWindows.ts`) alleggerisc
 FIRE, non quello di chi apre anche Storico, Analisi o Centri, che leggono tutte le spese per scelta: finché
 `expenses.all` è nel record, quel costo resta — e un giro di pagine vi aggiunge una finestra per pagina (sopra, 2026-09-30).
 Per misurarlo serve una rivisita presa dopo aver aperto tutte le route nello stesso contesto, che lo script oggi non fa.
+
+## Il censimento della prima schermata → `doc/guide/prima-schermata.md`
+
+`npm run mobile:census` e `npm run mobile:budget` girano sulla STESSA build `.next-perf` servita da `perf:serve` su
+:3200, mai accanto a `perf:bench` né alla suite Playwright: misurano la composizione della prima schermata, non il tempo.
+Comandi, metriche, fixture e ratchet stanno nella loro guida (scorporata da qui il 2026-10-10, quando questa superò le
+500 righe).

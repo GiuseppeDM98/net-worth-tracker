@@ -1,6 +1,6 @@
 # MOB-01 — Il censimento in repo e il budget della prima schermata
 
-> Stato: da fare · riletta in modo adversariale il 2026-10-10: 25 rilievi, 5 decisioni · Priorità: 1 (le altre MOB si chiudono con i suoi numeri) · Sforzo: M · Dipende da: — (PERF-01 in develop dal 2026-09-28, PR #409: `perf:build`, `perf:serve`, `perf:budget`; PERF-00 chiusa il 2026-09-28: la nuova Esposizione e `instrument-profile-cache` nel seed ci sono) · Sblocca: MOB-02..MOB-08
+> Stato: fatta il 2026-10-10 (README § 3.1, decisioni 58 e 59) · riletta in modo adversariale il 2026-10-10: 25 rilievi, 5 decisioni · Priorità: 1 (le altre MOB si chiudono con i suoi numeri) · Sforzo: M · Dipende da: — (PERF-01 in develop dal 2026-09-28, PR #409: `perf:build`, `perf:serve`, `perf:budget`; PERF-00 chiusa il 2026-09-28: la nuova Esposizione e `instrument-profile-cache` nel seed ci sono) · Sblocca: MOB-02..MOB-08
 
 ## 1. Il problema, misurato
 

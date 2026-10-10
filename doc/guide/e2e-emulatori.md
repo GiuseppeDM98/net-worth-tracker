@@ -4,7 +4,7 @@
 
 ## Files
 
-- **E2E ed emulatori**: `playwright.config.ts`, `e2e/*.spec.ts`, `e2e/global-setup.ts`, the six `e2e/auth*.setup.ts` + `e2e/persistedCache.ts` (the helper that keeps the persisted query cache out of the parked sessions), `e2e/freshnessProbe.ts` (the helper that records what a load showed and reads what the app persisted), `e2e/shellBoot.ts`, the seeds `scripts/seedEmulator.ts` + `scripts/seed*.mts` (`seedPensionE2E`, `seedAnalisiE2E`, `seedCoastFireE2E`, `seedCostCentersE2E`, `seedSplitE2E`, `seedHallOfFameE2E`, `seedInstrumentProfilesE2E` + `scripts/instrumentProfileFixtures.ts`, the Esposizione's Yahoo profiles shared by the base seed and the E2E re-stamp), the production mirror `scripts/mirrorProdAccount.mts` (`npm run mirror:seed` / `mirror:remove`), throwaway exercises `scripts/*.tmp.mts` (untracked); npm scripts `test:e2e` / `e2e:seed*` / `dev:e2e` / `emulators` / `emulators:seed` / `dev:emulator`
+- **E2E ed emulatori**: `playwright.config.ts`, `e2e/*.spec.ts`, `e2e/global-setup.ts`, the six `e2e/auth*.setup.ts` + `e2e/persistedCache.ts` (the helper that keeps the persisted query cache out of the parked sessions), `e2e/freshnessProbe.ts` (the helper that records what a load showed and reads what the app persisted), `e2e/shellBoot.ts`, the seeds `scripts/seedEmulator.ts` + `scripts/seed*.mts` (`seedPensionE2E`, `seedAnalisiE2E`, `seedCoastFireE2E`, `seedCostCentersE2E`, `seedSplitE2E`, `seedHallOfFameE2E`, `seedInstrumentProfilesE2E` + `scripts/instrumentProfileFixtures.ts`, the Esposizione's Yahoo profiles shared by the base seed and the E2E re-stamp, `seedCensusE2E` — the first-screen census's account `census@example.com`, not a Playwright fixture: `npm run mobile:census` re-seeds it on the `perf:serve` build at :3200 — the port it shares with `perf:*`, never with :3100 — and writes `.mobile-census/` (gitignored), doc/guide/prima-schermata.md), the production mirror `scripts/mirrorProdAccount.mts` (`npm run mirror:seed` / `mirror:remove`), throwaway exercises `scripts/*.tmp.mts` (untracked); npm scripts `test:e2e` / `e2e:seed*` / `dev:e2e` / `emulators` / `emulators:seed` / `dev:emulator`
 
 ## Proving a refactor changed no number
 - **Measure the noise floor BEFORE interpreting a diff**: anything downstream of `new Date()` drifts (cents at two
@@ -114,6 +114,15 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   terminal that started them, so `--export-on-exit` runs) and rerun.
 
 ## Browser-Driven E2E (Playwright)
+- **The parked session may or may not carry what a Firestore sync writes into `localStorage`**
+  (2026-10-10, `e2e/motion.layout.spec.ts`): `auth*.setup.ts` captures the state as soon as the
+  profile shows, so the colour theme `ColorThemeProvider` copies from `userPreferences/{uid}` is in
+  the file on one run and missing on the next — and then every test sees the theme switch a few
+  hundred ms after its load. No seed resets the base account's `userPreferences` (that day the
+  persisted `.emulator-data` carried a colour theme from an earlier session). A spec that counts
+  reads or renders, or that needs no theme change mid-test, reads the account's stored theme from
+  the emulator and writes it into `localStorage` with `addInitScript` before the page loads, so
+  the sync writes the same value and changes nothing.
 - **The six `auth*.setup.ts` anchor on the PROFILE, at 1440** (2026-09-28). Since the shell is in the
   prerendered HTML, `getByRole('navigation')` and `main` exist on `/dashboard` before Firebase has said who is signed
   in, so the old anchor (`navigation.or(main)`) would have declared the session ready too early. Each setup now waits

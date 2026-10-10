@@ -224,6 +224,7 @@ For contributors and AI agents, the repo keeps its guidance split by scope:
 | [`AGENTS.md`](AGENTS.md) | Repo-wide conventions, data/state patterns, UI patterns, testing, workflow |
 | [`doc/guide/`](doc/guide/) | One file per domain — a page, a tab, a subsystem (`stati`, `dialog`, `temi`, `account-condiviso-demo`, `shell`, `cache-persistita`, `e2e-emulatori` for the Playwright and emulator harness) — the full rules and blind spots for that area |
 | [`perf/`](perf/) · [`doc/guide/velocita.md`](doc/guide/velocita.md) | The size budget (`budget.json`), the benchmark's routes and last runs; the manual — commands, baseline, raised ceilings, census — is the guide |
+| [`doc/mobile/`](doc/mobile/) | The live mobile-composition series (MOB-01..09): the index with the baseline, the decisions and the state, one spec per session, the first-screen budget (`budget.json`, its manual in [`doc/guide/prima-schermata.md`](doc/guide/prima-schermata.md)) and the prompt that retires a spec — the folder goes when the last spec is retired |
 | [`DESIGN.md`](DESIGN.md) | The aesthetic spec (normative) |
 | [`PRODUCT.md`](PRODUCT.md) · [`SETUP.md`](SETUP.md) · [`WORKFLOW.md`](WORKFLOW.md) | Positioning · environment/emulators · session rules |
 
@@ -273,6 +274,10 @@ npm run perf:budget    # JS per page of a production build against perf/budget.j
 npm run perf:build     # Production build against the emulators, then `npm run perf:serve` on :3200
 npm run perf:bench -- --runs=3  # Time to the first figure, cold and by navigation, per page
 npm run perf:census -- --runs=5 # Components re-rendered per key / tab switch (after `npm run perf:build -- --profile`)
+
+# First screen on phone and tablet (doc/guide/prima-schermata.md), on the same :3200 build
+npm run mobile:census -- --email=census@example.com  # Re-seeds its fixture, measures 19 surfaces at 390/768/1024
+npm run mobile:budget  # The last run against doc/mobile/budget.json (a budget that only tightens)
 ```
 
 Server time, which the emulators cannot show, is read in production: `GET /api/dashboard/overview` answers with a
