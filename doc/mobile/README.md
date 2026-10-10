@@ -6,7 +6,11 @@
 > di riferimento in `reference/` e questo indice: la domanda con la risposta, come è stato misurato il mobile attuale,
 > la baseline, le tre direzioni disegnate e quella scelta, l'ordine consigliato e lo stato. **Si implementa DOPO le 14
 > spec PERF** (decisione del proprietario; tutte in develop e ritirate, l'ultima il 2026-10-08): PERF-02 (in develop dal 2026-09-29) e PERF-03 (in develop dal 2026-09-30: la riga «Aggiornato alle…» sta nel `PageHeader`, non nella composizione) cambiano la shell che il mobile eredita, PERF-04 (in develop dal 2026-09-30), PERF-12 (dal 2026-10-06) e PERF-11 (dal 2026-10-07) e PERF-14 (dal 2026-10-08)
-> hanno toccato gli stessi componenti. Una spec che si chiude aggiorna la tabella in § 6 e, se ha rimisurato, la baseline in § 3.
+> hanno toccato gli stessi componenti. Una spec che si chiude aggiorna la tabella in § 6 e, se ha rimisurato, la tabella § 3.1
+> «Fixture» (creata da MOB-01 con la prima corsa sul fixture del budget); la tabella del 2026-09-26 sul mirror (§ 3) resta
+> intatta come riferimento storico, e le corse sul mirror di fine spec vanno in SESSION_NOTES (solo aggregati). **Lettura
+> adversariale del 2026-10-10**: tutte e nove le spec rilette insieme contro il codice e le decisioni di § 9, 261 rilievi
+> corretti in loco e 49 domande chiuse (§ 9, decisioni 9–57); § 10 è vuoto.
 
 ## 1. La domanda e la risposta
 
@@ -106,6 +110,13 @@ Lettura: a 768 la griglia a due colonne dimezza lo scroll (mediana ~2,4 schermat
 una intera; a 1024 landscape (768 px di altezza) si torna a UNA tessera sopra la piega e ~3,1 schermate (mediana 3,11). La composizione
 attuale premia il portrait e penalizza il landscape.
 
+### 3.1 Fixture (dal primo `mobile:census` di MOB-01)
+
+La tabella la scrive MOB-01 con la prima corsa sul fixture `census@example.com` (decisione 10): data, account, le 19
+superfici × 390/768/1024 con le metriche di MOB-01 § 4, solo numeri aggregati. È la tabella che le spec MOB-02..08
+aggiornano quando rimisurano, e la base di `doc/mobile/budget.json`; sotto, l'elenco delle voci allargate con `raisedBy`
+(decisioni 19 e 22). La tabella § 3 (mirror, dev server, 2026-09-26) non si tocca più.
+
 ### Le tessere a 390 delle tre pagine dei mock (top e altezza in px da inizio `main`)
 
 | Panoramica (navbar 66, verdetto 315) | top | h | cifre |
@@ -187,12 +198,27 @@ prima di PERF-01: MOB-01 misura un'app che li contiene, e MOB-06 e MOB-07 compon
 DOPO quei contributi.
 
 MOB-01 va prima di tutto, come PERF-01: le altre si chiudono con i suoi numeri. MOB-02 è il CONTRATTO che sette spec
-citano alla lettera (la tabella delle API in § 4.1): le due decisioni di fondazione che pone — l'ordine del DOM e la
-posizione dell'asse (§ 4.9, domande 8 e 9) — vanno risposte e scritte qui in § 9 PRIMA di aprire MOB-03, o si rifanno
-sette pagine. Dopo MOB-02 quattro sessioni possono partire in parallelo (MOB-03, 04, 06, 07) e MOB-05 subito dopo; i
-moduli condivisi (`PatrimonioTile`, `salesNarrative`, `scheduledSentence`, `playwright.config.ts`, `budget.json`) vanno
-a chi arriva prima, e le spec dicono in § 3 chi possiede cosa. MOB-08 (tablet) vuole le pagine composte; MOB-09 chiude
-la serie: finché manca, DESIGN.md dice il contrario del codice.
+citano alla lettera (la tabella delle API in § 4.1); le due decisioni di fondazione che poneva — l'ordine del DOM e la
+posizione dell'asse — sono decise in § 9 (1, 2, 11, 12). **Le spec si implementano UNA PER VOLTA, nell'ordine dei
+numeri, 01 → 09, mai due insieme** (proprietario, 2026-10-10, decisione 9): ogni spec parte dal diff di quella prima,
+e un modulo condiviso appartiene alla spec con il numero più basso che lo tocca — chi viene dopo lo usa con quei nomi.
+MOB-08 (tablet) vuole le pagine composte; MOB-09 chiude la serie: finché manca, DESIGN.md dice il contrario del codice.
+
+| Modulo condiviso | Proprietaria | Chi lo usa dopo |
+|---|---|---|
+| `doc/mobile/budget.json`, `scripts/mobileCensus.mjs`, `lib/utils/mobileBudget.ts`, il fixture `census@example.com` (`scripts/seedCensusE2E.mts`) | MOB-01 | tutte |
+| `PageVerdict` (`strip`, `scope`, `axis`, `restCollapse`), `Tile` (`collapse`, `asideWhenClosed`, `LIFTED_FIGURE_CLASS`), `ErrorNotice` (`collapse`, `live`), `VerdictStrip`, `PageRest`, `verdictStrip.ts`, `mobileSections.ts`, i due hook, `--ease-spring`, `PageTabBar` | MOB-02 | MOB-03..08 |
+| `PatrimonioTile` (`liftedFigures`, `id`, curva a 120 px), `ComposizioneTile` di overview (`collapse`, `asideWhenClosed`), `salesNarrative.ts` (`binding`), `describeScheduledCaption` | MOB-03 | MOB-06 (Patrimonio), la landing |
+| `scheduledSentence` come `scope` (`describeTrackingScope`), `CashflowKpiTrio` e `CashflowPeriodoTile.liftedFigures`, `ExpenseDialog.onSuccess(saved)`, `components/cashflow/CashflowTabSkeletons.tsx`, `e2e/bundle.lazy.mobile.spec.ts` e `e2e/lazyTabLanding.ts` | MOB-04 | MOB-06 (Analisi), MOB-08 |
+| `playwright.config.ts`: il progetto `degraded-mobile` e `/degraded\./` nel `testIgnore` di `mobile` | MOB-05 | MOB-08 |
+| `analisi/tiles/PeriodoTile.liftedFigures`, `FlussoTile.liftedFigures` | MOB-06 | MOB-08 |
+| `usePortfolioExposure(ownerId, assets, options)` | MOB-07 | — |
+| `playwright.config.ts`: i progetti `tablet` e `tablet-landscape`; `lib/utils/tabletComposition.ts`; la barra di `app/dashboard/layout.tsx` | MOB-08 | MOB-09 |
+| DESIGN.md, `.impeccable/design.json`, `## Composizione mobile` uniformata nelle guide, README.md utente, PRODUCT.md | MOB-09 | — |
+
+Ogni spec riscrive anche le stesse righe (CLAUDE.md «Latest» e § Current Status, § 6 e § 3.1 di questo indice,
+`Draft Release Temp.md`, `doc/guide/e2e-emulatori.md`): in sequenza non c'è conflitto, e ognuna le riscrive nello stato
+finale della serie fino a lei.
 
 **Cosa è cambiato dopo le spec (2026-10-10, fuori dossier, in develop)** — chi apre MOB-04 e MOB-06 riverifica contro il codice:
 Patrimonio ha un tipo di asset in più, il **prestito** (`loan`, valore negativo, `doc/guide/patrimonio.md`): la tessera
@@ -206,23 +232,27 @@ scadenza) non tocca la composizione. Nessuna striscia e nessun budget cambia per
 le tessere che già c'erano.
 
 Un avvertimento del passaggio di coerenza, da tenere davanti: **il budget della prima schermata rischia di diventare
-una lista di eccezioni** — le clausole vincolanti annullano il taglio del verdetto, le tessere eroe sono alte 585–709 px,
-e si misura sul mirror, che cambia con il giorno del mese. Le domande comuni in § 10 vanno risposte una volta, non spec
-per spec.
+una lista di eccezioni** — le clausole vincolanti annullano il taglio del verdetto, le tessere eroe sono alte 585–709 px.
+Per questo si misura sul fixture `census@example.com` (decisioni 6 e 10), con tolleranza zero (23), e le sole eccezioni
+ammesse sono le voci con `raisedBy` (19, 22), elencate in § 3.1. Le domande comuni sono state risposte una volta (§ 9),
+non spec per spec.
 
 ## 6. Stato
 
 | Spec | Titolo | Priorità | Sforzo | Dipende da | Modello · effort | Stato |
 |---|---|---|---|---|---|---|
-| [MOB-01](MOB-01-censimento-e-budget-prima-schermata.md) | Il censimento in repo e il budget della prima schermata | 1 | M | PERF-01, PERF-00 (chiusa il 2026-09-28) | Opus 5.5 · high | da fare |
-| [MOB-02](MOB-02-primitive-della-composizione.md) | Le primitive della composizione | 1 | L | MOB-01, PERF-12, PERF-14 (con PERF-02; PERF-03) | Fable 5.1 · xhigh | da fare |
-| [MOB-03](MOB-03-panoramica.md) | Panoramica | 2 | M | MOB-02, PERF-03, PERF-07 | Fable 5.1 · high | da fare |
-| [MOB-04](MOB-04-cashflow-cinque-tab.md) | Cashflow: le cinque tab | 2 | L | MOB-02, PERF-06 | Fable 5.1 · xhigh | da fare |
-| [MOB-05](MOB-05-rendimenti.md) | Rendimenti | 2 | M | MOB-02, PERF-09 | Fable 5.1 · high | da fare |
-| [MOB-06](MOB-06-patrimonio-analisi-storico-hall-of-fame.md) | Patrimonio · Analisi · Storico · Hall of Fame | 3 | L | MOB-02, PERF-11 | Opus 5.5 · high | da fare |
-| [MOB-07](MOB-07-allocazione-previdenza-fire.md) | Allocazione · Previdenza · FIRE | 3 | L | MOB-02 (PERF-04, 05, 10 chiuse; PERF-00 chiusa il 2026-09-28) | Fable 5.1 · high | da fare |
-| [MOB-08](MOB-08-tablet-768-e-1024.md) | Tablet: 768 e 1024 | 3 | M | MOB-03..07 (PERF-01, 02, 14) | Opus 5.5 · high | da fare |
-| [MOB-09](MOB-09-design-md-guide-e-chiusura.md) | DESIGN.md, guide e chiusura | 3 | M | MOB-03..08 | Opus 5.5 · high | da fare |
+| [MOB-01](MOB-01-censimento-e-budget-prima-schermata.md) | Il censimento in repo e il budget della prima schermata | 1 | M | — (PERF-01 e PERF-00 in develop) | Opus 5.5 · high | da fare · riletta in modo adversariale il 2026-10-10: 25 rilievi, 5 decisioni |
+| [MOB-02](MOB-02-primitive-della-composizione.md) | Le primitive della composizione | 1 | L | MOB-01 | Fable 5.1 · xhigh | da fare · riletta in modo adversariale il 2026-10-10: 30 rilievi, 11 decisioni |
+| [MOB-03](MOB-03-panoramica.md) | Panoramica | 2 | M | MOB-01, MOB-02 | Fable 5.1 · high | da fare · riletta in modo adversariale il 2026-10-10: 28 rilievi, 6 decisioni |
+| [MOB-04](MOB-04-cashflow-cinque-tab.md) | Cashflow: le cinque tab | 2 | L | MOB-01, MOB-02, MOB-03 | Fable 5.1 · xhigh | da fare · riletta in modo adversariale il 2026-10-10: 34 rilievi, 9 decisioni |
+| [MOB-05](MOB-05-rendimenti.md) | Rendimenti | 2 | M | MOB-01, MOB-02 | Fable 5.1 · high | da fare · riletta in modo adversariale il 2026-10-10: 25 rilievi, 4 decisioni |
+| [MOB-06](MOB-06-patrimonio-analisi-storico-hall-of-fame.md) | Patrimonio · Analisi · Storico · Hall of Fame | 3 | L | MOB-01, MOB-02, MOB-03, MOB-04 | Opus 5.5 · high | da fare · riletta in modo adversariale il 2026-10-10: 35 rilievi, 8 decisioni |
+| [MOB-07](MOB-07-allocazione-previdenza-fire.md) | Allocazione · Previdenza · FIRE | 3 | L | MOB-01, MOB-02 | Fable 5.1 · high | da fare · riletta in modo adversariale il 2026-10-10: 27 rilievi, 7 decisioni |
+| [MOB-08](MOB-08-tablet-768-e-1024.md) | Tablet: 768 e 1024 | 3 | M | MOB-02..07 | Opus 5.5 · high | da fare · riletta in modo adversariale il 2026-10-10: 30 rilievi, 5 decisioni |
+| [MOB-09](MOB-09-design-md-guide-e-chiusura.md) | DESIGN.md, guide e chiusura | 3 | M | MOB-02..08 | Opus 5.5 · high | da fare · riletta in modo adversariale il 2026-10-10: 27 rilievi, 6 decisioni |
+
+Le PERF citate nelle intestazioni delle spec sono tutte ritirate e in develop: non sono dipendenze aperte. L'ordine è quello
+dei numeri (decisione 9).
 
 Effort = il livello di ragionamento di Claude Code. Fable 5.1 dove il lavoro attraversa regole di dominio dense (le
 narrative e le clausole vincolanti, Cashflow, Rendimenti, Pianificazione); Opus 5.5 dove è meccanico ma esteso (il
@@ -247,13 +277,15 @@ Fino a MOB-01: `reference/mobile-census.mjs` copiato nella radice del repo come 
 'playwright'` risolve da lì), emulatori + mirror + `npm run dev:emulator`, poi
 `node .tmp-mobile-measure.mjs --out=<cartella fuori dal repo>` (opzioni `--viewports=390,768,1024`,
 `--surfaces=panoramica,rendimenti`), cancellato a fine sessione; il JSON e gli screenshot restano fuori dal repo. Da
-MOB-01: `npm run mobile:census` e `npm run mobile:budget` sulla build di produzione di `perf:build`, servita da `perf:serve` (:3200), con il `--` di
-npm davanti alle opzioni.
+MOB-01: `npm run mobile:census -- --email=census@example.com` e `npm run mobile:budget` sulla build di produzione di
+`perf:build`, servita da `perf:serve` (:3200), con il `--` di npm davanti alle opzioni, da Git Bash (PowerShell 5.1
+mangia il `--`, doc/guide/velocita.md); il mirror (`--email=mirror@example.com`) solo per il giro guidato e il
+confronto con la baseline § 3 in SESSION_NOTES.
 
 ## 9. Decisioni del proprietario (2026-09-26)
 
 - Sì al design ad hoc, come **composizione mobile** (stesse tessere, token, narrative, route): cambia la prima
-  schermata (verdetto + ≤4–5 cifre) e come si arriva al resto (un tap).
+  schermata (verdetto + ≤ 5 cifre fuori dal verdetto, al più 4 nella striscia) e come si arriva al resto (un tap).
 - **Una sola composizione «schermo piccolo»** per telefono e tablet: due colonne dai 768, al più tre a 1024; `desktop:`
   resta l'unico switch, `lg:` resta vietato.
 - **Direzione A** come base; da C l'eyebrow rosso e Plusvalenze in errore; niente diario, niente pager.
@@ -277,31 +309,94 @@ npm davanti alle opzioni.
   «una sola composizione» e «`desktop:` unico switch» valgono per griglia, striscia e righe, e restano. Un grafico può
   cambiare disegno sotto la larghezza in cui smette di leggersi; mai cifre né atterraggi, e le sue didascalie vengono da
   `analisiNarrative.ts` come ogni altra frase (MOB-06 § 4.2, MOB-08 § 4.1, MOB-09 § 4.1).
+- **Decisioni della lettura adversariale (2026-10-10)**, numerate di seguito alle otto di fondazione; ogni spec le cita
+  per numero. Le prime sedici sono trasversali, le altre stanno sotto la spec a cui appartengono.
+  - **Trasversali.** (9) **Una spec per volta, nell'ordine dei numeri 01 → 09**, mai due insieme; un modulo condiviso è
+    della spec con il numero più basso che lo tocca (tabella in § 5). (10) **Il budget si misura sull'account dedicato
+    `census@example.com`** (`npm run e2e:seed:census`, `scripts/seedCensusE2E.mts`: Centri e Divisione accesi, una cedola,
+    una riga in calendario, la storia di Hall of Fame del seed `hof`, date relative al giorno della corsa così che ogni
+    superficie mostri gli stessi conteggi in qualunque giorno del mese); `mobile:census` lo risemina prima di misurare
+    quando `--email` è il suo. (11) **L'ordine unico è il DOM di oggi su ogni pagina**: a 1440 non cambia nulla salvo LA
+    tessera portata in testa dove non lo è (What If); sul telefono le righe chiuse seguono il DOM desktop (Panoramica:
+    Sintesi prima di Cashflow); nessuna classe `order-*` nelle griglie composte; ogni guida dichiara l'ordine in
+    § Composizione mobile. (12) **L'asse sta subito sotto il titolo, prima della prima frase** (titolo → asse → prima
+    frase → striscia → scope → «Il perché»); **a 1440 sono due istanze dello stesso controllo** (nello slot con
+    `desktop:hidden`, al posto di oggi con `hidden desktop:flex`, stessa prop di stato, come le `actions` di
+    `PageHeader`). (13) **Le cifre dello `scope` contano DENTRO il verdetto** (ogni discendente della `section` salvo
+    l'`ul` della striscia); `PageVerdict` rende lo `scope` a ogni larghezza quando la pagina lo passa (sotto `desktop:`
+    dopo la striscia, a 1440 sotto il paragrafo), e la pagina che lo vuole solo sotto `desktop:` lo passa con
+    `sections.compact`. (14) **La didascalia del calendario sotto le cifre che lo contengono compare a ogni larghezza**
+    (Panoramica, Tracciamento); **in Analisi e Divisione `scheduledSentence` esce dalla `sentence` e diventa lo
+    `scope`**, `lead` = la prima frase, nessun `binding` su `scheduledSentence`; in Divisione «Con quelle, …» diventa
+    «Con le spese in calendario, …». (15) **Una cella della striscia può ripetere una cifra che la tessera aperta stampa
+    nella sua LETTURA, in una riga di classifica o in una riga del ledger**: The Lifted-Figure Rule nasconde solo i
+    BLOCCHI (KPI, chip, didascalie, eroi); letture, classifiche e ledger restano interi. (16) **Il conto «≤ 5 cifre fuori
+    dal verdetto sopra la pill» conta tutte le cifre, LA tessera compresa**; l'obiettivo 5 vale a 390; a 768/1024
+    l'obiettivo è il misurato di MOB-08, che fa da tetto. (17) **Di un blocco sollevato si nasconde solo la cifra
+    ripetuta**, l'altra resta nella tessera («€ da spostare», `trailingPct`, la quota del trio); **quando la cifra non
+    ripetuta farebbe sforare il 5, il blocco si nasconde intero e la cifra entra come clausola nel seguito di «Il
+    perché»** (l'euro del chip dell'anno su Panoramica e Patrimonio, il chip «dal massimo» di Rendimenti). (18) **Per la
+    deroga «solo titolo» conta ogni cella della striscia**, anche `points`, `pp`, `ratio` e `rank` (la decisione 7 vale
+    solo per il censimento): Rendimenti con il 60/40 va in «solo titolo», senza si taglia al primo «;». (19) **LA tessera
+    senza curva** (Bilanciamento, Evento, Tetto del mese, Obiettivi, e Hall of Fame se il grafico a 120 px non basta):
+    `firstClosedRowAbovePill` registrato `false` con `raisedBy: "MOB-NN: perché"` in `budget.json` e una riga in § 3.1,
+    solo per le superfici elencate. (20) **Lo zero firmato si stampa senza segno ovunque** («0 €», `isPrintedZero`):
+    `formatStripFigure` lo fa, MOB-03 e MOB-06 allineano `overviewNarrative` e `patrimonioNarrative` (cambio a 1440
+    dichiarato). (21) **LA tessera resta sempre aperta**, fuori dal controller, senza trigger. (22) **La pill di
+    `PageTabBar` passa a 44×44**; le pagine a tab crescono di ~12 px e `budget.json` si allarga per le sole metriche
+    mosse con `raisedBy: "MOB-02: pill a 44 px"`. (23) **Tolleranza zero** su ogni metrica; `mobile:budget -- --tighten`
+    scrive il misurato esatto, solo con `--email=census@example.com`, e si rifiuta se una superficie è `missing` o
+    `unsettled`. (24) **L'eroe di LA tessera è esente dalla regola «non ripete»** anche quando il `lead` lo nomina (è la
+    tessera).
+  - **MOB-02.** (25) Le due azioni di Hall of Fame («Aggiungi una nota», «Aggiorna i record») scendono dopo il
+    Dettaglio sotto `desktop:` già in MOB-02; il grafico di Record del patrimonio scende a 120 px; se la prima riga chiusa
+    resta sotto la pill, eccezione `raisedBy` (19). Il podio resta a cinque righe.
+  - **MOB-03.** (26) «Messo da parte finora» = la quota del verdetto (`resolveLivedCashflow`), già arrotondata con
+    `Math.round` come la frase; la tessera Cashflow tiene il mese intero. (27) Mese con `taxIsTheStory`: il taglio va DOPO
+    la clausola della vendita (titolo + prima frase + tasse visibili, risparmio e mercato dietro «Il perché»). (28) Una
+    cella con un valore oltre 9 caratteri («+123.456,78 €») prende una riga intera della striscia e le altre scendono
+    (layout di `VerdictStrip`, MOB-02).
+  - **MOB-04.** (29) Una spesa salvata dal «+» fuori dal periodo o dai filtri: nessuna apertura, periodo e filtri fermi,
+    solo il toast di successo che esiste. (30) Dividendi e Centri di Costo senza striscia. (31) La striscia di
+    Tracciamento solleva il trio (totali del periodo, calendario compreso, con lo `scope` «Nel totale ci sono ancora…»);
+    nel trio si nascondono solo le tre cifre ripetute. (32) Il residuo per persona di Divisione passa al «−» U+2212 anche a
+    1440. (33) Budget oltre il tetto: frase intera e striscia (la ripetizione è nel verdetto, non nella tessera).
+    (34) Tetto superato solo dal calendario: la cella si chiama «Supererai» e apre `bud-rischio`; «Oltre» (superamento
+    già avvenuto) apre `bud-avvisi`. (35) In attesa e in errore il wrapper del verdetto resta montato e rende lo slot
+    `axis` attorno a skeleton ed `ErrorNotice`: il selettore è lo stesso elemento e tiene il focus (ingegneria, non una
+    scelta).
+  - **MOB-05.** (36) Benchmark con tutte e sei le serie fallite = lettura fallita a ogni larghezza (`SectionSpec.failed`,
+    `ErrorNotice` al posto della tessera, cella 2 «modello non disponibile»). (37) Contributi senza registro: punto cieco
+    dichiarato in `doc/guide/rendimenti.md`. (38) Il chip «dal massimo del periodo» passa nel seguito sotto `desktop:`
+    (caso di 17); il chip sull'altra base resta.
+  - **MOB-06.** (39) Storico: una sola cella del Driver, «Risparmio {anno}»; il mercato resta nel ledger aperto.
+    (40) Patrimonio: eroe esente (24); `'yearly'` e `'curve-end'` sollevati come MOB-03, l'euro dell'anno nel seguito (17);
+    striscia G/P + Liquidità; se il census conta più di 5, cede la cella Liquidità. (41) Movimenti in lettura fallita:
+    `ErrorNotice` anche a 1440. (42) Le didascalie della barra del Flusso («Quote delle spese», «Quote di quanto è
+    uscito») perdono l'importo sotto `desktop:` quando ristampa una cifra del verdetto o della striscia; lo tengono con un
+    disavanzo (base diversa dalle entrate).
+  - **MOB-07.** (43) What If: LA tessera è Evento, prima nel DOM anche a 1440 (cella sinistra); MOB-09 riscrive la frase
+    desktop di The Input Tile Rule. (44) Il vincolo del fondo è la riga d'ambito `scope` sotto `desktop:`
+    (`describeFireLockScope`), la frase nel seguito. (45) Allocazione: «Fuori posizione» + lo scarto maggiore, il
+    punteggio no. (46) Previdenza con due o più contribuenti: verdetto intero e nessuna striscia; con uno, `leadLength: 0`
+    e le tre celle. (47) Obiettivi: nessuna striscia.
+  - **MOB-08.** (48) Il trigger della barra in orizzontale a 44×44 (`size-11` + `py-1`, barra 53 px, prima schermata 715).
+    (49) A 1024 al più 6 righe chiuse accanto a LA tessera (`MAX_BESIDE_ROWS = 6`), le altre sotto su tre colonne; accanto
+    stanno solo le chiuse che precedono la prima aperta, da lei in poi tutto va sotto in ordine DOM (da 1); flusso
+    `sparse`, mai `dense` (da 1). (50) iPad 12,9" in verticale (contenitore 992 px): tre colonne con la pill; lo skeleton
+    generico resta a due colonne. (51) Il criterio «`screens` a 1024 ≤ `screens` a 768» è sostituito da «`screens` a 1024
+    ≤ la baseline del 2026-09-26 a 1024 (§ 3)» per ogni superficie composta, misurato da `mobile:budget` sul fixture.
+  - **MOB-09.** (52) Il testo delle quattro regole lo applica Claude verbatim in DESIGN.md e nel sidecar, dopo l'OK del
+    proprietario sul testo nella sessione MOB-09. (53) Critiche Impeccable: nuove per Panoramica, Tracciamento,
+    Rendimenti e Hall of Fame; le altre dodici cancellate nello stesso commit, rifatte da `polish` in sessioni successive.
+    (54) `components.tile-closed-row` entra nel frontmatter di DESIGN.md (i colori di `tile-default`, `rounded:
+    "{rounded.2xl}"`, `height: "52px"`, `padding: "0 20px"`). (55) Nel Draft una voce per pagina, riscritta nello stato
+    finale, più una di 📚 Documentation. (56) Il giro F di MOB-09 si fa con DevTools sul portatile a 390 e 1024 sul
+    mirror (l'app degli emulatori si collega a 127.0.0.1: un telefono non entra); la riga in errore con uno script
+    Playwright usa-e-getta. (57) Le critiche si scrivono dal Mac (WORKFLOW § Where things are recorded).
 
 ## 10. Domande aperte al proprietario
 
-Le spec le pongono in § 4 con la prova; qui l'elenco deduplicato. Le comuni 1–6 e, di MOB-01, «mirror o fixture» e
-«cosa è una cifra» sono DECISE il 2026-09-27: vedi § 9. Restano aperte le altre (il podio di Hall of Fame nel budget compreso).
-
-**Comuni a più spec**
-1. ~~Deroga «solo titolo»~~ — decisa: ammessa e dichiarata (§ 9).
-2. ~~L'ordine del DOM~~ — deciso: una sequenza sola, nessun riordino CSS (§ 9).
-3. ~~L'asse~~ — deciso: slot `axis` di `PageVerdict` (§ 9).
-4. ~~Tessera alta~~ — deciso: la curva si accorcia, mai la lettura (§ 9).
-5. ~~Punteggiatura a 1440~~ — deciso: sì, il builder ripunteggia anche a 1440 (§ 9).
-6. ~~Stessa cifra due volte~~ — deciso: nel paragrafo aperto sì, nella tessera no (§ 9).
-7. Un blocco sollevato che porta con sé una cifra che nessuno ristampa (l'euro del chip dell'anno, il chip «dal
-   massimo», «€ da spostare») (MOB-03, 05, 07).
-8. La didascalia del calendario anche a 1440 (MOB-03, 04).
-9. Il budget ≤ 5 cifre: il podio di Hall of Fame conta? A 768/1024 il tetto è il misurato? Patrimonio non ci sta
-   (MOB-02, 06, 08).
-
-**Una sola spec** — MOB-01: le tolleranze sul fixture, la riga d'ambito nel verdetto (mirror/fixture e «cosa è una cifra»
-sono decise, § 9). MOB-02: LA tessera non si chiude mai; +12 px sulle pagine a tab. MOB-03:
-«Messo da parte» finora o mese intero. MOB-04: Divisione (paragrafo o didascalia), spesa salvata fuori periodo,
-Dividendi e Centri senza striscia, spese avvenute o il trio, Budget «Oltre» dal solo calendario, il «−» di Divisione a
-1440. MOB-05: Benchmark in errore, Contributi senza registro. MOB-06: Movimenti in `ErrorNotice` a 1440, le azioni di
-Hall of Fame in fondo, la didascalia della barra del Flusso senza importo sul telefono. MOB-07: il vincolo del fondo come riga d'ambito o `binding`, What If (Evento o Prima e dopo),
-Obiettivi con o senza striscia. MOB-08: trigger della barra a 44 px, `dense` a 768, sei righe accanto o tutte, iPad
-12,9" verticale. MOB-09: il testo delle quattro regole, quali critiche Impeccable, `tile-closed-row` nel frontmatter,
-una voce o una per pagina nel draft.
+Nessuna: le 49 domande della lettura adversariale del 2026-10-10 sono chiuse in § 9 (decisioni 9–57), e ogni spec
+scrive la sua risposta come istruzione. Una domanda nuova nasce solo da un fatto che una sessione di implementazione
+scopre nel codice, si pone subito al proprietario con lo strumento interattivo e la risposta si aggiunge qui.
