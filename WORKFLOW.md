@@ -136,7 +136,7 @@ npm run dev:emulator     # the app on :3000 pointed at the emulators
 Prerequisites (a JDK) and the full guide: SETUP.md → Step 6. Port 3100 (`npm run dev:e2e`, isolated
 `.next-e2e` build dir) is the Playwright server; keep it separate from the tour server on :3000. Port
 3200 (`npm run perf:serve`, the `.next-perf` production build) is the speed benchmark's and the first-screen census's
-(`npm run mobile:census`, `doc/guide/velocita.md`).
+(`npm run mobile:census`, `doc/guide/prima-schermata.md`).
 
 ### Obligation 5 — how to hand the owner an app already authenticated
 

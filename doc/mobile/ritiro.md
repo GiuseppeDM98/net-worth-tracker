@@ -22,8 +22,8 @@ della PR e la data si leggono in `git log --first-parent develop --format="%h %a
 --date=short`, e la riga di stato li scrive come le PERF («PR #NNN in develop dal <data>») —
 E la MISURA DI CHIUSURA della spec è rifatta sul codice mergiato: `npm run mobile:census --
 --email=census@example.com` e poi `npm run mobile:budget` verdi sulla build `perf:build`
-servita da `perf:serve` su :3200 con gli emulatori accesi (doc/guide/velocita.md § Il
-censimento della prima schermata; doc/mobile/README.md § 8), dal 5 al penultimo giorno del
+servita da `perf:serve` su :3200 con gli emulatori accesi (doc/guide/prima-schermata.md;
+doc/mobile/README.md § 8), dal 5 al penultimo giorno del
 mese (README § 9, decisione 59), con la riga di README § 6 e la tabella § 3.1 aggiornate
 dalla sessione che ha implementato (README § 7, ultimo punto: «ogni spec dichiara la sua
 misura in § 2 (`mobile:budget`) e la riporta qui»). NON sono segnali: il deploy su `main` o
@@ -102,19 +102,20 @@ ORDINE DI LAVORO
    --exclude-dir=.mobile-census` — (a) il numero: `grep -rn "MOB-<NN>" .` (il 2026-10-10
    MOB-01 contava 68 occorrenze: 8 fuori dalla cartella in 7 file tracciati —
    `scripts/mobileCensus.mjs` 2, `scripts/seedCensusE2E.mts`, `lib/utils/mobileBudget.ts`,
-   `doc/guide/velocita.md`, CLAUDE.md, AGENTS.md, WORKFLOW.md — più 3 in SESSION_NOTES.md
+   `doc/guide/prima-schermata.md` (fino allo scorporo del 2026-10-10: `velocita.md`), CLAUDE.md, AGENTS.md,
+   WORKFLOW.md — più 3 in SESSION_NOTES.md
    (untracked), 25 in README, 28 nelle otto spec sorelle, 1 in `reference/mobile-census.mjs`
    e 3 nella spec stessa); (b) il percorso: `grep -rn "doc/mobile/<SPEC senza cartella>" .`
    e `grep -rn "doc/mobile" .` (il 2026-10-10: 19 righe in 7 file di codice e test —
    `scripts/mobileBudget.mts` 4, `scripts/mobileCensus.mjs` 3, `scripts/seedCensusE2E.mts`
    2, `lib/utils/mobileBudget.ts` 4, `__tests__/mobileSurfaces.test.ts` 4,
    `__tests__/mobileCensusFigures.test.ts` 1, `e2e/allocation.mobile.spec.ts` 1 — oltre a
-   CLAUDE.md, AGENTS.md, WORKFLOW.md e `doc/guide/velocita.md`); (c) il titolo a parole,
+   CLAUDE.md, AGENTS.md, WORKFLOW.md e `doc/guide/prima-schermata.md`); (c) il titolo a parole,
    in italiano e in inglese: `grep -rn -i -E "<le parole del titolo>|<la loro resa
    inglese>" .` (per MOB-01: «censimento in repo», «budget della prima schermata»,
    «first-screen census», «first-screen budget» → il 2026-10-10 14 file, indice, spec e
    SESSION_NOTES compresi, fra cui i tre test, `.gitignore`, AGENTS.md, CLAUDE.md,
-   WORKFLOW.md, `doc/guide/velocita.md` e `doc/guide/e2e-emulatori.md`); (d) gli ORFANI
+   WORKFLOW.md, `doc/guide/prima-schermata.md` e `doc/guide/e2e-emulatori.md`); (d) gli ORFANI
    NUMERICI, cioè una decisione, una
    sezione o una tabella citate col numero senza il documento che le numera: `grep -rn -E
    "README § ?9|§ 9|decision[ei]? [0-9]+|decisions? [0-9]+|§ 3\.1|§ 4\.[0-9]" scripts
@@ -151,8 +152,8 @@ ORDINE DI LAVORO
    uniforma e che la spec della pagina crea (README § 9, decisione 11: ogni guida dichiara
    l'ordine in § Composizione mobile; il 2026-10-10 nessuna guida l'ha ancora) e, per ciò
    che sembra un bug e non lo è, nei suoi § Per-page blind spots; lo strumento di misura, le
-   colonne, il ratchet e il fixture → doc/guide/velocita.md § Il censimento della prima
-   schermata e § Files; gli account e le trappole del collaudo → doc/guide/e2e-emulatori.md
+   colonne, il ratchet e il fixture → doc/guide/prima-schermata.md (§ Il censimento e
+   § Files); gli account e le trappole del collaudo → doc/guide/e2e-emulatori.md
    e la tabella dei fixture di WORKFLOW.md § 3; le invarianti → il test che le pinna
    (`__tests__/<modulo>.test.ts`, con l'intestazione che dice quale falsificazione l'ha
    vista rossa) e la riga «Suites to run after a change here» del § Files della guida; le
@@ -164,18 +165,18 @@ ORDINE DI LAVORO
    con la data e senza il nome della spec (COMMENTS.md). Il giorno dell'ULTIMA spec, il
    contenuto ancora operativo di README.md della serie va ciascuno in UNA casa: la tabella
    del mirror del 2026-09-26 (§ 3) e la tabella del fixture (§ 3.1, quella che le spec
-   aggiornano) → doc/guide/velocita.md § Il censimento della prima schermata (come la
-   baseline PERF del 2026-09-26 è § Baseline storica, f2d4ec3); le decisioni di § 9 che
+   aggiornano) → doc/guide/prima-schermata.md (come la baseline PERF del 2026-09-26 è
+   § Baseline storica di velocita.md, f2d4ec3); le decisioni di § 9 che
    vincolano ancora il codice → AGENTS.md (regola + data) o la guida della pagina; la
    tabella dei moduli condivisi di § 5 → le guide delle aree che li usano, per nome; § 8
-   «Come si rimisura» → velocita.md (oggi già lì: si verifica che non manchi nulla); § 4 le
+   «Come si rimisura» → prima-schermata.md (oggi già lì: si verifica che non manchi nulla); § 4 le
    tre direzioni e la scelta → README.md § Documentation come storia, con le date;
    `doc/mobile/budget.json` SI SPOSTA e non si cancella mai: la casa proposta, imitando la
    serie PERF (`perf/budget.json` e `perf/routes.json` stanno in `perf/`, fuori da `doc/`),
    è `perf/mobile-budget.json`, con `BUDGET_PATH` di `scripts/mobileBudget.mts:31`, il
    `git show HEAD:` di `:45`, `BUDGET_PATH` di `scripts/mobileCensus.mjs:52`, il `resolve`
    di `__tests__/mobileSurfaces.test.ts:15` e ogni frase di CLAUDE.md, AGENTS.md,
-   velocita.md e dei commenti che lo nomina mossi NELLO STESSO commit, `git mv` per tenere
+   prima-schermata.md e dei commenti che lo nomina mossi NELLO STESSO commit, `git mv` per tenere
    la storia, e `grep -rn "doc/mobile/budget.json" .` a zero prima del commit;
    `doc/mobile/reference/mobile-census.mjs` (lo script usa-e-getta della baseline) se ne va
    con la cartella, `git log -- doc/mobile/reference/` è il suo archivio, e
@@ -256,11 +257,11 @@ righe: una lezione di dominio NON va lì ma nella sua guida (§ 0), e uno stub d
 supera i 3–4 punti è una guida che rientra (2700–2970 caratteri furono il segnale,
 AGENTS.md:31); WORKFLOW.md 24.393 caratteri e 306 righe, solo lo standard e la sua
 traduzione locale (§ 3 in coda: «Do not duplicate project conventions here»); le guide
-senza tetto scritto, le più grandi il 2026-10-10 — velocita.md 46.174 caratteri / 505
-righe, patrimonio.md 42.090 / 344, allocazione.md 41.168 / 189, e2e-emulatori.md
-39.917 / 352, cashflow.md 38.127 / 322 —: ciò che l'ultimo ritiro travasa in velocita.md
-(README § 3 con § 3.1 e le tabelle dei mock, 9.166 caratteri; § 8, 872) la porta verso
-i 56.000, e si dichiara. Se sfori, NON tagliare in
+con il tetto indicativo di ~500 righe ciascuna (oltre si divide per sotto-tema, in una sessione: così il 2026-10-10
+`prima-schermata.md` è uscita da `velocita.md`, 514 righe), le più grandi il 2026-10-10 — patrimonio.md 42.090
+caratteri / 344 righe, allocazione.md 41.168 / 189, velocita.md 40.033 / 443, e2e-emulatori.md 40.713 / 361,
+cashflow.md 38.127 / 322; `prima-schermata.md` 8.439 / 88 —: ciò che l'ultimo ritiro le travasa (README § 3 con § 3.1
+e le tabelle dei mock, 9.166 caratteri; § 8, 872) la porta verso i 18.500, e si dichiara. Se sfori, NON tagliare in
 chiusura: dimmelo e proponi lo scorporo
 come sessione a parte.
 

@@ -1,8 +1,7 @@
 /**
  * mobile:census — «what does the FIRST SCREEN hold, on a phone and on a tablet?», per surface
  * (a route, or a tab of Cashflow and FIRE) at 390×844, 768×1024 and 1024×768, on the production
- * build `perf:serve` serves on :3200 (the manual: doc/guide/velocita.md § Il censimento della
- * prima schermata). `npm run mobile:budget` then holds the run against doc/mobile/budget.json.
+ * build `perf:serve` serves on :3200 (the manual: doc/guide/prima-schermata.md). `npm run mobile:budget` then holds the run against doc/mobile/budget.json.
  *
  * Ported on 2026-10-10 (MOB-01) from the throwaway that measured the mirror on 2026-09-26
  * (doc/mobile/reference/mobile-census.mjs, the baseline of doc/mobile/README.md § 3), with the

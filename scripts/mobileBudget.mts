@@ -1,7 +1,6 @@
 /**
  * mobile:budget — the last `npm run mobile:census` against doc/mobile/budget.json, the first-screen
- * budget that can only get better (the manual: doc/guide/velocita.md § Il censimento della prima
- * schermata).
+ * budget that can only get better (the manual: doc/guide/prima-schermata.md).
  *
  * Reads `.mobile-census/last-run.json` (no browser, no server) and hands it to
  * `compareCensusToBudget` (lib/utils/mobileBudget.ts) together with the budget committed in HEAD

@@ -1,7 +1,7 @@
 /**
  * The first-screen budget of the small-screen composition: per surface × viewport, how long the
  * page is and what the first screen holds, against `doc/mobile/budget.json` — a budget that can
- * only get BETTER (doc/guide/velocita.md § Il censimento della prima schermata).
+ * only get BETTER (doc/guide/prima-schermata.md).
  *
  * Pure on purpose, like `perfBudget.ts`: `scripts/mobileCensus.mjs` measures in a browser,
  * `scripts/mobileBudget.mts` reads the files and git, this module decides. Every metric has a

@@ -25,7 +25,10 @@ in `doc/guide/<tema>.md`** (one file per page, tab, integration or subsystem —
 cross-cutting subsystems: `stati`, `dialog`, `temi`, `account-condiviso-demo`, Settings inside `impostazioni`;
 since 2026-09-20 the test harness, `e2e-emulatori`, whose two stubs sit in section 5 under their old names; since
 2026-09-30 `shell`, its stub under *Navigation* in section 4, and `cache-persistita`, its stub under *Caching* in
-section 2): open the guide for the area you are about to touch. Each guide opens with a scope line, lists its files
+section 2; since 2026-10-10 `prima-schermata`, the first-screen census, its stub under *Performance tooling* in
+section 5): open the guide for the area you are about to touch. **Sizes** (owner, 2026-10-10): this file ~1000 lines,
+a guide ~500 — past that a guide splits by sub-topic in a session of its own, never trimmed at a session's close
+(`prima-schermata.md` left `velocita.md` at 514 lines). Each guide opens with a scope line, lists its files
 and the suites to run after a change there (§ *Files*), and ends with its *Per-page blind spots* — behaviours that
 look like bugs and are not. Section 3 is the index: the 3–4 things to know before opening each guide, then the
 pointer — a stub that grows past that is a guide leaking back (2026-09-20: ten had, up to 2700 characters each;
@@ -909,7 +912,7 @@ file used to carry.
 - **A ceiling only a measure may lower, and only a new feature may raise** — `raisedBy` on the route, the before/after
   and a row in § Registro dei tetti alzati, in the same commit; `libraryCopies: { recharts: 1 }` is a rule, not a
   measure. TIMES compare only on the same machine in the same session (±10%); COUNTS compare anywhere.
-- **The first-screen census shares the port** (2026-10-10, MOB-01): `npm run mobile:census` measures the composition of
+- **The first-screen census shares the port** (2026-10-10, MOB-01; its manual is `doc/guide/prima-schermata.md`): `npm run mobile:census` measures the composition of
   19 surfaces × 390/768/1024 on the same :3200 build, re-seeding its own fixture `census@example.com`; `npm run
   mobile:budget` holds the run against `doc/mobile/budget.json` (zero tolerance, it only tightens, a widening carries
   `raisedBy: "MOB-NN: …"`). The fixture refuses to be measured from the 1st to the 4th and on the month's last day.

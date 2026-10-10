@@ -315,7 +315,7 @@ chi implementa le riverifica, perché nel frattempo le PERF riscrivono i caricam
 su Windows (PowerShell 5.1 mangia il `--`). Il censimento risemina il fixture, ricostruisce i suoi record di Hall of
 Fame e si rifiuta dal 1 al 4 del mese e l'ultimo giorno; l'uscita (`.mobile-census/`: JSON senza testi e screenshot)
 è gitignored. Il mirror (`--email=mirror@example.com`) serve al giro guidato e al confronto con la baseline § 3 in
-SESSION_NOTES, mai al budget. Comandi, colonne e ratchet: doc/guide/velocita.md § Il censimento della prima schermata.
+SESSION_NOTES, mai al budget. Comandi, colonne e ratchet: doc/guide/prima-schermata.md.
 `--selftest` prova la misura su un frammento noto, senza server. `reference/mobile-census.mjs` resta come lo script che
 ha misurato la baseline.
 
