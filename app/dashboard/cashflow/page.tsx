@@ -52,6 +52,11 @@ import { useFreshness } from '@/lib/hooks/useFreshness';
 import { queryKeys } from '@/lib/query/queryKeys';
 import { dividendStatsQueryKey, useDividendRegistry } from '@/lib/hooks/useDividendStats';
 import { listExpenseYears, trackingWindow } from '@/lib/utils/expenseWindows';
+import {
+  EXPENSE_DEEP_LINK_PARAMS,
+  parseExpenseDeepLinkRequest,
+  toExpenseDeepLinkDraft,
+} from '@/lib/utils/expenseDeepLink';
 import { type Period, currentMonthPeriod } from '@/lib/utils/period';
 import { tabPanelSwitch } from '@/lib/utils/motionVariants';
 import { PageContainer } from '@/components/layout/PageContainer';
@@ -180,6 +185,21 @@ export default function CashflowPage() {
   // empty ledger — the one thing a tracker must never say (lib/utils/statesNarrative.ts).
   const loadFailed = expensesError || categoriesError;
   const isDemo = useDemoMode();
+  // A Shortcut capture (`?nuova-spesa=1&importo&nota&categoria`, lib/utils/expenseDeepLink.ts):
+  // parsed here, resolved against the categories once they have settled, and handed to
+  // Tracciamento, which opens the dialog with it. Gated on the tracking tab and off in
+  // demo (every mutation is gated there). The key lets the tab open it exactly once.
+  const categoriesSettled = !categoriesLoading && (categoriesQuery.data !== undefined || categoriesError);
+  const deepLink = useMemo(() => {
+    if (initialTab !== 'tracking' || isDemo) return null;
+    const get = (name: string) => searchParams.get(name);
+    const request = parseExpenseDeepLinkRequest(get);
+    if (!request || !categoriesSettled) return null;
+    const key = (Object.values(EXPENSE_DEEP_LINK_PARAMS) as string[])
+      .map((param) => searchParams.get(param) ?? '')
+      .join('|');
+    return { key, draft: toExpenseDeepLinkDraft(request, categories) };
+  }, [initialTab, isDemo, categoriesSettled, categories, searchParams]);
   // After Tracciamento's figures, never during them: a preload is a download competing with the
   // first read (the «idle» browser waiting on Firestore — AGENTS.md § Dynamic Imports).
   const tabsPreloadReady = !loading && !loadFailed;
@@ -224,11 +244,19 @@ export default function CashflowPage() {
   };
 
   // Canonicalize the URL on mount only when the tab param is absent or invalid. An Effect Event:
-  // the URL and the router are read, never triggers — it runs once, at mount.
+  // the URL and the router are read, never triggers — it runs once, at mount. A Shortcut
+  // capture (`nuova-spesa` and friends) and `owner` survive it: without them the replace
+  // below would wipe the prefill before Tracciamento reads it.
   const canonicalizeTabParam = useEffectEvent(() => {
     const currentTab = searchParams.get('tab');
     if (currentTab !== initialTab) {
-      router.replace(`${pathname}?tab=${initialTab}`, { scroll: false });
+      const preserved = new URLSearchParams();
+      for (const param of ['owner', ...Object.values(EXPENSE_DEEP_LINK_PARAMS)]) {
+        const value = searchParams.get(param);
+        if (value !== null) preserved.set(param, value);
+      }
+      const extra = preserved.toString();
+      router.replace(`${pathname}?tab=${initialTab}${extra ? `&${extra}` : ''}`, { scroll: false });
     }
   });
   useEffect(() => {
@@ -395,6 +423,7 @@ export default function CashflowPage() {
               availableYears={availableYears}
               categories={categories}
               initialOwnerId={ownerParam}
+              deepLink={deepLink}
               loading={loading}
                 loadFailed={loadFailed}
               onRefresh={handleRefresh}

@@ -31,6 +31,7 @@
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
@@ -87,6 +88,8 @@ import { PeriodPicker } from '@/components/ui/period-picker';
 import { type Period, periodLabel } from '@/lib/utils/period';
 import { MultiSelect, type MultiSelectGroup } from '@/components/ui/multi-select';
 import { getExpenseDate } from '@/lib/utils/expenseHelpers';
+import type { ExpenseDeepLinkDraft } from '@/lib/utils/expenseDeepLink';
+import { EXPENSE_DEEP_LINK_PARAMS } from '@/lib/utils/expenseDeepLink';
 import { cn } from '@/lib/utils';
 import { projectMonthEndSpending } from '@/lib/utils/overviewNarrative';
 import {
@@ -169,6 +172,12 @@ interface ExpenseTrackingTabProps {
    * the filter where the reader left it.
    */
   initialOwnerId?: string | null;
+  /**
+   * A Shortcut capture (`?nuova-spesa=1&importo&nota&categoria`, lib/utils/expenseDeepLink.ts),
+   * resolved by the page once the categories have settled. The tab opens the dialog with it
+   * once, keyed on `key`, then strips the params from the URL. Null on every other entry.
+   */
+  deepLink?: { key: string; draft: ExpenseDeepLinkDraft } | null;
 }
 
 interface ListFilters {
@@ -276,13 +285,42 @@ export function ExpenseTrackingTab({
   splitEnabled,
   familyMembers,
   initialOwnerId = null,
+  deepLink = null,
 }: ExpenseTrackingTabProps) {
   const { user } = useAuth();
   const { ownerId } = useActiveAccount();
   const isDemo = useDemoMode();
   const queryClient = useQueryClient();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [deepLinkDraft, setDeepLinkDraft] = useState<ExpenseDeepLinkDraft | null>(null);
+
+  // A Shortcut capture opens the dialog once, settled during render on the link's key —
+  // never in an effect (react-hooks/set-state-in-effect). The key survives the URL
+  // cleanup below, so stripping the params cannot reopen it, and a second manual
+  // «nuova voce» starts blank because the draft is cleared at close.
+  const [consumedDeepLinkKey, setConsumedDeepLinkKey] = useState<string | null>(null);
+  if (deepLink && deepLink.key !== consumedDeepLinkKey && !isDemo) {
+    setConsumedDeepLinkKey(deepLink.key);
+    setEditingExpense(null);
+    setDeepLinkDraft(deepLink.draft);
+    setDialogOpen(true);
+  }
+
+  // The params served their purpose at open: strip them (replace, no history entry) so a
+  // reload or a shared copy of the URL does not prefill again. A navigation action, so it
+  // lives in an effect — not a state setter.
+  useEffect(() => {
+    if (!consumedDeepLinkKey) return;
+    const current = new URLSearchParams(searchParams.toString());
+    if (current.get(EXPENSE_DEEP_LINK_PARAMS.request) === null) return;
+    for (const param of Object.values(EXPENSE_DEEP_LINK_PARAMS)) current.delete(param);
+    const rest = current.toString();
+    router.replace(rest ? `${pathname}?${rest}` : pathname, { scroll: false });
+  }, [consumedDeepLinkKey, pathname, router, searchParams]);
 
   // Opens the add-expense dialog when the bottom-nav "+" button fires the custom event.
   useEffect(() => {
@@ -451,6 +489,7 @@ export function ExpenseTrackingTab({
   const handleDialogClose = () => {
     setDialogOpen(false);
     setEditingExpense(null);
+    setDeepLinkDraft(null);
   };
 
   const handleSuccess = async () => {
@@ -809,6 +848,7 @@ export function ExpenseTrackingTab({
         open={dialogOpen}
         onClose={handleDialogClose}
         expense={editingExpense}
+        initialDraft={deepLinkDraft}
         onSuccess={handleSuccess}
       />
 
