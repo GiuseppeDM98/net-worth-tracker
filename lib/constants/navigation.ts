@@ -51,6 +51,15 @@ export const assistantNavItem: NavItem = {
   icon: Bot,
 };
 
+// Bottom-pill routes (portrait phone): the three primary routes plus Allocazione, which the
+// owner opens daily for the rebalance check — behind «Altro» it was one tap further than its
+// siblings. Single source like the other arrays: BottomNavigation maps this, SecondaryMenuDrawer
+// excludes it (it stays in the Sidebar's Pianificazione group on desktop).
+export const bottomMainNav: NavItem[] = [
+  ...primaryNav,
+  { name: 'Allocazione', href: '/dashboard/allocation', icon: PieChart },
+];
+
 // All secondary hrefs — used by BottomNavigation to determine "Altro" active state.
 export const secondaryHrefs: string[] = [
   ...analysisNav.map((i) => i.href),

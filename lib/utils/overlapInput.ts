@@ -13,7 +13,7 @@
 import type { Asset } from '@/types/assets';
 import type { InstrumentProfile } from '@/types/exposure';
 import { expandAssetExposure } from '@/lib/utils/assetExposureUtils';
-import { instrumentTicker, isExposureBaseAsset, isQuotedInstrument, profileModuleFor } from '@/lib/utils/exposureRequests';
+import { effectiveProfileTicker, isExposureBaseAsset, isQuotedInstrument, profileModuleFor } from '@/lib/utils/exposureRequests';
 import type { OverlapDirectStock, OverlapEtfVector, OverlapInput } from '@/lib/utils/overlapUtils';
 
 export function buildOverlapInput(
@@ -30,7 +30,7 @@ export function buildOverlapInput(
     if (!(marketValue > 0)) continue;
     totalPortfolioValue += marketValue;
     if (!isQuotedInstrument(asset)) continue;
-    const ticker = instrumentTicker(asset);
+    const ticker = effectiveProfileTicker(asset);
     if (profileModuleFor(asset.type) === 'fund') {
       const holdings = profiles[ticker]?.fund?.holdings;
       if (!holdings || holdings.length === 0) continue;

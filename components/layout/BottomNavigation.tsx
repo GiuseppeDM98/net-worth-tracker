@@ -8,7 +8,7 @@ import { Suspense, useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { SecondaryMenuDrawer } from './SecondaryMenuDrawer';
 import { isNavItemActive } from '@/lib/utils/navUtils';
-import { primaryNav, secondaryHrefs } from '@/lib/constants/navigation';
+import { bottomMainNav, secondaryHrefs } from '@/lib/constants/navigation';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 
 /**
@@ -80,9 +80,9 @@ export function BottomNavigation() {
   const isPillVisible = useMediaQuery(PILL_VISIBLE_QUERY);
   const activePillLayoutId = isPillVisible ? ACTIVE_PILL_LAYOUT_ID : undefined;
 
-  const isAltroActive = secondaryHrefs.some(
-    (href) => pathname === href || pathname.startsWith(href + '/')
-  );
+  const isAltroActive = secondaryHrefs
+    .filter((href) => !bottomMainNav.some((item) => item.href === href))
+    .some((href) => pathname === href || pathname.startsWith(href + '/'));
   // Zero-duration transition disables the sliding-pill animation for users
   // who have requested reduced motion at the OS level.
   const pillTransition = prefersReducedMotion
@@ -112,7 +112,7 @@ export function BottomNavigation() {
             transition={pillTransition}
           >
             <div className="flex items-center gap-1 px-2 py-1.5">
-              {primaryNav.map((item) => {
+              {bottomMainNav.map((item) => {
                 const isActive = isNavItemActive(item.href, pathname);
                 return (
                   <SceneLink

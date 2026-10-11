@@ -19,6 +19,7 @@
 import YahooFinance from 'yahoo-finance2';
 import type { ExposureLegSlice, InstrumentFundProfile, InstrumentStockProfile } from '@/types/exposure';
 import { sectorLabel, YAHOO_ASSET_PROFILE_SECTOR_TO_KEY } from '@/lib/constants/exposureSectors';
+import { isIsinShaped } from '@/lib/utils/yahooSymbolForIsin';
 
 /** What the service asks of Yahoo; injectable so the service is tested without the network. */
 export interface YahooProfileSource {
@@ -92,10 +93,30 @@ export function normalizeStockAnswer(summary: RawStockSummary | null | undefined
 
 const yahooFinance = new YahooFinance();
 
+/**
+ * An ISIN-shaped ticker Yahoo cannot quote directly: `search(isin)` names the fund's listings
+ * and the first hit is the quotable symbol. A manual, Scalable or Trade Republic position born
+ * with the ISIN as its ticker heals this way without a curated table entry. Anything else is
+ * returned as stored.
+ */
+async function resolveQuotableSymbol(ticker: string): Promise<string> {
+  const trimmed = ticker.trim();
+  if (!isIsinShaped(trimmed)) return trimmed;
+  try {
+    const result = (await yahooFinance.search(trimmed)) as { quotes?: Array<{ symbol?: string }> };
+    const hit = result?.quotes?.find((quote) => typeof quote?.symbol === 'string' && quote.symbol.trim() !== '')?.symbol?.trim();
+    if (hit) return hit;
+  } catch {
+    // Search failing falls through to the direct quote, which then fails the same way as before.
+  }
+  return trimmed;
+}
+
 export const yahooProfileSource: YahooProfileSource = {
   async fetchFund(ticker, now) {
     try {
-      const summary = (await yahooFinance.quoteSummary(ticker, { modules: ['topHoldings', 'fundProfile'] })) as RawFundSummary;
+      const symbol = await resolveQuotableSymbol(ticker);
+      const summary = (await yahooFinance.quoteSummary(symbol, { modules: ['topHoldings', 'fundProfile'] })) as RawFundSummary;
       return normalizeFundAnswer(summary, now);
     } catch {
       return null;
@@ -103,7 +124,8 @@ export const yahooProfileSource: YahooProfileSource = {
   },
   async fetchStock(ticker, now) {
     try {
-      const summary = (await yahooFinance.quoteSummary(ticker, { modules: ['assetProfile', 'price'] })) as RawStockSummary;
+      const symbol = await resolveQuotableSymbol(ticker);
+      const summary = (await yahooFinance.quoteSummary(symbol, { modules: ['assetProfile', 'price'] })) as RawStockSummary;
       return normalizeStockAnswer(summary, now);
     } catch {
       return null;

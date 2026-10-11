@@ -41,6 +41,8 @@ export const YAHOO_SYMBOL_BY_ISIN: Readonly<Record<string, string>> = {
   // Global
   IE00BK5BQT80: 'VWCE.MI', // Vanguard FTSE All-World
   IE00B4L5Y983: 'SWDA.MI', // iShares Core MSCI World
+  IE00BD4TXV59: 'UETW.DE', // UBS Core MSCI World USD Acc (Xetra; same fund on every listing)
+  IE00BF4RFH31: 'IUSN.DE', // iShares MSCI World Small Cap USD Acc (Xetra EUR listing of WSML)
   IE00BFY0GT14: 'SWRD.L',  // State Street SPDR MSCI World
   IE00B3RBWM25: 'VHYL.MI', // Vanguard FTSE All-World High Dividend Yield
   LU0274208692: 'DBXW.DE', // Xtrackers MSCI World Swap

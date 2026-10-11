@@ -38,7 +38,7 @@ import type {
 import { expandAssetExposure, type ExposureComponent } from '@/lib/utils/assetExposureUtils';
 import { getAssetDisplayTicker } from '@/lib/utils/assetDisplay';
 import { sectorLabel } from '@/lib/constants/exposureSectors';
-import { instrumentTicker, isExposureBaseAsset, isQuotedInstrument, profileModuleFor } from '@/lib/utils/exposureRequests';
+import { effectiveProfileTicker, isExposureBaseAsset, isQuotedInstrument, profileModuleFor } from '@/lib/utils/exposureRequests';
 
 // ─── What each class can say about itself ────────────────────────────────────
 
@@ -63,14 +63,48 @@ const LEG_DESTINY: Record<AssetClass, LegDestiny> = {
   carry: 'notApplicable',
 };
 
+/** Mapping from ticker suffix to geographical region label. Used when Yahoo profile is absent. */
+const TICKER_TO_REGION: Record<string, string> = {
+  '.MI': 'Italia',
+  '.DE': 'Germania',
+  '.PA': 'Francia',
+  '.L': 'Gran Bretagna',
+  '.SW': 'Svizzera',
+  '.BR': 'Brasile',
+  '.TO': 'Canada',
+  '.A': 'Australia',
+  '.HK': 'Hong Kong',
+  '.S': 'Svezia',
+  '.K': 'Corea del Sud',
+  '.T': 'Spagna',
+  '.I': 'Italia',
+  '.Q': 'Italia',
+};
+
+/** A class the map does not know (a document written by a later schema) has no look-through here either. */
+function legDestiny(assetClass: string): LegDestiny {
+  return LEG_DESTINY[assetClass as AssetClass] ?? 'notApplicable';
+}
+
 /** The classes with no security-level look-through by nature; derived from the map so the two can never disagree. */
 export const NON_LOOKTHROUGH_ASSET_CLASSES: ReadonlySet<string> = new Set(
   (Object.keys(LEG_DESTINY) as AssetClass[]).filter((assetClass) => LEG_DESTINY[assetClass] === 'notApplicable'),
 );
 
-/** A class the map does not know (a document written by a later schema) has no look-through here either. */
-function legDestiny(assetClass: string): LegDestiny {
-  return LEG_DESTINY[assetClass as AssetClass] ?? 'notApplicable';
+/** Determines a region label from an instrument ticker suffix when Yahoo profile is absent. */
+function tickerToRegion(ticker: string): string | null {
+  const upper = ticker.toUpperCase();
+  // Check for exact suffix matches
+  for (const [suffix, region] of Object.entries(TICKER_TO_REGION)) {
+    if (upper.endsWith(suffix)) return region;
+  }
+  // Check for country name in ticker (e.g., 'IT' for Italia)
+  if (upper === 'IT' || upper.endsWith('.IT')) return 'Italia';
+  if (upper === 'DE' || upper.endsWith('.DE')) return 'Germania';
+  if (upper === 'FR' || upper.endsWith('.FR')) return 'Francia';
+  if (upper === 'GB' || upper.endsWith('.L')) return 'Gran Bretagna';
+  if (upper === 'CH' || upper.endsWith('.SW')) return 'Svizzera';
+  return null;
 }
 
 // ─── Accumulators ────────────────────────────────────────────────────────────
@@ -194,7 +228,7 @@ function buildBaseAssets(assets: Asset[], profiles: Record<string, InstrumentPro
       name: asset.name,
       displayTicker: getAssetDisplayTicker(asset),
       quoted: isQuotedInstrument(asset),
-      profile: profiles[instrumentTicker(asset)],
+      profile: profiles[effectiveProfileTicker(asset)],
       legs,
       marketValue: legs.reduce((sum, leg) => sum + leg.marketValue, 0),
     };
@@ -214,7 +248,7 @@ type SliceReader = (base: BaseAsset) => ExposureLegSlice[] | null;
 const readHoldings: SliceReader = ({ asset, profile }) => {
   const profileModule = profileModuleFor(asset.type);
   if (profileModule === 'stock') {
-    const ticker = instrumentTicker(asset);
+    const ticker = effectiveProfileTicker(asset);
     return [{ key: ticker.toUpperCase(), label: profile?.stock?.longName ?? ticker, weight: 1 }];
   }
   if (profileModule === 'fund') return profile?.fund?.holdings?.length ? profile.fund.holdings : null;
@@ -253,7 +287,18 @@ function accumulateEquityView(baseAssets: BaseAsset[], readSlices: SliceReader, 
       }
       const slices = readSlices(base);
       if (!slices) {
-        addToBucket(view.unread, base.name, leg.notionalValue);
+        // Try to determine region from ticker suffix when Yahoo profile is absent.
+        const region = tickerToRegion(effectiveProfileTicker(base.asset));
+        if (region) {
+          addToBucket(view.read, base.name, leg.notionalValue);
+          addEntry(view, region.toUpperCase(), region, undefined, leg.notionalValue, {
+            ticker: base.displayTicker,
+            name: base.name,
+            amount: leg.notionalValue,
+          });
+        } else {
+          addToBucket(view.unread, base.name, leg.notionalValue);
+        }
         continue;
       }
       addToBucket(view.read, base.name, leg.notionalValue);
@@ -288,7 +333,7 @@ function accumulateIssuers(baseAssets: BaseAsset[]): ExposureViewData {
     // A bond or a crypto is quoted but has no issuer Yahoo knows: «non letto», with its name
     // (owner, 2026-09-28).
     const issuer =
-      profileModule === 'stock' ? (profile?.stock?.longName ?? instrumentTicker(asset)) : profileModule === 'fund' ? (profile?.fund?.family ?? null) : null;
+      profileModule === 'stock' ? (profile?.stock?.longName ?? effectiveProfileTicker(asset)) : profileModule === 'fund' ? (profile?.fund?.family ?? null) : null;
     if (!issuer) {
       addToBucket(view.unread, base.name, marketValue);
       continue;

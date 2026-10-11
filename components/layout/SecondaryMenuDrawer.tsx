@@ -22,7 +22,7 @@ import { useLogout } from '@/lib/hooks/useLogout';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveAccount } from '@/contexts/ActiveAccountContext';
 import { getAccountLabel, getDisplayInfo } from '@/lib/utils/userDisplayUtils';
-import { analysisNav, planningNav, assistantNavItem } from '@/lib/constants/navigation';
+import { analysisNav, planningNav, assistantNavItem, bottomMainNav } from '@/lib/constants/navigation';
 import { SIDEBAR_AVATAR_CLASS } from '@/components/layout/shellStyles';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TILE_EYEBROW_CLASS } from '@/components/ui/tile';
@@ -115,6 +115,10 @@ export function SecondaryMenuDrawer({ open, onOpenChange }: SecondaryMenuDrawerP
 
   const { displayName, initials } = getDisplayInfo(user);
   const activeAccount = accessibleAccounts.find((a) => a.ownerId === ownerId);
+  // Allocazione sits in the bottom pill on a phone — listing it here too would duplicate the
+  // one route that is both main and planned. The desktop Sidebar keeps its Pianificazione group.
+  const drawerAnalysisNav = analysisNav.filter((nav) => !bottomMainNav.some((item) => item.href === nav.href));
+  const drawerPlanningNav = planningNav.filter((nav) => !bottomMainNav.some((item) => item.href === nav.href));
 
   // py-3 (12px × 2) + text-sm line-height (~20px) = 44px — meets WCAG 2.5.5 touch target minimum.
   const navItemCn = (active: boolean) =>
@@ -188,7 +192,7 @@ export function SecondaryMenuDrawer({ open, onOpenChange }: SecondaryMenuDrawerP
                   {/* motion.li carries the stagger variant; the inner Link keeps
                       aria-current, Next.js prefetching, and right-click semantics. */}
                   <ul className="m-0 list-none p-0">
-                    {analysisNav.map((nav) => (
+                    {drawerAnalysisNav.map((nav) => (
                       <motion.li key={nav.href} variants={drawerItem}>
                         <SceneLink
                           href={nav.href}
@@ -210,7 +214,7 @@ export function SecondaryMenuDrawer({ open, onOpenChange }: SecondaryMenuDrawerP
                     Pianificazione
                   </motion.p>
                   <ul className="m-0 list-none p-0">
-                    {planningNav.map((nav) => (
+                    {drawerPlanningNav.map((nav) => (
                       <motion.li key={nav.href} variants={drawerItem}>
                         <SceneLink
                           href={nav.href}

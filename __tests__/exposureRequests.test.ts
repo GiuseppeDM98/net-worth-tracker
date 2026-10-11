@@ -5,6 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Asset } from '@/types/assets';
 import {
+  effectiveProfileTicker,
   isExposureBaseAsset,
   isQuotedInstrument,
   profileModuleFor,
@@ -51,6 +52,31 @@ describe('the module per type', () => {
 });
 
 describe('selectProfileRequests', () => {
+  it('resolves an ISIN ticker through the shared catalogue, so a broker position is readable', () => {
+    // Scalable / Trade Republic / hand-entered positions carry the ISIN as ticker; Yahoo cannot
+    // quote that, so the request must carry the resolved symbol.
+    expect(effectiveProfileTicker({ ticker: 'IE00B4L5Y983', isin: 'IE00B4L5Y983' })).toBe('SWDA.MI');
+    expect(effectiveProfileTicker({ ticker: 'IE00BD4TXV59', isin: 'IE00BD4TXV59' })).toBe('UETW.DE');
+    expect(effectiveProfileTicker({ ticker: 'IE00BF4RFH31', isin: 'IE00BF4RFH31' })).toBe('IUSN.DE');
+    // The isin field repairs even an empty ticker.
+    expect(effectiveProfileTicker({ ticker: '', isin: 'IE00B4L5Y983' })).toBe('SWDA.MI');
+    // A real symbol passes through untouched.
+    expect(effectiveProfileTicker({ ticker: 'VWCE.DE' })).toBe('VWCE.DE');
+    // Unknown ISIN stays as-is: the server's search fallback may still heal it.
+    expect(effectiveProfileTicker({ ticker: 'IE00B6R52259', isin: 'IE00B6R52259' })).toBe('IE00B6R52259');
+  });
+
+  it('treats an ISIN-ticker ETF the catalogue knows as quoted and requests its symbol', () => {
+    const requests = selectProfileRequests([
+      asset({ id: 'ubs', ticker: 'IE00BD4TXV59', isin: 'IE00BD4TXV59' }),
+      asset({ id: 'small', ticker: 'IE00BF4RFH31', isin: 'IE00BF4RFH31' }),
+    ]);
+    expect(requests).toEqual([
+      { ticker: 'IUSN.DE', module: 'fund' },
+      { ticker: 'UETW.DE', module: 'fund' },
+    ]);
+  });
+
   it('lists the quoted base tickers with their module, unique, trimmed and sorted', () => {
     const requests = selectProfileRequests([
       asset({ id: 'vwce', ticker: ' VWCE.DE ' }),
