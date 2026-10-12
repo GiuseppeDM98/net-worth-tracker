@@ -41,6 +41,7 @@ import {
   RecurrenceFrequency,
 } from '@/types/expenses';
 import { CostCenter } from '@/types/costCenters';
+import type { ExpenseDeepLinkDraft } from '@/lib/utils/expenseDeepLink';
 import { resolveCostCenterColor } from '@/lib/utils/costCenterColors';
 import { useChartColors } from '@/lib/hooks/useChartColors';
 import { useCostCenters } from '@/lib/hooks/useCostCenters';
@@ -374,6 +375,11 @@ interface ExpenseDialogProps {
   onClose: () => void;
   expense?: Expense | null;
   onSuccess?: () => void;
+  /**
+   * Prefill for a create opened from a deep link (the Apple Pay Shortcut capture,
+   * lib/utils/expenseDeepLink.ts). Edit mode ignores it: a saved row is the truth.
+   */
+  initialDraft?: ExpenseDeepLinkDraft | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -416,6 +422,12 @@ interface FormBodyProps {
   availableSubCategories: ComboboxOption[];
   onCreateCategory: (name: string) => void;
   onCreateSubCategory: (name: string) => void;
+  /**
+   * A Shortcut capture naming a category that resolved to nothing
+   * (lib/utils/expenseDeepLink.ts) — offered as a one-tap «create» under the picker.
+   * Create mode only, hidden once a category is picked. Null everywhere else.
+   */
+  draftCategoryName: string | null;
   /** Re-points the category selection when the type changes. */
   onTypeChange: (type: ExpenseType) => void;
   /**
@@ -474,6 +486,7 @@ function ExpenseFormBody({
   availableSubCategories,
   onCreateCategory,
   onCreateSubCategory,
+  draftCategoryName,
   onTypeChange,
   onBackToTypePicker,
   typeChangeNotice,
@@ -634,6 +647,19 @@ function ExpenseFormBody({
                 onCreateOption={onCreateCategory}
                 createOptionLabel="Aggiungi categoria"
               />
+              {/* A Shortcut capture naming an unknown category: one tap opens its creation
+                  prefilled, instead of typing the name into the search above. Hidden once a
+                  category is picked; after the creation the new row is picked by hand. */}
+              {draftCategoryName && !selectedCategoryId && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onCreateCategory(draftCategoryName)}
+                >
+                  {`Crea "${draftCategoryName}"`}
+                </Button>
+              )}
               {errors.categoryId && (
                 <p className="text-sm text-destructive">{errors.categoryId.message}</p>
               )}
@@ -1312,7 +1338,7 @@ const EMPTY_ASSETS: Asset[] = [];
 const EMPTY_COST_CENTERS: CostCenter[] = [];
 const EMPTY_FAMILY_MEMBERS: FamilyMember[] = [];
 
-export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<ExpenseDialogProps>) {
+export function ExpenseDialog({ open, onClose, expense, onSuccess, initialDraft }: Readonly<ExpenseDialogProps>) {
   const { user } = useAuth();
   const { ownerId } = useActiveAccount();
   const queryClient = useQueryClient();
@@ -1457,12 +1483,16 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
   const [openSubject, setOpenSubject] = useState<{
     open: boolean;
     expense: Expense | null | undefined;
+    initialDraft: ExpenseDeepLinkDraft | null | undefined;
   } | null>(null);
-  if (!openSubject || openSubject.open !== open || openSubject.expense !== expense) {
-    setOpenSubject({ open, expense });
+  if (!openSubject || openSubject.open !== open || openSubject.expense !== expense || openSubject.initialDraft !== initialDraft) {
+    setOpenSubject({ open, expense, initialDraft });
     if (open) {
       setStatus({ phase: 'idle' });
-      setStep(expense ? 2 : 1);
+      // A deep link carrying a resolved type already made the picker's decision (the
+      // Shortcut's category), so it lands on the form like an edit; «Cambia tipo» stays
+      // available in create mode. Without one it opens on the picker like any create.
+      setStep(expense || initialDraft?.type ? 2 : 1);
       setAdvancedOpen(isAdvancedPrePopulated(expense));
       setSelectedCostCenterId(expense?.costCenterId || '__none__');
       setPersonalMemberId(expense?.personalMemberId || '');
@@ -1538,13 +1568,13 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
       });
     } else {
       reset({
-        type: 'variable',
-        categoryId: '',
+        type: initialDraft?.type ?? 'variable',
+        categoryId: initialDraft?.categoryId ?? '',
         subCategoryId: '',
-        amount: undefined as unknown as number,
+        amount: initialDraft?.amount ?? (undefined as unknown as number),
         currency: 'EUR',
         date: new Date(),
-        notes: '',
+        notes: initialDraft?.notes ?? '',
         link: '',
         isRecurring: false,
         recurringFrequency: DEFAULT_RECURRENCE_FREQUENCY,
@@ -1556,7 +1586,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
         debtAssetId: '__none__',
       });
     }
-  }, [expense, reset, open]);
+  }, [expense, initialDraft, reset, open]);
 
   // A NEW row opens on the default account of its type (Impostazioni › Spese) once the settings
   // have answered. Declared AFTER the reset effect above, so in the commit that opens the dialog
@@ -2156,6 +2186,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess }: Readonly<Ex
     availableSubCategories,
     onCreateCategory: handleCreateCategory,
     onCreateSubCategory: handleCreateSubCategory,
+    draftCategoryName: !expense && !selectedCategoryId ? (initialDraft?.categoryName ?? null) : null,
     onTypeChange: handleTypeChange,
     onBackToTypePicker: isEdit ? undefined : () => setStep(1),
     typeChangeNotice,
