@@ -1,12 +1,13 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { TrendingDown, TrendingUp, Trophy } from 'lucide-react';
+import { Eye, EyeOff, TrendingDown, TrendingUp, Trophy } from 'lucide-react';
 import type { DashboardOverviewSparklinePoint } from '@/types/dashboardOverview';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
 import { formatPercentage } from '@/lib/services/chartService';
 import { signChipClass, signTextClass } from '@/lib/utils/metricColors';
 import { cn } from '@/lib/utils';
+import { setPatrimonioVisible, usePatrimonioVisible } from '@/lib/hooks/usePatrimonioVisible';
 import { OverviewAnimatedCurrency } from '@/components/dashboard/OverviewAnimatedCurrency';
 import { NetWorthSparkline } from '@/components/dashboard/NetWorthSparkline';
 import { PeriodSelector, type SparklinePeriod } from '@/components/dashboard/PeriodSelector';
@@ -58,6 +59,12 @@ interface PatrimonioTileProps {
   assetCount?: number;
   /** Appends "· snapshot del mese presente" to whichever count line is shown. */
   hasCurrentMonthSnapshot?: boolean;
+  /**
+   * Whether the hero total is masked behind the peek eye (default `true`). The public
+   * landing passes `false`: its figures are invented sample data with nothing to hide,
+   * and masking them would hide the product's own promise.
+   */
+  peekable?: boolean;
   className?: string;
 }
 
@@ -117,17 +124,48 @@ export function PatrimonioTile({
   countLine,
   assetCount = 0,
   hasCurrentMonthSnapshot = false,
+  peekable = true,
   className,
 }: PatrimonioTileProps) {
   const hasSparkline = sparklineDisplay.length >= 2;
+  // Masked until the eye is pressed (`usePatrimonioVisible`, default hidden, persisted
+  // per browser). The landing opts out via `peekable={false}` — sample data stays visible.
+  const patrimonioVisible = usePatrimonioVisible();
+  const heroMasked = peekable && !patrimonioVisible;
+  const toggleLabel = patrimonioVisible ? 'Nascondi patrimonio totale' : 'Mostra patrimonio totale';
+  const ToggleIcon = patrimonioVisible ? EyeOff : Eye;
 
   return (
     <OverviewTile eyebrow="Patrimonio totale lordo" className={className} ariaLabel="Patrimonio">
-      <OverviewAnimatedCurrency
-        value={totalValue}
-        animateOnMount={true}
-        className={cn('mt-2.5 block leading-none', heroValueClass)}
-      />
+      {/* The row wraps: on a 360px phone an 8-figure total at 32px plus the 44px
+          touch target would otherwise push past the tile's edge. */}
+      <div className="mt-2.5 flex flex-wrap items-center gap-x-1.5 gap-y-2">
+        {heroMasked ? (
+          <>
+            <span aria-hidden="true" className={cn('block min-w-0 leading-none', heroValueClass)}>
+              ••••••
+            </span>
+            <span className="sr-only">Patrimonio nascosto</span>
+          </>
+        ) : (
+          <OverviewAnimatedCurrency
+            value={totalValue}
+            animateOnMount={true}
+            className={cn('block min-w-0 leading-none', heroValueClass)}
+          />
+        )}
+        {peekable && (
+          <button
+            type="button"
+            onClick={() => setPatrimonioVisible(!patrimonioVisible)}
+            aria-pressed={patrimonioVisible}
+            aria-label={toggleLabel}
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11"
+          >
+            <ToggleIcon className="h-5 w-5" aria-hidden="true" />
+          </button>
+        )}
+      </div>
 
       {/* Variation chips + record, one grouped row from tablet up, a column on phones. */}
       {(variations.monthly || variations.yearly || isNewATH) && (
