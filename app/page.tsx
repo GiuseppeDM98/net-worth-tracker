@@ -274,6 +274,7 @@ export default function HomePage() {
                   heroValueClass={resolveHeroValueClass(SAMPLE_TOTAL_VALUE)}
                   variations={SAMPLE_VARIATIONS}
                   isNewATH
+                  peekable={false}
                   sparklinePeriod={sparklinePeriod}
                   onSparklinePeriodChange={setSparklinePeriod}
                   sparklineDisplay={sparklineDisplay}
