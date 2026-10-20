@@ -145,7 +145,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   detail is a `ResponsiveModal` `sm`, «Elimina» arms through `useArmedDelete` and the reading prints
   `describeExpenseDeleteConsequence` until the second press or a disarm (`describeMovementDetailReading`); a row of a
   series skips the arming and reaches `SeriesDeleteDialog` on its first press. The «Tipo» and «Note» rows left the
-  detail: the eyebrow carries the type («Movimenti · Spesa variabile») and the title IS the note, printed whole.
+  detail: the eyebrow carries the type («Movimenti · Spesa non necessaria») and the title IS the note, printed whole.
   `deleteSingleExpense` MUST branch on `type === 'transfer'` to call
   `reconcileTransferDelete` (both legs), like `ExpenseTable` does. The feed keeps `surface="flat"` on every width (a
   card per day inside the Movimenti tile would be a card inside a card); `ExpenseTable` is desktop-only, so with the

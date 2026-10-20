@@ -4,7 +4,7 @@
  * WHY THIS EXISTS
  * A category is identified by its document id, never by its name. Nothing in the app
  * enforces name uniqueness (`createCategory` is a bare `addDoc`), and the product
- * deliberately allows "Casa" to exist as a Spese Fisse category AND as a Spese
+ * deliberately allows "Casa" to exist as a Spese Necessarie category AND as a Spese
  * Variabili one — they are two different documents describing two different things.
  * Every surface that grouped by `categoryName` therefore merged them, and the Sankey,
  * whose node identity IS its id, went further: duplicate ids make d3-sankey keep the
@@ -77,7 +77,7 @@ export interface LabelledGroup {
  * Resolve display labels for one rendered surface, disambiguating only real collisions.
  *
  * "Casa" stays "Casa" when it is the only Casa on screen, and becomes
- * "Casa (Spese Fisse)" / "Casa (Spese Variabili)" only when two distinct keys share the
+ * "Casa (Spese Necessarie)" / "Casa (Spese Non Necessarie)" only when two distinct keys share the
  * name. Qualifying unconditionally would tax every label in the common case to fix a
  * problem almost nobody has, which is why the check is scoped to the data actually
  * being rendered rather than to the taxonomy as a whole.
@@ -124,7 +124,7 @@ export interface CategoryScope {
  *
  * The type match is EXACT. The predicates this replaces tested `type !== 'income'`,
  * which lumped fixed, variable and debt into one list and let transfers through — so
- * the drill-down under "Casa (Spese Fisse)" also listed the variable Casa rows and its
+ * the drill-down under "Casa (Spese Necessarie)" also listed the variable Casa rows and its
  * total disagreed with the branch the user had clicked.
  *
  * The subcategory match needs no special case for rows carrying none: getSubCategoryKey

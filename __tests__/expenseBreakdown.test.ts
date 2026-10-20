@@ -174,7 +174,7 @@ describe('buildCashflowBreakdown', () => {
       // Assert
       expect(result.totals.totalExpenses).toBe(-140);
       expect(result.expensesByType).toEqual([
-        { type: 'fixed', label: 'Spese Fisse', total: -100 },
+        { type: 'fixed', label: 'Spese Necessarie', total: -100 },
         { type: 'unclassified', label: 'Non classificate', total: -40 },
       ]);
     });

@@ -40,7 +40,7 @@ async function cashQuantity(db: FirebaseFirestore.Firestore): Promise<number> {
 }
 
 /** Opens the two-step create dialog from Tracciamento and picks the type on step 1. */
-async function openNewEntry(page: Page, type: 'Spesa variabile' | 'Trasferimento') {
+async function openNewEntry(page: Page, type: 'Spesa non necessaria' | 'Trasferimento') {
   await page.goto('/dashboard/cashflow', { waitUntil: 'load' });
   await page.getByRole('region', { name: 'Movimenti' }).waitFor({ timeout: 60_000 });
   await page.evaluate(() => window.dispatchEvent(new CustomEvent('cashflow:add-expense')));
@@ -70,7 +70,7 @@ test('a recurring expense links every row, debits today\'s at save and leaves th
   const db = await admin();
   const before = await cashQuantity(db);
 
-  const dialog = await openNewEntry(page, 'Spesa variabile');
+  const dialog = await openNewEntry(page, 'Spesa non necessaria');
   await dialog.locator('#amount').fill(String(DECOY_AMOUNT));
   await dialog.locator('#categoryId').click();
   await dialog.getByRole('button', { name: 'Alimentari', exact: true }).click();

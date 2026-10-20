@@ -63,8 +63,8 @@ interface CategoryAccumulator {
 /**
  * Rank spending categories.
  *
- * Grouped by (type, category), not by name: "Casa" under Spese Fisse and "Casa" under
- * Spese Variabili are two different documents and get two rows, each drillable into its
+ * Grouped by (type, category), not by name: "Casa" under Spese Necessarie and "Casa" under
+ * Spese Non Necessarie are two different documents and get two rows, each drillable into its
  * own transactions. They used to be summed into one row whose drill-down then showed a
  * mix of both.
  */

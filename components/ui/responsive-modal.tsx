@@ -63,7 +63,7 @@ export interface ResponsiveModalProps {
    * (DESIGN.md → The One-Eyebrow Rule).
    */
   eyebrow?: string;
-  /** The act, at Headline 20px — «Nuova spesa variabile», not «Modulo spesa». */
+  /** The act, at Headline 20px — «Nuova spesa non necessaria», not «Modulo spesa». */
   title: React.ReactNode;
   /**
    * The reading line under the title, and on a form the status line. A `ModalReading` carries

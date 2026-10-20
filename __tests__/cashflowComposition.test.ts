@@ -46,8 +46,8 @@ describe('buildExpenseComposition', () => {
     // Assert — one merged 1.200 € row is what this replaces
     expect(slices).toHaveLength(2);
     expect(slices.map((slice) => [slice.name, slice.value])).toEqual([
-      ['Casa (Spese Fisse)', 800],
-      ['Casa (Spese Variabili)', 400],
+      ['Casa (Spese Necessarie)', 800],
+      ['Casa (Spese Non Necessarie)', 400],
     ]);
   });
 
@@ -240,7 +240,7 @@ describe('detectSpendingAnomalies', () => {
 
     // Assert
     expect(anomalies).toHaveLength(1);
-    expect(anomalies[0].categoryLabel).toBe('Casa (Spese Fisse)');
+    expect(anomalies[0].categoryLabel).toBe('Casa (Spese Necessarie)');
     expect(anomalies[0].categoryKey).toBe('cat-casa-fixed');
     expect(anomalies[0].expenseType).toBe('fixed');
   });

@@ -282,7 +282,7 @@ export function buildCategoryTimeSeries(
   }
 
   // Preserve rank order so the legend reads strongest-first; a name shared by two
-  // kept keys gets its type qualifier appended ("Casa (Spese Fisse)").
+  // kept keys gets its type qualifier appended ("Casa (Spese Necessarie)").
   const keptRanked = rankedKeys.filter((categoryKey) => keptKeys.has(categoryKey));
   const labels = resolveDisplayLabels(
     keptRanked.map((categoryKey) => {

@@ -335,7 +335,7 @@ describe('rankCategories', () => {
 
     const ranking = rankCategories(rows, 'expenses');
 
-    expect(ranking.rows.map((r) => r.category)).toEqual(['Casa (Spese Fisse)', 'Casa (Spese Variabili)']);
+    expect(ranking.rows.map((r) => r.category)).toEqual(['Casa (Spese Necessarie)', 'Casa (Spese Non Necessarie)']);
   });
 
   it('should return an empty ranking with no rows of that kind', () => {

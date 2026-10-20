@@ -94,8 +94,8 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   icons statically (tree-shaken, ~30 KB raw by the 2026-09-26 estimate) and only the render by name keeps the lazy map.
 
 ## Expense Grouping: key by id, label by name (`lib/utils/expenseGrouping.ts`)
-- **Category names are NOT unique and never will be** — the product deliberately allows "Casa" as both a *Spese Fisse*
-  and a *Spese Variabili* category, so anything keyed on `categoryName` merges them.
+- **Category names are NOT unique and never will be** — the product deliberately allows "Casa" as both a *Spese Necessarie*
+  and a *Spese Non Necessarie* category, so anything keyed on `categoryName` merges them.
 - **The one rule: group by `getCategoryKey`/`getSubCategoryKey`, display via `resolveDisplayLabels`.** `getCategoryKey` =
   `categoryId || trimmed name || UNCATEGORIZED_LABEL`; `getSubCategoryKey` maps missing/blank to `NO_SUBCATEGORY_KEY`, a
   key like any other — which is what lets callers drop their `=== 'Altro'` special cases.
@@ -104,6 +104,13 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   fixed+variable+debt together and let transfers through.
 
 ## Expense Sign Convention and Type Changes
+- **The two spending types mean NECESSITY, not cadence** (owner, 2026-10-20): `fixed` is labelled «Spese Necessarie»
+  (rent, utilities, groceries, the car, the children, health, taxes) and `variable` «Spese Non Necessarie» (eating out,
+  subscriptions, hobbies, clothes, gifts, holidays). The stored ids stay `fixed`/`variable`, every reader of the type is
+  untouched, and the Budget's pace rule (`budgetUtils` — a `fixed` category is what is booked, never paced) keeps its
+  name. The owner's production categories were rationalised the same day with a one-off scratchpad script (40 → 30,
+  727 rows re-pointed), outside the repo. Blind spot: «necessarie» is a substring of «non necessarie», so a search for
+  that token matches both types; the discriminating token is «non» (`__tests__/entitySearch.test.ts`).
 - **A cash account's balance is stored to the cent, not only the movement** (2026-10-07): every movement was already
   `roundToCents`, but `balance + movement` in binary floats left a residue that grew at each write and surfaced raw in
   the asset form's «Saldo» («4033,050000000001» on the owner's account). Every writer of a cash account's `quantity`

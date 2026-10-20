@@ -237,8 +237,8 @@ type ExpenseFormValues = z.infer<typeof expenseSchema>;
 // Sentence case, like every other title in the app: a modal title is a sentence about an act,
 // not a headline in a newspaper.
 const CREATE_TITLES: Record<ExpenseType, string> = {
-  variable: 'Nuova spesa variabile',
-  fixed: 'Nuova spesa fissa',
+  variable: 'Nuova spesa non necessaria',
+  fixed: 'Nuova spesa necessaria',
   debt: 'Nuovo debito',
   income: 'Nuova entrata',
   transfer: 'Nuovo trasferimento',
@@ -264,8 +264,8 @@ interface TypeOption {
 }
 
 const TYPE_OPTIONS: TypeOption[] = [
-  { value: 'variable', label: 'Spesa variabile', description: 'Ristorante, shopping, svago, imprevisti', Icon: ShoppingCart },
-  { value: 'fixed', label: 'Spesa fissa', description: 'Affitto, abbonamenti, bollette, utenze', Icon: Receipt },
+  { value: 'variable', label: 'Spesa non necessaria', description: 'Ristorante, abbonamenti, svago, regali', Icon: ShoppingCart },
+  { value: 'fixed', label: 'Spesa necessaria', description: 'Affitto, bollette, spesa alimentare, auto', Icon: Receipt },
   { value: 'debt', label: 'Debito / rata', description: 'Mutuo, prestito, finanziamento ricorrente', Icon: CreditCard },
   { value: 'income', label: 'Entrata', description: 'Stipendio, bonus, dividendi, rimborsi', Icon: TrendingUp },
   { value: 'transfer', label: 'Trasferimento', description: 'Sposta denaro tra conti', Icon: ArrowLeftRight },
@@ -2190,8 +2190,8 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess, returnFocusTo
 
   // The eyebrow carries the context and, after a centred dot, the scope — which is where the
   // type badge went: a Badge beside the title was a second label register for the same fact.
-  // The scope names ONE row's type, so it takes the picker's singular label («Spesa variabile»)
-  // and not `EXPENSE_TYPE_LABELS`, which is the plural of a category group («Spese Variabili»).
+  // The scope names ONE row's type, so it takes the picker's singular label («Spesa non necessaria»)
+  // and not `EXPENSE_TYPE_LABELS`, which is the plural of a category group («Spese Non Necessarie»).
   const dialogEyebrow = isTypePicker
     ? 'Nuova voce · Passo 1 di 2'
     // Step 2 keeps the counter: the eyebrow used to drop from «Passo 1 di 2» to the type alone.

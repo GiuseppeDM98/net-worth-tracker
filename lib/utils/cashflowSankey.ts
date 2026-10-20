@@ -16,7 +16,7 @@
  * `new Map(nodes.map(d => [id(d), d]))`, so two nodes sharing an id collapse into one —
  * the last one wins, the first is orphaned at value 0, and the survivor absorbs both
  * branches because `value = max(sum(sourceLinks), sum(targetLinks))`. Building ids from
- * category NAMES therefore merged "Casa" under Spese Fisse with "Casa" under Spese
+ * category NAMES therefore merged "Casa" under Spese Necessarie with "Casa" under Spese
  * Variabili, which are two different documents the product deliberately allows. Worse,
  * an income category sharing a name with an expense one closed a cycle through Budget
  * and made d3-sankey throw "circular link", blanking the chart.
@@ -708,8 +708,8 @@ interface RoleCategoryLabelEntry {
  * A name can repeat for two reasons here, where the type view has one. The SAME category split by
  * a subcategory override sits under two roles: the role tells the two nodes apart («Abbonamenti
  * (Necessità)» / «Abbonamenti (Desideri)»). Two DIFFERENT categories that share a name sit under
- * one role with two types: the role they share says nothing, the type does («Casa (Spese Fisse)» /
- * «Casa (Spese Variabili)»). When both happen at once the qualifier carries both. An income
+ * one role with two types: the role they share says nothing, the type does («Casa (Spese Necessarie)» /
+ * «Casa (Spese Non Necessarie)»). When both happen at once the qualifier carries both. An income
  * category is always «(Entrate)»: it has no role, and its type is what sets it apart.
  */
 function resolveRoleCategoryLabels(entries: RoleCategoryLabelEntry[]): Map<string, string> {

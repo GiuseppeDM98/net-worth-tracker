@@ -33,7 +33,7 @@ const monthOf = (expense: Expense) => ({
   month: expense.date.getMonth() + 1,
 });
 
-/** A fixed-type entity row of the "Casa (Spese Fisse)" category. */
+/** A fixed-type entity row of the "Casa (Spese Necessarie)" category. */
 function casaFixed(year: number, month: number, amount: number): Expense {
   return makeExpense({ type: 'fixed', amount, date: new Date(year, month - 1, 15) });
 }
@@ -495,7 +495,7 @@ describe('resolveYearRowWindows', () => {
 
 // ── buildEntitySubCategoryDeltas ─────────────────────────────────────────────
 
-/** Casa (Spese Fisse) row on a named subcategory. */
+/** Casa (Spese Necessarie) row on a named subcategory. */
 function casaSub(year: number, month: number, amount: number, subId: string, subName: string): Expense {
   return makeExpense({
     type: 'fixed',

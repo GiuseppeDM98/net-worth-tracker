@@ -177,6 +177,11 @@ test('reaches a zero-spend entity through the search — one interaction, honest
   // Never spent a euro on it, still a legitimate focus — and the Scheda says so instead of
   // rendering empty chrome.
   await expect(scheda(page)).toContainText(`Nessuna transazione registrata per Skipass dal ${PREVIOUS_YEAR}.`);
+  // The landing is the LAST scroll: until 2026-10-20 the modal's focus restore (after its exit
+  // animation) pulled the page back up to the trigger a moment after the Scheda had scrolled in.
+  await page.waitForTimeout(1000);
+  await expect(scheda(page)).toBeInViewport();
+  await expect(page.getByRole('button', { name: 'Vai a categoria' })).not.toBeInViewport();
 });
 
 test('excludes transfer categories from the entity search', async ({ page }) => {
@@ -329,7 +334,7 @@ test.describe('Flusso by 50/30/20 role', () => {
     await expect(flusso.getByRole('button', { name: 'Per tipo' })).toHaveAttribute('aria-pressed', 'true');
     await expect(flusso).not.toContainText('50/30/20');
     const chart = flusso.getByRole('img');
-    await expect(chart.locator('text').filter({ hasText: /^Spese Fisse$/ })).toHaveCount(1);
+    await expect(chart.locator('text').filter({ hasText: /^Spese Necessarie$/ })).toHaveCount(1);
     await expect(chart.locator('text').filter({ hasText: /^Necessità$/ })).toHaveCount(0);
   });
 });

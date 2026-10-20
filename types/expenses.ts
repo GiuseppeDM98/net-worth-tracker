@@ -13,8 +13,8 @@ export type ExpenseType = 'fixed' | 'variable' | 'debt' | 'income' | 'transfer';
 export type RecurrenceFrequency = 'monthly' | 'yearly';
 
 export const EXPENSE_TYPE_LABELS: Record<ExpenseType, string> = {
-  fixed: 'Spese Fisse',
-  variable: 'Spese Variabili',
+  fixed: 'Spese Necessarie',
+  variable: 'Spese Non Necessarie',
   debt: 'Debiti',
   income: 'Entrate',
   transfer: 'Trasferimento',

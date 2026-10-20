@@ -267,7 +267,7 @@ test.describe('Cashflow › Tracciamento, composed for a phone', () => {
     await page.getByRole('button', { name: 'Aggiungi nuova voce' }).click();
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
-    await dialog.getByRole('radio', { name: /^Spesa variabile/ }).click();
+    await dialog.getByRole('radio', { name: /^Spesa non necessaria/ }).click();
     await dialog.locator('#amount').fill('7');
     await dialog.locator('#categoryId').click();
     await page.getByRole('button', { name: 'Alimentari', exact: true }).click();

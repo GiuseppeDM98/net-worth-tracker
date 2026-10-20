@@ -261,7 +261,7 @@ test('a plain spesa takes a fee too: two linked rows on the same account, the no
   await page.evaluate(() => window.dispatchEvent(new CustomEvent('cashflow:add-expense')));
   const dialog = page.getByRole('dialog');
   await dialog.waitFor();
-  await dialog.getByRole('radio', { name: /^Spesa variabile/ }).click();
+  await dialog.getByRole('radio', { name: /^Spesa non necessaria/ }).click();
   await dialog.locator('#amount').fill('80');
   await dialog.locator('#categoryId').click();
   await dialog.getByRole('button', { name: FEE_CATEGORY_NAME, exact: true }).click();
@@ -301,7 +301,7 @@ test('a two-row series takes a fee on each occurrence, and deleting the series t
   await page.evaluate(() => window.dispatchEvent(new CustomEvent('cashflow:add-expense')));
   const dialog = page.getByRole('dialog');
   await dialog.waitFor();
-  await dialog.getByRole('radio', { name: /^Spesa variabile/ }).click();
+  await dialog.getByRole('radio', { name: /^Spesa non necessaria/ }).click();
   await dialog.locator('#amount').fill('60');
   await dialog.locator('#categoryId').click();
   await dialog.getByRole('button', { name: FEE_CATEGORY_NAME, exact: true }).click();

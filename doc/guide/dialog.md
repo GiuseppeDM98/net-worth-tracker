@@ -38,7 +38,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   never `chartService`, so it stays SDK-free.
 - **A summary block inside a modal is `bg-muted`**, never `bg-card` — on this surface that is a card inside a card.
 - **The eyebrow's scope is the SINGULAR of one row's type.** `EXPENSE_TYPE_LABELS` is the plural of a category group
-  («Spese Variabili»); the picker's own label is the one a modal about ONE row wants («Spesa variabile»).
+  («Spese Non Necessarie»); the picker's own label is the one a modal about ONE row wants («Spesa non necessaria»).
 - **A refused submit lands in the reading line, in Italian, and scrolls to the field** (`describeFormRefusal` →
   «Mancano 2 campi: Importo e Categoria.»; `handleSubmit(onSubmit, onInvalid)`, `aria-invalid` on the field,
   `scrollIntoView` + focus on the first): `AssetDialog` since 2026-09-14 morning, `ExpenseDialog` since the afternoon,
@@ -53,7 +53,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   Tracciamento and Patrimonio specs check the words only.
   A zod `z.number()` fed `NaN` by `valueAsNumber` says «Invalid input» unless the schema carries `{ error: '…' }` —
   every number the expense form can leave empty now does. Step 2 keeps the counter in the eyebrow («Passo 2 di 2 ·
-  Spesa variabile»).
+  Spesa non necessaria»).
 - **A delete on a ROW of a table arms in the row; a delete that needs a CHOICE is a modal** (2026-09-14, the Movimenti
   table): `useArmedDelete` on a plain row with the consequence printed in the row (`describeExpenseDeleteConsequence`)
   and one live region per table; `SeriesDeleteDialog` («solo questa o tutte le 12?», `describeSeriesDeleteReading`,

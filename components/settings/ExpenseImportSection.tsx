@@ -46,8 +46,8 @@ interface ExpenseImportSectionProps {
 }
 
 const TYPE_LABELS: Record<string, string> = {
-  fixed: 'Spese Fisse',
-  variable: 'Spese Variabili',
+  fixed: 'Spese Necessarie',
+  variable: 'Spese Non Necessarie',
   debt: 'Debiti',
   income: 'Entrate',
 };

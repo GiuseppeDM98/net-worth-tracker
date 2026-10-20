@@ -200,7 +200,7 @@ function makeBundle(overrides: Partial<AssistantMonthContextBundle> = {}): Assis
       { categoryName: 'Cibo', total: -3000, transactionCount: 6, subCategories: [] },
     ],
     incomeByCategory: [{ categoryName: 'Stipendio', total: 9000, transactionCount: 3 }],
-    expensesByType: [{ type: 'fixed', label: 'Spese Fisse', total: -7000 }],
+    expensesByType: [{ type: 'fixed', label: 'Spese Necessarie', total: -7000 }],
     topIndividualExpenses: [
       { categoryName: 'Casa', subCategoryName: 'Affitto', amount: -1000, date: '2026-07-03' },
     ],
@@ -1203,8 +1203,8 @@ describe('generateEmailHtml', () => {
       makeMonthlyData({
         totalExpenses: 2000,
         expensesByType: [
-          { type: 'fixed', label: 'Spese Fisse', amount: 1000 },
-          { type: 'variable', label: 'Spese Variabili', amount: 500 },
+          { type: 'fixed', label: 'Spese Necessarie', amount: 1000 },
+          { type: 'variable', label: 'Spese Non Necessarie', amount: 500 },
         ],
       }),
     );
@@ -1217,12 +1217,12 @@ describe('generateEmailHtml', () => {
       makeMonthlyData({
         totalExpenses: 2000,
         expensesByType: [
-          { type: 'fixed', label: 'Spese Fisse', amount: 1200 },
-          { type: 'variable', label: 'Spese Variabili', amount: 800 },
+          { type: 'fixed', label: 'Spese Necessarie', amount: 1200 },
+          { type: 'variable', label: 'Spese Non Necessarie', amount: 800 },
         ],
       }),
     );
-    expect(html).toContain('Spese Fisse');
+    expect(html).toContain('Spese Necessarie');
     expect(html).not.toContain('Non classificate');
   });
 

@@ -172,7 +172,7 @@ describe('buildImportPlan', () => {
     );
     expect(plan.validRows).toHaveLength(0);
     expect(plan.errors[0].reason).toMatch(/ambiguo/i);
-    expect(plan.errors[0].reason).toMatch(/Spese Fisse/);
+    expect(plan.errors[0].reason).toMatch(/Spese Necessarie/);
   });
 
   it('attaches same-name-same-type duplicates to the OLDEST document and says so', () => {

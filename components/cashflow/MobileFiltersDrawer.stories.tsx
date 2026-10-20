@@ -7,7 +7,7 @@ import type { MultiSelectGroup } from '@/components/ui/multi-select';
 
 const CATEGORY_OPTIONS: MultiSelectGroup[] = [
   {
-    heading: 'Spese Fisse',
+    heading: 'Spese Necessarie',
     options: [
       { value: 'cat-1', label: 'Affitto' },
       { value: 'cat-2', label: 'Abbonamenti' },
@@ -15,7 +15,7 @@ const CATEGORY_OPTIONS: MultiSelectGroup[] = [
     ],
   },
   {
-    heading: 'Spese Variabili',
+    heading: 'Spese Non Necessarie',
     options: [
       { value: 'cat-4', label: 'Alimentari' },
       { value: 'cat-5', label: 'Trasporti' },

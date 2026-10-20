@@ -350,7 +350,7 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   machine (2026-10-16). Each flake below was red once or twice in a full run and green alone right after
   (`--repeat-each=3`); a second red of the same test is a pattern, not noise:
   - `cashflow.tablet.spec.ts` «the tabs are 44×44…» [tablet] (2026-10-16): 0 visible tabs 1,3 s after the verdict — the tab
-    bar not yet painted when `open()` returned on the verdict and THE tile. If it returns, `open()` waits for the tablist too.
+    bar not yet painted when `open()` returned on the verdict and THE tile. Returned on 2026-10-20 (landscape, one full run); since then `open()` waits for the tablist and a visible tab too.
   - `overview.mobile.spec.ts` «a cell with a six-figure variation…» (2026-10-16, twice): the strip's second row 1,3–1,6 px
     apart where the cells share a line. Fixed: the test polls until the two cells share their line before reading the boxes.
   - The «remembered across a reload» tests of `mobile-composition.patrimonio.mobile.spec.ts` and `overview.mobile.spec.ts`

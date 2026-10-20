@@ -5,7 +5,7 @@ import type { ExpenseType } from '@/types/expenses';
  * the hero's legend (Rule of Three: until 2026-09-14 three files each kept their own map, and the
  * table's said `income → --chart-1`, `fixed → --chart-2` while the legend 400px above said
  * `Entrate → --chart-2`, `Spese → --chart-1` — the same green meant «Entrate» in one place and
- * «Spese Fisse» in the other, measured on the mirror).
+ * «Spese Necessarie» in the other, measured on the mirror).
  *
  * Two registers, deliberately:
  *   - a ROW's type takes the sign token for income (`positive`: a gain, like every other gain on

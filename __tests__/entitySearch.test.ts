@@ -58,7 +58,7 @@ describe('buildEntitySearchIndex', () => {
     const condominio = index.find((item) => item.id === 'fixed:cat-casa:sub-cond');
     expect(condominio?.label).toBe('Condominio');
     expect(condominio?.parentLabel).toBe('Casa');
-    expect(condominio?.qualifier).toBe('Spese Fisse');
+    expect(condominio?.qualifier).toBe('Spese Necessarie');
     expect(condominio?.target).toEqual({ expenseType: 'fixed', categoryKey: 'cat-casa', subCategoryKey: 'sub-cond' });
   });
 
@@ -75,8 +75,8 @@ describe('buildEntitySearchIndex', () => {
     // Assert — keyed by id, so neither swallows the other
     expect(index).toHaveLength(2);
     expect(index.map((item) => [item.id, item.label, item.qualifier])).toEqual([
-      ['fixed:cat-casa-fixed', 'Casa', 'Spese Fisse'],
-      ['variable:cat-casa-var', 'Casa', 'Spese Variabili'],
+      ['fixed:cat-casa-fixed', 'Casa', 'Spese Necessarie'],
+      ['variable:cat-casa-var', 'Casa', 'Spese Non Necessarie'],
     ]);
   });
 
@@ -229,7 +229,7 @@ describe('searchEntities', () => {
   });
 
   it('should rank label prefix, then label substring, then qualifier-only matches', () => {
-    // Arrange — "Casa" (fixed) matches "spese" only through its qualifier "Spese Fisse"
+    // Arrange — "Casa" (fixed) matches "spese" only through its qualifier "Spese Necessarie"
     const index = buildEntitySearchIndex(
       [
         makeCategory({ id: 'cat-med', name: 'Spese Mediche', type: 'variable' }),
@@ -280,12 +280,13 @@ describe('searchEntities', () => {
     );
 
     // Act
-    const results = searchEntities(index, 'casa fisse');
+    // «necessarie» sits inside «Non Necessarie» too, so the discriminating token is «non»
+    const results = searchEntities(index, 'casa non');
 
     // Assert
     expect(results).toHaveLength(1);
-    expect(results[0].id).toBe('fixed:cat-casa-fixed');
-    expect(results[0].qualifier).toBe('Spese Fisse');
+    expect(results[0].id).toBe('variable:cat-casa-var');
+    expect(results[0].qualifier).toBe('Spese Non Necessarie');
   });
 
   it('should default the limit to 8, honor an explicit one, and break ties alphabetically', () => {

@@ -124,8 +124,8 @@ test('the expense form refuses in Italian, in the reading line, and points at th
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
   await expect(dialog.getByText('Nuova voce · Passo 1 di 2')).toBeVisible();
-  await dialog.getByRole('radio', { name: /^Spesa variabile/ }).click();
-  await expect(dialog.getByText('Nuova voce · Passo 2 di 2 · Spesa variabile')).toBeVisible();
+  await dialog.getByRole('radio', { name: /^Spesa non necessaria/ }).click();
+  await expect(dialog.getByText('Nuova voce · Passo 2 di 2 · Spesa non necessaria')).toBeVisible();
 
   const status = dialog.getByRole('status');
   await expect(status).toContainText('La voce entra nelle spese del mese');
@@ -206,7 +206,7 @@ test('a saved expense lands in place: the counter and the table follow the write
   try {
     await page.getByRole('button', { name: 'Nuova Spesa' }).click();
     const dialog = page.getByRole('dialog');
-    await dialog.getByRole('radio', { name: /^Spesa variabile/ }).click();
+    await dialog.getByRole('radio', { name: /^Spesa non necessaria/ }).click();
     await dialog.locator('#amount').fill(AMOUNT);
     await dialog.locator('#categoryId').click();
     await dialog.getByRole('button', { name: 'Alimentari', exact: true }).click();
@@ -274,7 +274,7 @@ test('a row dated next year shows when the period moves there: the second window
     expect(total).toBeGreaterThan(0);
     await page.getByRole('button', { name: 'Nuova Spesa' }).click();
     const dialog = page.getByRole('dialog');
-    await dialog.getByRole('radio', { name: /^Spesa variabile/ }).click();
+    await dialog.getByRole('radio', { name: /^Spesa non necessaria/ }).click();
     await dialog.locator('#amount').fill(AMOUNT);
     await dialog.locator('#date').fill(`${nextYear}-03-15`);
     await dialog.locator('#categoryId').click();

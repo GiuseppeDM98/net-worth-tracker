@@ -178,8 +178,8 @@ describe('assistant prompt data block', () => {
       // Arrange
       const bundle = makeBundle({
         expensesByType: [
-          { type: 'fixed', label: 'Spese Fisse', total: -750 },
-          { type: 'variable', label: 'Spese Variabili', total: -250 },
+          { type: 'fixed', label: 'Spese Necessarie', total: -750 },
+          { type: 'variable', label: 'Spese Non Necessarie', total: -250 },
         ],
       });
 
@@ -188,7 +188,7 @@ describe('assistant prompt data block', () => {
 
       // Assert
       expect(content).toContain('--- SPESE PER TIPO ---');
-      expect(content).toContain('Spese Fisse: -750 € (75,0%)');
+      expect(content).toContain('Spese Necessarie: -750 € (75,0%)');
     });
 
     it('should print «Entrate» as the Cashflow page does, dividends inside and named', () => {

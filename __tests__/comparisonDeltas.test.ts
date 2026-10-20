@@ -76,8 +76,8 @@ describe('buildCategoryComparison', () => {
     // Assert — a name-keyed comparison would merge them into one 1.200 € row
     expect(rows).toHaveLength(2);
     expect(rows.map((row) => [row.label, row.current])).toEqual([
-      ['Casa (Spese Variabili)', 400],
-      ['Casa (Spese Fisse)', 800],
+      ['Casa (Spese Non Necessarie)', 400],
+      ['Casa (Spese Necessarie)', 800],
     ]);
     expect(new Set(rows.map((row) => row.key)).size).toBe(2);
   });

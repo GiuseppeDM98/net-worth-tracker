@@ -171,8 +171,8 @@ describe('resolveDisplayLabels', () => {
   it('should leave unique names untouched', () => {
     // Arrange
     const groups = [
-      { key: 'cat-casa', name: 'Casa', qualifier: 'Spese Fisse' },
-      { key: 'cat-cibo', name: 'Cibo', qualifier: 'Spese Variabili' },
+      { key: 'cat-casa', name: 'Casa', qualifier: 'Spese Necessarie' },
+      { key: 'cat-cibo', name: 'Cibo', qualifier: 'Spese Non Necessarie' },
     ];
 
     // Act
@@ -186,25 +186,25 @@ describe('resolveDisplayLabels', () => {
   it('should qualify only the colliding name, leaving its neighbours plain', () => {
     // Arrange
     const groups = [
-      { key: 'cat-casa-fixed', name: 'Casa', qualifier: 'Spese Fisse' },
-      { key: 'cat-casa-var', name: 'Casa', qualifier: 'Spese Variabili' },
-      { key: 'cat-cibo', name: 'Cibo', qualifier: 'Spese Variabili' },
+      { key: 'cat-casa-fixed', name: 'Casa', qualifier: 'Spese Necessarie' },
+      { key: 'cat-casa-var', name: 'Casa', qualifier: 'Spese Non Necessarie' },
+      { key: 'cat-cibo', name: 'Cibo', qualifier: 'Spese Non Necessarie' },
     ];
 
     // Act
     const labels = resolveDisplayLabels(groups);
 
     // Assert
-    expect(labels.get('cat-casa-fixed')).toBe('Casa (Spese Fisse)');
-    expect(labels.get('cat-casa-var')).toBe('Casa (Spese Variabili)');
+    expect(labels.get('cat-casa-fixed')).toBe('Casa (Spese Necessarie)');
+    expect(labels.get('cat-casa-var')).toBe('Casa (Spese Non Necessarie)');
     expect(labels.get('cat-cibo')).toBe('Cibo');
   });
 
   it('should not treat repeated entries of one key as a collision', () => {
     // Arrange — the same group listed twice, as a caller building per-row would produce
     const groups = [
-      { key: 'cat-casa', name: 'Casa', qualifier: 'Spese Fisse' },
-      { key: 'cat-casa', name: 'Casa', qualifier: 'Spese Fisse' },
+      { key: 'cat-casa', name: 'Casa', qualifier: 'Spese Necessarie' },
+      { key: 'cat-casa', name: 'Casa', qualifier: 'Spese Necessarie' },
     ];
 
     // Act
@@ -217,8 +217,8 @@ describe('resolveDisplayLabels', () => {
   it('should keep both keys when name and qualifier are identical', () => {
     // Arrange — nothing enforces uniqueness even within one type
     const groups = [
-      { key: 'cat-casa-a', name: 'Casa', qualifier: 'Spese Fisse' },
-      { key: 'cat-casa-b', name: 'Casa', qualifier: 'Spese Fisse' },
+      { key: 'cat-casa-a', name: 'Casa', qualifier: 'Spese Necessarie' },
+      { key: 'cat-casa-b', name: 'Casa', qualifier: 'Spese Necessarie' },
     ];
 
     // Act
@@ -226,8 +226,8 @@ describe('resolveDisplayLabels', () => {
 
     // Assert
     expect(labels.size).toBe(2);
-    expect(labels.get('cat-casa-a')).toBe('Casa (Spese Fisse)');
-    expect(labels.get('cat-casa-b')).toBe('Casa (Spese Fisse)');
+    expect(labels.get('cat-casa-a')).toBe('Casa (Spese Necessarie)');
+    expect(labels.get('cat-casa-b')).toBe('Casa (Spese Necessarie)');
   });
 
   it('should fall back to the plain name when a colliding group has no qualifier', () => {

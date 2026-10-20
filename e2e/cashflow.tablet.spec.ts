@@ -44,6 +44,10 @@ async function open(page: Page): Promise<void> {
   await page.goto('/dashboard/cashflow');
   await expect(page.getByRole('region', { name: 'Verdetto del periodo' })).toBeVisible({ timeout: 45_000 });
   await expect(lead(page)).toBeVisible();
+  // The tab bar paints after the verdict and THE tile: without this wait «the tabs are 44×44» read 0
+  // visible tabs 1,3 s after the verdict, once on 2026-10-16 and again on 2026-10-20 (e2e-emulatori.md).
+  await expect(page.getByRole('tablist').first()).toBeVisible();
+  await expect(page.getByRole('tab').filter({ visible: true }).first()).toBeVisible();
 }
 
 test.describe('Cashflow › Tracciamento, composed for a tablet', () => {

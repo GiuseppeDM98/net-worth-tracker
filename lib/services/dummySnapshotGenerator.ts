@@ -369,7 +369,7 @@ async function generateMonthlyExpenses(
       amount: -Math.abs(amount), // Expenses are negative
       currency: 'EUR',
       date: new Date(year, month - 1, dayOfMonth),
-      notes: 'Spesa fissa fittizia',
+      notes: 'Spesa necessaria fittizia',
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -396,7 +396,7 @@ async function generateMonthlyExpenses(
       amount: -Math.abs(amount), // Expenses are negative
       currency: 'EUR',
       date: new Date(year, month - 1, dayOfMonth),
-      notes: 'Spesa variabile fittizia',
+      notes: 'Spesa non necessaria fittizia',
       createdAt: new Date(),
       updatedAt: new Date(),
     };

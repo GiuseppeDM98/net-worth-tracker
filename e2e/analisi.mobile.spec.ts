@@ -108,7 +108,7 @@ test('draws the Flusso by type as a bar of the spending and rows, never a Sankey
   await expect(flusso.getByText('Quote delle spese.', { exact: true })).toBeVisible();
 
   // A row opens the Scheda, like every other entry point.
-  await flusso.getByRole('region', { name: 'Spese Variabili' }).getByRole('button', { name: /^Alimentari, / }).click();
+  await flusso.getByRole('region', { name: 'Spese Non Necessarie' }).getByRole('button', { name: /^Alimentari, / }).click();
   await expect(page.getByText(`Totale · ${CURRENT_YEAR}`)).toBeVisible();
   await expect(page.getByText(`Totale · ${CURRENT_YEAR}`).locator('..').getByText(/^400[\s ]*€$/)).toBeVisible();
 });

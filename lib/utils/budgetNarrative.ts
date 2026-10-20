@@ -546,7 +546,7 @@ export function describeBudgetCounts(expenseCount: number, incomeCount: number, 
 }
 
 export const CATEGORY_FOOTER: Narrative = [
-  prose('Il tetto è su tutte le spese del mese; «assegnato» somma solo i budget mensili di spesa per categoria — annuali, entrate e sottocategorie restano fuori. Una categoria è «fissa» per il tipo della sua categoria (Spese Fisse o Debiti) e non segue il ritmo: «Fine mese» conta solo le rate in calendario.'),
+  prose('Il tetto è su tutte le spese del mese; «assegnato» somma solo i budget mensili di spesa per categoria — annuali, entrate e sottocategorie restano fuori. Una categoria è «fissa» per il tipo della sua categoria (Spese Necessarie o Debiti) e non segue il ritmo: «Fine mese» conta solo le rate in calendario.'),
 ];
 
 // ─── Nuovo budget / Modifica budget ───────────────────────────────────────────

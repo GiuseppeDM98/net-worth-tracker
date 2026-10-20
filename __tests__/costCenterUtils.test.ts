@@ -59,8 +59,8 @@ describe('buildCategoryComposition', () => {
     ];
     const comp = buildCategoryComposition(expenses);
     expect(comp).toHaveLength(2);
-    expect(comp[0]).toMatchObject({ key: 'c-fix', categoryName: 'Casa (Spese Fisse)', total: 300 });
-    expect(comp[1]).toMatchObject({ key: 'c-var', categoryName: 'Casa (Spese Variabili)', total: 100 });
+    expect(comp[0]).toMatchObject({ key: 'c-fix', categoryName: 'Casa (Spese Necessarie)', total: 300 });
+    expect(comp[1]).toMatchObject({ key: 'c-var', categoryName: 'Casa (Spese Non Necessarie)', total: 100 });
   });
 });
 

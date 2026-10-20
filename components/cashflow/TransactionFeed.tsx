@@ -49,8 +49,8 @@ import { LAZY_CATEGORY_ICONS } from '@/components/expenses/IconPickerPopover';
 
 const EXPENSE_TYPE_LABELS: Record<ExpenseType, string> = {
   income: 'Entrata',
-  fixed: 'Spesa fissa',
-  variable: 'Spesa variabile',
+  fixed: 'Spesa necessaria',
+  variable: 'Spesa non necessaria',
   debt: 'Debito',
   transfer: 'Trasferimento',
 };

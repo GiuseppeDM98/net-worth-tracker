@@ -86,6 +86,8 @@
 
 - **Cashflow › Movimenti (tabella)** — Fixed the deletion of a whole series from the table view, which left the fees' debits on the account; the feed already gave them back.
 
+- **Analisi › Vai a categoria…** — Fixed the page jumping back to the top a moment after the chosen category's Scheda had scrolled into view: the Scheda now opens once the search has closed, and stays where you can read it.
+
 - **Rendimenti › Analizza con AI** — Fixed the empty or cut-off report: when the model declines to write it, another model takes over where the kind of refusal allows it, and the dialog names the model that actually wrote the report; when the refusal stands, or the report reaches its maximum length, the dialog says so — refused, or stopped halfway with the text written so far incomplete — and «Rigenera» is offered after any failure, not only beside a finished report.
 
 ## 🔧 Improvements
@@ -107,6 +109,8 @@
 
 - **Cashflow · FIRE e Simulazioni · Impostazioni (telefono e tablet)** — Improved the section pill under the title: every tab is now a 44-pixel target for the thumb, so the pill is a little taller.
 - **Ogni pagina** — Improved the figures in every verdict and reading: the «€» now sits right after its number («+1.200 €» instead of a whole monospace cell of space between them), on the phone's figure strip too.
+
+- **Cashflow — Spese Necessarie e Non Necessarie** — Changed the names of the two spending types: «Spese Fisse» is now «Spese Necessarie» and «Spese Variabili» is «Spese Non Necessarie», in the type cards of a new entry («Spesa necessaria» / «Spesa non necessaria»), the filters, the feed, Analisi and the CSV import. Your categories keep their type; only its name changes, so you can sort them by what you need and what you choose.
 
 - **FIRE** — Improved the FIRE number: the loan on an excluded primary residence is left out with the house, so a debt on a thing not counted never lowers the figure.
 - **Storico › Driver** — Improved «mutuo»: a month that opens a loan shows the debt going up and one that closes it shows it repaid.

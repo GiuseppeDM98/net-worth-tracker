@@ -482,7 +482,7 @@ function prepareCashflowData(expenses: Expense[], historyFloorYear: number | nul
   byCategory.sort((a, b) => b.amount - a.amount);
 
   // Take top 5 categories; a name shared by two keys in the rendered slice gets its
-  // type qualifier appended ("Casa (Spese Fisse)").
+  // type qualifier appended ("Casa (Spese Necessarie)").
   const topSlice = byCategory.slice(0, 5);
   const labels = resolveDisplayLabels(
     topSlice.map(({ key, categoryName, qualifier }) => ({ key, name: categoryName, qualifier }))

@@ -206,7 +206,7 @@ export function summarizeSpendingRoles(
 
 /**
  * ONE bucket's categories under the names a list prints: «Casa» stays «Casa», and two categories
- * that share a name inside the bucket take their type («Casa (Spese Fisse)» / «Casa (Spese
+ * that share a name inside the bucket take their type («Casa (Spese Necessarie)» / «Casa (Spese
  * Variabili)») — the role they share would tell nothing apart. The roles Sankey resolves its own
  * labels over the whole chart (`resolveRoleCategoryLabels`), where a name can also repeat across
  * roles; a list shows one role at a time, so the type is the only thing that can differ.

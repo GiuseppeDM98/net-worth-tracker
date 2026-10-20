@@ -154,7 +154,7 @@ describe('buildCategoryTimeSeries', () => {
 
     const { series } = buildCategoryTimeSeries(expenses, 'year', 'expenses', 2025, 6);
 
-    expect(series.map((s) => s.name)).toEqual(['Casa (Spese Fisse)', 'Casa (Spese Variabili)']);
+    expect(series.map((s) => s.name)).toEqual(['Casa (Spese Necessarie)', 'Casa (Spese Non Necessarie)']);
     expect(series.map((s) => s.values[0])).toEqual([300, 100]);
   });
 
@@ -202,7 +202,7 @@ describe('buildTypeTimeSeries', () => {
     const { series } = buildTypeTimeSeries(expenses, 'year', 2025);
 
     // Order is fixed by EXPENSE_TYPE_ORDER, not by total — unlike categories.
-    expect(series.map((s) => s.name)).toEqual(['Spese Fisse', 'Spese Variabili', 'Debiti']);
+    expect(series.map((s) => s.name)).toEqual(['Spese Necessarie', 'Spese Non Necessarie', 'Debiti']);
     expect(series.map((s) => s.values[0])).toEqual([400, 250, 100]);
   });
 
@@ -215,7 +215,7 @@ describe('buildTypeTimeSeries', () => {
 
     const { series } = buildTypeTimeSeries(expenses, 'year', 2025);
 
-    expect(series.map((s) => s.name)).toEqual(['Spese Fisse']);
+    expect(series.map((s) => s.name)).toEqual(['Spese Necessarie']);
     expect(series[0].values).toEqual([300]);
   });
 
@@ -228,7 +228,7 @@ describe('buildTypeTimeSeries', () => {
 
     const { series } = buildTypeTimeSeries(expenses, 'year', 2025);
 
-    expect(series.map((s) => s.name)).toEqual(['Spese Fisse', 'Spese Variabili']);
+    expect(series.map((s) => s.name)).toEqual(['Spese Necessarie', 'Spese Non Necessarie']);
   });
 
   it('aligns per-type values to the shared, gap-free monthly axis', () => {
@@ -241,7 +241,7 @@ describe('buildTypeTimeSeries', () => {
 
     expect(buckets.map((b) => b.key)).toEqual(['2025-01', '2025-02', '2025-03']);
     // Jan=100, Feb=0 (gap), Mar=150
-    expect(series[0]).toMatchObject({ name: 'Spese Fisse', values: [100, 0, 150] });
+    expect(series[0]).toMatchObject({ name: 'Spese Necessarie', values: [100, 0, 150] });
   });
 
   it('returns empty axis and series when no expense data exists', () => {

@@ -333,7 +333,7 @@ Otto scenari (i cinque di default qui, poi i tre aggiunti), ognuno in un contest
 storico cashflow» di Impostazioni › Preferenze, un input controllato della pagina), **allocation** (dal 2026-10-08,
 PR #439: 10 tasti in «Target Criptovalute» di Impostazioni › Allocazione, la tab più grande — Crypto perché la formula
 non la possiede mai, quindi il campo è abilitato su ogni account), **expense** (10 tasti in «Importo» di
-«Nuova Spesa» › Spesa variabile, letto da `useWatch` alla radice del dialog), **tabs** (Cashflow Tracciamento ⇄ Budget,
+«Nuova Spesa» › Spesa non necessaria, letto da `useWatch` alla radice del dialog), **tabs** (Cashflow Tracciamento ⇄ Budget,
 quattro cambi con entrambe le tab già montate), **asset** (dal 2026-10-07, PR #434: 10 tasti in «Quantità» di
 «Aggiungi asset» › ETF, la posizione iniziale — non «Modifica»: un ETF è un tipo del registro, e in modifica quantità e
 PMC sono in sola lettura). Dal 2026-10-08 (PR #441) due scenari che non digitano: **mount** (un caricamento pieno della

@@ -153,8 +153,8 @@ describe('buildBudgetFlowData — same category name under two types', () => {
     const labels = view.nodes.map((node) => node.label);
 
     // Assert
-    expect(labels).toContain('Casa (Spese Fisse)');
-    expect(labels).toContain('Casa (Spese Variabili)');
+    expect(labels).toContain('Casa (Spese Necessarie)');
+    expect(labels).toContain('Casa (Spese Non Necessarie)');
   });
 
   it('should leave a name that does not collide unqualified', () => {
@@ -439,11 +439,11 @@ describe('the descriptor index', () => {
     expect(view.index.get(idOf(view, 'Budget'))).toEqual({ kind: 'budget' });
     expect(view.index.get(idOf(view, 'Risparmi'))).toEqual({ kind: 'savings' });
     expect(view.index.get(idOf(view, FIXED))).toEqual({ kind: 'expenseType', expenseType: 'fixed' });
-    expect(view.index.get(idOf(view, 'Casa (Spese Fisse)'))).toEqual({
+    expect(view.index.get(idOf(view, 'Casa (Spese Necessarie)'))).toEqual({
       kind: 'category',
       expenseType: 'fixed',
       categoryKey: 'cat-casa-fixed',
-      categoryLabel: 'Casa (Spese Fisse)',
+      categoryLabel: 'Casa (Spese Necessarie)',
     });
   });
 

@@ -47,6 +47,11 @@ export function EntitySearch({
   // Where the focus goes back when the modal closes — Radix restores it to `body` when the
   // opener was tapped on Safari or the search was reached through the page (measured 2026-09-14).
   const triggerRef = useRef<HTMLButtonElement>(null);
+  // The pick waits for the modal to finish closing. Fired at once, the drill-down scrolled the
+  // Scheda into view at 50 ms and the modal's focus restore then pulled the page back up to the
+  // trigger (`focus()` scrolls) — a one-second jump the owner saw on 2026-10-20. Landing after
+  // `onExitComplete` makes the Scheda the last to move and the last to hold the focus.
+  const pendingTargetRef = useRef<EntitySearchTarget | null>(null);
 
   const index = useMemo(() => buildEntitySearchIndex(categories, expenses), [categories, expenses]);
   const results = searchEntities(index, query);
@@ -80,6 +85,11 @@ export function EntitySearch({
         reading="Scegliendo una voce, la Scheda si apre sotto le tessere con il totale del periodo, la quota sul padre e l'andamento."
         width="md"
         returnFocusTo={triggerRef}
+        onExitComplete={() => {
+          const target = pendingTargetRef.current;
+          pendingTargetRef.current = null;
+          if (target) onSelect(target);
+        }}
       >
         {/* shouldFilter={false}: matching and ranking live in searchEntities
             (accent-folded, label-prefix first); cmdk's own substring filter
@@ -99,7 +109,7 @@ export function EntitySearch({
                 key={item.id}
                 value={item.id}
                 onSelect={() => {
-                  onSelect(item.target);
+                  pendingTargetRef.current = item.target;
                   handleClose();
                 }}
               >
