@@ -15,7 +15,9 @@
  * able to heal). Yahoo failing with a stale answer in cache — useful or empty — the stale one is
  * served, and its `fetchedAt` says how old it is (an old empty answer still dates the footer, and
  * reads «non letto» exactly as no answer would). `force` asks Yahoo whatever the age, and keeps
- * the last cached answer if Yahoo fails.
+ * the last cached answer if Yahoo fails. `requireAllocation` is the fund-allocation route's
+ * reading: a fund module cached before the allocation field existed (or one Yahoo answered
+ * without it) is re-asked daily, so an import is not blind for a whole month.
  *
  * Two stages, timed apart for the route's `Server-Timing` (since 2026-10-05): every cached
  * document is read first, in parallel (`db`), then Yahoo is asked for what is missing, expired or
@@ -76,18 +78,30 @@ export function createAdminProfileCacheStore(db: Pick<typeof adminDb, 'collectio
 // ─── Freshness, per module ───────────────────────────────────────────────────
 
 function isUsefulFund(profile: InstrumentFundProfile): boolean {
-  return !!(profile.holdings?.length || profile.sectors?.length || profile.family);
+  return !!(profile.holdings?.length || profile.sectors?.length || profile.family || profile.allocation);
 }
 
 function isUsefulStock(profile: InstrumentStockProfile): boolean {
   return !!(profile.sectorKey || profile.longName);
 }
 
-function isFresh<M extends ProfileModule>(module: M, data: ModuleData[M], now: Date): boolean {
+function isFresh<M extends ProfileModule>(
+  module: M,
+  data: ModuleData[M],
+  now: Date,
+  requireAllocation = false,
+): boolean {
   const fetched = Date.parse(data.fetchedAt);
   if (Number.isNaN(fetched)) return false;
+  const age = now.getTime() - fetched;
+  // A caller that needs the published MIX treats a module without it as an empty answer: an old
+  // document (written before the field existed) heals on the first import, and a fund Yahoo truly
+  // has no allocation for is re-asked daily at most — never on every preview.
+  if (module === 'fund' && requireAllocation && !(data as InstrumentFundProfile).allocation) {
+    return age < EMPTY_PROFILE_TTL_MS;
+  }
   const useful = module === 'fund' ? isUsefulFund(data as InstrumentFundProfile) : isUsefulStock(data as InstrumentStockProfile);
-  return now.getTime() - fetched < (useful ? USEFUL_PROFILE_TTL_MS : EMPTY_PROFILE_TTL_MS);
+  return age < (useful ? USEFUL_PROFILE_TTL_MS : EMPTY_PROFILE_TTL_MS);
 }
 
 // ─── Resolution ──────────────────────────────────────────────────────────────
@@ -95,6 +109,8 @@ function isFresh<M extends ProfileModule>(module: M, data: ModuleData[M], now: D
 export interface ResolveInstrumentProfilesOptions {
   /** «Aggiorna»: ask Yahoo whatever the age; the last good answer stays if Yahoo fails. */
   force?: boolean;
+  /** The caller needs `allocation`: a fund module without it is re-asked daily (`isFresh`). */
+  requireAllocation?: boolean;
   now?: Date;
   source?: YahooProfileSource;
   store?: ProfileCacheStore;
@@ -127,10 +143,10 @@ async function resolveModule<M extends ProfileModule>(
   ticker: string,
   module: M,
   cached: ModuleData[M] | undefined,
-  { force, now, source, store }: ResolvedOptions,
+  { force, now, source, store, requireAllocation }: ResolvedOptions,
   counts: ProfileResolutionCounts,
 ): Promise<ModuleData[M] | undefined> {
-  if (cached && !force && isFresh(module, cached, now)) {
+  if (cached && !force && isFresh(module, cached, now, requireAllocation)) {
     counts.hits += 1;
     return cached;
   }
@@ -180,6 +196,7 @@ export async function resolveInstrumentProfiles(
 ): Promise<ResolvedInstrumentProfiles> {
   const resolved: ResolvedOptions = {
     force: options.force ?? false,
+    requireAllocation: options.requireAllocation ?? false,
     now: options.now ?? new Date(),
     source: options.source ?? yahooProfileSource,
     store: options.store ?? createAdminProfileCacheStore(),

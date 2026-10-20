@@ -231,6 +231,20 @@ export const performanceYieldsRequestSchema = z.object({
 export { goalProposalSchema } from '@/lib/utils/goalProposal';
 
 /**
+ * GET /api/portfolio/fund-allocation?isins=<ISIN,…> — the funds whose published allocation the
+ * client needs (an import preview, the ETF form). A closed list of real ISINs: this route is not a
+ * Yahoo proxy, so it refuses a free ticker and bounds the fan-out to one import's worth of funds.
+ */
+export const fundAllocationQuerySchema = z.object({
+  isins: z
+    .string()
+    .min(1)
+    .max(1000)
+    .transform((value) => value.split(',').map((isin) => isin.trim().toUpperCase()).filter(Boolean))
+    .pipe(z.array(isinSchema).min(1).max(40)),
+});
+
+/**
  * Parse helper: runs safeParse and returns either the typed data or a
  * ready-to-return 400 NextResponse with flattened zod error details.
  */

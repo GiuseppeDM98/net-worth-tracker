@@ -949,6 +949,23 @@ describe('describeBrokerConnections', () => {
       'Nessuna sincronizzazione Trade Republic: la sincronizzazione legge posizioni, liquidità e piani di accumulo, in sola lettura.'
     );
   });
+
+  it('speaks of an IMPORT, not a sync, for Intesa Sanpaolo', () => {
+    expect(plain(describeBrokerConnections('intesa', {}))).toBe(
+      'Nessun import Intesa Sanpaolo: carica il file XLSX del portafoglio per controllare le posizioni prima di salvarle.'
+    );
+    const text = plain(
+      describeBrokerConnections('intesa', {
+        lastSyncAt: '2026-10-19T10:00:00.000Z',
+        holdingsCount: 22,
+        cashBalance: 6606.39,
+      })
+    );
+    expect(text).toBe(
+      'Ultimo import 19/10/2026 da Intesa Sanpaolo: 22 posizioni e liquidità 6606 € — prezzi e quantità letti dal file, non aggiornati in automatico.'
+    );
+    expect(text).not.toContain('sincronizzazione');
+  });
 });
 
 describe('describeThemeMode', () => {

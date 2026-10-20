@@ -5,10 +5,10 @@
  * keeps the last good answer), an unexpected shape is an EMPTY profile («non letto», 24 h TTL).
  *
  * Yahoo module asymmetry (doc/guide/allocazione.md § Esposizione — the per-ticker cache and
- * Yahoo's two modules): a fund's `topHoldings` → holdings and
- * `sectorWeightings` (snake_case keys) plus `fundProfile.family`; a stock's `assetProfile.sector`
- * (Title Case, mapped) plus `price.longName`. Which one is asked depends on the asset's TYPE, so
- * each module carries its own `fetchedAt` in the cache document.
+ * Yahoo's two modules): a fund's `topHoldings` → holdings, `sectorWeightings` (snake_case keys),
+ * the published asset allocation (the six `*Position` fractions) and `fundProfile.family`; a
+ * stock's `assetProfile.sector` (Title Case, mapped) plus `price.longName`. Which one is asked
+ * depends on the asset's TYPE, so each module carries its own `fetchedAt` in the cache document.
  *
  * Normalisation: a fund's holding weights are shares of the whole FUND,
  * so they are divided by `stockPosition` to become shares of the EQUITY SLEEVE (a 4,5% name in a
@@ -32,6 +32,11 @@ export interface YahooProfileSource {
 
 interface RawTopHoldings {
   stockPosition?: number | null;
+  bondPosition?: number | null;
+  cashPosition?: number | null;
+  otherPosition?: number | null;
+  preferredPosition?: number | null;
+  convertiblePosition?: number | null;
   holdings?: Array<{ symbol?: string | null; holdingName?: string | null; holdingPercent?: number | null }> | null;
   sectorWeightings?: Array<Record<string, number | null | undefined>> | null;
 }
@@ -68,12 +73,29 @@ export function normalizeFundAnswer(summary: RawFundSummary | null | undefined, 
 
   const family = summary?.fundProfile?.family;
 
+  // The published mix, all six buckets at once. Yahoo reports fractions of the whole fund
+  // (0,1925 = 19,25%); a value outside [0,1] is clamped rather than trusted, and a missing one is
+  // 0. Only a fund with at least one bucket gets an `allocation` — an all-zero answer is «non
+  // letto», not a fund that is 0% of everything.
+  const fraction = (value: number | null | undefined): number =>
+    typeof value === 'number' && Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0;
+  const allocation = {
+    stock: fraction(topHoldings?.stockPosition),
+    bond: fraction(topHoldings?.bondPosition),
+    cash: fraction(topHoldings?.cashPosition),
+    other: fraction(topHoldings?.otherPosition),
+    preferred: fraction(topHoldings?.preferredPosition),
+    convertible: fraction(topHoldings?.convertiblePosition),
+  };
+  const hasAllocation = Object.values(allocation).some((weight) => weight > 0);
+
   return {
     fetchedAt: now.toISOString(),
     ...(holdings.length > 0 ? { holdings } : {}),
     ...(sectors.length > 0 ? { sectors } : {}),
     holdingsBasis: stockPosition ? 'sleeve' : 'fund',
     family: typeof family === 'string' && family.trim() !== '' ? family : null,
+    ...(hasAllocation ? { allocation } : {}),
   };
 }
 

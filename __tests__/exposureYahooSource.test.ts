@@ -69,6 +69,51 @@ describe('normalizeFundAnswer', () => {
     expect(profile).toEqual({ fetchedAt: '2026-09-28T10:00:00.000Z', holdingsBasis: 'fund', family: null });
     expect(normalizeFundAnswer(undefined, NOW).family).toBeNull();
   });
+
+  it('keeps the published asset allocation, clamped to fractions, when Yahoo reports one', () => {
+    const profile = normalizeFundAnswer(
+      {
+        topHoldings: {
+          stockPosition: 0.1925,
+          bondPosition: 0.7269,
+          cashPosition: 0.036,
+          otherPosition: 0.0446,
+          preferredPosition: 0,
+          convertiblePosition: 0.0003,
+        },
+      },
+      NOW
+    );
+    expect(profile.allocation).toEqual({
+      stock: 0.1925,
+      bond: 0.7269,
+      cash: 0.036,
+      other: 0.0446,
+      preferred: 0,
+      convertible: 0.0003,
+    });
+    // A bucket outside [0,1] is clamped, and an omitted one is zero — never NaN or undefined.
+    const clamped = normalizeFundAnswer(
+      { topHoldings: { stockPosition: 1.4, bondPosition: -0.2 } },
+      NOW
+    );
+    expect(clamped.allocation).toEqual({
+      stock: 1,
+      bond: 0,
+      cash: 0,
+      other: 0,
+      preferred: 0,
+      convertible: 0,
+    });
+  });
+
+  it('omits the allocation when every bucket is zero or absent', () => {
+    const profile = normalizeFundAnswer(
+      { topHoldings: { stockPosition: 0, bondPosition: 0, cashPosition: null, holdings: [] } },
+      NOW
+    );
+    expect(profile.allocation).toBeUndefined();
+  });
 });
 
 describe('normalizeStockAnswer', () => {

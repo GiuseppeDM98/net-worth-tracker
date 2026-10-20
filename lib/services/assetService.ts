@@ -248,6 +248,12 @@ export async function updateAsset(
     if ('subCategory' in updates && updates.subCategory === undefined) {
       cleanedUpdates.subCategory = deleteField();
     }
+    // composition is user-clearable: turning «Asset composto» off sends the key undefined, and
+    // without this delete the old legs stay in Firestore and keep splitting the fund in
+    // «Composizione». Same `in` guard: a price refresh never mentions it.
+    if ('composition' in updates && updates.composition === undefined) {
+      cleanedUpdates.composition = deleteField();
+    }
     // exchange is optional and user-clearable (the combobox's clear button). Same `in` guard:
     // a partial caller must not wipe a label it never sent.
     if ('exchange' in updates && updates.exchange === undefined) {
@@ -328,8 +334,8 @@ export type AssetMetadataFormData = Omit<AssetFormData, 'quantity' | 'averageCos
  * sending quantity/averageCost would wipe the PMC on every metadata save. `updateAsset` is unchanged and still
  * used for cash/realestate.
  *
- * `taxRate`/`displayTicker`/`subCategory`/`exchange`/`notes` keep the same undefined→deleteField() clearing as
- * `updateAsset` (the form always sends the key, undefined when cleared). quantity/averageCost/holdingStartDate are
+ * `taxRate`/`displayTicker`/`subCategory`/`composition`/`exchange`/`notes` keep the same undefined→deleteField()
+ * clearing as `updateAsset` (the form always sends the key, undefined when cleared). quantity/averageCost/holdingStartDate are
  * structurally absent from the payload type, so the ledger-derived fields can never be cleared by
  * a metadata edit.
  */
@@ -357,6 +363,11 @@ export async function updateAssetMetadata(
     // those are exactly the classes that carry subcategories. Same `in` guard as updateAsset.
     if ('subCategory' in updates && updates.subCategory === undefined) {
       cleanedUpdates.subCategory = deleteField();
+    }
+    // composition too — «Asset composto» off is an undefined key, and the stored legs must go with
+    // it or the fund keeps being split in «Composizione». Same `in` guard.
+    if ('composition' in updates && updates.composition === undefined) {
+      cleanedUpdates.composition = deleteField();
     }
     // exchange too — user-clearable from the dialog, same `in` guard.
     if ('exchange' in updates && updates.exchange === undefined) {

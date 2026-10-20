@@ -85,6 +85,20 @@ describe('resolveInstrumentProfiles — the TTL per module', () => {
     expect(documents.get('VWCE.DE')?.fund?.fetchedAt).toBe(NOW.toISOString());
   });
 
+  it('counts a published allocation alone as a useful answer: 30 days, not 24 hours', async () => {
+    const cachedFund: InstrumentFundProfile = {
+      fetchedAt: daysAgo(10),
+      holdingsBasis: 'fund',
+      family: null,
+      allocation: { stock: 0.6, bond: 0.3, cash: 0.1, other: 0, preferred: 0, convertible: 0 },
+    };
+    const { store } = memoryStore({ 'VWCE.DE': { fund: cachedFund } });
+    const { source, fetchFund } = fakeSource();
+    const { response } = await resolveInstrumentProfiles([fundRequest], { now: NOW, source, store });
+    expect(fetchFund).not.toHaveBeenCalled();
+    expect(response.profiles['VWCE.DE'].fund?.allocation?.stock).toBe(0.6);
+  });
+
   it('retries an EMPTY answer after 24 hours, not before', async () => {
     const emptyFund = (fetchedAt: string): InstrumentFundProfile => ({ fetchedAt, holdingsBasis: 'fund', family: null });
 
@@ -98,6 +112,51 @@ describe('resolveInstrumentProfiles — the TTL per module', () => {
     const { response } = await resolveInstrumentProfiles([fundRequest], { now: NOW, source: oldSource.source, store: old.store });
     expect(oldSource.fetchFund).toHaveBeenCalledTimes(1);
     expect(response.profiles['VWCE.DE'].fund?.family).toBe('Vanguard');
+  });
+
+  it('re-asks a useful module that lacks the allocation only when the caller needs one', async () => {
+    // A profile written before `allocation` existed: useful for holdings/sectors, blind for a mix.
+    const cachedFund: InstrumentFundProfile = {
+      fetchedAt: daysAgo(10),
+      holdingsBasis: 'sleeve',
+      family: 'Vanguard',
+      holdings: [{ key: 'NVDA', label: 'Nvidia', weight: 0.05 }],
+    };
+    const { store } = memoryStore({ 'VWCE.DE': { fund: cachedFund } });
+
+    const exposureSource = fakeSource();
+    await resolveInstrumentProfiles([fundRequest], { now: NOW, source: exposureSource.source, store });
+    expect(exposureSource.fetchFund).not.toHaveBeenCalled();
+
+    const allocationSource = fakeSource({
+      fund: {
+        allocation: { stock: 0.9, bond: 0.05, cash: 0.05, other: 0, preferred: 0, convertible: 0 },
+      },
+    });
+    const { response } = await resolveInstrumentProfiles([fundRequest], {
+      now: NOW,
+      source: allocationSource.source,
+      store,
+      requireAllocation: true,
+    });
+    expect(allocationSource.fetchFund).toHaveBeenCalledTimes(1);
+    expect(response.profiles['VWCE.DE'].fund?.allocation?.stock).toBe(0.9);
+  });
+
+  it('honours the 24-hour floor for a fresh module that has no allocation', async () => {
+    const { store } = memoryStore({
+      'VWCE.DE': {
+        fund: { fetchedAt: hoursAgo(23), holdingsBasis: 'sleeve', family: 'Vanguard' },
+      },
+    });
+    const { source, fetchFund } = fakeSource();
+    await resolveInstrumentProfiles([fundRequest], {
+      now: NOW,
+      source,
+      store,
+      requireAllocation: true,
+    });
+    expect(fetchFund).not.toHaveBeenCalled();
   });
 
   it('serves the stale useful answer, with its own date, when Yahoo fails', async () => {

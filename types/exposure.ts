@@ -43,6 +43,22 @@ export interface ExposureLegSlice {
   weight: number;
 }
 
+/**
+ * A fund's published ASSET ALLOCATION — the same `topHoldings` answer, read as the six buckets
+ * Morningstar fills (fractions of the whole fund, 0..1; a bucket Yahoo omits is 0). It is what
+ * lets an ETF/fund with a hybrid mix be split across classes in «Composizione» instead of sitting
+ * on one class: `lib/utils/fundComposition.ts` maps it to `Asset.composition`. Never a user's
+ * number, so it belongs in the shared per-ticker cache like every other Yahoo field.
+ */
+export interface InstrumentFundAllocation {
+  stock: number;
+  bond: number;
+  cash: number;
+  other: number;
+  preferred: number;
+  convertible: number;
+}
+
 export interface InstrumentFundProfile {
   /** ISO instant of Yahoo's answer for this module. */
   fetchedAt: string;
@@ -57,6 +73,8 @@ export interface InstrumentFundProfile {
   holdingsBasis: 'sleeve' | 'fund';
   /** `fundProfile.family` as Yahoo writes it; null when Yahoo has none. */
   family: string | null;
+  /** The fund's published mix; absent when Yahoo published none («non letto»). */
+  allocation?: InstrumentFundAllocation;
 }
 
 export interface InstrumentStockProfile {
@@ -78,6 +96,18 @@ export interface InstrumentProfile {
 export interface InstrumentProfilesResponse {
   profiles: Record<string, InstrumentProfile>;
   /** The oldest `fetchedAt` among the modules used, for the tile's footer; null when none was. */
+  oldestFetchedAt: string | null;
+}
+
+/**
+ * `GET /api/portfolio/fund-allocation?isins=<ISIN,…>` — the published mix of the funds asked for,
+ * keyed by the ISIN the caller sent (the same key the shared cache stores the module under). An
+ * ISIN Yahoo cannot read is ABSENT, never a zero allocation: the import preview says which rows
+ * it could not read instead of splitting them 100/0.
+ */
+export interface FundAllocationsResponse {
+  allocations: Record<string, InstrumentFundAllocation>;
+  /** The oldest `fetchedAt` among the profiles actually answered; null when none was. */
   oldestFetchedAt: string | null;
 }
 
