@@ -3,7 +3,13 @@
 > **Quando aprire questa guida** — chi tocca `components/settings/BrokerConnectionsSection.tsx`,
 > `components/settings/broker/ScalableConnectionTile.tsx`,
 > `components/settings/broker/TradeRepublicConnectionTile.tsx`,
+> `components/settings/broker/IntesaSanpaoloConnectionTile.tsx`,
 > `lib/utils/scalableImport.ts` o `lib/utils/tradeRepublicImport.ts` (i mapping puri),
+> `lib/utils/intesaSanpaoloImport.ts` (parser e piano del file XLSX) o
+> `lib/utils/intesaSanpaoloWorkbook.ts` (lettura del file, libreria importata in modo lazily),
+> `lib/utils/fundComposition.ts` (la composizione pubblicata → `Asset.composition`),
+> `lib/utils/fundAllocationClient.ts` (la porta client, a chunk di 40 ISIN) o
+> `app/api/portfolio/fund-allocation/route.ts` (la lettura dall'ISIN),
 > `lib/server/scalableCli.ts` (runner `sc`), `lib/server/scalableService.ts` (profili per
 > email, device flow, guard dell'host),
 > `lib/server/tradeRepublicQr.ts` (handshake QR), `lib/server/tradeRepublicClient.ts` (sessione),
@@ -13,13 +19,13 @@
 > `brokerConnections/{ownerId}/brokers/{broker}`) o `firestore.rules` (la match `brokerSessions`).
 > File: `CLAUDE.md` → *Key Features* → *Collegamenti broker*.
 
-## I due ponti, e cosa li distingue
+## I tre ponti, e cosa li distingue
 
 - **Ogni broker è un componente e un modulo puri propri.** `BrokerConnectionsSection` possiede la
-   pagina e nient'altro: due tile in una griglia `items-start`. Il resto — come si ottiene la
-   sessione, cosa contiene il payload, quali cifre si possono scrivere — è diverso per broker, e
-   accorparlo avrebbe prodotto un file da 700 righe con un `broker ===` in ogni ramo. La griglia
-   usa `items-start` perché le due colonne hanno altezze diverse: senza, la più corta verrebbe
+   pagina e nient'altro: tre tile in una griglia `items-start`. Il resto — come si ottiene la
+   sessione o il file, cosa contiene il payload, quali cifre si possono scrivere — è diverso per
+   broker, e accorparlo avrebbe prodotto un file da 700 righe con un `broker ===` in ogni ramo. La
+   griglia usa `items-start` perché le colonne hanno altezze diverse: senza, la più corta verrebbe
    stirata fino all'altezza della vicina. (La seconda tile della colonna Scalable — «Refresh
    login», le istruzioni da terminale — è stata rimossa quando il login è diventato un device
    flow guidato dal server: `sc login` non si fa più dal terminale dell'utente.)
@@ -28,9 +34,10 @@
   Trade Republic NON ha una sessione «sola lettura» come la CLI di Scalable, quindi la garanzia è
   **strutturale** — l'elenco chiuso in `tradeRepublicClient.ts` — e non un'impostazione lato
   broker. Aggiungere un comando in quella lista è il cambio che questa guida vieta, esattamente
-  come aggiungere un argv in quella.
+  come aggiungere un argv in quella. Intesa Sanpaolo non ha una sessione: il file è letto nel
+  browser e non viene mai inviato al server, quindi anche lì la garanzia è strutturale.
 - **Il doc id dei metadati è il broker, non l'owner** (`brokerConnections/{ownerId}/brokers/{broker}`).
-  Con due broker servono due documenti per owner, e le rules non possono estrarre una sottostringa
+  Con più broker servono più documenti per owner, e le rules non possono estrarre una sottostringa
   da un doc id composto: l'owner resta sul padre, così le rule sopra non si toccano. Il documento
   piatto dell'era mono-broker NON è migrato, di proposito: ogni campo che conteneva
   (`lastSyncAt`, i conteggi, gli id degli asset) lo riscrive la sync successiva, quindi si perderebbe
@@ -234,7 +241,7 @@
 - **Persistono solo i metadati.** `brokerConnections/{ownerId}/brokers/{broker}` (rules
   sull'owner del padre, `userId` e `broker` coincidenti con il path) tiene quando/quante
   posizioni/cassa — mai token, mai output grezzo. La pagina resta senza verdetto: il tab
-  Collegamenti è un form con due tile (una per broker, solo sync).
+  Collegamenti è un form con tre tile (una per broker, solo sync o import).
 - **Le letture riuscite vivono 60 secondi in memoria, per profilo.** Il secondo
   «Sincronizza» entro un minuto rilegge la cache, non il broker — voluto (una sync sono tre
   spawn di CLI), ma la cache è per PROCESSO: su un deploy con più istanze ogni istanza ha la
@@ -243,6 +250,61 @@
 - **Il mapping del tipo broker è best-effort.** `mapScalableType` copre ETF/azioni/bond/fondi/crypto;
   l'ignoto cade su ETF azionario con `typeUncertain` — l'anteprima lo nomina, la correzione sta
   su Patrimonio. Stessa regola per il `taxRate` proposto (26%, 12,5% sui bond).
+
+## Intesa Sanpaolo — import del file `.xlsx` (`intesaSanpaoloImport.ts`, `intesaSanpaoloWorkbook.ts`)
+
+- **Intesa non ha un'API di lettura per il retail, quindi il ponte è il file.** L'utente esporta il
+  portafoglio dal sito della banca e carica l'`.xlsx` nella tile: il file è letto nel BROWSER
+  (`readIntesaWorkbookFile`, libreria XLSX importata lazy) e non lascia mai la macchina. Solo
+  `.xlsx`: il CSV non è accettato, e il controllo sta sia nell'`accept` dell'input sia nella
+  funzione di lettura.
+- **Il parser legge per INTESTAZIONI, mai per numeri di riga.** L'export ha una sezione per conto,
+  una tabella per fondi/SICAV, una per obbligazioni/certificati e la sezione liquidità; le righe
+  vuote e i titoli di sezione si spostano quando l'utente aggiunge un conto, ma ogni tabella ripete
+  `Descrizione`/`ISIN`. Una tabella con `Quantità` e `Prezzo medio fiscale` è obbligazionaria, le
+  altre sono fondi.
+- **I numeri sono ITALIANI: il punto è separatore delle migliaia e la virgola è il decimale**
+  (`2.995` è 2995, `1.234,56 €` è 1234.56, `19.699,016` è 19699.016). `parseIntesaNumber` è l'unica
+  regola; un `16.29.36` di `Data-Ora` non deve mai attraversarla.
+- **Nessun salvataggio senza anteprima**, stessa postura degli altri ponti. Le posizioni nuove
+  nascono con `exchange: 'Intesa Sanpaolo'`, `autoUpdatePrice: false` (il file è la fonte), `ticker`
+  dal catalogo ISIN o l'ISIN, `taxRate` 26% sui fondi e 12,5% sulle obbligazioni.
+- **Una posizione già tracciata si riconosce per ISIN e non si duplica.** Di lei l'import ripara
+  solo prezzo ed etichetta broker, MAI la quantità: per i tipi ledger `quantity`/`averageCost`
+  appartengono al Registro, e uno scostamento è un avviso da riconciliare a mano. La patch dei
+  metadati passa a `updateAssetMetadata` insieme a `taxRate` e `displayTicker` correnti, perché su
+  quel path un campo assente è un `deleteField()`: senza, un aggiornamento di prezzo cancellerebbe
+  aliquota e alias.
+- **La liquidità è un conto suo** (`Intesa Sanpaolo — Liquidità`, ticker stabile `INTESA-EUR`): il
+  saldo è il `Saldo totale` del file, il conto si crea la prima volta e si aggiorna per ticker (mai
+  per nome, che l'utente può rinominare). Un import successivo non crea duplicati.
+- **Solo metadati persistono** (`brokerConnections/{ownerId}/brokers/intesa`): quando, quante
+  posizioni, saldo e id del conto. Mai il file, mai le righe grezze.
+- **La classe dei fondi è best-effort** (`inferFundClass`): le parole `BOND`/`OBBLIG`/`TESORERIA`
+  danno bonds, `EQUITY`/`WORLD`/`RESEARCH` danno equity, un multi-asset cade su equity con
+  `typeUncertain`; l'anteprima lo nomina e la correzione sta su Patrimonio. Un certificato è
+  sempre `bond`/`bonds`.
+- **La composizione di un fondo si legge dall'ISIN, e i fondi ibridi si scompongono davvero**
+  (`lib/utils/fundComposition.ts`, `GET /api/portfolio/fund-allocation?isins=…`): Yahoo pubblica in
+  `topHoldings` i sei campi `stockPosition`/`bondPosition`/`cashPosition`/`otherPosition`/
+  `preferredPosition`/`convertiblePosition` come frazioni del fondo INTERO, e l'import li traduce in
+  `Asset.composition` — `stock`→equity, `bond`/`preferred`/`convertible`→bonds, `cash`→cash,
+  `other`→la classe dell'asset — normalizzate a 100 esatti, gambe sotto l'1% scartate e lo scarto
+  di arrotondamento sulla gamba più grande. La `assetClass` salvata diventa la gamba più grande,
+  così un lettore che ignora `composition` mostra la sleeve reale. **Una composizione già digitata
+  non viene MAI sovrascritta**; una esistente ma vuota viene riempita (`compositionUpdate`, kind
+  `composition-update`). Fail-soft: un ISIN che Yahoo non legge resta ASSENTE (mai 0/0/0), la riga
+  tiene l'avviso `typeUncertain`, e l'import salva comunque. La route è autenticata ma non
+  owner-scoped (la risposta è di Yahoo, condivisa da ogni account) e non è un proxy Yahoo: una
+  lista limitata di ISIN veri, un modulo `fund` ciascuno, attraverso la cache per ticker. Quella
+  cache richiede di nuovo un modulo `fund` privo di `allocation` dopo 24 ore (`requireAllocation`),
+  così i documenti scritti prima che il campo esistesse si sanano al primo import invece di
+  aspettare il TTL di 30 giorni.
+- **Il certificato porta un prezzo in EURO PER UNITÀ, non una quotazione % di Borsa.** Il file
+  dell'esempio lo quota `1.014,9 €` con PMC `1.000 €`: il valore importato è corretto, ma
+  l'editor di Patrimonio applica la convenzione `% del nominale` (nominale 1 €) a ogni bond con
+  ISIN, quindi mostrerebbe `101.490` come prezzo. L'anteprima lo dichiara e la nota dell'asset lo
+  ricorda; non è un errore di lettura e non si corregge cambiando il prezzo importato.
 
 ## Per-page blind spots
 
@@ -261,3 +323,11 @@
   saldo EUR non viene sommato: se ti serve, creane il conto a parte. E un piano di accumulo qui è
   solo DICHIARATO: l'app non lo usa per calcolare la spesa futura, quindi non aspettarti che
   compaia nel Cashflow o nel piano FIRE.
+- **Intesa Sanpaolo**: il «Totale Controvalore» del file comprende le posizioni, non la liquidità —
+  il saldo arriva dalla sezione Liquidità e diventa un conto a parte. Una riga di certificato porta
+  un `Data-Ora` (`16.29.36`) nella colonna della data: non è un numero e non deve finire nel parser
+  dei prezzi. Una posizione già tracciata NON cambia quantità tramite l'import: se il file dice
+  altro, l'avviso lo dichiara e la rettifica resta manuale. E un fondo multi-asset viene proposto
+  azionario SOLO quando Yahoo non ne pubblica la composizione (ISIN non letto): se il mix arriva,
+  le gambe sono già in «Composizione» — è la classe di ripiego dichiarata, non un errore di
+  lettura.

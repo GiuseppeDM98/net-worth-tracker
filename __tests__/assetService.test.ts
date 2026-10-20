@@ -11,7 +11,7 @@
  * doesn't need real Firebase env vars (same convention as __tests__/assetExposure.test.ts).
  */
 import { beforeEach, describe, it, expect, vi } from 'vitest';
-import type { Asset } from '@/types/assets';
+import type { Asset, AssetComposition } from '@/types/assets';
 
 vi.mock('@/lib/firebase/config', () => ({ db: {} }));
 vi.mock('@/lib/utils/authFetch', () => ({ authenticatedFetch: vi.fn() }));
@@ -227,5 +227,50 @@ describe('the notes field is user-clearable', () => {
     await updateAssetMetadata('a1', { notes: undefined });
     const payload = vi.mocked(updateDoc).mock.calls[0][1] as unknown as Record<string, unknown>;
     expect(payload.notes).toBe(SENTINEL);
+  });
+});
+
+// Turning «Asset composto» off sends `composition: undefined`; without an explicit delete the old
+// legs stayed in Firestore and kept splitting the fund in «Composizione». Both write paths.
+describe('the composition is user-clearable', () => {
+  const SENTINEL = Symbol('deleteField');
+
+  beforeEach(() => {
+    vi.mocked(updateDoc).mockClear();
+    vi.mocked(deleteField).mockReturnValue(SENTINEL as never);
+    vi.mocked(updateDoc).mockResolvedValue(undefined as never);
+    vi.mocked(getDoc).mockResolvedValue({ data: () => ({ userId: 'u1', quantity: 5 }) } as never);
+  });
+
+  it('deletes the composition on both write paths when the switch is off', async () => {
+    await updateAsset('a1', { composition: undefined });
+    let payload = vi.mocked(updateDoc).mock.calls[0][1] as unknown as Record<string, unknown>;
+    expect(payload.composition).toBe(SENTINEL);
+
+    vi.mocked(updateDoc).mockClear();
+    await updateAssetMetadata('a1', { composition: undefined });
+    payload = vi.mocked(updateDoc).mock.calls[0][1] as unknown as Record<string, unknown>;
+    expect(payload.composition).toBe(SENTINEL);
+  });
+
+  it('leaves the composition alone for a partial caller that never mentions it', async () => {
+    await updateAsset('a1', { currentPrice: 101 });
+    let payload = vi.mocked(updateDoc).mock.calls[0][1] as unknown as Record<string, unknown>;
+    expect('composition' in payload).toBe(false);
+
+    vi.mocked(updateDoc).mockClear();
+    await updateAssetMetadata('a1', { currentPrice: 101 });
+    payload = vi.mocked(updateDoc).mock.calls[0][1] as unknown as Record<string, unknown>;
+    expect('composition' in payload).toBe(false);
+  });
+
+  it('writes the legs when the caller sends them', async () => {
+    const composition: AssetComposition[] = [
+      { assetClass: 'equity', percentage: 60 },
+      { assetClass: 'bonds', percentage: 40 },
+    ];
+    await updateAssetMetadata('a1', { composition });
+    const payload = vi.mocked(updateDoc).mock.calls[0][1] as unknown as Record<string, unknown>;
+    expect(payload.composition).toEqual(composition);
   });
 });

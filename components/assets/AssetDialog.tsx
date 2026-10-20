@@ -55,6 +55,8 @@ import { useSettings } from '@/lib/hooks/useSettings';
 import { queryKeys } from '@/lib/query/queryKeys';
 import { formatCurrency, formatNumberIt, formatPercentageIt } from '@/lib/utils/formatters';
 import { resolveAllocationRole } from '@/lib/utils/allocationUtils';
+import { compositionFromFundAllocation } from '@/lib/utils/fundComposition';
+import { fetchFundAllocations } from '@/lib/utils/fundAllocationClient';
 import { suggestIsLiquid } from '@/lib/utils/assetLiquidity';
 import { hasMarketPrice } from '@/lib/utils/assetPricing';
 import {
@@ -91,7 +93,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Calculator, Plus, X, BarChart3, Landmark, Bitcoin, Wallet, Home, Package, TrendingUp, ChevronLeft, PiggyBank, Building2 } from 'lucide-react';
+import { Calculator, Plus, X, BarChart3, Landmark, Bitcoin, Wallet, Home, Package, TrendingUp, ChevronLeft, PiggyBank, Building2, Loader2 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { SearchableCombobox } from '@/components/ui/searchable-combobox';
@@ -361,13 +363,19 @@ const NO_GEOGRAPHIC_AREA = '__auto__';
 /** The form's id, so the footer's submit can live outside the `<form>` in the modal's footer. */
 const ASSET_FORM_ID = 'asset-form';
 
+/**
+ * The ISIN shape, shared by the form's validation and the automatic composition read: the read
+ * must not ask Yahoo for a half-typed value, and the two must agree on what "complete" means.
+ */
+const ISIN_PATTERN = /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/;
+
 const assetSchema = z.object({
   ticker: z.string(),
   // User-facing alias for `ticker`. Purely cosmetic — never
   // touches price retrieval, which always reads `ticker`. Gated the same as `ticker` itself.
   displayTicker: z.string().optional(),
   name: z.string().min(1, 'Serve il nome'),
-  isin: z.string().regex(/^[A-Z]{2}[A-Z0-9]{9}[0-9]$/, 'ISIN non valido (esempio: IT0003128367)').optional().or(z.literal('')),
+  isin: z.string().regex(ISIN_PATTERN, 'ISIN non valido (esempio: IT0003128367)').optional().or(z.literal('')),
   // Exchange/market label, purely informational (no validation beyond length).
   exchange: z.string().max(60, 'Nome borsa troppo lungo').optional(),
   // Free-text note, purely informational: shown under the name in Strumenti, read by nothing.
@@ -757,6 +765,18 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
   const [newSubCategoryName, setNewSubCategoryName] = useState('');
   const [isAddingSubCategory, setIsAddingSubCategory] = useState(false);
   const [composition, setComposition] = useState<AssetComposition[]>([]);
+  /**
+   * The automatic read's own line: which ISIN was asked and what came back. Keyed by ISIN so a
+   * changed value hides the previous answer without an effect resetting it.
+   */
+  const [compositionLookup, setCompositionLookup] = useState<{
+    isin: string;
+    status: 'reading' | 'unavailable';
+  } | null>(null);
+  /** True once the user has written the mix: their rows are never replaced by a read. */
+  const [compositionTouched, setCompositionTouched] = useState(false);
+  /** The ISIN the CURRENT rows were filled from, when the form filled them (not the user). */
+  const [compositionSourceIsin, setCompositionSourceIsin] = useState<string | null>(null);
   const [hasOutstandingDebt, setHasOutstandingDebt] = useState(false);
   // True once the user has picked an allocation role by hand — from then on the type/sub-category
   // driven suggestion stops overriding their choice.
@@ -806,6 +826,10 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
   const watchIsComposite = useWatch({ control, name: 'isComposite' });
   const watchCurrency = useWatch({ control, name: 'currency' });
   const watchIsin = useWatch({ control, name: 'isin' });
+  /** The ISIN as the route reads it, and the automatic read's line for THIS value only. */
+  const normalizedIsin = (watchIsin ?? '').trim().toUpperCase();
+  const compositionLookupStatus =
+    compositionLookup?.isin === normalizedIsin ? compositionLookup.status : null;
   const watchExchange = useWatch({ control, name: 'exchange' });
   const watchBondCouponFrequency = useWatch({ control, name: 'bondCouponFrequency' });
   const watchBondInflationIndexation = useWatch({ control, name: 'bondInflationIndexation' });
@@ -848,6 +872,13 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
   const newAsset_showTicker =
     selectedType !== 'cash' && selectedType !== 'realestate' && selectedType !== 'pensionFund' && selectedType !== 'crowdfunding';
   const newAsset_showISIN = selectedType === 'stock' || selectedType === 'etf' || selectedType === 'bond';
+  // An ETF's class does not decide whether it HAS an ISIN: a bond-class ETF needs one for the
+  // published composition just as an equity one needs it for dividends. Stocks and bonds keep
+  // their class gates (the identifier drives their own features).
+  const isinFieldEnabled =
+    selectedType === 'etf' ||
+    (selectedType === 'stock' && selectedAssetClass === 'equity') ||
+    (selectedType === 'bond' && selectedAssetClass === 'bonds');
   const newAsset_showGeographicArea =
     selectedType !== 'cash' && selectedType !== 'realestate' && selectedType !== 'pensionFund' && selectedType !== 'crowdfunding';
   // Exchange options for the combobox: the owner's already-used labels, plus whatever the form
@@ -973,11 +1004,24 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
       setStep(asset || initialType ? 2 : 1);
       setAllocationRoleTouched(false);
       setIsLiquidTouched(false);
+      setCompositionLookup(null);
+      setCompositionTouched(false);
+      setCompositionSourceIsin(null);
       // Reset calculator on every open to avoid stale data from previous session
       setShowCostCalculator(false);
       setBrokerEntries([{ qty: '', price: '' }]);
       if (asset) {
-        setComposition(asset.composition && asset.composition.length > 0 ? asset.composition : []);
+        // A saved mix is the user's: it is never replaced by an automatic read, even when the
+        // ISIN is edited. Only an empty one (or one the form itself filled) is fair game.
+        const savedComposition =
+          asset.composition && asset.composition.length > 0 ? asset.composition : [];
+        setComposition(savedComposition);
+        setCompositionTouched(savedComposition.length > 0);
+        // A saved mix is already the answer for this ISIN; an EMPTY one is a question the
+        // automatic read still has to ask, so it must not look answered.
+        setCompositionSourceIsin(
+          savedComposition.length > 0 ? asset.isin?.trim().toUpperCase() || null : null
+        );
         setHasOutstandingDebt(!!(asset.outstandingDebt && asset.outstandingDebt > 0));
         setShowCostBasis(!!((asset.averageCost && asset.averageCost > 0) || (asset.taxRate && asset.taxRate > 0)));
         setShowTER(!!(asset.totalExpenseRatio && asset.totalExpenseRatio > 0));
@@ -1144,6 +1188,78 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
     }
   }, [asset, reset, open, setValue, replaceTiers, initialType]);
 
+  /**
+   * The composition is read from the ISIN BY ITSELF (2026-10-20): a fund's published mix is a
+   * public fact, and the form already holds the key, so a button was a step for nothing. The
+   * 500 ms debounce means a typed or pasted ISIN asks once, never per keystroke.
+   *
+   * It writes ONLY a mix that is absent or that THIS form filled for a different ISIN. A mix the
+   * user typed (`compositionTouched`) is never replaced, including when the ISIN is edited; and
+   * `compositionSourceIsin` is the answer already given for an ISIN, so «unavailable» is not
+   * asked twice in one open.
+   */
+  useEffect(() => {
+    // ETFs only: a pension fund has no ISIN field, and a hidden stale one must never be read.
+    if (!open || selectedType !== 'etf') return;
+    const isin = normalizedIsin;
+    if (!ISIN_PATTERN.test(isin)) return;
+    if (compositionTouched) return;
+    if (compositionSourceIsin === isin) return;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      // `reset()` in the effect above lands a render late: the first commit of an open can still
+      // carry the PREVIOUS asset's ISIN. Read the live form value at fire time, not the watched one.
+      if ((getValues('isin') ?? '').trim().toUpperCase() !== isin) return;
+      setCompositionLookup({ isin, status: 'reading' });
+      void fetchFundAllocations([isin])
+        .then(({ allocations }) => {
+          if (cancelled || (getValues('isin') ?? '').trim().toUpperCase() !== isin) return;
+          const nextComposition = compositionFromFundAllocation(
+            allocations[isin],
+            selectedAssetClass
+          );
+          if (nextComposition.length === 0) {
+            // A mix THIS form filled for another ISIN is stale: drop it rather than show the
+            // wrong fund's composition under the new one.
+            if (compositionSourceIsin !== null && compositionSourceIsin !== isin) {
+              setComposition([]);
+              setValue('isComposite', false, { shouldDirty: true });
+            }
+            setCompositionSourceIsin(isin);
+            setCompositionLookup({ isin, status: 'unavailable' });
+            return;
+          }
+          setComposition(nextComposition);
+          setCompositionSourceIsin(isin);
+          setValue('isComposite', true, { shouldDirty: true });
+          setCompositionLookup(null);
+        })
+        .catch(() => {
+          if (!cancelled) setCompositionLookup({ isin, status: 'unavailable' });
+        })
+        .finally(() => {
+          // A read cancelled by a keystroke, a switch or a close leaves no answer to show: drop
+          // its spinner. On a real answer the status is already null or «unavailable».
+          setCompositionLookup((current) =>
+            current?.isin === isin && current.status === 'reading' ? null : current
+          );
+        });
+    }, 500);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [
+    open,
+    selectedType,
+    normalizedIsin,
+    compositionTouched,
+    compositionSourceIsin,
+    selectedAssetClass,
+    getValues,
+    setValue,
+  ]);
+
   // Selects the asset type in step 1, auto-derives the class, and advances to step 2
   const handleTypeSelect = (type: AssetType) => {
     setValue('type', type);
@@ -1198,10 +1314,12 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
 
   const addCompositionEntry = () => {
     setComposition([...composition, { assetClass: 'equity', percentage: 0 }]);
+    setCompositionTouched(true);
   };
 
   const removeCompositionEntry = (index: number) => {
     setComposition(composition.filter((_, i) => i !== index));
+    setCompositionTouched(true);
   };
 
   const updateCompositionEntry = <K extends 'assetClass' | 'percentage' | 'subCategory'>(
@@ -1212,6 +1330,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
     const updated = [...composition];
     updated[index] = { ...updated[index], [field]: value };
     setComposition(updated);
+    setCompositionTouched(true);
   };
 
   // Get available sub-categories for a specific asset class in composition
@@ -1716,18 +1835,14 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
               id="isin"
               {...register('isin')}
               placeholder="IE00B3RBWM25"
-              disabled={
-                // Enable for stocks/ETFs in equity class (dividends)
-                !((selectedType === 'stock' || selectedType === 'etf') && selectedAssetClass === 'equity') &&
-                // Enable for bonds in bonds class (price scraping)
-                !(selectedType === 'bond' && selectedAssetClass === 'bonds')
-              }
+              disabled={!isinFieldEnabled}
             />
             {errors.isin && (
               <p className="text-sm text-destructive">{errors.isin.message}</p>
             )}
             <p className="text-xs text-muted-foreground">
-              Necessario per dividendi automatici (azioni/ETF) e aggiornamento prezzi obbligazioni MOT
+              Necessario per dividendi automatici (azioni/ETF), aggiornamento prezzi obbligazioni MOT
+              e composizione dei fondi.
             </p>
           </div>
           )}
@@ -2304,10 +2419,10 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
           </div>
           )}
 
-          {/* Composizione — only shown for ETF */}
+          {/* Composizione — ETF e fondo pensione (il fondo pensione non ha ISIN: si digita) */}
           {newAsset_showComposition && (
           <div className="space-y-2 rounded-lg border p-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <div className="space-y-0.5">
                 <Label htmlFor="isComposite">Asset composto</Label>
                 <p className="text-xs text-muted-foreground">
@@ -2317,13 +2432,38 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
               <Switch
                 id="isComposite"
                 checked={watchIsComposite}
-                onCheckedChange={(checked) => setValue('isComposite', checked)}
+                onCheckedChange={(checked) => {
+                  setValue('isComposite', checked);
+                  if (!checked) {
+                    // Turning it off is a statement: the automatic read must not fill it back.
+                    setCompositionTouched(true);
+                    return;
+                  }
+                  // Off → on with no rows is also the way to ask for a FRESH read: there is no
+                  // button for it. Rows still on screen are never replaced.
+                  if (composition.length === 0) {
+                    setCompositionTouched(false);
+                    setCompositionSourceIsin(null);
+                  }
+                }}
               />
             </div>
 
+            {compositionLookupStatus === 'reading' && (
+              <p role="status" className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Lettura della composizione dall&apos;ISIN…
+              </p>
+            )}
+            {compositionLookupStatus === 'unavailable' && composition.length === 0 && (
+              <p role="status" className="text-xs text-muted-foreground">
+                Nessun mix pubblicato per questo ISIN: puoi inserirlo a mano.
+              </p>
+            )}
+
             {isComposite && (
               <div className="mt-4 space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <Label>Composizione percentuale</Label>
                   <Button
                     type="button"
@@ -2352,6 +2492,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
                             const updated = [...composition];
                             updated[index] = { ...updated[index], assetClass: value as AssetClass, subCategory: undefined };
                             setComposition(updated);
+                            setCompositionTouched(true);
                           }}
                         >
                           <SelectTrigger>

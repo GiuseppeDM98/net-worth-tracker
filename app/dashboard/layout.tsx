@@ -8,6 +8,7 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeaderSkeleton } from '@/components/layout/PageHeader';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
+import { BrokerSyncReminder } from '@/components/dashboard/BrokerSyncReminder';
 import { FlaskConical } from 'lucide-react';
 import { useDemoMode } from '@/lib/hooks/useDemoMode';
 import { TILE_EYEBROW_CLASS } from '@/components/ui/tile';
@@ -101,6 +102,7 @@ export default function DashboardLayout({
               }
             >
               {children}
+              <BrokerSyncReminder />
             </ProtectedRoute>
           </main>
         </SidebarInset>

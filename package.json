@@ -67,6 +67,7 @@
     "react-dom": "^19.2.2",
     "react-hook-form": "^7.66.0",
     "react-markdown": "^10.1.0",
+    "read-excel-file": "^9.3.12",
     "recharts": "^3.3.0",
     "remark-gfm": "^4.0.1",
     "resend": "^6.12.0",

@@ -25,8 +25,12 @@ import { removeUndefinedDeep } from '@/lib/utils/firestoreData';
 
 const BROKER_CONNECTIONS_COLLECTION = 'brokerConnections';
 
-/** The providers with a read-only bridge. The id is the subcollection leaf, so it must be stable. */
-export const BROKERS = ['scalable', 'traderepublic'] as const;
+/**
+ * The providers with a read-only bridge. The id is the subcollection leaf, so it must be stable.
+ * `intesa` is a file import (its `.xlsx` export), not a live session: the metadata shape is the
+ * same, and the tile reads the file the user chooses.
+ */
+export const BROKERS = ['scalable', 'traderepublic', 'intesa'] as const;
 export type BrokerId = (typeof BROKERS)[number];
 
 export function isBrokerId(value: string): value is BrokerId {
@@ -132,4 +136,21 @@ export async function saveBrokerConnection(
     existing.exists() ? payload : { ...payload, createdAt: now },
     { merge: true }
   );
+}
+
+export async function getAllBrokerConnections(
+  ownerId: string
+): Promise<Record<BrokerId, BrokerConnection | null>> {
+  const result: Record<BrokerId, BrokerConnection | null> = {
+    scalable: null,
+    traderepublic: null,
+    intesa: null,
+  };
+  await Promise.all(
+    BROKERS.map(async (broker) => {
+      const conn = await getBrokerConnection(ownerId, broker);
+      result[broker] = conn;
+    })
+  );
+  return result;
 }

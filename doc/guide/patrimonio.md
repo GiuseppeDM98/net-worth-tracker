@@ -10,7 +10,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 - **Mutuo tile** (2026-09-25): `components/assets/tiles/MutuoTile.tsx`, pure `lib/utils/mortgageSummary.ts` (`summarizeMortgage`, `projectPayoff`, `interestPaidOf`), words `describeMortgage*` in `patrimonioNarrative.ts`, reader `getMortgageInstalments` + `lib/hooks/useMortgageInstalments.ts`; tests `__tests__/mortgageSummary.test.ts`, `e2e/cashflow.mortgage.spec.ts`
 - **Patrimonio**: `app/dashboard/assets/page.tsx` (owns every dialog), `components/assets/*` (+ `PatrimonioTile`/`ComposizioneTile` reused from the overview), pure `lib/utils/{patrimonioNarrative,patrimonioSummary,assetPerformanceDeltas,costBasisEur}.ts` (`costBasisPerUnitEur`/`unitPriceEur` = EUR against EUR, fees included), `lib/utils/bondPricing.ts` (`resolveBondPrice` = the ONE Borsa Italiana quote → euro per unit, nominal 1 € by default, BTP€i coefficient; `toBorsaItalianaQuote` the inverse; shared with `lib/helpers/priceUpdater.ts`), `lib/utils/bondDetailsForm.ts` (`buildBondDetailsFromForm`, a rate of 0 is a zero coupon); `lib/services/assetService.ts`, `types/assets.ts`; spec `e2e/assets.bond.spec.ts`
 - **Light rows and dialogs** (2026-10-07): `StrumentiTile` (`useMediaQuery('(min-width: 1440px)')`, one list), `AssetRow` (`ASSET_ROW_LAZY_CHARTS`, the sparkline a `lazyComponent`), `AssetSparkline` (colours as a prop), the `{ open, mounted }` state and the openers in `app/dashboard/assets/page.tsx`, `onExitComplete` in `components/ui/responsive-modal.tsx`, the six watching leaves at the top of `AssetDialog.tsx`; specs `e2e/assets.rows.spec.ts` (1440) and `e2e/assets.rows.mobile.spec.ts` (390), the census scenario `asset` (`scripts/perfRenderCensus.mjs`)
-- **Suites to run after a change here — Asset / bond** (moved from `AGENTS.md` § Commands on 2026-09-30): `assetDialogHelpers`, `couponUtils`
+- **Suites to run after a change here — Asset / bond** (moved from `AGENTS.md` § Commands on 2026-09-30): `assetDialogHelpers`, `couponUtils`, `fundComposition`, `fundAllocationClient`
 
 ## Asset Pricing, FX and Assets
 
@@ -302,6 +302,20 @@ form whose fields depend on a discriminant, and the marker rule itself, stay the
   census, 0 and 0 after the move (`npm run perf:census -- --scenario=asset`; one `useWatch('quantity')` put back at the
   root read 563, seen red). The root keeps the watches that decide the form's SHAPE (type, class, the switches and
   selects — one change per click) and the ISIN. Submit-time reads stay `getValues()`/the `data` of `handleSubmit`.
+- **La composizione si legge dall'ISIN DA SOLA, e una digitata non viene mai sovrascritta** (2026-10-20): appena l'ISIN
+  di un ETF è completo (la stessa forma dello schema, `ISIN_PATTERN`), `AssetDialog` chiede il mix pubblicato a
+  `GET /api/portfolio/fund-allocation` dopo 500 ms, lo mappa con `lib/utils/fundComposition.ts` e riempie le righe
+  accendendo «Asset composto». Nessun pulsante: il mix è un fatto pubblico e la chiave è già nel form. Il debounce evita
+  una chiamata per tasto, e lo scatto rilegge l'ISIN dal form (`getValues`) perché il primo commit di un'altra apertura
+  può portare ancora il valore precedente. La lettura scrive SOLO una composizione assente o riempita da lei per un ALTRO
+  ISIN: `compositionTouched` protegge le righe digitate (anche cambiando l'ISIN), `compositionSourceIsin` impedisce di
+  richiedere due volte lo stesso «non disponibile» nella stessa apertura. Spegnere «Asset composto» è una dichiarazione:
+  le righe si svuotano e la lettura non le riempie più; riaccenderlo a righe vuote è il modo per chiedere un mix
+  AGGIORNATO (non c'è un pulsante). **L'ISIN è abilitato per ogni ETF**, non solo per quelli in classe
+  azioni, perché un ETF obbligazionario ne ha bisogno per la composizione. La chiave `composition` è protetta da
+  `deleteField()` su ENTRAMBE le vie di scrittura (`updateAsset`, `updateAssetMetadata`): un chiamante parziale (un
+  aggiornamento prezzo) non manda la chiave e non le tocca. L'import Intesa riempie solo una composizione VUOTA, mai una
+  digitata.
 - **A marker on a label is a claim the validation has to honour.** `*` = required, `(opzionale)` in
   `text-muted-foreground font-normal` = explicitly optional; the zod schema, any imperative guard in `onSubmit` and the
   marker's own condition must agree (2026-08-30: Sottocategoria was `.optional()` in zod, blocked by a guard, and

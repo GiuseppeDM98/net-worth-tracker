@@ -1,10 +1,11 @@
 /**
  * Broker connections — the «Collegamenti» tab: read-only sync from the brokers this app speaks to.
  *
- * Two providers, two components, one rule: a sync only ever READS. Scalable goes through the `sc`
- * CLI on the hosting machine and can be rebuilt from pasted JSON when the binary is missing;
- * Trade Republic is reached over HTTP with a session this server holds. Neither writes to the
- * broker, and each says so in its own tile.
+ * Three providers, three components, one rule: an import only ever READS. Scalable goes through the
+ * `sc` CLI on the hosting machine and can be rebuilt from pasted JSON when the binary is missing;
+ * Trade Republic is reached over HTTP with a session this server holds; Intesa Sanpaolo is a file
+ * import (its `.xlsx` portfolio export) parsed in the browser. None writes to the broker, and each
+ * says so in its own tile.
  *
  * The providers are siblings rather than a switch inside one component: the shared part is a
  * `Tile` with a reading, a preview and a save, and everything else — how the session is obtained,
@@ -16,6 +17,7 @@
 
 import { ScalableConnectionTile } from '@/components/settings/broker/ScalableConnectionTile';
 import { TradeRepublicConnectionTile } from '@/components/settings/broker/TradeRepublicConnectionTile';
+import { IntesaSanpaoloConnectionTile } from '@/components/settings/broker/IntesaSanpaoloConnectionTile';
 
 interface BrokerConnectionsSectionProps {
   ownerId: string;
@@ -26,11 +28,12 @@ interface BrokerConnectionsSectionProps {
 export function BrokerConnectionsSection({ ownerId, disabled = false }: BrokerConnectionsSectionProps) {
   return (
     // `items-start` so each provider's column keeps its natural height: the Scalable column is
-    // two tiles and the Trade Republic one is a single shorter tile, and a stretched grid item
-    // would leave the second one padded with a void it does not own.
+    // two tiles and the others are single shorter tiles, and a stretched grid item would leave a
+    // void it does not own.
     <div className="grid grid-cols-1 items-start gap-3 desktop:grid-cols-2">
       <ScalableConnectionTile ownerId={ownerId} disabled={disabled} />
       <TradeRepublicConnectionTile ownerId={ownerId} disabled={disabled} />
+      <IntesaSanpaoloConnectionTile ownerId={ownerId} disabled={disabled} />
     </div>
   );
 }
