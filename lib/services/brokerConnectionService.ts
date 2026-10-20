@@ -137,3 +137,20 @@ export async function saveBrokerConnection(
     { merge: true }
   );
 }
+
+export async function getAllBrokerConnections(
+  ownerId: string
+): Promise<Record<BrokerId, BrokerConnection | null>> {
+  const result: Record<BrokerId, BrokerConnection | null> = {
+    scalable: null,
+    traderepublic: null,
+    intesa: null,
+  };
+  await Promise.all(
+    BROKERS.map(async (broker) => {
+      const conn = await getBrokerConnection(ownerId, broker);
+      result[broker] = conn;
+    })
+  );
+  return result;
+}

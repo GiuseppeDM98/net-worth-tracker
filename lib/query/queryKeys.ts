@@ -127,4 +127,9 @@ export const queryKeys = {
   costCenters: {
     all: (userId: string) => ['cost-centers', userId] as const,
   },
+
+  // Broker connections metadata (last sync, counts) — per owner, all brokers in one query.
+  brokerConnections: {
+    all: (userId: string) => ['broker-connections', userId] as const,
+  },
 } as const;

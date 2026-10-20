@@ -62,22 +62,29 @@ import { useAssets } from '@/lib/hooks/useAssets';
 import { useExpenseCategories } from '@/lib/hooks/useExpenses';
 import { useFreshness } from '@/lib/hooks/useFreshness';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { TILE_CELL_CLASS } from '@/components/ui/tile';
+import { lazyComponent } from '@/components/ui/lazy-component';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PageTabs } from '@/components/layout/PageTabs';
 import type { TabDef } from '@/components/layout/PageTabBar';
 import { TileGridSkeleton } from '@/components/ui/tile-grid-skeleton';
 import { ErrorNotice } from '@/components/ui/error-notice';
+import { cn } from '@/lib/utils';
 import { describeReadFailure, resolveSurfaceState } from '@/lib/utils/statesNarrative';
 import { describeTargetProblem, describeUnsavedChanges } from '@/lib/utils/settingsNarrative';
 import { AllocazioneTab } from '@/components/settings/tabs/AllocazioneTab';
 import { AspettoTab } from '@/components/settings/tabs/AspettoTab';
-import { CollegamentiTab } from '@/components/settings/tabs/CollegamentiTab';
 import { CondivisioneTab } from '@/components/settings/tabs/CondivisioneTab';
 import { DividendiTab } from '@/components/settings/tabs/DividendiTab';
 import { GeneraleTab } from '@/components/settings/tabs/GeneraleTab';
 import { SpeseTab } from '@/components/settings/tabs/SpeseTab';
-import { runGuarded, SETTINGS_TABS_LAYOUT_ID } from '@/components/settings/tabs/shared';
+import {
+  runGuarded,
+  SETTINGS_TABS_LAYOUT_ID,
+  SettingsTabPanel,
+} from '@/components/settings/tabs/shared';
 
 // Module-level tab definitions drive both the mobile pill and the desktop underline tabs.
 const SETTINGS_TABS: TabDef[] = [
@@ -94,6 +101,30 @@ const EMPTY_CATEGORIES: ExpenseCategory[] = [];
 const EMPTY_ASSETS: Asset[] = [];
 
 const PAGE_HEADER = { label: 'Configurazione', title: 'Impostazioni', description: 'Target, preferenze e flussi' } as const;
+
+/**
+ * The broker bridges are a chunk of their own: a reader who never opens «Collegamenti» should not
+ * pay for the three tiles, their parsers and their session code in Impostazioni' initial
+ * JavaScript. The tab is mounted only when visited, so its fallback is the tab's own loading
+ * state — the same panel, with three tile-shaped placeholders.
+ */
+const LazyCollegamentiTab = lazyComponent(() =>
+  import('@/components/settings/tabs/CollegamentiTab').then((module) => module.CollegamentiTab)
+);
+
+function CollegamentiTabSkeleton() {
+  return (
+    <SettingsTabPanel tab="collegamenti" label="Collegamenti">
+      <div className={cn(TILE_CELL_CLASS, 'desktop:col-span-12')}>
+        <div className="grid grid-cols-1 items-start gap-3 desktop:grid-cols-2">
+          {[0, 1, 2].map((index) => (
+            <Skeleton key={index} className="h-[210px] rounded-xl" />
+          ))}
+        </div>
+      </div>
+    </SettingsTabPanel>
+  );
+}
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -442,7 +473,11 @@ export default function SettingsPage() {
 
         {mountedTabs.has('condivisione') && <CondivisioneTab isDemo={isDemo} />}
         {mountedTabs.has('collegamenti') && ownerId && (
-          <CollegamentiTab ownerId={ownerId} isDemo={isDemo} />
+          <LazyCollegamentiTab
+            ownerId={ownerId}
+            isDemo={isDemo}
+            fallback={<CollegamentiTabSkeleton />}
+          />
         )}
 
         {mountedTabs.has('aspetto') && <AspettoTab />}
