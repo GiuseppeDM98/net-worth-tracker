@@ -89,6 +89,12 @@ describe('getSettings — lettura', () => {
     expect(settings?.transferFeeSubCategoryId).toBe('sub-fee');
   });
 
+  it('returns the property operation defaults instead of dropping them', async () => {
+    const settings = await getSettings('user-1');
+
+    expect(settings?.realEstateCostCategories).toEqual(STORED_SETTINGS.realEstateCostCategories);
+  });
+
   it('returns the default dividend account instead of dropping it', async () => {
     const settings = await getSettings('user-1');
 
@@ -265,6 +271,26 @@ describe('setSettings — scrittura, ramo senza targets (merge: true)', () => {
 
     await setSettings('user-1', { targets: TARGETS, spendingRolesEnabled: true } as AssetAllocationSettings);
     expect(writtenPayload().spendingRolesEnabled).toBe(true);
+  });
+
+  // A LIST through both chains: `merge: true` replaces an array whole, where a map would keep a
+  // removed default key by key; an entry without a subcategory carries no `undefined` (Firestore refuses it).
+  it('writes realEstateCostCategories through both chains, an entry without subcategory without the key', async () => {
+    const list = [{ kind: 'notary' as const, categoryId: 'cat-home', subCategoryId: undefined }];
+    await setSettings('user-1', { realEstateCostCategories: list } as AssetAllocationSettings);
+    expect(writtenPayload().realEstateCostCategories).toEqual([{ kind: 'notary', categoryId: 'cat-home' }]);
+
+    await setSettings('user-1', { targets: TARGETS, realEstateCostCategories: list } as AssetAllocationSettings);
+    expect(writtenPayload().realEstateCostCategories).toEqual([{ kind: 'notary', categoryId: 'cat-home' }]);
+  });
+
+  it('clears realEstateCostCategories in both chains when the key is sent empty', async () => {
+    await setSettings('user-1', { realEstateCostCategories: undefined } as AssetAllocationSettings);
+    expect(writtenPayload().realEstateCostCategories).toBe(DELETE_SENTINEL);
+
+    vi.mocked(getDoc).mockResolvedValue({ exists: () => true, data: () => ({ realEstateCostCategories: [{ kind: 'notary', categoryId: 'x' }] }) } as never);
+    await setSettings('user-1', { targets: TARGETS, realEstateCostCategories: undefined } as AssetAllocationSettings);
+    expect(writtenPayload()).not.toHaveProperty('realEstateCostCategories');
   });
 
   it('does not touch the start month when the key is absent from the update', async () => {

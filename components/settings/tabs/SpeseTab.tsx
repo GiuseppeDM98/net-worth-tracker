@@ -36,6 +36,7 @@ import { CategoryDeleteConfirmDialog } from '@/components/expenses/CategoryDelet
 import { CategoryMoveDialog } from '@/components/expenses/CategoryMoveDialog';
 import { LAZY_CATEGORY_ICONS } from '@/components/expenses/IconPickerPopover';
 import ExpenseImportSection from '@/components/settings/ExpenseImportSection';
+import { RealEstateDefaultsTile } from '@/components/settings/RealEstateDefaultsTile';
 import { cn } from '@/lib/utils';
 import { useArmedDelete } from '@/lib/hooks/useArmedDelete';
 import { resolveCenteredModalOrigin } from '@/lib/utils/modalOrigin';
@@ -651,6 +652,17 @@ export function SpeseTab({
       {/* Import CSV — the section renders its own tile (preview-first, undo per batch) */}
       <div className={cn(TILE_CELL_CLASS, 'desktop:col-span-7')}>
         <ExpenseImportSection onImported={onExpenseImported} />
+      </div>
+
+      {/* Compravendita — the default category of each cost of a house's purchase or sale (2026-10-21) */}
+      <div className={cn(TILE_CELL_CLASS, 'tablet:col-span-2 desktop:col-span-12')}>
+        <RealEstateDefaultsTile
+          value={slice.realEstateCostCategories}
+          onChange={(realEstateCostCategories) => onChange({ realEstateCostCategories })}
+          categories={expenseCategories}
+          categoriesState={categoriesState}
+          onRetryCategories={() => void onRetryCategories()}
+        />
       </div>
 
       {/* Categorie — the management inventory at the tile's cadence */}

@@ -36,7 +36,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, RefreshCw } from 'lucide-react';
+import { House, Plus, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
@@ -573,6 +573,13 @@ export default function AssetsPage() {
       >
         <RefreshCw className={cn('h-4 w-4', updatingPrices && 'animate-spin')} aria-hidden="true" />
         <span className="hidden sm:inline">{updatingPrices ? 'Aggiornamento...' : 'Aggiorna prezzi'}</span>
+      </Button>
+      {/* The guided path that records a house's purchase or sale (2026-10-21, doc/guide/compravendita.md). */}
+      <Button asChild type="button" variant="outline" className="h-9" aria-label="Compra o vendi casa">
+        <Link href="/dashboard/assets/compravendita">
+          <House className="h-4 w-4" aria-hidden="true" />
+          <span className="hidden sm:inline">Compra o vendi casa</span>
+        </Link>
       </Button>
       <Button
         type="button"

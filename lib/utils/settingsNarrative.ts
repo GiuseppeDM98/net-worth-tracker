@@ -642,6 +642,16 @@ export function describeTransferFeeCategory({ categoryName, subCategoryName }: T
   return [prose(`La commissione scritta su una voce diventa una spesa in ${target}, addebitata sul suo conto alla sua data; su una serie, una per ogni voce.`)];
 }
 
+/**
+ * Compravendita (2026-10-21) — how many kinds of cost of a house's purchase or sale start on a saved
+ * category; the others start on the category whose name answers them (`suggestCategory`).
+ */
+export function describeRealEstateCategoriesSetting(saved: number, total: number): Narrative {
+  if (saved === 0) return [prose('Nessuna categoria predefinita: la compravendita propone ogni volta quella dal nome più simile.')];
+  if (saved === total) return [prose('Ogni voce della compravendita parte dalla sua categoria predefinita.')];
+  return [prose(`${saved} voci su ${total} della compravendita partono dalla loro categoria predefinita; le altre da quella dal nome più simile.`)];
+}
+
 export interface ExpenseCategoryCounts {
   income: number;
   fixed: number;

@@ -42,6 +42,7 @@ import { appliedBalanceEffectsOf } from '@/lib/utils/cashSettlement';
 import type { Expense, ExpenseType } from '@/types/expenses';
 import { CompactExpenseRow } from '@/components/cashflow/CompactExpenseRow';
 import type { LinkSeriesTarget } from '@/components/expenses/LinkSeriesDialog';
+import { houseOfRow } from '@/lib/utils/propertyLink';
 import { EXPENSE_TYPE_DOT_CLASS as TYPE_DOT_CLASS } from '@/lib/constants/expenseTypeColors';
 import { LAZY_CATEGORY_ICONS } from '@/components/expenses/IconPickerPopover';
 
@@ -112,6 +113,13 @@ interface TransactionDetailModalProps {
    * row and «Collega la serie al mutuo…»; absent or empty = neither is offered.
    */
   propertyNames?: Map<string, string>;
+  /**
+   * Names of the houses a row can be linked to («Legata all'immobile», `Expense.propertyAssetId`),
+   * for the «Immobile» row and «Collega la serie a un immobile…»; absent or empty = neither.
+   */
+  houseNames?: Map<string, string>;
+  /** Loan id → the house it finances (`housesByLoan`): a mortgage instalment's house is derived, not linked. */
+  loanHouses?: Map<string, string>;
 }
 
 /**
@@ -152,6 +160,8 @@ function TransactionDetailModal({
   memberNames,
   accountNames,
   propertyNames,
+  houseNames,
+  loanHouses,
 }: Readonly<TransactionDetailModalProps>) {
   const deleteRef = useRef<HTMLButtonElement | null>(null);
   const { armed, onClick: onArmedClick, onBlur } = useArmedDelete(deleteRef, () => onDelete(expense));
@@ -195,6 +205,11 @@ function TransactionDetailModal({
   const debtLink = propertyNames ? describeDebtLink(expense, propertyNames) : null;
   if (debtLink) {
     details.push({ label: 'Mutuo', value: debtLink });
+  }
+  // The house: the row's own link, or the one its mortgage finances (owner, 2026-10-21 tour).
+  const house = houseNames ? houseOfRow(expense, loanHouses ?? new Map()) : null;
+  if (house && houseNames) {
+    details.push({ label: 'Immobile', value: `${houseNames.get(house.houseId) ?? 'immobile eliminato'}${house.viaLoan ? ' · dal mutuo' : ''}` });
   }
   if (expense.costCenterName) {
     details.push({ label: 'Centro di costo', value: expense.costCenterName });
@@ -335,6 +350,14 @@ function TransactionDetailModal({
           {expense.isInstallment ? 'Collega il piano al mutuo…' : 'Collega la serie al mutuo…'}
         </Button>
       )}
+      {/* «Legata all'immobile» for a series that exists (owner, 2026-10-21): a sale in Patrimonio ›
+          Compravendita then proposes to stop it. Moves no balance; a transfer names its property already. */}
+      {isSeries && !isTransfer && onLinkSeries && !isDemo && houseNames && houseNames.size > 0 && !house?.viaLoan && (
+        <Button type="button" variant="outline" size="sm" className="mt-2 h-11 w-full desktop:h-8" onClick={() => onLinkSeries(expense, 'property')}>
+          <Home className="mr-2 h-4 w-4" aria-hidden="true" />
+          {expense.isInstallment ? 'Collega il piano a un immobile…' : 'Collega la serie a un immobile…'}
+        </Button>
+      )}
     </ResponsiveModal>
   );
 }
@@ -368,6 +391,10 @@ export interface TransactionFeedProps {
   accountNames?: Map<string, string>;
   /** Property names by id, for the detail's «Mutuo» row and «Collega la serie al mutuo…». */
   propertyNames?: Map<string, string>;
+  /** House names by id, for the detail's «Immobile» row and «Collega la serie a un immobile…». */
+  houseNames?: Map<string, string>;
+  /** Loan id → the house it finances, for the «Immobile» row of a mortgage instalment. */
+  loanHouses?: Map<string, string>;
   isDemo: boolean;
   hasActiveFilters: boolean;
   /** Map of categoryId → { icon?, color? } for row icon badges. */
@@ -413,6 +440,8 @@ export function TransactionFeed({
   onLinkSeries,
   accountNames,
   propertyNames,
+  houseNames,
+  loanHouses,
   isDemo,
   hasActiveFilters,
   categoryMetaMap,
@@ -570,6 +599,8 @@ export function TransactionFeed({
           memberNames={memberNames}
           accountNames={accountNames}
           propertyNames={propertyNames}
+          houseNames={houseNames}
+          loanHouses={loanHouses}
         />
       )}
     </div>

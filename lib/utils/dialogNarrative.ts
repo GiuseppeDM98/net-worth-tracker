@@ -466,8 +466,8 @@ export interface LinkSeriesFacts {
   pastCount: number;
   /** The account chosen so far, by name; null before a choice. */
   accountName: string | null;
-  /** What the series is linked to: an account (the default) or a property's mortgage. */
-  target?: 'account' | 'debt';
+  /** What the series is linked to: an account (the default), a loan, or a house («Legata all'immobile»). */
+  target?: 'account' | 'debt' | 'property';
 }
 
 /**
@@ -482,6 +482,7 @@ export function describeLinkSeriesReading(facts: LinkSeriesFacts): Narrative {
       ? [{ text: '.' }]
       : [{ text: facts.pastCount === 1 ? '; quella già avvenuta resta com’è.' : '; le ' }, ...(facts.pastCount === 1 ? [] : [{ text: String(facts.pastCount), mono: true }, { text: ' già avvenute restano come sono.' }])];
   if (facts.target === 'debt') return describeLinkSeriesToDebtReading(facts, noun, past);
+  if (facts.target === 'property') return describeLinkSeriesToPropertyReading(facts, noun);
   if (facts.futureCount === 0 || !facts.firstDate) {
     return [{ text: `Nessuna ${noun.one} futura da collegare: quelle ancora da venire hanno già un conto che si muove alla loro data, o la serie è finita.` }];
   }
@@ -509,6 +510,20 @@ function describeLinkSeriesToDebtReading(facts: LinkSeriesFacts, noun: { one: st
     return [{ text: `L’unica ${noun.one} futura, il ` }, day, { text: ', ridurrà il debito ' }, ...property, { text: ' della sua quota capitale' }, ...past];
   }
   return [{ text: 'Le ' }, { text: String(facts.futureCount), mono: true }, { text: ` ${noun.many} future, dal ` }, day, { text: ', ridurranno il debito ' }, ...property, { text: ' della loro quota capitale, ciascuna alla sua data' }, ...past];
+}
+
+/**
+ * «Le 24 voci della serie saranno legate a Casa: alla vendita, la Compravendita proporrà di fermarla.
+ * Nessun saldo si muove.» — the house twin (owner, 2026-10-21): the whole series, past included, since
+ * the link moves nothing. `futureCount` counts every occurrence here.
+ */
+function describeLinkSeriesToPropertyReading(facts: LinkSeriesFacts, noun: { one: string; many: string }): Narrative {
+  const house = facts.accountName ? `a ${facts.accountName}` : 'all’immobile che scegli';
+  const what: Narrative =
+    facts.futureCount === 1
+      ? [{ text: `L’unica ${noun.one} della serie sarà legata ${house}` }]
+      : [{ text: 'Le ' }, { text: String(facts.futureCount), mono: true }, { text: ` ${noun.many} della serie saranno legate ${house}` }];
+  return [...what, { text: ': alla vendita, la Compravendita proporrà di fermarla. Nessun saldo si muove.' }];
 }
 
 /** What the asset type decides — the three consequences the eight cards cannot show. */
@@ -1096,6 +1111,29 @@ export const EXPENSE_BUDGET_EXCLUSION_HINT =
 export const EXPENSE_BUDGET_EXCLUSION_SERIES_HINT =
   'Vale per ogni voce della serie: tutte fuori dal budget, o nessuna.';
 export const EXPENSE_BUDGET_EXCLUSION_CHIP = 'fuori budget';
+
+/**
+ * «Legata all'immobile» (owner, 2026-10-21): the house a row belongs to (`Expense.propertyAssetId`) —
+ * a mortgage instalment, a home or CPI policy — so a sale proposes to stop its series.
+ */
+export const EXPENSE_PROPERTY_LINK_HINT =
+  'Una rata del mutuo, una polizza della casa: alla vendita in Patrimonio › Compravendita la serie viene proposta da fermare. Non muove alcun saldo.';
+export const EXPENSE_PROPERTY_LINK_SERIES_HINT =
+  'In una serie nuova la porta ogni voce; per una serie che esiste usa «Collega la serie a un immobile…» dal dettaglio di una sua voce.';
+
+/**
+ * A transfer touching a property (lib/utils/propertyTransfer.ts): the line under the two pickers,
+ * one per direction, and the refusal of a sale above the property's recorded value (owner,
+ * 2026-10-21: the revaluation is a gesture of its own, made in Patrimonio before the transfer).
+ */
+export const PROPERTY_TRANSFER_IN_HINT =
+  'Il conto scende e il valore dell’immobile sale dello stesso importo alla data del trasferimento: una caparra o un acconto non è una spesa, è patrimonio che cambia forma.';
+export const PROPERTY_TRANSFER_OUT_HINT =
+  'Il valore dell’immobile scende e il conto sale dello stesso importo alla data del trasferimento: una vendita o una caparra ricevuta non è un’entrata, è patrimonio che cambia forma.';
+
+export function describePropertyTransferRefusal(propertyName: string, available: number): string {
+  return `Supera il valore di ${propertyName} (${cachedFormatCurrencyEUR(Math.max(0, available))}): aggiornane prima il valore in Patrimonio.`;
+}
 
 export interface DebtRepaymentFieldFacts {
   /** The loan chosen under «Riduce il debito di»; null when none is. */

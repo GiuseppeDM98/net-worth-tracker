@@ -414,6 +414,7 @@ function buildSingleExpenseDoc(
     personalMemberId: expenseData.personalMemberId,
     // «Fuori dal budget» is stored only when set: absent means counted (types/expenses.ts).
     excludeFromBudget: expenseData.excludeFromBudget ? true : undefined,
+    propertyAssetId: expenseData.propertyAssetId,
     transferFeeExpenseId: expenseData.transferFeeExpenseId,
     feeOfTransferId: expenseData.feeOfTransferId,
     createdAt: now,
@@ -564,6 +565,8 @@ async function createRecurringExpenses(
         personalMemberId: expenseData.personalMemberId,
         // And so is «Fuori dal budget»: every occurrence is out, or none is.
         excludeFromBudget: expenseData.excludeFromBudget ? true : undefined,
+        // And «Legata all'immobile»: the whole series belongs to the house.
+        propertyAssetId: expenseData.propertyAssetId,
         transferFeeExpenseId: feeDoc?.ref.id,
         createdAt: now,
         updatedAt: now,
@@ -702,6 +705,8 @@ async function createInstallmentExpenses(
         personalMemberId: expenseData.personalMemberId,
         // And so is «Fuori dal budget»: every instalment is out, or none is.
         excludeFromBudget: expenseData.excludeFromBudget ? true : undefined,
+        // And «Legata all'immobile»: the whole series belongs to the house.
+        propertyAssetId: expenseData.propertyAssetId,
         transferFeeExpenseId: feeDoc?.ref.id,
 
         createdAt: now,
@@ -1548,6 +1553,23 @@ export async function linkSeriesToCashAccount(userId: string, expense: Expense, 
   await batch.commit();
   await invalidateDashboardOverviewSummary(userId, 'expense_updated');
   return linkable.length;
+}
+
+/**
+ * «Collega la serie a un immobile» (owner, 2026-10-21): every occurrence of `expense`'s series, past
+ * and to come, takes `propertyAssetId` — «Legata all'immobile», which moves no balance, so the past is
+ * linked too and the whole series reads the same. A sale in Patrimonio › Compravendita then proposes to
+ * stop it. One batch: a series is capped under 500 rows. Returns how many occurrences were linked.
+ */
+export async function linkSeriesToProperty(userId: string, expense: Expense, propertyAssetId: string): Promise<number> {
+  const rows = await getSeriesOf(userId, expense);
+  if (rows.length === 0) return 0;
+  const batch = writeBatch(db);
+  for (const row of rows) {
+    batch.update(doc(db, EXPENSES_COLLECTION, row.id), { propertyAssetId, updatedAt: new Date() });
+  }
+  await batch.commit();
+  return rows.length;
 }
 
 /** Firestore's ceiling on the values of one `in` filter. */

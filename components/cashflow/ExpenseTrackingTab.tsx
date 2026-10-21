@@ -71,6 +71,8 @@ import Link from 'next/link';
 
 import { ExpenseDialog, type SavedExpense } from '@/components/expenses/ExpenseDialog';
 import { ExpenseTable } from '@/components/expenses/ExpenseTable';
+import { isTransferableProperty } from '@/lib/utils/propertyTransfer';
+import { housesByLoan } from '@/lib/utils/propertyLink';
 import { SeriesDeleteDialog, resolveSeriesDeleteMode, type SeriesDeleteRequest } from '@/components/expenses/SeriesDeleteDialog';
 import { LinkSeriesDialog, type LinkSeriesRequest } from '@/components/expenses/LinkSeriesDialog';
 import { useAssets } from '@/lib/hooks/useAssets';
@@ -376,6 +378,10 @@ export function ExpenseTrackingTab({
   // and property, so a row whose debt was repaid in full still names what it repaid.
   const repayableLoans = useMemo(() => (allAssets ?? []).filter(isRepayableDebt), [allAssets]);
   const propertyNames = useMemo(() => new Map((allAssets ?? []).filter((a) => a.type === 'loan' || a.type === 'realestate').map((a) => [a.id, a.name.trim()])), [allAssets]);
+  // The houses a series can be linked to («Legata all'immobile»): the properties a sale in Compravendita sells.
+  const houses = useMemo(() => (allAssets ?? []).filter(isTransferableProperty), [allAssets]);
+  const houseNames = useMemo(() => new Map(houses.map((a) => [a.id, a.name.trim()])), [houses]);
+  const loanHouses = useMemo(() => housesByLoan(allAssets ?? []), [allAssets]);
 
   // Desktop list view: the day-grouped feed (default, shared with mobile) or the dense table.
   // Remembered (localStorage), like Patrimonio's toggles: a reader who works in the table
@@ -990,6 +996,7 @@ export function ExpenseTrackingTab({
           ownerId={ownerId}
           cashAccounts={cashAccounts}
           loans={repayableLoans}
+          houses={houses}
           now={now}
           onClose={() => setLinkRequest(null)}
           onLinked={() => void onRefresh()}
@@ -1024,6 +1031,8 @@ export function ExpenseTrackingTab({
       }}
       accountNames={accountNames}
       propertyNames={repayableLoans.length > 0 ? propertyNames : undefined}
+      houseNames={houseNames}
+      loanHouses={loanHouses}
       isDemo={isDemo}
       hasActiveFilters={hasActiveFilters}
       categoryMetaMap={categoryMetaMap}

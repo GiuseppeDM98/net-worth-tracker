@@ -186,7 +186,7 @@ un telefono, e dalla riga sotto la conversazione dell'Assistente).
 - **«Applica» non è idempotente sugli obiettivi**: premuto due volte creerebbe due volte gli obiettivi nuovi — per
   questo dopo `done` il bottone resta disabilitato e il documento `applied` non lo mostra più.
 - **Il demo non ha il Consulente**: scrive le impostazioni, e quelle del demo sono di tutti (`useDemoMode`).
-- **Le rules sono inerti finché non sono deployate** (`npx firebase deploy --only firestore:rules`): prima del deploy
+- **Le rules sono inerti finché non sono deployate** (`npx firebase deploy --only firestore:rules`; fatto dal proprietario il 2026-10-20, il Consulente provato in produzione): prima del deploy
   la pagina non legge il documento (permission-denied → la lettura fallisce e la pagina lo dice).
 - **Nessuna spec E2E della corsa**, per la regola delle prove che non spendono; la corsa vera è stata fatta sul
   mirror il 2026-10-20 con la chiave del proprietario (gli esiti in SESSION_NOTES della sessione e nel commit).

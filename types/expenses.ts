@@ -180,6 +180,11 @@ export interface Expense {
   // skip it, through ONE predicate, `countsTowardBudget` (lib/utils/budgetUtils.ts). Absent = counted,
   // so no migration; meaningful on spending types only (the form offers it there alone).
   excludeFromBudget?: boolean;
+  // «Legata all'immobile» (owner, 2026-10-21): the property (a `realestate` asset) this row belongs to —
+  // a mortgage instalment, a home or CPI policy. It moves no balance; a sale in Patrimonio › Compravendita
+  // proposes to stop the series linked to the house it sells (lib/utils/realEstateOperationPlan.ts →
+  // isProposedToStop). Every occurrence of a series carries it. Absent = linked to nothing.
+  propertyAssetId?: string;
   // Set only on expenses written by the historical CSV importer (lib/services/expenseImportService.ts).
   // Groups every row of one import together so the whole batch can be undone in one call.
   importBatchId?: string;
@@ -284,5 +289,6 @@ export interface ExpenseFormData {
   costCenterName?: string;  // Denormalized name, must be kept in sync via costCenterService
   personalMemberId?: string; // FamilyMember this row belongs to; absent = in comune (see Expense)
   excludeFromBudget?: boolean; // «Fuori dal budget»: Budget skips the row, every other total keeps it (see Expense)
+  propertyAssetId?: string; // «Legata all'immobile»: the property a sale stops this series for (see Expense)
 }
 

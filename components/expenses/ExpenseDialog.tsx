@@ -18,7 +18,7 @@
  *     transfer, «Commissione»: a fee typed there becomes a spending row of its own, linked to the
  *     transfer (lib/utils/transferFee.ts); on a debt, «Riduce il debito di»: the property whose
  *     mortgage the instalment repays, by its principal, on its date (lib/utils/mortgageRepayment.ts)
- *   - "Impostazioni avanzate" Collapsible: Centro di Costo, Link, Acquisto Rateale, Ricorrenza Mensile
+ *   - "Impostazioni avanzate" Collapsible: Centro di Costo, Legata all'immobile, Link, Acquisto Rateale, Ricorrenza Mensile
  *
  * Advanced section auto-expands when editing a record with advanced data set.
  * On mobile (<=768 px): vaul Drawer bottom sheet with drag-to-dismiss.
@@ -54,6 +54,7 @@ import { applyDebtRepaymentEdit, applyDebtRepayments } from '@/lib/services/debt
 import { debtBalanceOf, isRepayableDebt, splitInstalment } from '@/lib/utils/mortgageRepayment';
 import { applyBalanceEffects } from '@/lib/services/cashBalanceReconciliation';
 import { editBalanceEffects } from '@/lib/utils/cashSettlement';
+import { exceedsPropertyValue, isTransferableProperty, propertyValueAvailable } from '@/lib/utils/propertyTransfer';
 import {
   describeExpenseFeeNote,
   expenseFeeCategoryLabel,
@@ -123,11 +124,16 @@ import {
   describeModalStatus,
   describeExpenseFeeField,
   describeWriteError,
+  describePropertyTransferRefusal,
+  PROPERTY_TRANSFER_IN_HINT,
+  PROPERTY_TRANSFER_OUT_HINT,
   EXPENSE_TYPE_PICKER_READING,
   EXPENSE_FEE_NEEDS_CATEGORY,
   EXPENSE_FEE_READING,
   EXPENSE_FEE_UNREAD,
   EXPENSE_BUDGET_EXCLUSION_LABEL,
+  EXPENSE_PROPERTY_LINK_HINT,
+  EXPENSE_PROPERTY_LINK_SERIES_HINT,
   EXPENSE_BUDGET_EXCLUSION_HINT,
   EXPENSE_BUDGET_EXCLUSION_SERIES_HINT,
   type ModalStatus,
@@ -204,7 +210,7 @@ const expenseSchema = z
     if (data.type !== 'transfer') return;
     const origin = data.linkedCashAssetId && data.linkedCashAssetId !== '__none__' ? data.linkedCashAssetId : null;
     const destination = data.transferCashAssetId && data.transferCashAssetId !== '__none__' ? data.transferCashAssetId : null;
-    if (!origin) ctx.addIssue({ code: 'custom', path: ['linkedCashAssetId'], message: 'Scegli il conto di origine' });
+    if (!origin) ctx.addIssue({ code: 'custom', path: ['linkedCashAssetId'], message: 'Scegli il conto o l’immobile di origine' });
     if (!destination) ctx.addIssue({ code: 'custom', path: ['transferCashAssetId'], message: 'Scegli il conto o l’immobile di destinazione' });
     if (origin && destination && origin === destination) {
       ctx.addIssue({ code: 'custom', path: ['transferCashAssetId'], message: 'Origine e destinazione devono essere due conti diversi' });
@@ -283,7 +289,7 @@ const RECURRENCE_FREQUENCY_OPTIONS = [
 
 function isAdvancedPrePopulated(expense: Expense | null | undefined): boolean {
   if (!expense) return false;
-  return !!(expense.costCenterId || expense.link || expense.isInstallment || expense.isRecurring);
+  return !!(expense.costCenterId || expense.propertyAssetId || expense.link || expense.isInstallment || expense.isRecurring);
 }
 
 // ---------------------------------------------------------------------------
@@ -434,6 +440,9 @@ interface FormBodyProps {
   costCentersEnabled: boolean;
   selectedCostCenterId: string;
   setSelectedCostCenterId: (id: string) => void;
+  /** «Legata all'immobile»: '__none__' or a property id (`Expense.propertyAssetId`). */
+  selectedPropertyId: string;
+  setSelectedPropertyId: (id: string) => void;
   /** Cashflow › Divisione is on AND the household has someone to attribute a row to. */
   splitEnabled: boolean;
   familyMembers: FamilyMember[];
@@ -459,8 +468,14 @@ interface FormBodyProps {
   feeHint: string | null;
   /** The row being edited IS a fee (it names the row it was charged for): it takes no fee of its own. */
   isFeeRowEdit: boolean;
-  /** Where a transfer can land: the cash accounts, then the properties whose value lives in `quantity` (a deposit on a house). */
-  transferDestinations: { accounts: Asset[]; properties: Asset[] };
+  /**
+   * Where a transfer can start and land: the cash accounts, then the properties whose value lives
+   * in `quantity` (lib/utils/propertyTransfer.ts) — a deposit on a house, or a sale. Never a
+   * property on both ends.
+   */
+  transferEndpoints: { accounts: Asset[]; properties: Asset[] };
+  /** The transfer starts from a property (a sale): «Commissione» is hidden, the costs are rows of their own. */
+  originIsProperty: boolean;
   /** Loans a debt row can repay (`isRepayableDebt`, plus the one the row already names). */
   loans: Asset[];
   watchedDebtAssetId: string | undefined;
@@ -501,6 +516,8 @@ function ExpenseFormBody({
   costCentersEnabled,
   selectedCostCenterId,
   setSelectedCostCenterId,
+  selectedPropertyId,
+  setSelectedPropertyId,
   splitEnabled,
   familyMembers,
   personalMemberId,
@@ -515,7 +532,8 @@ function ExpenseFormBody({
   feeEnabled,
   feeHint,
   isFeeRowEdit,
-  transferDestinations,
+  transferEndpoints,
+  originIsProperty,
   loans,
   watchedDebtAssetId,
   watchedIsDebtPayoff,
@@ -717,7 +735,7 @@ function ExpenseFormBody({
         <div className="space-y-3">
           <div className="space-y-2">
             <Label htmlFor="linkedCashAssetId">
-              Conto di Origine *
+              Origine *
             </Label>
             <Select
               value={watchedLinkedCashAssetId || '__none__'}
@@ -728,15 +746,30 @@ function ExpenseFormBody({
                 aria-invalid={!!errors.linkedCashAssetId}
                 aria-describedby={errors.linkedCashAssetId ? 'linkedCashAssetId-error' : undefined}
               >
-                <SelectValue placeholder="Seleziona conto" />
+                <SelectValue placeholder="Seleziona conto o immobile" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__none__">Seleziona conto</SelectItem>
-                {cashAssets.map((asset) => (
-                  <SelectItem key={asset.id} value={asset.id}>
-                    {asset.name} ({asset.currency})
-                  </SelectItem>
-                ))}
+                <SelectItem value="__none__">Seleziona conto o immobile</SelectItem>
+                <SelectGroup>
+                  <SelectLabel>Conti</SelectLabel>
+                  {transferEndpoints.accounts.map((asset) => (
+                    <SelectItem key={asset.id} value={asset.id}>
+                      {asset.name} ({asset.currency})
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+                {/* A sale, or a deposit received (2026-10-21): the property's value becomes money on
+                    an account. Not offered while the destination is itself a property. */}
+                {transferEndpoints.properties.length > 0 && !transferEndpoints.properties.some((a) => a.id === watchedTransferCashAssetId) && (
+                  <SelectGroup>
+                    <SelectLabel>Immobili</SelectLabel>
+                    {transferEndpoints.properties.map((asset) => (
+                      <SelectItem key={asset.id} value={asset.id}>
+                        {asset.name}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                )}
               </SelectContent>
             </Select>
             {errors.linkedCashAssetId && (
@@ -764,7 +797,7 @@ function ExpenseFormBody({
                 <SelectItem value="__none__">Seleziona conto o immobile</SelectItem>
                 <SelectGroup>
                   <SelectLabel>Conti</SelectLabel>
-                  {transferDestinations.accounts
+                  {transferEndpoints.accounts
                     .filter((a) => a.id !== watchedLinkedCashAssetId || watchedLinkedCashAssetId === '__none__')
                     .map((asset) => (
                       <SelectItem key={asset.id} value={asset.id}>
@@ -774,11 +807,12 @@ function ExpenseFormBody({
                 </SelectGroup>
                 {/* A deposit on a house (2026-10-10): the money leaves the account and becomes value of the
                     property — net-zero, like any transfer. Only a property whose value lives in `quantity`
-                    (price 1, as the form writes it) can take it; the pension fund has its own flow. */}
-                {transferDestinations.properties.length > 0 && (
+                    (price 1, as the form writes it) can take it; the pension fund has its own flow. Not
+                    offered while the origin is itself a property. */}
+                {transferEndpoints.properties.length > 0 && !originIsProperty && (
                   <SelectGroup>
                     <SelectLabel>Immobili</SelectLabel>
-                    {transferDestinations.properties.map((asset) => (
+                    {transferEndpoints.properties.map((asset) => (
                       <SelectItem key={asset.id} value={asset.id}>
                         {asset.name}
                       </SelectItem>
@@ -794,9 +828,11 @@ function ExpenseFormBody({
             )}
           </div>
           <p id="transferCashAssetId-hint" className="text-xs text-muted-foreground">
-            {transferDestinations.properties.some((a) => a.id === watchedTransferCashAssetId)
-              ? 'Il conto scende e il valore dell’immobile sale dello stesso importo alla data del trasferimento: una caparra o un acconto non è una spesa, è patrimonio che cambia forma.'
-              : 'I due saldi si muovono alla data del trasferimento: subito se è oggi o passata, quel giorno se è futura.'}
+            {originIsProperty
+              ? PROPERTY_TRANSFER_OUT_HINT
+              : transferEndpoints.properties.some((a) => a.id === watchedTransferCashAssetId)
+                ? PROPERTY_TRANSFER_IN_HINT
+                : 'I due saldi si muovono alla data del trasferimento: subito se è oggi o passata, quel giorno se è futura.'}
           </p>
         </div>
       ) : selectedType === 'transfer' ? (
@@ -835,7 +871,9 @@ function ExpenseFormBody({
       {/* ---- Commissione: the bank's charge for this row, a spending row of its own
           (lib/utils/expenseFee.ts) in the category chosen in Impostazioni, on the row's account and
           date; on a series, one per occurrence. A fee row never takes a fee of its own. */}
-      {cashAssets.length > 0 && !isFeeRowEdit && (
+      {/* A transfer out of a property takes no fee (owner, 2026-10-21): it would be debited to the
+          house, and the costs of a sale — agency, notary — are spending rows of their own. */}
+      {cashAssets.length > 0 && !isFeeRowEdit && !originIsProperty && (
         <div className="space-y-2">
           <Label htmlFor="fee">
             Commissione <span className="text-muted-foreground font-normal">(opzionale)</span>
@@ -1036,6 +1074,34 @@ function ExpenseFormBody({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+          )}
+
+          {/* ---- Legata all'immobile (owner, 2026-10-21) ----
+              The house a row belongs to — a mortgage instalment, a home or CPI policy — so a sale in
+              Patrimonio › Compravendita proposes to stop its series. Moves no balance; never on a
+              transfer, which already names its property as an endpoint. Offered only when a
+              property exists, and an edited row keeps the one it names. */}
+          {selectedType !== 'transfer' && (transferEndpoints.properties.length > 0 || selectedPropertyId !== '__none__') && (
+            <div className="space-y-2">
+              <Label htmlFor="propertyAssetId">Legata all&apos;immobile</Label>
+              <Select value={selectedPropertyId} onValueChange={setSelectedPropertyId}>
+                <SelectTrigger id="propertyAssetId" aria-describedby="propertyAssetId-hint">
+                  <SelectValue placeholder="Nessun immobile" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Nessun immobile</SelectItem>
+                  {transferEndpoints.properties.map((asset) => (
+                    <SelectItem key={asset.id} value={asset.id}>
+                      {asset.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p id="propertyAssetId-hint" className="text-xs text-muted-foreground">
+                {EXPENSE_PROPERTY_LINK_HINT}
+                {selectedIsRecurring && ` ${EXPENSE_PROPERTY_LINK_SERIES_HINT}`}
+              </p>
             </div>
           )}
 
@@ -1430,14 +1496,11 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess, returnFocusTo
   const { data: settings } = useSettings(ownerId, { enabled: readsEnabled });
   const { data: costCenters = EMPTY_COST_CENTERS } = useCostCenters(ownerId, { enabled: readsEnabled });
   const cashAssets = useMemo(() => allAssets.filter((a) => a.type === 'cash' && a.assetClass === 'cash'), [allAssets]);
-  // Where a transfer can land: the accounts, and the properties whose value lives in `quantity`
-  // at price 1 (as the form writes them) — a deposit on a house moves the account's money into
-  // the property's value (2026-10-10). A property priced otherwise cannot take a euro delta.
-  const transferDestinations = useMemo(
-    () => ({
-      accounts: cashAssets,
-      properties: allAssets.filter((a) => a.type === 'realestate' && a.assetClass === 'realestate' && a.currentPrice === 1),
-    }),
+  // Where a transfer can start and land: the accounts, and the properties whose value lives in
+  // `quantity` at price 1 (lib/utils/propertyTransfer.ts) — a deposit on a house moves the
+  // account's money into the property's value (2026-10-10), a sale the other way (2026-10-21).
+  const transferEndpoints = useMemo(
+    () => ({ accounts: cashAssets, properties: allAssets.filter(isTransferableProperty) }),
     [allAssets, cashAssets]
   );
   // Loans a debt row can repay. A loan already named by the row stays listed even once its debt
@@ -1449,6 +1512,8 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess, returnFocusTo
   const defaultCreditCashAssetId = settings?.defaultCreditCashAssetId || '__none__';
   const costCentersEnabled = settings?.costCentersEnabled ?? false;
   const [selectedCostCenterId, setSelectedCostCenterId] = useState<string>('__none__');
+  // «Legata all'immobile», same shape as the cost centre: a plain state, no validation.
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string>('__none__');
   // Divisione: '' is «in comune», the default. Stored as its own state rather than a form field
   // because it is not validated and has no error state — same shape as the cost centre above.
   const splitEnabled = settings?.expenseSplitEnabled ?? false;
@@ -1581,6 +1646,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess, returnFocusTo
       setStep(expense ? 2 : 1);
       setAdvancedOpen(isAdvancedPrePopulated(expense));
       setSelectedCostCenterId(expense?.costCenterId || '__none__');
+      setSelectedPropertyId(expense?.propertyAssetId || '__none__');
       setPersonalMemberId(expense?.personalMemberId || '');
     }
   }
@@ -1850,7 +1916,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess, returnFocusTo
     subCategoryId: 'Sottocategoria',
     notes: 'Note',
     link: 'Link',
-    linkedCashAssetId: selectedType === 'transfer' ? 'Conto di origine' : 'Conto',
+    linkedCashAssetId: selectedType === 'transfer' ? 'Origine' : 'Conto',
     transferCashAssetId: 'Destinazione',
     fee: 'Commissione',
     debtAssetId: 'Prestito',
@@ -1917,6 +1983,19 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess, returnFocusTo
       return;
     }
 
+    // A property never gives more than it is worth (lib/utils/propertyTransfer.ts): a sale above the
+    // recorded value is a revaluation first, made in Patrimonio — refused here, under the amount.
+    const originProperty = data.type === 'transfer' ? transferEndpoints.properties.find((asset) => asset.id === data.linkedCashAssetId) : undefined;
+    if (originProperty) {
+      const available = propertyValueAvailable(originProperty, expense ?? null);
+      if (exceedsPropertyValue(Math.abs(data.amount ?? 0), available)) {
+        const message = describePropertyTransferRefusal(originProperty.name, available);
+        form.setError('amount', { type: 'custom', message }, { shouldFocus: true });
+        setStatus({ phase: 'error', message });
+        return;
+      }
+    }
+
     setStatus({ phase: 'submitting' });
 
     let subCategoryName: string | undefined;
@@ -1932,6 +2011,8 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess, returnFocusTo
       data.transferCashAssetId === '__none__' ? undefined : data.transferCashAssetId;
     const resolvedCostCenterId =
       selectedCostCenterId === '__none__' ? undefined : selectedCostCenterId;
+    // A transfer names its property as an endpoint: the link is for every other row.
+    const resolvedPropertyAssetId = data.type !== 'transfer' && selectedPropertyId !== '__none__' ? selectedPropertyId : undefined;
     // A transfer is net-zero and belongs to no one: it moves money between the household's own
     // accounts, which is exactly what feeding a joint account looks like. Marking it personal
     // would put plumbing into somebody's column.
@@ -1945,8 +2026,9 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess, returnFocusTo
     const resolvedIsDebtPayoff = !!resolvedDebtAssetId && data.isDebtPayoff === true;
     // «Fuori dal budget» is a spending row's flag: re-typed to income or transfer, it goes.
     const resolvedExcludeFromBudget = data.type !== 'income' && data.type !== 'transfer' && data.excludeFromBudget === true;
-    // A fee row takes no fee of its own; any other row may carry one (lib/utils/expenseFee.ts).
-    const requestedFee = isFeeRowEdit ? null : normalizeExpenseFee(data.fee);
+    // A fee row takes no fee of its own, nor a transfer out of a property (its field is hidden);
+    // any other row may carry one (lib/utils/expenseFee.ts).
+    const requestedFee = isFeeRowEdit || originProperty ? null : normalizeExpenseFee(data.fee);
     const feeNote = describeExpenseFeeNote({
       type: data.type,
       destinationName: allAssets.find((asset) => asset.id === transferCashAssetId)?.name,
@@ -1994,6 +2076,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess, returnFocusTo
         costCenterName: resolvedCostCenterName,
         personalMemberId: resolvedPersonalMemberId,
         excludeFromBudget: resolvedExcludeFromBudget || undefined,
+        propertyAssetId: resolvedPropertyAssetId,
       };
 
       // One «now» for the whole save: whether a row moves its account today or on its date
@@ -2057,6 +2140,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess, returnFocusTo
           isDebtPayoff: resolvedIsDebtPayoff ? true : deleteField(),
           // Absent means counted (types/expenses.ts), so unticking has to DELETE the field.
           excludeFromBudget: resolvedExcludeFromBudget ? true : deleteField(),
+          propertyAssetId: resolvedPropertyAssetId ?? deleteField(),
         };
         await updateExpense(
           expense.id,
@@ -2107,6 +2191,7 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess, returnFocusTo
             debtAssetId: resolvedDebtAssetId,
             isDebtPayoff: resolvedIsDebtPayoff ? true : undefined,
             excludeFromBudget: resolvedExcludeFromBudget ? true : undefined,
+            propertyAssetId: resolvedPropertyAssetId,
             updatedAt: now,
           },
         };
@@ -2222,8 +2307,12 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess, returnFocusTo
       );
       setValue('categoryId', match?.categoryId ?? '');
       setValue('subCategoryId', match?.subCategoryId ?? '');
+      // Only a transfer starts from a property: leaving the type, the house is no row's account.
+      if (nextType !== 'transfer' && transferEndpoints.properties.some((asset) => asset.id === getValues('linkedCashAssetId'))) {
+        setValue('linkedCashAssetId', '__none__');
+      }
     },
-    [categories, getValues, setValue]
+    [categories, getValues, setValue, transferEndpoints]
   );
 
   /**
@@ -2316,6 +2405,8 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess, returnFocusTo
     costCentersEnabled,
     selectedCostCenterId,
     setSelectedCostCenterId,
+    selectedPropertyId,
+    setSelectedPropertyId,
     splitEnabled,
     familyMembers,
     personalMemberId,
@@ -2330,7 +2421,8 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess, returnFocusTo
     feeEnabled,
     feeHint,
     isFeeRowEdit,
-    transferDestinations,
+    transferEndpoints,
+    originIsProperty: selectedType === 'transfer' && transferEndpoints.properties.some((asset) => asset.id === watchedLinkedCashAssetId),
     loans,
     watchedIsDebtPayoff,
     watchedDebtAssetId,

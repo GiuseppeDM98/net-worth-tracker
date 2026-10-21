@@ -41,6 +41,26 @@ import {
   type TargetProblem,
 } from '@/lib/utils/allocationTargetValidation';
 import { calculateFormulaEquityPercentage, resolveAutoEquityBondsSplit } from '@/lib/utils/equityBondsAutoTargets';
+import { REAL_ESTATE_COST_KINDS, type CategoryChoice, type RealEstateCostDefault, type RealEstateCostKind } from '@/types/realEstateOperation';
+
+// ─── Patrimonio › Compravendita's defaults ───────────────────────────────────────────────
+
+/**
+ * The defaults in `REAL_ESTATE_COST_KINDS` order, one per kind, without a category-less entry: the
+ * Spese snapshot is a JSON string, so two orders of the same list would read as an edit.
+ */
+export function orderRealEstateDefaults(list: readonly RealEstateCostDefault[]): RealEstateCostDefault[] {
+  return REAL_ESTATE_COST_KINDS.flatMap((kind) => {
+    const entry = list.find((candidate) => candidate.kind === kind && candidate.categoryId);
+    return entry ? [entry.subCategoryId ? { kind, categoryId: entry.categoryId, subCategoryId: entry.subCategoryId } : { kind, categoryId: entry.categoryId }] : [];
+  });
+}
+
+/** The list with `kind` set to `choice`, or removed when `choice` is null. */
+export function withRealEstateDefault(list: readonly RealEstateCostDefault[], kind: RealEstateCostKind, choice: CategoryChoice | null): RealEstateCostDefault[] {
+  const others = list.filter((entry) => entry.kind !== kind);
+  return orderRealEstateDefaults(choice ? [...others, { kind, ...choice }] : others);
+}
 
 // ─── Identifiers ──────────────────────────────────────────────────────────────────────────
 
@@ -161,6 +181,8 @@ export interface SpeseSlice {
   transferFeeCategoryId: string;
   transferFeeSubCategoryId: string;
   spendingRolesEnabled: boolean;
+  /** Patrimonio › Compravendita's default categories, in `REAL_ESTATE_COST_KINDS` order (`withRealEstateDefault`); [] = none. */
+  realEstateCostCategories: RealEstateCostDefault[];
 }
 
 export interface DividendiSlice {
@@ -392,6 +414,7 @@ export function sliceSettings(
     transferFeeCategoryId: data.transferFeeCategoryId || '',
     transferFeeSubCategoryId: data.transferFeeSubCategoryId || '',
     spendingRolesEnabled: data.spendingRolesEnabled ?? false,
+    realEstateCostCategories: orderRealEstateDefaults(data.realEstateCostCategories ?? []),
   };
 
   const dividendi: DividendiSlice = {
@@ -512,6 +535,7 @@ export function composeSettingsDocument(
     defaultCreditCashAssetId: spese.defaultCreditCashAssetId !== NO_SELECTION ? spese.defaultCreditCashAssetId : undefined,
     transferFeeCategoryId: spese.transferFeeCategoryId || undefined,
     transferFeeSubCategoryId: spese.transferFeeSubCategoryId || undefined,
+    realEstateCostCategories: spese.realEstateCostCategories.length > 0 ? spese.realEstateCostCategories : undefined,
     stampDutyEnabled: generale.stampDutyEnabled,
     stampDutyRate: generale.stampDutyRate,
     checkingAccountSubCategory: generale.checkingAccountSubCategory,

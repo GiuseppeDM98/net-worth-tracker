@@ -55,6 +55,15 @@ function serializeFamilyMembers(
   }));
 }
 
+/** Firestore refuses `undefined` inside an array element: a default without a subcategory omits the key. */
+function serializeRealEstateCostCategories(list: NonNullable<AssetAllocationSettings['realEstateCostCategories']>) {
+  return list.map((entry) => ({
+    kind: entry.kind,
+    categoryId: entry.categoryId,
+    ...(entry.subCategoryId ? { subCategoryId: entry.subCategoryId } : {}),
+  }));
+}
+
 /**
  * Get allocation settings for a user
  *
@@ -101,6 +110,7 @@ export async function getSettings(
       dividendCashAssetId: data.dividendCashAssetId,
       transferFeeCategoryId: data.transferFeeCategoryId,
       transferFeeSubCategoryId: data.transferFeeSubCategoryId,
+      realEstateCostCategories: data.realEstateCostCategories,
       fireProjectionScenarios: data.fireProjectionScenarios,
       monteCarloScenarios: data.monteCarloScenarios,
       goalBasedInvestingEnabled: data.goalBasedInvestingEnabled,
@@ -257,6 +267,14 @@ export async function setSettings(
           docData.transferFeeSubCategoryId = settings.transferFeeSubCategoryId;
         } else {
           delete docData.transferFeeSubCategoryId;
+        }
+      }
+      // User-clearable from Impostazioni → Spese (the property operation's default categories).
+      if ('realEstateCostCategories' in settings) {
+        if (settings.realEstateCostCategories !== undefined) {
+          docData.realEstateCostCategories = serializeRealEstateCostCategories(settings.realEstateCostCategories);
+        } else {
+          delete docData.realEstateCostCategories;
         }
       }
       if (settings.fireProjectionScenarios !== undefined) {
@@ -444,6 +462,11 @@ export async function setSettings(
       if ('transferFeeSubCategoryId' in settings) {
         docData.transferFeeSubCategoryId =
           settings.transferFeeSubCategoryId !== undefined ? settings.transferFeeSubCategoryId : deleteField();
+      }
+      // A list, so `merge: true` replaces it whole (a map would keep a removed key).
+      if ('realEstateCostCategories' in settings) {
+        docData.realEstateCostCategories =
+          settings.realEstateCostCategories !== undefined ? serializeRealEstateCostCategories(settings.realEstateCostCategories) : deleteField();
       }
       if (settings.fireProjectionScenarios !== undefined) {
         docData.fireProjectionScenarios = settings.fireProjectionScenarios;

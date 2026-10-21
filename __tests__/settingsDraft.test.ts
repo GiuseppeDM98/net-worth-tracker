@@ -43,7 +43,7 @@ const WRITTEN_KEYS = [
   'dividendIncomeSubCategoryId', 'expenseSplitEnabled', 'familyMembers', 'goalBasedInvestingEnabled',
   'goalDrivenAllocationEnabled', 'includePrimaryResidenceInFIRE', 'laborIncomeCategoryIds', 'monthlyEmailEnabled',
   'monthlyEmailRecipients', 'pensionReturnStartMonth', 'performanceExcludesCash', 'performanceIncludesExcludedAssets',
-  'performanceIncludesPensionFunds', 'plannedAnnualExpenses', 'quarterlyEmailEnabled', 'riskFreeRate',
+  'performanceIncludesPensionFunds', 'plannedAnnualExpenses', 'quarterlyEmailEnabled', 'realEstateCostCategories', 'riskFreeRate',
   'semiAnnualEmailEnabled', 'spendingRolesEnabled', 'stampDutyEnabled', 'stampDutyRate', 'targets',
   'transferFeeCategoryId', 'transferFeeSubCategoryId', 'userAge', 'weeklyBudgetEmailEnabled', 'withdrawalRate',
   'yearlyEmailEnabled',

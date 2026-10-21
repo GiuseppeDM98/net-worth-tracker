@@ -55,7 +55,7 @@ test('a transfer without its two accounts is refused, the reason under each fiel
   await dialog.locator('#amount').fill(String(DECOY_AMOUNT));
   await dialog.locator('button[type=submit]').click();
 
-  await expect(dialog.getByRole('alert').filter({ hasText: 'Scegli il conto di origine' })).toBeVisible();
+  await expect(dialog.getByRole('alert').filter({ hasText: 'Scegli il conto o l’immobile di origine' })).toBeVisible();
   await expect(dialog.getByRole('alert').filter({ hasText: 'Scegli il conto o l’immobile di destinazione' })).toBeVisible();
   await expect(dialog.locator('#linkedCashAssetId')).toHaveAttribute('aria-invalid', 'true');
   await expect(dialog.locator('#transferCashAssetId')).toHaveAttribute('aria-invalid', 'true');

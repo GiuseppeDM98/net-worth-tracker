@@ -26,7 +26,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   skeleton cells `lib/constants/cashflowTabSkeletons.ts`, the fallbacks of Dividendi and Divisione
   `components/cashflow/CashflowTabSkeletons.tsx` (2026-10-06); held by `perf:budget` (Cashflow's ceiling), by every
   `e2e/cashflow.*.spec.ts` that opens a tab, and by `e2e/lazyTabLanding.ts` (the fallback's geometry)
-- **Suites to run after a change here — Transfers / cash** (moved from `AGENTS.md` § Commands on 2026-09-30): `cashBalanceReconciliation`, `updateCashAssetBalancesAtomic`, `transferFeature`, `cashSettlement`, `serverCashSettlement` · **Commissione** `expenseFee`, `dialogNarrative` (+ `settingsRoundTrip`, `settingsNarrative`) · **Mutuo** `mortgageRepayment`, `mortgageSummary`, `updateAssetDebtFields`, `loanAssets`, `growthDrivers` (+ `patrimonioNarrative` for the tile's words) · **Ricorrenze** `recurrenceDates` · **Browser** `e2e/cashflow.{accounts,transfer-fee,mortgage}.spec.ts`
+- **Suites to run after a change here — Transfers / cash** (moved from `AGENTS.md` § Commands on 2026-09-30): `cashBalanceReconciliation`, `updateCashAssetBalancesAtomic`, `transferFeature`, `cashSettlement`, `serverCashSettlement`, `propertyTransfer`, `propertyLink` · **Commissione** `expenseFee`, `dialogNarrative` (+ `settingsRoundTrip`, `settingsNarrative`) · **Mutuo** `mortgageRepayment`, `mortgageSummary`, `updateAssetDebtFields`, `loanAssets`, `growthDrivers` (+ `patrimonioNarrative` for the tile's words) · **Ricorrenze** `recurrenceDates` · **Browser** `e2e/cashflow.{accounts,transfer-fee,mortgage}.spec.ts`
 
 ## Expenses by window (`lib/utils/expenseWindows.ts`)
 - **Tracciamento, Divisione, Budget and FIRE read a WINDOW of the expenses, never the collection** (2026-09-30).
@@ -208,8 +208,21 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   `assertFundValueLivesInQuantity`). The account falls and the property's value rises by the amount on the transfer's
   date (`balanceEffectsOf` is generic over asset ids; the client and the server write `quantity + delta` whatever the
   asset), net-zero for Cashflow, a transfer for the Driver (`other` on both legs, which cancel). The picker groups
-  «Conti» and «Immobili» and the hint says it is patrimony changing form, not a spending; the origin stays a cash
-  account. The feed and the table name the destination from EVERY asset (`accountNames`), not the cash ones alone.
+  «Conti» and «Immobili» and the hint says it is patrimony changing form, not a spending. The feed and the table name
+  the destination from EVERY asset (`accountNames`), not the cash ones alone.
+- **A transfer can START from a property** (owner, 2026-10-21 — a sale, a deposit received;
+  `lib/utils/propertyTransfer.ts`): «Origine» groups «Conti» and «Immobili» like the destination, a property is
+  offered on one end only, the hint reads «una vendita o una caparra ricevuta non è un’entrata». A property never
+  gives more than it is worth: an amount above its value (plus what the edited row already took, `propertyValueAvailable`)
+  is refused under the amount, the revaluation being the owner's gesture in Patrimonio. «Commissione» is hidden on such
+  a transfer (it would debit the house) and leaving the type clears a property origin. The guided path that writes a
+  whole purchase or sale with these transfers is Patrimonio › Compravendita (doc/guide/compravendita.md).
+- **«Legata all'immobile»** (`Expense.propertyAssetId`, owner 2026-10-21): any row but a transfer may name the house it
+  belongs to (the form's «Impostazioni avanzate»; «Collega la serie a un immobile…» from a series row's detail links
+  every occurrence, past included — it moves no balance; absent = none, no migration). Nothing in Cashflow reads it
+  but the detail («Immobile», «· dal mutuo» when the row repays a loan that finances the house — the loan wins,
+  `lib/utils/propertyLink.ts`); a sale in Compravendita proposes to stop the house's series. The rule and the reason in
+  doc/guide/compravendita.md § «Legata all'immobile».
 - **The BATCH paths refuse to cross the transfer boundary** (`crossesTransferBoundary`): `updateExpensesType`,
   `moveExpensesToCategory`, `moveExpensesFromSubCategory` throw `TransferBoundaryError` when expenses exist, since each
   row would need its own destination account.

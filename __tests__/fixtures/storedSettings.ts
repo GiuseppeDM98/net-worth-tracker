@@ -28,6 +28,10 @@ export const STORED_SETTINGS = {
   dividendCashAssetId: 'cash-1',
   transferFeeCategoryId: 'cat-fee',
   transferFeeSubCategoryId: 'sub-fee',
+  realEstateCostCategories: [
+    { kind: 'notary' as const, categoryId: 'cat-home', subCategoryId: 'sub-notary' },
+    { kind: 'mortgageInstalment' as const, categoryId: 'cat-mortgage' },
+  ],
 };
 
 /**
@@ -86,6 +90,13 @@ export const FULL_PAGE_SETTINGS: AssetAllocationSettings = {
   defaultCreditCashAssetId: 'cash-credit',
   transferFeeCategoryId: 'cat-fee',
   transferFeeSubCategoryId: 'sub-fee',
+  // In `REAL_ESTATE_COST_KINDS` order, as the slice keeps it (orderRealEstateDefaults).
+  realEstateCostCategories: [
+    { kind: 'agency', categoryId: 'cat-home', subCategoryId: 'sub-agency' },
+    { kind: 'notary', categoryId: 'cat-home', subCategoryId: 'sub-notary' },
+    { kind: 'mortgageInstalment', categoryId: 'cat-mortgage' },
+    { kind: 'insuranceRefund', categoryId: 'cat-refund' },
+  ],
   stampDutyEnabled: true,
   stampDutyRate: 0.25,
   checkingAccountSubCategory: 'Conto corrente',

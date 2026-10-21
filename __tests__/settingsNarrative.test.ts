@@ -43,6 +43,7 @@ import {
   describeTargetProblem,
   describeThemeMode,
   describeTransferFeeCategory,
+  describeRealEstateCategoriesSetting,
   describeSpendingRolesSetting,
   describeUnsavedChanges,
   summarizeExpenseCategories,
@@ -808,6 +809,14 @@ describe('describeTransferFeeCategory', () => {
 
   it('says what stalls without a category: the form field stays off', () => {
     expect(plain(describeTransferFeeCategory({}))).toBe('Senza una categoria, il campo «Commissione» del form spesa resta spento.');
+  });
+});
+
+describe('describeRealEstateCategoriesSetting', () => {
+  it('says how many kinds of a house operation start on a saved category, and what the rest do', () => {
+    expect(plain(describeRealEstateCategoriesSetting(0, 13))).toBe('Nessuna categoria predefinita: la compravendita propone ogni volta quella dal nome più simile.');
+    expect(plain(describeRealEstateCategoriesSetting(4, 13))).toBe('4 voci su 13 della compravendita partono dalla loro categoria predefinita; le altre da quella dal nome più simile.');
+    expect(plain(describeRealEstateCategoriesSetting(13, 13))).toBe('Ogni voce della compravendita parte dalla sua categoria predefinita.');
   });
 });
 

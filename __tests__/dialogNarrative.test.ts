@@ -27,6 +27,7 @@ import {
   describeSnapshotOverwrite,
   describeExpenseFeeField,
   describeDebtRepaymentField,
+  describePropertyTransferRefusal,
   describeTradeIntent,
   describeWriteError,
   pluralize,
@@ -704,6 +705,15 @@ describe('describeLinkSeriesReading — «Collega la serie a un conto»', () => 
     );
     expect(plain(describeLinkSeriesReading({ mode: 'recurring', futureCount: 0, firstDate: null, pastCount: 4, accountName: 'Casa', target: 'debt' }))).toContain('riducono già il debito di un prestito');
   });
+
+  it('should link every occurrence to a house, the past too, and say no balance moves', () => {
+    expect(plain(describeLinkSeriesReading({ mode: 'recurring', futureCount: 24, firstDate: first, pastCount: 9, accountName: 'Casa', target: 'property' }))).toBe(
+      'Le 24 voci della serie saranno legate a Casa: alla vendita, la Compravendita proporrà di fermarla. Nessun saldo si muove.',
+    );
+    expect(plain(describeLinkSeriesReading({ mode: 'installment', futureCount: 1, firstDate: first, pastCount: 0, accountName: null, target: 'property' }))).toBe(
+      'L’unica rata della serie sarà legata all’immobile che scegli: alla vendita, la Compravendita proporrà di fermarla. Nessun saldo si muove.',
+    );
+  });
 });
 
 describe('describeDebtRepaymentField — the line under «Riduce il debito di»', () => {
@@ -741,5 +751,19 @@ describe('describeDebtRepaymentField — the line under «Riduce il debito di»'
       'Estinzione totale: alla data della voce il debito di Mutuo Casa (10.000,00 €) va a zero. Una penale o gli interessi del periodo vanno nella commissione.'
     );
     expect(flat(describeDebtRepaymentField({ loanName: 'Mutuo Casa', debt: 10_000, instalment: null, split: null, isPayoff: true }))).toContain('scende di tutto l’importo');
+  });
+});
+
+describe('describePropertyTransferRefusal — a sale above the recorded value', () => {
+  const flat = (text: string) => text.replace(/\u00a0/g, ' ');
+
+  it('should name the property, its value and where to raise it', () => {
+    expect(flat(describePropertyTransferRefusal('Casa al mare', 130_000))).toBe(
+      'Supera il valore di Casa al mare (130.000,00 €): aggiornane prima il valore in Patrimonio.'
+    );
+  });
+
+  it('should never print a negative value', () => {
+    expect(flat(describePropertyTransferRefusal('Casa', -50))).toContain('(0,00 €)');
   });
 });

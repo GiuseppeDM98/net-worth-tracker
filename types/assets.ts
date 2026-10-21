@@ -1,4 +1,5 @@
 import type { PensionFundDetails } from './pension';
+import type { RealEstateCostDefault } from './realEstateOperation';
 
 // AssetType: Granular classification used in UI (stock, ETF, bond, crypto, etc.)
 // AssetClass: Broad financial categories for allocation analysis (equity, bonds, etc.)
@@ -395,6 +396,10 @@ export interface AssetAllocationSettings {
   // decides the fee row's. Absent → the form's «Commissione» field is disabled, with a pointer here.
   transferFeeCategoryId?: string;
   transferFeeSubCategoryId?: string;
+  // Patrimonio › Compravendita (2026-10-21): the category each kind of cost starts on (notary,
+  // taxes, instalments…), set in Impostazioni › Spese. A list, replaced whole on every save
+  // (types/realEstateOperation.ts → RealEstateCostDefault); absent or empty = the path suggests.
+  realEstateCostCategories?: RealEstateCostDefault[];
   // Default cash account credited by dividends and coupons; an instrument's own
   // `Asset.dividendCashAssetId` wins over it (lib/utils/dividendAccount.ts). Read server-side
   // straight from the settings doc by `dividendIncomeService`.
