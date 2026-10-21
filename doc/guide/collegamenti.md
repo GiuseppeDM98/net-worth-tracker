@@ -4,9 +4,12 @@
 > `components/settings/broker/ScalableConnectionTile.tsx`,
 > `components/settings/broker/TradeRepublicConnectionTile.tsx`,
 > `components/settings/broker/IntesaSanpaoloConnectionTile.tsx`,
+> `components/settings/broker/AzimutConnectionTile.tsx`,
 > `lib/utils/scalableImport.ts` o `lib/utils/tradeRepublicImport.ts` (i mapping puri),
 > `lib/utils/intesaSanpaoloImport.ts` (parser e piano del file XLSX) o
 > `lib/utils/intesaSanpaoloWorkbook.ts` (lettura del file, libreria importata in modo lazily),
+> `lib/utils/azimutImport.ts` (parser e piano del file XLSX) o
+> `lib/utils/azimutWorkbook.ts` (lettura del file, libreria importata in modo lazily),
 > `lib/utils/fundComposition.ts` (la composizione pubblicata → `Asset.composition`),
 > `lib/utils/fundAllocationClient.ts` (la porta client, a chunk di 40 ISIN) o
 > `app/api/portfolio/fund-allocation/route.ts` (la lettura dall'ISIN),
@@ -19,7 +22,7 @@
 > `brokerConnections/{ownerId}/brokers/{broker}`) o `firestore.rules` (la match `brokerSessions`).
 > File: `CLAUDE.md` → *Key Features* → *Collegamenti broker*.
 
-## I tre ponti, e cosa li distingue
+## I quattro ponti, e cosa li distingue
 
 - **Ogni broker è un componente e un modulo puri propri.** `BrokerConnectionsSection` possiede la
    pagina e nient'altro: tre tile in una griglia `items-start`. Il resto — come si ottiene la
@@ -331,3 +334,10 @@
   azionario SOLO quando Yahoo non ne pubblica la composizione (ISIN non letto): se il mix arriva,
   le gambe sono già in «Composizione» — è la classe di ripiego dichiarata, non un errore di
   lettura.
+
+## Azimut — import del file `.xlsx` (`azimutImport.ts`, `azimutWorkbook.ts`)
+
+- **Import del file XLSX con 4 fogli distinti**: Azimut esporta un file `.xlsx` contenente i fogli `AZIMUT - GESTITO`, `AZIMUT - ECONOMIA REALE`, `AZIMUT - AMMINISTRATO` e `AZIMUT - LIQUIDITA`.
+- **Estrazione codice ISIN o ticker Bloomberg**: in `AZIMUT - AMMINISTRATO`, per le sezioni Azioni, Obbligazioni e ETF/ETC/ETN, viene estratto l'ISIN o il ticker tra parentesi (convertendo i suffissi Bloomberg come `GY` → `.DE`, `IM` → `.MI`, `FP` → `.PA`). Le indicazioni di valuta tra parentesi come `(EUR)` vengono ignorate.
+- **Liquidità**: la sezione `AZIMUT - LIQUIDITA` rileva il saldo del conto corrente e crea/aggiorna il conto di cassa `Azimut — Liquidità` con ticker fisso `AZIMUT-EUR`.
+- **Anteprima e persistenza**: le posizioni nuove nascono con `exchange: 'Azimut'` e `autoUpdatePrice: false`. Per le posizioni con ISIN viene letta la composizione pubblicata da Yahoo. Solo i metadati di sincronizzazione sono salvati in `brokerConnections/{ownerId}/brokers/azimut`.

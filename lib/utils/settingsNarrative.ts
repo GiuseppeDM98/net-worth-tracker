@@ -842,21 +842,31 @@ export interface BrokerConnectionsInput {
  * when the input that justifies it is absent, and here that input is the broker.
  */
 export function describeBrokerConnections(
-  broker: 'scalable' | 'traderepublic' | 'intesa',
+  broker: 'scalable' | 'traderepublic' | 'intesa' | 'azimut',
   { lastSyncAt, holdingsCount, cashBalance, savingsPlanCount }: BrokerConnectionsInput
 ): Narrative {
   const isTradeRepublic = broker === 'traderepublic';
   const isIntesa = broker === 'intesa';
-  const brokerName = isIntesa ? 'Intesa Sanpaolo' : isTradeRepublic ? 'Trade Republic' : 'Scalable';
+  const isAzimut = broker === 'azimut';
+  const isFileBroker = isIntesa || isAzimut;
+  const brokerName = isAzimut
+    ? 'Azimut'
+    : isIntesa
+      ? 'Intesa Sanpaolo'
+      : isTradeRepublic
+        ? 'Trade Republic'
+        : 'Scalable';
 
   if (!lastSyncAt) {
     return [
       prose(
-        isIntesa
-          ? 'Nessun import Intesa Sanpaolo: carica il file XLSX del portafoglio per controllare le posizioni prima di salvarle.'
-          : isTradeRepublic
-            ? 'Nessuna sincronizzazione Trade Republic: la sincronizzazione legge posizioni, liquidità e piani di accumulo, in sola lettura.'
-            : 'Nessuna sincronizzazione Scalable: la sincronizzazione legge posizioni e liquidità, in sola lettura.'
+        isAzimut
+          ? 'Nessun import Azimut: carica il file XLSX del portafoglio per controllare le posizioni prima di salvarle.'
+          : isIntesa
+            ? 'Nessun import Intesa Sanpaolo: carica il file XLSX del portafoglio per controllare le posizioni prima di salvarle.'
+            : isTradeRepublic
+              ? 'Nessuna sincronizzazione Trade Republic: la sincronizzazione legge posizioni, liquidità e piani di accumulo, in sola lettura.'
+              : 'Nessuna sincronizzazione Scalable: la sincronizzazione legge posizioni e liquidità, in sola lettura.'
       ),
     ];
   }
@@ -873,10 +883,10 @@ export function describeBrokerConnections(
       : '';
 
   return [
-    prose(`${isIntesa ? 'Ultimo import' : 'Ultima lettura'} ${when} da ${brokerName}: `),
+    prose(`${isFileBroker ? 'Ultimo import' : 'Ultima lettura'} ${when} da ${brokerName}: `),
     figure(`${positions}${cash}${plans}`),
     prose(
-      isIntesa
+      isFileBroker
         ? ' — prezzi e quantità letti dal file, non aggiornati in automatico.'
         : isTradeRepublic
           ? ' — le quantità restano del Registro, i prezzi arrivano da Yahoo.'
