@@ -380,7 +380,32 @@ export interface FamilyMember {
   firstEmploymentYear?: number; // First calendar year of participation — anchors the plafond 5/20-year windows
 }
 
+// Weight optimizer (lib/utils/weightOptimizer.ts) — four fixed priority levels an objective can
+// carry, from "never trade it away" to "nice to have". Also used by `IdealAllocationSettings`'s
+// per-objective priorities (class, leverage, factor, group cap).
+export type ObjectivePriority = 'essential' | 'high' | 'medium' | 'low';
+
+// The owner's model-portfolio criteria (Allocazione › Accumulo › "Criteri del modello"), read by the
+// weight optimizer to propose market weights. Classes and sub-category targets are NOT duplicated
+// here — they are read from the existing `targets` (AssetAllocationTarget); this settings block only
+// carries priorities and the per-instrument/per-group caps.
+export interface IdealAllocationSettings {
+  enabled: boolean;
+  classPriority: ObjectivePriority;
+  leveragePriority: ObjectivePriority | 'off';
+  factorObjectives: Array<{ assetClass: AssetClass; priority: ObjectivePriority }>;
+  instrumentLimits: Array<{ assetId: string; minPct?: number; maxPct?: number }>;
+  groupLimits: Array<{
+    id: string;
+    label: string;
+    assetIds: string[];
+    maxPct: number;
+    priority: ObjectivePriority;
+  }>;
+}
+
 export interface AssetAllocationSettings {
+  idealAllocation?: IdealAllocationSettings; // the model portfolio's criteria (weight optimizer)
   userAge?: number;
   riskFreeRate?: number;
   withdrawalRate?: number; // Safe withdrawal rate for FIRE calculations (e.g., 4.0 for 4%)

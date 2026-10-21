@@ -7,7 +7,18 @@
  * page's sub-targets).
  */
 
-import type { AssetAllocationSettings } from '@/types/assets';
+import type { AssetAllocationSettings, IdealAllocationSettings } from '@/types/assets';
+
+/** The model portfolio's criteria — every field diverges from DEFAULT_IDEAL_ALLOCATION so a field
+ *  lost on either write chain or the read mapping shows. */
+export const STORED_IDEAL_ALLOCATION: IdealAllocationSettings = {
+  enabled: true,
+  classPriority: 'high',
+  leveragePriority: 'medium',
+  factorObjectives: [{ assetClass: 'equity', priority: 'low' }],
+  instrumentLimits: [{ assetId: 'asset-1', minPct: 5, maxPct: 40 }],
+  groupLimits: [{ id: 'group-1', label: 'Leva', assetIds: ['asset-1', 'asset-2'], maxPct: 20, priority: 'high' }],
+};
 
 /** Ogni valore è scelto per essere DIVERSO dal default, così un campo perso si vede. */
 export const STORED_SETTINGS = {
@@ -25,6 +36,7 @@ export const STORED_SETTINGS = {
   familyMembers: [{ id: 'm1', name: 'Giuseppe' }],
   expenseSplitEnabled: true,
   spendingRolesEnabled: true,
+  idealAllocation: STORED_IDEAL_ALLOCATION,
   dividendCashAssetId: 'cash-1',
   transferFeeCategoryId: 'cat-fee',
   transferFeeSubCategoryId: 'sub-fee',

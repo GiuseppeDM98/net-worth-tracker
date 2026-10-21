@@ -263,3 +263,21 @@ test.describe('Allocazione, composta per un telefono', () => {
     expect(desktop.map((s) => s.name).slice(0, 2)).toEqual(["Bilanciamento dell'allocazione", 'Allocazione per classe']);
   });
 });
+
+/**
+ * Accumulo a 390px: il bersaglio di «Crea piano».
+ *
+ * REGRESSION GUARD: visto rosso rimettendo `h-8` al posto di `TILE_ACTION_CLASS`. Copre SOLO lo stato
+ * «nessun piano» (la composizione con un piano attivo è di `accumulo.mobile.spec.ts`).
+ */
+test('«Crea piano» dell’Accumulo è un bersaglio di almeno 44px sul telefono', async ({ page }) => {
+  await page.goto('/dashboard/allocation?tab=accumulo', { waitUntil: 'load' });
+  await expect(page.getByRole('region', { name: 'Verdetto sul piano di accumulo' })).toBeVisible({ timeout: 60_000 });
+
+  const accumulo = page.locator('section[aria-label="Accumulo"]');
+  const create = accumulo.getByRole('button', { name: 'Crea piano' });
+  await expect(create).toBeVisible({ timeout: 30_000 });
+
+  const box = await create.boundingBox();
+  expect(box!.height).toBeGreaterThanOrEqual(44);
+});

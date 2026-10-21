@@ -38,7 +38,7 @@ import { invalidateDashboardOverviewSummary } from '@/lib/services/dashboardOver
 import type { AssetAllocationSettings, AssetAllocationTarget } from '@/types/assets';
 // The fixture is shared with settingsDraft.test.ts since 2026-10-08: the page's draft
 // is held to the same document the service's whitelists are.
-import { STORED_SETTINGS } from './fixtures/storedSettings';
+import { STORED_IDEAL_ALLOCATION, STORED_SETTINGS } from './fixtures/storedSettings';
 
 const TARGETS = { equity: { targetPercentage: 100 } } as unknown as AssetAllocationTarget;
 
@@ -68,6 +68,12 @@ describe('getSettings — lettura', () => {
     expect(settings?.performanceIncludesExcludedAssets).toBe(true);
     expect(settings?.performanceExcludesCash).toBe(true);
     expect(settings?.pensionReturnStartMonth).toBe('2026-07');
+  });
+
+  it('returns idealAllocation instead of dropping it', async () => {
+    const settings = await getSettings('user-1');
+
+    expect(settings?.idealAllocation).toEqual(STORED_IDEAL_ALLOCATION);
   });
 
   it('keeps returning the pre-existing fields alongside them', async () => {
@@ -318,6 +324,39 @@ describe('setSettings — scrittura, ramo senza targets (merge: true)', () => {
       expect(writtenPayload()).not.toHaveProperty(field);
     }
   );
+});
+
+describe('setSettings — i criteri del modello', () => {
+  it('writes idealAllocation through both chains', async () => {
+    await setSettings('user-1', { idealAllocation: STORED_IDEAL_ALLOCATION } as AssetAllocationSettings);
+    expect(writtenPayload().idealAllocation).toEqual(STORED_IDEAL_ALLOCATION);
+
+    await setSettings('user-1', { targets: TARGETS, idealAllocation: STORED_IDEAL_ALLOCATION } as AssetAllocationSettings);
+    expect(writtenPayload().idealAllocation).toEqual(STORED_IDEAL_ALLOCATION);
+  });
+
+  // «Salva i criteri» (Allocazione › Accumulo) sends ONLY idealAllocation.
+  it('writes the criteria alone: no other setting is in the payload', async () => {
+    await setSettings('user-1', { idealAllocation: STORED_IDEAL_ALLOCATION } as AssetAllocationSettings);
+
+    const payload = writtenPayload();
+    expect(payload.idealAllocation).toEqual(STORED_IDEAL_ALLOCATION);
+    expect(Object.keys(payload).filter((key) => key !== 'idealAllocation' && key !== 'userId' && key !== 'updatedAt')).toEqual([]);
+  });
+
+  it('leaves the criteria alone when the key is absent from the update', async () => {
+    await setSettings('user-1', { costCentersEnabled: true } as AssetAllocationSettings);
+    expect(writtenPayload()).not.toHaveProperty('idealAllocation');
+  });
+
+  it('drops an optional bound that is undefined: Firestore refuses undefined inside an array', async () => {
+    await setSettings('user-1', {
+      idealAllocation: { ...STORED_IDEAL_ALLOCATION, instrumentLimits: [{ assetId: 'asset-1', minPct: undefined, maxPct: 40 }] },
+    } as AssetAllocationSettings);
+
+    expect(writtenPayload().idealAllocation).toMatchObject({ instrumentLimits: [{ assetId: 'asset-1', maxPct: 40 }] });
+    expect((writtenPayload().idealAllocation as { instrumentLimits: object[] }).instrumentLimits[0]).not.toHaveProperty('minPct');
+  });
 });
 
 describe('setSettings — il riepilogo della Panoramica', () => {
