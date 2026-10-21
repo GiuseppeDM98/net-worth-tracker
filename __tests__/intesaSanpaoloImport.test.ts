@@ -20,6 +20,7 @@ import {
   parseIntesaWorkbook,
   type IntesaRows,
 } from '@/lib/utils/intesaSanpaoloImport';
+import { readIntesaWorkbookFile } from '@/lib/utils/intesaSanpaoloWorkbook';
 import type { Asset } from '@/types/assets';
 
 const FIXTURE = resolve(__dirname, 'fixtures/intesa-sanpaolo-portfolio.xlsx');
@@ -140,6 +141,15 @@ describe('parseIntesaWorkbook', () => {
 
   it('refuses a sheet that has neither positions nor liquidity', () => {
     expect(() => parseIntesaWorkbook([['Investimenti'], [null, null]])).toThrow(IntesaParseError);
+  });
+});
+
+describe('readIntesaWorkbookFile validation for Drag and Drop', () => {
+  it('rejects files without .xlsx extension', async () => {
+    const invalidFile = new File(['dummy content'], 'report.csv', { type: 'text/csv' });
+    await expect(readIntesaWorkbookFile(invalidFile)).rejects.toThrow(
+      'Il file deve essere un .xlsx esportato da Intesa Sanpaolo.'
+    );
   });
 });
 

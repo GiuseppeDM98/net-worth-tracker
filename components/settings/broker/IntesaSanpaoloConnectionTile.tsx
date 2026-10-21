@@ -20,6 +20,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertTriangle, FileSpreadsheet, Loader2, Trash2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Tile } from '@/components/ui/tile';
 import { useAssets } from '@/lib/hooks/useAssets';
@@ -159,6 +160,8 @@ export function IntesaSanpaoloConnectionTile({ ownerId, disabled = false }: Inte
   const [error, setError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string>('');
   const [plan, setPlan] = useState<IntesaImportPlan | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragCounterRef = useRef(0);
 
   const loadConnection = useCallback(async () => {
     try {
@@ -179,6 +182,9 @@ export function IntesaSanpaoloConnectionTile({ ownerId, disabled = false }: Inte
     return () => clearTimeout(timer);
   }, [loadConnection]);
 
+  const busy = parsing || saving;
+  const disabledAll = disabled || busy || assetsLoading || assetsFailed;
+
   const reset = () => {
     setPlan(null);
     setFileName('');
@@ -186,36 +192,82 @@ export function IntesaSanpaoloConnectionTile({ ownerId, disabled = false }: Inte
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  const processFile = useCallback(
+    (file: File) => {
+      if (disabled || busy || assetsLoading || assetsFailed) return;
+      setFileName(file.name);
+      setPlan(null);
+      setError(null);
+      setParsing(true);
+      void readIntesaWorkbookFile(file)
+        .then(async (workbook) => {
+          // One extra round trip BEFORE the preview: Yahoo's published mix for every fund in the
+          // report (from the shared per-ticker cache), so a hybrid fund is created already split
+          // across classes instead of landing on one class by name. Fail-soft: an unread ISIN is
+          // simply absent, and the row keeps the «classe da verificare» warning.
+          const fundIsins = workbook.positions
+            .filter((position) => position.section === 'fund')
+            .map((position) => position.isin);
+          const { allocations } = await fetchFundAllocations(fundIsins);
+          return buildIntesaImportPlan(workbook, assets, allocations);
+        })
+        .then(
+          (importPlan) => {
+            setPlan(importPlan);
+            toast.success('Anteprima pronta: controlla le righe prima di salvare.');
+          },
+          (err: unknown) => {
+            setError(err instanceof Error ? err.message : 'File non leggibile: riprova.');
+            if (fileInputRef.current) fileInputRef.current.value = '';
+          }
+        )
+        .finally(() => setParsing(false));
+    },
+    [disabled, busy, assetsLoading, assetsFailed, assets]
+  );
+
   const handleFile = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || disabled) return;
-    setFileName(file.name);
-    setPlan(null);
-    setError(null);
-    setParsing(true);
-    void readIntesaWorkbookFile(file)
-      .then(async (workbook) => {
-        // One extra round trip BEFORE the preview: Yahoo's published mix for every fund in the
-        // report (from the shared per-ticker cache), so a hybrid fund is created already split
-        // across classes instead of landing on one class by name. Fail-soft: an unread ISIN is
-        // simply absent, and the row keeps the «classe da verificare» warning.
-        const fundIsins = workbook.positions
-          .filter((position) => position.section === 'fund')
-          .map((position) => position.isin);
-        const { allocations } = await fetchFundAllocations(fundIsins);
-        return buildIntesaImportPlan(workbook, assets, allocations);
-      })
-      .then(
-        (importPlan) => {
-          setPlan(importPlan);
-          toast.success('Anteprima pronta: controlla le righe prima di salvare.');
-        },
-        (err: unknown) => {
-          setError(err instanceof Error ? err.message : 'File non leggibile: riprova.');
-          if (fileInputRef.current) fileInputRef.current.value = '';
-        }
-      )
-      .finally(() => setParsing(false));
+    if (file) processFile(file);
+  };
+
+  const handleDragEnter = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (disabledAll) return;
+    dragCounterRef.current += 1;
+    if (event.dataTransfer.items && event.dataTransfer.items.length > 0) {
+      setIsDragging(true);
+    }
+  };
+
+  const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (disabledAll) return;
+    dragCounterRef.current -= 1;
+    if (dragCounterRef.current <= 0) {
+      dragCounterRef.current = 0;
+      setIsDragging(false);
+    }
+  };
+
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragging(false);
+    dragCounterRef.current = 0;
+    if (disabledAll) return;
+
+    const file = event.dataTransfer.files?.[0];
+    if (file) {
+      processFile(file);
+    }
   };
 
   const handleSave = () => {
@@ -260,11 +312,28 @@ export function IntesaSanpaoloConnectionTile({ ownerId, disabled = false }: Inte
           cashBalance: connection?.cashBalance,
         });
 
-  const busy = parsing || saving;
-  const disabledAll = disabled || busy || assetsLoading || assetsFailed;
-
   return (
-    <div className="flex min-w-0 flex-col gap-3">
+    <div
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className={cn(
+        'relative flex min-w-0 flex-col gap-3 rounded-2xl transition-all',
+        isDragging && 'ring-2 ring-primary ring-offset-2'
+      )}
+    >
+      {isDragging && (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-primary bg-card/95 p-4 text-center backdrop-blur-xs transition-all">
+          <Upload className="h-8 w-8 animate-bounce text-primary" aria-hidden="true" />
+          <p className="mt-2 text-[14px] font-semibold text-foreground">
+            Rilascia qui il file XLSX
+          </p>
+          <p className="text-[12px] text-muted-foreground">
+            Esportazione portafoglio Intesa Sanpaolo (.xlsx)
+          </p>
+        </div>
+      )}
       <Tile
         eyebrow="Intesa Sanpaolo"
         aside={
