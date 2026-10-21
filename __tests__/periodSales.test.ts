@@ -119,7 +119,7 @@ describe('summarizePeriodSales', () => {
     ];
     const summary = summarizePeriodSales([asset('a', 'A', 26)], ledger, SEPTEMBER)!;
 
-    expect(summary.realizedGain).toBeCloseTo(479, 9); // 1500 − 20 − 10 × 100,10
+    expect(summary.realizedGain).toBeCloseTo(480, 9); // 1500 − 20 − 10 × 100
     expect(summary.estimatedTax).toBeCloseTo(130, 9); // 26% × 10 × (150 − 100)
   });
 

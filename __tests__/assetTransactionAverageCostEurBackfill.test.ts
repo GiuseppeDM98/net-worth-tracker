@@ -154,7 +154,7 @@ describe('backfillAverageCostEur', () => {
     const asset = mocks.assetsStore.get('asset-eur')!;
     expect(asset.quantity).toBe(12); // not rewritten by the backfill
     expect(asset.averageCost).toBe(100); // native PMC: fees excluded, and not rewritten
-    expect(asset.averageCostEur).toBe(101); // (10 × 100 + 10) / 10 — the fiscal cost
+    expect(asset.averageCostEur).toBe(100); // the buy's fee is a cashflow row, not part of the cost
   });
 
   it('projects the field from a baseline-only ledger (a position never traded since migration)', async () => {

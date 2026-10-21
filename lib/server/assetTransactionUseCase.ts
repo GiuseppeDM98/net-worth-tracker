@@ -16,6 +16,9 @@ import { invalidateDashboardOverviewSummaryServer } from '@/lib/services/dashboa
 import { removeUndefinedDeep } from '@/lib/utils/firestoreData';
 import { toDate, getItalyDayBoundsUtc } from '@/lib/utils/dateHelpers';
 import { roundToCents } from '@/lib/utils/cents';
+import { resolveExpenseFeeCategory, type ExpenseFeeCategory } from '@/lib/utils/expenseFee';
+import { buildTradeFeeExpenseDoc, describeTradeFeeNote, planTradeFee, type TradeFeePlan } from '@/lib/utils/tradeFeeExpense';
+import type { ExpenseCategory } from '@/types/expenses';
 import {
   ASSET_TRANSACTIONS_COLLECTION,
   ASSET_TRANSACTIONS_META_COLLECTION,
@@ -44,6 +47,7 @@ import type { AssetType } from '@/types/assets';
  */
 
 const ASSETS_COLLECTION = 'assets';
+const EXPENSES_COLLECTION = 'expenses';
 
 /**
  * A semantic failure that needs Firestore context (meta missing, wrong asset type, a future
@@ -91,6 +95,7 @@ function docToAssetTransaction(id: string, data: DocumentData): AssetTransaction
     priceEur: data.priceEur,
     fees: data.fees,
     linkedCashAssetId: data.linkedCashAssetId,
+    feeExpenseId: data.feeExpenseId,
     withheldTaxEur: data.withheldTaxEur,
     isBaseline: data.isBaseline,
     indexationCoefficient: data.indexationCoefficient,
@@ -112,6 +117,7 @@ function buildTradeSetDocData(t: AssetTransaction): Record<string, unknown> {
     priceEur: t.priceEur,
     fees: t.fees,
     linkedCashAssetId: t.linkedCashAssetId,
+    feeExpenseId: t.feeExpenseId,
     withheldTaxEur: t.withheldTaxEur,
     isBaseline: t.isBaseline,
     indexationCoefficient: t.indexationCoefficient,
@@ -135,6 +141,7 @@ function buildTradeUpdateDocData(t: AssetTransaction): Record<string, unknown> {
     priceEur: t.priceEur,
     fees: t.fees ?? FieldValue.delete(),
     linkedCashAssetId: t.linkedCashAssetId ?? FieldValue.delete(),
+    feeExpenseId: t.feeExpenseId ?? FieldValue.delete(),
     withheldTaxEur: t.withheldTaxEur ?? FieldValue.delete(),
     indexationCoefficient: t.indexationCoefficient ?? FieldValue.delete(),
     note: t.note ?? FieldValue.delete(),
@@ -172,6 +179,49 @@ async function getOwnedTradeOrThrow(ownerId: string, transactionId: string): Pro
     throw new TradeUseCaseError(404, 'Operazione non trovata.');
   }
   return docToAssetTransaction(snap.id, snap.data() as DocumentData);
+}
+
+/**
+ * Where a trade's fee row lands: the category chosen in Impostazioni › Spese for fees, or null
+ * when none is set (or it was deleted since). Read with the Admin SDK — a route has no signed-in
+ * client — like `resolveDividendIncomeCategory`. A null never blocks the trade: the fee still
+ * leaves the account, it just has no cashflow row.
+ */
+async function resolveTradeFeeCategory(ownerId: string): Promise<ExpenseFeeCategory | null> {
+  const settingsDoc = await adminDb.collection('assetAllocationTargets').doc(ownerId).get();
+  const settings = settingsDoc.exists ? settingsDoc.data() : null;
+  if (!settings?.transferFeeCategoryId) return null;
+  const categoryDoc = await adminDb.collection('expenseCategories').doc(settings.transferFeeCategoryId).get();
+  if (!categoryDoc.exists || categoryDoc.data()?.userId !== ownerId) return null;
+  const category = { ...(categoryDoc.data() as Omit<ExpenseCategory, 'id'>), id: categoryDoc.id } as ExpenseCategory;
+  return resolveExpenseFeeCategory([{ ...category, subCategories: category.subCategories ?? [] }], settings);
+}
+
+/** What a mutation does to the trade's fee row (decided before the transaction, applied in it). */
+interface FeeWrite {
+  plan: Exclude<TradeFeePlan, { kind: 'none' }>;
+  ref: DocumentReference;
+  category: ExpenseFeeCategory | null;
+  /** Only a plan with a row to read: it may have been deleted by hand since. */
+  readsExisting: boolean;
+}
+
+async function prepareFeeWrite(
+  ownerId: string,
+  fees: number | undefined,
+  existingFeeExpenseId: string | undefined
+): Promise<FeeWrite | undefined> {
+  const category = normalizeFeePresent(fees) ? await resolveTradeFeeCategory(ownerId) : null;
+  const plan = planTradeFee(fees, !!existingFeeExpenseId, !!category);
+  if (plan.kind === 'none') return undefined;
+  const ref = existingFeeExpenseId
+    ? adminDb.collection(EXPENSES_COLLECTION).doc(existingFeeExpenseId)
+    : adminDb.collection(EXPENSES_COLLECTION).doc();
+  return { plan, ref, category, readsExisting: !!existingFeeExpenseId };
+}
+
+function normalizeFeePresent(fees: number | undefined): boolean {
+  return fees !== undefined && Number.isFinite(fees) && fees > 0;
 }
 
 async function assertCashSettlementAsset(ownerId: string, cashAssetId: string): Promise<void> {
@@ -229,6 +279,8 @@ interface PreparedMutation {
   targetTransactionId?: string;
   /** Reversal of old + application of new, aggregated per cash-asset docId (self-edit nets). */
   cashDeltaByDocId: Map<string, number>;
+  /** The fee row to create, move or remove with the trade. Absent when the trade has none. */
+  feeWrite?: FeeWrite;
   /** Trade type whose result drives the response (new type for create/edit, old type for delete). */
   affectedType: AssetTransactionType;
   invalidationReason: string;
@@ -274,12 +326,16 @@ async function prepareCreate(
     updatedAt: now,
   };
 
+  const feeWrite = await prepareFeeWrite(ownerId, newTransaction.fees, undefined);
+  if (feeWrite) newTransaction.feeExpenseId = feeWrite.ref.id;
+
   const cashDeltaByDocId = new Map<string, number>();
   addCashDelta(cashDeltaByDocId, newTransaction, 1);
 
   return {
     ownerId,
     assetId: data.assetId,
+    feeWrite,
     op: 'set',
     tradeRef,
     newTransaction,
@@ -353,6 +409,9 @@ async function prepareEdit(
     updatedAt: new Date(),
   };
 
+  const feeWrite = await prepareFeeWrite(ownerId, mergedFees, oldTrade.feeExpenseId);
+  newTransaction.feeExpenseId = feeWrite && feeWrite.plan.kind !== 'delete' ? feeWrite.ref.id : undefined;
+
   const cashDeltaByDocId = new Map<string, number>();
   addCashDelta(cashDeltaByDocId, oldTrade, -1); // reverse the previous settlement
   addCashDelta(cashDeltaByDocId, newTransaction, 1); // apply the new one (nets if unchanged)
@@ -360,6 +419,7 @@ async function prepareEdit(
   return {
     ownerId,
     assetId: oldTrade.assetId,
+    feeWrite,
     op: 'update',
     tradeRef: adminDb.collection(ASSET_TRANSACTIONS_COLLECTION).doc(transactionId),
     newTransaction,
@@ -383,6 +443,7 @@ async function prepareDelete(ownerId: string, transactionId: string): Promise<Pr
   return {
     ownerId,
     assetId: oldTrade.assetId,
+    feeWrite: await prepareFeeWrite(ownerId, undefined, oldTrade.feeExpenseId),
     op: 'delete',
     tradeRef: adminDb.collection(ASSET_TRANSACTIONS_COLLECTION).doc(transactionId),
     targetTransactionId: transactionId,
@@ -428,6 +489,9 @@ async function commitTradeMutation(
       const ref = adminDb.collection(ASSETS_COLLECTION).doc(docId);
       cashReads.push({ ref, snap: await tx.get(ref) });
     }
+
+    // r4: the fee row the trade already names, when there is one (it may be gone by hand).
+    const feeSnap = plan.feeWrite?.readsExisting ? await tx.get(plan.feeWrite.ref) : undefined;
 
     // ── COMPUTE (pure) ─────────────────────────────────────────────────────────
     const existing = existingSnap.docs.map((d) => docToAssetTransaction(d.id, d.data()));
@@ -476,6 +540,32 @@ async function commitTradeMutation(
         ...(derived.holdingStartDate !== undefined ? { holdingStartDate: derived.holdingStartDate } : {}),
       })
     );
+
+    // w4: the fee row. A row deleted by hand since is born again by the next save of the trade.
+    if (plan.feeWrite) {
+      const { plan: feePlan, ref: feeRef, category } = plan.feeWrite;
+      const rowExists = !!feeSnap?.exists;
+      const trade = plan.newTransaction;
+      if (feePlan.kind === 'delete') {
+        if (rowExists) tx.delete(feeRef);
+      } else if (rowExists) {
+        tx.update(feeRef, { amount: -feePlan.amount, date: trade!.date, updatedAt: new Date() });
+      } else if (category && trade) {
+        const assetData = assetSnap.data();
+        tx.set(
+          feeRef,
+          buildTradeFeeExpenseDoc({
+            userId: plan.ownerId,
+            tradeId: trade.id,
+            amount: feePlan.amount,
+            date: trade.date,
+            category,
+            notes: describeTradeFeeNote(trade.type, (assetData?.ticker as string | undefined) || (assetData?.name as string | undefined)),
+            now: new Date(),
+          })
+        );
+      }
+    }
 
     // w3: cash settlements (skip zero and missing accounts, like updateCashAssetBalancesAtomic).
     for (const { ref, snap } of cashReads) {

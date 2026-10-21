@@ -386,4 +386,87 @@ describe('assetTransactionUseCase — atomic write transaction', () => {
     expect(asset.averageCost).toBe(150); // (10·100 + 10·200) / 20
     expect(asset.holdingStartDate).toBe(originalHoldingStart); // untouched, never deleteField()
   });
+
+  describe('the fee of a trade in the cashflow (2026-10-21)', () => {
+    function seedFeeCategory() {
+      store.set(docKey('assetAllocationTargets', OWNER), { transferFeeCategoryId: 'cat-fee' });
+      store.set(docKey('expenseCategories', 'cat-fee'), {
+        userId: OWNER,
+        name: 'Commissioni',
+        type: 'variable',
+        subCategories: [],
+      });
+    }
+    const feeRows = () => [...store.entries()].filter(([k]) => k.startsWith('expenses/'));
+
+    it('writes the fee as a cashflow row that moves no account, and keeps it out of the PMC', async () => {
+      seedAsset({ quantity: 0, ticker: 'VWCE' });
+      seedCash('cash-1', 10000);
+      seedFeeCategory();
+
+      await createAssetTransaction(OWNER, {
+        assetId: 'asset-1',
+        type: 'buy',
+        date: new Date(),
+        quantity: 10,
+        pricePerUnit: 100,
+        fees: 5,
+        linkedCashAssetId: 'cash-1',
+      });
+
+      expect(store.get(docKey('assets', 'asset-1'))!.averageCostEur).toBe(100); // not 100.5
+      expect(store.get(docKey('assets', 'cash-1'))!.quantity).toBe(8995); // the fee leaves ONCE
+      const rows = feeRows();
+      expect(rows).toHaveLength(1);
+      const [rowKey, row] = rows[0];
+      expect(row).toMatchObject({
+        userId: OWNER,
+        type: 'variable',
+        categoryId: 'cat-fee',
+        amount: -5,
+        notes: 'Commissione su acquisto di VWCE',
+      });
+      expect(row.linkedCashAssetId).toBeUndefined();
+      const trade = [...store.entries()].find(([k]) => k.startsWith('assetTransactions/'))!;
+      expect(row.feeOfTradeId).toBe(trade[0].split('/')[1]);
+      expect(trade[1].feeExpenseId).toBe(rowKey.split('/')[1]);
+    });
+
+    it('writes no row when no fee category is set, and the trade still goes through', async () => {
+      seedAsset({ quantity: 0 });
+      seedCash('cash-1', 10000);
+
+      await createAssetTransaction(OWNER, {
+        assetId: 'asset-1', type: 'buy', date: new Date(), quantity: 10, pricePerUnit: 100, fees: 5, linkedCashAssetId: 'cash-1',
+      });
+
+      expect(feeRows()).toHaveLength(0);
+      expect(store.get(docKey('assets', 'cash-1'))!.quantity).toBe(8995);
+    });
+
+    it('creates the row when an old trade with fees is saved again, then moves and removes it with the trade', async () => {
+      seedAsset({ quantity: 10, averageCost: 100, averageCostEur: 100.5 });
+      seedCash('cash-1', 9000);
+      seedFeeCategory();
+      store.set(docKey('assetTransactions', 't1'), {
+        userId: OWNER, assetId: 'asset-1', type: 'buy', date: new Date(2024, 5, 1), quantity: 10,
+        pricePerUnit: 100, priceEur: 100, fees: 5, linkedCashAssetId: 'cash-1',
+        createdAt: new Date(2024, 5, 1), updatedAt: new Date(2024, 5, 1),
+      });
+
+      await updateAssetTransaction(OWNER, 't1', { note: 'ricontrollata' });
+
+      expect(store.get(docKey('assets', 'asset-1'))!.averageCostEur).toBe(100); // recomputed without the fee
+      expect(feeRows()).toHaveLength(1);
+      const feeId = store.get(docKey('assetTransactions', 't1'))!.feeExpenseId as string;
+      expect(store.get(docKey('expenses', feeId))!.amount).toBe(-5);
+
+      await updateAssetTransaction(OWNER, 't1', { fees: 8 });
+      expect(store.get(docKey('expenses', feeId))!.amount).toBe(-8);
+      expect(feeRows()).toHaveLength(1);
+
+      await deleteAssetTransaction(OWNER, 't1');
+      expect(feeRows()).toHaveLength(0);
+    });
+  });
 });
