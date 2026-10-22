@@ -275,7 +275,9 @@ pointer — a stub that grows past that is a guide leaking back (2026-09-20: ten
 - **Global shared cache** (benchmark, FX, ECB): natural key as doc id, no `userId`, `read: isAuthenticated(); write:
   false`; client `staleTime` = server TTL minus headroom. **A shared per-ticker cache the client NEVER reads**
   (`instrument-profile-cache`, 2026-09-28): rules `if false`, Admin SDK only, ONLY the external source's answers
-  (`mergeFields` per module), nothing of any user's — doc/guide/allocazione.md § Esposizione.
+  (`mergeFields` per module), nothing of any user's — doc/guide/allocazione.md § Esposizione. **And a shared
+  per-NAME one** (`fund-identity-cache`, 2026-10-22: EODHD's answer for a broker's product name — 90 days matched,
+  7 days a miss, an `unavailable` never cached, one call per distinct name; doc/guide/collegamenti.md § Azimut).
 - **A server-owned materialized summary is fresh only while every write to an input invalidates it**
   (`dashboardOverviewSummaries/{userId}`, 2026-10-03): a new writer owes its invalidation in the same commit; fresh =
   no `invalidatedAt`, same `sourceVersion`, same Italian day, ≤ 6 h; rebuilt in `after()` under a precondition —

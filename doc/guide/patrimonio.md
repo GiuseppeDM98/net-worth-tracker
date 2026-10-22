@@ -302,6 +302,19 @@ form whose fields depend on a discriminant, and the marker rule itself, stay the
   census, 0 and 0 after the move (`npm run perf:census -- --scenario=asset`; one `useWatch('quantity')` put back at the
   root read 563, seen red). The root keeps the watches that decide the form's SHAPE (type, class, the switches and
   selects — one change per click) and the ISIN. Submit-time reads stay `getValues()`/the `data` of `handleSubmit`.
+- **Un ISIN si quota con yahoo-finance2** (2026-10-22): Yahoo non quota un ISIN (`quote('LU0605515377')`
+  non risponde), e un broker che pubblica solo l'ISIN lasciava l'asset con l'ISIN come ticker — quindi
+  non quotabile. Il simbolo lo trova `lib/server/yahooSymbol.ts` — **UN solo risolutore, letto dal prezzo
+  (`lib/services/yahooFinanceService.ts`) e dall'Esposizione** (`lib/server/exposure/yahooSource.ts`) — in
+  quest'ordine: prima il **catalogo misurato** (`lib/utils/yahooSymbolForIsin.ts`), poi la **ricerca della
+  libreria**, e il simbolo che ne esce viene **misurato** prima di usarlo: la ricerca nomina il fondo, il
+  prezzo del simbolo nomina ciò che quel simbolo quota, e i due devono essere lo STESSO fondo
+  (`namesTheSameFund`, la regola con cui il catalogo è stato misurato). Misurato: `LU0605515377` → `FPIJ.F`
+  → 37,633 € (il file del broker dice 37,74 €: la stessa quota); `FR0011253624` → 3.919,57 € (file:
+  3.916,80 €). Un simbolo che Yahoo non descrive NON si quota (il nome di un altro fondo non si può
+  confrontare, e un simbolo non verificato è un prezzo sbagliato su un asset vero — nell'Esposizione
+  sarebbero le quote di un ALTRO fondo); un ISIN che la libreria non nomina (LU0119620416, nessuna
+  quotazione su Yahoo) resta non quotabile — come prima, e non come un prezzo inventato.
 - **La composizione si legge dall'ISIN DA SOLA, e una digitata non viene mai sovrascritta** (2026-10-20): appena l'ISIN
   di un ETF è completo (la stessa forma dello schema, `ISIN_PATTERN`), `AssetDialog` chiede il mix pubblicato a
   `GET /api/portfolio/fund-allocation` dopo 500 ms, lo mappa con `lib/utils/fundComposition.ts` e riempie le righe

@@ -13,6 +13,7 @@ import {
   INTESA_BROKER_NAME,
   INTESA_CASH_TICKER,
   IntesaParseError,
+  applyIntesaClassChoices,
   buildIntesaImportPlan,
   mapIntesaPositionToAssetFormData,
   mapIntesaPositionType,
@@ -251,7 +252,7 @@ describe('buildIntesaImportPlan', () => {
     const diff = plan.holdings.find((holding) => holding.position.isin === 'IT0005650905');
     expect(diff?.kind).toBe('new');
     expect(diff?.formData.composition).toHaveLength(3);
-    expect(diff?.typeUncertain).toBe(false);
+    expect(diff?.needsClassChoice).toBe(false);
     expect(plan.warnings.some((warning) => warning.includes('MARKET SELECTION 20'))).toBe(false);
   });
 
@@ -296,7 +297,7 @@ describe('buildIntesaImportPlan', () => {
     const diff = plan.holdings.find((holding) => holding.position.isin === 'IT0005650905');
     expect(diff?.kind).toBe('unchanged');
     expect(diff?.compositionUpdate).toBe(false);
-    expect(diff?.typeUncertain).toBe(false);
+    expect(diff?.needsClassChoice).toBe(false);
     expect(plan.stats.compositionUpdateCount).toBe(0);
     // The preview must not announce a mix the save would not write.
     expect(diff?.formData.composition?.map((leg) => leg.assetClass)).toEqual([
@@ -304,5 +305,49 @@ describe('buildIntesaImportPlan', () => {
       'equity',
       'cash',
     ]);
+  });
+});
+
+describe('the class the user chooses in the preview', () => {
+  it('waits for a class on every fund the market could not decide', async () => {
+    const workbook = await readFixture();
+    const plan = buildIntesaImportPlan(workbook, []);
+
+    const waiting = plan.holdings.filter((holding) => holding.needsClassChoice);
+    // The name says nothing about the class and no mix was read: the row asks for it.
+    expect(waiting.length).toBeGreaterThan(0);
+    expect(waiting.every((holding) => holding.kind === 'new')).toBe(true);
+    // The class is not a warning any more: the row asks it, and the import waits.
+    expect(plan.warnings.some((warning) => warning.includes('classe non deducibile'))).toBe(false);
+  });
+
+  it('takes the class already stored on a tracked asset: the second upload asks nothing', async () => {
+    const workbook = await readFixture();
+    const position = workbook.positions.find((candidate) => candidate.isin === 'IT0005650905')!;
+    const existing = existingAsset({
+      isin: position.isin,
+      name: position.name,
+      assetClass: 'bonds',
+      quantity: position.quantity,
+      currentPrice: position.price,
+    });
+
+    const plan = buildIntesaImportPlan(workbook, [existing]);
+    const diff = plan.holdings.find((holding) => holding.position.isin === position.isin)!;
+
+    expect(diff.needsClassChoice).toBe(false);
+    expect(diff.storedAssetClass).toBe('bonds');
+  });
+
+  it('stores the class the user chose, on the row that was waiting for it', async () => {
+    const workbook = await readFixture();
+    const plan = buildIntesaImportPlan(workbook, []);
+    const position = workbook.positions.find((candidate) => candidate.isin === 'IT0005650905')!;
+
+    const saved = applyIntesaClassChoices(plan, { [position.isin]: 'bonds' });
+    const diff = saved.holdings.find((holding) => holding.position.isin === position.isin)!;
+
+    expect(diff.formData.assetClass).toBe('bonds');
+    expect(diff.needsClassChoice).toBe(false);
   });
 });

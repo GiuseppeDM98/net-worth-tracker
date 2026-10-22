@@ -195,6 +195,12 @@ NEXT_PUBLIC_ENABLE_TEST_SNAPSHOTS=false
 # Sign up for free at https://resend.com (free tier: 3000 emails/month).
 RESEND_API_KEY=
 RESEND_FROM_EMAIL=onboarding@resend.dev
+
+# EODHD — fund identity for the Azimut import (optional, SERVER-SIDE ONLY)
+# The Azimut «Gestito» sheet names its funds and gives no code; this token lets the import
+# search that NAME and read the fund's ISIN (EODHD Search API). No NEXT_PUBLIC_ prefix: the
+# token must never reach the client bundle.
+EODHD_API_TOKEN=
 ```
 
 **How to get the values:**
@@ -208,6 +214,7 @@ RESEND_FROM_EMAIL=onboarding@resend.dev
 - `RESEND_FROM_EMAIL` (optional): Sender address for monthly emails. Options:
   - `onboarding@resend.dev` — Resend shared domain, no setup required. Delivers only to your Resend account's email address (suitable for personal/single-user deployments).
   - A verified custom domain address (e.g. `noreply@yourdomain.com`) — required to deliver to arbitrary recipients. Add your domain under Resend → Domains and configure the provided DNS records. Note: `*.vercel.app` subdomains cannot be verified as sending domains.
+- `EODHD_API_TOKEN` (optional, server-side only): lets the Azimut import resolve the ISIN of a fund the file names but does not code (the «Gestito» sheet). Create a free key at [eodhd.com/cp/api-key](https://eodhd.com/cp/api-key). The **free plan covers the Search API** — fundamentals answer `403` («Only EOD data allowed for free users»), so the fund's asset class still comes from its published mix, never from EODHD. Answers are cached in `fund-identity-cache` (one call per distinct product name, 90 days for a match, 7 for a miss); without the token the import works normally and the preview says the ISIN search was unavailable.
 
 **For detailed Firebase Admin SDK configuration on Vercel, see [VERCEL_SETUP.md](./VERCEL_SETUP.md)**
 

@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { InstrumentFundAllocation } from '@/types/exposure';
-import { compositionFromFundAllocation, MIN_COMPOSITION_LEG_PCT } from '@/lib/utils/fundComposition';
+import { compositionFromFundAllocation, MIN_COMPOSITION_LEG_PCT, resolveAllocationClass } from '@/lib/utils/fundComposition';
 
 const MARKET_SELECTION_20: InstrumentFundAllocation = {
   stock: 0.1925,
@@ -82,5 +82,43 @@ describe('compositionFromFundAllocation', () => {
       'equity'
     );
     for (const leg of composition) expect(leg.percentage).toBeGreaterThan(0);
+  });
+});
+
+describe('resolveAllocationClass', () => {
+  it('names the largest measured bucket', () => {
+    expect(resolveAllocationClass(MARKET_SELECTION_20, 'equity')).toEqual({
+      assetClass: 'bonds',
+      measured: true,
+    });
+    expect(resolveAllocationClass(allocation({ stock: 1 }), 'bonds')).toEqual({
+      assetClass: 'equity',
+      measured: true,
+    });
+  });
+
+  it('counts preferred and convertibles as bonds', () => {
+    expect(resolveAllocationClass(allocation({ preferred: 0.7, convertible: 0.2, stock: 0.1 }), 'equity')).toEqual({
+      assetClass: 'bonds',
+      measured: true,
+    });
+  });
+
+  it('never turns «other» into a measured class', () => {
+    // The WisdomTree currency ETCs publish 100% other: no class is known, the fallback is a guess.
+    expect(resolveAllocationClass(allocation({ other: 1 }), 'equity')).toEqual({
+      assetClass: 'equity',
+      measured: false,
+    });
+    expect(resolveAllocationClass(allocation({ other: 0.5, stock: 0.5 }), 'equity')).toEqual({
+      assetClass: 'equity',
+      measured: false,
+    });
+  });
+
+  it('returns null without a mix, or for a mix with no weight at all', () => {
+    expect(resolveAllocationClass(null, 'equity')).toBeNull();
+    expect(resolveAllocationClass(undefined, 'equity')).toBeNull();
+    expect(resolveAllocationClass(allocation(), 'equity')).toBeNull();
   });
 });

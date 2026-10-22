@@ -7,6 +7,12 @@
  * - Single ticker quotes: getQuote()
  * - Batch quotes: getMultipleQuotes() (parallel fetching with Promise.allSettled)
  *
+ * AN ISIN IS QUOTED THROUGH THE LIBRARY. A broker that publishes only an ISIN leaves the asset
+ * with the ISIN as its ticker, and Yahoo quotes no ISIN: `quote('LU0605515377')` answers nothing
+ * (measured), while the symbol the library's own search names for that ISIN (`FPIJ.F`) quotes the
+ * same fund at the same price (37,633 € — the broker's own file says 37,74 €). The symbol is
+ * found and MEASURED by `lib/server/yahooSymbol.ts`, the ONE resolver the exposure reads too.
+ *
  * Error Handling Strategy:
  * Returns null prices on failure rather than throwing errors, allowing callers
  * to decide how to handle missing data (e.g., keep old price, show warning, etc.).
@@ -14,6 +20,7 @@
 
 import YahooFinance from 'yahoo-finance2';
 import { hasMarketPrice } from '@/lib/utils/assetPricing';
+import { resolveQuotableSymbol } from '@/lib/server/yahooSymbol';
 
 // Create YahooFinance instance (required in v3+)
 const yahooFinance = new YahooFinance();
@@ -28,12 +35,13 @@ export interface QuoteResult {
 /**
  * Get current quote for a single ticker
  *
- * @param ticker - Stock/ETF ticker symbol (e.g., "AAPL", "VWCE.DE")
+ * @param ticker - Stock/ETF ticker symbol (e.g., "AAPL", "VWCE.DE") or an ISIN
  * @returns Quote result with price and currency, or null price with error message
  */
 export async function getQuote(ticker: string): Promise<QuoteResult> {
   try {
-    const quote = await yahooFinance.quote(ticker);
+    const symbol = await resolveQuotableSymbol(ticker);
+    const quote = await yahooFinance.quote(symbol);
 
     if (!quote || !quote.regularMarketPrice) {
       return {

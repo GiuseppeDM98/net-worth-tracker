@@ -12,6 +12,7 @@ import {
   CORRECTED_ISIN_PAIRS,
   YAHOO_SYMBOL_BY_ISIN,
   isCorrectedIsin,
+  namesTheSameFund,
   resolveYahooSymbolForIsin,
 } from '@/lib/utils/yahooSymbolForIsin';
 import { TR_YAHOO_TICKER_BY_ISIN } from '@/lib/utils/tradeRepublicImport';
@@ -94,5 +95,30 @@ describe('resolveYahooSymbolForIsin', () => {
     for (const isin of Object.keys(TR_YAHOO_TICKER_BY_ISIN)) {
       expect(isin in YAHOO_SYMBOL_BY_ISIN, `${isin} is written down in both fund tables`).toBe(false);
     }
+  });
+});
+
+describe('namesTheSameFund', () => {
+  it('reads the two spellings of one fund as one fund', () => {
+    // Measured pair (2026-10-22): `search('LU0605515377')` names «Fidelity Funds - Global
+    // Dividend Fund» and `quoteSummary('FPIJ.F', ['price']).longName` names the same string.
+    expect(
+      namesTheSameFund('Fidelity Funds - Global Dividend Fund', 'Fidelity Funds - Global Dividend Fund')
+    ).toBe(true);
+    // Case, punctuation and spacing are the same name spelled differently.
+    expect(namesTheSameFund('R-co Valor C EUR', 'R-Co Valor C EUR')).toBe(true);
+    expect(namesTheSameFund('R-CO VALOR', 'R CO VALOR')).toBe(true);
+  });
+
+  it('refuses another fund, and an absent name', () => {
+    // The load-bearing half: a name that merely resembles another one is another fund, and a
+    // symbol we cannot name is a symbol we may not quote.
+    expect(
+      namesTheSameFund('Fidelity Funds - Global Dividend Fund', 'Fidelity Global Dividend Fund Series T5 LSC')
+    ).toBe(false);
+    expect(namesTheSameFund('Fidelity Global Dividend Fund', 'R-co Valor C EUR')).toBe(false);
+    expect(namesTheSameFund('Fidelity Global Dividend Fund', undefined)).toBe(false);
+    expect(namesTheSameFund(undefined, 'Fidelity Global Dividend Fund')).toBe(false);
+    expect(namesTheSameFund('', '')).toBe(false);
   });
 });

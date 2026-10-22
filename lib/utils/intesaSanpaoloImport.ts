@@ -21,7 +21,8 @@ import type { Asset, AssetClass, AssetComposition, AssetFormData, AssetType } fr
 import type { InstrumentFundAllocation } from '@/types/exposure';
 import { isLedgerAssetType } from '@/types/assetTransactions';
 import { resolveYahooSymbolForIsin } from '@/lib/utils/yahooSymbolForIsin';
-import { compositionFromFundAllocation } from '@/lib/utils/fundComposition';
+import { compositionFromFundAllocation, resolveAllocationClass } from '@/lib/utils/fundComposition';
+import { applyClassChoices, needsClassChoice } from '@/lib/utils/importClassChoice';
 
 /** A row as `read-excel-file` returns it, so this module stays free of the library. */
 export type IntesaCell = unknown;
@@ -296,12 +297,21 @@ export function mapIntesaPositionToAssetFormData(
 ): AssetFormData {
   const { type, assetClass } = mapIntesaPositionType(position);
   const composition = compositionForPosition(position, allocation, assetClass);
+  // A fund that is nearly all ONE class has no composition to store, but the mix still names its
+  // class (`resolveAllocationClass`, the ONE rule the Azimut bridge reads too): the name's guess
+  // is a fallback, the published mix is the answer.
+  const measuredClass = resolveAllocationClass(allocation, assetClass);
+  // A composition's largest leg IS the class; without one, the class the mix measured.
+  const storedClass =
+    composition.length > 0
+      ? storedClassFor(assetClass, composition)
+      : (measuredClass?.assetClass ?? assetClass);
   return {
     ticker: resolveYahooSymbolForIsin(position.isin) ?? position.isin,
     displayTicker: position.name,
     name: position.name,
     type,
-    assetClass: storedClassFor(assetClass, composition),
+    assetClass: storedClass,
     currency: 'EUR',
     quantity: position.quantity,
     ...(composition.length > 0 ? { composition } : {}),
@@ -340,7 +350,16 @@ export interface IntesaHoldingDiff {
   existingDisplayTicker?: string | null;
   /** Report quantity minus tracked quantity — a number to reconcile, never an auto-write. */
   quantityDrift: number;
-  typeUncertain: boolean;
+  /**
+   * The row waits for a class FROM THE USER: the market did not decide it (no published mix) and
+   * no tracked asset carries one. A row that UPDATES a tracked asset never waits — the class is
+   * already stored there, and the import never overwrites it.
+   */
+  needsClassChoice: boolean;
+  /** The key the class choice is filed under: the row's own ISIN in the plan. */
+  classChoiceKey: string;
+  /** The class stored on the tracked asset this row updates — `undefined` for a new position. */
+  storedAssetClass?: AssetClass;
   /** The tracked asset is not labelled as this broker yet (or has another label). */
   exchangeUpdate: boolean;
   /**
@@ -422,22 +441,21 @@ export function buildIntesaImportPlan(
     const formData = mapIntesaPositionToAssetFormData(position, allocation);
     const composition = formData.composition ?? [];
     const hasComposition = composition.length > 0;
-    const { typeUncertain } = mapIntesaPositionType(position);
+    const { typeUncertain, assetClass } = mapIntesaPositionType(position);
+    // The market's answer: the published mix produced a composition, or it named the class of a
+    // fund that is nearly all one class (`resolveAllocationClass`, the same rule the Azimut
+    // bridge reads). Everything else is the name's guess — and a guess is not a class: the row
+    // waits for the user, in the preview row.
+    const marketDecided = hasComposition || resolveAllocationClass(allocation, assetClass)?.measured === true;
+    const unresolvedClass = typeUncertain && !marketDecided;
     if (!existing) {
-      // A fund whose published mix was read needs no «classe da verificare» warning: the mix IS
-      // the answer, and `Asset.assetClass` now carries its largest leg.
-      if (typeUncertain && !hasComposition) {
-        warnings.push(
-          `«${position.name}»: classe non deducibile dal nome, proposta azionaria — verifica su Patrimonio.`
-        );
-      }
       return {
         kind: 'new',
         position,
         formData,
         quantityDrift: 0,
-        // A read composition answers the class question; the row needs no «verifica».
-        typeUncertain: typeUncertain && !hasComposition,
+        needsClassChoice: needsClassChoice({ uncertain: unresolvedClass }),
+        classChoiceKey: position.isin,
         exchangeUpdate: true,
         compositionUpdate: false,
       } satisfies IntesaHoldingDiff;
@@ -463,11 +481,6 @@ export function buildIntesaImportPlan(
         `«${existing.name}»: il file riporta ${position.quantity} quote contro ${existing.quantity} nel Registro — il prezzo si aggiorna, la quantità no (riconcilia con una rettifica).`
       );
     }
-    if (typeUncertain && !hasExistingComposition && !compositionUpdate) {
-      warnings.push(
-        `«${existing.name}»: classe proposta dal nome e composizione non disponibile — verifica su Patrimonio.`
-      );
-    }
     return {
       kind,
       position,
@@ -476,7 +489,14 @@ export function buildIntesaImportPlan(
       existingTaxRate: existing.taxRate,
       existingDisplayTicker: existing.displayTicker,
       quantityDrift: hasDrift ? drift : 0,
-      typeUncertain: typeUncertain && !hasExistingComposition && !compositionUpdate,
+      // The class of a tracked asset is ALREADY decided: it is the one stored there, and the
+      // import never overwrites it. So the second upload of the same file asks nothing.
+      needsClassChoice: needsClassChoice({
+        uncertain: unresolvedClass && !hasExistingComposition && !compositionUpdate,
+        storedClass: existing.assetClass,
+      }),
+      classChoiceKey: position.isin,
+      storedAssetClass: existing.assetClass,
       exchangeUpdate,
       compositionUpdate,
     } satisfies IntesaHoldingDiff;
@@ -514,4 +534,16 @@ export function buildIntesaImportPlan(
       skippedCount: workbook.skipped,
     },
   };
+}
+
+/**
+ * The plan as it is SAVED: the classes the user picked in the preview, on the rows that were
+ * waiting for one. A row that was not waiting keeps the class the plan measured — the choices are
+ * filed by the row's own id, so one can only land on the row it was made for.
+ */
+export function applyIntesaClassChoices(
+  plan: IntesaImportPlan,
+  choices: Record<string, AssetClass>
+): IntesaImportPlan {
+  return { ...plan, holdings: applyClassChoices(plan.holdings, choices) };
 }

@@ -6,10 +6,19 @@
  * layer (`azimutImport.ts`), previewed row by row, and only written after «Salva nel
  * patrimonio». New positions become assets labelled `exchange: 'Azimut'`; a position
  * already tracked gets its price repaired and its broker label confirmed, never its
- * ledger quantity. New funds also carry the published asset mix read from their ISIN (Yahoo's
- * `topHoldings`, through the shared per-ticker cache); an existing fund with an empty composition
- * is backfilled, while one the user already typed is never overwritten. The liquidity section
+ * ledger quantity. New funds also carry the published asset mix read from their ISIN, or from the
+ * Bloomberg ticker the file prints when it has no ISIN (Yahoo's `topHoldings`, through the shared
+ * per-ticker cache); a GESTITO row has NEITHER, so its product name is first searched on EODHD
+ * (`GET /api/portfolio/fund-identity`) and the unique ISIN it answers with is both the identity the
+ * position is saved under and the key its mix is then read by. An existing fund with an empty
+ * composition is backfilled, and one with no ISIN gets the one the name found — while a
+ * composition or an ISIN the user already typed is never overwritten. The liquidity section
  * becomes one cash account, matched by its stable ticker.
+ *
+ * A row the market could not class (no published mix, no identity) WAITS for a class: the preview
+ * row carries a dropdown over the app's own classes, and the import does not start while one is
+ * still empty. A row that updates a tracked asset never waits — its class is the one already
+ * stored, and the import never overwrites it (doc/guide/collegamenti.md → La classe scelta a mano).
  *
  * Only metadata is persisted in `brokerConnections/{ownerId}/brokers/azimut`: never the file.
  */
@@ -22,17 +31,30 @@ import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Tile } from '@/components/ui/tile';
-import { useAssets } from '@/lib/hooks/useAssets';
+import { assetsQueryOptions, useAssets } from '@/lib/hooks/useAssets';
 import { describeBrokerConnections } from '@/lib/utils/settingsNarrative';
 import { formatCurrency, formatNumber, formatPercentageIt } from '@/lib/utils/formatters';
 import { ASSET_CLASS_LABELS } from '@/lib/utils/allocationUtils';
+import { IMPORT_CLASS_OPTIONS } from '@/lib/utils/importClassChoice';
 import { fetchFundAllocations } from '@/lib/utils/fundAllocationClient';
+import { fetchFundIdentities } from '@/lib/utils/fundIdentityClient';
 import { queryKeys } from '@/lib/query/queryKeys';
-import type { AssetComposition } from '@/types/assets';
+import type { AssetClass, AssetComposition } from '@/types/assets';
 import {
   AZIMUT_BROKER_NAME,
+  applyAzimutClassChoices,
+  azimutAllocationLookup,
   buildAzimutImportPlan,
+  needsFundIdentity,
   type AzimutDiffKind,
   type AzimutImportPlan,
 } from '@/lib/utils/azimutImport';
@@ -56,6 +78,7 @@ const KIND_LABEL: Record<AzimutDiffKind, string> = {
   'drift-only': 'Scostamento quantità',
   'price-and-drift': 'Prezzo + scostamento',
   'composition-update': 'Composizione',
+  'identity-update': 'ISIN aggiunto',
   unchanged: 'Invariato',
 };
 
@@ -68,16 +91,26 @@ function describeComposition(composition: AssetComposition[] | undefined): strin
     .join(' · ');
 }
 
+/**
+ * The id of a row's class control: the row's own key, reduced to what an id may hold (a product
+ * name carries spaces and quotes). The prefix keeps this page's two bridges apart.
+ */
+function classSelectId(key: string): string {
+  return `azimut-class-${key.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
+}
+
 interface AzimutSaveResult {
   createdAssets: number;
   updatedPrices: number;
   filledCompositions: number;
+  filledIsins: number;
 }
 
 async function persistAzimutImport(ownerId: string, plan: AzimutImportPlan): Promise<AzimutSaveResult> {
   let createdAssets = 0;
   let updatedPrices = 0;
   let filledCompositions = 0;
+  let filledIsins = 0;
   for (const diff of plan.holdings) {
     if (diff.kind === 'new') {
       await createAsset(ownerId, diff.formData);
@@ -86,16 +119,18 @@ async function persistAzimutImport(ownerId: string, plan: AzimutImportPlan): Pro
     }
     if (!diff.existingAssetId) continue;
     const shouldWritePrice = diff.kind === 'price-update' || diff.kind === 'price-and-drift';
-    if (!shouldWritePrice && !diff.exchangeUpdate && !diff.compositionUpdate) continue;
+    if (!shouldWritePrice && !diff.exchangeUpdate && !diff.compositionUpdate && !diff.isinUpdate) continue;
     await updateAssetMetadata(diff.existingAssetId, {
       ...(shouldWritePrice ? { currentPrice: diff.position.price } : {}),
       ...(diff.compositionUpdate ? { composition: diff.formData.composition } : {}),
+      ...(diff.isinUpdate && diff.formData.isin ? { isin: diff.formData.isin } : {}),
       exchange: AZIMUT_BROKER_NAME,
       taxRate: diff.existingTaxRate,
       displayTicker: diff.existingDisplayTicker ?? undefined,
     });
     if (shouldWritePrice) updatedPrices += 1;
     if (diff.compositionUpdate) filledCompositions += 1;
+    if (diff.isinUpdate) filledIsins += 1;
   }
 
   let cashAssetId: string | undefined;
@@ -134,13 +169,12 @@ async function persistAzimutImport(ownerId: string, plan: AzimutImportPlan): Pro
     },
     'azimut'
   );
-  return { createdAssets, updatedPrices, filledCompositions };
+  return { createdAssets, updatedPrices, filledCompositions, filledIsins };
 }
 
 export function AzimutConnectionTile({ ownerId, disabled = false }: AzimutConnectionTileProps) {
   const queryClient = useQueryClient();
-  const { data: assetsData, isLoading: assetsLoading, isError: assetsFailed } = useAssets(ownerId);
-  const assets = assetsData ?? [];
+  const { isLoading: assetsLoading, isError: assetsFailed } = useAssets(ownerId);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [connection, setConnection] = useState<BrokerConnection | null>(null);
   const [loadingConnection, setLoadingConnection] = useState(true);
@@ -150,6 +184,9 @@ export function AzimutConnectionTile({ ownerId, disabled = false }: AzimutConnec
   const [error, setError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string>('');
   const [plan, setPlan] = useState<AzimutImportPlan | null>(null);
+  /** The class the user chose, by the row's own key: the rows the market could not class. */
+  const [classChoices, setClassChoices] = useState<Record<string, AssetClass>>({});
+  const [identitySearchFailed, setIdentitySearchFailed] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const dragCounterRef = useRef(0);
 
@@ -177,6 +214,8 @@ export function AzimutConnectionTile({ ownerId, disabled = false }: AzimutConnec
 
   const reset = () => {
     setPlan(null);
+    setClassChoices({});
+    setIdentitySearchFailed(false);
     setFileName('');
     setError(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -187,19 +226,51 @@ export function AzimutConnectionTile({ ownerId, disabled = false }: AzimutConnec
       if (disabled || busy || assetsLoading || assetsFailed) return;
       setFileName(file.name);
       setPlan(null);
+      setClassChoices({});
+      setIdentitySearchFailed(false);
       setError(null);
       setParsing(true);
       void readAzimutWorkbookFile(file)
         .then(async (workbook) => {
-          const fundIsins = workbook.positions
-            .filter((position) => position.isin !== undefined)
-            .map((position) => position.isin as string);
-          const { allocations } = await fetchFundAllocations(fundIsins);
-          return buildAzimutImportPlan(workbook, assets, allocations);
+          // Two rounds, because the second DEPENDS on the first.
+          //
+          // 1. Names: a fund the file gives no code for (the GESTITO sheet prints nothing but the
+          //    product name) is asked about by that name, and the ISIN EODHD answers with is the
+          //    identity it will be saved under.
+          // 2. Mixes: the codes the file printed, plus the ISINs the names resolved to — a fund
+          //    whose name yields a unique ISIN can then be classed from its published mix.
+          const identityNames = workbook.positions
+            .filter(needsFundIdentity)
+            .map((position) => position.name);
+          const identityLookup = await fetchFundIdentities(identityNames);
+          const resolvedIsins = Object.values(identityLookup.byName).flatMap((result) =>
+            result.status === 'matched' && result.identity ? [result.identity.isin] : []
+          );
+
+          const lookups = workbook.positions.map(azimutAllocationLookup);
+          const fundIsins = [
+            ...lookups.flatMap((lookup) => (lookup.isin ? [lookup.isin] : [])),
+            ...resolvedIsins,
+          ];
+          const fundTickers = lookups.flatMap((lookup) => (lookup.ticker ? [lookup.ticker] : []));
+          const { allocations } = await fetchFundAllocations(fundIsins, fundTickers);
+          // The assets the plan matches against must be the CURRENT ones: the hook's list can be
+          // a snapshot (the persisted cache restores the last one), and a plan built on a stale
+          // list calls every tracked position NEW — and creates it a second time. The import is
+          // a write path: it reads the assets as they are (`staleTime: 0`).
+          const currentAssets = await queryClient.fetchQuery({
+            ...assetsQueryOptions(ownerId),
+            staleTime: 0,
+          });
+          return {
+            plan: buildAzimutImportPlan(workbook, currentAssets, allocations, identityLookup.byName),
+            identitySearchFailed: identityLookup.failedChunks > 0,
+          };
         })
         .then(
-          (importPlan) => {
+          ({ plan: importPlan, identitySearchFailed: searchFailed }) => {
             setPlan(importPlan);
+            setIdentitySearchFailed(searchFailed);
             toast.success('Anteprima pronta: controlla le righe prima di salvare.');
           },
           (err: unknown) => {
@@ -209,7 +280,7 @@ export function AzimutConnectionTile({ ownerId, disabled = false }: AzimutConnec
         )
         .finally(() => setParsing(false));
     },
-    [disabled, busy, assetsLoading, assetsFailed, assets]
+    [disabled, busy, assetsLoading, assetsFailed, ownerId, queryClient]
   );
 
   const handleFile = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -256,10 +327,23 @@ export function AzimutConnectionTile({ ownerId, disabled = false }: AzimutConnec
     }
   };
 
+  /**
+   * The rows the market could not class, and the ones still waiting for the user. A row that
+   * updates a tracked asset is not among them: its class is the one already stored.
+   */
+  const classChoiceRows = plan?.holdings.filter((diff) => diff.needsClassChoice) ?? [];
+  const classChoiceMissing = classChoiceRows.filter((diff) => !classChoices[diff.classChoiceKey]);
+
   const handleSave = () => {
     if (!plan || disabled) return;
+    // The import does not start with a row the market could not class and the user did not: a
+    // class is a claim about the position, and nobody has made it yet.
+    if (classChoiceMissing.length > 0) {
+      toast.error('Scegli la classe delle righe che ne sono senza: l’import non parte senza.');
+      return;
+    }
     setSaving(true);
-    void persistAzimutImport(ownerId, plan)
+    void persistAzimutImport(ownerId, applyAzimutClassChoices(plan, classChoices))
       .then(
         (result) => {
           queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
@@ -271,7 +355,7 @@ export function AzimutConnectionTile({ ownerId, disabled = false }: AzimutConnec
               result.filledCompositions > 0
                 ? `, ${result.filledCompositions} composizioni lette dall'ISIN`
                 : ''
-            }.`
+            }${result.filledIsins > 0 ? `, ${result.filledIsins} ISIN aggiunti` : ''}.`
           );
         },
         (err: unknown) => {
@@ -357,7 +441,10 @@ export function AzimutConnectionTile({ ownerId, disabled = false }: AzimutConnec
           <p className="text-[11px] leading-[1.45] text-muted-foreground">
             Solo file <span className="font-mono">.xlsx</span> esportati dal portafoglio Azimut.
             Importa posizioni da Gestito, Economia Reale, Amministrato (azioni, obbligazioni, ETF) e Liquidità.
-            Per gli asset in Amministrato vengono letti ISIN o codice ticker tra parentesi.
+            La composizione si legge dall&apos;ISIN o dal codice ticker tra parentesi. Il foglio
+            Gestito non riporta né l&apos;uno né l&apos;altro: il nome del prodotto viene cercato su
+            EODHD, e l&apos;ISIN trovato — solo se univoco — diventa l&apos;identità della posizione;
+            dove nessun mix è pubblicato la riga chiede la classe, e l&apos;import aspetta la risposta.
           </p>
 
           {assetsFailed && (
@@ -384,10 +471,18 @@ export function AzimutConnectionTile({ ownerId, disabled = false }: AzimutConnec
                 aggiornare
                 {plan.stats.compositionUpdateCount > 0 &&
                   `, ${plan.stats.compositionUpdateCount} composizioni da completare`}
+                {plan.stats.isinUpdateCount > 0 && `, ${plan.stats.isinUpdateCount} ISIN da aggiungere`}
                 {plan.stats.driftCount > 0 && `, ${plan.stats.driftCount} scostamenti di quantità`}
                 {plan.stats.unchangedCount > 0 && `, ${plan.stats.unchangedCount} invariati`}
                 {plan.stats.skippedCount > 0 && `, ${plan.stats.skippedCount} righe scartate`}.
               </p>
+
+              {identitySearchFailed && (
+                <p className="text-[12px] leading-[1.45] text-warning-foreground">
+                  Ricerca ISIN non disponibile (EODHD): le posizioni si importano lo stesso e le
+                  righe dei fondi senza codice chiedono la classe.
+                </p>
+              )}
 
               <ul className="flex max-h-72 flex-col overflow-y-auto">
                 {plan.holdings.map((diff) => {
@@ -396,6 +491,14 @@ export function AzimutConnectionTile({ ownerId, disabled = false }: AzimutConnec
                       ? describeComposition(diff.formData.composition)
                       : '';
                   const hasComposition = compositionLabel !== '';
+                  // A product name is no ticker: GESTITO rows have no code in the file, and printing
+                  // the name twice reads as if the app had found one. `formData.isin` is the ISIN the
+                  // name lookup found, when it did.
+                  const displayCode =
+                    diff.position.isin ??
+                    diff.formData.isin ??
+                    (diff.position.ticker !== diff.position.name ? diff.position.ticker : undefined) ??
+                    '—';
                   return (
                     <li
                       key={diff.position.id}
@@ -404,21 +507,58 @@ export function AzimutConnectionTile({ ownerId, disabled = false }: AzimutConnec
                       <span className="min-w-0">
                         <span className="block truncate font-medium">{diff.position.name}</span>
                         <span className="block font-mono text-[11px] text-muted-foreground">
-                          {diff.position.isin ?? diff.position.ticker ?? '—'} · {formatNumber(diff.position.quantity)} quote ·{' '}
+                          {displayCode} · {formatNumber(diff.position.quantity)} quote ·{' '}
                           {formatNumber(diff.position.price)} EUR
                           {diff.position.marketValue !== undefined &&
                             ` · ${formatCurrency(diff.position.marketValue)}`}
                         </span>
                         {hasComposition && (
                           <span className="block text-[12px] text-muted-foreground">
-                            Composizione dall&apos;ISIN: {compositionLabel}
+                            Composizione pubblicata: {compositionLabel}
                           </span>
                         )}
-                        {diff.typeUncertain && !hasComposition && (
-                          <span className="block text-[12px] text-warning-foreground">
-                            {diff.kind === 'new'
-                              ? 'Classe non deducibile dal nome: proposta azionaria, verifica su Patrimonio.'
-                              : 'Classe proposta dal nome e composizione non disponibile: verifica su Patrimonio.'}
+                        {diff.needsClassChoice && (
+                          <span className="mt-1 flex flex-wrap items-center gap-2">
+                            <Label
+                              htmlFor={classSelectId(diff.classChoiceKey)}
+                              className="text-[12px] text-muted-foreground"
+                            >
+                              Classe
+                            </Label>
+                            <Select
+                              value={classChoices[diff.classChoiceKey] ?? ''}
+                              onValueChange={(value) =>
+                                setClassChoices((choices) => ({
+                                  ...choices,
+                                  [diff.classChoiceKey]: value as AssetClass,
+                                }))
+                              }
+                            >
+                              <SelectTrigger
+                                id={classSelectId(diff.classChoiceKey)}
+                                size="sm"
+                                className="h-8 w-40 text-[13px]"
+                                aria-label={`Classe — ${diff.position.name}`}
+                              >
+                                <SelectValue placeholder="Scegli la classe" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {IMPORT_CLASS_OPTIONS.map((option) => (
+                                  <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <span className="text-[12px] text-warning-foreground">
+                              Classe non deducibile: sceglila qui.
+                            </span>
+                          </span>
+                        )}
+                        {!diff.needsClassChoice && diff.storedAssetClass && (
+                          <span className="block text-[12px] text-muted-foreground">
+                            Classe: {ASSET_CLASS_LABELS[diff.storedAssetClass] ?? diff.storedAssetClass}{' '}
+                            (dal patrimonio)
                           </span>
                         )}
                         {(diff.kind === 'drift-only' || diff.kind === 'price-and-drift') && (
@@ -435,6 +575,14 @@ export function AzimutConnectionTile({ ownerId, disabled = false }: AzimutConnec
                   );
                 })}
               </ul>
+
+              {classChoiceRows.length > 0 && (
+                <p role="status" className="text-[12px] leading-[1.45] text-warning-foreground">
+                  {classChoiceMissing.length > 0
+                    ? `${classChoiceMissing.length} di ${classChoiceRows.length} righe senza classe: sceglila nella riga per importarle.`
+                    : 'Classe scelta su tutte le righe: l’import può partire.'}
+                </p>
+              )}
 
               {plan.cash && (
                 <p className="rounded-lg bg-muted p-3 text-[13px] leading-[1.45]">
@@ -462,7 +610,7 @@ export function AzimutConnectionTile({ ownerId, disabled = false }: AzimutConnec
               <div className="mt-auto flex flex-wrap gap-2 border-t border-border pt-3">
                 <Button
                   onClick={handleSave}
-                  disabled={saving || (plan.holdings.length === 0 && !plan.cash)}
+                  disabled={saving || classChoiceMissing.length > 0 || (plan.holdings.length === 0 && !plan.cash)}
                   className="h-10"
                 >
                   {saving && <Loader2 className="h-4 w-4 animate-spin" />}

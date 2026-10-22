@@ -19,7 +19,7 @@
 import YahooFinance from 'yahoo-finance2';
 import type { ExposureLegSlice, InstrumentFundProfile, InstrumentStockProfile } from '@/types/exposure';
 import { sectorLabel, YAHOO_ASSET_PROFILE_SECTOR_TO_KEY } from '@/lib/constants/exposureSectors';
-import { isIsinShaped } from '@/lib/utils/yahooSymbolForIsin';
+import { resolveQuotableSymbol } from '@/lib/server/yahooSymbol';
 
 /** What the service asks of Yahoo; injectable so the service is tested without the network. */
 export interface YahooProfileSource {
@@ -115,30 +115,43 @@ export function normalizeStockAnswer(summary: RawStockSummary | null | undefined
 
 const yahooFinance = new YahooFinance();
 
+/** The module list `quoteSummary` accepts, as its own typings spell it. */
+type QuoteSummaryModules = NonNullable<Parameters<typeof yahooFinance.quoteSummary>[1]>['modules'];
+
 /**
- * An ISIN-shaped ticker Yahoo cannot quote directly: `search(isin)` names the fund's listings
- * and the first hit is the quotable symbol. A manual, Scalable or Trade Republic position born
- * with the ISIN as its ticker heals this way without a curated table entry. Anything else is
- * returned as stored.
+ * `quoteSummary` validates Yahoo's answer against the library's schema and throws when the answer
+ * does not fit — the WHOLE answer, even for the modules we asked for that fit fine.
+ * `fundProfile.brokerages` is the recurring offender (measured 2026-10-22: Yahoo answers an array
+ * of bank NAMES where the schema wants objects, and a fund with a perfectly good `topHoldings` mix
+ * was lost with it — `0P00017T6E.F`, «R-co Valor C EUR»). The retry asks for Yahoo's raw answer,
+ * which the normalisers below already treat defensively; a network failure is rethrown and stays
+ * the `null` fund it was.
  */
-async function resolveQuotableSymbol(ticker: string): Promise<string> {
-  const trimmed = ticker.trim();
-  if (!isIsinShaped(trimmed)) return trimmed;
+async function quoteSummaryLoose<Summary>(symbol: string, modules: QuoteSummaryModules): Promise<Summary> {
   try {
-    const result = (await yahooFinance.search(trimmed)) as { quotes?: Array<{ symbol?: string }> };
-    const hit = result?.quotes?.find((quote) => typeof quote?.symbol === 'string' && quote.symbol.trim() !== '')?.symbol?.trim();
-    if (hit) return hit;
-  } catch {
-    // Search failing falls through to the direct quote, which then fails the same way as before.
+    return (await yahooFinance.quoteSummary(symbol, { modules })) as Summary;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    if (!/schema validation/i.test(message)) throw error;
+    return (await yahooFinance.quoteSummary(symbol, { modules }, { validateResult: false })) as Summary;
   }
-  return trimmed;
 }
 
+/**
+ * An ISIN-shaped ticker Yahoo cannot quote directly: the symbol is FOUND and MEASURED by
+ * `lib/server/yahooSymbol.ts` — the written catalogue first, then yahoo-finance2's own search,
+ * and the symbol it names is used only when the search's name and the symbol's own price name the
+ * same fund. A manual, Scalable or Trade Republic position born with the ISIN as its ticker heals
+ * this way without a curated table entry. Anything else is returned as stored.
+ *
+ * THE MEASUREMENT MATTERS HERE MORE THAN IN THE PRICE. The first hit of a search can be another
+ * fund: the holdings this path reads would then be ANOTHER fund's, on a real position.
+ */
 export const yahooProfileSource: YahooProfileSource = {
   async fetchFund(ticker, now) {
     try {
       const symbol = await resolveQuotableSymbol(ticker);
-      const summary = (await yahooFinance.quoteSummary(symbol, { modules: ['topHoldings', 'fundProfile'] })) as RawFundSummary;
+      const summary = await quoteSummaryLoose<RawFundSummary>(symbol, ['topHoldings', 'fundProfile']);
       return normalizeFundAnswer(summary, now);
     } catch {
       return null;
@@ -147,7 +160,7 @@ export const yahooProfileSource: YahooProfileSource = {
   async fetchStock(ticker, now) {
     try {
       const symbol = await resolveQuotableSymbol(ticker);
-      const summary = (await yahooFinance.quoteSummary(symbol, { modules: ['assetProfile', 'price'] })) as RawStockSummary;
+      const summary = await quoteSummaryLoose<RawStockSummary>(symbol, ['assetProfile', 'price']);
       return normalizeStockAnswer(summary, now);
     } catch {
       return null;
