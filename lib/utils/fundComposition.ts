@@ -15,7 +15,7 @@
  * class is this — so a nearly single-class fund, which has no composition to store, still takes
  * its class from the market instead of from its name.
  */
-import type { AssetClass, AssetComposition } from '@/types/assets';
+import type { AssetClass, AssetComposition, AssetType } from '@/types/assets';
 import type { InstrumentFundAllocation } from '@/types/exposure';
 
 /**
@@ -134,4 +134,42 @@ export function resolveAllocationClass(
   if (!best) return other > 0 ? { assetClass: fallbackClass, measured: false } : null;
   if (other >= best.weight) return { assetClass: fallbackClass, measured: false };
   return { assetClass: best.assetClass, measured: true };
+}
+
+/**
+ * What an import stores for one instrument from its published mix: the composition legs (empty
+ * when the fund is nearly all one class) and the class the asset should carry. A composition's
+ * largest leg IS the class; without one, the class the mix measured; otherwise the caller's
+ * fallback (the class the broker's type or the name proposed).
+ *
+ * `measured` says whether the market decided anything at all — the same fact the import previews
+ * read to stop calling a fund «tipo non riconosciuto» after Yahoo has placed it. This is the ONE
+ * implementation of the rule: Intesa, Azimut, Scalable and Trade Republic all read it.
+ */
+export interface FundCompositionReading {
+  composition: AssetComposition[];
+  assetClass: AssetClass;
+  measured: boolean;
+}
+
+export function readFundComposition(
+  allocation: InstrumentFundAllocation | null | undefined,
+  fallbackClass: AssetClass
+): FundCompositionReading {
+  const composition = compositionFromFundAllocation(allocation, fallbackClass);
+  const measuredClass = resolveAllocationClass(allocation, fallbackClass);
+  return {
+    composition,
+    assetClass: composition.length > 0 ? composition[0].assetClass : (measuredClass?.assetClass ?? fallbackClass),
+    measured: composition.length > 0 || measuredClass?.measured === true,
+  };
+}
+
+/**
+ * The asset types whose class and composition can come from a published fund mix: a collective
+ * instrument (an ETF, a fund) and an ETC/ETN wrapper. A stock, a bond and crypto have no mix to
+ * read, and asking Yahoo for one would only spend a cache document.
+ */
+export function usesPublishedFundMix(type: AssetType): boolean {
+  return type === 'etf' || type === 'commodity';
 }

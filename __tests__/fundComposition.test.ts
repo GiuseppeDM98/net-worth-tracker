@@ -8,7 +8,13 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { InstrumentFundAllocation } from '@/types/exposure';
-import { compositionFromFundAllocation, MIN_COMPOSITION_LEG_PCT, resolveAllocationClass } from '@/lib/utils/fundComposition';
+import {
+  compositionFromFundAllocation,
+  MIN_COMPOSITION_LEG_PCT,
+  readFundComposition,
+  resolveAllocationClass,
+  usesPublishedFundMix,
+} from '@/lib/utils/fundComposition';
 
 const MARKET_SELECTION_20: InstrumentFundAllocation = {
   stock: 0.1925,
@@ -120,5 +126,65 @@ describe('resolveAllocationClass', () => {
     expect(resolveAllocationClass(null, 'equity')).toBeNull();
     expect(resolveAllocationClass(undefined, 'equity')).toBeNull();
     expect(resolveAllocationClass(allocation(), 'equity')).toBeNull();
+  });
+});
+
+describe('readFundComposition — the ONE rule every bridge stores', () => {
+  it('stores the mix and makes its largest leg the asset class', () => {
+    expect(readFundComposition(MARKET_SELECTION_20, 'equity')).toEqual({
+      composition: [
+        { assetClass: 'bonds', percentage: 72.7 },
+        { assetClass: 'equity', percentage: 23.7 },
+        { assetClass: 'cash', percentage: 3.6 },
+      ],
+      assetClass: 'bonds',
+      measured: true,
+    });
+  });
+
+  it('keeps the asset class the mix measured for a nearly single-class fund', () => {
+    // No composition to store (one leg says it all), but the mix still names the class — the
+    // reading every bridge needs when the broker's type is only a name-based guess.
+    expect(readFundComposition(allocation({ stock: 0.9945, cash: 0.0055 }), 'bonds')).toEqual({
+      composition: [],
+      assetClass: 'equity',
+      measured: true,
+    });
+  });
+
+  it('falls back without a reading, and never presents «other» as a measured class', () => {
+    expect(readFundComposition(null, 'equity')).toEqual({
+      composition: [],
+      assetClass: 'equity',
+      measured: false,
+    });
+    expect(readFundComposition(allocation({ other: 1 }), 'equity')).toEqual({
+      composition: [],
+      assetClass: 'equity',
+      measured: false,
+    });
+    // «other» outweighs the only measured bucket: the mix produces a composition
+    // (the fund has structure), so `measured` is true — Yahoo DID place the instrument,
+    // even though its class comes from the fallback. The uncertain-type warning is
+    // suppressed because the market confirmed this is a fund/ETF.
+    expect(readFundComposition(allocation({ stock: 0.2, other: 0.8 }), 'bonds')).toEqual({
+      composition: [
+        { assetClass: 'bonds', percentage: 80 },
+        { assetClass: 'equity', percentage: 20 },
+      ],
+      assetClass: 'bonds',
+      measured: true,
+    });
+  });
+});
+
+describe('usesPublishedFundMix', () => {
+  it('reads a mix only for a collective wrapper or an ETC/ETN', () => {
+    expect(usesPublishedFundMix('etf')).toBe(true);
+    expect(usesPublishedFundMix('commodity')).toBe(true);
+    expect(usesPublishedFundMix('stock')).toBe(false);
+    expect(usesPublishedFundMix('bond')).toBe(false);
+    expect(usesPublishedFundMix('crypto')).toBe(false);
+    expect(usesPublishedFundMix('cash')).toBe(false);
   });
 });

@@ -38,12 +38,13 @@ import {
 import { Tile } from '@/components/ui/tile';
 import { assetsQueryOptions, useAssets } from '@/lib/hooks/useAssets';
 import { describeBrokerConnections } from '@/lib/utils/settingsNarrative';
-import { formatCurrency, formatNumber, formatPercentageIt } from '@/lib/utils/formatters';
+import { formatCurrency, formatNumber } from '@/lib/utils/formatters';
 import { ASSET_CLASS_LABELS } from '@/lib/utils/allocationUtils';
+import { describeFundComposition } from '@/lib/utils/fundCompositionLabel';
 import { IMPORT_CLASS_OPTIONS } from '@/lib/utils/importClassChoice';
 import { fetchFundAllocations } from '@/lib/utils/fundAllocationClient';
 import { queryKeys } from '@/lib/query/queryKeys';
-import type { AssetClass, AssetComposition } from '@/types/assets';
+import type { AssetClass } from '@/types/assets';
 import {
   INTESA_BROKER_NAME,
   applyIntesaClassChoices,
@@ -73,16 +74,6 @@ const KIND_LABEL: Record<IntesaDiffKind, string> = {
   'composition-update': 'Composizione',
   unchanged: 'Invariato',
 };
-
-/** «72,70% Obbligazioni · 23,70% Azioni · 3,60% Liquidità» — the mix the import will store. */
-function describeComposition(composition: AssetComposition[] | undefined): string {
-  return (composition ?? [])
-    .map(
-      (leg) =>
-        `${formatPercentageIt(leg.percentage, 2)} ${ASSET_CLASS_LABELS[leg.assetClass] ?? leg.assetClass}`
-    )
-    .join(' · ');
-}
 
 /**
  * The id of a row's class control: the row's own key (its ISIN), reduced to what an id may hold.
@@ -462,7 +453,7 @@ export function IntesaSanpaoloConnectionTile({ ownerId, disabled = false }: Inte
                   // with its own composition keeps it, and showing Yahoo's fresher one would lie.
                   const compositionLabel =
                     diff.kind === 'new' || diff.compositionUpdate
-                      ? describeComposition(diff.formData.composition)
+                      ? describeFundComposition(diff.formData.composition)
                       : '';
                   const hasComposition = compositionLabel !== '';
                   return (

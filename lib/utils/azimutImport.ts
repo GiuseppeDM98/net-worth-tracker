@@ -11,11 +11,11 @@
  * the preview plan. It performs NO I/O and knows nothing about React or Firestore.
  */
 
-import type { Asset, AssetClass, AssetComposition, AssetFormData, AssetType } from '@/types/assets';
+import type { Asset, AssetClass, AssetFormData, AssetType } from '@/types/assets';
 import type { InstrumentFundAllocation } from '@/types/exposure';
 import { isLedgerAssetType } from '@/types/assetTransactions';
 import { resolveYahooSymbolForIsin } from '@/lib/utils/yahooSymbolForIsin';
-import { compositionFromFundAllocation, resolveAllocationClass } from '@/lib/utils/fundComposition';
+import { readFundComposition, resolveAllocationClass } from '@/lib/utils/fundComposition';
 import { applyClassChoices, needsClassChoice } from '@/lib/utils/importClassChoice';
 import { normalizeFundName, type FundIdentity } from '@/lib/utils/fundIdentity';
 import type { FundIdentityResult } from '@/types/fundIdentity';
@@ -493,15 +493,6 @@ export function mapAzimutPositionType(position: AzimutPositionInput): MappedAzim
   return { type: 'etf', assetClass, typeUncertain: uncertain };
 }
 
-function compositionForPosition(
-  position: AzimutPositionInput,
-  allocation: InstrumentFundAllocation | null | undefined,
-  assetClass: AssetClass
-): AssetComposition[] {
-  if (!usesFundMix(position)) return [];
-  return compositionFromFundAllocation(allocation, assetClass);
-}
-
 export function mapAzimutPositionToAssetFormData(
   position: AzimutPositionInput,
   allocation?: InstrumentFundAllocation | null,
@@ -509,12 +500,12 @@ export function mapAzimutPositionToAssetFormData(
 ): AssetFormData {
   const { type, assetClass } = mapAzimutPositionType(position);
   const mix = usesFundMix(position) ? allocation : undefined;
-  const composition = compositionForPosition(position, mix, assetClass);
-  // A fund that is nearly all ONE class has no composition to store, but the mix still names its
-  // class (`GRID.MI` is 99,45% equity). `other` never counts: it is not a class, it is the part
-  // Yahoo could not bucket — and when it is the biggest bucket the name's guess stands. Where a
-  // composition IS stored the same mix produced it, so this reading never contradicts it.
-  const storedClass = resolveAllocationClass(mix, assetClass)?.assetClass ?? assetClass;
+  // The ONE rule every bridge reads (`readFundComposition`): the composition legs, and the
+  // dominant leg as the asset's own class. A fund that is nearly all ONE class has no composition
+  // to store, but the mix still names its class (`GRID.MI` is 99,45% equity). `other` never
+  // counts: it is not a class, it is the part Yahoo could not bucket — and when it is the biggest
+  // bucket the name's guess stands.
+  const reading = readFundComposition(mix, assetClass);
   // Three ways to know what the position is, in order: the code the file printed, the ISIN EODHD
   // found from the product name (a GESTITO row has nothing else), and — when neither exists — the
   // name itself, which is an identity for matching but not a symbol to quote.
@@ -528,10 +519,10 @@ export function mapAzimutPositionToAssetFormData(
     displayTicker: position.displayTicker ?? position.name,
     name: position.name,
     type,
-    assetClass: storedClass,
+    assetClass: reading.assetClass,
     currency: position.currency || 'EUR',
     quantity: position.quantity,
-    ...(composition.length > 0 ? { composition } : {}),
+    ...(reading.composition.length > 0 ? { composition: reading.composition } : {}),
     ...(position.averageCost !== undefined && position.averageCost > 0
       ? { averageCost: position.averageCost }
       : {}),

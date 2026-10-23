@@ -41,8 +41,10 @@
  */
 
 import type { Asset, AssetClass, AssetFormData, AssetType } from '@/types/assets';
+import type { InstrumentFundAllocation } from '@/types/exposure';
 import { isLedgerAssetType } from '@/types/assetTransactions';
 import { resolveYahooSymbolForIsin } from '@/lib/utils/yahooSymbolForIsin';
+import { readFundComposition, usesPublishedFundMix } from '@/lib/utils/fundComposition';
 
 // ─── Input shapes (what the three topics hold) ───────────────────────────────
 
@@ -434,47 +436,82 @@ export function resolveTrYahooTicker(holding: TrHoldingInput): string | null {
  * `currentPrice` falls back to 0 when the quote lookup failed, and the plan pairs that with a
  * warning naming the position. A created asset at 0 is visible and fixable; a position missing
  * from the portfolio is neither.
+ *
+ * `allocation` is the fund's published mix, fetched by the caller before the preview. When Yahoo
+ * answered one, the position is born split across its real classes (`composition`) and its own
+ * class is the largest leg — the same rule Intesa and Azimut read, through
+ * `readFundComposition`.
  */
-export function mapTrHoldingToAssetFormData(holding: TrHoldingInput): AssetFormData {
+function mapTrHoldingWithComposition(
+  holding: TrHoldingInput,
+  allocation?: InstrumentFundAllocation | null,
+): { formData: AssetFormData; measured: boolean } {
   const { type, assetClass } = mapTrType(holding.rawType, holding.rawCategory);
+  const reading = usesPublishedFundMix(type)
+    ? readFundComposition(allocation, assetClass)
+    : {
+        composition: [],
+        assetClass,
+        measured: false,
+      };
   return {
-    ticker: holding.yahooTicker ?? resolveTrYahooTicker(holding) ?? holding.isin,
-    displayTicker: holding.name,
-    name: holding.name,
-    type,
-    assetClass,
-    currency: holding.currency,
-    quantity: holding.quantity,
-    ...(holding.averageCost !== undefined && holding.averageCost > 0
-      ? { averageCost: holding.averageCost }
-      : {}),
-    taxRate: defaultTrTaxRateFor(type),
-    currentPrice: holding.price ?? 0,
-    isLiquid: true,
-    autoUpdatePrice: true,
-    isin: holding.isin,
-    exchange: 'Trade Republic',
+    formData: {
+      ticker: holding.yahooTicker ?? resolveTrYahooTicker(holding) ?? holding.isin,
+      displayTicker: holding.name,
+      name: holding.name,
+      type,
+      assetClass: reading.assetClass,
+      currency: holding.currency,
+      quantity: holding.quantity,
+      ...(reading.composition.length > 0 ? { composition: reading.composition } : {}),
+      ...(holding.averageCost !== undefined && holding.averageCost > 0
+        ? { averageCost: holding.averageCost }
+        : {}),
+      taxRate: defaultTrTaxRateFor(type),
+      currentPrice: holding.price ?? 0,
+      isLiquid: true,
+      autoUpdatePrice: true,
+      isin: holding.isin,
+      exchange: 'Trade Republic',
+    },
+    measured: reading.measured,
   };
+}
+
+export function mapTrHoldingToAssetFormData(
+  holding: TrHoldingInput,
+  allocation?: InstrumentFundAllocation | null,
+): AssetFormData {
+  return mapTrHoldingWithComposition(holding, allocation).formData;
 }
 
 // ─── Import plan (the preview) ───────────────────────────────────────────────
 
 /**
  * No `price-update` kind, unlike Scalable: this bridge has no price to compare (§1 of the
- * header). The plan is therefore `new` / `drift-only` / `unchanged`.
+ * header). The plan is therefore `new` / `drift-only` / `composition-update` / `unchanged`.
  */
-export type TrHoldingDiffKind = 'new' | 'drift-only' | 'unchanged';
+export type TrHoldingDiffKind = 'new' | 'drift-only' | 'composition-update' | 'unchanged';
 
 export interface TrHoldingDiff {
   kind: TrHoldingDiffKind;
   holding: TrHoldingInput;
-  /** Creation payload for `kind === 'new'`. */
+  /** Creation payload for `kind === 'new'`; composition patch preview otherwise. */
   formData: AssetFormData;
   existingAssetId?: string;
   existingName?: string;
+  /** Carried through the metadata write so a composition update cannot wipe a rate. */
+  existingTaxRate?: number;
+  /** Carried through the metadata write so a composition update cannot wipe the alias. */
+  existingDisplayTicker?: string | null;
   /** Broker quantity minus tracked quantity — a number to reconcile, never an auto-write. */
   quantityDrift: number;
   typeUncertain: boolean;
+  /**
+   * The tracked asset had NO composition and this import read the fund's published mix: fill it.
+   * A composition the user already typed is NEVER overwritten — not even with a fresher one.
+   */
+  compositionUpdate: boolean;
 }
 
 export interface TrCashPlan {
@@ -501,6 +538,8 @@ export interface TrImportPlan {
     holdingCount: number;
     newCount: number;
     driftCount: number;
+    /** Existing funds whose empty composition this import fills from the published mix. */
+    compositionUpdateCount: number;
     unchangedCount: number;
     skippedCount: number;
     savingsPlanCount: number;
@@ -509,7 +548,10 @@ export interface TrImportPlan {
 
 const QTY_EPS = 1e-6;
 
-export type TrExistingAsset = Pick<Asset, 'id' | 'name' | 'isin' | 'type' | 'quantity' | 'ticker'>;
+export type TrExistingAsset = Pick<
+  Asset,
+  'id' | 'name' | 'isin' | 'type' | 'quantity' | 'ticker' | 'composition' | 'taxRate' | 'displayTicker'
+>;
 
 /**
  * Apply the preview's per-row ticker override to a creation payload. A blank override keeps
@@ -526,12 +568,18 @@ export function applyTrTickerOverride(formData: AssetFormData, ticker: string | 
  * Diff broker positions against the tracked assets (matched by ISIN). Only two things can come
  * out of it: a position to create, and a quantity mismatch to reconcile. There is no price write
  * and there is no quantity write — the ledger owns both.
+ *
+ * `allocations` is Yahoo's published mix per identity (ISIN or Yahoo ticker), fetched by the caller
+ * before the plan is built. It is used twice: a NEW fund stores it as `composition`, and an
+ * EXISTING fund with no composition gets it filled — so hybrid funds imported before this existed
+ * become visible in «Composizione» on the next import without touching a split the user typed.
  */
 export function buildTrImportPlan(
   holdings: TrHoldingInput[],
   cashBalances: TrCashInput[],
   savingsPlans: TrSavingsPlanInput[],
-  existingAssets: TrExistingAsset[]
+  existingAssets: TrExistingAsset[],
+  allocations: Record<string, InstrumentFundAllocation> = {},
 ): TrImportPlan {
   const byIsin = new Map<string, TrExistingAsset>();
   for (const asset of existingAssets) {
@@ -542,10 +590,17 @@ export function buildTrImportPlan(
   const warnings: string[] = [];
   const diffs: TrHoldingDiff[] = holdings.map((holding) => {
     const existing = byIsin.get(holding.isin);
-    const formData = mapTrHoldingToAssetFormData(holding);
+    const ticker = holding.yahooTicker ?? resolveTrYahooTicker(holding);
+    const allocation = allocations[holding.isin] ?? (ticker ? allocations[ticker] : undefined);
+    const { formData, measured } = mapTrHoldingWithComposition(holding, allocation);
     const typeUncertain = mapTrType(holding.rawType, holding.rawCategory).typeUncertain;
+    const composition = formData.composition ?? [];
+    const hasComposition = composition.length > 0;
     if (!existing) {
-      if (typeUncertain) {
+      // The published mix places the instrument even when the broker's type string is unknown: a
+      // warning that calls it «ETF azionario» beside a class the market measured would contradict
+      // the asset the import is about to create.
+      if (typeUncertain && !measured) {
         warnings.push(
           `«${holding.name}»: tipo broker «${holding.rawType || holding.rawCategory || 'sconosciuto'}» non riconosciuto, proposto come ETF azionario — verifica su Patrimonio.`
         );
@@ -566,6 +621,7 @@ export function buildTrImportPlan(
         formData,
         quantityDrift: 0,
         typeUncertain,
+        compositionUpdate: false,
       } satisfies TrHoldingDiff;
     }
     const drift = holding.quantity - existing.quantity;
@@ -577,14 +633,20 @@ export function buildTrImportPlan(
         `«${existing.name}»: il broker riporta ${holding.quantity} quote contro ${existing.quantity} nel Registro — la quantità non viene toccata (riconcilia con una rettifica).`
       );
     }
+    const hasExistingComposition = (existing.composition?.length ?? 0) > 0;
+    // Fill an EMPTY composition only: the user's own split is a statement, not a cache.
+    const compositionUpdate = !hasExistingComposition && hasComposition;
     return {
-      kind: hasDrift ? 'drift-only' : 'unchanged',
+      kind: hasDrift ? 'drift-only' : compositionUpdate ? 'composition-update' : 'unchanged',
       holding,
       formData,
       existingAssetId: existing.id,
       existingName: existing.name,
+      existingTaxRate: existing.taxRate,
+      existingDisplayTicker: existing.displayTicker,
       quantityDrift: hasDrift ? drift : 0,
       typeUncertain,
+      compositionUpdate,
     } satisfies TrHoldingDiff;
   });
 
@@ -617,6 +679,7 @@ export function buildTrImportPlan(
       holdingCount: holdings.length,
       newCount: diffs.filter((d) => d.kind === 'new').length,
       driftCount: diffs.filter((d) => d.kind === 'drift-only').length,
+      compositionUpdateCount: diffs.filter((d) => d.compositionUpdate).length,
       unchangedCount: diffs.filter((d) => d.kind === 'unchanged').length,
       skippedCount: 0,
       savingsPlanCount: savingsPlanRows.length,

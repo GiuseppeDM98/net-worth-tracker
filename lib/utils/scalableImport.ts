@@ -24,8 +24,10 @@
  */
 
 import type { Asset, AssetClass, AssetFormData, AssetType } from '@/types/assets';
+import type { InstrumentFundAllocation } from '@/types/exposure';
 import { isLedgerAssetType } from '@/types/assetTransactions';
 import { resolveYahooSymbolForIsin } from '@/lib/utils/yahooSymbolForIsin';
+import { readFundComposition, usesPublishedFundMix } from '@/lib/utils/fundComposition';
 
 // ─── Input shapes (what the two `sc` commands print) ─────────────────────────
 
@@ -366,27 +368,53 @@ export function defaultTaxRateFor(type: AssetType): number {
  * though auto-update is off, because `autoUpdatePrice: false` is the authoritative gate in both
  * `assetPricing.ts` and `priceUpdater.ts` — the broker keeps feeding the price and the ticker is
  * read only by the look-through. That is also why a wrong entry could not move a price here.
+ *
+ * `allocation` is the fund's published mix, fetched by the caller before the preview. When Yahoo
+ * answered one, the position is born split across its real classes (`composition`) and its own
+ * class is the largest leg — the same rule Intesa and Azimut read, through
+ * `readFundComposition`.
  */
-export function mapHoldingToAssetFormData(holding: ScalableHoldingInput): AssetFormData {
+function mapHoldingWithComposition(
+  holding: ScalableHoldingInput,
+  allocation?: InstrumentFundAllocation | null,
+): { formData: AssetFormData; measured: boolean } {
   const { type, assetClass } = mapScalableType(holding.rawType);
+  const reading = usesPublishedFundMix(type)
+    ? readFundComposition(allocation, assetClass)
+    : {
+        composition: [],
+        assetClass,
+        measured: false,
+      };
   return {
-    ticker: resolveYahooSymbolForIsin(holding.isin) ?? holding.isin,
-    displayTicker: holding.name,
-    name: holding.name,
-    type,
-    assetClass,
-    currency: holding.currency,
-    quantity: holding.quantity,
-    ...(holding.averageCost !== undefined && holding.averageCost > 0
-      ? { averageCost: holding.averageCost }
-      : {}),
-    taxRate: defaultTaxRateFor(type),
-    currentPrice: holding.price,
-    isLiquid: true,
-    autoUpdatePrice: false,
-    isin: holding.isin,
-    exchange: 'Scalable Capital',
+    formData: {
+      ticker: resolveYahooSymbolForIsin(holding.isin) ?? holding.isin,
+      displayTicker: holding.name,
+      name: holding.name,
+      type,
+      assetClass: reading.assetClass,
+      currency: holding.currency,
+      quantity: holding.quantity,
+      ...(reading.composition.length > 0 ? { composition: reading.composition } : {}),
+      ...(holding.averageCost !== undefined && holding.averageCost > 0
+        ? { averageCost: holding.averageCost }
+        : {}),
+      taxRate: defaultTaxRateFor(type),
+      currentPrice: holding.price,
+      isLiquid: true,
+      autoUpdatePrice: false,
+      isin: holding.isin,
+      exchange: 'Scalable Capital',
+    },
+    measured: reading.measured,
   };
+}
+
+export function mapHoldingToAssetFormData(
+  holding: ScalableHoldingInput,
+  allocation?: InstrumentFundAllocation | null,
+): AssetFormData {
+  return mapHoldingWithComposition(holding, allocation).formData;
 }
 
 // ─── Import plan (the preview) ───────────────────────────────────────────────
@@ -396,15 +424,20 @@ export type HoldingDiffKind =
   | 'price-update'
   | 'drift-only'
   | 'price-and-drift'
+  | 'composition-update'
   | 'unchanged';
 
 export interface HoldingDiff {
   kind: HoldingDiffKind;
   holding: ScalableHoldingInput;
-  /** Creation payload for `kind === 'new'`; price patch preview otherwise. */
+  /** Creation payload for `kind === 'new'`; price/composition patch preview otherwise. */
   formData: AssetFormData;
   existingAssetId?: string;
   existingName?: string;
+  /** Carried through the metadata write so a price or composition update cannot wipe a rate. */
+  existingTaxRate?: number;
+  /** Carried through the metadata write so a price or composition update cannot wipe the alias. */
+  existingDisplayTicker?: string | null;
   prevPrice?: number;
   /** Relative price move vs the tracked price, null when the tracked price is 0. */
   priceDeltaPct: number | null;
@@ -421,6 +454,11 @@ export interface HoldingDiff {
    * `null` when the tracked ticker is already right, or when the catalogue does not know the ISIN.
    */
   tickerUpdate: string | null;
+  /**
+   * The tracked asset had NO composition and this import read the fund's published mix: fill it.
+   * A composition the user already typed is NEVER overwritten — not even with a fresher one.
+   */
+  compositionUpdate: boolean;
 }
 
 export interface CashPlan {
@@ -486,6 +524,8 @@ export interface ScalableImportPlan {
     unchangedCount: number;
     /** Tracked positions whose ticker is an ISIN the catalogue can now replace with a symbol. */
     tickerUpdateCount: number;
+    /** Existing funds whose empty composition this import fills from the published mix. */
+    compositionUpdateCount: number;
     skippedCount: number;
   };
 }
@@ -494,12 +534,31 @@ export interface ScalableImportPlan {
  * Diff broker positions against the tracked assets (matched by ISIN). Price moves become
  * updates; quantity mismatches on ledger types become drift warnings only — the plan never
  * proposes a quantity write for them.
+ *
+ * `allocations` is Yahoo's published mix per identity (ISIN or Yahoo ticker), fetched by the caller
+ * before the plan is built. It is used twice: a NEW fund stores it as `composition`, and an
+ * EXISTING fund with no composition gets it filled — so hybrid funds imported before this existed
+ * become visible in «Composizione» on the next import without touching a split the user typed.
  */
 export function buildScalableImportPlan(
   holdings: ScalableHoldingInput[],
   overview: ScalableOverviewInput | null,
-  existingAssets: Pick<Asset, 'id' | 'name' | 'isin' | 'ticker' | 'type' | 'assetClass' | 'quantity' | 'currentPrice'>[],
-  overnight: ScalableOvernightInput | null = null
+  existingAssets: Pick<
+    Asset,
+    | 'id'
+    | 'name'
+    | 'isin'
+    | 'ticker'
+    | 'type'
+    | 'assetClass'
+    | 'quantity'
+    | 'currentPrice'
+    | 'composition'
+    | 'taxRate'
+    | 'displayTicker'
+  >[],
+  overnight: ScalableOvernightInput | null = null,
+  allocations: Record<string, InstrumentFundAllocation> = {},
 ): ScalableImportPlan {
   const byIsin = new Map<string, (typeof existingAssets)[number]>();
   for (const asset of existingAssets) {
@@ -510,15 +569,21 @@ export function buildScalableImportPlan(
   const warnings: string[] = [];
   const diffs: HoldingDiff[] = holdings.map((holding) => {
     const existing = byIsin.get(holding.isin);
-    const formData = mapHoldingToAssetFormData(holding);
+    const symbol = resolveYahooSymbolForIsin(holding.isin);
+    const allocation = allocations[holding.isin] ?? (symbol ? allocations[symbol] : undefined);
+    const { formData, measured } = mapHoldingWithComposition(holding, allocation);
     const typeUncertain = mapScalableType(holding.rawType).typeUncertain;
     // A tracked position still carrying its ISIN as the ticker predates the bridge: Yahoo cannot
     // quote that, so the fund stays opaque. Offering the symbol repairs it WITHOUT touching the
     // price, which is the broker's — see `mapHoldingToAssetFormData` on why that is safe.
-    const symbol = resolveYahooSymbolForIsin(holding.isin);
     const tickerUpdate = existing && symbol && existing.ticker?.trim().toUpperCase() === holding.isin ? symbol : null;
+    const composition = formData.composition ?? [];
+    const hasComposition = composition.length > 0;
     if (!existing) {
-      if (typeUncertain) {
+      // The published mix places the instrument even when the broker's type string is unknown: a
+      // warning that calls it «ETF azionario» beside a class the market measured would contradict
+      // the asset the import is about to create.
+      if (typeUncertain && !measured) {
         warnings.push(
           `«${holding.name}»: tipo broker «${holding.rawType || 'sconosciuto'}» non riconosciuto, proposto come ETF azionario — verifica su Patrimonio.`
         );
@@ -531,18 +596,24 @@ export function buildScalableImportPlan(
         quantityDrift: 0,
         typeUncertain,
         tickerUpdate: null,
+        compositionUpdate: false,
       } satisfies HoldingDiff;
     }
     const priceMoved = Math.abs(existing.currentPrice - holding.price) > PRICE_EPS;
     const drift = holding.quantity - existing.quantity;
     const hasDrift = isLedgerAssetType(existing.type) && Math.abs(drift) > QTY_EPS;
+    const hasExistingComposition = (existing.composition?.length ?? 0) > 0;
+    // Fill an EMPTY composition only: the user's own split is a statement, not a cache.
+    const compositionUpdate = !hasExistingComposition && hasComposition;
     const kind: HoldingDiffKind = priceMoved
       ? hasDrift
         ? 'price-and-drift'
         : 'price-update'
       : hasDrift
         ? 'drift-only'
-        : 'unchanged';
+        : compositionUpdate
+          ? 'composition-update'
+          : 'unchanged';
     if (hasDrift) {
       warnings.push(
         `«${existing.name}»: il broker riporta ${holding.quantity} quote contro ${existing.quantity} nel Registro — il prezzo si aggiorna, la quantità no (riconcilia con una rettifica).`
@@ -554,6 +625,8 @@ export function buildScalableImportPlan(
       formData,
       existingAssetId: existing.id,
       existingName: existing.name,
+      existingTaxRate: existing.taxRate,
+      existingDisplayTicker: existing.displayTicker,
       prevPrice: existing.currentPrice,
       priceDeltaPct:
         existing.currentPrice !== 0
@@ -562,6 +635,7 @@ export function buildScalableImportPlan(
       quantityDrift: hasDrift ? drift : 0,
       typeUncertain,
       tickerUpdate,
+      compositionUpdate,
     } satisfies HoldingDiff;
   });
 
@@ -574,6 +648,7 @@ export function buildScalableImportPlan(
     // Its own count: a position can be `unchanged` on price and still be unquotable, and folding
     // the repair into the unchanged bucket would make the preview claim there is nothing to do.
     tickerUpdateCount: diffs.filter((d) => d.tickerUpdate !== null).length,
+    compositionUpdateCount: diffs.filter((d) => d.compositionUpdate).length,
     skippedCount: 0,
   };
 

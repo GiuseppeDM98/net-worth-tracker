@@ -42,13 +42,14 @@ import {
 import { Tile } from '@/components/ui/tile';
 import { assetsQueryOptions, useAssets } from '@/lib/hooks/useAssets';
 import { describeBrokerConnections } from '@/lib/utils/settingsNarrative';
-import { formatCurrency, formatNumber, formatPercentageIt } from '@/lib/utils/formatters';
+import { formatCurrency, formatNumber } from '@/lib/utils/formatters';
 import { ASSET_CLASS_LABELS } from '@/lib/utils/allocationUtils';
+import { describeFundComposition } from '@/lib/utils/fundCompositionLabel';
 import { IMPORT_CLASS_OPTIONS } from '@/lib/utils/importClassChoice';
 import { fetchFundAllocations } from '@/lib/utils/fundAllocationClient';
 import { fetchFundIdentities } from '@/lib/utils/fundIdentityClient';
 import { queryKeys } from '@/lib/query/queryKeys';
-import type { AssetClass, AssetComposition } from '@/types/assets';
+import type { AssetClass } from '@/types/assets';
 import {
   AZIMUT_BROKER_NAME,
   applyAzimutClassChoices,
@@ -81,15 +82,6 @@ const KIND_LABEL: Record<AzimutDiffKind, string> = {
   'identity-update': 'ISIN aggiunto',
   unchanged: 'Invariato',
 };
-
-function describeComposition(composition: AssetComposition[] | undefined): string {
-  return (composition ?? [])
-    .map(
-      (leg) =>
-        `${formatPercentageIt(leg.percentage, 2)} ${ASSET_CLASS_LABELS[leg.assetClass] ?? leg.assetClass}`
-    )
-    .join(' · ');
-}
 
 /**
  * The id of a row's class control: the row's own key, reduced to what an id may hold (a product
@@ -488,7 +480,7 @@ export function AzimutConnectionTile({ ownerId, disabled = false }: AzimutConnec
                 {plan.holdings.map((diff) => {
                   const compositionLabel =
                     diff.kind === 'new' || diff.compositionUpdate
-                      ? describeComposition(diff.formData.composition)
+                      ? describeFundComposition(diff.formData.composition)
                       : '';
                   const hasComposition = compositionLabel !== '';
                   // A product name is no ticker: GESTITO rows have no code in the file, and printing
