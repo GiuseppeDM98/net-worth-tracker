@@ -16,7 +16,7 @@ import { ALLOCATION_ADVICE_RUN_STAGES, type AllocationAdviceRunEvent, type Alloc
  * request streams SSE (`stage` events, then `done` with the document, or `error`), and the
  * client chains the three (`useConsulenteRun`), retrying a failed stage from itself.
  *
- * Why three requests: a model call with reasoning (two on Opus 5.5 at effort high, one with web
+ * Why three requests: a model call with reasoning (two on Opus 5.5, one on Sonnet 5.5 with web
  * search) is minutes — the owner's run of 2026-10-20 took 396 s, the strategy alone 210 s — and
  * Vercel's Hobby plan stops a function at 300 s (60 s without Fluid compute: it must be on).
  * `maxDuration` is that ceiling; a stage that outlives it is cut with a 504 and the document

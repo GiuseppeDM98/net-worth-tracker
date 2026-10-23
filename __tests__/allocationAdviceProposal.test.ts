@@ -7,10 +7,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   ALLOCATION_PROPOSAL_BLOCK,
+  allocationAdviceAnswerSchema,
   allocationAdviceAnswersSchema,
   allocationAdviceProposalSchema,
   instrumentCandidatesSchema,
-  parseAllocationProposal,
+  parseAllocationAnswer,
   parseFencedBlock,
   parseInstrumentCandidates,
   parseInstrumentCandidatesLenient,
@@ -123,15 +124,64 @@ describe('parseFencedBlock', () => {
     expect(parseFencedBlock('```x\n{"b": 1}\n```', 'x', schema)).toBeNull();
   });
 
-  it('parses a proposal and the candidates through their own helpers', () => {
-    const text = `Testo.\n\`\`\`${ALLOCATION_PROPOSAL_BLOCK}\n${JSON.stringify(PROPOSAL)}\n\`\`\``;
-    expect(parseAllocationProposal(text)?.summary).toBe('Più obbligazioni, meno liquidità.');
+  it('parses the candidates through their own helper', () => {
     expect(parseInstrumentCandidates('```instrument-candidates\n{"sleeves": []}\n```')).toEqual({ sleeves: [] });
   });
 
   it('strips the structure blocks from the prose a reader is shown', () => {
     const text = `Prima.\n\n\`\`\`${ALLOCATION_PROPOSAL_BLOCK}\n{}\n\`\`\`\n\n\nDopo.`;
     expect(stripFencedBlocks(text)).toBe('Prima.\n\nDopo.');
+  });
+});
+
+describe('parseAllocationAnswer — the structured answer of the strategy and the review (2026-10-23)', () => {
+  it('reads the markdown and the proposal', () => {
+    const parsed = parseAllocationAnswer(JSON.stringify({ markdown: '  # Report\nTesto.  ', proposal: PROPOSAL }));
+    expect(parsed?.markdown).toBe('# Report\nTesto.');
+    expect(parsed?.proposal?.summary).toBe('Più obbligazioni, meno liquidità.');
+    expect(parsed?.refused).toEqual([]);
+  });
+
+  it('keeps the markdown and says why when the proposal breaks a sum the API does not enforce', () => {
+    const broken = { ...PROPOSAL, classes: PROPOSAL.classes.slice(0, 1) };
+    const parsed = parseAllocationAnswer(JSON.stringify({ markdown: 'Testo.', proposal: broken }));
+    expect(parsed?.markdown).toBe('Testo.');
+    expect(parsed?.proposal).toBeNull();
+    expect(parsed?.refused.join(' ')).toMatch(/sommare a 100/);
+  });
+
+  it('answers null for anything that is not the answer object', () => {
+    expect(parseAllocationAnswer('Solo testo.')).toBeNull();
+    expect(parseAllocationAnswer('{"proposal": {}}')).toBeNull();
+    expect(parseAllocationAnswer('null')).toBeNull();
+  });
+
+  it('takes a goal mix as one optional key per class, and refuses a key that is not a class', () => {
+    const goal = { name: 'Casa', priority: 'alta', assignments: [], rationale: '' };
+    const withMix = { ...PROPOSAL, goals: [{ ...goal, recommendedAllocation: { bonds: 70, cash: 30 } }] };
+    expect(allocationAdviceProposalSchema.safeParse(withMix).success).toBe(true);
+    const offSum = { ...PROPOSAL, goals: [{ ...goal, recommendedAllocation: { bonds: 70 } }] };
+    expect(allocationAdviceProposalSchema.safeParse(offSum).success).toBe(false);
+    const stray = allocationAdviceProposalSchema.safeParse({ ...PROPOSAL, goals: [{ ...goal, recommendedAllocation: { bonds: 70, cash: 30, oro: 0 } }] });
+    expect(stray.success && stray.data.goals[0].recommendedAllocation).toEqual({ bonds: 70, cash: 30 });
+  });
+
+  it('reads a goal mix sent as pairs in any order back into the stored object', () => {
+    const goal = { name: 'Casa', priority: 'alta', assignments: [], rationale: '' };
+    const answer = (recommendedAllocation: unknown) =>
+      parseAllocationAnswer(JSON.stringify({ markdown: 'Testo.', proposal: { ...PROPOSAL, goals: [{ ...goal, recommendedAllocation }] } }));
+    const pairs = [{ assetClass: 'equity', percentage: 60 }, { assetClass: 'trendFollowing', percentage: 15 }, { assetClass: 'bonds', percentage: 25 }];
+    expect(answer(pairs)?.proposal?.goals[0].recommendedAllocation).toEqual({ equity: 60, bonds: 25, trendFollowing: 15 });
+    expect(answer([])?.proposal?.goals[0].recommendedAllocation).toBeUndefined();
+    expect(answer([{ assetClass: 'equity', percentage: 50 }, { assetClass: 'equity', percentage: 50 }])?.proposal).toBeNull();
+    expect(answer([{ assetClass: 'equity', percentage: 80 }])?.refused.join(' ')).toMatch(/sommare a 100/);
+  });
+
+  it('sends the goal mix as a list on the wire, so its order is free', () => {
+    const wire = z.toJSONSchema(allocationAdviceAnswerSchema) as unknown as {
+      properties: { proposal: { properties: { goals: { items: { properties: { recommendedAllocation: { type?: string } } } } } } };
+    };
+    expect(wire.properties.proposal.properties.goals.items.properties.recommendedAllocation.type).toBe('array');
   });
 });
 

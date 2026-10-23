@@ -34,17 +34,21 @@ export function findAssetByName(assets: readonly Asset[], name: string): Asset |
   const byName = assets.find((asset) => asset.name.trim().toLowerCase() === wanted);
   if (byName) return byName;
   // The prompt prints every instrument as «name (TICKER)», and the model copies it that way —
-  // and shortens «SWDA.MI» to «SWDA» (the owner's run, 2026-10-20: Eleonora's quota went
+  // and shortens «SWDA.MI» to «SWDA» (the owner's run, 2026-10-20: a household member's quota went
   // unmatched). Accept the printed form, and the ticker alone, with or without its exchange.
-  const tickerOf = (asset: Asset) => (asset.ticker ?? '').trim().toLowerCase();
+  // The prompt prints the `displayTicker` alias when there is one (`getAssetDisplayTicker`): an
+  // ETC whose ticker is «ISIN.SG» reaches the model by its alias, so the alias names it too (the
+  // owner's run, 2026-10-23: two quotas went unmatched).
+  const tickersOf = (asset: Asset) => [asset.ticker, asset.displayTicker].map((t) => (t ?? '').trim().toLowerCase()).filter((t) => t !== '');
   const bare = (ticker: string) => ticker.split('.')[0];
+  const named = (asset: Asset, ticker: string) => tickersOf(asset).some((t) => t === ticker || bare(t) === bare(ticker));
   const printed = /^(.*)\s\(([^()]+)\)$/.exec(wanted);
   if (printed) {
     const [, head, tail] = printed;
-    const byPrinted = assets.find((asset) => asset.name.trim().toLowerCase() === head.trim() && (tickerOf(asset) === tail.trim() || bare(tickerOf(asset)) === bare(tail.trim())));
+    const byPrinted = assets.find((asset) => asset.name.trim().toLowerCase() === head.trim() && named(asset, tail.trim()));
     if (byPrinted) return byPrinted;
   }
-  const byTicker = assets.filter((asset) => tickerOf(asset) !== '' && (tickerOf(asset) === wanted || bare(tickerOf(asset)) === bare(wanted)));
+  const byTicker = assets.filter((asset) => named(asset, wanted));
   return byTicker.length === 1 ? byTicker[0] : null;
 }
 

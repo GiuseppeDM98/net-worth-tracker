@@ -128,9 +128,10 @@ and **record the outcome somewhere that survives the session** (`CLAUDE.md` or e
 **The outcome is one line, the signals are not** (2026-10-19). In `CLAUDE.md` the session's status
 entry says what was done, where it is documented, what is still open and what comes next; it
 replaces the previous one. The session's signals — type-check, test counts, E2E runs, flakes,
-skipped phases — go in the commit message and, where they teach something, in the area's guide,
-never in `CLAUDE.md`: that file is injected into every turn, and a status entry that collects them
-grows back into a diary after every trim.
+skipped phases, the guided tour's walk and its findings (2026-10-23) — go in the commit message
+and, where they teach something, in the area's guide, never in `CLAUDE.md`: that file is injected
+into every turn, and a status entry that collects them grows back into a diary after every trim.
+Of the tour, the status entry keeps only its outcome: done and closed, or what it left open.
 
 ---
 

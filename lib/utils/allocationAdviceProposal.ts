@@ -1,8 +1,9 @@
 /**
  * The contract between the Consulente's agents and the app, in ONE place (2026-10-20): the
- * answers the path collects, the proposal Opus 5.5 writes in a fenced ```allocation-proposal
- * block, the candidates Sonnet 5.5 writes in a fenced ```instrument-candidates block, and the
- * parser that lifts a block out of the prose.
+ * answers the path collects, the proposal Opus 5.5 returns beside its markdown as a structured
+ * output (`allocationAdviceAnswerSchema`, since 2026-10-23), the candidates Sonnet 5.5 writes in
+ * a fenced ```instrument-candidates block — web search answers with citations, which structured
+ * outputs refuse (400) — and the parser that lifts that block out of the prose.
  *
  * Client-safe on purpose (no `server-only`, no Firestore): the report page validates a stored
  * proposal before it renders an «Applica» button on it, and the run route validates the answers
@@ -111,8 +112,10 @@ export const proposalGoalSchema = z.object({
   targetDateIso: isoDate.optional(),
   priority: goalPrioritySchema,
   monthlyContribution: z.number().finite().nonnegative().optional(),
+  // One optional key per class, as the app stores it. On the wire it travels as a list of pairs
+  // (`allocationAdviceAnswerSchema`): see there why.
   recommendedAllocation: z
-    .partialRecord(z.enum(ASSET_CLASSES), z.number().finite().min(0).max(100))
+    .object(Object.fromEntries(ASSET_CLASSES.map((cls) => [cls, z.number().finite().min(0).max(100).optional()])) as Record<AssetClass, z.ZodOptional<z.ZodNumber>>)
     .refine((mix) => sumsTo100(Object.values(mix).map((pct) => pct ?? 0)), { message: "L'allocazione consigliata deve sommare a 100." })
     .optional(),
   /** Quotas on instruments HELD today, by exact name, in percent of the instrument. */
@@ -120,16 +123,18 @@ export const proposalGoalSchema = z.object({
   rationale: z.string().max(500),
 });
 
+const proposalShape = {
+  summary: z.string().trim().min(1).max(800),
+  classes: z.array(proposalClassSchema).min(1).max(8),
+  assetRoles: z.array(proposalAssetRoleSchema).max(60),
+  goals: z.array(proposalGoalSchema).max(20),
+  reviewByIso: isoDate,
+  reviewReason: z.string().max(400),
+  risks: z.array(z.string().max(300)).max(10),
+};
+
 export const allocationAdviceProposalSchema = z
-  .object({
-    summary: z.string().trim().min(1).max(800),
-    classes: z.array(proposalClassSchema).min(1).max(8),
-    assetRoles: z.array(proposalAssetRoleSchema).max(60),
-    goals: z.array(proposalGoalSchema).max(20),
-    reviewByIso: isoDate,
-    reviewReason: z.string().max(400),
-    risks: z.array(z.string().max(300)).max(10),
-  })
+  .object(proposalShape)
   .refine(
     (proposal) => {
       // The percentages of the classes without a fixed amount sum to 100: a fixed cash reserve
@@ -144,6 +149,76 @@ export const allocationAdviceProposalSchema = z
   });
 
 export type AllocationAdviceProposal = z.infer<typeof allocationAdviceProposalSchema>;
+
+/**
+ * The answer of the strategy and of the review (2026-10-23): ONE JSON object, the report's
+ * markdown beside the proposal, sent to the API as the structured-output schema — the API
+ * guarantees the shape, so a missing or broken block can no longer cost a whole Opus call.
+ * The API does not enforce the numeric and length bounds nor the refinements (the sums to 100):
+ * the SDK moves them into the schema's descriptions, and `parseAllocationAnswer` checks them here.
+ *
+ * A goal's mix travels as a list of `{ assetClass, percentage }` pairs, not as the stored object:
+ * the API writes an object's keys in the schema's order, so a model that wrote `equity` and then
+ * `trendFollowing` could no longer go back to `bonds`, and the mix fell short of 100 (the tour of
+ * 2026-10-23, twice on the same goal). A record would not compile either: it becomes
+ * `additionalProperties`, which structured outputs only take as `false`.
+ */
+const wireGoalSchema = proposalGoalSchema.extend({
+  recommendedAllocation: z
+    .array(z.object({ assetClass: z.enum(ASSET_CLASSES), percentage: z.number().finite().min(0).max(100) }))
+    .max(8)
+    .optional(),
+});
+
+export const allocationAdviceAnswerSchema = z.object({
+  markdown: z.string(),
+  proposal: z.object({ ...proposalShape, goals: z.array(wireGoalSchema).max(20) }),
+});
+
+/** The wire's list of pairs back to the stored object; a class named twice stays a list, and fails the check. */
+function mixOf(pairs: unknown): unknown {
+  if (!Array.isArray(pairs)) return pairs;
+  if (pairs.length === 0) return undefined;
+  const mix: Record<string, unknown> = {};
+  for (const pair of pairs) {
+    const cls = (pair as { assetClass?: unknown } | null)?.assetClass;
+    if (typeof cls !== 'string' || cls in mix) return pairs;
+    mix[cls] = (pair as { percentage?: unknown }).percentage;
+  }
+  return mix;
+}
+
+function storedProposalOf(proposal: unknown): unknown {
+  const goals = (proposal as { goals?: unknown } | null)?.goals;
+  if (!Array.isArray(goals)) return proposal;
+  return {
+    ...(proposal as object),
+    goals: goals.map((goal) =>
+      goal && typeof goal === 'object' && 'recommendedAllocation' in goal
+        ? { ...goal, recommendedAllocation: mixOf((goal as { recommendedAllocation: unknown }).recommendedAllocation) }
+        : goal
+    ),
+  };
+}
+
+/**
+ * Reads a structured answer: null when the text is not the JSON object at all; the markdown
+ * with `proposal: null` when the proposal breaks a bound or a sum the API does not enforce —
+ * the report still shows what the agent wrote, and the caller decides what a missing proposal means.
+ */
+export function parseAllocationAnswer(text: string): { markdown: string; proposal: AllocationAdviceProposal | null; refused: string[] } | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  const markdown = (parsed as { markdown?: unknown } | null)?.markdown;
+  if (typeof markdown !== 'string') return null;
+  const proposal = allocationAdviceProposalSchema.safeParse(storedProposalOf((parsed as { proposal?: unknown }).proposal));
+  if (proposal.success) return { markdown: markdown.trim(), proposal: proposal.data, refused: [] };
+  return { markdown: markdown.trim(), proposal: null, refused: proposal.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`) };
+}
 
 // ─── The instrument candidates (Sonnet 5.5) ──────────────────────────────────
 
@@ -203,12 +278,9 @@ export function parseFencedBlock<T>(text: string, lang: string, schema: z.ZodTyp
   return result.success ? result.data : null;
 }
 
+/** The language of the proposal's block in the INPUT of the next agent (`withBlock` in run.ts). */
 export const ALLOCATION_PROPOSAL_BLOCK = 'allocation-proposal';
 export const INSTRUMENT_CANDIDATES_BLOCK = 'instrument-candidates';
-
-export function parseAllocationProposal(text: string): AllocationAdviceProposal | null {
-  return parseFencedBlock(text, ALLOCATION_PROPOSAL_BLOCK, allocationAdviceProposalSchema);
-}
 
 /** The LAST fenced block of a language, as JSON, or null without one or on broken JSON. */
 function lastFencedJson(text: string, lang: string): unknown {

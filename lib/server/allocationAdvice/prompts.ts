@@ -11,9 +11,10 @@
  * The data rules are the assistant's: the figures come from the block and are never
  * recomputed; a class or an instrument the user does not have is not invented; the user's
  * answers win over the agent's taste (a home the user wants excluded stays excluded; the
- * agent may say why it would decide otherwise, in words). The proposal is JSON in ONE fenced
- * block, parsed by `lib/utils/allocationAdviceProposal.ts`, and nothing is written until the
- * user presses «Applica».
+ * agent may say why it would decide otherwise, in words). The strategy and the review answer as
+ * a structured output, `{ markdown, proposal }` (`allocationAdviceAnswerSchema` in
+ * `lib/utils/allocationAdviceProposal.ts`, 2026-10-23); the instrument search writes ONE fenced
+ * block; nothing is written until the user presses «Applica».
  */
 
 import { ASSET_CLASS_LABELS, ASSET_CLASS_SEQUENCE } from '@/lib/utils/allocationUtils';
@@ -98,22 +99,20 @@ const CONSULENTE_CORE = [
 // ─── 1. Strategy (Opus 5.5) ───────────────────────────────────────────────────
 
 const PROPOSAL_SCHEMA_TEXT = [
-  '```allocation-proposal',
   '{',
   '  "summary": string (2-3 frasi: la proposta in breve),',
   '  "classes": [ { "assetClass": chiave di classe, "targetPercentage": number (della base; 0 se "fixedAmount" è presente), "fixedAmount"?: number (solo "cash": riserva fissa in euro), "rationale": string, "subTargets": [ { "name": string, "targetPercentage": number (della classe; i sotto-target di una classe sommano a 100, oppure lista vuota), "instrument"?: string, "rationale"?: string } ] } ],',
   '  "assetRoles": [ { "assetName": nome ESATTO di uno strumento del blocco STRUMENTI, "role": "tradable" | "frozen" | "excluded", "reason": string } ],',
-  '  "goals": [ { "goalId"?: id di un obiettivo esistente, "name": string, "targetAmount"?: number, "targetDateIso"?: "YYYY-MM-DD", "priority": "alta" | "media" | "bassa", "monthlyContribution"?: number, "recommendedAllocation"?: { chiave di classe: number, … somma 100 }, "assignments": [ { "assetName": nome ESATTO di uno strumento posseduto, "percentage": number (quota dello strumento, 0-100) } ], "rationale": string } ],',
+  '  "goals": [ { "goalId"?: id di un obiettivo esistente, "name": string, "targetAmount"?: number, "targetDateIso"?: "YYYY-MM-DD", "priority": "alta" | "media" | "bassa", "monthlyContribution"?: number, "recommendedAllocation"?: [ { "assetClass": chiave di classe, "percentage": number } ] (le percentuali sommano a 100; nel blocco di una proposta già scritta la stessa allocazione compare come oggetto { chiave di classe: number }), "assignments": [ { "assetName": nome ESATTO di uno strumento posseduto, "percentage": number (quota dello strumento, 0-100) } ], "rationale": string } ],',
   '  "reviewByIso": "YYYY-MM-DD",',
   '  "reviewReason": string,',
   '  "risks": [ string ]',
   '}',
-  '```',
 ].join('\n');
 
 const STRATEGY_CONTRACT = [
   '# Cosa devi produrre',
-  'Prima il ragionamento in markdown, con queste sezioni:',
+  "La risposta è UN oggetto JSON con due campi, `markdown` e `proposal`. In `markdown` l'analisi per l'utente, con queste sezioni:",
   '1. **La situazione** — cosa vedi nel portafoglio di oggi rispetto a orizzonte, tolleranza e obiettivi (2-4 frasi).',
   "2. **L'allocazione proposta** — ogni classe con la percentuale e il perché; per ogni classe i sotto-target (nome e % della classe); la liquidità come percentuale o come riserva fissa in euro, dicendo quale e perché.",
   '3. **Casa, fondi pensione e illiquidi** — il ruolo scelto dall\'utente e il tuo giudizio su di esso.',
@@ -123,7 +122,7 @@ const STRATEGY_CONTRACT = [
   '',
   "Se i dati contengono il blocco IL PIANO IN VIGORE E IL PERCHÉ, è il piano che l'utente segue oggi e le ragioni di allora: non ripartire da zero. Tieni ciò che regge ancora, cambia ciò che i dati nuovi o le risposte nuove contraddicono, e aggiungi la sezione **Rispetto al piano precedente** (fra «Cosa cambia rispetto a oggi» e «Rischi e revisione») che dice cosa confermi, cosa cambi e perché, richieste di modifica di allora comprese.",
   '',
-  'Poi, alla fine, UN solo blocco di codice con linguaggio `allocation-proposal` che contenga SOLO JSON valido, senza commenti, con questo schema:',
+  'In `proposal` la proposta strutturata, con questi campi:',
   PROPOSAL_SCHEMA_TEXT,
   'Vincoli: le "targetPercentage" delle classi senza "fixedAmount" sommano esattamente a 100; ogni classe compare una volta; i nomi in "assetName" sono copiati ESATTAMENTE dal blocco STRUMENTI; "assetRoles" contiene solo gli strumenti il cui ruolo deve CAMBIARE o che l\'utente ha nominato (casa, fondi pensione, illiquidi), non tutti; un sotto-target che corrisponde a uno strumento già posseduto lo nomina in "instrument". Il nome di un sotto-target è la SOTTOCATEGORIA che gli strumenti posseduti portano già nel blocco STRUMENTI (es. «All World», «Bond Singoli»): un sotto-target con un nome nuovo resta vuoto finché l\'utente non riclassifica lo strumento a mano — se lo proponi, dillo nel testo.',
 ].join('\n');
@@ -207,7 +206,7 @@ export function buildInstrumentsPrompt(answers: AllocationAdviceAnswers, proposa
 
 const REVIEW_CONTRACT = [
   '# Cosa devi produrre',
-  "Il report finale per l'utente, in markdown, che unisce la strategia e gli strumenti trovati. Sezioni, in quest'ordine:",
+  "La risposta è UN oggetto JSON con due campi, `markdown` e `proposal`. In `markdown` il report finale per l'utente, che unisce la strategia e gli strumenti trovati. Sezioni, in quest'ordine:",
   "1. **In una frase** — il verdetto sull'allocazione proposta rispetto a quella di oggi.",
   "2. **L'allocazione proposta** — ogni classe con percentuale e perché; i sotto-target sotto ogni classe.",
   '3. **Gli strumenti** — per ogni sotto-target lo strumento consigliato (ISIN e borsa), perché lui, e se è già in portafoglio; se la ricerca non ha verificato qualcosa, dillo.',
@@ -216,7 +215,7 @@ const REVIEW_CONTRACT = [
   '6. **Cosa fare adesso** — i passi concreti, in ordine, con i costi fiscali di un eventuale cambio di strumento.',
   '7. **Rischi e revisione** — e la data entro cui rivedere il piano.',
   '',
-  'Poi UN solo blocco `allocation-proposal` con lo stesso schema della strategia, rivisto alla luce degli strumenti: in ogni sotto-target "instrument" nomina lo strumento scelto (nome e ISIN); le percentuali, i ruoli, gli obiettivi e la data di revisione restano coerenti con il testo. Se non cambi nulla della strategia, ricopia il suo blocco.',
+  'In `proposal` la proposta con gli stessi campi della strategia (il suo blocco `allocation-proposal` nei dati qui sotto), rivista alla luce degli strumenti: in ogni sotto-target "instrument" nomina lo strumento scelto (nome e ISIN); le percentuali, i ruoli, gli obiettivi e la data di revisione restano coerenti con il testo. Se non cambi nulla della strategia, ricopia la sua proposta.',
   PROPOSAL_SCHEMA_TEXT,
 ].join('\n');
 
@@ -224,7 +223,7 @@ const REVIEW_CONTRACT = [
 const REVISION_CONTRACT = [
   '',
   '# La revisione su richiesta',
-  "L'utente ha letto il report e chiede una modifica. Riscrivi il report INTERO con le stesse sette sezioni, applicando la richiesta dove è sensata e coerente con i dati e con le risposte del percorso; dove non lo è, o ha un costo (fiscale, di rischio, per gli obiettivi), dillo apertamente in una sezione in più, «La tua richiesta», subito dopo «In una frase». Le richieste precedenti restano applicate, salvo contrasto con l'ultima. Il blocco allocation-proposal in coda riflette il report rivisto.",
+  "L'utente ha letto il report e chiede una modifica. Riscrivi il report INTERO con le stesse sette sezioni, applicando la richiesta dove è sensata e coerente con i dati e con le risposte del percorso; dove non lo è, o ha un costo (fiscale, di rischio, per gli obiettivi), dillo apertamente in una sezione in più, «La tua richiesta», subito dopo «In una frase». Le richieste precedenti restano applicate, salvo contrasto con l'ultima. La `proposal` riflette il report rivisto.",
 ].join('\n');
 
 /**
