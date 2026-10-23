@@ -107,7 +107,9 @@ describe('the three prompts', () => {
     const a = buildStrategyPrompt(ANSWERS, 'DATI A');
     const b = buildStrategyPrompt({ ...ANSWERS, age: 60, broker: 'Altro' }, 'DATI B');
     expect(a.system).toBe(b.system);
-    expect(a.system).toContain('```allocation-proposal');
+    // A structured answer since 2026-10-23: the fields are described, no fenced block is asked for.
+    expect(a.system).toContain('UN oggetto JSON con due campi, `markdown` e `proposal`');
+    expect(a.system).not.toContain('```allocation-proposal');
     expect(a.system).toContain('"assetClass": chiave di classe');
     expect(a.userContent).toContain('DATI A');
     expect(a.userContent).toContain('--- RISPOSTE DEL PERCORSO ---');
@@ -128,6 +130,6 @@ describe('the three prompts', () => {
     const withBlock = buildReviewPrompt(ANSWERS, 'STRATEGIA', 'STRUMENTI', { sleeves: [] });
     expect(withBlock.userContent).not.toContain('non ha prodotto un blocco strutturato valido');
     expect(withBlock.userContent).toContain('--- STRATEGIA PROPOSTA (primo agente) ---\nSTRATEGIA');
-    expect(withBlock.system).toContain('Il report finale');
+    expect(withBlock.system).toContain('il report finale');
   });
 });

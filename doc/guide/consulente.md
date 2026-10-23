@@ -59,19 +59,32 @@
 
 - **Tre chiamate in serie, persistite a ogni fase** (`runAllocationAdvice`; sull'account del proprietario, mirror del 2026-10-20: 7,1 minuti in tutto — strategia 2,6, strumenti 2,7, revisione 1,7 — e un report di ~11 000 caratteri): il contesto è il bundle YTD
   dell'Assistente (`buildAssistantYtdContext` + `formatBundleForPrompt`, blocco portafoglio incluso); la strategia
-  su Opus 5.5 (effort `high`, `max_tokens` 32 000, nessun tool); gli strumenti su Sonnet 5.5 con
-  `web_search_20260209` (`max_uses` 12); la revisione su Opus 5.5. Ogni chiamata è uno stream letto fino alla
-  fine: `stop_reason` deciso dal `message_delta` terminale — `max_tokens` e `refusal` sono fasi FALLITE dette
-  nelle parole del prodotto (`AllocationAdviceStageError`, `retryable`), mai una proposta a metà letta come intera.
-- **La struttura non si legge mai dalla prosa** (la regola dell'Assistente): la strategia emette UN blocco
-  ```` ```allocation-proposal ````, la ricerca UN blocco ```` ```instrument-candidates ````, la revisione il report e
-  un blocco `allocation-proposal` rivisto. `parseFencedBlock` prende l'ULTIMO blocco di quel linguaggio e lo valida
-  con zod; una strategia senza blocco valido fallisce la corsa; una revisione senza blocco valido tiene la proposta
-  della strategia (`report.proposal`); la ricerca senza blocco lascia `candidates: null` e il report lo dice.
+  su Opus 5.5 (effort `medium`, `max_tokens` 32 000, nessun tool); gli strumenti su Sonnet 5.5 (effort `high`) con
+  `web_search_20260209` (`max_uses` 20, `ALLOCATION_ADVICE_WEB_SEARCH_MAX_USES`); la revisione su Opus 5.5. Ogni chiamata è uno stream letto fino alla
+  fine dall'accumulatore dell'SDK (`beta.messages.stream(...).finalMessage()`): `stop_reason` e il modello che ha
+  risposto vengono dal messaggio finale (dopo un fallback a metà stream, quello che ha finito) — `max_tokens` e
+  `refusal` sono fasi FALLITE dette nelle parole del prodotto (`AllocationAdviceStageError`, `retryable`), mai una
+  proposta a metà letta come intera. Un turno che la ricerca web mette in pausa (`pause_turn`, il tetto del ciclo
+  lato server) si riprende rimandando la risposta in pausa come messaggio dell'assistente, fino a
+  `ALLOCATION_ADVICE_MAX_CONTINUATIONS` volte, con i testi uniti (2026-10-23; prima la pausa faceva fallire la fase).
+- **La struttura non si legge mai dalla prosa** (la regola dell'Assistente): strategia e revisione rispondono con
+  un output strutturato, UN oggetto `{ markdown, proposal }` (`allocationAdviceAnswerSchema`, dal 2026-10-23): la
+  forma la garantisce l'API, le somme e i limiti no (l'SDK li sposta nelle descrizioni dello schema) e li controlla
+  `parseAllocationAnswer`. Una strategia la cui proposta non regge fallisce la corsa; una revisione che non regge
+  tiene la proposta della strategia (`report.proposal`). L'API scrive le chiavi di un oggetto nell'ordine dello
+  schema: l'allocazione di un obiettivo viaggia quindi come lista di coppie `{ assetClass, percentage }` e
+  `parseAllocationAnswer` la rimette nell'oggetto salvato. Con un oggetto per chiave, dopo `trendFollowing` il
+  modello non poteva più scrivere `bonds` e la somma restava sotto 100 (giro del 2026-10-23, due volte sullo stesso
+  obiettivo). Un record non si compila: diventa `additionalProperties`, che gli output strutturati vogliono `false`.
+  La ricerca resta su UN blocco
+  ```` ```instrument-candidates ```` (`parseFencedBlock` prende l'ULTIMO e lo valida con zod), perché la ricerca web
+  risponde con citazioni e gli output strutturati le rifiutano (400); senza blocco lascia `candidates: null` e il
+  report lo dice. All'agente successivo strategia e strumenti arrivano con il loro blocco rimesso nel testo (`withBlock`).
 - **Gli schemi**: le classi della proposta sono `ASSET_CLASS_SEQUENCE` (una chiave fuori dall'enumerazione è rifiutata);
   le percentuali delle classi SENZA `fixedAmount` sommano a 100 (±0,5); i sotto-target di una classe sommano a 100 o
   sono vuoti; una classe compare una volta; `recommendedAllocation` di un obiettivo somma a 100; gli `assetName`
-  sono il nome ESATTO del blocco STRUMENTI (il modello lo copia; `findAssetByName` è case- e spazio-insensibile).
+  sono il nome ESATTO del blocco STRUMENTI (il modello lo copia; `findAssetByName` è case- e spazio-insensibile e riconosce anche l'alias
+  `displayTicker`, che il blocco stampa al posto del ticker: senza, il 2026-10-23 «Applica» ha perso le quote di due ETC).
 - **Il documento** `allocationAdvice/{uid}` è UNO per account, riscritto intero all'avvio (`setAllocationAdviceAdmin`)
   e poi aggiornato per fase (`patchAllocationAdviceAdmin`, `merge: true`, `removeUndefinedDeep`); le date viaggiano
   come Timestamp e tornano Date campo per campo (`mapAllocationAdviceData`, condiviso dai due SDK). Stati:

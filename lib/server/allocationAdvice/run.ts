@@ -1,7 +1,10 @@
 import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
+import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
 import {
+  ALLOCATION_ADVICE_INSTRUMENTS_EFFORT,
   ALLOCATION_ADVICE_INSTRUMENTS_MODEL,
+  ALLOCATION_ADVICE_STRATEGY_EFFORT,
   ALLOCATION_ADVICE_STRATEGY_MODEL,
   SERVER_SIDE_FALLBACK_BETA,
 } from '@/lib/constants/aiModels';
@@ -10,7 +13,10 @@ import { formatBundleForPrompt, formatPortfolioForPrompt } from '@/lib/server/as
 import { buildInstrumentsPrompt, buildReviewPrompt, buildRevisionPrompt, buildStrategyPrompt } from './prompts';
 import { getAllocationAdviceAdmin, patchAllocationAdviceAdmin, setAllocationAdviceAdmin } from './store';
 import {
-  parseAllocationProposal,
+  ALLOCATION_PROPOSAL_BLOCK,
+  INSTRUMENT_CANDIDATES_BLOCK,
+  allocationAdviceAnswerSchema,
+  parseAllocationAnswer,
   parseInstrumentCandidatesLenient,
   stripFencedBlocks,
   type AllocationAdviceAnswers,
@@ -25,11 +31,13 @@ import { priorPlanOf } from '@/lib/utils/allocationAdviceDocument';
  * the platform cut leaves what it had reached. Each call is its OWN request from the client
  * (`runAllocationAdviceStage`): see the note above it.
  *
- * Every call streams (`stream: true`) and is read to its end: the SDK's HTTP timeout never
- * counts against a 32 000-token answer, and the terminal `message_delta` carries the
- * `stop_reason` the surface must read (a `max_tokens` cut or a `refusal` is a failed stage,
- * said in the product's words — never a half proposal parsed as whole). Both models opt into
- * the server-side fallback (aiModels.ts).
+ * Every call streams and is read to its end: the SDK's HTTP timeout never counts against a
+ * 32 000-token answer, and the final message carries the `stop_reason` the surface must read
+ * (a `max_tokens` cut or a `refusal` is a failed stage, said in the product's words — never a
+ * half proposal parsed as whole). The strategy and the review answer as a structured output
+ * (markdown + proposal, `allocationAdviceAnswerSchema`); the instrument search keeps its fenced
+ * block, because web search answers with citations and structured outputs refuse them. Both
+ * models opt into the server-side fallback (aiModels.ts).
  */
 
 /** Output budget per call: thinking AND text; a strategy with its block is a few thousand tokens, the rest is reasoning. */
@@ -70,23 +78,20 @@ export class AllocationAdviceStageError extends Error {
   }
 }
 
-/** Reads a streamed answer to its end: the text, the stop reason, the model that answered. */
-async function collectStream(stream: AsyncIterable<Anthropic.Beta.BetaRawMessageStreamEvent>, requestedModel: string): Promise<CollectedAnswer> {
-  let text = '';
-  let stopReason: string | null = null;
-  let model = requestedModel;
-  let webSearchUsed = false;
-  for await (const chunk of stream) {
-    if (chunk.type === 'message_start') model = chunk.message.model;
-    if (chunk.type === 'content_block_start' && chunk.content_block?.type === 'server_tool_use') webSearchUsed = true;
-    if (chunk.type === 'content_block_start' && chunk.content_block?.type === 'fallback') {
-      console.info(`[consulente] ${chunk.content_block.from.model} declined; ${chunk.content_block.to.model} continued`);
-    }
-    if (chunk.type === 'message_delta' && chunk.delta?.stop_reason) stopReason = chunk.delta.stop_reason;
-    if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') text += chunk.delta.text;
-  }
-  return { text: text.trim(), stopReason, model, webSearchUsed };
-}
+/**
+ * How many times a stage resumes a turn the server paused. With web search the server runs its
+ * own tool loop and stops it at a cap with `stop_reason: 'pause_turn'`; the turn is resumed by
+ * sending the paused answer back as the assistant's message, with no new user text. Before
+ * 2026-10-23 a pause failed the stage and «Riprova» redid every search.
+ */
+export const ALLOCATION_ADVICE_MAX_CONTINUATIONS = 3;
+
+/**
+ * The structured answer of the strategy and the review: the wire form of
+ * `allocationAdviceAnswerSchema`. Only `type` and `schema` go out: the helper's `parse` would
+ * make the SDK throw on a proposal that breaks a sum, where the run keeps the markdown instead.
+ */
+const ALLOCATION_ANSWER_FORMAT = { type: 'json_schema' as const, schema: betaZodOutputFormat(allocationAdviceAnswerSchema).schema };
 
 /** A stage's answer is usable only when the model finished on its own. */
 function assertFinished(stage: AllocationAdviceStage, answer: CollectedAnswer): void {
@@ -100,47 +105,74 @@ function assertFinished(stage: AllocationAdviceStage, answer: CollectedAnswer): 
   throw new AllocationAdviceStageError(stage, 'La risposta del modello si è interrotta prima della fine. Riprova fra qualche istante.', true);
 }
 
-async function callModel(
-  stage: AllocationAdviceStage,
-  model: string,
-  prompt: { system: string; userContent: string },
-  webSearch: boolean
-): Promise<CollectedAnswer> {
-  let stream: AsyncIterable<Anthropic.Beta.BetaRawMessageStreamEvent>;
-  try {
-    stream = await anthropic.beta.messages.create({
-      model,
-      betas: [SERVER_SIDE_FALLBACK_BETA],
-      fallbacks: 'default',
-      max_tokens: ALLOCATION_ADVICE_MAX_TOKENS,
-      system: prompt.system,
-      thinking: { type: 'adaptive' },
-      output_config: { effort: 'high' },
-      ...(webSearch
-        ? {
-            tools: [
-              {
-                type: 'web_search_20260209',
-                name: 'web_search',
-                max_uses: ALLOCATION_ADVICE_WEB_SEARCH_MAX_USES,
-              } satisfies Anthropic.Beta.BetaWebSearchTool20260209,
-            ],
-          }
-        : {}),
-      messages: [{ role: 'user', content: prompt.userContent }],
-      stream: true,
-    });
-  } catch (error) {
-    const type = error instanceof Anthropic.APIError ? error.type : undefined;
-    if (type === 'overloaded_error' || (error instanceof Anthropic.APIError && error.status === 429)) {
-      throw new AllocationAdviceStageError(stage, 'I server AI sono temporaneamente sovraccarichi. Riprova tra qualche minuto.', true);
+interface ModelCall {
+  model: string;
+  prompt: { system: string; userContent: string };
+  effort: 'low' | 'medium' | 'high';
+  /** Web search: the instrument stage only — its citations rule out a structured answer. */
+  webSearch?: boolean;
+  /** The structured answer: the strategy and the review. */
+  structured?: boolean;
+}
+
+/**
+ * One stage's model call, streamed and read to its end by the SDK's accumulator (`finalMessage`):
+ * the text, the stop reason, and the model that answered — after a mid-stream fallback the
+ * accumulator names the model that finished, not the one that declined. A paused turn is resumed
+ * up to `ALLOCATION_ADVICE_MAX_CONTINUATIONS` times, its text kept.
+ */
+async function callModel(stage: AllocationAdviceStage, call: ModelCall): Promise<CollectedAnswer> {
+  const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: 'user', content: call.prompt.userContent }];
+  const texts: string[] = [];
+  let webSearchUsed = false;
+  for (let turn = 0; ; turn++) {
+    let message: Anthropic.Beta.BetaMessage;
+    try {
+      message = await anthropic.beta.messages
+        .stream({
+          model: call.model,
+          betas: [SERVER_SIDE_FALLBACK_BETA],
+          fallbacks: 'default',
+          max_tokens: ALLOCATION_ADVICE_MAX_TOKENS,
+          system: call.prompt.system,
+          thinking: { type: 'adaptive' },
+          output_config: { effort: call.effort, ...(call.structured ? { format: ALLOCATION_ANSWER_FORMAT } : {}) },
+          ...(call.webSearch
+            ? {
+                tools: [
+                  {
+                    type: 'web_search_20260209',
+                    name: 'web_search',
+                    max_uses: ALLOCATION_ADVICE_WEB_SEARCH_MAX_USES,
+                  } satisfies Anthropic.Beta.BetaWebSearchTool20260209,
+                ],
+              }
+            : {}),
+          messages: [...messages],
+        })
+        .finalMessage();
+    } catch (error) {
+      const type = error instanceof Anthropic.APIError ? error.type : undefined;
+      if (type === 'overloaded_error' || (error instanceof Anthropic.APIError && error.status === 429)) {
+        throw new AllocationAdviceStageError(stage, 'I server AI sono temporaneamente sovraccarichi. Riprova tra qualche minuto.', true);
+      }
+      console.error(`[consulente] ${stage} failed`, error);
+      throw new AllocationAdviceStageError(stage, 'Il servizio AI non ha risposto. Riprova fra qualche istante.', true);
     }
-    console.error(`[consulente] ${stage} failed`, error);
-    throw new AllocationAdviceStageError(stage, 'Il servizio AI non ha risposto. Riprova fra qualche istante.', true);
+    for (const block of message.content) {
+      if (block.type === 'text') texts.push(block.text);
+      if (block.type === 'server_tool_use') webSearchUsed = true;
+      if (block.type === 'fallback') console.info(`[consulente] ${block.from.model} declined; ${block.to.model} continued`);
+    }
+    if (message.stop_reason === 'pause_turn' && turn < ALLOCATION_ADVICE_MAX_CONTINUATIONS) {
+      // The paused answer goes back unchanged — thinking, tool and fallback blocks included.
+      messages.push({ role: 'assistant', content: message.content as Anthropic.Beta.BetaContentBlockParam[] });
+      continue;
+    }
+    const answer: CollectedAnswer = { text: texts.join('').trim(), stopReason: message.stop_reason, model: message.model, webSearchUsed };
+    assertFinished(stage, answer);
+    return answer;
   }
-  const answer = await collectStream(stream, model);
-  assertFinished(stage, answer);
-  return answer;
 }
 
 // ─── The run, one request per stage ─────────────────────────────────────────────
@@ -208,12 +240,19 @@ async function runStrategy(document: AllocationAdviceDocument, onStage: (stage: 
   const bundle = await buildAssistantYtdContext(document.userId);
   const dataBlock = formatBundleForPrompt(bundle);
   await enterStage(document, 'strategy', onStage);
-  const answer = await callModel('strategy', ALLOCATION_ADVICE_STRATEGY_MODEL, buildStrategyPrompt(document.answers, dataBlock, priorPlan), false);
-  const proposal = parseAllocationProposal(answer.text);
-  if (!proposal) {
+  const answer = await callModel('strategy', {
+    model: ALLOCATION_ADVICE_STRATEGY_MODEL,
+    prompt: buildStrategyPrompt(document.answers, dataBlock, priorPlan),
+    effort: ALLOCATION_ADVICE_STRATEGY_EFFORT,
+    structured: true,
+  });
+  const parsed = parseAllocationAnswer(answer.text);
+  if (!parsed?.proposal) {
+    // The shape is the API's; what fails here is a sum or a bound it does not enforce.
+    console.warn('[consulente] strategy proposal refused', parsed ? parsed.refused : 'not the answer object');
     throw new AllocationAdviceStageError('strategy', 'Il modello non ha prodotto una proposta leggibile. Riprova: di norma la seconda corsa rientra.', true);
   }
-  document.strategy = { markdown: stripFencedBlocks(answer.text), proposal, model: answer.model, finishedAt: new Date() };
+  document.strategy = { markdown: parsed.markdown, proposal: parsed.proposal, model: answer.model, finishedAt: new Date() };
   await patchAllocationAdviceAdmin(document.userId, { strategy: document.strategy });
 }
 
@@ -223,7 +262,12 @@ async function runInstruments(document: AllocationAdviceDocument, onStage: (stag
   const bundle = await buildAssistantYtdContext(document.userId);
   const holdingsBlock = formatPortfolioForPrompt(bundle.portfolio).join('\n');
   await enterStage(document, 'instruments', onStage);
-  const answer = await callModel('instruments', ALLOCATION_ADVICE_INSTRUMENTS_MODEL, buildInstrumentsPrompt(document.answers, proposal, holdingsBlock), true);
+  const answer = await callModel('instruments', {
+    model: ALLOCATION_ADVICE_INSTRUMENTS_MODEL,
+    prompt: buildInstrumentsPrompt(document.answers, proposal, holdingsBlock),
+    effort: ALLOCATION_ADVICE_INSTRUMENTS_EFFORT,
+    webSearch: true,
+  });
   // Lenient: the sleeves that parse are kept; what was refused goes to the log, so a block the
   // agent writes wrong is diagnosed, not silently null (the owner's run 4, 2026-10-20).
   const { candidates, refused } = parseInstrumentCandidatesLenient(answer.text);
@@ -243,21 +287,22 @@ async function runReview(document: AllocationAdviceDocument, onStage: (stage: Al
   const { strategy, instruments } = document;
   if (!strategy?.proposal || !instruments) throw new AllocationAdviceStageError('review', 'Mancano strategia o strumenti da rivedere. Avvia di nuovo la ricerca.', false);
   await enterStage(document, 'review', onStage);
-  const answer = await callModel(
-    'review',
-    ALLOCATION_ADVICE_STRATEGY_MODEL,
-    buildReviewPrompt(
+  const answer = await callModel('review', {
+    model: ALLOCATION_ADVICE_STRATEGY_MODEL,
+    prompt: buildReviewPrompt(
       document.answers,
-      withBlock(strategy.markdown, 'allocation-proposal', strategy.proposal),
-      withBlock(instruments.markdown, 'instrument-candidates', instruments.candidates),
+      withBlock(strategy.markdown, ALLOCATION_PROPOSAL_BLOCK, strategy.proposal),
+      withBlock(instruments.markdown, INSTRUMENT_CANDIDATES_BLOCK, instruments.candidates),
       instruments.candidates
     ),
-    false
-  );
-  // The review's block when valid, the strategy's otherwise: a malformed review loses its
-  // structure, never the proposal.
-  const reviewed = parseAllocationProposal(answer.text);
-  document.report = { markdown: stripFencedBlocks(answer.text), proposal: reviewed ?? strategy.proposal, model: answer.model, finishedAt: new Date() };
+    effort: ALLOCATION_ADVICE_STRATEGY_EFFORT,
+    structured: true,
+  });
+  // The review's proposal when valid, the strategy's otherwise: a review that breaks a sum loses
+  // its structure, never the proposal.
+  const reviewed = parseAllocationAnswer(answer.text);
+  if (reviewed && !reviewed.proposal) console.warn('[consulente] review proposal refused', reviewed.refused);
+  document.report = { markdown: reviewed?.markdown ?? answer.text, proposal: reviewed?.proposal ?? strategy.proposal, model: answer.model, finishedAt: new Date() };
   document.status = 'ready';
   await patchAllocationAdviceAdmin(document.userId, { report: document.report, status: 'ready' });
 }
@@ -272,21 +317,22 @@ async function runRevise(document: AllocationAdviceDocument, request: string, on
   if (!strategy?.proposal || !instruments || !report) throw new AllocationAdviceStageError('review', "Non c'è un report finito da rivedere. Avvia la ricerca.");
   const requests = [...(document.revisions ?? []).map((row) => row.request), request];
   await enterStage(document, 'review', onStage);
-  const answer = await callModel(
-    'review',
-    ALLOCATION_ADVICE_STRATEGY_MODEL,
-    buildRevisionPrompt(
+  const answer = await callModel('review', {
+    model: ALLOCATION_ADVICE_STRATEGY_MODEL,
+    prompt: buildRevisionPrompt(
       document.answers,
-      withBlock(strategy.markdown, 'allocation-proposal', strategy.proposal),
-      withBlock(instruments.markdown, 'instrument-candidates', instruments.candidates),
+      withBlock(strategy.markdown, ALLOCATION_PROPOSAL_BLOCK, strategy.proposal),
+      withBlock(instruments.markdown, INSTRUMENT_CANDIDATES_BLOCK, instruments.candidates),
       instruments.candidates,
-      withBlock(report.markdown, 'allocation-proposal', report.proposal),
+      withBlock(report.markdown, ALLOCATION_PROPOSAL_BLOCK, report.proposal),
       requests
     ),
-    false
-  );
-  const reviewed = parseAllocationProposal(answer.text);
-  document.report = { markdown: stripFencedBlocks(answer.text), proposal: reviewed ?? report.proposal, model: answer.model, finishedAt: new Date() };
+    effort: ALLOCATION_ADVICE_STRATEGY_EFFORT,
+    structured: true,
+  });
+  const reviewed = parseAllocationAnswer(answer.text);
+  if (reviewed && !reviewed.proposal) console.warn('[consulente] revision proposal refused', reviewed.refused);
+  document.report = { markdown: reviewed?.markdown ?? answer.text, proposal: reviewed?.proposal ?? report.proposal, model: answer.model, finishedAt: new Date() };
   document.revisions = [...(document.revisions ?? []), { request, at: new Date() }];
   document.status = 'ready';
   await patchAllocationAdviceAdmin(document.userId, { report: document.report, revisions: document.revisions, status: 'ready' });

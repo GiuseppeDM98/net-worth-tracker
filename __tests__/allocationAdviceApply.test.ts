@@ -97,6 +97,14 @@ describe('planRoleChanges', () => {
     expect(findAssetByName([...list, twin], 'SWDA')).toBeNull();
     expect(findAssetByName(list, '  ')).toBeNull();
   });
+
+  it('matches the display alias the prompt prints in place of the ticker (2026-10-23)', () => {
+    const etc = asset({ id: 'a-etc', name: 'ETC Metallo', ticker: 'XS0000000000.SG', displayTicker: 'METL', type: 'etf', assetClass: 'commodity', quantity: 10, currentPrice: 10 });
+    const list = [...ASSETS, etc];
+    expect(findAssetByName(list, 'ETC Metallo (METL)')?.id).toBe('a-etc');
+    expect(findAssetByName(list, 'METL')?.id).toBe('a-etc');
+    expect(findAssetByName(list, 'ETC Metallo (XS0000000000.SG)')?.id).toBe('a-etc');
+  });
 });
 
 describe('planGoalDocument', () => {

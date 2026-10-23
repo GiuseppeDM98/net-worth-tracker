@@ -86,7 +86,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   («Non assegnato a nessun obiettivo: X € su Y €») — FIRE › Obiettivi' own arithmetic, a property NET of the loan that
   finances it (`lib/utils/goalAssetValue.ts`), a loan never a holding a goal can take; with the feature off nothing of
   it is printed (a feature not in use, never a zero). The free figure is printed EVEN when no goal touches the
-  instrument («libero da obiettivi (64.392 €)»): without it the model summed the gross values, found the total short
+  instrument («libero da obiettivi (60.000 €)»): without it the model summed the gross values, found the total short
   of the mortgage and called the data inconsistent (the owner's run, 2026-10-20); the coverage line says the property
   is net and tells it to sum the rows' free figures, not the values.
 - **The email gets the block too** (owner's decision): `buildEmailAiPrompt` reuses `formatBundleForPrompt`, so the
@@ -212,10 +212,11 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   `assignments` names instruments by their EXACT name from the STRUMENTI block with a percent of each; the CARD resolves
   the names to asset ids (`findAssetByName`, lib/utils/allocationAdviceApply.ts: the exact name, the printed «name
   (TICKER)» form, or the ticker alone with or without its exchange — the owner's run of 2026-10-20 had the model write
-  «… (SWDA)» for «SWDA.MI») and the route takes `{ assetId, percentage }` through `goalWriteAssignmentsSchema`,
+  «… (SWDA)» for «SWDA.MI»; the `displayTicker` alias counts as a ticker, because the block prints it in its place —
+  on 2026-10-23 two ETCs ticked «ISIN.SG» reached the model by their alias and their quotas were lost) and the route takes `{ assetId, percentage }` through `goalWriteAssignmentsSchema`,
   refusing a sum past 100% on one asset. On an update present quotas replace the goal's, absent ones leave them, and
   **one unmatched name keeps EVERY quota of today** (`keepQuotas`: the card sends no `assignments` and its eyebrow
-  says so) — the first version wrote the resolved list, which was empty, and wiped Eleonora's 50% of SWDA on the
+  says so) — the first version wrote the resolved list, which was empty, and wiped a household member's quota of an ETF on the
   mirror. On a creation an unmatched name is shown in amber and left out. `lib/utils/goalProposal.ts` owns the ONE zod schema
   for both the block and the route body (client-safe, since the card validates before rendering). In zod 4 use
   **`z.partialRecord`** for `recommendedAllocation` — `z.record` with an enum key demands every key.
