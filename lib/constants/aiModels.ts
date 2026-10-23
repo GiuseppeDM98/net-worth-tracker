@@ -15,8 +15,8 @@
  * that needs a different model changes its own line and leaves the others alone.
  *
  * WARNING (Checklist Comment): every call reads content blocks by `type`; the three prose
- * surfaces send `thinking: { type: 'adaptive' }` with an `effort` (`high`, Sonnet 5.5's default:
- * its levels were recalibrated and no sweep on real requests has been run yet), the memory
+ * surfaces send `thinking: { type: 'adaptive' }` with an `effort` (`high`, Sonnet 5.5's default,
+ * kept without an effort sweep: owner's decision of 2026-10-23), the memory
  * extraction sends neither and forces `tool_choice` — Haiku 5.5 accepts it and then skips
  * thinking, so its `max_tokens` holds the tool input alone; Sonnet 5.5 / Opus 5.5 refuse a forced
  * `tool_choice` (400), so moving the extraction up a tier means `tool_choice: 'auto'` plus
@@ -62,3 +62,13 @@ export const MEMORY_EXTRACTION_MODEL = 'claude-haiku-5-5';
  */
 export const ALLOCATION_ADVICE_STRATEGY_MODEL = 'claude-opus-5-5';
 export const ALLOCATION_ADVICE_INSTRUMENTS_MODEL = 'claude-sonnet-5-5';
+
+/**
+ * The effort of each Consulente model. Opus 5.5 defaults to `medium`, thinks more per turn than
+ * Opus 5 at the same level, and at `medium` matches Opus 5 at `high` on long analyses with fewer
+ * tokens; the strategy took 210 s of a 300 s function at `high`. The search stays on Sonnet 5.5's
+ * default `high` (owner, 2026-10-23: no effort sweep). Lower effort, not prose, is the lever for
+ * less thinking.
+ */
+export const ALLOCATION_ADVICE_STRATEGY_EFFORT = 'medium' as const;
+export const ALLOCATION_ADVICE_INSTRUMENTS_EFFORT = 'high' as const;

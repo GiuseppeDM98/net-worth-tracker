@@ -51,7 +51,7 @@ function sendGoalWrite(args: { ownerId: string; proposal: GoalProposal; isUpdate
         goal: proposal,
         // Absent quotas leave the goal's as they are; present ones replace them — unless one
         // name matched nothing: then today's quotas all stay (the owner's run, 2026-10-20, wiped
-        // Eleonora's 50% of SWDA by writing the resolved list, which was empty).
+        // a household member's quota of an ETF by writing the resolved list, which was empty).
         ...(proposal.assignments !== undefined && !keepQuotas ? { assignments: quotas } : {}),
       }),
     });
