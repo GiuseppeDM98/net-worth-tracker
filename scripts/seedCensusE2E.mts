@@ -73,7 +73,7 @@ const now = new Date();
 
 // The same lists `scripts/mirrorProdAccount.mts` clears for its account, plus the two per-user
 // documents only this fixture can have left behind.
-const USER_COLLECTIONS = ['assets', 'expenses', 'expenseCategories', 'monthly-snapshots', 'assetTransactions', 'pensionContributions', 'dividends', 'costCenters', 'goals', 'assistantThreads'];
+const USER_COLLECTIONS = ['assets', 'expenses', 'expenseCategories', 'monthly-snapshots', 'assetTransactions', 'pensionContributions', 'dividends', 'costCenters', 'goals', 'assistantThreads', 'accumulationPlans'];
 const PER_USER_DOCS = ['users', 'assetAllocationTargets', 'assetTransactionsMeta', 'budgets', 'hall-of-fame', 'performance-cache', 'dashboardOverviewSummaries', 'goalBasedInvesting', 'userPreferences'];
 
 // ── The calendar of the run ─────────────────────────────────────────────────────────────────────
@@ -492,6 +492,75 @@ async function seedGoals(): Promise<void> {
 }
 
 console.info(`Seeding the census fixture for ${UID} on ${PROJECT_ID}…`);
+// ── Accumulo ────────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * ONE active plan of 12 installments for Allocazione › Accumulo (2026-10-20), NO model portfolio:
+ * the page the census measures is the one a plan alone composes. Started two months before the day
+ * of the run, so the open installment is the third whatever the day (the first two executed, no late
+ * line), as in `e2e/accumuloFixture.ts`. Round invented figures on the census instruments.
+ */
+async function seedAccumulationPlan(): Promise<void> {
+  const weights = [
+    { assetId: 'census-vwce', targetPercentage: 50, label: 'Vanguard FTSE All-World', price: 110, quantity: 3 },
+    { assetId: 'census-aapl', targetPercentage: 20, label: 'Apple Inc.', price: 175, quantity: 1 },
+    { assetId: 'census-btp', targetPercentage: 30, label: 'BTP Valore 2030', price: 101, quantity: 1 },
+  ];
+  const keyAt = (offset: number) => {
+    const m = monthAt(offset);
+    return `${m.year}-${String(m.month + 1).padStart(2, '0')}`;
+  };
+  const positionId = (assetId: string) => `census-pos-${assetId.replace('census-', '')}`;
+  const installments = Array.from({ length: 12 }, (_, k) => {
+    const index = k + 1;
+    const executed = index <= 2;
+    return {
+      index,
+      month: keyAt(index - 3),
+      carryInEur: {},
+      ...(executed ? { confirmedAt: now } : {}),
+      lines: weights.map((weight) => ({
+        positionId: positionId(weight.assetId),
+        assetId: weight.assetId,
+        plannedQuantity: weight.quantity,
+        priceEurAtPlan: weight.price,
+        plannedAmountEur: weight.quantity * weight.price,
+        status: executed ? 'executed' : 'planned',
+        ...(executed ? { executedQuantity: weight.quantity, executedAmountEur: weight.quantity * weight.price } : {}),
+      })),
+    };
+  });
+  await db.collection('accumulationPlans').doc('census-accumulo-plan').set({
+    userId: UID,
+    name: 'Piano Census',
+    status: 'active',
+    startMonth: keyAt(-2),
+    months: 12,
+    liquidity: { sourceCashAssetIds: ['census-cash'], reserveEur: 2000, monthlyInflowEur: 0 },
+    positions: weights.map((weight) => ({
+      id: positionId(weight.assetId),
+      label: weight.label,
+      targetPercentage: weight.targetPercentage,
+      memberAssetIds: [weight.assetId],
+      buyAssetId: weight.assetId,
+    })),
+    disposals: [],
+    baseline: {
+      capturedAt: now,
+      positionValuesEur: { [positionId('census-vwce')]: 1540, [positionId('census-aapl')]: 1400, [positionId('census-btp')]: 303 },
+      sourceCashEur: 8000,
+      pricesEur: { 'census-vwce': 110, 'census-aapl': 175, 'census-btp': 101 },
+      measurement: { measuredAt: now, classNotionalEur: { equity: 2940, bonds: 303, crypto: 27500, cash: 8000 }, marketBaseEur: 38743 },
+    },
+    installments,
+    residualEur: 0,
+    createdAt: now,
+    updatedAt: now,
+    activatedAt: now,
+  });
+  console.info('  ✓ one active accumulation plan (no model portfolio)');
+}
+
 await seedAccount();
 await removeEverything();
 await seedSettings();
@@ -503,5 +572,6 @@ await seedBudget();
 await seedCoupon();
 await seedPensionContributions();
 await seedGoals();
+await seedAccumulationPlan();
 console.info('Done.');
 process.exit(0);

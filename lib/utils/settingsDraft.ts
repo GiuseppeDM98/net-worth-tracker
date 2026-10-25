@@ -32,8 +32,10 @@ import type {
   AssetAllocationTarget,
   AssetClass,
   FamilyMember,
+  IdealAllocationSettings,
   SubCategoryTarget,
 } from '@/types/assets';
+import { DEFAULT_IDEAL_ALLOCATION } from '@/lib/utils/weightOptimizer';
 import {
   dropUnnamedSubTargets,
   findTargetProblem,
@@ -193,10 +195,14 @@ export interface DividendiSlice {
 
 /**
  * Read-only declarations: fields OWNED by other pages (FIRE › Calcolatore, Coast FIRE, the
- * Assistant's popover). The page reads them for a tile's reading line and never writes them —
- * no dirty check, not in `composeSettingsDocument`.
+ * Assistant's popover, Allocazione › Accumulo). The page reads them for a tile's reading line and
+ * never writes them from a control — no dirty check. The model portfolio's criteria are CARRIED
+ * THROUGH `composeSettingsDocument` from the document read just before «Salva» (the write goes
+ * through `setSettings`, which replaces the targets and must not lose them).
  */
 export interface SettingsDeclarations {
+  /** The optimizer's criteria, edited in Allocazione › Accumulo; summarised on the Allocazione tab. */
+  idealAllocation: IdealAllocationSettings;
   planParams: {
     withdrawalRate?: number;
     plannedAnnualExpenses?: number;
@@ -424,6 +430,7 @@ export function sliceSettings(
   };
 
   const declarations: SettingsDeclarations = {
+    idealAllocation: data.idealAllocation ?? DEFAULT_IDEAL_ALLOCATION,
     planParams: {
       withdrawalRate: data.withdrawalRate,
       plannedAnnualExpenses: data.plannedAnnualExpenses,
@@ -527,6 +534,9 @@ export function composeSettingsDocument(
     goalDrivenAllocationEnabled: generale.goalDrivenAllocationEnabled,
     withdrawalRate: current?.withdrawalRate,
     plannedAnnualExpenses: current?.plannedAnnualExpenses,
+    // The model portfolio's criteria are read-only here (edited in Allocazione › Accumulo): what the
+    // document holds NOW goes back, never the copy this page loaded.
+    ...(current?.idealAllocation ? { idealAllocation: current.idealAllocation } : {}),
     targets: composeTargets(cleaned),
     dividendIncomeCategoryId: dividendi.dividendIncomeCategoryId || undefined,
     dividendIncomeSubCategoryId: dividendi.dividendIncomeSubCategoryId || undefined,

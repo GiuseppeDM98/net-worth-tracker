@@ -229,6 +229,7 @@ qui, la più recente in cima. Le eccezioni ammesse sono queste e nessun'altra: L
 prima riga chiusa resta sotto la pill (DESIGN.md → The First-Screen Rule), la pill di `PageTabBar` portata a 44 px
 (2026-10-10), la deriva del giorno o della macchina provata sul codice di develop dello stesso giorno.
 
+- **`2026-10-20: allocazione-accumulo`** (prima misura di Allocazione › Accumulo sul fixture, con un piano attivo di 12 rate e nessun portafoglio modello; LA tessera «Questo mese» senza una curva da cedere), due voci: 390 e 768 registrano `firstClosedRowAbovePill: false`, perché l'unica riga chiusa (Classi del piano) sta sotto la pill; 1024 `true`. Misura: 390 1,64 · 1/0 · 10 / 6; 768 1,2 · 2/1 · 13 / 10; 1024 1,27 · 2/1 · 11 / 8.
 - **`2026-10-17: …`** (la tessera «Intestatari»; proprietario: la tessera su Panoramica e Patrimonio, a riga intera in coda), due voci a 390
   contro HEAD: `screens` sale su Panoramica 1,75 → 1,83 e su Patrimonio 1,67 → 1,75 — una riga chiusa in più (52 px) in coda alle righe,
   perché il fixture nomina un membro della famiglia tramite il fondo pensione (il suo intestatario È il membro di Previdenza,
