@@ -1,3 +1,5 @@
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   PATRIMONIO_VISIBILITY_STORAGE_KEY,
@@ -6,6 +8,8 @@ import {
   setPatrimonioVisible,
   subscribePatrimonioVisibility,
 } from '@/lib/hooks/usePatrimonioVisible';
+import { NarrativeText } from '@/components/ui/narrative-text';
+import type { Narrative } from '@/lib/utils/narrative';
 
 function installFakeStorage(initial: Record<string, string> = {}): Map<string, string> {
   const store = new Map<string, string>(Object.entries(initial));
@@ -27,52 +31,55 @@ beforeEach(() => {
 });
 
 describe('readStoredPatrimonioVisibility', () => {
-  it('is hidden by default when nothing was stored', () => {
-    installFakeStorage();
-    // The write in beforeEach must not leak: start from an empty store.
-    localStorage.removeItem(PATRIMONIO_VISIBILITY_STORAGE_KEY);
-    expect(readStoredPatrimonioVisibility()).toBe(false);
-  });
-
-  it('reads a stored visible decision', () => {
+  it('is hidden by default on app opening', () => {
     installFakeStorage({ [PATRIMONIO_VISIBILITY_STORAGE_KEY]: '1' });
-    expect(readStoredPatrimonioVisibility()).toBe(true);
-  });
-
-  it('treats any other stored value as hidden', () => {
-    installFakeStorage({ [PATRIMONIO_VISIBILITY_STORAGE_KEY]: '0' });
     expect(readStoredPatrimonioVisibility()).toBe(false);
-  });
-
-  it('stays hidden when storage is unavailable', () => {
-    vi.unstubAllGlobals();
-    expect(readStoredPatrimonioVisibility()).toBe(false);
+    expect(getPatrimonioVisibleSnapshot()).toBe(false);
   });
 });
 
 describe('setPatrimonioVisible', () => {
-  it('persists the visible decision', () => {
-    const store = installFakeStorage();
-    setPatrimonioVisible(true);
-    expect(store.get(PATRIMONIO_VISIBILITY_STORAGE_KEY)).toBe('1');
-    expect(getPatrimonioVisibleSnapshot()).toBe(true);
-  });
-
-  it('clears the key when hiding again', () => {
-    const store = installFakeStorage({ [PATRIMONIO_VISIBILITY_STORAGE_KEY]: '1' });
-    setPatrimonioVisible(false);
-    expect(store.has(PATRIMONIO_VISIBILITY_STORAGE_KEY)).toBe(false);
-    expect(getPatrimonioVisibleSnapshot()).toBe(false);
-  });
-
-  it('notifies subscribers of the change', () => {
+  it('updates in-memory snapshot and notifies subscribers', () => {
     installFakeStorage();
     const listener = vi.fn();
     const unsubscribe = subscribePatrimonioVisibility(listener);
+
     setPatrimonioVisible(true);
+    expect(getPatrimonioVisibleSnapshot()).toBe(true);
     expect(listener).toHaveBeenCalledTimes(1);
-    unsubscribe();
+
     setPatrimonioVisible(false);
-    expect(listener).toHaveBeenCalledTimes(1);
+    expect(getPatrimonioVisibleSnapshot()).toBe(false);
+    expect(listener).toHaveBeenCalledTimes(2);
+
+    unsubscribe();
+  });
+});
+
+describe('NarrativeText masking', () => {
+  it('masks the figure in "Il patrimonio vale X" when patrimonioVisible is false', () => {
+    setPatrimonioVisible(false);
+    const narrative: Narrative = [
+      { text: 'Il patrimonio vale ' },
+      { text: '412.380,52 €', mono: true },
+      { text: ': +4120,18 € su luglio.' },
+    ];
+    const html = renderToStaticMarkup(createElement(NarrativeText, { segments: narrative }));
+    expect(html).toContain('Il patrimonio vale ');
+    expect(html).toContain('••••••');
+    expect(html).not.toContain('412.380,52 €');
+  });
+
+  it('reveals the figure in "Il patrimonio vale X" when patrimonioVisible is true', () => {
+    setPatrimonioVisible(true);
+    const narrative: Narrative = [
+      { text: 'Il patrimonio vale ' },
+      { text: '412.380,52 €', mono: true },
+      { text: ': +4120,18 € su luglio.' },
+    ];
+    const html = renderToStaticMarkup(createElement(NarrativeText, { segments: narrative }));
+    expect(html).toContain('Il patrimonio vale ');
+    expect(html).toContain('412.380,52 €');
+    expect(html).not.toContain('••••••');
   });
 });
