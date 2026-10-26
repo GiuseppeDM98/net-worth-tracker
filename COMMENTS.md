@@ -211,6 +211,16 @@ The code shows what's happening. Comments provide context and reasoning.
 ### 2. Keep Comments Updated
 Outdated comments are worse than no comments. When you modify code, update related comments.
 
+⚠️ **Comments that count age silently.** A comment that counts ("the two writes of this module", "the four
+gestures") or closes a list ("only certificates and donations") is true the day it is written and false the day a
+member is added — and no linter, type checker or test reads it. Two habits:
+- **When you add a member** (a write, a branch, a type, a case), grep the comments beside the names you touch for
+  numbers and closed lists, and fix them in the same change.
+- **When you write one**, prefer the open form: "every write that changes a row already written passes here" stays
+  true at three, or at ten.
+
+(Measured 2026-10-26: one change left four such comments behind, found only when its spec was retired.)
+
 ### 3. Write for Future Readers
 Assume readers are intelligent but unfamiliar with the specific context. Make it easy for them to understand.
 
