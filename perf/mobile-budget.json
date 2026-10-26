@@ -53,6 +53,11 @@
       "path": "/dashboard/allocation",
       "target": true
     },
+    "allocazione-accumulo": {
+      "path": "/dashboard/allocation?tab=accumulo",
+      "tab": "Accumulo",
+      "target": true
+    },
     "previdenza": {
       "path": "/dashboard/pension",
       "target": true
@@ -694,6 +699,37 @@
         "firstClosedRowAbovePill": null,
         "overflowX": false,
         "raisedBy": "2026-10-15: la macchina di riferimento è cambiata (il budget ne ha una sola): il budget era stato stretto sull'altra, che misura qualche centesimo in meno; la pill a 44 px dal 2026-10-10"
+      }
+    },
+    "allocazione-accumulo": {
+      "390": {
+        "screens": 1.64,
+        "tilesAboveFold": 1,
+        "tilesFullyAboveFold": 0,
+        "figuresAboveFold": 10,
+        "figuresOutsideVerdict": 6,
+        "firstClosedRowAbovePill": false,
+        "overflowX": false,
+        "raisedBy": "2026-10-20: prima misura di Accumulo (piano attivo, nessun modello); l'unica riga chiusa (Classi del piano) sta sotto la pill perché Questo mese, la tessera aperta, occupa la prima schermata"
+      },
+      "768": {
+        "screens": 1.2,
+        "tilesAboveFold": 2,
+        "tilesFullyAboveFold": 1,
+        "figuresAboveFold": 13,
+        "figuresOutsideVerdict": 10,
+        "firstClosedRowAbovePill": false,
+        "overflowX": false,
+        "raisedBy": "2026-10-20: prima misura di Accumulo (piano attivo, nessun modello); l'unica riga chiusa (Classi del piano) sta sotto la pill perché Questo mese, la tessera aperta, occupa la prima schermata"
+      },
+      "1024": {
+        "screens": 1.27,
+        "tilesAboveFold": 2,
+        "tilesFullyAboveFold": 1,
+        "figuresAboveFold": 11,
+        "figuresOutsideVerdict": 8,
+        "firstClosedRowAbovePill": true,
+        "overflowX": false
       }
     }
   }

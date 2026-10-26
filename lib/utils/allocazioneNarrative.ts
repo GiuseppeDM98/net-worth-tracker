@@ -143,6 +143,23 @@ export interface AllocazioneVerdictInput {
   /** The Versa answer at the Piano's amount; null when the page has no amount. */
   nextMoney: NextMoney | null;
   orphans: OrphanedTarget[];
+  /**
+   * The active accumulation plan's open installment. When present it takes the place of the Versa
+   * clause: «il piano di accumulo compra questo mese 3134 € in 4 strumenti» — one answer to «cosa
+   * faccio con i prossimi soldi?», never two. `null` (no active plan) leaves the sentence as it was.
+   */
+  pac?: PacVerdictInput | null;
+}
+
+export interface PacVerdictInput {
+  /** Σ `plannedAmountEur` of the open installment's lines that are not skipped. */
+  monthTotalEur: number;
+  /** The distinct positions on those lines. */
+  instrumentCount: number;
+  /** The month's name in lowercase, «ottobre». */
+  monthLabel: string;
+  /** Every line of the open installment is closed. */
+  allClosed: boolean;
 }
 
 /** «Le azioni pesano 3,3 pp più del target, le obbligazioni 9,1 pp meno e la liquidità 3,3 pp meno» */
@@ -163,6 +180,43 @@ function nextMoneyClause(nextMoney: NextMoney | null): Narrative {
   if (!nextMoney || nextMoney.amount <= 0 || nextMoney.slices.length === 0) return [];
   const slices = nextMoney.slices.map((slice) => [amount(slice.amount), prose(` di ${sliceObject(slice)}`)]);
   return [prose('con '), amount(nextMoney.amount), prose(' in più compreresti '), ...joinList(slices)];
+}
+
+/** «il piano di accumulo compra questo mese 3134 € in 4 strumenti» / «la rata di ottobre del piano di accumulo è chiusa» */
+function pacClause(pac: PacVerdictInput): Narrative {
+  if (pac.allClosed) return [prose(`la rata di ${pac.monthLabel} del piano di accumulo è chiusa`)];
+  return [
+    prose('il piano di accumulo compra questo mese '),
+    amount(pac.monthTotalEur),
+    prose(pac.instrumentCount === 1 ? ' in 1 strumento' : ` in ${pac.instrumentCount} strumenti`),
+  ];
+}
+
+export interface PacSubstitutionLabels {
+  /** The instrument the Piano buys («DBMFE»). */
+  replaced: string;
+  /** The one the plan buys in its place («MFEH»). */
+  buying: string;
+}
+
+/**
+ * The line above the Piano's moves while a plan is active: what the accumulation plan buys this
+ * month and that this Piano does not count it, plus, when the Piano buys an instrument the plan
+ * replaced, which one the plan buys instead. «Il piano di accumulo compra questo mese 4207 € in 7
+ * strumenti; questo piano non ne tiene conto. Il piano di accumulo compra MFEH al posto di DBMFE.»
+ */
+export function describePacOverlap(pac: PacVerdictInput, substitutions: PacSubstitutionLabels[] = []): Narrative {
+  const head: Narrative = pac.allClosed
+    ? [prose(`La rata di ${pac.monthLabel} del piano di accumulo è chiusa, ma questo piano non ne tiene conto.`)]
+    : [
+        prose('Il piano di accumulo compra questo mese '),
+        amount(pac.monthTotalEur),
+        prose(pac.instrumentCount === 1 ? ' in 1 strumento' : ` in ${pac.instrumentCount} strumenti`),
+        prose('; questo piano non ne tiene conto.'),
+      ];
+  if (substitutions.length === 0) return head;
+  const items = substitutions.map((item) => [figure(item.buying), prose(' al posto di '), figure(item.replaced)]);
+  return [...head, prose(' Il piano di accumulo compra '), ...joinList(items), prose('.')];
 }
 
 function leverageClause(leverage: { current: number; target: number } | null): Narrative {
@@ -213,7 +267,8 @@ export function buildAllocazioneVerdict(input: AllocazioneVerdictInput): PageVer
   lead.push(prose('.'));
 
   const leverage = leverageClause(input.leverage);
-  const next = nextMoneyClause(input.nextMoney);
+  // With an active PAC the next money is the plan's own month.
+  const next = input.pac ? pacClause(input.pac) : nextMoneyClause(input.nextMoney);
   const rest: Narrative = [...asSentence(leverage), ...asSentence(next)];
   const restLabel = leverage.length > 0 && next.length > 0 ? 'la leva e i prossimi soldi' : leverage.length > 0 ? 'la leva' : next.length > 0 ? 'dove vanno i prossimi soldi' : null;
 

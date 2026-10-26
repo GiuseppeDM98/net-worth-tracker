@@ -268,3 +268,29 @@ test('a 1440 la pagina è quella di oggi: nessuna riga chiusa, nessuna striscia,
   const bilanciamento = page.getByRole('region', { name: "Bilanciamento dell'allocazione" });
   await expect(bilanciamento.getByText('Fuori posizione', { exact: true }).locator('xpath=following-sibling::p[1]')).toBeVisible();
 });
+
+/** La scheda «Accumulo» (`?tab=accumulo`): il verdetto del piano di accumulo e lo stato vuoto. */
+async function openAccumulo(page: Page) {
+  await page.goto('/dashboard/allocation?tab=accumulo', { waitUntil: 'load' });
+  await expect(page.getByRole('region', { name: 'Verdetto sul piano di accumulo' })).toBeVisible({ timeout: 60_000 });
+}
+
+test('a 1440 Accumulo senza piano: nessuna riga chiusa, nessuna striscia, il verdetto intero', async ({ page }) => {
+  await openAccumulo(page);
+  // Il fixture base non ha un piano: lo stato vuoto ha il suo verdetto, senza taglio («Il perché») né celle.
+  await expect(page.locator('main [id$="-trigger"]')).toHaveCount(0);
+  await expect(page.getByRole('list', { name: 'Le cifre del verdetto' })).toBeHidden();
+  await expect(page.getByRole('heading', { level: 2, name: 'Il resto della pagina' })).toBeHidden();
+  await expect(page.getByRole('button', { name: /^Il perché/ })).toHaveCount(0);
+  await expect(page.locator('section[aria-label="Accumulo"]').getByRole('button', { name: 'Crea piano' })).toBeVisible({ timeout: 30_000 });
+});
+
+test('la scheda Bilanciamento resta quella di prima: il tab è nell\'URL e Accumulo non la sostituisce', async ({ page }) => {
+  await openAllocazione(page);
+  await expect(page.getByRole('region', { name: "Verdetto sull'allocazione" })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Verdetto sul piano di accumulo' })).toHaveCount(0);
+  await page.getByRole('tab', { name: 'Accumulo' }).click();
+  await expect(page).toHaveURL(/tab=accumulo/);
+  await expect(page.getByRole('region', { name: 'Verdetto sul piano di accumulo' })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('region', { name: "Verdetto sull'allocazione" })).toHaveCount(0);
+});
