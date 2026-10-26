@@ -18,9 +18,9 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 ### Engine (`lib/utils/assetTransactionUtils.ts`, pure and Firebase-free)
 - ALL trade money-math lives here (replay, PMC, realized P&L, XIRR, total return, invested capital); the service/route
   layer is a thin atomic writer. A new `AssetTransactionType` must update the replay switch, the zod schema AND
-  `TransactionDialog`. **Native PMC excludes fees**, which live only on the EUR side, and a sell never moves it.
+  `TransactionDialog`. **Neither PMC carries a purchase fee** (2026-10-21; the EUR one did until then) and a sell never moves them: the fee is a cashflow row of its own (§ Fee as a cashflow row).
   **The EUR side is the one the app measures against** (2026-09-07): `buildDerivedAssetFields` projects
-  `averageCostEur` (= `costBasisEur / quantity`, fees included) onto the asset doc beside `quantity` and the native
+  `averageCostEur` (= `costBasisEur / quantity`, fees excluded) onto the asset doc beside `quantity` and the native
   `averageCost`, and `lib/utils/costBasisEur.ts` is the ONE reader of the pair — doc/guide/patrimonio.md § Asset
   Pricing. `backfillAverageCostEur` (use case + route + the Patrimonio page's one-shot trigger) projects the field onto
   the docs written before it existed; it writes ONLY that field, and a ledger the replay rejects is counted in
@@ -54,6 +54,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   transaction, with the optional fields populated ONLY for `sell`, so a caller indexes by id with no holes.
   `replayTransactions(txs)` is just `.state` of the same call.
 
+- **Fee as a cashflow row** (2026-10-21, `lib/utils/tradeFeeExpense.ts`, written by `assetTransactionUseCase` in the trade's own transaction): a buy or sell with `fees` and a fee category set in Impostazioni › Spese (`transferFeeCategoryId`, the one expense fees use) also writes a spending row on the trade's date, no account (the trade's settlement already debits `fees`, `computeCashDelta` unchanged — a second debit would pay twice), linked both ways (`AssetTransaction.feeExpenseId`, `Expense.feeOfTradeId`). An edit moves its amount and date, a delete or a cleared fee removes it; with no category the trade still saves and no row is written. `investedEur` and the XIRR flows still count the fee (the cash left); realized P&L stays net of the SELL fee. A trade saved before this has no row: saving it again creates it and recomputes the PMC, no script. Pinned by `tradeFeeExpense`, `assetTransactionWriteTx`.
 - **A sell credits its account NET of the tax the broker withheld** (2026-09-20, `AssetTransaction.withheldTaxEur`,
   SELL only, `>= 0`). In regime amministrato the tax leaves the proceeds the day of the sale; crediting the gross left
   the owner to lower the account by hand, and every verdict read that as «altre variazioni». `computeCashDelta` =

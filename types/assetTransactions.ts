@@ -51,9 +51,13 @@ export interface AssetTransaction {
   quantity: number;
   pricePerUnit: number;      // native currency per unit (>= 0)
   priceEur: number;          // EUR per unit at trade date (>= 0); == pricePerUnit for EUR assets
-  fees?: number;             // total EUR commissions (>= 0). buy: added to EUR cost basis;
-                             // sell: subtracted from proceeds; adjustment: not allowed
+  fees?: number;             // total EUR commissions (>= 0). Never in the EUR cost basis (a cashflow
+                             // row of its own); buy: debited with the cash; sell: subtracted from
+                             // proceeds; adjustment: not allowed
   linkedCashAssetId?: string; // optional settlement cash asset (buy debits, sell credits)
+  // The cashflow row the fees were written to (lib/utils/tradeFeeExpense.ts), when a fee category
+  // was set. Server-owned: the form never sends it. Absent on trades saved before 2026-10-21.
+  feeExpenseId?: string;
   // SELL only: the capital-gains tax the broker withheld at the sale, EUR (>= 0), typed from the
   // statement over a prefilled estimate. It lowers what the settlement account receives and
   // replaces the estimate in the period readings (periodSales); realized P&L and XIRR stay
