@@ -24,7 +24,7 @@ import { MONTH_NAMES } from '@/lib/constants/months';
 import { CHECKING_ACCOUNT_STAMP_DUTY_EUR, CHECKING_ACCOUNT_STAMP_DUTY_THRESHOLD_EUR } from '@/lib/constants/stampDuty';
 import type { ExpenseType } from '@/types/expenses';
 import type { CategoryClassificationCounts } from '@/lib/utils/spendingRoles';
-import type { AssetClass } from '@/types/assets';
+import type { AssetClass, IdealAllocationSettings, ObjectivePriority } from '@/types/assets';
 import { ASSET_CLASS_LABELS } from '@/lib/utils/allocationUtils';
 import type { TargetProblem } from '@/lib/utils/allocationTargetValidation';
 
@@ -560,6 +560,110 @@ export function describeClassTargets({ classCount, withSubcategories, problem }:
   segments.push(prose('; un totale sopra il '), figure('100%'), prose(' è la leva target.'));
   return segments;
 }
+
+export const OBJECTIVE_PRIORITY_LABELS: Record<ObjectivePriority, string> = {
+  essential: 'essenziale',
+  high: 'alta',
+  medium: 'media',
+  low: 'bassa',
+};
+
+export interface IdealAllocationFactorInput {
+  /** Italian asset-class label (ASSET_CLASS_LABELS), already resolved by the caller. */
+  classLabel: string;
+  priority: ObjectivePriority;
+}
+
+export interface IdealAllocationInput {
+  enabled: boolean;
+  classPriority: ObjectivePriority;
+  leveragePriority: ObjectivePriority | 'off';
+  /** deriveTargetLeverageRatio(targets), the leva target the leverage objective aims at. */
+  targetLeverageRatio: number;
+  factorObjectives: IdealAllocationFactorInput[];
+}
+
+/**
+ * The ONE translation of a saved `IdealAllocationSettings` into the words the readings print: class
+ * labels from `ASSET_CLASS_LABELS`. Four surfaces read the criteria (Impostazioni, the PAC's
+ * Ottimizzato step, the model portfolio and its dialog) and each would otherwise build this by hand.
+ */
+export function buildIdealAllocationInput(value: IdealAllocationSettings, targetLeverageRatio: number): IdealAllocationInput {
+  return {
+    enabled: value.enabled,
+    classPriority: value.classPriority,
+    leveragePriority: value.leveragePriority,
+    targetLeverageRatio,
+    factorObjectives: value.factorObjectives.map((f) => ({
+      classLabel: ASSET_CLASS_LABELS[f.assetClass] ?? f.assetClass,
+      priority: f.priority,
+    })),
+  };
+}
+
+/** «classi (essenziale)», «leva 1,3× (alta)», … — one entry per objective that is on. */
+export function listIdealObjectives({ classPriority, leveragePriority, targetLeverageRatio, factorObjectives }: IdealAllocationInput): string[] {
+  const objectiveTexts: string[] = [`classi (${OBJECTIVE_PRIORITY_LABELS[classPriority]})`];
+
+  if (leveragePriority !== 'off') {
+    objectiveTexts.push(
+      `leva ${numTrim(targetLeverageRatio)}× (${OBJECTIVE_PRIORITY_LABELS[leveragePriority]})`
+    );
+  }
+
+  if (factorObjectives.length > 0) {
+    const factorText = factorObjectives
+      .map((f) => `${f.classLabel} (${OBJECTIVE_PRIORITY_LABELS[f.priority]})`)
+      .join(', ');
+    objectiveTexts.push(`secondo livello di ${factorText}`);
+  }
+
+  return objectiveTexts;
+}
+
+/**
+ * Allocazione ideale — which objectives the weight optimizer can
+ * propose PAC weights from, and their priority. Spenta: the PAC's Target step stays manual.
+ */
+export function describeIdealAllocation(input: IdealAllocationInput): Narrative {
+  if (!input.enabled) {
+    return [prose('Spenta: nel portafoglio modello e nel PAC i pesi si inseriscono solo a mano.')];
+  }
+  const objectiveTexts = listIdealObjectives(input);
+  const count = objectiveTexts.length;
+  return [
+    prose(
+      `Il portafoglio modello e il PAC possono proporre i pesi da ${count} ${count === 1 ? 'criterio' : 'criteri'}: ${objectiveTexts.join(', ')}.`
+    ),
+  ];
+}
+
+/**
+ * Composizione ideale (Allocazione, and its dialog) — the same objectives read as the tile's own
+ * answer, «com'è fatto il mio portafoglio ideale, strumento per strumento?», not as what the PAC
+ * can do: the tool stands on its own, with or without a plan (owner's wording, 2026-09-25).
+ * Called only with the objectives on; the tile says «spenta» with its own sentence.
+ */
+export function describeIdealComposition(input: IdealAllocationInput): Narrative {
+  const objectiveTexts = listIdealObjectives(input);
+  const whose = objectiveTexts.length === 1 ? 'il tuo criterio' : `i tuoi ${objectiveTexts.length} criteri`;
+  return [prose(`Il portafoglio che rispetta meglio ${whose}, strumento per strumento: ${objectiveTexts.join(', ')}.`)];
+}
+
+/**
+ * §3.2 — a class with a target > 0 but sub-categories still OFF cannot carry a second-level
+ * objective yet; this guided hint (under the tile's "Secondo livello" row) says what to turn on,
+ * one sentence per class, so the reader is not left guessing why the checkbox never appears.
+ */
+export function describeSecondLevelSetupHint(classLabels: string[]): string | null {
+  if (classLabels.length === 0) return null;
+  return (
+    `Per usare un secondo livello su ${classLabels.join(', ')}, attiva le sue sottocategorie nei ` +
+    `target qui sopra e assegna a ogni strumento la sua (Patrimonio → Modifica; nei compositi, ogni ` +
+    `componente ha la sua).`
+  );
+}
+
 
 // ─── Spese ────────────────────────────────────────────────────────────────────
 

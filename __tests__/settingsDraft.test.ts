@@ -26,8 +26,8 @@ import {
   targetFieldId,
   type SettingsSlices,
 } from '@/lib/utils/settingsDraft';
-import type { AssetAllocationTarget } from '@/types/assets';
-import { FULL_PAGE_SETTINGS, STORED_SETTINGS } from './fixtures/storedSettings';
+import type { AssetAllocationSettings, AssetAllocationTarget } from '@/types/assets';
+import { FULL_PAGE_SETTINGS, STORED_IDEAL_ALLOCATION, STORED_SETTINGS } from './fixtures/storedSettings';
 
 /** `getDefaultTargets()` of the service, without the service (its module loads the SDK). */
 const DEFAULT_TARGETS: AssetAllocationTarget = {
@@ -107,6 +107,15 @@ describe('sliceSettings ∘ composeSettingsDocument — the identity', () => {
 
     expect(slices.allocazione.classes.equity.targetPercentage).toBe(43.25);
     expect(slices.allocazione.classes.bonds.targetPercentage).toBe(32.25);
+  });
+
+  it('carries the model portfolio criteria through from the document read just before «Salva»', () => {
+    const slices = sliceSettings(STORED_SETTINGS, DEFAULT_TARGETS);
+    // The page loaded another copy; the document now holds the criteria saved from Allocazione › Accumulo.
+    const stale = { ...STORED_SETTINGS, idealAllocation: undefined } as AssetAllocationSettings;
+    expect(composeOk(slices, stale).document).not.toHaveProperty('idealAllocation');
+
+    expect(composeOk(slices, STORED_SETTINGS).document.idealAllocation).toEqual(STORED_IDEAL_ALLOCATION);
   });
 
   it('writes an emptied select or input as undefined, never as its sentinel', () => {
