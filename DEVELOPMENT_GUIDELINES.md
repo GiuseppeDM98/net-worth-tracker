@@ -235,7 +235,7 @@ docs: add API authentication section to README
 
 **Rules**:
 - Subject line: max 72 characters, imperative mood, no period
-- Body (when needed): explain WHY, not what — the diff shows the what
+- Body: one line per change of the session, with its type (§ Commit Scope); add the WHY where the diff cannot show it
 - Reference issue tracker IDs when relevant: `fix: handle null address (#142)`
 
 ---
@@ -253,12 +253,7 @@ Keep names lowercase, hyphen-separated, and specific enough to be identifiable a
 ---
 
 ### Commit Scope
-Each commit should represent a single logical change. If your commit message requires "and", consider splitting it.
-
-**Don't mix**:
-- Refactoring with feature work
-- Formatting changes with logic changes
-- Multiple unrelated fixes in a single commit
+How many commits to make is WORKFLOW.md's call: one per session. When a session brings different changes, including ones that came up along the way, the title names the main one and the body lists them, one per line, each with its type (feat, fix, refactor, docs). When something new is large or risky, the agent may propose doing it in another session, but the owner decides.
 
 ---
 
@@ -415,7 +410,7 @@ Refactoring is not a project. It is a habit. Leave every file slightly better th
 
 ### Refactoring Rules
 - Refactor with tests in place. If there are no tests, write them first.
-- Never mix refactoring with feature work in the same commit.
+- A refactoring that comes with feature work gets its own line, typed `refactor`, in the commit body (§ Commit Scope).
 - Refactor in small steps — one concern at a time, verifying correctness after each step.
 
 ---
