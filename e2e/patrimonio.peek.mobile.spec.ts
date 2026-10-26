@@ -4,18 +4,14 @@
  *
  * 1. L'hero nasce MASCHERATO («••••••», il valore vero non è nel DOM) e l'occhio è un
  *    target da 44px su touch (`h-11 w-11` sotto `pointer: coarse`, 32px col mouse).
- * 2. Il tocco rivela il totale, la scelta sopravvive al reload (`localStorage`), e un
- *    secondo tocco rimaskera — senza che la riga spinga `main` a scorrere di lato.
+ * 2. Il tocco rivela il totale, e all'apertura/reload dell'app il saldo torna sempre nascosto.
  *
- * Account base, progetto `mobile` (390×844, touch). Non scrive dati dell'account: Develop
- * l'unica scrittura è la chiave `localStorage` del browser di test, che muore col contesto.
+ * Account base, progetto `mobile` (390×844, touch).
  */
 
 import { test, expect } from '@playwright/test';
 
-const STORAGE_KEY = 'nwt-patrimonio-visibile';
-
-test('l’occhio è un target da 44px, rivela al tocco e la scelta sopravvive al reload', async ({ page }) => {
+test('l’occhio è un target da 44px, rivela al tocco e torna nascosto al reload', async ({ page }) => {
   await page.goto('/dashboard');
   const hero = page.getByRole('region', { name: 'Patrimonio', exact: true });
   await expect(hero).toBeVisible({ timeout: 30_000 });
@@ -23,7 +19,7 @@ test('l’occhio è un target da 44px, rivela al tocco e la scelta sopravvive al
   // Positive anchor first: the page answered before asserting the masked state.
   await expect(page.getByRole('heading', { level: 2 }).first()).toBeVisible();
 
-  // Masked by default on a browser that never chose: the real total is not in the DOM,
+  // Masked by default: the real total is not in the DOM,
   // only the bullets (aria-hidden) and their sr-only naming.
   const eye = hero.getByRole('button', { name: 'Mostra patrimonio totale' });
   await expect(eye).toBeVisible();
@@ -36,29 +32,22 @@ test('l’occhio è un target da 44px, rivela al tocco e la scelta sopravvive al
   expect(box.width, 'eye width on touch').toBeGreaterThanOrEqual(44);
   expect(box.height, 'eye height on touch').toBeGreaterThanOrEqual(44);
 
-  // A tap reveals: the bullets leave, the pressed state flips, the decision is stored.
+  // A tap reveals: the bullets leave, the pressed state flips.
   await eye.tap();
   const hideEye = hero.getByRole('button', { name: 'Nascondi patrimonio totale' });
   await expect(hideEye).toBeVisible();
   await expect(hideEye).toHaveAttribute('aria-pressed', 'true');
   await expect(hero.getByText('Patrimonio nascosto')).toHaveCount(0);
   await expect(hero.getByText('••••••')).toHaveCount(0);
-  await expect(page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)).resolves.toBe('1');
 
-  // The choice survives a reload instead of hiding again.
+  // All'apertura dell'app / reload: il saldo torna sempre nascosto.
   await page.reload();
   const heroAfterReload = page.getByRole('region', { name: 'Patrimonio', exact: true });
   await expect(heroAfterReload).toBeVisible({ timeout: 30_000 });
   await expect(
-    heroAfterReload.getByRole('button', { name: 'Nascondi patrimonio totale' }),
+    heroAfterReload.getByRole('button', { name: 'Mostra patrimonio totale' }),
   ).toBeVisible();
-  await expect(heroAfterReload.getByText('••••••')).toHaveCount(0);
-
-  // A second tap masks again and clears the stored decision.
-  await heroAfterReload.getByRole('button', { name: 'Nascondi patrimonio totale' }).tap();
-  await expect(heroAfterReload.getByRole('button', { name: 'Mostra patrimonio totale' })).toBeVisible();
   await expect(heroAfterReload.getByText('••••••')).toBeVisible();
-  await expect(page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)).resolves.toBeNull();
 });
 
 test('l’hero rivelato non spinge `main` a scorrere di lato a 390px', async ({ page }) => {

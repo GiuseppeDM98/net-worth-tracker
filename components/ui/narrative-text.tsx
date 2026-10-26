@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils';
 import type { Narrative } from '@/lib/utils/narrative';
+import { usePatrimonioVisible } from '@/lib/hooks/usePatrimonioVisible';
 
 interface NarrativeTextProps {
   segments: Narrative;
@@ -30,10 +31,20 @@ export function NarrativeSegments({
   segments,
   figureClassName = 'font-semibold',
 }: Omit<NarrativeTextProps, 'className'>) {
+  const patrimonioVisible = usePatrimonioVisible();
+
   return (
     <>
-      {segments.map((segment, i) =>
-        segment.mono ? (
+      {segments.map((segment, i) => {
+        const isPatrimonioVale =
+          i > 0 &&
+          typeof segments[i - 1]?.text === 'string' &&
+          /patrimonio vale(va)?\s*$/i.test(segments[i - 1].text);
+
+        const textToDisplay =
+          isPatrimonioVale && !patrimonioVisible ? '••••••' : segment.text;
+
+        return segment.mono ? (
           <span
             key={i}
             className={cn(
@@ -44,12 +55,12 @@ export function NarrativeSegments({
               !segment.sign && 'text-foreground',
             )}
           >
-            {segment.text}
+            {textToDisplay}
           </span>
         ) : (
-          <span key={i}>{segment.text}</span>
-        ),
-      )}
+          <span key={i}>{textToDisplay}</span>
+        );
+      })}
     </>
   );
 }
