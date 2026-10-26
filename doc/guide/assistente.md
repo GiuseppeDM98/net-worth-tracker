@@ -216,7 +216,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   on 2026-10-23 two ETCs ticked «ISIN.SG» reached the model by their alias and their quotas were lost) and the route takes `{ assetId, percentage }` through `goalWriteAssignmentsSchema`,
   refusing a sum past 100% on one asset. On an update present quotas replace the goal's, absent ones leave them, and
   **one unmatched name keeps EVERY quota of today** (`keepQuotas`: the card sends no `assignments` and its eyebrow
-  says so) — the first version wrote the resolved list, which was empty, and wiped a household member's quota of an ETF on the
+  says so) — the first version wrote the resolved list, which was empty, and wiped a goal's quota of an ETF on the
   mirror. On a creation an unmatched name is shown in amber and left out. `lib/utils/goalProposal.ts` owns the ONE zod schema
   for both the block and the route body (client-safe, since the card validates before rendering). In zod 4 use
   **`z.partialRecord`** for `recommendedAllocation` — `z.record` with an enum key demands every key.

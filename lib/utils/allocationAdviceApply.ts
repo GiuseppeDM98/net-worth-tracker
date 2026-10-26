@@ -34,7 +34,7 @@ export function findAssetByName(assets: readonly Asset[], name: string): Asset |
   const byName = assets.find((asset) => asset.name.trim().toLowerCase() === wanted);
   if (byName) return byName;
   // The prompt prints every instrument as «name (TICKER)», and the model copies it that way —
-  // and shortens «SWDA.MI» to «SWDA» (the owner's run, 2026-10-20: a household member's quota went
+  // and shortens «SWDA.MI» to «SWDA» (the owner's run, 2026-10-20: a goal's quota went
   // unmatched). Accept the printed form, and the ticker alone, with or without its exchange.
   // The prompt prints the `displayTicker` alias when there is one (`getAssetDisplayTicker`): an
   // ETC whose ticker is «ISIN.SG» reaches the model by its alias, so the alias names it too (the
