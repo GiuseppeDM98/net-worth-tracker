@@ -77,10 +77,12 @@ export function VariationChip({
   value,
   percentage,
   caption,
+  masked = false,
 }: {
   value: number;
   percentage: number;
   caption: string;
+  masked?: boolean;
 }) {
   const Icon = value >= 0 ? TrendingUp : TrendingDown;
   return (
@@ -89,13 +91,19 @@ export function VariationChip({
         className={cn(
           'inline-flex w-fit max-w-full items-center gap-1.5 whitespace-nowrap rounded-[9px] px-[11px] py-[6px]',
           'font-mono text-[12px] font-semibold leading-none tracking-[-0.01em] tabular-nums',
-          signChipClass(value),
+          masked ? 'bg-muted text-muted-foreground' : signChipClass(value),
         )}
       >
-        <Icon className="h-[13px] w-[13px] shrink-0" aria-hidden="true" />
-        {value >= 0 ? '+' : '−'}
-        {cachedFormatCurrencyEUR(Math.abs(value))} ({percentage >= 0 ? '+' : '−'}
-        {formatPercentage(Math.abs(percentage))})
+        {masked ? (
+          '••••••'
+        ) : (
+          <>
+            <Icon className="h-[13px] w-[13px] shrink-0" aria-hidden="true" />
+            {value >= 0 ? '+' : '−'}
+            {cachedFormatCurrencyEUR(Math.abs(value))} ({percentage >= 0 ? '+' : '−'}
+            {formatPercentage(Math.abs(percentage))})
+          </>
+        )}
       </span>
       <span className="text-[11px] text-muted-foreground">{caption}</span>
     </div>
@@ -175,6 +183,7 @@ export function PatrimonioTile({
               value={variations.monthly.value}
               percentage={variations.monthly.percentage}
               caption="questo mese"
+              masked={heroMasked}
             />
           )}
           {variations.yearly && (
@@ -182,6 +191,7 @@ export function PatrimonioTile({
               value={variations.yearly.value}
               percentage={variations.yearly.percentage}
               caption="da inizio anno"
+              masked={heroMasked}
             />
           )}
           {isNewATH && (
@@ -208,8 +218,8 @@ export function PatrimonioTile({
             <NetWorthSparkline data={sparklineDisplay} filled={true} color="var(--chart-1)" height={180} interactive />
           </div>
           <div className="mt-1.5 flex justify-between font-mono text-[10px] tabular-nums text-muted-foreground">
-            <span>{cachedFormatCurrencyEUR(sparklineDisplay[0].totalNetWorth, true)}</span>
-            <span>{cachedFormatCurrencyEUR(sparklineDisplay[sparklineDisplay.length - 1].totalNetWorth, true)}</span>
+            <span>{heroMasked ? '•••••' : cachedFormatCurrencyEUR(sparklineDisplay[0].totalNetWorth, true)}</span>
+            <span>{heroMasked ? '•••••' : cachedFormatCurrencyEUR(sparklineDisplay[sparklineDisplay.length - 1].totalNetWorth, true)}</span>
           </div>
         </>
       )}
