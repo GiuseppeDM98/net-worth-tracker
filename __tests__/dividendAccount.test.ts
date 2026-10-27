@@ -106,7 +106,7 @@ describe('dividendIncomeAmount', () => {
 
 describe('the asset form', () => {
   it('should ask an account only of the types that pay', () => {
-    expect(['stock', 'etf', 'bond'].every((type) => paysDividends(type as never))).toBe(true);
+    expect(['stock', 'etf', 'fund', 'bond'].every((type) => paysDividends(type as never))).toBe(true);
     expect(['crypto', 'commodity', 'cash', 'realestate', 'pensionFund'].some((type) => paysDividends(type as never))).toBe(false);
   });
 

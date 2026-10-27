@@ -36,13 +36,15 @@ describe('a quoted instrument', () => {
     expect(isQuotedInstrument(asset({ id: 'a', type: 'realestate' }))).toBe(false);
     expect(isQuotedInstrument(asset({ id: 'a', type: 'stock', subCategory: 'Private Equity' }))).toBe(false);
     expect(isQuotedInstrument(asset({ id: 'a', type: 'bond' }))).toBe(true);
+    expect(isQuotedInstrument(asset({ id: 'a', type: 'fund' }))).toBe(true);
     expect(isQuotedInstrument(asset({ id: 'a', type: 'crypto' }))).toBe(true);
   });
 });
 
 describe('the module per type', () => {
-  it('asks fund for an ETF and an ETC, stock for a stock, nothing for the rest', () => {
+  it('asks fund for an ETF, a mutual fund and an ETC, stock for a stock, nothing for the rest', () => {
     expect(profileModuleFor('etf')).toBe('fund');
+    expect(profileModuleFor('fund')).toBe('fund');
     expect(profileModuleFor('commodity')).toBe('fund');
     expect(profileModuleFor('stock')).toBe('stock');
     expect(profileModuleFor('bond')).toBeNull();

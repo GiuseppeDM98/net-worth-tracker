@@ -38,7 +38,7 @@ const MANUALLY_VALUED_SUBCATEGORY = 'Private Equity';
 /**
  * Whether an asset can be priced from a market data provider (Yahoo Finance / Borsa Italiana).
  *
- * @param assetType   - The asset type (stock, etf, bond, crypto, commodity, cash, realestate, pensionFund)
+ * @param assetType   - The asset type (stock, etf, fund, bond, crypto, commodity, cash, realestate, pensionFund)
  * @param subCategory - Optional sub-category (e.g. "Private Equity" within the equity class)
  * @returns True when an automatic quote is meaningful for this asset.
  */

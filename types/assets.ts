@@ -13,6 +13,7 @@ export type { GeographicArea };
 // - cash -> cash
 // - realestate -> realestate
 // - pensionFund -> equity (fallback only; the real mix lives in `composition`) - see TYPE_TO_CLASS
+// - fund -> equity (fallback only; its real mix lives in `composition`, read from the ISIN) - see TYPE_TO_CLASS
 //
 // WARNING: adding a type here requires updating TYPE_TO_CLASS in components/assets/AssetDialog.tsx
 // (exhaustive `Record<AssetType, AssetClass>` — tsc catches this one) and deciding whether the type
@@ -20,7 +21,10 @@ export type { GeographicArea };
 // `crowdfunding` is a REAL-ESTATE CROWDFUNDING participation: illiquid, valued by what the
 // platform publishes, and mapped to the `realestate` CLASS in TYPE_TO_CLASS — so allocation,
 // FIRE and every class-level read treat it as real estate without a second code path.
-export type AssetType = 'stock' | 'etf' | 'bond' | 'crypto' | 'commodity' | 'cash' | 'realestate' | 'pensionFund' | 'crowdfunding';
+// `fund` is a MUTUAL FUND / SICAV bought by NAV: the same shape as an `etf` (market-priced when it
+// has a ticker, composition from its ISIN, traded through the ledger, it pays distributions), but a
+// distinct type so a managed fund is not called an index fund. Its class is chosen by the user.
+export type AssetType = 'stock' | 'etf' | 'fund' | 'bond' | 'crypto' | 'commodity' | 'cash' | 'realestate' | 'pensionFund' | 'crowdfunding';
 // trendFollowing (managed futures) and carry are exposure-only classes reached via a leveraged/
 // composite `etf`'s `composition` legs — no
 // AssetType maps to them directly in TYPE_TO_CLASS.

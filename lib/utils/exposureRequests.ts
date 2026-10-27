@@ -56,6 +56,7 @@ export function isQuotedInstrument(asset: Pick<Asset, 'type' | 'subCategory' | '
  */
 const MODULE_BY_TYPE: Record<AssetType, ProfileModule | null> = {
   etf: 'fund',
+  fund: 'fund',
   commodity: 'fund',
   stock: 'stock',
   bond: null,

@@ -22,7 +22,7 @@ import type { InstrumentFundAllocation } from '@/types/exposure';
 import { isLedgerAssetType } from '@/types/assetTransactions';
 import { resolveYahooSymbolForIsin } from '@/lib/utils/yahooSymbolForIsin';
 import { readFundComposition, resolveAllocationClass } from '@/lib/utils/fundComposition';
-import { applyClassChoices, needsClassChoice } from '@/lib/utils/importClassChoice';
+import { inferFundClassFromName } from '@/lib/utils/fundNameClass';
 
 /** A row as `read-excel-file` returns it, so this module stays free of the library. */
 export type IntesaCell = unknown;
@@ -122,22 +122,6 @@ function isTableHeader(row: readonly IntesaCell[]): boolean {
 
 function isBondTable(row: readonly IntesaCell[]): boolean {
   return normalized(text(row[2])) === 'QUANTITA' && normalized(text(row[3])).includes('PREZZO MEDIO FISCALE');
-}
-
-/** The best available class from the fund's own name; the preview names every uncertain one. */
-function inferFundClass(name: string): { assetClass: AssetClass; uncertain: boolean } {
-  const n = normalized(name);
-  if (/\b(BOND|OBBLIG|TESORERIA|CREDIT|MONETAR|LIQUID|SHORT TERM)\b/.test(n)) {
-    return { assetClass: 'bonds', uncertain: false };
-  }
-  if (/\b(EQUITY|AZION|WORLD|EUROPEAN RESEARCH|US RESEARCH|EMERGING MARKETS)\b/.test(n)) {
-    return { assetClass: 'equity', uncertain: false };
-  }
-  if (/\b(COMMODIT|GOLD|ORO)\b/.test(n)) return { assetClass: 'commodity', uncertain: false };
-  if (/\b(REAL ESTATE|IMMOBIL)\b/.test(n)) return { assetClass: 'realestate', uncertain: false };
-  // Multi-asset funds have no single class in this app; equity is the least wrong default and
-  // the preview says the classification needs a check on Patrimonio.
-  return { assetClass: 'equity', uncertain: true };
 }
 
 function sectionLabel(section: IntesaPositionSection): string {
@@ -264,7 +248,7 @@ export function mapIntesaPositionType(position: IntesaPositionInput): MappedInte
   if (position.section === 'bond') {
     return { type: 'bond', assetClass: 'bonds', typeUncertain: false };
   }
-  const { assetClass, uncertain } = inferFundClass(position.name);
+  const { assetClass, uncertain } = inferFundClassFromName(position.name);
   // A fund is an `etf` here: it is a market-priced collective instrument, and the app has no
   // distinct mutual-fund type. The class is what allocation reads.
   return { type: 'etf', assetClass, typeUncertain: uncertain };
@@ -327,13 +311,11 @@ export interface IntesaHoldingDiff {
   /** Report quantity minus tracked quantity — a number to reconcile, never an auto-write. */
   quantityDrift: number;
   /**
-   * The row waits for a class FROM THE USER: the market did not decide it (no published mix) and
-   * no tracked asset carries one. A row that UPDATES a tracked asset never waits — the class is
-   * already stored there, and the import never overwrites it.
+   * A NEW row whose class is the name's default (`inferFundClassFromName`): no keyword and no
+   * published mix. It is imported as such and the preview says so — the correction lives on
+   * Patrimonio. A row that updates a tracked asset is never guessed: its class is stored there.
    */
-  needsClassChoice: boolean;
-  /** The key the class choice is filed under: the row's own ISIN in the plan. */
-  classChoiceKey: string;
+  classGuessed: boolean;
   /** The class stored on the tracked asset this row updates — `undefined` for a new position. */
   storedAssetClass?: AssetClass;
   /** The tracked asset is not labelled as this broker yet (or has another label). */
@@ -420,18 +402,15 @@ export function buildIntesaImportPlan(
     const { typeUncertain, assetClass } = mapIntesaPositionType(position);
     // The market's answer: the published mix produced a composition, or it named the class of a
     // fund that is nearly all one class (`resolveAllocationClass`, the same rule the Azimut
-    // bridge reads). Everything else is the name's guess — and a guess is not a class: the row
-    // waits for the user, in the preview row.
+    // bridge reads). Everything else is the name's guess, written as is.
     const marketDecided = hasComposition || resolveAllocationClass(allocation, assetClass)?.measured === true;
-    const unresolvedClass = typeUncertain && !marketDecided;
     if (!existing) {
       return {
         kind: 'new',
         position,
         formData,
         quantityDrift: 0,
-        needsClassChoice: needsClassChoice({ uncertain: unresolvedClass }),
-        classChoiceKey: position.isin,
+        classGuessed: typeUncertain && !marketDecided,
         exchangeUpdate: true,
         compositionUpdate: false,
       } satisfies IntesaHoldingDiff;
@@ -466,12 +445,8 @@ export function buildIntesaImportPlan(
       existingDisplayTicker: existing.displayTicker,
       quantityDrift: hasDrift ? drift : 0,
       // The class of a tracked asset is ALREADY decided: it is the one stored there, and the
-      // import never overwrites it. So the second upload of the same file asks nothing.
-      needsClassChoice: needsClassChoice({
-        uncertain: unresolvedClass && !hasExistingComposition && !compositionUpdate,
-        storedClass: existing.assetClass,
-      }),
-      classChoiceKey: position.isin,
+      // import never overwrites it.
+      classGuessed: false,
       storedAssetClass: existing.assetClass,
       exchangeUpdate,
       compositionUpdate,
@@ -510,16 +485,4 @@ export function buildIntesaImportPlan(
       skippedCount: workbook.skipped,
     },
   };
-}
-
-/**
- * The plan as it is SAVED: the classes the user picked in the preview, on the rows that were
- * waiting for one. A row that was not waiting keeps the class the plan measured — the choices are
- * filed by the row's own id, so one can only land on the row it was made for.
- */
-export function applyIntesaClassChoices(
-  plan: IntesaImportPlan,
-  choices: Record<string, AssetClass>
-): IntesaImportPlan {
-  return { ...plan, holdings: applyClassChoices(plan.holdings, choices) };
 }

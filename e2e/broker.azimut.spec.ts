@@ -1,24 +1,22 @@
 /**
- * Azimut — l'anteprima chiede la classe che il mercato non ha detto (2026-10-22).
+ * Azimut — la classe che il mercato non ha detto viene dal NOME del fondo (2026-10-27).
  *
  * PERCHÉ ESISTE: il foglio Gestito non porta alcun codice, e per un fondo che il mercato non
- * classifica (nessun mix pubblicato) la classe era una PROPOSTA — «azionaria» — scritta nell'asset
- * e correggibile solo dopo, su Patrimonio, riga per riga. Da oggi la domanda è nella riga
- * dell'anteprima, e l'import non parte finché una riga ne è senza.
+ * classifica (nessun mix pubblicato) la classe la deduce il nome (`inferFundClassFromName`). Dal
+ * 2026-10-22 al 2026-10-27 la riga chiedeva la classe e l'import aspettava; per scelta del
+ * proprietario l'import ora non chiede nulla: scrive la classe del nome e la riga dice che è dedotta.
  *
  * Il contratto verificato qui:
- *  1. la riga che il mercato non ha classificato mostra il menu delle classi, e il bottone
- *     «Salva nel patrimonio» resta disabilitato finché la riga è senza;
- *  2. scelta la classe, l'import parte e l'asset nasce con QUELLA classe (letta dall'emulatore, non
- *     dagli screenshot);
- *  3. il SECONDO caricamento dello stesso file non chiede più nulla: la riga è ormai un asset
+ *  1. l'anteprima non ha menu di classe e «Salva nel patrimonio» è subito abilitato; la riga che
+ *     il mercato non ha classificato dice «dedotta dal nome»;
+ *  2. l'import parte e l'asset nasce con la classe del nome (letta dall'emulatore, non dagli
+ *     screenshot);
+ *  3. il SECONDO caricamento dello stesso file non deduce più nulla: la riga è ormai un asset
  *     tracciato, e la sua classe è quella già salvata.
  *
- * QUANTE righe aspettano dipende dalla rete (il mix di un ticker lo legge Yahoo, l'identità di un
- * fondo senza codice la cerca EODHD): la spec non conta le righe, ne sceglie TUTTE quelle che
- * aspettano. La riga che SEMPRE aspetta è quella del fondo copiato in valuta (il suo mix è tutto
- * «other», che non è una classe): su quella l'affermazione «la classe scelta è quella salvata» è
- * verificabile senza dipendere da Yahoo.
+ * La riga verificata è quella del fondo coperto in valuta: il suo mix è tutto «other», che non è
+ * una classe, e il nome non ha parole chiave — quindi resta SEMPRE la classe di default
+ * (azionaria) senza dipendere da Yahoo o da EODHD.
  *
  * L'account è quello base, e la spec RIPULISCE quello che ha creato (gli asset dell'import): la
  * suite condivide un account, e 35 asset in più sposterebbero i numeri delle altre spec
@@ -32,8 +30,8 @@ const FIXTURE = resolve(__dirname, '../__tests__/fixtures/azimut-portfolio.xlsx'
 const DOCUMENTS = 'http://127.0.0.1:8080/v1/projects/demo-net-worth/databases/(default)/documents';
 const OWNER = { Authorization: 'Bearer owner', 'Content-Type': 'application/json' };
 const USER_ID = 'test-user-1';
-/** The row the market never classes: its mix is all «other» (a currency hedge), so it always waits. */
-const WAITING_ROW = 'WT LONG JPY SHORT EUR (EUJP IM)';
+/** The row the market never classes: its mix is all «other» (a currency hedge), so the name decides. */
+const GUESSED_ROW = 'WT LONG JPY SHORT EUR (EUJP IM)';
 
 interface FirestoreValue {
   stringValue?: string;
@@ -60,7 +58,7 @@ async function storedClass(name: string): Promise<string | undefined> {
   return doc?.fields?.assetClass?.stringValue;
 }
 
-test.describe('Azimut — la classe scelta a mano', () => {
+test.describe('Azimut — la classe dal nome', () => {
   // The preview asks EODHD for the funds without a code and Yahoo for the mixes of the ETFs: the
   // round trips are the network's, not the app's.
   test.setTimeout(240_000);
@@ -99,42 +97,31 @@ test.describe('Azimut — la classe scelta a mano', () => {
     return tile;
   }
 
-  test('la riga senza classe chiede, l’import aspetta, e la scelta arriva nell’asset', async ({
-    page,
-  }) => {
+  test('l’import non chiede la classe: la deduce dal nome e la scrive nell’asset', async ({ page }) => {
     const tile = await openAzimutTile(page);
 
     await tile
       .locator('input[aria-label="Carica il file XLSX del portafoglio Azimut"]')
       .setInputFiles(FIXTURE);
 
-    // The preview is up: the file's rows, with the ones the market could not class.
+    // The preview is up, with no question in it: no class menu, and the save is released.
     const salva = tile.getByRole('button', { name: 'Salva nel patrimonio' });
-    await expect(tile.getByText(/righe senza classe/)).toBeVisible({ timeout: 120_000 });
-    await expect(salva).toBeDisabled();
-
-    // The rows that need a class carry the menu; the others carry the class the market named.
-    const menus = tile.getByRole('combobox');
-    const missing = await menus.count();
-    expect(missing).toBeGreaterThan(0);
-    await expect(menus.first()).toBeVisible();
-
-    // Every row gets a class: the import is released.
-    for (let index = 0; index < missing; index += 1) {
-      await menus.nth(index).click();
-      await page.getByRole('listbox').getByRole('option', { name: 'Obbligazioni' }).click();
-    }
-    await expect(tile.getByText('Classe scelta su tutte le righe: l’import può partire.')).toBeVisible();
+    await expect(tile.getByText('Anteprima:')).toBeVisible({ timeout: 120_000 });
+    await expect(tile.getByRole('combobox')).toHaveCount(0);
     await expect(salva).toBeEnabled();
+
+    // The row the market could not class says its class was deduced.
+    const guessedRow = tile.getByRole('listitem').filter({ hasText: GUESSED_ROW });
+    await expect(guessedRow).toContainText('Classe: Azioni — dedotta dal nome, verificala su Patrimonio');
 
     await salva.click();
     await expect(tile.getByText('Anteprima:')).toHaveCount(0, { timeout: 120_000 });
 
-    // The class the user chose is the one STORED (read from the emulator, not from the page).
-    await expect.poll(() => storedClass(WAITING_ROW), { timeout: 60_000 }).toBe('bonds');
+    // The name's class is the one STORED (read from the emulator, not from the page).
+    await expect.poll(() => storedClass(GUESSED_ROW), { timeout: 60_000 }).toBe('equity');
   });
 
-  test('il secondo caricamento non chiede più nulla: la classe è quella già salvata', async ({
+  test('il secondo caricamento non deduce più nulla: la classe è quella già salvata', async ({
     page,
   }) => {
     const tile = await openAzimutTile(page);
@@ -144,10 +131,9 @@ test.describe('Azimut — la classe scelta a mano', () => {
       .setInputFiles(FIXTURE);
     // The preview is up before anything is counted: a count taken before it exists proves nothing.
     await expect(tile.getByText('Anteprima:')).toBeVisible({ timeout: 120_000 });
-    await expect(tile.getByText(/righe senza classe/)).toHaveCount(0);
 
-    // The rows are tracked assets now: no menu, and the class they carry is the stored one.
-    await expect(tile.getByRole('combobox')).toHaveCount(0);
+    // The rows are tracked assets now: nothing is deduced, the class they carry is the stored one.
+    await expect(tile.getByText(/dedotta dal nome/)).toHaveCount(0);
     await expect(tile.getByText(/dal patrimonio/).first()).toBeVisible();
     await expect(tile.getByRole('button', { name: 'Salva nel patrimonio' })).toBeEnabled();
   });

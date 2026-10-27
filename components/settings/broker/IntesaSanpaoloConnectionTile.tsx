@@ -11,10 +11,10 @@
  * is backfilled, while one the user already typed is never overwritten. The liquidity section
  * becomes one cash account, matched by its stable ticker.
  *
- * A row the market could not class (no published mix) WAITS for a class: the preview row carries a
- * dropdown over the app's own classes, and the import does not start while one is still empty. A
- * row that updates a tracked asset never waits — its class is the one already stored, and the
- * import never overwrites it (doc/guide/collegamenti.md → La classe scelta a mano).
+ * A row the market could not class (no published mix) takes the class its name suggests
+ * (`inferFundClassFromName`) and the preview row says it was deduced; a row that updates a tracked
+ * asset keeps the class already stored — the import never overwrites it
+ * (doc/guide/collegamenti.md → La classe dal nome).
  *
  * Only metadata is persisted in `brokerConnections/{ownerId}/brokers/intesa`: never the file.
  */
@@ -27,27 +27,16 @@ import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Tile } from '@/components/ui/tile';
 import { assetsQueryOptions, useAssets } from '@/lib/hooks/useAssets';
 import { describeBrokerConnections } from '@/lib/utils/settingsNarrative';
 import { formatCurrency, formatNumber } from '@/lib/utils/formatters';
 import { ASSET_CLASS_LABELS } from '@/lib/utils/allocationUtils';
 import { describeFundComposition } from '@/lib/utils/fundCompositionLabel';
-import { IMPORT_CLASS_OPTIONS } from '@/lib/utils/importClassChoice';
 import { fetchFundAllocations } from '@/lib/utils/fundAllocationClient';
 import { queryKeys } from '@/lib/query/queryKeys';
-import type { AssetClass } from '@/types/assets';
 import {
   INTESA_BROKER_NAME,
-  applyIntesaClassChoices,
   buildIntesaImportPlan,
   type IntesaDiffKind,
   type IntesaImportPlan,
@@ -75,13 +64,6 @@ const KIND_LABEL: Record<IntesaDiffKind, string> = {
   unchanged: 'Invariato',
 };
 
-/**
- * The id of a row's class control: the row's own key (its ISIN), reduced to what an id may hold.
- * The prefix keeps this page's two bridges apart.
- */
-function classSelectId(key: string): string {
-  return `intesa-class-${key.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
-}
 
 interface IntesaSaveResult {
   createdAssets: number;
@@ -173,8 +155,6 @@ export function IntesaSanpaoloConnectionTile({ ownerId, disabled = false }: Inte
   const [error, setError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string>('');
   const [plan, setPlan] = useState<IntesaImportPlan | null>(null);
-  /** The class the user chose, by the row's own key: the rows the market could not class. */
-  const [classChoices, setClassChoices] = useState<Record<string, AssetClass>>({});
   const [isDragging, setIsDragging] = useState(false);
   const dragCounterRef = useRef(0);
 
@@ -202,7 +182,6 @@ export function IntesaSanpaoloConnectionTile({ ownerId, disabled = false }: Inte
 
   const reset = () => {
     setPlan(null);
-    setClassChoices({});
     setFileName('');
     setError(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -213,8 +192,7 @@ export function IntesaSanpaoloConnectionTile({ ownerId, disabled = false }: Inte
       if (disabled || busy || assetsLoading || assetsFailed) return;
       setFileName(file.name);
       setPlan(null);
-      setClassChoices({});
-      setError(null);
+        setError(null);
       setParsing(true);
       void readIntesaWorkbookFile(file)
         .then(async (workbook) => {
@@ -295,23 +273,10 @@ export function IntesaSanpaoloConnectionTile({ ownerId, disabled = false }: Inte
     }
   };
 
-  /**
-   * The rows the market could not class, and the ones still waiting for the user. A row that
-   * updates a tracked asset is not among them: its class is the one already stored.
-   */
-  const classChoiceRows = plan?.holdings.filter((diff) => diff.needsClassChoice) ?? [];
-  const classChoiceMissing = classChoiceRows.filter((diff) => !classChoices[diff.classChoiceKey]);
-
   const handleSave = () => {
     if (!plan || disabled) return;
-    // The import does not start with a row the market could not class and the user did not: a
-    // class is a claim about the position, and nobody has made it yet.
-    if (classChoiceMissing.length > 0) {
-      toast.error('Scegli la classe delle righe che ne sono senza: l’import non parte senza.');
-      return;
-    }
     setSaving(true);
-    void persistIntesaImport(ownerId, applyIntesaClassChoices(plan, classChoices))
+    void persistIntesaImport(ownerId, plan)
       .then(
         (result) => {
           queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
@@ -474,45 +439,18 @@ export function IntesaSanpaoloConnectionTile({ ownerId, disabled = false }: Inte
                             Composizione dall&apos;ISIN: {compositionLabel}
                           </span>
                         )}
-                        {diff.needsClassChoice && (
-                          <span className="mt-1 flex flex-wrap items-center gap-2">
-                            <Label
-                              htmlFor={classSelectId(diff.classChoiceKey)}
-                              className="text-[12px] text-muted-foreground"
-                            >
-                              Classe
-                            </Label>
-                            <Select
-                              value={classChoices[diff.classChoiceKey] ?? ''}
-                              onValueChange={(value) =>
-                                setClassChoices((choices) => ({
-                                  ...choices,
-                                  [diff.classChoiceKey]: value as AssetClass,
-                                }))
-                              }
-                            >
-                              <SelectTrigger
-                                id={classSelectId(diff.classChoiceKey)}
-                                size="sm"
-                                className="h-8 w-40 text-[13px]"
-                                aria-label={`Classe — ${diff.position.name}`}
-                              >
-                                <SelectValue placeholder="Scegli la classe" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {IMPORT_CLASS_OPTIONS.map((option) => (
-                                  <SelectItem key={option.value} value={option.value}>
-                                    {option.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <span className="text-[12px] text-warning-foreground">
-                              Classe non deducibile: sceglila qui.
-                            </span>
+                        {diff.kind === 'new' && !hasComposition && (
+                          <span
+                            className={cn(
+                              'block text-[12px]',
+                              diff.classGuessed ? 'text-warning-foreground' : 'text-muted-foreground'
+                            )}
+                          >
+                            Classe: {ASSET_CLASS_LABELS[diff.formData.assetClass] ?? diff.formData.assetClass}
+                            {diff.classGuessed && ' — dedotta dal nome, verificala su Patrimonio'}
                           </span>
                         )}
-                        {!diff.needsClassChoice && diff.storedAssetClass && (
+                        {diff.storedAssetClass && (
                           <span className="block text-[12px] text-muted-foreground">
                             Classe: {ASSET_CLASS_LABELS[diff.storedAssetClass] ?? diff.storedAssetClass}{' '}
                             (dal patrimonio)
@@ -532,14 +470,6 @@ export function IntesaSanpaoloConnectionTile({ ownerId, disabled = false }: Inte
                   );
                 })}
               </ul>
-
-              {classChoiceRows.length > 0 && (
-                <p role="status" className="text-[12px] leading-[1.45] text-warning-foreground">
-                  {classChoiceMissing.length > 0
-                    ? `${classChoiceMissing.length} di ${classChoiceRows.length} righe senza classe: sceglila nella riga per importarle.`
-                    : 'Classe scelta su tutte le righe: l’import può partire.'}
-                </p>
-              )}
 
               {plan.cash && (
                 <p className="rounded-lg bg-muted p-3 text-[13px] leading-[1.45]">
@@ -567,7 +497,7 @@ export function IntesaSanpaoloConnectionTile({ ownerId, disabled = false }: Inte
               <div className="mt-auto flex flex-wrap gap-2 border-t border-border pt-3">
                 <Button
                   onClick={handleSave}
-                  disabled={saving || classChoiceMissing.length > 0 || (plan.holdings.length === 0 && !plan.cash)}
+                  disabled={saving || (plan.holdings.length === 0 && !plan.cash)}
                   className="h-10"
                 >
                   {saving && <Loader2 className="h-4 w-4 animate-spin" />}

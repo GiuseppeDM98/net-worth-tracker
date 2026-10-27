@@ -9,7 +9,6 @@ import {
   AZIMUT_BROKER_NAME,
   AZIMUT_CASH_TICKER,
   AzimutParseError,
-  applyAzimutClassChoices,
   azimutAllocationKey,
   azimutAllocationLookup,
   buildAzimutImportPlan,
@@ -293,7 +292,7 @@ describe('buildAzimutImportPlan', () => {
     // 99,45% equity is one leg, so there is no composition to store — but the class is measured.
     expect(grid.formData.assetClass).toBe('equity');
     expect(grid.formData.composition).toBeUndefined();
-    expect(grid.needsClassChoice).toBe(false);
+    expect(grid.classGuessed).toBe(false);
     expect(plan.warnings.some((warning) => warning.includes('FIRST TRUST'))).toBe(false);
   });
 
@@ -304,7 +303,7 @@ describe('buildAzimutImportPlan', () => {
     });
     const iwde = plan.holdings.find((h) => h.position.name.startsWith('ISHARES MSCI WORLD'))!;
     expect(iwde.formData.composition?.map((leg) => leg.assetClass)).toEqual(['equity', 'cash']);
-    expect(iwde.needsClassChoice).toBe(false);
+    expect(iwde.classGuessed).toBe(false);
   });
 
   it('keeps a fund that is ALL «other» undecided: the mix names no class', async () => {
@@ -314,30 +313,33 @@ describe('buildAzimutImportPlan', () => {
     });
     const eujp = plan.holdings.find((h) => h.position.name.startsWith('WT LONG JPY'))!;
     expect(eujp.formData.assetClass).toBe('equity');
-    // The mix names no class: the row waits for the USER, in the preview.
-    expect(eujp.needsClassChoice).toBe(true);
+    // The mix names no class: the name's default stands, and the preview says it was guessed.
+    expect(eujp.classGuessed).toBe(true);
   });
 
-  it('waits for a class on every row the market could not decide', async () => {
+  it('classes every fund by its name when the market said nothing, and flags only the defaults', async () => {
     const workbook = await readSampleWorkbook();
     const plan = buildAzimutImportPlan(workbook, []);
-    const waiting = plan.holdings.filter((holding) => holding.needsClassChoice);
-    // Four GESTITO funds with no code to look up, and the two ETFs whose mix is unread: the class
-    // of each is a question for the user, not a proposal the app writes.
-    expect(waiting.map((holding) => holding.position.name).sort()).toEqual(
+    const classOf = (prefix: string) =>
+      plan.holdings.find((holding) => holding.position.name.startsWith(prefix))!.formData.assetClass;
+
+    // A keyword decides: no question, no flag.
+    expect(classOf('FIDELITY FUNDS GLOBAL MULTI ASSET DEFENSIVE')).toBe('bonds');
+    expect(classOf('FIDELITY GLOBAL DIVIDEND')).toBe('equity');
+    expect(classOf('MORGAN STANLEY INVESTMENT FUNDS GLOBAL BRANDS')).toBe('equity');
+
+    // No keyword: equity by default, imported as such and named in the preview.
+    const guessed = plan.holdings.filter((holding) => holding.classGuessed);
+    expect(guessed.map((holding) => holding.position.name).sort()).toEqual(
       [
-        'FIDELITY FUNDS GLOBAL MULTI ASSET DEFENSIVE FUND "A" (EUR) ACC',
-        'FIDELITY GLOBAL DIVIDEND "A" (EURHDG) ACC',
         'FIRST TRUST CLEAN EDGE SMART GRID ETF (GRID IM)',
         'FRANKLIN FTSE INDIA UCITS ETF (FLXI IM) EUR',
-        'MORGAN STANLEY INVESTMENT FUNDS GLOBAL BRANDS "A" (USD) ACC',
         'R-CO VALOR "C" (EUR) ACC',
         'WT LONG JPY SHORT EUR (EUJP IM)',
         'WT SHT USD LONG EUR (USEU IM) EUR',
       ].sort()
     );
-    // The class is not a warning any more: the row asks it, and the import waits.
-    expect(plan.warnings.some((warning) => warning.includes('classe non deducibile'))).toBe(false);
+    expect(guessed.every((holding) => holding.formData.assetClass === 'equity')).toBe(true);
   });
 });
 
@@ -373,11 +375,11 @@ describe('buildAzimutImportPlan with the ISIN a name search resolved', () => {
     expect(diff.formData.ticker).toBe('FR0011253624');
     // The mix arrived under the ISIN, not under the product name.
     expect(diff.formData.composition?.map((leg) => leg.assetClass)).toEqual(['equity', 'bonds', 'cash']);
-    expect(diff.needsClassChoice).toBe(false);
+    expect(diff.classGuessed).toBe(false);
     expect(plan.warnings.some((warning) => warning.includes(rco.name))).toBe(false);
   });
 
-  it('leaves a «none» answer with no ISIN — and the row waiting for a class', async () => {
+  it('leaves a «none» answer with no ISIN — and the class to the name', async () => {
     const { workbook, rco, identities } = await rcoScenario();
     identities[normalizeFundName(rco.name)] = {
       query: rco.name,
@@ -390,20 +392,21 @@ describe('buildAzimutImportPlan with the ISIN a name search resolved', () => {
 
     expect(diff.formData.isin).toBeUndefined();
     expect(diff.formData.ticker).toBe(rco.name);
-    // No ISIN and no mix: the class is the user's to choose, in the preview row.
-    expect(diff.needsClassChoice).toBe(true);
+    // No ISIN and no mix: the name's default, flagged in the preview row.
+    expect(diff.formData.assetClass).toBe('equity');
+    expect(diff.classGuessed).toBe(true);
     expect(plan.warnings.some((warning) => warning.includes('ISIN'))).toBe(false);
   });
 
-  it('waits for a class when the identity is found but its mix is unread', async () => {
+  it('keeps the name’s class when the identity is found but its mix is unread', async () => {
     const { workbook, rco, identities } = await rcoScenario();
 
     const plan = buildAzimutImportPlan(workbook, [], {}, identities);
     const diff = plan.holdings.find((holding) => holding.position.id === rco.id)!;
 
-    // The ISIN was found, the class was not: the row asks for it, the ISIN is not a class.
+    // The ISIN was found, the class was not: the ISIN is not a class, the name's default stands.
     expect(diff.formData.isin).toBe('FR0011253624');
-    expect(diff.needsClassChoice).toBe(true);
+    expect(diff.classGuessed).toBe(true);
   });
 
   it('adds the ISIN to an existing asset that has none, without touching its identity', async () => {
@@ -476,25 +479,9 @@ describe('the class the user chooses in the preview', () => {
     const diff = plan.holdings.find((holding) => holding.position.id === rco.id)!;
 
     // The class of a tracked asset is decided: the one stored there, which the import never
-    // overwrites. So the row is not a question, and the preview does not ask it.
-    expect(diff.needsClassChoice).toBe(false);
+    // overwrites — so it is not a guess either.
+    expect(diff.classGuessed).toBe(false);
     expect(diff.storedAssetClass).toBe('bonds');
-  });
-
-  it('stores the class the user chose, on the row that was waiting for it', async () => {
-    const workbook = await readSampleWorkbook();
-    const rco = workbook.positions.find((candidate) => candidate.name.startsWith('R-CO VALOR'))!;
-    const plan = buildAzimutImportPlan(workbook, []);
-
-    const saved = applyAzimutClassChoices(plan, { [rco.id]: 'bonds' });
-    const diff = saved.holdings.find((holding) => holding.position.id === rco.id)!;
-
-    expect(diff.formData.assetClass).toBe('bonds');
-    expect(diff.needsClassChoice).toBe(false);
-    // The rows that were not waiting keep the class the plan measured.
-    const grid = saved.holdings.find((holding) => holding.position.name.startsWith('FIRST TRUST'))!;
-    expect(grid.formData.assetClass).toBe('equity');
-    expect(grid.needsClassChoice).toBe(true);
   });
 });
 
