@@ -44,7 +44,7 @@ import {
   assistantNavItem,
   type NavItem,
 } from '@/lib/constants/navigation';
-import { Settings, LogOut, ChevronsUpDown, PanelLeftClose, PanelLeftOpen, Check, Users } from 'lucide-react';
+import { Settings, LogOut, ChevronsUpDown, PanelLeftClose, PanelLeftOpen, Check, Users, Link2 } from 'lucide-react';
 
 function NavItems({ items }: { items: NavItem[] }) {
   const pathname = usePathname();
@@ -196,6 +196,19 @@ export function AppSidebar() {
         {/* Footer — in icon mode the button becomes a 44px square around the avatar */}
         <SidebarFooter className="border-t border-sidebar-border">
           <SidebarMenu>
+            {/* Quick access to broker connections */}
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                tooltip="Gestisci collegamenti broker"
+              >
+                <SceneLink href="/dashboard/settings?tab=collegamenti" onClick={closeMobile}>
+                  <Link2 className="size-4" />
+                  <span className="group-data-[collapsible=icon]:hidden">Collegamenti</span>
+                </SceneLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+
             <SidebarMenuItem>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
