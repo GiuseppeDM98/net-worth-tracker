@@ -83,6 +83,37 @@ export const YAHOO_SYMBOL_BY_ISIN: Readonly<Record<string, string>> = {
 const ISIN_SHAPE = /^[A-Z]{2}[A-Z0-9]{10}$/;
 
 /**
+ * A fund's name as two sources of truth spell it: case, punctuation and spacing differ
+ * («R-co Valor C EUR» / «R-Co Valor C EUR»), the words do not.
+ */
+function normalizeFundName(value: string | null | undefined): string {
+  return (value ?? '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+/**
+ * THE MEASUREMENT every row of the catalogue rests on, as a rule anyone can run: `search(isin)`
+ * names the fund, and the symbol's own price names what that symbol actually quotes — the two
+ * must be the same fund.
+ *
+ * It is the same rule the catalogue was measured with, so a runtime answer and a written row are
+ * judged by ONE yardstick. Equality, not resemblance: a name that merely resembles another is
+ * another fund, and a wrong symbol is a wrong price on a real asset.
+ */
+export function namesTheSameFund(
+  searchName: string | null | undefined,
+  quoteName: string | null | undefined
+): boolean {
+  const left = normalizeFundName(searchName);
+  const right = normalizeFundName(quoteName);
+  if (left === '' || right === '') return false;
+  return left === right;
+}
+
+/**
  * Whether a stored `ticker` is in fact an ISIN a broker left behind, rather than a symbol Yahoo can
  * quote. The one place this shape is written down: the resolver below and the exposure service both
  * ask it, and three copies of a regex that decides «does this asset exist for Yahoo» is how one of

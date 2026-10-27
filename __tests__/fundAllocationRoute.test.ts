@@ -77,6 +77,15 @@ describe('GET /api/portfolio/fund-allocation', () => {
     expect(resolveProfilesMock).not.toHaveBeenCalled();
   });
 
+  it('refuses a free-form name where a ticker belongs', async () => {
+    // A real ISIN rides alongside, so a 400 can only come from the ticker list itself.
+    const response = await fundAllocationRoute(
+      request('?isins=IT0005650905&tickers=Fidelity%20Global%20Multi%20Asset%20Defensive')
+    );
+    expect(response.status).toBe(400);
+    expect(resolveProfilesMock).not.toHaveBeenCalled();
+  });
+
   it('asks the fund module once per ISIN and answers only the mixes Yahoo published', async () => {
     const response = await fundAllocationRoute(
       request('?isins=IT0005650905,LU2629378014')
@@ -94,6 +103,39 @@ describe('GET /api/portfolio/fund-allocation', () => {
     // An unread ISIN is ABSENT, never a zero allocation the client would print as 100/0.
     expect(body.allocations.LU2629378014).toBeUndefined();
     expect(body.oldestFetchedAt).toBe('2026-10-20T08:00:00.000Z');
+  });
+
+  it('reads a ticker list as a second identity, keyed as asked', async () => {
+    resolveProfilesMock.mockResolvedValueOnce({
+      response: {
+        profiles: {
+          'GRID.MI': { fund: { fetchedAt: '2026-10-20T08:00:00.000Z', holdingsBasis: 'fund', allocation: ALLOCATION } },
+          'EUJP.MI': { fund: { fetchedAt: '2026-10-20T08:00:00.000Z', holdingsBasis: 'fund' } },
+        },
+        oldestFetchedAt: '2026-10-20T08:00:00.000Z',
+      },
+      counts: { hits: 0, fetched: 2 },
+    });
+
+    const response = await fundAllocationRoute(request('?tickers=GRID.MI,EUJP.MI'));
+
+    expect(response.status).toBe(200);
+    expect(resolveProfilesMock).toHaveBeenCalledWith(
+      [
+        { ticker: 'GRID.MI', module: 'fund' },
+        { ticker: 'EUJP.MI', module: 'fund' },
+      ],
+      expect.objectContaining({ requireAllocation: true })
+    );
+    const body = await response.json();
+    expect(body.allocations).toEqual({ 'GRID.MI': ALLOCATION });
+    expect(body.allocations['EUJP.MI']).toBeUndefined();
+  });
+
+  it('refuses a query that names no instrument at all', async () => {
+    const response = await fundAllocationRoute(request('?isins=&tickers='));
+    expect(response.status).toBe(400);
+    expect(resolveProfilesMock).not.toHaveBeenCalled();
   });
 
   it('names its stages in Server-Timing', async () => {

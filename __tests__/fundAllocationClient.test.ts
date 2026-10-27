@@ -33,6 +33,11 @@ function isinsOf(call: number): string[] {
   return (new URL(url, 'http://localhost').searchParams.get('isins') ?? '').split(',');
 }
 
+function tickersOf(call: number): string[] {
+  const url = fetchMock.mock.calls[call][0] as string;
+  return (new URL(url, 'http://localhost').searchParams.get('tickers') ?? '').split(',');
+}
+
 describe('fetchFundAllocations', () => {
   beforeEach(() => {
     fetchMock.mockReset();
@@ -90,5 +95,26 @@ describe('fetchFundAllocations', () => {
     const result = await fetchFundAllocations(['VWCE.DE', '']);
     expect(fetchMock).not.toHaveBeenCalled();
     expect(result).toEqual({ allocations: {}, oldestFetchedAt: null });
+  });
+
+  it('asks tickers in their own list, never as ISINs', async () => {
+    fetchMock.mockResolvedValue(answer({ 'GRID.MI': allocation(0.99) }, '2026-10-20T08:00:00.000Z'));
+
+    const result = await fetchFundAllocations([], ['GRID.MI', ' EUJP.MI ', 'not a ticker']);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(tickersOf(0)).toEqual(['GRID.MI', 'EUJP.MI']);
+    expect(new URL(fetchMock.mock.calls[0][0] as string, 'http://localhost').searchParams.has('isins')).toBe(false);
+    expect(result.allocations['GRID.MI']).toEqual(allocation(0.99));
+  });
+
+  it('sends the two lists as two requests, each under its own bound', async () => {
+    fetchMock.mockResolvedValue(answer({}, null));
+
+    await fetchFundAllocations([A], ['GRID.MI']);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(isinsOf(0)).toEqual([A]);
+    expect(tickersOf(1)).toEqual(['GRID.MI']);
   });
 });

@@ -11,6 +11,11 @@
  * is backfilled, while one the user already typed is never overwritten. The liquidity section
  * becomes one cash account, matched by its stable ticker.
  *
+ * A row the market could not class (no published mix) takes the class its name suggests
+ * (`inferFundClassFromName`) and the preview row says it was deduced; a row that updates a tracked
+ * asset keeps the class already stored — the import never overwrites it
+ * (doc/guide/collegamenti.md → La classe dal nome).
+ *
  * Only metadata is persisted in `brokerConnections/{ownerId}/brokers/intesa`: never the file.
  */
 
@@ -23,13 +28,13 @@ import { useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Tile } from '@/components/ui/tile';
-import { useAssets } from '@/lib/hooks/useAssets';
+import { assetsQueryOptions, useAssets } from '@/lib/hooks/useAssets';
 import { describeBrokerConnections } from '@/lib/utils/settingsNarrative';
-import { formatCurrency, formatNumber, formatPercentageIt } from '@/lib/utils/formatters';
+import { formatCurrency, formatNumber } from '@/lib/utils/formatters';
 import { ASSET_CLASS_LABELS } from '@/lib/utils/allocationUtils';
+import { describeFundComposition } from '@/lib/utils/fundCompositionLabel';
 import { fetchFundAllocations } from '@/lib/utils/fundAllocationClient';
 import { queryKeys } from '@/lib/query/queryKeys';
-import type { AssetComposition } from '@/types/assets';
 import {
   INTESA_BROKER_NAME,
   buildIntesaImportPlan,
@@ -59,15 +64,6 @@ const KIND_LABEL: Record<IntesaDiffKind, string> = {
   unchanged: 'Invariato',
 };
 
-/** «72,70% Obbligazioni · 23,70% Azioni · 3,60% Liquidità» — the mix the import will store. */
-function describeComposition(composition: AssetComposition[] | undefined): string {
-  return (composition ?? [])
-    .map(
-      (leg) =>
-        `${formatPercentageIt(leg.percentage, 2)} ${ASSET_CLASS_LABELS[leg.assetClass] ?? leg.assetClass}`
-    )
-    .join(' · ');
-}
 
 interface IntesaSaveResult {
   createdAssets: number;
@@ -149,8 +145,7 @@ async function persistIntesaImport(ownerId: string, plan: IntesaImportPlan): Pro
 
 export function IntesaSanpaoloConnectionTile({ ownerId, disabled = false }: IntesaSanpaoloConnectionTileProps) {
   const queryClient = useQueryClient();
-  const { data: assetsData, isLoading: assetsLoading, isError: assetsFailed } = useAssets(ownerId);
-  const assets = assetsData ?? [];
+  const { isLoading: assetsLoading, isError: assetsFailed } = useAssets(ownerId);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [connection, setConnection] = useState<BrokerConnection | null>(null);
   const [loadingConnection, setLoadingConnection] = useState(true);
@@ -197,19 +192,27 @@ export function IntesaSanpaoloConnectionTile({ ownerId, disabled = false }: Inte
       if (disabled || busy || assetsLoading || assetsFailed) return;
       setFileName(file.name);
       setPlan(null);
-      setError(null);
+        setError(null);
       setParsing(true);
       void readIntesaWorkbookFile(file)
         .then(async (workbook) => {
           // One extra round trip BEFORE the preview: Yahoo's published mix for every fund in the
           // report (from the shared per-ticker cache), so a hybrid fund is created already split
           // across classes instead of landing on one class by name. Fail-soft: an unread ISIN is
-          // simply absent, and the row keeps the «classe da verificare» warning.
+          // simply absent, and the row asks the class to the user.
           const fundIsins = workbook.positions
             .filter((position) => position.section === 'fund')
             .map((position) => position.isin);
           const { allocations } = await fetchFundAllocations(fundIsins);
-          return buildIntesaImportPlan(workbook, assets, allocations);
+          // The assets the plan matches against must be the CURRENT ones: the hook's list can be
+          // a snapshot (the persisted cache restores the last one), and a plan built on a stale
+          // list calls every tracked position NEW — and creates it a second time. The import is
+          // a write path: it reads the assets as they are (`staleTime: 0`).
+          const currentAssets = await queryClient.fetchQuery({
+            ...assetsQueryOptions(ownerId),
+            staleTime: 0,
+          });
+          return buildIntesaImportPlan(workbook, currentAssets, allocations);
         })
         .then(
           (importPlan) => {
@@ -223,7 +226,7 @@ export function IntesaSanpaoloConnectionTile({ ownerId, disabled = false }: Inte
         )
         .finally(() => setParsing(false));
     },
-    [disabled, busy, assetsLoading, assetsFailed, assets]
+    [disabled, busy, assetsLoading, assetsFailed, ownerId, queryClient]
   );
 
   const handleFile = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -415,7 +418,7 @@ export function IntesaSanpaoloConnectionTile({ ownerId, disabled = false }: Inte
                   // with its own composition keeps it, and showing Yahoo's fresher one would lie.
                   const compositionLabel =
                     diff.kind === 'new' || diff.compositionUpdate
-                      ? describeComposition(diff.formData.composition)
+                      ? describeFundComposition(diff.formData.composition)
                       : '';
                   const hasComposition = compositionLabel !== '';
                   return (
@@ -436,11 +439,21 @@ export function IntesaSanpaoloConnectionTile({ ownerId, disabled = false }: Inte
                             Composizione dall&apos;ISIN: {compositionLabel}
                           </span>
                         )}
-                        {diff.typeUncertain && !hasComposition && (
-                          <span className="block text-[12px] text-warning-foreground">
-                            {diff.kind === 'new'
-                              ? 'Classe non deducibile dal nome: proposta azionaria, verifica su Patrimonio.'
-                              : 'Classe proposta dal nome e composizione non disponibile: verifica su Patrimonio.'}
+                        {diff.kind === 'new' && !hasComposition && (
+                          <span
+                            className={cn(
+                              'block text-[12px]',
+                              diff.classGuessed ? 'text-warning-foreground' : 'text-muted-foreground'
+                            )}
+                          >
+                            Classe: {ASSET_CLASS_LABELS[diff.formData.assetClass] ?? diff.formData.assetClass}
+                            {diff.classGuessed && ' — dedotta dal nome, verificala su Patrimonio'}
+                          </span>
+                        )}
+                        {diff.storedAssetClass && (
+                          <span className="block text-[12px] text-muted-foreground">
+                            Classe: {ASSET_CLASS_LABELS[diff.storedAssetClass] ?? diff.storedAssetClass}{' '}
+                            (dal patrimonio)
                           </span>
                         )}
                         {(diff.kind === 'drift-only' || diff.kind === 'price-and-drift') && (

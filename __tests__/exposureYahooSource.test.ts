@@ -154,4 +154,31 @@ describe('yahooProfileSource', () => {
     await expect(yahooProfileSource.fetchFund('NOPE', NOW)).resolves.toBeNull();
     await expect(yahooProfileSource.fetchStock('NOPE', NOW)).resolves.toBeNull();
   });
+
+  it('keeps a valid mix when an UNRELATED module breaks Yahoo\u2019s schema (R-CO Valor)', async () => {
+    // Measured 2026-10-22 on `0P00017T6E.F`: `fundProfile.brokerages` comes back as an array of
+    // bank NAMES, the schema wants objects, and the whole answer — a perfectly good `topHoldings`
+    // mix included — used to be thrown away. The retry asks for the raw answer.
+    quoteSummaryMock.mockRejectedValueOnce(new Error('Failed Yahoo Schema validation')).mockResolvedValueOnce({
+      topHoldings: { stockPosition: 0.6, bondPosition: 0.3, cashPosition: 0.1, otherPosition: 0 },
+      fundProfile: { family: 'Rothschild & Co', brokerages: ['Augsburger Aktienbank AG'] },
+    });
+
+    const fund = await yahooProfileSource.fetchFund('0P00017T6E.F', NOW);
+
+    expect(quoteSummaryMock).toHaveBeenNthCalledWith(
+      2,
+      '0P00017T6E.F',
+      { modules: ['topHoldings', 'fundProfile'] },
+      { validateResult: false }
+    );
+    expect(fund?.allocation).toMatchObject({ stock: 0.6, bond: 0.3, cash: 0.1 });
+    expect(fund?.family).toBe('Rothschild & Co');
+  });
+
+  it('does not retry a failure that is not a schema mismatch', async () => {
+    quoteSummaryMock.mockRejectedValue(new Error('Not Found'));
+    await yahooProfileSource.fetchFund('NOPE', NOW);
+    expect(quoteSummaryMock).toHaveBeenCalledTimes(1);
+  });
 });

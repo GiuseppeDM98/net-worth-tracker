@@ -17,11 +17,12 @@
  * as `16.29.36` must never reach the numeric parser).
  */
 
-import type { Asset, AssetClass, AssetComposition, AssetFormData, AssetType } from '@/types/assets';
+import type { Asset, AssetClass, AssetFormData, AssetType } from '@/types/assets';
 import type { InstrumentFundAllocation } from '@/types/exposure';
 import { isLedgerAssetType } from '@/types/assetTransactions';
 import { resolveYahooSymbolForIsin } from '@/lib/utils/yahooSymbolForIsin';
-import { compositionFromFundAllocation } from '@/lib/utils/fundComposition';
+import { readFundComposition, resolveAllocationClass } from '@/lib/utils/fundComposition';
+import { inferFundClassFromName } from '@/lib/utils/fundNameClass';
 
 /** A row as `read-excel-file` returns it, so this module stays free of the library. */
 export type IntesaCell = unknown;
@@ -121,22 +122,6 @@ function isTableHeader(row: readonly IntesaCell[]): boolean {
 
 function isBondTable(row: readonly IntesaCell[]): boolean {
   return normalized(text(row[2])) === 'QUANTITA' && normalized(text(row[3])).includes('PREZZO MEDIO FISCALE');
-}
-
-/** The best available class from the fund's own name; the preview names every uncertain one. */
-function inferFundClass(name: string): { assetClass: AssetClass; uncertain: boolean } {
-  const n = normalized(name);
-  if (/\b(BOND|OBBLIG|TESORERIA|CREDIT|MONETAR|LIQUID|SHORT TERM)\b/.test(n)) {
-    return { assetClass: 'bonds', uncertain: false };
-  }
-  if (/\b(EQUITY|AZION|WORLD|EUROPEAN RESEARCH|US RESEARCH|EMERGING MARKETS)\b/.test(n)) {
-    return { assetClass: 'equity', uncertain: false };
-  }
-  if (/\b(COMMODIT|GOLD|ORO)\b/.test(n)) return { assetClass: 'commodity', uncertain: false };
-  if (/\b(REAL ESTATE|IMMOBIL)\b/.test(n)) return { assetClass: 'realestate', uncertain: false };
-  // Multi-asset funds have no single class in this app; equity is the least wrong default and
-  // the preview says the classification needs a check on Patrimonio.
-  return { assetClass: 'equity', uncertain: true };
 }
 
 function sectionLabel(section: IntesaPositionSection): string {
@@ -263,48 +248,33 @@ export function mapIntesaPositionType(position: IntesaPositionInput): MappedInte
   if (position.section === 'bond') {
     return { type: 'bond', assetClass: 'bonds', typeUncertain: false };
   }
-  const { assetClass, uncertain } = inferFundClass(position.name);
+  const { assetClass, uncertain } = inferFundClassFromName(position.name);
   // A fund is an `etf` here: it is a market-priced collective instrument, and the app has no
   // distinct mutual-fund type. The class is what allocation reads.
   return { type: 'etf', assetClass, typeUncertain: uncertain };
 }
 
 /**
- * The composition a fund's published allocation gives it, when Yahoo answered one. The legs are
- * the app's stored shape and sum to 100 (`compositionFromFundAllocation`); the dominant leg also
- * becomes the asset's OWN class, so a reader that ignores `composition` shows the real largest
- * sleeve instead of the name-based fallback. Returns `[]` for a bond or an unread allocation.
+ * A fresh `AssetFormData` for an Intesa position. The report is the source, so Yahoo stays off.
  */
-function compositionForPosition(
-  position: IntesaPositionInput,
-  allocation: InstrumentFundAllocation | null | undefined,
-  assetClass: AssetClass,
-): AssetComposition[] {
-  if (position.section !== 'fund') return [];
-  return compositionFromFundAllocation(allocation, assetClass);
-}
-
-/** The class a composite fund stores on the asset: its largest composition leg, else the inference. */
-function storedClassFor(assetClass: AssetClass, composition: AssetComposition[]): AssetClass {
-  return composition.length > 0 ? composition[0].assetClass : assetClass;
-}
-
-/** A fresh `AssetFormData` for an Intesa position. The report is the source, so Yahoo stays off. */
 export function mapIntesaPositionToAssetFormData(
   position: IntesaPositionInput,
   allocation?: InstrumentFundAllocation | null,
 ): AssetFormData {
   const { type, assetClass } = mapIntesaPositionType(position);
-  const composition = compositionForPosition(position, allocation, assetClass);
+  // Only a fund has a published mix; a bond's ISIN has no `topHoldings` to read. The reading is
+  // the ONE rule Intesa, Azimut, Scalable and Trade Republic share (`readFundComposition`): the
+  // composition legs, and the dominant leg as the asset's own class.
+  const reading = readFundComposition(position.section === 'fund' ? allocation : undefined, assetClass);
   return {
     ticker: resolveYahooSymbolForIsin(position.isin) ?? position.isin,
     displayTicker: position.name,
     name: position.name,
     type,
-    assetClass: storedClassFor(assetClass, composition),
+    assetClass: reading.assetClass,
     currency: 'EUR',
     quantity: position.quantity,
-    ...(composition.length > 0 ? { composition } : {}),
+    ...(reading.composition.length > 0 ? { composition: reading.composition } : {}),
     ...(position.averageCost !== undefined && position.averageCost > 0
       ? { averageCost: position.averageCost }
       : {}),
@@ -340,7 +310,14 @@ export interface IntesaHoldingDiff {
   existingDisplayTicker?: string | null;
   /** Report quantity minus tracked quantity — a number to reconcile, never an auto-write. */
   quantityDrift: number;
-  typeUncertain: boolean;
+  /**
+   * A NEW row whose class is the name's default (`inferFundClassFromName`): no keyword and no
+   * published mix. It is imported as such and the preview says so — the correction lives on
+   * Patrimonio. A row that updates a tracked asset is never guessed: its class is stored there.
+   */
+  classGuessed: boolean;
+  /** The class stored on the tracked asset this row updates — `undefined` for a new position. */
+  storedAssetClass?: AssetClass;
   /** The tracked asset is not labelled as this broker yet (or has another label). */
   exchangeUpdate: boolean;
   /**
@@ -422,22 +399,18 @@ export function buildIntesaImportPlan(
     const formData = mapIntesaPositionToAssetFormData(position, allocation);
     const composition = formData.composition ?? [];
     const hasComposition = composition.length > 0;
-    const { typeUncertain } = mapIntesaPositionType(position);
+    const { typeUncertain, assetClass } = mapIntesaPositionType(position);
+    // The market's answer: the published mix produced a composition, or it named the class of a
+    // fund that is nearly all one class (`resolveAllocationClass`, the same rule the Azimut
+    // bridge reads). Everything else is the name's guess, written as is.
+    const marketDecided = hasComposition || resolveAllocationClass(allocation, assetClass)?.measured === true;
     if (!existing) {
-      // A fund whose published mix was read needs no «classe da verificare» warning: the mix IS
-      // the answer, and `Asset.assetClass` now carries its largest leg.
-      if (typeUncertain && !hasComposition) {
-        warnings.push(
-          `«${position.name}»: classe non deducibile dal nome, proposta azionaria — verifica su Patrimonio.`
-        );
-      }
       return {
         kind: 'new',
         position,
         formData,
         quantityDrift: 0,
-        // A read composition answers the class question; the row needs no «verifica».
-        typeUncertain: typeUncertain && !hasComposition,
+        classGuessed: typeUncertain && !marketDecided,
         exchangeUpdate: true,
         compositionUpdate: false,
       } satisfies IntesaHoldingDiff;
@@ -463,11 +436,6 @@ export function buildIntesaImportPlan(
         `«${existing.name}»: il file riporta ${position.quantity} quote contro ${existing.quantity} nel Registro — il prezzo si aggiorna, la quantità no (riconcilia con una rettifica).`
       );
     }
-    if (typeUncertain && !hasExistingComposition && !compositionUpdate) {
-      warnings.push(
-        `«${existing.name}»: classe proposta dal nome e composizione non disponibile — verifica su Patrimonio.`
-      );
-    }
     return {
       kind,
       position,
@@ -476,7 +444,10 @@ export function buildIntesaImportPlan(
       existingTaxRate: existing.taxRate,
       existingDisplayTicker: existing.displayTicker,
       quantityDrift: hasDrift ? drift : 0,
-      typeUncertain: typeUncertain && !hasExistingComposition && !compositionUpdate,
+      // The class of a tracked asset is ALREADY decided: it is the one stored there, and the
+      // import never overwrites it.
+      classGuessed: false,
+      storedAssetClass: existing.assetClass,
       exchangeUpdate,
       compositionUpdate,
     } satisfies IntesaHoldingDiff;

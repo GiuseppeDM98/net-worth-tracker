@@ -223,6 +223,15 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Collezione fund-identity-cache - l'identità che EODHD dà a un NOME di prodotto (ISIN, nome
+    // della classe, divisa), condivisa fra tutti gli account. Document ID ==
+    // encodeURIComponent(nome normalizzato); nessun campo userId. Letta e scritta SOLO dall'Admin
+    // SDK: il client la riceve da /api/portfolio/fund-identity. Il default nega comunque; il
+    // blocco lo documenta (doc/guide/collegamenti.md § Azimut).
+    match /fund-identity-cache/{nameId} {
+      allow read, write: if false;
+    }
+
     // Collezione benchmark-cache - rendimenti storici dei portafogli modello (dato globale)
     // Document ID == benchmarkId (es. "60-40", "all-weather"); nessun campo userId.
     // Leggibile da qualsiasi utente autenticato; scrivibile solo via Admin SDK (write: false).

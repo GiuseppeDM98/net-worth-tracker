@@ -20,6 +20,11 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   row tint means "no market quote", NOT "illiquid".
 - **`suggestIsLiquid` is the single liquidity-default predicate**, keyed on the TYPE so a REIT **ETF** stays liquid; three
   call sites in lock-step (create-mode effect, edit-mode legacy fallback, liquid/illiquid net-worth read-time fallback).
+- **A mutual fund is `type: 'fund'`** (2026-10-23), not an ETF: same shape as an ETF everywhere that matters — market
+  price when it has a ticker, composition read from its ISIN, trades through the ledger (`LEDGER_ASSET_TYPES`), pays
+  distributions (`paysDividends`), TER — but its class is the MANDATE's, chosen by the user in step 2 (equity, bonds,
+  multi-asset in `composition`). There is **no `AssetClass 'fund'`**: a fund has no class of its own, exactly like
+  `pensionFund` (decision D2). Its `TYPE_TO_CLASS` entry (`equity`) is only the fallback before the picker/mix answers.
 - `buildAssetFormDataFromValues` clamps `autoUpdatePrice` to `false` when `hasMarketPrice()` is false. **That clamp is
   the only defense — never remove it.**
 - **GBp (pence) ≠ GBP**: normalize `price / 100` before any FX call or values inflate 100×. **Never call Frankfurter from
@@ -302,6 +307,19 @@ form whose fields depend on a discriminant, and the marker rule itself, stay the
   census, 0 and 0 after the move (`npm run perf:census -- --scenario=asset`; one `useWatch('quantity')` put back at the
   root read 563, seen red). The root keeps the watches that decide the form's SHAPE (type, class, the switches and
   selects — one change per click) and the ISIN. Submit-time reads stay `getValues()`/the `data` of `handleSubmit`.
+- **Un ISIN si quota con yahoo-finance2** (2026-10-22): Yahoo non quota un ISIN (`quote('LU0605515377')`
+  non risponde), e un broker che pubblica solo l'ISIN lasciava l'asset con l'ISIN come ticker — quindi
+  non quotabile. Il simbolo lo trova `lib/server/yahooSymbol.ts` — **UN solo risolutore, letto dal prezzo
+  (`lib/services/yahooFinanceService.ts`) e dall'Esposizione** (`lib/server/exposure/yahooSource.ts`) — in
+  quest'ordine: prima il **catalogo misurato** (`lib/utils/yahooSymbolForIsin.ts`), poi la **ricerca della
+  libreria**, e il simbolo che ne esce viene **misurato** prima di usarlo: la ricerca nomina il fondo, il
+  prezzo del simbolo nomina ciò che quel simbolo quota, e i due devono essere lo STESSO fondo
+  (`namesTheSameFund`, la regola con cui il catalogo è stato misurato). Misurato: `LU0605515377` → `FPIJ.F`
+  → 37,633 € (il file del broker dice 37,74 €: la stessa quota); `FR0011253624` → 3.919,57 € (file:
+  3.916,80 €). Un simbolo che Yahoo non descrive NON si quota (il nome di un altro fondo non si può
+  confrontare, e un simbolo non verificato è un prezzo sbagliato su un asset vero — nell'Esposizione
+  sarebbero le quote di un ALTRO fondo); un ISIN che la libreria non nomina (LU0119620416, nessuna
+  quotazione su Yahoo) resta non quotabile — come prima, e non come un prezzo inventato.
 - **La composizione si legge dall'ISIN DA SOLA, e una digitata non viene mai sovrascritta** (2026-10-20): appena l'ISIN
   di un ETF è completo (la stessa forma dello schema, `ISIN_PATTERN`), `AssetDialog` chiede il mix pubblicato a
   `GET /api/portfolio/fund-allocation` dopo 500 ms, lo mappa con `lib/utils/fundComposition.ts` e riempie le righe
@@ -311,11 +329,17 @@ form whose fields depend on a discriminant, and the marker rule itself, stay the
   ISIN: `compositionTouched` protegge le righe digitate (anche cambiando l'ISIN), `compositionSourceIsin` impedisce di
   richiedere due volte lo stesso «non disponibile» nella stessa apertura. Spegnere «Asset composto» è una dichiarazione:
   le righe si svuotano e la lettura non le riempie più; riaccenderlo a righe vuote è il modo per chiedere un mix
-  AGGIORNATO (non c'è un pulsante). **L'ISIN è abilitato per ogni ETF**, non solo per quelli in classe
-  azioni, perché un ETF obbligazionario ne ha bisogno per la composizione. La chiave `composition` è protetta da
+  AGGIORNATO (non c'è un pulsante). **L'ISIN è abilitato per ogni ETF e ogni fondo**, non solo per quelli in classe
+  azioni, perché un ETF obbligazionario o un fondo bilanciato ne hanno bisogno per la composizione. La chiave `composition` è protetta da
   `deleteField()` su ENTRAMBE le vie di scrittura (`updateAsset`, `updateAssetMetadata`): un chiamante parziale (un
   aggiornamento prezzo) non manda la chiave e non le tocca. L'import Intesa riempie solo una composizione VUOTA, mai una
-  digitata.
+  digitata. **«Asset composto» è un valore della tendina «Classe», non una classe** (`lib/utils/assetClassChoice.ts`, 2026-10-27):
+  sceglierlo accende lo switch omonimo e semina le due gambe Azioni/Obbligazioni a 0%, da riempire fino a 100%; una classe
+  singola spegne la composizione, come lo switch. Le due voci portano le STESSE parole di proposito: sono due maniglie su un
+  solo campo, e un secondo nome per una sola dichiarazione è il modo in cui tendina e switch iniziano a divergere.
+  `Asset.assetClass` resta il RIPIEGO (quella scelta prima, `equity` di
+  default) perché un asset composto non ha una classe propria — le nove classi non esistono: la tavolozza ne ha otto
+  (`ASSET_CLASS_CHART_INDEX`), e un nono secchio prenderebbe gli euro che la composizione deve dividere.
 - **A marker on a label is a claim the validation has to honour.** `*` = required, `(opzionale)` in
   `text-muted-foreground font-normal` = explicitly optional; the zod schema, any imperative guard in `onSubmit` and the
   marker's own condition must agree (2026-08-30: Sottocategoria was `.optional()` in zod, blocked by a guard, and

@@ -47,7 +47,7 @@ import { calculateFormulaEquityPercentage, resolveAutoEquityBondsSplit } from '@
 export type SettingsTabId = 'generale' | 'allocazione' | 'spese' | 'dividendi' | 'condivisione' | 'collegamenti' | 'aspetto';
 
 export const SETTINGS_TAB_IDS: readonly SettingsTabId[] = [
-  'generale', 'allocazione', 'spese', 'dividendi', 'condivisione', 'aspetto',
+  'generale', 'allocazione', 'spese', 'dividendi', 'condivisione', 'collegamenti', 'aspetto',
 ];
 
 export function isSettingsTabId(value: string | null | undefined): value is SettingsTabId {

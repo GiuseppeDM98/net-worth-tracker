@@ -43,8 +43,12 @@ import { describeBrokerConnections } from '@/lib/utils/settingsNarrative';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { formatCurrency, formatDate, formatNumberIt } from '@/lib/utils/formatters';
 import { queryKeys } from '@/lib/query/queryKeys';
+import { fetchFundAllocations } from '@/lib/utils/fundAllocationClient';
+import { usesPublishedFundMix } from '@/lib/utils/fundComposition';
+import { describeFundComposition } from '@/lib/utils/fundCompositionLabel';
 import {
   buildScalableImportPlan,
+  mapScalableType,
   parseScalableHoldingsJson,
   parseScalableOverviewJson,
   parseScalableOvernightJson,
@@ -82,6 +86,7 @@ const KIND_LABEL: Record<HoldingDiffKind, string> = {
   'price-update': 'Prezzo aggiornato',
   'drift-only': 'Scostamento quantità',
   'price-and-drift': 'Prezzo + scostamento',
+  'composition-update': 'Composizione',
   unchanged: 'Invariato',
 };
 
@@ -188,6 +193,7 @@ export function ScalableConnectionTile({ ownerId, disabled = false }: ScalableCo
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [preparing, setPreparing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusText, setStatusText] = useState<string | null>(null);
@@ -244,13 +250,21 @@ export function ScalableConnectionTile({ ownerId, disabled = false }: ScalableCo
   }, [loadAll]);
 
   const buildPlan = useCallback(
-    (
+    async (
       holdings: ScalableHoldingInput[],
       overview: ScalableOverviewInput | null,
       overnight: ScalableOvernightInput | null,
       overnightWarningText: string | null
     ) => {
-      setPlan(buildScalableImportPlan(holdings, overview, assets, overnight));
+      // One extra round trip BEFORE the preview: Yahoo's published mix for every fund in the
+      // payload (from the shared per-ticker cache), so a hybrid ETF is created already split
+      // across classes instead of landing on one class by name. Fail-soft: an unread ISIN is
+      // simply absent, and the row keeps its name-based class.
+      const fundIsins = holdings
+        .filter((holding) => usesPublishedFundMix(mapScalableType(holding.rawType).type))
+        .map((holding) => holding.isin);
+      const { allocations } = await fetchFundAllocations(fundIsins);
+      setPlan(buildScalableImportPlan(holdings, overview, assets, overnight, allocations));
       const existingCash = findScalableCash(assets, SCALABLE_CASH_TICKER);
       const existingDeposit = findScalableCash(assets, SCALABLE_DEPOSIT_TICKER);
       setCashTarget(existingCash ? existingCash.id : NEW_CASH_VALUE);
@@ -282,7 +296,7 @@ export function ScalableConnectionTile({ ownerId, disabled = false }: ScalableCo
           })
         ),
       ]);
-      buildPlan(holdingsRes.holdings ?? [], overviewRes.overview ?? null, overnightRes.overnight, overnightRes.warning);
+      await buildPlan(holdingsRes.holdings ?? [], overviewRes.overview ?? null, overnightRes.overnight, overnightRes.warning);
       // No auto-import: `handleSave` closes over the `plan` of the render it was created in, so
       // calling it right after `setPlan` read the PREVIOUS plan (null on a fresh load) and bailed
       // on its own guard — the write never ran while the toast below claimed it had. The preview
@@ -297,8 +311,9 @@ export function ScalableConnectionTile({ ownerId, disabled = false }: ScalableCo
     }
   };
 
-  const handlePreviewFromText = () => {
+  const handlePreviewFromText = async () => {
     if (disabled) return;
+    setPreparing(true);
     try {
       const { holdings } = parseScalableHoldingsJson(holdingsText);
       const overview = overviewText.trim() !== '' ? parseScalableOverviewJson(overviewText) : null;
@@ -314,12 +329,14 @@ export function ScalableConnectionTile({ ownerId, disabled = false }: ScalableCo
               : 'Deposito non vincolato non letto: testo non valido.';
         }
       }
-      buildPlan(holdings, overview, overnight, overnightWarningText);
+      await buildPlan(holdings, overview, overnight, overnightWarningText);
       toast.success('Anteprima pronta: controlla le righe prima di salvare.');
     } catch (err) {
       setError(
         err instanceof ScalableParseError ? err.message : 'Testo non valido: ricontrolla l\'output incollato.'
       );
+    } finally {
+      setPreparing(false);
     }
   };
 
@@ -372,21 +389,32 @@ export function ScalableConnectionTile({ ownerId, disabled = false }: ScalableCo
     try {
       let createdAssets = 0;
       let updatedPrices = 0;
+      let filledCompositions = 0;
       for (const diff of plan.holdings) {
         if (diff.kind === 'new') {
           await createAsset(ownerId, diff.formData);
           createdAssets += 1;
-        } else if (diff.existingAssetId && (diff.kind === 'price-update' || diff.kind === 'price-and-drift' || diff.tickerUpdate)) {
-          // The symbol repair rides on the same write as the price: it is metadata, and a second
-          // write per position would double the sync's Firestore traffic for no extra information.
-          // `ticker` is sent ONLY when the plan resolved a different one, so a partial caller can
-          // never blank it — the `in` guard on the service side then leaves it alone.
-          await updateAssetMetadata(diff.existingAssetId, {
-            currentPrice: diff.holding.price,
-            ...(diff.tickerUpdate ? { ticker: diff.tickerUpdate } : {}),
-          });
-          updatedPrices += 1;
+          continue;
         }
+        if (!diff.existingAssetId) continue;
+        const shouldWritePrice = diff.kind === 'price-update' || diff.kind === 'price-and-drift';
+        // An unchanged row with the right symbol and no composition to fill has nothing to write.
+        if (!shouldWritePrice && !diff.tickerUpdate && !diff.compositionUpdate) continue;
+        // The symbol repair and the published composition ride on the same write as the price:
+        // both are metadata, and a second write per position would double the sync's Firestore
+        // traffic for no extra information. `ticker` is sent ONLY when the plan resolved a
+        // different one, so a partial caller can never blank it. taxRate and displayTicker are
+        // carried along because `updateAssetMetadata` treats an absent one as a request to
+        // DELETE it (the import must not wipe a cost-basis rate or an alias).
+        await updateAssetMetadata(diff.existingAssetId, {
+          ...(shouldWritePrice ? { currentPrice: diff.holding.price } : {}),
+          ...(diff.tickerUpdate ? { ticker: diff.tickerUpdate } : {}),
+          ...(diff.compositionUpdate ? { composition: diff.formData.composition } : {}),
+          taxRate: diff.existingTaxRate,
+          displayTicker: diff.existingDisplayTicker ?? undefined,
+        });
+        if (shouldWritePrice) updatedPrices += 1;
+        if (diff.compositionUpdate) filledCompositions += 1;
       }
       let cashAssetId: string | undefined;
       let cashBalance: number | undefined;
@@ -455,7 +483,9 @@ export function ScalableConnectionTile({ ownerId, disabled = false }: ScalableCo
       setPlan(null);
       await loadAll();
       toast.success(
-        `Sincronizzazione salvata: ${createdAssets} nuovi asset, ${updatedPrices} prezzi aggiornati.`
+        `Sincronizzazione salvata: ${createdAssets} nuovi asset, ${updatedPrices} prezzi aggiornati${
+          filledCompositions > 0 ? `, ${filledCompositions} composizioni ricavate` : ''
+        }.`
       );
     } catch (err) {
       console.error('[ScalableConnectionTile] save failed:', err);
@@ -493,7 +523,7 @@ export function ScalableConnectionTile({ ownerId, disabled = false }: ScalableCo
           )}
 
           <div className="flex flex-wrap items-center gap-2">
-            <Button onClick={handleSync} disabled={disabled || syncing || loading} className="h-10">
+            <Button onClick={handleSync} disabled={disabled || syncing || preparing || loading} className="h-10">
               {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
               {syncing ? 'Lettura…' : 'Sincronizza'}
             </Button>
@@ -577,6 +607,8 @@ export function ScalableConnectionTile({ ownerId, disabled = false }: ScalableCo
                 Anteprima: {plan.stats.newCount} nuovi, {plan.stats.priceUpdateCount} prezzi da
                 aggiornare
                 {plan.stats.driftCount > 0 && `, ${plan.stats.driftCount} scostamenti di quantità`}
+                {plan.stats.compositionUpdateCount > 0 &&
+                  `, ${plan.stats.compositionUpdateCount} composizioni da completare`}
                 {plan.stats.unchangedCount > 0 && `, ${plan.stats.unchangedCount} invariati`}
                 {plan.stats.tickerUpdateCount > 0 &&
                   `, ${plan.stats.tickerUpdateCount} ticker ISIN da sostituire col simbolo Yahoo`}
@@ -604,6 +636,12 @@ export function ScalableConnectionTile({ ownerId, disabled = false }: ScalableCo
                           Tipo non riconosciuto: proposto come ETF, verifica su Patrimonio.
                         </span>
                       )}
+                      {(diff.kind === 'new' || diff.compositionUpdate) &&
+                        (diff.formData.composition?.length ?? 0) > 0 && (
+                          <span className="block text-[12px] text-muted-foreground">
+                            Composizione dall&apos;ISIN: {describeFundComposition(diff.formData.composition)}
+                          </span>
+                        )}
                     </span>
                     <span className="flex-none text-[12px] text-muted-foreground">
                       {KIND_LABEL[diff.kind]}
@@ -740,8 +778,14 @@ export function ScalableConnectionTile({ ownerId, disabled = false }: ScalableCo
               />
             </div>
             <div>
-              <Button variant="outline" onClick={handlePreviewFromText} disabled={disabled} className="h-10">
-                Anteprima dal testo
+              <Button
+                variant="outline"
+                onClick={handlePreviewFromText}
+                disabled={disabled || preparing}
+                className="h-10"
+              >
+                {preparing && <Loader2 className="h-4 w-4 animate-spin" />}
+                {preparing ? 'Lettura composizioni…' : 'Anteprima dal testo'}
               </Button>
             </div>
           </div>

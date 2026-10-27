@@ -50,9 +50,13 @@ import { describeBrokerConnections } from '@/lib/utils/settingsNarrative';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
 import { formatCurrency, formatDate, formatNumberIt } from '@/lib/utils/formatters';
 import { queryKeys } from '@/lib/query/queryKeys';
+import { fetchFundAllocations } from '@/lib/utils/fundAllocationClient';
+import { usesPublishedFundMix } from '@/lib/utils/fundComposition';
+import { describeFundComposition } from '@/lib/utils/fundCompositionLabel';
 import {
   applyTrTickerOverride,
   buildTrImportPlan,
+  mapTrType,
   resolveTrYahooTicker,
   TR_CASH_ACCOUNT_NAME,
   TR_CASH_TICKER,
@@ -80,6 +84,7 @@ const BROKER = 'traderepublic' as const;
 const KIND_LABEL: Record<TrImportPlan['holdings'][number]['kind'], string> = {
   new: 'Nuovo',
   'drift-only': 'Scostamento quantità',
+  'composition-update': 'Composizione',
   unchanged: 'Invariato',
 };
 
@@ -262,13 +267,21 @@ export function TradeRepublicConnectionTile({ ownerId, disabled = false }: Trade
   }, [loadAll]);
 
   const buildPlan = useCallback(
-    (
+    async (
       holdings: TrHoldingInput[],
       balances: TrCashInput[],
       savingsPlans: TrSavingsPlanInput[],
       savingsPlanWarningText: string | null
     ) => {
-      setPlan(buildTrImportPlan(holdings, balances, savingsPlans, assets));
+      // One extra round trip BEFORE the preview: Yahoo's published mix for every fund in the
+      // payload (from the shared per-ticker cache), so a hybrid ETF is created already split
+      // across classes instead of landing on one class by name. Fail-soft: an unread ISIN is
+      // simply absent, and the row keeps its name-based class.
+      const fundIsins = holdings
+        .filter((holding) => usesPublishedFundMix(mapTrType(holding.rawType, holding.rawCategory).type))
+        .map((holding) => holding.isin);
+      const { allocations } = await fetchFundAllocations(fundIsins);
+      setPlan(buildTrImportPlan(holdings, balances, savingsPlans, assets, allocations));
       setTickerOverrides({});
       const existingCash = findTrCash(assets, TR_CASH_TICKER);
       setCashTarget(existingCash ? existingCash.id : NEW_CASH_VALUE);
@@ -299,7 +312,7 @@ export function TradeRepublicConnectionTile({ ownerId, disabled = false }: Trade
           })
         ),
       ]);
-      buildPlan(
+      await buildPlan(
         (positionsRes['positions'] as TrHoldingInput[]) ?? [],
         (cashRes['balances'] as TrCashInput[]) ?? [],
         plansRes.plans,
@@ -389,6 +402,7 @@ export function TradeRepublicConnectionTile({ ownerId, disabled = false }: Trade
     try {
       let createdAssets = 0;
       let repairedTickers = 0;
+      let filledCompositions = 0;
       for (const diff of plan.holdings) {
         // No price write: this broker publishes no quote, so there is nothing to compare or patch.
         if (diff.kind === 'new') {
@@ -405,18 +419,27 @@ export function TradeRepublicConnectionTile({ ownerId, disabled = false }: Trade
           // re-sync enough — no delete, no retyping.
           const resolved = diff.holding.yahooTicker ?? resolveTrYahooTicker(diff.holding);
           const trackedTicker = assets.find((asset) => asset.id === diff.existingAssetId)?.ticker;
-          if (
+          const shouldRepairTicker = Boolean(
             resolved &&
-            diff.holding.price !== undefined &&
-            trackedTicker === diff.holding.isin &&
-            trackedTicker !== resolved
-          ) {
-            await updateAssetMetadata(diff.existingAssetId, {
-              ticker: resolved,
-              currentPrice: diff.holding.price,
-            });
-            repairedTickers += 1;
-          }
+              diff.holding.price !== undefined &&
+              trackedTicker === diff.holding.isin &&
+              trackedTicker !== resolved
+          );
+          if (!shouldRepairTicker && !diff.compositionUpdate) continue;
+          // The published composition rides on the same write as a ticker repair: both are
+          // metadata. taxRate and displayTicker are carried along because
+          // `updateAssetMetadata` treats an absent one as a request to DELETE it (the import
+          // must not wipe a cost-basis rate or an alias).
+          await updateAssetMetadata(diff.existingAssetId, {
+            ...(shouldRepairTicker && resolved
+              ? { ticker: resolved, currentPrice: diff.holding.price }
+              : {}),
+            ...(diff.compositionUpdate ? { composition: diff.formData.composition } : {}),
+            taxRate: diff.existingTaxRate,
+            displayTicker: diff.existingDisplayTicker ?? undefined,
+          });
+          if (shouldRepairTicker) repairedTickers += 1;
+          if (diff.compositionUpdate) filledCompositions += 1;
         }
       }
       let cashAssetId: string | undefined;
@@ -460,7 +483,9 @@ export function TradeRepublicConnectionTile({ ownerId, disabled = false }: Trade
       setPlan(null);
       await loadAll();
       toast.success(
-        `Sincronizzazione salvata: ${createdAssets} nuovi asset${repairedTickers > 0 ? `, ${repairedTickers} ticker riparati` : ''}.`
+        `Sincronizzazione salvata: ${createdAssets} nuovi asset${repairedTickers > 0 ? `, ${repairedTickers} ticker riparati` : ''}${
+          filledCompositions > 0 ? `, ${filledCompositions} composizioni ricavate` : ''
+        }.`
       );
     } catch (err) {
       console.error('[TradeRepublicConnectionTile] save failed:', err);
@@ -621,6 +646,8 @@ export function TradeRepublicConnectionTile({ ownerId, disabled = false }: Trade
             <p className="text-[13px] font-medium">
               Anteprima: {plan.stats.newCount} nuovi
               {plan.stats.driftCount > 0 && `, ${plan.stats.driftCount} scostamenti di quantità`}
+              {plan.stats.compositionUpdateCount > 0 &&
+                `, ${plan.stats.compositionUpdateCount} composizioni da completare`}
               {plan.stats.unchangedCount > 0 && `, ${plan.stats.unchangedCount} invariati`}
               {plan.stats.savingsPlanCount > 0 && `, ${plan.stats.savingsPlanCount} piani di accumulo`}.
             </p>
@@ -650,6 +677,12 @@ export function TradeRepublicConnectionTile({ ownerId, disabled = false }: Trade
                           Tipo non riconosciuto: proposto come ETF, verifica su Patrimonio.
                         </span>
                       )}
+                      {(diff.kind === 'new' || diff.compositionUpdate) &&
+                        (diff.formData.composition?.length ?? 0) > 0 && (
+                          <span className="block text-[12px] text-muted-foreground">
+                            Composizione dall&apos;ISIN: {describeFundComposition(diff.formData.composition)}
+                          </span>
+                        )}
                     </span>
                     <span className="flex-none text-[12px] text-muted-foreground">{KIND_LABEL[diff.kind]}</span>
                   </li>

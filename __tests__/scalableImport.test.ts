@@ -377,6 +377,74 @@ describe('buildScalableImportPlan', () => {
     expect(plan.stats.tickerUpdateCount).toBe(0);
   });
 
+  it('creates a new fund already split, with the largest published sleeve as its class', () => {
+    const { holdings } = parseScalableHoldingsJson(NESTED_HOLDINGS);
+    const plan = buildScalableImportPlan(holdings, null, [], null, {
+      IE00B4L5Y983: { stock: 0.2, bond: 0.7, cash: 0.1, other: 0, preferred: 0, convertible: 0 },
+    });
+    const [diff] = plan.holdings;
+    expect(diff.kind).toBe('new');
+    expect(diff.formData.assetClass).toBe('bonds');
+    expect(diff.formData.composition).toEqual([
+      { assetClass: 'bonds', percentage: 70 },
+      { assetClass: 'equity', percentage: 20 },
+      { assetClass: 'cash', percentage: 10 },
+    ]);
+  });
+
+  it('fills an EXISTING empty composition without touching the price or the class', () => {
+    const { holdings } = parseScalableHoldingsJson(NESTED_HOLDINGS);
+    const plan = buildScalableImportPlan(
+      holdings,
+      null,
+      [{ ...existingAsset(), composition: [], taxRate: 12.5, displayTicker: 'Mondo' }],
+      null,
+      { IE00B4L5Y983: { stock: 0.2, bond: 0.7, cash: 0.1, other: 0, preferred: 0, convertible: 0 } }
+    );
+    const [diff] = plan.holdings;
+    // Price and quantity agree, so the ONLY thing to write is the composition: its own kind
+    // keeps it visible in the preview instead of hiding it under «Invariato».
+    expect(diff.kind).toBe('composition-update');
+    expect(diff.compositionUpdate).toBe(true);
+    expect(diff.existingTaxRate).toBe(12.5);
+    expect(diff.existingDisplayTicker).toBe('Mondo');
+    expect(plan.stats.compositionUpdateCount).toBe(1);
+    expect(plan.stats.unchangedCount).toBe(0);
+  });
+
+  it('never overwrites a composition the user typed', () => {
+    const { holdings } = parseScalableHoldingsJson(NESTED_HOLDINGS);
+    const manual = [
+      { assetClass: 'equity' as const, percentage: 60 },
+      { assetClass: 'bonds' as const, percentage: 40 },
+    ];
+    const plan = buildScalableImportPlan(
+      holdings,
+      null,
+      [{ ...existingAsset(), composition: manual }],
+      null,
+      { IE00B4L5Y983: { stock: 0.2, bond: 0.7, cash: 0.1, other: 0, preferred: 0, convertible: 0 } }
+    );
+    const [diff] = plan.holdings;
+    expect(diff.kind).toBe('unchanged');
+    expect(diff.compositionUpdate).toBe(false);
+    expect(plan.stats.compositionUpdateCount).toBe(0);
+  });
+
+  it('stops calling an uncertain broker type unknown once the market placed the fund', () => {
+    const { holdings } = parseScalableHoldingsJson(
+      JSON.stringify([{ isin: 'DE0001234567', name: 'Mystery', type: 'WARRANT', quantity: 1, price: 5, currency: 'EUR' }])
+    );
+    const withMix = buildScalableImportPlan(holdings, null, [], null, {
+      DE0001234567: { stock: 0.2, bond: 0.7, cash: 0.1, other: 0, preferred: 0, convertible: 0 },
+    });
+    expect(withMix.holdings[0].formData.type).toBe('etf');
+    expect(withMix.warnings).toHaveLength(0);
+    // The falsification: with no mix the same row must still warn, or the suppression above is
+    // an absence of the warning rather than a decision about it.
+    expect(buildScalableImportPlan(holdings, null, []).warnings[0]).toContain('non riconosciuto');
+  });
+
   it('names the suggested cash account', () => {
     expect(SCALABLE_CASH_ACCOUNT_NAME).toContain('Scalable');
   });

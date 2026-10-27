@@ -231,18 +231,56 @@ export const performanceYieldsRequestSchema = z.object({
 export { goalProposalSchema } from '@/lib/utils/goalProposal';
 
 /**
- * GET /api/portfolio/fund-allocation?isins=<ISIN,…> — the funds whose published allocation the
- * client needs (an import preview, the ETF form). A closed list of real ISINs: this route is not a
- * Yahoo proxy, so it refuses a free ticker and bounds the fan-out to one import's worth of funds.
+ * GET /api/portfolio/fund-allocation?isins=<ISIN,…>&tickers=<ticker,…> — the instruments whose
+ * published allocation the client needs (an import preview, the ETF form). Two closed lists: an
+ * ISIN is the identity a fund house publishes, a ticker is the Bloomberg code a broker file
+ * carries (`GRID IM` → `GRID.MI`) — never one list pretending to be the other, and each bounded
+ * to one import's worth. The route is not a Yahoo proxy.
  */
-export const fundAllocationQuerySchema = z.object({
-  isins: z
-    .string()
-    .min(1)
-    .max(1000)
-    .transform((value) => value.split(',').map((isin) => isin.trim().toUpperCase()).filter(Boolean))
-    .pipe(z.array(isinSchema).min(1).max(40)),
-});
+export const fundAllocationQuerySchema = z
+  .object({
+    isins: z.string().max(1000).optional().default(''),
+    tickers: z.string().max(1000).optional().default(''),
+  })
+  .transform(({ isins, tickers }) => ({
+    isins: isins
+      .split(',')
+      .map((isin) => isin.trim().toUpperCase())
+      .filter(Boolean),
+    tickers: tickers
+      .split(',')
+      .map((ticker) => ticker.trim())
+      .filter(Boolean),
+  }))
+  .pipe(
+    z.object({
+      isins: z.array(isinSchema).max(40),
+      tickers: z.array(tickerSchema).max(40),
+    })
+  )
+  .refine((value) => value.isins.length + value.tickers.length > 0, {
+    message: 'Provide at least one ISIN or ticker',
+  });
+
+/**
+ * GET /api/portfolio/fund-identity?names=<name>|<name> — the product names a broker export prints
+ * for funds it gives no code for (the Azimut «Gestito» sheet). A NAME is not an instrument, so it
+ * is bounded as text: `|`-separated (a product name may contain commas and quotes), at most ten
+ * per request — one import's worth — and each within the width EODHD's search accepts. The route
+ * asks EODHD once per name, one of the table's smallest quotas (a generous name would not fail
+ * here, it would simply answer nothing, so the bound is stated rather than trusted).
+ */
+export const fundIdentityQuerySchema = z
+  .object({
+    names: z.string().min(3).max(1200),
+  })
+  .transform(({ names }) =>
+    names
+      .split('|')
+      .map((name) => name.trim())
+      .filter(Boolean)
+  )
+  .pipe(z.array(z.string().min(3).max(140)).min(1).max(10));
 
 /**
  * Parse helper: runs safeParse and returns either the typed data or a

@@ -129,7 +129,10 @@ describe('parseIntesaWorkbook', () => {
       .map((position) => position.name);
     expect(uncertain).toContain('EURIZON MARKET SELECTION 20');
     expect(uncertain).toContain('EURIZON FUND - GLOBAL ALLOCATION  - CLASSE R');
-    expect(uncertain).toHaveLength(9);
+    expect(uncertain).toHaveLength(8);
+    // A conservative allocation fund sits with bonds, its largest sleeve.
+    const conservative = workbook.positions.find((position) => position.name.includes('CONSERVATIVE'));
+    expect(mapIntesaPositionType(conservative!).assetClass).toBe('bonds');
   });
 
   it('has no unreadable rows, only the certificate price caveat', async () => {
@@ -251,7 +254,7 @@ describe('buildIntesaImportPlan', () => {
     const diff = plan.holdings.find((holding) => holding.position.isin === 'IT0005650905');
     expect(diff?.kind).toBe('new');
     expect(diff?.formData.composition).toHaveLength(3);
-    expect(diff?.typeUncertain).toBe(false);
+    expect(diff?.classGuessed).toBe(false);
     expect(plan.warnings.some((warning) => warning.includes('MARKET SELECTION 20'))).toBe(false);
   });
 
@@ -296,7 +299,7 @@ describe('buildIntesaImportPlan', () => {
     const diff = plan.holdings.find((holding) => holding.position.isin === 'IT0005650905');
     expect(diff?.kind).toBe('unchanged');
     expect(diff?.compositionUpdate).toBe(false);
-    expect(diff?.typeUncertain).toBe(false);
+    expect(diff?.classGuessed).toBe(false);
     expect(plan.stats.compositionUpdateCount).toBe(0);
     // The preview must not announce a mix the save would not write.
     expect(diff?.formData.composition?.map((leg) => leg.assetClass)).toEqual([
@@ -304,5 +307,36 @@ describe('buildIntesaImportPlan', () => {
       'equity',
       'cash',
     ]);
+  });
+});
+
+describe('the class a fund takes from its name', () => {
+  it('imports every fund the market could not decide with the name’s default, flagged', async () => {
+    const workbook = await readFixture();
+    const plan = buildIntesaImportPlan(workbook, []);
+
+    const guessed = plan.holdings.filter((holding) => holding.classGuessed);
+    // The name says nothing about the class and no mix was read: equity, named in the preview.
+    expect(guessed.length).toBeGreaterThan(0);
+    expect(guessed.every((holding) => holding.kind === 'new')).toBe(true);
+    expect(guessed.every((holding) => holding.formData.assetClass === 'equity')).toBe(true);
+  });
+
+  it('takes the class already stored on a tracked asset — never a guess', async () => {
+    const workbook = await readFixture();
+    const position = workbook.positions.find((candidate) => candidate.isin === 'IT0005650905')!;
+    const existing = existingAsset({
+      isin: position.isin,
+      name: position.name,
+      assetClass: 'bonds',
+      quantity: position.quantity,
+      currentPrice: position.price,
+    });
+
+    const plan = buildIntesaImportPlan(workbook, [existing]);
+    const diff = plan.holdings.find((holding) => holding.position.isin === position.isin)!;
+
+    expect(diff.classGuessed).toBe(false);
+    expect(diff.storedAssetClass).toBe('bonds');
   });
 });

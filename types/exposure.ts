@@ -100,10 +100,11 @@ export interface InstrumentProfilesResponse {
 }
 
 /**
- * `GET /api/portfolio/fund-allocation?isins=<ISIN,…>` — the published mix of the funds asked for,
- * keyed by the ISIN the caller sent (the same key the shared cache stores the module under). An
- * ISIN Yahoo cannot read is ABSENT, never a zero allocation: the import preview says which rows
- * it could not read instead of splitting them 100/0.
+ * `GET /api/portfolio/fund-allocation?isins=<ISIN,…>&tickers=<ticker,…>` — the published mix of
+ * the instruments asked for, keyed by the identity the caller sent (the ISIN, or the ticker when
+ * the file had no ISIN; the same key the shared cache stores the module under). An instrument
+ * Yahoo cannot read is ABSENT, never a zero allocation: the import preview says which rows it
+ * could not read instead of splitting them 100/0.
  */
 export interface FundAllocationsResponse {
   allocations: Record<string, InstrumentFundAllocation>;

@@ -61,6 +61,7 @@ export const BROKER_DISPLAY_NAME: Record<BrokerId, string> = {
   scalable: 'Scalable Capital',
   traderepublic: 'Trade Republic',
   intesa: 'Intesa Sanpaolo',
+  azimut: 'Azimut',
 };
 
 /** Format last sync date for Italian locale. */

@@ -263,6 +263,23 @@ describe('mapTrHoldingToAssetFormData', () => {
   it('falls back to 0 when the quote lookup failed, so the plan can warn about it', () => {
     expect(mapTrHoldingToAssetFormData({ ...holding, price: undefined }).currentPrice).toBe(0);
   });
+
+  it('stores the published mix and makes its largest sleeve the class', () => {
+    const formData = mapTrHoldingToAssetFormData(holding, {
+      stock: 0.2,
+      bond: 0.7,
+      cash: 0.1,
+      other: 0,
+      preferred: 0,
+      convertible: 0,
+    });
+    expect(formData.assetClass).toBe('bonds');
+    expect(formData.composition).toEqual([
+      { assetClass: 'bonds', percentage: 70 },
+      { assetClass: 'equity', percentage: 20 },
+      { assetClass: 'cash', percentage: 10 },
+    ]);
+  });
 });
 
 describe('buildTrImportPlan', () => {
@@ -302,6 +319,98 @@ describe('buildTrImportPlan', () => {
     ]);
     expect(plan.holdings[0].kind).toBe('unchanged');
     expect(plan.warnings).toHaveLength(0);
+  });
+
+  it('creates a new fund already split, with the largest published sleeve as its class', () => {
+    const plan = buildTrImportPlan([holding], [], [], [], {
+      IE00B4L5Y983: { stock: 0.2, bond: 0.7, cash: 0.1, other: 0, preferred: 0, convertible: 0 },
+    });
+    const [diff] = plan.holdings;
+    expect(diff.kind).toBe('new');
+    expect(diff.formData.assetClass).toBe('bonds');
+    expect(diff.formData.composition?.[0]).toEqual({ assetClass: 'bonds', percentage: 70 });
+  });
+
+  it('fills an EXISTING empty composition and carries the metadata a write must not erase', () => {
+    const plan = buildTrImportPlan(
+      [holding],
+      [],
+      [],
+      [
+        {
+          id: 'asset-1',
+          name: 'World',
+          isin: 'IE00B4L5Y983',
+          type: 'etf',
+          quantity: 12.5,
+          ticker: 'SWDA.MI',
+          composition: [],
+          taxRate: 12.5,
+          displayTicker: 'Mondo',
+        },
+      ],
+      { IE00B4L5Y983: { stock: 0.2, bond: 0.7, cash: 0.1, other: 0, preferred: 0, convertible: 0 } }
+    );
+    const [diff] = plan.holdings;
+    expect(diff.kind).toBe('composition-update');
+    expect(diff.compositionUpdate).toBe(true);
+    expect(diff.existingTaxRate).toBe(12.5);
+    expect(diff.existingDisplayTicker).toBe('Mondo');
+    expect(plan.stats.compositionUpdateCount).toBe(1);
+    expect(plan.stats.unchangedCount).toBe(0);
+  });
+
+  it('reports a drift AND fills the empty composition in the same row', () => {
+    // `kind` names the loudest fact (the quantity mismatch), but the composition is independent:
+    // hiding it because the row already says «Scostamento» would leave the fund split-less until
+    // the user reconciled by hand.
+    const plan = buildTrImportPlan(
+      [holding],
+      [],
+      [],
+      [{ id: 'asset-1', name: 'World', isin: 'IE00B4L5Y983', type: 'etf', quantity: 10, ticker: 'SWDA.MI' }],
+      { IE00B4L5Y983: { stock: 0.2, bond: 0.7, cash: 0.1, other: 0, preferred: 0, convertible: 0 } }
+    );
+    const [diff] = plan.holdings;
+    expect(diff.kind).toBe('drift-only');
+    expect(diff.compositionUpdate).toBe(true);
+    expect(plan.stats.driftCount).toBe(1);
+    expect(plan.stats.compositionUpdateCount).toBe(1);
+  });
+
+  it('never overwrites a composition the user typed', () => {
+    const manual = [
+      { assetClass: 'equity' as const, percentage: 60 },
+      { assetClass: 'bonds' as const, percentage: 40 },
+    ];
+    const plan = buildTrImportPlan(
+      [holding],
+      [],
+      [],
+      [{ id: 'asset-1', name: 'World', isin: 'IE00B4L5Y983', type: 'etf', quantity: 12.5, ticker: 'SWDA.MI', composition: manual }],
+      { IE00B4L5Y983: { stock: 0.2, bond: 0.7, cash: 0.1, other: 0, preferred: 0, convertible: 0 } }
+    );
+    expect(plan.holdings[0].kind).toBe('unchanged');
+    expect(plan.holdings[0].compositionUpdate).toBe(false);
+    expect(plan.stats.compositionUpdateCount).toBe(0);
+  });
+
+  it('stops calling an uncertain broker type unknown once the market placed the fund', () => {
+    const mystery: TrHoldingInput = {
+      ...holding,
+      rawType: 'MYSTERY',
+      rawCategory: '',
+      isin: 'DE0001234567',
+      name: 'Mystery',
+      price: 5,
+    };
+    const withMix = buildTrImportPlan([mystery], [], [], [], {
+      DE0001234567: { stock: 0.2, bond: 0.7, cash: 0.1, other: 0, preferred: 0, convertible: 0 },
+    });
+    expect(withMix.holdings[0].formData.type).toBe('etf');
+    expect(withMix.warnings).toHaveLength(0);
+    // The falsification: the same row without a mix must still warn.
+    expect(buildTrImportPlan([mystery], [], [], []).warnings.join(' ')).toContain('non riconosciuto');
   });
 
   it('names a position that enters without a price instead of creating it silently worthless', () => {
