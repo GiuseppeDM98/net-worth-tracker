@@ -127,7 +127,7 @@ describe('parseAzimutWorkbook with real file', () => {
     const btp = bonds[0];
     expect(btp.name).toBe('BTP 0,35% 17 NOV 2028 EUR');
     expect(btp.quantity).toBe(25000);
-    expect(btp.price).toBe(94.73435);
+    expect(btp.price).toBeCloseTo(0.9473435, 7); // Bond prices are divided by 100 (percentage → decimal)
 
     const basf = stocks[0];
     expect(basf.name).toBe('BASF A.G. (BAS GY) EUR');
@@ -226,6 +226,27 @@ describe('parseAzimutNumber', () => {
     expect(parseAzimutNumber('N/D')).toBeUndefined();
     expect(parseAzimutNumber('')).toBeUndefined();
   });
+
+  it('correctly parses bond prices without 100x factor errors', () => {
+    // Bond prices in Italian format (comma as decimal, dot as thousands separator)
+    expect(parseAzimutNumber('94,73435')).toBe(94.73435); // BTP correct
+    expect(parseAzimutNumber('99,55509')).toBe(99.55509); // BTP correct
+    expect(parseAzimutNumber('91,1772')).toBe(91.1772);   // BTP correct
+    expect(parseAzimutNumber('75,384')).toBe(75.384);     // Bund correct
+
+    // Ensure we DON'T get 100x factor
+    expect(parseAzimutNumber('94,73435')).not.toBe(9473.435);
+    expect(parseAzimutNumber('99,55509')).not.toBe(9955.509);
+    expect(parseAzimutNumber('75,384')).not.toBe(7538.4);
+
+    // Handle edge cases that might cause 100x issues
+    expect(parseAzimutNumber('0,9473')).toBe(0.9473);      // Sub-1 price
+    expect(parseAzimutNumber('0,9473')).not.toBe(94.73);   // Not 100x larger
+
+    // Mixed separators: dot before comma = Italian format (comma is decimal)
+    expect(parseAzimutNumber('1.234,56')).toBe(1234.56);   // Italian: 1234,56
+    expect(parseAzimutNumber('10.100,50')).toBe(10100.5);  // Italian: 10100,50
+  });
 });
 
 describe('mapAzimutPositionToAssetFormData', () => {
@@ -238,7 +259,7 @@ describe('mapAzimutPositionToAssetFormData', () => {
     expect(formData.name).toBe('ENEL ORD (ENEL IM)');
     expect(formData.type).toBe('stock');
     expect(formData.assetClass).toBe('equity');
-    expect(formData.currentPrice).toBe(9.192);
+    expect(formData.currentPrice).toBe(9.192); // Stocks are not divided
     expect(formData.quantity).toBe(400);
   });
 

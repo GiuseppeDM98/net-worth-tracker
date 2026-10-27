@@ -86,6 +86,10 @@ function normalized(value: string): string {
 
 /**
  * Parse Italian or standard numeric values.
+ *
+ * Handles both formats:
+ * - Italian: comma as decimal, dot as thousands (2.649,03 → 2649.03, or 10.100 → 10100)
+ * - Standard: dot as decimal (94.73 → 94.73)
  */
 export function parseAzimutNumber(cell: AzimutCell): number | undefined {
   if (typeof cell === 'number' && Number.isFinite(cell)) return cell;
@@ -95,9 +99,24 @@ export function parseAzimutNumber(cell: AzimutCell): number | undefined {
   const negative = value.startsWith('-') || (value.startsWith('(') && value.endsWith(')'));
   value = value.replace(/[€%\s()]/g, '').replace(/^\+/, '');
   if (!/\d/.test(value)) return undefined;
-  value = value.includes(',')
-    ? value.replace(/\./g, '').replace(',', '.')
-    : value.replace(/\./g, '');
+
+  // Italian format detection: comma after any dot = Italian (2.649,03), or dot alone at end = Italian (10.100)
+  const lastComma = value.lastIndexOf(',');
+  const lastDot = value.lastIndexOf('.');
+  // Azimut always uses Italian format: comma as decimal, dot as thousands separator
+  const isItalianFormat = lastComma > -1 || (lastDot > -1 && lastComma === -1);
+
+  if (isItalianFormat && lastComma > -1) {
+    // Italian with comma: remove thousands separators (dots), convert decimal comma to dot
+    value = value.replace(/\./g, '').replace(',', '.');
+  } else if (isItalianFormat && lastDot > -1) {
+    // Italian with only dot(s): remove them as thousands separators
+    value = value.replace(/\./g, '');
+  } else {
+    // Fallback: remove any commas, keep dots
+    value = value.replace(/,/g, '');
+  }
+
   value = value.replace(/[^0-9.-]/g, '');
   const parsed = Number.parseFloat(value);
   if (!Number.isFinite(parsed)) return undefined;
@@ -394,8 +413,13 @@ export function parseAzimutWorkbook(input: AzimutSheetData[] | AzimutRows): Azim
         const contract = text(row[1]) || undefined;
         const quantity = parseAzimutNumber(row[2]);
         const currency = text(row[3]) || 'EUR';
-        const price = parseAzimutNumber(row[4]);
+        let price = parseAzimutNumber(row[4]);
         const marketValue = parseAzimutNumber(row[7]);
+
+        // Bonds (obbligazioni) are quoted as percentages: 94.73 means 94.73%, so divide by 100 for decimal
+        if (currentSection === 'obbligazioni' && price && price > 1) {
+          price = price / 100;
+        }
 
         const effectivePrice = price ?? (quantity && quantity > 0 && marketValue ? marketValue / quantity : undefined);
 
