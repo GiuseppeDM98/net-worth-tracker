@@ -119,8 +119,8 @@ export async function scrapeDividendsByIsin(
   }
 
   try {
-    // Select correct URL based on asset type
-    const baseUrl = assetType === 'etf' ? BORSA_ITALIANA_ETF_URL : BORSA_ITALIANA_STOCK_URL;
+    // Select correct URL based on asset type (a mutual fund is listed on the ETF page)
+    const baseUrl = assetType === 'etf' || assetType === 'fund' ? BORSA_ITALIANA_ETF_URL : BORSA_ITALIANA_STOCK_URL;
     const url = `${baseUrl}?isin=${encodeURIComponent(isin)}&lang=it`;
 
     // Fetch HTML

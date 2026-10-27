@@ -17,8 +17,8 @@
 > `lib/utils/fundIdentityClient.ts` (la porta client, a chunk di 10 nomi),
 > `lib/server/eodhd/fundIdentityService.ts` (la Search di EODHD e la cache per nome) o
 > `app/api/portfolio/fund-identity/route.ts` (l'identità di un prodotto senza codice),
-> `lib/utils/importClassChoice.ts` (la classe che il mercato non ha deciso: la regola dei due
-> ponti su file),
+> `lib/utils/fundNameClass.ts` (la classe che il mercato non ha deciso, dal nome: la regola dei
+> due ponti su file),
 > `lib/server/scalableCli.ts` (runner `sc`), `lib/server/scalableService.ts` (profili per
 > email, device flow, guard dell'host),
 > `lib/server/tradeRepublicQr.ts` (handshake QR), `lib/server/tradeRepublicClient.ts` (sessione),
@@ -289,11 +289,10 @@
   per nome, che l'utente può rinominare). Un import successivo non crea duplicati.
 - **Solo metadati persistono** (`brokerConnections/{ownerId}/brokers/intesa`): quando, quante
   posizioni, saldo e id del conto. Mai il file, mai le righe grezze.
-- **La classe dei fondi è best-effort** (`inferFundClass`): le parole `BOND`/`OBBLIG`/`TESORERIA`
-  danno bonds, `EQUITY`/`WORLD`/`RESEARCH` danno equity, un multi-asset cade su equity con
-  `typeUncertain` — e quando nessuna parola decide, **la riga dell'anteprima chiede la classe**
-  (vedi «La classe scelta a mano»): la deduzione dal nome non viene scritta, la scelta sì. Un
-  certificato è sempre `bond`/`bonds`.
+- **La classe dei fondi senza mix viene dal nome** (`inferFundClassFromName`, vedi «La classe dal
+  nome»): `BOND`/`OBBLIG…`/`TESORERIA` danno bonds, `EQUITY`/`AZION…`/`US` danno equity, un
+  `CONSERVATIVE` bonds; quando nessuna parola decide, equity con `classGuessed` — la riga lo dice e
+  l'import la scrive. Un certificato è sempre `bond`/`bonds`.
 - **La composizione di un fondo si legge dall'ISIN, o dal ticker quando l'ISIN non c'è, e i
   fondi ibridi si scompongono davvero**
   (`lib/utils/fundComposition.ts`, `GET /api/portfolio/fund-allocation?isins=…&tickers=…`): Yahoo pubblica in
@@ -304,8 +303,8 @@
   di arrotondamento sulla gamba più grande. La `assetClass` salvata diventa la gamba più grande,
   così un lettore che ignora `composition` mostra la sleeve reale. **Una composizione già digitata
   non viene MAI sovrascritta**; una esistente ma vuota viene riempita (`compositionUpdate`, kind
-  `composition-update`). Fail-soft: un ISIN che Yahoo non legge resta ASSENTE (mai 0/0/0), la riga
-  chiede la classe all'utente, e l'import parte solo dopo la scelta. La route è autenticata ma non
+  `composition-update`). Fail-soft: un ISIN che Yahoo non legge resta ASSENTE (mai 0/0/0) e la
+  classe la decide il nome. La route è autenticata ma non
   owner-scoped (la risposta è di Yahoo, condivisa da ogni account) e non è un proxy Yahoo: due
   liste chiuse e limitate (`isins=` e `tickers=`, 40 ciascuna — un ISIN non è un ticker e il
   client non le mescola), un modulo `fund` ciascuno, attraverso la cache per ticker. Quella
@@ -325,50 +324,43 @@
 - **L'identità di un fondo senza codice viene dal NOME, con EODHD — ma solo se è UNIVOCA.** La tile chiede prima `GET /api/portfolio/fund-identity?names=…` (autenticata, non owner-scoped: la risposta è di EODHD e il documento di cache non contiene nulla dell'utente; massimo 10 nomi per richiesta) per le sole righe `needsFundIdentity` (un fondo senza ISIN e senza ticker vero). `matchFundIdentity` (`lib/utils/fundIdentity.ts`) decompone il nome in strategia + classe + divisa + copertura + accumulo/distribuzione e **pretende che ogni parte coincida**: «Global Multi Asset Defensive A» non è la «Tactical Defensive A» (che EODHD elenca con lo stesso ISIN di un'altra classe — attaccarlo darebbe al fondo il prezzo e la classe di un altro), `EURHDG` non è la classe senza copertura, una `A-MINCOME` non è una `A-Acc`. Zero o due candidati rispondono `none`/`ambiguous` e **non si sceglie**: la riga resta senza ISIN e lo dice. `buildFundIdentityQuery` manda a EODHD la sola strategia (senza `"C" (EUR) ACC`), perché la Search API è un AND di token: il nome intero risponde 0 risultati, la strategia risponde tutte le classi (misurato 2026-10-22). La cache è `fund-identity-cache/{encodeURIComponent(nome normalizzato)}` — **Admin SDK soltanto** (`allow read, write: if false`), 90 giorni per una risposta `matched`, 7 per una `none`/`ambiguous`; un `unavailable` non viene mai messo in cache, così il prossimo import richiede. Senza `EODHD_API_TOKEN` ogni nome risponde `unavailable` e l'import funziona lo stesso (l'anteprima lo dichiara). Il piano gratuito EODHD consente la Search e **rifiuta i fundamentals** (403 «Only EOD data allowed for free users»): l'identità sì, la classe no.
 - **Estrazione codice ISIN o ticker Bloomberg**: in `AZIMUT - AMMINISTRATO`, per le sezioni Azioni, Obbligazioni e ETF/ETC/ETN, viene estratto l'ISIN o il ticker tra parentesi (convertendo i suffissi Bloomberg come `GY` → `.DE`, `IM` → `.MI`, `FP` → `.PA`). Le indicazioni di valuta tra parentesi come `(EUR)` vengono ignorate.
 - **Il ticker estratto è un'identità di mercato, non solo un'etichetta**: `azimutAllocationLookup` è L'UNICA regola su cosa si può chiedere a Yahoo — l'ISIN se c'è, altrimenti il ticker del foglio, mai il nome del prodotto (la tile che prepara la domanda e il piano che la abbina leggono la stessa funzione). **Dal 2026-10-22 la chiave del mix è `azimutAllocationKey(position) ?? identity.isin`**: l'ISIN che la ricerca per nome ha trovato è anche la chiave con cui la composizione pubblicata arriva.
-- **La classe di un fondo viene dal MIX PUBBLICATO quando c'è** (`resolveAllocationClass`, `lib/utils/fundComposition.ts`): il secchiello MISURATO più grande decide la classe. Serve perché un fondo quasi mono-classe non produce `composition` (una gamba sola non è una composizione) e senza questa regola finirebbe `azionaria` per ripiego: `GRID.MI` è 99,45% azioni, `FLXI.MI` 99,98%. **`other` non è una classe** — è ciò che Morningstar non ha saputo collocare — quindi un fondo tutto `other` (i due coperti `EUJP.MI`/`USEU.MI`) resta `measured: false` e **la riga chiede la classe all'utente** (non c'è mix che la nomini). `buildAzimutImportPlan` chiude la domanda solo con `hasComposition || allocationClass.measured`, mai contando le gambe. Quando l'ISIN c'è ma il mix no, l'ISIN resta **sulla riga** (`displayCode`): è l'identità, non la classe — e la classe la sceglie l'utente.
+- **La classe di un fondo viene dal MIX PUBBLICATO quando c'è** (`resolveAllocationClass`, `lib/utils/fundComposition.ts`): il secchiello MISURATO più grande decide la classe. Serve perché un fondo quasi mono-classe non produce `composition` (una gamba sola non è una composizione) e senza questa regola finirebbe `azionaria` per ripiego: `GRID.MI` è 99,45% azioni, `FLXI.MI` 99,98%. **`other` non è una classe** — è ciò che Morningstar non ha saputo collocare — quindi un fondo tutto `other` (i due coperti `EUJP.MI`/`USEU.MI`) resta `measured: false` e **la classe la decide il nome** (non c'è mix che la nomini). `buildAzimutImportPlan` considera la classe misurata solo con `hasComposition || allocationClass.measured`, mai contando le gambe. Quando l'ISIN c'è ma il mix no, l'ISIN resta **sulla riga** (`displayCode`): è l'identità, non la classe — e la classe resta quella del nome.
 - **Un mix valido non si perde per un modulo che non c'entra**: `quoteSummary(symbol, ['topHoldings','fundProfile'])` valida TUTTA la risposta e lancia quando `fundProfile.brokerages` torna come array di NOMI (Yahoo lo fa: misurato su `0P00017T6E.F`, «R-co Valor C EUR») — il mix di `topHoldings` andava perso con lui. `quoteSummaryLoose` riprova una volta con `{ validateResult: false }` e i normalizzatori restano difensivi (una forma inattesa è un profilo vuoto).
 - **Liquidità**: la sezione `AZIMUT - LIQUIDITA` rileva il saldo del conto corrente e crea/aggiorna il conto di cassa `Azimut — Liquidità` con ticker fisso `AZIMUT-EUR`.
 - **Anteprima e persistenza**: le posizioni nuove nascono con `exchange: 'Azimut'` e `autoUpdatePrice: false`; un fondo senza codice nasce con l'ISIN trovato (è la sua `ticker`), quindi riconoscibile al prossimo import e alla ricerca del suo mix. Un asset già tracciato **non cambia identità**: se non ha ISIN e la ricerca ne trova uno, il piano lo scrive (`identity-update`, una scrittura di metadati) e **non sostituisce mai** un ISIN già presente — e non riscrive mai il ticker. Solo i metadati di sincronizzazione sono salvati in `brokerConnections/{ownerId}/brokers/azimut`.
 - **FundFacts è stato scartato**: l'API richiede una chiave (`ffk_…`) anche per la ricerca, e il suo indice pubblico elenca 533 ISIN — non le due Fidelity in questione. EODHD l'ha sostituito perché la Search non richiede un piano a pagamento (i fundamentals sì), quindi una chiave `EODHD_API_TOKEN` server-side e il modulo `lib/server/eodhd/fundIdentityService.ts`.
 
-## La classe scelta a mano — i due ponti su file (`importClassChoice.ts`)
+## La classe dal nome — i due ponti su file (`fundNameClass.ts`)
 
-> I due ponti che leggono un file (Intesa, Azimut) chiedono la classe CHE IL MERCATO NON HA DETTO, e
-> la chiedono DOVE LA DECISIONE SI FA: la riga dell'anteprima.
+> I due ponti che leggono un file (Intesa, Azimut) NON chiedono la classe: quella che il mercato non
+> ha detto la deduce il nome, l'import la scrive e la riga dell'anteprima dice che è dedotta. Dal
+> 2026-10-22 al 2026-10-27 la riga chiedeva la classe e l'import aspettava (`importClassChoice.ts`,
+> rimosso): per scelta del proprietario la correzione sta su Patrimonio, lo stesso contratto di
+> Scalable e Trade Republic (`typeUncertain`).
 
-- **La regola è UNA e vive in `lib/utils/importClassChoice.ts`, che i due ponti leggono.** Tre righe:
-  - una riga che il mercato non ha classificato (nessun mix pubblicato, nessuna identità) **aspetta
-    una classe dall'UTENTE**: la riga dell'anteprima porta un menu a tendina sulle classi
-    dell'app (`IMPORT_CLASS_OPTIONS`, che enumera `ASSET_CLASS_SEQUENCE` — mai una lista scritta a
-    fianco);
-  - una riga che **aggiorna un asset già tracciato** prende la classe **già salvata** (l'import non
-    la sovrascrive MAI) → il secondo caricamento dello stesso file **non chiede niente**;
-  - un import che porta ancora una riga senza classe **NON parte**: il bottone «Salva nel patrimonio»
-    resta disabilitato e il gestore rifiuta comunque (`classChoiceMissing`).
-- **Il mix pubblicato è la risposta, la parola del nome è una domanda.** «Il mercato ha deciso» =
-  il mix ha prodotto una composizione, OPPURE ha nominato la classe di un fondo quasi mono-classe
-  (`resolveAllocationClass`, l'unica regola: `GRID.MI` è 99,45% azioni, `FLXI.MI` 99,98% — senza
-  questa regola finirebbero `azionaria` per ripiego). Tutto il resto è la deduzione dal nome, e la
-  deduzione non è una classe: la riga chiede.
-- **La classe non è più un avviso.** L'avviso «classe non deducibile dal nome, proposta azionaria —
-  verifica su Patrimonio» è sparito dai `plan.warnings` delle due tile: la domanda è nella riga, con
-  il menu, e il conto delle righe ancora senza classe sta nella riga di stato
-  («N di M righe senza classe: sceglila nella riga per importarle»). L'ISIN che la ricerca per nome
-  ha trovato resta sulla riga (`displayCode`): quel codice è l'identità, non la classe.
-- **La classe scelta viene applicata dal LIVELLO PURO** (`applyAzimutClassChoices` /
-  `applyIntesaClassChoices`, sopra `applyClassChoices`): le scelte sono file per CHIAVE DI RIGA (l'id
-  della posizione su Azimut, l'ISIN su Intesa), quindi una scelta non può finire sulla riga
-  sbagliata, e una riga che non aspettava nessuna scelta tiene la classe che il piano aveva misurato.
+- **La regola è UNA e vive in `lib/utils/fundNameClass.ts`, che i due ponti leggono**, così un fondo
+  non è azionario su Azimut e obbligazionario su Intesa. In ordine: cripto, materie prime, monetari
+  e obbligazionari (`BOND`, `DEBT`, `CREDIT`, `OBBLIG…`, `MONETAR…`), difensivi
+  (`DEFENSIVE`, `CONSERVATIVE`, `PRUDEN…` → bonds, la loro gamba più grande), azionari (`EQUITY`,
+  `AZION…`, `WORLD`, `US`, `DIVIDEND`, `BRANDS`, `VALUE`, `GROWTH` …), immobiliari. Una PAROLA vale
+  intera (`US` non è `USD`), una RADICE vale all'inizio di una parola più lunga (`AZION` è
+  `AZIONARIO`). Nessuna parola → `equity` con `uncertain`.
+- **Il mix pubblicato vince sul nome.** «Il mercato ha deciso» = il mix ha prodotto una
+  composizione, OPPURE ha nominato la classe di un fondo quasi mono-classe
+  (`resolveAllocationClass`: `GRID.MI` è 99,45% azioni). Solo quando il mercato tace vale il nome.
+- **`classGuessed` dice quali righe sono il default**: una riga NUOVA, senza parola chiave e senza
+  mix. La riga mostra «Classe: Azioni — dedotta dal nome, verificala su Patrimonio» (in colore
+  di avviso); le altre righe nuove senza composizione mostrano «Classe: …» e basta.
 - **Una riga che aggiorna un asset tracciato mostra la classe che ha già** («Classe: Obbligazioni (dal
-  patrimonio)»): la classe salvata è un fatto dell'asset, e l'import non la tocca.
+  patrimonio)»): la classe salvata è un fatto dell'asset, e l'import non la tocca mai.
 - **Il piano confronta gli asset CORRENTI, non la lista del hook.** Le due tile costruiscono il piano
   con `queryClient.fetchQuery(assetsQueryOptions(ownerId), { staleTime: 0 })`: la lista dell'hook può
   essere un'ISTANTANEA (la cache persistita ne ripristina l'ultima), e un piano costruito su una lista
   vecchia chiama «nuova» ogni posizione già tracciata — e la crea una seconda volta. L'import è un
   percorso di scrittura: legge gli asset come sono (verificato da `e2e/broker.azimut.spec.ts`).
 - **Le suite di questa area**: `__tests__/azimutImport.test.ts`, `__tests__/intesaSanpaoloImport.test.ts`,
-  `__tests__/importClassChoice.test.ts` (la regola condivisa) e `e2e/broker.azimut.spec.ts` (il menu
-  nella riga, l'import che aspetta, il secondo caricamento che non chiede).
+  `__tests__/fundNameClass.test.ts` (la regola condivisa) e `e2e/broker.azimut.spec.ts` (nessun
+  menu, la classe del nome salvata, il secondo caricamento che non deduce).
 
 ## Per-page blind spots
 
@@ -394,12 +386,12 @@
   altro, l'avviso lo dichiara e la rettifica resta manuale. E un fondo multi-asset viene proposto
   azionario SOLO quando Yahoo non ne pubblica la composizione (ISIN non letto): se il mix arriva,
   le gambe sono già in «Composizione» — è la classe di ripiego dichiarata, non un errore di
-  lettura. Da oggi la deduzione non viene scritta: la riga chiede la classe all'utente e l'import
-  aspetta la risposta.
-- **Azimut**: la riga senza classe NON è un errore di lettura: il foglio Gestito non porta alcun
-  codice e quei fondi vanno classificati da chi li conosce. La domanda sta nella riga dell'anteprima
-  (menu a tendina sulle classi dell'app) e l'import non parte finché una riga ne è senza. L'ISIN che
-  la ricerca per nome ha trovato resta sulla riga: quel codice è l'identità (una classe da scegliere,
-  non un'identità da inventare). Un import che mostra `—` al posto di un codice sta dicendo la
-  verità: il nome del prodotto non è un ticker. Un fondo senza codice che non chiede nulla ha una
-  classe MISURATA dal mix (R-CO Valor, 75,6% azioni) — non è una deduzione dal nome.
+  lettura. Quella classe viene scritta e la riga la dichiara «dedotta dal nome».
+- **Azimut**: «dedotta dal nome» NON è un errore di lettura: il foglio Gestito non porta alcun
+  codice e, quando né EODHD né Yahoo rispondono, il nome è l'unica fonte. L'ISIN che la ricerca per
+  nome ha trovato resta sulla riga: quel codice è l'identità, non la classe. Un import che mostra
+  `—` al posto di un codice sta dicendo la verità: il nome del prodotto non è un ticker (o la
+  ricerca per nome è in cache come `none` per 7 giorni). Un fondo senza codice con «Composizione
+  pubblicata» ha una classe MISURATA dal mix (R-CO Valor, 75,6% azioni) — non è una deduzione dal
+  nome. Il mix lo pubblica Yahoo, e non per tutti: misurato 2026-10-27, Fidelity Global Dividend
+  (`LU0605515377`) e Morgan Stanley Global Brands (`LU0119620416`) hanno l'ISIN ma nessun mix.

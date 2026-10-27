@@ -56,6 +56,14 @@ import { queryKeys } from '@/lib/query/queryKeys';
 import { formatCurrency, formatNumberIt, formatPercentageIt } from '@/lib/utils/formatters';
 import { resolveAllocationRole } from '@/lib/utils/allocationUtils';
 import { compositionFromFundAllocation } from '@/lib/utils/fundComposition';
+import {
+  ASSET_CLASS_CHOICES,
+  ASSET_CLASS_OPTIONS,
+  classSelectValue,
+  emptyMixedComposition,
+  isMixedClassChoice,
+  MIXED_CLASS_LABEL,
+} from '@/lib/utils/assetClassChoice';
 import { fetchFundAllocations } from '@/lib/utils/fundAllocationClient';
 import { suggestIsLiquid } from '@/lib/utils/assetLiquidity';
 import { hasMarketPrice } from '@/lib/utils/assetPricing';
@@ -93,7 +101,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Calculator, Plus, X, BarChart3, Landmark, Bitcoin, Wallet, Home, Package, TrendingUp, ChevronLeft, PiggyBank, Building2, Loader2 } from 'lucide-react';
+import { Calculator, Plus, X, BarChart3, Landmark, Bitcoin, Wallet, Home, Package, TrendingUp, ChevronLeft, PiggyBank, Building2, Loader2, PieChart } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { SearchableCombobox } from '@/components/ui/searchable-combobox';
@@ -318,6 +326,10 @@ async function scheduleCouponDividends(
 const TYPE_TO_CLASS: Record<AssetType, AssetClass> = {
   stock: 'equity',
   etf: 'equity',
+  // A mutual fund has no class of its own: the user picks the one its mandate follows (equity,
+  // bonds, or a multi-asset mix held in `composition`). 'equity' is only the fallback before the
+  // step-2 picker or the ISIN's published mix answers.
+  fund: 'equity',
   bond: 'bonds',
   crypto: 'crypto',
   cash: 'cash',
@@ -338,6 +350,7 @@ const TYPE_TO_CLASS: Record<AssetType, AssetClass> = {
 const TYPE_CARDS: { type: AssetType; label: string; title: string; Icon: React.ElementType; description: string }[] = [
   { type: 'stock', label: 'Azione', title: 'Nuova Azione', Icon: TrendingUp, description: 'Titoli azionari quotati in borsa' },
   { type: 'etf', label: 'ETF', title: 'Nuovo ETF', Icon: BarChart3, description: 'Fondi indicizzati diversificati' },
+  { type: 'fund', label: 'Fondo', title: 'Nuovo Fondo', Icon: PieChart, description: 'Fondi comuni e SICAV a gestione attiva' },
   { type: 'bond', label: 'Obbligazione', title: 'Nuova Obbligazione', Icon: Landmark, description: 'Titoli di debito con cedole' },
   { type: 'crypto', label: 'Criptovaluta', title: 'Nuova Criptovaluta', Icon: Bitcoin, description: 'Asset digitali decentralizzati' },
   { type: 'cash', label: 'Liquidità', title: 'Nuova Liquidità', Icon: Wallet, description: 'Conti correnti e conti deposito' },
@@ -385,10 +398,10 @@ const assetSchema = z.object({
   // Mirrors the AssetType union in types/assets.ts — keep the two in lock-step (tsc catches drift
   // where the form value is passed back as an AssetType). 'pensionFund' is accepted here from P0 on;
   // its type card and its dedicated fields land with the pension UI phase.
-  type: z.enum(['stock', 'etf', 'bond', 'crypto', 'commodity', 'cash', 'realestate', 'pensionFund', 'crowdfunding']),
+  type: z.enum(['stock', 'etf', 'fund', 'bond', 'crypto', 'commodity', 'cash', 'realestate', 'pensionFund', 'crowdfunding']),
   // Mirrors the AssetClass union in types/assets.ts (tsc catches drift the same way as `type` above).
   // 'trendFollowing'/'carry' are accepted here from L0 on but have no picker entry yet in the
-  // `assetClasses` composition-leg Select below — that lands with the leverage UI (phase L2).
+  // `ASSET_CLASS_CHOICES` composition-leg Select below — that lands with the leverage UI (phase L2).
   assetClass: z.enum(['equity', 'bonds', 'crypto', 'realestate', 'cash', 'commodity', 'trendFollowing', 'carry']),
   subCategory: z.string().optional(),
   currency: z.string().min(1, 'Serve la valuta'),
@@ -530,6 +543,7 @@ const FIELD_LABELS: Partial<Record<keyof AssetFormValues, string>> = {
 const assetTypes: { value: AssetType; label: string }[] = [
   { value: 'stock', label: 'Azione' },
   { value: 'etf', label: 'ETF' },
+  { value: 'fund', label: 'Fondo' },
   { value: 'bond', label: 'Obbligazione' },
   { value: 'crypto', label: 'Criptovaluta' },
   { value: 'commodity', label: 'Materia Prima' },
@@ -571,16 +585,9 @@ function isoDateToday(): string {
   return new Date().toISOString().split('T')[0];
 }
 
-const assetClasses: { value: AssetClass; label: string }[] = [
-  { value: 'equity', label: 'Azioni' },
-  { value: 'bonds', label: 'Obbligazioni' },
-  { value: 'crypto', label: 'Criptovalute' },
-  { value: 'realestate', label: 'Immobili' },
-  { value: 'cash', label: 'Liquidità' },
-  { value: 'commodity', label: 'Materie Prime' },
-  { value: 'trendFollowing', label: 'Trend Following' },
-  { value: 'carry', label: 'Carry' },
-];
+/* The class lists live in `lib/utils/assetClassChoice.ts`: the eight classes for a composition
+ * leg, the same eight plus «Asset composto» for the asset's own class (a composite has no single
+ * class of its own — the mix is the composition). */
 
 /*
  * The fields typed key by key, watched WHERE they are read (since 2026-10-07). With their
@@ -871,12 +878,14 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
   // Field visibility based on asset type — applies to both create and edit modes.
   const newAsset_showTicker =
     selectedType !== 'cash' && selectedType !== 'realestate' && selectedType !== 'pensionFund' && selectedType !== 'crowdfunding';
-  const newAsset_showISIN = selectedType === 'stock' || selectedType === 'etf' || selectedType === 'bond';
-  // An ETF's class does not decide whether it HAS an ISIN: a bond-class ETF needs one for the
-  // published composition just as an equity one needs it for dividends. Stocks and bonds keep
-  // their class gates (the identifier drives their own features).
+  const newAsset_showISIN =
+    selectedType === 'stock' || selectedType === 'etf' || selectedType === 'fund' || selectedType === 'bond';
+  // An ETF's or a fund's class does not decide whether it HAS an ISIN: a bond-class one needs it
+  // for the published composition just as an equity one needs it for dividends. Stocks and bonds
+  // keep their class gates (the identifier drives their own features).
   const isinFieldEnabled =
     selectedType === 'etf' ||
+    selectedType === 'fund' ||
     (selectedType === 'stock' && selectedAssetClass === 'equity') ||
     (selectedType === 'bond' && selectedAssetClass === 'bonds');
   const newAsset_showGeographicArea =
@@ -904,10 +913,14 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
   // `crypto` both double as either a direct spot holding (no TER) or an ETC wrapper around that
   // same underlying (e.g. WisdomTree Agriculture AIGA.MI, WisdomTree Physical Bitcoin) — the toggle
   // stays opt-in and off by default, so exposing it costs nothing for the spot case.
-  const newAsset_showTER = selectedType === 'etf' || selectedType === 'commodity' || selectedType === 'crypto';
+  const newAsset_showTER =
+    selectedType === 'etf' || selectedType === 'fund' || selectedType === 'commodity' || selectedType === 'crypto';
   // Leva: only ETFs can be leveraged/composite instruments.
   const newAsset_showLeverage = selectedType === 'etf';
-  const newAsset_showComposition = selectedType === 'etf' || selectedType === 'pensionFund';
+  const newAsset_showComposition = selectedType === 'etf' || selectedType === 'fund' || selectedType === 'pensionFund';
+  // «Asset composto» belongs to the types that can carry a composition, and to those only: a stock
+  // or a bond has one class, and offering it there would be a control that cannot keep its promise.
+  const classOptions = newAsset_showComposition ? ASSET_CLASS_OPTIONS : ASSET_CLASS_CHOICES;
 
   // Determine price source based on asset type
   const priceSource = selectedType === 'bond' && selectedAssetClass === 'bonds'
@@ -1199,8 +1212,9 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
    * asked twice in one open.
    */
   useEffect(() => {
-    // ETFs only: a pension fund has no ISIN field, and a hidden stale one must never be read.
-    if (!open || selectedType !== 'etf') return;
+    // ETFs and mutual funds only: a pension fund has no ISIN field, and a hidden stale one must
+    // never be read.
+    if (!open || (selectedType !== 'etf' && selectedType !== 'fund')) return;
     const isin = normalizedIsin;
     if (!ISIN_PATTERN.test(isin)) return;
     if (compositionTouched) return;
@@ -1265,6 +1279,30 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
     setValue('type', type);
     setValue('assetClass', TYPE_TO_CLASS[type]);
     setStep(2);
+  };
+
+  /**
+   * The asset's own class select, «Asset composto» included. Picking a real class turns the
+   * composition OFF — the switch's own settle clears the rows, and that is the statement that the
+   * asset is single-class. Picking «Asset composto» turns it on and seeds the two sleeves, so the
+   * mix is declared where it belongs; the stored `assetClass` stays the fallback (the class a
+   * reader uses when a composition is absent), because a composite has no single class of its own.
+   */
+  const handleAssetClassChoice = (value: string) => {
+    if (isMixedClassChoice(value)) {
+      setValue('isComposite', true, { shouldDirty: true });
+      if (composition.length === 0) {
+        setComposition(emptyMixedComposition());
+        // The composite entry is a statement about the SHAPE, not about the mix: a typed ISIN may
+        // still fill the rows from the fund's published mix (the read is skipped only for typed
+        // legs).
+        setCompositionTouched(false);
+        setCompositionSourceIsin(null);
+      }
+      return;
+    }
+    setValue('isComposite', false, { shouldDirty: true });
+    setValue('assetClass', value as AssetClass, { shouldDirty: true });
   };
 
   // Get available sub-categories for the selected asset class
@@ -1751,32 +1789,43 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
             </button>
           )}
 
-          {/* Classe Asset — ETF only, create mode.
+          {/* Classe Asset — ETF and fund, create mode.
               Every other type is silently derived from TYPE_TO_CLASS: an equity ETF, a bond ETF and
               a money-market ETF (e.g. XEON) are all `type: 'etf'`, and only the class tells them
               apart — that ambiguity doesn't exist for stock/bond/crypto/etc, so they don't get a
-              picker. Defaults to 'equity' (set by `handleTypeSelect` in step 1), editable here
-              before the suggestion effects below fire (allocationRole off `selectedAssetClass`,
-              isLiquid off type/subCategory). Trend Following/Carry have no dedicated color/target yet in
-              Impostazioni (doc/guide/allocazione.md § Allocation — the two plans and the leverage engine) — offered anyway since they exist for leveraged ETFs. */}
-          {!isEdit && selectedType === 'etf' && (
+              picker. A mutual fund has the same ambiguity (an equity, a bond and a multi-asset
+              fund are all `type: 'fund'`), so it gets the same picker. Defaults to 'equity' (set
+              by `handleTypeSelect` in step 1), editable here before the suggestion effects below
+              fire (allocationRole off `selectedAssetClass`, isLiquid off type/subCategory). Trend
+              Following/Carry have no dedicated color/target yet in Impostazioni
+              (doc/guide/allocazione.md § Allocation — the two plans and the leverage engine) —
+              offered anyway since they exist for leveraged ETFs. «Asset composto» is not a class:
+              it turns on the switch of the same name and hands the exposure to the composition
+              rows (`lib/utils/assetClassChoice.ts`). */}
+          {!isEdit && (selectedType === 'etf' || selectedType === 'fund') && (
             <div className="space-y-2">
-              <Label htmlFor="assetClassEtf">Classe *</Label>
+              <Label htmlFor="assetClassCreate">Classe *</Label>
               <Select
-                value={selectedAssetClass}
-                onValueChange={(value) => setValue('assetClass', value as AssetClass)}
+                value={classSelectValue(newAsset_showComposition && isComposite, selectedAssetClass ?? 'equity')}
+                onValueChange={handleAssetClassChoice}
               >
-                <SelectTrigger id="assetClassEtf">
+                <SelectTrigger id="assetClassCreate">
                   <SelectValue placeholder="Seleziona classe" />
                 </SelectTrigger>
                 <SelectContent>
-                  {assetClasses.map((assetClass) => (
+                  {classOptions.map((assetClass) => (
                     <SelectItem key={assetClass.value} value={assetClass.value}>
                       {assetClass.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {newAsset_showComposition && isComposite && (
+                <p className="text-xs text-muted-foreground">
+                  {MIXED_CLASS_LABEL}: l&apos;esposizione è nelle percentuali qui sotto, e devono
+                  sommare a 100%.
+                </p>
+              )}
               {errors.assetClass && (
                 <p className="text-sm text-destructive">{errors.assetClass.message}</p>
               )}
@@ -1959,9 +2008,10 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
                   const newType = value as AssetType;
                   setValue('type', newType);
                   // Re-derive the class from the new type, mirroring create's `handleTypeSelect` —
-                  // except for `etf`, whose class stays whatever the user set in the Select below
-                  // (decision 6: only ETF exposes a class choice; every other type is type-derived).
-                  if (newType !== 'etf') {
+                  // except for `etf` and `fund`, whose class stays whatever the user set in the
+                  // Select below (only a collective instrument exposes a class choice; every other
+                  // type is type-derived).
+                  if (newType !== 'etf' && newType !== 'fund') {
                     setValue('assetClass', TYPE_TO_CLASS[newType]);
                   }
                 }}
@@ -1985,22 +2035,26 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
             <div className="space-y-2">
               <Label htmlFor="assetClass">Classe *</Label>
               <Select
-                value={selectedAssetClass}
-                onValueChange={(value) =>
-                  setValue('assetClass', value as AssetClass)
-                }
+                value={classSelectValue(newAsset_showComposition && isComposite, selectedAssetClass ?? 'equity')}
+                onValueChange={handleAssetClassChoice}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleziona classe" />
                 </SelectTrigger>
                 <SelectContent>
-                  {assetClasses.map((assetClass) => (
+                  {classOptions.map((assetClass) => (
                     <SelectItem key={assetClass.value} value={assetClass.value}>
                       {assetClass.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {newAsset_showComposition && isComposite && (
+                <p className="text-xs text-muted-foreground">
+                  {MIXED_CLASS_LABEL}: l&apos;esposizione è nelle percentuali qui sotto, e devono
+                  sommare a 100%.
+                </p>
+              )}
               {errors.assetClass && (
                 <p className="text-sm text-destructive">
                   {errors.assetClass.message}
@@ -2419,14 +2473,14 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
           </div>
           )}
 
-          {/* Composizione — ETF e fondo pensione (il fondo pensione non ha ISIN: si digita) */}
+          {/* Composizione — ETF, fondi e fondo pensione (il fondo pensione non ha ISIN: si digita) */}
           {newAsset_showComposition && (
           <div className="space-y-2 rounded-lg border p-4">
             <div className="flex items-center justify-between gap-2">
               <div className="space-y-0.5">
                 <Label htmlFor="isComposite">Asset composto</Label>
                 <p className="text-xs text-muted-foreground">
-                  Es. fondo pensione con mix di azioni e obbligazioni
+                  Es. un fondo bilanciato o un fondo pensione con mix di azioni e obbligazioni
                 </p>
               </div>
               <Switch
@@ -2499,7 +2553,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
                             <SelectValue placeholder="Classe Asset" />
                           </SelectTrigger>
                           <SelectContent>
-                            {assetClasses.map((ac) => (
+                            {ASSET_CLASS_CHOICES.map((ac) => (
                               <SelectItem key={ac.value} value={ac.value}>
                                 {ac.label}
                               </SelectItem>

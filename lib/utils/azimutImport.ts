@@ -16,7 +16,7 @@ import type { InstrumentFundAllocation } from '@/types/exposure';
 import { isLedgerAssetType } from '@/types/assetTransactions';
 import { resolveYahooSymbolForIsin } from '@/lib/utils/yahooSymbolForIsin';
 import { readFundComposition, resolveAllocationClass } from '@/lib/utils/fundComposition';
-import { applyClassChoices, needsClassChoice } from '@/lib/utils/importClassChoice';
+import { inferFundClassFromName } from '@/lib/utils/fundNameClass';
 import { normalizeFundName, type FundIdentity } from '@/lib/utils/fundIdentity';
 import type { FundIdentityResult } from '@/types/fundIdentity';
 
@@ -215,29 +215,6 @@ function resolvedIdentity(
   if (!needsFundIdentity(position)) return undefined;
   const answer = identities[normalizeFundName(position.name)];
   return answer?.status === 'matched' ? answer.identity : undefined;
-}
-
-function inferFundClass(name: string): { assetClass: AssetClass; uncertain: boolean } {
-  const n = normalized(name);
-  if (/\b(BITC|BITCOIN|CRYPTO)\b/.test(n)) {
-    return { assetClass: 'crypto', uncertain: false };
-  }
-  if (/\b(GOLD|SILVER|COPPER|WHEAT|COMMODIT|ORO)\b/.test(n)) {
-    return { assetClass: 'commodity', uncertain: false };
-  }
-  if (/\b(EONIA|CASH|MONETAR|LIQUID|SHORT TERM)\b/.test(n)) {
-    return { assetClass: 'bonds', uncertain: false };
-  }
-  if (/\b(BOND|OBBLIG|TESORERIA|CREDIT|DEBT)\b/.test(n)) {
-    return { assetClass: 'bonds', uncertain: false };
-  }
-  if (/\b(EQUITY|AZION|WORLD|EUROPEAN|US|EMERGING|DAX|STAR MARK)\b/.test(n)) {
-    return { assetClass: 'equity', uncertain: false };
-  }
-  if (/\b(REAL ESTATE|IMMOBIL)\b/.test(n)) {
-    return { assetClass: 'realestate', uncertain: false };
-  }
-  return { assetClass: 'equity', uncertain: true };
 }
 
 function sectionLabel(section: AzimutSection): string {
@@ -489,7 +466,7 @@ export function mapAzimutPositionType(position: AzimutPositionInput): MappedAzim
     }
     return { type: 'etf', assetClass: 'equity', typeUncertain: false };
   }
-  const { assetClass, uncertain } = inferFundClass(position.name);
+  const { assetClass, uncertain } = inferFundClassFromName(position.name);
   return { type: 'etf', assetClass, typeUncertain: uncertain };
 }
 
@@ -554,13 +531,11 @@ export interface AzimutHoldingDiff {
   existingDisplayTicker?: string | null;
   quantityDrift: number;
   /**
-   * The row waits for a class FROM THE USER: the market did not decide it (no published mix, no
-   * identity) and no tracked asset carries one. A row that UPDATES a tracked asset never waits —
-   * the class is already stored there, and the import never overwrites it.
+   * A NEW row whose class is the name's default (`inferFundClassFromName`): no keyword, no published
+   * mix, no identity. It is imported as such and the preview says so — the correction lives on
+   * Patrimonio. A row that updates a tracked asset is never guessed: its class is stored there.
    */
-  needsClassChoice: boolean;
-  /** The key the class choice is filed under: the row's own id in the plan. */
-  classChoiceKey: string;
+  classGuessed: boolean;
   /** The class stored on the tracked asset this row updates — `undefined` for a new position. */
   storedAssetClass?: AssetClass;
   exchangeUpdate: boolean;
@@ -659,10 +634,8 @@ export function buildAzimutImportPlan(
     // asset, whatever the market publishes today.
     const hasExistingComposition = (existing?.composition?.length ?? 0) > 0;
     // The market's answer: the published mix measured the class, the mix produced a composition,
-    // or the tracked asset carries one. Everything else is the name's guess — and a guess is not
-    // a class: the row waits for the user (below).
+    // or the tracked asset carries one. Everything else is the name's guess, written as is.
     const marketDecided = classMeasured || hasExistingComposition;
-    const unresolvedClass = typeUncertain && !marketDecided;
 
     if (!existing) {
       return {
@@ -670,8 +643,7 @@ export function buildAzimutImportPlan(
         position,
         formData,
         quantityDrift: 0,
-        needsClassChoice: needsClassChoice({ uncertain: unresolvedClass }),
-        classChoiceKey: position.id,
+        classGuessed: typeUncertain && !marketDecided,
         exchangeUpdate: true,
         compositionUpdate: false,
         isinUpdate: false,
@@ -714,13 +686,8 @@ export function buildAzimutImportPlan(
       existingDisplayTicker: existing.displayTicker,
       quantityDrift: hasDrift ? drift : 0,
       // The class of a tracked asset is ALREADY decided: it is the one stored there, and the
-      // import never overwrites it. So the second upload of the same file asks nothing — the row
-      // is not a question, it is an update.
-      needsClassChoice: needsClassChoice({
-        uncertain: unresolvedClass,
-        storedClass: existing.assetClass,
-      }),
-      classChoiceKey: position.id,
+      // import never overwrites it.
+      classGuessed: false,
       storedAssetClass: existing.assetClass,
       exchangeUpdate,
       compositionUpdate,
@@ -761,16 +728,4 @@ export function buildAzimutImportPlan(
       skippedCount: workbook.skipped,
     },
   };
-}
-
-/**
- * The plan as it is SAVED: the classes the user picked in the preview, on the rows that were
- * waiting for one. A row that was not waiting keeps the class the plan measured — the choices are
- * filed by the row's own id, so one can only land on the row it was made for.
- */
-export function applyAzimutClassChoices(
-  plan: AzimutImportPlan,
-  choices: Record<string, AssetClass>
-): AzimutImportPlan {
-  return { ...plan, holdings: applyClassChoices(plan.holdings, choices) };
 }

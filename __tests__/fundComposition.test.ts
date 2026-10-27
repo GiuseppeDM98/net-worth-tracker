@@ -181,6 +181,7 @@ describe('readFundComposition — the ONE rule every bridge stores', () => {
 describe('usesPublishedFundMix', () => {
   it('reads a mix only for a collective wrapper or an ETC/ETN', () => {
     expect(usesPublishedFundMix('etf')).toBe(true);
+    expect(usesPublishedFundMix('fund')).toBe(true);
     expect(usesPublishedFundMix('commodity')).toBe(true);
     expect(usesPublishedFundMix('stock')).toBe(false);
     expect(usesPublishedFundMix('bond')).toBe(false);

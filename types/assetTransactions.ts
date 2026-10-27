@@ -14,7 +14,7 @@ export const ASSET_TRANSACTIONS_META_COLLECTION = 'assetTransactionsMeta';
  * `pensionContributions`) are deliberately excluded: their "quantity" is not the result of trading
  * operations.
  */
-const LEDGER_ASSET_TYPES = ['stock', 'etf', 'bond', 'crypto', 'commodity'] as const satisfies readonly AssetType[];
+const LEDGER_ASSET_TYPES = ['stock', 'etf', 'fund', 'bond', 'crypto', 'commodity'] as const satisfies readonly AssetType[];
 
 /** True when `type` is managed through the trade ledger (its quantity/PMC are replay-derived). */
 export function isLedgerAssetType(type: AssetType): boolean {

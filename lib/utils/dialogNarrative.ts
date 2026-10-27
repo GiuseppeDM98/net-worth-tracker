@@ -511,7 +511,7 @@ function describeLinkSeriesToDebtReading(facts: LinkSeriesFacts, noun: { one: st
   return [{ text: 'Le ' }, { text: String(facts.futureCount), mono: true }, { text: ` ${noun.many} future, dal ` }, day, { text: ', ridurranno il debito ' }, ...property, { text: ' della loro quota capitale, ciascuna alla sua data' }, ...past];
 }
 
-/** What the asset type decides — the three consequences the eight cards cannot show. */
+/** What the asset type decides — the three consequences the type cards cannot show. */
 /** Where the detail's armed «Elimina» is: never pressed, pressed once, or pressed and let go. */
 export type MovementDeletePhase = 'idle' | 'armed' | 'disarmed';
 

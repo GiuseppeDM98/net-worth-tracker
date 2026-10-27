@@ -45,7 +45,7 @@ export const NO_DIVIDEND_ACCOUNT = '__none__';
 
 /** The instrument types that pay a dividend or a coupon — the only ones asked for an account. */
 export function paysDividends(type: AssetType): boolean {
-  return type === 'stock' || type === 'etf' || type === 'bond';
+  return type === 'stock' || type === 'etf' || type === 'fund' || type === 'bond';
 }
 
 /**

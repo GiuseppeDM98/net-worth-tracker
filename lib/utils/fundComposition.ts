@@ -171,5 +171,5 @@ export function readFundComposition(
  * read, and asking Yahoo for one would only spend a cache document.
  */
 export function usesPublishedFundMix(type: AssetType): boolean {
-  return type === 'etf' || type === 'commodity';
+  return type === 'etf' || type === 'fund' || type === 'commodity';
 }
