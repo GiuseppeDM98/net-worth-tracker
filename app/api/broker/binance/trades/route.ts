@@ -25,6 +25,7 @@ import {
   getApiAuthErrorResponse,
   requireFirebaseAuth,
 } from '@/lib/server/apiAuth';
+import { canUseBinance } from '@/lib/utils/binanceAccess';
 import { parseOr400 } from '@/lib/server/validation';
 import {
   BinanceConfigError,
@@ -119,6 +120,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     decoded = await requireFirebaseAuth(request);
   } catch (error) {
     return getApiAuthErrorResponse(error) ?? NextResponse.json({ error: 'Non autenticato.' }, { status: 401 });
+  }
+
+  if (!canUseBinance(decoded.email)) {
+    return NextResponse.json({ error: 'Accesso negato.' }, { status: 403 });
   }
 
   const body: unknown = await request.json().catch(() => null);

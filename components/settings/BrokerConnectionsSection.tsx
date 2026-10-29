@@ -19,6 +19,8 @@ import { ScalableConnectionTile } from '@/components/settings/broker/ScalableCon
 import { TradeRepublicConnectionTile } from '@/components/settings/broker/TradeRepublicConnectionTile';
 import { IntesaSanpaoloConnectionTile } from '@/components/settings/broker/IntesaSanpaoloConnectionTile';
 import { AzimutConnectionTile } from '@/components/settings/broker/AzimutConnectionTile';
+import { useAuth } from '@/contexts/AuthContext';
+import { canUseBinance } from '@/lib/utils/binanceAccess';
 import { BinanceConnectionTile } from '@/components/settings/broker/BinanceConnectionTile';
 
 interface BrokerConnectionsSectionProps {
@@ -28,6 +30,7 @@ interface BrokerConnectionsSectionProps {
 }
 
 export function BrokerConnectionsSection({ ownerId, disabled = false }: BrokerConnectionsSectionProps) {
+  const { user } = useAuth();
   return (
     // `items-start` so each provider's column keeps its natural height: the Scalable column is
     // two tiles and the others are single shorter tiles, and a stretched grid item would leave a
@@ -37,7 +40,7 @@ export function BrokerConnectionsSection({ ownerId, disabled = false }: BrokerCo
       <TradeRepublicConnectionTile ownerId={ownerId} disabled={disabled} />
       <IntesaSanpaoloConnectionTile ownerId={ownerId} disabled={disabled} />
       <AzimutConnectionTile ownerId={ownerId} disabled={disabled} />
-      <BinanceConnectionTile ownerId={ownerId} disabled={disabled} />
+      {canUseBinance(user?.email) && <BinanceConnectionTile ownerId={ownerId} disabled={disabled} />}
     </div>
   );
 }
