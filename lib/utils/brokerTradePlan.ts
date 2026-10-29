@@ -21,9 +21,11 @@ import type { Asset } from '@/types/assets';
 import type { AssetTransaction, AssetTransactionSource } from '@/types/assetTransactions';
 import { isLedgerAssetType } from '@/types/assetTransactions';
 import type { BrokerTrade, SkippedBrokerTrade } from '@/lib/utils/brokerTrade';
+import { BINANCE_EXCHANGE, binanceManualTicker, binanceYahooSymbol } from '@/lib/utils/binanceImport';
 
 /** The asset facts the plan needs - the client's `Asset` is a superset. */
-export type PlanAsset = Pick<Asset, 'id' | 'isin' | 'name' | 'type'>;
+export type PlanAsset = Pick<Asset, 'id' | 'isin' | 'name' | 'type'> &
+  Partial<Pick<Asset, 'ticker' | 'exchange'>>;
 
 /** The ledger fields the dedupe reads - `source`/`sourceRef` are exactly what it needs. */
 export type PlanExistingTransaction = Pick<AssetTransaction, 'source' | 'sourceRef'>;
@@ -75,6 +77,15 @@ export function indexExistingBrokerTransactions(existing: readonly PlanExistingT
   return keys;
 }
 
+/** The Binance sync's own asset for a coin: the label AND the coin's identity (see `binanceImport.ts`). */
+export function findAssetByCoin<T extends PlanAsset>(assets: readonly T[], coin: string): T | undefined {
+  return assets.find(
+    (asset) =>
+      asset.exchange === BINANCE_EXCHANGE &&
+      (asset.ticker === binanceYahooSymbol(coin) || asset.ticker === binanceManualTicker(coin))
+  );
+}
+
 function findAssetByIsin(assets: readonly PlanAsset[], isin: string): PlanAsset | undefined {
   const wanted = isin.trim().toUpperCase();
   return assets.find((asset) => (asset.isin ?? '').trim().toUpperCase() === wanted);
@@ -116,12 +127,12 @@ export function buildBrokerTradePlan(input: {
       continue;
     }
 
-    if (!trade.isin) {
+    if (!trade.isin && !trade.coin) {
       skipped.push({ trade, reason: 'no-isin', message: 'Nessun ISIN nel dettaglio: operazione esclusa.' });
       continue;
     }
 
-    const asset = findAssetByIsin(input.assets, trade.isin);
+    const asset = trade.isin ? findAssetByIsin(input.assets, trade.isin) : findAssetByCoin(input.assets, trade.coin!);
     if (!asset) {
       skipped.push({ trade, reason: 'asset-not-found', message: 'Asset non presente nel Portafoglio: aggiungilo per importare questa operazione.' });
       continue;

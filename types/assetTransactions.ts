@@ -40,7 +40,7 @@ export type AssetTransactionType = 'buy' | 'sell' | 'adjustment';
  * both fields, so re-syncing repairs nothing and overwrites nothing. Edits are the user's, and a
  * broker read must never revert one.
  */
-export type AssetTransactionSource = 'scalable' | 'traderepublic';
+export type AssetTransactionSource = 'scalable' | 'traderepublic' | 'binance';
 
 /**
  * One trade in the asset ledger.

@@ -48,6 +48,7 @@ import { Tile } from '@/components/ui/tile';
 import { BrokerTradeImportDialog } from '@/components/settings/broker/BrokerTradeImportDialog';
 import { describeBrokerConnections } from '@/lib/utils/settingsNarrative';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
+import { errorMessage, failureWarning } from '@/lib/utils/errorMessage';
 import { formatCurrency, formatDate, formatNumberIt } from '@/lib/utils/formatters';
 import { queryKeys } from '@/lib/query/queryKeys';
 import { fetchFundAllocations } from '@/lib/utils/fundAllocationClient';
@@ -206,6 +207,127 @@ async function revokeTradeRepublicSession(ownerId: string): Promise<void> {
 
 // ─── The tile ────────────────────────────────────────────────────────────────
 
+/** What a Trade Republic save did, for the metadata and the toast. */
+interface TrSaveResult {
+  createdAssets: number;
+  repairedTickers: number;
+  filledCompositions: number;
+  cashBalance?: number;
+  cashAssetId?: string;
+}
+
+/**
+ * The save's writes, out of the component: the React Compiler skips a whole component holding a
+ * `?:`/`&&`/`??` inside a `try` (AGENTS.md § Motion), and this body is made of them.
+ */
+async function applyTrPlan(
+  ownerId: string,
+  plan: TrImportPlan,
+  assets: Asset[],
+  tickerOverrides: Record<string, string>,
+  cashTarget: string
+): Promise<TrSaveResult> {
+  let createdAssets = 0;
+  let repairedTickers = 0;
+  let filledCompositions = 0;
+  for (const diff of plan.holdings) {
+    // No price write: this broker publishes no quote, so there is nothing to compare or patch.
+    if (diff.kind === 'new') {
+      await createAsset(ownerId, applyTrTickerOverride(diff.formData, tickerOverrides[diff.holding.isin]));
+      createdAssets += 1;
+    } else if (diff.existingAssetId) {
+      // Self-healing. A tracked asset whose ticker is still the raw broker id a past sync
+      // wrote (the ISIN, or a crypto pseudo-ISIN) is UNQUOTABLE, so it would sit at 0 with
+      // a permanent -100% G/P. When this sync resolved a real Yahoo symbol — the route's
+      // `yahooTicker` (broker quote, table) first, the pure resolver otherwise —
+      // write it together with the quote just read, so the position prices at once instead
+      // of at the next refresh. A hand-fixed ticker (anything that is no longer the ISIN)
+      // is NEVER touched: the user knows better than the sync. This is what makes a
+      // re-sync enough — no delete, no retyping.
+      const resolved = diff.holding.yahooTicker ?? resolveTrYahooTicker(diff.holding);
+      const trackedTicker = assets.find((asset) => asset.id === diff.existingAssetId)?.ticker;
+      const shouldRepairTicker = Boolean(
+        resolved &&
+          diff.holding.price !== undefined &&
+          trackedTicker === diff.holding.isin &&
+          trackedTicker !== resolved
+      );
+      if (!shouldRepairTicker && !diff.compositionUpdate) continue;
+      // The published composition rides on the same write as a ticker repair: both are
+      // metadata. taxRate and displayTicker are carried along because
+      // `updateAssetMetadata` treats an absent one as a request to DELETE it (the import
+      // must not wipe a cost-basis rate or an alias).
+      await updateAssetMetadata(diff.existingAssetId, {
+        ...(shouldRepairTicker && resolved
+          ? { ticker: resolved, currentPrice: diff.holding.price }
+          : {}),
+        ...(diff.compositionUpdate ? { composition: diff.formData.composition } : {}),
+        taxRate: diff.existingTaxRate,
+        displayTicker: diff.existingDisplayTicker ?? undefined,
+      });
+      if (shouldRepairTicker) repairedTickers += 1;
+      if (diff.compositionUpdate) filledCompositions += 1;
+    }
+  }
+  let cashAssetId: string | undefined;
+  let cashBalance: number | undefined;
+  if (plan.cash) {
+    cashBalance = Math.round(plan.cash.balance * 100) / 100;
+    if (cashTarget === NEW_CASH_VALUE) {
+      cashAssetId = await createAsset(ownerId, {
+        ticker: TR_CASH_TICKER,
+        displayTicker: TR_CASH_ACCOUNT_NAME,
+        name: TR_CASH_ACCOUNT_NAME,
+        type: 'cash',
+        assetClass: 'cash',
+        currency: plan.cash.currency,
+        quantity: cashBalance,
+        currentPrice: 1,
+        isLiquid: true,
+        autoUpdatePrice: false,
+        exchange: 'Trade Republic',
+      });
+    } else {
+      await updateAsset(cashTarget, { quantity: cashBalance });
+      cashAssetId = cashTarget;
+    }
+  }
+  return { createdAssets, repairedTickers, filledCompositions, cashBalance, cashAssetId };
+}
+
+function trConnectionRecord(plan: TrImportPlan, result: TrSaveResult) {
+  return {
+    holdingsCount: plan.stats.holdingCount,
+    savingsPlanCount: plan.stats.savingsPlanCount,
+    ...(result.cashBalance !== undefined ? { cashBalance: result.cashBalance } : {}),
+    ...(result.cashAssetId ? { cashAssetId: result.cashAssetId } : {}),
+    createdAssets: result.createdAssets,
+    // No price was read, so nothing was updated: recorded as absent rather than as a zero,
+    // which would read as «prices checked, none moved».
+  };
+}
+
+function trSavedMessage(result: TrSaveResult): string {
+  const repaired = result.repairedTickers > 0 ? `, ${result.repairedTickers} ticker riparati` : '';
+  const filled = result.filledCompositions > 0 ? `, ${result.filledCompositions} composizioni ricavate` : '';
+  return `Sincronizzazione salvata: ${result.createdAssets} nuovi asset${repaired}${filled}.`;
+}
+
+/** The list a response carries, or an empty one: a `??` would sit inside the handler's `try`. */
+function listOf<T>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
+}
+
+const QR_DEAD_STATUSES: readonly string[] = ['failed', 'expired'];
+
+function isQrDead(status: string): boolean {
+  return QR_DEAD_STATUSES.includes(status);
+}
+
+function qrFailureText(view: { error?: string }): string {
+  return view.error ?? 'Collegamento non riuscito: riprova.';
+}
+
 export function TradeRepublicConnectionTile({ ownerId, disabled = false }: TradeRepublicConnectionTileProps) {
   const queryClient = useQueryClient();
   const [connection, setConnection] = useState<BrokerConnection | null>(null);
@@ -253,9 +375,8 @@ export function TradeRepublicConnectionTile({ ownerId, disabled = false }: Trade
     } catch (err) {
       console.error('[TradeRepublicConnectionTile] load failed:', err);
       toast.error('Impossibile caricare i collegamenti broker');
-    } finally {
-      setLoading(false);
     }
+    setLoading(false);
   }, [ownerId]);
 
   useEffect(() => {
@@ -305,16 +426,13 @@ export function TradeRepublicConnectionTile({ ownerId, disabled = false }: Trade
           (r) => ({ plans: r['savingsPlans'] as TrSavingsPlanInput[], warning: null as string | null }),
           (err: unknown) => ({
             plans: [] as TrSavingsPlanInput[],
-            warning:
-              err instanceof Error
-                ? `Piani di accumulo non letti: ${err.message}`
-                : 'Piani di accumulo non letti.',
+            warning: failureWarning(err, 'Piani di accumulo non letti'),
           })
         ),
       ]);
       await buildPlan(
-        (positionsRes['positions'] as TrHoldingInput[]) ?? [],
-        (cashRes['balances'] as TrCashInput[]) ?? [],
+        listOf<TrHoldingInput>(positionsRes['positions']),
+        listOf<TrCashInput>(cashRes['balances']),
         plansRes.plans,
         plansRes.warning
       );
@@ -323,10 +441,9 @@ export function TradeRepublicConnectionTile({ ownerId, disabled = false }: Trade
       // documents at the same line).
       toast.success('Anteprima pronta: controlla le righe e salva.');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Lettura non riuscita: riprova.');
-    } finally {
-      setSyncing(false);
+      setError(errorMessage(err, 'Lettura non riuscita: riprova.'));
     }
+    setSyncing(false);
   };
 
   const handleStartLogin = async () => {
@@ -336,10 +453,9 @@ export function TradeRepublicConnectionTile({ ownerId, disabled = false }: Trade
     try {
       setQr(await startTradeRepublicLogin(ownerId));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Collegamento non riuscito: riprova.');
-    } finally {
-      setLinking(false);
+      setError(errorMessage(err, 'Collegamento non riuscito: riprova.'));
     }
+    setLinking(false);
   };
 
   /**
@@ -368,12 +484,12 @@ export function TradeRepublicConnectionTile({ ownerId, disabled = false }: Trade
             toast.success('Collegamento completato: ora puoi sincronizzare.');
             await loadAll();
             setConnected(true);
-          } else if (next.status === 'failed' || next.status === 'expired') {
+          } else if (isQrDead(next.status)) {
             setQr(null);
-            setError(next.error ?? 'Collegamento non riuscito: riprova.');
+            setError(qrFailureText(next));
           }
         } catch (err) {
-          setError(err instanceof Error ? err.message : 'Stato del collegamento non disponibile.');
+          setError(errorMessage(err, 'Stato del collegamento non disponibile.'));
         }
       })();
     }, 2500);
@@ -390,103 +506,23 @@ export function TradeRepublicConnectionTile({ ownerId, disabled = false }: Trade
       await loadAll();
       toast.success('Sessione revocata: questo server non legge più il conto.');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Revoca non riuscita: riprova.');
-    } finally {
-      setRevoking(false);
+      setError(errorMessage(err, 'Revoca non riuscita: riprova.'));
     }
+    setRevoking(false);
   };
 
   const handleSave = async () => {
     if (!plan || disabled) return;
     setSaving(true);
     try {
-      let createdAssets = 0;
-      let repairedTickers = 0;
-      let filledCompositions = 0;
-      for (const diff of plan.holdings) {
-        // No price write: this broker publishes no quote, so there is nothing to compare or patch.
-        if (diff.kind === 'new') {
-          await createAsset(ownerId, applyTrTickerOverride(diff.formData, tickerOverrides[diff.holding.isin]));
-          createdAssets += 1;
-        } else if (diff.existingAssetId) {
-          // Self-healing. A tracked asset whose ticker is still the raw broker id a past sync
-          // wrote (the ISIN, or a crypto pseudo-ISIN) is UNQUOTABLE, so it would sit at 0 with
-          // a permanent -100% G/P. When this sync resolved a real Yahoo symbol — the route's
-          // `yahooTicker` (broker quote, table) first, the pure resolver otherwise —
-          // write it together with the quote just read, so the position prices at once instead
-          // of at the next refresh. A hand-fixed ticker (anything that is no longer the ISIN)
-          // is NEVER touched: the user knows better than the sync. This is what makes a
-          // re-sync enough — no delete, no retyping.
-          const resolved = diff.holding.yahooTicker ?? resolveTrYahooTicker(diff.holding);
-          const trackedTicker = assets.find((asset) => asset.id === diff.existingAssetId)?.ticker;
-          const shouldRepairTicker = Boolean(
-            resolved &&
-              diff.holding.price !== undefined &&
-              trackedTicker === diff.holding.isin &&
-              trackedTicker !== resolved
-          );
-          if (!shouldRepairTicker && !diff.compositionUpdate) continue;
-          // The published composition rides on the same write as a ticker repair: both are
-          // metadata. taxRate and displayTicker are carried along because
-          // `updateAssetMetadata` treats an absent one as a request to DELETE it (the import
-          // must not wipe a cost-basis rate or an alias).
-          await updateAssetMetadata(diff.existingAssetId, {
-            ...(shouldRepairTicker && resolved
-              ? { ticker: resolved, currentPrice: diff.holding.price }
-              : {}),
-            ...(diff.compositionUpdate ? { composition: diff.formData.composition } : {}),
-            taxRate: diff.existingTaxRate,
-            displayTicker: diff.existingDisplayTicker ?? undefined,
-          });
-          if (shouldRepairTicker) repairedTickers += 1;
-          if (diff.compositionUpdate) filledCompositions += 1;
-        }
-      }
-      let cashAssetId: string | undefined;
-      let cashBalance: number | undefined;
-      if (plan.cash) {
-        cashBalance = Math.round(plan.cash.balance * 100) / 100;
-        if (cashTarget === NEW_CASH_VALUE) {
-          cashAssetId = await createAsset(ownerId, {
-            ticker: TR_CASH_TICKER,
-            displayTicker: TR_CASH_ACCOUNT_NAME,
-            name: TR_CASH_ACCOUNT_NAME,
-            type: 'cash',
-            assetClass: 'cash',
-            currency: plan.cash.currency,
-            quantity: cashBalance,
-            currentPrice: 1,
-            isLiquid: true,
-            autoUpdatePrice: false,
-            exchange: 'Trade Republic',
-          });
-        } else {
-          await updateAsset(cashTarget, { quantity: cashBalance });
-          cashAssetId = cashTarget;
-        }
-      }
-      await saveBrokerConnection(
-        ownerId,
-        {
-          holdingsCount: plan.stats.holdingCount,
-          savingsPlanCount: plan.stats.savingsPlanCount,
-          ...(cashBalance !== undefined ? { cashBalance } : {}),
-          ...(cashAssetId ? { cashAssetId } : {}),
-          createdAssets,
-          // No price was read, so nothing was updated: recorded as absent rather than as a zero,
-          // which would read as «prices checked, none moved».
-        },
-        BROKER
-      );
+      const saved = await applyTrPlan(ownerId, plan, assets, tickerOverrides, cashTarget);
+      await saveBrokerConnection(ownerId, trConnectionRecord(plan, saved), BROKER);
+
       queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.overview(ownerId) });
       setPlan(null);
       await loadAll();
-      toast.success(
-        `Sincronizzazione salvata: ${createdAssets} nuovi asset${repairedTickers > 0 ? `, ${repairedTickers} ticker riparati` : ''}${
-          filledCompositions > 0 ? `, ${filledCompositions} composizioni ricavate` : ''
-        }.`
-      );
+      toast.success(trSavedMessage(saved));
     } catch (err) {
       console.error('[TradeRepublicConnectionTile] save failed:', err);
       // A partial save may already have created the cash account, so the in-memory `assets` are
@@ -494,9 +530,8 @@ export function TradeRepublicConnectionTile({ ownerId, disabled = false }: Trade
       await loadAll();
       setPlan(null);
       toast.error('Salvataggio non riuscito: riprova con Sincronizza.');
-    } finally {
-      setSaving(false);
     }
+    setSaving(false);
   };
 
   const cashAssets = assets.filter((a) => a.type === 'cash' && a.assetClass === 'cash');

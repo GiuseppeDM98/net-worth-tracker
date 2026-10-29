@@ -28,6 +28,7 @@ import type { AssetTransactionSource } from '@/types/assetTransactions';
 const ROUTE: Record<AssetTransactionSource, string> = {
   scalable: '/api/broker/scalable/trades',
   traderepublic: '/api/broker/traderepublic/trades',
+  binance: '/api/broker/binance/trades',
 };
 
 function readError(data: unknown, fallback: string): string {

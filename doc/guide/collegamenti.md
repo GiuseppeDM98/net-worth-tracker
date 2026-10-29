@@ -5,6 +5,9 @@
 > `components/settings/broker/TradeRepublicConnectionTile.tsx`,
 > `components/settings/broker/IntesaSanpaoloConnectionTile.tsx`,
 > `components/settings/broker/AzimutConnectionTile.tsx`,
+> `components/settings/broker/BinanceConnectionTile.tsx`,
+> `lib/utils/binanceImport.ts` (parser, prezzo EUR e piano), `lib/server/binanceClient.ts` (richieste
+> firmate, whitelist di sola lettura), `app/api/broker/binance/read`,
 > `lib/utils/scalableImport.ts` o `lib/utils/tradeRepublicImport.ts` (i mapping puri),
 > `lib/utils/intesaSanpaoloImport.ts` (parser e piano del file XLSX) o
 > `lib/utils/intesaSanpaoloWorkbook.ts` (lettura del file, libreria importata in modo lazily),
@@ -28,7 +31,7 @@
 > `brokerConnections/{ownerId}/brokers/{broker}`) o `firestore.rules` (la match `brokerSessions`).
 > File: `CLAUDE.md` → *Key Features* → *Collegamenti broker*.
 
-## I quattro ponti, e cosa li distingue
+## I cinque ponti, e cosa li distingue
 
 - **Ogni broker è un componente e un modulo puri propri.** `BrokerConnectionsSection` possiede la
    pagina e nient'altro: tre tile in una griglia `items-start`. Il resto — come si ottiene la
@@ -329,6 +332,72 @@
 - **Liquidità**: la sezione `AZIMUT - LIQUIDITA` rileva il saldo del conto corrente e crea/aggiorna il conto di cassa `Azimut — Liquidità` con ticker fisso `AZIMUT-EUR`.
 - **Anteprima e persistenza**: le posizioni nuove nascono con `exchange: 'Azimut'` e `autoUpdatePrice: false`; un fondo senza codice nasce con l'ISIN trovato (è la sua `ticker`), quindi riconoscibile al prossimo import e alla ricerca del suo mix. Un asset già tracciato **non cambia identità**: se non ha ISIN e la ricerca ne trova uno, il piano lo scrive (`identity-update`, una scrittura di metadati) e **non sostituisce mai** un ISIN già presente — e non riscrive mai il ticker. Solo i metadati di sincronizzazione sono salvati in `brokerConnections/{ownerId}/brokers/azimut`.
 - **FundFacts è stato scartato**: l'API richiede una chiave (`ffk_…`) anche per la ricerca, e il suo indice pubblico elenca 533 ISIN — non le due Fidelity in questione. EODHD l'ha sostituito perché la Search non richiede un piano a pagamento (i fundamentals sì), quindi una chiave `EODHD_API_TOKEN` server-side e il modulo `lib/server/eodhd/fundIdentityService.ts`.
+
+## Binance — sola lettura con la chiave del server (`binanceImport.ts`, `binanceClient.ts`)
+
+- **Un'API key per ISTANZA, non per utente.** `BINANCE_API_KEY` e `BINANCE_API_SECRET` stanno
+  nell'ambiente del server (`.env.local`, SETUP.md → Binance Sync) e non in Firestore: è la scelta del
+  proprietario, e ha un costo dichiarato — **un solo account Binance per deploy**. Chi apre l'app da
+  un altro account vedrebbe lo stesso Binance, quindi il collegamento è per chi ospita l'app per sé.
+  Senza chiave la route risponde 503 con le parole del tile, non un errore generico. La chiave va
+  creata con **«Enable Reading» e nient'altro**: la whitelist sotto è il secondo lucchetto, non il
+  primo.
+- **La garanzia di sola lettura è STRUTTURALE** (`READ_ENDPOINTS`): un elenco chiuso di cinque
+  endpoint (`/api/v3/account`, `get-funding-asset`, le due `simple-earn/*/position`,
+  `ticker/price`). `get-funding-asset` è una `POST`, ma Binance la definisce una query. Aggiungere
+  una voce che scrive è il cambio che questa guida vieta, come per Scalable e Trade Republic.
+- **Ogni tentativo è firmato di nuovo.** Il retry su 429/418 riusava timestamp e firma del primo
+  tentativo: dopo l'attesa (fino a 60 secondi) la richiesta usciva dalla `recvWindow` e tornava
+  `-1021`. Misurato nello script da cui questo ponte è nato (`binance_test.py`, 6 simboli persi in
+  una scansione parallela). `recvWindow` è al massimo consentito (60 s).
+- **Una moneta, un asset, wallet sommati.** Spot, Funding e Simple Earn (flessibile + bloccato) sono
+  tre posti dove sta la stessa moneta: `aggregateBinanceHoldings` li somma e il tile ne nomina i
+  wallet. **Tutto è `type: 'crypto'`, `assetClass: 'crypto'`, `exchange: 'Binance'`, stablecoin
+  comprese** — la categoria la sceglie il proprietario, non la sync. `EUR` è scartato: un saldo
+  fiat è un conto, non una posizione crypto.
+- **Il prezzo lo dà Binance, il ticker lo dà Yahoo.** `currentPrice` è il prezzo EUR di Binance
+  (`resolveBinanceEurPrice`: coppia diretta, inversa, poi via USDT), così un asset nuovo non entra
+  a 0. Il ticker è `<MONETA>-EUR` **solo** se la route ha verificato che Yahoo lo quota in EUR
+  (`withYahooTickers`); altrimenti l'asset nasce `BINANCE-<MONETA>` a prezzo manuale e la sync ne
+  tiene fresco il prezzo (`price-update`, solo per gli asset a prezzo manuale e solo se è cambiato).
+  Indovinare un simbolo Yahoo che non esiste lascerebbe l'asset senza quotazione a ogni refresh.
+- **Il match col tracciato è per etichetta E identità.** Un asset è «di Binance» se ha
+  `exchange: 'Binance'` e ticker `<MONETA>-EUR` o `BINANCE-<MONETA>`. L'etichetta da sola
+  prenderebbe un asset fatto a mano; il ticker da solo fonderebbe il BTC di Trade Republic con
+  quello di Binance e ne farebbe uno scostamento fittizio.
+- **Quantità e P/L sono del Registro, come per ogni broker.** La sync crea le monete NUOVE e non
+  scrive la quantità di una esistente: uno scostamento è un avviso da riconciliare con una
+  rettifica. **Il P/L non lo calcola la sync**: lo calcola l'app confrontando il valore con
+  `averageCostEur` del Registro. Un asset appena creato dalla sync NON ha costo medio finché non si
+  importa le operazioni (vedi sotto, avviene nello stesso passo di **Sincronizza**): senza, niente P/L.
+- **Un wallet non letto è un AVVISO, mai un wallet vuoto.** Spot è l'unica lettura che può far
+  fallire la sync (senza non c'è portafoglio); Funding ed Earn sono opzionali e, se falliscono,
+  tornano in `warnings`. Una quantità silenziosamente corta si leggerebbe come scostamento dal
+  Registro.
+- **Sotto 1 € una moneta NUOVA non viene creata** (`BINANCE_MIN_NEW_VALUE_EUR`) e una senza prezzo
+  in EUR neppure: la polvere seppellirebbe le posizioni vere e un prezzo a 0 farebbe calare il
+  patrimonio. Entrambe sono NOMINATE nell'anteprima, non scartate in silenzio.
+- **Un solo pulsante, due passi** (2026-10-28): **Sincronizza** legge i wallet, salva monete nuove e
+  prezzi, poi importa SUBITO le operazioni, senza anteprima intermedia né modale: le monete devono
+  esistere prima, o i trade non hanno uno strumento su cui atterrare. Se l'import fallisce le monete
+  restano salvate e l'esito lo dice; la route ricalcola il piano sul registro corrente e scrive solo
+  le righe importabili, il resto è elencato nell'esito.
+- **Storico operazioni** (`app/api/broker/binance/trades`, `lib/utils/binanceTradeImport.ts`): stessa
+  route e scrittura idempotente per `sourceRef` degli altri broker (`source: 'binance'`). Legge Spot (`myTrades` dei soli simboli delle monete
+  oggi in mano), Convert, acquisti con carta/bonifico in EUR, Dust → BNB e reward Earn, e ogni
+  **gamba** è un BUY o SELL di UNA moneta valutata in EUR **al giorno** con le kline 1d pubbliche
+  (coppia `<MONETA>EUR`, altrimenti `<MONETA>USDT` / `EURUSDT`, ±1 giorno). Un trade Spot sono due
+  gambe (vendi la quota, compri la base); la commissione in un terzo asset è una terza gamba.
+  Il join con l'asset è `trade.coin` + etichetta «Binance» + ticker della moneta (`findAssetByCoin`).
+- **Una vendita non supera mai ciò che lo storico ha comprato.** Depositi, prelievi e trasferimenti
+  non portano costo e NON sono importati, quindi una moneta può uscire con più unità vendute che
+  acquistate: il Registro rifiuterebbe la vendita (422). Il parser tiene un saldo corrente per moneta,
+  taglia la vendita alla parte coperta e dichiara il resto fra «righe non sono operazioni». Lo stesso
+  elenco porta le letture fallite (`readWarnings`). Una gamba senza prezzo storico in EUR è esclusa
+  con il motivo, mai scritta a 0.
+- **Fuori scope, dichiarato**: liquidità EUR; depositi, prelievi e trasferimenti (quindi la quantità del
+  Registro può restare sotto il saldo reale: è lo scostamento che la sync già segnala); monete vendute
+  del tutto prima di oggi (i simboli scansionati sono quelli delle monete in mano); storico oltre 4 anni.
 
 ## La classe dal nome — i due ponti su file (`fundNameClass.ts`)
 

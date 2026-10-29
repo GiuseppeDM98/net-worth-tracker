@@ -41,6 +41,7 @@ import { Tile } from '@/components/ui/tile';
 import { BrokerTradeImportDialog } from '@/components/settings/broker/BrokerTradeImportDialog';
 import { describeBrokerConnections } from '@/lib/utils/settingsNarrative';
 import { authenticatedFetch } from '@/lib/utils/authFetch';
+import { errorMessage, failureWarning } from '@/lib/utils/errorMessage';
 import { formatCurrency, formatDate, formatNumberIt } from '@/lib/utils/formatters';
 import { queryKeys } from '@/lib/query/queryKeys';
 import { fetchFundAllocations } from '@/lib/utils/fundAllocationClient';
@@ -48,6 +49,7 @@ import { usesPublishedFundMix } from '@/lib/utils/fundComposition';
 import { describeFundComposition } from '@/lib/utils/fundCompositionLabel';
 import {
   buildScalableImportPlan,
+  type ScalableImportPlan,
   mapScalableType,
   parseScalableHoldingsJson,
   parseScalableOverviewJson,
@@ -187,6 +189,189 @@ async function readScalableLoginStatus(ownerId: string, sessionId: string): Prom
   return data as LoginView;
 }
 
+/** What a Scalable save did, for the metadata and the toast. */
+interface ScalableSaveResult {
+  createdAssets: number;
+  updatedPrices: number;
+  filledCompositions: number;
+  cashBalance?: number;
+  cashAssetId?: string;
+  depositBalance?: number;
+  depositAssetId?: string;
+}
+
+/**
+ * The save's writes, out of the component: the React Compiler skips a whole component holding a
+ * `?:`/`&&`/`??` inside a `try` (AGENTS.md § Motion), and this body is made of them.
+ */
+async function applyScalablePlan(
+  ownerId: string,
+  plan: ScalableImportPlan,
+  cashTarget: string,
+  depositTarget: string
+): Promise<ScalableSaveResult> {
+  let createdAssets = 0;
+  let updatedPrices = 0;
+  let filledCompositions = 0;
+  for (const diff of plan.holdings) {
+    if (diff.kind === 'new') {
+      await createAsset(ownerId, diff.formData);
+      createdAssets += 1;
+      continue;
+    }
+    if (!diff.existingAssetId) continue;
+    const shouldWritePrice = diff.kind === 'price-update' || diff.kind === 'price-and-drift';
+    // An unchanged row with the right symbol and no composition to fill has nothing to write.
+    if (!shouldWritePrice && !diff.tickerUpdate && !diff.compositionUpdate) continue;
+    // The symbol repair and the published composition ride on the same write as the price:
+    // both are metadata, and a second write per position would double the sync's Firestore
+    // traffic for no extra information. `ticker` is sent ONLY when the plan resolved a
+    // different one, so a partial caller can never blank it. taxRate and displayTicker are
+    // carried along because `updateAssetMetadata` treats an absent one as a request to
+    // DELETE it (the import must not wipe a cost-basis rate or an alias).
+    await updateAssetMetadata(diff.existingAssetId, {
+      ...(shouldWritePrice ? { currentPrice: diff.holding.price } : {}),
+      ...(diff.tickerUpdate ? { ticker: diff.tickerUpdate } : {}),
+      ...(diff.compositionUpdate ? { composition: diff.formData.composition } : {}),
+      taxRate: diff.existingTaxRate,
+      displayTicker: diff.existingDisplayTicker ?? undefined,
+    });
+    if (shouldWritePrice) updatedPrices += 1;
+    if (diff.compositionUpdate) filledCompositions += 1;
+  }
+  let cashAssetId: string | undefined;
+  let cashBalance: number | undefined;
+  if (plan.cash) {
+    cashBalance = Math.round(plan.cash.balance * 100) / 100;
+    if (cashTarget === NEW_CASH_VALUE) {
+      cashAssetId = await createAsset(ownerId, {
+        ticker: SCALABLE_CASH_TICKER,
+        displayTicker: SCALABLE_CASH_ACCOUNT_NAME,
+        name: SCALABLE_CASH_ACCOUNT_NAME,
+        type: 'cash',
+        assetClass: 'cash',
+        currency: plan.cash.currency,
+        quantity: cashBalance,
+        currentPrice: 1,
+        isLiquid: true,
+        autoUpdatePrice: false,
+        exchange: 'Scalable Capital',
+      });
+    } else {
+      await updateAsset(cashTarget, { quantity: cashBalance });
+      cashAssetId = cashTarget;
+    }
+  }
+
+  // The deposit is its OWN account: a different balance at the broker, paying interest on
+  // its own schedule. Its rate has no Asset field, so it is declared in the preview, not stored.
+  let depositAssetId: string | undefined;
+  let depositBalance: number | undefined;
+  if (plan.deposit) {
+    depositBalance = Math.round(plan.deposit.balance * 100) / 100;
+    if (depositTarget === NEW_CASH_VALUE) {
+      depositAssetId = await createAsset(ownerId, {
+        ticker: SCALABLE_DEPOSIT_TICKER,
+        displayTicker: SCALABLE_DEPOSIT_ACCOUNT_NAME,
+        name: SCALABLE_DEPOSIT_ACCOUNT_NAME,
+        type: 'cash',
+        assetClass: 'cash',
+        currency: plan.deposit.currency,
+        quantity: depositBalance,
+        currentPrice: 1,
+        isLiquid: true,
+        autoUpdatePrice: false,
+        exchange: 'Scalable Capital',
+      });
+    } else {
+      await updateAsset(depositTarget, { quantity: depositBalance });
+      depositAssetId = depositTarget;
+    }
+  }
+  return {
+    createdAssets,
+    updatedPrices,
+    filledCompositions,
+    cashBalance,
+    cashAssetId,
+    depositBalance,
+    depositAssetId,
+  };
+}
+
+function scalableConnectionRecord(plan: ScalableImportPlan, result: ScalableSaveResult) {
+  return {
+    holdingsCount: plan.stats.holdingCount,
+    skippedCount: plan.stats.skippedCount,
+    ...(result.cashBalance !== undefined ? { cashBalance: result.cashBalance } : {}),
+    ...(result.cashAssetId ? { cashAssetId: result.cashAssetId } : {}),
+    ...(result.depositBalance !== undefined ? { depositBalance: result.depositBalance } : {}),
+    ...(result.depositAssetId ? { depositAssetId: result.depositAssetId } : {}),
+    ...(plan.deposit?.interestRate !== undefined
+      ? { depositInterestRate: plan.deposit.interestRate }
+      : {}),
+    createdAssets: result.createdAssets,
+    updatedPrices: result.updatedPrices,
+  };
+}
+
+function scalableSavedMessage(result: ScalableSaveResult): string {
+  const filled = result.filledCompositions > 0 ? `, ${result.filledCompositions} composizioni ricavate` : '';
+  return `Sincronizzazione salvata: ${result.createdAssets} nuovi asset, ${result.updatedPrices} prezzi aggiornati${filled}.`;
+}
+
+/** The list a response carries, or an empty one: a `??` would sit inside the handler's `try`. */
+function listOf<T>(value: T[] | undefined): T[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function orNull<T>(value: T | null | undefined): T | null {
+  return value === undefined ? null : value;
+}
+
+/** The status line for the backend session, out of the `try` that fetches it. */
+function backendStatusText(data: unknown): string | null {
+  const status = (data as { status?: unknown } | null)?.status;
+  if (typeof status !== 'string') return null;
+  const user = (data as { user?: string }).user;
+  return `Sessione ${user || 'Scalable'}: ${BACKEND_STATUS_LABEL[status] ?? status}`;
+}
+
+const LOGIN_DEAD_STATUSES: readonly string[] = ['failed', 'expired'];
+
+function isLoginDead(status: string): boolean {
+  return LOGIN_DEAD_STATUSES.includes(status);
+}
+
+function loginFailureText(view: { error?: string }): string {
+  return view.error ?? 'Collegamento non riuscito: riprova.';
+}
+
+/** The pasted `sc` output, parsed. The nested try is a module-level one, where the compiler is fine. */
+function parsePastedScalable(texts: { holdings: string; overview: string; overnight: string }) {
+  const { holdings } = parseScalableHoldingsJson(texts.holdings);
+  const overview = texts.overview.trim() !== '' ? parseScalableOverviewJson(texts.overview) : null;
+  let overnight: ScalableOvernightInput | null = null;
+  let overnightWarning: string | null = null;
+  if (texts.overnight.trim() !== '') {
+    try {
+      overnight = parseScalableOvernightJson(texts.overnight);
+    } catch (err) {
+      overnightWarning =
+        err instanceof ScalableParseError
+          ? `Deposito non vincolato non letto: ${err.message}`
+          : 'Deposito non vincolato non letto: testo non valido.';
+    }
+  }
+  return { holdings, overview, overnight, overnightWarning };
+}
+
+function pasteFailureText(err: unknown): string {
+  return err instanceof ScalableParseError
+    ? err.message
+    : "Testo non valido: ricontrolla l'output incollato.";
+}
+
 export function ScalableConnectionTile({ ownerId, disabled = false }: ScalableConnectionTileProps) {
   const queryClient = useQueryClient();
   const [connection, setConnection] = useState<BrokerConnection | null>(null);
@@ -214,11 +399,8 @@ export function ScalableConnectionTile({ ownerId, disabled = false }: ScalableCo
       const res = await authenticatedFetch('/api/scalable/status');
       if (res.ok) {
         const data = await res.json();
-        if (typeof data?.status === 'string') {
-          setStatusText(
-            `Sessione ${data.user || 'Scalable'}: ${BACKEND_STATUS_LABEL[data.status] ?? data.status}`
-          );
-        }
+        const text = backendStatusText(data);
+        if (text) setStatusText(text);
       }
     } catch {
       // Non-critical status polling error
@@ -237,9 +419,8 @@ export function ScalableConnectionTile({ ownerId, disabled = false }: ScalableCo
     } catch (err) {
       console.error('[ScalableConnectionTile] load failed:', err);
       toast.error('Impossibile caricare i collegamenti broker');
-    } finally {
-      setLoading(false);
     }
+    setLoading(false);
   }, [ownerId, checkBackendStatus]);
 
   useEffect(() => {
@@ -286,17 +467,19 @@ export function ScalableConnectionTile({ ownerId, disabled = false }: ScalableCo
         postReadCommand(ownerId, 'holdings'),
         postReadCommand(ownerId, 'overview'),
         postReadCommand(ownerId, 'overnight').then(
-          (r) => ({ overnight: r.overnight ?? null, warning: null as string | null }),
+          (r) => ({ overnight: orNull(r.overnight), warning: null as string | null }),
           (err: unknown) => ({
             overnight: null,
-            warning:
-              err instanceof Error
-                ? `Deposito non vincolato non letto: ${err.message}`
-                : 'Deposito non vincolato non letto.',
+            warning: failureWarning(err, 'Deposito non vincolato non letto'),
           })
         ),
       ]);
-      await buildPlan(holdingsRes.holdings ?? [], overviewRes.overview ?? null, overnightRes.overnight, overnightRes.warning);
+      await buildPlan(
+        listOf(holdingsRes.holdings),
+        orNull(overviewRes.overview),
+        overnightRes.overnight,
+        overnightRes.warning
+      );
       // No auto-import: `handleSave` closes over the `plan` of the render it was created in, so
       // calling it right after `setPlan` read the PREVIOUS plan (null on a fresh load) and bailed
       // on its own guard — the write never ran while the toast below claimed it had. The preview
@@ -304,40 +487,27 @@ export function ScalableConnectionTile({ ownerId, disabled = false }: ScalableCo
       // docstring describes.
       toast.success('Anteprima pronta: controlla le righe e salva.');
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Lettura non riuscita: riprova.';
+      const message = errorMessage(err, 'Lettura non riuscita: riprova.');
       setError(message);
-    } finally {
-      setSyncing(false);
     }
+    setSyncing(false);
   };
 
   const handlePreviewFromText = async () => {
     if (disabled) return;
     setPreparing(true);
     try {
-      const { holdings } = parseScalableHoldingsJson(holdingsText);
-      const overview = overviewText.trim() !== '' ? parseScalableOverviewJson(overviewText) : null;
-      let overnight: ScalableOvernightInput | null = null;
-      let overnightWarningText: string | null = null;
-      if (overnightText.trim() !== '') {
-        try {
-          overnight = parseScalableOvernightJson(overnightText);
-        } catch (err) {
-          overnightWarningText =
-            err instanceof ScalableParseError
-              ? `Deposito non vincolato non letto: ${err.message}`
-              : 'Deposito non vincolato non letto: testo non valido.';
-        }
-      }
-      await buildPlan(holdings, overview, overnight, overnightWarningText);
+      const { holdings, overview, overnight, overnightWarning } = parsePastedScalable({
+        holdings: holdingsText,
+        overview: overviewText,
+        overnight: overnightText,
+      });
+      await buildPlan(holdings, overview, overnight, overnightWarning);
       toast.success('Anteprima pronta: controlla le righe prima di salvare.');
     } catch (err) {
-      setError(
-        err instanceof ScalableParseError ? err.message : 'Testo non valido: ricontrolla l\'output incollato.'
-      );
-    } finally {
-      setPreparing(false);
+      setError(pasteFailureText(err));
     }
+    setPreparing(false);
   };
 
   const handleStartLogin = async () => {
@@ -347,10 +517,9 @@ export function ScalableConnectionTile({ ownerId, disabled = false }: ScalableCo
     try {
       setLogin(await startScalableLogin(ownerId));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Collegamento non riuscito: riprova.');
-    } finally {
-      setLinking(false);
+      setError(errorMessage(err, 'Collegamento non riuscito: riprova.'));
     }
+    setLinking(false);
   };
 
   const loginId = login?.id ?? null;
@@ -371,12 +540,12 @@ export function ScalableConnectionTile({ ownerId, disabled = false }: ScalableCo
             setLogin(null);
             toast.success('Collegamento completato: ora puoi sincronizzare.');
             await loadAll();
-          } else if (next.status === 'failed' || next.status === 'expired') {
+          } else if (isLoginDead(next.status)) {
             setLogin(null);
-            setError(next.error ?? 'Collegamento non riuscito: riprova.');
+            setError(loginFailureText(next));
           }
         } catch (err) {
-          setError(err instanceof Error ? err.message : 'Stato del collegamento non disponibile.');
+          setError(errorMessage(err, 'Stato del collegamento non disponibile.'));
         }
       })();
     }, 2500);
@@ -387,106 +556,13 @@ export function ScalableConnectionTile({ ownerId, disabled = false }: ScalableCo
     if (!plan || disabled) return;
     setSaving(true);
     try {
-      let createdAssets = 0;
-      let updatedPrices = 0;
-      let filledCompositions = 0;
-      for (const diff of plan.holdings) {
-        if (diff.kind === 'new') {
-          await createAsset(ownerId, diff.formData);
-          createdAssets += 1;
-          continue;
-        }
-        if (!diff.existingAssetId) continue;
-        const shouldWritePrice = diff.kind === 'price-update' || diff.kind === 'price-and-drift';
-        // An unchanged row with the right symbol and no composition to fill has nothing to write.
-        if (!shouldWritePrice && !diff.tickerUpdate && !diff.compositionUpdate) continue;
-        // The symbol repair and the published composition ride on the same write as the price:
-        // both are metadata, and a second write per position would double the sync's Firestore
-        // traffic for no extra information. `ticker` is sent ONLY when the plan resolved a
-        // different one, so a partial caller can never blank it. taxRate and displayTicker are
-        // carried along because `updateAssetMetadata` treats an absent one as a request to
-        // DELETE it (the import must not wipe a cost-basis rate or an alias).
-        await updateAssetMetadata(diff.existingAssetId, {
-          ...(shouldWritePrice ? { currentPrice: diff.holding.price } : {}),
-          ...(diff.tickerUpdate ? { ticker: diff.tickerUpdate } : {}),
-          ...(diff.compositionUpdate ? { composition: diff.formData.composition } : {}),
-          taxRate: diff.existingTaxRate,
-          displayTicker: diff.existingDisplayTicker ?? undefined,
-        });
-        if (shouldWritePrice) updatedPrices += 1;
-        if (diff.compositionUpdate) filledCompositions += 1;
-      }
-      let cashAssetId: string | undefined;
-      let cashBalance: number | undefined;
-      if (plan.cash) {
-        cashBalance = Math.round(plan.cash.balance * 100) / 100;
-        if (cashTarget === NEW_CASH_VALUE) {
-          cashAssetId = await createAsset(ownerId, {
-            ticker: SCALABLE_CASH_TICKER,
-            displayTicker: SCALABLE_CASH_ACCOUNT_NAME,
-            name: SCALABLE_CASH_ACCOUNT_NAME,
-            type: 'cash',
-            assetClass: 'cash',
-            currency: plan.cash.currency,
-            quantity: cashBalance,
-            currentPrice: 1,
-            isLiquid: true,
-            autoUpdatePrice: false,
-            exchange: 'Scalable Capital',
-          });
-        } else {
-          await updateAsset(cashTarget, { quantity: cashBalance });
-          cashAssetId = cashTarget;
-        }
-      }
-
-      // The deposit is its OWN account: a different balance at the broker, paying interest on
-      // its own schedule. Its rate has no Asset field, so it is declared in the preview, not stored.
-      let depositAssetId: string | undefined;
-      let depositBalance: number | undefined;
-      if (plan.deposit) {
-        depositBalance = Math.round(plan.deposit.balance * 100) / 100;
-        if (depositTarget === NEW_CASH_VALUE) {
-          depositAssetId = await createAsset(ownerId, {
-            ticker: SCALABLE_DEPOSIT_TICKER,
-            displayTicker: SCALABLE_DEPOSIT_ACCOUNT_NAME,
-            name: SCALABLE_DEPOSIT_ACCOUNT_NAME,
-            type: 'cash',
-            assetClass: 'cash',
-            currency: plan.deposit.currency,
-            quantity: depositBalance,
-            currentPrice: 1,
-            isLiquid: true,
-            autoUpdatePrice: false,
-            exchange: 'Scalable Capital',
-          });
-        } else {
-          await updateAsset(depositTarget, { quantity: depositBalance });
-          depositAssetId = depositTarget;
-        }
-      }
-      await saveBrokerConnection(ownerId, {
-        holdingsCount: plan.stats.holdingCount,
-        skippedCount: plan.stats.skippedCount,
-        ...(cashBalance !== undefined ? { cashBalance } : {}),
-        ...(cashAssetId ? { cashAssetId } : {}),
-        ...(depositBalance !== undefined ? { depositBalance } : {}),
-        ...(depositAssetId ? { depositAssetId } : {}),
-        ...(plan.deposit?.interestRate !== undefined
-          ? { depositInterestRate: plan.deposit.interestRate }
-          : {}),
-        createdAssets,
-        updatedPrices,
-      }, 'scalable');
+      const saved = await applyScalablePlan(ownerId, plan, cashTarget, depositTarget);
+      await saveBrokerConnection(ownerId, scalableConnectionRecord(plan, saved), 'scalable');
       queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(ownerId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.overview(ownerId) });
       setPlan(null);
       await loadAll();
-      toast.success(
-        `Sincronizzazione salvata: ${createdAssets} nuovi asset, ${updatedPrices} prezzi aggiornati${
-          filledCompositions > 0 ? `, ${filledCompositions} composizioni ricavate` : ''
-        }.`
-      );
+      toast.success(scalableSavedMessage(saved));
     } catch (err) {
       console.error('[ScalableConnectionTile] save failed:', err);
       // A partial save can have ALREADY created the cash/deposit accounts, so the in-memory
@@ -496,9 +572,8 @@ export function ScalableConnectionTile({ ownerId, disabled = false }: ScalableCo
       await loadAll();
       setPlan(null);
       toast.error('Salvataggio non riuscito: riprova con Sincronizza.');
-    } finally {
-      setSaving(false);
     }
+    setSaving(false);
   };
 
   const cashAssets = assets.filter((a) => a.type === 'cash' && a.assetClass === 'cash');

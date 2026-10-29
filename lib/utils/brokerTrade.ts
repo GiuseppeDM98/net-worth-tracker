@@ -37,6 +37,11 @@ export interface BrokerTrade {
   type: AssetTransactionType;
   /** ISIN, uppercased. The join key against Portafoglio. Absent on a few cash-like rows. */
   isin?: string;
+  /**
+   * The coin code (`BTC`), for a broker whose instruments have no ISIN. The plan joins on it
+   * to the asset the Binance sync created (label «Binance» + the coin's ticker), never by name.
+   */
+  coin?: string;
   /** Human label as the broker prints it — for the preview row only, never written to the ledger. */
   label: string;
   /** Execution date (broker timestamp), in the BROKER's local date semantics. */
