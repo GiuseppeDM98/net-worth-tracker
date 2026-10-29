@@ -19,7 +19,7 @@ vi.mock('server-only', () => ({}));
 vi.mock('@/lib/firebase/config', () => ({ auth: { currentUser: null }, db: {} }));
 vi.mock('@/lib/firebase/admin', () => ({ adminDb: {} }));
 vi.mock('@/lib/server/apiAuth', () => ({
-  requireFirebaseAuth: vi.fn(async () => ({ uid: 'owner-1', email: 'rykymai@gmail.com' })),
+  requireFirebaseAuth: vi.fn(async () => ({ uid: 'owner-1', email: 'riccardo.maistri95@gmail.com' })),
   assertCanAccessAccount: vi.fn(async () => undefined),
   getApiAuthErrorResponse: vi.fn(() => null),
 }));
