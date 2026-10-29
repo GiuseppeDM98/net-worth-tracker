@@ -22,9 +22,17 @@ const mocks = vi.hoisted(() => ({
   getUserAssetsAdmin: vi.fn(),
   getAssetTransactionsAdmin: vi.fn(),
   createAssetTransaction: vi.fn(),
+  batchDelete: vi.fn(),
+  batchCommit: vi.fn(),
 }));
 
 vi.mock('server-only', () => ({}));
+vi.mock('@/lib/firebase/admin', () => ({
+  adminDb: {
+    collection: (name: string) => ({ doc: (id: string) => ({ name, id }) }),
+    batch: () => ({ delete: mocks.batchDelete, commit: mocks.batchCommit }),
+  },
+}));
 vi.mock('@/lib/server/assetAdminRepository', () => ({
   getUserAssetsAdmin: mocks.getUserAssetsAdmin,
   getAssetTransactionsAdmin: mocks.getAssetTransactionsAdmin,
@@ -145,7 +153,7 @@ describe('buildBrokerTradePreview', () => {
 
   it('reports an already imported row separately, never as something to write', async () => {
     mocks.getAssetTransactionsAdmin.mockResolvedValue([
-      { source: 'scalable', sourceRef: 'q9Yc4BSHp85cafCe2jRpKD' },
+      { assetId: 'asset-1', source: 'scalable', sourceRef: 'q9Yc4BSHp85cafCe2jRpKD' },
     ]);
     const preview = await buildBrokerTradePreview(
       'owner-1',
@@ -156,6 +164,19 @@ describe('buildBrokerTradePreview', () => {
     expect(preview.alreadyImported).toHaveLength(1);
     expect(preview.alreadyImported[0].status).toBe('already-imported');
   });
+
+  it('does not count a row of a deleted asset as already imported', async () => {
+    mocks.getAssetTransactionsAdmin.mockResolvedValue([
+      { id: 'tx-orphan', assetId: 'deleted-asset', source: 'scalable', sourceRef: 'q9Yc4BSHp85cafCe2jRpKD' },
+    ]);
+    const preview = await buildBrokerTradePreview(
+      'owner-1',
+      'scalable',
+      scalablePayload('q9Yc4BSHp85cafCe2jRpKD', '2026-09-14T10:33:06.128Z')
+    );
+    expect(preview.toImport).toHaveLength(1);
+    expect(preview.alreadyImported).toHaveLength(0);
+  });
 });
 
 describe('importBrokerTrades', () => {
@@ -163,6 +184,21 @@ describe('importBrokerTrades', () => {
     mocks.getUserAssetsAdmin.mockReset().mockResolvedValue([ASSET]);
     mocks.getAssetTransactionsAdmin.mockReset().mockResolvedValue([]);
     mocks.createAssetTransaction.mockReset().mockResolvedValue({ id: 'tx-1' });
+  });
+
+  it('deletes the broker\'s orphan rows before importing, and only those', async () => {
+    mocks.batchDelete.mockReset();
+    mocks.batchCommit.mockReset().mockResolvedValue(undefined);
+    mocks.getAssetTransactionsAdmin.mockResolvedValue([
+      { id: 'orphan', assetId: 'deleted-asset', source: 'scalable', sourceRef: 'old' },
+      { id: 'live', assetId: 'asset-1', source: 'scalable', sourceRef: 'kept' },
+      { id: 'manual-orphan', assetId: 'deleted-asset' },
+      { id: 'other-broker', assetId: 'deleted-asset', source: 'traderepublic', sourceRef: 'x' },
+    ]);
+    await importBrokerTrades('owner-1', 'scalable', scalablePayload('q9Yc4BSHp85cafCe2jRpKD', '2026-09-14T10:33:06.128Z'), []);
+    expect(mocks.batchDelete).toHaveBeenCalledTimes(1);
+    expect(mocks.batchDelete.mock.calls[0][0]).toEqual({ name: 'assetTransactions', id: 'orphan' });
+    expect(mocks.batchCommit).toHaveBeenCalledTimes(1);
   });
 
   it('writes each approved row through the ledger use case, carrying its provenance', async () => {
@@ -256,5 +292,49 @@ describe('importBrokerTrades', () => {
     expect(result.failed).toEqual([
       { sourceRef: 'second', message: 'Nessun lotto disponibile per la vendita.' },
     ]);
+  });
+});
+
+describe('Binance balance reconciliation', () => {
+  const COIN_ASSET = {
+    id: 'btc', name: 'BTC', type: 'crypto' as const, ticker: 'BTC-EUR', exchange: 'Binance',
+    quantity: 1, averageCost: 100, currentPrice: 200,
+  };
+
+  beforeEach(() => {
+    mocks.getUserAssetsAdmin.mockReset().mockResolvedValue([COIN_ASSET]);
+    mocks.getAssetTransactionsAdmin.mockReset().mockResolvedValue([
+      { id: 't1', assetId: 'btc', date: new Date('2024-05-01T10:00:00Z'), source: 'binance', sourceRef: 'x' },
+    ]);
+    mocks.createAssetTransaction.mockReset().mockResolvedValue({ id: 'adj' });
+    mocks.batchCommit.mockReset();
+  });
+
+  const payload = (heldBalances: Record<string, number>): BrokerTradesPayload => ({
+    list: { spotTrades: [], convert: [], fiatBuys: [], dust: [], earnRewards: [], klines: {}, heldBalances },
+    details: {},
+  });
+
+  it('adds one adjustment to the real balance, blending covered cost with today\'s price', async () => {
+    const result = await importBrokerTrades('owner-1', 'binance', payload({ BTC: 3 }), []);
+    expect(result.reconciled).toBe(1);
+    const call = mocks.createAssetTransaction.mock.calls[0][1];
+    expect(call).toMatchObject({ assetId: 'btc', type: 'adjustment', quantity: 3, source: 'binance' });
+    expect(call.date).toEqual(new Date('2024-05-01T10:00:00Z'));
+    // (1 * 100 + 2 * 200) / 3
+    expect(call.pricePerUnit).toBeCloseTo(166.6667, 3);
+  });
+
+  it('adds nothing when the ledger already holds the balance, or more', async () => {
+    expect((await importBrokerTrades('owner-1', 'binance', payload({ BTC: 1 }), [])).reconciled).toBe(0);
+    expect((await importBrokerTrades('owner-1', 'binance', payload({ BTC: 0.5 }), [])).reconciled).toBe(0);
+    expect(mocks.createAssetTransaction).not.toHaveBeenCalled();
+  });
+
+  it('skips a coin with no trades at all, and never reconciles other brokers', async () => {
+    mocks.getAssetTransactionsAdmin.mockResolvedValue([]);
+    expect((await importBrokerTrades('owner-1', 'binance', payload({ BTC: 3 }), [])).reconciled).toBe(0);
+    const scalable = await importBrokerTrades('owner-1', 'scalable', scalablePayload('a', '2026-09-14T10:33:06.128Z'), []);
+    expect(scalable.reconciled).toBeUndefined();
   });
 });

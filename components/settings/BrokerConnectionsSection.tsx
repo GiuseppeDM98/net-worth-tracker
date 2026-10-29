@@ -19,6 +19,7 @@ import { ScalableConnectionTile } from '@/components/settings/broker/ScalableCon
 import { TradeRepublicConnectionTile } from '@/components/settings/broker/TradeRepublicConnectionTile';
 import { IntesaSanpaoloConnectionTile } from '@/components/settings/broker/IntesaSanpaoloConnectionTile';
 import { AzimutConnectionTile } from '@/components/settings/broker/AzimutConnectionTile';
+import { BinanceConnectionTile } from '@/components/settings/broker/BinanceConnectionTile';
 
 interface BrokerConnectionsSectionProps {
   ownerId: string;
@@ -36,6 +37,7 @@ export function BrokerConnectionsSection({ ownerId, disabled = false }: BrokerCo
       <TradeRepublicConnectionTile ownerId={ownerId} disabled={disabled} />
       <IntesaSanpaoloConnectionTile ownerId={ownerId} disabled={disabled} />
       <AzimutConnectionTile ownerId={ownerId} disabled={disabled} />
+      <BinanceConnectionTile ownerId={ownerId} disabled={disabled} />
     </div>
   );
 }

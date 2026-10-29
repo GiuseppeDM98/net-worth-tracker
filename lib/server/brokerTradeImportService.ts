@@ -1,11 +1,13 @@
 import 'server-only';
+import { adminDb } from '@/lib/firebase/admin';
 import { getUserAssetsAdmin, getAssetTransactionsAdmin } from '@/lib/server/assetAdminRepository';
 import { createAssetTransaction, DuplicateBrokerTradeError } from '@/lib/server/assetTransactionUseCase';
-import { buildBrokerTradePlan, brokerTradeKey, type BrokerTradePlan } from '@/lib/utils/brokerTradePlan';
+import { buildBrokerTradePlan, brokerTradeKey, findAssetByCoin, type BrokerTradePlan } from '@/lib/utils/brokerTradePlan';
 import { parseScalableTrades } from '@/lib/utils/scalableTradeImport';
+import { parseBinanceTrades } from '@/lib/utils/binanceTradeImport';
 import { parseTradeRepublicTrades } from '@/lib/utils/tradeRepublicTradeImport';
 import type { BrokerTrade } from '@/lib/utils/brokerTrade';
-import type { AssetTransactionSource } from '@/types/assetTransactions';
+import { ASSET_TRANSACTIONS_COLLECTION, isLedgerAssetType, type AssetTransactionSource } from '@/types/assetTransactions';
 
 /**
  * The broker half of the trade importer: read the broker's history, join it to the ledger, and
@@ -62,7 +64,9 @@ function parseBrokerPayload(
   const parsed =
     source === 'scalable'
       ? parseScalableTrades(payload.list, details)
-      : parseTradeRepublicTrades(payload.list, details);
+      : source === 'binance'
+        ? parseBinanceTrades(payload.list)
+        : parseTradeRepublicTrades(payload.list, details);
   return { trades: parsed.trades, skipped: parsed.skipped };
 }
 
@@ -100,10 +104,12 @@ export async function buildBrokerTradePreview(
   source: AssetTransactionSource,
   payload: BrokerTradesPayload
 ): Promise<BrokerTradePreview> {
-  const [assets, transactions] = await Promise.all([
+  const [assets, allTransactions] = await Promise.all([
     getUserAssetsAdmin(ownerId),
     getAssetTransactionsAdmin(ownerId),
   ]);
+  // An orphan (its asset was deleted) is not «already imported»: the position it fed is gone.
+  const transactions = allTransactions.filter((t) => !isOrphanBrokerTransaction(t, source, assets));
   const { trades, skipped } = parseBrokerPayload(source, payload);
   const plan = buildBrokerTradePlan({
     trades,
@@ -115,6 +121,36 @@ export async function buildBrokerTradePreview(
   return { ...plan, source };
 }
 
+/** A trade of this broker whose asset no longer exists. */
+function isOrphanBrokerTransaction(
+  transaction: { assetId: string; source?: AssetTransactionSource },
+  source: AssetTransactionSource,
+  assets: readonly { id: string }[]
+): boolean {
+  return transaction.source === source && !assets.some((asset) => asset.id === transaction.assetId);
+}
+
+/**
+ * Delete the broker's ledger rows left behind by deleted assets. The duplicate check is owner-wide
+ * (a broker id is unique per account), so an orphan would keep a recreated asset empty forever.
+ * Only rows with this broker's `source` and no surviving asset are touched.
+ */
+async function purgeOrphanBrokerTransactions(ownerId: string, source: AssetTransactionSource): Promise<number> {
+  const [assets, transactions] = await Promise.all([
+    getUserAssetsAdmin(ownerId),
+    getAssetTransactionsAdmin(ownerId),
+  ]);
+  const orphans = transactions.filter((t) => isOrphanBrokerTransaction(t, source, assets));
+  for (let i = 0; i < orphans.length; i += 400) {
+    const batch = adminDb.batch();
+    for (const orphan of orphans.slice(i, i + 400)) {
+      batch.delete(adminDb.collection(ASSET_TRANSACTIONS_COLLECTION).doc(orphan.id));
+    }
+    await batch.commit();
+  }
+  return orphans.length;
+}
+
 export interface BrokerTradeImportResult {
   imported: number;
   /** Rows the atomic idempotency check caught as already present: a concurrent sync won the race. */
@@ -123,6 +159,59 @@ export interface BrokerTradeImportResult {
   failed: { sourceRef: string; message: string }[];
   /** Realized P&L per written SELL, so the UI can report what the import moved. */
   realizedPnlEur: number;
+  /** Binance only: coins raised to the real balance by an adjustment (see `reconcileBinanceBalances`). */
+  reconciled?: number;
+}
+
+/**
+ * Binance: the history has no deposits, withdrawals or transfers, so the replay can end BELOW the
+ * real balance. For each coin tracked by the sync whose ledger quantity is short, add ONE
+ * `adjustment` (absolute reset) to the real balance, dated at the asset's last trade so the replay
+ * order stays valid. The PMC blends the covered units at their ledger cost with the uncovered ones
+ * at today's price (zero P&L: a cost nobody knows is not invented). Idempotent: once the quantity
+ * matches, nothing is added. A ledger quantity ABOVE the balance is left alone (a sale the history
+ * misses is for the user to reconcile).
+ */
+async function reconcileBinanceBalances(
+  ownerId: string,
+  payload: BrokerTradesPayload
+): Promise<number> {
+  const held = (payload.list as { heldBalances?: Record<string, number> } | null)?.heldBalances;
+  if (!held) return 0;
+  const [assets, transactions] = await Promise.all([
+    getUserAssetsAdmin(ownerId),
+    getAssetTransactionsAdmin(ownerId),
+  ]);
+  let reconciled = 0;
+  for (const [coin, balance] of Object.entries(held)) {
+    const asset = findAssetByCoin(assets, coin);
+    if (!asset || !isLedgerAssetType(asset.type) || !(balance > 0)) continue;
+    const own = transactions.filter((t) => t.assetId === asset.id);
+    if (own.length === 0) continue;
+    const gap = balance - asset.quantity;
+    if (!(gap > 1e-9) || !(asset.currentPrice > 0)) continue;
+    const lastDate = own.reduce((latest, t) => (t.date > latest ? t.date : latest), own[0].date);
+    const covered = asset.quantity * (asset.averageCost ?? asset.currentPrice);
+    const pricePerUnit = (covered + gap * asset.currentPrice) / balance;
+    try {
+      await createAssetTransaction(ownerId, {
+        assetId: asset.id,
+        type: 'adjustment',
+        date: lastDate,
+        quantity: balance,
+        pricePerUnit,
+        source: 'binance',
+        sourceRef: `a-${coin.replace(/[^A-Za-z0-9_-]/g, '')}-${lastDate.getTime()}`,
+        note: 'Allineamento al saldo Binance (depositi e trasferimenti non sono nello storico)',
+      });
+      reconciled += 1;
+    } catch (error) {
+      if (!(error instanceof DuplicateBrokerTradeError)) {
+        console.error('[binance] reconcile failed', coin, error);
+      }
+    }
+  }
+  return reconciled;
 }
 
 /**
@@ -151,6 +240,7 @@ export async function importBrokerTrades(
   payload: BrokerTradesPayload,
   selectedSourceRefs: readonly string[]
 ): Promise<BrokerTradeImportResult> {
+  await purgeOrphanBrokerTransactions(ownerId, source);
   const preview = await buildBrokerTradePreview(ownerId, source, payload);
   const approved = new Set(selectedSourceRefs);
   const rows = preview.toImport.filter((row) => approved.has(row.trade.sourceRef));
@@ -195,6 +285,7 @@ export async function importBrokerTrades(
       result.failed.push({ sourceRef: trade.sourceRef, message });
     }
   }
+  if (source === 'binance') result.reconciled = await reconcileBinanceBalances(ownerId, payload);
   return result;
 }
 

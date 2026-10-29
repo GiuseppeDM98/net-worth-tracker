@@ -622,6 +622,26 @@ Così l'app può lanciare `sc` ma non leggerne i file, e la regola non consente 
 
 ---
 
+## Binance Sync
+
+Il collegamento Binance (Impostazioni › Collegamenti) legge Spot, Funding e Simple Earn con la
+chiave API del **server**: nessun login da fare, ma un solo account Binance per deploy.
+
+1. Su Binance: *Profilo › Gestione API › Crea API*. Permessi: **solo «Abilita lettura»**
+   (niente trading, niente prelievi). Se ti è possibile, restringi la chiave all'IP del server.
+2. Nel `.env.local` (e nelle variabili d'ambiente di Vercel), mai con prefisso `NEXT_PUBLIC_`:
+
+```bash
+BINANCE_API_KEY=...
+BINANCE_API_SECRET=...
+```
+
+3. Riavvia l'app. Senza le due variabili il tile risponde «Collegamento Binance non configurato».
+
+Sulla regione: Binance blocca alcune aree geografiche (tra cui gli Stati Uniti). Le funzioni
+Vercel sono in `fra1`, che va bene; un host in un'area bloccata risponderebbe con un errore di
+Binance, non del tile.
+
 ## Vercel Deployment
 
 > **La sync Scalable NON funziona su Vercel**, e il rifiuto è intenzionale. Per il perché e per

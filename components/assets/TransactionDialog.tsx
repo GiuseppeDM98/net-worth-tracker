@@ -211,11 +211,18 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
   // An asset whose ledger contains at least one broker-imported transaction is considered
   // broker-managed: manual sells are disabled because the broker import pipeline owns them.
   const brokerSource = useMemo<AssetTransactionSource | null>(
-    () => existingTransactions.find((t) => t.source === 'scalable' || t.source === 'traderepublic')?.source ?? null,
+    () => existingTransactions.find((t) => t.source !== undefined)?.source ?? null,
     [existingTransactions]
   );
   const isBrokerManaged = brokerSource !== null;
-  const brokerLabel = brokerSource === 'scalable' ? 'Scalable Capital' : brokerSource === 'traderepublic' ? 'Trade Republic' : '';
+  const brokerLabel =
+    brokerSource === 'scalable'
+      ? 'Scalable Capital'
+      : brokerSource === 'traderepublic'
+        ? 'Trade Republic'
+        : brokerSource === 'binance'
+          ? 'Binance'
+          : '';
 
   const {
     register,

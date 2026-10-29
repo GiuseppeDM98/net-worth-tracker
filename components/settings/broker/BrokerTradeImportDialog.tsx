@@ -38,6 +38,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { formatCurrency, formatDate, formatNumberIt } from '@/lib/utils/formatters';
+import { errorMessage } from '@/lib/utils/errorMessage';
 import { queryKeys } from '@/lib/query/queryKeys';
 import { signChipClass } from '@/lib/utils/metricColors';
 import {
@@ -113,6 +114,12 @@ function countLabel(count: number, singular: string, plural: string): string {
   return count === 1 ? singular : plural;
 }
 
+/** The success line, out of the `try` that writes: the realized-gain clause is a ternary. */
+function importedMessage(imported: number, realizedPnlEur: number): string {
+  const realized = realizedPnlEur !== 0 ? ` · plusvalenza ${formatCurrency(realizedPnlEur)}` : '';
+  return `${imported} operazioni importate${realized}.`;
+}
+
 export function BrokerTradeImportDialog({
   open,
   onClose,
@@ -171,7 +178,7 @@ export function BrokerTradeImportDialog({
           setLoaded({
             requestKey,
             phase: 'failed',
-            error: err instanceof Error ? err.message : 'Lettura non riuscita: riprova.',
+            error: errorMessage(err, 'Lettura non riuscita: riprova.'),
             preview: null,
             approved: NO_APPROVED,
             outcome: null,
@@ -208,11 +215,7 @@ export function BrokerTradeImportDialog({
       ]);
       if (written.failed.length === 0) {
         setLoaded({ ...subject, phase: 'ready', outcome: written });
-        const realized =
-          written.realizedPnlEur !== 0
-            ? ` · plusvalenza ${formatCurrency(written.realizedPnlEur)}`
-            : '';
-        toast.success(`${written.imported} operazioni importate${realized}.`);
+        toast.success(importedMessage(written.imported, written.realizedPnlEur));
         onClose();
       } else {
         // A partial write STAYS OPEN, with the failures listed: the user has to see which operations
@@ -224,7 +227,7 @@ export function BrokerTradeImportDialog({
       setLoaded({
         ...subject,
         phase: 'failed',
-        error: err instanceof Error ? err.message : 'Salvataggio non riuscito: riprova.',
+        error: errorMessage(err, 'Salvataggio non riuscito: riprova.'),
       });
     }
   };

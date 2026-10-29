@@ -46,4 +46,6 @@ export interface BrokerTradeImportResultDto {
   duplicates: number;
   failed: { sourceRef: string; message: string }[];
   realizedPnlEur: number;
+  /** Binance only: coins whose Registro quantity was raised to the real balance with an adjustment. */
+  reconciled?: number;
 }

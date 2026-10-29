@@ -842,25 +842,30 @@ export interface BrokerConnectionsInput {
  * when the input that justifies it is absent, and here that input is the broker.
  */
 export function describeBrokerConnections(
-  broker: 'scalable' | 'traderepublic' | 'intesa' | 'azimut',
+  broker: 'scalable' | 'traderepublic' | 'intesa' | 'azimut' | 'binance',
   { lastSyncAt, holdingsCount, cashBalance, savingsPlanCount }: BrokerConnectionsInput
 ): Narrative {
   const isTradeRepublic = broker === 'traderepublic';
   const isIntesa = broker === 'intesa';
   const isAzimut = broker === 'azimut';
+  const isBinance = broker === 'binance';
   const isFileBroker = isIntesa || isAzimut;
-  const brokerName = isAzimut
-    ? 'Azimut'
-    : isIntesa
-      ? 'Intesa Sanpaolo'
-      : isTradeRepublic
+  const brokerName = isBinance
+    ? 'Binance'
+    : isAzimut
+      ? 'Azimut'
+      : isIntesa
+        ? 'Intesa Sanpaolo'
+        : isTradeRepublic
         ? 'Trade Republic'
         : 'Scalable';
 
   if (!lastSyncAt) {
     return [
       prose(
-        isAzimut
+        isBinance
+          ? 'Nessuna sincronizzazione Binance: la sincronizzazione legge i saldi di Spot, Funding ed Earn, in sola lettura.'
+          : isAzimut
           ? 'Nessun import Azimut: carica il file XLSX del portafoglio per controllare le posizioni prima di salvarle.'
           : isIntesa
             ? 'Nessun import Intesa Sanpaolo: carica il file XLSX del portafoglio per controllare le posizioni prima di salvarle.'
@@ -890,7 +895,9 @@ export function describeBrokerConnections(
         ? ' — prezzi e quantità letti dal file, non aggiornati in automatico.'
         : isTradeRepublic
           ? ' — le quantità restano del Registro, i prezzi arrivano da Yahoo.'
-          : ' — i prezzi si aggiornano, le quantità restano del Registro.'
+          : isBinance
+            ? ' — le quantità restano del Registro, i prezzi arrivano da Yahoo o da Binance.'
+            : ' — i prezzi si aggiornano, le quantità restano del Registro.'
     ),
   ];
 }
