@@ -31,7 +31,11 @@
    scattered across several.
 
 4. **Always answer in Italian** when working on this repo. This applies to the conversational
-   channel; code, identifiers and comments stay in English.
+   channel; code, identifiers and comments stay in English. **Every tracked document is written in
+   English too** (2026-11-01: guides, specs, series indexes, SESSION_NOTES.md's blocks): Italian is
+   reserved for the UI text a document quotes, for page and feature names (they are the labels the
+   product shows) and for the owner's own words, quoted as such. A guide still in Italian is rewritten
+   in English the first time a session rewrites it anyway, never in a session of its own.
 
 5. **Questions and proposals are asked interactively** (2026-09-11). When a decision is the owner's —
    which layers to build, on which surfaces, a wording — put it through the agent's interactive
