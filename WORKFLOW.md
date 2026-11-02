@@ -32,12 +32,13 @@
 
 4. **Always answer in Italian** when working on this repo. This applies to the conversational
    channel; code, identifiers and comments stay in English. **Every tracked document is written in
-   English too** (2026-11-01: guides, specs, series indexes, SESSION_NOTES.md's blocks): Italian is
-   reserved for the UI text a document quotes, for page and feature names (they are the labels the
+   the repo's documentation language** (2026-11-01): English in the open repos, Italian where the
+   repo's documentation is Italian (its WORKFLOW.md says which). In an English-language repo, Italian
+   is reserved for the UI text a document quotes, for page and feature names (they are the labels the
    product shows) and for the owner's own words, quoted as such — the launch prompt at the end of a
-   spec (its § 11, the text the owner pastes) is the owner's words and stays in Italian (2026-11-01).
-   A guide still in Italian is rewritten in English the first time a session rewrites it anyway, never
-   in a session of its own.
+   spec, the text the owner pastes, is the owner's words and stays in Italian. A guide still in the
+   other language is rewritten the first time a session rewrites it anyway, never in a session of its
+   own.
 
 5. **Questions and proposals are asked interactively** (2026-09-11). When a decision is the owner's —
    which layers to build, on which surfaces, a wording — put it through the agent's interactive
@@ -130,6 +131,16 @@ disappear. The verification is done together, in chat, one phase at a time.
    does not cover**, and never ask the owner to redo by hand something already verified. Whatever
    the tour finds becomes an assertion before the session ends, or it will come back: the tour
    exists to discover what nobody thought to assert, not to replace the tests.
+
+**A before/after comparison of screenshots is shown cropped, one item at a time** (2026-10-30, after
+«I don't understand the differences between before and after, which images am I supposed to compare?»
+in front of twenty near-identical PNGs): never a folder of files to open. The agent opens a browser
+window on an HTML page with BEFORE and AFTER **cropped to the area that changes** — one above the
+other, or side by side for phone screenshots — and **enlarged** when the difference is a few pixels (a
+darker grey), with a title saying where to look; before talking about it, it checks the crop with a
+headless screenshot of the same page. The message says «Comparison N of M», what changes and which
+side is which; the window rules of obligation 5 apply (one item per message, closed and counted before
+the next).
 
 ### Standard phases, when they make sense
 
