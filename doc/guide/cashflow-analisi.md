@@ -213,7 +213,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   remainder), so three equal types read 34 + 33 + 33 and never 99; `percentage` stays unrounded and nothing on screen
   prints it. Colours: the one type map
   (`EXPENSE_TYPE_COLOR_VAR`, savings `CASHFLOW_SERIES_COLOR.income`), never the Sankey's hex. The subcategory toggle
-  and the node count are hidden there. The rules of the roles themselves are in doc/guide/cashflow.md § Ruoli 50/30/20.
+  and the node count are hidden there. The rules of the roles themselves are in doc/guide/cashflow.md § 50/30/20 roles.
 - **`RankedRows` is a real `<ul>`, and a clickable row is a real `<button>` inside its `<li>`** — named
   «{label} · {caption}, {amount}, {share}%» (the caption is the day and the subcategory of a single expense) with
   `aria-current` on the focused one. Never `role="listitem"` on the button (the `CompositionList` habit): the explicit
