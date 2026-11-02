@@ -1,12 +1,12 @@
-# Cashflow — meccanica delle spese condivisa
+# Cashflow — shared expense mechanics
 
-> **Quando aprire questa guida** — questa guida copre le regole comuni a tutte le tab
-> Cashflow (Tracciamento, Analisi, Budget, Dividendi, Divisione) e ai Centri di Costo — segno,
-> ricorrenze, import, raggruppamento, drill-down, Sankey. Aprila quando tocchi
+> **When to open this guide** — this guide covers the rules shared by every Cashflow tab
+> (Tracciamento, Analisi, Budget, Dividendi, Divisione) and by Centri di Costo — sign,
+> recurrences, import, grouping, drill-down, Sankey. Open it when you touch
 > `lib/utils/{expenseGrouping,expenseTypeTransition,recurrenceDates,expenseImport,cashflowSankey}.ts`,
-> `lib/services/expenseImportService.ts`, `handleEntitySelect` in `AnalisiTab.tsx` o i loro
-> consumatori. In `AGENTS.md` resta lo stub con l'essenziale; qui c'è la regola completa.
-> Moduli e file: § *Files*, sotto.
+> `lib/services/expenseImportService.ts`, `handleEntitySelect` in `AnalisiTab.tsx` or their
+> consumers. In `AGENTS.md` only the stub with the essentials remains; the full rule is here.
+> Modules and files: § *Files* below.
 
 ## Files
 
@@ -268,7 +268,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   expense category of the same name close a cycle through Budget and `computeNodeDepths` throws `"circular link"`,
   blanking the chart. **Ids are opaque**: `index` is the only sanctioned way to ask what a node is.
 
-## Ruoli 50/30/20: Necessità · Desideri · Risparmi (`lib/utils/spendingRoles.ts`)
+## 50/30/20 roles: Necessità · Desideri · Risparmi (`lib/utils/spendingRoles.ts`)
 - **Opt-in** (`settings.spendingRolesEnabled`, default off, Impostazioni › Spese › «Ruoli 50/30/20», the five write
   places) and meant for Analisi's Flusso only (doc/guide/cashflow-analisi.md): no 50/30/20 tile, no budget per role,
   nothing in emails, PDF or the assistant. Off, the app is exactly what it was — the role colours are not even read

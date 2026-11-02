@@ -1,11 +1,11 @@
 # Cashflow › Tracciamento
 
-> **Quando aprire questa guida** — chi tocca `components/cashflow/ExpenseTrackingTab.tsx`
-> (stato, handler, la griglia; `applyListFilters` a livello di modulo) e
-> `components/cashflow/tiles/*`, o le pure `lib/utils/{tracciamentoSummary,cashflowNarrative}.ts`.
-> In `AGENTS.md` resta lo stub con l'essenziale; qui c'è la regola completa. Moduli e file:
-> § *Files*, sotto. Le regole comuni a tutte le
-> tab Cashflow (segno, ricorrenze, import, raggruppamento, drill-down, Sankey) vivono in
+> **When to open this guide** — you are editing `components/cashflow/ExpenseTrackingTab.tsx`
+> (state, handlers, the grid; `applyListFilters` at module level) and
+> `components/cashflow/tiles/*`, or the pure `lib/utils/{tracciamentoSummary,cashflowNarrative}.ts`.
+> In `AGENTS.md` only the stub with the essentials remains; the full rule is here. Modules and files:
+> § *Files*, below. The rules shared by every
+> Cashflow tab (sign, recurrences, import, grouping, drill-down, Sankey) live in
 > `doc/guide/cashflow.md`.
 
 ## Files
@@ -66,7 +66,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   a total that genuinely EXCLUDES them, so on Tracciamento and Analisi the words have to be unambiguous.
   **A row dated after today is `isScheduledRow`** — after TODAY, by Italian calendar DAY and never by instant
   (`isItalyDayAfter`): a row saved from the dialog carries its creation time and the page's `now` is frozen at mount,
-  so an instant comparison chipped a spesa recorded an hour ago. The same day rule governs `splitSpendingAtDate`,
+  so an instant comparison chipped an expense recorded an hour ago. The same day rule governs `splitSpendingAtDate`,
   `budgetUtils`' two splits and `costCenterSummary`'s `isBooked`, so the four surfaces agree on what «oggi» is.
   A scheduled row takes the chip «In calendario» in the feed, the table and the detail drawer, and its amount drops
   the sign colour (the sign tokens mean gained and lost, and it is neither yet). The two month charts draw the months not started at reduced opacity, never outlined — the
@@ -247,4 +247,4 @@ Composed on 2026-10-12 (PR #454; its spec, retired the same day, is in `git log 
 
 - **The trio's spending arrow repeats the first sentence's pacing on a phone** (seen 2026-10-15 on the census fixture, once the previous month's same days hold rows: «in aumento del 121,2%» in the sentence and «↑ 121,2%» under Spese, 7 figures outside the verdict at 390): Analisi lifts that arrow (`CashflowKpiTrio`'s `expensesDeltaLifted`, since 2026-10-14), Tracciamento does not — the owner's call that day was for Analisi alone. Whether to lift it here too is a decision not taken; `perf/mobile-budget.json` records the 7 with its `raisedBy`.
 - **The trio loses its three figures at 390** (2026-10-12): the strip prints them, THE tile keeps the labels, the deltas, the rate and the coverage, up to 1439 (on a tablet too since 2026-10-16); whole at 1440, where there is no strip. **The title stands alone** over the strip whenever the month has no calendar ahead («Il perché · le cifre del periodo»): the first sentence would reprint the three cells, so the «solo titolo» deroga (DESIGN.md → The Binding-Clause Rule) is declared here, not a cut gone missing. A row saved out of the period, or that the list's filters would hide, opens no row and moves no filter — the toast is the only sign. With nothing in and nothing out the verdict is whole, no «Il perché».
-- **Tracciamento**: a period never opened before shows the tiles' skeleton while its window is read (the pickers stay), and the pickers offer every year between the oldest and the newest row, one with no row included; the period slice uses `periodToRange` (browser local time) while the month buckets use the Italian calendar; the phone bar's controls are 36px; `TransactionFeed`/`CompactExpenseRow` carry two pre-existing `react-hooks` errors; a custom range has no previous period; the month-end projection exists only in the current month; `components/dashboard/overview/NarrativeText.tsx` is an unused re-export (knip). The hero's KPIs print the PERIOD's totals (calendar included) beside a delta measured on the lived window («↓ 70,1% vs 1–14 ago» under a whole-month 1953 €) — the verdict's second sentence is what reconciles the two, by design. The Movimenti reading still sums scheduled spending and income into one figure («7 in calendario (3753 €)»). The `describePeriodCashflow` reading and `expenseEntityStats` keep their own windows (§ *Two conventions now coexist on purpose*, above in this guide — the citation pointed at an `AGENTS.md` section that left it with the 2026-09-06 scorporo).
+- **Tracciamento**: a period never opened before shows the tiles' skeleton while its window is read (the pickers stay), and the pickers offer every year between the oldest and the newest row, one with no row included; the period slice uses `periodToRange` (browser local time) while the month buckets use the Italian calendar; the phone bar's controls are 36px; `TransactionFeed`/`CompactExpenseRow` carry two pre-existing `react-hooks` errors; a custom range has no previous period; the month-end projection exists only in the current month; `components/dashboard/overview/NarrativeText.tsx` is an unused re-export (knip). The hero's KPIs print the PERIOD's totals (calendar included) beside a delta measured on the lived window («↓ 70,1% vs 1–14 ago» under a whole-month 1953 €) — the verdict's second sentence is what reconciles the two, by design. The Movimenti reading still sums scheduled spending and income into one figure («7 in calendario (3753 €)»). The `describePeriodCashflow` reading and `expenseEntityStats` keep their own windows (§ *Two conventions now coexist on purpose*, above in this guide — the citation pointed at an `AGENTS.md` section that left it with the 2026-09-06 carve-out).
