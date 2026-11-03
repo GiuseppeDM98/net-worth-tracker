@@ -177,7 +177,7 @@ after uses it under those names, IDENTICAL (§ 7).
 
 | Spec | Title | Effort | Depends on | Model · effort | Status |
 |---|---|---|---|---|---|
-| [AI-00](AI-00-dipendenze.md) | Dependency upgrade | S | — | Opus 5.5 · medium | implemented on 2026-11-03, PR #NNN (read on 2026-11-01, decisions 33, 41–43, 75, 76 in § 3) |
+| [AI-00](AI-00-dipendenze.md) | Dependency upgrade | S | — | Opus 5.5 · medium | implemented on 2026-11-03, PR #497 (read on 2026-11-01, decisions 33, 41–43, 75, 76 in § 3) |
 | [AI-01](AI-01-direzione-visiva-consulente.md) | The visual direction: three concepts, one choice (Consulente and Assistente) | M | AI-00 (order only) | Fable 5.1 · high, on the Windows machine | read on 2026-11-01 (adversarial reading, 31 findings, decisions 26, 36–38, 44, 49–51, 74 in § 3) |
 | [AI-02](AI-02-blocco-cashflow-consulente.md) | The Consulente's cashflow block | M | AI-00 | Opus 5.5 · high | read on 2026-11-01 (adversarial reading, 32 findings, decisions 25, 27, 45–48 in § 3) |
 | [AI-03](AI-03-redesign-percorso-corsa-report.md) | The redesign of the path, the run and the report; `ChoiceList`; the DOM test harness | L | AI-00, AI-01 | Fable 5.1 · xhigh | read on 2026-11-01 (adversarial reading, 46 findings, decisions 21, 36, 37, 39, 49–52 in § 3) |

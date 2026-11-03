@@ -48,16 +48,16 @@ The open rows of the audit of 2026-11-03. Compared at every session start; a row
 
 | Date | Package | From → to | Advisory cured | PR |
 | --- | --- | --- | --- | --- |
-| 2026-11-03 | zod | 4.4.3 → 4.6.7 | memory exhaustion on oversized constrained collections | #NNN |
-| 2026-11-03 | re2js (under @firebase/firestore) | 2.8.6 → 2.9.1 | lookbehind DoS | #NNN |
-| 2026-11-03 | undici | 6.29.0 → 6.29.1 · 7.30.0 → 7.30.1 · 8.11.2 → 8.12.3 | DoS, TLS validation, cache poisoning (nine advisories) | #NNN |
-| 2026-11-03 | vitest and `@vitest/*` | 4.1.11 → 4.1.12 | code injection via mock registration; Windows backslash traversal | #NNN |
-| 2026-11-03 | vite (rolldown 1.1.5 → 1.2.16) | 8.1.5 → 8.3.5 | launch-editor on Windows | #NNN |
-| 2026-11-03 | storybook, `@storybook/*`, eslint-plugin-storybook | 10.4.1 → 10.6.5 | origin validation in the preview; code injection from the local network | #NNN |
-| 2026-11-03 | esbuild (one copy; tsx's nested 0.28.1 deduped away) | 0.27.7 → 0.28.2 | file read from the dev server on Windows | #NNN |
-| 2026-11-03 | body-parser | 1.20.8 → 1.20.9 · 2.3.0 → 2.4.0 | DoS on a compressed body | #NNN |
-| 2026-11-03 | qs · fast-uri · ip-address | 6.16.0 → 6.16.2 · 3.1.8 → 3.1.9 · 10.7.3 → 10.7.5 | DoS in stringify; URI spoofing; quadratic zone match | #NNN |
-| 2026-11-03 | @hono/node-server | 1.19.17 → 2.1.6 (published 2026-11-02, the newest in `@modelcontextprotocol/sdk`'s `^1.19.9 \|\| ^2.0.5`; a major inside the parent's range) | `serveStatic` decoding the path twice | #NNN |
+| 2026-11-03 | zod | 4.4.3 → 4.6.7 | memory exhaustion on oversized constrained collections | #497 |
+| 2026-11-03 | re2js (under @firebase/firestore) | 2.8.6 → 2.9.1 | lookbehind DoS | #497 |
+| 2026-11-03 | undici | 6.29.0 → 6.29.1 · 7.30.0 → 7.30.1 · 8.11.2 → 8.12.3 | DoS, TLS validation, cache poisoning (nine advisories) | #497 |
+| 2026-11-03 | vitest and `@vitest/*` | 4.1.11 → 4.1.12 | code injection via mock registration; Windows backslash traversal | #497 |
+| 2026-11-03 | vite (rolldown 1.1.5 → 1.2.16) | 8.1.5 → 8.3.5 | launch-editor on Windows | #497 |
+| 2026-11-03 | storybook, `@storybook/*`, eslint-plugin-storybook | 10.4.1 → 10.6.5 | origin validation in the preview; code injection from the local network | #497 |
+| 2026-11-03 | esbuild (one copy; tsx's nested 0.28.1 deduped away) | 0.27.7 → 0.28.2 | file read from the dev server on Windows | #497 |
+| 2026-11-03 | body-parser | 1.20.8 → 1.20.9 · 2.3.0 → 2.4.0 | DoS on a compressed body | #497 |
+| 2026-11-03 | qs · fast-uri · ip-address | 6.16.0 → 6.16.2 · 3.1.8 → 3.1.9 · 10.7.3 → 10.7.5 | DoS in stringify; URI spoofing; quadratic zone match | #497 |
+| 2026-11-03 | @hono/node-server | 1.19.17 → 2.1.6 (published 2026-11-02, the newest in `@modelcontextprotocol/sdk`'s `^1.19.9 \|\| ^2.0.5`; a major inside the parent's range) | `serveStatic` decoding the path twice | #497 |
 
 AI-03 adds its `jsdom` / `@testing-library/*` row here and runs the gate below once (doc/ai README, decision 21).
 `@testing-library/dom` 10.4.2 and `user-event` 14.6.8 are already hoisted, under storybook, undeclared.
