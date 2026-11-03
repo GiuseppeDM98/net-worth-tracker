@@ -23,13 +23,13 @@ import {
   OWNER_COMMON_LABEL,
   OWNER_UNASSIGNED_LABEL,
   hasCostFigures,
-  ownershipRowOn,
   resolveAssetOwnership,
   summarizeOwnership,
   type OwnershipRow,
 } from '@/lib/utils/assetOwnership';
 import { describeOwnership, describeOwnershipAnswer, describeOwnershipAside, describeOwnershipFooter, OWNERSHIP_FOOTER } from '@/lib/utils/patrimonioNarrative';
 import { narrativeToText } from '@/lib/utils/narrative';
+import { ownershipRowOn } from '@/lib/utils/ownershipBasis';
 
 const asset = (overrides: Partial<Asset> & { id: string }): Asset =>
   ({
