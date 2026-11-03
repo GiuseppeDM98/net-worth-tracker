@@ -33,6 +33,9 @@ const EMULATOR_ENV = {
 };
 const USER_COLLECTIONS = ['assets', 'expenses', 'expenseCategories', 'monthly-snapshots', 'assetTransactions', 'pensionContributions', 'dividends', 'costCenters', 'goals', 'assistantThreads'];
 const PER_USER_DOCS = ['users', 'assetAllocationTargets', 'assetTransactionsMeta', 'budgets', 'hall-of-fame', 'performance-cache', 'dashboardOverviewSummaries', 'goalBasedInvesting'];
+// Written by the app DURING a tour, never read from production: a Consulente run leaves its report and its
+// answers in allocationAdvice, the theme lands in userPreferences. mirror:remove left both behind until 2026-11-03.
+const TOUR_ONLY_DOCS = ['allocationAdvice', 'userPreferences'];
 
 type AnyRecord = Record<string, unknown>;
 const [command, argument] = process.argv.slice(2);
@@ -171,7 +174,7 @@ async function removeRows(db: FirebaseFirestore.Firestore) {
     await batch.commit();
     if (snap.size > 0) console.info(`removed ${c}: ${snap.size}`);
   }
-  for (const c of PER_USER_DOCS) await db.collection(c).doc(MIRROR_UID).delete();
+  for (const c of [...PER_USER_DOCS, ...TOUR_ONLY_DOCS]) await db.collection(c).doc(MIRROR_UID).delete();
 }
 
 try {

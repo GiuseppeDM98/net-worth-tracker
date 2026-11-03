@@ -10,7 +10,7 @@ import type { Dispatch } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import type { Asset, FamilyMember } from '@/types/assets';
 import type { CostCenter } from '@/types/costCenters';
-import { REAL_ESTATE_COST_TYPES, type LifePolicyMode, type RealEstateOperationAnswers, type RealEstateOperationScreen } from '@/types/realEstateOperation';
+import { REAL_ESTATE_COST_LABELS, REAL_ESTATE_COST_TYPES, type LifePolicyMode, type RealEstateOperationAnswers, type RealEstateOperationScreen } from '@/types/realEstateOperation';
 import type { RealEstateOperationAction } from '@/lib/utils/realEstateOperationDraft';
 import { costKindsOf, propertyChoices } from '@/lib/utils/realEstateOperationDraft';
 import { futureSeriesAfter, loansFinancing, type RealEstatePlanContext } from '@/lib/utils/realEstateOperationPlan';
@@ -18,7 +18,6 @@ import {
   LIFE_POLICY_INSURED_HINT,
   LIFE_POLICY_LINK_HINT,
   LIFE_POLICY_NO_MEMBERS_HINT,
-  REAL_ESTATE_COST_LABELS,
   describeBalance,
   describeMortgageEnd,
   describeMortgageInstalment,

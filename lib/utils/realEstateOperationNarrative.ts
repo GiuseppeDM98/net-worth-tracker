@@ -8,7 +8,7 @@
 
 import { MONTH_NAMES } from '@/lib/constants/months';
 import { cachedFormatCurrencyEUR } from '@/lib/utils/formatters';
-import type { RealEstateCostKind, RealEstateOperationAnswers, RealEstateOperationScreen } from '@/types/realEstateOperation';
+import { REAL_ESTATE_COST_LABELS, type RealEstateCostKind, type RealEstateOperationAnswers, type RealEstateOperationScreen } from '@/types/realEstateOperation';
 import {
   addMonthsIso,
   COST_NOTE,
@@ -51,23 +51,6 @@ export const LIFE_POLICY_NO_MEMBERS_HINT = 'Per scegliere l’assicurato aggiung
 
 /** Under a life policy's «Legata alla casa». */
 export const LIFE_POLICY_LINK_HINT = 'Una CPI del mutuo: alla vendita la casa propone di fermarla. Una polizza personale resta libera.';
-
-/** The label each cost row carries on the costs screen and in Impostazioni › Spese. */
-export const REAL_ESTATE_COST_LABELS: Record<RealEstateCostKind, string> = {
-  agency: 'Agenzia',
-  notary: 'Notaio',
-  purchaseTaxes: 'Imposte d’acquisto (registro o IVA, ipotecaria e catastale)',
-  mortgageCosts: 'Istruttoria e perizia del mutuo',
-  mortgageTax: 'Imposta sostitutiva sul mutuo',
-  homeInsurance: 'Polizza scoppio e incendio',
-  lifeInsurance: 'Polizza vita / CPI',
-  mortgageInstalment: 'Rata e estinzione del mutuo',
-  insuranceLoanInstalment: 'Rata del prestito di una polizza',
-  saleCertificates: 'Certificazioni e pratiche (APE, conformità)',
-  capitalGainsTax: 'Imposta sulla plusvalenza',
-  payoffCosts: 'Costi dell’estinzione (penale, interessi del periodo)',
-  insuranceRefund: 'Rimborso di una polizza',
-};
 
 /** The words of a screen: its eyebrow, its question, its help line. */
 export interface ScreenCopy {

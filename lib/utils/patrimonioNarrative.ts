@@ -30,7 +30,8 @@ import {
 } from '@/lib/utils/salesNarrative';
 import type { Narrative, NarrativeSegment, PageVerdictModel, VerdictTone } from '@/lib/utils/narrative';
 import type { MonthFlows } from '@/lib/utils/marketEffect';
-import { ownershipRowOn, type OwnershipBasis, type OwnershipSummary } from '@/lib/utils/assetOwnership';
+import type { OwnershipBasis, OwnershipSummary } from '@/lib/utils/assetOwnership';
+import { ownershipRowOn } from '@/lib/utils/ownershipBasis';
 import type { MortgageSummary, MortgageYear } from '@/lib/utils/mortgageSummary';
 
 export interface PatrimonioVerdictInput {

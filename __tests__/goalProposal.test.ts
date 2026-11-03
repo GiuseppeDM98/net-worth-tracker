@@ -120,6 +120,12 @@ describe('the proposal that MODIFIES a goal and names its instruments (2026-10-2
     expect(goalProposalSchema.safeParse({ ...VALID, goalId: '' }).success).toBe(false);
   });
 
+  it('takes twenty instruments and refuses a twenty-first', () => {
+    const assignments = Array.from({ length: 21 }, (_, index) => ({ assetName: `ETF ${index + 1}`, percentage: 10 }));
+    expect(parseGoalProposal(JSON.stringify({ ...VALID, assignments }))).toBeNull();
+    expect(parseGoalProposal(JSON.stringify({ ...VALID, assignments: assignments.slice(0, 20) }))?.assignments).toHaveLength(20);
+  });
+
   it('keeps a proposal without them a plain creation', () => {
     const proposal = parseGoalProposal(JSON.stringify(VALID));
     expect(proposal?.goalId).toBeUndefined();

@@ -194,11 +194,6 @@ export interface OwnershipRow {
 /** What the tile's rows and reading are measured on: today's value, or the price of carry (2026-10-18). */
 export type OwnershipBasis = 'value' | 'cost';
 
-/** A row's amount and share on the chosen basis — the rows, the reading and the answer read ONE rule. */
-export function ownershipRowOn(row: OwnershipRow, basis: OwnershipBasis): { value: number; sharePct: number | null } {
-  return basis === 'cost' ? { value: row.costValue, sharePct: row.costSharePct } : { value: row.value, sharePct: row.sharePct };
-}
-
 /**
  * Whether the summary carries the carry figures at all: a Panoramica payload cached before source
  * version 25 has rows without `costValue`, and the tile offers no switch on it (the day's first

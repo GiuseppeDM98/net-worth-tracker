@@ -13,9 +13,8 @@ import { ErrorNotice } from '@/components/ui/error-notice';
 import { CategoryField } from '@/components/assets/compravendita/fields';
 import { describeReadFailure, type SurfaceState } from '@/lib/utils/statesNarrative';
 import { withRealEstateDefault } from '@/lib/utils/settingsDraft';
-import { REAL_ESTATE_COST_LABELS } from '@/lib/utils/realEstateOperationNarrative';
 import { describeRealEstateCategoriesSetting } from '@/lib/utils/settingsNarrative';
-import { REAL_ESTATE_COST_KINDS, REAL_ESTATE_COST_TYPES, realEstateDefaultsByKind, type RealEstateCostDefault } from '@/types/realEstateOperation';
+import { REAL_ESTATE_COST_KINDS, REAL_ESTATE_COST_LABELS, REAL_ESTATE_COST_TYPES, realEstateDefaultsByKind, type RealEstateCostDefault } from '@/types/realEstateOperation';
 import type { ExpenseCategory } from '@/types/expenses';
 
 interface RealEstateDefaultsTileProps {

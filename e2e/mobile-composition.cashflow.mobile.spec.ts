@@ -340,8 +340,13 @@ test.describe('Cashflow › Budget, composed for a phone, with a ceiling of 1000
     // 2026-10-10 («~11.274 €» under «Oltre» in a third of a 390px tile) — only «Al giorno» stays
     // in the row. Seen red on 2026-10-12 with the lift ignored (`lifted()` returning nothing).
     const liftedKpis = page.locator('#bud-tetto [class~="max-desktop:hidden"]');
-    await expect(liftedKpis).toHaveCount(2);
-    for (let i = 0; i < 2; i++) await expect(liftedKpis.nth(i)).toBeHidden();
+    // On the month's first three days there is no pace: «Fine mese» has no value to lift
+    // (`liftedBlocks` skips a null) and stays in the row, so only «Oltre» is lifted. Red on those
+    // days from 2026-10-12 to 2026-11-03, when a full run first landed on one.
+    const italyDay = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Rome', day: 'numeric' }).format(new Date()));
+    const liftedCount = italyDay >= 4 ? 2 : 1;
+    await expect(liftedKpis).toHaveCount(liftedCount);
+    for (let i = 0; i < liftedCount; i++) await expect(liftedKpis.nth(i)).toBeHidden();
 
     // At 1440 the KPIs are printed again, side by side, each a container whose figure shrinks to
     // its cell (`container-type: inline-size`): a guard, not a proof of the overlap — no figure of

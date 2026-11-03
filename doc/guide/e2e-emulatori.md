@@ -91,7 +91,11 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   nothing touches the disk. The child re-keys everything to `prod-mirror` (`userId` on every row, the snapshot ids
   `{uid}-{y}-{m}`, the per-user docs), creates `mirror@example.com` / `test1234`, and leaves the caches out so the app
   recomputes with the current math. The account is a standard; the data is removed at the end of the session
-  (`MIRROR_UID=… npm run mirror:remove` clears one seeded under another id).
+  (`MIRROR_UID=… npm run mirror:remove` clears one seeded under another id). **What the app writes during a tour goes
+  too** (2026-11-03, `TOUR_ONLY_DOCS`): a Consulente run leaves `allocationAdvice/prod-mirror` with its report and answers, the
+  theme `userPreferences/prod-mirror`, and neither is read from production; a new per-account document the app writes joins that
+  list. Check after a tour by listing the emulator's collections for `prod-mirror`. A saved `.emulator-data` older than that
+  date may bring a `userPreferences/prod-mirror` back at the next start: it is local and git-ignored.
 - **Stopping the emulators: export FIRST, then kill.** `--export-on-exit` runs only on a SIGINT delivered to the
   `firebase` CLI process itself: on macOS `kill -INT <cli pid>` does it (2026-09-06) — but not reliably on emulators started as
   a background task of the agent's session (2026-09-20: 80 s with no export and the ports still held; the hub's export below
@@ -367,6 +371,7 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
     `patchOverview`'s route callback still had the overview refetch in flight (`route.fetch: Test ended` at
     `overviewFixture.ts:73`) — a harness race of a 2,6 s test, not a page fact. If it returns, end that test with
     `page.unrouteAll({ behavior: 'ignoreErrors' })`.
+- **A full run on the month's first three days reads a different Budget** (2026-11-03): `mobile-composition.cashflow.mobile.spec.ts` «the two cells open the right row» counted two lifted KPIs, one on those days (no pace, `liftedBlocks` skips «Fine mese»); it now reads the Italian day. Not a flake: a test written on a later day stays green until a run lands there. **A seed that ran before the Auth emulator was up** gave 12 red in one full run the same day (`seed exit=1`, the fixtures missing): wait on BOTH :8080 and :9099 before `emulators:seed`.
 - **`e2e/cashflow.transfer-fee.spec.ts` was red ONCE in a full run** (2026-10-07, Windows machine, the second full run
   of PR #434, which did not touch transfers): green alone and in the suite's order, cause not traced. A second red
   there is a pattern, not noise — note the run before re-running it. **`e2e/cashflow.mobile.spec.ts` › «every tab of the
