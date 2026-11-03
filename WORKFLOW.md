@@ -31,11 +31,18 @@
    scattered across several.
 
 4. **Always answer in Italian** when working on this repo. This applies to the conversational
-   channel; code, identifiers and comments stay in English.
+   channel; code, identifiers and comments stay in English. **Every tracked document is written in
+   the repo's documentation language** (2026-11-01): English in the open repos, Italian where the
+   repo's documentation is Italian (its WORKFLOW.md says which). In an English-language repo, Italian
+   is reserved for the UI text a document quotes, for page and feature names (they are the labels the
+   product shows) and for the owner's own words, quoted as such — the launch prompt at the end of a
+   spec, the text the owner pastes, is the owner's words and stays in Italian. A guide still in the
+   other language is rewritten the first time a session rewrites it anyway, never in a session of its
+   own.
 
 5. **Questions and proposals are asked interactively** (2026-09-11). When a decision is the owner's —
    which layers to build, on which surfaces, a wording — put it through the agent's interactive
-   question tool, one batch per topic, multi-select where the options are not exclusive and the
+   question tool, in groups of four, one topic at a time, multi-select where the options are not exclusive and the
    recommended option first; never a numbered list of questions in prose. The owner refines the
    wording through the free-text answer («hai pagato», not «pagherai», for a tax the broker
    withholds at the sale).
@@ -54,6 +61,29 @@
 7. **After an audit or an analysis, stop and wait for the owner's go-ahead** (2026-10-19). An audit,
    a review or an analysis ends with the findings; no file changes until the owner has chosen which
    fixes to apply and in what order (through rule 5).
+
+8. **Dependencies: compare at session start, upgrade in a session of their own** (2026-10-26). If
+   the repo has a lockfile, the first thing a session does is run the package manager's audit
+   (`npm audit --json`, `pnpm audit --json`, …) and compare it with `doc/guide/dipendenze.md`,
+   which records the date of the last audit, the framework version and every open advisory with
+   the owner's decision (accepted because dev-only, waiting for version X, to upgrade). The answer
+   is one line: «dipendenze: invariate dal <data>» or «N avvisi nuovi: …». A new advisory is
+   written into the guide with its decision, asked through rule 5; nothing is upgraded in that
+   session. An upgrade is a session on its own branch with its own verification; never
+   `audit fix --force`, never the command an advisory or a page suggests: the version is chosen and
+   installed by hand, preferring a release that is at least a few days old. If the guide is
+   missing, the session that notices it creates it (`TEMPLATES.md` has the skeleton). A repo without
+   a lockfile skips this rule.
+
+9. **`SESSION_NOTES.md` is the session's temporary container** (2026-10-26). A working file in the
+   repo root, created at the start of the session and never committed. Before the closing prompt it
+   ends with one block per thing learned: *Cosa* (what was done), *Perché* (the decision behind
+   it), *Nota* (traps and measurements, each with its date), *Dove va a fine sessione* (`AGENTS.md`
+   if it holds for the whole repo · `doc/guide/<tema>.md` if a domain lesson · `WORKFLOW.md` if a
+   session rule · `CLAUDE.md` if project state · a comment at the right line if it is the why of one
+   line). The closing prompt writes every entry into its destination and deletes the file before
+   the single commit; a note that names no destination is lost. A `SESSION_NOTES.md` still on the
+   remote means a session was not closed.
 
 ---
 
@@ -101,6 +131,16 @@ disappear. The verification is done together, in chat, one phase at a time.
    does not cover**, and never ask the owner to redo by hand something already verified. Whatever
    the tour finds becomes an assertion before the session ends, or it will come back: the tour
    exists to discover what nobody thought to assert, not to replace the tests.
+
+**A before/after comparison of screenshots is shown cropped, one item at a time** (2026-10-30, after
+«I don't understand the differences between before and after, which images am I supposed to compare?»
+in front of twenty near-identical PNGs): never a folder of files to open. The agent opens a browser
+window on an HTML page with BEFORE and AFTER **cropped to the area that changes** — one above the
+other, or side by side for phone screenshots — and **enlarged** when the difference is a few pixels (a
+darker grey), with a title saying where to look; before talking about it, it checks the crop with a
+headless screenshot of the same page. The message says «Comparison N of M», what changes and which
+side is which; the window rules of obligation 5 apply (one item per message, closed and counted before
+the next).
 
 ### Standard phases, when they make sense
 

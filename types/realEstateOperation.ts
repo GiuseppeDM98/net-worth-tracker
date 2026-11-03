@@ -33,6 +33,27 @@ export const REAL_ESTATE_COST_KINDS = [
 ] as const;
 export type RealEstateCostKind = (typeof REAL_ESTATE_COST_KINDS)[number];
 
+/**
+ * The label each cost row carries on the costs screen and in Impostazioni › Spese. Here and not in
+ * `realEstateOperationNarrative`, which brings the path's plan with it: read from there, Impostazioni's
+ * first load carried 8 KB gz of Compravendita (2026-11-03, doc/guide/velocita.md § Registro dei tetti alzati).
+ */
+export const REAL_ESTATE_COST_LABELS: Record<RealEstateCostKind, string> = {
+  agency: 'Agenzia',
+  notary: 'Notaio',
+  purchaseTaxes: 'Imposte d’acquisto (registro o IVA, ipotecaria e catastale)',
+  mortgageCosts: 'Istruttoria e perizia del mutuo',
+  mortgageTax: 'Imposta sostitutiva sul mutuo',
+  homeInsurance: 'Polizza scoppio e incendio',
+  lifeInsurance: 'Polizza vita / CPI',
+  mortgageInstalment: 'Rata e estinzione del mutuo',
+  insuranceLoanInstalment: 'Rata del prestito di una polizza',
+  saleCertificates: 'Certificazioni e pratiche (APE, conformità)',
+  capitalGainsTax: 'Imposta sulla plusvalenza',
+  payoffCosts: 'Costi dell’estinzione (penale, interessi del periodo)',
+  insuranceRefund: 'Rimborso di una polizza',
+};
+
 /** The expense types a kind's category may have: an instalment repays a loan, a refund is income. */
 export const REAL_ESTATE_COST_TYPES: Record<RealEstateCostKind, readonly ExpenseType[]> = {
   agency: ['fixed', 'variable'],

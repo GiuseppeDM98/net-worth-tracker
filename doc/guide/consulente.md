@@ -1,169 +1,169 @@
 # Allocazione › Consulente
 
-> **Quando aprire questa guida** — chi tocca `app/dashboard/allocation/consulente/*`,
+> **When to open this guide** — whoever touches `app/dashboard/allocation/consulente/*`,
 > `components/allocation/consulente/*`, `lib/server/allocationAdvice/*`, `app/api/allocation-advice/*`,
 > `lib/utils/allocationAdvice{Proposal,Draft,Apply,Narrative,Document}.ts`, `lib/hooks/useAllocationAdvice.ts`,
-> `lib/services/allocationAdviceService.ts`, `types/allocationAdvice.ts`. In `AGENTS.md` resta lo stub con
-> l'essenziale; qui c'è la regola completa. Nato il 2026-10-20 (owner's decision: «io sinceramente farei tutto
+> `lib/services/allocationAdviceService.ts`, `types/allocationAdvice.ts`. In `AGENTS.md` the stub with the
+> essentials stays; here is the full rule. Born on 2026-10-20 (owner's decision: «io sinceramente farei tutto
 > adesso in questa sessione»).
 
 ## Files
 
-- **Pagina**: `app/dashboard/allocation/consulente/page.tsx` (il gate sul flag `NEXT_PUBLIC_ASSISTANT_AI_ENABLED`, come
-  l'Assistente, e `configured` = la chiave letta sul server), `components/allocation/consulente/ConsulenteClient.tsx`
-  (le tre viste: percorso · corsa · report), `ConsulenteWizard.tsx` (le otto schermate), `ConsulenteRun.tsx` (le
-  fasi via SSE), `ConsulenteReport.tsx` (verdetto, tessere, markdown, «Applica»).
-- **Puro**: `lib/utils/allocationAdviceProposal.ts` (gli schemi zod delle risposte, della proposta e dei candidati; il
-  blocco recintato), `allocationAdviceDraft.ts` (il reducer del percorso, la bozza su localStorage, le risposte
-  precompilate), `allocationAdviceApply.ts` (i piani di «Applica»: target, ruoli, obiettivi; la base di oggi; gli
-  scenari di perdita), `allocationAdviceNarrative.ts` (ogni frase), `allocationAdviceDocument.ts` (il mapper del
-  documento per entrambi gli SDK), `lib/utils/sseReader.ts`.
-- **Server**: `lib/server/allocationAdvice/prompts.ts` (i tre prompt), `run.ts` (l'orchestrazione: contesto →
-  strategia → strumenti → revisione, persistita a ogni fase), `store.ts` (Admin, `allocationAdvice/{uid}`);
-  `app/api/allocation-advice/run/route.ts` (SSE, `maxDuration = 600`, 6 corse l'ora), `applied/route.ts`.
-- **Client**: `lib/services/allocationAdviceService.ts` (la lettura sotto le rules), `lib/hooks/useAllocationAdvice.ts`
-  (`queryKeys.allocationAdvice.all`), `lib/services/assetService.ts → updateAssetAllocationRole` (il SOLO campo che
-  «Applica» tocca su un asset), `firestore.rules` (`read: canAccess`, `write: false`).
-- **Modelli**: `lib/constants/aiModels.ts` → `ALLOCATION_ADVICE_STRATEGY_MODEL` (Opus 5.5) e
+- **Page**: `app/dashboard/allocation/consulente/page.tsx` (the gate on the `NEXT_PUBLIC_ASSISTANT_AI_ENABLED` flag, as
+  for the Assistente, and `configured` = the key read on the server), `components/allocation/consulente/ConsulenteClient.tsx`
+  (the three views: path · run · report), `ConsulenteWizard.tsx` (the eight screens), `ConsulenteRun.tsx` (the
+  stages via SSE), `ConsulenteReport.tsx` (verdict, tiles, markdown, «Applica»).
+- **Pure**: `lib/utils/allocationAdviceProposal.ts` (the zod schemas of the answers, the proposal and the candidates; the
+  fenced block), `allocationAdviceDraft.ts` (the path's reducer, the draft on localStorage, the prefilled
+  answers), `allocationAdviceApply.ts` (the plans of «Applica»: targets, roles, goals; today's base; the loss
+  scenarios), `allocationAdviceNarrative.ts` (every sentence), `allocationAdviceDocument.ts` (the document mapper
+  for both SDKs), `lib/utils/sseReader.ts`.
+- **Server**: `lib/server/allocationAdvice/prompts.ts` (the three prompts), `run.ts` (the orchestration: context →
+  strategy → instruments → review, persisted at every stage), `store.ts` (Admin, `allocationAdvice/{uid}`);
+  `app/api/allocation-advice/run/route.ts` (SSE, `maxDuration = 300`, 6 runs an hour), `applied/route.ts`.
+- **Client**: `lib/services/allocationAdviceService.ts` (the read under the rules), `lib/hooks/useAllocationAdvice.ts`
+  (`queryKeys.allocationAdvice.all`), `lib/services/assetService.ts → updateAssetAllocationRole` (the ONLY field
+  «Applica» touches on an asset), `firestore.rules` (`read: canAccess`, `write: false`).
+- **Models**: `lib/constants/aiModels.ts` → `ALLOCATION_ADVICE_STRATEGY_MODEL` (Opus 5.5) and
   `ALLOCATION_ADVICE_INSTRUMENTS_MODEL` (Sonnet 5.5).
 - **Suites to run after a change here**: `allocationAdviceProposal`, `allocationAdviceDraft`, `allocationAdviceApply`,
   `allocationAdviceNarrative`, `allocationAdvicePrompts`, `allocationAdviceRun`, `allocationAdviceRoutes` ·
-  `reactCompilerCoverage` (un ternario dentro un `||` nel Wizard fu saltato il primo giorno) · **Browser**
-  `e2e/allocation.consulente.spec.ts` (le otto schermate sul fixture base, MAI la corsa: una prova non apre un
-  controllo che spende).
+  `reactCompilerCoverage` (a ternary inside a `||` in the Wizard was skipped on the first day) · **Browser**
+  `e2e/allocation.consulente.spec.ts` (the eight screens on the base fixture, NEVER the run: a test does not open a
+  control that spends).
 
-## Il percorso
+## The path
 
-- **Una domanda per schermata, «Indietro» sempre** (owner, 2026-10-20). Le otto schermate sono
+- **One question per screen, «Indietro» always** (owner, 2026-10-20). The eight screens are
   `ALLOCATION_ADVICE_STEPS` (`profilo · tolleranza · borsa · politica · obiettivi · ruoli · vincoli · riepilogo`);
   **a draft that comes back follows FIRE › Obiettivi** (`reconcileDraftGoals`, 2026-10-20: goals added since are
   appended as on a fresh start, deleted ones dropped, the ones the draft has keep what was typed, a goal typed as new
   stays — the owner's «Rifai» reopened the third run's answers, taken before the goal document existed, and saw
   «Nessun obiettivo registrato»; the «rispecchiano la realtà» checkbox is hidden with zero goals);
-  la schermata degli obiettivi ha sotto-schermate — una per obiettivo esistente o aggiunto, poi «cosa manca» con
-  «rispecchiano la realtà?» e il testo libero — e «Indietro» dalla schermata dei ruoli torna su «cosa manca».
-  Il reducer è puro (`allocationAdviceDraftReducer`); `describeStepBlock` dice perché una schermata non avanza
-  (età e orizzonte mancanti, un obiettivo nuovo senza nome).
-- **La bozza vive su QUESTO browser** (`allocation-advice-draft:{uid}`, `readStoredDraft`/`writeStoredDraft`,
-  `try/catch` su ogni accesso): una corsa conclusa la cancella; un documento precedente precompila le risposte.
-- **Gli scenari di perdita sono euro sulla base di oggi** (`lossScenarios(currentAllocationOnBase(assets).baseTotal)`):
-  la stessa partizione della pagina Allocazione (negoziabili + non negoziabili, netta dei debiti), mai il
-  patrimonio intero.
-- **Le risposte precompilate** (`initialAnswers`): l'età dalle impostazioni, gli obiettivi da FIRE › Obiettivi, i
-  ruoli di casa / fondi pensione / illiquidi dal ruolo che gli asset portano oggi (`resolveAllocationRoleWithin`),
-  la borsa `DEFAULT_EXCHANGE`.
-- **Il riepilogo è un elenco di righe, ciascuna un link alla sua schermata** (`goto`); «Avvia la ricerca» è
-  disabilitato senza la chiave sul server («Servizio AI non configurato»).
+  the goals screen has sub-screens — one per existing or added goal, then «cosa manca» with
+  «rispecchiano la realtà?» and the free text — and «Indietro» from the roles screen goes back to «cosa manca».
+  The reducer is pure (`allocationAdviceDraftReducer`); `describeStepBlock` says why a screen does not advance
+  (age and horizon missing, a new goal without a name).
+- **The draft lives on THIS browser** (`allocation-advice-draft:{uid}`, `readStoredDraft`/`writeStoredDraft`,
+  `try/catch` on every access): a finished run deletes it; a previous document prefills the answers.
+- **The loss scenarios are euros on today's base** (`lossScenarios(currentAllocationOnBase(assets).baseTotal)`):
+  the same partition as the Allocazione page (tradable + non-tradable, net of debts), never the whole
+  net worth.
+- **The prefilled answers** (`initialAnswers`): the age from the settings, the goals from FIRE › Obiettivi, the
+  roles of the home / pension funds / illiquid assets from the role the assets carry today (`resolveAllocationRoleWithin`),
+  the exchange `DEFAULT_EXCHANGE`.
+- **The summary is a list of rows, each a link to its screen** (`goto`); «Avvia la ricerca» is
+  disabled without the key on the server («Servizio AI non configurato»).
 
-## La corsa
+## The run
 
-- **Tre chiamate in serie, persistite a ogni fase** (`runAllocationAdvice`; sull'account del proprietario, mirror del 2026-10-20: 7,1 minuti in tutto — strategia 2,6, strumenti 2,7, revisione 1,7 — e un report di ~11 000 caratteri): il contesto è il bundle YTD
-  dell'Assistente (`buildAssistantYtdContext` + `formatBundleForPrompt`, blocco portafoglio incluso); la strategia
-  su Opus 5.5 (effort `medium`, `max_tokens` 32 000, nessun tool); gli strumenti su Sonnet 5.5 (effort `high`) con
-  `web_search_20260209` (`max_uses` 20, `ALLOCATION_ADVICE_WEB_SEARCH_MAX_USES`); la revisione su Opus 5.5. Ogni chiamata è uno stream letto fino alla
-  fine dall'accumulatore dell'SDK (`beta.messages.stream(...).finalMessage()`): `stop_reason` e il modello che ha
-  risposto vengono dal messaggio finale (dopo un fallback a metà stream, quello che ha finito) — `max_tokens` e
-  `refusal` sono fasi FALLITE dette nelle parole del prodotto (`AllocationAdviceStageError`, `retryable`), mai una
-  proposta a metà letta come intera. Un turno che la ricerca web mette in pausa (`pause_turn`, il tetto del ciclo
-  lato server) si riprende rimandando la risposta in pausa come messaggio dell'assistente, fino a
-  `ALLOCATION_ADVICE_MAX_CONTINUATIONS` volte, con i testi uniti (2026-10-23; prima la pausa faceva fallire la fase).
-- **La struttura non si legge mai dalla prosa** (la regola dell'Assistente): strategia e revisione rispondono con
-  un output strutturato, UN oggetto `{ markdown, proposal }` (`allocationAdviceAnswerSchema`, dal 2026-10-23): la
-  forma la garantisce l'API, le somme e i limiti no (l'SDK li sposta nelle descrizioni dello schema) e li controlla
-  `parseAllocationAnswer`. Una strategia la cui proposta non regge fallisce la corsa; una revisione che non regge
-  tiene la proposta della strategia (`report.proposal`). L'API scrive le chiavi di un oggetto nell'ordine dello
-  schema: l'allocazione di un obiettivo viaggia quindi come lista di coppie `{ assetClass, percentage }` e
-  `parseAllocationAnswer` la rimette nell'oggetto salvato. Con un oggetto per chiave, dopo `trendFollowing` il
-  modello non poteva più scrivere `bonds` e la somma restava sotto 100 (giro del 2026-10-23, due volte sullo stesso
-  obiettivo). Un record non si compila: diventa `additionalProperties`, che gli output strutturati vogliono `false`.
-  La ricerca resta su UN blocco
-  ```` ```instrument-candidates ```` (`parseFencedBlock` prende l'ULTIMO e lo valida con zod), perché la ricerca web
-  risponde con citazioni e gli output strutturati le rifiutano (400); senza blocco lascia `candidates: null` e il
-  report lo dice. All'agente successivo strategia e strumenti arrivano con il loro blocco rimesso nel testo (`withBlock`).
-- **Gli schemi**: le classi della proposta sono `ASSET_CLASS_SEQUENCE` (una chiave fuori dall'enumerazione è rifiutata);
-  le percentuali delle classi SENZA `fixedAmount` sommano a 100 (±0,5); i sotto-target di una classe sommano a 100 o
-  sono vuoti; una classe compare una volta; `recommendedAllocation` di un obiettivo somma a 100; gli `assetName`
-  sono il nome ESATTO del blocco STRUMENTI (il modello lo copia; `findAssetByName` è case- e spazio-insensibile e riconosce anche l'alias
-  `displayTicker`, che il blocco stampa al posto del ticker: senza, il 2026-10-23 «Applica» ha perso le quote di due ETC).
-- **Il documento** `allocationAdvice/{uid}` è UNO per account, riscritto intero all'avvio (`setAllocationAdviceAdmin`)
-  e poi aggiornato per fase (`patchAllocationAdviceAdmin`, `merge: true`, `removeUndefinedDeep`); le date viaggiano
-  come Timestamp e tornano Date campo per campo (`mapAllocationAdviceData`, condiviso dai due SDK). Stati:
-  `draft · running · ready · failed · applied`; `stage` dice dove la corsa è o si è fermata. Una corsa `running` da
-  più di 20 minuti (`RUN_STALE_AFTER_MS`) è considerata morta e la pagina riapre il percorso.
-- **La corsa parte dal click, mai da un effetto** (`useConsulenteRun`, 2026-10-20): un primo taglio apriva lo stream
-  in un `useEffect` con un guard su ref, e lo StrictMode di React (dev) monta l'effetto due volte — il guard teneva la
-  PRIMA chiusura, già annullata dal suo cleanup, e ogni evento veniva scartato: la pagina restava su «Avvio il
-  percorso» mentre il server finiva la corsa. Una richiesta che spende minuti e denaro appartiene al gesto che l'ha
-  chiesta; `inFlight` rifiuta un secondo avvio mentre uno corre.
-- **Una richiesta per fase, mai la corsa intera** (owner, 2026-10-20, durante il giro: «su Vercel Hobby le funzioni
-  devono stare sotto il minuto, vero?»). Vercel Hobby ferma una funzione a 300 s con Fluid compute (60 s senza: va
-  acceso in Vercel → Settings → Functions), e la terza corsa sul mirror è durata 396 s in una richiesta, con la sola
-  strategia a 210 s. Quindi `runAllocationAdviceStage` esegue UNA fase (`AllocationAdviceRunStage`: `strategy`, che
-  crea il documento dalle risposte e contiene il contesto · `instruments` · `review`, che leggono il documento
-  persistito — `document` passato in memoria dalla corsa intera, letto dallo store dalla route) e la route
-  (`maxDuration = 300`, body `{ userId, stage, answers? }`, il rate limit conta solo la `strategy`) streama
-  `stage` → `done | error` per quella fase. Il client (`useConsulenteRun.start(answers, from)`) incatena le tre, legge
-  ogni stream fino al suo `done`, rilegge il documento dopo ogni fase; una fase fallita o tagliata resta
-  `resumeFrom` e «Riprova» (`retry`) riparte da lì sul documento persistito, mai da capo. La revisione rilegge
-  strategia e strumenti con i blocchi rimessi al loro posto (`withBlock`): il documento tiene il markdown spogliato
-  e la struttura, non il testo grezzo. `runAllocationAdvice` resta le tre in sequenza, per chi non ha un tetto.
-  Una fase che supera comunque i 300 s è un 504 con il documento fermo su quella fase: «Riprova» la ripete.
-- **Le risposte entrano dalla stessa via che le ha scritte**: `allocationAdviceAnswersSchema` è lo schema delle
-  schermate E della route (`parseOr400`).
+- **Three calls in series, persisted at every stage** (`runAllocationAdvice`; on the owner's account, mirror of 2026-10-20: 7,1 minutes in all — strategy 2,6, instruments 2,7, review 1,7 — and a report of ~11 000 characters): the context is the YTD bundle
+  of the Assistente (`buildAssistantYtdContext` + `formatBundleForPrompt`, portfolio block included); the strategy
+  on Opus 5.5 (effort `medium`, `max_tokens` 32 000, no tool); the instruments on Sonnet 5.5 (effort `high`) with
+  `web_search_20260209` (`max_uses` 20, `ALLOCATION_ADVICE_WEB_SEARCH_MAX_USES`); the review on Opus 5.5. Each call is a stream read to the
+  end by the SDK's accumulator (`beta.messages.stream(...).finalMessage()`): `stop_reason` and the model that
+  answered come from the final message (after a mid-stream fallback, the one that finished) — `max_tokens` and
+  `refusal` are FAILED stages told in the product's words (`AllocationAdviceStageError`, `retryable`), never a
+  half-written proposal read as a whole one. A turn the web search pauses (`pause_turn`, the ceiling of the loop
+  on the server side) is resumed by sending the paused response back as an assistant message, up to
+  `ALLOCATION_ADVICE_MAX_CONTINUATIONS` times, with the texts joined (2026-10-23; before, the pause failed the stage).
+- **The structure is never read from the prose** (the Assistente's rule): strategy and review answer with
+  a structured output, ONE object `{ markdown, proposal }` (`allocationAdviceAnswerSchema`, since 2026-10-23): the
+  API guarantees the shape, not the sums and the limits (the SDK moves them into the schema's descriptions), and
+  `parseAllocationAnswer` checks them. A strategy whose proposal does not hold fails the run; a review that does not
+  hold keeps the strategy's proposal (`report.proposal`). The API writes an object's keys in the schema's order: a
+  goal's allocation therefore travels as a list of pairs `{ assetClass, percentage }`, and
+  `parseAllocationAnswer` puts it back into the saved object. With one object per key, after `trendFollowing` the
+  model could no longer write `bonds` and the sum stayed under 100 (tour of 2026-10-23, twice on the same
+  goal). A record does not compile: it becomes `additionalProperties`, which structured outputs want `false`.
+  The research stays on ONE ```` ```instrument-candidates ```` block (`parseFencedBlock` takes the LAST one and
+  validates it with zod), because web search answers with citations and structured outputs refuse them (400);
+  without a block it leaves `candidates: null` and the report says so. Strategy and instruments reach the next
+  agent with their block put back into the text (`withBlock`).
+- **The schemas**: the proposal's classes are `ASSET_CLASS_SEQUENCE` (a key outside the enumeration is rejected);
+  the percentages of the classes WITHOUT `fixedAmount` add up to 100 (±0,5); a class's sub-targets add up to 100 or
+  are empty; a class appears once; a goal's `recommendedAllocation` adds up to 100; each `assetName`
+  is the EXACT name from the STRUMENTI block (the model copies it; `findAssetByName` is case- and space-insensitive and also recognises the
+  `displayTicker` alias, which the block prints in place of the ticker: without it, on 2026-10-23 «Applica» lost the quotas of two ETCs).
+- **The document** `allocationAdvice/{uid}` is ONE per account, rewritten whole at the start (`setAllocationAdviceAdmin`)
+  and then updated per stage (`patchAllocationAdviceAdmin`, `merge: true`, `removeUndefinedDeep`); the dates travel
+  as Timestamp and come back as Date field by field (`mapAllocationAdviceData`, shared by the two SDKs). States:
+  `draft · running · ready · failed · applied`; `stage` says where the run is or where it stopped. A `running` run
+  older than 20 minutes (`RUN_STALE_AFTER_MS`) is considered dead and the page reopens the path.
+- **The run starts from the click, never from an effect** (`useConsulenteRun`, 2026-10-20): a first cut opened the stream
+  in a `useEffect` with a guard on a ref, and React's StrictMode (dev) mounts the effect twice — the guard kept the
+  FIRST closure, already cancelled by its cleanup, and every event was discarded: the page stayed on «Avvio il
+  percorso» while the server finished the run. A request that spends minutes and money belongs to the gesture that
+  asked for it; `inFlight` refuses a second start while one is running.
+- **One request per stage, never the whole run** (owner, 2026-10-20, during the tour: «su Vercel Hobby le funzioni
+  devono stare sotto il minuto, vero?»). Vercel Hobby stops a function at 300 s with Fluid compute (60 s without: it
+  must be turned on in Vercel → Settings → Functions), and the third run on the mirror lasted 396 s in one request,
+  with the strategy alone at 210 s. So `runAllocationAdviceStage` runs ONE stage (`AllocationAdviceRunStage`: `strategy`,
+  which creates the document from the answers and includes the context · `instruments` · `review`, which read the
+  persisted document — `document` passed in memory by the whole run, read from the store by the route) and the route
+  (`maxDuration = 300`, body `{ userId, stage, answers? }`, the rate limit counts only the `strategy`) streams
+  `stage` → `done | error` for that stage. The client (`useConsulenteRun.start(answers, from)`) chains the three, reads
+  each stream to its `done`, rereads the document after every stage; a failed or cut stage stays
+  `resumeFrom` and «Riprova» (`retry`) restarts from there on the persisted document, never from scratch. The review
+  rereads strategy and instruments with the blocks put back in place (`withBlock`): the document keeps the stripped
+  markdown and the structure, not the raw text. `runAllocationAdvice` stays the three in sequence, for whoever has no
+  ceiling. A stage that still exceeds 300 s is a 504 with the document stopped on that stage: «Riprova» repeats it.
+- **The answers enter through the same door that wrote them**: `allocationAdviceAnswersSchema` is the schema of the
+  screens AND of the route (`parseOr400`).
 
-## Il report e «Applica»
+## The report and «Applica»
 
-- **Il verdetto è `buildConsulenteVerdict`**: «La proposta è pronta.» con il `summary` e la data di revisione;
-  «Allocazione applicata.» con la data; «Il percorso non si è concluso.» con la frase dell'errore; e, con il report
-  ma senza blocco valido, un `warning` che dice perché «Applica» non c'è.
-- **Un percorso nuovo legge il piano in vigore e il perché** (owner, 2026-10-20: «quando rivedrò il report alla data
-  indicata, quello nuovo tiene conto delle scelte e dei motivi fatti in passato?»): la fase `strategy` legge il
-  documento precedente PRIMA di sostituirlo (`priorPlanOf`, lib/utils/allocationAdviceDocument.ts: il markdown
-  dell'ultimo report, le sue richieste di modifica, quando fu applicato, entro quando chiedeva di essere rivisto e
-  perché) e `buildStrategyPrompt` lo appende ai dati come blocco «IL PIANO IN VIGORE E IL PERCHÉ»
-  (`formatPriorPlanForPrompt`); il contratto della strategia, invariato byte per byte, chiede di non ripartire da zero
-  e di aggiungere la sezione «Rispetto al piano precedente». Il documento nuovo non conserva il vecchio: il report
-  precedente vive nel prompt, non nel documento.
-- **«Chiedi una modifica» rilancia SOLO la revisione** (owner, 2026-10-20, durante il giro: «vorrei liberarmi degli
-  ETF obbligazionari per i bond singoli… meglio dirlo all'inizio?»): una richiesta nata DOPO aver letto il report non
-  costa un «Rifai il percorso». La tessera sotto «Il report» (`useConsulenteRevision`, `REVISION_COPY`) manda alla
-  route `stage: 'revise'` con `request` (1–1000 caratteri, conta nel rate limit come una corsa); `runRevise` esige un
-  report finito, rientra in `stage: 'review'`, chiama Opus 5.5 con `buildRevisionPrompt` — strategia e strumenti con
-  i blocchi rimessi, il report precedente, TUTTE le richieste in ordine (l'ultima è la nuova), il contratto della
-  revisione più la sezione «La tua richiesta» dove la richiesta non è sensata o ha un costo — e sostituisce
-  `report` (proposta rivista, o la precedente se il blocco è malformato), accoda a `document.revisions`
-  (`{ request, at }`, sempre un array dal mapper) e riporta lo stato a `ready` (un piano già applicato torna da
-  applicare). La tessera elenca le richieste fatte; «Applica» è disabilitato mentre la revisione corre. Una richiesta
-  che conviene conoscere PRIMA (un vincolo, una classe da evitare) va ancora nella schermata «Vincoli».
-- **Le tessere**: Allocazione proposta (oggi → proposta per classe, `buildProposalRows` su `currentAllocationOnBase`,
-  le classi possedute che la proposta lascia cadere aggiunte in coda a 0), Strumenti (i candidati per sotto-target,
-  «in portafoglio» quando già posseduto, il `caveat` in ambra), Obiettivi, Ruoli degli asset (solo i cambi che
-  cambiano qualcosa, `planRoleChanges`; un nome non trovato è elencato e ignorato), Il report (markdown), Applica.
-- **«Applica» mostra i piani PRIMA di scrivere, una spunta per voce** (owner, 2026-10-20): i target
-  (`buildTargetsFromProposal` → `setSettings({ targets })`, che SOSTITUISCE il documento dei target come fa Impostazioni;
-  una classe assente dalla proposta sparisce dai target), i ruoli (`updateAssetAllocationRole`, una `updateDoc` sul
-  solo campo: `updateAsset` e `updateAssetMetadata` cancellano `taxRate`/`displayTicker` assenti dal parziale), gli
-  obiettivi (`planGoalDocument` → `saveGoalData`, il documento intero come FIRE › Obiettivi: esistenti aggiornati per
-  id, nuovi con colore, eliminati quelli segnati «da eliminare» nelle risposte, le quote dei soli obiettivi toccati
-  riscritte in percento; le quote di uno strumento oltre il 100% sono RIDOTTE nel margine lasciato dagli obiettivi
-  non toccati e il piano lo dice, mai in silenzio). Poi `POST /api/allocation-advice/applied` registra cosa è stato
-  scritto e il documento passa ad `applied`; ogni chiave dei lettori è invalidata (settings, assets, overview, goals,
-  allocationAdvice).
-- **La data di revisione** (`reviewByIso`) vive nel documento, non nelle impostazioni: la pagina Allocazione la
-  stampa nel suo header (`describeReviewBy` → `describeAllocazioneHeader.reviewBy`) solo quando il piano è stato
-  applicato — nessun sesto posto nelle FIVE places.
-- **I prompt** (`lib/server/allocationAdvice/prompts.ts`): `system` identico per ogni utente (ruolo, regole sui dati,
-  contratto di risposta, schema del blocco), tutto dell'utente in `userContent` (`formatAnswersForPrompt`, il blocco
-  dati, il risultato dell'altro agente). Le risposte dell'utente VINCONO sulla preferenza del modello (un ruolo
-  scelto resta; il modello può dire perché deciderebbe altrimenti, nel testo).
+- **The verdict is `buildConsulenteVerdict`**: «La proposta è pronta.» with the `summary` and the review date;
+  «Allocazione applicata.» with the date; «Il percorso non si è concluso.» with the error's sentence; and, with the
+  report but without a valid block, a `warning` that says why «Applica» is not there.
+- **A new path reads the plan in force and the why** (owner, 2026-10-20: «quando rivedrò il report alla data
+  indicata, quello nuovo tiene conto delle scelte e dei motivi fatti in passato?»): the `strategy` stage reads the
+  previous document BEFORE replacing it (`priorPlanOf`, lib/utils/allocationAdviceDocument.ts: the markdown of the
+  last report, its change requests, when it was applied, by when it asked to be reviewed and why) and
+  `buildStrategyPrompt` appends it to the data as the block «IL PIANO IN VIGORE E IL PERCHÉ»
+  (`formatPriorPlanForPrompt`); the strategy's contract, unchanged byte for byte, asks not to start over from zero
+  and to add the section «Rispetto al piano precedente». The new document does not keep the old one: the previous
+  report lives in the prompt, not in the document.
+- **«Chiedi una modifica» relaunches ONLY the review** (owner, 2026-10-20, during the tour: «vorrei liberarmi degli
+  ETF obbligazionari per i bond singoli… meglio dirlo all'inizio?»): a request born AFTER reading the report does not
+  cost a «Rifai il percorso». The tile under «Il report» (`useConsulenteRevision`, `REVISION_COPY`) sends the route
+  `stage: 'revise'` with `request` (1–1000 characters, counted in the rate limit as a run); `runRevise` requires a
+  finished report, re-enters `stage: 'review'`, calls Opus 5.5 with `buildRevisionPrompt` — strategy and instruments
+  with the blocks put back, the previous report, ALL the requests in order (the last is the new one), the review's
+  contract plus the section «La tua richiesta» where the request is not sensible or has a cost — and replaces
+  `report` (revised proposal, or the previous one if the block is malformed), appends to `document.revisions`
+  (`{ request, at }`, always an array from the mapper) and brings the state back to `ready` (a plan already applied
+  is to be applied again). The tile lists the requests made; «Applica» is disabled while the review is running. A
+  request worth knowing BEFORE (a constraint, a class to avoid) still goes in the «Vincoli» screen.
+- **The tiles**: Allocazione proposta (today → proposal per class, `buildProposalRows` on `currentAllocationOnBase`,
+  the held classes the proposal drops appended at the end at 0), Strumenti (the candidates per sub-target,
+  «in portafoglio» when already held, the `caveat` in amber), Obiettivi, Ruoli degli asset (only the changes that
+  change something, `planRoleChanges`; a name not found is listed and ignored), Il report (markdown), Applica.
+- **«Applica» shows the plans BEFORE writing, one tick per item** (owner, 2026-10-20): the targets
+  (`buildTargetsFromProposal` → `setSettings({ targets })`, which REPLACES the targets document as Impostazioni does;
+  a class absent from the proposal disappears from the targets), the roles (`updateAssetAllocationRole`, an `updateDoc`
+  on the field alone: `updateAsset` and `updateAssetMetadata` delete `taxRate`/`displayTicker` absent from the
+  partial), the goals (`planGoalDocument` → `saveGoalData`, the whole document as FIRE › Obiettivi does: existing ones
+  updated by id, new ones with a colour, those marked «da eliminare» in the answers deleted, the quotas of the touched
+  goals only rewritten in percent; an instrument's quotas beyond 100% are REDUCED within the margin the untouched
+  goals leave, and the plan says so, never silently). Then `POST /api/allocation-advice/applied` records what was
+  written and the document moves to `applied`; every key of the readers is invalidated (settings, assets, overview,
+  goals, allocationAdvice).
+- **The review date** (`reviewByIso`) lives in the document, not in the settings: the Allocazione page prints it in
+  its header (`describeReviewBy` → `describeAllocazioneHeader.reviewBy`) only when the plan has been applied — no
+  sixth place in the FIVE places.
+- **The prompts** (`lib/server/allocationAdvice/prompts.ts`): `system` identical for every user (role, rules on the
+  data, answer contract, the block's schema), everything of the user's in `userContent` (`formatAnswersForPrompt`,
+  the data block, the other agent's result). The user's answers WIN over the model's preference (a chosen role
+  stays; the model may say why it would decide otherwise, in the text).
 
 ## Composizione mobile
 
-Nessuna composizione, per scelta: come l'Assistente (DESIGN.md → The Conversation-Is-Content Rule) il contenuto è
-un percorso — una colonna a 720px, una scheda per schermata, bottoni a 44px sotto `desktop:`; niente striscia,
-niente righe chiuse, nessuna memoria `mobile-sections:`. Non è fra le superfici di `mobile:census` (la route non è
-in `navigation.ts`: si raggiunge dal bottone «Consulente» di Allocazione, desktop nell'header e sotto le tessere su
-un telefono, e dalla riga sotto la conversazione dell'Assistente).
+No composition, by choice: like the Assistente (DESIGN.md → The Conversation-Is-Content Rule) the content is
+a path — one column at 720px, one card per screen, buttons at 44px below `desktop:`; no strip, no closed rows,
+no `mobile-sections:` memory. It is not among the surfaces of `mobile:census` (the route is not in
+`navigation.ts`: it is reached from Allocazione's «Consulente» button, on desktop in the header and below the tiles
+on a phone, and from the row under the Assistente's conversation).
 
 ## Per-page blind spots
 - **The review invite** (owner, 2026-10-20, after applying the first production plan: «nei giorni vicino alla data,
@@ -190,16 +190,16 @@ un telefono, e dalla riga sotto la conversazione dell'Assistente).
   (`answers.exchange` is '' until typed, and step 3 does not pass), and a draft that comes back with an unlisted
   exchange reopens it (`isListedExchange`). The free text goes to the instrument agent as written.
 
-- **La corsa costa e dura minuti** (tre chiamate, due su Opus 5.5, una con ricerca web): «Puoi lasciare la pagina»
-  è vero — ogni fase è salvata — ma la connessione SSE chiusa non ferma il server; chi riapre vede la fase salvata
-  e la pagina rilegge il documento finché è `running`. Una corsa tagliata dalla piattaforma resta `running` fino
-  allo stale di 20 minuti.
-- **Una corsa per account alla volta**: il documento è uno; «Rifai il percorso» apre il percorso SOPRA il documento
-  (che resta finché una nuova corsa lo sostituisce con `set`).
-- **«Applica» non è idempotente sugli obiettivi**: premuto due volte creerebbe due volte gli obiettivi nuovi — per
-  questo dopo `done` il bottone resta disabilitato e il documento `applied` non lo mostra più.
-- **Il demo non ha il Consulente**: scrive le impostazioni, e quelle del demo sono di tutti (`useDemoMode`).
-- **Le rules sono inerti finché non sono deployate** (`npx firebase deploy --only firestore:rules`; fatto dal proprietario il 2026-10-20, il Consulente provato in produzione): prima del deploy
-  la pagina non legge il documento (permission-denied → la lettura fallisce e la pagina lo dice).
-- **Nessuna spec E2E della corsa**, per la regola delle prove che non spendono; la corsa vera è stata fatta sul
-  mirror il 2026-10-20 con la chiave del proprietario (gli esiti in SESSION_NOTES della sessione e nel commit).
+- **The run costs money and takes minutes** (three calls, two on Opus 5.5, one with web search): «Puoi lasciare la
+  pagina» is true — every stage is saved — but the closed SSE connection does not stop the server; whoever reopens
+  sees the saved stage and the page rereads the document while it is `running`. A run cut by the platform stays
+  `running` until the 20-minute stale mark.
+- **One run per account at a time**: there is one document; «Rifai il percorso» opens the path OVER the document
+  (which stays until a new run replaces it with `set`).
+- **«Applica» is not idempotent on the goals**: pressed twice it would create the new goals twice — which is why
+  after `done` the button stays disabled and the `applied` document no longer shows it.
+- **The demo has no Consulente**: it writes the settings, and the demo's settings are everyone's (`useDemoMode`).
+- **The rules are inert until they are deployed** (`npx firebase deploy --only firestore:rules`; done by the owner on 2026-10-20, the Consulente tried in production): before the deploy
+  the page does not read the document (permission-denied → the read fails and the page says so).
+- **No E2E spec of the run**, by the rule of the tests that do not spend; the real run was made on the
+  mirror on 2026-10-20 with the owner's key (the outcomes in the session's SESSION_NOTES and in the commit).

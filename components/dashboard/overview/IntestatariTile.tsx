@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { hasCostFigures, ownershipRowOn, type OwnershipBasis, type OwnershipSummary } from '@/lib/utils/assetOwnership';
+import { hasCostFigures, type OwnershipBasis, type OwnershipSummary } from '@/lib/utils/assetOwnership';
+import { ownershipRowOn } from '@/lib/utils/ownershipBasis';
 import { describeOwnership, describeOwnershipAside, describeOwnershipFooter } from '@/lib/utils/patrimonioNarrative';
 import { cn } from '@/lib/utils';
 import type { TileCollapse } from '@/components/ui/tile';

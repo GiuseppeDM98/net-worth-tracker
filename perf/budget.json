@@ -5,64 +5,68 @@
       "raisedBy": "2026-10-11: la landing rende le tessere della Panoramica (CashflowTile con la didascalia del calendario e NarrativeText, PatrimonioTile con i blocchi sollevabili): 509,5 → 511,2 KB gz; tetto = misura +2% come #432 e #436, OK del proprietario 2026-10-11. Misura prima/dopo in doc/guide/velocita.md § Registro"
     },
     "/dashboard": {
-      "initialJsGzKB": 623,
-      "raisedBy": "2026-10-11: la composizione mobile della Panoramica carica le primitive della composizione del 2026-10-10 (VerdictStrip, PageRest, useMobileSections, TileRowShell su Radix Collapsible): 603,3 → 610,7 KB gz, un chunk iniziale in più (29 → 30); tetto = misura +2% come #432 e #436, OK del proprietario 2026-10-11. Misura prima/dopo in doc/guide/velocita.md § Registro"
+      "initialJsGzKB": 626,
+      "raisedBy": "#497: KB gz misurati sulla stessa macchina, 616,4 (2026-10-17) → 623,7 con le funzioni dopo il 17 (passo maggiore: 1c7fea18, IntestatariTile) → 625,9 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
     },
     "/dashboard/allocation": {
-      "initialJsGzKB": 595,
-      "raisedBy": "2026-10-16: la rail di icone in orizzontale (TabletRail nel layout) e le risposte delle righe chiuse (RowAnswers e le funzioni describe*ClosedAnswers), 592,6 → 595 KB gz sulla stessa macchina e sessione (la build del codice mergiato conservata); tetto 593 → 595, la misura arrotondata su, OK del proprietario 2026-10-16. Prima: #436: firebase 12.13 → 12.19 (@firebase/firestore 4.14 → 4.17), +57 KB gz sui condivisi che Next 16.4 riduce di 16; richiesto da firebase-admin 14 (@firebase/app 0.16.2). Misura prima/dopo in doc/guide/velocita.md § Registro"
+      "initialJsGzKB": 604,
+      "raisedBy": "#497: KB gz misurati sulla stessa macchina, 595,2 → 601,5 (406049b7, il Consulente, +3,8; 952fe509 +1) → 603,7 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
     },
     "/dashboard/analisi": {
-      "initialJsGzKB": 651,
-      "raisedBy": "2026-10-16: la rail di icone in orizzontale (TabletRail nel layout) e le risposte delle righe chiuse (RowAnswers e le funzioni describe*ClosedAnswers), 647,6 → 650,5 KB gz sulla stessa macchina e sessione (la build del codice mergiato conservata); tetto 648 → 651, la misura arrotondata su, OK del proprietario 2026-10-16. Prima: #436: firebase 12.13 → 12.19 (@firebase/firestore 4.14 → 4.17), +57 KB gz sui condivisi che Next 16.4 riduce di 16; richiesto da firebase-admin 14 (@firebase/app 0.16.2). Misura prima/dopo in doc/guide/velocita.md § Registro"
+      "initialJsGzKB": 654,
+      "raisedBy": "#497: KB gz misurati sulla stessa macchina, 650,7 → 651 → 653,1 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
     },
     "/dashboard/assets": {
-      "initialJsGzKB": 707,
-      "raisedBy": "2026-10-16: la rail di icone in orizzontale (TabletRail nel layout) e le risposte delle righe chiuse (RowAnswers e le funzioni describe*ClosedAnswers), 703,7 → 706,8 KB gz sulla stessa macchina e sessione (la build del codice mergiato conservata); tetto 704 → 707, la misura arrotondata su, OK del proprietario 2026-10-16. Prima: 2026-10-16: la composizione tablet (lib/utils/tabletComposition.ts, lib/hooks/useTabletComposition.ts) su diciannove griglie, 702,8 → 703,7 KB gz sulla stessa build e sessione; tetto 703 → 704, la misura arrotondata su per scelta del proprietario 2026-10-16. Prima: 2026-10-15: la composizione di Allocazione, Previdenza e FIRE porta le primitive della composizione su nove route e Turbopack riequilibra i chunk comuni: Patrimonio 701,4 → 702,8 KB gz senza un modulo suo (Analisi +1,4, Storico +0,6, sotto i loro tetti); tetto 703 per scelta del proprietario 2026-10-15. Prima: 2026-10-14: 696,1 → 701,4 (33 → 34 chunk iniziali). Misura prima/dopo in doc/guide/velocita.md § Registro"
+      "initialJsGzKB": 733,
+      "raisedBy": "#497: KB gz misurati sulla stessa macchina, 707 → 720,4 (952fe509 +8, b08dff8a +2,8: Intestatari e quote) → 730 con zod 4.6.7 → 732,1 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
     },
     "/dashboard/assistant": {
-      "initialJsGzKB": 700,
-      "raisedBy": "#432: il React Compiler acceso (memo cache per componente, +20–26% gz sul codice dei componenti; misura prima/dopo in doc/guide/velocita.md § Registro)"
+      "initialJsGzKB": 712,
+      "raisedBy": "#497: KB gz misurati sulla stessa macchina, 692,2 → 699,5 (406049b7, tutto il portafoglio nel contesto, +5,2) → 709,1 con zod 4.6.7 → 711,2 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
     },
     "/dashboard/cashflow": {
-      "initialJsGzKB": 766,
-      "raisedBy": "2026-10-16: la rail di icone in orizzontale (TabletRail nel layout) e le risposte delle righe chiuse (RowAnswers e le funzioni describe*ClosedAnswers), 763,3 → 765,9 KB gz sulla stessa macchina e sessione (la build del codice mergiato conservata); tetto 764 → 766, la misura arrotondata su, OK del proprietario 2026-10-16. Prima: 2026-10-14: le primitive della composizione (VerdictStrip, PageRest), condivise ora da sei route, passano in un chunk comune che anche Cashflow carica: 761,6 → 763,1 KB gz, 37 → 38 chunk iniziali (+0,1 dalla prop di CashflowKpiTrio); OK del proprietario 2026-10-14. Misura prima/dopo in doc/guide/velocita.md § Registro"
+      "initialJsGzKB": 783,
+      "raisedBy": "#497: KB gz misurati sulla stessa macchina, 766 → 771,1 (952fe509 +2,1, d6464235 +2) → 780,7 con zod 4.6.7 → 782,9 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
     },
     "/dashboard/fire-simulations": {
-      "initialJsGzKB": 738,
-      "raisedBy": "2026-10-16: la rail di icone in orizzontale (TabletRail nel layout) e le risposte delle righe chiuse (RowAnswers e le funzioni describe*ClosedAnswers), 735,4 → 737,7 KB gz sulla stessa macchina e sessione (la build del codice mergiato conservata); tetto 736 → 738, la misura arrotondata su, OK del proprietario 2026-10-16. Prima: #436: firebase 12.13 → 12.19 (@firebase/firestore 4.14 → 4.17), +57 KB gz sui condivisi che Next 16.4 riduce di 16; richiesto da firebase-admin 14 (@firebase/app 0.16.2). Misura prima/dopo in doc/guide/velocita.md § Registro"
+      "initialJsGzKB": 742,
+      "raisedBy": "#497: KB gz misurati sulla stessa macchina, 737,9 → 739,6 (d6464235 +1,6) → 741,8 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
     },
     "/dashboard/hall-of-fame": {
-      "initialJsGzKB": 617,
-      "raisedBy": "2026-10-16: la rail di icone in orizzontale (TabletRail nel layout) e le risposte delle righe chiuse (RowAnswers e le funzioni describe*ClosedAnswers), 613,8 → 616,2 KB gz sulla stessa macchina e sessione (la build del codice mergiato conservata); tetto 615 → 617, la misura arrotondata su, OK del proprietario 2026-10-16. Prima: #436: firebase 12.13 → 12.19 (@firebase/firestore 4.14 → 4.17), +57 KB gz sui condivisi che Next 16.4 riduce di 16; richiesto da firebase-admin 14 (@firebase/app 0.16.2). Misura prima/dopo in doc/guide/velocita.md § Registro"
+      "initialJsGzKB": 621,
+      "raisedBy": "#497: KB gz misurati sulla stessa macchina, 616,3 → 618,4 (952fe509 +1) → 620,5 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
     },
     "/dashboard/history": {
-      "initialJsGzKB": 773,
-      "raisedBy": "2026-10-16: la rail di icone in orizzontale (TabletRail nel layout) e le risposte delle righe chiuse (RowAnswers e le funzioni describe*ClosedAnswers), 770,1 → 772,6 KB gz sulla stessa macchina e sessione (la build del codice mergiato conservata); tetto 772 → 773, la misura arrotondata su, OK del proprietario 2026-10-16. Prima: #436: firebase 12.13 → 12.19 (@firebase/firestore 4.14 → 4.17), +57 KB gz sui condivisi che Next 16.4 riduce di 16; richiesto da firebase-admin 14 (@firebase/app 0.16.2). Misura prima/dopo in doc/guide/velocita.md § Registro"
+      "initialJsGzKB": 777,
+      "raisedBy": "#497: KB gz misurati sulla stessa macchina, 772,8 → 774,3 (952fe509 +1,5) → 776,4 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
     },
     "/dashboard/pension": {
-      "initialJsGzKB": 663,
-      "raisedBy": "2026-10-16: la rail di icone in orizzontale (TabletRail nel layout) e le risposte delle righe chiuse (RowAnswers e le funzioni describe*ClosedAnswers), 660,6 → 663 KB gz sulla stessa macchina e sessione (la build del codice mergiato conservata); tetto 661 → 663, la misura arrotondata su, OK del proprietario 2026-10-16. Prima: #436: firebase 12.13 → 12.19 (@firebase/firestore 4.14 → 4.17), +57 KB gz sui condivisi che Next 16.4 riduce di 16; richiesto da firebase-admin 14 (@firebase/app 0.16.2). Misura prima/dopo in doc/guide/velocita.md § Registro"
+      "initialJsGzKB": 677,
+      "raisedBy": "#497: KB gz misurati sulla stessa macchina, 663,1 → 664,4 (952fe509 +0,6; i chunk ridivisi quando ownershipRowOn ha lasciato assetOwnership, +0,7) → 674 con zod 4.6.7 → 676,2 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
     },
     "/dashboard/performance": {
-      "initialJsGzKB": 653,
-      "raisedBy": "2026-10-16: la rail di icone in orizzontale (TabletRail nel layout) e le risposte delle righe chiuse (RowAnswers e le funzioni describe*ClosedAnswers), 649,7 → 652,5 KB gz sulla stessa macchina e sessione (la build del codice mergiato conservata); tetto 651 → 653, la misura arrotondata su, OK del proprietario 2026-10-16. Prima: #436: firebase 12.13 → 12.19 (@firebase/firestore 4.14 → 4.17), +57 KB gz sui condivisi che Next 16.4 riduce di 16; richiesto da firebase-admin 14 (@firebase/app 0.16.2). Misura prima/dopo in doc/guide/velocita.md § Registro"
+      "initialJsGzKB": 658,
+      "raisedBy": "#497: KB gz misurati sulla stessa macchina, 652,7 → 655 → 657,1 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
     },
     "/dashboard/settings": {
-      "initialJsGzKB": 702,
-      "raisedBy": "2026-10-16: la rail di icone in orizzontale (TabletRail nel layout) e le risposte delle righe chiuse (RowAnswers e le funzioni describe*ClosedAnswers), 699,7 → 701,6 KB gz sulla stessa macchina e sessione (la build del codice mergiato conservata); tetto 701 → 702, la misura arrotondata su, OK del proprietario 2026-10-16. Prima: #436: firebase 12.13 → 12.19 (@firebase/firestore 4.14 → 4.17), +57 KB gz sui condivisi che Next 16.4 riduce di 16; richiesto da firebase-admin 14 (@firebase/app 0.16.2). Misura prima/dopo in doc/guide/velocita.md § Registro"
+      "initialJsGzKB": 720,
+      "raisedBy": "#497: KB gz misurati sulla stessa macchina, 701,7 → 707,6 (d6464235, la tessera dei default di Compravendita: +13,2, di cui 8,3 tolti spostando le etichette) → 717,2 con zod 4.6.7 → 719,3 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
     },
     "/login": {
-      "initialJsGzKB": 474,
-      "raisedBy": "#436: firebase 12.13 → 12.19 (@firebase/firestore 4.14 → 4.17), +57 KB gz sui condivisi che Next 16.4 riduce di 16; richiesto da firebase-admin 14 (@firebase/app 0.16.2). Misura prima/dopo in doc/guide/velocita.md § Registro"
+      "initialJsGzKB": 478,
+      "raisedBy": "#497: KB gz misurati sulla stessa macchina, 473 → 474,9 (952fe509 +1,7, il commit che mette ThemeColorSync nel layout radice) → 477,1 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
     },
     "/register": {
-      "initialJsGzKB": 475,
-      "raisedBy": "#436: firebase 12.13 → 12.19 (@firebase/firestore 4.14 → 4.17), +57 KB gz sui condivisi che Next 16.4 riduce di 16; richiesto da firebase-admin 14 (@firebase/app 0.16.2). Misura prima/dopo in doc/guide/velocita.md § Registro"
+      "initialJsGzKB": 479,
+      "raisedBy": "#497: KB gz misurati sulla stessa macchina, 473,4 → 476 (952fe509 +1,8; 406049b7 +0,8) → 478,2 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
+    },
+    "/dashboard/assets/compravendita": {
+      "initialJsGzKB": 594,
+      "raisedBy": "#497: KB gz misurati sulla stessa macchina, la route è nata senza tetto il 2026-10-21 (d6464235): 591,7 → 593,9 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
     }
   },
-  "sharedGzKB": 534,
-  "sharedRaisedBy": "#436: firebase 12.13 → 12.19 (@firebase/firestore 4.14 → 4.17), +57 KB gz misurati a parità di Next (482,8 → 539,5), −16 da Next 16.2 → 16.4 (→ 523,5); richiesto da firebase-admin 14, che vuole @firebase/app 0.16.2 e con ogni firebase < 12.19 ne lascia due copie",
+  "sharedGzKB": 535,
+  "sharedRaisedBy": "#497: re2js 2.8.6 → 2.9.1 sotto @firebase/firestore (avviso sul lookbehind), 532,2 → 534,3 KB gz (doc/guide/velocita.md § Registro dei tetti alzati)",
   "libraryCopies": {
     "recharts": 1
   }

@@ -1,12 +1,12 @@
 # Assistente AI
 
-> **Quando aprire questa guida** — chi tocca `app/dashboard/assistant/*`, `components/assistant/*`,
+> **When to open this guide** — whoever touches `app/dashboard/assistant/*`, `components/assistant/*`,
 > `lib/server/assistant/*`, `lib/services/assistantMonthContextService.ts`,
 > `lib/utils/{assistantNarrative,assistantPeriodOptions,expenseBreakdown,goalProposal}.ts`,
 > `lib/hooks/useAssistantStreaming.ts`, `app/api/ai/assistant/*`, `app/api/goals/route.ts`. In
-> `AGENTS.md` resta lo stub con l'essenziale; qui c'è la regola completa. Moduli e file: § *Files*, sotto.
-> Nessuna spec E2E permanente: entrambi i blocchi dichiarano «no Playwright spec» (le prove
-> usa-e-getta sono state cancellate — vedi *Per-page blind spots*).
+> `AGENTS.md` the stub with the essentials stays; here is the full rule. Modules and files: § *Files* below.
+> No permanent E2E spec: both blocks state «no Playwright spec» (the throwaway specs
+> were deleted — see *Per-page blind spots*).
 
 ## Files
 
@@ -66,8 +66,8 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   bundle's `portfolio`, `goals`, `targetAllocation`, `targetAllocationSource`, from the same documents and the
   same pure functions as the five period builders (no expenses: the loans' «ultima rata nel periodo» needs a period;
   no snapshot, no cashflow). `formatTodayContextForPrompt` prints it under «=== DATI FINANZIARI: PORTAFOGLIO DI OGGI
-  (nessun periodo selezionato) ===» with a line naming what is NOT there (entrate, uscite, snapshot, confronto tra
-  date: «chiedi all'utente di selezionare il periodo, non stimare»); `buildChatPrompt` takes it as its sixth argument
+  (nessun periodo selezionato) ===» with a line naming what is NOT there (income, outflows, snapshot, comparison between
+  dates: «chiedi all'utente di selezionare il periodo, non stimare»); `buildChatPrompt` takes it as its sixth argument
   and uses it only when there is no bundle. The route passes it as `todayContext` to `streamAssistantResponse` and
   sends NO `context` SSE event: the page's tiles are a period's, and «Patrimonio oggi» already stands in.
 - **The allocation the model reads is the PAGE's base, never the snapshot's whole patrimony** (owner's decision):
@@ -216,7 +216,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   on 2026-10-23 two ETCs ticked «ISIN.SG» reached the model by their alias and their quotas were lost) and the route takes `{ assetId, percentage }` through `goalWriteAssignmentsSchema`,
   refusing a sum past 100% on one asset. On an update present quotas replace the goal's, absent ones leave them, and
   **one unmatched name keeps EVERY quota of today** (`keepQuotas`: the card sends no `assignments` and its eyebrow
-  says so) — the first version wrote the resolved list, which was empty, and wiped a household member's quota of an ETF on the
+  says so) — the first version wrote the resolved list, which was empty, and wiped a goal's quota of an ETF on the
   mirror. On a creation an unmatched name is shown in amber and left out. `lib/utils/goalProposal.ts` owns the ONE zod schema
   for both the block and the route body (client-safe, since the card validates before rendering). In zod 4 use
   **`z.partialRecord`** for `recommendedAllocation` — `z.record` with an enum key demands every key.

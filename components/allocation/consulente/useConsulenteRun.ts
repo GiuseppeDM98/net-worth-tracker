@@ -3,7 +3,7 @@
 /**
  * The RUN as state started from a gesture (2026-10-20): «Avvia la ricerca» calls `start`, which
  * sends the route ONE request per stage (strategy · instruments · review — Vercel's Hobby plan
- * stops a function at 300 s, a whole run is six to seven minutes), reading each SSE stream to
+ * stops a function at 300 s, a whole run is about five minutes at effort `medium` (2026-10-23)), reading each SSE stream to
  * its `done` before the next, and moves `state` stage by stage. A stage that fails or is cut is
  * remembered as `resumeFrom`: «Riprova» (`retry`) restarts there, on the persisted document,
  * never from scratch.
