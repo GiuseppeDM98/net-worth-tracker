@@ -45,6 +45,6 @@
 
 ## Per-page blind spots
 
-- **The Vercel region, the ESM-only trap and the audit advisories are in `CLAUDE.md` § Known Issues**: the functions
+- **The ESM-only trap and the audit count are in `CLAUDE.md` § Known Issues, the Vercel region in § Data & Integrations**: the functions
   in `fra1` beside Firestore in `eur3` (held by `__tests__/vercelConfig.test.ts`), the `ERR_REQUIRE_ESM` of PR #436
   and its `overrides`, and the `npm audit` count; the advisories and their decisions are in `doc/guide/dipendenze.md`.

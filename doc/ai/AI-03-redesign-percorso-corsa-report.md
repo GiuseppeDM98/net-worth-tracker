@@ -1,6 +1,6 @@
 # AI-03 — The redesign of the path, the run and the report; `ChoiceList`
 
-> Series `doc/ai/` (README.md § 5): **depends on AI-00** (the clean repo on Node 24, its dependency gate and the
+> Series `doc/ai/` (README.md § 5): **depends on AI-00** (retired on 2026-11-03, in develop since 2026-11-03, PR #497: the clean repo on Node 24, the dependency gate and the
 > register of `doc/guide/dipendenze.md`) **and AI-01** (the chosen concept, DESIGN.md § 5 «AI Surfaces» with The
 > AI-Accent Rule and The Path-Scene Rule, the light-mode value of `--ai-accent`); **AI-04, AI-05, AI-06 depend on it**
 > (`ChoiceList`, the RTL harness, `Tile`'s `generated`, the classes of `lib/constants/aiAccent.ts`; AI-04 also
@@ -124,7 +124,7 @@ primitive; component tests get a DOM harness; nothing the path ASKS changes.
    `min-w-[420px]` → the overflow guard is red.
 10. **The DOM harness** (decision 21): `jsdom`, `@testing-library/react`, `@testing-library/dom`,
     `@testing-library/user-event` as devDependencies; `vitest.config.ts` with two projects (`node` for `.test.ts`, `dom`
-    for `.test.tsx`); `__tests__/domSetup.ts` (new); AI-00's dependency gate run once; the row in
+    for `.test.tsx`); `__tests__/domSetup.ts` (new); the gate of `doc/guide/dipendenze.md` § How an upgrade is done run once; the row in
     `doc/guide/dipendenze.md` § Registro. Proof: `npx vitest run __tests__/choiceList.test.tsx` passes under jsdom,
     `npx vitest run __tests__/reactCompilerCoverage.test.ts` still under node, `npx vitest run` in both zones green.
     Mutation: drop the `dom` project → `npx vitest run __tests__/choiceList.test.tsx` exits 1 «No test files found».
@@ -177,9 +177,9 @@ primitive; component tests get a DOM harness; nothing the path ASKS changes.
 
 ### The DOM harness (decision 21)
 
-- `npm install -D jsdom@<exact> @testing-library/react@<exact> @testing-library/dom@<exact> @testing-library/user-event@<exact>`:
+- `npm install -D --save-exact jsdom@<exact> @testing-library/react@<exact> @testing-library/dom@<exact> @testing-library/user-event@<exact>`:
   each the newest stable version published at least seven days before the session (WORKFLOW.md rule 8: installed
-  by hand, a release a few days old), pinned exact as AI-00's method does (`doc/guide/dipendenze.md` § How an upgrade
+  by hand, a release a few days old), pinned exact (`--save-exact`, `doc/guide/dipendenze.md` § How an upgrade
   is done). `@testing-library/dom` is the peer of `@testing-library/react` 16 and `@testing-library/user-event` 14 and
   is named on its own line. No `@testing-library/jest-dom`: the assertions read the DOM (`getAttribute(…)` with
   `toBe`, `textContent` with `toContain`, `queryBy…` with `toBeNull`).
@@ -203,7 +203,7 @@ export default defineConfig({
   runs without globals, so Testing Library cannot register it itself); a `ResizeObserver` stub (Radix measures the
   hidden input of a radio or a checkbox with it inside a form; jsdom has none); a `window.matchMedia` stub answering
   `matches: false` (framer's `useReducedMotion` and `useCountUp` read it; a test that wants reduced motion replaces it).
-- The dependency gate of AI-00 (`doc/guide/dipendenze.md` § How an upgrade is done), once, after the install
+- The dependency gate (`doc/guide/dipendenze.md` § How an upgrade is done), once, after the install
   (decision 33: on Node 24): `node -v` (v24); `npx tsc --noEmit`; `npm run lint`; `TZ=Europe/Rome npx vitest run` and
   `TZ=UTC npx vitest run`; `npm run build && npm run perf:budget`;
   `npm run build-storybook -- --quiet -o <scratchpad>/storybook-static`; the emulators restarted (`npm run emulators`,
@@ -719,7 +719,7 @@ RTL harness`; PR to `develop`, its preview opened by the owner for phase F. No f
   `error`); a request it must hold to read a state is answered after the assertion. No dummy key in `package.json`, no
   real request from a spec. Worked example: `e2e/allocation.consulente.spec.ts` › «runs the three stages on a faked
   route, a failed stage retried from itself».»
-- **`doc/guide/dipendenze.md`** § Registro (the section AI-00 makes of «The table»), its «Moves» table: one row —
+- **`doc/guide/dipendenze.md`** § Registro, its «Moves» table: one row —
   the date · `jsdom`, `@testing-library/react`, `@testing-library/dom`, `@testing-library/user-event` · new
   devDependencies at their exact versions · no advisory (the component-test harness, decision 21) · the PR.
 - **`AGENTS.md`** § Allocazione › Consulente, :455 rewritten in place (net 0 lines): «- A probe never SPENDS on the
@@ -763,7 +763,7 @@ doc/ai/AI-03-redesign-percorso-corsa-report.md. Per prima cosa `node -v`: se non
 Fermati e dimmelo anche se in README § 6 AI-02 non risulta ritirata, o se AI-03 vi è segnata «da rileggere»
 (decisione 37: prima la rilettura mirata delle parti riscritte). Implementa AI-03 così com'è scritta, in
 quest'ordine: l'harness (le quattro devDependencies a versione esatta, i due progetti di vitest.config.ts,
-__tests__/domSetup.ts, il gate delle dipendenze di AI-00 una volta, la riga nel § Registro); `ChoiceList` con il
+__tests__/domSetup.ts, il gate di doc/guide/dipendenze.md § How an upgrade is done una volta, la riga nel § Registro); `ChoiceList` con il
 contratto della § 4 (identico: lo usano AI-04, AI-05, AI-06) e le due copie di `ChoiceRows` eliminate; `Tile` con
 `generated` e lib/constants/aiAccent.ts; i token in globals.css e «Analizza con AI»; `PathRail` e la scena con le
 varianti di motionVariants.ts; la corsa con `stageStartedAt`, i minuti tipici, `StageRows` e gli stati del
