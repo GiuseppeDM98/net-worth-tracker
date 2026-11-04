@@ -248,8 +248,10 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   the two legacy fields leave the property — three writes in that order, the loan first, so a failure leaves the
   account readable. The legacy netting stays in `calculateAssetValue` for a document the migration never reaches (the
   demo account), the Driver reads both models across the migration month (doc/guide/storico.md), and `isRepayableDebt`
-  still offers a legacy property to an instalment. Pinned by `__tests__/loanAssets.test.ts` and the last case of
-  `e2e/cashflow.mortgage.spec.ts` (a reload creates no second loan).
+  still offers a legacy property to an instalment. **The decision is Firestore's, re-read from the server** (2026-11-03): the page's list can be the
+  one IndexedDB restored, older than the migration, and a full E2E run wrote a second loan from it. Two tabs at the same
+  instant can still both write. Pinned by `__tests__/loanAssets.test.ts`, `__tests__/loanMigrationService.test.ts` and the
+  last two cases of `e2e/cashflow.mortgage.spec.ts` (a reload, and a restored list still showing the debt, create no second loan).
 - **«Intestatari» — whose each asset is, by QUOTA** (owner, 2026-10-17; `lib/utils/assetOwnership.ts` over the ONE
   slice primitive `lib/utils/assetSlice.ts`, shared with FIRE › Obiettivi' quotas). A slice of an asset is UNITS —
   quote of an instrument, euro of an account, a property, a pension fund or a loan, whose value lives in `quantity`

@@ -259,8 +259,9 @@ export default function AssetsPage() {
 
   // ─── Legacy property debt → loan migration trigger ────────────────────────────
   // One-shot (2026-10-10): a property that still carries `outstandingDebt` gets a `loan` asset of
-  // its own, its instalments re-pointed (lib/services/loanMigration.ts). Idempotent — once no
-  // property carries a debt there is nothing to do — and gated on the demo like every write.
+  // its own, its instalments re-pointed (lib/services/loanMigration.ts). The ref holds for one page
+  // load only and `assets` may be the restored list, so the service re-reads each property from the
+  // server before it writes (2026-11-03). Gated on the demo like every write.
   const loanMigrationAttemptedRef = useRef<string | null>(null);
 
   useEffect(() => {

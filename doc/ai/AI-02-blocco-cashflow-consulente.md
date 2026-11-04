@@ -1,6 +1,6 @@
 # AI-02 — The Consulente's cashflow block
 
-> Series `doc/ai/` (README.md § 5): **depends on AI-00** (the repo after the upgrade); **AI-04 depends on it** (the
+> Series `doc/ai/` (README.md § 5): **depends on AI-00** (retired on 2026-11-03, in develop since 2026-11-03, PR #497: the repo after the upgrade); **AI-04 depends on it** (the
 > interview reads the same block) and **AI-05 reuses `buildCashAccountLines`** (the register's accounts). Written on
 > 2026-11-01 from `develop` @ b9411a4d. Executes decision 7 (an aggregate block on 12 months + a 24-month monthly
 > series, from a pure function), decision 27 (the same block in the Assistente's year, YTD and history analyses),

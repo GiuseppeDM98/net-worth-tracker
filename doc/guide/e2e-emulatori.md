@@ -32,6 +32,8 @@
   process list before doubting the code.
 
 ## Emulator Exercise Scripts
+- **A module two scripts or a test share is a `.ts`, imported with no extension** (2026-11-03, `scripts/mirrorCollections.ts`):
+  `tsc` refuses a path ending in `.mts` (TS5097, no `allowImportingTsExtensions`); a top-level await still wants the `.mts` entry.
 - **On Windows, start `next dev` from PowerShell through the npm script** (2026-09-20): launched from Git Bash as
   `npx cross-env … next dev -p 3200` the server answered every `[param]` route with Next's own 404 page while static
   routes worked — `PUT /api/dividends/<id>` read as «not found» for ten checks — and the same code started from
@@ -92,9 +94,10 @@ the rules permitting the writes, real `Timestamp` values surviving `removeUndefi
   `{uid}-{y}-{m}`, the per-user docs), creates `mirror@example.com` / `test1234`, and leaves the caches out so the app
   recomputes with the current math. The account is a standard; the data is removed at the end of the session
   (`MIRROR_UID=… npm run mirror:remove` clears one seeded under another id). **What the app writes during a tour goes
-  too** (2026-11-03, `TOUR_ONLY_DOCS`): a Consulente run leaves `allocationAdvice/prod-mirror` with its report and answers, the
-  theme `userPreferences/prod-mirror`, and neither is read from production; a new per-account document the app writes joins that
-  list. Check after a tour by listing the emulator's collections for `prod-mirror`. A saved `.emulator-data` older than that
+  too** (2026-11-03, `TOUR_ONLY_DOCS` in `scripts/mirrorCollections.ts`, held against `firestore.rules` by
+  `__tests__/mirrorCollections.test.ts`): a Consulente run leaves `allocationAdvice/prod-mirror`, the theme `userPreferences/prod-mirror`, a chat
+  `assistantMemory/prod-mirror` and the `messages` under its thread (`recursiveDelete`: a delete does not cascade), a grant `account-access/prod-mirror`,
+  and none is read from production; a new per-account document the app writes joins that list. Check after a tour by listing the emulator's collections for `prod-mirror`. A saved `.emulator-data` older than that
   date may bring a `userPreferences/prod-mirror` back at the next start: it is local and git-ignored.
 - **Stopping the emulators: export FIRST, then kill.** `--export-on-exit` runs only on a SIGINT delivered to the
   `firebase` CLI process itself: on macOS `kill -INT <cli pid>` does it (2026-09-06) — but not reliably on emulators started as

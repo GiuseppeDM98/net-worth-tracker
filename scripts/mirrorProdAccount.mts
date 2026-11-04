@@ -19,6 +19,7 @@
 import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { PER_USER_DOCS, TOUR_ONLY_DOCS, USER_COLLECTIONS } from './mirrorCollections';
 
 /** Overridable (`MIRROR_UID=… npm run mirror:remove`) to clear a mirror seeded under another id. */
 export const MIRROR_UID = process.env.MIRROR_UID || 'prod-mirror';
@@ -31,11 +32,6 @@ const EMULATOR_ENV = {
   FIREBASE_AUTH_EMULATOR_HOST: '127.0.0.1:9099',
   GCLOUD_PROJECT: 'demo-net-worth',
 };
-const USER_COLLECTIONS = ['assets', 'expenses', 'expenseCategories', 'monthly-snapshots', 'assetTransactions', 'pensionContributions', 'dividends', 'costCenters', 'goals', 'assistantThreads'];
-const PER_USER_DOCS = ['users', 'assetAllocationTargets', 'assetTransactionsMeta', 'budgets', 'hall-of-fame', 'performance-cache', 'dashboardOverviewSummaries', 'goalBasedInvesting'];
-// Written by the app DURING a tour, never read from production: a Consulente run leaves its report and its
-// answers in allocationAdvice, the theme lands in userPreferences. mirror:remove left both behind until 2026-11-03.
-const TOUR_ONLY_DOCS = ['allocationAdvice', 'userPreferences'];
 
 type AnyRecord = Record<string, unknown>;
 const [command, argument] = process.argv.slice(2);
@@ -168,13 +164,16 @@ async function removeRows(db: FirebaseFirestore.Firestore) {
     let batch = db.batch();
     let n = 0;
     for (const doc of snap.docs) {
+      // A thread's messages are a subcollection, and a delete does not cascade (2026-11-03).
+      if (c === 'assistantThreads') { await db.recursiveDelete(doc.ref); continue; }
       batch.delete(doc.ref);
       if (++n % 400 === 0) { await batch.commit(); batch = db.batch(); }
     }
     await batch.commit();
     if (snap.size > 0) console.info(`removed ${c}: ${snap.size}`);
   }
-  for (const c of [...PER_USER_DOCS, ...TOUR_ONLY_DOCS]) await db.collection(c).doc(MIRROR_UID).delete();
+  // recursiveDelete, because budgetHistory/{uid} holds only its months subcollection (2026-11-03).
+  for (const c of [...PER_USER_DOCS, ...TOUR_ONLY_DOCS]) await db.recursiveDelete(db.collection(c).doc(MIRROR_UID));
 }
 
 try {

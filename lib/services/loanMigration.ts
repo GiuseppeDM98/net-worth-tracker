@@ -3,9 +3,9 @@
  * debt becomes a `loan` asset of its own, the instalments linked to the property move to the loan,
  * the legacy fields leave the property.
  *
- * Fired once by the Patrimonio page (the same posture as the ledger migration and the
- * `averageCostEur` backfill there): silent, idempotent — a second run finds no property with a
- * debt and writes nothing — and gated on the demo like every write, so the demo account keeps
+ * Fired by the Patrimonio page on each load whose list shows a debt (the same posture as the ledger
+ * migration and the `averageCostEur` backfill there): silent, idempotent — it decides on what
+ * Firestore holds now, so a second run finds no property with a debt and writes nothing — and gated on the demo like every write, so the demo account keeps
  * the legacy netting of `calculateAssetValue`. Client SDK: every document is the owner's
  * (`firestore.rules`), and the rows are listed with the `userId` the rules need.
  *
@@ -16,7 +16,7 @@
  * operations, so they go in chunks.
  */
 
-import { collection, deleteField, doc, getDocs, query, where, writeBatch } from 'firebase/firestore';
+import { collection, deleteField, doc, getDocFromServer, getDocs, query, where, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import { createAsset } from '@/lib/services/assetService';
 import { invalidateDashboardOverviewSummary } from '@/lib/services/dashboardOverviewInvalidation';
@@ -45,16 +45,28 @@ async function linkedRowsOf(ownerId: string, propertyIds: string[]): Promise<{ i
 }
 
 /**
- * Move every legacy property debt of `ownerId` into a loan. `assets` is the list the page already
- * holds — nothing is re-read to decide, only the rows to re-point. Returns how many properties
- * were migrated (0 = nothing to do).
+ * Move every legacy property debt of `ownerId` into a loan. `assets` only names the candidates: the
+ * page's list can be the one IndexedDB restored, older than a migration already done, and a second
+ * loan was written from it (2026-11-03) — so each property is re-read from the server, never from
+ * Firestore's local cache, and a failed read writes nothing. Returns how many properties were
+ * migrated (0 = nothing to do). Two tabs reading at the same instant can still both write.
  */
 export async function migratePropertyDebtsToLoans(ownerId: string, assets: Asset[]): Promise<LoanMigrationResult> {
-  const properties = propertiesWithLegacyDebt(assets);
+  const candidates = propertiesWithLegacyDebt(assets);
+  if (candidates.length === 0) return { migrated: 0 };
+
+  const fresh = await Promise.all(
+    candidates.map(async (candidate) => {
+      const snapshot = await getDocFromServer(doc(db, ASSETS_COLLECTION, candidate.id));
+      return snapshot.exists() ? ({ ...snapshot.data(), id: candidate.id } as Asset) : null;
+    })
+  );
+  const current = fresh.filter((asset): asset is Asset => asset !== null);
+  const properties = propertiesWithLegacyDebt(current);
   if (properties.length === 0) return { migrated: 0 };
 
   const linkedRows = await linkedRowsOf(ownerId, properties.map((property) => property.id));
-  const steps = planLoanMigration(assets, linkedRows);
+  const steps = planLoanMigration(current, linkedRows);
 
   for (const step of steps) {
     const loanId = await createAsset(ownerId, step.loan);

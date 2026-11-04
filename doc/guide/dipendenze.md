@@ -10,7 +10,7 @@
 
 | | |
 | --- | --- |
-| **Last audit** | 2026-11-03 (`npm audit --json`, on the lock of the upgrade commit) |
+| **Last audit** | 2026-11-03 (`npm audit --json`, on the lock of 5db48808) |
 | **Result** | **41 advisories**: 9 high · 32 moderate, no critical, no low (54 before the upgrade) |
 | **Frameworks** | Next.js `^16.4.2` · React 19 (compiler on) · firebase `^12.5.0` (12.19.0) · firebase-admin `^14.5.0` · zod `^4.6.7` · `@anthropic-ai/sdk` `^0.115.0` · storybook `^10.6.5` · firebase-tools `^15.24.0` (15.33.0) · vitest `^4.1.12` |
 | **Node** | 24.x (`engines.node`, held by `__tests__/vercelConfig.test.ts`) |
@@ -22,7 +22,8 @@
    with `firebase-tools@13.11.2` (a semver-major downgrade of the CLI) or with `eslint@4` / `eslint-config-next@0.2.4` /
    `@storybook/react-vite@8.5.3` / `eslint-plugin-storybook@0.1.1` (major downgrades of development tools). Plus the
    rows that read `fixAvailable: true` with no fixed version inside their parents' ranges (2026-11-01, nine rows;
-   2026-11-03, `eslint-plugin-import` and `google-gax`). **`google-gax` is the one not strictly dev**: besides
+   2026-11-03, `eslint-plugin-import` and `google-gax`). Raising the `minimatch` override and adding a `glob` one were
+   declined (2026-11-01). **`google-gax` is the one not strictly dev**: besides
    `firebase-tools` it sits under `@google-cloud/firestore-api`, optional under `firebase-admin`; 5.0.8, the last 5.x,
    is still inside the advisory's range (via `rimraf`).
 2. **Accepted, runtime, no fix** (2026-10-08): `@grpc/grpc-js` under the client `firebase` (`firebase@9.14.0` is the
@@ -40,9 +41,9 @@ The open rows of the audit of 2026-11-03. Compared at every session start; a row
 | high | firebase · @firebase/firestore · @firebase/firestore-compat · @grpc/grpc-js | 4 | `firebase@9.14.0` (major) | accepted (2) |
 | high | firebase-tools · basic-ftp · get-uri · pac-proxy-agent · proxy-agent | 5 | `firebase-tools@13.11.2` (major) | accepted (1) |
 | moderate | @google-cloud/pubsub · @opentelemetry/core · gaxios · glob · minimatch · rimraf · superstatic · uuid | 8 | `firebase-tools@13.11.2` (major) | accepted (1) |
-| moderate | eslint · eslint-config-next · @eslint-community/eslint-utils · @eslint/config-array · @eslint/eslintrc · @typescript-eslint/{parser,typescript-estree,utils} · typescript-eslint · eslint-plugin-jsx-a11y · eslint-plugin-import | 11 | `eslint@4` / `eslint-config-next@0.2.4` / `eslint-plugin-storybook@0.1.1` (major) | accepted (1) |
+| moderate | eslint · eslint-config-next · @eslint-community/eslint-utils · @eslint/config-array · @eslint/eslintrc · @typescript-eslint/{parser,typescript-estree,utils} · typescript-eslint · eslint-plugin-jsx-a11y | 10 | `eslint@4` / `eslint-config-next@0.2.4` / `eslint-plugin-storybook@0.1.1` (major) | accepted (1) |
 | moderate | @storybook/react-vite · @joshwooding/vite-plugin-react-docgen-typescript · eslint-plugin-storybook | 3 | major downgrade | accepted (1) |
-| moderate | archiver · archiver-utils · zip-stream · readdir-glob · exegesis · googleapis-common · eslint-plugin-react · @typescript-eslint/eslint-plugin · @typescript-eslint/type-utils · google-gax | 10 | `true`, but no fixed version in range | accepted (1) |
+| moderate | archiver · archiver-utils · zip-stream · readdir-glob · exegesis · googleapis-common · eslint-plugin-react · @typescript-eslint/eslint-plugin · @typescript-eslint/type-utils · google-gax · eslint-plugin-import | 11 | `true` or a major, it flips; no fixed version in range | accepted (1) |
 
 ### Moves
 
@@ -50,9 +51,9 @@ The open rows of the audit of 2026-11-03. Compared at every session start; a row
 | --- | --- | --- | --- | --- |
 | 2026-11-03 | zod | 4.4.3 → 4.6.7 | memory exhaustion on oversized constrained collections | #497 |
 | 2026-11-03 | re2js (under @firebase/firestore) | 2.8.6 → 2.9.1 | lookbehind DoS | #497 |
-| 2026-11-03 | undici | 6.29.0 → 6.29.1 · 7.30.0 → 7.30.1 · 8.11.2 → 8.12.3 | DoS, TLS validation, cache poisoning (nine advisories) | #497 |
+| 2026-11-03 | undici | 6.29.0 → 6.29.1 · 7.30.0 → 7.30.1 · 8.11.2 → 8.12.3 | DoS, TLS validation, cache poisoning (eight advisories) | #497 |
 | 2026-11-03 | vitest and `@vitest/*` | 4.1.11 → 4.1.12 | code injection via mock registration; Windows backslash traversal | #497 |
-| 2026-11-03 | vite (rolldown 1.1.5 → 1.2.16) | 8.1.5 → 8.3.5 | launch-editor on Windows | #497 |
+| 2026-11-03 | vite (rolldown 1.1.5 → 1.2.16) | 8.1.5 → 8.3.5 | launch-editor (three, one high); cross-origin script execution through custom middleware; files outside `server.fs.allow` | #497 |
 | 2026-11-03 | storybook, `@storybook/*`, eslint-plugin-storybook | 10.4.1 → 10.6.5 | origin validation in the preview; code injection from the local network | #497 |
 | 2026-11-03 | esbuild (one copy; tsx's nested 0.28.1 deduped away) | 0.27.7 → 0.28.2 | file read from the dev server on Windows | #497 |
 | 2026-11-03 | body-parser | 1.20.8 → 1.20.9 · 2.3.0 → 2.4.0 | DoS on a compressed body | #497 |
@@ -75,16 +76,20 @@ AI-03 adds its `jsdom` / `@testing-library/*` row here and runs the gate below o
   `storybook` past their major. `npm audit fix` never; its `--dry-run --json` is read once.
 - **After each group, in order**: (1) the lock comparison: every moved version against the previous green group's lock
   (`.packages[k].version`), and each line one `npm explain` ties to the group, or the group stops; (2) the put-back: an
-  entry whose version did not move gets its previous form, a new `inBundle` entry is dropped; (3) `npm ci` and
+  entry whose version did not move gets its previous form, except the root entry `""`, which carries the new ranges; a
+  new `inBundle` entry is dropped; (3) `npm ci` and
   `npm ls --all`; (4) the gate.
 - **The gate**: `node -v`; `npx tsc --noEmit`; `npm run lint`; `TZ=Europe/Rome npx vitest run` and `TZ=UTC npx vitest run`;
   `npm run build && npm run perf:budget`; `npm run build-storybook -- --quiet -o <scratchpad>/storybook-static`; the
   emulators restarted and seeded, :3100 free, `npx playwright test --project=desktop`. After the last group, the whole
-  `npm run test:e2e`, and on the PR's Vercel preview an Admin route with no token answers 401, never 500.
+  `npm run test:e2e`, and on the PR's Vercel preview an Admin route with no token answers 401, never 500. A red
+  test among the known flakes of `doc/guide/e2e-emulatori.md` (§ Browser-Driven E2E) is re-run alone with
+  `--repeat-each=3` and must be green there; a second red of the same test stops the session.
 - **The acceptance filter**: walk `npm audit --json`'s `.vulnerabilities`; a row passes only when its `fixAvailable` is
   a major of `firebase`, `firebase-tools`, `eslint`, `eslint-config-next`, `@storybook/react-vite`,
   `eslint-plugin-storybook`, or the row is one of § Registro's last line. It must print nothing.
-- **`jq` is not on the Windows machine**: there the comparison, the put-back and the filter are small node scripts.
+- **`jq` is not on the Windows machine**: there the comparison, the put-back and the filter are small node scripts; the
+  `jq` lines are in `git show 7514812a:doc/ai/AI-00-dipendenze.md` (:192, :194, :206).
 
 ## Per-page blind spots
 
@@ -92,8 +97,9 @@ AI-03 adds its `jsdom` / `@testing-library/*` row here and runs the gate below o
   the recorded one means advisories published in the meantime, not an undocumented `npm update`.
 - **`fixAvailable: true` is not a fix inside the range**: read the versions. Rows also flip between `true` and a major
   from one audit to the next: `@typescript-eslint/{eslint-plugin,type-utils}` within one day (2026-11-01),
-  `eslint-plugin-import` and `google-gax` read `true` on the morning of 2026-11-03 with the old lock, and
-  `eslint-plugin-import` a major on the final one. The filter accepts them by name, not by flag.
+  `eslint-plugin-import` and `google-gax` read `true` on the morning of 2026-11-03 with the old lock, and on
+  the final lock `eslint-plugin-import` changes from one run to the next (`true`, then a major of `eslint-config-next`,
+  four runs in a row). The filter accepts them by name, not by flag.
 - **An open-ended override is a door**: `minimatch >=10.2.1` goes to 11.0.4 under `npm audit fix`, with
   `firebase-tools` 15.33.0 → 15.34.2 (dry run of 2026-11-03: 85 package changes). Its output is not pure JSON: text lines
   come first.

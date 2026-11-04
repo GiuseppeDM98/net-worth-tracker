@@ -295,8 +295,9 @@ once, even after a reload.
     Mutation: put `generated` on `RegistraContestoTile` → the count fails.
 18. **The assistant route's first load stays in budget**: `ExpenseDialog` reaches the card only through
     `lazyComponent(() => import('@/components/expenses/ExpenseDialog').then((m) => m.ExpenseDialog))` at module level,
-    preloaded on hover and focus of «Modifica». Proof: `npm run perf:budget` keeps `/dashboard/assistant` ≤ 700 KB gz
-    and `/dashboard/cashflow` ≤ 766 (`perf/budget.json`). Mutation: a static import → the assistant route grows past
+    preloaded on hover and focus of «Modifica». Proof: `npm run perf:budget` keeps `/dashboard/assistant` and
+    `/dashboard/cashflow` within their ceilings in `perf/budget.json` (712 and 783 KB gz on 2026-11-03, measured 711,2 and
+    782,9: under 1 KB of margin, so a raise stops the session for the owner, § 11). Mutation: a static import → the assistant route grows past
     its ceiling.
 19. **Nothing else changes for the other modes** beyond the 4000 cap, the preview without fenced blocks, the header's
     44px actions and the accent: the analysis builders' `system`, `buildChatPrompt`'s output, the goal card's
