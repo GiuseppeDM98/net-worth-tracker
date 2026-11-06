@@ -315,6 +315,11 @@ The app **is** locally runnable; there is no fallback to declare.
   `Bearer owner` header) over wiping `.emulator-data/`, which throws away the shared seed. A
   document with side effects — a transaction or trade, whose deletion re-runs the replay — is
   deleted BY THE APP instead: a REST delete skips the replay (doc/guide/e2e-emulatori.md § Browser-Driven E2E (Playwright)).
+- **A mock page published as an Artifact inherits the host skeleton's `body{color:#000}`** (2026-11-06, the concept
+  pages of AI-01): the Artifact host prepends `:root{color-scheme:light} body{background:#fff;color:#000}` and nests the
+  page inside its body, so a text colour declared on `html` is overridden for every descendant and a dark page shows
+  black on black — Playwright on `file://` never shows it. A page meant for an Artifact sets `background` AND `color`
+  on `body` (the page contract asks for the background alone).
 
 ### Where things are recorded
 

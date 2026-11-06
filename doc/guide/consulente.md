@@ -157,6 +157,16 @@
   the data block, the other agent's result). The user's answers WIN over the model's preference (a chosen role
   stays; the model may say why it would decide otherwise, in the text).
 
+## The visual direction
+
+The Consulente follows DESIGN.md § 5 → «AI Surfaces», concept B «La scena» (chosen on 2026-11-06, decision 74 of
+doc/ai/README.md): **The Path-Scene Rule** (one stage, the rail that says where the path is and fills with the run's
+stages, the slide forward and back, the report's cascade), **The Question-Card Rule** (the interview's cards; the
+scene's footer owns «Continua» and «Avvia la ricerca») and **The AI-Accent Rule** (the accent on what the model wrote
+and, on hover and focus only, on «Avvia il colloquio», «Continua», «Avvia la ricerca», «Riprova», «Rivedi il report»).
+The code follows it from the redesign of the path, the run and the report on (AI-03); until then § The path, § The run
+and § The report and «Applica» describe what renders.
+
 ## Composizione mobile
 
 No composition, by choice: like the Assistente (DESIGN.md → The Conversation-Is-Content Rule) the content is

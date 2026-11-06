@@ -272,6 +272,15 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   region), the rows by `list` «Domande suggerite», the axis by `tablist` «Periodo di analisi», the disclosure by `button` «Come
   funziona».
 
+## The visual direction
+
+The whole page follows DESIGN.md § 5 → «AI Surfaces», concept B «La scena» (chosen on 2026-11-06, decision 74 of
+doc/ai/README.md): **The AI-Accent Rule** (the accent on the «Assistente» sub-eyebrow of a model's message, on
+proposal and question cards, and on the hover of «Invia messaggio», «Registra», «Rispondi» and the suggestion rows;
+never on the verdict, the companion column, the thread list or the user's messages), **The Question-Card Rule** (the
+cards inside a message, ONE «Rispondi» under the last) and the paragraph «The Assistente page» (the conversation stays
+still, the companion column's content slides with the mode). The code follows it from the Registra mode on (AI-05).
+
 ## Composizione mobile
 
 No composition, by design: the page's content is a conversation (DESIGN.md → The Conversation-Is-Content Rule), not a grid of tiles answering one question — below `desktop:` the conversation and its composer are the page and the companion tiles follow them in one column; nothing is closed, lifted or remembered (no `mobile-sections:` key). It is not one of the nineteen surfaces of `mobile:census`.
