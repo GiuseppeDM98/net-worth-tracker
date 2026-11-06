@@ -171,6 +171,43 @@ test('a mortgage series repays today\'s principal at save and leaves the next on
   expect((await asset(db, CASH_ID)).quantity).toBeCloseTo(cashStart - INSTALMENT, 2);
 });
 
+// Owner, 2026-11-06: an October instalment opened in November read today's split, not October's.
+test('a settled instalment reads the figures stamped that day; an edit or a future date goes back to today\'s split, declared an estimate', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.goto('/dashboard/cashflow', { waitUntil: 'load' });
+  const movimenti = page.getByRole('region', { name: 'Movimenti' });
+  await movimenti.waitFor({ timeout: 60_000 });
+  await movimenti.getByRole('tab', { name: 'Feed' }).click();
+  await movimenti.getByRole('button', { name: new RegExp(`^${NOTE}, `) }).first().click();
+  await page.getByRole('dialog').getByRole('button', { name: `Modifica ${NOTE}`, exact: true }).click();
+  const dialog = page.getByRole('dialog').filter({ hasText: 'Modifica voce' });
+  const today = new Date();
+  const day = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+  // The stamped 412 / 600, in the past tense and dated — not today's split on the lowered debt (413,24 / 598,76).
+  await expect(dialog.locator('#debtAssetId-hint')).toHaveText(
+    new RegExp(`^Il ${day} il debito di Mutuo Fenicottero è sceso della quota capitale: 412,00[\\s ]*€ di 1\\.?012,00[\\s ]*€, il resto \\(600,00[\\s ]*€\\) sono interessi al TAN 3,6%\\.$`)
+  );
+  // A changed amount is what the save will split again on today's debt (199.588 €): the line follows it.
+  await dialog.locator('#amount').fill('1100');
+  await expect(dialog.locator('#debtAssetId-hint')).toHaveText(
+    /^Alla data della rata il debito di Mutuo Fenicottero scende della quota capitale: sul debito di oggi 501,24[\s ]*€ di 1\.?100,00[\s ]*€, il resto \(598,76[\s ]*€\) sono interessi al TAN 3,6%\.$/
+  );
+  await dialog.locator('#amount').fill(String(INSTALMENT));
+  // A date still to come: today's figures are an estimate, and the line says so.
+  const next = new Date(today.getFullYear(), today.getMonth() + 1, 15);
+  await dialog.locator('#date').fill(`${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-15`);
+  await expect(dialog.locator('#debtAssetId-hint')).toHaveText(
+    /^Alla data della rata il debito di Mutuo Fenicottero scende della quota capitale, stimata sul debito di oggi: 413,24[\s ]*€ di 1\.?012,00[\s ]*€, il resto \(598,76[\s ]*€\) sono interessi al TAN 3,6%; la cifra esatta si calcola quel giorno\.$/
+  );
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden({ timeout: 30_000 });
+  // Nothing was saved: the row keeps its stamp and the debt its figure.
+  const db = await admin();
+  const [row] = await rowsWith(db, NOTE);
+  expect(row.data()).toMatchObject({ amount: -INSTALMENT, debtPrincipalRepaid: 412, debtInterestPaid: 600 });
+  expect((await asset(db, LOAN_ID)).quantity).toBe(DEBT - 412);
+});
+
 test('Patrimonio\'s «Mutuo» tile reads the interest and the principal the year\'s instalment paid', async ({ page }) => {
   test.setTimeout(120_000);
   await page.goto('/dashboard/assets', { waitUntil: 'load' });

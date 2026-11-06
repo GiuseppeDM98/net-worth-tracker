@@ -206,6 +206,7 @@ export function SnapshotSearchDialog({
             <Label htmlFor="snapshot-select">Mese</Label>
             <SearchableCombobox
               id="snapshot-select"
+              label="Mese"
               options={snapshotOptions}
               value={selectedSnapshotId}
               onValueChange={handleSelectSnapshot}

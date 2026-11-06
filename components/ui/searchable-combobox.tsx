@@ -1,8 +1,17 @@
 'use client';
 
-import { useState, useRef, useEffect, type ReactNode, type ChangeEvent } from 'react';
-import { Check, X, Plus, SearchX } from 'lucide-react';
+import { useState, useRef, useEffect, useId, type ReactNode, type ChangeEvent } from 'react';
+import { Check, X, Plus, SearchX, ChevronDown } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from '@/components/ui/drawer';
+import { usePopperSheet } from '@/components/ui/popper-sheet';
 import { cn } from '@/lib/utils';
 
 export interface ComboboxOption {
@@ -17,6 +26,11 @@ interface SearchableComboboxProps {
   options: ComboboxOption[];
   value: string;
   onValueChange: (value: string) => void;
+  /**
+   * The field's name («Categoria», «Strumento»): the title of the sheet a phone opens, and what
+   * its search field is named after. The host's `<Label htmlFor={id}>` still names the control.
+   */
+  label: string;
   placeholder?: string;
   searchPlaceholder?: string;
   disabled?: boolean;
@@ -37,12 +51,18 @@ interface SearchableComboboxProps {
 /**
  * Searchable combobox with dropdown filtering and optional color badges.
  *
- * Provides a text input that filters options as the user types, with dropdown
- * selection and optional visual badge showing the current selection.
+ * Above 768px a text input filters the options as the user types, the list floating under it.
+ * Below (owner, 2026-11-06: «every dropdown in a separate window on a phone», the width at which
+ * `ResponsiveModal` is a drawer) the control is a button that opens a bottom-sheet `Drawer` with
+ * the search field at its top and thumb-sized rows — the same `Drawer` the modal uses, so a
+ * category picked inside a form on a phone is a sheet over a sheet, as `MultiSelect` already is.
+ * The search field is not focused on open (doc/guide/dialog.md: below 769px nothing takes the
+ * focus, or the keyboard covers the list on every opening); it is one tap away.
  *
  * @param options - Array of selectable options with value, label, and optional color
  * @param value - Currently selected option value
  * @param onValueChange - Callback fired when selection changes
+ * @param label - The field's name: the sheet's title
  * @param placeholder - Text shown when no option is selected (default: "Seleziona...")
  * @param searchPlaceholder - Text shown in input when focused (default: "Cerca...")
  * @param disabled - Disables the input and prevents interaction
@@ -55,6 +75,7 @@ export function SearchableCombobox({
   options,
   value,
   onValueChange,
+  label,
   placeholder = 'Seleziona...',
   searchPlaceholder = 'Cerca...',
   disabled = false,
@@ -74,6 +95,8 @@ export function SearchableCombobox({
   const [isFocused, setIsFocused] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const sheet = usePopperSheet();
+  const sheetId = useId();
 
   // === Filtering and Display Logic ===
 
@@ -158,7 +181,109 @@ export function SearchableCombobox({
   // Icon of the currently selected option (only shown when not focused).
   const selectedIcon: ReactNode | null = !isFocused ? (selectedOption?.icon ?? null) : null;
 
+  const rows = (
+    <OptionRows
+      options={filteredOptions}
+      value={value}
+      onSelect={handleSelect}
+      onCreate={onCreateOption ? handleCreate : undefined}
+      showCreate={!!onCreateOption && !hasExactMatch}
+      createLabel={searchQuery.trim() ? `${createOptionLabel} "${searchQuery.trim()}"` : createOptionLabel}
+      emptyMessage={emptyMessage}
+      size={sheet ? 'sheet' : 'dense'}
+    />
+  );
+
   // === Rendering ===
+
+  const badge = showBadge && selectedOption && value !== '' && (
+    <div className="flex items-center gap-2 px-3 py-2 bg-muted rounded-md border border-border">
+      {selectedOption.icon ? (
+        <span className="text-muted-foreground flex-shrink-0">{selectedOption.icon}</span>
+      ) : selectedOption.color ? (
+        <div
+          className="w-3 h-3 rounded-full border border-gray-300"
+          style={{ backgroundColor: selectedOption.color }}
+        />
+      ) : null}
+      <span className="text-sm font-medium">{selectedOption.label}</span>
+      {onClear && (
+        <button
+          type="button"
+          onClick={handleClear}
+          className="ml-auto hover:bg-accent rounded-full p-0.5 transition-colors"
+          aria-label="Rimuovi selezione"
+        >
+          <X className="h-3 w-3 text-muted-foreground" />
+        </button>
+      )}
+    </div>
+  );
+
+  if (sheet) {
+    return (
+      <div className="space-y-2">
+        {/* noBodyStyles / repositionInputs={false}: the same two settings as ResponsiveModal's
+            drawer (the keyboard would shift the sheet and not restore it). The trigger is a Radix
+            Trigger so the focus comes back to it when the sheet closes. */}
+        <Drawer
+          open={isDropdownOpen}
+          onOpenChange={(open) => {
+            setIsDropdownOpen(open);
+            if (!open) setSearchQuery('');
+          }}
+          noBodyStyles
+          repositionInputs={false}
+        >
+          <DrawerTrigger asChild>
+            <button
+              type="button"
+              id={id}
+              disabled={disabled}
+              // A combobox that opens a dialog, like the Select's trigger: the role takes
+              // `aria-invalid`, which a plain button does not.
+              role="combobox"
+              aria-haspopup="dialog"
+              aria-expanded={isDropdownOpen}
+              aria-controls={sheetId}
+              aria-invalid={ariaInvalid || undefined}
+              className={cn(
+                // The Input's own shell, so a field and a picker read as one kind of control.
+                'flex h-9 w-full min-w-0 items-center gap-2 rounded-md border border-input bg-transparent px-3 text-left text-base shadow-xs transition-[color,box-shadow] outline-none md:text-sm dark:bg-input/30',
+                'focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50',
+                'aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40',
+                'disabled:cursor-not-allowed disabled:opacity-50',
+                className,
+              )}
+            >
+              {selectedOption?.icon && (
+                <span className="shrink-0 text-muted-foreground">{selectedOption.icon}</span>
+              )}
+              <span className={cn('min-w-0 flex-1 truncate', !selectedOption && 'text-muted-foreground')}>
+                {selectedOption?.label ?? placeholder}
+              </span>
+              <ChevronDown className="size-4 shrink-0 opacity-50" aria-hidden="true" />
+            </button>
+          </DrawerTrigger>
+          <DrawerContent id={sheetId} minHeight="medium">
+            <DrawerHeader className="border-b px-4 pb-3 pt-2 text-left">
+              <DrawerTitle className="text-[20px] font-semibold leading-[1.25] tracking-[-0.01em]">{label}</DrawerTitle>
+              <DrawerDescription className="sr-only">Cerca nell’elenco e tocca una voce per sceglierla.</DrawerDescription>
+              <Input
+                aria-label={`Cerca ${label.toLowerCase()}`}
+                placeholder={searchPlaceholder}
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                className="mt-2 h-11"
+              />
+            </DrawerHeader>
+            <div className="min-h-0 flex-1 overflow-y-auto py-2">{rows}</div>
+          </DrawerContent>
+        </Drawer>
+        {badge}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-2">
@@ -183,78 +308,74 @@ export function SearchableCombobox({
         {isFocused && isDropdownOpen && !disabled && (
           // Use bg-popover + border-border to match the shadcn Select dropdown appearance
           <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-60 overflow-auto text-popover-foreground">
-            {filteredOptions.length === 0 && !onCreateOption ? (
-              // A dropdown is not a tile: the absence is one centred line, no eyebrow above it.
-              <div className="p-3 flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                <SearchX className="w-4 h-4 shrink-0" aria-hidden="true" />
-                {emptyMessage}
-              </div>
-            ) : (
-              filteredOptions.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  className={cn(
-                    'w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer text-left',
-                    value === option.value && 'bg-accent text-accent-foreground'
-                  )}
-                  onClick={() => handleSelect(option.value)}
-                >
-                  {option.icon ? (
-                    <span className="flex-shrink-0 text-muted-foreground">{option.icon}</span>
-                  ) : option.color ? (
-                    <div
-                      className="w-3 h-3 rounded-full flex-shrink-0 border border-gray-300"
-                      style={{ backgroundColor: option.color }}
-                    />
-                  ) : null}
-                  <span className="flex-1">{option.label}</span>
-                  {value === option.value && (
-                    <Check className="h-4 w-4 text-primary flex-shrink-0" />
-                  )}
-                </button>
-              ))
-            )}
-            {onCreateOption && !hasExactMatch && (
-              <button
-                type="button"
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer text-left border-t border-border/50 text-primary"
-                onClick={handleCreate}
-              >
-                <Plus className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                <span className="flex-1">
-                  {searchQuery.trim()
-                    ? `${createOptionLabel} "${searchQuery.trim()}"`
-                    : createOptionLabel}
-                </span>
-              </button>
-            )}
+            {rows}
           </div>
         )}
       </div>
-      {showBadge && selectedOption && value !== '' && (
-        <div className="flex items-center gap-2 px-3 py-2 bg-muted rounded-md border border-border">
-          {selectedOption.icon ? (
-            <span className="text-muted-foreground flex-shrink-0">{selectedOption.icon}</span>
-          ) : selectedOption.color ? (
-            <div
-              className="w-3 h-3 rounded-full border border-gray-300"
-              style={{ backgroundColor: selectedOption.color }}
-            />
-          ) : null}
-          <span className="text-sm font-medium">{selectedOption.label}</span>
-          {onClear && (
-            <button
-              type="button"
-              onClick={handleClear}
-              className="ml-auto hover:bg-accent rounded-full p-0.5 transition-colors"
-              aria-label="Rimuovi selezione"
-            >
-              <X className="h-3 w-3 text-muted-foreground" />
-            </button>
-          )}
-        </div>
-      )}
+      {badge}
     </div>
+  );
+}
+
+interface OptionRowsProps {
+  options: ComboboxOption[];
+  value: string;
+  onSelect: (value: string) => void;
+  onCreate?: () => void;
+  showCreate: boolean;
+  createLabel: string;
+  emptyMessage: string;
+  /** `dense` under the desktop input (32px rows), `sheet` in the phone's drawer (44px rows). */
+  size: 'dense' | 'sheet';
+}
+
+/** The option list, shared by the floating dropdown and the sheet: rows, the create row, the absence. */
+function OptionRows({ options, value, onSelect, onCreate, showCreate, createLabel, emptyMessage, size }: OptionRowsProps) {
+  const rowClass = cn(
+    'w-full flex items-center gap-2 hover:bg-accent hover:text-accent-foreground cursor-pointer text-left',
+    size === 'sheet' ? 'min-h-11 px-4 text-base' : 'px-3 py-2 text-sm',
+  );
+  return (
+    <>
+      {options.length === 0 && !onCreate ? (
+        // A dropdown is not a tile: the absence is one centred line, no eyebrow above it.
+        <div className="p-3 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+          <SearchX className="w-4 h-4 shrink-0" aria-hidden="true" />
+          {emptyMessage}
+        </div>
+      ) : (
+        options.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            className={cn(rowClass, value === option.value && 'bg-accent text-accent-foreground')}
+            onClick={() => onSelect(option.value)}
+          >
+            {option.icon ? (
+              <span className="flex-shrink-0 text-muted-foreground">{option.icon}</span>
+            ) : option.color ? (
+              <div
+                className="w-3 h-3 rounded-full flex-shrink-0 border border-gray-300"
+                style={{ backgroundColor: option.color }}
+              />
+            ) : null}
+            <span className="flex-1">{option.label}</span>
+            {value === option.value && (
+              <Check className="h-4 w-4 text-primary flex-shrink-0" aria-hidden="true" />
+            )}
+          </button>
+        ))
+      )}
+      {onCreate && showCreate && (
+        <button
+          type="button"
+          className={cn(rowClass, 'border-t border-border/50 text-primary')}
+          onClick={onCreate}
+        >
+          <Plus className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          <span className="flex-1">{createLabel}</span>
+        </button>
+      )}
+    </>
   );
 }

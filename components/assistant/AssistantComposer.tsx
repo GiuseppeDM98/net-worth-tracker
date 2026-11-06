@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { NO_AUTOFILL_ATTRIBUTES } from '@/components/ui/autofill';
 import { Square, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -55,6 +56,7 @@ export function AssistantComposer({
       <div className="flex items-end gap-2">
         <textarea
           ref={textareaRef}
+          {...NO_AUTOFILL_ATTRIBUTES}
           value={draft}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={(e) => {

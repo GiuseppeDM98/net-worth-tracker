@@ -526,6 +526,11 @@ file used to carry.
   `alert`); `describeWriteError` (`lib/utils/dialogNarrative.ts`) is the ONE translation of a failed write.
 - Two-click confirms live in `lib/hooks/useArmedDelete.ts`: no timer, ever; Escape while armed means DISARM
   (`hasArmedConfirm()`). The two form rules stay here: § Dialog Form Reset, § Two-Step Create Dialogs.
+- **Below 769px every dropdown is a bottom sheet** (2026-11-06, `components/ui/popper-sheet.ts` + `app/globals.css`
+  § Popper sheet): a Radix `Select`/`DropdownMenu` and a `<Popover sheet>` keep their anatomy and are re-pinned by CSS;
+  `SearchableCombobox` opens a vaul `Drawer` titled by its `label`. **No autofill on the app's fields**
+  (`components/ui/autofill.ts`): `Input`/`Textarea` spread `NO_AUTOFILL_ATTRIBUTES`, a raw field spreads them by hand,
+  every non-auth form is `autoComplete="off"` — held by `__tests__/fieldAutocomplete.test.ts`.
 - A controlled modal with no Radix `Trigger` drops focus on `body` when it closes; since 2026-10-08 `ResponsiveModal`
   restores the element focused at open (every keyboard opener; pinned by `e2e/pension.spec.ts`), and a host whose opener
   never held the focus (Safari's click, a non-focusable row) still passes `returnFocusTo`, taken from `event.currentTarget`

@@ -1,9 +1,11 @@
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
+import { NO_AUTOFILL_ATTRIBUTES } from "@/components/ui/autofill"
 
 export type TextareaProps = React.TextareaHTMLAttributes<HTMLTextAreaElement>
 
+/** The app's multi-line field. No autofill by default (components/ui/autofill.ts); a caller's `autoComplete` wins. */
 const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
   ({ className, ...props }, ref) => {
     return (
@@ -13,6 +15,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
           className
         )}
         ref={ref}
+        {...NO_AUTOFILL_ATTRIBUTES}
         {...props}
       />
     )

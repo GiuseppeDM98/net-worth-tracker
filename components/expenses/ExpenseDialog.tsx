@@ -26,6 +26,7 @@
  */
 
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { NO_AUTOFILL_ATTRIBUTES } from '@/components/ui/autofill';
 import { useForm, useFormState, Controller, useWatch, type FieldErrors, type UseFormReturn } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -51,9 +52,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Asset, FamilyMember } from '@/types/assets';
 import { createExpenseSettledOnDate, getFeeOf, saveExpenseFee, updateExpense, type ExpenseFee } from '@/lib/services/expenseService';
 import { applyDebtRepaymentEdit, applyDebtRepayments } from '@/lib/services/debtRepaymentService';
-import { debtBalanceOf, isRepayableDebt, splitInstalment } from '@/lib/utils/mortgageRepayment';
+import { debtBalanceOf, isRepayableDebt, planDebtEdit, splitInstalment } from '@/lib/utils/mortgageRepayment';
 import { applyBalanceEffects } from '@/lib/services/cashBalanceReconciliation';
-import { editBalanceEffects } from '@/lib/utils/cashSettlement';
+import { editBalanceEffects, settlesLater } from '@/lib/utils/cashSettlement';
 import { exceedsPropertyValue, isTransferableProperty, propertyValueAvailable } from '@/lib/utils/propertyTransfer';
 import {
   describeExpenseFeeNote,
@@ -553,7 +554,7 @@ function ExpenseFormBody({
   const linkableCostCenters = costCenters.filter((center) => !center.archivedAt || center.id === selectedCostCenterId);
   const recurringFrequency = selectedRecurringFrequency ?? DEFAULT_RECURRENCE_FREQUENCY;
   return (
-    <form id="expense-form" onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-5">
+    <form id="expense-form" autoComplete="off" onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-5">
 
       {/* ---- Tipo di voce ----
            Create mode reached this form through the step-1 picker, so the type is already
@@ -678,6 +679,7 @@ function ExpenseFormBody({
             <>
               <SearchableCombobox
                 id="categoryId"
+                label="Categoria"
                 options={availableCategories}
                 value={selectedCategoryId || ''}
                 onValueChange={(value) => {
@@ -704,6 +706,7 @@ function ExpenseFormBody({
           </Label>
           <SearchableCombobox
             id="subCategoryId"
+            label="Sottocategoria"
             options={availableSubCategories}
             value={watchedSubCategoryId || ''}
             onValueChange={(value) => setValue('subCategoryId', value || undefined)}
@@ -723,6 +726,7 @@ function ExpenseFormBody({
         <Label htmlFor="notes">Note / Descrizione</Label>
         <textarea
           id="notes"
+          {...NO_AUTOFILL_ATTRIBUTES}
           {...register('notes')}
           placeholder="es. Spesa supermercato Conad"
           className="w-full min-h-[72px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
@@ -1874,6 +1878,15 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess, returnFocusTo
     const debt = debtBalanceOf(loan);
     const instalment = typeof watchedAmount === 'number' && Number.isFinite(watchedAmount) && watchedAmount > 0 ? watchedAmount : null;
     const isPayoff = watchedIsDebtPayoff === true;
+    const now = new Date();
+    const date = selectedDate instanceof Date && !Number.isNaN(selectedDate.getTime()) ? selectedDate : now;
+    // The line follows the save's own decision (planDebtEdit): a settled row the form has not
+    // changed keeps the figures stamped the day it settled; anything else is split again on
+    // today's debt, as the save will do — and declared an estimate while the date is to come.
+    const unchanged =
+      isEdit && expense && instalment !== null && typeof expense.debtPrincipalRepaid === 'number'
+        ? planDebtEdit(expense, { type: selectedType, amount: -instalment, debtAssetId: loan.id, isDebtPayoff: isPayoff, date }, now).unchanged
+        : false;
     return describeDebtRepaymentField({
       loanName: loan.name,
       debt,
@@ -1881,8 +1894,10 @@ export function ExpenseDialog({ open, onClose, expense, onSuccess, returnFocusTo
       instalment,
       split: instalment === null ? null : splitInstalment(instalment, debt, loan.debtInterestRate, isPayoff),
       isPayoff,
+      isScheduled: settlesLater(date, now),
+      settled: unchanged && expense ? { date: expense.date, principal: expense.debtPrincipalRepaid ?? 0, interest: expense.debtInterestPaid ?? 0 } : null,
     });
-  }, [loans, watchedDebtAssetId, watchedAmount, watchedIsDebtPayoff]);
+  }, [loans, watchedDebtAssetId, watchedAmount, watchedIsDebtPayoff, selectedDate, selectedType, isEdit, expense]);
 
   const handleCategoryCreated = async () => {
     await loadCategories();

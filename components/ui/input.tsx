@@ -1,7 +1,9 @@
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
+import { NO_AUTOFILL_ATTRIBUTES } from "@/components/ui/autofill"
 
+/** The app's text field. No autofill by default (components/ui/autofill.ts); a caller's `autoComplete` wins. */
 function Input({ className, type, ...props }: React.ComponentProps<"input">) {
   return (
     <input
@@ -13,6 +15,7 @@ function Input({ className, type, ...props }: React.ComponentProps<"input">) {
         "aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40",
         className
       )}
+      {...NO_AUTOFILL_ATTRIBUTES}
       {...props}
     />
   )

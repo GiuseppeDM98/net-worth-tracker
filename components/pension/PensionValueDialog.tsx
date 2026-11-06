@@ -140,7 +140,7 @@ export function PensionValueDialog({ open, onClose, defaultAssetId }: PensionVal
       {!hasFunds ? (
         <p className="text-sm text-muted-foreground">Prima crea un asset «Fondo Pensione» in Patrimonio.</p>
       ) : (
-        <form id="pension-value-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form id="pension-value-form" autoComplete="off" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           {funds.length > 1 && (
             <div className="space-y-2">
               <Label htmlFor="pv-fund">Fondo</Label>

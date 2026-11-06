@@ -1802,7 +1802,7 @@ export function AssetDialog({ open, onClose, asset, onRegisterTrade, initialType
 
         {/* Step 2: form — edit mode OR create mode after type selection */}
         {(isEdit || step === 2) && (
-        <form id={ASSET_FORM_ID} onSubmit={handleSubmit(onSubmit, onInvalid)}>
+        <form id={ASSET_FORM_ID} autoComplete="off" onSubmit={handleSubmit(onSubmit, onInvalid)}>
           <div className="space-y-4">
 
           {/* Back to type picker — create mode only */}

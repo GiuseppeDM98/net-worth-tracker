@@ -3,6 +3,7 @@
 import { useState, useMemo, lazy, Suspense, type ReactNode } from 'react';
 import { Tag, X } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { usePopperSheet } from '@/components/ui/popper-sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CATEGORY_ICONS, CATEGORY_ICON_NAMES, CATEGORY_ICONS_BY_TYPE } from '@/lib/constants/categoryIcons';
@@ -95,6 +96,9 @@ export function IconPickerPopover({
   expenseType,
 }: Readonly<IconPickerPopoverProps>) {
   const [open, setOpen] = useState(false);
+  // On a phone the picker is a bottom sheet: the search is not focused on open, or the keyboard
+  // would cover the grid on every opening (doc/guide/dialog.md: no focus below 769px).
+  const isSheet = usePopperSheet();
   const [search, setSearch] = useState('');
 
   // Base order: type-relevant icons first, then the rest (deduped).
@@ -134,7 +138,7 @@ export function IconPickerPopover({
   };
 
   return (
-    <Popover open={open} onOpenChange={(v) => { setOpen(v); if (!v) setSearch(''); }}>
+    <Popover sheet open={open} onOpenChange={(v) => { setOpen(v); if (!v) setSearch(''); }}>
       <PopoverTrigger asChild>
         <Button
           type="button"
@@ -168,8 +172,8 @@ export function IconPickerPopover({
             placeholder="Cerca icona…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="h-8 text-sm"
-            autoFocus
+            className={isSheet ? 'h-11' : 'h-8 text-sm'}
+            autoFocus={!isSheet}
           />
 
           {/* Icon grid */}

@@ -25,8 +25,8 @@
       "raisedBy": "#497: KB gz misurati sulla stessa macchina, 692,2 → 699,5 (406049b7, tutto il portafoglio nel contesto, +5,2) → 709,1 con zod 4.6.7 → 711,2 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
     },
     "/dashboard/cashflow": {
-      "initialJsGzKB": 783,
-      "raisedBy": "#497: KB gz misurati sulla stessa macchina, 766 → 771,1 (952fe509 +2,1, d6464235 +2) → 780,7 con zod 4.6.7 → 782,9 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
+      "initialJsGzKB": 785,
+      "raisedBy": "#497: KB gz misurati sulla stessa macchina, 766 → 771,1 (952fe509 +2,1, d6464235 +2) → 780,7 con zod 4.6.7 → 782,9 con re2js 2.9.1 → 784,0 (fix/rata-dettaglio-select-mobile-autocomplete 2026-11-06: le tendine come foglio sotto i 769px e il combobox col Drawer, +1,1; doc/guide/velocita.md § Registro dei tetti alzati)"
     },
     "/dashboard/fire-simulations": {
       "initialJsGzKB": 742,
@@ -49,8 +49,8 @@
       "raisedBy": "#497: KB gz misurati sulla stessa macchina, 652,7 → 655 → 657,1 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
     },
     "/dashboard/settings": {
-      "initialJsGzKB": 720,
-      "raisedBy": "#497: KB gz misurati sulla stessa macchina, 701,7 → 707,6 (d6464235, la tessera dei default di Compravendita: +13,2, di cui 8,3 tolti spostando le etichette) → 717,2 con zod 4.6.7 → 719,3 con re2js 2.9.1 (doc/guide/velocita.md § Registro dei tetti alzati)"
+      "initialJsGzKB": 721,
+      "raisedBy": "#497: KB gz misurati sulla stessa macchina, 701,7 → 707,6 (d6464235, la tessera dei default di Compravendita: +13,2, di cui 8,3 tolti spostando le etichette) → 717,2 con zod 4.6.7 → 719,3 con re2js 2.9.1 → 720,3 (fix/rata-dettaglio-select-mobile-autocomplete 2026-11-06: le tendine come foglio sotto i 769px, +1,0; doc/guide/velocita.md § Registro dei tetti alzati)"
     },
     "/login": {
       "initialJsGzKB": 478,

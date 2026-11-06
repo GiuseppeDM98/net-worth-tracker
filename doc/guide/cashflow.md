@@ -191,7 +191,13 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   tile) because the interest depends on that day's debt: an edit gives it back and re-splits on today's debt
   (`planDebtEdit`, a no-op when loan, amount, payoff flag and date side are unchanged), a delete gives back exactly it
   (`reverseAppliedBalances` → `reverseDebtRepayments`). The client applies the rows already happened, `settleDueBalances`
-  the rest on their day, in the same transaction as the accounts. «Collega la serie al mutuo…»
+  the rest on their day, in the same transaction as the accounts. **The line under «Riduce il debito di» follows the
+  same decision** (`describeDebtRepaymentField`, owner 2026-11-06 — an October instalment opened in November used to
+  print today's split): a settled row the form has not changed (`planDebtEdit(...).unchanged`) reads the figures STAMPED
+  that day, dated and in the past tense («Il 01/10/2026 il debito di X è sceso della quota capitale: 505,20 € di
+  557,30 €, il resto (52,10 €) …»); a changed amount, loan or payoff flag goes back to today's split, as the save will;
+  a date still to come declares it an estimate («stimata sul debito di oggi … la cifra esatta si calcola quel giorno»).
+  Pinned by `__tests__/dialogNarrative.test.ts` and `e2e/cashflow.mortgage.spec.ts`. «Collega la serie al mutuo…»
   (`selectDebtLinkableOccurrences`) links only the future occurrences not yet linked whose account has not moved; the
   past is never touched — the typed debt reflects it.
 - **«Estinzione anticipata» is a `debt` row that is ALL principal** (`isDebtPayoff`, owner 2026-10-10): the checkbox
