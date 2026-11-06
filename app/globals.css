@@ -752,3 +752,93 @@ html[data-vt="page"]::view-transition-image-pair(page-verdict) {
 .no-scrollbar::-webkit-scrollbar {
   display: none; /* Chromium, Safari */
 }
+
+/* === Popper sheet (components/ui/popper-sheet.ts) ===
+ * Below 769px a Select, a DropdownMenu or a picking Popover marks its content `data-popper-sheet`
+ * and becomes a bottom sheet. Radix positions the popper WRAPPER with inline styles (fixed, a
+ * translate to the trigger), so the wrapper is re-pinned with `!important`; the content's own
+ * classes are beaten by these unlayered rules (Tailwind's utilities sit in a layer). The backdrop
+ * is the wrapper's `::before`: the wrapper is a fixed stacking context with no transform, so a
+ * fixed pseudo-element covers the viewport whatever the content's animation does. A press on it is
+ * a press outside the content, which Radix already treats as a dismiss. */
+[data-radix-popper-content-wrapper]:has(> [data-popper-sheet]) {
+  position: fixed !important;
+  inset: auto 0 0 0 !important;
+  transform: none !important;
+  min-width: 0 !important;
+  width: 100%;
+}
+[data-radix-popper-content-wrapper]:has(> [data-popper-sheet])::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: rgb(0 0 0 / 0.5);
+}
+[data-popper-sheet] {
+  width: 100%;
+  max-width: none;
+  max-height: 70dvh;
+  border-radius: 10px 10px 0 0;
+  border-bottom-width: 0;
+  background: var(--card);
+  color: var(--card-foreground);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  translate: none;
+  transform-origin: bottom center;
+}
+/* The drawer's drag handle, so the two sheets read as one surface. */
+[data-popper-sheet]::before {
+  content: '';
+  display: block;
+  flex-shrink: 0;
+  margin: 12px auto 4px;
+  height: 6px;
+  width: 48px;
+  border-radius: 9999px;
+  background: var(--muted);
+}
+/* Thumb-sized rows (AGENTS.md § Accessibility: targets ≥ 44px) at the drawer's text size. */
+[data-popper-sheet] [data-slot='select-item'],
+[data-popper-sheet] [data-slot='dropdown-menu-item'] {
+  min-height: 44px;
+  padding-inline: 16px 40px;
+  font-size: 1rem;
+}
+[data-popper-sheet] [data-slot='select-item'] > span:first-child {
+  right: 16px;
+}
+[data-popper-sheet] [data-slot='select-label'],
+[data-popper-sheet] [data-slot='dropdown-menu-label'] {
+  padding-inline: 16px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  [data-radix-popper-content-wrapper]:has(> [data-popper-sheet])::before {
+    animation: popper-sheet-backdrop-in 200ms ease-out;
+  }
+  [data-radix-popper-content-wrapper]:has(> [data-popper-sheet][data-state='closed'])::before {
+    animation: popper-sheet-backdrop-out 200ms ease-in forwards;
+  }
+  [data-popper-sheet][data-state='open'] {
+    animation: popper-sheet-in 300ms var(--ease-spring);
+  }
+  [data-popper-sheet][data-state='closed'] {
+    animation: popper-sheet-out 200ms ease-in forwards;
+  }
+}
+@keyframes popper-sheet-in {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@keyframes popper-sheet-out {
+  from { transform: translateY(0); }
+  to { transform: translateY(100%); }
+}
+@keyframes popper-sheet-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes popper-sheet-backdrop-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}

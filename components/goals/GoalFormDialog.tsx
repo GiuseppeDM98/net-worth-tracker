@@ -6,6 +6,7 @@
 'use client';
 
 import { useState } from 'react';
+import { NO_AUTOFILL_ATTRIBUTES } from '@/components/ui/autofill';
 import { AssetClass } from '@/types/assets';
 import { ASSET_CLASS_LABELS, ASSET_CLASS_SEQUENCE } from '@/lib/utils/allocationUtils';
 import {
@@ -363,6 +364,7 @@ export function GoalFormDialog({
             <Label htmlFor="goalNotes">Note (opzionale)</Label>
             <textarea
               id="goalNotes"
+              {...NO_AUTOFILL_ATTRIBUTES}
               className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               rows={3}
               maxLength={500}

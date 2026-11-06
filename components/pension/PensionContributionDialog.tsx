@@ -253,7 +253,7 @@ export function PensionContributionDialog({ open, onClose, defaultAssetId, onRec
           Prima crea un asset «Fondo Pensione» in Patrimonio: i versamenti si collegano a quel fondo.
         </p>
       ) : (
-        <form id="pension-contribution-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form id="pension-contribution-form" autoComplete="off" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="pc-fund">Fondo</Label>
             <Select value={watchAssetId} onValueChange={(value) => setValue('assetId', value, { shouldValidate: true })}>

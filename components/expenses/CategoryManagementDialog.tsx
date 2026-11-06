@@ -889,7 +889,7 @@ export function CategoryManagementDialog({
           </>
         }
       >
-        <form id="category-form" onSubmit={handleSubmit(onSubmit)}>
+        <form id="category-form" autoComplete="off" onSubmit={handleSubmit(onSubmit)}>
           <CategoryFormBody {...formBodyProps} />
         </form>
       </ResponsiveModal>

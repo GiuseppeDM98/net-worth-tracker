@@ -55,6 +55,8 @@
 
 ## 🐛 Bug Fixes
 
+- **Cashflow — la rata del mutuo** — Fixed the line under «Riduce il debito di» printing today's split of principal and interest on every instalment: an instalment already settled now reads the figures of its own day, dated («Il 01/10/2026 il debito di Mutuo Casa è sceso della quota capitale: 505,20 € di 557,30 €, il resto (52,10 €) sono interessi al TAN 0,7%»); an instalment still to come says its figures are an estimate on today's debt, computed for real the day it settles.
+
 - **Assistente AI — il Cashflow nel tile** — Fixed the assistant's «Entrate» and «Uscite» not matching Cashflow › Tracciamento: a row dated the 1st of a month at Italian midnight was counted in the previous month (the window was the server's, in UTC), and «Entrate» left the coupons out while the page counts them. Now every window is the Italian calendar month and «Entrate» is the page's figure, with «di cui dividendi» under it.
 - **FIRE › Obiettivi — la casa col mutuo** — Fixed the «Quota libera» list printing a home at its gross value while the «Non assegnato» total already netted the mortgage: a property now counts, for every goal, net of the loan that finances it, and a loan is never an instrument a goal can hold (nor is it offered when assigning).
 - **Assistente AI — risposte interrotte** — Fixed a long consultative answer («cosa miglioreresti della mia allocazione?») ending on «ho raggiunto il limite di lunghezza»: the answer's budget is five times what it was.
@@ -94,6 +96,9 @@
 - **Rendimenti › Analizza con AI** — Fixed the empty or cut-off report: when the model declines to write it, another model takes over where the kind of refusal allows it, and the dialog names the model that actually wrote the report; when the refusal stands, or the report reaches its maximum length, the dialog says so — refused, or stopped halfway with the text written so far incomplete — and «Rigenera» is offered after any failure, not only beside a finished report.
 
 ## 🔧 Improvements
+
+- **Ogni pagina (telefono e tablet in verticale) — le tendine** — Every dropdown now opens as a sheet from the bottom of the screen instead of a small list beside the field: the type, account, loan, period and filter pickers, the account menu under «Altro», the category icon picker and the assistant's preferences, with thumb-sized rows and a backdrop; Categoria and Sottocategoria (and the dividend's instrument, the Storico month) open a sheet with the search field at the top and «Aggiungi …» at the bottom.
+- **Ogni modulo — niente suggerimenti automatici** — The browser no longer proposes previously typed values on the app's fields (amounts, names, notes, dates, search), and the password managers keep their icon out of them; the login and registration fields still offer your saved credentials.
 
 - **Security — Next.js 16.4.2** — Updated Next.js from 16.4.0 to 16.4.2, which fixes two critical remote code execution advisories (GHSA-2464-fhr4-w9xw, GHSA-673q-mjm6-r5xr) and a denial of service in Server Actions (GHSA-p3m5-59mp-jv5r). Self-hosted deployments should update.
 - **Assistente AI — mentre pensa** — Changed the chip that appears when a long answer is still thinking: instead of «Sta impiegando più del previsto…» it now says, in turn, «Ci sto ragionando…», «Sto facendo i conti…», «Sto rileggendo il portafoglio…», «Sto mettendo in fila i numeri…», «Ancora un momento…».

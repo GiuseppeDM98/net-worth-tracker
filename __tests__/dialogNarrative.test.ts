@@ -752,6 +752,29 @@ describe('describeDebtRepaymentField — the line under «Riduce il debito di»'
     );
     expect(flat(describeDebtRepaymentField({ loanName: 'Mutuo Casa', debt: 10_000, instalment: null, split: null, isPayoff: true }))).toContain('scende di tutto l’importo');
   });
+
+  // Owner, 2026-11-06: an October instalment opened in November read today's split, not October's.
+  it('should read a settled row by the figures stamped the day it settled, never today\'s split', () => {
+    const settled = { date: new Date(2026, 9, 1, 12), principal: 505.2, interest: 52.1 };
+    expect(flat(describeDebtRepaymentField({ loanName: 'Casa', debt: 90_000, annualRatePct: 0.7, instalment: 557.3, split: { interest: 37.97, principal: 519.33 }, settled }))).toBe(
+      'Il 01/10/2026 il debito di Casa è sceso della quota capitale: 505,20 € di 557,30 €, il resto (52,10 €) sono interessi al TAN 0,7%.'
+    );
+    expect(flat(describeDebtRepaymentField({ loanName: 'Casa', debt: 1000, instalment: 100, split: { interest: 0, principal: 100 }, settled: { ...settled, principal: 100, interest: 0 } }))).toBe(
+      'Il 01/10/2026 il debito di Casa è sceso dell’intera rata (100,00 €): il prestito non aveva un TAN.'
+    );
+    expect(flat(describeDebtRepaymentField({ loanName: 'Casa', debt: 6000, annualRatePct: 3.6, instalment: 4000, split: { interest: 0, principal: 4000 }, isPayoff: true, settled: { ...settled, principal: 4000, interest: 0 } }))).toBe(
+      'Estinzione anticipata: il 01/10/2026 il debito di Casa è sceso di 4000,00 €. Una penale o gli interessi del periodo vanno nella commissione.'
+    );
+  });
+
+  it('should declare today\'s split an estimate while the row\'s date is still to come', () => {
+    expect(flat(describeDebtRepaymentField({ loanName: 'Casa', debt: 90_000, annualRatePct: 0.7, instalment: 557.3, split: { interest: 37.97, principal: 519.33 }, isScheduled: true }))).toBe(
+      'Alla data della rata il debito di Casa scende della quota capitale, stimata sul debito di oggi: 519,33 € di 557,30 €, il resto (37,97 €) sono interessi al TAN 0,7%; la cifra esatta si calcola quel giorno.'
+    );
+    // Without an amount or a TAN nothing is estimated, so nothing is declared one.
+    expect(describeDebtRepaymentField({ loanName: 'Casa', debt: 182_000, annualRatePct: 3.25, instalment: null, split: null, isScheduled: true })).not.toContain('stimata');
+    expect(describeDebtRepaymentField({ loanName: 'Casa', debt: 1000, instalment: 100, split: { interest: 0, principal: 100 }, isScheduled: true })).not.toContain('stimata');
+  });
 });
 
 describe('describePropertyTransferRefusal — a sale above the recorded value', () => {

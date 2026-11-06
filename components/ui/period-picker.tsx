@@ -11,6 +11,7 @@
 'use client';
 
 import * as React from 'react';
+import { NO_AUTOFILL_ATTRIBUTES } from '@/components/ui/autofill';
 import { addMonths, subMonths, format } from 'date-fns';
 import { it as itLocale } from 'date-fns/locale';
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -200,6 +201,7 @@ export function PeriodPicker({ value, onChange, availableYears = [], className, 
             <label htmlFor="period-picker-from" className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">Da</label>
             <input
               id="period-picker-from"
+              {...NO_AUTOFILL_ATTRIBUTES}
               type="text"
               value={fromText}
               onChange={handleFromTextChange}
@@ -212,6 +214,7 @@ export function PeriodPicker({ value, onChange, availableYears = [], className, 
             <label htmlFor="period-picker-to" className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">A</label>
             <input
               id="period-picker-to"
+              {...NO_AUTOFILL_ATTRIBUTES}
               type="text"
               value={toText}
               onChange={handleToTextChange}
