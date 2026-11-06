@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="it" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Concetto B · La scena</title>
+<style>
+:root{--radius:10px;--background:oklch(1 0 0);--foreground:oklch(0.145 0 0);--card:oklch(1 0 0);--primary:oklch(0.205 0 0);--primary-foreground:oklch(0.985 0 0);--muted:oklch(0.97 0 0);--muted-40:oklch(0.97 0 0 / 40%);--muted-foreground:oklch(0.546 0 0);--accent:oklch(0.97 0 0);--destructive:oklch(0.577 0.245 27.325);--warning-foreground:oklch(0.468 0.098 75);--positive:oklch(0.482 0.194 149.214);--ai-accent:oklch(0.56 0.2 305);--ai-glow:color-mix(in oklch,var(--ai-accent) 40%,transparent);--border:oklch(0.922 0 0);--input:oklch(0.922 0 0);--input-30:transparent;--ring:oklch(0.708 0 0);--chart-1:oklch(0.500 0.200 262);--chart-2:oklch(0.600 0.125 172);--ease-spring:linear(0,0.093 8.3%,0.280 16.7%,0.476 25%,0.643 33.3%,0.771 41.7%,0.861 50%,0.922 58.3%,0.960 66.7%,0.982 75%,0.994 83.3%,1);--quart:cubic-bezier(0.25,1,0.5,1);--std:cubic-bezier(0.4,0,0.2,1)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--background:oklch(0.145 0 0);--foreground:oklch(0.985 0 0);--card:oklch(0.205 0 0);--primary:oklch(0.922 0 0);--primary-foreground:oklch(0.205 0 0);--muted:oklch(0.269 0 0);--muted-40:oklch(0.269 0 0 / 40%);--muted-foreground:oklch(0.708 0 0);--accent:oklch(0.269 0 0);--destructive:oklch(0.704 0.191 22.216);--warning-foreground:oklch(0.854 0.090 82);--positive:oklch(0.740 0.156 148.655);--ai-accent:oklch(0.65 0.2 305);--border:oklch(1 0 0 / 10%);--input:oklch(1 0 0 / 15%);--input-30:oklch(1 0 0 / 4.5%);--ring:oklch(0.556 0 0);--chart-1:oklch(0.488 0.243 264.376);--chart-2:oklch(0.696 0.17 162.48)}}
+:root[data-theme="dark"]{--background:oklch(0.145 0 0);--foreground:oklch(0.985 0 0);--card:oklch(0.205 0 0);--primary:oklch(0.922 0 0);--primary-foreground:oklch(0.205 0 0);--muted:oklch(0.269 0 0);--muted-40:oklch(0.269 0 0 / 40%);--muted-foreground:oklch(0.708 0 0);--accent:oklch(0.269 0 0);--destructive:oklch(0.704 0.191 22.216);--warning-foreground:oklch(0.854 0.090 82);--positive:oklch(0.740 0.156 148.655);--ai-accent:oklch(0.65 0.2 305);--border:oklch(1 0 0 / 10%);--input:oklch(1 0 0 / 15%);--input-30:oklch(1 0 0 / 4.5%);--ring:oklch(0.556 0 0);--chart-1:oklch(0.488 0.243 264.376);--chart-2:oklch(0.696 0.17 162.48)}
+*{box-sizing:border-box;min-width:0}
+html{background:var(--background);color:var(--foreground);font-family:"Geist Sans",system-ui,sans-serif;font-size:14px;line-height:1.6;-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--background);color:var(--foreground)}
+h1,h2,h3,p,ul,ol,dl,dd,figure{margin:0}ul,ol{padding:0;list-style:none}
+button{font:inherit;color:inherit}
+.sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.mono{font-family:"Geist Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.eb{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--muted-foreground);line-height:1.4}
+.seb{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted-foreground);line-height:1.4}
+.ai{color:var(--ai-accent)}
+.mf{color:var(--muted-foreground)}
+.s11{font-size:11px}.s12{font-size:12px}.s13{font-size:13px;line-height:1.45}.s15{font-size:15px}
+.wrap{max-width:1920px;margin:0 auto;padding:0 16px}
+header{padding:24px 0 8px;border-bottom:1px solid var(--border)}
+header h1{font-size:24px;font-weight:600;line-height:1.15;letter-spacing:-.025em;margin-top:8px}
+.draft{margin-top:16px;display:grid;gap:12px;max-width:920px}
+.draft p{font-size:13px;line-height:1.45;color:var(--muted-foreground)}
+.draft b{color:var(--foreground);font-weight:600}
+#mode{margin-top:12px}
+section[data-scene]{padding:24px 0;border-bottom:1px solid var(--border)}
+section[data-scene]>h2{font-size:16px;font-weight:600;line-height:1.4;letter-spacing:-.005em}
+section[data-scene]>.lead{font-size:13px;line-height:1.45;color:var(--muted-foreground);margin-top:4px;max-width:920px}
+figure{margin-top:16px}
+.frame{border:1px dashed var(--border);border-radius:16px;padding:16px;background:var(--background)}
+.frame+.frame{margin-top:12px}
+figcaption{font-size:12px;line-height:1.5;color:var(--muted-foreground);margin-top:12px;max-width:920px}
+figcaption b{color:var(--foreground);font-weight:600}
+.replay{margin-top:12px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:44px;padding:0 16px;border-radius:8px;border:1px solid transparent;background:var(--primary);color:var(--primary-foreground);font-size:14px;font-weight:500;cursor:pointer;transition:border-color .2s var(--std),box-shadow .2s var(--std)}
+.btn.out{background:var(--input-30);border-color:var(--border);color:var(--foreground)}
+.btn.gh{background:transparent;color:var(--foreground)}
+.btn.ic{width:44px;padding:0}
+.btn.pr{background:var(--primary);color:var(--primary-foreground)}
+.btn[disabled]{opacity:.5;pointer-events:none}
+.btn:focus-visible,.row:focus-within,textarea:focus-visible{outline:none;box-shadow:0 0 0 3px color-mix(in oklch,var(--ring) 50%,transparent)}
+.btn.aic:hover,.btn.aic:focus-visible{border-color:var(--ai-accent);box-shadow:0 0 14px var(--ai-glow)}
+.btn.aic.out:hover,.btn.aic.gh:hover,.btn.aic.out:focus-visible,.btn.aic.gh:focus-visible{color:var(--ai-accent)}
+.btn.on{background:var(--accent)}
+svg{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tile{display:flex;flex-direction:column;border:1px solid var(--border);border-radius:16px;background:var(--card);padding:20px;transition:border-color .2s var(--std),box-shadow .2s var(--std)}
+.tile.gen{border-color:var(--ai-accent)}
+.tile.gen:hover,.tile.gen:focus-within{box-shadow:0 0 14px var(--ai-glow)}
+.th{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.th>:first-child{flex:none}.th .as{font-size:10px;color:var(--muted-foreground);flex:1 1 auto;text-align:right}
+.rd{font-size:13px;line-height:1.45;margin-top:8px}
+.rd .f{font-family:"Geist Mono",ui-monospace,monospace;font-weight:600;font-variant-numeric:tabular-nums}
+.ft{margin-top:auto;border-top:1px solid var(--border);padding-top:14px;font-size:11px;color:var(--muted-foreground)}
+.vh{font-size:24px;font-weight:600;line-height:1.15;letter-spacing:-.025em}
+.vs{font-size:14px;line-height:1.6;color:var(--muted-foreground);margin-top:8px;max-width:920px}
+.vs .f{font-family:"Geist Mono",ui-monospace,monospace;font-weight:600;font-variant-numeric:tabular-nums;color:var(--foreground)}
+.pos{color:var(--positive)}.neu{color:var(--muted-foreground)}
+.hl{font-size:24px;font-weight:600;line-height:1.15;letter-spacing:-.025em;margin-top:12px}
+.help{font-size:14px;line-height:1.6;color:var(--muted-foreground);margin-top:8px;max-width:600px}
+.card{border:1px solid var(--border);border-radius:16px;background:var(--card);padding:20px;width:100%;max-width:720px;margin:0 auto}
+.stage{overflow-x:clip}
+.rail{display:flex;gap:6px;margin:0 auto 12px;max-width:720px}
+.rail li{flex:1;height:3px;border-radius:9999px;background:var(--border)}
+.rail li.done{background:var(--muted-foreground)}.rail li.cur{background:var(--foreground)}.rail li.int,.rail li.run{background:var(--ai-accent)}.rail li.fail{background:var(--destructive)}
+.rail li.fill{transform-origin:left;transition:transform .3s var(--ease-spring)}
+.rail .lab{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}.rail .sep{display:none}
+.rows{border:1px solid var(--border);border-radius:14px;margin-top:16px}
+.row{display:flex;gap:12px;align-items:flex-start;padding:12px 16px;min-height:44px;border-top:1px solid var(--border);border-radius:0}
+.row:first-child{border-top:0;border-radius:14px 14px 0 0}.row:last-child{border-radius:0 0 14px 14px}
+.row input{margin:4px 0 0;width:16px;height:16px;accent-color:var(--foreground);flex:none}
+.row label{flex:1;display:flex;flex-direction:column;gap:2px;cursor:pointer;min-height:20px;justify-content:center}
+.row .l{font-size:14px;font-weight:500}.row .h{font-size:13px;line-height:1.45;color:var(--muted-foreground)}
+.fld{margin-top:8px;height:44px;border:1px solid var(--input);border-radius:8px;background:var(--input-30);padding:0 12px;display:flex;align-items:center;font-size:16px;color:var(--muted-foreground)}
+.foot{margin-top:24px;border-top:1px solid var(--border);padding-top:16px;display:flex;flex-direction:column-reverse;gap:8px}
+.foot .r{display:flex;flex-direction:column;gap:8px}
+.ls{border:1px solid var(--border);border-radius:14px;background:var(--muted-40);padding:0 16px;margin-top:16px}
+.ls li{padding:10px 0;font-size:13px;line-height:1.45;border-top:1px solid var(--border)}.ls li:first-child{border-top:0}
+.qc{border:1px solid var(--ai-accent);border-radius:14px;padding:16px;transition:box-shadow .2s var(--std)}
+.qc:hover,.qc:focus-within{box-shadow:0 0 14px var(--ai-glow)}
+.qc .q{font-size:16px;font-weight:500;line-height:1.4;margin-top:6px}
+.qc .rows{margin-top:12px}
+.qs{display:grid;gap:16px;margin-top:16px}
+.sk{border:1px solid var(--border);border-radius:14px;padding:16px;display:grid;gap:10px}
+.sk i{display:block;height:12px;border-radius:6px;background:var(--muted)}
+.enter{transition:transform .25s var(--quart),opacity .25s var(--quart)}
+.qenter{transition:transform .2s var(--quart),opacity .2s var(--quart)}
+.cas{transition:transform .4s var(--quart),opacity .4s var(--quart);transition-delay:calc(var(--i,0)*80ms + 50ms)}
+section[data-scene]:not(.in) .enter{transform:translateX(24px);opacity:0}
+section[data-scene]:not(.in) .enter.back{transform:translateX(-24px)}
+section[data-scene]:not(.in) .qenter{transform:translateY(8px);opacity:0}
+section[data-scene]:not(.in) .cas{transform:translateY(16px);opacity:0}
+section[data-scene]:not(.in) .fill{transform:scaleX(0)}
+.stg{display:grid;gap:0;margin-top:16px;border:1px solid var(--border);border-radius:14px}
+.stg li{display:flex;gap:12px;padding:12px 16px;border-top:1px solid var(--border);align-items:flex-start}.stg li:first-child{border-top:0}
+.stg .ico{width:20px;height:20px;display:flex;align-items:center;justify-content:center;flex:none;margin-top:2px}
+.stg .ico b{width:8px;height:8px;border-radius:9999px;background:var(--border);display:block}
+.stg .t{font-size:14px;font-weight:500}.stg .d{font-size:13px;line-height:1.45;color:var(--muted-foreground)}
+.stg .m{margin-left:auto;flex:none;text-align:right;font-size:11px;color:var(--muted-foreground)}
+.stg li.act .t{color:var(--ai-accent)}
+.stg li.pend .t{color:var(--muted-foreground)}
+.grid{display:grid;gap:12px;grid-template-columns:1fr}
+.k{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px;padding:8px 0;border-top:1px solid var(--border);font-size:13px;align-items:baseline}
+.k:first-child{border-top:0}
+.k .v{font-family:"Geist Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;flex:none}
+.tk{height:3px;border-radius:9999px;background:var(--muted);margin-top:4px;position:relative}
+.tk i{display:block;height:100%;border-radius:9999px;background:var(--chart-1)}
+.tk b{position:absolute;top:-3px;width:1px;height:9px;background:color-mix(in oklch,var(--foreground) 70%,transparent)}
+.ta{width:100%;min-height:44px;field-sizing:content;border:1px solid var(--border);border-radius:14px;background:var(--muted-40);padding:12px 16px;font:inherit;font-size:16px;color:var(--foreground);resize:none}
+.ta::placeholder{color:var(--muted-foreground)}
+.ph{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;min-height:36px;margin-bottom:16px}
+.ph .t{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px}
+.ph .acts{display:flex;gap:8px;flex-wrap:wrap}
+.pill{display:inline-flex;background:var(--muted);border-radius:10px;padding:4px;gap:2px;max-width:100%;overflow-x:auto}
+.pill button{height:44px;padding:0 12px;border-radius:8px;border:0;background:transparent;color:var(--foreground);opacity:.7;font-size:13px;font-weight:500;cursor:pointer;flex:none}
+.pill button[aria-checked="true"]{background:var(--background);opacity:1}
+.strip{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px;margin-top:12px;padding:8px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.vx{display:flex;flex-direction:column;gap:12px;margin-top:12px}
+.hero{display:grid;gap:12px;margin-top:16px}
+.msg{min-width:0}.msg+.msg{margin-top:16px}
+.msg.me{margin-left:auto;max-width:85%;border-radius:14px;background:var(--muted-40);padding:12px 16px}
+.mh{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:8px}
+.mh .ts{font-family:"Geist Mono",ui-monospace,monospace;font-size:11px;color:var(--muted-foreground);font-variant-numeric:tabular-nums}
+.msg p.b{font-size:14px;line-height:1.6}
+.pc{margin-top:12px;border:1px solid var(--ai-accent);border-radius:14px;background:var(--muted-40);padding:16px;transition:box-shadow .2s var(--std)}
+.pc:hover,.pc:focus-within{box-shadow:0 0 14px var(--ai-glow)}
+.pc .n{font-size:15px;font-weight:600;line-height:1.3;margin-top:4px}
+.pc dl{display:grid;gap:6px 24px;margin-top:12px;grid-template-columns:1fr}
+.pc .dr{display:flex;justify-content:space-between;gap:12px;font-size:13px}
+.pc .dr dt{color:var(--muted-foreground)}.pc .dr dd{font-family:"Geist Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;text-align:right}
+.pc .acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.pc .rows{margin-top:12px}
+.sug li{border-top:1px solid var(--border)}.sug li:first-child{border-top:0}
+.sug button{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;padding:9px 0;text-align:left;font-size:13px;background:none;border:0;cursor:pointer;transition:color .2s var(--std)}
+.sug button svg{width:14px;height:14px;color:var(--muted-foreground);transition:color .2s var(--std)}
+.sug button:hover svg:first-child,.sug button:focus-visible svg:first-child{color:var(--ai-accent)}
+.sug button span{flex:1}
+.comp{display:flex;gap:8px;align-items:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--border)}
+.comp .ta{flex:1}
+.cnt{margin-top:6px;font-size:11px;color:var(--muted-foreground);text-align:right}
+.comp2{margin-top:12px}
+.hero36{font-family:"Geist Mono",ui-monospace,monospace;font-size:36px;font-weight:700;letter-spacing:-.03em;line-height:1;margin-top:12px;font-variant-numeric:tabular-nums}
+.chip{display:inline-flex;align-self:flex-start;border-radius:9px;padding:6px 11px;font-size:12px;font-family:"Geist Mono",ui-monospace,monospace;font-weight:600;background:color-mix(in oklch,var(--positive) 10%,transparent);color:var(--positive);margin-top:8px}
+.rep{font-size:14px;line-height:1.6;display:grid;gap:8px;margin-top:12px}
+.rep h4{font-size:16px;font-weight:600;line-height:1.4;margin:4px 0 0}
+.aply{display:grid;gap:8px;margin-top:12px}
+.aply label{display:flex;gap:12px;align-items:flex-start;min-height:44px;font-size:13px;line-height:1.45;cursor:pointer}
+.aply input{width:16px;height:16px;margin-top:3px;accent-color:var(--foreground);flex:none}
+.cc{display:grid;gap:12px}
+@media (min-width:768px){.foot{flex-direction:row;align-items:center;justify-content:space-between}.foot .r{flex-direction:row;align-items:center}.grid.two{grid-template-columns:1fr 1fr}.pc dl{grid-template-columns:1fr 1fr}.tw{grid-template-columns:1fr 1fr}}
+@media (min-width:1440px){.vh{font-size:30px}.vs{font-size:15px}.hl{font-size:30px}.help{font-size:15px}.btn{height:36px}.btn.ic{width:36px}.btn.ic.send{height:44px;width:44px}.pc .acts .btn{height:44px}.sug button{min-height:0;padding:6px 8px;margin:0 -8px;width:calc(100% + 16px);border-radius:8px}.sug button:hover{background:var(--muted-40)}.row{min-height:0}.row label{min-height:0}.stage{display:grid;grid-template-columns:160px 1fr;gap:24px;align-items:start}.rail{flex-direction:column;gap:14px;margin:4px 0 0;max-width:none}.rail li,.rail li.done,.rail li.cur,.rail li.int,.rail li.run,.rail li.fail{height:auto;background:none;display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted-foreground);border-radius:0}.rail li::before{content:"";width:8px;height:8px;border-radius:9999px;background:var(--border);flex:none}.rail li.done::before{background:var(--muted-foreground)}.rail li.cur{color:var(--foreground);font-weight:600}.rail li.cur::before{background:var(--foreground)}.rail li.int::before,.rail li.run::before{background:var(--ai-accent)}.rail li.int,.rail li.run{color:var(--ai-accent)}.rail li.fail::before{background:var(--destructive)}.rail .lab{position:static;width:auto;height:auto;margin:0;overflow:visible;clip:auto;white-space:normal}.rail .sep{display:block}.rail li.fill{transform:none}.rail li.fill::before{transform-origin:center;transition:transform .3s var(--ease-spring)}section[data-scene]:not(.in) .rail li.fill::before{transform:scale(0)}.rail .sep{height:1px;background:var(--border);margin:6px 0}.rail .sep::before{display:none}.card{margin:0;padding:24px}.hero{grid-template-columns:2fr 1fr;align-items:start}.vx{flex-direction:row;align-items:flex-start;justify-content:space-between;gap:24px}.pill button{height:28px;font-size:12px}.fld{height:36px;font-size:14px}.ta{font-size:14px}.strip{margin-top:0}}
+@media (prefers-reduced-motion:reduce){.enter,.qenter,.cas{transition:opacity .15s var(--quart);transition-delay:0s}section[data-scene]:not(.in) .enter,section[data-scene]:not(.in) .qenter,section[data-scene]:not(.in) .cas{transform:none}section[data-scene]:not(.in) .enter.back{transform:none}.rail li.fill,.rail li.fill::before{transition:none}section[data-scene]:not(.in) .fill,section[data-scene]:not(.in) .rail li.fill::before{transform:none}.btn,.tile,.qc,.pc{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+<p class="eb">Concetto B · La scena · dati d'esempio</p>
+<h1>Il Consulente è un percorso su UNA scena: una schermata alla volta, una guida che dice dove sei, un report che arriva tessera per tessera.</h1>
+<button id="mode" type="button" class="btn out" aria-pressed="false">Passa alla modalità chiara</button>
+<div class="draft">
+<p><b>Bozza di The Path-Scene Rule.</b> The Consulente is a path on ONE stage: the 720px scene card shows one screen at a time, and the screen that leaves slides out while the next slides in along the reading direction — forward from the right; «Indietro» and every jump back from the summary from the left, whatever the distance —; the stage clips its horizontal overflow. The first render (a reload, a restored draft) does not animate, and after a change the focus moves to the new screen's headline. <b>The rail</b> says where the path is and is not a control: from <code>desktop:</code> a vertical rail in a 160px column left of the card and outside it, eight ticks with 11px labels; below <code>desktop:</code> — the phone, the tablet upright and in landscape — a strip of eight ticks above the card, the labels <code>sr-only</code>; the current tick carries <code>aria-current="step"</code>, and no tick is a button. On the goal sub-screens the «obiettivi» tick stays current and the eyebrow adds «obiettivo n di m»; the interview's three ticks (a sibling list «Il colloquio», hidden until the interview starts) light in the accent one round at a time. The scene's eyebrow is its only eyebrow: «Passo n di 8 · {tema}», «Colloquio · tornata N di 3». <b>The run</b> turns the rail into the four stages and fills it with stage STATUS, one segment as each stage becomes active — done in <code>--muted-foreground</code>, active in <code>--ai-accent</code>, pending in <code>--border</code>, failed or stale in <code>--destructive</code>, never the accent —; each stage row keeps its label and what it reads and adds «di solito ~N min» (nothing for the portfolio read) and the active stage's elapsed time, outside the live region; never a percentage, never a remaining time. <b>The report</b> enters with the Panoramica's cascade, once per session under a once-flag of its own; its tiles follow The AI-Accent Rule. Under reduced motion a slide becomes a fade and nothing else moves.</p>
+<p><b>Bozza del paragrafo «The Assistente page».</b> The conversation is the page (The Conversation-Is-Content Rule): the «Conversazione» tile and, from <code>desktop:</code>, the companion column at <code>2fr 1fr</code>. A change of mode — a period of «Periodo di analisi», Registra — keeps the conversation still and slides the companion column's content as a screen of the Consulente slides; question and proposal cards enter with the question card's motion. In Registra the axis gives way to the strip «Registra · l'Assistente conosce categorie, conti e le ultime righe» with «Torna all'analisi»; before the first message the companion shows the register summary computed in the browser; the thread is «Registrazioni · 1 nov 2026», one per Italian day. The composer holds 4000 characters and shows its counter from 3800. The verdict, the companion, the thread list and the composer take no accent beyond the hover of «Invia messaggio», of «Registra» and of the suggestion rows.</p>
+</div>
+</header>
+<main>
+
+<section data-scene="path" class="in" aria-labelledby="h-path">
+<h2 id="h-path">Scena 1 · Il percorso</h2>
+<p class="lead">Passo 2 di 8: la guida a sinistra da 1440px, una striscia di otto tick sopra la scheda sotto quella larghezza. Nessun tick è un pulsante.</p>
+<figure>
+<div class="frame">
+<div class="stage">
+<ol class="rail" aria-label="Il percorso">
+<li class="done"><span class="lab">Profilo</span><span class="sr">, fatto</span></li>
+<li class="cur" aria-current="step"><span class="lab">Perdite</span><span class="sr">, passo corrente</span></li>
+<li><span class="lab">Borsa</span></li>
+<li><span class="lab">Proventi</span></li>
+<li><span class="lab">Obiettivi</span></li>
+<li><span class="lab">Ruoli</span></li>
+<li><span class="lab">Vincoli</span></li>
+<li><span class="lab">Riepilogo</span></li>
+</ol>
+<div class="card enter" role="region" aria-label="Passo 2 di 8: Le perdite">
+<div class="th"><p class="eb">Passo 2 di 8 · Le perdite</p></div>
+<h3 class="hl" tabindex="-1">Quanto reggi a vedere il portafoglio in rosso?</h3>
+<p class="help">Scegli pensando al peggior anno, non a quello medio: i tre scenari sotto sono sulla tua base di oggi.</p>
+<ul class="ls" aria-label="Scenari di perdita sulla tua base">
+<li><span class="mono">−10%</span> sarebbero <span class="mono">6000 €</span> in meno.</li>
+<li><span class="mono">−25%</span> sarebbero <span class="mono">15.000 €</span> in meno.</li>
+<li><span class="mono">−40%</span> sarebbero <span class="mono">24.000 €</span> in meno.</li>
+</ul>
+<p class="s11 mf" style="margin-top:8px">Base di oggi: <span class="mono">60.000 €</span> (negoziabile e non negoziabile, al netto dei debiti).</p>
+<div class="rows" role="radiogroup" aria-label="Tolleranza alle perdite">
+<div class="row"><input type="radio" name="loss" id="b-l1"><label for="b-l1"><span class="l">Bassa</span><span class="h">Un −10% mi farebbe vendere o dormire male.</span></label></div>
+<div class="row"><input type="radio" name="loss" id="b-l2" checked><label for="b-l2"><span class="l">Media</span><span class="h">Reggerei un −25% senza vendere, con fatica.</span></label></div>
+<div class="row"><input type="radio" name="loss" id="b-l3"><label for="b-l3"><span class="l">Alta</span><span class="h">Reggerei un −40% senza vendere, e comprerei ancora.</span></label></div>
+</div>
+<div class="foot"><button type="button" class="btn out">Indietro</button><div class="r"><button type="button" class="btn">Avanti</button></div></div>
+</div>
+</div>
+</div>
+<figcaption><b>Movimento.</b> La schermata che entra: x 24px → 0, 0,25 s ease-out-quart; quella che esce: x 0 → −24px, 0,18 s. «Indietro» e ogni salto dal riepilogo entrano da sinistra, qualunque sia la distanza. Primo render (ricarica, bozza ripristinata): nessuna animazione; dopo un cambio il focus va al titolo della schermata. <b>Movimento ridotto:</b> dissolvenza 0,15 s in entrata e 0,1 s in uscita, nient'altro si muove. <b>Stati non disegnati:</b> le sotto-schermate degli obiettivi tengono acceso il tick «Obiettivi» e l'eyebrow aggiunge «obiettivo n di m»; sotto 1440 (telefono, tablet dritto e di lato) la guida è la striscia sopra la scheda e le etichette sono solo per lo screen reader; «Avanti» disabilitato con la riga di blocco in <code>--warning-foreground</code> nel piè di pagina.</figcaption>
+</figure>
+<button type="button" class="btn out replay">Riproduci</button>
+</section>
+
+<section data-scene="interview" class="in" aria-labelledby="h-int">
+<h2 id="h-int">Scena 2 · Il colloquio</h2>
+<p class="lead">Dopo il riepilogo, prima della strategia: la guida accende i tre tick del colloquio, la scena mostra la nota della tornata e le sue carte. Il pulsante primario è nel piè di pagina, mai nella carta.</p>
+<figure>
+<div class="frame">
+<div class="stage">
+<ol class="rail" aria-label="Il percorso">
+<li class="done"><span class="lab">Profilo</span><span class="sr">, fatto</span></li><li class="done"><span class="lab">Perdite</span><span class="sr">, fatto</span></li><li class="done"><span class="lab">Borsa</span><span class="sr">, fatto</span></li><li class="done"><span class="lab">Proventi</span><span class="sr">, fatto</span></li><li class="done"><span class="lab">Obiettivi</span><span class="sr">, fatto</span></li><li class="done"><span class="lab">Ruoli</span><span class="sr">, fatto</span></li><li class="done"><span class="lab">Vincoli</span><span class="sr">, fatto</span></li><li class="done"><span class="lab">Riepilogo</span><span class="sr">, fatto</span></li>
+<li class="sep" aria-hidden="true"></li>
+<li class="int" aria-current="step"><span class="lab">Tornata 1</span><span class="sr">, in corso</span></li><li><span class="lab">Tornata 2</span></li><li><span class="lab">Tornata 3</span></li>
+</ol>
+<div class="card enter" role="region" aria-label="Colloquio, tornata 1 di 3">
+<div class="th"><p class="eb">Colloquio · tornata 1 di 3</p><span class="as">risposte in questo browser</span></div>
+<p class="s15" style="margin-top:12px;line-height:1.6">Ho letto le tue risposte e il portafoglio: due cose cambiano la strategia.</p>
+<div class="qs">
+<div class="qc qenter" style="--i:0">
+<p class="seb ai">Il Consulente chiede · 1 di 2</p>
+<p class="q">La casa al mare: la compri in contanti o con un mutuo?</p>
+<div class="rows" role="radiogroup" aria-label="La casa al mare: la compri in contanti o con un mutuo?">
+<div class="row"><input type="radio" name="q1" id="b-q1a"><label for="b-q1a"><span class="l">In contanti</span></label></div>
+<div class="row"><input type="radio" name="q1" id="b-q1b" checked><label for="b-q1b"><span class="l">Con un mutuo</span></label></div>
+<div class="row"><input type="radio" name="q1" id="b-q1c"><label for="b-q1c"><span class="l">Altro…</span></label></div>
+<div class="row"><input type="radio" name="q1" id="b-q1d"><label for="b-q1d"><span class="l">Preferisco non dire</span></label></div>
+</div>
+</div>
+<div class="qc qenter" style="--i:1">
+<p class="seb ai">Il Consulente chiede · 2 di 2</p>
+<p class="q">Quali entrate puoi contare nei prossimi cinque anni?</p>
+<div class="rows" role="group" aria-label="Quali entrate puoi contare nei prossimi cinque anni?">
+<div class="row"><input type="checkbox" id="b-q2a"><label for="b-q2a"><span class="l">Un bonus annuale</span></label></div>
+<div class="row"><input type="checkbox" id="b-q2b"><label for="b-q2b"><span class="l">Un affitto</span></label></div>
+<div class="row"><input type="checkbox" id="b-q2c"><label for="b-q2c"><span class="l">Una seconda attività</span></label></div>
+<div class="row"><input type="checkbox" id="b-q2d"><label for="b-q2d"><span class="l">Altro…</span><span class="h">Esclude le altre risposte.</span></label></div>
+<div class="row"><input type="checkbox" id="b-q2e"><label for="b-q2e"><span class="l">Preferisco non dire</span><span class="h">Esclude le altre risposte.</span></label></div>
+</div>
+</div>
+</div>
+<div class="foot"><button type="button" class="btn out">Salta il colloquio</button><div class="r"><button type="button" class="btn aic">Continua</button></div></div>
+</div>
+</div>
+</div>
+<div class="frame">
+<div class="stage">
+<ol class="rail" aria-label="Il percorso" aria-hidden="true"><li class="done"><span class="lab">Profilo</span></li><li class="done"><span class="lab">Perdite</span></li><li class="done"><span class="lab">Borsa</span></li><li class="done"><span class="lab">Proventi</span></li><li class="done"><span class="lab">Obiettivi</span></li><li class="done"><span class="lab">Ruoli</span></li><li class="done"><span class="lab">Vincoli</span></li><li class="done"><span class="lab">Riepilogo</span></li><li class="sep"></li><li class="done"><span class="lab">Tornata 1</span></li><li class="int" aria-current="step"><span class="lab">Tornata 2</span></li><li><span class="lab">Tornata 3</span></li></ol>
+<div class="card" role="region" aria-label="Colloquio, tornata 2 di 3, in attesa">
+<div class="th"><p class="eb">Colloquio · tornata 2 di 3</p><span class="as">il Consulente sta leggendo</span></div>
+<p class="s13 mf" style="margin-top:12px">Tornata 1 · Ho letto le tue risposte e il portafoglio: due cose cambiano la strategia.</p>
+<div class="qs" aria-busy="true" role="status" aria-label="Il Consulente prepara le domande">
+<div class="sk" aria-hidden="true"><i style="width:40%"></i><i style="width:80%"></i><i style="width:60%"></i></div>
+<div class="sk" aria-hidden="true"><i style="width:35%"></i><i style="width:70%"></i><i style="width:55%"></i></div>
+</div>
+<div class="foot"><button type="button" class="btn out">Salta il colloquio</button><div class="r"><button type="button" class="btn" disabled>Continua</button></div></div>
+</div>
+</div>
+</div>
+<figcaption><b>Movimento.</b> Ogni carta entra y 8px → 0, 0,2 s ease-out-quart, la seconda 80 ms dopo la prima; la scena entra da destra come ogni schermata. I tre tick del colloquio si accendono nell'accento una tornata alla volta. <b>Movimento ridotto:</b> le carte appaiono, la scena dissolve. <b>Stati:</b> il secondo fotogramma è l'attesa — la nota della tornata precedente sopra, due carte scheletro con <code>aria-busy</code>, «Salta il colloquio» attivo e «Continua» spento; nella domanda multipla «Altro…» e «Preferisco non dire» si escludono a vicenda (scegliere una svuota le altre); «Altro…» apre un campo al posto suo, senza autofocus; dopo la terza tornata, o con zero domande, il primario diventa «Avvia la ricerca»; la carta non ha mai un pulsante.</figcaption>
+</figure>
+<button type="button" class="btn out replay">Riproduci</button>
+</section>
+
+<section data-scene="run" class="in" aria-labelledby="h-run">
+<h2 id="h-run">Scena 3 · La corsa</h2>
+<p class="lead">La guida diventa le quattro fasi e si riempie per STATO: un segmento quando la fase diventa attiva. Mai una percentuale, mai un tempo residuo.</p>
+<figure>
+<div class="frame">
+<div class="stage">
+<ol class="rail" aria-label="Avanzamento delle fasi">
+<li class="done"><span class="lab">Leggo</span><span class="sr">, fatto</span></li>
+<li class="run fill" aria-current="step"><span class="lab">Strategia</span><span class="sr">, in corso</span></li>
+<li><span class="lab">Strumenti</span></li>
+<li><span class="lab">Revisione</span></li>
+</ol>
+<div class="card enter" role="region" aria-label="Corsa del Consulente">
+<div class="th"><p class="eb">Consulente · in corso</p><span class="as">avviato alle 14:02</span></div>
+<h3 class="hl" role="status" aria-live="polite" tabindex="-1">Propongo la strategia.</h3>
+<ol class="stg" aria-label="Le fasi">
+<li><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span><div><p class="t">Leggo il portafoglio</p><p class="d">Strumenti, allocazione, registro, obiettivi, previdenza, famiglia.</p></div><span class="m">fatto</span></li>
+<li class="act"><span class="ico ai"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/></svg></span><div><p class="t">Propongo la strategia</p><p class="d">Opus 5.5 ragiona su orizzonte, tolleranza, obiettivi e vincoli.</p></div><span class="m">di solito ~2 min<br><span class="mono">1:12</span></span></li>
+<li class="pend"><span class="ico"><b></b></span><div><p class="t">Cerco gli strumenti</p><p class="d">Sonnet 5.5 verifica sul web quotazione, ISIN e costi sulla tua borsa.</p></div><span class="m">di solito ~2 min</span></li>
+<li class="pend"><span class="ico"><b></b></span><div><p class="t">Rivedo il tutto</p><p class="d">Opus 5.5 unisce strategia e strumenti nel report finale.</p></div><span class="m">di solito ~1 min</span></li>
+</ol>
+<p class="s11 mf" style="margin-top:12px">Puoi lasciare la pagina: ogni fase viene salvata appena finisce.</p>
+</div>
+</div>
+</div>
+<figcaption><b>Movimento.</b> Il riempimento di una fase: scaleX 0 → 1 su ease-spring (la molla 400/35 campionata su 300 ms), una volta per fase quando diventa attiva; nessun segmento si muove dopo. Il tempo trascorso («1:12») sta fuori dalla regione live, che annuncia solo il titolo della fase. <b>Movimento ridotto:</b> il riempimento è istantaneo. <b>Stato fallito o stantio</b> (una corsa <code>running</code> da più di 20 minuti): il segmento e il titolo della fase in <code>--destructive</code>, il titolo «Il percorso non si è concluso.», la frase dell'errore sotto, il piè di pagina con «Torna al riepilogo» e «Riprova» (primario, accento su hover e focus): «Riprova» riparte dalla fase ferma sul documento salvato, mai da capo. Nessuna fase attiva prende l'accento quando è fallita.</figcaption>
+</figure>
+<button type="button" class="btn out replay">Riproduci</button>
+</section>
+
+<section data-scene="report" class="in" aria-labelledby="h-rep">
+<h2 id="h-rep">Scena 4 · Il report</h2>
+<p class="lead">Il verdetto, poi le tessere a cascata: ogni tessera scritta dal modello porta il bordo e l'eyebrow nell'accento; «Chiedi una modifica» e «Applica» no.</p>
+<figure>
+<div class="frame">
+<div class="vx"><div><h3 class="vh">La proposta è pronta<span class="pos" aria-hidden="true">.</span></h3><p class="vs">Un portafoglio <span class="f">60/25/10/5</span> ad accumulazione, con la casa al mare coperta da un mutuo e il fondo emergenze in liquidità. Rivista da Opus 5.5 il <span class="f">1 nov 2026</span>; da rivedere entro <span class="f">maggio 2027</span>.</p></div></div>
+<div class="grid two" style="margin-top:16px">
+<section class="tile gen cas" style="--i:0" aria-label="Allocazione proposta">
+<div class="th"><h3 class="eb ai">Allocazione proposta</h3><span class="as">oggi → proposta</span></div>
+<p class="rd">Quattro classi: le azioni scendono dall'<span class="f">80%</span> al <span class="f">60%</span>, entrano obbligazioni e oro.</p>
+<div style="margin-top:12px">
+<div class="k"><span>Azioni</span><span class="v"><span class="mf">80%</span> → <span class="cu" data-to="60">60</span>%</span></div><div class="tk"><i style="width:60%"></i><b style="left:80%"></b></div>
+<div class="k"><span>Obbligazioni</span><span class="v"><span class="mf">0%</span> → <span class="cu" data-to="25">25</span>%</span></div><div class="tk"><i style="width:25%"></i><b style="left:0"></b></div>
+<div class="k"><span>Liquidità</span><span class="v"><span class="mf">20%</span> → <span class="cu" data-to="10">10</span>%</span></div><div class="tk"><i style="width:10%"></i><b style="left:20%"></b></div>
+<div class="k"><span>Oro</span><span class="v"><span class="mf">0%</span> → <span class="cu" data-to="5">5</span>%</span></div><div class="tk"><i style="width:5%"></i><b style="left:0"></b></div>
+</div>
+<p class="ft">La barra è la proposta, il segno è oggi; base <span class="mono">60.000 €</span>.</p>
+</section>
+<section class="tile gen cas" style="--i:1" aria-label="Strumenti">
+<div class="th"><h3 class="eb ai">Strumenti</h3><span class="as">4 candidati</span></div>
+<p class="rd">Due già in portafoglio, due da aprire; ogni strumento con il suo ISIN verificato sul web.</p>
+<div style="margin-top:12px">
+<div class="k"><span>ETF azionario globale ad accumulazione<br><span class="s11 mf">Azioni · ISIN di esempio · in portafoglio</span></span><span class="v">60%</span></div>
+<div class="k"><span>ETF obbligazionario euro<br><span class="s11 mf">Obbligazioni · ISIN di esempio</span></span><span class="v">25%</span></div>
+<div class="k"><span>Conto deposito<br><span class="s11 mf">Liquidità · in portafoglio</span></span><span class="v">10%</span></div>
+<div class="k"><span>ETC oro fisico<br><span class="s11 mf">Oro · ISIN di esempio</span></span><span class="v">5%</span></div>
+</div>
+</section>
+<section class="tile gen cas" style="--i:2" aria-label="Obiettivi">
+<div class="th"><h3 class="eb ai">Obiettivi</h3><span class="as">3 nel piano</span></div>
+<p class="rd">Ogni obiettivo con gli strumenti che lo coprono e la quota di ciascuno.</p>
+<div style="margin-top:12px">
+<div class="k"><span>Casa al mare<br><span class="s11 mf">entro il 2034 · alta</span></span><span class="v">60.000 €</span></div>
+<div class="k"><span>Fondo emergenze<br><span class="s11 mf">senza scadenza · alta</span></span><span class="v">12.000 €</span></div>
+<div class="k"><span>Auto nuova<br><span class="s11 mf">entro il 2029 · media</span></span><span class="v">20.000 €</span></div>
+</div>
+</section>
+<section class="tile gen cas" style="--i:3" aria-label="Ruoli degli asset">
+<div class="th"><h3 class="eb ai">Ruoli degli asset</h3><span class="as">1 cambio</span></div>
+<p class="rd">Cosa entra nella base dei target e cosa resta fuori, rispetto a oggi.</p>
+<div style="margin-top:12px"><div class="k"><span>Fondo pensione</span><span class="v s13">negoziabile → non negoziabile</span></div></div>
+</section>
+<section class="tile cas" style="--i:4" aria-label="Il colloquio">
+<div class="th"><h3 class="eb">Il colloquio</h3><span class="as">1 tornata</span></div>
+<p class="rd">Due domande, due risposte: la casa con un mutuo, nessuna entrata extra dichiarata.</p>
+<div style="margin-top:12px"><div class="k"><span>La casa al mare: in contanti o con un mutuo?</span><span class="v s13">Con un mutuo</span></div><div class="k"><span>Entrate nei prossimi cinque anni</span><span class="v s13">preferisco non dire</span></div></div>
+</section>
+<section class="tile gen cas" style="--i:5" aria-label="Il report">
+<div class="th"><h3 class="eb ai">Il report</h3><span class="as">Opus 5.5 · 1 nov 2026</span></div>
+<div class="rep"><h4>Rispetto al piano precedente</h4><p>Nessun piano in vigore: questo è il primo. La riserva di liquidità copre sei mesi di spese e resta in conto deposito…</p><h4>La strategia</h4><p>Con vent'anni di orizzonte e una tolleranza media, il 60% azionario regge un −25% senza intaccare gli obiettivi datati…</p></div>
+</section>
+<section class="tile cas" style="--i:6" aria-label="Chiedi una modifica">
+<div class="th"><h3 class="eb">Chiedi una modifica</h3><span class="as">0 richieste</span></div>
+<p class="rd">Una richiesta rilancia solo la revisione (Opus 5.5, un paio di minuti): strategia e strumenti restano, il report e la proposta vengono riscritti.</p>
+<label class="seb" for="b-rev" style="margin-top:12px;display:block">Cosa vuoi cambiare</label>
+<textarea id="b-rev" class="ta" style="margin-top:6px" rows="2" placeholder="es. vorrei liberarmi degli ETF obbligazionari e concentrarmi sui bond singoli"></textarea>
+<div style="margin-top:12px"><button type="button" class="btn out aic">Rivedi il report</button></div>
+</section>
+<section class="tile cas" style="--i:7" aria-label="Applica">
+<div class="th"><h3 class="eb">Applica</h3><span class="as">3 scritture</span></div>
+<p class="rd">I piani PRIMA di scrivere, un segno per ciascuno; dopo, la pagina Allocazione legge la data di revisione.</p>
+<div class="aply">
+<label><input type="checkbox" checked><span>I target per classe: Azioni 60 · Obbligazioni 25 · Liquidità 10 · Oro 5 (sostituisce i target di Impostazioni).</span></label>
+<label><input type="checkbox" checked><span>I ruoli: Fondo pensione → non negoziabile.</span></label>
+<label><input type="checkbox" checked><span>Gli obiettivi: tre aggiornati, nessuno eliminato; le quote toccate riscritte in percentuale.</span></label>
+</div>
+<div style="margin-top:12px"><button type="button" class="btn">Applica alle impostazioni</button></div>
+</section>
+</div>
+</div>
+<figcaption><b>Movimento.</b> Le tessere entrano a cascata — staggerContainer 80 ms × cardItem 0,4 s (y 16px → 0, ease-out-quart) — una volta per sessione, sotto un once-flag del report; le percentuali proposte contano da 0 in 620 ms (useCountUp, once) su ease-out-quart. <b>Movimento ridotto:</b> le tessere appaiono, le cifre al valore finale. <b>Stati non disegnati:</b> senza revisione la tessera «La strategia» (Opus 5.5 · data) sta al posto de «Il report»; un documento ancora in corso riaperto dopo una ricarica mostra solo «Le fasi» (le righe della scena 3) sotto il verdetto «Propongo la strategia.»; applicato, il verdetto diventa «Allocazione applicata.» con la data e «Applica» sparisce; «Applica» resta spento mentre una revisione gira. Hover e focus-visible su una tessera generata: il bagliore 14px al 40%; a riposo solo il bordo.</figcaption>
+</figure>
+<button type="button" class="btn out replay">Riproduci</button>
+</section>
+
+<section data-scene="register" class="in" aria-labelledby="h-reg">
+<h2 id="h-reg">Scena 5 · Assistente › Registra</h2>
+<p class="lead">La pagina Assistente nel modo Registra: l'asse lascia il posto alla striscia, la conversazione resta ferma, la colonna compagna cambia contenuto scorrendo come una schermata.</p>
+<figure>
+<div class="frame">
+<div class="ph"><div class="t"><span class="eb">Assistente</span><span class="s13" style="font-weight:500">Assistente</span><span class="s13 mf">· registra una spesa o un'entrata parlando</span></div><div class="acts"><button type="button" class="btn out ic" aria-label="Conversazioni (3)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></button><button type="button" class="btn out ic" aria-label="Memoria (4)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7 7 0 0 0-7 7c0 3 2 4 2 6h10c0-2 2-3 2-6a7 7 0 0 0-7-7zM9 19h6M10 22h4"/></svg></button><button type="button" class="btn out ic aic on" aria-label="Registra, attivo" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4z"/></svg></button><button type="button" class="btn ic" aria-label="Nuova conversazione"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></div></div>
+<div class="vx"><div><h3 class="vh">Pronto a registrare<span class="neu" aria-hidden="true">.</span></h3><p class="vs">Conosco <span class="f">2</span> conti, <span class="f">24</span> categorie e i centri di costo; scrivi la spesa come la diresti, propongo la riga e scrivo solo su «Conferma».</p></div></div>
+<div class="strip"><span class="s13">Registra · l'Assistente conosce categorie, conti e le ultime righe</span><button type="button" class="btn gh">Torna all'analisi</button></div>
+<div class="hero">
+<div>
+<section class="tile" aria-label="Conversazione">
+<div class="th"><h3 class="eb">Conversazione</h3><span class="as">Registrazioni · 1 nov 2026</span></div>
+<p class="rd"><span class="f">2</span> messaggi; le righe proposte si scrivono solo su Conferma.</p>
+<div style="margin-top:16px">
+<div class="msg me"><div class="mh"><span class="seb">Tu</span><span class="ts">1 nov 2026</span></div><p class="b">ieri 48 € al supermercato e 30 € di benzina</p></div>
+<div class="msg"><div class="mh"><span class="seb ai">Assistente</span><span class="ts">1 nov 2026</span></div>
+<p class="b">Due righe: la spesa al supermercato la propongo così; per la benzina mi manca il conto.</p>
+<div class="pc qenter" style="--i:0">
+<p class="seb ai">L'Assistente propone</p>
+<p class="n">Spesa · <span class="mono">48 €</span></p>
+<dl><div class="dr"><dt>Categoria</dt><dd>Spesa › Supermercato</dd></div><div class="dr"><dt>Data</dt><dd>31/10/2026</dd></div><div class="dr"><dt>Conto</dt><dd>Conto corrente</dd></div><div class="dr"><dt>Tipo</dt><dd>Necessaria</dd></div></dl>
+<div class="acts"><button type="button" class="btn">Conferma</button><button type="button" class="btn out">Modifica</button><button type="button" class="btn gh">Ignora</button></div>
+</div>
+<div class="pc qenter" style="--i:1">
+<p class="seb ai">L'Assistente chiede</p>
+<p class="n" style="font-weight:500">Da quale conto hai pagato la benzina?</p>
+<div class="rows" role="radiogroup" aria-label="Da quale conto hai pagato la benzina?" style="background:var(--card)">
+<div class="row"><input type="radio" name="acc" id="b-a1"><label for="b-a1"><span class="l">Conto corrente</span></label></div>
+<div class="row"><input type="radio" name="acc" id="b-a2"><label for="b-a2"><span class="l">Carta di credito</span></label></div>
+<div class="row"><input type="radio" name="acc" id="b-a3"><label for="b-a3"><span class="l">Altro…</span></label></div>
+<div class="row"><input type="radio" name="acc" id="b-a4"><label for="b-a4"><span class="l">Preferisco non dire</span></label></div>
+</div>
+</div>
+<div style="margin-top:12px"><button type="button" class="btn out aic" style="height:44px" disabled>Rispondi</button></div>
+</div>
+</div>
+</section>
+<div class="comp"><textarea class="ta" rows="1" aria-label="Scrivi un messaggio all'assistente" placeholder="Scrivi la spesa o l'entrata…"></textarea><button type="button" class="btn ic send aic" aria-label="Invia messaggio"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4z"/></svg></button></div>
+<div class="comp comp2" aria-label="Il compositore vicino al limite"><div style="flex:1"><textarea class="ta" rows="2" aria-label="Scrivi un messaggio all'assistente" readonly>ieri 48 € al supermercato, 30 € di benzina, poi il pranzo con i colleghi 22 € pagati con la carta, l'abbonamento della palestra 45 € il primo del mese…</textarea><p class="cnt mono" role="status">3.812 / 4.000</p></div><button type="button" class="btn ic send aic" aria-label="Invia messaggio"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4z"/></svg></button></div>
+</div>
+<div class="cc">
+<section class="tile enter" aria-label="Registro">
+<div class="th"><h3 class="eb">Registro</h3><span class="as">calcolato qui</span></div>
+<p class="rd">Due conti, <span class="f">24</span> categorie, centri di costo attivi: quello che l'Assistente sa prima del primo messaggio.</p>
+<div style="margin-top:12px">
+<div class="k"><span>Conto corrente<br><span class="s11 mf">predefinito per le spese</span></span><span class="v">4000 €</span></div>
+<div class="k"><span>Conto deposito<br><span class="s11 mf">predefinito per le entrate</span></span><span class="v">15.000 €</span></div>
+<div class="k"><span>Categorie</span><span class="v">24</span></div>
+<div class="k"><span>Centri di costo</span><span class="v s13">attivi</span></div>
+</div>
+</section>
+<section class="tile enter" aria-label="Cosa sa di te">
+<div class="th"><h3 class="eb">Cosa sa di te</h3><span class="as">4 voci</span></div>
+<p class="rd">Tre fatti e un obiettivo attivo; la memoria è accesa.</p>
+<div style="margin-top:12px"><div class="k"><span>Fondo emergenze</span><span class="v s13">12.000 €</span></div><div class="k"><span>Orizzonte: 20 anni</span><span class="v s13 mf">fatto</span></div></div>
+</section>
+</div>
+</div>
+</div>
+<figcaption><b>Movimento.</b> Entrare in Registra tiene ferma la conversazione: la colonna compagna scorre come una schermata del Consulente (x 24px → 0, 0,25 s ease-out-quart); le carte entrano come la carta domanda (y 8px → 0, 0,2 s, la seconda 80 ms dopo). <b>Movimento ridotto:</b> la colonna dissolve in 0,15 s, le carte appaiono. <b>Stati:</b> UN solo «Rispondi» (44px, accento su hover e focus) sotto l'ultima carta domanda del messaggio, attivo quando ogni carta ha una risposta e nulla è in streaming — qui spento perché la domanda è aperta —; «Conferma», «Modifica», «Ignora» mai accentati, 44px; il secondo compositore mostra il contatore da 3.800 caratteri («3.812 / 4.000»); prima del primo messaggio la colonna compagna mostra il riepilogo del registro calcolato nel browser; il pulsante «Registra» dell'intestazione è attivo (`aria-pressed`) e prende l'accento solo su hover.</figcaption>
+</figure>
+<button type="button" class="btn out replay">Riproduci</button>
+</section>
+
+<section data-scene="analysis" class="in" aria-labelledby="h-an">
+<h2 id="h-an">Scena 6 · Assistente › Mese</h2>
+<p class="lead">Il modo di analisi: il verdetto è il contesto, l'asse accanto al verdetto da 1440px e sotto il titolo prima; una proposta di obiettivo dentro il messaggio.</p>
+<figure>
+<div class="frame">
+<div class="ph"><div class="t"><span class="eb">Assistente</span><span class="s13" style="font-weight:500">Assistente</span><span class="s13 mf">· ragiona sui numeri di un periodo</span></div><div class="acts"><button type="button" class="btn out ic" aria-label="Conversazioni (3)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></button><button type="button" class="btn out ic" aria-label="Memoria (4)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7 7 0 0 0-7 7c0 3 2 4 2 6h10c0-2 2-3 2-6a7 7 0 0 0-7-7zM9 19h6M10 22h4"/></svg></button><button type="button" class="btn out ic aic" aria-label="Registra"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4z"/></svg></button><button type="button" class="btn ic" aria-label="Nuova conversazione"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></div></div>
+<div class="vx"><div><h3 class="vh">Ottobre è andato bene<span class="pos" aria-hidden="true">.</span></h3><p class="vs">Entrate <span class="f">2000 €</span>, uscite <span class="f">1500 €</span>: hai messo da parte il <span class="f pos">25%</span>. Il patrimonio vale <span class="f">60.000 €</span>.</p></div>
+<div class="pill" role="radiogroup" aria-label="Periodo di analisi"><button type="button" role="radio" aria-checked="true">Mese</button><button type="button" role="radio" aria-checked="false">Anno</button><button type="button" role="radio" aria-checked="false">YTD</button><button type="button" role="radio" aria-checked="false">Storico</button><button type="button" role="radio" aria-checked="false">Libera</button></div></div>
+<div class="hero">
+<div>
+<section class="tile" aria-label="Conversazione">
+<div class="th"><h3 class="eb">Conversazione</h3><span class="as">Analisi · Ottobre 2026</span></div>
+<p class="rd"><span class="f">2</span> messaggi; la risposta usa i numeri di ottobre 2026.</p>
+<div style="margin-top:16px">
+<div class="msg me"><div class="mh"><span class="seb">Tu</span><span class="ts">1 nov 2026</span></div><p class="b">Com'è andato ottobre? Dovrei tenere più liquidità?</p></div>
+<div class="msg"><div class="mh"><span class="seb ai">Assistente</span><span class="ts">1 nov 2026</span></div>
+<p class="b">Il mese chiude con 500 € di risparmio: un quarto delle entrate. Con un fondo emergenze da sei mesi di spese, 9.000 €, saresti coperto; oggi la liquidità è 12.000 €, quindi la riserva c'è già. Ti propongo di darle un nome.</p>
+<div class="pc qenter" style="--i:0">
+<p class="seb ai">Proposta di obiettivo</p>
+<p class="n">Fondo emergenze</p>
+<dl><div class="dr"><dt>Importo target</dt><dd>12.000 €</dd></div><div class="dr"><dt>Scadenza</dt><dd>nessuna</dd></div><div class="dr"><dt>Priorità</dt><dd>alta</dd></div><div class="dr"><dt>Contributo mensile</dt><dd>—</dd></div></dl>
+<p class="s13 mf" style="margin-top:12px">La liquidità di oggi lo copre: l'obiettivo nasce già raggiunto e tiene la riserva fuori dai piani.</p>
+<div class="acts"><button type="button" class="btn">Conferma</button><button type="button" class="btn gh">Ignora</button></div>
+</div>
+</div>
+<div style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px">
+<p class="seb">Continua con</p>
+<ul class="sug" aria-label="Domande suggerite">
+<li><button type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg><span>Quanto potrei versare ogni mese sugli ETF?</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button></li>
+<li><button type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg><span>Quali spese sono cresciute rispetto a settembre?</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button></li>
+<li><button type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg><span>Come sto rispetto al budget?</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button></li>
+</ul>
+</div>
+</div>
+</section>
+<div class="comp"><textarea class="ta" rows="1" aria-label="Scrivi un messaggio all'assistente" placeholder="Scrivi una domanda sul tuo portafoglio…"></textarea><button type="button" class="btn ic send aic" aria-label="Invia messaggio"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4z"/></svg></button></div>
+</div>
+<div class="cc">
+<section class="tile enter" aria-label="Patrimonio nel periodo">
+<div class="th"><h3 class="eb">Patrimonio nel periodo</h3><span class="as">a fine ottobre</span></div>
+<p class="rd">Da gennaio il patrimonio è salito di <span class="f pos">+4000 €</span>.</p>
+<p class="hero36">60.000 €</p>
+<span class="chip">+500 € a ottobre</span>
+</section>
+<section class="tile enter" aria-label="Cashflow">
+<div class="th"><h3 class="eb">Cashflow</h3><span class="as">Ottobre 2026</span></div>
+<p class="rd">Hai messo da parte il <span class="f pos">25%</span> delle entrate.</p>
+<div style="margin-top:12px"><div class="k"><span>Entrate</span><span class="v">2000 €</span></div><div class="k"><span>Uscite</span><span class="v">1500 €</span></div><div class="k"><span>Risparmio</span><span class="v">500 €</span></div></div>
+</section>
+<section class="tile enter" aria-label="Cosa sa di te">
+<div class="th"><h3 class="eb">Cosa sa di te</h3><span class="as">4 voci</span></div>
+<p class="rd">Tre fatti e un obiettivo attivo; la memoria è accesa.</p>
+</section>
+</div>
+</div>
+</div>
+<figcaption><b>Movimento.</b> Un cambio di periodo tiene ferma la conversazione e fa scorrere il contenuto della colonna compagna (x 24px → 0, 0,25 s ease-out-quart); la carta «Proposta di obiettivo» entra y 8px → 0, 0,2 s. <b>Movimento ridotto:</b> la colonna dissolve, la carta appare. <b>L'accento, e dove no:</b> sul sotto-eyebrow «Assistente» di un messaggio del modello (mai su «Tu»), sul bordo e sull'eyebrow della carta, sull'hover di «Invia messaggio», di «Registra» e delle righe suggerite (l'icona Sparkles); mai sul verdetto, sull'asse, sulla colonna compagna, sull'elenco delle conversazioni, sui messaggi dell'utente, sulla prosa del modello. «Conferma» e «Ignora» 44px, mai accentati.</figcaption>
+</figure>
+<button type="button" class="btn out replay">Riproduci</button>
+</section>
+
+</main>
+</div>
+<script>
+(function(){
+var html=document.documentElement,mb=document.getElementById('mode');
+function setMode(t){html.dataset.theme=t;mb.setAttribute('aria-pressed',String(t==='light'));mb.textContent=t==='light'?'Passa alla modalità scura':'Passa alla modalità chiara'}
+mb.addEventListener('click',function(){setMode(html.dataset.theme==='light'?'dark':'light')});
+var reduce=matchMedia('(prefers-reduced-motion: reduce)');
+function countUp(scene){scene.querySelectorAll('.cu').forEach(function(el){var to=+el.dataset.to;if(reduce.matches){el.textContent=to;return}var t0=performance.now();function f(now){var p=Math.min((now-t0)/620,1),e=1-Math.pow(1-p,4);el.textContent=Math.round(to*e);if(p<1)requestAnimationFrame(f)}requestAnimationFrame(f)})}
+document.querySelectorAll('section[data-scene]').forEach(function(s){var b=s.querySelector('.replay');b.addEventListener('click',function(){s.classList.remove('in');void s.offsetWidth;s.classList.add('in');countUp(s)})});
+})();
+</script>
+</body>
+</html>
