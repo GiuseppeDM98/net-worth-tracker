@@ -145,7 +145,7 @@ export function DividendDialog({ open, onClose, dividend, onSuccess, returnFocus
   const [taxEdited, setTaxEdited] = useState(false);
   const [typeEdited, setTypeEdited] = useState(false);
 
-  // Settled during render on the `open` subject (AGENTS.md § Motion → react-hooks/set-state-in-effect):
+  // Settled during render on the `open` subject (AGENTS.md § React Compiler and the hooks rules → react-hooks/set-state-in-effect):
   // a reopened form starts idle and untouched, whatever the last attempt said.
   const [prevOpen, setPrevOpen] = useState(open);
   if (prevOpen !== open) {

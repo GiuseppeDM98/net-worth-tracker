@@ -355,7 +355,7 @@ pagina intera — `PageVerdict`, `VerdictStrip` e i tre `RecordBoardTile` a ogni
 compilato: `handleStripOpen` chiudeva su `sections` (nuovo a ogni render → `onOpen` nuovo → striscia e verdetto
 ri-renderizzati: ora la pagina passa `reveal` stesso, che il hook tiene stabile), e il compiler lasciava
 `describeIncomeRecords` e `describeSavingsRecords` fuori dalla cache accanto a chiamate identiche che cachava (un
-`useMemo` a mano, AGENTS.md § Motion). I 20 di oggi: la pagina, `PageContainer`, `PageHeader`, `PageRest`, la riga toccata
+`useMemo` a mano, AGENTS.md § React Compiler and the hooks rules). I 20 di oggi: la pagina, `PageContainer`, `PageHeader`, `PageRest`, la riga toccata
 (`RecordBoardTile` → `Tile` → `TileRowShell` → i primitivi Radix del `Collapsible`). Il JSON
 porta anche `byName` intero per run: un host che deve renderizzare una volta invece di due si legge per nome (build
 `--no-mangling`). Le colonne sono PER TASTO (per cambio, in `tabs` e `nav`; per caricamento, in `mount`):

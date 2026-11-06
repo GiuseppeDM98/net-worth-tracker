@@ -10,7 +10,7 @@ import { CLOSED_ANSWER_CLASS, ASIDE_YIELDS_TO_ANSWER_CLASS } from '@/lib/utils/t
 
 /**
  * A row of the small-screen composition, as `useMobileSections().collapse(id)` hands it to a
- * tile (The Closed-Row Rule, since 2026-10-10; AGENTS.md § Motion). The same object until the
+ * tile (The Closed-Row Rule, since 2026-10-10; doc/guide/motion.md). The same object until the
  * row changes.
  */
 export interface TileCollapse {

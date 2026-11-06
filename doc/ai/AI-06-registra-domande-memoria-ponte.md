@@ -431,7 +431,7 @@ export function formatQuestionAnswersAsMessage(entries: ReadonlyArray<{ question
   is AI-04's free-text row. A `category` question keeps the free-text «Altro…».
 - **«Rispondi»** renders under the last valid kept block only, as a `Button` of 44px (`h-11`) hover-accented (The
   AI-Accent Rule, decision 36), enabled when `formatQuestionAnswersAsMessage` of every valid kept block is non-null and
-  `answerable`. Its handler (a function of its own, awaited: AGENTS.md § Motion, the React Compiler bullets) records,
+  `answerable`. Its handler (a function of its own, awaited: AGENTS.md § React Compiler and the hooks rules) records,
   for each card, `recordProposal(proposalKey('question', index), { status: 'answered', answer: describeAnswer(question,
   value, labels), at: new Date() })`, then `await submitAnswer(text)`, then moves the focus to the first card's
   read-only «Risposta: …» line (`tabIndex={-1}`).
@@ -578,7 +578,7 @@ first when `opts.afterWrittenCard`, then the contextual and curated chips, dedup
 - **a11y** (AGENTS.md § Accessibility): the question's text names its `ChoiceList`; the `Select` has its `aria-label`
   and `FIELD_HEIGHT_CLASS` (`components/assets/compravendita/fields.tsx:19` @ ce26af4d); «Rispondi» and the bridge are
   44px below `desktop:`; the focus after «Rispondi» goes to the first read-only answer.
-- **React Compiler** (AGENTS.md § Motion): no conditional or logical expression inside a `try/catch` in the handlers
+- **React Compiler** (AGENTS.md § React Compiler and the hooks rules): no conditional or logical expression inside a `try/catch` in the handlers
   (a function of its own, awaited in the try); the providers compute in render, no manual memo.
 - **The Cashflow page stays prerendered**: its server page reads `ANTHROPIC_API_KEY` when Next renders it, at build,
   as the Assistente page does; a key added on Vercel shows the bridge after the next deploy (a blind spot in the
@@ -735,7 +735,7 @@ categories, remembers rules; the Cashflow bridge`, PR to `develop`. No flag of i
 
 ```
 Leggi WORKFLOW.md, AGENTS.md (§ Assistant · Assistente, § Cashflow — expense mechanics, § Cashflow › Tracciamento,
-§ React Query and Derived State, § Motion — i bullet del React Compiler, § Accessibility, § Tailwind Breakpoints,
+§ React Query and Derived State, § React Compiler and the hooks rules, § Accessibility, § Tailwind Breakpoints,
 § Commands), DESIGN.md § 5 «AI Surfaces» e The Question-Card Rule, doc/guide/assistente.md, doc/guide/cashflow.md
 (§ Expense Sign Convention and Type Changes: commissione, rata, estinzione, trasferimento su un immobile; § Recurring
 Series), doc/guide/cashflow-tracciamento.md, doc/guide/e2e-emulatori.md, doc/guide/prima-schermata.md,

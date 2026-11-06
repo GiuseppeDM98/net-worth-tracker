@@ -568,7 +568,7 @@ backtick or tilde — the offset react-markdown's hast `pre` node carries in `po
   shown only in register mode (the thread sync sets the mode from the thread).
 - `components/assistant/ExpenseProposalCard.tsx` (new, criteria 7–10, 14): props `{ proposal: ExpenseProposal; index: number }`;
   `resolveExpenseProposal` + `describeExpenseProposalState`; a local `const confirm = async () => {…}` whose `try`
-  holds no branch (AGENTS.md § Motion, the React Compiler rewrites), the three service calls in the module-level
+  holds no branch (AGENTS.md § React Compiler and the hooks rules, the React Compiler rewrites), the three service calls in the module-level
   `writeExpenseProposal(ownerId, resolved, now)` that returns the ids: `setSaving(true)` → the write → `recordProposal`
   → toast → the four invalidations → the PATCH (its failure: `PROPOSAL_STATE_NOT_SAVED`) → the focus on the state
   line (`tabIndex={-1}`); a write failure shows
@@ -618,7 +618,7 @@ backtick or tilde — the offset react-markdown's hast `pre` node carries in `po
 - **Every expense window is an Italian calendar window** — the recent rows from `getItalyMonthBoundsUtc` to
   `getItalyDayBoundsUtc(now).end`; the title's date and `findRegisterThread` in the Italian zone; the suites run in
   three zones (CLAUDE.md § Current Status).
-- **The React Compiler** (AGENTS.md § Motion) — the block index is derived, never a render counter; the card's write
+- **The React Compiler** (AGENTS.md § React Compiler and the hooks rules) — the block index is derived, never a render counter; the card's write
   is a module-level helper awaited from a local `const confirm`; `MARKDOWN_COMPONENTS` stays module-level and reads
   context through hooks; `reactCompilerCoverage` compiles every new file.
 - **Dialog Form Reset and Two-Step Create Dialogs** (`doc/guide/dialog.md`) — `initialValues` joins the `(open,
@@ -794,7 +794,7 @@ already gates the page; no new flag.
 
 ```
 Leggi WORKFLOW.md, AGENTS.md (§ Assistant · Assistente, § Cashflow — expense mechanics, § React Query and Derived
-State, § Motion — i punti sul React Compiler, § Accessibility, § Commands, § Dialog Form Reset, § Two-Step Create
+State, § React Compiler and the hooks rules, § Accessibility, § Commands, § Dialog Form Reset, § Two-Step Create
 Dialogs), DESIGN.md § 5 «AI Surfaces», doc/guide/assistente.md, doc/guide/cashflow.md,
 doc/guide/cashflow-tracciamento.md, doc/guide/dialog.md, doc/guide/e2e-emulatori.md, doc/ai/README.md § 3-4-7,
 doc/ai/AI-05-assistente-registra.md, i mock dell'Assistente di AI-01 e il diff di AI-03 (in develop). Node 24

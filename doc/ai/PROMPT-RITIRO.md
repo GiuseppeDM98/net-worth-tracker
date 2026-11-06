@@ -188,7 +188,7 @@ ORDINE DI LAVORO
    misurata al collaudo. Un pezzo in UN posto solo: una regola che vale su tutto il repo
    → AGENTS.md, come RULE + DATE + WHERE IT IS PINNED (§ 0; per la serie: § Firestore
    Writes per le scritture dalla card, § Server Layer and API Authorization → server.md
-   per il PATCH e lo stream, § Motion per le varianti di scena, § Accessibility,
+   per il PATCH e lo stream, doc/guide/motion.md per le varianti di scena, § Accessibility,
    § Commands per il gate delle dipendenze e il progetto `dom` di Vitest, § Browser-Driven
    E2E per la rotta finta; gli stub di § 3 «Allocazione › Consulente», «Assistant ·
    Assistente» e «Cashflow › Tracciamento» restano a 3–4 punti, oltre è una guida che

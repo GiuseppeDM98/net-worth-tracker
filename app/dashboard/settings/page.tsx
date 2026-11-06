@@ -176,7 +176,7 @@ export default function SettingsPage() {
   const hasUnsavedChanges = unsavedSentence !== null;
 
   // The draft is seeded from the document — settled DURING render on the (owner, read) subject
-  // (AGENTS.md § Motion, the third answer): the first document of this owner seeds it, a fresher
+  // (AGENTS.md § React Compiler and the hooks rules, the third answer): the first document of this owner seeds it, a fresher
   // read reseeds it ONLY while no tab is dirty — a co-owner's save never overwrites what the
   // reader is typing; it lands at the next «Salva» or «Annulla», which re-read anyway.
   const seedSubject = settingsDocument === undefined ? null : `${ownerId}:${settingsQuery.dataUpdatedAt}`;

@@ -232,7 +232,7 @@ interface AssetRowProps {
  * One instrument below `desktop:` — a flat row (name, class, value, G/P) that expands in place
  * on the details, the unit-price sparkline, the three Δ windows and the actions. Flat on purpose:
  * the rows live inside the Strumenti tile, and a card per row would be a card inside a card.
- * Expansion is the CSS `grid-rows-[0fr] → [1fr]` technique (AGENTS.md → Motion), with `inert`
+ * Expansion is the CSS `grid-rows-[0fr] → [1fr]` technique (doc/guide/motion.md), with `inert`
  * on the closed panel so its buttons leave the tab order. Elimina is a two-click confirm without
  * a timer (`useArmedDelete`, since 2026-09-14).
  */

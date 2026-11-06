@@ -29,7 +29,7 @@ interface AuthShellProps {
  *
  * Reduced motion is honoured here through the root `MotionProvider` (app/layout.tsx), which wraps
  * these routes like every other: the `MotionConfig` this frame carried until 2026-09-29 was a
- * nested duplicate with the same value — inert, and the reason AGENTS.md → Motion could not say
+ * nested duplicate with the same value — inert, and the reason doc/guide/motion.md (then AGENTS.md § Motion) could not say
  * «ONE» truthfully.
  */
 export function AuthShell({ verdict, verdictAriaLabel, footer, children }: AuthShellProps) {

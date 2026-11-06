@@ -196,7 +196,7 @@ concepts, on invented figures, and the choice is written where AI-03..06 impleme
 
 ### The session's steps
 
-1. `node -v` prints v24 (decision 33). Read WORKFLOW.md; AGENTS.md § Motion, § Accessibility, § Tailwind Breakpoints
+1. `node -v` prints v24 (decision 33). Read WORKFLOW.md; doc/guide/motion.md, AGENTS.md § React Compiler and the hooks rules, § Accessibility, § Tailwind Breakpoints
    and Responsive Layout; DESIGN.md whole; doc/guide/consulente.md, doc/guide/assistente.md, doc/guide/temi.md; the four
    Consulente components, `GoalProposalCard.tsx`, `AssistantConversazioneTile.tsx`, `AssistantComposer.tsx`,
    `AssistantStreamingResponse.tsx`, `components/ui/segmented-pill.tsx`, `lib/utils/motionVariants.ts`,
@@ -436,7 +436,7 @@ at 283 (22° away) and Cyberpunk at 341 (36°). The detector's `low-contrast` ag
   typed by hand, never produced by `impeccable-documenter`, and the sidecar changes only through the additive script.
 - **DESIGN → The Modal-Is-A-Tile Rule** — here it means that a question card is never a modal: the interview happens in
   the scene, the chat's questions in the message.
-- **AGENTS.md § Motion** — here it means that the Framer motion lives in `lib/utils/motionVariants.ts` under one
+- **doc/guide/motion.md** (until 2026-11-06 AGENTS.md § Motion) — here it means that the Framer motion lives in `lib/utils/motionVariants.ts` under one
   `MotionConfig reducedMotion="user"`, and a CSS-timed motion runs through `motion-safe:` classes (`ROW_MOTION_CLASS`,
   `components/ui/tile.tsx:129` @ ce26af4d): every row of the table has its reduced value, and each scene's caption
   states it — A's collapse and C's writing line included.
@@ -692,7 +692,7 @@ PR to `develop`. Nothing deploys.
 In Italian (decision 34).
 
 ```
-Leggi WORKFLOW.md, AGENTS.md (§ Motion, § Accessibility, § Tailwind Breakpoints and Responsive Layout), DESIGN.md per
+Leggi WORKFLOW.md, doc/guide/motion.md, AGENTS.md (§ React Compiler and the hooks rules, § Accessibility, § Tailwind Breakpoints and Responsive Layout), DESIGN.md per
 intero, doc/guide/consulente.md, doc/guide/assistente.md, doc/guide/temi.md e doc/ai/AI-01-direzione-visiva-consulente.md
 (con doc/ai/README.md § 3, § 7 e § 8). Lavora sulla macchina Windows (le critiche di Impeccable si scrivono solo lì) e
 controlla per primo `node -v` (v24). Esegui AI-01 così com'è scritta: sample.json inventato; UNA tela Design con le tre
