@@ -1,17 +1,16 @@
 # AI-03 — The redesign of the path, the run and the report; `ChoiceList`
 
 > Series `doc/ai/` (README.md § 5): **depends on AI-00** (retired on 2026-11-03, in develop since 2026-11-03, PR #497: the clean repo on Node 24, the dependency gate and the
-> register of `doc/guide/dipendenze.md`) **and AI-01** (the chosen concept, DESIGN.md § 5 «AI Surfaces» with The
+> register of `doc/guide/dipendenze.md`) **and AI-01 (retired on 2026-11-06, in develop since 2026-11-06, PR #503): the chosen concept, DESIGN.md § 5 «AI Surfaces» with The
 > AI-Accent Rule and The Path-Scene Rule, the light-mode value of `--ai-accent`); **AI-04, AI-05, AI-06 depend on it**
 > (`ChoiceList`, the RTL harness, `Tile`'s `generated`, the classes of `lib/constants/aiAccent.ts`; AI-04 also
 > `PathRail`'s `interview` and the scene variants). Written on 2026-11-01 from `develop` @ b9411a4d (the code is
 > identical at ce26af4d). Executes decision 14 (scope: the path, the run, the report; the interview is AI-04) and the
-> adopted choices A19, A20, A21. **This spec is written for concept B «La scena»** (AI-01's recommendation): if the
-> owner's choice in AI-01 is not B for the Consulente, the AI-01 session itself rewrites, in its own commit and from
-> the chosen concept, criteria 2, 3 and 9, the § 3 choices on the rail, `PathRail` and the slide's direction, § 4
-> «The scene», the rail traps of § 5, the `motionVariants` test and the rail and reduced-motion assertions of § 6, the
-> screenshots of § 7 C, the rail lines of § 9, the Draft Release line and § 11 (decision 37); `ChoiceList`, the
-> harness, the run's minutes and failed states, the report's accent and the tokens do not depend on the concept.
+> adopted choices A19, A20, A21. **This spec is written for concept B «La scena»**, the owner's choice for the
+> Consulente (decision 74, 2026-11-06; the conditional of decision 37 is settled). § 4 rewritten on 2026-11-06 at
+> AI-01's retirement (decision 78: the rail's fills and the interview ticks in the accent, the active stage row as a
+> generated surface, `AI_CONTROL_ACCENT_CLASS` + `AI_CONTROL_ACCENT_LABEL_CLASS`, `cardEnterVariants`), to be reread
+> there.
 > Read adversarially on 2026-11-01: 46 findings applied, the decisions 21–73 in README.md § 3 (this spec: decisions
 > 14, 15, 21, 22, 26, 33, 34, 35, 36, 37, 39, 49, 50, 51, 52, 55).
 
@@ -63,7 +62,7 @@
 
 ## 2. Goal and acceptance criteria
 
-The Consulente's three views follow DESIGN.md § 5 «AI Surfaces» as AI-01 wrote it; the choice rows are one
+The Consulente's three views follow DESIGN.md § 5 «AI Surfaces» as it stands (2026-11-06); the choice rows are one
 primitive; component tests get a DOM harness; nothing the path ASKS changes.
 
 1. **`ChoiceList` is the only choice-rows component**: `components/ui/choice-list.tsx` (new) with the contract of
@@ -97,7 +96,7 @@ primitive; component tests get a DOM harness; nothing the path ASKS changes.
    cascades; drop `reduced !== true` from the initializer → the reduced-motion opening fades; print the value without
    `useCountUp` → a single text is sampled.
 5. **The accent tokens and the controls that call the model** (decision 36): one `--ai-accent` per mode (the light
-   value AI-01 measured in `:root`), `--ai-glow` once; «Avvia la ricerca», «Riprova», «Rivedi il report» and «Analizza
+   value `oklch(0.56 0.2 305)` of DESIGN.md → The AI-Accent Rule in `:root`), `--ai-glow` once; «Avvia la ricerca», «Riprova», «Rivedi il report» and «Analizza
    con AI» glow on hover and focus only. Proof: `grep -c -- "--ai-accent:" app/globals.css` → 2,
    `grep -c -- "--ai-glow:" app/globals.css` → 1, `grep -c "ai-accent-light" app/globals.css` → 0; the class
    assertions in `e2e/allocation.consulente.spec.ts` («Avvia la ricerca»), `__tests__/consulenteRun.test.tsx`
@@ -140,7 +139,7 @@ primitive; component tests get a DOM harness; nothing the path ASKS changes.
   Library; the pure helpers keep their `.test.ts`.
 - **Decision 22**: § 10 lists only what is definitively not done, or what another spec of the series does.
 - **Decisions 33, 34, 35**: Node 24 for every gate; the § 11 prompt stays in Italian; the guides are in English.
-- **Decision 37**: the header's one conditional on AI-01's concept.
+- **Decision 37**: the header's one conditional on the concept, settled by decision 74 (B, 2026-11-06).
 - **Decision 39**: the real `ANTHROPIC_API_KEY` of `.env.local` reaches `dev:e2e` and enables «Avvia la ricerca»; the
   route is ALWAYS faked with `page.route`, never a spend; this spec writes it into `doc/guide/e2e-emulatori.md`. No
   dummy key in `package.json`.
@@ -149,8 +148,8 @@ primitive; component tests get a DOM harness; nothing the path ASKS changes.
 - **Decision 50**: `STAGE_TYPICAL_MINUTES = { context: 0, strategy: 2, instruments: 2, review: 1 }`; «di solito ~N
   min», nothing for 0.
 - **Decision 51**: the run rail's fill is stage STATUS: one fill per stage when it becomes active, never a percentage
-  nor a remaining time (DESIGN § 1 «No decorative progress bars» does not apply to it; AI-01 writes it in The
-  Path-Scene Rule).
+  nor a remaining time (DESIGN § 1 «No decorative progress bars» does not apply to it; DESIGN.md → The
+  Path-Scene Rule holds it, 2026-11-06).
 - **Decision 52**: the release line of § 9.
 - **Decision 55**: «Altro…» and «Preferisco non dire» are exclusive rows in a multiple choice; `ChoiceList` implements
   `exclusive: true` here, AI-04 flags the rows.
@@ -299,13 +298,16 @@ export function PathRail(props: PathRailProps): React.JSX.Element;
 - **`interview`** (accepted here, passed by AI-04): a sibling `<ol aria-label="Il colloquio">` after the path's list,
   three `<li>` «Tornata N di 3» drawn as ticks; `aria-hidden="true"` and `opacity-50` while `reached === null`; with a
   number, readable, the tornate before `reached` done, `reached` current with `aria-current="step"`, and the path's
-  eight all done with no `aria-current` (the rail has ONE current step).
+  eight all done with no `aria-current` (the rail has ONE current step). Its ticks light in the accent one round at
+  a time: `bg-[color:var(--ai-accent)]` on `reached` and on the tornate before it, `bg-border` ahead (DESIGN.md →
+  The Path-Scene Rule; decision 78, 2026-11-06).
 - **Run mode**: `<ol aria-label="Le fasi" aria-hidden="true">` of four segments (the stage rows of the card are the
   list a screen reader reads): a `bg-border` track with a fill span `origin-left scale-x-0` that becomes `scale-x-100`
   when its stage is `active`, `done` or `failed` (on the 1440 column `origin-top scale-y-0` → `scale-y-100`), with
   `motion-safe:transition-transform motion-safe:duration-300 motion-safe:ease-spring`: ONE fill per stage when it
-  becomes active (decision 51). The fill is `bg-foreground` while active, `bg-foreground/50` when done,
-  `bg-destructive` when failed, never the accent (the accent is never a fill). Under reduced motion the `motion-safe:`
+  becomes active (decision 51). The fill is `bg-[color:var(--ai-accent)]` while active, `bg-muted-foreground` when done,
+  `bg-destructive` when failed: with the interview's ticks, the only fills the accent is allowed (DESIGN.md → The
+  Path-Scene Rule; decision 78, 2026-11-06). Under reduced motion the `motion-safe:`
   transition does not apply and the fill is instant.
 - **The layout**: in the Wizard and in `ConsulenteRun`, a wrapper
   `<div className="mx-auto grid w-full max-w-[720px] grid-cols-1 gap-4 desktop:max-w-[900px] desktop:grid-cols-[160px_1fr]">`
@@ -353,6 +355,11 @@ export const sceneVariantsReduced: Variants = {
   enter: { opacity: 0 },
   center: { opacity: 1, transition: { duration: 0.15 } },
   exit: { opacity: 0, transition: { duration: 0.1 } },
+};
+/** A question or proposal card entering (DESIGN.md § 5, «Question card, entering»): a translate only, so MotionConfig reducedMotion="user" leaves nothing and the card appears. Read by AI-04 and AI-05. */
+export const cardEnterVariants: Variants = {
+  enter: { y: 8 },
+  center: { y: 0, transition: { duration: 0.2, ease: easeOutQuart } },
 };
 ```
 
@@ -407,7 +414,9 @@ export function runStageStates(at: { status: 'running' | 'failed' | 'done'; stag
   `bg-border` dot, failed a `bg-destructive` dot), `STAGE_COPY[stage].label` and `.detail`, `describeStageTypical`
   on the right (`font-mono text-[12px] tabular-nums text-muted-foreground`), on the active row `elapsed` beside it
   with `aria-hidden="true"`, and a `sr-only` state word («, fatto», «, in corso», «, non riuscito»; none for pending).
-  The active row takes `border-l-2 border-l-[color:var(--ai-accent)]` (A21: the active stage of a run).
+  The active row takes `AI_GENERATED_SURFACE_CLASS` — the 1px `--ai-accent` border at rest and the glow on hover
+  and focus-visible, «the run's active stage» of DESIGN.md → The AI-Accent Rule (A21; decision 78, 2026-11-06) —
+  and no left border.
 - `useElapsed(since: number): string`, local to `ConsulenteRun.tsx`: `now` in state, a 1 s `setInterval` in an effect
   cleared on unmount, «m:ss» of `Math.max(0, now - since)`.
 - `ConsulenteRun` renders the wrapper with `PathRail mode="run"` (the stages from `runStageStates` labelled with
@@ -430,13 +439,19 @@ export function runStageStates(at: { status: 'running' | 'failed' | 'done'; stag
 export const AI_GENERATED_SURFACE_CLASS =
   'border-[color:var(--ai-accent)] motion-safe:transition-shadow motion-safe:duration-200 hover:shadow-[0_0_14px_var(--ai-glow)] has-[:focus-visible]:shadow-[0_0_14px_var(--ai-glow)]';
 export const AI_GENERATED_EYEBROW_CLASS = 'text-[color:var(--ai-accent)]';
-/** A control that calls the model: the glow on hover and on keyboard focus only; never at rest, never a fill. */
-export const AI_CONTROL_ACCENT_CLASS = 'hover:shadow-[0_0_14px_var(--ai-glow)] focus-visible:shadow-[0_0_14px_var(--ai-glow)]';
+/**
+ * A control that calls the model (The AI-Accent Rule): on hover and on keyboard focus only, the border turns the
+ * accent and the glow appears, over 200 ms; never at rest, never a fill. The focus ring stays `ring-ring`.
+ */
+export const AI_CONTROL_ACCENT_CLASS =
+  'transition-[border-color,color,box-shadow] duration-200 hover:border-[color:var(--ai-accent)] focus-visible:border-[color:var(--ai-accent)] hover:shadow-[0_0_14px_var(--ai-glow)] focus-visible:shadow-[0_0_14px_var(--ai-glow)]';
+/** Added to AI_CONTROL_ACCENT_CLASS on an outline or ghost control only: its label turns the accent too; a filled control keeps --primary-foreground. */
+export const AI_CONTROL_ACCENT_LABEL_CLASS = 'hover:text-[color:var(--ai-accent)] focus-visible:text-[color:var(--ai-accent)]';
 ```
 
 - **`ConsulenteReport.tsx`**: `generated` on «Allocazione proposta», «Strumenti», «Obiettivi», «Ruoli degli asset»,
   «Il report», «La strategia» and, in the running view, «Le fasi»; never on «Applica» nor «Chiedi una modifica»
-  (decision 49; AI-04 adds «Il colloquio» with it). «Rivedi il report» takes `AI_CONTROL_ACCENT_CLASS`.
+  (decision 49; AI-04's «Il colloquio» stays without it, decision 79). «Rivedi il report» takes `AI_CONTROL_ACCENT_CLASS`.
 - **The running view** (:154-173): «Le fasi» holds `StageRows rows={runStageStates({ status: 'running', stage: document.stage })}`
   with no `elapsed` (a reload does not know when the stage began; the aside keeps «avviato il …»); it does not
   cascade.
@@ -458,13 +473,14 @@ export const AI_CONTROL_ACCENT_CLASS = 'hover:shadow-[0_0_14px_var(--ai-glow)] f
 
 ### Tokens, the other controls, the comments
 
-- **`app/globals.css`**: in `:root` (:96) the light-mode value AI-01 measured and recorded in DESIGN.md § 5 «AI
-  Surfaces» replaces `oklch(0.65 0.2 305)`; `.dark` (:156) keeps `oklch(0.65 0.2 305)`;
+- **`app/globals.css`**: in `:root` (:96) the light-mode value of DESIGN.md § 5 «AI
+  Surfaces», `oklch(0.56 0.2 305)`, replaces `oklch(0.65 0.2 305)`; `.dark` (:156) keeps `oklch(0.65 0.2 305)`;
   `--ai-glow: color-mix(in oklch, var(--ai-accent) 40%, transparent);` once, in `:root` under `--ai-accent` (`.dark`
   sits on `<html>`, the same element, so the glow follows the dark accent with no copy). No `--ai-accent-light`.
 - **`app/dashboard/performance/page.tsx:299 @ ce26af4d`** («Analizza con AI», decision 36): the inline
-  `hover:shadow-[0_0_14px_color-mix(in_oklch,var(--ai-accent)_40%,transparent)]` becomes `AI_CONTROL_ACCENT_CLASS`,
-  and its hover border and text gain the same `focus-visible:` pair; the colour, the timing and the icon unchanged.
+  `hover:shadow-[0_0_14px_color-mix(in_oklch,var(--ai-accent)_40%,transparent)]` becomes `AI_CONTROL_ACCENT_CLASS` +
+  `AI_CONTROL_ACCENT_LABEL_CLASS` (an outline control), which carry the same border, text and glow and add the
+  `focus-visible:` pair; the colour, the timing and the icon unchanged.
 - **Comments**: `ConsulenteClient.tsx`'s header «the page is one column at 720px» → «the page is one column at 720px
   (900px at 1440, the path's rail beside the card)»; the header of `e2e/allocation.consulente.spec.ts` is rewritten in
   English, its paragraph «NON avvia mai la ricerca…» becoming «It presses «Avvia la ricerca» only on a route faked
@@ -557,7 +573,8 @@ export const AI_CONTROL_ACCENT_CLASS = 'hover:shadow-[0_0_14px_var(--ai-glow)] f
   `running` at `instruments` with T3. Mutation: stamp the time in `start` only → the T1 assertion is red.
 - `__tests__/motionVariants.test.ts` (new, node): `sceneEnter(1).x === 24`, `sceneEnter(-1).x === -24`,
   `sceneExit(1).x === -24` with `transition.duration === 0.18`, the center's duration 0.25, no key of
-  `sceneVariantsReduced` holds an `x`. Mutation: swap the sign in `sceneEnter` → red.
+  `sceneVariantsReduced` holds an `x`; `cardEnterVariants.enter` holds `y: 8` and no `opacity` (decision 78: a
+  translate only). Mutation: swap the sign in `sceneEnter` → red; add `opacity: 0` to `cardEnterVariants.enter` → red.
 - `__tests__/allocationAdviceNarrative.test.ts` (extended): `STAGE_TYPICAL_MINUTES` holds the four stages with
   0 · 2 · 2 · 1; `describeStageTypical('strategy')` is «di solito ~2 min», `describeStageTypical('context')` is null.
   Mutation: return the string for 0 → red.
@@ -733,7 +750,7 @@ RTL harness`; PR to `develop`, its preview opened by the owner for phase F. No f
   (`components/ui/path-rail.tsx`, `sceneVariants` in `lib/utils/motionVariants.ts`, `ConsulenteWizard.tsx`,
   `ConsulenteRun.tsx`) and one under The AI-Accent Rule (`Tile`'s `generated`, `lib/constants/aiAccent.ts`, the
   Consulente's report and run, Rendimenti's «Analizza con AI»); in The Question-Card Rule the ONE word `ChoiceRows`
-  becomes `ChoiceList` (AI-01 wrote the rule when only `ChoiceRows` existed — its «Names before birth» rule); nothing
+  becomes `ChoiceList` (the rule was written on 2026-11-01, when only `ChoiceRows` existed); nothing
   else rewritten, nothing added to the frontmatter.
 - **`Draft Release Temp.md`**: the entry «Allocazione — Consulente» (one entry per surface, rewritten to its final
   state, as the file's header says) gains, before its last sentence («Reached from the «Consulente» button…»),

@@ -35,7 +35,7 @@ Target: `doc/ai/reference/concept-a.html` — Concetto A «Il taccuino» (AI-01,
 
 The Consulente half is written for this product: −10/−25/−40% turned into euros on the user's 60.000 € base, behavioural radio hints, «di solito ~2 min» with no percentage, the collapse-to-chip reusing the house Closed-Row Rule. The Assistente half is not specific in the same way: offset «Tu» bubbles, author headers, a timestamp on every message and a sparkle «Continua con» list make the generic chat column the thesis says it must not be.
 
-Detector (Assessment B, exit 2 both modes): `low-contrast` 0, `design-system-*` 0, `cramped-padding` 0. Advisory families only: `undersized-ui-text` 33 (24 at 10px, 9 at 9px: the app's own eyebrow and meta sizes), `tiny-text` 13, `overused-font` 2 (Geist Sans / Geist Mono, the app's fonts), `ai-color-palette` 4 in light only (the flat `--ai-accent` text, not a gradient). All classified false positives or sanctioned by AI-01 § 5; the 9px speaker labels are the one tier worth a second look.
+Detector (Assessment B, exit 2 both modes): `low-contrast` 0, `design-system-*` 0, `cramped-padding` 0. Advisory families only: `undersized-ui-text` 33 (24 at 10px, 9 at 9px: the app's own eyebrow and meta sizes), `tiny-text` 13, `overused-font` 2 (Geist Sans / Geist Mono, the app's fonts), `ai-color-palette` 4 in light only (the flat `--ai-accent` text, not a gradient). All classified false positives or advisory (on the AI-01 mocks, 2026-11-06, only `low-contrast` and `design-system-*` were criteria; the advisory families come from the app's own type system); the 9px speaker labels are the one tier worth a second look.
 
 ## Strengths
 
@@ -74,4 +74,4 @@ Detector (Assessment B, exit 2 both modes): `low-contrast` 0, `design-system-*` 
 2. Should the Assistente stop pretending to be a document and be an honest conversation that borrows only the collapse-to-chip, or go all the way (no bubbles, the user's words as quoted ledger lines)?
 3. If the whole report chapter is model-written, should the violet mark what the user has not yet checked rather than mere authorship?
 
-Questions skipped: deferred to the session's single AskUserQuestion (AI-01 decision 37: no question before the mocks, one question after them).
+Questions skipped: deferred to the session's single AskUserQuestion (the session's rule of 2026-11-06: no question before the mocks, one question after them).

@@ -7,8 +7,8 @@
 > 2026-11-01
 > from `develop` @ b9411a4d. Executes decisions 9, 10, 12, 13, the adopted choices A15–A18 (A15 as amended by decision
 > 64, A16 by decisions 31 and 66) and decisions 21, 29–32, 38, 40, 64–73. § 4 Client is written for a conversation
-> column with cards, the Assistente concept AI-05 and AI-06 assume; the AI-01 session rewrites it under decision 37
-> when the chosen concept differs. The sentences that must work at the end: «60 euro di benzina, fuori budget» → the
+> column with cards, the Assistente's concept B «La scena» (decision 74, 2026-11-06; the conditional of decision 37
+> settled); the bridge's accent removed on 2026-11-06 at AI-01's retirement (decision 78), to be reread there. The sentences that must work at the end: «60 euro di benzina, fuori budget» → the
 > card with «Fuori dal budget» set, nothing asked; «ho pagato la rata del mutuo» → a `debt` row on the loan with its
 > principal and interest line (with two loans the name does not tell apart: «Quale prestito?»); «sposta 500 dal conto
 > principale al conto risparmio» → a transfer that moves two balances; «ho versato 2000 euro di caparra sulla casa dal
@@ -277,8 +277,8 @@
 ## 3. Decisions
 
 - **Owner**: decisions 9, 10 (as updated by decision 68), 12, 13; and of the adversarial reading 21 (RTL tests are
-  `.test.tsx`), 22 (no heirs), 29 and 30 (§ 10), 31 (property transfers), 32 (§ 10), 36 (the hover accent on «Rispondi»
-  and the bridge), 38 (one «Rispondi» per message), 39 (the E2E key and the faked route), 40 (new categories), 64 (the
+  `.test.tsx`), 22 (no heirs), 29 and 30 (§ 10), 31 (property transfers), 32 (§ 10), 36 (the hover accent on «Rispondi»,
+  not on the bridge — decision 78), 38 (one «Rispondi» per message), 39 (the E2E key and the faked route), 40 (new categories), 64 (the
   answer lines), 65 (no question beside a proposal), 66 (loan question, unlinked instalment), 67 (rules supersede), 68
   («fuori budget» never asked, «Di cosa si tratta?»), 69 (the WHEN thresholds), 70 (rows with `ownerId`; memory as
   today, keyed by the account), 71 (memory off; the switch the answer names is «Apprendimento automatico» in the
@@ -534,7 +534,8 @@ export function isAssistantBridgeShown({ assistantConfigured, isDemo, flagValue 
   visibility `max-desktop:portrait:hidden h-11 shrink-0`. In portrait the FAB is the one add control and the «Altro»
   sheet does not carry the bridge.
 - The link is `Button asChild variant="outline"` around `next/link`, «Chiedi all'Assistente», `MessageSquarePlus`
-  `aria-hidden`, hover-accented as «Registra» (decision 36).
+  `aria-hidden`, with no AI accent: a link that calls no model (DESIGN.md → The AI-Accent Rule's «Never accented»;
+  decision 78, 2026-11-06).
 
 ### Follow-ups (`lib/utils/assistantFollowUps.ts`)
 
@@ -713,7 +714,7 @@ categories, remembers rules; the Cashflow bridge`, PR to `develop`. No flag of i
   «Conferma», once.» becomes «… once; it asks the details with options, moves money onto accounts and houses, repays
   loans, repeats rows and proposes new categories.»; **Cashflow › Tracciamento** gains «; the bridge to Registra
   beside «Aggiungi» (2026-11)» before its guide pointer.
-- DESIGN.md → The Question-Card Rule (written by AI-01) gains: «An entity question (accounts, centres, members, loans)
+- DESIGN.md → The Question-Card Rule (2026-11-01) gains: «An entity question (accounts, centres, members, loans)
   shows at most three option rows and no «Preferisco non dire»; «Altro…» opens, under the list, a labelled `Select` of
   every item (`otherSelect`); in the chat the host's ONE «Rispondi» sits under the message's last card (2026-11).»
 - `Draft Release Temp.md`, two entries prepended under «✨ New Features»: «**Assistente — Registra** — The Assistente now

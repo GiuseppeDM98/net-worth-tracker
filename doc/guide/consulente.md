@@ -165,7 +165,8 @@ stages, the slide forward and back, the report's cascade), **The Question-Card R
 scene's footer owns «Continua» and «Avvia la ricerca») and **The AI-Accent Rule** (the accent on what the model wrote
 and, on hover and focus only, on «Avvia il colloquio», «Continua», «Avvia la ricerca», «Riprova», «Rivedi il report»).
 The code follows it from the redesign of the path, the run and the report on (AI-03); until then § The path, § The run
-and § The report and «Applica» describe what renders.
+and § The report and «Applica» describe what renders, and `app/globals.css` serves `oklch(0.65 0.2 305)` in both modes
+with no `--ai-glow` (the light value and the glow land with that redesign).
 
 ## Composizione mobile
 

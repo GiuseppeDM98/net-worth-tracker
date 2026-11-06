@@ -206,7 +206,8 @@ ORDINE DI LAVORO
    riga «Suites to run after a change here» del § Files della guida (`grep -ln "Suites to
    run after a change here" doc/guide/*.md | wc -l`: 23 il 2026-11-02); le tre regole
    nominate, i token e la tabella del moto → DESIGN.md § 5 «AI Surfaces» e
-   `.impeccable/design.json` `extensions.motion`, SOLO per mano di AI-01 e dopo l'OK del
+   `.impeccable/design.json` `extensions.motion`, SOLO per mano di AI-01 (ritirata il 2026-11-06:
+   da allora le spec eredi vi aggiungono solo la riga «Implemented on» del loro § 9) e dopo l'OK del
    proprietario sul testo (mai rigenerare DESIGN.md; il sidecar si verifica con uno script
    prima di riscriverlo); lo stato del progetto → CLAUDE.md «Latest» (una riga: la domanda
    e il rimando, il dettaglio nella guida) e § Known Issues (il primo punto, `npm audit`,
@@ -228,7 +229,7 @@ ORDINE DI LAVORO
    spende» è già in WORKFLOW.md § 3, `grep -n "SPENDS" WORKFLOW.md`); § 10 ciò che non si
    fa → i blind spots della guida interessata; `doc/ai/reference/` (i concept HTML e
    `sample.json` di AI-01) se ne va con la cartella, `git log -- doc/ai/reference/` è il
-   suo archivio, e fuori da `doc/ai/` nessuno lo cita per percorso (AI-01 criterio 13:
+   suo archivio, e fuori da `doc/ai/` nessuno lo cita per percorso (la prova di AI-01, 2026-11-06:
    `grep -rn "doc/ai/reference" DESIGN.md doc/guide` → 0; se una frase lo cita, passa alla
    data e a `git log`). Sostituire, mai accumulare.
    In CLAUDE.md una riga di modulo resta la domanda e il rimando: la data, il tipo nuovo,
