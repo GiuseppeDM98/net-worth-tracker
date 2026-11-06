@@ -2,7 +2,7 @@
 
 /**
  * The controller of a page's rows below `desktop:` (The Closed-Row Rule, since 2026-10-10;
- * AGENTS.md § Motion, doc/guide/hall-of-fame.md § Composizione mobile): which tile is open, what
+ * doc/guide/motion.md, doc/guide/hall-of-fame.md § Composizione mobile): which tile is open, what
  * the browser remembers, which failed read stays open, and the one `TileCollapse` object each
  * `Tile` receives.
  *
@@ -14,8 +14,8 @@
  *
  * TWO RULES OF ENGINEERING, both for the React Compiler:
  *   - `collapse(id)` answers the SAME object until that row's `open`, `mounted` or `failed` changes,
- *     or every tile re-renders on every tap. The cache is a state settled DURING render (AGENTS.md
- *     § Motion, pattern 3), never a ref read in render (`react-hooks/refs`).
+ *     or every tile re-renders on every tap. The cache is a state settled DURING render (AGENTS.md § React Compiler and the hooks rules,
+ *     pattern 3), never a ref read in render (`react-hooks/refs`).
  *   - a gesture handler is born once per id and holds NO render value that can go stale: it reads
  *     the memory from the store at EVENT time and knows only the key and the defaults it was born
  *     with — both constants of a page (pass a module-level `defaultOpen`: a literal array would be
@@ -199,7 +199,7 @@ export function useMobileSections({
   const openRows = rows.filter((id) => open.has(id));
   const eyebrows = Object.fromEntries(sections.map((section) => [section.id, section.eyebrow]));
 
-  // Pattern (3) of AGENTS.md § Motion: the cache settles during render, before any return.
+  // Pattern (3) of AGENTS.md § React Compiler and the hooks rules: the cache settles during render, before any return.
   const [rowsCache, setRowsCache] = useState<ReadonlyMap<string, CachedRow>>(() => new Map());
   const current = rebuildRows(rowsCache, { known, open, visited, failed, key, defaults: defaultOpen, setVisited, setDismissed });
   if (current !== rowsCache) setRowsCache(current);

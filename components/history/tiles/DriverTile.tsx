@@ -161,7 +161,7 @@ function PeriodRow({ model, open, onToggle }: { model: PeriodRowModel; open: boo
           {model.growthPct !== null && <span className="ml-1.5 text-[11px] font-normal">({signedPct(model.growthPct)})</span>}
         </span>
       </button>
-      {/* Rows expanding into sub-rows: the CSS grid-rows technique, `inert` while closed (AGENTS → Motion). */}
+      {/* Rows expanding into sub-rows: the CSS grid-rows technique, `inert` while closed (doc/guide/motion.md). */}
       <div id={panelId} className={cn('grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none', open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]')} inert={!open}>
         <div className="overflow-hidden">
           <Ledger parts={parts} />

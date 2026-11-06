@@ -583,7 +583,7 @@ La risposta è UN oggetto JSON con tre campi, in quest'ordine: `note`, `satisfie
 - **AGENTS.md § Accessibility** — touch targets ≥ 44px (the rows, the footer's buttons, the `Select`); each
   `ChoiceList` inside a `QuestionCard` takes the question's text as its `label` (the group's accessible name); the
   round's blocking sentence is the footer's `role="status"`; the skeleton carries `aria-busy="true"`.
-- **AGENTS.md § Motion (the React Compiler bullets)** — the reducers are pure; no `try … finally` and no `throw`
+- **AGENTS.md § React Compiler and the hooks rules** — the reducers are pure; no `try … finally` and no `throw`
   inside a `try` in a component or hook (promise chains); the card list keyed by `question.id` (unique by the parser);
   the `ChoiceList` name from `useId()`, so two cards never share a radio group.
 - **`askedAt` crosses JSON** (SSE, localStorage, the request body) — every reader parses a round with
@@ -812,7 +812,7 @@ ricerca» for whoever wants the old path.
 
 ```
 Leggi WORKFLOW.md, AGENTS.md (§ Allocazione › Consulente, § Assistant · Assistente, § React Query and Derived State,
-§ Motion — i punti del React Compiler, § Accessibility, § Commands), DESIGN.md § 5 «AI Surfaces» (The AI-Accent
+§ React Compiler and the hooks rules, § Accessibility, § Commands), doc/guide/motion.md, DESIGN.md § 5 «AI Surfaces» (The AI-Accent
 Rule, The Question-Card Rule, The Path-Scene Rule), doc/guide/consulente.md, doc/guide/e2e-emulatori.md,
 doc/ai/README.md § 3-4-7-8, doc/ai/AI-04-colloquio.md e i diff di AI-01, AI-02 e AI-03 (sono in develop). Node 24
 (`node -v`): un gate su un'altra versione non vale. Implementa AI-04 così com'è scritta: questionSet.ts e

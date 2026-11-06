@@ -464,7 +464,7 @@ export function TransactionFeed({
   const sliced = useMemo(() => transactions.slice(0, effectiveShowCount), [transactions, effectiveShowCount]);
 
   // Once per saved row: the focus lands on its button the first time the row is in the list. A
-  // ref, not state — the effect only focuses, it never re-renders (AGENTS.md § Motion).
+  // ref, not state — the effect only focuses, it never re-renders (AGENTS.md § React Compiler and the hooks rules).
   const focusedRowId = useRef<string | null>(null);
   useEffect(() => {
     if (!focusRowId || focusedRowId.current === focusRowId) return;

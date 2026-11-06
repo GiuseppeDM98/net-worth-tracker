@@ -473,7 +473,7 @@ export const AI_CONTROL_ACCENT_CLASS = 'hover:shadow-[0_0_14px_var(--ai-glow)] f
 
 ## 5. Constraints and traps (AGENTS.md / DESIGN.md rules, «here it means that»)
 
-- **AGENTS.md § Motion, with its React Compiler bullets** — here it means the `AnimatePresence` child is keyed and
+- **doc/guide/motion.md and AGENTS.md § React Compiler and the hooks rules** — here it means the `AnimatePresence` child is keyed and
   pure, `direction` is state, the refs are read in callbacks only, `useReducedMotion()` is called once per component,
   no CSS media query for motion, the new hooks sit before the early returns of the Wizard (:185) and of the report
   (:154); `reactCompilerCoverage` is the gate.
@@ -755,7 +755,7 @@ RTL harness`; PR to `develop`, its preview opened by the owner for phase F. No f
 ## 11. The prompt that implements it
 
 ```
-Leggi WORKFLOW.md, AGENTS.md (§ Motion, con i punti sul React Compiler; § Accessibility; § Tailwind Breakpoints;
+Leggi WORKFLOW.md, doc/guide/motion.md, AGENTS.md (§ React Compiler and the hooks rules; § Accessibility; § Tailwind Breakpoints;
 § Browser-Driven E2E; § Commands), DESIGN.md § 1 e § 5 «AI Surfaces» (The AI-Accent Rule, The Path-Scene Rule),
 doc/guide/consulente.md, doc/guide/compravendita.md, doc/guide/e2e-emulatori.md (§ Browser-Driven E2E),
 doc/guide/dipendenze.md (§ How an upgrade is done, § Registro), doc/ai/README.md § 3, § 6, § 7, § 8 e

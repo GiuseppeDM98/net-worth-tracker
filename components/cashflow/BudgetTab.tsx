@@ -181,7 +181,7 @@ export function BudgetTab({ categories, categoriesLoading, categoriesFailed, his
   const openerRef = useRef<HTMLElement | null>(null);
 
   // «Salvato» is a confirmation and fades after a moment; the next save shows it again. The
-  // dismissal is settled during render on the status it belongs to (AGENTS.md → Motion,
+  // dismissal is settled during render on the status it belongs to (AGENTS.md § React Compiler and the hooks rules,
   // `react-hooks/set-state-in-effect`), and the timer lives in its own effect.
   const [savedDismissed, setSavedDismissed] = useState(false);
   const [prevSaveStatus, setPrevSaveStatus] = useState<BudgetSaveStatus>(budget.saveStatus);

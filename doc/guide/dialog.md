@@ -133,7 +133,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 ## Dialog Form Reset
 - The reset `useEffect` must include `open` in its deps and start with `if (!open) return`. It holds ONLY the
   react-hook-form calls (`reset`, `setValue`, `replaceTiers`); every `useState` setter of the dialog's own UI state
-  (step, status, toggles, a selected id) is settled during render, keyed on `(open, record)` — see AGENTS.md § Motion →
+  (step, status, toggles, a selected id) is settled during render, keyed on `(open, record)` — see AGENTS.md § React Compiler and the hooks rules →
   `react-hooks/set-state-in-effect` (2026-09-06).
 - The new-record branch must enumerate **every** field, optional ones included, and call `replaceTiers([])` — `reset()`
   does not clear field arrays.

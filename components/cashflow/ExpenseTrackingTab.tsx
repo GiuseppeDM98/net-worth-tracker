@@ -419,7 +419,7 @@ export function ExpenseTrackingTab({
   // A link arriving from Divisione changes `?owner=` without remounting this tab (it is
   // `forceMount`), so the initializer above would never run again. Settled DURING render on the
   // param as its subject — never `useEffect + setState`, which would paint one frame of the old
-  // filter (AGENTS.md § Motion → react-hooks/set-state-in-effect, answer 3).
+  // filter (AGENTS.md § React Compiler and the hooks rules → react-hooks/set-state-in-effect, answer 3).
   const [ownerParamSeen, setOwnerParamSeen] = useState<string | null | undefined>(initialOwnerId);
   if (ownerParamSeen !== initialOwnerId) {
     setOwnerParamSeen(initialOwnerId);

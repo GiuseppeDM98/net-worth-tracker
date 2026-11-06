@@ -1,6 +1,6 @@
 /**
  * The small-screen composition, on its sample page (since 2026-10-10; the rules in
- * doc/guide/hall-of-fame.md § Composizione mobile and AGENTS.md § Motion): Hall of Fame at 390,
+ * doc/guide/hall-of-fame.md § Composizione mobile and doc/guide/motion.md): Hall of Fame at 390,
  * on the `hof` fixture (`scripts/seedHallOfFameE2E.mts`: 47 snapshots, best month marzo 2024,
  * income record dicembre 2025 at 6900 €, savings record the same month at +3700 €, running month
  * settembre 2026 fourth).

@@ -12,7 +12,7 @@
  *
  * On 2026-10-05, when the compiler was turned on, the first run found 48 skipped functions, the settings, Cashflow,
  * Rendimenti, Patrimonio and Panoramica pages among them; each was rewritten without changing
- * behaviour, and the ways to do it are in AGENTS.md § Motion. Seen red that day with a
+ * behaviour, and the ways to do it are in AGENTS.md § React Compiler and the hooks rules. Seen red that day with a
  * `try … finally` put back in a component, and with an `eslint-disable-next-line
  * react-hooks/exhaustive-deps`.
  *
