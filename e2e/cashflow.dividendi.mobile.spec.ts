@@ -75,8 +75,12 @@ test('an announced coupon is chipped «Attesa» in the row, the totals and the c
   await drawer.getByRole('button', { name: 'Registra pagamento', exact: true }).click();
   await expect(status).toHaveText('Mancano 4 campi: Strumento, Importo lordo, Ritenuta e Unità.');
 
-  await drawer.locator('#assetId').fill('BTP');
-  await drawer.getByRole('button', { name: /BTP - BTP Valore 2030/ }).click();
+  // The instrument picker is a sheet on a phone (2026-11-06, doc/guide/dialog.md): open it, search, pick.
+  await drawer.locator('#assetId').click();
+  const picker = page.getByRole('dialog', { name: 'Strumento' });
+  await picker.getByRole('textbox', { name: 'Cerca strumento' }).fill('BTP');
+  await picker.getByRole('button', { name: /BTP - BTP Valore 2030/ }).click();
+  await expect(picker).toBeHidden();
   await drawer.locator('#grossAmountPerShare').fill('6.5');
   await expect(drawer.locator('#withholdingTax')).toHaveValue('0.8125');
   await drawer.locator('#exDate').fill(isoDaysFromNow(18));

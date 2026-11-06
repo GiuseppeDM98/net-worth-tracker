@@ -23,6 +23,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, type RefObject } from 'react';
+import { NO_AUTOFILL_ATTRIBUTES } from '@/components/ui/autofill';
 import { useForm, Controller, useWatch, type FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -396,6 +397,7 @@ export function DividendDialog({ open, onClose, dividend, onSuccess, returnFocus
     >
       <form
         id={DIVIDEND_FORM_ID}
+        autoComplete="off"
         onSubmit={handleSubmit(onSubmit, onInvalid)}
         // An edit after a refusal clears it: the next submit names only what is still missing.
         onChange={() => status.phase === 'error' && setStatus({ phase: 'idle' })}
@@ -411,6 +413,7 @@ export function DividendDialog({ open, onClose, dividend, onSuccess, returnFocus
             render={({ field }) => (
               <SearchableCombobox
                 id="assetId"
+                label="Strumento"
                 options={options}
                 value={field.value || ''}
                 onValueChange={(value) => {
@@ -623,6 +626,7 @@ export function DividendDialog({ open, onClose, dividend, onSuccess, returnFocus
           </Label>
           <textarea
             id="notes"
+            {...NO_AUTOFILL_ATTRIBUTES}
             {...register('notes')}
             placeholder="es. dividendo del quarto trimestre"
             className="min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:text-sm"

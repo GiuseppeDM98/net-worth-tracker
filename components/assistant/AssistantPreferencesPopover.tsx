@@ -34,7 +34,7 @@ export function AssistantPreferencesPopover({
   const controlsDisabled = isLoading || isPending || disabled;
 
   return (
-    <Popover>
+    <Popover sheet>
       <PopoverTrigger asChild>
         <Button
           variant="ghost"

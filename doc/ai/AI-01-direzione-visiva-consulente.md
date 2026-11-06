@@ -1,7 +1,7 @@
 # AI-01 — The visual direction
 
-> Series `doc/ai/` (README.md § 5). **Runs after AI-00 is merged into `develop`** (the numeric order of README.md
-> § 5), though it uses nothing of AI-00's diff; AI-03, AI-04, AI-05 and AI-06 depend on it. Written on 2026-11-01 from
+> Series `doc/ai/` (README.md § 5). **Runs after AI-00** (retired on 2026-11-03, in develop since 2026-11-03, PR #497; the numeric order of README.md
+> § 5), though it uses nothing of its diff; AI-03, AI-04, AI-05 and AI-06 depend on it. Written on 2026-11-01 from
 > `develop` @ b9411a4d. Executes decision 3 (the concepts in a spec of their own), decision 14 (the Consulente's
 > scope: path, interview, run, report), decision 15 (`--ai-accent` on the AI surfaces) and decision 26 (the Assistente
 > page, in register mode and in one analysis mode, is drawn too). **No app code changes in this session**: its

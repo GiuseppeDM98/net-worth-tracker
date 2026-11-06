@@ -1147,19 +1147,36 @@ export interface DebtRepaymentFieldFacts {
   split: { interest: number; principal: number } | null;
   /** «Estinzione anticipata» is ticked: the whole amount is principal. */
   isPayoff?: boolean;
+  /**
+   * The row's date is still to come: `split` is an ESTIMATE on today's debt, the exact figures
+   * are computed the day it settles (every earlier instalment lowers the debt first).
+   */
+  isScheduled?: boolean;
+  /**
+   * A row that already settled and that the form has not changed (the save's own `unchanged`,
+   * lib/utils/mortgageRepayment.ts → planDebtEdit): what it repaid THAT day, as stamped on it
+   * (`debtPrincipalRepaid` / `debtInterestPaid`), never a recomputation on today's debt — the
+   * interest of an October instalment was October's. `instalment` is then the row's amount.
+   */
+  settled?: { date: Date; principal: number; interest: number } | null;
 }
 
 /**
  * The line under «Riduce il debito di» on a `debt` row (lib/utils/mortgageRepayment.ts): that only
- * the PRINCIPAL lowers the debt, and how much of this instalment it is on today's debt — the
- * figure an owner can check against the bank's amortisation plan before saving. On a payoff the
- * whole amount is principal, and the debt it leaves is said.
+ * the PRINCIPAL lowers the debt, and how much of this instalment it is — on the debt of the day it
+ * settled when the row already did (owner, 2026-11-06: the line used to recompute every past
+ * instalment on today's debt), on today's debt when it is being typed, and declared an estimate
+ * when the row's date is still to come. The figure an owner can check against the bank's
+ * amortisation plan. On a payoff the whole amount is principal, and the debt it leaves is said.
  */
 export function describeDebtRepaymentField(facts: DebtRepaymentFieldFacts): string {
   if (!facts.loanName) {
     return 'Se è la rata di un mutuo o di un prestito, scegli il prestito: alla data della rata il suo debito scende della quota capitale.';
   }
   const eur = (value: number) => cachedFormatCurrencyEUR(value);
+  if (facts.settled) {
+    return describeSettledRepayment(facts.loanName, facts.settled, facts.instalment, facts.annualRatePct, facts.isPayoff === true, eur);
+  }
   if (facts.isPayoff) {
     if (facts.instalment === null || !facts.split) {
       return `Estinzione anticipata: alla data della voce il debito di ${facts.loanName} (${eur(facts.debt)}) scende di tutto l’importo. Una penale o gli interessi del periodo vanno nella commissione.`;
@@ -1172,10 +1189,41 @@ export function describeDebtRepaymentField(facts: DebtRepaymentFieldFacts): stri
   if (!facts.annualRatePct || facts.annualRatePct <= 0) {
     return `Alla data della rata il debito di ${facts.loanName} scende dell’intera rata: il prestito non ha un TAN (si imposta in Patrimonio).`;
   }
-  // A TAN prints with the decimals it was typed with («3,2%», «3,25%»), never a padded «3,20%».
-  const rate = new Intl.NumberFormat('it-IT', { style: 'percent', maximumFractionDigits: 3 }).format(facts.annualRatePct / 100);
+  const rate = formatTan(facts.annualRatePct);
   if (!facts.split || facts.instalment === null) {
     return `Alla data della rata il debito di ${facts.loanName} (${eur(facts.debt)}) scende della quota capitale, al TAN ${rate}.`;
   }
+  if (facts.isScheduled) {
+    return `Alla data della rata il debito di ${facts.loanName} scende della quota capitale, stimata sul debito di oggi: ${eur(facts.split.principal)} di ${eur(facts.instalment)}, il resto (${eur(facts.split.interest)}) sono interessi al TAN ${rate}; la cifra esatta si calcola quel giorno.`;
+  }
   return `Alla data della rata il debito di ${facts.loanName} scende della quota capitale: sul debito di oggi ${eur(facts.split.principal)} di ${eur(facts.instalment)}, il resto (${eur(facts.split.interest)}) sono interessi al TAN ${rate}.`;
+}
+
+/** A TAN prints with the decimals it was typed with («3,2%», «3,25%»), never a padded «3,20%». */
+function formatTan(annualRatePct: number): string {
+  return new Intl.NumberFormat('it-IT', { style: 'percent', maximumFractionDigits: 3 }).format(annualRatePct / 100);
+}
+
+/**
+ * The line of a row that already repaid its loan: the figures stamped on it that day, in the
+ * past tense. The amount is the row's (the `settled` branch is reached only while the form has
+ * not changed it); a payoff was all principal; a loan without a TAN took the whole instalment.
+ */
+function describeSettledRepayment(
+  loanName: string,
+  settled: { date: Date; principal: number; interest: number },
+  instalment: number | null,
+  annualRatePct: number | undefined,
+  isPayoff: boolean,
+  eur: (value: number) => string,
+): string {
+  const day = formatDate(settled.date);
+  if (isPayoff) {
+    return `Estinzione anticipata: il ${day} il debito di ${loanName} è sceso di ${eur(settled.principal)}. Una penale o gli interessi del periodo vanno nella commissione.`;
+  }
+  if (!annualRatePct || annualRatePct <= 0) {
+    return `Il ${day} il debito di ${loanName} è sceso dell’intera rata (${eur(settled.principal)}): il prestito non aveva un TAN.`;
+  }
+  const paid = instalment ?? settled.principal + settled.interest;
+  return `Il ${day} il debito di ${loanName} è sceso della quota capitale: ${eur(settled.principal)} di ${eur(paid)}, il resto (${eur(settled.interest)}) sono interessi al TAN ${formatTan(annualRatePct)}.`;
 }

@@ -7,6 +7,10 @@
 Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 - **Dialog e form trasversali**: `components/ui/{responsive-modal,modal-status-line}.tsx` (`ModalWidth` sm/md/lg/xl), `lib/utils/modalOrigin.ts` (`resolveCenteredModalOrigin`), `lib/utils/dialogNarrative.ts` (`describeFormRefusal`, `describeExpenseDeleteConsequence`, `describeSeriesDeleteReading`, `describeMovementDetailReading`, `describeMovementsFilterReading`, `describeSnapshotOverwrite`), `lib/hooks/useArmedDelete.ts`, `components/expenses/SeriesDeleteDialog.tsx` (`resolveSeriesDeleteMode` = the ONE rule for «solo questa o tutte?»), `lib/constants/aiModels.ts`; `components/layout/LogoutDialog.tsx` stays an `AlertDialog` — doc/guide/dialog.md
+- **Dropdowns as sheets, fields without autofill** (2026-11-06): `components/ui/popper-sheet.ts` (`usePopperSheet`, the
+  threshold), `app/globals.css` § Popper sheet, `components/ui/{select,dropdown-menu,popover}.tsx` (`data-popper-sheet`;
+  `Popover`'s `sheet` prop), `components/ui/searchable-combobox.tsx` (the drawer branch, `label`),
+  `components/ui/autofill.ts` + `components/ui/{input,textarea}.tsx`; tests `__tests__/fieldAutocomplete.test.ts`
 - **Two-step create dialogs and the reset rule** (moved here from `AGENTS.md` § 2 on 2026-10-10): `components/assets/AssetDialog.tsx`, `components/expenses/ExpenseDialog.tsx` (the `openSubject` reset during render in both); guard `e2e/assets.rows.spec.ts` «Nuovo after Modifica opens on step 1» (the test «AssetDialog leaves with its exit animation and gives the focus back to «Modifica»; «Aggiungi asset» then opens on step 1»)
 
 ## Dialog e form trasversali
@@ -16,6 +20,29 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
   `h-11` on a drawer, so writing «Annulla» then the primary in DOM order puts the primary on TOP on a phone.
 - **Four widths, and no others**: `sm` 420 · `md` 560 · `lg` 720 · `xl` 960. `dialogClassName` survives as an escape
   hatch and currently has no user; reach for a width name first.
+- **A dropdown below 769px is a bottom sheet** (owner, 2026-11-06: «every dropdown in a separate window on a phone»;
+  the modal's own threshold, `POPPER_SHEET_QUERY` in `components/ui/popper-sheet.ts`, so a dropdown inside a drawer is
+  always a sheet). Two mechanisms. The Radix poppers — every `Select`, every `DropdownMenu`, and a `Popover` whose root
+  passes `sheet` (the icon picker, the assistant's preferences; an informing popover like «Come si calcola» stays a
+  floating card) — KEEP their anatomy (keyboard, typeahead, focus return, dismiss on an outside press) and mark the
+  content `data-popper-sheet`: `app/globals.css` § Popper sheet re-pins Radix's popper wrapper to the bottom edge with
+  `!important` (the wrapper is positioned by inline styles), draws the backdrop as the wrapper's `::before`, animates the
+  rise and gives the rows 44px; the rules are unlayered on purpose, so they beat the content's own utilities. A `sheet`
+  Popover is also `modal`: inside a drawer the drawer's scroll lock would otherwise swallow the sheet's touch scroll
+  (the `MultiSelect` `forceDrawer` lesson). `SearchableCombobox` (categories, subcategories, the dividend's instrument,
+  the Storico month) is not a popper: below 769px its input becomes a `role="combobox"` button that opens a vaul
+  `Drawer` titled by its new required `label`, the search field at the top (NOT focused on open, like every drawer here)
+  and the same rows as the desktop list, 44px, `Aggiungi …` included; the rows stay plain buttons named by their label,
+  so a spec written for the desktop list (`getByRole('button', { name })`) drives the sheet too. A screenshot probe at
+  390 measured each sheet flush with the bottom edge and the viewport width on 2026-11-06.
+- **No autofill on the app's own fields** (owner, 2026-11-06; `components/ui/autofill.ts`): `Input` and `Textarea` spread
+  `NO_AUTOFILL_ATTRIBUTES` (`autoComplete="off"` + the 1Password / LastPass / Bitwarden opt-outs) BEFORE the caller's
+  props, a raw `<input>` that takes text or a raw `<textarea>` spreads them by hand, and every `<form>` outside /login
+  and /register carries `autoComplete="off"`; the auth fields keep their tokens (`email`, `current-password`,
+  `new-password`) because that is what a password manager reads. Standard attributes only — Chrome still autofills a
+  field it recognises as an address or a name, and the owner declined the non-standard token that silences it.
+  `__tests__/fieldAutocomplete.test.ts` renders the two primitives and scans app/ and components/ for a field or a
+  form without them (comments blanked first: a `<input type="date">` named in a doc comment is not a field).
 - **The reading IS the status line.** `describeModalStatus(status, copy)` returns the idle/submitting/error sentence
   and its tone; `ModalStatusLine` renders it as ONE stable node — `role="status" aria-live="polite"
   aria-atomic="true"` — that is also Radix's `Description`. Two traps, both already paid for on /login: the container

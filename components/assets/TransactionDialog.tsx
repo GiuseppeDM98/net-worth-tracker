@@ -539,7 +539,7 @@ export function TransactionDialog({ open, onClose, asset, transaction }: Transac
       width="md"
       footer={footer}
     >
-      <form id={formId} onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <form id={formId} autoComplete="off" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         {/* Type selector — segmented pill (DESIGN.md Variant B). Disabled in edit; locked for baseline. */}
         <div
           role="radiogroup"

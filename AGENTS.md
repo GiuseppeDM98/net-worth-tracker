@@ -526,6 +526,11 @@ file used to carry.
   `alert`); `describeWriteError` (`lib/utils/dialogNarrative.ts`) is the ONE translation of a failed write.
 - Two-click confirms live in `lib/hooks/useArmedDelete.ts`: no timer, ever; Escape while armed means DISARM
   (`hasArmedConfirm()`). The two form rules stay here: § Dialog Form Reset, § Two-Step Create Dialogs.
+- **Below 769px every dropdown is a bottom sheet** (2026-11-06, `components/ui/popper-sheet.ts` + `app/globals.css`
+  § Popper sheet): a Radix `Select`/`DropdownMenu` and a `<Popover sheet>` keep their anatomy and are re-pinned by CSS;
+  `SearchableCombobox` opens a vaul `Drawer` titled by its `label`. **No autofill on the app's fields**
+  (`components/ui/autofill.ts`): `Input`/`Textarea` spread `NO_AUTOFILL_ATTRIBUTES`, a raw field spreads them by hand,
+  every non-auth form is `autoComplete="off"` — held by `__tests__/fieldAutocomplete.test.ts`.
 - A controlled modal with no Radix `Trigger` drops focus on `body` when it closes; since 2026-10-08 `ResponsiveModal`
   restores the element focused at open (every keyboard opener; pinned by `e2e/pension.spec.ts`), and a host whose opener
   never held the focus (Safari's click, a non-focusable row) still passes `returnFocusTo`, taken from `event.currentTarget`
@@ -552,6 +557,11 @@ file used to carry.
   `assertCanAccessAccount` on Admin routes, the client substituting `ownerId`. Rules changes are inert until deployed.
 - Il resto — l'auto-login dalla landing, dove resta `user.uid`, `memberUids` e la discovery, il banner demo, le rules
   per collezione, lo switcher in Sidebar E `SecondaryMenuDrawer` — in `doc/guide/account-condiviso-demo.md`.
+
+### Dependencies → `doc/guide/dipendenze.md`
+- `npm audit --json` is compared with the guide's § Registro at every session start (WORKFLOW.md rule 8).
+- Never `npm audit fix`; an upgrade is its own session, one group at a time, undone by copy + `npm ci`, never `git checkout`.
+- The gate and the acceptance filter live in the guide's § How an upgrade is done (2026-11-03).
 
 ### Color Theme System → `doc/guide/temi.md`
 - **Parallel theming**: next-themes owns `.dark`, the custom system owns `data-theme` (an external store, 2026-09-06).
@@ -800,6 +810,7 @@ file used to carry.
 > guided-verification protocol — live in **WORKFLOW.md**.
 
 ### Commands
+- **The dependency gate** (Node 24 first, the whole list): `doc/guide/dipendenze.md` § How an upgrade is done (2026-11-03).
 - **Phantom errors after a branch switch are a stale `node_modules`** (untracked, branch-shared): ~25 `tsc` errors
   clustered in `e2e/` and `lib/utils/expenseImport.ts` (`papaparse`, `@playwright/test` missing), or `next build`'s
   «Failed to resolve package babel-plugin-react-compiler» (2026-10-07) — `npm install` first, then put back any lock
