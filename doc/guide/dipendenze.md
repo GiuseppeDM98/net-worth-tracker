@@ -10,8 +10,8 @@
 
 | | |
 | --- | --- |
-| **Last audit** | 2026-11-03 (`npm audit --json`, on the lock of 5db48808) |
-| **Result** | **41 advisories**: 9 high · 32 moderate, no critical, no low (54 before the upgrade) |
+| **Last audit** | 2026-11-06 (`npm audit --json`, on the lock of 5db48808, unchanged since 2026-11-03) |
+| **Result** | **32 advisories**: 9 high · 23 moderate, no critical, no low (41 on 2026-11-03 on the same lock — nine moderate rows of the eslint and `firebase-tools` chains left the registry's advisories; 54 before the upgrade) |
 | **Frameworks** | Next.js `^16.4.2` · React 19 (compiler on) · firebase `^12.5.0` (12.19.0) · firebase-admin `^14.5.0` · zod `^4.6.7` · `@anthropic-ai/sdk` `^0.115.0` · storybook `^10.6.5` · firebase-tools `^15.24.0` (15.33.0) · vitest `^4.1.12` |
 | **Node** | 24.x (`engines.node`, held by `__tests__/vercelConfig.test.ts`) |
 | **Next step** | none open: the next audit opens the next session (WORKFLOW.md rule 8) |

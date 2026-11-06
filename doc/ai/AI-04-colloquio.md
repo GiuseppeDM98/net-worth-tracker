@@ -1,11 +1,12 @@
 # AI-04 — The interview: the critical friend before the strategy
 
-> Series `doc/ai/` (README.md § 5): **depends on AI-01** (The Question-Card Rule, The AI-Accent Rule), **AI-02** (the
+> Series `doc/ai/` (README.md § 5): **depends on AI-01 (retired on 2026-11-06, in develop since 2026-11-06, PR #503): The Question-Card Rule, The AI-Accent Rule), **AI-02** (the
 > cashflow block the interview reads, the prompt builders' options object) **and AI-03** (`ChoiceList`, `PathRail`
 > with its `interview` prop, `Tile`'s `generated`, the component-test harness of decision 21); **AI-06 depends on it**
 > (`lib/utils/questionSet.ts`, `QuestionCard`). Written on 2026-11-01 from `develop` @ b9411a4d. Executes decisions 4,
-> 6, 8 and the adopted choices A1–A6, A22. If the owner's concept choice in AI-01 is not B for the Consulente, the
-> AI-01 session rewrites criterion 10 and its tests from the chosen concept (decision 37). Read adversarially on
+> 6, 8 and the adopted choices A1–A6, A22. The Consulente's concept is B «La scena» (decision 74, 2026-11-06; the
+> conditional of decision 37 settled); criteria 9–11 and § 4 rewritten on 2026-11-06 at AI-01's retirement (decisions
+> 78, 79), to be reread there. Read adversarially on
 > 2026-11-01: 35 findings applied, the decisions 21–73 in README.md § 3 (this spec: decisions 4, 6, 8, 21, 22, 23, 24,
 > 33, 34, 36, 37, 38, 39, 49, 53, 54, 55, 56, 57).
 
@@ -142,7 +143,8 @@ one round about the written request. Each criterion: statement · proof · the m
    document's `updatedAt` dropped; one newer kept; one with zero rounds dropped; with no document kept). Mutation: keep
    every stored interview → the failed-document case fails.
 9. **The report shows «Il colloquio»** (A6, decision 53): `ConsulenteInterviewTile({ interview })` (no hooks), a
-   `Tile` with `generated` (decision 49), placed after the text tile («Il report», or «La strategia» without a report)
+   `Tile` WITHOUT `generated` — it recaps the user's own answers, the third exception of DESIGN.md → The AI-Accent
+   Rule (decision 79, 2026-11-06) —, placed after the text tile («Il report», or «La strategia» without a report)
    and before «Chiedi una modifica». Per round a sub-eyebrow «Tornata i», the `note`, each question with its answer
    (`describeAnswer`, «non risposta» when absent, «nessuna domanda» for a round without questions); `aside` «1 tornata»
    or «N tornate», followed by « · saltato» when skipped; no tile with zero rounds or `interview: null`. Proof:
@@ -150,11 +152,12 @@ one round about the written request. Each criterion: statement · proof · the m
    in § 6). Mutation: render the tile for zero rounds → the empty-render assertion fails.
 10. **The rail lights the interview** (AI-03's `PathRail` `interview` prop, AI-03-Q1): the Wizard passes
     `interview={{ total: 3, reached: null }}` on the eight screens (three dimmed ticks, `aria-hidden`) and
-    `interview={{ total: 3, reached: N }}` on the scene, N the round shown or being asked; the scene's eyebrow
+    `interview={{ total: 3, reached: N }}` on the scene, N the round shown or being asked, the reached tick and the ones before it lit in `--ai-accent` (DESIGN.md → The
+    Path-Scene Rule; decision 78); the scene's eyebrow
     «Colloquio · tornata N di 3» is its only `TILE_EYEBROW_CLASS` (decision 57). Proof: E2E — on the summary
     `getByRole('list', { name: 'Il colloquio' })` has count 0; on round 2 it is visible and its second item has
-    `aria-current="step"`. Mutation: pass `reached: null` on the scene → the round-2 assertion fails.
-11. **`QuestionCard` obeys The Question-Card Rule** (AI-01; decisions 38, 54, 55, 57):
+    `aria-current="step"` and the class `bg-[color:var(--ai-accent)]`. Mutation: pass `reached: null` on the scene → the round-2 assertion fails.
+11. **`QuestionCard` obeys The Question-Card Rule** (DESIGN.md § 5 → AI Surfaces, 2026-11-06; decisions 38, 54, 55, 57):
     `components/ui/question-card.tsx`, never `bg-card` — a `rounded-xl` block with the 1px `--ai-accent` border and the
     glow only on hover and focus-visible (decision 36) — and NO button inside. The eyebrow «Il Consulente chiede · i di
     n» is a `TILE_SUB_EYEBROW_CLASS` in the AI accent; then `text`, `why`, and a `ChoiceList` whose `label` is the
@@ -213,7 +216,7 @@ one round about the written request. Each criterion: statement · proof · the m
   («Altro…» always), **55** (exclusive «Altro…» and «Preferisco non dire» in a multiple question), **56** (the waiting
   skeleton), **57** (one `TILE_EYEBROW`, the cards' sub-eyebrow), **21** (component tests in `.test.tsx` with React
   Testing Library, hook tests with `renderHook`), **36** (the AI accent on hover and focus-visible), **39** (the real
-  key enables the controls, the route always faked), **49** (`generated` on «Il colloquio»), **33** (every gate on Node
+  key enables the controls, the route always faked), **49** as amended by **79** (no `generated` on «Il colloquio»), **33** (every gate on Node
   24), **34** (the § 11 prompt in Italian), **37** (the header's conditional), **22** (§ 10 lists only what is
   definitive).
 - **A1** (client-held until the strategy), **A2** (12 an hour), **A3** (skip always), **A4** (the strategy's data plus
@@ -517,7 +520,7 @@ La risposta è UN oggetto JSON con tre campi, in quest'ordine: `note`, `satisfie
   boolean /* default true */; otherSelect?: { label: string; items: readonly { id: string; name: string }[] } }):
   React.JSX.Element`. It renders, inside a `rounded-xl` block (`border border-[var(--ai-accent)]`, the hover and
   focus-visible glow of The AI-Accent Rule, `p-4 desktop:p-5`): the eyebrow (`eyebrow ?? «Il Consulente chiede ·
-  {index} di {total}»`, `TILE_SUB_EYEBROW_CLASS` in the AI accent), `text` (16px, 17px at `desktop:`), `why` (13px
+  {index} di {total}»`, `TILE_SUB_EYEBROW_CLASS` in the AI accent), `text` (16px below `desktop:` and 20px from it, weight 500 — The Question-Card Rule), `why` (13px
   muted) and a `ChoiceList` with `name` from `useId()` plus `question.id`, `label = question.text`, `mode =
   question.kind`, and `options` = `withDeclineOption(question).options` (only when `decline`) with the «Altro…» row
   (`QUESTION_OTHER_VALUE`, only with `allowOther`) inserted before «Preferisco non dire»; both reserved rows carry
@@ -532,21 +535,22 @@ La risposta è UN oggetto JSON con tre campi, in quest'ordine: `note`, `satisfie
   `draft.step` is the summary and `draft.phase === 'interview'`, inside the path's 720px `TILE_SURFACE_CLASS` card
   (the cards stack `gap-4` in it, no card within a card) as one more scene of AI-03's (`data-scene="interview"`, the
   enter from the summary and the exit back to it as AI-03's scenes; a new round replaces the cards inside the same
-  scene, the cards entering per AI-01's motion table). Top to bottom: `PathRail` (criterion 10); the eyebrow
+  scene, the cards entering with `cardEnterVariants` of AI-03's `motionVariants.ts`, the motion table's «Question card, entering»). Top to bottom: `PathRail` (criterion 10); the eyebrow
   «Colloquio · tornata N di 3»; the headline = the last round's `note` («Il Consulente legge le tue risposte e i tuoi
   dati.» before round 1 arrives); while asking the skeleton (criterion 14); otherwise the last round's
   `QuestionCard`s, keyed by `question.id`; the footer: «Indietro» (→ `{ type: 'phase', phase: 'path' }`, the summary,
   the rounds kept; disabled while asking), the secondary «Salta il colloquio», the primary «Continua» while
   `canRequestRound`, «Avvia la ricerca» otherwise, «Riprova» after a failed round, disabled while
   `describeInterviewBlock` speaks (its sentence in the footer's `role="status"`) or a round is asked. The controls
-  that call the model — «Continua», «Avvia la ricerca», «Riprova», «Salta il colloquio» (it starts the strategy) —
-  take the AI accent on hover and focus-visible only (decision 36).
+  that call the model — «Continua», «Avvia la ricerca», «Riprova» — take the AI accent on hover and focus-visible
+  only (decision 36); «Salta il colloquio» never, though it starts the strategy (DESIGN.md → The AI-Accent Rule's
+  «Never accented»; decision 78).
 - `ConsulenteWizard.tsx`: the summary's footer — with no round, the primary «Avvia il colloquio» (dispatches
   `{ type: 'phase', phase: 'interview' }` and requests round 1 from the click) and the secondary «Salta il colloquio e
   avvia la ricerca» (`run.start(answers, 'strategy', { rounds: [], skipped: true })`); with rounds, the primary «Torna
   al colloquio» (the scene, no request) and the secondary «Ricomincia il colloquio» (`{ type: 'interview', action:
   { type: 'reset' } }`); all four disabled without the key, the primary reading «Servizio AI non configurato».
-  «Avvia il colloquio» and «Salta il colloquio e avvia la ricerca» take the hover accent (decision 36). «Continua»
+  «Avvia il colloquio» takes the hover accent (decision 36); «Salta il colloquio e avvia la ricerca» does not (decision 78). «Continua»
   requests `{ answers, interview: draft.interview }` and dispatches the received round; «Salta il colloquio» calls
   `abort()`, dispatches `{ type: 'interview', action: { type: 'skip' } }` and starts `run.start(answers, 'strategy',
   interviewReducer(interview, { type: 'skip' }))`; «Avvia la ricerca» starts `run.start(answers, 'strategy',
@@ -558,7 +562,7 @@ La risposta è UN oggetto JSON con tre campi, in quest'ordine: `note`, `satisfie
   `useConsulenteInterview` for criterion 13: «Rivedi il report» → the round (the textarea read-only, the skeleton,
   «Salta le domande» enabled) → the `QuestionCard`s under the round's `note` and «Rivedi il report» again; under the
   last request of the list, `document.revisionInterview`'s round (a sub-eyebrow «Il Consulente ha chiesto» in the AI
-  accent, each question with its answer). «Rivedi il report», «Riprova» and «Salta le domande» take the hover accent.
+  accent, each question with its answer). «Rivedi il report» and «Riprova» take the hover accent; «Salta le domande» does not (decision 78).
 - `ConsulenteReport.tsx`: `ConsulenteInterviewTile` placed per criterion 9; `ConsulenteRevisionTile` in place of the
   inline tile.
 
@@ -601,7 +605,7 @@ La risposta è UN oggetto JSON con tre campi, in quest'ordine: `note`, `satisfie
   «Salta il colloquio» still starts the strategy, which takes a slot too.
 - **A shared-account viewer** — as the strategy: `assertCanAccessAccount`, the rate limit keyed by `ownerId`, the draft
   keyed by `ownerId` on this browser.
-- **Reduced motion** — the cards enter per AI-01's motion table: no translate under reduced motion.
+- **Reduced motion** — the cards enter per the motion table of DESIGN.md § 5 → AI Surfaces: no translate under reduced motion, the card appears.
 - **E2E: a probe never spends** (decision 39) — `/api/allocation-advice/run` is faked in every spec with ONE
   `page.route` handler that reads `request.postDataJSON().stage`: `interview` answers the scripted round
   (`data: {"type":"interview","round":…}`), `strategy` and `revise` record the body and answer `{ type: 'error',
@@ -671,7 +675,7 @@ La risposta è UN oggetto JSON con tre campi, in quest'ordine: `note`, `satisfie
   `bg-card`. Mutations: criterion 11's.
 - `__tests__/consulenteInterviewTile.test.tsx` (new, React Testing Library): heading «Il colloquio», aside «2
   tornate», «1 tornata», «2 tornate · saltato»; a decline shows «Preferisco non dire», an «Altro» answer «Altro: …», a
-  missing answer «non risposta»; `data-generated` on the tile; zero rounds and `null` render nothing. Mutation:
+  missing answer «non risposta»; no `data-generated` on the tile (decision 79); zero rounds and `null` render nothing. Mutation:
   «tornate» hard-coded → the «1 tornata» case fails.
 - `__tests__/useConsulenteRun.test.tsx` (new, `renderHook` with a `QueryClientProvider` wrapper,
   `@/lib/utils/authFetch` mocked): criterion 15.
@@ -814,7 +818,7 @@ ricerca» for whoever wants the old path.
 Leggi WORKFLOW.md, AGENTS.md (§ Allocazione › Consulente, § Assistant · Assistente, § React Query and Derived State,
 § React Compiler and the hooks rules, § Accessibility, § Commands), doc/guide/motion.md, DESIGN.md § 5 «AI Surfaces» (The AI-Accent
 Rule, The Question-Card Rule, The Path-Scene Rule), doc/guide/consulente.md, doc/guide/e2e-emulatori.md,
-doc/ai/README.md § 3-4-7-8, doc/ai/AI-04-colloquio.md e i diff di AI-01, AI-02 e AI-03 (sono in develop). Node 24
+doc/ai/README.md § 3-4-7-8, doc/ai/AI-04-colloquio.md e i diff di AI-02 e AI-03 (sono in develop). Node 24
 (`node -v`): un gate su un'altra versione non vale. Implementa AI-04 così com'è scritta: questionSet.ts e
 question-card.tsx con i contratti della § 4 (identici: li usa AI-06); la richiesta `stage: 'interview'` della route,
 che chiama runInterviewRound e MAI runAllocationAdviceStage, senza scritture su allocationAdvice/{uid};
@@ -825,8 +829,8 @@ chiamate); il rate limit a 12. Test: le suite della § 6 — questionSet, alloca
 allocationAdviceProposal, allocationAdvicePrompts, allocationAdviceRun, allocationAdviceRoutes,
 allocationAdviceDocument, allocationAdviceDraft, i .test.tsx questionCard, consulenteInterviewTile, useConsulenteRun,
 useConsulenteInterview, e reactCompilerCoverage — Vitest in entrambe le zone, le spec Playwright con la route SEMPRE
-finta. Fermati e chiedimi se: la scelta del concetto di AI-01 non è B e il criterio 10 non è stato riscritto
-(decisione 37); un contratto di AI-01, AI-02 o AI-03 nel codice differisce da quello citato nella § 4; una suite verde
+finta. Fermati e chiedimi se: un contratto di AI-02 o AI-03 nel codice, o una regola di DESIGN.md § 5 «AI Surfaces»,
+differisce da quello citato nella § 4; una suite verde
 prima di te diventa rossa per un motivo fuori da questa spec. Collaudo: § 7; la corsa vera una volta, sul mirror, al
 mio «pronto». Un branch, un commit, solo dopo il mio OK con il riassunto del diff. SESSION_NOTES.md non si committa.
 ```

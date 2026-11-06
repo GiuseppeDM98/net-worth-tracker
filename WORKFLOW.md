@@ -320,6 +320,9 @@ The app **is** locally runnable; there is no fallback to declare.
   page inside its body, so a text colour declared on `html` is overridden for every descendant and a dark page shows
   black on black — Playwright on `file://` never shows it. A page meant for an Artifact sets `background` AND `color`
   on `body` (the page contract asks for the background alone).
+- **`impeccable detect` runs its `design-system-*` checks only on a file inside the repo root** (2026-11-06, the
+  retirement of AI-01): a copy in the scratchpad reports 0 for that family while `low-contrast` still fires, so a
+  probe page (a light copy, a themes sheet) goes in the repo root as `.tmp-*.html` and is deleted before the commit.
 
 ### Where things are recorded
 

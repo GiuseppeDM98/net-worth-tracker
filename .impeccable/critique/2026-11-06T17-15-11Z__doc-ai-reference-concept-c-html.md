@@ -35,7 +35,7 @@ Target: `doc/ai/reference/concept-c.html` — Concetto C «Il colloquio» (AI-01
 
 Copy and data are written for this product (euro losses on 60.000 €, «le risposte restano in questo browser», «Fondo pensione: negoziabile → non negoziabile», «3 scritture · nessuno eliminato»). The form could belong to any AI chat: offset «Tu» bubbles, author eyebrows, three pulsing dots, a send arrow. What ties it to the house is the tile shell. The direction holds for the interview and the run, which really are model turns; less for the eight fixed screens and the report, where dressing a wizard and a long-lived plan as messages costs navigation, version clarity and accent truthfulness.
 
-Detector (Assessment B, exit 2 both modes): `low-contrast` 0, `design-system-*` 0, `cramped-padding` 0. Advisory families only: `undersized-ui-text` 49 (38 at 10px, 11 at 9px — the app's eyebrow and meta sizes), `tiny-text` 14, `overused-font` 2 (Geist), `ai-color-palette` 5 in light only (flat `--ai-accent` text), `pulsing-dot` 1 (the streaming «sta scrivendo» indicator, `role="status"`, static under reduced motion — the case the rule allows). All classified false positives or sanctioned by AI-01 § 5.
+Detector (Assessment B, exit 2 both modes): `low-contrast` 0, `design-system-*` 0, `cramped-padding` 0. Advisory families only: `undersized-ui-text` 49 (38 at 10px, 11 at 9px — the app's eyebrow and meta sizes), `tiny-text` 14, `overused-font` 2 (Geist), `ai-color-palette` 5 in light only (flat `--ai-accent` text), `pulsing-dot` 1 (the streaming «sta scrivendo» indicator, `role="status"`, static under reduced motion — the case the rule allows). All classified false positives or advisory (on the AI-01 mocks, 2026-11-06, only `low-contrast` and `design-system-*` were criteria; the advisory families come from the app's own type system).
 
 ## Strengths
 
@@ -78,4 +78,4 @@ Detector (Assessment B, exit 2 both modes): `low-contrast` 0, `design-system-*` 
 2. A plan the user lives with until May 2027: should it live inside a message, or should the conversation live inside the plan?
 3. Consulente and Assistente both speak in violet on the same grid with the same composer: how does the user know which one is accountable for a number? If it does not matter, should the Consulente be a mode of the Assistente?
 
-Questions skipped: deferred to the session's single AskUserQuestion (AI-01 decision 37: no question before the mocks, one question after them).
+Questions skipped: deferred to the session's single AskUserQuestion (the session's rule of 2026-11-06: no question before the mocks, one question after them).

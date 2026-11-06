@@ -276,7 +276,7 @@ Moved here from `CLAUDE.md` → *Key Files* on 2026-09-19.
 
 The whole page follows DESIGN.md § 5 → «AI Surfaces», concept B «La scena» (chosen on 2026-11-06, decision 74 of
 doc/ai/README.md): **The AI-Accent Rule** (the accent on the «Assistente» sub-eyebrow of a model's message, on
-proposal and question cards, and on the hover of «Invia messaggio», «Registra», «Rispondi» and the suggestion rows;
+proposal and question cards, and on the hover of «Invia messaggio», «Registra», «Rigenera», «Rispondi» and the suggestion rows;
 never on the verdict, the companion column, the thread list or the user's messages), **The Question-Card Rule** (the
 cards inside a message, ONE «Rispondi» under the last) and the paragraph «The Assistente page» (the conversation stays
 still, the companion column's content slides with the mode). The code follows it from the Registra mode on (AI-05).

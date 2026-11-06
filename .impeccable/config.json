@@ -54,7 +54,7 @@
           "doc/ai/reference/concept-c.html"
         ],
         "createdAt": "2026-11-06T17:51:01.290Z",
-        "reason": "AI-01 static mocks (2026-11-06): the 9/10px strings are the app's own tile eyebrow and sub-eyebrow tiers; AI-01 § 5 keeps the advisory families out of the criteria. Confirmed by Giuseppe 2026-11-06"
+        "reason": "AI-01 static mocks (2026-11-06): the 9/10px strings are the app's own tile eyebrow and sub-eyebrow tiers; on these mocks only `low-contrast` and `design-system-*` were criteria, the detector's advisory families were not. Confirmed by Giuseppe 2026-11-06"
       }
     ]
   }

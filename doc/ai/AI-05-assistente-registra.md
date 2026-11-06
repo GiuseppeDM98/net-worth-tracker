@@ -5,9 +5,10 @@
 > b9411a4d. Executes decisions 5, 9 (the first two row kinds: expenses and income — transfers and instalments are
 > AI-06), 11, 16, 17, 18, 26, 28, 58–63 and the adopted choices A9–A14. The user's sentence that must work at the end
 > of this spec: «Ciao, ho fatto spesa per 103 euro, per favore segnalo» → a card «Spesa · 103,00 € · Cibo › Spesa ·
-> oggi · Conto principale» → «Conferma» → the row in Cashflow › Tracciamento. § 4 Client assumes AI-01's Assistente
-> concept is a conversation column with cards; if AI-01 records another, the AI-01 session rewrites § 4 Client in
-> its own commit (decision 37). Read adversarially on 2026-11-01: 43 findings applied, the decisions 21–73 in
+> oggi · Conto principale» → «Conferma» → the row in Cashflow › Tracciamento. § 4 Client is written for the Assistente's
+> concept B «La scena» (decision 74, 2026-11-06), a conversation column with cards; criterion 20, its § 4 step and
+> its test added on 2026-11-06 at AI-01's retirement (decision 78, the page's motion), to be reread there. Read
+> adversarially on 2026-11-01: 43 findings applied, the decisions 21–73 in
 > README.md § 3 (this spec: decisions 21, 22, 26, 28, 29, 30, 33, 34, 35, 36, 37, 39, 58, 59, 60, 61, 62, 63).
 
 ## 1. The problem today (evidence on the code)
@@ -283,10 +284,10 @@ once, even after a reload.
     second → the test fails.
 17. **The whole Assistente page is under DESIGN.md § 5 «AI Surfaces»** (decision 26), in register and analysis modes:
     the verdict, the context panel, the thread list, the composer and the cards take the layout, spacing and type of
-    AI-01's Assistente mocks, and The AI-Accent Rule places the accent — on what the model wrote (each assistant
+    the paragraph «The Assistente page» (its drawing: the Assistente scenes of `doc/ai/reference/concept-b.html`), and The AI-Accent Rule places the accent — on what the model wrote (each assistant
     message's role eyebrow «Assistente» accented and `data-generated`, the two proposal cards), on hover and
     focus-visible of every control that calls the model and never at rest (the composer's send, «Registra»,
-    «Rigenera», the starter and follow-up rows), nowhere else: the verdict and the panel are computed by code, the
+    «Rigenera», the starter and follow-up rows — the rule's «a row of «Domande suggerite»»), nowhere else: the verdict and the panel are computed by code, the
     thread list and the memory are the user's, so they stay achromatic; the header's four icon actions
     (Conversazioni, Memoria, the preferences trigger, «Registra») are `h-11 w-11 desktop:h-9 desktop:w-9` and the
     primary `h-11 w-11 desktop:h-9 desktop:w-auto` (AGENTS.md § Accessibility). Proof: the E2E counts
@@ -303,6 +304,16 @@ once, even after a reload.
     44px actions and the accent: the analysis builders' `system`, `buildChatPrompt`'s output, the goal card's
     behaviour except its persisted state. Proof: the existing suites green (`assistantPromptBundle`,
     `assistantPromptRouting`, `assistantRoutes`, `anthropicStream`, `goalProposal`), no existing assertion rewritten.
+20. **The page moves as the paragraph «The Assistente page» of DESIGN.md § 5 says** (decision 78, 2026-11-06): a
+    change of mode — a period of «Periodo di analisi», «Registra», «Torna all'analisi» — keeps the «Conversazione» tile
+    still and slides the companion column's content as a screen of the Consulente slides (`sceneVariants` of AI-03,
+    forward from the right into Registra, back from the left; `sceneVariantsReduced` under reduced motion); the
+    expense and goal cards enter with the question card's motion (`cardEnterVariants` of AI-03: y 8px → 0 · 0.2 s ·
+    ease-out-quart; under reduced motion they appear). Proof: `__tests__/assistantCompanionScene.test.tsx` (new, RTL):
+    the companion's wrapper carries `data-scene` equal to the mode and the «Conversazione» tile has none; under
+    `MotionConfig reducedMotion="always"` the wrapper's style holds no `transform`; `expenseProposalCard.test.tsx`
+    asserts the card's root is a `motion.div` with `cardEnterVariants`. Mutation: wrap the whole grid in the scene →
+    the «no `data-scene` on the tile» assertion fails; drop the reduced branch → the `transform` assertion fails.
 
 ## 3. Decisions
 
@@ -582,6 +593,12 @@ backtick or tilde — the offset react-markdown's hast `pre` node carries in `po
   (the page's, for the focus), the send button hover-accented.
 - `AssistantHeader.tsx` and `AssistantPreferencesPopover.tsx`: the «Registra» action and `onEnterRegister`; the four
   icon actions and the primary 44px below `desktop:` (criterion 17).
+- `AssistantPageClient.tsx` (criterion 20): the companion column's content (`companionTiles`, :457-458 @ ce26af4d, and
+  `RegistraContestoTile` in Registra) inside `AnimatePresence mode="wait"` → `motion.div` keyed by the mode, with
+  `variants={reduced ? sceneVariantsReduced : sceneVariants}`, `custom` = the direction (forward into Registra and on a
+  later period, back on «Torna all'analisi» and an earlier period), `data-scene={mode}`; the grid, the
+  «Conversazione» tile and the composer outside it; the first render does not animate (`initial={false}`).
+  `ExpenseProposalCard` and `GoalProposalCard` render their root as `motion.div` with `cardEnterVariants`.
 - `AssistantPageClient.tsx`: `enterRegister()` (criterion 11) from the header and, once, from `?mode=registra`
   (`useSearchParams`, as `app/dashboard/cashflow/page.tsx:102` @ ce26af4d reads its params; a one-shot state settled
   with the deferred shape of the thread sync effect, `:248-265` @ ce26af4d, after `useAssistantThreads` resolves);
@@ -689,6 +706,7 @@ Components and hooks (`.test.tsx`, jsdom, RTL — decision 21):
 - `__tests__/expenseProposalCard.test.tsx` (new), `__tests__/goalProposalCard.test.tsx` (new),
   `__tests__/assistantStreamingResponse.test.tsx` (new: two expense blocks and one goal block receive `expense:0`,
   `expense:1`, `goal:0`; six expense blocks → five cards), `__tests__/expenseDialogInitialValues.test.tsx` (new),
+  `__tests__/assistantCompanionScene.test.tsx` (new: criterion 20, its two mutations),
   `__tests__/assistantComposer.test.tsx` (new), `__tests__/useAssistantStreaming.test.tsx` (new, `renderHook` in a
   `QueryClientProvider`, `authenticatedFetch` mocked to answer an SSE `Response`).
 
@@ -714,7 +732,7 @@ Browser (Playwright, the stream always faked):
   `proposals`); `fetchRegisterInputs` against the emulator seed in a throwaway `__tests__/zz-emulator-register.test.ts`
   (`vi.mock('server-only')`, `FIRESTORE_EMULATOR_HOST` set): the window's first row, the month block's lines.
 - **E**: screenshots at 390, 768, 1024×768 and 1440 of the page in register (empty, the panel, a card idle, written,
-  with a problem, interrupted, future-dated) and in `month_analysis` (the restyle), set against AI-01's Assistente mocks.
+  with a problem, interrupted, future-dated) and in `month_analysis` (the restyle), set against the Assistente scenes of `doc/ai/reference/concept-b.html`.
 - **F** (at the owner's «pronto»): on the mirror (`npm run mirror:seed -- <email>`) with the owner's key, the owner
   types the sentence of the header, «stipendio di 2.000 ieri», «benzina 60 euro fuori budget» and the two-row
   sentence of decision 61; confirms the first; opens Tracciamento from the card; reloads the thread; asks «come sono
@@ -748,6 +766,8 @@ already gates the page; no new flag.
     cards (`GoalProposalCard`, `ExpenseProposalCard`) are `not-prose` blocks with the AI accent (DESIGN.md → The
     AI-Accent Rule), never a card in the tile»;
   - «the header has three icon actions and ONE primary» → «four icon actions (Registra, 2026-11) and ONE primary»;
+  - § The visual direction: «The code follows it from the Registra mode on (AI-05).» → «The code follows it from the
+    Registra mode on (2026-11): the companion slides with `sceneVariants`, the cards enter with `cardEnterVariants`.»;
   - § Per-page blind spots: «**Assistente**: no Playwright spec (the throwaway specs were deleted); …» → «**Assistente**:
     the analysis modes have no Playwright spec; …»; «A confirmed goal proposal can be confirmed again after a reload
     (accepted for v1)…» → «A card's outcome is saved on its message (2026-11): a reload shows «Obiettivo creato» /
@@ -797,7 +817,7 @@ Leggi WORKFLOW.md, AGENTS.md (§ Assistant · Assistente, § Cashflow — expens
 State, § React Compiler and the hooks rules, § Accessibility, § Commands, § Dialog Form Reset, § Two-Step Create
 Dialogs), DESIGN.md § 5 «AI Surfaces», doc/guide/assistente.md, doc/guide/cashflow.md,
 doc/guide/cashflow-tracciamento.md, doc/guide/dialog.md, doc/guide/e2e-emulatori.md, doc/ai/README.md § 3-4-7,
-doc/ai/AI-05-assistente-registra.md, i mock dell'Assistente di AI-01 e il diff di AI-03 (in develop). Node 24
+doc/ai/AI-05-assistente-registra.md, le scene dell'Assistente in doc/ai/reference/concept-b.html e il diff di AI-03 (in develop). Node 24
 (`node -v`). Implementa AI-05 così com'è scritta: la modalità `register` in OGNI punto del nuovo commento WARNING di
 types/assistant.ts; lo zod sul body con tutti i campi e il tetto di 4000 caratteri in ogni modalità, il contatore da
 3800; il contesto puro con gli id, la finestra italiana, le serie raccolte in una riga, il blocco IL MESE da
@@ -812,7 +832,7 @@ nell'header, la striscia al posto della pill, «Torna all'analisi», `?mode=regi
 della § 4 sono condivisi con AI-06: nomi identici. Test dei componenti in .test.tsx con RTL, le funzioni pure in
 .test.ts, Vitest in Europe/Rome, nella zona della macchina e con TZ=UTC; le due spec Playwright con lo stream SEMPRE
 finto. Ti fermi e mi chiedi se: un tetto di perf:budget va alzato, il commento WARNING trova un punto che la spec non
-nomina, o il concetto di AI-01 per l'Assistente non è una colonna di conversazione con card. Collaudo: § 7; la prova
+nomina, o la colonna compagna non ha un contenitore unico da far scorrere (criterio 20). Collaudo: § 7; la prova
 vera sul mirror al mio «pronto». Un branch, un commit, solo dopo il mio OK con il riassunto del diff.
 SESSION_NOTES.md non si committa.
 ```
