@@ -4,7 +4,7 @@
  * The fields the Compravendita screens share: a money or number input, the date, the account
  * picker and the category picker (a category or one of its subcategories, by allowed type). Module-level,
  * controlled, no state of their own — the draft is the reducer's (lib/utils/realEstateOperationDraft.ts).
- * A choice as rows is the shared `ChoiceList` (components/ui/choice-list.tsx, since AI-03).
+ * A choice as rows is the shared `ChoiceList` (components/ui/choice-list.tsx, since 2026-11-07).
  */
 
 import type { Asset } from '@/types/assets';

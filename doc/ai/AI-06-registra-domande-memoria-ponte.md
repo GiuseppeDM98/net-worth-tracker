@@ -429,7 +429,7 @@ export function formatQuestionAnswersAsMessage(entries: ReadonlyArray<{ question
   cash accounts (plus `refs.properties` named «{nome} (immobile)» for the ids `account:from` and `account:to`), the
   centres without `archivedAt`, the members, `refs.loans`. With `readFailed` the card gets no `otherSelect` and «Altro…»
   is AI-04's free-text row. A `category` question keeps the free-text «Altro…».
-- **«Rispondi»** renders under the last valid kept block only, as a `Button` of 44px (`h-11`) hover-accented (The
+- **«Rispondi»** renders under the last valid kept block only, as a `Button` of 44px (`h-11`) hover-accented (`AI_CONTROL_ACCENT_CLASS` + `border border-transparent`, decisions 36 and 85; The
   AI-Accent Rule, decision 36), enabled when `formatQuestionAnswersAsMessage` of every valid kept block is non-null and
   `answerable`. Its handler (a function of its own, awaited: AGENTS.md § React Compiler and the hooks rules) records,
   for each card, `recordProposal(proposalKey('question', index), { status: 'answered', answer: describeAnswer(question,

@@ -1,5 +1,5 @@
 /**
- * The AI accent, as classes (DESIGN.md → The AI-Accent Rule; AI-03, 2026-11-07). Two things wear
+ * The AI accent, as classes (DESIGN.md → The AI-Accent Rule, 2026-11-07). Two things wear
  * it, and differently: what the model WROTE carries the 1px accent border at rest and a glow on
  * hover; a control that ASKS the model turns the accent on hover and keyboard focus only, never at
  * rest. The tokens are `--ai-accent` and `--ai-glow` in app/globals.css.

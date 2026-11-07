@@ -259,7 +259,10 @@ The app **is** locally runnable; there is no fallback to declare.
   do not ask the owner to reason about what a guest "would" see.
 - Two areas are deliberately out of reach of a tour: the **assistant** needs
   `NEXT_PUBLIC_ASSISTANT_AI_ENABLED` and a live Anthropic key, and **email/PDF** have no DOM — they
-  are verified by rendering them from a throwaway spec (doc/guide/email-pdf.md).
+  are verified by rendering them from a throwaway spec (doc/guide/email-pdf.md). **The PR's Vercel preview is no
+  tour for an AI surface** (owner, 2026-11-07, the Consulente's scene): the preview holds the demo account alone, and
+  the demo blocks every AI feature (`useDemoMode()`), so a phase F planned there is skipped — it runs on the MIRROR
+  (below) with the `.env.local` key, or, by the owner's choice, in production after the deploy.
 
 ### Obligation 4 — automate it here
 

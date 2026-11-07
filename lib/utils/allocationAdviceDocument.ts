@@ -44,7 +44,7 @@ export function pageShowsReport(args: { document: AllocationAdviceDocument | nul
   return visible && (redoAt === null || redoAt !== document.updatedAt.getTime());
 }
 
-// ─── The run's stage rows (AI-03, 2026-11-07) ─────────────────────────────────
+// ─── The run's stage rows (2026-11-07) ────────────────────────────────────────
 
 export type StageRowState = 'done' | 'active' | 'pending' | 'failed';
 

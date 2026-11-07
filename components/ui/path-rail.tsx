@@ -1,17 +1,18 @@
 'use client';
 
 /**
- * The rail beside the Consulente's scene (DESIGN.md → The Path-Scene Rule; AI-03, 2026-11-07):
+ * The rail beside the Consulente's scene (DESIGN.md → The Path-Scene Rule, 2026-11-07):
  * where the reader is on the path, and, during the run, which stage is working. A strip above
  * the card below `desktop:`, a 160px column to its left at 1440 — ONE DOM, the breakpoint
  * decides (the names are `sr-only` on the strip).
  *
  * Path mode: one tick per step, the current one `aria-current="step"`; the interview's three
- * ticks (AI-04 passes them) light in the AI accent one round at a time and, while a round is on,
+ * ticks (the interview passes them) light in the AI accent one round at a time and, while a round is on,
  * take the current step from the path. Run mode: four fills that scale in as their stage becomes
  * active — the accent while active, muted when done, destructive when failed; the list is
- * `aria-hidden` because the card's stage rows are what a screen reader reads. The ticks are not
- * buttons and carry no handler.
+ * `aria-hidden` because the card's stage rows are what a screen reader reads, and its wrapper is a
+ * plain div, not a landmark. The strip is 24px tall in both modes, so the card stays put when the
+ * run replaces the path (2026-11-07). The ticks are not buttons and carry no handler.
  */
 
 import { cn } from '@/lib/utils';
@@ -23,7 +24,7 @@ export type PathRailProps =
       mode: 'path';
       steps: readonly string[];
       current: number;
-      /** The interview's rounds (AI-04): `reached` is the ROUND number, 1-based — `2` is «Tornata 2 di 3» current, the first done; `null` before the interview opens (decision 86). */
+      /** The interview's rounds: `reached` is the ROUND number, 1-based — `2` is «Tornata 2 di 3» current, the first done; `null` before the interview opens (decision 86). */
       interview?: { total: 3; reached: number | null };
     }
   | { mode: 'run'; stages: readonly { label: string; state: PathRailStageState }[] };
@@ -101,17 +102,21 @@ function RunList({ stages }: { stages: readonly { label: string; state: PathRail
   );
 }
 
+/** ONE height below `desktop:` for both modes: the card does not move when the run replaces the path (2026-11-07). */
+const STRIP_CLASS = 'h-6 desktop:h-auto';
+
 export function PathRail(props: PathRailProps) {
   if (props.mode === 'run') {
+    // A div, not a landmark: the list inside is `aria-hidden`, and a «Dove sei» navigation with nothing to read would still be listed (2026-11-07).
     return (
-      <nav aria-label="Dove sei" className="h-6 desktop:h-auto">
+      <div className={STRIP_CLASS}>
         <RunList stages={props.stages} />
-      </nav>
+      </div>
     );
   }
   const interviewOn = props.interview !== undefined && props.interview.reached !== null;
   return (
-    <nav aria-label="Dove sei" className="desktop:pt-1">
+    <nav aria-label="Dove sei" className={cn(STRIP_CLASS, 'desktop:pt-1')}>
       <PathList steps={props.steps} current={props.current} allDone={interviewOn} />
       {props.interview && <InterviewList total={props.interview.total} reached={props.interview.reached} />}
     </nav>

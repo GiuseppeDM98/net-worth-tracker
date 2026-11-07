@@ -1,5 +1,5 @@
 /**
- * `useConsulenteRun` (components/allocation/consulente/useConsulenteRun.ts, AI-03): the stage's
+ * `useConsulenteRun` (components/allocation/consulente/useConsulenteRun.ts, 2026-11-07): the stage's
  * clock — `stageStartedAt` stamped when the run opens, at every `stage` event and at a retry. The
  * route is a mocked `authenticatedFetch` answering SSE streams the test feeds; only `Date` is faked.
  */
@@ -104,5 +104,27 @@ describe('useConsulenteRun', () => {
       retried.close();
       await flush();
     });
+  });
+
+  it('remembers the stage in flight when its request throws, so «Riprova» never re-pays a saved stage (2026-11-07)', async () => {
+    const strategy = sseResponse();
+    authenticatedFetch
+      .mockImplementationOnce(() => Promise.resolve(strategy.response))
+      // The instruments request answers a non-ok status: `openRunBody` throws the route's sentence.
+      .mockImplementationOnce(() => Promise.resolve(new Response(JSON.stringify({ error: 'Servizio non disponibile.' }), { status: 503 })));
+    const client = new QueryClient();
+    const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+    const { result } = renderHook(() => useConsulenteRun('u1', vi.fn()), { wrapper });
+
+    act(() => {
+      result.current.start(answers);
+    });
+    await act(async () => {
+      strategy.send({ type: 'done' });
+      strategy.close();
+      await flush();
+    });
+    await waitFor(() => expect(authenticatedFetch).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(result.current.state).toMatchObject({ kind: 'failed', error: 'Servizio non disponibile.', retryable: true, resumeFrom: 'instruments' }));
   });
 });

@@ -6,7 +6,7 @@
     },
     "/dashboard": {
       "initialJsGzKB": 627,
-      "raisedBy": "#507: AI-03, Tile legge lib/constants/aiAccent.ts (la superficie generata) — 625,7 → 626,0 (perf:build) e 626,1 (npm run build) sulla stessa macchina (doc/guide/velocita.md § Registro dei tetti alzati)"
+      "raisedBy": "#507: Tile legge lib/constants/aiAccent.ts (la superficie generata) — 625,7 → 626,0 (perf:build) e 626,1 (npm run build) sulla stessa macchina (doc/guide/velocita.md § Registro dei tetti alzati)"
     },
     "/dashboard/allocation": {
       "initialJsGzKB": 604,
@@ -38,7 +38,7 @@
     },
     "/dashboard/history": {
       "initialJsGzKB": 778,
-      "raisedBy": "#507: AI-03, Tile legge lib/constants/aiAccent.ts (la superficie generata) — 776,6 → 777,9 sulla stessa macchina, 33 → 34 chunk iniziali (doc/guide/velocita.md § Registro dei tetti alzati)"
+      "raisedBy": "#507: Tile legge lib/constants/aiAccent.ts (la superficie generata) — 776,6 → 777,9 sulla stessa macchina, 33 → 34 chunk iniziali (doc/guide/velocita.md § Registro dei tetti alzati)"
     },
     "/dashboard/pension": {
       "initialJsGzKB": 677,
@@ -62,7 +62,7 @@
     },
     "/dashboard/assets/compravendita": {
       "initialJsGzKB": 595,
-      "raisedBy": "#507: AI-03, ChoiceList al posto di ChoiceRows (la modalità multipla porta Checkbox e useRovingFocus) — 593,1 → 594,3 sulla stessa macchina (doc/guide/velocita.md § Registro dei tetti alzati)"
+      "raisedBy": "#507: ChoiceList al posto di ChoiceRows (la modalità multipla porta Checkbox e useRovingFocus) — 593,1 → 594,3 sulla stessa macchina (doc/guide/velocita.md § Registro dei tetti alzati)"
     }
   },
   "sharedGzKB": 535,

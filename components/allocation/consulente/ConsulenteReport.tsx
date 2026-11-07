@@ -9,7 +9,7 @@
  * The writes go through the app's own services (`setSettings`, `updateAssetAllocationRole`,
  * `saveGoalData`) and then the «applied» route records them; every reader's key is invalidated.
  *
- * What the model wrote wears the AI accent (`generated`, DESIGN.md → The AI-Accent Rule; AI-03,
+ * What the model wrote wears the AI accent (`generated`, DESIGN.md → The AI-Accent Rule,
  * 2026-11-07); «Applica» and «Chiedi una modifica» do not: they ask, they do not say. The column
  * cascades in ONCE per JS session (a reload plays it again, a client navigation back does not,
  * reduced motion never) and the proposed percentages count up with it.

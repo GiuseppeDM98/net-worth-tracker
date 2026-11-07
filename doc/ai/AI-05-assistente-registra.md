@@ -1,7 +1,7 @@
 # AI-05 — Assistente › Registra: the mode, the context, the proposal, the confirmation
 
 > Series `doc/ai/` (README.md § 5): **depends on AI-02** (retired on 2026-11-07, in develop since 2026-11-07, PR #505: the
-> CASHFLOW 12 MESI block and `buildCashAccountLines`) **and AI-03** (the AI accent in CSS and `Tile generated`,
+> CASHFLOW 12 MESI block and `buildCashAccountLines`) **and AI-03** (retired on 2026-11-07, in develop since 2026-11-07, PR #507: the AI accent in CSS and `Tile generated`,
 > DESIGN.md § 5 «AI Surfaces», the RTL harness of decision 21); **AI-06 depends on it**. Written on 2026-11-01 from `develop` @
 > b9411a4d. Executes decisions 5, 9 (the first two row kinds: expenses and income — transfers and instalments are
 > AI-06), 11, 16, 17, 18, 26, 28, 58–63, 82 and the adopted choices A9–A14. The user's sentence that must work at the end
@@ -307,12 +307,14 @@ once, even after a reload.
     `assistantPromptRouting`, `assistantRoutes`, `anthropicStream`, `goalProposal`), no existing assertion rewritten.
 20. **The page moves as the paragraph «The Assistente page» of DESIGN.md § 5 says** (decision 78, 2026-11-06): a
     change of mode — a period of «Periodo di analisi», «Registra», «Torna all'analisi» — keeps the «Conversazione» tile
-    still and slides the companion column's content as a screen of the Consulente slides (`sceneVariants` of AI-03,
+    still and slides the companion column's content as a screen of the Consulente slides (`sceneVariants` of `lib/utils/motionVariants.ts`,
     forward from the right into Registra, back from the left; `sceneVariantsReduced` under reduced motion); the
-    expense and goal cards enter with the question card's motion (`cardEnterVariants` of AI-03: y 8px → 0 · 0.2 s ·
+    expense and goal cards enter with the question card's motion (`cardEnterVariants` of `lib/utils/motionVariants.ts`: y 8px → 0 · 0.2 s ·
     ease-out-quart; under reduced motion they appear). Proof: `__tests__/assistantCompanionScene.test.tsx` (new, RTL):
     the companion's wrapper carries `data-scene` equal to the mode and the «Conversazione» tile has none; under
-    `MotionConfig reducedMotion="always"` the wrapper's style holds no `transform`; `expenseProposalCard.test.tsx`
+    `window.matchMedia` answering `matches: true` for `(prefers-reduced-motion: reduce)` — replaced before rendering, as
+    `__tests__/domSetup.ts` says; `MotionConfig reducedMotion="always"` does not flip `useReducedMotion()` (2026-11-07) — the
+    wrapper's style holds no `transform`; `expenseProposalCard.test.tsx`
     asserts the card's root is a `motion.div` with `cardEnterVariants`. Mutation: wrap the whole grid in the scene →
     the «no `data-scene` on the tile» assertion fails; drop the reduced branch → the `transform` assertion fails.
 21. **Registra reads the CASHFLOW 12 MESI block like every other mode** (decision 82, 2026-11-07): the route's one
@@ -602,7 +604,8 @@ backtick or tilde — the offset react-markdown's hast `pre` node carries in `po
   «Conferma» records `{ status: 'written', writtenIds: [goal.id] }` from the `{ goal }` the route answers, «Ignora»
   `ignored`; the labels unchanged; the root takes the accent (criterion 17); buttons `h-11 desktop:h-9`.
 - `AssistantComposer.tsx`: `maxLength`, the counter (criterion 3), `inputRef?: RefObject<HTMLTextAreaElement | null>`
-  (the page's, for the focus), the send button hover-accented.
+  (the page's, for the focus), the send button hover-accented (`AI_CONTROL_ACCENT_CLASS`, with `border border-transparent`
+  if filled: decision 85).
 - `AssistantHeader.tsx` and `AssistantPreferencesPopover.tsx`: the «Registra» action and `onEnterRegister`; the four
   icon actions and the primary 44px below `desktop:` (criterion 17).
 - `AssistantPageClient.tsx` (criterion 20): the companion column's content (`companionTiles`, :457-458 @ ce26af4d, and
@@ -624,10 +627,11 @@ backtick or tilde — the offset react-markdown's hast `pre` node carries in `po
 - `AssistantStreamingResponse.tsx`: props gain `mode`, `threadId` and `recordProposal` (the hook's, passed by
   `AssistantConversazioneTile`); one `MessageIdProvider` per assistant message, the derived index, the assistant role
   eyebrow accented with `data-generated` (criterion 17).
-- `lib/constants/aiAccent.ts` (AI-03): `AI_GENERATED_SURFACE_CLASS` and `AI_GENERATED_EYEBROW_CLASS` are the
+- `lib/constants/aiAccent.ts` (in develop since 2026-11-07): `AI_GENERATED_SURFACE_CLASS` and `AI_GENERATED_EYEBROW_CLASS` are the
   classes `Tile generated` applies, read here by the surfaces that are not tiles (the messages, the cards);
-  `AI_CONTROL_ACCENT_CLASS` is the hover/focus-visible accent of a control that calls the model («Registra»,
-  «Rispondi», the composer's send). No new constant is created here.
+  `AI_CONTROL_ACCENT_CLASS` is the hover/focus-visible accent of a control that calls the model («Registra» — a ghost
+  icon action, so with `AI_CONTROL_ACCENT_LABEL_CLASS` too —,
+  the composer's send, with `border border-transparent` on a filled one, decision 85; «Rispondi» is AI-06's). No new constant is created here.
 - `ExpenseDialog.tsx`: `initialValues` (criterion 14); the dialog's own toasts unchanged.
 - `lib/utils/assistantNarrative.ts`: `buildRegisterVerdict(summary: AssistantRegisterSummary | null): PageVerdictModel`;
   `describeConversation` gains `mode`: in `register`, empty → «Cosa vuoi registrare? Scrivi qui sotto la spesa o
@@ -754,7 +758,8 @@ Browser (Playwright, the stream always faked):
 ## 8. Putting it into service
 
 Branch `feat/assistente-registra`, commit `feat(assistente): Registra — a mode that proposes a row and writes it on
-Conferma, once`, PR to `develop`, the preview for the owner. The Assistente's `NEXT_PUBLIC_ASSISTANT_AI_ENABLED`
+Conferma, once`, PR to `develop`; phase F on the mirror (§ 7), never on the preview, which holds the demo account alone
+(README § 8). The Assistente's `NEXT_PUBLIC_ASSISTANT_AI_ENABLED`
 already gates the page; no new flag.
 
 ## 9. Documentation

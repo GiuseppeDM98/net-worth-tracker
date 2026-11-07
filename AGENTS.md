@@ -779,7 +779,7 @@ file used to carry.
   again to undo it (2026-11-07: a chat mutation stayed applied until restored by hand). **`next dev`
   rewrites `tsconfig.json`** (an extra dist dir in `include`, the formatting): a stray `tsconfig.json` in a diff is
   checked out again, never committed (2026-10-10).
-- **Components and hooks are tested under jsdom** (2026-11-07, AI-03): `__tests__/<name>.test.tsx` runs in the `dom`
+- **Components and hooks are tested under jsdom** (2026-11-07): `__tests__/<name>.test.tsx` runs in the `dom`
   project of `vitest.config.ts` (Testing Library, `@testing-library/user-event`, `__tests__/domSetup.ts` for cleanup,
   `ResizeObserver` and `matchMedia`), `.test.ts` in the `node` one; plain assertions, no jest-dom. An `aria-hidden`
   element has NO accessible name (accname step 2A): `getByRole(…, { name, hidden: true })` finds nothing — take it from

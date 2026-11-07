@@ -82,7 +82,7 @@ describe('pageShowsReport (2026-10-20)', () => {
   });
 });
 
-describe('the run’s stage rows (AI-03)', () => {
+describe('the run’s stage rows (2026-11-07)', () => {
   it('reads revise as the review', () => {
     expect(stageOfRunStage('revise')).toBe('review');
     expect(stageOfRunStage('instruments')).toBe('instruments');

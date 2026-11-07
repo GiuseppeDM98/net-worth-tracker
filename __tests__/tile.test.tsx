@@ -1,5 +1,5 @@
 /**
- * `Tile`'s `generated` (components/ui/tile.tsx, AI-03): what the model wrote carries the accent
+ * `Tile`'s `generated` (components/ui/tile.tsx, 2026-11-07): what the model wrote carries the accent
  * surface and the accent eyebrow, in the open tile and in the closed row; a failed row keeps its
  * red. Without the flag, nothing of the accent.
  */

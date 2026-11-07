@@ -149,7 +149,7 @@ describe('the exchange list (2026-10-20)', () => {
   });
 });
 
-describe('the stages’ typical durations (AI-03)', () => {
+describe('the stages’ typical durations (2026-11-07)', () => {
   it('names the four stages at 0 · 2 · 2 · 1 minutes', () => {
     expect(STAGE_TYPICAL_MINUTES).toEqual({ context: 0, strategy: 2, instruments: 2, review: 1 });
   });
