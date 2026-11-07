@@ -8,7 +8,15 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { buildChatPrompt, buildMonthAnalysisPrompt, formatTodayContextForPrompt } from '@/lib/server/assistant/prompts';
+import {
+  buildChatPrompt,
+  buildHistoryAnalysisPrompt,
+  buildMonthAnalysisPrompt,
+  buildYearAnalysisPrompt,
+  buildYtdAnalysisPrompt,
+  formatTodayContextForPrompt,
+  formatCashflowBlockSection,
+} from '@/lib/server/assistant/prompts';
 import { AssistantMonthContextBundle, AssistantPreferences } from '@/types/assistant';
 import { emptyAssistantPortfolioContext } from '@/lib/utils/assistantPortfolioContext';
 
@@ -684,5 +692,66 @@ describe('assistant prompt data block', () => {
       // data into it would silently break the prefix match.
       expect(first).toBe(second);
     });
+  });
+});
+
+describe('the CASHFLOW 12 MESI block in every mode of the Assistente (decision 81, 2026-11-07)', () => {
+  const BLOCK = '--- CASHFLOW 12 MESI (x) ---\nX';
+  // The note the owner approved on 2026-11-07, verbatim.
+  const NOTE = "Il blocco CASHFLOW 12 MESI qui sotto è il cashflow di tutta la storia registrata fino a oggi, qualunque sia il periodo in esame: le cifre di un periodo vengono dai blocchi del periodo; usalo per l'andamento recente, la capacità di risparmio e la sua stabilità, gli impegni ricorrenti e i conti.";
+  const builders = [
+    ['month', buildMonthAnalysisPrompt],
+    ['year', buildYearAnalysisPrompt],
+    ['ytd', buildYtdAnalysisPrompt],
+    ['history', buildHistoryAnalysisPrompt],
+  ] as const;
+
+  it.each(builders)('%s: the note and the block sit after the numeric block and before the question', (_, build) => {
+    const bundle = makeBundle();
+    const withBlock = build(bundle, 'Come va?', PREFERENCES, [], BLOCK).userContent;
+    const numeric = withBlock.indexOf('--- CASHFLOW ---');
+    const note = withBlock.indexOf(NOTE);
+    const block = withBlock.indexOf(BLOCK);
+    const question = withBlock.indexOf("Domanda dell'utente: Come va?");
+    expect(numeric).toBeGreaterThan(-1);
+    expect(note).toBeGreaterThan(numeric);
+    expect(block).toBe(note + NOTE.length + 1);
+    expect(question).toBeGreaterThan(block);
+    expect(withBlock).toContain(`${BLOCK}\n\nDomanda dell'utente: Come va?`);
+  });
+
+  it.each(builders)('%s: without the block the user turn is today\'s, and system is the same with or without', (_, build) => {
+    const bundle = makeBundle();
+    const without = build(bundle, 'Come va?', PREFERENCES, []);
+    const withBlock = build(bundle, 'Come va?', PREFERENCES, [], BLOCK);
+    expect(without.userContent).not.toContain('CASHFLOW 12 MESI');
+    // The block adds exactly its three lines (note, block, blank) and changes nothing else.
+    expect(withBlock.userContent.replace(`${NOTE}\n${BLOCK}\n\n`, '')).toBe(without.userContent);
+    expect(withBlock.system).toBe(without.system);
+    expect(withBlock.system).not.toContain('CASHFLOW 12 MESI');
+  });
+
+  function todayContext() {
+    const bundle = makeBundle();
+    return { portfolio: bundle.portfolio, goals: null, targetAllocation: bundle.targetAllocation, targetAllocationSource: bundle.targetAllocationSource };
+  }
+
+  it.each([
+    ['a period attached', () => buildChatPrompt('x', PREFERENCES, 'marzo 2026', [], makeBundle(), null, BLOCK), () => buildChatPrompt('x', PREFERENCES, 'marzo 2026', [], makeBundle(), null)],
+    ['the portfolio of today', () => buildChatPrompt('x', PREFERENCES, undefined, [], null, todayContext(), BLOCK), () => buildChatPrompt('x', PREFERENCES, undefined, [], null, todayContext())],
+    ['no data at all', () => buildChatPrompt('x', PREFERENCES, undefined, [], null, null, BLOCK), () => buildChatPrompt('x', PREFERENCES, undefined, [], null, null)],
+  ])('the chat with %s carries it right before the request, and system does not move', (_, withIt, withoutIt) => {
+    const withBlock = withIt();
+    const without = withoutIt();
+    expect(withBlock.userContent).toContain(`\n\n${NOTE}\n${BLOCK}\n\nRichiesta utente: x`);
+    expect(withBlock.userContent.replace(`\n${NOTE}\n${BLOCK}\n`, '')).toBe(without.userContent);
+    expect(without.userContent).not.toContain('CASHFLOW 12 MESI');
+    expect(withBlock.system).toBe(without.system);
+  });
+
+  it('formatCashflowBlockSection prints the note, the block and a blank line, or nothing', () => {
+    expect(formatCashflowBlockSection(BLOCK)).toEqual([NOTE, BLOCK, '']);
+    expect(formatCashflowBlockSection(null)).toEqual([]);
+    expect(formatCashflowBlockSection('')).toEqual([]);
   });
 });

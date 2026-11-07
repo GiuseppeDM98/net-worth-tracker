@@ -37,6 +37,16 @@ export const LOAN_ASSET_TYPE: AssetType = 'loan';
 export function isLoanAsset(asset: Pick<Asset, 'type'>): boolean {
   return asset.type === LOAN_ASSET_TYPE;
 }
+
+/**
+ * A cash ACCOUNT is `type === 'cash' && assetClass === 'cash'` — the cash-picker rule
+ * (doc/guide/patrimonio.md § Asset Pricing, FX and Assets): a money-market ETF carries `assetClass: 'cash'`
+ * but is an instrument, and belongs in the table. Lives here beside `isLoanAsset` (2026-11) so a pure
+ * module can read it without importing the client SDK through `patrimonioSummary.ts`, which re-exports it.
+ */
+export function isCashAccount(asset: Pick<Asset, 'type' | 'assetClass'>): boolean {
+  return asset.type === 'cash' && asset.assetClass === 'cash';
+}
 // trendFollowing (managed futures) and carry are exposure-only classes reached via a leveraged/
 // composite `etf`'s `composition` legs — no
 // AssetType maps to them directly in TYPE_TO_CLASS.

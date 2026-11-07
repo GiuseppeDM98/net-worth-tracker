@@ -30,6 +30,7 @@ import {
   buildAssistantHistoryContext,
   buildAssistantTodayContext,
 } from '@/lib/services/assistantMonthContextService';
+import { readCashflowBlockForPrompt } from '@/lib/server/assistant/cashflowBlockPrompt';
 import {
   AssistantMemoryItem,
   AssistantMonthContextBundle,
@@ -244,6 +245,10 @@ export async function POST(request: NextRequest) {
       contextBundle = await buildAssistantMonthContext(body.userId, body.month, includeDummy);
     }
 
+    // The CASHFLOW 12 MESI block in every mode, a chat with no context included (decision 81,
+    // 2026-11-07); a rejection reaches the catch below — a 500, never a silent empty block.
+    const cashflowBlock = await readCashflowBlockForPrompt(body.userId, new Date());
+
     // Load active memory items to inject into the prompt.
     // Errors are non-fatal: if memory fetch fails we proceed without items
     // rather than blocking the chat. The user experience degrades gracefully.
@@ -313,6 +318,7 @@ export async function POST(request: NextRequest) {
             prompt: body.prompt.trim(),
             contextBundle,
             todayContext,
+            cashflowBlock,
             month: body.month ?? null,
             preferences,
             memoryItems: activeMemoryItems,

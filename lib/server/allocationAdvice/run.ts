@@ -8,7 +8,8 @@ import {
   ALLOCATION_ADVICE_STRATEGY_MODEL,
   SERVER_SIDE_FALLBACK_BETA,
 } from '@/lib/constants/aiModels';
-import { buildAssistantYtdContext } from '@/lib/services/assistantMonthContextService';
+import { buildAssistantYtdContext, fetchCashflowBlockInputs } from '@/lib/services/assistantMonthContextService';
+import { buildCashflowBlock, formatCashflowBlockForPrompt } from '@/lib/utils/cashflowBlock';
 import { formatBundleForPrompt, formatPortfolioForPrompt } from '@/lib/server/assistant/prompts';
 import { buildInstrumentsPrompt, buildReviewPrompt, buildRevisionPrompt, buildStrategyPrompt } from './prompts';
 import { getAllocationAdviceAdmin, patchAllocationAdviceAdmin, setAllocationAdviceAdmin } from './store';
@@ -234,15 +235,22 @@ async function enterStage(document: AllocationAdviceDocument, stage: AllocationA
   onStage(stage);
 }
 
-async function runStrategy(document: AllocationAdviceDocument, onStage: (stage: AllocationAdviceStage) => void, priorPlan: AllocationAdvicePriorPlan | null): Promise<void> {
+async function runStrategy(document: AllocationAdviceDocument, onStage: (stage: AllocationAdviceStage) => void, priorPlan: AllocationAdvicePriorPlan | null, now: Date): Promise<void> {
   // The context: the YTD bundle, the fullest picture of the year the app has, with every
-  // portfolio block the assistant reads.
-  const bundle = await buildAssistantYtdContext(document.userId);
+  // portfolio block the assistant reads; beside it the CASHFLOW 12 MESI block (2026-11), read once
+  // per strategy — the goals' contributions and the cash reserve are sized on it. A failed read
+  // rejects here and fails the stage, retryable: never a strategy on a silent empty cashflow.
+  const [bundle, cashflow] = await Promise.all([
+    buildAssistantYtdContext(document.userId),
+    fetchCashflowBlockInputs(document.userId, now),
+  ]);
   const dataBlock = formatBundleForPrompt(bundle);
+  const { expenses, ...input } = cashflow;
+  const cashflowBlock = formatCashflowBlockForPrompt(buildCashflowBlock(expenses, input));
   await enterStage(document, 'strategy', onStage);
   const answer = await callModel('strategy', {
     model: ALLOCATION_ADVICE_STRATEGY_MODEL,
-    prompt: buildStrategyPrompt(document.answers, dataBlock, priorPlan),
+    prompt: buildStrategyPrompt(document.answers, dataBlock, { priorPlan, cashflowBlock }),
     effort: ALLOCATION_ADVICE_STRATEGY_EFFORT,
     structured: true,
   });
@@ -360,7 +368,7 @@ export async function runAllocationAdviceStage({ userId, stage, answers, documen
   }
 
   try {
-    if (stage === 'strategy') await runStrategy(document, onStage, priorPlan);
+    if (stage === 'strategy') await runStrategy(document, onStage, priorPlan, now);
     else if (stage === 'instruments') await runInstruments(document, onStage);
     else if (stage === 'review') await runReview(document, onStage);
     else {

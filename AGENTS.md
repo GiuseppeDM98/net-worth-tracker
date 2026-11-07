@@ -474,7 +474,7 @@ file used to carry.
 
 ### Assistant · Assistente → `doc/guide/assistente.md`
 - The context service runs server-side (`adminDb` directly); every mode maps to its own builder in `stream/route.ts` (a missing branch silently falls through to monthly); `buildAssistantPeriodRangeContext` is the FIFTH builder.
-- ONE aggregator (`buildCashflowBreakdown`) per builder; a new required bundle field means updating ALL 4 builders. `system` is byte-identical per mode — never interpolate per-request data; `cache_control` deliberately NOT used.
+- ONE aggregator (`buildCashflowBreakdown`) per bundle builder; a new required bundle field means updating ALL 4 builders; the CASHFLOW 12 MESI block (`lib/utils/cashflowBlock.ts`, 2026-11) is its own read beside the bundle, in the `userContent` of every Assistente mode, of the Consulente's strategy and of the emails' AI comments (decision 81). `system` is byte-identical per mode — never interpolate per-request data; `cache_control` deliberately NOT used.
 - A silent cap in a context builder becomes a hallucinated "N/D": a cap either does not exist or is stated in the text the model reads. `ASSISTANT_SYSTEM_CORE` is shared with `buildEmailAiPrompt`.
 - A free question with NO context still gets the portfolio of today (`buildAssistantTodayContext` → `AssistantTodayContext`, the sixth argument of `buildChatPrompt`, 2026-10-20): the period bundle is a chosen period's, never a substitute for the portfolio.
 - THE PROPOSAL PROTOCOL: the AI never writes — it emits ONE fenced ```goal-proposal block, the write happens on the user's Conferma via `POST /api/goals` (a new goal) or `PATCH /api/goals` (`goalId`, a rewrite in place, 2026-10-20); `goalProposal.ts` owns the ONE zod schema, quotas travel by instrument NAME and the card resolves them to ids.
@@ -774,7 +774,9 @@ file used to carry.
   entry, then `git diff --stat`.
 - `npm test -- <file>` / `npx vitest run <file>` for targeted tests; **`npx tsc --noEmit` before any PR**, re-run AFTER
   writing the tests. **Never `git checkout <file>` to undo ONE edit on uncommitted work** (2026-09-24): it throws away
-  the session's rewrite of it — undo a falsification with the tool that made it, then `tsc` again. **`next dev`
+  the session's rewrite of it — undo a falsification with the tool that made it, then `tsc` again; a scripted
+  falsification that DELETES a line puts a marker comment in its place, since an empty replacement cannot be found
+  again to undo it (2026-11-07: a chat mutation stayed applied until restored by hand). **`next dev`
   rewrites `tsconfig.json`** (an extra dist dir in `include`, the formatting): a stray `tsconfig.json` in a diff is
   checked out again, never committed (2026-10-10).
 - **`npm run lint` is at zero since 2026-09-06 and stays there**: a new `any` gets its real type, no new
@@ -791,7 +793,9 @@ file used to carry.
   became a Windows path) — prefix `MSYS_NO_PATHCONV=1`; **its `sed -i` is not a falsification tool** (2026-09-28: a
   pattern with `€` matched nothing and exited 0, and a CRLF file came back LF) — swap text with a node script that
   asserts exactly one match, and grep the line before trusting the run. A Markdown backtick inside a double-quoted
-  `node -e` is run by bash as a command (write the text through a file).
+  `node -e` is run by bash as a command (write the text through a file); a `\\` inside a quoted heredoc reached the
+  file as ONE backslash (2026-11-07: a patch script's `'\\n'` wrote a real newline into a test) — text with
+  backslashes goes through the editor tools, never a heredoc.
 - **A surface with no DOM is verified by RENDERING it** (the PDF through `renderToFile` under Vitest, the emails in
   Chromium at 390 / 600 / 1440), and a render with hand-built data proves the WORDS, not the data path (2026-09-07: run
   `fetchPDFData` itself on the emulators) — doc/guide/email-pdf.md § Verifying a surface with no DOM.
@@ -923,7 +927,8 @@ file used to carry.
 - **A green check never seen red asserts nothing** — the check's own arithmetic included. **When a falsification stays
   GREEN, the test is the bug** — one of five, each met here: another line holds the property (name it in the test, or it
   is deleted as dead code — 2026-09-21: the re-cap of `splitFromSurplus`, `estimateSaleTax`'s floor, the explicit
-  `tabIndex` beside `AsideToggle`'s `itemProps`); a test added beside others is proven by a falsification that turns
+  `tabIndex` beside `AsideToggle`'s `itemProps`; 2026-11-07, the after-today guard on the cashflow block's first series
+  row); a test added beside others is proven by a falsification that turns
   ONLY it red (2026-09-28, `__tests__/exposureEngine.test.ts`); the ASSERTION is the inert one — suspect its anchor
   (2026-09-21, the monthly email: `toContain('1400')` matched the caption, not the `<td align="right">` cell); the
   fixture makes a branch unreachable (`allocateByShare`'s rounding correction cannot fire on two shares); the test PINS

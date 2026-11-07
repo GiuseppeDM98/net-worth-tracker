@@ -25,6 +25,7 @@ const {
   extractMemoryCandidatesMock,
   extractStructuredGoalFromTextMock,
   accountAccessDocGetMock,
+  fetchCashflowBlockInputsMock,
 } = vi.hoisted(() => ({
   verifyIdTokenMock: vi.fn(),
   buildAssistantMonthContextMock: vi.fn(),
@@ -47,6 +48,7 @@ const {
   extractMemoryCandidatesMock: vi.fn(),
   extractStructuredGoalFromTextMock: vi.fn(),
   accountAccessDocGetMock: vi.fn(),
+  fetchCashflowBlockInputsMock: vi.fn(),
 }));
 
 vi.mock('server-only', () => ({}));
@@ -67,6 +69,10 @@ vi.mock('@/lib/firebase/admin', () => ({
       if (name === 'account-access') {
         return { doc: vi.fn(() => ({ get: accountAccessDocGetMock })) };
       }
+      // The history analysis reads its start year from the settings (fetchHistoryStartYear).
+      if (name === 'assetAllocationTargets') {
+        return { doc: vi.fn(() => ({ get: vi.fn(async () => ({ data: () => ({ cashflowHistoryStartYear: 2025 }) })) })) };
+      }
       throw new Error(`Unexpected collection: ${name}`);
     }),
   },
@@ -78,6 +84,7 @@ vi.mock('@/lib/services/assistantMonthContextService', () => ({
   buildAssistantYtdContext: buildAssistantYtdContextMock,
   buildAssistantHistoryContext: buildAssistantHistoryContextMock,
   buildAssistantTodayContext: buildAssistantTodayContextMock,
+  fetchCashflowBlockInputs: fetchCashflowBlockInputsMock,
 }));
 
 vi.mock('@/lib/server/assistant/store', () => ({
@@ -149,6 +156,9 @@ describe('Assistant private API routes', () => {
     verifyIdTokenMock.mockResolvedValue({ uid: 'user-1' });
     // Default: no delegated-access grant, so cross-account calls are denied (403).
     accountAccessDocGetMock.mockResolvedValue({ exists: false, data: () => undefined });
+    fetchCashflowBlockInputsMock.mockResolvedValue({
+      expenses: [], todayIso: '2026-10-20', categories: [], assets: [], settings: null, assetValueOf: () => 0,
+    });
     // `satisfies` is load-bearing: the mock is an untyped vi.fn(), so without it a
     // renamed or dropped bundle field leaves this fixture green while it no longer
     // resembles what the route actually receives.
@@ -736,6 +746,56 @@ describe('Assistant private API routes', () => {
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({
       error: 'Authenticated user does not have access to requested account',
+    });
+  });
+
+  describe('POST /api/ai/assistant/stream — the CASHFLOW 12 MESI block (2026-11)', () => {
+    const PERIOD_BUNDLE = { selector: { year: 2026, month: -1 } };
+
+    function streamRequest(body: Record<string, unknown>) {
+      return streamRoute(
+        createJsonRequest('http://localhost/api/ai/assistant/stream', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer valid-token' },
+          body: { userId: 'user-1', prompt: 'Come va?', ...body },
+        })
+      );
+    }
+
+    beforeEach(() => {
+      buildAssistantYearContextMock.mockResolvedValue(PERIOD_BUNDLE);
+      buildAssistantYtdContextMock.mockResolvedValue(PERIOD_BUNDLE);
+      buildAssistantHistoryContextMock.mockResolvedValue(PERIOD_BUNDLE);
+    });
+
+    it.each([
+      ['year_analysis', { year: 2025 }],
+      ['ytd_analysis', {}],
+      ['history_analysis', {}],
+      ['month_analysis', { month: { year: 2026, month: 3 } }],
+      ['chat', { chatContext: 'month', month: { year: 2026, month: 3 } }],
+      ['chat', { chatContext: 'ytd' }],
+      ['chat', { chatContext: 'history' }],
+      ['chat', { chatContext: 'none' }],
+    ])('%s %o reads the block once, for the owner, and hands it to the stream — never on the SSE (decision 81)', async (mode, extra) => {
+      const response = await streamRequest({ mode, ...extra });
+      expect(response.status).toBe(200);
+      const streamText = await response.text();
+      expect(fetchCashflowBlockInputsMock).toHaveBeenCalledTimes(1);
+      expect(fetchCashflowBlockInputsMock.mock.calls[0][0]).toBe('user-1');
+      expect(fetchCashflowBlockInputsMock.mock.calls[0][1]).toBeInstanceOf(Date);
+      const args = streamAssistantResponseMock.mock.calls[0][0] as { cashflowBlock: string | null };
+      expect(args.cashflowBlock).toContain('--- CASHFLOW 12 MESI');
+      expect(streamText).not.toContain('CASHFLOW 12 MESI');
+    });
+
+    it.each(['ytd_analysis', 'chat'])('%s: a failed read answers the 500, never a silent empty block', async (mode) => {
+      fetchCashflowBlockInputsMock.mockRejectedValue(new Error('read failed'));
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const response = await streamRequest({ mode, chatContext: 'none' });
+      expect(response.status).toBe(500);
+      await expect(response.json()).resolves.toEqual({ error: "Impossibile avviare lo stream dell'assistente" });
+      expect(streamAssistantResponseMock).not.toHaveBeenCalled();
     });
   });
 });
